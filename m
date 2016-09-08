@@ -1,121 +1,92 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 8 Sep 2016 13:39:32 +0200
-Subject: [PATCH 06/10] PM / Domains: Verify the PM domain is present when
- adding a provider
-In-Reply-To: <1471340976-5379-7-git-send-email-jonathanh@nvidia.com>
-References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
- <1471340976-5379-7-git-send-email-jonathanh@nvidia.com>
-Message-ID: <CAPDyKFoLh6f3at-grfWmeRuvLwW+o=4sLG0kExuF+eZxDF_hHA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2016 13:39:58 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <871t0uiqn9.fsf@linux.intel.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <3757738.rjzYG3yq8e@wuerfel> <871t0uiqn9.fsf@linux.intel.com>
+Message-ID: <12394164.0mceYlJJBD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 August 2016 at 11:49, Jon Hunter <jonathanh@nvidia.com> wrote:
-> When a PM domain provider is added, there is currently no way to tell if
-> any PM domains associated with the provider are present. Naturally, the
-> PM domain provider should not be registered if the PM domains have not
-> been added. Nonetheless, verify that the PM domain(s) associated with a
-> provider are present when registering the PM domain provider.
->
-> This change adds a dependency on the function pm_genpd_present() when
-> CONFIG_PM_GENERIC_DOMAINS_OF is enabled and so ensure this function is
-> available when CONFIG_PM_GENERIC_DOMAINS_OF selected.
->
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  drivers/base/power/domain.c | 45 ++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 42 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index d09e45145a3d..50223ae0c9a7 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -586,7 +586,7 @@ static int __init genpd_poweroff_unused(void)
->  }
->  late_initcall(genpd_poweroff_unused);
->
-> -#ifdef CONFIG_PM_SLEEP
-> +#if defined(CONFIG_PM_SLEEP) || defined(CONFIG_PM_GENERIC_DOMAINS_OF)
->
->  /**
->   * pm_genpd_present - Check if the given PM domain has been initialized.
-> @@ -606,6 +606,10 @@ static bool pm_genpd_present(const struct generic_pm_domain *genpd)
->         return false;
->  }
->
-> +#endif
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +
->  static bool genpd_dev_active_wakeup(struct generic_pm_domain *genpd,
->                                     struct device *dev)
->  {
-> @@ -1453,7 +1457,23 @@ static int genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
->  int of_genpd_add_provider_simple(struct device_node *np,
->                                  struct generic_pm_domain *genpd)
->  {
-> -       return genpd_add_provider(np, genpd_xlate_simple, genpd);
-> +       int ret;
-> +
-> +       if (!np || !genpd)
-> +               return -EINVAL;
-> +
-> +       mutex_lock(&gpd_list_lock);
-> +
-> +       if (!pm_genpd_present(genpd)) {
-> +               mutex_unlock(&gpd_list_lock);
-> +               return -EINVAL;
-> +       }
-> +
-> +       ret = genpd_add_provider(np, genpd_xlate_simple, genpd);
+On Thursday, September 8, 2016 2:20:58 PM CEST Felipe Balbi wrote:
+> >> It's quite a hack, though. I still think that inheriting DMA (or
+> >> manually initializing a child with parent's DMA bits and pieces) is the
+> >> best way to go. So we're back to of_dma_configure() and
+> >> acpi_dma_configure(), right?
+> >
+> > That won't solve the problems with the DT properties or the
+> > dma configuration for PCI devices though.
+> 
+> acpi_dma_configure() is supposed to pass along DMA bits from PCI to
+> child devices, no?
 
-You could simplify this, by assigning ret and initial value of
--EINVAL, then do like this:
+I don't know, haven't looked at that code.
 
-if (pm_genpd_present(genpd))
-    ret = genpd_add_provider(np, genpd_xlate_simple, genpd);
+> >> But this needs to be done before dwc3_probe() executes. For dwc3-pci
+> >> that's easy, but for DT devices, seems like it should be in of
+> >> core. Below is, clearly, not enough but should show the idea:
+> >> 
+> >> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> >> index fd5cfad7c403..a54610198946 100644
+> >> --- a/drivers/of/device.c
+> >> +++ b/drivers/of/device.c
+> >> @@ -94,8 +94,12 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+> >>          * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+> >>          * setup the correct supported mask.
+> >>          */
+> >> -       if (!dev->coherent_dma_mask)
+> >> -               dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> >> +       if (!dev->coherent_dma_mask) {
+> >> +               if (!dev->parent->coherent_dma_mask)
+> >> +                       dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> >> +               else
+> >> +                       dev->coherent_dma_mask = dev->parent->coherent_dma_mask;
+> >> +       }
+> >>  
+> >
+> > As the comment above that code says, the default 32-bit mask is intentional,
+> > and you need the driver to ask for the mask it wants using
+> > dma_set_mask_and_coherent(), while the platform code should be able to use
+> > dev->of_node to figure out whether that mask is supported.
+> >
+> > Just setting the initial mask to something else based on what the parent
+> > supports will not do the right thing elsewhere.
+> 
+> oh man, it gets more and more complex. Seems like either path we take
+> will cause problems somewhere 
+> 
+> If we make dwc3.ko a library which glue calls directly then all these
+> problems are solved but we break all current DTs and fall into the trap
+> of having another MUSB.
 
-> +
-> +       mutex_unlock(&gpd_list_lock);
-> +
-> +       return ret;
->  }
->  EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple);
->
-> @@ -1465,7 +1485,26 @@ EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple);
->  int of_genpd_add_provider_onecell(struct device_node *np,
->                                   struct genpd_onecell_data *data)
->  {
-> -       return genpd_add_provider(np, genpd_xlate_onecell, data);
-> +       unsigned int i;
-> +       int ret;
-> +
-> +       if (!np || !data)
-> +               return -EINVAL;
-> +
-> +       mutex_lock(&gpd_list_lock);
-> +
-> +       for (i = 0; i < data->num_domains; i++) {
-> +               if (!pm_genpd_present(data->domains[i])) {
-> +                       mutex_unlock(&gpd_list_lock);
-> +                       return -EINVAL;
-> +               }
-> +       }
-> +
-> +       ret = genpd_add_provider(np, genpd_xlate_onecell, data);
-> +
-> +       mutex_unlock(&gpd_list_lock);
-> +
-> +       return ret;
->  }
->  EXPORT_SYMBOL_GPL(of_genpd_add_provider_onecell);
->
-> --
-> 2.1.4
->
+I don't see how we'd break the current DTs, I'm fairly sure we could turn dwc3
+into a library without changing the DT representation. However the parts
+that I think would change are
 
-Besides the minor nitpick above, you may add my ack.
+- The sysfs representation for dwc3-pci, as we would no longer have
+  a parent-child relationship there.
+- The power management handling might need a rework, since you currently
+  rely on the hierarchy between dwc3-pci, dwc3 and xhci for turning
+  power on and off
+- turning dwc3 into a library probably implies also turning xhci into
+  a library, in part for consistency.
+- if we don't do the whole usb_bus->sysdev thing, we need to not just
+  do this for dwc3 but also chipidea and maybe a couple of others.
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+There should not be any show-stoppers here, but it's a lot of work.
 
-Kind regards
-Uffe
+> If we try to pass DMA bits from parent to child, then we have the fact
+> that DT ends up, in practice, always having a parent device.
+
+I don't understand what you mean here, but I agree that the various ways
+we discussed for copying the DMA flags from one 'struct device' to another
+all turned out to be flawed in at least one way.
+
+Do you see any problems with the patch I posted other than the ugliness
+of the dwc3 and xhci drivers finding out which pointer to use for
+usb_bus->sysdev? If we can solve this, we shouldn't need any new
+of_dma_configure/acpi_dma_configure calls and we won't have to
+turn the drivers into a library, so maybe let's try to come up with
+better ideas for that sub-problem.
+
+	Arnd
