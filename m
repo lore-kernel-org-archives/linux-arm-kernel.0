@@ -1,228 +1,173 @@
 From: kevin.brodsky@arm.com (Kevin Brodsky)
-Date: Thu,  8 Sep 2016 14:53:17 +0100
-Subject: [PATCH 1/8] arm64: Refactor vDSO setup
+Date: Thu,  8 Sep 2016 14:53:19 +0100
+Subject: [PATCH 3/8] arm64: compat: Expose offset to registers in sigframes
 In-Reply-To: <20160908135324.7112-1-kevin.brodsky@arm.com>
 References: <20160908135324.7112-1-kevin.brodsky@arm.com>
-Message-ID: <20160908135324.7112-2-kevin.brodsky@arm.com>
+Message-ID: <20160908135324.7112-4-kevin.brodsky@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the logic for setting up mappings and pages for the vDSO into
-static functions with a clear interface. This will allow to reuse the
-setup code for the future compat vDSO.
+This will be needed to provide debug information (CFI/unwind tables)
+in compat sigreturn trampolines, part of the future compat vDSO.
 
 Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 ---
- arch/arm64/kernel/vdso.c | 174 ++++++++++++++++++++++++++---------------------
- 1 file changed, 97 insertions(+), 77 deletions(-)
+ arch/arm64/include/asm/signal32.h | 46 +++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/asm-offsets.c   | 13 +++++++++++
+ arch/arm64/kernel/signal32.c      | 46 ---------------------------------------
+ 3 files changed, 59 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 97bc68f4c689..b9a1268c21c6 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -36,9 +36,11 @@
- #include <asm/vdso.h>
- #include <asm/vdso_datapage.h>
- 
--extern char vdso_start, vdso_end;
--static unsigned long vdso_pages;
--static struct page **vdso_pagelist;
-+struct vdso_mappings {
-+	unsigned long num_pages;
-+	struct page **pages;
-+	struct vm_special_mapping data_mapping, code_mapping;
-+};
- 
- /*
-  * The vDSO data page.
-@@ -49,6 +51,92 @@ static union {
- } vdso_data_store __page_aligned_data;
- struct vdso_data *vdso_data = &vdso_data_store.data;
- 
-+static int __init setup_vdso_mappings(const char *name,
-+				      const char *code_start,
-+				      const char *code_end,
-+				      struct vdso_mappings *mappings)
-+{
-+	unsigned long i, num_pages;
-+	struct page **pages;
-+
-+	if (memcmp(code_start, "\177ELF", 4)) {
-+		pr_err("%s is not a valid ELF object!\n", name);
-+		return -EINVAL;
-+	}
-+
-+	num_pages = (code_end - code_start) >> PAGE_SHIFT;
-+	pr_info("%s: %ld pages (%ld code @ %p, %ld data @ %p)\n",
-+		name, num_pages + 1, num_pages, code_start, 1L, vdso_data);
-+
-+	/* Allocate the vDSO code pages, plus a page for the data. */
-+	pages = kcalloc(num_pages + 1, sizeof(struct page *), GFP_KERNEL);
-+	if (pages == NULL)
-+		return -ENOMEM;
-+
-+	/* Grab the vDSO data page. */
-+	pages[0] = virt_to_page(vdso_data);
-+
-+	/* Grab the vDSO code pages. */
-+	for (i = 0; i < num_pages; i++)
-+		pages[i + 1] = virt_to_page(code_start + i * PAGE_SIZE);
-+
-+	/* Populate the special mapping structures */
-+	mappings->data_mapping = (struct vm_special_mapping) {
-+		.name	= "[vvar]",
-+		.pages	= &pages[0],
-+	};
-+
-+	mappings->code_mapping = (struct vm_special_mapping) {
-+		.name	= "[vdso]",
-+		.pages	= &pages[1],
-+	};
-+
-+	mappings->num_pages = num_pages;
-+	mappings->pages = pages;
-+	return 0;
-+}
-+
-+static int setup_vdso_pages(const struct vdso_mappings *mappings)
-+{
-+	struct mm_struct *mm = current->mm;
-+	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
-+	void *ret;
-+
-+	vdso_text_len = mappings->num_pages << PAGE_SHIFT;
-+	/* Be sure to map the data page */
-+	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
-+
-+	down_write(&mm->mmap_sem);
-+	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
-+	if (IS_ERR_VALUE(vdso_base)) {
-+		ret = ERR_PTR(vdso_base);
-+		goto up_fail;
-+	}
-+	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
-+				       VM_READ|VM_MAYREAD,
-+				       &mappings->data_mapping);
-+	if (IS_ERR(ret))
-+		goto up_fail;
-+
-+	vdso_base += PAGE_SIZE;
-+	mm->context.vdso = (void *)vdso_base;
-+	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
-+				       VM_READ|VM_EXEC|
-+				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-+				       &mappings->code_mapping);
-+	if (IS_ERR(ret))
-+		goto up_fail;
-+
-+
-+	up_write(&mm->mmap_sem);
-+	return 0;
-+
-+up_fail:
-+	mm->context.vdso = NULL;
-+	up_write(&mm->mmap_sem);
-+	return PTR_ERR(ret);
-+}
-+
+diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
+index eeaa97559bab..ee0def038182 100644
+--- a/arch/arm64/include/asm/signal32.h
++++ b/arch/arm64/include/asm/signal32.h
+@@ -20,6 +20,52 @@
  #ifdef CONFIG_COMPAT
- /*
-  * Create and map the vectors page for AArch32 tasks.
-@@ -109,89 +197,21 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
- }
- #endif /* CONFIG_COMPAT */
+ #include <linux/compat.h>
  
--static struct vm_special_mapping vdso_spec[2];
-+extern char vdso_start, vdso_end;
++struct compat_sigcontext {
++	/* We always set these two fields to 0 */
++	compat_ulong_t			trap_no;
++	compat_ulong_t			error_code;
 +
-+static struct vdso_mappings vdso_mappings;
++	compat_ulong_t			oldmask;
++	compat_ulong_t			arm_r0;
++	compat_ulong_t			arm_r1;
++	compat_ulong_t			arm_r2;
++	compat_ulong_t			arm_r3;
++	compat_ulong_t			arm_r4;
++	compat_ulong_t			arm_r5;
++	compat_ulong_t			arm_r6;
++	compat_ulong_t			arm_r7;
++	compat_ulong_t			arm_r8;
++	compat_ulong_t			arm_r9;
++	compat_ulong_t			arm_r10;
++	compat_ulong_t			arm_fp;
++	compat_ulong_t			arm_ip;
++	compat_ulong_t			arm_sp;
++	compat_ulong_t			arm_lr;
++	compat_ulong_t			arm_pc;
++	compat_ulong_t			arm_cpsr;
++	compat_ulong_t			fault_address;
++};
++
++struct compat_ucontext {
++	compat_ulong_t			uc_flags;
++	compat_uptr_t			uc_link;
++	compat_stack_t			uc_stack;
++	struct compat_sigcontext	uc_mcontext;
++	compat_sigset_t			uc_sigmask;
++	int		__unused[32 - (sizeof (compat_sigset_t) / sizeof (int))];
++	compat_ulong_t	uc_regspace[128] __attribute__((__aligned__(8)));
++};
++
++struct compat_sigframe {
++	struct compat_ucontext	uc;
++	compat_ulong_t		retcode[2];
++};
++
++struct compat_rt_sigframe {
++	struct compat_siginfo info;
++	struct compat_sigframe sig;
++};
++
+ #define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
  
- static int __init vdso_init(void)
- {
--	int i;
--
--	if (memcmp(&vdso_start, "\177ELF", 4)) {
--		pr_err("vDSO is not a valid ELF object!\n");
--		return -EINVAL;
--	}
--
--	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
--	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
--		vdso_pages + 1, vdso_pages, &vdso_start, 1L, vdso_data);
--
--	/* Allocate the vDSO pagelist, plus a page for the data. */
--	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
--				GFP_KERNEL);
--	if (vdso_pagelist == NULL)
--		return -ENOMEM;
--
--	/* Grab the vDSO data page. */
--	vdso_pagelist[0] = virt_to_page(vdso_data);
--
--	/* Grab the vDSO code pages. */
--	for (i = 0; i < vdso_pages; i++)
--		vdso_pagelist[i + 1] = virt_to_page(&vdso_start + i * PAGE_SIZE);
--
--	/* Populate the special mapping structures */
--	vdso_spec[0] = (struct vm_special_mapping) {
--		.name	= "[vvar]",
--		.pages	= vdso_pagelist,
--	};
--
--	vdso_spec[1] = (struct vm_special_mapping) {
--		.name	= "[vdso]",
--		.pages	= &vdso_pagelist[1],
--	};
--
--	return 0;
-+	return setup_vdso_mappings("vdso", &vdso_start, &vdso_end,
-+				   &vdso_mappings);
- }
- arch_initcall(vdso_init);
+ extern const compat_ulong_t aarch32_sigret_code[6];
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 3ae6b310ac9b..82e60cbcad03 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -24,6 +24,7 @@
+ #include <linux/kvm_host.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
++#include <asm/signal32.h>
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <asm/vdso_datapage.h>
+@@ -61,6 +62,18 @@ int main(void)
+   DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
+   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
+   BLANK();
++#ifdef CONFIG_COMPAT
++  DEFINE(COMPAT_SIGFRAME_REGS_OFFSET,
++				offsetof(struct compat_sigframe, uc) +
++				offsetof(struct compat_ucontext, uc_mcontext) +
++				offsetof(struct compat_sigcontext, arm_r0));
++  DEFINE(COMPAT_RT_SIGFRAME_REGS_OFFSET,
++				offsetof(struct compat_rt_sigframe, sig) +
++				offsetof(struct compat_sigframe, uc) +
++				offsetof(struct compat_ucontext, uc_mcontext) +
++				offsetof(struct compat_sigcontext, arm_r0));
++  BLANK();
++#endif
+   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id.counter));
+   BLANK();
+   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index b7063de792f7..9de7d128e0e0 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -29,42 +29,6 @@
+ #include <asm/uaccess.h>
+ #include <asm/unistd.h>
  
- int arch_setup_additional_pages(struct linux_binprm *bprm,
- 				int uses_interp)
- {
--	struct mm_struct *mm = current->mm;
--	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
--	void *ret;
+-struct compat_sigcontext {
+-	/* We always set these two fields to 0 */
+-	compat_ulong_t			trap_no;
+-	compat_ulong_t			error_code;
 -
--	vdso_text_len = vdso_pages << PAGE_SHIFT;
--	/* Be sure to map the data page */
--	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
+-	compat_ulong_t			oldmask;
+-	compat_ulong_t			arm_r0;
+-	compat_ulong_t			arm_r1;
+-	compat_ulong_t			arm_r2;
+-	compat_ulong_t			arm_r3;
+-	compat_ulong_t			arm_r4;
+-	compat_ulong_t			arm_r5;
+-	compat_ulong_t			arm_r6;
+-	compat_ulong_t			arm_r7;
+-	compat_ulong_t			arm_r8;
+-	compat_ulong_t			arm_r9;
+-	compat_ulong_t			arm_r10;
+-	compat_ulong_t			arm_fp;
+-	compat_ulong_t			arm_ip;
+-	compat_ulong_t			arm_sp;
+-	compat_ulong_t			arm_lr;
+-	compat_ulong_t			arm_pc;
+-	compat_ulong_t			arm_cpsr;
+-	compat_ulong_t			fault_address;
+-};
 -
--	down_write(&mm->mmap_sem);
--	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
--	if (IS_ERR_VALUE(vdso_base)) {
--		ret = ERR_PTR(vdso_base);
--		goto up_fail;
--	}
--	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
--				       VM_READ|VM_MAYREAD,
--				       &vdso_spec[0]);
--	if (IS_ERR(ret))
--		goto up_fail;
+-struct compat_ucontext {
+-	compat_ulong_t			uc_flags;
+-	compat_uptr_t			uc_link;
+-	compat_stack_t			uc_stack;
+-	struct compat_sigcontext	uc_mcontext;
+-	compat_sigset_t			uc_sigmask;
+-	int		__unused[32 - (sizeof (compat_sigset_t) / sizeof (int))];
+-	compat_ulong_t	uc_regspace[128] __attribute__((__aligned__(8)));
+-};
 -
--	vdso_base += PAGE_SIZE;
--	mm->context.vdso = (void *)vdso_base;
--	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
--				       VM_READ|VM_EXEC|
--				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
--				       &vdso_spec[1]);
--	if (IS_ERR(ret))
--		goto up_fail;
--
--
--	up_write(&mm->mmap_sem);
--	return 0;
--
--up_fail:
--	mm->context.vdso = NULL;
--	up_write(&mm->mmap_sem);
--	return PTR_ERR(ret);
-+	return setup_vdso_pages(&vdso_mappings);
- }
+ struct compat_vfp_sigframe {
+ 	compat_ulong_t	magic;
+ 	compat_ulong_t	size;
+@@ -91,16 +55,6 @@ struct compat_aux_sigframe {
+ 	unsigned long			end_magic;
+ } __attribute__((__aligned__(8)));
  
- /*
+-struct compat_sigframe {
+-	struct compat_ucontext	uc;
+-	compat_ulong_t		retcode[2];
+-};
+-
+-struct compat_rt_sigframe {
+-	struct compat_siginfo info;
+-	struct compat_sigframe sig;
+-};
+-
+ #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
+ 
+ static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
 -- 
 2.8.2
