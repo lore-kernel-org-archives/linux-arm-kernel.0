@@ -1,57 +1,208 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  8 Sep 2016 14:17:47 +0200
-Subject: [PATCH v3 0/4] drm: Add Support for Passive RGB to VGA bridges
-Message-ID: <20160908121751.16911-1-maxime.ripard@free-electrons.com>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Thu, 8 Sep 2016 20:21:39 +0800
+Subject: [PATCH v5 3/5] media: Add Mediatek MDP Driver
+In-Reply-To: <cb59f743-66b9-15cd-0281-54510d7f93ca@xs4all.nl>
+References: <1472559944-55114-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1472559944-55114-4-git-send-email-minghsiu.tsai@mediatek.com>
+ <cb59f743-66b9-15cd-0281-54510d7f93ca@xs4all.nl>
+Message-ID: <1473337299.17443.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2016-09-05 at 12:17 +0200, Hans Verkuil wrote:
+> On 08/30/2016 02:25 PM, Minghsiu Tsai wrote:
+> > Add MDP driver for MT8173
+> > 
+> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> > ---
+> >  drivers/media/platform/Kconfig                |   17 +
+> >  drivers/media/platform/Makefile               |    2 +
+> >  drivers/media/platform/mtk-mdp/Makefile       |    9 +
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_comp.c |  159 ++++
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_comp.h |   72 ++
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_core.c |  294 ++++++
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_core.h |  260 +++++
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_ipi.h  |  126 +++
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c  | 1270 +++++++++++++++++++++++++
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.h  |   22 +
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_regs.c |  152 +++
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_regs.h |   31 +
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c  |  145 +++
+> >  drivers/media/platform/mtk-mdp/mtk_mdp_vpu.h  |   41 +
+> >  14 files changed, 2600 insertions(+)
+> >  create mode 100644 drivers/media/platform/mtk-mdp/Makefile
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_comp.c
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_comp.h
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_core.h
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_ipi.h
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_m2m.h
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_regs.c
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_regs.h
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c
+> >  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_vpu.h
+> > 
+> 
+> <snip>
+> 
+> > +static inline bool mtk_mdp_is_target_compose(u32 target)
+> > +{
+> > +	if (target == V4L2_SEL_TGT_COMPOSE_DEFAULT
+> > +	    || target == V4L2_SEL_TGT_COMPOSE_BOUNDS
+> > +	    || target == V4L2_SEL_TGT_COMPOSE)
+> > +		return true;
+> > +	return false;
+> > +}
+> > +
+> > +static inline bool mtk_mdp_is_target_crop(u32 target)
+> > +{
+> > +	if (target == V4L2_SEL_TGT_CROP_DEFAULT
+> > +	    || target == V4L2_SEL_TGT_CROP_BOUNDS
+> > +	    || target == V4L2_SEL_TGT_CROP)
+> > +		return true;
+> > +	return false;
+> > +}
+> > +
+> > +static int mtk_mdp_m2m_g_selection(struct file *file, void *fh,
+> > +				       struct v4l2_selection *s)
+> > +{
+> > +	struct mtk_mdp_frame *frame;
+> > +	struct mtk_mdp_ctx *ctx = fh_to_ctx(fh);
+> > +	bool valid = false;
+> > +
+> > +	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+> > +		if (mtk_mdp_is_target_compose(s->target))
+> > +			valid = true;
+> > +	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+> > +		if (mtk_mdp_is_target_crop(s->target))
+> > +			valid = true;
+> > +	}
+> > +	if (!valid) {
+> > +		mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
+> > +			    s->target);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	frame = mtk_mdp_ctx_get_frame(ctx, s->type);
+> > +
+> > +	switch (s->target) {
+> > +	case V4L2_SEL_TGT_COMPOSE_DEFAULT:
+> > +	case V4L2_SEL_TGT_COMPOSE_BOUNDS:
+> > +	case V4L2_SEL_TGT_CROP_BOUNDS:
+> > +	case V4L2_SEL_TGT_CROP_DEFAULT:
+> > +		s->r.left = 0;
+> > +		s->r.top = 0;
+> > +		s->r.width = frame->width;
+> > +		s->r.height = frame->height;
+> > +		return 0;
+> > +
+> > +	case V4L2_SEL_TGT_COMPOSE:
+> > +	case V4L2_SEL_TGT_CROP:
+> > +		s->r.left = frame->crop.left;
+> > +		s->r.top = frame->crop.top;
+> > +		s->r.width = frame->crop.width;
+> > +		s->r.height = frame->crop.height;
+> > +		return 0;
+> > +	}
+> > +
+> > +	return -EINVAL;
+> > +}
+> > +
+> > +static int mtk_mdp_check_scaler_ratio(struct mtk_mdp_variant *var, int src_w,
+> > +				      int src_h, int dst_w, int dst_h, int rot)
+> > +{
+> > +	int tmp_w, tmp_h;
+> > +
+> > +	if (rot == 90 || rot == 270) {
+> > +		tmp_w = dst_h;
+> > +		tmp_h = dst_w;
+> > +	} else {
+> > +		tmp_w = dst_w;
+> > +		tmp_h = dst_h;
+> > +	}
+> > +
+> > +	if ((src_w / tmp_w) > var->h_scale_down_max ||
+> > +	    (src_h / tmp_h) > var->v_scale_down_max ||
+> > +	    (tmp_w / src_w) > var->h_scale_up_max ||
+> > +	    (tmp_h / src_h) > var->v_scale_up_max)
+> > +		return -EINVAL;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mtk_mdp_m2m_s_selection(struct file *file, void *fh,
+> > +				   struct v4l2_selection *s)
+> > +{
+> > +	struct mtk_mdp_frame *frame;
+> > +	struct mtk_mdp_ctx *ctx = fh_to_ctx(fh);
+> > +	struct v4l2_rect new_r;
+> > +	struct mtk_mdp_variant *variant = ctx->mdp_dev->variant;
+> > +	int ret;
+> > +	bool valid = false;
+> > +
+> > +	if (s->type == V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+> > +		if (mtk_mdp_is_target_compose(s->target))
+> > +			valid = true;
+> > +	} else if (s->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+> > +		if (mtk_mdp_is_target_crop(s->target))
+> > +			valid = true;
+> > +	}
+> 
+> These tests are wrong: you can't set the _DEFAULT and _BOUNDS targets.
+> Those are read-only. It's easiest to just explicitly check for _CROP or
+> _COMPOSE here.
+> 
+> I've added a check to v4l2-compliance to test for this.
+> 
 
-This serie is about adding support for the RGB to VGA bridge found in
-the A13-Olinuxino and the CHIP VGA adapter.
+I will fix it in v6 and test with the latest v4l2-compliance. Thanks.
 
-Both these boards rely on an entirely passive bridge made out of
-resitor ladders that do not require any initialisation. The only thing
-needed is to get the timings from the screen if available (and if not,
-fall back on XGA standards), set up the display pipeline to output on
-the RGB bus with the proper timings, and you're done.
 
-This serie also fixes a bunch of bugs uncovered when trying to
-increase the resolution, and hence the pixel clock, of our
-pipeline. It also fixes a few bugs in the DRM driver itself that went
-unnoticed before.
-
-Let me know what you think,
-Maxime
-
-Changes from v2:
-  - Changed the compatible as suggested
-  - Rebased on top 4.8
-
-Changes from v1:
-  - Switch to using a vga-connector
-  - Use drm_encoder bridge pointer instead of doing our own
-  - Report the connector status as unknown instead of connected by
-    default, and as connected only if we can retrieve the EDID.
-  - Switch to of_i2c_get_adapter by node, and put the reference when done
-  - Rebased on linux-next	      
-
-Maxime Ripard (4):
-  drm/bridge: Add RGB to VGA bridge support
-  ARM: sun5i: a13-olinuxino: Enable VGA bridge
-  ARM: multi_v7: enable VGA bridge
-  ARM: sunxi: Enable VGA bridge
-
- .../bindings/display/bridge/rgb-to-vga-bridge.txt  |  52 +++++
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |  60 ++++++
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/configs/sunxi_defconfig                   |   1 +
- drivers/gpu/drm/bridge/Kconfig                     |   6 +
- drivers/gpu/drm/bridge/Makefile                    |   1 +
- drivers/gpu/drm/bridge/rgb-to-vga.c                | 232 +++++++++++++++++++++
- 7 files changed, 353 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
- create mode 100644 drivers/gpu/drm/bridge/rgb-to-vga.c
-
--- 
-2.9.3
+> > +	if (!valid) {
+> > +		mtk_mdp_dbg(1, "[%d] invalid type:%d,%u", ctx->id, s->type,
+> > +			    s->target);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	new_r = s->r;
+> > +	ret = mtk_mdp_try_crop(ctx, s->type, &new_r);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	if (mtk_mdp_is_target_crop(s->target))
+> > +		frame = &ctx->s_frame;
+> > +	else
+> > +		frame = &ctx->d_frame;
+> > +
+> > +	/* Check to see if scaling ratio is within supported range */
+> > +	if (mtk_mdp_ctx_state_is_set(ctx, MTK_MDP_DST_FMT | MTK_MDP_SRC_FMT)) {
+> > +		if (V4L2_TYPE_IS_OUTPUT(s->type)) {
+> > +			ret = mtk_mdp_check_scaler_ratio(variant, new_r.width,
+> > +				new_r.height, ctx->d_frame.crop.width,
+> > +				ctx->d_frame.crop.height,
+> > +				ctx->ctrls.rotate->val);
+> > +		} else {
+> > +			ret = mtk_mdp_check_scaler_ratio(variant,
+> > +				ctx->s_frame.crop.width,
+> > +				ctx->s_frame.crop.height, new_r.width,
+> > +				new_r.height, ctx->ctrls.rotate->val);
+> > +		}
+> > +
+> > +		if (ret) {
+> > +			dev_info(&ctx->mdp_dev->pdev->dev,
+> > +				"Out of scaler range");
+> > +			return -EINVAL;
+> > +		}
+> > +	}
+> > +
+> > +	s->r = new_r;
+> > +	frame->crop = new_r;
+> > +
+> > +	return 0;
+> > +}
+> 
+> 
+> Regards,
+> 
+> 	Hans
