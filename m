@@ -1,38 +1,45 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 8 Sep 2016 16:32:25 +0800
+Date: Thu, 8 Sep 2016 16:35:04 +0800
 Subject: [PATCH v2 6/7] clk: sunxi-ng: Add A23 CCU
-In-Reply-To: <20160908082939.GJ8913@lukather>
+In-Reply-To: <CAGb2v64JhY7KoaxGkpeGinLZ2GoYWyDj+UjE_JwLW_4sVYd_9w@mail.gmail.com>
 References: <20160906121837.7517-1-maxime.ripard@free-electrons.com>
  <20160906121837.7517-7-maxime.ripard@free-electrons.com>
  <CAGb2v64jDTWB4faaBdCBCcFrt1WNf=PYwc16kpgsUhaMRudHnQ@mail.gmail.com>
  <20160908082939.GJ8913@lukather>
-Message-ID: <CAGb2v64JhY7KoaxGkpeGinLZ2GoYWyDj+UjE_JwLW_4sVYd_9w@mail.gmail.com>
+ <CAGb2v64JhY7KoaxGkpeGinLZ2GoYWyDj+UjE_JwLW_4sVYd_9w@mail.gmail.com>
+Message-ID: <CAGb2v646Qv8biTNP1ryfoLMpt=40i0m9D4EVCFhZ767WkbfwhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 4:29 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Sep 07, 2016 at 03:24:11PM +0800, Chen-Yu Tsai wrote:
->> > +               [CLK_BUS_MSGBOX]        = &bus_msgbox_clk.common.hw,
+On Thu, Sep 8, 2016 at 4:32 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Thu, Sep 8, 2016 at 4:29 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Wed, Sep 07, 2016 at 03:24:11PM +0800, Chen-Yu Tsai wrote:
+>>> > +               [CLK_BUS_MSGBOX]        = &bus_msgbox_clk.common.hw,
+>>>
+>>> A23 manual and Allwinner sources say there is a bus gate for SPINLOCK.
+>>> Tested it myself, and it indeed exists.
 >>
->> A23 manual and Allwinner sources say there is a bus gate for SPINLOCK.
->> Tested it myself, and it indeed exists.
->
-> Yes, sorry. It was supposed to be spinlock instead of msgbox.
->
->> > +       [RST_BUS_SPINLOCK]      =  { 0x2c4, BIT(22) },
->>
->> Allwinner sources say there is a reset control for MSGBOX.
->> Tested it myself, and it indeed exists.
->
-> However, the msgbox is mentionned nowhere in the datasheet.
->
-> I'd prefer to be able to test that it actually works before adding it
-> to the clock driver.
+>> Yes, sorry. It was supposed to be spinlock instead of msgbox.
 
-I did in fact test it. With reset asserted, writes get ignored,
-and reads produce all 0s. With the reset deasserted and clock
-enabled, reads give the default value and writes stick. Afterwards
-when I toggle the reset, the values revert to the default.
+There is also a gate for msgbox, in case I'm not clear.
 
 ChenYu
+
+>>
+>>> > +       [RST_BUS_SPINLOCK]      =  { 0x2c4, BIT(22) },
+>>>
+>>> Allwinner sources say there is a reset control for MSGBOX.
+>>> Tested it myself, and it indeed exists.
+>>
+>> However, the msgbox is mentionned nowhere in the datasheet.
+>>
+>> I'd prefer to be able to test that it actually works before adding it
+>> to the clock driver.
+>
+> I did in fact test it. With reset asserted, writes get ignored,
+> and reads produce all 0s. With the reset deasserted and clock
+> enabled, reads give the default value and writes stick. Afterwards
+> when I toggle the reset, the values revert to the default.
+>
+> ChenYu
