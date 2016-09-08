@@ -1,52 +1,22 @@
-From: jorik@kippendief.biz (Jorik Jonker)
-Date: Thu, 8 Sep 2016 10:02:13 +0200
-Subject: [PATCH v4 4/8] dts: sun8i-h3: move uart1 pinmux/peripheral
- assocation to DSTI
-In-Reply-To: <20160908062317.GD8913@lukather>
-References: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
- <1473235141-12768-5-git-send-email-jorik@kippendief.biz>
- <20160908062317.GD8913@lukather>
-Message-ID: <20160908080213.GA32547@carbon.kippendief.biz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2016 09:58:07 +0200
+Subject: [PATCH 1/2] ARM: lpc32xx: remove unused header file mach/irqs.h
+In-Reply-To: <1473303609-20076-1-git-send-email-vz@mleia.com>
+References: <1473303609-20076-1-git-send-email-vz@mleia.com>
+Message-ID: <4384334.zRRuiCemSt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime, Chen-Yu: thanks for taking the effort to go through my patches 
-again!
+On Thursday, September 8, 2016 6:00:08 AM CEST Vladimir Zapolskiy wrote:
+> The removed LPC32xx mach/irqs.h file is not included in any source
+> code, function declaration lpc32xx_init_irq() is also unused, remove
+> them as leftovers after switching to a new interrupt controller
+> driver.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 
-On Thu, Sep 08, 2016 at 08:23:17AM +0200, Maxime Ripard wrote:
->On Wed, Sep 07, 2016 at 09:58:57AM +0200, jorik at kippendief.biz wrote:
->> From: Jorik Jonker <jorik@kippendief.biz>
->>
->> Users using this UART without RTS/CTS should override the association in
->> their board specific DTS. All (1) board using this UART uses RTS/CTS, so
->> this breaks nothing.
->
->Using RTS / CTS is very rare among the boards. Forcing it down the
->throat of every user doesn't seem like the right thing to do.
+Good catch!
 
-So, I'm going for a v5, with these changes:
-- rename uart0_pins to uart0_pa_pins (as there could be a pf)
-- associate uart0_pa_pins with uart0 on all H3 board DTS files
-- put rts/cts in seperate pinmux sets for uart1 (2,3: see below)
-- associate rx/tx for uart1-3 in H3 DTSI (this is the only option)
-- associate UART1 rts/cts as pinctrl-1 in sun8i-h3-bananapi-m2-plus
-  (to prevent breakage for existing users)
+Both patches
 
-I am a bit in doubt if I should include pinmux definitions for the 
-following things, as Chen-Yu said to only include stuff that is actually 
-used in a board:
-
-- uart0_pf_pins, since there is no board using it
-- uart{2,3}_rts_cts, as I agree RTS/CTS is a bit exotic
-
-Maxime/Chen-Yu: what do you think of this?
-
-Best,
-Jorik
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/6efb4bf1/attachment-0001.sig>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
