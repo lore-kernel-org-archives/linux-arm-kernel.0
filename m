@@ -1,74 +1,270 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  8 Sep 2016 11:48:35 +0200
-Subject: [PATCH v3 0/8] clk: sunxi-ng: Introduce support for A23 and A33 CCUs
-Message-ID: <20160908094843.14710-1-maxime.ripard@free-electrons.com>
+Date: Thu,  8 Sep 2016 11:48:38 +0200
+Subject: [PATCH v3 3/8] clk: sunxi-ng: div: Allow to set a maximum
+In-Reply-To: <20160908094843.14710-1-maxime.ripard@free-electrons.com>
+References: <20160908094843.14710-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160908094843.14710-4-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Some dividers might have a maximum value that is lower than the width of
+the register.
 
-Here is the migration for the A23 and A33 clocks to the sunxi-ng
-framework.
+Add a field to _ccu_div to handle those case properly. If the field is set
+to 0, the code will assume that the maximum value is the maximum one that
+can be used with the field register width.
 
-It has been tested on SinA33 board, and I made sure that everything
-was reported at the exact same rate, that the MMC was still working in
-DDR, etc.
+Otherwise, we'll use whatever value has been set.
 
-This has also been tested to implement the DRM driver, so I'm
-confident things will work just fine.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi-ng/ccu_div.h  | 24 ++++++++++++++++++++----
+ drivers/clk/sunxi-ng/ccu_mp.c   | 23 +++++++++++++----------
+ drivers/clk/sunxi-ng/ccu_nkm.c  |  4 ++--
+ drivers/clk/sunxi-ng/ccu_nkmp.c | 21 ++++++++++-----------
+ drivers/clk/sunxi-ng/ccu_nm.c   | 16 ++++++++++------
+ 5 files changed, 55 insertions(+), 33 deletions(-)
 
-Let me know what you think,
-Maxime
-
-Changes from v2:
-  - Added the msgbox reset and spinlock clocks
-  - Added some doc for the max value for the dividers
-  - Removed whitespace error
-
-Changes from v1:
-  - Allowed to set a maximum on the dividers, and used that on the CPU
-    clocks
-  - Renamed the CE (crypto engine) clocks to SS (security system) to
-    stick to what's being used in the datasheet
-  - Added a TODO to mention that we don't really know whose parents
-    are linked to the USB clocks.		  
-
-Maxime Ripard (8):
-  clk: sunxi-ng: div: Add mux table macros
-  clk: sunxi-ng: div: Add kerneldoc for the _ccu_div structure
-  clk: sunxi-ng: div: Allow to set a maximum
-  clk: sunxi-ng: mux: Add mux table macro
-  clk: sunxi-ng: Add N-class clocks support
-  clk: sunxi-ng: Add A33 CCU support
-  clk: sunxi-ng: Add A23 CCU
-  ARM: sun8i: Convert the A23 and A33 to the CCU
-
- .../devicetree/bindings/clock/sunxi-ccu.txt        |   2 +
- arch/arm/boot/dts/sun8i-a23-a33.dtsi               | 257 ++-----
- arch/arm/boot/dts/sun8i-a23.dtsi                   |  51 +-
- arch/arm/boot/dts/sun8i-a33.dtsi                   |  73 +-
- drivers/clk/sunxi-ng/Kconfig                       |  28 +
- drivers/clk/sunxi-ng/Makefile                      |   3 +
- drivers/clk/sunxi-ng/ccu-sun8i-a23-a33.h           |  63 ++
- drivers/clk/sunxi-ng/ccu-sun8i-a23.c               | 736 +++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-a33.c               | 780 +++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_div.h                     |  66 +-
- drivers/clk/sunxi-ng/ccu_mp.c                      |  23 +-
- drivers/clk/sunxi-ng/ccu_mult.c                    | 133 ++++
- drivers/clk/sunxi-ng/ccu_mult.h                    |  35 +
- drivers/clk/sunxi-ng/ccu_mux.h                     |  26 +-
- drivers/clk/sunxi-ng/ccu_nkm.c                     |   4 +-
- drivers/clk/sunxi-ng/ccu_nkmp.c                    |  21 +-
- drivers/clk/sunxi-ng/ccu_nm.c                      |  16 +-
- include/dt-bindings/clock/sun8i-a23-a33-ccu.h      | 127 ++++
- include/dt-bindings/reset/sun8i-a23-a33-ccu.h      |  87 +++
- 19 files changed, 2172 insertions(+), 359 deletions(-)
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a23-a33.h
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a23.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a33.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_mult.c
- create mode 100644 include/dt-bindings/clock/sun8i-a23-a33-ccu.h
- create mode 100644 include/dt-bindings/reset/sun8i-a23-a33-ccu.h
-
+diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+index e1b1326e68a1..34c338832c0d 100644
+--- a/drivers/clk/sunxi-ng/ccu_div.h
++++ b/drivers/clk/sunxi-ng/ccu_div.h
+@@ -23,6 +23,9 @@
+  * struct _ccu_div - Internal divider description
+  * @shift: Bit offset of the divider in its register
+  * @width: Width of the divider field in its register
++ * @max: Maximum value allowed for that divider. This is the
++ *       arithmetic value, not the maximum value to be set in the
++ *       register.
+  * @flags: clk_divider flags to apply on this divider
+  * @table: Divider table pointer (if applicable)
+  *
+@@ -37,6 +40,8 @@ struct _ccu_div {
+ 	u8			shift;
+ 	u8			width;
+ 
++	u32			max;
++
+ 	u32			flags;
+ 
+ 	struct clk_div_table	*table;
+@@ -50,14 +55,25 @@ struct _ccu_div {
+ 		.table	= _table,					\
+ 	}
+ 
+-#define _SUNXI_CCU_DIV_FLAGS(_shift, _width, _flags)			\
+-	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, NULL, _flags)
+-
+ #define _SUNXI_CCU_DIV_TABLE(_shift, _width, _table)			\
+ 	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, _table, 0)
+ 
++#define _SUNXI_CCU_DIV_MAX_FLAGS(_shift, _width, _max, _flags) \
++	{								\
++		.shift	= _shift,					\
++		.width	= _width,					\
++		.flags	= _flags,					\
++		.max	= _max,						\
++	}
++
++#define _SUNXI_CCU_DIV_FLAGS(_shift, _width, _flags)			\
++	_SUNXI_CCU_DIV_MAX_FLAGS(_shift, _width, 0, _flags)
++
++#define _SUNXI_CCU_DIV_MAX(_shift, _width, _max)			\
++	_SUNXI_CCU_DIV_MAX_FLAGS(_shift, _width, _max, 0)
++
+ #define _SUNXI_CCU_DIV(_shift, _width)					\
+-	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, NULL, 0)
++	_SUNXI_CCU_DIV_FLAGS(_shift, _width, 0)
+ 
+ struct ccu_div {
+ 	u32			enable;
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
+index cbf33ef5faa9..ebb1b31568a5 100644
+--- a/drivers/clk/sunxi-ng/ccu_mp.c
++++ b/drivers/clk/sunxi-ng/ccu_mp.c
+@@ -21,9 +21,9 @@ static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
+ 	unsigned int best_m = 0, best_p = 0;
+ 	unsigned int _m, _p;
+ 
+-	for (_p = 0; _p <= max_p; _p++) {
++	for (_p = 1; _p <= max_p; _p <<= 1) {
+ 		for (_m = 1; _m <= max_m; _m++) {
+-			unsigned long tmp_rate = (parent >> _p) / _m;
++			unsigned long tmp_rate = parent / _p / _m;
+ 
+ 			if (tmp_rate > rate)
+ 				continue;
+@@ -46,13 +46,15 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
+ 				       void *data)
+ {
+ 	struct ccu_mp *cmp = data;
++	unsigned int max_m, max_p;
+ 	unsigned int m, p;
+ 
+-	ccu_mp_find_best(parent_rate, rate,
+-			 1 << cmp->m.width, (1 << cmp->p.width) - 1,
+-			 &m, &p);
++	max_m = cmp->m.max ?: 1 << cmp->m.width;
++	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+ 
+-	return (parent_rate >> p) / m;
++	ccu_mp_find_best(parent_rate, rate, max_m, max_p, &m, &p);
++
++	return parent_rate / p / m;
+ }
+ 
+ static void ccu_mp_disable(struct clk_hw *hw)
+@@ -108,13 +110,14 @@ static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
+ {
+ 	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+ 	unsigned long flags;
++	unsigned int max_m, max_p;
+ 	unsigned int m, p;
+ 	u32 reg;
+ 
+-	ccu_mp_find_best(parent_rate, rate,
+-			 1 << cmp->m.width, (1 << cmp->p.width) - 1,
+-			 &m, &p);
++	max_m = cmp->m.max ?: 1 << cmp->m.width;
++	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+ 
++	ccu_mp_find_best(parent_rate, rate, max_m, max_p, &m, &p);
+ 
+ 	spin_lock_irqsave(cmp->common.lock, flags);
+ 
+@@ -122,7 +125,7 @@ static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	reg &= ~GENMASK(cmp->m.width + cmp->m.shift - 1, cmp->m.shift);
+ 	reg &= ~GENMASK(cmp->p.width + cmp->p.shift - 1, cmp->p.shift);
+ 
+-	writel(reg | (p << cmp->p.shift) | ((m - 1) << cmp->m.shift),
++	writel(reg | (ilog2(p) << cmp->p.shift) | ((m - 1) << cmp->m.shift),
+ 	       cmp->common.base + cmp->common.reg);
+ 
+ 	spin_unlock_irqrestore(cmp->common.lock, flags);
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+index 182452919ede..059fdc3b4f96 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkm.c
++++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+@@ -103,7 +103,7 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+ 
+ 	_nkm.max_n = 1 << nkm->n.width;
+ 	_nkm.max_k = 1 << nkm->k.width;
+-	_nkm.max_m = 1 << nkm->m.width;
++	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+ 
+ 	ccu_nkm_find_best(parent_rate, rate, &_nkm);
+ 
+@@ -129,7 +129,7 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	_nkm.max_n = 1 << nkm->n.width;
+ 	_nkm.max_k = 1 << nkm->k.width;
+-	_nkm.max_m = 1 << nkm->m.width;
++	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+ 
+ 	ccu_nkm_find_best(parent_rate, rate, &_nkm);
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+index 9f2b98e19dc9..9769dee99511 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.c
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+@@ -29,14 +29,14 @@ static void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
+ 	unsigned long _n, _k, _m, _p;
+ 
+ 	for (_k = 1; _k <= nkmp->max_k; _k++) {
+-		for (_p = 0; _p <= nkmp->max_p; _p++) {
++		for (_p = 1; _p <= nkmp->max_p; _p <<= 1) {
+ 			unsigned long tmp_rate;
+ 
+-			rational_best_approximation(rate / _k, parent >> _p,
++			rational_best_approximation(rate / _k, parent / _p,
+ 						    nkmp->max_n, nkmp->max_m,
+ 						    &_n, &_m);
+ 
+-			tmp_rate = (parent * _n * _k >> _p) / _m;
++			tmp_rate = parent * _n * _k / (_m * _p);
+ 
+ 			if (tmp_rate > rate)
+ 				continue;
+@@ -110,13 +110,12 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	_nkmp.max_n = 1 << nkmp->n.width;
+ 	_nkmp.max_k = 1 << nkmp->k.width;
+-	_nkmp.max_m = 1 << nkmp->m.width;
+-	_nkmp.max_p = (1 << nkmp->p.width) - 1;
++	_nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
++	_nkmp.max_p = nkmp->p.max ?: 1 << ((1 << nkmp->p.width) - 1);
+ 
+-	ccu_nkmp_find_best(*parent_rate, rate,
+-			   &_nkmp);
++	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
+ 
+-	return (*parent_rate * _nkmp.n * _nkmp.k >> _nkmp.p) / _nkmp.m;
++	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
+ }
+ 
+ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+@@ -129,8 +128,8 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	_nkmp.max_n = 1 << nkmp->n.width;
+ 	_nkmp.max_k = 1 << nkmp->k.width;
+-	_nkmp.max_m = 1 << nkmp->m.width;
+-	_nkmp.max_p = (1 << nkmp->p.width) - 1;
++	_nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
++	_nkmp.max_p = nkmp->p.max ?: 1 << ((1 << nkmp->p.width) - 1);
+ 
+ 	ccu_nkmp_find_best(parent_rate, rate, &_nkmp);
+ 
+@@ -145,7 +144,7 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	reg |= (_nkmp.n - 1) << nkmp->n.shift;
+ 	reg |= (_nkmp.k - 1) << nkmp->k.shift;
+ 	reg |= (_nkmp.m - 1) << nkmp->m.shift;
+-	reg |= _nkmp.p << nkmp->p.shift;
++	reg |= ilog2(_nkmp.p) << nkmp->p.shift;
+ 
+ 	writel(reg, nkmp->common.base + nkmp->common.reg);
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+index e35ddd8eec8b..b61bdd8c7a7f 100644
+--- a/drivers/clk/sunxi-ng/ccu_nm.c
++++ b/drivers/clk/sunxi-ng/ccu_nm.c
+@@ -61,11 +61,13 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+ 			      unsigned long *parent_rate)
+ {
+ 	struct ccu_nm *nm = hw_to_ccu_nm(hw);
++	unsigned long max_n, max_m;
+ 	unsigned long n, m;
+ 
+-	rational_best_approximation(rate, *parent_rate,
+-				    1 << nm->n.width, 1 << nm->m.width,
+-				    &n, &m);
++	max_n = 1 << nm->n.width;
++	max_m = nm->m.max ?: 1 << nm->m.width;
++
++	rational_best_approximation(rate, *parent_rate, max_n, max_m, &n, &m);
+ 
+ 	return *parent_rate * n / m;
+ }
+@@ -75,6 +77,7 @@ static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
+ {
+ 	struct ccu_nm *nm = hw_to_ccu_nm(hw);
+ 	unsigned long flags;
++	unsigned long max_n, max_m;
+ 	unsigned long n, m;
+ 	u32 reg;
+ 
+@@ -83,9 +86,10 @@ static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	else
+ 		ccu_frac_helper_disable(&nm->common, &nm->frac);
+ 
+-	rational_best_approximation(rate, parent_rate,
+-				    1 << nm->n.width, 1 << nm->m.width,
+-				    &n, &m);
++	max_n = 1 << nm->n.width;
++	max_m = nm->m.max ?: 1 << nm->m.width;
++
++	rational_best_approximation(rate, parent_rate, max_n, max_m, &n, &m);
+ 
+ 	spin_lock_irqsave(nm->common.lock, flags);
+ 
 -- 
 2.9.3
