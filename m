@@ -1,33 +1,38 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Thu, 08 Sep 2016 09:44:47 +0200
-Subject: [PATCH 4/8] ARM: dts: bcm283x: Add a new EMMC pin group from
- the downstream tree.
-In-Reply-To: <87650770.23554.026b1e4b-e35d-48e6-9394-7eeea0ff9add.open-xchange@email.1und1.de>
-References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
- <1473244289-20728-5-git-send-email-kraxel@redhat.com>
- <87650770.23554.026b1e4b-e35d-48e6-9394-7eeea0ff9add.open-xchange@email.1und1.de>
-Message-ID: <1473320687.6698.25.camel@redhat.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  8 Sep 2016 09:43:24 +0200
+Subject: [PATCH 28/30] arm64: dts: r8a7796: Add pinctrl device node
+In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
+References: <cover.1473320411.git.horms+renesas@verge.net.au>
+Message-ID: <50809470486ae28a814c17f813d9201c3299692f.1473320411.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mi, 2016-09-07 at 20:13 +0200, Stefan Wahren wrote:
-> > Gerd Hoffmann <kraxel@redhat.com> hat am 7. September 2016 um 12:31
-> > geschrieben:
-> > 
-> > 
-> > From: Eric Anholt <eric@anholt.net>
-> > 
-> > This will be used for having EMMC (sdhci-bcm2835.c) drive the
-> > wireless.
-> 
-> sdhci-bcm2835.c has been replaced by sdhci-iproc.c
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-Ah, right, I'll update the commit msg for v2.
+This patch adds pinctrl device node for R8A7796 SoC.
 
-> How about adding pull defines to include/dt-bindings/pinctrl/bcm2835.h?
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Already there (or do you mean something other than '#define
-BCM2835_FSEL_*' ?)
-
-cheers,
-  Gerd
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 1edf82440d78..91abc0732bdf 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -107,6 +107,11 @@
+ 			status = "disabled";
+ 		};
+ 
++		pfc: pin-controller at e6060000 {
++			compatible = "renesas,pfc-r8a7796";
++			reg = <0 0xe6060000 0 0x50c>;
++		};
++
+ 		cpg: clock-controller at e6150000 {
+ 			compatible = "renesas,r8a7796-cpg-mssr";
+ 			reg = <0 0xe6150000 0 0x1000>;
+-- 
+2.7.0.rc3.207.g0ac5344
