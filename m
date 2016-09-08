@@ -1,95 +1,63 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 8 Sep 2016 20:40:58 +0100
-Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
-In-Reply-To: <m260q6jibf.fsf@baylibre.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
- <m260q6jibf.fsf@baylibre.com>
-Message-ID: <7d631565-287c-ab38-c152-d65b5ace1e0e@codethink.co.uk>
+From: zach.brown@ni.com (Zach Brown)
+Date: Thu, 8 Sep 2016 14:42:45 -0500
+Subject: [PATCH v6 1/2] sdhci-of-arasan: Add device tree parameter
+ xlnx-fails-without-test-cd bit
+Message-ID: <1473363766-12652-1-git-send-email-zach.brown@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/16 20:35, Kevin Hilman wrote:
-> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
->
->> This is a new driver for the USB PHY found in Meson8b and GXBB SoCs.
->>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
->
-> I tested this on meson-gxbb-p200 with USB host and a mass storage
-> device.
->
-> Tested-by: Kevin Hilman <khilman@baylibre.com>
->
-> A minor question/comment below, for you and for Kishon...
->
-> [...]
->
->> +static int phy_meson_usb2_probe(struct platform_device *pdev)
->> +{
->> +	struct phy_meson_usb2_priv *priv;
->> +	struct resource *res;
->> +	struct phy *phy;
->> +	struct phy_provider *phy_provider;
->> +	int ret;
->> +
->> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
->> +	if (!priv)
->> +		return -ENOMEM;
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	priv->regs = devm_ioremap_resource(&pdev->dev, res);
->> +	if (IS_ERR(priv->regs))
->> +		return PTR_ERR(priv->regs);
->> +
->> +	priv->clk_usb_general = devm_clk_get(&pdev->dev, "usb_general");
->> +	if (IS_ERR(priv->clk_usb_general))
->> +		return PTR_ERR(priv->clk_usb_general);
->> +
->> +	priv->clk_usb = devm_clk_get(&pdev->dev, "usb");
->> +	if (IS_ERR(priv->clk_usb))
->> +		return PTR_ERR(priv->clk_usb);
->> +
->> +	priv->dr_mode = of_usb_get_dr_mode_by_phy(pdev->dev.of_node, -1);
->> +	if (priv->dr_mode == USB_DR_MODE_UNKNOWN) {
->> +		dev_err(&pdev->dev,
->> +			"missing dual role configuration of the controller\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	phy = devm_phy_create(&pdev->dev, NULL, &phy_meson_usb2_ops);
->> +	if (IS_ERR(phy)) {
->> +		dev_err(&pdev->dev, "failed to create PHY\n");
->> +		return PTR_ERR(phy);
->> +	}
->> +
->> +	if (usb_reset_refcnt++ == 0) {
->> +		ret = device_reset(&pdev->dev);
->> +		if (ret) {
->> +			dev_err(&phy->dev, "Failed to reset USB PHY\n");
->> +			return ret;
->> +		}
->> +	}
->
-> The ref count + reset here looks like something that could/should be
-> handled in a runtime PM callback.
->
-> IOW, there should be a pm_runtime_get_sync() here, and in the
-> ->runtime_resume() callback, the device_reset() would be called.
-> Runtime PM does the refcounting, and only calls ->runtime_resume() on
-> the 0 -> 1 transition.
->
-> This isn't a big deal for now, so I'll let Kishon decide, but using
-> runtime PM from the start will help enabling other PM features later.
+The sdhci controller on xilinx zynq devices will not function unless
+the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+In cases where it is impossible to provide the CD bit in hardware,
+setting the controller to test mode and then setting inserted to true
+will get the controller to function without the CD bit.
 
-I agree, pm_runtime would probably be the best place to handle >1
-device with shared items such as reset.
+The device property "xlnx-fails-without-test-cd" will let the arasan
+driver know the controller does not have the CD line wired and that the
+controller does not function without it.
 
-The version I wrote, I simply enabled the clocks and reset the device
-when probed to work around the shared reset.
+Signed-off-by: Zach Brown <zach.brown@ni.com>
+---
+v2:
+ * improved commit messages
+ * removed fake-cd device property
+ * removed fake-cd quirk
+ * use broken-cd device property
+ * documented new usage of broken-cd
+v3:
+ * removed new usage of broken-cd
+ * created fails-without-test-cd device property
+ * created arasan controller specific quirk
+v4:
+ * changed fails-without-test-cd to xlnx-fails-without-test-cd
+ * removed extra blank line
+v5:
+ * Fixed style mistake
+ * Changed (1 << 0 ) to BIT(0)
+v6:
+ * Fixed style mistakes
+ * Condensed unnecessarily long variable names
+ * Removed line wraps that were no longer necessary.
+ * Rebased changes off Ulf's mmc tree's next branch.
 
 
+ Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+df --gt /Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+index 3404afa..e71f043 100644
+--- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
++++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+@@ -21,6 +21,10 @@ Required Properties:
+   - interrupts: Interrupt specifier
+   - interrupt-parent: Phandle for the interrupt controller that services
+ 		      interrupts for this device.
++Optional Properties:
++- xlnx-fails-without-test-cd: when present, the controller doesn't work when
++  the CD line is not connected properly, and the line is not connected
++  properly. Test mode can be used to force the controller to function.
+ 
+ Required Properties for "arasan,sdhci-5.1":
+   - phys: From PHY bindings: Phandle for the Generic PHY for arasan.
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+2.7.4
