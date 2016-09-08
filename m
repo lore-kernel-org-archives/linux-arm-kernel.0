@@ -1,54 +1,53 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Thu, 8 Sep 2016 04:48:15 +0300
-Subject: [PATCH v2 2/3] gpio: mxc: shift gpio_mxc_init() to subsys_initcall
- level
+Date: Thu, 8 Sep 2016 04:48:14 +0300
+Subject: [PATCH v2 1/3] pinctrl: imx: accept gpio request/free from pinctrl
 In-Reply-To: <1473299296-22458-1-git-send-email-vladimir_zapolskiy@mentor.com>
 References: <1473299296-22458-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <1473299296-22458-3-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1473299296-22458-2-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In general situation on-SoC GPIO controller drivers should be probed
-after pinctrl/pinmux controller driver, because on-SoC GPIOs utilize a
-pin/pad as a resource provided and controlled by pinctrl subsystem.
+While only Freescale Vybrid SoC has settings of GPIO capabilities done
+by iomux controller, it is only a matter of GPIO controller driver
+implementation for the rest of Freescale/NXP SoCs from iMX series.
 
-This is stated in multiple places, e.g. from drivers/Makefile:
-
-  GPIO must come after pinctrl as gpios may need to mux pins etc
-
-Looking at Freescale iMX SoC series specifics, imx*_pinctrl_init()
-functions are called at arch_initcall and postcore_initcall init
-levels, so the change of initcall level for gpio-mxc driver from
-postcore_initcall to subsys_initcall level is sufficient. Also note
-that the most of GPIO controller drivers settled at subsys_initcall
-level.
-
-If pinctrl subsystem manages pads with GPIO functions, the change is
-needed to avoid unwanted driver probe deferrals during kernel boot.
+As a practical example on GPIO request a pad function should be
+switched to GPIO, but because this requires updates to all particular
+iMX pinctrl drivers, for simplicity at the moment add only a proper
+connection between shared pinctrl-imx and pinctrl/pinmux core, namely
+.gpio_request_enable/.gpio_disable_free/.gpio_set_direction callbacks
+should return success to a caller. This change allows to progress by
+adding request/free callbacks into gpio-mxc.c driver.
 
 Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 ---
 Changes from v1 to v2:
-* replaced by a change with better commit description and which
-  moves gpio_mxc_init() call to subsys_initcall() instead of
-  apparently too late device_initcall(), this mitigates Shawn's
-  expressed concern about the change.
+* none
 
- drivers/gpio/gpio-mxc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/freescale/pinctrl-imx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 1b342a3842c8..1fdd5d804b5b 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -510,7 +510,7 @@ static int __init gpio_mxc_init(void)
- {
- 	return platform_driver_register(&mxc_gpio_driver);
- }
--postcore_initcall(gpio_mxc_init);
-+subsys_initcall(gpio_mxc_init);
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index 71391757938b..6e248ca10169 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -315,7 +315,7 @@ static int imx_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
  
- MODULE_AUTHOR("Freescale Semiconductor, "
- 	      "Daniel Mack <danielncaiaq.de>, "
+ 	/* Currently implementation only for shared mux/conf register */
+ 	if (!(info->flags & SHARE_MUX_CONF_REG))
+-		return -EINVAL;
++		return 0;
+ 
+ 	pin_reg = &info->pin_regs[offset];
+ 	if (pin_reg->mux_reg == -1)
+@@ -380,7 +380,7 @@ static int imx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+ 	 * They are part of the shared mux/conf register.
+ 	 */
+ 	if (!(info->flags & SHARE_MUX_CONF_REG))
+-		return -EINVAL;
++		return 0;
+ 
+ 	pin_reg = &info->pin_regs[offset];
+ 	if (pin_reg->mux_reg == -1)
 -- 
 2.8.1
