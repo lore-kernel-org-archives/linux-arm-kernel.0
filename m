@@ -1,43 +1,78 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Sep 2016 12:00:23 +0200
-Subject: [PATCH 2/2] ARM: dts: add device tree for the RealView EB Rev D
-In-Reply-To: <15288435.aYlmo6e5Gb@wuerfel>
-References: <1473327043-31903-1-git-send-email-linus.walleij@linaro.org>
- <15288435.aYlmo6e5Gb@wuerfel>
-Message-ID: <CACRpkdZdY-knG+htdgZ0t80GLqC7aNujNf7mwUveDrAnCQ5yfQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 8 Sep 2016 12:00:31 +0200
+Subject: [PATCH 5/6] ARM: dts: Add NextThing GR8 dtsi
+In-Reply-To: <20160907175148.c3fioqbr2k2pdqri@x1-6-00-0f-9f-c6-3e-90.cpe.webspeed.dk>
+References: <20160831081817.5191-6-maxime.ripard@free-electrons.com>
+ <20160907175148.c3fioqbr2k2pdqri@x1-6-00-0f-9f-c6-3e-90.cpe.webspeed.dk>
+Message-ID: <20160908100031.GO8913@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 11:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday, September 8, 2016 11:30:43 AM CEST Linus Walleij wrote:
->> @@ -608,6 +608,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
->>         arm-realview-pb1176.dtb \
->>         arm-realview-pb11mp.dtb \
->>         arm-realview-eb.dtb \
->> +       arm-realview-eb-revd.dtb \
->>         arm-realview-eb-11mp.dtb \
->>         arm-realview-eb-11mp-revb.dtb \
->>         arm-realview-eb-a9mp.dtb \
->
-> Is the ethernet device on the baseboard or the core tile?
+On Wed, Sep 07, 2016 at 07:51:48PM +0200, Rask Ingemann Lambertsen wrote:
+> On Wed, Aug 31, 2016 at 4:18 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > From: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> >
+> > The GR8 is an SoC made by Nextthing loosely based on the sun5i family.
+> >
+> > Since it's not clear yet what we can factor out and merge with the A10s and
+> > A13 support, let's keep it out of the sun5i.dtsi include tree. We will
+> > figure out what can be shared when things settle down.
+> >
+> > Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/gr8.dtsi | 1080 ++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 1080 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/gr8.dtsi
+> >
+> > diff --git a/arch/arm/boot/dts/gr8.dtsi b/arch/arm/boot/dts/gr8.dtsi
+> > new file mode 100644
+> > index 000000000000..d21cfa3f3c14
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/gr8.dtsi
+> 
+> In the node names, you sometimes use underscores and sometimes use hyphens.
+> Here are the ones I spotted:
+> 
+> > +               osc3M: osc3M_clk {
+> > +               pll3x2: pll3x2_clk {
+> > +               pll7x2: pll7x2_clk {
+> > +       display-engine {
+> > +               sram-controller at 01c00000 {
+> > +                               otg_sram: sram-section at 0000 {
+> > +               dma: dma-controller at 01c02000 {
+> > +               tve0: tv-encoder at 01c0a000 {
+> > +               tcon0: lcd-controller at 01c0c000 {
+> > +               intc: interrupt-controller at 01c20400 {
+> > +                       lcd_rgb666_pins: lcd_rgb666 at 0 {
+> > +                       nand_pins_a: nand_base0 at 0 {
+> > +                       nand_cs0_pins_a: nand_cs at 0 {
+> > +                       nand_rb0_pins_a: nand_rb at 0 {
+> > +                       uart1_cts_rts_pins_a: uart1-cts-rts at 0 {
+> > +               fe0: display-frontend at 01e00000 {
+> > +               be0: display-backend at 01e60000 {
+> 
+> Underscores should not be used in node names. [1][2] Since you're adding a
+> new file here, please use hyphens instead.
 
-It's on the baseboard.
+I wonder what the rationale behind this is. The ePAPR clearly
+documents the underscore as being a valid character for the node
+names.
 
-> My understanding is that you have a baseboard which comes in
-> different revisions and a set of CPU modules (arm9, arm1136,
-> arm1176, arm11mp, cortex-a9, ...) that can be freely combined,
-> so if the ethernet device is on the baseboard, we also need revd
-> variants for 11mp and a9mp.
+I'll change the few inconsistencies though.
 
-Yeah... you're right.
+Thanks!
+Maxime
 
-> The arm-realview-eb-11mp-revb seems to refer to RevB of
-> the core tile rather than the baseboard (?), so we may need
-> a better notation for the file names to clarify that difference.
-
-OK will try to come up with some namespace.
-
-Revisiting this mess...
-
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/aae07d1e/attachment.sig>
