@@ -1,37 +1,40 @@
-From: netz.kernel@gmail.com (Marty Plummer)
-Date: Thu,  8 Sep 2016 12:23:46 -0500
-Subject: [RFC 7/7] Make Hi3620 explicit, remove wildcards
-In-Reply-To: <20160908172346.27506-1-netz.kernel@gmail.com>
-References: <20160908172346.27506-1-netz.kernel@gmail.com>
-Message-ID: <20160908172346.27506-7-netz.kernel@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 08 Sep 2016 10:31:03 -0700
+Subject: [PATCH V3 0/5] firmware: Add support for TI System Control
+ Interface (TI-SCI) protocol driver
+In-Reply-To: <f41d968c-46c9-997e-0fa0-edbef34a1fa5@ti.com> (Nishanth Menon's
+ message of "Thu, 8 Sep 2016 09:00:37 -0500")
+References: <20160906190127.23522-1-nm@ti.com> <7hshtbtu8l.fsf@baylibre.com>
+ <f41d968c-46c9-997e-0fa0-edbef34a1fa5@ti.com>
+Message-ID: <m2y432nvs8.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a preparatory series for adding the ARMv5/v6 hi3520 SoCs.
-Assumptions were made when adding hi3620 that don't hold water in
-light of adding support for the hi3520 SoC.  Fix the issue by renaming
-config options and other namespaces to avoid collisions with the new
-work.
+Nishanth Menon <nm@ti.com> writes:
 
-Only internal APIs are modified with this series.
+> On 09/07/2016 01:55 PM, Kevin Hilman wrote:
+>> Nishanth Menon <nm@ti.com> writes:
+>
+> [...] full mail thread in https://lkml.org/lkml/2016/9/6/747
+>
+>>> Overall architecture is very similar to SCPI[4] as follows:
+>>
+>> Dumb Q: I'm curious about the limitations in SCPI that were found that
+>> made TI decided to implement its own version.
 
-Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
----
- drivers/dma/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+[...]
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 739f797..74bab9d0 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -279,7 +279,7 @@ config INTEL_MIC_X100_DMA
- 
- config K3_DMA
- 	tristate "Hisilicon K3 DMA support"
--	depends on ARCH_HI3xxx
-+	depends on ARCH_HI3620
- 	select DMA_ENGINE
- 	select DMA_VIRTUAL_CHANNELS
- 	help
--- 
-2.9.3
+> Long story short, investigation was done into what SCPI was providing
+> (TI internal ofcourse) and SCPI did not fit our SoC generation needs -
+
+Thanks for the detailed explanation.  Very helpful.
+
+To be clear, I'm not a proponent of always using ARM "standards"
+(especially when it's not exactly clear if it's a standard or a Juno
+thing) but I'm seeing several SoCs come out with SCPI derivatives, or
+old ARM versions etc., so was just curious about the decision making
+process.
+
+Thanks for sharing,
+
+Kevin
