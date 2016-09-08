@@ -1,43 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 8 Sep 2016 11:27:52 +0200
-Subject: [PATCH 3/3] soc: ti: Add ti_sci_pm_domains driver
-In-Reply-To: <7h4m5rv9kz.fsf@baylibre.com>
-References: <20160819235653.26355-1-nm@ti.com>
- <20160819235653.26355-4-nm@ti.com>
- <CAPDyKFooDUOPT9dP8HaW3YBO9PsX-1+96PPE7CRMyjEkra7cBQ@mail.gmail.com>
- <57C0D2C9.1030801@ti.com> <57C5E1DA.2040405@ti.com>
- <CAPDyKFqszM48nXnnA9D8iCp34k-ZmNvOkHPCc=Fya4nJA7PvBQ@mail.gmail.com>
- <57CF26DB.4020807@ti.com> <7h4m5rv9kz.fsf@baylibre.com>
-Message-ID: <CAPDyKFo0Cb90BbY7ra6VDjb5frC5=VtmE3V6tDK=VosfPmod7Q@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu,  8 Sep 2016 11:28:15 +0200
+Subject: [PATCH] ARM: imx35: add iim module to imx35.dtsi
+Message-ID: <1473326895-19189-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+This is a prerequisite to remove the static mappings for imx35 devicetree
+based machines.
 
->
-> One more idea...
->
-> Since you don't really have a domain (a group of devices), what you
-> really have is each device having an independent power switch, so as Ulf
-> suggested, what you really need is for all the devices to share the same
-> set of runtime PM callbacks that call SCI.  The only difference is the
-> unique ID.
->
-> Rather than using all of genpd, you could also just use a pm_domain
-> which is what genpd is built on top of (and also omap_device, which
-> you're probably familiar with also.)
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/boot/dts/imx35.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Even if this would work as well, the downside would be that you need
-to re-invent the parts related to the DT parsing, the probing/removal
-and attaching/detaching of the device to the PM domain.
-
-You probably don't want to go there... :-)
-
->
-> That would allow you to keep the drivers completely generic, yet share
-> all the SCI specific "domain" code inside a pm_domain.
->
-> Kevin
-
-Kind regards
-Uffe
+diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+index 490b7b44f1e7..f812d586c5ce 100644
+--- a/arch/arm/boot/dts/imx35.dtsi
++++ b/arch/arm/boot/dts/imx35.dtsi
+@@ -309,6 +309,13 @@
+ 				status = "disabled";
+ 			};
+ 
++			iim at 53ff0000 {
++				compatible = "fsl,imx35-iim";
++				reg = <0x53ff0000 0x4000>;
++				interrupts = <19>;
++				clocks = <&clks 80>;
++			};
++
+ 			usbotg: usb at 53ff4000 {
+ 				compatible = "fsl,imx35-usb", "fsl,imx27-usb";
+ 				reg = <0x53ff4000 0x0200>;
+-- 
+2.8.1
