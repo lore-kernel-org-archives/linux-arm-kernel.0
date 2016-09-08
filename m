@@ -1,89 +1,42 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 7 Sep 2016 19:24:40 -0700
-Subject: [PATCH 2/4] Input: jornada720_kbd - get rid of mach/irqs.h include
-In-Reply-To: <E1bhZVd-0005cZ-5z@rmk-PC.armlinux.org.uk>
-References: <20160907095029.GL1041@n2100.armlinux.org.uk>
- <E1bhZVd-0005cZ-5z@rmk-PC.armlinux.org.uk>
-Message-ID: <20160908022440.GF6445@dtor-ws>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 7 Sep 2016 19:24:50 -0700
+Subject: [PATCH 1/7] clk: gxbb: expose USB clocks
+In-Reply-To: <20160907221403.GA13062@codeaurora.org>
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160904213152.25837-2-martin.blumenstingl@googlemail.com>
+ <20160907003355.GQ12510@codeaurora.org>
+ <CAFBinCBwcVkXi9wVt1FGaEFdK+fsxz-r12ao89HwqozqLGtd7A@mail.gmail.com>
+ <20160907221403.GA13062@codeaurora.org>
+Message-ID: <CAOi56cVD-ijetJ0rn=D2DNCVYaGVV7EfdfsSdQQB-Z1p5QSXUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 10:51:09AM +0100, Russell King wrote:
-> Switch the jornada720 keyboard driver to obtain its interrupt from the
-> platform device, rather than via a hard-coded interrupt number obtained
-> from the mach/irqs.h header.
-> 
-> Tested-by: Adam Wysocki <armlinux@chmurka.net>
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+On Wed, Sep 7, 2016 at 3:14 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 09/07, Martin Blumenstingl wrote:
+>> On Wed, Sep 7, 2016 at 2:33 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> > On 09/04, Martin Blumenstingl wrote:
+>> >> USB0_DDR_BRIDGE and USB1_DDR_BRIDGE1 are needed for the related
+>> >> dwc2 usb controller. USB, USB0 and USB1 are needed for the PHYs.
+>> >> Expose these clocks to DT and comment out in clk driver.
+>> >>
+>> >> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+>> >> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> >
+>> > Is authorship correct on this patch? Did Jerome author it
+>> > instead?
+>> We (Jerome and I) have both worked on this patch, that's why you have
+>> two signed-off-by's.
+>> Or is this simply about the order (author = from address should be
+>> listed first)?
+>
+> Yes. Typically author is listed first in the signed-off-by chain.
+>
 
-This has already been applied as well.
+And if you use git-format-patch + git-send-email, there would also be a
 
-> ---
->  arch/arm/mach-sa1100/jornada720.c       |  6 ++++++
->  drivers/input/keyboard/jornada720_kbd.c | 11 +++++++----
->  2 files changed, 13 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
-> index c0b1f5bafae4..2b96f7bc16bd 100644
-> --- a/arch/arm/mach-sa1100/jornada720.c
-> +++ b/arch/arm/mach-sa1100/jornada720.c
-> @@ -217,9 +217,15 @@ static struct platform_device jornada_ssp_device = {
->  	.id             = -1,
->  };
->  
-> +static struct resource jornada_kbd_resources[] = {
-> +	DEFINE_RES_IRQ(IRQ_GPIO0),
-> +};
-> +
->  static struct platform_device jornada_kbd_device = {
->  	.name		= "jornada720_kbd",
->  	.id		= -1,
-> +	.num_resources	= ARRAY_SIZE(jornada_kbd_resources),
-> +	.resource	= jornada_kbd_resources,
->  };
->  
->  static struct platform_device jornada_ts_device = {
-> diff --git a/drivers/input/keyboard/jornada720_kbd.c b/drivers/input/keyboard/jornada720_kbd.c
-> index 4b2e9ff18ba1..6ac9fee1d8fa 100644
-> --- a/drivers/input/keyboard/jornada720_kbd.c
-> +++ b/drivers/input/keyboard/jornada720_kbd.c
-> @@ -26,7 +26,6 @@
->  
->  #include <mach/jornada720.h>
->  #include <mach/hardware.h>
-> -#include <mach/irqs.h>
->  
->  MODULE_AUTHOR("Kristoffer Ericson <Kristoffer.Ericson@gmail.com>");
->  MODULE_DESCRIPTION("HP Jornada 710/720/728 keyboard driver");
-> @@ -98,7 +97,11 @@ static int jornada720_kbd_probe(struct platform_device *pdev)
->  {
->  	struct jornadakbd *jornadakbd;
->  	struct input_dev *input_dev;
-> -	int i, err;
-> +	int i, err, irq;
-> +
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq <= 0)
-> +		return irq < 0 ? irq : -EINVAL;
->  
->  	jornadakbd = devm_kzalloc(&pdev->dev, sizeof(*jornadakbd), GFP_KERNEL);
->  	input_dev = devm_input_allocate_device(&pdev->dev);
-> @@ -126,10 +129,10 @@ static int jornada720_kbd_probe(struct platform_device *pdev)
->  
->  	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
->  
-> -	err = devm_request_irq(&pdev->dev, IRQ_GPIO0, jornada720_kbd_interrupt,
-> +	err = devm_request_irq(&pdev->dev, irq, jornada720_kbd_interrupt,
->  			       IRQF_TRIGGER_FALLING, "jornadakbd", pdev);
->  	if (err) {
-> -		printk(KERN_INFO "jornadakbd720_kbd: Unable to grab IRQ\n");
-> +		dev_err(&pdev->dev, "unable to grab IRQ%d: %d\n", irq, err);
->  		return err;
->  	}
->  
-> -- 
-> 2.1.0
-> 
+From: Jerome Brunet <jbrunet@baylibre.com>
 
--- 
-Dmitry
+at the beginning so that when it gets applied by the maintainer,
+authorship is correct.
+
+Kevin
