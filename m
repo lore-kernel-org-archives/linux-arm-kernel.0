@@ -1,33 +1,50 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu,  8 Sep 2016 16:51:46 +0200
-Subject: [PATCH v2 5/5] clk: at91: sckc: optimize boot time
-In-Reply-To: <20160908145146.20422-1-alexandre.belloni@free-electrons.com>
-References: <20160908145146.20422-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20160908145146.20422-6-alexandre.belloni@free-electrons.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 8 Sep 2016 07:55:44 -0700
+Subject: [PATCH v3 2/3] hwmon: xgene: Add hwmon driver
+In-Reply-To: <8664936.LICyesLN7G@wuerfel>
+References: <1469134557-26869-1-git-send-email-hotran@apm.com>
+ <13081573.BbD3TmEU5Y@wuerfel> <20160907222754.GA31475@roeck-us.net>
+ <8664936.LICyesLN7G@wuerfel>
+Message-ID: <6c6118cf-f9cf-d5f2-dde0-afea0143687c@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assume that if the oscillator is enabled (OSC32EN bit is present), the
-delay has already elapsed as the bootloader probably waited for the
-oscillator to settle. This could waste up to 1.2s.
+On 09/08/2016 01:15 AM, Arnd Bergmann wrote:
+> On Wednesday, September 7, 2016 3:27:54 PM CEST Guenter Roeck wrote:
+>> On Wed, Sep 07, 2016 at 11:41:44PM +0200, Arnd Bergmann wrote:
+>>> On Thursday, July 21, 2016 1:55:56 PM CEST Hoan Tran wrote:
+>>>> +               ctx->comm_base_addr = cppc_ss->base_address;
+>>>> +               if (ctx->comm_base_addr) {
+>>>> +                       ctx->pcc_comm_addr =
+>>>> +                                       acpi_os_ioremap(ctx->comm_base_addr,
+>>>> +                                                       cppc_ss->length);
+>>>>
+>>>
+>>> This causes the arm64 allmodconfig build to fail now, according to
+>>> kernelci:
+>>>
+>>>       1  ERROR: "memblock_is_memory" [drivers/hwmon/xgene-hwmon.ko] undefined!
+>>>
+>> How do you even get there ? arm64:allmodconfig fails for me in -next with
+>>
+>> drivers/pwm/pwm-berlin.c: In function ?berlin_pwm_suspend?:
+>> drivers/pwm/pwm-berlin.c:245:35: error: ?struct berlin_pwm_chip? has no member named ?chips?
+>
+> That was fixed in yesterday's linux-next.
+>
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/clk/at91/sckc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Maybe, but now I get
 
-diff --git a/drivers/clk/at91/sckc.c b/drivers/clk/at91/sckc.c
-index 04059ea761c2..d669f5ca4dac 100644
---- a/drivers/clk/at91/sckc.c
-+++ b/drivers/clk/at91/sckc.c
-@@ -69,7 +69,7 @@ static int clk_slow_osc_prepare(struct clk_hw *hw)
- 	void __iomem *sckcr = osc->sckcr;
- 	u32 tmp = readl(sckcr);
- 
--	if (tmp & AT91_SCKC_OSC32BYP)
-+	if (tmp & (AT91_SCKC_OSC32BYP | AT91_SCKC_OSC32EN))
- 		return 0;
- 
- 	writel(tmp | AT91_SCKC_OSC32EN, sckcr);
--- 
-2.9.3
+Building arm:allmodconfig ... failed
+--------------
+Error log:
+crypto/crypto_engine.c: In function 'crypto_transfer_hash_request':
+crypto/crypto_engine.c:234:3: error: implicit declaration of function 'queue_kthread_work'
+
+Building arm64:allmodconfig ... failed
+--------------
+Error log:
+arch/arm64/kvm/../../../virt/kvm/arm/arch_timer.c: In function ?kvm_timer_hyp_init?:
+arch/arm64/kvm/../../../virt/kvm/arm/arch_timer.c:457:1: warning: label ?out_free? defined but not used
+
+Guenter
