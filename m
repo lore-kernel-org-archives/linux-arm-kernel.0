@@ -1,356 +1,81 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  8 Sep 2016 23:46:48 +0200
-Subject: [PATCH 3/4] ARM: dts: split RealView EB 11MPCore variants
-In-Reply-To: <1473371209-24086-1-git-send-email-linus.walleij@linaro.org>
-References: <1473371209-24086-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1473371209-24086-3-git-send-email-linus.walleij@linaro.org>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 8 Sep 2016 23:48:53 +0200
+Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
+In-Reply-To: <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
+ <m260q6jibf.fsf@baylibre.com>
+ <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
+ <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
+ <m2eg4ui0nl.fsf@baylibre.com>
+ <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
+Message-ID: <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There used to be two versions of the RealView EB 11MPCore:
+On Thu, Sep 8, 2016 at 10:53 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> On 08/09/16 21:42, Kevin Hilman wrote:
+>>
+>> Ben Dooks <ben.dooks@codethink.co.uk> writes:
+>>
+>>> On 08/09/16 20:52, Martin Blumenstingl wrote:
+>>>>
+>>>> On Thu, Sep 8, 2016 at 9:35 PM, Kevin Hilman <khilman@baylibre.com>
+>>>> wrote:
+>>>>>>
+>>>>>> +     phy = devm_phy_create(&pdev->dev, NULL, &phy_meson_usb2_ops);
+>>>>>> +     if (IS_ERR(phy)) {
+>>>>>> +             dev_err(&pdev->dev, "failed to create PHY\n");
+>>>>>> +             return PTR_ERR(phy);
+>>>>>> +     }
+>>>>>> +
+>>>>>> +     if (usb_reset_refcnt++ == 0) {
+>>>>>> +             ret = device_reset(&pdev->dev);
+>>>>>> +             if (ret) {
+>>>>>> +                     dev_err(&phy->dev, "Failed to reset USB PHY\n");
+>>>>>> +                     return ret;
+>>>>>> +             }
+>>>>>> +     }
+>>>>>
+>>>>>
+>>>>> The ref count + reset here looks like something that could/should be
+>>>>> handled in a runtime PM callback.
+>>>>
+>>>> Unfortunately that doesn't work (as Jerome found out) because both
+>>>> PHYs are sharing the same reset line.
+>>>> So if the second PHY would call device_reset then it would also reset
+>>>> the first PHY!
+>>>>
+>>>> There's a comment above the declaration of usb_reset_refcnt which
+>>>> tries to explain this:
+>>>> "The PHYs are sharing a common reset line -> we are only allowed to
+>>>> reset once for all PHYs."
+>>>> Maybe I should move this comment to the "if (usb_reset_refcnt++ == 0)
+>>>> {" line to make it easier to see?
+>>>>
+>>>
+>>> pm-runtime has refcounting in it. When one of the nodes turns on,
+>>> the pm-runtime will call your driver to say there is a user when
+>>> this first use turns up.
+>>>
+>>> If all the sub-phys turn off and drop their refcount then the driver
+>>> is called to say there are no more users and you can go to sleep.
+>>
+>>
+>> After a chat w/Martin on IRC, It turns out runtime PM wont help here.
+>>
+>> The reason is because there are physically two PHY devices[1].  Those 2
+>> devices will be treated independely by runtime PM, and have separate
+>> use-counting, which means doing what I proposed would cause a reset to
+>> happen when either device was probed.
+>>
+>> So, I think it's OK as it is.
+>
+>
+> Surely you can do pm_runtime_get/put on the phy's parent platform
+> device and do it that way?
+could you please be more specific with that (do you mean pdev->dev.parent)?
+so we would use pm_runtime_{get_sync,put} with the parent, while we
+would still define the runtime_resume in our driver.
 
-- arm-realview-eb-11mp.dts: the most common variant supported by
-  QEMU with the revision C core tile
-- arm-realview-eb-revb.dts: for the variant with the elder revision
-  B core tile.
-
-As it turns out that there are also a few variants of the
-baseboard, unrelated to the coretile, and that these can of
-course be mounted on top of each other in all permutations, we
-create:
-
-- arm-realview-eb-11mp.dts: the most common variant supported by
-  QEMU with the pre-revision D baseboard and the revision C core
-  tile.
-- arm-realview-eb-11mp-bbrevd.dts: the revision D baseboard
-  with the common revision C core tile.
-- arm-realview-eb-11mp-ctrevb.dts: the pre-revision D baseboard
-  with the revision B core tile.
-- arm-realview-eb-11mp-bbrevd-ctrevb.dts: the revision D baseboard
-  with the revision B core time.
-
-Or as a table:
-
-           | Core tile: C               | Core tile: B
------------+----------------------------+-----------------------------------
-Baseboard: |                            |
-pre-D      |arm-realvie-eb-11mp         | arm-realview-eb-11mp-ctrevb
------------+----------------------------+-----------------------------------
-Baseboard: |                            |
-D          |arm-realview-eb-11mp-bbrevd | arm-realview-eb-11mp-bbrevd-ctrevb
------------+----------------------------+-----------------------------------
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/Makefile                         |  4 +-
- .../dts/arm-realview-eb-11mp-bbrevd-ctrevb.dts     | 32 ++++++++
- arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd.dts  | 28 +++++++
- arch/arm/boot/dts/arm-realview-eb-11mp-ctrevb.dts  | 93 ++++++++++++++++++++++
- arch/arm/boot/dts/arm-realview-eb-11mp-revb.dts    | 93 ----------------------
- arch/arm/boot/dts/arm-realview-eb-11mp.dts         |  2 +-
- 6 files changed, 157 insertions(+), 95 deletions(-)
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd-ctrevb.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-11mp-ctrevb.dts
- delete mode 100644 arch/arm/boot/dts/arm-realview-eb-11mp-revb.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 6d3519fa07c3..2ec6f6236165 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -610,7 +610,9 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
- 	arm-realview-eb.dtb \
- 	arm-realview-eb-bbrevd.dtb \
- 	arm-realview-eb-11mp.dtb \
--	arm-realview-eb-11mp-revb.dtb \
-+	arm-realview-eb-11mp-bbrevd.dtb \
-+	arm-realview-eb-11mp-ctrevb.dtb \
-+	arm-realview-eb-11mp-bbrevd-ctrevb.dtb \
- 	arm-realview-eb-a9mp.dtb \
- 	arm-realview-pba8.dtb \
- 	arm-realview-pbx-a9.dtb
-diff --git a/arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd-ctrevb.dts b/arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd-ctrevb.dts
-new file mode 100644
-index 000000000000..e18769df9fd9
---- /dev/null
-+++ b/arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd-ctrevb.dts
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright 2016 Linaro Ltd
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining a copy
-+ * of this software and associated documentation files (the "Software"), to deal
-+ * in the Software without restriction, including without limitation the rights
-+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-+ * copies of the Software, and to permit persons to whom the Software is
-+ * furnished to do so, subject to the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be included in
-+ * all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-+ * THE SOFTWARE.
-+ */
-+
-+#include "arm-realview-eb-11mp-ctrevb.dts"
-+#include "arm-realview-eb-bbrevd.dtsi"
-+
-+/*
-+ * This is the EB with the new Revision D baseboard with SMSC9118 ethernet and
-+ * the Rev B core tile.
-+ */
-+/ {
-+	model = "ARM RealView Emulation Baseboard Rev D with ARM11MPCore Core Tile Rev B";
-+};
-diff --git a/arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd.dts b/arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd.dts
-new file mode 100644
-index 000000000000..26b1c69e9f43
---- /dev/null
-+++ b/arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd.dts
-@@ -0,0 +1,28 @@
-+/*
-+ * Copyright 2016 Linaro Ltd
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining a copy
-+ * of this software and associated documentation files (the "Software"), to deal
-+ * in the Software without restriction, including without limitation the rights
-+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-+ * copies of the Software, and to permit persons to whom the Software is
-+ * furnished to do so, subject to the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be included in
-+ * all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-+ * THE SOFTWARE.
-+ */
-+
-+#include "arm-realview-eb-11mp.dts"
-+#include "arm-realview-eb-bbrevd.dtsi"
-+
-+/ {
-+	model = "ARM RealView Emulation Baseboard Rev D with ARM11MPCore Rev C Core Tile";
-+};
-diff --git a/arch/arm/boot/dts/arm-realview-eb-11mp-ctrevb.dts b/arch/arm/boot/dts/arm-realview-eb-11mp-ctrevb.dts
-new file mode 100644
-index 000000000000..e68527b0d552
---- /dev/null
-+++ b/arch/arm/boot/dts/arm-realview-eb-11mp-ctrevb.dts
-@@ -0,0 +1,93 @@
-+/*
-+ * Copyright 2016 Linaro Ltd
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining a copy
-+ * of this software and associated documentation files (the "Software"), to deal
-+ * in the Software without restriction, including without limitation the rights
-+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-+ * copies of the Software, and to permit persons to whom the Software is
-+ * furnished to do so, subject to the following conditions:
-+ *
-+ * The above copyright notice and this permission notice shall be included in
-+ * all copies or substantial portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-+ * THE SOFTWARE.
-+ */
-+
-+#include "arm-realview-eb-11mp.dts"
-+
-+/ {
-+	model = "ARM RealView Emulation Baseboard with ARM11MPCore Rev B";
-+};
-+
-+/*
-+ * The revision B has a distinctly different layout of the syscon, so
-+ * append a specific compatible-string.
-+ */
-+&syscon {
-+	compatible = "arm,realview-eb11mp-revb-syscon", "arm,realview-eb-syscon", "syscon", "simple-mfd";
-+};
-+
-+&intc {
-+	reg = <0x10101000 0x1000>,
-+	      <0x10100100 0x100>;
-+};
-+
-+&L2 {
-+	reg = <0x10102000 0x1000>;
-+};
-+
-+&scu {
-+	reg = <0x10100000 0x100>;
-+};
-+
-+&twd_timer {
-+	reg = <0x10100600 0x20>;
-+};
-+
-+&twd_wdog {
-+	reg = <0x10100620 0x20>;
-+};
-+
-+/*
-+ * On revision B, we cannot reach the secondary interrupt
-+ * controller, as a result, some peripherals that are dependent
-+ * on their IRQ cannot be reached, so disable them.
-+ */
-+&intc_second {
-+	status = "disabled";
-+};
-+
-+&gpio0 {
-+	status = "disabled";
-+};
-+
-+&gpio1 {
-+	status = "disabled";
-+};
-+
-+&gpio2 {
-+	status = "disabled";
-+};
-+
-+&serial2 {
-+	status = "disabled";
-+};
-+
-+&serial3 {
-+	status = "disabled";
-+};
-+
-+&ssp {
-+	status = "disabled";
-+};
-+
-+&wdog {
-+	status = "disabled";
-+};
-diff --git a/arch/arm/boot/dts/arm-realview-eb-11mp-revb.dts b/arch/arm/boot/dts/arm-realview-eb-11mp-revb.dts
-deleted file mode 100644
-index e68527b0d552..000000000000
---- a/arch/arm/boot/dts/arm-realview-eb-11mp-revb.dts
-+++ /dev/null
-@@ -1,93 +0,0 @@
--/*
-- * Copyright 2016 Linaro Ltd
-- *
-- * Permission is hereby granted, free of charge, to any person obtaining a copy
-- * of this software and associated documentation files (the "Software"), to deal
-- * in the Software without restriction, including without limitation the rights
-- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-- * copies of the Software, and to permit persons to whom the Software is
-- * furnished to do so, subject to the following conditions:
-- *
-- * The above copyright notice and this permission notice shall be included in
-- * all copies or substantial portions of the Software.
-- *
-- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-- * THE SOFTWARE.
-- */
--
--#include "arm-realview-eb-11mp.dts"
--
--/ {
--	model = "ARM RealView Emulation Baseboard with ARM11MPCore Rev B";
--};
--
--/*
-- * The revision B has a distinctly different layout of the syscon, so
-- * append a specific compatible-string.
-- */
--&syscon {
--	compatible = "arm,realview-eb11mp-revb-syscon", "arm,realview-eb-syscon", "syscon", "simple-mfd";
--};
--
--&intc {
--	reg = <0x10101000 0x1000>,
--	      <0x10100100 0x100>;
--};
--
--&L2 {
--	reg = <0x10102000 0x1000>;
--};
--
--&scu {
--	reg = <0x10100000 0x100>;
--};
--
--&twd_timer {
--	reg = <0x10100600 0x20>;
--};
--
--&twd_wdog {
--	reg = <0x10100620 0x20>;
--};
--
--/*
-- * On revision B, we cannot reach the secondary interrupt
-- * controller, as a result, some peripherals that are dependent
-- * on their IRQ cannot be reached, so disable them.
-- */
--&intc_second {
--	status = "disabled";
--};
--
--&gpio0 {
--	status = "disabled";
--};
--
--&gpio1 {
--	status = "disabled";
--};
--
--&gpio2 {
--	status = "disabled";
--};
--
--&serial2 {
--	status = "disabled";
--};
--
--&serial3 {
--	status = "disabled";
--};
--
--&ssp {
--	status = "disabled";
--};
--
--&wdog {
--	status = "disabled";
--};
-diff --git a/arch/arm/boot/dts/arm-realview-eb-11mp.dts b/arch/arm/boot/dts/arm-realview-eb-11mp.dts
-index 87ff602a2a2d..aac1edd4b227 100644
---- a/arch/arm/boot/dts/arm-realview-eb-11mp.dts
-+++ b/arch/arm/boot/dts/arm-realview-eb-11mp.dts
-@@ -24,7 +24,7 @@
- #include "arm-realview-eb-mp.dtsi"
- 
- / {
--	model = "ARM RealView Emulation Baseboard with ARM11MPCore Rev C";
-+	model = "ARM RealView Emulation Baseboard with ARM11MPCore Rev C Core Tile";
- 	arm,hbi = <0x146>;
- 
- 	/*
--- 
-2.7.4
+I'd be happy if that works and we can remove that refcounting hack
