@@ -1,72 +1,79 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 8 Sep 2016 10:54:34 +0530
-Subject: [PATCH v2 1/2] phy: rockchip-typec: add pm runtime support
-In-Reply-To: <1473289577-14101-1-git-send-email-zyw@rock-chips.com>
-References: <1473289577-14101-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <57D0F612.10702@ti.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 8 Sep 2016 07:33:51 +0200
+Subject: [GIT PULL] ARM64: Xilinx ZynqMP DT changes for v4.9
+In-Reply-To: <066cb4a0-d823-f940-5189-95302f098fd5@monstr.eu>
+References: <066cb4a0-d823-f940-5189-95302f098fd5@monstr.eu>
+Message-ID: <e64cdd1e-fa51-a31e-d1c3-b67e45ee0819@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi guys,
 
-On Thursday 08 September 2016 04:36 AM, Chris Zhong wrote:
-> Adds pm_runtime support for rockchip Type-C, so that power domain is
-> enabled only when there is a transaction going on to help save power.
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> ---
-> 
-> Changes in v2:
-> -- add pm_runtime_put_sync in err case
-> 
->  drivers/phy/phy-rockchip-typec.c | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/drivers/phy/phy-rockchip-typec.c b/drivers/phy/phy-rockchip-typec.c
-> index fb58a27..0b2f528 100644
-> --- a/drivers/phy/phy-rockchip-typec.c
-> +++ b/drivers/phy/phy-rockchip-typec.c
-> @@ -552,6 +552,12 @@ static int tcphy_phy_init(struct rockchip_typec_phy *tcphy, u8 mode)
->  		goto err_clk_core;
->  	}
->  
-> +	ret = pm_runtime_get_sync(tcphy->dev);
-> +	if (ret < 0) {
-> +		dev_err(tcphy->dev, "cannot get pm runtime %d\n", ret);
-> +		goto err_clk_ref;
-> +	}
+any update on this one?
 
-phy_core will do get_sync for you if.. <see below>
-> +
->  	reset_control_deassert(tcphy->tcphy_rst);
->  
->  	property_enable(tcphy, &cfg->typec_conn_dir, tcphy->flip);
-> @@ -600,8 +606,10 @@ static int tcphy_phy_init(struct rockchip_typec_phy *tcphy, u8 mode)
->  	return 0;
->  
->  err_wait_pma:
-> +	pm_runtime_put_sync(tcphy->dev);
->  	reset_control_assert(tcphy->uphy_rst);
->  	reset_control_assert(tcphy->tcphy_rst);
-> +err_clk_ref:
->  	clk_disable_unprepare(tcphy->clk_ref);
->  err_clk_core:
->  	clk_disable_unprepare(tcphy->clk_core);
-> @@ -610,6 +618,7 @@ err_clk_core:
->  
->  static void tcphy_phy_deinit(struct rockchip_typec_phy *tcphy)
->  {
-> +	pm_runtime_put_sync(tcphy->dev);
->  	reset_control_assert(tcphy->tcphy_rst);
->  	reset_control_assert(tcphy->uphy_rst);
->  	reset_control_assert(tcphy->pipe_rst);
-> @@ -987,6 +996,15 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
->  		return PTR_ERR(phy_provider);
->  	}
->  
-> +	pm_runtime_enable(dev);
+Thanks,
+Michal
 
-... pm_runtime_enable is invoked before phy_create.
+On 19.8.2016 12:40, Michal Simek wrote:
+> Hi,
+> 
+> please pull these changes to your tree.
+> 
+> Thanks,
+> Michal
+> 
+> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+> 
+>   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-4.9
+> 
+> for you to fetch changes up to 908c9e733b1c8929f6e42094e58f9b2c06694247:
+> 
+>   ARM64: zynqmp: Correct the watchdog timer interrupt number (2016-08-19
+> 12:31:36 +0200)
+> 
+> ----------------------------------------------------------------
+> arm64: Xilinx ZynqMP dt patches for v4.9
+> 
+> - Fix gic ranges property
+> - Use 64bit size cells format
+> - Add PCIe node
+> - Correct pmu and watchdog nodes
+> 
+> ----------------------------------------------------------------
+> Alexander Graf (1):
+>       ARM64: zynqmp: Align gic ranges for 64k in device tree
+> 
+> Michal Simek (3):
+>       ARM64: zynqmp: Use 64bit size cell format
+>       ARM64: zynqmp: Add PCIe node
+>       ARM64: zynqmp: Add missing interrupt-parent to PMU node
+> 
+> Punnaiah Choudary Kalluri (1):
+>       ARM64: zynqmp: Correct the watchdog timer interrupt number
+> 
+>  arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts |   2 +-
+>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi      | 100
+> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++------------------------------
+>  2 files changed, 71 insertions(+), 31 deletions(-)
+> 
 
-Thanks
-Kishon
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/5b02ca3c/attachment.sig>
