@@ -1,78 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Sep 2016 12:00:31 +0200
-Subject: [PATCH 5/6] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <20160907175148.c3fioqbr2k2pdqri@x1-6-00-0f-9f-c6-3e-90.cpe.webspeed.dk>
-References: <20160831081817.5191-6-maxime.ripard@free-electrons.com>
- <20160907175148.c3fioqbr2k2pdqri@x1-6-00-0f-9f-c6-3e-90.cpe.webspeed.dk>
-Message-ID: <20160908100031.GO8913@lukather>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu,  8 Sep 2016 11:02:20 +0100
+Subject: [PATCH] arm64/io: Allow I/O writes to use {W,X}ZR
+Message-ID: <56d8dac83c2b8167d8fc730075e255bbf9490bc1.1473328940.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 07:51:48PM +0200, Rask Ingemann Lambertsen wrote:
-> On Wed, Aug 31, 2016 at 4:18 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > From: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> >
-> > The GR8 is an SoC made by Nextthing loosely based on the sun5i family.
-> >
-> > Since it's not clear yet what we can factor out and merge with the A10s and
-> > A13 support, let's keep it out of the sun5i.dtsi include tree. We will
-> > figure out what can be shared when things settle down.
-> >
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/gr8.dtsi | 1080 ++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 1080 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/gr8.dtsi
-> >
-> > diff --git a/arch/arm/boot/dts/gr8.dtsi b/arch/arm/boot/dts/gr8.dtsi
-> > new file mode 100644
-> > index 000000000000..d21cfa3f3c14
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/gr8.dtsi
-> 
-> In the node names, you sometimes use underscores and sometimes use hyphens.
-> Here are the ones I spotted:
-> 
-> > +               osc3M: osc3M_clk {
-> > +               pll3x2: pll3x2_clk {
-> > +               pll7x2: pll7x2_clk {
-> > +       display-engine {
-> > +               sram-controller at 01c00000 {
-> > +                               otg_sram: sram-section at 0000 {
-> > +               dma: dma-controller at 01c02000 {
-> > +               tve0: tv-encoder at 01c0a000 {
-> > +               tcon0: lcd-controller at 01c0c000 {
-> > +               intc: interrupt-controller at 01c20400 {
-> > +                       lcd_rgb666_pins: lcd_rgb666 at 0 {
-> > +                       nand_pins_a: nand_base0 at 0 {
-> > +                       nand_cs0_pins_a: nand_cs at 0 {
-> > +                       nand_rb0_pins_a: nand_rb at 0 {
-> > +                       uart1_cts_rts_pins_a: uart1-cts-rts at 0 {
-> > +               fe0: display-frontend at 01e00000 {
-> > +               be0: display-backend at 01e60000 {
-> 
-> Underscores should not be used in node names. [1][2] Since you're adding a
-> new file here, please use hyphens instead.
+When zeroing an I/O location, the current accessors are forced to
+allocate a temporary register to store the zero for the write. By
+tweaking the assembly constraints, we can allow the compiler to use
+the zero register directly in such cases, and save some juggling.
+Compiling a representative kernel configuration with GCC 6 shows
+that 2.3KB worth of code can be wasted just on that!
 
-I wonder what the rationale behind this is. The ePAPR clearly
-documents the underscore as being a valid character for the node
-names.
+  text     data    bss      dec      hex     filename
+ 13316776 3248256 18176769 34741801 2121e29 vmlinux.o.new
+ 13319140 3248256 18176769 34744165 2122765 vmlinux.o.old
 
-I'll change the few inconsistencies though.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm64/include/asm/io.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Thanks!
-Maxime
-
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 9b6e408cfa51..aff77237f9fa 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -40,25 +40,25 @@
+ #define __raw_writeb __raw_writeb
+ static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
+ {
+-	asm volatile("strb %w0, [%1]" : : "r" (val), "r" (addr));
++	asm volatile("strb %w0, [%1]" : : "rZ" (val), "r" (addr));
+ }
+ 
+ #define __raw_writew __raw_writew
+ static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+ {
+-	asm volatile("strh %w0, [%1]" : : "r" (val), "r" (addr));
++	asm volatile("strh %w0, [%1]" : : "rZ" (val), "r" (addr));
+ }
+ 
+ #define __raw_writel __raw_writel
+ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
+ {
+-	asm volatile("str %w0, [%1]" : : "r" (val), "r" (addr));
++	asm volatile("str %w0, [%1]" : : "rZ" (val), "r" (addr));
+ }
+ 
+ #define __raw_writeq __raw_writeq
+ static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
+ {
+-	asm volatile("str %0, [%1]" : : "r" (val), "r" (addr));
++	asm volatile("str %x0, [%1]" : : "rZ" (val), "r" (addr));
+ }
+ 
+ #define __raw_readb __raw_readb
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/aae07d1e/attachment.sig>
+2.8.1.dirty
