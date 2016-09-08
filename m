@@ -1,74 +1,43 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Sep 2016 13:16:48 +0200
-Subject: [PATCH 3/3] arm64/kvm: use alternative auto-nop
-In-Reply-To: <1473242830-26246-4-git-send-email-mark.rutland@arm.com>
-References: <1473242830-26246-1-git-send-email-mark.rutland@arm.com>
- <1473242830-26246-4-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160908111648.GZ23592@cbox>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Thu, 8 Sep 2016 14:14:57 +0300
+Subject: [RFC PATCH] gpio/gpiolib: Forbid irqchip default trigger if
+ probed over DT
+In-Reply-To: <CACRpkdaLf5H6qhF0kS5W-p3YmKh5DxZxyinoV5u9HBKts9CQLg@mail.gmail.com>
+References: <1473170343-16853-1-git-send-email-marc.zyngier@arm.com>
+ <CACRpkdaLf5H6qhF0kS5W-p3YmKh5DxZxyinoV5u9HBKts9CQLg@mail.gmail.com>
+Message-ID: <20160908111457.GD15313@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 11:07:10AM +0100, Mark Rutland wrote:
-> Make use of the new alternative_if and alternative_else_nop_endif and
-> get rid of our homebew NOP sleds, making the code simpler to read.
-
-homebew?
-
+On Thu, Sep 08, 2016 at 12:13:27AM +0200, Linus Walleij wrote:
+> On Tue, Sep 6, 2016 at 3:59 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > 
-> Note that for __kvm_call_hyp the branch to __vhe_hyp_call has been moved
-> out of the alternative sequence, and in the default case there will be
-> four additional NOPs executed.
+> > Using a default trigger is a bad idea if using DT to configure
+> > interrupts, as the device's interrupt specifier will always contain
+> > the trigger configuration.
+> >
+> > Let's warn about that particular situation, and revert to not
+> > having a default. Hopefully, the couple of drivers still using
+> > this feature will quickly be fixed.
+> >
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: kvmarm at lists.cs.columbia.edu
+> Patch applied. This is a good way to get rid of this madness.
+> 
+> > +       /*
+> > +        * Specifying a default trigger is a terrible idea if DT is
+> > +        * used to configure the interrupts, as you may end-up with
+> > +        * conflicting triggers. Tell the user, and reset to NONE.
+> > +        */
+> > +       if (WARN_ON(of_node && type != IRQ_TYPE_NONE,
+> > +                   "%s: Ignoring %d default trigger\n", of_node->full_name))
+> > +               type = IRQ_TYPE_NONE;
+> 
+> I *strongly* suspect this is bad also when using ACPI.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+I agree.
 
-> ---
->  arch/arm64/include/asm/kvm_mmu.h | 10 +++-------
->  arch/arm64/kvm/hyp.S             |  6 +-----
->  2 files changed, 4 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index b6bb834..dff1098 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -99,14 +99,10 @@
->  .macro kern_hyp_va	reg
->  alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
->  	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
-> -alternative_else
-> -	nop
-> -alternative_endif
-> -alternative_if_not ARM64_HYP_OFFSET_LOW
-> -	nop
-> -alternative_else
-> +alternative_else_nop_endif
-> +alternative_if ARM64_HYP_OFFSET_LOW
->  	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
-> -alternative_endif
-> +alternative_else_nop_endif
->  .endm
->  
->  #else
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 7ce9315..2726635 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -46,10 +46,6 @@ alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
->  	hvc	#0
->  	ldr     lr, [sp], #16
->  	ret
-> -alternative_else
-> +alternative_else_nop_endif
->  	b	__vhe_hyp_call
-> -	nop
-> -	nop
-> -	nop
-> -alternative_endif
->  ENDPROC(__kvm_call_hyp)
-> -- 
-> 1.9.1
-> 
+> Would the GPIO ACPI people devise a patch on top of this
+> to emit the same warning for the ACPI usecase?
+
+Yup, I'll make a patch for ACPI next week.
