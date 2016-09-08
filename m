@@ -1,213 +1,37 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 8 Sep 2016 13:41:07 +0200
-Subject: [PATCH 07/10] PM / Domains: Prepare for adding support to remove
- PM domains
-In-Reply-To: <1471340976-5379-8-git-send-email-jonathanh@nvidia.com>
-References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
- <1471340976-5379-8-git-send-email-jonathanh@nvidia.com>
-Message-ID: <CAPDyKFp1ww6fcd+UXaH_qdC+C52+BkDFteiqqHyM4poFUQc=_w@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 8 Sep 2016 19:46:34 +0800
+Subject: [PATCH v4 1/4] arm64: arch_timer: Add device tree binding for
+ A-008585 erratum
+In-Reply-To: <e69db8b1-5fe2-ed0a-b073-de3efdd854d2@suse.com>
+References: <1467877572-10817-1-git-send-email-oss@buserror.net>
+ <e69db8b1-5fe2-ed0a-b073-de3efdd854d2@suse.com>
+Message-ID: <57D14F9A.2050007@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 August 2016 at 11:49, Jon Hunter <jonathanh@nvidia.com> wrote:
-> In order to remove PM domains safely from the list of PM domains,
-> it is necessary to adding locking for the PM domain list around any
-> places where devices or subdomains are added to a PM domain.
->
-> There are places where a reference to a PM domain is obtained via
-> calling of_genpd_get_from_provider() before adding the device or the
-> subdomain. In these cases a lock for the PM domain list needs to be
-> held around the call to of_genpd_get_from_provider() and the call to
-> add the device/subdomain. To avoid deadlocks by multiple attempts to
-> obtain the PM domain list lock, add functions genpd_add_device() and
-> genpd_add_subdomain() which require the user to hold the PM domain
-> list lock when calling.
->
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+Ping
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-
-Kind regards
-Uffe
-
-> ---
->  drivers/base/power/domain.c | 97 ++++++++++++++++++++++++++++++++++-----------
->  1 file changed, 73 insertions(+), 24 deletions(-)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 50223ae0c9a7..7ce4608bbbe0 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1060,14 +1060,8 @@ static void genpd_free_dev_data(struct device *dev,
->         dev_pm_put_subsys_data(dev);
->  }
->
-> -/**
-> - * __pm_genpd_add_device - Add a device to an I/O PM domain.
-> - * @genpd: PM domain to add the device to.
-> - * @dev: Device to be added.
-> - * @td: Set of PM QoS timing parameters to attach to the device.
-> - */
-> -int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
-> -                         struct gpd_timing_data *td)
-> +static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
-> +                           struct gpd_timing_data *td)
->  {
->         struct generic_pm_domain_data *gpd_data;
->         int ret = 0;
-> @@ -1107,6 +1101,24 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
->
->         return ret;
->  }
-> +
-> +/**
-> + * __pm_genpd_add_device - Add a device to an I/O PM domain.
-> + * @genpd: PM domain to add the device to.
-> + * @dev: Device to be added.
-> + * @td: Set of PM QoS timing parameters to attach to the device.
-> + */
-> +int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
-> +                         struct gpd_timing_data *td)
-> +{
-> +       int ret;
-> +
-> +       mutex_lock(&gpd_list_lock);
-> +       ret = genpd_add_device(genpd, dev, td);
-> +       mutex_unlock(&gpd_list_lock);
-> +
-> +       return ret;
-> +}
->  EXPORT_SYMBOL_GPL(__pm_genpd_add_device);
->
->  /**
-> @@ -1160,13 +1172,8 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
->  }
->  EXPORT_SYMBOL_GPL(pm_genpd_remove_device);
->
-> -/**
-> - * pm_genpd_add_subdomain - Add a subdomain to an I/O PM domain.
-> - * @genpd: Master PM domain to add the subdomain to.
-> - * @subdomain: Subdomain to be added.
-> - */
-> -int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
-> -                          struct generic_pm_domain *subdomain)
-> +static int genpd_add_subdomain(struct generic_pm_domain *genpd,
-> +                              struct generic_pm_domain *subdomain)
->  {
->         struct gpd_link *link, *itr;
->         int ret = 0;
-> @@ -1209,6 +1216,23 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
->                 kfree(link);
->         return ret;
->  }
-> +
-> +/**
-> + * pm_genpd_add_subdomain - Add a subdomain to an I/O PM domain.
-> + * @genpd: Master PM domain to add the subdomain to.
-> + * @subdomain: Subdomain to be added.
-> + */
-> +int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
-> +                          struct generic_pm_domain *subdomain)
-> +{
-> +       int ret;
-> +
-> +       mutex_lock(&gpd_list_lock);
-> +       ret = genpd_add_subdomain(genpd, subdomain);
-> +       mutex_unlock(&gpd_list_lock);
-> +
-> +       return ret;
-> +}
->  EXPORT_SYMBOL_GPL(pm_genpd_add_subdomain);
->
->  /**
-> @@ -1575,12 +1599,22 @@ static struct generic_pm_domain *genpd_get_from_provider(
->  int of_genpd_add_device(struct of_phandle_args *genpdspec, struct device *dev)
->  {
->         struct generic_pm_domain *genpd;
-> +       int ret;
-> +
-> +       mutex_lock(&gpd_list_lock);
->
->         genpd = genpd_get_from_provider(genpdspec);
-> -       if (IS_ERR(genpd))
-> -               return PTR_ERR(genpd);
-> +       if (IS_ERR(genpd)) {
-> +               ret = PTR_ERR(genpd);
-> +               goto out;
-> +       }
->
-> -       return pm_genpd_add_device(genpd, dev);
-> +       ret = genpd_add_device(genpd, dev, NULL);
-> +
-> +out:
-> +       mutex_unlock(&gpd_list_lock);
-> +
-> +       return ret;
->  }
->  EXPORT_SYMBOL_GPL(of_genpd_add_device);
->
-> @@ -1597,16 +1631,28 @@ int of_genpd_add_subdomain(struct of_phandle_args *parent_spec,
->                            struct of_phandle_args *subdomain_spec)
->  {
->         struct generic_pm_domain *parent, *subdomain;
-> +       int ret;
-> +
-> +       mutex_lock(&gpd_list_lock);
->
->         parent = genpd_get_from_provider(parent_spec);
-> -       if (IS_ERR(parent))
-> -               return PTR_ERR(parent);
-> +       if (IS_ERR(parent)) {
-> +               ret = PTR_ERR(parent);
-> +               goto out;
-> +       }
->
->         subdomain = genpd_get_from_provider(subdomain_spec);
-> -       if (IS_ERR(subdomain))
-> -               return PTR_ERR(subdomain);
-> +       if (IS_ERR(subdomain)) {
-> +               ret = PTR_ERR(subdomain);
-> +               goto out;
-> +       }
-> +
-> +       ret = genpd_add_subdomain(parent, subdomain);
-> +
-> +out:
-> +       mutex_unlock(&gpd_list_lock);
->
-> -       return pm_genpd_add_subdomain(parent, subdomain);
-> +       return ret;
->  }
->  EXPORT_SYMBOL_GPL(of_genpd_add_subdomain);
->
-> @@ -1705,9 +1751,11 @@ int genpd_dev_pm_attach(struct device *dev)
->                         return -ENOENT;
->         }
->
-> +       mutex_lock(&gpd_list_lock);
->         pd = genpd_get_from_provider(&pd_args);
->         of_node_put(pd_args.np);
->         if (IS_ERR(pd)) {
-> +               mutex_unlock(&gpd_list_lock);
->                 dev_dbg(dev, "%s() failed to find PM domain: %ld\n",
->                         __func__, PTR_ERR(pd));
->                 return -EPROBE_DEFER;
-> @@ -1716,13 +1764,14 @@ int genpd_dev_pm_attach(struct device *dev)
->         dev_dbg(dev, "adding to PM domain %s\n", pd->name);
->
->         for (i = 1; i < GENPD_RETRY_MAX_MS; i <<= 1) {
-> -               ret = pm_genpd_add_device(pd, dev);
-> +               ret = genpd_add_device(pd, dev, NULL);
->                 if (ret != -EAGAIN)
->                         break;
->
->                 mdelay(i);
->                 cond_resched();
->         }
-> +       mutex_unlock(&gpd_list_lock);
->
->         if (ret < 0) {
->                 dev_err(dev, "failed to add to PM domain %s: %d",
-> --
-> 2.1.4
->
+On 2016/8/25 19:04, Matthias Brugger wrote:
+> Hi all,
+> 
+> On 07/07/16 09:46, Scott Wood wrote:
+>> This erratum describes a bug in logic outside the core, so MIDR can't be
+>> used to identify its presence, and reading an SoC-specific revision
+>> register from common arch timer code would be awkward.  So, describe it
+>> in the device tree.
+>>
+>> Signed-off-by: Scott Wood <oss@buserror.net>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> ---
+> 
+> As of today I wasn't able to find this series in linux-next. Was this series somehow forgotten? Scott maybe you can resend the patches adding the clocksource maintainer.
+> 
+> Regards,
+> Matthias
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
