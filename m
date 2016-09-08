@@ -1,97 +1,57 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  8 Sep 2016 14:17:49 +0200
-Subject: [PATCH v3 2/4] ARM: sun5i: a13-olinuxino: Enable VGA bridge
-In-Reply-To: <20160908121751.16911-1-maxime.ripard@free-electrons.com>
-References: <20160908121751.16911-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160908121751.16911-3-maxime.ripard@free-electrons.com>
+Date: Thu,  8 Sep 2016 14:17:47 +0200
+Subject: [PATCH v3 0/4] drm: Add Support for Passive RGB to VGA bridges
+Message-ID: <20160908121751.16911-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have support for the VGA bridges using our DRM driver, enable
-the display engine for the Olimex A13-Olinuxino.
+Hi,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 60 +++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+This serie is about adding support for the RGB to VGA bridge found in
+the A13-Olinuxino and the CHIP VGA adapter.
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index b3c234c65ea1..1cc7ff361f49 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -72,6 +72,53 @@
- 			default-state = "on";
- 		};
- 	};
-+
-+	bridge {
-+		compatible = "rgb-to-vga-bridge";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+
-+				vga_bridge_in: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&tcon0_out_vga>;
-+				};
-+			};
-+
-+			port at 1 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <1>;
-+
-+				vga_bridge_out: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vga_con_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	vga {
-+		compatible = "vga-connector";
-+
-+		port {
-+			vga_con_in: endpoint {
-+				remote-endpoint = <&vga_bridge_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&be0 {
-+	status = "okay";
- };
- 
- &ehci0 {
-@@ -211,6 +258,19 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
-+	status = "okay";
-+};
-+
-+&tcon0_out {
-+	tcon0_out_vga: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&vga_bridge_in>;
-+	};
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins_b>;
+Both these boards rely on an entirely passive bridge made out of
+resitor ladders that do not require any initialisation. The only thing
+needed is to get the timings from the screen if available (and if not,
+fall back on XGA standards), set up the display pipeline to output on
+the RGB bus with the proper timings, and you're done.
+
+This serie also fixes a bunch of bugs uncovered when trying to
+increase the resolution, and hence the pixel clock, of our
+pipeline. It also fixes a few bugs in the DRM driver itself that went
+unnoticed before.
+
+Let me know what you think,
+Maxime
+
+Changes from v2:
+  - Changed the compatible as suggested
+  - Rebased on top 4.8
+
+Changes from v1:
+  - Switch to using a vga-connector
+  - Use drm_encoder bridge pointer instead of doing our own
+  - Report the connector status as unknown instead of connected by
+    default, and as connected only if we can retrieve the EDID.
+  - Switch to of_i2c_get_adapter by node, and put the reference when done
+  - Rebased on linux-next	      
+
+Maxime Ripard (4):
+  drm/bridge: Add RGB to VGA bridge support
+  ARM: sun5i: a13-olinuxino: Enable VGA bridge
+  ARM: multi_v7: enable VGA bridge
+  ARM: sunxi: Enable VGA bridge
+
+ .../bindings/display/bridge/rgb-to-vga-bridge.txt  |  52 +++++
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |  60 ++++++
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/sunxi_defconfig                   |   1 +
+ drivers/gpu/drm/bridge/Kconfig                     |   6 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/rgb-to-vga.c                | 232 +++++++++++++++++++++
+ 7 files changed, 353 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
+ create mode 100644 drivers/gpu/drm/bridge/rgb-to-vga.c
+
 -- 
 2.9.3
