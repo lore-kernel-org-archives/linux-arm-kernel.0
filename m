@@ -1,135 +1,71 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 8 Sep 2016 18:24:24 +0800
-Subject: [PATCH] phy: sun4i-usb: Use spinlock to guard phyctl register
- access
-In-Reply-To: <883333c3-5685-905f-3e96-2c2498a22b8a@redhat.com>
-References: <20160908031418.12627-1-wens@csie.org>
- <883333c3-5685-905f-3e96-2c2498a22b8a@redhat.com>
-Message-ID: <CAGb2v644Ncb8kyvKaJDYLe43M6U2C0EcTVeEP5zbeX=Ei=xs7g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  8 Sep 2016 12:26:08 +0200
+Subject: [PATCH v3 1/3] ARM: sunxi: Support the Nextthing GR8
+In-Reply-To: <20160908102610.26783-1-maxime.ripard@free-electrons.com>
+References: <20160908102610.26783-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160908102610.26783-2-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 6:16 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi,
->
->
-> On 08-09-16 05:14, Chen-Yu Tsai wrote:
->>
->> The musb driver calls into this phy driver to disable/enable squelch
->> detection. This function was introduced in 24fe86a617c5 ("phy: sun4i-usb:
->> Add a sunxi specific function for setting squelch-detect"). This
->> function in turn calls sun4i_usb_phy_write, which uses a mutex to
->> guard the common access register. Unfortunately musb does this
->> in atomic context, which results in the following warning with lock
->> debugging enabled:
->>
->> BUG: sleeping function called from invalid context at
->> kernel/locking/mutex.c:97
->> in_atomic(): 1, irqs_disabled(): 128, pid: 96, name: kworker/0:2
->> CPU: 0 PID: 96 Comm: kworker/0:2 Not tainted 4.8.0-rc4-00181-gd502f8ad1c3e
->> #13
->> Hardware name: Allwinner sun8i Family
->> Workqueue: events musb_deassert_reset
->> [<c010bc01>] (unwind_backtrace) from [<c0109237>] (show_stack+0xb/0xc)
->> [<c0109237>] (show_stack) from [<c02a669b>] (dump_stack+0x67/0x74)
->> [<c02a669b>] (dump_stack) from [<c05d68c9>] (mutex_lock+0x15/0x2c)
->> [<c05d68c9>] (mutex_lock) from [<c02c3589>]
->> (sun4i_usb_phy_write+0x39/0xec)
->> [<c02c3589>] (sun4i_usb_phy_write) from [<c03e6327>]
->> (musb_port_reset+0xfb/0x184)
->> [<c03e6327>] (musb_port_reset) from [<c03e4917>]
->> (musb_deassert_reset+0x1f/0x2c)
->> [<c03e4917>] (musb_deassert_reset) from [<c012ecb5>]
->> (process_one_work+0x129/0x2b8)
->> [<c012ecb5>] (process_one_work) from [<c012f5e3>]
->> (worker_thread+0xf3/0x424)
->> [<c012f5e3>] (worker_thread) from [<c0132dbd>] (kthread+0xa1/0xb8)
->> [<c0132dbd>] (kthread) from [<c0105f31>] (ret_from_fork+0x11/0x20)
->>
->> Since the register access is mmio, we can use a spinlock to guard this
->> specific access, rather than the mutex that guards the entire phy.
->>
->> Fixes: ba4bdc9e1dc0 ("PHY: sunxi: Add driver for sunxi usb phy")
->> Cc: Hans de Goede <hdegoede@redhat.com>
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
->
-> Good catch, but you're actually replacing the locking calls in the only
-> user of sun4i_usb_phy_data.mutex, so after your patch it is no longer
-> used anywhere. Can you do a v2 just outright replacing it with a
-> spinlock please ?
+The GR8 is an SoC made by Nextthing Co, loosely based on the sun5i family.
 
-Ah. I misread the other use of mutex_lock, which is actually using
-the mutex in struct phy. Sure I'll just replace it.
+It has a number of new controllers compared to the A10s and A13 (SPDIF, I2S),
+but some controllers missing too (Ethernet, less I2C, less UARTs).
 
-After sending this patch I wondered if I should have used
-spin_lock_irqsave though.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/arm/sunxi/README                  | 2 ++
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ MAINTAINERS                                     | 1 +
+ arch/arm/mach-sunxi/sunxi.c                     | 1 +
+ 4 files changed, 5 insertions(+)
 
-ChenYu
-
->
-> Thanks,
->
-> Hans
->
->
->
->
->> ---
->>  drivers/phy/phy-sun4i-usb.c | 8 ++++++--
->>  1 file changed, 6 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
->> index fcf4d95ecc6d..ae4ac5457c64 100644
->> --- a/drivers/phy/phy-sun4i-usb.c
->> +++ b/drivers/phy/phy-sun4i-usb.c
->> @@ -40,6 +40,7 @@
->>  #include <linux/power_supply.h>
->>  #include <linux/regulator/consumer.h>
->>  #include <linux/reset.h>
->> +#include <linux/spinlock.h>
->>  #include <linux/usb/of.h>
->>  #include <linux/workqueue.h>
->>
->> @@ -115,6 +116,7 @@ struct sun4i_usb_phy_data {
->>         const struct sun4i_usb_phy_cfg *cfg;
->>         enum usb_dr_mode dr_mode;
->>         struct mutex mutex;
->> +       spinlock_t reg_lock; /* guard access to phyctl reg */
->>         struct sun4i_usb_phy {
->>                 struct phy *phy;
->>                 void __iomem *pmu;
->> @@ -183,7 +185,7 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy
->> *phy, u32 addr, u32 data,
->>         void __iomem *phyctl = phy_data->base +
->> phy_data->cfg->phyctl_offset;
->>         int i;
->>
->> -       mutex_lock(&phy_data->mutex);
->> +       spin_lock(&phy_data->reg_lock);
->>
->>         if (phy_data->cfg->type == sun8i_a33_phy ||
->>             phy_data->cfg->type == sun50i_a64_phy) {
->> @@ -221,7 +223,8 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy
->> *phy, u32 addr, u32 data,
->>
->>                 data >>= 1;
->>         }
->> -       mutex_unlock(&phy_data->mutex);
->> +
->> +       spin_unlock(&phy_data->reg_lock);
->>  }
->>
->>  static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
->> @@ -583,6 +586,7 @@ static int sun4i_usb_phy_probe(struct platform_device
->> *pdev)
->>                 return -ENOMEM;
->>
->>         mutex_init(&data->mutex);
->> +       spin_lock_init(&data->reg_lock);
->>         INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
->>         dev_set_drvdata(dev, data);
->>         data->cfg = of_device_get_match_data(dev);
->>
->
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index e5a115f24471..77f57efbea83 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -31,6 +31,8 @@ SunXi family
+         + User Manual
+           http://dl.linux-sunxi.org/A13/A13%20User%20Manual%20-%20v1.2%20%282013-01-08%29.pdf
+ 
++      - Next Thing Co GR8 (sun5i)
++
+     * Dual ARM Cortex-A7 based SoCs
+       - Allwinner A20 (sun7i)
+         + User Manual
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index 7e79fcc36b0d..3975d0a0e4c2 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -14,3 +14,4 @@ using one of the following compatible strings:
+   allwinner,sun8i-a83t
+   allwinner,sun8i-h3
+   allwinner,sun9i-a80
++  nextthing,gr8
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 20bb1d00098c..7be47efb2159 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -982,6 +982,7 @@ M:	Chen-Yu Tsai <wens@csie.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ N:	sun[x456789]i
++F:	arch/arm/boot/dts/ntc-gr8*
+ 
+ ARM/Allwinner SoC Clock Support
+ M:	Emilio L?pez <emilio@elopez.com.ar>
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 95dca8c2c9ed..2e2bde271205 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -22,6 +22,7 @@ static const char * const sunxi_board_dt_compat[] = {
+ 	"allwinner,sun5i-a10s",
+ 	"allwinner,sun5i-a13",
+ 	"allwinner,sun5i-r8",
++	"nextthing,gr8",
+ 	NULL,
+ };
+ 
+-- 
+2.9.3
