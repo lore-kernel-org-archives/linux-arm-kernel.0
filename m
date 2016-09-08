@@ -1,59 +1,44 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 8 Sep 2016 20:31:36 +0800
-Subject: [PATCH v4 1/4] arm64: arch_timer: Add device tree binding for
- A-008585 erratum
-In-Reply-To: <57D15497.9030606@arm.com>
-References: <1467877572-10817-1-git-send-email-oss@buserror.net>
- <e69db8b1-5fe2-ed0a-b073-de3efdd854d2@suse.com> <57D14F9A.2050007@huawei.com>
- <57D15497.9030606@arm.com>
-Message-ID: <57D15A28.8040807@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 8 Sep 2016 14:34:23 +0200
+Subject: [PATCH v3 3/3] ARM: dts: gr8: Add support for the GR8 evaluation
+ board
+In-Reply-To: <CAGb2v648hLSKsCv6HjaYGUPtvMRGqFC5N-ST4Tp3qsNTw_igmQ@mail.gmail.com>
+References: <20160908102610.26783-1-maxime.ripard@free-electrons.com>
+ <20160908102610.26783-4-maxime.ripard@free-electrons.com>
+ <CAGb2v648hLSKsCv6HjaYGUPtvMRGqFC5N-ST4Tp3qsNTw_igmQ@mail.gmail.com>
+Message-ID: <20160908123423.GP8913@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/9/8 20:07, Marc Zyngier wrote:
-> On 08/09/16 12:46, Ding Tianhong wrote:
->> Ping
+On Thu, Sep 08, 2016 at 06:34:55PM +0800, Chen-Yu Tsai wrote:
+> > +&i2c1 {
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&i2c1_pins_a>;
+> > +       status = "okay";
+> > +
+> > +       pcf8563: rtc at 51 {
+> > +               compatible = "phg,pcf8563";
+> > +               reg = <0x51>;
+> > +       };
+> > +
+> > +       wm8978: codec at 1a {
 > 
-> Oh please! Maybe you could look at the couple of points I've raised in
-> this thread and help addressing them, given that you have a vested
-> interest in seeing these patches being merged? Pinging people this way
-> is not very productive.
-> 
-> Thanks,
-> 
+> I think these should be ordered by address? Otherwise
 
-Ok, I miss that patch, I will review your command and feedback, thanks.
+Yeah, sorry, I don't know how to count anymore....
 
-Ding
+Thanks, I fixed it while applying.
 
-> 	M.
-> 
->>
->> On 2016/8/25 19:04, Matthias Brugger wrote:
->>> Hi all,
->>>
->>> On 07/07/16 09:46, Scott Wood wrote:
->>>> This erratum describes a bug in logic outside the core, so MIDR can't be
->>>> used to identify its presence, and reading an SoC-specific revision
->>>> register from common arch timer code would be awkward.  So, describe it
->>>> in the device tree.
->>>>
->>>> Signed-off-by: Scott Wood <oss@buserror.net>
->>>> Acked-by: Rob Herring <robh@kernel.org>
->>>> ---
->>>
->>> As of today I wasn't able to find this series in linux-next. Was this series somehow forgotten? Scott maybe you can resend the patches adding the clocksource maintainer.
->>>
->>> Regards,
->>> Matthias
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>>
->>
->>
-> 
-> 
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/37cced38/attachment.sig>
