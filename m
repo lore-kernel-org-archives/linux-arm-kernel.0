@@ -1,50 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Sep 2016 11:38:49 +0100
-Subject: [RFCv4 0/7]  arm_pmu/perf tools: play nicely with CPU PMU cpumasks
-In-Reply-To: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
-References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160908103849.GF1493@arm.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu,  8 Sep 2016 12:45:59 +0200
+Subject: [PATCH] KVM: ARM: cleanup kvm_timer_hyp_init
+Message-ID: <1473331560-3103-1-git-send-email-pbonzini@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 11:21:45AM +0100, Mark Rutland wrote:
-> I'm trying to make the perf tool play better with PMUs in heterogeneous systems
-> (e.g. big.LITTLE), where there are several logical PMUs, each covering a subset
-> of CPUs.
-> 
-> Currently perf-record doesn't work for these PMUs, unless forced to use
-> per-thread mmaps. In the absence of a cpumask, it tries to open events on CPUs
-> not supported by a PMU, and gives up. In the presence of a cpumask, it ends up
-> failing to mmap, as the evlist->cpus map contains a different set of CPUs from
-> the evsel->cpus map populated from the cpumask. This is addressed by the
-> penultimate patch in this series.
-> 
-> Complicating matters, prior to commit 00e727bb389359c8 ("perf stat: Balance
-> opening and reading events"), from version two of this series, perf-stat would
-> behave erroneously in the presence of a cpumask file, blocking forever after
-> the workload completed. While this is now fixed, existing binaries (e.g. those
-> shipped by distributions) would be broken by the addition of a cpumask file
-> kernel-side.
-> 
-> To cater for this, this series adds support for a new PMU sysfs file, named
-> 'cpus' rather than 'cpumask', listing a number of CPUs that a logical PMU
-> covers. As old binaries will not look for this, this can be safely added to the
-> kernel without risk of breakage.
+Remove two unnecessary labels now that kvm_timer_hyp_init is not
+creating its own workqueue anymore.
 
-On my x86 laptop, I have the following under /sys/bus/event_source/devices:
+Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+---
+ virt/kvm/arm/arch_timer.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-power/cpumask 0
-uncore_arb/cpumask 0
-uncore_imc/cpumask 0
-uncore_cbox_0/cpumask 0
-uncore_cbox_1/cpumask 0
-cstate_core/cpumask 0-1
-cstate_pkg/cpumask 0
-
-Are you saying that, prior to 00e727bb3893, perf stat blocks forever on
-those PMUs? If so, wouldn't we need to rename all those files too?
-
-I don't want to be the odd duck kernel-side, because of a bug that's
-been fixed in userspace.
-
-Will
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 4309b60ebf17..27a1f6341d41 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -445,7 +445,7 @@ int kvm_timer_hyp_init(void)
+ 	if (err) {
+ 		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
+ 			host_vtimer_irq, err);
+-		goto out;
++		return err;
+ 	}
+ 
+ 	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
+@@ -453,10 +453,6 @@ int kvm_timer_hyp_init(void)
+ 	cpuhp_setup_state(CPUHP_AP_KVM_ARM_TIMER_STARTING,
+ 			  "AP_KVM_ARM_TIMER_STARTING", kvm_timer_starting_cpu,
+ 			  kvm_timer_dying_cpu);
+-	goto out;
+-out_free:
+-	free_percpu_irq(host_vtimer_irq, kvm_get_running_vcpus());
+-out:
+ 	return err;
+ }
+ 
+-- 
+1.8.3.1
