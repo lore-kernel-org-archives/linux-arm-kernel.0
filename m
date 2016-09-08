@@ -1,23 +1,32 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 8 Sep 2016 20:16:57 +0200
-Subject: [RFCv4 0/7]  arm_pmu/perf tools: play nicely with CPU PMU cpumasks
-In-Reply-To: <20160908162502.GB4801@kernel.org>
-References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
- <20160908162502.GB4801@kernel.org>
-Message-ID: <20160908181657.GX10153@twins.programming.kicks-ass.net>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 08 Sep 2016 11:17:08 -0700
+Subject: [PATCH 0/2] spi: meson: Add Amlogic GXBB compatible
+In-Reply-To: <4a199a95-3ee6-a3a0-bc8a-63bd0912e7d2@suse.de> ("Andreas
+ =?utf-8?Q?F=C3=A4rber=22's?= message of "Thu, 8 Sep 2016 14:50:37 +0200")
+References: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
+ <293061a8-e867-4d91-20cb-6e5df8e9b543@suse.de>
+ <4a199a95-3ee6-a3a0-bc8a-63bd0912e7d2@suse.de>
+Message-ID: <m2r38umf2z.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 01:25:02PM -0300, Arnaldo Carvalho de Melo wrote:
-> Em Thu, Sep 08, 2016 at 11:21:45AM +0100, Mark Rutland escreveu:
-> > Hi,
-> > 
-> > I'm trying to make the perf tool play better with PMUs in heterogeneous systems
-> > (e.g. big.LITTLE), where there are several logical PMUs, each covering a subset
-> > of CPUs.
-> 
-> So I added 6/7 and 7/7 to my local perf/core branch, I think they can go
-> before the others, Peter, do you want me to take the kernel parts as
-> well?
+Andreas F?rber <afaerber@suse.de> writes:
 
-arm pmu stuff usually goes through the arm tree. Up to Mark I suppose.
+> Am 08.09.2016 um 14:04 schrieb Andreas F?rber:
+>> Am 08.09.2016 um 09:53 schrieb Neil Armstrong:
+>>> This patchset adds a specific compatible string in the Meson SPIFC driver for
+>>> the Amlogic Meson GXBB SoC.
+>> 
+>> Any particular reason? We could just reuse the meson6 one since there
+>> appear to be no code changes so far.
+>
+> So Neil is essentially telling me they don't know whether there are any
+> differences in the IP block, so a separate compatible string was chosen.
+>
+> No objection from my side, but a general clarification from device tree
+> maintainers when and when not to would be appreciated. (+ devicetree)
+
+I'm not sure what the "right" way is (Rob?) but I think the usual way is
+to add new compatibles when needed.
+
+Kevin
