@@ -1,34 +1,109 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Sep 2016 08:23:17 +0200
-Subject: [PATCH v4 4/8] dts: sun8i-h3: move uart1 pinmux/peripheral
- assocation to DSTI
-In-Reply-To: <1473235141-12768-5-git-send-email-jorik@kippendief.biz>
-References: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
- <1473235141-12768-5-git-send-email-jorik@kippendief.biz>
-Message-ID: <20160908062317.GD8913@lukather>
+From: Minghuan.Lian@nxp.com (Minghuan Lian)
+Date: Thu, 8 Sep 2016 14:25:49 +0800
+Subject: [PATCH 1/2] pci/layercape: disable all iATUs before initialization
+Message-ID: <1473315950-6396-1-git-send-email-Minghuan.Lian@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 09:58:57AM +0200, jorik at kippendief.biz wrote:
-> From: Jorik Jonker <jorik@kippendief.biz>
-> 
-> Users using this UART without RTS/CTS should override the association in
-> their board specific DTS. All (1) board using this UART uses RTS/CTS, so
-> this breaks nothing.
+Layerscape PCIe has 6 outbound iATUs. The bootloader such as
+u-boot uses 4 iATUs for CFG0 CFG1 IO and MEM separately. But
+Designware driver only uses two outbound iATUs. To avoid
+conflict between enabled but unused iATUs with used iATUs
+under Linux and unexpected behavior, the patch disables all
+iATUs before initialization.
 
-Using RTS / CTS is very rare among the boards. Forcing it down the
-throat of every user doesn't seem like the right thing to do.
+Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+---
+ drivers/pci/host/pci-layerscape.c  | 17 +++++++++++++++--
+ drivers/pci/host/pcie-designware.c |  7 +++++++
+ drivers/pci/host/pcie-designware.h |  1 +
+ 3 files changed, 23 insertions(+), 2 deletions(-)
 
-Maxime
-
+diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+index 114ba81..cf783ad 100644
+--- a/drivers/pci/host/pci-layerscape.c
++++ b/drivers/pci/host/pci-layerscape.c
+@@ -38,6 +38,8 @@
+ /* PEX LUT registers */
+ #define PCIE_LUT_DBG		0x7FC /* PEX LUT Debug Register */
+ 
++#define PCIE_IATU_NUM		6
++
+ struct ls_pcie_drvdata {
+ 	u32 lut_offset;
+ 	u32 ltssm_shift;
+@@ -55,6 +57,8 @@ struct ls_pcie {
+ 
+ #define to_ls_pcie(x)	container_of(x, struct ls_pcie, pp)
+ 
++static void ls_pcie_host_init(struct pcie_port *pp);
++
+ static bool ls_pcie_is_bridge(struct ls_pcie *pcie)
+ {
+ 	u32 header_type;
+@@ -87,6 +91,14 @@ static void ls_pcie_drop_msg_tlp(struct ls_pcie *pcie)
+ 	iowrite32(val, pcie->dbi + PCIE_STRFMR1);
+ }
+ 
++static void ls_pcie_disable_outbound_atus(struct ls_pcie *pcie)
++{
++	int i;
++
++	for (i = 0; i < PCIE_IATU_NUM; i++)
++		dw_pcie_disable_outbound_atu(&pcie->pp, i);
++}
++
+ static int ls1021_pcie_link_up(struct pcie_port *pp)
+ {
+ 	u32 state;
+@@ -124,9 +136,8 @@ static void ls1021_pcie_host_init(struct pcie_port *pp)
+ 	}
+ 	pcie->index = index[1];
+ 
++	ls_pcie_host_init(pp);
+ 	dw_pcie_setup_rc(pp);
+-
+-	ls_pcie_drop_msg_tlp(pcie);
+ }
+ 
+ static int ls_pcie_link_up(struct pcie_port *pp)
+@@ -153,6 +164,8 @@ static void ls_pcie_host_init(struct pcie_port *pp)
+ 	ls_pcie_clear_multifunction(pcie);
+ 	ls_pcie_drop_msg_tlp(pcie);
+ 	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);
++
++	ls_pcie_disable_outbound_atus(pcie);
+ }
+ 
+ static int ls_pcie_msi_host_init(struct pcie_port *pp,
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 12afce1..e4d1203 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -172,6 +172,13 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
+ 	dw_pcie_readl_rc(pp, PCIE_ATU_CR2, &val);
+ }
+ 
++void dw_pcie_disable_outbound_atu(struct pcie_port *pp, int index)
++{
++	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | index,
++			  PCIE_ATU_VIEWPORT);
++	dw_pcie_writel_rc(pp, 0, PCIE_ATU_CR2);
++}
++
+ static struct irq_chip dw_msi_irq_chip = {
+ 	.name = "PCI-MSI",
+ 	.irq_enable = pci_msi_unmask_irq,
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index f437f9b..e998bfc 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -85,5 +85,6 @@ int dw_pcie_wait_for_link(struct pcie_port *pp);
+ int dw_pcie_link_up(struct pcie_port *pp);
+ void dw_pcie_setup_rc(struct pcie_port *pp);
+ int dw_pcie_host_init(struct pcie_port *pp);
++void dw_pcie_disable_outbound_atu(struct pcie_port *pp, int index);
+ 
+ #endif /* _PCIE_DESIGNWARE_H */
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/80527ec8/attachment.sig>
+1.9.1
