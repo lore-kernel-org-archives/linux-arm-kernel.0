@@ -1,32 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Sep 2016 11:44:13 +0200
-Subject: [PATCH 2/2] ARM: dts: add device tree for the RealView EB Rev D
-In-Reply-To: <1473327043-31903-1-git-send-email-linus.walleij@linaro.org>
-References: <1473327043-31903-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <15288435.aYlmo6e5Gb@wuerfel>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Thu, 08 Sep 2016 12:43:06 +0300
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <2733202.7lpFC7RnDm@wuerfel>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <6739240.VDAnDBppH0@wuerfel> <87y432iylr.fsf@linux.intel.com>
+ <2733202.7lpFC7RnDm@wuerfel>
+Message-ID: <87lgz2iv6d.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 8, 2016 11:30:43 AM CEST Linus Walleij wrote:
-> @@ -608,6 +608,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
->         arm-realview-pb1176.dtb \
->         arm-realview-pb11mp.dtb \
->         arm-realview-eb.dtb \
-> +       arm-realview-eb-revd.dtb \
->         arm-realview-eb-11mp.dtb \
->         arm-realview-eb-11mp-revb.dtb \
->         arm-realview-eb-a9mp.dtb \
 
-Is the ethernet device on the baseboard or the core tile?
+Hi,
 
-My understanding is that you have a baseboard which comes in
-different revisions and a set of CPU modules (arm9, arm1136,
-arm1176, arm11mp, cortex-a9, ...) that can be freely combined,
-so if the ethernet device is on the baseboard, we also need revd
-variants for 11mp and a9mp.
+Arnd Bergmann <arnd@arndb.de> writes:
+> On Thursday, September 8, 2016 11:29:04 AM CEST Felipe Balbi wrote:
+>> > If we do that, we have to put child devices of the dwc3 devices into
+>> > the platform glue, and it also breaks those dwc3 devices that don't
+>> > have a parent driver.
+>> 
+>> Well, this is easy to fix:
+>> 
+>>         if (dwc->dev->parent) {
+>>                 dwc->sysdev = dwc->dev->parent;
+>>         } else {
+>>                 dev_info(dwc->dev, "Please provide a glue layer!\n");
+>>                 dwc->sysdev = dwc->dev;
+>>         }
+>
+> I don't understand. Do you mean we should have an extra level of
+> stacking and splitting "static struct platform_driver dwc3_driver"
+> in two so instead of
+>
+> 	"qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "xhci" (usb_bus.dev)
+>
+> we do this?
+>
+> 	"qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "dwc3-glue" -> "xhci" (usb_bus.dev)
 
-The arm-realview-eb-11mp-revb seems to refer to RevB of
-the core tile rather than the baseboard (?), so we may need
-a better notation for the file names to clarify that difference.
+no :-)
 
-	Arnd
+If we have a parent device, use that as sysdev, otherwise use self as
+sysdev.
+
+> That sounds a bit clumsy for the sake of consistency with PCI.
+> The advantage is that xhci can always use the grandparent device
+> as sysdev whenever it isn't probed through PCI or firmware
+> itself, but the purpose of the dwc3-glue is otherwise questionable.
+>
+> How about adding a 'compatible="snps,dwc3-pci"' property for the dwc3
+> device when that is created from the PCI driver and checking for that
+> with the device property interface instead? If it's "snps,dwc3"
+> we use the device itself while for "snps,dwc3-pci", we use the parent?
+
+Any reason why we wouldn't use e.g. dwc3-omap.dev as sysdev?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/9de6b544/attachment.sig>
