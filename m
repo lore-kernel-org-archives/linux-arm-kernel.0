@@ -1,54 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 8 Sep 2016 13:07:51 +0100
-Subject: [PATCH v4 1/4] arm64: arch_timer: Add device tree binding for
- A-008585 erratum
-In-Reply-To: <57D14F9A.2050007@huawei.com>
-References: <1467877572-10817-1-git-send-email-oss@buserror.net>
- <e69db8b1-5fe2-ed0a-b073-de3efdd854d2@suse.com> <57D14F9A.2050007@huawei.com>
-Message-ID: <57D15497.9030606@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2016 14:14:50 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <01a5728b-9ea7-3ccf-34e8-7602a654306b@ti.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <87d1keirlu.fsf@linux.intel.com>
+ <01a5728b-9ea7-3ccf-34e8-7602a654306b@ti.com>
+Message-ID: <3028577.HpC29kEMTB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/16 12:46, Ding Tianhong wrote:
-> Ping
+On Thursday, September 8, 2016 3:02:56 PM CEST Grygorii Strashko wrote:
+> dwc3: probe()
+>         if (!&pdev->dev->of_node)
+>                  legacy case - hard-code DMA props
+>                 dwc->sysdev = &pdev->dev;
 
-Oh please! Maybe you could look at the couple of points I've raised in
-this thread and help addressing them, given that you have a vested
-interest in seeing these patches being merged? Pinging people this way
-is not very productive.
+The PCI case will fall into this too, as we almost never have an
+->of_node pointer for a PCI device.
 
-Thanks,
+Do we actually have any legacy dwc3 users in Linux that are neither DT
+nor PCI based? Maybe we can just skip that.
 
-	M.
+>         else
+>                 dev = &pdev->dev;
+>                 do {
+>                         if (is_device_dma_capable(dev)) {
+>                                 dwc->sysdev = dev;
+>                                 break;
+>                         }
+>                    dev = dev->parent;
+>                 while (dev);
+>                 ^this cycle can be limited in depth (2 for PCI)
 
-> 
-> On 2016/8/25 19:04, Matthias Brugger wrote:
->> Hi all,
->>
->> On 07/07/16 09:46, Scott Wood wrote:
->>> This erratum describes a bug in logic outside the core, so MIDR can't be
->>> used to identify its presence, and reading an SoC-specific revision
->>> register from common arch timer code would be awkward.  So, describe it
->>> in the device tree.
->>>
->>> Signed-off-by: Scott Wood <oss@buserror.net>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>> ---
->>
->> As of today I wasn't able to find this series in linux-next. Was this series somehow forgotten? Scott maybe you can resend the patches adding the clocksource maintainer.
->>
->> Regards,
->> Matthias
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
-> 
-> 
+Right, this could work by itself and looks generic enough.
 
-
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
