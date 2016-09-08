@@ -1,50 +1,52 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Sep 2016 16:25:25 +0200
-Subject: [PATCH] KVM: arm/arm64: arch_timer: remove unused error handling
-In-Reply-To: <20160908135908.1312349-1-arnd@arndb.de>
-References: <20160908135908.1312349-1-arnd@arndb.de>
-Message-ID: <20160908142525.GB9940@cbox>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 8 Sep 2016 22:26:17 +0800
+Subject: [PATCH v2 0/7] ARM: dts: imx: add gpio-ranges properties to some
+ iMX GPIO controllers
+In-Reply-To: <a97478e5-e423-2c9b-de71-3341c76ff4fe@mentor.com>
+References: <1471723491-15330-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <a97478e5-e423-2c9b-de71-3341c76ff4fe@mentor.com>
+Message-ID: <20160908142617.GG16911@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Sep 07, 2016 at 06:31:15PM +0300, Vladimir Zapolskiy wrote:
+> Hello Shawn, Fabio.
+> 
+> On 08/20/2016 11:04 PM, Vladimir Zapolskiy wrote:
+> >% gawk -n '{ sub(/.*__/, ""); if ($1 ~ "^GPIO") print $1, $2/4}' \
+> >	arch/arm/boot/dts/imxXX-pinfunc.h | sort -n
+> >
+> >Note that this means that potential errors in arch/arm/boot/dts/imx*-pinfunc.h
+> >descriptions may migrate to this change, please double check the values.
+> >
+> >If needed similar changes may be done for the rest of iMX SoCs.
+> >
+> >Changes from v1 to v2:
+> >* in copy-pasted commit messages corrected SoC names
+> >
+> >Vladimir Zapolskiy (7):
+> >  ARM: dts: add gpio-ranges property to iMX50 GPIO controllers
+> >  ARM: dts: add gpio-ranges property to iMX6Q/D GPIO controllers
+> >  ARM: dts: add gpio-ranges property to iMX6DL/S GPIO controllers
+> >  ARM: dts: add gpio-ranges property to iMX6SL GPIO controllers
+> >  ARM: dts: add gpio-ranges property to iMX6SX GPIO controllers
+> >  ARM: dts: add gpio-ranges property to iMX6UL GPIO controllers
+> >  ARM: dts: add gpio-ranges property to iMX7D/S GPIO controllers
+> >
+> > arch/arm/boot/dts/imx50.dtsi  | 16 +++++++++++++
+> > arch/arm/boot/dts/imx6dl.dtsi | 53 +++++++++++++++++++++++++++++++++++++++++++
+> > arch/arm/boot/dts/imx6q.dtsi  | 37 ++++++++++++++++++++++++++++++
+> > arch/arm/boot/dts/imx6sl.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++++
+> > arch/arm/boot/dts/imx6sx.dtsi | 14 ++++++++++++
+> > arch/arm/boot/dts/imx6ul.dtsi | 11 +++++++++
+> > arch/arm/boot/dts/imx7s.dtsi  | 14 ++++++++++++
+> > 7 files changed, 197 insertions(+)
+> >
+> 
+> Gentle ping, please provide review comments, the change would be good
+> to have in v4.9.
 
-On Thu, Sep 08, 2016 at 03:58:44PM +0200, Arnd Bergmann wrote:
-> A cleanup removed the call to create_singlethread_workqueue(), but did not
-> remove the code that was used in case it failed:
-> 
-> virt/kvm/arm/arch_timer.c: In function 'kvm_timer_hyp_init':
-> virt/kvm/arm/arch_timer.c:457:1: error: label 'out_free' defined but not used [-Werror=unused-label]
-> 
-> This removes the now dead code too.
+I'm fine to pick them up, but can you please squash them into one patch
+and drop the newline right before gpio-ranges property?
 
-Paolo beat you to it:
-https://lists.cs.columbia.edu/pipermail/kvmarm/2016-September/021626.html
-
-Thanks,
--Christoffer
-
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 3706feacd007 ("KVM: Remove deprecated create_singlethread_workqueue")
-> ---
->  virt/kvm/arm/arch_timer.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 4309b60ebf17..46980a49a3bb 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -453,9 +453,6 @@ int kvm_timer_hyp_init(void)
->  	cpuhp_setup_state(CPUHP_AP_KVM_ARM_TIMER_STARTING,
->  			  "AP_KVM_ARM_TIMER_STARTING", kvm_timer_starting_cpu,
->  			  kvm_timer_dying_cpu);
-> -	goto out;
-> -out_free:
-> -	free_percpu_irq(host_vtimer_irq, kvm_get_running_vcpus());
->  out:
->  	return err;
->  }
-> -- 
-> 2.9.0
-> 
+Shawn
