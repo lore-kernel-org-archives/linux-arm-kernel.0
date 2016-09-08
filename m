@@ -1,9 +1,9 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  8 Sep 2016 11:21:47 +0100
-Subject: [RFCv4 2/7] arm64: perf: move to common attr_group fields
+Date: Thu,  8 Sep 2016 11:21:48 +0100
+Subject: [RFCv4 3/7] arm: perf: move to common attr_group fields
 In-Reply-To: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
 References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1473330112-28528-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1473330112-28528-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,96 +13,121 @@ common files (e.g. cpumask) for us in subsequent patches.
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/perf_event.c | 36 ++++++++++++++++++++++++------------
- 1 file changed, 24 insertions(+), 12 deletions(-)
+ arch/arm/kernel/perf_event_v7.c | 47 ++++++++++++++++++++++++-----------------
+ 1 file changed, 28 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 838ccf1..bcc8dff 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -523,12 +523,6 @@ static struct attribute_group armv8_pmuv3_format_attr_group = {
- 	.attrs = armv8_pmuv3_format_attrs,
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 1506385..b942349 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -596,12 +596,6 @@ static struct attribute_group armv7_pmuv1_events_attr_group = {
+ 	.attrs = armv7_pmuv1_event_attrs,
  };
  
--static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
--	&armv8_pmuv3_events_attr_group,
--	&armv8_pmuv3_format_attr_group,
+-static const struct attribute_group *armv7_pmuv1_attr_groups[] = {
+-	&armv7_pmuv1_events_attr_group,
+-	&armv7_pmu_format_attr_group,
+-	NULL,
+-};
+-
+ ARMV7_EVENT_ATTR(mem_access, ARMV7_PERFCTR_MEM_ACCESS);
+ ARMV7_EVENT_ATTR(l1i_cache, ARMV7_PERFCTR_L1_ICACHE_ACCESS);
+ ARMV7_EVENT_ATTR(l1d_cache_wb, ARMV7_PERFCTR_L1_DCACHE_WB);
+@@ -653,12 +647,6 @@ static struct attribute_group armv7_pmuv2_events_attr_group = {
+ 	.attrs = armv7_pmuv2_event_attrs,
+ };
+ 
+-static const struct attribute_group *armv7_pmuv2_attr_groups[] = {
+-	&armv7_pmuv2_events_attr_group,
+-	&armv7_pmu_format_attr_group,
 -	NULL,
 -};
 -
  /*
   * Perf Events' indices
   */
-@@ -985,7 +979,10 @@ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
- 	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_pmuv3";
- 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
--	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
+@@ -1208,7 +1196,10 @@ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a8";
+ 	cpu_pmu->map_event	= armv7_a8_map_event;
+-	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
-+		&armv8_pmuv3_events_attr_group;
++		&armv7_pmuv1_events_attr_group;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
-+		&armv8_pmuv3_format_attr_group;
- 	return armv8pmu_probe_pmu(cpu_pmu);
++		&armv7_pmu_format_attr_group;
+ 	return armv7_probe_num_events(cpu_pmu);
  }
  
-@@ -994,7 +991,10 @@ static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_cortex_a53";
- 	cpu_pmu->map_event		= armv8_a53_map_event;
--	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
+@@ -1217,7 +1208,10 @@ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a9";
+ 	cpu_pmu->map_event	= armv7_a9_map_event;
+-	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
-+		&armv8_pmuv3_events_attr_group;
++		&armv7_pmuv1_events_attr_group;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
-+		&armv8_pmuv3_format_attr_group;
- 	return armv8pmu_probe_pmu(cpu_pmu);
++		&armv7_pmu_format_attr_group;
+ 	return armv7_probe_num_events(cpu_pmu);
  }
  
-@@ -1003,7 +1003,10 @@ static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_cortex_a57";
- 	cpu_pmu->map_event		= armv8_a57_map_event;
--	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
+@@ -1226,7 +1220,10 @@ static int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a5";
+ 	cpu_pmu->map_event	= armv7_a5_map_event;
+-	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
-+		&armv8_pmuv3_events_attr_group;
++		&armv7_pmuv1_events_attr_group;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
-+		&armv8_pmuv3_format_attr_group;
- 	return armv8pmu_probe_pmu(cpu_pmu);
++		&armv7_pmu_format_attr_group;
+ 	return armv7_probe_num_events(cpu_pmu);
  }
  
-@@ -1012,7 +1015,10 @@ static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_cortex_a72";
- 	cpu_pmu->map_event		= armv8_a57_map_event;
--	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
+@@ -1236,7 +1233,10 @@ static int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->name		= "armv7_cortex_a15";
+ 	cpu_pmu->map_event	= armv7_a15_map_event;
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
+-	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
-+		&armv8_pmuv3_events_attr_group;
++		&armv7_pmuv2_events_attr_group;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
-+		&armv8_pmuv3_format_attr_group;
- 	return armv8pmu_probe_pmu(cpu_pmu);
++		&armv7_pmu_format_attr_group;
+ 	return armv7_probe_num_events(cpu_pmu);
  }
  
-@@ -1021,7 +1027,10 @@ static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_cavium_thunder";
- 	cpu_pmu->map_event		= armv8_thunder_map_event;
--	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
+@@ -1246,7 +1246,10 @@ static int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->name		= "armv7_cortex_a7";
+ 	cpu_pmu->map_event	= armv7_a7_map_event;
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
+-	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
-+		&armv8_pmuv3_events_attr_group;
++		&armv7_pmuv2_events_attr_group;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
-+		&armv8_pmuv3_format_attr_group;
- 	return armv8pmu_probe_pmu(cpu_pmu);
++		&armv7_pmu_format_attr_group;
+ 	return armv7_probe_num_events(cpu_pmu);
  }
  
-@@ -1030,7 +1039,10 @@ static int armv8_vulcan_pmu_init(struct arm_pmu *cpu_pmu)
- 	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_brcm_vulcan";
- 	cpu_pmu->map_event		= armv8_vulcan_map_event;
--	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
+@@ -1256,7 +1259,10 @@ static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->name		= "armv7_cortex_a12";
+ 	cpu_pmu->map_event	= armv7_a12_map_event;
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
+-	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
-+		&armv8_pmuv3_events_attr_group;
++		&armv7_pmuv2_events_attr_group;
 +	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
-+		&armv8_pmuv3_format_attr_group;
- 	return armv8pmu_probe_pmu(cpu_pmu);
++		&armv7_pmu_format_attr_group;
+ 	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+@@ -1264,7 +1270,10 @@ static int armv7_a17_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	int ret = armv7_a12_pmu_init(cpu_pmu);
+ 	cpu_pmu->name = "armv7_cortex_a17";
+-	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
++	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
++		&armv7_pmuv2_events_attr_group;
++	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_FORMATS] =
++		&armv7_pmu_format_attr_group;
+ 	return ret;
  }
  
 -- 
