@@ -1,156 +1,143 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Thu, 8 Sep 2016 11:09:20 +0900
-Subject: [PATCH v2] arm64: Improve kprobes test for atomic sequence
-In-Reply-To: <57D0203E.1070901@linaro.org>
-References: <1473184499-6018-1-git-send-email-dave.long@linaro.org>
- <20160907145244.ea997984134c15c12793ca74@kernel.org>
- <57D0203E.1070901@linaro.org>
-Message-ID: <20160908110920.f618f545ee75669cee373fdf@kernel.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 7 Sep 2016 19:22:45 -0700
+Subject: [PATCH 4/4] Input: jornada720_ts - get rid of mach/irqs.h and
+ mach/hardware.h includes
+In-Reply-To: <E1bhZVn-0005cl-E4@rmk-PC.armlinux.org.uk>
+References: <20160907095029.GL1041@n2100.armlinux.org.uk>
+ <E1bhZVn-0005cl-E4@rmk-PC.armlinux.org.uk>
+Message-ID: <20160908022245.GD6445@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Sep 2016 10:12:14 -0400
-David Long <dave.long@linaro.org> wrote:
-
-> On 09/07/2016 01:52 AM, Masami Hiramatsu wrote:
-> > On Tue,  6 Sep 2016 13:54:59 -0400
-> > David Long <dave.long@linaro.org> wrote:
-> >
-> >> From: "David A. Long" <dave.long@linaro.org>
-> >>
-> >> Kprobes searches backwards a finite number of instructions to determine if
-> >> there is an attempt to probe a load/store exclusive sequence. It stops when
-> >> it hits the maximum number of instructions or a load or store exclusive.
-> >> However this means it can run up past the beginning of the function and
-> >> start looking at literal constants. This has been shown to cause a false
-> >> positive and blocks insertion of the probe. To fix this, further limit the
-> >> backwards search to stop if it hits a symbol address from kallsyms. The
-> >> presumption is that this is the entry point to this code (particularly for
-> >> the common case of placing probes at the beginning of functions).
-> >>
-> >> This also improves efficiency by not searching code that is not part of the
-> >> function. There may be some possibility that the label might not denote the
-> >> entry path to the probed instruction but the likelihood seems low and this
-> >> is just another example of how the kprobes user really needs to be
-> >> careful about what they are doing.
-> >
-> > Hi Dave,
-> >
-> > kallsyms_lookup_size_offset() part looks good to me. By the way,
-> > is there any reason we'll check the _text and module's base address
-> > boundary?
-> > I think those are already searced by kallsyms_lookup_size_offset(),
-> > so you don't need to check those. If the address is not found by
-> > kallsyms_lookup_size_offset(), that address maybe out-of-text.
-> >
+On Wed, Sep 07, 2016 at 10:51:19AM +0100, Russell King wrote:
+> Switch the jornada720 touchscreen driver to obtain its gpio from
+> the platform device via gpiolib and derive the interrupt from the
+> GPIO, rather than via a hard-coded interrupt number obtained from
+> the mach/irqs.h and mach/hardware.h headers.
 > 
-> CONFIG KPROBES does currently select CONFIG_KALLSYMS, but is it wise for 
-> this code to depend on that?  Perhaps the text boundary checking should 
-> be moved under an else clause for the case of 
-> kallsyms_lookup_size_offset() failing?
+> Tested-by: Adam Wysocki <armlinux@chmurka.net>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Would you have any case where the address is in kernel_text but kallsyms_lookup
-failed to find symbol? IMHO, even if there is, we should reject probing on
-such "nowhere" address. 
+Applied, thank you.
 
-Thank you,
-
+> ---
+>  arch/arm/mach-sa1100/jornada720.c         | 10 ++++++++++
+>  drivers/input/touchscreen/jornada720_ts.c | 21 ++++++++++++++-------
+>  2 files changed, 24 insertions(+), 7 deletions(-)
 > 
-> > Thank you,
-> >>
-> >> Signed-off-by: David A. Long <dave.long@linaro.org>
-> >> ---
-> >>   arch/arm64/kernel/probes/decode-insn.c | 48 +++++++++++++++++++++++-----------
-> >>   1 file changed, 33 insertions(+), 15 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
-> >> index 37e47a9..356ee52 100644
-> >> --- a/arch/arm64/kernel/probes/decode-insn.c
-> >> +++ b/arch/arm64/kernel/probes/decode-insn.c
-> >> @@ -16,6 +16,7 @@
-> >>   #include <linux/kernel.h>
-> >>   #include <linux/kprobes.h>
-> >>   #include <linux/module.h>
-> >> +#include <linux/kallsyms.h>
-> >>   #include <asm/kprobes.h>
-> >>   #include <asm/insn.h>
-> >>   #include <asm/sections.h>
-> >> @@ -122,7 +123,7 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
-> >>   static bool __kprobes
-> >>   is_probed_address_atomic(kprobe_opcode_t *scan_start, kprobe_opcode_t *scan_end)
-> >>   {
-> >> -	while (scan_start > scan_end) {
-> >> +	while (scan_start >= scan_end) {
-> >>   		/*
-> >>   		 * atomic region starts from exclusive load and ends with
-> >>   		 * exclusive store.
-> >> @@ -144,26 +145,43 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
-> >>   	kprobe_opcode_t insn = le32_to_cpu(*addr);
-> >>   	kprobe_opcode_t *scan_start = addr - 1;
-> >>   	kprobe_opcode_t *scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
-> >> +	unsigned long size = 0, offset = 0;
-> >>   #if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
-> >>   	struct module *mod;
-> >>   #endif
-> >>
-> >> -	if (addr >= (kprobe_opcode_t *)_text &&
-> >> -	    scan_end < (kprobe_opcode_t *)_text)
-> >> -		scan_end = (kprobe_opcode_t *)_text;
-> >> +	/*
-> >> +	 * If there's a symbol defined in front of and near enough to
-> >> +	 * the probe address assume it is the entry point to this
-> >> +	 * code and use it to further limit how far back we search
-> >> +	 * when determining if we're in an atomic sequence.
-> >> +	 */
-> >> +	if (kallsyms_lookup_size_offset((unsigned long) addr, &size, &offset))
-> >> +		if (offset < (MAX_ATOMIC_CONTEXT_SIZE*sizeof(kprobe_opcode_t)))
-> >> +			scan_end = addr - (offset / sizeof(kprobe_opcode_t));
-> >> +
-> >> +	if (scan_end <= scan_start) {
-> >> +		if (addr >= (kprobe_opcode_t *)_text &&
-> >> +		    scan_end < (kprobe_opcode_t *)_text)
-> >> +			scan_end = (kprobe_opcode_t *)_text;
-> >>   #if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
-> >> -	else {
-> >> -		preempt_disable();
-> >> -		mod = __module_address((unsigned long)addr);
-> >> -		if (mod && within_module_init((unsigned long)addr, mod) &&
-> >> -			!within_module_init((unsigned long)scan_end, mod))
-> >> -			scan_end = (kprobe_opcode_t *)mod->init_layout.base;
-> >> -		else if (mod && within_module_core((unsigned long)addr, mod) &&
-> >> -			!within_module_core((unsigned long)scan_end, mod))
-> >> -			scan_end = (kprobe_opcode_t *)mod->core_layout.base;
-> >> -		preempt_enable();
-> >> -	}
-> >> +		else {
-> >> +			preempt_disable();
-> >> +			mod = __module_address((unsigned long)addr);
-> >> +			if (mod &&
-> >> +			    within_module_init((unsigned long)addr, mod) &&
-> >> +			    !within_module_init((unsigned long)scan_end, mod))
-> >> +				scan_end =
-> >> +				    (kprobe_opcode_t *)mod->init_layout.base;
-> >> +			else if (mod &&
-> >> +			    within_module_core((unsigned long)addr, mod) &&
-> >> +			    !within_module_core((unsigned long)scan_end, mod))
-> >> +				scan_end =
-> >> +				    (kprobe_opcode_t *)mod->core_layout.base;
-> >> +			preempt_enable();
-> >> +		}
-> >>   #endif
-> >> +	}
-> >>   	decoded = arm_probe_decode_insn(insn, asi);
-> >>
-> >>   	if (decoded == INSN_REJECTED ||
-> >> --
-> >> 2.5.0
-> >>
+> diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
+> index 2b96f7bc16bd..0a2ca9be00e6 100644
+> --- a/arch/arm/mach-sa1100/jornada720.c
+> +++ b/arch/arm/mach-sa1100/jornada720.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/tty.h>
+>  #include <linux/delay.h>
+> +#include <linux/gpio/machine.h>
+>  #include <linux/platform_data/sa11x0-serial.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/ioport.h>
+> @@ -228,6 +229,13 @@ static struct platform_device jornada_kbd_device = {
+>  	.resource	= jornada_kbd_resources,
+>  };
+>  
+> +static struct gpiod_lookup_table jornada_ts_gpiod_table = {
+> +	.dev_id		= "jornada_ts",
+> +	.table		= {
+> +		GPIO_LOOKUP("gpio", 9, "penup", GPIO_ACTIVE_HIGH),
+> +	},
+> +};
+> +
+>  static struct platform_device jornada_ts_device = {
+>  	.name		= "jornada_ts",
+>  	.id		= -1,
+> @@ -256,6 +264,8 @@ static int __init jornada720_init(void)
+>  		GPSR = GPIO_GPIO20;	/* restart gpio20 */
+>  		udelay(20);		/* give it some time to restart */
+>  
+> +		gpiod_add_lookup_table(&jornada_ts_gpiod_table);
+> +
+>  		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+>  	}
+>  
+> diff --git a/drivers/input/touchscreen/jornada720_ts.c b/drivers/input/touchscreen/jornada720_ts.c
+> index ea3b6a5b83e6..729b3c89324c 100644
+> --- a/drivers/input/touchscreen/jornada720_ts.c
+> +++ b/drivers/input/touchscreen/jornada720_ts.c
+> @@ -13,6 +13,7 @@
+>   * HP Jornada 710/720/729 Touchscreen Driver
+>   */
+>  
+> +#include <linux/gpio/consumer.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/input.h>
+>  #include <linux/interrupt.h>
+> @@ -20,9 +21,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/io.h>
+>  
+> -#include <mach/hardware.h>
+>  #include <mach/jornada720.h>
+> -#include <mach/irqs.h>
+>  
+>  MODULE_AUTHOR("Kristoffer Ericson <kristoffer.ericson@gmail.com>");
+>  MODULE_DESCRIPTION("HP Jornada 710/720/728 touchscreen driver");
+> @@ -30,6 +29,7 @@ MODULE_LICENSE("GPL v2");
+>  
+>  struct jornada_ts {
+>  	struct input_dev *dev;
+> +	struct gpio_desc *gpio;
+>  	int x_data[4];		/* X sample values */
+>  	int y_data[4];		/* Y sample values */
+>  };
+> @@ -71,8 +71,8 @@ static irqreturn_t jornada720_ts_interrupt(int irq, void *dev_id)
+>  	struct input_dev *input = jornada_ts->dev;
+>  	int x, y;
+>  
+> -	/* If GPIO_GPIO9 is set to high then report pen up */
+> -	if (GPLR & GPIO_GPIO(9)) {
+> +	/* If gpio is high then report pen up */
+> +	if (gpiod_get_value(jornada_ts->gpio)) {
+>  		input_report_key(input, BTN_TOUCH, 0);
+>  		input_sync(input);
+>  	} else {
+> @@ -101,7 +101,7 @@ static int jornada720_ts_probe(struct platform_device *pdev)
+>  {
+>  	struct jornada_ts *jornada_ts;
+>  	struct input_dev *input_dev;
+> -	int error;
+> +	int error, irq;
+>  
+>  	jornada_ts = devm_kzalloc(&pdev->dev, sizeof(*jornada_ts), GFP_KERNEL);
+>  	if (!jornada_ts)
+> @@ -113,6 +113,14 @@ static int jornada720_ts_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, jornada_ts);
+>  
+> +	jornada_ts->gpio = devm_gpiod_get(&pdev->dev, "penup", GPIOD_IN);
+> +	if (IS_ERR(jornada_ts->gpio))
+> +		return PTR_ERR(jornada_ts->gpio);
+> +
+> +	irq = gpiod_to_irq(jornada_ts->gpio);
+> +	if (irq <= 0)
+> +		return irq < 0 ? irq : -EINVAL;
+> +
+>  	jornada_ts->dev = input_dev;
+>  
+>  	input_dev->name = "HP Jornada 7xx Touchscreen";
+> @@ -125,8 +133,7 @@ static int jornada720_ts_probe(struct platform_device *pdev)
+>  	input_set_abs_params(input_dev, ABS_X, 270, 3900, 0, 0);
+>  	input_set_abs_params(input_dev, ABS_Y, 180, 3700, 0, 0);
+>  
+> -	error = devm_request_irq(&pdev->dev, IRQ_GPIO9,
+> -				 jornada720_ts_interrupt,
+> +	error = devm_request_irq(&pdev->dev, irq, jornada720_ts_interrupt,
+>  				 IRQF_TRIGGER_RISING,
+>  				 "HP7XX Touchscreen driver", pdev);
+>  	if (error) {
+> -- 
+> 2.1.0
 > 
-> Thanks,
-> -dl
-> 
-> 
-
 
 -- 
-Masami Hiramatsu <mhiramat@kernel.org>
+Dmitry
