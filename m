@@ -1,29 +1,24 @@
 From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 7 Sep 2016 19:58:09 -0500
-Subject: [PATCH v4 01/22] of: device: Support loading a module with OF
- based modalias
-In-Reply-To: <20160907213519.27340-2-stephen.boyd@linaro.org>
+Date: Wed, 7 Sep 2016 19:58:43 -0500
+Subject: [PATCH v4 02/22] of: device: Export of_device_{get_modalias,
+ uvent_modalias} to modules
+In-Reply-To: <20160907213519.27340-3-stephen.boyd@linaro.org>
 References: <20160907213519.27340-1-stephen.boyd@linaro.org>
- <20160907213519.27340-2-stephen.boyd@linaro.org>
-Message-ID: <CAL_JsqLC-ucq03wLY65mwYXQJHC_mVoK3LOMfpXVpYhKXssLgA@mail.gmail.com>
+ <20160907213519.27340-3-stephen.boyd@linaro.org>
+Message-ID: <CAL_JsqKE=K+p6dtgfEP7pCij07BfyOBw_scLV6O1eEn8N9hsAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Sep 7, 2016 at 4:34 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> In the case of ULPI devices, we want to be able to load the
-> driver before registering the device so that we don't get stuck
-> in a loop waiting for the phy module to appear and failing usb
-> controller probe. Currently we request the ulpi module via the
-> ulpi ids, but in the DT case we might need to request it with the
-> OF based modalias instead. Add a common function that allows
-> anyone to request a module with the OF based modalias.
+> The ULPI bus can be built as a module, and it will soon be
+> calling these functions when it supports probing devices from DT.
+> Export them so they can be used by the ULPI module.
 >
 > Cc: Rob Herring <robh+dt@kernel.org>
 > Cc: <devicetree@vger.kernel.org>
 > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
->  drivers/of/device.c       | 23 +++++++++++++++++++++++
->  include/linux/of_device.h |  6 ++++++
->  2 files changed, 29 insertions(+)
+>  drivers/of/device.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
