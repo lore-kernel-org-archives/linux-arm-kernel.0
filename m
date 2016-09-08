@@ -1,468 +1,142 @@
-From: hongtao.jia@nxp.com (Troy Jia)
-Date: Thu, 8 Sep 2016 07:11:45 +0000
-Subject: [PATCH V2 7/7] thermal: qoriq: Add thermal management support
-In-Reply-To: <1471610370.2691.62.camel@intel.com>
-References: <1467256118-41754-1-git-send-email-hongtao.jia@nxp.com>
- <1471610370.2691.62.camel@intel.com>
-Message-ID: <AM4PR0401MB18438E5760B14FC2610A0D31EBFB0@AM4PR0401MB1843.eurprd04.prod.outlook.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 8 Sep 2016 10:21:27 +0300
+Subject: [PATCH v5 2/2] sdhci-of-arasan: Set controller to test mode when
+ xlnx-fails-without-test-cd is present
+In-Reply-To: <1473286961-19608-2-git-send-email-zach.brown@ni.com>
+References: <1473286961-19608-1-git-send-email-zach.brown@ni.com>
+ <1473286961-19608-2-git-send-email-zach.brown@ni.com>
+Message-ID: <3b3935f7-5d3c-f721-81a5-bb8e8cd186e9@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Zhang Rui [mailto:rui.zhang at intel.com]
-> Sent: Friday, August 19, 2016 8:40 PM
-> To: Hongtao Jia <hongtao.jia@nxp.com>; edubezval at gmail.com;
-> robh+dt at kernel.org; galak at codeaurora.org; Scott Wood
-> <scott.wood@nxp.com>; shawnguo at kernel.org
-> Cc: linux-pm at vger.kernel.org; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH V2 7/7] thermal: qoriq: Add thermal management support
+On 08/09/16 01:22, Zach Brown wrote:
+> The sdhci controller on xilinx zynq devices will not function unless
+> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+> In cases where it is impossible to provide the CD bit in hardware,
+> setting the controller to test mode and then setting inserted to true
+> will get the controller to function without the CD bit.
 > 
-> On ?, 2016-06-30 at 11:08 +0800, Jia Hongtao wrote:
-> > This driver add thermal management support by enabling TMU (Thermal
-> > Monitoring Unit) on QorIQ platform.
-> >
-> > It's based on thermal of framework:
-> > - Trip points defined in device tree.
-> > - Cpufreq as cooling device registered in qoriq cpufreq driver.
-> >
-> > Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
+> When the device has the property xlnx-fails-without-test-cd the driver
+> changes the controller to test mode and sets test inserted to true to
+> make the controller function.
 > 
-> The patch looks good to me.
-> I only need to take this patch, right?
+> Signed-off-by: Zach Brown <zach.brown@ni.com>
+
+Doesn't apply.  Please re-base on Ulf's mmc tree's next branch.
+
+But since you're doing that please consider some style changes below.
+
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 34 +++++++++++++++++++++++++++++++++-
+>  drivers/mmc/host/sdhci.h           |  2 ++
+>  2 files changed, 35 insertions(+), 1 deletion(-)
 > 
-> thanks,
-> rui
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index b6f4c1d..46be9d9 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/of_device.h>
+>  #include <linux/phy/phy.h>
+>  #include "sdhci-pltfm.h"
+> +#include <linux/of.h>
+>  
+>  #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
+>  
+> @@ -38,6 +39,10 @@
+>  struct sdhci_arasan_data {
+>  	struct clk	*clk_ahb;
+>  	struct phy	*phy;
+> +	unsigned int arasan_quirks; /* Arasan deviations from spec */
 
-Yes. You just need to take this patch.
-Sorry for the late response. I was on my long vacation back then.
+Should really try to line up the variable names.  The name seems a bit
+redundant too e.g. arasan_quirks -> quirks
 
-Thanks,
-Hongtao.
+> +
+> +/* Controller does not have CD wired and will not function normally without */
+> +#define SDHCI_ARASAN_QUIRK_FAILS_WITHOUT_TEST_CD	BIT(0)
 
-> > ---
-> > Changes of V2:
-> > * Add HAS_IOMEM dependency to fix build error on UM
-> >
-> > ?drivers/thermal/Kconfig?????????|??10 ++
-> > ?drivers/thermal/Makefile????????|???1 +
-> > ?drivers/thermal/qoriq_thermal.c | 328
-> > ++++++++++++++++++++++++++++++++++++++++
-> > ?3 files changed, 339 insertions(+)
-> > ?create mode 100644 drivers/thermal/qoriq_thermal.c
-> >
-> > diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> > index 2d702ca..56ef30d 100644
-> > --- a/drivers/thermal/Kconfig
-> > +++ b/drivers/thermal/Kconfig
-> > @@ -195,6 +195,16 @@ config IMX_THERMAL
-> > ?	??cpufreq is used as the cooling device to throttle CPUs
-> > when the
-> > ?	??passive trip is crossed.
-> >
-> > +config QORIQ_THERMAL
-> > +	tristate "QorIQ Thermal Monitoring Unit"
-> > +	depends on THERMAL_OF
-> > +	depends on HAS_IOMEM
-> > +	help
-> > +	??Support for Thermal Monitoring Unit (TMU) found on QorIQ
-> > platforms.
-> > +	??It supports one critical trip point and one passive trip
-> > point. The
-> > +	??cpufreq is used as the cooling device to throttle CPUs
-> > when the
-> > +	??passive trip is crossed.
-> > +
-> > ?config SPEAR_THERMAL
-> > ?	tristate "SPEAr thermal sensor driver"
-> > ?	depends on PLAT_SPEAR || COMPILE_TEST
-> > diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> > index 10b07c1..6662232 100644
-> > --- a/drivers/thermal/Makefile
-> > +++ b/drivers/thermal/Makefile
-> > @@ -37,6 +37,7 @@ obj-$(CONFIG_DB8500_THERMAL)	+=
-> > db8500_thermal.o
-> > ?obj-$(CONFIG_ARMADA_THERMAL)	+= armada_thermal.o
-> > ?obj-$(CONFIG_TANGO_THERMAL)	+= tango_thermal.o
-> > ?obj-$(CONFIG_IMX_THERMAL)	+= imx_thermal.o
-> > +obj-$(CONFIG_QORIQ_THERMAL)	+= qoriq_thermal.o
-> > ?obj-$(CONFIG_DB8500_CPUFREQ_COOLING)	+=
-> > db8500_cpufreq_cooling.o
-> > ?obj-$(CONFIG_INTEL_POWERCLAMP)	+= intel_powerclamp.o
-> > ?obj-$(CONFIG_X86_PKG_TEMP_THERMAL)	+= x86_pkg_temp_thermal.o
-> > diff --git a/drivers/thermal/qoriq_thermal.c
-> > b/drivers/thermal/qoriq_thermal.c
-> > new file mode 100644
-> > index 0000000..644ba52
-> > --- /dev/null
-> > +++ b/drivers/thermal/qoriq_thermal.c
-> > @@ -0,0 +1,328 @@
-> > +/*
-> > + * Copyright 2016 Freescale Semiconductor, Inc.
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > modify it
-> > + * under the terms and conditions of the GNU General Public License,
-> > + * version 2, as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope it will be useful, but
-> > WITHOUT
-> > + * ANY WARRANTY; without even the implied warranty of
-> > MERCHANTABILITY or
-> > + * FITNESS FOR A PARTICULAR PURPOSE.??See the GNU General Public
-> > License for
-> > + * more details.
-> > + *
-> > + */
-> > +
-> > +#include <linux/module.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/err.h>
-> > +#include <linux/io.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/thermal.h>
-> > +
-> > +#include "thermal_core.h"
-> > +
-> > +#define SITES_MAX	16
-> > +
-> > +/*
-> > + * QorIQ TMU Registers
-> > + */
-> > +struct qoriq_tmu_site_regs {
-> > +	u32 tritsr;		/* Immediate Temperature Site
-> > Register */
-> > +	u32 tratsr;		/* Average Temperature Site
-> > Register */
-> > +	u8 res0[0x8];
-> > +};
-> > +
-> > +struct qoriq_tmu_regs {
-> > +	u32 tmr;		/* Mode Register */
-> > +#define TMR_DISABLE	0x0
-> > +#define TMR_ME		0x80000000
-> > +#define TMR_ALPF	0x0c000000
-> > +	u32 tsr;		/* Status Register */
-> > +	u32 tmtmir;		/* Temperature measurement
-> > interval Register */
-> > +#define TMTMIR_DEFAULT	0x0000000f
-> > +	u8 res0[0x14];
-> > +	u32 tier;		/* Interrupt Enable Register */
-> > +#define TIER_DISABLE	0x0
-> > +	u32 tidr;		/* Interrupt Detect Register */
-> > +	u32 tiscr;		/* Interrupt Site Capture Register
-> > */
-> > +	u32 ticscr;		/* Interrupt Critical Site
-> > Capture Register */
-> > +	u8 res1[0x10];
-> > +	u32 tmhtcrh;		/* High Temperature Capture
-> > Register */
-> > +	u32 tmhtcrl;		/* Low Temperature Capture
-> > Register */
-> > +	u8 res2[0x8];
-> > +	u32 tmhtitr;		/* High Temperature Immediate
-> > Threshold */
-> > +	u32 tmhtatr;		/* High Temperature Average
-> > Threshold */
-> > +	u32 tmhtactr;	/* High Temperature Average Crit
-> > Threshold */
-> > +	u8 res3[0x24];
-> > +	u32 ttcfgr;		/* Temperature Configuration
-> > Register */
-> > +	u32 tscfgr;		/* Sensor Configuration Register
-> > */
-> > +	u8 res4[0x78];
-> > +	struct qoriq_tmu_site_regs site[SITES_MAX];
-> > +	u8 res5[0x9f8];
-> > +	u32 ipbrr0;		/* IP Block Revision Register 0
-> > */
-> > +	u32 ipbrr1;		/* IP Block Revision Register 1
-> > */
-> > +	u8 res6[0x310];
-> > +	u32 ttr0cr;		/* Temperature Range 0 Control
-> > Register */
-> > +	u32 ttr1cr;		/* Temperature Range 1 Control
-> > Register */
-> > +	u32 ttr2cr;		/* Temperature Range 2 Control
-> > Register */
-> > +	u32 ttr3cr;		/* Temperature Range 3 Control
-> > Register */
-> > +};
-> > +
-> > +/*
-> > + * Thermal zone data
-> > + */
-> > +struct qoriq_tmu_data {
-> > +	struct thermal_zone_device *tz;
-> > +	struct qoriq_tmu_regs __iomem *regs;
-> > +	int sensor_id;
-> > +	bool little_endian;
-> > +};
-> > +
-> > +static void tmu_write(struct qoriq_tmu_data *p, u32 val, void
-> > __iomem *addr)
-> > +{
-> > +	if (p->little_endian)
-> > +		iowrite32(val, addr);
-> > +	else
-> > +		iowrite32be(val, addr);
-> > +}
-> > +
-> > +static u32 tmu_read(struct qoriq_tmu_data *p, void __iomem *addr)
-> > +{
-> > +	if (p->little_endian)
-> > +		return ioread32(addr);
-> > +	else
-> > +		return ioread32be(addr);
-> > +}
-> > +
-> > +static int tmu_get_temp(void *p, int *temp)
-> > +{
-> > +	u32 val;
-> > +	struct qoriq_tmu_data *data = p;
-> > +
-> > +	val = tmu_read(data, &data->regs->site[data-
-> > >sensor_id].tritsr);
-> > +	*temp = (val & 0xff) * 1000;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int qoriq_tmu_get_sensor_id(void)
-> > +{
-> > +	int ret, id;
-> > +	struct of_phandle_args sensor_specs;
-> > +	struct device_node *np, *sensor_np;
-> > +
-> > +	np = of_find_node_by_name(NULL, "thermal-zones");
-> > +	if (!np)
-> > +		return -ENODEV;
-> > +
-> > +	sensor_np = of_get_next_child(np, NULL);
-> > +	ret = of_parse_phandle_with_args(sensor_np, "thermal-
-> > sensors",
-> > +			"#thermal-sensor-cells",
-> > +			0, &sensor_specs);
-> > +	if (ret) {
-> > +		of_node_put(np);
-> > +		of_node_put(sensor_np);
-> > +		return ret;
-> > +	}
-> > +
-> > +	if (sensor_specs.args_count >= 1) {
-> > +		id = sensor_specs.args[0];
-> > +		WARN(sensor_specs.args_count > 1,
-> > +				"%s: too many cells in sensor
-> > specifier %d\n",
-> > +				sensor_specs.np->name,
-> > sensor_specs.args_count);
-> > +	} else {
-> > +		id = 0;
-> > +	}
-> > +
-> > +	of_node_put(np);
-> > +	of_node_put(sensor_np);
-> > +
-> > +	return id;
-> > +}
-> > +
-> > +static int qoriq_tmu_calibration(struct platform_device *pdev)
-> > +{
-> > +	int i, val, len;
-> > +	u32 range[4];
-> > +	const u32 *calibration;
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	struct qoriq_tmu_data *data = platform_get_drvdata(pdev);
-> > +
-> > +	if (of_property_read_u32_array(np, "fsl,tmu-range", range,
-> > 4)) {
-> > +		dev_err(&pdev->dev, "missing calibration range.\n");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	/* Init temperature range registers */
-> > +	tmu_write(data, range[0], &data->regs->ttr0cr);
-> > +	tmu_write(data, range[1], &data->regs->ttr1cr);
-> > +	tmu_write(data, range[2], &data->regs->ttr2cr);
-> > +	tmu_write(data, range[3], &data->regs->ttr3cr);
-> > +
-> > +	calibration = of_get_property(np, "fsl,tmu-calibration",
-> > &len);
-> > +	if (calibration == NULL || len % 8) {
-> > +		dev_err(&pdev->dev, "invalid calibration data.\n");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	for (i = 0; i < len; i += 8, calibration += 2) {
-> > +		val = of_read_number(calibration, 1);
-> > +		tmu_write(data, val, &data->regs->ttcfgr);
-> > +		val = of_read_number(calibration + 1, 1);
-> > +		tmu_write(data, val, &data->regs->tscfgr);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static void qoriq_tmu_init_device(struct qoriq_tmu_data *data)
-> > +{
-> > +	/* Disable interrupt, using polling instead */
-> > +	tmu_write(data, TIER_DISABLE, &data->regs->tier);
-> > +
-> > +	/* Set update_interval */
-> > +	tmu_write(data, TMTMIR_DEFAULT, &data->regs->tmtmir);
-> > +
-> > +	/* Disable monitoring */
-> > +	tmu_write(data, TMR_DISABLE, &data->regs->tmr);
-> > +}
-> > +
-> > +static struct thermal_zone_of_device_ops tmu_tz_ops = {
-> > +	.get_temp = tmu_get_temp,
-> > +};
-> > +
-> > +static int qoriq_tmu_probe(struct platform_device *pdev)
-> > +{
-> > +	int ret;
-> > +	const struct thermal_trip *trip;
-> > +	struct qoriq_tmu_data *data;
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	u32 site = 0;
-> > +
-> > +	if (!np) {
-> > +		dev_err(&pdev->dev, "Device OF-Node is NULL");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	data = devm_kzalloc(&pdev->dev, sizeof(struct
-> > qoriq_tmu_data),
-> > +			????GFP_KERNEL);
-> > +	if (!data)
-> > +		return -ENOMEM;
-> > +
-> > +	platform_set_drvdata(pdev, data);
-> > +
-> > +	data->little_endian = of_property_read_bool(np, "little-
-> > endian");
-> > +
-> > +	data->sensor_id = qoriq_tmu_get_sensor_id();
-> > +	if (data->sensor_id < 0) {
-> > +		dev_err(&pdev->dev, "Failed to get sensor id\n");
-> > +		ret = -ENODEV;
-> > +		goto err_iomap;
-> > +	}
-> > +
-> > +	data->regs = of_iomap(np, 0);
-> > +	if (!data->regs) {
-> > +		dev_err(&pdev->dev, "Failed to get memory
-> > region\n");
-> > +		ret = -ENODEV;
-> > +		goto err_iomap;
-> > +	}
-> > +
-> > +	qoriq_tmu_init_device(data);	/* TMU initialization */
-> > +
-> > +	ret = qoriq_tmu_calibration(pdev);	/* TMU calibration
-> > */
-> > +	if (ret < 0)
-> > +		goto err_tmu;
-> > +
-> > +	data->tz = thermal_zone_of_sensor_register(&pdev->dev, data-
-> > >sensor_id,
-> > +				data, &tmu_tz_ops);
-> > +	if (IS_ERR(data->tz)) {
-> > +		ret = PTR_ERR(data->tz);
-> > +		dev_err(&pdev->dev,
-> > +			"Failed to register thermal zone device
-> > %d\n", ret);
-> > +		goto err_tmu;
-> > +	}
-> > +
-> > +	trip = of_thermal_get_trip_points(data->tz);
-> > +
-> > +	/* Enable monitoring */
-> > +	site |= 0x1 << (15 - data->sensor_id);
-> > +	tmu_write(data, site | TMR_ME | TMR_ALPF, &data->regs->tmr);
-> > +
-> > +	return 0;
-> > +
-> > +err_tmu:
-> > +	iounmap(data->regs);
-> > +
-> > +err_iomap:
-> > +	platform_set_drvdata(pdev, NULL);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int qoriq_tmu_remove(struct platform_device *pdev)
-> > +{
-> > +	struct qoriq_tmu_data *data = platform_get_drvdata(pdev);
-> > +
-> > +	thermal_zone_of_sensor_unregister(&pdev->dev, data->tz);
-> > +
-> > +	/* Disable monitoring */
-> > +	tmu_write(data, TMR_DISABLE, &data->regs->tmr);
-> > +
-> > +	iounmap(data->regs);
-> > +	platform_set_drvdata(pdev, NULL);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int qoriq_tmu_suspend(struct device *dev)
-> > +{
-> > +	u32 tmr;
-> > +	struct qoriq_tmu_data *data = dev_get_drvdata(dev);
-> > +
-> > +	/* Disable monitoring */
-> > +	tmr = tmu_read(data, &data->regs->tmr);
-> > +	tmr &= ~TMR_ME;
-> > +	tmu_write(data, tmr, &data->regs->tmr);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int qoriq_tmu_resume(struct device *dev)
-> > +{
-> > +	u32 tmr;
-> > +	struct qoriq_tmu_data *data = dev_get_drvdata(dev);
-> > +
-> > +	/* Enable monitoring */
-> > +	tmr = tmu_read(data, &data->regs->tmr);
-> > +	tmr |= TMR_ME;
-> > +	tmu_write(data, tmr, &data->regs->tmr);
-> > +
-> > +	return 0;
-> > +}
-> > +#endif
-> > +
-> > +static SIMPLE_DEV_PM_OPS(qoriq_tmu_pm_ops,
-> > +			?qoriq_tmu_suspend, qoriq_tmu_resume);
-> > +
-> > +static const struct of_device_id qoriq_tmu_match[] = {
-> > +	{ .compatible = "fsl,qoriq-tmu", },
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, qoriq_tmu_match);
-> > +
-> > +static struct platform_driver qoriq_tmu = {
-> > +	.driver	= {
-> > +		.name		= "qoriq_thermal",
-> > +		.pm		= &qoriq_tmu_pm_ops,
-> > +		.of_match_table	= qoriq_tmu_match,
-> > +	},
-> > +	.probe	= qoriq_tmu_probe,
-> > +	.remove	= qoriq_tmu_remove,
-> > +};
-> > +module_platform_driver(qoriq_tmu);
-> > +
-> > +MODULE_AUTHOR("Jia Hongtao <hongtao.jia@nxp.com>");
-> > +MODULE_DESCRIPTION("QorIQ Thermal Monitoring Unit driver");
-> > +MODULE_LICENSE("GPL v2");
-> > --
-> > 2.1.0.27.g96db324
-> >
+SDHCI_ARASAN_QUIRK_FAILS_WITHOUT_TEST_CD seems unnecessarily long.
+What about SDHCI_ARASAN_QUIRK_FORCE_CDTEST?
+
+>  };
+>  
+>  static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host *host)
+> @@ -79,12 +84,32 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
+>  	}
+>  }
+>  
+> +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
+> +{
+> +	u8 ctrl;
+> +	struct sdhci_pltfm_host *pltfm_host;
+> +	struct sdhci_arasan_data *sdhci_arasan;
+
+Normally we would define and initialize i.e.
+
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+
+> +
+> +	sdhci_reset(host, mask);
+> +
+> +	pltfm_host = sdhci_priv(host);
+> +	sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+> +
+> +	if (sdhci_arasan->arasan_quirks &
+> +	     SDHCI_ARASAN_QUIRK_FAILS_WITHOUT_TEST_CD) {
+> +		ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
+> +		ctrl |= SDHCI_CTRL_CDTEST_INS |
+> +			SDHCI_CTRL_CDTEST_EN;
+
+Didn't need to wrap the line above.
+
+> +		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+> +	}
+> +}
+> +
+>  static struct sdhci_ops sdhci_arasan_ops = {
+>  	.set_clock = sdhci_arasan_set_clock,
+>  	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
+>  	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
+>  	.set_bus_width = sdhci_set_bus_width,
+> -	.reset = sdhci_reset,
+> +	.reset = sdhci_arasan_reset,
+>  	.set_uhs_signaling = sdhci_set_uhs_signaling,
+>  };
+>  
+> @@ -179,6 +204,7 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>  	struct sdhci_host *host;
+>  	struct sdhci_pltfm_host *pltfm_host;
+>  	struct sdhci_arasan_data *sdhci_arasan;
+> +	struct device_node *np = pdev->dev.of_node;
+>  
+>  	host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
+>  				sizeof(*sdhci_arasan));
+> @@ -215,6 +241,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	sdhci_get_of_property(pdev);
+> +
+> +	if (of_get_property(np, "xlnx-fails-without-test-cd", NULL)) {
+> +		sdhci_arasan->arasan_quirks |=
+> +				SDHCI_ARASAN_QUIRK_FAILS_WITHOUT_TEST_CD;
+> +	}
+> +
+>  	pltfm_host->clk = clk_xin;
+>  
+>  	ret = mmc_of_parse(host->mmc);
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index 609f87c..60dbf1f 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -84,6 +84,8 @@
+>  #define   SDHCI_CTRL_ADMA32	0x10
+>  #define   SDHCI_CTRL_ADMA64	0x18
+>  #define   SDHCI_CTRL_8BITBUS	0x20
+> +#define  SDHCI_CTRL_CDTEST_INS	0x40
+> +#define  SDHCI_CTRL_CDTEST_EN	0x80
+>  
+>  #define SDHCI_POWER_CONTROL	0x29
+>  #define  SDHCI_POWER_ON		0x01
+> 
