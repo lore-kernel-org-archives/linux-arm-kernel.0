@@ -1,60 +1,31 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Thu,  8 Sep 2016 20:46:42 +0800
-Subject: [PATCH] arm64: use preempt_disable_notrace in _percpu_read/write
-Message-ID: <1473338802-18712-1-git-send-email-zhang.chunyan@linaro.org>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 8 Sep 2016 14:50:37 +0200
+Subject: [PATCH 0/2] spi: meson: Add Amlogic GXBB compatible
+In-Reply-To: <293061a8-e867-4d91-20cb-6e5df8e9b543@suse.de>
+References: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
+ <293061a8-e867-4d91-20cb-6e5df8e9b543@suse.de>
+Message-ID: <4a199a95-3ee6-a3a0-bc8a-63bd0912e7d2@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When debug preempt or preempt tracer is enabled, preempt_count_add/sub()
-can be traced by function and function graph tracing, and
-preempt_disable/enable() would call preempt_count_add/sub(), so in Ftrace
-subsystem we should use preempt_disable/enable_notrace instead.
+Am 08.09.2016 um 14:04 schrieb Andreas F?rber:
+> Am 08.09.2016 um 09:53 schrieb Neil Armstrong:
+>> This patchset adds a specific compatible string in the Meson SPIFC driver for
+>> the Amlogic Meson GXBB SoC.
+> 
+> Any particular reason? We could just reuse the meson6 one since there
+> appear to be no code changes so far.
 
-In the commit 345ddcc882d8 ("ftrace: Have set_ftrace_pid use the bitmap
-like events do") the function this_cpu_read() was added to
-trace_graph_entry(), and if this_cpu_read() calls preempt_disable(), graph
-tracer will go into a recursive loop, even if the tracing_on is
-disabled.
+So Neil is essentially telling me they don't know whether there are any
+differences in the IP block, so a separate compatible string was chosen.
 
-So this patch change to use preempt_enable/disable_notrace instead in
-this_cpu_read().
+No objection from my side, but a general clarification from device tree
+maintainers when and when not to would be appreciated. (+ devicetree)
 
-Since Yonghui Yang helped a lot to find the root cause of this problem,
-so also add his SOB.
+Cheers,
+Andreas
 
-Signed-off-by: Yonghui Yang <mark.yang@spreadtrum.com>
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
----
- arch/arm64/include/asm/percpu.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-index 0a456be..2fee2f5 100644
---- a/arch/arm64/include/asm/percpu.h
-+++ b/arch/arm64/include/asm/percpu.h
-@@ -199,19 +199,19 @@ static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
- #define _percpu_read(pcp)						\
- ({									\
- 	typeof(pcp) __retval;						\
--	preempt_disable();						\
-+	preempt_disable_notrace();					\
- 	__retval = (typeof(pcp))__percpu_read(raw_cpu_ptr(&(pcp)), 	\
- 					      sizeof(pcp));		\
--	preempt_enable();						\
-+	preempt_enable_notrace();					\
- 	__retval;							\
- })
- 
- #define _percpu_write(pcp, val)						\
- do {									\
--	preempt_disable();						\
-+	preempt_disable_notrace();					\
- 	__percpu_write(raw_cpu_ptr(&(pcp)), (unsigned long)(val), 	\
- 				sizeof(pcp));				\
--	preempt_enable();						\
-+	preempt_enable_notrace();					\
- } while(0)								\
- 
- #define _pcp_protect(operation, pcp, val)			\
 -- 
-2.7.4
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
