@@ -1,24 +1,28 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  8 Sep 2016 09:53:24 +0200
-Subject: [PATCH 0/2] spi: meson: Add Amlogic GXBB compatible
-Message-ID: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
+Date: Thu,  8 Sep 2016 09:53:26 +0200
+Subject: [PATCH 2/2] spi: meson: Add GXBB compatible
+In-Reply-To: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
+References: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1473321206-32284-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds a specific compatible string in the Meson SPIFC driver for
-the Amlogic Meson GXBB SoC.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/spi/spi-meson-spifc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-This patchset is SPI-only respin from Jerome Brunet patchset at [1].
-
-[1] http://lkml.kernel.org/r/1473261223-15412-1-git-send-email-jbrunet at baylibre.com
-
-Neil Armstrong (2):
-  dt-bindings: spi-meson: Add GXBB Compatible string
-  spi: meson: Add GXBB compatible
-
- Documentation/devicetree/bindings/spi/spi-meson.txt | 2 +-
- drivers/spi/spi-meson-spifc.c                       | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/spi/spi-meson-spifc.c b/drivers/spi/spi-meson-spifc.c
+index 2465259..616566e 100644
+--- a/drivers/spi/spi-meson-spifc.c
++++ b/drivers/spi/spi-meson-spifc.c
+@@ -442,6 +442,7 @@ static const struct dev_pm_ops meson_spifc_pm_ops = {
+ 
+ static const struct of_device_id meson_spifc_dt_match[] = {
+ 	{ .compatible = "amlogic,meson6-spifc", },
++	{ .compatible = "amlogic,meson-gxbb-spifc", },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, meson_spifc_dt_match);
 -- 
 1.9.1
