@@ -1,39 +1,49 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu,  8 Sep 2016 10:38:11 -0700
-Subject: [PATCH] phy: rockchip-typec: add pm_runtime_disable in err case
-Message-ID: <1473356291-19247-1-git-send-email-zyw@rock-chips.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 08 Sep 2016 10:38:27 -0700
+Subject: [PATCH 3/3] soc: ti: Add ti_sci_pm_domains driver
+In-Reply-To: <CAPDyKFo0Cb90BbY7ra6VDjb5frC5=VtmE3V6tDK=VosfPmod7Q@mail.gmail.com>
+ (Ulf Hansson's message of "Thu, 8 Sep 2016 11:27:52 +0200")
+References: <20160819235653.26355-1-nm@ti.com>
+ <20160819235653.26355-4-nm@ti.com>
+ <CAPDyKFooDUOPT9dP8HaW3YBO9PsX-1+96PPE7CRMyjEkra7cBQ@mail.gmail.com>
+ <57C0D2C9.1030801@ti.com> <57C5E1DA.2040405@ti.com>
+ <CAPDyKFqszM48nXnnA9D8iCp34k-ZmNvOkHPCc=Fya4nJA7PvBQ@mail.gmail.com>
+ <57CF26DB.4020807@ti.com> <7h4m5rv9kz.fsf@baylibre.com>
+ <CAPDyKFo0Cb90BbY7ra6VDjb5frC5=VtmE3V6tDK=VosfPmod7Q@mail.gmail.com>
+Message-ID: <m2mvjinvfw.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pm_runtime_disable in err case to make the pm_runtime_enable/disable
-is invoked balanced.
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> [...]
+>
+>>
+>> One more idea...
+>>
+>> Since you don't really have a domain (a group of devices), what you
+>> really have is each device having an independent power switch, so as Ulf
+>> suggested, what you really need is for all the devices to share the same
+>> set of runtime PM callbacks that call SCI.  The only difference is the
+>> unique ID.
+>>
+>> Rather than using all of genpd, you could also just use a pm_domain
+>> which is what genpd is built on top of (and also omap_device, which
+>> you're probably familiar with also.)
+>
+> Even if this would work as well, the downside would be that you need
+> to re-invent the parts related to the DT parsing, the probing/removal
+> and attaching/detaching of the device to the PM domain.
+>
+> You probably don't want to go there... :-)
 
----
+All you'd need to read from DT would be the device-specific ID for
+TI-SCI, and that could be done at bind time with a notifier.  The, in
+that same notifier, if a TI-SCI ID exists, it would get added to the
+pm_domain.
 
- drivers/phy/phy-rockchip-typec.c | 2 ++
- 1 file changed, 2 insertions(+)
+Anyways, your original proposal is much preferred if it can work.  I'm
+just throwing out another option because I really don't like one genpd
+per device.
 
-diff --git a/drivers/phy/phy-rockchip-typec.c b/drivers/phy/phy-rockchip-typec.c
-index 7cfb0f8..dd257c7 100644
---- a/drivers/phy/phy-rockchip-typec.c
-+++ b/drivers/phy/phy-rockchip-typec.c
-@@ -977,6 +977,7 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
- 		if (IS_ERR(phy)) {
- 			dev_err(dev, "failed to create phy: %s\n",
- 				child_np->name);
-+			pm_runtime_disable(dev);
- 			return PTR_ERR(phy);
- 		}
- 
-@@ -986,6 +987,7 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
- 	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
- 	if (IS_ERR(phy_provider)) {
- 		dev_err(dev, "Failed to register phy provider\n");
-+		pm_runtime_disable(dev);
- 		return PTR_ERR(phy_provider);
- 	}
- 
--- 
-1.9.1
+Kevin
