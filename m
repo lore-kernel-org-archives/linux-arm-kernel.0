@@ -1,18 +1,41 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 8 Sep 2016 21:35:00 +0800
-Subject: [PATCH v3 7/8] clk: sunxi-ng: Add A23 CCU
-In-Reply-To: <20160908094843.14710-8-maxime.ripard@free-electrons.com>
-References: <20160908094843.14710-1-maxime.ripard@free-electrons.com>
- <20160908094843.14710-8-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v67KCDbv8KjdudR6Z0p34QNgXvC-Md-CJfdX8ABLXRFegA@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 8 Sep 2016 21:35:27 +0800
+Subject: [PATCH v10 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
+In-Reply-To: <20160908111654.GH1493@arm.com>
+References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
+ <20160905123617.18775-4-aleksey.makarov@linaro.org>
+ <7e5486cc-4080-2d1e-8f6d-98874379887d@gmail.com>
+ <20160908111654.GH1493@arm.com>
+Message-ID: <b1064bed-3823-392d-e4c1-cf82f06712ff@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 5:48 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Add support for the clock unit found in the A23. Due to the similarities
-> with the A33, it also shares its clock IDs to allow sharing the DTSI.
+On 2016/9/8 19:16, Will Deacon wrote:
+> On Wed, Sep 07, 2016 at 12:30:19PM +0300, Aleksey Makarov wrote:
+>>
+>> On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
+>>> SBBR mentions SPCR as a mandatory ACPI table.  So enable it for ARM64
+>>>
+>>> Earlycon should be set up as early as possible.  ACPI boot tables are
+>>> mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
+>>> is called from setup_arch() and that's where we parse SPCR.
+>>> So it has to be opted-in per-arch.
+>>>
+>>> When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
+>>> deferred until the DT/ACPI decision is done.  Initialize DT earlycon
+>>> if ACPI is disabled.
+>>
+>> Hi Will, Catalin,
+>>
+>> Can you review this patch and consider ACKing it please?
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Hanjun, Al, Mark, Graeme -- any comments on this?
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+We tested this patch on D02, although d02 is 8250 based
+uart, but this patch is the core part, which makes sense
+to me,
+
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks
+Hanjun
