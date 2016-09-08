@@ -1,34 +1,42 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu,  8 Sep 2016 06:00:09 +0300
-Subject: [PATCH 2/2] ARM: lpc32xx: remove unused header file clock.h
-In-Reply-To: <1473303609-20076-1-git-send-email-vz@mleia.com>
-References: <1473303609-20076-1-git-send-email-vz@mleia.com>
-Message-ID: <1473303609-20076-2-git-send-email-vz@mleia.com>
+Date: Thu,  8 Sep 2016 06:00:08 +0300
+Subject: [PATCH 1/2] ARM: lpc32xx: remove unused header file mach/irqs.h
+Message-ID: <1473303609-20076-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The removed clock.h file is a leftover after moving the platform to a
-common clock framework driver, it contains unused "struct clk"
-definition, which under circumstances may coalesce with a generic
-"struct clk" declaration for clock consumers. Also remove useless
-include of the removed local file from a single source file
-mach-lpc32xx/pm.c.
+The removed LPC32xx mach/irqs.h file is not included in any source
+code, function declaration lpc32xx_init_irq() is also unused, remove
+them as leftovers after switching to a new interrupt controller
+driver.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/mach-lpc32xx/clock.h | 38 --------------------------------------
- arch/arm/mach-lpc32xx/pm.c    |  1 -
- 2 files changed, 39 deletions(-)
- delete mode 100644 arch/arm/mach-lpc32xx/clock.h
+ arch/arm/mach-lpc32xx/common.h            |   1 -
+ arch/arm/mach-lpc32xx/include/mach/irqs.h | 117 ------------------------------
+ 2 files changed, 118 deletions(-)
+ delete mode 100644 arch/arm/mach-lpc32xx/include/mach/irqs.h
 
-diff --git a/arch/arm/mach-lpc32xx/clock.h b/arch/arm/mach-lpc32xx/clock.h
+diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+index 30c9e64..02575c2 100644
+--- a/arch/arm/mach-lpc32xx/common.h
++++ b/arch/arm/mach-lpc32xx/common.h
+@@ -24,7 +24,6 @@
+ /*
+  * Other arch specific structures and functions
+  */
+-extern void __init lpc32xx_init_irq(void);
+ extern void __init lpc32xx_map_io(void);
+ extern void __init lpc32xx_serial_init(void);
+ 
+diff --git a/arch/arm/mach-lpc32xx/include/mach/irqs.h b/arch/arm/mach-lpc32xx/include/mach/irqs.h
 deleted file mode 100644
-index c0a8434..0000000
---- a/arch/arm/mach-lpc32xx/clock.h
+index 0019053..0000000
+--- a/arch/arm/mach-lpc32xx/include/mach/irqs.h
 +++ /dev/null
-@@ -1,38 +0,0 @@
+@@ -1,117 +0,0 @@
 -/*
-- * arch/arm/mach-lpc32xx/clock.h
+- * arch/arm/mach-lpc32xx/include/mach/irqs.h
 - *
 - * Author: Kevin Wells <kevin.wells@nxp.com>
 - *
@@ -45,37 +53,104 @@ index c0a8434..0000000
 - * GNU General Public License for more details.
 - */
 -
--#ifndef __LPC32XX_CLOCK_H
--#define __LPC32XX_CLOCK_H
+-#ifndef __ASM_ARM_ARCH_IRQS_H
+-#define __ASM_ARM_ARCH_IRQS_H
 -
--struct clk {
--	struct list_head node;
--	struct clk *parent;
--	u32 rate;
--	u32 usecount;
+-#define LPC32XX_SIC1_IRQ(n)		(32 + (n))
+-#define LPC32XX_SIC2_IRQ(n)		(64 + (n))
 -
--	int (*set_rate) (struct clk *, unsigned long);
--	unsigned long (*round_rate) (struct clk *, unsigned long);
--	unsigned long (*get_rate) (struct clk *clk);
--	int (*enable) (struct clk *, int);
+-/*
+- * MIC interrupts
+- */
+-#define IRQ_LPC32XX_SUB1IRQ		0
+-#define IRQ_LPC32XX_SUB2IRQ		1
+-#define IRQ_LPC32XX_PWM3		3
+-#define IRQ_LPC32XX_PWM4		4
+-#define IRQ_LPC32XX_HSTIMER		5
+-#define IRQ_LPC32XX_WATCH		6
+-#define IRQ_LPC32XX_UART_IIR3		7
+-#define IRQ_LPC32XX_UART_IIR4		8
+-#define IRQ_LPC32XX_UART_IIR5		9
+-#define IRQ_LPC32XX_UART_IIR6		10
+-#define IRQ_LPC32XX_FLASH		11
+-#define IRQ_LPC32XX_SD1			13
+-#define IRQ_LPC32XX_LCD			14
+-#define IRQ_LPC32XX_SD0			15
+-#define IRQ_LPC32XX_TIMER0		16
+-#define IRQ_LPC32XX_TIMER1		17
+-#define IRQ_LPC32XX_TIMER2		18
+-#define IRQ_LPC32XX_TIMER3		19
+-#define IRQ_LPC32XX_SSP0		20
+-#define IRQ_LPC32XX_SSP1		21
+-#define IRQ_LPC32XX_I2S0		22
+-#define IRQ_LPC32XX_I2S1		23
+-#define IRQ_LPC32XX_UART_IIR7		24
+-#define IRQ_LPC32XX_UART_IIR2		25
+-#define IRQ_LPC32XX_UART_IIR1		26
+-#define IRQ_LPC32XX_MSTIMER		27
+-#define IRQ_LPC32XX_DMA			28
+-#define IRQ_LPC32XX_ETHERNET		29
+-#define IRQ_LPC32XX_SUB1FIQ		30
+-#define IRQ_LPC32XX_SUB2FIQ		31
 -
--	/* Register address and bit mask for simple clocks */
--	void __iomem *enable_reg;
--	u32 enable_mask;
--};
+-/*
+- * SIC1 interrupts start at offset 32
+- */
+-#define IRQ_LPC32XX_JTAG_COMM_TX	LPC32XX_SIC1_IRQ(1)
+-#define IRQ_LPC32XX_JTAG_COMM_RX	LPC32XX_SIC1_IRQ(2)
+-#define IRQ_LPC32XX_GPI_28		LPC32XX_SIC1_IRQ(4)
+-#define IRQ_LPC32XX_TS_P		LPC32XX_SIC1_IRQ(6)
+-#define IRQ_LPC32XX_TS_IRQ		LPC32XX_SIC1_IRQ(7)
+-#define IRQ_LPC32XX_TS_AUX		LPC32XX_SIC1_IRQ(8)
+-#define IRQ_LPC32XX_SPI2		LPC32XX_SIC1_IRQ(12)
+-#define IRQ_LPC32XX_PLLUSB		LPC32XX_SIC1_IRQ(13)
+-#define IRQ_LPC32XX_PLLHCLK		LPC32XX_SIC1_IRQ(14)
+-#define IRQ_LPC32XX_PLL397		LPC32XX_SIC1_IRQ(17)
+-#define IRQ_LPC32XX_I2C_2		LPC32XX_SIC1_IRQ(18)
+-#define IRQ_LPC32XX_I2C_1		LPC32XX_SIC1_IRQ(19)
+-#define IRQ_LPC32XX_RTC			LPC32XX_SIC1_IRQ(20)
+-#define IRQ_LPC32XX_KEY			LPC32XX_SIC1_IRQ(22)
+-#define IRQ_LPC32XX_SPI1		LPC32XX_SIC1_IRQ(23)
+-#define IRQ_LPC32XX_SW			LPC32XX_SIC1_IRQ(24)
+-#define IRQ_LPC32XX_USB_OTG_TIMER	LPC32XX_SIC1_IRQ(25)
+-#define IRQ_LPC32XX_USB_OTG_ATX		LPC32XX_SIC1_IRQ(26)
+-#define IRQ_LPC32XX_USB_HOST		LPC32XX_SIC1_IRQ(27)
+-#define IRQ_LPC32XX_USB_DEV_DMA		LPC32XX_SIC1_IRQ(28)
+-#define IRQ_LPC32XX_USB_DEV_LP		LPC32XX_SIC1_IRQ(29)
+-#define IRQ_LPC32XX_USB_DEV_HP		LPC32XX_SIC1_IRQ(30)
+-#define IRQ_LPC32XX_USB_I2C		LPC32XX_SIC1_IRQ(31)
+-
+-/*
+- * SIC2 interrupts start at offset 64
+- */
+-#define IRQ_LPC32XX_GPIO_00		LPC32XX_SIC2_IRQ(0)
+-#define IRQ_LPC32XX_GPIO_01		LPC32XX_SIC2_IRQ(1)
+-#define IRQ_LPC32XX_GPIO_02		LPC32XX_SIC2_IRQ(2)
+-#define IRQ_LPC32XX_GPIO_03		LPC32XX_SIC2_IRQ(3)
+-#define IRQ_LPC32XX_GPIO_04		LPC32XX_SIC2_IRQ(4)
+-#define IRQ_LPC32XX_GPIO_05		LPC32XX_SIC2_IRQ(5)
+-#define IRQ_LPC32XX_SPI2_DATAIN		LPC32XX_SIC2_IRQ(6)
+-#define IRQ_LPC32XX_U2_HCTS		LPC32XX_SIC2_IRQ(7)
+-#define IRQ_LPC32XX_P0_P1_IRQ		LPC32XX_SIC2_IRQ(8)
+-#define IRQ_LPC32XX_GPI_08		LPC32XX_SIC2_IRQ(9)
+-#define IRQ_LPC32XX_GPI_09		LPC32XX_SIC2_IRQ(10)
+-#define IRQ_LPC32XX_GPI_19		LPC32XX_SIC2_IRQ(11)
+-#define IRQ_LPC32XX_U7_HCTS		LPC32XX_SIC2_IRQ(12)
+-#define IRQ_LPC32XX_GPI_07		LPC32XX_SIC2_IRQ(15)
+-#define IRQ_LPC32XX_SDIO		LPC32XX_SIC2_IRQ(18)
+-#define IRQ_LPC32XX_U5_RX		LPC32XX_SIC2_IRQ(19)
+-#define IRQ_LPC32XX_SPI1_DATAIN		LPC32XX_SIC2_IRQ(20)
+-#define IRQ_LPC32XX_GPI_00		LPC32XX_SIC2_IRQ(22)
+-#define IRQ_LPC32XX_GPI_01		LPC32XX_SIC2_IRQ(23)
+-#define IRQ_LPC32XX_GPI_02		LPC32XX_SIC2_IRQ(24)
+-#define IRQ_LPC32XX_GPI_03		LPC32XX_SIC2_IRQ(25)
+-#define IRQ_LPC32XX_GPI_04		LPC32XX_SIC2_IRQ(26)
+-#define IRQ_LPC32XX_GPI_05		LPC32XX_SIC2_IRQ(27)
+-#define IRQ_LPC32XX_GPI_06		LPC32XX_SIC2_IRQ(28)
+-#define IRQ_LPC32XX_SYSCLK		LPC32XX_SIC2_IRQ(31)
+-
+-#define LPC32XX_NR_IRQS			96
 -
 -#endif
-diff --git a/arch/arm/mach-lpc32xx/pm.c b/arch/arm/mach-lpc32xx/pm.c
-index 207e812..6247157 100644
---- a/arch/arm/mach-lpc32xx/pm.c
-+++ b/arch/arm/mach-lpc32xx/pm.c
-@@ -73,7 +73,6 @@
- #include <mach/hardware.h>
- #include <mach/platform.h>
- #include "common.h"
--#include "clock.h"
- 
- #define TEMP_IRAM_AREA  IO_ADDRESS(LPC32XX_IRAM_BASE)
- 
 -- 
 2.8.1
