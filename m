@@ -1,44 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Sep 2016 22:22:14 +0200
-Subject: [RFC 1/7] Make Hi3620 explicit, remove wildcards
-In-Reply-To: <df45ed73-0f7a-89d0-7cc5-5b6549f2b0f9@gmail.com>
-References: <20160908172346.27506-1-netz.kernel@gmail.com>
- <4234280.g2uciTKcvR@wuerfel> <df45ed73-0f7a-89d0-7cc5-5b6549f2b0f9@gmail.com>
-Message-ID: <6260903.qUKuQuTBEX@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 8 Sep 2016 22:23:20 +0200
+Subject: [PATCH] ARM: dts: sun8i: Move A23/A33 usbphy and usb_otg nodes
+ to common dtsi
+In-Reply-To: <20160908032535.12987-1-wens@csie.org>
+References: <20160908032535.12987-1-wens@csie.org>
+Message-ID: <20160908202320.GU8913@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 8, 2016 3:12:26 PM CEST Marty Plummer wrote:
-> So, in this case it should be one single patch? Geeze this is hella
-> complicated to just get a name changed 
+Hi,
 
-Yes and yes. Sometimes it's easier to leave an slightly misleading
-name than to change it. ;-)
+On Thu, Sep 08, 2016 at 11:25:35AM +0800, Chen-Yu Tsai wrote:
+> The usbphy and usb_otg nodes in the A23 and A33 dts files only differ
+> by compatible, and for the usbphy, the size of one of its register
+> regions.
+> 
+> Move all the common bits to the A23/A33 common dtsi file.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> 
+> Hi Maxime,
+> 
+> This patch applies on top of your A23/A33 CCU patches.
 
-If there is any relation between Hi3620 and Hi3520, we could also
-decide to use the "HI3xxx" name for both after all, and just
-change the Kconfig files like
+It was not applying properly. I think I did the proper fixup, but
+you'll probably want to double check.
 
+Maxime
 
-config ARCH_HI3xxx
-        bool "Hisilicon Hi36xx family"
-        depends on ARCH_MULTI_V5 || ARCH_MULTI_V6 || ARCH_MULTI_V7
-        select CACHE_L2X0 if CPU_V7
-        select HAVE_ARM_SCU if SMP
-
-...
-        config DEBUG_HI3520_UART
-                bool "Hisilicon HI3520 Debug UART"
-                depends on ARCH_HI3xxx
-                select DEBUG_UART_PL01X
-                help
-                  Say Y here if you want kernel low-level debugging support
-
-        config DEBUG_HI3620_UART
-                bool "Hisilicon HI3620 Debug UART"
-                depends on ARCH_HI3xxx
-                select DEBUG_UART_PL01X
-                help
-                  Say Y here if you want kernel low-level debugging support
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/b161d038/attachment.sig>
