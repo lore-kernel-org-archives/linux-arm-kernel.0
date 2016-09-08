@@ -1,120 +1,60 @@
 From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Thu, 8 Sep 2016 21:09:04 +0800
-Subject: [PATCH v6 4/6] arm64: dts: mediatek: Add MDP for MT8173
+Date: Thu, 8 Sep 2016 21:09:05 +0800
+Subject: [PATCH v6 5/6] media: mtk-mdp: support pixelformat V4L2_PIX_FMT_MT21C
 In-Reply-To: <1473340146-6598-1-git-send-email-minghsiu.tsai@mediatek.com>
 References: <1473340146-6598-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <1473340146-6598-5-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <1473340146-6598-6-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MDP node for MT8173
+Add V4L2_PIX_FMT_MT21C in format list.
 
 Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |   84 ++++++++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
+ drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c  |    8 ++++++++
+ drivers/media/platform/mtk-mdp/mtk_mdp_regs.c |    4 ++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 10f638f..cd93228 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -41,6 +41,14 @@
- 		dpi0 = &dpi0;
- 		dsi0 = &dsi0;
- 		dsi1 = &dsi1;
-+		mdp_rdma0 = &mdp_rdma0;
-+		mdp_rdma1 = &mdp_rdma1;
-+		mdp_rsz0 = &mdp_rsz0;
-+		mdp_rsz1 = &mdp_rsz1;
-+		mdp_rsz2 = &mdp_rsz2;
-+		mdp_wdma0 = &mdp_wdma0;
-+		mdp_wrot0 = &mdp_wrot0;
-+		mdp_wrot1 = &mdp_wrot1;
- 	};
+diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+index 0655027..a90972e 100644
+--- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
++++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+@@ -54,6 +54,14 @@ static struct mtk_mdp_pix_align mtk_mdp_size_align = {
  
- 	cpus {
-@@ -716,6 +724,82 @@
- 			#clock-cells = <1>;
- 		};
+ static const struct mtk_mdp_fmt mtk_mdp_formats[] = {
+ 	{
++		.pixelformat	= V4L2_PIX_FMT_MT21C,
++		.depth		= { 8, 4 },
++		.row_depth	= { 8, 8 },
++		.num_planes	= 2,
++		.num_comp	= 2,
++		.align		= &mtk_mdp_size_align,
++		.flags		= MTK_MDP_FMT_FLAG_OUTPUT,
++	}, {
+ 		.pixelformat	= V4L2_PIX_FMT_NV12M,
+ 		.depth		= { 8, 4 },
+ 		.row_depth	= { 8, 8 },
+diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_regs.c b/drivers/media/platform/mtk-mdp/mtk_mdp_regs.c
+index a5601e1..86d57f3 100644
+--- a/drivers/media/platform/mtk-mdp/mtk_mdp_regs.c
++++ b/drivers/media/platform/mtk-mdp/mtk_mdp_regs.c
+@@ -29,6 +29,8 @@ enum MDP_COLOR_ENUM {
+ 	MDP_COLOR_NV12 = MDP_COLORFMT_PACK(0, 2, 1, 1, 1, 8, 1, 0, 12),
+ 	MDP_COLOR_I420 = MDP_COLORFMT_PACK(0, 3, 0, 1, 1, 8, 1, 0, 8),
+ 	MDP_COLOR_YV12 = MDP_COLORFMT_PACK(0, 3, 0, 1, 1, 8, 1, 1, 8),
++	/* Mediatek proprietary format */
++	MDP_COLOR_420_MT21 = MDP_COLORFMT_PACK(5, 2, 1, 1, 1, 256, 1, 0, 12),
+ };
  
-+		mdp {
-+			compatible = "mediatek,mt8173-mdp";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+			mediatek,vpu = <&vpu>;
-+
-+			mdp_rdma0: rdma at 14001000 {
-+				compatible = "mediatek,mt8173-mdp-rdma";
-+				reg = <0 0x14001000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_RDMA0>,
-+					 <&mmsys CLK_MM_MUTEX_32K>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+				iommus = <&iommu M4U_PORT_MDP_RDMA0>;
-+				mediatek,larb = <&larb0>;
-+			};
-+
-+			mdp_rdma1: rdma at 14002000 {
-+				compatible = "mediatek,mt8173-mdp-rdma";
-+				reg = <0 0x14002000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_RDMA1>,
-+					 <&mmsys CLK_MM_MUTEX_32K>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+				iommus = <&iommu M4U_PORT_MDP_RDMA1>;
-+				mediatek,larb = <&larb4>;
-+			};
-+
-+			mdp_rsz0: rsz at 14003000 {
-+				compatible = "mediatek,mt8173-mdp-rsz";
-+				reg = <0 0x14003000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_RSZ0>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			};
-+
-+			mdp_rsz1: rsz at 14004000 {
-+				compatible = "mediatek,mt8173-mdp-rsz";
-+				reg = <0 0x14004000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_RSZ1>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			};
-+
-+			mdp_rsz2: rsz at 14005000 {
-+				compatible = "mediatek,mt8173-mdp-rsz";
-+				reg = <0 0x14005000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_RSZ2>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			};
-+
-+			mdp_wdma0: wdma at 14006000 {
-+				compatible = "mediatek,mt8173-mdp-wdma";
-+				reg = <0 0x14006000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_WDMA>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+				iommus = <&iommu M4U_PORT_MDP_WDMA>;
-+				mediatek,larb = <&larb0>;
-+			};
-+
-+			mdp_wrot0: wrot at 14007000 {
-+				compatible = "mediatek,mt8173-mdp-wrot";
-+				reg = <0 0x14007000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_WROT0>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+				iommus = <&iommu M4U_PORT_MDP_WROT0>;
-+				mediatek,larb = <&larb0>;
-+			};
-+
-+			mdp_wrot1: wrot at 14008000 {
-+				compatible = "mediatek,mt8173-mdp-wrot";
-+				reg = <0 0x14008000 0 0x1000>;
-+				clocks = <&mmsys CLK_MM_MDP_WROT1>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+				iommus = <&iommu M4U_PORT_MDP_WROT1>;
-+				mediatek,larb = <&larb4>;
-+			};
-+		};
-+
- 		ovl0: ovl at 1400c000 {
- 			compatible = "mediatek,mt8173-disp-ovl";
- 			reg = <0 0x1400c000 0 0x1000>;
+ static int32_t mtk_mdp_map_color_format(int v4l2_format)
+@@ -37,6 +39,8 @@ static int32_t mtk_mdp_map_color_format(int v4l2_format)
+ 	case V4L2_PIX_FMT_NV12M:
+ 	case V4L2_PIX_FMT_NV12:
+ 		return MDP_COLOR_NV12;
++	case V4L2_PIX_FMT_MT21C:
++		return MDP_COLOR_420_MT21;
+ 	case V4L2_PIX_FMT_YUV420M:
+ 	case V4L2_PIX_FMT_YUV420:
+ 		return MDP_COLOR_I420;
 -- 
 1.7.9.5
