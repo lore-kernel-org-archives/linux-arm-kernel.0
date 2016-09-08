@@ -1,76 +1,76 @@
 From: patrice.chotard@st.com (Patrice Chotard)
-Date: Thu, 8 Sep 2016 16:06:45 +0200
-Subject: [PATCH 1/4] ARM: dts: STiH410: Handle interconnect clock required
- by EHCI/OHCI (USB)
-In-Reply-To: <20160908091136.17301-2-lee.jones@linaro.org>
+Date: Thu, 8 Sep 2016 16:07:04 +0200
+Subject: [PATCH 2/4] ARM: dts: STiH407-family: Provide interconnect clock
+ for consumption in ST SDHCI
+In-Reply-To: <20160908091136.17301-3-lee.jones@linaro.org>
 References: <20160908091136.17301-1-lee.jones@linaro.org>
- <20160908091136.17301-2-lee.jones@linaro.org>
-Message-ID: <775896f5-b732-c447-9880-ed648588be02@st.com>
+ <20160908091136.17301-3-lee.jones@linaro.org>
+Message-ID: <ffc66a96-dd25-cfb2-9b51-bdaeaadb99b1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Lee
 
+
 On 09/08/2016 11:11 AM, Lee Jones wrote:
 > The STiH4{07,10} platform contains some interconnect clocks which are used
-> by various IPs.  If this clock isn't handled correctly by ST's EHCI/OHCI
-> drivers, their hub won't be found, the following error be shown and the
-> result will be non-working USB:
+> by various IPs.  If these clocks aren't handled correctly by ST's SDHCI
+> driver MMC will break and the following output can be observed:
 >
->   [   97.221963] hub 2-1:1.0: hub_ext_port_status failed (err = -110)
+> [   13.916949] mmc0: Timeout waiting for hardware interrupt.
+> [   13.922349] sdhci: =========== REGISTER DUMP (mmc0)===========
+> [   13.928175] sdhci: Sys addr: 0x00000000 | Version:  0x00001002
+> [   13.933999] sdhci: Blk size: 0x00007040 | Blk cnt:  0x00000001
+> [   13.939825] sdhci: Argument: 0x00fffff0 | Trn mode: 0x00000013
+> [   13.945650] sdhci: Present:  0x1fff0206 | Host ctl: 0x00000011
+> [   13.951475] sdhci: Power:    0x0000000f | Blk gap:  0x00000080
+> [   13.957300] sdhci: Wake-up:  0x00000000 | Clock:    0x00003f07
+> [   13.963126] sdhci: Timeout:  0x00000004 | Int stat: 0x00000000
+> [   13.968952] sdhci: Int enab: 0x02ff008b | Sig enab: 0x02ff008b
+> [   13.974777] sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
+> [   13.980602] sdhci: Caps:     0x21ed3281 | Caps_1:   0x00000000
+> [   13.986428] sdhci: Cmd:      0x0000063a | Max curr: 0x00000000
+> [   13.992252] sdhci: Host ctl2: 0x00000000
+> [   13.996166] sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x7c048200
+> [   14.001990] sdhci: ===========================================
+> [   14.009802] mmc0: Got data interrupt 0x02000000 even though no data operation was in progress.
 >
 > Cc: stable at vger.kernel.org
 > Tested-by: Peter Griffin <peter.griffin@linaro.org>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/boot/dts/stih410.dtsi | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
+>  arch/arm/boot/dts/stih407-family.dtsi | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
-> index 9ee5e20..f1aa34c 100644
-> --- a/arch/arm/boot/dts/stih410.dtsi
-> +++ b/arch/arm/boot/dts/stih410.dtsi
-> @@ -41,7 +41,8 @@
->  			compatible = "st,st-ohci-300x";
->  			reg = <0x9a03c00 0x100>;
->  			interrupts = <GIC_SPI 180 IRQ_TYPE_NONE>;
-> -			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
-> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
-> +				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
->  			resets = <&powerdown STIH407_USB2_PORT0_POWERDOWN>,
->  				 <&softreset STIH407_USB2_PORT0_SOFTRESET>;
->  			reset-names = "power", "softreset";
-> @@ -57,7 +58,8 @@
->  			interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index 55ecfbe..744c5bc 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -550,8 +550,9 @@
+>  			interrupt-names = "mmcirq";
 >  			pinctrl-names = "default";
->  			pinctrl-0 = <&pinctrl_usb0>;
-> -			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
-> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
-> +				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
->  			resets = <&powerdown STIH407_USB2_PORT0_POWERDOWN>,
->  				 <&softreset STIH407_USB2_PORT0_SOFTRESET>;
->  			reset-names = "power", "softreset";
-> @@ -71,7 +73,8 @@
->  			compatible = "st,st-ohci-300x";
->  			reg = <0x9a83c00 0x100>;
->  			interrupts = <GIC_SPI 181 IRQ_TYPE_NONE>;
-> -			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
-> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
-> +				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
->  			resets = <&powerdown STIH407_USB2_PORT1_POWERDOWN>,
->  				 <&softreset STIH407_USB2_PORT1_SOFTRESET>;
->  			reset-names = "power", "softreset";
-> @@ -87,7 +90,8 @@
->  			interrupts = <GIC_SPI 153 IRQ_TYPE_NONE>;
+>  			pinctrl-0 = <&pinctrl_mmc0>;
+> -			clock-names = "mmc";
+> -			clocks = <&clk_s_c0_flexgen CLK_MMC_0>;
+> +			clock-names = "mmc", "icn";
+> +			clocks = <&clk_s_c0_flexgen CLK_MMC_0>,
+> +				 <&clk_s_c0_flexgen CLK_RX_ICN_HVA>;
+>  			bus-width = <8>;
+>  		};
+>  
+> @@ -564,8 +565,9 @@
+>  			interrupt-names = "mmcirq";
 >  			pinctrl-names = "default";
->  			pinctrl-0 = <&pinctrl_usb1>;
-> -			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
-> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
-> +				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
->  			resets = <&powerdown STIH407_USB2_PORT1_POWERDOWN>,
->  				 <&softreset STIH407_USB2_PORT1_SOFTRESET>;
->  			reset-names = "power", "softreset";
+>  			pinctrl-0 = <&pinctrl_sd1>;
+> -			clock-names = "mmc";
+> -			clocks = <&clk_s_c0_flexgen CLK_MMC_1>;
+> +			clock-names = "mmc", "icn";
+> +			clocks = <&clk_s_c0_flexgen CLK_MMC_1>,
+> +				 <&clk_s_c0_flexgen CLK_RX_ICN_HVA>;
+>  			resets = <&softreset STIH407_MMC1_SOFTRESET>;
+>  			bus-width = <4>;
+>  		};
 
 Applied
 
-thanks
+Thanks
