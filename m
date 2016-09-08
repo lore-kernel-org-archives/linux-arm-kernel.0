@@ -1,43 +1,54 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Thu, 8 Sep 2016 04:48:13 +0300
-Subject: [PATCH v2 0/3] gpio/pinctrl: imx: let IOMUX controller know about
- on-SoC GPIOs
-Message-ID: <1473299296-22458-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Date: Thu, 8 Sep 2016 04:48:15 +0300
+Subject: [PATCH v2 2/3] gpio: mxc: shift gpio_mxc_init() to subsys_initcall
+ level
+In-Reply-To: <1473299296-22458-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1473299296-22458-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1473299296-22458-3-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change establishes a connection between on-SoC IOMUX controller(s)
-and GPIO controllers found on some SoC from Freescale/NXP iMX series,
-if a GPIO controller device node contains common gpio-ranges information.
+In general situation on-SoC GPIO controller drivers should be probed
+after pinctrl/pinmux controller driver, because on-SoC GPIOs utilize a
+pin/pad as a resource provided and controlled by pinctrl subsystem.
 
-The change is backward compatible with respect to potentially not updated
-outdated DTB data without gpio-ranges propery, for such boards the only
-functional change is lowered initcall priority of GPIO controller driver,
-which in general anyway is exected to be used only after pinctrl/pinmux
-controller.
+This is stated in multiple places, e.g. from drivers/Makefile:
 
-If this change is applied the next interesting applications may be done
-as a follow-up work, for example switching pad function to GPIO on gpiod
-request, converting iomux controller driver to strict type and so on.
+  GPIO must come after pinctrl as gpios may need to mux pins etc
 
-For actual values of gpio-ranges properties please reference series
-"ARM: dts: imx: add gpio-ranges properties to some iMX GPIO controllers"
-http://www.spinics.net/lists/arm-kernel/msg525258.html
+Looking at Freescale iMX SoC series specifics, imx*_pinctrl_init()
+functions are called at arch_initcall and postcore_initcall init
+levels, so the change of initcall level for gpio-mxc driver from
+postcore_initcall to subsys_initcall level is sufficient. Also note
+that the most of GPIO controller drivers settled at subsys_initcall
+level.
 
+If pinctrl subsystem manages pads with GPIO functions, the change is
+needed to avoid unwanted driver probe deferrals during kernel boot.
+
+Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+---
 Changes from v1 to v2:
-* replaced 2/3 by an own change providing a better commit description
-  and which moves gpio_mxc_init() call to subsys_initcall() instead of
+* replaced by a change with better commit description and which
+  moves gpio_mxc_init() call to subsys_initcall() instead of
   apparently too late device_initcall(), this mitigates Shawn's
   expressed concern about the change.
 
-Vladimir Zapolskiy (3):
-  pinctrl: imx: accept gpio request/free from pinctrl
-  gpio: mxc: shift gpio_mxc_init() to subsys_initcall level
-  gpio: mxc: add generic gpio request/free callbacks to pinctrl
+ drivers/gpio/gpio-mxc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/gpio/gpio-mxc.c                 | 7 ++++++-
- drivers/pinctrl/freescale/pinctrl-imx.c | 4 ++--
- 2 files changed, 8 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index 1b342a3842c8..1fdd5d804b5b 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -510,7 +510,7 @@ static int __init gpio_mxc_init(void)
+ {
+ 	return platform_driver_register(&mxc_gpio_driver);
+ }
+-postcore_initcall(gpio_mxc_init);
++subsys_initcall(gpio_mxc_init);
+ 
+ MODULE_AUTHOR("Freescale Semiconductor, "
+ 	      "Daniel Mack <danielncaiaq.de>, "
 -- 
 2.8.1
