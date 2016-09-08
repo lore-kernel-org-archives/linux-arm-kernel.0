@@ -1,38 +1,76 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 08 Sep 2016 12:34:16 -0400
-Subject: [PATCH v10 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
-In-Reply-To: <20160908111654.GH1493@arm.com>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
- <20160905123617.18775-4-aleksey.makarov@linaro.org>
- <7e5486cc-4080-2d1e-8f6d-98874379887d@gmail.com>
- <20160908111654.GH1493@arm.com>
-Message-ID: <1473352456.21193.8.camel@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 8 Sep 2016 11:44:33 -0500
+Subject: [PATCH RFC 1/3] DT: bindings: mmc: Add property for 3.3V only
+ support
+In-Reply-To: <1736517218.106027.c3e46c0d-6759-48dd-92a9-ce98ef74d48a.open-xchange@email.1und1.de>
+References: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
+ <1470488140-10104-2-git-send-email-stefan.wahren@i2se.com>
+ <20160810184451.GA13473@rob-hp-laptop>
+ <853617027.179290.63a6f478-ad48-40c8-82ca-760dd1afc040.open-xchange@email.1und1.de>
+ <CAL_JsqJ09hXYrp_pgAw9FXrBv+=grkm_zip6qB9XefujPECTxQ@mail.gmail.com>
+ <468a6704-a9f0-1715-ff64-9e331a6a80b1@rock-chips.com>
+ <8f87c885-3c55-cac8-a9f5-e121ae031f90@intel.com>
+ <CAPDyKFr8X93oqiPzkQxPnfMGyV9UBEybvfODX5if3VwMbheKcw@mail.gmail.com>
+ <1736517218.106027.c3e46c0d-6759-48dd-92a9-ce98ef74d48a.open-xchange@email.1und1.de>
+Message-ID: <20160908164433.GA32615@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-09-08 at 12:16 +0100, Will Deacon wrote:
-> On Wed, Sep 07, 2016 at 12:30:19PM +0300, Aleksey Makarov wrote:
-> > 
-> > 
-> > On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
-> > > 
-> > > SBBR mentions SPCR as a mandatory ACPI table.??So enable it for ARM64
-> > > 
-> > > Earlycon should be set up as early as possible.??ACPI boot tables are
-> > > mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
-> > > is called from setup_arch() and that's where we parse SPCR.
-> > > So it has to be opted-in per-arch.
-> > > 
-> > > When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
-> > > deferred until the DT/ACPI decision is done.??Initialize DT earlycon
-> > > if ACPI is disabled.
-> > Hi Will, Catalin,
-> > 
-> > Can you review this patch and consider ACKing it please?
-> Hanjun, Al, Mark, Graeme -- any comments on this?
+On Fri, Sep 02, 2016 at 08:50:28PM +0200, Stefan Wahren wrote:
+> Hi Ulf, hi Rob
 > 
-> Will
+> > Ulf Hansson <ulf.hansson@linaro.org> hat am 30. August 2016 um 11:26
+> > geschrieben:
+> > 
+> > 
+> > On 18 August 2016 at 14:25, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> > > On 11/08/16 03:48, Shawn Lin wrote:
+> > >> + Adrian
+> > >>
+> > >> Let's queue Adrian here who now maintains SDHCI stuff.
+> > >
+> > > SDHCI drivers may not implement no-1-8-v in a consistent manner, but as far
+> > > as I can see, the meaning is still clear: 1.8V will not be used for either
+> > > supply or signaling.
+> > 
+> > Okay.
+> > 
+> > >
+> > > SDHCI is complicated because the SDHCI specification does not cover eMMC.
+> > > From the perspective of SDHCI, the only 1.8V modes are the UHS-I modes, so
+> > > support for 1.8V signaling is the same as support for one of those modes
+> > > (the spec even says as much).  But what happens is that the host controller
+> > > can support those modes but the board can't supply 1.8V so the drivers
+> > > remove capability for the modes.  Support for 1.8V supply has a capability
+> > > bit which drivers can override if necessary but removable SD cards don't
+> > > support 1.8V supply anyway, so the issue doesn't arise if the host
+> > > controller is only used for uSD cards.
+> > 
+> > By looking how SDHCI uses the SDHCI_SUPPORT_DDR50 in conjunction with
+> > SDHCI_QUIRK2_NO_1_8_V (which is set when no-1-8-v DT property is
+> > provided), this becomes a bit messy.
+> > 
+> > From Adrian's summary above, it then seems appropriate to limit the
+> > no-1-8-v DT property to apply only to capabilities related to SD
+> > cards, as I assume that also was the original purpose.
+> > 
+> > Do you think it's possible to clean up this in sdhci when assigning
+> > the caps masks, and then also clarify the no-1-8-v DT binding in the
+> > documentation?
+> 
+> was the question addressed to me? I think this clean up should be a separate
+> patch series. Unfortunately i don't have a clue about what exactly and how it
+> should be fixed.
+> 
+> > 
+> > Regarding the new DT binding proposed to be added, mmc-ddr-3_3v, it
+> > seems we need this to be able to properly describe the HW.
+> > Rob, do you have an issue with adding this binding? I am thinking that
+> > we already have mmc-ddr-1_8v and mmc-ddr-1_2v, so it just follow
+> > existing pattern.
+> 
+> @Rob: gently ping ...
 
-I think there is a problem still with systems using 32-bit access to 8250
-UARTs (i.e. Mustang) but that will need a DBG2 table spec change and
-followup patch to resolve.
+Yes, this seems fine. I was only the no-1-8-v removal I had issue with.
+
+Rob
