@@ -1,37 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  8 Sep 2016 09:43:14 +0200
-Subject: [PATCH 18/30] arm64: dts: h3ulcb: enable EXTALR clk
+Date: Thu,  8 Sep 2016 09:43:25 +0200
+Subject: [PATCH 29/30] arm64: dts: r8a7796: salvator-x: add serial console pins
 In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
 References: <cover.1473320411.git.horms+renesas@verge.net.au>
-Message-ID: <b00d23f71f2cbca63d4d8ddde15b39f18fccd7a8.1473320411.git.horms+renesas@verge.net.au>
+Message-ID: <6b5f8e7e7fc5e5ff293d95406d1adb2e24e037ce.1473320411.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-This enables EXTALR clock that can be used for the watchdog.
+Adds pin control for SCIF2.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-index 3ba1f72526ba..42a4208f57ed 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
-@@ -37,6 +37,10 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+index e72be3856d79..13db7d61c26c 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+@@ -31,11 +31,27 @@
+ 	};
+ };
+ 
++&pfc {
++	pinctrl-0 = <&scif_clk_pins>;
++	pinctrl-names = "default";
++
++	scif2_pins: scif2 {
++		groups = "scif2_data_a";
++		function = "scif2";
++	};
++	scif_clk_pins: scif_clk {
++		groups = "scif_clk_a";
++		function = "scif_clk";
++	};
++};
++
+ &extal_clk {
  	clock-frequency = <16666666>;
  };
  
-+&extalr_clk {
-+	clock-frequency = <32768>;
-+};
-+
- &pfc {
- 	pinctrl-0 = <&scif_clk_pins>;
- 	pinctrl-names = "default";
+ &scif2 {
++	pinctrl-0 = <&scif2_pins>;
++	pinctrl-names = "default";
+ 	status = "okay";
+ };
+ 
 -- 
 2.7.0.rc3.207.g0ac5344
