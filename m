@@ -1,56 +1,16 @@
 From: netz.kernel@gmail.com (Marty Plummer)
-Date: Thu, 8 Sep 2016 12:55:50 -0500
-Subject: [RFC 1/7] Make Hi3620 explicit, remove wildcards
-In-Reply-To: <20160908174756.GC12916@io.lakedaemon.net>
+Date: Thu, 8 Sep 2016 13:04:06 -0500
+Subject: [RFC 7/7] Make Hi3620 explicit, remove wildcards
+In-Reply-To: <20160908175428.GE12916@io.lakedaemon.net>
 References: <20160908172346.27506-1-netz.kernel@gmail.com>
- <20160908174756.GC12916@io.lakedaemon.net>
-Message-ID: <a9b0bd8f-6ccb-6b39-a961-c5b5aca9a9f1@gmail.com>
+ <20160908172346.27506-7-netz.kernel@gmail.com>
+ <20160908175428.GE12916@io.lakedaemon.net>
+Message-ID: <8b753f4e-3b58-9076-5291-11239a4a7046@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2016 12:47 PM, Jason Cooper wrote:
-> Hi Marty,
-> 
-> + Andrew, Russell,
-> 
-> 
-> Since this is your first series, I'll go ahead and gather a few comments
-> right here:
-> 
-> - Make sure to change the subject line for each patch.
-> 
-> The subject is retrieved from the first line of the commit.  you can
-> look at the output of 'git log --oneline' to see a nice, concise view of
-> your series.
-> 
-Ah crap. I knew the subject was taken from the first line of the commit,
-but to be honest I didn't think there was any real room for unique
-subjects here, since its quite literally the exact same changes in each
-file affected, but I take it this is a general rule that each patch in a
-series has to have a unique subject, then?
-> - Include 'PATCH' or 'Patch' inside the square brackets on the subject
->   line.
-> 
-> When you use the prefix option, as you did, it *replaces* 'PATCH', so
-> you need '--subject-prefix="RFC PATCH"' or '--subject-prefix="RFC PATCH V2"'
-Ah ok. I didn't realize you needed both RFC and PATCH in this instance.
-> 
-> - Please Cc Andrew, Russell and myself on future series.
-> 
-> Personally, I do that at the 'send-email' stage instead of
-> 'format-patch'.  But whichever you prefer.  Don't be shy about Cc'ing.
-> We all are accustomed to handling lots of email.  It makes it easier for
-> us to spot stuff we are actively involved in. :-)
-> 
-> thx,
-> 
-> Jason.
-> 
-Alrighty, I sorta realized this issue right after I sent, will do in
-future instances. Also, you say at 'send-email' instead of
-'format-patch'; I take it there is a way to do the latter? I'm not aware
-of it :)
-> On Thu, Sep 08, 2016 at 12:23:40PM -0500, Marty Plummer wrote:
+On 09/08/2016 12:54 PM, Jason Cooper wrote:
+> On Thu, Sep 08, 2016 at 12:23:46PM -0500, Marty Plummer wrote:
 >> This is a preparatory series for adding the ARMv5/v6 hi3520 SoCs.
 >> Assumptions were made when adding hi3620 that don't hold water in
 >> light of adding support for the hi3520 SoC.  Fix the issue by renaming
@@ -61,27 +21,23 @@ of it :)
 >>
 >> Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
 >> ---
->>  arch/arm/Kconfig.debug | 2 +-
+>>  drivers/dma/Kconfig | 2 +-
 >>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index a9693b6..9094ca6 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -280,7 +280,7 @@ choice
->>  
->>  	config DEBUG_HI3620_UART
->>  		bool "Hisilicon HI3620 Debug UART"
->> -		depends on ARCH_HI3xxx
->> +		depends on ARCH_HI3620
->>  		select DEBUG_UART_PL01X
->>  		help
->>  		  Say Y here if you want kernel low-level debugging support
->> -- 
->> 2.9.3
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> This doesn't have to do with DMA, but it's last in the series, so...
+> 
+> I saw on IRC that you have the serial port, vic, and clock at some
+> initial stage of working for your board, congrats!
+> 
+Yep! Also got usb going (well, I have to manually modprobe the modules,
+but it does work). Thanks a lot!
+> I would add those patches to the end of this series implementing that
+> basic functionality.  That makes it very clear to everyone *why* the
+> previous patches are necessary.
+I suppose so, I was just trying to keep changes as modular as possible,
+but if you think that's a good idea, I'll roll with it.
+> 
+> thx,
+> 
+> Jason.
+> 
