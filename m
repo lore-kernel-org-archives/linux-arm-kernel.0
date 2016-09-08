@@ -1,29 +1,76 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  8 Sep 2016 09:53:25 +0200
-Subject: [PATCH 1/2] dt-bindings: spi-meson: Add GXBB Compatible string
-In-Reply-To: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
-References: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1473321206-32284-2-git-send-email-narmstrong@baylibre.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  8 Sep 2016 09:43:12 +0200
+Subject: [PATCH 16/30] arm64: dts: h3ulcb: enable EthernetAVB
+In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
+References: <cover.1473320411.git.horms+renesas@verge.net.au>
+Message-ID: <144bf6ccb13fc661a2d18ae8b13f25e61015331b.1473320411.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- Documentation/devicetree/bindings/spi/spi-meson.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-meson.txt b/Documentation/devicetree/bindings/spi/spi-meson.txt
-index bb52a86..dc6d031 100644
---- a/Documentation/devicetree/bindings/spi/spi-meson.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-meson.txt
-@@ -7,7 +7,7 @@ NOR memories, without DMA support and a 64-byte unified transmit /
- receive buffer.
+This supports Ethernet AVB on H3ULCB board
+
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 32 ++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+index 67ce368ff9ee..fb694b8c6f59 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+@@ -19,6 +19,7 @@
  
- Required properties:
-- - compatible: should be "amlogic,meson6-spifc"
-+ - compatible: should be "amlogic,meson6-spifc" or "amlogic,meson-gxbb-spifc"
-  - reg: physical base address and length of the controller registers
-  - clocks: phandle of the input clock for the baud rate generator
-  - #address-cells: should be 1
+ 	aliases {
+ 		serial0 = &scif2;
++		ethernet0 = &avb;
+ 	};
+ 
+ 	chosen {
+@@ -49,6 +50,11 @@
+ 		groups = "scif_clk_a";
+ 		function = "scif_clk";
+ 	};
++
++	avb_pins: avb {
++		groups = "avb_mdc";
++		function = "avb";
++	};
+ };
+ 
+ &scif2 {
+@@ -62,3 +68,29 @@
+ 	clock-frequency = <14745600>;
+ 	status = "okay";
+ };
++
++&avb {
++	pinctrl-0 = <&avb_pins>;
++	pinctrl-names = "default";
++	renesas,no-ether-link;
++	phy-handle = <&phy0>;
++	status = "okay";
++
++	phy0: ethernet-phy at 0 {
++		rxc-skew-ps = <900>;
++		rxdv-skew-ps = <0>;
++		rxd0-skew-ps = <0>;
++		rxd1-skew-ps = <0>;
++		rxd2-skew-ps = <0>;
++		rxd3-skew-ps = <0>;
++		txc-skew-ps = <900>;
++		txen-skew-ps = <0>;
++		txd0-skew-ps = <0>;
++		txd1-skew-ps = <0>;
++		txd2-skew-ps = <0>;
++		txd3-skew-ps = <0>;
++		reg = <0>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
 -- 
-1.9.1
+2.7.0.rc3.207.g0ac5344
