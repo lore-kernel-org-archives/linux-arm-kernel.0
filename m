@@ -1,92 +1,69 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu,  8 Sep 2016 11:26:01 -0400
-Subject: [PATCH 2/2] ARM: dts: s5p: Add missing unit name to memory nodes for
- S5PV210 boards
-In-Reply-To: <1473348361-15784-1-git-send-email-javier@osg.samsung.com>
-References: <1473348361-15784-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1473348361-15784-3-git-send-email-javier@osg.samsung.com>
+From: groeck@google.com (Guenter Roeck)
+Date: Thu, 8 Sep 2016 08:31:32 -0700
+Subject: [RESEND PATCH v3 1/2] phy: rockchip-typec: add pm runtime support
+In-Reply-To: <1473314253-2646-1-git-send-email-zyw@rock-chips.com>
+References: <57D0F612.10702@ti.com>
+ <1473314253-2646-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <CABXOdTdNgm_3BfyQx+EVULpEN+22uBcB+PTuniQXfivJGHgxNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following DTC warnings:
+On Wed, Sep 7, 2016 at 10:57 PM, Chris Zhong <zyw@rock-chips.com> wrote:
+> Adds pm_runtime support for rockchip Type-C, so that power domain is
+> enabled only when there is a transaction going on to help save power.
+>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+>
+> Changes in v3:
+> - use phy_core pm_runtime
+>
+> Changes in v2:
+> - add pm_runtime_put_sync in err case
+>
+>  drivers/phy/phy-rockchip-typec.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/drivers/phy/phy-rockchip-typec.c b/drivers/phy/phy-rockchip-typec.c
+> index fb58a27..7cfb0f8 100644
+> --- a/drivers/phy/phy-rockchip-typec.c
+> +++ b/drivers/phy/phy-rockchip-typec.c
+> @@ -960,6 +960,8 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
+>                 return PTR_ERR(tcphy->extcon);
+>         }
+>
+> +       pm_runtime_enable(dev);
+> +
 
-"Node /memory has a reg or ranges property, but no unit name"
+Does this now need a matching pm_runtime_disable() in error cases ?
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Guenter
 
----
-
- arch/arm/boot/dts/s5pv210-aquila.dts   | 2 +-
- arch/arm/boot/dts/s5pv210-goni.dts     | 2 +-
- arch/arm/boot/dts/s5pv210-smdkc110.dts | 2 +-
- arch/arm/boot/dts/s5pv210-smdkv210.dts | 2 +-
- arch/arm/boot/dts/s5pv210-torbreck.dts | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/s5pv210-aquila.dts b/arch/arm/boot/dts/s5pv210-aquila.dts
-index da24ab570b0e..d763c5b4c65d 100644
---- a/arch/arm/boot/dts/s5pv210-aquila.dts
-+++ b/arch/arm/boot/dts/s5pv210-aquila.dts
-@@ -29,7 +29,7 @@
- 		bootargs = "console=ttySAC2,115200n8 root=/dev/mmcblk1p5 rw rootwait ignore_loglevel earlyprintk";
- 	};
- 
--	memory {
-+	memory at 30000000 {
- 		device_type = "memory";
- 		reg = <0x30000000 0x05000000
- 			0x40000000 0x18000000>;
-diff --git a/arch/arm/boot/dts/s5pv210-goni.dts b/arch/arm/boot/dts/s5pv210-goni.dts
-index 0a33d402138e..c56f51ee7897 100644
---- a/arch/arm/boot/dts/s5pv210-goni.dts
-+++ b/arch/arm/boot/dts/s5pv210-goni.dts
-@@ -29,7 +29,7 @@
- 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p5 rw rootwait ignore_loglevel earlyprintk";
- 	};
- 
--	memory {
-+	memory at 30000000 {
- 		device_type = "memory";
- 		reg = <0x30000000 0x05000000
- 			0x40000000 0x10000000
-diff --git a/arch/arm/boot/dts/s5pv210-smdkc110.dts b/arch/arm/boot/dts/s5pv210-smdkc110.dts
-index 1eedab7ffe94..5d14da911aa5 100644
---- a/arch/arm/boot/dts/s5pv210-smdkc110.dts
-+++ b/arch/arm/boot/dts/s5pv210-smdkc110.dts
-@@ -29,7 +29,7 @@
- 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p1 rw rootwait ignore_loglevel earlyprintk";
- 	};
- 
--	memory {
-+	memory@20000000 {
- 		device_type = "memory";
- 		reg = <0x20000000 0x20000000>;
- 	};
-diff --git a/arch/arm/boot/dts/s5pv210-smdkv210.dts b/arch/arm/boot/dts/s5pv210-smdkv210.dts
-index 9eb6aff3e38f..75398318ed57 100644
---- a/arch/arm/boot/dts/s5pv210-smdkv210.dts
-+++ b/arch/arm/boot/dts/s5pv210-smdkv210.dts
-@@ -29,7 +29,7 @@
- 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p1 rw rootwait ignore_loglevel earlyprintk";
- 	};
- 
--	memory {
-+	memory at 20000000 {
- 		device_type = "memory";
- 		reg = <0x20000000 0x40000000>;
- 	};
-diff --git a/arch/arm/boot/dts/s5pv210-torbreck.dts b/arch/arm/boot/dts/s5pv210-torbreck.dts
-index 622599fd2cfa..7cb50bcee888 100644
---- a/arch/arm/boot/dts/s5pv210-torbreck.dts
-+++ b/arch/arm/boot/dts/s5pv210-torbreck.dts
-@@ -29,7 +29,7 @@
- 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p1 rw rootwait ignore_loglevel earlyprintk";
- 	};
- 
--	memory {
-+	memory at 20000000 {
- 		device_type = "memory";
- 		reg = <0x20000000 0x20000000>;
- 	};
--- 
-2.7.4
+>         for_each_available_child_of_node(np, child_np) {
+>                 struct phy *phy;
+>
+> @@ -990,6 +992,13 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> +static int rockchip_typec_phy_remove(struct platform_device *pdev)
+> +{
+> +       pm_runtime_disable(&pdev->dev);
+> +
+> +       return 0;
+> +}
+> +
+>  static const struct of_device_id rockchip_typec_phy_dt_ids[] = {
+>         { .compatible = "rockchip,rk3399-typec-phy" },
+>         {}
+> @@ -999,6 +1008,7 @@ MODULE_DEVICE_TABLE(of, rockchip_typec_phy_dt_ids);
+>
+>  static struct platform_driver rockchip_typec_phy_driver = {
+>         .probe          = rockchip_typec_phy_probe,
+> +       .remove         = rockchip_typec_phy_remove,
+>         .driver         = {
+>                 .name   = "rockchip-typec-phy",
+>                 .of_match_table = rockchip_typec_phy_dt_ids,
+> --
+> 1.9.1
+>
