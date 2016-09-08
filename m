@@ -1,205 +1,87 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 8 Sep 2016 08:49:17 +0200
-Subject: [PATCH v5 0/5] Add MT8173 MDP Driver
-In-Reply-To: <1472559944-55114-1-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1472559944-55114-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <ecea3371-8f37-ade5-dc57-a0016fe17a32@xs4all.nl>
+From: andrea.merello@gmail.com (Andrea Merello)
+Date: Thu,  8 Sep 2016 09:01:03 +0200
+Subject: [PATCH] clk: stm32f4: don't assume 48MHz clock is derived from
+ primary PLL
+Message-ID: <1473318063-21782-1-git-send-email-andrea.merello@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FYI: I'm missing a MAINTAINERS entry for this driver.
+This driver just look at the PLLs configurations set by the
+bootloader, but it assumes the 48MHz clock is derived from the primary
+PLL; however using PLLSAI is another option for generating the 48MHz
+clock.
 
-Please add one when you post v6.
+This patch make the driver to check for this, and eventually adjust the
+clock tree accordingly
 
-Thanks!
+Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Cc: Alexandre Torgue <alexandre.torgue@st.com>
+Cc: Bruno Herrera <bruherrera@gmail.com>
+---
+ drivers/clk/clk-stm32f4.c | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
 
-	Hans
-
-On 08/30/2016 02:25 PM, Minghsiu Tsai wrote:
-> Changes in v5:
-> - Add ack in the comment of dts patch 
-> - Fix s/g_selection()
-> - Separate format V4L2_PIX_FMT_MT21C into new patch  
-> 
-> Changes in v4:
-> - Add "depends on HAS_DMA" in Kconfig.
-> - Fix s/g_selection()
-> - Replace struct v4l2_crop with u32 and struct v4l2_rect
-> - Remove VB2_USERPTR
-> - Move mutex lock after ctx allocation in mtk_mdp_m2m_open()
-> - Add new format V4L2_PIX_FMT_YVU420 to support software on Android platform.
-> - Only width/height of image in format V4L2_PIX_FMT_MT21 is aligned to 16/16,
->   other ones are aligned to 2/2 by default
-> 
-> Changes in v3:
-> - Modify device ndoe as structured one.
-> - Fix conflict in dts on Linux 4.8-rc1
-> 
-> Changes in v2:
-> - Add section to describe blocks function in dts-bindings
-> - Remove the assignment of device_caps in querycap()
-> - Remove format's name assignment
-> - Copy colorspace-related parameters from OUTPUT to CAPTURE
-> - Use m2m helper functions
-> - Fix DMA allocation failure
-> - Initialize lazily vpu instance in streamon()
-> 
-> ==============
->  Introduction
-> ==============
-> 
-> The purpose of this series is to add the driver for Media Data Path HW embedded in the Mediatek's MT8173 SoC.
-> MDP is used for scaling and color space conversion.
-> 
-> It could convert V4L2_PIX_FMT_MT21 to V4L2_PIX_FMT_NV12M or V4L2_PIX_FMT_YUV420M.
-> 
-> NV12M/YUV420M/MT21 -> MDP -> NV12M/YUV420M
-> 
-> This patch series rely on MTK VPU driver in patch series "Add MT8173 Video Encoder Driver and VPU Driver"[1] and "Add MT8173 Video Decoder Driver"[2].
-> MDP driver rely on VPU driver to load, communicate with VPU.
-> 
-> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
-> 
-> [1]https://patchwork.kernel.org/patch/9002171/
-> [2]https://patchwork.kernel.org/patch/9141245/
-> 
-> ==================
->  Device interface
-> ==================
-> 
-> In principle the driver bases on v4l2 memory-to-memory framework:
-> it provides a single video node and each opened file handle gets its own private context with separate buffer queues. Each context consist of 2 buffer queues: OUTPUT (for source buffers) and CAPTURE (for destination buffers).
-> OUTPUT and CAPTURE buffer could be MMAP or DMABUF memory type.
-> 
-> v4l2-compliance test output:
-> # v4l2-compliance -d /dev/image-proc0
-> v4l2-compliance SHA   : a737a6161485fffb70bf51e4fd7f6e2d910174c1
-> 
-> Driver Info:
->         Driver name   : mtk-mdp
->         Card type     : soc:mdp
->         Bus info      : platform:mt8173
->         Driver version: 4.8.0
->         Capabilities  : 0x84204000
->                 Video Memory-to-Memory Multiplanar
->                 Streaming
->                 Extended Pix Format
->                 Device Capabilities
->         Device Caps   : 0x04204000
->                 Video Memory-to-Memory Multiplanar
->                 Streaming
->                 Extended Pix Format
-> 
-> Compliance test for device /dev/image-proc0 (not using libv4l2):
-> 
-> Required ioctls:
->         test VIDIOC_QUERYCAP: OK
-> 
-> Allow for multiple opens:
->         test second video open: OK
->         test VIDIOC_QUERYCAP: OK
->         test VIDIOC_G/S_PRIORITY: OK
->         test for unlimited opens: OK
-> 
-> Debug ioctls:
->         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
->         test VIDIOC_LOG_STATUS: OK (Not Supported)
-> 
-> Input ioctls:
->         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
->         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
->         test VIDIOC_ENUMAUDIO: OK (Not Supported)
->         test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
->         test VIDIOC_G/S_AUDIO: OK (Not Supported)
->         Inputs: 0 Audio Inputs: 0 Tuners: 0
-> 
-> Output ioctls:
->         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
->         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
->         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
->         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
->         Outputs: 0 Audio Outputs: 0 Modulators: 0
-> 
-> Input/Output configuration ioctls:
->         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
->         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
->         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
->         test VIDIOC_G/S_EDID: OK (Not Supported)
-> 
->         Control ioctls:
->                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK
->                 test VIDIOC_QUERYCTRL: OK
->                 test VIDIOC_G/S_CTRL: OK
->                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK
->                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
->                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
->                 Standard Controls: 5 Private Controls: 0
-> 
->         Format ioctls:
->                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
->                 test VIDIOC_G/S_PARM: OK (Not Supported)
->                 test VIDIOC_G_FBUF: OK (Not Supported)
->                 test VIDIOC_G_FMT: OK
->                 test VIDIOC_TRY_FMT: OK
->                 test VIDIOC_S_FMT: OK
->                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
->                 test Cropping: OK
->                 test Composing: OK
->                 test Scaling: OK
-> 
->         Codec ioctls:
->                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
->                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
->                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-> 
->         Buffer ioctls:
->                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
->                 test VIDIOC_EXPBUF: OK
-> 
-> Test input 0:
-> 
-> 
-> Total: 43, Succeeded: 43, Failed: 0, Warnings: 0
-> 
-> 
-> Minghsiu Tsai (5):
->   VPU: mediatek: Add mdp support
->   dt-bindings: Add a binding for Mediatek MDP
->   media: Add Mediatek MDP Driver
->   arm64: dts: mediatek: Add MDP for MT8173
->   media: mtk-mdp: support pixelformat V4L2_PIX_FMT_MT21C
-> 
->  .../devicetree/bindings/media/mediatek-mdp.txt     |  109 ++
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   84 ++
->  drivers/media/platform/Kconfig                     |   17 +
->  drivers/media/platform/Makefile                    |    2 +
->  drivers/media/platform/mtk-mdp/Makefile            |    9 +
->  drivers/media/platform/mtk-mdp/mtk_mdp_comp.c      |  159 +++
->  drivers/media/platform/mtk-mdp/mtk_mdp_comp.h      |   72 ++
->  drivers/media/platform/mtk-mdp/mtk_mdp_core.c      |  294 +++++
->  drivers/media/platform/mtk-mdp/mtk_mdp_core.h      |  260 ++++
->  drivers/media/platform/mtk-mdp/mtk_mdp_ipi.h       |  126 ++
->  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c       | 1278 ++++++++++++++++++++
->  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.h       |   22 +
->  drivers/media/platform/mtk-mdp/mtk_mdp_regs.c      |  156 +++
->  drivers/media/platform/mtk-mdp/mtk_mdp_regs.h      |   31 +
->  drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c       |  145 +++
->  drivers/media/platform/mtk-mdp/mtk_mdp_vpu.h       |   41 +
->  drivers/media/platform/mtk-vpu/mtk_vpu.h           |    5 +
->  17 files changed, 2810 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
->  create mode 100644 drivers/media/platform/mtk-mdp/Makefile
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_comp.c
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_comp.h
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_core.c
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_core.h
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_ipi.h
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_m2m.h
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_regs.c
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_regs.h
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c
->  create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_vpu.h
-> 
+diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+index 02d6810..7f1ba8f 100644
+--- a/drivers/clk/clk-stm32f4.c
++++ b/drivers/clk/clk-stm32f4.c
+@@ -24,6 +24,7 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ 
++#define STM32F4_RCC_CR			0x00
+ #define STM32F4_RCC_PLLCFGR		0x04
+ #define STM32F4_RCC_CFGR		0x08
+ #define STM32F4_RCC_AHB1ENR		0x30
+@@ -31,6 +32,8 @@
+ #define STM32F4_RCC_AHB3ENR		0x38
+ #define STM32F4_RCC_APB1ENR		0x40
+ #define STM32F4_RCC_APB2ENR		0x44
++#define STM32F4_RCC_PLLSAICFGR		0x88
++#define STM32F4_RCC_DCKCFGR		0x8C
+ 
+ struct stm32f4_gate_data {
+ 	u8	offset;
+@@ -238,16 +241,35 @@ static struct clk *clk_register_apb_mul(struct device *dev, const char *name,
+ static void stm32f4_rcc_register_pll(const char *hse_clk, const char *hsi_clk)
+ {
+ 	unsigned long pllcfgr = readl(base + STM32F4_RCC_PLLCFGR);
+-
++	unsigned long pllsaicfgr = readl(base + STM32F4_RCC_PLLSAICFGR);
++	unsigned long dckcfgr = readl(base + STM32F4_RCC_DCKCFGR);
++	unsigned long rcccr = readl(base + STM32F4_RCC_CR);
++	bool saien = rcccr & BIT(28);
+ 	unsigned long pllm   = pllcfgr & 0x3f;
+ 	unsigned long plln   = (pllcfgr >> 6) & 0x1ff;
+ 	unsigned long pllp   = BIT(((pllcfgr >> 16) & 3) + 1);
+ 	const char   *pllsrc = pllcfgr & BIT(22) ? hse_clk : hsi_clk;
+ 	unsigned long pllq   = (pllcfgr >> 24) & 0xf;
++	bool src48_sai = dckcfgr & BIT(27);
++	unsigned long pllsain = (pllsaicfgr >> 6) & 0x1ff;
++	unsigned long pllsaip = BIT(((pllsaicfgr >> 16) & 3) + 1);
+ 
+ 	clk_register_fixed_factor(NULL, "vco", pllsrc, 0, plln, pllm);
+ 	clk_register_fixed_factor(NULL, "pll", "vco", 0, 1, pllp);
+-	clk_register_fixed_factor(NULL, "pll48", "vco", 0, 1, pllq);
++
++	if (src48_sai && !saien) {
++		pr_err("48MHz derived from SAI PLL, but SAI PLL disabled (blame the bootloader)\n");
++		return;
++	}
++
++	if (saien)
++		clk_register_fixed_factor(NULL, "sai",
++					pllsrc, 0, pllsain, pllm);
++
++	if (src48_sai)
++		clk_register_fixed_factor(NULL, "pll48", "sai", 0, 1, pllsaip);
++	else
++		clk_register_fixed_factor(NULL, "pll48", "vco", 0, 1, pllq);
+ }
+ 
+ /*
+-- 
+2.7.4
