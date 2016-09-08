@@ -1,60 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu,  8 Sep 2016 11:02:20 +0100
-Subject: [PATCH] arm64/io: Allow I/O writes to use {W,X}ZR
-Message-ID: <56d8dac83c2b8167d8fc730075e255bbf9490bc1.1473328940.git.robin.murphy@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 8 Sep 2016 11:02:48 +0100
+Subject: [PATCH 00/19] Handle guest-generated SErrors/Aborts
+In-Reply-To: <AM5PR0802MB2452C619386893AAFFAE490D9EFB0@AM5PR0802MB2452.eurprd08.prod.outlook.com>
+References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
+ <AM5PR0802MB2452C619386893AAFFAE490D9EFB0@AM5PR0802MB2452.eurprd08.prod.outlook.com>
+Message-ID: <57D13748.8070703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When zeroing an I/O location, the current accessors are forced to
-allocate a temporary register to store the zero for the write. By
-tweaking the assembly constraints, we can allow the compiler to use
-the zero register directly in such cases, and save some juggling.
-Compiling a representative kernel configuration with GCC 6 shows
-that 2.3KB worth of code can be wasted just on that!
+Hi Wei,
 
-  text     data    bss      dec      hex     filename
- 13316776 3248256 18176769 34741801 2121e29 vmlinux.o.new
- 13319140 3248256 18176769 34744165 2122765 vmlinux.o.old
+On 08/09/16 10:47, Wei Chen wrote:
+> Hi Marc,
+> 
+> On 2016/9/6 21:09, Marc Zyngier wrote:
+>> A little known "feature" of giving guest access to real memory mapped
+>> HW is that it could trigger asynchronous aborts (SError on ARMv8) if
+>> the guest accesses it in a non-conventional way (and depending on how
+>> HW and firmware have been integrated). So far, KVM lacks any support
+>> to handle this gracefully.
+> 
+> I can reproduce this issue on Seattle board (ARM64), but I can't
+> reproduce it on FVP (Cortex-A15x2 ARM32). Did you mean that this issue 
+> onlu takes place on ARMv8? Have you ever reproduced this issue on any 
+> ARM32 platform?
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/include/asm/io.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+On a 32bit platform, I've only managed to get an external abort firing
+while running at EL1 and then taken to HYP. But that doesn't mean that
+32bit systems are immune to this. It completely depends on the system
+integration (how fast the error generating peripheral replies and how
+the error is exposed to the CPU, for example).
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 9b6e408cfa51..aff77237f9fa 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -40,25 +40,25 @@
- #define __raw_writeb __raw_writeb
- static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
- {
--	asm volatile("strb %w0, [%1]" : : "r" (val), "r" (addr));
-+	asm volatile("strb %w0, [%1]" : : "rZ" (val), "r" (addr));
- }
- 
- #define __raw_writew __raw_writew
- static inline void __raw_writew(u16 val, volatile void __iomem *addr)
- {
--	asm volatile("strh %w0, [%1]" : : "r" (val), "r" (addr));
-+	asm volatile("strh %w0, [%1]" : : "rZ" (val), "r" (addr));
- }
- 
- #define __raw_writel __raw_writel
- static inline void __raw_writel(u32 val, volatile void __iomem *addr)
- {
--	asm volatile("str %w0, [%1]" : : "r" (val), "r" (addr));
-+	asm volatile("str %w0, [%1]" : : "rZ" (val), "r" (addr));
- }
- 
- #define __raw_writeq __raw_writeq
- static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
- {
--	asm volatile("str %0, [%1]" : : "r" (val), "r" (addr));
-+	asm volatile("str %x0, [%1]" : : "rZ" (val), "r" (addr));
- }
- 
- #define __raw_readb __raw_readb
+As for the model, I'd be surprised if it had any facility for this. Most
+of that is IMPDEF, and ignoring the error seems to be a valid
+implementation...
+
+Thanks,
+
+	M.
 -- 
-2.8.1.dirty
+Jazz is not dead. It just smells funny...
