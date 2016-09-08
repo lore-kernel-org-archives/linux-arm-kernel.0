@@ -1,75 +1,80 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  8 Sep 2016 11:21:51 +0100
-Subject: [RFCv4 6/7] perf: util: only open events on CPUs an evsel permits
+Date: Thu,  8 Sep 2016 11:21:52 +0100
+Subject: [RFCv4 7/7] perf: util: support alternative sysfs cpumask
 In-Reply-To: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
 References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1473330112-28528-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <1473330112-28528-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In systems with heterogeneous CPU PMUs, it's possible for each evsel to
-cover a distinct set of CPUs, and hence the cpu_map associated with each
-evsel may have a distinct idx<->id mapping. Any of these may be distinct from
-the evlist's cpu map.
+The perf tools can read a cpumask file for a PMU, describing a subset of
+CPUs which that PMU covers. So far this has only been used to cater for
+uncore PMUs, which in practice happen to only have a single CPU
+described in the mask.
 
-Events can be tied to the same fd so long as they use the same per-cpu
-ringbuffer (i.e. so long as they are on the same CPU). To acquire the
-correct FDs, we must compare the Linux logical IDs rather than the evsel
-or evlist indices.
+Until recently, the perf tools only correctly handled cpumask containing
+a single CPU, and only when monitoring in system-wide mode. For example,
+prior to commit 00e727bb389359c8 ("perf stat: Balance opening and
+reading events"), a mask with more than a single CPU could cause
+perf stat to hang. When a CPU PMU covers a subset of CPUs, but lacks a
+cpumask, perf record will fail to open events (on the cores the PMU does
+not support), and gives up.
 
-This path adds logic to perf_evlist__mmap_per_evsel to handle this,
-translating IDs as required. As PMUs may cover a subset of CPUs from the
-evlist, we skip the CPUs a PMU cannot handle.
+For systems with heterogeneous CPUs such as ARM big.LITTLE systems, this
+presents a problem. We have a PMU for each microarchitecture (e.g. a big
+PMU and a little PMU), and would like to expose a cpumask for each (so
+as to allow perf record and other tools to do the right thing). However,
+doing so kernel-side will cause old perf binaries to not function (e.g.
+hitting the issue solved by 00e727bb389359c8), and thus commits the
+cardinal sin of breaking (existing) userspace.
 
-Without this patch, perf record may try to mmap erroneous FDs on
-heterogeneous systems, and will bail out early rather than running the
-workload.
+To address this chicken-and-egg problem, this patch adds support got a
+new file, cpus, which is largely identical to the existing cpumask file.
+A kernel can expose this file, knowing that new perf binaries will
+correctly support it, while old perf binaries will not look for it (and
+thus will not be broken).
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Jiri Olsa <jolsa@kernel.org>
 Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
 Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Jiri Olsa <jolsa@kernel.org>
 Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: linux-kernel at vger.kernel.org
 ---
- tools/perf/util/evlist.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ tools/perf/util/pmu.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/tools/perf/util/evlist.c b/tools/perf/util/evlist.c
-index 097b3ed..ea34c5a 100644
---- a/tools/perf/util/evlist.c
-+++ b/tools/perf/util/evlist.c
-@@ -1032,16 +1032,18 @@ perf_evlist__should_poll(struct perf_evlist *evlist __maybe_unused,
- }
+diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
+index ddb0261..2babcdf 100644
+--- a/tools/perf/util/pmu.c
++++ b/tools/perf/util/pmu.c
+@@ -445,14 +445,23 @@ static struct cpu_map *pmu_cpumask(const char *name)
+ 	FILE *file;
+ 	struct cpu_map *cpus;
+ 	const char *sysfs = sysfs__mountpoint();
++	const char *templates[] = {
++		 "%s/bus/event_source/devices/%s/cpumask",
++		 "%s/bus/event_source/devices/%s/cpus",
++		 NULL
++	};
++	const char **template;
  
- static int perf_evlist__mmap_per_evsel(struct perf_evlist *evlist, int idx,
--				       struct mmap_params *mp, int cpu,
-+				       struct mmap_params *mp, int cpu_idx,
- 				       int thread, int *_output, int *_output_backward)
- {
- 	struct perf_evsel *evsel;
- 	int revent;
-+	int evlist_cpu = cpu_map__cpu(evlist->cpus, cpu_idx);
+ 	if (!sysfs)
+ 		return NULL;
  
- 	evlist__for_each_entry(evlist, evsel) {
- 		struct perf_mmap *maps = evlist->mmap;
- 		int *output = _output;
- 		int fd;
-+		int cpu;
+-	snprintf(path, PATH_MAX,
+-		 "%s/bus/event_source/devices/%s/cpumask", sysfs, name);
++	for (template = templates; *template; template++) {
++		snprintf(path, PATH_MAX, *template, sysfs, name);
++		if (stat(path, &st) == 0)
++			break;
++	}
  
- 		if (evsel->attr.write_backward) {
- 			output = _output_backward;
-@@ -1060,6 +1062,10 @@ static int perf_evlist__mmap_per_evsel(struct perf_evlist *evlist, int idx,
- 		if (evsel->system_wide && thread)
- 			continue;
+-	if (stat(path, &st) < 0)
++	if (!*template)
+ 		return NULL;
  
-+		cpu = cpu_map__idx(evsel->cpus, evlist_cpu);
-+		if (cpu == -1)
-+			continue;
-+
- 		fd = FD(evsel, cpu, thread);
- 
- 		if (*output == -1) {
+ 	file = fopen(path, "r");
 -- 
 1.9.1
