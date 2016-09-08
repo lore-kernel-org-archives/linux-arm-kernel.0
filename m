@@ -1,81 +1,49 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 8 Sep 2016 23:48:53 +0200
-Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
-In-Reply-To: <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
- <m260q6jibf.fsf@baylibre.com>
- <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
- <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
- <m2eg4ui0nl.fsf@baylibre.com>
- <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
-Message-ID: <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 08 Sep 2016 15:15:57 -0700
+Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
+In-Reply-To: <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
+References: <20141009151605.GA8818@ulmo.nvidia.com>
+ <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <6c896634c4d6446df0388da2c0228232@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 10:53 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> On 08/09/16 21:42, Kevin Hilman wrote:
->>
->> Ben Dooks <ben.dooks@codethink.co.uk> writes:
->>
->>> On 08/09/16 20:52, Martin Blumenstingl wrote:
->>>>
->>>> On Thu, Sep 8, 2016 at 9:35 PM, Kevin Hilman <khilman@baylibre.com>
->>>> wrote:
->>>>>>
->>>>>> +     phy = devm_phy_create(&pdev->dev, NULL, &phy_meson_usb2_ops);
->>>>>> +     if (IS_ERR(phy)) {
->>>>>> +             dev_err(&pdev->dev, "failed to create PHY\n");
->>>>>> +             return PTR_ERR(phy);
->>>>>> +     }
->>>>>> +
->>>>>> +     if (usb_reset_refcnt++ == 0) {
->>>>>> +             ret = device_reset(&pdev->dev);
->>>>>> +             if (ret) {
->>>>>> +                     dev_err(&phy->dev, "Failed to reset USB PHY\n");
->>>>>> +                     return ret;
->>>>>> +             }
->>>>>> +     }
->>>>>
->>>>>
->>>>> The ref count + reset here looks like something that could/should be
->>>>> handled in a runtime PM callback.
->>>>
->>>> Unfortunately that doesn't work (as Jerome found out) because both
->>>> PHYs are sharing the same reset line.
->>>> So if the second PHY would call device_reset then it would also reset
->>>> the first PHY!
->>>>
->>>> There's a comment above the declaration of usb_reset_refcnt which
->>>> tries to explain this:
->>>> "The PHYs are sharing a common reset line -> we are only allowed to
->>>> reset once for all PHYs."
->>>> Maybe I should move this comment to the "if (usb_reset_refcnt++ == 0)
->>>> {" line to make it easier to see?
->>>>
->>>
->>> pm-runtime has refcounting in it. When one of the nodes turns on,
->>> the pm-runtime will call your driver to say there is a user when
->>> this first use turns up.
->>>
->>> If all the sub-phys turn off and drop their refcount then the driver
->>> is called to say there are no more users and you can go to sleep.
->>
->>
->> After a chat w/Martin on IRC, It turns out runtime PM wont help here.
->>
->> The reason is because there are physically two PHY devices[1].  Those 2
->> devices will be treated independely by runtime PM, and have separate
->> use-counting, which means doing what I proposed would cause a reset to
->> happen when either device was probed.
->>
->> So, I think it's OK as it is.
->
->
-> Surely you can do pm_runtime_get/put on the phy's parent platform
-> device and do it that way?
-could you please be more specific with that (do you mean pdev->dev.parent)?
-so we would use pm_runtime_{get_sync,put} with the parent, while we
-would still define the runtime_resume in our driver.
+Hi Lothar,
 
-I'd be happy if that works and we can remove that refcounting hack
+On 2014-10-10 07:22, Lothar Wa?mann wrote:
+> This patch series adds support for polarity inversion to the pwm-imx
+> driver. The patches have been tested on i.MX6, i.MX53 and with the
+> ti-ehrpwm.c driver.
+
+Do you know what prevented this patchset from getting merged?
+
+We are looking for Polarity support in PWM for too, this is especially
+useful for backlight control.
+
+--
+Stefan
+
+> 
+> Changes wrt. v2:
+> - make the use of '#pwm-cells = <3>' optional, so that the change does
+>   not break existing DT blobs as suggested by Arnd Bergmann and Sascha
+>   Hauer.
+> 
+> Changes wrt. v3:
+> - implemented the approach suggested by Sascha Hauer 
+> - don't modify struct pwm_ops in the imx_pwm probe function
+> 
+> Changes wrt. v4:
+> - rebased onto current linux-next
+> - dropped cleanup patch which is not necessary any more
+> - resent with ACK from Shawn Guo and Reviewed-By tag from Sascha Hauer
+> 
+> Changes wrt. v5:
+> - don't remove of_pwm_n_cells to keep sanity checks for #pwm-cells as
+>   suggested by Thierry Reding
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
