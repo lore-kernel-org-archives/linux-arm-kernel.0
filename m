@@ -1,39 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Sep 2016 14:56:01 +0200
-Subject: [PATCH] drm/sun4i: add missing header dependencies
-In-Reply-To: <1473332362-25497-1-git-send-email-baoyou.xie@linaro.org>
-References: <1473332362-25497-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20160908125601.GQ8913@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  8 Sep 2016 13:55:36 +0100
+Subject: [PATCH 3/6] arm64: dcc: simplify accessors
+In-Reply-To: <1473339339-32334-1-git-send-email-mark.rutland@arm.com>
+References: <1473339339-32334-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1473339339-32334-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 06:59:22PM +0800, Baoyou Xie wrote:
-> We get 5 warnings when building kernel with W=1:
-> drivers/gpu/drm/sun4i/sun4i_framebuffer.c:33:23: warning: no previous prototype for 'sun4i_framebuffer_init' [-Wmissing-prototypes]
-> drivers/gpu/drm/sun4i/sun4i_framebuffer.c:47:6: warning: no previous prototype for 'sun4i_framebuffer_free' [-Wmissing-prototypes]
-> drivers/gpu/drm/sun4i/sun4i_rgb.c:202:5: warning: no previous prototype for 'sun4i_rgb_init' [-Wmissing-prototypes]
-> drivers/gpu/drm/sun4i/sun4i_dotclock.c:151:5: warning: no previous prototype for 'sun4i_dclk_create' [-Wmissing-prototypes]
-> drivers/gpu/drm/sun4i/sun4i_dotclock.c:186:5: warning: no previous prototype for 'sun4i_dclk_free' [-Wmissing-prototypes]
-> 
-> In fact, these functions are declared in
-> drivers/gpu/drm/sun4i/sun4i_framebuffer.h,
-> drivers/gpu/drm/sun4i/sun4i_rgb.h,
-> drivers/gpu/drm/sun4i/sun4i_dotclock.h,
-> so this patch adds missing header dependencies.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+A while back we added {read,write}_sysreg accessors to handle accesses
+to system registers, without the usual boilerplate asm volatile,
+temporary variable, etc.
 
-Applied, thanks!
-Maxime
+This patch makes use of these in the arm64 DCC accessors to make the
+code shorter and clearer.
 
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/dcc.h | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/include/asm/dcc.h b/arch/arm64/include/asm/dcc.h
+index 65e0190..836b056 100644
+--- a/arch/arm64/include/asm/dcc.h
++++ b/arch/arm64/include/asm/dcc.h
+@@ -21,21 +21,16 @@
+ #define __ASM_DCC_H
+ 
+ #include <asm/barrier.h>
++#include <asm/sysreg.h>
+ 
+ static inline u32 __dcc_getstatus(void)
+ {
+-	u32 ret;
+-
+-	asm volatile("mrs %0, mdccsr_el0" : "=r" (ret));
+-
+-	return ret;
++	return read_sysreg(mdccsr_el0);
+ }
+ 
+ static inline char __dcc_getchar(void)
+ {
+-	char c;
+-
+-	asm volatile("mrs %0, dbgdtrrx_el0" : "=r" (c));
++	char c = read_sysreg(dbgdtrrx_el0);
+ 	isb();
+ 
+ 	return c;
+@@ -47,8 +42,7 @@ static inline void __dcc_putchar(char c)
+ 	 * The typecast is to make absolutely certain that 'c' is
+ 	 * zero-extended.
+ 	 */
+-	asm volatile("msr dbgdtrtx_el0, %0"
+-			: : "r" ((unsigned long)(unsigned char)c));
++	write_sysreg((unsigned char)c, dbgdtrtx_el0);
+ 	isb();
+ }
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/1db356f3/attachment.sig>
+1.9.1
