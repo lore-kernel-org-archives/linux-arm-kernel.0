@@ -1,46 +1,62 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  8 Sep 2016 09:43:18 +0200
-Subject: [PATCH 22/30] arm64: dts: r8a7795: remove unnecessary
- cap-mmc-highspeed property
-In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
-References: <cover.1473320411.git.horms+renesas@verge.net.au>
-Message-ID: <56de959f533f5138f1cd5aaa4706e1831c479e28.1473320411.git.horms+renesas@verge.net.au>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 8 Sep 2016 09:55:30 +0200
+Subject: [PATCH 3/7] mtd: nand: automate NAND timings selection
+In-Reply-To: <20160907175917.2a4791d3@bbrezillon>
+References: <1473250902-31139-1-git-send-email-s.hauer@pengutronix.de>
+ <1473250902-31139-4-git-send-email-s.hauer@pengutronix.de>
+ <20160907154114.1aae0462@bbrezillon>
+ <20160907143615.cholyvh6zyk7rnfj@pengutronix.de>
+ <20160907165951.51f15505@bbrezillon>
+ <20160907175917.2a4791d3@bbrezillon>
+Message-ID: <20160908075530.e4o2gecxxlmedtlx@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove cap-mmc-highspeed property from SDHI2 and SDHI3.
+On Wed, Sep 07, 2016 at 05:59:17PM +0200, Boris Brezillon wrote:
+> On Wed, 7 Sep 2016 16:59:51 +0200
+> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+> 
+> > On Wed, 7 Sep 2016 16:36:15 +0200
+> > Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > 
+> > > Ok, I think now we are understanding each other. So I keep two timing
+> > > instances in struct nand_chip, one for initialization and one optimized
+> > > timing. They both get initialized once during chip detection and can be
+> > > reused when needed.  
+> > 
+> > Hm, not sure we need to keep 2 instances around, all we need to save is
+> > the 'best_onfi_timing_mode', or we can just update
+> > ->default_onfi_timing_mode based on the result of the timing mode  
+> > detection, so that, when nand_setup_data_interface() is called, all we
+> > have to do is:
+> > 
+> > 	conf = chip->data_iface_conf;
+> > 	conf->type = NAND_SDR_IFACE,
+> > 	conf->timings.sdr = *onfi_async_timing_mode_to_sdr_timings(chip->default_onfi_timing_mode);
+> > 	chip->setup_data_interface(mtd, conf, false);
+> > 
+> 
+> After the discussion we had on IRC, I want to reconsider what I said.
+> How about having a global nand_default_data_iface_config that would
+> work will all chips (probably exposing mode 0 timings and an SDR
+> interface).
+> This one will be used even for DDR NANDs, because after a reset they
+> return back to SDR mode, timing mode 0.
+> 
+> Now, I keep thinking that other timing modes should not be directly
+> exposed.
 
-This property is unnecessary as the driver automatically sets
-the highspeed capability. Furthermore its use is inconsistent with SDHI0
-and SDHI1 which are also highspeed capable but do not have this property
-present.
+sounds good. How do you think the default iface_config should be
+exposed? Should I turn the onfi_sdr_timings array to struct
+nand_data_interface like done before and add a accessor function for the
+first element, something like:
 
-Found by inspection.
+const struct nand_data_interface *nand_default_data_interface(void);
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+Sascha
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 64899b556a0e..8c15040f2540 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1122,7 +1122,6 @@
- 			clocks = <&cpg CPG_MOD 312>;
- 			max-frequency = <200000000>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
--			cap-mmc-highspeed;
- 			status = "disabled";
- 		};
- 
-@@ -1133,7 +1132,6 @@
- 			clocks = <&cpg CPG_MOD 311>;
- 			max-frequency = <200000000>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
--			cap-mmc-highspeed;
- 			status = "disabled";
- 		};
- 
 -- 
-2.7.0.rc3.207.g0ac5344
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
