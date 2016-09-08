@@ -1,53 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Sep 2016 12:01:19 +0100
-Subject: [PATCH v8 00/16] fix some type infos and bugs for arm64/of numa
-In-Reply-To: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20160908110119.GG1493@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2016 13:04:01 +0200
+Subject: [PATCH V2 4/4] ARM64 LPC: support earlycon for UART connected to
+ LPC
+In-Reply-To: <57D137AF.9070306@gmail.com>
+References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
+ <4291379.IHAA72aKCk@wuerfel> <57D137AF.9070306@gmail.com>
+Message-ID: <7585762.SZVHZyJdka@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 02:54:51PM +0800, Zhen Lei wrote:
-> v7 -> v8:
-> Updated patches according to Will Deacon's review comments, thanks.
+On Thursday, September 8, 2016 6:04:31 PM CEST zhichang wrote:
+> Hi, Arnd,
 > 
-> The changed patches is: 3, 5, 8, 9, 10, 11, 12, 13, 15
-> Patch 3 requires an ack from Rob Herring.
-> Patch 10 requires an ack from linux-mm.
+> On 2016?09?07? 22:52, Arnd Bergmann wrote:
+> > On Wednesday, September 7, 2016 9:33:53 PM CEST Zhichang Yuan wrote:
+> >> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
+> >>
+> >> This patch support the earlycon for UART connected to LPC on Hip06.
+> >> This patch is depended on the LPC driver.
+> >>
+> >> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+> >>
+> > 
+> > I'm skeptical about this too. Is this just needed because the 8250
+> > earlycon support comes before the lpc bus initialization?
+> I think you wonder why early_serial8250_setup can not be used direclty for this earlycon of LPC uart.
 > 
-> Hi, Will:
-> Something should still be clarified:
-> Patch 5, I modified it according to my last reply. BTW, The last sentence
->          "srat_disabled() ? -EINVAL : 0" of arm64_acpi_numa_init should be moved
->          into acpi_numa_init, I think.
->          
-> Patch 9, I still leave the code in arch/arm64.
->          1) the implementation of setup_per_cpu_areas on all platforms are different.
->          2) Although my implementation referred to PowerPC, but still something different.
-> 
-> Patch 15, I modified the description again. Can you take a look at it? If this patch is
-> 	  dropped, the patch 14 should also be dropped.
-> 
-> Patch 16, How many times the function node_distance to be called rely on the APP(need many tasks
->           to be scheduled), I have not prepared yet, so I give up this patch as your advise. 
+> 1. the earlycon kernel parameter format of LPC uart is different from 8250. something like that
+> "earlycon=hisilpcuart,mmio,0xa01b0000,0,0x2f8". You see, there is one more parameter after the baudrate.
 
-Ok, I'm trying to pick the pieces out of this patch series and it's not
-especially easy. As far as I can tell:
+We should never need to specify the addresses manually like this,
+it's actually supposed to work if you just list "earlycon" here.
 
-  Patch 3 needs an ack from the device-tree folks
+The first membase is apparently only used during setup:
 
-  Patch 10 needs an ack from the memblock folks
++       writel(LPC_IRQ_CLEAR, device->port.membase + LPC_REG_IRQ_ST);
++       /* ensure the LPC is available */
++       while (!(readl(device->port.membase + LPC_REG_OP_STATUS) &
++                       LPC_STATUS_IDLE))
 
-  Patch 11 depends on patch 10
+Why doesn't the firmware do this before handing off control of
+the kernel to the console?
 
-  Patches 14,15,16 can wait for the time being (I still don't see their
-  value).
+> Hip06 LPC uart need two base addresses for earlycon.
+> 2. the IO type is mmio to introduce a memory base address to access LPC register file. But the real uart
+> IO type is UPIO_PORT. This is spcial...
 
-So, I could pick up patches 1-2, 4-9 and 12-13 but it's not clear whether
-that makes any sense. The whole series seems to be a mix of trivial printk
-cleanups, a bunch of core OF stuff, some new features and then some
-questionable changes at the end.
+This sounds like a deficiency in the of_setup_earlycon() function,
+which can only handle MMIO addresses, and won't actually
+be able to understand nodes without a "ranges" property like
+you have here.
 
-Please throw me a clue,
+I think we need to add a special case for port ranges here.
 
-Will
+	Arnd
