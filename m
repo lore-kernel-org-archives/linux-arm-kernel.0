@@ -1,73 +1,84 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Sep 2016 09:37:48 +0200
-Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <CAGb2v64h7kq2jWzUJ74vDdOOQOXPxjx3ruSsJMXvyr7fP63BGg@mail.gmail.com>
+Date: Thu, 8 Sep 2016 09:40:17 +0200
+Subject: [PATCH v2 4/4] ARM: dts: gr8: Add support for the GR8 evaluation
+ board
+In-Reply-To: <CAGb2v66Ed1u5NaC9ev=ohywCbssy6BnkPcThY2D9O=_eNK1pdA@mail.gmail.com>
 References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
- <20160907145400.27192-4-maxime.ripard@free-electrons.com>
- <CACRpkdZsxA7avmO85R=-Quu7FQwSVMPhQMDmmgL+xbkVTB-2HQ@mail.gmail.com>
- <CAGb2v64h7kq2jWzUJ74vDdOOQOXPxjx3ruSsJMXvyr7fP63BGg@mail.gmail.com>
-Message-ID: <20160908073748.GF8913@lukather>
+ <20160907145400.27192-5-maxime.ripard@free-electrons.com>
+ <CAGb2v66Ed1u5NaC9ev=ohywCbssy6BnkPcThY2D9O=_eNK1pdA@mail.gmail.com>
+Message-ID: <20160908074017.GG8913@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 12:46:14PM +0800, Chen-Yu Tsai wrote:
-> > I mean it like supporting these in *addition* to the custom ones, so there can
-> > be a smooth phase-over.
-> >
-> > Check for example Laurent's commit for SH-PFC:
-> > commit 16ccaf5bb5a52372bfebd3dfbb79dd810ad49c09
-> > "pinctrl: sh-pfc: Accept standard function, pins and groups properties"
-> > It's awesome, and since, they have improved the looks of Renesas
-> > DTS files a lot.
-> >
-> > It could look a bit like this nice thing from
-> > lpc4337-ciaa.dts:
-> >
-> > &pinctrl {
-> >         enet_rmii_pins: enet-rmii-pins {
-> >                 enet_rmii_rxd_cfg {
-> >                         pins = "p1_15", "p0_0";
-> >                         function = "enet";
-> >                         slew-rate = <1>;
-> >                         bias-disable;
-> >                         input-enable;
-> >                         input-schmitt-disable;
-> >                 };
-> >
-> >                 enet_rmii_txd_cfg {
-> >                         pins = "p1_18", "p1_20";
-> >                         function = "enet";
-> >                         slew-rate = <1>;
-> >                         bias-disable;
-> >                         input-enable;
-> >                         input-schmitt-disable;
-> >                 };
-> > (etc)
+On Wed, Sep 07, 2016 at 11:23:56PM +0800, Chen-Yu Tsai wrote:
+> > +&i2c1 {
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&i2c1_pins_a>;
+> > +       status = "okay";
+> > +
+> > +       pcf8563: rtc at 51 {
+> > +               compatible = "phg,pcf8563";
+> > +               reg = <0x51>;
+> > +       };
+> > +
+> > +       wm8978: codec at 1a {
+> > +               #sound-dai-cells = <0>;
+> > +               compatible = "wlf,wm8978";
+> > +               reg = <0x1a>;
+> > +       };
 > 
-> This looks nice.
+> Seems like I2S support will happen soon? :)
 
-Indeed.
+Indeed :)
 
-> I've slightly looked at the generic pinconf stuff.  I think we
-> should be able to support them, though the sunxi pinctrl driver
-> currently doesn't work well with it though. For example, it doesn't
-> declare ".is_generic = true", it doesn't filter unsupported pinconf
-> parameters, and it doesn't reply to queries correctly. I will fix
-> these bits.
+It's not working for the moment, which is why it's not enabled through
+a simple-card, but I'll work on it ASAP.
+
+(same thing with SPDIF).
+
 > 
-> Also, I think we are needlessly using pin groups, 1 pin per group.
-> Can pinconf/pinctrl work without them? Would there be any harm
-> converting the sunxi driver to work directly with pins? This would
-> make it match generic pinconf parsing, and make it easier to get
-> both working together.
+> > +};
+> 
+> [...]
+> 
+> > diff --git a/arch/arm/boot/dts/ntc-gr8.dtsi b/arch/arm/boot/dts/ntc-gr8.dtsi
+> > index d21cfa3f3c14..cdb7a12946c4 100644
+> > --- a/arch/arm/boot/dts/ntc-gr8.dtsi
+> > +++ b/arch/arm/boot/dts/ntc-gr8.dtsi
+> 
+> This looks like the wrong patch. Nevertheless...
 
-I think it comes from a requirement that you had to have groups at
-some point (I don't know if it's still the case), which is why we
-ended up with single-pin groups, because we can mux each pins entirely
-separately.
+Hmmm, indeed.
 
-If it's not required anymore, then yes, it makes total sense to remove
-it.
+> 
+> > @@ -228,7 +228,7 @@
+> >
+> >                 axi_gates: clk at 01c2005c {
+> >                         #clock-cells = <1>;
+> > -                       compatible = "allwinner,sun4i-a10-axi-gates-clk";
+> > +                       compatible = "allwinner,sun4i-a10-gates-clk";
+> >                         reg = <0x01c2005c 0x4>;
+> >                         clocks = <&axi>;
+> >                         clock-indices = <0>;
+> > @@ -244,7 +244,7 @@
+> >                                         <2>, <5>, <6>,
+> >                                         <7>, <8>, <9>,
+> >                                         <10>, <13>,
+> > -                                       <14>, <20>,
+> > +                                       <14>, <17>, <20>,
+> >                                         <21>, <22>,
+> >                                         <28>, <32>, <34>,
+> >                                         <36>, <40>, <44>,
+> > @@ -254,7 +254,7 @@
+> >                                              "ahb_ohci", "ahb_ss", "ahb_dma",
+> >                                              "ahb_bist", "ahb_mmc0", "ahb_mmc1",
+> >                                              "ahb_mmc2", "ahb_nand",
+> > -                                            "ahb_sdram", "ahb_spi0",
+> > +                                            "ahb_sdram", "ahb_sdram", "ahb_spi0",
+> 
+> I don't think this will work. Copy/paste error?
+
+Yes, that was supposed to be ethernet. Sorry.
 
 Maxime
 
@@ -81,4 +92,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/e9e0ca6b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/fb37f880/attachment-0001.sig>
