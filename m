@@ -1,36 +1,71 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 8 Sep 2016 14:21:04 +0100
-Subject: [PATCH 0/2] spi: meson: Add Amlogic GXBB compatible
-In-Reply-To: <4a199a95-3ee6-a3a0-bc8a-63bd0912e7d2@suse.de>
-References: <1473321206-32284-1-git-send-email-narmstrong@baylibre.com>
- <293061a8-e867-4d91-20cb-6e5df8e9b543@suse.de>
- <4a199a95-3ee6-a3a0-bc8a-63bd0912e7d2@suse.de>
-Message-ID: <5f05c488-1889-057b-7068-8e070ff95611@codethink.co.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Sep 2016 15:21:08 +0200
+Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
+ GPIO driver
+In-Reply-To: <20160905122611.GO1041@n2100.armlinux.org.uk>
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
+ <87eg57e54l.fsf@belgarion.home> <20160830091805.GL1041@n2100.armlinux.org.uk>
+ <87k2eycip0.fsf@belgarion.home> <20160830184612.GO1041@n2100.armlinux.org.uk>
+ <87fupmc59b.fsf@belgarion.home> <20160831084938.GQ1041@n2100.armlinux.org.uk>
+ <CACRpkdZBNH=4qZEfcLzqZAN=tum2f3YeoQj0D5PsH+P0Cf+7LQ@mail.gmail.com>
+ <20160905122611.GO1041@n2100.armlinux.org.uk>
+Message-ID: <CACRpkdZkCHqYYpYKA+Nvj4XY1zecdbZxMuRe=bbdziJL2fHf6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/16 13:50, Andreas F?rber wrote:
-> Am 08.09.2016 um 14:04 schrieb Andreas F?rber:
->> Am 08.09.2016 um 09:53 schrieb Neil Armstrong:
->>> This patchset adds a specific compatible string in the Meson SPIFC driver for
->>> the Amlogic Meson GXBB SoC.
->>
->> Any particular reason? We could just reuse the meson6 one since there
->> appear to be no code changes so far.
+On Mon, Sep 5, 2016 at 2:26 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, Sep 05, 2016 at 11:06:28AM +0200, Linus Walleij wrote:
+>> I couldn't resist testing on the Compaq iPAQ h3600. It works the
+>> same as before so:
+>> Tested-by: Linus Walleij <linus.walleij@linaro.org> [for Compaq iPAQ H3600]
 >
-> So Neil is essentially telling me they don't know whether there are any
-> differences in the IP block, so a separate compatible string was chosen.
+> Great news.  I've been thinking about digging out my h3600, but it's
+> very old, and hasn't been turned on for many years.  I'm not sure what
+> state it's in.
 >
-> No objection from my side, but a general clarification from device tree
-> maintainers when and when not to would be appreciated. (+ devicetree)
+> I've been hoping to try booting some kernels with qemu-system-arm, but
+> so far I've completely failed to get qemu-system-arm to do anything
+> useful - it just sits there doing apparently nothing, irrespective of
+> which platform I choose or which kernel I give it.
+>
+>> The only news in the bootlog is this:
+>> sa11x0-pcmcia: probe of sa11x0-pcmcia failed with error -2
+>
+> Not so great news - that's -ENOENT.  Did that happen before these
+> changes?  That could be that the gpiod lookup table isn't found.
+> However, if that were the case, I'd have expected an error message
+> along the lines of:
+>
+> Failed to get GPIO for xxx: -nnn
+>
+> from soc_pcmcia_request_gpiods().  The other possibility is that
+> we're not getting to sa11x0_drv_pcmcia_legacy_probe() but instead
+> trying to initialise it as a generic sa11x0 socket, and
+> sa11x0_pcmcia_hw_init() is failing as a result.
+>
+> We should be using the legacy probe on H3600, so sa11x0_pcmcia_hw_init()
+> should never be reached.
 
-I prefer to add both the device-tree itself, so if there are differences
-found later then it can be dealt with without rebuilding both the DT
-and kernel.
+However that is what happens, this is my callstack after
+adding some prints:
 
-It is nice to have the new ones added to the driver so that you know the
-hardware choices in play.
+sa11x0_pcmcia_init
+sa11x0_drv_pcmcia_probe
+soc_pcmcia_init_one
+soc_pcmcia_add_one
+soc_pcmcia_hw_init
+sa11x0_pcmcia_hw_init
+soc_pcmcia_add_one: pcmcia HW init failed
+sa11x0-pcmcia: probe of sa11x0-pcmcia failed with error -2
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+It bails out when trying to get the "reset" gpio.
+
+I'm trying to figure out how this can happen.
+
+On the plus side: this minor snag is all the problems I have.
+All other GPIOs work exactly as they should.
+
+Yours,
+Linus Walleij
