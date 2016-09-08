@@ -1,50 +1,58 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Thu, 08 Sep 2016 09:48:48 +0200
-Subject: [PATCH 1/8] ARM: dts: bcm283x: Define standard pinctrl groups
- in the gpio node.
-In-Reply-To: <87bmzzr1bg.fsf@eliezer.anholt.net>
-References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
- <1473244289-20728-2-git-send-email-kraxel@redhat.com>
- <1564766913.23457.026b1e4b-e35d-48e6-9394-7eeea0ff9add.open-xchange@email.1und1.de>
- <87bmzzr1bg.fsf@eliezer.anholt.net>
-Message-ID: <1473320928.6698.28.camel@redhat.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  8 Sep 2016 09:42:59 +0200
+Subject: [PATCH 03/30] arm64: dts: r8a7795: set maximum frequency for SDHI
+ clocks
+In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
+References: <cover.1473320411.git.horms+renesas@verge.net.au>
+Message-ID: <dcdca4d53845d1fdf3f7f25e7db709886facea00.1473320411.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mi, 2016-09-07 at 11:50 -0700, Eric Anholt wrote:
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
-> > Hi Gerd,
-> >
-> >> Gerd Hoffmann <kraxel@redhat.com> hat am 7. September 2016 um 12:31
-> >> geschrieben:
-> >> 
-> >> 
-> >> From: Eric Anholt <eric@anholt.net>
-> >> 
-> >> The BCM2835-ARM-Peripherals.pdf documentation specifies what the
-> >> function selects do for the pins, and there are a bunch of obvious
-> >> groupings to be made.  With these created, we'll be able to replace
-> >> bcm2835-rpi.dtsi's main "set all of these pins to alt0" with
-> >> references to specific groups we want enabled.
-> >
-> > on IMX/MXS platform it's unwanted to add all possible muxes in the dtsi file. So
-> > i would suggest to add only the actually used muxes. That makes it easier to
-> > maintain.
-> 
-> On the other hand, I find that having to go back to the docs for
-> determining the fsels is worse than just verifying and defining them
-> here all at once.
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Agreeing here.  IMO it is nice to have them all even if unused for
-documentation purposes.
+Define the upper limit otherwise the driver cannot utilize max speeds.
 
-> Maintaining has also gotten harder because our DTs
-> are split across 32 and 64-bit ARM, so rpi3 changes that require adding
-> one of these pinmux definitions back to the dtsi would require painful
-> cross-branch merges.
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-It'll also easily cause merge conflicts.
-
-cheers,
-  Gerd
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 99953ca9a45e..834a12a13735 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1098,6 +1098,7 @@
+ 			reg = <0 0xee100000 0 0x2000>;
+ 			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 314>;
++			max-frequency = <200000000>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			status = "disabled";
+ 		};
+@@ -1107,6 +1108,7 @@
+ 			reg = <0 0xee120000 0 0x2000>;
+ 			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 313>;
++			max-frequency = <200000000>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			status = "disabled";
+ 		};
+@@ -1116,6 +1118,7 @@
+ 			reg = <0 0xee140000 0 0x2000>;
+ 			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 312>;
++			max-frequency = <200000000>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			cap-mmc-highspeed;
+ 			status = "disabled";
+@@ -1126,6 +1129,7 @@
+ 			reg = <0 0xee160000 0 0x2000>;
+ 			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 311>;
++			max-frequency = <200000000>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			cap-mmc-highspeed;
+ 			status = "disabled";
+-- 
+2.7.0.rc3.207.g0ac5344
