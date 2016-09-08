@@ -1,126 +1,126 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 8 Sep 2016 13:49:14 +0200
-Subject: [PATCH 08/10] PM / Domains: Add support for removing PM domains
-In-Reply-To: <1471340976-5379-9-git-send-email-jonathanh@nvidia.com>
-References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
- <1471340976-5379-9-git-send-email-jonathanh@nvidia.com>
-Message-ID: <CAPDyKFrVO9wb3ffmxA7HUUDt1_aYxe=aqa1v+xNpdrYiLt_m0A@mail.gmail.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Thu, 08 Sep 2016 14:52:46 +0300
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <12394164.0mceYlJJBD@wuerfel>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <3757738.rjzYG3yq8e@wuerfel> <871t0uiqn9.fsf@linux.intel.com>
+ <12394164.0mceYlJJBD@wuerfel>
+Message-ID: <87r38uhalt.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 August 2016 at 11:49, Jon Hunter <jonathanh@nvidia.com> wrote:
-> The genpd framework allows users to add PM domains via the pm_genpd_init()
-> function, however, there is no corresponding function to remove a PM
-> domain. For most devices this may be fine as the PM domains are never
-> removed, however, for devices that wish to populate the PM domains from
-> within a driver, having the ability to remove a PM domain if the probing
-> of the device fails or the driver is unloaded is necessary.
->
-> Add the function pm_genpd_remove() to remove a PM domain by referencing
-> it's generic_pm_domain structure.
->
-> PM domains can only be removed if they are not a parent domain to
-> another PM domain and have no devices associated with them.
 
-I think we should also check if the there's is a provider registered
-for the genpd, as it should also prevent the genpd from being removed.
-Right?
+Hi,
 
-I noticed that you are adding the ->provider pointer to the genpd
-struct in patch 9/10. Perhaps re-structure $subject patch and 9/10 a
-bit to deal with this, so we can add the pm_genpd_remove() API in a
-more safe manner.
+Arnd Bergmann <arnd@arndb.de> writes:
+>> >> But this needs to be done before dwc3_probe() executes. For dwc3-pci
+>> >> that's easy, but for DT devices, seems like it should be in of
+>> >> core. Below is, clearly, not enough but should show the idea:
+>> >> 
+>> >> diff --git a/drivers/of/device.c b/drivers/of/device.c
+>> >> index fd5cfad7c403..a54610198946 100644
+>> >> --- a/drivers/of/device.c
+>> >> +++ b/drivers/of/device.c
+>> >> @@ -94,8 +94,12 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>> >>          * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+>> >>          * setup the correct supported mask.
+>> >>          */
+>> >> -       if (!dev->coherent_dma_mask)
+>> >> -               dev->coherent_dma_mask = DMA_BIT_MASK(32);
+>> >> +       if (!dev->coherent_dma_mask) {
+>> >> +               if (!dev->parent->coherent_dma_mask)
+>> >> +                       dev->coherent_dma_mask = DMA_BIT_MASK(32);
+>> >> +               else
+>> >> +                       dev->coherent_dma_mask = dev->parent->coherent_dma_mask;
+>> >> +       }
+>> >>  
+>> >
+>> > As the comment above that code says, the default 32-bit mask is intentional,
+>> > and you need the driver to ask for the mask it wants using
+>> > dma_set_mask_and_coherent(), while the platform code should be able to use
+>> > dev->of_node to figure out whether that mask is supported.
+>> >
+>> > Just setting the initial mask to something else based on what the parent
+>> > supports will not do the right thing elsewhere.
+>> 
+>> oh man, it gets more and more complex. Seems like either path we take
+>> will cause problems somewhere 
+>> 
+>> If we make dwc3.ko a library which glue calls directly then all these
+>> problems are solved but we break all current DTs and fall into the trap
+>> of having another MUSB.
+>
+> I don't see how we'd break the current DTs, I'm fairly sure we could turn dwc3
 
-Kind regards
-Uffe
+well, at a minimum dwc3-{pci,exynos,st,omap,of-simple}.c would have to
+look at possible children for their own quirks and properties.
 
+> into a library without changing the DT representation. However the parts
+> that I think would change are
 >
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  drivers/base/power/domain.c | 46 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/pm_domain.h   |  5 +++++
->  2 files changed, 51 insertions(+)
+> - The sysfs representation for dwc3-pci, as we would no longer have
+>   a parent-child relationship there.
+
+that's a no-brainer, I think
+
+> - The power management handling might need a rework, since you currently
+>   rely on the hierarchy between dwc3-pci, dwc3 and xhci for turning
+>   power on and off
+
+simple enough to do as well.
+
+> - turning dwc3 into a library probably implies also turning xhci into
+>   a library, in part for consistency.
+
+yeah, I considered that too. We could still do it in parts, though.
+
+> - if we don't do the whole usb_bus->sysdev thing, we need to not just
+>   do this for dwc3 but also chipidea and maybe a couple of others.
+
+MUSB comes to mind
+
+> There should not be any show-stoppers here, but it's a lot of work.
+
+I think the biggest work will making sure people don't abuse functions
+just because they're now part of a single binary. Having them as
+separate modules helped a lot reducing the maintenance overhead. There
+was only one occasion where someone sent a glue layer which iterated
+over its children to find struct dwc3 * from child's drvdata.
+
+>> If we try to pass DMA bits from parent to child, then we have the fact
+>> that DT ends up, in practice, always having a parent device.
 >
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 7ce4608bbbe0..72b973539205 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1356,6 +1356,52 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
->  }
->  EXPORT_SYMBOL_GPL(pm_genpd_init);
+> I don't understand what you mean here, but I agree that the various ways
+
+well, we can't simply use what I pointed out a few emails back:
+
+if (dwc->dev->parent)
+	dwc->sysdev = dwc->dev->parent
+else
+	dwc->sysdev = dwc->dev
+
+> we discussed for copying the DMA flags from one 'struct device' to another
+> all turned out to be flawed in at least one way.
 >
-> +/**
-> + * pm_genpd_remove - Remove a generic I/O PM domain
-> + * @genpd: Pointer to PM domain that is to be removed.
-> + *
-> + * To remove the PM domain, this function:
-> + *  - Removes the PM domain as a subdomain to any parent domains,
-> + *    if it was added.
-> + *  - Removes the PM domain from the list of registered PM domains.
-> + *
-> + * The PM domain will only be removed, if it is not a parent to any
-> + * other PM domain and has no devices associated with it.
-> + */
-> +int pm_genpd_remove(struct generic_pm_domain *genpd)
-> +{
-> +       struct gpd_link *l, *link;
-> +       int ret = 0;
-> +
-> +       if (IS_ERR_OR_NULL(genpd))
-> +               return -EINVAL;
-> +
-> +       mutex_lock(&gpd_list_lock);
-> +       mutex_lock(&genpd->lock);
-> +
-> +       if (!list_empty(&genpd->master_links) || genpd->device_count) {
-> +               mutex_unlock(&genpd->lock);
-> +               mutex_unlock(&gpd_list_lock);
-> +               pr_err("%s: unable to remove %s\n", __func__, genpd->name);
-> +               return -EBUSY;
-> +       }
-> +
-> +       list_for_each_entry_safe(link, l, &genpd->slave_links, slave_node) {
-> +               list_del(&link->master_node);
-> +               list_del(&link->slave_node);
-> +               kfree(link);
-> +       }
-> +
-> +       list_del(&genpd->gpd_list_node);
-> +       mutex_unlock(&genpd->lock);
-> +       cancel_work_sync(&genpd->power_off_work);
-> +       mutex_unlock(&gpd_list_lock);
-> +       pr_debug("%s: removed %s\n", __func__, genpd->name);
-> +
-> +       return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(pm_genpd_remove);
-> +
->  #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
->
->  typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index f103869db443..fbdc5c4588ef 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -128,6 +128,7 @@ extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
->                                      struct generic_pm_domain *target);
->  extern int pm_genpd_init(struct generic_pm_domain *genpd,
->                          struct dev_power_governor *gov, bool is_off);
-> +extern int pm_genpd_remove(struct generic_pm_domain *genpd);
->
->  extern struct dev_power_governor simple_qos_governor;
->  extern struct dev_power_governor pm_domain_always_on_gov;
-> @@ -163,6 +164,10 @@ static inline int pm_genpd_init(struct generic_pm_domain *genpd,
->  {
->         return -ENOSYS;
->  }
-> +static inline int pm_genpd_remove(struct generic_pm_domain *genpd)
-> +{
-> +       return -ENOTSUPP;
-> +}
->  #endif
->
->  static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
-> --
-> 2.1.4
->
+> Do you see any problems with the patch I posted other than the ugliness
+> of the dwc3 and xhci drivers finding out which pointer to use for
+> usb_bus->sysdev? If we can solve this, we shouldn't need any new
+> of_dma_configure/acpi_dma_configure calls and we won't have to
+> turn the drivers into a library, so maybe let's try to come up with
+> better ideas for that sub-problem.
+
+No big problems with that, no. Just the ifdef looking for a PCI bus in
+the parent. How about passing a flag via device_properties? I don't
+wanna change dwc3 core's device name with a platform_device_id because
+there probably already are scripts relying on the names to enable
+pm_runtime for example.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/47b9c31c/attachment.sig>
