@@ -1,24 +1,50 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 8 Sep 2016 18:37:20 +0800
-Subject: [PATCH v3 2/3] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <20160908102610.26783-3-maxime.ripard@free-electrons.com>
-References: <20160908102610.26783-1-maxime.ripard@free-electrons.com>
- <20160908102610.26783-3-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64P66XNx6oiLAy7U74Ng5UwVj=wmyOm2-5u42M_YP-VRQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 8 Sep 2016 11:38:49 +0100
+Subject: [RFCv4 0/7]  arm_pmu/perf tools: play nicely with CPU PMU cpumasks
+In-Reply-To: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
+References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160908103849.GF1493@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 6:26 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> From: Myl?ne Josserand <mylene.josserand@free-electrons.com>
->
-> The GR8 is an SoC made by Nextthing loosely based on the sun5i family.
->
-> Since it's not clear yet what we can factor out and merge with the A10s and
-> A13 support, let's keep it out of the sun5i.dtsi include tree. We will
-> figure out what can be shared when things settle down.
->
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Thu, Sep 08, 2016 at 11:21:45AM +0100, Mark Rutland wrote:
+> I'm trying to make the perf tool play better with PMUs in heterogeneous systems
+> (e.g. big.LITTLE), where there are several logical PMUs, each covering a subset
+> of CPUs.
+> 
+> Currently perf-record doesn't work for these PMUs, unless forced to use
+> per-thread mmaps. In the absence of a cpumask, it tries to open events on CPUs
+> not supported by a PMU, and gives up. In the presence of a cpumask, it ends up
+> failing to mmap, as the evlist->cpus map contains a different set of CPUs from
+> the evsel->cpus map populated from the cpumask. This is addressed by the
+> penultimate patch in this series.
+> 
+> Complicating matters, prior to commit 00e727bb389359c8 ("perf stat: Balance
+> opening and reading events"), from version two of this series, perf-stat would
+> behave erroneously in the presence of a cpumask file, blocking forever after
+> the workload completed. While this is now fixed, existing binaries (e.g. those
+> shipped by distributions) would be broken by the addition of a cpumask file
+> kernel-side.
+> 
+> To cater for this, this series adds support for a new PMU sysfs file, named
+> 'cpus' rather than 'cpumask', listing a number of CPUs that a logical PMU
+> covers. As old binaries will not look for this, this can be safely added to the
+> kernel without risk of breakage.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+On my x86 laptop, I have the following under /sys/bus/event_source/devices:
+
+power/cpumask 0
+uncore_arb/cpumask 0
+uncore_imc/cpumask 0
+uncore_cbox_0/cpumask 0
+uncore_cbox_1/cpumask 0
+cstate_core/cpumask 0-1
+cstate_pkg/cpumask 0
+
+Are you saying that, prior to 00e727bb3893, perf stat blocks forever on
+those PMUs? If so, wouldn't we need to rename all those files too?
+
+I don't want to be the odd duck kernel-side, because of a bug that's
+been fixed in userspace.
+
+Will
