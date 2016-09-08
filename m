@@ -1,47 +1,33 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  8 Sep 2016 09:43:08 +0200
-Subject: [PATCH 12/30] arm64: dts: r8a7795: Add SoC-specific compatible
- property to audio-dmac nodes
-In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
-References: <cover.1473320411.git.horms+renesas@verge.net.au>
-Message-ID: <f826473520e7aba2e416f79a3acbd6da3921e0a2.1473320411.git.horms+renesas@verge.net.au>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Thu, 08 Sep 2016 09:44:47 +0200
+Subject: [PATCH 4/8] ARM: dts: bcm283x: Add a new EMMC pin group from
+ the downstream tree.
+In-Reply-To: <87650770.23554.026b1e4b-e35d-48e6-9394-7eeea0ff9add.open-xchange@email.1und1.de>
+References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
+ <1473244289-20728-5-git-send-email-kraxel@redhat.com>
+ <87650770.23554.026b1e4b-e35d-48e6-9394-7eeea0ff9add.open-xchange@email.1und1.de>
+Message-ID: <1473320687.6698.25.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Mi, 2016-09-07 at 20:13 +0200, Stefan Wahren wrote:
+> > Gerd Hoffmann <kraxel@redhat.com> hat am 7. September 2016 um 12:31
+> > geschrieben:
+> > 
+> > 
+> > From: Eric Anholt <eric@anholt.net>
+> > 
+> > This will be used for having EMMC (sdhci-bcm2835.c) drive the
+> > wireless.
+> 
+> sdhci-bcm2835.c has been replaced by sdhci-iproc.c
 
-The audio-dmac nodes used the generic compatible property only.
-Add the SoC-specific one, to make it future proof.
+Ah, right, I'll update the commit msg for v2.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+> How about adding pull defines to include/dt-bindings/pinctrl/bcm2835.h?
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 5d59e7fe7bbc..64899b556a0e 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -328,7 +328,8 @@
- 		};
- 
- 		audma0: dma-controller at ec700000 {
--			compatible = "renesas,rcar-dmac";
-+			compatible = "renesas,dmac-r8a7795",
-+				     "renesas,rcar-dmac";
- 			reg = <0 0xec700000 0 0x10000>;
- 			interrupts = <GIC_SPI 350 IRQ_TYPE_LEVEL_HIGH
- 				      GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
-@@ -360,7 +361,8 @@
- 		};
- 
- 		audma1: dma-controller@ec720000 {
--			compatible = "renesas,rcar-dmac";
-+			compatible = "renesas,dmac-r8a7795",
-+				     "renesas,rcar-dmac";
- 			reg = <0 0xec720000 0 0x10000>;
- 			interrupts = <GIC_SPI 351 IRQ_TYPE_LEVEL_HIGH
- 				      GIC_SPI 336 IRQ_TYPE_LEVEL_HIGH
--- 
-2.7.0.rc3.207.g0ac5344
+Already there (or do you mean something other than '#define
+BCM2835_FSEL_*' ?)
+
+cheers,
+  Gerd
