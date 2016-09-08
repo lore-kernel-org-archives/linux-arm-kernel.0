@@ -1,44 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Sep 2016 11:57:46 +0200
-Subject: [PATCH 5/6] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <CABxcv=kJCuP==QVRqyuoORSoWKAEqXmt5iRjdvDcCcr4MSm0gQ@mail.gmail.com>
-References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
- <20160831081817.5191-6-maxime.ripard@free-electrons.com>
- <CABxcv=kJCuP==QVRqyuoORSoWKAEqXmt5iRjdvDcCcr4MSm0gQ@mail.gmail.com>
-Message-ID: <20160908095746.GN8913@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2016 12:00:26 +0200
+Subject: [PATCH V2 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <57D11BE9.7010709@hisilicon.com>
+References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
+ <2175767.JxAh0qjf0L@wuerfel> <57D11BE9.7010709@hisilicon.com>
+Message-ID: <74367472.RYBpLsaIy1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Thursday, September 8, 2016 4:06:01 PM CEST zhichang.yuan wrote:
+> > 
+> >> +struct lpc_io_ops {
+> >> +    unsigned int periosz;
+> >> +    int (*lpc_iord)(struct hisilpc_dev *pdev, struct lpc_cycle_para *para,
+> >> +                            unsigned long ptaddr, unsigned char *buf,
+> >> +                            unsigned long dlen);
+> >> +    int (*lpc_iowr)(struct hisilpc_dev *pdev, struct lpc_cycle_para *para,
+> >> +                            unsigned long ptaddr,
+> >> +                            const unsigned char *buf,
+> >> +                            unsigned long dlen);
+> >> +};
+> > 
+> > The operations are not needed unless we also put the earlycon support
+> > in, so maybe leave them out from the first patch and only add them
+> > later (or drop the earlycon support if possible).
+> 
+> Do you want to remove the struct lpc_io_ops member from struct hisilpc_dev??
+> I think we can not do that.
+> 
+> These two functions are essential rd/wr operation for Hip06 LPC. They will be fallen into
+> when the upper layer drivers call their own IO in/out functions, such as serial_in/serial_out
+> for 8250 serial.
+> 
+> I can define lpc_iord/lpc_iowr directly in struct hisilpc_dev and cancel the definition of
+> struct lpc_io_ops. In my original idea, several LPC cycle types will be supported. Each cycle
+> type has its specific ops. Now, only one cycle type is needed, the struct lpc_io_ops is not
+> meaningful.
 
-On Wed, Sep 07, 2016 at 04:51:55PM +0200, Javier Martinez Canillas wrote:
-> Hello Maxime,
-> 
-> On Wed, Aug 31, 2016 at 10:18 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> 
-> [snip]
-> 
-> > +
-> > +#include "skeleton.dtsi"
-> > +
-> 
-> The skeleton.dtsi has been deprecated and shouldn't be used in new DTS files:
-> 
-> http://www.spinics.net/lists/arm-kernel/msg528080.html
+My point was that the indirect function calls are not needed at
+until patch four, so you can call the functions directly here,
+and make the logic for indirect function calls part of that
+later patch.
 
-Ok, thanks, I'll change it in the v3.
+What are the other LPC cycle types that could be supported?
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/d7268678/attachment.sig>
+	Arnd
