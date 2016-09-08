@@ -1,60 +1,68 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 8 Sep 2016 09:41:07 +0800
-Subject: [PATCH 0/3] gpio/pinctrl: imx: let IOMUX controller know about
- on-SoC GPIOs
-In-Reply-To: <1c1d23a0-9656-2682-e573-13385a002998@mentor.com>
-References: <1471644615-10320-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <cc5ab313-c3c6-bfd4-d2b8-92a7d153cf05@mentor.com>
- <20160905021201.GC25778@tiger>
- <1c1d23a0-9656-2682-e573-13385a002998@mentor.com>
-Message-ID: <20160908014107.GA2533@x250>
+From: spjoshi@codeaurora.org (spjoshi at codeaurora.org)
+Date: Wed, 07 Sep 2016 18:46:32 -0700
+Subject: [PATCH v2 01/17] rpmsg: Enable matching devices with drivers
+ based on DT
+In-Reply-To: <1472768889-3906-2-git-send-email-bjorn.andersson@linaro.org>
+References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
+ <1472768889-3906-2-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <eaf4753b0be45873adf29f04cb315e02@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 02:49:16PM +0300, Vladimir Zapolskiy wrote:
-> >If I understand it correctly, with the change, most of GPIO client
-> >device drivers use the same init level as GPIO driver.  So we are not
-> >sure if GPIO driver is ready when client drivers try to request GPIO.
+On 2016-09-01 15:27, Bjorn Andersson wrote:
+> Make it possible to match rpmsg devices based on device tree node, in
+> addition to the id table. In some of these cases the rpmsg driver would
+> not have a id_table, so make this optional.
 > 
-> please give it a test run (with and without DTS gpio-ranges changes,
-> or just 2/3 from the series), I've tested on iMX6Q SabreLite, SabreAuto,
-> SabreSD and I don't see any regressions or noticeable increase of
-> -EPROBE_DEFER hits due to not ready GPIOs.
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> ---
 > 
-> >most of GPIO client device drivers use the same init level as GPIO driver.
+> Changes since v1:
+> - None
 > 
-> IMHO that will be the case, if the change 2/3 from the series is applied.
+>  drivers/rpmsg/virtio_rpmsg_bus.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
 > 
-> Statisticaly most of GPIO consumers should settle on device_initcall or
-> module_init level, the latter one is translated to device_initcall if
-> a driver is built-in, so the proposed downgrading of GPIO controller
-> driver init call level looks to be appropriate.
+> diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c 
+> b/drivers/rpmsg/virtio_rpmsg_bus.c
+> index 4a4374cc6a59..495fa0a282d3 100644
+> --- a/drivers/rpmsg/virtio_rpmsg_bus.c
+> +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+> @@ -33,6 +33,7 @@
+>  #include <linux/wait.h>
+>  #include <linux/rpmsg.h>
+>  #include <linux/mutex.h>
+> +#include <linux/of_device.h>
 > 
-> However pinctrl/pinmux driver should definitely have higher init level
-> priority in comparison to GPIO controller driver, every GPIO consumer
-> is a pinctrl/pinmux consumer as well, most of iMX pinctrl/pinmux drivers
-> are initialized at arch_initcall level, so there is a plenty of options
-> to satisfy (GPIO driver initcall) < (pinmux/pinctrl driver initcall)
-> equation:
-> * change pinmux/pinctrl driver initcall level to postcore_initcall
->   and GPIO driver initcall level to arch_initcall or lower one,
-> * keep pinmux/pinctrl driver at arch_initcall level, set GPIO driver
->   initcall level to any lower than arch_initcall (e.g. device_initcall)
-> * keep everything as is, drop 2/3 and rely on -EPROBE_DEFER from
->   GPIO driver probe due to not yet initialized pinctrl driver.
+>  /**
+>   * struct virtproc_info - virtual remote processor state
+> @@ -175,11 +176,12 @@ static int rpmsg_dev_match(struct device *dev,
+> struct device_driver *drv)
+>  	const struct rpmsg_device_id *ids = rpdrv->id_table;
+>  	unsigned int i;
 > 
-> >It shouldn't be a problem if every client driver handle the failure
-> >with deferred probing, but I'm not sure that's the case now.
-> >
+> -	for (i = 0; ids[i].name[0]; i++)
+> -		if (rpmsg_id_match(rpdev, &ids[i]))
+> -			return 1;
+> +	if (ids)
+> +		for (i = 0; ids[i].name[0]; i++)
+> +			if (rpmsg_id_match(rpdev, &ids[i]))
+> +				return 1;
 > 
-> From what I see it is the case for the most critical drivers, for the
-> rest I believe it is a bug, which can be revealed by shifting GPIO
-> driver initcall level and fixed, see also
-> 
-> https://lists.linuxfoundation.org/pipermail/ksummit-discuss/2016-August/003419.html
+> -	return 0;
+> +	return of_driver_match_device(dev, drv);
 
-Okay, fair enough.
+Do we care falling back to acpi_driver_match_device if 
+of_driver_match_device fails (something similar to what platform_match 
+does)?
 
-For the series,
+>  }
+> 
+>  static int rpmsg_uevent(struct device *dev, struct kobj_uevent_env 
+> *env)
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+Sarang
+
+--
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
