@@ -1,41 +1,70 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  8 Sep 2016 10:11:32 +0100
-Subject: [PATCH 0/4] ARM: MMC: USB: Fix clocking
-Message-ID: <20160908091136.17301-1-lee.jones@linaro.org>
+Date: Thu,  8 Sep 2016 10:11:33 +0100
+Subject: [PATCH 1/4] ARM: dts: STiH410: Handle interconnect clock required by
+ EHCI/OHCI (USB)
+In-Reply-To: <20160908091136.17301-1-lee.jones@linaro.org>
+References: <20160908091136.17301-1-lee.jones@linaro.org>
+Message-ID: <20160908091136.17301-2-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before we had critical-clock support, it was not possible to boot a kernel
-without using the 'clk_ignore_unused' kernel command-line parameter.  This
-was due to the existance of inter-connect clocks which weren't associated
-with any physical device and thus could not be handled (think get, enable,
-disable) correctly.  As a consequence the platform would catastrophically
-fail when the Common Clock Framework tried to disable unused clocks.
+The STiH4{07,10} platform contains some interconnect clocks which are used
+by various IPs.  If this clock isn't handled correctly by ST's EHCI/OHCI
+drivers, their hub won't be found, the following error be shown and the
+result will be non-working USB:
 
-Now we do have critical-clock support, it has identified some additional
-clocks which are required for the successful functioning of some key IP.
+  [   97.221963] hub 2-1:1.0: hub_ext_port_status failed (err = -110)
 
-With the introduction of critical-clock support in v4.8, our developers'
-default configuration is to run with 'clk_ignore_unused' removed.  This
-patch-set ensures they can achieve successful boot when a) booting from
-an SD Card and when b) booting using USB->Eth adaptors for NFS booting.
+Cc: stable at vger.kernel.org
+Tested-by: Peter Griffin <peter.griffin@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih410.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-Please consider this set for your respective -fixes branches for
-inclusion into the v4.8-rcs.
-
-Lee Jones (4):
-  ARM: dts: STiH410: Handle interconnect clock required by EHCI/OHCI
-    (USB)
-  ARM: dts: STiH407-family: Provide interconnect clock for consumption
-    in ST SDHCI
-  dt-bindings: mmc: sdhci-st: Mention the discretionary "icn" clock
-  mmc: sdhci-st: Handle interconnect clock
-
- Documentation/devicetree/bindings/mmc/sdhci-st.txt |  2 +-
- arch/arm/boot/dts/stih407-family.dtsi              | 10 ++++++----
- arch/arm/boot/dts/stih410.dtsi                     | 12 ++++++++----
- drivers/mmc/host/sdhci-st.c                        | 15 ++++++++++++++-
- 4 files changed, 29 insertions(+), 10 deletions(-)
-
+diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+index 9ee5e20..f1aa34c 100644
+--- a/arch/arm/boot/dts/stih410.dtsi
++++ b/arch/arm/boot/dts/stih410.dtsi
+@@ -41,7 +41,8 @@
+ 			compatible = "st,st-ohci-300x";
+ 			reg = <0x9a03c00 0x100>;
+ 			interrupts = <GIC_SPI 180 IRQ_TYPE_NONE>;
+-			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
++			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
++				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
+ 			resets = <&powerdown STIH407_USB2_PORT0_POWERDOWN>,
+ 				 <&softreset STIH407_USB2_PORT0_SOFTRESET>;
+ 			reset-names = "power", "softreset";
+@@ -57,7 +58,8 @@
+ 			interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_usb0>;
+-			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
++			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
++				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
+ 			resets = <&powerdown STIH407_USB2_PORT0_POWERDOWN>,
+ 				 <&softreset STIH407_USB2_PORT0_SOFTRESET>;
+ 			reset-names = "power", "softreset";
+@@ -71,7 +73,8 @@
+ 			compatible = "st,st-ohci-300x";
+ 			reg = <0x9a83c00 0x100>;
+ 			interrupts = <GIC_SPI 181 IRQ_TYPE_NONE>;
+-			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
++			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
++				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
+ 			resets = <&powerdown STIH407_USB2_PORT1_POWERDOWN>,
+ 				 <&softreset STIH407_USB2_PORT1_SOFTRESET>;
+ 			reset-names = "power", "softreset";
+@@ -87,7 +90,8 @@
+ 			interrupts = <GIC_SPI 153 IRQ_TYPE_NONE>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_usb1>;
+-			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
++			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
++				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
+ 			resets = <&powerdown STIH407_USB2_PORT1_POWERDOWN>,
+ 				 <&softreset STIH407_USB2_PORT1_SOFTRESET>;
+ 			reset-names = "power", "softreset";
 -- 
 2.9.3
