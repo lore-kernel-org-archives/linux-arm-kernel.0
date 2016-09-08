@@ -1,51 +1,40 @@
 From: johnyoun@synopsys.com (John Youn)
-Date: Wed, 07 Sep 2016 19:39:33 -0700
-Subject: [PATCH v5 0/3] usb: dwc2: Fix core reset and force mode delays
-Message-ID: <cover.1473302184.git.johnyoun@synopsys.com>
+Date: Wed, 07 Sep 2016 19:39:37 -0700
+Subject: [PATCH v5 1/3] usb: dwc2: gadget: Only initialize device if in device
+ mode
+In-Reply-To: <cover.1473302184.git.johnyoun@synopsys.com>
+References: <cover.1473302184.git.johnyoun@synopsys.com>
+Message-ID: <a27f7de13d9b1e1ba83fcfb4ec978596bc96f8ca.1473302184.git.johnyoun@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series accounts for the delay from the IDDIG debounce filter when
-switching modes. This delay is a function of the PHY clock speed and
-can range from 5-50 ms. This delay must be taken into account on core
-reset and force modes. A full explanation is provided in the patch
-commit log and code comments.
+In dwc2_hsotg_udc_start(), don't initialize the controller for device
+mode unless we are actually in device mode.
 
-This revision of the series increases the IDDIG delay to 100 ms. Some
-rockchip platforms seem to timeout even with 50 ms so I have doubled
-this.
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+Signed-off-by: John Youn <johnyoun@synopsys.com>
+---
+ drivers/usb/dwc2/gadget.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-Appreciate any testing on RK3188 platforms.
-
-v5:
-* Added Stefan Wahren's tested-by
-* Dropped RFT
-
-v4:
-* Increased the IDDIG delay to 110ms.
-* Removed tested-by for patch 2 since I have changed the delays.
-
-v3:
-* Added tested-bys for patch 1-2
-* Fixed an issue where a function was not returning a value
-* Dropped patch 4
-
-v2:
-* Broke up the last patch of the original series
-
-Regards,
-John
-
-John Youn (3):
-  usb: dwc2: gadget: Only initialize device if in device mode
-  usb: dwc2: Add delay to core soft reset
-  usb: dwc2: Properly account for the force mode delays
-
- drivers/usb/dwc2/core.c   | 126 +++++++++++++++++++++++++++++++++++++++-------
- drivers/usb/dwc2/core.h   |   1 +
- drivers/usb/dwc2/gadget.c |   7 ++-
- drivers/usb/dwc2/hw.h     |   1 +
- 4 files changed, 116 insertions(+), 19 deletions(-)
-
+diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
+index 94bd19a..4cd6403 100644
+--- a/drivers/usb/dwc2/gadget.c
++++ b/drivers/usb/dwc2/gadget.c
+@@ -3466,8 +3466,11 @@ static int dwc2_hsotg_udc_start(struct usb_gadget *gadget,
+ 		otg_set_peripheral(hsotg->uphy->otg, &hsotg->gadget);
+ 
+ 	spin_lock_irqsave(&hsotg->lock, flags);
+-	dwc2_hsotg_init(hsotg);
+-	dwc2_hsotg_core_init_disconnected(hsotg, false);
++	if (dwc2_hw_is_device(hsotg)) {
++		dwc2_hsotg_init(hsotg);
++		dwc2_hsotg_core_init_disconnected(hsotg, false);
++	}
++
+ 	hsotg->enabled = 0;
+ 	spin_unlock_irqrestore(&hsotg->lock, flags);
+ 
 -- 
 2.9.0
