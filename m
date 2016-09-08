@@ -1,88 +1,49 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 8 Sep 2016 19:55:29 +0200 (CEST)
-Subject: [PATCH 1/8] ARM: dts: bcm283x: Define standard pinctrl groups
- in the gpio node.
-In-Reply-To: <1473244289-20728-2-git-send-email-kraxel@redhat.com>
-References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
- <1473244289-20728-2-git-send-email-kraxel@redhat.com>
-Message-ID: <1628308726.55593.220fafc0-57d9-4317-a72d-0875dfb2d658.open-xchange@email.1und1.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 8 Sep 2016 19:55:46 +0200
+Subject: [PATCH] ARM: imx35: add iim module to imx35.dtsi
+In-Reply-To: <CAOMZO5DmaLsxAsjORCauxBkqAmOMQxu4HTASo+jxBsoo+iL8Ow@mail.gmail.com>
+References: <1473326895-19189-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAOMZO5DmaLsxAsjORCauxBkqAmOMQxu4HTASo+jxBsoo+iL8Ow@mail.gmail.com>
+Message-ID: <20160908175546.lvc5qehbekx7s2ty@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerd,
-
-> Gerd Hoffmann <kraxel@redhat.com> hat am 7. September 2016 um 12:31
-> geschrieben:
+On Thu, Sep 08, 2016 at 01:21:49PM -0300, Fabio Estevam wrote:
+> Hi Uwe,
 > 
+> On Thu, Sep 8, 2016 at 6:28 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > This is a prerequisite to remove the static mappings for imx35 devicetree
+> > based machines.
+> >
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/imx35.dtsi | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+> > index 490b7b44f1e7..f812d586c5ce 100644
+> > --- a/arch/arm/boot/dts/imx35.dtsi
+> > +++ b/arch/arm/boot/dts/imx35.dtsi
+> > @@ -309,6 +309,13 @@
+> >                                 status = "disabled";
+> >                         };
+> >
+> > +                       iim at 53ff0000 {
+> > +                               compatible = "fsl,imx35-iim";
 > 
-> From: Eric Anholt <eric@anholt.net>
-> 
-> The BCM2835-ARM-Peripherals.pdf documentation specifies what the
-> function selects do for the pins, and there are a bunch of obvious
-> groupings to be made.  With these created, we'll be able to replace
-> bcm2835-rpi.dtsi's main "set all of these pins to alt0" with
-> references to specific groups we want enabled.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  arch/arm/boot/dts/bcm283x.dtsi | 170
-> +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 170 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-> index 4d9f3ab..acb616f 100644
-> --- a/arch/arm/boot/dts/bcm283x.dtsi
-> +++ b/arch/arm/boot/dts/bcm283x.dtsi
-> @@ -131,6 +131,176 @@
->  
->  			interrupt-controller;
->  			#interrupt-cells = <2>;
-> +
-> +			/* Defines pin muxing groups according to
-> +			 * BCM2835-ARM-Peripherals.pdf page 102.
-> +			 *
-> +			 * While each pin can have its mux selected
-> +			 * for various functions individually, some
-> +			 * groups only make sense to switch to a
-> +			 * particular function together.
-> +			 */
-> ...
-> +			i2c0_gpio32: i2c0_gpio32 {
-> +				brcm,pins = <32 34>;
-> +				brcm,function = <BCM2835_FSEL_ALT0>;
-> +			};
-> +			spio0_gpio35: spio0_gpio35 {
-> +				brcm,pins = <35 36 37 38 39>;
-> +				brcm,function = <BCM2835_FSEL_ALT0>;
-> +			};
+> Where is "fsl,imx35-iim" defined?
 
-s/spio0/spi0
+right next to the other fsl,imx*-iim :-)
 
-> +			pwm0_gpio40: pwm0_gpio40 {
-> +				brcm,pins = <40>;
-> +				brcm,function = <BCM2835_FSEL_ALT0>;
-> +			};
-> ...
-> +			uart1_ctsrts_gpio42: uart1_ctsrts_gpio42 {
-> +				brcm,pins = <42 43>;
-> +				brcm,function = <BCM2835_FSEL_ALT5>;
-> +			};
+By the way, compared to the other imx*.dtsi I didn't declare
+compatibility to fsl,imx27-iim. I checked the i.MX25 reference manual
+and the i.MX35 looked different. Didn't check for imx5x and the i.MX27
+RM doesn't describe the registers. What do you think?
 
-Please sort all pinctrl nodes by label.
+Best regards
+Uwe
 
-According to this page [1] the pinctrl group for parallel display interface is
-missing. Is it intended?
-
-[1] - http://elinux.org/RPi_BCM2835_GPIOs
-
->  		};
->  
->  		uart0: serial at 7e201000 {
-> -- 
-> 1.8.3.1
-> 
-> 
-> _______________________________________________
-> linux-rpi-kernel mailing list
-> linux-rpi-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
