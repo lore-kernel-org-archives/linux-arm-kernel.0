@@ -1,35 +1,37 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 8 Sep 2016 09:44:57 +0200
-Subject: [PATCH 4/7] spi: meson: Add GXBB compatible
-In-Reply-To: <20160907185846.GE3950@sirena.org.uk>
-References: <1473261223-15412-1-git-send-email-jbrunet@baylibre.com>
- <1473261223-15412-5-git-send-email-jbrunet@baylibre.com>
- <20160907185846.GE3950@sirena.org.uk>
-Message-ID: <639f64f7-1268-12e3-1f22-44a45baa9559@baylibre.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  8 Sep 2016 09:43:14 +0200
+Subject: [PATCH 18/30] arm64: dts: h3ulcb: enable EXTALR clk
+In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
+References: <cover.1473320411.git.horms+renesas@verge.net.au>
+Message-ID: <b00d23f71f2cbca63d4d8ddde15b39f18fccd7a8.1473320411.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2016 08:58 PM, Mark Brown wrote:
-> On Wed, Sep 07, 2016 at 05:13:40PM +0200, Jerome Brunet wrote:
->> From: Neil Armstrong <narmstrong@baylibre.com>
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
-> 
-> I can't do anything with this, you've not provided a signoff.  Please
-> resend with a signoff - see SubmittingPatches for details on what this
-> means and why it's important.
-> 
-> I also only have patches 4 and 5 of this series and no cover letter,
-> what is going on there?
-> 
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Hi Mark,
+This enables EXTALR clock that can be used for the watchdog.
 
-Submitting patchsets for multiple subsystems is not straightforward, the cover-letter should also have been sent to linux-spi ML, lesson learned !
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Jerome left my signoff because the patches were left untouched from my branch.
-Nevertheless, I will submit these patches 4 & 5 in a separate SPI serie, please ignore them in this patchset.
-
-Thanks,
-Neil
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+index 3ba1f72526ba..42a4208f57ed 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+@@ -37,6 +37,10 @@
+ 	clock-frequency = <16666666>;
+ };
+ 
++&extalr_clk {
++	clock-frequency = <32768>;
++};
++
+ &pfc {
+ 	pinctrl-0 = <&scif_clk_pins>;
+ 	pinctrl-names = "default";
+-- 
+2.7.0.rc3.207.g0ac5344
