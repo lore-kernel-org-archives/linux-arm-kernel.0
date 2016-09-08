@@ -1,72 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  8 Sep 2016 09:43:01 +0200
-Subject: [PATCH 05/30] arm64: dts: r8a7795: salvator-x: enable usb2_phy of
+Date: Thu,  8 Sep 2016 09:43:02 +0200
+Subject: [PATCH 06/30] arm64: dts: r8a7795: salvator-x: enable USB 2.0 Host
  channel 0
 In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
 References: <cover.1473320411.git.horms+renesas@verge.net.au>
-Message-ID: <a905b72ce9216a501d8239a1f1790817b5645ef9.1473320411.git.horms+renesas@verge.net.au>
+Message-ID: <34ccd788a38983249727b081b2bf92ab54bfa27c.1473320411.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-This patch also adds a regulator node for USB2.0 to handle VBUS on/off
-by the phy-rcar-gen3-usb2 driver.
+We have to set SW15 to pin 2-3 side on the board before we use CN9
+as USB host or peripheral.
 
 Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 98f02631a0f0..8c8bfdccdc2b 100644
+index 8c8bfdccdc2b..c0e6e8f7c7d8 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
 +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -110,6 +110,17 @@
- 			  1800000 0>;
- 	};
- 
-+	vbus0_usb2: regulator-vbus0-usb2 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "USB20_VBUS0";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+
-+		gpio = <&gpio6 16 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
- 	audio_clkout: audio_clkout {
- 		/*
- 		 * This is same as <&rcar_sound 0>
-@@ -193,6 +204,11 @@
- 		function = "audio_clk";
- 	};
- 
-+	usb0_pins: usb0 {
-+		groups = "usb0";
-+		function = "usb0";
-+	};
-+
- 	usb1_pins: usb1 {
- 		groups = "usb1";
- 		function = "usb1";
-@@ -369,6 +385,14 @@
+@@ -407,6 +407,10 @@
  	status = "okay";
  };
  
-+&usb2_phy0 {
-+	pinctrl-0 = <&usb0_pins>;
-+	pinctrl-names = "default";
-+
-+	vbus-supply = <&vbus0_usb2>;
++&ehci0 {
 +	status = "okay";
 +};
 +
- &usb2_phy1 {
- 	pinctrl-0 = <&usb1_pins>;
- 	pinctrl-names = "default";
+ &ehci1 {
+ 	status = "okay";
+ };
+@@ -415,6 +419,10 @@
+ 	status = "okay";
+ };
+ 
++&ohci0 {
++	status = "okay";
++};
++
+ &ohci1 {
+ 	status = "okay";
+ };
 -- 
 2.7.0.rc3.207.g0ac5344
