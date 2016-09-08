@@ -1,61 +1,52 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 8 Sep 2016 17:47:02 +0200
-Subject: [PATCH v4 6/9] pinctrl: Add IRQ support to STM32 gpios
-In-Reply-To: <CACRpkdZ_r0phJeScTYs_LmEHavcjGo6YjHPEHo-rKAv+rLgiFg@mail.gmail.com>
-References: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
- <1473180341-1999-7-git-send-email-alexandre.torgue@st.com>
- <CACRpkdZ_r0phJeScTYs_LmEHavcjGo6YjHPEHo-rKAv+rLgiFg@mail.gmail.com>
-Message-ID: <0063a1ef-1b09-7cfc-f18b-76f2bb07eb84@st.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 8 Sep 2016 08:50:39 -0700
+Subject: [PATCH v2 0/7] arm64: Privileged Access Never using TTBR0_EL1
+ switching
+In-Reply-To: <20160908125123.ypkye5nclsi5vx4f@localhost>
+References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+ <CAGXu5j++0LgDEv=m1yQb4hB57MQ2MYVCpeex9TFTRmQpNYhNsQ@mail.gmail.com>
+ <20160908125123.ypkye5nclsi5vx4f@localhost>
+Message-ID: <CAGXu5jKCZmZSJHK-EFunNtbqbxBT1KsLE31VygapwgZX9XmFAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On 09/07/2016 11:06 PM, Linus Walleij wrote:
-> On Tue, Sep 6, 2016 at 6:45 PM, Alexandre TORGUE
-> <alexandre.torgue@st.com> wrote:
->
->> This patch adds IRQ support to STM32 gpios.
+On Thu, Sep 8, 2016 at 5:51 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Sep 07, 2016 at 04:20:55PM -0700, Kees Cook wrote:
+>> On Fri, Sep 2, 2016 at 8:02 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > This is the second version of the arm64 PAN emulation by disabling
+>> > TTBR0_EL1 accesses. The major change from v1 is the use of a thread_info
+>> > member to store the real TTBR0_EL1 value. The advantage is slightly
+>> > simpler assembler macros for uaccess_enable with the downside that
+>> > switch_mm() must always update the saved ttbr0 even if there is no mm
+>> > switch.
 >>
->> The EXTI controller has 16 lines dedicated to GPIOs.
->> EXTI line n can be connected to only line n of one of the GPIO ports, for
->> example EXTI0 can be connected to either PA0, or PB0, or PC0...
->> This port selection is done by specifying the port number into System
->> Config registers.
->>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>> Is arm64 thread_info attached to the kernel stack? (i.e. is this
+>> introducing a valuable target for stack-based attacks?)
 >
->> +++ b/drivers/pinctrl/stm32/Kconfig
->> @@ -6,6 +6,8 @@ config PINCTRL_STM32
->>         select PINMUX
->>         select GENERIC_PINCONF
->>         select GPIOLIB
->> +       select GPIOLIB_IRQCHIP
->
-> But you're not really using GPIOLIB_IRQCHIP. You have a different,
-> super-complex irqchip in use.
+> Currently yes, thread_info is on the kernel stack. At some point we'll
+> decouple it in a similar way to what x86 are doing/planning.
 
-Thanks Linus for this review. I will send a V5.
-Just one question, when you say "super-complex irqchip in use", do you 
-mean I could use another (simplest) solution to handle this EXTI controller?
+Okay, cool. As long as this is on the horizon, that's cool. :)
 
-Regards
+> If thread_info on the stack can be corrupted, ttbr0 is not our only
+> worry but I agree it adds to the existing ones (addr_limit, task_struct
+> pointer).
+>
+> That said, I don't have a strong preference for thread_info vs per-CPU
+> variable for the shadow TTBR0. The latter feels a bit more natural to me
+> since TTBR0 can be seen as a CPU state (that's what I did in v1).
+> However, using thread_info saves us couple of instructions in the asm
+> code for uaccess_enable.
 
-Alex
+I would opt for the safer (in per-CPU area), but I have clear biases.
+;) Getting this emulation at all closes a huge exploitation method, so
+on balance, the new exposure (which as you say is already not the only
+target on the stack) is worth it. :)
 
->
-> So just don't select this.
->
->> +       bank->gpio_chip.irqdomain = irq_domain_create_hierarchy(pctl->domain,
->> +                                       0, STM32_GPIO_IRQ_LINE, bank->fwnode,
->> +                                       &stm32_gpio_domain_ops, bank);
->
-> Don't use that irqdomain pointer inside the gpio_chip.
->
-> Instead declare the irqdomain pointer inside struct stm32_gpio_bank
-> or something like that.
->
-> Yours,
-> Linus Walleij
->
+Thanks!
+
+-Kees
+
+-- 
+Kees Cook
+Nexus Security
