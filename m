@@ -1,35 +1,46 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 8 Sep 2016 20:19:05 +0200
-Subject: [PATCH] atomic64: No need for
- CONFIG_ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-In-Reply-To: <1473352098-5822-1-git-send-email-vgupta@synopsys.com>
-References: <1473352098-5822-1-git-send-email-vgupta@synopsys.com>
-Message-ID: <20160908181905.GY10153@twins.programming.kicks-ass.net>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 8 Sep 2016 21:19:36 +0300
+Subject: [PATCH V3 0/5] firmware: Add support for TI System Control
+ Interface (TI-SCI) protocol driver
+In-Reply-To: <m2y432nvs8.fsf@baylibre.com>
+References: <20160906190127.23522-1-nm@ti.com> <7hshtbtu8l.fsf@baylibre.com>
+ <f41d968c-46c9-997e-0fa0-edbef34a1fa5@ti.com> <m2y432nvs8.fsf@baylibre.com>
+Message-ID: <9c609ea5-5ea8-f58a-ae32-f8af2c85dd72@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 09:28:18AM -0700, Vineet Gupta wrote:
-> This came to light when implementing native 64-bit atomics for ARCv2.
-> 
-> The atomic64 self-test code uses CONFIG_ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-> to check whether atomic64_dec_if_positive() is available.
-> It seems it was needed when not every arch defined it.
-> However as of current code the Kconfig option seems needless
-> 
-> - for CONFIG_GENERIC_ATOMIC64 it is auto-enabled in lib/Kconfig and a
->   generic definition of API is present lib/atomic64.c
-> - arches with native 64-bit atomics select it in arch/*/Kconfig and
->   define the API in their headers
-> 
-> So I see no point in keeping the Kconfig option
-> 
-> Compile tested for 2 representatives:
->  - blackfin (CONFIG_GENERIC_ATOMIC64)
->  - x86 (!CONFIG_GENERIC_ATOMIC64)
-> 
-> Also logistics wise it seemed simpler to just do this in 1 patch vs.
-> splitting per arch - but I can break it up if maintainer feel that
-> is better to avoid conflicts.
+On 08/09/16 20:31, Kevin Hilman wrote:
+> Nishanth Menon <nm@ti.com> writes:
+>
+>> On 09/07/2016 01:55 PM, Kevin Hilman wrote:
+>>> Nishanth Menon <nm@ti.com> writes:
+>>
+>> [...] full mail thread in https://lkml.org/lkml/2016/9/6/747
+>>
+>>>> Overall architecture is very similar to SCPI[4] as follows:
+>>>
+>>> Dumb Q: I'm curious about the limitations in SCPI that were found that
+>>> made TI decided to implement its own version.
+>
+> [...]
+>
+>> Long story short, investigation was done into what SCPI was providing
+>> (TI internal ofcourse) and SCPI did not fit our SoC generation needs -
+>
+> Thanks for the detailed explanation.  Very helpful.
+>
+> To be clear, I'm not a proponent of always using ARM "standards"
+> (especially when it's not exactly clear if it's a standard or a Juno
+> thing) but I'm seeing several SoCs come out with SCPI derivatives, or
+> old ARM versions etc., so was just curious about the decision making
+> process.
+>
+> Thanks for sharing,
+>
+> Kevin
 
-Works for me; you want me to take this, or do you need it for you ARCv2
-patches?
+So, any other comments for this series or shall we still try to get it 
+merged for 4.9? We are -rc5 so it might be too late already and probably 
+better to push this for 4.10.
+
+-Tero
