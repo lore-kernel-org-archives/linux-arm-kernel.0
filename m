@@ -1,52 +1,69 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 8 Sep 2016 08:50:39 -0700
-Subject: [PATCH v2 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-In-Reply-To: <20160908125123.ypkye5nclsi5vx4f@localhost>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <CAGXu5j++0LgDEv=m1yQb4hB57MQ2MYVCpeex9TFTRmQpNYhNsQ@mail.gmail.com>
- <20160908125123.ypkye5nclsi5vx4f@localhost>
-Message-ID: <CAGXu5jKCZmZSJHK-EFunNtbqbxBT1KsLE31VygapwgZX9XmFAg@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu,  8 Sep 2016 17:06:44 +0100
+Subject: [PATCH v3 2/8] arm64: KVM: Move GIC accessors to arch_gicv3.h
+In-Reply-To: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
+References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1473350810-10857-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 5:51 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Sep 07, 2016 at 04:20:55PM -0700, Kees Cook wrote:
->> On Fri, Sep 2, 2016 at 8:02 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > This is the second version of the arm64 PAN emulation by disabling
->> > TTBR0_EL1 accesses. The major change from v1 is the use of a thread_info
->> > member to store the real TTBR0_EL1 value. The advantage is slightly
->> > simpler assembler macros for uaccess_enable with the downside that
->> > switch_mm() must always update the saved ttbr0 even if there is no mm
->> > switch.
->>
->> Is arm64 thread_info attached to the kernel stack? (i.e. is this
->> introducing a valuable target for stack-based attacks?)
->
-> Currently yes, thread_info is on the kernel stack. At some point we'll
-> decouple it in a similar way to what x86 are doing/planning.
+Since we are going to share vgic-v3 save/restore code with ARM keep
+arch specific accessors separately.
 
-Okay, cool. As long as this is on the horizon, that's cool. :)
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/include/asm/arch_gicv3.h |   13 +++++++++++++
+ arch/arm64/kvm/hyp/vgic-v3-sr.c     |   13 -------------
+ 2 files changed, 13 insertions(+), 13 deletions(-)
 
-> If thread_info on the stack can be corrupted, ttbr0 is not our only
-> worry but I agree it adds to the existing ones (addr_limit, task_struct
-> pointer).
->
-> That said, I don't have a strong preference for thread_info vs per-CPU
-> variable for the shadow TTBR0. The latter feels a bit more natural to me
-> since TTBR0 can be seen as a CPU state (that's what I did in v1).
-> However, using thread_info saves us couple of instructions in the asm
-> code for uaccess_enable.
-
-I would opt for the safer (in per-CPU area), but I have clear biases.
-;) Getting this emulation at all closes a huge exploitation method, so
-on balance, the new exposure (which as you say is already not the only
-target on the stack) is worth it. :)
-
-Thanks!
-
--Kees
-
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 8ec88e5..ae7dbd7 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -79,6 +79,19 @@
+ #include <linux/stringify.h>
+ #include <asm/barrier.h>
+ 
++#define read_gicreg(r)							\
++	({								\
++		u64 reg;						\
++		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
++		reg;							\
++	})
++
++#define write_gicreg(v,r)						\
++	do {								\
++		u64 __val = (v);					\
++		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
++	} while (0)
++
+ /*
+  * Low-level accessors
+  *
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 5f8f80b..f2dbd2e 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -24,19 +24,6 @@
+ #define vtr_to_max_lr_idx(v)		((v) & 0xf)
+ #define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
+ 
+-#define read_gicreg(r)							\
+-	({								\
+-		u64 reg;						\
+-		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
+-		reg;							\
+-	})
+-
+-#define write_gicreg(v,r)						\
+-	do {								\
+-		u64 __val = (v);					\
+-		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
+-	} while (0)
+-
+ static u64 __hyp_text __gic_v3_get_lr(unsigned int lr)
+ {
+ 	switch (lr & 0xf) {
 -- 
-Kees Cook
-Nexus Security
+1.7.9.5
