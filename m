@@ -1,72 +1,88 @@
 From: kevin.brodsky@arm.com (Kevin Brodsky)
-Date: Thu,  8 Sep 2016 15:00:55 +0100
-Subject: [RFC PATCH 0/8] arm64: Add a compat vDSO
-Message-ID: <20160908140103.7468-1-kevin.brodsky@arm.com>
+Date: Thu,  8 Sep 2016 15:01:00 +0100
+Subject: [RFC PATCH 5/8] arm64: compat: 32-bit vDSO setup
+In-Reply-To: <20160908140103.7468-1-kevin.brodsky@arm.com>
+References: <20160908140103.7468-1-kevin.brodsky@arm.com>
+Message-ID: <20160908140103.7468-6-kevin.brodsky@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+If the compat vDSO is enabled, install it in compat processes. In this
+case, the compat vDSO replaces the vector page.
 
-This series adds support for a compat (AArch32) vDSO, providing two
-userspace functionalities to compat processes:
+aarch32_setup_vectors_page has also been renamed to the more generic
+aarch32_setup_additional_pages to reflect both use cases.
 
-* "Virtual" time syscalls (gettimeofday and clock_gettime). The
-  implementation is an adaptation of the arm vDSO (vgettimeofday.c),
-  sharing the data page with the 64-bit vDSO.
+Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+---
+ arch/arm64/include/asm/elf.h |  6 +++---
+ arch/arm64/kernel/vdso.c     | 22 +++++++++++++++++++++-
+ 2 files changed, 24 insertions(+), 4 deletions(-)
 
-* sigreturn trampolines, following the example of the 64-bit vDSO
-  (sigreturn.S), but slightly more complicated because we provide A32
-  and T32 variants for both sigreturn and rt_sigreturn.
-
-The first point brings the performance improvement expected of a vDSO,
-by implementing time syscalls directly in userspace. The second point
-allows us to get rid of the compat vector page, at the expense of the
-kuser helpers (this is one reason for not enabling the compat vDSO by
-default).
-
-Unfortunately, this time we cannot escape using a 32-bit toolchain. To
-build the compat VDSO, CONFIG_COMPAT_VDSO must be set *and*
-CROSS_COMPILE_ARM32 must be defined to the prefix of a 32-bit compiler.
-Failure to do so will not prevent building the kernel, but a warning
-will be printed and the compat vDSO will not be built.
-
-I have only tested the series with a 64-bit userspace (+ 32-bit glibc).
-Testing it with a 32-bit userspace would be very welcome.
-
-Thanks,
-Kevin
-
-Kevin Brodsky (8):
-  arm64: Refactor vDSO setup
-  arm64: compat: Add time-related syscall numbers
-  arm64: compat: Expose offset to registers in sigframes
-  arm64: compat: Add a 32-bit vDSO
-  arm64: compat: 32-bit vDSO setup
-  arm64: elf: Set AT_SYSINFO_EHDR in compat processes
-  arm64: compat: Use vDSO sigreturn trampolines if available
-  arm64: Wire up and expose the new compat vDSO
-
- arch/arm64/Kconfig                       |  20 +++
- arch/arm64/Makefile                      |  20 ++-
- arch/arm64/include/asm/elf.h             |  15 +-
- arch/arm64/include/asm/signal32.h        |  46 +++++
- arch/arm64/include/asm/unistd.h          |   2 +
- arch/arm64/include/asm/vdso.h            |   3 +
- arch/arm64/kernel/Makefile               |   8 +-
- arch/arm64/kernel/asm-offsets.c          |  13 ++
- arch/arm64/kernel/signal32.c             |  61 ++-----
- arch/arm64/kernel/vdso.c                 | 198 ++++++++++++---------
- arch/arm64/kernel/vdso32/Makefile        | 121 +++++++++++++
- arch/arm64/kernel/vdso32/sigreturn.S     |  86 +++++++++
- arch/arm64/kernel/vdso32/vdso.S          |  32 ++++
- arch/arm64/kernel/vdso32/vdso.lds.S      |  98 +++++++++++
- arch/arm64/kernel/vdso32/vgettimeofday.c | 294 +++++++++++++++++++++++++++++++
- 15 files changed, 883 insertions(+), 134 deletions(-)
- create mode 100644 arch/arm64/kernel/vdso32/Makefile
- create mode 100644 arch/arm64/kernel/vdso32/sigreturn.S
- create mode 100644 arch/arm64/kernel/vdso32/vdso.S
- create mode 100644 arch/arm64/kernel/vdso32/vdso.lds.S
- create mode 100644 arch/arm64/kernel/vdso32/vgettimeofday.c
-
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index a55384f4a5d7..7da9452596ad 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -185,10 +185,10 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+ #define compat_start_thread		compat_start_thread
+ #define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
+ #define COMPAT_ARCH_DLINFO
+-extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
+-				      int uses_interp);
++extern int aarch32_setup_additional_pages(struct linux_binprm *bprm,
++					  int uses_interp);
+ #define compat_arch_setup_additional_pages \
+-					aarch32_setup_vectors_page
++					aarch32_setup_additional_pages
+ 
+ #endif /* CONFIG_COMPAT */
+ 
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index d74f9ac7e336..97d37b64b146 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -139,6 +139,25 @@ up_fail:
+ }
+ 
+ #ifdef CONFIG_COMPAT
++#ifdef CONFIG_VDSO32
++extern char vdso32_start, vdso32_end;
++
++static struct vdso_mappings vdso32_mappings;
++
++static int __init vdso32_init(void)
++{
++	return setup_vdso_mappings("vdso32", &vdso32_start, &vdso32_end,
++				   &vdso32_mappings);
++}
++arch_initcall(vdso32_init);
++
++int aarch32_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
++{
++	return setup_vdso_pages(&vdso32_mappings);
++}
++
++#else /* CONFIG_VDSO32 */
++
+ /*
+  * Create and map the vectors page for AArch32 tasks.
+  */
+@@ -173,7 +192,7 @@ static int alloc_vectors_page(void)
+ }
+ arch_initcall(alloc_vectors_page);
+ 
+-int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
++int aarch32_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ {
+ 	struct mm_struct *mm = current->mm;
+ 	unsigned long addr = AARCH32_VECTORS_BASE;
+@@ -197,6 +216,7 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
+ 
+ 	return PTR_ERR_OR_ZERO(ret);
+ }
++#endif /* CONFIG_VDSO32 */
+ #endif /* CONFIG_COMPAT */
+ 
+ extern char vdso_start, vdso_end;
 -- 
 2.9.3
