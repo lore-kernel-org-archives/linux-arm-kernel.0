@@ -1,49 +1,87 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 8 Sep 2016 19:55:46 +0200
-Subject: [PATCH] ARM: imx35: add iim module to imx35.dtsi
-In-Reply-To: <CAOMZO5DmaLsxAsjORCauxBkqAmOMQxu4HTASo+jxBsoo+iL8Ow@mail.gmail.com>
-References: <1473326895-19189-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CAOMZO5DmaLsxAsjORCauxBkqAmOMQxu4HTASo+jxBsoo+iL8Ow@mail.gmail.com>
-Message-ID: <20160908175546.lvc5qehbekx7s2ty@pengutronix.de>
+From: netz.kernel@gmail.com (Marty Plummer)
+Date: Thu, 8 Sep 2016 12:55:50 -0500
+Subject: [RFC 1/7] Make Hi3620 explicit, remove wildcards
+In-Reply-To: <20160908174756.GC12916@io.lakedaemon.net>
+References: <20160908172346.27506-1-netz.kernel@gmail.com>
+ <20160908174756.GC12916@io.lakedaemon.net>
+Message-ID: <a9b0bd8f-6ccb-6b39-a961-c5b5aca9a9f1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 01:21:49PM -0300, Fabio Estevam wrote:
-> Hi Uwe,
+On 09/08/2016 12:47 PM, Jason Cooper wrote:
+> Hi Marty,
 > 
-> On Thu, Sep 8, 2016 at 6:28 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > This is a prerequisite to remove the static mappings for imx35 devicetree
-> > based machines.
-> >
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx35.dtsi | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-> > index 490b7b44f1e7..f812d586c5ce 100644
-> > --- a/arch/arm/boot/dts/imx35.dtsi
-> > +++ b/arch/arm/boot/dts/imx35.dtsi
-> > @@ -309,6 +309,13 @@
-> >                                 status = "disabled";
-> >                         };
-> >
-> > +                       iim at 53ff0000 {
-> > +                               compatible = "fsl,imx35-iim";
+> + Andrew, Russell,
 > 
-> Where is "fsl,imx35-iim" defined?
-
-right next to the other fsl,imx*-iim :-)
-
-By the way, compared to the other imx*.dtsi I didn't declare
-compatibility to fsl,imx27-iim. I checked the i.MX25 reference manual
-and the i.MX35 looked different. Didn't check for imx5x and the i.MX27
-RM doesn't describe the registers. What do you think?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
+> Since this is your first series, I'll go ahead and gather a few comments
+> right here:
+> 
+> - Make sure to change the subject line for each patch.
+> 
+> The subject is retrieved from the first line of the commit.  you can
+> look at the output of 'git log --oneline' to see a nice, concise view of
+> your series.
+> 
+Ah crap. I knew the subject was taken from the first line of the commit,
+but to be honest I didn't think there was any real room for unique
+subjects here, since its quite literally the exact same changes in each
+file affected, but I take it this is a general rule that each patch in a
+series has to have a unique subject, then?
+> - Include 'PATCH' or 'Patch' inside the square brackets on the subject
+>   line.
+> 
+> When you use the prefix option, as you did, it *replaces* 'PATCH', so
+> you need '--subject-prefix="RFC PATCH"' or '--subject-prefix="RFC PATCH V2"'
+Ah ok. I didn't realize you needed both RFC and PATCH in this instance.
+> 
+> - Please Cc Andrew, Russell and myself on future series.
+> 
+> Personally, I do that at the 'send-email' stage instead of
+> 'format-patch'.  But whichever you prefer.  Don't be shy about Cc'ing.
+> We all are accustomed to handling lots of email.  It makes it easier for
+> us to spot stuff we are actively involved in. :-)
+> 
+> thx,
+> 
+> Jason.
+> 
+Alrighty, I sorta realized this issue right after I sent, will do in
+future instances. Also, you say at 'send-email' instead of
+'format-patch'; I take it there is a way to do the latter? I'm not aware
+of it :)
+> On Thu, Sep 08, 2016 at 12:23:40PM -0500, Marty Plummer wrote:
+>> This is a preparatory series for adding the ARMv5/v6 hi3520 SoCs.
+>> Assumptions were made when adding hi3620 that don't hold water in
+>> light of adding support for the hi3520 SoC.  Fix the issue by renaming
+>> config options and other namespaces to avoid collisions with the new
+>> work.
+>>
+>> Only internal APIs are modified with this series.
+>>
+>> Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
+>> ---
+>>  arch/arm/Kconfig.debug | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index a9693b6..9094ca6 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -280,7 +280,7 @@ choice
+>>  
+>>  	config DEBUG_HI3620_UART
+>>  		bool "Hisilicon HI3620 Debug UART"
+>> -		depends on ARCH_HI3xxx
+>> +		depends on ARCH_HI3620
+>>  		select DEBUG_UART_PL01X
+>>  		help
+>>  		  Say Y here if you want kernel low-level debugging support
+>> -- 
+>> 2.9.3
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
