@@ -1,35 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 8 Sep 2016 15:09:17 -0300
-Subject: [PATCH] ARM: imx35: add iim module to imx35.dtsi
-In-Reply-To: <20160908175546.lvc5qehbekx7s2ty@pengutronix.de>
-References: <1473326895-19189-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CAOMZO5DmaLsxAsjORCauxBkqAmOMQxu4HTASo+jxBsoo+iL8Ow@mail.gmail.com>
- <20160908175546.lvc5qehbekx7s2ty@pengutronix.de>
-Message-ID: <CAOMZO5BLJvL3ad5An2n=h0K+15qOZfWDVLbUz+fe_4Mz7NLMXw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 8 Sep 2016 18:10:51 +0000
+Subject: [RFC 1/7] Make Hi3620 explicit, remove wildcards
+In-Reply-To: <a9b0bd8f-6ccb-6b39-a961-c5b5aca9a9f1@gmail.com>
+References: <20160908172346.27506-1-netz.kernel@gmail.com>
+ <20160908174756.GC12916@io.lakedaemon.net>
+ <a9b0bd8f-6ccb-6b39-a961-c5b5aca9a9f1@gmail.com>
+Message-ID: <20160908181051.GF12916@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 2:55 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+On Thu, Sep 08, 2016 at 12:55:50PM -0500, Marty Plummer wrote:
+> On 09/08/2016 12:47 PM, Jason Cooper wrote:
+> > - Please Cc Andrew, Russell and myself on future series.
+> > 
+> > Personally, I do that at the 'send-email' stage instead of
+> > 'format-patch'.  But whichever you prefer.  Don't be shy about Cc'ing.
+> > We all are accustomed to handling lots of email.  It makes it easier for
+> > us to spot stuff we are actively involved in. :-)
+> > 
+> Alrighty, I sorta realized this issue right after I sent, will do in
+> future instances. Also, you say at 'send-email' instead of
+> 'format-patch'; I take it there is a way to do the latter? I'm not aware
+> of it :)
 
->> Where is "fsl,imx35-iim" defined?
->
-> right next to the other fsl,imx*-iim :-)
+Both git send-email and git format-patch take --to, --cc, --bcc as
+arguments.  I prefer to do all of the email addressing with send-email
+instead of while doing format-patch.  But it's personal preference,
+that's why the options are in both.
 
-Ok,  "fsl,imx35-iim" is not being used arch/arm/mach-imx/cpu-imx35.c currently.
+thx,
 
-I suppose you want to replace
- "rev = imx_readl(MX35_IO_ADDRESS(MX35_IIM_BASE_ADDR + MXC_IIMSREV));"
-
-by retrieving the base address via dt, like we do in
-imx5_read_srev_reg() at arch/arm/mach-imx/cpu-imx5.c.
-
-
-> By the way, compared to the other imx*.dtsi I didn't declare
-> compatibility to fsl,imx27-iim. I checked the i.MX25 reference manual
-> and the i.MX35 looked different. Didn't check for imx5x and the i.MX27
-> RM doesn't describe the registers. What do you think?
-
-I think this is fine as is, so:
-
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Jason.
