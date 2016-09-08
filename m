@@ -1,64 +1,43 @@
-From: spjoshi@codeaurora.org (spjoshi at codeaurora.org)
-Date: Wed, 07 Sep 2016 18:46:44 -0700
-Subject: [PATCH v2 02/17] rpmsg: Name rpmsg devices based on channel id
-In-Reply-To: <1472768889-3906-3-git-send-email-bjorn.andersson@linaro.org>
-References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
- <1472768889-3906-3-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <58df94aef3510117612447b2a677faf1@codeaurora.org>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 8 Sep 2016 04:48:13 +0300
+Subject: [PATCH v2 0/3] gpio/pinctrl: imx: let IOMUX controller know about
+ on-SoC GPIOs
+Message-ID: <1473299296-22458-1-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-09-01 15:27, Bjorn Andersson wrote:
-> By basing rpmsg device names on channel id we end up with human 
-> readable
-> device names in sysfs and debug logs.
-> 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> ---
-> 
-> Changes since v1:
-> - None
-> 
->  drivers/rpmsg/virtio_rpmsg_bus.c | 12 ++----------
->  1 file changed, 2 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c 
-> b/drivers/rpmsg/virtio_rpmsg_bus.c
-> index 495fa0a282d3..c4bd89ea7681 100644
-> --- a/drivers/rpmsg/virtio_rpmsg_bus.c
-> +++ b/drivers/rpmsg/virtio_rpmsg_bus.c
-> @@ -136,14 +136,6 @@ rpmsg_show_attr(src, src, "0x%x\n");
->  rpmsg_show_attr(dst, dst, "0x%x\n");
->  rpmsg_show_attr(announce, announce ? "true" : "false", "%s\n");
-> 
-> -/*
-> - * Unique (and free running) index for rpmsg devices.
-> - *
-> - * Yeah, we're not recycling those numbers (yet?). will be easy
-> - * to change if/when we want to.
-> - */
-> -static unsigned int rpmsg_dev_index;
-> -
->  static ssize_t modalias_show(struct device *dev,
->  			     struct device_attribute *attr, char *buf)
->  {
-> @@ -531,8 +523,8 @@ static struct rpmsg_channel
-> *rpmsg_create_channel(struct virtproc_info *vrp,
-> 
->  	strncpy(rpdev->id.name, chinfo->name, RPMSG_NAME_SIZE);
-> 
-> -	/* very simple device indexing plumbing which is enough for now */
-> -	dev_set_name(&rpdev->dev, "rpmsg%d", rpmsg_dev_index++);
-> +	dev_set_name(&rpdev->dev, "%s:%s",
-> +		     dev_name(dev->parent), rpdev->id.name);
-> 
->  	rpdev->dev.parent = &vrp->vdev->dev;
->  	rpdev->dev.bus = &rpmsg_bus;
+The change establishes a connection between on-SoC IOMUX controller(s)
+and GPIO controllers found on some SoC from Freescale/NXP iMX series,
+if a GPIO controller device node contains common gpio-ranges information.
 
-Reviewed-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+The change is backward compatible with respect to potentially not updated
+outdated DTB data without gpio-ranges propery, for such boards the only
+functional change is lowered initcall priority of GPIO controller driver,
+which in general anyway is exected to be used only after pinctrl/pinmux
+controller.
 
-Sarang
+If this change is applied the next interesting applications may be done
+as a follow-up work, for example switching pad function to GPIO on gpiod
+request, converting iomux controller driver to strict type and so on.
 
---
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+For actual values of gpio-ranges properties please reference series
+"ARM: dts: imx: add gpio-ranges properties to some iMX GPIO controllers"
+http://www.spinics.net/lists/arm-kernel/msg525258.html
+
+Changes from v1 to v2:
+* replaced 2/3 by an own change providing a better commit description
+  and which moves gpio_mxc_init() call to subsys_initcall() instead of
+  apparently too late device_initcall(), this mitigates Shawn's
+  expressed concern about the change.
+
+Vladimir Zapolskiy (3):
+  pinctrl: imx: accept gpio request/free from pinctrl
+  gpio: mxc: shift gpio_mxc_init() to subsys_initcall level
+  gpio: mxc: add generic gpio request/free callbacks to pinctrl
+
+ drivers/gpio/gpio-mxc.c                 | 7 ++++++-
+ drivers/pinctrl/freescale/pinctrl-imx.c | 4 ++--
+ 2 files changed, 8 insertions(+), 3 deletions(-)
+
+-- 
+2.8.1
