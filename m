@@ -1,228 +1,156 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 8 Sep 2016 10:06:45 +0800
-Subject: [PATCH v4 00/22] Support qcom's HSIC USB and rewrite USB2 HS
- support
-In-Reply-To: <20160907213519.27340-1-stephen.boyd@linaro.org>
-References: <20160907213519.27340-1-stephen.boyd@linaro.org>
-Message-ID: <CAL411-ocwAAQ_cn2a+NS08hbFVUMNBvh_QRbPf-fd9=2YMK8kA@mail.gmail.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Thu, 8 Sep 2016 11:09:20 +0900
+Subject: [PATCH v2] arm64: Improve kprobes test for atomic sequence
+In-Reply-To: <57D0203E.1070901@linaro.org>
+References: <1473184499-6018-1-git-send-email-dave.long@linaro.org>
+ <20160907145244.ea997984134c15c12793ca74@kernel.org>
+ <57D0203E.1070901@linaro.org>
+Message-ID: <20160908110920.f618f545ee75669cee373fdf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 5:34 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> The state of USB ChipIdea support on Qualcomm's platforms is not great.
-> The DT description of these devices requires up to three different nodes
-> for what amounts to be the same hardware block, when there should really
-> only be one. Furthermore, the "phy" driver that is in mainline (phy-msm-usb.c)
-> duplicates the OTG state machine and touches the ci controller wrapper
-> registers when it should really be focused on the phy and the ULPI accesses
-> needed to get the phy working. There's also a slimmed down phy driver for
-> the msm8916 platform, but really the phy hardware is the same as other MSMs,
-> so we have two drivers doing pretty much the same thing. This leads to a
-> situtaion where we have the chipidea core driver, the "phy" driver, and
-> sometimes the ehci-msm.c driver operating the same device all at the same
-> time with very little coordination. This just isn't very safe and is
-> confusing from a driver perspective when trying to figure out who does what.
-> Finally, there isn't any HSIC support on platforms like apq8074 so we
-> should add that.
->
-> This patch series updates the ChipIdea driver and the MSM wrapper
-> (ci_hdrc_msm.c) to properly handle the PHY and wrapper bits at the right
-> times in the right places. To get there, we update the ChipIdea core to
-> have support for the ULPI phy bus introduced by Heikki. Along the way
-> we fix bugs with the extcon handling for peripheral and OTG mode controllers
-> and move the parts of phy-usb-msm.c that are touching the CI controller
-> wrapper into the wrapper driver (ci_hdrc_msm.c). Finally we add support
-> for the HSIC phy based on the ULPI bus and rewrite the HS phy driver
-> (phy-usb-msm.c) as a standard ULPI phy driver.
->
-> Once this series is accepted, we should be able to delete the phy-usb-msm.c,
-> phy-qcom-8x16-usb.c, and ehci-msm.c drivers from the tree and use the ULPI
-> based phy driver (which also lives in drivers/phy/ instead of drivers/usb/phy/)
-> and the chipidea host core instead.
->
-> I've also sent separate patches for other minor pieces to make this
-> all work. The full tree can be found here[3], hacks and all to get
-> things working. I've tested this on the db410c, apq8074 dragonboard,
-> and ifc6410 with configfs gadgets and otg cables.
->
-> Patches based on v4.8-rc1
->
-> Changes from v3:
->
->  * Picked up Acks from Peter
->
->  * Updated extcon consolidation patch per Peter's comments
->
->  * Folded in simplification from Heikki for ULPI DT matching
->
+On Wed, 7 Sep 2016 10:12:14 -0400
+David Long <dave.long@linaro.org> wrote:
 
-I find the kbuild dependency error when compile your series, I remembered
-someone met it before, would you have a solution:
+> On 09/07/2016 01:52 AM, Masami Hiramatsu wrote:
+> > On Tue,  6 Sep 2016 13:54:59 -0400
+> > David Long <dave.long@linaro.org> wrote:
+> >
+> >> From: "David A. Long" <dave.long@linaro.org>
+> >>
+> >> Kprobes searches backwards a finite number of instructions to determine if
+> >> there is an attempt to probe a load/store exclusive sequence. It stops when
+> >> it hits the maximum number of instructions or a load or store exclusive.
+> >> However this means it can run up past the beginning of the function and
+> >> start looking at literal constants. This has been shown to cause a false
+> >> positive and blocks insertion of the probe. To fix this, further limit the
+> >> backwards search to stop if it hits a symbol address from kallsyms. The
+> >> presumption is that this is the entry point to this code (particularly for
+> >> the common case of placing probes at the beginning of functions).
+> >>
+> >> This also improves efficiency by not searching code that is not part of the
+> >> function. There may be some possibility that the label might not denote the
+> >> entry path to the probed instruction but the likelihood seems low and this
+> >> is just another example of how the kprobes user really needs to be
+> >> careful about what they are doing.
+> >
+> > Hi Dave,
+> >
+> > kallsyms_lookup_size_offset() part looks good to me. By the way,
+> > is there any reason we'll check the _text and module's base address
+> > boundary?
+> > I think those are already searced by kallsyms_lookup_size_offset(),
+> > so you don't need to check those. If the address is not found by
+> > kallsyms_lookup_size_offset(), that address maybe out-of-text.
+> >
+> 
+> CONFIG KPROBES does currently select CONFIG_KALLSYMS, but is it wise for 
+> this code to depend on that?  Perhaps the text boundary checking should 
+> be moved under an else clause for the case of 
+> kallsyms_lookup_size_offset() failing?
 
-  GEN     ./Makefile
-scripts/kconfig/conf  --silentoldconfig Kconfig
-drivers/usb/Kconfig:39:error: recursive dependency detected!
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/usb/Kconfig:39: symbol USB is selected by MOUSE_APPLETOUCH
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/input/mouse/Kconfig:187: symbol MOUSE_APPLETOUCH depends on INPUT
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/input/Kconfig:8: symbol INPUT is selected by VT
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/tty/Kconfig:12: symbol VT is selected by FB_STI
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:674: symbol FB_STI depends on FB
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/video/fbdev/Kconfig:5: symbol FB is selected by DRM_KMS_FB_HELPER
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpu/drm/Kconfig:42: symbol DRM_KMS_FB_HELPER is selected by
-DRM_KMS_CMA_HELPER
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpu/drm/Kconfig:98: symbol DRM_KMS_CMA_HELPER is selected by DRM_IMX
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpu/drm/imx/Kconfig:1: symbol DRM_IMX depends on IMX_IPUV3_CORE
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/gpu/ipu-v3/Kconfig:1: symbol IMX_IPUV3_CORE depends on RESET_CONTROLLER
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/reset/Kconfig:4: symbol RESET_CONTROLLER is selected by USB_CHIPIDEA
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/usb/chipidea/Kconfig:1: symbol USB_CHIPIDEA depends on USB_EHCI_HCD
-For a resolution refer to Documentation/kbuild/kconfig-language.txt
-subsection "Kconfig recursive dependency limitations"
-drivers/usb/host/Kconfig:84: symbol USB_EHCI_HCD depends on USB
-#
+Would you have any case where the address is in kernel_text but kallsyms_lookup
+failed to find symbol? IMHO, even if there is, we should reject probing on
+such "nowhere" address. 
 
-Peter
+Thank you,
 
-> Changes from v2:
->
->  * Added SoC specific compatibles in phy bindings
->
->  * Dropped AVVIS patch for OTG statemachine
->
->  * New patch to consolidate extcon handlers
->
->  * Picked up Acks from Peter
->
->  * Rebased onto v4.8-rc1
->
->  * Reworked ULPI OF code to look at vid == 0 instead of pid == 0
->
->  * Dropped ULPI bindings for vid and pid overrides
->
-> Changes from v1:
->
->  * Reworked ULPI device probing to keep using vendor/product ids that
->    come from DT if needed and falls back to OF style match when product id
->    is 0
->
->  * PHY init later patch was rejected so that moved to a quirk flag and
->    the msm wrapper started managing the phy on/off
->
->  * Updated clk requirements for HSIC phy in binding doc
->
->  * Added optional clk in wrapper for "housekeeping" found on older qcom
->    platforms
->
->  * Bug fix to OTGSC polling function
->
->  * Changed runtime PM patch to set as active instead of get/put
->
-> TODO:
->  * DMA fails on arm64 so we need something like [1] to make it work.
->
->  * The db410c needs a driver to toggle the onboard switch to connect
->    the usb hub instead of micro port when the usb cable is disconnected
->
->  * apq8064 platforms need a vbus regulator to really use otg and I haven't
->    tried out the RPM based regulators yet
->
->  * The HSIC phy on the apq8074 dragonboard is connected to a usb4604
->    device which requires the i2c driver to probe and send an i2c
->    sequence before the HSIC controller enumerates or HSIC doesn't work.
->    Right now I have a hack to force the controller to probe defer
->    once so that usb4604 probes first. This needs a more proper solution
->    like having the DT describe a linkage between the controller and
->    the usb device so we can enforce probe ordering.
->
->  * OTG support requires a working VBUS supply on apq8074 dragonboard
->    and that requires changes to the smbb_charger driver to support
->    the OTG OVP switch as a regulator[2]. This series needs revival
->    on the list so that OTG works properly on that board.
->
-> [1] https://lkml.org/lkml/2016/2/22/7
-> [2] http://lkml.kernel.org/g/1449621618-11900-1-git-send-email-tim.bird at sonymobile.com
-> [3] https://git.linaro.org/people/stephen.boyd/linux.git/shortlog/refs/heads/usb-hsic-8074
->
->
-> Stephen Boyd (22):
->   of: device: Support loading a module with OF based modalias
->   of: device: Export of_device_{get_modalias,uvent_modalias} to modules
->   usb: ulpi: Support device discovery via DT
->   usb: chipidea: Only read/write OTGSC from one place
->   usb: chipidea: Handle extcon events properly
->   usb: chipidea: Add platform flag for wrapper phy management
->   usb: chipidea: Notify events when switching host mode
->   usb: chipidea: Remove locking in ci_udc_start()
->   usb: chipidea: Add support for ULPI PHY bus
->   usb: chipidea: Consolidate extcon notifiers
->   usb: chipidea: msm: Mark device as runtime pm active
->   usb: chipidea: msm: Rely on core to override AHBBURST
->   usb: chipidea: msm: Use hw_write_id_reg() instead of writel
->   usb: chipidea: msm: Add proper clk and reset support
->   usb: chipidea: msm: Mux over secondary phy at the right time
->   usb: chipidea: msm: Restore wrapper settings after reset
->   usb: chipidea: msm: Make platform data driver local instead of global
->   usb: chipidea: msm: Add reset controller for PHY POR bit
->   usb: chipidea: msm: Handle phy power states
->   usb: chipidea: msm: Be silent on probe defer errors
->   phy: Add support for Qualcomm's USB HSIC phy
->   phy: Add support for Qualcomm's USB HS phy
->
->  .../devicetree/bindings/phy/qcom,usb-hs-phy.txt    |  83 ++++++
->  .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  65 +++++
->  Documentation/devicetree/bindings/usb/ulpi.txt     |  20 ++
->  drivers/of/device.c                                |  25 ++
->  drivers/phy/Kconfig                                |  15 ++
->  drivers/phy/Makefile                               |   2 +
->  drivers/phy/phy-qcom-usb-hs.c                      | 289 +++++++++++++++++++++
->  drivers/phy/phy-qcom-usb-hsic.c                    | 160 ++++++++++++
->  drivers/usb/chipidea/Kconfig                       |   8 +
->  drivers/usb/chipidea/Makefile                      |   1 +
->  drivers/usb/chipidea/ci.h                          |  22 +-
->  drivers/usb/chipidea/ci_hdrc_msm.c                 | 280 +++++++++++++++++---
->  drivers/usb/chipidea/core.c                        | 122 ++++-----
->  drivers/usb/chipidea/host.c                        |  10 +
->  drivers/usb/chipidea/otg.c                         |  86 +++++-
->  drivers/usb/chipidea/udc.c                         |   3 -
->  drivers/usb/chipidea/ulpi.c                        | 113 ++++++++
->  drivers/usb/common/ulpi.c                          |  77 +++++-
->  include/linux/of_device.h                          |   6 +
->  include/linux/usb/chipidea.h                       |   9 +-
->  20 files changed, 1259 insertions(+), 137 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
->  create mode 100644 Documentation/devicetree/bindings/usb/ulpi.txt
->  create mode 100644 drivers/phy/phy-qcom-usb-hs.c
->  create mode 100644 drivers/phy/phy-qcom-usb-hsic.c
->  create mode 100644 drivers/usb/chipidea/ulpi.c
->
-> --
-> 2.9.0.rc2.8.ga28705d
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> > Thank you,
+> >>
+> >> Signed-off-by: David A. Long <dave.long@linaro.org>
+> >> ---
+> >>   arch/arm64/kernel/probes/decode-insn.c | 48 +++++++++++++++++++++++-----------
+> >>   1 file changed, 33 insertions(+), 15 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
+> >> index 37e47a9..356ee52 100644
+> >> --- a/arch/arm64/kernel/probes/decode-insn.c
+> >> +++ b/arch/arm64/kernel/probes/decode-insn.c
+> >> @@ -16,6 +16,7 @@
+> >>   #include <linux/kernel.h>
+> >>   #include <linux/kprobes.h>
+> >>   #include <linux/module.h>
+> >> +#include <linux/kallsyms.h>
+> >>   #include <asm/kprobes.h>
+> >>   #include <asm/insn.h>
+> >>   #include <asm/sections.h>
+> >> @@ -122,7 +123,7 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+> >>   static bool __kprobes
+> >>   is_probed_address_atomic(kprobe_opcode_t *scan_start, kprobe_opcode_t *scan_end)
+> >>   {
+> >> -	while (scan_start > scan_end) {
+> >> +	while (scan_start >= scan_end) {
+> >>   		/*
+> >>   		 * atomic region starts from exclusive load and ends with
+> >>   		 * exclusive store.
+> >> @@ -144,26 +145,43 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
+> >>   	kprobe_opcode_t insn = le32_to_cpu(*addr);
+> >>   	kprobe_opcode_t *scan_start = addr - 1;
+> >>   	kprobe_opcode_t *scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
+> >> +	unsigned long size = 0, offset = 0;
+> >>   #if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
+> >>   	struct module *mod;
+> >>   #endif
+> >>
+> >> -	if (addr >= (kprobe_opcode_t *)_text &&
+> >> -	    scan_end < (kprobe_opcode_t *)_text)
+> >> -		scan_end = (kprobe_opcode_t *)_text;
+> >> +	/*
+> >> +	 * If there's a symbol defined in front of and near enough to
+> >> +	 * the probe address assume it is the entry point to this
+> >> +	 * code and use it to further limit how far back we search
+> >> +	 * when determining if we're in an atomic sequence.
+> >> +	 */
+> >> +	if (kallsyms_lookup_size_offset((unsigned long) addr, &size, &offset))
+> >> +		if (offset < (MAX_ATOMIC_CONTEXT_SIZE*sizeof(kprobe_opcode_t)))
+> >> +			scan_end = addr - (offset / sizeof(kprobe_opcode_t));
+> >> +
+> >> +	if (scan_end <= scan_start) {
+> >> +		if (addr >= (kprobe_opcode_t *)_text &&
+> >> +		    scan_end < (kprobe_opcode_t *)_text)
+> >> +			scan_end = (kprobe_opcode_t *)_text;
+> >>   #if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
+> >> -	else {
+> >> -		preempt_disable();
+> >> -		mod = __module_address((unsigned long)addr);
+> >> -		if (mod && within_module_init((unsigned long)addr, mod) &&
+> >> -			!within_module_init((unsigned long)scan_end, mod))
+> >> -			scan_end = (kprobe_opcode_t *)mod->init_layout.base;
+> >> -		else if (mod && within_module_core((unsigned long)addr, mod) &&
+> >> -			!within_module_core((unsigned long)scan_end, mod))
+> >> -			scan_end = (kprobe_opcode_t *)mod->core_layout.base;
+> >> -		preempt_enable();
+> >> -	}
+> >> +		else {
+> >> +			preempt_disable();
+> >> +			mod = __module_address((unsigned long)addr);
+> >> +			if (mod &&
+> >> +			    within_module_init((unsigned long)addr, mod) &&
+> >> +			    !within_module_init((unsigned long)scan_end, mod))
+> >> +				scan_end =
+> >> +				    (kprobe_opcode_t *)mod->init_layout.base;
+> >> +			else if (mod &&
+> >> +			    within_module_core((unsigned long)addr, mod) &&
+> >> +			    !within_module_core((unsigned long)scan_end, mod))
+> >> +				scan_end =
+> >> +				    (kprobe_opcode_t *)mod->core_layout.base;
+> >> +			preempt_enable();
+> >> +		}
+> >>   #endif
+> >> +	}
+> >>   	decoded = arm_probe_decode_insn(insn, asi);
+> >>
+> >>   	if (decoded == INSN_REJECTED ||
+> >> --
+> >> 2.5.0
+> >>
+> 
+> Thanks,
+> -dl
+> 
+> 
+
+
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
