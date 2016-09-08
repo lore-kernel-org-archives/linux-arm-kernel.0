@@ -1,87 +1,94 @@
-From: kevin.brodsky@arm.com (Kevin Brodsky)
-Date: Thu, 8 Sep 2016 15:00:53 +0100
-Subject: [PATCH 0/8] arm64: Add a compat vDSO
-In-Reply-To: <20160908135324.7112-1-kevin.brodsky@arm.com>
-References: <20160908135324.7112-1-kevin.brodsky@arm.com>
-Message-ID: <be0defa8-267f-8abf-607a-a70196e9bf00@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 8 Sep 2016 09:00:37 -0500
+Subject: [PATCH V3 0/5] firmware: Add support for TI System Control
+ Interface (TI-SCI) protocol driver
+In-Reply-To: <7hshtbtu8l.fsf@baylibre.com>
+References: <20160906190127.23522-1-nm@ti.com> <7hshtbtu8l.fsf@baylibre.com>
+Message-ID: <f41d968c-46c9-997e-0fa0-edbef34a1fa5@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore this whole series, I sent the wrong version... Sorry for the noise! 
-I'll be sending the right version momentarily.
+On 09/07/2016 01:55 PM, Kevin Hilman wrote:
+> Nishanth Menon <nm@ti.com> writes:
 
-Kevin
+[...] full mail thread in https://lkml.org/lkml/2016/9/6/747
 
-On 08/09/16 14:53, Kevin Brodsky wrote:
-> Hi,
+>> Overall architecture is very similar to SCPI[4] as follows:
 >
-> This series adds support for a compat (AArch32) vDSO, providing two
-> userspace functionalities to compat processes:
->
-> * Time "virtual" syscalls (gettimeofday and clock_gettime). The
->    implementation is an adaptation of the arm vDSO (vgettimeofday.c),
->    using the same the data page as the 64-bit vDSO.
->
-> * sigreturn trampolines, following the example of the 64-bit vDSO
->    (sigreturn.S), but slightly more complicated because we provide A32
->    and T32 variants for both sigreturn and rt_sigreturn.
->
-> The first point brings the performance improvement expected of a vDSO,
-> by implementing syscalls directly in userspace. The second point allows
-> us to get rid of the compat vector page, at the expense of the kuser
-> helpers (this is one reason for not enabling the compat vDSO by
-> default).
->
-> Unfortunately, this time we cannot escape using a 32-bit toolchain. To
-> build the compat VDSO, CONFIG_COMPAT_VDSO must be set *and*
-> CROSS_COMPILE_ARM32 must be defined to the prefix of a 32-bit compiler.
-> Failure to do so will not prevent building the kernel, but a warning
-> will be printed and the compat vDSO will not be built.
->
->
-> The last patch requires my Makefile fix [1] to apply. I pushed the
-> series on top of this patch on pdsw-git:
->
->    git at pdsw-git.cambridge.arm.com:users/kevbro01/linux compat-vdso
->
-> I have only tested the series with a 64-bit userspace (+ 32-bit glibc).
-> Testing it with a 32-bit userspace would be very welcome.
->
-> Thanks,
-> Kevin
->
-> [1]: "arm64: fix vdso-offsets.h dependency"
->       http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/422307.html
->
-> Kevin Brodsky (8):
->    arm64: Refactor vDSO setup
->    arm64: compat: Add time-related syscall numbers
->    arm64: compat: Expose offset to registers in sigframes
->    arm64: compat: Add a 32-bit vDSO
->    arm64: compat: 32-bit vDSO setup
->    arm64: elf: Set AT_SYSINFO_EHDR in compat processes
->    arm64: compat: Use vDSO sigreturn trampolines if available
->    arm64: Wire up and expose the new compat vDSO
->
->   arch/arm64/Kconfig                       |  20 +++
->   arch/arm64/Makefile                      |  20 ++-
->   arch/arm64/include/asm/elf.h             |  13 +-
->   arch/arm64/include/asm/signal32.h        |  46 +++++
->   arch/arm64/include/asm/unistd.h          |   2 +
->   arch/arm64/include/asm/vdso.h            |   3 +
->   arch/arm64/kernel/Makefile               |   9 +-
->   arch/arm64/kernel/asm-offsets.c          |  13 ++
->   arch/arm64/kernel/signal32.c             |  61 ++-----
->   arch/arm64/kernel/vdso.c                 | 196 +++++++++++++--------
->   arch/arm64/kernel/vdso32/Makefile        | 120 +++++++++++++
->   arch/arm64/kernel/vdso32/sigreturn.S     |  82 +++++++++
->   arch/arm64/kernel/vdso32/vdso.S          |  32 ++++
->   arch/arm64/kernel/vdso32/vdso.lds.S      |  98 +++++++++++
->   arch/arm64/kernel/vdso32/vgettimeofday.c | 294 +++++++++++++++++++++++++++++++
->   15 files changed, 876 insertions(+), 133 deletions(-)
->   create mode 100644 arch/arm64/kernel/vdso32/Makefile
->   create mode 100644 arch/arm64/kernel/vdso32/sigreturn.S
->   create mode 100644 arch/arm64/kernel/vdso32/vdso.S
->   create mode 100644 arch/arm64/kernel/vdso32/vdso.lds.S
->   create mode 100644 arch/arm64/kernel/vdso32/vgettimeofday.c
->
+> Dumb Q: I'm curious about the limitations in SCPI that were found that
+> made TI decided to implement its own version.
+
+
+Not really a dumb question.. (and praying I dont trigger a flame war
+:D) I will skip the approximately year something worth of discussions
+and TI's Linaro connect requests for consolidation of standards aside, 
+lets not forget to add ARM's new protocol proposal to the list that I 
+cant seem to find public reference to (ccying folks in case I have'nt 
+looked the right place in http://infocenter.arm.com), but which also 
+developed in parallel to TI-SCI. Anyways..
+
+Just as a background for new folks: ARM Power Control System
+Architecture Specification Version (ARM DEN 0050) (which you'd need to 
+contact ARM to get access to) strongly recommends System Control
+Processor - but ofcourse, SCPI evolved as ARMs way of solving the Juno 
+problem set (and Sudeep can probably add lots of backgrounds on that). 
+And SCPI is not, at least to my knowledge, mandatory for ARM vendors 
+to follow. It probably suffices to say that ARM had SCPI and TI 
+developed TI-SCI.
+
+Now, to answer your question, why did we not just use SCPI instead of
+re-inventing the wheel? To be honest, and folks who have the year
+something background know this: We really did not want to spin our own.
+
+SCPI and TISCI or other similar protocols tend to have few constraints 
+to work with:
+a) messaging infrastructure and capabilities ARM MHU Vs what we have
+for TI message Manager (one word vs upto 128 queued 64byte messages in 
+message manager from multiple simultaneous requesters)- examples being 
+virtualized pipes and sizes we have for communication allows our 
+protocol to optimize messaging appropriate to the SoC.
+b) SoC architecture and constraints required of that - examples: here
+being the processing entities, multitude variations of integrations
+and SoC spins, required higher level of abstraction to even have a
+resemblance of sanity at HLOS level.
+c) To a minor extent, not really relevant for this thread: timelines
+of parallel development and influence from corresponding SoC and other 
+stakeholders within each corporates.
+
+Long story short, investigation was done into what SCPI was providing
+(TI internal ofcourse) and SCPI did not fit our SoC generation needs -
+   -
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922g/index.html 
+
+vs http://processors.wiki.ti.com/index.php/TISCI is available to
+compare and contrast but the key highlights are probably as follows:
+-  SCPI seems to be constrained around capabilities of MHU and does
+not allow better leverage of h/w K2G (and future SoCs) have
+capabilities of.
+- SCPI abstraction levels did not fit our SoC architecture models we
+are moving to where ARM cores running Linux are optional and no longer
+the system master of the SoC - we do have non-ARM SoCs as well in our
+SoC portfolio and obviously non-Linux solutions as well. some little
+details:
+    - From being able to mandate response messages which can be tuned
+from "dont bother to tell me once you are done" to fine grained as
+"tell me when you get around to this operation but let me know before
+you actually process" as optional states for any type of messages
+    - Levels of abstraction of "I dont care what you in system
+controller do as long as my Display Subsystem func clk runs as xyz Hz"
+    - we need to care about hardware block level operation, not how the
+SoC intricacies of operating the hardware block is.. example we need 
+capability to hold a hardware block active from two processing 
+entities for blocks that are capable of doing so (example: GPIO and 
+blocks with virtualized view capability)
+
+
+and obviously more..
+
+Obviously, each protocol could claim superiority of level of
+control/abstraction provided based on SoC arch targeted etc.. but I
+will try and avoid getting into that debate.
+
+-- 
+Regards,
+Nishanth Menon
