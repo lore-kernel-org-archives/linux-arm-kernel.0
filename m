@@ -1,65 +1,96 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Thu, 08 Sep 2016 12:43:06 +0300
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <2733202.7lpFC7RnDm@wuerfel>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
- <6739240.VDAnDBppH0@wuerfel> <87y432iylr.fsf@linux.intel.com>
- <2733202.7lpFC7RnDm@wuerfel>
-Message-ID: <87lgz2iv6d.fsf@linux.intel.com>
+From: Wei.Chen@arm.com (Wei Chen)
+Date: Thu, 8 Sep 2016 09:47:20 +0000
+Subject: [PATCH 00/19] Handle guest-generated SErrors/Aborts
+References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <AM5PR0802MB2452C619386893AAFFAE490D9EFB0@AM5PR0802MB2452.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
-Hi,
+On 2016/9/6 21:09, Marc Zyngier wrote:
+> A little known "feature" of giving guest access to real memory mapped
+> HW is that it could trigger asynchronous aborts (SError on ARMv8) if
+> the guest accesses it in a non-conventional way (and depending on how
+> HW and firmware have been integrated). So far, KVM lacks any support
+> to handle this gracefully.
 
-Arnd Bergmann <arnd@arndb.de> writes:
-> On Thursday, September 8, 2016 11:29:04 AM CEST Felipe Balbi wrote:
->> > If we do that, we have to put child devices of the dwc3 devices into
->> > the platform glue, and it also breaks those dwc3 devices that don't
->> > have a parent driver.
->> 
->> Well, this is easy to fix:
->> 
->>         if (dwc->dev->parent) {
->>                 dwc->sysdev = dwc->dev->parent;
->>         } else {
->>                 dev_info(dwc->dev, "Please provide a glue layer!\n");
->>                 dwc->sysdev = dwc->dev;
->>         }
+I can reproduce this issue on Seattle board (ARM64), but I can't
+reproduce it on FVP (Cortex-A15x2 ARM32). Did you mean that this issue
+onlu takes place on ARMv8? Have you ever reproduced this issue on any
+ARM32 platform?
+
+Regards,
+
 >
-> I don't understand. Do you mean we should have an extra level of
-> stacking and splitting "static struct platform_driver dwc3_driver"
-> in two so instead of
+> This series introduces a set of mechanisms to catch such a fault and
+> deliver a vSError (or Virtual Abort for 32bit) to the offending vcpu.
 >
-> 	"qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "xhci" (usb_bus.dev)
+> These aborts can either trigger at EL1 (whilst the guest is running),
+> or at EL2 (during the handling of an exit). The first case is pretty
+> easy to handle (use the ad-hoc vectors on arm64, or decode the EA bit
+> on arm), but the second one is a bit more fiddly, as we need to ensure
+> that the exception is pending by the time we unmask it. This is
+> achived by using some heavy DSBs on the hot path, with the following
+> caveats:
 >
-> we do this?
+> - I've only been able to trigger the EL2 handling on A57 (Seatle,
+>   Juno).
+> - I've measured a 40/50 cycles hit on Juno (A57), but I haven't
+>   measured the impact on bigger systems
 >
-> 	"qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "dwc3-glue" -> "xhci" (usb_bus.dev)
-
-no :-)
-
-If we have a parent device, use that as sysdev, otherwise use self as
-sysdev.
-
-> That sounds a bit clumsy for the sake of consistency with PCI.
-> The advantage is that xhci can always use the grandparent device
-> as sysdev whenever it isn't probed through PCI or firmware
-> itself, but the purpose of the dwc3-glue is otherwise questionable.
+> The last patch of this series adds a missing feature to the
+> GICV-proxying series, delivering a vSError to a guest that performed
+> an illegal access to the GIC.
 >
-> How about adding a 'compatible="snps,dwc3-pci"' property for the dwc3
-> device when that is created from the PCI driver and checking for that
-> with the device property interface instead? If it's "snps,dwc3"
-> we use the device itself while for "snps,dwc3-pci", we use the parent?
+> Patches on top of current kvmarm/queue + the GICV przying series.
+>
+> Marc Zyngier (19):
+>   arm64: KVM: Rename HCR_VA to HCR_VSE
+>   arm64: KVM: Preserve pending vSError in world switch
+>   arm64: KVM: Add Virtual Abort injection helper
+>   arm64: KVM: Add exception code to report EL1 asynchronous aborts
+>   arm64: KVM: Add EL1 async abort handler
+>   arm64: KVM: Route asynchronous aborts
+>   arm64: KVM: Allow an exit code to be tagged with an SError
+>   arm64: KVM: Inject a Virtual SError if it was pending
+>   arm64: KVM: Handle async aborts delivered while at EL2
+>   arm: KVM: Preserve pending Virtual Abort in world switch
+>   arm: KVM: Add Virtual Abort injection helper
+>   arm: KVM: Add HYP async abort handler
+>   arm: KVM: Allow an exit code to be tagged with a Virtual Abort
+>   arm: KVM: Handle async aborts delivered while at HYP
+>   arm: KVM: Inject a Virtual Abort if it was pending
+>   arm: KVM: Drop unreachable HYP abort handlers
+>   arm/arm64: KVM: Inject virtual abort when guest exits on external
+>     abort
+>   arm/arm64: KVM: Remove external abort test from MMIO handling
+>   arm64: KVM: Inject a vSerror if detecting a bad GICV access at EL2
+>
+>  arch/arm/include/asm/kvm_asm.h       |  4 +++
+>  arch/arm/include/asm/kvm_emulate.h   |  1 +
+>  arch/arm/kvm/emulate.c               | 12 +++++++++
+>  arch/arm/kvm/handle_exit.c           | 49 ++++++++++++++++--------------------
+>  arch/arm/kvm/hyp/entry.S             | 31 +++++++++++++++++++++++
+>  arch/arm/kvm/hyp/hyp-entry.S         | 16 +++++++++++-
+>  arch/arm/kvm/hyp/switch.c            |  9 +++++++
+>  arch/arm/kvm/mmio.c                  |  6 -----
+>  arch/arm/kvm/mmu.c                   |  5 ++++
+>  arch/arm64/include/asm/kvm_arm.h     |  4 +--
+>  arch/arm64/include/asm/kvm_asm.h     |  9 +++++--
+>  arch/arm64/include/asm/kvm_emulate.h |  1 +
+>  arch/arm64/include/asm/kvm_hyp.h     |  2 +-
+>  arch/arm64/kvm/handle_exit.c         | 23 +++++++++++++++++
+>  arch/arm64/kvm/hyp/entry.S           | 33 +++++++++++++++++++++++-
+>  arch/arm64/kvm/hyp/hyp-entry.S       | 36 ++++++++++++++++++++++----
+>  arch/arm64/kvm/hyp/switch.c          | 33 +++++++++++++++++++++---
+>  arch/arm64/kvm/inject_fault.c        | 12 +++++++++
+>  virt/kvm/arm/hyp/vgic-v2-sr.c        | 21 ++++++++++++----
+>  19 files changed, 254 insertions(+), 53 deletions(-)
+>
 
-Any reason why we wouldn't use e.g. dwc3-omap.dev as sysdev?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/9de6b544/attachment.sig>
+--
+Regards,
+Wei Chen
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
