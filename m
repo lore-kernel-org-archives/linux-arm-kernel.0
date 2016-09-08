@@ -1,73 +1,74 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  8 Sep 2016 11:21:46 +0100
-Subject: [RFCv4 1/7] drivers/perf: arm_pmu: add common attr group fields
-In-Reply-To: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
-References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1473330112-28528-2-git-send-email-mark.rutland@arm.com>
+Date: Thu,  8 Sep 2016 11:21:45 +0100
+Subject: [RFCv4 0/7]  arm_pmu/perf tools: play nicely with CPU PMU cpumasks
+Message-ID: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for adding common attribute groups, add an array of
-attribute group pointers to arm_pmu, which will be used if the
-backend hasn't already set pmu::attr_groups.
+Hi,
 
-Subsequent patches will move backends over to using these, before adding
-common fields.
+I'm trying to make the perf tool play better with PMUs in heterogeneous systems
+(e.g. big.LITTLE), where there are several logical PMUs, each covering a subset
+of CPUs.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- drivers/perf/arm_pmu.c       | 3 +++
- include/linux/perf/arm_pmu.h | 9 ++++++++-
- 2 files changed, 11 insertions(+), 1 deletion(-)
+Currently perf-record doesn't work for these PMUs, unless forced to use
+per-thread mmaps. In the absence of a cpumask, it tries to open events on CPUs
+not supported by a PMU, and gives up. In the presence of a cpumask, it ends up
+failing to mmap, as the evlist->cpus map contains a different set of CPUs from
+the evsel->cpus map populated from the cpumask. This is addressed by the
+penultimate patch in this series.
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index f5e1008..145caf4 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -1039,6 +1039,9 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 		goto out_free;
- 	}
- 
-+	if (!pmu->pmu.attr_groups)
-+		pmu->pmu.attr_groups = pmu->attr_groups;
-+
- 	ret = cpu_pmu_init(pmu);
- 	if (ret)
- 		goto out_free;
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index e188438..8030814 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -14,7 +14,7 @@
- 
- #include <linux/interrupt.h>
- #include <linux/perf_event.h>
--
-+#include <linux/sysfs.h>
- #include <asm/cputype.h>
- 
- /*
-@@ -77,6 +77,12 @@ struct pmu_hw_events {
- 	struct arm_pmu		*percpu_pmu;
- };
- 
-+enum armpmu_attr_groups {
-+	ARMPMU_ATTR_GROUP_EVENTS,
-+	ARMPMU_ATTR_GROUP_FORMATS,
-+	ARMPMU_NR_ATTR_GROUPS
-+};
-+
- struct arm_pmu {
- 	struct pmu	pmu;
- 	cpumask_t	active_irqs;
-@@ -111,6 +117,7 @@ struct arm_pmu {
- 	struct pmu_hw_events	__percpu *hw_events;
- 	struct list_head	entry;
- 	struct notifier_block	cpu_pm_nb;
-+	const struct attribute_group *attr_groups[ARMPMU_NR_ATTR_GROUPS + 1];
- };
- 
- #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+Complicating matters, prior to commit 00e727bb389359c8 ("perf stat: Balance
+opening and reading events"), from version two of this series, perf-stat would
+behave erroneously in the presence of a cpumask file, blocking forever after
+the workload completed. While this is now fixed, existing binaries (e.g. those
+shipped by distributions) would be broken by the addition of a cpumask file
+kernel-side.
+
+To cater for this, this series adds support for a new PMU sysfs file, named
+'cpus' rather than 'cpumask', listing a number of CPUs that a logical PMU
+covers. As old binaries will not look for this, this can be safely added to the
+kernel without risk of breakage.
+
+I've included the kernel and userspace parts in this series as they've proven
+difficult to review in isolation.
+
+Thanks,
+Mark.
+
+Since v1 [1]:
+* Avoid double cpu_map__idx() call in perf_evlist__mmap_per_evsel
+* Look for a supported_cpumask file when a cpumask file is not present
+
+Since v2 [2]:
+* Drop patches which have been picked up from v2
+* Rebase to v4.8-rc1
+* Better describe the issue in the supported_cpumask patch
+
+Since v3 [3]:
+* Prepend patches exporting the cpus file for ARM PMUs
+* s/supported_cpus/cpus/
+
+[1] http://lkml.kernel.org/r/1467907474-3290-1-git-send-email-mark.rutland at arm.com
+[2] http://lkml.kernel.org/r/1468577293-19667-1-git-send-email-mark.rutland at arm.com
+[3] http://lkml.kernel.org/r/1470933366-1364-1-git-send-email-mark.rutland at arm.com
+
+Mark Rutland (7):
+  drivers/perf: arm_pmu: add common attr group fields
+  arm64: perf: move to common attr_group fields
+  arm: perf: move to common attr_group fields
+  drivers/perf: arm_pmu: only use common attr_groups
+  drivers/perf: arm_pmu: expose a cpumask in sysfs
+  perf: util: only open events on CPUs an evsel permits
+  perf: util: support alternative sysfs cpumask
+
+ arch/arm/kernel/perf_event_v7.c | 47 ++++++++++++++++++++++++-----------------
+ arch/arm64/kernel/perf_event.c  | 36 ++++++++++++++++++++-----------
+ drivers/perf/arm_pmu.c          | 23 ++++++++++++++++++++
+ include/linux/perf/arm_pmu.h    | 10 ++++++++-
+ tools/perf/util/evlist.c        |  8 ++++++-
+ tools/perf/util/pmu.c           | 15 ++++++++++---
+ 6 files changed, 103 insertions(+), 36 deletions(-)
+
 -- 
 1.9.1
