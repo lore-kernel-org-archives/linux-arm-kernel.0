@@ -1,75 +1,58 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 7 Sep 2016 20:12:32 -0500
-Subject: [PATCH v4 03/22] usb: ulpi: Support device discovery via DT
-In-Reply-To: <20160907213519.27340-4-stephen.boyd@linaro.org>
-References: <20160907213519.27340-1-stephen.boyd@linaro.org>
- <20160907213519.27340-4-stephen.boyd@linaro.org>
-Message-ID: <CAL_JsqJbk2TGmASK974hO0n+Y3DmB3tbggbd9wXCNa9Ug9QdDg@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 8 Sep 2016 09:15:36 +0800
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <3189648.KnWLgq0lTY@wuerfel>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <12021424.cItk3A7CfE@wuerfel> <87inu8kny0.fsf@linux.intel.com>
+ <3189648.KnWLgq0lTY@wuerfel>
+Message-ID: <20160908011535.GE13903@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2016 at 4:35 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> The qcom HSIC ULPI phy doesn't have any bits set in the vendor or
-> product ID registers. This makes it impossible to make a ULPI
-> driver match against the ID registers. Add support to discover
-> the ULPI phys via DT help alleviate this problem. In the DT case,
-> we'll look for a ULPI bus node underneath the device registering
-> the ULPI viewport (or the parent of that device to support
-> chipidea's device layout) and then match up the phy node
-> underneath that with the ULPI device that's created.
->
-> The side benefit of this is that we can use standard properties
-> in the phy node like clks, regulators, gpios, etc. because we
-> don't have firmware like ACPI to turn these things on for us. And
-> we can use the DT phy binding to point our phy consumer to the
-> phy provider.
->
-> The ULPI bus code supports native enumeration by reading the
-> vendor ID and product ID registers at device creation time, but
-> we can't be certain that those register reads will succeed if the
-> phy is not powered up. To avoid any problems with reading the ID
-> registers before the phy is powered we fallback to DT matching
-> when the ID reads fail.
->
-> If the ULPI spec had some generic power sequencing for these
-> registers we could put that into the ULPI bus layer and power up
-> the device before reading the ID registers. Unfortunately this
-> doesn't exist and the power sequence is usually device specific.
-> By having the device matched up with DT we can avoid this
-> problem.
->
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> Cc: <devicetree@vger.kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  Documentation/devicetree/bindings/usb/ulpi.txt | 20 +++++++
->  drivers/usb/common/ulpi.c                      | 77 ++++++++++++++++++++++++--
->  2 files changed, 92 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/ulpi.txt
+On Wed, Sep 07, 2016 at 05:24:08PM +0200, Arnd Bergmann wrote:
+> On Wednesday, September 7, 2016 1:24:07 PM CEST Felipe Balbi wrote:
+> > 
+> > Hi,
+> > 
+> > Arnd Bergmann <arnd@arndb.de> writes:
+> > 
+> > [...]
+> > 
+> > > Regarding the DMA configuration that you mention in ci_hdrc_add_device(),
+> > > I think we should replace 
+> > >
+> > >         pdev->dev.dma_mask = dev->dma_mask;
+> > >         pdev->dev.dma_parms = dev->dma_parms;
+> > >         dma_set_coherent_mask(&pdev->dev, dev->coherent_dma_mask);
+> > >
+> > > with of_dma_configure(), which has the chance to configure more than
+> > > just those three, as the dma API might look into different aspects:
+> > >
+> > > - iommu specific configuration
+> > > - cache coherency information
+> > > - bus type
+> > > - dma offset
+> > > - dma_map_ops pointer
+> > >
+> > > We try to handle everything in of_dma_configure() at configuration
+> > > time, and that would be the place to add anything else that we might
+> > > need in the future.
+> > 
+> > There are a couple problems with this:
+> > 
+> > 1) won't work for PCI-based systems.
+> > 
+> > DWC3 is used in production PCI-based HW and also in Synopsys HAPS DX
+> > platform (FPGA that appears like a PCI card to host PC)
+> 
+> Right, I was specifically talking about the code in chipidea here,
+> which I think is never used on the PCI bus, and how the current
+> code is broken. We can probably do better than of_dma_configure()
+> (see below), but it would be an improvement.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Chipidea is also used at PCI bus too, see drivers/usb/chipidea/ci_hdrc_pci.c
 
-But one concern below.
+-- 
 
-> -static int ulpi_register(struct device *dev, struct ulpi *ulpi)
-> +static int ulpi_of_register(struct ulpi *ulpi)
-> +{
-> +       struct device_node *np = NULL, *child;
-> +
-> +       /* Find a ulpi bus underneath the parent or the parent of the parent */
-
-parent of the parent is called the grandparent.
-
-> +       if (ulpi->dev.parent->of_node)
-> +               np = of_find_node_by_name(ulpi->dev.parent->of_node, "ulpi");
-> +       else if (ulpi->dev.parent->parent && ulpi->dev.parent->parent->of_node)
-> +               np = of_find_node_by_name(ulpi->dev.parent->parent->of_node,
-
-First setting "parent = ulpi->dev.parent" would make this a bit easier
-on the eyes.
-
-When is it valid to be the grandparent? The binding doesn't mention that.
-
-Rob
+Best Regards,
+Peter Chen
