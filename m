@@ -1,17 +1,19 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 07 Sep 2016 16:57:32 -0700
+Date: Wed, 07 Sep 2016 17:11:44 -0700
 Subject: [PATCH v5 2/3] arm64: Add arm64 kexec support
 In-Reply-To: <20160906054359.GC16712@linaro.org>
 References: <cover.1472766405.git.geoff@infradead.org>
  <3a90727656b958ccf3ca303002785920615c495b.1472766405.git.geoff@infradead.org>
  <20160906054359.GC16712@linaro.org>
-Message-ID: <1473292652.8862.14.camel@infradead.org>
+Message-ID: <1473293504.8862.19.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 2016-09-06 at 14:44 +0900, AKASHI Takahiro wrote:
+> 
 > On Thu, Sep 01, 2016 at 09:51:10PM +0000, Geoff Levand wrote:
-
+> 
+> > 
 > > +int arm64_load_other_segments(struct kexec_info *info,
 > > +	unsigned long image_base)
 > > +{
@@ -35,16 +37,20 @@ On Tue, 2016-09-06 at 14:44 +0900, AKASHI Takahiro wrote:
 
 dtb_1 means from 1st stage, dtb_2 means a new 2nd stage.
 
+> 
 > Instead, I'm going to use:
 > ????dtb_2 => "dtb_user" (if a command line option is specified)
 > ????dtb_1 => "dtb_sys" (if from /sys/firmware/fdt), or
 > ?????????????"dtb_unflatten" (if created from /proc/device-tree)
 > to distinguish the origins in my kdump patches.
 
-Sure, that's OK.  If you make a fixup patch I'll merge it in.
+Sure, that's OK.??I pushed ot a change to my master branch.
 
 > 
-> > +static int get_memory_ranges_iomem_cb(void *data, int nr, char *str,
+> 
+> > 
+> > +static int get_memory_ranges_iomem_cb(void *data, int nr, char
+> > *str,
 > > +	unsigned long long base, unsigned long long length)
 > > +{
 > > +	struct memory_range *r;
@@ -60,15 +66,18 @@ Sure, that's OK.  If you make a fixup patch I'll merge it in.
 > > +	set_phys_offset(r->start);
 > This will no longer work correctly for identifying PHYS_OFFSET
 > once the following patch is applied:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/450433.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/450
+> 433.html
 > and it is now queued in arm64/for-next.
 > 
-> I will include a fixup in my kdump patches as the current code of kexec
+> I will include a fixup in my kdump patches as the current code of
+> kexec
 > doesn't rely on a result of virt_to_phys() seriously.
-
 OK.
 
+> 
 > +int get_memory_ranges(struct memory_range **range, int *ranges,
+> > 
 > > +	unsigned long kexec_flags)
 > > +{
 > > +	static struct memory_range array[KEXEC_SEGMENT_MAX];
@@ -82,11 +91,13 @@ OK.
 > Do we really need to scan a DT blob here?
 > I think that all the (usable) memory regions are added to
 > /proc/iomem anyway.
-
 I guess it is now expected that /proc/iomem has memory
 in it.
 
-> > +void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
+> 
+> > 
+> > +void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym
+> > *UNUSED(sym),
 > > +	unsigned long r_type, void *ptr, unsigned long address,
 > > +	unsigned long value)
 > > +{
@@ -111,7 +122,6 @@ in it.
 > > +#endif
 > Did you see my comment?
 > http://lists.infradead.org/pipermail/kexec/2016-August/016947.html
-
 I'm still expecting?elf.h to have these.
 
 -Geoff
