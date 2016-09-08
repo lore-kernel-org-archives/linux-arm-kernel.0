@@ -1,136 +1,88 @@
 From: kevin.brodsky@arm.com (Kevin Brodsky)
-Date: Thu,  8 Sep 2016 14:53:24 +0100
-Subject: [PATCH 8/8] arm64: Wire up and expose the new compat vDSO
+Date: Thu,  8 Sep 2016 14:53:21 +0100
+Subject: [PATCH 5/8] arm64: compat: 32-bit vDSO setup
 In-Reply-To: <20160908135324.7112-1-kevin.brodsky@arm.com>
 References: <20160908135324.7112-1-kevin.brodsky@arm.com>
-Message-ID: <20160908135324.7112-9-kevin.brodsky@arm.com>
+Message-ID: <20160908135324.7112-6-kevin.brodsky@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose the new compat vDSO via the COMPAT_VDSO config option.
+If the compat vDSO is enabled, install it in compat processes. In this
+case, the compat vDSO replaces the vector page.
 
-The option is not enabled by default for two reasons:
-
-* The vDSO page replaces the vector page. The vDSO provides its own
-  sigreturn trampolines, replacing those in the vector page, but the
-  kuser helpers are gone. As a result enabling the compat vDSO will
-  break userspace programs relying on the kuser helpers.
-
-* We really need a 32-bit compiler this time, and we rely on the user
-  to provide it themselves by setting CROSS_COMPILE_ARM32. Therefore
-  enabling the option by default would make little sense, since the
-  user must explicitly set an environment variable anyway.
-
-CONFIG_COMPAT_VDSO is not directly used in the code, because we want
-to ignore it (build as if it were not set) if the user didn't set
-CROSS_COMPILE_ARM32 properly. If the variable has been set to a valid
-prefix, CONFIG_VDSO32 will be set; this is the option that the code
-and Makefiles will test.
+aarch32_setup_vectors_page has also been renamed to the more generic
+aarch32_setup_additional_pages to reflect both use cases.
 
 Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 ---
- arch/arm64/Kconfig         | 20 ++++++++++++++++++++
- arch/arm64/Makefile        | 20 ++++++++++++++++++--
- arch/arm64/kernel/Makefile |  9 ++++++---
- 3 files changed, 44 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/elf.h |  6 +++---
+ arch/arm64/kernel/vdso.c     | 22 +++++++++++++++++++++-
+ 2 files changed, 24 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4f436220384f..02c1aa6ab90c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -947,6 +947,26 @@ config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index 24ed037f09fd..d811f81bdd11 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -183,10 +183,10 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+ #define compat_start_thread		compat_start_thread
+ #define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
+ #define COMPAT_ARCH_DLINFO
+-extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
+-				      int uses_interp);
++extern int aarch32_setup_additional_pages(struct linux_binprm *bprm,
++					  int uses_interp);
+ #define compat_arch_setup_additional_pages \
+-					aarch32_setup_vectors_page
++					aarch32_setup_additional_pages
  
-+config COMPAT_VDSO
-+	bool "32-bit vDSO"
-+	depends on COMPAT
-+	default n
-+	help
-+	  Warning: this completely removes the compat vector page, including
-+	  kuser helpers, which may break 32-bit processes.
+ #endif /* CONFIG_COMPAT */
+ 
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index b9a1268c21c6..2b7f4dc44758 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -138,6 +138,25 @@ up_fail:
+ }
+ 
+ #ifdef CONFIG_COMPAT
++#ifdef CONFIG_VDSO32
++extern char vdso32_start, vdso32_end;
 +
-+	  Warning: a 32-bit toolchain is necessary to build the vDSO. You
-+	  must explicitly define which toolchain should be used by setting
-+	  CROSS_COMPILE_ARM32 to the prefix of the 32-bit toolchain (same format
-+	  as CROSS_COMPILE). If a 32-bit compiler cannot be found, a warning
-+	  will be printed and the kernel will be built as if COMPAT_VDSO had not
-+	  been set.
++static struct vdso_mappings vdso32_mappings;
 +
-+	  Provide a vDSO to 32-bit processes. It includes the symbols provided
-+	  by the vDSO from the 32-bit kernel, so that a 32-bit libc can use
-+	  the compat vDSO without modification. It also provides sigreturn
-+	  trampolines, and replaces the vector page.
++static int __init vdso32_init(void)
++{
++	return setup_vdso_mappings("vdso32", &vdso32_start, &vdso32_end,
++				   &vdso32_mappings);
++}
++arch_initcall(vdso32_init);
 +
- endmenu
- 
- menu "Power management options"
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 7bb702a0f1e2..992df1553374 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -30,10 +30,24 @@ $(warning LSE atomics not supported by binutils)
-   endif
- endif
- 
--KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr)
-+ifeq ($(CONFIG_COMPAT_VDSO), y)
-+  # Check that the user has provided a valid prefix for arm32 (we allow
-+  # CROSS_COMPILE_ARM32 to be defined but empty, in case the system gcc should
-+  # be used)
-+  ifeq ($(shell [ -v CROSS_COMPILE_ARM32 ] && echo y),)
-+    $(warning CROSS_COMPILE_ARM32 not defined, the compat vDSO will not be built)
-+  else ifeq ($(shell which $(CROSS_COMPILE_ARM32)gcc 2> /dev/null),)
-+    $(warning $(CROSS_COMPILE_ARM32)gcc not found, the compat vDSO will not be built)
-+  else
-+    export CONFIG_VDSO32 := y
-+    vdso32 := -DCONFIG_VDSO32=1
-+  endif
-+endif
++int aarch32_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
++{
++	return setup_vdso_pages(&vdso32_mappings);
++}
 +
-+KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(vdso32)
- KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
- KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
--KBUILD_AFLAGS	+= $(lseinstr)
-+KBUILD_AFLAGS	+= $(lseinstr) $(vdso32)
++#else /* CONFIG_VDSO32 */
++
+ /*
+  * Create and map the vectors page for AArch32 tasks.
+  */
+@@ -172,7 +191,7 @@ static int alloc_vectors_page(void)
+ }
+ arch_initcall(alloc_vectors_page);
  
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
-@@ -128,6 +142,8 @@ archclean:
- prepare: vdso_prepare
- vdso_prepare: prepare0
- 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
-+	$(if $(CONFIG_VDSO32),$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso32 \
-+					  include/generated/vdso32-offsets.h)
+-int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
++int aarch32_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ {
+ 	struct mm_struct *mm = current->mm;
+ 	unsigned long addr = AARCH32_VECTORS_BASE;
+@@ -195,6 +214,7 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
  
- define archhelp
-   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index bab85990691d..d26a1441d794 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -25,9 +25,11 @@ OBJCOPYFLAGS := --prefix-symbols=__efistub_
- $(obj)/%.stub.o: $(obj)/%.o FORCE
- 	$(call if_changed,objcopy)
+ 	return PTR_ERR_OR_ZERO(ret);
+ }
++#endif /* CONFIG_VDSO32 */
+ #endif /* CONFIG_COMPAT */
  
--arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
--					   sys_compat.o entry32.o		\
--					   ../../arm/kernel/opcodes.o
-+arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o sys_compat.o	\
-+					   entry32.o ../../arm/kernel/opcodes.o
-+ifneq ($(CONFIG_VDSO32),y)
-+arm64-obj-y				+= kuser32.o
-+endif
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-@@ -47,6 +49,7 @@ arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
- arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
-+obj-$(CONFIG_VDSO32)			+= vdso32/
- obj-m					+= $(arm64-obj-m)
- head-y					:= head.o
- extra-y					+= $(head-y) vmlinux.lds
+ extern char vdso_start, vdso_end;
 -- 
 2.8.2
