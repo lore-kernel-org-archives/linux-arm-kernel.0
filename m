@@ -1,80 +1,89 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  8 Sep 2016 11:21:52 +0100
-Subject: [RFCv4 7/7] perf: util: support alternative sysfs cpumask
+Date: Thu,  8 Sep 2016 11:21:50 +0100
+Subject: [RFCv4 5/7] drivers/perf: arm_pmu: expose a cpumask in sysfs
 In-Reply-To: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
 References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1473330112-28528-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <1473330112-28528-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The perf tools can read a cpumask file for a PMU, describing a subset of
-CPUs which that PMU covers. So far this has only been used to cater for
-uncore PMUs, which in practice happen to only have a single CPU
-described in the mask.
+In systems with heterogeneous CPUs, there are multiple logical CPU PMUs,
+each of which covers a subset of CPUs in the system. In some cases
+userspace needs to know which CPUs a given logical PMU covers, so we'd
+like to expose a cpumask under sysfs, similar to what is done for uncore
+PMUs.
 
-Until recently, the perf tools only correctly handled cpumask containing
-a single CPU, and only when monitoring in system-wide mode. For example,
-prior to commit 00e727bb389359c8 ("perf stat: Balance opening and
-reading events"), a mask with more than a single CPU could cause
-perf stat to hang. When a CPU PMU covers a subset of CPUs, but lacks a
-cpumask, perf record will fail to open events (on the cores the PMU does
-not support), and gives up.
+Unfortunately, prior to commit 00e727bb389359c8 ("perf stat: Balance
+opening and reading events"), perf stat only correctly handled a cpumask
+holding a single CPU, and only when profiling in system-wide mode. In
+other cases, the presence of a cpumask file could cause perf stat to
+behave erratically.
 
-For systems with heterogeneous CPUs such as ARM big.LITTLE systems, this
-presents a problem. We have a PMU for each microarchitecture (e.g. a big
-PMU and a little PMU), and would like to expose a cpumask for each (so
-as to allow perf record and other tools to do the right thing). However,
-doing so kernel-side will cause old perf binaries to not function (e.g.
-hitting the issue solved by 00e727bb389359c8), and thus commits the
-cardinal sin of breaking (existing) userspace.
+Thus, exposing a cpumask file would break older perf binaries in cases
+where they would otherwise work.
 
-To address this chicken-and-egg problem, this patch adds support got a
-new file, cpus, which is largely identical to the existing cpumask file.
-A kernel can expose this file, knowing that new perf binaries will
-correctly support it, while old perf binaries will not look for it (and
-thus will not be broken).
+To avoid this issue while still providing userspace with the information
+it needs, this patch exposes a differently-named file (cpus) under
+sysfs. New tools can look for this and operate correctly, while older
+tools will not be adversely affected by its presence.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Jiri Olsa <jolsa@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: linux-kernel at vger.kernel.org
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- tools/perf/util/pmu.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ drivers/perf/arm_pmu.c       | 21 +++++++++++++++++++++
+ include/linux/perf/arm_pmu.h |  1 +
+ 2 files changed, 22 insertions(+)
 
-diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
-index ddb0261..2babcdf 100644
---- a/tools/perf/util/pmu.c
-+++ b/tools/perf/util/pmu.c
-@@ -445,14 +445,23 @@ static struct cpu_map *pmu_cpumask(const char *name)
- 	FILE *file;
- 	struct cpu_map *cpus;
- 	const char *sysfs = sysfs__mountpoint();
-+	const char *templates[] = {
-+		 "%s/bus/event_source/devices/%s/cpumask",
-+		 "%s/bus/event_source/devices/%s/cpus",
-+		 NULL
-+	};
-+	const char **template;
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index ac83e1e..09e9944 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -534,6 +534,25 @@ static int armpmu_filter_match(struct perf_event *event)
+ 	return cpumask_test_cpu(cpu, &armpmu->supported_cpus);
+ }
  
- 	if (!sysfs)
- 		return NULL;
++static ssize_t armpmu_cpumask_show(struct device *dev,
++				   struct device_attribute *attr, char *buf)
++{
++	struct arm_pmu *armpmu = to_arm_pmu(dev_get_drvdata(dev));
++	return cpumap_print_to_pagebuf(true, buf, &armpmu->supported_cpus);
++}
++
++static struct device_attribute armpmu_cpumask_attr =
++		__ATTR(cpus, S_IRUGO, armpmu_cpumask_show, NULL);
++
++static struct attribute *armpmu_common_attrs[] = {
++	&armpmu_cpumask_attr.attr,
++	NULL,
++};
++
++static struct attribute_group armpmu_common_attr_group = {
++	.attrs = armpmu_common_attrs,
++};
++
+ static void armpmu_init(struct arm_pmu *armpmu)
+ {
+ 	atomic_set(&armpmu->active_events, 0);
+@@ -551,6 +570,8 @@ static void armpmu_init(struct arm_pmu *armpmu)
+ 		.filter_match	= armpmu_filter_match,
+ 		.attr_groups	= armpmu->attr_groups,
+ 	};
++	armpmu->attr_groups[ARMPMU_ATTR_GROUP_COMMON] =
++		&armpmu_common_attr_group;
+ }
  
--	snprintf(path, PATH_MAX,
--		 "%s/bus/event_source/devices/%s/cpumask", sysfs, name);
-+	for (template = templates; *template; template++) {
-+		snprintf(path, PATH_MAX, *template, sysfs, name);
-+		if (stat(path, &st) == 0)
-+			break;
-+	}
+ /* Set at runtime when we know what CPU type we are. */
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 8030814..4040b90 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -78,6 +78,7 @@ struct pmu_hw_events {
+ };
  
--	if (stat(path, &st) < 0)
-+	if (!*template)
- 		return NULL;
- 
- 	file = fopen(path, "r");
+ enum armpmu_attr_groups {
++	ARMPMU_ATTR_GROUP_COMMON,
+ 	ARMPMU_ATTR_GROUP_EVENTS,
+ 	ARMPMU_ATTR_GROUP_FORMATS,
+ 	ARMPMU_NR_ATTR_GROUPS
 -- 
 1.9.1
