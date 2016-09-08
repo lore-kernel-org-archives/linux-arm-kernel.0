@@ -1,34 +1,74 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 8 Sep 2016 08:45:35 -0500
-Subject: [PATCH 3/3] of: pci: remove unused MSI controller helpers
-In-Reply-To: <1472744284-18305-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1472744284-18305-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1472744284-18305-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAL_JsqJHN3VCzs4k_FpQSGr=69B_YcCJDhZxi=poZW-2QNMRvw@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 8 Sep 2016 15:50:02 +0200
+Subject: [PATCH 1/4] ARM: dts: STiH410: Handle interconnect clock required
+ by EHCI/OHCI (USB)
+In-Reply-To: <20160908091136.17301-2-lee.jones@linaro.org>
+References: <20160908091136.17301-1-lee.jones@linaro.org>
+ <20160908091136.17301-2-lee.jones@linaro.org>
+Message-ID: <b4bedbf6-6d1d-574f-c8e2-84a08e092c2f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2016 at 10:38 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> All the users of the small MSI controller API have been migrated to use
-> the generic MSI infrastructure instead. We no longer need a global
-> chained list of msi_controller. Instead, MSI controllers are now
-> represented as irq domains attached to OF nodes, and the resolution
-> between a device requesting an MSI and the corresponding MSI controller
-> is done by the generic interrupt resolution logic.
+Hi Lee
+
+
+On 09/08/2016 11:11 AM, Lee Jones wrote:
+> The STiH4{07,10} platform contains some interconnect clocks which are used
+> by various IPs.  If this clock isn't handled correctly by ST's EHCI/OHCI
+> drivers, their hub won't be found, the following error be shown and the
+> result will be non-working USB:
 >
-> Therefore, this API is now completely useless, and can be removed from
-> the kernel.
+>   [   97.221963] hub 2-1:1.0: hub_ext_port_status failed (err = -110)
 >
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: stable at vger.kernel.org
+> Tested-by: Peter Griffin <peter.griffin@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  drivers/of/of_pci.c    | 45 ---------------------------------------------
->  include/linux/of_pci.h | 11 -----------
->  2 files changed, 56 deletions(-)
-
-This is to both Bjorn and me, but I'm assuming you want Bjorn to take
-the series.
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-Rob
+>  arch/arm/boot/dts/stih410.dtsi | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+> index 9ee5e20..f1aa34c 100644
+> --- a/arch/arm/boot/dts/stih410.dtsi
+> +++ b/arch/arm/boot/dts/stih410.dtsi
+> @@ -41,7 +41,8 @@
+>  			compatible = "st,st-ohci-300x";
+>  			reg = <0x9a03c00 0x100>;
+>  			interrupts = <GIC_SPI 180 IRQ_TYPE_NONE>;
+> -			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
+> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
+> +				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
+>  			resets = <&powerdown STIH407_USB2_PORT0_POWERDOWN>,
+>  				 <&softreset STIH407_USB2_PORT0_SOFTRESET>;
+>  			reset-names = "power", "softreset";
+> @@ -57,7 +58,8 @@
+>  			interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&pinctrl_usb0>;
+> -			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
+> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
+> +				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
+>  			resets = <&powerdown STIH407_USB2_PORT0_POWERDOWN>,
+>  				 <&softreset STIH407_USB2_PORT0_SOFTRESET>;
+>  			reset-names = "power", "softreset";
+> @@ -71,7 +73,8 @@
+>  			compatible = "st,st-ohci-300x";
+>  			reg = <0x9a83c00 0x100>;
+>  			interrupts = <GIC_SPI 181 IRQ_TYPE_NONE>;
+> -			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
+> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
+> +				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
+>  			resets = <&powerdown STIH407_USB2_PORT1_POWERDOWN>,
+>  				 <&softreset STIH407_USB2_PORT1_SOFTRESET>;
+>  			reset-names = "power", "softreset";
+> @@ -87,7 +90,8 @@
+>  			interrupts = <GIC_SPI 153 IRQ_TYPE_NONE>;
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&pinctrl_usb1>;
+> -			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>;
+> +			clocks = <&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
+> +				 <&clk_s_c0_flexgen CLK_RX_ICN_DISP_0>;
+>  			resets = <&powerdown STIH407_USB2_PORT1_POWERDOWN>,
+>  				 <&softreset STIH407_USB2_PORT1_SOFTRESET>;
+>  			reset-names = "power", "softreset";
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
