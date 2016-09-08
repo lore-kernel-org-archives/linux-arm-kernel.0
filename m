@@ -1,174 +1,58 @@
-From: johnyoun@synopsys.com (John Youn)
-Date: Wed, 07 Sep 2016 19:39:40 -0700
-Subject: [PATCH v5 2/3] usb: dwc2: Add delay to core soft reset
-In-Reply-To: <cover.1473302184.git.johnyoun@synopsys.com>
-References: <cover.1473302184.git.johnyoun@synopsys.com>
-Message-ID: <4cfa6baf14f5d892864d07c76c728e9d40f1456f.1473302184.git.johnyoun@synopsys.com>
+From: Gang.Liu@nxp.com (Liu Gang)
+Date: Thu, 8 Sep 2016 10:31:44 +0800
+Subject: [PATCH] arm64: dts: ls2080a: Add 'dma-coherent' for ls2080a PCI nodes
+Message-ID: <1473301904-27259-1-git-send-email-Gang.Liu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a delay to the core soft reset function to account for the IDDIG
-debounce filter.
+The 'dma-coherent' indicates that the hardware IP block can ensure
+the coherency of the data transferred from/to the IP block. This
+can avoid the software cache flush/invalid actions, and improve
+the performance significantly.
 
-If the current mode is host, either due to the force mode bit being
-set (which persists after core reset) or the connector id pin, a core
-soft reset will temporarily reset the mode to device and a delay from
-the IDDIG debounce filter will occur before going back to host mode.
+The PCI IP block of ls2080a has this capability, so adding this
+feature to improve the PCI performance.
 
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-Signed-off-by: John Youn <johnyoun@synopsys.com>
+Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
 ---
- drivers/usb/dwc2/core.c | 95 +++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/usb/dwc2/core.h |  1 +
- drivers/usb/dwc2/hw.h   |  1 +
- 3 files changed, 97 insertions(+)
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
-index 4135a5f..a3068e0 100644
---- a/drivers/usb/dwc2/core.c
-+++ b/drivers/usb/dwc2/core.c
-@@ -238,6 +238,77 @@ int dwc2_enter_hibernation(struct dwc2_hsotg *hsotg)
- 	return ret;
- }
- 
-+/**
-+ * dwc2_wait_for_mode() - Waits for the controller mode.
-+ * @hsotg:	Programming view of the DWC_otg controller.
-+ * @host_mode:	If true, waits for host mode, otherwise device mode.
-+ */
-+static void dwc2_wait_for_mode(struct dwc2_hsotg *hsotg,
-+			       bool host_mode)
-+{
-+	ktime_t start;
-+	ktime_t end;
-+	unsigned int timeout = 110;
-+
-+	dev_vdbg(hsotg->dev, "Waiting for %s mode\n",
-+		 host_mode ? "host" : "device");
-+
-+	start = ktime_get();
-+
-+	while (1) {
-+		s64 ms;
-+
-+		if (dwc2_is_host_mode(hsotg) == host_mode) {
-+			dev_vdbg(hsotg->dev, "%s mode set\n",
-+				 host_mode ? "Host" : "Device");
-+			break;
-+		}
-+
-+		end = ktime_get();
-+		ms = ktime_to_ms(ktime_sub(end, start));
-+
-+		if (ms >= (s64)timeout) {
-+			dev_warn(hsotg->dev, "%s: Couldn't set %s mode\n",
-+				 __func__, host_mode ? "host" : "device");
-+			break;
-+		}
-+
-+		usleep_range(1000, 2000);
-+	}
-+}
-+
-+/**
-+ * dwc2_iddig_filter_enabled() - Returns true if the IDDIG debounce
-+ * filter is enabled.
-+ */
-+static bool dwc2_iddig_filter_enabled(struct dwc2_hsotg *hsotg)
-+{
-+	u32 gsnpsid;
-+	u32 ghwcfg4;
-+
-+	if (!dwc2_hw_is_otg(hsotg))
-+		return false;
-+
-+	/* Check if core configuration includes the IDDIG filter. */
-+	ghwcfg4 = dwc2_readl(hsotg->regs + GHWCFG4);
-+	if (!(ghwcfg4 & GHWCFG4_IDDIG_FILT_EN))
-+		return false;
-+
-+	/*
-+	 * Check if the IDDIG debounce filter is bypassed. Available
-+	 * in core version >= 3.10a.
-+	 */
-+	gsnpsid = dwc2_readl(hsotg->regs + GSNPSID);
-+	if (gsnpsid >= DWC2_CORE_REV_3_10a) {
-+		u32 gotgctl = dwc2_readl(hsotg->regs + GOTGCTL);
-+
-+		if (gotgctl & GOTGCTL_DBNCE_FLTR_BYPASS)
-+			return false;
-+	}
-+
-+	return true;
-+}
-+
- /*
-  * Do core a soft reset of the core.  Be careful with this because it
-  * resets all the internal state machines of the core.
-@@ -246,9 +317,30 @@ int dwc2_core_reset(struct dwc2_hsotg *hsotg)
- {
- 	u32 greset;
- 	int count = 0;
-+	bool wait_for_host_mode = false;
- 
- 	dev_vdbg(hsotg->dev, "%s()\n", __func__);
- 
-+	/*
-+	 * If the current mode is host, either due to the force mode
-+	 * bit being set (which persists after core reset) or the
-+	 * connector id pin, a core soft reset will temporarily reset
-+	 * the mode to device. A delay from the IDDIG debounce filter
-+	 * will occur before going back to host mode.
-+	 *
-+	 * Determine whether we will go back into host mode after a
-+	 * reset and account for this delay after the reset.
-+	 */
-+	if (dwc2_iddig_filter_enabled(hsotg)) {
-+		u32 gotgctl = dwc2_readl(hsotg->regs + GOTGCTL);
-+		u32 gusbcfg = dwc2_readl(hsotg->regs + GUSBCFG);
-+
-+		if (!(gotgctl & GOTGCTL_CONID_B) ||
-+		    (gusbcfg & GUSBCFG_FORCEHOSTMODE)) {
-+			wait_for_host_mode = true;
-+		}
-+	}
-+
- 	/* Core Soft Reset */
- 	greset = dwc2_readl(hsotg->regs + GRSTCTL);
- 	greset |= GRSTCTL_CSFTRST;
-@@ -277,6 +369,9 @@ int dwc2_core_reset(struct dwc2_hsotg *hsotg)
- 		}
- 	} while (!(greset & GRSTCTL_AHBIDLE));
- 
-+	if (wait_for_host_mode)
-+		dwc2_wait_for_mode(hsotg, true);
-+
- 	return 0;
- }
- 
-diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
-index 78526ee..466c220 100644
---- a/drivers/usb/dwc2/core.h
-+++ b/drivers/usb/dwc2/core.h
-@@ -882,6 +882,7 @@ struct dwc2_hsotg {
- #define DWC2_CORE_REV_2_92a	0x4f54292a
- #define DWC2_CORE_REV_2_94a	0x4f54294a
- #define DWC2_CORE_REV_3_00a	0x4f54300a
-+#define DWC2_CORE_REV_3_10a	0x4f54310a
- 
- #if IS_ENABLED(CONFIG_USB_DWC2_HOST) || IS_ENABLED(CONFIG_USB_DWC2_DUAL_ROLE)
- 	union dwc2_hcd_internal_flags {
-diff --git a/drivers/usb/dwc2/hw.h b/drivers/usb/dwc2/hw.h
-index efc3bcd..9105844 100644
---- a/drivers/usb/dwc2/hw.h
-+++ b/drivers/usb/dwc2/hw.h
-@@ -48,6 +48,7 @@
- #define GOTGCTL_ASESVLD			(1 << 18)
- #define GOTGCTL_DBNC_SHORT		(1 << 17)
- #define GOTGCTL_CONID_B			(1 << 16)
-+#define GOTGCTL_DBNCE_FLTR_BYPASS	(1 << 15)
- #define GOTGCTL_DEVHNPEN		(1 << 11)
- #define GOTGCTL_HSTSETHNPEN		(1 << 10)
- #define GOTGCTL_HNPREQ			(1 << 9)
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index e3b6034..4eba766 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -588,6 +588,7 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
++			dma-coherent;
+ 			num-lanes = <4>;
+ 			bus-range = <0x0 0xff>;
+ 			ranges = <0x81000000 0x0 0x00000000 0x10 0x00010000 0x0 0x00010000   /* downstream I/O */
+@@ -612,6 +613,7 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
++			dma-coherent;
+ 			num-lanes = <4>;
+ 			bus-range = <0x0 0xff>;
+ 			ranges = <0x81000000 0x0 0x00000000 0x12 0x00010000 0x0 0x00010000   /* downstream I/O */
+@@ -636,6 +638,7 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
++			dma-coherent;
+ 			num-lanes = <8>;
+ 			bus-range = <0x0 0xff>;
+ 			ranges = <0x81000000 0x0 0x00000000 0x14 0x00010000 0x0 0x00010000   /* downstream I/O */
+@@ -660,6 +663,7 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
++			dma-coherent;
+ 			num-lanes = <4>;
+ 			bus-range = <0x0 0xff>;
+ 			ranges = <0x81000000 0x0 0x00000000 0x16 0x00010000 0x0 0x00010000   /* downstream I/O */
 -- 
-2.9.0
+2.1.0.27.g96db324
