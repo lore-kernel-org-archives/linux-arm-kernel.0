@@ -1,47 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 8 Sep 2016 11:20:35 +0100
-Subject: [PATCH v2] arm64: defconfig: enable common modules for power
- management
-In-Reply-To: <5498297.rN0szKFv4p@wuerfel>
-References: <1472705469-25599-1-git-send-email-leo.yan@linaro.org>
- <5498297.rN0szKFv4p@wuerfel>
-Message-ID: <20160908102035.GD1493@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  8 Sep 2016 11:21:46 +0100
+Subject: [RFCv4 1/7] drivers/perf: arm_pmu: add common attr group fields
+In-Reply-To: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
+References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1473330112-28528-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+In preparation for adding common attribute groups, add an array of
+attribute group pointers to arm_pmu, which will be used if the
+backend hasn't already set pmu::attr_groups.
 
-On Thu, Sep 01, 2016 at 09:33:38AM +0200, Arnd Bergmann wrote:
-> On Thursday, September 1, 2016 12:51:09 PM CEST Leo Yan wrote:
-> > Enable common modules for power management; one is to enable
-> > CPUFREQ_DT driver; the driver is used by many platforms by passing OPP
-> > table from device tree.
-> > 
-> > Also enables thermal related drivers. Firstly we need enable
-> > configuration CPU_THERMAL for CPU cooling device driver, this will bind
-> > thermal zone with CPU cooling device; and enable 'power allocator'
-> > thermal governor.
-> > 
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > 
-> 
-> Looks good,
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Catalin and Will: I never know who should merge this kind of patch
-> as we have a number of other arm64 defconfig patches going through
-> arm-soc, but this patch is not really platform specific.
-> 
-> Do you want to pick it up in the arm64 tree or should we take
-> this and others patches like it in general?
+Subsequent patches will move backends over to using these, before adding
+common fields.
 
-I'm perfectly happy with you taking this, but thanks for asking the
-question. I think that, outside of the architectural bits, it makes
-sense for arm-soc to manage config options that are requested by the
-submaintainers. It also helps reduce defconfig churn. I typically wait
-until -rc1 before making any .config changes, unless they're urgent
-(e.g. systemd suddenly starts needing some options enabled in order to
-boot), so if you queue this for the merge window then we should be good.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ drivers/perf/arm_pmu.c       | 3 +++
+ include/linux/perf/arm_pmu.h | 9 ++++++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-Will
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index f5e1008..145caf4 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -1039,6 +1039,9 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 		goto out_free;
+ 	}
+ 
++	if (!pmu->pmu.attr_groups)
++		pmu->pmu.attr_groups = pmu->attr_groups;
++
+ 	ret = cpu_pmu_init(pmu);
+ 	if (ret)
+ 		goto out_free;
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index e188438..8030814 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -14,7 +14,7 @@
+ 
+ #include <linux/interrupt.h>
+ #include <linux/perf_event.h>
+-
++#include <linux/sysfs.h>
+ #include <asm/cputype.h>
+ 
+ /*
+@@ -77,6 +77,12 @@ struct pmu_hw_events {
+ 	struct arm_pmu		*percpu_pmu;
+ };
+ 
++enum armpmu_attr_groups {
++	ARMPMU_ATTR_GROUP_EVENTS,
++	ARMPMU_ATTR_GROUP_FORMATS,
++	ARMPMU_NR_ATTR_GROUPS
++};
++
+ struct arm_pmu {
+ 	struct pmu	pmu;
+ 	cpumask_t	active_irqs;
+@@ -111,6 +117,7 @@ struct arm_pmu {
+ 	struct pmu_hw_events	__percpu *hw_events;
+ 	struct list_head	entry;
+ 	struct notifier_block	cpu_pm_nb;
++	const struct attribute_group *attr_groups[ARMPMU_NR_ATTR_GROUPS + 1];
+ };
+ 
+ #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+-- 
+1.9.1
