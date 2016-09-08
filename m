@@ -1,96 +1,68 @@
-From: Wei.Chen@arm.com (Wei Chen)
-Date: Thu, 8 Sep 2016 09:47:20 +0000
-Subject: [PATCH 00/19] Handle guest-generated SErrors/Aborts
-References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <AM5PR0802MB2452C619386893AAFFAE490D9EFB0@AM5PR0802MB2452.eurprd08.prod.outlook.com>
+From: vkuznets@redhat.com (Vitaly Kuznetsov)
+Date: Thu,  8 Sep 2016 11:48:28 +0200
+Subject: [PATCH] arm/xen: fix SMP guests boot
+Message-ID: <1473328108-30658-1-git-send-email-vkuznets@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Commit 88e957d6e47f ("xen: introduce xen_vcpu_id mapping") broke SMP ARM
+guests on Xen. When FIFO-based event channels are in use (this is the
+default), evtchn_fifo_alloc_control_block() is called on CPU_UP_PREPARE
+event and this happens before we set up xen_vcpu_id mapping in
+xen_starting_cpu. Temporary fix the issue by setting direct Linux CPU id
+<-> Xen vCPU id mapping for all possible CPUs at boot. We don't currently
+support kexec/kdump on Xen/ARM so these ids always match.
 
-On 2016/9/6 21:09, Marc Zyngier wrote:
-> A little known "feature" of giving guest access to real memory mapped
-> HW is that it could trigger asynchronous aborts (SError on ARMv8) if
-> the guest accesses it in a non-conventional way (and depending on how
-> HW and firmware have been integrated). So far, KVM lacks any support
-> to handle this gracefully.
+In future, we have several ways to solve the issue, e.g.:
+- Eliminate all hypercalls from CPU_UP_PREPARE, do them from the starting
+CPU. This can probably be done for both x86 and ARM and, if done, will
+allow us to get Xen's idea of vCPU id from CPUID/MPIDR on the starting CPU
+directly, no messing with ACPI/device tree required.
+- Save vCPU id information from ACPI/device tree on ARM and use it to
+initialize xen_vcpu_id mapping. This is the same trick we currently do on
+x86.
 
-I can reproduce this issue on Seattle board (ARM64), but I can't
-reproduce it on FVP (Cortex-A15x2 ARM32). Did you mean that this issue
-onlu takes place on ARMv8? Have you ever reproduced this issue on any
-ARM32 platform?
+Reported-by: Julien Grall <julien.grall@arm.com>
+Tested-by: Wei Chen <Wei.Chen@arm.com>
+Signed-off-by: Vitaly Kuznetsov <vkuznets@redhat.com>
+---
+It would be nice if this patch could still make it to 4.8 as all SMP
+ARM/Xen guests are currently broken.
+---
+ arch/arm/xen/enlighten.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-Regards,
-
->
-> This series introduces a set of mechanisms to catch such a fault and
-> deliver a vSError (or Virtual Abort for 32bit) to the offending vcpu.
->
-> These aborts can either trigger at EL1 (whilst the guest is running),
-> or at EL2 (during the handling of an exit). The first case is pretty
-> easy to handle (use the ad-hoc vectors on arm64, or decode the EA bit
-> on arm), but the second one is a bit more fiddly, as we need to ensure
-> that the exception is pending by the time we unmask it. This is
-> achived by using some heavy DSBs on the hot path, with the following
-> caveats:
->
-> - I've only been able to trigger the EL2 handling on A57 (Seatle,
->   Juno).
-> - I've measured a 40/50 cycles hit on Juno (A57), but I haven't
->   measured the impact on bigger systems
->
-> The last patch of this series adds a missing feature to the
-> GICV-proxying series, delivering a vSError to a guest that performed
-> an illegal access to the GIC.
->
-> Patches on top of current kvmarm/queue + the GICV przying series.
->
-> Marc Zyngier (19):
->   arm64: KVM: Rename HCR_VA to HCR_VSE
->   arm64: KVM: Preserve pending vSError in world switch
->   arm64: KVM: Add Virtual Abort injection helper
->   arm64: KVM: Add exception code to report EL1 asynchronous aborts
->   arm64: KVM: Add EL1 async abort handler
->   arm64: KVM: Route asynchronous aborts
->   arm64: KVM: Allow an exit code to be tagged with an SError
->   arm64: KVM: Inject a Virtual SError if it was pending
->   arm64: KVM: Handle async aborts delivered while at EL2
->   arm: KVM: Preserve pending Virtual Abort in world switch
->   arm: KVM: Add Virtual Abort injection helper
->   arm: KVM: Add HYP async abort handler
->   arm: KVM: Allow an exit code to be tagged with a Virtual Abort
->   arm: KVM: Handle async aborts delivered while at HYP
->   arm: KVM: Inject a Virtual Abort if it was pending
->   arm: KVM: Drop unreachable HYP abort handlers
->   arm/arm64: KVM: Inject virtual abort when guest exits on external
->     abort
->   arm/arm64: KVM: Remove external abort test from MMIO handling
->   arm64: KVM: Inject a vSerror if detecting a bad GICV access at EL2
->
->  arch/arm/include/asm/kvm_asm.h       |  4 +++
->  arch/arm/include/asm/kvm_emulate.h   |  1 +
->  arch/arm/kvm/emulate.c               | 12 +++++++++
->  arch/arm/kvm/handle_exit.c           | 49 ++++++++++++++++--------------------
->  arch/arm/kvm/hyp/entry.S             | 31 +++++++++++++++++++++++
->  arch/arm/kvm/hyp/hyp-entry.S         | 16 +++++++++++-
->  arch/arm/kvm/hyp/switch.c            |  9 +++++++
->  arch/arm/kvm/mmio.c                  |  6 -----
->  arch/arm/kvm/mmu.c                   |  5 ++++
->  arch/arm64/include/asm/kvm_arm.h     |  4 +--
->  arch/arm64/include/asm/kvm_asm.h     |  9 +++++--
->  arch/arm64/include/asm/kvm_emulate.h |  1 +
->  arch/arm64/include/asm/kvm_hyp.h     |  2 +-
->  arch/arm64/kvm/handle_exit.c         | 23 +++++++++++++++++
->  arch/arm64/kvm/hyp/entry.S           | 33 +++++++++++++++++++++++-
->  arch/arm64/kvm/hyp/hyp-entry.S       | 36 ++++++++++++++++++++++----
->  arch/arm64/kvm/hyp/switch.c          | 33 +++++++++++++++++++++---
->  arch/arm64/kvm/inject_fault.c        | 12 +++++++++
->  virt/kvm/arm/hyp/vgic-v2-sr.c        | 21 ++++++++++++----
->  19 files changed, 254 insertions(+), 53 deletions(-)
->
-
-
---
-Regards,
-Wei Chen
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 3d2cef6..f193414 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -170,9 +170,6 @@ static int xen_starting_cpu(unsigned int cpu)
+ 	pr_info("Xen: initializing cpu%d\n", cpu);
+ 	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
+ 
+-	/* Direct vCPU id mapping for ARM guests. */
+-	per_cpu(xen_vcpu_id, cpu) = cpu;
+-
+ 	info.mfn = virt_to_gfn(vcpup);
+ 	info.offset = xen_offset_in_page(vcpup);
+ 
+@@ -330,6 +327,7 @@ static int __init xen_guest_init(void)
+ {
+ 	struct xen_add_to_physmap xatp;
+ 	struct shared_info *shared_info_page = NULL;
++	int cpu;
+ 
+ 	if (!xen_domain())
+ 		return 0;
+@@ -380,7 +378,8 @@ static int __init xen_guest_init(void)
+ 		return -ENOMEM;
+ 
+ 	/* Direct vCPU id mapping for ARM guests. */
+-	per_cpu(xen_vcpu_id, 0) = 0;
++	for_each_possible_cpu(cpu)
++		per_cpu(xen_vcpu_id, cpu) = cpu;
+ 
+ 	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
+ 	if (xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
+-- 
+2.7.4
