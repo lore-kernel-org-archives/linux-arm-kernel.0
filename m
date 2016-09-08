@@ -1,37 +1,56 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 8 Sep 2016 08:40:51 -0500
-Subject: [PATCH v8 03/16] of/numa: add nid check for memory block
-In-Reply-To: <1472712907-12700-4-git-send-email-thunder.leizhen@huawei.com>
-References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
- <1472712907-12700-4-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <CAL_JsqK6P86F=AJjC2J6W4NOFXavb4e-OR_dmc4iofUNCJGrJA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  8 Sep 2016 15:41:31 +0200
+Subject: [PATCH 1/2] ARM: dts: add EBI2 to the Qualcomm MSM8660 DTSI
+Message-ID: <1473342091-30507-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2016 at 1:54 AM, Zhen Lei <thunder.leizhen@huawei.com> wrote:
-> If the numa-id which was configured in memory@ devicetree node is greater
-> than MAX_NUMNODES, we should report a warning. We have done this for cpus
-> and distance-map dt nodes, this patch help them to be consistent.
->
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  drivers/of/of_numa.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-> index 7b3fbdc..c1bd62c 100644
-> --- a/drivers/of/of_numa.c
-> +++ b/drivers/of/of_numa.c
-> @@ -75,6 +75,11 @@ static int __init of_numa_parse_memory_nodes(void)
->                          */
->                         continue;
->
-> +               if (nid >= MAX_NUMNODES) {
-> +                       pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
+This adds the external bus interface EBI2 to the MSM8660 device
+tree, albeit with status = "disabled" so that devices actually
+using EBI2 can turn it on if needed.
 
-Really using pr_fmt should come first so you're not changing this
-line. But not worth respinning for that:
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v2->v3:
+- Use the new #address-cells = <2> for indicating the CS in the
+  first address cell
+- Use the ranges property properly for defining the six different
+  CS address windows
+- Define CS3 to properly map over 128MB
+- The EBI2 bindings are now ACKed by Rob Herring and a pull request
+  to ARM SoC for both binding and driver is pending.
+- This should be safe to merge for v4.9
+---
+ arch/arm/boot/dts/qcom-msm8660.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Acked-by: Rob Herring <robh@kernel.org>
-
-Rob
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 8c65e0d82559..0b6348544598 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -141,6 +141,23 @@
+ 			};
+ 		};
+ 
++		ebi2 at 1a100000 {
++			compatible = "qcom,msm8660-ebi2";
++			#address-cells = <2>;
++			#size-cells = <1>;
++			ranges = <0 0x0 0x1a800000 0x00800000>,
++				 <1 0x0 0x1b000000 0x00800000>,
++				 <2 0x0 0x1b800000 0x00800000>,
++				 <3 0x0 0x1d000000 0x08000000>,
++				 <4 0x0 0x1c800000 0x00800000>,
++				 <5 0x0 0x1c000000 0x00800000>;
++			reg = <0x1a100000 0x1000>, <0x1a110000 0x1000>;
++			reg-names = "ebi2", "xmem";
++			clocks = <&gcc EBI2_2X_CLK>, <&gcc EBI2_CLK>;
++			clock-names = "ebi2x", "ebi2";
++			status = "disabled";
++		};
++
+ 		qcom,ssbi at 500000 {
+ 			compatible = "qcom,ssbi";
+ 			reg = <0x500000 0x1000>;
+-- 
+2.7.4
