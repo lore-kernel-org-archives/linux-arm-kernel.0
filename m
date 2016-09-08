@@ -1,43 +1,62 @@
-From: netz.kernel@gmail.com (Marty Plummer)
-Date: Thu, 8 Sep 2016 13:04:06 -0500
-Subject: [RFC 7/7] Make Hi3620 explicit, remove wildcards
-In-Reply-To: <20160908175428.GE12916@io.lakedaemon.net>
-References: <20160908172346.27506-1-netz.kernel@gmail.com>
- <20160908172346.27506-7-netz.kernel@gmail.com>
- <20160908175428.GE12916@io.lakedaemon.net>
-Message-ID: <8b753f4e-3b58-9076-5291-11239a4a7046@gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 8 Sep 2016 13:04:17 -0500
+Subject: [PATCH 3/3] soc: ti: Add ti_sci_pm_domains driver
+In-Reply-To: <m2mvjinvfw.fsf@baylibre.com>
+References: <20160819235653.26355-1-nm@ti.com>
+ <20160819235653.26355-4-nm@ti.com>
+ <CAPDyKFooDUOPT9dP8HaW3YBO9PsX-1+96PPE7CRMyjEkra7cBQ@mail.gmail.com>
+ <57C0D2C9.1030801@ti.com> <57C5E1DA.2040405@ti.com>
+ <CAPDyKFqszM48nXnnA9D8iCp34k-ZmNvOkHPCc=Fya4nJA7PvBQ@mail.gmail.com>
+ <57CF26DB.4020807@ti.com> <7h4m5rv9kz.fsf@baylibre.com>
+ <CAPDyKFo0Cb90BbY7ra6VDjb5frC5=VtmE3V6tDK=VosfPmod7Q@mail.gmail.com>
+ <m2mvjinvfw.fsf@baylibre.com>
+Message-ID: <57D1A821.3010904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2016 12:54 PM, Jason Cooper wrote:
-> On Thu, Sep 08, 2016 at 12:23:46PM -0500, Marty Plummer wrote:
->> This is a preparatory series for adding the ARMv5/v6 hi3520 SoCs.
->> Assumptions were made when adding hi3620 that don't hold water in
->> light of adding support for the hi3520 SoC.  Fix the issue by renaming
->> config options and other namespaces to avoid collisions with the new
->> work.
+Hi,
+On 09/08/2016 12:38 PM, Kevin Hilman wrote:
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>
+>> [...]
 >>
->> Only internal APIs are modified with this series.
+>>>
+>>> One more idea...
+>>>
+>>> Since you don't really have a domain (a group of devices), what you
+>>> really have is each device having an independent power switch, so as Ulf
+>>> suggested, what you really need is for all the devices to share the same
+>>> set of runtime PM callbacks that call SCI.  The only difference is the
+>>> unique ID.
+>>>
+>>> Rather than using all of genpd, you could also just use a pm_domain
+>>> which is what genpd is built on top of (and also omap_device, which
+>>> you're probably familiar with also.)
 >>
->> Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
->> ---
->>  drivers/dma/Kconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> This doesn't have to do with DMA, but it's last in the series, so...
-> 
-> I saw on IRC that you have the serial port, vic, and clock at some
-> initial stage of working for your board, congrats!
-> 
-Yep! Also got usb going (well, I have to manually modprobe the modules,
-but it does work). Thanks a lot!
-> I would add those patches to the end of this series implementing that
-> basic functionality.  That makes it very clear to everyone *why* the
-> previous patches are necessary.
-I suppose so, I was just trying to keep changes as modular as possible,
-but if you think that's a good idea, I'll roll with it.
-> 
-> thx,
-> 
-> Jason.
-> 
+>> Even if this would work as well, the downside would be that you need
+>> to re-invent the parts related to the DT parsing, the probing/removal
+>> and attaching/detaching of the device to the PM domain.
+>>
+>> You probably don't want to go there... :-)
+>
+> All you'd need to read from DT would be the device-specific ID for
+> TI-SCI, and that could be done at bind time with a notifier.  The, in
+> that same notifier, if a TI-SCI ID exists, it would get added to the
+> pm_domain.
+>
+> Anyways, your original proposal is much preferred if it can work.  I'm
+> just throwing out another option because I really don't like one genpd
+> per device.
+>
+> Kevin
+>
+
+I am first trying to leverage the dev_attach/detach and start/stop 
+callbacks that Ulf suggested without creating a single genpd per device 
+and it looks like it will work for us. I appreciate the alternative 
+suggestions but I agree we'd like to leverage as much of the existing 
+genpd framework as we can and avoid going down the omap_device style 
+implementation path.
+
+Regards,
+Dave
