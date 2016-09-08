@@ -1,69 +1,61 @@
-From: groeck@google.com (Guenter Roeck)
-Date: Thu, 8 Sep 2016 08:31:32 -0700
-Subject: [RESEND PATCH v3 1/2] phy: rockchip-typec: add pm runtime support
-In-Reply-To: <1473314253-2646-1-git-send-email-zyw@rock-chips.com>
-References: <57D0F612.10702@ti.com>
- <1473314253-2646-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <CABXOdTdNgm_3BfyQx+EVULpEN+22uBcB+PTuniQXfivJGHgxNQ@mail.gmail.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 8 Sep 2016 17:47:02 +0200
+Subject: [PATCH v4 6/9] pinctrl: Add IRQ support to STM32 gpios
+In-Reply-To: <CACRpkdZ_r0phJeScTYs_LmEHavcjGo6YjHPEHo-rKAv+rLgiFg@mail.gmail.com>
+References: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
+ <1473180341-1999-7-git-send-email-alexandre.torgue@st.com>
+ <CACRpkdZ_r0phJeScTYs_LmEHavcjGo6YjHPEHo-rKAv+rLgiFg@mail.gmail.com>
+Message-ID: <0063a1ef-1b09-7cfc-f18b-76f2bb07eb84@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2016 at 10:57 PM, Chris Zhong <zyw@rock-chips.com> wrote:
-> Adds pm_runtime support for rockchip Type-C, so that power domain is
-> enabled only when there is a transaction going on to help save power.
->
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> ---
->
-> Changes in v3:
-> - use phy_core pm_runtime
->
-> Changes in v2:
-> - add pm_runtime_put_sync in err case
->
->  drivers/phy/phy-rockchip-typec.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/drivers/phy/phy-rockchip-typec.c b/drivers/phy/phy-rockchip-typec.c
-> index fb58a27..7cfb0f8 100644
-> --- a/drivers/phy/phy-rockchip-typec.c
-> +++ b/drivers/phy/phy-rockchip-typec.c
-> @@ -960,6 +960,8 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
->                 return PTR_ERR(tcphy->extcon);
->         }
->
-> +       pm_runtime_enable(dev);
-> +
+Hi Linus,
 
-Does this now need a matching pm_runtime_disable() in error cases ?
+On 09/07/2016 11:06 PM, Linus Walleij wrote:
+> On Tue, Sep 6, 2016 at 6:45 PM, Alexandre TORGUE
+> <alexandre.torgue@st.com> wrote:
+>
+>> This patch adds IRQ support to STM32 gpios.
+>>
+>> The EXTI controller has 16 lines dedicated to GPIOs.
+>> EXTI line n can be connected to only line n of one of the GPIO ports, for
+>> example EXTI0 can be connected to either PA0, or PB0, or PC0...
+>> This port selection is done by specifying the port number into System
+>> Config registers.
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>
+>> +++ b/drivers/pinctrl/stm32/Kconfig
+>> @@ -6,6 +6,8 @@ config PINCTRL_STM32
+>>         select PINMUX
+>>         select GENERIC_PINCONF
+>>         select GPIOLIB
+>> +       select GPIOLIB_IRQCHIP
+>
+> But you're not really using GPIOLIB_IRQCHIP. You have a different,
+> super-complex irqchip in use.
 
-Guenter
+Thanks Linus for this review. I will send a V5.
+Just one question, when you say "super-complex irqchip in use", do you 
+mean I could use another (simplest) solution to handle this EXTI controller?
 
->         for_each_available_child_of_node(np, child_np) {
->                 struct phy *phy;
+Regards
+
+Alex
+
 >
-> @@ -990,6 +992,13 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
->         return 0;
->  }
+> So just don't select this.
 >
-> +static int rockchip_typec_phy_remove(struct platform_device *pdev)
-> +{
-> +       pm_runtime_disable(&pdev->dev);
-> +
-> +       return 0;
-> +}
-> +
->  static const struct of_device_id rockchip_typec_phy_dt_ids[] = {
->         { .compatible = "rockchip,rk3399-typec-phy" },
->         {}
-> @@ -999,6 +1008,7 @@ MODULE_DEVICE_TABLE(of, rockchip_typec_phy_dt_ids);
+>> +       bank->gpio_chip.irqdomain = irq_domain_create_hierarchy(pctl->domain,
+>> +                                       0, STM32_GPIO_IRQ_LINE, bank->fwnode,
+>> +                                       &stm32_gpio_domain_ops, bank);
 >
->  static struct platform_driver rockchip_typec_phy_driver = {
->         .probe          = rockchip_typec_phy_probe,
-> +       .remove         = rockchip_typec_phy_remove,
->         .driver         = {
->                 .name   = "rockchip-typec-phy",
->                 .of_match_table = rockchip_typec_phy_dt_ids,
-> --
-> 1.9.1
+> Don't use that irqdomain pointer inside the gpio_chip.
+>
+> Instead declare the irqdomain pointer inside struct stm32_gpio_bank
+> or something like that.
+>
+> Yours,
+> Linus Walleij
 >
