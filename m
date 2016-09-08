@@ -1,47 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Sep 2016 11:29:57 +0200
-Subject: [PATCH] pwm: meson: handle unknown ID values
-In-Reply-To: <20160908092354.GB24112@ulmo.ba.sec>
-References: <20160906125106.1511562-1-arnd@arndb.de>
- <20160908092354.GB24112@ulmo.ba.sec>
-Message-ID: <7923222.muhSLJ29Um@wuerfel>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu,  8 Sep 2016 11:30:21 +0200
+Subject: [PATCH 1/2] ARM: clk-imx35: fix name for ckil clk
+Message-ID: <1473327022-8065-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 8, 2016 11:23:54 AM CEST Thierry Reding wrote:
-> On Tue, Sep 06, 2016 at 02:50:47PM +0200, Arnd Bergmann wrote:
-> > When building with -Wmaybe-uninitialized, we get a couple of harmless
-> > warnings about three functions in this new driver that don't look
-> > safe to the compiler:
-> > 
-> > drivers/pwm/pwm-meson.c: In function 'meson_pwm_get_state':
-> > drivers/pwm/pwm-meson.c:355:26: error: 'mask' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> > drivers/pwm/pwm-meson.c: In function 'meson_pwm_disable':
-> > drivers/pwm/pwm-meson.c:263:13: error: 'enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> > drivers/pwm/pwm-meson.c: In function 'meson_pwm_apply':
-> > drivers/pwm/pwm-meson.c:231:13: error: 'clk_shift' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> > drivers/pwm/pwm-meson.c:231:36: error: 'enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> > drivers/pwm/pwm-meson.c:231:24: error: 'clk_enable' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> > 
-> > Specifically, if we have a device with an id other than 0 or 1,
-> > this would result in undefined behavior. This is currently not
-> > possible, but the compiler cannot be expected to know this.
-> > 
-> > This patch adds a 'default' clause to let the compiler know
-> > what to do instead, which shuts up the warning and makes the
-> > code slightly more resiliant in case it gets extended to other
-> > identifiers.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  drivers/pwm/pwm-meson.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> 
-> Applied, though I left out the dummy assignment of state->enabled = 0
-> because that's dead code anyway.
+This fixes
+	[    0.000000] i.MX clk 82: register failed with -17
+because the name is duplicated.
 
-Sounds good. My first version had "break" instead of "return" there,
-so it required the assignment,  but you are in the current version you
-are right that we are better off without it.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/clk/imx/clk-imx35.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	Arnd
+diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
+index b0978d3b83e2..d302ed3b8225 100644
+--- a/drivers/clk/imx/clk-imx35.c
++++ b/drivers/clk/imx/clk-imx35.c
+@@ -115,7 +115,7 @@ static void __init _mx35_clocks_init(void)
+ 	}
+ 
+ 	clk[ckih] = imx_clk_fixed("ckih", 24000000);
+-	clk[ckil] = imx_clk_fixed("ckih", 32768);
++	clk[ckil] = imx_clk_fixed("ckil", 32768);
+ 	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX35, "mpll", "ckih", base + MX35_CCM_MPCTL);
+ 	clk[ppll] = imx_clk_pllv1(IMX_PLLV1_IMX35, "ppll", "ckih", base + MX35_CCM_PPCTL);
+ 
+-- 
+2.8.1
