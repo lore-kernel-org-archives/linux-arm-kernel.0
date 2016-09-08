@@ -1,137 +1,123 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu,  8 Sep 2016 12:25:22 -0600
-Subject: [PATCH V4] perf tools: adding support for address filters
-Message-ID: <1473359122-1045-1-git-send-email-mathieu.poirier@linaro.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu,  8 Sep 2016 11:33:24 -0700
+Subject: [PATCH v2] ARM: dts: da850-lcdk: Add NAND to DT
+Message-ID: <20160908183324.32389-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes it possible to use the current filter
-framework with address filters.  That way address filters for
-HW tracers such as CoreSight and IntelPT can be communicated
-to the kernel drivers.
+From: Karl Beldan <kbeldan@baylibre.com>
 
-CC: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+This adds DT support for the NAND connected to the SoC AEMIF.
+Passed torture hashing a 40MB file on top of UBIFS using subpages.
 
+Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+[khilman: add back default partitions from an earlier patch]
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
-Changes for V4:
- - Added support for address filters over more than one
-   nibble.
- - Removed Jiri's ack, this version is too different from
-   what was reviewed.
+Applies on Sekhar's v4.9/dts branch.
 
-Changes for V3:
- - Added Jiri's ack.
- - Rebased to v4.8-rc5.
+Sekhar, feel free to edit the comment text for the partitions as you see fit.
 
-Changes for V2:
- - Rebased to v4.8-rc4.
- - Revisited error path.
----
- tools/perf/util/evsel.c        | 17 +++++++++++++++++
- tools/perf/util/evsel.h        |  2 ++
- tools/perf/util/parse-events.c | 39 ++++++++++++++++++++++++++++++++++-----
- 3 files changed, 53 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/da850-lcdk.dts | 83 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
 
-diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-index d40f852d2de2..5d809ffb85bc 100644
---- a/tools/perf/util/evsel.c
-+++ b/tools/perf/util/evsel.c
-@@ -1046,6 +1046,23 @@ int perf_evsel__set_filter(struct perf_evsel *evsel, const char *filter)
- 	return -1;
- }
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index 7563260e95d1..7b8ab21fed6c 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -63,6 +63,27 @@
+ 			0x04 0x00000110 0x00000ff0
+ 		>;
+ 	};
++
++	nand_pins: nand_pins {
++		pinctrl-single,bits = <
++			/* EMA_WAIT[0], EMA_OE, EMA_WE, EMA_CS[3] */
++			0x1c 0x10110010  0xf0ff00f0
++			/*
++			 * EMA_D[0], EMA_D[1], EMA_D[2],
++			 * EMA_D[3], EMA_D[4], EMA_D[5],
++			 * EMA_D[6], EMA_D[7]
++			 */
++			0x24 0x11111111  0xffffffff
++			/*
++			 * EMA_D[8],  EMA_D[9],  EMA_D[10],
++			 * EMA_D[11], EMA_D[12], EMA_D[13],
++			 * EMA_D[14], EMA_D[15]
++			 */
++			0x20 0x11111111  0xffffffff
++			/* EMA_A[1], EMA_A[2] */
++			0x30 0x01100000  0x0ff00000
++		>;
++	};
+ };
  
-+int perf_evsel__append_addr_filter(struct perf_evsel *evsel,
-+				   const char *filter)
-+{
-+	char *new_filter;
+ &serial2 {
+@@ -136,3 +157,65 @@
+ 	tx-num-evt = <32>;
+ 	rx-num-evt = <32>;
+ };
 +
-+	if (evsel->filter == NULL)
-+		return perf_evsel__set_filter(evsel, filter);
++&aemif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins>;
++	status = "okay";
++	cs3 {
++		#address-cells = <2>;
++		#size-cells = <1>;
++		clock-ranges;
++		ranges;
 +
-+	if (asprintf(&new_filter, "%s,%s", evsel->filter, filter) > 0) {
-+		free(evsel->filter);
-+		evsel->filter = new_filter;
-+		return 0;
-+	}
++		ti,cs-chipselect = <3>;
 +
-+	return -1;
-+}
++		nand at 2000000,0 {
++			compatible = "ti,davinci-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0 0x02000000 0x02000000
++			       1 0x00000000 0x00008000>;
 +
- int perf_evsel__append_filter(struct perf_evsel *evsel,
- 			      const char *op, const char *filter)
- {
-diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
-index 8ceb7ebb51f5..15ca5f85e946 100644
---- a/tools/perf/util/evsel.h
-+++ b/tools/perf/util/evsel.h
-@@ -235,6 +235,8 @@ void perf_evsel__set_sample_id(struct perf_evsel *evsel,
- 			       bool use_sample_identifier);
- 
- int perf_evsel__set_filter(struct perf_evsel *evsel, const char *filter);
-+int perf_evsel__append_addr_filter(struct perf_evsel *evsel,
-+				   const char *filter);
- int perf_evsel__append_filter(struct perf_evsel *evsel,
- 			      const char *op, const char *filter);
- int perf_evsel__apply_filter(struct perf_evsel *evsel, int ncpus, int nthreads,
-diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-index 2eb8b1ed4cc8..3e158ad7eeb8 100644
---- a/tools/perf/util/parse-events.c
-+++ b/tools/perf/util/parse-events.c
-@@ -1760,20 +1760,49 @@ foreach_evsel_in_last_glob(struct perf_evlist *evlist,
- static int set_filter(struct perf_evsel *evsel, const void *arg)
- {
- 	const char *str = arg;
-+	bool found = false;
-+	int nr_addr_filters = 0;
-+	struct perf_pmu *pmu = NULL;
- 
--	if (evsel == NULL || evsel->attr.type != PERF_TYPE_TRACEPOINT) {
--		fprintf(stderr,
--			"--filter option should follow a -e tracepoint option\n");
--		return -1;
-+	if (evsel == NULL)
-+		goto err;
++			ti,davinci-chipselect = <1>;
++			ti,davinci-mask-ale = <0>;
++			ti,davinci-mask-cle = <0>;
++			ti,davinci-mask-chipsel = <0>;
 +
-+	if (evsel->attr.type == PERF_TYPE_TRACEPOINT) {
-+		if (perf_evsel__append_filter(evsel, "&&", str) < 0) {
-+			fprintf(stderr,
-+				"not enough memory to hold filter string\n");
-+			return -1;
-+		}
++			ti,davinci-nand-buswidth = <16>;
++			ti,davinci-ecc-mode = "hw";
++			ti,davinci-ecc-bits = <4>;
++			ti,davinci-nand-use-bbt;
 +
-+		return 0;
- 	}
- 
--	if (perf_evsel__append_filter(evsel, "&&", str) < 0) {
-+	while ((pmu = perf_pmu__scan(pmu)) != NULL)
-+		if (pmu->type == evsel->attr.type) {
-+			found = true;
-+			break;
-+		}
++			/*
++			 * The OMAP-L132/L138 Bootloader doc SPRAB41E reads:
++			 * "To boot from NAND Flash, the AIS should be written
++			 * to NAND block 1 (NAND block 0 is not used by default)".
++			 * The same doc mentions that for ROM "Silicon Revision 2.1",
++			 * "Updated NAND boot mode to offer boot from block 0 or block 1".
++			 * However the limitaion is left here by default for compatibility
++			 * with older silicon and because it needs new boot pin settings
++			 * not possible in stock LCDK.
++			 */
++			partitions {
++				compatible = "fixed-partitions";
++				#address-cells = <1>;
++				#size-cells = <1>;
 +
-+	if (found)
-+		perf_pmu__scan_file(pmu, "nr_addr_filters",
-+				    "%d", &nr_addr_filters);
-+
-+	if (!nr_addr_filters)
-+		goto err;
-+
-+	if (perf_evsel__append_addr_filter(evsel, str) < 0) {
- 		fprintf(stderr,
- 			"not enough memory to hold filter string\n");
- 		return -1;
- 	}
- 
- 	return 0;
-+
-+err:
-+	fprintf(stderr,
-+		"--filter option should follow a -e tracepoint or HW tracer option\n");
-+
-+	return -1;
- }
- 
- int parse_filter(const struct option *opt, const char *str,
++				partition at 0 {
++					label = "u-boot env";
++					reg = <0 0x020000>;
++				};
++				partition at 0x020000 {
++					/* The LCDK defaults to booting from this partition */
++					label = "u-boot";
++					reg = <0x020000 0x080000>;
++				};
++				partition at 0x0a0000 {
++					label = "free space";
++					reg = <0x0a0000 0>;
++				};
++			};
++		};
++	};
++};
 -- 
-2.7.4
+2.9.3
