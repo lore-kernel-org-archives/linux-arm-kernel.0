@@ -1,45 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Sep 2016 10:45:26 +0200
-Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
-In-Reply-To: <87y432iylr.fsf@linux.intel.com>
-References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
- <6739240.VDAnDBppH0@wuerfel> <87y432iylr.fsf@linux.intel.com>
-Message-ID: <2733202.7lpFC7RnDm@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 8 Sep 2016 10:53:47 +0200
+Subject: [PATCH v2 2/7] clk: sunxi-ng: div: Allow to set a maximum
+In-Reply-To: <CAGb2v66C9GJ5Svm+7NE2cStc5KiNgoriB329K4fhZJMTSbZ8Kw@mail.gmail.com>
+References: <20160906121837.7517-1-maxime.ripard@free-electrons.com>
+ <20160906121837.7517-3-maxime.ripard@free-electrons.com>
+ <CAGb2v66C9GJ5Svm+7NE2cStc5KiNgoriB329K4fhZJMTSbZ8Kw@mail.gmail.com>
+Message-ID: <20160908085347.GK8913@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 8, 2016 11:29:04 AM CEST Felipe Balbi wrote:
-> > If we do that, we have to put child devices of the dwc3 devices into
-> > the platform glue, and it also breaks those dwc3 devices that don't
-> > have a parent driver.
+On Wed, Sep 07, 2016 at 12:20:10AM +0800, Chen-Yu Tsai wrote:
+> On Tue, Sep 6, 2016 at 8:18 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Some dividers might have a maximum value that is lower than the width of
+> > the register.
+> >
+> > Add a field to _ccu_div to handle those case properly. If the field is set
+> > to 0, the code will assume that the maximum value is the maximum one that
+> > can be used with the field register width.
 > 
-> Well, this is easy to fix:
-> 
->         if (dwc->dev->parent) {
->                 dwc->sysdev = dwc->dev->parent;
->         } else {
->                 dev_info(dwc->dev, "Please provide a glue layer!\n");
->                 dwc->sysdev = dwc->dev;
->         }
+> This is a bit confusing. What is the maximum referring to? The raw value
+> in the register? Or the actual divider?
 
-I don't understand. Do you mean we should have an extra level of
-stacking and splitting "static struct platform_driver dwc3_driver"
-in two so instead of
+The maximum divider, not the value in the register.
 
-	"qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "xhci" (usb_bus.dev)
+> Personally I'd go with the maximum valid value of the register. You
+> could get rid of the special power-of-2 handling code you added.
 
-we do this?
+I think I prefer to have the actual divider value. This is what is
+documented in the datasheet, and it's entirely independant of the
+actual factor being used, or the offset (is it register + 1, or simply
+register)
 
-	"qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "dwc3-glue" -> "xhci" (usb_bus.dev)
+I have the feeling that it's something we want to be abstracted away
+from the data side of things.
 
-That sounds a bit clumsy for the sake of consistency with PCI.
-The advantage is that xhci can always use the grandparent device
-as sysdev whenever it isn't probed through PCI or firmware
-itself, but the purpose of the dwc3-glue is otherwise questionable.
+> Either way I think the message and the field name should be more explicit.
 
-How about adding a 'compatible="snps,dwc3-pci"' property for the dwc3
-device when that is created from the PCI driver and checking for that
-with the device property interface instead? If it's "snps,dwc3"
-we use the device itself while for "snps,dwc3-pci", we use the parent?
+Understood.
 
-	Arnd
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/f40f88c9/attachment.sig>
