@@ -1,8 +1,9 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  8 Sep 2016 13:55:33 +0100
-Subject: [PATCH 0/6] arm64: replace open-coded {msr, mrs} with {read,
- write}_sysreg()
-Message-ID: <1473339339-32334-1-git-send-email-mark.rutland@arm.com>
+Date: Thu,  8 Sep 2016 13:55:35 +0100
+Subject: [PATCH 2/6] arm64: arch_timer: simplify accessors
+In-Reply-To: <1473339339-32334-1-git-send-email-mark.rutland@arm.com>
+References: <1473339339-32334-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1473339339-32334-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,40 +11,123 @@ A while back we added {read,write}_sysreg accessors to handle accesses
 to system registers, without the usual boilerplate asm volatile,
 temporary variable, etc.
 
-These patches replace asm blocks that perform mrs/msr with
-{read,write}_sysreg(), and remove code and comments that this change makes
-unnecessary. Where {read,write}_sysreg() are not appropriate, comments are
-added to explain why.
+This patch makes use of these in the arm64 arch timer accessors to make
+the code shorter and clearer.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/arch_timer.h | 41 +++++++++++++------------------------
+ 1 file changed, 14 insertions(+), 27 deletions(-)
+
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index fbe0ca3..7ff386c 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -20,6 +20,7 @@
+ #define __ASM_ARCH_TIMER_H
  
-This gets rid of a reasonable amount of code, and makes what
-remains easier to follow. 
-
-Thanks,
-Mark.
-
-Mark Rutland (6):
-  arm64: sysreg: allow write_sysreg to use XZR
-  arm64: arch_timer: simplify accessors
-  arm64: dcc: simplify accessors
-  arm64/kvm: use {read,write}_sysreg()
-  arm64: simplify sysreg manipulation
-  arm64: simplify contextidr_thread_switch
-
- arch/arm64/include/asm/arch_timer.h    | 41 ++++++++++++----------------------
- arch/arm64/include/asm/dcc.h           | 14 ++++--------
- arch/arm64/include/asm/hw_breakpoint.h | 13 ++++++-----
- arch/arm64/include/asm/mmu_context.h   | 36 +++++++++++------------------
- arch/arm64/include/asm/pgtable-hwdef.h |  1 +
- arch/arm64/include/asm/sysreg.h        | 28 +++++++++++++----------
- arch/arm64/include/asm/thread_info.h   |  3 +++
- arch/arm64/include/asm/virt.h          |  6 ++---
- arch/arm64/kernel/cacheinfo.c          |  8 +++----
- arch/arm64/kernel/debug-monitors.c     |  8 +++----
- arch/arm64/kernel/process.c            | 14 +++++-------
- arch/arm64/kernel/sys_compat.c         |  2 +-
- arch/arm64/kvm/sys_regs.c              | 31 +++++++++----------------
- arch/arm64/kvm/sys_regs_generic_v8.c   |  6 ++---
- 14 files changed, 86 insertions(+), 125 deletions(-)
-
+ #include <asm/barrier.h>
++#include <asm/sysreg.h>
+ 
+ #include <linux/bug.h>
+ #include <linux/init.h>
+@@ -38,19 +39,19 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
+ 	if (access == ARCH_TIMER_PHYS_ACCESS) {
+ 		switch (reg) {
+ 		case ARCH_TIMER_REG_CTRL:
+-			asm volatile("msr cntp_ctl_el0,  %0" : : "r" (val));
++			write_sysreg(val, cntp_ctl_el0);
+ 			break;
+ 		case ARCH_TIMER_REG_TVAL:
+-			asm volatile("msr cntp_tval_el0, %0" : : "r" (val));
++			write_sysreg(val, cntp_tval_el0);
+ 			break;
+ 		}
+ 	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
+ 		switch (reg) {
+ 		case ARCH_TIMER_REG_CTRL:
+-			asm volatile("msr cntv_ctl_el0,  %0" : : "r" (val));
++			write_sysreg(val, cntv_ctl_el0);
+ 			break;
+ 		case ARCH_TIMER_REG_TVAL:
+-			asm volatile("msr cntv_tval_el0, %0" : : "r" (val));
++			write_sysreg(val, cntv_tval_el0);
+ 			break;
+ 		}
+ 	}
+@@ -61,48 +62,38 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
+ static __always_inline
+ u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
+ {
+-	u32 val;
+-
+ 	if (access == ARCH_TIMER_PHYS_ACCESS) {
+ 		switch (reg) {
+ 		case ARCH_TIMER_REG_CTRL:
+-			asm volatile("mrs %0,  cntp_ctl_el0" : "=r" (val));
+-			break;
++			return read_sysreg(cntp_ctl_el0);
+ 		case ARCH_TIMER_REG_TVAL:
+-			asm volatile("mrs %0, cntp_tval_el0" : "=r" (val));
+-			break;
++			return read_sysreg(cntp_tval_el0);
+ 		}
+ 	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
+ 		switch (reg) {
+ 		case ARCH_TIMER_REG_CTRL:
+-			asm volatile("mrs %0,  cntv_ctl_el0" : "=r" (val));
+-			break;
++			return read_sysreg(cntv_ctl_el0);
+ 		case ARCH_TIMER_REG_TVAL:
+-			asm volatile("mrs %0, cntv_tval_el0" : "=r" (val));
+-			break;
++			return read_sysreg(cntv_tval_el0);
+ 		}
+ 	}
+ 
+-	return val;
++	BUG();
+ }
+ 
+ static inline u32 arch_timer_get_cntfrq(void)
+ {
+-	u32 val;
+-	asm volatile("mrs %0,   cntfrq_el0" : "=r" (val));
+-	return val;
++	return read_sysreg(cntfrq_el0);
+ }
+ 
+ static inline u32 arch_timer_get_cntkctl(void)
+ {
+-	u32 cntkctl;
+-	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
+-	return cntkctl;
++	return read_sysreg(cntkctl_el1);
+ }
+ 
+ static inline void arch_timer_set_cntkctl(u32 cntkctl)
+ {
+-	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
++	write_sysreg(cntkctl, cntkctl_el1);
+ }
+ 
+ static inline u64 arch_counter_get_cntpct(void)
+@@ -116,12 +107,8 @@ static inline u64 arch_counter_get_cntpct(void)
+ 
+ static inline u64 arch_counter_get_cntvct(void)
+ {
+-	u64 cval;
+-
+ 	isb();
+-	asm volatile("mrs %0, cntvct_el0" : "=r" (cval));
+-
+-	return cval;
++	return read_sysreg(cntvct_el0);
+ }
+ 
+ static inline int arch_timer_arch_init(void)
 -- 
 1.9.1
