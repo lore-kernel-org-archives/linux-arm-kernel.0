@@ -1,370 +1,79 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 8 Sep 2016 09:41:10 +0100
-Subject: [PATCH 12/13] arm64: dts: add Allwinner A64 SoC .dtsi
-In-Reply-To: <20160726203041.29366-13-maxime.ripard@free-electrons.com>
-References: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
- <20160726203041.29366-13-maxime.ripard@free-electrons.com>
-Message-ID: <c2334630-edab-5b42-48dd-5e4edd5f3de1@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 8 Sep 2016 10:47:10 +0200
+Subject: [PATCH 09/19] arm64: KVM: Handle async aborts delivered while at
+ EL2
+In-Reply-To: <57D04CB3.1030208@arm.com>
+References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
+ <1473166937-15271-10-git-send-email-marc.zyngier@arm.com>
+ <20160907170304.GT23592@cbox> <57D04CB3.1030208@arm.com>
+Message-ID: <20160908084703.GU23592@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On 26/07/16 21:30, Maxime Ripard wrote:
-> From: Andre Przywara <andre.przywara@arm.com>
+On Wed, Sep 07, 2016 at 06:21:55PM +0100, Marc Zyngier wrote:
+> On 07/09/16 18:03, Christoffer Dall wrote:
+> > On Tue, Sep 06, 2016 at 02:02:07PM +0100, Marc Zyngier wrote:
+> >> If EL1 generates an asynchronous abort and then traps into EL2
+> >> before the abort has been delivered, we may end-up with the
+> >> abort firing at the worse possible place: on the host.
+> >>
+> >> In order to avoid this, it is necessary to take the abort at EL2,
+> >> by clearing the PSTATE.A bit. In order to survive this abort,
+> >> we do it at a point where we're in a known state with respect
+> >> to the world switch, and handle the resulting exception,
+> >> overloading the exit code in the process.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm64/kvm/hyp/entry.S     | 33 ++++++++++++++++++++++++++++++++-
+> >>  arch/arm64/kvm/hyp/hyp-entry.S | 25 +++++++++++++++++++++++--
+> >>  arch/arm64/kvm/hyp/switch.c    |  6 ++++++
+> >>  3 files changed, 61 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> >> index 3967c231..7662ef5 100644
+> >> --- a/arch/arm64/kvm/hyp/entry.S
+> >> +++ b/arch/arm64/kvm/hyp/entry.S
+> >> @@ -122,7 +122,38 @@ ENTRY(__guest_exit)
+> >>  	// Now restore the host regs
+> >>  	restore_callee_saved_regs x2
+> >>  
+> >> -	ret
+> >> +	// If we have a pending asynchronous abort, now is the
+> >> +	// time to find out. From your VAXorcist book, page 666:
+> >> +	// "Threaten me not, oh Evil one!  For I speak with
+> >> +	// the power of DEC, and I command thee to show thyself!"
+> >> +	mrs	x2, elr_el2
+> >> +	mrs	x3, esr_el2
+> >> +	mrs	x4, spsr_el2
+> >> +	mov	x5, x0
+> >> +
+> >> +	dsb	sy		// Synchronize against in-flight ld/st
+> >> +	msr	daifclr, #4	// Unmask aborts
+> >> +
+> >> +	// This is our single instruction exception window. A pending
+> >> +	// SError is guaranteed to occur at the earliest when we unmask
+> >> +	// it, and at the latest just after the ISB.
+> > 
+> > Why is it guaranteed to to occur at the latest after the ISB?  I thought
+> > that asynchronous exceptions could in theory be deferred until forever,
+> > but I am probably wrong about this.
 > 
-> The Allwinner A64 SoC is a low-cost chip with 4 ARM Cortex-A53 cores
-> and the typical tablet / TV box peripherals.
-> The SoC is based on the (32-bit) Allwinner H3 chip, sharing most of
-> the peripherals and the memory map.
-> Although the cores are proper 64-bit ones, the whole SoC is actually
-> limited to 4GB (including all the supported DRAM), so we use 32-bit
-> address and size cells. This has the nice feature of us being able to
-> reuse the DT for 32-bit kernels as well.
-> This .dtsi lists the hardware that we support so far.
+> The DSB is going to force all transactions to be completed and at that
+> point, we shouldn't have anything being further delayed (this is not an
+> architectural guarantee, but something that happens to work on the cores
+> I have access to), and the potential exception becomes pending.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> [Maxime: Convert to CCU binding, drop the MMC support for now]
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/arm/sunxi.txt |   1 +
->  MAINTAINERS                                     |   1 +
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi   | 273 ++++++++++++++++++++++++
->  3 files changed, 275 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> At this point, we perform the unmask. A pending exception *can* fire at
+> that point, but is not guaranteed to do so. But the ISB, being a
+> "context synchronization event", guarantees that the exception fires
+> before the first instruction that follows the ISB (see D1.14.4). This is
+> what gives us this one instruction window (after the unmask, or after
+> the isb).
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index 7e79fcc36b0d..7e59d8ba86af 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -14,3 +14,4 @@ using one of the following compatible strings:
->    allwinner,sun8i-a83t
->    allwinner,sun8i-h3
->    allwinner,sun9i-a80
-> +  allwinner,sun50i-a64
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 7304d2e37a98..440490126bfb 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -955,6 +955,7 @@ M:	Chen-Yu Tsai <wens@csie.org>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  N:	sun[x456789]i
-> +F:	arch/arm64/boot/dts/allwinner/
->  
->  ARM/Allwinner SoC Clock Support
->  M:	Emilio L?pez <emilio@elopez.com.ar>
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> new file mode 100644
-> index 000000000000..636165d75373
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -0,0 +1,273 @@
-> +/*
-> + * Copyright (C) 2016 ARM Ltd.
-> + * based on the Allwinner H3 dtsi:
-> + *    Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include <dt-bindings/clock/sun50i-a64-ccu.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +#include <dt-bindings/reset/sun50i-a64-ccu.h>
-> +
-> +/ {
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 1 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <1>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 2 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <2>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu at 3 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <3>;
-> +			enable-method = "psci";
-> +		};
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <GIC_PPI 13
-> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 14
-> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 11
-> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 10
-> +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +	};
+Yes, this makes sense.  So if by whatever weird sequence of events we
+see an SError after the ISB, we simply give up and admit that the system
+is screwy, which also makes sense.
 
-Can you add a PMU node here? Or shall I send a patch on top of it?
-It would be:
-
-	pmu {
-        	compatible = "arm,cortex-a53-pmu", "arm,armv8-pmuv3";
-		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,	
-			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-			     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
-		interrupt-affinity = <&cpu0>,
-				     <&cpu1>,
-				     <&cpu2>,
-				     <&cpu3>;
-	};
-
-This enables perf to use hardware counters (for cycles and instructions,
-for instance).
-
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		osc24M: osc24M_clk {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <24000000>;
-> +			clock-output-names = "osc24M";
-> +		};
-> +
-> +		osc32k: osc32k_clk {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <32768>;
-> +			clock-output-names = "osc32k";
-> +		};
-> +	};
-
-Can you remove this "clocks" node and put the two subnodes directly onto
-the top level?
-I know that putting clocks into a subnode is quite wide spread, but it
-does not represent any hardware hierarchy, especially in this
-fixed-clock case.
-So if we can (and it is easy here!) we should avoid any clocks subnode.
-
-(Yes, I know that this was in my original DT as well, but Mark Rutland
-convinced me of this.)
-
-Cheers,
-Andre.
-
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		ccu: clock at 01c20000 {
-> +			compatible = "allwinner,sun50i-a64-ccu";
-> +			reg = <0x01c20000 0x400>;
-> +			clocks = <&osc24M>, <&osc32k>;
-> +			clock-names = "hosc", "losc";
-> +			#clock-cells = <1>;
-> +			#reset-cells = <1>;
-> +		};
-> +
-> +		pio: pinctrl at 1c20800 {
-> +			compatible = "allwinner,sun50i-a64-pinctrl";
-> +			reg = <0x01c20800 0x400>;
-> +			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_A64_BUS_PIO>;
-> +			gpio-controller;
-> +			#gpio-cells = <3>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +
-> +			i2c1_pins: i2c1_pins {
-> +				allwinner,pins = "PH2", "PH3";
-> +				allwinner,function = "i2c1";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +
-> +			uart0_pins_a: uart0 at 0 {
-> +				allwinner,pins = "PB8", "PB9";
-> +				allwinner,function = "uart0";
-> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +			};
-> +		};
-> +
-> +		uart0: serial at 1c28000 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x01c28000 0x400>;
-> +			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&ccu CLK_A64_BUS_UART0>;
-> +			resets = <&ccu RST_A64_BUS_UART0>;
-> +			status = "disabled";
-> +		};
-> +
-> +		uart1: serial at 1c28400 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x01c28400 0x400>;
-> +			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&ccu CLK_A64_BUS_UART1>;
-> +			resets = <&ccu RST_A64_BUS_UART1>;
-> +			status = "disabled";
-> +		};
-> +
-> +		uart2: serial at 1c28800 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x01c28800 0x400>;
-> +			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&ccu CLK_A64_BUS_UART2>;
-> +			resets = <&ccu RST_A64_BUS_UART2>;
-> +			status = "disabled";
-> +		};
-> +
-> +		uart3: serial at 1c28c00 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x01c28c00 0x400>;
-> +			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&ccu CLK_A64_BUS_UART3>;
-> +			resets = <&ccu RST_A64_BUS_UART3>;
-> +			status = "disabled";
-> +		};
-> +
-> +		uart4: serial at 1c29000 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x01c29000 0x400>;
-> +			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&ccu CLK_A64_BUS_UART4>;
-> +			resets = <&ccu RST_A64_BUS_UART4>;
-> +			status = "disabled";
-> +		};
-> +
-> +		rtc: rtc at 1f00000 {
-> +			compatible = "allwinner,sun6i-a31-rtc";
-> +			reg = <0x01f00000 0x54>;
-> +			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-> +		};
-> +
-> +		i2c0: i2c at 1c2ac00 {
-> +			compatible = "allwinner,sun6i-a31-i2c";
-> +			reg = <0x01c2ac00 0x400>;
-> +			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_A64_BUS_I2C0>;
-> +			resets = <&ccu RST_A64_BUS_I2C0>;
-> +			status = "disabled";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +		};
-> +
-> +		i2c1: i2c at 1c2b000 {
-> +			compatible = "allwinner,sun6i-a31-i2c";
-> +			reg = <0x01c2b000 0x400>;
-> +			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_A64_BUS_I2C1>;
-> +			resets = <&ccu RST_A64_BUS_I2C1>;
-> +			status = "disabled";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +		};
-> +
-> +		i2c2: i2c at 1c2b400 {
-> +			compatible = "allwinner,sun6i-a31-i2c";
-> +			reg = <0x01c2b400 0x400>;
-> +			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_A64_BUS_I2C2>;
-> +			resets = <&ccu RST_A64_BUS_I2C2>;
-> +			status = "disabled";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +		};
-> +
-> +		gic: interrupt-controller at 1c81000 {
-> +			compatible = "arm,gic-400";
-> +			reg = <0x01c81000 0x1000>,
-> +			      <0x01c82000 0x2000>,
-> +			      <0x01c84000 0x2000>,
-> +			      <0x01c86000 0x2000>;
-> +			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +		};
-> +	};
-> +};
-> 
+Thanks,
+-Christoffer
