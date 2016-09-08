@@ -1,33 +1,78 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 8 Sep 2016 18:10:51 +0000
-Subject: [RFC 1/7] Make Hi3620 explicit, remove wildcards
-In-Reply-To: <a9b0bd8f-6ccb-6b39-a961-c5b5aca9a9f1@gmail.com>
-References: <20160908172346.27506-1-netz.kernel@gmail.com>
- <20160908174756.GC12916@io.lakedaemon.net>
- <a9b0bd8f-6ccb-6b39-a961-c5b5aca9a9f1@gmail.com>
-Message-ID: <20160908181051.GF12916@io.lakedaemon.net>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Thu, 8 Sep 2016 11:12:13 -0700 (PDT)
+Subject: [PATCH] arm/xen: fix SMP guests boot
+In-Reply-To: <1473328108-30658-1-git-send-email-vkuznets@redhat.com>
+References: <1473328108-30658-1-git-send-email-vkuznets@redhat.com>
+Message-ID: <alpine.DEB.2.10.1609081111070.2359@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 12:55:50PM -0500, Marty Plummer wrote:
-> On 09/08/2016 12:47 PM, Jason Cooper wrote:
-> > - Please Cc Andrew, Russell and myself on future series.
-> > 
-> > Personally, I do that at the 'send-email' stage instead of
-> > 'format-patch'.  But whichever you prefer.  Don't be shy about Cc'ing.
-> > We all are accustomed to handling lots of email.  It makes it easier for
-> > us to spot stuff we are actively involved in. :-)
-> > 
-> Alrighty, I sorta realized this issue right after I sent, will do in
-> future instances. Also, you say at 'send-email' instead of
-> 'format-patch'; I take it there is a way to do the latter? I'm not aware
-> of it :)
+On Thu, 8 Sep 2016, Vitaly Kuznetsov wrote:
+> Commit 88e957d6e47f ("xen: introduce xen_vcpu_id mapping") broke SMP ARM
+> guests on Xen. When FIFO-based event channels are in use (this is the
+> default), evtchn_fifo_alloc_control_block() is called on CPU_UP_PREPARE
+> event and this happens before we set up xen_vcpu_id mapping in
+> xen_starting_cpu. Temporary fix the issue by setting direct Linux CPU id
+> <-> Xen vCPU id mapping for all possible CPUs at boot. We don't currently
+> support kexec/kdump on Xen/ARM so these ids always match.
+> 
+> In future, we have several ways to solve the issue, e.g.:
+> - Eliminate all hypercalls from CPU_UP_PREPARE, do them from the starting
+> CPU. This can probably be done for both x86 and ARM and, if done, will
+> allow us to get Xen's idea of vCPU id from CPUID/MPIDR on the starting CPU
+> directly, no messing with ACPI/device tree required.
+> - Save vCPU id information from ACPI/device tree on ARM and use it to
+> initialize xen_vcpu_id mapping. This is the same trick we currently do on
+> x86.
+> 
+> Reported-by: Julien Grall <julien.grall@arm.com>
+> Tested-by: Wei Chen <Wei.Chen@arm.com>
+> Signed-off-by: Vitaly Kuznetsov <vkuznets@redhat.com>
 
-Both git send-email and git format-patch take --to, --cc, --bcc as
-arguments.  I prefer to do all of the email addressing with send-email
-instead of while doing format-patch.  But it's personal preference,
-that's why the options are in both.
+Acked-by: Stefano Stabellini <sstabellini@kernel.org>
 
-thx,
 
-Jason.
+> It would be nice if this patch could still make it to 4.8 as all SMP
+> ARM/Xen guests are currently broken.
+
+Yes
+
+
+>  arch/arm/xen/enlighten.c | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 3d2cef6..f193414 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -170,9 +170,6 @@ static int xen_starting_cpu(unsigned int cpu)
+>  	pr_info("Xen: initializing cpu%d\n", cpu);
+>  	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
+>  
+> -	/* Direct vCPU id mapping for ARM guests. */
+> -	per_cpu(xen_vcpu_id, cpu) = cpu;
+> -
+>  	info.mfn = virt_to_gfn(vcpup);
+>  	info.offset = xen_offset_in_page(vcpup);
+>  
+> @@ -330,6 +327,7 @@ static int __init xen_guest_init(void)
+>  {
+>  	struct xen_add_to_physmap xatp;
+>  	struct shared_info *shared_info_page = NULL;
+> +	int cpu;
+>  
+>  	if (!xen_domain())
+>  		return 0;
+> @@ -380,7 +378,8 @@ static int __init xen_guest_init(void)
+>  		return -ENOMEM;
+>  
+>  	/* Direct vCPU id mapping for ARM guests. */
+> -	per_cpu(xen_vcpu_id, 0) = 0;
+> +	for_each_possible_cpu(cpu)
+> +		per_cpu(xen_vcpu_id, cpu) = cpu;
+>  
+>  	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
+>  	if (xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
+> -- 
+> 2.7.4
+> 
