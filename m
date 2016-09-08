@@ -1,109 +1,60 @@
 From: Minghuan.Lian@nxp.com (Minghuan Lian)
-Date: Thu, 8 Sep 2016 14:25:49 +0800
-Subject: [PATCH 1/2] pci/layercape: disable all iATUs before initialization
-Message-ID: <1473315950-6396-1-git-send-email-Minghuan.Lian@nxp.com>
+Date: Thu, 8 Sep 2016 14:25:50 +0800
+Subject: [PATCH 2/2] pci/layerscape: fix error response behavior
+In-Reply-To: <1473315950-6396-1-git-send-email-Minghuan.Lian@nxp.com>
+References: <1473315950-6396-1-git-send-email-Minghuan.Lian@nxp.com>
+Message-ID: <1473315950-6396-2-git-send-email-Minghuan.Lian@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Layerscape PCIe has 6 outbound iATUs. The bootloader such as
-u-boot uses 4 iATUs for CFG0 CFG1 IO and MEM separately. But
-Designware driver only uses two outbound iATUs. To avoid
-conflict between enabled but unused iATUs with used iATUs
-under Linux and unexpected behavior, the patch disables all
-iATUs before initialization.
+By default, when the PCIe controller experiences an erroneous
+completion from an external completer for its outbound non-posted
+request, it always sends an OKAY response to the device's internal
+AXI slave system interface. However, such default system error
+response behavior cannot be used for other types of outbound
+non-posted requests. For example, the outbound memory read
+transaction requires an actual ERROR response, like UR completion
+or completion timeout. The patch is to fix it by forwarding
+the error response of the non-posted request.
 
 Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 ---
- drivers/pci/host/pci-layerscape.c  | 17 +++++++++++++++--
- drivers/pci/host/pcie-designware.c |  7 +++++++
- drivers/pci/host/pcie-designware.h |  1 +
- 3 files changed, 23 insertions(+), 2 deletions(-)
+ drivers/pci/host/pci-layerscape.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-index 114ba81..cf783ad 100644
+index cf783ad..873447a 100644
 --- a/drivers/pci/host/pci-layerscape.c
 +++ b/drivers/pci/host/pci-layerscape.c
-@@ -38,6 +38,8 @@
+@@ -34,6 +34,8 @@
+ /* PEX Internal Configuration Registers */
+ #define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask Register1 */
+ #define PCIE_DBI_RO_WR_EN	0x8bc /* DBI Read-Only Write Enable Register */
++#define PCIE_ABSERR		0x8d0 /* Bridge Slave Error Response Register */
++#define PCIE_ABSERR_SETTING	0x9401 /* Forward error of non-posted request */
+ 
  /* PEX LUT registers */
  #define PCIE_LUT_DBG		0x7FC /* PEX LUT Debug Register */
- 
-+#define PCIE_IATU_NUM		6
-+
- struct ls_pcie_drvdata {
- 	u32 lut_offset;
- 	u32 ltssm_shift;
-@@ -55,6 +57,8 @@ struct ls_pcie {
- 
- #define to_ls_pcie(x)	container_of(x, struct ls_pcie, pp)
- 
-+static void ls_pcie_host_init(struct pcie_port *pp);
-+
- static bool ls_pcie_is_bridge(struct ls_pcie *pcie)
- {
- 	u32 header_type;
-@@ -87,6 +91,14 @@ static void ls_pcie_drop_msg_tlp(struct ls_pcie *pcie)
- 	iowrite32(val, pcie->dbi + PCIE_STRFMR1);
+@@ -99,6 +101,12 @@ static void ls_pcie_disable_outbound_atus(struct ls_pcie *pcie)
+ 		dw_pcie_disable_outbound_atu(&pcie->pp, i);
  }
  
-+static void ls_pcie_disable_outbound_atus(struct ls_pcie *pcie)
++/* Forward error response of outbound non-posted requests */
++static void ls_pcie_fix_error_response(struct ls_pcie *pcie)
 +{
-+	int i;
-+
-+	for (i = 0; i < PCIE_IATU_NUM; i++)
-+		dw_pcie_disable_outbound_atu(&pcie->pp, i);
++	iowrite32(PCIE_ABSERR_SETTING, pcie->dbi + PCIE_ABSERR);
 +}
 +
  static int ls1021_pcie_link_up(struct pcie_port *pp)
  {
  	u32 state;
-@@ -124,9 +136,8 @@ static void ls1021_pcie_host_init(struct pcie_port *pp)
- 	}
- 	pcie->index = index[1];
- 
-+	ls_pcie_host_init(pp);
- 	dw_pcie_setup_rc(pp);
--
--	ls_pcie_drop_msg_tlp(pcie);
- }
- 
- static int ls_pcie_link_up(struct pcie_port *pp)
-@@ -153,6 +164,8 @@ static void ls_pcie_host_init(struct pcie_port *pp)
- 	ls_pcie_clear_multifunction(pcie);
- 	ls_pcie_drop_msg_tlp(pcie);
+@@ -166,6 +174,7 @@ static void ls_pcie_host_init(struct pcie_port *pp)
  	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);
-+
-+	ls_pcie_disable_outbound_atus(pcie);
+ 
+ 	ls_pcie_disable_outbound_atus(pcie);
++	ls_pcie_fix_error_response(pcie);
  }
  
  static int ls_pcie_msi_host_init(struct pcie_port *pp,
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 12afce1..e4d1203 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -172,6 +172,13 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
- 	dw_pcie_readl_rc(pp, PCIE_ATU_CR2, &val);
- }
- 
-+void dw_pcie_disable_outbound_atu(struct pcie_port *pp, int index)
-+{
-+	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | index,
-+			  PCIE_ATU_VIEWPORT);
-+	dw_pcie_writel_rc(pp, 0, PCIE_ATU_CR2);
-+}
-+
- static struct irq_chip dw_msi_irq_chip = {
- 	.name = "PCI-MSI",
- 	.irq_enable = pci_msi_unmask_irq,
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index f437f9b..e998bfc 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -85,5 +85,6 @@ int dw_pcie_wait_for_link(struct pcie_port *pp);
- int dw_pcie_link_up(struct pcie_port *pp);
- void dw_pcie_setup_rc(struct pcie_port *pp);
- int dw_pcie_host_init(struct pcie_port *pp);
-+void dw_pcie_disable_outbound_atu(struct pcie_port *pp, int index);
- 
- #endif /* _PCIE_DESIGNWARE_H */
 -- 
 1.9.1
