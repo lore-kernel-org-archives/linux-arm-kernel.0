@@ -1,58 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  8 Sep 2016 09:42:58 +0200
-Subject: [PATCH 02/30] arm64: dts: r8a7795: add FDP1 device nodes
+Date: Thu,  8 Sep 2016 09:43:01 +0200
+Subject: [PATCH 05/30] arm64: dts: r8a7795: salvator-x: enable usb2_phy of
+ channel 0
 In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
 References: <cover.1473320411.git.horms+renesas@verge.net.au>
-Message-ID: <bfb31459342701e0017f790ce675fcaf4df0d1c9.1473320411.git.horms+renesas@verge.net.au>
+Message-ID: <a905b72ce9216a501d8239a1f1790817b5645ef9.1473320411.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kieran Bingham <kieran@ksquared.org.uk>
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Kieran Bingham <kieran@bingham.xyz>
+This patch also adds a regulator node for USB2.0 to handle VBUS on/off
+by the phy-rcar-gen3-usb2 driver.
+
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 8c85b50d306b..99953ca9a45e 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1294,5 +1294,32 @@
- 			clocks = <&cpg CPG_MOD 613>;
- 			power-domains = <&sysc R8A7795_PD_A3VP>;
- 		};
-+
-+		fdp1 at fe940000 {
-+			compatible = "renesas,fdp1";
-+			reg = <0 0xfe940000 0 0x2400>;
-+			interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 119>;
-+			power-domains = <&sysc R8A7795_PD_A3VP>;
-+			renesas,fcp = <&fcpf0>;
-+		};
-+
-+		fdp1 at fe944000 {
-+			compatible = "renesas,fdp1";
-+			reg = <0 0xfe944000 0 0x2400>;
-+			interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 118>;
-+			power-domains = <&sysc R8A7795_PD_A3VP>;
-+			renesas,fcp = <&fcpf1>;
-+		};
-+
-+		fdp1 at fe948000 {
-+			compatible = "renesas,fdp1";
-+			reg = <0 0xfe948000 0 0x2400>;
-+			interrupts = <GIC_SPI 264 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 117>;
-+			power-domains = <&sysc R8A7795_PD_A3VP>;
-+			renesas,fcp = <&fcpf2>;
-+		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index 98f02631a0f0..8c8bfdccdc2b 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -110,6 +110,17 @@
+ 			  1800000 0>;
  	};
+ 
++	vbus0_usb2: regulator-vbus0-usb2 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "USB20_VBUS0";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++
++		gpio = <&gpio6 16 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	audio_clkout: audio_clkout {
+ 		/*
+ 		 * This is same as <&rcar_sound 0>
+@@ -193,6 +204,11 @@
+ 		function = "audio_clk";
+ 	};
+ 
++	usb0_pins: usb0 {
++		groups = "usb0";
++		function = "usb0";
++	};
++
+ 	usb1_pins: usb1 {
+ 		groups = "usb1";
+ 		function = "usb1";
+@@ -369,6 +385,14 @@
+ 	status = "okay";
  };
+ 
++&usb2_phy0 {
++	pinctrl-0 = <&usb0_pins>;
++	pinctrl-names = "default";
++
++	vbus-supply = <&vbus0_usb2>;
++	status = "okay";
++};
++
+ &usb2_phy1 {
+ 	pinctrl-0 = <&usb1_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.7.0.rc3.207.g0ac5344
