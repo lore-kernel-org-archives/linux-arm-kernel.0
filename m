@@ -1,156 +1,108 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu,  8 Sep 2016 06:00:08 +0300
-Subject: [PATCH 1/2] ARM: lpc32xx: remove unused header file mach/irqs.h
-Message-ID: <1473303609-20076-1-git-send-email-vz@mleia.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Thu,  8 Sep 2016 11:03:01 +0800
+Subject: [PATCH V6 0/3] Integration of function trace with System Trace IP
+ blocks
+Message-ID: <1473303784-18262-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The removed LPC32xx mach/irqs.h file is not included in any source
-code, function declaration lpc32xx_init_irq() is also unused, remove
-them as leftovers after switching to a new interrupt controller
-driver.
+IP blocks allowing a variety of trace sources to log debugging
+information to a pre-defined area have been introduced on a couple of
+architecture [1][2]. These system trace blocks (also known as STM)
+typically follow the MIPI STPv2 protocol [3] and provide a system wide
+logging facility to any device, running a kernel or not, with access
+to the block's log entry port(s).  Since each trace message has a
+timestamp, it is possible to correlate events happening in the entire
+system rather than being confined to the logging facility of a single
+entity.
 
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
----
- arch/arm/mach-lpc32xx/common.h            |   1 -
- arch/arm/mach-lpc32xx/include/mach/irqs.h | 117 ------------------------------
- 2 files changed, 118 deletions(-)
- delete mode 100644 arch/arm/mach-lpc32xx/include/mach/irqs.h
+This patchset is trying to use STM IP blocks to store function tracing
+information produced by Ftrace and I'm taking the Function trace
+(trace type is TRACE_FN) as the example in this patchset, but other
+types of traces also can be supported.
 
-diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
-index 30c9e64..02575c2 100644
---- a/arch/arm/mach-lpc32xx/common.h
-+++ b/arch/arm/mach-lpc32xx/common.h
-@@ -24,7 +24,6 @@
- /*
-  * Other arch specific structures and functions
-  */
--extern void __init lpc32xx_init_irq(void);
- extern void __init lpc32xx_map_io(void);
- extern void __init lpc32xx_serial_init(void);
- 
-diff --git a/arch/arm/mach-lpc32xx/include/mach/irqs.h b/arch/arm/mach-lpc32xx/include/mach/irqs.h
-deleted file mode 100644
-index 0019053..0000000
---- a/arch/arm/mach-lpc32xx/include/mach/irqs.h
-+++ /dev/null
-@@ -1,117 +0,0 @@
--/*
-- * arch/arm/mach-lpc32xx/include/mach/irqs.h
-- *
-- * Author: Kevin Wells <kevin.wells@nxp.com>
-- *
-- * Copyright (C) 2010 NXP Semiconductors
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#ifndef __ASM_ARM_ARCH_IRQS_H
--#define __ASM_ARM_ARCH_IRQS_H
--
--#define LPC32XX_SIC1_IRQ(n)		(32 + (n))
--#define LPC32XX_SIC2_IRQ(n)		(64 + (n))
--
--/*
-- * MIC interrupts
-- */
--#define IRQ_LPC32XX_SUB1IRQ		0
--#define IRQ_LPC32XX_SUB2IRQ		1
--#define IRQ_LPC32XX_PWM3		3
--#define IRQ_LPC32XX_PWM4		4
--#define IRQ_LPC32XX_HSTIMER		5
--#define IRQ_LPC32XX_WATCH		6
--#define IRQ_LPC32XX_UART_IIR3		7
--#define IRQ_LPC32XX_UART_IIR4		8
--#define IRQ_LPC32XX_UART_IIR5		9
--#define IRQ_LPC32XX_UART_IIR6		10
--#define IRQ_LPC32XX_FLASH		11
--#define IRQ_LPC32XX_SD1			13
--#define IRQ_LPC32XX_LCD			14
--#define IRQ_LPC32XX_SD0			15
--#define IRQ_LPC32XX_TIMER0		16
--#define IRQ_LPC32XX_TIMER1		17
--#define IRQ_LPC32XX_TIMER2		18
--#define IRQ_LPC32XX_TIMER3		19
--#define IRQ_LPC32XX_SSP0		20
--#define IRQ_LPC32XX_SSP1		21
--#define IRQ_LPC32XX_I2S0		22
--#define IRQ_LPC32XX_I2S1		23
--#define IRQ_LPC32XX_UART_IIR7		24
--#define IRQ_LPC32XX_UART_IIR2		25
--#define IRQ_LPC32XX_UART_IIR1		26
--#define IRQ_LPC32XX_MSTIMER		27
--#define IRQ_LPC32XX_DMA			28
--#define IRQ_LPC32XX_ETHERNET		29
--#define IRQ_LPC32XX_SUB1FIQ		30
--#define IRQ_LPC32XX_SUB2FIQ		31
--
--/*
-- * SIC1 interrupts start at offset 32
-- */
--#define IRQ_LPC32XX_JTAG_COMM_TX	LPC32XX_SIC1_IRQ(1)
--#define IRQ_LPC32XX_JTAG_COMM_RX	LPC32XX_SIC1_IRQ(2)
--#define IRQ_LPC32XX_GPI_28		LPC32XX_SIC1_IRQ(4)
--#define IRQ_LPC32XX_TS_P		LPC32XX_SIC1_IRQ(6)
--#define IRQ_LPC32XX_TS_IRQ		LPC32XX_SIC1_IRQ(7)
--#define IRQ_LPC32XX_TS_AUX		LPC32XX_SIC1_IRQ(8)
--#define IRQ_LPC32XX_SPI2		LPC32XX_SIC1_IRQ(12)
--#define IRQ_LPC32XX_PLLUSB		LPC32XX_SIC1_IRQ(13)
--#define IRQ_LPC32XX_PLLHCLK		LPC32XX_SIC1_IRQ(14)
--#define IRQ_LPC32XX_PLL397		LPC32XX_SIC1_IRQ(17)
--#define IRQ_LPC32XX_I2C_2		LPC32XX_SIC1_IRQ(18)
--#define IRQ_LPC32XX_I2C_1		LPC32XX_SIC1_IRQ(19)
--#define IRQ_LPC32XX_RTC			LPC32XX_SIC1_IRQ(20)
--#define IRQ_LPC32XX_KEY			LPC32XX_SIC1_IRQ(22)
--#define IRQ_LPC32XX_SPI1		LPC32XX_SIC1_IRQ(23)
--#define IRQ_LPC32XX_SW			LPC32XX_SIC1_IRQ(24)
--#define IRQ_LPC32XX_USB_OTG_TIMER	LPC32XX_SIC1_IRQ(25)
--#define IRQ_LPC32XX_USB_OTG_ATX		LPC32XX_SIC1_IRQ(26)
--#define IRQ_LPC32XX_USB_HOST		LPC32XX_SIC1_IRQ(27)
--#define IRQ_LPC32XX_USB_DEV_DMA		LPC32XX_SIC1_IRQ(28)
--#define IRQ_LPC32XX_USB_DEV_LP		LPC32XX_SIC1_IRQ(29)
--#define IRQ_LPC32XX_USB_DEV_HP		LPC32XX_SIC1_IRQ(30)
--#define IRQ_LPC32XX_USB_I2C		LPC32XX_SIC1_IRQ(31)
--
--/*
-- * SIC2 interrupts start at offset 64
-- */
--#define IRQ_LPC32XX_GPIO_00		LPC32XX_SIC2_IRQ(0)
--#define IRQ_LPC32XX_GPIO_01		LPC32XX_SIC2_IRQ(1)
--#define IRQ_LPC32XX_GPIO_02		LPC32XX_SIC2_IRQ(2)
--#define IRQ_LPC32XX_GPIO_03		LPC32XX_SIC2_IRQ(3)
--#define IRQ_LPC32XX_GPIO_04		LPC32XX_SIC2_IRQ(4)
--#define IRQ_LPC32XX_GPIO_05		LPC32XX_SIC2_IRQ(5)
--#define IRQ_LPC32XX_SPI2_DATAIN		LPC32XX_SIC2_IRQ(6)
--#define IRQ_LPC32XX_U2_HCTS		LPC32XX_SIC2_IRQ(7)
--#define IRQ_LPC32XX_P0_P1_IRQ		LPC32XX_SIC2_IRQ(8)
--#define IRQ_LPC32XX_GPI_08		LPC32XX_SIC2_IRQ(9)
--#define IRQ_LPC32XX_GPI_09		LPC32XX_SIC2_IRQ(10)
--#define IRQ_LPC32XX_GPI_19		LPC32XX_SIC2_IRQ(11)
--#define IRQ_LPC32XX_U7_HCTS		LPC32XX_SIC2_IRQ(12)
--#define IRQ_LPC32XX_GPI_07		LPC32XX_SIC2_IRQ(15)
--#define IRQ_LPC32XX_SDIO		LPC32XX_SIC2_IRQ(18)
--#define IRQ_LPC32XX_U5_RX		LPC32XX_SIC2_IRQ(19)
--#define IRQ_LPC32XX_SPI1_DATAIN		LPC32XX_SIC2_IRQ(20)
--#define IRQ_LPC32XX_GPI_00		LPC32XX_SIC2_IRQ(22)
--#define IRQ_LPC32XX_GPI_01		LPC32XX_SIC2_IRQ(23)
--#define IRQ_LPC32XX_GPI_02		LPC32XX_SIC2_IRQ(24)
--#define IRQ_LPC32XX_GPI_03		LPC32XX_SIC2_IRQ(25)
--#define IRQ_LPC32XX_GPI_04		LPC32XX_SIC2_IRQ(26)
--#define IRQ_LPC32XX_GPI_05		LPC32XX_SIC2_IRQ(27)
--#define IRQ_LPC32XX_GPI_06		LPC32XX_SIC2_IRQ(28)
--#define IRQ_LPC32XX_SYSCLK		LPC32XX_SIC2_IRQ(31)
--
--#define LPC32XX_NR_IRQS			96
--
--#endif
+Logging information generated by the Ftrace subsystem to STM and gathered
+in the sink device can be used in conjunction with trace data from other
+board components, also collected in the same trace sink.  
+
+This example is using ARM coresight STM but the same would apply to any
+other architecture wishing to do the same.
+
+Comments would be greatly appreciated.
+
+Thanks,
+Chunyan
+
+[1]. https://lwn.net/Articles/674746/
+[2]. http://lxr.free-electrons.com/source/drivers/hwtracing/intel_th/
+[3]. http://mipi.org/specifications/debug#STP
+
+Changes from v5:
+* Addressed comments from Steven Rostedt:
+  - Removed .commit() from trace_export;
+  - Changed to directly call trace_process_export() instead of trace_export::commit();
+  - Used 'ring_buffer_event_length(event)' instead to get the trace size;
+  - Removed trace_export pointer from trace_array structure.
+* Revised commit message a little to make the description more accurate.
+
+Changes from v4:
+* Addressed comments from Steven Rostedt:
+  - Removed 'inline' annotations from the function which is called via function pointer;
+  - Removed useless components from structure trace_export;
+  - Added '__rcu' annotation to the RCU variables;
+  - Used 'rcu_assign_pointer' to do every RCU assignment;
+  - Added WARN_ON_ONCE() when the .write() is not assigned;
+  - In order to reduce the overhead caused by adding this feature, this revision used an
+    global array instead of a big "if statement" to get the size of trace entry according
+    to the trace type.
+  - In order to keep the current logic unchanged, made ftrace_exports() only being called if
+    there's something have been added, i.e. if trace_export to stm_ftrace has been added in
+    this patchset.
+
+Changes from v3:
+* Addressed comments from Steven Rostedt:
+  - Added comments for the element 'name' and 'next' of trace_export;
+  - Changed to use RCU functions instead of mutex in function callback;
+  - Moved the check for name to register trace_export function;
+* Renamed 'trace_function_exports' to 'trace_exports' since its
+  implementation is not only for function_trace;  The similar changes on
+  'add_trace_export' and 'rm_trace_export'.
+
+Changes from v2:
+* Rebased on v4.8-rc1.
+* Added trace_export class, and make traces can be exported to not only
+ring buffer but also other area such as STM.
+* Made stm_ftrace as an trace_export.
+* More detailed changes are described in change log of each patch.
+
+Changes from v1:
+* Addressed comments from Alexander Shishkin:
+ - Modified some ambiguous change logs.
+ - Decoupled stm_ftrace and trace_output interface to STM.
+ - Changed the file name from stm_ftrace.c to stm/ftrace.c.
+ - Implemented link/unlink hooks for stm_ftrace.
+* Removed useless header file include from stm/ftrace.c
+* Added Acked-by from Steven Rostedt on 4/4.
+
+Chunyan Zhang (3):
+  tracing: add a possibility of exporting function trace to other places
+    instead of ring buffer only
+  stm class: ftrace: Add ftrace-export-over-stm driver
+  stm: Mark the functions of writing buffer with notrace
+
+ drivers/hwtracing/coresight/coresight-stm.c |   2 +-
+ drivers/hwtracing/intel_th/sth.c            |  11 ++-
+ drivers/hwtracing/stm/Kconfig               |  11 +++
+ drivers/hwtracing/stm/Makefile              |   2 +
+ drivers/hwtracing/stm/core.c                |   7 +-
+ drivers/hwtracing/stm/dummy_stm.c           |   2 +-
+ drivers/hwtracing/stm/ftrace.c              |  88 +++++++++++++++++++
+ include/linux/stm.h                         |   4 +-
+ include/linux/trace.h                       |  33 +++++++
+ kernel/trace/trace.c                        | 132 +++++++++++++++++++++++++++-
+ 10 files changed, 280 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/hwtracing/stm/ftrace.c
+ create mode 100644 include/linux/trace.h
+
 -- 
-2.8.1
+2.7.4
