@@ -1,42 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 8 Sep 2016 11:02:48 +0100
-Subject: [PATCH 00/19] Handle guest-generated SErrors/Aborts
-In-Reply-To: <AM5PR0802MB2452C619386893AAFFAE490D9EFB0@AM5PR0802MB2452.eurprd08.prod.outlook.com>
-References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
- <AM5PR0802MB2452C619386893AAFFAE490D9EFB0@AM5PR0802MB2452.eurprd08.prod.outlook.com>
-Message-ID: <57D13748.8070703@arm.com>
+From: zhichang.yuan02@gmail.com (zhichang)
+Date: Thu, 8 Sep 2016 18:04:31 +0800
+Subject: [PATCH V2 4/4] ARM64 LPC: support earlycon for UART connected to
+ LPC
+In-Reply-To: <4291379.IHAA72aKCk@wuerfel>
+References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1473255233-154297-5-git-send-email-yuanzhichang@hisilicon.com>
+ <4291379.IHAA72aKCk@wuerfel>
+Message-ID: <57D137AF.9070306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+Hi, Arnd,
 
-On 08/09/16 10:47, Wei Chen wrote:
-> Hi Marc,
+On 2016?09?07? 22:52, Arnd Bergmann wrote:
+> On Wednesday, September 7, 2016 9:33:53 PM CEST Zhichang Yuan wrote:
+>> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
+>>
+>> This patch support the earlycon for UART connected to LPC on Hip06.
+>> This patch is depended on the LPC driver.
+>>
+>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+>>
 > 
-> On 2016/9/6 21:09, Marc Zyngier wrote:
->> A little known "feature" of giving guest access to real memory mapped
->> HW is that it could trigger asynchronous aborts (SError on ARMv8) if
->> the guest accesses it in a non-conventional way (and depending on how
->> HW and firmware have been integrated). So far, KVM lacks any support
->> to handle this gracefully.
+> I'm skeptical about this too. Is this just needed because the 8250
+> earlycon support comes before the lpc bus initialization?
+I think you wonder why early_serial8250_setup can not be used direclty for this earlycon of LPC uart.
+
+1. the earlycon kernel parameter format of LPC uart is different from 8250. something like that
+"earlycon=hisilpcuart,mmio,0xa01b0000,0,0x2f8". You see, there is one more parameter after the baudrate.
+Hip06 LPC uart need two base addresses for earlycon.
+2. the IO type is mmio to introduce a memory base address to access LPC register file. But the real uart
+IO type is UPIO_PORT. This is spcial...
+
+3. Just as your guess, earlycon should be earlier than lpc initialization.
+
+Best,
+Zhichang
+
 > 
-> I can reproduce this issue on Seattle board (ARM64), but I can't
-> reproduce it on FVP (Cortex-A15x2 ARM32). Did you mean that this issue 
-> onlu takes place on ARMv8? Have you ever reproduced this issue on any 
-> ARM32 platform?
-
-On a 32bit platform, I've only managed to get an external abort firing
-while running at EL1 and then taken to HYP. But that doesn't mean that
-32bit systems are immune to this. It completely depends on the system
-integration (how fast the error generating peripheral replies and how
-the error is exposed to the CPU, for example).
-
-As for the model, I'd be surprised if it had any facility for this. Most
-of that is IMPDEF, and ignoring the error seems to be a valid
-implementation...
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Could we start the LPC driver earlier to work around that?
+> 
+> 	Arnd
+> 
