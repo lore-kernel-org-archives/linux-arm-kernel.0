@@ -1,65 +1,33 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Thu,  8 Sep 2016 19:03:43 +0800
-Subject: [PATCH] arm64: rockchip: fix i2c resource describe error of rk3368
-Message-ID: <1473332623-31951-1-git-send-email-andy.yan@rock-chips.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 8 Sep 2016 13:04:58 +0200
+Subject: [PATCH v2 1/7] clocksource: exynos_mct: Add the support for ARM64
+In-Reply-To: <1472046551-703-2-git-send-email-cw00.choi@samsung.com>
+References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
+ <1472046551-703-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <562e232f-7e69-6d54-e49d-36042d166800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the TRM and downstream code from rockchip, the register
-address of i2c1 on rk3368 is 0xff660000 and i2c2 is 0xff140000.
+On 24/08/2016 15:49, Chanwoo Choi wrote:
+> This patch adds the support for ARM 64bit. The delay_timer is only supported
+> on ARM 32bit.
+> 
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
 
-This patch fix the i2c1 & i2c2 register address definition error, also
-fix the clk and pinctrl reference error.
+I don't really like #ifdef in the code itself but I suppose there is no
+much choice.
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
----
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index 0fcb214..2f8e19f 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -315,16 +315,16 @@
- 		status = "disabled";
- 	};
- 
--	i2c1: i2c at ff140000 {
-+	i2c2: i2c at ff140000 {
- 		compatible = "rockchip,rk3368-i2c", "rockchip,rk3288-i2c";
- 		reg = <0x0 0xff140000 0x0 0x1000>;
- 		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clock-names = "i2c";
--		clocks = <&cru PCLK_I2C1>;
-+		clocks = <&cru PCLK_I2C2>;
- 		pinctrl-names = "default";
--		pinctrl-0 = <&i2c1_xfer>;
-+		pinctrl-0 = <&i2c2_xfer>;
- 		status = "disabled";
- 	};
- 
-@@ -554,16 +554,16 @@
- 		status = "disabled";
- 	};
- 
--	i2c2: i2c at ff660000 {
-+	i2c1: i2c at ff660000 {
- 		compatible = "rockchip,rk3368-i2c", "rockchip,rk3288-i2c";
- 		reg = <0x0 0xff660000 0x0 0x1000>;
- 		interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clock-names = "i2c";
--		clocks = <&cru PCLK_I2C2>;
-+		clocks = <&cru PCLK_I2C1>;
- 		pinctrl-names = "default";
--		pinctrl-0 = <&i2c2_xfer>;
-+		pinctrl-0 = <&i2c1_xfer>;
- 		status = "disabled";
- 	};
- 
 -- 
-2.7.4
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
