@@ -1,46 +1,55 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 8 Sep 2016 21:19:36 +0300
-Subject: [PATCH V3 0/5] firmware: Add support for TI System Control
- Interface (TI-SCI) protocol driver
-In-Reply-To: <m2y432nvs8.fsf@baylibre.com>
-References: <20160906190127.23522-1-nm@ti.com> <7hshtbtu8l.fsf@baylibre.com>
- <f41d968c-46c9-997e-0fa0-edbef34a1fa5@ti.com> <m2y432nvs8.fsf@baylibre.com>
-Message-ID: <9c609ea5-5ea8-f58a-ae32-f8af2c85dd72@ti.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Thu, 8 Sep 2016 21:21:17 +0300
+Subject: [PATCH v2] ARM: dts: lpc32xx: set default parent clock for pwm1 &
+ pwm2
+In-Reply-To: <1473356873-10610-1-git-send-email-slemieux.tyco@gmail.com>
+References: <1473356873-10610-1-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <427912e4-a67a-898c-1736-8958f1b42296@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/16 20:31, Kevin Hilman wrote:
-> Nishanth Menon <nm@ti.com> writes:
->
->> On 09/07/2016 01:55 PM, Kevin Hilman wrote:
->>> Nishanth Menon <nm@ti.com> writes:
->>
->> [...] full mail thread in https://lkml.org/lkml/2016/9/6/747
->>
->>>> Overall architecture is very similar to SCPI[4] as follows:
->>>
->>> Dumb Q: I'm curious about the limitations in SCPI that were found that
->>> made TI decided to implement its own version.
->
-> [...]
->
->> Long story short, investigation was done into what SCPI was providing
->> (TI internal ofcourse) and SCPI did not fit our SoC generation needs -
->
-> Thanks for the detailed explanation.  Very helpful.
->
-> To be clear, I'm not a proponent of always using ARM "standards"
-> (especially when it's not exactly clear if it's a standard or a Juno
-> thing) but I'm seeing several SoCs come out with SCPI derivatives, or
-> old ARM versions etc., so was just curious about the decision making
-> process.
->
-> Thanks for sharing,
->
-> Kevin
+Hi Sylvain,
 
-So, any other comments for this series or shall we still try to get it 
-merged for 4.9? We are -rc5 so it might be too late already and probably 
-better to push this for 4.10.
+On 08.09.2016 20:47, Sylvain Lemieux wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
+> 
+> The change setup the peripheral clock (PERIPH_CLK) as the default
+> parent clock for PWM1 & PWM2.
+> 
+> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> ---
+> Changes from v1 to v2:
+> * Only assigned the PWM clock.
+> 
+>  arch/arm/boot/dts/lpc32xx.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+> index e295e1e..218d9fa 100644
+> --- a/arch/arm/boot/dts/lpc32xx.dtsi
+> +++ b/arch/arm/boot/dts/lpc32xx.dtsi
+> @@ -469,6 +469,8 @@
+>  				compatible = "nxp,lpc3220-pwm";
+>  				reg = <0x4005C000 0x4>;
+>  				clocks = <&clk LPC32XX_CLK_PWM1>;
+> +				assigned-clocks = <&clk LPC32XX_CLK_PWM1>;
+> +				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
+>  				status = "disabled";
+>  			};
+>  
+> @@ -476,6 +478,8 @@
+>  				compatible = "nxp,lpc3220-pwm";
+>  				reg = <0x4005C004 0x4>;
+>  				clocks = <&clk LPC32XX_CLK_PWM2>;
+> +				assigned-clocks = <&clk LPC32XX_CLK_PWM2>;
+> +				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
+>  				status = "disabled";
+>  			};
+>  
+> 
 
--Tero
+the change is applied, thank you!
+
+--
+With best wishes,
+Vladimir
