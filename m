@@ -1,60 +1,70 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 8 Sep 2016 22:50:19 +0200
-Subject: [PATCH] i2c: rk3x: Restore clock settings at resume time
-In-Reply-To: <1472505756-8302-1-git-send-email-dianders@chromium.org>
-References: <1472505756-8302-1-git-send-email-dianders@chromium.org>
-Message-ID: <20160908205018.GG3166@katana>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 8 Sep 2016 21:53:24 +0100
+Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
+In-Reply-To: <m2eg4ui0nl.fsf@baylibre.com>
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
+ <m260q6jibf.fsf@baylibre.com>
+ <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
+ <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
+ <m2eg4ui0nl.fsf@baylibre.com>
+Message-ID: <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 02:22:36PM -0700, Douglas Anderson wrote:
-> Depending on a number of factors including:
-> - Which exact Rockchip SoC we're working with
-> - How deep we suspend
-> - Which i2c port we're on
-> 
-> We might lose the state of the i2c registers at suspend time.
-> Specifically we've found that on rk3399 the i2c ports that are not in
-> the PMU power domain lose their state with the current suspend depth
-> configured by ARM Tursted Firmware.
-> 
-> Note that there are very few actual i2c registers that aren't configured
-> per transfer anyway so all we actually need to re-configure are the
-> clock config registers.  We'll just add a call to rk3x_i2c_adapt_div()
-> at resume time and be done with it.
-> 
-> NOTE: On rk3399 on ports whose power was lost, I put printouts in at
-> resume time.  I saw things like:
->   before: con=0x00010300, div=0x00060006
->   after:  con=0x00010200, div=0x00180025
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+On 08/09/16 21:42, Kevin Hilman wrote:
+> Ben Dooks <ben.dooks@codethink.co.uk> writes:
+>
+>> On 08/09/16 20:52, Martin Blumenstingl wrote:
+>>> On Thu, Sep 8, 2016 at 9:35 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>>>>> +     phy = devm_phy_create(&pdev->dev, NULL, &phy_meson_usb2_ops);
+>>>>> +     if (IS_ERR(phy)) {
+>>>>> +             dev_err(&pdev->dev, "failed to create PHY\n");
+>>>>> +             return PTR_ERR(phy);
+>>>>> +     }
+>>>>> +
+>>>>> +     if (usb_reset_refcnt++ == 0) {
+>>>>> +             ret = device_reset(&pdev->dev);
+>>>>> +             if (ret) {
+>>>>> +                     dev_err(&phy->dev, "Failed to reset USB PHY\n");
+>>>>> +                     return ret;
+>>>>> +             }
+>>>>> +     }
+>>>>
+>>>> The ref count + reset here looks like something that could/should be
+>>>> handled in a runtime PM callback.
+>>> Unfortunately that doesn't work (as Jerome found out) because both
+>>> PHYs are sharing the same reset line.
+>>> So if the second PHY would call device_reset then it would also reset
+>>> the first PHY!
+>>>
+>>> There's a comment above the declaration of usb_reset_refcnt which
+>>> tries to explain this:
+>>> "The PHYs are sharing a common reset line -> we are only allowed to
+>>> reset once for all PHYs."
+>>> Maybe I should move this comment to the "if (usb_reset_refcnt++ == 0)
+>>> {" line to make it easier to see?
+>>>
+>>
+>> pm-runtime has refcounting in it. When one of the nodes turns on,
+>> the pm-runtime will call your driver to say there is a user when
+>> this first use turns up.
+>>
+>> If all the sub-phys turn off and drop their refcount then the driver
+>> is called to say there are no more users and you can go to sleep.
+>
+> After a chat w/Martin on IRC, It turns out runtime PM wont help here.
+>
+> The reason is because there are physically two PHY devices[1].  Those 2
+> devices will be treated independely by runtime PM, and have separate
+> use-counting, which means doing what I proposed would cause a reset to
+> happen when either device was probed.
+>
+> So, I think it's OK as it is.
 
-Fixed the code checker warnings:
+Surely you can do pm_runtime_get/put on the phy's parent platform
+device and do it that way?
 
-    SPARSE
-drivers/i2c/busses/i2c-rk3x.c:1346:14: warning: duplicate const
-    SMATCH
-drivers/i2c/busses/i2c-rk3x.c:1346:14: warning: duplicate const
-
-and applied to for-current, thanks!
-
-
-Note my code checkers also say this (unrelated to your patch):
-
-    SPARSE
-drivers/i2c/busses/i2c-rk3x.c:888:17: warning: cast truncates bits from constant value (ffffffffff00 becomes ffffff00)
-
-  CC      drivers/i2c/busses/i2c-rk3x.o
-drivers/i2c/busses/i2c-rk3x.c: In function 'rk3x_i2c_v1_calc_timings':
-drivers/i2c/busses/i2c-rk3x.c:745:41: warning: variable 'min_total_ns' set but not used [-Wunused-but-set-variable]
-
-I haven't checked those, though...
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/01c87369/attachment.sig>
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
