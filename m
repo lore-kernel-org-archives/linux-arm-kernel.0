@@ -1,68 +1,65 @@
-From: shaohui.xie@nxp.com (S.H. Xie)
-Date: Thu, 8 Sep 2016 10:57:34 +0000
-Subject: [PATCH 1/7] [v2] dt-bindings: fsl: updates bindings for some
- SoC-specific devices
-In-Reply-To: <20160908023026.GC2533@x250>
-References: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
- <1473069695-33092-2-git-send-email-shh.xie@gmail.com>
- <20160908023026.GC2533@x250>
-Message-ID: <DB5PR0401MB2183290FCC833282DB09A264E8FB0@DB5PR0401MB2183.eurprd04.prod.outlook.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Thu,  8 Sep 2016 18:59:22 +0800
+Subject: [PATCH] drm/sun4i: add missing header dependencies
+Message-ID: <1473332362-25497-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Thursday, September 08, 2016 10:30 AM
-> To: shh.xie at gmail.com
-> Cc: devicetree at vger.kernel.org; robh+dt at kernel.org; mark.rutland at arm.com;
-> linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
-> will.deacon at arm.com; linux-kernel at vger.kernel.org; S.H. Xie
-> <shaohui.xie@nxp.com>; arnd at arndb.de
-> Subject: Re: [PATCH 1/7] [v2] dt-bindings: fsl: updates bindings for some SoC-
-> specific devices
-> 
-> On Mon, Sep 05, 2016 at 06:01:29PM +0800, shh.xie at gmail.com wrote:
-> > From: Shaohui Xie <Shaohui.Xie@nxp.com>
-> >
-> > SCFG and DCFG are SoC-specific devices can be found on SoCs like
-> > LS1021A, LS1043A and LS1046A, this patch updates bindings for SCFG and
-> > DCFG to reflect more SoCs.
-> >
-> > Signed-off-by: Shaohui Xie <Shaohui.Xie@nxp.com>
-> > ---
-> > changes in V2:
-> > new patch.
-> >
-> >  Documentation/devicetree/bindings/arm/fsl.txt | 12 +++++++++---
-> >  1 file changed, 9 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/fsl.txt
-> > b/Documentation/devicetree/bindings/arm/fsl.txt
-> > index dbbc095..6f92d0b 100644
-> > --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> > +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> > @@ -97,7 +97,7 @@ Freescale LS1021A Platform Device Tree Bindings
-> > Required root node compatible properties:
-> >    - compatible = "fsl,ls1021a";
-> >
-> > -Freescale LS1021A SoC-specific Device Tree Bindings
-> > +Freescale SoC-specific Device Tree Bindings
-> >  -------------------------------------------
-> >
-> >  Freescale SCFG
-> > @@ -105,7 +105,10 @@ Freescale SCFG
-> >  configuration and status registers for the chip. Such as getting PEX
-> > port  status.
-> >    Required properties:
-> > -  - compatible: should be "fsl,ls1021a-scfg"
-> > +  - compatible: Should contain a chip-specific compatible string,
-> > +	Chip-specific strings are of the form "fsl,<chip>-scfg", such as:
-> > +	"fsl,ls1021a-scfg"
-> 
-> Per Documentation/devicetree/bindings/submitting-patches.txt, the known values
-> of "<chip>" should be documented.
-Will add the supported chips in next version.
+We get 5 warnings when building kernel with W=1:
+drivers/gpu/drm/sun4i/sun4i_framebuffer.c:33:23: warning: no previous prototype for 'sun4i_framebuffer_init' [-Wmissing-prototypes]
+drivers/gpu/drm/sun4i/sun4i_framebuffer.c:47:6: warning: no previous prototype for 'sun4i_framebuffer_free' [-Wmissing-prototypes]
+drivers/gpu/drm/sun4i/sun4i_rgb.c:202:5: warning: no previous prototype for 'sun4i_rgb_init' [-Wmissing-prototypes]
+drivers/gpu/drm/sun4i/sun4i_dotclock.c:151:5: warning: no previous prototype for 'sun4i_dclk_create' [-Wmissing-prototypes]
+drivers/gpu/drm/sun4i/sun4i_dotclock.c:186:5: warning: no previous prototype for 'sun4i_dclk_free' [-Wmissing-prototypes]
 
-Thank you!
+In fact, these functions are declared in
+drivers/gpu/drm/sun4i/sun4i_framebuffer.h,
+drivers/gpu/drm/sun4i/sun4i_rgb.h,
+drivers/gpu/drm/sun4i/sun4i_dotclock.h,
+so this patch adds missing header dependencies.
 
-Shaohui
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ drivers/gpu/drm/sun4i/sun4i_dotclock.c    | 1 +
+ drivers/gpu/drm/sun4i/sun4i_framebuffer.c | 1 +
+ drivers/gpu/drm/sun4i/sun4i_rgb.c         | 1 +
+ 3 files changed, 3 insertions(+)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+index 5b34631..4332da4 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
++++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+@@ -14,6 +14,7 @@
+ #include <linux/regmap.h>
+ 
+ #include "sun4i_tcon.h"
++#include "sun4i_dotclock.h"
+ 
+ struct sun4i_dclk {
+ 	struct clk_hw	hw;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+index 70688fe..8b6ce619 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+@@ -15,6 +15,7 @@
+ #include <drm/drmP.h>
+ 
+ #include "sun4i_drv.h"
++#include "sun4i_framebuffer.h"
+ 
+ static void sun4i_de_output_poll_changed(struct drm_device *drm)
+ {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index f5bbac6..3d11c48 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -19,6 +19,7 @@
+ 
+ #include "sun4i_drv.h"
+ #include "sun4i_tcon.h"
++#include "sun4i_rgb.h"
+ 
+ struct sun4i_rgb {
+ 	struct drm_connector	connector;
+-- 
+2.7.4
