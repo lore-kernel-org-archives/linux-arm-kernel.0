@@ -1,14 +1,14 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Sep 2016 10:14:42 +0200
+Date: Thu, 08 Sep 2016 10:15:25 +0200
 Subject: [PATCH v3 2/3] hwmon: xgene: Add hwmon driver
-In-Reply-To: <20160907223705.GA31582@roeck-us.net>
+In-Reply-To: <20160907222754.GA31475@roeck-us.net>
 References: <1469134557-26869-1-git-send-email-hotran@apm.com>
- <13081573.BbD3TmEU5Y@wuerfel> <20160907223705.GA31582@roeck-us.net>
-Message-ID: <2992356.ULGoZEEDZp@wuerfel>
+ <13081573.BbD3TmEU5Y@wuerfel> <20160907222754.GA31475@roeck-us.net>
+Message-ID: <8664936.LICyesLN7G@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 7, 2016 3:37:05 PM CEST Guenter Roeck wrote:
+On Wednesday, September 7, 2016 3:27:54 PM CEST Guenter Roeck wrote:
 > On Wed, Sep 07, 2016 at 11:41:44PM +0200, Arnd Bergmann wrote:
 > > On Thursday, July 21, 2016 1:55:56 PM CEST Hoan Tran wrote:
 > > > +               ctx->comm_base_addr = cppc_ss->base_address;
@@ -23,23 +23,11 @@ On Wednesday, September 7, 2016 3:37:05 PM CEST Guenter Roeck wrote:
 > > 
 > >       1  ERROR: "memblock_is_memory" [drivers/hwmon/xgene-hwmon.ko] undefined!
 > > 
-> > Should this perhaps call ioremap() or memremap() instead?
-> > 
-> Hmmm ... almost sounds to me like blaming the messenger. e7cd190385d1 ("arm64:
-> mark reserved memblock regions explicitly in iomem") starts using a function
-> in acpi_os_ioremap() which is not exported. On top of that, memblock_is_memory()
-> is declared as __init_memblock, which makes me really uncomfortable.
-> If acpi_os_ioremap() must not be used by modules, and possibly only during
-> early (?) initialization, maybe its declaration should state those limitations ?
+> How do you even get there ? arm64:allmodconfig fails for me in -next with
+> 
+> drivers/pwm/pwm-berlin.c: In function ?berlin_pwm_suspend?:
+> drivers/pwm/pwm-berlin.c:245:35: error: ?struct berlin_pwm_chip? has no member named ?chips?
 
-Ah, I didn't notice that. I guess both patches were correct individually and
-got added to linux-next around the same time but caused allmodconfig to blow up
-when used together.
-
-Adding everyone who was involved in the memblock patch to Cc here, maybe one
-of them has an idea what the correct fix is. There are only two other drivers
-using acpi_os_ioremap() and one of them is x86-specific, so it's still likely
-that drivers are not actually supposed to use this symbol. Making
-acpi_os_ioremap() an exported function in arm64 would also work.
+That was fixed in yesterday's linux-next.
 
 	Arnd
