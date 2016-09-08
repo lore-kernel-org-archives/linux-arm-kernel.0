@@ -1,113 +1,91 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Thu,  8 Sep 2016 11:03:04 +0800
-Subject: [PATCH V6 3/3] stm: Mark the functions of writing buffer with notrace
-In-Reply-To: <1473303784-18262-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1473303784-18262-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1473303784-18262-4-git-send-email-zhang.chunyan@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  8 Sep 2016 11:14:18 +0800
+Subject: [PATCH] phy: sun4i-usb: Use spinlock to guard phyctl register access
+Message-ID: <20160908031418.12627-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_STM_FTRACE is selected, Function trace data can be writen
-to sink via STM, all functions that related to writing data packets
-to STM should be marked 'notrace' to avoid being traced by Ftrace,
-otherwise the program would stall into an endless loop.
+The musb driver calls into this phy driver to disable/enable squelch
+detection. This function was introduced in 24fe86a617c5 ("phy: sun4i-usb:
+Add a sunxi specific function for setting squelch-detect"). This
+function in turn calls sun4i_usb_phy_write, which uses a mutex to
+guard the common access register. Unfortunately musb does this
+in atomic context, which results in the following warning with lock
+debugging enabled:
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
+BUG: sleeping function called from invalid context at kernel/locking/mutex.c:97
+in_atomic(): 1, irqs_disabled(): 128, pid: 96, name: kworker/0:2
+CPU: 0 PID: 96 Comm: kworker/0:2 Not tainted 4.8.0-rc4-00181-gd502f8ad1c3e #13
+Hardware name: Allwinner sun8i Family
+Workqueue: events musb_deassert_reset
+[<c010bc01>] (unwind_backtrace) from [<c0109237>] (show_stack+0xb/0xc)
+[<c0109237>] (show_stack) from [<c02a669b>] (dump_stack+0x67/0x74)
+[<c02a669b>] (dump_stack) from [<c05d68c9>] (mutex_lock+0x15/0x2c)
+[<c05d68c9>] (mutex_lock) from [<c02c3589>] (sun4i_usb_phy_write+0x39/0xec)
+[<c02c3589>] (sun4i_usb_phy_write) from [<c03e6327>] (musb_port_reset+0xfb/0x184)
+[<c03e6327>] (musb_port_reset) from [<c03e4917>] (musb_deassert_reset+0x1f/0x2c)
+[<c03e4917>] (musb_deassert_reset) from [<c012ecb5>] (process_one_work+0x129/0x2b8)
+[<c012ecb5>] (process_one_work) from [<c012f5e3>] (worker_thread+0xf3/0x424)
+[<c012f5e3>] (worker_thread) from [<c0132dbd>] (kthread+0xa1/0xb8)
+[<c0132dbd>] (kthread) from [<c0105f31>] (ret_from_fork+0x11/0x20)
+
+Since the register access is mmio, we can use a spinlock to guard this
+specific access, rather than the mutex that guards the entire phy.
+
+Fixes: ba4bdc9e1dc0 ("PHY: sunxi: Add driver for sunxi usb phy")
+Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: stable at vger.kernel.org
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/hwtracing/coresight/coresight-stm.c |  2 +-
- drivers/hwtracing/intel_th/sth.c            | 11 +++++++----
- drivers/hwtracing/stm/core.c                |  7 ++++---
- drivers/hwtracing/stm/dummy_stm.c           |  2 +-
- include/linux/stm.h                         |  4 ++--
- 5 files changed, 15 insertions(+), 11 deletions(-)
+ drivers/phy/phy-sun4i-usb.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 73be58a..345c81e 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -386,7 +386,7 @@ static long stm_generic_set_options(struct stm_data *stm_data,
- 	return 0;
- }
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index fcf4d95ecc6d..ae4ac5457c64 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -40,6 +40,7 @@
+ #include <linux/power_supply.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/reset.h>
++#include <linux/spinlock.h>
+ #include <linux/usb/of.h>
+ #include <linux/workqueue.h>
  
--static ssize_t stm_generic_packet(struct stm_data *stm_data,
-+static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
- 				  unsigned int master,
- 				  unsigned int channel,
- 				  unsigned int packet,
-diff --git a/drivers/hwtracing/intel_th/sth.c b/drivers/hwtracing/intel_th/sth.c
-index e1aee61..b034446 100644
---- a/drivers/hwtracing/intel_th/sth.c
-+++ b/drivers/hwtracing/intel_th/sth.c
-@@ -67,10 +67,13 @@ static void sth_iowrite(void __iomem *dest, const unsigned char *payload,
+@@ -115,6 +116,7 @@ struct sun4i_usb_phy_data {
+ 	const struct sun4i_usb_phy_cfg *cfg;
+ 	enum usb_dr_mode dr_mode;
+ 	struct mutex mutex;
++	spinlock_t reg_lock; /* guard access to phyctl reg */
+ 	struct sun4i_usb_phy {
+ 		struct phy *phy;
+ 		void __iomem *pmu;
+@@ -183,7 +185,7 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+ 	void __iomem *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
+ 	int i;
+ 
+-	mutex_lock(&phy_data->mutex);
++	spin_lock(&phy_data->reg_lock);
+ 
+ 	if (phy_data->cfg->type == sun8i_a33_phy ||
+ 	    phy_data->cfg->type == sun50i_a64_phy) {
+@@ -221,7 +223,8 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+ 
+ 		data >>= 1;
  	}
+-	mutex_unlock(&phy_data->mutex);
++
++	spin_unlock(&phy_data->reg_lock);
  }
  
--static ssize_t sth_stm_packet(struct stm_data *stm_data, unsigned int master,
--			      unsigned int channel, unsigned int packet,
--			      unsigned int flags, unsigned int size,
--			      const unsigned char *payload)
-+static ssize_t notrace sth_stm_packet(struct stm_data *stm_data,
-+				      unsigned int master,
-+				      unsigned int channel,
-+				      unsigned int packet,
-+				      unsigned int flags,
-+				      unsigned int size,
-+				      const unsigned char *payload)
- {
- 	struct sth_device *sth = container_of(stm_data, struct sth_device, stm);
- 	struct intel_th_channel __iomem *out =
-diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
-index 51f81d6..37d3bcb 100644
---- a/drivers/hwtracing/stm/core.c
-+++ b/drivers/hwtracing/stm/core.c
-@@ -425,7 +425,7 @@ static int stm_file_assign(struct stm_file *stmf, char *id, unsigned int width)
- 	return ret;
- }
+ static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
+@@ -583,6 +586,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
--static ssize_t stm_write(struct stm_data *data, unsigned int master,
-+static ssize_t notrace stm_write(struct stm_data *data, unsigned int master,
- 			  unsigned int channel, const char *buf, size_t count)
- {
- 	unsigned int flags = STP_PACKET_TIMESTAMPED;
-@@ -1121,8 +1121,9 @@ void stm_source_unregister_device(struct stm_source_data *data)
- }
- EXPORT_SYMBOL_GPL(stm_source_unregister_device);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count)
-+int notrace stm_source_write(struct stm_source_data *data,
-+			     unsigned int chan,
-+			     const char *buf, size_t count)
- {
- 	struct stm_source_device *src = data->src;
- 	struct stm_device *stm;
-diff --git a/drivers/hwtracing/stm/dummy_stm.c b/drivers/hwtracing/stm/dummy_stm.c
-index a86612d..c5f94ca 100644
---- a/drivers/hwtracing/stm/dummy_stm.c
-+++ b/drivers/hwtracing/stm/dummy_stm.c
-@@ -21,7 +21,7 @@
- #include <linux/slab.h>
- #include <linux/stm.h>
- 
--static ssize_t
-+static ssize_t notrace
- dummy_stm_packet(struct stm_data *stm_data, unsigned int master,
- 		 unsigned int channel, unsigned int packet, unsigned int flags,
- 		 unsigned int size, const unsigned char *payload)
-diff --git a/include/linux/stm.h b/include/linux/stm.h
-index 8369d8a..210ff22 100644
---- a/include/linux/stm.h
-+++ b/include/linux/stm.h
-@@ -133,7 +133,7 @@ int stm_source_register_device(struct device *parent,
- 			       struct stm_source_data *data);
- void stm_source_unregister_device(struct stm_source_data *data);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count);
-+int notrace stm_source_write(struct stm_source_data *data, unsigned int chan,
-+			     const char *buf, size_t count);
- 
- #endif /* _STM_H_ */
+ 	mutex_init(&data->mutex);
++	spin_lock_init(&data->reg_lock);
+ 	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
+ 	dev_set_drvdata(dev, data);
+ 	data->cfg = of_device_get_match_data(dev);
 -- 
-2.7.4
+2.9.3
