@@ -1,76 +1,79 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Thu, 8 Sep 2016 04:52:21 +0300
-Subject: [PATCH 0/3] gpio/pinctrl: imx: let IOMUX controller know about
- on-SoC GPIOs
-In-Reply-To: <20160908014107.GA2533@x250>
-References: <1471644615-10320-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <cc5ab313-c3c6-bfd4-d2b8-92a7d153cf05@mentor.com>
- <20160905021201.GC25778@tiger>
- <1c1d23a0-9656-2682-e573-13385a002998@mentor.com>
- <20160908014107.GA2533@x250>
-Message-ID: <ade688f5-8c43-8d58-3842-af14b4622adf@mentor.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Wed, 07 Sep 2016 18:54:43 -0700
+Subject: [PATCH v4 03/22] usb: ulpi: Support device discovery via DT
+In-Reply-To: <CAL_JsqJbk2TGmASK974hO0n+Y3DmB3tbggbd9wXCNa9Ug9QdDg@mail.gmail.com>
+References: <20160907213519.27340-1-stephen.boyd@linaro.org>
+ <20160907213519.27340-4-stephen.boyd@linaro.org>
+ <CAL_JsqJbk2TGmASK974hO0n+Y3DmB3tbggbd9wXCNa9Ug9QdDg@mail.gmail.com>
+Message-ID: <147329968397.3646.12327973042398769279@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Quoting Rob Herring (2016-09-07 18:12:32)
+> On Wed, Sep 7, 2016 at 4:35 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> > ---
+> >  Documentation/devicetree/bindings/usb/ulpi.txt | 20 +++++++
+> >  drivers/usb/common/ulpi.c                      | 77 ++++++++++++++++++++++++--
+> >  2 files changed, 92 insertions(+), 5 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/usb/ulpi.txt
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
+> But one concern below.
+> 
+> > -static int ulpi_register(struct device *dev, struct ulpi *ulpi)
+> > +static int ulpi_of_register(struct ulpi *ulpi)
+> > +{
+> > +       struct device_node *np = NULL, *child;
+> > +
+> > +       /* Find a ulpi bus underneath the parent or the parent of the parent */
+> 
+> parent of the parent is called the grandparent.
 
-On 09/08/2016 04:41 AM, Shawn Guo wrote:
-> On Mon, Sep 05, 2016 at 02:49:16PM +0300, Vladimir Zapolskiy wrote:
->>> If I understand it correctly, with the change, most of GPIO client
->>> device drivers use the same init level as GPIO driver.  So we are not
->>> sure if GPIO driver is ready when client drivers try to request GPIO.
->>
->> please give it a test run (with and without DTS gpio-ranges changes,
->> or just 2/3 from the series), I've tested on iMX6Q SabreLite, SabreAuto,
->> SabreSD and I don't see any regressions or noticeable increase of
->> -EPROBE_DEFER hits due to not ready GPIOs.
->>
->>> most of GPIO client device drivers use the same init level as GPIO driver.
->>
->> IMHO that will be the case, if the change 2/3 from the series is applied.
->>
->> Statisticaly most of GPIO consumers should settle on device_initcall or
->> module_init level, the latter one is translated to device_initcall if
->> a driver is built-in, so the proposed downgrading of GPIO controller
->> driver init call level looks to be appropriate.
->>
->> However pinctrl/pinmux driver should definitely have higher init level
->> priority in comparison to GPIO controller driver, every GPIO consumer
->> is a pinctrl/pinmux consumer as well, most of iMX pinctrl/pinmux drivers
->> are initialized at arch_initcall level, so there is a plenty of options
->> to satisfy (GPIO driver initcall) < (pinmux/pinctrl driver initcall)
->> equation:
->> * change pinmux/pinctrl driver initcall level to postcore_initcall
->>   and GPIO driver initcall level to arch_initcall or lower one,
->> * keep pinmux/pinctrl driver at arch_initcall level, set GPIO driver
->>   initcall level to any lower than arch_initcall (e.g. device_initcall)
->> * keep everything as is, drop 2/3 and rely on -EPROBE_DEFER from
->>   GPIO driver probe due to not yet initialized pinctrl driver.
->>
->>> It shouldn't be a problem if every client driver handle the failure
->>> with deferred probing, but I'm not sure that's the case now.
->>>
->>
->> From what I see it is the case for the most critical drivers, for the
->> rest I believe it is a bug, which can be revealed by shifting GPIO
->> driver initcall level and fixed, see also
->>
->> https://lists.linuxfoundation.org/pipermail/ksummit-discuss/2016-August/003419.html
->
-> Okay, fair enough.
->
-> For the series,
->
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
->
+Heh, I can reword it.
 
-thank you for review/ack, just in parallel I've sent v2 with a shift
-to subsys_initcall, which, I agree, might be more preferrable.
+> 
+> > +       if (ulpi->dev.parent->of_node)
+> > +               np = of_find_node_by_name(ulpi->dev.parent->of_node, "ulpi");
+> > +       else if (ulpi->dev.parent->parent && ulpi->dev.parent->parent->of_node)
+> > +               np = of_find_node_by_name(ulpi->dev.parent->parent->of_node,
+> 
+> First setting "parent = ulpi->dev.parent" would make this a bit easier
+> on the eyes.
 
-If you more like v2, please ack that series.
+Ok.
 
-Thank you in advance.
+> 
+> When is it valid to be the grandparent? The binding doesn't mention that.
 
---
-With best wishes,
-Vladimir
+This case arises when we're registering the ulpi device as a child of
+the device created by chipidea usb glue drivers (the "core" chipidea
+device called something like ci_hdrc.N). In that case we have DT like
+this:
+
+	usb-controller {
+		ulpi {
+			phy {
+			};
+		};
+	};
+
+where the usb-controller node corresponds to a device that's probed by
+the glue driver. That glue driver creates a child platform device,
+ci_hdrc.0, that doesn't have any DT node associated with it, and then
+that device driver probes and creates the ulpi device that is associated
+with the phy node.
+
+The grandparent scenario will fall away once Peter's patch is merged to
+set the of_node of ci_hdrc.0 to be the same of_node as the glue
+device[1]. I can rebase on that patch, but it looked like the power
+sequence stuff was getting held up.
+
+Honestly, having the child device registered by the glue driver seems to
+cause some difficulties and I've been thinking about how we could get
+rid of it, but Peter seems fairly adamant about keeping this design.
+Also, I think dwc3 is done in a similar way, but in that case the child
+device is in DT and I think we could put the ulpi node inside of it. I
+haven't looked in too much detail though.
+
+[1] http://lkml.kernel.org/r/1471252398-957-6-git-send-email-peter.chen at nxp.com
