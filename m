@@ -1,44 +1,53 @@
-From: zhichang.yuan02@gmail.com (zhichang)
-Date: Thu, 8 Sep 2016 18:04:31 +0800
-Subject: [PATCH V2 4/4] ARM64 LPC: support earlycon for UART connected to
- LPC
-In-Reply-To: <4291379.IHAA72aKCk@wuerfel>
-References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
- <1473255233-154297-5-git-send-email-yuanzhichang@hisilicon.com>
- <4291379.IHAA72aKCk@wuerfel>
-Message-ID: <57D137AF.9070306@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 8 Sep 2016 10:55:36 +0100
+Subject: [PATCH 00/19] Handle guest-generated SErrors/Aborts
+In-Reply-To: <20160908094428.GW23592@cbox>
+References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
+ <20160908094428.GW23592@cbox>
+Message-ID: <57D13598.90301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd,
-
-On 2016?09?07? 22:52, Arnd Bergmann wrote:
-> On Wednesday, September 7, 2016 9:33:53 PM CEST Zhichang Yuan wrote:
->> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
+On 08/09/16 10:44, Christoffer Dall wrote:
+> On Tue, Sep 06, 2016 at 02:01:58PM +0100, Marc Zyngier wrote:
+>> A little known "feature" of giving guest access to real memory mapped
+>> HW is that it could trigger asynchronous aborts (SError on ARMv8) if
+>> the guest accesses it in a non-conventional way (and depending on how
+>> HW and firmware have been integrated). So far, KVM lacks any support
+>> to handle this gracefully.
 >>
->> This patch support the earlycon for UART connected to LPC on Hip06.
->> This patch is depended on the LPC driver.
+>> This series introduces a set of mechanisms to catch such a fault and
+>> deliver a vSError (or Virtual Abort for 32bit) to the offending vcpu.
 >>
->> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+>> These aborts can either trigger at EL1 (whilst the guest is running),
+>> or at EL2 (during the handling of an exit). The first case is pretty
+>> easy to handle (use the ad-hoc vectors on arm64, or decode the EA bit
+>> on arm), but the second one is a bit more fiddly, as we need to ensure
+>> that the exception is pending by the time we unmask it. This is
+>> achived by using some heavy DSBs on the hot path, with the following
+>> caveats:
 >>
+>> - I've only been able to trigger the EL2 handling on A57 (Seatle,
+>>   Juno).
+>> - I've measured a 40/50 cycles hit on Juno (A57), but I haven't
+>>   measured the impact on bigger systems
+>>
+>> The last patch of this series adds a missing feature to the
+>> GICV-proxying series, delivering a vSError to a guest that performed
+>> an illegal access to the GIC.
+>>
+>> Patches on top of current kvmarm/queue + the GICV przying series.
 > 
-> I'm skeptical about this too. Is this just needed because the 8250
-> earlycon support comes before the lpc bus initialization?
-I think you wonder why early_serial8250_setup can not be used direclty for this earlycon of LPC uart.
+> przying?  proxying?  Or something in Polish perhaps?
 
-1. the earlycon kernel parameter format of LPC uart is different from 8250. something like that
-"earlycon=hisilpcuart,mmio,0xa01b0000,0,0x2f8". You see, there is one more parameter after the baudrate.
-Hip06 LPC uart need two base addresses for earlycon.
-2. the IO type is mmio to introduce a memory base address to access LPC register file. But the real uart
-IO type is UPIO_PORT. This is spcial...
-
-3. Just as your guess, earlycon should be earlier than lpc initialization.
-
-Best,
-Zhichang
+Proxying, with added fat fingers... ;-)
 
 > 
-> Could we start the LPC driver earlier to work around that?
-> 
-> 	Arnd
-> 
+> For the series:
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Thanks!
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
