@@ -1,79 +1,45 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Sep 2016 10:47:10 +0200
-Subject: [PATCH 09/19] arm64: KVM: Handle async aborts delivered while at
- EL2
-In-Reply-To: <57D04CB3.1030208@arm.com>
-References: <1473166937-15271-1-git-send-email-marc.zyngier@arm.com>
- <1473166937-15271-10-git-send-email-marc.zyngier@arm.com>
- <20160907170304.GT23592@cbox> <57D04CB3.1030208@arm.com>
-Message-ID: <20160908084703.GU23592@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2016 10:45:26 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <87y432iylr.fsf@linux.intel.com>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <6739240.VDAnDBppH0@wuerfel> <87y432iylr.fsf@linux.intel.com>
+Message-ID: <2733202.7lpFC7RnDm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 06:21:55PM +0100, Marc Zyngier wrote:
-> On 07/09/16 18:03, Christoffer Dall wrote:
-> > On Tue, Sep 06, 2016 at 02:02:07PM +0100, Marc Zyngier wrote:
-> >> If EL1 generates an asynchronous abort and then traps into EL2
-> >> before the abort has been delivered, we may end-up with the
-> >> abort firing at the worse possible place: on the host.
-> >>
-> >> In order to avoid this, it is necessary to take the abort at EL2,
-> >> by clearing the PSTATE.A bit. In order to survive this abort,
-> >> we do it at a point where we're in a known state with respect
-> >> to the world switch, and handle the resulting exception,
-> >> overloading the exit code in the process.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm64/kvm/hyp/entry.S     | 33 ++++++++++++++++++++++++++++++++-
-> >>  arch/arm64/kvm/hyp/hyp-entry.S | 25 +++++++++++++++++++++++--
-> >>  arch/arm64/kvm/hyp/switch.c    |  6 ++++++
-> >>  3 files changed, 61 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-> >> index 3967c231..7662ef5 100644
-> >> --- a/arch/arm64/kvm/hyp/entry.S
-> >> +++ b/arch/arm64/kvm/hyp/entry.S
-> >> @@ -122,7 +122,38 @@ ENTRY(__guest_exit)
-> >>  	// Now restore the host regs
-> >>  	restore_callee_saved_regs x2
-> >>  
-> >> -	ret
-> >> +	// If we have a pending asynchronous abort, now is the
-> >> +	// time to find out. From your VAXorcist book, page 666:
-> >> +	// "Threaten me not, oh Evil one!  For I speak with
-> >> +	// the power of DEC, and I command thee to show thyself!"
-> >> +	mrs	x2, elr_el2
-> >> +	mrs	x3, esr_el2
-> >> +	mrs	x4, spsr_el2
-> >> +	mov	x5, x0
-> >> +
-> >> +	dsb	sy		// Synchronize against in-flight ld/st
-> >> +	msr	daifclr, #4	// Unmask aborts
-> >> +
-> >> +	// This is our single instruction exception window. A pending
-> >> +	// SError is guaranteed to occur at the earliest when we unmask
-> >> +	// it, and at the latest just after the ISB.
-> > 
-> > Why is it guaranteed to to occur at the latest after the ISB?  I thought
-> > that asynchronous exceptions could in theory be deferred until forever,
-> > but I am probably wrong about this.
+On Thursday, September 8, 2016 11:29:04 AM CEST Felipe Balbi wrote:
+> > If we do that, we have to put child devices of the dwc3 devices into
+> > the platform glue, and it also breaks those dwc3 devices that don't
+> > have a parent driver.
 > 
-> The DSB is going to force all transactions to be completed and at that
-> point, we shouldn't have anything being further delayed (this is not an
-> architectural guarantee, but something that happens to work on the cores
-> I have access to), and the potential exception becomes pending.
+> Well, this is easy to fix:
 > 
-> At this point, we perform the unmask. A pending exception *can* fire at
-> that point, but is not guaranteed to do so. But the ISB, being a
-> "context synchronization event", guarantees that the exception fires
-> before the first instruction that follows the ISB (see D1.14.4). This is
-> what gives us this one instruction window (after the unmask, or after
-> the isb).
-> 
-Yes, this makes sense.  So if by whatever weird sequence of events we
-see an SError after the ISB, we simply give up and admit that the system
-is screwy, which also makes sense.
+>         if (dwc->dev->parent) {
+>                 dwc->sysdev = dwc->dev->parent;
+>         } else {
+>                 dev_info(dwc->dev, "Please provide a glue layer!\n");
+>                 dwc->sysdev = dwc->dev;
+>         }
 
-Thanks,
--Christoffer
+I don't understand. Do you mean we should have an extra level of
+stacking and splitting "static struct platform_driver dwc3_driver"
+in two so instead of
+
+	"qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "xhci" (usb_bus.dev)
+
+we do this?
+
+	"qcom,dwc3" -> "snps,dwc3" (usb_bus.sysdev) -> "dwc3-glue" -> "xhci" (usb_bus.dev)
+
+That sounds a bit clumsy for the sake of consistency with PCI.
+The advantage is that xhci can always use the grandparent device
+as sysdev whenever it isn't probed through PCI or firmware
+itself, but the purpose of the dwc3-glue is otherwise questionable.
+
+How about adding a 'compatible="snps,dwc3-pci"' property for the dwc3
+device when that is created from the PCI driver and checking for that
+with the device property interface instead? If it's "snps,dwc3"
+we use the device itself while for "snps,dwc3-pci", we use the parent?
+
+	Arnd
