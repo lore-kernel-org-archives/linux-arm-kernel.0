@@ -1,233 +1,219 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 8 Sep 2016 14:23:25 +0100
-Subject: [PATCH 3/7] [v2] arm64: dts: add QorIQ LS1046A SoC support
-In-Reply-To: <1473069695-33092-4-git-send-email-shh.xie@gmail.com>
-References: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
- <1473069695-33092-4-git-send-email-shh.xie@gmail.com>
-Message-ID: <57D1664D.3060502@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2016 15:23:44 +0200
+Subject: [PATCH V2 1/4] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <57D11711.9090901@hisilicon.com>
+References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
+ <3419224.SdRtVQMJCi@wuerfel> <57D11711.9090901@hisilicon.com>
+Message-ID: <246257868.K0dkmX9SMq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/16 11:01, shh.xie at gmail.com wrote:
-> From: Mingkai Hu <Mingkai.Hu@nxp.com>
+On Thursday, September 8, 2016 3:45:21 PM CEST zhichang.yuan wrote:
+> On 2016/9/7 23:06, Arnd Bergmann wrote:
+> > On Wednesday, September 7, 2016 9:33:50 PM CEST Zhichang Yuan wrote:
+> >> +#ifdef CONFIG_ARM64_INDIRECT_PIO
+> >> +
+> >> +typedef u64 (*inhook)(void *devobj, unsigned long ptaddr, void *inbuf,
+> >> +                               size_t dlen, unsigned int count);
+> >> +typedef void (*outhook)(void *devobj, unsigned long ptaddr,
+> >> +                               const void *outbuf, size_t dlen,
+> >> +                               unsigned int count);
+> >> +
+> >> +struct extio_ops {
+> >> +       inhook  pfin;
+> >> +       outhook pfout;
+> >> +       void *devpara;
+> >> +};
+> >> +
+> >> +extern struct extio_ops *arm64_simops __refdata;
+> >> +
+> >> +/*Up to now, only applied to Hip06 LPC. Define as static here.*/
+> >> +static inline void arm64_set_simops(struct extio_ops *ops)
+> >> +{
+> >> +       if (ops)
+> >> +               WRITE_ONCE(arm64_simops, ops);
+> >> +}
+> >> +
+> >> +
+> >> +#define BUILDIO(bw, type)                                              \
+> >> +static inline type in##bw(unsigned long addr)                          \
+> >> +{                                                                      \
+> >> +       if (addr >= PCIBIOS_MIN_IO)                                     \
+> >> +               return read##bw(PCI_IOBASE + addr);                     \
+> >> +       return (arm64_simops && arm64_simops->pfin) ?                   \
+> >> +               arm64_simops->pfin(arm64_simops->devpara, addr, NULL,   \
+> >> +                                       sizeof(type), 1) : -1;          \
+> >> +}                                                      \
+> >>
+> > 
+> > Hmm, the way this is done, enabling CONFIG_ARM64_INDIRECT_PIO at
+> > compile time means that only the dynamically registered PIO support
+> > is possible for I/O port ranges 0-0xfff.
+> Yes. The arm64_simops is only for IO range 0-0xfff. But since only one global arm64_simops, this patch doesn't
+> support the dynamically PIO register, only one PIO range of 0-0xfff is supported. As for multiple PIO ranges
+> register, you also mention below, will discuss there.
+
+I think having only one range is enough, but it may be best not to
+assume that this is mapped at a fixed location in the Linux PIO
+port address space.
+
+As I understand, you list all the child devices in DT, so those
+port numbers should all be translatable from bus specific (0x0-0xfff)
+into the larger Linux range that also contains PCI devices.
+
+> > I think the runtime check should better test if simops was defined
+> > first and fall back to normal PIO otherwise, in order to allow
+> > LPC implementations on a PCI-LPC bridge.
+> Do you mean check arm64_simops first?
+> I don't understand clearly what is the benefit about that.
+> It seems that most IO accesses are MMIO, is it the current implementation a bit efficent?
+
+No, this is about having devices at hardcoded PIO addresses behind PCI
+on another (non-hisilicon) machine running the same kernel binary.
+
+> > How about allowing an I/O port range to be defined along with
+> > the operations and check against that?
+> > 
+> > u8 intb(unsigned long port)
+> > {
+> > 	if (arm64_simops &&
+> > 	    (port >= arm64_simops->min) && 
+> > 	    (port <= arm64_simops->max))
+> > 		return arm64_simops->pfin(arm64_simops, port, 1);
+> > 	else
+> > 		return readb(PCI_IOBASE + addr);
+> > }
+> > 
+> > The other advantage of that is that you can dynamically register
+> > a translation for the LPC port range into the Linux I/O port range
+> > like PCI hosts do.
+> Yes. an IO port range along with the operations is more generic and extensible.
+> Do you want to define extio_ops like that:
 > 
-> LS1046A is an SoC with 4 ARMv8 A72 cores and most other IP blocks
-> are similar to LS1043A which also complies to Freescale Chassis 2.1
-> spec.
+> struct extio_ops {
+>         unsigned long start;
+>         unsigned long end;
+>         unsigned long ptoffset;/* port IO - linux io */
+>         inhook  pfin;
+>         outhook pfout;
+>         void *devpara;
+> };
 > 
-> Created LS1046A SoC DTSI file to be included by board level DTS
-> files.
+> With this structure, we can register the PIO range we need without limit in 0-0xfff. But there is only one global struct
+> extio_ops where arm64_simops points to, we can only register one operation.
+> Actually, Hip06 LPC currently need at least two PIO ranges, 0xe4-0xe7, 0x2f8-0x2ff.
+> In this patch, we want to make the PIO differentiation in the new revised in/out() is more simpler, just reserve a bigger
+> PIO range of 0-0xfff from the whole PIO range for this indirect-IO introduced in this patch-set. I think this reservation
+> is not so safe, if there are other legacy devices which are designed to use fixable PIO range below 0x1000 through in/out,
+> the trouble will happen.
+
+I don't think we can solve all the possible cases. When a driver asks
+for a hardcoded address, we can either route that to the first PCI bus
+that registers, or always route it to LPC, but there may always be
+corner cases that don't work.
+
+Fortunately, it is very rare for hardcoded PIO addresses to be required
+in particular on non-x86 architectures, so it might not matter too much
+in practice:
+
+Having the extio range live on ports 0-0x1000 by default is probably
+reasonable, as long as that range is also usable for PCI on other
+platforms. Having it registered dynamically after the PCI bus should
+also be ok.
+
+> Based on your initial idea, I have two thoughts which help to make the indirect-IO more generic:
 > 
-> Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
-> Signed-off-by: Mihai Bantea <mihai.bantea@nxp.com>
-> Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
-> Signed-off-by: Gong Qianyu <Qianyu.Gong@nxp.com>
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> Signed-off-by: Mingkai Hu <Mingkai.Hu@nxp.com>
-> Signed-off-by: Shaohui Xie <Shaohui.Xie@nxp.com>
-> ---
-> Changes in V2:
-> 1. addressed Arnd's comments.
->    removed memory size property.
->    refined devices' names.
->    removed PCIe and MSI nodes.
-> 2. updated interrupt properties with readable defines.
-> 3. removed clock-names property from I2C and watchdog nodes.
-> 4. added crypto nodes.
->    binding of crypto nodes available at:
->    http://patchwork.ozlabs.org/patch/663184/
-> 5. added CPU idle-states node.
-> 6. added ddr controller node.
+> 1. setup a list where all indirect-IO devices' operations are linked to
 > 
->  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 511 +++++++++++++++++++++++++
->  1 file changed, 511 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
 > 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-> new file mode 100644
-> index 0000000..9697332
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-> @@ -0,0 +1,511 @@
-> +/*
-> + * Device Tree Include file for Freescale Layerscape-1046A family SoC.
-> + *
-> + * Copyright 2016, Freescale Semiconductor, Inc.
-> + *
-> + * Mingkai Hu <mingkai.hu@nxp.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPLv2 or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	compatible = "fsl,ls1046a";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	aliases {
-> +		crypto = &crypto;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a72";
-> +			reg = <0x0>;
-> +			clocks = <&clockgen 1 0>;
-> +			next-level-cache = <&l2>;
-> +			cpu-idle-states = <&CPU_PH20>;
-> +		};
-> +
-> +		cpu1: cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a72";
-> +			reg = <0x1>;
-> +			clocks = <&clockgen 1 0>;
-> +			next-level-cache = <&l2>;
-> +			cpu-idle-states = <&CPU_PH20>;
-> +		};
-> +
-> +		cpu2: cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a72";
-> +			reg = <0x2>;
-> +			clocks = <&clockgen 1 0>;
-> +			next-level-cache = <&l2>;
-> +			cpu-idle-states = <&CPU_PH20>;
-> +		};
-> +
-> +		cpu3: cpu at 3 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a72";
-> +			reg = <0x3>;
-> +			clocks = <&clockgen 1 0>;
-> +			next-level-cache = <&l2>;
-> +			cpu-idle-states = <&CPU_PH20>;
-> +		};
-> +
-> +		l2: l2-cache {
-> +			compatible = "cache";
-> +		};
-> +	};
-> +
-> +	idle-states {
-> +		entry-method = "arm,psci";
-> +
-> +		CPU_PH20: cpu-ph20 {
-> +			compatible = "arm,idle-state";
-> +			idle-state-name = "PH20";
-> +			arm,psci-suspend-param = <0x00010000>;
-> +			entry-latency-us = <1000>;
-> +			exit-latency-us = <1000>;
-> +			min-residency-us = <3000>;
-> +		};
-> +	};
-> +
-> +	memory at 80000000 {
-> +		device_type = "memory";
-> +	};
-> +
-> +	sysclk: sysclk {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <100000000>;
-> +		clock-output-names = "sysclk";
-> +	};
-> +
-> +	reboot {
-> +		compatible ="syscon-reboot";
-> +		regmap = <&dcfg>;
-> +		offset = <0xb0>;
-> +		mask = <0x02>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <GIC_PPI 13 IRQ_TYPE_EDGE_RISING>,
-> +			     <GIC_PPI 14 IRQ_TYPE_EDGE_RISING>,
-> +			     <GIC_PPI 11 IRQ_TYPE_EDGE_RISING>,
-> +			     <GIC_PPI 10 IRQ_TYPE_EDGE_RISING>;
+> struct extio_range {
+>         unsigned long start;/* inclusive, sys io addr */
+>         unsigned long end;/* inclusive, sys io addr */
+>         unsigned long ptoffset;/* port Io - system Io */
+> };
+> 
+> struct extio_node {
+>         struct list_head ranlink;
+> 
+>         struct extio_range iores;
+> 
+>         /*pointer to the device provided services*/
+>         struct extio_ops *regops;
+> };
+> 
+> when in/out is called with the input PIO parameter, check which node contains the input PIO and call the corresponding operation to
+> complete the IO.
+> 
+> static inline type inb(unsigned long addr)
+> {
+>         struct extio_node *extop;
+>         unsigned long offset;
+> /* extio_range_getops() will scan the list to find the node where start <= addr <= end is satisfied*/
+>         extop = extio_range_getops(addr, &offset);
+>         if (!extop)
+>                 return read##bw(PCI_IOBASE + addr);
+>         if (extop->regops && extop->regops->pfin)
+>                 return extop->regops->pfin(extop->regops->devpara,
+>                                 addr + offset, NULL, sizeof(type), 1);
+>         return -1;
+> }
+> 
+> The major disadvantage of this method is the performance. When the list is not long, it will be ok, I think.
 
-No, this is completely wrong. The timer is always level triggered, and
-you're missing the affinity bits that are described the GIC binding.
+> If support multiple PIO ranges are not needed, we don't need this list, only continue use the global arm64_simops based on the new
+> extio_ops structure. Probably this is your suggestion.
 
-> +	};
-> +
-> +	pmu {
-> +		compatible = "arm,armv8-pmuv3";
+I wouldn't go this far: just assume that there is either one set of
+operations registered or none at all, but make it possible to have it
+at an arbitrary address.
 
-Please add "arm,cortex-a72-pmu".
+> 2. extend the linux IO space to spare a fully separate PIO range for indirect-IO
+> 
+> the current linux IO space on arm64 is 0 to  IO_SPACE_LIMIT:
+> 
+> #define IO_SPACE_LIMIT		(PCI_IO_SIZE - 1)
+> #define PCI_IOBASE		((void __iomem *)PCI_IO_START)
+> 
+> current PCI_IO_SIZE is 16M.
+> 
+> It seems the current linux IO space on arm64 is totally for PCI IO based on MMIO. For indirect-IO in this patch-set, we populate the linux
+> IO range from 16M to 18M, this 2M linux IO space can be divided into 32 segments with segment size is 64K. Each segment is exclusively populated
+> by one indirect-IO device. when the device is creating, a segment with unique segment ID will be allocated and the IO resource will be converted
+> to the IO range corresponding with that segment. For example, segement 2 will own the IO range 0x1020000 - 0x102ffff.
+> 
+> the structure for this way is:
+> 
+> #define EXTIO_VECTOR_MAX     32
+> struct extio_vector {
+>         struct mutex            seglock;
+> 
+> 	/* one bit corresponds with one segment */
+>         DECLARE_BITMAP(bmap, EXTIO_VECTOR_MAX);
+>         struct extio_ops       *opsvec;
+> };
+> 
+> 
+> when the corresponding driver call in/out with one port address from the allocated linux IO resource, the processing like that:
+> 
+> static inline type inb(unsigned long addr)
+> {
+>         if (!(addr & (0x01 << 16))) /* only check bit 16 */
+>                 return readb(PCI_IOBASE + addr);
+> /* extio_inb will directly parse the bit16 to bit 20 to get the segment ID, then get the corresponding IO operation specific to device */
+>         return extio_inb(addr);
+> }
+> 
+> This method is nearly no performance lose, but is more complicated. Maybe it is not worthy to do that.
 
-> +		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-affinity = <&cpu0>,
-> +				     <&cpu1>,
-> +				     <&cpu2>,
-> +				     <&cpu3>;
-> +	};
-> +
-> +	gic: interrupt-controller at 1400000 {
-> +		compatible = "arm,gic-400";
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		reg = <0x0 0x1410000 0 0x10000>, /* GICD */
-> +		      <0x0 0x1420000 0 0x20000>, /* GICC */
-> +		      <0x0 0x1440000 0 0x20000>, /* GICH */
-> +		      <0x0 0x1460000 0 0x20000>; /* GICV */
-> +		interrupts = <1 9 0xf08>;
+No, I don't think this is necessary either.
 
-Please choose between expressing the interrupts entirely with numerals
-or entirely with symbols. At the moment this is a mix between the two.
+> > We may also want to move the inb/outb definitions into a .c file
+> > as they are getting rather big.
+> The current in/out is defined as inline function in asm-generic/io.h; If we move them to .c file, probably much change.....
 
-> +	};
+The current implementation turns into a single CPU instruction, my idea
+was not to grow that too much but instead turn it into a branch instruction
+when your code is enabled at compile-time. When it's disabled, we should
+still use the existing behavior.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Arnd
