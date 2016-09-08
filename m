@@ -1,65 +1,44 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Thu, 8 Sep 2016 17:44:00 +0300
-Subject: [PATCH v2 0/7] ARM: dts: imx: add gpio-ranges properties to some
- iMX GPIO controllers
-In-Reply-To: <20160908142617.GG16911@tiger>
-References: <1471723491-15330-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <a97478e5-e423-2c9b-de71-3341c76ff4fe@mentor.com>
- <20160908142617.GG16911@tiger>
-Message-ID: <cc71f4aa-f0ad-83a4-52b1-4d745af234a8@mentor.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu,  8 Sep 2016 16:51:41 +0200
+Subject: [PATCH v2 0/5] AT91: sckc improvements
+Message-ID: <20160908145146.20422-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi,
 
-On 09/08/2016 05:26 PM, Shawn Guo wrote:
-> On Wed, Sep 07, 2016 at 06:31:15PM +0300, Vladimir Zapolskiy wrote:
->> Hello Shawn, Fabio.
->>
->> On 08/20/2016 11:04 PM, Vladimir Zapolskiy wrote:
->>> % gawk -n '{ sub(/.*__/, ""); if ($1 ~ "^GPIO") print $1, $2/4}' \
->>> 	arch/arm/boot/dts/imxXX-pinfunc.h | sort -n
->>>
->>> Note that this means that potential errors in arch/arm/boot/dts/imx*-pinfunc.h
->>> descriptions may migrate to this change, please double check the values.
->>>
->>> If needed similar changes may be done for the rest of iMX SoCs.
->>>
->>> Changes from v1 to v2:
->>> * in copy-pasted commit messages corrected SoC names
->>>
->>> Vladimir Zapolskiy (7):
->>>  ARM: dts: add gpio-ranges property to iMX50 GPIO controllers
->>>  ARM: dts: add gpio-ranges property to iMX6Q/D GPIO controllers
->>>  ARM: dts: add gpio-ranges property to iMX6DL/S GPIO controllers
->>>  ARM: dts: add gpio-ranges property to iMX6SL GPIO controllers
->>>  ARM: dts: add gpio-ranges property to iMX6SX GPIO controllers
->>>  ARM: dts: add gpio-ranges property to iMX6UL GPIO controllers
->>>  ARM: dts: add gpio-ranges property to iMX7D/S GPIO controllers
->>>
->>> arch/arm/boot/dts/imx50.dtsi  | 16 +++++++++++++
->>> arch/arm/boot/dts/imx6dl.dtsi | 53 +++++++++++++++++++++++++++++++++++++++++++
->>> arch/arm/boot/dts/imx6q.dtsi  | 37 ++++++++++++++++++++++++++++++
->>> arch/arm/boot/dts/imx6sl.dtsi | 52 ++++++++++++++++++++++++++++++++++++++++++
->>> arch/arm/boot/dts/imx6sx.dtsi | 14 ++++++++++++
->>> arch/arm/boot/dts/imx6ul.dtsi | 11 +++++++++
->>> arch/arm/boot/dts/imx7s.dtsi  | 14 ++++++++++++
->>> 7 files changed, 197 insertions(+)
->>>
->>
->> Gentle ping, please provide review comments, the change would be good
->> to have in v4.9.
->
-> I'm fine to pick them up, but can you please squash them into one patch
+This patch set improves the slow clock controller driver.
 
-I have no strict objections to squashing in this case.
+The first patch simply moves some code around to avoid having extern
+functions declared.
 
-> and drop the newline right before gpio-ranges property?
+The second patch adds support for the SCKC found on sama5d4 and later.
+It is notably missing the OSC32EN bit.
+The third and fourth patches make use of this new driver (DT ABI is not
+broken \o/)
 
-Sure, I will drop empty lines and send a single patch v3 today or tomorrow.
+Finally, there is an optimization. Trying to find wether the slow
+oscillator is already stable to avoid waiting 1.2s twice in the boot
+process.
 
-Thank you for review.
+Changes in v2:
+ - Fixed a typo pointed by Boris
 
---
-With best wishes,
-Vladimir
+Alexandre Belloni (5):
+  clk: at91: move slow clock controller clocks to sckc.c
+  clk: at91: Add sama5d4 sckc support
+  ARM: dts: at91: sama5d4: use proper sckc compatible
+  ARM: dts: at91: sama5d2: use correct sckc compatible
+  clk: at91: sckc: optimize boot time
+
+ .../devicetree/bindings/clock/at91-clock.txt       |   3 +-
+ arch/arm/boot/dts/sama5d2.dtsi                     |  26 +-
+ arch/arm/boot/dts/sama5d4.dtsi                     |  27 +-
+ drivers/clk/at91/clk-slow.c                        | 353 ----------------
+ drivers/clk/at91/sckc.c                            | 447 ++++++++++++++++++++-
+ drivers/clk/at91/sckc.h                            |  22 -
+ 6 files changed, 456 insertions(+), 422 deletions(-)
+ delete mode 100644 drivers/clk/at91/sckc.h
+
+-- 
+2.9.3
