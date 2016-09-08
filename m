@@ -1,48 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 7 Sep 2016 17:22:54 -0700
-Subject: [PATCH 4/5] ARM: dts: exynos: add support for ISP power domain
- to exynos4x12 clocks device
-In-Reply-To: <1472737551-15272-5-git-send-email-m.szyprowski@samsung.com>
-References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
- <1472737551-15272-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20160908002254.GD13062@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 8 Sep 2016 08:44:49 +0800
+Subject: [PATCH v6 2/3] ARM: dts: add TOPEET itop elite based board
+In-Reply-To: <1473285535-21996-3-git-send-email-ayaka@soulik.info>
+Message-ID: <201609080815.OeHovfsz%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01, Marek Szyprowski wrote:
-> Exynos4412 clock controller contains some additional clocks for FIMC-ISP
-> (Camera ISP) subsystem. Registers for those clocks are partially located
-> in the SOC area, which belongs to ISP power domain.
-> 
-> This patch extends clock controller node with ISP clock sub-node and link
-> (phandle) to ISP power domain.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4x12.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-> index 3394bdcf10ae..4daea67546b9 100644
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@ -74,6 +74,11 @@
->  		compatible = "samsung,exynos4412-clock";
->  		reg = <0x10030000 0x20000>;
->  		#clock-cells = <1>;
-> +
-> +		isp-clock-controller {
-> +			compatible = "samsung,exynos4412-isp-clock";
-> +			power-domains = <&pd_isp>;
-> +		};
+Hi Randy,
 
-Why can't we extend support in power domains code to have
-multiple domains for a single device node? i.e. power-domains =
-<&pd_isp>, <&pd_foo>, <&pd_bar>, and then pick the right one with
-power-domain-names or something like that? Making a subnode
-(which seems to turn into a child platform device?) seems like a
-quick solution for larger problems.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.8-rc5 next-20160907]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+url:    https://github.com/0day-ci/linux/commits/Randy-Li/Add-a-new-board-TOPEET-iTOP-for-Exynos-4412/20160908-060206
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-omap2plus_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/exynos4412-itop-elite.dts:130.26-27 syntax error
+   FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 28176 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/22cdfda3/attachment-0001.obj>
