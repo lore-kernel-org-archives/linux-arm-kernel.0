@@ -1,38 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Sep 2016 13:51:24 +0100
-Subject: [PATCH v2 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-In-Reply-To: <CAGXu5j++0LgDEv=m1yQb4hB57MQ2MYVCpeex9TFTRmQpNYhNsQ@mail.gmail.com>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <CAGXu5j++0LgDEv=m1yQb4hB57MQ2MYVCpeex9TFTRmQpNYhNsQ@mail.gmail.com>
-Message-ID: <20160908125123.ypkye5nclsi5vx4f@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2016 14:52:29 +0200
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <20160908122810.GA14132@b29397-desktop>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <4934737.egJZVdaLZs@wuerfel> <20160908122810.GA14132@b29397-desktop>
+Message-ID: <6547614.50rx8ya9lj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 04:20:55PM -0700, Kees Cook wrote:
-> On Fri, Sep 2, 2016 at 8:02 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > This is the second version of the arm64 PAN emulation by disabling
-> > TTBR0_EL1 accesses. The major change from v1 is the use of a thread_info
-> > member to store the real TTBR0_EL1 value. The advantage is slightly
-> > simpler assembler macros for uaccess_enable with the downside that
-> > switch_mm() must always update the saved ttbr0 even if there is no mm
-> > switch.
+On Thursday, September 8, 2016 8:28:10 PM CEST Peter Chen wrote:
+> On Thu, Sep 08, 2016 at 12:17:21PM +0200, Arnd Bergmann wrote:
+> > On Thursday, September 8, 2016 12:43:06 PM CEST Felipe Balbi wrote:
+> > > Arnd Bergmann <arnd@arndb.de> writes:
+> > > > On Thursday, September 8, 2016 11:29:04 AM CEST Felipe Balbi wrote:
+> > > If we have a parent device, use that as sysdev, otherwise use self as
+> > > sysdev.
+> > 
+> > But there is often a parent device in DT, as the xhci device is
+> > attached to some internal bus that gets turned into a platform_device
+> > as well, so checking whether there is a parent will get the wrong
+> > device node.
 > 
-> Is arm64 thread_info attached to the kernel stack? (i.e. is this
-> introducing a valuable target for stack-based attacks?)
+> From my point, all platform and firmware information at dwc3 are
+> correct, so we don't need to change dwc3/core.c, only changing for
+> xhci-plat.c is ok.
 
-Currently yes, thread_info is on the kernel stack. At some point we'll
-decouple it in a similar way to what x86 are doing/planning.
+Ok, thanks. That leaves the PCI glue, right?
 
-If thread_info on the stack can be corrupted, ttbr0 is not our only
-worry but I agree it adds to the existing ones (addr_limit, task_struct
-pointer).
+> diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
+> index d2e3f65..563600b 100644
+> --- a/drivers/usb/core/hcd.c
+> +++ b/drivers/usb/core/hcd.c
+> @@ -1118,7 +1118,7 @@ static int register_root_hub(struct usb_hcd *hcd)
+>  		/* Did the HC die before the root hub was registered? */
+>  		if (HCD_DEAD(hcd))
+>  			usb_hc_died (hcd);	/* This time clean up */
+> -		usb_dev->dev.of_node = parent_dev->of_node;
+> +		usb_dev->dev.of_node = parent_dev->sysdev->of_node;
+>  	}
+>  	mutex_unlock(&usb_bus_idr_lock);
+> 
+> At above changes, the root hub's of_node equals to xhci-hcd sysdev's
+> of_node, which is from firmware or from its parent (it is dwc3 core
+> device).
 
-That said, I don't have a strong preference for thread_info vs per-CPU
-variable for the shadow TTBR0. The latter feels a bit more natural to me
-since TTBR0 can be seen as a CPU state (that's what I did in v1).
-However, using thread_info saves us couple of instructions in the asm
-code for uaccess_enable.
+Just to make sure I understand you right:
 
--- 
-Catalin
+in the qcom,dwc3 -> dwc3 -> xhci hierarchy, this would be the
+dwc3 device, not the qcom,dwc3 device.
+
+> > > > That sounds a bit clumsy for the sake of consistency with PCI.
+> > > > The advantage is that xhci can always use the grandparent device
+> > > > as sysdev whenever it isn't probed through PCI or firmware
+> > > > itself, but the purpose of the dwc3-glue is otherwise questionable.
+> > > >
+> > > > How about adding a 'compatible="snps,dwc3-pci"' property for the dwc3
+> > > > device when that is created from the PCI driver and checking for that
+> > > > with the device property interface instead? If it's "snps,dwc3"
+> > > > we use the device itself while for "snps,dwc3-pci", we use the parent?
+> > > 
+> 
+> For pci glue device, it is always the parent for dwc3 core device.
+> In your patch, you may not need to split pci or non-pci, just using
+> if (dev->parent).
+
+Here we have the pci-dwc3 -> dwc3 -> xhci hierarchy, and we want
+sysdev to point to pci-dwc3, not dwc3!
+
+The point is that the pci_dev is where we have the dma settings
+and (optionally) additional DT or ACPI data for that device.
+
+	Arnd
