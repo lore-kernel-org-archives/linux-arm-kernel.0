@@ -1,174 +1,45 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 8 Sep 2016 15:34:46 +0200
-Subject: [PATCH 4/6] arm64/kvm: use {read,write}_sysreg()
-In-Reply-To: <1473339339-32334-5-git-send-email-mark.rutland@arm.com>
-References: <1473339339-32334-1-git-send-email-mark.rutland@arm.com>
- <1473339339-32334-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160908133446.GA9940@cbox>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Sep 2016 15:34:42 +0200
+Subject: [GIT PULL] Qualcomm EBI2 bindings and bus driver
+Message-ID: <CACRpkdYvowN2htUuN46JNVdfaKNw3AEbBfzAeScHQcLU5o3ZUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 01:55:37PM +0100, Mark Rutland wrote:
-> A while back we added {read,write}_sysreg accessors to handle accesses
-> to system registers, without the usual boilerplate asm volatile,
-> temporary variable, etc.
-> 
-> This patch makes use of these in the arm64 KVM code to make the code
-> shorter and clearer.
-> 
-> At the same time, a comment style violation next to a system register
-> access is fixed up in reset_pmcr, and comments describing whether
-> operations are reads or writes are removed as this is now painfully
-> obvious.
+Hi ARM SoC folks,
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+please pull this new EBI2 bus driver and its bindings into an
+apropriate branch in the ARM SoC tree. The binding now has
+Rob Herrings ACK and we have hopefully finally figured out how
+this should be done.
 
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/virt.h        |  6 ++----
->  arch/arm64/kvm/sys_regs.c            | 31 +++++++++++--------------------
->  arch/arm64/kvm/sys_regs_generic_v8.c |  6 ++----
->  3 files changed, 15 insertions(+), 28 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> index 1788545..c5cc940 100644
-> --- a/arch/arm64/include/asm/virt.h
-> +++ b/arch/arm64/include/asm/virt.h
-> @@ -45,6 +45,7 @@
->  #ifndef __ASSEMBLY__
->  
->  #include <asm/ptrace.h>
-> +#include <asm/sysreg.h>
->  
->  /*
->   * __boot_cpu_mode records what mode CPUs were booted in.
-> @@ -75,10 +76,7 @@ static inline bool is_hyp_mode_mismatched(void)
->  
->  static inline bool is_kernel_in_hyp_mode(void)
->  {
-> -	u64 el;
-> -
-> -	asm("mrs %0, CurrentEL" : "=r" (el));
-> -	return el == CurrentEL_EL2;
-> +	return read_sysreg(CurrentEL) == CurrentEL_EL2;
->  }
->  
->  #ifdef CONFIG_ARM64_VHE
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index e51367d..f302fdb 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -36,6 +36,7 @@
->  #include <asm/kvm_host.h>
->  #include <asm/kvm_mmu.h>
->  #include <asm/perf_event.h>
-> +#include <asm/sysreg.h>
->  
->  #include <trace/events/kvm.h>
->  
-> @@ -67,11 +68,9 @@ static u32 get_ccsidr(u32 csselr)
->  
->  	/* Make sure noone else changes CSSELR during this! */
->  	local_irq_disable();
-> -	/* Put value into CSSELR */
-> -	asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
-> +	write_sysreg(csselr, csselr_el1);
->  	isb();
-> -	/* Read result out of CCSIDR */
-> -	asm volatile("mrs %0, ccsidr_el1" : "=r" (ccsidr));
-> +	ccsidr = read_sysreg(ccsidr_el1);
->  	local_irq_enable();
->  
->  	return ccsidr;
-> @@ -174,9 +173,7 @@ static bool trap_dbgauthstatus_el1(struct kvm_vcpu *vcpu,
->  	if (p->is_write) {
->  		return ignore_write(vcpu, p);
->  	} else {
-> -		u32 val;
-> -		asm volatile("mrs %0, dbgauthstatus_el1" : "=r" (val));
-> -		p->regval = val;
-> +		p->regval = read_sysreg(dbgauthstatus_el1);
->  		return true;
->  	}
->  }
-> @@ -429,10 +426,7 @@ static void reset_wcr(struct kvm_vcpu *vcpu,
->  
->  static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  {
-> -	u64 amair;
-> -
-> -	asm volatile("mrs %0, amair_el1\n" : "=r" (amair));
-> -	vcpu_sys_reg(vcpu, AMAIR_EL1) = amair;
-> +	vcpu_sys_reg(vcpu, AMAIR_EL1) = read_sysreg(amair_el1);
->  }
->  
->  static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-> @@ -456,8 +450,9 @@ static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  {
->  	u64 pmcr, val;
->  
-> -	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
-> -	/* Writable bits of PMCR_EL0 (ARMV8_PMU_PMCR_MASK) is reset to UNKNOWN
-> +	pmcr = read_sysreg(pmcr_el0);
-> +	/*
-> +	 * Writable bits of PMCR_EL0 (ARMV8_PMU_PMCR_MASK) are reset to UNKNOWN
->  	 * except PMCR.E resetting to zero.
->  	 */
->  	val = ((pmcr & ~ARMV8_PMU_PMCR_MASK)
-> @@ -557,9 +552,9 @@ static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->  		return false;
->  
->  	if (!(p->Op2 & 1))
-> -		asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
-> +		pmceid = read_sysreg(pmceid0_el0);
->  	else
-> -		asm volatile("mrs %0, pmceid1_el0\n" : "=r" (pmceid));
-> +		pmceid = read_sysreg(pmceid1_el0);
->  
->  	p->regval = pmceid;
->  
-> @@ -1833,11 +1828,7 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
->  	static void get_##reg(struct kvm_vcpu *v,			\
->  			      const struct sys_reg_desc *r)		\
->  	{								\
-> -		u64 val;						\
-> -									\
-> -		asm volatile("mrs %0, " __stringify(reg) "\n"		\
-> -			     : "=r" (val));				\
-> -		((struct sys_reg_desc *)r)->val = val;			\
-> +		((struct sys_reg_desc *)r)->val = read_sysreg(reg);	\
->  	}
->  
->  FUNCTION_INVARIANT(midr_el1)
-> diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-> index ed90578..46af718 100644
-> --- a/arch/arm64/kvm/sys_regs_generic_v8.c
-> +++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-> @@ -26,6 +26,7 @@
->  #include <asm/kvm_host.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_coproc.h>
-> +#include <asm/sysreg.h>
->  #include <linux/init.h>
->  
->  #include "sys_regs.h"
-> @@ -43,10 +44,7 @@ static bool access_actlr(struct kvm_vcpu *vcpu,
->  
->  static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  {
-> -	u64 actlr;
-> -
-> -	asm volatile("mrs %0, actlr_el1\n" : "=r" (actlr));
-> -	vcpu_sys_reg(vcpu, ACTLR_EL1) = actlr;
-> +	vcpu_sys_reg(vcpu, ACTLR_EL1) = read_sysreg(actlr_el1);
->  }
->  
->  /*
-> -- 
-> 1.9.1
-> 
+Yours,
+Linus Walleij
+
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/qcom-ebi2-arm-soc
+
+for you to fetch changes up to 335a127548081322bd2b294d715418648912f20c:
+
+  bus: qcom: add EBI2 driver (2016-09-08 15:27:05 +0200)
+
+----------------------------------------------------------------
+Qualcomm EBI2 bindings and bus driver.
+
+----------------------------------------------------------------
+Linus Walleij (2):
+      bus: qcom: add EBI2 device tree bindings
+      bus: qcom: add EBI2 driver
+
+ .../devicetree/bindings/bus/qcom,ebi2.txt          | 138 +++++++
+ drivers/bus/Kconfig                                |   7 +
+ drivers/bus/Makefile                               |   1 +
+ drivers/bus/qcom-ebi2.c                            | 408 +++++++++++++++++++++
+ 4 files changed, 554 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/qcom,ebi2.txt
+ create mode 100644 drivers/bus/qcom-ebi2.c
