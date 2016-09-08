@@ -1,44 +1,55 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Thu,  8 Sep 2016 13:47:53 -0400
-Subject: [PATCH v2] ARM: dts: lpc32xx: set default parent clock for pwm1 & pwm2
-Message-ID: <1473356873-10610-1-git-send-email-slemieux.tyco@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 8 Sep 2016 17:50:36 +0000
+Subject: [RFC 2/7] Make Hi3620 explicit, remove wildcards
+In-Reply-To: <20160908172346.27506-2-netz.kernel@gmail.com>
+References: <20160908172346.27506-1-netz.kernel@gmail.com>
+ <20160908172346.27506-2-netz.kernel@gmail.com>
+Message-ID: <20160908175036.GD12916@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+On Thu, Sep 08, 2016 at 12:23:41PM -0500, Marty Plummer wrote:
+> This is a preparatory series for adding the ARMv5/v6 hi3520 SoCs.
+> Assumptions were made when adding hi3620 that don't hold water in
+> light of adding support for the hi3520 SoC.  Fix the issue by renaming
+> config options and other namespaces to avoid collisions with the new
+> work.
+> 
+> Only internal APIs are modified with this series.
+> 
+> Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-The change setup the peripheral clock (PERIPH_CLK) as the default
-parent clock for PWM1 & PWM2.
+A quick trick for figuring out the preferred Subject line format for a
+subsystem is to do:
 
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
-Changes from v1 to v2:
-* Only assigned the PWM clock.
+$ git log --oneline --no-merges -- arch/arm/boot/dts/
 
- arch/arm/boot/dts/lpc32xx.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+thx,
 
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index e295e1e..218d9fa 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -469,6 +469,8 @@
- 				compatible = "nxp,lpc3220-pwm";
- 				reg = <0x4005C000 0x4>;
- 				clocks = <&clk LPC32XX_CLK_PWM1>;
-+				assigned-clocks = <&clk LPC32XX_CLK_PWM1>;
-+				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
- 				status = "disabled";
- 			};
- 
-@@ -476,6 +478,8 @@
- 				compatible = "nxp,lpc3220-pwm";
- 				reg = <0x4005C004 0x4>;
- 				clocks = <&clk LPC32XX_CLK_PWM2>;
-+				assigned-clocks = <&clk LPC32XX_CLK_PWM2>;
-+				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
- 				status = "disabled";
- 			};
- 
--- 
-1.8.3.1
+Jason.
+
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index faacd52..7ffd3a3 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -154,7 +154,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
+>  	exynos5440-sd5v1.dtb \
+>  	exynos5440-ssdk5440.dtb \
+>  	exynos5800-peach-pi.dtb
+> -dtb-$(CONFIG_ARCH_HI3xxx) += \
+> +dtb-$(CONFIG_ARCH_HI3620) += \
+>  	hi3620-hi4511.dtb
+>  dtb-$(CONFIG_ARCH_HIGHBANK) += \
+>  	highbank.dtb \
+> -- 
+> 2.9.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
