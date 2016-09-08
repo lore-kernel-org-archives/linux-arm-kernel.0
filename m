@@ -1,136 +1,37 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Thu, 8 Sep 2016 21:09:02 +0800
-Subject: [PATCH v6 2/6] dt-bindings: Add a binding for Mediatek MDP
-In-Reply-To: <1473340146-6598-1-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1473340146-6598-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <1473340146-6598-3-git-send-email-minghsiu.tsai@mediatek.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 8 Sep 2016 21:12:18 +0800
+Subject: [PATCH 5/7] [v2] arm64: dts: add LS1046A-RDB board support
+In-Reply-To: <1473069695-33092-6-git-send-email-shh.xie@gmail.com>
+References: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
+ <1473069695-33092-6-git-send-email-shh.xie@gmail.com>
+Message-ID: <20160908131218.GB16911@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT binding documentation of MDP for the MT8173 SoC
-from Mediatek
+On Mon, Sep 05, 2016 at 06:01:33PM +0800, shh.xie at gmail.com wrote:
+> +&ifc {
+> +	status = "okay";
 
-Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/media/mediatek-mdp.txt     |  109 ++++++++++++++++++++
- 1 file changed, 109 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
+For sake of consistency, please have 'status' at the end of property
+list.
 
-diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-new file mode 100644
-index 0000000..4182063
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-@@ -0,0 +1,109 @@
-+* Mediatek Media Data Path
-+
-+Media Data Path is used for scaling and color space conversion.
-+
-+Required properties (controller (parent) node):
-+- compatible: "mediatek,mt8173-mdp"
-+- mediatek,vpu: the node of video processor unit, see
-+  Documentation/devicetree/bindings/media/mediatek-vpu.txt for details.
-+
-+Required properties (all function blocks, child node):
-+- compatible: Should be one of
-+        "mediatek,mt8173-mdp-rdma"  - read DMA
-+        "mediatek,mt8173-mdp-rsz"   - resizer
-+        "mediatek,mt8173-mdp-wdma"  - write DMA
-+        "mediatek,mt8173-mdp-wrot"  - write DMA with rotation
-+- reg: Physical base address and length of the function block register space
-+- clocks: device clocks, see
-+  Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
-+- power-domains: a phandle to the power domain, see
-+  Documentation/devicetree/bindings/power/power_domain.txt for details.
-+
-+Required properties (DMA function blocks, child node):
-+- compatible: Should be one of
-+        "mediatek,mt8173-mdp-rdma"
-+        "mediatek,mt8173-mdp-wdma"
-+        "mediatek,mt8173-mdp-wrot"
-+- iommus: should point to the respective IOMMU block with master port as
-+  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-+  for details.
-+- mediatek,larb: must contain the local arbiters in the current Socs, see
-+  Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
-+  for details.
-+
-+Example:
-+mdp {
-+	compatible = "mediatek,mt8173-mdp";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	ranges;
-+	mediatek,vpu = <&vpu>;
-+
-+	mdp_rdma0: rdma at 14001000 {
-+		compatible = "mediatek,mt8173-mdp-rdma";
-+		reg = <0 0x14001000 0 0x1000>;
-+		clocks = <&mmsys CLK_MM_MDP_RDMA0>,
-+			 <&mmsys CLK_MM_MUTEX_32K>;
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+		iommus = <&iommu M4U_PORT_MDP_RDMA0>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	mdp_rdma1: rdma at 14002000 {
-+		compatible = "mediatek,mt8173-mdp-rdma";
-+		reg = <0 0x14002000 0 0x1000>;
-+		clocks = <&mmsys CLK_MM_MDP_RDMA1>,
-+			 <&mmsys CLK_MM_MUTEX_32K>;
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+		iommus = <&iommu M4U_PORT_MDP_RDMA1>;
-+		mediatek,larb = <&larb4>;
-+	};
-+
-+	mdp_rsz0: rsz at 14003000 {
-+		compatible = "mediatek,mt8173-mdp-rsz";
-+		reg = <0 0x14003000 0 0x1000>;
-+		clocks = <&mmsys CLK_MM_MDP_RSZ0>;
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+	};
-+
-+	mdp_rsz1: rsz at 14004000 {
-+		compatible = "mediatek,mt8173-mdp-rsz";
-+		reg = <0 0x14004000 0 0x1000>;
-+		clocks = <&mmsys CLK_MM_MDP_RSZ1>;
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+	};
-+
-+	mdp_rsz2: rsz at 14005000 {
-+		compatible = "mediatek,mt8173-mdp-rsz";
-+		reg = <0 0x14005000 0 0x1000>;
-+		clocks = <&mmsys CLK_MM_MDP_RSZ2>;
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+	};
-+
-+	mdp_wdma0: wdma at 14006000 {
-+		compatible = "mediatek,mt8173-mdp-wdma";
-+		reg = <0 0x14006000 0 0x1000>;
-+		clocks = <&mmsys CLK_MM_MDP_WDMA>;
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+		iommus = <&iommu M4U_PORT_MDP_WDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	mdp_wrot0: wrot at 14007000 {
-+		compatible = "mediatek,mt8173-mdp-wrot";
-+		reg = <0 0x14007000 0 0x1000>;
-+		clocks = <&mmsys CLK_MM_MDP_WROT0>;
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+		iommus = <&iommu M4U_PORT_MDP_WROT0>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	mdp_wrot1: wrot at 14008000 {
-+		compatible = "mediatek,mt8173-mdp-wrot";
-+		reg = <0 0x14008000 0 0x1000>;
-+		clocks = <&mmsys CLK_MM_MDP_WROT1>;
-+		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+		iommus = <&iommu M4U_PORT_MDP_WROT1>;
-+		mediatek,larb = <&larb4>;
-+	};
-+};
--- 
-1.7.9.5
+Shawn
+
+> +	#address-cells = <2>;
+> +	#size-cells = <1>;
+> +	/* NAND Flashe and CPLD on board */
+> +	ranges = <0x0 0x0 0x0 0x7e800000 0x00010000
+> +		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
+> +
+> +	nand at 0,0 {
+> +		compatible = "fsl,ifc-nand";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x0 0x0 0x10000>;
+> +	};
+> +
+> +	cpld: board-control at 2,0 {
+> +		compatible = "fsl,ls1046ardb-cpld";
+> +		reg = <0x2 0x0 0x0000100>;
+> +	};
+> +};
