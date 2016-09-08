@@ -1,50 +1,74 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 8 Sep 2016 09:29:19 +0200
-Subject: [PATCH v2 2/9] drm/sun4i: support A33 tcon
-In-Reply-To: <CAGb2v670juZTMovDZCoiW00d3otrBbOWwQXp0NzNeT6sP6zocA@mail.gmail.com>
-References: <20160906144620.6322-1-maxime.ripard@free-electrons.com>
- <20160906144620.6322-3-maxime.ripard@free-electrons.com>
- <CAGb2v670juZTMovDZCoiW00d3otrBbOWwQXp0NzNeT6sP6zocA@mail.gmail.com>
-Message-ID: <20160908072919.GE8913@lukather>
+Date: Thu, 8 Sep 2016 09:37:48 +0200
+Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
+In-Reply-To: <CAGb2v64h7kq2jWzUJ74vDdOOQOXPxjx3ruSsJMXvyr7fP63BGg@mail.gmail.com>
+References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
+ <20160907145400.27192-4-maxime.ripard@free-electrons.com>
+ <CACRpkdZsxA7avmO85R=-Quu7FQwSVMPhQMDmmgL+xbkVTB-2HQ@mail.gmail.com>
+ <CAGb2v64h7kq2jWzUJ74vDdOOQOXPxjx3ruSsJMXvyr7fP63BGg@mail.gmail.com>
+Message-ID: <20160908073748.GF8913@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 11:16:33PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Sep 6, 2016 at 10:46 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The A33 has a significantly different pipeline, with components that differ
-> > too.
+On Thu, Sep 08, 2016 at 12:46:14PM +0800, Chen-Yu Tsai wrote:
+> > I mean it like supporting these in *addition* to the custom ones, so there can
+> > be a smooth phase-over.
 > >
-> > Make sure we had compatible for them.
+> > Check for example Laurent's commit for SH-PFC:
+> > commit 16ccaf5bb5a52372bfebd3dfbb79dd810ad49c09
+> > "pinctrl: sh-pfc: Accept standard function, pins and groups properties"
+> > It's awesome, and since, they have improved the looks of Renesas
+> > DTS files a lot.
 > >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 7 ++++++-
-> >  drivers/gpu/drm/sun4i/sun4i_backend.c                         | 1 +
-> >  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 8 +++++---
-> >  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 8 +++++++-
-> >  4 files changed, 19 insertions(+), 5 deletions(-)
+> > It could look a bit like this nice thing from
+> > lpc4337-ciaa.dts:
 > >
-> > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > index df8f4aeefe4c..bd3136a5cba5 100644
-> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > @@ -26,7 +26,9 @@ TCON
-> >  The TCON acts as a timing controller for RGB, LVDS and TV interfaces.
+> > &pinctrl {
+> >         enet_rmii_pins: enet-rmii-pins {
+> >                 enet_rmii_rxd_cfg {
+> >                         pins = "p1_15", "p0_0";
+> >                         function = "enet";
+> >                         slew-rate = <1>;
+> >                         bias-disable;
+> >                         input-enable;
+> >                         input-schmitt-disable;
+> >                 };
 > >
-> >  Required properties:
-> > - - compatible: value should be "allwinner,sun5i-a13-tcon".
-> > + - compatible: value must be either:
-> > +   * allwinner,sun5i-a13-tcon
-> > +   * allwinner,sun8i-a33-tcon
-> >   - reg: base address and size of memory-mapped region
-> >   - interrupts: interrupt associated to this IP
-> >   - clocks: phandles to the clocks feeding the TCON. Three are needed:
+> >                 enet_rmii_txd_cfg {
+> >                         pins = "p1_18", "p1_20";
+> >                         function = "enet";
+> >                         slew-rate = <1>;
+> >                         bias-disable;
+> >                         input-enable;
+> >                         input-schmitt-disable;
+> >                 };
+> > (etc)
 > 
-> You should probably put a note saying the A33 only needs 2 clocks.
-> You can keep my ack after fixing it.
+> This looks nice.
 
-I did while applying, thanks!
+Indeed.
+
+> I've slightly looked at the generic pinconf stuff.  I think we
+> should be able to support them, though the sunxi pinctrl driver
+> currently doesn't work well with it though. For example, it doesn't
+> declare ".is_generic = true", it doesn't filter unsupported pinconf
+> parameters, and it doesn't reply to queries correctly. I will fix
+> these bits.
+> 
+> Also, I think we are needlessly using pin groups, 1 pin per group.
+> Can pinconf/pinctrl work without them? Would there be any harm
+> converting the sunxi driver to work directly with pins? This would
+> make it match generic pinconf parsing, and make it easier to get
+> both working together.
+
+I think it comes from a requirement that you had to have groups at
+some point (I don't know if it's still the case), which is why we
+ended up with single-pin groups, because we can mux each pins entirely
+separately.
+
+If it's not required anymore, then yes, it makes total sense to remove
+it.
+
 Maxime
 
 -- 
@@ -57,4 +81,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/eeaaa040/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160908/e9e0ca6b/attachment.sig>
