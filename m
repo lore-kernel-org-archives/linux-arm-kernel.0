@@ -1,39 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 8 Sep 2016 14:40:25 +0100
-Subject: [PATCH v2 2/2] arm64: Use static keys for CPU features
-In-Reply-To: <48d10fa1-ee4c-e398-b5ae-9815bf0f18eb@akamai.com>
-References: <1473096348-19548-1-git-send-email-catalin.marinas@arm.com>
- <1473096348-19548-3-git-send-email-catalin.marinas@arm.com>
- <48d10fa1-ee4c-e398-b5ae-9815bf0f18eb@akamai.com>
-Message-ID: <20160908134025.2nq3e5ohienesrae@localhost>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 8 Sep 2016 08:40:51 -0500
+Subject: [PATCH v8 03/16] of/numa: add nid check for memory block
+In-Reply-To: <1472712907-12700-4-git-send-email-thunder.leizhen@huawei.com>
+References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472712907-12700-4-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <CAL_JsqK6P86F=AJjC2J6W4NOFXavb4e-OR_dmc4iofUNCJGrJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 12:59:52PM -0400, Jason Baron wrote:
-> On 09/05/2016 01:25 PM, Catalin Marinas wrote:
-> > This patch adds static keys transparently for all the cpu_hwcaps
-> > features by implementing an array of default-false static keys and
-> > enabling them when detected. The cpus_have_cap() check uses the static
-> > keys if the feature being checked is a constant, otherwise the compiler
-> > generates the bitmap test.
-> > 
-> > Because of the early call to static_branch_enable() via
-> > check_local_cpu_errata() -> update_cpu_capabilities(), the jump labels
-> > are initialised in cpuinfo_store_boot_cpu().
-> 
-> Was there a reason the jump_label_init() couldn't be moved
-> earlier in the common code?
+On Thu, Sep 1, 2016 at 1:54 AM, Zhen Lei <thunder.leizhen@huawei.com> wrote:
+> If the numa-id which was configured in memory@ devicetree node is greater
+> than MAX_NUMNODES, we should report a warning. We have done this for cpus
+> and distance-map dt nodes, this patch help them to be consistent.
+>
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  drivers/of/of_numa.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+> index 7b3fbdc..c1bd62c 100644
+> --- a/drivers/of/of_numa.c
+> +++ b/drivers/of/of_numa.c
+> @@ -75,6 +75,11 @@ static int __init of_numa_parse_memory_nodes(void)
+>                          */
+>                         continue;
+>
+> +               if (nid >= MAX_NUMNODES) {
+> +                       pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
 
-No particular reason, only that I wasn't sure what the arch requirements
-to be able to initialise the jump labels early are (for example,
-jump_label_init() calls arch_jump_label_transform_static(); there don't
-seem to be any issues at a first look but I don't have the hardware to
-test and confirm). Therefore I followed the powerpc idea of calling
-jump_label_init() directly earlier.
+Really using pr_fmt should come first so you're not changing this
+line. But not worth respinning for that:
 
-We also don't know how early it needs to be to benefit other
-architectures (powerpc seems to call it on a very early path via
-early_setup()).
+Acked-by: Rob Herring <robh@kernel.org>
 
--- 
-Catalin
+Rob
