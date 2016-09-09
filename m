@@ -1,43 +1,24 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 9 Sep 2016 10:14:53 -0400
-Subject: [PATCH] arm64: Expose TASK_SIZE to userspace via auxv
-In-Reply-To: <CAFLxGvx2YB9D1rECjDrALYWoEtGk=4WL9SKXEGgpxH1c_4Sfxg@mail.gmail.com>
-References: <20160816183231.21179-1-cov@codeaurora.org>
- <20160817103006.GB20762@e104818-lin.cambridge.arm.com>
- <CED1E802-65C5-48B9-8165-46684BE81164@codeaurora.org>
- <CAFLxGvx2YB9D1rECjDrALYWoEtGk=4WL9SKXEGgpxH1c_4Sfxg@mail.gmail.com>
-Message-ID: <857a7f1d-ecdb-21e1-6043-1bb6dce3aad6@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 9 Sep 2016 16:15:27 +0200
+Subject: [PATCH v3 1/9] ethernet: add sun8i-emac driver
+In-Reply-To: <1473425117-18645-2-git-send-email-clabbe.montjoie@gmail.com>
+References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1473425117-18645-2-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20160909141527.GE30871@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Hi Corentin
 
-On 08/18/2016 08:17 AM, Richard Weinberger wrote:
-> On Wed, Aug 17, 2016 at 1:12 PM, Christopher Covington
-> <cov@codeaurora.org> wrote:
->>
->>
->> On August 17, 2016 6:30:06 AM EDT, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>> On Tue, Aug 16, 2016 at 02:32:29PM -0400, Christopher Covington wrote:
->>>> Some userspace applications need to know the maximum virtual address
->>> they can
->>>> use (TASK_SIZE).
->>>
->>> Just curious, what are the cases needing TASK_SIZE in user space?
->>
->> Checkpoint/Restore In Userspace and the Mozilla Javascript Engine https://bugzilla.mozilla.org/show_bug.cgi?id=1143022 are the specific cases I've run into. I've heard LuaJIT might have a similar situation. In general I think making allocations from the top down is a shortcut for finding a large unused region of memory.
-> 
-> I think this makes sense for all archs.
-> At lest UserModeLinux on x86 also needs to know bottom and top
-> addresses of the usable
-> address space.
-> Currently it figures by scanning and catching SIGSEGV.
+> +static int sun8i_emac_mdio_register(struct net_device *ndev)
+> +{
+> +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
+> +	struct mii_bus *bus;
+> +	int ret;
+> +
+> +	bus = mdiobus_alloc();
 
-For the bottom, can you use /proc/sys/vm/mmap_min_addr?
+You can use devm_mdiobus_alloc() which will simplify your error
+handling and unregister code.
 
-Cov
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+	 Andrew
