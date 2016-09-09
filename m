@@ -1,71 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 Sep 2016 14:33:34 +0200
-Subject: [PATCH 2/2] ARM: dts: add device tree for the RealView EB Rev D
-In-Reply-To: <e396557c-774a-fbc7-b1d7-04d49b0287b8@arm.com>
-References: <1473327043-31903-1-git-send-email-linus.walleij@linaro.org>
- <15288435.aYlmo6e5Gb@wuerfel>
- <CACRpkdZdY-knG+htdgZ0t80GLqC7aNujNf7mwUveDrAnCQ5yfQ@mail.gmail.com>
- <e396557c-774a-fbc7-b1d7-04d49b0287b8@arm.com>
-Message-ID: <CACRpkdZDUPgsGAKMmactEpxzSC01NsKhOG8XBp14yDByn0ex9A@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 9 Sep 2016 14:35:22 +0200
+Subject: [PATCH 4/9] mtd: nand: Add function to convert ONFI mode to
+ data_interface
+In-Reply-To: <1473422712-12359-5-git-send-email-s.hauer@pengutronix.de>
+References: <1473422712-12359-1-git-send-email-s.hauer@pengutronix.de>
+ <1473422712-12359-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20160909143522.6a3b6975@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 9, 2016 at 12:47 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+On Fri,  9 Sep 2016 14:05:07 +0200
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-> I wonder if it would be feasible to simply add a disabled LAN91C111 next
-> to the LAN9118 and have a hook in realview-dt.c to swizzle the status at
-> runtime based on a read of SYS_ID? (Or is that utterly disgusting?)
+> onfi_init_data_interface() initializes a data interface with
+> values from a given ONFI mode.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/mtd/nand/nand_timings.c | 16 ++++++++++++++++
+>  include/linux/mtd/nand.h        |  2 ++
+>  2 files changed, 18 insertions(+)
+> 
+> diff --git a/drivers/mtd/nand/nand_timings.c b/drivers/mtd/nand/nand_timings.c
+> index 9af2ebc..ece4ff2 100644
+> --- a/drivers/mtd/nand/nand_timings.c
+> +++ b/drivers/mtd/nand/nand_timings.c
+> @@ -269,3 +269,19 @@ const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode)
+>  	return &onfi_sdr_timings[mode].timings.sdr;
+>  }
+>  EXPORT_SYMBOL(onfi_async_timing_mode_to_sdr_timings);
+> +
+> +/**
+> + * onfi_init_data_interface - [NAND Interface] Initialize a data interface from
+> + * given ONFI mode
+> + * @iface: The data interface to be initialized
+> + * @mode: The ONFI timing mode
+> + */
+> +int onfi_init_data_interface(struct nand_data_interface *iface, int mode)
 
-I feel what you feel: runtime detection would be better.
+Can we choose a more future proof prototype (like the one I suggested)
+for this function. Passing the nand_chip will later allow to extract
+extended timings (tR, tPROG, tCCS, ...) from the param page, and
+passing the interface type makes it compatible with DDR mode.
 
-The root cause that it is not happening is that device tree is essentially
-static and hates scenarios to have its contents even augmented at
-runtime. Especially plug-and-play type scenarios. So something that was
-so easy to hack up in boardfiles is a nightmare in device tree.
-
-It is technically feasible and I have even done it, in another context.
-
-That was when I employed a "Schr?dinger's cat" approach to the
-ARM Versatile display detection:
-
-First I put all possible displays into the device tree, and at runtime
-selected which one to connect using the endpoint graph mechanism
-in device tree. This was frowned upon.
-
-I then put a pretty standard VGA display in as default, and then added
-code to augment that node to whatever display was actually found
-by mangling several atributes of the node, rewriting, augmenting,
-adding, subtracting. Mostly augmenting. This too, was frowned upon.
-
-This can be done with the ethernet as well: I can just put
-both of them in into "disabled" state and switch to "ok" on the one that is
-actually there with some code in e.g. mach-realview.
-
-Or I can put in the LAN91C111 and mange that DT node into a
-LAN9118 by manipulating the DT node at runtime incl. changing the
-compatible string with code.
-
-However upstream developes nixed both approaches before. (After
-developing quite a bit of code for each, so I was a bit burnt,
-bitter? me? nah. Creative destruction let's say. We learnt something
-in the process.)
-
-I was instead told to go work on device tree overlays, or to let
-the boot loader (in the RealView case, the abandonware that was
-never integrated into upstream U-boot) to do DT augmentation.
-One possibility was to let the kernel augment the device tree
-before booting and the boot loader just line up a bunch of
-overlays it should apply when parsing the DTB(s).
-
-I haven't had time to catch up with what should actually be done
-here. I felt a bit like a big piece of design and development was
-dropped in my lap to get my boards converted to device tree.
-I started looking at it, I might do it one day, but I have lots of other
-stuff to do too.
-
-Now it seems that at the finishing line of any Versatile family
-device tree conversion I run into this kind of "reinvent DT overlays"
-stuff...
-
-Yours,
-Linus Walleij
+> +{
+> +	if (mode < 0 || mode >= ARRAY_SIZE(onfi_sdr_timings))
+> +		return -EINVAL;
+> +
+> +	*iface = onfi_sdr_timings[mode];
+> +
+> +	return 0;
+> +}
+> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+> index f305bed..0044fac 100644
+> --- a/include/linux/mtd/nand.h
+> +++ b/include/linux/mtd/nand.h
+> @@ -1104,6 +1104,8 @@ static inline int onfi_get_sync_timing_mode(struct nand_chip *chip)
+>  	return le16_to_cpu(chip->onfi_params.src_sync_timing_mode);
+>  }
+>  
+> +int onfi_init_data_interface(struct nand_data_interface *iface, int onfi_mode);
+> +
+>  /*
+>   * Check if it is a SLC nand.
+>   * The !nand_is_slc() can be used to check the MLC/TLC nand chips.
