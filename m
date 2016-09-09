@@ -1,146 +1,114 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri,  9 Sep 2016 21:24:04 +0200
-Subject: [PATCH V6 2/5] PCI/ACPI: Check platform specific ECAM quirks
+Date: Fri,  9 Sep 2016 21:24:07 +0200
+Subject: [PATCH V6 5/5] PCI: thunder: Enable ACPI PCI controller for ThunderX
+ pass1.x silicon version
 In-Reply-To: <1473449047-10499-1-git-send-email-tn@semihalf.com>
 References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
-Message-ID: <1473449047-10499-3-git-send-email-tn@semihalf.com>
+Message-ID: <1473449047-10499-6-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms may not be fully compliant with generic set of PCI config
-accessors. For these cases we implement the way to overwrite CFG accessors
-set and configuration space range.
+ThunderX pass1.x requires to emulate the EA headers for on-chip devices
+hence it has to use custom pci_thunder_ecam_ops for accessing PCI config
+space (pci-thuner-ecam.c). Add new entries to MCFG quirk array where they
+can be applied while probing ACPI based PCI host controller.
 
-In first place pci_mcfg_parse() saves machine's IDs and revision number
-(these come from MCFG header) in order to match against known quirk entries.
-Then the algorithm traverses available quirk list (static array),
-matches against <oem_id, oem_table_id, rev, domain, bus number range> and
-returns custom PCI config ops and/or CFG resource structure.
+ThunderX pass1.x is using the same way for accessing off-chip devices
+(so-called PEM) as silicon pass-2.x so we need to add PEM quirk
+entries too.
 
-When adding new quirk there are two possibilities:
-1. Override default pci_generic_ecam_ops ops but CFG resource comes from MCFG
-{ "OEM_ID", "OEM_TABLE_ID", <REV>, <DOMAIN>, <BUS_NR>, &foo_ops, MCFG_RES_EMPTY },
-2. Override default pci_generic_ecam_ops ops and CFG resource. For this case
-it is also allowed get CFG resource from quirk entry w/o having it in MCFG.
-{ "OEM_ID", "OEM_TABLE_ID", <REV>, <DOMAIN>, <BUS_NR>, &boo_ops,
-  DEFINE_RES_MEM(START, SIZE) },
-
-pci_generic_ecam_ops and MCFG entries will be used for platforms
-free from quirks.
+Quirk is considered for ThunderX silicon pass1.x only which is identified
+via MCFG revision 2.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
 ---
- drivers/acpi/pci_mcfg.c | 80 +++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 74 insertions(+), 6 deletions(-)
+ drivers/acpi/pci_mcfg.c             | 45 +++++++++++++++++++++++++++++++++++++
+ drivers/pci/host/pci-thunder-ecam.c |  2 +-
+ include/linux/pci-ecam.h            |  3 +++
+ 3 files changed, 49 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-index ffcc651..2b8acc7 100644
+index 1f73d7b..eb14f74 100644
 --- a/drivers/acpi/pci_mcfg.c
 +++ b/drivers/acpi/pci_mcfg.c
-@@ -32,6 +32,59 @@ struct mcfg_entry {
- 	u8			bus_start;
- 	u8			bus_end;
+@@ -77,6 +77,51 @@ static struct mcfg_fixup mcfg_quirks[] = {
+ 	  DEFINE_RES_MEM(0x994057000000UL, 0x39 * SZ_16M) },
+ 	{ "CAVIUM", "THUNDERX", 1, 19, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+ 	  DEFINE_RES_MEM(0x99808f000000UL, 0x39 * SZ_16M) },
++
++	/* SoC pass1.x */
++	{ "CAVIUM", "THUNDERX", 2, 4, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x88001f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 5, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x884057000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 6, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x88808f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 7, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x89001f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 8, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x894057000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 9, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x89808f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 14, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x98001f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 15, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x984057000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 16, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x98808f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 17, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x99001f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 18, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x994057000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 2, 19, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x99808f000000UL, 0x39 * SZ_16M) },
++#endif
++#ifdef CONFIG_PCI_HOST_THUNDER_ECAM
++	/* SoC pass1.x */
++	{ "CAVIUM", "THUNDERX", 2, 0, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
++	  MCFG_RES_EMPTY},
++	{ "CAVIUM", "THUNDERX", 2, 1, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
++	  MCFG_RES_EMPTY},
++	{ "CAVIUM", "THUNDERX", 2, 2, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
++	  MCFG_RES_EMPTY},
++	{ "CAVIUM", "THUNDERX", 2, 3, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
++	  MCFG_RES_EMPTY},
++	{ "CAVIUM", "THUNDERX", 2, 10, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
++	  MCFG_RES_EMPTY},
++	{ "CAVIUM", "THUNDERX", 2, 11, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
++	  MCFG_RES_EMPTY},
++	{ "CAVIUM", "THUNDERX", 2, 12, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
++	  MCFG_RES_EMPTY},
++	{ "CAVIUM", "THUNDERX", 2, 13, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
++	  MCFG_RES_EMPTY},
+ #endif
  };
-+struct mcfg_fixup {
-+	char oem_id[ACPI_OEM_ID_SIZE + 1];
-+	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
-+	u32 oem_revision;
-+	u16 seg;
-+	struct resource bus_range;
-+	struct pci_ecam_ops *ops;
-+	struct resource cfgres;
-+};
-+
-+#define MCFG_DOM_ANY			(-1)
-+#define MCFG_BUS_RANGE(start, end)	DEFINE_RES_NAMED((start),	\
-+						((end) - (start) + 1),	\
-+						NULL, IORESOURCE_BUS)
-+#define MCFG_BUS_ANY		MCFG_BUS_RANGE(0x0, 0xff)
-+#define MCFG_RES_EMPTY		DEFINE_RES_NAMED(0, 0, NULL, 0)
-+
-+static struct mcfg_fixup mcfg_quirks[] = {
-+/*	{ OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, cfgres, ops }, */
-+};
-+
-+static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
-+static char mcfg_oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
-+static u32 mcfg_oem_revision;
-+
-+static void pci_mcfg_match_quirks(struct acpi_pci_root *root,
-+				  struct resource *cfgres,
-+				  struct pci_ecam_ops **ecam_ops)
-+{
-+	struct mcfg_fixup *f;
-+	int i;
-+
-+	/*
-+	 * First match against PCI topology <domain:bus> then use OEM ID, OEM
-+	 * table ID, and OEM revision from MCFG table standard header.
-+	 */
-+	for (i = 0, f = mcfg_quirks; i < ARRAY_SIZE(mcfg_quirks); i++, f++) {
-+		if (f->seg == root->segment &&
-+		    resource_contains(&f->bus_range, &root->secondary) &&
-+		    !memcmp(f->oem_id, mcfg_oem_id, ACPI_OEM_ID_SIZE) &&
-+		    !memcmp(f->oem_table_id, mcfg_oem_table_id,
-+		            ACPI_OEM_TABLE_ID_SIZE) &&
-+		    f->oem_revision == mcfg_oem_revision) {
-+			if (f->cfgres.start)
-+				*cfgres = f->cfgres;
-+			if (f->ops)
-+				*ecam_ops =  f->ops;
-+			dev_info(&root->device->dev, "Applying PCI MCFG quirks for %s %s rev: %d\n",
-+				 f->oem_id, f->oem_table_id, f->oem_revision);
-+			return;
-+		}
-+	}
-+}
  
- /* List to save MCFG entries */
- static LIST_HEAD(pci_mcfg_list);
-@@ -61,14 +114,24 @@ int pci_mcfg_lookup(struct acpi_pci_root *root, struct resource *cfgres,
- 
- 	}
- 
--	if (!root->mcfg_addr)
--		return -ENXIO;
--
- skip_lookup:
- 	memset(&res, 0, sizeof(res));
--	res.start = root->mcfg_addr + (bus_res->start << 20);
--	res.end = res.start + (resource_size(bus_res) << 20) - 1;
--	res.flags = IORESOURCE_MEM;
-+	if (root->mcfg_addr) {
-+		res.start = root->mcfg_addr + (bus_res->start << 20);
-+		res.end = res.start + (resource_size(bus_res) << 20) - 1;
-+		res.flags = IORESOURCE_MEM;
-+	}
-+
-+	/*
-+	 * Let to override default ECAM ops and CFG resource range.
-+	 * Also, this might even retrieve CFG resource range in case MCFG
-+	 * does not have it. Invalid CFG start address means MCFG firmware bug
-+	 * or we need another quirk in array.
-+	 */
-+	pci_mcfg_match_quirks(root, &res, &ops);
-+	if (!res.start)
-+		return -ENXIO;
-+
- 	*cfgres = res;
- 	*ecam_ops = ops;
- 	return 0;
-@@ -101,6 +164,11 @@ static __init int pci_mcfg_parse(struct acpi_table_header *header)
- 		list_add(&e->list, &pci_mcfg_list);
- 	}
- 
-+	/* Save MCFG IDs and revision for quirks matching */
-+	memcpy(mcfg_oem_id, header->oem_id, ACPI_OEM_ID_SIZE);
-+	memcpy(mcfg_oem_table_id, header->oem_table_id, ACPI_OEM_TABLE_ID_SIZE);
-+	mcfg_oem_revision = header->revision;
-+
- 	pr_info("MCFG table detected, %d entries\n", n);
- 	return 0;
+diff --git a/drivers/pci/host/pci-thunder-ecam.c b/drivers/pci/host/pci-thunder-ecam.c
+index d50a3dc..b6c17e2 100644
+--- a/drivers/pci/host/pci-thunder-ecam.c
++++ b/drivers/pci/host/pci-thunder-ecam.c
+@@ -346,7 +346,7 @@ static int thunder_ecam_config_write(struct pci_bus *bus, unsigned int devfn,
+ 	return pci_generic_config_write(bus, devfn, where, size, val);
  }
+ 
+-static struct pci_ecam_ops pci_thunder_ecam_ops = {
++struct pci_ecam_ops pci_thunder_ecam_ops = {
+ 	.bus_shift	= 20,
+ 	.pci_ops	= {
+ 		.map_bus        = pci_ecam_map_bus,
+diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+index 65505ea..35f0e81 100644
+--- a/include/linux/pci-ecam.h
++++ b/include/linux/pci-ecam.h
+@@ -62,6 +62,9 @@ extern struct pci_ecam_ops pci_generic_ecam_ops;
+ #ifdef CONFIG_PCI_HOST_THUNDER_PEM
+ extern struct pci_ecam_ops pci_thunder_pem_ops;
+ #endif
++#ifdef CONFIG_PCI_HOST_THUNDER_ECAM
++extern struct pci_ecam_ops pci_thunder_ecam_ops;
++#endif
+ 
+ #ifdef CONFIG_PCI_HOST_GENERIC
+ /* for DT-based PCI controllers that support ECAM */
 -- 
 1.9.1
