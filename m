@@ -1,47 +1,64 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 9 Sep 2016 14:28:16 +0800
-Subject: [PATCH 1/2] ARM: clk-imx35: fix name for ckil clk
-In-Reply-To: <20160909062034.tim2tzcihui6inoa@pengutronix.de>
-References: <1473327022-8065-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160909061631.GI16911@tiger>
- <20160909062034.tim2tzcihui6inoa@pengutronix.de>
-Message-ID: <20160909062816.GL16911@tiger>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 9 Sep 2016 08:36:12 +0200
+Subject: [PATCH v6 1/2] sdhci-of-arasan: Add device tree parameter
+ xlnx-fails-without-test-cd bit
+In-Reply-To: <1473363766-12652-1-git-send-email-zach.brown@ni.com>
+References: <1473363766-12652-1-git-send-email-zach.brown@ni.com>
+Message-ID: <541103ba-28d1-1fc0-cc5e-66eea914aa2d@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 08:20:34AM +0200, Uwe Kleine-K?nig wrote:
-> To += mturquette, sboyd
+On 8.9.2016 21:42, Zach Brown wrote:
+> The sdhci controller on xilinx zynq devices will not function unless
+> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+> In cases where it is impossible to provide the CD bit in hardware,
+> setting the controller to test mode and then setting inserted to true
+> will get the controller to function without the CD bit.
 > 
-> Hello Shawn, hello Michael, hello Stephen,
+> The device property "xlnx-fails-without-test-cd" will let the arasan
+> driver know the controller does not have the CD line wired and that the
+> controller does not function without it.
 > 
-> On Fri, Sep 09, 2016 at 02:16:31PM +0800, Shawn Guo wrote:
-> > On Thu, Sep 08, 2016 at 11:30:21AM +0200, Uwe Kleine-K?nig wrote:
-> > > This fixes
-> > > 	[    0.000000] i.MX clk 82: register failed with -17
-> > > because the name is duplicated.
-> > > 
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > 
-> > I did not queue any clock patches for this cycle.  Can you please send
-> > the patches directly to clock maintainers?
+> Signed-off-by: Zach Brown <zach.brown@ni.com>
+> ---
+> v2:
+>  * improved commit messages
+>  * removed fake-cd device property
+>  * removed fake-cd quirk
+>  * use broken-cd device property
+>  * documented new usage of broken-cd
+> v3:
+>  * removed new usage of broken-cd
+>  * created fails-without-test-cd device property
+>  * created arasan controller specific quirk
+> v4:
+>  * changed fails-without-test-cd to xlnx-fails-without-test-cd
+>  * removed extra blank line
+> v5:
+>  * Fixed style mistake
+>  * Changed (1 << 0 ) to BIT(0)
+> v6:
+>  * Fixed style mistakes
+>  * Condensed unnecessarily long variable names
+>  * Removed line wraps that were no longer necessary.
+>  * Rebased changes off Ulf's mmc tree's next branch.
 > 
-> @shawnguo: Is this an ack?
+> 
+>  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> df --gt /Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> index 3404afa..e71f043 100644
+> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> @@ -21,6 +21,10 @@ Required Properties:
+>    - interrupts: Interrupt specifier
+>    - interrupt-parent: Phandle for the interrupt controller that services
+>  		      interrupts for this device.
+> +Optional Properties:
+> +- xlnx-fails-without-test-cd: when present, the controller doesn't work when
 
-Yes,
+xlnx, here.
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
-
-> @mturquette, sboyd: should I resend? IMHO the first patch should go in
-> soon.
-> 
-> Best regards
-> Uwe
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Michal
