@@ -1,66 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Sep 2016 16:54:07 +0200
-Subject: [GIT PULL] Allwinner clock fixes for 4.8
-In-Reply-To: <b03d92eb-ac69-506d-d05a-e28bca5ca284@codeaurora.org>
-References: <20160907193335.GA4283@lukather>
- <b03d92eb-ac69-506d-d05a-e28bca5ca284@codeaurora.org>
-Message-ID: <20160909145407.GF8881@lukather>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Fri, 9 Sep 2016 16:58:05 +0200
+Subject: [PATCH V4 3/4] ARM: bcm2835: add thermal node to device-tree of
+ bcm283x
+In-Reply-To: <19cc8fbf-6ceb-995e-850d-9d82bdaff8d0@i2se.com>
+References: <1473407397-29395-1-git-send-email-kernel@martin.sperl.org>
+ <1473407397-29395-4-git-send-email-kernel@martin.sperl.org>
+ <19cc8fbf-6ceb-995e-850d-9d82bdaff8d0@i2se.com>
+Message-ID: <8876586A-98F8-4AAF-AD90-86EB12C22FDC@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
 
-On Thu, Sep 08, 2016 at 12:56:53PM -0700, Stephen Boyd wrote:
-> On 09/07/2016 12:33 PM, Maxime Ripard wrote:
-> > Hi Mike, Stephen,
-> >
-> > Please pull the following tag for the 4.8 release.
-> >
-> > Thanks!
-> > Maxime
-> >
-> > The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-> >
-> >   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-> >
-> > are available in the git repository at:
-> >
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clk-fixes-for-4.8
-> >
-> > for you to fetch changes up to 6654674cb7b5953ac04fc9d7f5f511676ae97e29:
-> >
-> >   clk: sunxi-ng: Fix wrong reset register offsets (2016-08-29 08:38:55 +0200)
-> >
-> > ----------------------------------------------------------------
-> > Clock Fixes for the Allwinner SoCs, 4.8 Edition
-> >
-> > The usual bunch of fixes to the our clock drivers, mostly targetted to the
-> > brand new sunxi-ng drivers.
+> On 09.09.2016, at 16:25, Stefan Wahren <stefan.wahren@i2se.com> wrote:
 > 
-> Pulled, thanks. But,
-
-Thanks!
-
-> >
-> > ----------------------------------------------------------------
-> > Chen-Yu Tsai (2):
-> >       clk: sunxi-ng: Fix inverted test condition in ccu_helper_wait_for_lock
+>> Am 09.09.2016 um 09:49 schrieb kernel at martin.sperl.org:
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>> 
+>> Add the node for the thermal sensor of the bcm2835-soc
+>> to the device tree.
+>> 
+>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>> Reviewed-by: Eric Anholt <eric@anholt.net>
+>> ---
+>> arch/arm/boot/dts/bcm283x.dtsi | 6 ++++++
+>> 1 file changed, 6 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+>> index b982522..e2e3a46 100644
+>> --- a/arch/arm/boot/dts/bcm283x.dtsi
+>> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+>> @@ -186,6 +186,12 @@
+>>            interrupts = <2 14>; /* pwa1 */
+>>        };
+>> 
+>> +        thermal: thermal at 0x7e212000 {
+>> +            compatible = "brcm,bcm2835-thermal";
+>> +            reg = <0x7e212000 0x8>;
+>> +            clocks = <&clocks BCM2835_CLOCK_TSENS>;
+>> +        };
+>> +
 > 
-> we already had this one in clk-fixes. Git figured it out of course.
+> Since the driver handles 3 different SoC (2835, 2836, 2837). This node
+> should be defined in the SoC specific dtsi files, because the BCM2836
+> includes bcm283x.dtsi too.
+> 
+> Be aware the patch for bcm2837 must go to ARM64.
 
-Hmmm, sorry, it was probably a mistake from when I got back from
-vacation.
+I can not really follow:
+* the node is defined in the dtsi included by all 3 soc,
+   and it is available on all so it sits where for example
+   spi0 or uart0 is located
+* as for arm64: this describes the registers that are
+   identical for arm and arm64 and the bcm2837.dtsi
+   is also including ../../../../arm/boot/dts/bcm283x.dtsi
 
-Maxime
+So what is the problem?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160909/6ea04eaf/attachment-0001.sig>
+Martin
+
+P.s the patches apply cleanly against master.
