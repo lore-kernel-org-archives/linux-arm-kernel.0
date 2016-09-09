@@ -1,82 +1,28 @@
-From: bparrot@ti.com (Benoit Parrot)
-Date: Fri, 9 Sep 2016 11:03:55 -0500
-Subject: [PATCH] [media] platform: constify vb2_ops structures
-In-Reply-To: <1473379150-17315-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1473379150-17315-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20160909160355.GC27225@ti.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 09 Sep 2016 18:10:46 +0200
+Subject: [PATCH 1/3] ARM: pxa: pxa_cplds: fix interrupt handling
+In-Reply-To: <1473015587-15589-1-git-send-email-robert.jarzmik@free.fr>
+ (Robert Jarzmik's message of "Sun, 4 Sep 2016 20:59:45 +0200")
+References: <1473015587-15589-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <8760q5hx4p.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Thanks for the patch.
+> Since its initial commit, the driver is buggy for multiple interrupts
+> handling. The translation from the former lubbock.c file was not
+> complete, and might stall all interrupt handling when multiple
+> interrupts occur.
+>
+> This is especially true when inside the interrupt handler and if a new
+> interrupt comes and is not handled, leaving the output line still held,
+> and not creating a transition as the GPIO block behind would expect to
+> trigger another cplds_irq_handler() call.
+...
+Applied to pxa/for-next.
 
-Julia Lawall <Julia.Lawall@lip6.fr> wrote on Fri [2016-Sep-09 01:59:10 +0200]:
-> Check for vb2_ops structures that are only stored in the ops field of a
-> vb2_queue structure.  That field is declared const, so vb2_ops structures
-> that have this property can be declared as const also.
-> 
-> The semantic patch that makes this change is as follows:
-> (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> @r disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct vb2_ops i at p = { ... };
-> 
-> @ok@
-> identifier r.i;
-> struct vb2_queue e;
-> position p;
-> @@
-> e.ops = &i at p;
-> 
-> @bad@
-> position p != {r.p,ok.p};
-> identifier r.i;
-> struct vb2_ops e;
-> @@
-> e at i@p
-> 
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->  struct vb2_ops i = { ... };
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> ---
->  drivers/media/platform/exynos-gsc/gsc-m2m.c              |    2 +-
->  drivers/media/platform/exynos4-is/fimc-capture.c         |    2 +-
->  drivers/media/platform/exynos4-is/fimc-m2m.c             |    2 +-
->  drivers/media/platform/m2m-deinterlace.c                 |    2 +-
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c       |    2 +-
->  drivers/media/platform/mx2_emmaprp.c                     |    2 +-
->  drivers/media/platform/rcar-vin/rcar-dma.c               |    2 +-
->  drivers/media/platform/rcar_jpu.c                        |    2 +-
->  drivers/media/platform/s5p-g2d/g2d.c                     |    2 +-
->  drivers/media/platform/s5p-jpeg/jpeg-core.c              |    2 +-
->  drivers/media/platform/sh_vou.c                          |    2 +-
->  drivers/media/platform/soc_camera/atmel-isi.c            |    2 +-
->  drivers/media/platform/soc_camera/rcar_vin.c             |    2 +-
->  drivers/media/platform/soc_camera/sh_mobile_ceu_camera.c |    2 +-
->  drivers/media/platform/sti/bdisp/bdisp-v4l2.c            |    2 +-
+Cheers.
 
-For the following 2 drivers,
-
->  drivers/media/platform/ti-vpe/cal.c                      |    2 +-
->  drivers/media/platform/ti-vpe/vpe.c                      |    2 +-
-
-Reviewed-by: Benoit Parrot <bparrot@ti.com>
-
->  drivers/media/platform/vim2m.c                           |    2 +-
->  drivers/media/platform/xilinx/xilinx-dma.c               |    2 +-
->  19 files changed, 19 insertions(+), 19 deletions(-)
-
-Regards,
-Benoit Parrot
+-- 
+Robert
