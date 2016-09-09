@@ -1,35 +1,39 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri,  9 Sep 2016 14:45:10 +0200
-Subject: [PATCH v3 2/9] MAINTAINERS: Add myself as maintainer of sun8i-emac
+Date: Fri,  9 Sep 2016 14:45:14 +0200
+Subject: [PATCH v3 6/9] ARM: dts: sun8i: Enable sun8i-emac on the Orange PI PC
 In-Reply-To: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
 References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1473425117-18645-3-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1473425117-18645-7-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add myself as maintainer of the sun8i-emac driver.
+The sun8i-emac hardware is present on the Orange PI PC.
+It uses the internal PHY.
+
+This patch create the needed emac and phy nodes.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6781a3f..43f5be3 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -582,6 +582,12 @@ S:	Maintained
- F:	Documentation/i2c/busses/i2c-ali1563
- F:	drivers/i2c/busses/i2c-ali1563.c
- 
-+ALLWINNER SUN8I-EMAC ETHERNET DRIVER
-+M:	Corentin Labbe <clabbe.montjoie@gmail.com>
-+L:	netdev at vger.kernel.org
-+S:	Maintained
-+F:	drivers/net/ethernet/allwinner/sun8i-emac.c
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index daf50b9a6..24f8e97 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -165,3 +165,13 @@
+ 	/* USB VBUS is always on */
+ 	status = "okay";
+ };
 +
- ALLWINNER SECURITY SYSTEM
- M:	Corentin Labbe <clabbe.montjoie@gmail.com>
- L:	linux-crypto at vger.kernel.org
++&emac {
++	phy = <&phy1>;
++	phy-mode = "mii";
++	allwinner,leds-active-low;
++	status = "okay";
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
 -- 
 2.7.3
