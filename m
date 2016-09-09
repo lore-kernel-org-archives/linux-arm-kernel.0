@@ -1,39 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Sep 2016 12:05:58 +0100
-Subject: [RFCv4 1/7] drivers/perf: arm_pmu: add common attr group fields
-In-Reply-To: <20160909102554.GF20192@arm.com>
-References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
- <1473330112-28528-2-git-send-email-mark.rutland@arm.com>
- <20160909102554.GF20192@arm.com>
-Message-ID: <20160909110558.GC10562@leverpostej>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri,  9 Sep 2016 13:13:49 +0200
+Subject: [PATCH v4 2/3] clocksource: timer-atmel-pit: remove uselesss
+ WARN_ON_ONCE
+In-Reply-To: <20160909111350.27534-1-alexandre.belloni@free-electrons.com>
+References: <20160909111350.27534-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20160909111350.27534-3-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 11:25:54AM +0100, Will Deacon wrote:
-> On Thu, Sep 08, 2016 at 11:21:46AM +0100, Mark Rutland wrote:
-> > +enum armpmu_attr_groups {
-> > +	ARMPMU_ATTR_GROUP_EVENTS,
-> > +	ARMPMU_ATTR_GROUP_FORMATS,
-> > +	ARMPMU_NR_ATTR_GROUPS
-> > +};
-> > +
-> >  struct arm_pmu {
-> >  	struct pmu	pmu;
-> >  	cpumask_t	active_irqs;
-> > @@ -111,6 +117,7 @@ struct arm_pmu {
-> >  	struct pmu_hw_events	__percpu *hw_events;
-> >  	struct list_head	entry;
-> >  	struct notifier_block	cpu_pm_nb;
-> > +	const struct attribute_group *attr_groups[ARMPMU_NR_ATTR_GROUPS + 1];
-> 
-> Is the '+ 1' because the array has to be NULL terminated?
+IRQ handlers are running with IRQ disabled for a while, remove wrong
+comment and useless test.
 
-Yes.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/clocksource/timer-atmel-pit.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-> Probably worth a comment to disuade people from sending "obvious"
-> fixes.
-
-Sure. I had meant to do this already, but forgot. :/
-
-Thanks,
-Mark.
+diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+index da7e6d4eef4d..91cf04704ed1 100644
+--- a/drivers/clocksource/timer-atmel-pit.c
++++ b/drivers/clocksource/timer-atmel-pit.c
+@@ -149,12 +149,6 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+ {
+ 	struct pit_data *data = dev_id;
+ 
+-	/*
+-	 * irqs should be disabled here, but as the irq is shared they are only
+-	 * guaranteed to be off if the timer irq is registered first.
+-	 */
+-	WARN_ON_ONCE(!irqs_disabled());
+-
+ 	/* The PIT interrupt may be disabled, and is shared */
+ 	if (clockevent_state_periodic(&data->clkevt) &&
+ 	    (pit_read(data->base, AT91_PIT_SR) & AT91_PIT_PITS)) {
+-- 
+2.9.3
