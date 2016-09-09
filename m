@@ -1,131 +1,54 @@
-From: hotran@apm.com (Hoan Tran)
-Date: Fri, 9 Sep 2016 12:24:32 -0700
-Subject: [PATCH] hwmon: xgene: access mailbox as RAM
-In-Reply-To: <2529114.aAikiSWl11@wuerfel>
-References: <1469134557-26869-1-git-send-email-hotran@apm.com>
- <13081573.BbD3TmEU5Y@wuerfel> <20160907223705.GA31582@roeck-us.net>
- <2529114.aAikiSWl11@wuerfel>
-Message-ID: <CAFHUOYzm4VH1fc3D0fLVv3bCU=2SHx7tZM4nFnCvWeuY+QfEFw@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri,  9 Sep 2016 21:24:02 +0200
+Subject: [PATCH V6 0/5] ECAM quirks handling for ARM64 platforms
+Message-ID: <1473449047-10499-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Quirk handling relies on an idea of simple static array which contains
+quirk enties. Each entry consists of identification information (IDs from
+standard header of MCFG table) along with custom pci_ecam_ops structure and 
+configuration space resource structure. This way it is possible find
+corresponding quirk entries and override pci_ecam_ops and PCI configuration
+space regions.
 
-On Fri, Sep 9, 2016 at 8:38 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The newly added hwmon driver fails to build in an allmodconfig
-> kernel:
->
->       1  ERROR: "memblock_is_memory" [drivers/hwmon/xgene-hwmon.ko] undefined!
->
-> According to comments in the code, the mailbox is a shared memory region,
-> not a set of MMIO registers, so we should use memremap() for mapping it
-> instead of ioremap or acpi_os_ioremap, and pointer dereferences instead
-> of readl/writel.
->
-> The driver already uses plain kernel pointers, so it's a bit unusual
-> to work with functions that operate on __iomem pointers, and this
-> fixes that part too.
->
-> I'm using READ_ONCE/WRITE_ONCE here to keep the existing behavior
-> regarding the ordering of the accesses from the CPU, but note that
-> there are no barriers (also unchanged from before).
->
-> I'm also keeping the endianess behavior, though I'm unsure whether
-> the message data was supposed to be in LE32 format in the first
-> place, it's possible this was meant to be interpreted as a byte
-> stream instead.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> diff --git a/drivers/hwmon/xgene-hwmon.c b/drivers/hwmon/xgene-hwmon.c
-> index bc78a5d10182..e834dfb3acca 100644
-> --- a/drivers/hwmon/xgene-hwmon.c
-> +++ b/drivers/hwmon/xgene-hwmon.c
-> @@ -34,7 +34,8 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/platform_device.h>
-> -#include <acpi/acpi_io.h>
-> +#include <linux/io.h>
+As an example, the last 3 patches present quirk handling mechanism usage for
+ThunderX.
 
-Alphabetical order.
+v5 -> v6
+- rebase against v4.8-rc5
+- drop patch 1 form previous series
+- keep pci_acpi_setup_ecam_mapping() in ARM64 arch directory
+- move quirk code to pci_mcfg.c
+- restrict quirk to override pci_ecam_ops and CFG resource structure
+  only, no init call any more
+- split ThunderX quirks into the smaller chunks
+- add ThunderX pass1.x silicon revision support
 
-> +
->  #include <acpi/pcc.h>
->
->  /* SLIMpro message defines */
-> @@ -126,10 +127,10 @@ static u16 xgene_word_tst_and_clr(u16 *addr, u16 mask)
->  {
->         u16 ret, val;
->
-> -       val = readw_relaxed(addr);
-> +       val = le16_to_cpu(READ_ONCE(*addr));
->         ret = val & mask;
->         val &= ~mask;
-> -       writew_relaxed(val, addr);
-> +       WRITE_ONCE(*addr, cpu_to_le16(val));
->
->         return ret;
->  }
-> @@ -137,7 +138,7 @@ static u16 xgene_word_tst_and_clr(u16 *addr, u16 mask)
->  static int xgene_hwmon_pcc_rd(struct xgene_hwmon_dev *ctx, u32 *msg)
->  {
->         struct acpi_pcct_shared_memory *generic_comm_base = ctx->pcc_comm_addr;
-> -       void *ptr = generic_comm_base + 1;
-> +       u32 *ptr = (void*)(generic_comm_base + 1);
+v4 -> v5
+- rebase against v4.8-rc1
+- rework to exact MCFG OEM ID, TABLE ID, rev match
+  - use memcmp instead of strncmp
+  - no substring match
+- fix typos and dmesg message
 
-Space before "*".
+Tomasz Nowicki (5):
+  PCI/ACPI: Extend pci_mcfg_lookup() responsibilities
+  PCI/ACPI: Check platform specific ECAM quirks
+  PCI: thunder-pem: Allow to probe PEM-specific register range for ACPI
+    case
+  PCI: thunder: Enable ACPI PCI controller for ThunderX pass2.x silicon
+    version
+  PCI: thunder: Enable ACPI PCI controller for ThunderX pass1.x silicon
+    version
 
->         int rc, i;
->         u16 val;
->
-> @@ -146,21 +147,21 @@ static int xgene_hwmon_pcc_rd(struct xgene_hwmon_dev *ctx, u32 *msg)
->         ctx->resp_pending = true;
->
->         /* Write signature for subspace */
-> -       writel_relaxed(PCC_SIGNATURE_MASK | ctx->mbox_idx,
-> -                      &generic_comm_base->signature);
-> +       WRITE_ONCE(generic_comm_base->signature,
-> +                  cpu_to_le32(PCC_SIGNATURE_MASK | ctx->mbox_idx));
->
->         /* Write to the shared command region */
-> -       writew_relaxed(MSG_TYPE(msg[0]) | PCCC_GENERATE_DB_INT,
-> -                      &generic_comm_base->command);
-> +       WRITE_ONCE(generic_comm_base->command,
-> +                  cpu_to_le16(MSG_TYPE(msg[0]) | PCCC_GENERATE_DB_INT));
->
->         /* Flip CMD COMPLETE bit */
-> -       val = readw_relaxed(&generic_comm_base->status);
-> +       val = le16_to_cpu(READ_ONCE(generic_comm_base->status));
->         val &= ~PCCS_CMD_COMPLETE;
-> -       writew_relaxed(val, &generic_comm_base->status);
-> +       WRITE_ONCE(generic_comm_base->status, cpu_to_le16(val));
->
->         /* Copy the message to the PCC comm space */
->         for (i = 0; i < sizeof(struct slimpro_resp_msg) / 4; i++)
-> -               writel_relaxed(msg[i], ptr + i * 4);
-> +               WRITE_ONCE(ptr[i], cpu_to_le32(msg[i]));
->
->         /* Ring the doorbell */
->         rc = mbox_send_message(ctx->mbox_chan, msg);
-> @@ -652,9 +653,9 @@ static int xgene_hwmon_probe(struct platform_device *pdev)
->                  */
->                 ctx->comm_base_addr = cppc_ss->base_address;
->                 if (ctx->comm_base_addr) {
-> -                       ctx->pcc_comm_addr =
-> -                                       acpi_os_ioremap(ctx->comm_base_addr,
-> -                                                       cppc_ss->length);
-> +                       ctx->pcc_comm_addr = memremap(ctx->comm_base_addr,
-> +                                                       cppc_ss->length,
-> +                                                       MEMREMAP_WT);
+ arch/arm64/kernel/pci.c             |  17 ++--
+ drivers/acpi/pci_mcfg.c             | 168 +++++++++++++++++++++++++++++++++++-
+ drivers/pci/host/pci-thunder-ecam.c |   2 +-
+ drivers/pci/host/pci-thunder-pem.c  |  63 +++++++++++---
+ include/linux/pci-acpi.h            |   4 +-
+ include/linux/pci-ecam.h            |   7 ++
+ 6 files changed, 230 insertions(+), 31 deletions(-)
 
-It should be MEMREMAP_WB. As mailbox shared memory is on RAM and our
-co-processor is also in the coherency domain.
-
-Thanks
-Hoan
-
->                 } else {
->                         dev_err(&pdev->dev, "Failed to get PCC comm region\n");
->                         rc = -ENODEV;
->
+-- 
+1.9.1
