@@ -1,54 +1,306 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 09 Sep 2016 13:13:48 -0700
-Subject: next build: 143 builds: 2 failed, 141 passed, 2 errors,
- 2 warnings (next-20160909)
-In-Reply-To: <3939380.a1AWegjel5@wuerfel> (Arnd Bergmann's message of "Fri, 09
- Sep 2016 21:25:00 +0200")
-References: <57d26402.eeb8c20a.ba0e2.8bbb@mx.google.com>
- <2582793.W17ckCts1B@wuerfel> <m2oa3xgg98.fsf@baylibre.com>
- <3939380.a1AWegjel5@wuerfel>
-Message-ID: <m2d1kchlvn.fsf@baylibre.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Sat, 10 Sep 2016 02:05:11 +0530
+Subject: [PATCH 1/2] ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual initial
+ support
+Message-ID: <1473453312-2786-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+i.CoreM6 Quad/Dual modules are system on module solutions manufactured
+by Engicam with following characteristics:
+CPU           NXP i.MX6 DQ, 800MHz
+RAM           1GB, 32, 64 bit, DDR3-800/1066
+NAND          SLC,512MB
+Power supply  Single 5V
+MAX LCD RES   FULLHD
 
-> On Friday, September 9, 2016 10:00:35 AM CEST Kevin Hilman wrote:
->> Arnd Bergmann <arnd@arndb.de> writes:
->> 
->> > On Friday, September 9, 2016 12:25:54 AM CEST kernelci. org bot wrote:
->> >> next build: 143 builds: 2 failed, 141 passed, 2 errors, 2 warnings (next-20160909)
->> >
->> > This is pretty good, here is what's left:
->> >
->> >> rpc_defconfig (arm) ? FAIL, 1 error, 0 warnings, 0 section mismatches
->> >> 
->> >> Errors:
->> >>     fs/fat/dir.c:758:424: internal compiler error: Segmentation fault
->> >
->> > Could we please update the gcc build on kernelci.org from "Linaro GCC 5.3-2016.02"
->> > to the following version (Linaro GCC 5.3-2016.05) or later?
->> 
->> I finally found the release tarballs for Linaro toolchains (the "latest"
->> link on the linaro releases was stale, and pointing to 2016.02).
->> 
->> So it's now 5.3-2016.05 on all the kCI builders.
->
->
-> Great, thanks!
->
-> Any idea about the x86 binutils issue? Which version do you have
-> at the moment?
+and more info at
+http://www.engicam.com/en/products/embedded/som/sodimm/i-core-m6s-dl-d-q
 
-The builders are bascially stock ubuntu trusty 14.04 LTS, which has
-gcc-4.8.2 and binutils-2.24.
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ arch/arm/boot/dts/Makefile           |   1 +
+ arch/arm/boot/dts/imx6q-icore.dts    |  59 +++++++++++
+ arch/arm/boot/dts/imx6qdl-icore.dtsi | 188 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 248 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-icore.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-icore.dtsi
 
-Using the Ubuntu toolchain PPA[1], I'm able to put gcc-5 on those
-builders, but newer binutils isn't available in that PPA for Trusty. 
-
-We've been planning on upgrading the builders to Xenial 16.04 LTS, which
-would bring the binutils update, but haven't gotten to that yet.
-
-Kevin
-
-[1] https://launchpad.net/~ubuntu-toolchain-r/+archive/ubuntu/test
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f79cac2..511510d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -374,6 +374,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-gw553x.dtb \
+ 	imx6q-h100.dtb \
+ 	imx6q-hummingboard.dtb \
++	imx6q-icore.dtb \
+ 	imx6q-icore-rqs.dtb \
+ 	imx6q-marsboard.dtb \
+ 	imx6q-nitrogen6x.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-icore.dts b/arch/arm/boot/dts/imx6q-icore.dts
+new file mode 100644
+index 0000000..3518147
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-icore.dts
+@@ -0,0 +1,59 @@
++/*
++ * Copyright (C) 2016 Amarula Solutions B.V.
++ * Copyright (C) 2016 Engicam S.r.l.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx6q.dtsi"
++#include "imx6qdl-icore.dtsi"
++
++/ {
++	model = "Engicam i.CoreM6 Quad/Dual Starter Kit";
++	compatible = "fsl,imx6-icore", "fsl,imx6q";
++};
++
++&can1 {
++	status = "oaky";
++};
++
++&can2 {
++	status = "oaky";
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+new file mode 100644
+index 0000000..e36ba6c
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+@@ -0,0 +1,188 @@
++/*
++ * Copyright (C) 2016 Amarula Solutions B.V.
++ * Copyright (C) 2016 Engicam S.r.l.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++
++/ {
++	memory {
++		reg = <0x10000000 0x80000000>;
++	};
++};
++
++&can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	status = "okay";
++};
++
++&can2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan2>;
++	status = "okay";
++};
++
++&clks {
++	assigned-clocks = <&clks IMX6QDL_CLK_LVDS2_SEL>;
++	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
++};
++
++&gpmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gpmi_nand>;
++	fsl,legacy-bch-geometry;
++	nand-on-flash-bbt;
++	status = "okay";
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
++
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart4>;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	cd-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
++	no-1-8-v;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_flexcan1: flexcan1grp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x80000000
++			MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX 0x80000000
++		>;
++	};
++
++	pinctrl_flexcan2: flexcan2grp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX 0x80000000
++			MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX 0x80000000
++		>;
++	};
++
++	pinctrl_gpmi_nand: gpmi-nand {
++		fsl,pins = <
++			MX6QDL_PAD_NANDF_CLE__NAND_CLE     0xb0b1
++			MX6QDL_PAD_NANDF_ALE__NAND_ALE     0xb0b1
++			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B   0xb0b1
++			MX6QDL_PAD_NANDF_RB0__NAND_READY_B 0xb000
++			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B   0xb0b1
++			MX6QDL_PAD_NANDF_CS1__NAND_CE1_B   0xb0b1
++			MX6QDL_PAD_SD4_CMD__NAND_RE_B      0xb0b1
++			MX6QDL_PAD_SD4_CLK__NAND_WE_B      0xb0b1
++			MX6QDL_PAD_NANDF_D0__NAND_DATA00   0xb0b1
++			MX6QDL_PAD_NANDF_D1__NAND_DATA01   0xb0b1
++			MX6QDL_PAD_NANDF_D2__NAND_DATA02   0xb0b1
++			MX6QDL_PAD_NANDF_D3__NAND_DATA03   0xb0b1
++			MX6QDL_PAD_NANDF_D4__NAND_DATA04   0xb0b1
++			MX6QDL_PAD_NANDF_D5__NAND_DATA05   0xb0b1
++			MX6QDL_PAD_NANDF_D6__NAND_DATA06   0xb0b1
++			MX6QDL_PAD_NANDF_D7__NAND_DATA07   0xb0b1
++			MX6QDL_PAD_SD4_DAT0__NAND_DQS      0x00b1
++		>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
++			MX6QDL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_EB2__I2C2_SCL  0x4001b8b1
++			MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
++		>;
++	};
++
++	pinctrl_i2c3: i2c3grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_5__I2C3_SCL  0x4001b8b1
++			MX6QDL_PAD_EIM_D18__I2C3_SDA 0x4001b8b1
++			MX6QDL_PAD_GPIO_0__CCM_CLKO1	0x130b0
++		>;
++	};
++
++	pinctrl_uart4: uart4grp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
++			MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17070
++			MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10070
++			MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17070
++			MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17070
++			MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17070
++			MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17070
++		>;
++	};
++};
+-- 
+2.7.4
