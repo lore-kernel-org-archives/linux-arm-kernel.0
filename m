@@ -1,55 +1,44 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  9 Sep 2016 14:07:08 +0100
-Subject: [PATCH v4 1/9] arm64: Set the safe value for L1 icache policy
+Date: Fri,  9 Sep 2016 14:07:11 +0100
+Subject: [PATCH v4 4/9] arm64: alternative: Disallow patching instructions
+ using literals
 In-Reply-To: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
 References: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1473426436-17870-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1473426436-17870-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now we use 0 as the safe value for CTR_EL0:L1Ip, which is
-not defined at the moment. The safer value for the L1Ip should be
-the weakest of the policies, which happens to be AIVIVT. While at it,
-fix the comment about safe_val.
+The alternative code patching doesn't check if the replaced instruction
+uses a pc relative literal. This could cause silent corruption in the
+instruction stream as the instruction will be executed from a different
+address than what it was compiled for. Catch all such cases.
 
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Andre Przywara <andre.przywara@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Suggested-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 2 +-
- arch/arm64/kernel/cpufeature.c      | 5 +++--
- 2 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/alternative.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index c07c5d1..df47969 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -63,7 +63,7 @@ struct arm64_ftr_bits {
- 	enum ftr_type	type;
- 	u8		shift;
- 	u8		width;
--	s64		safe_val; /* safe value for discrete features */
-+	s64		safe_val; /* safe value for FTR_EXACT features */
- };
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 4434dab..992918d 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -79,6 +79,12 @@ static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
+ 			offset = target - (unsigned long)insnptr;
+ 			insn = aarch64_set_branch_offset(insn, offset);
+ 		}
++	} else if (aarch64_insn_uses_literal(insn)) {
++		/*
++		 * Disallow patching unhandled instructions using PC relative
++		 * literal addresses
++		 */
++		BUG();
+ 	}
  
- /*
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index c3d7ae4..4a19138d 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -147,9 +147,10 @@ static const struct arm64_ftr_bits ftr_ctr[] = {
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
- 	/*
- 	 * Linux can handle differing I-cache policies. Userspace JITs will
--	 * make use of *minLine
-+	 * make use of *minLine.
-+	 * If we have differing I-cache policies, report it as the weakest - AIVIVT.
- 	 */
--	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, 0),	/* L1Ip */
-+	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, ICACHE_POLICY_AIVIVT),	/* L1Ip */
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 10, 0),	/* RAZ */
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
- 	ARM64_FTR_END,
+ 	return insn;
 -- 
 2.7.4
