@@ -1,42 +1,94 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 9 Sep 2016 16:21:45 +0200
-Subject: [PATCH 10/10] PM / Domains: Add support for removing nested PM
- domains by provider
-In-Reply-To: <f31e57aa-52aa-d340-ca2b-73dbdf769035@nvidia.com>
-References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
- <1471340976-5379-11-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFq3h1-64FtZwXa7XWO1UJj8Od-cfjwa8i4bDwN1VVdL7w@mail.gmail.com>
- <f31e57aa-52aa-d340-ca2b-73dbdf769035@nvidia.com>
-Message-ID: <CAPDyKFqSLqHq7XymD2CZzzyAV3ohr5pKS1uTR6DXyBFh+VWCfg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri,  9 Sep 2016 15:23:30 +0100
+Subject: [PATCH v5 01/14] drivers: iommu: add FWNODE_IOMMU fwnode type
+In-Reply-To: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
+References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20160909142343.13314-2-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On systems booting with a device tree, every struct device is
+associated with a struct device_node, that represents its DT
+representation. The device node can be used in generic kernel
+contexts (eg IRQ translation, IOMMU streamid mapping), to
+retrieve the properties associated with the device and carry
+out kernel operation accordingly. Owing to the 1:1 relationship
+between the device and its device_node, the device_node can also
+be used as a look-up token for the device (eg looking up a device
+through its device_node), to retrieve the device in kernel paths
+where the device_node is available.
 
->>>  /**
->>> + * of_genpd_remove_tail - Remove the last PM domain registered for a provider
->>> + * @provider: Pointer to device structure associated with provider
->>
->> The naming of this function would be okay, if we only have added
->> genpds in the gpd_list by using list_add_tail(), although we don't.
->> Instead we use list_add() and put them first in the list.
->>
->> So, unless we change to use list_add_tail() when adding genpds (I
->> assume we can do that!), I would rather change the name of this
->> function to of_genpd_remove_first().
->>
->> What option do you prefer?
->
-> I think that I would prefer either of_genpd_remove_last() or
-> of_genpd_remove_one(). Although _first is accurate from the list
-> perspective it seems odd from the user perspective. I think that _last
-> is more meaningful as we are removing the last that was added regardless
-> or how things appear on the list. Alternatively, _one could be a good
-> compromise.
+On systems booting with ACPI, the same abstraction provided by
+the device_node is required to provide look-up functionality.
 
-I am fine with of_genpd_remove_last().
+Therefore, mirroring the approach implemented in the IRQ domain
+kernel layer, this patch adds an additional fwnode type FWNODE_IOMMU.
 
-[...]
+This patch also implements a glue kernel layer that allows to
+allocate/free FWNODE_IOMMU fwnode_handle structures and associate
+them with IOMMU devices.
 
-Kind regards
-Uffe
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+---
+ include/linux/fwnode.h |  1 +
+ include/linux/iommu.h  | 25 +++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
+index 8516717..6e10050 100644
+--- a/include/linux/fwnode.h
++++ b/include/linux/fwnode.h
+@@ -19,6 +19,7 @@ enum fwnode_type {
+ 	FWNODE_ACPI_DATA,
+ 	FWNODE_PDATA,
+ 	FWNODE_IRQCHIP,
++	FWNODE_IOMMU,
+ };
+ 
+ struct fwnode_handle {
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index a35fb8b..6456528 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -38,6 +38,7 @@ struct bus_type;
+ struct device;
+ struct iommu_domain;
+ struct notifier_block;
++struct fwnode_handle;
+ 
+ /* iommu fault flags */
+ #define IOMMU_FAULT_READ	0x0
+@@ -543,4 +544,28 @@ static inline void iommu_device_unlink(struct device *dev, struct device *link)
+ 
+ #endif /* CONFIG_IOMMU_API */
+ 
++/* IOMMU fwnode handling */
++static inline bool is_fwnode_iommu(struct fwnode_handle *fwnode)
++{
++	return fwnode && fwnode->type == FWNODE_IOMMU;
++}
++
++static inline struct fwnode_handle *iommu_alloc_fwnode(void)
++{
++	struct fwnode_handle *fwnode;
++
++	fwnode = kzalloc(sizeof(struct fwnode_handle), GFP_KERNEL);
++	fwnode->type = FWNODE_IOMMU;
++
++	return fwnode;
++}
++
++static inline void iommu_free_fwnode(struct fwnode_handle *fwnode)
++{
++	if (WARN_ON(!is_fwnode_iommu(fwnode)))
++		return;
++
++	kfree(fwnode);
++}
++
+ #endif /* __LINUX_IOMMU_H */
+-- 
+2.10.0
