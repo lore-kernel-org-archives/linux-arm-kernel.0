@@ -1,68 +1,72 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Fri,  9 Sep 2016 15:49:06 +0800
-Subject: [PATCH 6/6] arm64: dts: rockchip: add pd_usb3 power node for rk3399
-In-Reply-To: <1473406836-6720-1-git-send-email-zhangqing@rock-chips.com>
-References: <1473406836-6720-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1473407346-7588-1-git-send-email-zhangqing@rock-chips.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Fri,  9 Sep 2016 07:49:53 +0000
+Subject: [PATCH V4 0/4] thermal: bcm2835: add thermal driver
+Message-ID: <1473407397-29395-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1.add pd node for RK3399 Soc
-2.create power domain tree
-3.add qos node for domain
+From: Martin Sperl <kernel@martin.sperl.org>
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+Add a thermal driver for the TSENSE device of the bcm2835 SOC.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 4b67a249b3bc..1cae76afc8ca 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -703,10 +703,12 @@
- 		compatible = "syscon";
- 		reg = <0x0 0xffa58000 0x0 0x20>;
- 	};
-+
- 	qos_gmac: qos at ffa5c000 {
- 		compatible = "syscon";
- 		reg = <0x0 0xffa5c000 0x0 0x20>;
- 	};
-+
- 	qos_pcie: qos at ffa60080 {
- 		compatible = "syscon";
- 		reg = <0x0 0xffa60080 0x0 0x20>;
-@@ -721,6 +723,17 @@
- 		compatible = "syscon";
- 		reg = <0x0 0xffa60180 0x0 0x20>;
- 	};
-+
-+	qos_usb_otg0: qos at ffa70000 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa70000 0x0 0x20>;
-+	};
-+
-+	qos_usb_otg1: qos at ffa70080 {
-+		compatible = "syscon";
-+		reg = <0x0 0xffa70080 0x0 0x20>;
-+	};
-+
- 	qos_sd: qos at ffa74000 {
- 		compatible = "syscon";
- 		reg = <0x0 0xffa74000 0x0 0x20>;
-@@ -900,6 +913,12 @@
- 				clocks = <&cru HCLK_SDIO>;
- 				pm_qos = <&qos_sdioaudio>;
- 			};
-+			pd_usb3 at RK3399_PD_USB3 {
-+				reg = <RK3399_PD_USB3>;
-+				clocks = <&cru ACLK_USB3>;
-+				pm_qos = <&qos_usb_otg0>,
-+					 <&qos_usb_otg1>;
-+			};
- 			pd_vio at RK3399_PD_VIO {
- 				reg = <RK3399_PD_VIO>;
- 				#address-cells = <1>;
--- 
-1.9.1
+If the firmware enables the HW, then the configuration is not touched.
+In case the firmware has not enabled the device, then we try to set
+it up correctly (which unfortunately can not get tested).
+
+It exposes temperature and a critical trip point
+(using a hardcoded default of 80C or the temperature configured
+in the control register by the firmware, which reads as
+407C currently)
+
+The calibrations are (potentially) different for bcm2835, bcm2836
+and bcm2837 and can get selected by the compatible property
+in the device tree.
+
+The driver also exposes the registers via debugfs.
+
+Possible future enhancements:
+* the device has the ability to trigger interrupts on reaching
+  the programmed critical temperature.
+  I have no knowledge which interrupt could be responsible
+  for this on the ARM side, so if we get to know which irq
+  it is we can implement that.
+  Instead the driver right now implements polling in 1 second intervals
+* the device can also reset the HW after the trip point
+  has been reached (also with some delay, so that corrective
+  actions can get taken) - this is currently not enabled by the
+  firmware, but could.
+* we could define more trip points for THERMAL_TRIP_HOT
+* make the trip point limits modifiable (ops.set_trip_temp)
+
+Changelog:
+ V1 -> V2: renamed dt-binding documentation file
+       	   added specific settings depending on compatible
+	   added trip point based on register
+	   setting up ctrl-register if HW is not enabled by firmware
+	     as per recommendation of Eric (untested)
+	   check that clock frequency is in range
+	     (1.9 - 5MHz - as per comment in clk-bcm2835.c)
+ 	   added driver to multi_v7_defconfig
+ V2 -> V3: made a module in multi_v7_defconfig
+           fixed typo in dt-binding document
+ V3 -> V4: moved driver back to thermal (not using bcm sub-directory)
+       	   set polling interval to 1second (was 0ms, so interrupt driven)
+
+Martin Sperl (4):
+  dt: bindings: add thermal device driver for bcm2835
+  thermal: bcm2835: add thermal driver for bcm2835 soc
+  ARM: bcm2835: add thermal node to device-tree of bcm283x
+  ARM: bcm2835: add thermal driver to default_config
+
+ .../bindings/thermal/brcm,bcm2835-thermal.txt      |  17 ++
+ arch/arm/boot/dts/bcm283x.dtsi                     |   6 +
+ arch/arm/configs/bcm2835_defconfig                 |   2 +
+ drivers/thermal/Kconfig                            |   5 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/bcm2835_thermal.c                  | 327 +++++++++++++++++++++
+ 6 files changed, 358 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/brcm,bcm2835-thermal.txt
+ create mode 100644 drivers/thermal/bcm2835_thermal.c
+
+--
+2.1.4
