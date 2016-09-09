@@ -1,60 +1,36 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 9 Sep 2016 10:34:38 +0200
-Subject: [PATCH 3/3] soc: ti: Add ti_sci_pm_domains driver
-In-Reply-To: <m2mvjinvfw.fsf@baylibre.com>
-References: <20160819235653.26355-1-nm@ti.com>
- <20160819235653.26355-4-nm@ti.com>
- <CAPDyKFooDUOPT9dP8HaW3YBO9PsX-1+96PPE7CRMyjEkra7cBQ@mail.gmail.com>
- <57C0D2C9.1030801@ti.com> <57C5E1DA.2040405@ti.com>
- <CAPDyKFqszM48nXnnA9D8iCp34k-ZmNvOkHPCc=Fya4nJA7PvBQ@mail.gmail.com>
- <57CF26DB.4020807@ti.com> <7h4m5rv9kz.fsf@baylibre.com>
- <CAPDyKFo0Cb90BbY7ra6VDjb5frC5=VtmE3V6tDK=VosfPmod7Q@mail.gmail.com>
- <m2mvjinvfw.fsf@baylibre.com>
-Message-ID: <CAPDyKFqYy7UOzW5d5JKO=YWoUN8QcX086iBMoWZu4MCtJh-vgA@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 9 Sep 2016 09:34:20 +0100
+Subject: [RFD] hix5hd2 datasheet?
+In-Reply-To: <dae6535c-13f2-7d79-d938-30b1a6fb4afc@gmail.com>
+References: <dae6535c-13f2-7d79-d938-30b1a6fb4afc@gmail.com>
+Message-ID: <57D2740C.10000@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2016 at 19:38, Kevin Hilman <khilman@baylibre.com> wrote:
-> Ulf Hansson <ulf.hansson@linaro.org> writes:
->
->> [...]
->>
->>>
->>> One more idea...
->>>
->>> Since you don't really have a domain (a group of devices), what you
->>> really have is each device having an independent power switch, so as Ulf
->>> suggested, what you really need is for all the devices to share the same
->>> set of runtime PM callbacks that call SCI.  The only difference is the
->>> unique ID.
->>>
->>> Rather than using all of genpd, you could also just use a pm_domain
->>> which is what genpd is built on top of (and also omap_device, which
->>> you're probably familiar with also.)
->>
->> Even if this would work as well, the downside would be that you need
->> to re-invent the parts related to the DT parsing, the probing/removal
->> and attaching/detaching of the device to the PM domain.
->>
->> You probably don't want to go there... :-)
->
-> All you'd need to read from DT would be the device-specific ID for
-> TI-SCI, and that could be done at bind time with a notifier.  The, in
-> that same notifier, if a TI-SCI ID exists, it would get added to the
-> pm_domain.
->
-> Anyways, your original proposal is much preferred if it can work.  I'm
-> just throwing out another option because I really don't like one genpd
-> per device.
+Hi Marty,
 
-Okay, then we are in full agreement!
+On 08/09/2016 23:58, Marty Plummer wrote:
+> Hello,
+> 
+> 	I'm currently working to get the ethernet interface for the
+> hi3520 SoC to work, and I think (emphasis on think) the hix5hd2-gmac
+> driver is compatible, or nearly so, as checking the sdk source code
+> for the interface has a fairly large amount of similar code (well, as
+> similar as 2.6.24 vs 4.8-rc4 code can be) and identical register
+> definitions to the very bit, so I was hoping to compare the datasheets
+> and see how far the commonality goes. Plus, having the datasheets
+> readily available will be of assistance to anyone else looking to
+> contribute.
 
-BTW, I have just been trying to convince other people working on
-Rockchip SoCs, to also avoid using one genpd per device. Feel free to
-join those discussions [1] as well. :-)
++Jiancheng into this mail group.
+Maybe you could get the hix5hd2 datasheets from him.
+Thanks!
 
-Kind regards
-Uffe
+Best Regards,
+Wei
 
-[1]
-https://lkml.org/lkml/2016/9/1/377
+> 
+> Thanks,
+> 	Marty
+> 
+> 
