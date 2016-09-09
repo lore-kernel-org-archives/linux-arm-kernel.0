@@ -1,33 +1,26 @@
 From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Fri, 9 Sep 2016 16:41:59 +0200
-Subject: [PATCH v5 4/9] ARM: dts: Add EXTI controller node to stm32f429
+Date: Fri, 9 Sep 2016 16:41:58 +0200
+Subject: [PATCH v5 3/9] ARM: STM32: Select external interrupts controller
 In-Reply-To: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
 References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1473432124-6784-5-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1473432124-6784-4-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 35df462..1a189d4 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -176,6 +176,14 @@
- 			reg = <0x40013800 0x400>;
- 		};
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2d601d7..157cea9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -877,6 +877,7 @@ config ARCH_STM32
+ 	select CLKSRC_STM32
+ 	select PINCTRL
+ 	select RESET_CONTROLLER
++	select STM32_EXTI
+ 	help
+ 	  Support for STMicroelectronics STM32 processors.
  
-+		exti: interrupt-controller at 40013c00 {
-+			compatible = "st,stm32-exti";
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			reg = <0x40013C00 0x400>;
-+			interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
-+		};
-+
- 		pin-controller {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
 -- 
 1.9.1
