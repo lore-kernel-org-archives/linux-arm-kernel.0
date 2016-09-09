@@ -1,181 +1,87 @@
-From: oss@buserror.net (Scott Wood)
-Date: Thu, 08 Sep 2016 22:47:20 -0500
-Subject: [v11, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
-In-Reply-To: <1473150503-9550-6-git-send-email-yangbo.lu@nxp.com>
-References: <1473150503-9550-1-git-send-email-yangbo.lu@nxp.com>
- <1473150503-9550-6-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1473392840.30217.170.camel@buserror.net>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Fri, 9 Sep 2016 11:49:43 +0800
+Subject: [PATCH v8 10/16] mm/memblock: add a new function
+ memblock_alloc_near_nid
+In-Reply-To: <1472712907-12700-11-git-send-email-thunder.leizhen@huawei.com>
+References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472712907-12700-11-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <57D23157.7000203@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-09-06 at 16:28 +0800, Yangbo Lu wrote:
-> The global utilities block controls power management, I/O device
-> enabling, power-onreset(POR) configuration monitoring, alternate
-> function selection for multiplexed signals,and clock control.
+Hi, linux-mm folks:
+    Can somebody help me to review this patch?
+    I ran scripts/get_maintainer.pl -f mm/memblock.c and scripts/get_maintainer.pl -f mm/, but
+the results showed me that there is no maintainer.
+    To understand this patch should also read patch 11.
+
+On 2016/9/1 14:55, Zhen Lei wrote:
+> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
+> actually exist. The percpu variable areas and numa control blocks of that
+> memoryless numa nodes must be allocated from the nearest available node
+> to improve performance.
 > 
-> This patch adds a driver to manage and access global utilities block.
-> Initially only reading SVR and registering soc device are supported.
-> Other guts accesses, such as reading RCW, should eventually be moved
-> into this driver as well.
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  include/linux/memblock.h |  1 +
+>  mm/memblock.c            | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 29 insertions(+)
 > 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> Signed-off-by: Scott Wood <oss@buserror.net>
-
-Don't put my signoff on patches that I didn't put it on myself. ?Definitely
-don't put mine *after* yours on patches that were last modified by you.
-
-If you want to mention that the soc_id encoding was my suggestion, then do so
-explicitly.
-
-> +/* SoC attribute definition for QorIQ platform */
-> +static const struct soc_device_attribute qoriq_soc[] = {
-> +#ifdef CONFIG_PPC
-> +	/*
-> +	?* Power Architecture-based SoCs T Series
-> +	?*/
-> +
-> +	/* SoC: T1024/T1014/T1023/T1013 Rev: 1.0 */
-> +	{ .soc_id	= "svr:0x85400010,name:T1024,die:T1024",
-> +	??.revision	= "1.0",
-> +	},
-> +	{ .soc_id	= "svr:0x85480010,name:T1024E,die:T1024",
-> +	??.revision	= "1.0",
-> +	},
-
-Revision could be computed from the low 8 bits of SVR (just as you do for unknown SVRs).
-
-We could move the die name into .family:
-
-	{
-		.soc_id = "svr:0x85490010,name:T1023E,",
-		.family = "QorIQ T1024",
-	}
-
-I see you dropped svre (and the trailing comma), though I guess the vast
-majority of potential users will be looking at .family. ?In which case do we
-even need name? ?If we just make the soc_id be "svr:0xnnnnnnnn" then we could
-shrink the table to an svr+mask that identifies each die. ?I'd still want to
-keep the "svr:" even if we're giving up on the general tagging system, to make
-it clear what the number refers to, and to provide some defense against users
-who match only against soc_id rather than soc_id+family. ?Or we could go
-further and format soc_id as "QorIQ SVR 0xnnnnnnnn" so that soc_id-only
-matches are fully acceptable rather than just less dangerous.
-
-> +static const struct soc_device_attribute *fsl_soc_device_match(
-> +	unsigned int svr, const struct soc_device_attribute *matches)
+> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> index 2925da2..8e866e0 100644
+> --- a/include/linux/memblock.h
+> +++ b/include/linux/memblock.h
+> @@ -290,6 +290,7 @@ static inline int memblock_get_region_node(const struct memblock_region *r)
+> 
+>  phys_addr_t memblock_alloc_nid(phys_addr_t size, phys_addr_t align, int nid);
+>  phys_addr_t memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid);
+> +phys_addr_t memblock_alloc_near_nid(phys_addr_t size, phys_addr_t align, int nid);
+> 
+>  phys_addr_t memblock_alloc(phys_addr_t size, phys_addr_t align);
+> 
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index 483197e..6578fff 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -1189,6 +1189,34 @@ again:
+>  	return ret;
+>  }
+> 
+> +phys_addr_t __init memblock_alloc_near_nid(phys_addr_t size, phys_addr_t align, int nid)
 > +{
-> +	char svr_match[50];
-> +	int n;
+> +	int i, best_nid, distance;
+> +	u64 pa;
+> +	DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
 > +
-> +	n = sprintf(svr_match, "*%08x*", svr);
-
-n = sprintf(svr_match, "svr:0x%08x,*", svr);
-
-(according to the current encoding)
-
+> +	bitmap_zero(nodes_map, MAX_NUMNODES);
 > +
-> +	do {
-> +		if (!matches->soc_id)
-> +			return NULL;
-> +		if (glob_match(svr_match, matches->soc_id))
-> +			break;
-> +	} while (matches++);
-
-Are you expecting "matches++" to ever evaluate as false?
-
-> +	/* Register soc device */
-> +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> +	if (!soc_dev_attr) {
-> +		ret = -ENOMEM;
-> +		goto out_unmap;
+> +find_nearest_node:
+> +	best_nid = NUMA_NO_NODE;
+> +	distance = INT_MAX;
+> +
+> +	for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
+> +		if (node_distance(nid, i) < distance) {
+> +			best_nid = i;
+> +			distance = node_distance(nid, i);
+> +		}
+> +
+> +	pa = memblock_alloc_nid(size, align, best_nid);
+> +	if (!pa) {
+> +		BUG_ON(best_nid == NUMA_NO_NODE);
+> +		bitmap_set(nodes_map, best_nid, 1);
+> +		goto find_nearest_node;
 > +	}
-
-Couldn't this be statically allocated?
-
 > +
-> +	machine = of_flat_dt_get_machine_name();
-> +	if (machine)
-> +		soc_dev_attr->machine = kasprintf(GFP_KERNEL, "%s",
-> machine);
-> +
-> +	soc_dev_attr->family = kasprintf(GFP_KERNEL, "QorIQ");
-> +
-> +	svr = fsl_guts_get_svr();
-> +	fsl_soc = fsl_soc_device_match(svr, qoriq_soc);
-> +	if (fsl_soc) {
-> +		soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%s",
-> +						?fsl_soc->soc_id);
-
-You can use kstrdup() if you're just copying the string as is.
-
-> +		soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%s",
-> +						???fsl_soc->revision);
-> +	} else {
-> +		soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "0x%08x",
-> svr);
-
-	kasprintf(GFP_KERNEL, "svr:0x%08x,", svr);
-
-
-> +
-> +	soc_dev = soc_device_register(soc_dev_attr);
-> +	if (IS_ERR(soc_dev)) {
-> +		ret = -ENODEV;
-
-Why are you changing the error code?
-
-> +		goto out;
-> +	} else {
-
-Unnecessary "else".
-
-> +		pr_info("Detected: %s\n", soc_dev_attr->machine);
-
-Machine: %s
-
-> +		pr_info("Detected SoC family: %s\n", soc_dev_attr->family);
-> +		pr_info("Detected SoC ID: %s, revision: %s\n",
-> +			soc_dev_attr->soc_id, soc_dev_attr->revision);
-
-s/Detected //g
-
-
-> +	}
-> +	return 0;
-> +out:
-> +	kfree(soc_dev_attr->machine);
-> +	kfree(soc_dev_attr->family);
-> +	kfree(soc_dev_attr->soc_id);
-> +	kfree(soc_dev_attr->revision);
-> +	kfree(soc_dev_attr);
-> +out_unmap:
-> +	iounmap(guts->regs);
-> +out_free:
-> +	kfree(guts);
-
-devm
-
-> +static int fsl_guts_remove(struct platform_device *dev)
-> +{
-> +	kfree(soc_dev_attr->machine);
-> +	kfree(soc_dev_attr->family);
-> +	kfree(soc_dev_attr->soc_id);
-> +	kfree(soc_dev_attr->revision);
-> +	kfree(soc_dev_attr);
-> +	soc_device_unregister(soc_dev);
-> +	iounmap(guts->regs);
-> +	kfree(guts);
-> +	return 0;
+> +	return pa;
 > +}
-
-Don't free the memory before you unregister the device that uses it (moot if
-you use devm).
-
-> ?
-> +#ifdef CONFIG_FSL_GUTS
-> +unsigned int fsl_guts_get_svr(void);
-> +#endif
-
-Don't ifdef prototypes (unless you're going to provide a stub alternative).
-
--Scott
+> +
+>  phys_addr_t __init __memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
+>  {
+>  	return memblock_alloc_base_nid(size, align, max_addr, NUMA_NO_NODE,
+> --
+> 2.5.0
+> 
+> 
+> 
+> .
+> 
