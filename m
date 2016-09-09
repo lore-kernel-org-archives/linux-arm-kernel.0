@@ -1,282 +1,41 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri,  9 Sep 2016 14:48:47 -0700
-Subject: [PATCH v2] extcon: Add support for qcom SPMI PMIC USB id detection
- hardware
-Message-ID: <20160909214847.20103-1-stephen.boyd@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 9 Sep 2016 14:56:53 -0700
+Subject: [PATCH v2] hwmon: xgene: access mailbox as RAM
+In-Reply-To: <3475893.910N1IvcYZ@wuerfel>
+References: <1469134557-26869-1-git-send-email-hotran@apm.com>
+ <CAFHUOYzm4VH1fc3D0fLVv3bCU=2SHx7tZM4nFnCvWeuY+QfEFw@mail.gmail.com>
+ <2852054.37zytD0HIa@wuerfel> <3475893.910N1IvcYZ@wuerfel>
+Message-ID: <20160909215653.GA2362@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Qualcomm PMICs have a misc device that performs USB id pin
-detection via an interrupt. When the interrupt triggers, we
-should read the interrupt line to see if it has gone high or low.
-If the interrupt is low then the ID pin is grounded, and if the
-interrupt is high then the ID pin is being held high.
+On Fri, Sep 09, 2016 at 10:10:45PM +0200, Arnd Bergmann wrote:
+> The newly added hwmon driver fails to build in an allmodconfig
+> kernel:
+> 
+>       ERROR: "memblock_is_memory" [drivers/hwmon/xgene-hwmon.ko] undefined!
+> 
+> According to comments in the code, the mailbox is a shared memory region,
+> not a set of MMIO registers, so we should use memremap() for mapping it
+> instead of ioremap or acpi_os_ioremap, and pointer dereferences instead
+> of readl/writel.
+> 
+> The driver already uses plain kernel pointers, so it's a bit unusual
+> to work with functions that operate on __iomem pointers, and this
+> fixes that part too.
+> 
+> I'm using READ_ONCE/WRITE_ONCE here to keep the existing behavior
+> regarding the ordering of the accesses from the CPU, but note that
+> there are no barriers (also unchanged from before).
+> 
+> I'm also keeping the endianess behavior, though I'm unsure whether
+> the message data was supposed to be in LE32 format in the first
+> place, it's possible this was meant to be interpreted as a byte
+> stream instead.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Cc: Roger Quadros <rogerq@ti.com>
-Cc: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
----
+Applied after 's/endianess/endianness/' to make checkpatch happy.
 
-Changes from v1:
- * Fixed Makefile ordering
- * Fixed up copyright markings
-
- .../bindings/extcon/qcom,pm8941-misc.txt           |  41 +++++
- drivers/extcon/Kconfig                             |   6 +
- drivers/extcon/Makefile                            |   1 +
- drivers/extcon/extcon-qcom-spmi-misc.c             | 167 +++++++++++++++++++++
- 4 files changed, 215 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt
- create mode 100644 drivers/extcon/extcon-qcom-spmi-misc.c
-
-diff --git a/Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt b/Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt
-new file mode 100644
-index 000000000000..35383adb10f1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt
-@@ -0,0 +1,41 @@
-+Qualcomm's PM8941 USB ID Extcon device
-+
-+Some Qualcomm PMICs have a "misc" module that can be used to detect when
-+the USB ID pin has been pulled low or high.
-+
-+PROPERTIES
-+
-+- compatible:
-+    Usage: required
-+    Value type: <string>
-+    Definition: Should contain "qcom,pm8941-misc";
-+
-+- reg:
-+    Usage: required
-+    Value type: <u32>
-+    Definition: Should contain the offset to the misc address space
-+
-+- interrupts:
-+    Usage: required
-+    Value type: <prop-encoded-array>
-+    Definition: Should contain the usb id interrupt
-+
-+- interrupt-names:
-+    Usage: required
-+    Value type: <stringlist>
-+    Definition: Should contain the string "usb_id" for the usb id interrupt
-+
-+Example:
-+
-+	pmic {
-+		usb_id: misc at 900 {
-+			compatible = "qcom,pm8941-misc";
-+			reg = <0x900>;
-+			interrupts = <0x0 0x9 0 IRQ_TYPE_EDGE_BOTH>;
-+			interrupt-names = "usb_id";
-+		};
-+	}
-+
-+	usb-controller {
-+		extcon = <&usb_id>;
-+	};
-diff --git a/drivers/extcon/Kconfig b/drivers/extcon/Kconfig
-index 3d89e60a3e71..04788d92ea52 100644
---- a/drivers/extcon/Kconfig
-+++ b/drivers/extcon/Kconfig
-@@ -96,6 +96,12 @@ config EXTCON_PALMAS
- 	  Say Y here to enable support for USB peripheral and USB host
- 	  detection by palmas usb.
- 
-+config EXTCON_QCOM_SPMI_MISC
-+	tristate "Qualcomm USB extcon support"
-+	help
-+	  Say Y here to enable SPMI PMIC based USB cable detection
-+	  support on Qualcomm PMICs such as PM8941.
-+
- config EXTCON_RT8973A
- 	tristate "Richtek RT8973A EXTCON support"
- 	depends on I2C
-diff --git a/drivers/extcon/Makefile b/drivers/extcon/Makefile
-index 972c813c375b..31a0a999c4fb 100644
---- a/drivers/extcon/Makefile
-+++ b/drivers/extcon/Makefile
-@@ -14,6 +14,7 @@ obj-$(CONFIG_EXTCON_MAX77693)	+= extcon-max77693.o
- obj-$(CONFIG_EXTCON_MAX77843)	+= extcon-max77843.o
- obj-$(CONFIG_EXTCON_MAX8997)	+= extcon-max8997.o
- obj-$(CONFIG_EXTCON_PALMAS)	+= extcon-palmas.o
-+obj-$(CONFIG_EXTCON_QCOM_SPMI_MISC) += extcon-qcom-spmi-misc.o
- obj-$(CONFIG_EXTCON_RT8973A)	+= extcon-rt8973a.o
- obj-$(CONFIG_EXTCON_SM5502)	+= extcon-sm5502.o
- obj-$(CONFIG_EXTCON_USB_GPIO)	+= extcon-usb-gpio.o
-diff --git a/drivers/extcon/extcon-qcom-spmi-misc.c b/drivers/extcon/extcon-qcom-spmi-misc.c
-new file mode 100644
-index 000000000000..1b8e24494c60
---- /dev/null
-+++ b/drivers/extcon/extcon-qcom-spmi-misc.c
-@@ -0,0 +1,167 @@
-+/**
-+ * Based on extcon-usb-gpio.c
-+ *
-+ * Copyright (C) 2016 Linaro Ltd
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/extcon.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/workqueue.h>
-+
-+#define USB_ID_DEBOUNCE_MS	5	/* ms */
-+
-+struct qcom_usb_extcon_info {
-+	struct extcon_dev *edev;
-+	int irq;
-+	struct delayed_work wq_detcable;
-+	unsigned long debounce_jiffies;
-+};
-+
-+static const unsigned int qcom_usb_extcon_cable[] = {
-+	EXTCON_USB_HOST,
-+	EXTCON_NONE,
-+};
-+
-+static void qcom_usb_extcon_detect_cable(struct work_struct *work)
-+{
-+	bool id;
-+	int ret;
-+	struct qcom_usb_extcon_info *info = container_of(to_delayed_work(work),
-+						    struct qcom_usb_extcon_info,
-+						    wq_detcable);
-+
-+	/* check ID and update cable state */
-+	ret = irq_get_irqchip_state(info->irq, IRQCHIP_STATE_LINE_LEVEL, &id);
-+	if (ret)
-+		return;
-+
-+	extcon_set_cable_state_(info->edev, EXTCON_USB_HOST, !id);
-+}
-+
-+static irqreturn_t qcom_usb_irq_handler(int irq, void *dev_id)
-+{
-+	struct qcom_usb_extcon_info *info = dev_id;
-+
-+	queue_delayed_work(system_power_efficient_wq, &info->wq_detcable,
-+			   info->debounce_jiffies);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int qcom_usb_extcon_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct qcom_usb_extcon_info *info;
-+	int ret;
-+
-+	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+
-+	info->edev = devm_extcon_dev_allocate(dev, qcom_usb_extcon_cable);
-+	if (IS_ERR(info->edev)) {
-+		dev_err(dev, "failed to allocate extcon device\n");
-+		return -ENOMEM;
-+	}
-+
-+	ret = devm_extcon_dev_register(dev, info->edev);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to register extcon device\n");
-+		return ret;
-+	}
-+
-+	info->debounce_jiffies = msecs_to_jiffies(USB_ID_DEBOUNCE_MS);
-+	INIT_DELAYED_WORK(&info->wq_detcable, qcom_usb_extcon_detect_cable);
-+
-+	info->irq = platform_get_irq_byname(pdev, "usb_id");
-+	if (info->irq < 0)
-+		return info->irq;
-+
-+	ret = devm_request_threaded_irq(dev, info->irq, NULL,
-+					qcom_usb_irq_handler,
-+					IRQF_TRIGGER_RISING |
-+					IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-+					pdev->name, info);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to request handler for ID IRQ\n");
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, info);
-+	device_init_wakeup(dev, 1);
-+
-+	/* Perform initial detection */
-+	qcom_usb_extcon_detect_cable(&info->wq_detcable.work);
-+
-+	return 0;
-+}
-+
-+static int qcom_usb_extcon_remove(struct platform_device *pdev)
-+{
-+	struct qcom_usb_extcon_info *info = platform_get_drvdata(pdev);
-+
-+	cancel_delayed_work_sync(&info->wq_detcable);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int qcom_usb_extcon_suspend(struct device *dev)
-+{
-+	struct qcom_usb_extcon_info *info = dev_get_drvdata(dev);
-+	int ret = 0;
-+
-+	if (device_may_wakeup(dev))
-+		ret = enable_irq_wake(info->irq);
-+
-+	return ret;
-+}
-+
-+static int qcom_usb_extcon_resume(struct device *dev)
-+{
-+	struct qcom_usb_extcon_info *info = dev_get_drvdata(dev);
-+	int ret = 0;
-+
-+	if (device_may_wakeup(dev))
-+		ret = disable_irq_wake(info->irq);
-+
-+	return ret;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(qcom_usb_extcon_pm_ops,
-+			 qcom_usb_extcon_suspend, qcom_usb_extcon_resume);
-+
-+static const struct of_device_id qcom_usb_extcon_dt_match[] = {
-+	{ .compatible = "qcom,pm8941-misc", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, qcom_usb_extcon_dt_match);
-+
-+static struct platform_driver qcom_usb_extcon_driver = {
-+	.probe		= qcom_usb_extcon_probe,
-+	.remove		= qcom_usb_extcon_remove,
-+	.driver		= {
-+		.name	= "extcon-pm8941-misc",
-+		.pm	= &qcom_usb_extcon_pm_ops,
-+		.of_match_table = qcom_usb_extcon_dt_match,
-+	},
-+};
-+module_platform_driver(qcom_usb_extcon_driver);
-+
-+MODULE_DESCRIPTION("QCOM USB ID extcon driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.9.0.rc2.8.ga28705d
+Thanks,
+Guenter
