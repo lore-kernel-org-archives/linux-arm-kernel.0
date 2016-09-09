@@ -1,59 +1,49 @@
-From: shaohui.xie@nxp.com (S.H. Xie)
-Date: Fri, 9 Sep 2016 09:00:26 +0000
-Subject: [PATCH 3/7] [v2] arm64: dts: add QorIQ LS1046A SoC support
-In-Reply-To: <57D1664D.3060502@arm.com>
-References: <1473069695-33092-1-git-send-email-shh.xie@gmail.com>
- <1473069695-33092-4-git-send-email-shh.xie@gmail.com>
- <57D1664D.3060502@arm.com>
-Message-ID: <DB5PR0401MB2183AF1CB29F26B41192F246E8FA0@DB5PR0401MB2183.eurprd04.prod.outlook.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 9 Sep 2016 11:00:16 +0200
+Subject: [PATCH v3] ARM: dts: add gpio-ranges property to iMX GPIO
+ controllers
+In-Reply-To: <729f2fd7-df40-c631-5365-892ee25854b3@mentor.com>
+References: <1473386556-1934-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <20160909072020.ieehalkgxxjfewhs@pengutronix.de>
+ <729f2fd7-df40-c631-5365-892ee25854b3@mentor.com>
+Message-ID: <20160909090016.pc4d5j7lvjvbofvf@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +	timer {
-> > +		compatible = "arm,armv8-timer";
-> > +		interrupts = <GIC_PPI 13 IRQ_TYPE_EDGE_RISING>,
-> > +			     <GIC_PPI 14 IRQ_TYPE_EDGE_RISING>,
-> > +			     <GIC_PPI 11 IRQ_TYPE_EDGE_RISING>,
-> > +			     <GIC_PPI 10 IRQ_TYPE_EDGE_RISING>;
+On Fri, Sep 09, 2016 at 11:44:10AM +0300, Vladimir Zapolskiy wrote:
+> Hi Uwe,
 > 
-> No, this is completely wrong. The timer is always level triggered, and you're
-> missing the affinity bits that are described the GIC binding.
-[S.H] Will use (GIC_CPU_MASK_RAW(0xf) | IRQ_TYPE_LEVEL_LOW) in next version.
+> On 09/09/2016 10:20 AM, Uwe Kleine-K?nig wrote:
+> > On Fri, Sep 09, 2016 at 05:02:36AM +0300, Vladimir Zapolskiy wrote:
+> > > To establish a connection between GPIO controllers and pin multiplexor
+> > > controller add gpio-ranges properties to all GPIO controllers found
+> > > on iMX50, iMX6Q/D, iMX6DL/S, iMX6SL, iMX6SX, iMX6UL and iMX7D/S
+> > > SoCs. The change was done after human parsing of output from
+> > 
+> > When looking at doing the same for i.MX35 there are a few pin pairs that
+> > are driven by the same GPIO, e.g.:
+> > 
+> > 	$ grep GPIO3_9 imx35-pinfunc.h
+> > 	#define MX35_PAD_CTS1__GPIO3_9					0x194 0x5d8 0x918 0x5 0x0
+> > 	#define MX35_PAD_FEC_COL__GPIO3_9				0x2ec 0x750 0x918 0x5 0x1
+> > 
+> > With this it's not possible to correctly add a gpio-ranges, right?
+> 
+> this is an interesting exceptional case, I don't think that pinctrl
+> and gpio subsystems are ready to handle it.
+> 
+> If both pads are muxed to the same GPIO, then I presume on output it
+> behaves like a tee, but do you know what would be the input value,
+> if one line is driven high and another one is low?
 
-> 
-> > +	};
-> > +
-> > +	pmu {
-> > +		compatible = "arm,armv8-pmuv3";
-> 
-> Please add "arm,cortex-a72-pmu".
-[S.H] Will use "arm,cortex-a72-pmu" in next version.
+That depends on the setting of register
+IOMUXC_GPIO3_IPP_IND_G_IN_9_SELECT_INPUT at offset 0x918 (third value in
+the constants). If it's 0 (fifth value) the value at MX35_PAD_CTS1 is
+read, if it's 1 MX35_PAD_FEC_COL is used.
 
-> 
-> > +		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
-> > +			     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-> > +		interrupt-affinity = <&cpu0>,
-> > +				     <&cpu1>,
-> > +				     <&cpu2>,
-> > +				     <&cpu3>;
-> > +	};
-> > +
-> > +	gic: interrupt-controller at 1400000 {
-> > +		compatible = "arm,gic-400";
-> > +		#interrupt-cells = <3>;
-> > +		interrupt-controller;
-> > +		reg = <0x0 0x1410000 0 0x10000>, /* GICD */
-> > +		      <0x0 0x1420000 0 0x20000>, /* GICC */
-> > +		      <0x0 0x1440000 0 0x20000>, /* GICH */
-> > +		      <0x0 0x1460000 0 0x20000>; /* GICV */
-> > +		interrupts = <1 9 0xf08>;
-> 
-> Please choose between expressing the interrupts entirely with numerals or entirely
-> with symbols. At the moment this is a mix between the two.
-[S.H] Will fix it in next version.
+Best regards
+Uwe
 
-Thank you!
-
-Shaohui
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
