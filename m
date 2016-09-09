@@ -1,28 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 9 Sep 2016 18:19:20 +0100
-Subject: next build: 143 builds: 2 failed, 141 passed, 2 errors, 2
- warnings (next-20160909)
-In-Reply-To: <m2oa3xgg98.fsf@baylibre.com>
-References: <57d26402.eeb8c20a.ba0e2.8bbb@mx.google.com>
- <2582793.W17ckCts1B@wuerfel> <m2oa3xgg98.fsf@baylibre.com>
-Message-ID: <20160909171920.GW27946@sirena.org.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 9 Sep 2016 18:21:14 +0100
+Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
+In-Reply-To: <CAFBinCCDDwydB+RP0CZKoAW5Suxotn224ZFVWvt2OGW3gNJR1g@mail.gmail.com>
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
+ <m260q6jibf.fsf@baylibre.com>
+ <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
+ <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
+ <m2eg4ui0nl.fsf@baylibre.com>
+ <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
+ <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
+ <m2sht9gkau.fsf@baylibre.com>
+ <CAFBinCCDDwydB+RP0CZKoAW5Suxotn224ZFVWvt2OGW3gNJR1g@mail.gmail.com>
+Message-ID: <b9730890-d98c-2c3a-8af1-96b8c394c30f@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 10:00:35AM -0700, Kevin Hilman wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
+On 09/09/16 17:14, Martin Blumenstingl wrote:
+> On Fri, Sep 9, 2016 at 5:33 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> However, the problem with all of the solutions proposed (runtime PM ones
+>> included) is that we're forcing a board-specific design issue (2 devices
+>> sharing a reset line) into a driver that should not have any
+>> board-specific assumptions in it.
+>>
+>> For example, if this driver is used on another platform where different
+>> PHYs have different reset lines, then one of them (the unlucky one who
+>> is not probed first) will never get reset.  So any form of per-device
+>> ref-counting is not a portable solution.
+> maybe we should also consider Ben's solution: he played with the USB
+> PHY on his Meson8b board. His approach was to have only one USB PHY
+> driver instance which exposes two PHYs.
+> The downside of this: the driver would have to know the offset of the
+> PHYs (0x0 for the first PHY, 0x20 for the second), but we could handle
+> the reset using runtime PM without any hacks.
+>
+> I checked the USB PHY reference driver: it seems that there will be a
+> new USB PHY with the GXL/GXM SoCs.
+> So maybe we could live with the assumption that the PHYs are at
+> consecutive addresses.
+>
+>> I'm not sure yet how the reset framework is supposed to handle shared
+>> reset lines, but that needs some investigation.  I quick glance and it
+>> seems that reset controllers can have shared lines, so that should be
+>> investigated.
+> unfortunately shared resets are not allowed to use reset_control_reset, see [0]
+>
+>
+> [0] http://lxr.free-electrons.com/source/drivers/reset/core.c#L102
 
-> > Could we please update the gcc build on kernelci.org from "Linaro GCC 5.3-2016.02"
-> > to the following version (Linaro GCC 5.3-2016.05) or later?
+If we didn't have the shared reset, we'd have one of node per phy
+and not have to have two sub-nodes... I don't think any other bits
+of the PHY framework are shared.
 
-> I finally found the release tarballs for Linaro toolchains (the "latest"
-> link on the linaro releases was stale, and pointing to 2016.02).
-
-That link should be fixed now or shortly to avoid future confusion.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160909/dc2cea95/attachment.sig>
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
