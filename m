@@ -1,141 +1,71 @@
-From: pku.leo@gmail.com (Leo Li)
-Date: Fri, 9 Sep 2016 14:37:12 -0500
-Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <306f579a2f2362595a55c53e48657563@agner.ch>
-References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
- <20160906185849.27pjhawadca5pwow@pengutronix.de>
- <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
- <87ca69fb85848a0a86b34a9a9037a57b@agner.ch>
- <CADRPPNSPye45bmFshfwb+gDA0x0ygs4Ofa6HMYbKt9ER0oeccg@mail.gmail.com>
- <8f8f7ffc4aef513ef5064ba0491fbc63@agner.ch>
- <CADRPPNR4oiRVgFqaM=1=Zn_JzrVJDVmozWsouLByXRtaHCh=qQ@mail.gmail.com>
- <306f579a2f2362595a55c53e48657563@agner.ch>
-Message-ID: <CADRPPNS3PecYRaAMR+0RuzU+gE3y5ZN-x7HzqggrdDsN-CkArg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Sep 2016 21:58:49 +0200
+Subject: [PATCH] hwmon: xgene: access mailbox as RAM
+In-Reply-To: <CAFHUOYzm4VH1fc3D0fLVv3bCU=2SHx7tZM4nFnCvWeuY+QfEFw@mail.gmail.com>
+References: <1469134557-26869-1-git-send-email-hotran@apm.com>
+ <2529114.aAikiSWl11@wuerfel>
+ <CAFHUOYzm4VH1fc3D0fLVv3bCU=2SHx7tZM4nFnCvWeuY+QfEFw@mail.gmail.com>
+Message-ID: <2852054.37zytD0HIa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 9, 2016 at 11:51 AM, Stefan Agner <stefan@agner.ch> wrote:
-> On 2016-09-08 16:57, Leo Li wrote:
->> On Thu, Sep 8, 2016 at 5:39 PM, Stefan Agner <stefan@agner.ch> wrote:
->>> On 2016-09-06 15:40, Leo Li wrote:
->>>> On Tue, Sep 6, 2016 at 4:51 PM, Stefan Agner <stefan@agner.ch> wrote:
->>>>> On 2016-09-06 13:06, Leo Li wrote:
->>>>>> On Tue, Sep 6, 2016 at 1:58 PM, Uwe Kleine-K?nig
->>>>>> <u.kleine-koenig@pengutronix.de> wrote:
->>>>>>> On Fri, Aug 19, 2016 at 05:05:22PM -0500, Li Yang wrote:
->>> <snip>
->>>>>>>> @@ -1081,8 +1090,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
->>>>>>>>               return ret;
->>>>>>>>       }
->>>>>>>>
->>>>>>>> +     /* optional bus recovery feature through pinctrl */
->>>>>>>>       i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
->>>>>>>> -     if (IS_ERR(i2c_imx->pinctrl)) {
->>>>>>>> +     /* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
->>>>>>>> +     if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
->>>>>>>> +                     PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
->>>>>>>>               ret = PTR_ERR(i2c_imx->pinctrl);
->>>>>>>>               goto clk_disable;
->>>>>>>>       }
->>>>>>>
->>>>>>> devm_pinctrl_get might return the following error-valued pointers:
->>>>>>>  - -EINVAL
->>>>>>>  - -ENOMEM
->>>>>>>  - -ENODEV
->>>>>>>  - -EPROBE_DEFER
->>>>>>>
->>>>>>> There are several error paths returning -EINVAL, one is when an invalid
->>>>>>> phandle is used. Do you really want to ignore that?
->>>>>>>
->>>>>>> IMO error handling is better done with inverse logic, that is continue
->>>>>>> on some explicit error, bail out on all unknown stuff. This tends to be
->>>>>>> more robust. Also the comment should be improved to not explain that for
->>>>>>> -ENOMEM and -EPROBE_DEFER we bail out (which should be obvious for
->>>>>>> anyone who can read C) but to explain why.
->>>>>>
->>>>>> What you said is true for normal error handling, but in this scenario
->>>>>> it is intentional to ignore all pinctrl related errors except critical
->>>>>> ones because failing to have pinctrl for an optional feature shouldn't
->>>>>> impact the function of normal i2c.  We choose to catch -ENOMEM because
->>>>>> the error could also cause problem for i2c probe, and -EPROBE_DEFER
->>>>>> because it's possible that the pinctrl will be ready later and we want
->>>>>> to give it a chance.  The i2c driver really don't care why the pinctrl
->>>>>> was not usable.  I thought I added comment before the
->>>>>
->>>>> I don't agree. E.g. -EINVAL would appear if you pass devm_pinctrl_get an
->>>>> invalid device. Currently you would silently ignore that, which is not
->>>>> what you want.
->>>>
->>>> It is not silently ignored, there will be a message printed out saying
->>>> pinctrl is not available and bus recovery is not supported.  On the
->>>> contrary, without this change the entire i2c driver fails to work
->>>> silently if pinctrl is somehow not working.  And if the system is so
->>>> broken that the pointer to the i2c device is NULL, the probe of i2c
->>>> would have already failed before this point.  We shouldn't count on an
->>>> optional function of the driver to catch fundamental issues like this.
->>>>
->>>>>
->>>>> You want to get the pinctrl in any case expect there isn't one. And that
->>>>> is how you should formulate your if statement.
->>>>>
->>>>> /*
->>>>>  * It is ok if no pinctrl device is available. We'll not be able to use
->>>>> the
->>>>>  * bus recovery feature, but otherwise the driver works fine...
->>>>>  */
->>>>> if (PTR_ERR(i2c_imx->pinctrl) != -ENODEV)
->>>>
->>>> I agree that there could be other possibilities that the pinctrl
->>>> failed to work beside the reason I described in the commit
->>>> message(platform doesn't support pinctrl at all).  But I don't think
->>>> any of them other than the -ENOMEM and -EPROBE_DEFER deserves a bail
->>>> out for the entire i2c driver.
->>>
->>> FWIW, I disagree. If there is pinctrl defined, you want be sure that it
->>> gets applied properly, no matter what. E.g. when devm_pinctrl_get return
->>> EINVAL (Uwe's example) the driver will continue and likely fail in
->>> mysterious ways later on because the pins have not been muxed properly.
->>> The driver should not load in that situation so that the developer is
->>> forced to fix his mistakes. The only reason to bail out here is if there
->>> is no pin controller (ENODEV). And it seems that Uwe also tends to that
->>> solution.
->>
->> With this patch the i2c bus recovery feature will be disabled if the
->> devm_pinctrl_get() fails.  The pin mux setting will not be changed in
->> either i2c probe stage or at runtime.  I don't think it can cause any
->> trouble to normal I2C operation.  IMO, it is not good to *force*
->
-> If you have a pin controller, and you make a typo in your device tree
-> which leads to a wrong phandle and devm_pinctrl_get returning -EINVAL,
-> the system won't mux the pins... And that will certainly affect normal
-> I2C operation!
+On Friday, September 9, 2016 12:24:32 PM CEST Hoan Tran wrote:
+> On Fri, Sep 9, 2016 at 8:38 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > The newly added hwmon driver fails to build in an allmodconfig
+> > index bc78a5d10182..e834dfb3acca 100644
+> > --- a/drivers/hwmon/xgene-hwmon.c
+> > +++ b/drivers/hwmon/xgene-hwmon.c
+> > @@ -34,7 +34,8 @@
+> >  #include <linux/module.h>
+> >  #include <linux/of.h>
+> >  #include <linux/platform_device.h>
+> > -#include <acpi/acpi_io.h>
+> > +#include <linux/io.h>
+> 
+> Alphabetical order.
+> 
+> >         struct acpi_pcct_shared_memory *generic_comm_base = ctx->pcc_comm_addr;
+> > -       void *ptr = generic_comm_base + 1;
+> > +       u32 *ptr = (void*)(generic_comm_base + 1);
+> 
+> Space before "*".
 
-I see why we are having different understanding now.  The i2c-imx
-driver doesn't rely on the pinctrl to get the correct pin-mux setting
-for I2C operation.   The pinctrl code was just added for recently for
-the bus recovery function.  The assumption is that the correct
-pin-muxing has been taken care of by platform code or reset logic.
-The pinctrl is only used to enter/exit bus recovery mode, nothing
-else.  Hence optional.  So a typo in the pinctrl node only impacts bus
-recovery function.
+Ok.
 
->
->> people fix problem that they don't really care by deliberately enlarge
->> the problem.  That's why we don't panic() on any error we found.  For
->> those who do care about the bus recovery, they can get the information
->> from the console.
->
-> IMHO, it is just stupid to ignore errors and then let the developer
-> later on trace back what the initial issue was. Error out early is a
-> common sense software design principle...
->
-> I am not asking for a panic(), I am just suggesting to only ignore
-> pinctrl if it returns -ENODEV, the case you care are about.
+> > @@ -652,9 +653,9 @@ static int xgene_hwmon_probe(struct platform_device *pdev)
+> >                  */
+> >                 ctx->comm_base_addr = cppc_ss->base_address;
+> >                 if (ctx->comm_base_addr) {
+> > -                       ctx->pcc_comm_addr =
+> > -                                       acpi_os_ioremap(ctx->comm_base_addr,
+> > -                                                       cppc_ss->length);
+> > +                       ctx->pcc_comm_addr = memremap(ctx->comm_base_addr,
+> > +                                                       cppc_ss->length,
+> > +                                                       MEMREMAP_WT);
+> 
+> It should be MEMREMAP_WB. As mailbox shared memory is on RAM and our
+> co-processor is also in the coherency domain.
 
-It was just an analogy for enlarging the problem for getting
-attention.  But you probably thought that it was not enlarging the
-problem as you think pinctrl is required by the driver instead of an
-optional thing.
+Right, I was wondering about this, since I could not figure out what
+the other side is (hardware, service processor or firmware).
+So MEMREMAP_WB makes sense here.
 
-Regards,
-Leo
+Two more questions:
+
+* Any comment on the byte ordering of the data in this line:
+
+        /* Copy the message to the PCC comm space */
+        for (i = 0; i < sizeof(struct slimpro_resp_msg) / 4; i++)
+-               writel_relaxed(msg[i], ptr + i * 4);
++               WRITE_ONCE(ptr[i], cpu_to_le32(msg[i]));
+
+This assumes that the old code was correct even when running on
+big-endian kernels and the message data consists of 32-bit data words.
+If the message has some other format instead, we would need to treat
+this as a byte stream and not do swapping here but instead do it
+(if any) in the code that reads or writes the actual data here.
+
+* Are you sure you don't need any smp_rmb()/smp_wmb() barriers
+between the accesses?
+
+	Arnd
