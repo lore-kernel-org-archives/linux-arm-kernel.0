@@ -1,190 +1,383 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu,  8 Sep 2016 21:43:55 -0700
-Subject: [PATCH v3 2/2] ASoC: rockchip: Add DP dai-links to the rk3399-gru
- machine driver
-In-Reply-To: <1473181792-15398-1-git-send-email-zyw@rock-chips.com>
-References: <1473181792-15398-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1473396235-11769-1-git-send-email-zyw@rock-chips.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Fri, 9 Sep 2016 13:20:46 +0800
+Subject: [PATCH v4 3/4] arm64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <20160826134004.7e86e798@arm.com>
+References: <1467877572-10817-1-git-send-email-oss@buserror.net>
+ <1467877572-10817-3-git-send-email-oss@buserror.net>
+ <20160826134004.7e86e798@arm.com>
+Message-ID: <57D246AE.8040900@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DP audio output support to the rk3399-gru machine
-driver.
+On 2016/8/26 20:40, Marc Zyngier wrote:
+> On Thu, 7 Jul 2016 02:46:11 -0500
+> Scott Wood <oss@buserror.net> wrote:
+> 
+> (+Mark)
+> 
+>> Erratum A-008585 says that the ARM generic timer counter "has the
+>> potential to contain an erroneous value for a small number of core
+>> clock cycles every time the timer value changes".  Accesses to TVAL
+>> (both read and write) are also affected due to the implicit counter
+>> read.  Accesses to CVAL are not affected.
+>>
+>> The workaround is to reread TVAL and count registers until successive reads
+>> return the same value, and when writing TVAL to retry until counter
+>> reads before and after the write return the same value.
+>>
+>> This erratum can be found on LS1043A and LS2080A.
+>>
+>> Signed-off-by: Scott Wood <oss@buserror.net>
+>> ---
+>> v4:
+>> - Undef ARCH_TIMER_REG_READ after use
+>>
+>> v3:
+>> - Used cval rather than a loop for the write side of the erratum
+>> - Added a Kconfig control
+>> - Moved the device tree binding into its own patch
+>> - Added erratum to silicon-errata.txt
+>> - Changed function names to contain the erratum name
+>> - Factored out the setting of erratum versions of set_next_event
+>>   to improve readability
+>> - Added a comment clarifying that the timeout is arbitrary
+>>
+>> v2:
+>> Significant rework based on feedback, including using static_key,
+>> disabling VDSO counter access rather than adding the workaround to the
+>> VDSO, and uninlining the loops.
+>>
+>> Dropped the separate property for indicating that writes to TVAL are
+>> affected, as I believe that's just a side effect of the implicit
+>> counter read being corrupted, and thus a chip that is affected by one
+>> will always be affected by the other.
+>>
+>> Dropped the arm32 portion as it seems there was confusion about whether
+>> LS1021A is affected.  Currently I am being told that it is not
+>> affected.
+>>
+>> I considered writing to CVAL rather than looping on TVAL writes, but
+>> that would still have required separate set_next_event() code for the
+>> erratum, and adding CVAL to the enum would have required a bunch of
+>> extra handlers in switch statements (even where unused, due to compiler
+>> warnings about unhandled enum values) including in an arm32 header.  It
+>> seemed better to avoid the arm32 interaction and new untested
+>> accessors.
+>> ---
+>>  Documentation/arm64/silicon-errata.txt |   2 +
+>>  arch/arm64/include/asm/arch_timer.h    |  50 +++++++++++++---
+>>  drivers/clocksource/Kconfig            |  10 ++++
+>>  drivers/clocksource/arm_arch_timer.c   | 103 +++++++++++++++++++++++++++++++++
+>>  4 files changed, 156 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+>> index 4da60b4..041e3a9 100644
+>> --- a/Documentation/arm64/silicon-errata.txt
+>> +++ b/Documentation/arm64/silicon-errata.txt
+>> @@ -60,3 +60,5 @@ stable kernels.
+>>  | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
+>>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
+>>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
+>> +|                |                 |                 |                         |
+>> +| Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
+>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+>> index fbe0ca3..927dc6f 100644
+>> --- a/arch/arm64/include/asm/arch_timer.h
+>> +++ b/arch/arm64/include/asm/arch_timer.h
+>> @@ -23,10 +23,36 @@
+>>  
+>>  #include <linux/bug.h>
+>>  #include <linux/init.h>
+>> +#include <linux/jump_label.h>
+>>  #include <linux/types.h>
+>>  
+>>  #include <clocksource/arm_arch_timer.h>
+>>  
+>> +extern struct static_key_false arch_timer_read_ool_enabled;
+>> +
+>> +#define ARCH_TIMER_REG_READ(reg, func) \
+>> +extern u64 func##_ool(void); \
+>> +static inline u64 __##func(void) \
+>> +{ \
+>> +	u64 val; \
+>> +	asm volatile("mrs %0, " reg : "=r" (val)); \
+>> +	return val; \
+>> +} \
+>> +static inline u64 _##func(void) \
+>> +{ \
+>> +	if (IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) && \
+>> +	    static_branch_unlikely(&arch_timer_read_ool_enabled)) \
+>> +		return func##_ool(); \
+>> +	else \
+>> +		return __##func(); \
+>> +}
+>> +
+>> +ARCH_TIMER_REG_READ("cntp_tval_el0", arch_timer_get_ptval)
+>> +ARCH_TIMER_REG_READ("cntv_tval_el0", arch_timer_get_vtval)
+>> +ARCH_TIMER_REG_READ("cntvct_el0", arch_counter_get_cntvct)
+>> +
+>> +#undef ARCH_TIMER_REG_READ
+>> +
+>>  /*
+>>   * These register accessors are marked inline so the compiler can
+>>   * nicely work out which register we want, and chuck away the rest of
+>> @@ -58,6 +84,16 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
+>>  	isb();
+>>  }
+>>  
+>> +static __always_inline void arch_timer_cval_write_cp15(int access, u64 val)
+>> +{
+>> +	if (access == ARCH_TIMER_PHYS_ACCESS)
+>> +		asm volatile("msr cntp_cval_el0, %0" : : "r" (val));
+>> +	else if (access == ARCH_TIMER_VIRT_ACCESS)
+>> +		asm volatile("msr cntv_cval_el0, %0" : : "r" (val));
+>> +
+>> +	isb();
+>> +}
+>> +
+>>  static __always_inline
+>>  u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
+>>  {
+>> @@ -66,19 +102,19 @@ u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
+>>  	if (access == ARCH_TIMER_PHYS_ACCESS) {
+>>  		switch (reg) {
+>>  		case ARCH_TIMER_REG_CTRL:
+>> -			asm volatile("mrs %0,  cntp_ctl_el0" : "=r" (val));
+>> +			asm volatile("mrs %0, cntp_ctl_el0" : "=r" (val));
+> 
+> Spurious change?
+> 
+>>  			break;
+>>  		case ARCH_TIMER_REG_TVAL:
+>> -			asm volatile("mrs %0, cntp_tval_el0" : "=r" (val));
+>> +			val = _arch_timer_get_ptval();
+>>  			break;
+>>  		}
+>>  	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
+>>  		switch (reg) {
+>>  		case ARCH_TIMER_REG_CTRL:
+>> -			asm volatile("mrs %0,  cntv_ctl_el0" : "=r" (val));
+>> +			asm volatile("mrs %0, cntv_ctl_el0" : "=r" (val));
+> 
+> Here too?
+> 
+>>  			break;
+>>  		case ARCH_TIMER_REG_TVAL:
+>> -			asm volatile("mrs %0, cntv_tval_el0" : "=r" (val));
+>> +			val = _arch_timer_get_vtval();
+>>  			break;
+>>  		}
+>>  	}
+>> @@ -116,12 +152,8 @@ static inline u64 arch_counter_get_cntpct(void)
+>>  
+>>  static inline u64 arch_counter_get_cntvct(void)
+>>  {
+>> -	u64 cval;
+>> -
+>>  	isb();
+>> -	asm volatile("mrs %0, cntvct_el0" : "=r" (cval));
+>> -
+>> -	return cval;
+>> +	return _arch_counter_get_cntvct();
+>>  }
+>>  
+>>  static inline int arch_timer_arch_init(void)
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index 47352d2..48c6039 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -223,6 +223,16 @@ config ARM_ARCH_TIMER_EVTSTREAM
+>>  	  This must be disabled for hardware validation purposes to detect any
+>>  	  hardware anomalies of missing events.
+>>  
+>> +config FSL_ERRATUM_A008585
+>> +	bool "Workaround for Freescale/NXP Erratum A-008585"
+>> +	default y
+>> +	depends on ARM_ARCH_TIMER && ARM64
+>> +	help
+>> +	  This option enables a workaround for Freescale/NXP Erratum
+>> +	  A-008585 ("ARM generic timer may contain an erroneous
+>> +	  value").  The workaround will only be active if the
+>> +	  fsl,erratum-a008585 property is found in the timer node.
+>> +
+>>  config ARM_GLOBAL_TIMER
+>>  	bool
+>>  	select CLKSRC_OF if OF
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index 4814446..b857027 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -83,6 +83,51 @@ static bool arch_timer_mem_use_virtual;
+>>   * Architected system timer support.
+>>   */
+>>  
+>> +#ifdef CONFIG_FSL_ERRATUM_A008585
+>> +DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
+>> +EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
+>> +
+>> +/*
+>> + * __always_inline is used to ensure that func() is not an actual function
+>> + * pointer, which would result in the register accesses potentially being too
+>> + * far apart for the loop to work.
+>> + *
+>> + * The timeout is an arbitrary value well beyond the highest number
+>> + * of iterations the loop has been observed to take.
+>> + */
+>> +static __always_inline u64 fsl_a008585_reread_counter(u64 (*func)(void))
+>> +{
+>> +	u64 cval_old, cval_new;
+>> +	int timeout = 200;
+>> +
+>> +	do {
+>> +		isb();
+>> +		cval_old = func();
+>> +		cval_new = func();
+>> +		timeout--;
+>> +	} while (unlikely(cval_old != cval_new) && timeout);
+>> +
+>> +	WARN_ON_ONCE(!timeout);
+>> +	return cval_new;
+>> +}
+>> +
+>> +u64 arch_counter_get_cntvct_ool(void)
+>> +{
+>> +	return fsl_a008585_reread_counter(__arch_counter_get_cntvct);
+>> +}
+>> +
+>> +u64 arch_timer_get_vtval_ool(void)
+>> +{
+>> +	return fsl_a008585_reread_counter(__arch_timer_get_vtval);
+>> +}
+>> +
+>> +u64 arch_timer_get_ptval_ool(void)
+>> +{
+>> +	return fsl_a008585_reread_counter(__arch_timer_get_ptval);
+>> +}
+>> +
+>> +#endif /* CONFIG_FSL_ERRATUM_A008585 */
+>> +
+>>  static __always_inline
+>>  void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
+>>  			  struct clock_event_device *clk)
+>> @@ -232,6 +277,35 @@ static __always_inline void set_next_event(const int access, unsigned long evt,
+>>  	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+>>  }
+>>  
+>> +#ifdef CONFIG_FSL_ERRATUM_A008585
+>> +static __always_inline void fsl_a008585_set_next_event(const int access,
+>> +		unsigned long evt, struct clock_event_device *clk)
+>> +{
+>> +	unsigned long ctrl;
+>> +	u64 cval = evt + arch_counter_get_cntvct();
+>> +
+>> +	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
+>> +	ctrl |= ARCH_TIMER_CTRL_ENABLE;
+>> +	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
+>> +	arch_timer_cval_write_cp15(access, cval);
+>> +	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+>> +}
+>> +
+>> +static int fsl_a008585_set_next_event_virt(unsigned long evt,
+>> +					   struct clock_event_device *clk)
+>> +{
+>> +	fsl_a008585_set_next_event(ARCH_TIMER_VIRT_ACCESS, evt, clk);
+>> +	return 0;
+>> +}
+>> +
+>> +static int fsl_a008585_set_next_event_phys(unsigned long evt,
+>> +					   struct clock_event_device *clk)
+>> +{
+>> +	fsl_a008585_set_next_event(ARCH_TIMER_PHYS_ACCESS, evt, clk);
+>> +	return 0;
+>> +}
+>> +#endif /* CONFIG_FSL_ERRATUM_A008585 */
+>> +
+>>  static int arch_timer_set_next_event_virt(unsigned long evt,
+>>  					  struct clock_event_device *clk)
+>>  {
+>> @@ -260,6 +334,19 @@ static int arch_timer_set_next_event_phys_mem(unsigned long evt,
+>>  	return 0;
+>>  }
+>>  
+>> +static void fsl_a008585_set_sne(struct clock_event_device *clk)
+>> +{
+>> +#ifdef CONFIG_FSL_ERRATUM_A008585
+>> +	if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
+>> +		return;
+>> +
+>> +	if (arch_timer_uses_ppi == VIRT_PPI)
+>> +		clk->set_next_event = fsl_a008585_set_next_event_virt;
+>> +	else
+>> +		clk->set_next_event = fsl_a008585_set_next_event_phys;
+>> +#endif
+>> +}
+>> +
+>>  static void __arch_timer_setup(unsigned type,
+>>  			       struct clock_event_device *clk)
+>>  {
+>> @@ -288,6 +375,8 @@ static void __arch_timer_setup(unsigned type,
+>>  		default:
+>>  			BUG();
+>>  		}
+>> +
+>> +		fsl_a008585_set_sne(clk);
+>>  	} else {
+>>  		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
+>>  		clk->name = "arch_mem_timer";
+>> @@ -485,6 +574,15 @@ static void __init arch_counter_register(unsigned type)
+>>  			arch_timer_read_counter = arch_counter_get_cntvct;
+>>  		else
+>>  			arch_timer_read_counter = arch_counter_get_cntpct;
+>> +
+>> +#ifdef CONFIG_FSL_ERRATUM_A008585
+>> +		/*
+>> +		 * Don't use the vdso fastpath if errata require using
+>> +		 * the out-of-line counter accessor.
+>> +		 */
+>> +		if (static_branch_unlikely(&arch_timer_read_ool_enabled))
+>> +			clocksource_counter.name = "arch_sys_counter_ool";
+>> +#endif
+>>  	} else {
+>>  		arch_timer_read_counter = arch_counter_get_cntvct_mem;
+>>  
+>> @@ -766,6 +864,11 @@ static void __init arch_timer_of_init(struct device_node *np)
+>>  
+>>  	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
+>>  
+>> +#ifdef CONFIG_FSL_ERRATUM_A008585
+>> +	if (of_property_read_bool(np, "fsl,erratum-a008585"))
+>> +		static_branch_enable(&arch_timer_read_ool_enabled);
+>> +#endif
+>> +
+>>  	/*
+>>  	 * If we cannot rely on firmware initializing the timer registers then
+>>  	 * we should use the physical timers instead.
+> 
+> 
+> I'm still worried that this series doesn't address Xen or KVM guests
+> that need to be made aware of the broken timers.
+> 
+Hi Marc:
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
----
+I think "ARCH_TIMER_REG_READ("cntv_tval_el0", arch_timer_get_vtval)" could cover the tval changes in KVM guest, and
+I fould the guest still use the get_cycles() to get the timer cycles, if I miss something, please remind me, thanks.
 
-Changes in v3:
-- change spdif to i2s2
 
-Changes in v2:
-- correct the commit message
+> At the very least, I'd like a kernel command line option that'd let the
+> user reliably run its VMs. You can do something along the lines of
+> 46fd5c6b, and have a command line argument like
+> "clocksource.arm_arch_timer.fsl-a008585=1", which would enable the
+> workaround.
+> 
 
- .../bindings/sound/rockchip,rk3399-gru-sound.txt   | 11 +--
- sound/soc/rockchip/rk3399_gru_sound.c              | 93 ++++++++++++++++++++++
- 2 files changed, 99 insertions(+), 5 deletions(-)
+I don't think adding in command line is a good solution for this bug, we should not told the OS user how to fix it
+by adding command line option, and need to fix it by dts or ACPI.
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-index f19b6c8..83af540 100644
---- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-@@ -1,15 +1,16 @@
--ROCKCHIP with MAX98357A/RT5514/DA7219 codecs on GRU boards
-+ROCKCHIP with MAX98357A/RT5514/DA7219 codecs and DP via spdif on GRU boards
- 
- Required properties:
- - compatible: "rockchip,rk3399-gru-sound"
--- rockchip,cpu: The phandle of the Rockchip I2S controller that's
-+- rockchip,cpu: The phandle of the Rockchip I2S controller controller that's
-   connected to the codecs
--- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
-+- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs and of the
-+  DP encoder node
- 
- Example:
- 
- sound {
- 	compatible = "rockchip,rk3399-gru-sound";
--	rockchip,cpu = <&i2s0>;
--	rockchip,codec = <&max98357a &rt5514 &da7219>;
-+	rockchip,cpu = <&i2s0 &i2s2>;
-+	rockchip,codec = <&max98357a &rt5514 &da7219 &cdn_dp>;
- };
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 164b6da..d9aa2e0 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -25,6 +25,7 @@
- #include <linux/spi/spi.h>
- #include <sound/core.h>
- #include <sound/jack.h>
-+#include <sound/hdmi-codec.h>
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
-@@ -214,6 +215,65 @@ static int rockchip_sound_da7219_init(struct snd_soc_pcm_runtime *rtd)
- 	return 0;
- }
- 
-+
-+static int rockchip_sound_cdndp_hw_params(struct snd_pcm_substream *substream,
-+					  struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-+	int mclk, ret;
-+
-+	/* in bypass mode, the mclk has to be one of the frequencies below */
-+	switch (params_rate(params)) {
-+	case 8000:
-+	case 16000:
-+	case 24000:
-+	case 32000:
-+	case 48000:
-+	case 64000:
-+	case 96000:
-+		mclk = 12288000;
-+		break;
-+	case 11025:
-+	case 22050:
-+	case 44100:
-+	case 88200:
-+		mclk = 11289600;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk,
-+				     SND_SOC_CLOCK_OUT);
-+	if (ret < 0) {
-+		dev_err(codec_dai->dev, "Can't set cpu clock out %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct snd_soc_jack cdn_dp_card_jack;
-+
-+static int rockchip_sound_cdndp_init(struct snd_soc_pcm_runtime *runtime)
-+{
-+	struct snd_soc_card *card = runtime->card;
-+	struct snd_soc_codec *codec = runtime->codec;
-+	int ret;
-+
-+	/* enable jack detection */
-+	ret = snd_soc_card_jack_new(card, "DP Jack", SND_JACK_LINEOUT,
-+				    &cdn_dp_card_jack, NULL, 0);
-+	if (ret) {
-+		dev_err(card->dev, "Can't new DP Jack %d\n", ret);
-+		return ret;
-+	}
-+
-+	return hdmi_codec_set_jack_detect(codec, &cdn_dp_card_jack);
-+}
-+
- static struct snd_soc_ops rockchip_sound_max98357a_ops = {
- 	.hw_params = rockchip_sound_max98357a_hw_params,
- };
-@@ -226,10 +286,15 @@ static struct snd_soc_ops rockchip_sound_da7219_ops = {
- 	.hw_params = rockchip_sound_da7219_hw_params,
- };
- 
-+static struct snd_soc_ops rockchip_sound_cdndp_ops = {
-+	.hw_params = rockchip_sound_cdndp_hw_params,
-+};
-+
- enum {
- 	DAILINK_MAX98357A,
- 	DAILINK_RT5514,
- 	DAILINK_DA7219,
-+	DAILINK_CDNDP,
- 	DAILINK_RT5514_DSP,
- };
- 
-@@ -264,6 +329,15 @@ static struct snd_soc_dai_link rockchip_dailinks[] = {
- 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 			SND_SOC_DAIFMT_CBS_CFS,
- 	},
-+	[DAILINK_CDNDP] = {
-+		.name = "DP",
-+		.stream_name = "DP PCM",
-+		.codec_dai_name = "i2s-hifi",
-+		.init = rockchip_sound_cdndp_init,
-+		.ops = &rockchip_sound_cdndp_ops,
-+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+			SND_SOC_DAIFMT_CBS_CFS,
-+	},
- 	/* RT5514 DSP for voice wakeup via spi bus */
- 	[DAILINK_RT5514_DSP] = {
- 		.name = "RT5514 DSP",
-@@ -334,6 +408,25 @@ static int rockchip_sound_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	cpu_node = of_parse_phandle(pdev->dev.of_node, "rockchip,cpu", 1);
-+	if (!cpu_node) {
-+		dev_err(&pdev->dev, "Property 'rockchip,cpu 1' missing or invalid\n");
-+		return -EINVAL;
-+	}
-+
-+	rockchip_dailinks[DAILINK_CDNDP].platform_of_node = cpu_node;
-+	rockchip_dailinks[DAILINK_CDNDP].cpu_of_node = cpu_node;
-+
-+	rockchip_dailinks[DAILINK_CDNDP].codec_of_node =
-+		of_parse_phandle(pdev->dev.of_node, "rockchip,codec",
-+				 DAILINK_CDNDP);
-+	if (!rockchip_dailinks[DAILINK_CDNDP].codec_of_node) {
-+		dev_err(&pdev->dev,
-+			"Property[%d] 'rockchip,codec' missing or invalid\n",
-+			DAILINK_CDNDP);
-+		return -EINVAL;
-+	}
-+
- 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
- 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_dai_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
- 	rockchip_dailinks[DAILINK_RT5514_DSP].platform_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
--- 
-1.9.1
+Thanks.
+Ding
+
+> Thanks,
+> 
+> 	M.
+> 
