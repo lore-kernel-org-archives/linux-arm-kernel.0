@@ -1,45 +1,30 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri,  9 Sep 2016 14:45:15 +0200
-Subject: [PATCH v3 7/9] ARM: dts: sun8i: Enable sun8i-emac on the Orange PI One
+Date: Fri,  9 Sep 2016 14:45:16 +0200
+Subject: [PATCH v3 8/9] ARM: sunxi: Enable sun8i-emac driver on sunxi_defconfig
 In-Reply-To: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
 References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1473425117-18645-8-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1473425117-18645-9-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans de Goede <hdegoede@redhat.com>
+Enable the sun8i-emac driver in the sunxi default configuration
 
-The sun8i-emac hardware is present on the Orange PI One.
-It uses the internal PHY.
-
-This patch create the needed emac and phy nodes.
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/configs/sunxi_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-index 0adf932..0bc3867 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-@@ -94,6 +94,16 @@
- 	status = "okay";
- };
- 
-+&emac {
-+	phy = <&phy1>;
-+	phy-mode = "mii";
-+	allwinner,leds-active-low;
-+	status = "okay";
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 714da33..153707a 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -40,6 +40,7 @@ CONFIG_ATA=y
+ CONFIG_AHCI_SUNXI=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SUN4I_EMAC=y
++CONFIG_SUN8I_EMAC=y
+ # CONFIG_NET_VENDOR_ARC is not set
+ # CONFIG_NET_CADENCE is not set
+ # CONFIG_NET_VENDOR_BROADCOM is not set
 -- 
 2.7.3
