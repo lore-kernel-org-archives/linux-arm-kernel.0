@@ -1,89 +1,124 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Sep 2016 17:55:07 +0100
-Subject: [PATCH v3 5/8] KVM: arm: vgic: Support 64-bit data manipulation
- on 32-bit host systems
-In-Reply-To: <1473350810-10857-6-git-send-email-vladimir.murzin@arm.com>
-References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
- <1473350810-10857-6-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <57D2E96B.70909@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 09 Sep 2016 09:51:50 -0700
+Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
+In-Reply-To: <CADRPPNR4oiRVgFqaM=1=Zn_JzrVJDVmozWsouLByXRtaHCh=qQ@mail.gmail.com>
+References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
+ <20160906185849.27pjhawadca5pwow@pengutronix.de>
+ <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
+ <87ca69fb85848a0a86b34a9a9037a57b@agner.ch>
+ <CADRPPNSPye45bmFshfwb+gDA0x0ygs4Ofa6HMYbKt9ER0oeccg@mail.gmail.com>
+ <8f8f7ffc4aef513ef5064ba0491fbc63@agner.ch>
+ <CADRPPNR4oiRVgFqaM=1=Zn_JzrVJDVmozWsouLByXRtaHCh=qQ@mail.gmail.com>
+Message-ID: <306f579a2f2362595a55c53e48657563@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/16 17:06, Vladimir Murzin wrote:
-> We have couple of 64-bit registers defined in GICv3 architecture, so
-> unsigned long accesses to these registers will only access a single
-> 32-bit part of that regitser. On the other hand these registers can't
-> be accessed as 64-bit with a single instruction like ldrd/strd or
-> ldmia/stmia if we run a 32-bit host because KVM does not support
-> access to MMIO space done by these instructions.
+On 2016-09-08 16:57, Leo Li wrote:
+> On Thu, Sep 8, 2016 at 5:39 PM, Stefan Agner <stefan@agner.ch> wrote:
+>> On 2016-09-06 15:40, Leo Li wrote:
+>>> On Tue, Sep 6, 2016 at 4:51 PM, Stefan Agner <stefan@agner.ch> wrote:
+>>>> On 2016-09-06 13:06, Leo Li wrote:
+>>>>> On Tue, Sep 6, 2016 at 1:58 PM, Uwe Kleine-K?nig
+>>>>> <u.kleine-koenig@pengutronix.de> wrote:
+>>>>>> On Fri, Aug 19, 2016 at 05:05:22PM -0500, Li Yang wrote:
+>> <snip>
+>>>>>>> @@ -1081,8 +1090,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
+>>>>>>>               return ret;
+>>>>>>>       }
+>>>>>>>
+>>>>>>> +     /* optional bus recovery feature through pinctrl */
+>>>>>>>       i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
+>>>>>>> -     if (IS_ERR(i2c_imx->pinctrl)) {
+>>>>>>> +     /* bailout on -ENOMEM or -EPROBE_DEFER, continue for other errors */
+>>>>>>> +     if (PTR_ERR(i2c_imx->pinctrl) == -ENOMEM ||
+>>>>>>> +                     PTR_ERR(i2c_imx->pinctrl) == -EPROBE_DEFER) {
+>>>>>>>               ret = PTR_ERR(i2c_imx->pinctrl);
+>>>>>>>               goto clk_disable;
+>>>>>>>       }
+>>>>>>
+>>>>>> devm_pinctrl_get might return the following error-valued pointers:
+>>>>>>  - -EINVAL
+>>>>>>  - -ENOMEM
+>>>>>>  - -ENODEV
+>>>>>>  - -EPROBE_DEFER
+>>>>>>
+>>>>>> There are several error paths returning -EINVAL, one is when an invalid
+>>>>>> phandle is used. Do you really want to ignore that?
+>>>>>>
+>>>>>> IMO error handling is better done with inverse logic, that is continue
+>>>>>> on some explicit error, bail out on all unknown stuff. This tends to be
+>>>>>> more robust. Also the comment should be improved to not explain that for
+>>>>>> -ENOMEM and -EPROBE_DEFER we bail out (which should be obvious for
+>>>>>> anyone who can read C) but to explain why.
+>>>>>
+>>>>> What you said is true for normal error handling, but in this scenario
+>>>>> it is intentional to ignore all pinctrl related errors except critical
+>>>>> ones because failing to have pinctrl for an optional feature shouldn't
+>>>>> impact the function of normal i2c.  We choose to catch -ENOMEM because
+>>>>> the error could also cause problem for i2c probe, and -EPROBE_DEFER
+>>>>> because it's possible that the pinctrl will be ready later and we want
+>>>>> to give it a chance.  The i2c driver really don't care why the pinctrl
+>>>>> was not usable.  I thought I added comment before the
+>>>>
+>>>> I don't agree. E.g. -EINVAL would appear if you pass devm_pinctrl_get an
+>>>> invalid device. Currently you would silently ignore that, which is not
+>>>> what you want.
+>>>
+>>> It is not silently ignored, there will be a message printed out saying
+>>> pinctrl is not available and bus recovery is not supported.  On the
+>>> contrary, without this change the entire i2c driver fails to work
+>>> silently if pinctrl is somehow not working.  And if the system is so
+>>> broken that the pointer to the i2c device is NULL, the probe of i2c
+>>> would have already failed before this point.  We shouldn't count on an
+>>> optional function of the driver to catch fundamental issues like this.
+>>>
+>>>>
+>>>> You want to get the pinctrl in any case expect there isn't one. And that
+>>>> is how you should formulate your if statement.
+>>>>
+>>>> /*
+>>>>  * It is ok if no pinctrl device is available. We'll not be able to use
+>>>> the
+>>>>  * bus recovery feature, but otherwise the driver works fine...
+>>>>  */
+>>>> if (PTR_ERR(i2c_imx->pinctrl) != -ENODEV)
+>>>
+>>> I agree that there could be other possibilities that the pinctrl
+>>> failed to work beside the reason I described in the commit
+>>> message(platform doesn't support pinctrl at all).  But I don't think
+>>> any of them other than the -ENOMEM and -EPROBE_DEFER deserves a bail
+>>> out for the entire i2c driver.
+>>
+>> FWIW, I disagree. If there is pinctrl defined, you want be sure that it
+>> gets applied properly, no matter what. E.g. when devm_pinctrl_get return
+>> EINVAL (Uwe's example) the driver will continue and likely fail in
+>> mysterious ways later on because the pins have not been muxed properly.
+>> The driver should not load in that situation so that the developer is
+>> forced to fix his mistakes. The only reason to bail out here is if there
+>> is no pin controller (ENODEV). And it seems that Uwe also tends to that
+>> solution.
 > 
-> It means that a 32-bit guest accesses these registers in 32-bit
-> chunks, so the only thing we need to do is to ensure that
-> extract_bytes() always takes 64-bit data.
-> 
-> Since we are here fix couple of other width related issues catched by
-> gcc
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-mmio-v3.c |    6 +++---
->  virt/kvm/arm/vgic/vgic-mmio.h    |    2 +-
->  2 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index acbe691..0d3c76a 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -23,7 +23,7 @@
->  #include "vgic-mmio.h"
->  
->  /* extract @num bytes at @offset bytes offset in data */
-> -unsigned long extract_bytes(unsigned long data, unsigned int offset,
-> +unsigned long extract_bytes(u64 data, unsigned int offset,
->  			    unsigned int num)
->  {
->  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
-> @@ -181,7 +181,7 @@ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
->  	int target_vcpu_id = vcpu->vcpu_id;
->  	u64 value;
->  
-> -	value = (mpidr & GENMASK(23, 0)) << 32;
-> +	value = (u64)(mpidr & GENMASK(23, 0)) << 32;
->  	value |= ((target_vcpu_id & 0xffff) << 8);
->  	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
->  		value |= GICR_TYPER_LAST;
-> @@ -611,7 +611,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->  	bool broadcast;
->  
->  	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
-> -	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
-> +	broadcast = reg & BIT_ULL(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
->  	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
->  	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
->  	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index 0b3ecf9..80f92ce 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -96,7 +96,7 @@ unsigned long vgic_data_mmio_bus_to_host(const void *val, unsigned int len);
->  void vgic_data_host_to_mmio_bus(void *buf, unsigned int len,
->  				unsigned long data);
->  
-> -unsigned long extract_bytes(unsigned long data, unsigned int offset,
-> +unsigned long extract_bytes(u64 data, unsigned int offset,
->  			    unsigned int num);
->  
->  u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
-> 
+> With this patch the i2c bus recovery feature will be disabled if the
+> devm_pinctrl_get() fails.  The pin mux setting will not be changed in
+> either i2c probe stage or at runtime.  I don't think it can cause any
+> trouble to normal I2C operation.  IMO, it is not good to *force*
 
-My personal preference would be to split this in two patches. One that
-changes extract_bytes to work on 64bit quantities, and another one that
-addresses the 64bit issues. Not a big deal though.
+If you have a pin controller, and you make a typo in your device tree
+which leads to a wrong phandle and devm_pinctrl_get returning -EINVAL,
+the system won't mux the pins... And that will certainly affect normal
+I2C operation!
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> people fix problem that they don't really care by deliberately enlarge
+> the problem.  That's why we don't panic() on any error we found.  For
+> those who do care about the bus recovery, they can get the information
+> from the console.
 
-Thanks,
+IMHO, it is just stupid to ignore errors and then let the developer
+later on trace back what the initial issue was. Error out early is a
+common sense software design principle...
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I am not asking for a panic(), I am just suggesting to only ignore
+pinctrl if it returns -ENODEV, the case you care are about.
+
+--
+Stefan
