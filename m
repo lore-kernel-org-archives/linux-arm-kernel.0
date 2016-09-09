@@ -1,353 +1,390 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Sep 2016 10:19:35 +0100
-Subject: [PATCH v3 1/8] arm64: KVM: Use static keys for selecting the GIC
- backend
-In-Reply-To: <1473350810-10857-2-git-send-email-vladimir.murzin@arm.com>
-References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
- <1473350810-10857-2-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <57D27EA7.2040500@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 9 Sep 2016 10:20:12 +0100
+Subject: [UPDATE PATCH V10 1/8] ACPI: I/O Remapping Table (IORT) initial
+ support
+In-Reply-To: <1473249412-20226-1-git-send-email-tn@semihalf.com>
+References: <1473152938-17388-2-git-send-email-tn@semihalf.com>
+ <1473249412-20226-1-git-send-email-tn@semihalf.com>
+Message-ID: <20160909092012.GC19669@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+Hi Rafael,
 
-On 08/09/16 17:06, Vladimir Murzin wrote:
-> Currently GIC backend is selected via alternative framework and this
-> is fine. We are going to introduce vgic-v3 to 32-bit world and there
-> we don't have patching framework in hand, so we can either check
-> support for GICv3 every time we need to choose which backend to use or
-> try to optimise it by using static keys. The later looks quite
-> promising because we can share logic involved in selecting GIC backend
-> between architectures if both uses static keys.
+On Wed, Sep 07, 2016 at 01:56:52PM +0200, Tomasz Nowicki wrote:
+> IORT shows representation of IO topology for ARM based systems.
+> It describes how various components are connected together on
+> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
 > 
-> This patch moves arm64 from alternative to static keys framework for
-> selecting GIC backend. To make static keys work on hyp side we need to
-> make sure that hyp can access to the key which is RW data. For that
-> purpose introduce __hyp_data section we can map to hyp and place the
-> key there.
+> Initial support allows to detect IORT table presence and save its
+> root pointer obtained through acpi_get_table(). The pointer validity
+> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+> is not set while using IORT nodes we would dereference unmapped pointers.
 > 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> For the aforementioned reason call iort_table_detect() from acpi_init()
+> which guarantees acpi_gbl_permanent_mmap to be set at that point.
+> 
+> Add generic helpers which are helpful for scanning and retrieving
+> information from IORT table content. List of the most important helpers:
+> - iort_find_dev_node() finds IORT node for a given device
+> - iort_node_map_rid() maps device RID and returns IORT node which provides
+>   final translation
+> 
+> IORT support is placed under drivers/acpi/arm64/ new directory due to its
+> ARM64 specific nature. The code there is considered only for ARM64.
+> The long term plan is to keep all ARM64 specific tables support
+> in this place e.g. GTDT table.
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > ---
->  arch/arm/include/asm/kvm_host.h   |   13 +++++++++++++
->  arch/arm/include/asm/kvm_hyp.h    |    2 --
->  arch/arm/include/asm/virt.h       |    8 ++++++++
->  arch/arm/kernel/vmlinux.lds.S     |    6 ++++++
->  arch/arm/kvm/arm.c                |   19 +++++++++++++++++++
->  arch/arm64/include/asm/kvm_host.h |   15 +++++++++++++++
->  arch/arm64/include/asm/kvm_hyp.h  |    2 --
->  arch/arm64/include/asm/virt.h     |    7 +++++++
->  arch/arm64/kernel/vmlinux.lds.S   |    6 ++++++
->  arch/arm64/kvm/hyp/switch.c       |   19 +++++++++----------
->  10 files changed, 83 insertions(+), 14 deletions(-)
+
+Apart from the minor commit logs oversights we consider these two
+patches ready to go, please let us know if there is something you want
+changed since we are at risk of missing yet another merge window.
+
+It is ARM64 specific code, we created and moved the code to its
+ARM64 specific directory and we are happy to maintain it as such,
+we need your ACK to get this done so if there is something you
+want changed please let us know otherwise I would ask your ACK
+on these two patches to give Marc a go-ahead for -next and
+hopefully 4.9.
+
+Thanks !
+Lorenzo
+
+>  drivers/acpi/Kconfig        |   4 +
+>  drivers/acpi/Makefile       |   2 +
+>  drivers/acpi/arm64/Kconfig  |   6 ++
+>  drivers/acpi/arm64/Makefile |   1 +
+>  drivers/acpi/arm64/iort.c   | 213 ++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/acpi/bus.c          |   2 +
+>  include/linux/acpi_iort.h   |  30 +++++++
+>  7 files changed, 258 insertions(+)
+>  create mode 100644 drivers/acpi/arm64/Kconfig
+>  create mode 100644 drivers/acpi/arm64/Makefile
+>  create mode 100644 drivers/acpi/arm64/iort.c
+>  create mode 100644 include/linux/acpi_iort.h
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index de338d9..bfa6eec 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -21,11 +21,14 @@
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 445ce28..d5c0614 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -521,4 +521,8 @@ config ACPI_CONFIGFS
+>  	  userspace. The configurable ACPI groups will be visible under
+>  	  /config/acpi, assuming configfs is mounted under /config.
 >  
->  #include <linux/types.h>
->  #include <linux/kvm_types.h>
-> +#include <linux/jump_label.h>
+> +if ARM64
+> +source "drivers/acpi/arm64/Kconfig"
+> +endif
 > +
->  #include <asm/kvm.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_mmio.h>
->  #include <asm/fpstate.h>
->  #include <kvm/arm_arch_timer.h>
-> +#include <asm/cputype.h>
+>  endif	# ACPI
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 5ae9d85..e5ada78 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -105,3 +105,5 @@ obj-$(CONFIG_ACPI_CONFIGFS)	+= acpi_configfs.o
 >  
->  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
->  
-> @@ -310,4 +313,14 @@ static inline int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
->  	return -ENXIO;
->  }
->  
-> +extern struct static_key_false kvm_gicv3_cpuif;
-
-I think we should follow the model set by kvm_vgic_global_state, which
-is declared in arm_vgic.h. Even better, we should *embed* the static key
-in this structure. This will reduce the clutter and we wouldn't have to
-deal with all the section stuff (the hyp_data thing is a good cleanup,
-but I'd like to see it as a separate patch if possible).
-
+>  video-objs			+= acpi_video.o video_detect.o
+>  obj-y				+= dptf/
 > +
-> +static inline bool kvm_arm_support_gicv3_cpuif(void)
+> +obj-$(CONFIG_ARM64)		+= arm64/
+> diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+> new file mode 100644
+> index 0000000..4616da4
+> --- /dev/null
+> +++ b/drivers/acpi/arm64/Kconfig
+> @@ -0,0 +1,6 @@
+> +#
+> +# ACPI Configuration for ARM64
+> +#
+> +
+> +config ACPI_IORT
+> +	bool
+> diff --git a/drivers/acpi/arm64/Makefile b/drivers/acpi/arm64/Makefile
+> new file mode 100644
+> index 0000000..72331f2
+> --- /dev/null
+> +++ b/drivers/acpi/arm64/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_ACPI_IORT) 	+= iort.o
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> new file mode 100644
+> index 0000000..e28e256
+> --- /dev/null
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -0,0 +1,213 @@
+> +/*
+> + * Copyright (C) 2016, Semihalf
+> + *	Author: Tomasz Nowicki <tn@semihalf.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * This file implements early detection/parsing of I/O mapping
+> + * reported to OS through firmware via I/O Remapping Table (IORT)
+> + * IORT document number: ARM DEN 0049A
+> + */
+> +
+> +#define pr_fmt(fmt)	"ACPI: IORT: " fmt
+> +
+> +#include <linux/acpi_iort.h>
+> +#include <linux/kernel.h>
+> +#include <linux/pci.h>
+> +
+> +typedef acpi_status (*iort_find_node_callback)
+> +	(struct acpi_iort_node *node, void *context);
+> +
+> +/* Root pointer to the mapped IORT table */
+> +static struct acpi_table_header *iort_table;
+> +
+> +static LIST_HEAD(iort_msi_chip_list);
+> +static DEFINE_SPINLOCK(iort_msi_chip_lock);
+> +
+> +static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
+> +					     iort_find_node_callback callback,
+> +					     void *context)
 > +{
-> +	if (IS_ENABLED(CONFIG_ARM_GIC_V3))
-> +		return !!cpuid_feature_extract(CPUID_EXT_PFR1, 28);
-> +	else
-> +		return false;
+> +	struct acpi_iort_node *iort_node, *iort_end;
+> +	struct acpi_table_iort *iort;
+> +	int i;
+> +
+> +	if (!iort_table)
+> +		return NULL;
+> +
+> +	/* Get the first IORT node */
+> +	iort = (struct acpi_table_iort *)iort_table;
+> +	iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort,
+> +				 iort->node_offset);
+> +	iort_end = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+> +				iort_table->length);
+> +
+> +	for (i = 0; i < iort->node_count; i++) {
+> +		if (WARN_TAINT(iort_node >= iort_end, TAINT_FIRMWARE_WORKAROUND,
+> +			       "IORT node pointer overflows, bad table!\n"))
+> +			return NULL;
+> +
+> +		if (iort_node->type == type &&
+> +		    ACPI_SUCCESS(callback(iort_node, context)))
+> +				return iort_node;
+> +
+> +		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+> +					 iort_node->length);
+> +	}
+> +
+> +	return NULL;
 > +}
 > +
->  #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-> index 6eaff28..bd9434e 100644
-> --- a/arch/arm/include/asm/kvm_hyp.h
-> +++ b/arch/arm/include/asm/kvm_hyp.h
-> @@ -23,8 +23,6 @@
->  #include <asm/kvm_mmu.h>
->  #include <asm/vfp.h>
->  
-> -#define __hyp_text __section(.hyp.text) notrace
-> -
->  #define __ACCESS_CP15(CRn, Op1, CRm, Op2)	\
->  	"mrc", "mcr", __stringify(p15, Op1, %0, CRn, CRm, Op2), u32
->  #define __ACCESS_CP15_64(Op1, CRm)		\
-> diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-> index a2e75b8..e61a809 100644
-> --- a/arch/arm/include/asm/virt.h
-> +++ b/arch/arm/include/asm/virt.h
-> @@ -28,6 +28,9 @@
->   */
->  #define BOOT_CPU_MODE_MISMATCH	PSR_N_BIT
->  
-> +#define __hyp_text __section(.hyp.text) notrace
-> +#define __hyp_data __section(.hyp.data)
+> +static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+> +					    void *context)
+> +{
+> +	struct device *dev = context;
+> +	acpi_status status = AE_NOT_FOUND;
 > +
->  #ifndef __ASSEMBLY__
->  #include <asm/cacheflush.h>
->  
-> @@ -87,6 +90,11 @@ extern char __hyp_idmap_text_end[];
->  /* The section containing the hypervisor text */
->  extern char __hyp_text_start[];
->  extern char __hyp_text_end[];
+> +	if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT) {
+> +		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
+> +		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+> +		struct acpi_iort_named_component *ncomp;
 > +
-> +/* The section containing the hypervisor data */
-> +extern char __hyp_data_start[];
-> +extern char __hyp_data_end[];
+> +		if (!adev)
+> +			goto out;
 > +
+> +		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
+> +		if (ACPI_FAILURE(status)) {
+> +			dev_warn(dev, "Can't get device full path name\n");
+> +			goto out;
+> +		}
+> +
+> +		ncomp = (struct acpi_iort_named_component *)node->node_data;
+> +		if (!strcmp(ncomp->device_name, buf.pointer))
+> +			status = AE_OK;
+> +
+> +		acpi_os_free(buf.pointer);
+> +	} else if (node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+> +		struct acpi_iort_root_complex *pci_rc;
+> +		struct pci_bus *bus;
+> +
+> +		bus = to_pci_bus(dev);
+> +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
+> +
+> +		/*
+> +		 * It is assumed that PCI segment numbers maps one-to-one
+> +		 * with root complexes. Each segment number can represent only
+> +		 * one root complex.
+> +		 */
+> +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
+> +			status = AE_OK;
+> +	}
+> +out:
+> +	return status;
+> +}
+> +
+> +static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+> +		       u32 *rid_out)
+> +{
+> +	/* Single mapping does not care for input id */
+> +	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+> +		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+> +		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+> +			*rid_out = map->output_base;
+> +			return 0;
+> +		}
+> +
+> +		pr_warn(FW_BUG "[map %p] SINGLE MAPPING flag not allowed for node type %d, skipping ID map\n",
+> +			map, type);
+> +		return -ENXIO;
+> +	}
+> +
+> +	if (rid_in < map->input_base ||
+> +	    (rid_in >= map->input_base + map->id_count))
+> +		return -ENXIO;
+> +
+> +	*rid_out = map->output_base + (rid_in - map->input_base);
+> +	return 0;
+> +}
+> +
+> +static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
+> +						u32 rid_in, u32 *rid_out,
+> +						u8 type)
+> +{
+> +	u32 rid = rid_in;
+> +
+> +	/* Parse the ID mapping tree to find specified node type */
+> +	while (node) {
+> +		struct acpi_iort_id_mapping *map;
+> +		int i;
+> +
+> +		if (node->type == type) {
+> +			if (rid_out)
+> +				*rid_out = rid;
+> +			return node;
+> +		}
+> +
+> +		if (!node->mapping_offset || !node->mapping_count)
+> +			goto fail_map;
+> +
+> +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
+> +				   node->mapping_offset);
+> +
+> +		/* Firmware bug! */
+> +		if (!map->output_reference) {
+> +			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
+> +			       node, node->type);
+> +			goto fail_map;
+> +		}
+> +
+> +		/* Do the RID translation */
+> +		for (i = 0; i < node->mapping_count; i++, map++) {
+> +			if (!iort_id_map(map, node->type, rid, &rid))
+> +				break;
+> +		}
+> +
+> +		if (i == node->mapping_count)
+> +			goto fail_map;
+> +
+> +		node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+> +				    map->output_reference);
+> +	}
+> +
+> +fail_map:
+> +	/* Map input RID to output RID unchanged on mapping failure*/
+> +	if (rid_out)
+> +		*rid_out = rid_in;
+> +
+> +	return NULL;
+> +}
+> +
+> +static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
+> +{
+> +	struct pci_bus *pbus;
+> +
+> +	if (!dev_is_pci(dev))
+> +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+> +				      iort_match_node_callback, dev);
+> +
+> +	/* Find a PCI root bus */
+> +	pbus = to_pci_dev(dev)->bus;
+> +	while (!pci_is_root_bus(pbus))
+> +		pbus = pbus->parent;
+> +
+> +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+> +			      iort_match_node_callback, &pbus->dev);
+> +}
+> +
+> +void __init acpi_iort_init(void)
+> +{
+> +	acpi_status status;
+> +
+> +	status = acpi_get_table(ACPI_SIG_IORT, 0, &iort_table);
+> +	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
+> +		const char *msg = acpi_format_exception(status);
+> +		pr_err("Failed to get table, %s\n", msg);
+> +	}
+> +}
+> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+> index 85b7d07..e56e643 100644
+> --- a/drivers/acpi/bus.c
+> +++ b/drivers/acpi/bus.c
+> @@ -36,6 +36,7 @@
+>  #ifdef CONFIG_X86
+>  #include <asm/mpspec.h>
 >  #endif
->  
->  #endif /* __ASSEMBLY__ */
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index d24e5dd..6d53824 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -25,6 +25,11 @@
->  	*(.hyp.text)							\
->  	VMLINUX_SYMBOL(__hyp_text_end) = .;
->  
-> +#define HYPERVISOR_DATA							\
-> +	VMLINUX_SYMBOL(__hyp_data_start) = .;				\
-> +	*(.hyp.data)							\
-> +	VMLINUX_SYMBOL(__hyp_data_end) = .;
-> +
->  #define IDMAP_TEXT							\
->  	ALIGN_FUNCTION();						\
->  	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
-> @@ -256,6 +261,7 @@ SECTIONS
->  		 */
->  		DATA_DATA
->  		CONSTRUCTORS
-> +		HYPERVISOR_DATA
-
-If you follow my idea of of embedding the static key, we can defer all
-of this to another patch set.
-
->  
->  		_edata = .;
->  	}
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 75f130e..f966763 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -27,6 +27,7 @@
->  #include <linux/mman.h>
->  #include <linux/sched.h>
->  #include <linux/kvm.h>
-> +#include <linux/irqchip/arm-gic-v3.h>
->  #include <trace/events/kvm.h>
->  #include <kvm/arm_pmu.h>
->  
-> @@ -68,6 +69,9 @@ static bool vgic_present;
->  
->  static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
->  
-> +/* GIC system register CPU interface */
-> +__hyp_data DEFINE_STATIC_KEY_FALSE(kvm_gicv3_cpuif);
-> +
->  static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
->  {
->  	BUG_ON(preemptible());
-> @@ -1178,6 +1182,14 @@ static int init_common_resources(void)
->  		return -ENOMEM;
+> +#include <linux/acpi_iort.h>
+>  #include <linux/pci.h>
+>  #include <acpi/apei.h>
+>  #include <linux/dmi.h>
+> @@ -1186,6 +1187,7 @@ static int __init acpi_init(void)
 >  	}
 >  
-> +	if (kvm_arm_support_gicv3_cpuif()) {
-
-Why do we need to check this? If we identify a GICv3 (as exposed by the
-host GIC driver), let's just use that.
-
-> +		if (!gic_enable_sre())
-> +			kvm_info("GIC CPU interface present but disabled by higher exception level\n");
-
-Do you really want to try and enable SRE there? It feels wrong, as it
-will already have been enabled by the host driver. Also, we don't
-support having GICv3 in a non-SRE configuration (firmware must expose a
-GICv2 in that case).
-
+>  	pci_mmcfg_late_init();
+> +	acpi_iort_init();
+>  	acpi_scan_init();
+>  	acpi_ec_init();
+>  	acpi_debugfs_init();
+> diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+> new file mode 100644
+> index 0000000..fcacaf7
+> --- /dev/null
+> +++ b/include/linux/acpi_iort.h
+> @@ -0,0 +1,30 @@
+> +/*
+> + * Copyright (C) 2016, Semihalf
+> + *	Author: Tomasz Nowicki <tn@semihalf.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+> + * Place - Suite 330, Boston, MA 02111-1307 USA.
+> + */
 > +
-> +		static_branch_enable(&kvm_gicv3_cpuif);
-> +		kvm_info("GIC system register CPU interface\n");
-> +	}
-
-Can this whole hunk be moved to the vgic initialization instead?
-
+> +#ifndef __ACPI_IORT_H__
+> +#define __ACPI_IORT_H__
 > +
->  	return 0;
->  }
->  
-> @@ -1297,6 +1309,13 @@ static int init_hyp_mode(void)
->  		goto out_err;
->  	}
->  
-> +	err = create_hyp_mappings(kvm_ksym_ref(__hyp_data_start),
-> +				  kvm_ksym_ref(__hyp_data_end), PAGE_HYP);
-> +	if (err) {
-> +		kvm_err("Cannot map hyp data section\n");
-> +		goto out_err;
-> +	}
+> +#include <linux/acpi.h>
 > +
->  	err = create_hyp_mappings(kvm_ksym_ref(__start_rodata),
->  				  kvm_ksym_ref(__end_rodata), PAGE_HYP_RO);
->  	if (err) {
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 3eda975..1da74e8 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -24,6 +24,9 @@
->  
->  #include <linux/types.h>
->  #include <linux/kvm_types.h>
-> +#include <linux/jump_label.h>
+> +#ifdef CONFIG_ACPI_IORT
+> +void acpi_iort_init(void);
+> +#else
+> +static inline void acpi_iort_init(void) { }
+> +#endif
 > +
-> +#include <asm/cpufeature.h>
->  #include <asm/kvm.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_mmio.h>
-> @@ -390,4 +393,16 @@ static inline void __cpu_init_stage2(void)
->  		  "PARange is %d bits, unsupported configuration!", parange);
->  }
->  
-> +extern struct static_key_false kvm_gicv3_cpuif;
-> +
-> +static inline bool kvm_arm_support_gicv3_cpuif(void)
-> +{
-> +	int reg = read_system_reg(SYS_ID_AA64PFR0_EL1);
-> +
-> +	if (IS_ENABLED(CONFIG_ARM_GIC_V3))
-> +		return !!cpuid_feature_extract_unsigned_field(reg, ID_AA64PFR0_GIC_SHIFT);
-> +
-> +	return false;
-> +}
-> +
->  #endif /* __ARM64_KVM_HOST_H__ */
-> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> index cff5105..5c4ac82 100644
-> --- a/arch/arm64/include/asm/kvm_hyp.h
-> +++ b/arch/arm64/include/asm/kvm_hyp.h
-> @@ -23,8 +23,6 @@
->  #include <asm/kvm_mmu.h>
->  #include <asm/sysreg.h>
->  
-> -#define __hyp_text __section(.hyp.text) notrace
-> -
->  #define read_sysreg_elx(r,nvh,vh)					\
->  	({								\
->  		u64 reg;						\
-> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> index 1788545..c49426e 100644
-> --- a/arch/arm64/include/asm/virt.h
-> +++ b/arch/arm64/include/asm/virt.h
-> @@ -42,6 +42,9 @@
->  #define BOOT_CPU_MODE_EL1	(0xe11)
->  #define BOOT_CPU_MODE_EL2	(0xe12)
->  
-> +#define __hyp_text __section(.hyp.text) notrace
-> +#define __hyp_data __section(.hyp.data)
-> +
->  #ifndef __ASSEMBLY__
->  
->  #include <asm/ptrace.h>
-> @@ -95,6 +98,10 @@ extern char __hyp_idmap_text_end[];
->  extern char __hyp_text_start[];
->  extern char __hyp_text_end[];
->  
-> +/* The section containing the hypervisor data */
-> +extern char __hyp_data_start[];
-> +extern char __hyp_data_end[];
-> +
->  #endif /* __ASSEMBLY__ */
->  
->  #endif /* ! __ASM__VIRT_H */
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 659963d..ea94a10 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -40,6 +40,11 @@ jiffies = jiffies_64;
->  	*(.hyp.text)					\
->  	VMLINUX_SYMBOL(__hyp_text_end) = .;
->  
-> +#define HYPERVISOR_DATA					\
-> +	VMLINUX_SYMBOL(__hyp_data_start) = .;		\
-> +	.hyp.data : {*(.hyp.data)}			\
-> +	VMLINUX_SYMBOL(__hyp_data_end) = .;
-> +
->  #define IDMAP_TEXT					\
->  	. = ALIGN(SZ_4K);				\
->  	VMLINUX_SYMBOL(__idmap_text_start) = .;		\
-> @@ -185,6 +190,7 @@ SECTIONS
->  	_data = .;
->  	_sdata = .;
->  	RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
-> +	HYPERVISOR_DATA
->  	PECOFF_EDATA_PADDING
->  	_edata = .;
->  
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 5a84b45..cdc1360 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -126,17 +126,13 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
->  	write_sysreg(0, vttbr_el2);
->  }
->  
-> -static hyp_alternate_select(__vgic_call_save_state,
-> -			    __vgic_v2_save_state, __vgic_v3_save_state,
-> -			    ARM64_HAS_SYSREG_GIC_CPUIF);
-> -
-> -static hyp_alternate_select(__vgic_call_restore_state,
-> -			    __vgic_v2_restore_state, __vgic_v3_restore_state,
-> -			    ARM64_HAS_SYSREG_GIC_CPUIF);
-> -
->  static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
->  {
-> -	__vgic_call_save_state()(vcpu);
-> +	if (static_branch_unlikely(&kvm_gicv3_cpuif))
-> +		__vgic_v3_save_state(vcpu);
-> +	else
-> +		__vgic_v2_save_state(vcpu);
-> +
->  	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
->  }
->  
-> @@ -149,7 +145,10 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
->  	val |= vcpu->arch.irq_lines;
->  	write_sysreg(val, hcr_el2);
->  
-> -	__vgic_call_restore_state()(vcpu);
-> +	if (static_branch_unlikely(&kvm_gicv3_cpuif))
-> +		__vgic_v3_restore_state(vcpu);
-> +	else
-> +		__vgic_v2_restore_state(vcpu);
->  }
->  
->  static bool __hyp_text __true_value(void)
+> +#endif /* __ACPI_IORT_H__ */
+> -- 
+> 1.9.1
 > 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
