@@ -1,23 +1,29 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Sat, 10 Sep 2016 00:23:16 +0200
-Subject: [4.8.0-rc1] am335x-evm boot failure: n_tty_receive_buf_common:
- "Unable to handle kernel paging request.."
-In-Reply-To: <87ceb885-94a6-b9b3-60b3-2017198c4338@ti.com>
-References: <87ceb885-94a6-b9b3-60b3-2017198c4338@ti.com>
-Message-ID: <CAALWOA_=9fMG156H_XSZBjeckQUK-moDWoRE6_kr-8=Z_-KZuA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 9 Sep 2016 19:25:46 -0300
+Subject: [PATCH v3 2/3] ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
+ initial support
+In-Reply-To: <CAMty3ZAPbJM5EQD_OqN9nr---y1P0e+5Y5ujL4g7YoPEsuU+aw@mail.gmail.com>
+References: <1473457525-27768-1-git-send-email-jagan@amarulasolutions.com>
+ <1473457525-27768-2-git-send-email-jagan@amarulasolutions.com>
+ <CAOMZO5BPhY14S4G541MTpsCW64SsCiNcsksJarBCWqGOnaPf3A@mail.gmail.com>
+ <CAMty3ZC+49D7aALOKcsjoiqptQwrrtHGMAGCtcPn51QDsksSSQ@mail.gmail.com>
+ <CAMty3ZAM-sZ0aZU0Z+8WhDcepx8KM96xUbn+n3UcDSjFTafC-A@mail.gmail.com>
+ <CAOMZO5AuZ5DqqKngLw67_-3PdoYx5pMNmm1ZHwRd79rYPJY-+Q@mail.gmail.com>
+ <CAOMZO5D2WNBh6fy8iFYasSZnovfBJRxzBt55ceaPqwCn3zvepg@mail.gmail.com>
+ <CAMty3ZAPbJM5EQD_OqN9nr---y1P0e+5Y5ujL4g7YoPEsuU+aw@mail.gmail.com>
+Message-ID: <CAOMZO5CpdL62frpVkHOQ4gGoXrVQv3AjiXqHoXfZW8RKTuxJXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If you look more carefully the first problem is actually a bus error:
-[ 15.776190] Unhandled fault: external abort on non-linefetch (0x1028)
-at 0xf9e3e044
-[ 15.825925] PC is at omap_hwmod_read+0x14/0x28
-[ 15.830583] LR is at omap_rtc_wait_not_busy+0x1c/0x44
+On Fri, Sep 9, 2016 at 7:21 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
 
-I have no idea how the kernel manages to continue after a bus error in
-a driver (inside local_irq_disable even), but I wouldn't be inclined
-to take any later errors seriously.
+> Why? can't we update iomux reg value any side effects or something.
 
-See also the "4.8 crash on BeagleBone" thread on linux-omap.
+Sure you can change it.
 
-Matthijs
+You were using 0x8000000 before and I assume you tested flexcan and it
+worked well.
+
+Putting 1b0b0 will keep the same setting, so no functional change.
+
+Why did you select 0x1b020?
