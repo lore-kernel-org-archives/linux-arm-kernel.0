@@ -1,32 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  9 Sep 2016 23:25:33 +0200
-Subject: [PATCH 4/6] ARM: nomadik: select MFD_SYSCON
+Date: Fri,  9 Sep 2016 23:25:34 +0200
+Subject: [PATCH 5/6] ARM: dts: add PMU to the NHK15 device tree
 In-Reply-To: <1473456335-22767-1-git-send-email-linus.walleij@linaro.org>
 References: <1473456335-22767-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1473456335-22767-5-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1473456335-22767-6-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the Power Management Unit is using syscon to access a
-set of necessary hardware muxing, let's select MFD_SYSCON for
-the Nomadik subarchitecture.
+The so-called Nomadik Power Mangament Unit is actually a set
+of some power management registers and some miscellaneous
+system control stuff like muxing of entire hardware units.
+Add this as a system controller.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-nomadik/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-nomadik/Kconfig b/arch/arm/mach-nomadik/Kconfig
-index b7e9801fdaa4..3ae45b8d7b0a 100644
---- a/arch/arm/mach-nomadik/Kconfig
-+++ b/arch/arm/mach-nomadik/Kconfig
-@@ -7,6 +7,7 @@ menuconfig ARCH_NOMADIK
- 	select CLKSRC_NOMADIK_MTU_SCHED_CLOCK
- 	select CPU_ARM926T
- 	select GPIOLIB
-+	select MFD_SYSCON
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select PINCTRL
- 	select PINCTRL_NOMADIK
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index d2d532a9d783..80a3c9ccccd9 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -168,6 +168,12 @@
+ 		};
+ 	};
+ 
++	/* Power Management Unit */
++	pmu: pmu at 101e9000 {
++		compatible = "stericsson,nomadik-pmu", "syscon";
++		reg = <0x101e0000 0x1000>;
++	};
++
+ 	src: src at 101e0000 {
+ 		compatible = "stericsson,nomadik-src";
+ 		reg = <0x101e0000 0x1000>;
 -- 
 2.7.4
