@@ -1,39 +1,58 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  9 Sep 2016 23:25:29 +0200
-Subject: [PATCH 0/6] Enable Nomadik NHK15 graphics
-Message-ID: <1473456335-22767-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri,  9 Sep 2016 23:25:30 +0200
+Subject: [PATCH 1/6] ARM: dts: add STMPE PWM to the NHK15 device tree
+In-Reply-To: <1473456335-22767-1-git-send-email-linus.walleij@linaro.org>
+References: <1473456335-22767-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1473456335-22767-2-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As all other pieces have been merged into the PWM and fbdev
-subsystems, we can turn on graphics on the Nomadik NHK15
-board.
+This adds the STMPE PWM to the NHK15 device tree.
 
-Tested and works like a charm with boot penguin, console if
-desired and fbsplash. Even blanks the screen properly to save
-energy.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-nomadik-nhk15.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-The missing DT bindings should probably have been merged in
-the fbdev tree, but it doesn't matter where they are merged
-so I plan to send this whole series as a pull request to
-ARM SoC. The only non-DT change is the Kconfig change to
-select MFD_SYSCON.
-
-Linus Walleij (6):
-  ARM: dts: add STMPE PWM to the NHK15 device tree
-  dt-bindings: add vendor TPO
-  dt-bindings: Add TPO TPG110 binding
-  ARM: nomadik: select MFD_SYSCON
-  ARM: dts: add PMU to the NHK15 device tree
-  ARM: dts: add the CLCD LCD display to the NHK15
-
- .../bindings/display/panel/tpo,tpg110.txt          | 47 +++++++++++++++
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm/boot/dts/ste-nomadik-nhk15.dts            | 68 ++++++++++++++++++++++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 28 +++++++++
- arch/arm/mach-nomadik/Kconfig                      |  1 +
- 5 files changed, 145 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
-
+diff --git a/arch/arm/boot/dts/ste-nomadik-nhk15.dts b/arch/arm/boot/dts/ste-nomadik-nhk15.dts
+index d35aa88791ad..3ec5c653ad56 100644
+--- a/arch/arm/boot/dts/ste-nomadik-nhk15.dts
++++ b/arch/arm/boot/dts/ste-nomadik-nhk15.dts
+@@ -140,6 +140,10 @@
+ 						0x03020067 // Up
+ 						0x0303006c>; // Down
+ 			};
++			stmpe0_pwm: stmpe_pwm {
++				compatible = "st,stmpe-pwm";
++				#pwm-cells = <2>;
++			};
+ 		};
+ 		stmpe1: stmpe2401 at 44 {
+ 			compatible = "st,stmpe2401";
+@@ -183,4 +187,24 @@
+ 			wp-gpios = <&stmpe_gpio44 18 GPIO_ACTIVE_HIGH>;
+ 		};
+ 	};
++
++	bl: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&stmpe0_pwm 0 500000>;
++		pwm-names = "backlight";
++		brightness-levels = <
++			0  1  2  3  4  5  6  7  8  9
++			10 11 12 13 14 15 16 17 18 19
++			20 21 22 23 24 25 26 27 28 29
++			30 31 32 33 34 35 36 37 38 39
++			40 41 42 43 44 45 46 47 48 49
++			50 51 52 53 54 55 56 57 58 59
++			60 61 62 63 64 65 66 67 68 69
++			70 71 72 73 74 75 76 77 78 79
++			80 81 82 83 84 85 86 87 88 89
++			90 91 92 93 94 95 96 97 98 99
++			100
++		>;
++		default-brightness-level = <100>;
++	};
+ };
 -- 
 2.7.4
