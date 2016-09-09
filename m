@@ -1,46 +1,66 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Fri, 09 Sep 2016 17:21:02 +0100
-Subject: [PATCH v2 1/2] ARM: dts: Remove use of skeleton.dtsi from
- bcm283x.dtsi
-In-Reply-To: <5852905.snAkjWmlVZ@wuerfel>
-References: <1470233565-30154-1-git-send-email-ijc@hellion.org.uk>
- <7746678.0mZLVD2k0J@wuerfel> <1473432356.28111.60.camel@hellion.org.uk>
- <5852905.snAkjWmlVZ@wuerfel>
-Message-ID: <1473438062.28111.61.camel@hellion.org.uk>
+From: zach.brown@ni.com (Zach Brown)
+Date: Fri, 9 Sep 2016 11:28:02 -0500
+Subject: [PATCH v7 1/2] sdhci-of-arasan: Add device tree parameter xlnx,
+ fails-without-test-cd bit
+Message-ID: <1473438483-3857-1-git-send-email-zach.brown@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-09-09 at 17:47 +0200, Arnd Bergmann wrote:
-> On Friday, September 9, 2016 3:45:56 PM CEST Ian Campbell wrote:
-> > 
-> > On Tue, 2016-08-23 at 12:09 +0200, Arnd Bergmann wrote:
-> > > 
-> > > I had skipped the new message as well while sorting through 5000
-> > > messages after my vacation, but I've now put it into my TODO
-> > > folder
-> > > and will get to it eventually.
-> > 
-> > Is it still on your TODO or should I do...
-> > 
-> > > 
-> > > We sometimes miss stuff that is meant for arm-soc when it comes
-> > > from people that don't normally send us patches. If you want to
-> > > be sure to catch the attention, stick a 'GIT PULL' into the
-> > > subject
-> > > or send a ping on IRC.
-> > 
-> > ... one of these?
-> > 
-> > It'd be great to get this fixed in v4.8 so that the corresponding
-> > device-tree.git tag will build.
-> 
-> Oh, it ended??up in my v4.9-todo folder, not 4.8, I misunderstood
-> the urgency, sorry.
+The sdhci controller on xilinx zynq devices will not function unless
+the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+In cases where it is impossible to provide the CD bit in hardware,
+setting the controller to test mode and then setting inserted to true
+will get the controller to function without the CD bit.
 
-No worries.
+The device property "xlnx,fails-without-test-cd" will let the arasan
+driver know the controller does not have the CD line wired and that the
+controller does not function without it.
 
-> I've applied it to the fixes branch now.
+Signed-off-by: Zach Brown <zach.brown@ni.com>
+---
+v2:
+ * improved commit messages
+ * removed fake-cd device property
+ * removed fake-cd quirk
+ * use broken-cd device property
+ * documented new usage of broken-cd
+v3:
+ * removed new usage of broken-cd
+ * created fails-without-test-cd device property
+ * created arasan controller specific quirk
+v4:
+ * changed fails-without-test-cd to xlnx-fails-without-test-cd
+ * removed extra blank line
+v5:
+ * Fixed style mistake
+ * Changed (1 << 0 ) to BIT(0)
+v6:
+ * Fixed style mistakes
+ * Condensed unnecessarily long variable names
+ * Removed line wraps that were no longer necessary.
+ * Rebased changes off Ulf's mmc tree's next branch.
+v7:
+ * Removed erroneous re-creation of Optional Properties section
+ * Changed xlnx-fails-without-test-cd to xlnx,fails-without-test-cd
+ * Changed of_get_property to of_property_read_bool
 
-Thank you!
 
-Ian.
+ Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+index 3404afa..49df630 100644
+--- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
++++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+@@ -36,6 +36,9 @@ Optional Properties:
+   - #clock-cells: If specified this should be the value <0>.  With this property
+     in place we will export a clock representing the Card Clock.  This clock
+     is expected to be consumed by our PHY.  You must also specify
++  - xlnx,fails-without-test-cd: when present, the controller doesn't work when
++    the CD line is not connected properly, and the line is not connected
++    properly. Test mode can be used to force the controller to function.
+ 
+ Example:
+ 	sdhci at e0100000 {
+-- 
+2.7.4
