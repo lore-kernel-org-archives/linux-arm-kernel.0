@@ -1,35 +1,39 @@
 From: bd-phuc@jinso.co.jp (bd-phuc at jinso.co.jp)
-Date: Fri,  9 Sep 2016 20:43:10 +0900
-Subject: [PATCH 4/8] clk: renesas: r8a7795: Add CMT clocks
-In-Reply-To: <1473421394-9745-1-git-send-email-bd-phuc@jinso.co.jp>
-References: <1473421394-9745-1-git-send-email-bd-phuc@jinso.co.jp>
-Message-ID: <1473421394-9745-5-git-send-email-bd-phuc@jinso.co.jp>
+Date: Fri,  9 Sep 2016 20:43:06 +0900
+Subject: [PATCH 0/8] clocksource: sh_cmt: Add R-car Gen3 CMT0/1 support
+Message-ID: <1473421394-9745-1-git-send-email-bd-phuc@jinso.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bui Duc Phuc <bd-phuc@jinso.co.jp>
 
-This patch adds CMT module clocks for r8a7795 SoC.
+Hi,
 
-Signed-off-by: Bui Duc Phuc <bd-phuc@jinso.co.jp>
----
- drivers/clk/renesas/r8a7795-cpg-mssr.c | 4 ++++
- 1 file changed, 4 insertions(+)
+These are my first patches which will be added CMT driver for support 
+R-car Gen3 series (r8a7795 and r8a7796).
+Please consider these patches.
 
-diff --git a/drivers/clk/renesas/r8a7795-cpg-mssr.c b/drivers/clk/renesas/r8a7795-cpg-mssr.c
-index e38bf60..86968ea 100644
---- a/drivers/clk/renesas/r8a7795-cpg-mssr.c
-+++ b/drivers/clk/renesas/r8a7795-cpg-mssr.c
-@@ -123,6 +123,10 @@ static const struct mssr_mod_clk r8a7795_mod_clks[] __initconst = {
- 	DEF_MOD("sys-dmac2",		 217,	R8A7795_CLK_S3D1),
- 	DEF_MOD("sys-dmac1",		 218,	R8A7795_CLK_S3D1),
- 	DEF_MOD("sys-dmac0",		 219,	R8A7795_CLK_S3D1),
-+	DEF_MOD("cmt3",		 	 300,	R8A7795_CLK_R),
-+	DEF_MOD("cmt2",		 	 301,	R8A7795_CLK_R),
-+	DEF_MOD("cmt1",		 	 302,	R8A7795_CLK_R),
-+	DEF_MOD("cmt0",		 	 303,	R8A7795_CLK_R),
- 	DEF_MOD("scif2",		 310,	R8A7795_CLK_S3D4),
- 	DEF_MOD("sdif3",		 311,	R8A7795_CLK_SD3),
- 	DEF_MOD("sdif2",		 312,	R8A7795_CLK_SD2),
+Best regards.
+
+Bui Duc Phuc (8):
+  devicetree: binding: R-car Gen3 CMT0 and CMT1 bindings
+  ARM64: dts: r8a7795: Add CMT device to DT
+  ARM64: dts: r8a7796: Add CMT device to DT
+  clk: renesas: r8a7795: Add CMT clocks
+  clk: renesas: r8a7796: Add CMT clocks
+  clocksource: sh_cmt: Support separate R-car Gen3 CMT0/1
+  clocksource: Kconfig: Modify CMT config support 64bit
+  ARM64: defconfig: Enable SH_TIMER_CMT config option
+
+ .../devicetree/bindings/timer/renesas,cmt.txt      |  2 ++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 30 ++++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 30 ++++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |  1 +
+ drivers/clk/renesas/r8a7795-cpg-mssr.c             |  4 +++
+ drivers/clk/renesas/r8a7796-cpg-mssr.c             |  4 +++
+ drivers/clocksource/Kconfig                        |  2 +-
+ drivers/clocksource/sh_cmt.c                       | 21 +++++++++++++--
+ 8 files changed, 91 insertions(+), 3 deletions(-)
+
 -- 
 2.7.4
