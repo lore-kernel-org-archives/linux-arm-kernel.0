@@ -1,124 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Sep 2016 22:10:45 +0200
-Subject: [PATCH v2] hwmon: xgene: access mailbox as RAM
-In-Reply-To: <2852054.37zytD0HIa@wuerfel>
-References: <1469134557-26869-1-git-send-email-hotran@apm.com>
- <CAFHUOYzm4VH1fc3D0fLVv3bCU=2SHx7tZM4nFnCvWeuY+QfEFw@mail.gmail.com>
- <2852054.37zytD0HIa@wuerfel>
-Message-ID: <3475893.910N1IvcYZ@wuerfel>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 09 Sep 2016 13:13:48 -0700
+Subject: next build: 143 builds: 2 failed, 141 passed, 2 errors,
+ 2 warnings (next-20160909)
+In-Reply-To: <3939380.a1AWegjel5@wuerfel> (Arnd Bergmann's message of "Fri, 09
+ Sep 2016 21:25:00 +0200")
+References: <57d26402.eeb8c20a.ba0e2.8bbb@mx.google.com>
+ <2582793.W17ckCts1B@wuerfel> <m2oa3xgg98.fsf@baylibre.com>
+ <3939380.a1AWegjel5@wuerfel>
+Message-ID: <m2d1kchlvn.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added hwmon driver fails to build in an allmodconfig
-kernel:
+Arnd Bergmann <arnd@arndb.de> writes:
 
-      ERROR: "memblock_is_memory" [drivers/hwmon/xgene-hwmon.ko] undefined!
+> On Friday, September 9, 2016 10:00:35 AM CEST Kevin Hilman wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>> 
+>> > On Friday, September 9, 2016 12:25:54 AM CEST kernelci. org bot wrote:
+>> >> next build: 143 builds: 2 failed, 141 passed, 2 errors, 2 warnings (next-20160909)
+>> >
+>> > This is pretty good, here is what's left:
+>> >
+>> >> rpc_defconfig (arm) ? FAIL, 1 error, 0 warnings, 0 section mismatches
+>> >> 
+>> >> Errors:
+>> >>     fs/fat/dir.c:758:424: internal compiler error: Segmentation fault
+>> >
+>> > Could we please update the gcc build on kernelci.org from "Linaro GCC 5.3-2016.02"
+>> > to the following version (Linaro GCC 5.3-2016.05) or later?
+>> 
+>> I finally found the release tarballs for Linaro toolchains (the "latest"
+>> link on the linaro releases was stale, and pointing to 2016.02).
+>> 
+>> So it's now 5.3-2016.05 on all the kCI builders.
+>
+>
+> Great, thanks!
+>
+> Any idea about the x86 binutils issue? Which version do you have
+> at the moment?
 
-According to comments in the code, the mailbox is a shared memory region,
-not a set of MMIO registers, so we should use memremap() for mapping it
-instead of ioremap or acpi_os_ioremap, and pointer dereferences instead
-of readl/writel.
+The builders are bascially stock ubuntu trusty 14.04 LTS, which has
+gcc-4.8.2 and binutils-2.24.
 
-The driver already uses plain kernel pointers, so it's a bit unusual
-to work with functions that operate on __iomem pointers, and this
-fixes that part too.
+Using the Ubuntu toolchain PPA[1], I'm able to put gcc-5 on those
+builders, but newer binutils isn't available in that PPA for Trusty. 
 
-I'm using READ_ONCE/WRITE_ONCE here to keep the existing behavior
-regarding the ordering of the accesses from the CPU, but note that
-there are no barriers (also unchanged from before).
+We've been planning on upgrading the builders to Xenial 16.04 LTS, which
+would bring the binutils update, but haven't gotten to that yet.
 
-I'm also keeping the endianess behavior, though I'm unsure whether
-the message data was supposed to be in LE32 format in the first
-place, it's possible this was meant to be interpreted as a byte
-stream instead.
+Kevin
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-v2: use write-back mapping instead of write-thru,
-    minor coding style changes
-
-diff --git a/drivers/hwmon/xgene-hwmon.c b/drivers/hwmon/xgene-hwmon.c
-index bc78a5d10182..e5470bd49067 100644
---- a/drivers/hwmon/xgene-hwmon.c
-+++ b/drivers/hwmon/xgene-hwmon.c
-@@ -27,6 +27,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/hwmon.h>
- #include <linux/hwmon-sysfs.h>
-+#include <linux/io.h>
- #include <linux/interrupt.h>
- #include <linux/kfifo.h>
- #include <linux/mailbox_controller.h>
-@@ -34,7 +35,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
--#include <acpi/acpi_io.h>
-+
- #include <acpi/pcc.h>
- 
- /* SLIMpro message defines */
-@@ -126,10 +127,10 @@ static u16 xgene_word_tst_and_clr(u16 *addr, u16 mask)
- {
- 	u16 ret, val;
- 
--	val = readw_relaxed(addr);
-+	val = le16_to_cpu(READ_ONCE(*addr));
- 	ret = val & mask;
- 	val &= ~mask;
--	writew_relaxed(val, addr);
-+	WRITE_ONCE(*addr, cpu_to_le16(val));
- 
- 	return ret;
- }
-@@ -137,7 +138,7 @@ static u16 xgene_word_tst_and_clr(u16 *addr, u16 mask)
- static int xgene_hwmon_pcc_rd(struct xgene_hwmon_dev *ctx, u32 *msg)
- {
- 	struct acpi_pcct_shared_memory *generic_comm_base = ctx->pcc_comm_addr;
--	void *ptr = generic_comm_base + 1;
-+	u32 *ptr = (void *)(generic_comm_base + 1);
- 	int rc, i;
- 	u16 val;
- 
-@@ -146,21 +147,21 @@ static int xgene_hwmon_pcc_rd(struct xgene_hwmon_dev *ctx, u32 *msg)
- 	ctx->resp_pending = true;
- 
- 	/* Write signature for subspace */
--	writel_relaxed(PCC_SIGNATURE_MASK | ctx->mbox_idx,
--		       &generic_comm_base->signature);
-+	WRITE_ONCE(generic_comm_base->signature,
-+		   cpu_to_le32(PCC_SIGNATURE_MASK | ctx->mbox_idx));
- 
- 	/* Write to the shared command region */
--	writew_relaxed(MSG_TYPE(msg[0]) | PCCC_GENERATE_DB_INT,
--		       &generic_comm_base->command);
-+	WRITE_ONCE(generic_comm_base->command,
-+		   cpu_to_le16(MSG_TYPE(msg[0]) | PCCC_GENERATE_DB_INT));
- 
- 	/* Flip CMD COMPLETE bit */
--	val = readw_relaxed(&generic_comm_base->status);
-+	val = le16_to_cpu(READ_ONCE(generic_comm_base->status));
- 	val &= ~PCCS_CMD_COMPLETE;
--	writew_relaxed(val, &generic_comm_base->status);
-+	WRITE_ONCE(generic_comm_base->status, cpu_to_le16(val));
- 
- 	/* Copy the message to the PCC comm space */
- 	for (i = 0; i < sizeof(struct slimpro_resp_msg) / 4; i++)
--		writel_relaxed(msg[i], ptr + i * 4);
-+		WRITE_ONCE(ptr[i], cpu_to_le32(msg[i]));
- 
- 	/* Ring the doorbell */
- 	rc = mbox_send_message(ctx->mbox_chan, msg);
-@@ -652,9 +653,9 @@ static int xgene_hwmon_probe(struct platform_device *pdev)
- 		 */
- 		ctx->comm_base_addr = cppc_ss->base_address;
- 		if (ctx->comm_base_addr) {
--			ctx->pcc_comm_addr =
--					acpi_os_ioremap(ctx->comm_base_addr,
--							cppc_ss->length);
-+			ctx->pcc_comm_addr = memremap(ctx->comm_base_addr,
-+							cppc_ss->length,
-+							MEMREMAP_WB);
- 		} else {
- 			dev_err(&pdev->dev, "Failed to get PCC comm region\n");
- 			rc = -ENODEV;
+[1] https://launchpad.net/~ubuntu-toolchain-r/+archive/ubuntu/test
