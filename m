@@ -1,33 +1,44 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 09 Sep 2016 10:00:35 -0700
-Subject: next build: 143 builds: 2 failed, 141 passed, 2 errors,
- 2 warnings (next-20160909)
-In-Reply-To: <2582793.W17ckCts1B@wuerfel> (Arnd Bergmann's message of "Fri, 09
- Sep 2016 13:18:31 +0200")
-References: <57d26402.eeb8c20a.ba0e2.8bbb@mx.google.com>
- <2582793.W17ckCts1B@wuerfel>
-Message-ID: <m2oa3xgg98.fsf@baylibre.com>
+From: fweimer@redhat.com (Florian Weimer)
+Date: Fri, 9 Sep 2016 19:01:12 +0200
+Subject: [RFC PATCH 0/5] arm64: Signal context expansion
+In-Reply-To: <20160909152047.GA3958@e103592.cambridge.arm.com>
+References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
+ <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
+ <20160909152047.GA3958@e103592.cambridge.arm.com>
+Message-ID: <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On 09/09/2016 05:21 PM, Dave Martin wrote:
 
-> On Friday, September 9, 2016 12:25:54 AM CEST kernelci. org bot wrote:
->> next build: 143 builds: 2 failed, 141 passed, 2 errors, 2 warnings (next-20160909)
+>> Do you add this extra information only if the stack is sufficiently large?
+>>
+>> x86_64 adds the new information even for small stacks set up with
+>> sigaltstack, leading to memory corruption on bleeding-edge hardware:
+>>
+>>   <https://bugzilla.kernel.org/show_bug.cgi?id=153531>
 >
-> This is pretty good, here is what's left:
+> Hmmm, not yet.  We already check that the whole frame is writable user
+> memory, but this isn't sufficient to avoid user corruption in the case
+> of alternate signal stacks.  I'll fix this -- thanks for flagging it.
 >
->> rpc_defconfig (arm) ? FAIL, 1 error, 0 warnings, 0 section mismatches
->> 
->> Errors:
->>     fs/fat/dir.c:758:424: internal compiler error: Segmentation fault
->
-> Could we please update the gcc build on kernelci.org from "Linaro GCC 5.3-2016.02"
-> to the following version (Linaro GCC 5.3-2016.05) or later?
+> If the stack isn't large enough, we'll still have to SEGV the task
+> though.
 
-I finally found the release tarballs for Linaro toolchains (the "latest"
-link on the linaro releases was stale, and pointing to 2016.02).
+You could skip copying the data and not install a pointer to it in the 
+existing signal context.
 
-So it's now 5.3-2016.05 on all the kCI builders.
+> We can (and should) bump up the SIG{,MIN}STKSZ constants when adding
+> the SVE support proper to the kernel,
 
-Kevin
+That's a userspace ABI change (libraries use these constants to size 
+struct members), and not a good idea.  You might get away with at this 
+stage, but you can't do this every time you add some new process state 
+you want to add to signal handlers.
+
+> I wonder whether we should make the signal stack size runtime
+> discoverable through sysconf() instead...
+
+That might be a good idea, yes.
+
+Florian
