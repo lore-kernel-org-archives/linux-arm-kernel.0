@@ -1,36 +1,30 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Sep 2016 10:29:59 +0100
-Subject: [PATCH v10 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
-In-Reply-To: <7e5486cc-4080-2d1e-8f6d-98874379887d@gmail.com>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
- <20160905123617.18775-4-aleksey.makarov@linaro.org>
- <7e5486cc-4080-2d1e-8f6d-98874379887d@gmail.com>
-Message-ID: <20160909092958.GB20192@arm.com>
+Date: Fri, 9 Sep 2016 10:31:31 +0100
+Subject: [RFCv4 0/7]  arm_pmu/perf tools: play nicely with CPU PMU cpumasks
+In-Reply-To: <20160908181657.GX10153@twins.programming.kicks-ass.net>
+References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
+ <20160908162502.GB4801@kernel.org>
+ <20160908181657.GX10153@twins.programming.kicks-ass.net>
+Message-ID: <20160909093131.GC20192@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2016 at 12:30:19PM +0300, Aleksey Makarov wrote:
-> 
-> On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
-> > SBBR mentions SPCR as a mandatory ACPI table.  So enable it for ARM64
+On Thu, Sep 08, 2016 at 08:16:57PM +0200, Peter Zijlstra wrote:
+> On Thu, Sep 08, 2016 at 01:25:02PM -0300, Arnaldo Carvalho de Melo wrote:
+> > Em Thu, Sep 08, 2016 at 11:21:45AM +0100, Mark Rutland escreveu:
+> > > Hi,
+> > > 
+> > > I'm trying to make the perf tool play better with PMUs in heterogeneous systems
+> > > (e.g. big.LITTLE), where there are several logical PMUs, each covering a subset
+> > > of CPUs.
 > > 
-> > Earlycon should be set up as early as possible.  ACPI boot tables are
-> > mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
-> > is called from setup_arch() and that's where we parse SPCR.
-> > So it has to be opted-in per-arch.
-> > 
-> > When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
-> > deferred until the DT/ACPI decision is done.  Initialize DT earlycon
-> > if ACPI is disabled.
+> > So I added 6/7 and 7/7 to my local perf/core branch, I think they can go
+> > before the others, Peter, do you want me to take the kernel parts as
+> > well?
 > 
-> Hi Will, Catalin,
-> 
-> Can you review this patch and consider ACKing it please?
+> arm pmu stuff usually goes through the arm tree. Up to Mark I suppose.
 
-Since the ACPI folks seem happy with the series, then:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-for this patch.
+I can queue the kernel bits once I've reviewed them (will try to take a
+look today).
 
 Will
