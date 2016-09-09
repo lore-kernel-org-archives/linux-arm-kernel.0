@@ -1,117 +1,282 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Sat, 10 Sep 2016 03:15:25 +0530
-Subject: [PATCH v3 3/3] ARM: dts: imx6q: Add Engicam i.CoreM6 DualLite/Solo
- initial support
-In-Reply-To: <1473457525-27768-1-git-send-email-jagan@amarulasolutions.com>
-References: <1473457525-27768-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1473457525-27768-3-git-send-email-jagan@amarulasolutions.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Fri,  9 Sep 2016 14:48:47 -0700
+Subject: [PATCH v2] extcon: Add support for qcom SPMI PMIC USB id detection
+ hardware
+Message-ID: <20160909214847.20103-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.CoreM6 DualLite/Solo modules are system on module solutions manufactured
-by Engicam with following characteristics:
-CPU           NXP i.MX6 DL, 800MHz
-RAM           1GB, 32, 64 bit, DDR3-800/1066
-NAND          SLC,512MB
-Power supply  Single 5V
-MAX LCD RES   FULLHD
+Some Qualcomm PMICs have a misc device that performs USB id pin
+detection via an interrupt. When the interrupt triggers, we
+should read the interrupt line to see if it has gone high or low.
+If the interrupt is low then the ID pin is grounded, and if the
+interrupt is high then the ID pin is being held high.
 
-and more info at
-http://www.engicam.com/en/products/embedded/som/sodimm/i-core-m6s-dl-d-q
-
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Cc: Roger Quadros <rogerq@ti.com>
+Cc: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
-Changes for v3:
-	- Use compatible as engicam,imx6-icore instead of fsl,imx6-icore
-Changes for v2:
-	- s/oaky/okay/g
 
- arch/arm/boot/dts/Makefile         |  1 +
- arch/arm/boot/dts/imx6dl-icore.dts | 59 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-icore.dts
+Changes from v1:
+ * Fixed Makefile ordering
+ * Fixed up copyright markings
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 511510d..6175f44 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -333,6 +333,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-gw552x.dtb \
- 	imx6dl-gw553x.dtb \
- 	imx6dl-hummingboard.dtb \
-+	imx6dl-icore.dtb \
- 	imx6dl-nit6xlite.dtb \
- 	imx6dl-nitrogen6x.dtb \
- 	imx6dl-phytec-pbab01.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-icore.dts b/arch/arm/boot/dts/imx6dl-icore.dts
+ .../bindings/extcon/qcom,pm8941-misc.txt           |  41 +++++
+ drivers/extcon/Kconfig                             |   6 +
+ drivers/extcon/Makefile                            |   1 +
+ drivers/extcon/extcon-qcom-spmi-misc.c             | 167 +++++++++++++++++++++
+ 4 files changed, 215 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt
+ create mode 100644 drivers/extcon/extcon-qcom-spmi-misc.c
+
+diff --git a/Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt b/Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt
 new file mode 100644
-index 0000000..aec332c
+index 000000000000..35383adb10f1
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-icore.dts
-@@ -0,0 +1,59 @@
-+/*
-+ * Copyright (C) 2016 Amarula Solutions B.V.
-+ * Copyright (C) 2016 Engicam S.r.l.
++++ b/Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt
+@@ -0,0 +1,41 @@
++Qualcomm's PM8941 USB ID Extcon device
++
++Some Qualcomm PMICs have a "misc" module that can be used to detect when
++the USB ID pin has been pulled low or high.
++
++PROPERTIES
++
++- compatible:
++    Usage: required
++    Value type: <string>
++    Definition: Should contain "qcom,pm8941-misc";
++
++- reg:
++    Usage: required
++    Value type: <u32>
++    Definition: Should contain the offset to the misc address space
++
++- interrupts:
++    Usage: required
++    Value type: <prop-encoded-array>
++    Definition: Should contain the usb id interrupt
++
++- interrupt-names:
++    Usage: required
++    Value type: <stringlist>
++    Definition: Should contain the string "usb_id" for the usb id interrupt
++
++Example:
++
++	pmic {
++		usb_id: misc at 900 {
++			compatible = "qcom,pm8941-misc";
++			reg = <0x900>;
++			interrupts = <0x0 0x9 0 IRQ_TYPE_EDGE_BOTH>;
++			interrupt-names = "usb_id";
++		};
++	}
++
++	usb-controller {
++		extcon = <&usb_id>;
++	};
+diff --git a/drivers/extcon/Kconfig b/drivers/extcon/Kconfig
+index 3d89e60a3e71..04788d92ea52 100644
+--- a/drivers/extcon/Kconfig
++++ b/drivers/extcon/Kconfig
+@@ -96,6 +96,12 @@ config EXTCON_PALMAS
+ 	  Say Y here to enable support for USB peripheral and USB host
+ 	  detection by palmas usb.
+ 
++config EXTCON_QCOM_SPMI_MISC
++	tristate "Qualcomm USB extcon support"
++	help
++	  Say Y here to enable SPMI PMIC based USB cable detection
++	  support on Qualcomm PMICs such as PM8941.
++
+ config EXTCON_RT8973A
+ 	tristate "Richtek RT8973A EXTCON support"
+ 	depends on I2C
+diff --git a/drivers/extcon/Makefile b/drivers/extcon/Makefile
+index 972c813c375b..31a0a999c4fb 100644
+--- a/drivers/extcon/Makefile
++++ b/drivers/extcon/Makefile
+@@ -14,6 +14,7 @@ obj-$(CONFIG_EXTCON_MAX77693)	+= extcon-max77693.o
+ obj-$(CONFIG_EXTCON_MAX77843)	+= extcon-max77843.o
+ obj-$(CONFIG_EXTCON_MAX8997)	+= extcon-max8997.o
+ obj-$(CONFIG_EXTCON_PALMAS)	+= extcon-palmas.o
++obj-$(CONFIG_EXTCON_QCOM_SPMI_MISC) += extcon-qcom-spmi-misc.o
+ obj-$(CONFIG_EXTCON_RT8973A)	+= extcon-rt8973a.o
+ obj-$(CONFIG_EXTCON_SM5502)	+= extcon-sm5502.o
+ obj-$(CONFIG_EXTCON_USB_GPIO)	+= extcon-usb-gpio.o
+diff --git a/drivers/extcon/extcon-qcom-spmi-misc.c b/drivers/extcon/extcon-qcom-spmi-misc.c
+new file mode 100644
+index 000000000000..1b8e24494c60
+--- /dev/null
++++ b/drivers/extcon/extcon-qcom-spmi-misc.c
+@@ -0,0 +1,167 @@
++/**
++ * Based on extcon-usb-gpio.c
 + *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
++ * Copyright (C) 2016 Linaro Ltd
 + *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+/dts-v1/;
++#include <linux/extcon.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/workqueue.h>
 +
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-icore.dtsi"
++#define USB_ID_DEBOUNCE_MS	5	/* ms */
 +
-+/ {
-+	model = "Engicam i.CoreM6 DualLite/Solo Starter Kit";
-+	compatible = "engicam,imx6-icore", "fsl,imx6dl";
++struct qcom_usb_extcon_info {
++	struct extcon_dev *edev;
++	int irq;
++	struct delayed_work wq_detcable;
++	unsigned long debounce_jiffies;
 +};
 +
-+&can1 {
-+	status = "okay";
++static const unsigned int qcom_usb_extcon_cable[] = {
++	EXTCON_USB_HOST,
++	EXTCON_NONE,
 +};
 +
-+&can2 {
-+	status = "okay";
++static void qcom_usb_extcon_detect_cable(struct work_struct *work)
++{
++	bool id;
++	int ret;
++	struct qcom_usb_extcon_info *info = container_of(to_delayed_work(work),
++						    struct qcom_usb_extcon_info,
++						    wq_detcable);
++
++	/* check ID and update cable state */
++	ret = irq_get_irqchip_state(info->irq, IRQCHIP_STATE_LINE_LEVEL, &id);
++	if (ret)
++		return;
++
++	extcon_set_cable_state_(info->edev, EXTCON_USB_HOST, !id);
++}
++
++static irqreturn_t qcom_usb_irq_handler(int irq, void *dev_id)
++{
++	struct qcom_usb_extcon_info *info = dev_id;
++
++	queue_delayed_work(system_power_efficient_wq, &info->wq_detcable,
++			   info->debounce_jiffies);
++
++	return IRQ_HANDLED;
++}
++
++static int qcom_usb_extcon_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct qcom_usb_extcon_info *info;
++	int ret;
++
++	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
++
++	info->edev = devm_extcon_dev_allocate(dev, qcom_usb_extcon_cable);
++	if (IS_ERR(info->edev)) {
++		dev_err(dev, "failed to allocate extcon device\n");
++		return -ENOMEM;
++	}
++
++	ret = devm_extcon_dev_register(dev, info->edev);
++	if (ret < 0) {
++		dev_err(dev, "failed to register extcon device\n");
++		return ret;
++	}
++
++	info->debounce_jiffies = msecs_to_jiffies(USB_ID_DEBOUNCE_MS);
++	INIT_DELAYED_WORK(&info->wq_detcable, qcom_usb_extcon_detect_cable);
++
++	info->irq = platform_get_irq_byname(pdev, "usb_id");
++	if (info->irq < 0)
++		return info->irq;
++
++	ret = devm_request_threaded_irq(dev, info->irq, NULL,
++					qcom_usb_irq_handler,
++					IRQF_TRIGGER_RISING |
++					IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
++					pdev->name, info);
++	if (ret < 0) {
++		dev_err(dev, "failed to request handler for ID IRQ\n");
++		return ret;
++	}
++
++	platform_set_drvdata(pdev, info);
++	device_init_wakeup(dev, 1);
++
++	/* Perform initial detection */
++	qcom_usb_extcon_detect_cable(&info->wq_detcable.work);
++
++	return 0;
++}
++
++static int qcom_usb_extcon_remove(struct platform_device *pdev)
++{
++	struct qcom_usb_extcon_info *info = platform_get_drvdata(pdev);
++
++	cancel_delayed_work_sync(&info->wq_detcable);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int qcom_usb_extcon_suspend(struct device *dev)
++{
++	struct qcom_usb_extcon_info *info = dev_get_drvdata(dev);
++	int ret = 0;
++
++	if (device_may_wakeup(dev))
++		ret = enable_irq_wake(info->irq);
++
++	return ret;
++}
++
++static int qcom_usb_extcon_resume(struct device *dev)
++{
++	struct qcom_usb_extcon_info *info = dev_get_drvdata(dev);
++	int ret = 0;
++
++	if (device_may_wakeup(dev))
++		ret = disable_irq_wake(info->irq);
++
++	return ret;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(qcom_usb_extcon_pm_ops,
++			 qcom_usb_extcon_suspend, qcom_usb_extcon_resume);
++
++static const struct of_device_id qcom_usb_extcon_dt_match[] = {
++	{ .compatible = "qcom,pm8941-misc", },
++	{ }
 +};
++MODULE_DEVICE_TABLE(of, qcom_usb_extcon_dt_match);
++
++static struct platform_driver qcom_usb_extcon_driver = {
++	.probe		= qcom_usb_extcon_probe,
++	.remove		= qcom_usb_extcon_remove,
++	.driver		= {
++		.name	= "extcon-pm8941-misc",
++		.pm	= &qcom_usb_extcon_pm_ops,
++		.of_match_table = qcom_usb_extcon_dt_match,
++	},
++};
++module_platform_driver(qcom_usb_extcon_driver);
++
++MODULE_DESCRIPTION("QCOM USB ID extcon driver");
++MODULE_LICENSE("GPL v2");
 -- 
-2.7.4
+2.9.0.rc2.8.ga28705d
