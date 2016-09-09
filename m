@@ -1,56 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  9 Sep 2016 17:20:32 +0200
-Subject: [GIT PULL 4/4] arm64: tegra: Device tree changes for v4.9-rc1
-In-Reply-To: <20160909152032.9550-1-thierry.reding@gmail.com>
-References: <20160909152032.9550-1-thierry.reding@gmail.com>
-Message-ID: <20160909152032.9550-4-thierry.reding@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 9 Sep 2016 16:21:27 +0100
+Subject: [RFC PATCH 0/5] arm64: Signal context expansion
+In-Reply-To: <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
+References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
+ <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
+Message-ID: <20160909152047.GA3958@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Fri, Sep 09, 2016 at 04:39:14PM +0200, Florian Weimer wrote:
+> On 09/09/2016 04:15 PM, Dave Martin wrote:
+> >This new record can be added in sigframe.__reserved[] if there is a
+> >need to allocate extra space beyond the standard signal frame.  The
+> >extra block of memory referenced by extra_context can then be parsed in
+> >the same way as sigcontext.__reserved[].  Old code should just ignore
+> >the whole thing as an unrecognised record.  To maintain backward
+> >compatibility, signal context records defined today are always placed
+> >directly in __reserved[], never in the block referenced by
+> >extra_context.
+> 
+> Do you add this extra information only if the stack is sufficiently large?
+> 
+> x86_64 adds the new information even for small stacks set up with
+> sigaltstack, leading to memory corruption on bleeding-edge hardware:
+> 
+>   <https://bugzilla.kernel.org/show_bug.cgi?id=153531>
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+Hmmm, not yet.  We already check that the whole frame is writable user
+memory, but this isn't sufficient to avoid user corruption in the case
+of alternate signal stacks.  I'll fix this -- thanks for flagging it.
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+If the stack isn't large enough, we'll still have to SEGV the task
+though.
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.9-arm64-dt
+We can (and should) bump up the SIG{,MIN}STKSZ constants when adding
+the SVE support proper to the kernel, but this doesn't solve the
+problem of existing binaries.  For backwards compatibility the kernel
+would still have to permit the historical (too-small) values of
+these constants for calls to sigaltstack(2) though, which is not ideal.
 
-for you to fetch changes up to 988232412e6711a9bbdc06d4e008b552bbf7cd06:
+I wonder whether we should make the signal stack size runtime
+discoverable through sysconf() instead...
 
-  arm64: tegra: Select PM_GENERIC_DOMAINS (2016-08-24 17:11:44 +0200)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-arm64: tegra: Device tree changes for v4.9-rc1
-
-Add a couple of devices (AGIC, ADMA) on Tegra210 and enable them on
-Smaug. Also enable DPAUX on Smaug to allow the I2C bus that shares pads
-with the DPAUX to be used to access various audio devices. Furthermore,
-enable the XUSB controller on Smaug for USB 3.0 support.
-
-Finally, select PM_GENERIC_DOMAINS for 64-bit Tegra devices to make sure
-devices are probed only after their power partitions have been enabled.
-
-----------------------------------------------------------------
-Jon Hunter (9):
-      arm64: tegra: Drop clock and reset names for XUSB powergates
-      arm64: tegra: Add AGIC node for Tegra210
-      arm64: tegra: Add ADMA node for Tegra210
-      arm64: tegra: Add SOR power-domain for Tegra210
-      arm64: tegra: Add ACONNECT, ADMA and AGIC nodes Tegra210 Smaug
-      arm64: tegra: Enable DPAUX for Tegra210 Smaug
-      arm64: tegra: Add the various audio devices for Tegra210 Smaug
-      arm64: tegra: Enable XUSB controller on Tegra210 Smaug
-      arm64: tegra: Select PM_GENERIC_DOMAINS
-
-Stephen Warren (1):
-      arm64: tegra: Simplify Tegra210 GPIO compatible value
-
- arch/arm64/Kconfig.platforms                  |   2 +
- arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 120 ++++++++++++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra210.dtsi      |  79 +++++++++++++++--
- 3 files changed, 194 insertions(+), 7 deletions(-)
+Cheers
+---Dave
