@@ -1,93 +1,45 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri,  9 Sep 2016 19:17:47 +0100
-Subject: [PATCH 22/20] iommu/arm-smmu: Fall back to global bypass
+Date: Fri,  9 Sep 2016 19:17:48 +0100
+Subject: [PATCH 4.5/20] Docs: dt: document ARM SMMUv3 generic binding usage
 In-Reply-To: <cover.1473173789.git.robin.murphy@arm.com>
 References: <cover.1473173789.git.robin.murphy@arm.com>
-Message-ID: <9c467662ca0fb562cff6d5c9443d77eacb257060.1473443407.git.robin.murphy@arm.com>
+Message-ID: <6067fc2b12b3bc681687753eedd941c8244c22fa.1473443407.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike SMMUv2, SMMUv3 has no easy way to bypass unknown stream IDs,
-other than allocating and filling in the entire stream table with bypass
-entries, which for some configurations would waste *gigabytes* of RAM.
-Otherwise, all transactions on unknown stream IDs will simply be aborted
-with a C_BAD_STREAMID event.
+Now that we've ratified SMMUv3's use of the generic binding, document it.
 
-Rather than render the system unusable in the case of an invalid DT,
-avoid enabling the SMMU altogether such that everything bypasses
-(though letting the explicit disable_bypass option take precedence).
-
+CC: Rob Herring <robh+dt@kernel.org>
+CC: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 28 +++++++++++++++++++++++-----
- 1 file changed, 23 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index be293b5aa896..859b80c83946 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -126,6 +126,9 @@
- #define CR2_RECINVSID			(1 << 1)
- #define CR2_E2H				(1 << 0)
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+index 7b94c88cf2ee..69a694f70bea 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
+@@ -27,6 +27,12 @@ the PCIe specification.
+                       * "cmdq-sync" - CMD_SYNC complete
+                       * "gerror"    - Global Error activated
  
-+#define ARM_SMMU_GBPA			0x44
-+#define GBPA_ABORT			(1 << 20)
++- #iommu-cells      : See the generic IOMMU binding described in
++                        devicetree/bindings/iommu/iommu.txt
++                      for details. For SMMUv3, must be 1, with each cell
++                      describing a single stream ID. All possible stream
++                      ID which a device may emit must be described.
 +
- #define ARM_SMMU_IRQ_CTRL		0x50
- #define IRQ_CTRL_EVTQ_IRQEN		(1 << 2)
- #define IRQ_CTRL_PRIQ_IRQEN		(1 << 1)
-@@ -2242,7 +2245,7 @@ static int arm_smmu_device_disable(struct arm_smmu_device *smmu)
- 	return ret;
- }
+ ** SMMUv3 optional properties:
  
--static int arm_smmu_device_reset(struct arm_smmu_device *smmu)
-+static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
- {
- 	int ret;
- 	u32 reg, enables;
-@@ -2343,8 +2346,14 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 		return ret;
- 	}
- 
--	/* Enable the SMMU interface */
--	enables |= CR0_SMMUEN;
-+
-+	/* Enable the SMMU interface, or ensure bypass */
-+	if (!bypass || disable_bypass) {
-+		enables |= CR0_SMMUEN;
-+	} else {
-+		reg = readl_relaxed(smmu->base + ARM_SMMU_GBPA);
-+		writel_relaxed(reg & ~GBPA_ABORT, smmu->base + ARM_SMMU_GBPA);
-+	}
- 	ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
- 				      ARM_SMMU_CR0ACK);
- 	if (ret) {
-@@ -2543,6 +2552,15 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct arm_smmu_device *smmu;
- 	struct device *dev = &pdev->dev;
-+	bool bypass = true;
-+	u32 cells;
-+
-+	if (of_property_read_u32(dev->of_node, "#iommu-cells", &cells))
-+		dev_err(dev, "missing #iommu-cells property\n");
-+	else if (cells != 1)
-+		dev_err(dev, "invalid #iommu-cells value (%d)\n", cells);
-+	else
-+		bypass = false;
- 
- 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
- 	if (!smmu) {
-@@ -2595,8 +2613,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, smmu);
- 
- 	/* Reset the device */
--	ret = arm_smmu_device_reset(smmu);
--	if (ret)
-+	ret = arm_smmu_device_reset(smmu, bypass);
-+	if (ret || bypass)
- 		return ret;
- 
- 	/* And we're up. Go go go! */
+ - dma-coherent      : Present if DMA operations made by the SMMU (page
+@@ -54,6 +60,6 @@ the PCIe specification.
+                              <GIC_SPI 79 IRQ_TYPE_EDGE_RISING>;
+                 interrupt-names = "eventq", "priq", "cmdq-sync", "gerror";
+                 dma-coherent;
+-                #iommu-cells = <0>;
++                #iommu-cells = <1>;
+                 msi-parent = <&its 0xff0000>;
+         };
 -- 
 2.8.1.dirty
