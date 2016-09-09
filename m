@@ -1,59 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  9 Sep 2016 12:16:01 +0100
-Subject: [PATCH 2/6] arm64: barriers: introduce nops and __nops macros for NOP
- sequences
+Date: Fri,  9 Sep 2016 12:16:05 +0100
+Subject: [PATCH 6/6] irqchip/gic-v3: Use nops macro for Cavium ThunderX
+ erratum 23154
 In-Reply-To: <1473419765-3437-1-git-send-email-will.deacon@arm.com>
 References: <1473419765-3437-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1473419765-3437-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1473419765-3437-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NOP sequences tend to get used for padding out alternative sections
-and uarch-specific pipeline flushes in errata workarounds.
+The workaround for Cavium ThunderX erratum 23154 has a homebrew
+pipeflush built out of NOP sequences around the read of the IAR.
 
-This patch adds macros for generating these sequences as both inline
-asm blocks, but also as strings suitable for embedding in other asm
-blocks directly.
+This patch converts the code to use the new nops macro, which makes it
+a little easier to read.
 
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 9 +++++++++
- arch/arm64/include/asm/barrier.h   | 3 +++
- 2 files changed, 12 insertions(+)
+ arch/arm64/include/asm/arch_gicv3.h | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index d5025c69ca81..43a75e2fe931 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -87,6 +87,15 @@
- 	.endm
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 0d41944d965d..258f0e118375 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -121,14 +121,9 @@ static inline u64 gic_read_iar_cavium_thunderx(void)
+ {
+ 	u64 irqstat;
  
- /*
-+ * NOP sequence
-+ */
-+	.macro	nops, num
-+	.rept	\num
-+	nop
-+	.endr
-+	.endm
-+
-+/*
-  * Emit an entry into the exception table
-  */
- 	.macro		_asm_extable, from, to
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 4eea7f618dce..4e0497f581a0 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -20,6 +20,9 @@
+-	asm volatile(
+-		"nop;nop;nop;nop\n\t"
+-		"nop;nop;nop;nop");
+-
++	nops(8);
+ 	irqstat = read_sysreg_s(ICC_IAR1_EL1);
+-
+-	asm volatile(
+-		"nop;nop;nop;nop");
++	nops(4);
+ 	mb();
  
- #ifndef __ASSEMBLY__
- 
-+#define __nops(n)	".rept	" #n "\nnop\n.endr\n"
-+#define nops(n)		asm volatile(__nops(n))
-+
- #define sev()		asm volatile("sev" : : : "memory")
- #define wfe()		asm volatile("wfe" : : : "memory")
- #define wfi()		asm volatile("wfi" : : : "memory")
+ 	return irqstat;
 -- 
 2.1.4
