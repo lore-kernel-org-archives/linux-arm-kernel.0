@@ -1,87 +1,78 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri,  9 Sep 2016 15:23:42 +0100
-Subject: [PATCH v5 13/14] drivers: acpi: iort: add single mapping function
+Date: Fri,  9 Sep 2016 15:23:41 +0100
+Subject: [PATCH v5 12/14] drivers: acpi: iort: replace rid map type with type
+ mask
 In-Reply-To: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
 References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20160909142343.13314-14-lorenzo.pieralisi@arm.com>
+Message-ID: <20160909142343.13314-13-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current IORT id mapping API requires components to provide
-an input requester ID (a Bus-Device-Function (BDF) identifier for
-PCI devices) to translate an input identifier to an output
-identifier through an IORT range mapping.
+IORT tables provide data that allow the kernel to carry out
+device ID mappings between endpoints and system components
+(eg interrupt controllers, IOMMUs). When the mapping for a
+given device ID is carried out, the translation mechanism
+is done on a per-subsystem basis rather than a component
+subtype (ie the IOMMU kernel layer will look for mappings
+from a device to all IORT node types corresponding to IOMMU
+components), therefore the corresponding mapping API should
+work on a range (ie mask) of IORT node types corresponding
+to a common set of components (eg IOMMUs) rather than a
+specific node type.
 
-Named components do not have an identifiable source ID therefore
-their respective input/output mapping can only be defined in
-IORT tables through single mappings, that provide a translation
-that does not require any input identifier.
-
-Current IORT interface for requester id mappings (iort_node_map_rid())
-is not suitable for components that do not provide a requester id,
-so it cannot be used for IORT named components.
-
-Add an interface to the IORT API to enable retrieval of id
-by allowing an indexed walk of the single mappings array for
-a given component, therefore completing the IORT mapping API.
+Upgrade the IORT iort_node_map_rid() API to work with a
+type mask instead of a single node type so that it can
+be used for mappings that span multiple components types
+(ie IOMMUs).
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/acpi/arm64/iort.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ drivers/acpi/arm64/iort.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 36ea93e..7c68eb4 100644
+index a12dda9..36ea93e 100644
 --- a/drivers/acpi/arm64/iort.c
 +++ b/drivers/acpi/arm64/iort.c
-@@ -284,6 +284,45 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
- 	return 0;
- }
+@@ -25,6 +25,9 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
  
-+static
-+struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
-+					u32 *id_out, u8 type_mask,
-+					int index)
-+{
-+	struct acpi_iort_node *parent;
-+	struct acpi_iort_id_mapping *map;
++#define IORT_TYPE_MASK(type)	(1 << (type))
++#define IORT_MSI_TYPE		(1 << ACPI_IORT_NODE_ITS_GROUP)
 +
-+	if (!node->mapping_offset || !node->mapping_count ||
-+				     index >= node->mapping_count)
-+		return NULL;
-+
-+	map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-+			   node->mapping_offset);
-+
-+	/* Firmware bug! */
-+	if (!map->output_reference) {
-+		pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
-+		       node, node->type);
-+		return NULL;
-+	}
-+
-+	parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-+			       map->output_reference);
-+
-+	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
-+		return NULL;
-+
-+	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
-+		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
-+		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-+			*id_out = map[index].output_base;
-+			return parent;
-+		}
-+	}
-+
-+	return NULL;
-+}
-+
+ struct iort_its_msi_chip {
+ 	struct list_head	list;
+ 	struct fwnode_handle	*fw_node;
+@@ -283,7 +286,7 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+ 
  static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
  						u32 rid_in, u32 *rid_out,
- 						u8 type_mask)
+-						u8 type)
++						u8 type_mask)
+ {
+ 	u32 rid = rid_in;
+ 
+@@ -292,7 +295,7 @@ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
+ 		struct acpi_iort_id_mapping *map;
+ 		int i;
+ 
+-		if (node->type == type) {
++		if (IORT_TYPE_MASK(node->type) & type_mask) {
+ 			if (rid_out)
+ 				*rid_out = rid;
+ 			return node;
+@@ -365,7 +368,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+ 	if (!node)
+ 		return req_id;
+ 
+-	iort_node_map_rid(node, req_id, &dev_id, ACPI_IORT_NODE_ITS_GROUP);
++	iort_node_map_rid(node, req_id, &dev_id, IORT_MSI_TYPE);
+ 	return dev_id;
+ }
+ 
 -- 
 2.10.0
