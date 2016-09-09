@@ -1,38 +1,74 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  9 Sep 2016 23:25:34 +0200
-Subject: [PATCH 5/6] ARM: dts: add PMU to the NHK15 device tree
+Date: Fri,  9 Sep 2016 23:25:32 +0200
+Subject: [PATCH 3/6] dt-bindings: Add TPO TPG110 binding
 In-Reply-To: <1473456335-22767-1-git-send-email-linus.walleij@linaro.org>
 References: <1473456335-22767-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1473456335-22767-6-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1473456335-22767-4-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The so-called Nomadik Power Mangament Unit is actually a set
-of some power management registers and some miscellaneous
-system control stuff like muxing of entire hardware units.
-Add this as a system controller.
+This adds device tree bindings for the TPO TPG110 panel found
+mounted in the Nomadik NHK8815.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ .../bindings/display/panel/tpo,tpg110.txt          | 47 ++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index d2d532a9d783..80a3c9ccccd9 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -168,6 +168,12 @@
- 		};
- 	};
- 
-+	/* Power Management Unit */
-+	pmu: pmu at 101e9000 {
-+		compatible = "stericsson,nomadik-pmu", "syscon";
-+		reg = <0x101e0000 0x1000>;
+diff --git a/Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt b/Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
+new file mode 100644
+index 000000000000..f5e3c6f2095a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
+@@ -0,0 +1,47 @@
++TPO TPG110 Panel
++================
++
++This binding builds on the DPI bindings, adding a few properties
++as a superset of a DPI. See panel-dpi.txt for the required DPI
++bindings.
++
++Required properties:
++- compatible : "tpo,tpg110"
++- grestb-gpios : panel reset GPIO
++- scen-gpios : serial control enable GPIO
++- scl-gpios : serial control clock line GPIO
++- sda-gpios : serial control data line GPIO
++
++Required nodes:
++- Video port for DPI input, see panel-dpi.txt
++- Panel timing for DPI setup, see panel-dpi.txt
++
++Example
++-------
++
++panel {
++	compatible = "tpo,tpg110", "panel-dpi";
++	grestb-gpios = <&stmpe_gpio44 5 GPIO_ACTIVE_LOW>;
++	scen-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
++	scl-gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
++	sda-gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
++	backlight = <&bl>;
++
++	port {
++		nomadik_clcd_panel: endpoint {
++			remote-endpoint = <&nomadik_clcd_pads>;
++		};
 +	};
 +
- 	src: src at 101e0000 {
- 		compatible = "stericsson,nomadik-src";
- 		reg = <0x101e0000 0x1000>;
++	panel-timing {
++		clock-frequency = <33200000>;
++		hactive = <800>;
++		hback-porch = <216>;
++		hfront-porch = <40>;
++		hsync-len = <1>;
++		vactive = <480>;
++		vback-porch = <35>;
++		vfront-porch = <10>;
++		vsync-len = <1>;
++	};
++};
 -- 
 2.7.4
