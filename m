@@ -1,118 +1,98 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 9 Sep 2016 11:43:22 +0200
-Subject: [PATCH v2] phy: sun4i-usb: Use spinlock to guard phyctl register
- access
-In-Reply-To: <20160909035818.16273-1-wens@csie.org>
-References: <20160909035818.16273-1-wens@csie.org>
-Message-ID: <1db79dae-50d7-4b01-caec-d7415b9a0986@redhat.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Fri, 9 Sep 2016 15:18:16 +0530
+Subject: [PATCH 4/8] of: dma: Split of_configure_dma() into mask and ops
+ configuration
+In-Reply-To: <CANqRtoRVRrP9dc3qc-xSE_Wct2HPznzzi1hdrHeC8h2gA=JcKg@mail.gmail.com>
+References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
+ <1470696550-3416-5-git-send-email-sricharan@codeaurora.org>
+ <CANqRtoRVRrP9dc3qc-xSE_Wct2HPznzzi1hdrHeC8h2gA=JcKg@mail.gmail.com>
+Message-ID: <000701d20a7f$4df2ae40$e9d80ac0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Magnus,
 
-On 09-09-16 05:58, Chen-Yu Tsai wrote:
-> The musb driver calls into this phy driver to disable/enable squelch
-> detection. This function was introduced in 24fe86a617c5 ("phy: sun4i-usb:
-> Add a sunxi specific function for setting squelch-detect"). This
-> function in turn calls sun4i_usb_phy_write, which uses a mutex to
-> guard the common access register. Unfortunately musb does this
-> in atomic context, which results in the following warning with lock
-> debugging enabled:
+>On Tue, Aug 9, 2016 at 7:49 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>>
+>> The of_configure_dma() function configures both the DMA masks and ops.
+>> Moving DMA ops configuration to probe time would thus also delay
+>> configuration of the DMA masks, which might not be safe. To avoid issues
+>> split the configuration in two to allow keeping masks configuration at
+>> device add time and move ops configuration to device probe time.
 >
-> BUG: sleeping function called from invalid context at kernel/locking/mutex.c:97
-> in_atomic(): 1, irqs_disabled(): 128, pid: 96, name: kworker/0:2
-> CPU: 0 PID: 96 Comm: kworker/0:2 Not tainted 4.8.0-rc4-00181-gd502f8ad1c3e #13
-> Hardware name: Allwinner sun8i Family
-> Workqueue: events musb_deassert_reset
-> [<c010bc01>] (unwind_backtrace) from [<c0109237>] (show_stack+0xb/0xc)
-> [<c0109237>] (show_stack) from [<c02a669b>] (dump_stack+0x67/0x74)
-> [<c02a669b>] (dump_stack) from [<c05d68c9>] (mutex_lock+0x15/0x2c)
-> [<c05d68c9>] (mutex_lock) from [<c02c3589>] (sun4i_usb_phy_write+0x39/0xec)
-> [<c02c3589>] (sun4i_usb_phy_write) from [<c03e6327>] (musb_port_reset+0xfb/0x184)
-> [<c03e6327>] (musb_port_reset) from [<c03e4917>] (musb_deassert_reset+0x1f/0x2c)
-> [<c03e4917>] (musb_deassert_reset) from [<c012ecb5>] (process_one_work+0x129/0x2b8)
-> [<c012ecb5>] (process_one_work) from [<c012f5e3>] (worker_thread+0xf3/0x424)
-> [<c012f5e3>] (worker_thread) from [<c0132dbd>] (kthread+0xa1/0xb8)
-> [<c0132dbd>] (kthread) from [<c0105f31>] (ret_from_fork+0x11/0x20)
+>Hi Sricharan, Laurent, everyone,
 >
-> Since the register access is mmio, we can use a spinlock to guard this
-> specific access, rather than the mutex that guards the entire phy.
+>I'm currently having a look at this series. Want to give it a spin
+>with the IPMMU driver, however it takes a bit of time to wrap around
+>my head on init ordering issues with both OF method and standard
+>platform device setup on two different architectures...
 >
-> Fixes: ba4bdc9e1dc0 ("PHY: sunxi: Add driver for sunxi usb phy")
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>FWIW, here's some cosmetic feedback for this patch to begin with:
+>
+>In the patch title and commit message you probably want to do perform
+>a s/of_configure_dma()/of_dma_configure()/g.
+>
+  Ya, that right.
+ Thanks for having a look. I am going to post V2 shortly
+  Infact on the next post, this split patch won't be there.
 
-Looks good to me:
+ Also, there is a bug in this series which missed before posting,
+ https://patchwork.kernel.org/patch/9269913/
 
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
 Regards,
+ Sricharan
+ 
 
-Hans
-
-
-> ---
+>> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>> ---
+>>  drivers/of/device.c       | 48 ++++++++++++++++++++++++++++++++++-------------
+>>  drivers/of/platform.c     |  6 ++++--
+>>  drivers/pci/probe.c       |  3 ++-
+>>  include/linux/of_device.h | 11 +++++++++--
+>>  4 files changed, 50 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/drivers/of/device.c b/drivers/of/device.c
+>> index 1c843e2..e1fad50 100644
+>> --- a/drivers/of/device.c
+>> +++ b/drivers/of/device.c
+>> @@ -71,7 +71,7 @@ int of_device_add(struct platform_device *ofdev)
+>>  }
+>>
+>>  /**
+>> - * of_dma_configure - Setup DMA configuration
+>> + * of_dma_configure - Setup DMA masks and offset
+>>   * @dev:       Device to apply DMA configuration
+>>   * @np:                Pointer to OF node having DMA configuration
+>>   *
 >
-> Changes since v1:
+>The hunk above should be "of_dma_configure_masks" to make the
+>documentation match the function name.
 >
->   - Remove the old mutex, since it is no longer used
->   - Use irqsave/irqrestore variant of spinlock ops
+>> @@ -82,13 +82,11 @@ int of_device_add(struct platform_device *ofdev)
+>>   * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
+>>   * to fix up DMA configuration.
+>>   */
+>> -void of_dma_configure(struct device *dev, struct device_node *np)
+>> +void of_dma_configure_masks(struct device *dev, struct device_node *np)
+>>  {
+>> -       u64 dma_addr, paddr, size;
+>> -       int ret;
+>> -       bool coherent;
+>> +       u64 dma_addr, paddr, size, range_mask;
+>>         unsigned long offset;
+>> -       const struct iommu_ops *iommu;
+>> +       int ret;
+>>
+>>         /*
+>>          * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
 >
-> ---
->  drivers/phy/phy-sun4i-usb.c | 11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)
+>Thanks,
 >
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index fcf4d95ecc6d..34b7f0c2e019 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -40,6 +40,7 @@
->  #include <linux/power_supply.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/reset.h>
-> +#include <linux/spinlock.h>
->  #include <linux/usb/of.h>
->  #include <linux/workqueue.h>
+>/ magnus
 >
-> @@ -114,7 +115,7 @@ struct sun4i_usb_phy_data {
->  	void __iomem *base;
->  	const struct sun4i_usb_phy_cfg *cfg;
->  	enum usb_dr_mode dr_mode;
-> -	struct mutex mutex;
-> +	spinlock_t reg_lock; /* guard access to phyctl reg */
->  	struct sun4i_usb_phy {
->  		struct phy *phy;
->  		void __iomem *pmu;
-> @@ -181,9 +182,10 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->  	struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
->  	u32 temp, usbc_bit = BIT(phy->index * 2);
->  	void __iomem *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
-> +	unsigned long flags;
->  	int i;
->
-> -	mutex_lock(&phy_data->mutex);
-> +	spin_lock_irqsave(&phy_data->reg_lock, flags);
->
->  	if (phy_data->cfg->type == sun8i_a33_phy ||
->  	    phy_data->cfg->type == sun50i_a64_phy) {
-> @@ -221,7 +223,8 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->
->  		data >>= 1;
->  	}
-> -	mutex_unlock(&phy_data->mutex);
-> +
-> +	spin_unlock_irqrestore(&phy_data->reg_lock, flags);
->  }
->
->  static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
-> @@ -582,7 +585,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
->  	if (!data)
->  		return -ENOMEM;
->
-> -	mutex_init(&data->mutex);
-> +	spin_lock_init(&data->reg_lock);
->  	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
->  	dev_set_drvdata(dev, data);
->  	data->cfg = of_device_get_match_data(dev);
->
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
