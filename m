@@ -1,34 +1,37 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 9 Sep 2016 14:26:35 +0200
-Subject: [PATCH 1/9] mtd: nand: Create a NAND reset function
-In-Reply-To: <CAOMZO5DfSU5rhf45Vcs7Sit=v2FdQtm=nhdfstZdYwizP6C-=w@mail.gmail.com>
-References: <1473422712-12359-1-git-send-email-s.hauer@pengutronix.de>
- <1473422712-12359-2-git-send-email-s.hauer@pengutronix.de>
- <CAOMZO5DfSU5rhf45Vcs7Sit=v2FdQtm=nhdfstZdYwizP6C-=w@mail.gmail.com>
-Message-ID: <20160909142635.23a8c865@bbrezillon>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 9 Sep 2016 14:29:52 +0200
+Subject: [PATCH v4 0/3] clocksource: timer-atmel-pit: driver cleanups
+In-Reply-To: <20160909111350.27534-1-alexandre.belloni@free-electrons.com>
+References: <20160909111350.27534-1-alexandre.belloni@free-electrons.com>
+Message-ID: <c9de6c9e-e7a7-33bb-7fda-9802f616d594@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Sep 2016 09:15:52 -0300
-Fabio Estevam <festevam@gmail.com> wrote:
+On 09/09/2016 13:13, Alexandre Belloni wrote:
+> Hi Daniel,
+> 
+> This is just the cleanup part of the previous seris as the fix has been applied.
+> 
+> It is rebased on top of v4.8-rc5 and should apply cleanly.
+> 
+> Alexandre Belloni (3):
+>   clocksource: timer-atmel-pit: drop at91sam926x_pit_common_init
+>   clocksource: timer-atmel-pit: remove uselesss WARN_ON_ONCE
+>   clocksource: timer-atmel-pit: simplify IRQ handler
+> 
+>  drivers/clocksource/timer-atmel-pit.c | 96 ++++++++++++++---------------------
+>  1 file changed, 37 insertions(+), 59 deletions(-)
 
-> Hi Sascha,
-> 
-> On Fri, Sep 9, 2016 at 9:05 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> >  /**
-> > + * nand_reset - Reset and initialize a NAND device
-> > + * @chip: The NAND chip
-> > + *
-> > + * Returns 0 for success or negative error code otherwise
-> > + */
-> > +int nand_reset(struct nand_chip *chip)
-> > +{
-> > +       chip->cmdfunc(&chip->mtd, NAND_CMD_RESET, -1, -1);
-> > +
-> > +       return 0;  
-> 
-> It always return 0 here, so the comment and code do not match.
+Ok, I have applied the series.
 
-Not sure this is a big problem, because the function is updated in
-patch 6 and after that it can return an error.
+Thanks.
+
+  -- Daniel
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
