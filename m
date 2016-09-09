@@ -1,94 +1,103 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Sep 2016 16:25:58 +0100
-Subject: [PATCH v3 1/8] arm64: KVM: Use static keys for selecting the GIC
- backend
-In-Reply-To: <57D2D1F0.301@arm.com>
-References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
- <1473350810-10857-2-git-send-email-vladimir.murzin@arm.com>
- <57D27EA7.2040500@arm.com> <57D281F1.5000902@arm.com>
- <57D2BCEB.3030306@arm.com> <57D2C469.1030006@arm.com> <57D2D1F0.301@arm.com>
-Message-ID: <57D2D486.3090100@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 09 Sep 2016 08:33:13 -0700
+Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
+In-Reply-To: <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
+ (Martin Blumenstingl's message of "Thu, 8 Sep 2016 23:48:53 +0200")
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
+ <m260q6jibf.fsf@baylibre.com>
+ <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
+ <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
+ <m2eg4ui0nl.fsf@baylibre.com>
+ <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
+ <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
+Message-ID: <m2sht9gkau.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/16 16:14, Vladimir Murzin wrote:
-> On 09/09/16 15:17, Marc Zyngier wrote:
->> On 09/09/16 14:45, Vladimir Murzin wrote:
->>> On 09/09/16 10:33, Vladimir Murzin wrote:
->>>> Hi Marc,
->>>>
->>>> On 09/09/16 10:19, Marc Zyngier wrote:
->>>>>> Hi Vladimir,
->>>>>>
->>>> ...
->>>>>>>>  
->>>>>>>> +extern struct static_key_false kvm_gicv3_cpuif;
->>>>>>
->>>>>> I think we should follow the model set by kvm_vgic_global_state, which
->>>>>> is declared in arm_vgic.h. Even better, we should *embed* the static key
->>>>>> in this structure. This will reduce the clutter and we wouldn't have to
->>>>>> deal with all the section stuff (the hyp_data thing is a good cleanup,
->>>>>> but I'd like to see it as a separate patch if possible).
->>>> Yes, it is what I was thinking about too, but was not sure about which
->>>> way to go, so hyp_data seemed me something we might reuse latter.
->>>> However, I agree that we can defer hyp_data thing...
->>>>
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+
+> On Thu, Sep 8, 2016 at 10:53 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+>> On 08/09/16 21:42, Kevin Hilman wrote:
 >>>
->>> I've just tried it out and it seems that static keys are not happy to
->>> accept a key after kern_hyp_va is applied at &kvm_vgic_global_state:
->>
->> Ah, there is a trick. You do not need kern_hyp_va at all, because this
->> is not evaluated as an expression at runtime (so the pointer doesn't matter).
->>
-> 
-> Ah, right, thank for a tip! ;)
-> 
->>>> In file included from ./include/linux/jump_label.h:105:0,
->>>>                  from arch/arm64/kvm/hyp/switch.c:19:
->>>> ./arch/arm64/include/asm/jump_label.h: In function ?__guest_run?:
->>>> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
->>>>   asm goto("1: nop\n\t"
->>>>   ^
->>>> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
->>>>   asm goto("1: nop\n\t"
->>>>   ^
->>>> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
->>>>   asm goto("1: nop\n\t"
->>>>   ^
->>>> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
->>>>   asm goto("1: nop\n\t"
->>>>   ^
->>>> make[1]: *** [arch/arm64/kvm/hyp/switch.o] Error 1
->>>> make: *** [arch/arm64/kvm/hyp/switch.o] Error 2
+>>> Ben Dooks <ben.dooks@codethink.co.uk> writes:
 >>>
->>> it looks like we cannot avoid hyp_data thing... if you don't mind I can
->>> do hyp_data clean-up in separate patch. Alternatively, we can do
->>> conversion to static keys for both architectures later as an
->>> optimisation step.
+>>>> On 08/09/16 20:52, Martin Blumenstingl wrote:
+>>>>>
+>>>>> On Thu, Sep 8, 2016 at 9:35 PM, Kevin Hilman <khilman@baylibre.com>
+>>>>> wrote:
+>>>>>>>
+>>>>>>> +     phy = devm_phy_create(&pdev->dev, NULL, &phy_meson_usb2_ops);
+>>>>>>> +     if (IS_ERR(phy)) {
+>>>>>>> +             dev_err(&pdev->dev, "failed to create PHY\n");
+>>>>>>> +             return PTR_ERR(phy);
+>>>>>>> +     }
+>>>>>>> +
+>>>>>>> +     if (usb_reset_refcnt++ == 0) {
+>>>>>>> +             ret = device_reset(&pdev->dev);
+>>>>>>> +             if (ret) {
+>>>>>>> +                     dev_err(&phy->dev, "Failed to reset USB PHY\n");
+>>>>>>> +                     return ret;
+>>>>>>> +             }
+>>>>>>> +     }
+>>>>>>
+>>>>>>
+>>>>>> The ref count + reset here looks like something that could/should be
+>>>>>> handled in a runtime PM callback.
+>>>>>
+>>>>> Unfortunately that doesn't work (as Jerome found out) because both
+>>>>> PHYs are sharing the same reset line.
+>>>>> So if the second PHY would call device_reset then it would also reset
+>>>>> the first PHY!
+>>>>>
+>>>>> There's a comment above the declaration of usb_reset_refcnt which
+>>>>> tries to explain this:
+>>>>> "The PHYs are sharing a common reset line -> we are only allowed to
+>>>>> reset once for all PHYs."
+>>>>> Maybe I should move this comment to the "if (usb_reset_refcnt++ == 0)
+>>>>> {" line to make it easier to see?
+>>>>>
+>>>>
+>>>> pm-runtime has refcounting in it. When one of the nodes turns on,
+>>>> the pm-runtime will call your driver to say there is a user when
+>>>> this first use turns up.
+>>>>
+>>>> If all the sub-phys turn off and drop their refcount then the driver
+>>>> is called to say there are no more users and you can go to sleep.
+>>>
+>>>
+>>> After a chat w/Martin on IRC, It turns out runtime PM wont help here.
+>>>
+>>> The reason is because there are physically two PHY devices[1].  Those 2
+>>> devices will be treated independely by runtime PM, and have separate
+>>> use-counting, which means doing what I proposed would cause a reset to
+>>> happen when either device was probed.
+>>>
+>>> So, I think it's OK as it is.
 >>
->> Can you try the above first? I've just tried the same approach with my
->> vgic-trap series, and it compiles fine (untested though):
-> 
-> I was about to try it out, but didn't manage to find a branch with
-> vgic-trap series, so I did a quick fixup for my series and now it is
-> running non-VHE boot tests and I don't expect issues with VHE one. I
-> think diff bellow should work runtime too, but if you do want me to give
-> it a try it'd be handy to have a branch I can pull from ;)
+>>
+>> Surely you can do pm_runtime_get/put on the phy's parent platform
+>> device and do it that way?
+> could you please be more specific with that (do you mean pdev->dev.parent)?
+> so we would use pm_runtime_{get_sync,put} with the parent, while we
+> would still define the runtime_resume in our driver.
 
-I think Christoffer has pulled it into kvmarm/queue.
+You'd also need to do get/put on the children, but yes, that's what Ben
+is suggesting.
 
->> +	kvm_vgic_global_state.vgic_v2_cpuif_trap = STATIC_KEY_FALSE_INIT;
->> +
-> 
-> I did this a bit different:
-> 
-> +struct vgic_global __section(.hyp.text) kvm_vgic_global_state =
-> {.gicv3_cpuif = STATIC_KEY_FALSE_INIT,};
+However, the problem with all of the solutions proposed (runtime PM ones
+included) is that we're forcing a board-specific design issue (2 devices
+sharing a reset line) into a driver that should not have any
+board-specific assumptions in it.
 
-Yeah, that's actually nicer.
+For example, if this driver is used on another platform where different
+PHYs have different reset lines, then one of them (the unlucky one who
+is not probed first) will never get reset.  So any form of per-device
+ref-counting is not a portable solution.
 
-Thanks,
+I'm not sure yet how the reset framework is supposed to handle shared
+reset lines, but that needs some investigation.  I quick glance and it
+seems that reset controllers can have shared lines, so that should be
+investigated.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Kevin
