@@ -1,24 +1,31 @@
-From: david.brown@linaro.org (David Brown)
-Date: Fri, 9 Sep 2016 17:40:48 -0600
-Subject: [kernel-hardening] [PATCH v2 0/7] arm64: Privileged Access Never
- using TTBR0_EL1 switching
-In-Reply-To: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20160909234048.GA9803@davidb.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Sep 2016 16:47:43 -0700
+Subject: [4.8.0-rc1] am335x-evm boot failure: n_tty_receive_buf_common:
+ "Unable to handle kernel paging request.."
+In-Reply-To: <CAALWOA_=9fMG156H_XSZBjeckQUK-moDWoRE6_kr-8=Z_-KZuA@mail.gmail.com>
+References: <87ceb885-94a6-b9b3-60b3-2017198c4338@ti.com>
+ <CAALWOA_=9fMG156H_XSZBjeckQUK-moDWoRE6_kr-8=Z_-KZuA@mail.gmail.com>
+Message-ID: <20160909234742.becrs3zb4ihc2mq6@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2016 at 04:02:06PM +0100, Catalin Marinas wrote:
->This is the second version of the arm64 PAN emulation by disabling
->TTBR0_EL1 accesses. The major change from v1 is the use of a thread_info
->member to store the real TTBR0_EL1 value. The advantage is slightly
->simpler assembler macros for uaccess_enable with the downside that
->switch_mm() must always update the saved ttbr0 even if there is no mm
->switch.
+* Matthijs van Duin <matthijsvanduin@gmail.com> [160909 15:23]:
+> If you look more carefully the first problem is actually a bus error:
+> [ 15.776190] Unhandled fault: external abort on non-linefetch (0x1028)
+> at 0xf9e3e044
+> [ 15.825925] PC is at omap_hwmod_read+0x14/0x28
+> [ 15.830583] LR is at omap_rtc_wait_not_busy+0x1c/0x44
+> 
+> I have no idea how the kernel manages to continue after a bus error in
+> a driver (inside local_irq_disable even), but I wouldn't be inclined
+> to take any later errors seriously.
+> 
+> See also the "4.8 crash on BeagleBone" thread on linux-omap.
 
-I seem to have a lot better results with this series than I was having
-with v1.  I've tested this both within qemu, and on the HiKey board
-and with OP-TEE (to make sure it didn't break anything), and
-everything seems to be working.
+Yeah. Just disable omap_l3_smx/noc driver and you should see
+a proper stack trace. With the L3 driver we're seeing the trace
+for L3 error interrupt.
 
-Tested-by: David Brown <david.brown@linaro.org>
+Regards,
+
+Tony
