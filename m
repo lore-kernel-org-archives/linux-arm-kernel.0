@@ -1,42 +1,71 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  9 Sep 2016 12:15:59 +0100
-Subject: [PATCH 0/6] Further NOP/sysreg cleanups
-Message-ID: <1473419765-3437-1-git-send-email-will.deacon@arm.com>
+Date: Fri,  9 Sep 2016 12:16:03 +0100
+Subject: [PATCH 4/6] arm64: KVM: Move GIC accessors to arch_gicv3.h
+In-Reply-To: <1473419765-3437-1-git-send-email-will.deacon@arm.com>
+References: <1473419765-3437-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1473419765-3437-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's clearly something going round our office, as both Rutland and I
-ended up doing some mundane NOP and sysreg cleanups for the arm64 headers.
+From: Vladimir Murzin <vladimir.murzin@arm.com>
 
-I plan to queue the first three patches here, but the GIC stuff can wait,
-as it depends on Vladimir's patch (included here for completeness) and
-this is hardly urgent.
+Since we are going to share vgic-v3 save/restore code with ARM
+keep arch specific accessors separately.
 
-Will
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/arch_gicv3.h | 13 +++++++++++++
+ arch/arm64/kvm/hyp/vgic-v3-sr.c     | 13 -------------
+ 2 files changed, 13 insertions(+), 13 deletions(-)
 
---->8
-
-Vladimir Murzin (1):
-  arm64: KVM: Move GIC accessors to arch_gicv3.h
-
-Will Deacon (5):
-  arm64: sysreg: replace open-coded mrs_s/msr_s with
-    {read,write}_sysreg_s
-  arm64: barriers: introduce nops and __nops macros for NOP sequences
-  arm64: lse: convert lse alternatives NOP padding to use __nops
-  irqchip/gic-v3: Convert arm64 GIC accessors to {read,write}_sysreg_s
-  irqchip/gic-v3: Use nops macro for Cavium ThunderX erratum 23154
-
- arch/arm64/include/asm/arch_gicv3.h | 33 +++++++++----------
- arch/arm64/include/asm/assembler.h  |  9 ++++++
- arch/arm64/include/asm/atomic_lse.h | 64 ++++++++++++++++---------------------
- arch/arm64/include/asm/barrier.h    |  3 ++
- arch/arm64/include/asm/cmpxchg.h    |  4 +--
- arch/arm64/include/asm/cputype.h    |  6 +---
- arch/arm64/include/asm/spinlock.h   | 27 +++++++---------
- arch/arm64/include/asm/sysreg.h     | 16 ++++++++++
- arch/arm64/kvm/hyp/vgic-v3-sr.c     | 13 --------
- 9 files changed, 83 insertions(+), 92 deletions(-)
-
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 8ec88e5b290f..ae7dbd79e257 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -79,6 +79,19 @@
+ #include <linux/stringify.h>
+ #include <asm/barrier.h>
+ 
++#define read_gicreg(r)							\
++	({								\
++		u64 reg;						\
++		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
++		reg;							\
++	})
++
++#define write_gicreg(v,r)						\
++	do {								\
++		u64 __val = (v);					\
++		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
++	} while (0)
++
+ /*
+  * Low-level accessors
+  *
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 5f8f80b4a224..f2dbd2e76dbd 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -24,19 +24,6 @@
+ #define vtr_to_max_lr_idx(v)		((v) & 0xf)
+ #define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
+ 
+-#define read_gicreg(r)							\
+-	({								\
+-		u64 reg;						\
+-		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
+-		reg;							\
+-	})
+-
+-#define write_gicreg(v,r)						\
+-	do {								\
+-		u64 __val = (v);					\
+-		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
+-	} while (0)
+-
+ static u64 __hyp_text __gic_v3_get_lr(unsigned int lr)
+ {
+ 	switch (lr & 0xf) {
 -- 
 2.1.4
