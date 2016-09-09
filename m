@@ -1,85 +1,68 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu,  8 Sep 2016 18:36:50 -0700
-Subject: [PATCH] gpu: Remove depends on RESET_CONTROLLER when not a provider
-Message-ID: <20160909013650.25166-1-stephen.boyd@linaro.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 9 Sep 2016 09:37:43 +0800
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <6547614.50rx8ya9lj@wuerfel>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <4934737.egJZVdaLZs@wuerfel>
+ <20160908122810.GA14132@b29397-desktop>
+ <6547614.50rx8ya9lj@wuerfel>
+Message-ID: <20160909013743.GB15637@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These GPU drivers only depend on the RESET_CONTROLLER config
-option to fix build issues that existed when there weren't stub
-reset APIs for reset controller consumers. Given that these
-drivers aren't providing any reset controllers themselves, they
-don't actually depend on the API to build (just to function) so
-they don't need to depend on it. Remove the dependency to fix
-recursive build errors like the following:
+On Thu, Sep 08, 2016 at 02:52:29PM +0200, Arnd Bergmann wrote:
+> On Thursday, September 8, 2016 8:28:10 PM CEST Peter Chen wrote:
+> > On Thu, Sep 08, 2016 at 12:17:21PM +0200, Arnd Bergmann wrote:
+> > > On Thursday, September 8, 2016 12:43:06 PM CEST Felipe Balbi wrote:
+> > > > Arnd Bergmann <arnd@arndb.de> writes:
+> > > > > On Thursday, September 8, 2016 11:29:04 AM CEST Felipe Balbi wrote:
+> > > > If we have a parent device, use that as sysdev, otherwise use self as
+> > > > sysdev.
+> > > 
+> > > But there is often a parent device in DT, as the xhci device is
+> > > attached to some internal bus that gets turned into a platform_device
+> > > as well, so checking whether there is a parent will get the wrong
+> > > device node.
+> > 
+> > From my point, all platform and firmware information at dwc3 are
+> > correct, so we don't need to change dwc3/core.c, only changing for
+> > xhci-plat.c is ok.
+> 
+> Ok, thanks. That leaves the PCI glue, right?
 
-drivers/usb/Kconfig:39:error: recursive dependency detected!
-drivers/usb/Kconfig:39: symbol USB is selected by MOUSE_APPLETOUCH
-drivers/input/mouse/Kconfig:187:        symbol MOUSE_APPLETOUCH depends on INPUT
-drivers/input/Kconfig:8:        symbol INPUT is selected by VT
-drivers/tty/Kconfig:12: symbol VT is selected by FB_STI
-drivers/video/fbdev/Kconfig:674:        symbol FB_STI depends on FB
-drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
-drivers/gpu/drm/Kconfig:42:     symbol DRM_KMS_FB_HELPER is selected by DRM_KMS_CMA_HELPER
-drivers/gpu/drm/Kconfig:98:     symbol DRM_KMS_CMA_HELPER is selected by DRM_IMX
-drivers/gpu/drm/imx/Kconfig:1:  symbol DRM_IMX depends on IMX_IPUV3_CORE
-drivers/gpu/ipu-v3/Kconfig:1:   symbol IMX_IPUV3_CORE depends on RESET_CONTROLLER
-drivers/reset/Kconfig:4:        symbol RESET_CONTROLLER is selected by USB_CHIPIDEA
-drivers/usb/chipidea/Kconfig:1: symbol USB_CHIPIDEA depends on USB_EHCI_HCD
-drivers/usb/host/Kconfig:84:    symbol USB_EHCI_HCD depends on USB
+If pci's firmware information can only get from dwc3-pci, I was wrong.
+I am almost sure your patch covers all 3 cases. dwc3->sysdev covers
+dwc3 core and gadget side, hcd->self.sysdev cover host side. The only
+possible improvement may be how to detect pci device.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Mark Yao <mark.yao@rock-chips.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Peter Chen <peter.chen@nxp.com>
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
----
+> 
+> > diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
+> > index d2e3f65..563600b 100644
+> > --- a/drivers/usb/core/hcd.c
+> > +++ b/drivers/usb/core/hcd.c
+> > @@ -1118,7 +1118,7 @@ static int register_root_hub(struct usb_hcd *hcd)
+> >  		/* Did the HC die before the root hub was registered? */
+> >  		if (HCD_DEAD(hcd))
+> >  			usb_hc_died (hcd);	/* This time clean up */
+> > -		usb_dev->dev.of_node = parent_dev->of_node;
+> > +		usb_dev->dev.of_node = parent_dev->sysdev->of_node;
+> >  	}
+> >  	mutex_unlock(&usb_bus_idr_lock);
+> > 
+> > At above changes, the root hub's of_node equals to xhci-hcd sysdev's
+> > of_node, which is from firmware or from its parent (it is dwc3 core
+> > device).
+> 
+> Just to make sure I understand you right:
+> 
+> in the qcom,dwc3 -> dwc3 -> xhci hierarchy, this would be the
+> dwc3 device, not the qcom,dwc3 device.
+> 
 
-This has come out of some USB chipidea patches I've been working on. Please see
-http://lkml.kernel.org/r/20160907213519.27340-1-stephen.boyd at linaro.org for
-more details.
+Yes, since there is a DT node for dwc3, and firmware information is there,
+that's why the original patch (Grygorii Strashko's) can work.
 
- drivers/gpu/drm/rockchip/Kconfig | 1 -
- drivers/gpu/drm/tegra/Kconfig    | 1 -
- drivers/gpu/ipu-v3/Kconfig       | 1 -
- 3 files changed, 3 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-index 3c58669a06ce..6f7f9c59f05b 100644
---- a/drivers/gpu/drm/rockchip/Kconfig
-+++ b/drivers/gpu/drm/rockchip/Kconfig
-@@ -1,7 +1,6 @@
- config DRM_ROCKCHIP
- 	tristate "DRM Support for Rockchip"
- 	depends on DRM && ROCKCHIP_IOMMU
--	depends on RESET_CONTROLLER
- 	select DRM_GEM_CMA_HELPER
- 	select DRM_KMS_HELPER
- 	select DRM_PANEL
-diff --git a/drivers/gpu/drm/tegra/Kconfig b/drivers/gpu/drm/tegra/Kconfig
-index 63ebb154b9b5..bbf5a4b7e0b6 100644
---- a/drivers/gpu/drm/tegra/Kconfig
-+++ b/drivers/gpu/drm/tegra/Kconfig
-@@ -3,7 +3,6 @@ config DRM_TEGRA
- 	depends on ARCH_TEGRA || (ARM && COMPILE_TEST)
- 	depends on COMMON_CLK
- 	depends on DRM
--	depends on RESET_CONTROLLER
- 	select DRM_KMS_HELPER
- 	select DRM_MIPI_DSI
- 	select DRM_PANEL
-diff --git a/drivers/gpu/ipu-v3/Kconfig b/drivers/gpu/ipu-v3/Kconfig
-index aefdff95356d..08766c6e7856 100644
---- a/drivers/gpu/ipu-v3/Kconfig
-+++ b/drivers/gpu/ipu-v3/Kconfig
-@@ -1,7 +1,6 @@
- config IMX_IPUV3_CORE
- 	tristate "IPUv3 core support"
- 	depends on SOC_IMX5 || SOC_IMX6Q || ARCH_MULTIPLATFORM
--	depends on RESET_CONTROLLER
- 	select GENERIC_IRQ_CHIP
- 	help
- 	  Choose this if you have a i.MX5/6 system and want to use the Image
 -- 
-2.9.0.rc2.8.ga28705d
+
+Best Regards,
+Peter Chen
