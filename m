@@ -1,49 +1,204 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Fri, 9 Sep 2016 11:44:10 +0300
-Subject: [PATCH v3] ARM: dts: add gpio-ranges property to iMX GPIO
- controllers
-In-Reply-To: <20160909072020.ieehalkgxxjfewhs@pengutronix.de>
-References: <1473386556-1934-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <20160909072020.ieehalkgxxjfewhs@pengutronix.de>
-Message-ID: <729f2fd7-df40-c631-5365-892ee25854b3@mentor.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 9 Sep 2016 09:45:07 +0100
+Subject: [PATCH V10 1/8] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <20160909030938.GA8544@arm.com>
+References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
+ <1473152938-17388-2-git-send-email-tn@semihalf.com>
+ <20160909030938.GA8544@arm.com>
+Message-ID: <20160909084507.GA19669@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Fri, Sep 09, 2016 at 11:09:40AM +0800, Dennis Chen wrote:
+> Hi Tomasz,
+> 
+> On Tue, Sep 06, 2016 at 11:08:51AM +0200, Tomasz Nowicki wrote:
+> [...]
+> > +static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+> > +		       u32 *rid_out)
+> > +{
+> > +	/* Single mapping does not care for input id */
+> > +	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+> > +		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+> > +		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+> > +			*rid_out = map->output_base;
+> > +			return 0;
+> > +		}
+> > +
+> > +		pr_warn(FW_BUG "[map %p] SINGLE MAPPING flag not allowed for node type %d, skipping ID map\n",
+> > +			map, type);
+> > +		return -ENXIO;
+> > +	}
+> > +
+> > +	if (rid_in < map->input_base ||
+> > +	    (rid_in >= map->input_base + map->id_count))
+> > +		return -ENXIO;
+> > +
+> > +	*rid_out = map->output_base + (rid_in - map->input_base);
+> > +	return 0;
+> > +}
+> > +
+> > +static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
+> > +						u32 rid_in, u32 *rid_out,
+> > +						u8 type)
+> > +{
+> > +	u32 rid = rid_in;
+> > +
+> > +	/* Parse the ID mapping tree to find specified node type */
+> > +	while (node) {
+> > +		struct acpi_iort_id_mapping *map;
+> > +		int i;
+> > +
+> > +		if (node->type == type) {
+> > +			if (rid_out)
+> > +				*rid_out = rid;
+> > +			return node;
+> > +		}
+> > +
+> > +		if (!node->mapping_offset || !node->mapping_count)
+> > +			goto fail_map;
+> If node->mapping_count is zero, then node->mapping_offset must be zero. A firmware bug
+> otherwise?
 
-On 09/09/2016 10:20 AM, Uwe Kleine-K?nig wrote:
-> On Fri, Sep 09, 2016 at 05:02:36AM +0300, Vladimir Zapolskiy wrote:
->> To establish a connection between GPIO controllers and pin multiplexor
->> controller add gpio-ranges properties to all GPIO controllers found
->> on iMX50, iMX6Q/D, iMX6DL/S, iMX6SL, iMX6SX, iMX6UL and iMX7D/S
->> SoCs. The change was done after human parsing of output from
->
-> When looking at doing the same for i.MX35 there are a few pin pairs that
-> are driven by the same GPIO, e.g.:
->
-> 	$ grep GPIO3_9 imx35-pinfunc.h
-> 	#define MX35_PAD_CTS1__GPIO3_9					0x194 0x5d8 0x918 0x5 0x0
-> 	#define MX35_PAD_FEC_COL__GPIO3_9				0x2ec 0x750 0x918 0x5 0x1
->
-> With this it's not possible to correctly add a gpio-ranges, right?
+So ? This function is there to map RIDs, not to validate all firmware
+permutations and current code behaviour seems correct to me.
 
-this is an interesting exceptional case, I don't think that pinctrl
-and gpio subsystems are ready to handle it.
+> > +
+> > +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
+> > +				   node->mapping_offset);
+> > +
+> > +		/* Firmware bug! */
+> > +		if (!map->output_reference) {
+> > +			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
+> > +			       node, node->type);
+> > +			goto fail_map;
+> > +		}
+> > +
+> > +		/* Do the RID translation */
+> > +		for (i = 0; i < node->mapping_count; i++, map++) {
+> > +			if (!iort_id_map(map, node->type, rid, &rid))
+> > +				break;
+> > +		}
+> >
+> Just curious about if there is kind of possibility that we can get
+> some reduplicated DeviceIDs with a deliberate ID mapping design in FW
+> for the SMMU/RC node. For instance, for a system with 2 PCIe RCs both
+> behind an individual SMMU device, how to make sure the StreamID mapped
+> is unique across the entire system, the same for DeviceID mapped.
+> Anyway, this is my personal confusion, maybe it's not a problem at all
+> for current design ;-)
 
-If both pads are muxed to the same GPIO, then I presume on output it
-behaves like a tee, but do you know what would be the input value,
-if one line is driven high and another one is low?
+Are you asking if FW can contain bugs ? Yes it can. I do not see
+how your comment is related to this patch though.
 
-> i.MX1, i.MX21, i.MX25, i.MX27 and i.MX53 could benefit from such a
-> change though. i.MX35 and i.MX51 have duplicates.
->
+Lorenzo
 
-I keep my hands off it, because I don't have any boards powered by
-these SoCs to be able to test the change. FWIW I hold one i.MX31
-powered board from old times, but I see that i.MX31 has poor DTS
-support in general, there is no GPIO controller device node to
-add the property.
-
---
-With best wishes,
-Vladimir
+> Thanks,
+> Dennis
+> > +
+> > +		if (i == node->mapping_count)
+> > +			goto fail_map;
+> > +
+> > +		node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
+> > +				    map->output_reference);
+> > +	}
+> > +
+> > +fail_map:
+> > +	/* Map input RID to output RID unchanged on mapping failure*/
+> > +	if (rid_out)
+> > +		*rid_out = rid_in;
+> > +
+> > +	return NULL;
+> > +}
+> > +
+> > +static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
+> > +{
+> > +	struct pci_bus *pbus;
+> > +
+> > +	if (!dev_is_pci(dev))
+> > +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+> > +				      iort_match_node_callback, dev);
+> > +
+> > +	/* Find a PCI root bus */
+> > +	pbus = to_pci_dev(dev)->bus;
+> > +	while (!pci_is_root_bus(pbus))
+> > +		pbus = pbus->parent;
+> > +
+> > +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+> > +			      iort_match_node_callback, &pbus->dev);
+> > +}
+> > +
+> > +void __init acpi_iort_init(void)
+> > +{
+> > +	acpi_status status;
+> > +
+> > +	status = acpi_get_table(ACPI_SIG_IORT, 0, &iort_table);
+> > +	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
+> > +		const char *msg = acpi_format_exception(status);
+> > +		pr_err("Failed to get table, %s\n", msg);
+> > +	}
+> > +}
+> > diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+> > index 85b7d07..e56e643 100644
+> > --- a/drivers/acpi/bus.c
+> > +++ b/drivers/acpi/bus.c
+> > @@ -36,6 +36,7 @@
+> >  #ifdef CONFIG_X86
+> >  #include <asm/mpspec.h>
+> >  #endif
+> > +#include <linux/acpi_iort.h>
+> >  #include <linux/pci.h>
+> >  #include <acpi/apei.h>
+> >  #include <linux/dmi.h>
+> > @@ -1186,6 +1187,7 @@ static int __init acpi_init(void)
+> >  	}
+> >  
+> >  	pci_mmcfg_late_init();
+> > +	acpi_iort_init();
+> >  	acpi_scan_init();
+> >  	acpi_ec_init();
+> >  	acpi_debugfs_init();
+> > diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+> > new file mode 100644
+> > index 0000000..fcacaf7
+> > --- /dev/null
+> > +++ b/include/linux/acpi_iort.h
+> > @@ -0,0 +1,30 @@
+> > +/*
+> > + * Copyright (C) 2016, Semihalf
+> > + *	Author: Tomasz Nowicki <tn@semihalf.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify it
+> > + * under the terms and conditions of the GNU General Public License,
+> > + * version 2, as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope it will be useful, but WITHOUT
+> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> > + * more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License along with
+> > + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+> > + * Place - Suite 330, Boston, MA 02111-1307 USA.
+> > + */
+> > +
+> > +#ifndef __ACPI_IORT_H__
+> > +#define __ACPI_IORT_H__
+> > +
+> > +#include <linux/acpi.h>
+> > +
+> > +#ifdef CONFIG_ACPI_IORT
+> > +void acpi_iort_init(void);
+> > +#else
+> > +static inline void acpi_iort_init(void) { }
+> > +#endif
+> > +
+> > +#endif /* __ACPI_IORT_H__ */
+> > -- 
+> > 1.9.1
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
