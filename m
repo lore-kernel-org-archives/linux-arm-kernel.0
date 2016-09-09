@@ -1,23 +1,118 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  9 Sep 2016 13:13:47 +0200
-Subject: [PATCH v4 0/3] clocksource: timer-atmel-pit: driver cleanups
-Message-ID: <20160909111350.27534-1-alexandre.belloni@free-electrons.com>
+Date: Fri,  9 Sep 2016 13:13:48 +0200
+Subject: [PATCH v4 1/3] clocksource: timer-atmel-pit: drop
+ at91sam926x_pit_common_init
+In-Reply-To: <20160909111350.27534-1-alexandre.belloni@free-electrons.com>
+References: <20160909111350.27534-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20160909111350.27534-2-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Merge at91sam926x_pit_common_init in at91sam926x_pit_dt_init as this is the
+only initialization method now.
 
-This is just the cleanup part of the previous seris as the fix has been applied.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/clocksource/timer-atmel-pit.c | 79 +++++++++++++++--------------------
+ 1 file changed, 34 insertions(+), 45 deletions(-)
 
-It is rebased on top of v4.8-rc5 and should apply cleanly.
-
-Alexandre Belloni (3):
-  clocksource: timer-atmel-pit: drop at91sam926x_pit_common_init
-  clocksource: timer-atmel-pit: remove uselesss WARN_ON_ONCE
-  clocksource: timer-atmel-pit: simplify IRQ handler
-
- drivers/clocksource/timer-atmel-pit.c | 96 ++++++++++++++---------------------
- 1 file changed, 37 insertions(+), 59 deletions(-)
-
+diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+index 7f0f5b26d8c5..da7e6d4eef4d 100644
+--- a/drivers/clocksource/timer-atmel-pit.c
++++ b/drivers/clocksource/timer-atmel-pit.c
+@@ -177,11 +177,41 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+ /*
+  * Set up both clocksource and clockevent support.
+  */
+-static int __init at91sam926x_pit_common_init(struct pit_data *data)
++static int __init at91sam926x_pit_dt_init(struct device_node *node)
+ {
+-	unsigned long	pit_rate;
+-	unsigned	bits;
+-	int		ret;
++	unsigned long   pit_rate;
++	unsigned        bits;
++	int             ret;
++	struct pit_data *data;
++
++	data = kzalloc(sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	data->base = of_iomap(node, 0);
++	if (!data->base) {
++		pr_err("Could not map PIT address\n");
++		return -ENXIO;
++	}
++
++	data->mck = of_clk_get(node, 0);
++	if (IS_ERR(data->mck)) {
++		pr_err("Unable to get mck clk\n");
++		return PTR_ERR(data->mck);
++	}
++
++	ret = clk_prepare_enable(data->mck);
++	if (ret) {
++		pr_err("Unable to enable mck\n");
++		return ret;
++	}
++
++	/* Get the interrupts property */
++	data->irq = irq_of_parse_and_map(node, 0);
++	if (!data->irq) {
++		pr_err("Unable to get IRQ from DT\n");
++		return -EINVAL;
++	}
+ 
+ 	/*
+ 	 * Use our actual MCK to figure out how many MCK/16 ticks per
+@@ -236,46 +266,5 @@ static int __init at91sam926x_pit_common_init(struct pit_data *data)
+ 
+ 	return 0;
+ }
+-
+-static int __init at91sam926x_pit_dt_init(struct device_node *node)
+-{
+-	struct pit_data *data;
+-	int ret;
+-
+-	data = kzalloc(sizeof(*data), GFP_KERNEL);
+-	if (!data)
+-		return -ENOMEM;
+-
+-	data->base = of_iomap(node, 0);
+-	if (!data->base) {
+-		pr_err("Could not map PIT address\n");
+-		return -ENXIO;
+-	}
+-
+-	data->mck = of_clk_get(node, 0);
+-	if (IS_ERR(data->mck))
+-		/* Fallback on clkdev for !CCF-based boards */
+-		data->mck = clk_get(NULL, "mck");
+-
+-	if (IS_ERR(data->mck)) {
+-		pr_err("Unable to get mck clk\n");
+-		return PTR_ERR(data->mck);
+-	}
+-
+-	ret = clk_prepare_enable(data->mck);
+-	if (ret) {
+-		pr_err("Unable to enable mck\n");
+-		return ret;
+-	}
+-
+-	/* Get the interrupts property */
+-	data->irq = irq_of_parse_and_map(node, 0);
+-	if (!data->irq) {
+-		pr_err("Unable to get IRQ from DT\n");
+-		return -EINVAL;
+-	}
+-
+-	return at91sam926x_pit_common_init(data);
+-}
+ CLOCKSOURCE_OF_DECLARE(at91sam926x_pit, "atmel,at91sam9260-pit",
+ 		       at91sam926x_pit_dt_init);
 -- 
 2.9.3
