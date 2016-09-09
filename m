@@ -1,49 +1,46 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri,  9 Sep 2016 10:01:07 -0400
-Subject: [PATCH 6/8] ARM: dts: rockchip: Add missing unit name to memory nodes
- in rk322x boards
+Date: Fri,  9 Sep 2016 10:01:05 -0400
+Subject: [PATCH 4/8] ARM: dts: rockchip: Remove skeleton.dtsi inclusion in
+ rk3xxx.dtsi
 In-Reply-To: <1473429669-6185-1-git-send-email-javier@osg.samsung.com>
 References: <1473429669-6185-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1473429669-6185-7-git-send-email-javier@osg.samsung.com>
+Message-ID: <1473429669-6185-5-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following DTC warnings:
+The skeleton.dtsi file was removed in ARM64 for different reasons as
+explained in commit ("3ebee5a2e141 arm64: dts: kill skeleton.dtsi").
+
+These also applies to ARM and it will also allow to get rid of the
+following DTC warnings in the future:
 
 "Node /memory has a reg or ranges property, but no unit name"
+
+The disassembled DTB are almost the same, besides empty chosen nodes
+being removed. So the change should not have a functional impact.
 
 Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
 
- arch/arm/boot/dts/rk3228-evb.dts | 2 +-
- arch/arm/boot/dts/rk3229-evb.dts | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/rk3xxx.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
-index 904668e2e666..58834330a5ba 100644
---- a/arch/arm/boot/dts/rk3228-evb.dts
-+++ b/arch/arm/boot/dts/rk3228-evb.dts
-@@ -46,7 +46,7 @@
- 	model = "Rockchip RK3228 Evaluation board";
- 	compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index e15beb3c671e..0394312f392d 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -44,9 +44,11 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/soc/rockchip,boot-mode.h>
+-#include "skeleton.dtsi"
  
--	memory {
-+	memory at 60000000 {
- 		device_type = "memory";
- 		reg = <0x60000000 0x40000000>;
- 	};
-diff --git a/arch/arm/boot/dts/rk3229-evb.dts b/arch/arm/boot/dts/rk3229-evb.dts
-index b6a12035a6bb..dcdd0cee619e 100644
---- a/arch/arm/boot/dts/rk3229-evb.dts
-+++ b/arch/arm/boot/dts/rk3229-evb.dts
-@@ -46,7 +46,7 @@
- 	model = "Rockchip RK3229 Evaluation board";
- 	compatible = "rockchip,rk3229-evb", "rockchip,rk3229";
+ / {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
+ 	interrupt-parent = <&gic>;
  
--	memory {
-+	memory at 60000000 {
- 		device_type = "memory";
- 		reg = <0x60000000 0x40000000>;
- 	};
+ 	aliases {
 -- 
 2.7.4
