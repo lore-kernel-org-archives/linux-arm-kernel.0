@@ -1,47 +1,94 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 9 Sep 2016 16:21:27 +0100
-Subject: [RFC PATCH 0/5] arm64: Signal context expansion
-In-Reply-To: <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
-References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
- <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
-Message-ID: <20160909152047.GA3958@e103592.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 9 Sep 2016 16:25:58 +0100
+Subject: [PATCH v3 1/8] arm64: KVM: Use static keys for selecting the GIC
+ backend
+In-Reply-To: <57D2D1F0.301@arm.com>
+References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
+ <1473350810-10857-2-git-send-email-vladimir.murzin@arm.com>
+ <57D27EA7.2040500@arm.com> <57D281F1.5000902@arm.com>
+ <57D2BCEB.3030306@arm.com> <57D2C469.1030006@arm.com> <57D2D1F0.301@arm.com>
+Message-ID: <57D2D486.3090100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 04:39:14PM +0200, Florian Weimer wrote:
-> On 09/09/2016 04:15 PM, Dave Martin wrote:
-> >This new record can be added in sigframe.__reserved[] if there is a
-> >need to allocate extra space beyond the standard signal frame.  The
-> >extra block of memory referenced by extra_context can then be parsed in
-> >the same way as sigcontext.__reserved[].  Old code should just ignore
-> >the whole thing as an unrecognised record.  To maintain backward
-> >compatibility, signal context records defined today are always placed
-> >directly in __reserved[], never in the block referenced by
-> >extra_context.
+On 09/09/16 16:14, Vladimir Murzin wrote:
+> On 09/09/16 15:17, Marc Zyngier wrote:
+>> On 09/09/16 14:45, Vladimir Murzin wrote:
+>>> On 09/09/16 10:33, Vladimir Murzin wrote:
+>>>> Hi Marc,
+>>>>
+>>>> On 09/09/16 10:19, Marc Zyngier wrote:
+>>>>>> Hi Vladimir,
+>>>>>>
+>>>> ...
+>>>>>>>>  
+>>>>>>>> +extern struct static_key_false kvm_gicv3_cpuif;
+>>>>>>
+>>>>>> I think we should follow the model set by kvm_vgic_global_state, which
+>>>>>> is declared in arm_vgic.h. Even better, we should *embed* the static key
+>>>>>> in this structure. This will reduce the clutter and we wouldn't have to
+>>>>>> deal with all the section stuff (the hyp_data thing is a good cleanup,
+>>>>>> but I'd like to see it as a separate patch if possible).
+>>>> Yes, it is what I was thinking about too, but was not sure about which
+>>>> way to go, so hyp_data seemed me something we might reuse latter.
+>>>> However, I agree that we can defer hyp_data thing...
+>>>>
+>>>
+>>> I've just tried it out and it seems that static keys are not happy to
+>>> accept a key after kern_hyp_va is applied at &kvm_vgic_global_state:
+>>
+>> Ah, there is a trick. You do not need kern_hyp_va at all, because this
+>> is not evaluated as an expression at runtime (so the pointer doesn't matter).
+>>
 > 
-> Do you add this extra information only if the stack is sufficiently large?
+> Ah, right, thank for a tip! ;)
 > 
-> x86_64 adds the new information even for small stacks set up with
-> sigaltstack, leading to memory corruption on bleeding-edge hardware:
+>>>> In file included from ./include/linux/jump_label.h:105:0,
+>>>>                  from arch/arm64/kvm/hyp/switch.c:19:
+>>>> ./arch/arm64/include/asm/jump_label.h: In function ?__guest_run?:
+>>>> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
+>>>>   asm goto("1: nop\n\t"
+>>>>   ^
+>>>> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
+>>>>   asm goto("1: nop\n\t"
+>>>>   ^
+>>>> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
+>>>>   asm goto("1: nop\n\t"
+>>>>   ^
+>>>> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
+>>>>   asm goto("1: nop\n\t"
+>>>>   ^
+>>>> make[1]: *** [arch/arm64/kvm/hyp/switch.o] Error 1
+>>>> make: *** [arch/arm64/kvm/hyp/switch.o] Error 2
+>>>
+>>> it looks like we cannot avoid hyp_data thing... if you don't mind I can
+>>> do hyp_data clean-up in separate patch. Alternatively, we can do
+>>> conversion to static keys for both architectures later as an
+>>> optimisation step.
+>>
+>> Can you try the above first? I've just tried the same approach with my
+>> vgic-trap series, and it compiles fine (untested though):
 > 
->   <https://bugzilla.kernel.org/show_bug.cgi?id=153531>
+> I was about to try it out, but didn't manage to find a branch with
+> vgic-trap series, so I did a quick fixup for my series and now it is
+> running non-VHE boot tests and I don't expect issues with VHE one. I
+> think diff bellow should work runtime too, but if you do want me to give
+> it a try it'd be handy to have a branch I can pull from ;)
 
-Hmmm, not yet.  We already check that the whole frame is writable user
-memory, but this isn't sufficient to avoid user corruption in the case
-of alternate signal stacks.  I'll fix this -- thanks for flagging it.
+I think Christoffer has pulled it into kvmarm/queue.
 
-If the stack isn't large enough, we'll still have to SEGV the task
-though.
+>> +	kvm_vgic_global_state.vgic_v2_cpuif_trap = STATIC_KEY_FALSE_INIT;
+>> +
+> 
+> I did this a bit different:
+> 
+> +struct vgic_global __section(.hyp.text) kvm_vgic_global_state =
+> {.gicv3_cpuif = STATIC_KEY_FALSE_INIT,};
 
+Yeah, that's actually nicer.
 
-We can (and should) bump up the SIG{,MIN}STKSZ constants when adding
-the SVE support proper to the kernel, but this doesn't solve the
-problem of existing binaries.  For backwards compatibility the kernel
-would still have to permit the historical (too-small) values of
-these constants for calls to sigaltstack(2) though, which is not ideal.
+Thanks,
 
-I wonder whether we should make the signal stack size runtime
-discoverable through sysconf() instead...
-
-Cheers
----Dave
+	M.
+-- 
+Jazz is not dead. It just smells funny...
