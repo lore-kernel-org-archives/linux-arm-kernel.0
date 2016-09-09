@@ -1,60 +1,53 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 9 Sep 2016 14:45:15 +0100
-Subject: [PATCH v3 1/8] arm64: KVM: Use static keys for selecting the GIC
- backend
-In-Reply-To: <57D281F1.5000902@arm.com>
-References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
- <1473350810-10857-2-git-send-email-vladimir.murzin@arm.com>
- <57D27EA7.2040500@arm.com> <57D281F1.5000902@arm.com>
-Message-ID: <57D2BCEB.3030306@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  9 Sep 2016 14:50:14 +0100
+Subject: [PATCH] iommu/arm-smmu: Disable interrupts whilst holding the cmdq
+ lock
+Message-ID: <1473429014-17926-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/16 10:33, Vladimir Murzin wrote:
-> Hi Marc,
-> 
-> On 09/09/16 10:19, Marc Zyngier wrote:
->> > Hi Vladimir,
->> > 
-> ...
->>> >>  
->>> >> +extern struct static_key_false kvm_gicv3_cpuif;
->> > 
->> > I think we should follow the model set by kvm_vgic_global_state, which
->> > is declared in arm_vgic.h. Even better, we should *embed* the static key
->> > in this structure. This will reduce the clutter and we wouldn't have to
->> > deal with all the section stuff (the hyp_data thing is a good cleanup,
->> > but I'd like to see it as a separate patch if possible).
-> Yes, it is what I was thinking about too, but was not sure about which
-> way to go, so hyp_data seemed me something we might reuse latter.
-> However, I agree that we can defer hyp_data thing...
-> 
+The cmdq lock is taken whenever we issue comments into the command queue,
+which can occur in IRQ context (as a result if unmap) or in process
+context (as a result of a threaded IRQ handler or device probe).
 
-I've just tried it out and it seems that static keys are not happy to
-accept a key after kern_hyp_va is applied at &kvm_vgic_global_state:
+This can lead to a theoretical deadlock if the interrupt handler
+performing the unmap hits whilst the lock is taken, so explicitly use
+the {irqsave,irqrestore} spin_lock accessors for the cmdq lock.
 
-> In file included from ./include/linux/jump_label.h:105:0,
->                  from arch/arm64/kvm/hyp/switch.c:19:
-> ./arch/arm64/include/asm/jump_label.h: In function ?__guest_run?:
-> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
->   asm goto("1: nop\n\t"
->   ^
-> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
->   asm goto("1: nop\n\t"
->   ^
-> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
->   asm goto("1: nop\n\t"
->   ^
-> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
->   asm goto("1: nop\n\t"
->   ^
-> make[1]: *** [arch/arm64/kvm/hyp/switch.o] Error 1
-> make: *** [arch/arm64/kvm/hyp/switch.o] Error 2
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-it looks like we cannot avoid hyp_data thing... if you don't mind I can
-do hyp_data clean-up in separate patch. Alternatively, we can do
-conversion to static keys for both architectures later as an
-optimisation step.
-
-Cheers
-Vladimir
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index c040e246bc59..5db6931c715c 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -893,6 +893,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+ 				    struct arm_smmu_cmdq_ent *ent)
+ {
+ 	u64 cmd[CMDQ_ENT_DWORDS];
++	unsigned long flags;
+ 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+ 	struct arm_smmu_queue *q = &smmu->cmdq.q;
+ 
+@@ -902,7 +903,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+ 		return;
+ 	}
+ 
+-	spin_lock(&smmu->cmdq.lock);
++	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+ 	while (queue_insert_raw(q, cmd) == -ENOSPC) {
+ 		if (queue_poll_cons(q, false, wfe))
+ 			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
+@@ -910,7 +911,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+ 
+ 	if (ent->opcode == CMDQ_OP_CMD_SYNC && queue_poll_cons(q, true, wfe))
+ 		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
+-	spin_unlock(&smmu->cmdq.lock);
++	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+ }
+ 
+ /* Context descriptor manipulation functions */
+-- 
+2.1.4
