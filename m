@@ -1,27 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 9 Sep 2016 11:14:07 +0100
-Subject: next-20160909 build: 1 failures 0 warnings (next-20160909)
-In-Reply-To: <E1biHa1-0004JG-Om@optimist>
-References: <E1biHa1-0004JG-Om@optimist>
-Message-ID: <20160909101407.GA27946@sirena.org.uk>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Fri,  9 Sep 2016 18:18:09 +0800
+Subject: [PATCH] coresight: stm: return error code instead of zero in
+ .packet() to avoid dead loop
+Message-ID: <1473416289-30882-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 09:54:37AM +0100, Build bot for Mark Brown wrote:
+In STM framework driver, the trace data writing loop would keep running
+until it received a negative return value or the whole trace packet has
+been written to STM device.  So if the .packet() of STM device always
+returns zero since the device is not enabled or the parameter isn't
+supported, STM framework driver will stall into a dead loop.
 
-Since yesterday -next has been failing to build an arm64 allmodconfig
-due to:
+Returning -EACCES (Permission denied) in .packet() if the device is
+disabled makes more sense, and this is the same for returning -EINVAL
+if the channel passed into is not supported.
 
-> 	arm64-allmodconfig
-> ERROR: "memblock_is_memory" [drivers/hwmon/xgene-hwmon.ko] undefined!
+Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-stm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-caused by 05dbf57876b97d2 (hwmon: Add xgene hwmon driver).  That symbol
-is not exported so can't be used from modules though I can't immediately
-see how that module acquired a reference to that symbol.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160909/1803546f/attachment.sig>
+diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+index 73be58a..6291ce1 100644
+--- a/drivers/hwtracing/coresight/coresight-stm.c
++++ b/drivers/hwtracing/coresight/coresight-stm.c
+@@ -399,10 +399,10 @@ static ssize_t stm_generic_packet(struct stm_data *stm_data,
+ 						   struct stm_drvdata, stm);
+ 
+ 	if (!(drvdata && local_read(&drvdata->mode)))
+-		return 0;
++		return -EACCES;
+ 
+ 	if (channel >= drvdata->numsp)
+-		return 0;
++		return -EINVAL;
+ 
+ 	ch_addr = (unsigned long)stm_channel_addr(drvdata, channel);
+ 
+-- 
+2.7.4
