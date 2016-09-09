@@ -1,46 +1,49 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri,  9 Sep 2016 10:01:04 -0400
-Subject: [PATCH 3/8] ARM: dts: rockchip: Remove skeleton.dtsi inclusion in
- rk3288.dtsi
+Date: Fri,  9 Sep 2016 10:01:06 -0400
+Subject: [PATCH 5/8] ARM: dts: rockchip: Add missing unit name to memory nodes
+ in rk3036 boards
 In-Reply-To: <1473429669-6185-1-git-send-email-javier@osg.samsung.com>
 References: <1473429669-6185-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1473429669-6185-4-git-send-email-javier@osg.samsung.com>
+Message-ID: <1473429669-6185-6-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The skeleton.dtsi file was removed in ARM64 for different reasons as
-explained in commit ("3ebee5a2e141 arm64: dts: kill skeleton.dtsi").
-
-These also applies to ARM and it will also allow to get rid of the
-following DTC warnings in the future:
+This patch fixes the following DTC warnings:
 
 "Node /memory has a reg or ranges property, but no unit name"
-
-The disassembled DTB are almost the same, besides empty chosen nodes
-being removed. So the change should not have a functional impact.
 
 Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
 
- arch/arm/boot/dts/rk3288.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/rk3036-evb.dts   | 2 +-
+ arch/arm/boot/dts/rk3036-kylin.dts | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 17ec2e2d7a60..2cf1eb2e6202 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -46,9 +46,11 @@
- #include <dt-bindings/thermal/thermal.h>
- #include <dt-bindings/power/rk3288-power.h>
- #include <dt-bindings/soc/rockchip,boot-mode.h>
--#include "skeleton.dtsi"
+diff --git a/arch/arm/boot/dts/rk3036-evb.dts b/arch/arm/boot/dts/rk3036-evb.dts
+index 8db9e9b197a2..2f5f15524fba 100644
+--- a/arch/arm/boot/dts/rk3036-evb.dts
++++ b/arch/arm/boot/dts/rk3036-evb.dts
+@@ -46,7 +46,7 @@
+ 	model = "Rockchip RK3036 Evaluation board";
+ 	compatible = "rockchip,rk3036-evb", "rockchip,rk3036";
  
- / {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
- 	compatible = "rockchip,rk3288";
+-	memory {
++	memory at 60000000 {
+ 		device_type = "memory";
+ 		reg = <0x60000000 0x40000000>;
+ 	};
+diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
+index 1df1557a46c3..3de958ec29c0 100644
+--- a/arch/arm/boot/dts/rk3036-kylin.dts
++++ b/arch/arm/boot/dts/rk3036-kylin.dts
+@@ -46,7 +46,7 @@
+ 	model = "Rockchip RK3036 KylinBoard";
+ 	compatible = "rockchip,rk3036-kylin", "rockchip,rk3036";
  
- 	interrupt-parent = <&gic>;
+-	memory {
++	memory at 60000000 {
+ 		device_type = "memory";
+ 		reg = <0x60000000 0x20000000>;
+ 	};
 -- 
 2.7.4
