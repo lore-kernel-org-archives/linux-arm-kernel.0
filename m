@@ -1,85 +1,78 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Sep 2016 07:53:15 +0100
-Subject: [PATCH v4 3/4] arm64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <1473383336.30217.96.camel@buserror.net>
-References: <1467877572-10817-1-git-send-email-oss@buserror.net>
- <1467877572-10817-3-git-send-email-oss@buserror.net>
- <20160826134004.7e86e798@arm.com>
- <1473383336.30217.96.camel@buserror.net>
-Message-ID: <20160909075315.36da82b7@why.wild-wind.fr.eu.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 9 Sep 2016 15:53:41 +0900
+Subject: [PATCH 4/8] of: dma: Split of_configure_dma() into mask and ops
+ configuration
+In-Reply-To: <1470696550-3416-5-git-send-email-sricharan@codeaurora.org>
+References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
+ <1470696550-3416-5-git-send-email-sricharan@codeaurora.org>
+Message-ID: <CANqRtoRVRrP9dc3qc-xSE_Wct2HPznzzi1hdrHeC8h2gA=JcKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Sep 2016 20:08:56 -0500
-Scott Wood <oss@buserror.net> wrote:
+On Tue, Aug 9, 2016 at 7:49 AM, Sricharan R <sricharan@codeaurora.org> wrote:
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>
+> The of_configure_dma() function configures both the DMA masks and ops.
+> Moving DMA ops configuration to probe time would thus also delay
+> configuration of the DMA masks, which might not be safe. To avoid issues
+> split the configuration in two to allow keeping masks configuration at
+> device add time and move ops configuration to device probe time.
 
-> On Fri, 2016-08-26 at 13:40 +0100, Marc Zyngier wrote:
-> > On Thu, 7 Jul 2016 02:46:11 -0500
-> > Scott Wood <oss@buserror.net> wrote:
-> > 
-> > (+Mark)
-> >   
-> > > 
-> > > ?static __always_inline
-> > > ?u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
-> > > ?{
-> > > @@ -66,19 +102,19 @@ u32 arch_timer_reg_read_cp15(int access, enum
-> > > arch_timer_reg reg)
-> > > ?	if (access == ARCH_TIMER_PHYS_ACCESS) {
-> > > ?		switch (reg) {
-> > > ?		case ARCH_TIMER_REG_CTRL:
-> > > -			asm volatile("mrs %0,??cntp_ctl_el0" : "=r"
-> > > (val));
-> > > +			asm volatile("mrs %0, cntp_ctl_el0" : "=r"
-> > > (val));  
-> > Spurious change?
-> >   
-> > > 
-> > > ?			break;
-> > > ?		case ARCH_TIMER_REG_TVAL:
-> > > -			asm volatile("mrs %0, cntp_tval_el0" : "=r"
-> > > (val));
-> > > +			val = _arch_timer_get_ptval();
-> > > ?			break;
-> > > ?		}
-> > > ?	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
-> > > ?		switch (reg) {
-> > > ?		case ARCH_TIMER_REG_CTRL:
-> > > -			asm volatile("mrs %0,??cntv_ctl_el0" : "=r"
-> > > (val));
-> > > +			asm volatile("mrs %0, cntv_ctl_el0" : "=r"
-> > > (val));  
-> > Here too?  
-> 
-> No, it's not spurious.
-> 
-> I answered this in?http://lists.infradead.org/pipermail/linux-arm-kernel/2016-
-> June/438310.html
-> 
-> The extra spacing seemed to be an attempt to get things to line up between the
-> CTRL and TVAL asm statements.??When the TVAL case was converted to a function
-> call, there was nothing for the above to line up with, so I moved it back to
-> normal spacing.
-> 
-> > I'm still worried that this series doesn't address Xen or KVM guests
-> > that need to be made aware of the broken timers.
-> > 
-> > At the very least, I'd like a kernel command line option that'd let the
-> > user reliably run its VMs. You can do something along the lines of
-> > 46fd5c6b, and have a command line argument like
-> > "clocksource.arm_arch_timer.fsl-a008585=1", which would enable the
-> > workaround.  
-> 
-> OK, I'll respin with a command line argument to use for now. ?Mike Caraman has
-> said he plans to do a better solution for KVM -- Mike, have you had a chance
-> to look at this?
+Hi Sricharan, Laurent, everyone,
 
-If there is a plan, we'd all like to hear about it, specially if this
-involves a userspace ABI (which is likely).
+I'm currently having a look at this series. Want to give it a spin
+with the IPMMU driver, however it takes a bit of time to wrap around
+my head on init ordering issues with both OF method and standard
+platform device setup on two different architectures...
+
+FWIW, here's some cosmetic feedback for this patch to begin with:
+
+In the patch title and commit message you probably want to do perform
+a s/of_configure_dma()/of_dma_configure()/g.
+
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  drivers/of/device.c       | 48 ++++++++++++++++++++++++++++++++++-------------
+>  drivers/of/platform.c     |  6 ++++--
+>  drivers/pci/probe.c       |  3 ++-
+>  include/linux/of_device.h | 11 +++++++++--
+>  4 files changed, 50 insertions(+), 18 deletions(-)
+>
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 1c843e2..e1fad50 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -71,7 +71,7 @@ int of_device_add(struct platform_device *ofdev)
+>  }
+>
+>  /**
+> - * of_dma_configure - Setup DMA configuration
+> + * of_dma_configure - Setup DMA masks and offset
+>   * @dev:       Device to apply DMA configuration
+>   * @np:                Pointer to OF node having DMA configuration
+>   *
+
+The hunk above should be "of_dma_configure_masks" to make the
+documentation match the function name.
+
+> @@ -82,13 +82,11 @@ int of_device_add(struct platform_device *ofdev)
+>   * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
+>   * to fix up DMA configuration.
+>   */
+> -void of_dma_configure(struct device *dev, struct device_node *np)
+> +void of_dma_configure_masks(struct device *dev, struct device_node *np)
+>  {
+> -       u64 dma_addr, paddr, size;
+> -       int ret;
+> -       bool coherent;
+> +       u64 dma_addr, paddr, size, range_mask;
+>         unsigned long offset;
+> -       const struct iommu_ops *iommu;
+> +       int ret;
+>
+>         /*
+>          * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
 
 Thanks,
 
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+/ magnus
