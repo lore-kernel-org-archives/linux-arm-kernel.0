@@ -1,91 +1,107 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Sep 2016 18:06:14 +0100
-Subject: [PATCH v3 1/8] arm64: KVM: Use static keys for selecting the GIC
- backend
-In-Reply-To: <57D2E0C6.1040608@arm.com>
-References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
- <1473350810-10857-2-git-send-email-vladimir.murzin@arm.com>
- <57D27EA7.2040500@arm.com> <57D281F1.5000902@arm.com>
- <57D2BCEB.3030306@arm.com> <57D2C469.1030006@arm.com> <57D2D1F0.301@arm.com>
- <57D2D486.3090100@arm.com> <57D2E0C6.1040608@arm.com>
-Message-ID: <57D2EC06.5040709@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 Sep 2016 18:15:37 +0100
+Subject: [PATCH v2 3/7] arm64: Introduce uaccess_{disable, enable}
+ functionality based on TTBR0_EL1
+In-Reply-To: <1472828533-28197-4-git-send-email-catalin.marinas@arm.com>
+References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+ <1472828533-28197-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20160909171537.GD19083@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/16 17:18, Vladimir Murzin wrote:
-> On 09/09/16 16:25, Marc Zyngier wrote:
->> On 09/09/16 16:14, Vladimir Murzin wrote:
->>> On 09/09/16 15:17, Marc Zyngier wrote:
->>>> On 09/09/16 14:45, Vladimir Murzin wrote:
->>>>> On 09/09/16 10:33, Vladimir Murzin wrote:
->>>>>> Hi Marc,
->>>>>>
->>>>>> On 09/09/16 10:19, Marc Zyngier wrote:
->>>>>>>> Hi Vladimir,
->>>>>>>>
->>>>>> ...
->>>>>>>>>>  
->>>>>>>>>> +extern struct static_key_false kvm_gicv3_cpuif;
->>>>>>>>
->>>>>>>> I think we should follow the model set by kvm_vgic_global_state, which
->>>>>>>> is declared in arm_vgic.h. Even better, we should *embed* the static key
->>>>>>>> in this structure. This will reduce the clutter and we wouldn't have to
->>>>>>>> deal with all the section stuff (the hyp_data thing is a good cleanup,
->>>>>>>> but I'd like to see it as a separate patch if possible).
->>>>>> Yes, it is what I was thinking about too, but was not sure about which
->>>>>> way to go, so hyp_data seemed me something we might reuse latter.
->>>>>> However, I agree that we can defer hyp_data thing...
->>>>>>
->>>>>
->>>>> I've just tried it out and it seems that static keys are not happy to
->>>>> accept a key after kern_hyp_va is applied at &kvm_vgic_global_state:
->>>>
->>>> Ah, there is a trick. You do not need kern_hyp_va at all, because this
->>>> is not evaluated as an expression at runtime (so the pointer doesn't matter).
->>>>
->>>
->>> Ah, right, thank for a tip! ;)
->>>
->>>>>> In file included from ./include/linux/jump_label.h:105:0,
->>>>>>                  from arch/arm64/kvm/hyp/switch.c:19:
->>>>>> ./arch/arm64/include/asm/jump_label.h: In function ?__guest_run?:
->>>>>> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
->>>>>>   asm goto("1: nop\n\t"
->>>>>>   ^
->>>>>> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
->>>>>>   asm goto("1: nop\n\t"
->>>>>>   ^
->>>>>> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
->>>>>>   asm goto("1: nop\n\t"
->>>>>>   ^
->>>>>> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
->>>>>>   asm goto("1: nop\n\t"
->>>>>>   ^
->>>>>> make[1]: *** [arch/arm64/kvm/hyp/switch.o] Error 1
->>>>>> make: *** [arch/arm64/kvm/hyp/switch.o] Error 2
->>>>>
->>>>> it looks like we cannot avoid hyp_data thing... if you don't mind I can
->>>>> do hyp_data clean-up in separate patch. Alternatively, we can do
->>>>> conversion to static keys for both architectures later as an
->>>>> optimisation step.
->>>>
->>>> Can you try the above first? I've just tried the same approach with my
->>>> vgic-trap series, and it compiles fine (untested though):
->>>
->>> I was about to try it out, but didn't manage to find a branch with
->>> vgic-trap series, so I did a quick fixup for my series and now it is
->>> running non-VHE boot tests and I don't expect issues with VHE one. I
->>> think diff bellow should work runtime too, but if you do want me to give
->>> it a try it'd be handy to have a branch I can pull from ;)
->>
->> I think Christoffer has pulled it into kvmarm/queue.
-> 
-> Nothing has exploded so far for both architectures.
+On Fri, Sep 02, 2016 at 04:02:09PM +0100, Catalin Marinas wrote:
+>  /*
+>   * User access enabling/disabling.
+>   */
+> +#ifdef CONFIG_ARM64_TTBR0_PAN
+> +static inline void uaccess_ttbr0_disable(void)
+> +{
+> +	unsigned long ttbr;
+> +
+> +	/* reserved_ttbr0 placed at the end of swapper_pg_dir */
+> +	ttbr = read_sysreg(ttbr1_el1) + SWAPPER_DIR_SIZE;
+> +	write_sysreg(ttbr, ttbr0_el1);
+> +	isb();
+> +}
+> +
+> +static inline void uaccess_ttbr0_enable(void)
+> +{
+> +	unsigned long flags;
+> +
+> +	/*
+> +	 * Disable interrupts to avoid preemption and potential saved
+> +	 * TTBR0_EL1 updates between reading the variable and the MSR.
+> +	 */
+> +	local_irq_save(flags);
+> +	write_sysreg(current_thread_info()->ttbr0, ttbr0_el1);
+> +	isb();
+> +	local_irq_restore(flags);
+> +}
 
-Great. Hopefully you can respin the series next week.
+I followed up with the ARM architects on potential improvements to this
+sequence. In summary, changing TCR_EL1.A1 is not guaranteed to have an
+effect unless it is followed by TLBI. IOW, we can't use this bit for a
+quick switch to the reserved ASID.
 
-Thanks,
+Setting TCR_EL1.EPD0 to 1 would work as long as it is followed by an
+ASID change to a reserved one with no entries in the TLB. However, the
+code sequence above (and the corresponding asm ones) would become even
+more complex, so I don't think we gain anything.
 
-	M.
+Untested, using EPD0 (the assembly version would look sligtly better
+than the C version but still a few instructions more than what we
+currently have):
+
+static inline void uaccess_ttbr0_disable(void)
+{
+	unsigned long ttbr;
+	unsigned long tcr;
+
+	/* disable TTBR0 page table walks */
+	tcr = read_sysreg(tcr_el1);
+	tcr |= TCR_ELD0
+	write_sysreg(tcr, tcr_el1);
+	isb();
+
+	/* mask out the ASID bits (zero is a reserved ASID) */
+	ttbr = read_sysreg(ttbr0_el1);
+	ttbr &= ~ASID_MASK;
+	write_sysreg(ttbr, ttbr0_el1);
+	isb();
+}
+
+static inline void uaccess_ttbr0_enable(void)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	ttbr = read_sysreg(ttbr0_el1);
+	ttbr |= current_thread_info()->asid;
+	write_sysreg(ttbr, ttbr0_el1);
+	isb();
+
+	/* enable TTBR0 page table walks */
+	tcr = read_sysreg(tcr_el1);
+	tcr |= TCR_ELD0
+	write_sysreg(tcr, tcr_el1);
+	isb();
+
+	local_irq_restore(flags);
+}
+
+The IRQ disabling for the above sequence is still required since we need
+to guarantee the atomicity of the ASID read with the TTBR0_EL1 write.
+
+We may be able to avoid current_thread_info()->asid *if* we find some
+other per-CPU place to store the ASID (unused TTBR1_EL1 bits was
+suggested, though not sure about the architecture requirements on those
+bits being zero when TCR_EL1.A1 is 0). But even with these in place, the
+requirement to have to ISBs and the additional TCR_EL1 read/write
+doesn't give us anything better.
+
+In conclusion, I propose that we stick to the current TTBR0_EL1 switch
+as per these patches.
+
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
