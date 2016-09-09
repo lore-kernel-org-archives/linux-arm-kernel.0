@@ -1,131 +1,115 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri,  9 Sep 2016 21:24:03 +0200
-Subject: [PATCH V6 1/5] PCI/ACPI: Extend pci_mcfg_lookup() responsibilities
+Date: Fri,  9 Sep 2016 21:24:05 +0200
+Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific register
+ range for ACPI case
 In-Reply-To: <1473449047-10499-1-git-send-email-tn@semihalf.com>
 References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
-Message-ID: <1473449047-10499-2-git-send-email-tn@semihalf.com>
+Message-ID: <1473449047-10499-4-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for adding MCFG platform specific quirk handling move
-CFG resource calculation and ECAM ops assignment to pci_mcfg_lookup().
-It becomes the gate for further ops and CFG resource manipulation
-in arch-agnostic code (drivers/acpi/pci_mcfg.c).
-
-No functionality changes in this patch.
+thunder-pem driver stands for being ACPI based PCI host controller.
+However, there is no standard way to describe its PEM-specific register
+ranges in ACPI tables. Thus we add thunder_pem_init() ACPI extension
+to obtain hardcoded addresses from static resource array.
+Although it is not pretty, it prevents from creating standard mechanism to
+handle similar cases in future.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 ---
- arch/arm64/kernel/pci.c  | 17 +++++------------
- drivers/acpi/pci_mcfg.c  | 28 +++++++++++++++++++++++++---
- include/linux/pci-acpi.h |  4 +++-
- 3 files changed, 33 insertions(+), 16 deletions(-)
+ drivers/pci/host/pci-thunder-pem.c | 61 ++++++++++++++++++++++++++++++--------
+ 1 file changed, 48 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index acf3872..fb439c7 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -125,24 +125,17 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
- 	u16 seg = root->segment;
- 	struct pci_config_window *cfg;
- 	struct resource cfgres;
--	unsigned int bsz;
-+	struct pci_ecam_ops *ecam_ops;
-+	int ret;
+diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+index 6abaf80..b048761 100644
+--- a/drivers/pci/host/pci-thunder-pem.c
++++ b/drivers/pci/host/pci-thunder-pem.c
+@@ -18,6 +18,7 @@
+ #include <linux/init.h>
+ #include <linux/of_address.h>
+ #include <linux/of_pci.h>
++#include <linux/pci-acpi.h>
+ #include <linux/pci-ecam.h>
+ #include <linux/platform_device.h>
  
--	/* Use address from _CBA if present, otherwise lookup MCFG */
--	if (!root->mcfg_addr)
--		root->mcfg_addr = pci_mcfg_lookup(seg, bus_res);
+@@ -284,6 +285,40 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
+ 	return pci_generic_config_write(bus, devfn, where, size, val);
+ }
+ 
++#ifdef CONFIG_ACPI
++static struct resource thunder_pem_reg_res[] = {
++	[4] = DEFINE_RES_MEM(0x87e0c0000000UL, SZ_16M),
++	[5] = DEFINE_RES_MEM(0x87e0c1000000UL, SZ_16M),
++	[6] = DEFINE_RES_MEM(0x87e0c2000000UL, SZ_16M),
++	[7] = DEFINE_RES_MEM(0x87e0c3000000UL, SZ_16M),
++	[8] = DEFINE_RES_MEM(0x87e0c4000000UL, SZ_16M),
++	[9] = DEFINE_RES_MEM(0x87e0c5000000UL, SZ_16M),
++	[14] = DEFINE_RES_MEM(0x97e0c0000000UL, SZ_16M),
++	[15] = DEFINE_RES_MEM(0x97e0c1000000UL, SZ_16M),
++	[16] = DEFINE_RES_MEM(0x97e0c2000000UL, SZ_16M),
++	[17] = DEFINE_RES_MEM(0x97e0c3000000UL, SZ_16M),
++	[18] = DEFINE_RES_MEM(0x97e0c4000000UL, SZ_16M),
++	[19] = DEFINE_RES_MEM(0x97e0c5000000UL, SZ_16M),
++};
++
++static struct resource *thunder_pem_acpi_res(struct pci_config_window *cfg)
++{
++	struct acpi_device *adev = to_acpi_device(cfg->parent);
++	struct acpi_pci_root *root = acpi_driver_data(adev);
++
++	if ((root->segment >= 4 && root->segment <= 9) ||
++	    (root->segment >= 14 && root->segment <= 19))
++		return &thunder_pem_reg_res[root->segment];
++
++	return NULL;
++}
++#else
++static struct resource *thunder_pem_acpi_res(struct pci_config_window *cfg)
++{
++	return NULL;
++}
++#endif
++
+ static int thunder_pem_init(struct pci_config_window *cfg)
+ {
+ 	struct device *dev = cfg->parent;
+@@ -292,24 +327,24 @@ static int thunder_pem_init(struct pci_config_window *cfg)
+ 	struct thunder_pem_pci *pem_pci;
+ 	struct platform_device *pdev;
+ 
+-	/* Only OF support for now */
+-	if (!dev->of_node)
+-		return -EINVAL;
 -
--	if (!root->mcfg_addr) {
-+	ret = pci_mcfg_lookup(root, &cfgres, &ecam_ops);
-+	if (ret) {
- 		dev_err(&root->device->dev, "%04x:%pR ECAM region not found\n",
- 			seg, bus_res);
- 		return NULL;
+ 	pem_pci = devm_kzalloc(dev, sizeof(*pem_pci), GFP_KERNEL);
+ 	if (!pem_pci)
+ 		return -ENOMEM;
+ 
+-	pdev = to_platform_device(dev);
+-
+-	/*
+-	 * The second register range is the PEM bridge to the PCIe
+-	 * bus.  It has a different config access method than those
+-	 * devices behind the bridge.
+-	 */
+-	res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (acpi_disabled) {
++		pdev = to_platform_device(dev);
++
++		/*
++		 * The second register range is the PEM bridge to the PCIe
++		 * bus.  It has a different config access method than those
++		 * devices behind the bridge.
++		 */
++		res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	} else {
++		res_pem = thunder_pem_acpi_res(cfg);
++	}
+ 	if (!res_pem) {
+-		dev_err(dev, "missing \"reg[1]\"property\n");
++		dev_err(dev, "missing configuration region\n");
+ 		return -EINVAL;
  	}
  
--	bsz = 1 << pci_generic_ecam_ops.bus_shift;
--	cfgres.start = root->mcfg_addr + bus_res->start * bsz;
--	cfgres.end = cfgres.start + resource_size(bus_res) * bsz - 1;
--	cfgres.flags = IORESOURCE_MEM;
--	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
--			      &pci_generic_ecam_ops);
-+	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res, ecam_ops);
- 	if (IS_ERR(cfg)) {
- 		dev_err(&root->device->dev, "%04x:%pR error %ld mapping ECAM\n",
- 			seg, bus_res, PTR_ERR(cfg));
-diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-index b5b376e..ffcc651 100644
---- a/drivers/acpi/pci_mcfg.c
-+++ b/drivers/acpi/pci_mcfg.c
-@@ -22,6 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/pci-acpi.h>
-+#include <linux/pci-ecam.h>
- 
- /* Structure to hold entries from the MCFG table */
- struct mcfg_entry {
-@@ -35,9 +36,18 @@ struct mcfg_entry {
- /* List to save MCFG entries */
- static LIST_HEAD(pci_mcfg_list);
- 
--phys_addr_t pci_mcfg_lookup(u16 seg, struct resource *bus_res)
-+int pci_mcfg_lookup(struct acpi_pci_root *root, struct resource *cfgres,
-+		    struct pci_ecam_ops **ecam_ops)
- {
-+	struct pci_ecam_ops *ops = &pci_generic_ecam_ops;
-+	struct resource *bus_res = &root->secondary;
-+	u16 seg = root->segment;
- 	struct mcfg_entry *e;
-+	struct resource res;
-+
-+	/* Use address from _CBA if present, otherwise lookup MCFG */
-+	if (root->mcfg_addr)
-+		goto skip_lookup;
- 
- 	/*
- 	 * We expect exact match, unless MCFG entry end bus covers more than
-@@ -45,10 +55,22 @@ phys_addr_t pci_mcfg_lookup(u16 seg, struct resource *bus_res)
- 	 */
- 	list_for_each_entry(e, &pci_mcfg_list, list) {
- 		if (e->segment == seg && e->bus_start == bus_res->start &&
--		    e->bus_end >= bus_res->end)
--			return e->addr;
-+		    e->bus_end >= bus_res->end) {
-+			root->mcfg_addr = e->addr;
-+		}
-+
- 	}
- 
-+	if (!root->mcfg_addr)
-+		return -ENXIO;
-+
-+skip_lookup:
-+	memset(&res, 0, sizeof(res));
-+	res.start = root->mcfg_addr + (bus_res->start << 20);
-+	res.end = res.start + (resource_size(bus_res) << 20) - 1;
-+	res.flags = IORESOURCE_MEM;
-+	*cfgres = res;
-+	*ecam_ops = ops;
- 	return 0;
- }
- 
-diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index 7d63a66..7a4e83a 100644
---- a/include/linux/pci-acpi.h
-+++ b/include/linux/pci-acpi.h
-@@ -24,7 +24,9 @@ static inline acpi_status pci_acpi_remove_pm_notifier(struct acpi_device *dev)
- }
- extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
- 
--extern phys_addr_t pci_mcfg_lookup(u16 domain, struct resource *bus_res);
-+struct pci_ecam_ops;
-+extern int pci_mcfg_lookup(struct acpi_pci_root *root, struct resource *cfgres,
-+			   struct pci_ecam_ops **ecam_ops);
- 
- static inline acpi_handle acpi_find_root_bridge_handle(struct pci_dev *pdev)
- {
 -- 
 1.9.1
