@@ -1,115 +1,99 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri,  9 Sep 2016 21:24:05 +0200
-Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific register
- range for ACPI case
+Date: Fri,  9 Sep 2016 21:24:06 +0200
+Subject: [PATCH V6 4/5] PCI: thunder: Enable ACPI PCI controller for ThunderX
+ pass2.x silicon version
 In-Reply-To: <1473449047-10499-1-git-send-email-tn@semihalf.com>
 References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
-Message-ID: <1473449047-10499-4-git-send-email-tn@semihalf.com>
+Message-ID: <1473449047-10499-5-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-thunder-pem driver stands for being ACPI based PCI host controller.
-However, there is no standard way to describe its PEM-specific register
-ranges in ACPI tables. Thus we add thunder_pem_init() ACPI extension
-to obtain hardcoded addresses from static resource array.
-Although it is not pretty, it prevents from creating standard mechanism to
-handle similar cases in future.
+ThunderX PCIe controller to off-chip devices (so-called PEM) is not fully
+compliant with ECAM standard. It uses non-standard configuration space
+accessors (see pci_thunder_pem_ops) and custom configuration space granulation
+(see bus_shift = 24). In order to access configuration space and
+probe PEM as ACPI based PCI host controller we need to add MCFG quirk
+infrastructure. This involves:
+1. Export PEM pci_thunder_pem_ops structure so it is visible to MCFG quirk
+   code.
+2. New quirk entries for each PEM segment. Each contains platform IDs,
+   mentioned pci_thunder_pem_ops and CFG resources.
+
+Quirk is considered for ThunderX silicon pass2.x only which is identified
+via MCFG revision 1.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/pci/host/pci-thunder-pem.c | 61 ++++++++++++++++++++++++++++++--------
- 1 file changed, 48 insertions(+), 13 deletions(-)
+ drivers/acpi/pci_mcfg.c            | 27 +++++++++++++++++++++++++++
+ drivers/pci/host/pci-thunder-pem.c |  2 +-
+ include/linux/pci-ecam.h           |  4 ++++
+ 3 files changed, 32 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+index 2b8acc7..1f73d7b 100644
+--- a/drivers/acpi/pci_mcfg.c
++++ b/drivers/acpi/pci_mcfg.c
+@@ -51,6 +51,33 @@ struct mcfg_fixup {
+ 
+ static struct mcfg_fixup mcfg_quirks[] = {
+ /*	{ OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, cfgres, ops }, */
++#ifdef CONFIG_PCI_HOST_THUNDER_PEM
++	/* SoC pass2.x */
++	{ "CAVIUM", "THUNDERX", 1, 4, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x88001f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 5, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x884057000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 6, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x88808f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 7, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x89001f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 8, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x894057000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 9, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x89808f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 14, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x98001f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 15, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x984057000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 16, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x98808f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 17, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x99001f000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 18, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x994057000000UL, 0x39 * SZ_16M) },
++	{ "CAVIUM", "THUNDERX", 1, 19, MCFG_BUS_ANY, &pci_thunder_pem_ops,
++	  DEFINE_RES_MEM(0x99808f000000UL, 0x39 * SZ_16M) },
++#endif
+ };
+ 
+ static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
 diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-index 6abaf80..b048761 100644
+index b048761..d7c10cc 100644
 --- a/drivers/pci/host/pci-thunder-pem.c
 +++ b/drivers/pci/host/pci-thunder-pem.c
-@@ -18,6 +18,7 @@
- #include <linux/init.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
-+#include <linux/pci-acpi.h>
- #include <linux/pci-ecam.h>
- #include <linux/platform_device.h>
- 
-@@ -284,6 +285,40 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
- 	return pci_generic_config_write(bus, devfn, where, size, val);
+@@ -367,7 +367,7 @@ static int thunder_pem_init(struct pci_config_window *cfg)
+ 	return 0;
  }
  
-+#ifdef CONFIG_ACPI
-+static struct resource thunder_pem_reg_res[] = {
-+	[4] = DEFINE_RES_MEM(0x87e0c0000000UL, SZ_16M),
-+	[5] = DEFINE_RES_MEM(0x87e0c1000000UL, SZ_16M),
-+	[6] = DEFINE_RES_MEM(0x87e0c2000000UL, SZ_16M),
-+	[7] = DEFINE_RES_MEM(0x87e0c3000000UL, SZ_16M),
-+	[8] = DEFINE_RES_MEM(0x87e0c4000000UL, SZ_16M),
-+	[9] = DEFINE_RES_MEM(0x87e0c5000000UL, SZ_16M),
-+	[14] = DEFINE_RES_MEM(0x97e0c0000000UL, SZ_16M),
-+	[15] = DEFINE_RES_MEM(0x97e0c1000000UL, SZ_16M),
-+	[16] = DEFINE_RES_MEM(0x97e0c2000000UL, SZ_16M),
-+	[17] = DEFINE_RES_MEM(0x97e0c3000000UL, SZ_16M),
-+	[18] = DEFINE_RES_MEM(0x97e0c4000000UL, SZ_16M),
-+	[19] = DEFINE_RES_MEM(0x97e0c5000000UL, SZ_16M),
-+};
-+
-+static struct resource *thunder_pem_acpi_res(struct pci_config_window *cfg)
-+{
-+	struct acpi_device *adev = to_acpi_device(cfg->parent);
-+	struct acpi_pci_root *root = acpi_driver_data(adev);
-+
-+	if ((root->segment >= 4 && root->segment <= 9) ||
-+	    (root->segment >= 14 && root->segment <= 19))
-+		return &thunder_pem_reg_res[root->segment];
-+
-+	return NULL;
-+}
-+#else
-+static struct resource *thunder_pem_acpi_res(struct pci_config_window *cfg)
-+{
-+	return NULL;
-+}
+-static struct pci_ecam_ops pci_thunder_pem_ops = {
++struct pci_ecam_ops pci_thunder_pem_ops = {
+ 	.bus_shift	= 24,
+ 	.init		= thunder_pem_init,
+ 	.pci_ops	= {
+diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+index 7adad20..65505ea 100644
+--- a/include/linux/pci-ecam.h
++++ b/include/linux/pci-ecam.h
+@@ -58,6 +58,10 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+ 			       int where);
+ /* default ECAM ops */
+ extern struct pci_ecam_ops pci_generic_ecam_ops;
++/* ECAM ops for known quirks */
++#ifdef CONFIG_PCI_HOST_THUNDER_PEM
++extern struct pci_ecam_ops pci_thunder_pem_ops;
 +#endif
-+
- static int thunder_pem_init(struct pci_config_window *cfg)
- {
- 	struct device *dev = cfg->parent;
-@@ -292,24 +327,24 @@ static int thunder_pem_init(struct pci_config_window *cfg)
- 	struct thunder_pem_pci *pem_pci;
- 	struct platform_device *pdev;
  
--	/* Only OF support for now */
--	if (!dev->of_node)
--		return -EINVAL;
--
- 	pem_pci = devm_kzalloc(dev, sizeof(*pem_pci), GFP_KERNEL);
- 	if (!pem_pci)
- 		return -ENOMEM;
- 
--	pdev = to_platform_device(dev);
--
--	/*
--	 * The second register range is the PEM bridge to the PCIe
--	 * bus.  It has a different config access method than those
--	 * devices behind the bridge.
--	 */
--	res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (acpi_disabled) {
-+		pdev = to_platform_device(dev);
-+
-+		/*
-+		 * The second register range is the PEM bridge to the PCIe
-+		 * bus.  It has a different config access method than those
-+		 * devices behind the bridge.
-+		 */
-+		res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	} else {
-+		res_pem = thunder_pem_acpi_res(cfg);
-+	}
- 	if (!res_pem) {
--		dev_err(dev, "missing \"reg[1]\"property\n");
-+		dev_err(dev, "missing configuration region\n");
- 		return -EINVAL;
- 	}
- 
+ #ifdef CONFIG_PCI_HOST_GENERIC
+ /* for DT-based PCI controllers that support ECAM */
 -- 
 1.9.1
