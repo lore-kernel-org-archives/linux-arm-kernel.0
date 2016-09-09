@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri,  9 Sep 2016 17:20:30 +0200
-Subject: [GIT PULL 2/4] soc/tegra: Changes for v4.9-rc1
+Date: Fri,  9 Sep 2016 17:20:31 +0200
+Subject: [GIT PULL 3/4] ARM: tegra: Device tree changes for v4.9-rc1
 In-Reply-To: <20160909152032.9550-1-thierry.reding@gmail.com>
 References: <20160909152032.9550-1-thierry.reding@gmail.com>
-Message-ID: <20160909152032.9550-2-thierry.reding@gmail.com>
+Message-ID: <20160909152032.9550-3-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,24 +15,29 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.9-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.9-arm-dt
 
-for you to fetch changes up to a9ccc123a8e05365f7515dcd023b01100809a6fa:
+for you to fetch changes up to 7e9d474954f4c8c27534633252500e0c477581bd:
 
-  soc/tegra: pmc: Fix incorrect DPD request (2016-08-16 12:30:52 +0200)
+  ARM: tegra: Correct polarity for Tegra114 PMIC interrupt (2016-08-16 15:10:23 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-soc/tegra: Changes for v4.9-rc1
+ARM: tegra: Device tree changes for v4.9-rc1
 
-This contains a single patch to fix an issue with setting the deep power
-down mode of I/O rails.
+Contains a couple of cleanups for Tegra114 device trees.
 
 ----------------------------------------------------------------
-Vince Hsu (1):
-      soc/tegra: pmc: Fix incorrect DPD request
+Jon Hunter (1):
+      ARM: tegra: Correct polarity for Tegra114 PMIC interrupt
 
- drivers/soc/tegra/pmc.c | 28 ++++++++--------------------
- 1 file changed, 8 insertions(+), 20 deletions(-)
+Stephen Warren (1):
+      ARM: tegra: Fix Tegra114 USB compatible values
+
+ arch/arm/boot/dts/tegra114-dalmore.dts | 2 +-
+ arch/arm/boot/dts/tegra114-roth.dts    | 2 +-
+ arch/arm/boot/dts/tegra114-tn7.dts     | 2 +-
+ arch/arm/boot/dts/tegra114.dtsi        | 8 ++++----
+ 4 files changed, 7 insertions(+), 7 deletions(-)
