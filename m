@@ -1,53 +1,78 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 9 Sep 2016 09:36:12 -0600
-Subject: [PATCH] coresight: stm: return error code instead of zero in
- .packet() to avoid dead loop
-In-Reply-To: <1473416289-30882-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1473416289-30882-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <CANLsYkxHiGs+sQiKsL5dP6VgGcup4TBN6QYh4=1t2c6_2akABg@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 9 Sep 2016 17:36:18 +0200 (CEST)
+Subject: [PATCH V4 3/4] ARM: bcm2835: add thermal node to device-tree of
+ bcm283x
+In-Reply-To: <8876586A-98F8-4AAF-AD90-86EB12C22FDC@martin.sperl.org>
+References: <1473407397-29395-1-git-send-email-kernel@martin.sperl.org>
+ <1473407397-29395-4-git-send-email-kernel@martin.sperl.org>
+ <19cc8fbf-6ceb-995e-850d-9d82bdaff8d0@i2se.com>
+ <8876586A-98F8-4AAF-AD90-86EB12C22FDC@martin.sperl.org>
+Message-ID: <2117811305.32861.15854341-2f8e-4e20-95f4-e76f81e6fd56.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 September 2016 at 04:18, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
-> In STM framework driver, the trace data writing loop would keep running
-> until it received a negative return value or the whole trace packet has
-> been written to STM device.  So if the .packet() of STM device always
-> returns zero since the device is not enabled or the parameter isn't
-> supported, STM framework driver will stall into a dead loop.
->
-> Returning -EACCES (Permission denied) in .packet() if the device is
-> disabled makes more sense, and this is the same for returning -EINVAL
-> if the channel passed into is not supported.
->
-> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-> ---
->  drivers/hwtracing/coresight/coresight-stm.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-> index 73be58a..6291ce1 100644
-> --- a/drivers/hwtracing/coresight/coresight-stm.c
-> +++ b/drivers/hwtracing/coresight/coresight-stm.c
-> @@ -399,10 +399,10 @@ static ssize_t stm_generic_packet(struct stm_data *stm_data,
->                                                    struct stm_drvdata, stm);
->
->         if (!(drvdata && local_read(&drvdata->mode)))
-> -               return 0;
-> +               return -EACCES;
->
->         if (channel >= drvdata->numsp)
-> -               return 0;
-> +               return -EINVAL;
->
->         ch_addr = (unsigned long)stm_channel_addr(drvdata, channel);
->
-> --
-> 2.7.4
->
 
-Applied, but I had to change the title to "coresight: stm: return
-error code instead of zero in .packet()" as the previous one exceeded
-80 characters.
+> Martin Sperl <kernel@martin.sperl.org> hat am 9. September 2016 um 16:58
+> geschrieben:
+> 
+> 
+> 
+> > On 09.09.2016, at 16:25, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > 
+> >> Am 09.09.2016 um 09:49 schrieb kernel at martin.sperl.org:
+> >> From: Martin Sperl <kernel@martin.sperl.org>
+> >> 
+> >> Add the node for the thermal sensor of the bcm2835-soc
+> >> to the device tree.
+> >> 
+> >> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> >> Reviewed-by: Eric Anholt <eric@anholt.net>
+> >> ---
+> >> arch/arm/boot/dts/bcm283x.dtsi | 6 ++++++
+> >> 1 file changed, 6 insertions(+)
+> >> 
+> >> diff --git a/arch/arm/boot/dts/bcm283x.dtsi
+> >> b/arch/arm/boot/dts/bcm283x.dtsi
+> >> index b982522..e2e3a46 100644
+> >> --- a/arch/arm/boot/dts/bcm283x.dtsi
+> >> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> >> @@ -186,6 +186,12 @@
+> >>            interrupts = <2 14>; /* pwa1 */
+> >>        };
+> >> 
+> >> +        thermal: thermal at 0x7e212000 {
+> >> +            compatible = "brcm,bcm2835-thermal";
+> >> +            reg = <0x7e212000 0x8>;
+> >> +            clocks = <&clocks BCM2835_CLOCK_TSENS>;
+> >> +        };
+> >> +
+> > 
+> > Since the driver handles 3 different SoC (2835, 2836, 2837). This node
+> > should be defined in the SoC specific dtsi files, because the BCM2836
+> > includes bcm283x.dtsi too.
+> > 
+> > Be aware the patch for bcm2837 must go to ARM64.
+> 
+> I can not really follow:
+> * the node is defined in the dtsi included by all 3 soc,
+>    and it is available on all so it sits where for example
+>    spi0 or uart0 is located
+> * as for arm64: this describes the registers that are
+>    identical for arm and arm64 and the bcm2837.dtsi
+>    is also including ../../../../arm/boot/dts/bcm283x.dtsi
+> 
+> So what is the problem?
 
-Thanks,
-Mathieu
+The thermal driver specifies 3 different compatibles with partially different
+settings.
+If this patch is applied, all SoC (bcm2835, bcm2836, bcm2837) would use the
+bcm2835 settings.
+I can't believe this is intended.
+
+Why does the binding contains 3 different compatibles if only one is used?
+
+> 
+> Martin
+> 
+> P.s the patches apply cleanly against master.
+>
