@@ -1,86 +1,118 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 9 Sep 2016 10:41:08 +0100
-Subject: [PATCH 06/10] PM / Domains: Verify the PM domain is present when
- adding a provider
-In-Reply-To: <CAPDyKFoLh6f3at-grfWmeRuvLwW+o=4sLG0kExuF+eZxDF_hHA@mail.gmail.com>
-References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
- <1471340976-5379-7-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFoLh6f3at-grfWmeRuvLwW+o=4sLG0kExuF+eZxDF_hHA@mail.gmail.com>
-Message-ID: <d52f7901-b65b-3ea9-4c3b-863f7c105320@nvidia.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 9 Sep 2016 11:43:22 +0200
+Subject: [PATCH v2] phy: sun4i-usb: Use spinlock to guard phyctl register
+ access
+In-Reply-To: <20160909035818.16273-1-wens@csie.org>
+References: <20160909035818.16273-1-wens@csie.org>
+Message-ID: <1db79dae-50d7-4b01-caec-d7415b9a0986@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 08/09/16 12:39, Ulf Hansson wrote:
-> On 16 August 2016 at 11:49, Jon Hunter <jonathanh@nvidia.com> wrote:
->> When a PM domain provider is added, there is currently no way to tell if
->> any PM domains associated with the provider are present. Naturally, the
->> PM domain provider should not be registered if the PM domains have not
->> been added. Nonetheless, verify that the PM domain(s) associated with a
->> provider are present when registering the PM domain provider.
->>
->> This change adds a dependency on the function pm_genpd_present() when
->> CONFIG_PM_GENERIC_DOMAINS_OF is enabled and so ensure this function is
->> available when CONFIG_PM_GENERIC_DOMAINS_OF selected.
->>
->> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->> ---
->>  drivers/base/power/domain.c | 45 ++++++++++++++++++++++++++++++++++++++++++---
->>  1 file changed, 42 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index d09e45145a3d..50223ae0c9a7 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -586,7 +586,7 @@ static int __init genpd_poweroff_unused(void)
->>  }
->>  late_initcall(genpd_poweroff_unused);
->>
->> -#ifdef CONFIG_PM_SLEEP
->> +#if defined(CONFIG_PM_SLEEP) || defined(CONFIG_PM_GENERIC_DOMAINS_OF)
->>
->>  /**
->>   * pm_genpd_present - Check if the given PM domain has been initialized.
->> @@ -606,6 +606,10 @@ static bool pm_genpd_present(const struct generic_pm_domain *genpd)
->>         return false;
->>  }
->>
->> +#endif
->> +
->> +#ifdef CONFIG_PM_SLEEP
->> +
->>  static bool genpd_dev_active_wakeup(struct generic_pm_domain *genpd,
->>                                     struct device *dev)
->>  {
->> @@ -1453,7 +1457,23 @@ static int genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
->>  int of_genpd_add_provider_simple(struct device_node *np,
->>                                  struct generic_pm_domain *genpd)
->>  {
->> -       return genpd_add_provider(np, genpd_xlate_simple, genpd);
->> +       int ret;
->> +
->> +       if (!np || !genpd)
->> +               return -EINVAL;
->> +
->> +       mutex_lock(&gpd_list_lock);
->> +
->> +       if (!pm_genpd_present(genpd)) {
->> +               mutex_unlock(&gpd_list_lock);
->> +               return -EINVAL;
->> +       }
->> +
->> +       ret = genpd_add_provider(np, genpd_xlate_simple, genpd);
-> 
-> You could simplify this, by assigning ret and initial value of
-> -EINVAL, then do like this:
-> 
-> if (pm_genpd_present(genpd))
->     ret = genpd_add_provider(np, genpd_xlate_simple, genpd);
+On 09-09-16 05:58, Chen-Yu Tsai wrote:
+> The musb driver calls into this phy driver to disable/enable squelch
+> detection. This function was introduced in 24fe86a617c5 ("phy: sun4i-usb:
+> Add a sunxi specific function for setting squelch-detect"). This
+> function in turn calls sun4i_usb_phy_write, which uses a mutex to
+> guard the common access register. Unfortunately musb does this
+> in atomic context, which results in the following warning with lock
+> debugging enabled:
+>
+> BUG: sleeping function called from invalid context at kernel/locking/mutex.c:97
+> in_atomic(): 1, irqs_disabled(): 128, pid: 96, name: kworker/0:2
+> CPU: 0 PID: 96 Comm: kworker/0:2 Not tainted 4.8.0-rc4-00181-gd502f8ad1c3e #13
+> Hardware name: Allwinner sun8i Family
+> Workqueue: events musb_deassert_reset
+> [<c010bc01>] (unwind_backtrace) from [<c0109237>] (show_stack+0xb/0xc)
+> [<c0109237>] (show_stack) from [<c02a669b>] (dump_stack+0x67/0x74)
+> [<c02a669b>] (dump_stack) from [<c05d68c9>] (mutex_lock+0x15/0x2c)
+> [<c05d68c9>] (mutex_lock) from [<c02c3589>] (sun4i_usb_phy_write+0x39/0xec)
+> [<c02c3589>] (sun4i_usb_phy_write) from [<c03e6327>] (musb_port_reset+0xfb/0x184)
+> [<c03e6327>] (musb_port_reset) from [<c03e4917>] (musb_deassert_reset+0x1f/0x2c)
+> [<c03e4917>] (musb_deassert_reset) from [<c012ecb5>] (process_one_work+0x129/0x2b8)
+> [<c012ecb5>] (process_one_work) from [<c012f5e3>] (worker_thread+0xf3/0x424)
+> [<c012f5e3>] (worker_thread) from [<c0132dbd>] (kthread+0xa1/0xb8)
+> [<c0132dbd>] (kthread) from [<c0105f31>] (ret_from_fork+0x11/0x20)
+>
+> Since the register access is mmio, we can use a spinlock to guard this
+> specific access, rather than the mutex that guards the entire phy.
+>
+> Fixes: ba4bdc9e1dc0 ("PHY: sunxi: Add driver for sunxi usb phy")
+> Cc: Hans de Goede <hdegoede@redhat.com>
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Yes good idea. Will do.
+Looks good to me:
 
-Thanks
-Jon
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
--- 
-nvpublic
+Regards,
+
+Hans
+
+
+> ---
+>
+> Changes since v1:
+>
+>   - Remove the old mutex, since it is no longer used
+>   - Use irqsave/irqrestore variant of spinlock ops
+>
+> ---
+>  drivers/phy/phy-sun4i-usb.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index fcf4d95ecc6d..34b7f0c2e019 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -40,6 +40,7 @@
+>  #include <linux/power_supply.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/reset.h>
+> +#include <linux/spinlock.h>
+>  #include <linux/usb/of.h>
+>  #include <linux/workqueue.h>
+>
+> @@ -114,7 +115,7 @@ struct sun4i_usb_phy_data {
+>  	void __iomem *base;
+>  	const struct sun4i_usb_phy_cfg *cfg;
+>  	enum usb_dr_mode dr_mode;
+> -	struct mutex mutex;
+> +	spinlock_t reg_lock; /* guard access to phyctl reg */
+>  	struct sun4i_usb_phy {
+>  		struct phy *phy;
+>  		void __iomem *pmu;
+> @@ -181,9 +182,10 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+>  	struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
+>  	u32 temp, usbc_bit = BIT(phy->index * 2);
+>  	void __iomem *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
+> +	unsigned long flags;
+>  	int i;
+>
+> -	mutex_lock(&phy_data->mutex);
+> +	spin_lock_irqsave(&phy_data->reg_lock, flags);
+>
+>  	if (phy_data->cfg->type == sun8i_a33_phy ||
+>  	    phy_data->cfg->type == sun50i_a64_phy) {
+> @@ -221,7 +223,8 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+>
+>  		data >>= 1;
+>  	}
+> -	mutex_unlock(&phy_data->mutex);
+> +
+> +	spin_unlock_irqrestore(&phy_data->reg_lock, flags);
+>  }
+>
+>  static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
+> @@ -582,7 +585,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>  	if (!data)
+>  		return -ENOMEM;
+>
+> -	mutex_init(&data->mutex);
+> +	spin_lock_init(&data->reg_lock);
+>  	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
+>  	dev_set_drvdata(dev, data);
+>  	data->cfg = of_device_get_match_data(dev);
+>
