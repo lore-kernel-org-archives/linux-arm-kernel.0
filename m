@@ -1,102 +1,139 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 09 Sep 2016 11:25:37 -0700
-Subject: [PATCH 2/5] mmc: bcm2835-sdhost: Add new driver for the internal
- SD controller.
-In-Reply-To: <1473347315.6698.53.camel@redhat.com>
-References: <1466595738-2229-1-git-send-email-kraxel@redhat.com>
- <1466595738-2229-3-git-send-email-kraxel@redhat.com>
- <CAPDyKFryfGpA+8tZhtkzUVMFhomOevFz8k9R1b2O0oUn8giT1w@mail.gmail.com>
- <1473347315.6698.53.camel@redhat.com>
-Message-ID: <877falaq1q.fsf@eliezer.anholt.net>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 9 Sep 2016 21:02:18 +0200 (CEST)
+Subject: [PATCH V4 3/4] ARM: bcm2835: add thermal node to device-tree of
+ bcm283x
+In-Reply-To: <185DA6B2-AFC0-4199-A361-0164381AD317@martin.sperl.org>
+References: <1473407397-29395-1-git-send-email-kernel@martin.sperl.org>
+ <1473407397-29395-4-git-send-email-kernel@martin.sperl.org>
+ <19cc8fbf-6ceb-995e-850d-9d82bdaff8d0@i2se.com>
+ <8876586A-98F8-4AAF-AD90-86EB12C22FDC@martin.sperl.org>
+ <2117811305.32861.15854341-2f8e-4e20-95f4-e76f81e6fd56.open-xchange@email.1und1.de>
+ <185DA6B2-AFC0-4199-A361-0164381AD317@martin.sperl.org>
+Message-ID: <677965855.33392.597ccfbe-225b-403b-8ffa-3f42292996d4.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gerd Hoffmann <kraxel@redhat.com> writes:
+Hi Martin,
 
-> On Mi, 2016-08-31 at 14:58 +0200, Ulf Hansson wrote:
->> On 22 June 2016 at 13:42, Gerd Hoffmann <kraxel@redhat.com> wrote:
->> > From: Eric Anholt <eric@anholt.net>
->> >
->> > The 2835 has two SD controllers: The Arasan SDHCI controller that we
->> > currently use, and a custom SD controller.  The custom one runs faster
->> >
->> > The code was originally written by Phil Elwell in the downstream
->> > Rasbperry Pi tree, and I did a major cleanup on it (+319, -707 lines
->> > out of the original 2055) for inclusion.
->> >
->> > Signed-off-by: Eric Anholt <eric@anholt.net>
->> 
->> Apologize for the delay!
->
-> No problem, I was on summer vacation anyway ...
->
->> Could you start by providing some more information about the driver
->> and the controller in change in the change log please.
->
-> Eric?  I don't know much more than what the commit message above says.
->
-> Beside the speedup mentioned above driving the sdcard with the custom sd
-> controller allows to use the sdhci (handled by sdhci-iproc) to be used
-> for the wifi on the rpi3.
+> Martin Sperl <kernel@martin.sperl.org> hat am 9. September 2016 um 20:12
+> geschrieben:
+> 
+> 
+> 
+> > On 09.09.2016, at 17:36, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > 
+> > 
+> >> Martin Sperl <kernel@martin.sperl.org> hat am 9. September 2016 um 16:58
+> >> geschrieben:
+> >> 
+> >> 
+> >> 
+> >>>> On 09.09.2016, at 16:25, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> >>>> 
+> >>>> Am 09.09.2016 um 09:49 schrieb kernel at martin.sperl.org:
+> >>>> From: Martin Sperl <kernel@martin.sperl.org>
+> >>>> 
+> >>>> Add the node for the thermal sensor of the bcm2835-soc
+> >>>> to the device tree.
+> >>>> 
+> >>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> >>>> Reviewed-by: Eric Anholt <eric@anholt.net>
+> >>>> ---
+> >>>> arch/arm/boot/dts/bcm283x.dtsi | 6 ++++++
+> >>>> 1 file changed, 6 insertions(+)
+> >>>> 
+> >>>> diff --git a/arch/arm/boot/dts/bcm283x.dtsi
+> >>>> b/arch/arm/boot/dts/bcm283x.dtsi
+> >>>> index b982522..e2e3a46 100644
+> >>>> --- a/arch/arm/boot/dts/bcm283x.dtsi
+> >>>> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> >>>> @@ -186,6 +186,12 @@
+> >>>>           interrupts = <2 14>; /* pwa1 */
+> >>>>       };
+> >>>> 
+> >>>> +        thermal: thermal at 0x7e212000 {
 
-Maybe just add that we need both controllers in order to do both wifi
-and SD card?  I don't know exactly what Ulf wants to see here.
+please remove 0x here.
 
->> > +static void bcm2835_sdhost_set_power(struct bcm2835_host *host, bool on)
->> > +{
->> > +       bcm2835_sdhost_write(host, on ? 1 : 0, SDVDD);
->> 
->> What exactly does this power on/off?
->
-> Dunno.  Eric?
+> >>>> +            compatible = "brcm,bcm2835-thermal";
+> >>>> +            reg = <0x7e212000 0x8>;
+> >>>> +            clocks = <&clocks BCM2835_CLOCK_TSENS>;
+> >>>> +        };
+> >>>> +
+> >>> 
+> >>> Since the driver handles 3 different SoC (2835, 2836, 2837). This node
+> >>> should be defined in the SoC specific dtsi files, because the BCM2836
+> >>> includes bcm283x.dtsi too.
+> >>> 
+> >>> Be aware the patch for bcm2837 must go to ARM64.
+> >> 
+> >> I can not really follow:
+> >> * the node is defined in the dtsi included by all 3 soc,
+> >>   and it is available on all so it sits where for example
+> >>   spi0 or uart0 is located
+> >> * as for arm64: this describes the registers that are
+> >>   identical for arm and arm64 and the bcm2837.dtsi
+> >>   is also including ../../../../arm/boot/dts/bcm283x.dtsi
+> >> 
+> >> So what is the problem?
+> > 
+> > The thermal driver specifies 3 different compatibles with partially
+> > different
+> > settings.
+> > If this patch is applied, all SoC (bcm2835, bcm2836, bcm2837) would use the
+> > bcm2835 settings.
+> > I can't believe this is intended.
+> > 
+> > Why does the binding contains 3 different compatibles if only one is used?
+> 
+> Now I understand - did not think of that: good catch!
+> 
+> To minimize the patch: what about setting it to 2837 by default (in 283x.dtsi)
+> and only change compatible in 2835.dtsi and 2836.dtsi - that is 3 files
+> changed instead of 4 or 5...
 
-Note: I don't know much about SD, so I'm just trying to play oracle for
-you all here.
+Please don't do this in order avoid to confusion. We have compatible strings for
+each SoC and we have dtsi files for each SoC. So i think the right way would be
+the following:
 
-VDD bit 0 (POWER_ON) starts the power-on setup cycle by the sdhost once
-power is already supplied to the card by some other means.  In the
-SDHOST docs they assume you're going to use GPIO to control SD card
-power, but for Raspberry Pi they just have the SD Card's VDD always on.
-It's unclear to me what's controlling power to the Pi3 wifi/BT's SD
-client, but I don't have specs to it.
+bcm283x.dtsi
 
-Note that after you've set POWER_ON to 0, you can also set bit 1
-(CLOCK_OFF) to 1 to turn off the clock to the power-on FSM.
+thermal: thermal at 7e212000 {
+            reg = <0x7e212000 0x8>;
+            clocks = <&clocks BCM2835_CLOCK_TSENS>;
+};
 
->> > +       /* Need to send CMD12 if -
->> > +        * a) open-ended multiblock transfer (no CMD23)
->> > +        * b) error in multiblock transfer
->> > +        */
->> > +       if (host->mrq->stop && (data->error || !host->use_sbc)) {
->> > +               if (bcm2835_sdhost_send_command(host, host->mrq->stop)) {
->> > +                       /* No busy, so poll for completion */
->> > +                       if (!host->use_busy)
->> 
->> This looks a bit weird. Can you explain why this is needed?
->
-> Eric, any clue?  Some hardware bug workaround?
-> Have a pointer to hardware specs?
 
-Would no-CMD23 transfers mean that data->blocks was 0 to mean
-indefinite?  That's the only mention of CMD12 in the spec -- when you've
-set HBLC to 0, you need to CMD12 or CMD52 when you're done with the
-transfer.
+bcm2835.dtsi
 
->> > +static void bcm2835_sdhost_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->> > +{
->> 
->> I don't find any place where you control power to the card here. Don't
->> you need to do that?
->
-> Eric?
+&thermal {
+            compatible = "brcm,bcm2835-thermal";
+            status = "okay";
+};
 
-It looks like the card is always powered.  Do you mean something else by
-power (like bringing up the FSM)?  Is there something else needed in
-set_ios()?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160909/8ee17a2b/attachment.sig>
+bcm2836.dtsi
+
+&thermal {
+            compatible = "brcm,bcm2836-thermal";
+            status = "okay";
+};
+
+bcm2837.dtsi
+
+&thermal {
+            compatible = "brcm,bcm2837-thermal";
+            status = "okay";
+};
+
+> 
+> Or any other ideas how to detect which Soc we run on during runtime?
+> I.e: query the root compatible string in the device-tree?
+> 
+> Just before I create a new patch set to fix that.
+> 
+> Martin
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
