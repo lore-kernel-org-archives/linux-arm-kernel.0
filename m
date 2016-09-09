@@ -1,204 +1,78 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 9 Sep 2016 09:45:07 +0100
-Subject: [PATCH V10 1/8] ACPI: I/O Remapping Table (IORT) initial support
-In-Reply-To: <20160909030938.GA8544@arm.com>
-References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
- <1473152938-17388-2-git-send-email-tn@semihalf.com>
- <20160909030938.GA8544@arm.com>
-Message-ID: <20160909084507.GA19669@red-moon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 9 Sep 2016 10:47:17 +0200
+Subject: [PATCH v6 0/8] power: add power sequence library
+In-Reply-To: <eb032ff2-dac4-5efe-dda0-96404f290aa8@linaro.org>
+References: <1471252398-957-1-git-send-email-peter.chen@nxp.com>
+ <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
+ <20160824085335.GB27233@shlinux2>
+ <20160829111045.GB3736@b29397-desktop>
+ <3a45793f-18d9-0688-d2ab-ef79432c473c@linaro.org>
+ <20160831095220.GA11938@b29397-desktop>
+ <fd94340b-1c1d-2307-7e57-5b05f1655d2c@linaro.org>
+ <20160902011046.GB11262@shlinux2>
+ <eb032ff2-dac4-5efe-dda0-96404f290aa8@linaro.org>
+Message-ID: <CAPDyKFp0w0mBGNgu6uk7UevUka_ha6MvaVyOzXjCg3S8kdF7tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 11:09:40AM +0800, Dennis Chen wrote:
-> Hi Tomasz,
-> 
-> On Tue, Sep 06, 2016 at 11:08:51AM +0200, Tomasz Nowicki wrote:
-> [...]
-> > +static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
-> > +		       u32 *rid_out)
-> > +{
-> > +	/* Single mapping does not care for input id */
-> > +	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
-> > +		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
-> > +		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> > +			*rid_out = map->output_base;
-> > +			return 0;
-> > +		}
-> > +
-> > +		pr_warn(FW_BUG "[map %p] SINGLE MAPPING flag not allowed for node type %d, skipping ID map\n",
-> > +			map, type);
-> > +		return -ENXIO;
-> > +	}
-> > +
-> > +	if (rid_in < map->input_base ||
-> > +	    (rid_in >= map->input_base + map->id_count))
-> > +		return -ENXIO;
-> > +
-> > +	*rid_out = map->output_base + (rid_in - map->input_base);
-> > +	return 0;
-> > +}
-> > +
-> > +static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
-> > +						u32 rid_in, u32 *rid_out,
-> > +						u8 type)
-> > +{
-> > +	u32 rid = rid_in;
-> > +
-> > +	/* Parse the ID mapping tree to find specified node type */
-> > +	while (node) {
-> > +		struct acpi_iort_id_mapping *map;
-> > +		int i;
-> > +
-> > +		if (node->type == type) {
-> > +			if (rid_out)
-> > +				*rid_out = rid;
-> > +			return node;
-> > +		}
-> > +
-> > +		if (!node->mapping_offset || !node->mapping_count)
-> > +			goto fail_map;
-> If node->mapping_count is zero, then node->mapping_offset must be zero. A firmware bug
-> otherwise?
+[...]
 
-So ? This function is there to map RIDs, not to validate all firmware
-permutations and current code behaviour seems correct to me.
+>>>>
+>>>> We had an agreement that keep mmc's pwrseq framework unchanging.
+>>>> Unless Ulf and rob both agree to change.
+>>>
+>>> Why 2 separate approach for same problem ?
+>>> And I see this as possible duplication of code/functionality :)
+>>
+>> How the new kernel compatibles old dts? If we do not need to
+>> consider this problem, the mmc can try to use power sequence library
+>> too in future.
+>
+>
+> I think we should attempt to get both MMC and USB power seq
+> come on one agreement, so that it can be reused.
 
-> > +
-> > +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-> > +				   node->mapping_offset);
-> > +
-> > +		/* Firmware bug! */
-> > +		if (!map->output_reference) {
-> > +			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
-> > +			       node, node->type);
-> > +			goto fail_map;
-> > +		}
-> > +
-> > +		/* Do the RID translation */
-> > +		for (i = 0; i < node->mapping_count; i++, map++) {
-> > +			if (!iort_id_map(map, node->type, rid, &rid))
-> > +				break;
-> > +		}
-> >
-> Just curious about if there is kind of possibility that we can get
-> some reduplicated DeviceIDs with a deliberate ID mapping design in FW
-> for the SMMU/RC node. For instance, for a system with 2 PCIe RCs both
-> behind an individual SMMU device, how to make sure the StreamID mapped
-> is unique across the entire system, the same for DeviceID mapped.
-> Anyway, this is my personal confusion, maybe it's not a problem at all
-> for current design ;-)
+That would be nice. Although, to do that you would have to allow some
+DT bindings to be deprecated in the new generic power seq bindings, as
+otherwise you would break existing DTBs.
 
-Are you asking if FW can contain bugs ? Yes it can. I do not see
-how your comment is related to this patch though.
+I guess that is what Rob was objecting to!?
 
-Lorenzo
+>
+> MMC Power Seq :
+>  It is based on platform_device/platform_driver approach,
 
-> Thanks,
-> Dennis
-> > +
-> > +		if (i == node->mapping_count)
-> > +			goto fail_map;
-> > +
-> > +		node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-> > +				    map->output_reference);
-> > +	}
-> > +
-> > +fail_map:
-> > +	/* Map input RID to output RID unchanged on mapping failure*/
-> > +	if (rid_out)
-> > +		*rid_out = rid_in;
-> > +
-> > +	return NULL;
-> > +}
-> > +
-> > +static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
-> > +{
-> > +	struct pci_bus *pbus;
-> > +
-> > +	if (!dev_is_pci(dev))
-> > +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-> > +				      iort_match_node_callback, dev);
-> > +
-> > +	/* Find a PCI root bus */
-> > +	pbus = to_pci_dev(dev)->bus;
-> > +	while (!pci_is_root_bus(pbus))
-> > +		pbus = pbus->parent;
-> > +
-> > +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
-> > +			      iort_match_node_callback, &pbus->dev);
-> > +}
-> > +
-> > +void __init acpi_iort_init(void)
-> > +{
-> > +	acpi_status status;
-> > +
-> > +	status = acpi_get_table(ACPI_SIG_IORT, 0, &iort_table);
-> > +	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-> > +		const char *msg = acpi_format_exception(status);
-> > +		pr_err("Failed to get table, %s\n", msg);
-> > +	}
-> > +}
-> > diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
-> > index 85b7d07..e56e643 100644
-> > --- a/drivers/acpi/bus.c
-> > +++ b/drivers/acpi/bus.c
-> > @@ -36,6 +36,7 @@
-> >  #ifdef CONFIG_X86
-> >  #include <asm/mpspec.h>
-> >  #endif
-> > +#include <linux/acpi_iort.h>
-> >  #include <linux/pci.h>
-> >  #include <acpi/apei.h>
-> >  #include <linux/dmi.h>
-> > @@ -1186,6 +1187,7 @@ static int __init acpi_init(void)
-> >  	}
-> >  
-> >  	pci_mmcfg_late_init();
-> > +	acpi_iort_init();
-> >  	acpi_scan_init();
-> >  	acpi_ec_init();
-> >  	acpi_debugfs_init();
-> > diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-> > new file mode 100644
-> > index 0000000..fcacaf7
-> > --- /dev/null
-> > +++ b/include/linux/acpi_iort.h
-> > @@ -0,0 +1,30 @@
-> > +/*
-> > + * Copyright (C) 2016, Semihalf
-> > + *	Author: Tomasz Nowicki <tn@semihalf.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify it
-> > + * under the terms and conditions of the GNU General Public License,
-> > + * version 2, as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope it will be useful, but WITHOUT
-> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> > + * more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License along with
-> > + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-> > + * Place - Suite 330, Boston, MA 02111-1307 USA.
-> > + */
-> > +
-> > +#ifndef __ACPI_IORT_H__
-> > +#define __ACPI_IORT_H__
-> > +
-> > +#include <linux/acpi.h>
-> > +
-> > +#ifdef CONFIG_ACPI_IORT
-> > +void acpi_iort_init(void);
-> > +#else
-> > +static inline void acpi_iort_init(void) { }
-> > +#endif
-> > +
-> > +#endif /* __ACPI_IORT_H__ */
-> > -- 
-> > 1.9.1
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
+We recently converted MMC to this. It's has a clear benefit as you can
+rely on the behaviour from the driver core and PM core. So, it simply
+avoids duplication of code.
+
+>
+> USB Power seq :
+>  We are trying to propose library approach, with compatible string match.
+>
+> We should try to have one approach.
+>>
+>>
+>>>>>   - Lets also add suspend/resume callback to struct pwrseq
+>>>>>
+>>>> Why suspend/resume can't do at related driver's suspend/resume API?
+>>>
+>>> Nope...
+>>> The pwrseq library would have taken ownership of resources, so
+>>> related driver cannot suspend the device. Again it is architecture
+>>> specific, but we should have provision to handle this.
+>>>
+>>> The system I am dealing with today, does need suspend/resume
+>>> callback. To be precise, suspend is close to off state for some devices
+>>> or
+>>> they could enter standby or different low power state, but to do that,
+>>> we need same resource as used for ON/OFF functionality.
+>>>
+>> Ok, I will have API for suspend/resume. You can implement it at your own
+>> library or generic one.
+
+As stated, using a platform device + driver would simplify this, as
+you wouldn't need an API but only a driver. I guess.
+
+Kind regards
+Uffe
