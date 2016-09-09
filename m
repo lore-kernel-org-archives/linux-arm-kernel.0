@@ -1,83 +1,74 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri,  9 Sep 2016 15:23:32 +0100
-Subject: [PATCH v5 03/14] drivers: acpi: iort: introduce linker section for
- IORT entries probing
-In-Reply-To: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
-References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20160909142343.13314-4-lorenzo.pieralisi@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 9 Sep 2016 16:34:13 +0200
+Subject: [PATCH 3/6] drm/panel: simple: Add A10 EVB 5 inch panel support
+In-Reply-To: <CAGb2v66GsA8uNaaZfnnHFgBLA-LChCnO3vLhdtfzHNU0nHXH4Q@mail.gmail.com>
+References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
+ <20160831081817.5191-4-maxime.ripard@free-electrons.com>
+ <CAGb2v66GsA8uNaaZfnnHFgBLA-LChCnO3vLhdtfzHNU0nHXH4Q@mail.gmail.com>
+Message-ID: <20160909143413.GA8881@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit e647b532275b ("ACPI: Add early device probing
-infrastructure") the kernel has gained the infrastructure that allows
-adding linker script section entries to execute ACPI driver callbacks
-(ie probe routines) for all subsystems that register a table entry
-in the respective kernel section (eg clocksource, irqchip).
+Hi,
 
-Since ARM IOMMU devices data is described through IORT tables when
-booting with ACPI, the ARM IOMMU drivers must be made able to hook ACPI
-callback routines that are called to probe IORT entries and initialize
-the respective IOMMU devices.
+On Mon, Sep 05, 2016 at 10:00:01PM +0800, Chen-Yu Tsai wrote:
+> On Wed, Aug 31, 2016 at 4:18 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The A10-EVB from Allwinner comes with an unidentified panel, with the only
+> > mark on the PCB being A10-SUB-EVB-5LCD.
+> >
+> > Add timings to simple panel to handle it.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
+> >  1 file changed, 26 insertions(+)
+> >
+> > diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> > index 85143d1b9b31..be371b053aab 100644
+> > --- a/drivers/gpu/drm/panel/panel-simple.c
+> > +++ b/drivers/gpu/drm/panel/panel-simple.c
+> > @@ -386,6 +386,29 @@ static void panel_simple_shutdown(struct device *dev)
+> >         panel_simple_disable(&panel->base);
+> >  }
+> >
+> > +static const struct drm_display_mode allwinner_a10_sub_evb_5lcd_mode = {
+> > +       .clock = 33000,
+> > +       .hdisplay = 800,
+> > +       .hsync_start = 800 + 209,
+> > +       .hsync_end = 800 + 209 + 1,
+> > +       .htotal = 800 + 209 + 1 + 45,
+> > +       .vdisplay = 480,
+> > +       .vsync_start = 480 + 22,
+> > +       .vsync_end = 480 + 22 + 1,
+> > +       .vtotal = 480 + 22 + 1 + 22,
+> > +       .vrefresh = 60,
+> 
+> I assume the numbers came from the fex file? Allwinner LCD timing numbers
+> aren't very precise. This seems to yield a refresh rate of 58.x Hz.
+> The dot clock can go below MHz resolution, so it should be possible
+> to set it to a more proper clock rate here.
 
-To avoid adding driver specific hooks into IORT table initialization
-code (breaking therefore code modularity - ie ACPI IORT code must be made
-aware of ARM SMMU drivers ACPI init callbacks), this patch adds code
-that allows ARM SMMU drivers to take advantage of the ACPI early probing
-infrastructure, so that they can add linker script section entries
-containing drivers callback to be executed on IORT tables detection.
+Indeed.
 
-Since IORT nodes are differentiated by a type, the callback routines
-can easily parse the IORT table entries, check the IORT nodes and
-carry out some actions whenever the IORT node type associated with
-the driver specific callback is matched.
+Upon closer inspection, it seems (from the ribbon) that the display is
+an hannstar, but there's no screen reference anywhere.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Tomasz Nowicki <tn@semihalf.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/acpi/arm64/iort.c         | 3 +++
- include/asm-generic/vmlinux.lds.h | 1 +
- include/linux/acpi_iort.h         | 3 +++
- 3 files changed, 7 insertions(+)
+By looking into it using the available references, the date of
+production found on that panel, and so on, it seems like it is an
+HSD050IDW1-A, whose timings do not seem to far off. But it's pure
+speculation at this point.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index a6fba4d..4cbeb707 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -367,5 +367,8 @@ void __init acpi_iort_init(void)
- 	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
- 		const char *msg = acpi_format_exception(status);
- 		pr_err("Failed to get table, %s\n", msg);
-+		return;
- 	}
-+
-+	acpi_probe_device_table(iort);
- }
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 2456397..7ee4e0c 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -546,6 +546,7 @@
- 	IRQCHIP_OF_MATCH_TABLE()					\
- 	ACPI_PROBE_TABLE(irqchip)					\
- 	ACPI_PROBE_TABLE(clksrc)					\
-+	ACPI_PROBE_TABLE(iort)						\
- 	EARLYCON_TABLE()
- 
- #define INIT_TEXT							\
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 0e32dac..d16fdda 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -39,4 +39,7 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
- { return NULL; }
- #endif
- 
-+#define IORT_ACPI_DECLARE(name, table_id, fn)		\
-+	ACPI_DECLARE_PROBE_ENTRY(iort, name, table_id, 0, NULL, 0, fn)
-+
- #endif /* __ACPI_IORT_H__ */
+Maxime
+
 -- 
-2.10.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160909/d72d8656/attachment-0001.sig>
