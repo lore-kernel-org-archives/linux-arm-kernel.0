@@ -1,248 +1,149 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  9 Sep 2016 15:15:42 +0100
-Subject: [RFC PATCH 1/5] arm64: signal: Refactor sigcontext parsing in
- rt_sigreturn
-In-Reply-To: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
-References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1473430576-20792-2-git-send-email-Dave.Martin@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 9 Sep 2016 15:17:13 +0100
+Subject: [PATCH v3 1/8] arm64: KVM: Use static keys for selecting the GIC
+ backend
+In-Reply-To: <57D2BCEB.3030306@arm.com>
+References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
+ <1473350810-10857-2-git-send-email-vladimir.murzin@arm.com>
+ <57D27EA7.2040500@arm.com> <57D281F1.5000902@arm.com>
+ <57D2BCEB.3030306@arm.com>
+Message-ID: <57D2C469.1030006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, rt_sigreturn does very limited checking on the
-sigcontext coming from userspace.
+On 09/09/16 14:45, Vladimir Murzin wrote:
+> On 09/09/16 10:33, Vladimir Murzin wrote:
+>> Hi Marc,
+>>
+>> On 09/09/16 10:19, Marc Zyngier wrote:
+>>>> Hi Vladimir,
+>>>>
+>> ...
+>>>>>>  
+>>>>>> +extern struct static_key_false kvm_gicv3_cpuif;
+>>>>
+>>>> I think we should follow the model set by kvm_vgic_global_state, which
+>>>> is declared in arm_vgic.h. Even better, we should *embed* the static key
+>>>> in this structure. This will reduce the clutter and we wouldn't have to
+>>>> deal with all the section stuff (the hyp_data thing is a good cleanup,
+>>>> but I'd like to see it as a separate patch if possible).
+>> Yes, it is what I was thinking about too, but was not sure about which
+>> way to go, so hyp_data seemed me something we might reuse latter.
+>> However, I agree that we can defer hyp_data thing...
+>>
+> 
+> I've just tried it out and it seems that static keys are not happy to
+> accept a key after kern_hyp_va is applied at &kvm_vgic_global_state:
 
-Future additions of extra dynamic sigcontext data will increase the
-potential for surprises.  Also, it is not clear whether the
-sigcontext extension records are supposed to occur in a particular
-order.
+Ah, there is a trick. You do not need kern_hyp_va at all, because this
+is not evaluated as an expression at runtime (so the pointer doesn't matter).
 
-This patch factors out the sigcontext parsing into a separate
-function, and adds extra checks to validate the well-formedness of
-the sigcontext structure.
+>> In file included from ./include/linux/jump_label.h:105:0,
+>>                  from arch/arm64/kvm/hyp/switch.c:19:
+>> ./arch/arm64/include/asm/jump_label.h: In function ?__guest_run?:
+>> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
+>>   asm goto("1: nop\n\t"
+>>   ^
+>> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
+>>   asm goto("1: nop\n\t"
+>>   ^
+>> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
+>>   asm goto("1: nop\n\t"
+>>   ^
+>> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
+>>   asm goto("1: nop\n\t"
+>>   ^
+>> make[1]: *** [arch/arm64/kvm/hyp/switch.o] Error 1
+>> make: *** [arch/arm64/kvm/hyp/switch.o] Error 2
+> 
+> it looks like we cannot avoid hyp_data thing... if you don't mind I can
+> do hyp_data clean-up in separate patch. Alternatively, we can do
+> conversion to static keys for both architectures later as an
+> optimisation step.
 
-To help with this, an abstraction for the signal frame layout is
-also added, using offsets to track the location of different
-records in the frame.  Although trivial, this provides a base to
-extend upon in order to track more complex layouts.
+Can you try the above first? I've just tried the same approach with my
+vgic-trap series, and it compiles fine (untested though):
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/kernel/signal.c | 121 +++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 101 insertions(+), 20 deletions(-)
-
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index a8eafdb..8e0e0a3 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -19,9 +19,11 @@
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 194184c..397e240 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -301,7 +301,7 @@ again:
+ 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+ 		goto again;
  
- #include <linux/compat.h>
- #include <linux/errno.h>
-+#include <linux/kernel.h>
- #include <linux/signal.h>
- #include <linux/personality.h>
- #include <linux/freezer.h>
-+#include <linux/stddef.h>
- #include <linux/uaccess.h>
- #include <linux/tracehook.h>
- #include <linux/ratelimit.h>
-@@ -45,6 +47,10 @@ struct rt_sigframe {
- 	u64 lr;
+-	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
++	if (static_branch_unlikely(&kvm_vgic_global_state.vgic_v2_cpuif_trap) &&
+ 	    exit_code == ARM_EXCEPTION_TRAP) {
+ 		bool valid;
+ 
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index bb46c03..cc59a28 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -67,6 +67,9 @@ struct vgic_global {
+ 
+ 	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
+ 	bool			can_emulate_gicv2;
++
++	/* Trapping GICv2 GICV region? */
++	struct static_key_false	vgic_v2_cpuif_trap;
  };
  
-+struct rt_sigframe_user_layout {
-+	struct rt_sigframe __user *sigframe;
-+};
-+
- static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- {
- 	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
-@@ -92,12 +98,86 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- 	return err ? -EFAULT : 0;
+ extern struct vgic_global kvm_vgic_global_state;
+@@ -269,8 +272,6 @@ struct vgic_cpu {
+ 	bool lpis_enabled;
+ };
+ 
+-extern struct static_key_false vgic_v2_cpuif_trap;
+-
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+ void kvm_vgic_early_init(struct kvm *kvm);
+ int kvm_vgic_create(struct kvm *kvm, u32 type);
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 0a063af..4af600e 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -278,7 +278,7 @@ int vgic_v2_map_resources(struct kvm *kvm)
+ 		goto out;
+ 	}
+ 
+-	if (!static_branch_unlikely(&vgic_v2_cpuif_trap)) {
++	if (!static_branch_unlikely(&kvm_vgic_global_state.vgic_v2_cpuif_trap)) {
+ 		ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
+ 					    kvm_vgic_global_state.vcpu_base,
+ 					    KVM_VGIC_V2_CPU_SIZE, true);
+@@ -296,8 +296,6 @@ out:
+ 	return ret;
  }
  
-+struct user_ctxs {
-+	struct fpsimd_context __user *fpsimd;
-+};
-+
-+static int parse_user_sigframe(struct user_ctxs *user,
-+			       struct rt_sigframe __user *sf)
-+{
-+	struct sigcontext __user *sc = &sf->uc.uc_mcontext;
-+	struct _aarch64_ctx __user *head =
-+		(struct _aarch64_ctx __user *)&sc->__reserved;
-+	size_t offset = 0;
-+
-+	user->fpsimd = NULL;
-+
-+	while (1) {
-+		int err;
-+		u32 magic, size;
-+
-+		head = (struct _aarch64_ctx __user *)&sc->__reserved[offset];
-+		if (!IS_ALIGNED((unsigned long)head, 16))
-+			goto invalid;
-+
-+		err = 0;
-+		__get_user_error(magic, &head->magic, err);
-+		__get_user_error(size, &head->size, err);
-+		if (err)
-+			return err;
-+
-+		switch (magic) {
-+		case 0:
-+			if (size)
-+				goto invalid;
-+
-+			goto done;
-+
-+		case FPSIMD_MAGIC:
-+			if (user->fpsimd)
-+				goto invalid;
-+
-+			if (offset > sizeof(sc->__reserved) -
-+					sizeof(*user->fpsimd) ||
-+			    size < sizeof(*user->fpsimd))
-+				goto invalid;
-+
-+			user->fpsimd = (struct fpsimd_context __user *)head;
-+			break;
-+
-+		case ESR_MAGIC:
-+			/* ignore */
-+			break;
-+
-+		default:
-+			goto invalid;
-+		}
-+
-+		if (size < sizeof(*head))
-+			goto invalid;
-+
-+		if (size > sizeof(sc->__reserved) - (sizeof(*head) + offset))
-+			goto invalid;
-+
-+		offset += size;
-+	}
-+
-+done:
-+	if (!user->fpsimd)
-+		goto invalid;
-+
-+	return 0;
-+
-+invalid:
-+	return -EINVAL;
-+}
-+
- static int restore_sigframe(struct pt_regs *regs,
- 			    struct rt_sigframe __user *sf)
- {
- 	sigset_t set;
- 	int i, err;
--	void *aux = sf->uc.uc_mcontext.__reserved;
-+	struct user_ctxs user;
+-DEFINE_STATIC_KEY_FALSE(vgic_v2_cpuif_trap);
+-
+ /**
+  * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
+  * @node:	pointer to the DT node
+@@ -314,6 +312,8 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 		return -ENXIO;
+ 	}
  
- 	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
- 	if (err == 0)
-@@ -116,12 +196,11 @@ static int restore_sigframe(struct pt_regs *regs,
- 	regs->syscallno = ~0UL;
- 
- 	err |= !valid_user_regs(&regs->user_regs, current);
-+	if (err == 0)
-+		err = parse_user_sigframe(&user, sf);
- 
--	if (err == 0) {
--		struct fpsimd_context *fpsimd_ctx =
--			container_of(aux, struct fpsimd_context, head);
--		err |= restore_fpsimd_context(fpsimd_ctx);
--	}
-+	if (err == 0)
-+		err = restore_fpsimd_context(user.fpsimd);
- 
- 	return err;
- }
-@@ -162,10 +241,11 @@ badframe:
- 	return 0;
- }
- 
--static int setup_sigframe(struct rt_sigframe __user *sf,
-+static int setup_sigframe(struct rt_sigframe_user_layout *user,
- 			  struct pt_regs *regs, sigset_t *set)
- {
- 	int i, err = 0;
-+	struct rt_sigframe __user *sf = user->sigframe;
- 	void *aux = sf->uc.uc_mcontext.__reserved;
- 	struct _aarch64_ctx *end;
- 
-@@ -209,33 +289,32 @@ static int setup_sigframe(struct rt_sigframe __user *sf,
- 	return err;
- }
- 
--static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
--					       struct pt_regs *regs)
-+static int get_sigframe(struct rt_sigframe_user_layout *user,
-+			 struct ksignal *ksig, struct pt_regs *regs)
- {
- 	unsigned long sp, sp_top;
--	struct rt_sigframe __user *frame;
- 
- 	sp = sp_top = sigsp(regs->sp, ksig);
- 
- 	sp = (sp - sizeof(struct rt_sigframe)) & ~15;
--	frame = (struct rt_sigframe __user *)sp;
-+	user->sigframe = (struct rt_sigframe __user *)sp;
- 
- 	/*
- 	 * Check that we can actually write to the signal frame.
- 	 */
--	if (!access_ok(VERIFY_WRITE, frame, sp_top - sp))
--		frame = NULL;
-+	if (!access_ok(VERIFY_WRITE, user->sigframe, sp_top - sp))
-+		return -EFAULT;
- 
--	return frame;
-+	return 0;
- }
- 
- static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
--			 void __user *frame, int usig)
-+			 struct rt_sigframe_user_layout *user, int usig)
- {
- 	__sigrestore_t sigtramp;
- 
- 	regs->regs[0] = usig;
--	regs->sp = (unsigned long)frame;
-+	regs->sp = (unsigned long)user->sigframe;
- 	regs->regs[29] = regs->sp + offsetof(struct rt_sigframe, fp);
- 	regs->pc = (unsigned long)ka->sa.sa_handler;
- 
-@@ -250,20 +329,22 @@ static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
- static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 			  struct pt_regs *regs)
- {
-+	struct rt_sigframe_user_layout user;
- 	struct rt_sigframe __user *frame;
- 	int err = 0;
- 
--	frame = get_sigframe(ksig, regs);
--	if (!frame)
-+	if (get_sigframe(&user, ksig, regs))
- 		return 1;
- 
-+	frame = user.sigframe;
++	kvm_vgic_global_state.vgic_v2_cpuif_trap = STATIC_KEY_FALSE_INIT;
 +
- 	__put_user_error(0, &frame->uc.uc_flags, err);
- 	__put_user_error(NULL, &frame->uc.uc_link, err);
+ 	if (!PAGE_ALIGNED(info->vcpu.start) ||
+ 	    !PAGE_ALIGNED(resource_size(&info->vcpu))) {
+ 		kvm_info("GICV region size/alignment is unsafe, using trapping (reduced performance)\n");
+@@ -332,7 +332,7 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 			goto out;
+ 		}
  
- 	err |= __save_altstack(&frame->uc.uc_stack, regs->sp);
--	err |= setup_sigframe(frame, regs, set);
-+	err |= setup_sigframe(&user, regs, set);
- 	if (err == 0) {
--		setup_return(regs, &ksig->ka, frame, usig);
-+		setup_return(regs, &ksig->ka, &user, usig);
- 		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
- 			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
- 			regs->regs[1] = (unsigned long)&frame->info;
+-		static_branch_enable(&vgic_v2_cpuif_trap);
++		static_branch_enable(&kvm_vgic_global_state.vgic_v2_cpuif_trap);
+ 	}
+ 
+ 	kvm_vgic_global_state.vctrl_base = ioremap(info->vctrl.start,
+
+
+Thanks,
+
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
