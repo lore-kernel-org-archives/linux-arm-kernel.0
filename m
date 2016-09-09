@@ -1,224 +1,242 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  9 Sep 2016 14:07:15 +0100
-Subject: [PATCH v4 8/9] arm64: Refactor sysinstr exception handling
+Date: Fri,  9 Sep 2016 14:07:16 +0100
+Subject: [PATCH v4 9/9] arm64: Work around systems with mismatched cache line
+ sizes
 In-Reply-To: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
 References: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1473426436-17870-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1473426436-17870-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now we trap some of the user space data cache operations
-based on a few Errata (ARM 819472, 826319, 827319 and 824069).
-We need to trap userspace access to CTR_EL0, if we detect mismatched
-cache line size. Since both these traps share the EC, refactor
-the handler a little bit to make it a bit more reader friendly.
+Systems with differing CPU i-cache/d-cache line sizes can cause
+problems with the cache management by software when the execution
+is migrated from one to another. Usually, the application reads
+the cache size on a CPU and then uses that length to perform cache
+operations. However, if it gets migrated to another CPU with a smaller
+cache line size, things could go completely wrong. To prevent such
+cases, always use the smallest cache line size among the CPUs. The
+kernel CPU feature infrastructure already keeps track of the safe
+value for all CPUID registers including CTR. This patch works around
+the problem by :
+
+For kernel, dynamically patch the kernel to read the cache size
+from the system wide copy of CTR_EL0.
+
+For applications, trap read accesses to CTR_EL0 (by clearing the SCTLR.UCT)
+and emulate the mrs instruction to return the system wide safe value
+of CTR_EL0.
+
+For faster access (i.e, avoiding to lookup the system wide value of CTR_EL0
+via read_system_reg), we keep track of the pointer to table entry for
+CTR_EL0 in the CPU feature infrastructure.
 
 Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Andre Przywara <andre.przywara@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/esr.h | 76 ++++++++++++++++++++++++++++++++++++++------
- arch/arm64/kernel/traps.c    | 73 +++++++++++++++++++++++++++---------------
- 2 files changed, 114 insertions(+), 35 deletions(-)
+ arch/arm64/include/asm/assembler.h  | 24 ++++++++++++++++++++++--
+ arch/arm64/include/asm/cpufeature.h |  3 ++-
+ arch/arm64/include/asm/esr.h        |  8 ++++++++
+ arch/arm64/include/asm/sysreg.h     |  1 +
+ arch/arm64/kernel/asm-offsets.c     |  2 ++
+ arch/arm64/kernel/cpu_errata.c      | 22 ++++++++++++++++++++++
+ arch/arm64/kernel/traps.c           | 14 ++++++++++++++
+ 7 files changed, 71 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index a4bb3f5..f09a5ae 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -216,6 +216,20 @@ lr	.req	x30		// link register
+ 	.macro	mmid, rd, rn
+ 	ldr	\rd, [\rn, #MM_CONTEXT_ID]
+ 	.endm
++/*
++ * read_ctr - read CTR_EL0. If the system has mismatched
++ * cache line sizes, provide the system wide safe value
++ * from arm64_ftr_reg_ctrel0.sys_val
++ */
++	.macro	read_ctr, reg
++alternative_if_not ARM64_MISMATCHED_CACHE_LINE_SIZE
++	mrs	\reg, ctr_el0			// read CTR
++	nop
++alternative_else
++	ldr_l	\reg, arm64_ftr_reg_ctrel0 + ARM64_FTR_SYSVAL
++alternative_endif
++	.endm
++
+ 
+ /*
+  * raw_dcache_line_size - get the minimum D-cache line size on this CPU
+@@ -232,7 +246,10 @@ lr	.req	x30		// link register
+  * dcache_line_size - get the safe D-cache line size across all CPUs
+  */
+ 	.macro	dcache_line_size, reg, tmp
+-	raw_dcache_line_size	\reg, \tmp
++	read_ctr	\tmp
++	ubfm		\tmp, \tmp, #16, #19	// cache line size encoding
++	mov		\reg, #4		// bytes per word
++	lsl		\reg, \reg, \tmp	// actual cache line size
+ 	.endm
+ 
+ /*
+@@ -250,7 +267,10 @@ lr	.req	x30		// link register
+  * icache_line_size - get the safe I-cache line size across all CPUs
+  */
+ 	.macro	icache_line_size, reg, tmp
+-	raw_icache_line_size	\reg, \tmp
++	read_ctr	\tmp
++	and		\tmp, \tmp, #0xf	// cache line size encoding
++	mov		\reg, #4		// bytes per word
++	lsl		\reg, \reg, \tmp	// actual cache line size
+ 	.endm
+ 
+ /*
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 0c4f282..8f325bf 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -37,8 +37,9 @@
+ #define ARM64_WORKAROUND_CAVIUM_27456		12
+ #define ARM64_HAS_32BIT_EL0			13
+ #define ARM64_HYP_OFFSET_LOW			14
++#define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
+ 
+-#define ARM64_NCAPS				15
++#define ARM64_NCAPS				16
+ 
+ #ifndef __ASSEMBLY__
+ 
 diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index f772e15..9875b32 100644
+index 9875b32..d14c478 100644
 --- a/arch/arm64/include/asm/esr.h
 +++ b/arch/arm64/include/asm/esr.h
-@@ -78,6 +78,23 @@
- 
- #define ESR_ELx_IL		(UL(1) << 25)
- #define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
+@@ -149,6 +149,9 @@
+ 					 ((op2) << ESR_ELx_SYS64_ISS_OP2_SHIFT) | \
+ 					 ((crn) << ESR_ELx_SYS64_ISS_CRN_SHIFT) | \
+ 					 ((crm) << ESR_ELx_SYS64_ISS_CRM_SHIFT))
 +
-+/* ISS field definitions shared by different classes */
-+#define ESR_ELx_WNR		(UL(1) << 6)
++#define ESR_ELx_SYS64_ISS_SYS_OP_MASK	(ESR_ELx_SYS64_ISS_SYS_MASK | \
++					 ESR_ELx_SYS64_ISS_DIR_MASK)
+ /*
+  * User space cache operations have the following sysreg encoding
+  * in System instructions.
+@@ -167,6 +170,11 @@
+ #define ESR_ELx_SYS64_ISS_EL0_CACHE_OP_VAL \
+ 				(ESR_ELx_SYS64_ISS_SYS_VAL(1, 3, 1, 7, 0) | \
+ 				 ESR_ELx_SYS64_ISS_DIR_WRITE)
 +
-+/* Shared ISS field definitions for Data/Instruction aborts */
-+#define ESR_ELx_EA		(UL(1) << 9)
-+#define ESR_ELx_S1PTW		(UL(1) << 7)
++#define ESR_ELx_SYS64_ISS_SYS_CTR	ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 1, 0, 0)
++#define ESR_ELx_SYS64_ISS_SYS_CTR_READ	(ESR_ELx_SYS64_ISS_SYS_CTR | \
++					 ESR_ELx_SYS64_ISS_DIR_READ)
 +
-+/* Shared ISS fault status code(IFSC/DFSC) for Data/Instruction aborts */
-+#define ESR_ELx_FSC		(0x3F)
-+#define ESR_ELx_FSC_TYPE	(0x3C)
-+#define ESR_ELx_FSC_EXTABT	(0x10)
-+#define ESR_ELx_FSC_ACCESS	(0x08)
-+#define ESR_ELx_FSC_FAULT	(0x04)
-+#define ESR_ELx_FSC_PERM	(0x0C)
-+
-+/* ISS field definitions for Data Aborts */
- #define ESR_ELx_ISV		(UL(1) << 24)
- #define ESR_ELx_SAS_SHIFT	(22)
- #define ESR_ELx_SAS		(UL(3) << ESR_ELx_SAS_SHIFT)
-@@ -86,16 +103,9 @@
- #define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
- #define ESR_ELx_SF 		(UL(1) << 15)
- #define ESR_ELx_AR 		(UL(1) << 14)
--#define ESR_ELx_EA 		(UL(1) << 9)
- #define ESR_ELx_CM 		(UL(1) << 8)
--#define ESR_ELx_S1PTW 		(UL(1) << 7)
--#define ESR_ELx_WNR		(UL(1) << 6)
--#define ESR_ELx_FSC		(0x3F)
--#define ESR_ELx_FSC_TYPE	(0x3C)
--#define ESR_ELx_FSC_EXTABT	(0x10)
--#define ESR_ELx_FSC_ACCESS	(0x08)
--#define ESR_ELx_FSC_FAULT	(0x04)
--#define ESR_ELx_FSC_PERM	(0x0C)
-+
-+/* ISS field definitions for exceptions taken in to Hyp */
- #define ESR_ELx_CV		(UL(1) << 24)
- #define ESR_ELx_COND_SHIFT	(20)
- #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
-@@ -109,6 +119,54 @@
- 	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
- 	 ((imm) & 0xffff))
- 
-+/* ISS field definitions for System instruction traps */
-+#define ESR_ELx_SYS64_ISS_RES0_SHIFT	22
-+#define ESR_ELx_SYS64_ISS_RES0_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_RES0_SHIFT)
-+#define ESR_ELx_SYS64_ISS_DIR_MASK	0x1
-+#define ESR_ELx_SYS64_ISS_DIR_READ	0x1
-+#define ESR_ELx_SYS64_ISS_DIR_WRITE	0x0
-+
-+#define ESR_ELx_SYS64_ISS_RT_SHIFT	5
-+#define ESR_ELx_SYS64_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_SYS64_ISS_RT_SHIFT)
-+#define ESR_ELx_SYS64_ISS_CRM_SHIFT	1
-+#define ESR_ELx_SYS64_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_SYS64_ISS_CRM_SHIFT)
-+#define ESR_ELx_SYS64_ISS_CRN_SHIFT	10
-+#define ESR_ELx_SYS64_ISS_CRN_MASK	(UL(0xf) << ESR_ELx_SYS64_ISS_CRN_SHIFT)
-+#define ESR_ELx_SYS64_ISS_OP1_SHIFT	14
-+#define ESR_ELx_SYS64_ISS_OP1_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_OP1_SHIFT)
-+#define ESR_ELx_SYS64_ISS_OP2_SHIFT	17
-+#define ESR_ELx_SYS64_ISS_OP2_MASK	(UL(0x7) << ESR_ELx_SYS64_ISS_OP2_SHIFT)
-+#define ESR_ELx_SYS64_ISS_OP0_SHIFT	20
-+#define ESR_ELx_SYS64_ISS_OP0_MASK	(UL(0x3) << ESR_ELx_SYS64_ISS_OP0_SHIFT)
-+#define ESR_ELx_SYS64_ISS_SYS_MASK	(ESR_ELx_SYS64_ISS_OP0_MASK | \
-+					 ESR_ELx_SYS64_ISS_OP1_MASK | \
-+					 ESR_ELx_SYS64_ISS_OP2_MASK | \
-+					 ESR_ELx_SYS64_ISS_CRN_MASK | \
-+					 ESR_ELx_SYS64_ISS_CRM_MASK)
-+#define ESR_ELx_SYS64_ISS_SYS_VAL(op0, op1, op2, crn, crm) \
-+					(((op0) << ESR_ELx_SYS64_ISS_OP0_SHIFT) | \
-+					 ((op1) << ESR_ELx_SYS64_ISS_OP1_SHIFT) | \
-+					 ((op2) << ESR_ELx_SYS64_ISS_OP2_SHIFT) | \
-+					 ((crn) << ESR_ELx_SYS64_ISS_CRN_SHIFT) | \
-+					 ((crm) << ESR_ELx_SYS64_ISS_CRM_SHIFT))
-+/*
-+ * User space cache operations have the following sysreg encoding
-+ * in System instructions.
-+ * op0=1, op1=3, op2=1, crn=7, crm={ 5, 10, 11, 14 }, WRITE (L=0)
-+ */
-+#define ESR_ELx_SYS64_ISS_CRM_DC_CIVAC	14
-+#define ESR_ELx_SYS64_ISS_CRM_DC_CVAU	11
-+#define ESR_ELx_SYS64_ISS_CRM_DC_CVAC	10
-+#define ESR_ELx_SYS64_ISS_CRM_IC_IVAU	5
-+
-+#define ESR_ELx_SYS64_ISS_EL0_CACHE_OP_MASK	(ESR_ELx_SYS64_ISS_OP0_MASK | \
-+						 ESR_ELx_SYS64_ISS_OP1_MASK | \
-+						 ESR_ELx_SYS64_ISS_OP2_MASK | \
-+						 ESR_ELx_SYS64_ISS_CRN_MASK | \
-+						 ESR_ELx_SYS64_ISS_DIR_MASK)
-+#define ESR_ELx_SYS64_ISS_EL0_CACHE_OP_VAL \
-+				(ESR_ELx_SYS64_ISS_SYS_VAL(1, 3, 1, 7, 0) | \
-+				 ESR_ELx_SYS64_ISS_DIR_WRITE)
  #ifndef __ASSEMBLY__
  #include <asm/types.h>
  
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index cc06794..4f26ad5 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -100,6 +100,7 @@
+ /* SCTLR_EL1 specific flags. */
+ #define SCTLR_EL1_UCI		(1 << 26)
+ #define SCTLR_EL1_SPAN		(1 << 23)
++#define SCTLR_EL1_UCT		(1 << 15)
+ #define SCTLR_EL1_SED		(1 << 8)
+ #define SCTLR_EL1_CP15BEN	(1 << 5)
+ 
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 05070b7..4a2f0f0 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -23,6 +23,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/kvm_host.h>
+ #include <linux/suspend.h>
++#include <asm/cpufeature.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/smp_plat.h>
+@@ -145,5 +146,6 @@ int main(void)
+   DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
+   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
+   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
++  DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
+   return 0;
+ }
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 5836b3d..0150394 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -30,6 +30,21 @@ is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int scope)
+ 				       entry->midr_range_max);
+ }
+ 
++static bool
++has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
++				int scope)
++{
++	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
++	return (read_cpuid_cachetype() & arm64_ftr_reg_ctrel0.strict_mask) !=
++		(arm64_ftr_reg_ctrel0.sys_val & arm64_ftr_reg_ctrel0.strict_mask);
++}
++
++static void cpu_enable_trap_ctr_access(void *__unused)
++{
++	/* Clear SCTLR_EL1.UCT */
++	config_sctlr_el1(SCTLR_EL1_UCT, 0);
++}
++
+ #define MIDR_RANGE(model, min, max) \
+ 	.def_scope = SCOPE_LOCAL_CPU, \
+ 	.matches = is_affected_midr_range, \
+@@ -108,6 +123,13 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	},
+ #endif
+ 	{
++		.desc = "Mismatched cache line size",
++		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
++		.matches = has_mismatched_cache_line_size,
++		.def_scope = SCOPE_LOCAL_CPU,
++		.enable = cpu_enable_trap_ctr_access,
++	},
++	{
+ 	}
+ };
+ 
 diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index e04f838..224f64e 100644
+index 224f64e..93445f8 100644
 --- a/arch/arm64/kernel/traps.c
 +++ b/arch/arm64/kernel/traps.c
-@@ -447,36 +447,29 @@ void cpu_enable_cache_maint_trap(void *__unused)
- 		: "=r" (res)					\
- 		: "r" (address), "i" (-EFAULT) )
- 
--asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
-+static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
- {
- 	unsigned long address;
--	int ret;
-+	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
-+	int crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
-+	int ret = 0;
- 
--	/* if this is a write with: Op0=1, Op2=1, Op1=3, CRn=7 */
--	if ((esr & 0x01fffc01) == 0x0012dc00) {
--		int rt = (esr >> 5) & 0x1f;
--		int crm = (esr >> 1) & 0x0f;
-+	address = (rt == 31) ? 0 : regs->regs[rt];
- 
--		address = (rt == 31) ? 0 : regs->regs[rt];
--
--		switch (crm) {
--		case 11:		/* DC CVAU, gets promoted */
--			__user_cache_maint("dc civac", address, ret);
--			break;
--		case 10:		/* DC CVAC, gets promoted */
--			__user_cache_maint("dc civac", address, ret);
--			break;
--		case 14:		/* DC CIVAC */
--			__user_cache_maint("dc civac", address, ret);
--			break;
--		case 5:			/* IC IVAU */
--			__user_cache_maint("ic ivau", address, ret);
--			break;
--		default:
--			force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
--			return;
--		}
--	} else {
-+	switch (crm) {
-+	case ESR_ELx_SYS64_ISS_CRM_DC_CVAU:	/* DC CVAU, gets promoted */
-+		__user_cache_maint("dc civac", address, ret);
-+		break;
-+	case ESR_ELx_SYS64_ISS_CRM_DC_CVAC:	/* DC CVAC, gets promoted */
-+		__user_cache_maint("dc civac", address, ret);
-+		break;
-+	case ESR_ELx_SYS64_ISS_CRM_DC_CIVAC:	/* DC CIVAC */
-+		__user_cache_maint("dc civac", address, ret);
-+		break;
-+	case ESR_ELx_SYS64_ISS_CRM_IC_IVAU:	/* IC IVAU */
-+		__user_cache_maint("ic ivau", address, ret);
-+		break;
-+	default:
- 		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
- 		return;
- 	}
-@@ -487,6 +480,34 @@ asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
+@@ -480,6 +480,14 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
  		regs->pc += 4;
  }
  
-+struct sys64_hook {
-+	unsigned int esr_mask;
-+	unsigned int esr_val;
-+	void (*handler)(unsigned int esr, struct pt_regs *regs);
-+};
-+
-+static struct sys64_hook sys64_hooks[] = {
-+	{
-+		.esr_mask = ESR_ELx_SYS64_ISS_EL0_CACHE_OP_MASK,
-+		.esr_val = ESR_ELx_SYS64_ISS_EL0_CACHE_OP_VAL,
-+		.handler = user_cache_maint_handler,
-+	},
-+	{},
-+};
-+
-+asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
++static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
 +{
-+	struct sys64_hook *hook;
++	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
 +
-+	for (hook = sys64_hooks; hook->handler; hook++)
-+		if ((hook->esr_mask & esr) == hook->esr_val) {
-+			hook->handler(esr, regs);
-+			return;
-+		}
-+
-+	force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
++	regs->regs[rt] = arm64_ftr_reg_ctrel0.sys_val;
++	regs->pc += 4;
 +}
 +
- long compat_arm_syscall(struct pt_regs *regs);
+ struct sys64_hook {
+ 	unsigned int esr_mask;
+ 	unsigned int esr_val;
+@@ -492,6 +500,12 @@ static struct sys64_hook sys64_hooks[] = {
+ 		.esr_val = ESR_ELx_SYS64_ISS_EL0_CACHE_OP_VAL,
+ 		.handler = user_cache_maint_handler,
+ 	},
++	{
++		/* Trap read access to CTR_EL0 */
++		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
++		.esr_val = ESR_ELx_SYS64_ISS_SYS_CTR_READ,
++		.handler = ctr_read_handler,
++	},
+ 	{},
+ };
  
- asmlinkage long do_ni_syscall(struct pt_regs *regs)
 -- 
 2.7.4
