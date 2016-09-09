@@ -1,199 +1,116 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri,  9 Sep 2016 15:24:14 +0530
-Subject: [PATCH] cpufreq: create link to policy only for registered CPUs
-In-Reply-To: <20160819110032.GM1041@n2100.armlinux.org.uk>
-References: <20160819110032.GM1041@n2100.armlinux.org.uk>
-Message-ID: <a0469c333e08b3953bfe9e8356c6919c26578349.1473414746.git.viresh.kumar@linaro.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 9 Sep 2016 11:57:15 +0200
+Subject: [PATCH] clk: stm32f4: don't assume 48MHz clock is derived from
+ primary PLL
+In-Reply-To: <1473318063-21782-1-git-send-email-andrea.merello@gmail.com>
+References: <1473318063-21782-1-git-send-email-andrea.merello@gmail.com>
+Message-ID: <b39d3544-9512-9e0b-2f5b-4135835009f9@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a cpufreq driver is registered very early in the boot stage (e.g.
-registered from postcore_initcall()), then cpufreq core may generate
-kernel warnings for it.
+Hi Andrea,
 
-In this case, the CPUs are registered as devices with the kernel only
-after the cpufreq driver is registered, while the CPUs were brought
-online way before that. And by the time cpufreq_add_dev() gets called,
-the cpu device isn't stored in the per-cpu variable (cpu_sys_devices,)
-which is read by get_cpu_device().
+On 09/08/2016 09:01 AM, Andrea Merello wrote:
+> This driver just look at the PLLs configurations set by the
+> bootloader, but it assumes the 48MHz clock is derived from the primary
+> PLL; however using PLLSAI is another option for generating the 48MHz
+> clock.
+>
+> This patch make the driver to check for this, and eventually adjust the
+> clock tree accordingly
 
-And so cpufreq core fails to get device for the CPU, for which
-cpufreq_add_dev() was called in the first place and we will hit a
-WARN_ON(!cpu_dev).
+Another patch-set is ongoing concerning RTC clock for stm32f4. It is 
+developed by Gabriel Fernandez (I add him directly in this reply).
+Can you check with him how he plans to manage this RTC clock in order to 
+have something similar / coherent for SAI clocks, 48MHz ....
 
-Even if we reuse the 'dev' parameter passed to cpufreq_add_dev() to
-avoid that warning, there might be other CPUs online that share the
-policy with the cpu for which cpufreq_add_dev() is called. And
-eventually get_cpu_device() will return NULL for them as well, and we
-will hit the same WARN_ON() again.
+Concerning this patch,
+When I look at the clock tree I see that 48 MHz is only provided by pll 
+named "PLL". So If you use PLL SAI to provide a clock at 48 MHz, you 
+actually use SAI_A or SAI_B clock. I'm right ?
 
-In order to fix these issues, change cpufreq core to create links to the
-policy for a cpu only when cpufreq_add_dev() is called for that CPU.
+I think we need to have something more configurable. Each special clock 
+(SAI / RTC /LCd ...) have to be configurable and each "parents" (PLL / 
+PLLI2S / PLLSAI) should be described at least in the driver.
 
-Reuse the 'real_cpus' mask to track that as well.
+Gabriel,
 
-Note that cpufreq_remove_dev() already handles removal of the links for
-individual CPUs and cpufreq_add_dev() has aligned with that now.
+Can you send a draft of your patch-set for RTC clock to Andrea, in order 
+to discuss about this topic.
 
-Reported-by: Russell King <linux@armlinux.org.uk>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/cpufreq.c | 89 +++++++++++++++--------------------------------
- 1 file changed, 28 insertions(+), 61 deletions(-)
+Thanks
 
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index 13fb589b6d2c..3a64136bf21b 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -916,58 +916,18 @@ static struct kobj_type ktype_cpufreq = {
- 	.release	= cpufreq_sysfs_release,
- };
- 
--static int add_cpu_dev_symlink(struct cpufreq_policy *policy, int cpu)
-+static int add_cpu_dev_symlink(struct cpufreq_policy *policy,
-+			       struct device *dev)
- {
--	struct device *cpu_dev;
--
--	pr_debug("%s: Adding symlink for CPU: %u\n", __func__, cpu);
--
--	if (!policy)
--		return 0;
--
--	cpu_dev = get_cpu_device(cpu);
--	if (WARN_ON(!cpu_dev))
--		return 0;
--
--	return sysfs_create_link(&cpu_dev->kobj, &policy->kobj, "cpufreq");
-+	dev_dbg(dev, "%s: Adding symlink\n", __func__);
-+	return sysfs_create_link(&dev->kobj, &policy->kobj, "cpufreq");
- }
- 
--static void remove_cpu_dev_symlink(struct cpufreq_policy *policy, int cpu)
-+static void remove_cpu_dev_symlink(struct cpufreq_policy *policy,
-+				   struct device *dev)
- {
--	struct device *cpu_dev;
--
--	pr_debug("%s: Removing symlink for CPU: %u\n", __func__, cpu);
--
--	cpu_dev = get_cpu_device(cpu);
--	if (WARN_ON(!cpu_dev))
--		return;
--
--	sysfs_remove_link(&cpu_dev->kobj, "cpufreq");
--}
--
--/* Add/remove symlinks for all related CPUs */
--static int cpufreq_add_dev_symlink(struct cpufreq_policy *policy)
--{
--	unsigned int j;
--	int ret = 0;
--
--	/* Some related CPUs might not be present (physically hotplugged) */
--	for_each_cpu(j, policy->real_cpus) {
--		ret = add_cpu_dev_symlink(policy, j);
--		if (ret)
--			break;
--	}
--
--	return ret;
--}
--
--static void cpufreq_remove_dev_symlink(struct cpufreq_policy *policy)
--{
--	unsigned int j;
--
--	/* Some related CPUs might not be present (physically hotplugged) */
--	for_each_cpu(j, policy->real_cpus)
--		remove_cpu_dev_symlink(policy, j);
-+	dev_dbg(dev, "%s: Removing symlink\n", __func__);
-+	sysfs_remove_link(&dev->kobj, "cpufreq");
- }
- 
- static int cpufreq_add_dev_interface(struct cpufreq_policy *policy)
-@@ -999,7 +959,7 @@ static int cpufreq_add_dev_interface(struct cpufreq_policy *policy)
- 			return ret;
- 	}
- 
--	return cpufreq_add_dev_symlink(policy);
-+	return 0;
- }
- 
- __weak struct cpufreq_governor *cpufreq_default_governor(void)
-@@ -1129,7 +1089,6 @@ static void cpufreq_policy_put_kobj(struct cpufreq_policy *policy, bool notify)
- 
- 	down_write(&policy->rwsem);
- 	cpufreq_stats_free_table(policy);
--	cpufreq_remove_dev_symlink(policy);
- 	kobj = &policy->kobj;
- 	cmp = &policy->kobj_unregister;
- 	up_write(&policy->rwsem);
-@@ -1211,8 +1170,8 @@ static int cpufreq_online(unsigned int cpu)
- 	if (new_policy) {
- 		/* related_cpus should at least include policy->cpus. */
- 		cpumask_copy(policy->related_cpus, policy->cpus);
--		/* Remember CPUs present at the policy creation time. */
--		cpumask_and(policy->real_cpus, policy->cpus, cpu_present_mask);
-+		/* Clear mask of registered CPUs */
-+		cpumask_clear(policy->real_cpus);
- 	}
- 
- 	/*
-@@ -1327,6 +1286,8 @@ static int cpufreq_online(unsigned int cpu)
- 	return ret;
- }
- 
-+static void cpufreq_offline(unsigned int cpu);
-+
- /**
-  * cpufreq_add_dev - the cpufreq interface for a CPU device.
-  * @dev: CPU device.
-@@ -1336,22 +1297,28 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
- {
- 	struct cpufreq_policy *policy;
- 	unsigned cpu = dev->id;
-+	int ret;
- 
- 	dev_dbg(dev, "%s: adding CPU%u\n", __func__, cpu);
- 
--	if (cpu_online(cpu))
--		return cpufreq_online(cpu);
-+	if (cpu_online(cpu)) {
-+		ret = cpufreq_online(cpu);
-+		if (ret)
-+			return ret;
-+	}
- 
--	/*
--	 * A hotplug notifier will follow and we will handle it as CPU online
--	 * then.  For now, just create the sysfs link, unless there is no policy
--	 * or the link is already present.
--	 */
-+	/* Create sysfs link on CPU registration */
- 	policy = per_cpu(cpufreq_cpu_data, cpu);
- 	if (!policy || cpumask_test_and_set_cpu(cpu, policy->real_cpus))
- 		return 0;
- 
--	return add_cpu_dev_symlink(policy, cpu);
-+	ret = add_cpu_dev_symlink(policy, dev);
-+	if (ret) {
-+		cpumask_clear_cpu(cpu, policy->real_cpus);
-+		cpufreq_offline(cpu);
-+	}
-+
-+	return ret;
- }
- 
- static void cpufreq_offline(unsigned int cpu)
-@@ -1432,7 +1399,7 @@ static void cpufreq_remove_dev(struct device *dev, struct subsys_interface *sif)
- 		cpufreq_offline(cpu);
- 
- 	cpumask_clear_cpu(cpu, policy->real_cpus);
--	remove_cpu_dev_symlink(policy, cpu);
-+	remove_cpu_dev_symlink(policy, dev);
- 
- 	if (cpumask_empty(policy->real_cpus))
- 		cpufreq_policy_free(policy, true);
--- 
-2.7.1.410.g6faf27b
+Alex
+
+
+>
+> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Alexandre Torgue <alexandre.torgue@st.com>
+> Cc: Bruno Herrera <bruherrera@gmail.com>
+> ---
+>  drivers/clk/clk-stm32f4.c | 26 ++++++++++++++++++++++++--
+>  1 file changed, 24 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+> index 02d6810..7f1ba8f 100644
+> --- a/drivers/clk/clk-stm32f4.c
+> +++ b/drivers/clk/clk-stm32f4.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+>
+> +#define STM32F4_RCC_CR			0x00
+>  #define STM32F4_RCC_PLLCFGR		0x04
+>  #define STM32F4_RCC_CFGR		0x08
+>  #define STM32F4_RCC_AHB1ENR		0x30
+> @@ -31,6 +32,8 @@
+>  #define STM32F4_RCC_AHB3ENR		0x38
+>  #define STM32F4_RCC_APB1ENR		0x40
+>  #define STM32F4_RCC_APB2ENR		0x44
+> +#define STM32F4_RCC_PLLSAICFGR		0x88
+> +#define STM32F4_RCC_DCKCFGR		0x8C
+>
+>  struct stm32f4_gate_data {
+>  	u8	offset;
+> @@ -238,16 +241,35 @@ static struct clk *clk_register_apb_mul(struct device *dev, const char *name,
+>  static void stm32f4_rcc_register_pll(const char *hse_clk, const char *hsi_clk)
+>  {
+>  	unsigned long pllcfgr = readl(base + STM32F4_RCC_PLLCFGR);
+> -
+> +	unsigned long pllsaicfgr = readl(base + STM32F4_RCC_PLLSAICFGR);
+> +	unsigned long dckcfgr = readl(base + STM32F4_RCC_DCKCFGR);
+> +	unsigned long rcccr = readl(base + STM32F4_RCC_CR);
+> +	bool saien = rcccr & BIT(28);
+>  	unsigned long pllm   = pllcfgr & 0x3f;
+>  	unsigned long plln   = (pllcfgr >> 6) & 0x1ff;
+>  	unsigned long pllp   = BIT(((pllcfgr >> 16) & 3) + 1);
+>  	const char   *pllsrc = pllcfgr & BIT(22) ? hse_clk : hsi_clk;
+>  	unsigned long pllq   = (pllcfgr >> 24) & 0xf;
+> +	bool src48_sai = dckcfgr & BIT(27);
+> +	unsigned long pllsain = (pllsaicfgr >> 6) & 0x1ff;
+> +	unsigned long pllsaip = BIT(((pllsaicfgr >> 16) & 3) + 1);
+>
+>  	clk_register_fixed_factor(NULL, "vco", pllsrc, 0, plln, pllm);
+>  	clk_register_fixed_factor(NULL, "pll", "vco", 0, 1, pllp);
+> -	clk_register_fixed_factor(NULL, "pll48", "vco", 0, 1, pllq);
+> +
+> +	if (src48_sai && !saien) {
+> +		pr_err("48MHz derived from SAI PLL, but SAI PLL disabled (blame the bootloader)\n");
+> +		return;
+> +	}
+> +
+> +	if (saien)
+> +		clk_register_fixed_factor(NULL, "sai",
+> +					pllsrc, 0, pllsain, pllm);
+> +
+> +	if (src48_sai)
+> +		clk_register_fixed_factor(NULL, "pll48", "sai", 0, 1, pllsaip);
+> +	else
+> +		clk_register_fixed_factor(NULL, "pll48", "vco", 0, 1, pllq);
+>  }
+>
+>  /*
+>
