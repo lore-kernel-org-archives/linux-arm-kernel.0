@@ -1,99 +1,42 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  9 Sep 2016 15:15:46 +0100
-Subject: [RFC PATCH 5/5] arm64: signal: Parse extra_context during sigreturn
-In-Reply-To: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
-References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1473430576-20792-6-git-send-email-Dave.Martin@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 9 Sep 2016 16:21:45 +0200
+Subject: [PATCH 10/10] PM / Domains: Add support for removing nested PM
+ domains by provider
+In-Reply-To: <f31e57aa-52aa-d340-ca2b-73dbdf769035@nvidia.com>
+References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
+ <1471340976-5379-11-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFq3h1-64FtZwXa7XWO1UJj8Od-cfjwa8i4bDwN1VVdL7w@mail.gmail.com>
+ <f31e57aa-52aa-d340-ca2b-73dbdf769035@nvidia.com>
+Message-ID: <CAPDyKFqSLqHq7XymD2CZzzyAV3ohr5pKS1uTR6DXyBFh+VWCfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If extra_context is present, parse it.
+[...]
 
-To avoid abuse by userspace, this patch attempts to ensure that:
- * that no more than one extra_context is accepted;
- * that the extra_context is a sensible size;
- * that the extra context data is properly aligned.
+>>>  /**
+>>> + * of_genpd_remove_tail - Remove the last PM domain registered for a provider
+>>> + * @provider: Pointer to device structure associated with provider
+>>
+>> The naming of this function would be okay, if we only have added
+>> genpds in the gpd_list by using list_add_tail(), although we don't.
+>> Instead we use list_add() and put them first in the list.
+>>
+>> So, unless we change to use list_add_tail() when adding genpds (I
+>> assume we can do that!), I would rather change the name of this
+>> function to of_genpd_remove_first().
+>>
+>> What option do you prefer?
+>
+> I think that I would prefer either of_genpd_remove_last() or
+> of_genpd_remove_one(). Although _first is accurate from the list
+> perspective it seems odd from the user perspective. I think that _last
+> is more meaningful as we are removing the last that was added regardless
+> or how things appear on the list. Alternatively, _one could be a good
+> compromise.
 
-This patch relies on the user accessors in order to ensure that the
-user-supplied extra context data pointer is an honest userspace
-address.
+I am fine with of_genpd_remove_last().
 
-Other than that, the kernel doesn't care specially whether the
-pointer supplied is sensible (e.g., not garbage, doesn't overlap
-sigcontext.__reserved[], etc.) since this cannot harm the kernel.
+[...]
 
-More checks may be added later in order to aid debugging of
-botched sigreturns from userspace.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/kernel/signal.c | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
-
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index d7cdb51..c5f18ef 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -221,6 +221,7 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 	char __user *base = (char __user *)&sc->__reserved;
- 	size_t offset = 0;
- 	size_t limit = sizeof(sc->__reserved);
-+	bool have_extra_context = false;
- 
- 	user->fpsimd = NULL;
- 
-@@ -230,6 +231,9 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 	while (1) {
- 		int err = 0;
- 		u32 magic, size;
-+		struct extra_context const __user *extra;
-+		void __user *extra_data;
-+		u32 extra_size;
- 
- 		if (limit - offset < sizeof(*head))
- 			goto invalid;
-@@ -267,6 +271,42 @@ static int parse_user_sigframe(struct user_ctxs *user,
- 			/* ignore */
- 			break;
- 
-+		case EXTRA_MAGIC:
-+			if (have_extra_context)
-+				goto invalid;
-+
-+			if (size < sizeof(*extra))
-+				goto invalid;
-+
-+			extra = (struct extra_context const __user *)head;
-+			__get_user_error(extra_data, &extra->data, err);
-+			__get_user_error(extra_size, &extra->size, err);
-+			if (err)
-+				return err;
-+
-+			/* Prevent looping/repeated parsing of extra_conext */
-+			have_extra_context = true;
-+
-+			/*
-+			 * Rely on the __user accessors to reject bogus
-+			 * pointers.
-+			 */
-+			base = extra_data;
-+			if (!IS_ALIGNED((unsigned long)base, 16))
-+				goto invalid;
-+
-+			/* Reject "unreasonably large" frames: */
-+			limit = extra_size;
-+			if (limit > SIGFRAME_MAXSZ - sizeof(sc->__reserved))
-+				goto invalid;
-+
-+			/*
-+			 * Ignore trailing terminator in __reserved[]
-+			 * and start parsing extra_data:
-+			 */
-+			offset = 0;
-+			continue;
-+
- 		default:
- 			goto invalid;
- 		}
--- 
-2.1.4
+Kind regards
+Uffe
