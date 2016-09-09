@@ -1,78 +1,113 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 9 Sep 2016 17:36:18 +0200 (CEST)
-Subject: [PATCH V4 3/4] ARM: bcm2835: add thermal node to device-tree of
- bcm283x
-In-Reply-To: <8876586A-98F8-4AAF-AD90-86EB12C22FDC@martin.sperl.org>
-References: <1473407397-29395-1-git-send-email-kernel@martin.sperl.org>
- <1473407397-29395-4-git-send-email-kernel@martin.sperl.org>
- <19cc8fbf-6ceb-995e-850d-9d82bdaff8d0@i2se.com>
- <8876586A-98F8-4AAF-AD90-86EB12C22FDC@martin.sperl.org>
-Message-ID: <2117811305.32861.15854341-2f8e-4e20-95f4-e76f81e6fd56.open-xchange@email.1und1.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Sep 2016 17:38:58 +0200
+Subject: [PATCH] hwmon: xgene: access mailbox as RAM
+In-Reply-To: <20160907223705.GA31582@roeck-us.net>
+References: <1469134557-26869-1-git-send-email-hotran@apm.com>
+ <13081573.BbD3TmEU5Y@wuerfel> <20160907223705.GA31582@roeck-us.net>
+Message-ID: <2529114.aAikiSWl11@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The newly added hwmon driver fails to build in an allmodconfig
+kernel:
 
-> Martin Sperl <kernel@martin.sperl.org> hat am 9. September 2016 um 16:58
-> geschrieben:
-> 
-> 
-> 
-> > On 09.09.2016, at 16:25, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > 
-> >> Am 09.09.2016 um 09:49 schrieb kernel at martin.sperl.org:
-> >> From: Martin Sperl <kernel@martin.sperl.org>
-> >> 
-> >> Add the node for the thermal sensor of the bcm2835-soc
-> >> to the device tree.
-> >> 
-> >> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> >> Reviewed-by: Eric Anholt <eric@anholt.net>
-> >> ---
-> >> arch/arm/boot/dts/bcm283x.dtsi | 6 ++++++
-> >> 1 file changed, 6 insertions(+)
-> >> 
-> >> diff --git a/arch/arm/boot/dts/bcm283x.dtsi
-> >> b/arch/arm/boot/dts/bcm283x.dtsi
-> >> index b982522..e2e3a46 100644
-> >> --- a/arch/arm/boot/dts/bcm283x.dtsi
-> >> +++ b/arch/arm/boot/dts/bcm283x.dtsi
-> >> @@ -186,6 +186,12 @@
-> >>            interrupts = <2 14>; /* pwa1 */
-> >>        };
-> >> 
-> >> +        thermal: thermal at 0x7e212000 {
-> >> +            compatible = "brcm,bcm2835-thermal";
-> >> +            reg = <0x7e212000 0x8>;
-> >> +            clocks = <&clocks BCM2835_CLOCK_TSENS>;
-> >> +        };
-> >> +
-> > 
-> > Since the driver handles 3 different SoC (2835, 2836, 2837). This node
-> > should be defined in the SoC specific dtsi files, because the BCM2836
-> > includes bcm283x.dtsi too.
-> > 
-> > Be aware the patch for bcm2837 must go to ARM64.
-> 
-> I can not really follow:
-> * the node is defined in the dtsi included by all 3 soc,
->    and it is available on all so it sits where for example
->    spi0 or uart0 is located
-> * as for arm64: this describes the registers that are
->    identical for arm and arm64 and the bcm2837.dtsi
->    is also including ../../../../arm/boot/dts/bcm283x.dtsi
-> 
-> So what is the problem?
+      1  ERROR: "memblock_is_memory" [drivers/hwmon/xgene-hwmon.ko] undefined!
 
-The thermal driver specifies 3 different compatibles with partially different
-settings.
-If this patch is applied, all SoC (bcm2835, bcm2836, bcm2837) would use the
-bcm2835 settings.
-I can't believe this is intended.
+According to comments in the code, the mailbox is a shared memory region,
+not a set of MMIO registers, so we should use memremap() for mapping it
+instead of ioremap or acpi_os_ioremap, and pointer dereferences instead
+of readl/writel.
 
-Why does the binding contains 3 different compatibles if only one is used?
+The driver already uses plain kernel pointers, so it's a bit unusual
+to work with functions that operate on __iomem pointers, and this
+fixes that part too.
 
-> 
-> Martin
-> 
-> P.s the patches apply cleanly against master.
->
+I'm using READ_ONCE/WRITE_ONCE here to keep the existing behavior
+regarding the ordering of the accesses from the CPU, but note that
+there are no barriers (also unchanged from before).
+
+I'm also keeping the endianess behavior, though I'm unsure whether
+the message data was supposed to be in LE32 format in the first
+place, it's possible this was meant to be interpreted as a byte
+stream instead.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/hwmon/xgene-hwmon.c b/drivers/hwmon/xgene-hwmon.c
+index bc78a5d10182..e834dfb3acca 100644
+--- a/drivers/hwmon/xgene-hwmon.c
++++ b/drivers/hwmon/xgene-hwmon.c
+@@ -34,7 +34,8 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
+-#include <acpi/acpi_io.h>
++#include <linux/io.h>
++
+ #include <acpi/pcc.h>
+ 
+ /* SLIMpro message defines */
+@@ -126,10 +127,10 @@ static u16 xgene_word_tst_and_clr(u16 *addr, u16 mask)
+ {
+ 	u16 ret, val;
+ 
+-	val = readw_relaxed(addr);
++	val = le16_to_cpu(READ_ONCE(*addr));
+ 	ret = val & mask;
+ 	val &= ~mask;
+-	writew_relaxed(val, addr);
++	WRITE_ONCE(*addr, cpu_to_le16(val));
+ 
+ 	return ret;
+ }
+@@ -137,7 +138,7 @@ static u16 xgene_word_tst_and_clr(u16 *addr, u16 mask)
+ static int xgene_hwmon_pcc_rd(struct xgene_hwmon_dev *ctx, u32 *msg)
+ {
+ 	struct acpi_pcct_shared_memory *generic_comm_base = ctx->pcc_comm_addr;
+-	void *ptr = generic_comm_base + 1;
++	u32 *ptr = (void*)(generic_comm_base + 1);
+ 	int rc, i;
+ 	u16 val;
+ 
+@@ -146,21 +147,21 @@ static int xgene_hwmon_pcc_rd(struct xgene_hwmon_dev *ctx, u32 *msg)
+ 	ctx->resp_pending = true;
+ 
+ 	/* Write signature for subspace */
+-	writel_relaxed(PCC_SIGNATURE_MASK | ctx->mbox_idx,
+-		       &generic_comm_base->signature);
++	WRITE_ONCE(generic_comm_base->signature,
++		   cpu_to_le32(PCC_SIGNATURE_MASK | ctx->mbox_idx));
+ 
+ 	/* Write to the shared command region */
+-	writew_relaxed(MSG_TYPE(msg[0]) | PCCC_GENERATE_DB_INT,
+-		       &generic_comm_base->command);
++	WRITE_ONCE(generic_comm_base->command,
++		   cpu_to_le16(MSG_TYPE(msg[0]) | PCCC_GENERATE_DB_INT));
+ 
+ 	/* Flip CMD COMPLETE bit */
+-	val = readw_relaxed(&generic_comm_base->status);
++	val = le16_to_cpu(READ_ONCE(generic_comm_base->status));
+ 	val &= ~PCCS_CMD_COMPLETE;
+-	writew_relaxed(val, &generic_comm_base->status);
++	WRITE_ONCE(generic_comm_base->status, cpu_to_le16(val));
+ 
+ 	/* Copy the message to the PCC comm space */
+ 	for (i = 0; i < sizeof(struct slimpro_resp_msg) / 4; i++)
+-		writel_relaxed(msg[i], ptr + i * 4);
++		WRITE_ONCE(ptr[i], cpu_to_le32(msg[i]));
+ 
+ 	/* Ring the doorbell */
+ 	rc = mbox_send_message(ctx->mbox_chan, msg);
+@@ -652,9 +653,9 @@ static int xgene_hwmon_probe(struct platform_device *pdev)
+ 		 */
+ 		ctx->comm_base_addr = cppc_ss->base_address;
+ 		if (ctx->comm_base_addr) {
+-			ctx->pcc_comm_addr =
+-					acpi_os_ioremap(ctx->comm_base_addr,
+-							cppc_ss->length);
++			ctx->pcc_comm_addr = memremap(ctx->comm_base_addr,
++							cppc_ss->length,
++							MEMREMAP_WT);
+ 		} else {
+ 			dev_err(&pdev->dev, "Failed to get PCC comm region\n");
+ 			rc = -ENODEV;
