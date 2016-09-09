@@ -1,41 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Sep 2016 17:38:15 +0200
-Subject: [PATCH v3 2/3] hwmon: xgene: Add hwmon driver
-In-Reply-To: <20160907223705.GA31582@roeck-us.net>
-References: <1469134557-26869-1-git-send-email-hotran@apm.com>
- <13081573.BbD3TmEU5Y@wuerfel> <20160907223705.GA31582@roeck-us.net>
-Message-ID: <11301286.5CCaiCKzda@wuerfel>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 9 Sep 2016 17:46:00 +0200
+Subject: [PULL 0/2] KVM/ARM Fixes for v4.8 - round #2
+In-Reply-To: <20160909105456.8585-1-christoffer.dall@linaro.org>
+References: <20160909105456.8585-1-christoffer.dall@linaro.org>
+Message-ID: <3be5d17b-070f-2873-325d-44904af7d84c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 7, 2016 3:37:05 PM CEST Guenter Roeck wrote:
-> On Wed, Sep 07, 2016 at 11:41:44PM +0200, Arnd Bergmann wrote:
-> > On Thursday, July 21, 2016 1:55:56 PM CEST Hoan Tran wrote:
-> > > +               ctx->comm_base_addr = cppc_ss->base_address;
-> > > +               if (ctx->comm_base_addr) {
-> > > +                       ctx->pcc_comm_addr =
-> > > +                                       acpi_os_ioremap(ctx->comm_base_addr,
-> > > +                                                       cppc_ss->length);
-> > > 
-> > 
-> > This causes the arm64 allmodconfig build to fail now, according to
-> > kernelci:
-> > 
-> >       1  ERROR: "memblock_is_memory" [drivers/hwmon/xgene-hwmon.ko] undefined!
-> > 
-> > Should this perhaps call ioremap() or memremap() instead?
-> > 
-> Hmmm ... almost sounds to me like blaming the messenger. e7cd190385d1 ("arm64:
-> mark reserved memblock regions explicitly in iomem") starts using a function
-> in acpi_os_ioremap() which is not exported. On top of that, memblock_is_memory()
-> is declared as __init_memblock, which makes me really uncomfortable.
-> If acpi_os_ioremap() must not be used by modules, and possibly only during
-> early (?) initialization, maybe its declaration should state those limitations ?
 
-I think there is more wrong with it, the driver also accesses a shared
-memory area with kernel pointers using readl_relaxed/writel_relaxed,
-which are only valid on MMIO registers.
 
-I've prepared a patch, please have a look at the follow-up email.
+On 09/09/2016 12:54, Christoffer Dall wrote:
+> Hi Paolo and Radim,
+> 
+> Here are a couple of fixes for KVM/ARM for v4.8-rc6 or -rc7, as soon as
+> they can make it.
+> 
+> They fix an idmap issue on 32-bit KVM on ARM, and fixes a memory
+> unmapping issue that we've had forever on both arm and arm64.
+> 
+> The following changes since commit 20218b86ad8adb4bf71db9425bb59680f345eafd:
+> 
+>   Merge tag 'kvm-s390-master-4.8-3' of git://git.kernel.org/pub/scm/linux/kernel/git/kvms390/linux into kvm-master (2016-09-05 16:15:22 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-v4.8-round2
+> 
+> for you to fetch changes up to 293f293637b55db4f9f522a5a72514e98a541076:
+> 
+>   kvm-arm: Unmap shadow pagetables properly (2016-09-09 12:40:30 +0200)
+> 
+> Thanks!
+> -Christoffer
+> 
+> ---
+> Marc Zyngier (1):
+>       arm: KVM: Fix idmap overlap detection when the kernel is idmap'ed
+> 
+> Suzuki K Poulose (1):
+>       kvm-arm: Unmap shadow pagetables properly
+> 
+>  arch/arm/kvm/arm.c | 2 --
+>  arch/arm/kvm/mmu.c | 4 +++-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-	Arnd
+Pulled, thanks.
+
+Paolo
