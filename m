@@ -1,20 +1,39 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 9 Sep 2016 20:36:13 +0800
-Subject: [PATCH v3 2/4] ARM: sun5i: a13-olinuxino: Enable VGA bridge
-In-Reply-To: <20160908121751.16911-3-maxime.ripard@free-electrons.com>
-References: <20160908121751.16911-1-maxime.ripard@free-electrons.com>
- <20160908121751.16911-3-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66C1U8KqSec1Zk8Kyz2n5tQ-Ts4wADfOQR0njbrgnjOzw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Sep 2016 13:40:07 +0100
+Subject: [PATCH 1/6] arm64: sysreg: replace open-coded mrs_s/msr_s with
+ {read,write}_sysreg_s
+In-Reply-To: <1473419765-3437-2-git-send-email-will.deacon@arm.com>
+References: <1473419765-3437-1-git-send-email-will.deacon@arm.com>
+ <1473419765-3437-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20160909124007.GD10562@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 8:17 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Now that we have support for the VGA bridges using our DRM driver, enable
-> the display engine for the Olimex A13-Olinuxino.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Fri, Sep 09, 2016 at 12:16:00PM +0100, Will Deacon wrote:
+> Similar to our {read,write}_sysreg accessors for architected, named
+> system registers, this patch introduces {read,write}_sysreg_s variants
+> that can take arbitrary sys_reg output and therefore access IMPDEF
+> registers or registers that unsupported by binutils.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/cputype.h |  6 +-----
+>  arch/arm64/include/asm/sysreg.h  | 16 ++++++++++++++++
+>  2 files changed, 17 insertions(+), 5 deletions(-)
 
-Assuming the bridge bindings are good,
+> +#define write_sysreg_s(v, r) do {					\
+> +	u64 __val = (u64)v;					\
+> +	asm volatile("msr_s " __stringify(r) ", %0"		\
+> +		     : : "r" (__val));				\
+> +} while (0)
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+As with my patches, can we please make write_sysreg_s allow the zero
+register? i.e. use the "%x0" tempate and "rZ" constraint. The mrs_s asm
+template should handle that correctly.
+
+With that:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
