@@ -1,136 +1,154 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 8 Sep 2016 17:24:32 -0700
-Subject: [RFC 00/17] clk: Add per-controller locks to fix deadlocks
-In-Reply-To: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
-References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160909002432.GE13062@codeaurora.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 9 Sep 2016 08:45:51 +0800
+Subject: [PATCH v4 00/22] Support qcom's HSIC USB and rewrite USB2 HS
+ support
+In-Reply-To: <147336920894.5149.4788295408306540134@sboyd-linaro>
+References: <20160907213519.27340-1-stephen.boyd@linaro.org>
+ <CAL411-ocwAAQ_cn2a+NS08hbFVUMNBvh_QRbPf-fd9=2YMK8kA@mail.gmail.com>
+ <147336920894.5149.4788295408306540134@sboyd-linaro>
+Message-ID: <20160909004551.GA15637@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16, Krzysztof Kozlowski wrote:
-> Hi,
+On Thu, Sep 08, 2016 at 02:13:28PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-09-07 19:06:45)
+> > On Thu, Sep 8, 2016 at 5:34 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> > > The state of USB ChipIdea support on Qualcomm's platforms is not great.
+> > > The DT description of these devices requires up to three different nodes
+> > > for what amounts to be the same hardware block, when there should really
+> > > only be one. Furthermore, the "phy" driver that is in mainline (phy-msm-usb.c)
+> > > duplicates the OTG state machine and touches the ci controller wrapper
+> > > registers when it should really be focused on the phy and the ULPI accesses
+> > > needed to get the phy working. There's also a slimmed down phy driver for
+> > > the msm8916 platform, but really the phy hardware is the same as other MSMs,
+> > > so we have two drivers doing pretty much the same thing. This leads to a
+> > > situtaion where we have the chipidea core driver, the "phy" driver, and
+> > > sometimes the ehci-msm.c driver operating the same device all at the same
+> > > time with very little coordination. This just isn't very safe and is
+> > > confusing from a driver perspective when trying to figure out who does what.
+> > > Finally, there isn't any HSIC support on platforms like apq8074 so we
+> > > should add that.
+> > >
+> > > This patch series updates the ChipIdea driver and the MSM wrapper
+> > > (ci_hdrc_msm.c) to properly handle the PHY and wrapper bits at the right
+> > > times in the right places. To get there, we update the ChipIdea core to
+> > > have support for the ULPI phy bus introduced by Heikki. Along the way
+> > > we fix bugs with the extcon handling for peripheral and OTG mode controllers
+> > > and move the parts of phy-usb-msm.c that are touching the CI controller
+> > > wrapper into the wrapper driver (ci_hdrc_msm.c). Finally we add support
+> > > for the HSIC phy based on the ULPI bus and rewrite the HS phy driver
+> > > (phy-usb-msm.c) as a standard ULPI phy driver.
+> > >
+> > > Once this series is accepted, we should be able to delete the phy-usb-msm.c,
+> > > phy-qcom-8x16-usb.c, and ehci-msm.c drivers from the tree and use the ULPI
+> > > based phy driver (which also lives in drivers/phy/ instead of drivers/usb/phy/)
+> > > and the chipidea host core instead.
+> > >
+> > > I've also sent separate patches for other minor pieces to make this
+> > > all work. The full tree can be found here[3], hacks and all to get
+> > > things working. I've tested this on the db410c, apq8074 dragonboard,
+> > > and ifc6410 with configfs gadgets and otg cables.
+> > >
+> > > Patches based on v4.8-rc1
+> > >
+> > > Changes from v3:
+> > >
+> > >  * Picked up Acks from Peter
+> > >
+> > >  * Updated extcon consolidation patch per Peter's comments
+> > >
+> > >  * Folded in simplification from Heikki for ULPI DT matching
+> > >
+> > 
+> > I find the kbuild dependency error when compile your series, I remembered
+> > someone met it before, would you have a solution:
 > 
-> RFC, please, do not apply, maybe except patch #1 which is harmless.
-> 
-> 
-> Introduction
-> ============
-> The patchset brings new entity: clock controller representing a hardware
-> block.  The clock controller comes with its own prepare lock which
-> is used then in many places.  The idea is to fix the deadlock mentioned
-> in commit 10ff4c5239a1 ("i2c: exynos5: Fix possible ABBA deadlock by keeping
-> I2C clock prepared") and commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA deadlock
-> by keeping clock prepared").
-> 
-> 
-> Disclaimer
-> ==========
-> Request for comments, so:
-> 1. Only exynos_defconfig builds,
-> 2. A lot of FIXME/TODO note still,
-> 3. Checkpatch not run, lines not aligned,
-> 4. Other (non-exynos) drivers not converted,
-> 5. Probably not yet bisectable,
-> 6. Locking became quite complex.
->    The previous one lock was simple.  Inefficient and dead-lock prone but
->    simple.  Because of clock hierarchy spanning through controllers, the
->    new locking became quite complicated.  I don't like it but...
-> 
-> 
-> Details
-> =======
-> In Exynos-based boards case the deadlock occurs between clock's
-> prepare_lock and regmap-i2c's lock:
-> 
-> CPU #0:                             CPU #1:
-> lock(regmap)
->                                     s2mps11-clk: clk_prepare_lock()
-> 
-> i2c-exynos: clk_prepare_lock() - wait
->                                     lock(regmap) - wait
-> 
-> The clk_prepare_lock() on both CPUs come from different clock drivers
-> and components:
-> 1. I2C clock is part of SoC block and is required by i2c-s3c2410/i2c-exynos5
->    driver,
-> 2. S2MPS11 clock is separate device, however driver uses I2C regmap.
-> 
-> The deadlock was reported by lockdep (always) and was happening
-> in 20% of boots of Odroid XU3 with multi_v7 defconfig.  Workaround for
-> deadlock was implemented by removing prepare/unprepare calls from I2C
-> transfers.  However these are just workarounds... which after applying
-> this patch can be reverted.
-> 
-> Additionally Marek Szyprowski's work on domains/clocks/pinctrl exposed
-> the deadlock again in different configuration.
+> Yes. Should I send it through the drm maintainers?
 > 
 
-Per-controller locks seems to be a misnomer. These patches look
-more like per-clk_register() locks. The clk registrant can decide
-how fine grained to make the prepare locking scheme. They can
-decide to have one lock per clk, one lock for the entire tree, or
-one lock per arbitrary subtree. I'd prefer to drop the controller
-concept unless it's really done that way, by attaching to the OF
-clk provider or device pointer.
+Yes, please add me at cc list, thanks.
 
-Given that, it seems that conceptually these patches allow clk
-registrants to carve out a set of clks that they want to be
-treated as an atomic unit with regards to the prepare lock.
-TL;DR trees of per-process recursive prepare mutex locks where
-the locks cover one or more clks.
-
-The locks are recursive per-process to simplify the problem where
-we need to acquire the same lock multiple times while traversing
-a tree that shares the same lock, right? Otherwise we would need
-to track which locks we've already grabbed and refcount and we
-wouldn't be able to re-enter the framework from within the clk
-ops of the same atomic unit.
-
-As long as we can guarantee that we always take the locks in the
-same order we'll be fine. The burden to ensure that would be
-placed on the clk registrants though, and verifying that will be
-left up to humans? That seems fragile and error prone. We can
-always say that we take the global lock and then traverse the
-children up to the roots, but we can't be sure that during the
-tree traversal we don't take locks in different order because of
-how the clk registrant has structured things.
-
-It would be great if the different clk APIs were listed, with the
-order of how locks are taken BTW. And really overall just more
-information about how the locking scheme works. I had to read
-this patch series quite a few times to come to (hopefully the
-right) conclusions.
-
-So I'm not very fond of this design because the locking scheme is
-pretty much out of the hands of the framework and can be easily
-broken. I'm biased of course, because I'd prefer we go with my
-wwmutex design of per-clk locks[1]. Taking locks in any order
-works fine there, and we resolve quite a few long standing
-locking problems that we have while improving scalability. The
-problem there is that we don't get the recursive mutex design
-(maybe that's a benefit!). Once a clk_op reenters the framework
-with consumer APIs and tries to grab the same lock we deadlock.
-This is why I've been slowly splitting consumers from providers
-so we can easily identify these cases. If we had something like
-coordinated clk rate switching, we could get rid of clk_ops
-reentering the framework and avoid this problem (and we really do
-need to do that).
-
-The one thing I do like about this patch series though is the
-gradual movement of providers to the new locking scheme. Maybe if
-we combined that idea with per-clk wwmutex locks we could have
-the best of both worlds and fix reentrancy later when we need it?
-There's wwmutex_trylock() that we could use. Perhaps always pass
-a NULL context if some clk flag isn't set (CLK_USE_PER_CLK_LOCK).
-Plus we could assign the same wwmutex all over the place when
-that flag isn't set and allocate a unique wwmutex at clk_register
-time otherwise. I haven't thought about it deeply, so there may
-be some glaring problem that I'm missing like when we have half
-the clks in a tree with the flag set or something. This is where
-driving home from the office for 45 minutes helps.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/251039.html
+Peter
+> ---8<---
+> From: Stephen Boyd <stephen.boyd@linaro.org>
+> Subject: [PATCH] gpu: Remove depends on RESET_CONTROLLER when not a provider
+> 
+> These GPU drivers only depend on the RESET_CONTROLLER config
+> option to fix build issues that existed when there weren't stub
+> reset APIs for reset controller consumers. Given that these
+> drivers aren't providing any reset controllers themselves, they
+> don't actually depend on the API to build (just to function) so
+> they don't need to depend on it. Remove the dependency to fix
+> recursive build errors like the following:
+> 
+> drivers/usb/Kconfig:39:error: recursive dependency detected!
+> drivers/usb/Kconfig:39: symbol USB is selected by MOUSE_APPLETOUCH
+> drivers/input/mouse/Kconfig:187:        symbol MOUSE_APPLETOUCH depends on INPUT
+> drivers/input/Kconfig:8:        symbol INPUT is selected by VT
+> drivers/tty/Kconfig:12: symbol VT is selected by FB_STI
+> drivers/video/fbdev/Kconfig:674:        symbol FB_STI depends on FB
+> drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
+> drivers/gpu/drm/Kconfig:42:     symbol DRM_KMS_FB_HELPER is selected by DRM_KMS_CMA_HELPER
+> drivers/gpu/drm/Kconfig:98:     symbol DRM_KMS_CMA_HELPER is selected by DRM_IMX
+> drivers/gpu/drm/imx/Kconfig:1:  symbol DRM_IMX depends on IMX_IPUV3_CORE
+> drivers/gpu/ipu-v3/Kconfig:1:   symbol IMX_IPUV3_CORE depends on RESET_CONTROLLER
+> drivers/reset/Kconfig:4:        symbol RESET_CONTROLLER is selected by USB_CHIPIDEA
+> drivers/usb/chipidea/Kconfig:1: symbol USB_CHIPIDEA depends on USB_EHCI_HCD
+> drivers/usb/host/Kconfig:84:    symbol USB_EHCI_HCD depends on USB
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: <dri-devel@lists.freedesktop.org>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Mark Yao <mark.yao@rock-chips.com>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+>  drivers/gpu/drm/rockchip/Kconfig | 1 -
+>  drivers/gpu/drm/tegra/Kconfig    | 1 -
+>  drivers/gpu/ipu-v3/Kconfig       | 1 -
+>  3 files changed, 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+> index 3c58669a06ce..6f7f9c59f05b 100644
+> --- a/drivers/gpu/drm/rockchip/Kconfig
+> +++ b/drivers/gpu/drm/rockchip/Kconfig
+> @@ -1,7 +1,6 @@
+>  config DRM_ROCKCHIP
+>  	tristate "DRM Support for Rockchip"
+>  	depends on DRM && ROCKCHIP_IOMMU
+> -	depends on RESET_CONTROLLER
+>  	select DRM_GEM_CMA_HELPER
+>  	select DRM_KMS_HELPER
+>  	select DRM_PANEL
+> diff --git a/drivers/gpu/drm/tegra/Kconfig b/drivers/gpu/drm/tegra/Kconfig
+> index 63ebb154b9b5..bbf5a4b7e0b6 100644
+> --- a/drivers/gpu/drm/tegra/Kconfig
+> +++ b/drivers/gpu/drm/tegra/Kconfig
+> @@ -3,7 +3,6 @@ config DRM_TEGRA
+>  	depends on ARCH_TEGRA || (ARM && COMPILE_TEST)
+>  	depends on COMMON_CLK
+>  	depends on DRM
+> -	depends on RESET_CONTROLLER
+>  	select DRM_KMS_HELPER
+>  	select DRM_MIPI_DSI
+>  	select DRM_PANEL
+> diff --git a/drivers/gpu/ipu-v3/Kconfig b/drivers/gpu/ipu-v3/Kconfig
+> index aefdff95356d..08766c6e7856 100644
+> --- a/drivers/gpu/ipu-v3/Kconfig
+> +++ b/drivers/gpu/ipu-v3/Kconfig
+> @@ -1,7 +1,6 @@
+>  config IMX_IPUV3_CORE
+>  	tristate "IPUv3 core support"
+>  	depends on SOC_IMX5 || SOC_IMX6Q || ARCH_MULTIPLATFORM
+> -	depends on RESET_CONTROLLER
+>  	select GENERIC_IRQ_CHIP
+>  	help
+>  	  Choose this if you have a i.MX5/6 system and want to use the Image
+> -- 
+> 2.9.0.rc2.8.ga28705d
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+
+Best Regards,
+Peter Chen
