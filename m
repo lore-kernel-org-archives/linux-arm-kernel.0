@@ -1,78 +1,85 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  9 Sep 2016 14:07:07 +0100
-Subject: [PATCH v4 0/9] arm64: Work around for mismatched cache line size
-Message-ID: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
+Date: Fri,  9 Sep 2016 14:07:12 +0100
+Subject: [PATCH v4 5/9] arm64: insn: Add helpers for adrp offsets
+In-Reply-To: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
+References: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1473426436-17870-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds a work around for systems with mismatched {I,D}-cache
-line sizes. When a thread of execution gets migrated to a different CPU,
-the cache line size it had cached could be larger than that of the new
-CPU. This could cause data corruption issues. We work around this by
+Adds helpers for decoding/encoding the PC relative addresses for adrp.
+This will be used for handling dynamic patching of 'adrp' instructions
+in alternative code patching.
 
- - Dynamically patching the kernel to use the smallest line size on the
-   system (from the CPU feature infrastructure)
- - Trapping the userspace access to CTR_EL0 (by clearing SCTLR_EL1.UCT) and
-   emulating it with the system wide safe value of CTR.
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/insn.h | 11 ++++++++++-
+ arch/arm64/kernel/insn.c      | 13 +++++++++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
 
-The series also adds support for alternative code patching of adrp
-instructions by adjusting the PC-relative address offset to reflect
-the new PC.
-
-The series has been tested on Juno with a hack to forced enabling
-of the capability.
-
-Applies on aarch64 for-next/core.
- The tree is avaiable at :
-  git://linux-arm.org/linux-skp.git ctr-v4
-
-Changes since V3:
- - Use ldr_l for arm64_ftr_reg_ctrel0+ARM64_FTR_SYS_VAL, saving one
-   instruction.
- - Added Acked-by's from Andre
-
-Changes since V2:
- - Rebase to for-next/core which contains Ard's series for refactoring
-   the arm64_ftr_reg [1]
-
-Changes since V1:
-
- - Replace adr_adrp insn helper with seperate helpers for adr and adrp.
- - Add/use align_down() macro for adjusting the page address for adrp offsets.
- - Add comments for existing ISS field defintions.
- - Added a patch to disallow silent patching of unhandled pc relative
-   instructions in alternative code patching.
-
-[1] http://marc.info/?l=linux-arm-kernel&m=147263959504998&w=2
-
-
-Suzuki K Poulose (9):
-  arm64: Set the safe value for L1 icache policy
-  arm64: Use consistent naming for errata handling
-  arm64: Rearrange CPU errata workaround checks
-  arm64: alternative: Disallow patching instructions using literals
-  arm64: insn: Add helpers for adrp offsets
-  arm64: alternative: Add support for patching adrp instructions
-  arm64: Introduce raw_{d,i}cache_line_size
-  arm64: Refactor sysinstr exception handling
-  arm64: Work around systems with mismatched cache line sizes
-
- arch/arm64/include/asm/assembler.h  | 44 +++++++++++++++++--
- arch/arm64/include/asm/cpufeature.h | 13 +++---
- arch/arm64/include/asm/esr.h        | 84 +++++++++++++++++++++++++++++++----
- arch/arm64/include/asm/insn.h       | 11 ++++-
- arch/arm64/include/asm/sysreg.h     |  1 +
- arch/arm64/kernel/alternative.c     | 21 +++++++++
- arch/arm64/kernel/asm-offsets.c     |  2 +
- arch/arm64/kernel/cpu_errata.c      | 26 ++++++++++-
- arch/arm64/kernel/cpufeature.c      | 35 ++++++++++-----
- arch/arm64/kernel/cpuinfo.c         |  2 -
- arch/arm64/kernel/hibernate-asm.S   |  2 +-
- arch/arm64/kernel/insn.c            | 13 ++++++
- arch/arm64/kernel/relocate_kernel.S |  2 +-
- arch/arm64/kernel/smp.c             |  8 +++-
- arch/arm64/kernel/traps.c           | 87 ++++++++++++++++++++++++++-----------
- 15 files changed, 286 insertions(+), 65 deletions(-)
-
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 1dbaa90..bc85366 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -246,7 +246,8 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
+ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+ { return (val); }
+ 
+-__AARCH64_INSN_FUNCS(adr_adrp,	0x1F000000, 0x10000000)
++__AARCH64_INSN_FUNCS(adr,	0x9F000000, 0x10000000)
++__AARCH64_INSN_FUNCS(adrp,	0x9F000000, 0x90000000)
+ __AARCH64_INSN_FUNCS(prfm_lit,	0xFF000000, 0xD8000000)
+ __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
+ __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
+@@ -318,6 +319,11 @@ __AARCH64_INSN_FUNCS(msr_reg,	0xFFF00000, 0xD5100000)
+ bool aarch64_insn_is_nop(u32 insn);
+ bool aarch64_insn_is_branch_imm(u32 insn);
+ 
++static inline bool aarch64_insn_is_adr_adrp(u32 insn)
++{
++	return aarch64_insn_is_adr(insn) || aarch64_insn_is_adrp(insn);
++}
++
+ int aarch64_insn_read(void *addr, u32 *insnp);
+ int aarch64_insn_write(void *addr, u32 insn);
+ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+@@ -398,6 +404,9 @@ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
+ int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
+ int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
+ 
++s32 aarch64_insn_adrp_get_offset(u32 insn);
++u32 aarch64_insn_adrp_set_offset(u32 insn, s32 offset);
++
+ bool aarch32_insn_is_wide(u32 insn);
+ 
+ #define A32_RN_OFFSET	16
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 178488f..6f2ac4f 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -1202,6 +1202,19 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
+ 	BUG();
+ }
+ 
++s32 aarch64_insn_adrp_get_offset(u32 insn)
++{
++	BUG_ON(!aarch64_insn_is_adrp(insn));
++	return aarch64_insn_decode_immediate(AARCH64_INSN_IMM_ADR, insn) << 12;
++}
++
++u32 aarch64_insn_adrp_set_offset(u32 insn, s32 offset)
++{
++	BUG_ON(!aarch64_insn_is_adrp(insn));
++	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_ADR, insn,
++						offset >> 12);
++}
++
+ /*
+  * Extract the Op/CR data from a msr/mrs instruction.
+  */
 -- 
 2.7.4
