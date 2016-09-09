@@ -1,74 +1,208 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 9 Sep 2016 16:34:13 +0200
-Subject: [PATCH 3/6] drm/panel: simple: Add A10 EVB 5 inch panel support
-In-Reply-To: <CAGb2v66GsA8uNaaZfnnHFgBLA-LChCnO3vLhdtfzHNU0nHXH4Q@mail.gmail.com>
-References: <20160831081817.5191-1-maxime.ripard@free-electrons.com>
- <20160831081817.5191-4-maxime.ripard@free-electrons.com>
- <CAGb2v66GsA8uNaaZfnnHFgBLA-LChCnO3vLhdtfzHNU0nHXH4Q@mail.gmail.com>
-Message-ID: <20160909143413.GA8881@lukather>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri,  9 Sep 2016 15:23:43 +0100
+Subject: [PATCH v5 14/14] drivers: acpi: iort: introduce iort_iommu_configure
+In-Reply-To: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
+References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20160909142343.13314-15-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+DT based systems have a generic kernel API to configure IOMMUs
+for devices (ie of_iommu_configure()).
 
-On Mon, Sep 05, 2016 at 10:00:01PM +0800, Chen-Yu Tsai wrote:
-> On Wed, Aug 31, 2016 at 4:18 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The A10-EVB from Allwinner comes with an unidentified panel, with the only
-> > mark on the PCB being A10-SUB-EVB-5LCD.
-> >
-> > Add timings to simple panel to handle it.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> >
-> > diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-> > index 85143d1b9b31..be371b053aab 100644
-> > --- a/drivers/gpu/drm/panel/panel-simple.c
-> > +++ b/drivers/gpu/drm/panel/panel-simple.c
-> > @@ -386,6 +386,29 @@ static void panel_simple_shutdown(struct device *dev)
-> >         panel_simple_disable(&panel->base);
-> >  }
-> >
-> > +static const struct drm_display_mode allwinner_a10_sub_evb_5lcd_mode = {
-> > +       .clock = 33000,
-> > +       .hdisplay = 800,
-> > +       .hsync_start = 800 + 209,
-> > +       .hsync_end = 800 + 209 + 1,
-> > +       .htotal = 800 + 209 + 1 + 45,
-> > +       .vdisplay = 480,
-> > +       .vsync_start = 480 + 22,
-> > +       .vsync_end = 480 + 22 + 1,
-> > +       .vtotal = 480 + 22 + 1 + 22,
-> > +       .vrefresh = 60,
-> 
-> I assume the numbers came from the fex file? Allwinner LCD timing numbers
-> aren't very precise. This seems to yield a refresh rate of 58.x Hz.
-> The dot clock can go below MHz resolution, so it should be possible
-> to set it to a more proper clock rate here.
+On ARM based ACPI systems, the of_iommu_configure() equivalent can
+be implemented atop ACPI IORT kernel API, with the corresponding
+functions to map device identifiers to IOMMUs and retrieve the
+corresponding IOMMU operations necessary for DMA operations set-up.
 
-Indeed.
+By relying on the iommu_fwspec generic kernel infrastructure,
+implement the IORT based IOMMU configuration for ARM ACPI systems
+and hook it up in the ACPI kernel layer that implements DMA
+configuration for a device.
 
-Upon closer inspection, it seems (from the ribbon) that the display is
-an hannstar, but there's no screen reference anywhere.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+---
+ drivers/acpi/arm64/iort.c | 96 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/acpi/scan.c       |  7 +++-
+ include/linux/acpi_iort.h |  6 +++
+ 3 files changed, 108 insertions(+), 1 deletion(-)
 
-By looking into it using the available references, the date of
-production found on that panel, and so on, it seems like it is an
-HSD050IDW1-A, whose timings do not seem to far off. But it's pure
-speculation at this point.
-
-Maxime
-
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 7c68eb4..55a4ae9 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -19,6 +19,7 @@
+ #define pr_fmt(fmt)	"ACPI: IORT: " fmt
+ 
+ #include <linux/acpi_iort.h>
++#include <linux/iommu-fwspec.h>
+ #include <linux/kernel.h>
+ #include <linux/list.h>
+ #include <linux/pci.h>
+@@ -27,6 +28,8 @@
+ 
+ #define IORT_TYPE_MASK(type)	(1 << (type))
+ #define IORT_MSI_TYPE		(1 << ACPI_IORT_NODE_ITS_GROUP)
++#define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
++				(1 << ACPI_IORT_NODE_SMMU_V3))
+ 
+ struct iort_its_msi_chip {
+ 	struct list_head	list;
+@@ -467,6 +470,99 @@ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id)
+ 	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
+ }
+ 
++static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
++{
++	u32 *rid = data;
++
++	*rid = alias;
++	return 0;
++}
++
++static int arm_smmu_iort_xlate(struct device *dev, u32 streamid,
++			       struct fwnode_handle *fwnode)
++{
++	int ret = iommu_fwspec_init(dev, fwnode);
++
++	if (!ret)
++		ret = iommu_fwspec_add_ids(dev, &streamid, 1);
++
++	return ret;
++}
++
++static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
++					struct acpi_iort_node *node,
++					u32 streamid)
++{
++	struct fwnode_handle *iort_fwnode = NULL;
++	int ret;
++
++	if (node) {
++		iort_fwnode = iort_get_fwnode(node);
++		if (!iort_fwnode)
++			return NULL;
++
++		ret = arm_smmu_iort_xlate(dev, streamid,
++					  iort_fwnode);
++		if (!ret)
++			return fwspec_iommu_get_ops(iort_fwnode);
++	}
++
++	return NULL;
++}
++
++/**
++ * iort_iommu_configure - Set-up IOMMU configuration for a device.
++ *
++ * @dev: device to configure
++ *
++ * Returns: iommu_ops pointer on configuration success
++ *          NULL on configuration failure
++ */
++const struct iommu_ops *iort_iommu_configure(struct device *dev)
++{
++	struct acpi_iort_node *node, *parent;
++	const struct iommu_ops *ops = NULL;
++	u32 streamid = 0;
++
++	if (dev_is_pci(dev)) {
++		struct pci_bus *bus = to_pci_dev(dev)->bus;
++		u32 rid;
++
++		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
++				       &rid);
++
++		node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
++				      iort_match_node_callback, &bus->dev);
++		if (!node)
++			return NULL;
++
++		parent = iort_node_map_rid(node, rid, &streamid,
++					   IORT_IOMMU_TYPE);
++
++		ops = iort_iommu_xlate(dev, parent, streamid);
++
++	} else {
++		int i = 0;
++
++		node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
++				      iort_match_node_callback, dev);
++		if (!node)
++			return NULL;
++
++		parent = iort_node_get_id(node, &streamid,
++					  IORT_IOMMU_TYPE, i++);
++
++		while (parent) {
++			ops = iort_iommu_xlate(dev, parent, streamid);
++
++			parent = iort_node_get_id(node, &streamid,
++						  IORT_IOMMU_TYPE, i++);
++		}
++	}
++
++	return ops;
++}
++
+ static void __init acpi_iort_register_irq(int hwirq, const char *name,
+ 					  int trigger,
+ 					  struct resource *res)
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 9614232..7e56a85 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -7,6 +7,7 @@
+ #include <linux/slab.h>
+ #include <linux/kernel.h>
+ #include <linux/acpi.h>
++#include <linux/acpi_iort.h>
+ #include <linux/signal.h>
+ #include <linux/kthread.h>
+ #include <linux/dmi.h>
+@@ -1377,11 +1378,15 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+  */
+ void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+ {
++	const struct iommu_ops *iommu;
++
++	iommu = iort_iommu_configure(dev);
++
+ 	/*
+ 	 * Assume dma valid range starts at 0 and covers the whole
+ 	 * coherent_dma_mask.
+ 	 */
+-	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, NULL,
++	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
+ 			   attr == DEV_DMA_COHERENT);
+ }
+ 
+diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+index 1ed4f8f..167649a 100644
+--- a/include/linux/acpi_iort.h
++++ b/include/linux/acpi_iort.h
+@@ -36,6 +36,8 @@ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
+ int iort_set_fwnode(struct acpi_iort_node *iort_node,
+ 		    struct fwnode_handle *fwnode);
+ struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node);
++/* IOMMU interface */
++const struct iommu_ops *iort_iommu_configure(struct device *dev);
+ #else
+ static inline void acpi_iort_init(void) { }
+ static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+@@ -49,6 +51,10 @@ static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
+ static inline
+ struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
+ { return NULL; }
++/* IOMMU interface */
++static inline
++const struct iommu_ops *iort_iommu_configure(struct device *dev)
++{ return NULL; }
+ #endif
+ 
+ #define IORT_ACPI_DECLARE(name, table_id, fn)		\
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160909/d72d8656/attachment-0001.sig>
+2.10.0
