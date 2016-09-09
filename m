@@ -1,78 +1,45 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri,  9 Sep 2016 10:28:56 +0200
-Subject: [PATCH v2 2/4] pinctrl: amlogic: gxbb: add nand pins
-In-Reply-To: <1473409738-27175-1-git-send-email-jbrunet@baylibre.com>
-References: <1473409738-27175-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <1473409738-27175-3-git-send-email-jbrunet@baylibre.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 09 Sep 2016 10:29:17 +0200
+Subject: [PATCH] gpu: Remove depends on RESET_CONTROLLER when not a
+ provider
+In-Reply-To: <20160909013650.25166-1-stephen.boyd@linaro.org>
+References: <20160909013650.25166-1-stephen.boyd@linaro.org>
+Message-ID: <1473409757.3023.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add EE domains pins for the NAND flash controller.
-Even tough we have no driver for the NAND flash controller yet, we need
-to have these pins in pinctrl as the actual pin are shared with the spifc
-controller. The bootloader on the S905-P200 setup pinmux for the NAND
-controller so we need the kernel to properly deactivate this if necessary.
+Am Donnerstag, den 08.09.2016, 18:36 -0700 schrieb Stephen Boyd:
+> These GPU drivers only depend on the RESET_CONTROLLER config
+> option to fix build issues that existed when there weren't stub
+> reset APIs for reset controller consumers. Given that these
+> drivers aren't providing any reset controllers themselves, they
+> don't actually depend on the API to build (just to function) so
+> they don't need to depend on it. Remove the dependency to fix
+> recursive build errors like the following:
+> 
+> drivers/usb/Kconfig:39:error: recursive dependency detected!
+> drivers/usb/Kconfig:39: symbol USB is selected by MOUSE_APPLETOUCH
+> drivers/input/mouse/Kconfig:187:        symbol MOUSE_APPLETOUCH depends on INPUT
+> drivers/input/Kconfig:8:        symbol INPUT is selected by VT
+> drivers/tty/Kconfig:12: symbol VT is selected by FB_STI
+> drivers/video/fbdev/Kconfig:674:        symbol FB_STI depends on FB
+> drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
+> drivers/gpu/drm/Kconfig:42:     symbol DRM_KMS_FB_HELPER is selected by DRM_KMS_CMA_HELPER
+> drivers/gpu/drm/Kconfig:98:     symbol DRM_KMS_CMA_HELPER is selected by DRM_IMX
+> drivers/gpu/drm/imx/Kconfig:1:  symbol DRM_IMX depends on IMX_IPUV3_CORE
+> drivers/gpu/ipu-v3/Kconfig:1:   symbol IMX_IPUV3_CORE depends on RESET_CONTROLLER
+> drivers/reset/Kconfig:4:        symbol RESET_CONTROLLER is selected by USB_CHIPIDEA
+> drivers/usb/chipidea/Kconfig:1: symbol USB_CHIPIDEA depends on USB_EHCI_HCD
+> drivers/usb/host/Kconfig:84:    symbol USB_EHCI_HCD depends on USB
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Mark Yao <mark.yao@rock-chips.com>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-Acked-by: Kevin Hilman <khilman@baylibre.com>
----
- drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-index f74dbd5d350b..699f93c51040 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-@@ -168,6 +168,15 @@ static const unsigned int sdcard_d3_pins[] = { PIN(CARD_4, EE_OFF) };
- static const unsigned int sdcard_cmd_pins[] = { PIN(CARD_3, EE_OFF) };
- static const unsigned int sdcard_clk_pins[] = { PIN(CARD_2, EE_OFF) };
- 
-+static const unsigned int nand_ce0_pins[]	= { PIN(BOOT_8, EE_OFF) };
-+static const unsigned int nand_ce1_pins[]	= { PIN(BOOT_9, EE_OFF) };
-+static const unsigned int nand_rb0_pins[]	= { PIN(BOOT_10, EE_OFF) };
-+static const unsigned int nand_ale_pins[]	= { PIN(BOOT_11, EE_OFF) };
-+static const unsigned int nand_cle_pins[]	= { PIN(BOOT_12, EE_OFF) };
-+static const unsigned int nand_wen_clk_pins[]	= { PIN(BOOT_13, EE_OFF) };
-+static const unsigned int nand_ren_wr_pins[]	= { PIN(BOOT_14, EE_OFF) };
-+static const unsigned int nand_dqs_pins[]	= { PIN(BOOT_15, EE_OFF) };
-+
- static const unsigned int uart_tx_a_pins[]	= { PIN(GPIOX_12, EE_OFF) };
- static const unsigned int uart_rx_a_pins[]	= { PIN(GPIOX_13, EE_OFF) };
- static const unsigned int uart_cts_a_pins[]	= { PIN(GPIOX_14, EE_OFF) };
-@@ -402,6 +411,14 @@ static struct meson_pmx_group meson_gxbb_periphs_groups[] = {
- 	GROUP(nor_q,		5,	3),
- 	GROUP(nor_c,		5,	2),
- 	GROUP(nor_cs,		5,	0),
-+	GROUP(nand_ce0,		4,	26),
-+	GROUP(nand_ce1,		4,	27),
-+	GROUP(nand_rb0,		4,	25),
-+	GROUP(nand_ale,		4,	24),
-+	GROUP(nand_cle,		4,	23),
-+	GROUP(nand_wen_clk,	4,	22),
-+	GROUP(nand_ren_wr,	4,	21),
-+	GROUP(nand_dqs,		4,	20),
- 
- 	/* Bank CARD */
- 	GROUP(sdcard_d1,	2,	14),
-@@ -493,6 +510,11 @@ static const char * const sdcard_groups[] = {
- 	"sdcard_cmd", "sdcard_clk",
- };
- 
-+static const char * const nand_groups[] = {
-+	"nand_ce0", "nand_ce1", "nand_rb0", "nand_ale", "nand_cle",
-+	"nand_wen_clk", "nand_ren_wr", "nand_dqs",
-+};
-+
- static const char * const uart_a_groups[] = {
- 	"uart_tx_a", "uart_rx_a", "uart_cts_a", "uart_rts_a",
- };
-@@ -539,6 +561,7 @@ static struct meson_pmx_func meson_gxbb_periphs_functions[] = {
- 	FUNCTION(emmc),
- 	FUNCTION(nor),
- 	FUNCTION(sdcard),
-+	FUNCTION(nand),
- 	FUNCTION(uart_a),
- 	FUNCTION(uart_b),
- 	FUNCTION(uart_c),
--- 
-2.7.4
+thanks
+Philipp
