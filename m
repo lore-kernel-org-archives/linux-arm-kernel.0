@@ -1,140 +1,83 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri,  9 Sep 2016 15:23:33 +0100
-Subject: [PATCH v5 04/14] drivers: acpi: iort: add support for IOMMU fwnode
- registration
+Date: Fri,  9 Sep 2016 15:23:32 +0100
+Subject: [PATCH v5 03/14] drivers: acpi: iort: introduce linker section for
+ IORT entries probing
 In-Reply-To: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
 References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20160909142343.13314-5-lorenzo.pieralisi@arm.com>
+Message-ID: <20160909142343.13314-4-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACPI IORT table provide entries for IOMMU (aka SMMU in ARM world)
-components that allow creating the kernel data structures required to
-probe and initialize the IOMMU devices.
+Since commit e647b532275b ("ACPI: Add early device probing
+infrastructure") the kernel has gained the infrastructure that allows
+adding linker script section entries to execute ACPI driver callbacks
+(ie probe routines) for all subsystems that register a table entry
+in the respective kernel section (eg clocksource, irqchip).
 
-This patch provides support in the IORT kernel code to register IOMMU
-components and their respective fwnode.
+Since ARM IOMMU devices data is described through IORT tables when
+booting with ACPI, the ARM IOMMU drivers must be made able to hook ACPI
+callback routines that are called to probe IORT entries and initialize
+the respective IOMMU devices.
+
+To avoid adding driver specific hooks into IORT table initialization
+code (breaking therefore code modularity - ie ACPI IORT code must be made
+aware of ARM SMMU drivers ACPI init callbacks), this patch adds code
+that allows ARM SMMU drivers to take advantage of the ACPI early probing
+infrastructure, so that they can add linker script section entries
+containing drivers callback to be executed on IORT tables detection.
+
+Since IORT nodes are differentiated by a type, the callback routines
+can easily parse the IORT table entries, check the IORT nodes and
+carry out some actions whenever the IORT node type associated with
+the driver specific callback is matched.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/acpi/arm64/iort.c | 65 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/acpi_iort.h |  9 +++++++
- 2 files changed, 74 insertions(+)
+ drivers/acpi/arm64/iort.c         | 3 +++
+ include/asm-generic/vmlinux.lds.h | 1 +
+ include/linux/acpi_iort.h         | 3 +++
+ 3 files changed, 7 insertions(+)
 
 diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 4cbeb707..b89b3d3 100644
+index a6fba4d..4cbeb707 100644
 --- a/drivers/acpi/arm64/iort.c
 +++ b/drivers/acpi/arm64/iort.c
-@@ -20,7 +20,9 @@
+@@ -367,5 +367,8 @@ void __init acpi_iort_init(void)
+ 	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
+ 		const char *msg = acpi_format_exception(status);
+ 		pr_err("Failed to get table, %s\n", msg);
++		return;
+ 	}
++
++	acpi_probe_device_table(iort);
+ }
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index 2456397..7ee4e0c 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -546,6 +546,7 @@
+ 	IRQCHIP_OF_MATCH_TABLE()					\
+ 	ACPI_PROBE_TABLE(irqchip)					\
+ 	ACPI_PROBE_TABLE(clksrc)					\
++	ACPI_PROBE_TABLE(iort)						\
+ 	EARLYCON_TABLE()
  
- #include <linux/acpi_iort.h>
- #include <linux/kernel.h>
-+#include <linux/list.h>
- #include <linux/pci.h>
-+#include <linux/slab.h>
- 
- struct iort_its_msi_chip {
- 	struct list_head	list;
-@@ -28,6 +30,69 @@ struct iort_its_msi_chip {
- 	u32			translation_id;
- };
- 
-+struct iort_fwnode {
-+	struct list_head list;
-+	struct acpi_iort_node *iort_node;
-+	struct fwnode_handle *fwnode;
-+};
-+static LIST_HEAD(iort_fwnode_list);
-+static DEFINE_SPINLOCK(iort_fwnode_lock);
-+
-+/**
-+ * iort_set_fwnode() - Create iort_fwnode and use it to register
-+ *		       iommu data in the iort_fwnode_list
-+ *
-+ * @node: IORT table node associated with the IOMMU
-+ * @fwnode: fwnode associated with the IORT node
-+ *
-+ * Returns: 0 on success
-+ *          <0 on failure
-+ */
-+int iort_set_fwnode(struct acpi_iort_node *iort_node,
-+		    struct fwnode_handle *fwnode)
-+{
-+	struct iort_fwnode *np;
-+
-+	np = kzalloc(sizeof(struct iort_fwnode), GFP_ATOMIC);
-+
-+	if (WARN_ON(!np))
-+		return -ENOMEM;
-+
-+	INIT_LIST_HEAD(&np->list);
-+	np->iort_node = iort_node;
-+	np->fwnode = fwnode;
-+
-+	spin_lock(&iort_fwnode_lock);
-+	list_add_tail(&np->list, &iort_fwnode_list);
-+	spin_unlock(&iort_fwnode_lock);
-+
-+	return 0;
-+}
-+
-+/**
-+ * iort_get_fwnode() - Retrieve fwnode associated with an IORT node
-+ *
-+ * @node: IORT table node to be looked-up
-+ *
-+ * Returns: fwnode_handle pointer on success, NULL on failure
-+*/
-+struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
-+{
-+	struct iort_fwnode *curr;
-+	struct fwnode_handle *fwnode = NULL;
-+
-+	spin_lock(&iort_fwnode_lock);
-+	list_for_each_entry(curr, &iort_fwnode_list, list) {
-+		if (curr->iort_node == node) {
-+			fwnode = curr->fwnode;
-+			break;
-+		}
-+	}
-+	spin_unlock(&iort_fwnode_lock);
-+
-+	return fwnode;
-+}
-+
- typedef acpi_status (*iort_find_node_callback)
- 	(struct acpi_iort_node *node, void *context);
- 
+ #define INIT_TEXT							\
 diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index d16fdda..c851646 100644
+index 0e32dac..d16fdda 100644
 --- a/include/linux/acpi_iort.h
 +++ b/include/linux/acpi_iort.h
-@@ -30,6 +30,9 @@ struct fwnode_handle *iort_find_domain_token(int trans_id);
- void acpi_iort_init(void);
- u32 iort_msi_map_rid(struct device *dev, u32 req_id);
- struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
-+int iort_set_fwnode(struct acpi_iort_node *iort_node,
-+		    struct fwnode_handle *fwnode);
-+struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node);
- #else
- static inline void acpi_iort_init(void) { }
- static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
-@@ -37,6 +40,12 @@ static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
- static inline struct irq_domain *iort_get_device_domain(struct device *dev,
- 							u32 req_id)
+@@ -39,4 +39,7 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
  { return NULL; }
-+static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
-+				  struct fwnode_handle *fwnode)
-+{ return -ENODEV; }
-+static inline
-+struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
-+{ return NULL; }
  #endif
  
- #define IORT_ACPI_DECLARE(name, table_id, fn)		\
++#define IORT_ACPI_DECLARE(name, table_id, fn)		\
++	ACPI_DECLARE_PROBE_ENTRY(iort, name, table_id, 0, NULL, 0, fn)
++
+ #endif /* __ACPI_IORT_H__ */
 -- 
 2.10.0
