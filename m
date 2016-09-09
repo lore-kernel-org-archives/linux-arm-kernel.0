@@ -1,43 +1,45 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 9 Sep 2016 21:15:54 +0200
-Subject: [PATCH 1/2] ARM: clk-imx35: fix name for ckil clk
-In-Reply-To: <20160909181138.GD7243@codeaurora.org>
-References: <1473327022-8065-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160909061631.GI16911@tiger>
- <20160909062034.tim2tzcihui6inoa@pengutronix.de>
- <20160909181138.GD7243@codeaurora.org>
-Message-ID: <20160909191554.p5heukzkidwqiwpf@pengutronix.de>
+Date: Fri, 9 Sep 2016 21:24:28 +0200
+Subject: [PATCH 1/9] mtd: nand: Create a NAND reset function
+In-Reply-To: <20160909142635.23a8c865@bbrezillon>
+References: <1473422712-12359-1-git-send-email-s.hauer@pengutronix.de>
+ <1473422712-12359-2-git-send-email-s.hauer@pengutronix.de>
+ <CAOMZO5DfSU5rhf45Vcs7Sit=v2FdQtm=nhdfstZdYwizP6C-=w@mail.gmail.com>
+ <20160909142635.23a8c865@bbrezillon>
+Message-ID: <20160909192428.bxexkdokigezeqc7@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 11:11:38AM -0700, Stephen Boyd wrote:
-> On 09/09, Uwe Kleine-K?nig wrote:
-> > To += mturquette, sboyd
+Hello,
+
+On Fri, Sep 09, 2016 at 02:26:35PM +0200, Boris Brezillon wrote:
+> On Fri, 9 Sep 2016 09:15:52 -0300
+> Fabio Estevam <festevam@gmail.com> wrote:
+> > On Fri, Sep 9, 2016 at 9:05 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > > 
-> > Hello Shawn, hello Michael, hello Stephen,
+> > >  /**
+> > > + * nand_reset - Reset and initialize a NAND device
+> > > + * @chip: The NAND chip
+> > > + *
+> > > + * Returns 0 for success or negative error code otherwise
+> > > + */
+> > > +int nand_reset(struct nand_chip *chip)
+> > > +{
+> > > +       chip->cmdfunc(&chip->mtd, NAND_CMD_RESET, -1, -1);
+> > > +
+> > > +       return 0;  
 > > 
-> > On Fri, Sep 09, 2016 at 02:16:31PM +0800, Shawn Guo wrote:
-> > > On Thu, Sep 08, 2016 at 11:30:21AM +0200, Uwe Kleine-K?nig wrote:
-> > > > This fixes
-> > > > 	[    0.000000] i.MX clk 82: register failed with -17
-> > > > because the name is duplicated.
-> > > > 
-> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > 
-> > > I did not queue any clock patches for this cycle.  Can you please send
-> > > the patches directly to clock maintainers?
-> > 
-> > @shawnguo: Is this an ack?
-> > @mturquette, sboyd: should I resend? IMHO the first patch should go in
-> > soon.
+> > It always return 0 here, so the comment and code do not match.
 > 
-> Does the first patch need a fixes tag? We can apply them
-> directly.
+> Not sure this is a big problem, because the function is updated in
+> patch 6 and after that it can return an error.
 
-The breakage was introduced by v4.3-rc2~4^2~71^2, i.e.
-3713e3f5e927 (clk: imx35: define two clocks for rtc).
+Also from a purely logically POV "Returns 0 for success or negative
+error code otherwise" doesn't contradict the implementation. The
+function just always succeeds and so the statement is true because the
+left argument of the or expression is true :-)
 
-Best regards
+SCNR
 Uwe
 
 -- 
