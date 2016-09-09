@@ -1,31 +1,38 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri, 09 Sep 2016 10:26:31 +0200
-Subject: [PATCH 4/8] ARM: dts: bcm283x: Add a new EMMC pin group from
- the downstream tree.
-In-Reply-To: <429647ef-ff1e-4999-5b19-3b4529ad3872@i2se.com>
-References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
- <1473244289-20728-5-git-send-email-kraxel@redhat.com>
- <87650770.23554.026b1e4b-e35d-48e6-9394-7eeea0ff9add.open-xchange@email.1und1.de>
- <1473320687.6698.25.camel@redhat.com>
- <429647ef-ff1e-4999-5b19-3b4529ad3872@i2se.com>
-Message-ID: <1473409591.6698.81.camel@redhat.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri,  9 Sep 2016 10:28:54 +0200
+Subject: [PATCH v2 0/4] ARM: amlogic: Add spifc support to Amlogic's GXBB
+ family
+Message-ID: <1473409738-27175-1-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi,
+This patch series adds the necessary pins, clocks and device tree nodes to
+enable the spifc controller on the GXBB family. I had to add the nand pins
+in pintctrl as the pinmux setting left by u-boot was conflicting with the
+spifc pinmux during my test on the P200.
 
-> No, i thought of the GPIO pull up/down register values:
-> 
-> BCM2835_PUD_OFF 0
-> BCM2835_PUD_DOWN 1
-> BCM2835_PUD_UP 2
+Changes since v1 at : http://lkml.kernel.org/r/1473261223-15412-1-git-send-email-jbrunet at baylibre.com
+ * Omit patches :
+  - dt-bindings: spi-meson: Add GXBB Compatible string
+  - spi: meson: Add GXBB compatible
+  Sent as dedicated series
+ * Omit patch:
+  - clk: gxbb: expose spifc clock
+  Already applied
+ * Rename SPI flash controller pins from spifc_* to nor_* to keep the
+   name aligned with the datasheet
 
-We can do that, sure (and probably drop the unused "enum
-bcm2835_pinconf_pull" from drivers/pinctrl/bcm/pinctrl-bcm2835.c at the
-same time).
+Jerome Brunet (3):
+  pinctrl: amlogic: gxbb: add spi nor pins
+  pinctrl: amlogic: gxbb: add nand pins
+  ARM64: dts: amlogic: add spi nor pins
 
-But I fail to see how this is related to the patch discussed, looks like
-a independent issue to me ...
+Neil Armstrong (1):
+  ARM64: dts: meson-gxbb: Add SPIFC node
 
-cheers,
-  Gerd
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 19 +++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson-gxbb.c  | 37 +++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
+
+-- 
+2.7.4
