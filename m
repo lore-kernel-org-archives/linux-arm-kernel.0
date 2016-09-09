@@ -1,28 +1,31 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Sep 2016 12:28:41 +0100
-Subject: [PATCH] cpufreq: create link to policy only for registered CPUs
-In-Reply-To: <20160909112204.GE18547@vireshk-i7>
-References: <20160819110032.GM1041@n2100.armlinux.org.uk>
- <a0469c333e08b3953bfe9e8356c6919c26578349.1473414746.git.viresh.kumar@linaro.org>
- <20160909111620.GQ1041@n2100.armlinux.org.uk>
- <20160909112204.GE18547@vireshk-i7>
-Message-ID: <20160909112841.GS1041@n2100.armlinux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 Sep 2016 12:34:11 +0100
+Subject: [PATCH] arm64: spinlocks: implement smp_mb__before_spinlock() as
+ smp_mb()
+In-Reply-To: <1473072965-7272-1-git-send-email-will.deacon@arm.com>
+References: <1473072965-7272-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20160909113411.GB19083@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 04:52:04PM +0530, Viresh Kumar wrote:
-> Thanks for testing it.. You need another patch from Rafael, which
-> should be in linux-next by now..
+On Mon, Sep 05, 2016 at 11:56:05AM +0100, Will Deacon wrote:
+> smp_mb__before_spinlock() is intended to upgrade a spin_lock() operation
+> to a full barrier, such that prior stores are ordered with respect to
+> loads and stores occuring inside the critical section.
 > 
-> commit 3689ad7ed6a8 ("cpufreq: Drop unnecessary check from
-> cpufreq_policy_alloc()")
+> Unfortunately, the core code defines the barrier as smp_wmb(), which
+> is insufficient to provide the required ordering guarantees when used in
+> conjunction with our load-acquire-based spinlock implementation.
 > 
-> Both patches combined will fix the problem you were getting.
+> This patch overrides the arm64 definition of smp_mb__before_spinlock()
+> to map to a full smp_mb().
+> 
+> Cc: <stable@vger.kernel.org>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Reported-by: Alan Stern <stern@rowland.harvard.edu>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Please send me this other patch.  Seems absurd to fix a reported problem
-without copying appropriate patches to the reporter...
+Queued for -rc6. Thanks.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Catalin
