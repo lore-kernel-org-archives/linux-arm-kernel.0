@@ -1,50 +1,79 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Fri, 9 Sep 2016 09:36:27 +0100
-Subject: [PATCH v10 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
-In-Reply-To: <1473352456.21193.8.camel@redhat.com>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
- <20160905123617.18775-4-aleksey.makarov@linaro.org>
- <7e5486cc-4080-2d1e-8f6d-98874379887d@gmail.com>
- <20160908111654.GH1493@arm.com>
- <1473352456.21193.8.camel@redhat.com>
-Message-ID: <20160909083627.GA7292@xora-monster>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 09 Sep 2016 11:42:19 +0300
+Subject: [PATCH] [media] platform: constify vb2_ops structures
+In-Reply-To: <1473379150-17315-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1473379150-17315-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1520635.43zSurJaks@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 12:34:16PM -0400, Mark Salter wrote:
-> On Thu, 2016-09-08 at 12:16 +0100, Will Deacon wrote:
-> > On Wed, Sep 07, 2016 at 12:30:19PM +0300, Aleksey Makarov wrote:
-> > > 
-> > > 
-> > > On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
-> > > > 
-> > > > SBBR mentions SPCR as a mandatory ACPI table.??So enable it for ARM64
-> > > > 
-> > > > Earlycon should be set up as early as possible.??ACPI boot tables are
-> > > > mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
-> > > > is called from setup_arch() and that's where we parse SPCR.
-> > > > So it has to be opted-in per-arch.
-> > > > 
-> > > > When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
-> > > > deferred until the DT/ACPI decision is done.??Initialize DT earlycon
-> > > > if ACPI is disabled.
-> > > Hi Will, Catalin,
-> > > 
-> > > Can you review this patch and consider ACKing it please?
-> > Hanjun, Al, Mark, Graeme -- any comments on this?
-> > 
-> > Will
+Hi Julia,
+
+Thank you for the patch.
+
+On Friday 09 Sep 2016 01:59:10 Julia Lawall wrote:
+> Check for vb2_ops structures that are only stored in the ops field of a
+> vb2_queue structure.  That field is declared const, so vb2_ops structures
+> that have this property can be declared as const also.
 > 
-> I think there is a problem still with systems using 32-bit access to 8250
-> UARTs (i.e. Mustang) but that will need a DBG2 table spec change and
-> followup patch to resolve.
+> The semantic patch that makes this change is as follows:
+> (http://coccinelle.lip6.fr/)
 > 
+> // <smpl>
+> @r disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct vb2_ops i at p = { ... };
+> 
+> @ok@
+> identifier r.i;
+> struct vb2_queue e;
+> position p;
+> @@
+> e.ops = &i at p;
+> 
+> @bad@
+> position p != {r.p,ok.p};
+> identifier r.i;
+> struct vb2_ops e;
+> @@
+> e at i@p
+> 
+> @depends on !bad disable optional_qualifier@
+> identifier r.i;
+> @@
+> static
+> +const
+>  struct vb2_ops i = { ... };
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-We went over this with the HPE firmware people. The General Address
-Structure has Register Bit Width and Access Size fields. If set
-correctly then 8250 UART works.
+For the drivers below,
 
-AFAIK Moonshot firmware has this fix, I have no access to Mustang
-firmware to verify on that platform.
+>  drivers/media/platform/m2m-deinterlace.c                 |    2 +-
+>  drivers/media/platform/rcar-vin/rcar-dma.c               |    2 +-
+>  drivers/media/platform/rcar_jpu.c                        |    2 +-
+>  drivers/media/platform/sh_vou.c                          |    2 +-
+>  drivers/media/platform/soc_camera/atmel-isi.c            |    2 +-
+>  drivers/media/platform/soc_camera/sh_mobile_ceu_camera.c |    2 +-
+>  drivers/media/platform/vim2m.c                           |    2 +-
+>  drivers/media/platform/xilinx/xilinx-dma.c               |    2 +-
 
-Graeme
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+For
+
+>  drivers/media/platform/soc_camera/rcar_vin.c             |    2 +-
+
+you can also add my
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+tag, but the driver will be scheduled for removal very soon.
+
+-- 
+Regards,
+
+Laurent Pinchart
