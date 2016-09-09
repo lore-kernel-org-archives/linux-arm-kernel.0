@@ -1,44 +1,78 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  9 Sep 2016 14:07:11 +0100
-Subject: [PATCH v4 4/9] arm64: alternative: Disallow patching instructions
- using literals
-In-Reply-To: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
-References: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1473426436-17870-5-git-send-email-suzuki.poulose@arm.com>
+Date: Fri,  9 Sep 2016 14:07:07 +0100
+Subject: [PATCH v4 0/9] arm64: Work around for mismatched cache line size
+Message-ID: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The alternative code patching doesn't check if the replaced instruction
-uses a pc relative literal. This could cause silent corruption in the
-instruction stream as the instruction will be executed from a different
-address than what it was compiled for. Catch all such cases.
+This series adds a work around for systems with mismatched {I,D}-cache
+line sizes. When a thread of execution gets migrated to a different CPU,
+the cache line size it had cached could be larger than that of the new
+CPU. This could cause data corruption issues. We work around this by
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Suggested-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/alternative.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ - Dynamically patching the kernel to use the smallest line size on the
+   system (from the CPU feature infrastructure)
+ - Trapping the userspace access to CTR_EL0 (by clearing SCTLR_EL1.UCT) and
+   emulating it with the system wide safe value of CTR.
 
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 4434dab..992918d 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -79,6 +79,12 @@ static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
- 			offset = target - (unsigned long)insnptr;
- 			insn = aarch64_set_branch_offset(insn, offset);
- 		}
-+	} else if (aarch64_insn_uses_literal(insn)) {
-+		/*
-+		 * Disallow patching unhandled instructions using PC relative
-+		 * literal addresses
-+		 */
-+		BUG();
- 	}
- 
- 	return insn;
+The series also adds support for alternative code patching of adrp
+instructions by adjusting the PC-relative address offset to reflect
+the new PC.
+
+The series has been tested on Juno with a hack to forced enabling
+of the capability.
+
+Applies on aarch64 for-next/core.
+ The tree is avaiable at :
+  git://linux-arm.org/linux-skp.git ctr-v4
+
+Changes since V3:
+ - Use ldr_l for arm64_ftr_reg_ctrel0+ARM64_FTR_SYS_VAL, saving one
+   instruction.
+ - Added Acked-by's from Andre
+
+Changes since V2:
+ - Rebase to for-next/core which contains Ard's series for refactoring
+   the arm64_ftr_reg [1]
+
+Changes since V1:
+
+ - Replace adr_adrp insn helper with seperate helpers for adr and adrp.
+ - Add/use align_down() macro for adjusting the page address for adrp offsets.
+ - Add comments for existing ISS field defintions.
+ - Added a patch to disallow silent patching of unhandled pc relative
+   instructions in alternative code patching.
+
+[1] http://marc.info/?l=linux-arm-kernel&m=147263959504998&w=2
+
+
+Suzuki K Poulose (9):
+  arm64: Set the safe value for L1 icache policy
+  arm64: Use consistent naming for errata handling
+  arm64: Rearrange CPU errata workaround checks
+  arm64: alternative: Disallow patching instructions using literals
+  arm64: insn: Add helpers for adrp offsets
+  arm64: alternative: Add support for patching adrp instructions
+  arm64: Introduce raw_{d,i}cache_line_size
+  arm64: Refactor sysinstr exception handling
+  arm64: Work around systems with mismatched cache line sizes
+
+ arch/arm64/include/asm/assembler.h  | 44 +++++++++++++++++--
+ arch/arm64/include/asm/cpufeature.h | 13 +++---
+ arch/arm64/include/asm/esr.h        | 84 +++++++++++++++++++++++++++++++----
+ arch/arm64/include/asm/insn.h       | 11 ++++-
+ arch/arm64/include/asm/sysreg.h     |  1 +
+ arch/arm64/kernel/alternative.c     | 21 +++++++++
+ arch/arm64/kernel/asm-offsets.c     |  2 +
+ arch/arm64/kernel/cpu_errata.c      | 26 ++++++++++-
+ arch/arm64/kernel/cpufeature.c      | 35 ++++++++++-----
+ arch/arm64/kernel/cpuinfo.c         |  2 -
+ arch/arm64/kernel/hibernate-asm.S   |  2 +-
+ arch/arm64/kernel/insn.c            | 13 ++++++
+ arch/arm64/kernel/relocate_kernel.S |  2 +-
+ arch/arm64/kernel/smp.c             |  8 +++-
+ arch/arm64/kernel/traps.c           | 87 ++++++++++++++++++++++++++-----------
+ 15 files changed, 286 insertions(+), 65 deletions(-)
+
 -- 
 2.7.4
