@@ -1,191 +1,120 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Fri, 9 Sep 2016 11:09:40 +0800
-Subject: [PATCH V10 1/8] ACPI: I/O Remapping Table (IORT) initial support
-In-Reply-To: <1473152938-17388-2-git-send-email-tn@semihalf.com>
-References: <1473152938-17388-1-git-send-email-tn@semihalf.com>
- <1473152938-17388-2-git-send-email-tn@semihalf.com>
-Message-ID: <20160909030938.GA8544@arm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 9 Sep 2016 12:18:11 +0900
+Subject: [PATCH v3 2/3] hwmon: xgene: Add hwmon driver
+In-Reply-To: <57D141DF.2010603@arm.com>
+References: <1469134557-26869-1-git-send-email-hotran@apm.com>
+ <13081573.BbD3TmEU5Y@wuerfel> <20160907223705.GA31582@roeck-us.net>
+ <2992356.ULGoZEEDZp@wuerfel> <57D141DF.2010603@arm.com>
+Message-ID: <20160909031809.GG16712@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Thu, Sep 08, 2016 at 11:47:59AM +0100, James Morse wrote:
+> Hi,
+> 
+> On 08/09/16 09:14, Arnd Bergmann wrote:
+> > On Wednesday, September 7, 2016 3:37:05 PM CEST Guenter Roeck wrote:
+> >> On Wed, Sep 07, 2016 at 11:41:44PM +0200, Arnd Bergmann wrote:
+> >>> On Thursday, July 21, 2016 1:55:56 PM CEST Hoan Tran wrote:
+> >>>> +               ctx->comm_base_addr = cppc_ss->base_address;
+> >>>> +               if (ctx->comm_base_addr) {
+> >>>> +                       ctx->pcc_comm_addr =
+> >>>> +                                       acpi_os_ioremap(ctx->comm_base_addr,
+> >>>> +                                                       cppc_ss->length);
+> >>>>
+> >>>
+> >>> This causes the arm64 allmodconfig build to fail now, according to
+> >>> kernelci:
+> >>>
+> >>>       1  ERROR: "memblock_is_memory" [drivers/hwmon/xgene-hwmon.ko] undefined!
+> >>>
+> >>> Should this perhaps call ioremap() or memremap() instead?
+> >>>
+> >> Hmmm ... almost sounds to me like blaming the messenger. e7cd190385d1 ("arm64:
+> >> mark reserved memblock regions explicitly in iomem") starts using a function
+> >> in acpi_os_ioremap() which is not exported. On top of that, memblock_is_memory()
+> >> is declared as __init_memblock, which makes me really uncomfortable.
+> >> If acpi_os_ioremap() must not be used by modules, and possibly only during
+> >> early (?) initialization, maybe its declaration should state those limitations ?
+> > 
+> > Ah, I didn't notice that. I guess both patches were correct individually and
+> > got added to linux-next around the same time but caused allmodconfig to blow up
+> > when used together.
+> > 
+> > Adding everyone who was involved in the memblock patch to Cc here, maybe one
+> > of them has an idea what the correct fix is. There are only two other drivers
+> > using acpi_os_ioremap() and one of them is x86-specific, so it's still likely
+> > that drivers are not actually supposed to use this symbol. Making
+> > acpi_os_ioremap() an exported function in arm64 would also work.
+> 
+> You could use acpi_os_map_iomem()/acpi_os_unmap_iomem() from acpi/acpi_io.h.
+> If there isn't an existing mapping these end up in acpi_os_ioremap(), and are
+> already EXPORT_SYMBOL_GPL().
 
-On Tue, Sep 06, 2016 at 11:08:51AM +0200, Tomasz Nowicki wrote:
-[...]
-> +static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
-> +		       u32 *rid_out)
-> +{
-> +	/* Single mapping does not care for input id */
-> +	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
-> +		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
-> +		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> +			*rid_out = map->output_base;
-> +			return 0;
-> +		}
-> +
-> +		pr_warn(FW_BUG "[map %p] SINGLE MAPPING flag not allowed for node type %d, skipping ID map\n",
-> +			map, type);
-> +		return -ENXIO;
-> +	}
-> +
-> +	if (rid_in < map->input_base ||
-> +	    (rid_in >= map->input_base + map->id_count))
-> +		return -ENXIO;
-> +
-> +	*rid_out = map->output_base + (rid_in - map->input_base);
-> +	return 0;
-> +}
-> +
-> +static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
-> +						u32 rid_in, u32 *rid_out,
-> +						u8 type)
-> +{
-> +	u32 rid = rid_in;
-> +
-> +	/* Parse the ID mapping tree to find specified node type */
-> +	while (node) {
-> +		struct acpi_iort_id_mapping *map;
-> +		int i;
-> +
-> +		if (node->type == type) {
-> +			if (rid_out)
-> +				*rid_out = rid;
-> +			return node;
-> +		}
-> +
-> +		if (!node->mapping_offset || !node->mapping_count)
-> +			goto fail_map;
-If node->mapping_count is zero, then node->mapping_offset must be zero. A firmware bug
-otherwise?
-> +
-> +		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-> +				   node->mapping_offset);
-> +
-> +		/* Firmware bug! */
-> +		if (!map->output_reference) {
-> +			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
-> +			       node, node->type);
-> +			goto fail_map;
-> +		}
-> +
-> +		/* Do the RID translation */
-> +		for (i = 0; i < node->mapping_count; i++, map++) {
-> +			if (!iort_id_map(map, node->type, rid, &rid))
-> +				break;
-> +		}
->
-Just curious about if there is kind of possibility that we can get some reduplicated DeviceIDs
-with a deliberate ID mapping design in FW for the SMMU/RC node. For instance, for a system with 2
-PCIe RCs both behind an individual SMMU device, how to make sure the StreamID mapped is unique 
-across the entire system, the same for DeviceID mapped. 
-Anyway, this is my personal confusion, maybe it's not a problem at all for current design ;-)
+acpi_os_ioremap() is re-defined in arm64/include/asm/acpi.h.
+
+The problem is that, as memblock_is_memory() is declared as __init,
+we cannot build any drivers which call acpi_os_ioremap() as modules.
+
+As far as this specific issue is concerned, if we make a change like:
+
+===8<===
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -207,7 +207,7 @@ static void __init request_standard_resources(void)
+                res = alloc_bootmem_low(sizeof(*res));
+                if (memblock_is_nomap(region)) {
+                        res->name  = "reserved";
+-                       res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
++                       res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+                } else {
+                        res->name  = "System RAM";
+                        res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+===>8===
+
+and revert the following hunk from the commit:
+
+===8<===
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -12,7 +12,7 @@
+ #ifndef _ASM_ACPI_H
+ #define _ASM_ACPI_H
+ 
+-#include <linux/mm.h>
++#include <linux/memblock.h>
+ #include <linux/psci.h>
+ 
+ #include <asm/cputype.h>
+@@ -32,7 +32,11 @@
+ static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+                                            acpi_size size)
+ {
+-       if (!page_is_ram(phys >> PAGE_SHIFT))
++       /*
++        * EFI's reserve_regions() call adds memory with the WB attribute
++        * to memblock via early_init_dt_add_memory_arch().
++        */
++       if (!memblock_is_memory(phys))
+                return ioremap(phys, size);
+ 
+        return ioremap_cache(phys, size);
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+===>8===
+
+The build error will be gone. (and still kdump should work.)
+
+But I don't know how we should distinguish IORESOURCE_MEM and
+IORESOURCE_SYSTEM_RAM.
 
 Thanks,
-Dennis
-> +
-> +		if (i == node->mapping_count)
-> +			goto fail_map;
-> +
-> +		node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-> +				    map->output_reference);
-> +	}
-> +
-> +fail_map:
-> +	/* Map input RID to output RID unchanged on mapping failure*/
-> +	if (rid_out)
-> +		*rid_out = rid_in;
-> +
-> +	return NULL;
-> +}
-> +
-> +static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
-> +{
-> +	struct pci_bus *pbus;
-> +
-> +	if (!dev_is_pci(dev))
-> +		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-> +				      iort_match_node_callback, dev);
-> +
-> +	/* Find a PCI root bus */
-> +	pbus = to_pci_dev(dev)->bus;
-> +	while (!pci_is_root_bus(pbus))
-> +		pbus = pbus->parent;
-> +
-> +	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
-> +			      iort_match_node_callback, &pbus->dev);
-> +}
-> +
-> +void __init acpi_iort_init(void)
-> +{
-> +	acpi_status status;
-> +
-> +	status = acpi_get_table(ACPI_SIG_IORT, 0, &iort_table);
-> +	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-> +		const char *msg = acpi_format_exception(status);
-> +		pr_err("Failed to get table, %s\n", msg);
-> +	}
-> +}
-> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
-> index 85b7d07..e56e643 100644
-> --- a/drivers/acpi/bus.c
-> +++ b/drivers/acpi/bus.c
-> @@ -36,6 +36,7 @@
->  #ifdef CONFIG_X86
->  #include <asm/mpspec.h>
->  #endif
-> +#include <linux/acpi_iort.h>
->  #include <linux/pci.h>
->  #include <acpi/apei.h>
->  #include <linux/dmi.h>
-> @@ -1186,6 +1187,7 @@ static int __init acpi_init(void)
->  	}
->  
->  	pci_mmcfg_late_init();
-> +	acpi_iort_init();
->  	acpi_scan_init();
->  	acpi_ec_init();
->  	acpi_debugfs_init();
-> diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-> new file mode 100644
-> index 0000000..fcacaf7
-> --- /dev/null
-> +++ b/include/linux/acpi_iort.h
-> @@ -0,0 +1,30 @@
-> +/*
-> + * Copyright (C) 2016, Semihalf
-> + *	Author: Tomasz Nowicki <tn@semihalf.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-> + * Place - Suite 330, Boston, MA 02111-1307 USA.
-> + */
-> +
-> +#ifndef __ACPI_IORT_H__
-> +#define __ACPI_IORT_H__
-> +
-> +#include <linux/acpi.h>
-> +
-> +#ifdef CONFIG_ACPI_IORT
-> +void acpi_iort_init(void);
-> +#else
-> +static inline void acpi_iort_init(void) { }
-> +#endif
-> +
-> +#endif /* __ACPI_IORT_H__ */
-> -- 
-> 1.9.1
+-Takahiro AKASHI
+
+> (I'm still waiting for allmodconfig on linux-next to finish building)
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Thanks,
+> 
+> James
+> 
 > 
