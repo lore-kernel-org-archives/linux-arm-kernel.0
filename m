@@ -1,85 +1,109 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  9 Sep 2016 14:07:12 +0100
-Subject: [PATCH v4 5/9] arm64: insn: Add helpers for adrp offsets
+Date: Fri,  9 Sep 2016 14:07:14 +0100
+Subject: [PATCH v4 7/9] arm64: Introduce raw_{d,i}cache_line_size
 In-Reply-To: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
 References: <1473426436-17870-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1473426436-17870-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1473426436-17870-8-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds helpers for decoding/encoding the PC relative addresses for adrp.
-This will be used for handling dynamic patching of 'adrp' instructions
-in alternative code patching.
+On systems with mismatched i/d cache min line sizes, we need to use
+the smallest size possible across all CPUs. This will be done by fetching
+the system wide safe value from CPU feature infrastructure.
+However the some special users(e.g kexec, hibernate) would need the line
+size on the CPU (rather than the system wide), when either the system
+wide feature may not be accessible or it is guranteed that the caller
+executes with a gurantee of no migration.
+Provide another helper which will fetch cache line size on the current CPU.
 
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: James Morse <james.morse@arm.com>
+Reviewed-by: Geoff Levand <geoff@infradead.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/insn.h | 11 ++++++++++-
- arch/arm64/kernel/insn.c      | 13 +++++++++++++
- 2 files changed, 23 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/assembler.h  | 24 ++++++++++++++++++++----
+ arch/arm64/kernel/hibernate-asm.S   |  2 +-
+ arch/arm64/kernel/relocate_kernel.S |  2 +-
+ 3 files changed, 22 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 1dbaa90..bc85366 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -246,7 +246,8 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
- static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
- { return (val); }
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index d5025c6..a4bb3f5 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -218,9 +218,10 @@ lr	.req	x30		// link register
+ 	.endm
  
--__AARCH64_INSN_FUNCS(adr_adrp,	0x1F000000, 0x10000000)
-+__AARCH64_INSN_FUNCS(adr,	0x9F000000, 0x10000000)
-+__AARCH64_INSN_FUNCS(adrp,	0x9F000000, 0x90000000)
- __AARCH64_INSN_FUNCS(prfm_lit,	0xFF000000, 0xD8000000)
- __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
- __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
-@@ -318,6 +319,11 @@ __AARCH64_INSN_FUNCS(msr_reg,	0xFFF00000, 0xD5100000)
- bool aarch64_insn_is_nop(u32 insn);
- bool aarch64_insn_is_branch_imm(u32 insn);
- 
-+static inline bool aarch64_insn_is_adr_adrp(u32 insn)
-+{
-+	return aarch64_insn_is_adr(insn) || aarch64_insn_is_adrp(insn);
-+}
-+
- int aarch64_insn_read(void *addr, u32 *insnp);
- int aarch64_insn_write(void *addr, u32 insn);
- enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
-@@ -398,6 +404,9 @@ int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
- int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
- int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
- 
-+s32 aarch64_insn_adrp_get_offset(u32 insn);
-+u32 aarch64_insn_adrp_set_offset(u32 insn, s32 offset);
-+
- bool aarch32_insn_is_wide(u32 insn);
- 
- #define A32_RN_OFFSET	16
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 178488f..6f2ac4f 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -1202,6 +1202,19 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
- 	BUG();
- }
- 
-+s32 aarch64_insn_adrp_get_offset(u32 insn)
-+{
-+	BUG_ON(!aarch64_insn_is_adrp(insn));
-+	return aarch64_insn_decode_immediate(AARCH64_INSN_IMM_ADR, insn) << 12;
-+}
-+
-+u32 aarch64_insn_adrp_set_offset(u32 insn, s32 offset)
-+{
-+	BUG_ON(!aarch64_insn_is_adrp(insn));
-+	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_ADR, insn,
-+						offset >> 12);
-+}
-+
  /*
-  * Extract the Op/CR data from a msr/mrs instruction.
+- * dcache_line_size - get the minimum D-cache line size from the CTR register.
++ * raw_dcache_line_size - get the minimum D-cache line size on this CPU
++ * from the CTR register.
   */
+-	.macro	dcache_line_size, reg, tmp
++	.macro	raw_dcache_line_size, reg, tmp
+ 	mrs	\tmp, ctr_el0			// read CTR
+ 	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
+ 	mov	\reg, #4			// bytes per word
+@@ -228,9 +229,17 @@ lr	.req	x30		// link register
+ 	.endm
+ 
+ /*
+- * icache_line_size - get the minimum I-cache line size from the CTR register.
++ * dcache_line_size - get the safe D-cache line size across all CPUs
+  */
+-	.macro	icache_line_size, reg, tmp
++	.macro	dcache_line_size, reg, tmp
++	raw_dcache_line_size	\reg, \tmp
++	.endm
++
++/*
++ * raw_icache_line_size - get the minimum I-cache line size on this CPU
++ * from the CTR register.
++ */
++	.macro	raw_icache_line_size, reg, tmp
+ 	mrs	\tmp, ctr_el0			// read CTR
+ 	and	\tmp, \tmp, #0xf		// cache line size encoding
+ 	mov	\reg, #4			// bytes per word
+@@ -238,6 +247,13 @@ lr	.req	x30		// link register
+ 	.endm
+ 
+ /*
++ * icache_line_size - get the safe I-cache line size across all CPUs
++ */
++	.macro	icache_line_size, reg, tmp
++	raw_icache_line_size	\reg, \tmp
++	.endm
++
++/*
+  * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
+  */
+ 	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
+diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
+index 7734f3e..e56d848 100644
+--- a/arch/arm64/kernel/hibernate-asm.S
++++ b/arch/arm64/kernel/hibernate-asm.S
+@@ -96,7 +96,7 @@ ENTRY(swsusp_arch_suspend_exit)
+ 
+ 	add	x1, x10, #PAGE_SIZE
+ 	/* Clean the copied page to PoU - based on flush_icache_range() */
+-	dcache_line_size x2, x3
++	raw_dcache_line_size x2, x3
+ 	sub	x3, x2, #1
+ 	bic	x4, x10, x3
+ 2:	dc	cvau, x4	/* clean D line / unified line */
+diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
+index 51b73cd..ce704a4 100644
+--- a/arch/arm64/kernel/relocate_kernel.S
++++ b/arch/arm64/kernel/relocate_kernel.S
+@@ -34,7 +34,7 @@ ENTRY(arm64_relocate_new_kernel)
+ 	/* Setup the list loop variables. */
+ 	mov	x17, x1				/* x17 = kimage_start */
+ 	mov	x16, x0				/* x16 = kimage_head */
+-	dcache_line_size x15, x0		/* x15 = dcache line size */
++	raw_dcache_line_size x15, x0		/* x15 = dcache line size */
+ 	mov	x14, xzr			/* x14 = entry ptr */
+ 	mov	x13, xzr			/* x13 = copy dest */
+ 
 -- 
 2.7.4
