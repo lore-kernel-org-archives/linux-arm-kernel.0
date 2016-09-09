@@ -1,29 +1,140 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 9 Sep 2016 16:25:44 +0200
-Subject: [PATCH 09/10] PM / Domains: Store the provider in the PM domain
- structure
-In-Reply-To: <73870e28-3600-8a84-7659-55d4a8320a1d@nvidia.com>
-References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
- <1471340976-5379-10-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFp+93=CrmgLNx1ritm1Dm=eWFJn=vbuzAUb9VmWc4j1fg@mail.gmail.com>
- <73870e28-3600-8a84-7659-55d4a8320a1d@nvidia.com>
-Message-ID: <CAPDyKFr7uLgqzMpEfMDZHnnFXTxhvSsaeaUSfM4-6rbahp1PEg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri,  9 Sep 2016 15:23:33 +0100
+Subject: [PATCH v5 04/14] drivers: acpi: iort: add support for IOMMU fwnode
+ registration
+In-Reply-To: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
+References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20160909142343.13314-5-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+The ACPI IORT table provide entries for IOMMU (aka SMMU in ARM world)
+components that allow creating the kernel data structures required to
+probe and initialize the IOMMU devices.
 
->>
->> I also think you should extend this change, to also make the
->> of_genpd_del_provider() API to reset the genpd->provider = NULL.
->> Otherwise you can't track when a provider is removed.
->
-> Unfortunately that is not going to work. The function
-> of_genpd_remove_tail() (patch #10) uses the ->provider member to remove
-> the last domain for the given provider and of_genpd_del_provider() must
-> be called before hand.
+This patch provides support in the IORT kernel code to register IOMMU
+components and their respective fwnode.
 
-Yes, of course - you are right!
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+---
+ drivers/acpi/arm64/iort.c | 65 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/acpi_iort.h |  9 +++++++
+ 2 files changed, 74 insertions(+)
 
-Kind regards
-Uffe
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 4cbeb707..b89b3d3 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -20,7 +20,9 @@
+ 
+ #include <linux/acpi_iort.h>
+ #include <linux/kernel.h>
++#include <linux/list.h>
+ #include <linux/pci.h>
++#include <linux/slab.h>
+ 
+ struct iort_its_msi_chip {
+ 	struct list_head	list;
+@@ -28,6 +30,69 @@ struct iort_its_msi_chip {
+ 	u32			translation_id;
+ };
+ 
++struct iort_fwnode {
++	struct list_head list;
++	struct acpi_iort_node *iort_node;
++	struct fwnode_handle *fwnode;
++};
++static LIST_HEAD(iort_fwnode_list);
++static DEFINE_SPINLOCK(iort_fwnode_lock);
++
++/**
++ * iort_set_fwnode() - Create iort_fwnode and use it to register
++ *		       iommu data in the iort_fwnode_list
++ *
++ * @node: IORT table node associated with the IOMMU
++ * @fwnode: fwnode associated with the IORT node
++ *
++ * Returns: 0 on success
++ *          <0 on failure
++ */
++int iort_set_fwnode(struct acpi_iort_node *iort_node,
++		    struct fwnode_handle *fwnode)
++{
++	struct iort_fwnode *np;
++
++	np = kzalloc(sizeof(struct iort_fwnode), GFP_ATOMIC);
++
++	if (WARN_ON(!np))
++		return -ENOMEM;
++
++	INIT_LIST_HEAD(&np->list);
++	np->iort_node = iort_node;
++	np->fwnode = fwnode;
++
++	spin_lock(&iort_fwnode_lock);
++	list_add_tail(&np->list, &iort_fwnode_list);
++	spin_unlock(&iort_fwnode_lock);
++
++	return 0;
++}
++
++/**
++ * iort_get_fwnode() - Retrieve fwnode associated with an IORT node
++ *
++ * @node: IORT table node to be looked-up
++ *
++ * Returns: fwnode_handle pointer on success, NULL on failure
++*/
++struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
++{
++	struct iort_fwnode *curr;
++	struct fwnode_handle *fwnode = NULL;
++
++	spin_lock(&iort_fwnode_lock);
++	list_for_each_entry(curr, &iort_fwnode_list, list) {
++		if (curr->iort_node == node) {
++			fwnode = curr->fwnode;
++			break;
++		}
++	}
++	spin_unlock(&iort_fwnode_lock);
++
++	return fwnode;
++}
++
+ typedef acpi_status (*iort_find_node_callback)
+ 	(struct acpi_iort_node *node, void *context);
+ 
+diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+index d16fdda..c851646 100644
+--- a/include/linux/acpi_iort.h
++++ b/include/linux/acpi_iort.h
+@@ -30,6 +30,9 @@ struct fwnode_handle *iort_find_domain_token(int trans_id);
+ void acpi_iort_init(void);
+ u32 iort_msi_map_rid(struct device *dev, u32 req_id);
+ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
++int iort_set_fwnode(struct acpi_iort_node *iort_node,
++		    struct fwnode_handle *fwnode);
++struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node);
+ #else
+ static inline void acpi_iort_init(void) { }
+ static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+@@ -37,6 +40,12 @@ static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
+ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
+ 							u32 req_id)
+ { return NULL; }
++static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
++				  struct fwnode_handle *fwnode)
++{ return -ENODEV; }
++static inline
++struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
++{ return NULL; }
+ #endif
+ 
+ #define IORT_ACPI_DECLARE(name, table_id, fn)		\
+-- 
+2.10.0
