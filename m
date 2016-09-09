@@ -1,40 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 9 Sep 2016 17:04:59 +0530
-Subject: [PATCH] cpufreq: create link to policy only for registered CPUs
-In-Reply-To: <20160909112841.GS1041@n2100.armlinux.org.uk>
-References: <20160819110032.GM1041@n2100.armlinux.org.uk>
- <a0469c333e08b3953bfe9e8356c6919c26578349.1473414746.git.viresh.kumar@linaro.org>
- <20160909111620.GQ1041@n2100.armlinux.org.uk>
- <20160909112204.GE18547@vireshk-i7>
- <20160909112841.GS1041@n2100.armlinux.org.uk>
-Message-ID: <20160909113459.GG18547@vireshk-i7>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 9 Sep 2016 12:35:08 +0100
+Subject: [PATCH] arm64: use preempt_disable_notrace in _percpu_read/write
+In-Reply-To: <1473338802-18712-1-git-send-email-zhang.chunyan@linaro.org>
+References: <1473338802-18712-1-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <20160909113508.GC19083@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-09-16, 12:28, Russell King - ARM Linux wrote:
-> On Fri, Sep 09, 2016 at 04:52:04PM +0530, Viresh Kumar wrote:
-> > Thanks for testing it.. You need another patch from Rafael, which
-> > should be in linux-next by now..
-> > 
-> > commit 3689ad7ed6a8 ("cpufreq: Drop unnecessary check from
-> > cpufreq_policy_alloc()")
-> > 
-> > Both patches combined will fix the problem you were getting.
+On Thu, Sep 08, 2016 at 08:46:42PM +0800, Chunyan Zhang wrote:
+> When debug preempt or preempt tracer is enabled, preempt_count_add/sub()
+> can be traced by function and function graph tracing, and
+> preempt_disable/enable() would call preempt_count_add/sub(), so in Ftrace
+> subsystem we should use preempt_disable/enable_notrace instead.
 > 
-> Please send me this other patch.  Seems absurd to fix a reported problem
-> without copying appropriate patches to the reporter...
+> In the commit 345ddcc882d8 ("ftrace: Have set_ftrace_pid use the bitmap
+> like events do") the function this_cpu_read() was added to
+> trace_graph_entry(), and if this_cpu_read() calls preempt_disable(), graph
+> tracer will go into a recursive loop, even if the tracing_on is
+> disabled.
+> 
+> So this patch change to use preempt_enable/disable_notrace instead in
+> this_cpu_read().
+> 
+> Since Yonghui Yang helped a lot to find the root cause of this problem,
+> so also add his SOB.
+> 
+> Signed-off-by: Yonghui Yang <mark.yang@spreadtrum.com>
+> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
 
-It got merged separately, and yes you should have been cc'd for that
-as well.
-
-Please find it attached now..
+Queued for 4.8-rc6. Thanks.
 
 -- 
-viresh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-cpufreq-Drop-unnecessary-check-from-cpufreq_policy_a.patch
-Type: text/x-diff
-Size: 1223 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160909/6d7f844a/attachment.bin>
+Catalin
