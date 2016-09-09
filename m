@@ -1,58 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  9 Sep 2016 23:25:30 +0200
-Subject: [PATCH 1/6] ARM: dts: add STMPE PWM to the NHK15 device tree
+Date: Fri,  9 Sep 2016 23:25:31 +0200
+Subject: [PATCH 2/6] dt-bindings: add vendor TPO
 In-Reply-To: <1473456335-22767-1-git-send-email-linus.walleij@linaro.org>
 References: <1473456335-22767-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1473456335-22767-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1473456335-22767-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the STMPE PWM to the NHK15 device tree.
+TPO was a merger on June 5 2006 of Toppoly Optoelectronics and
+Philips Mobile Display Systems. They manufactured small and medium
+mobile displays.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-nomadik-nhk15.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-nhk15.dts b/arch/arm/boot/dts/ste-nomadik-nhk15.dts
-index d35aa88791ad..3ec5c653ad56 100644
---- a/arch/arm/boot/dts/ste-nomadik-nhk15.dts
-+++ b/arch/arm/boot/dts/ste-nomadik-nhk15.dts
-@@ -140,6 +140,10 @@
- 						0x03020067 // Up
- 						0x0303006c>; // Down
- 			};
-+			stmpe0_pwm: stmpe_pwm {
-+				compatible = "st,stmpe-pwm";
-+				#pwm-cells = <2>;
-+			};
- 		};
- 		stmpe1: stmpe2401 at 44 {
- 			compatible = "st,stmpe2401";
-@@ -183,4 +187,24 @@
- 			wp-gpios = <&stmpe_gpio44 18 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
-+
-+	bl: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&stmpe0_pwm 0 500000>;
-+		pwm-names = "backlight";
-+		brightness-levels = <
-+			0  1  2  3  4  5  6  7  8  9
-+			10 11 12 13 14 15 16 17 18 19
-+			20 21 22 23 24 25 26 27 28 29
-+			30 31 32 33 34 35 36 37 38 39
-+			40 41 42 43 44 45 46 47 48 49
-+			50 51 52 53 54 55 56 57 58 59
-+			60 61 62 63 64 65 66 67 68 69
-+			70 71 72 73 74 75 76 77 78 79
-+			80 81 82 83 84 85 86 87 88 89
-+			90 91 92 93 94 95 96 97 98 99
-+			100
-+		>;
-+		default-brightness-level = <100>;
-+	};
- };
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 1992aa97d45a..65b7bbbc893f 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -270,6 +270,7 @@ toshiba	Toshiba Corporation
+ toumaz	Toumaz
+ tplink	TP-LINK Technologies Co., Ltd.
+ tpk	TPK U.S.A. LLC
++tpo	TPO
+ tronfy	Tronfy
+ tronsmart	Tronsmart
+ truly	Truly Semiconductors Limited
 -- 
 2.7.4
