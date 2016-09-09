@@ -1,34 +1,62 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 9 Sep 2016 09:20:20 +0200
-Subject: [PATCH v3] ARM: dts: add gpio-ranges property to iMX GPIO
- controllers
-In-Reply-To: <1473386556-1934-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1473386556-1934-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <20160909072020.ieehalkgxxjfewhs@pengutronix.de>
+From: radioconfusion@gmail.com (radioconfusion at gmail.com)
+Date: Fri, 09 Sep 2016 10:24:50 +0300
+Subject: [crypto] [marvell-cesa] Possible regression after Linux 4.7
+Message-ID: <57d263c4.d5002e0a.8975e.0df2@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 05:02:36AM +0300, Vladimir Zapolskiy wrote:
-> To establish a connection between GPIO controllers and pin multiplexor
-> controller add gpio-ranges properties to all GPIO controllers found
-> on iMX50, iMX6Q/D, iMX6DL/S, iMX6SL, iMX6SX, iMX6UL and iMX7D/S
-> SoCs. The change was done after human parsing of output from
+Hello,
+Thu,  8 Sep 2016 16:52:16 +0200, Romain Perier wrote:
+> > Hello,
+> >
+> > I'm testing the marvell-cesa -driver on Armada 385 board and I think I've found
+> > a regression between Linux 4.7 and 4.8-rc4.
+> > I want to accelerate my curl connections. So I compiled the 4.8-rc4 with
+> > marvell-cesa enabled and HEAD revision of cryptodev-linux.
+> >
+> > Here is my output:
+> >
+> > ~# uname -r
+> > 4.8.0-rc4
+> > ~# modprobe cryptodev
+> > ~# modprobe marvell-cesa
+> > ~# curl -k --ciphers AES256-SHA256 https://myserver/myfile >/dev/null
+> >    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+> >                                   Dload  Upload   Total   Spent    Left  Speed
+> >   19  200M   19 39.7M    0     0  16.2M      0  0:00:12  0:00:02  0:00:10 16.2M
+> > curl: (56) SSL read: error:1408F119:SSL routines:SSL3_GET_RECORD:decryption
+> > failed or bad record mac, errno 0
+> >
+--- snip ---
+>
+> Thank you for your feedbacks.
+> I can reproduce the issue with and without multiple engines.
 
-When looking at doing the same for i.MX35 there are a few pin pairs that
-are driven by the same GPIO, e.g.:
+Thank you for your testing. Do you mean that you can reproduce it with
+Linux 4.7 too?
 
-	$ grep GPIO3_9 imx35-pinfunc.h 
-	#define MX35_PAD_CTS1__GPIO3_9					0x194 0x5d8 0x918 0x5 0x0
-	#define MX35_PAD_FEC_COL__GPIO3_9				0x2ec 0x750 0x918 0x5 0x1
+> However, I have found an interesting thing, If I use only --ciphers
+> AES256, it works perfectly fine, could you confirm this ?
 
-With this it's not possible to correctly add a gpio-ranges, right?
+Yes, I can confirm. And I have found the reason too.
+Most of available ciphers will not be accelerated at all.
+Only these ones I have verified to be accelerated by cesa:
+AES256-SHA256
+AES256-SHA
+AES128-SHA256
+AES128-SHA
 
-i.MX1, i.MX21, i.MX25, i.MX27 and i.MX53 could benefit from such a
-change though. i.MX35 and i.MX51 have duplicates.
+When cesa is working, I can see "irq/42-f1090000" on process list of top(1) and
+curl doesn't take all of available cpu.
 
-Best regards
-Uwe
+It's not easy to detect acceleration by performance because I tested with
+Linux 4.7 and older cryptodev (1.8 release) and I got average curl throughput
+~22 MiB/s with AES256-SHA256 + cesa. Without cesa I got ~20 MiB/s average with
+same configuration.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> In any case, I will investigate.
+
+Thank you very much.
+
+Best Regards,
+Jussi
