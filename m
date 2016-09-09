@@ -1,45 +1,43 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 9 Sep 2016 16:12:02 +0200
-Subject: [PATCH 1/8] ARM: dts: bcm283x: Define standard pinctrl groups in
- the gpio node.
-In-Reply-To: <1473411924.6698.85.camel@redhat.com>
-References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
- <1473244289-20728-2-git-send-email-kraxel@redhat.com>
- <1628308726.55593.220fafc0-57d9-4317-a72d-0875dfb2d658.open-xchange@email.1und1.de>
- <1473411924.6698.85.camel@redhat.com>
-Message-ID: <5ca1637e-58d8-fd04-416e-4619d99c4d12@i2se.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 9 Sep 2016 10:14:53 -0400
+Subject: [PATCH] arm64: Expose TASK_SIZE to userspace via auxv
+In-Reply-To: <CAFLxGvx2YB9D1rECjDrALYWoEtGk=4WL9SKXEGgpxH1c_4Sfxg@mail.gmail.com>
+References: <20160816183231.21179-1-cov@codeaurora.org>
+ <20160817103006.GB20762@e104818-lin.cambridge.arm.com>
+ <CED1E802-65C5-48B9-8165-46684BE81164@codeaurora.org>
+ <CAFLxGvx2YB9D1rECjDrALYWoEtGk=4WL9SKXEGgpxH1c_4Sfxg@mail.gmail.com>
+Message-ID: <857a7f1d-ecdb-21e1-6043-1bb6dce3aad6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 09.09.2016 um 11:05 schrieb Gerd Hoffmann:
->   Hi,
->
->> According to this page [1] the pinctrl group for parallel display interface is
->> missing. Is it intended?
+Hi Richard,
+
+On 08/18/2016 08:17 AM, Richard Weinberger wrote:
+> On Wed, Aug 17, 2016 at 1:12 PM, Christopher Covington
+> <cov@codeaurora.org> wrote:
 >>
->> [1] - http://elinux.org/RPi_BCM2835_GPIOs
-> Just an oversight I guess.  Eric?
->
-> Does this look correct?
->
-> +                       dpi_gpio4: dpi_gpio4 {
-> +                               brcm,pins = <4 5 6 7 8 9 10 11 12 13
-> +                                            14 15 16 17 18 19 20 21
-> +                                            22 23 24 25 26 27>;
-> +                               brcm,function = <BCM2835_FSEL_ALT2>;
-> +                       };
+>>
+>> On August 17, 2016 6:30:06 AM EDT, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>>> On Tue, Aug 16, 2016 at 02:32:29PM -0400, Christopher Covington wrote:
+>>>> Some userspace applications need to know the maximum virtual address
+>>> they can
+>>>> use (TASK_SIZE).
+>>>
+>>> Just curious, what are the cases needing TASK_SIZE in user space?
+>>
+>> Checkpoint/Restore In Userspace and the Mozilla Javascript Engine https://bugzilla.mozilla.org/show_bug.cgi?id=1143022 are the specific cases I've run into. I've heard LuaJIT might have a similar situation. In general I think making allocations from the top down is a shortcut for finding a large unused region of memory.
+> 
+> I think this makes sense for all archs.
+> At lest UserModeLinux on x86 also needs to know bottom and top
+> addresses of the usable
+> address space.
+> Currently it figures by scanning and catching SIGSEGV.
 
-According to the wiki and the website [1] it starts at gpio 0
+For the bottom, can you use /proc/sys/vm/mmap_min_addr?
 
-[1] -
-https://www.raspberrypi.org/documentation/hardware/raspberrypi/dpi/README.md
+Cov
 
->
-> thanks,
->   Gerd
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
