@@ -1,56 +1,62 @@
-From: sramana@codeaurora.org (Srinivas Ramana)
-Date: Fri, 09 Sep 2016 22:04:05 +0530
-Subject: Improper TTBCR for arm 32bit kernel decompression
-Message-ID: <57D2E47D.5030105@codeaurora.org>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Fri, 9 Sep 2016 09:37:20 -0700
+Subject: [PATCH 4/8] ARM: dts: bcm283x: Add a new EMMC pin group from the
+ downstream tree.
+In-Reply-To: <e61a4efa-3685-6694-5fda-3272f6605665@i2se.com>
+References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
+ <1473244289-20728-5-git-send-email-kraxel@redhat.com>
+ <87650770.23554.026b1e4b-e35d-48e6-9394-7eeea0ff9add.open-xchange@email.1und1.de>
+ <1473320687.6698.25.camel@redhat.com>
+ <373fe61a-61d4-164e-0760-d68a0c4925dd@broadcom.com>
+ <e61a4efa-3685-6694-5fda-3272f6605665@i2se.com>
+Message-ID: <5d464384-ba0d-516f-9fde-3a65386d4834@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Stefan,
 
-While trying to boot arm-32 bit kernel, I came across a problem where 
-TTBCR is in improper state. If the bootloader uses the long descriptor 
-format and jumps to kernel decompressor code, TTBCR may not be in the 
-right state. So, as soon as the MMU is enabled, execution can not 
-proceed further.
-
-Before enabling the MMU, it is required to clear the TTBCR.PD0 field to 
-use TTBR0 for translation table walks. Also, TTBCR.N should be reset to 
-'0' to indicate the correct base address width. The 'commit 
-dbece45894d3a ("ARM: 7501/1: decompressor: reset ttbcr for VMSA ARMv7 
-cores")' does the reset of TTBCR.N, but doesn't consider all the bits 
-for the size of TTBCR.N.
-
-when i tried the below change where i explicitly clear TTBCR.PD0 and use 
-correct mask for TTBCR.N, I see proper memory after MMU is enabled and 
-decompression succeeds.
-
-Request your comments on the change below. If it looks good, I can 
-submit a patch for inclusion.
-
----------------------8<----------------------------------
-diff --git a/arch/arm/boot/compressed/head.S 
-b/arch/arm/boot/compressed/head.S
-index af11c2f..5769f1f 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -779,7 +779,8 @@ __armv7_mmu_cache_on:
-                 orrne   r0, r0, #1              @ MMU enabled
-                 movne   r1, #0xfffffffd         @ domain 0 = client
-                 bic     r6, r6, #1 << 31        @ 32-bit translation system
--               bic     r6, r6, #3 << 0         @ use only ttbr0
-+               bic     r6, r6, #7 << 0         @ width of base address 
-field
-+               bic     r6, r6, #1 << 4         @ use only ttbr0
-                 mcrne   p15, 0, r3, c2, c0, 0   @ load page table pointer
-                 mcrne   p15, 0, r1, c3, c0, 0   @ load domain access 
-control
-                 mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
----------------------8<----------------------------------
-
-Thanks,
--- Srinivas R
-
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
-Inc., is a member of Code Aurora Forum, a Linux Foundation Collaborative 
-Project.
+On 16-09-08 11:58 PM, Stefan Wahren wrote:
+> Hi Scott,
+>
+> Am 08.09.2016 um 21:50 schrieb Scott Branden:
+>> Hi Gerd/Eric
+>>
+>> On 16-09-08 12:44 AM, Gerd Hoffmann wrote:
+>>> On Mi, 2016-09-07 at 20:13 +0200, Stefan Wahren wrote:
+>>>>> Gerd Hoffmann <kraxel@redhat.com> hat am 7. September 2016 um 12:31
+>>>>> geschrieben:
+>>>>>
+>>>>>
+>>>>> From: Eric Anholt <eric@anholt.net>
+>>>>>
+>>>>> This will be used for having EMMC (sdhci-bcm2835.c) drive the
+>>>>> wireless.
+>>>>
+>>>> sdhci-bcm2835.c has been replaced by sdhci-iproc.c
+>>>
+>>> Ah, right, I'll update the commit msg for v2.
+>>>
+>> Should we entirely remove sdhci-bcm2835.c to reduce confusion going
+>> forward?
+>
+> did i missed something?
+No - looks like I did.  Everything is cleaned up in latest.
+>
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=46cd175c9788e39a1c57698ab58f34844d216428
+>
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=7eb16493ecaa41ceeb448717ee2c59690cd9047f
+>
+>
+>>
+>>>> How about adding pull defines to include/dt-bindings/pinctrl/bcm2835.h?
+>>>
+>>> Already there (or do you mean something other than '#define
+>>> BCM2835_FSEL_*' ?)
+>>>
+>>> cheers,
+>>>   Gerd
+>>>
+>>
+>> Thanks,
+>>  Scott
+>
