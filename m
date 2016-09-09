@@ -1,75 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Sep 2016 11:25:54 +0100
-Subject: [RFCv4 1/7] drivers/perf: arm_pmu: add common attr group fields
-In-Reply-To: <1473330112-28528-2-git-send-email-mark.rutland@arm.com>
-References: <1473330112-28528-1-git-send-email-mark.rutland@arm.com>
- <1473330112-28528-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160909102554.GF20192@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 9 Sep 2016 11:29:11 +0100
+Subject: [PATCH v3 2/2] ASoC: rockchip: Add DP dai-links to the
+ rk3399-gru machine driver
+In-Reply-To: <1473396235-11769-1-git-send-email-zyw@rock-chips.com>
+References: <1473181792-15398-1-git-send-email-zyw@rock-chips.com>
+ <1473396235-11769-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <20160909102911.GE27946@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 11:21:46AM +0100, Mark Rutland wrote:
-> In preparation for adding common attribute groups, add an array of
-> attribute group pointers to arm_pmu, which will be used if the
-> backend hasn't already set pmu::attr_groups.
-> 
-> Subsequent patches will move backends over to using these, before adding
-> common fields.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/perf/arm_pmu.c       | 3 +++
->  include/linux/perf/arm_pmu.h | 9 ++++++++-
->  2 files changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index f5e1008..145caf4 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -1039,6 +1039,9 @@ int arm_pmu_device_probe(struct platform_device *pdev,
->  		goto out_free;
->  	}
->  
-> +	if (!pmu->pmu.attr_groups)
-> +		pmu->pmu.attr_groups = pmu->attr_groups;
-> +
->  	ret = cpu_pmu_init(pmu);
->  	if (ret)
->  		goto out_free;
-> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-> index e188438..8030814 100644
-> --- a/include/linux/perf/arm_pmu.h
-> +++ b/include/linux/perf/arm_pmu.h
-> @@ -14,7 +14,7 @@
->  
->  #include <linux/interrupt.h>
->  #include <linux/perf_event.h>
-> -
-> +#include <linux/sysfs.h>
->  #include <asm/cputype.h>
->  
->  /*
-> @@ -77,6 +77,12 @@ struct pmu_hw_events {
->  	struct arm_pmu		*percpu_pmu;
->  };
->  
-> +enum armpmu_attr_groups {
-> +	ARMPMU_ATTR_GROUP_EVENTS,
-> +	ARMPMU_ATTR_GROUP_FORMATS,
-> +	ARMPMU_NR_ATTR_GROUPS
-> +};
-> +
->  struct arm_pmu {
->  	struct pmu	pmu;
->  	cpumask_t	active_irqs;
-> @@ -111,6 +117,7 @@ struct arm_pmu {
->  	struct pmu_hw_events	__percpu *hw_events;
->  	struct list_head	entry;
->  	struct notifier_block	cpu_pm_nb;
-> +	const struct attribute_group *attr_groups[ARMPMU_NR_ATTR_GROUPS + 1];
+On Thu, Sep 08, 2016 at 09:43:55PM -0700, Chris Zhong wrote:
+> This patch adds DP audio output support to the rk3399-gru machine
+> driver.
 
-Is the '+ 1' because the array has to be NULL terminated? Probably worth
-a comment to disuade people from sending "obvious" fixes.
-
-Will
+Please don't resend or update single patches in the middle of a patch
+series, it makes things very confusing.  Please send the entire patch
+series at once.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160909/e5a76945/attachment.sig>
