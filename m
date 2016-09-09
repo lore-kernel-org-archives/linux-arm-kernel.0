@@ -1,117 +1,63 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 9 Sep 2016 14:45:13 +0300
-Subject: [PATCH v6 2/2] sdhci-of-arasan: Set controller to test mode when
- xlnx-fails-without-test-cd is present
-In-Reply-To: <1473363766-12652-2-git-send-email-zach.brown@ni.com>
-References: <1473363766-12652-1-git-send-email-zach.brown@ni.com>
- <1473363766-12652-2-git-send-email-zach.brown@ni.com>
-Message-ID: <47ff9881-d144-bade-a5d7-995d1304675a@intel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 9 Sep 2016 13:50:09 +0200
+Subject: [PATCH 3/4] dt-bindings: mmc: sdhci-st: Mention the discretionary
+ "icn" clock
+In-Reply-To: <20160908091136.17301-4-lee.jones@linaro.org>
+References: <20160908091136.17301-1-lee.jones@linaro.org>
+ <20160908091136.17301-4-lee.jones@linaro.org>
+Message-ID: <CAPDyKFpgo2zy6CoQS=HfZMph_zKTM=ZSxzUkNeZ4due+CsMwoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/16 22:42, Zach Brown wrote:
-> The sdhci controller on xilinx zynq devices will not function unless
-> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
-> In cases where it is impossible to provide the CD bit in hardware,
-> setting the controller to test mode and then setting inserted to true
-> will get the controller to function without the CD bit.
-> 
-> When the device has the property xlnx-fails-without-test-cd the driver
-> changes the controller to test mode and sets test inserted to true to
-> make the controller function.
-> 
-> Signed-off-by: Zach Brown <zach.brown@ni.com>
+On 8 September 2016 at 11:11, Lee Jones <lee.jones@linaro.org> wrote:
+> The interconnect (ICN) clock is required for functional working of
+> MMC on some ST platforms.  When not supplied it can result in
+> broken MMC and the following output:
+>
+>         [   13.916949] mmc0: Timeout waiting for hardware interrupt.
+>         [   13.922349] sdhci: =========== REGISTER DUMP (mmc0)===========
+>         [   13.928175] sdhci: Sys addr: 0x00000000 | Version:  0x00001002
+>         [   13.933999] sdhci: Blk size: 0x00007040 | Blk cnt:  0x00000001
+>         [   13.939825] sdhci: Argument: 0x00fffff0 | Trn mode: 0x00000013
+>         [   13.945650] sdhci: Present:  0x1fff0206 | Host ctl: 0x00000011
+>         [   13.951475] sdhci: Power:    0x0000000f | Blk gap:  0x00000080
+>         [   13.957300] sdhci: Wake-up:  0x00000000 | Clock:    0x00003f07
+>         [   13.963126] sdhci: Timeout:  0x00000004 | Int stat: 0x00000000
+>         [   13.968952] sdhci: Int enab: 0x02ff008b | Sig enab: 0x02ff008b
+>         [   13.974777] sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
+>         [   13.980602] sdhci: Caps:     0x21ed3281 | Caps_1:   0x00000000
+>         [   13.986428] sdhci: Cmd:      0x0000063a | Max curr: 0x00000000
+>         [   13.992252] sdhci: Host ctl2: 0x00000000
+>         [   13.996166] sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x7c048200
+>         [   14.001990] sdhci: ===========================================
+>         [   14.009802] mmc0: Got data interrupt 0x02000000 even though no data operation was in progress.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  drivers/mmc/host/sdhci-of-arasan.c | 27 ++++++++++++++++++++++++++-
->  drivers/mmc/host/sdhci.h           |  2 ++
->  2 files changed, 28 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index 33601a8..37c8ca0 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -26,6 +26,7 @@
->  #include <linux/phy/phy.h>
->  #include <linux/regmap.h>
->  #include "sdhci-pltfm.h"
-> +#include <linux/of.h>
->  
->  #define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
->  #define SDHCI_ARASAN_VENDOR_REGISTER	0x78
-> @@ -98,6 +99,10 @@ struct sdhci_arasan_data {
->  
->  	struct regmap	*soc_ctl_base;
->  	const struct sdhci_arasan_soc_ctl_map *soc_ctl_map;
-> +	unsigned int	quirks; /* Arasan deviations from spec */
-> +
-> +/* Controller does not have CD wired and will not function normally without */
-> +#define SDHCI_ARASAN_QUIRK_FORCE_CDTEST	BIT(0)
->  };
->  
->  static const struct sdhci_arasan_soc_ctl_map rk3399_soc_ctl_map = {
-> @@ -245,12 +250,27 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
->  	writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
->  }
->  
-> +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
-> +{
-> +	u8 ctrl;
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
-> +
-> +	sdhci_reset(host, mask);
-> +
-> +	if (sdhci_arasan->quirks & SDHCI_ARASAN_QUIRK_FORCE_CDTEST) {
-> +		ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
-> +		ctrl |= SDHCI_CTRL_CDTEST_INS | SDHCI_CTRL_CDTEST_EN;
-> +		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
-> +	}
-> +}
-> +
->  static struct sdhci_ops sdhci_arasan_ops = {
->  	.set_clock = sdhci_arasan_set_clock,
->  	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
->  	.get_timeout_clock = sdhci_arasan_get_timeout_clock,
->  	.set_bus_width = sdhci_set_bus_width,
-> -	.reset = sdhci_reset,
-> +	.reset = sdhci_arasan_reset,
->  	.set_uhs_signaling = sdhci_set_uhs_signaling,
->  };
->  
-> @@ -545,6 +565,7 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->  	struct sdhci_host *host;
->  	struct sdhci_pltfm_host *pltfm_host;
->  	struct sdhci_arasan_data *sdhci_arasan;
-> +	struct device_node *np = pdev->dev.of_node;
->  
->  	host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
->  				sizeof(*sdhci_arasan));
-> @@ -599,6 +620,10 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->  	}
->  
->  	sdhci_get_of_property(pdev);
-> +
-> +	if (of_get_property(np, "xlnx-fails-without-test-cd", NULL))
+>  Documentation/devicetree/bindings/mmc/sdhci-st.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-st.txt b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
+> index 88faa91..3cd4c43 100644
+> --- a/Documentation/devicetree/bindings/mmc/sdhci-st.txt
+> +++ b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
+> @@ -10,7 +10,7 @@ Required properties:
+>                         subsystem (mmcss) inside the FlashSS (available in STiH407 SoC
+>                         family).
+>
+> -- clock-names:         Should be "mmc".
+> +- clock-names:         Should be "mmc" and "icn".  (NB: The latter is not compulsory)
+>                         See: Documentation/devicetree/bindings/resource-names.txt
+>  - clocks:              Phandle to the clock.
+>                         See: Documentation/devicetree/bindings/clock/clock-bindings.txt
+> --
+> 2.9.3
+>
 
-Sorry, should have spotted this before.  This needs to be
-of_property_read_bool() not of_get_property().
+This looks good to me!
 
-> +		sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
-> +
->  	pltfm_host->clk = clk_xin;
->  
->  	if (of_device_is_compatible(pdev->dev.of_node,
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index a2bc9e1..c722cd2 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -84,6 +84,8 @@
->  #define   SDHCI_CTRL_ADMA32	0x10
->  #define   SDHCI_CTRL_ADMA64	0x18
->  #define   SDHCI_CTRL_8BITBUS	0x20
-> +#define  SDHCI_CTRL_CDTEST_INS	0x40
-> +#define  SDHCI_CTRL_CDTEST_EN	0x80
->  
->  #define SDHCI_POWER_CONTROL	0x29
->  #define  SDHCI_POWER_ON		0x01
-> 
+I am guessing you want this to go through my mmc tree, as I think
+patch 3 and patch 4 should go together. If not, tell me.
+
+Kind regards
+Uffe
