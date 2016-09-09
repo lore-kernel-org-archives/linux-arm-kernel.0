@@ -1,43 +1,63 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri,  9 Sep 2016 12:54:55 +0200
-Subject: [PULL 1/2] arm: KVM: Fix idmap overlap detection when the kernel is
- idmap'ed
-In-Reply-To: <20160909105456.8585-1-christoffer.dall@linaro.org>
-References: <20160909105456.8585-1-christoffer.dall@linaro.org>
-Message-ID: <20160909105456.8585-2-christoffer.dall@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 9 Sep 2016 12:52:39 +0200
+Subject: [PATCH v2 2/5] clk: at91: Add sama5d4 sckc support
+In-Reply-To: <20160908145146.20422-3-alexandre.belloni@free-electrons.com>
+References: <20160908145146.20422-1-alexandre.belloni@free-electrons.com>
+ <20160908145146.20422-3-alexandre.belloni@free-electrons.com>
+Message-ID: <20160909105239.dbtaqrxigs6uaimu@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Hi,
 
-We're trying hard to detect when the HYP idmap overlaps with the
-HYP va, as it makes the teardown of a cpu dangerous. But there is
-one case where an overlap is completely safe, which is when the
-whole of the kernel is idmap'ed, which is likely to happen on 32bit
-when RAM is at 0x8000000 and we're using a 2G/2G VA split.
+On 08/09/2016 at 16:51:43 +0200, Alexandre Belloni wrote :
+> +static void __init of_sama5d4_sckc_setup(struct device_node *np)
+> +{
+> +	void __iomem *regbase = of_iomap(np, 0);
+> +	struct clk *clk = NULL;
+> +	struct clk_sama5d4_slow_osc *osc;
+> +	struct clk_init_data init;
+> +	const char *xtal_name;
+> +	const char *parent_names[2] = { "slow_rc_osc", "slow_osc" };
+> +	bool bypass;
+> +
+> +	if (!regbase)
+> +		return;
+> +
+> +	xtal_name = of_clk_get_parent_name(np, 0);
+> +
+> +	bypass = of_property_read_bool(np, "atmel,osc-bypass");
+> +
+> +	osc = kzalloc(sizeof(*osc), GFP_KERNEL);
+> +	if (!osc)
+> +		return;
+> +
+> +	init.name = parent_names[1];
+> +	init.ops = &sama5d4_slow_osc_ops;
+> +	init.parent_names = &xtal_name;
+> +	init.num_parents = 1;
+> +	init.flags = CLK_IGNORE_UNUSED;
+> +
+> +	osc->hw.init = &init;
+> +	osc->sckcr = regbase;
+> +	osc->startup_usec = 1200000;
+> +
+> +	if (bypass)
+> +		writel((readl(regbase) | AT91_SCKC_OSC32BYP), regbase);
+> +
+> +	clk = clk_register(NULL, &osc->hw);
+> +	if (IS_ERR(clk))
+> +		kfree(osc);
+> +
+> +	clk = at91_clk_register_slow_rc_osc(regbase, parent_names[0], 32768,
+> +					    250000000, 75);
 
-In that case, we can proceed safely.
+That one could be a fixed clock as it is actually impossible to
+enable/disable it on sama5d4/2.
 
-Reported-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/mmu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+I'll send an updated patch series (maybe after getting some feedback).
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 29d0b23..a3faafe 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1714,7 +1714,8 @@ int kvm_mmu_init(void)
- 		 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
- 
- 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
--	    hyp_idmap_start <  kern_hyp_va(~0UL)) {
-+	    hyp_idmap_start <  kern_hyp_va(~0UL) &&
-+	    hyp_idmap_start != (unsigned long)__hyp_idmap_text_start) {
- 		/*
- 		 * The idmap page is intersecting with the VA space,
- 		 * it is not safe to continue further.
 -- 
-2.9.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
