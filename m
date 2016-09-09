@@ -1,52 +1,85 @@
-From: andrew-ct.chen@mediatek.com (andrew-ct chen)
-Date: Fri, 9 Sep 2016 09:25:14 +0800
-Subject: [PATCH] [media] VPU: mediatek: fix null pointer dereference on
- pdev
-In-Reply-To: <20160907171027.16424-1-colin.king@canonical.com>
-References: <20160907171027.16424-1-colin.king@canonical.com>
-Message-ID: <1473384314.10811.0.camel@mtksdaap41>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Thu,  8 Sep 2016 18:36:50 -0700
+Subject: [PATCH] gpu: Remove depends on RESET_CONTROLLER when not a provider
+Message-ID: <20160909013650.25166-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-09-07 at 18:10 +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> pdev is being null checked, however, prior to that it is being
-> dereferenced by platform_get_drvdata.  Move the assignments of
-> vpu and run to after the pdev null check to avoid a potential
-> null pointer dereference.
-> 
+These GPU drivers only depend on the RESET_CONTROLLER config
+option to fix build issues that existed when there weren't stub
+reset APIs for reset controller consumers. Given that these
+drivers aren't providing any reset controllers themselves, they
+don't actually depend on the API to build (just to function) so
+they don't need to depend on it. Remove the dependency to fix
+recursive build errors like the following:
 
-Reviewed-by:Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+drivers/usb/Kconfig:39:error: recursive dependency detected!
+drivers/usb/Kconfig:39: symbol USB is selected by MOUSE_APPLETOUCH
+drivers/input/mouse/Kconfig:187:        symbol MOUSE_APPLETOUCH depends on INPUT
+drivers/input/Kconfig:8:        symbol INPUT is selected by VT
+drivers/tty/Kconfig:12: symbol VT is selected by FB_STI
+drivers/video/fbdev/Kconfig:674:        symbol FB_STI depends on FB
+drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
+drivers/gpu/drm/Kconfig:42:     symbol DRM_KMS_FB_HELPER is selected by DRM_KMS_CMA_HELPER
+drivers/gpu/drm/Kconfig:98:     symbol DRM_KMS_CMA_HELPER is selected by DRM_IMX
+drivers/gpu/drm/imx/Kconfig:1:  symbol DRM_IMX depends on IMX_IPUV3_CORE
+drivers/gpu/ipu-v3/Kconfig:1:   symbol IMX_IPUV3_CORE depends on RESET_CONTROLLER
+drivers/reset/Kconfig:4:        symbol RESET_CONTROLLER is selected by USB_CHIPIDEA
+drivers/usb/chipidea/Kconfig:1: symbol USB_CHIPIDEA depends on USB_EHCI_HCD
+drivers/usb/host/Kconfig:84:    symbol USB_EHCI_HCD depends on USB
 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  drivers/media/platform/mtk-vpu/mtk_vpu.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.c b/drivers/media/platform/mtk-vpu/mtk_vpu.c
-> index c9bf58c..43907a3 100644
-> --- a/drivers/media/platform/mtk-vpu/mtk_vpu.c
-> +++ b/drivers/media/platform/mtk-vpu/mtk_vpu.c
-> @@ -523,9 +523,9 @@ static int load_requested_vpu(struct mtk_vpu *vpu,
->  
->  int vpu_load_firmware(struct platform_device *pdev)
->  {
-> -	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-> +	struct mtk_vpu *vpu;
->  	struct device *dev = &pdev->dev;
-> -	struct vpu_run *run = &vpu->run;
-> +	struct vpu_run *run;
->  	const struct firmware *vpu_fw = NULL;
->  	int ret;
->  
-> @@ -534,6 +534,9 @@ int vpu_load_firmware(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> +	vpu = platform_get_drvdata(pdev);
-> +	run = &vpu->run;
-> +
->  	mutex_lock(&vpu->vpu_mutex);
->  	if (vpu->fw_loaded) {
->  		mutex_unlock(&vpu->vpu_mutex);
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Mark Yao <mark.yao@rock-chips.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Peter Chen <peter.chen@nxp.com>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
+
+This has come out of some USB chipidea patches I've been working on. Please see
+http://lkml.kernel.org/r/20160907213519.27340-1-stephen.boyd at linaro.org for
+more details.
+
+ drivers/gpu/drm/rockchip/Kconfig | 1 -
+ drivers/gpu/drm/tegra/Kconfig    | 1 -
+ drivers/gpu/ipu-v3/Kconfig       | 1 -
+ 3 files changed, 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index 3c58669a06ce..6f7f9c59f05b 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -1,7 +1,6 @@
+ config DRM_ROCKCHIP
+ 	tristate "DRM Support for Rockchip"
+ 	depends on DRM && ROCKCHIP_IOMMU
+-	depends on RESET_CONTROLLER
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_KMS_HELPER
+ 	select DRM_PANEL
+diff --git a/drivers/gpu/drm/tegra/Kconfig b/drivers/gpu/drm/tegra/Kconfig
+index 63ebb154b9b5..bbf5a4b7e0b6 100644
+--- a/drivers/gpu/drm/tegra/Kconfig
++++ b/drivers/gpu/drm/tegra/Kconfig
+@@ -3,7 +3,6 @@ config DRM_TEGRA
+ 	depends on ARCH_TEGRA || (ARM && COMPILE_TEST)
+ 	depends on COMMON_CLK
+ 	depends on DRM
+-	depends on RESET_CONTROLLER
+ 	select DRM_KMS_HELPER
+ 	select DRM_MIPI_DSI
+ 	select DRM_PANEL
+diff --git a/drivers/gpu/ipu-v3/Kconfig b/drivers/gpu/ipu-v3/Kconfig
+index aefdff95356d..08766c6e7856 100644
+--- a/drivers/gpu/ipu-v3/Kconfig
++++ b/drivers/gpu/ipu-v3/Kconfig
+@@ -1,7 +1,6 @@
+ config IMX_IPUV3_CORE
+ 	tristate "IPUv3 core support"
+ 	depends on SOC_IMX5 || SOC_IMX6Q || ARCH_MULTIPLATFORM
+-	depends on RESET_CONTROLLER
+ 	select GENERIC_IRQ_CHIP
+ 	help
+ 	  Choose this if you have a i.MX5/6 system and want to use the Image
+-- 
+2.9.0.rc2.8.ga28705d
