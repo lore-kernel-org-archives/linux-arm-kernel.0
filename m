@@ -1,79 +1,49 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 09 Sep 2016 11:42:19 +0300
-Subject: [PATCH] [media] platform: constify vb2_ops structures
-In-Reply-To: <1473379150-17315-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1473379150-17315-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1520635.43zSurJaks@avalon>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Fri, 9 Sep 2016 11:44:10 +0300
+Subject: [PATCH v3] ARM: dts: add gpio-ranges property to iMX GPIO
+ controllers
+In-Reply-To: <20160909072020.ieehalkgxxjfewhs@pengutronix.de>
+References: <1473386556-1934-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <20160909072020.ieehalkgxxjfewhs@pengutronix.de>
+Message-ID: <729f2fd7-df40-c631-5365-892ee25854b3@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia,
+Hi Uwe,
 
-Thank you for the patch.
+On 09/09/2016 10:20 AM, Uwe Kleine-K?nig wrote:
+> On Fri, Sep 09, 2016 at 05:02:36AM +0300, Vladimir Zapolskiy wrote:
+>> To establish a connection between GPIO controllers and pin multiplexor
+>> controller add gpio-ranges properties to all GPIO controllers found
+>> on iMX50, iMX6Q/D, iMX6DL/S, iMX6SL, iMX6SX, iMX6UL and iMX7D/S
+>> SoCs. The change was done after human parsing of output from
+>
+> When looking at doing the same for i.MX35 there are a few pin pairs that
+> are driven by the same GPIO, e.g.:
+>
+> 	$ grep GPIO3_9 imx35-pinfunc.h
+> 	#define MX35_PAD_CTS1__GPIO3_9					0x194 0x5d8 0x918 0x5 0x0
+> 	#define MX35_PAD_FEC_COL__GPIO3_9				0x2ec 0x750 0x918 0x5 0x1
+>
+> With this it's not possible to correctly add a gpio-ranges, right?
 
-On Friday 09 Sep 2016 01:59:10 Julia Lawall wrote:
-> Check for vb2_ops structures that are only stored in the ops field of a
-> vb2_queue structure.  That field is declared const, so vb2_ops structures
-> that have this property can be declared as const also.
-> 
-> The semantic patch that makes this change is as follows:
-> (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> @r disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct vb2_ops i at p = { ... };
-> 
-> @ok@
-> identifier r.i;
-> struct vb2_queue e;
-> position p;
-> @@
-> e.ops = &i at p;
-> 
-> @bad@
-> position p != {r.p,ok.p};
-> identifier r.i;
-> struct vb2_ops e;
-> @@
-> e at i@p
-> 
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->  struct vb2_ops i = { ... };
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+this is an interesting exceptional case, I don't think that pinctrl
+and gpio subsystems are ready to handle it.
 
-For the drivers below,
+If both pads are muxed to the same GPIO, then I presume on output it
+behaves like a tee, but do you know what would be the input value,
+if one line is driven high and another one is low?
 
->  drivers/media/platform/m2m-deinterlace.c                 |    2 +-
->  drivers/media/platform/rcar-vin/rcar-dma.c               |    2 +-
->  drivers/media/platform/rcar_jpu.c                        |    2 +-
->  drivers/media/platform/sh_vou.c                          |    2 +-
->  drivers/media/platform/soc_camera/atmel-isi.c            |    2 +-
->  drivers/media/platform/soc_camera/sh_mobile_ceu_camera.c |    2 +-
->  drivers/media/platform/vim2m.c                           |    2 +-
->  drivers/media/platform/xilinx/xilinx-dma.c               |    2 +-
+> i.MX1, i.MX21, i.MX25, i.MX27 and i.MX53 could benefit from such a
+> change though. i.MX35 and i.MX51 have duplicates.
+>
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+I keep my hands off it, because I don't have any boards powered by
+these SoCs to be able to test the change. FWIW I hold one i.MX31
+powered board from old times, but I see that i.MX31 has poor DTS
+support in general, there is no GPIO controller device node to
+add the property.
 
-For
-
->  drivers/media/platform/soc_camera/rcar_vin.c             |    2 +-
-
-you can also add my
-
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-tag, but the driver will be scheduled for removal very soon.
-
--- 
-Regards,
-
-Laurent Pinchart
+--
+With best wishes,
+Vladimir
