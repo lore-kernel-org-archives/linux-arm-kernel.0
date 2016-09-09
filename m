@@ -1,50 +1,53 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 9 Sep 2016 13:36:56 -0400 (EDT)
-Subject: Improper TTBCR for arm 32bit kernel decompression
-In-Reply-To: <57D2E47D.5030105@codeaurora.org>
-References: <57D2E47D.5030105@codeaurora.org>
-Message-ID: <alpine.LFD.2.20.1609091334120.14769@knanqh.ubzr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Sep 2016 18:37:36 +0100
+Subject: [PATCH v6 00/20] Generic DT bindings for PCI IOMMUs and ARM SMMU
+In-Reply-To: <cover.1473173789.git.robin.murphy@arm.com>
+References: <cover.1473173789.git.robin.murphy@arm.com>
+Message-ID: <20160909173736.GF11418@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Sep 2016, Srinivas Ramana wrote:
+Hi Robin,
 
-> Hello,
+On Tue, Sep 06, 2016 at 04:33:33PM +0100, Robin Murphy wrote:
+> Here's v6 to address last week's comments. For the sake of honesty I've
+> left Lorenzo's tested-by off everything I've changed since, and Eric's
+> reviewed-by off patch 19 having non-trivially reworked the guts of it.
 > 
-> While trying to boot arm-32 bit kernel, I came across a problem where TTBCR is
-> in improper state. If the bootloader uses the long descriptor format and jumps
-> to kernel decompressor code, TTBCR may not be in the right state. So, as soon
-> as the MMU is enabled, execution can not proceed further.
+> Patch 20 is new, but as it's currently a solution waiting for a problem
+> as far as we're aware, oughtn't to get in the way; hopefully the rest is
+> in good shape for 4.9 now.
 > 
-> Before enabling the MMU, it is required to clear the TTBCR.PD0 field to use
-> TTBR0 for translation table walks. Also, TTBCR.N should be reset to '0' to
-> indicate the correct base address width. The 'commit dbece45894d3a ("ARM:
-> 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores")' does the reset of
-> TTBCR.N, but doesn't consider all the bits for the size of TTBCR.N.
+> Branch here, based on Will's iommu/devel queue:
 > 
-> when i tried the below change where i explicitly clear TTBCR.PD0 and use
-> correct mask for TTBCR.N, I see proper memory after MMU is enabled and
-> decompression succeeds.
-> 
-> Request your comments on the change below. If it looks good, I can submit a
-> patch for inclusion.
-> 
-> ---------------------8<----------------------------------
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index af11c2f..5769f1f 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -779,7 +779,8 @@ __armv7_mmu_cache_on:
->                 orrne   r0, r0, #1              @ MMU enabled
->                 movne   r1, #0xfffffffd         @ domain 0 = client
->                 bic     r6, r6, #1 << 31        @ 32-bit translation system
-> -               bic     r6, r6, #3 << 0         @ use only ttbr0
-> +               bic     r6, r6, #7 << 0         @ width of base address field
-> +               bic     r6, r6, #1 << 4         @ use only ttbr0
+> git://linux-arm.org/linux-rm iommu/generic-v6
 
-You could combine those instructions like this:
+I'm pretty happy with this (modulo the binding docs update etc we
+discussed off list), however I'm seeing an allmodconfig build failure
+with this applied. Error below.
 
-		bic	r6, r6, #(7 << 0) | (1 << 4) @ use only ttbr0
+Please can you take a look and send a fixup patch?
 
+Cheers,
 
-Nicolas
+Will
+
+--->8
+
+In file included from drivers/gpu/drm/exynos/exynos_drm_drv.c:33:0:
+drivers/gpu/drm/exynos/exynos_drm_iommu.h: In function ?__exynos_iommu_create_mapping?:
+drivers/gpu/drm/exynos/exynos_drm_iommu.h:69:8: error: too few arguments to function ?iommu_dma_init_domain?
+  ret = iommu_dma_init_domain(domain, start, size);
+        ^
+In file included from drivers/gpu/drm/exynos/exynos_drm_iommu.h:53:0,
+                 from drivers/gpu/drm/exynos/exynos_drm_drv.c:33:
+./include/linux/dma-iommu.h:33:5: note: declared here
+ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+     ^
+make[4]: *** [drivers/gpu/drm/exynos/exynos_drm_drv.o] Error 1
+make[3]: *** [drivers/gpu/drm/exynos] Error 2
+make[3]: *** Waiting for unfinished jobs....
+make[2]: *** [drivers/gpu/drm] Error 2
+make[1]: *** [drivers/gpu] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [drivers] Error 2
