@@ -1,57 +1,45 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 9 Sep 2016 18:21:14 +0100
-Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
-In-Reply-To: <CAFBinCCDDwydB+RP0CZKoAW5Suxotn224ZFVWvt2OGW3gNJR1g@mail.gmail.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
- <m260q6jibf.fsf@baylibre.com>
- <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
- <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
- <m2eg4ui0nl.fsf@baylibre.com>
- <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
- <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
- <m2sht9gkau.fsf@baylibre.com>
- <CAFBinCCDDwydB+RP0CZKoAW5Suxotn224ZFVWvt2OGW3gNJR1g@mail.gmail.com>
-Message-ID: <b9730890-d98c-2c3a-8af1-96b8c394c30f@codethink.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Sep 2016 18:26:09 +0100
+Subject: [PATCH v8 8/9] arm64: pmu: Detect and enable multiple PMUs in an
+ ACPI system
+In-Reply-To: <1472507300-9844-9-git-send-email-jeremy.linton@arm.com>
+References: <1472507300-9844-1-git-send-email-jeremy.linton@arm.com>
+ <1472507300-9844-9-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20160909172609.GD11418@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/16 17:14, Martin Blumenstingl wrote:
-> On Fri, Sep 9, 2016 at 5:33 PM, Kevin Hilman <khilman@baylibre.com> wrote:
->> However, the problem with all of the solutions proposed (runtime PM ones
->> included) is that we're forcing a board-specific design issue (2 devices
->> sharing a reset line) into a driver that should not have any
->> board-specific assumptions in it.
->>
->> For example, if this driver is used on another platform where different
->> PHYs have different reset lines, then one of them (the unlucky one who
->> is not probed first) will never get reset.  So any form of per-device
->> ref-counting is not a portable solution.
-> maybe we should also consider Ben's solution: he played with the USB
-> PHY on his Meson8b board. His approach was to have only one USB PHY
-> driver instance which exposes two PHYs.
-> The downside of this: the driver would have to know the offset of the
-> PHYs (0x0 for the first PHY, 0x20 for the second), but we could handle
-> the reset using runtime PM without any hacks.
->
-> I checked the USB PHY reference driver: it seems that there will be a
-> new USB PHY with the GXL/GXM SoCs.
-> So maybe we could live with the assumption that the PHYs are at
-> consecutive addresses.
->
->> I'm not sure yet how the reset framework is supposed to handle shared
->> reset lines, but that needs some investigation.  I quick glance and it
->> seems that reset controllers can have shared lines, so that should be
->> investigated.
-> unfortunately shared resets are not allowed to use reset_control_reset, see [0]
->
->
-> [0] http://lxr.free-electrons.com/source/drivers/reset/core.c#L102
+On Mon, Aug 29, 2016 at 04:48:19PM -0500, Jeremy Linton wrote:
+> +/* Count number and type of CPU cores in the system. */
+> +static void __init arm_pmu_acpi_determine_cpu_types(struct list_head *pmus)
+> +{
+> +	int i;
+> +	bool alloc_failure = false;
+> +
+> +	for_each_possible_cpu(i) {
+> +		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
+> +		u32 partnum = MIDR_PARTNUM(cinfo->reg_midr);
+> +		struct pmu_types *pmu;
+> +
+> +		list_for_each_entry(pmu, pmus, list) {
+> +			if (pmu->cpu_type == partnum) {
+> +				pmu->cpu_count++;
+> +				break;
+> +			}
+> +		}
+> +
+> +		/* we didn't find the CPU type, add an entry to identify it */
+> +		if ((&pmu->list == pmus) && (!alloc_failure)) {
+> +			pmu = kzalloc(sizeof(struct pmu_types), GFP_KERNEL);
+> +			if (!pmu) {
+> +				pr_warn("Unable to allocate pmu_types\n");
+> +				/*
+> +				 * continue to count cpus for any pmu_types
+> +				 * already allocated, but don't allocate any
+> +				 * more pmu_types. This avoids undercounting.
+> +				 */
+> +				alloc_failure = true;
 
-If we didn't have the shared reset, we'd have one of node per phy
-and not have to have two sub-nodes... I don't think any other bits
-of the PHY framework are shared.
+I thought we were ripping this out?
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Will
