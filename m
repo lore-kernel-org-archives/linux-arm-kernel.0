@@ -1,26 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 9 Sep 2016 14:44:27 -0300
-Subject: [PATCH 1/2] ARM: dts: imx6ul: Add DTS for liteSOM module
-In-Reply-To: <20160909103906.15209-1-m.niestroj@grinn-global.com>
-References: <20160909103906.15209-1-m.niestroj@grinn-global.com>
-Message-ID: <CAOMZO5AmXRs9eqzvOc8WOVc_xzZJFN8DOoOddw22WALqU66u6w@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 09 Sep 2016 10:57:24 -0700
+Subject: [PATCH V4 2/4] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <1473407397-29395-3-git-send-email-kernel@martin.sperl.org>
+References: <1473407397-29395-1-git-send-email-kernel@martin.sperl.org>
+ <1473407397-29395-3-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87a8fharcr.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 9, 2016 at 7:39 AM, Marcin Niestroj
-<m.niestroj@grinn-global.com> wrote:
+kernel at martin.sperl.org writes:
 
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6ul-litesom.dtsi
-> @@ -0,0 +1,52 @@
-> +/*
-> + * Copyright (C) 2016 Grinn
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> Add basic thermal driver for bcm2835 SOC.
+>
+> This driver currently relies on the firmware setting up the
+> tsense HW block and does not set it up itself.
+>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 
-Is it possible to use a dual GPLv2/X11 license?
-
-Patches look good.
+Acked-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160909/324bf9f8/attachment.sig>
