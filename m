@@ -1,47 +1,29 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 9 Sep 2016 16:25:03 +0200
-Subject: [PATCH V4 3/4] ARM: bcm2835: add thermal node to device-tree of
- bcm283x
-In-Reply-To: <1473407397-29395-4-git-send-email-kernel@martin.sperl.org>
-References: <1473407397-29395-1-git-send-email-kernel@martin.sperl.org>
- <1473407397-29395-4-git-send-email-kernel@martin.sperl.org>
-Message-ID: <19cc8fbf-6ceb-995e-850d-9d82bdaff8d0@i2se.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 9 Sep 2016 16:25:44 +0200
+Subject: [PATCH 09/10] PM / Domains: Store the provider in the PM domain
+ structure
+In-Reply-To: <73870e28-3600-8a84-7659-55d4a8320a1d@nvidia.com>
+References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
+ <1471340976-5379-10-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFp+93=CrmgLNx1ritm1Dm=eWFJn=vbuzAUb9VmWc4j1fg@mail.gmail.com>
+ <73870e28-3600-8a84-7659-55d4a8320a1d@nvidia.com>
+Message-ID: <CAPDyKFr7uLgqzMpEfMDZHnnFXTxhvSsaeaUSfM4-6rbahp1PEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 09.09.2016 um 09:49 schrieb kernel at martin.sperl.org:
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> Add the node for the thermal sensor of the bcm2835-soc
-> to the device tree.
->
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> Reviewed-by: Eric Anholt <eric@anholt.net>
-> ---
->  arch/arm/boot/dts/bcm283x.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-> index b982522..e2e3a46 100644
-> --- a/arch/arm/boot/dts/bcm283x.dtsi
-> +++ b/arch/arm/boot/dts/bcm283x.dtsi
-> @@ -186,6 +186,12 @@
->  			interrupts = <2 14>; /* pwa1 */
->  		};
->  
-> +		thermal: thermal at 0x7e212000 {
-> +			compatible = "brcm,bcm2835-thermal";
-> +			reg = <0x7e212000 0x8>;
-> +			clocks = <&clocks BCM2835_CLOCK_TSENS>;
-> +		};
-> +
+[...]
 
-Since the driver handles 3 different SoC (2835, 2836, 2837). This node
-should be defined in the SoC specific dtsi files, because the BCM2836
-includes bcm283x.dtsi too.
+>>
+>> I also think you should extend this change, to also make the
+>> of_genpd_del_provider() API to reset the genpd->provider = NULL.
+>> Otherwise you can't track when a provider is removed.
+>
+> Unfortunately that is not going to work. The function
+> of_genpd_remove_tail() (patch #10) uses the ->provider member to remove
+> the last domain for the given provider and of_genpd_del_provider() must
+> be called before hand.
 
-Be aware the patch for bcm2837 must go to ARM64.
+Yes, of course - you are right!
 
->  		aux: aux at 0x7e215000 {
->  			compatible = "brcm,bcm2835-aux";
->  			#clock-cells = <1>;
+Kind regards
+Uffe
