@@ -1,135 +1,187 @@
-From: hotran@apm.com (Hoan Tran)
-Date: Fri, 9 Sep 2016 10:05:13 -0700
-Subject: [PATCH] hwmon: xgene: access mailbox as RAM
-In-Reply-To: <20160909165855.GB18952@roeck-us.net>
-References: <1469134557-26869-1-git-send-email-hotran@apm.com>
- <13081573.BbD3TmEU5Y@wuerfel> <20160907223705.GA31582@roeck-us.net>
- <2529114.aAikiSWl11@wuerfel> <20160909165855.GB18952@roeck-us.net>
-Message-ID: <CAFHUOYx=HPN+73WevyBpM_0v1npBHaeExt2Qu24qYT+eHvNacw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 9 Sep 2016 18:05:40 +0100
+Subject: [PATCH v3 7/8] ARM: Move system register accessors to asm/cp15.h
+In-Reply-To: <1473350810-10857-8-git-send-email-vladimir.murzin@arm.com>
+References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
+ <1473350810-10857-8-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <57D2EBE4.4060107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 9, 2016 at 9:58 AM, Guenter Roeck <linux@roeck-us.net> wrote:
-> Hi Arnd,
->
-> On Fri, Sep 09, 2016 at 05:38:58PM +0200, Arnd Bergmann wrote:
->> The newly added hwmon driver fails to build in an allmodconfig
->> kernel:
->>
->>       1  ERROR: "memblock_is_memory" [drivers/hwmon/xgene-hwmon.ko] undefined!
->>
->> According to comments in the code, the mailbox is a shared memory region,
->> not a set of MMIO registers, so we should use memremap() for mapping it
->> instead of ioremap or acpi_os_ioremap, and pointer dereferences instead
->> of readl/writel.
->>
->> The driver already uses plain kernel pointers, so it's a bit unusual
->> to work with functions that operate on __iomem pointers, and this
->> fixes that part too.
->>
->> I'm using READ_ONCE/WRITE_ONCE here to keep the existing behavior
->> regarding the ordering of the accesses from the CPU, but note that
->> there are no barriers (also unchanged from before).
->>
->> I'm also keeping the endianess behavior, though I'm unsure whether
->> the message data was supposed to be in LE32 format in the first
->> place, it's possible this was meant to be interpreted as a byte
->> stream instead.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>
->
-> Thanks a lot for looking into this.
->
-> I'll apply this patch to address the build problem. Much better than
-> my rude "depends on BROKEN". It would be great to get a Tested-by:
-> from someone with access to the hardware.
->
+On 08/09/16 17:06, Vladimir Murzin wrote:
+> Headers linux/irqchip/arm-gic.v3.h and arch/arm/include/asm/kvm_hyp.h
+> are included in virt/kvm/arm/hyp/vgic-v3-sr.c and both define macros
+> called __ACCESS_CP15 and __ACCESS_CP15_64 which obviously creates a
+> conflict. These macros were introduced independently for GIC and KVM
+> and, in fact, do the same thing.
+> 
+> As an option we could add prefixes to KVM and GIC version of macros so
+> they won't clash, but it'd introduce code duplication.  Alternatively,
+> we could keep macro in, say, GIC header and include it in KVM one (or
+> vice versa), but such dependency would not look nicer.
+> 
+> So we follow arm64 way (it handles this via sysreg.h) and move only
+> single set of macros to asm/cp15.h
+> 
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  arch/arm/include/asm/arch_gicv3.h |   27 +++++++++++----------------
+>  arch/arm/include/asm/cp15.h       |   15 +++++++++++++++
+>  arch/arm/include/asm/kvm_hyp.h    |   15 +--------------
+>  3 files changed, 27 insertions(+), 30 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+> index e08d151..af25c32 100644
+> --- a/arch/arm/include/asm/arch_gicv3.h
+> +++ b/arch/arm/include/asm/arch_gicv3.h
+> @@ -22,9 +22,7 @@
+>  
+>  #include <linux/io.h>
+>  #include <asm/barrier.h>
+> -
+> -#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	p15, Op1, %0, CRn, CRm, Op2
+> -#define __ACCESS_CP15_64(Op1, CRm)		p15, Op1, %Q0, %R0, CRm
+> +#include <asm/cp15.h>
+>  
+>  #define ICC_EOIR1			__ACCESS_CP15(c12, 0, c12, 1)
+>  #define ICC_DIR				__ACCESS_CP15(c12, 0, c11, 1)
+> @@ -102,58 +100,55 @@
+>  
+>  static inline void gic_write_eoir(u32 irq)
+>  {
+> -	asm volatile("mcr " __stringify(ICC_EOIR1) : : "r" (irq));
+> +	write_sysreg(irq, ICC_EOIR1);
+>  	isb();
+>  }
+>  
+>  static inline void gic_write_dir(u32 val)
+>  {
+> -	asm volatile("mcr " __stringify(ICC_DIR) : : "r" (val));
+> +	write_sysreg(val, ICC_DIR);
+>  	isb();
+>  }
+>  
+>  static inline u32 gic_read_iar(void)
+>  {
+> -	u32 irqstat;
+> +	u32 irqstat = read_sysreg(ICC_IAR1);
+>  
+> -	asm volatile("mrc " __stringify(ICC_IAR1) : "=r" (irqstat));
+>  	dsb(sy);
+> +
+>  	return irqstat;
+>  }
+>  
+>  static inline void gic_write_pmr(u32 val)
+>  {
+> -	asm volatile("mcr " __stringify(ICC_PMR) : : "r" (val));
+> +	write_sysreg(val, ICC_PMR);
+>  }
+>  
+>  static inline void gic_write_ctlr(u32 val)
+>  {
+> -	asm volatile("mcr " __stringify(ICC_CTLR) : : "r" (val));
+> +	write_sysreg(val, ICC_CTLR);
+>  	isb();
+>  }
+>  
+>  static inline void gic_write_grpen1(u32 val)
+>  {
+> -	asm volatile("mcr " __stringify(ICC_IGRPEN1) : : "r" (val));
+> +	write_sysreg(val, ICC_IGRPEN1);
+>  	isb();
+>  }
+>  
+>  static inline void gic_write_sgi1r(u64 val)
+>  {
+> -	asm volatile("mcrr " __stringify(ICC_SGI1R) : : "r" (val));
+> +	write_sysreg(val, ICC_SGI1R);
+>  }
+>  
+>  static inline u32 gic_read_sre(void)
+>  {
+> -	u32 val;
+> -
+> -	asm volatile("mrc " __stringify(ICC_SRE) : "=r" (val));
+> -	return val;
+> +	return read_sysreg(ICC_SRE);
+>  }
+>  
+>  static inline void gic_write_sre(u32 val)
+>  {
+> -	asm volatile("mcr " __stringify(ICC_SRE) : : "r" (val));
+> +	write_sysreg(val, ICC_SRE);
+>  	isb();
+>  }
+>  
+> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+> index c3f1152..f661732 100644
+> --- a/arch/arm/include/asm/cp15.h
+> +++ b/arch/arm/include/asm/cp15.h
+> @@ -47,6 +47,21 @@
+>  #define vectors_high()	(0)
+>  #endif
+>  
+> +#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	\
+> +	"mrc", "mcr", __stringify(p15, Op1, %0, CRn, CRm, Op2), u32
+> +#define __ACCESS_CP15_64(Op1, CRm)		\
+> +	"mrrc", "mcrr", __stringify(p15, Op1, %Q0, %R0, CRm), u64
+> +
+> +#define __read_sysreg(r, w, c, t) ({				\
+> +	t __val;						\
+> +	asm volatile(r " " c : "=r" (__val));			\
+> +	__val;							\
+> +})
+> +#define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
+> +
+> +#define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
+> +#define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
+> +
 
-Hi Arnd and Guenter,
+Shouldn't that be placed after the #ifdef below?
 
-Thanks for the patch. I'm testing it out.
+>  #ifdef CONFIG_CPU_CP15
+>  
+>  extern unsigned long cr_alignment;	/* defined in entry-armv.S */
+> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+> index bd9434e..0b475d2 100644
+> --- a/arch/arm/include/asm/kvm_hyp.h
+> +++ b/arch/arm/include/asm/kvm_hyp.h
+> @@ -20,26 +20,13 @@
+>  
+>  #include <linux/compiler.h>
+>  #include <linux/kvm_host.h>
+> +#include <asm/cp15.h>
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/vfp.h>
+>  
+> -#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	\
+> -	"mrc", "mcr", __stringify(p15, Op1, %0, CRn, CRm, Op2), u32
+> -#define __ACCESS_CP15_64(Op1, CRm)		\
+> -	"mrrc", "mcrr", __stringify(p15, Op1, %Q0, %R0, CRm), u64
+>  #define __ACCESS_VFP(CRn)			\
+>  	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
+>  
+> -#define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
+> -#define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
+> -
+> -#define __read_sysreg(r, w, c, t) ({				\
+> -	t __val;						\
+> -	asm volatile(r " " c : "=r" (__val));			\
+> -	__val;							\
+> -})
+> -#define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
+> -
+>  #define write_special(v, r)					\
+>  	asm volatile("msr " __stringify(r) ", %0" : : "r" (v))
+>  #define read_special(r) ({					\
+> 
 
-Hoan
+Could you please cc RMK on this, given that this touches a core arch/arm
+file?
 
-> Guenter
->
->> diff --git a/drivers/hwmon/xgene-hwmon.c b/drivers/hwmon/xgene-hwmon.c
->> index bc78a5d10182..e834dfb3acca 100644
->> --- a/drivers/hwmon/xgene-hwmon.c
->> +++ b/drivers/hwmon/xgene-hwmon.c
->> @@ -34,7 +34,8 @@
->>  #include <linux/module.h>
->>  #include <linux/of.h>
->>  #include <linux/platform_device.h>
->> -#include <acpi/acpi_io.h>
->> +#include <linux/io.h>
->> +
->>  #include <acpi/pcc.h>
->>
->>  /* SLIMpro message defines */
->> @@ -126,10 +127,10 @@ static u16 xgene_word_tst_and_clr(u16 *addr, u16 mask)
->>  {
->>       u16 ret, val;
->>
->> -     val = readw_relaxed(addr);
->> +     val = le16_to_cpu(READ_ONCE(*addr));
->>       ret = val & mask;
->>       val &= ~mask;
->> -     writew_relaxed(val, addr);
->> +     WRITE_ONCE(*addr, cpu_to_le16(val));
->>
->>       return ret;
->>  }
->> @@ -137,7 +138,7 @@ static u16 xgene_word_tst_and_clr(u16 *addr, u16 mask)
->>  static int xgene_hwmon_pcc_rd(struct xgene_hwmon_dev *ctx, u32 *msg)
->>  {
->>       struct acpi_pcct_shared_memory *generic_comm_base = ctx->pcc_comm_addr;
->> -     void *ptr = generic_comm_base + 1;
->> +     u32 *ptr = (void*)(generic_comm_base + 1);
->>       int rc, i;
->>       u16 val;
->>
->> @@ -146,21 +147,21 @@ static int xgene_hwmon_pcc_rd(struct xgene_hwmon_dev *ctx, u32 *msg)
->>       ctx->resp_pending = true;
->>
->>       /* Write signature for subspace */
->> -     writel_relaxed(PCC_SIGNATURE_MASK | ctx->mbox_idx,
->> -                    &generic_comm_base->signature);
->> +     WRITE_ONCE(generic_comm_base->signature,
->> +                cpu_to_le32(PCC_SIGNATURE_MASK | ctx->mbox_idx));
->>
->>       /* Write to the shared command region */
->> -     writew_relaxed(MSG_TYPE(msg[0]) | PCCC_GENERATE_DB_INT,
->> -                    &generic_comm_base->command);
->> +     WRITE_ONCE(generic_comm_base->command,
->> +                cpu_to_le16(MSG_TYPE(msg[0]) | PCCC_GENERATE_DB_INT));
->>
->>       /* Flip CMD COMPLETE bit */
->> -     val = readw_relaxed(&generic_comm_base->status);
->> +     val = le16_to_cpu(READ_ONCE(generic_comm_base->status));
->>       val &= ~PCCS_CMD_COMPLETE;
->> -     writew_relaxed(val, &generic_comm_base->status);
->> +     WRITE_ONCE(generic_comm_base->status, cpu_to_le16(val));
->>
->>       /* Copy the message to the PCC comm space */
->>       for (i = 0; i < sizeof(struct slimpro_resp_msg) / 4; i++)
->> -             writel_relaxed(msg[i], ptr + i * 4);
->> +             WRITE_ONCE(ptr[i], cpu_to_le32(msg[i]));
->>
->>       /* Ring the doorbell */
->>       rc = mbox_send_message(ctx->mbox_chan, msg);
->> @@ -652,9 +653,9 @@ static int xgene_hwmon_probe(struct platform_device *pdev)
->>                */
->>               ctx->comm_base_addr = cppc_ss->base_address;
->>               if (ctx->comm_base_addr) {
->> -                     ctx->pcc_comm_addr =
->> -                                     acpi_os_ioremap(ctx->comm_base_addr,
->> -                                                     cppc_ss->length);
->> +                     ctx->pcc_comm_addr = memremap(ctx->comm_base_addr,
->> +                                                     cppc_ss->length,
->> +                                                     MEMREMAP_WT);
->>               } else {
->>                       dev_err(&pdev->dev, "Failed to get PCC comm region\n");
->>                       rc = -ENODEV;
->>
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
