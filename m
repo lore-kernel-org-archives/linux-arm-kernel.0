@@ -1,45 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri,  9 Sep 2016 19:17:48 +0100
-Subject: [PATCH 4.5/20] Docs: dt: document ARM SMMUv3 generic binding usage
-In-Reply-To: <cover.1473173789.git.robin.murphy@arm.com>
-References: <cover.1473173789.git.robin.murphy@arm.com>
-Message-ID: <6067fc2b12b3bc681687753eedd941c8244c22fa.1473443407.git.robin.murphy@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 9 Sep 2016 11:24:30 -0700
+Subject: [PATCH v2 0/7] arm64: Privileged Access Never using TTBR0_EL1
+ switching
+In-Reply-To: <20160909163116.GA10792@leverpostej>
+References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+ <CAGXu5j++0LgDEv=m1yQb4hB57MQ2MYVCpeex9TFTRmQpNYhNsQ@mail.gmail.com>
+ <20160908125123.ypkye5nclsi5vx4f@localhost>
+ <20160909163116.GA10792@leverpostej>
+Message-ID: <CAGXu5jJMdym7jWv5P7YHdqu4eU7a3dzQqgXHppzOwRCYQ6O1Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we've ratified SMMUv3's use of the generic binding, document it.
+On Fri, Sep 9, 2016 at 9:31 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Sep 08, 2016 at 01:51:24PM +0100, Catalin Marinas wrote:
+>> On Wed, Sep 07, 2016 at 04:20:55PM -0700, Kees Cook wrote:
+>> > On Fri, Sep 2, 2016 at 8:02 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > > This is the second version of the arm64 PAN emulation by disabling
+>> > > TTBR0_EL1 accesses. The major change from v1 is the use of a thread_info
+>> > > member to store the real TTBR0_EL1 value. The advantage is slightly
+>> > > simpler assembler macros for uaccess_enable with the downside that
+>> > > switch_mm() must always update the saved ttbr0 even if there is no mm
+>> > > switch.
+>> >
+>> > Is arm64 thread_info attached to the kernel stack? (i.e. is this
+>> > introducing a valuable target for stack-based attacks?)
+>>
+>> Currently yes, thread_info is on the kernel stack. At some point we'll
+>> decouple it in a similar way to what x86 are doing/planning.
+>
+> FWIW, I'm currently working on this (atop of Andy's x86 patches). The
+> IRQ stack work largely removed out dependence on the stack pointer to
+> find thread_info, and I have a plan for the remaining places.
+>
+> There's a fair amount of ground work to do first (e.g. reworking headers
+> to avoid circular dependencies), but hopefully I'll have something that
+> I can share soon.
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Fantastic! Thanks for the heads-up. :)
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-index 7b94c88cf2ee..69a694f70bea 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-@@ -27,6 +27,12 @@ the PCIe specification.
-                       * "cmdq-sync" - CMD_SYNC complete
-                       * "gerror"    - Global Error activated
- 
-+- #iommu-cells      : See the generic IOMMU binding described in
-+                        devicetree/bindings/iommu/iommu.txt
-+                      for details. For SMMUv3, must be 1, with each cell
-+                      describing a single stream ID. All possible stream
-+                      ID which a device may emit must be described.
-+
- ** SMMUv3 optional properties:
- 
- - dma-coherent      : Present if DMA operations made by the SMMU (page
-@@ -54,6 +60,6 @@ the PCIe specification.
-                              <GIC_SPI 79 IRQ_TYPE_EDGE_RISING>;
-                 interrupt-names = "eventq", "priq", "cmdq-sync", "gerror";
-                 dma-coherent;
--                #iommu-cells = <0>;
-+                #iommu-cells = <1>;
-                 msi-parent = <&its 0xff0000>;
-         };
+-Kees
+
 -- 
-2.8.1.dirty
+Kees Cook
+Nexus Security
