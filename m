@@ -1,45 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 9 Sep 2016 16:17:58 +0100
-Subject: [PATCH v10 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
-In-Reply-To: <ffcabf79-17b8-f386-32b5-a6052f27f992@linaro.org>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
- <20160905123617.18775-4-aleksey.makarov@linaro.org>
- <7e5486cc-4080-2d1e-8f6d-98874379887d@gmail.com>
- <20160909092958.GB20192@arm.com>
- <ffcabf79-17b8-f386-32b5-a6052f27f992@linaro.org>
-Message-ID: <20160909151758.GA11418@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri,  9 Sep 2016 17:20:29 +0200
+Subject: [GIT PULL 1/4] bus: NVIDIA Tegra ACONNECT changes for v4.9-rc1
+Message-ID: <20160909152032.9550-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 06:07:04PM +0300, Aleksey Makarov wrote:
-> On 09/09/2016 12:29 PM, Will Deacon wrote:
-> > On Wed, Sep 07, 2016 at 12:30:19PM +0300, Aleksey Makarov wrote:
-> >>
-> >> On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
-> >>> SBBR mentions SPCR as a mandatory ACPI table.  So enable it for ARM64
-> >>>
-> >>> Earlycon should be set up as early as possible.  ACPI boot tables are
-> >>> mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
-> >>> is called from setup_arch() and that's where we parse SPCR.
-> >>> So it has to be opted-in per-arch.
-> >>>
-> >>> When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
-> >>> deferred until the DT/ACPI decision is done.  Initialize DT earlycon
-> >>> if ACPI is disabled.
-> >>
-> >> Hi Will, Catalin,
-> >>
-> >> Can you review this patch and consider ACKing it please?
-> > 
-> > Since the ACPI folks seem happy with the series, then:
-> > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > for this patch.
-> 
-> Thank you.  Can you pull the series?  Should I ask Rafael?
+Hi ARM SoC maintainers,
 
-The series should go via Rafael, since the bulk of the changes are
-outside of arch/arm64.
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-Will
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.9-bus
+
+for you to fetch changes up to 3a99cb090b523f88d0a19598d39704afac11adcb:
+
+  bus: tegra-aconnect: Use of_pm_clk_add_clk() (2016-08-16 12:22:51 +0200)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+bus: NVIDIA Tegra ACONNECT changes for v4.9-rc1
+
+This contains a patch that makes use of some symbols that were added in
+v4.8 and a second patch takes advantage to enable building the driver as
+a loadable module.
+
+----------------------------------------------------------------
+Jon Hunter (1):
+      bus: tegra-aconnect: Use of_pm_clk_add_clk()
+
+Thierry Reding (1):
+      bus: tegra-aconnect: Make symbol tristate
+
+ drivers/bus/Kconfig          |  6 +-----
+ drivers/bus/tegra-aconnect.c | 22 ++--------------------
+ 2 files changed, 3 insertions(+), 25 deletions(-)
