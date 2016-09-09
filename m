@@ -1,99 +1,38 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri,  9 Sep 2016 12:54:56 +0200
-Subject: [PULL 2/2] kvm-arm: Unmap shadow pagetables properly
-In-Reply-To: <20160909105456.8585-1-christoffer.dall@linaro.org>
-References: <20160909105456.8585-1-christoffer.dall@linaro.org>
-Message-ID: <20160909105456.8585-3-christoffer.dall@linaro.org>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Fri, 9 Sep 2016 16:23:22 +0530
+Subject: [PATCH 2/2] devicetree: bindings: uart: Add new compatible string for
+ ZynqMP
+In-Reply-To: <1473418402-34855-1-git-send-email-navam@xilinx.com>
+References: <1473418402-34855-1-git-send-email-navam@xilinx.com>
+Message-ID: <1473418402-34855-2-git-send-email-navam@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+From: Nava kishore Manne <nava.manne@xilinx.com>
 
-On arm/arm64, we depend on the kvm_unmap_hva* callbacks (via
-mmu_notifiers::invalidate_*) to unmap the stage2 pagetables when
-the userspace buffer gets unmapped. However, when the Hypervisor
-process exits without explicit unmap of the guest buffers, the only
-notifier we get is kvm_arch_flush_shadow_all() (via mmu_notifier::release
-) which does nothing on arm. Later this causes us to access pages that
-were already released [via exit_mmap() -> unmap_vmas()] when we actually
-get to unmap the stage2 pagetable [via kvm_arch_destroy_vm() ->
-kvm_free_stage2_pgd()]. This triggers crashes with CONFIG_DEBUG_PAGEALLOC,
-which unmaps any free'd pages from the linear map.
-
- [  757.644120] Unable to handle kernel paging request at virtual address
-  ffff800661e00000
- [  757.652046] pgd = ffff20000b1a2000
- [  757.655471] [ffff800661e00000] *pgd=00000047fffe3003, *pud=00000047fcd8c003,
-  *pmd=00000047fcc7c003, *pte=00e8004661e00712
- [  757.666492] Internal error: Oops: 96000147 [#3] PREEMPT SMP
- [  757.672041] Modules linked in:
- [  757.675100] CPU: 7 PID: 3630 Comm: qemu-system-aar Tainted: G      D
- 4.8.0-rc1 #3
- [  757.683240] Hardware name: AppliedMicro X-Gene Mustang Board/X-Gene Mustang Board,
-  BIOS 3.06.15 Aug 19 2016
- [  757.692938] task: ffff80069cdd3580 task.stack: ffff8006adb7c000
- [  757.698840] PC is at __flush_dcache_area+0x1c/0x40
- [  757.703613] LR is at kvm_flush_dcache_pmd+0x60/0x70
- [  757.708469] pc : [<ffff20000809dbdc>] lr : [<ffff2000080b4a70>] pstate: 20000145
- ...
- [  758.357249] [<ffff20000809dbdc>] __flush_dcache_area+0x1c/0x40
- [  758.363059] [<ffff2000080b6748>] unmap_stage2_range+0x458/0x5f0
- [  758.368954] [<ffff2000080b708c>] kvm_free_stage2_pgd+0x34/0x60
- [  758.374761] [<ffff2000080b2280>] kvm_arch_destroy_vm+0x20/0x68
- [  758.380570] [<ffff2000080aa330>] kvm_put_kvm+0x210/0x358
- [  758.385860] [<ffff2000080aa524>] kvm_vm_release+0x2c/0x40
- [  758.391239] [<ffff2000082ad234>] __fput+0x114/0x2e8
- [  758.396096] [<ffff2000082ad46c>] ____fput+0xc/0x18
- [  758.400869] [<ffff200008104658>] task_work_run+0x108/0x138
- [  758.406332] [<ffff2000080dc8ec>] do_exit+0x48c/0x10e8
- [  758.411363] [<ffff2000080dd5fc>] do_group_exit+0x6c/0x130
- [  758.416739] [<ffff2000080ed924>] get_signal+0x284/0xa18
- [  758.421943] [<ffff20000808a098>] do_signal+0x158/0x860
- [  758.427060] [<ffff20000808aad4>] do_notify_resume+0x6c/0x88
- [  758.432608] [<ffff200008083624>] work_pending+0x10/0x14
- [  758.437812] Code: 9ac32042 8b010001 d1000443 8a230000 (d50b7e20)
-
-This patch fixes the issue by moving the kvm_free_stage2_pgd() to
-kvm_arch_flush_shadow_all().
-
-Cc: <stable@vger.kernel.org> # 3.9+
-Tested-by: Itaru Kitayama <itaru.kitayama@riken.jp>
-Reported-by: Itaru Kitayama <itaru.kitayama@riken.jp>
-Reported-by: James Morse <james.morse@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+[stelford at cadence.com: cherry picked from
+https://github.com/Xilinx/linux-xlnx commit
+37b8a9780766422b2437f5166ddef3767bb60887]
+Signed-off-by: Scott Telford <stelford@cadence.com>
 ---
- arch/arm/kvm/arm.c | 2 --
- arch/arm/kvm/mmu.c | 1 +
- 2 files changed, 1 insertion(+), 2 deletions(-)
+ Documentation/devicetree/bindings/serial/cdns,uart.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 75f130e..c94b90d 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -158,8 +158,6 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
- {
- 	int i;
+diff --git a/Documentation/devicetree/bindings/serial/cdns,uart.txt b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+index a3eb154..4fe7aae 100644
+--- a/Documentation/devicetree/bindings/serial/cdns,uart.txt
++++ b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+@@ -1,7 +1,8 @@
+ Binding for Cadence UART Controller
  
--	kvm_free_stage2_pgd(kvm);
--
- 	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
- 		if (kvm->vcpus[i]) {
- 			kvm_arch_vcpu_free(kvm->vcpus[i]);
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index a3faafe..e9a5c0e 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1894,6 +1894,7 @@ void kvm_arch_memslots_updated(struct kvm *kvm, struct kvm_memslots *slots)
- 
- void kvm_arch_flush_shadow_all(struct kvm *kvm)
- {
-+	kvm_free_stage2_pgd(kvm);
- }
- 
- void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
+ Required properties:
+-- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps"
++- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps" for Zynq and
++               "cdns,uart-r1p12" for Zynq Ultrascale+ MPSoC uart controller.
+ - reg: Should contain UART controller registers location and length.
+ - interrupts: Should contain UART controller interrupts.
+ - clocks: Must contain phandles to the UART clocks
 -- 
-2.9.0
+2.1.2
