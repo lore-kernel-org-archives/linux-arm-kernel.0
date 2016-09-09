@@ -1,54 +1,35 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 9 Sep 2016 17:46:00 +0200
-Subject: [PULL 0/2] KVM/ARM Fixes for v4.8 - round #2
-In-Reply-To: <20160909105456.8585-1-christoffer.dall@linaro.org>
-References: <20160909105456.8585-1-christoffer.dall@linaro.org>
-Message-ID: <3be5d17b-070f-2873-325d-44904af7d84c@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Sep 2016 17:47:56 +0200
+Subject: [PATCH v2 1/2] ARM: dts: Remove use of skeleton.dtsi from
+ bcm283x.dtsi
+In-Reply-To: <1473432356.28111.60.camel@hellion.org.uk>
+References: <1470233565-30154-1-git-send-email-ijc@hellion.org.uk>
+ <7746678.0mZLVD2k0J@wuerfel> <1473432356.28111.60.camel@hellion.org.uk>
+Message-ID: <5852905.snAkjWmlVZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday, September 9, 2016 3:45:56 PM CEST Ian Campbell wrote:
+> On Tue, 2016-08-23 at 12:09 +0200, Arnd Bergmann wrote:
+> > I had skipped the new message as well while sorting through 5000
+> > messages after my vacation, but I've now put it into my TODO folder
+> > and will get to it eventually.
+> 
+> Is it still on your TODO or should I do...
+>
+> > We sometimes miss stuff that is meant for arm-soc when it comes
+> > from people that don't normally send us patches. If you want to
+> > be sure to catch the attention, stick a 'GIT PULL' into the subject
+> > or send a ping on IRC.
+> 
+> ... one of these?
+> 
+> It'd be great to get this fixed in v4.8 so that the corresponding
+> device-tree.git tag will build.
 
+Oh, it ended  up in my v4.9-todo folder, not 4.8, I misunderstood
+the urgency, sorry.
 
-On 09/09/2016 12:54, Christoffer Dall wrote:
-> Hi Paolo and Radim,
-> 
-> Here are a couple of fixes for KVM/ARM for v4.8-rc6 or -rc7, as soon as
-> they can make it.
-> 
-> They fix an idmap issue on 32-bit KVM on ARM, and fixes a memory
-> unmapping issue that we've had forever on both arm and arm64.
-> 
-> The following changes since commit 20218b86ad8adb4bf71db9425bb59680f345eafd:
-> 
->   Merge tag 'kvm-s390-master-4.8-3' of git://git.kernel.org/pub/scm/linux/kernel/git/kvms390/linux into kvm-master (2016-09-05 16:15:22 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-v4.8-round2
-> 
-> for you to fetch changes up to 293f293637b55db4f9f522a5a72514e98a541076:
-> 
->   kvm-arm: Unmap shadow pagetables properly (2016-09-09 12:40:30 +0200)
-> 
-> Thanks!
-> -Christoffer
-> 
-> ---
-> Marc Zyngier (1):
->       arm: KVM: Fix idmap overlap detection when the kernel is idmap'ed
-> 
-> Suzuki K Poulose (1):
->       kvm-arm: Unmap shadow pagetables properly
-> 
->  arch/arm/kvm/arm.c | 2 --
->  arch/arm/kvm/mmu.c | 4 +++-
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I've applied it to the fixes branch now.
 
-Pulled, thanks.
-
-Paolo
+	Arnd
