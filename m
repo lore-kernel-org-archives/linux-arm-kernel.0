@@ -1,52 +1,68 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  9 Sep 2016 15:15:41 +0100
-Subject: [RFC PATCH 0/5] arm64: Signal context expansion
-Message-ID: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Fri, 9 Sep 2016 15:18:29 +0100
+Subject: [PATCH] iommu/arm-smmu: Disable interrupts whilst holding the
+ cmdq lock
+In-Reply-To: <1473429014-17926-1-git-send-email-will.deacon@arm.com>
+References: <1473429014-17926-1-git-send-email-will.deacon@arm.com>
+Message-ID: <59c5e15e-b937-e966-6419-ef8f3043f505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for supporting the ARM Scalable Vector Extension in the
-Linux kernel, it is necessary to be able to save more data in the signal
-frame than can be accommodated in the existing arm64 signal frame
-structure.
+Hi Will,
 
+On 09/09/16 14:50, Will Deacon wrote:
+> The cmdq lock is taken whenever we issue comments into the command queue,
 
-To minimise ABI impact the current structures are retained as-is, and a
-new extra_context record is defined, which (if present) declares some
-additional space beyond the standard arm64 signal frame.
+s/comments/commands/
 
-This new record can be added in sigframe.__reserved[] if there is a
-need to allocate extra space beyond the standard signal frame.  The
-extra block of memory referenced by extra_context can then be parsed in
-the same way as sigcontext.__reserved[].  Old code should just ignore
-the whole thing as an unrecognised record.  To maintain backward
-compatibility, signal context records defined today are always placed
-directly in __reserved[], never in the block referenced by
-extra_context.
+> which can occur in IRQ context (as a result if unmap) or in process
 
-This series also does some refactoring in order to make it easier to add
-records to the signal frame in the future, using the new expansion
-mechanism.  The extra_context mechanism is hidden behind a simple
-allocator that grows and signal frame only as needed.
+s/if/of/
 
+> context (as a result of a threaded IRQ handler or device probe).
+> 
+> This can lead to a theoretical deadlock if the interrupt handler
+> performing the unmap hits whilst the lock is taken, so explicitly use
+> the {irqsave,irqrestore} spin_lock accessors for the cmdq lock.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Note: this series makes rt_sigreturn somewhat stricter about parsing the
-signal frame than previously: violators will be SEGV'd.  This should
-only be an ABI break for software that was doing something wrong in the
-first place, but I'm open to suggestions if people have concerns about
-it.
+Works for me and keeps lockdep quiet, so FWIW
 
+Tested-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 
-Dave Martin (5):
-  arm64: signal: Refactor sigcontext parsing in rt_sigreturn
-  arm64: signal: factor frame layout and population into separate passes
-  arm64: signal: factor out signal frame record allocation
-  arm64: signal: Allocate extra sigcontext space as needed
-  arm64: signal: Parse extra_context during sigreturn
-
- arch/arm64/include/uapi/asm/sigcontext.h |  27 +++
- arch/arm64/kernel/signal.c               | 355 ++++++++++++++++++++++++++++---
- 2 files changed, 350 insertions(+), 32 deletions(-)
-
--- 
-2.1.4
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index c040e246bc59..5db6931c715c 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -893,6 +893,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>  				    struct arm_smmu_cmdq_ent *ent)
+>  {
+>  	u64 cmd[CMDQ_ENT_DWORDS];
+> +	unsigned long flags;
+>  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+>  	struct arm_smmu_queue *q = &smmu->cmdq.q;
+>  
+> @@ -902,7 +903,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>  		return;
+>  	}
+>  
+> -	spin_lock(&smmu->cmdq.lock);
+> +	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+>  	while (queue_insert_raw(q, cmd) == -ENOSPC) {
+>  		if (queue_poll_cons(q, false, wfe))
+>  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
+> @@ -910,7 +911,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>  
+>  	if (ent->opcode == CMDQ_OP_CMD_SYNC && queue_poll_cons(q, true, wfe))
+>  		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
+> -	spin_unlock(&smmu->cmdq.lock);
+> +	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+>  }
+>  
+>  /* Context descriptor manipulation functions */
+> 
