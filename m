@@ -1,135 +1,135 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  9 Sep 2016 12:16:04 +0100
-Subject: [PATCH 5/6] irqchip/gic-v3: Convert arm64 GIC accessors to {read,
- write}_sysreg_s
-In-Reply-To: <1473419765-3437-1-git-send-email-will.deacon@arm.com>
-References: <1473419765-3437-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1473419765-3437-6-git-send-email-will.deacon@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Sep 2016 12:16:20 +0100
+Subject: [PATCH] cpufreq: create link to policy only for registered CPUs
+In-Reply-To: <a0469c333e08b3953bfe9e8356c6919c26578349.1473414746.git.viresh.kumar@linaro.org>
+References: <20160819110032.GM1041@n2100.armlinux.org.uk>
+ <a0469c333e08b3953bfe9e8356c6919c26578349.1473414746.git.viresh.kumar@linaro.org>
+Message-ID: <20160909111620.GQ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GIC system registers are accessed using open-coded wrappers around
-the mrs_s/msr_s asm macros.
+On Fri, Sep 09, 2016 at 03:24:14PM +0530, Viresh Kumar wrote:
+> If a cpufreq driver is registered very early in the boot stage (e.g.
+> registered from postcore_initcall()), then cpufreq core may generate
+> kernel warnings for it.
+> 
+> In this case, the CPUs are registered as devices with the kernel only
+> after the cpufreq driver is registered, while the CPUs were brought
+> online way before that.
 
-This patch moves the code over to the {read,wrote}_sysreg_s accessors
-instead, reducing the amount of explicit asm blocks in the arch headers.
+This seems confusing, maybe:
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/arch_gicv3.h | 45 ++++++++++++++-----------------------
- 1 file changed, 17 insertions(+), 28 deletions(-)
+"In this case, the CPUs are brought online, then the cpufreq driver is
+registered, and then the CPU topology devices are registered."
 
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index ae7dbd79e257..0d41944d965d 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -79,18 +79,8 @@
- #include <linux/stringify.h>
- #include <asm/barrier.h>
- 
--#define read_gicreg(r)							\
--	({								\
--		u64 reg;						\
--		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
--		reg;							\
--	})
--
--#define write_gicreg(v,r)						\
--	do {								\
--		u64 __val = (v);					\
--		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
--	} while (0)
-+#define read_gicreg			read_sysreg_s
-+#define write_gicreg			write_sysreg_s
- 
- /*
-  * Low-level accessors
-@@ -101,13 +91,13 @@
- 
- static inline void gic_write_eoir(u32 irq)
- {
--	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" ((u64)irq));
-+	write_sysreg_s(irq, ICC_EOIR1_EL1);
- 	isb();
- }
- 
- static inline void gic_write_dir(u32 irq)
- {
--	asm volatile("msr_s " __stringify(ICC_DIR_EL1) ", %0" : : "r" ((u64)irq));
-+	write_sysreg_s(irq, ICC_DIR_EL1);
- 	isb();
- }
- 
-@@ -115,7 +105,7 @@ static inline u64 gic_read_iar_common(void)
- {
- 	u64 irqstat;
- 
--	asm volatile("mrs_s %0, " __stringify(ICC_IAR1_EL1) : "=r" (irqstat));
-+	irqstat = read_sysreg_s(ICC_IAR1_EL1);
- 	dsb(sy);
- 	return irqstat;
- }
-@@ -133,10 +123,12 @@ static inline u64 gic_read_iar_cavium_thunderx(void)
- 
- 	asm volatile(
- 		"nop;nop;nop;nop\n\t"
--		"nop;nop;nop;nop\n\t"
--		"mrs_s %0, " __stringify(ICC_IAR1_EL1) "\n\t"
--		"nop;nop;nop;nop"
--		: "=r" (irqstat));
-+		"nop;nop;nop;nop");
-+
-+	irqstat = read_sysreg_s(ICC_IAR1_EL1);
-+
-+	asm volatile(
-+		"nop;nop;nop;nop");
- 	mb();
- 
- 	return irqstat;
-@@ -144,37 +136,34 @@ static inline u64 gic_read_iar_cavium_thunderx(void)
- 
- static inline void gic_write_pmr(u32 val)
- {
--	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" ((u64)val));
-+	write_sysreg_s(val, ICC_PMR_EL1);
- }
- 
- static inline void gic_write_ctlr(u32 val)
- {
--	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" ((u64)val));
-+	write_sysreg_s(val, ICC_CTLR_EL1);
- 	isb();
- }
- 
- static inline void gic_write_grpen1(u32 val)
- {
--	asm volatile("msr_s " __stringify(ICC_GRPEN1_EL1) ", %0" : : "r" ((u64)val));
-+	write_sysreg_s(val, ICC_GRPEN1_EL1);
- 	isb();
- }
- 
- static inline void gic_write_sgi1r(u64 val)
- {
--	asm volatile("msr_s " __stringify(ICC_SGI1R_EL1) ", %0" : : "r" (val));
-+	write_sysreg_s(val, ICC_SGI1R_EL1);
- }
- 
- static inline u32 gic_read_sre(void)
- {
--	u64 val;
--
--	asm volatile("mrs_s %0, " __stringify(ICC_SRE_EL1) : "=r" (val));
--	return val;
-+	return read_sysreg_s(ICC_SRE_EL1);
- }
- 
- static inline void gic_write_sre(u32 val)
- {
--	asm volatile("msr_s " __stringify(ICC_SRE_EL1) ", %0" : : "r" ((u64)val));
-+	write_sysreg_s(val, ICC_SRE_EL1);
- 	isb();
- }
- 
+which gives more of a linear A happens, then B, then C.
+
+> ... And by the time cpufreq_add_dev() gets called,
+> the cpu device isn't stored in the per-cpu variable (cpu_sys_devices,)
+> which is read by get_cpu_device().
+
+s/And by/By/ or "However, by"
+
+> And so cpufreq core fails to get device for the CPU, for which
+> cpufreq_add_dev() was called in the first place and we will hit a
+> WARN_ON(!cpu_dev).
+
+s/And so/So the/
+
+This isn't the WARN_ON() statement that's triggering for me.
+
+> Even if we reuse the 'dev' parameter passed to cpufreq_add_dev() to
+> avoid that warning, there might be other CPUs online that share the
+> policy with the cpu for which cpufreq_add_dev() is called. And
+> eventually get_cpu_device() will return NULL for them as well, and we
+> will hit the same WARN_ON() again.
+
+s/And eventually/Eventually/
+
+> In order to fix these issues, change cpufreq core to create links to the
+> policy for a cpu only when cpufreq_add_dev() is called for that CPU.
+> 
+> Reuse the 'real_cpus' mask to track that as well.
+> 
+> Note that cpufreq_remove_dev() already handles removal of the links for
+> individual CPUs and cpufreq_add_dev() has aligned with that now.
+
+I applied this patch, but I still get:
+
+WARNING: CPU: 0 PID: 1 at drivers/cpufreq/cpufreq.c:1040 cpufreq_add_dev+0x144/0x634
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Not tainted 4.8.0-rc5+ #1061
+Hardware name: Intel-Assabet
+Backtrace:
+[<c0212190>] (dump_backtrace) from [<c021249c>] (show_stack+0x18/0x1c)
+ r6:00000000 r5:c05ca11d r4:00000000
+[<c0212484>] (show_stack) from [<c036e84c>] (dump_stack+0x20/0x28)
+[<c036e82c>] (dump_stack) from [<c021f7ec>] (__warn+0xd0/0xfc)
+[<c021f71c>] (__warn) from [<c021f840>] (warn_slowpath_null+0x28/0x30)
+ r10:00000000 r8:c062927c r7:00000000 r6:00000000 r5:c063d288 r4:00000000
+[<c021f818>] (warn_slowpath_null) from [<c043dc84>] (cpufreq_add_dev+0x144/0x634)
+[<c043db40>] (cpufreq_add_dev) from [<c03dc43c>] (bus_probe_device+0x5c/0x84)
+ r10:00000000 r9:00000000 r8:00000000 r7:00000000 r6:c062927c r5:c063d288
+ r4:c0640148
+[<c03dc3e0>] (bus_probe_device) from [<c03da7c4>] (device_add+0x390/0x520)
+ r6:c0629284 r5:00000000 r4:c062927c
+[<c03da434>] (device_add) from [<c03daad8>] (device_register+0x1c/0x20)
+ r10:c061d848 r8:c0603524 r7:00000001 r6:00000000 r5:c062927c r4:c062927c
+[<c03daabc>] (device_register) from [<c03df5e8>] (register_cpu+0x88/0xac)
+ r4:c0629274
+[<c03df560>] (register_cpu) from [<c0603544>] (topology_init+0x20/0x2c)
+ r7:c0646760 r6:c0623568 r5:c061d834 r4:00000000
+[<c0603524>] (topology_init) from [<c020974c>] (do_one_initcall+0xc0/0x178)
+ r4:00000004
+[<c020968c>] (do_one_initcall) from [<c0600e70>] (kernel_init_freeable+0xfc/0x1c4)
+ r10:c061d848 r9:00000000 r8:0000008c r7:c0646760 r6:c0623568 r5:c061d834
+ r4:00000004
+[<c0600d74>] (kernel_init_freeable) from [<c052b6cc>] (kernel_init+0x10/0xf4)
+ r10:00000000 r8:00000000 r7:00000000 r6:00000000 r5:c052b6bc r4:00000000
+[<c052b6bc>] (kernel_init) from [<c020fcf0>] (ret_from_fork+0x14/0x24)
+ r4:00000000
+---[ end trace d7209ea270f4f585 ]---
+
+I'm afraid I rather predicted that after reading the patch but before
+running the test: the patch does nothing to solve the original warning,
+as the code path which gets us to that warning remains untouched by
+this patch.
+
+The code path is:
+
+static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
+{
+        if (cpu_online(cpu))
+                return cpufreq_online(cpu);
+
+static int cpufreq_online(unsigned int cpu)
+{
+        policy = per_cpu(cpufreq_cpu_data, cpu);
+        if (policy) {
+        } else {
+                new_policy = true;
+                policy = cpufreq_policy_alloc(cpu);
+
+static struct cpufreq_policy *cpufreq_policy_alloc(unsigned int cpu)
+{
+        if (WARN_ON(!dev))
+                return NULL;
+
+The only change in your patch that affected this path was this:
+
+-       if (cpu_online(cpu))
+-               return cpufreq_online(cpu);
++       if (cpu_online(cpu)) {
++               ret = cpufreq_online(cpu);
++               if (ret)
++                       return ret;
++       }
+
+which obviously has no bearing on that WARN_ON() firing.
+
+Maybe I'm testing the wrong patch.
+
 -- 
-2.1.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
