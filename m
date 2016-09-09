@@ -1,45 +1,46 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 09 Sep 2016 18:20:54 +0200
-Subject: [PATCH 8/8] ARM: pxa/lubbock: add pcmcia clock
-In-Reply-To: <20160907091027.GI1041@n2100.armlinux.org.uk> (Russell King's
- message of "Wed, 7 Sep 2016 10:10:27 +0100")
-References: <20160906163711.GB1041@n2100.armlinux.org.uk>
- <E1bhJNx-0008DR-2l@rmk-PC.armlinux.org.uk>
- <87a8flhrsa.fsf@belgarion.home>
- <20160907091027.GI1041@n2100.armlinux.org.uk>
-Message-ID: <871t0thwnt.fsf@belgarion.home>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Fri, 09 Sep 2016 17:21:02 +0100
+Subject: [PATCH v2 1/2] ARM: dts: Remove use of skeleton.dtsi from
+ bcm283x.dtsi
+In-Reply-To: <5852905.snAkjWmlVZ@wuerfel>
+References: <1470233565-30154-1-git-send-email-ijc@hellion.org.uk>
+ <7746678.0mZLVD2k0J@wuerfel> <1473432356.28111.60.camel@hellion.org.uk>
+ <5852905.snAkjWmlVZ@wuerfel>
+Message-ID: <1473438062.28111.61.camel@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+On Fri, 2016-09-09 at 17:47 +0200, Arnd Bergmann wrote:
+> On Friday, September 9, 2016 3:45:56 PM CEST Ian Campbell wrote:
+> > 
+> > On Tue, 2016-08-23 at 12:09 +0200, Arnd Bergmann wrote:
+> > > 
+> > > I had skipped the new message as well while sorting through 5000
+> > > messages after my vacation, but I've now put it into my TODO
+> > > folder
+> > > and will get to it eventually.
+> > 
+> > Is it still on your TODO or should I do...
+> > 
+> > > 
+> > > We sometimes miss stuff that is meant for arm-soc when it comes
+> > > from people that don't normally send us patches. If you want to
+> > > be sure to catch the attention, stick a 'GIT PULL' into the
+> > > subject
+> > > or send a ping on IRC.
+> > 
+> > ... one of these?
+> > 
+> > It'd be great to get this fixed in v4.8 so that the corresponding
+> > device-tree.git tag will build.
+> 
+> Oh, it ended??up in my v4.9-todo folder, not 4.8, I misunderstood
+> the urgency, sorry.
 
-> On Tue, Sep 06, 2016 at 07:17:09PM +0200, Robert Jarzmik wrote:
->> Russell King <rmk+kernel@armlinux.org.uk> writes:
->> 
->> > Add the required PCMCIA clock for the SA1111 "1800" device.  This clock
->> > is used to compute timing information for the PCMCIA interface in the
->> > SoC device, rather than the SA1111.  Hence, the provision of this clock
->> > is a convenience for the driver and does not reflect the hardware, so
->> > this must not be copied into DT.
->> >
->> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
->> But more importantly:
->> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> Thanks Robert.  I guess no one else is be interested in these patches,
-> so I'm going to drop them into -next today, and send them on Friday or
-> over this weekend.
+No worries.
 
-Great !!!!
+> I've applied it to the fixes branch now.
 
-I'll keep the irq_get_chip() workaround in my private tree for now so that my
-automated testing farm can also test the compact flash card. And yes, /dev/hda1
-appeared on my lubbock, with a good old MSDOS filesystem :))))
+Thank you!
 
-Thanks for the time taken for explanations, I appreciated.
-
-Cheers.
-
--- 
-Robert
+Ian.
