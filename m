@@ -1,115 +1,59 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Sat, 10 Sep 2016 02:24:41 +0530
-Subject: [PATCH v2 2/2] ARM: dts: imx6q: Add Engicam i.CoreM6 DualLite/Solo
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 9 Sep 2016 17:57:24 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
  initial support
-In-Reply-To: <1473454481-6684-1-git-send-email-jagan@amarulasolutions.com>
-References: <1473454481-6684-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1473454481-6684-2-git-send-email-jagan@amarulasolutions.com>
+In-Reply-To: <1473453312-2786-1-git-send-email-jagan@amarulasolutions.com>
+References: <1473453312-2786-1-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <CAOMZO5Co0CXMY1uWcF+_vN=+0wFSw1VrN-+c9AuY7zNq2WKLTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.CoreM6 DualLite/Solo modules are system on module solutions manufactured
-by Engicam with following characteristics:
-CPU           NXP i.MX6 DL, 800MHz
-RAM           1GB, 32, 64 bit, DDR3-800/1066
-NAND          SLC,512MB
-Power supply  Single 5V
-MAX LCD RES   FULLHD
+On Fri, Sep 9, 2016 at 5:35 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
 
-and more info at
-http://www.engicam.com/en/products/embedded/som/sodimm/i-core-m6s-dl-d-q
+> +/dts-v1/;
+> +
+> +#include "imx6q.dtsi"
+> +#include "imx6qdl-icore.dtsi"
+> +
+> +/ {
+> +       model = "Engicam i.CoreM6 Quad/Dual Starter Kit";
+> +       compatible = "fsl,imx6-icore", "fsl,imx6q";
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v2:
-	- s/oaky/okay/g
+Should be:
+ compatible = "engicam,imx6-icore", "fsl,imx6q";
 
- arch/arm/boot/dts/Makefile         |  1 +
- arch/arm/boot/dts/imx6dl-icore.dts | 59 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-icore.dts
+You could also send a patch adding engicam entry to
+Documentation/devicetree/bindings/vendor-prefixes.txt
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 511510d..6175f44 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -333,6 +333,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-gw552x.dtb \
- 	imx6dl-gw553x.dtb \
- 	imx6dl-hummingboard.dtb \
-+	imx6dl-icore.dtb \
- 	imx6dl-nit6xlite.dtb \
- 	imx6dl-nitrogen6x.dtb \
- 	imx6dl-phytec-pbab01.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-icore.dts b/arch/arm/boot/dts/imx6dl-icore.dts
-new file mode 100644
-index 0000000..55dd0e1
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-icore.dts
-@@ -0,0 +1,59 @@
-+/*
-+ * Copyright (C) 2016 Amarula Solutions B.V.
-+ * Copyright (C) 2016 Engicam S.r.l.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-icore.dtsi"
-+
-+/ {
-+	model = "Engicam i.CoreM6 DualLite/Solo Starter Kit";
-+	compatible = "fsl,imx6-icore", "fsl,imx6dl";
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&can2 {
-+	status = "okay";
-+};
--- 
-2.7.4
+> +};
+> +
+> +&can1 {
+> +       status = "oaky";
+
+Should be "okay"
+
+> +};
+> +
+> +&can2 {
+> +       status = "oaky";
+
+Should be "okay"
+
+> +&iomuxc {
+> +       pinctrl_flexcan1: flexcan1grp {
+> +               fsl,pins = <
+> +                       MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x80000000
+> +                       MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX 0x80000000
+
+No 0x80000000, please. Use the real IOMUX register value instead.
+
+
+> +               >;
+> +       };
+> +
+> +       pinctrl_flexcan2: flexcan2grp {
+> +               fsl,pins = <
+> +                       MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX 0x80000000
+> +                       MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX 0x80000000
+
+Same here.
