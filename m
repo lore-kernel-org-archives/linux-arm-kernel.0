@@ -1,50 +1,24 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Sat, 10 Sep 2016 03:44:10 +0530
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 9 Sep 2016 19:19:03 -0300
 Subject: [PATCH v3 2/3] ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
  initial support
-In-Reply-To: <CAMty3ZC+49D7aALOKcsjoiqptQwrrtHGMAGCtcPn51QDsksSSQ@mail.gmail.com>
+In-Reply-To: <CAMty3ZAM-sZ0aZU0Z+8WhDcepx8KM96xUbn+n3UcDSjFTafC-A@mail.gmail.com>
 References: <1473457525-27768-1-git-send-email-jagan@amarulasolutions.com>
  <1473457525-27768-2-git-send-email-jagan@amarulasolutions.com>
  <CAOMZO5BPhY14S4G541MTpsCW64SsCiNcsksJarBCWqGOnaPf3A@mail.gmail.com>
  <CAMty3ZC+49D7aALOKcsjoiqptQwrrtHGMAGCtcPn51QDsksSSQ@mail.gmail.com>
-Message-ID: <CAMty3ZAM-sZ0aZU0Z+8WhDcepx8KM96xUbn+n3UcDSjFTafC-A@mail.gmail.com>
+ <CAMty3ZAM-sZ0aZU0Z+8WhDcepx8KM96xUbn+n3UcDSjFTafC-A@mail.gmail.com>
+Message-ID: <CAOMZO5AuZ5DqqKngLw67_-3PdoYx5pMNmm1ZHwRd79rYPJY-+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 10, 2016 at 3:33 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> On Sat, Sep 10, 2016 at 3:29 AM, Fabio Estevam <festevam@gmail.com> wrote:
->> On Fri, Sep 9, 2016 at 6:45 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
+On Fri, Sep 9, 2016 at 7:14 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
+
+>> Yeah, I got 1b0b0
 >>
->>> +&iomuxc {
->>> +       pinctrl_flexcan1: flexcan1grp {
->>> +               fsl,pins = <
->>> +                       MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x1b020
->>> +                       MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX 0x1b020
->>
->> In the previous version you had "0x80000000", which means: use the pad
->> value that comes from the bootloader.
->>
->> Does your bootloader configure the CAN pins? If not, then it should be
->> 1b0b0, which is the POR value of register
->> IOMUXC_SW_PAD_CTL_PAD_KEY_ROW2.
->>
->> To confirm, you can do this in your bootloader:
->>
->> => md.l 20E05DC 1
+>> U-Boot > md.l 20E05DC 1
 >> 020e05dc: 0001b0b0
->>
->> and see if returns 1b0b0 or 1b020.
 >
-> Yeah, I got 1b0b0
->
-> U-Boot > md.l 20E05DC 1
-> 020e05dc: 0001b0b0
+> So I'm assigning change value to 1b020 Linux that's ok right?
 
-So I'm assigning change value to 1b020 Linux that's ok right?
-
-thanks!
--- 
-Jagan Teki
-Free Software Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Then just use 0x1b020 for the flexcan pins.
