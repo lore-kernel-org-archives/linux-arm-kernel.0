@@ -1,39 +1,23 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Sat, 10 Sep 2016 03:51:42 +0530
-Subject: [PATCH v3 2/3] ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
- initial support
-In-Reply-To: <CAOMZO5D2WNBh6fy8iFYasSZnovfBJRxzBt55ceaPqwCn3zvepg@mail.gmail.com>
-References: <1473457525-27768-1-git-send-email-jagan@amarulasolutions.com>
- <1473457525-27768-2-git-send-email-jagan@amarulasolutions.com>
- <CAOMZO5BPhY14S4G541MTpsCW64SsCiNcsksJarBCWqGOnaPf3A@mail.gmail.com>
- <CAMty3ZC+49D7aALOKcsjoiqptQwrrtHGMAGCtcPn51QDsksSSQ@mail.gmail.com>
- <CAMty3ZAM-sZ0aZU0Z+8WhDcepx8KM96xUbn+n3UcDSjFTafC-A@mail.gmail.com>
- <CAOMZO5AuZ5DqqKngLw67_-3PdoYx5pMNmm1ZHwRd79rYPJY-+Q@mail.gmail.com>
- <CAOMZO5D2WNBh6fy8iFYasSZnovfBJRxzBt55ceaPqwCn3zvepg@mail.gmail.com>
-Message-ID: <CAMty3ZAPbJM5EQD_OqN9nr---y1P0e+5Y5ujL4g7YoPEsuU+aw@mail.gmail.com>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Sat, 10 Sep 2016 00:23:16 +0200
+Subject: [4.8.0-rc1] am335x-evm boot failure: n_tty_receive_buf_common:
+ "Unable to handle kernel paging request.."
+In-Reply-To: <87ceb885-94a6-b9b3-60b3-2017198c4338@ti.com>
+References: <87ceb885-94a6-b9b3-60b3-2017198c4338@ti.com>
+Message-ID: <CAALWOA_=9fMG156H_XSZBjeckQUK-moDWoRE6_kr-8=Z_-KZuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 10, 2016 at 3:49 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Fri, Sep 9, 2016 at 7:19 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> On Fri, Sep 9, 2016 at 7:14 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
->>
->>>> Yeah, I got 1b0b0
->>>>
->>>> U-Boot > md.l 20E05DC 1
->>>> 020e05dc: 0001b0b0
->>>
->>> So I'm assigning change value to 1b020 Linux that's ok right?
->>
->> Then just use 0x1b020 for the flexcan pins.
->
-> 1b0b0 I mean :-)
+If you look more carefully the first problem is actually a bus error:
+[ 15.776190] Unhandled fault: external abort on non-linefetch (0x1028)
+at 0xf9e3e044
+[ 15.825925] PC is at omap_hwmod_read+0x14/0x28
+[ 15.830583] LR is at omap_rtc_wait_not_busy+0x1c/0x44
 
-Why? can't we update iomux reg value any side effects or something.
+I have no idea how the kernel manages to continue after a bus error in
+a driver (inside local_irq_disable even), but I wouldn't be inclined
+to take any later errors seriously.
 
-thanks!
--- 
-Jagan Teki
-Free Software Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+See also the "4.8 crash on BeagleBone" thread on linux-omap.
+
+Matthijs
