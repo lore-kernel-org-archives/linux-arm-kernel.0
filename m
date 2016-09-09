@@ -1,74 +1,52 @@
-From: oss@buserror.net (Scott Wood)
-Date: Thu, 08 Sep 2016 20:08:56 -0500
-Subject: [PATCH v4 3/4] arm64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <20160826134004.7e86e798@arm.com>
-References: <1467877572-10817-1-git-send-email-oss@buserror.net>
- <1467877572-10817-3-git-send-email-oss@buserror.net>
- <20160826134004.7e86e798@arm.com>
-Message-ID: <1473383336.30217.96.camel@buserror.net>
+From: andrew-ct.chen@mediatek.com (andrew-ct chen)
+Date: Fri, 9 Sep 2016 09:25:14 +0800
+Subject: [PATCH] [media] VPU: mediatek: fix null pointer dereference on
+ pdev
+In-Reply-To: <20160907171027.16424-1-colin.king@canonical.com>
+References: <20160907171027.16424-1-colin.king@canonical.com>
+Message-ID: <1473384314.10811.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-08-26 at 13:40 +0100, Marc Zyngier wrote:
-> On Thu, 7 Jul 2016 02:46:11 -0500
-> Scott Wood <oss@buserror.net> wrote:
+On Wed, 2016-09-07 at 18:10 +0100, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> (+Mark)
+> pdev is being null checked, however, prior to that it is being
+> dereferenced by platform_get_drvdata.  Move the assignments of
+> vpu and run to after the pdev null check to avoid a potential
+> null pointer dereference.
 > 
-> > 
-> > ?static __always_inline
-> > ?u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
-> > ?{
-> > @@ -66,19 +102,19 @@ u32 arch_timer_reg_read_cp15(int access, enum
-> > arch_timer_reg reg)
-> > ?	if (access == ARCH_TIMER_PHYS_ACCESS) {
-> > ?		switch (reg) {
-> > ?		case ARCH_TIMER_REG_CTRL:
-> > -			asm volatile("mrs %0,??cntp_ctl_el0" : "=r"
-> > (val));
-> > +			asm volatile("mrs %0, cntp_ctl_el0" : "=r"
-> > (val));
-> Spurious change?
+
+Reviewed-by:Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  drivers/media/platform/mtk-vpu/mtk_vpu.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
 > 
-> > 
-> > ?			break;
-> > ?		case ARCH_TIMER_REG_TVAL:
-> > -			asm volatile("mrs %0, cntp_tval_el0" : "=r"
-> > (val));
-> > +			val = _arch_timer_get_ptval();
-> > ?			break;
-> > ?		}
-> > ?	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
-> > ?		switch (reg) {
-> > ?		case ARCH_TIMER_REG_CTRL:
-> > -			asm volatile("mrs %0,??cntv_ctl_el0" : "=r"
-> > (val));
-> > +			asm volatile("mrs %0, cntv_ctl_el0" : "=r"
-> > (val));
-> Here too?
-
-No, it's not spurious.
-
-I answered this in?http://lists.infradead.org/pipermail/linux-arm-kernel/2016-
-June/438310.html
-
-The extra spacing seemed to be an attempt to get things to line up between the
-CTRL and TVAL asm statements.??When the TVAL case was converted to a function
-call, there was nothing for the above to line up with, so I moved it back to
-normal spacing.
-
-> I'm still worried that this series doesn't address Xen or KVM guests
-> that need to be made aware of the broken timers.
-> 
-> At the very least, I'd like a kernel command line option that'd let the
-> user reliably run its VMs. You can do something along the lines of
-> 46fd5c6b, and have a command line argument like
-> "clocksource.arm_arch_timer.fsl-a008585=1", which would enable the
-> workaround.
-
-OK, I'll respin with a command line argument to use for now. ?Mike Caraman has
-said he plans to do a better solution for KVM -- Mike, have you had a chance
-to look at this?
-
--Scott
+> diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.c b/drivers/media/platform/mtk-vpu/mtk_vpu.c
+> index c9bf58c..43907a3 100644
+> --- a/drivers/media/platform/mtk-vpu/mtk_vpu.c
+> +++ b/drivers/media/platform/mtk-vpu/mtk_vpu.c
+> @@ -523,9 +523,9 @@ static int load_requested_vpu(struct mtk_vpu *vpu,
+>  
+>  int vpu_load_firmware(struct platform_device *pdev)
+>  {
+> -	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
+> +	struct mtk_vpu *vpu;
+>  	struct device *dev = &pdev->dev;
+> -	struct vpu_run *run = &vpu->run;
+> +	struct vpu_run *run;
+>  	const struct firmware *vpu_fw = NULL;
+>  	int ret;
+>  
+> @@ -534,6 +534,9 @@ int vpu_load_firmware(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> +	vpu = platform_get_drvdata(pdev);
+> +	run = &vpu->run;
+> +
+>  	mutex_lock(&vpu->vpu_mutex);
+>  	if (vpu->fw_loaded) {
+>  		mutex_unlock(&vpu->vpu_mutex);
