@@ -1,68 +1,100 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 9 Sep 2016 09:57:38 +0200
-Subject: [PATCH] RFC: ARM: fix the uaccess crash on PB11MPCore
-In-Reply-To: <1468256893-12811-1-git-send-email-linus.walleij@linaro.org>
-References: <1468256893-12811-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <78f8cd15-6cde-0493-e429-43d047dd58f7@baylibre.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 9 Sep 2016 08:58:23 +0100
+Subject: [PATCH v3 0/8] ARM: KVM: Support for vgic-v3
+In-Reply-To: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
+References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <57D26B9F.7050301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2016 07:08 PM, Linus Walleij wrote:
-> The following patch was sketched by Russell in response to my
-> crashes on the PB11MPCore after the patch for software-based
-> priviledged no access support for ARMv8.1. See this thread:
-> http://marc.info/?l=linux-arm-kernel&m=144051749807214&w=2
++Christoffer
+
+I should have checked my send-email command twice...
+
+Vladimir
+
+On 08/09/16 17:06, Vladimir Murzin wrote:
+> Hi,
 > 
-> I am unsure what is going on, I suspect everyone involved in
-> the discussion is. I just want to repost this to get the
-> discussion restarted, as I still have to apply this patch
-> with every kernel iteration to get my PB11MPCore Realview
-> running.
+> This is an attempt to make use vgic-v3 under arch/arm since
+> save-restore functionality got re-written in C and can be shared
+> between arm/arm64 like it has already been done for vgic-v2 and timer.
 > 
-> I also know that Oxnas has actual, mass-deployed NAS (PogoPlug
-> Pro variants) using PB11MPCore, and that they may or may not
-> be seeing the same issue so I want their feedback on this: do
-> you or do you not see this with mainline, or have you not even
-> tested?
+> With this patches I'm able to get 32 core an AArch32 ARMv8 guest boot:
 > 
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Neil Armstrong <narmstrong@baylibre.com>
-> Fixes: a5e090acbf54 ("ARM: software-based priviledged-no-access support")
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/kernel/smp_tlb.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-
-Hi Linus, Russell, Arnd,
-
-I made a quick port ox OX820 over v4.8-rc4 and when enabling CONFIG_CPU_SW_DOMAIN_PAN
-I get the following trace at boot time :
-[    1.690000] Unable to handle kernel paging request at virtual address b6f23684
-[    1.690000] Unable to handle kernel paging request at virtual address b6f95ef4
-[    1.690000] pgd = c281c000
-[    1.690000] [b6f95ef4] *pgd=62821831, *pte=00000000, *ppte=00000000
-[    1.690000] Internal error: Oops: 81f [#1] SMP ARM
-[    1.690000] Modules linked in:
-[    1.690000] CPU: 1 PID: 65 Comm: mount Not tainted 4.8.0-rc4-00001-g0e9c45d-dirty #22
-[    1.690000] Hardware name: Generic DT based system
-[    1.690000] task: c2aad860 task.stack: c2814000
-[    1.690000] PC is at ipi_flush_tlb_page+0x34/0x44
-[    1.690000] LR is at on_each_cpu_mask+0x58/0x60
-[    1.690000] pc : [<c010d3dc>]    lr : [<c017d584>]    psr: 20000193
-[    1.690000] sp : c2815da0  ip : 00000002  fp : 00067c40
-[    1.690000] r10: c0702744  r9 : 67c4079f  r8 : 67c9e75f
-[    1.690000] r7 : c2815dbc  r6 : c010d3a8  r5 : c2816164  r4 : 20000113
-[    1.690000] r3 : 00000000  r2 : b6f95003  r1 : 00000003  r0 : 00000003
-[    1.690000] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
-[    1.690000] Control: 00c5787d  Table: 6281c00a  DAC: 00000051
-[    1.690000] Process mount (pid: 65, stack limit = 0xc2814190)
-[    1.690000] Stack: (0xc2815da0 to 0xc2816000)
-[...]
-[    1.690000] ---[ end trace 8f1207a6d611da09 ]---
-
-When applying this patch, it solved the issue.
-
-Tested-by: Neil Armstrong <narmstrong@baylibre.com>
-
-Neil
+> ...
+> GICv3: CPU31: found redistributor 703 region 0:0x000000003ffd0000
+> CPU31: thread -1, cpu 3, socket 7, mpidr 80000703
+> Brought up 32 CPUs
+> SMP: Total of 32 processors activated (768.00 BogoMIPS).
+> CPU: All CPU(s) started in SVC mode.
+> ...
+> 
+> Additionally, quite lightweight test based on Self IPI guest test[1]
+> has been run with up to 255 cpus.
+> 
+> [1] http://www.spinics.net/lists/kvm/msg128974.html
+> 
+> Changelog:
+> 
+>     v2 -> v3
+>        - rebased on v4.8-rc5
+>        - commit messages are reworked to be more precise and clear (I
+>          hope so)
+>        - MPIDR_HWID_BITMASK is used to discard Aff3 in
+>          MPIDR_AFFINITY_LEVEL macro
+>        - cast to u64 is used instead of abuse of GENMASK_ULL while
+>          building value for typer register
+>        - static keys are used to select GIC backend
+>        - config option to guard ITS code is moved to separate patch
+> 
+>     v1 -> v2
+>        - rebased on v4.8-rc2
+>        - introduced guard for ITS code
+> 
+> Thanks!
+> 
+> Vladimir Murzin (8):
+>   arm64: KVM: Use static keys for selecting the GIC backend
+>   arm64: KVM: Move GIC accessors to arch_gicv3.h
+>   arm64: KVM: Move vgic-v3 save/restore to virt/kvm/arm/hyp
+>   KVM: arm64: vgic-its: Introduce config option to guard ITS specific
+>     code
+>   KVM: arm: vgic: Support 64-bit data manipulation on 32-bit host
+>     systems
+>   ARM: Change MPIDR_AFFINITY_LEVEL to ignore Aff3
+>   ARM: Move system register accessors to asm/cp15.h
+>   ARM: KVM: Support vgic-v3
+> 
+>  arch/arm/include/asm/arch_gicv3.h                 |   91 +++++++++++++++++----
+>  arch/arm/include/asm/cp15.h                       |   15 ++++
+>  arch/arm/include/asm/cputype.h                    |    3 +-
+>  arch/arm/include/asm/kvm_asm.h                    |    3 +
+>  arch/arm/include/asm/kvm_host.h                   |   13 +++
+>  arch/arm/include/asm/kvm_hyp.h                    |   20 +----
+>  arch/arm/include/asm/virt.h                       |    8 ++
+>  arch/arm/include/uapi/asm/kvm.h                   |    7 ++
+>  arch/arm/kernel/vmlinux.lds.S                     |    6 ++
+>  arch/arm/kvm/Makefile                             |    2 +
+>  arch/arm/kvm/arm.c                                |   19 +++++
+>  arch/arm/kvm/coproc.c                             |   36 ++++++++
+>  arch/arm/kvm/hyp/Makefile                         |    1 +
+>  arch/arm/kvm/hyp/switch.c                         |   12 ++-
+>  arch/arm64/include/asm/arch_gicv3.h               |   13 +++
+>  arch/arm64/include/asm/kvm_host.h                 |   15 ++++
+>  arch/arm64/include/asm/kvm_hyp.h                  |    2 -
+>  arch/arm64/include/asm/virt.h                     |    7 ++
+>  arch/arm64/kernel/vmlinux.lds.S                   |    6 ++
+>  arch/arm64/kvm/Kconfig                            |    4 +-
+>  arch/arm64/kvm/hyp/Makefile                       |    2 +-
+>  arch/arm64/kvm/hyp/switch.c                       |   19 ++---
+>  include/kvm/arm_vgic.h                            |    8 --
+>  {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v3-sr.c |   13 ---
+>  virt/kvm/arm/vgic/vgic-kvm-device.c               |   11 +--
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c                  |    8 +-
+>  virt/kvm/arm/vgic/vgic-mmio.c                     |    2 -
+>  virt/kvm/arm/vgic/vgic-mmio.h                     |    4 +-
+>  virt/kvm/arm/vgic/vgic.h                          |   54 +-----------
+>  29 files changed, 265 insertions(+), 139 deletions(-)
+>  rename {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v3-sr.c (96%)
+> 
