@@ -1,43 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 9 Sep 2016 18:32:51 +0100
-Subject: [GIT PULL] arm64 fixes for 4.8-rc6
-Message-ID: <20160909173248.GA13922@e104818-lin.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 9 Sep 2016 13:36:56 -0400 (EDT)
+Subject: Improper TTBCR for arm 32bit kernel decompression
+In-Reply-To: <57D2E47D.5030105@codeaurora.org>
+References: <57D2E47D.5030105@codeaurora.org>
+Message-ID: <alpine.LFD.2.20.1609091334120.14769@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, 9 Sep 2016, Srinivas Ramana wrote:
 
-Please pull the arm64 fixes below. Thanks.
+> Hello,
+> 
+> While trying to boot arm-32 bit kernel, I came across a problem where TTBCR is
+> in improper state. If the bootloader uses the long descriptor format and jumps
+> to kernel decompressor code, TTBCR may not be in the right state. So, as soon
+> as the MMU is enabled, execution can not proceed further.
+> 
+> Before enabling the MMU, it is required to clear the TTBCR.PD0 field to use
+> TTBR0 for translation table walks. Also, TTBCR.N should be reset to '0' to
+> indicate the correct base address width. The 'commit dbece45894d3a ("ARM:
+> 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores")' does the reset of
+> TTBCR.N, but doesn't consider all the bits for the size of TTBCR.N.
+> 
+> when i tried the below change where i explicitly clear TTBCR.PD0 and use
+> correct mask for TTBCR.N, I see proper memory after MMU is enabled and
+> decompression succeeds.
+> 
+> Request your comments on the change below. If it looks good, I can submit a
+> patch for inclusion.
+> 
+> ---------------------8<----------------------------------
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index af11c2f..5769f1f 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -779,7 +779,8 @@ __armv7_mmu_cache_on:
+>                 orrne   r0, r0, #1              @ MMU enabled
+>                 movne   r1, #0xfffffffd         @ domain 0 = client
+>                 bic     r6, r6, #1 << 31        @ 32-bit translation system
+> -               bic     r6, r6, #3 << 0         @ use only ttbr0
+> +               bic     r6, r6, #7 << 0         @ width of base address field
+> +               bic     r6, r6, #1 << 4         @ use only ttbr0
 
-The following changes since commit c6935931c1894ff857616ff8549b61236a19148f:
+You could combine those instructions like this:
 
-  Linux 4.8-rc5 (2016-09-04 14:31:46 -0700)
+		bic	r6, r6, #(7 << 0) | (1 << 4) @ use only ttbr0
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 2b9743441a312e0b0a2d87deae363eccbe9d0f00:
-
-  arm64: use preempt_disable_notrace in _percpu_read/write (2016-09-09 12:34:47 +0100)
-
-----------------------------------------------------------------
-- smp_mb__before_spinlock() changed to smp_mb() on arm64 since the
-  generic definition to smp_wmb() is not sufficient
-
-- avoid a recursive loop with the graph tracer by using using
-  preempt_(enable|disable)_notrace in _percpu_(read|write)
-
-----------------------------------------------------------------
-Chunyan Zhang (1):
-      arm64: use preempt_disable_notrace in _percpu_read/write
-
-Will Deacon (1):
-      arm64: spinlocks: implement smp_mb__before_spinlock() as smp_mb()
-
- arch/arm64/include/asm/percpu.h   |  8 ++++----
- arch/arm64/include/asm/spinlock.h | 10 ++++++++++
- 2 files changed, 14 insertions(+), 4 deletions(-)
-
--- 
-Catalin
+Nicolas
