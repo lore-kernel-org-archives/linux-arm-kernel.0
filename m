@@ -1,37 +1,34 @@
 From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 9 Sep 2016 09:14:41 +0200
-Subject: [PATCH v2 4/4] ARM: dts: imx28: Fix build warnings with W=1
-In-Reply-To: <20160908140338.GD16911@tiger>
-References: <1473103670-15922-1-git-send-email-festevam@gmail.com>
- <1473103670-15922-4-git-send-email-festevam@gmail.com>
- <20160908140338.GD16911@tiger>
-Message-ID: <20160909091441.01b152ca@ipc1.ka-ro>
+Date: Fri, 9 Sep 2016 09:18:57 +0200
+Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
+In-Reply-To: <6c896634c4d6446df0388da2c0228232@agner.ch>
+References: <20141009151605.GA8818@ulmo.nvidia.com>
+ <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
+ <6c896634c4d6446df0388da2c0228232@agner.ch>
+Message-ID: <20160909091857.7a263220@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, 8 Sep 2016 22:03:38 +0800 Shawn Guo wrote:
-> On Mon, Sep 05, 2016 at 04:27:50PM -0300, Fabio Estevam wrote:
-> > diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-> > index 0ebbc83..b4d4dbb 100644
-> > --- a/arch/arm/boot/dts/imx28-tx28.dts
-> > +++ b/arch/arm/boot/dts/imx28-tx28.dts
-> > @@ -35,7 +35,8 @@
-> >  		usbotg = &usb0;
-> >  	};
-> >  
-> > -	memory {
-> > +	memory at 0 {
-> > +		device_type = "memory";
-> >  		reg = <0 0>; /* will be filled in by U-Boot */
+On Thu, 08 Sep 2016 15:15:57 -0700 Stefan Agner wrote:
+> On 2014-10-10 07:22, Lothar Wa?mann wrote:
+> > This patch series adds support for polarity inversion to the pwm-imx
+> > driver. The patches have been tested on i.MX6, i.MX53 and with the
+> > ti-ehrpwm.c driver.
 > 
-> I'm curious to know if the unit-address will be fixed up or not when
-> 'reg' property gets updated by U-Boot.
+> Do you know what prevented this patchset from getting merged?
 > 
-No. U-Boot does not change the unit name, when updating in the reg
-property. But that does not do any harm (for now), thus the change is
-OK.
+No idea.
+
+> We are looking for Polarity support in PWM for too, this is especially
+> useful for backlight control.
+> 
+Actually the PWM driver may be the wrong place to achieve this. When
+the backlight driver sets the brightness to 0 to switch the backlight
+off, it will disable the PWM. This will make the PWM pin go LOW and
+thus turn the backlight to full brightness rather than off (unless there
+is an additional GPIO that controls a backlight enable pin on the LCD).
 
 
 Lothar Wa?mann
