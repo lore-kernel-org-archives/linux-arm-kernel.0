@@ -1,235 +1,172 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri,  9 Sep 2016 15:23:31 +0100
-Subject: [PATCH v5 02/14] drivers: iommu: implement
- arch_{set/get}_iommu_fwspec API
+Date: Fri,  9 Sep 2016 15:23:39 +0100
+Subject: [PATCH v5 10/14] drivers: iommu: arm-smmu: split probe functions into
+ DT/generic portions
 In-Reply-To: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
 References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20160909142343.13314-3-lorenzo.pieralisi@arm.com>
+Message-ID: <20160909142343.13314-11-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iommu fwspec configuration mechanism currently relies on
-the arch specific struct dev_archdata.iommu member to stash
-the struct iommu_fwspec pointer set-up for streamid translation.
+Current ARM SMMU probe functions intermingle HW and DT probing
+in the initialization functions to detect and programme the ARM SMMU
+driver features. In order to allow probing the ARM SMMU with other
+firmwares than DT, this patch splits the ARM SMMU init functions into
+DT and HW specific portions so that other FW interfaces (ie ACPI) can
+reuse the HW probing functions and skip the DT portion accordingly.
 
-The struct dev_archdata.iommu member is arch specific and is not present
-on all arches that make use of the struct iommu_fwspec infrastructure,
-hence an arch specific kernel API is required to set-up and retrieve
-struct iommu_fwspec pointers safely from generic iommu code, hiding
-the arch specific details.
-
-Implement the arch_{set/get}_iommu_fwspec() generic kernel infrastructure
-and add the ARM/ARM64 back-end implementations.
+This patch implements no functional change, only code reshuffling.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- arch/arm/Kconfig                      |  1 +
- arch/arm/include/asm/iommu-fwspec.h   | 30 ++++++++++++++++++++++++++++++
- arch/arm64/Kconfig                    |  1 +
- arch/arm64/include/asm/iommu-fwspec.h | 30 ++++++++++++++++++++++++++++++
- drivers/iommu/Kconfig                 |  3 +++
- drivers/iommu/of_iommu.c              | 14 +++++++-------
- include/linux/of_iommu.h              | 10 ++++++++++
- 7 files changed, 82 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm/include/asm/iommu-fwspec.h
- create mode 100644 arch/arm64/include/asm/iommu-fwspec.h
+ drivers/iommu/arm-smmu.c | 65 +++++++++++++++++++++++++++++-------------------
+ 1 file changed, 39 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a9c4e48..e84f62e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -59,6 +59,7 @@ config ARM
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
- 	select HAVE_IDE if PCI || ISA || PCMCIA
-+	select HAVE_IOMMU_FWSPEC if IOMMU_API
- 	select HAVE_IRQ_TIME_ACCOUNTING
- 	select HAVE_KERNEL_GZIP
- 	select HAVE_KERNEL_LZ4
-diff --git a/arch/arm/include/asm/iommu-fwspec.h b/arch/arm/include/asm/iommu-fwspec.h
-new file mode 100644
-index 0000000..2e87d8b
---- /dev/null
-+++ b/arch/arm/include/asm/iommu-fwspec.h
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_IOMMU_FWSPEC_H
-+#define __ASM_IOMMU_FWSPEC_H
-+
-+static inline void arch_set_iommu_fwspec(struct device *dev,
-+					 struct iommu_fwspec *fwspec)
-+{
-+	dev->archdata.iommu = fwspec;
-+}
-+
-+static inline struct iommu_fwspec *arch_get_iommu_fwspec(struct device *dev)
-+{
-+	return dev->archdata.iommu;
-+}
-+#endif
-+
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index bc3f00f..10c9b3d 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -83,6 +83,7 @@ config ARM64
- 	select HAVE_GCC_PLUGINS
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
-+	select HAVE_IOMMU_FWSPEC if IOMMU_API
- 	select HAVE_IRQ_TIME_ACCOUNTING
- 	select HAVE_MEMBLOCK
- 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
-diff --git a/arch/arm64/include/asm/iommu-fwspec.h b/arch/arm64/include/asm/iommu-fwspec.h
-new file mode 100644
-index 0000000..2e87d8b
---- /dev/null
-+++ b/arch/arm64/include/asm/iommu-fwspec.h
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_IOMMU_FWSPEC_H
-+#define __ASM_IOMMU_FWSPEC_H
-+
-+static inline void arch_set_iommu_fwspec(struct device *dev,
-+					 struct iommu_fwspec *fwspec)
-+{
-+	dev->archdata.iommu = fwspec;
-+}
-+
-+static inline struct iommu_fwspec *arch_get_iommu_fwspec(struct device *dev)
-+{
-+	return dev->archdata.iommu;
-+}
-+#endif
-+
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 8ee54d7..101cb17 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -67,6 +67,9 @@ config OF_IOMMU
-        def_bool y
-        depends on OF && IOMMU_API
- 
-+config HAVE_IOMMU_FWSPEC
-+	bool
-+
- # IOMMU-agnostic DMA-mapping layer
- config IOMMU_DMA
- 	bool
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 04d616d..38669b8 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -229,7 +229,7 @@ postcore_initcall_sync(of_iommu_init);
- 
- int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np)
- {
--	struct iommu_fwspec *fwspec = dev->archdata.iommu;
-+	struct iommu_fwspec *fwspec = arch_get_iommu_fwspec(dev);
- 
- 	if (fwspec)
- 		return 0;
-@@ -240,13 +240,13 @@ int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np)
- 
- 	fwspec->iommu_np = of_node_get(iommu_np);
- 	fwspec->iommu_ops = of_iommu_get_ops(iommu_np);
--	dev->archdata.iommu = fwspec;
-+	arch_set_iommu_fwspec(dev, fwspec);
- 	return 0;
- }
- 
- void iommu_fwspec_free(struct device *dev)
- {
--	struct iommu_fwspec *fwspec = dev->archdata.iommu;
-+	struct iommu_fwspec *fwspec = arch_get_iommu_fwspec(dev);
- 
- 	if (fwspec) {
- 		of_node_put(fwspec->iommu_np);
-@@ -256,7 +256,7 @@ void iommu_fwspec_free(struct device *dev)
- 
- int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
- {
--	struct iommu_fwspec *fwspec = dev->archdata.iommu;
-+	struct iommu_fwspec *fwspec = arch_get_iommu_fwspec(dev);
- 	size_t size;
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index d453c55..bdb4e26 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1665,7 +1665,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 	unsigned long size;
+ 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+ 	u32 id;
+-	bool cttw_dt, cttw_reg;
++	bool cttw_reg, cttw_fw = smmu->features & ARM_SMMU_FEAT_COHERENT_WALK;
  	int i;
  
-@@ -264,7 +264,7 @@ int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
- 		return -EINVAL;
+ 	dev_notice(smmu->dev, "probing hardware configuration...\n");
+@@ -1710,20 +1710,17 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
  
- 	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + num_ids]);
--	fwspec = krealloc(dev->archdata.iommu, size, GFP_KERNEL);
-+	fwspec = krealloc(fwspec, size, GFP_KERNEL);
- 	if (!fwspec)
- 		return -ENOMEM;
+ 	/*
+ 	 * In order for DMA API calls to work properly, we must defer to what
+-	 * the DT says about coherency, regardless of what the hardware claims.
++	 * the FW says about coherency, regardless of what the hardware claims.
+ 	 * Fortunately, this also opens up a workaround for systems where the
+ 	 * ID register value has ended up configured incorrectly.
+ 	 */
+-	cttw_dt = of_dma_is_coherent(smmu->dev->of_node);
+ 	cttw_reg = !!(id & ID0_CTTW);
+-	if (cttw_dt)
+-		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
+-	if (cttw_dt || cttw_reg)
++	if (cttw_fw || cttw_reg)
+ 		dev_notice(smmu->dev, "\t%scoherent table walk\n",
+-			   cttw_dt ? "" : "non-");
+-	if (cttw_dt != cttw_reg)
++			   cttw_fw ? "" : "non-");
++	if (cttw_fw != cttw_reg)
+ 		dev_notice(smmu->dev,
+-			   "\t(IDR0.CTTW overridden by dma-coherent property)\n");
++			   "\t(IDR0.CTTW overridden by FW configuration)\n");
  
-@@ -272,11 +272,11 @@ int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
- 		fwspec->ids[fwspec->num_ids + i] = ids[i];
+ 	/* Max. number of entries we have for stream matching/indexing */
+ 	size = 1 << ((id >> ID0_NUMSIDB_SHIFT) & ID0_NUMSIDB_MASK);
+@@ -1904,15 +1901,25 @@ static const struct of_device_id arm_smmu_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
  
- 	fwspec->num_ids += num_ids;
--	dev->archdata.iommu = fwspec;
-+	arch_set_iommu_fwspec(dev, fwspec);
- 	return 0;
- }
- 
- inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
+-static int arm_smmu_device_dt_probe(struct platform_device *pdev)
++static int arm_smmu_device_dt_probe(struct platform_device *pdev,
++				    struct arm_smmu_device *smmu)
  {
--	return dev->archdata.iommu;
-+	return arch_get_iommu_fwspec(dev);
- }
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index accdc05..358db49 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -46,6 +46,16 @@ void iommu_fwspec_free(struct device *dev);
- int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
- struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
+ 	const struct arm_smmu_match_data *data;
+-	struct resource *res;
+-	struct arm_smmu_device *smmu;
+ 	struct device *dev = &pdev->dev;
+-	int num_irqs, i, err;
+ 	bool legacy_binding;
  
-+#ifdef CONFIG_HAVE_IOMMU_FWSPEC
-+#include <asm/iommu-fwspec.h>
-+#else /* !CONFIG_HAVE_IOMMU_FWSPEC */
-+static inline void arch_set_iommu_fwspec(struct device *dev,
-+					 struct iommu_fwspec *fwspec) {}
++	if (of_property_read_u32(dev->of_node, "#global-interrupts",
++				 &smmu->num_global_irqs)) {
++		dev_err(dev, "missing #global-interrupts property\n");
++		return -ENODEV;
++	}
 +
-+static inline struct iommu_fwspec *
-+arch_get_iommu_fwspec(struct device *dev) { return NULL; }
-+#endif
++	data = of_device_get_match_data(dev);
++	smmu->version = data->version;
++	smmu->model = data->model;
 +
- void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
- const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
++	parse_driver_options(smmu);
++
+ 	legacy_binding = of_find_property(dev->of_node, "mmu-masters", NULL);
+ 	if (legacy_binding && !using_generic_binding) {
+ 		pr_notice("deprecated \"mmu-masters\" DT property in use; DMA API support unavailable\n");
+@@ -1924,6 +1931,19 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	if (of_dma_is_coherent(smmu->dev->of_node))
++		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
++
++	return 0;
++}
++
++static int arm_smmu_device_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	struct arm_smmu_device *smmu;
++	struct device *dev = &pdev->dev;
++	int num_irqs, i, err;
++
+ 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
+ 	if (!smmu) {
+ 		dev_err(dev, "failed to allocate arm_smmu_device\n");
+@@ -1931,9 +1951,10 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	}
+ 	smmu->dev = dev;
+ 
+-	data = of_device_get_match_data(dev);
+-	smmu->version = data->version;
+-	smmu->model = data->model;
++	err = arm_smmu_device_dt_probe(pdev, smmu);
++
++	if (err)
++		return err;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	smmu->base = devm_ioremap_resource(dev, res);
+@@ -1941,12 +1962,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		return PTR_ERR(smmu->base);
+ 	smmu->size = resource_size(res);
+ 
+-	if (of_property_read_u32(dev->of_node, "#global-interrupts",
+-				 &smmu->num_global_irqs)) {
+-		dev_err(dev, "missing #global-interrupts property\n");
+-		return -ENODEV;
+-	}
+-
+ 	num_irqs = 0;
+ 	while ((res = platform_get_resource(pdev, IORESOURCE_IRQ, num_irqs))) {
+ 		num_irqs++;
+@@ -1981,8 +1996,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	if (err)
+ 		return err;
+ 
+-	parse_driver_options(smmu);
+-
+ 	if (smmu->version == ARM_SMMU_V2 &&
+ 	    smmu->num_context_banks != smmu->num_context_irqs) {
+ 		dev_err(dev,
+@@ -2004,7 +2017,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
++	fwspec_iommu_set_ops(&dev->of_node->fwnode, &arm_smmu_ops);
+ 	platform_set_drvdata(pdev, smmu);
+ 	arm_smmu_device_reset(smmu);
+ 
+@@ -2044,7 +2057,7 @@ static struct platform_driver arm_smmu_driver = {
+ 		.name		= "arm-smmu",
+ 		.of_match_table	= of_match_ptr(arm_smmu_of_match),
+ 	},
+-	.probe	= arm_smmu_device_dt_probe,
++	.probe	= arm_smmu_device_probe,
+ 	.remove	= arm_smmu_device_remove,
+ };
  
 -- 
 2.10.0
