@@ -1,168 +1,206 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 9 Sep 2016 16:14:56 +0100
-Subject: [PATCH v3 1/8] arm64: KVM: Use static keys for selecting the GIC
- backend
-In-Reply-To: <57D2C469.1030006@arm.com>
-References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
- <1473350810-10857-2-git-send-email-vladimir.murzin@arm.com>
- <57D27EA7.2040500@arm.com> <57D281F1.5000902@arm.com>
- <57D2BCEB.3030306@arm.com> <57D2C469.1030006@arm.com>
-Message-ID: <57D2D1F0.301@arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 9 Sep 2016 16:17:33 +0100
+Subject: [PATCH 08/10] PM / Domains: Add support for removing PM domains
+In-Reply-To: <c8498eca-6934-1cab-31d9-3d8ce4c74897@nvidia.com>
+References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
+ <1471340976-5379-9-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFrVO9wb3ffmxA7HUUDt1_aYxe=aqa1v+xNpdrYiLt_m0A@mail.gmail.com>
+ <c8498eca-6934-1cab-31d9-3d8ce4c74897@nvidia.com>
+Message-ID: <63871fe6-cda6-2a95-9c09-e4b3ebfa3419@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/16 15:17, Marc Zyngier wrote:
-> On 09/09/16 14:45, Vladimir Murzin wrote:
->> On 09/09/16 10:33, Vladimir Murzin wrote:
->>> Hi Marc,
+
+On 09/09/16 14:54, Jon Hunter wrote:
+> On 08/09/16 12:49, Ulf Hansson wrote:
+>> On 16 August 2016 at 11:49, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>> The genpd framework allows users to add PM domains via the pm_genpd_init()
+>>> function, however, there is no corresponding function to remove a PM
+>>> domain. For most devices this may be fine as the PM domains are never
+>>> removed, however, for devices that wish to populate the PM domains from
+>>> within a driver, having the ability to remove a PM domain if the probing
+>>> of the device fails or the driver is unloaded is necessary.
 >>>
->>> On 09/09/16 10:19, Marc Zyngier wrote:
->>>>> Hi Vladimir,
->>>>>
->>> ...
->>>>>>>  
->>>>>>> +extern struct static_key_false kvm_gicv3_cpuif;
->>>>>
->>>>> I think we should follow the model set by kvm_vgic_global_state, which
->>>>> is declared in arm_vgic.h. Even better, we should *embed* the static key
->>>>> in this structure. This will reduce the clutter and we wouldn't have to
->>>>> deal with all the section stuff (the hyp_data thing is a good cleanup,
->>>>> but I'd like to see it as a separate patch if possible).
->>> Yes, it is what I was thinking about too, but was not sure about which
->>> way to go, so hyp_data seemed me something we might reuse latter.
->>> However, I agree that we can defer hyp_data thing...
+>>> Add the function pm_genpd_remove() to remove a PM domain by referencing
+>>> it's generic_pm_domain structure.
 >>>
+>>> PM domains can only be removed if they are not a parent domain to
+>>> another PM domain and have no devices associated with them.
 >>
->> I've just tried it out and it seems that static keys are not happy to
->> accept a key after kern_hyp_va is applied at &kvm_vgic_global_state:
+>> I think we should also check if the there's is a provider registered
+>> for the genpd, as it should also prevent the genpd from being removed.
+>> Right?
 > 
-> Ah, there is a trick. You do not need kern_hyp_va at all, because this
-> is not evaluated as an expression at runtime (so the pointer doesn't matter).
-> 
+> Yes I would agree. I had thought that after patch #4 of this series that
+> only the provider itself would be able to call this. However, we should
+> probably still verify that the provider has correctly remove itself.
 
-Ah, right, thank for a tip! ;)
+So now I have the following. I am still not 100% happy. I cannot clear
+the ->provider when calling of_genpd_del_provider() and so I cannot use
+this to verify if the provider is present and so I need to check the
+list of providers and it gets a bit messy. I have been wracking my
+brains to find a better alternative (including a single function to
+remove the provider and domains at once but there are issues with that
+as well).
 
->>> In file included from ./include/linux/jump_label.h:105:0,
->>>                  from arch/arm64/kvm/hyp/switch.c:19:
->>> ./arch/arm64/include/asm/jump_label.h: In function ?__guest_run?:
->>> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
->>>   asm goto("1: nop\n\t"
->>>   ^
->>> ./arch/arm64/include/asm/jump_label.h:31:2: warning: asm operand 0 probably doesn?t match constraints
->>>   asm goto("1: nop\n\t"
->>>   ^
->>> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
->>>   asm goto("1: nop\n\t"
->>>   ^
->>> ./arch/arm64/include/asm/jump_label.h:31:2: error: impossible constraint in ?asm?
->>>   asm goto("1: nop\n\t"
->>>   ^
->>> make[1]: *** [arch/arm64/kvm/hyp/switch.o] Error 1
->>> make: *** [arch/arm64/kvm/hyp/switch.o] Error 2
->>
->> it looks like we cannot avoid hyp_data thing... if you don't mind I can
->> do hyp_data clean-up in separate patch. Alternatively, we can do
->> conversion to static keys for both architectures later as an
->> optimisation step.
-> 
-> Can you try the above first? I've just tried the same approach with my
-> vgic-trap series, and it compiles fine (untested though):
+I think that long term it may make sense to reference the providers
+exclusively by the fwnode_handle and make the list of provider non-DT
+specific. I could do it now, but it would increase the series.
 
-I was about to try it out, but didn't manage to find a branch with
-vgic-trap series, so I did a quick fixup for my series and now it is
-running non-VHE boot tests and I don't expect issues with VHE one. I
-think diff bellow should work runtime too, but if you do want me to give
-it a try it'd be handy to have a branch I can pull from ;)
+Cheers
+Jon
 
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 194184c..397e240 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -301,7 +301,7 @@ again:
->  	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
->  		goto again;
->  
-> -	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
-> +	if (static_branch_unlikely(&kvm_vgic_global_state.vgic_v2_cpuif_trap) &&
->  	    exit_code == ARM_EXCEPTION_TRAP) {
->  		bool valid;
->  
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index bb46c03..cc59a28 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -67,6 +67,9 @@ struct vgic_global {
->  
->  	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
->  	bool			can_emulate_gicv2;
-> +
-> +	/* Trapping GICv2 GICV region? */
-> +	struct static_key_false	vgic_v2_cpuif_trap;
->  };
->  
->  extern struct vgic_global kvm_vgic_global_state;
-> @@ -269,8 +272,6 @@ struct vgic_cpu {
->  	bool lpis_enabled;
->  };
->  
-> -extern struct static_key_false vgic_v2_cpuif_trap;
-> -
->  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
->  void kvm_vgic_early_init(struct kvm *kvm);
->  int kvm_vgic_create(struct kvm *kvm, u32 type);
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index 0a063af..4af600e 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -278,7 +278,7 @@ int vgic_v2_map_resources(struct kvm *kvm)
->  		goto out;
->  	}
->  
-> -	if (!static_branch_unlikely(&vgic_v2_cpuif_trap)) {
-> +	if (!static_branch_unlikely(&kvm_vgic_global_state.vgic_v2_cpuif_trap)) {
->  		ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
->  					    kvm_vgic_global_state.vcpu_base,
->  					    KVM_VGIC_V2_CPU_SIZE, true);
-> @@ -296,8 +296,6 @@ out:
->  	return ret;
->  }
->  
-> -DEFINE_STATIC_KEY_FALSE(vgic_v2_cpuif_trap);
-> -
->  /**
->   * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
->   * @node:	pointer to the DT node
-> @@ -314,6 +312,8 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
->  		return -ENXIO;
->  	}
->  
-> +	kvm_vgic_global_state.vgic_v2_cpuif_trap = STATIC_KEY_FALSE_INIT;
-> +
+---
+ drivers/base/power/domain.c | 89 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pm_domain.h   |  5 +++
+ 2 files changed, 94 insertions(+)
 
-I did this a bit different:
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 82f87038f108..57c64fc1a164 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -39,6 +39,8 @@
+ static LIST_HEAD(gpd_list);
+ static DEFINE_MUTEX(gpd_list_lock);
+ 
++static bool genpd_provider_present(struct device_node *np);
++
+ /*
+  * Get the generic PM domain for a particular struct device.
+  * This validates the struct device pointer, the PM domain pointer,
+@@ -1356,6 +1358,68 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
+ }
+ EXPORT_SYMBOL_GPL(pm_genpd_init);
+ 
++static int genpd_remove(struct generic_pm_domain *genpd)
++{
++	struct gpd_link *l, *link;
++
++	if (IS_ERR_OR_NULL(genpd))
++		return -EINVAL;
++
++	mutex_lock(&genpd->lock);
++
++	if (is_of_node(genpd->provider)) {
++		if (genpd_provider_present(to_of_node(genpd->provider))) {
++			mutex_unlock(&genpd->lock);
++			pr_err("Provider present, unable to remove %s\n",
++			       genpd->name);
++			return -EBUSY;
++		}
++	}
++
++	if (!list_empty(&genpd->master_links) || genpd->device_count) {
++		mutex_unlock(&genpd->lock);
++		pr_err("%s: unable to remove %s\n", __func__, genpd->name);
++		return -EBUSY;
++	}
++
++	list_for_each_entry_safe(link, l, &genpd->slave_links, slave_node) {
++		list_del(&link->master_node);
++		list_del(&link->slave_node);
++		kfree(link);
++	}
++
++	list_del(&genpd->gpd_list_node);
++	mutex_unlock(&genpd->lock);
++	cancel_work_sync(&genpd->power_off_work);
++	pr_debug("%s: removed %s\n", __func__, genpd->name);
++
++	return 0;
++}
++
++/**
++ * pm_genpd_remove - Remove a generic I/O PM domain
++ * @genpd: Pointer to PM domain that is to be removed.
++ *
++ * To remove the PM domain, this function:
++ *  - Removes the PM domain as a subdomain to any parent domains,
++ *    if it was added.
++ *  - Removes the PM domain from the list of registered PM domains.
++ *
++ * The PM domain will only be removed, if it is not a parent to any
++ * other PM domain and has no devices associated with it.
++ */
++int pm_genpd_remove(struct generic_pm_domain *genpd)
++{
++	int ret;
++
++	mutex_lock(&gpd_list_lock);
++	ret = genpd_remove(genpd);
++	mutex_unlock(&gpd_list_lock);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(pm_genpd_remove);
++
+ #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+ 
+ typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
+@@ -1563,6 +1627,26 @@ void of_genpd_del_provider(struct device_node *np)
+ EXPORT_SYMBOL_GPL(of_genpd_del_provider);
+ 
+ /**
++ * genpd_provider_present() - Verify if a PM domain provider is present
++ * @np: Device node pointer associated with the PM domain provider
++ */
++static bool genpd_provider_present(struct device_node *np)
++{
++	struct of_genpd_provider *cp;
++
++	mutex_lock(&of_genpd_mutex);
++	list_for_each_entry(cp, &of_genpd_providers, link) {
++		if (cp->node == np) {
++			mutex_unlock(&of_genpd_mutex);
++			return true;
++		}
++	}
++	mutex_unlock(&of_genpd_mutex);
++
++	return false;
++}
++
++/**
+  * genpd_get_from_provider() - Look-up PM domain
+  * @genpdspec: OF phandle args to use for look-up
+  *
+@@ -1798,6 +1882,11 @@ out:
+ 	return ret ? -EPROBE_DEFER : 0;
+ }
+ EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
++#else
++static bool genpd_provider_present(struct device_node *np)
++{
++	return false;
++}
+ #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
+ 
+ 
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index e71764ac7248..4aa285e44eb0 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -129,6 +129,7 @@ extern int pm_genpd_remove_subdomain(struct generic_pm_domain *genpd,
+ 				     struct generic_pm_domain *target);
+ extern int pm_genpd_init(struct generic_pm_domain *genpd,
+ 			 struct dev_power_governor *gov, bool is_off);
++extern int pm_genpd_remove(struct generic_pm_domain *genpd);
+ 
+ extern struct dev_power_governor simple_qos_governor;
+ extern struct dev_power_governor pm_domain_always_on_gov;
+@@ -164,6 +165,10 @@ static inline int pm_genpd_init(struct generic_pm_domain *genpd,
+ {
+ 	return -ENOSYS;
+ }
++static inline int pm_genpd_remove(struct generic_pm_domain *genpd)
++{
++	return -ENOTSUPP;
++}
+ #endif
+ 
+ static inline int pm_genpd_add_device(struct generic_pm_domain *genpd,
+-- 
+2.1.4 
 
-+struct vgic_global __section(.hyp.text) kvm_vgic_global_state =
-{.gicv3_cpuif = STATIC_KEY_FALSE_INIT,};
-
-Thanks
-Vladimir
-
->  	if (!PAGE_ALIGNED(info->vcpu.start) ||
->  	    !PAGE_ALIGNED(resource_size(&info->vcpu))) {
->  		kvm_info("GICV region size/alignment is unsafe, using trapping (reduced performance)\n");
-> @@ -332,7 +332,7 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
->  			goto out;
->  		}
->  
-> -		static_branch_enable(&vgic_v2_cpuif_trap);
-> +		static_branch_enable(&kvm_vgic_global_state.vgic_v2_cpuif_trap);
->  	}
->  
->  	kvm_vgic_global_state.vctrl_base = ioremap(info->vctrl.start,
-> 
-> 
-> Thanks,
-> 
-> 	M.
-> 
+-- 
+nvpublic
