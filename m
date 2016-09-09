@@ -1,63 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri,  9 Sep 2016 14:07:29 -0700
-Subject: [PATCH] ARM: dts: Add power button support for igepv5
-Message-ID: <20160909210729.20184-1-tony@atomide.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 09 Sep 2016 14:20:57 -0700
+Subject: [PATCH 1/8] ARM: dts: bcm283x: Define standard pinctrl groups in
+ the gpio node.
+In-Reply-To: <1473411924.6698.85.camel@redhat.com>
+References: <1473244289-20728-1-git-send-email-kraxel@redhat.com>
+ <1473244289-20728-2-git-send-email-kraxel@redhat.com>
+ <1628308726.55593.220fafc0-57d9-4317-a72d-0875dfb2d658.open-xchange@email.1und1.de>
+ <1473411924.6698.85.camel@redhat.com>
+Message-ID: <8737l893d2.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power button support for igepv5.
+e<#secure method=pgpmime mode=sign>
+Gerd Hoffmann <kraxel@redhat.com> writes:
 
-Cc: Agust? Fontquerni i Gorchs <afontquerni@iseebcn.com>
-Cc: Enric Balletbo Serra <eballetbo@gmail.com>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: Pau Pajuel <ppajuel@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/omap5-igep0050.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+>   Hi,
+>
+>> According to this page [1] the pinctrl group for parallel display interface is
+>> missing. Is it intended?
+>> 
+>> [1] - http://elinux.org/RPi_BCM2835_GPIOs
+>
+> Just an oversight I guess.  Eric?
+>
+> Does this look correct?
+>
+> +                       dpi_gpio4: dpi_gpio4 {
+> +                               brcm,pins = <4 5 6 7 8 9 10 11 12 13
+> +                                            14 15 16 17 18 19 20 21
+> +                                            22 23 24 25 26 27>;
+> +                               brcm,function = <BCM2835_FSEL_ALT2>;
+> +                       };
 
-diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
---- a/arch/arm/boot/dts/omap5-igep0050.dts
-+++ b/arch/arm/boot/dts/omap5-igep0050.dts
-@@ -7,6 +7,7 @@
-  */
- /dts-v1/;
- 
-+#include <dt-bindings/input/input.h>
- #include "omap5-board-common.dtsi"
- 
- / {
-@@ -17,6 +18,18 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x7f000000>; /* 2032 MB */
- 	};
-+
-+	gpio_keys {
-+                compatible = "gpio-keys";
-+		pinctrl-0 = <&power_button_pin>;
-+		pinctrl-names = "default";
-+
-+		power-button {
-+			label = "Power Button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio4 22 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
- };
- 
- &hdmi {
-@@ -58,6 +71,12 @@
- 			OMAP5_IOPAD(0x0fa, PIN_INPUT | MUX_MODE0)	/* i2c4_sda */
- 		>;
- 	};
-+
-+	power_button_pin: pinctrl_power_button_pin {
-+		pinctrl-single,pins = <
-+			OMAP5_IOPAD(0x086, PIN_INPUT | MUX_MODE6)	/* gpio4_118 */
-+		>;
-+	};
- };
- 
- &tpd12s015 {
--- 
-2.9.3
+For DPI, you also need pins 0-3 in there for clock and syncs.
+
+That set of data pins would be for a 24-bit mode, which is what we
+should be using for the Adafruit kippah + 7" panel combo.
