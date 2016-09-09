@@ -1,63 +1,103 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 9 Sep 2016 13:50:09 +0200
-Subject: [PATCH 3/4] dt-bindings: mmc: sdhci-st: Mention the discretionary
- "icn" clock
-In-Reply-To: <20160908091136.17301-4-lee.jones@linaro.org>
-References: <20160908091136.17301-1-lee.jones@linaro.org>
- <20160908091136.17301-4-lee.jones@linaro.org>
-Message-ID: <CAPDyKFpgo2zy6CoQS=HfZMph_zKTM=ZSxzUkNeZ4due+CsMwoA@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 9 Sep 2016 19:53:36 +0800
+Subject: [PATCH v4 2/3] arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
+In-Reply-To: <1473141861-5033-3-git-send-email-jun.nie@linaro.org>
+References: <1473141861-5033-1-git-send-email-jun.nie@linaro.org>
+ <1473141861-5033-3-git-send-email-jun.nie@linaro.org>
+Message-ID: <20160909115336.GB16924@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2016 at 11:11, Lee Jones <lee.jones@linaro.org> wrote:
-> The interconnect (ICN) clock is required for functional working of
-> MMC on some ST platforms.  When not supplied it can result in
-> broken MMC and the following output:
->
->         [   13.916949] mmc0: Timeout waiting for hardware interrupt.
->         [   13.922349] sdhci: =========== REGISTER DUMP (mmc0)===========
->         [   13.928175] sdhci: Sys addr: 0x00000000 | Version:  0x00001002
->         [   13.933999] sdhci: Blk size: 0x00007040 | Blk cnt:  0x00000001
->         [   13.939825] sdhci: Argument: 0x00fffff0 | Trn mode: 0x00000013
->         [   13.945650] sdhci: Present:  0x1fff0206 | Host ctl: 0x00000011
->         [   13.951475] sdhci: Power:    0x0000000f | Blk gap:  0x00000080
->         [   13.957300] sdhci: Wake-up:  0x00000000 | Clock:    0x00003f07
->         [   13.963126] sdhci: Timeout:  0x00000004 | Int stat: 0x00000000
->         [   13.968952] sdhci: Int enab: 0x02ff008b | Sig enab: 0x02ff008b
->         [   13.974777] sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
->         [   13.980602] sdhci: Caps:     0x21ed3281 | Caps_1:   0x00000000
->         [   13.986428] sdhci: Cmd:      0x0000063a | Max curr: 0x00000000
->         [   13.992252] sdhci: Host ctl2: 0x00000000
->         [   13.996166] sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x7c048200
->         [   14.001990] sdhci: ===========================================
->         [   14.009802] mmc0: Got data interrupt 0x02000000 even though no data operation was in progress.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  Documentation/devicetree/bindings/mmc/sdhci-st.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-st.txt b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
-> index 88faa91..3cd4c43 100644
-> --- a/Documentation/devicetree/bindings/mmc/sdhci-st.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sdhci-st.txt
-> @@ -10,7 +10,7 @@ Required properties:
->                         subsystem (mmcss) inside the FlashSS (available in STiH407 SoC
->                         family).
->
-> -- clock-names:         Should be "mmc".
-> +- clock-names:         Should be "mmc" and "icn".  (NB: The latter is not compulsory)
->                         See: Documentation/devicetree/bindings/resource-names.txt
->  - clocks:              Phandle to the clock.
->                         See: Documentation/devicetree/bindings/clock/clock-bindings.txt
-> --
-> 2.9.3
->
+A bit more comments as below ...
 
-This looks good to me!
+On Tue, Sep 06, 2016 at 02:04:20PM +0800, Jun Nie wrote:
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "simple-bus";
+> +		interrupt-parent = <&gic>;
+> +		ranges;
+> +
+> +		timer {
+> +			compatible = "arm,armv8-timer";
+> +			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
+> +				     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+> +				     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+> +				     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
 
-I am guessing you want this to go through my mmc tree, as I think
-patch 3 and patch 4 should go together. If not, tell me.
+Affinity bits are missing for PPI interrupt.  You can use a bit help
+from defines in include/dt-bindings/interrupt-controller/arm-gic.h.
 
-Kind regards
-Uffe
+> +		};
+> +
+> +		pmu {
+> +			compatible = "arm,cortex-a53-pmu";
+> +			interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>;
+> +		};
+
+There are no unit-address for timer and pmu, so we should probably move
+them out of soc simple-bus and put them directly under root.
+
+> +
+> +		aon_sysctrl: aon-sysctrl at 116000 {
+> +			compatible = "zte,zx296718-aon-sysctrl", "syscon";
+> +			reg = <0x116000 0x1000>;
+> +		};
+> +
+> +		uart0: uart at 11f000 {
+> +			compatible = "arm,pl011", "arm,primecell";
+> +			arm,primecell-periphid = <0x001feffe>;
+> +			reg = <0x11f000 0x1000>;
+> +			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&osc24m>;
+> +			clock-names = "apb_pclk";
+> +			status = "disabled";
+> +		};
+> +
+> +		dma: dma-controller at 1460000 {
+> +			compatible = "zte,zx296702-dma";
+> +			reg = <0x01460000 0x1000>;
+> +			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&osc24m>;
+> +			clock-names = "dmaclk";
+> +			#dma-cells = <1>;
+> +			dma-channels = <32>;
+> +			dma-requests = <32>;
+> +		};
+> +
+> +		sysctrl: sysctrl at 1463000 {
+> +			compatible = "zte,zx296718-sysctrl", "syscon";
+> +			reg = <0x1463000 0x1000>;
+> +		};
+> +
+> +		gic: interrupt-controller at 2a00000 {
+> +			compatible = "arm,gic-v3";
+> +			#interrupt-cells = <3>;
+> +			#address-cells = <0>;
+> +			#redistributor-regions = <6>;
+> +			redistributor-stride = <0x0 0x40000>;
+> +			interrupt-controller;
+> +			reg = <0x02a00000 0x10000>,
+> +			      <0x02b00000 0x20000>,
+> +			      <0x02b20000 0x20000>,
+> +			      <0x02b40000 0x20000>,
+> +			      <0x02b60000 0x20000>,
+> +			      <0x02b80000 0x20000>,
+> +			      <0x02ba0000 0x20000>;
+> +			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+
+Affinity bits are missing.
+
+Shawn
+
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
