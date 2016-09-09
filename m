@@ -1,38 +1,22 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Sep 2016 17:31:16 +0100
-Subject: [PATCH v2 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-In-Reply-To: <20160908125123.ypkye5nclsi5vx4f@localhost>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <CAGXu5j++0LgDEv=m1yQb4hB57MQ2MYVCpeex9TFTRmQpNYhNsQ@mail.gmail.com>
- <20160908125123.ypkye5nclsi5vx4f@localhost>
-Message-ID: <20160909163116.GA10792@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 9 Sep 2016 17:32:38 +0100
+Subject: [PATCH v3 2/8] arm64: KVM: Move GIC accessors to arch_gicv3.h
+In-Reply-To: <1473350810-10857-3-git-send-email-vladimir.murzin@arm.com>
+References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
+ <1473350810-10857-3-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <57D2E426.6000001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 01:51:24PM +0100, Catalin Marinas wrote:
-> On Wed, Sep 07, 2016 at 04:20:55PM -0700, Kees Cook wrote:
-> > On Fri, Sep 2, 2016 at 8:02 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > This is the second version of the arm64 PAN emulation by disabling
-> > > TTBR0_EL1 accesses. The major change from v1 is the use of a thread_info
-> > > member to store the real TTBR0_EL1 value. The advantage is slightly
-> > > simpler assembler macros for uaccess_enable with the downside that
-> > > switch_mm() must always update the saved ttbr0 even if there is no mm
-> > > switch.
-> > 
-> > Is arm64 thread_info attached to the kernel stack? (i.e. is this
-> > introducing a valuable target for stack-based attacks?)
+On 08/09/16 17:06, Vladimir Murzin wrote:
+> Since we are going to share vgic-v3 save/restore code with ARM keep
+> arch specific accessors separately.
 > 
-> Currently yes, thread_info is on the kernel stack. At some point we'll
-> decouple it in a similar way to what x86 are doing/planning.
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-FWIW, I'm currently working on this (atop of Andy's x86 patches). The
-IRQ stack work largely removed out dependence on the stack pointer to
-find thread_info, and I have a plan for the remaining places.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-There's a fair amount of ground work to do first (e.g. reworking headers
-to avoid circular dependencies), but hopefully I'll have something that
-I can share soon.
-
-Thanks,
-Mark.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
