@@ -1,71 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 09 Sep 2016 21:58:49 +0200
-Subject: [PATCH] hwmon: xgene: access mailbox as RAM
-In-Reply-To: <CAFHUOYzm4VH1fc3D0fLVv3bCU=2SHx7tZM4nFnCvWeuY+QfEFw@mail.gmail.com>
-References: <1469134557-26869-1-git-send-email-hotran@apm.com>
- <2529114.aAikiSWl11@wuerfel>
- <CAFHUOYzm4VH1fc3D0fLVv3bCU=2SHx7tZM4nFnCvWeuY+QfEFw@mail.gmail.com>
-Message-ID: <2852054.37zytD0HIa@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 9 Sep 2016 22:04:35 +0200
+Subject: [PATCH 12/13] arm64: dts: add Allwinner A64 SoC .dtsi
+In-Reply-To: <c2334630-edab-5b42-48dd-5e4edd5f3de1@arm.com>
+References: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
+ <20160726203041.29366-13-maxime.ripard@free-electrons.com>
+ <c2334630-edab-5b42-48dd-5e4edd5f3de1@arm.com>
+Message-ID: <20160909200435.GJ8881@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 9, 2016 12:24:32 PM CEST Hoan Tran wrote:
-> On Fri, Sep 9, 2016 at 8:38 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The newly added hwmon driver fails to build in an allmodconfig
-> > index bc78a5d10182..e834dfb3acca 100644
-> > --- a/drivers/hwmon/xgene-hwmon.c
-> > +++ b/drivers/hwmon/xgene-hwmon.c
-> > @@ -34,7 +34,8 @@
-> >  #include <linux/module.h>
-> >  #include <linux/of.h>
-> >  #include <linux/platform_device.h>
-> > -#include <acpi/acpi_io.h>
-> > +#include <linux/io.h>
+Hi,
+
+On Thu, Sep 08, 2016 at 09:41:10AM +0100, Andre Przywara wrote:
+> > +	timer {
+> > +		compatible = "arm,armv8-timer";
+> > +		interrupts = <GIC_PPI 13
+> > +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> > +			     <GIC_PPI 14
+> > +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> > +			     <GIC_PPI 11
+> > +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> > +			     <GIC_PPI 10
+> > +			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> > +	};
 > 
-> Alphabetical order.
+> Can you add a PMU node here? Or shall I send a patch on top of it?
+> It would be:
 > 
-> >         struct acpi_pcct_shared_memory *generic_comm_base = ctx->pcc_comm_addr;
-> > -       void *ptr = generic_comm_base + 1;
-> > +       u32 *ptr = (void*)(generic_comm_base + 1);
+> 	pmu {
+>         	compatible = "arm,cortex-a53-pmu", "arm,armv8-pmuv3";
+> 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
+> 			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,	
+> 			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+> 			     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
+> 		interrupt-affinity = <&cpu0>,
+> 				     <&cpu1>,
+> 				     <&cpu2>,
+> 				     <&cpu3>;
+> 	};
 > 
-> Space before "*".
-
-Ok.
-
-> > @@ -652,9 +653,9 @@ static int xgene_hwmon_probe(struct platform_device *pdev)
-> >                  */
-> >                 ctx->comm_base_addr = cppc_ss->base_address;
-> >                 if (ctx->comm_base_addr) {
-> > -                       ctx->pcc_comm_addr =
-> > -                                       acpi_os_ioremap(ctx->comm_base_addr,
-> > -                                                       cppc_ss->length);
-> > +                       ctx->pcc_comm_addr = memremap(ctx->comm_base_addr,
-> > +                                                       cppc_ss->length,
-> > +                                                       MEMREMAP_WT);
+> This enables perf to use hardware counters (for cycles and instructions,
+> for instance).
 > 
-> It should be MEMREMAP_WB. As mailbox shared memory is on RAM and our
-> co-processor is also in the coherency domain.
+> > +
+> > +	clocks {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		ranges;
+> > +
+> > +		osc24M: osc24M_clk {
+> > +			#clock-cells = <0>;
+> > +			compatible = "fixed-clock";
+> > +			clock-frequency = <24000000>;
+> > +			clock-output-names = "osc24M";
+> > +		};
+> > +
+> > +		osc32k: osc32k_clk {
+> > +			#clock-cells = <0>;
+> > +			compatible = "fixed-clock";
+> > +			clock-frequency = <32768>;
+> > +			clock-output-names = "osc32k";
+> > +		};
+> > +	};
+> 
+> Can you remove this "clocks" node and put the two subnodes directly onto
+> the top level?
+> I know that putting clocks into a subnode is quite wide spread, but it
+> does not represent any hardware hierarchy, especially in this
+> fixed-clock case.
+> So if we can (and it is easy here!) we should avoid any clocks subnode.
+> 
+> (Yes, I know that this was in my original DT as well, but Mark Rutland
+> convinced me of this.)
 
-Right, I was wondering about this, since I could not figure out what
-the other side is (hardware, service processor or firmware).
-So MEMREMAP_WB makes sense here.
+I'll do those changes before sending the new version.
 
-Two more questions:
+Maxime
 
-* Any comment on the byte ordering of the data in this line:
-
-        /* Copy the message to the PCC comm space */
-        for (i = 0; i < sizeof(struct slimpro_resp_msg) / 4; i++)
--               writel_relaxed(msg[i], ptr + i * 4);
-+               WRITE_ONCE(ptr[i], cpu_to_le32(msg[i]));
-
-This assumes that the old code was correct even when running on
-big-endian kernels and the message data consists of 32-bit data words.
-If the message has some other format instead, we would need to treat
-this as a byte stream and not do swapping here but instead do it
-(if any) in the code that reads or writes the actual data here.
-
-* Are you sure you don't need any smp_rmb()/smp_wmb() barriers
-between the accesses?
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160909/87c052f4/attachment.sig>
