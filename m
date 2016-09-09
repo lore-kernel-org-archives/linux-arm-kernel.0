@@ -1,44 +1,48 @@
-From: fweimer@redhat.com (Florian Weimer)
-Date: Fri, 9 Sep 2016 19:01:12 +0200
-Subject: [RFC PATCH 0/5] arm64: Signal context expansion
-In-Reply-To: <20160909152047.GA3958@e103592.cambridge.arm.com>
-References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
- <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
- <20160909152047.GA3958@e103592.cambridge.arm.com>
-Message-ID: <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 09 Sep 2016 10:04:19 -0700
+Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
+In-Reply-To: <CAFBinCCDDwydB+RP0CZKoAW5Suxotn224ZFVWvt2OGW3gNJR1g@mail.gmail.com>
+ (Martin Blumenstingl's message of "Fri, 9 Sep 2016 18:14:03 +0200")
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
+ <m260q6jibf.fsf@baylibre.com>
+ <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
+ <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
+ <m2eg4ui0nl.fsf@baylibre.com>
+ <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
+ <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
+ <m2sht9gkau.fsf@baylibre.com>
+ <CAFBinCCDDwydB+RP0CZKoAW5Suxotn224ZFVWvt2OGW3gNJR1g@mail.gmail.com>
+Message-ID: <m2k2elgg30.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2016 05:21 PM, Dave Martin wrote:
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
->> Do you add this extra information only if the stack is sufficiently large?
+> On Fri, Sep 9, 2016 at 5:33 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> However, the problem with all of the solutions proposed (runtime PM ones
+>> included) is that we're forcing a board-specific design issue (2 devices
+>> sharing a reset line) into a driver that should not have any
+>> board-specific assumptions in it.
 >>
->> x86_64 adds the new information even for small stacks set up with
->> sigaltstack, leading to memory corruption on bleeding-edge hardware:
->>
->>   <https://bugzilla.kernel.org/show_bug.cgi?id=153531>
+>> For example, if this driver is used on another platform where different
+>> PHYs have different reset lines, then one of them (the unlucky one who
+>> is not probed first) will never get reset.  So any form of per-device
+>> ref-counting is not a portable solution.
 >
-> Hmmm, not yet.  We already check that the whole frame is writable user
-> memory, but this isn't sufficient to avoid user corruption in the case
-> of alternate signal stacks.  I'll fix this -- thanks for flagging it.
->
-> If the stack isn't large enough, we'll still have to SEGV the task
-> though.
+> maybe we should also consider Ben's solution: he played with the USB
+> PHY on his Meson8b board. His approach was to have only one USB PHY
+> driver instance which exposes two PHYs.
+> The downside of this: the driver would have to know the offset of the
+> PHYs (0x0 for the first PHY, 0x20 for the second), but we could handle
+> the reset using runtime PM without any hacks.
 
-You could skip copying the data and not install a pointer to it in the 
-existing signal context.
+> I checked the USB PHY reference driver: it seems that there will be a
+> new USB PHY with the GXL/GXM SoCs.
+> So maybe we could live with the assumption that the PHYs are at
+> consecutive addresses.
 
-> We can (and should) bump up the SIG{,MIN}STKSZ constants when adding
-> the SVE support proper to the kernel,
+But isn't that also forcing us to make board-specific assumptions inside
+the driver.
 
-That's a userspace ABI change (libraries use these constants to size 
-struct members), and not a good idea.  You might get away with at this 
-stage, but you can't do this every time you add some new process state 
-you want to add to signal handlers.
-
-> I wonder whether we should make the signal stack size runtime
-> discoverable through sysconf() instead...
-
-That might be a good idea, yes.
-
-Florian
+Kevin
