@@ -1,114 +1,39 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri,  9 Sep 2016 21:24:07 +0200
-Subject: [PATCH V6 5/5] PCI: thunder: Enable ACPI PCI controller for ThunderX
- pass1.x silicon version
-In-Reply-To: <1473449047-10499-1-git-send-email-tn@semihalf.com>
-References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
-Message-ID: <1473449047-10499-6-git-send-email-tn@semihalf.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Sep 2016 21:25:00 +0200
+Subject: next build: 143 builds: 2 failed, 141 passed, 2 errors,
+ 2 warnings (next-20160909)
+In-Reply-To: <m2oa3xgg98.fsf@baylibre.com>
+References: <57d26402.eeb8c20a.ba0e2.8bbb@mx.google.com>
+ <2582793.W17ckCts1B@wuerfel> <m2oa3xgg98.fsf@baylibre.com>
+Message-ID: <3939380.a1AWegjel5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ThunderX pass1.x requires to emulate the EA headers for on-chip devices
-hence it has to use custom pci_thunder_ecam_ops for accessing PCI config
-space (pci-thuner-ecam.c). Add new entries to MCFG quirk array where they
-can be applied while probing ACPI based PCI host controller.
+On Friday, September 9, 2016 10:00:35 AM CEST Kevin Hilman wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > On Friday, September 9, 2016 12:25:54 AM CEST kernelci. org bot wrote:
+> >> next build: 143 builds: 2 failed, 141 passed, 2 errors, 2 warnings (next-20160909)
+> >
+> > This is pretty good, here is what's left:
+> >
+> >> rpc_defconfig (arm) ? FAIL, 1 error, 0 warnings, 0 section mismatches
+> >> 
+> >> Errors:
+> >>     fs/fat/dir.c:758:424: internal compiler error: Segmentation fault
+> >
+> > Could we please update the gcc build on kernelci.org from "Linaro GCC 5.3-2016.02"
+> > to the following version (Linaro GCC 5.3-2016.05) or later?
+> 
+> I finally found the release tarballs for Linaro toolchains (the "latest"
+> link on the linaro releases was stale, and pointing to 2016.02).
+> 
+> So it's now 5.3-2016.05 on all the kCI builders.
 
-ThunderX pass1.x is using the same way for accessing off-chip devices
-(so-called PEM) as silicon pass-2.x so we need to add PEM quirk
-entries too.
 
-Quirk is considered for ThunderX silicon pass1.x only which is identified
-via MCFG revision 2.
+Great, thanks!
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
----
- drivers/acpi/pci_mcfg.c             | 45 +++++++++++++++++++++++++++++++++++++
- drivers/pci/host/pci-thunder-ecam.c |  2 +-
- include/linux/pci-ecam.h            |  3 +++
- 3 files changed, 49 insertions(+), 1 deletion(-)
+Any idea about the x86 binutils issue? Which version do you have
+at the moment?
 
-diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-index 1f73d7b..eb14f74 100644
---- a/drivers/acpi/pci_mcfg.c
-+++ b/drivers/acpi/pci_mcfg.c
-@@ -77,6 +77,51 @@ static struct mcfg_fixup mcfg_quirks[] = {
- 	  DEFINE_RES_MEM(0x994057000000UL, 0x39 * SZ_16M) },
- 	{ "CAVIUM", "THUNDERX", 1, 19, MCFG_BUS_ANY, &pci_thunder_pem_ops,
- 	  DEFINE_RES_MEM(0x99808f000000UL, 0x39 * SZ_16M) },
-+
-+	/* SoC pass1.x */
-+	{ "CAVIUM", "THUNDERX", 2, 4, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x88001f000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 5, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x884057000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 6, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x88808f000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 7, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x89001f000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 8, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x894057000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 9, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x89808f000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 14, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x98001f000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 15, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x984057000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 16, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x98808f000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 17, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x99001f000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 18, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x994057000000UL, 0x39 * SZ_16M) },
-+	{ "CAVIUM", "THUNDERX", 2, 19, MCFG_BUS_ANY, &pci_thunder_pem_ops,
-+	  DEFINE_RES_MEM(0x99808f000000UL, 0x39 * SZ_16M) },
-+#endif
-+#ifdef CONFIG_PCI_HOST_THUNDER_ECAM
-+	/* SoC pass1.x */
-+	{ "CAVIUM", "THUNDERX", 2, 0, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-+	  MCFG_RES_EMPTY},
-+	{ "CAVIUM", "THUNDERX", 2, 1, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-+	  MCFG_RES_EMPTY},
-+	{ "CAVIUM", "THUNDERX", 2, 2, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-+	  MCFG_RES_EMPTY},
-+	{ "CAVIUM", "THUNDERX", 2, 3, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-+	  MCFG_RES_EMPTY},
-+	{ "CAVIUM", "THUNDERX", 2, 10, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-+	  MCFG_RES_EMPTY},
-+	{ "CAVIUM", "THUNDERX", 2, 11, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-+	  MCFG_RES_EMPTY},
-+	{ "CAVIUM", "THUNDERX", 2, 12, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-+	  MCFG_RES_EMPTY},
-+	{ "CAVIUM", "THUNDERX", 2, 13, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-+	  MCFG_RES_EMPTY},
- #endif
- };
- 
-diff --git a/drivers/pci/host/pci-thunder-ecam.c b/drivers/pci/host/pci-thunder-ecam.c
-index d50a3dc..b6c17e2 100644
---- a/drivers/pci/host/pci-thunder-ecam.c
-+++ b/drivers/pci/host/pci-thunder-ecam.c
-@@ -346,7 +346,7 @@ static int thunder_ecam_config_write(struct pci_bus *bus, unsigned int devfn,
- 	return pci_generic_config_write(bus, devfn, where, size, val);
- }
- 
--static struct pci_ecam_ops pci_thunder_ecam_ops = {
-+struct pci_ecam_ops pci_thunder_ecam_ops = {
- 	.bus_shift	= 20,
- 	.pci_ops	= {
- 		.map_bus        = pci_ecam_map_bus,
-diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
-index 65505ea..35f0e81 100644
---- a/include/linux/pci-ecam.h
-+++ b/include/linux/pci-ecam.h
-@@ -62,6 +62,9 @@ extern struct pci_ecam_ops pci_generic_ecam_ops;
- #ifdef CONFIG_PCI_HOST_THUNDER_PEM
- extern struct pci_ecam_ops pci_thunder_pem_ops;
- #endif
-+#ifdef CONFIG_PCI_HOST_THUNDER_ECAM
-+extern struct pci_ecam_ops pci_thunder_ecam_ops;
-+#endif
- 
- #ifdef CONFIG_PCI_HOST_GENERIC
- /* for DT-based PCI controllers that support ECAM */
--- 
-1.9.1
+	Arnd
