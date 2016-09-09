@@ -1,62 +1,58 @@
-From: radioconfusion@gmail.com (radioconfusion at gmail.com)
-Date: Fri, 09 Sep 2016 10:24:50 +0300
-Subject: [crypto] [marvell-cesa] Possible regression after Linux 4.7
-Message-ID: <57d263c4.d5002e0a.8975e.0df2@mx.google.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Fri,  9 Sep 2016 15:40:34 +0800
+Subject: [PATCH 4/6] arm64: dts: rockchip: add pd_sd power node for rk3399
+In-Reply-To: <1473406836-6720-1-git-send-email-zhangqing@rock-chips.com>
+References: <1473406836-6720-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1473406836-6720-5-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-Thu,  8 Sep 2016 16:52:16 +0200, Romain Perier wrote:
-> > Hello,
-> >
-> > I'm testing the marvell-cesa -driver on Armada 385 board and I think I've found
-> > a regression between Linux 4.7 and 4.8-rc4.
-> > I want to accelerate my curl connections. So I compiled the 4.8-rc4 with
-> > marvell-cesa enabled and HEAD revision of cryptodev-linux.
-> >
-> > Here is my output:
-> >
-> > ~# uname -r
-> > 4.8.0-rc4
-> > ~# modprobe cryptodev
-> > ~# modprobe marvell-cesa
-> > ~# curl -k --ciphers AES256-SHA256 https://myserver/myfile >/dev/null
-> >    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-> >                                   Dload  Upload   Total   Spent    Left  Speed
-> >   19  200M   19 39.7M    0     0  16.2M      0  0:00:12  0:00:02  0:00:10 16.2M
-> > curl: (56) SSL read: error:1408F119:SSL routines:SSL3_GET_RECORD:decryption
-> > failed or bad record mac, errno 0
-> >
---- snip ---
->
-> Thank you for your feedbacks.
-> I can reproduce the issue with and without multiple engines.
+1.add pd node for RK3399 Soc
+2.create power domain tree
+3.add qos node for domain
+4.add the pd_sd consumers node
 
-Thank you for your testing. Do you mean that you can reproduce it with
-Linux 4.7 too?
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-> However, I have found an interesting thing, If I use only --ciphers
-> AES256, it works perfectly fine, could you confirm this ?
-
-Yes, I can confirm. And I have found the reason too.
-Most of available ciphers will not be accelerated at all.
-Only these ones I have verified to be accelerated by cesa:
-AES256-SHA256
-AES256-SHA
-AES128-SHA256
-AES128-SHA
-
-When cesa is working, I can see "irq/42-f1090000" on process list of top(1) and
-curl doesn't take all of available cpu.
-
-It's not easy to detect acceleration by performance because I tested with
-Linux 4.7 and older cryptodev (1.8 release) and I got average curl throughput
-~22 MiB/s with AES256-SHA256 + cesa. Without cesa I got ~20 MiB/s average with
-same configuration.
-
-> In any case, I will investigate.
-
-Thank you very much.
-
-Best Regards,
-Jussi
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 52eeb007fddf..e2ecad651cac 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -253,6 +253,7 @@
+ 			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
+ 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+ 		fifo-depth = <0x100>;
++		power-domains = <&power RK3399_PD_SD>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -718,6 +719,10 @@
+ 		compatible = "syscon";
+ 		reg = <0x0 0xffa60180 0x0 0x20>;
+ 	};
++	qos_sd: qos at ffa74000 {
++		compatible = "syscon";
++		reg = <0x0 0xffa74000 0x0 0x20>;
++	};
+ 
+ 	qos_hdcp: qos at ffa90000 {
+ 		compatible = "syscon";
+@@ -875,6 +880,13 @@
+ 					 <&qos_pcie>,
+ 					 <&qos_usb_host0>,
+ 					 <&qos_usb_host1>;
++
++				pd_sd at RK3399_PD_SD {
++					reg = <RK3399_PD_SD>;
++					clocks = <&cru HCLK_SDMMC>,
++						 <&cru SCLK_SDMMC>;
++					pm_qos = <&qos_sd>;
++				};
+ 			};
+ 			pd_vio at RK3399_PD_VIO {
+ 				reg = <RK3399_PD_VIO>;
+-- 
+1.9.1
