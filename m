@@ -1,63 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 9 Sep 2016 08:06:44 +0100
-Subject: [PATCH v4 3/4] arm64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <57D246AE.8040900@huawei.com>
-References: <1467877572-10817-1-git-send-email-oss@buserror.net>
- <1467877572-10817-3-git-send-email-oss@buserror.net>
- <20160826134004.7e86e798@arm.com> <57D246AE.8040900@huawei.com>
-Message-ID: <20160909080644.5fbc2f68@why.wild-wind.fr.eu.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 09 Sep 2016 09:06:59 +0200
+Subject: [PATCH 4/4] ARM: dts: add RealView EB rev D A9 MPCore variant
+In-Reply-To: <1473371209-24086-4-git-send-email-linus.walleij@linaro.org>
+References: <1473371209-24086-1-git-send-email-linus.walleij@linaro.org>
+ <1473371209-24086-4-git-send-email-linus.walleij@linaro.org>
+Message-ID: <6789480.EASISD7LWe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Sep 2016 13:20:46 +0800
-Ding Tianhong <dingtianhong@huawei.com> wrote:
-
-Hi Ding,
-
-> > I'm still worried that this series doesn't address Xen or KVM guests
-> > that need to be made aware of the broken timers.
-> >   
-> Hi Marc:
+On Thursday, September 8, 2016 11:46:49 PM CEST Linus Walleij wrote:
+> The Cortex A9 MPCore tile can be mounted on top of the revision
+> D variant of the RealView EB, so create another variant of the
+> DTS file for this.
 > 
-> I think "ARCH_TIMER_REG_READ("cntv_tval_el0", arch_timer_get_vtval)"
-> could cover the tval changes in KVM guest, and I fould the guest
-> still use the get_cycles() to get the timer cycles, if I miss
-> something, please remind me, thanks.
-
-You're missing the point that to tell the guest that the HW has this
-erratum, we need the DT to be populated with the right property.
-
-> > At the very least, I'd like a kernel command line option that'd let
-> > the user reliably run its VMs. You can do something along the lines
-> > of 46fd5c6b, and have a command line argument like
-> > "clocksource.arm_arch_timer.fsl-a008585=1", which would enable the
-> > workaround.
-> >   
+> arm-realview-eb-a9mp = mounted on pre-revision D baseboard
+> arm-realview-eb-a9mp-bbrevd = mounted on the revision D baseboard
 > 
-> I don't think adding in command line is a good solution for this bug,
-> we should not told the OS user how to fix it by adding command line
-> option, and need to fix it by dts or ACPI.
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/boot/dts/Makefile                        |  1 +
+>  arch/arm/boot/dts/arm-realview-eb-a9mp-bbrevd.dts | 28 +++++++++++++++++++++++
+>  2 files changed, 29 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/arm-realview-eb-a9mp-bbrevd.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 2ec6f6236165..0f911bdc4282 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -614,6 +614,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
+>         arm-realview-eb-11mp-ctrevb.dtb \
+>         arm-realview-eb-11mp-bbrevd-ctrevb.dtb \
+>         arm-realview-eb-a9mp.dtb \
+> +       arm-realview-eb-a9mp-bbrevd.dtb \
+>         arm-realview-pba8.dtb \
+>         arm-realview-pbx-a9.dtb
 
-Sure. I'm happy to review the patches that will:
-- Add a new KVM kernel API describing properties for the timer so that
-  we can expose the erratum from the kernel to userspace
-- Add a similar API for Xen
-- Have all the userspace (QEMU, kvmtool, the Xen tools) to be converted
-  to use this new API so that they can emit the correct DT
-- Point to a change in the ACPI spec so that we can encode errata there
-- Add support for handling this erratum using ACPI in the kernel
-- Allow QEMU and the Xen tools to expose this erratum in the guests
-  ACPI tables
+All four patches look good to me. I wish we could come up with
+a better naming scheme, but your approach is better than anything
+I could think of already.
 
-Unless you're in a position to write all this code (and
-specifications), and post the patches *now*, I'll stand by my
-recommendation to have a command-line option. Not exposing this issue
-to the guest results in unreliable operations. You may not care, but I
-do.
-
-Thanks,
-
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+	Arnd
