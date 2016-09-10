@@ -1,367 +1,176 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Sun, 11 Sep 2016 01:47:03 +0800
-Subject: [PATCH v1 2/2] arm64: dts: rockchip: Add PX5 Evaluation board
-In-Reply-To: <1473529249-6151-1-git-send-email-andy.yan@rock-chips.com>
-References: <1473529249-6151-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1473529623-6268-1-git-send-email-andy.yan@rock-chips.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 10 Sep 2016 20:12:32 +0200
+Subject: [linux-sunxi] Re: [RFC] misc: Add Allwinner Q8 tablet hardware
+ manager
+In-Reply-To: <CAL_JsqLGS23JQxtdtUqNhkhDiV4mnKSBpMjdo4fx0=wuq_ydeg@mail.gmail.com>
+References: <20160901190820.21987-1-hdegoede@redhat.com>
+ <20160901190820.21987-2-hdegoede@redhat.com>
+ <CAL_JsqLGS23JQxtdtUqNhkhDiV4mnKSBpMjdo4fx0=wuq_ydeg@mail.gmail.com>
+Message-ID: <268244d0-55c3-167d-a70f-0e35e6b3dae6@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PX5 EVB is designed by Rockchip for automotive field,
-which intergrated with CVBS(TP2825)/MIPI DSI/CSI/LVDS
-HDMI video input/output interface, audio codec ES8396,
-WIFI/BT(on RTL8723BS), Gsensor BMA250E and light&proximity
-sensor STK3410.
+Hi,
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
----
+On 09-09-16 23:41, Rob Herring wrote:
+> On Thu, Sep 1, 2016 at 2:08 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets
+>> of which a new batch is produced every few weeks. Each batch uses a
+>> different mix of touchscreen, accelerometer and wifi peripherals.
+>>
+>> Given that each batch is different creating a devicetree for each variant
+>> is not desirable. This commit adds a Q8 tablet hardware manager which
+>> auto-detects the touchscreen and accelerometer so that a single generic
+>> dts can be used for these tablets.
+>>
+>> The wifi is connected to a discoverable bus (sdio or usb) and will be
+>> autodetected by the mmc resp. usb subsystems.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  .../misc/allwinner,sunxi-q8-hardwaremgr.txt        |  52 +++
+>>  drivers/misc/Kconfig                               |  12 +
+>>  drivers/misc/Makefile                              |   1 +
+>>  drivers/misc/q8-hardwaremgr.c                      | 512 +++++++++++++++++++++
+>>  4 files changed, 577 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
+>>  create mode 100644 drivers/misc/q8-hardwaremgr.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt b/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
+>> new file mode 100644
+>> index 0000000..f428bf5
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
+>> @@ -0,0 +1,52 @@
+>> +Q8 tablet hardware manager
+>> +--------------------------
+>> +
+>> +Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets of
+>> +which a new batch is produced every few weeks. Each batch uses a different
+>> +mix of touchscreen, accelerometer and wifi peripherals.
+>> +
+>> +Given that each batch is different creating a devicetree for each variant is
+>> +not desirable. The Q8 tablet hardware manager bindings are bindings for an os
+>> +module which auto-detects the touchscreen so that a single
+>> +generic dts can be used for these tablets.
+>> +
+>> +The wifi is connected to a discoverable bus and will be autodetected by the os.
+>> +
+>> +Required properties:
+>> + - compatible         : "allwinner,sunxi-q8-hardwaremgr"
+>> + - touchscreen        : phandle of a template touchscreen node, this must be a
+>> +                       child node of the touchscreen i2c bus
+>> +
+>> +Optional properties:
+>> + - touchscreen-supply : regulator phandle for the touchscreen vdd supply
+>
+> While I said I think you should be using overlays here, you could also
+> do it without.
 
-Changes in v1:
-- board rename
-- add vendor prefix for i2c interfaced devices
+Good, because I believe that doing things without overlays will
+be much easier. If you look at the actual implementation you will
+see that it sets a lot of properties (touchscreen width, height,
+inversion, axis-swapping, firmware-name) based on various sources,
+the explosion of possible overlays from this is huge, and if
+we're going to runtime patch the overlays then why use them at all
+and not just runtime generate all the info ?
 
- Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- arch/arm64/boot/dts/rockchip/Makefile              |   1 +
- arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts    | 304 +++++++++++++++++++++
- 3 files changed, 309 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
+> However, this node has to go. It is not h/w, and you
+> are putting it here purely to instantiate a driver.
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 6da3881..b6f92d6 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -107,6 +107,10 @@ Rockchip platforms device tree bindings
-     Required root node properties:
-       - compatible = "rockchip,r88", "rockchip,rk3368";
- 
-+- Rockchip PX5 Evaluation board:
-+    Required root node properties:
-+      - compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
-+
- - Rockchip RK3228 Evaluation board:
-     Required root node properties:
-      - compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index 7037a16..86c74b2 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -1,6 +1,7 @@
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts b/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
-new file mode 100644
-index 0000000..be0e915
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
-@@ -0,0 +1,304 @@
-+/*
-+ * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "rk3368.dtsi"
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "Rockchip PX5 EVB";
-+	compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
-+
-+	chosen {
-+		stdout-path = "serial4:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+
-+	keys: gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwr_key>;
-+
-+		power {
-+			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
-+			label = "GPIO Power";
-+			linux,code = <KEY_POWER>;
-+			wakeup-source;
-+		};
-+	};
-+
-+	vcc_sys: vcc-sys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+};
-+
-+&emmc {
-+	status = "okay";
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	clock-frequency = <150000000>;
-+	disable-wp;
-+	keep-power-in-suspend;
-+	non-removable;
-+	num-slots = <1>;
-+	vmmc-supply = <&vcc_io>;
-+	vqmmc-supply = <&vcc18_flash>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_bus8>;
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	rk808: pmic at 1b {
-+		compatible = "rockchip,rk808";
-+		reg = <0x1b>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int>, <&pmic_sleep>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
-+		rockchip,system-power-controller;
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc6-supply = <&vcc_sys>;
-+		vcc7-supply = <&vcc_sys>;
-+		vcc8-supply = <&vcc_io>;
-+		vcc9-supply = <&vcc_sys>;
-+		vcc10-supply = <&vcc_sys>;
-+		vcc11-supply = <&vcc_sys>;
-+		vcc12-supply = <&vcc_io>;
-+		clock-output-names = "xin32k", "rk808-clkout2";
-+		#clock-cells = <1>;
-+
-+		regulators {
-+			vdd_cpu: DCDC_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-name = "vdd_cpu";
-+			};
-+
-+			vdd_log: DCDC_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-name = "vdd_log";
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_ddr";
-+			};
-+
-+			vcc_io: DCDC_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc_io";
-+			};
-+
-+			vcc18_flash: LDO_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_flash";
-+			};
-+
-+			vcca_33: LDO_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcca_33";
-+			};
-+
-+			vdd_10: LDO_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd_10";
-+			};
-+
-+			avdd_33: LDO_REG4 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "avdd_33";
-+			};
-+
-+			vccio_sd: LDO_REG5 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vccio_sd";
-+			};
-+
-+			vdd10_lcd: LDO_REG6 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd10_lcd";
-+			};
-+
-+			vcc_18: LDO_REG7 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc_18";
-+			};
-+
-+			vcc18_lcd: LDO_REG8 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_lcd";
-+			};
-+
-+			vcc_sd: SWITCH_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_sd";
-+			};
-+
-+			vcc33_lcd: SWITCH_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc33_lcd";
-+			};
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+
-+	/* Accelerometer */
-+	bma250 at 18 {
-+		compatible = "bosch,bma250";
-+		reg = <0x18>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+
-+	stk3410 at 48 {
-+		compatible = "sensortek,STK3310";
-+		reg = <0x48>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+
-+	gsl1680: touchscreen at 40 {
-+		compatible = "silead,gsl1680";
-+		reg = <0x40>;
-+		interrupt-parent = <&gpio3>;
-+		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
-+		power-gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
-+		touchscreen-size-x = <800>;
-+		touchscreen-size-y = <1280>;
-+		silead,max-fingers = <5>;
-+	};
-+};
-+
-+&pinctrl {
-+
-+	keys {
-+		pwr_key: pwr-key {
-+			rockchip,pins = <0 2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	pmic {
-+		pmic_sleep: pmic-sleep {
-+			rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
-+		};
-+
-+		pmic_int: pmic-int {
-+			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+};
-+
-+&tsadc {
-+	status = "okay";
-+	rockchip,hw-tshut-mode = <0>; /* CRU */
-+	rockchip,hw-tshut-polarity = <1>; /* high */
-+};
-+
-+&uart4 {
-+	status = "okay";
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
--- 
-2.7.4
+With "this" in "this node has to go", do you mean the node
+with the "allwinner,sunxi-q8-hardwaremgr" compatible, or
+do you mean the touchscreen template node ?
+
+> For the
+> touchscreen property, surely you know where the touchscreen is located
+> in the DT?
+
+Nope q8 tablets come with A13, A23 or A33 SoCs, A23/A33 are pin
+compatible with each other, but the A13 is not, this leads to
+the touchscreen being on a different i2c bus, so I cannot hardcode
+things, likewise the power-gpios and interrupt found in the
+touchscreen node differ between the A13 vs A23/A33.
+
+I actually had a touchscreen-i2c-bus property containing a
+phandle to the i2c controller for the bus which has the
+touchscreen in an earlier revision + touchscreen-gpios
+and touchscreen-supply properties, I can switch to that
+if you prefer that over having a touchscreen template node.
+
+ > If not, of_find_node_by_name()?
+
+Still a bit confused about what you do not like,
+(touchscreen template node vs q8-hardwaremgr node).
+
+I guess (based on context) you do not want the
+q8-hardwaremgr node ?
+
+So the q8-hardwaremgr code should activate based on
+the machine compatible I presume? How does that
+work with module autoloading ?
+
+If you do not want the q8-hardwaremgr node and thus
+no touchscreen property them yes I can use
+of_find_node_by_name(), but I thought that was
+generally frowned up on?
+
+> For touchscreen-supply, I
+> assume this is to turn on the supply so you can talk to the touch
+> controller. There's no reason the supply can't just be in the
+> touchscreen node itself.
+
+Only a few q8 tablets actually use the regulator, so
+the hardwaremgr first tries detecting the touchscreen
+without it, and only if it does not find anything then
+tries with it, and adds a property to the touchscreen
+node for it, but I guess I can do this other way
+around and have it be present in the (incomplete /
+template) touchscreen node and delete it from it if
+not necessary.
+
+That + using of_find_node_by_name() should indeed allow
+me to remove the q8-hardwaremgr node. Assuming there is
+an answer to the module auto loading, as I expect most
+distros to build this as a module.
+
+Regards,
+
+Hans
+
+
+
+
+
+>
+>> +
+>> +touschreen node required properties:
+>> + - interrupt-parent   : phandle pointing to the interrupt controller
+>> +                       serving the touchscreen interrupt
+>> + - interrupts         : interrupt specification for the touchscreen interrupt
+>> + - power-gpios        : Specification for the pin connected to the touchscreen's
+>> +                       enable / wake pin. This needs to be driven high to
+>> +                       enable the touchscreen controller
+>> +
+>> +Example:
+>> +
+>> +/ {
+>> +       hwmgr {
+>> +               compatible = "allwinner,sunxi-q8-hardwaremgr";
+>> +               touchscreen = <&touchscreen>;
+>> +               touchscreen-supply = <&reg_ldo_io1>;
+>> +       };
+>> +};
+>> +
+>> +&i2c0 {
+>> +       touchscreen: touchscreen at 0 {
+>> +               interrupt-parent = <&pio>;
+>> +               interrupts = <1 5 IRQ_TYPE_EDGE_FALLING>; /* PB5 */
+>> +               power-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+>> +               /*
+>> +                * Enabled by sunxi-q8-hardwaremgr if it detects a
+>> +                * known model touchscreen.
+>> +                */
+>> +               status = "disabled";
+>> +       };
+>> +};
