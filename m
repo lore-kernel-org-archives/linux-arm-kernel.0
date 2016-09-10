@@ -1,68 +1,126 @@
-From: sramana@codeaurora.org (Srinivas Ramana)
-Date: Sat, 10 Sep 2016 11:20:05 +0530
-Subject: Improper TTBCR for arm 32bit kernel decompression
-In-Reply-To: <alpine.LFD.2.20.1609091334120.14769@knanqh.ubzr>
-References: <57D2E47D.5030105@codeaurora.org>
- <alpine.LFD.2.20.1609091334120.14769@knanqh.ubzr>
-Message-ID: <57D39F0D.8070803@codeaurora.org>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Sat, 10 Sep 2016 11:40:45 +0530
+Subject: [PATCH] ARM: dts: Add support for more than 2GB of memory for
+ omap5
+In-Reply-To: <20160909210530.19839-1-tony@atomide.com>
+References: <20160909210530.19839-1-tony@atomide.com>
+Message-ID: <67d158dd-4c08-42cc-0fe0-fc198d792e5e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2016 11:06 PM, Nicolas Pitre wrote:
-> On Fri, 9 Sep 2016, Srinivas Ramana wrote:
->
->> Hello,
->>
->> While trying to boot arm-32 bit kernel, I came across a problem where TTBCR is
->> in improper state. If the bootloader uses the long descriptor format and jumps
->> to kernel decompressor code, TTBCR may not be in the right state. So, as soon
->> as the MMU is enabled, execution can not proceed further.
->>
->> Before enabling the MMU, it is required to clear the TTBCR.PD0 field to use
->> TTBR0 for translation table walks. Also, TTBCR.N should be reset to '0' to
->> indicate the correct base address width. The 'commit dbece45894d3a ("ARM:
->> 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores")' does the reset of
->> TTBCR.N, but doesn't consider all the bits for the size of TTBCR.N.
->>
->> when i tried the below change where i explicitly clear TTBCR.PD0 and use
->> correct mask for TTBCR.N, I see proper memory after MMU is enabled and
->> decompression succeeds.
->>
->> Request your comments on the change below. If it looks good, I can submit a
->> patch for inclusion.
->>
->> ---------------------8<----------------------------------
->> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
->> index af11c2f..5769f1f 100644
->> --- a/arch/arm/boot/compressed/head.S
->> +++ b/arch/arm/boot/compressed/head.S
->> @@ -779,7 +779,8 @@ __armv7_mmu_cache_on:
->>                  orrne   r0, r0, #1              @ MMU enabled
->>                  movne   r1, #0xfffffffd         @ domain 0 = client
->>                  bic     r6, r6, #1 << 31        @ 32-bit translation system
->> -               bic     r6, r6, #3 << 0         @ use only ttbr0
->> +               bic     r6, r6, #7 << 0         @ width of base address field
->> +               bic     r6, r6, #1 << 4         @ use only ttbr0
->
-> You could combine those instructions like this:
->
-> 		bic	r6, r6, #(7 << 0) | (1 << 4) @ use only ttbr0
-Sure, Thanks for the suggestion. I can incorporate this and submit a 
-patch. Can i use your Acked-by?
-
-Thanks,
--- Srinivas R
-
->
-> Nicolas
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
 
 
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
-Inc., is a member of Code Aurora Forum, a Linux Foundation Collaborative 
-Project.
+On Saturday 10 September 2016 02:35 AM, Tony Lindgren wrote:
+> Some omap5 variants have more than 2GB of memory available as
+> optional models. Let's update the dts files to use two address
+> cells similar to what dra7 is using with commit dae320ec3173
+> ("ARM: dts: DRA7: change address-cells and size-cells").
+
+Acked-by: Lokesh Vutla <lokeshvutla@ti.com>
+
+Thanks and regards,
+Lokesh
+
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/boot/dts/omap5-cm-t54.dts   |  2 +-
+>  arch/arm/boot/dts/omap5-igep0050.dts |  2 +-
+>  arch/arm/boot/dts/omap5-uevm.dts     |  2 +-
+>  arch/arm/boot/dts/omap5.dtsi         | 22 +++++++++++-----------
+>  4 files changed, 14 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap5-cm-t54.dts b/arch/arm/boot/dts/omap5-cm-t54.dts
+> index c9390fa..b153f60 100644
+> --- a/arch/arm/boot/dts/omap5-cm-t54.dts
+> +++ b/arch/arm/boot/dts/omap5-cm-t54.dts
+> @@ -13,7 +13,7 @@
+>  
+>  	memory at 80000000 {
+>  		device_type = "memory";
+> -		reg = <0x80000000 0x7F000000>; /* 2048 MB */
+> +		reg = <0 0x80000000 0 0x7f000000>; /* 2048 MB */
+>  	};
+>  
+>  	aliases {
+> diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
+> index f24b449..078dd53 100644
+> --- a/arch/arm/boot/dts/omap5-igep0050.dts
+> +++ b/arch/arm/boot/dts/omap5-igep0050.dts
+> @@ -16,7 +16,7 @@
+>  
+>  	memory at 80000000 {
+>  		device_type = "memory";
+> -		reg = <0x80000000 0x7f000000>; /* 2032 MB */
+> +		reg = <0x0 0x80000000 0 0x7f000000>;	/* 2032 MB */
+>  	};
+>  
+>  	gpio_keys {
+> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+> index 1770447..c3c23e4 100644
+> --- a/arch/arm/boot/dts/omap5-uevm.dts
+> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+> @@ -15,7 +15,7 @@
+>  
+>  	memory at 80000000 {
+>  		device_type = "memory";
+> -		reg = <0x80000000 0x7F000000>; /* 2032 MB */
+> +		reg = <0 0x80000000 0 0x7f000000>; /* 2032 MB */
+>  	};
+>  };
+>  
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -12,8 +12,8 @@
+>  #include <dt-bindings/pinctrl/omap.h>
+>  
+>  / {
+> -	#address-cells = <1>;
+> -	#size-cells = <1>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+>  
+>  	compatible = "ti,omap5";
+>  	interrupt-parent = <&wakeupgen>;
+> @@ -90,10 +90,10 @@
+>  		compatible = "arm,cortex-a15-gic";
+>  		interrupt-controller;
+>  		#interrupt-cells = <3>;
+> -		reg = <0x48211000 0x1000>,
+> -		      <0x48212000 0x1000>,
+> -		      <0x48214000 0x2000>,
+> -		      <0x48216000 0x2000>;
+> +		reg = <0 0x48211000 0 0x1000>,
+> +		      <0 0x48212000 0 0x1000>,
+> +		      <0 0x48214000 0 0x2000>,
+> +		      <0 0x48216000 0 0x2000>;
+>  		interrupt-parent = <&gic>;
+>  	};
+>  
+> @@ -101,7 +101,7 @@
+>  		compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
+>  		interrupt-controller;
+>  		#interrupt-cells = <3>;
+> -		reg = <0x48281000 0x1000>;
+> +		reg = <0 0x48281000 0 0x1000>;
+>  		interrupt-parent = <&gic>;
+>  	};
+>  
+> @@ -129,11 +129,11 @@
+>  		compatible = "ti,omap5-l3-noc", "simple-bus";
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+> -		ranges;
+> +		ranges = <0 0 0 0xc0000000>;
+>  		ti,hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+> -		reg = <0x44000000 0x2000>,
+> -		      <0x44800000 0x3000>,
+> -		      <0x45000000 0x4000>;
+> +		reg = <0 0x44000000 0 0x2000>,
+> +		      <0 0x44800000 0 0x3000>,
+> +		      <0 0x45000000 0 0x4000>;
+>  		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
+>  			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+>  
+> 
