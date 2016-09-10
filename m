@@ -1,31 +1,30 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Sat, 10 Sep 2016 12:02:49 +0000
-Subject: [PATCH -next] meson: clk: Use builtin_platform_driver to simplify the
- code
-Message-ID: <1473508969-2776-1-git-send-email-weiyj.lk@gmail.com>
+Date: Sat, 10 Sep 2016 12:03:42 +0000
+Subject: [PATCH -next] hwrng: st - Fix missing clk_disable_unprepare() on
+ error in st_rng_probe()
+Message-ID: <1473509022-3478-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Yongjun <weiyongjun1@huawei.com>
 
-Use the builtin_platform_driver() macro to make the code simpler.
+Fix the missing clk_disable_unprepare() before return
+from st_rng_probe() in the error handling case.
 
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- drivers/clk/meson/meson8b.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ drivers/char/hw_random/st-rng.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-index e1d4aa1..aaa3e39 100644
---- a/drivers/clk/meson/meson8b.c
-+++ b/drivers/clk/meson/meson8b.c
-@@ -673,8 +673,4 @@ static struct platform_driver meson8b_driver = {
- 	},
- };
+diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
+index 7e8aa6b..938ec10 100644
+--- a/drivers/char/hw_random/st-rng.c
++++ b/drivers/char/hw_random/st-rng.c
+@@ -108,6 +108,7 @@ static int st_rng_probe(struct platform_device *pdev)
+ 	ret = hwrng_register(&ddata->ops);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to register HW RNG\n");
++		clk_disable_unprepare(clk);
+ 		return ret;
+ 	}
  
--static int __init meson8b_clkc_init(void)
--{
--	return platform_driver_register(&meson8b_driver);
--}
--device_initcall(meson8b_clkc_init);
-+builtin_platform_driver(meson8b_driver);
