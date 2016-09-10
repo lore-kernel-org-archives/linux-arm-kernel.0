@@ -1,9 +1,9 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Sat, 10 Sep 2016 11:07:32 +0800
-Subject: [PATCH] drm/rockchip: vop: support afbc format for rk3399 vop
+Date: Sat, 10 Sep 2016 11:10:37 +0800
+Subject: [PATCH 3/3 v1.1] drm/rockchip: vop: support afbc format for rk3399 vop
 In-Reply-To: <1473474544-16248-3-git-send-email-mark.yao@rock-chips.com>
 References: <1473474544-16248-3-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1473476852-25707-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1473477037-26407-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,6 +22,9 @@ it's useful to improve performance.
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
+changes in v1.1
+  correct some comment.
+
  drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  6 ++
  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 89 +++++++++++++++++++++++++++++
  drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 13 +++++
