@@ -1,234 +1,207 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Sat, 10 Sep 2016 10:29:04 +0800
-Subject: [PATCH 3/3] drm/rockchip: vop: support afdc for rk3399 vop
-In-Reply-To: <1473474544-16248-1-git-send-email-mark.yao@rock-chips.com>
-References: <1473474544-16248-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1473474544-16248-3-git-send-email-mark.yao@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 10 Sep 2016 10:33:22 +0800
+Subject: [PATCH v2 4/4] arm64: dts: add Pine64 support
+In-Reply-To: <20160909201029.24530-5-maxime.ripard@free-electrons.com>
+References: <20160909201029.24530-1-maxime.ripard@free-electrons.com>
+ <20160909201029.24530-5-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65JZ7gnOZ_LkkvGv5-bqXeK1E1O3eno85zYBSndNpN=Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rk3399 vop big can support one afbc decoder, the afbdc decoder
-can select which overlay window use it.
+Hi,
 
-afbdc window has some limit:
-  1, not support offset on source buffer.
-  2, if feed non-afbc buffer to afbc decoder, afbc decoder hardware
-     would die, we need take care of using it.
+On Sat, Sep 10, 2016 at 4:10 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> From: Andre Przywara <andre.przywara@arm.com>
+>
+> The Pine64 is a cost-efficient development board based on the
+> Allwinner A64 SoC.
+> There are three models: the basic version with Fast Ethernet and
+> 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
+> feature Gigabit Ethernet and additional connectors for touchscreens
+> and a camera. Or as my son put it: "Those are smaller and these are
+> missing." ;-)
+> The two Pine64+ models just differ in the amount of DRAM
+> (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
+> patches the DT accordingly we just need to provide one DT for the
+> Pine64+.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> [Maxime: Removed the common DTSI and include directly the pine64 DTS]
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm64/boot/dts/Makefile                       |  1 +
+>  arch/arm64/boot/dts/allwinner/Makefile             |  5 ++
+>  .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  | 50 ++++++++++++++++
+>  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 70 ++++++++++++++++++++++
+>  4 files changed, 126 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index 6e199c903676..ddcbf5a2c17e 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -1,4 +1,5 @@
+>  dts-dirs += al
+> +dts-dirs += allwinner
+>  dts-dirs += altera
+>  dts-dirs += amd
+>  dts-dirs += amlogic
+> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+> new file mode 100644
+> index 000000000000..1e29a5ae8282
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/Makefile
+> @@ -0,0 +1,5 @@
+> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+> +
+> +always         := $(dtb-y)
+> +subdir-y       := $(dts-dirs)
+> +clean-files    := *.dtb
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+> new file mode 100644
+> index 000000000000..790d14daaa6a
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+> @@ -0,0 +1,50 @@
+> +/*
+> + * Copyright (c) 2016 ARM Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "sun50i-a64-pine64.dts"
+> +
+> +/ {
+> +       model = "Pine64+";
+> +       compatible = "pine64,pine64-plus", "allwinner,sun50i-a64";
+> +
+> +       /* TODO: Camera, Ethernet PHY, touchscreen, etc. */
+> +};
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> new file mode 100644
+> index 000000000000..da9bca51f5a9
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> @@ -0,0 +1,70 @@
+> +/*
+> + * Copyright (c) 2016 ARM Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "sun50i-a64.dtsi"
+> +
+> +/ {
+> +       model = "Pine64";
+> +       compatible = "pine64,pine64", "allwinner,sun50i-a64";
+> +
+> +       aliases {
+> +               serial0 = &uart0;
+> +       };
+> +
+> +       chosen {
+> +               stdout-path = "serial0:115200n8";
+> +       };
+> +};
+> +
+> +&uart0 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart0_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&i2c1_pins>;
+> +       status = "okay";
 
-AFBC is a compressed format, means lower bandwidth consume,
-it's useful to improve performance.
+Schematics say this is missing an external pull-up. Has anyone tried it?
+Without a pull-up any access on the i2c bus should just block.
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  6 ++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 89 +++++++++++++++++++++++++++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h | 13 +++++
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c |  7 +++
- 4 files changed, 115 insertions(+)
+Also this is on the RPi-2 compatible header. There's also an UART and SPI
+that are standard for the RPi-2 header. We should consider enabling them
+as well.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index ea39329..1e07fd6 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-@@ -44,6 +44,12 @@ struct rockchip_crtc_funcs {
- 
- struct rockchip_crtc_state {
- 	struct drm_crtc_state base;
-+	int afbdc_win_format;
-+	int afbdc_win_width;
-+	int afbdc_win_height;
-+	int afbdc_win_ptr;
-+	int afbdc_win_id;
-+	int afbdc_en;
- 	int output_type;
- 	int output_mode;
- };
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 834456f..6918223 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -99,6 +99,7 @@ struct vop_win {
- 	struct drm_plane base;
- 	const struct vop_win_data *data;
- 	struct vop *vop;
-+	int id;
- 
- 	/* protected by dev->event_lock */
- 	bool enable;
-@@ -514,6 +515,7 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
- 		VOP_WIN_SET(vop, win, enable, 0);
- 		spin_unlock(&vop->reg_lock);
- 	}
-+	VOP_CTRL_SET(vop, afbdc_en, 0);
- 
- 	drm_crtc_vblank_off(crtc);
- 
-@@ -1007,9 +1009,81 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 	VOP_CTRL_SET(vop, standby, 0);
- }
- 
-+static int vop_afbdc_atomic_check(struct drm_crtc *crtc,
-+				  struct drm_crtc_state *crtc_state)
-+{
-+	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
-+	struct drm_atomic_state *state = crtc_state->state;
-+	struct drm_plane *plane;
-+	struct drm_plane_state *pstate;
-+	struct vop_plane_state *plane_state;
-+	struct vop_win *win;
-+	int afbdc_format;
-+	int i;
-+
-+	s->afbdc_en = 0;
-+
-+	for_each_plane_in_state(state, plane, pstate, i) {
-+		struct drm_framebuffer *fb = pstate->fb;
-+		struct drm_rect *src;
-+
-+		win = to_vop_win(plane);
-+		plane_state = to_vop_plane_state(pstate);
-+
-+		if (pstate->crtc != crtc || !fb)
-+			continue;
-+
-+		if (fb->modifier[0] != DRM_FORMAT_MOD_ARM_AFBC)
-+			continue;
-+
-+		switch (plane_state->format) {
-+		case VOP_FMT_ARGB8888:
-+			afbdc_format = AFBDC_FMT_U8U8U8U8;
-+			break;
-+		case VOP_FMT_RGB888:
-+			afbdc_format = AFBDC_FMT_U8U8U8;
-+			break;
-+		case VOP_FMT_RGB565:
-+			afbdc_format = AFBDC_FMT_RGB565;
-+			break;
-+		default:
-+			return -EINVAL;
-+		}
-+
-+		if (s->afbdc_en) {
-+			DRM_ERROR("vop only support one afbc layer\n");
-+			return -EINVAL;
-+		}
-+
-+		src = &pstate->src;
-+		if (src->x1 || src->y1 || fb->offsets[0]) {
-+			DRM_ERROR("win[%d] afbdc not support offset display\n",
-+				  win->id);
-+			DRM_ERROR("xpos=%d, ypos=%d, offset=%d\n",
-+				  src->x1, src->y1, fb->offsets[0]);
-+			return -EINVAL;
-+		}
-+		s->afbdc_win_format = afbdc_format;
-+		s->afbdc_win_width = pstate->fb->width - 1;
-+		s->afbdc_win_height = (drm_rect_height(src) >> 16) - 1;
-+		s->afbdc_win_id = win->id;
-+		s->afbdc_win_ptr = plane_state->yrgb_mst;
-+		s->afbdc_en = 1;
-+	}
-+
-+	return 0;
-+}
-+
-+static int vop_crtc_atomic_check(struct drm_crtc *crtc,
-+				 struct drm_crtc_state *crtc_state)
-+{
-+	return vop_afbdc_atomic_check(crtc, crtc_state);
-+}
-+
- static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
- 				  struct drm_crtc_state *old_crtc_state)
- {
-+	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc->state);
- 	struct vop *vop = to_vop(crtc);
- 
- 	if (WARN_ON(!vop->is_enabled))
-@@ -1017,6 +1091,19 @@ static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
- 
- 	spin_lock(&vop->reg_lock);
- 
-+	if (s->afbdc_en) {
-+		uint32_t pic_size;
-+
-+		VOP_CTRL_SET(vop, afbdc_format, s->afbdc_win_format | 1 << 4);
-+		VOP_CTRL_SET(vop, afbdc_hreg_block_split, 0);
-+		VOP_CTRL_SET(vop, afbdc_sel, s->afbdc_win_id);
-+		VOP_CTRL_SET(vop, afbdc_hdr_ptr, s->afbdc_win_ptr);
-+		pic_size = (s->afbdc_win_width & 0xffff);
-+		pic_size |= s->afbdc_win_height << 16;
-+		VOP_CTRL_SET(vop, afbdc_pic_size, pic_size);
-+	}
-+
-+	VOP_CTRL_SET(vop, afbdc_en, s->afbdc_en);
- 	vop_cfg_done(vop);
- 
- 	spin_unlock(&vop->reg_lock);
-@@ -1042,6 +1129,7 @@ static const struct drm_crtc_helper_funcs vop_crtc_helper_funcs = {
- 	.enable = vop_crtc_enable,
- 	.disable = vop_crtc_disable,
- 	.mode_fixup = vop_crtc_mode_fixup,
-+	.atomic_check = vop_crtc_atomic_check,
- 	.atomic_flush = vop_crtc_atomic_flush,
- 	.atomic_begin = vop_crtc_atomic_begin,
- };
-@@ -1413,6 +1501,7 @@ static void vop_win_init(struct vop *vop)
- 		struct vop_win *vop_win = &vop->win[i];
- 		const struct vop_win_data *win_data = &vop_data->win[i];
- 
-+		vop_win->id = i;
- 		vop_win->data = win_data;
- 		vop_win->vop = vop;
- 	}
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index ff4f52e..b9b120e 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -15,6 +15,10 @@
- #ifndef _ROCKCHIP_DRM_VOP_H
- #define _ROCKCHIP_DRM_VOP_H
- 
-+#define AFBDC_FMT_RGB565	0x0
-+#define AFBDC_FMT_U8U8U8U8	0x5
-+#define AFBDC_FMT_U8U8U8	0x4
-+
- enum vop_data_format {
- 	VOP_FMT_ARGB8888 = 0,
- 	VOP_FMT_RGB888,
-@@ -61,6 +65,15 @@ struct vop_ctrl {
- 	struct vop_reg hpost_st_end;
- 	struct vop_reg vpost_st_end;
- 
-+	/* AFBDC */
-+	struct vop_reg afbdc_en;
-+	struct vop_reg afbdc_sel;
-+	struct vop_reg afbdc_format;
-+	struct vop_reg afbdc_hreg_block_split;
-+	struct vop_reg afbdc_pic_size;
-+	struct vop_reg afbdc_hdr_ptr;
-+	struct vop_reg afbdc_rstn;
-+
- 	struct vop_reg cfg_done;
- };
- 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index f1a1688..a09437c 100644
---- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -300,6 +300,13 @@ static const struct vop_ctrl rk3399_ctrl_data = {
- 	.vact_st_end = VOP_REG(RK3399_DSP_VACT_ST_END, 0x1fff1fff, 0),
- 	.hpost_st_end = VOP_REG(RK3399_POST_DSP_HACT_INFO, 0x1fff1fff, 0),
- 	.vpost_st_end = VOP_REG(RK3399_POST_DSP_VACT_INFO, 0x1fff1fff, 0),
-+	.afbdc_rstn = VOP_REG(RK3399_AFBCD0_CTRL, 0x1, 3),
-+	.afbdc_en = VOP_REG(RK3399_AFBCD0_CTRL, 0x1, 0),
-+	.afbdc_sel = VOP_REG(RK3399_AFBCD0_CTRL, 0x3, 1),
-+	.afbdc_format = VOP_REG(RK3399_AFBCD0_CTRL, 0x1f, 16),
-+	.afbdc_hreg_block_split = VOP_REG(RK3399_AFBCD0_CTRL, 0x1, 21),
-+	.afbdc_hdr_ptr = VOP_REG(RK3399_AFBCD0_HDR_PTR, 0xffffffff, 0),
-+	.afbdc_pic_size = VOP_REG(RK3399_AFBCD0_PIC_SIZE, 0xffffffff, 0),
- 	.cfg_done = VOP_REG_MASK(RK3399_REG_CFG_DONE, 0x1, 0),
- };
- 
--- 
-1.9.1
+ChenYu
+
+> +};
+> --
+> 2.9.3
+>
