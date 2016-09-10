@@ -1,21 +1,42 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Sat, 10 Sep 2016 01:53:27 +0200
-Subject: [4.8.0-rc1] am335x-evm boot failure: n_tty_receive_buf_common:
- "Unable to handle kernel paging request.."
-In-Reply-To: <20160909234742.becrs3zb4ihc2mq6@atomide.com>
-References: <87ceb885-94a6-b9b3-60b3-2017198c4338@ti.com>
- <CAALWOA_=9fMG156H_XSZBjeckQUK-moDWoRE6_kr-8=Z_-KZuA@mail.gmail.com>
- <20160909234742.becrs3zb4ihc2mq6@atomide.com>
-Message-ID: <CAALWOA-e6SZEW67akn_EGnCPzfZbuw-wjwu-j1dfuucoCA5ecg@mail.gmail.com>
+From: oss@buserror.net (Scott Wood)
+Date: Fri,  9 Sep 2016 20:03:30 -0500
+Subject: [PATCH v5 2/5] arm64: dts: Add timer erratum property for LS2080A and
+ LS1043A
+In-Reply-To: <1473469413-11019-1-git-send-email-oss@buserror.net>
+References: <1473469413-11019-1-git-send-email-oss@buserror.net>
+Message-ID: <1473469413-11019-2-git-send-email-oss@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 September 2016 at 01:47, Tony Lindgren <tony@atomide.com> wrote:
-> Yeah. Just disable omap_l3_smx/noc driver and you should see
-> a proper stack trace. With the L3 driver we're seeing the trace
-> for L3 error interrupt.
+Signed-off-by: Scott Wood <oss@buserror.net>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 1 +
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
 
-Huh what, I see a proper stack trace in his post? I'm pretty sure
-omap_l3_noc doesn't even support am335x currently.
-
-Matthijs
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index e669fbd..952531d 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -123,6 +123,7 @@
+ 			     <1 14 0x1>, /* Physical Non-Secure PPI */
+ 			     <1 11 0x1>, /* Virtual PPI */
+ 			     <1 10 0x1>; /* Hypervisor PPI */
++		fsl,erratum-a008585;
+ 	};
+ 
+ 	pmu {
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 21023a3..9d3ac19 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -195,6 +195,7 @@
+ 			     <1 14 0x8>, /* Physical Non-Secure PPI, active-low */
+ 			     <1 11 0x8>, /* Virtual PPI, active-low */
+ 			     <1 10 0x8>; /* Hypervisor PPI, active-low */
++		fsl,erratum-a008585;
+ 	};
+ 
+ 	pmu {
+-- 
+2.7.4
