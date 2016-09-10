@@ -1,68 +1,66 @@
 From: andy.yan@rock-chips.com (Andy Yan)
-Date: Sun, 11 Sep 2016 01:44:00 +0800
-Subject: [PATCH v1 1/2] ARM: dts: add rockchip PX3 Evaluation board
+Date: Sun, 11 Sep 2016 01:47:03 +0800
+Subject: [PATCH v1 2/2] arm64: dts: rockchip: Add PX5 Evaluation board
 In-Reply-To: <1473529249-6151-1-git-send-email-andy.yan@rock-chips.com>
 References: <1473529249-6151-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1473529440-6202-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1473529623-6268-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PX3 EVB is designed by Rockchip for automotive field,
-which intergrated with CVBS(TP2825)/MIPI DSI/LVDS/HDMI
-video input/output interface, WIFI/BT/GPS(on a module
-named S500 which based on MT6620), Gsensor BMA250E and
-light&proximity sensor STK3410.
+PX5 EVB is designed by Rockchip for automotive field,
+which intergrated with CVBS(TP2825)/MIPI DSI/CSI/LVDS
+HDMI video input/output interface, audio codec ES8396,
+WIFI/BT(on RTL8723BS), Gsensor BMA250E and light&proximity
+sensor STK3410.
 
 Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-
 ---
 
 Changes in v1:
 - board rename
-- add vendor prefix for i2c interfaced sensors
-- use stdout-path to set the default console
+- add vendor prefix for i2c interfaced devices
 
  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk3188-px3-evb.dts               | 337 +++++++++++++++++++++
- 3 files changed, 342 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3188-px3-evb.dts
+ arch/arm64/boot/dts/rockchip/Makefile              |   1 +
+ arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts    | 304 +++++++++++++++++++++
+ 3 files changed, 309 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
 
 diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 6668645..6da3881 100644
+index 6da3881..b6f92d6 100644
 --- a/Documentation/devicetree/bindings/arm/rockchip.txt
 +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -21,6 +21,10 @@ Rockchip platforms device tree bindings
+@@ -107,6 +107,10 @@ Rockchip platforms device tree bindings
      Required root node properties:
-       - compatible = "radxa,rock", "rockchip,rk3188";
+       - compatible = "rockchip,r88", "rockchip,rk3368";
  
-+- Rockchip PX3 Evaluation board:
++- Rockchip PX5 Evaluation board:
 +    Required root node properties:
-+      - compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
++      - compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
 +
- - Radxa Rock2 Square board:
+ - Rockchip RK3228 Evaluation board:
      Required root node properties:
-       - compatible = "radxa,rock2-square", "rockchip,rk3288";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faacd52..88d27a2 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -620,6 +620,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3066a-marsboard.dtb \
- 	rk3066a-rayeager.dtb \
- 	rk3188-radxarock.dtb \
-+	rk3188-px3-evb.dtb \
- 	rk3228-evb.dtb \
- 	rk3229-evb.dtb \
- 	rk3288-evb-act8846.dtb \
-diff --git a/arch/arm/boot/dts/rk3188-px3-evb.dts b/arch/arm/boot/dts/rk3188-px3-evb.dts
+      - compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
+diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+index 7037a16..86c74b2 100644
+--- a/arch/arm64/boot/dts/rockchip/Makefile
++++ b/arch/arm64/boot/dts/rockchip/Makefile
+@@ -1,6 +1,7 @@
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
+ 
+ always		:= $(dtb-y)
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts b/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
 new file mode 100644
-index 0000000..f6bc738
+index 0000000..be0e915
 --- /dev/null
-+++ b/arch/arm/boot/dts/rk3188-px3-evb.dts
-@@ -0,0 +1,337 @@
++++ b/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
+@@ -0,0 +1,304 @@
 +/*
-+ * Copyright (c) 2016 Andy Yan <andy.yan@rock-chips.com>
++ * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
 + *
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
@@ -104,81 +102,71 @@ index 0000000..f6bc738
 + */
 +
 +/dts-v1/;
++#include "rk3368.dtsi"
 +#include <dt-bindings/input/input.h>
-+#include "rk3188.dtsi"
 +
 +/ {
-+	model = "Rockchip PX3-EVB";
-+	compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
++	model = "Rockchip PX5 EVB";
++	compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
 +
 +	chosen {
-+		stdout-path = "serial2:115200n8";
++		stdout-path = "serial4:115200n8";
 +	};
 +
-+	memory {
++	memory at 0 {
 +		device_type = "memory";
-+		reg = <0x60000000 0x80000000>;
++		reg = <0x0 0x0 0x0 0x80000000>;
 +	};
 +
-+	gpio-keys {
++	keys: gpio-keys {
 +		compatible = "gpio-keys";
-+		autorepeat;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwr_key>;
 +
 +		power {
-+			gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
++			label = "GPIO Power";
 +			linux,code = <KEY_POWER>;
-+			label = "GPIO Key Power";
-+			linux,input-type = <1>;
 +			wakeup-source;
-+			debounce-interval = <100>;
 +		};
 +	};
 +
-+	vcc_sys: vsys-regulator {
++	vcc_sys: vcc-sys-regulator {
 +		compatible = "regulator-fixed";
-+		regulator-name = "vsys";
++		regulator-name = "vcc_sys";
 +		regulator-min-microvolt = <5000000>;
 +		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
 +		regulator-boot-on;
 +	};
 +};
 +
-+&cpu0 {
-+	cpu0-supply = <&vdd_cpu>;
++&emmc {
++	status = "okay";
++	bus-width = <8>;
++	cap-mmc-highspeed;
++	clock-frequency = <150000000>;
++	disable-wp;
++	keep-power-in-suspend;
++	non-removable;
++	num-slots = <1>;
++	vmmc-supply = <&vcc_io>;
++	vqmmc-supply = <&vcc18_flash>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_bus8>;
 +};
 +
 +&i2c0 {
 +	status = "okay";
 +
-+	 /* Accelerometer */
-+	bma250 at 18 {
-+		compatible = "bosch,bma250";
-+		reg = <0x18>;
++	rk808: pmic at 1b {
++		compatible = "rockchip,rk808";
++		reg = <0x1b>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pmic_int>, <&pmic_sleep>;
 +		interrupt-parent = <&gpio0>;
-+		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+
-+	stk3410 at 48 {
-+		compatible = "sensortek,STK3310";
-+		reg = <0x48>;
-+		interrupt-parent = <&gpio1>;
 +		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+	rk808: pmic at 1c {
-+		compatible = "rockchip,rk818";
-+		reg = <0x1c>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
 +		rockchip,system-power-controller;
-+		wakeup-source;
-+		#clock-cells = <1>;
-+		clock-output-names = "xin32k", "rk808-clkout2";
-+
 +		vcc1-supply = <&vcc_sys>;
 +		vcc2-supply = <&vcc_sys>;
 +		vcc3-supply = <&vcc_sys>;
@@ -186,39 +174,34 @@ index 0000000..f6bc738
 +		vcc6-supply = <&vcc_sys>;
 +		vcc7-supply = <&vcc_sys>;
 +		vcc8-supply = <&vcc_io>;
-+		vcc9-supply = <&vcc_io>;
++		vcc9-supply = <&vcc_sys>;
++		vcc10-supply = <&vcc_sys>;
++		vcc11-supply = <&vcc_sys>;
++		vcc12-supply = <&vcc_io>;
++		clock-output-names = "xin32k", "rk808-clkout2";
++		#clock-cells = <1>;
 +
 +		regulators {
 +			vdd_cpu: DCDC_REG1 {
 +				regulator-always-on;
 +				regulator-boot-on;
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-name = "vdd_arm";
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-name = "vdd_cpu";
 +			};
 +
-+			vdd_gpu: DCDC_REG2 {
++			vdd_log: DCDC_REG2 {
 +				regulator-always-on;
 +				regulator-boot-on;
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1250000>;
-+				regulator-name = "vdd_gpu";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-name = "vdd_log";
 +			};
 +
 +			vcc_ddr: DCDC_REG3 {
 +				regulator-always-on;
 +				regulator-boot-on;
 +				regulator-name = "vcc_ddr";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
 +			};
 +
 +			vcc_io: DCDC_REG4 {
@@ -227,24 +210,22 @@ index 0000000..f6bc738
 +				regulator-min-microvolt = <3300000>;
 +				regulator-max-microvolt = <3300000>;
 +				regulator-name = "vcc_io";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
 +			};
 +
-+			vcc_cif: LDO_REG1 {
-+				 regulator-min-microvolt = <3300000>;
-+				 regulator-max-microvolt = <3300000>;
-+				 regulator-name = "vcc_cif";
++			vcc18_flash: LDO_REG1 {
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-name = "vcc18_flash";
 +			};
 +
-+			vcc_jetta33: LDO_REG2 {
++			vcca_33: LDO_REG2 {
 +				regulator-always-on;
 +				regulator-boot-on;
 +				regulator-min-microvolt = <3300000>;
 +				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc_jetta33";
++				regulator-name = "vcca_33";
 +			};
 +
 +			vdd_10: LDO_REG3 {
@@ -253,141 +234,125 @@ index 0000000..f6bc738
 +				regulator-min-microvolt = <1000000>;
 +				regulator-max-microvolt = <1000000>;
 +				regulator-name = "vdd_10";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
 +			};
 +
-+			lvds_12: LDO_REG4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "lvds_12";
-+			};
-+
-+			lvds_25: LDO_REG5 {
-+				regulator-min-microvolt = <1800000>;
++			avdd_33: LDO_REG4 {
++				regulator-min-microvolt = <3300000>;
 +				regulator-max-microvolt = <3300000>;
-+				regulator-name = "lvds_25";
++				regulator-name = "avdd_33";
 +			};
 +
-+			cif_18: LDO_REG6 {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "cif_18";
-+			};
-+
-+			vcc_sd: LDO_REG7 {
++			vccio_sd: LDO_REG5 {
 +				regulator-always-on;
 +				regulator-boot-on;
 +				regulator-min-microvolt = <1800000>;
 +				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc_sd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
++				regulator-name = "vccio_sd";
 +			};
 +
-+			wl_18: LDO_REG8 {
++			vdd10_lcd: LDO_REG6 {
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-name = "vdd10_lcd";
++			};
++
++			vcc_18: LDO_REG7 {
++				regulator-always-on;
++				regulator-boot-on;
 +				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "wl_18";
++				regulator-max-microvolt = <1800000>;
++				regulator-name = "vcc_18";
 +			};
 +
-+			lcd_33: SWITCH_REG1 {
-+				regulator-name = "lcd_33";
++			vcc18_lcd: LDO_REG8 {
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-name = "vcc18_lcd";
++			};
++
++			vcc_sd: SWITCH_REG1 {
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-name = "vcc_sd";
++			};
++
++			vcc33_lcd: SWITCH_REG2 {
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-name = "vcc33_lcd";
 +			};
 +		};
 +	};
++};
 +
++&i2c1 {
++	status = "okay";
++
++	/* Accelerometer */
++	bma250 at 18 {
++		compatible = "bosch,bma250";
++		reg = <0x18>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	stk3410 at 48 {
++		compatible = "sensortek,STK3310";
++		reg = <0x48>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
++	};
 +};
 +
 +&i2c2 {
++	status = "okay";
++
 +	gsl1680: touchscreen at 40 {
 +		compatible = "silead,gsl1680";
 +		reg = <0x40>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
-+		power-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
++		power-gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
 +		touchscreen-size-x = <800>;
 +		touchscreen-size-y = <1280>;
 +		silead,max-fingers = <5>;
 +	};
 +};
 +
-+&emmc {
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	disable-wp;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_rst>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	num-slots = <1>;
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
-+	vmmc-supply = <&vcc_sd>;
-+
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	disable-wp;
-+};
-+
-+&pwm1 {
-+	status = "okay";
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&pwm3 {
-+	status = "okay";
-+};
-+
 +&pinctrl {
-+	pcfg_output_low: pcfg-output-low {
-+		output-low;
-+	};
 +
-+	usb {
-+		host_vbus_drv: host-vbus-drv {
-+			rockchip,pins = <0 3 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+		otg_vbus_drv: otg-vbus-drv {
-+			rockchip,pins = <2 31 RK_FUNC_GPIO &pcfg_pull_none>;
++	keys {
++		pwr_key: pwr-key {
++			rockchip,pins = <0 2 RK_FUNC_GPIO &pcfg_pull_none>;
 +		};
 +	};
++
++	pmic {
++		pmic_sleep: pmic-sleep {
++			rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
++		};
++
++		pmic_int: pmic-int {
++			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
 +};
 +
-+&uart0 {
++&tsadc {
++	status = "okay";
++	rockchip,hw-tshut-mode = <0>; /* CRU */
++	rockchip,hw-tshut-polarity = <1>; /* high */
++};
++
++&uart4 {
 +	status = "okay";
 +};
 +
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
-+&usb_host {
++&usb_host0_ehci {
 +	status = "okay";
 +};
 +
