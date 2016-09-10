@@ -1,30 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 10 Sep 2016 06:10:04 -0700
-Subject: [4.8.0-rc1] am335x-evm boot failure: n_tty_receive_buf_common:
- "Unable to handle kernel paging request.."
-In-Reply-To: <CAALWOA-e6SZEW67akn_EGnCPzfZbuw-wjwu-j1dfuucoCA5ecg@mail.gmail.com>
-References: <87ceb885-94a6-b9b3-60b3-2017198c4338@ti.com>
- <CAALWOA_=9fMG156H_XSZBjeckQUK-moDWoRE6_kr-8=Z_-KZuA@mail.gmail.com>
- <20160909234742.becrs3zb4ihc2mq6@atomide.com>
- <CAALWOA-e6SZEW67akn_EGnCPzfZbuw-wjwu-j1dfuucoCA5ecg@mail.gmail.com>
-Message-ID: <20160910131002.6zyzybd6kcklt6yx@atomide.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Sat, 10 Sep 2016 15:54:11 +0200
+Subject: [PATCH -next] pwm: meson: Fix missing spin_lock_init()
+In-Reply-To: <1473489518-17981-1-git-send-email-weiyj.lk@gmail.com>
+References: <1473489518-17981-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <57D41083.3060109@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [160909 16:54]:
-> On 10 September 2016 at 01:47, Tony Lindgren <tony@atomide.com> wrote:
-> > Yeah. Just disable omap_l3_smx/noc driver and you should see
-> > a proper stack trace. With the L3 driver we're seeing the trace
-> > for L3 error interrupt.
+Le 10/09/2016 08:38, Wei Yongjun a ?crit :
+> From: Wei Yongjun <weiyongjun1@huawei.com>
 > 
-> Huh what, I see a proper stack trace in his post? I'm pretty sure
-> omap_l3_noc doesn't even support am335x currently.
+> The driver allocates the spinlock but not initialize it.
+> Use spin_lock_init() on it to initialize it correctly.
+> 
+> This is detected by Coccinelle semantic patch.
+> 
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
+>  drivers/pwm/pwm-meson.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/pwm/pwm-meson.c b/drivers/pwm/pwm-meson.c
+> index bfbbe7f..778d088 100644
+> --- a/drivers/pwm/pwm-meson.c
+> +++ b/drivers/pwm/pwm-meson.c
+> @@ -465,6 +465,7 @@ static int meson_pwm_probe(struct platform_device *pdev)
+>  	if (IS_ERR(meson->base))
+>  		return PTR_ERR(meson->base);
+>  
+> +	spin_lock_init(&meson->lock);
+>  	meson->chip.dev = &pdev->dev;
+>  	meson->chip.ops = &meson_pwm_ops;
+>  	meson->chip.base = -1;
+> 
 
-Oh OK sorry please ignore the post, I obviously did not look at
-the trace but assumed that was the case based on what I've seen.
+Thanks for the fix, but it was already posted earlier by Axel Lin <axel.lin@ingics.com>
 
-Yeah I don't think we have L3 interrupts working for am335x.
+Thierry will decide which one to merge.
 
-Regards,
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Tony
+Thanks,
+Neil
