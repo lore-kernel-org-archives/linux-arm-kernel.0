@@ -1,139 +1,79 @@
 From: oss@buserror.net (Scott Wood)
-Date: Fri,  9 Sep 2016 20:03:32 -0500
-Subject: [PATCH v5 4/5] arm/arm64: arch_timer: Use archdata to indicate vdso
- suitability
+Date: Fri,  9 Sep 2016 20:03:33 -0500
+Subject: [PATCH v5 5/5] arm64: arch_timer: Add command line parameter for
+ A-008585
 In-Reply-To: <1473469413-11019-1-git-send-email-oss@buserror.net>
 References: <1473469413-11019-1-git-send-email-oss@buserror.net>
-Message-ID: <1473469413-11019-4-git-send-email-oss@buserror.net>
+Message-ID: <1473469413-11019-5-git-send-email-oss@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of comparing the name to a magic string, use archdata to
-explicitly communicate whether the arch timer is suitable for
-direct vdso access.
+This allows KVM users to enable the workaround until a mechanism
+is implemented to automatically communicate this information.
 
 Signed-off-by: Scott Wood <oss@buserror.net>
-Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig                     |  1 +
- arch/arm/include/asm/clocksource.h   |  8 ++++++++
- arch/arm/kernel/vdso.c               |  2 +-
- arch/arm64/Kconfig                   |  1 +
- arch/arm64/include/asm/clocksource.h |  8 ++++++++
- arch/arm64/kernel/vdso.c             |  2 +-
- drivers/clocksource/arm_arch_timer.c | 11 +++--------
- 7 files changed, 23 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/include/asm/clocksource.h
- create mode 100644 arch/arm64/include/asm/clocksource.h
+ Documentation/kernel-parameters.txt  |  9 +++++++++
+ drivers/clocksource/arm_arch_timer.c | 20 +++++++++++++++++++-
+ 2 files changed, 28 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a9c4e48..b2113c2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1,6 +1,7 @@
- config ARM
- 	bool
- 	default y
-+	select ARCH_CLOCKSOURCE_DATA
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ELF_RANDOMIZE
-diff --git a/arch/arm/include/asm/clocksource.h b/arch/arm/include/asm/clocksource.h
-new file mode 100644
-index 0000000..0b350a7
---- /dev/null
-+++ b/arch/arm/include/asm/clocksource.h
-@@ -0,0 +1,8 @@
-+#ifndef _ASM_CLOCKSOURCE_H
-+#define _ASM_CLOCKSOURCE_H
-+
-+struct arch_clocksource_data {
-+	bool vdso_direct;	/* Usable for direct VDSO access? */
-+};
-+
-+#endif
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index 994e971..a0affd1 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -270,7 +270,7 @@ static bool tk_is_cntvct(const struct timekeeper *tk)
- 	if (!IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
- 		return false;
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index a4f4d69..25037de 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -698,6 +698,15 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			loops can be debugged more effectively on production
+ 			systems.
  
--	if (strcmp(tk->tkr_mono.clock->name, "arch_sys_counter") != 0)
-+	if (!tk->tkr_mono.clock->archdata.vdso_direct)
- 		return false;
- 
- 	return true;
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index bc3f00f..c19a574 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -4,6 +4,7 @@ config ARM64
- 	select ACPI_GENERIC_GSI if ACPI
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
- 	select ACPI_MCFG if ACPI
-+	select ARCH_CLOCKSOURCE_DATA
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-diff --git a/arch/arm64/include/asm/clocksource.h b/arch/arm64/include/asm/clocksource.h
-new file mode 100644
-index 0000000..0b350a7
---- /dev/null
-+++ b/arch/arm64/include/asm/clocksource.h
-@@ -0,0 +1,8 @@
-+#ifndef _ASM_CLOCKSOURCE_H
-+#define _ASM_CLOCKSOURCE_H
++	clocksource.arm_arch_timer.fsl-a008585=
++			[ARM64]
++			Format: <bool>
++			Enable/disable the workaround of Freescale/NXP
++			erratum A-008585.  This can be useful for KVM
++			guests, if the guest device tree doesn't show the
++			erratum.  If unspecified, the workaround is
++			enabled based on the device tree.
 +
-+struct arch_clocksource_data {
-+	bool vdso_direct;	/* Usable for direct VDSO access? */
-+};
-+
-+#endif
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 076312b..2fa7cf5 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -201,7 +201,7 @@ up_fail:
-  */
- void update_vsyscall(struct timekeeper *tk)
- {
--	u32 use_syscall = strcmp(tk->tkr_mono.clock->name, "arch_sys_counter");
-+	u32 use_syscall = !tk->tkr_mono.clock->archdata.vdso_direct;
- 
- 	++vdso_data->tb_seq_count;
- 	smp_wmb();
+ 	clearcpuid=BITNUM [X86]
+ 			Disable CPUID feature X for the kernel. See
+ 			arch/x86/include/asm/cpufeatures.h for the valid bit
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 2526543..36d4ee1 100644
+index 36d4ee1..e70e530 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -606,23 +606,18 @@ static void __init arch_counter_register(unsigned type)
- 		else
- 			arch_timer_read_counter = arch_counter_get_cntpct;
+@@ -98,6 +98,22 @@ early_param("clocksource.arm_arch_timer.evtstrm", early_evtstrm_cfg);
+ DEFINE_STATIC_KEY_FALSE(arch_timer_read_ool_enabled);
+ EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
  
-+		clocksource_counter.archdata.vdso_direct = true;
++static int fsl_a008585_enable = -1;
 +
- #ifdef CONFIG_FSL_ERRATUM_A008585
- 		/*
- 		 * Don't use the vdso fastpath if errata require using
- 		 * the out-of-line counter accessor.
- 		 */
- 		if (static_branch_unlikely(&arch_timer_read_ool_enabled))
--			clocksource_counter.name = "arch_sys_counter_ool";
-+			clocksource_counter.archdata.vdso_direct = false;
- #endif
- 	} else {
- 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
--
--		/* If the clocksource name is "arch_sys_counter" the
--		 * VDSO will attempt to read the CP15-based counter.
--		 * Ensure this does not happen when CP15-based
--		 * counter is not available.
--		 */
--		clocksource_counter.name = "arch_mem_counter";
- 	}
++static int __init early_fsl_a008585_cfg(char *buf)
++{
++	int ret;
++	bool val;
++
++	ret = strtobool(buf, &val);
++	if (ret)
++		return ret;
++
++	fsl_a008585_enable = val;
++	return 0;
++}
++early_param("clocksource.arm_arch_timer.fsl-a008585", early_fsl_a008585_cfg);
++
+ /*
+  * __always_inline is used to ensure that func() is not an actual function
+  * pointer, which would result in the register accesses potentially being too
+@@ -895,7 +911,9 @@ static int __init arch_timer_of_init(struct device_node *np)
+ 	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
  
- 	start_count = arch_timer_read_counter();
+ #ifdef CONFIG_FSL_ERRATUM_A008585
+-	if (of_property_read_bool(np, "fsl,erratum-a008585"))
++	if (fsl_a008585_enable < 0)
++		fsl_a008585_enable = of_property_read_bool(np, "fsl,erratum-a008585");
++	if (fsl_a008585_enable)
+ 		static_branch_enable(&arch_timer_read_ool_enabled);
+ #endif
+ 
 -- 
 2.7.4
