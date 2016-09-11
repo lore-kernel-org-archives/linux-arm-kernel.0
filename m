@@ -1,93 +1,74 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 11 Sep 2016 15:13:17 +0200
-Subject: [PATCH 1/6] gpio: constify gpio_chip structures
-In-Reply-To: <1473596082-32690-2-git-send-email-Julia.Lawall@lip6.fr>
-References: <1473596082-32690-1-git-send-email-Julia.Lawall@lip6.fr>
- <1473596082-32690-2-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <CAGhQ9VwrKZ0wzu=PAUkkpfsnZpYwvvya4kCAFwvV+J3WtSWBaA@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 11 Sep 2016 15:41:05 +0200
+Subject: [PATCH v2 0/6] usb/phy: Add Amlogic Meson8b and GXBB USB support
+In-Reply-To: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20160911134111.31141-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia,
+This series adds initial support for the DWC2 USB controllers and Meson
+specific USB PHYs found in Meson8b and GXBB SoCs, which means:
+- new DWC2 bindings and platform specific core configuration
+- a PHY driver supporting the USB2 PHY on Meson8b and GXBB SoCs
 
-On 11 September 2016 at 14:14, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
-> These structures are only used to copy into other structures, so declare
-> them as const.
->
-> The semantic patch that makes this change is as follows:
-> (http://coccinelle.lip6.fr/)
->
-> // <smpl>
-> @r disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct gpio_chip i at p = { ... };
->
-> @ok@
-> identifier r.i;
-> expression e;
-> position p;
-> @@
-> e = i at p;
->
-> @bad@
-> position p != {r.p,ok.p};
-> identifier r.i;
-> struct gpio_chip e;
-> @@
-> e at i@p
->
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->  struct gpio_chip i = { ... };
-> // </smpl>
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
->
-> ---
->  drivers/gpio/gpio-arizona.c  |    2 +-
->  drivers/gpio/gpio-bcm-kona.c |    2 +-
->  drivers/gpio/gpio-da9052.c   |    2 +-
->  drivers/gpio/gpio-da9055.c   |    2 +-
->  drivers/gpio/gpio-it87.c     |    2 +-
->  drivers/gpio/gpio-lp873x.c   |    2 +-
->  drivers/gpio/gpio-lpc18xx.c  |    2 +-
->  drivers/gpio/gpio-pisosr.c   |    2 +-
->  drivers/gpio/gpio-sch.c      |    2 +-
->  drivers/gpio/gpio-stmpe.c    |    2 +-
->  drivers/gpio/gpio-tc3589x.c  |    2 +-
->  drivers/gpio/gpio-tpic2810.c |    2 +-
->  drivers/gpio/gpio-tps65086.c |    2 +-
->  drivers/gpio/gpio-tps65218.c |    2 +-
->  drivers/gpio/gpio-tps65912.c |    2 +-
->  drivers/gpio/gpio-ts4900.c   |    2 +-
->  drivers/gpio/gpio-twl4030.c  |    2 +-
->  drivers/gpio/gpio-wm831x.c   |    2 +-
->  drivers/gpio/gpio-wm8350.c   |    2 +-
->  drivers/gpio/gpio-wm8994.c   |    2 +-
->  20 files changed, 20 insertions(+), 20 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-lpc18xx.c b/drivers/gpio/gpio-lpc18xx.c
-> index 98832c9..f12e02e 100644
-> --- a/drivers/gpio/gpio-lpc18xx.c
-> +++ b/drivers/gpio/gpio-lpc18xx.c
-> @@ -78,7 +78,7 @@ static int lpc18xx_gpio_direction_output(struct gpio_chip *chip,
->         return lpc18xx_gpio_direction(chip, offset, true);
->  }
->
-> -static struct gpio_chip lpc18xx_chip = {
-> +static const struct gpio_chip lpc18xx_chip = {
->         .label                  = "lpc18xx/43xx-gpio",
->         .request                = gpiochip_generic_request,
->         .free                   = gpiochip_generic_free,
+The first DWC2 controller is usually configured in OTG mode, whereas
+the second DWC2 controller is usually configured in host(-only) mode.
 
-For lpc18xx:
-Acked-by: Joachim Eastwood <manabian@gmail.com>
+Unfortunately no (public) datasheet is available and the reference PHY
+driver does not contain comments or speaking register name definitions.
+The nice people from BayLibre have already requested the datasheets
+(currently we can for example only guess that there is a mux clock
+inside the PHY, but we don't know it's parents).
+
+With this series both DWC2 controllers are configure in host mode,
+because the reference driver polls some of the PHY registers in OTG
+mode and then re-configures the dwc2 driver instance accordingly (if
+anyone is interested, this is the relevant piece of code: [0]). This
+seems good enough for the beginning though.
 
 
-regards,
-Joachim Eastwood
+Changes since v1:
+- the patch "clk: gxbb: expose USB clocks" was not sent again as it was
+  already applied by Kevin Hilman (thanks!)
+- dropped (unnecessary) USB PHY bus from .dts
+- remove underscores from PHY node names in .dts
+- rename the dwc2 nodes in the .dts to usb (as per convention)
+- remove unused struct reset_control from phy_meson_usb2_priv
+- removed refcounting "reset" workaround and only specify the reset for
+  the first PHY in the .dts (Jerome has reported that his boards don't
+  need the explicit reset, while my board needs it). In addition (to
+  make this work) the driver now treats the reset as optional
+- use the RESET_USB_OTG definition (from
+  <dt-bindings/reset/amlogic,meson-gxbb-reset.h>) instead of a magic
+  number in the .dts
+
+
+[0] https://github.com/150balbes/Amlogic_s905-kernel/blob/master/drivers/amlogic/usb/dwc_otg/310/dwc_otg_driver.c#L642
+
+
+Jerome Brunet (2):
+  usb: dwc2: add support for Meson8b and GXBB SoCs
+  ARM64: meson-gxbb-p20x: Enable USB Nodes
+
+Martin Blumenstingl (4):
+  Documentation: dt-bindings: Add documentation for the Meson USB2 PHYs
+  phy: meson: add USB2 PHY support for Meson8b and GXBB
+  ARM64: meson-gxbb: add USB Nodes
+  ARM64: meson-gxbb-vega-s95: Enable USB Nodes
+
+ .../devicetree/bindings/phy/meson-usb2-phy.txt     |  27 ++
+ Documentation/devicetree/bindings/usb/dwc2.txt     |   2 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |  29 +++
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  30 +++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  43 ++++
+ drivers/phy/Kconfig                                |  11 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-meson-usb2.c                       | 280 +++++++++++++++++++++
+ drivers/usb/dwc2/platform.c                        |  34 +++
+ 9 files changed, 457 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
+ create mode 100644 drivers/phy/phy-meson-usb2.c
+
+-- 
+2.9.3
