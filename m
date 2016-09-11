@@ -1,37 +1,28 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 11 Sep 2016 20:23:26 +0200
-Subject: [PATCH 4/5] ARM: dts: sun8i: Add touchscreen node for
- sun8i-a23-polaroid-mid2809pxe04
-In-Reply-To: <20160911182327.824-1-hdegoede@redhat.com>
-References: <20160911182327.824-1-hdegoede@redhat.com>
-Message-ID: <20160911182327.824-5-hdegoede@redhat.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Mon, 12 Sep 2016 00:00:36 +0530
+Subject: [PATCH v4 0/5] ARM: dts: imx6q: Add Engicam i.CoreM6 dts
+Message-ID: <1473618641-10159-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node enabling the gsl3670 touchscreen controller found on
-sun8i-a23-polaroid-mid2809pxe04 tablets.
+This is series add dts support for Engicam I.Core M6 qdl modules.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Jagan Teki (5):
+  of: Add vendor prefix for Engicam s.r.l company
+  ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual initial support
+  ARM: dts: imx6q: Add Engicam i.CoreM6 DualLite/Solo initial support
+  ARM: dts: imx6qdl-icore: Add usbhost support
+  ARM: dts: imx6qdl-icore: Add usbotg support
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts
-index c9213ca..9955f85 100644
---- a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts
-@@ -90,3 +90,12 @@
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- };
-+
-+&touchscreen {
-+	reg = <0x40>;
-+	compatible = "silead,gsl3670";
-+	firmware-name = "gsl3670-polaroid-mid2809pxe04.fw";
-+	touchscreen-size-x = <1660>;
-+	touchscreen-size-y = <890>;
-+	status = "okay";
-+};
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx6dl-icore.dts                 |  59 ++++++
+ arch/arm/boot/dts/imx6q-icore.dts                  |  59 ++++++
+ arch/arm/boot/dts/imx6qdl-icore.dtsi               | 235 +++++++++++++++++++++
+ 5 files changed, 356 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-icore.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-icore.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-icore.dtsi
+
 -- 
-2.9.3
+2.7.4
