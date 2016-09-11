@@ -1,39 +1,51 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 11 Sep 2016 20:23:27 +0200
-Subject: [PATCH 5/5] ARM: dts: sun8i: Add touchscreen node for sun8i-a33-ga10h
+Date: Sun, 11 Sep 2016 20:23:25 +0200
+Subject: [PATCH 3/5] ARM: dts: sun8i: Add touchscreen node for
+ sun8i-a23-polaroid-mid2407pxe03
 In-Reply-To: <20160911182327.824-1-hdegoede@redhat.com>
 References: <20160911182327.824-1-hdegoede@redhat.com>
-Message-ID: <20160911182327.824-6-hdegoede@redhat.com>
+Message-ID: <20160911182327.824-4-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ga10h tablet has a gsl3675 touchscreen, add a dt node describing it.
+Add a node enabling the gsl1680 touchscreen controller found on
+sun8i-a23-polaroid-mid2407pxe03 tablets.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Changes in v2:
+-Make ldo_io1 vddio-supply for the touchscreen rather then marking it as
+ regulator-always-on
+---
+ arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-index de6269d..f711599 100644
---- a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-@@ -58,6 +58,16 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
+index 4789aac..6662127 100644
+--- a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
++++ b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
+@@ -90,3 +90,22 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
  };
- 
-+&touchscreen {
-+	reg = <0x40>;
-+	compatible = "silead,gsl3675";
-+	firmware-name = "gsl3675-ga10h.fw";
-+	touchscreen-size-x = <1630>;
-+	touchscreen-size-y = <990>;
-+	touchscreen-inverted-y;
++
++&reg_ldo_io1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-touchscreen";
 +	status = "okay";
 +};
 +
- &lradc {
- 	button at 600 {
- 		label = "Back";
++&touchscreen {
++	reg = <0x40>;
++	compatible = "silead,gsl1680";
++	firmware-name = "gsl1680-polaroid-mid2407pxe03.fw";
++	touchscreen-size-x = <960>;
++	touchscreen-size-y = <640>;
++	touchscreen-inverted-x;
++	touchscreen-inverted-y;
++	vddio-supply = <&reg_ldo_io1>;
++	status = "okay";
++};
 -- 
 2.9.3
