@@ -1,55 +1,66 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 11 Sep 2016 15:41:07 +0200
-Subject: [PATCH v2 2/6] Documentation: dt-bindings: Add documentation for the
- Meson USB2 PHYs
+Date: Sun, 11 Sep 2016 15:41:10 +0200
+Subject: [PATCH v2 5/6] ARM64: meson-gxbb-p20x: Enable USB Nodes
 In-Reply-To: <20160911134111.31141-1-martin.blumenstingl@googlemail.com>
 References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
  <20160911134111.31141-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160911134111.31141-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20160911134111.31141-6-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the documentation for the bindings for the Meson8b and GXBB USB2
-PHYs.
+From: Jerome Brunet <jbrunet@baylibre.com>
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Enable both gxbb USB controller and add a 5V regulator for the OTG port
+VBUS
+
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- .../devicetree/bindings/phy/meson-usb2-phy.txt     | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 29 ++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/phy/meson-usb2-phy.txt b/Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
-new file mode 100644
-index 0000000..9da5ea2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
-@@ -0,0 +1,27 @@
-+* Amlogic USB2 PHY
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+index ce105fe..4493bce 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+@@ -93,6 +93,18 @@
+ 		compatible = "mmc-pwrseq-emmc";
+ 		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
+ 	};
 +
-+Required properties:
-+- compatible:	Depending on the platform this should be one of:
-+	"amlogic,meson8b-usb2-phy"
-+	"amlogic,meson-gxbb-usb2-phy"
-+- reg:		The base address and length of the registers
-+- #phys-cells:	should be 0 (see phy-bindings.txt in this directory)
-+- clocks:	phandle and clock identifier for the phy clocks
-+- clock-names:	"usb_general" and "usb"
++	usb_vbus: regulator-usb0-vbus {
++		compatible = "regulator-fixed";
 +
-+Optional properties:
-+- resets:	reference to the reset controller
-+- phy-supply:	see phy-bindings.txt in this directory
++		regulator-name = "USB0_VBUS";
 +
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
 +
-+Example:
++		gpio = <&gpio GPIODV_24 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ };
+ 
+ /* This UART is brought out to the DB9 connector */
+@@ -149,3 +161,20 @@
+ 	vmmc-supply = <&vcc_3v3>;
+ 	vmmcq-sumpply = <&vddio_boot>;
+ };
 +
-+usb0_phy: usb_phy at 0 {
-+	compatible = "amlogic,meson-gxbb-usb2-phy";
-+	#phy-cells = <0>;
-+	reg = <0x0 0x0 0x0 0x20>;
-+	resets = <&reset RESET_USB_OTG>;
-+	clocks = <&clkc CLKID_USB>, <&clkc CLKID_USB0>;
-+	clock-names = "usb_general", "usb";
++&usb0_phy {
++	status = "okay";
 +	phy-supply = <&usb_vbus>;
++};
++
++&usb1_phy {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
 +};
 -- 
 2.9.3
