@@ -1,93 +1,66 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 11 Sep 2016 22:21:04 +0200
-Subject: [GIT PULL] Allwinner clocks changes for 4.9
-Message-ID: <20160911202104.GA2491@lukather>
+Date: Sun, 11 Sep 2016 22:44:20 +0200
+Subject: [GIT PULL] Allwinner DT changes for 4.9, take 2
+Message-ID: <20160911204420.GA11949@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the usual bunch of clock patches for the Allwinner SoCs, this
-time converting more SoCs to the new framework.
+Please pull the following branch for 4.9, based on top of the previous
+one.
+
+To maintain bisectability, while avoiding some un-trivial merge
+conflicts, I had to merge the clk branch that I've sent a PR to Mike
+and Stephen. This branch will of course be stable.
 
 Thanks!
 Maxime
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+The following changes since commit bdc2601b02d31974b5765b93ac263b2eeab2e07c:
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+  Merge branch 'sunxi/clk-for-4.9' into sunxi/dt-for-4.9 (2016-09-10 11:45:28 +0200)
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clk-for-4.9
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.9-2
 
-for you to fetch changes up to d63a5e7c713a68bd368016f2022326a1a91310d8:
+for you to fetch changes up to 7a988a4dd29a8cfcf405a12441533d765d25a6b8:
 
-  clk: sunxi-ng: Add hardware dependency (2016-09-10 11:41:21 +0200)
-
-----------------------------------------------------------------
-Allwinner Clock changes for 4.9
-
-Four more SoCs converted to the new clock framework (A31, A31s, A23 and
-A33).
+  ARM: dts: gr8: Add support for the GR8 evaluation board (2016-09-11 22:23:17 +0200)
 
 ----------------------------------------------------------------
-Chen-Yu Tsai (6):
-      clk: sunxi-ng: mux: Increase fixed pre-divider div size
-      clk: sunxi-ng: nkm: Add mux to support multiple parents
-      clk: sunxi-ng: mux: Add support for mux tables
-      clk: sunxi-ng: mux: support fixed pre-dividers on multiple parents
-      clk: sunxi-ng: mux: Add clk notifier functions
-      clk: sunxi-ng: Add A31/A31s clocks
+Allwinner DT changes for 4.9, take 2
 
-Jean Delvare (1):
-      clk: sunxi-ng: Add hardware dependency
+A second set of device tree changes, this time switching a few SoCs to the
+new sunxi-ng clock framework. We also added the support for a new SoC
+(NextThing GR8 and its evaluation board), and the support for the DRM
+driver in the A33.
 
-Maxime Ripard (8):
-      clk: sunxi-ng: mux: Rename mux macro to be consistent
-      clk: sunxi-ng: div: Add mux table macros
-      clk: sunxi-ng: div: Add kerneldoc for the _ccu_div structure
-      clk: sunxi-ng: div: Allow to set a maximum
-      clk: sunxi-ng: mux: Add mux table macro
-      clk: sunxi-ng: Add N-class clocks support
-      clk: sunxi-ng: Add A33 CCU support
-      clk: sunxi-ng: Add A23 CCU
+----------------------------------------------------------------
+Chen-Yu Tsai (2):
+      ARM: dts: sun6i: switch A31/A31s to new CCU clock bindings
+      ARM: dts: sun8i: Move A23/A33 usbphy and usb_otg nodes to common dtsi
 
- .../devicetree/bindings/clock/sunxi-ccu.txt        |    5 +-
- drivers/clk/sunxi-ng/Kconfig                       |   39 +
- drivers/clk/sunxi-ng/Makefile                      |    4 +
- drivers/clk/sunxi-ng/ccu-sun6i-a31.c               | 1235 ++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun6i-a31.h               |   72 ++
- drivers/clk/sunxi-ng/ccu-sun8i-a23-a33.h           |   63 +
- drivers/clk/sunxi-ng/ccu-sun8i-a23.c               |  737 ++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-a33.c               |  780 +++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   10 +-
- drivers/clk/sunxi-ng/ccu_div.h                     |   66 +-
- drivers/clk/sunxi-ng/ccu_mp.c                      |   23 +-
- drivers/clk/sunxi-ng/ccu_mp.h                      |    2 +-
- drivers/clk/sunxi-ng/ccu_mult.c                    |  133 +++
- drivers/clk/sunxi-ng/ccu_mult.h                    |   35 +
- drivers/clk/sunxi-ng/ccu_mux.c                     |   56 +-
- drivers/clk/sunxi-ng/ccu_mux.h                     |   68 +-
- drivers/clk/sunxi-ng/ccu_nkm.c                     |   44 +-
- drivers/clk/sunxi-ng/ccu_nkm.h                     |   23 +
- drivers/clk/sunxi-ng/ccu_nkmp.c                    |   21 +-
- drivers/clk/sunxi-ng/ccu_nm.c                      |   16 +-
- include/dt-bindings/clock/sun6i-a31-ccu.h          |  187 +++
- include/dt-bindings/clock/sun8i-a23-a33-ccu.h      |  127 ++
- include/dt-bindings/reset/sun6i-a31-ccu.h          |  106 ++
- include/dt-bindings/reset/sun8i-a23-a33-ccu.h      |   87 ++
- 24 files changed, 3860 insertions(+), 79 deletions(-)
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun6i-a31.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun6i-a31.h
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a23-a33.h
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a23.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a33.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_mult.c
- create mode 100644 include/dt-bindings/clock/sun6i-a31-ccu.h
- create mode 100644 include/dt-bindings/clock/sun8i-a23-a33-ccu.h
- create mode 100644 include/dt-bindings/reset/sun6i-a31-ccu.h
- create mode 100644 include/dt-bindings/reset/sun8i-a23-a33-ccu.h
+Maxime Ripard (3):
+      ARM: sun8i: Convert the A23 and A33 to the CCU
+      ARM: sun8i: a33: Add display pipeline
+      ARM: sun8i: a23/a33: Add RGB666 pins
+
+Myl?ne Josserand (2):
+      ARM: dts: Add NextThing GR8 dtsi
+      ARM: dts: gr8: Add support for the GR8 evaluation board
+
+ arch/arm/boot/dts/Makefile           |    1 +
+ arch/arm/boot/dts/ntc-gr8-evb.dts    |  342 +++++++++++
+ arch/arm/boot/dts/ntc-gr8.dtsi       | 1087 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31.dtsi     |  424 +++----------
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi |  295 +++------
+ arch/arm/boot/dts/sun8i-a23.dtsi     |   80 +--
+ arch/arm/boot/dts/sun8i-a33.dtsi     |  236 +++++---
+ 7 files changed, 1791 insertions(+), 674 deletions(-)
+ create mode 100644 arch/arm/boot/dts/ntc-gr8-evb.dts
+ create mode 100644 arch/arm/boot/dts/ntc-gr8.dtsi
 
 -- 
 Maxime Ripard, Free Electrons
@@ -99,4 +72,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160911/71472c94/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160911/08fd7c31/attachment.sig>
