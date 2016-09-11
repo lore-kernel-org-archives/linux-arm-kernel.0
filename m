@@ -1,133 +1,132 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 11 Sep 2016 20:44:05 +0200
-Subject: [PATCH resend 2/5] input: touchscreen: Add LED trigger support to the
- softbutton code
+Date: Sun, 11 Sep 2016 20:44:07 +0200
+Subject: [PATCH resend 4/5] input: touchscreen: silead: Add regulator support
 In-Reply-To: <20160911184408.11657-1-hdegoede@redhat.com>
 References: <20160911184408.11657-1-hdegoede@redhat.com>
-Message-ID: <20160911184408.11657-3-hdegoede@redhat.com>
+Message-ID: <20160911184408.11657-5-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some hardware there are 1 or more LEDs behind the touchscreen
-softbuttons, which are intended to provide visual feedback to the
-user that the softbutton has been pressed, this commit adds support
-for this.
+On some tablets the touchscreen controller is powered by seperate
+regulators, add support for this.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/input/touchscreen/softbuttons.txt     |  4 ++
- drivers/input/touchscreen/softbuttons.c            | 49 +++++++++++++++++++++-
- 2 files changed, 52 insertions(+), 1 deletion(-)
+ .../bindings/input/touchscreen/silead_gsl1680.txt  |  2 +
+ drivers/input/touchscreen/silead.c                 | 51 ++++++++++++++++++++--
+ 2 files changed, 49 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
-index 3eb6f4c..b425b95 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
-@@ -17,6 +17,10 @@ Required subnode-properties:
-  - softbutton-min-y		: Y start of the area the softbutton area covers
-  - softbutton-max-y		: Y end of the area the softbutton area covers
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+index 820fee4..ce85ee5 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+@@ -18,6 +18,8 @@ Optional properties:
+ - touchscreen-inverted-y  : See touchscreen.txt
+ - touchscreen-swapped-x-y : See touchscreen.txt
+ - silead,max-fingers	  : maximum number of fingers the touchscreen can detect
++- vddio-supply		  : regulator phandle for controller VDDIO
++- avdd-supply		  : regulator phandle for controller AVDD
  
-+Optional subnode-properties:
-+- linux,led-trigger		: String for a LED trigger for providing visual
-+				  feedback that the softbutton has been pressed
-+
  Example:
  
- #include <dt-bindings/input/input.h>
-diff --git a/drivers/input/touchscreen/softbuttons.c b/drivers/input/touchscreen/softbuttons.c
-index 47aea18..9a3fbfa 100644
---- a/drivers/input/touchscreen/softbuttons.c
-+++ b/drivers/input/touchscreen/softbuttons.c
-@@ -11,6 +11,7 @@
- 
- #include <linux/input.h>
+diff --git a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
+index f502c84..c6a1ae9 100644
+--- a/drivers/input/touchscreen/silead.c
++++ b/drivers/input/touchscreen/silead.c
+@@ -29,6 +29,7 @@
  #include <linux/input/touchscreen.h>
-+#include <linux/leds.h>
- #include <linux/of.h>
+ #include <linux/pm.h>
+ #include <linux/irq.h>
++#include <linux/regulator/consumer.h>
  
- struct touchscreen_softbutton {
-@@ -19,6 +20,8 @@ struct touchscreen_softbutton {
- 	u32 min_y;
- 	u32 max_y;
- 	u32 keycode;
-+	const char *ledtrigger_name;
-+	struct led_trigger *ledtrigger;
- };
+ #include <asm/unaligned.h>
  
- struct touchscreen_softbutton_info {
-@@ -48,7 +51,7 @@ struct touchscreen_softbutton_info *devm_touchscreen_alloc_softbuttons(
- 	struct device *dev = input->dev.parent;
- 	struct device_node *np, *pp;
- 	struct touchscreen_softbutton_info *info;
--	int i, err, button_count;
-+	int i, j, err, button_count;
+@@ -72,6 +73,8 @@ enum silead_ts_power {
+ struct silead_ts_data {
+ 	struct i2c_client *client;
+ 	struct gpio_desc *gpio_power;
++	struct regulator *vddio;
++	struct regulator *avdd;
+ 	struct input_dev *input;
+ 	char fw_name[64];
+ 	struct touchscreen_properties prop;
+@@ -465,21 +468,52 @@ static int silead_ts_probe(struct i2c_client *client,
+ 	if (client->irq <= 0)
+ 		return -ENODEV;
  
- 	np = dev->of_node;
- 	if (!np)
-@@ -103,6 +106,36 @@ struct touchscreen_softbutton_info *devm_touchscreen_alloc_softbuttons(
- 			dev_err(dev, "%s: Inval max-y prop\n", pp->name);
- 			return ERR_PTR(-EINVAL);
- 		}
++	data->vddio = devm_regulator_get_optional(dev, "vddio");
++	if (IS_ERR(data->vddio)) {
++		if (PTR_ERR(data->vddio) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		data->vddio = NULL;
++	}
 +
-+		err = of_property_read_string(pp, "linux,led-trigger",
-+					      &btn->ledtrigger_name);
-+		if (err)
-+			continue; /* The LED trigger is optional */
++	data->avdd = devm_regulator_get_optional(dev, "avdd");
++	if (IS_ERR(data->avdd)) {
++		if (PTR_ERR(data->avdd) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		data->avdd = NULL;
++	}
 +
-+		/* Check if another softbutton uses the same trigger */
-+		for (j = 0; j < i; j++) {
-+			if (info->buttons[j].ledtrigger_name &&
-+			    strcmp(info->buttons[j].ledtrigger_name,
-+				   btn->ledtrigger_name) == 0) {
-+				btn->ledtrigger = info->buttons[j].ledtrigger;
-+				break;
-+			}
-+		}
-+		if (!btn->ledtrigger) {
-+			btn->ledtrigger =
-+				devm_kzalloc(dev, sizeof(*btn->ledtrigger),
-+					     GFP_KERNEL);
-+			if (!btn->ledtrigger)
-+				return ERR_PTR(-ENOMEM);
++	/*
++	 * Enable regulators at probe and disable them at remove, we need
++	 * to keep the chip powered otherwise it forgets its firmware.
++	 */
++	if (data->vddio) {
++		error = regulator_enable(data->vddio);
++		if (error)
++			return error;
++	}
 +
-+			btn->ledtrigger->name = btn->ledtrigger_name;
-+			err = devm_led_trigger_register(dev, btn->ledtrigger);
-+			if (err) {
-+				dev_err(dev, "%s: Ledtrigger register error\n",
-+					pp->name);
-+				return ERR_PTR(err);
-+			}
-+		}
++	if (data->avdd) {
++		error = regulator_enable(data->avdd);
++		if (error)
++			goto disable_vddio;
++	}
++
+ 	/* Power GPIO pin */
+ 	data->gpio_power = devm_gpiod_get_optional(dev, "power", GPIOD_OUT_LOW);
+ 	if (IS_ERR(data->gpio_power)) {
+ 		if (PTR_ERR(data->gpio_power) != -EPROBE_DEFER)
+ 			dev_err(dev, "Shutdown GPIO request failed\n");
+-		return PTR_ERR(data->gpio_power);
++		error = PTR_ERR(data->gpio_power);
++		goto disable_avdd;
  	}
  
- 	__set_bit(EV_KEY, input->evbit);
-@@ -126,6 +159,7 @@ bool touchscreen_handle_softbuttons(struct touchscreen_softbutton_info *info,
- 				    unsigned int x, unsigned int y, bool down)
- {
- 	int i;
-+	unsigned long led_delay = 1000; /* Keep the led on 1s after release */
+ 	error = silead_ts_setup(client);
+ 	if (error)
+-		return error;
++		goto disable_avdd;
  
- 	if (info == NULL)
- 		return false;
-@@ -137,6 +171,19 @@ bool touchscreen_handle_softbuttons(struct touchscreen_softbutton_info *info,
- 		    y <= info->buttons[i].max_y) {
- 			input_report_key(info->input,
- 					 info->buttons[i].keycode, down);
-+
-+			if (info->buttons[i].ledtrigger && down) {
-+				led_trigger_event(info->buttons[i].ledtrigger,
-+						  LED_FULL);
-+			} else if (info->buttons[i].ledtrigger && !down) {
-+				/* Led must be off before calling blink */
-+				led_trigger_event(info->buttons[i].ledtrigger,
-+						  LED_OFF);
-+				led_trigger_blink_oneshot(
-+					info->buttons[i].ledtrigger,
-+					&led_delay, &led_delay, 0);
-+			}
-+
- 			return true;
- 		}
+ 	error = silead_ts_request_input_dev(data);
+ 	if (error)
+-		return error;
++		goto disable_avdd;
+ 
+ 	error = devm_request_threaded_irq(dev, client->irq,
+ 					  NULL, silead_ts_threaded_irq_handler,
+@@ -487,10 +521,19 @@ static int silead_ts_probe(struct i2c_client *client,
+ 	if (error) {
+ 		if (error != -EPROBE_DEFER)
+ 			dev_err(dev, "IRQ request failed %d\n", error);
+-		return error;
++		goto disable_avdd;
  	}
+ 
+ 	return 0;
++
++disable_avdd:
++	if (data->avdd)
++		regulator_disable(data->avdd);
++disable_vddio:
++	if (data->vddio)
++		regulator_disable(data->vddio);
++
++	return error;
+ }
+ 
+ static int __maybe_unused silead_ts_suspend(struct device *dev)
 -- 
 2.9.3
