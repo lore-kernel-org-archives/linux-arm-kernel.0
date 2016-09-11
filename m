@@ -1,95 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 11 Sep 2016 17:40:35 +0100
-Subject: [PATCH] arm64: mm: move zero page from .bss to right before
- swapper_pg_dir
-In-Reply-To: <1473604714-5512-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1473604714-5512-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu-72w5G-0=5xh70LtcpVsuK2i_jJNiG1cWnOycVGKSzbw@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 11 Sep 2016 18:43:21 +0200
+Subject: [PATCH] Revert "Input: bma150 - extend chip detection for bma180"
+Message-ID: <20160911164321.23122-1-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 September 2016 at 15:38, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Move the statically allocated zero page from the .bss section to right
-> before swapper_pg_dir. This allows us to refer to its physical address
-> by simply reading TTBR1_EL1 (which always points to swapper_pg_dir and
-> always has its ASID field cleared), and subtracting PAGE_SIZE.
->
-> Inspired-by: http://marc.info/?l=linux-arm-kernel&m=147282867511801
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/mmu_context.h | 10 ++++++----
->  arch/arm64/kernel/head.S             |  1 -
->  arch/arm64/kernel/vmlinux.lds.S      |  2 ++
->  arch/arm64/mm/mmu.c                  |  1 -
->  4 files changed, 8 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index b1892a0dbcb0..94461ba5febd 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -49,13 +49,15 @@ static inline void contextidr_thread_switch(struct task_struct *next)
->   */
->  static inline void cpu_set_reserved_ttbr0(void)
->  {
-> -       unsigned long ttbr = virt_to_phys(empty_zero_page);
-> +       unsigned long dummy;
->
-> -       asm(
-> +       asm volatile(
-> +       "       mrs     %0, ttbr1_el1                   // get TTBR1\n"
-> +       "       sub     %0, %0, %1                      // subtract PAGE_SIZE\n"
->         "       msr     ttbr0_el1, %0                   // set TTBR0\n"
->         "       isb"
-> -       :
-> -       : "r" (ttbr));
-> +       : "=&r" (dummy)
-> +       : "I" (PAGE_SIZE));
->  }
->
->  /*
+This reverts commit ef3714fdbc8d ("Input: bma150 - extend chip
+detection for bma180").
 
-This first hunk is wrong, given that cpu_set_reserved_ttbr0() may be
-called when ttbr1_el1 does not point to swapper_pg_dir. But we should
-be able to simply drop it without affecting the remainder of the
-patch.
+The bma180 is not compatible with the bma150 at all, it has 14 bits
+resolution instead of 10, and it has quite different control registers.
 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 8bc9458f9add..6020b884b076 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -449,7 +449,6 @@ __primary_switched:
->         adr_l   x2, __bss_stop
->         sub     x2, x2, x0
->         bl      __pi_memset
-> -       dsb     ishst                           // Make zero page visible to PTW
->
->  #ifdef CONFIG_KASAN
->         bl      kasan_early_init
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 659963d40bb4..a14eb8ff5144 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -193,6 +193,8 @@ SECTIONS
->         . = ALIGN(PAGE_SIZE);
->         idmap_pg_dir = .;
->         . += IDMAP_DIR_SIZE;
-> +       empty_zero_page = .;
-> +       . += PAGE_SIZE;
->         swapper_pg_dir = .;
->         . += SWAPPER_DIR_SIZE;
->
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 4989948d1feb..539ce9d11325 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -53,7 +53,6 @@ EXPORT_SYMBOL(kimage_voffset);
->   * Empty_zero_page is a special page that is used for zero-initialized data
->   * and COW.
->   */
-> -unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
->  EXPORT_SYMBOL(empty_zero_page);
->
->  static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
-> --
-> 2.7.4
->
+Treating the bma180 as a bma150 wrt its data registers will just result
+in throwing away the lowest 4 bits, which is not too bad. But the ctrl
+registers are a different story.
+
+It may be that things happen to just work (I don't have a bma180 to
+test with) but that certainly does not make this right.
+
+Removing the bma180 id also removes overlap wrt the ids in the iio
+bma180 driver which does treat the bma180 properly.
+
+Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/input/misc/bma150.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/input/misc/bma150.c b/drivers/input/misc/bma150.c
+index b0d4453..cae4832 100644
+--- a/drivers/input/misc/bma150.c
++++ b/drivers/input/misc/bma150.c
+@@ -70,7 +70,6 @@
+ #define BMA150_CFG_5_REG	0x11
+ 
+ #define BMA150_CHIP_ID		2
+-#define BMA180_CHIP_ID		3
+ #define BMA150_CHIP_ID_REG	BMA150_DATA_0_REG
+ 
+ #define BMA150_ACC_X_LSB_REG	BMA150_DATA_2_REG
+@@ -539,7 +538,7 @@ static int bma150_probe(struct i2c_client *client,
+ 	}
+ 
+ 	chip_id = i2c_smbus_read_byte_data(client, BMA150_CHIP_ID_REG);
+-	if (chip_id != BMA150_CHIP_ID && chip_id != BMA180_CHIP_ID) {
++	if (chip_id != BMA150_CHIP_ID) {
+ 		dev_err(&client->dev, "BMA150 chip id error: %d\n", chip_id);
+ 		return -EINVAL;
+ 	}
+@@ -643,7 +642,6 @@ static UNIVERSAL_DEV_PM_OPS(bma150_pm, bma150_suspend, bma150_resume, NULL);
+ 
+ static const struct i2c_device_id bma150_id[] = {
+ 	{ "bma150", 0 },
+-	{ "bma180", 0 },
+ 	{ "smb380", 0 },
+ 	{ "bma023", 0 },
+ 	{ }
+-- 
+2.9.3
