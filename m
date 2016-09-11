@@ -1,74 +1,28 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 12 Sep 2016 00:00:41 +0530
-Subject: [PATCH v4 5/5] ARM: dts: imx6qdl-icore: Add usbotg support
-In-Reply-To: <1473618641-10159-1-git-send-email-jagan@amarulasolutions.com>
-References: <1473618641-10159-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1473618641-10159-6-git-send-email-jagan@amarulasolutions.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 11 Sep 2016 20:44:03 +0200
+Subject: [PATCH resend 0/5] input: resend of 5 touchscreen patches
+Message-ID: <20160911184408.11657-1-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usbotg support for Engicam i.CoreM6 dql modules.
+Hi Dmitry,
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v4:
-	- Newly added patch
+Thank you for merging the 2 silead touchscreen firmware loading patches
+into your for-linus branch.
 
- arch/arm/boot/dts/imx6qdl-icore.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Here is a resend of 5 patches intended for next, which do not seem to
+be getting anywhere hence the resend. Esp. patches 4 and 5, which
+already have Robh's ack for the dt bits seem ready for merging to me.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-index b4f7e64..fefd7fd 100644
---- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-@@ -65,6 +65,15 @@
- 		regulator-boot-on;
- 		regulator-always-on;
- 	};
-+
-+	reg_usb_otg_vbus: usb_otg_vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
- };
- 
- &can1 {
-@@ -125,6 +134,14 @@
- 	status = "okay";
- };
- 
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	disable-over-current;
-+	status = "okay";
-+};
-+
- &usdhc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc1>;
-@@ -199,6 +216,12 @@
- 		>;
- 	};
- 
-+	pinctrl_usbotg: usbotggrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x17059
-+		>;
-+	};
-+
- 	pinctrl_usdhc1: usdhc1grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17070
--- 
-2.7.4
+Rob, patches 1, 2 have a dt-bindings component, you had some questions
+about the dt bits in patch 1, which I've answered here:
+
+http://www.spinics.net/lists/arm-kernel/msg521450.html
+
+Regards,
+
+Hans
+
+p.s.
+
+Thank you both for all the great work you're doing on the kernel.
