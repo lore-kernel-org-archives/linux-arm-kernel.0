@@ -1,52 +1,93 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 11 Sep 2016 14:39:02 +0200
-Subject: [PATCH v2 1/2] pinctrl: meson-gxbb: add the missing SDIO interrupt pin
-In-Reply-To: <20160911123903.20027-1-martin.blumenstingl@googlemail.com>
-References: <20160828164725.19429-1-martin.blumenstingl@googlemail.com>
- <20160911123903.20027-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160911123903.20027-2-martin.blumenstingl@googlemail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 11 Sep 2016 15:13:17 +0200
+Subject: [PATCH 1/6] gpio: constify gpio_chip structures
+In-Reply-To: <1473596082-32690-2-git-send-email-Julia.Lawall@lip6.fr>
+References: <1473596082-32690-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1473596082-32690-2-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CAGhQ9VwrKZ0wzu=PAUkkpfsnZpYwvvya4kCAFwvV+J3WtSWBaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the SDIO interrupt pin which can be used by sd_emmc_a.
+Hi Julia,
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Suggested-by: Neil Armstrong <narmstrong@baylibre.com>
+On 11 September 2016 at 14:14, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
+> These structures are only used to copy into other structures, so declare
+> them as const.
+>
+> The semantic patch that makes this change is as follows:
+> (http://coccinelle.lip6.fr/)
+>
+> // <smpl>
+> @r disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct gpio_chip i at p = { ... };
+>
+> @ok@
+> identifier r.i;
+> expression e;
+> position p;
+> @@
+> e = i at p;
+>
+> @bad@
+> position p != {r.p,ok.p};
+> identifier r.i;
+> struct gpio_chip e;
+> @@
+> e at i@p
+>
+> @depends on !bad disable optional_qualifier@
+> identifier r.i;
+> @@
+> static
+> +const
+>  struct gpio_chip i = { ... };
+> // </smpl>
+>
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>
+> ---
+>  drivers/gpio/gpio-arizona.c  |    2 +-
+>  drivers/gpio/gpio-bcm-kona.c |    2 +-
+>  drivers/gpio/gpio-da9052.c   |    2 +-
+>  drivers/gpio/gpio-da9055.c   |    2 +-
+>  drivers/gpio/gpio-it87.c     |    2 +-
+>  drivers/gpio/gpio-lp873x.c   |    2 +-
+>  drivers/gpio/gpio-lpc18xx.c  |    2 +-
+>  drivers/gpio/gpio-pisosr.c   |    2 +-
+>  drivers/gpio/gpio-sch.c      |    2 +-
+>  drivers/gpio/gpio-stmpe.c    |    2 +-
+>  drivers/gpio/gpio-tc3589x.c  |    2 +-
+>  drivers/gpio/gpio-tpic2810.c |    2 +-
+>  drivers/gpio/gpio-tps65086.c |    2 +-
+>  drivers/gpio/gpio-tps65218.c |    2 +-
+>  drivers/gpio/gpio-tps65912.c |    2 +-
+>  drivers/gpio/gpio-ts4900.c   |    2 +-
+>  drivers/gpio/gpio-twl4030.c  |    2 +-
+>  drivers/gpio/gpio-wm831x.c   |    2 +-
+>  drivers/gpio/gpio-wm8350.c   |    2 +-
+>  drivers/gpio/gpio-wm8994.c   |    2 +-
+>  20 files changed, 20 insertions(+), 20 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-lpc18xx.c b/drivers/gpio/gpio-lpc18xx.c
+> index 98832c9..f12e02e 100644
+> --- a/drivers/gpio/gpio-lpc18xx.c
+> +++ b/drivers/gpio/gpio-lpc18xx.c
+> @@ -78,7 +78,7 @@ static int lpc18xx_gpio_direction_output(struct gpio_chip *chip,
+>         return lpc18xx_gpio_direction(chip, offset, true);
+>  }
+>
+> -static struct gpio_chip lpc18xx_chip = {
+> +static const struct gpio_chip lpc18xx_chip = {
+>         .label                  = "lpc18xx/43xx-gpio",
+>         .request                = gpiochip_generic_request,
+>         .free                   = gpiochip_generic_free,
 
-Fixes: 29885a656511 ("pinctrl: meson-gxbb: add the pins for the
-SDIO/sd_emmc_a controller")
----
- drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+For lpc18xx:
+Acked-by: Joachim Eastwood <manabian@gmail.com>
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-index fb479b8..4a27ae0 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-@@ -169,6 +169,7 @@ static const unsigned int sdio_d2_pins[] = { PIN(GPIOX_2, EE_OFF) };
- static const unsigned int sdio_d3_pins[] = { PIN(GPIOX_3, EE_OFF) };
- static const unsigned int sdio_cmd_pins[] = { PIN(GPIOX_4, EE_OFF) };
- static const unsigned int sdio_clk_pins[] = { PIN(GPIOX_5, EE_OFF) };
-+static const unsigned int sdio_irq_pins[] = { PIN(GPIOX_7, EE_OFF) };
- 
- static const unsigned int uart_tx_a_pins[]	= { PIN(GPIOX_12, EE_OFF) };
- static const unsigned int uart_rx_a_pins[]	= { PIN(GPIOX_13, EE_OFF) };
-@@ -383,6 +384,7 @@ static struct meson_pmx_group meson_gxbb_periphs_groups[] = {
- 	GROUP(sdio_d3,		8,	2),
- 	GROUP(sdio_cmd,		8,	1),
- 	GROUP(sdio_clk,		8,	0),
-+	GROUP(sdio_irq,		8,	11),
- 	GROUP(uart_tx_a,	4,	13),
- 	GROUP(uart_rx_a,	4,	12),
- 	GROUP(uart_cts_a,	4,	11),
-@@ -522,7 +524,7 @@ static const char * const sdcard_groups[] = {
- 
- static const char * const sdio_groups[] = {
- 	"sdio_d0", "sdio_d1", "sdio_d2", "sdio_d3",
--	"sdio_cmd", "sdio_clk",
-+	"sdio_cmd", "sdio_clk", "sdio_irq",
- };
- 
- static const char * const uart_a_groups[] = {
--- 
-2.9.3
+
+regards,
+Joachim Eastwood
