@@ -1,13 +1,13 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 11 Sep 2016 23:13:25 +0200
-Subject: [GIT PULL] Allwinner core changes for 4.9
-Message-ID: <20160911211325.GA18519@lukather>
+Date: Sun, 11 Sep 2016 23:19:57 +0200
+Subject: [GIT PULL] Allwinner arm64 config changes for 4.9
+Message-ID: <20160911211957.GA20927@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Kevin, Olof,
 
-Please pull the following changes for the next merge window.
+Please pull the following patch for the next merge window.
 
 Thanks!
 Maxime
@@ -18,30 +18,23 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-core-for-4.9
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-config64-for-4.9
 
-for you to fetch changes up to c1efda1238be1efa8612e26ee98795298ffd6f95:
+for you to fetch changes up to d229d205132bfd75fa0cf36fce24264ed01de28a:
 
-  ARM: sunxi: Support the Nextthing GR8 (2016-09-08 14:32:23 +0200)
-
-----------------------------------------------------------------
-Allwinner core changes for 4.9
-
-Add support for big endian on the Allwinner A20, and the Nextthing GR8 SoC
+  arm64: sunxi: Kconfig: add essential pinctrl driver (2016-08-23 21:37:17 +0200)
 
 ----------------------------------------------------------------
-Maxime Ripard (1):
-      ARM: sunxi: Support the Nextthing GR8
+Allwinner ARM64 Kconfig changes
 
-Michael Weiser (1):
-      ARM: sunxi: enable big-endian
+Select the pinctrl driver in kconfig
 
- Documentation/arm/sunxi/README                  | 2 ++
- Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
- MAINTAINERS                                     | 1 +
- arch/arm/mach-sunxi/Kconfig                     | 1 +
- arch/arm/mach-sunxi/sunxi.c                     | 1 +
- 5 files changed, 6 insertions(+)
+----------------------------------------------------------------
+Andre Przywara (1):
+      arm64: sunxi: Kconfig: add essential pinctrl driver
+
+ arch/arm64/Kconfig.platforms | 2 ++
+ 1 file changed, 2 insertions(+)
 
 -- 
 Maxime Ripard, Free Electrons
@@ -53,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160911/ed8910f1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160911/ae4db3b7/attachment-0001.sig>
