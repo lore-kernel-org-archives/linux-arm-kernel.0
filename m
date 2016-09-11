@@ -1,48 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 11 Sep 2016 13:16:25 +0100
-Subject: [PATCH v2 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-In-Reply-To: <CAKv+Gu9P4_90LEoyu1apeKZH20imLPD_EiB=zNAvyin-67ivKQ@mail.gmail.com>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <20160910095154.GA21444@e104818-lin.cambridge.arm.com>
- <CAKv+Gu9P4_90LEoyu1apeKZH20imLPD_EiB=zNAvyin-67ivKQ@mail.gmail.com>
-Message-ID: <20160911121624.GA16859@MBP.local>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sun, 11 Sep 2016 14:14:36 +0200
+Subject: [PATCH 0/6] constify gpio_chip structures
+Message-ID: <1473596082-32690-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 10, 2016 at 11:56:14AM +0100, Ard Biesheuvel wrote:
-> On 10 September 2016 at 10:51, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Fri, Sep 02, 2016 at 04:02:06PM +0100, Catalin Marinas wrote:
-> >> This is the second version of the arm64 PAN emulation by disabling
-> >> TTBR0_EL1 accesses. The major change from v1 is the use of a thread_info
-> >> member to store the real TTBR0_EL1 value. The advantage is slightly
-> >> simpler assembler macros for uaccess_enable with the downside that
-> >> switch_mm() must always update the saved ttbr0 even if there is no mm
-> >> switch.
-> >
-> > FYI, I got the Juno board rebooting in a loop with defconfig +
-> > ARM64_TTBR0_PAN enabled. It takes about 20-40 reboots to get the panic
-> > below on the EFI run-time services. I'll look into it on Monday (and
-> > cc'ing Ard who I forgot to add originally). Including the full log
-> > below:
-> 
-> Could you please try to reproduce it again, but this time with
-> 'efi=debug' on the kernel command line? Thanks
+Constify gpio_chip structures
 
-Just for the record, following our private email exchanges: when
-executing an EFI runtime service, an interrupt comes in and Linux
-disables TTBR0 accesses. When returning from interrupt, the kernel
-restores TTBR0_EL1 with the value in current thread_info which is
-different from the efi_mm one.
+---
 
-Two potential solutions:
-
-1. Temporarily update the current thread_info ttbr0 during EFI runtime
-   services (preemption is disabled). Suggested by Ard
-
-2. Go back to per-CPU saving of TTBR0_EL1 as in v1
-
-I'll implement 1 on Monday and give it a try.
-
--- 
-Catalin
+ drivers/gpio/gpio-arizona.c                   |    2 +-
+ drivers/gpio/gpio-bcm-kona.c                  |    2 +-
+ drivers/gpio/gpio-da9052.c                    |    2 +-
+ drivers/gpio/gpio-da9055.c                    |    2 +-
+ drivers/gpio/gpio-it87.c                      |    2 +-
+ drivers/gpio/gpio-lp873x.c                    |    2 +-
+ drivers/gpio/gpio-lpc18xx.c                   |    2 +-
+ drivers/gpio/gpio-pisosr.c                    |    2 +-
+ drivers/gpio/gpio-sch.c                       |    2 +-
+ drivers/gpio/gpio-stmpe.c                     |    2 +-
+ drivers/gpio/gpio-tc3589x.c                   |    2 +-
+ drivers/gpio/gpio-tpic2810.c                  |    2 +-
+ drivers/gpio/gpio-tps65086.c                  |    2 +-
+ drivers/gpio/gpio-tps65218.c                  |    2 +-
+ drivers/gpio/gpio-tps65912.c                  |    2 +-
+ drivers/gpio/gpio-ts4900.c                    |    2 +-
+ drivers/gpio/gpio-twl4030.c                   |    2 +-
+ drivers/gpio/gpio-wm831x.c                    |    2 +-
+ drivers/gpio/gpio-wm8350.c                    |    2 +-
+ drivers/gpio/gpio-wm8994.c                    |    2 +-
+ drivers/mfd/sm501.c                           |    2 +-
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    2 +-
+ drivers/pinctrl/stm32/pinctrl-stm32.c         |    2 +-
+ sound/soc/codecs/rt5677.c                     |    2 +-
+ sound/soc/codecs/wm5100.c                     |    2 +-
+ sound/soc/codecs/wm8903.c                     |    2 +-
+ sound/soc/codecs/wm8962.c                     |    2 +-
+ sound/soc/codecs/wm8996.c                     |    2 +-
+ sound/soc/soc-ac97.c                          |    2 +-
+ 29 files changed, 29 insertions(+), 29 deletions(-)
