@@ -1,28 +1,43 @@
 From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 12 Sep 2016 00:00:36 +0530
-Subject: [PATCH v4 0/5] ARM: dts: imx6q: Add Engicam i.CoreM6 dts
-Message-ID: <1473618641-10159-1-git-send-email-jagan@amarulasolutions.com>
+Date: Mon, 12 Sep 2016 00:00:37 +0530
+Subject: [PATCH v4 1/5] of: Add vendor prefix for Engicam s.r.l company
+In-Reply-To: <1473618641-10159-1-git-send-email-jagan@amarulasolutions.com>
+References: <1473618641-10159-1-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <1473618641-10159-2-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is series add dts support for Engicam I.Core M6 qdl modules.
+Engicam providing design services of electronic systems with
+high content of technology, relying on a long experience in
+electronic design.
 
-Jagan Teki (5):
-  of: Add vendor prefix for Engicam s.r.l company
-  ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual initial support
-  ARM: dts: imx6q: Add Engicam i.CoreM6 DualLite/Solo initial support
-  ARM: dts: imx6qdl-icore: Add usbhost support
-  ARM: dts: imx6qdl-icore: Add usbotg support
+For more info visit
+http://www.engicam.com/en/
 
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/imx6dl-icore.dts                 |  59 ++++++
- arch/arm/boot/dts/imx6q-icore.dts                  |  59 ++++++
- arch/arm/boot/dts/imx6qdl-icore.dtsi               | 235 +++++++++++++++++++++
- 5 files changed, 356 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-icore.dts
- create mode 100644 arch/arm/boot/dts/imx6q-icore.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-icore.dtsi
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v4:
+	- none
 
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 3003f33..327e4c7 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -85,6 +85,7 @@ elan	Elan Microelectronic Corp.
+ embest	Shenzhen Embest Technology Co., Ltd.
+ emmicro	EM Microelectronic
+ energymicro	Silicon Laboratories (formerly Energy Micro AS)
++engicam	Engicam S.r.l.
+ epcos	EPCOS AG
+ epfl	Ecole Polytechnique F?d?rale de Lausanne
+ epson	Seiko Epson Corp.
 -- 
 2.7.4
