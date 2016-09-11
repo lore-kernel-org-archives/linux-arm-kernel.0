@@ -1,74 +1,89 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 11 Sep 2016 15:41:05 +0200
-Subject: [PATCH v2 0/6] usb/phy: Add Amlogic Meson8b and GXBB USB support
-In-Reply-To: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+Date: Sun, 11 Sep 2016 15:41:06 +0200
+Subject: [PATCH v2 1/6] usb: dwc2: add support for Meson8b and GXBB SoCs
+In-Reply-To: <20160911134111.31141-1-martin.blumenstingl@googlemail.com>
 References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20160911134111.31141-1-martin.blumenstingl@googlemail.com>
+ <20160911134111.31141-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20160911134111.31141-2-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds initial support for the DWC2 USB controllers and Meson
-specific USB PHYs found in Meson8b and GXBB SoCs, which means:
-- new DWC2 bindings and platform specific core configuration
-- a PHY driver supporting the USB2 PHY on Meson8b and GXBB SoCs
+From: Jerome Brunet <jbrunet@baylibre.com>
 
-The first DWC2 controller is usually configured in OTG mode, whereas
-the second DWC2 controller is usually configured in host(-only) mode.
+Add compatible strings for amlogic Meson8b and GXBB SoCs with the
+corresponding configuration parameters.
 
-Unfortunately no (public) datasheet is available and the reference PHY
-driver does not contain comments or speaking register name definitions.
-The nice people from BayLibre have already requested the datasheets
-(currently we can for example only guess that there is a mux clock
-inside the PHY, but we don't know it's parents).
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ Documentation/devicetree/bindings/usb/dwc2.txt |  2 ++
+ drivers/usb/dwc2/platform.c                    | 34 ++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
 
-With this series both DWC2 controllers are configure in host mode,
-because the reference driver polls some of the PHY registers in OTG
-mode and then re-configures the dwc2 driver instance accordingly (if
-anyone is interested, this is the relevant piece of code: [0]). This
-seems good enough for the beginning though.
-
-
-Changes since v1:
-- the patch "clk: gxbb: expose USB clocks" was not sent again as it was
-  already applied by Kevin Hilman (thanks!)
-- dropped (unnecessary) USB PHY bus from .dts
-- remove underscores from PHY node names in .dts
-- rename the dwc2 nodes in the .dts to usb (as per convention)
-- remove unused struct reset_control from phy_meson_usb2_priv
-- removed refcounting "reset" workaround and only specify the reset for
-  the first PHY in the .dts (Jerome has reported that his boards don't
-  need the explicit reset, while my board needs it). In addition (to
-  make this work) the driver now treats the reset as optional
-- use the RESET_USB_OTG definition (from
-  <dt-bindings/reset/amlogic,meson-gxbb-reset.h>) instead of a magic
-  number in the .dts
-
-
-[0] https://github.com/150balbes/Amlogic_s905-kernel/blob/master/drivers/amlogic/usb/dwc_otg/310/dwc_otg_driver.c#L642
-
-
-Jerome Brunet (2):
-  usb: dwc2: add support for Meson8b and GXBB SoCs
-  ARM64: meson-gxbb-p20x: Enable USB Nodes
-
-Martin Blumenstingl (4):
-  Documentation: dt-bindings: Add documentation for the Meson USB2 PHYs
-  phy: meson: add USB2 PHY support for Meson8b and GXBB
-  ARM64: meson-gxbb: add USB Nodes
-  ARM64: meson-gxbb-vega-s95: Enable USB Nodes
-
- .../devicetree/bindings/phy/meson-usb2-phy.txt     |  27 ++
- Documentation/devicetree/bindings/usb/dwc2.txt     |   2 +
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |  29 +++
- .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  30 +++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  43 ++++
- drivers/phy/Kconfig                                |  11 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-meson-usb2.c                       | 280 +++++++++++++++++++++
- drivers/usb/dwc2/platform.c                        |  34 +++
- 9 files changed, 457 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
- create mode 100644 drivers/phy/phy-meson-usb2.c
-
+diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+index 20a68bf..2c30a54 100644
+--- a/Documentation/devicetree/bindings/usb/dwc2.txt
++++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+@@ -10,6 +10,8 @@ Required properties:
+   - "rockchip,rk3288-usb", "rockchip,rk3066-usb", "snps,dwc2": for rk3288 Soc;
+   - "lantiq,arx100-usb": The DWC2 USB controller instance in Lantiq ARX SoCs;
+   - "lantiq,xrx200-usb": The DWC2 USB controller instance in Lantiq XRX SoCs;
++  - "amlogic,meson8b-usb": The DWC2 USB controller instance in Amlogic Meson8b SoCs;
++  - "amlogic,meson-gxbb-usb": The DWC2 USB controller instance in Amlogic S905 SoCs;
+   - snps,dwc2: A generic DWC2 USB controller with default parameters.
+ - reg : Should contain 1 register range (address and length)
+ - interrupts : Should contain 1 interrupt
+diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
+index fc6f525..8f7b34c 100644
+--- a/drivers/usb/dwc2/platform.c
++++ b/drivers/usb/dwc2/platform.c
+@@ -181,6 +181,38 @@ static const struct dwc2_core_params params_ltq = {
+ 	.hibernation			= -1,
+ };
+ 
++static const struct dwc2_core_params params_amlogic = {
++	.otg_cap			= DWC2_CAP_PARAM_NO_HNP_SRP_CAPABLE,
++	.otg_ver			= -1,
++	.dma_enable			= 1,
++	.dma_desc_enable		= 0,
++	.dma_desc_fs_enable		= 0,
++	.speed				= DWC2_SPEED_PARAM_HIGH,
++	.enable_dynamic_fifo		= 1,
++	.en_multiple_tx_fifo		= -1,
++	.host_rx_fifo_size		= 512,
++	.host_nperio_tx_fifo_size	= 500,
++	.host_perio_tx_fifo_size	= 500,
++	.max_transfer_size		= -1,
++	.max_packet_count		= -1,
++	.host_channels			= 16,
++	.phy_type			= DWC2_PHY_TYPE_PARAM_UTMI,
++	.phy_utmi_width			= -1,
++	.phy_ulpi_ddr			= -1,
++	.phy_ulpi_ext_vbus		= -1,
++	.i2c_enable			= -1,
++	.ulpi_fs_ls			= -1,
++	.host_support_fs_ls_low_power	= -1,
++	.host_ls_low_power_phy_clk	= -1,
++	.ts_dline			= -1,
++	.reload_ctl			= 1,
++	.ahbcfg				= GAHBCFG_HBSTLEN_INCR8 <<
++					  GAHBCFG_HBSTLEN_SHIFT,
++	.uframe_sched			= 0,
++	.external_id_pin_ctl		= -1,
++	.hibernation			= -1,
++};
++
+ /*
+  * Check the dr_mode against the module configuration and hardware
+  * capabilities.
+@@ -464,6 +496,8 @@ static const struct of_device_id dwc2_of_match_table[] = {
+ 	{ .compatible = "lantiq,xrx200-usb", .data = &params_ltq },
+ 	{ .compatible = "snps,dwc2", .data = NULL },
+ 	{ .compatible = "samsung,s3c6400-hsotg", .data = NULL},
++	{ .compatible = "amlogic,meson8b-usb", .data = &params_amlogic },
++	{ .compatible = "amlogic,meson-gxbb-usb", .data = &params_amlogic },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, dwc2_of_match_table);
 -- 
 2.9.3
