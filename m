@@ -1,35 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
+From: sf84@laposte.net (Sebastian Frias)
 Date: Mon, 12 Sep 2016 14:29:37 +0200
-Subject: [PATCH v2 3/3] gpio: mxc: add generic gpio request/free callbacks
- to pinctrl
-In-Reply-To: <1473299296-22458-4-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1473299296-22458-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1473299296-22458-4-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <CACRpkdYL4PR1AYGhuT7rLZv3xepk1pqJ=Gg4MhUU+CPsCaJvMA@mail.gmail.com>
+Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
+In-Reply-To: <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
+References: <57BDAF2E.10502@laposte.net>
+ <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
+Message-ID: <57D69FB1.2020801@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 3:48 AM, Vladimir Zapolskiy
-<vladimir_zapolskiy@mentor.com> wrote:
+Hi Timur,
 
-> If a GPIO controller description in board DTB contains information
-> about mappings between GPIOs and pads under IOMUX control use it to
-> request and free GPIOs with respect to pinctrl/pinmux subsystems.
->
-> One of immediate positive functional changes is inability to
-> request non-existing GPIOs, i.e. if there is no pad such. Also
-> pinctrl/pinmux may now properly account pads occupied by requested
-> GPIOs.
->
-> The change has no effect, if "gpio-ranges" property is not found
-> including the case if a board has no DTB firmware.
->
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> ---
-> Changes from v1 to v2:
-> * none
+On 08/28/2016 10:36 PM, Timur Tabi wrote:
+> On Wed, Aug 24, 2016 at 9:29 AM, Sebastian Frias <sf84@laposte.net> wrote:
+>>
+>> If this is really not possible, it forces the SoC manufacturer to expose
+>> those properties in a different way, thus wasting a (seemingly) perfectly
+>> fine way of doing so: the DT and its documentation.
+> 
+> When you submit a new driver upstream, that patch also includes the
+> new device tree nodes and documentation for those nodes.  Everything
+> is peer-reviewed together.  I don't understand what you think the
+> problem is.
+> 
 
-Patch applied with Shawn's ACK.
+Thanks for your comment and sorry for the late reply.
 
-Yours,
-Linus Walleij
+My question is about submitting DT properties/nodes (describing some HW) for
+which there is no Linux driver. Like register addresses for HW blocks,
+including HW capabilities of said HW blocks, which may or may not be setup
+by Linux directly.
+
+The idea being that since DT describes the HW and is usually shared with the
+bootloader (yet stored in the Linux kernel tree), all layers of the stack
+could use the same DT and each layer would use relevant properties. So the
+DT would describe the whole SoC even if not all HW blocks have a Linux
+driver.
+
+3rd party users of said SoC could then write kernel modules for such HW
+blocks using the DT description. The DT would thus become the authoritative
+source of information regarding register programming for the SoC.
+
+Currently, HW blocks for which there is no public driver (that it is
+accessed through user-mode libraries or firmware) require a separate
+HW description (be it Documentation, headers, etc.)
+
+Since the DT describes the HW, it would make sense to expose the HW through
+DT, that would centralise the HW description.
+
+However, after discussing over IRC, it looks like there was no guidance on
+this. Some people think submitting DT properties/nodes without a corresponding
+Linux driver is frowned upon, while others thought it was an odd limitation
+and suggested asking here.
+
+Does that clarifies the scope of the question?
+
+Best regards,
+
+Sebastian
