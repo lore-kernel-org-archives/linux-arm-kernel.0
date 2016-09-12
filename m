@@ -1,50 +1,128 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 12 Sep 2016 20:58:42 +0200
-Subject: [UPDATE PATCH V11 1/8] ACPI: I/O Remapping Table (IORT) initial
- support
-In-Reply-To: <1473706460-9037-1-git-send-email-tn@semihalf.com>
-References: <1473705147-6588-2-git-send-email-tn@semihalf.com>
- <1473706460-9037-1-git-send-email-tn@semihalf.com>
-Message-ID: <87c1d6a4-a760-9f8a-ddbe-7cf6655d575b@semihalf.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 12 Sep 2016 21:05:47 +0200 (CEST)
+Subject: [PATCH v2 2/6] ARM: dts: bcm283x: Define standard pinctrl
+ groups in the gpio node.
+In-Reply-To: <1273800480.83718.15854341-2f8e-4e20-95f4-e76f81e6fd56.open-xchange@email.1und1.de>
+References: <1473668576-22256-1-git-send-email-kraxel@redhat.com>
+ <1473668576-22256-3-git-send-email-kraxel@redhat.com>
+ <1273800480.83718.15854341-2f8e-4e20-95f4-e76f81e6fd56.open-xchange@email.1und1.de>
+Message-ID: <103847685.101383.df740dd1-92f3-4978-9442-1f1b3a81e9da.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.09.2016 20:54, Tomasz Nowicki wrote:
-> IORT shows representation of IO topology for ARM based systems.
-> It describes how various components are connected together on
-> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
-> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
->
-> Initial support allows to detect IORT table presence and save its
-> root pointer obtained through acpi_get_table(). The pointer validity
-> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
-> is not set while using IORT nodes we would dereference unmapped pointers.
->
-> For the aforementioned reason call acpi_iort_init() from acpi_init()
-> which guarantees acpi_gbl_permanent_mmap to be set at that point.
->
-> Add generic helpers which are helpful for scanning and retrieving
-> information from IORT table content. List of the most important helpers:
-> - iort_find_dev_node() finds IORT node for a given device
-> - iort_node_map_rid() maps device RID and returns IORT node which provides
->   final translation
->
-> IORT support is placed under drivers/acpi/arm64/ new directory due to its
-> ARM64 specific nature. The code there is considered only for ARM64.
-> The long term plan is to keep all ARM64 specific tables support
-> in this place e.g. GTDT table.
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Hi Gerd,
 
-Hi Marc,
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 12. September 2016 um 20:19
+> geschrieben:
+> 
+> 
+> Hi Gerd,
+> 
+> > Gerd Hoffmann <kraxel@redhat.com> hat am 12. September 2016 um 10:22
+> > geschrieben:
+> > 
+> > 
+> > From: Eric Anholt <eric@anholt.net>
+> > 
+> > The BCM2835-ARM-Peripherals.pdf documentation specifies what the
+> > function selects do for the pins, and there are a bunch of obvious
+> > groupings to be made.  With these created, we'll be able to replace
+> > bcm2835-rpi.dtsi's main "set all of these pins to alt0" with
+> > references to specific groups we want enabled.
+> > 
+> > Signed-off-by: Eric Anholt <eric@anholt.net>
+> > 
+> > squashed in:
+> >   ARM: dts: bcm283x: Add the emmc pin group to bcm283x.dtsi.
+> >   ARM: dts: bcm283x: Add a group for mapping pins 48-53 to sdhost.
+> >   ARM: dts: bcm283x: Add a new EMMC pin group from the downstream tree.
+> > 
+> > fixups by kraxel:
+> >   * fix spi0 name
+> >   * sort & group entries
+> >   * use pull defines
+> >   * add dpi group
+> 
+> this looks like a changelog. Please move this at the proper place before the
+> first "diff" and specify the version.
+> 
+> > 
+> > Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+> > ---
+> >  arch/arm/boot/dts/bcm283x.dtsi | 203
+> > +++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 203 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+> > index 4d9f3ab..7b03b63 100644
+> > --- a/arch/arm/boot/dts/bcm283x.dtsi
+> > +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> > @@ -131,6 +131,209 @@
+> >  
+> >  			interrupt-controller;
+> >  			#interrupt-cells = <2>;
+> > +
+> > +			/* Defines pin muxing groups according to
+> > +			 * BCM2835-ARM-Peripherals.pdf page 102.
+> > +			 *
+> > +			 * While each pin can have its mux selected
+> > +			 * for various functions individually, some
+> > +			 * groups only make sense to switch to a
+> > +			 * particular function together.
+> > +			 */
+> > +			dpi_gpio4: dpi_gpio4 {
+> > +				brcm,pins = <0 1 2 3 4 5 6 7 8 9 10 11
+> > +					     12 13 14 15 16 17 18 19
+> > +					     20 21 22 23 24 25 26 27>;
+> > +				brcm,function = <BCM2835_FSEL_ALT2>;
+> > +			};
+> 
+> s/dpi_gpio4/dpi_gpio0
+> 
+> > +			emmc_gpio22: emmc_gpio22 {
+> > +				brcm,pins = <22 23 24 25 26 27>;
+> > +				brcm,function = <BCM2835_FSEL_ALT3>;
+> > +			};
+> > +			emmc_gpio34: emmc_gpio34 {
+> > +				brcm,pins = <34 35 36 37 38 39>;
+> > +				brcm,function = <BCM2835_FSEL_ALT3>;
+> > +				brcm,pull = <BCM2835_PUD_OFF
+> > +					     BCM2835_PUD_UP
+> > +					     BCM2835_PUD_UP
+> > +					     BCM2835_PUD_UP
+> > +					     BCM2835_PUD_UP
+> > +					     BCM2835_PUD_UP>;
+> > +			};
+> > +			emmc_gpio48: emmc_gpio48 {
+> > +				brcm,pins = <48 49 50 51 52 53>;
+> > +				brcm,function = <BCM2835_FSEL_ALT3>;
+> > +			};
+> 
+> Sorry, i didn't notice this before. The naming of these groups suggest 3 muxes
+> for the same eMMC interface. I thought there is a eMMC interface and a SD host
+> interface with different DMA channels.
+> 
+> > +
+> > ...
+> > +
+> > +			sdhost_gpio48: sdhost_gpio48 {
+> > +				brcm,pins = <48 49 50 51 52 53>;
+> > +				brcm,function = <BCM2835_FSEL_ALT0>;
+> > +			};
+> 
+> I think this incorrect. There is no function ALT0 for these pins, only ALT3.
 
-Series with updated patch 1 can be found:
-https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v11)
+please forget my last 2 comments. According to this page [1] eMMC is selected by
+ALT3 and sdhost is selected by ALT0.
 
-Sorry for zillions of patch updates...
+Do you know a reliable source where all muxes for both interface are documented?
+The datasheet isn't very helpful here.
 
-Thanks,
-Tomasz
+Regards
+Stefan
+
+[1] - http://pinout.xyz/pinout/sdio
+
+> 
+> Regards
+> Stefan
