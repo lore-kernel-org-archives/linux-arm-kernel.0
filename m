@@ -1,63 +1,114 @@
 From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Mon, 12 Sep 2016 20:12:44 +0200
-Subject: [PATCH v5 2/5] dts: sun8i-h3: split off RTS/CTS for UART1 in seperate
- pinmux
+Date: Mon, 12 Sep 2016 20:12:45 +0200
+Subject: [PATCH v5 3/5] dts: sun8i-h3: associate exposed UARTs on Orange Pi
+ Boards
 In-Reply-To: <1473703967-21356-1-git-send-email-jorik@kippendief.biz>
 References: <1473703967-21356-1-git-send-email-jorik@kippendief.biz>
-Message-ID: <1473703967-21356-3-git-send-email-jorik@kippendief.biz>
+Message-ID: <1473703967-21356-4-git-send-email-jorik@kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jorik Jonker <jorik@kippendief.biz>
 
-This was done to make UART1-3 on H3 consistent, and less complicated to
-enable UART1-3 on the breakout header on the several H3 board (notably
-Orange Pi's). This patch adds a bit of complexity for the existing Banana
-Pi, which already had the RTS/CTS associated on UART1.
+These H3 boards all expose UART1-3 on their expansion header. Since
+other functions can be muxed to these pins, they are explicitly
+disabled. To enable them, one could use DT overlays or U-boot commands:
 
-The RTS/CTS for UART2-3 could be defined in the same way, but since
-there is no actual use case for them at the moment, they are left out.
+ => fdt set /soc/serial at 01c28c00 status okay
 
 Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 ---
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts |  2 +-
- arch/arm/boot/dts/sun8i-h3.dtsi                 | 11 +++++++++--
- 2 files changed, 10 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts   | 18 ++++++++++++++++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 18 ++++++++++++++++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts  | 18 ++++++++++++++++++
+ 3 files changed, 54 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-index f3b1d5f..06fddaa 100644
---- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-@@ -185,7 +185,7 @@
- 
- &uart1 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&uart1_pins_a>;
-+	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+index f93f5d1..9aa2bb7 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+@@ -176,6 +176,24 @@
  	status = "okay";
  };
  
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 665fa32..742bced 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -367,8 +367,15 @@
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
--			uart1_pins_a: uart1 at 0 {
--				allwinner,pins = "PG6", "PG7", "PG8", "PG9";
-+			uart1_pins: uart1 {
-+				allwinner,pins = "PG6", "PG7";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
++	status = "disabled";
++};
 +
-+			uart1_rts_cts_pins: uart1_rts_cts {
-+				allwinner,pins = "PG8", "PG9";
- 				allwinner,function = "uart1";
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins>;
++	status = "disabled";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_pins>;
++	status = "disabled";
++};
++
+ &usb1_vbus_pin_a {
+ 	allwinner,pins = "PG13";
+ };
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index 0adf932..5c9b5bf 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -139,6 +139,24 @@
+ 	status = "okay";
+ };
+ 
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
++	status = "disabled";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins>;
++	status = "disabled";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_pins>;
++	status = "disabled";
++};
++
+ &usbphy {
+ 	/* USB VBUS is always on */
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index daf50b9..3ec9712 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -161,6 +161,24 @@
+ 	status = "okay";
+ };
+ 
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
++	status = "disabled";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins>;
++	status = "disabled";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart3_pins>;
++	status = "disabled";
++};
++
+ &usbphy {
+ 	/* USB VBUS is always on */
+ 	status = "okay";
 -- 
 2.7.4
