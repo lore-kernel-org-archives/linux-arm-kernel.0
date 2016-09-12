@@ -1,70 +1,131 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 12 Sep 2016 15:49:16 +0100
-Subject: [PATCH v4 02/10] arm64: KVM: Move GIC accessors to arch_gicv3.h
+Date: Mon, 12 Sep 2016 15:49:15 +0100
+Subject: [PATCH v4 01/10] arm64: KVM: Use static keys for selecting the GIC
+ backend
 In-Reply-To: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
 References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1473691764-29424-3-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1473691764-29424-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we are going to share vgic-v3 save/restore code with ARM keep
-arch specific accessors separately.
+Currently GIC backend is selected via alternative framework and this
+is fine. We are going to introduce vgic-v3 to 32-bit world and there
+we don't have patching framework in hand, so we can either check
+support for GICv3 every time we need to choose which backend to use or
+try to optimise it by using static keys. The later looks quite
+promising because we can share logic involved in selecting GIC backend
+between architectures if both uses static keys.
+
+This patch moves arm64 from alternative to static keys framework for
+selecting GIC backend. For that we embed static key into vgic_global
+and enable the key during vgic initialisation based on what has
+already been exposed by the host GIC driver.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/arch_gicv3.h |   13 +++++++++++++
- arch/arm64/kvm/hyp/vgic-v3-sr.c     |   13 -------------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm64/kvm/hyp/switch.c   |   21 +++++++++++----------
+ include/kvm/arm_vgic.h        |    4 ++++
+ virt/kvm/arm/vgic/vgic-init.c |    4 ++++
+ virt/kvm/arm/vgic/vgic.c      |    2 +-
+ 4 files changed, 20 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 8ec88e5..ae7dbd7 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -79,6 +79,19 @@
- #include <linux/stringify.h>
- #include <asm/barrier.h>
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 5a84b45..d5c4cc5 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -16,6 +16,8 @@
+  */
  
-+#define read_gicreg(r)							\
-+	({								\
-+		u64 reg;						\
-+		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
-+		reg;							\
-+	})
+ #include <linux/types.h>
++#include <linux/jump_label.h>
 +
-+#define write_gicreg(v,r)						\
-+	do {								\
-+		u64 __val = (v);					\
-+		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
-+	} while (0)
-+
- /*
-  * Low-level accessors
-  *
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-index 5f8f80b..f2dbd2e 100644
---- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-+++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-@@ -24,19 +24,6 @@
- #define vtr_to_max_lr_idx(v)		((v) & 0xf)
- #define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_hyp.h>
  
--#define read_gicreg(r)							\
--	({								\
--		u64 reg;						\
--		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
--		reg;							\
--	})
+@@ -126,17 +128,13 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+ 	write_sysreg(0, vttbr_el2);
+ }
+ 
+-static hyp_alternate_select(__vgic_call_save_state,
+-			    __vgic_v2_save_state, __vgic_v3_save_state,
+-			    ARM64_HAS_SYSREG_GIC_CPUIF);
 -
--#define write_gicreg(v,r)						\
--	do {								\
--		u64 __val = (v);					\
--		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
--	} while (0)
+-static hyp_alternate_select(__vgic_call_restore_state,
+-			    __vgic_v2_restore_state, __vgic_v3_restore_state,
+-			    ARM64_HAS_SYSREG_GIC_CPUIF);
 -
- static u64 __hyp_text __gic_v3_get_lr(unsigned int lr)
+ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
  {
- 	switch (lr & 0xf) {
+-	__vgic_call_save_state()(vcpu);
++	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
++		__vgic_v3_save_state(vcpu);
++	else
++		__vgic_v2_save_state(vcpu);
++
+ 	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
+ }
+ 
+@@ -149,7 +147,10 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+ 	val |= vcpu->arch.irq_lines;
+ 	write_sysreg(val, hcr_el2);
+ 
+-	__vgic_call_restore_state()(vcpu);
++	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
++		__vgic_v3_restore_state(vcpu);
++	else
++		__vgic_v2_restore_state(vcpu);
+ }
+ 
+ static bool __hyp_text __true_value(void)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 19b698e..994665a 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -23,6 +23,7 @@
+ #include <linux/types.h>
+ #include <kvm/iodev.h>
+ #include <linux/list.h>
++#include <linux/jump_label.h>
+ 
+ #define VGIC_V3_MAX_CPUS	255
+ #define VGIC_V2_MAX_CPUS	8
+@@ -63,6 +64,9 @@ struct vgic_global {
+ 
+ 	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
+ 	bool			can_emulate_gicv2;
++
++	/* GIC system register CPU interface */
++	struct static_key_false gicv3_cpuif;
+ };
+ 
+ extern struct vgic_global kvm_vgic_global_state;
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 83777c1..14d6718 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -405,6 +405,10 @@ int kvm_vgic_hyp_init(void)
+ 		break;
+ 	case GIC_V3:
+ 		ret = vgic_v3_probe(gic_kvm_info);
++		if (!ret) {
++			static_branch_enable(&kvm_vgic_global_state.gicv3_cpuif);
++			kvm_info("GIC system register CPU interface\n");
++		}
+ 		break;
+ 	default:
+ 		ret = -ENODEV;
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index e83b7fe..8a529a7 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -29,7 +29,7 @@
+ #define DEBUG_SPINLOCK_BUG_ON(p)
+ #endif
+ 
+-struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
++struct vgic_global __section(.hyp.text) kvm_vgic_global_state = {.gicv3_cpuif = STATIC_KEY_FALSE_INIT,};
+ 
+ /*
+  * Locking order is always:
 -- 
 1.7.9.5
