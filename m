@@ -1,24 +1,157 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 12 Sep 2016 11:07:46 -0700
-Subject: [PATCH v2 1/2] pinctrl: meson-gxbb: add the missing SDIO
- interrupt pin
-In-Reply-To: <20160911123903.20027-2-martin.blumenstingl@googlemail.com>
- (Martin Blumenstingl's message of "Sun, 11 Sep 2016 14:39:02 +0200")
-References: <20160828164725.19429-1-martin.blumenstingl@googlemail.com>
- <20160911123903.20027-1-martin.blumenstingl@googlemail.com>
- <20160911123903.20027-2-martin.blumenstingl@googlemail.com>
-Message-ID: <7hr38poutp.fsf@baylibre.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 13 Sep 2016 03:08:17 +0900
+Subject: [PATCH] dmaengine: cleanup with list_first_entry_or_null()
+Message-ID: <1473703697-903-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+The combo of list_empty() check and return list_first_entry()
+can be replaced with list_first_entry_or_null().
 
-> This adds the SDIO interrupt pin which can be used by sd_emmc_a.
->
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Suggested-by: Neil Armstrong <narmstrong@baylibre.com>
->
-> Fixes: 29885a656511 ("pinctrl: meson-gxbb: add the pins for the
-> SDIO/sd_emmc_a controller")
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Acked-by: Kevin Hilman <khilman@baylibre.com>
+ drivers/dma/coh901318.c  | 22 ++++------------------
+ drivers/dma/ep93xx_dma.c |  6 ++----
+ drivers/dma/ste_dma40.c  | 36 +++++-------------------------------
+ drivers/dma/virt-dma.h   |  6 ++----
+ 4 files changed, 13 insertions(+), 57 deletions(-)
+
+diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+index e4acd63..a373eca 100644
+--- a/drivers/dma/coh901318.c
++++ b/drivers/dma/coh901318.c
+@@ -1553,15 +1553,8 @@ coh901318_desc_submit(struct coh901318_chan *cohc, struct coh901318_desc *desc)
+ static struct coh901318_desc *
+ coh901318_first_active_get(struct coh901318_chan *cohc)
+ {
+-	struct coh901318_desc *d;
+-
+-	if (list_empty(&cohc->active))
+-		return NULL;
+-
+-	d = list_first_entry(&cohc->active,
+-			     struct coh901318_desc,
+-			     node);
+-	return d;
++	return list_first_entry_or_null(&cohc->active, struct coh901318_desc,
++					node);
+ }
+ 
+ static void
+@@ -1579,15 +1572,8 @@ coh901318_desc_queue(struct coh901318_chan *cohc, struct coh901318_desc *desc)
+ static struct coh901318_desc *
+ coh901318_first_queued(struct coh901318_chan *cohc)
+ {
+-	struct coh901318_desc *d;
+-
+-	if (list_empty(&cohc->queue))
+-		return NULL;
+-
+-	d = list_first_entry(&cohc->queue,
+-			     struct coh901318_desc,
+-			     node);
+-	return d;
++	return list_first_entry_or_null(&cohc->queue, struct coh901318_desc,
++					node);
+ }
+ 
+ static inline u32 coh901318_get_bytes_in_lli(struct coh901318_lli *in_lli)
+diff --git a/drivers/dma/ep93xx_dma.c b/drivers/dma/ep93xx_dma.c
+index 21f08cc..2ffaca2 100644
+--- a/drivers/dma/ep93xx_dma.c
++++ b/drivers/dma/ep93xx_dma.c
+@@ -262,10 +262,8 @@ static void ep93xx_dma_set_active(struct ep93xx_dma_chan *edmac,
+ static struct ep93xx_dma_desc *
+ ep93xx_dma_get_active(struct ep93xx_dma_chan *edmac)
+ {
+-	if (list_empty(&edmac->active))
+-		return NULL;
+-
+-	return list_first_entry(&edmac->active, struct ep93xx_dma_desc, node);
++	return list_first_entry_or_null(&edmac->active,
++					struct ep93xx_dma_desc, node);
+ }
+ 
+ /**
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index 8b18e44..e43d2bb 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -941,15 +941,7 @@ static void d40_desc_load(struct d40_chan *d40c, struct d40_desc *d40d)
+ 
+ static struct d40_desc *d40_first_active_get(struct d40_chan *d40c)
+ {
+-	struct d40_desc *d;
+-
+-	if (list_empty(&d40c->active))
+-		return NULL;
+-
+-	d = list_first_entry(&d40c->active,
+-			     struct d40_desc,
+-			     node);
+-	return d;
++	return list_first_entry_or_null(&d40c->active, struct d40_desc, node);
+ }
+ 
+ /* remove desc from current queue and add it to the pending_queue */
+@@ -962,36 +954,18 @@ static void d40_desc_queue(struct d40_chan *d40c, struct d40_desc *desc)
+ 
+ static struct d40_desc *d40_first_pending(struct d40_chan *d40c)
+ {
+-	struct d40_desc *d;
+-
+-	if (list_empty(&d40c->pending_queue))
+-		return NULL;
+-
+-	d = list_first_entry(&d40c->pending_queue,
+-			     struct d40_desc,
+-			     node);
+-	return d;
++	return list_first_entry_or_null(&d40c->pending_queue, struct d40_desc,
++					node);
+ }
+ 
+ static struct d40_desc *d40_first_queued(struct d40_chan *d40c)
+ {
+-	struct d40_desc *d;
+-
+-	if (list_empty(&d40c->queue))
+-		return NULL;
+-
+-	d = list_first_entry(&d40c->queue,
+-			     struct d40_desc,
+-			     node);
+-	return d;
++	return list_first_entry_or_null(&d40c->queue, struct d40_desc, node);
+ }
+ 
+ static struct d40_desc *d40_first_done(struct d40_chan *d40c)
+ {
+-	if (list_empty(&d40c->done))
+-		return NULL;
+-
+-	return list_first_entry(&d40c->done, struct d40_desc, node);
++	return list_first_entry_or_null(&d40c->done, struct d40_desc, node);
+ }
+ 
+ static int d40_psize_2_burst_size(bool is_log, int psize)
+diff --git a/drivers/dma/virt-dma.h b/drivers/dma/virt-dma.h
+index d9731ca..a030ae7 100644
+--- a/drivers/dma/virt-dma.h
++++ b/drivers/dma/virt-dma.h
+@@ -123,10 +123,8 @@ static inline void vchan_cyclic_callback(struct virt_dma_desc *vd)
+  */
+ static inline struct virt_dma_desc *vchan_next_desc(struct virt_dma_chan *vc)
+ {
+-	if (list_empty(&vc->desc_issued))
+-		return NULL;
+-
+-	return list_first_entry(&vc->desc_issued, struct virt_dma_desc, node);
++	return list_first_entry_or_null(&vc->desc_issued,
++					struct virt_dma_desc, node);
+ }
+ 
+ /**
+-- 
+1.9.1
