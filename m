@@ -1,39 +1,35 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 12 Sep 2016 09:31:25 +0100
-Subject: [STLinux Kernel] [PATCH -next] hwrng: st - Fix missing
- clk_disable_unprepare() on error in st_rng_probe()
-In-Reply-To: <1473509022-3478-1-git-send-email-weiyj.lk@gmail.com>
-References: <1473509022-3478-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <20160912083125.GA20253@griffinp-ThinkPad-X1-Carbon-2nd>
+From: m.niestroj@grinn-global.com (Marcin Niestroj)
+Date: Mon, 12 Sep 2016 10:34:58 +0200
+Subject: [PATCH 1/2] ARM: dts: imx6ul: Add DTS for liteSOM module
+In-Reply-To: <CAOMZO5AmXRs9eqzvOc8WOVc_xzZJFN8DOoOddw22WALqU66u6w@mail.gmail.com>
+References: <20160909103906.15209-1-m.niestroj@grinn-global.com>
+ <CAOMZO5AmXRs9eqzvOc8WOVc_xzZJFN8DOoOddw22WALqU66u6w@mail.gmail.com>
+Message-ID: <de2e41be-ad69-ce4b-57fe-3215bc9811ad@grinn-global.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+On 09.09.2016 19:44, Fabio Estevam wrote:
+> On Fri, Sep 9, 2016 at 7:39 AM, Marcin Niestroj
+> <m.niestroj@grinn-global.com> wrote:
+>
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6ul-litesom.dtsi
+>> @@ -0,0 +1,52 @@
+>> +/*
+>> + * Copyright (C) 2016 Grinn
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>
+> Is it possible to use a dual GPLv2/X11 license?
 
-On Sat, 10 Sep 2016, Wei Yongjun wrote:
+It is possible. But why should we do that?
 
-> From: Wei Yongjun <weiyongjun1@huawei.com>
-> 
-> Fix the missing clk_disable_unprepare() before return
-> from st_rng_probe() in the error handling case.
-> 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> ---
->  drivers/char/hw_random/st-rng.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
-> index 7e8aa6b..938ec10 100644
-> --- a/drivers/char/hw_random/st-rng.c
-> +++ b/drivers/char/hw_random/st-rng.c
-> @@ -108,6 +108,7 @@ static int st_rng_probe(struct platform_device *pdev)
->  	ret = hwrng_register(&ddata->ops);
->  	if (ret) {
->  		dev_err(&pdev->dev, "Failed to register HW RNG\n");
-> +		clk_disable_unprepare(clk);
->  		return ret;
->  	}
->  
-> 
+>
+> Patches look good.
+>
 
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
+-- 
+Marcin Niestroj
