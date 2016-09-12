@@ -1,24 +1,65 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 12 Sep 2016 10:29:15 -0300
-Subject: [PATCH 1/2] ARM: dts: imx6ul: Add DTS for liteSOM module
-In-Reply-To: <b9766440-d35d-b931-2883-3dcc11425337@grinn-global.com>
-References: <20160909103906.15209-1-m.niestroj@grinn-global.com>
- <CAOMZO5AmXRs9eqzvOc8WOVc_xzZJFN8DOoOddw22WALqU66u6w@mail.gmail.com>
- <de2e41be-ad69-ce4b-57fe-3215bc9811ad@grinn-global.com>
- <CAOMZO5Cp_ihOa9Z1r5_NiDqiGB+ZfpUn4n5xG95DMA27T=WX0A@mail.gmail.com>
- <b9766440-d35d-b931-2883-3dcc11425337@grinn-global.com>
-Message-ID: <CAOMZO5AtW=5bQAPC1PtAzuzSnF_KasqwhV7D6ZZdzhna+G-1pw@mail.gmail.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 12 Sep 2016 15:34:41 +0200
+Subject: [PATCH] BUG: atmel_serial: Interrupts not disabled on close
+Message-ID: <20160912133441.14597-1-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 8:16 AM, Marcin Niestroj
-<m.niestroj@grinn-global.com> wrote:
+Since commit 18dfef9c7f87 ("serial: atmel: convert to irq handling
+provided mctrl-gpio"), interrupts from GPIOs are not disabled any more
+when the serial port is closed, leading to an oops when the one of the
+input pin is toggled (CTS/DSR/DCD/RNG).
 
-> We are including imx6ul.dtsi which is GPLv2 only. Do you plan to
-> relicense it?
+This is only the case if those pins are used as GPIOs, i.e. declared
+like that:
+usart1: serial at f8020000 {
+        /* CTS and DTS will be handled by GPIO */
+        status = "okay";
+        rts-gpios = <&pioB 17 GPIO_ACTIVE_LOW>;
+        cts-gpios = <&pioB 16 GPIO_ACTIVE_LOW>;
+        dtr-gpios = <&pioB 14 GPIO_ACTIVE_LOW>;
+        dsr-gpios = <&pioC 31 GPIO_ACTIVE_LOW>;
+        rng-gpios = <&pioB 12 GPIO_ACTIVE_LOW>;
+        dcd-gpios = <&pioB 15 GPIO_ACTIVE_LOW>;
+};
 
-Yes, I think it is a good idea.
+That's because modem interrupts used to be freed in atmel_shutdown().
+After commit 18dfef9c7f87 ("serial: atmel: convert to irq handling
+provided mctrl-gpio"), this code was just removed.
+Calling atmel_disable_ms() disables the interrupts and everything works
+fine again.
 
-> What do you mean by non-Linux users? What other projects are using dts?
+Tested on at91sam9g35-cm
 
-FreeBSD, U-Boot, Barebox.
+(This patch doesn't apply on -stable kernels, fixes for 4.4 and 4.7 will
+be sent after this one is applied.)
+
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+Fixes: 18dfef9c7f87 ("serial: atmel: convert to irq handling provided mctrl-gpio")
+---
+ drivers/tty/serial/atmel_serial.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 2eaa18ddef61..8bbde52db376 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1929,6 +1929,9 @@ static void atmel_shutdown(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 
++	/* Disable modem control lines interrupts */
++	atmel_disable_ms(port);
++
+ 	/* Disable interrupts at device level */
+ 	atmel_uart_writel(port, ATMEL_US_IDR, -1);
+ 
+@@ -1979,8 +1982,6 @@ static void atmel_shutdown(struct uart_port *port)
+ 	 */
+ 	free_irq(port->irq, port);
+ 
+-	atmel_port->ms_irq_enabled = false;
+-
+ 	atmel_flush_buffer(port);
+ }
+ 
