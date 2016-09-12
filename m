@@ -1,43 +1,54 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Mon, 12 Sep 2016 09:27:14 +0200
-Subject: [PATCH -next] hwrng: st - Fix missing clk_disable_unprepare() on
- error in st_rng_probe()
-In-Reply-To: <1473509022-3478-1-git-send-email-weiyj.lk@gmail.com>
-References: <1473509022-3478-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <f427e4a6-1807-2f32-4a1b-ad3150a17135@st.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Sep 2016 09:28:12 +0200
+Subject: [PATCH v3 4/9] ARM: dts: sun8i-h3: Add dt node for the syscon
+ control module
+In-Reply-To: <1473425117-18645-5-git-send-email-clabbe.montjoie@gmail.com>
+References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1473425117-18645-5-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20160912072812.GB9449@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wey
-
-On 09/10/2016 02:03 PM, Wei Yongjun wrote:
-> From: Wei Yongjun <weiyongjun1@huawei.com>
+On Fri, Sep 09, 2016 at 02:45:12PM +0200, Corentin Labbe wrote:
+> This patch add the dt node for the syscon register present on the
+> Allwinner H3.
 > 
-> Fix the missing clk_disable_unprepare() before return
-> from st_rng_probe() in the error handling case.
+> Only two register are present in this syscon and the only one useful is
+> the one dedicated to EMAC clock.
 > 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 > ---
->  drivers/char/hw_random/st-rng.c | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/drivers/char/hw_random/st-rng.c b/drivers/char/hw_random/st-rng.c
-> index 7e8aa6b..938ec10 100644
-> --- a/drivers/char/hw_random/st-rng.c
-> +++ b/drivers/char/hw_random/st-rng.c
-> @@ -108,6 +108,7 @@ static int st_rng_probe(struct platform_device *pdev)
->  	ret = hwrng_register(&ddata->ops);
->  	if (ret) {
->  		dev_err(&pdev->dev, "Failed to register HW RNG\n");
-> +		clk_disable_unprepare(clk);
->  		return ret;
->  	}
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index fdf9fdb..a39da6f 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -140,6 +140,11 @@
+>  		#size-cells = <1>;
+>  		ranges;
 >  
-> 
-> 
-> 
+> +		syscon: syscon at 01c00000 {
+> +			compatible = "syscon";
 
+Having our compatible would be nice here. syscon doesn't mean anything
+by itself.
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+> +			reg = <0x01c00000 0x34>;
 
-Thanks
+And the size of our system controller is 0x1000
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160912/b888ced4/attachment.sig>
