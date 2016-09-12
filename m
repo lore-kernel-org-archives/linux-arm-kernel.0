@@ -1,27 +1,60 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Mon, 12 Sep 2016 12:24:37 -0700
-Subject: [PATCH v2] extcon: Add support for qcom SPMI PMIC USB id detection
- hardware
-In-Reply-To: <57D60E56.10807@samsung.com>
-References: <CGME20160909214851epcas1p3718ae2ac8b9758b2d81e581ab88bf2ce@epcas1p3.samsung.com>
- <20160909214847.20103-1-stephen.boyd@linaro.org> <57D60E56.10807@samsung.com>
-Message-ID: <147370827733.17983.2419748714043821743@sboyd-linaro>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Sep 2016 20:36:07 +0100
+Subject: [UPDATE PATCH V11 1/8] ACPI: I/O Remapping Table (IORT) initial
+ support
+In-Reply-To: <87c1d6a4-a760-9f8a-ddbe-7cf6655d575b@semihalf.com>
+References: <1473705147-6588-2-git-send-email-tn@semihalf.com>
+ <1473706460-9037-1-git-send-email-tn@semihalf.com>
+ <87c1d6a4-a760-9f8a-ddbe-7cf6655d575b@semihalf.com>
+Message-ID: <20160912203607.591773e6@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chanwoo Choi (2016-09-11 19:09:26)
-> Hi Stephen,
-> 
-> Looks good to me.
-> But, there are something that need to be modified.
-> - add the author information
-> - add the description of driver
-> - use the extcon_set_state() instead of extcon_set_cable_state_()
-> 
-> I modified this patch and applied it because I should send
-> the pull request within this week after releasing the rc6.
-> 
-> I added the comment about the modification.
-> 
+On Mon, 12 Sep 2016 20:58:42 +0200
+Tomasz Nowicki <tn@semihalf.com> wrote:
 
-Ok, sounds good. Thanks.
+> On 12.09.2016 20:54, Tomasz Nowicki wrote:
+> > IORT shows representation of IO topology for ARM based systems.
+> > It describes how various components are connected together on
+> > parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+> > http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+> >
+> > Initial support allows to detect IORT table presence and save its
+> > root pointer obtained through acpi_get_table(). The pointer validity
+> > depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+> > is not set while using IORT nodes we would dereference unmapped pointers.
+> >
+> > For the aforementioned reason call acpi_iort_init() from acpi_init()
+> > which guarantees acpi_gbl_permanent_mmap to be set at that point.
+> >
+> > Add generic helpers which are helpful for scanning and retrieving
+> > information from IORT table content. List of the most important helpers:
+> > - iort_find_dev_node() finds IORT node for a given device
+> > - iort_node_map_rid() maps device RID and returns IORT node which provides
+> >   final translation
+> >
+> > IORT support is placed under drivers/acpi/arm64/ new directory due to its
+> > ARM64 specific nature. The code there is considered only for ARM64.
+> > The long term plan is to keep all ARM64 specific tables support
+> > in this place e.g. GTDT table.
+> >
+> > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> > Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+> > Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>  
+> 
+> Hi Marc,
+> 
+> Series with updated patch 1 can be found:
+> https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v11)
+> 
+> Sorry for zillions of patch updates...
+
+I've swapped the two patches and pushed the result out again, but from
+now on, please send updates on top of irq/irqchip-4.9.
+
+Thanks,
+
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
