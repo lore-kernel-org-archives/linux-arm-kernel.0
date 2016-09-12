@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 12 Sep 2016 20:06:39 +0100
-Subject: Applied "ASoC: rockchip: spdif: restore register during
+Date: Mon, 12 Sep 2016 20:06:57 +0100
+Subject: Applied "ASoC: rockchip: i2s: restore register during
  runtime_suspend/resume cycle" to the asoc tree
-In-Reply-To: <1473229821-54139-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <E1bjWYx-0002XB-Vt@debutante>
+In-Reply-To: <1473229653-53789-1-git-send-email-sugar.zhang@rock-chips.com>
+Message-ID: <E1bjWZF-0002YT-2V@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: rockchip: spdif: restore register during runtime_suspend/resume cycle
+   ASoC: rockchip: i2s: restore register during runtime_suspend/resume cycle
 
 has been applied to the asoc tree at
 
@@ -34,50 +34,48 @@ to this mail.
 Thanks,
 Mark
 
->From 3628c6987fb45d719cd963805bbba9f15017290e Mon Sep 17 00:00:00 2001
+>From f0447f6cbb202e1be8244d15aee390a96d65e490 Mon Sep 17 00:00:00 2001
 From: Sugar Zhang <sugar.zhang@rock-chips.com>
-Date: Wed, 7 Sep 2016 14:30:21 +0800
-Subject: [PATCH] ASoC: rockchip: spdif: restore register during
+Date: Wed, 7 Sep 2016 14:27:33 +0800
+Subject: [PATCH] ASoC: rockchip: i2s: restore register during
  runtime_suspend/resume cycle
 
-when step into runtime_suspend, spdif pd will be disabled and loss state.
+when step into runtime_suspend, i2s pd will be disabled and loss state.
 so need to restore register when runtime_resume.
 
 Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/rockchip/rockchip_spdif.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ sound/soc/rockchip/rockchip_i2s.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
-index 4ca265737eda..fa8101d1e16f 100644
---- a/sound/soc/rockchip/rockchip_spdif.c
-+++ b/sound/soc/rockchip/rockchip_spdif.c
-@@ -65,6 +65,7 @@ static int __maybe_unused rk_spdif_runtime_suspend(struct device *dev)
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index 652e8c5ea166..974915cb4c4f 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -57,6 +57,7 @@ static int i2s_runtime_suspend(struct device *dev)
  {
- 	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
+ 	struct rk_i2s_dev *i2s = dev_get_drvdata(dev);
  
-+	regcache_cache_only(spdif->regmap, true);
- 	clk_disable_unprepare(spdif->mclk);
- 	clk_disable_unprepare(spdif->hclk);
++	regcache_cache_only(i2s->regmap, true);
+ 	clk_disable_unprepare(i2s->mclk);
  
-@@ -88,7 +89,16 @@ static int __maybe_unused rk_spdif_runtime_resume(struct device *dev)
+ 	return 0;
+@@ -73,7 +74,14 @@ static int i2s_runtime_resume(struct device *dev)
  		return ret;
  	}
  
 -	return 0;
-+	regcache_cache_only(spdif->regmap, false);
-+	regcache_mark_dirty(spdif->regmap);
++	regcache_cache_only(i2s->regmap, false);
++	regcache_mark_dirty(i2s->regmap);
 +
-+	ret = regcache_sync(spdif->regmap);
-+	if (ret) {
-+		clk_disable_unprepare(spdif->mclk);
-+		clk_disable_unprepare(spdif->hclk);
-+	}
++	ret = regcache_sync(i2s->regmap);
++	if (ret)
++		clk_disable_unprepare(i2s->mclk);
 +
 +	return ret;
  }
  
- static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
+ static inline struct rk_i2s_dev *to_info(struct snd_soc_dai *dai)
 -- 
 2.8.1
