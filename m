@@ -1,49 +1,39 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 12 Sep 2016 10:21:36 +0200
-Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <CADRPPNS3PecYRaAMR+0RuzU+gE3y5ZN-x7HzqggrdDsN-CkArg@mail.gmail.com>
-References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
- <20160906185849.27pjhawadca5pwow@pengutronix.de>
- <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
- <87ca69fb85848a0a86b34a9a9037a57b@agner.ch>
- <CADRPPNSPye45bmFshfwb+gDA0x0ygs4Ofa6HMYbKt9ER0oeccg@mail.gmail.com>
- <8f8f7ffc4aef513ef5064ba0491fbc63@agner.ch>
- <CADRPPNR4oiRVgFqaM=1=Zn_JzrVJDVmozWsouLByXRtaHCh=qQ@mail.gmail.com>
- <306f579a2f2362595a55c53e48657563@agner.ch>
- <CADRPPNS3PecYRaAMR+0RuzU+gE3y5ZN-x7HzqggrdDsN-CkArg@mail.gmail.com>
-Message-ID: <20160912102136.04c0728d@ipc1.ka-ro>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Mon, 12 Sep 2016 10:22:53 +0200
+Subject: [PATCH v2 3/6] ARM: dts: bcm283x: add pinctrl group to &pwm,
+ drop pins from &gpio
+In-Reply-To: <1473668576-22256-1-git-send-email-kraxel@redhat.com>
+References: <1473668576-22256-1-git-send-email-kraxel@redhat.com>
+Message-ID: <1473668576-22256-4-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+---
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-On Fri, 9 Sep 2016 14:37:12 -0500 Leo Li wrote:
-> On Fri, Sep 9, 2016 at 11:51 AM, Stefan Agner <stefan@agner.ch> wrote:
-> > On 2016-09-08 16:57, Leo Li wrote:
-[...]
-> >> people fix problem that they don't really care by deliberately enlarge
-> >> the problem.  That's why we don't panic() on any error we found.  For
-> >> those who do care about the bus recovery, they can get the information
-> >> from the console.
-> >
-> > IMHO, it is just stupid to ignore errors and then let the developer
-> > later on trace back what the initial issue was. Error out early is a
-> > common sense software design principle...
-> >
-> > I am not asking for a panic(), I am just suggesting to only ignore
-> > pinctrl if it returns -ENODEV, the case you care are about.
-> 
-> It was just an analogy for enlarging the problem for getting
-> attention.  But you probably thought that it was not enlarging the
-> problem as you think pinctrl is required by the driver instead of an
-> optional thing.
-> 
-The I2C bus recovery is a feature which is not used during normal
-operation and you won't find that it's not working unless something
-unusual happens (probably only in a productive environment). It may even
-be hard to trigger a condition to test the feature.
-Thus IMO it is vital that the driver complains loudly if something is
-missing to make this feature work if requested.
-
-
-Lothar Wa?mann
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 88bcd0c..ff62236 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -38,7 +38,7 @@
+ 	};
+ 
+ 	alt0: alt0 {
+-		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11 40 45>;
++		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11>;
+ 		brcm,function = <BCM2835_FSEL_ALT0>;
+ 	};
+ 
+@@ -68,6 +68,8 @@
+ };
+ 
+ &pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
+ 	status = "okay";
+ };
+ 
+-- 
+1.8.3.1
