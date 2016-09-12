@@ -1,205 +1,217 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 12 Sep 2016 12:01:11 +0100
-Subject: [PATCH V2 07/10] PM / Domains: Prepare for adding support to remove
- PM domains
+Date: Mon, 12 Sep 2016 12:01:09 +0100
+Subject: [PATCH V2 05/10] PM / Domains: Don't expose xlate and provider helper
+ functions
 In-Reply-To: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
 References: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1473678074-15126-8-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1473678074-15126-6-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to remove PM domains safely from the list of PM domains,
-it is necessary to adding locking for the PM domain list around any
-places where devices or subdomains are added to a PM domain.
+Functions __of_genpd_xlate_simple(), __of_genpd_xlate_onecell() and
+__of_genpd_add_provider() are not used outside of the core generic PM
+domain code. Therefore, reduce the number of APIs exposed by making
+these static. At the same time don't expose the typedef for
+genpd_xlate_t either and make this a local definition as well.
 
-There are places where a reference to a PM domain is obtained via
-calling of_genpd_get_from_provider() before adding the device or the
-subdomain. In these cases a lock for the PM domain list needs to be
-held around the call to of_genpd_get_from_provider() and the call to
-add the device/subdomain. To avoid deadlocks by multiple attempts to
-obtain the PM domain list lock, add functions genpd_add_device() and
-genpd_add_subdomain() which require the user to hold the PM domain
-list lock when calling.
+The functions are renamed to follow the naming conventions for static
+functions in the generic PM domain core.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/domain.c | 97 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 73 insertions(+), 24 deletions(-)
+ drivers/base/power/domain.c | 49 ++++++++++++++++++++++++++++++++++-----------
+ include/linux/pm_domain.h   | 42 +++++++++++++-------------------------
+ 2 files changed, 51 insertions(+), 40 deletions(-)
 
 diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index fc9f11c26eec..1bd8d412db06 100644
+index d8c1eabc7117..c93aa3a64839 100644
 --- a/drivers/base/power/domain.c
 +++ b/drivers/base/power/domain.c
-@@ -1060,14 +1060,8 @@ static void genpd_free_dev_data(struct device *dev,
- 	dev_pm_put_subsys_data(dev);
- }
+@@ -1329,6 +1329,10 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
+ EXPORT_SYMBOL_GPL(pm_genpd_init);
  
--/**
-- * __pm_genpd_add_device - Add a device to an I/O PM domain.
-- * @genpd: PM domain to add the device to.
-- * @dev: Device to be added.
-- * @td: Set of PM QoS timing parameters to attach to the device.
-- */
--int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
--			  struct gpd_timing_data *td)
-+static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
-+			    struct gpd_timing_data *td)
- {
- 	struct generic_pm_domain_data *gpd_data;
- 	int ret = 0;
-@@ -1107,6 +1101,24 @@ int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+ #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
++
++typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
++						   void *data);
++
+ /*
+  * Device Tree based PM domain providers.
+  *
+@@ -1340,8 +1344,8 @@ EXPORT_SYMBOL_GPL(pm_genpd_init);
+  * maps a PM domain specifier retrieved from the device tree to a PM domain.
+  *
+  * Two simple mapping functions have been provided for convenience:
+- *  - __of_genpd_xlate_simple() for 1:1 device tree node to PM domain mapping.
+- *  - __of_genpd_xlate_onecell() for mapping of multiple PM domains per node by
++ *  - genpd_xlate_simple() for 1:1 device tree node to PM domain mapping.
++ *  - genpd_xlate_onecell() for mapping of multiple PM domains per node by
+  *    index.
+  */
  
- 	return ret;
- }
-+
-+/**
-+ * __pm_genpd_add_device - Add a device to an I/O PM domain.
-+ * @genpd: PM domain to add the device to.
-+ * @dev: Device to be added.
-+ * @td: Set of PM QoS timing parameters to attach to the device.
-+ */
-+int __pm_genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
-+			  struct gpd_timing_data *td)
-+{
-+	int ret;
-+
-+	mutex_lock(&gpd_list_lock);
-+	ret = genpd_add_device(genpd, dev, td);
-+	mutex_unlock(&gpd_list_lock);
-+
-+	return ret;
-+}
- EXPORT_SYMBOL_GPL(__pm_genpd_add_device);
+@@ -1366,7 +1370,7 @@ static LIST_HEAD(of_genpd_providers);
+ static DEFINE_MUTEX(of_genpd_mutex);
  
  /**
-@@ -1160,13 +1172,8 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- }
- EXPORT_SYMBOL_GPL(pm_genpd_remove_device);
- 
--/**
-- * pm_genpd_add_subdomain - Add a subdomain to an I/O PM domain.
-- * @genpd: Master PM domain to add the subdomain to.
-- * @subdomain: Subdomain to be added.
-- */
--int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
--			   struct generic_pm_domain *subdomain)
-+static int genpd_add_subdomain(struct generic_pm_domain *genpd,
-+			       struct generic_pm_domain *subdomain)
+- * __of_genpd_xlate_simple() - Xlate function for direct node-domain mapping
++ * genpd_xlate_simple() - Xlate function for direct node-domain mapping
+  * @genpdspec: OF phandle args to map into a PM domain
+  * @data: xlate function private data - pointer to struct generic_pm_domain
+  *
+@@ -1374,7 +1378,7 @@ static DEFINE_MUTEX(of_genpd_mutex);
+  * have their own device tree nodes. The private data of xlate function needs
+  * to be a valid pointer to struct generic_pm_domain.
+  */
+-struct generic_pm_domain *__of_genpd_xlate_simple(
++static struct generic_pm_domain *genpd_xlate_simple(
+ 					struct of_phandle_args *genpdspec,
+ 					void *data)
  {
- 	struct gpd_link *link, *itr;
- 	int ret = 0;
-@@ -1209,6 +1216,23 @@ int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
- 		kfree(link);
- 	return ret;
+@@ -1382,10 +1386,9 @@ struct generic_pm_domain *__of_genpd_xlate_simple(
+ 		return ERR_PTR(-EINVAL);
+ 	return data;
  }
-+
-+/**
-+ * pm_genpd_add_subdomain - Add a subdomain to an I/O PM domain.
-+ * @genpd: Master PM domain to add the subdomain to.
-+ * @subdomain: Subdomain to be added.
-+ */
-+int pm_genpd_add_subdomain(struct generic_pm_domain *genpd,
-+			   struct generic_pm_domain *subdomain)
-+{
-+	int ret;
-+
-+	mutex_lock(&gpd_list_lock);
-+	ret = genpd_add_subdomain(genpd, subdomain);
-+	mutex_unlock(&gpd_list_lock);
-+
-+	return ret;
-+}
- EXPORT_SYMBOL_GPL(pm_genpd_add_subdomain);
+-EXPORT_SYMBOL_GPL(__of_genpd_xlate_simple);
  
  /**
-@@ -1571,12 +1595,22 @@ static struct generic_pm_domain *genpd_get_from_provider(
- int of_genpd_add_device(struct of_phandle_args *genpdspec, struct device *dev)
+- * __of_genpd_xlate_onecell() - Xlate function using a single index.
++ * genpd_xlate_onecell() - Xlate function using a single index.
+  * @genpdspec: OF phandle args to map into a PM domain
+  * @data: xlate function private data - pointer to struct genpd_onecell_data
+  *
+@@ -1394,7 +1397,7 @@ EXPORT_SYMBOL_GPL(__of_genpd_xlate_simple);
+  * A single cell is used as an index into an array of PM domains specified in
+  * the genpd_onecell_data struct when registering the provider.
+  */
+-struct generic_pm_domain *__of_genpd_xlate_onecell(
++static struct generic_pm_domain *genpd_xlate_onecell(
+ 					struct of_phandle_args *genpdspec,
+ 					void *data)
  {
- 	struct generic_pm_domain *genpd;
-+	int ret;
-+
-+	mutex_lock(&gpd_list_lock);
+@@ -1414,16 +1417,15 @@ struct generic_pm_domain *__of_genpd_xlate_onecell(
  
- 	genpd = genpd_get_from_provider(genpdspec);
--	if (IS_ERR(genpd))
--		return PTR_ERR(genpd);
-+	if (IS_ERR(genpd)) {
-+		ret = PTR_ERR(genpd);
-+		goto out;
-+	}
-+
-+	ret = genpd_add_device(genpd, dev, NULL);
- 
--	return pm_genpd_add_device(genpd, dev);
-+out:
-+	mutex_unlock(&gpd_list_lock);
-+
-+	return ret;
+ 	return genpd_data->domains[idx];
  }
- EXPORT_SYMBOL_GPL(of_genpd_add_device);
+-EXPORT_SYMBOL_GPL(__of_genpd_xlate_onecell);
  
-@@ -1593,16 +1627,28 @@ int of_genpd_add_subdomain(struct of_phandle_args *parent_spec,
- 			   struct of_phandle_args *subdomain_spec)
+ /**
+- * __of_genpd_add_provider() - Register a PM domain provider for a node
++ * genpd_add_provider() - Register a PM domain provider for a node
+  * @np: Device node pointer associated with the PM domain provider.
+  * @xlate: Callback for decoding PM domain from phandle arguments.
+  * @data: Context pointer for @xlate callback.
+  */
+-int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
+-			void *data)
++static int genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
++			      void *data)
  {
- 	struct generic_pm_domain *parent, *subdomain;
-+	int ret;
-+
-+	mutex_lock(&gpd_list_lock);
+ 	struct of_genpd_provider *cp;
  
- 	parent = genpd_get_from_provider(parent_spec);
--	if (IS_ERR(parent))
--		return PTR_ERR(parent);
-+	if (IS_ERR(parent)) {
-+		ret = PTR_ERR(parent);
-+		goto out;
-+	}
+@@ -1442,7 +1444,30 @@ int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
  
- 	subdomain = genpd_get_from_provider(subdomain_spec);
--	if (IS_ERR(subdomain))
--		return PTR_ERR(subdomain);
-+	if (IS_ERR(subdomain)) {
-+		ret = PTR_ERR(subdomain);
-+		goto out;
-+	}
-+
-+	ret = genpd_add_subdomain(parent, subdomain);
- 
--	return pm_genpd_add_subdomain(parent, subdomain);
-+out:
-+	mutex_unlock(&gpd_list_lock);
-+
-+	return ret;
+ 	return 0;
  }
- EXPORT_SYMBOL_GPL(of_genpd_add_subdomain);
+-EXPORT_SYMBOL_GPL(__of_genpd_add_provider);
++
++/**
++ * of_genpd_add_provider_simple() - Register a simple PM domain provider
++ * @np: Device node pointer associated with the PM domain provider.
++ * @genpd: Pointer to PM domain associated with the PM domain provider.
++ */
++int of_genpd_add_provider_simple(struct device_node *np,
++				 struct generic_pm_domain *genpd)
++{
++	return genpd_add_provider(np, genpd_xlate_simple, genpd);
++}
++EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple);
++
++/**
++ * of_genpd_add_provider_onecell() - Register a onecell PM domain provider
++ * @np: Device node pointer associated with the PM domain provider.
++ * @data: Pointer to the data associated with the PM domain provider.
++ */
++int of_genpd_add_provider_onecell(struct device_node *np,
++				  struct genpd_onecell_data *data)
++{
++	return genpd_add_provider(np, genpd_xlate_onecell, data);
++}
++EXPORT_SYMBOL_GPL(of_genpd_add_provider_onecell);
  
-@@ -1701,9 +1747,11 @@ int genpd_dev_pm_attach(struct device *dev)
- 			return -ENOENT;
- 	}
+ /**
+  * of_genpd_del_provider() - Remove a previously registered PM domain provider
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index bd411e754f4a..f103869db443 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -187,19 +187,12 @@ struct genpd_onecell_data {
+ 	unsigned int num_domains;
+ };
  
-+	mutex_lock(&gpd_list_lock);
- 	pd = genpd_get_from_provider(&pd_args);
- 	of_node_put(pd_args.np);
- 	if (IS_ERR(pd)) {
-+		mutex_unlock(&gpd_list_lock);
- 		dev_dbg(dev, "%s() failed to find PM domain: %ld\n",
- 			__func__, PTR_ERR(pd));
- 		return -EPROBE_DEFER;
-@@ -1712,13 +1760,14 @@ int genpd_dev_pm_attach(struct device *dev)
- 	dev_dbg(dev, "adding to PM domain %s\n", pd->name);
+-typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
+-						void *data);
+-
+ #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+-int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
+-			void *data);
++int of_genpd_add_provider_simple(struct device_node *np,
++				 struct generic_pm_domain *genpd);
++int of_genpd_add_provider_onecell(struct device_node *np,
++				  struct genpd_onecell_data *data);
+ void of_genpd_del_provider(struct device_node *np);
+-struct generic_pm_domain *__of_genpd_xlate_simple(
+-					struct of_phandle_args *genpdspec,
+-					void *data);
+-struct generic_pm_domain *__of_genpd_xlate_onecell(
+-					struct of_phandle_args *genpdspec,
+-					void *data);
+ extern int of_genpd_add_device(struct of_phandle_args *args,
+ 			       struct device *dev);
+ extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
+@@ -207,15 +200,19 @@ extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
  
- 	for (i = 1; i < GENPD_RETRY_MAX_MS; i <<= 1) {
--		ret = pm_genpd_add_device(pd, dev);
-+		ret = genpd_add_device(pd, dev, NULL);
- 		if (ret != -EAGAIN)
- 			break;
+ int genpd_dev_pm_attach(struct device *dev);
+ #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+-static inline int __of_genpd_add_provider(struct device_node *np,
+-					genpd_xlate_t xlate, void *data)
++static inline int of_genpd_add_provider_simple(struct device_node *np,
++					struct generic_pm_domain *genpd)
+ {
+-	return 0;
++	return -ENOTSUPP;
++}
++
++static inline int of_genpd_add_provider_onecell(struct device_node *np,
++					struct genpd_onecell_data *data)
++{
++	return -ENOTSUPP;
+ }
+-static inline void of_genpd_del_provider(struct device_node *np) {}
  
- 		mdelay(i);
- 		cond_resched();
- 	}
-+	mutex_unlock(&gpd_list_lock);
+-#define __of_genpd_xlate_simple		NULL
+-#define __of_genpd_xlate_onecell	NULL
++static inline void of_genpd_del_provider(struct device_node *np) {}
  
- 	if (ret < 0) {
- 		dev_err(dev, "failed to add to PM domain %s: %d",
+ static inline int of_genpd_add_device(struct of_phandle_args *args,
+ 				      struct device *dev)
+@@ -235,17 +232,6 @@ static inline int genpd_dev_pm_attach(struct device *dev)
+ }
+ #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
+ 
+-static inline int of_genpd_add_provider_simple(struct device_node *np,
+-					struct generic_pm_domain *genpd)
+-{
+-	return __of_genpd_add_provider(np, __of_genpd_xlate_simple, genpd);
+-}
+-static inline int of_genpd_add_provider_onecell(struct device_node *np,
+-					struct genpd_onecell_data *data)
+-{
+-	return __of_genpd_add_provider(np, __of_genpd_xlate_onecell, data);
+-}
+-
+ #ifdef CONFIG_PM
+ extern int dev_pm_domain_attach(struct device *dev, bool power_on);
+ extern void dev_pm_domain_detach(struct device *dev, bool power_off);
 -- 
 2.1.4
