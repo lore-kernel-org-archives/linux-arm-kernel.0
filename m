@@ -1,76 +1,54 @@
-From: fweimer@redhat.com (Florian Weimer)
-Date: Mon, 12 Sep 2016 14:49:20 +0200
-Subject: [RFC PATCH 0/5] arm64: Signal context expansion
-In-Reply-To: <20160912111749.GB3958@e103592.cambridge.arm.com>
-References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
- <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
- <20160909152047.GA3958@e103592.cambridge.arm.com>
- <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
- <20160912111749.GB3958@e103592.cambridge.arm.com>
-Message-ID: <1acabcd8-a259-4129-cee3-100401074c9d@redhat.com>
+From: ian.arkver.dev@gmail.com (Ian Arkver)
+Date: Mon, 12 Sep 2016 13:50:55 +0100
+Subject: [PATCH] arm: imx-dma: Don't change desc pointer before calling
+ callback
+Message-ID: <c1cd4d97-a8e2-0459-9f72-4d3f25e13bfb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2016 01:17 PM, Dave Martin wrote:
+This commit...
+fcaaba6 dmaengine: imx-dma: fix callback path in tasklet
+moved the test and call of the DMA completion callback function
+into the tasklet exit path which is after the manipulation of ld_queue
+and ld_active. This manipulation changes the desc pointer and can result
+in the wrong descriptor being checked for the callback function.
 
->>> If the stack isn't large enough, we'll still have to SEGV the task
->>> though.
->>
->> You could skip copying the data and not install a pointer to it in the
->> existing signal context.
->
-> We could, but then we'd corrupt the task state in sigreturn, since
-> we wouldn't have been able to save/restore part of the state.
+One fix is to use a temporary variable to do the queue update.
 
-Ah, I wasn't aware that the kernel doesn't have a copy of the state. 
-Could the kernel reserve space for it when sigaltstack is called?
+Signed-off-by: Ian Jamison <ian.dev@arkver.com>
+---
+I found the bug and tested this patch on kernel 3.10.103 which has the
+original patch backported. It was found using m2m_deinterlacer which issues
+several DMAs with a callback on the last one. When the callback is called
+early there is a race between the v4l2 framework returning the buffers
+which invalidates the buffer pointers and the next DMA completion. This
+resulted in intermittent NULL pointer dereferences. I believe the fix is
+relevant to current mainline kernel as this code fragment has not changed.
 
-> The least-wrong thing I can think of to do is:
->
-> * deprecate but continue to support the existing sigaltstack API/ABI
-> with today's {,MIN}SIGSTKSZ definitions
+  drivers/dma/imx-dma.c | 6 +++---
 
-There is also PTHREAD_STACK_MIN.  The glibc default for that (which is 
-overriden by some architectures) is 16 KiB.  It is also quite small; see 
-the sequence of events mentioned here:
+  1 file changed, 3 insertions(+), 3 deletions(-)
 
-   <https://sourceware.org/bugzilla/show_bug.cgi?id=20249>
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index a960608..335c2d0 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -653,10 +653,10 @@ static void imxdma_tasklet(unsigned long data)
+         list_move_tail(imxdmac->ld_active.next, &imxdmac->ld_free);
 
-> * guarantee (as much as possible) that software using this ABI continues
-> to work (by saving/restoring only data that _must_ be saved/restored at
-> each signal, which may be small enough to fit)
->
-> * providing a clean failure mode (fatal signal) when this proves
-> impossible at signal delivery/return time;
->
-> * define a new interface for runtime-querying the required signal stack
-> size;
->
-> * define a new syscall or new stack_t.ss_flags flags (say, SS_STRICT)
-> that permits the kernel to enforce a runtime-determined minimum greater
-> than MINSIGSTKSZ when calling sigaltstack().
->
->
-> Another option would be:
->
-> * define a new interface for runtime-querying the required signal stack
-> size, and
->
-> * support the current API/ABI, but make a call to sigaltstack() SEGV or
-> SIGILL the caller if it specifies ss_stack >= MINSIGSTKSZ but smaller
-> than the actual runtime minimum.
->
-> (this would cause old software to break immediately in an obvious way on
-> new systems, forcing people to fix their software -- which they might or
-> might not actually bother to do).
-
-The second option looks a bit problematic from a support perspective.
-
-Do you think it would be possible to block access to hardware features 
-that cause signal stack bloat on a per-process basis?  Then we could 
-bump the kernel requirement enforced by sigaltstack directly for the 
-default, and define a compatibility personality that minimizes the 
-signal stack size for old applications.  (A way to query the required 
-alternative signal stack size would still come in handy, though.)
-
-Florian
+         if (!list_empty(&imxdmac->ld_queue)) {
+-               desc = list_first_entry(&imxdmac->ld_queue, struct 
+imxdma_desc,
+-                                       node);
++               struct imxdma_desc *tmpdesc = list_first_entry(
++                       &imxdmac->ld_queue, struct imxdma_desc, node);
+                 list_move_tail(imxdmac->ld_queue.next, 
+&imxdmac->ld_active);
+-               if (imxdma_xfer_desc(desc) < 0)
++               if (imxdma_xfer_desc(tmpdesc) < 0)
+                         dev_warn(imxdma->dev, "%s: channel: %d couldn't 
+xfer desc\n",
+                                  __func__, imxdmac->channel);
+         }
+--
+2.9.3
