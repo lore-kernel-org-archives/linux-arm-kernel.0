@@ -1,63 +1,204 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Sep 2016 08:35:11 +0200
-Subject: [PATCH 4/9] mtd: nand: Add function to convert ONFI mode to
- data_interface
-In-Reply-To: <20160909143522.6a3b6975@bbrezillon>
-References: <1473422712-12359-1-git-send-email-s.hauer@pengutronix.de>
- <1473422712-12359-5-git-send-email-s.hauer@pengutronix.de>
- <20160909143522.6a3b6975@bbrezillon>
-Message-ID: <20160912063511.flb3se54dy4itlru@pengutronix.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 12 Sep 2016 12:07:05 +0530
+Subject: [PATCH V2] cpufreq: create link to policy only for registered CPUs
+In-Reply-To: <20160819110032.GM1041@n2100.armlinux.org.uk>
+References: <20160819110032.GM1041@n2100.armlinux.org.uk>
+Message-ID: <59daae7da84077fbf845b1aad2962933585f8e35.1473662181.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 02:35:22PM +0200, Boris Brezillon wrote:
-> On Fri,  9 Sep 2016 14:05:07 +0200
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > onfi_init_data_interface() initializes a data interface with
-> > values from a given ONFI mode.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  drivers/mtd/nand/nand_timings.c | 16 ++++++++++++++++
-> >  include/linux/mtd/nand.h        |  2 ++
-> >  2 files changed, 18 insertions(+)
-> > 
-> > diff --git a/drivers/mtd/nand/nand_timings.c b/drivers/mtd/nand/nand_timings.c
-> > index 9af2ebc..ece4ff2 100644
-> > --- a/drivers/mtd/nand/nand_timings.c
-> > +++ b/drivers/mtd/nand/nand_timings.c
-> > @@ -269,3 +269,19 @@ const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode)
-> >  	return &onfi_sdr_timings[mode].timings.sdr;
-> >  }
-> >  EXPORT_SYMBOL(onfi_async_timing_mode_to_sdr_timings);
-> > +
-> > +/**
-> > + * onfi_init_data_interface - [NAND Interface] Initialize a data interface from
-> > + * given ONFI mode
-> > + * @iface: The data interface to be initialized
-> > + * @mode: The ONFI timing mode
-> > + */
-> > +int onfi_init_data_interface(struct nand_data_interface *iface, int mode)
-> 
-> Can we choose a more future proof prototype (like the one I suggested)
-> for this function. Passing the nand_chip will later allow to extract
-> extended timings (tR, tPROG, tCCS, ...) from the param page, and
-> passing the interface type makes it compatible with DDR mode.
+If a cpufreq driver is registered very early in the boot stage (e.g.
+registered from postcore_initcall()), then cpufreq core may generate
+kernel warnings for it.
 
-Ok, will change as you suggested to:
+In this case, the CPUs are brought online, then the cpufreq driver is
+registered, and then the CPU topology devices are registered. However,
+by the time cpufreq_add_dev() gets called, the cpu device isn't stored
+in the per-cpu variable (cpu_sys_devices,) which is read by
+get_cpu_device().
 
-int onfi_init_data_interface(struct nand_chip *chip,
-                             struct nand_data_interface *iface,
-                             enum nand_data_interface_type type,
-                             int timing_mode)
+So the cpufreq core fails to get device for the CPU, for which
+cpufreq_add_dev() was called in the first place and we will hit a
+WARN_ON(!cpu_dev).
 
-Before I send another round: Are the other patches ok?
+Even if we reuse the 'dev' parameter passed to cpufreq_add_dev() to
+avoid that warning, there might be other CPUs online that share the
+policy with the cpu for which cpufreq_add_dev() is called. Eventually
+get_cpu_device() will return NULL for them as well, and we will hit the
+same WARN_ON() again.
 
-Sascha
+In order to fix these issues, change cpufreq core to create links to the
+policy for a cpu only when cpufreq_add_dev() is called for that CPU.
 
+Reuse the 'real_cpus' mask to track that as well.
+
+Note that cpufreq_remove_dev() already handles removal of the links for
+individual CPUs and cpufreq_add_dev() has aligned with that now.
+
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+V1->V2:
+- Updated changelog based on suggestions from Russell
+- Tested by from Russell
+
+ drivers/cpufreq/cpufreq.c | 89 +++++++++++++++--------------------------------
+ 1 file changed, 28 insertions(+), 61 deletions(-)
+
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index 13fb589b6d2c..3a64136bf21b 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -916,58 +916,18 @@ static struct kobj_type ktype_cpufreq = {
+ 	.release	= cpufreq_sysfs_release,
+ };
+ 
+-static int add_cpu_dev_symlink(struct cpufreq_policy *policy, int cpu)
++static int add_cpu_dev_symlink(struct cpufreq_policy *policy,
++			       struct device *dev)
+ {
+-	struct device *cpu_dev;
+-
+-	pr_debug("%s: Adding symlink for CPU: %u\n", __func__, cpu);
+-
+-	if (!policy)
+-		return 0;
+-
+-	cpu_dev = get_cpu_device(cpu);
+-	if (WARN_ON(!cpu_dev))
+-		return 0;
+-
+-	return sysfs_create_link(&cpu_dev->kobj, &policy->kobj, "cpufreq");
++	dev_dbg(dev, "%s: Adding symlink\n", __func__);
++	return sysfs_create_link(&dev->kobj, &policy->kobj, "cpufreq");
+ }
+ 
+-static void remove_cpu_dev_symlink(struct cpufreq_policy *policy, int cpu)
++static void remove_cpu_dev_symlink(struct cpufreq_policy *policy,
++				   struct device *dev)
+ {
+-	struct device *cpu_dev;
+-
+-	pr_debug("%s: Removing symlink for CPU: %u\n", __func__, cpu);
+-
+-	cpu_dev = get_cpu_device(cpu);
+-	if (WARN_ON(!cpu_dev))
+-		return;
+-
+-	sysfs_remove_link(&cpu_dev->kobj, "cpufreq");
+-}
+-
+-/* Add/remove symlinks for all related CPUs */
+-static int cpufreq_add_dev_symlink(struct cpufreq_policy *policy)
+-{
+-	unsigned int j;
+-	int ret = 0;
+-
+-	/* Some related CPUs might not be present (physically hotplugged) */
+-	for_each_cpu(j, policy->real_cpus) {
+-		ret = add_cpu_dev_symlink(policy, j);
+-		if (ret)
+-			break;
+-	}
+-
+-	return ret;
+-}
+-
+-static void cpufreq_remove_dev_symlink(struct cpufreq_policy *policy)
+-{
+-	unsigned int j;
+-
+-	/* Some related CPUs might not be present (physically hotplugged) */
+-	for_each_cpu(j, policy->real_cpus)
+-		remove_cpu_dev_symlink(policy, j);
++	dev_dbg(dev, "%s: Removing symlink\n", __func__);
++	sysfs_remove_link(&dev->kobj, "cpufreq");
+ }
+ 
+ static int cpufreq_add_dev_interface(struct cpufreq_policy *policy)
+@@ -999,7 +959,7 @@ static int cpufreq_add_dev_interface(struct cpufreq_policy *policy)
+ 			return ret;
+ 	}
+ 
+-	return cpufreq_add_dev_symlink(policy);
++	return 0;
+ }
+ 
+ __weak struct cpufreq_governor *cpufreq_default_governor(void)
+@@ -1129,7 +1089,6 @@ static void cpufreq_policy_put_kobj(struct cpufreq_policy *policy, bool notify)
+ 
+ 	down_write(&policy->rwsem);
+ 	cpufreq_stats_free_table(policy);
+-	cpufreq_remove_dev_symlink(policy);
+ 	kobj = &policy->kobj;
+ 	cmp = &policy->kobj_unregister;
+ 	up_write(&policy->rwsem);
+@@ -1211,8 +1170,8 @@ static int cpufreq_online(unsigned int cpu)
+ 	if (new_policy) {
+ 		/* related_cpus should at least include policy->cpus. */
+ 		cpumask_copy(policy->related_cpus, policy->cpus);
+-		/* Remember CPUs present at the policy creation time. */
+-		cpumask_and(policy->real_cpus, policy->cpus, cpu_present_mask);
++		/* Clear mask of registered CPUs */
++		cpumask_clear(policy->real_cpus);
+ 	}
+ 
+ 	/*
+@@ -1327,6 +1286,8 @@ static int cpufreq_online(unsigned int cpu)
+ 	return ret;
+ }
+ 
++static void cpufreq_offline(unsigned int cpu);
++
+ /**
+  * cpufreq_add_dev - the cpufreq interface for a CPU device.
+  * @dev: CPU device.
+@@ -1336,22 +1297,28 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
+ {
+ 	struct cpufreq_policy *policy;
+ 	unsigned cpu = dev->id;
++	int ret;
+ 
+ 	dev_dbg(dev, "%s: adding CPU%u\n", __func__, cpu);
+ 
+-	if (cpu_online(cpu))
+-		return cpufreq_online(cpu);
++	if (cpu_online(cpu)) {
++		ret = cpufreq_online(cpu);
++		if (ret)
++			return ret;
++	}
+ 
+-	/*
+-	 * A hotplug notifier will follow and we will handle it as CPU online
+-	 * then.  For now, just create the sysfs link, unless there is no policy
+-	 * or the link is already present.
+-	 */
++	/* Create sysfs link on CPU registration */
+ 	policy = per_cpu(cpufreq_cpu_data, cpu);
+ 	if (!policy || cpumask_test_and_set_cpu(cpu, policy->real_cpus))
+ 		return 0;
+ 
+-	return add_cpu_dev_symlink(policy, cpu);
++	ret = add_cpu_dev_symlink(policy, dev);
++	if (ret) {
++		cpumask_clear_cpu(cpu, policy->real_cpus);
++		cpufreq_offline(cpu);
++	}
++
++	return ret;
+ }
+ 
+ static void cpufreq_offline(unsigned int cpu)
+@@ -1432,7 +1399,7 @@ static void cpufreq_remove_dev(struct device *dev, struct subsys_interface *sif)
+ 		cpufreq_offline(cpu);
+ 
+ 	cpumask_clear_cpu(cpu, policy->real_cpus);
+-	remove_cpu_dev_symlink(policy, cpu);
++	remove_cpu_dev_symlink(policy, dev);
+ 
+ 	if (cpumask_empty(policy->real_cpus))
+ 		cpufreq_policy_free(policy, true);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.7.1.410.g6faf27b
