@@ -1,46 +1,35 @@
-From: swexru@gmail.com (Alexey Mednyy)
-Date: Tue, 13 Sep 2016 00:47:40 +0300
-Subject: iMX53 UART2 suspend freeze
-Message-ID: <1385a087-44c6-1785-f74b-27bddbf8f3ac@gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 12 Sep 2016 14:53:02 -0700
+Subject: [PATCH v2 00/17] Make rpmsg a framework
+In-Reply-To: <57D71FD9.9070007@codeaurora.org>
+References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
+ <20160912165233.GB21885@linaro.org> <20160912180015.GH405@tuxbot>
+ <bc618ac9-13c8-e9bf-c7e9-fe5b7309a585@codeaurora.org>
+ <20160912184957.GI405@tuxbot>
+ <7682a26a-310b-b283-dfe8-56d114f92dcb@codeaurora.org>
+ <20160912195854.GJ405@tuxbot> <57D71FD9.9070007@codeaurora.org>
+Message-ID: <20160912215302.GK405@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've met strange bug with mx53-qsb based board.
+On Mon 12 Sep 14:36 PDT 2016, Karthikeyan Ramasubramanian wrote:
 
-We use all 5 UART ports and I can say that on current UART2 with next 
-configuration in device-tree :
+> On 9/12/2016 1:58 PM, Bjorn Andersson wrote:
+[..]
+> >I have not looked through all of APR yet and don't know where msm_bus is
+> >heading, but for IPC-router your correct that the downstream driver does
+> >indeed require this; but that's a side effect of the downstream
+> >ipcrouter implementation, not the problem itself.
+> >
+> APR does send messages in atomic context in addition to the RPM Driver, but
+> IPC Router does not to the extent of my knowledge.
 
-         pinctrl_uart2: uart2grp {
-             fsl,pins = <
-                 MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX    0x1e4
-                 MX53_PAD_PATA_DMARQ__UART2_TXD_MUX    0x1e4
-             >;
-         };
+Thanks for the information, Karthik.
 
-&uart2 {
-         pinctrl-names = "default";
-         pinctrl-0 = <&pinctrl_uart2>;
-         status = "okay";
-};
+There seem to be 196 calls to apr_send_pkt() in the msm-3.18 kernel, I
+will have to go through them all later, but could you help me by
+pointing me to one of those that actually need to be executed in atomic
+context?
 
-prevents board from suspend.
-That's happening at least since commit 
-29add68d16474b7e8e3eadd94da4e909533b99d2 which is also suspend fixing 
-commit.
-
-All other ports UART1,3,4,5 suspending/resuming fine.
-
-I don't know where do dig next I double checked pinctl settings and it 
-seems like everything good there.
-
-I've found that most of mx53 based boards with uart2 using the same 
-muxing configuration.
-I wonder if anybody else experiencing this issue?
-same configured boards are:
-imx53-smd.dts
-imx53-tx53.dtsi - based
-imx53-tqma53.dtsi -  based
-imx53-m53evk.dts
-
-_________________________________
-Best regards, Mednyy Alexey.
+Thanks,
+Bjorn
