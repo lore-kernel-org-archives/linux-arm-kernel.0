@@ -1,249 +1,455 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 12 Sep 2016 10:37:55 +0200
-Subject: [PATCH v7 4/8] arm64: parse cpu capacity-dmips-mhz from DT
-In-Reply-To: <1473085372-2840-5-git-send-email-juri.lelli@arm.com>
-References: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
- <1473085372-2840-5-git-send-email-juri.lelli@arm.com>
-Message-ID: <CAKfTPtCN9zMtL82zc_=-KZ6U+cMORi+JTBVLDxKccY2hbJ=3vw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Sep 2016 09:42:57 +0100
+Subject: [PATCH v4 2/5] arm/arm64: vgic-new: Add distributor and
+ redistributor access
+In-Reply-To: <1473510138-4719-3-git-send-email-vijay.kilari@gmail.com>
+References: <1473510138-4719-1-git-send-email-vijay.kilari@gmail.com>
+ <1473510138-4719-3-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <57D66A91.9050104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juri,
-
-On 5 September 2016 at 16:22, Juri Lelli <juri.lelli@arm.com> wrote:
-> With the introduction of cpu capacity-dmips-mhz bindings, CPU capacities
-> can now be calculated from values extracted from DT and information
-> coming from cpufreq. Add parsing of DT information at boot time, and
-> complement it with cpufreq information. Also, store such information
-> using per CPU variables, as we do for arm.
->
-> Caveat: the information provided by this patch will start to be used in
-> the future. We need to #define arch_scale_cpu_capacity to something
-> provided in arch, so that scheduler's default implementation (which gets
-> used if arch_scale_cpu_capacity is not defined) is overwritten.
->
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-
-Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
-
+On 10/09/16 13:22, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> 
+> VGICv3 Distributor and Redistributor registers are accessed using
+> KVM_DEV_ARM_VGIC_GRP_DIST_REGS and KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+> with KVM_SET_DEVICE_ATTR and KVM_GET_DEVICE_ATTR ioctls.
+> These registers are accessed as 32-bit and cpu mpidr
+> value passed along with register offset is used to identify the
+> cpu for redistributor registers access.
+> 
+> The version of VGIC v3 specification is define here
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+> 
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 > ---
->
-> Changes from v1:
->   - normalize w.r.t. highest capacity found in DT
->   - bailout conditions (all-or-nothing)
->
-> Changes from v4:
->   - parsing modified to reflect change in binding (capacity-dmips-mhz)
->
-> Changes from v5:
->   - allocate raw_capacity array with kcalloc()
->   - pr_err() only for partial capacity information
->
-> Changes from v6:
->   - use cpuinfo.max_freq instead of policy->max
->   - add delayed work to unregister cpufreq notifier
-> ---
->  arch/arm64/kernel/topology.c | 159 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 158 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index 694f6deedbab..b75b0ba2e113 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -19,10 +19,162 @@
->  #include <linux/nodemask.h>
->  #include <linux/of.h>
->  #include <linux/sched.h>
-> +#include <linux/slab.h>
-> +#include <linux/cpufreq.h>
->
->  #include <asm/cputype.h>
->  #include <asm/topology.h>
->
-> +static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
-> +
-> +unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+>  arch/arm64/include/uapi/asm/kvm.h   |   4 ++
+>  virt/kvm/arm/vgic/vgic-kvm-device.c | 140 ++++++++++++++++++++++++++++++++++--
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c    |  16 +----
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |  72 +++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.c       |  22 ++++++
+>  virt/kvm/arm/vgic/vgic-mmio.h       |   4 ++
+>  virt/kvm/arm/vgic/vgic.h            |   5 ++
+>  7 files changed, 245 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 3051f86..56dc08d 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -201,10 +201,14 @@ struct kvm_arch_memory_slot {
+>  #define KVM_DEV_ARM_VGIC_GRP_CPU_REGS	2
+>  #define   KVM_DEV_ARM_VGIC_CPUID_SHIFT	32
+>  #define   KVM_DEV_ARM_VGIC_CPUID_MASK	(0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
+> +#define   KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT 32
+> +#define   KVM_DEV_ARM_VGIC_V3_MPIDR_MASK \
+> +			(0xffffffffULL << KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT)
+>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
+>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
+>  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+> +#define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+>  
+>  /* Device Control API on vcpu fd */
+> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> index 163b057..3225388 100644
+> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> @@ -320,9 +320,10 @@ static int vgic_attr_regs_access_v2(struct kvm_device *dev,
+>  
+>  	mutex_lock(&dev->kvm->lock);
+>  
+> -	ret = vgic_init(dev->kvm);
+> -	if (ret)
+> +	if (unlikely(!vgic_initialized(dev->kvm))) {
+> +		ret = -EBUSY;
+>  		goto out;
+> +	}
+>  
+>  	if (!lock_all_vcpus(dev->kvm)) {
+>  		ret = -EBUSY;
+> @@ -433,16 +434,144 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+>  
+>  #ifdef CONFIG_KVM_ARM_VGIC_V3
+>  
+> +static int parse_vgic_v3_attr(struct kvm_device *dev,
+
+nit: Please use a consistent naming: vgic_v3_parse_attr?
+
+> +			      struct kvm_device_attr *attr,
+> +			      struct vgic_reg_attr *reg_attr)
 > +{
-> +       return per_cpu(cpu_scale, cpu);
+> +	unsigned long mpidr;
+> +
+> +	mpidr = (attr->attr & KVM_DEV_ARM_VGIC_V3_MPIDR_MASK) >>
+> +		 KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT;
+> +
+> +	reg_attr->vcpu = kvm_mpidr_to_vcpu(dev->kvm, mpidr);
+> +	if (!reg_attr->vcpu)
+> +		return -EINVAL;
+> +
+> +	if (reg_attr->vcpu->vcpu_id >= atomic_read(&dev->kvm->online_vcpus))
+> +		return -EINVAL;
+> +
+> +	reg_attr->addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+> +
+> +	return 0;
 > +}
 > +
-> +static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
+> +/*
+> + * vgic_attr_regs_access_v3 - allows user space to access VGIC v3 state
+> + *
+> + * @dev:      kvm device handle
+> + * @attr:     kvm device attribute
+> + * @reg:      address the value is read or written
+> + * @is_write: true if userspace is writing a register
+> + */
+> +static int vgic_attr_regs_access_v3(struct kvm_device *dev,
+
+nit: vgic_v3_attr_access_regs? And fix the v2 version that is equally ugly?
+
+> +				    struct kvm_device_attr *attr,
+> +				    u64 *reg, bool is_write)
 > +{
-> +       per_cpu(cpu_scale, cpu) = capacity;
+> +	struct vgic_reg_attr reg_attr;
+> +	gpa_t addr;
+> +	struct kvm_vcpu *vcpu;
+> +	int ret;
+> +	u32 tmp32;
+> +
+> +	ret = parse_vgic_v3_attr(dev, attr, &reg_attr);
+> +	if (ret)
+> +		return ret;
+> +
+> +	vcpu = reg_attr.vcpu;
+> +	addr = reg_attr.addr;
+> +
+> +	mutex_lock(&dev->kvm->lock);
+> +
+> +	if (unlikely(!vgic_initialized(dev->kvm))) {
+> +		ret = -EBUSY;
+> +		goto out;
+> +	}
+> +
+> +	if (!lock_all_vcpus(dev->kvm)) {
+> +		ret = -EBUSY;
+> +		goto out;
+> +	}
+> +
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+> +		if (is_write)
+> +			tmp32 = *reg;
+> +
+> +		ret = vgic_v3_dist_uaccess(vcpu, is_write, addr, &tmp32);
+> +		if (!is_write)
+> +			*reg = tmp32;
+> +		break;
+> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
+> +		if (is_write)
+> +			tmp32 = *reg;
+> +
+> +		ret = vgic_v3_redist_uaccess(vcpu, is_write, addr, &tmp32);
+> +		if (!is_write)
+> +			*reg = tmp32;
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		break;
+> +	}
+> +
+> +	unlock_all_vcpus(dev->kvm);
+> +out:
+> +	mutex_unlock(&dev->kvm->lock);
+> +	return ret;
 > +}
 > +
-> +static u32 capacity_scale;
-> +static u32 *raw_capacity;
-> +static bool cap_parsing_failed;
-> +
-> +static void __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
-> +{
-> +       int ret;
-> +       u32 cpu_capacity;
-> +
-> +       if (cap_parsing_failed)
-> +               return;
-> +
-> +       ret = of_property_read_u32(cpu_node,
-> +                                  "capacity-dmips-mhz",
-> +                                  &cpu_capacity);
-> +       if (!ret) {
-> +               if (!raw_capacity) {
-> +                       raw_capacity = kcalloc(num_possible_cpus(),
-> +                                              sizeof(*raw_capacity),
-> +                                              GFP_KERNEL);
-> +                       if (!raw_capacity) {
-> +                               pr_err("cpu_capacity: failed to allocate memory for raw capacities\n");
-> +                               cap_parsing_failed = true;
-> +                               return;
-> +                       }
-> +               }
-> +               capacity_scale = max(cpu_capacity, capacity_scale);
-> +               raw_capacity[cpu] = cpu_capacity;
-> +               pr_debug("cpu_capacity: %s cpu_capacity=%u (raw)\n",
-> +                       cpu_node->full_name, raw_capacity[cpu]);
-> +       } else {
-> +               if (raw_capacity) {
-> +                       pr_err("cpu_capacity: missing %s raw capacity\n",
-> +                               cpu_node->full_name);
-> +                       pr_err("cpu_capacity: partial information: fallback to 1024 for all CPUs\n");
-> +               }
-> +               cap_parsing_failed = true;
-> +               kfree(raw_capacity);
-> +       }
-> +}
-> +
-> +static void normalize_cpu_capacity(void)
-> +{
-> +       u64 capacity;
-> +       int cpu;
-> +
-> +       if (!raw_capacity || cap_parsing_failed)
-> +               return;
-> +
-> +       pr_debug("cpu_capacity: capacity_scale=%u\n", capacity_scale);
-> +       for_each_possible_cpu(cpu) {
-> +               pr_debug("cpu_capacity: cpu=%d raw_capacity=%u\n",
-> +                        cpu, raw_capacity[cpu]);
-> +               capacity = (raw_capacity[cpu] << SCHED_CAPACITY_SHIFT)
-> +                       / capacity_scale;
-> +               set_capacity_scale(cpu, capacity);
-> +               pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
-> +                       cpu, arch_scale_cpu_capacity(NULL, cpu));
-> +       }
-> +}
-> +
-> +#ifdef CONFIG_CPU_FREQ
-> +static cpumask_var_t cpus_to_visit;
-> +static bool cap_parsing_done;
-> +static void parsing_done_workfn(struct work_struct *work);
-> +static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
-> +
-> +static int
-> +init_cpu_capacity_callback(struct notifier_block *nb,
-> +                          unsigned long val,
-> +                          void *data)
-> +{
-> +       struct cpufreq_policy *policy = data;
-> +       int cpu;
-> +
-> +       if (cap_parsing_failed || cap_parsing_done)
-> +               return 0;
-> +
-> +       switch (val) {
-> +       case CPUFREQ_NOTIFY:
-> +               pr_debug("cpu_capacity: init cpu capacity for CPUs [%*pbl] (to_visit=%*pbl)\n",
-> +                               cpumask_pr_args(policy->related_cpus),
-> +                               cpumask_pr_args(cpus_to_visit));
-> +               cpumask_andnot(cpus_to_visit,
-> +                              cpus_to_visit,
-> +                              policy->related_cpus);
-> +               for_each_cpu(cpu, policy->related_cpus) {
-> +                       raw_capacity[cpu] = arch_scale_cpu_capacity(NULL, cpu) *
-> +                                           policy->cpuinfo.max_freq / 1000UL;
-> +                       capacity_scale = max(raw_capacity[cpu], capacity_scale);
-> +               }
-> +               if (cpumask_empty(cpus_to_visit)) {
-> +                       normalize_cpu_capacity();
-> +                       kfree(raw_capacity);
-> +                       pr_debug("cpu_capacity: parsing done\n");
-> +                       cap_parsing_done = true;
-> +                       schedule_work(&parsing_done_work);
-> +               }
-> +       }
-> +       return 0;
-> +}
-> +
-> +static struct notifier_block init_cpu_capacity_notifier = {
-> +       .notifier_call = init_cpu_capacity_callback,
-> +};
-> +
-> +static int __init register_cpufreq_notifier(void)
-> +{
-> +       if (cap_parsing_failed)
-> +               return -EINVAL;
-> +
-> +       if (!alloc_cpumask_var(&cpus_to_visit, GFP_KERNEL)) {
-> +               pr_err("cpu_capacity: failed to allocate memory for cpus_to_visit\n");
-> +               return -ENOMEM;
-> +       }
-> +       cpumask_copy(cpus_to_visit, cpu_possible_mask);
-> +
-> +       return cpufreq_register_notifier(&init_cpu_capacity_notifier,
-> +                                        CPUFREQ_POLICY_NOTIFIER);
-> +}
-> +core_initcall(register_cpufreq_notifier);
-> +
-> +static void parsing_done_workfn(struct work_struct *work)
-> +{
-> +       cpufreq_unregister_notifier(&init_cpu_capacity_notifier,
-> +                                        CPUFREQ_POLICY_NOTIFIER);
-> +}
-> +
-> +#else
-> +static int __init free_raw_capacity(void)
-> +{
-> +       kfree(raw_capacity);
-> +
-> +       return 0;
-> +}
-> +core_initcall(free_raw_capacity);
-> +#endif
-> +
->  static int __init get_cpu_for_node(struct device_node *node)
+>  static int vgic_v3_set_attr(struct kvm_device *dev,
+>  			    struct kvm_device_attr *attr)
 >  {
->         struct device_node *cpu_node;
-> @@ -34,6 +186,7 @@ static int __init get_cpu_for_node(struct device_node *node)
->
->         for_each_possible_cpu(cpu) {
->                 if (of_get_cpu_node(cpu, NULL) == cpu_node) {
-> +                       parse_cpu_capacity(cpu_node, cpu);
->                         of_node_put(cpu_node);
->                         return cpu;
->                 }
-> @@ -178,13 +331,17 @@ static int __init parse_dt_topology(void)
->          * cluster with restricted subnodes.
->          */
->         map = of_get_child_by_name(cn, "cpu-map");
-> -       if (!map)
-> +       if (!map) {
-> +               cap_parsing_failed = true;
->                 goto out;
-> +       }
->
->         ret = parse_cluster(map, 0);
->         if (ret != 0)
->                 goto out_map;
->
-> +       normalize_cpu_capacity();
+> -	return vgic_set_common_attr(dev, attr);
+> +	int ret;
 > +
->         /*
->          * Check that all cores are in the topology; the SMP code will
->          * only mark cores described in the DT as possible.
-> --
-> 2.7.0
->
+> +	ret = vgic_set_common_attr(dev, attr);
+> +	if (ret != -ENXIO)
+> +		return ret;
+> +
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS: {
+> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+> +		u32 tmp32;
+> +		u64 reg;
+> +
+> +		if (get_user(tmp32, uaddr))
+> +			return -EFAULT;
+> +
+> +		reg = tmp32;
+> +		return vgic_attr_regs_access_v3(dev, attr, &reg, true);
+> +	}
+> +	}
+> +	return -ENXIO;
+>  }
+>  
+>  static int vgic_v3_get_attr(struct kvm_device *dev,
+>  			    struct kvm_device_attr *attr)
+>  {
+> -	return vgic_get_common_attr(dev, attr);
+> +	int ret;
+> +
+> +	ret = vgic_get_common_attr(dev, attr);
+> +	if (ret != -ENXIO)
+> +		return ret;
+> +
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS: {
+> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+> +		u64 reg;
+> +		u32 tmp32;
+> +
+> +		ret = vgic_attr_regs_access_v3(dev, attr, &reg, false);
+> +		if (ret)
+> +			return ret;
+> +		tmp32 = reg;
+> +		ret = put_user(tmp32, uaddr);
+> +		return ret;
+> +	}
+> +	}
+> +
+> +	return -ENXIO;
+>  }
+>  
+>  static int vgic_v3_has_attr(struct kvm_device *dev,
+> @@ -456,6 +585,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+>  			return 0;
+>  		}
+>  		break;
+> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
+> +		return vgic_v3_has_attr_regs(dev, attr);
+>  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+>  		return 0;
+>  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index 0b32f40..2cb04b7 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -368,10 +368,9 @@ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev)
+>  
+>  int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+>  {
+> -	int nr_irqs = dev->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
+>  	const struct vgic_register_region *regions;
+>  	gpa_t addr;
+> -	int nr_regions, i, len;
+> +	int nr_regions;
+>  
+>  	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+>  
+> @@ -392,18 +391,7 @@ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+>  	if (addr & 3)
+>  		return -ENXIO;
+>  
+> -	for (i = 0; i < nr_regions; i++) {
+> -		if (regions[i].bits_per_irq)
+> -			len = (regions[i].bits_per_irq * nr_irqs) / 8;
+> -		else
+> -			len = regions[i].len;
+> -
+> -		if (regions[i].reg_offset <= addr &&
+> -		    regions[i].reg_offset + len > addr)
+> -			return 0;
+> -	}
+> -
+> -	return -ENXIO;
+> +	return vgic_validate_mmio_region_addr(dev, regions, nr_regions, addr);
+>  }
+>  
+>  int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 3b4d507..ffbe1ae 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -18,6 +18,8 @@
+>  #include <kvm/arm_vgic.h>
+>  
+>  #include <asm/kvm_emulate.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_mmu.h>
+>  
+>  #include "vgic.h"
+>  #include "vgic-mmio.h"
+> @@ -379,6 +381,9 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
+>  		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16,
+>  		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICD_STATUSR,
+> +		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
+> +		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+>  		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
+>  		VGIC_ACCESS_32bit),
+> @@ -426,12 +431,18 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
+>  		vgic_mmio_read_v3r_ctlr, vgic_mmio_write_v3r_ctlr, 4,
+>  		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_STATUSR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
+> +		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
+>  		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
+>  		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_WAKER,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+> +		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
+>  		vgic_mmio_read_propbase, vgic_mmio_write_propbase, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+> @@ -552,6 +563,34 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+>  	return ret;
+>  }
+>  
+> +int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+> +{
+> +	const struct vgic_register_region *regions;
+> +	gpa_t addr;
+> +	int nr_regions;
+> +
+> +	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+> +
+> +	switch (attr->group) {
+> +	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+> +		regions = vgic_v3_dist_registers;
+> +		nr_regions = ARRAY_SIZE(vgic_v3_dist_registers);
+> +		break;
+> +	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:{
+> +		regions = vgic_v3_rdbase_registers;
+> +		nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
+> +		break;
+> +	}
+> +	default:
+> +		return -ENXIO;
+> +	}
+> +
+> +	/* We only support aligned 32-bit accesses. */
+> +	if (addr & 3)
+> +		return -ENXIO;
+> +
+> +	return vgic_validate_mmio_region_addr(dev, regions, nr_regions, addr);
+> +}
+>  /*
+>   * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
+>   * generation register ICC_SGI1R_EL1) with a given VCPU.
+> @@ -658,3 +697,36 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+>  		vgic_put_irq(vcpu->kvm, irq);
+>  	}
+>  }
+> +
+> +int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> +			 int offset, u32 *val)
+> +{
+> +	struct vgic_io_device dev = {
+> +		.regions = vgic_v3_dist_registers,
+> +		.nr_regions = ARRAY_SIZE(vgic_v3_dist_registers),
+> +	};
+> +
+> +	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
+> +}
+> +
+> +int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> +			   int offset, u32 *val)
+> +{
+> +	struct vgic_io_device rd_dev = {
+> +		.regions = vgic_v3_rdbase_registers,
+> +		.nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers),
+> +	};
+> +
+> +	struct vgic_io_device sgi_dev = {
+> +		.regions = vgic_v3_sgibase_registers,
+> +		.nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers),
+> +	};
+> +
+> +	/* SGI_base is the next 64K frame after RD_base */
+> +	if (offset >= SZ_64K)
+> +		return vgic_uaccess(vcpu, &sgi_dev, is_write,
+> +				    offset - SZ_64K, val);
+> +	else
+> +		return vgic_uaccess(vcpu, &rd_dev, is_write,
+> +				    offset, val);
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index 99d88a6..9294555 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -448,6 +448,28 @@ vgic_find_mmio_region(const struct vgic_register_region *region, int nr_regions,
+>  		       sizeof(region[0]), match_region);
+>  }
+>  
+> +/* Check if address falls within the region */
+> +int vgic_validate_mmio_region_addr(struct kvm_device *dev,
+> +				   const struct vgic_register_region *regions,
+> +				   int nr_regions, gpa_t addr)
+> +{
+> +	int i, len;
+> +	int nr_irqs = dev->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
+> +
+> +	for (i = 0; i < nr_regions; i++) {
+> +		if (regions[i].bits_per_irq)
+> +			len = (regions[i].bits_per_irq * nr_irqs) / 8;
+> +		else
+> +			len = regions[i].len;
+> +
+> +		if (regions[i].reg_offset <= addr &&
+> +		    regions[i].reg_offset + len > addr)
+> +			return 0;
+> +	}
+> +
+> +	return -ENXIO;
+> +}
+> +
+>  /*
+>   * kvm_mmio_read_buf() returns a value in a format where it can be converted
+>   * to a byte array and be directly observed as the guest wanted it to appear
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 3435f28..9a0109b 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -184,6 +184,10 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+>  int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
+>  		 bool is_write, int offset, u32 *val);
+>  
+> +int vgic_validate_mmio_region_addr(struct kvm_device *dev,
+> +				   const struct vgic_register_region *regions,
+> +				   int nr_regions, gpa_t addr);
+> +
+>  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+>  
+>  unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 6c4625c..94b3479 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -89,6 +89,11 @@ bool vgic_has_its(struct kvm *kvm);
+>  int kvm_vgic_register_its_device(void);
+>  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+>  int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
+> +int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
+> +int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> +			 int offset, u32 *val);
+> +int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> +			 int offset, u32 *val);
+>  #else
+>  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  {
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
