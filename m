@@ -1,147 +1,326 @@
-From: dave.long@linaro.org (David Long)
-Date: Sun, 11 Sep 2016 21:53:43 -0400
-Subject: [PATCH v3] arm64: Improve kprobes test for atomic sequence
-In-Reply-To: <20160910144841.1bbbffd8548128146df11a41@kernel.org>
-References: <1473449169-16032-1-git-send-email-dave.long@linaro.org>
- <20160910144841.1bbbffd8548128146df11a41@kernel.org>
-Message-ID: <57D60AA7.6010304@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 12 Sep 2016 11:09:26 +0900
+Subject: [PATCH v2] extcon: Add support for qcom SPMI PMIC USB id detection
+ hardware
+In-Reply-To: <20160909214847.20103-1-stephen.boyd@linaro.org>
+References: <CGME20160909214851epcas1p3718ae2ac8b9758b2d81e581ab88bf2ce@epcas1p3.samsung.com>
+ <20160909214847.20103-1-stephen.boyd@linaro.org>
+Message-ID: <57D60E56.10807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/10/2016 01:48 AM, Masami Hiramatsu wrote:
-> On Fri,  9 Sep 2016 15:26:09 -0400
-> David Long <dave.long@linaro.org> wrote:
->
->> From: "David A. Long" <dave.long@linaro.org>
->>
->> Kprobes searches backwards a finite number of instructions to determine if
->> there is an attempt to probe a load/store exclusive sequence. It stops when
->> it hits the maximum number of instructions or a load or store exclusive.
->> However this means it can run up past the beginning of the function and
->> start looking at literal constants. This has been shown to cause a false
->> positive and blocks insertion of the probe. To fix this, further limit the
->> backwards search to stop if it hits a symbol address from kallsyms. The
->> presumption is that this is the entry point to this code (particularly for
->> the common case of placing probes at the beginning of functions).
->>
->> This also improves efficiency by not searching code that is not part of the
->> function. There may be some possibility that the label might not denote the
->> entry path to the probed instruction but the likelihood seems low and this
->> is just another example of how the kprobes user really needs to be
->> careful about what they are doing.
->
-> Of course user should be careful, but also, in such case, kernel can reject
-> to probe it.
->
+Hi Stephen,
 
-I'm not exactly sure what you mean.  I'm just saying when everything 
-goes right we still cannot promise perfection in detecting a probe 
-within an atomic sequence.  This patch will reject a probe that is after 
-a ldx and has no intervening kallsyms label (and assuming it's within 
-the defined maximum count of subsequent instructions).
+Looks good to me.
+But, there are something that need to be modified.
+- add the author information
+- add the description of driver
+- use the extcon_set_state() instead of extcon_set_cable_state_()
 
->
->>
->> Signed-off-by: David A. Long <dave.long@linaro.org>
->> ---
->>   arch/arm64/kernel/probes/decode-insn.c | 48 ++++++++++++++++------------------
->>   1 file changed, 23 insertions(+), 25 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
->> index 37e47a9..a691112 100644
->> --- a/arch/arm64/kernel/probes/decode-insn.c
->> +++ b/arch/arm64/kernel/probes/decode-insn.c
->> @@ -16,6 +16,7 @@
->>   #include <linux/kernel.h>
->>   #include <linux/kprobes.h>
->>   #include <linux/module.h>
->> +#include <linux/kallsyms.h>
->>   #include <asm/kprobes.h>
->>   #include <asm/insn.h>
->>   #include <asm/sections.h>
->> @@ -122,7 +123,7 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
->>   static bool __kprobes
->>   is_probed_address_atomic(kprobe_opcode_t *scan_start, kprobe_opcode_t *scan_end)
->>   {
->> -	while (scan_start > scan_end) {
->> +	while (scan_start >= scan_end) {
->>   		/*
->>   		 * atomic region starts from exclusive load and ends with
->>   		 * exclusive store.
->> @@ -142,33 +143,30 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
->>   {
->>   	enum kprobe_insn decoded;
->>   	kprobe_opcode_t insn = le32_to_cpu(*addr);
->> -	kprobe_opcode_t *scan_start = addr - 1;
->> -	kprobe_opcode_t *scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
->> -#if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
->> -	struct module *mod;
->> -#endif
->> -
->> -	if (addr >= (kprobe_opcode_t *)_text &&
->> -	    scan_end < (kprobe_opcode_t *)_text)
->> -		scan_end = (kprobe_opcode_t *)_text;
->> -#if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
->> -	else {
->> -		preempt_disable();
->> -		mod = __module_address((unsigned long)addr);
->> -		if (mod && within_module_init((unsigned long)addr, mod) &&
->> -			!within_module_init((unsigned long)scan_end, mod))
->> -			scan_end = (kprobe_opcode_t *)mod->init_layout.base;
->> -		else if (mod && within_module_core((unsigned long)addr, mod) &&
->> -			!within_module_core((unsigned long)scan_end, mod))
->> -			scan_end = (kprobe_opcode_t *)mod->core_layout.base;
->> -		preempt_enable();
->> +	kprobe_opcode_t *scan_end = 0;
->
-> Please use NULL for pointer.
->
+I modified this patch and applied it because I should send
+the pull request within this week after releasing the rc6.
 
-A change has been made for v4.
+I added the comment about the modification.
 
->> +	unsigned long size = 0, offset = 0;
->> +
->> +	/*
->> +	 * If there's a symbol defined in front of and near enough to
->> +	 * the probe address assume it is the entry point to this
->> +	 * code and use it to further limit how far back we search
->> +	 * when determining if we're in an atomic sequence. If we could
->> +	 * not find any symbol skip the atomic test altogether as we
->> +	 * could otherwise end up searching irrelevant text/literals.
->> +	 * KPROBES depends on KALLSYMS so this last case should never
->> +	 * happen.
->> +	 */
->> +	if (kallsyms_lookup_size_offset((unsigned long) addr, &size, &offset)) {
->> +		if (offset < (MAX_ATOMIC_CONTEXT_SIZE*sizeof(kprobe_opcode_t)))
->> +			scan_end = addr - (offset / sizeof(kprobe_opcode_t));
->> +		else
->> +			scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
->
->          } else
->                 return INSN_REJECTED;
->
->    that is what I expected...
->
-> Thank you,
->
->>   	}
->> -#endif
->>   	decoded = arm_probe_decode_insn(insn, asi);
->>
->> -	if (decoded == INSN_REJECTED ||
->> -			is_probed_address_atomic(scan_start, scan_end))
->> -		return INSN_REJECTED;
->> +	if (decoded != INSN_REJECTED && scan_end)
->> +		if (is_probed_address_atomic(addr - 1, scan_end))
->> +			return INSN_REJECTED;
->>
->>   	return decoded;
->>   }
->> --
->> 2.5.0
->>
->
->
+On 2016? 09? 10? 06:48, Stephen Boyd wrote:
+> Some Qualcomm PMICs have a misc device that performs USB id pin
+> detection via an interrupt. When the interrupt triggers, we
+> should read the interrupt line to see if it has gone high or low.
+> If the interrupt is low then the ID pin is grounded, and if the
+> interrupt is high then the ID pin is being held high.
+> 
+> Cc: Roger Quadros <rogerq@ti.com>
+> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+> 
+> Changes from v1:
+>  * Fixed Makefile ordering
+>  * Fixed up copyright markings
+> 
+>  .../bindings/extcon/qcom,pm8941-misc.txt           |  41 +++++
+>  drivers/extcon/Kconfig                             |   6 +
+>  drivers/extcon/Makefile                            |   1 +
+>  drivers/extcon/extcon-qcom-spmi-misc.c             | 167 +++++++++++++++++++++
+>  4 files changed, 215 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt
+>  create mode 100644 drivers/extcon/extcon-qcom-spmi-misc.c
+> 
+> diff --git a/Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt b/Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt
+> new file mode 100644
+> index 000000000000..35383adb10f1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/extcon/qcom,pm8941-misc.txt
+> @@ -0,0 +1,41 @@
+> +Qualcomm's PM8941 USB ID Extcon device
+> +
+> +Some Qualcomm PMICs have a "misc" module that can be used to detect when
+> +the USB ID pin has been pulled low or high.
+> +
+> +PROPERTIES
+> +
+> +- compatible:
+> +    Usage: required
+> +    Value type: <string>
+> +    Definition: Should contain "qcom,pm8941-misc";
+> +
+> +- reg:
+> +    Usage: required
+> +    Value type: <u32>
+> +    Definition: Should contain the offset to the misc address space
+> +
+> +- interrupts:
+> +    Usage: required
+> +    Value type: <prop-encoded-array>
+> +    Definition: Should contain the usb id interrupt
+> +
+> +- interrupt-names:
+> +    Usage: required
+> +    Value type: <stringlist>
+> +    Definition: Should contain the string "usb_id" for the usb id interrupt
+> +
+> +Example:
+> +
+> +	pmic {
+> +		usb_id: misc at 900 {
+> +			compatible = "qcom,pm8941-misc";
+> +			reg = <0x900>;
+> +			interrupts = <0x0 0x9 0 IRQ_TYPE_EDGE_BOTH>;
+> +			interrupt-names = "usb_id";
+> +		};
+> +	}
+> +
+> +	usb-controller {
+> +		extcon = <&usb_id>;
+> +	};
+> diff --git a/drivers/extcon/Kconfig b/drivers/extcon/Kconfig
+> index 3d89e60a3e71..04788d92ea52 100644
+> --- a/drivers/extcon/Kconfig
+> +++ b/drivers/extcon/Kconfig
+> @@ -96,6 +96,12 @@ config EXTCON_PALMAS
+>  	  Say Y here to enable support for USB peripheral and USB host
+>  	  detection by palmas usb.
+>  
+> +config EXTCON_QCOM_SPMI_MISC
+> +	tristate "Qualcomm USB extcon support"
+> +	help
+> +	  Say Y here to enable SPMI PMIC based USB cable detection
+> +	  support on Qualcomm PMICs such as PM8941.
+> +
+>  config EXTCON_RT8973A
+>  	tristate "Richtek RT8973A EXTCON support"
+>  	depends on I2C
+> diff --git a/drivers/extcon/Makefile b/drivers/extcon/Makefile
+> index 972c813c375b..31a0a999c4fb 100644
+> --- a/drivers/extcon/Makefile
+> +++ b/drivers/extcon/Makefile
+> @@ -14,6 +14,7 @@ obj-$(CONFIG_EXTCON_MAX77693)	+= extcon-max77693.o
+>  obj-$(CONFIG_EXTCON_MAX77843)	+= extcon-max77843.o
+>  obj-$(CONFIG_EXTCON_MAX8997)	+= extcon-max8997.o
+>  obj-$(CONFIG_EXTCON_PALMAS)	+= extcon-palmas.o
+> +obj-$(CONFIG_EXTCON_QCOM_SPMI_MISC) += extcon-qcom-spmi-misc.o
+>  obj-$(CONFIG_EXTCON_RT8973A)	+= extcon-rt8973a.o
+>  obj-$(CONFIG_EXTCON_SM5502)	+= extcon-sm5502.o
+>  obj-$(CONFIG_EXTCON_USB_GPIO)	+= extcon-usb-gpio.o
+> diff --git a/drivers/extcon/extcon-qcom-spmi-misc.c b/drivers/extcon/extcon-qcom-spmi-misc.c
+> new file mode 100644
+> index 000000000000..1b8e24494c60
+> --- /dev/null
+> +++ b/drivers/extcon/extcon-qcom-spmi-misc.c
+> @@ -0,0 +1,167 @@
+> +/**
+> + * Based on extcon-usb-gpio.c
 
-Thanks,
--dl
+I think that following description is better than before.
+I'll modify it.
+
+  * extcon-qcom-spmi-misc.c - Qualcomm USB extcon driver to support USB ID
+  *                             detection based on extcon-usb-gpio.c.
+
+> + *
+> + * Copyright (C) 2016 Linaro Ltd
+
+s/Ltd/Ltd.
+
+You are missing the author information. I'll add following information:
+    * Stephen Boyd <stephen.boyd@linaro.org>
+
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/extcon.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/workqueue.h>
+> +
+> +#define USB_ID_DEBOUNCE_MS	5	/* ms */
+> +
+> +struct qcom_usb_extcon_info {
+> +	struct extcon_dev *edev;
+> +	int irq;
+> +	struct delayed_work wq_detcable;
+> +	unsigned long debounce_jiffies;
+> +};
+> +
+> +static const unsigned int qcom_usb_extcon_cable[] = {
+> +	EXTCON_USB_HOST,
+> +	EXTCON_NONE,
+> +};
+> +
+> +static void qcom_usb_extcon_detect_cable(struct work_struct *work)
+> +{
+> +	bool id;
+> +	int ret;
+> +	struct qcom_usb_extcon_info *info = container_of(to_delayed_work(work),
+> +						    struct qcom_usb_extcon_info,
+> +						    wq_detcable);
+> +
+> +	/* check ID and update cable state */
+> +	ret = irq_get_irqchip_state(info->irq, IRQCHIP_STATE_LINE_LEVEL, &id);
+> +	if (ret)
+> +		return;
+> +
+> +	extcon_set_cable_state_(info->edev, EXTCON_USB_HOST, !id);
+
+The extcon_set_cable_state_() is deprecated.
+Instead, I'll modify it using extcon_set_state() as following:
+
+	extcon_set_state(info->edev, EXTCON_USB_HOST, !id);
+
+> +}
+> +
+> +static irqreturn_t qcom_usb_irq_handler(int irq, void *dev_id)
+> +{
+> +	struct qcom_usb_extcon_info *info = dev_id;
+> +
+> +	queue_delayed_work(system_power_efficient_wq, &info->wq_detcable,
+> +			   info->debounce_jiffies);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int qcom_usb_extcon_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct qcom_usb_extcon_info *info;
+> +	int ret;
+> +
+> +	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
+> +	if (!info)
+> +		return -ENOMEM;
+> +
+> +	info->edev = devm_extcon_dev_allocate(dev, qcom_usb_extcon_cable);
+> +	if (IS_ERR(info->edev)) {
+> +		dev_err(dev, "failed to allocate extcon device\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	ret = devm_extcon_dev_register(dev, info->edev);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to register extcon device\n");
+> +		return ret;
+> +	}
+> +
+> +	info->debounce_jiffies = msecs_to_jiffies(USB_ID_DEBOUNCE_MS);
+> +	INIT_DELAYED_WORK(&info->wq_detcable, qcom_usb_extcon_detect_cable);
+> +
+> +	info->irq = platform_get_irq_byname(pdev, "usb_id");
+> +	if (info->irq < 0)
+> +		return info->irq;
+> +
+> +	ret = devm_request_threaded_irq(dev, info->irq, NULL,
+> +					qcom_usb_irq_handler,
+> +					IRQF_TRIGGER_RISING |
+> +					IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+> +					pdev->name, info);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to request handler for ID IRQ\n");
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, info);
+> +	device_init_wakeup(dev, 1);
+> +
+> +	/* Perform initial detection */
+> +	qcom_usb_extcon_detect_cable(&info->wq_detcable.work);
+> +
+> +	return 0;
+> +}
+> +
+> +static int qcom_usb_extcon_remove(struct platform_device *pdev)
+> +{
+> +	struct qcom_usb_extcon_info *info = platform_get_drvdata(pdev);
+> +
+> +	cancel_delayed_work_sync(&info->wq_detcable);
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int qcom_usb_extcon_suspend(struct device *dev)
+> +{
+> +	struct qcom_usb_extcon_info *info = dev_get_drvdata(dev);
+> +	int ret = 0;
+> +
+> +	if (device_may_wakeup(dev))
+> +		ret = enable_irq_wake(info->irq);
+> +
+> +	return ret;
+> +}
+> +
+> +static int qcom_usb_extcon_resume(struct device *dev)
+> +{
+> +	struct qcom_usb_extcon_info *info = dev_get_drvdata(dev);
+> +	int ret = 0;
+> +
+> +	if (device_may_wakeup(dev))
+> +		ret = disable_irq_wake(info->irq);
+> +
+> +	return ret;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(qcom_usb_extcon_pm_ops,
+> +			 qcom_usb_extcon_suspend, qcom_usb_extcon_resume);
+> +
+> +static const struct of_device_id qcom_usb_extcon_dt_match[] = {
+> +	{ .compatible = "qcom,pm8941-misc", },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, qcom_usb_extcon_dt_match);
+> +
+> +static struct platform_driver qcom_usb_extcon_driver = {
+> +	.probe		= qcom_usb_extcon_probe,
+> +	.remove		= qcom_usb_extcon_remove,
+> +	.driver		= {
+> +		.name	= "extcon-pm8941-misc",
+> +		.pm	= &qcom_usb_extcon_pm_ops,
+> +		.of_match_table = qcom_usb_extcon_dt_match,
+> +	},
+> +};
+> +module_platform_driver(qcom_usb_extcon_driver);
+> +
+> +MODULE_DESCRIPTION("QCOM USB ID extcon driver");
+
+You are missing the author information. I'll add it as following:
+
+	MODULE_AUTHOR("Stephen Boyd <stephen.boyd@linaro.org>");
+
+> +MODULE_LICENSE("GPL v2");
+> 
+
+-- 
+Best Regards,
+Chanwoo Choi
