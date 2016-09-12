@@ -1,85 +1,30 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 12 Sep 2016 22:00:21 +0200
-Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
-In-Reply-To: <074eed0df23199bc82f8d221690596d3@agner.ch>
-References: <20141009151605.GA8818@ulmo.nvidia.com>
- <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
- <6c896634c4d6446df0388da2c0228232@agner.ch>
- <20160909091857.7a263220@ipc1.ka-ro>
- <20160912124553.aqgv7b4vsx4urogi@piout.net>
- <20160912140401.qkezay7sqqavsf4i@pengutronix.de>
- <074eed0df23199bc82f8d221690596d3@agner.ch>
-Message-ID: <20160912200021.fsnfdgnng4it354g@pengutronix.de>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 12 Sep 2016 22:09:58 +0200 (CEST)
+Subject: [PATCH v2 3/4] ARM: dts: imx23: Fix build warnings with W=1
+In-Reply-To: <1473103670-15922-3-git-send-email-festevam@gmail.com>
+References: <1473103670-15922-1-git-send-email-festevam@gmail.com>
+ <1473103670-15922-3-git-send-email-festevam@gmail.com>
+Message-ID: <494364123.109779.ea238904-0649-44f2-b379-3c307984c54c.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stefan,
 
-On Mon, Sep 12, 2016 at 09:51:26AM -0700, Stefan Agner wrote:
-> On 2016-09-12 07:04, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > On Mon, Sep 12, 2016 at 02:45:53PM +0200, Alexandre Belloni wrote:
-> >> Isn't a properly designed PWM putting a high level on its pin when
-> >> disabled and configured with inversed polarity ?
-> > 
-> > it's not well defined. When trying several times over the years to
-> > properly define and document it, I didn't manage to agree with Thierry
-> > what is the right thing to define.
-> > 
-> > IMHO it would be sensible to make it explicitly undefined what happens
-> > when a PMW is disabled. This would simplify drivers from
-> > 
-> > 	pwm_config(mypwm, value, period);
-> > 	if (!value)
-> > 		pwm_disable(mypwm)
-> > 	else
-> > 		pwm_enable(led_dat->pwm);
-> > 
-> > to
-> > 
-> > 	pwm_config(mypwm, value, period);
-> > 
-> > and let the pwm driver disable it's clock (or whatever) when value is 0
-> > and there are energy saving benefits that don't hurt the expected
-> > behaviour of the pin. So the hardware specific stuff is handled in the
-> > hardware specific driver and usage in pwm-consumers is simplified.
-> > Moreover this also simplifies some pwm drivers because they don't have
-> > to catch in software the cases where the hardware differs from the
-> > expectation[1].
+> Fabio Estevam <festevam@gmail.com> hat am 5. September 2016 um 21:27
+> geschrieben:
 > 
-> That sounds like a sane definition to me and what I would have expected
-> from the PWM framework. That the pin is not defined after pwm_disable is
-> totally understandable. It is usually a case which the board designer
-> anyway needs to take care of (e.g. what is the state right after power
-> on? If the designer cares about, he will put a pull-up/down in place).
 > 
-> And it seems also Sascha suggested that:
-> https://lkml.org/lkml/2013/1/4/139
-
-actually I talked to Sascha in private before ranting :-)
-
-> I did not found where Thierry disagreed to that...?
-
-Hmm, I used gmane links before, most of them are dead today. :-|
-http://www.spinics.net/lists/linux-leds/msg03237.html is one example.
-
-> > Today it's a (maybe small) bug, when a pwm consumer calls pwm_config with
-> > value=0 and doesn't disable it afterwards. IMHO that's a bug in the pwm
-> > API that pwm_config with value=0 doesn't imply (the wanted effects of)
-> > pwm_disable.
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> I don't quite get what you are saying here. What wanted effects of
-> pwm_disable would you like to move into pwm_config with value=0?
+> Fix the following build warnings with W=1:
+> 
+> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but
+> no unit name
+> 
+> While at it, also pass the 'device_type' property as recommended by the
+> ePAPR specification.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-I want that the pwm driver disables its clock on pwm_config(mypwm, 0,
-someperiod) such that the consumer doesn't need to call
-pwm_disable(mypwm) to save power (assuming it's safe to do so, which
-only the pwm provider knows).
+Patch 1 and 3 works for my Olinuxino board.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
