@@ -1,48 +1,109 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 12 Sep 2016 17:13:47 +0100
-Subject: [PATCH v7 09/22] iommu/arm-smmu: Set PRIVCFG in stage 1 STEs
+Date: Mon, 12 Sep 2016 17:13:48 +0100
+Subject: [PATCH v7 10/22] iommu/arm-smmu: Handle stream IDs more dynamically
 In-Reply-To: <cover.1473695704.git.robin.murphy@arm.com>
 References: <cover.1473695704.git.robin.murphy@arm.com>
-Message-ID: <39a127b6729e8d0d51b62e74cdff6df4323b024a.1473695704.git.robin.murphy@arm.com>
+Message-ID: <6d635a9764d072ce1b1081f087cc743ba0ec1f56.1473695704.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the SMMUv3 equivalent of d346180e70b9 ("iommu/arm-smmu: Treat
-all device transactions as unprivileged"), so that once again those
-pesky DMA controllers with their privileged instruction fetches don't
-unexpectedly fault in stage 1 domains due to VMSAv8 rules.
+Rather than assuming fixed worst-case values for stream IDs and SMR
+masks, keep track of whatever implemented bits the hardware actually
+reports. This also obviates the slightly questionable validation of SMR
+fields in isolation - rather than aborting the whole SMMU probe for a
+hardware configuration which is still architecturally valid, we can
+simply refuse masters later if they try to claim an unrepresentable ID
+or mask (which almost certainly implies a DT error anyway).
 
 Acked-by: Will Deacon <will.deacon@arm.com>
 Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/iommu/arm-smmu.c | 43 ++++++++++++++++++++++---------------------
+ 1 file changed, 22 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 52860bcf80f2..0c45c1e02e04 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -267,6 +267,9 @@
- #define STRTAB_STE_1_SHCFG_INCOMING	1UL
- #define STRTAB_STE_1_SHCFG_SHIFT	44
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 4b1c87e947fd..f86d7887f69a 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -165,9 +165,7 @@
+ #define ARM_SMMU_GR0_SMR(n)		(0x800 + ((n) << 2))
+ #define SMR_VALID			(1 << 31)
+ #define SMR_MASK_SHIFT			16
+-#define SMR_MASK_MASK			0x7fff
+ #define SMR_ID_SHIFT			0
+-#define SMR_ID_MASK			0x7fff
  
-+#define STRTAB_STE_1_PRIVCFG_UNPRIV	2UL
-+#define STRTAB_STE_1_PRIVCFG_SHIFT	48
-+
- #define STRTAB_STE_2_S2VMID_SHIFT	0
- #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
- #define STRTAB_STE_2_VTCR_SHIFT		32
-@@ -1068,7 +1071,9 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- #ifdef CONFIG_PCI_ATS
- 			 STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT |
- #endif
--			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
-+			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT |
-+			 STRTAB_STE_1_PRIVCFG_UNPRIV <<
-+			 STRTAB_STE_1_PRIVCFG_SHIFT);
+ #define ARM_SMMU_GR0_S2CR(n)		(0xc00 + ((n) << 2))
+ #define S2CR_CBNDX_SHIFT		0
+@@ -346,6 +344,8 @@ struct arm_smmu_device {
+ 	atomic_t			irptndx;
  
- 		if (smmu->features & ARM_SMMU_FEAT_STALLS)
- 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
+ 	u32				num_mapping_groups;
++	u16				streamid_mask;
++	u16				smr_mask_mask;
+ 	DECLARE_BITMAP(smr_map, ARM_SMMU_MAX_SMRS);
+ 
+ 	unsigned long			va_size;
+@@ -1715,39 +1715,40 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 		dev_notice(smmu->dev,
+ 			   "\t(IDR0.CTTW overridden by dma-coherent property)\n");
+ 
++	/* Max. number of entries we have for stream matching/indexing */
++	size = 1 << ((id >> ID0_NUMSIDB_SHIFT) & ID0_NUMSIDB_MASK);
++	smmu->streamid_mask = size - 1;
+ 	if (id & ID0_SMS) {
+-		u32 smr, sid, mask;
++		u32 smr;
+ 
+ 		smmu->features |= ARM_SMMU_FEAT_STREAM_MATCH;
+-		smmu->num_mapping_groups = (id >> ID0_NUMSMRG_SHIFT) &
+-					   ID0_NUMSMRG_MASK;
+-		if (smmu->num_mapping_groups == 0) {
++		size = (id >> ID0_NUMSMRG_SHIFT) & ID0_NUMSMRG_MASK;
++		if (size == 0) {
+ 			dev_err(smmu->dev,
+ 				"stream-matching supported, but no SMRs present!\n");
+ 			return -ENODEV;
+ 		}
+ 
+-		smr = SMR_MASK_MASK << SMR_MASK_SHIFT;
+-		smr |= (SMR_ID_MASK << SMR_ID_SHIFT);
++		/*
++		 * SMR.ID bits may not be preserved if the corresponding MASK
++		 * bits are set, so check each one separately. We can reject
++		 * masters later if they try to claim IDs outside these masks.
++		 */
++		smr = smmu->streamid_mask << SMR_ID_SHIFT;
+ 		writel_relaxed(smr, gr0_base + ARM_SMMU_GR0_SMR(0));
+ 		smr = readl_relaxed(gr0_base + ARM_SMMU_GR0_SMR(0));
++		smmu->streamid_mask = smr >> SMR_ID_SHIFT;
+ 
+-		mask = (smr >> SMR_MASK_SHIFT) & SMR_MASK_MASK;
+-		sid = (smr >> SMR_ID_SHIFT) & SMR_ID_MASK;
+-		if ((mask & sid) != sid) {
+-			dev_err(smmu->dev,
+-				"SMR mask bits (0x%x) insufficient for ID field (0x%x)\n",
+-				mask, sid);
+-			return -ENODEV;
+-		}
++		smr = smmu->streamid_mask << SMR_MASK_SHIFT;
++		writel_relaxed(smr, gr0_base + ARM_SMMU_GR0_SMR(0));
++		smr = readl_relaxed(gr0_base + ARM_SMMU_GR0_SMR(0));
++		smmu->smr_mask_mask = smr >> SMR_MASK_SHIFT;
+ 
+ 		dev_notice(smmu->dev,
+-			   "\tstream matching with %u register groups, mask 0x%x",
+-			   smmu->num_mapping_groups, mask);
+-	} else {
+-		smmu->num_mapping_groups = (id >> ID0_NUMSIDB_SHIFT) &
+-					   ID0_NUMSIDB_MASK;
++			   "\tstream matching with %lu register groups, mask 0x%x",
++			   size, smmu->smr_mask_mask);
+ 	}
++	smmu->num_mapping_groups = size;
+ 
+ 	if (smmu->version < ARM_SMMU_V2 || !(id & ID0_PTFS_NO_AARCH32)) {
+ 		smmu->features |= ARM_SMMU_FEAT_FMT_AARCH32_L;
 -- 
 2.8.1.dirty
