@@ -1,56 +1,46 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Sep 2016 15:33:22 +0100
-Subject: [PATCH] ARM: dma-mapping: add in missing white space in error
- message text
-In-Reply-To: <db1758f8-0335-6661-e797-b2021682a087@arm.com>
-References: <20160912125212.32739-1-colin.king@canonical.com>
- <db1758f8-0335-6661-e797-b2021682a087@arm.com>
-Message-ID: <20160912143322.GW1041@n2100.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 12 Sep 2016 15:35:53 +0100
+Subject: [GIT PULL] ARM: module PLT optimizations
+In-Reply-To: <CAKv+Gu-=C_WwO30D=0nZCx9FMhj7qrHFzvkk4xnG81Y0t1bdUw@mail.gmail.com>
+References: <CAKv+Gu-=C_WwO30D=0nZCx9FMhj7qrHFzvkk4xnG81Y0t1bdUw@mail.gmail.com>
+Message-ID: <CAKv+Gu_q0BOYqNmap-BGe_p2Cm7qgRMuJ_eKZFMANpJiMwqbVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 02:06:09PM +0100, Robin Murphy wrote:
-> On 12/09/16 13:52, Colin King wrote:
-> > From: Colin Ian King <colin.king@canonical.com>
-> > 
-> > A dev_warn message spans two lines and the literal string is missing
-> > a white space between words. Add the white space.
-> > 
-> > Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> > ---
-> >  arch/arm/common/dmabounce.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-> > index 3012816..f47767b 100644
-> > --- a/arch/arm/common/dmabounce.c
-> > +++ b/arch/arm/common/dmabounce.c
-> > @@ -547,7 +547,7 @@ void dmabounce_unregister_dev(struct device *dev)
-> >  
-> >  	if (!device_info) {
-> >  		dev_warn(dev,
-> > -			 "Never registered with dmabounce but attempting"
-> > +			 "Never registered with dmabounce but attempting "
-> >  			 "to unregister!\n");
-> 
-> Per Documentation/CodingStyle, better to put the whole thing onto one
-> line so that, say, "git grep 'attempting to unregister'" doesn't leave
-> one scratching ones head in confusion.
-> 
-> Of course, even better would be to get rid of the whole thing and
-> convert ARM to use SWIOTLB, but hey, one thing at a time ;)
+On 30 August 2016 at 17:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Hello Russell,
+>
+> The following changes since commit 3eab887a55424fc2c27553b7bfe32330df83f7b8:
+>
+>   Linux 4.8-rc4 (2016-08-28 15:04:33 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
+>                                           tags/arm-plt-optimizations-for-v4.9
+>
+> for you to fetch changes up to 66e94ba3c8ea5ff5f1443a50441f953ef44010b1:
+>
+>   ARM: kernel: avoid brute force search on PLT generation
+>                                           (2016-08-30 17:45:34 +0100)
+>
+> ----------------------------------------------------------------
+> This series of 4 patches optimizes the ARM PLT generation code that
+> is invoked at module load time, to get rid of the O(n^2) algorithm
+> that results in pathological load times of 10 seconds or more for
+> large modules on certain STB platforms
+>
+> ----------------------------------------------------------------
+> Ard Biesheuvel (4):
+>       ARM: kernel: merge core and init PLTs
+>       ARM: kernel: allocate PLT entries only for external symbols
+>       ARM: kernel: sort relocation sections before allocating PLTs
+>       ARM: kernel: avoid brute force search on PLT generation
+>
+>  arch/arm/include/asm/module.h |   6 +-
+>  arch/arm/kernel/module-plts.c | 243 +++++++++++++++++++++++++-----------------
+>  arch/arm/kernel/module.lds    |   3 +-
+>  3 files changed, 147 insertions(+), 105 deletions(-)
+>
 
-I doubt that can happen - dmabounce does a little more than swiotlb
-because it copes with DMA masks that are _not_ a number of zeros
-followed by one bits.  It was written to support things like SA1111
-DMA, where the device has a bug in that it can't drive certain
-SDRAM address bits correctly.
-
-It also gets used for ITE8512 PCI controllers and IXP4xx platforms,
-although these should probably be converted to SWIOTLB.  However,
-without having test systems, I'd recommend leaving them as-is.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Ping?
