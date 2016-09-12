@@ -1,156 +1,152 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Sep 2016 15:59:31 +0100
-Subject: [PATCH] arm64: mm: move zero page from .bss to right before
- swapper_pg_dir
-In-Reply-To: <1473689784-29745-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1473689784-29745-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160912145931.GB14165@leverpostej>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Mon, 12 Sep 2016 16:01:17 +0100
+Subject: [RFC PATCH 0/5] arm64: Signal context expansion
+In-Reply-To: <20160912111749.GB3958@e103592.cambridge.arm.com>
+References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
+ <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
+ <20160909152047.GA3958@e103592.cambridge.arm.com>
+ <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
+ <20160912111749.GB3958@e103592.cambridge.arm.com>
+Message-ID: <57D6C33D.9020003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On 12/09/16 12:17, Dave Martin wrote:
+> On Fri, Sep 09, 2016 at 07:01:12PM +0200, Florian Weimer wrote:
+>> On 09/09/2016 05:21 PM, Dave Martin wrote:
+>>
+>>>> Do you add this extra information only if the stack is sufficiently large?
+>>>>
+>>>> x86_64 adds the new information even for small stacks set up with
+>>>> sigaltstack, leading to memory corruption on bleeding-edge hardware:
+>>>>
+>>>>  <https://bugzilla.kernel.org/show_bug.cgi?id=153531>
+>>>
+>>> Hmmm, not yet.  We already check that the whole frame is writable user
+>>> memory, but this isn't sufficient to avoid user corruption in the case
+>>> of alternate signal stacks.  I'll fix this -- thanks for flagging it.
+>>>
+>>> If the stack isn't large enough, we'll still have to SEGV the task
+>>> though.
+>>
+>> You could skip copying the data and not install a pointer to it in the
+>> existing signal context.
+> 
+> We could, but then we'd corrupt the task state in sigreturn, since
+> we wouldn't have been able to save/restore part of the state.
+> 
+>>> We can (and should) bump up the SIG{,MIN}STKSZ constants when adding
+>>> the SVE support proper to the kernel,
+>>
+>> That's a userspace ABI change (libraries use these constants to size struct
+>> members), and not a good idea.  You might get away with at this stage, but
+>> you can't do this every time you add some new process state you want to add
+>> to signal handlers.
+> 
+> For internal interfaces within a single component that's tolerable,
+> since a single value would be used for each of these constants
+> throughout the build of that component.
+> 
+> A quick search on sources.debian.org suggests that the total number of
+> packages that expose {,MIN}SIGSTKSZ dependent definitions in their
+> public interfaces is small (I couldn't find any after paging through
+> dozens of pages of results -- so the total is maybe in the range 0-10)
+> -- hopefully few enough to eyeball.
+> 
+> 
+>>> I wonder whether we should make the signal stack size runtime
+>>> discoverable through sysconf() instead...
+> 
+> I will likely suggest this for the future, but of course it doesn't help
+> for current binaries.
+> 
+> 
+> Note that MINSIGSTKSZ stared life wrong for arm64, and has since gone
+> through a few ABI breaking changes.  I don't condone this, but we have
+> form in this area :/
+> 
+> sigaltstack() already fails with ENOMEM for software that passes
+> ss_size = MINSIGSTKSZ, and is built against glibc<2.22 [1], [2], running
+> on linux>=4.3 [3], which is an ABI break in case where sigaltstack() is
+> otherwise guaranteed to succeed.
+> 
 
-On Mon, Sep 12, 2016 at 03:16:24PM +0100, Ard Biesheuvel wrote:
->  static inline void cpu_set_reserved_ttbr0(void)
->  {
-> -	unsigned long ttbr = virt_to_phys(empty_zero_page);
-> -
-> -	asm(
-> -	"	msr	ttbr0_el1, %0			// set TTBR0\n"
-> -	"	isb"
-> -	:
-> -	: "r" (ttbr));
-> +	/*
-> +	 * The zero page is located right before swapper_pg_dir, whose
-> +	 * physical address we can easily fetch from TTBR1_EL1.
-> +	 */
-> +	write_sysreg(read_sysreg(ttbr1_el1) - PAGE_SIZE, ttbr0_el1);
-> +	isb();
->  }
+yes, this was abi breaking change.
 
-As a heads-up, in arm64 for-next/core this is a write_sysreg() and an
-isb() thanks to [1,2]. This will need a rebase to avoid conflict.
+if glibc does not care about existing binaries
+that use sigaltstack with MINSIGSTKSZ then it can
+increase the size, but i think the kernel should
+not change the abi (there are other libcs and libc
+independent runtime systems on linux for aarch64
+with their own sigaltstack setup, not all of them
+may care about SVE).
 
->  /*
-> @@ -109,7 +108,8 @@ static inline void cpu_uninstall_idmap(void)
->  {
->  	struct mm_struct *mm = current->active_mm;
->  
-> -	cpu_set_reserved_ttbr0();
-> +	write_sysreg(virt_to_phys(empty_zero_page), ttbr0_el1);
-> +	isb();
->  	local_flush_tlb_all();
->  	cpu_set_default_tcr_t0sz();
->  
-> @@ -119,7 +119,8 @@ static inline void cpu_uninstall_idmap(void)
->  
->  static inline void cpu_install_idmap(void)
->  {
-> -	cpu_set_reserved_ttbr0();
-> +	write_sysreg(virt_to_phys(empty_zero_page), ttbr0_el1);
-> +	isb();
->  	local_flush_tlb_all();
->  	cpu_set_idmap_tcr_t0sz();
+i assume the kernel can avoid saving SVE regs when
+they are not used by the process.
 
-It would be worth a comment as to why we have to open-code these, so as
-to avoid "obvious" / "trivial cleanup" patches to this later. e.g.
-expand the comment in cpu_set_reserved_ttbr0 with:
+> 
+> The bottom line here is that the sigaltstack() API is broken with regard
+> to extensibility, so we cannot extend the amount of signal state without
+> breaking something.
+> 
 
-* In some cases (e.g. where cpu_replace_ttbr1 is used), TTBR1 may not
-* point at swapper_pg_dir, and this helper cannot be used.
+extending signal state can break things independently
+of sigaltstack.
 
-... and add /* see cpu_set_reserved_ttbr0 */ to both of these above the
-write_sysreg().
+binaries with strict guarantees about worst case stack
+usage can change behaviour.
 
-> diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
-> index 4e7e7067afdb..44e94e234ba0 100644
-> --- a/arch/arm64/include/asm/sections.h
-> +++ b/arch/arm64/include/asm/sections.h
-> @@ -26,5 +26,6 @@ extern char __hyp_text_start[], __hyp_text_end[];
->  extern char __idmap_text_start[], __idmap_text_end[];
->  extern char __irqentry_text_start[], __irqentry_text_end[];
->  extern char __mmuoff_data_start[], __mmuoff_data_end[];
-> +extern char __robss_start[], __robss_end[];
->  
->  #endif /* __ASM_SECTIONS_H */
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 5ce9b2929e0d..eae5036dc725 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -209,9 +209,19 @@ SECTIONS
->  
->  	BSS_SECTION(0, 0, 0)
->  
-> -	. = ALIGN(PAGE_SIZE);
-> +	. = ALIGN(SEGMENT_ALIGN);
-> +	__robss_start = .;
->  	idmap_pg_dir = .;
-> -	. += IDMAP_DIR_SIZE;
-> +	. = ALIGN(. + IDMAP_DIR_SIZE + PAGE_SIZE, SEGMENT_ALIGN);
-> +	__robss_end = .;
+fortunately glibc PTHREAD_STACK_MIN is huge on aarch64
+so applications using it are unlikely to break because
+of the increased signal state.
+(this also means it's impossible to have threads with
+tiny stacks on glibc, so large amount of threads means
+large amount of commit charge.)
 
-Is it really worth aligning this beyond PAGE_SIZE?
-
-We shouldn't be poking these very often, the padding is always larger
-than the number of used pages, and the swapper dir is relegated to page
-mappings regardless.
-
-> +	/*
-> +	 * Put the zero page right before swapper_pg_dir so we can easily
-> +	 * obtain its physical address by subtracting PAGE_SIZE from the
-> +	 * contents of TTBR1_EL1.
-> +	 */
-> +	empty_zero_page = __robss_end - PAGE_SIZE;
-
-Further to the above, I think this would be clearer if defined in-line
-as with the idmap and swapper pgdirs (with page alignment).
-
-[...]
-
->  	/*
-> -	 * Map the linear alias of the [_text, __init_begin) interval as
-> -	 * read-only/non-executable. This makes the contents of the
-> -	 * region accessible to subsystems such as hibernate, but
-> -	 * protects it from inadvertent modification or execution.
-> +	 * Map the linear alias of the intervals [_text, __init_begin) and
-> +	 * [robss_start, robss_end) as read-only/non-executable. This makes
-> +	 * the contents of these regions accessible to subsystems such
-> +	 * as hibernate, but protects them from inadvertent modification or
-> +	 * execution.
-
-For completeness, it may also be worth stating that we're mapping the
-gap between those as usual, since this will be freed.
-
-Then again, maybe not. ;)
-
-[...]
-
-> @@ -436,13 +442,19 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
->   */
->  static void __init map_kernel(pgd_t *pgd)
->  {
-> -	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
-> +	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init,
-> +		vmlinux_data, vmlinux_robss, vmlinux_tail;
->  
->  	map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
->  	map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
->  	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
->  			   &vmlinux_init);
-> -	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
-> +	map_kernel_segment(pgd, _data, __robss_start, PAGE_KERNEL,
-> +			   &vmlinux_data);
-> +	map_kernel_segment(pgd, __robss_start, __robss_end, PAGE_KERNEL_RO,
-> +			   &vmlinux_robss);
-> +	map_kernel_segment(pgd, __robss_end, _end, PAGE_KERNEL,
-> +			   &vmlinux_tail);
-
-Perhaps s/tail/swapper/ or s/tail/pgdir/ to make this clearer?
-
-Modulo the above, this looks good to me.
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/455284.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/455290.html
+> 
+> The least-wrong thing I can think of to do is:
+> 
+> * deprecate but continue to support the existing sigaltstack API/ABI
+> with today's {,MIN}SIGSTKSZ definitions
+> 
+> * guarantee (as much as possible) that software using this ABI continues
+> to work (by saving/restoring only data that _must_ be saved/restored at
+> each signal, which may be small enough to fit)
+> 
+> * providing a clean failure mode (fatal signal) when this proves
+> impossible at signal delivery/return time;
+> 
+> * define a new interface for runtime-querying the required signal stack
+> size;
+> 
+> * define a new syscall or new stack_t.ss_flags flags (say, SS_STRICT)
+> that permits the kernel to enforce a runtime-determined minimum greater
+> than MINSIGSTKSZ when calling sigaltstack().
+> 
+> 
+> Another option would be:
+> 
+> * define a new interface for runtime-querying the required signal stack
+> size, and
+> 
+> * support the current API/ABI, but make a call to sigaltstack() SEGV or
+> SIGILL the caller if it specifies ss_stack >= MINSIGSTKSZ but smaller
+> than the actual runtime minimum.
+> 
+> (this would cause old software to break immediately in an obvious way on
+> new systems, forcing people to fix their software -- which they might or
+> might not actually bother to do).
+> 
+> 
+> Thoughts?
+> 
+> Cheers
+> ---Dave
+> 
+> 
+> [1] https://sourceware.org/git/?p=glibc.git;a=commitdiff;h=b763f6ae859ecea70a5dacb8ad45c71d5f667e2e
+> 
+> [2] https://sourceware.org/git/?p=glibc.git;a=blob;f=sysdeps/unix/sysv/linux/bits/sigstack.h;h=e143034ce24dc383016b4882b89cfebc7a6a62d7;hb=b8079dd0d360648e4e8de48656c5c38972621072
+> 
+> [3] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c9692657c0321fec7bcb3ca8c6db56c08c640ace
+> 
