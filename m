@@ -1,48 +1,68 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 12 Sep 2016 12:15:40 -0300
-Subject: [PATCH v5 3/3] clk: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <CACrMeVA8CdL-Fqa4NwmBUPvzBXsi=o8bpB_tY2-Z0-xCoMX3xA@mail.gmail.com>
-References: <1468235521-3163-1-git-send-email-p.zabel@pengutronix.de>
- <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
- <5787C558.5060904@gmail.com> <2499789.N9zTF3cNAV@diplodocus>
- <CAOMZO5CPM9YfVqfpuyLmhGn9jC7p73Ocnc7LxE9=xA9ouawNQQ@mail.gmail.com>
- <CACrMeVA8CdL-Fqa4NwmBUPvzBXsi=o8bpB_tY2-Z0-xCoMX3xA@mail.gmail.com>
-Message-ID: <CAOMZO5DkMaRFwzH7HY872pLUdDrZfMq0xqLG+Xv88ut3Jd5Saw@mail.gmail.com>
+From: brendan.jackman@arm.com (Brendan Jackman)
+Date: Mon, 12 Sep 2016 16:19:43 +0100
+Subject: [PATCH v5 02/16] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <20160902201605.GA1705@linaro.org>
+References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
+ <1472242678-33700-3-git-send-email-lina.iyer@linaro.org>
+ <0b233802-f459-c6bb-ff42-70745a225cfb@arm.com>
+ <20160902201605.GA1705@linaro.org>
+Message-ID: <87sht59mcw.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akshay and Charles,
 
-On Mon, Sep 12, 2016 at 12:09 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
+Hi Lina,
 
-> Hi Fabio, Shawn,
+Sorry for the delay here, Sudeep and I were both been on holiday last week.
+
+On Fri, Sep 02 2016 at 21:16, Lina Iyer wrote:
+> On Fri, Sep 02 2016 at 07:21 -0700, Sudeep Holla wrote:
+[...]
+>>This version is *not very descriptive*. Also the discussion we had on v3
+>>version has not yet concluded IMO. So can I take that we agreed on what
+>>was proposed there or not ?
+>>
+> Sorry, this example is not very descriptive. Pls. check the 8916 dtsi
+> for the new changes in the following patches. Let me know if that makes
+> sense.
+
+The not-yet-concluded discussion Sudeep is referring to is at [1].
+
+In that thread we initially proposed the idea of, instead of splitting
+state phandles between cpu-idle-states and domain-idle-states, putting
+CPUs in their own domains and using domain-idle-states for _all_
+phandles, deprecating cpu-idle-states. I've brought this up in other
+threads [2] but discussion keeps petering out, and neither this example
+nor the 8916 dtsi in this patch series reflect the idea.
+
+It would be great if we could go back to the thread at [1] where Sudeep
+has posted examples and come to a clear consensus on the binding design
+before reviewing implementation patches. Ideally with input from Ulf,
+Rob and Kevin.
+
+[1] https://patchwork.kernel.org/patch/9264507
+[2] http://www.spinics.net/lists/devicetree/msg141024.html
 >
-> Advantech tested the v5 patch series on imx6q-b450v3 board (with 4.7
-> kernel) and confirmed the patch fixes the lvds blank display issue
-> being seen on some imx6q-b450v3 boards.
+> Thanks,
+> Lina
 >
-> Details below:
-> With the patch applied:
-> Board # 1: 100 times power on/off, no LVDS display failure
-> Board # 2: 100 times power on/off, no LVDS display failure
->
-> Without the patch:
-> Board # 1: LVDS display failure (blank display output) at 4th time power on/off.
-> Board # 2: LVDS display failure (blank display output) at 3rd time power on/off.
->
-> Tested-by: Charles Kang <Charles.Kang@advantech.com.tw>
+>>We could have better example above *really* based on the discussions we
+>>had so far. This example always makes me think it's well crafted to
+>>avoid any sort of discussions. We need to consider different use-cases
+>>e.g. what about CPU level states ?
+>>
+>>IMO, we need to discuss this DT binding in detail and arrive at someq
+>>conclusion before you take all the troubles to respin the series.
+>>Also it's better to keep the DT binding separate until we have some
+>>conclusion instead of posting the implementation for each version.
+>>That's just my opinion(I would be least bothered about implementation
+>>until I know it will be accepted before I can peek into the code, others
+>>may differ.
+>>
+>>--
+>>Regards,
+>>Sudeep
 
-Thanks for testing it.
-
-> Since the patch has been reviewed and confirmed to fix display
-> failures on 2 different boards (imx6q-evi and imx6q-b450v3), can it be
-> applied?
-
-Yes, I think this series is in a good shape now.
-
-Shawn,
-
-Are you happy with it?
-
-Thanks
+Cheers,
+Brendan
