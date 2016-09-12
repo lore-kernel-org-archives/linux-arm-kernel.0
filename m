@@ -1,112 +1,108 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 12 Sep 2016 14:56:42 +0200
-Subject: [PATCH V2 10/10] PM / Domains: Add support for removing nested PM
- domains by provider
-In-Reply-To: <1473678074-15126-11-git-send-email-jonathanh@nvidia.com>
-References: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
- <1473678074-15126-11-git-send-email-jonathanh@nvidia.com>
-Message-ID: <CAPDyKFomhNiC1CeeVCnYX5DOtT2tXYdAU30XTY9gnUSeos8uQw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Sep 2016 13:57:10 +0100
+Subject: [PATCH] arm64: mm: move zero page from .bss to right before
+ swapper_pg_dir
+In-Reply-To: <1473604714-5512-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1473604714-5512-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160912125710.GA13899@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 September 2016 at 13:01, Jon Hunter <jonathanh@nvidia.com> wrote:
-> If a device supports PM domains that are subdomains of another PM
-> domain, then the PM domains should be removed in reverse order to
-> ensure that the subdomains are removed first. Furthermore, if there is
-> more than one provider, then there needs to be a way to remove the
-> domains in reverse order for a specific provider.
->
-> Add the function of_genpd_remove_last() to remove the last PM domain
-> added by a given PM domain provider and return the generic_pm_domain
-> structure for the PM domain that was removed.
->
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+Hi,
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Sun, Sep 11, 2016 at 03:38:34PM +0100, Ard Biesheuvel wrote:
+> Move the statically allocated zero page from the .bss section to right
+> before swapper_pg_dir. This allows us to refer to its physical address
+> by simply reading TTBR1_EL1 (which always points to swapper_pg_dir and
+> always has its ASID field cleared), and subtracting PAGE_SIZE.
 
-Kind regards
-Uffe
+On a conflicting note, I was hoping to move the zero page into .rodata
+so as to catch any erroneous modification.
 
+Given that we can't rely on TTBR1 poiting at the swapper_pg_dir, that
+leaves us with Image size reduction vs RO-ification.
+
+Any thoughts/preference?
+
+Thanks,
+Mark,
+
+> Inspired-by: http://marc.info/?l=linux-arm-kernel&m=147282867511801
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  drivers/base/power/domain.c | 35 +++++++++++++++++++++++++++++++++++
->  include/linux/pm_domain.h   |  7 +++++++
->  2 files changed, 42 insertions(+)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 7481e3e316a2..b0cf46dcae73 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1745,6 +1745,41 @@ int of_genpd_add_subdomain(struct of_phandle_args *parent_spec,
->  EXPORT_SYMBOL_GPL(of_genpd_add_subdomain);
->
->  /**
-> + * of_genpd_remove_last - Remove the last PM domain registered for a provider
-> + * @provider: Pointer to device structure associated with provider
-> + *
-> + * Find the last PM domain that was added by a particular provider and
-> + * remove this PM domain from the list of PM domains. The provider is
-> + * identified by the 'provider' device structure that is passed. The PM
-> + * domain will only be removed, if the provider associated with domain
-> + * has been removed.
-> + *
-> + * Returns a valid pointer to struct generic_pm_domain on success or
-> + * ERR_PTR() on failure.
-> + */
-> +struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
-> +{
-> +       struct generic_pm_domain *gpd, *genpd = ERR_PTR(-ENOENT);
-> +       int ret;
-> +
-> +       if (IS_ERR_OR_NULL(np))
-> +               return ERR_PTR(-EINVAL);
-> +
-> +       mutex_lock(&gpd_list_lock);
-> +       list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
-> +               if (gpd->provider == &np->fwnode) {
-> +                       ret = genpd_remove(gpd);
-> +                       genpd = ret ? ERR_PTR(ret) : gpd;
-> +                       break;
-> +               }
-> +       }
-> +       mutex_unlock(&gpd_list_lock);
-> +
-> +       return genpd;
-> +}
-> +EXPORT_SYMBOL_GPL(of_genpd_remove_last);
-> +
-> +/**
->   * genpd_dev_pm_detach - Detach a device from its PM domain.
->   * @dev: Device to detach.
->   * @power_off: Currently not used
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index 85f7d53a9827..a09fe5c009c8 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -204,6 +204,7 @@ extern int of_genpd_add_device(struct of_phandle_args *args,
->                                struct device *dev);
->  extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
->                                   struct of_phandle_args *new_subdomain);
-> +extern struct generic_pm_domain *of_genpd_remove_last(struct device_node *np);
->
->  int genpd_dev_pm_attach(struct device *dev);
->  #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
-> @@ -237,6 +238,12 @@ static inline int genpd_dev_pm_attach(struct device *dev)
+>  arch/arm64/include/asm/mmu_context.h | 10 ++++++----
+>  arch/arm64/kernel/head.S             |  1 -
+>  arch/arm64/kernel/vmlinux.lds.S      |  2 ++
+>  arch/arm64/mm/mmu.c                  |  1 -
+>  4 files changed, 8 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> index b1892a0dbcb0..94461ba5febd 100644
+> --- a/arch/arm64/include/asm/mmu_context.h
+> +++ b/arch/arm64/include/asm/mmu_context.h
+> @@ -49,13 +49,15 @@ static inline void contextidr_thread_switch(struct task_struct *next)
+>   */
+>  static inline void cpu_set_reserved_ttbr0(void)
 >  {
->         return -ENODEV;
+> -	unsigned long ttbr = virt_to_phys(empty_zero_page);
+> +	unsigned long dummy;
+>  
+> -	asm(
+> +	asm volatile(
+> +	"	mrs	%0, ttbr1_el1			// get TTBR1\n"
+> +	"	sub	%0, %0, %1			// subtract PAGE_SIZE\n"
+>  	"	msr	ttbr0_el1, %0			// set TTBR0\n"
+>  	"	isb"
+> -	:
+> -	: "r" (ttbr));
+> +	: "=&r" (dummy)
+> +	: "I" (PAGE_SIZE));
 >  }
-> +
-> +static inline
-> +struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
-> +{
-> +       return ERR_PTR(-ENOTSUPP);
-> +}
->  #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
->
->  #ifdef CONFIG_PM
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  
+>  /*
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 8bc9458f9add..6020b884b076 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -449,7 +449,6 @@ __primary_switched:
+>  	adr_l	x2, __bss_stop
+>  	sub	x2, x2, x0
+>  	bl	__pi_memset
+> -	dsb	ishst				// Make zero page visible to PTW
+>  
+>  #ifdef CONFIG_KASAN
+>  	bl	kasan_early_init
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 659963d40bb4..a14eb8ff5144 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -193,6 +193,8 @@ SECTIONS
+>  	. = ALIGN(PAGE_SIZE);
+>  	idmap_pg_dir = .;
+>  	. += IDMAP_DIR_SIZE;
+> +	empty_zero_page = .;
+> +	. += PAGE_SIZE;
+>  	swapper_pg_dir = .;
+>  	. += SWAPPER_DIR_SIZE;
+>  
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 4989948d1feb..539ce9d11325 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -53,7 +53,6 @@ EXPORT_SYMBOL(kimage_voffset);
+>   * Empty_zero_page is a special page that is used for zero-initialized data
+>   * and COW.
+>   */
+> -unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
+>  EXPORT_SYMBOL(empty_zero_page);
+>  
+>  static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
