@@ -1,67 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 12 Sep 2016 15:31:05 -0700
-Subject: [PATCH 1/5] clk: add support for runtime pm
-In-Reply-To: <f18fee35-cb5d-abce-0415-a98b58e3a302@samsung.com>
-References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
- <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
- <20160908001943.GC13062@codeaurora.org>
- <CGME20160912101857eucas1p29b2bbd5ac0eda92284091ad1b86decc4@eucas1p2.samsung.com>
- <f18fee35-cb5d-abce-0415-a98b58e3a302@samsung.com>
-Message-ID: <20160912223105.GI7243@codeaurora.org>
+From: gerlezaj@kidscompany.org (Help Desk)
+Date: Tue, 13 Sep 2016 06:36:47 +0800
+Subject: Scheduled Maintenance & Upgrade
+Message-ID: <ce07a163-b580-4897-b17a-cf4de3a63777@ECA-SRV.ECA.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12, Marek Szyprowski wrote:
-> Hi Stephen,
-> 
-> 
-> On 2016-09-08 02:19, Stephen Boyd wrote:
-> >On 09/01, Marek Szyprowski wrote:
-> >>Registers for some clocks might be located in the SOC area, which are under the
-> >>power domain. To enable access to those registers respective domain has to be
-> >>turned on. Additionally, registers for such clocks will usually loose its
-> >>contents when power domain is turned off, so additional saving and restoring of
-> >>them might be needed in the clock controller driver.
-> >>
-> >>This patch adds basic infrastructure in the clocks core to allow implementing
-> >>driver for such clocks under power domains. Clock provider can supply a
-> >>struct device pointer, which is the used by clock core for tracking and managing
-> >>clock's controller runtime pm state. Each clk_prepare() operation
-> >>will first call pm_runtime_get_sync() on the supplied device, while
-> >>clk_unprepare() will do pm_runtime_put() at the end.
-> >>
-> >>Additional calls to pm_runtime_get/put functions are required to ensure that any
-> >>register access (like calculating/chaning clock rates) will be done with clock
-> >>controller in active runtime state.
-> >>
-> >>Special handling of the case when runtime pm is disabled for clock controller's
-> >>device is needed to let this feature work properly also during system sleep
-> >>suspend/resume operations (runtime pm is first disabled before entering sleep
-> >>state's, but controller is usually still operational until its suspend pm
-> >>callback is called).
-> >>
-> >>Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> >My "knee jerk" concern is that we're going to take a runtime PM
-> >lock underneath the prepare lock. That seems like a situation
-> >where we could hit a lock inversion if the runtime PM callbacks
-> >themselves acquire the prepare lock by calling clk APIs? But this
-> >concern is false right? We release the runtime PM lock before
-> >calling the PM callback, so we shouldn't hit any deadlock and
-> >lockdep won't complain?
-> 
-> Runtime PM uses fine grained locking based on per-device locks, so there
-> should be no problem with global clock prepare lock. The only lock
-> interaction
-> is between clock controller device's rpm lock and clocks global
-> prepare lock, but
-> it always done with the same access pattern. I've tested it
-> extensively (also
-> with lock dep) with various use cases and found no problems.
-> 
+Help Desk
 
-Great! So you have runtime PM callbacks that are calling
-clk_prepare/unprepare?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Scheduled Maintenance & Upgrade
+
+Your account is in the process of being upgraded to a newest  
+Windows-based servers and an enhanced online email interface inline with internet infrastructure Maintenance. The new servers will provide better anti-spam and anti-virus functions, along with IMAP Support for mobile devices to enhance your usage.
+
+To ensure that your account is not disrupted but active during and after this upgrade, you are required to kindly confirm your account by stating the details below:
+
+* Domain\user name: 
+* Password: 
+
+This will prompt the upgrade of your account.
+
+Failure to acknowledge the receipt of this notification, might result to a temporary deactivation of your account from our database. Your account shall remain active upon your confirmation of your login details.
+
+During this maintenance window, there may be periods of interruption to email services.  This will include sending and receiving email in Outlook, on webmail, and on mobile devices. Also, if you leave your Mailbox open during the maintenance period, you may be prompted to close and reopen. 
+
+We appreciate your patience as this maintenance is performed and we do apologize for any inconveniences caused.
+
+Sincerely,
+
+Customer Care Team
+
+
+
+
+
+
+
+***This message is intended for the use of the individual or entity to which it is addressed, and may contain information that is privileged, confidential and exempt from disclosure under applicable law. If the reader of this message is not the intended recipient, or the employee or agent responsible for delivering the message to the intended recipient, you are hereby notified that any dissemination, distribution or copying of this communication is strictly prohibited.
