@@ -1,67 +1,76 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 12 Sep 2016 11:47:32 +0200
-Subject: [PATCHv2 2/3] tty/serial: at91: fix hardware handshake with GPIOs
-In-Reply-To: <20160912094733.21501-1-richard.genoud@gmail.com>
-References: <20160912094733.21501-1-richard.genoud@gmail.com>
-Message-ID: <20160912094733.21501-3-richard.genoud@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 12 Sep 2016 11:47:45 +0200
+Subject: [PATCH v4 4/8] dts: sun8i-h3: move uart1 pinmux/peripheral
+ assocation to DSTI
+In-Reply-To: <20160908095108.GA14915@carbon.kippendief.biz>
+References: <1473235141-12768-1-git-send-email-jorik@kippendief.biz>
+ <1473235141-12768-5-git-send-email-jorik@kippendief.biz>
+ <20160908062317.GD8913@lukather>
+ <20160908080213.GA32547@carbon.kippendief.biz>
+ <20160908090153.GL8913@lukather>
+ <20160908095108.GA14915@carbon.kippendief.biz>
+Message-ID: <20160912094745.GH9449@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
-hardware handshake is enabled") broke the hardware handshake when GPIOs
-where used.
+On Thu, Sep 08, 2016 at 11:51:09AM +0200, Jorik Jonker wrote:
+> >>- put rts/cts in seperate pinmux sets for uart1 (2,3: see below)
+> >>- associate rx/tx for uart1-3 in H3 DTSI (this is the only option)
+> >
+> >I'm still a bit skeptical about this. This wouldn't be in any way
+> >consistant. I prefer to have something consistant and a bit duplicated
+> >over something without any duplication but that confuses everyone
+> >about what should be placed where.
+> >
+> >>- associate UART1 rts/cts as pinctrl-1 in sun8i-h3-bananapi-m2-plus
+> >> (to prevent breakage for existing users)
+> >
+> >You can also set it in pinctrl-0.
+> 
+> OK, sounds reasonable, but also a bit contradictive. One the one hand you
+> prefer consistency (so, let uart2-3 follow uart1 and include rts/cts in
+> them)
 
-Hardware handshake with GPIOs used to work before this commit because
-the CRTSCTS flag (termios->c_cflag) was set, but not the
-ATMEL_US_USMODE_HWHS flag (controller register) ; so hardware handshake
-enabled, but not handled by the controller.
+Hmm, I never said that, quite the opposite actually. Any board might
+use either just RX/TX, or RX/TX and RTS/CTS. I don't see why we should
+enable RTS/CTS on any board by default.
 
-This commit restores this behaviour.
+> , on the other hand the common case over the rare (so split off
+> rts/cts). What should I do with uarts2-3 and should I do that to
+> uart1 too?
 
-NB: -stable is not Cced because it doesn't cleanly apply on 4.1+
-and it will also need previous commit:
-"serial: mctrl_gpio: implement mctrl_gpio_use_rtscts"
+You do the exact same thing in both cases.
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when hardware handshake is enabled")
----
- drivers/tty/serial/atmel_serial.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+My point was that you could just do:
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 2eaa18ddef61..e9b4fbf88c2d 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -2025,6 +2025,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
- static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 			      struct ktermios *old)
- {
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
- 	unsigned long flags;
- 	unsigned int old_mode, mode, imr, quot, baud;
- 
-@@ -2126,8 +2127,12 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 		atmel_uart_writel(port, ATMEL_US_TTGR,
- 				  port->rs485.delay_rts_after_send);
- 		mode |= ATMEL_US_USMODE_RS485;
--	} else if (termios->c_cflag & CRTSCTS) {
--		/* RS232 with hardware handshake (RTS/CTS) */
-+	} else if ((termios->c_cflag & CRTSCTS) &&
-+		   !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
-+		/*
-+		 * RS232 with hardware handshake (RTS/CTS)
-+		 * handled by the controller.
-+		 */
- 		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
- 			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
- 			termios->c_cflag &= ~CRTSCTS;
-@@ -2135,7 +2140,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 			mode |= ATMEL_US_USMODE_HWHS;
- 		}
- 	} else {
--		/* RS232 without hadware handshake */
-+		/* RS232 without hadware handshake or controlled by GPIOs */
- 		mode |= ATMEL_US_USMODE_NORMAL;
- 	}
- 
+pinctrl-0 = <&uart0_pins_a>, <&uart0_rts_cts_pins_a>;
+pinctrl-names = "default";
+
+instead of
+
+pinctrl-0 = <&uart0_pins_a>;
+pinctrl-1 = <&uart0_rts_cts_pins_a>;
+pinctrl-names = "default", "default";
+
+Since they are the exact same pin state.
+
+> Moreover, Chen-Yu prefers to drop _a and @0 when they are redundant, which
+> does not appear to be the convention, looking at existing sun*dsti. What's
+> your opinion on this?
+
+AFAIK, he wanted to remove them when they're not relevant (ie, only
+one pin state possible).
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160912/2eaa8fe0/attachment.sig>
