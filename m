@@ -1,57 +1,46 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 12 Sep 2016 20:25:54 +0200 (CEST)
-Subject: [PATCH v2 6/6] ARM: dts: bcm283x: add pinctrl group to &sdhci,
- drop pins from &gpio
-In-Reply-To: <1473668576-22256-7-git-send-email-kraxel@redhat.com>
-References: <1473668576-22256-1-git-send-email-kraxel@redhat.com>
- <1473668576-22256-7-git-send-email-kraxel@redhat.com>
-Message-ID: <1935531346.83849.15854341-2f8e-4e20-95f4-e76f81e6fd56.open-xchange@email.1und1.de>
+From: pku.leo@gmail.com (Leo Li)
+Date: Mon, 12 Sep 2016 13:29:47 -0500
+Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
+In-Reply-To: <CADRPPNSLZ-Ck+40LZLdpEXPaBm+61AtrpRPgAcTCojWSsTBQDw@mail.gmail.com>
+References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
+ <20160906185849.27pjhawadca5pwow@pengutronix.de>
+ <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
+ <87ca69fb85848a0a86b34a9a9037a57b@agner.ch>
+ <CADRPPNSPye45bmFshfwb+gDA0x0ygs4Ofa6HMYbKt9ER0oeccg@mail.gmail.com>
+ <CAChUvXOGjTn6K5588UVgjbRWUY+weDtk2qbOU-NM4=kA2znh=Q@mail.gmail.com>
+ <20160907055547.opp57zyxhlplhxhm@pengutronix.de>
+ <CAChUvXMPDZB7=ZArQ5+6ae42N=Bsgv_OczGXnyhBjEdjt_yvsw@mail.gmail.com>
+ <CADRPPNSLZ-Ck+40LZLdpEXPaBm+61AtrpRPgAcTCojWSsTBQDw@mail.gmail.com>
+Message-ID: <CADRPPNQW92jqwNgmxVK69Sqp13utoy=owSKMAxkC7tgRgjygGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerd,
+On Mon, Sep 12, 2016 at 11:35 AM, Leo Li <pku.leo@gmail.com> wrote:
+> On Wed, Sep 7, 2016 at 5:07 AM, Tracy Smith <tlsmith3777@gmail.com> wrote:
+>> Hello, bus recovery is needed generally speaking because of potential
+>> protocol errors that might cause a failure condition hanging the bus.
+>>
+>> It happens frequently during bring-up of new I2C devices because firmware in
+>> I2C controllers fail to handle properly protocol errors.
+>>
+>> Can NXP add bus recovery for the LS1021A and LS1043A in a separate patch--
+>> unless there is no HW bus recovery mechanism?
+>>
+>> The concern is while fixing I.MX, NXP will fail to fix the driver bus
+>> recovery for the LS1021A and LS1043A and the bus will hang.
+>>
+>> If bus recovery is supported on the LS1021A and the LS1043A, a patch should
+>> be provided or added in this patch instead of simply disabling bus recovery.
+>> Request NXP to consider the patch if there is HW support for bus recovery.
+>
+> FYI.  http://patchwork.ozlabs.org/patch/573879/
 
-> Gerd Hoffmann <kraxel@redhat.com> hat am 12. September 2016 um 10:22
-> geschrieben:
-> 
-> 
-> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
-> ---
->  arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> index 8688204..3f0ce61 100644
-> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> @@ -43,7 +43,7 @@
->  	};
->  
->  	alt3: alt3 {
-> -		brcm,pins = <48 49 50 51 52 53>;
-> +		brcm,pins = <>;
+Hi Gao Pan,
 
-after dropping all pins from the group alt3 doesn't make sense anymore. I think
-this should be removed completely.
+Do you think the operations in the proposed patch is also usable on
+the I.MX SoC for bus recovery?  If so, would it be better to align the
+bus recovery implementation for both I.MX and QorIQ to use the same
+logic inside the IP?
 
->  		brcm,function = <BCM2835_FSEL_ALT3>;
->  	};
->  };
-> @@ -67,6 +67,8 @@
->  };
->  
->  &sdhci {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emmc_gpio48>;
->  	status = "okay";
->  	bus-width = <4>;
->  };
-> -- 
-> 1.8.3.1
-> 
-> 
-> _______________________________________________
-> linux-rpi-kernel mailing list
-> linux-rpi-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
+Regards,
+Leo
