@@ -1,27 +1,79 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Sep 2016 10:35:08 -0500
-Subject: [PATCH v5 1/4] nvmem: rockchip-efuse: update compatible strings
- for Rockchip efuse
-In-Reply-To: <1472786217-52214-2-git-send-email-finley.xiao@rock-chips.com>
-References: <1472786217-52214-1-git-send-email-finley.xiao@rock-chips.com>
- <1472786217-52214-2-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <20160912153508.GA25555@rob-hp-laptop>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 12 Sep 2016 17:36:07 +0200
+Subject: About enet_out clk on i.MX28, i.MX6 and i.MX7
+Message-ID: <20160912153607.qqkosq4uu2rl76eg@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 08:16:54PM -0700, Finley Xiao wrote:
-> Rk3399-efuse is organized as 32bits by 32 one-time programmable electrical
-> fuses. The efuse of earlier SoCs are organized as 32bits by 8 one-time
-> programmable electrical fuses with random access interface.
-> 
-> Add different device tree compatible string for different SoCs to be able
-> to differentiate between the two. The old binding is of course preserved,
-> though deprecated.
-> 
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  Documentation/devicetree/bindings/nvmem/rockchip-efuse.txt | 13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
+Hello,
 
-Acked-by: Rob Herring <robh@kernel.org>
+to operate the MDIO bus a clk is required. On some i.MX SoCs it can be
+configured if that clk is provided by the CPU or not (i.e. something
+else provides it).
+
+The devicetree abstraction for that is (e.g. on i.MX28):
+
+	mac0: ethernet at 800f0000 {
+		compatible = "fsl,imx28-fec";
+		...
+		clocks = <&clks 57>, <&clks 57>, <&clks 64>;
+		clock-names = "ipg", "ahb", "enet_out";
+		...
+	};
+
+and the driver does:
+
+	/* enet_out is optional, depends on board */
+	fep->clk_enet_out = devm_clk_get(&pdev->dev, "enet_out");
+	if (IS_ERR(fep->clk_enet_out))
+		fep->clk_enet_out = NULL;
+
+. IMHO this is clumsy and wrong. See for example
+arch/arm/boot/dts/imx28-m28evk.dts which has:
+
+	ethernet at 800f0000 {
+		...
+		clocks = <&clks 57>, <&clks 57>;
+		clock-names = "ipg", "ahb";
+	}
+
+to get rid of this entry. Moreover enet_out isn't a clock for the fec
+instance but for the mdio bus, so the better binding would be:
+
+	mac0: ethernet at 800f0000 {
+		compatible = "fsl,imx28-fec";
+
+		clocks = <&clks 57>, <&clks 57>;
+		clock-names = "ipg", "ahb";
+
+		mdio {
+			clocks = <&clks 64>;
+			...
+		};
+	};
+
+This better matches reality and is easier to overwrite per board without
+repeating stuff from imx28.dtsi as it is now.
+
+What do you think? Compatibility isn't a big concern, the fec driver
+could just keep handling "enet_out" as is and learn about the optional
+mdio/clocks.
+This would handle old dtbs just fine.
+
+Slightly related: Some machines (bluegiga,apx4devkit, karo,tx28) still
+enable enet_out clk in arch/arm/mach-mxs/mach-mxs.c. I think this can be
+dropped, right? (Unless recent kernels should still handle dtbs that
+don't have enet_out in the fec node. That affects dtbs built between
+
+	v3.6-rc1~144^2~7^2~11 = 3143bbb42b3d ("ARM: mxs: convert apx4devkit board to device tree")
+and
+
+	v3.10-rc1~63^2~10^2~20 = f231a9fe7f80 ("ARM: dts: mxs: add enet_out clock to devicetree")
+.)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
