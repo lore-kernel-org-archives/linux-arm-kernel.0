@@ -1,71 +1,70 @@
-From: minyard@acm.org (Corey Minyard)
-Date: Mon, 12 Sep 2016 17:06:36 -0500
-Subject: [PATCH 1/3] misc: Add Aspeed BT IPMI host driver
-In-Reply-To: <b42f1b61-8b00-2412-d51d-6207da8afcd6@kaod.org>
-References: <1472664259-23933-1-git-send-email-clg@kaod.org>
- <c06a8afb-9143-6aef-3425-ad1e50cae35d@kaod.org>
- <1ce6c4b4-5938-22fc-7467-d1efc220b772@gmail.com> <4727554.yt7pF8chOH@wuerfel>
- <7db5ada0-49ea-55eb-089e-d979941ceff5@gmail.com>
- <b42f1b61-8b00-2412-d51d-6207da8afcd6@kaod.org>
-Message-ID: <88ec11d5-3683-7ad3-341e-42d951b6574e@acm.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 13 Sep 2016 00:16:45 +0200
+Subject: [PATCH v2] drivers: acpi: fix GIC irq model default PCI IRQ
+ polarity
+In-Reply-To: <1473180663-20590-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1473180663-20590-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1512953.mRIMTKV6b1@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2016 04:23 PM, C?dric Le Goater wrote:
-> Hello,
->
-> On 09/12/2016 10:33 PM, Corey Minyard wrote:
->> On 09/12/2016 02:15 PM, Arnd Bergmann wrote:
->>> On Monday, September 12, 2016 1:55:40 PM CEST Corey Minyard wrote:
->>>> On 09/02/2016 08:22 AM, C?dric Le Goater wrote:
->>>>> Hello,
->>>>>
->>>>> Adding Corey in cc: . I guess I should have done that in the first place.
->>>> Yes, probably so.  I've been travelling and didn't see it on the mailing
->>>> lists until now.
->>>>
->>>> There is already a BT driver in the kernel, in drivers/char/ipmi, why
->>>> won't that work?
->>> The new driver is the host side (running on the BMC), the existing one
->>> is the client (running on the PC).
->>>
->>>      Arnd
->> Ok, that's not really clear from the documentation or the Kconfig.
->> In the IPMI spec the "host" side is the computer side, not the BMC
->> side.  Like:
->>
->>     11.6.1 BT Host Interface Registers
->>     The Host BT interface provides an independent set of registers and
->>     interrupts to allow the Host driver to
->>     communicate with the baseboard management controller without
->>     conflicting with the O/S ACPI driver.
->>
->> In light of that, this should probably be named the bt-bmc driver.
->>
->> I haven't reviewed this in detail, but I'm ok with putting it in
->> drivers/char/ipmi.  The state machine part looks reasonably
->> generic.  The configuration part isn't, but that could be split
->> out later if necessary.
->>
->> The biggest thing I don't like is the byte at a time interfaces
->> from userspace.  That seems fairly inefficient if the system
->> does extra work for each userspace access.  IIRC some
->> systems do and some don't.
-> What about the ioctl to send an SMS ATN event to the host ? Is
-> that ok for you ?
+On Tuesday, September 06, 2016 05:51:03 PM Lorenzo Pieralisi wrote:
+> On ACPI ARM based systems the GIC interrupt controller
+> and corresponding interrupt model permit only the high
+> polarity for level interrupts.
+> 
+> ACPI firmware describes PCI legacy IRQs through entries
+> in the _PRT objects. Entries in the _PRT can be of two types:
+> 
+> - Static: not configurable, trigger/polarity default to level-low,
+>   _PRT entry defines the global GSI interrupt number
+> - Configurable: _PRT interrupt entry contains a reference to the
+>   corresponding PCI interrupt link device (that in turn provides the
+>   interrupt descriptor through its _CRS/_PRS methods)
+> 
+> Configurable IRQ entries are not currently allowed by the ACPI
+> specification on ARM since they can only be used for interrupt pins that
+> are routable, as per ACPI specifications (version 6.1, 6.2.13):
+> 
+> "[...] There are two ways that _PRT can be used. Typically, the
+> interrupt input that a given PCI interrupt is on is configurable. For
+> example, a given PCI interrupt might be configured for either IRQ 10 or
+> 11 on an 8259 interrupt controller. In this model, each interrupt is
+> represented in the ACPI namespace as a PCI Interrupt Link Device. [...]"
+> 
+> ARM platforms GIC configurations do not allow dynamic IRQ routing,
+> since routing is statically laid out at synthesis time; therefore PCI
+> interrupt links cannot be used for PCI legacy IRQ descriptions in the
+> _PRT on ARM systems.
+> 
+> On the other hand, current core ACPI code handling PCI legacy IRQs
+> consider IRQ trigger/polarity for static _PRT entries as level-low.
+> 
+> On ARM systems with a GIC interrupt controller and corresponding
+> ACPI interrupt model this does not work in that GIC interrupt
+> controller is only capable of handling level interrupts whose
+> polarity is high (for PCI legacy IRQs - that are level-low by
+> specification - this means that the legacy IRQs are inverted before
+> reaching the interrupt controller pin), resulting in IRQ allocation
+> failures such as:
+> 
+> genirq: Setting trigger mode 8 for irq 18 failed (gic_set_type+0x0/0x48)
+> 
+> Change the default polarity for PCI legacy IRQs to high on systems
+> booting wth ACPI on platforms with a GIC interrupt controller model,
+> fixing the discrepancy between specification and HW behaviour.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Tested-by: Duc Dang <dhdang@apm.com>
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Duc Dang <dhdang@apm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Sinan Kaya <okaya@codeaurora.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-Yeah, that's necessary, there's no way the low-level driver can
-know when to do that.
+Applied.
 
-I have a similar piece of code in the qemu IPMI emulator, even
-the external IPMI emulator has a message it sends to set ATTN.
-
-I did look at similarities between the two pieces of code, but
-the qemu one has to be register-read/write driven, so it's
-completely different in design.
-
--corey
-
-> Thanks,
->
-> C.
+Thanks,
+Rafael
