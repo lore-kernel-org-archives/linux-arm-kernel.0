@@ -1,176 +1,352 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 Sep 2016 22:44:51 +0200
-Subject: [RFC PATCH 9/9] ethernet: sun8i-emac: add pm_runtime support
-In-Reply-To: <1473425117-18645-10-git-send-email-clabbe.montjoie@gmail.com>
-References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
- <1473425117-18645-10-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20160912204451.GO9449@lukather>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Mon, 12 Sep 2016 22:56:15 +0200
+Subject: [PATCH] Revert "Input: bma150 - extend chip detection for bma180"
+In-Reply-To: <c3312699-4821-7311-0540-3c02c806dde7@redhat.com>
+References: <20160911164321.23122-1-hdegoede@redhat.com>
+ <2C735D34-7559-4A62-A635-A5719C356D94@goldelico.com>
+ <a156f29f-43db-6811-7f7e-ac2c7682d766@redhat.com>
+ <4809E76B-7BFE-4D95-8631-079262E958E2@goldelico.com>
+ <c3312699-4821-7311-0540-3c02c806dde7@redhat.com>
+Message-ID: <493BB498-DD4E-47DA-AA8A-20EAC11256CA@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Sep 09, 2016 at 02:45:17PM +0200, Corentin Labbe wrote:
-> This patch add pm_runtime support to sun8i-emac.
-> For the moment, only basic support is added, (the device is marked as
-> used when net/open)
+> Am 12.09.2016 um 20:52 schrieb Hans de Goede <hdegoede@redhat.com>:
 > 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  drivers/net/ethernet/allwinner/sun8i-emac.c | 62 ++++++++++++++++++++++++++++-
->  1 file changed, 60 insertions(+), 2 deletions(-)
+> HI,
 > 
-> diff --git a/drivers/net/ethernet/allwinner/sun8i-emac.c b/drivers/net/ethernet/allwinner/sun8i-emac.c
-> index 1c4bc80..cce886e 100644
-> --- a/drivers/net/ethernet/allwinner/sun8i-emac.c
-> +++ b/drivers/net/ethernet/allwinner/sun8i-emac.c
-> @@ -9,7 +9,6 @@
->   * - MAC filtering
->   * - Jumbo frame
->   * - features rx-all (NETIF_F_RXALL_BIT)
-> - * - PM runtime
->   */
->  #include <linux/bitops.h>
->  #include <linux/clk.h>
-> @@ -27,6 +26,7 @@
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/pinctrl/pinctrl.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/reset.h>
->  #include <linux/scatterlist.h>
->  #include <linux/skbuff.h>
-> @@ -1301,11 +1301,18 @@ static int sun8i_emac_open(struct net_device *ndev)
->  	int err;
->  	u32 v;
->  
-> +	err = pm_runtime_get_sync(priv->dev);
-> +	if (err) {
-> +		pm_runtime_put_noidle(priv->dev);
-> +		dev_err(priv->dev, "pm_runtime error: %d\n", err);
-> +		return err;
-> +	}
-> +
->  	err = request_irq(priv->irq, sun8i_emac_dma_interrupt, 0,
->  			  dev_name(priv->dev), ndev);
->  	if (err) {
->  		dev_err(priv->dev, "Cannot request IRQ: %d\n", err);
-> -		return err;
-> +		goto err_runtime;
->  	}
->  
->  	/* Set interface mode (and configure internal PHY on H3) */
-> @@ -1395,6 +1402,8 @@ err_syscon:
->  	sun8i_emac_unset_syscon(ndev);
->  err_irq:
->  	free_irq(priv->irq, ndev);
-> +err_runtime:
-> +	pm_runtime_put(priv->dev);
->  	return err;
->  }
->  
-> @@ -1483,6 +1492,8 @@ static int sun8i_emac_stop(struct net_device *ndev)
->  	dma_free_coherent(priv->dev, priv->nbdesc_tx * sizeof(struct dma_desc),
->  			  priv->dd_tx, priv->dd_tx_phy);
->  
-> +	pm_runtime_put(priv->dev);
-> +
->  	return 0;
->  }
->  
-> @@ -2210,6 +2221,8 @@ static int sun8i_emac_probe(struct platform_device *pdev)
->  		goto probe_err;
->  	}
->  
-> +	pm_runtime_enable(priv->dev);
-> +
->  	return 0;
->  
->  probe_err:
-> @@ -2221,6 +2234,8 @@ static int sun8i_emac_remove(struct platform_device *pdev)
->  {
->  	struct net_device *ndev = platform_get_drvdata(pdev);
->  
-> +	pm_runtime_disable(&pdev->dev);
-> +
->  	unregister_netdev(ndev);
->  	platform_set_drvdata(pdev, NULL);
->  	free_netdev(ndev);
-> @@ -2228,6 +2243,47 @@ static int sun8i_emac_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static int __maybe_unused sun8i_emac_suspend(struct platform_device *pdev, pm_message_t state)
-> +{
-> +	struct net_device *ndev = platform_get_drvdata(pdev);
-> +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
-> +
-> +	napi_disable(&priv->napi);
-> +
-> +	if (netif_running(ndev))
-> +		netif_device_detach(ndev);
-> +
-> +	sun8i_emac_stop_tx(ndev);
-> +	sun8i_emac_stop_rx(ndev);
-> +
-> +	sun8i_emac_rx_clean(ndev);
-> +	sun8i_emac_tx_clean(ndev);
-> +
-> +	phy_stop(ndev->phydev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int __maybe_unused sun8i_emac_resume(struct platform_device *pdev)
-> +{
-> +	struct net_device *ndev = platform_get_drvdata(pdev);
-> +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
-> +
-> +	phy_start(ndev->phydev);
-> +
-> +	sun8i_emac_start_tx(ndev);
-> +	sun8i_emac_start_rx(ndev);
-> +
-> +	if (netif_running(ndev))
-> +		netif_device_attach(ndev);
-> +
-> +	netif_start_queue(ndev);
-> +
-> +	napi_enable(&priv->napi);
-> +
-> +	return 0;
-> +}
+> On 12-09-16 19:20, H. Nikolaus Schaller wrote:
+>> Hi,
+>> 
+>>> Am 12.09.2016 um 16:44 schrieb Hans de Goede <hdegoede@redhat.com>:
+>>> 
+>>> Hi,
+>>> 
+>>> On 12-09-16 16:31, H. Nikolaus Schaller wrote:
+>>>> Hi,
+>>>> 
+>>>>> Am 11.09.2016 um 18:43 schrieb Hans de Goede <hdegoede@redhat.com>:
+>>>>> 
+>>>>> This reverts commit ef3714fdbc8d ("Input: bma150 - extend chip
+>>>>> detection for bma180").
+>>>>> 
+>>>>> The bma180 is not compatible with the bma150 at all, it has 14 bits
+>>>>> resolution instead of 10, and it has quite different control registers.
+>>>>> 
+>>>>> Treating the bma180 as a bma150 wrt its data registers will just result
+>>>>> in throwing away the lowest 4 bits, which is not too bad. But the ctrl
+>>>>> registers are a different story.
+>>>>> 
+>>>>> It may be that things happen to just work (I don't have a bma180 to
+>>>>> test with) but that certainly does not make this right.
+>>>> 
+>>>> Yes, looks as if your observation is right. Thanks for pointing this out!
+>>>> 
+>>>> This did need me some research to find an answer...
+>>>> 
+>>>> If I remember correctly, the original patch was based on a recommendation
+>>>> from someone I don't remember, who said that the chips are the same in a
+>>>> different package. So we added the chip_id and it worked immediately as
+>>>> expected. It looks as if we did not check the data sheets. So we did not
+>>>> question this recommendation.
+>>>> 
+>>>>> 
+>>>>> Removing the bma180 id also removes overlap wrt the ids in the iio
+>>>>> bma180 driver which does treat the bma180 properly.
+>>>> 
+>>>> Nack.
+>>>> 
+>>>> The problem we get is that an iio driver is not an input driver and can't
+>>>> easily replace it.
+>>> 
+>>> Actually almost all accelerometer drivers in the Linux kernel are
+>>> iio drivers,
+>> 
+>> Yes, that is a good move indeed to make them more general.
+>> 
+>>> the bma150 driver is the odd duck out,
+>> 
+>> Indeed it seems to be in /misc for some reason.
+>> 
+>>> that is why
+>>> we've iio-sensor-proxy for apps which want the accelerometer
+>>> to behave as an input device:
+>>> 
+>>> https://github.com/hadess/iio-sensor-proxy
+>> 
+>> Does this provide an input device /dev/input/event?
+>> From a first look it seems to provide a D-Bus abstraction which is
+>> not the same as an /dev/input/event.
+> 
+> It also provides a /dev/input/event node through uinput:
+> 
+> https://github.com/hadess/iio-sensor-proxy/blob/master/src/fake-input-accelerometer.c
 
-The main idea behind the runtime PM hooks is that they bring the
-device to a working state and shuts it down when it's not needed
-anymore.
+Ah, I didn't see.
 
-However, they shouldn't be called when the device is still in used, so
-all the mangling with NAPI, the phy and so on is irrelevant here, but
-the clocks, resets, for example, are.
+> 
+> 
+>> What about latency?
+>> A kernel driver can react on a sensor interrupt, queue results
+>> and sleep.
+>> 
+>> Isn't a user-space process more resource hungry than a kernel thread?
+>> 
+>>> 
+>>>> An input driver can be used for gesture applications (e.g. detecting
+>>>> the device has been turned upside down) and can report X/Y/Z coordinates
+>>>> to e.g. X11 for games similar to a mouse or joystick (which the iio driver
+>>>> doesn't).
+>>> 
+>>> See above.
+>>> 
+>>>> So it should remain configurable which of both driver options is loaded,
+>>>> to match user space API needs.
+>>>> 
+>>>> BTW: id overlap is only a problem if both drivers are configured in parallel.
+>>> 
+>>> Right, so it is "only" a problem to any generic distro which tries to
+>>> support both bma150 and bma250 accelerometers, as both the input
+>>> bma150 as well as the iio bma250 driver claim to be bma180 compatible.
+>> 
+>> Well, it is only a problem if such a generic distro is really run on a device
+>> which has a bma180 defined in DT. There do not seem to exist many of these.
+> 
+> True, still the bma180 compatible is simply just wrong here, and as such
+> it really should be removed (it really should never have been added).
 
->  static const struct of_device_id sun8i_emac_of_match_table[] = {
->  	{ .compatible = "allwinner,sun8i-a83t-emac",
->  	  .data = &emac_variant_a83t },
-> @@ -2246,6 +2302,8 @@ static struct platform_driver sun8i_emac_driver = {
->  		.name           = "sun8i-emac",
->  		.of_match_table	= sun8i_emac_of_match_table,
->  	},
-> +	.suspend	= sun8i_emac_suspend,
-> +	.resume		= sun8i_emac_resume,
+Yes, I agree that the patch should be reverted because it is wrong. After we find
+a solution for the existing devices.
 
-These are not the runtime PM hooks. How did you test that?
+> 
+>>>> Next, I have tried to find out which devices really use the bma150 and bma180.
+>>>> 
+>>>> It appears that no in-tree device uses the bma150 while the GTA04 uses
+>>>> the bma180 (in DT), but not in any defconfig (the GTA04 specific config
+>>>> is not upstreamable since omap2plus_defconfig exists).
+>>>> 
+>>>> In user-space the GTA04 requires and actively uses this input driver for Replicant.
+>>>> 
+>>>> So I would conclude that this revert does not improve/fix any device using a
+>>>> bma150 (if it exists at all), but breaks an existing device.
+>>>> 
+>>>> What options do we have?
+>>>> 
+>>>> a) add proper register number constants and choose conditionally (where they differ)
+>>>> b) drop bma150 support completely and change registers for bma180
+>>>> c) clone the bma150 input driver into an bma180 input driver and fix registers
+>>>> d) extend the bma180 iio driver to optionally provide an input device
+>>>> e) write a generic input/iio-accel wrapper (which should work with any iio accelerometer)
+>>>> 
+>>>> I would favour approach e)
+>>> 
+>>> Good, because that solution already exists :) See:
+>>> https://github.com/hadess/iio-sensor-proxy
+>> 
+>> No, it is yet another option. I would formulate it as:
+>> 
+>> f) break user-space compatibility for existing systems and write / require
+>>   a user-space workaround.
+>> 
+>> This is something which is the least favorite in my view.
+> 
+> I'm pretty sure that no-one, really no-one wants to do
+> evdev emulation for iio devices in the kernel; and there
+> is nothing wrong with doing it in userspace.
 
-Maxime
+Yes, there is something wrong. It needs to update the user-space in
+a way we can't control and has worse performance.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160912/33d774be/attachment.sig>
+> 
+>> Since we have no control over the user space people have installed and IMHO
+>> a kernel shouldn't break APIs too often or only for really good reasons
+>> (e.g. completely new functions).
+>> 
+>> And we have no means to force user-space developers to integrate such daemons :(
+>> 
+>> So we break a device by upgrading to 4.9-kernel but can't give a solution.
+> 
+> The only user of this seems to be the gta04, and I believe gta04 users
+> will not just jump to 4.9 without getting that through some sort
+> of central distribution point which can make sure userland gets
+> fixed first.
+
+Unfortunatley this assumption is completely wrong. Kernels for gta04 can be
+updated independently of user-spaces and therefore they should try not to break
+user-space code. This is not always achievable but we try our best.
+We provide kernels and people can just install them:
+
+http://download.goldelico.com/letux-kernel/
+
+> 
+>>>> but it has an issue I have no solution for:
+>>>> 
+>>>> 	how to define in DT (or CONFIG?) which iio accelerometer(s) should
+>>>> 	be wrapped and presented as input device(s).
+>>> 
+>>> I believe currently iio-sensor-proxy simply wraps all accelerometers
+>>> it can find, which seems the right thing to do. Usually we're running
+>>> a generic desktop-ish OS / distro which wants these devices
+>>> to be available as input devices;
+>>> for special cases like actual
+>>> robots and stuff running Linux, iio-sensor-proxy can simply be
+>>> disabled; or not installed at all.
+>> 
+>> Well, the GTA04 we talk about falls into a third category: a mobile device.
+>> 
+>> Which is not running a desktop-ish OS / distro. It is running Replicant,
+> 
+> For replicant there is:
+> 
+> https://github.com/01org/android-iio-sensors-hal
+
+I don't know if this is part of the Replicant tree or has been integrated. The
+most current replicant is Android 4.2.
+
+Things may change with Replicant 6.0 which is still in its infancy and hasn't
+been tested on a gta04 at all.
+
+> 
+>> QtMoko, SHR, FSO or other user spaces which partially rely on /dev/input/event
+>> without starting a daemon.
+> 
+> So either these have a gta04 specific version, which can then
+> be fixed in parallel with the kernel, like one would do
+> with normal distros in a case like this. Or these are generic
+> in which case having them work with iio accelerometers is
+> a good thing in general, and they may even already work.
+
+> 
+>> At least in current releases and we have little
+>> influence to have them use a new daemon.
+>> 
+>> So I would strongly prefer if we can solve this in the kernel and keep the
+>> user-space API for the bma180 input driver stable.
+>> 
+>>> 
+>>> So all in all I believe that this is a solved problem, since
+>>> solution e. from above is already implemented.
+>> 
+>> Well it is also solved if we do not revert the patch at all, because it
+>> works in practice (even if not exactly correct) and is compatible to
+>> existing user-space.
+>> 
+>> In summary I don't like option f) because it creates more problems than
+>> it solves.
+>> 
+>> If e) is ruled out, IMHO the second best option seems to be d) to add a
+>> CONFIG_BMA180_INPUT_DEVICE and make it present some additional /dev/input/event
+>> in parallel to the iio interface.
+> 
+> Ugh, no we don't need more hacks here. I would greatly prefer to
+> just keep the "bma180" is in the bma150 input driver over adding
+> evdev event generation to iio drivers (either at the driver level
+> or the core).
+> 
+> I think that the best solution might be to do do something like this
+> in drivers/input/misc/bma150.c
+> 
+> static const struct i2c_device_id bma150_id[] = {
+>        { "bma150", 0 },
+> #ifndef CONFIG_BMA180 /* Avoid conflict with iio bma180 driver */
+>        { "bma180", 0 },
+> #endif
+>        { "smb380", 0 },
+>        { "bma023", 0 },
+>        { }
+> };
+> 
+> Then people relying on this can keep using it, and iio user
+> do not have to worry about it.
+
+Oh, that is an interesting compromise.
+
+I don't see anything wrong with it (except that it does not really solve
+the fundamental bma180 register issue but that seems to be only a problem
+for the gta04 device where it is proven by practice to be no problem).
+
+So if nobody else complains, we should go this way.
+
+BR and thanks,
+Nikolaus
+
+> 
+> Regards,
+> 
+> Hans
+> 
+> 
+> 
+>> I already have a similar approach in my to-be-upstreamed queue for the tsc2007
+>> touch screen driver to provide additional iio channels for raw values, chip
+>> temperature and the auxiliary general purpose ADC (which is used as ambient
+>> light sensor in the GTA04).
+>> 
+>> So let's develop some patch for drivers/iio/accel/bma180.c before we revert
+>> this bma150 patch and have nothing.
+>> 
+>> BR,
+>> Nikolaus Schaller
+>> 
+>>> 
+>>> Regards,
+>>> 
+>>> Hans
+>>> 
+>>> 
+>>> 
+>>>> 
+>>>> Well, it could be as simple as defining a virtual "input-iio-accel" wrapper
+>>>> driver with no real hardware behind and provide a reference to the iio DT node.
+>>>> But I think such virtual devices are against DT style.
+>>>> 
+>>>> So I don't know how to implement it in an acceptable way.
+>>>> 
+>>>> Ideas?
+>>>> 
+>>>> BR and thanks,
+>>>> Nikolaus Schaller
+>>>> 
+>>>>> 
+>>>>> Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
+>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>> ---
+>>>>> drivers/input/misc/bma150.c | 4 +---
+>>>>> 1 file changed, 1 insertion(+), 3 deletions(-)
+>>>>> 
+>>>>> diff --git a/drivers/input/misc/bma150.c b/drivers/input/misc/bma150.c
+>>>>> index b0d4453..cae4832 100644
+>>>>> --- a/drivers/input/misc/bma150.c
+>>>>> +++ b/drivers/input/misc/bma150.c
+>>>>> @@ -70,7 +70,6 @@
+>>>>> #define BMA150_CFG_5_REG	0x11
+>>>>> 
+>>>>> #define BMA150_CHIP_ID		2
+>>>>> -#define BMA180_CHIP_ID		3
+>>>>> #define BMA150_CHIP_ID_REG	BMA150_DATA_0_REG
+>>>>> 
+>>>>> #define BMA150_ACC_X_LSB_REG	BMA150_DATA_2_REG
+>>>>> @@ -539,7 +538,7 @@ static int bma150_probe(struct i2c_client *client,
+>>>>> 	}
+>>>>> 
+>>>>> 	chip_id = i2c_smbus_read_byte_data(client, BMA150_CHIP_ID_REG);
+>>>>> -	if (chip_id != BMA150_CHIP_ID && chip_id != BMA180_CHIP_ID) {
+>>>>> +	if (chip_id != BMA150_CHIP_ID) {
+>>>>> 		dev_err(&client->dev, "BMA150 chip id error: %d\n", chip_id);
+>>>>> 		return -EINVAL;
+>>>>> 	}
+>>>>> @@ -643,7 +642,6 @@ static UNIVERSAL_DEV_PM_OPS(bma150_pm, bma150_suspend, bma150_resume, NULL);
+>>>>> 
+>>>>> static const struct i2c_device_id bma150_id[] = {
+>>>>> 	{ "bma150", 0 },
+>>>>> -	{ "bma180", 0 },
+>>>>> 	{ "smb380", 0 },
+>>>>> 	{ "bma023", 0 },
+>>>>> 	{ }
+>>>>> --
+>>>>> 2.9.3
+>>>>> 
+>>>> 
+>> 
