@@ -1,126 +1,76 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Sep 2016 15:01:40 +0100
-Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
-In-Reply-To: <57D6AA54.6000208@laposte.net>
-References: <57BDAF2E.10502@laposte.net>
- <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
- <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
- <57D6AA54.6000208@laposte.net>
-Message-ID: <20160912135549.GA14165@leverpostej>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 12 Sep 2016 16:04:01 +0200
+Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
+In-Reply-To: <20160912124553.aqgv7b4vsx4urogi@piout.net>
+References: <20141009151605.GA8818@ulmo.nvidia.com>
+ <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
+ <6c896634c4d6446df0388da2c0228232@agner.ch>
+ <20160909091857.7a263220@ipc1.ka-ro>
+ <20160912124553.aqgv7b4vsx4urogi@piout.net>
+Message-ID: <20160912140401.qkezay7sqqavsf4i@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Mon, Sep 12, 2016 at 03:15:00PM +0200, Sebastian Frias wrote:
-> On 09/12/2016 02:38 PM, Mark Rutland wrote:
-> >>
-> >> 3rd party users of said SoC could then write kernel modules for such HW
-> >> blocks using the DT description. The DT would thus become the authoritative
-> >> source of information regarding register programming for the SoC.
-> > 
-> > I don't follow this part entirely. Why are you expecting thrid parties
-> > to write a driver for those blocks rather than upstreaming a driver for
-> > them?
-> 
-> 3rd parties could choose to write a driver (as opposed to use say, a user-mode
-> library) if it fits their programming model better, if they think they would
-> have better performance, or other reasons.
+On Mon, Sep 12, 2016 at 02:45:53PM +0200, Alexandre Belloni wrote:
+> Isn't a properly designed PWM putting a high level on its pin when
+> disabled and configured with inversed polarity ?
 
-A vendor can always choose to "add value" in this manner. The general
-expectation of *some* driver being upstreamed remains.
+it's not well defined. When trying several times over the years to
+properly define and document it, I didn't manage to agree with Thierry
+what is the right thing to define.
 
-> > I would generally agree that the hardware should be described in DT.
-> > The difficulty is that without a 'real' user it's not always possible to
-> > tell if we're describing the thing correctly.
-> 
-> That may be true, but so far we are not discussing changing DT's API so it
-> should not have big ramifications.
+IMHO it would be sensible to make it explicitly undefined what happens
+when a PMW is disabled. This would simplify drivers from
 
-You're not changing the code, but you are creating a binding. Bindings
-are intended to be stable (i.e. a working DTB from today should continue
-to work in future), and thus there are ramifications.
+	pwm_config(mypwm, value, period);
+	if (!value)
+		pwm_disable(mypwm)
+	else
+		pwm_enable(led_dat->pwm);
 
-Few devices these says are entirely independent, and most devices can be
-instantiated multiple times (even if there happens to only be a single
-instance in practice). For the example of a userspace driver there are
-very real ABI concerns, such as how the device(s) are discovered, how
-any related components like regulators and clocks are controlled, etc.
+to
 
-There are ramifications here, and it's a dangerous over simplification
-to say that this doesn't matter because we're not changing kernel code.
+	pwm_config(mypwm, value, period);
 
-> Besides, what "makes sense now" may "not make sense tomorrow" depending on
-> how the HW is modified.
+and let the pwm driver disable it's clock (or whatever) when value is 0
+and there are energy saving benefits that don't hurt the expected
+behaviour of the pin. So the hardware specific stuff is handled in the
+hardware specific driver and usage in pwm-consumers is simplified.
+Moreover this also simplifies some pwm drivers because they don't have
+to catch in software the cases where the hardware differs from the
+expectation[1].
+Looking at drivers/leds/leds-pwm.c it doesn't ensure that each
+pwm_enable is paired by an pwm_disable (e.g. on .remove). Is this a bug?
+With my purposed semantics of .config and .disable this would be much
+easier to fix.
 
-That's always the case when a new generation of hardware comes out, so I
-don't think that's relevant to the topic at hand.
+Regarding your question: Yeah, maybe all properly designed PWMs behave
+like you expect. But reality isn't only about properly designed
+hardware, so I wouldn't expect all hardware to behave. The inverse
+property might be software emulated and so on pwm_disable the pin might
+become 0.
 
-> We have somehow learned the hard-way that "le mieux est l'ennemi du bien"
-> (the better is the enemy of the good) and we are trying to take a more
-> practical (and flexible) approach.
-> 
-> > Putting smoething together that's only sufficient to support some
-> > out-of-tree driver with implicit assumptions that we are not aware of is
-> > far from fantastic.
-> 
-> That does not seem very positive and it is not the case anyway, otherwise we
-> would not be consulting here :-)
-> Agreed, right now this whole thing seems like a really hypothetical question,
-> but the intention is good.
-> 
-> Actually, I think it would encourage more SoC manufacturers to use DT as a way
-> to document their HW, which is a good thing.
+The obvious downside of my suggestion is that this is a change in what
+most people expect (because it was "safe" to call pwm_enable before),
+but the resulting code is simpler and cleaner.
 
-Writing and reviewing bindings is a very tricky topic, as it can require
-fairly intimate knowledge of a piece of hardware. I've repeatedly found
-that binding descriptions did not match the realities of the hardware,
-and I've only managed to do so by looking at accompanying driver code.
+Today it's a (maybe small) bug, when a pwm consumer calls pwm_config with
+value=0 and doesn't disable it afterwards. IMHO that's a bug in the pwm
+API that pwm_config with value=0 doesn't imply (the wanted effects of)
+pwm_disable.
 
-Given that manuals and other information on devices are often not freely
-available (if they exist at all), the proposal effectively limits myself
-and others to spot common (anti)patterns, which is far less than ideal,
-and will result in more mistakes.
+Best regards
+Uwe
 
-As it stands, the proposal asks for effort for the community (in terms
-of review and maintenance of bindings), with no benefit to the kernel
-community, and a number of pitfalls that we would rather avoid.
+[1] This might even be impossible: Consider a PWM that gets 0 (or
+high-z) on hw-disable independent of configured duty or inversion. The
+driver now sees for an inverted pwm: pwm_config(this, 0, 100);
+pwm_disable(this); The driver cannot know if it should continue to drive
+the pin at 1, or if the pwm consumer stopped caring about the pwm and
+disabling the hardware is OK.
 
-In an ideal world, writing and reviewing bindings would be a simple
-affair, and this could happen separately from work on any particular OS.
-In practice, things are sufficiently complicated that you need *some*
-demonstration that a binding is suitable, which is what I'm personally
-after when I ask for a Linux driver.
-
-> >> However, after discussing over IRC, it looks like there was no guidance on
-> >> this. Some people think submitting DT properties/nodes without a corresponding
-> >> Linux driver is frowned upon, while others thought it was an odd limitation
-> >> and suggested asking here.
-> > 
-> > Unfortunately, I think that the area is sufficiently vague that there
-> > simply is no clear and general answer.
-> > 
-> > For the sake of discussion, an example of a particular block, along with
-> > what you expect/need to describe would be helpful.
-> 
-> I don't have a more concrete example now.
-
-For this discussion to go somewhere, we need an example. Otherwise we're
-all coming at this with differing implicit assumptions and no clear
-evidence for any assertions.
-
-> As I stated, right now HW description is not centralised, and thus different
-> bits of information are cherry-picked by hand from HW description into DT for
-> bootloader, DT for Linux, Documentation/headers for 3rd-parties, etc.
-> 
-> But if I understood correctly your comment, you are basically saying that
-> without an example is hard to say.
-> Since the question seems understood, do you have an example of other SoC's
-> doing something similar?
-
-I do not have an example. I know that others are using DT for data
-beyond what Linux or another OS requires, but it's my understanding that
-that is typically in a separate DTB.
-
-Thanks,
-Mark.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
