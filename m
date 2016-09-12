@@ -1,46 +1,109 @@
-From: pku.leo@gmail.com (Leo Li)
-Date: Mon, 12 Sep 2016 13:29:47 -0500
-Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <CADRPPNSLZ-Ck+40LZLdpEXPaBm+61AtrpRPgAcTCojWSsTBQDw@mail.gmail.com>
-References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
- <20160906185849.27pjhawadca5pwow@pengutronix.de>
- <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
- <87ca69fb85848a0a86b34a9a9037a57b@agner.ch>
- <CADRPPNSPye45bmFshfwb+gDA0x0ygs4Ofa6HMYbKt9ER0oeccg@mail.gmail.com>
- <CAChUvXOGjTn6K5588UVgjbRWUY+weDtk2qbOU-NM4=kA2znh=Q@mail.gmail.com>
- <20160907055547.opp57zyxhlplhxhm@pengutronix.de>
- <CAChUvXMPDZB7=ZArQ5+6ae42N=Bsgv_OczGXnyhBjEdjt_yvsw@mail.gmail.com>
- <CADRPPNSLZ-Ck+40LZLdpEXPaBm+61AtrpRPgAcTCojWSsTBQDw@mail.gmail.com>
-Message-ID: <CADRPPNQW92jqwNgmxVK69Sqp13utoy=owSKMAxkC7tgRgjygGw@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 12 Sep 2016 20:32:19 +0200
+Subject: [PATCH V11 0/8] Introduce ACPI world to ITS irqchip
+Message-ID: <1473705147-6588-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 11:35 AM, Leo Li <pku.leo@gmail.com> wrote:
-> On Wed, Sep 7, 2016 at 5:07 AM, Tracy Smith <tlsmith3777@gmail.com> wrote:
->> Hello, bus recovery is needed generally speaking because of potential
->> protocol errors that might cause a failure condition hanging the bus.
->>
->> It happens frequently during bring-up of new I2C devices because firmware in
->> I2C controllers fail to handle properly protocol errors.
->>
->> Can NXP add bus recovery for the LS1021A and LS1043A in a separate patch--
->> unless there is no HW bus recovery mechanism?
->>
->> The concern is while fixing I.MX, NXP will fail to fix the driver bus
->> recovery for the LS1021A and LS1043A and the bus will hang.
->>
->> If bus recovery is supported on the LS1021A and the LS1043A, a patch should
->> be provided or added in this patch instead of simply disabling bus recovery.
->> Request NXP to consider the patch if there is HW support for bus recovery.
->
-> FYI.  http://patchwork.ozlabs.org/patch/573879/
+The series builds the PCI/MSI domain stack based on initial IORT driver
+which is added in first place. As a reference please see IORT spec:
+http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
 
-Hi Gao Pan,
+Tested on Cavium ThunderX server and Qualcomm Technologies server platform QDF2XXX.
+The patches can be found here:
+https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v11)
 
-Do you think the operations in the proposed patch is also usable on
-the I.MX SoC for bus recovery?  If so, would it be better to align the
-bus recovery implementation for both I.MX and QorIQ to use the same
-logic inside the IP?
+v10 -> v11
+- rebased against v4.8-rc6
+- bug fix for iort_match_node_callback() error handling
+- patch 1-2 changelog updates
 
-Regards,
-Leo
+v9 -> v10
+- error handling improvements for iort_match_node_callback() but no functional changes
+- iort.h -> acpi_iort.h header name change
+- style improvements
+
+v8 -> v9
+- rebased against v4.8-rc4
+- move root IORT pointer validation to one place iort_scan_node()
+- function names & Kconfig option name improvements
+- remove annoying dev_err() appearances for non-IORT users
+- for debug purpose print full ITS resource range
+
+v7 -> v8
+- rebased against v4.8-rc1
+- move IORT support under new drivers/acpi/arm64 directory
+- memory leak fix for iort_match_node_callback()
+- iort_node_map_rid() algorithm improvements
+- fix RID match check in iort_id_map()
+- fix typos and white spaces
+
+v6 -> v7
+- rebased against irq/irqchip-4.8
+- improvements for IORT ID mapping
+- call IORT init call from acpi_init() instead of arch_initcall()
+- split IORT driver in to two parts: core and ITS/MSI
+
+v5 -> v6
+- added locking mechanism for IORT list with domain token
+- IORT function name improvements
+- extended IORT RID mapping helper
+- reworked IORT to be more SMMU friendly
+- IORT functions which map RID and find corresponding domain are not
+  PCI specific any more (struct pci_dev -> struct device)
+- bug fixes
+
+v4 -> v5
+- rebased against v4.7-rc1
+- drop generic layer and call IORT functions directly
+- improve resource abstraction and string formatting
+
+v3 -> v4
+- rebased against v4.5
+- add ACPI support for IRQ domain handling on a per-device basis
+- reorder domain setup step
+- improve error handling
+- code style improvements
+
+v2 -> v3
+- rebased on top of 4.4
+- fixes and improvements for redistributor init via GICC structures
+- fixes as per kbuild reports
+
+v1 -> v2
+- rebased on top of 4.4-rc4
+- use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+
+Tomasz Nowicki (8):
+  ACPI: I/O Remapping Table (IORT) initial support
+  ACPI: Add new IORT functions to support MSI domain handling
+  PCI/MSI: Setup MSI domain on a per-device basis using IORT ACPI table
+  irqchip/gicv3-its: Cleanup for ITS domain initialization
+  irqchip/gicv3-its: Refactor ITS DT init code to prepare for ACPI
+  irqchip/gicv3-its: Probe ITS in the ACPI way
+  irqchip/gicv3-its: Factor out PCI-MSI part that might be reused for
+    ACPI
+  irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain
+    initialization
+
+ drivers/acpi/Kconfig                     |   4 +
+ drivers/acpi/Makefile                    |   2 +
+ drivers/acpi/arm64/Kconfig               |   6 +
+ drivers/acpi/arm64/Makefile              |   1 +
+ drivers/acpi/arm64/iort.c                | 366 +++++++++++++++++++++++++++++++
+ drivers/acpi/bus.c                       |   2 +
+ drivers/irqchip/Kconfig                  |   1 +
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c |  88 ++++++--
+ drivers/irqchip/irq-gic-v3-its.c         | 171 +++++++++++----
+ drivers/irqchip/irq-gic-v3.c             |   7 +-
+ drivers/pci/msi.c                        |  11 +-
+ include/linux/acpi_iort.h                |  42 ++++
+ include/linux/irqchip/arm-gic-v3.h       |   4 +-
+ 13 files changed, 635 insertions(+), 70 deletions(-)
+ create mode 100644 drivers/acpi/arm64/Kconfig
+ create mode 100644 drivers/acpi/arm64/Makefile
+ create mode 100644 drivers/acpi/arm64/iort.c
+ create mode 100644 include/linux/acpi_iort.h
+
+-- 
+1.9.1
