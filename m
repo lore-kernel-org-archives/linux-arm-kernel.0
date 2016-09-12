@@ -1,103 +1,85 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 12 Sep 2016 12:58:54 -0700
-Subject: [PATCH v2 00/17] Make rpmsg a framework
-In-Reply-To: <7682a26a-310b-b283-dfe8-56d114f92dcb@codeaurora.org>
-References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
- <20160912165233.GB21885@linaro.org> <20160912180015.GH405@tuxbot>
- <bc618ac9-13c8-e9bf-c7e9-fe5b7309a585@codeaurora.org>
- <20160912184957.GI405@tuxbot>
- <7682a26a-310b-b283-dfe8-56d114f92dcb@codeaurora.org>
-Message-ID: <20160912195854.GJ405@tuxbot>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 12 Sep 2016 22:00:21 +0200
+Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
+In-Reply-To: <074eed0df23199bc82f8d221690596d3@agner.ch>
+References: <20141009151605.GA8818@ulmo.nvidia.com>
+ <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
+ <6c896634c4d6446df0388da2c0228232@agner.ch>
+ <20160909091857.7a263220@ipc1.ka-ro>
+ <20160912124553.aqgv7b4vsx4urogi@piout.net>
+ <20160912140401.qkezay7sqqavsf4i@pengutronix.de>
+ <074eed0df23199bc82f8d221690596d3@agner.ch>
+Message-ID: <20160912200021.fsnfdgnng4it354g@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 12 Sep 12:21 PDT 2016, Jeffrey Hugo wrote:
+Hello Stefan,
 
-> On 9/12/2016 12:49 PM, Bjorn Andersson wrote:
-> >On Mon 12 Sep 11:13 PDT 2016, Jeffrey Hugo wrote:
-> >
-> >>On 9/12/2016 12:00 PM, Bjorn Andersson wrote:
-[..]
-> >>>Can you point me to the downstream code where this is implemented so I
-> >>>can have a look? Do you expect to get the response on that request?
-> >>
-> >>Have a look at -
-> >>smd_mask_receive_interrupt()
-> >>smd_is_pkt_avail()
-> >>
-> >
-> >In msm-3.18 these still seems to only come from either
-> >msm_rpm_enter_sleep() and the rpm-clock driver, related to flushing
-> >cached sleep state requests.
-> >
-> >>Every request to the RPM generates a response.  The Linux RPM driver may
-> >>decide to let the response sit in the fifo, or it may need to read and
-> >>process it.
-> >>
-> >
-> >Right, I presume we save some time by not waiting for these responses as
-> >we want to reach sleep as soon as possible. The answer I got last time
-> >this was discussed was that it was an optimization, not a functional
-> >requirement.
+On Mon, Sep 12, 2016 at 09:51:26AM -0700, Stefan Agner wrote:
+> On 2016-09-12 07:04, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > On Mon, Sep 12, 2016 at 02:45:53PM +0200, Alexandre Belloni wrote:
+> >> Isn't a properly designed PWM putting a high level on its pin when
+> >> disabled and configured with inversed polarity ?
+> > 
+> > it's not well defined. When trying several times over the years to
+> > properly define and document it, I didn't manage to agree with Thierry
+> > what is the right thing to define.
+> > 
+> > IMHO it would be sensible to make it explicitly undefined what happens
+> > when a PMW is disabled. This would simplify drivers from
+> > 
+> > 	pwm_config(mypwm, value, period);
+> > 	if (!value)
+> > 		pwm_disable(mypwm)
+> > 	else
+> > 		pwm_enable(led_dat->pwm);
+> > 
+> > to
+> > 
+> > 	pwm_config(mypwm, value, period);
+> > 
+> > and let the pwm driver disable it's clock (or whatever) when value is 0
+> > and there are energy saving benefits that don't hurt the expected
+> > behaviour of the pin. So the hardware specific stuff is handled in the
+> > hardware specific driver and usage in pwm-consumers is simplified.
+> > Moreover this also simplifies some pwm drivers because they don't have
+> > to catch in software the cases where the hardware differs from the
+> > expectation[1].
 > 
-> Two optimizations in play here.
+> That sounds like a sane definition to me and what I would have expected
+> from the PWM framework. That the pin is not defined after pwm_disable is
+> totally understandable. It is usually a case which the board designer
+> anyway needs to take care of (e.g. what is the state right after power
+> on? If the designer cares about, he will put a pull-up/down in place).
 > 
-> First, disabling interrupts prevents an immediate wakeup.  When the system
-> is entering sleep, IRQs are disabled.  The sleep request to RPM will trigger
-> a response, and the IRQ for that response will be queued. Once the sleep
-> processing is done, IRQs get enabled, so the pending IRQ from RPM will cause
-> an immediate wakeup.  The system will process the wakeup, and then go back
-> to sleep (sans request because nothing has changed).  This down-up-down
-> processing burns a lot of power.
+> And it seems also Sascha suggested that:
+> https://lkml.org/lkml/2013/1/4/139
+
+actually I talked to Sascha in private before ranting :-)
+
+> I did not found where Thierry disagreed to that...?
+
+Hmm, I used gmane links before, most of them are dead today. :-|
+http://www.spinics.net/lists/linux-leds/msg03237.html is one example.
+
+> > Today it's a (maybe small) bug, when a pwm consumer calls pwm_config with
+> > value=0 and doesn't disable it afterwards. IMHO that's a bug in the pwm
+> > API that pwm_config with value=0 doesn't imply (the wanted effects of)
+> > pwm_disable.
 > 
+> I don't quite get what you are saying here. What wanted effects of
+> pwm_disable would you like to move into pwm_config with value=0?
 
-But which "sleep request" is this? The only one I can find is the
-flushing of sleep state values from the rpm resource tables.
+I want that the pwm driver disables its clock on pwm_config(mypwm, 0,
+someperiod) such that the consumer doesn't need to call
+pwm_disable(mypwm) to save power (assuming it's safe to do so, which
+only the pwm provider knows).
 
-> Second is not waiting for the response.  Linux doesn't really do anything
-> with the sleep request response, so we can enter sleep faster by not waiting
-> for the response and processing (discarding) it when the system wakes up as
-> scheduled.
+Best regards
+Uwe
 
-Right, as long as the RPM code doesn't consider it a timeout don't have
-a problem if those ack's are handled after the resume.
-
-> However, Linux needs to ensure there is enough fifo space to
-> hold that response while asleep, otherwise the RPM will panic and crash the
-> system.  Therefore, if there are a number of outstanding requests that would
-> fill the fifo, then the RPM driver on Linux needs to spin and drain requests
-> from the fifo until a minimum free space buffer to hold additional expected
-> pending responses is established.  This has to occur with IRQs disabled.
-> 
-
-Right. Which means that the RPM driver needs to know how large the rx
-fifo is, what overhead the underlaying transport mechanism has and then
-calculate how many responses it should leave room for.
-
-[..]
-> >>If I recall correctly, there was a parameter in the RPM driver
-> >>for the transmit function that indicated if the request was being made in
-> >>atomic context or not, which would change the behavior of how the transmit
-> >>was handled.
-> >>
-> >
-> >You're correct, the question is still which of these code paths are
-> >actually needed and to motivate the endless maintenance of the extra
-> >code.
-> 
-> If we are just talking about transmitting in atomic context (not necessarily
-> related to sleep), if I recall correctly, some bus requests are sent to RPM
-> in atomic context, some APR requests to the Audio DSP are done in atomic
-> context, and I think IPC Router uses atomic context in some cases.  As a
-> generic framework that should support usecases to all processors/subsystems,
-> I don't think transmitting in atomic context is a special case for
-> RPM/sleep.
-> 
-
-I have not looked through all of APR yet and don't know where msm_bus is
-heading, but for IPC-router your correct that the downstream driver does
-indeed require this; but that's a side effect of the downstream
-ipcrouter implementation, not the problem itself.
-
-Regards,
-Bjorn
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
