@@ -1,47 +1,48 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 12 Sep 2016 09:02:54 -0400
-Subject: [PATCH V2 00/10] dmaengine: qcom_hidma: add MSI interrupt support
-Message-ID: <1473685384-19913-1-git-send-email-okaya@codeaurora.org>
+Date: Mon, 12 Sep 2016 09:02:55 -0400
+Subject: [PATCH V2 01/10] Documentation: DT: qcom_hidma: update binding for MSI
+In-Reply-To: <1473685384-19913-1-git-send-email-okaya@codeaurora.org>
+References: <1473685384-19913-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1473685384-19913-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new version of the HW supports MSI interrupts instead of wired
-interrupts. The MSI interrupts are especially useful for the guest machine
-execution. The wired interrupts usually trap to the hypervisor and then are
-relayed to the actual interrupt.
+Adding a new binding for qcom,hidma-1.1 to distinguish HW supporting
+MSI interrupts from the older revision.
 
-The MSI interrupts can be directly fed into the interrupt controller.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-Adding a new OF compat string (qcom,hidma-1.1) and ACPI string (QCOM8062)
-to distinguish newer HW from the older ones.
-
-Changes from v1:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/444167.html
-* Documentation update for DT bindings
-* Rebased to slave-next
-* Dropped dmaengine: qcom_hidma: eliminate processed variables. Replaced it
-  with dmaengine: qcom_hidma: protect common data structures
-
-Sinan Kaya (10):
-  Documentation: DT: qcom_hidma: update binding for MSI
-  Documentation: DT: qcom_hidma: correct spelling mistakes
-  of: irq: make of_msi_configure accessible from modules
-  dmaengine: qcom_hidma: configure DMA and MSI for OF
-  dmaengine: qcom_hidma: make pending_tre_count atomic
-  dmaengine: qcom_hidma: make error and success path common
-  dmaengine: qcom_hidma: bring out interrupt cause
-  dmaengine: qcom_hidma: add a common API to setup the interrupt
-  dmaengine: qcom_hidma: protect common data structures
-  dmaengine: qcom_hidma: add MSI support for interrupts
-
- .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  17 +-
- drivers/dma/qcom/hidma.c                           | 128 +++++++++-
- drivers/dma/qcom/hidma.h                           |   6 +-
- drivers/dma/qcom/hidma_dbg.c                       |   3 +-
- drivers/dma/qcom/hidma_ll.c                        | 278 ++++++++++-----------
- drivers/dma/qcom/hidma_mgmt.c                      |   5 +-
- drivers/of/irq.c                                   |   1 +
- 7 files changed, 279 insertions(+), 159 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+index fd5618b..47bfb5a 100644
+--- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
++++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+@@ -47,12 +47,23 @@ When the OS is not in control of the management interface (i.e. it's a guest),
+ the channel nodes appear on their own, not under a management node.
+ 
+ Required properties:
+-- compatible: must contain "qcom,hidma-1.0"
++- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
++for MSI capable HW.
+ - reg: Addresses for the transfer and event channel
+ - interrupts: Should contain the event interrupt
+ - desc-count: Number of asynchronous requests this channel can handle
+ - iommus: required a iommu node
+ 
++Optional properties for MSI:
++- msi-parent: pointer to the MSI controller object with the DeviceID in use.
++
++Example:
++ msi_parent: <&msi0 0x80024>
++
++msi0 is the MSI controller in the system. Bits 0-5 is the channel ID. 4
++is the channel ID. Bits 5-8 is the instance number. This is for the HIDMA
++instance 1.
++
+ Example:
+ 
+ Hypervisor OS configuration:
 -- 
 1.9.1
