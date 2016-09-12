@@ -1,39 +1,116 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 12 Sep 2016 12:22:39 +0200
-Subject: [PATCHv3 0/3] Devicetree bindings for Ion
-In-Reply-To: <1472601869-19469-1-git-send-email-labbott@redhat.com>
-References: <1472601869-19469-1-git-send-email-labbott@redhat.com>
-Message-ID: <20160912102239.GA5034@kroah.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 12 Sep 2016 12:23:30 +0200
+Subject: [PATCH 4/5] ARM: dts: exynos: add support for ISP power domain to
+ exynos4x12 clocks device
+In-Reply-To: <20160908002254.GD13062@codeaurora.org>
+References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
+ <1472737551-15272-5-git-send-email-m.szyprowski@samsung.com>
+ <20160908002254.GD13062@codeaurora.org>
+ <CGME20160912102332eucas1p145e79669788329b44343da62dcbe50ca@eucas1p1.samsung.com>
+Message-ID: <f340cca5-6cd6-6bd1-3b9a-ccd58cbc0091@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 05:04:26PM -0700, Laura Abbott wrote:
-> Hi,
-> 
-> This is a long overdue resend and slight update from the last version[1] of
-> Ion devicetree bindings.
-> 
-> The goal here is to keep the Ion bindings minimalist. I experimented with
-> dropping all but a dummy devicetree node and just matching on the machine
-> name in the platform file. This ends up being a nightmare for the DMA (i.e. CMA)
-> heap type. That heap requires a device structure to do its allocation and
-> setting up a device structure properly isn't pretty. I have other ideas for
-> working with that heap if this gets NAKed.
-> 
-> I've thought about the idea of a devicetree overlay for specifying more
-> platform configuration but that a) requires Android actually load the overlay
-> at the right time in the framework and b) opens up an entirely new can of
-> worms.
-> 
-> In conclusion, if we assume that Ion platform support is something anyone
-> actually wants, this is still the least bad and intrusive idea I've come up
-> with. There exists hisilicon Ion code but it came in without being fully acked.
-> I've converted it over as an example of how it might look.
-> 
-> As always, feedback appreciated.
+Hi Stephen,
 
-Give a total lack of feeback, I've now applied these patches :)
 
-thanks,
+On 2016-09-08 02:22, Stephen Boyd wrote:
+> On 09/01, Marek Szyprowski wrote:
+>> Exynos4412 clock controller contains some additional clocks for FIMC-ISP
+>> (Camera ISP) subsystem. Registers for those clocks are partially located
+>> in the SOC area, which belongs to ISP power domain.
+>>
+>> This patch extends clock controller node with ISP clock sub-node and link
+>> (phandle) to ISP power domain.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos4x12.dtsi | 5 +++++
+>>   1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+>> index 3394bdcf10ae..4daea67546b9 100644
+>> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+>> @@ -74,6 +74,11 @@
+>>   		compatible = "samsung,exynos4412-clock";
+>>   		reg = <0x10030000 0x20000>;
+>>   		#clock-cells = <1>;
+>> +
+>> +		isp-clock-controller {
+>> +			compatible = "samsung,exynos4412-isp-clock";
+>> +			power-domains = <&pd_isp>;
+>> +		};
+> Why can't we extend support in power domains code to have
+> multiple domains for a single device node? i.e. power-domains =
+> <&pd_isp>, <&pd_foo>, <&pd_bar>, and then pick the right one with
+> power-domain-names or something like that? Making a subnode
+> (which seems to turn into a child platform device?) seems like a
+> quick solution for larger problems.
 
-greg k-h
+The larger problem here is the fact that clock controller is partially 
+located
+in different power areas of SoC. Majority of the clock controllers is 
+located
+in the area which is typically always powered (besides system sleep case),
+while a few Camera ISP registers are located in the ISP block, which have
+separate power domain. Having a separate nodes for sub-parts of the 
+device is
+rather common approach, already practices by some more complex devices.
+
+I see some serious design problems with multiple entries in power domains
+property. First how to show that some part of the device IS NOT in any 
+domain?
+The question is how the automated assignment to domains would be handled for
+such case?
+
+The second is related to Linux kernel internals. Right now device 
+drivers are
+not aware of the power domains - there are no direct calls to power domains
+code, everything is hidden behind runtime pm which does all the hard work.
+
+Similar situation is on Exynos 542x/5800, which will look more or less like
+this:
+
+         clock: clock-controller at 10010000 {
+              compatible = "samsung,exynos5420-clock";
+              reg = <0x10010000 0x30000>;
+              #clock-cells = <1>;
++
++            gsc-clock-controller {
++                 compatible = "samsung,exynos5420-gsc-clock";
++                 power-domains = <&gsc_pd>;
++            };
++
++            isp-clock-controller {
++                 compatible = "samsung,exynos5420-isp-clock";
++                 power-domains = <&isp_pd>;
++            };
++
++            mfc-clock-controller {
++                 compatible = "samsung,exynos5420-mfc-clock";
++                 power-domains = <&mfc_pd>;
++            };
++
++            msc-clock-controller {
++                 compatible = "samsung,exynos5420-msc-clock";
++                 power-domains = <&msc_pd>;
++            };
++
++            disp-clock-controller {
++                 compatible = "samsung,exynos5420-disp-clock";
++                 power-domains = <&disp_pd>;
++            };
+          };
+
+The patch is not yet ready, so I didn't include it in this patchset.
+
+The clock controller evolved and in the latest Exynos 5433 it is divided in
+several parts (each related to given hw block and its power domains), which
+each is now modeled by a separate device node. This allows to bind power
+domains cleanly without any need for sub-nodes for the clock controllers.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
