@@ -1,57 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Sep 2016 22:34:19 +0200
-Subject: [GIT PULL] CLCD graphics for the Nomadik NHK15
-Message-ID: <CACRpkdZH+aFe-PSR-vmEVNJgKZ5nTgiUJroyhdYfVweQFh0s9A@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 12 Sep 2016 13:38:35 -0700
+Subject: [PATCH v2 0/4] ARM: amlogic: Add spifc support to Amlogic's GXBB
+ family
+In-Reply-To: <1473409738-27175-1-git-send-email-jbrunet@baylibre.com> (Jerome
+ Brunet's message of "Fri, 9 Sep 2016 10:28:54 +0200")
+References: <1473409738-27175-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <7heg4oq2es.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-this adds CLCD graphics to the Nomadik NHK15 following
-Tomi's merge of the required FBDEV changes.
+> This patch series adds the necessary pins, clocks and device tree nodes to
+> enable the spifc controller on the GXBB family. I had to add the nand pins
+> in pintctrl as the pinmux setting left by u-boot was conflicting with the
+> spifc pinmux during my test on the P200.
 
-It is all device tree changes except for a oneliner selecting
-MFD_SYSCON from the Nomadik Kconfig, as there are
-no other Nomadik changes pending and nothing else
-should be changing the Nomadik, and since it is pretty
-much in context with the DTS changes, I chose to include
-it here.
+This series seems to be missing a patch which enables the SPIfc on the
+P200 board for use with the on-board NOR flash.
 
-Please pull it in!
+Kevin
 
-Yours,
-Linus Walleij
-
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/clcd-nomadik
-
-for you to fetch changes up to 17470b7da11c137267c74ff0d2d4cca56f595c60:
-
-  ARM: dts: add the CLCD LCD display to the NHK15 (2016-09-09 23:16:07 +0200)
-
-----------------------------------------------------------------
-CLCD graphics on the Nomadik NHK15
-
-----------------------------------------------------------------
-Linus Walleij (6):
-      ARM: dts: add STMPE PWM to the NHK15 device tree
-      dt-bindings: add vendor TPO
-      dt-bindings: Add TPO TPG110 binding
-      ARM: nomadik: select MFD_SYSCON
-      ARM: dts: add PMU to the NHK15 device tree
-      ARM: dts: add the CLCD LCD display to the NHK15
-
- .../bindings/display/panel/tpo,tpg110.txt          | 47 +++++++++++++++
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm/boot/dts/ste-nomadik-nhk15.dts            | 68 ++++++++++++++++++++++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 28 +++++++++
- arch/arm/mach-nomadik/Kconfig                      |  1 +
- 5 files changed, 145 insertions(+)
- create mode 100644
-Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
+> Changes since v1 at : http://lkml.kernel.org/r/1473261223-15412-1-git-send-email-jbrunet at baylibre.com
+>  * Omit patches :
+>   - dt-bindings: spi-meson: Add GXBB Compatible string
+>   - spi: meson: Add GXBB compatible
+>   Sent as dedicated series
+>  * Omit patch:
+>   - clk: gxbb: expose spifc clock
+>   Already applied
+>  * Rename SPI flash controller pins from spifc_* to nor_* to keep the
+>    name aligned with the datasheet
+>
+> Jerome Brunet (3):
+>   pinctrl: amlogic: gxbb: add spi nor pins
+>   pinctrl: amlogic: gxbb: add nand pins
+>   ARM64: dts: amlogic: add spi nor pins
+>
+> Neil Armstrong (1):
+>   ARM64: dts: meson-gxbb: Add SPIFC node
+>
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 19 +++++++++++++++
+>  drivers/pinctrl/meson/pinctrl-meson-gxbb.c  | 37 +++++++++++++++++++++++++++++
+>  2 files changed, 56 insertions(+)
