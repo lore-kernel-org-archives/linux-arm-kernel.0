@@ -1,64 +1,55 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Mon, 12 Sep 2016 18:16:42 +0800
-Subject: [PATCH v7 4/9] drm/mediatek: update display module connections
-In-Reply-To: <1473147546.11736.7.camel@mtksdaap41>
+Date: Mon, 12 Sep 2016 18:16:53 +0800
+Subject: [PATCH v7 9/9] drm/mediatek: add support for Mediatek SoC MT2701
+In-Reply-To: <1473226653.11736.33.camel@mtksdaap41>
 References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
- <1472815484-43821-5-git-send-email-yt.shen@mediatek.com>
- <1473147546.11736.7.camel@mtksdaap41>
-Message-ID: <1473675402.12398.28.camel@mtksdaap41>
+ <1472815484-43821-10-git-send-email-yt.shen@mediatek.com>
+ <1473226653.11736.33.camel@mtksdaap41>
+Message-ID: <1473675413.12398.29.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi CK,
 
-On Tue, 2016-09-06 at 15:39 +0800, CK Hu wrote:
+On Wed, 2016-09-07 at 13:37 +0800, CK Hu wrote:
 > Hi, YT:
 > 
 > On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
-> > update connections for OVL, RDMA, BLS, DSI
+> > This patch add support for the Mediatek MT2701 DISP subsystem.
+> > There is only one OVL engine in MT2701.
 > > 
 > > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 25 +++++++++++++++++++++++++
-> >  1 file changed, 25 insertions(+)
-> > 
 > 
 > [snip...]
 > 
-> > @@ -111,6 +119,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
-> >  	if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_COLOR0) {
-> >  		*addr = DISP_REG_CONFIG_DISP_OVL0_MOUT_EN;
-> >  		value = OVL0_MOUT_EN_COLOR0;
-> > +	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
-> > +		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
-> > +		value = OVL_MOUT_EN_RDMA;
-> >  	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
-> >  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
-> >  		value = OD_MOUT_EN_RDMA0;
-> > @@ -148,6 +159,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
-> >  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
-> >  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
-> >  		value = COLOR1_SEL_IN_OVL1;
-> > +	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > index 4b4e449..465819b 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > @@ -112,6 +112,7 @@ struct mtk_ddp_comp_match {
+> >  
+> >  static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+> >  	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, NULL },
+> > +	[DDP_COMPONENT_BLS]	= { MTK_DISP_PWM,	0, NULL },
 > 
-> DDP_COMPONENT_BLS is a new symbol which is defined in 9th patch of this
-> series. I think the definition of DDP_COMPONENT_BLS should be in front
-> of this patch.
-OK, we will move the definition to this patch.
+> I think BLS is different than PWM, so this statement should be
+> 
+> [DDP_COMPONENT_BLS] = { MTK_DISP_BLS, 0, NULL };
+The BLS module actually is a multifunction device, one of them is the
+PWM function.  We only upstream PWM function [1] now, and it is
+accepted.  When there are real use case (gamma function), we will update
+this part.  What do you think?
 
 Regards,
 yt.shen
 
+[1] https://patchwork.kernel.org/patch/9223001/
+
 > 
-> > +		*addr = DISP_REG_CONFIG_DSI_SEL;
-> > +		value = DSI_SEL_IN_BLS;
-> >  	} else {
-> >  		value = 0;
-> >  	}
-> > @@ -155,6 +169,15 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
-> >  	return value;
-> >  }
-> >  
+> 
+> >  	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, &ddp_color },
+> >  	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, &ddp_color },
+> >  	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
 > 
 > Regards,
 > CK
