@@ -1,79 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Sep 2016 16:09:59 +0100
-Subject: [PATCH v2 1/7] arm64: Factor out PAN enabling/disabling into
- separate uaccess_* macros
-In-Reply-To: <20160912145219.GC2492@e104818-lin.cambridge.arm.com>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <1472828533-28197-2-git-send-email-catalin.marinas@arm.com>
- <20160905153828.GA27305@leverpostej>
- <20160912145219.GC2492@e104818-lin.cambridge.arm.com>
-Message-ID: <20160912150958.GC14165@leverpostej>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Mon, 12 Sep 2016 11:09:56 -0400
+Subject: [PATCH v5 3/3] clk: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <CAOMZO5CPM9YfVqfpuyLmhGn9jC7p73Ocnc7LxE9=xA9ouawNQQ@mail.gmail.com>
+References: <1468235521-3163-1-git-send-email-p.zabel@pengutronix.de>
+ <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
+ <5787C558.5060904@gmail.com> <2499789.N9zTF3cNAV@diplodocus>
+ <CAOMZO5CPM9YfVqfpuyLmhGn9jC7p73Ocnc7LxE9=xA9ouawNQQ@mail.gmail.com>
+Message-ID: <CACrMeVA8CdL-Fqa4NwmBUPvzBXsi=o8bpB_tY2-Z0-xCoMX3xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 03:52:19PM +0100, Catalin Marinas wrote:
-> On Mon, Sep 05, 2016 at 04:38:28PM +0100, Mark Rutland wrote:
-> > On Fri, Sep 02, 2016 at 04:02:07PM +0100, Catalin Marinas wrote:
-> > >  /*
-> > > + * User access enabling/disabling.
-> > > + */
-> > > +#define uaccess_disable(alt)						\
-> > > +do {									\
-> > > +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,			\
-> > > +			CONFIG_ARM64_PAN));				\
-> > > +} while (0)
-> > > +
-> > > +#define uaccess_enable(alt)						\
-> > > +do {									\
-> > > +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,			\
-> > > +			CONFIG_ARM64_PAN));				\
-> > > +} while (0)
-> > 
-> > Passing the alternative down is somewhat confusing. e.g. in the futex
-> > case it looks like we're only doing something when PAN is present,
-> > whereas we'll manipulate TTBR0 in the absence of PAN.
-> 
-> I agree it's confusing (I got it wrong first time as well and used the
-> wrong alternative for futex).
-> 
-> > If I've understood correctly, we need this to distinguish regular
-> > load/store uaccess sequences (eg. the futex code) from potentially
-> > patched unprivileged load/store sequences (e.g. {get,put}_user) when
-> > poking PSTATE.PAN.
-> > 
-> > So perhaps we could ahve something like:
-> > 
-> > * privileged_uaccess_{enable,disable}()
-> >   Which toggle TTBR0, or PAN (always).
-> >   These would handle cases like the futex/swp code.
-> >  
-> > * (unprivileged_)uaccess_{enable,disable}()
-> >   Which toggle TTBR0, or PAN (in the absence of UAO).
-> >   These would handle cases like the {get,put}_user sequences.
-> > 
-> > Though perhaps that is just as confusing. ;)
-> 
-> I find it more confusing. 
+On Tue, Jul 19, 2016 at 7:13 AM, Fabio Estevam <festevam@gmail.com> wrote:
+>
+> Great news! It is good to know you are able to confirm this series
+> fixes the LVDS issue on your board.
+>
+> Still interested to know if Novena LVDS still work with this series applied.
+>
+> Sean,Marek,
+>
+> Any chances of testing this series on Novena's board?
+>
+> Thanks
 
-Fair enough. :)
+Hi Fabio, Shawn,
 
-> In the non-UAO case, get_user etc. would
-> normally have to use privileged_uaccess_enable() since ldr is not
-> replaced with ldtr. Maybe uaccess_enable_for_exclusives() but it doesn't
-> look any better. 
+Advantech tested the v5 patch series on imx6q-b450v3 board (with 4.7
+kernel) and confirmed the patch fixes the lvds blank display issue
+being seen on some imx6q-b450v3 boards.
 
-I strongly prefer uaccess_enable_exclusives(), or something of that sort
-to both of the above. ;)
+Details below:
+With the patch applied:
+Board # 1: 100 times power on/off, no LVDS display failure
+Board # 2: 100 times power on/off, no LVDS display failure
 
-> I think adding some comments to the code (uaccess_enable macro) would
-> work better, clarifying what the alternative is for.
+Without the patch:
+Board # 1: LVDS display failure (blank display output) at 4th time power on/off.
+Board # 2: LVDS display failure (blank display output) at 3rd time power on/off.
 
-That will make things smoewhat clearer, though only after one reads the
-comments. In contrast, uaccess_enable_exclusives() would be
-self-documenting w.r.t. the intented use-case.
+Tested-by: Charles Kang <Charles.Kang@advantech.com.tw>
 
-Do we ever want to use the 8.1 atomics for futexes? If so, perhaps
-uaccess_enable_atomics()?
+Since the patch has been reviewed and confirmed to fix display
+failures on 2 different boards (imx6q-evi and imx6q-b450v3), can it be
+applied?
 
 Thanks,
-Mark.
+Akshay
