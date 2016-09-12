@@ -1,156 +1,64 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 12 Sep 2016 17:13:58 -0500
-Subject: [PATCH v4 1/2] nxp/dts: add pcie aer interrupt-name property in
- the dts
-In-Reply-To: <1472625442-23309-1-git-send-email-po.liu@nxp.com>
-References: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
- <1472625442-23309-1-git-send-email-po.liu@nxp.com>
-Message-ID: <20160912221358.GI23532@localhost>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 12 Sep 2016 15:16:40 -0700
+Subject: [PATCH/RFC v3 00/22] soc: renesas: Add R-Car RST driver for
+ obtaining mode pin state
+In-Reply-To: <CAMuHMdWu34OQSS6J3bf=0-1TYULc=coiVomBjtBatwGta5F3HQ@mail.gmail.com>
+References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
+ <20160630201407.GA27880@codeaurora.org>
+ <CAMuHMdWu34OQSS6J3bf=0-1TYULc=coiVomBjtBatwGta5F3HQ@mail.gmail.com>
+Message-ID: <20160912221640.GG7243@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2016 at 02:37:21PM +0800, Po Liu wrote:
-> NXP some platforms aer interrupt was not MSI/MSI-X/INTx
-> but using interrupt line independently. This patch add a "aer"
-> interrupt-names for aer interrupt.
-> With the interrupt-names "aer", code could probe aer interrupt
-> line for pcie root port, replace the aer interrupt service irq.
-> This is intend to fixup the Layerscape platforms which aer interrupt
-> was not MSI/MSI-X/INTx, but using interrupt line independently.
+On 09/01, Geert Uytterhoeven wrote:
+> Hi Stephen,
 > 
-> Signed-off-by: Po Liu <po.liu@nxp.com>
+> On Thu, Jun 30, 2016 at 10:14 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 06/01, Geert Uytterhoeven wrote:
+> >> Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
+> >> state of the mode pins either by a call from the board code, or directly
+> >> by using a hardcoded register access. This is a bit messy, and creates a
+> >> dependency between driver and platform code.
+> >>
+> >> This RFC patch series converts the various Renesas R-Car clock drivers
+> >> and support code from reading the mode pin states using a hardcoded
+> >> register access to using a new R-Car RST driver.
+> >
+> > Dumb question, can we use the nvmem reading APIs instead of an
+> > SoC specific function to read the modes?
+> 
+> Thanks for your suggestion, the nvmem API indeed looks like a suitable API,
+> as it does support read-only nvmems.
+> 
+> Unfortunately I also see a few disadvantages:
+>   1. nvmem_init() is a subsys_initcall(), while most of our users (except for
+>      the recent renesas-cpg-mssr driver) are clock drivers using
+>      CLK_OF_DECLARE(), and are thus initialized from of_clk_init() at much
+>      earlier time_init() time.
+>      Of course the mvmem subsystem and/or the clock drivers can be changed, if
+>      deemed useful.
 
-Rob and Shawn had comments here, and I'm not sure they ever got resolved.
+Sounds like this is solvable.
 
-> ---
-> changes for V4:
-> 	- Add comments explain why to add this patch
-> 	- Move the binding changes to pci code patch
-> 
->  arch/arm/boot/dts/ls1021a.dtsi                 |  6 ++++--
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 18 +++++++++---------
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 16 ++++++++--------
->  3 files changed, 21 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index 368e219..443e50b 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -634,7 +634,8 @@
->  			reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
->  			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
-> +			interrupts = <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			fsl,pcie-scfg = <&scfg 0>;
->  			#address-cells = <3>;
->  			#size-cells = <2>;
-> @@ -657,7 +658,8 @@
->  			reg = <0x00 0x03500000 0x0 0x00010000   /* controller registers */
->  			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			fsl,pcie-scfg = <&scfg 1>;
->  			#address-cells = <3>;
->  			#size-cells = <2>;
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> index e669fbd..654071d 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> @@ -527,9 +527,9 @@
->  			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
->  			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 118 0x4>, /* controller interrupt */
-> -				     <0 117 0x4>; /* PME interrupt */
-> -			interrupt-names = "intr", "pme";
-> +			interrupts = <0 117 0x4>, /* PME interrupt */
-> +					 <0 118 0x4>; /* aer interrupt */
-> +			interrupt-names = "pme", "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> @@ -552,9 +552,9 @@
->  			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
->  			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 128 0x4>,
-> -				     <0 127 0x4>;
-> -			interrupt-names = "intr", "pme";
-> +			interrupts = <0 127 0x4>,
-> +					 <0 128 0x4>;
-> +			interrupt-names = "pme", "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> @@ -577,9 +577,9 @@
->  			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
->  			       0x50 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 162 0x4>,
-> -				     <0 161 0x4>;
-> -			interrupt-names = "intr", "pme";
-> +			interrupts = <0 161 0x4>,
-> +					 <0 162 0x4>;
-> +			interrupt-names = "pme", "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> index 21023a3..58844e8 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> @@ -583,8 +583,8 @@
->  			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
->  			       0x10 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 108 0x4>; /* Level high type */
-> -			interrupt-names = "intr";
-> +			interrupts = <0 108 0x4>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> @@ -607,8 +607,8 @@
->  			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
->  			       0x12 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 113 0x4>; /* Level high type */
-> -			interrupt-names = "intr";
-> +			interrupts = <0 113 0x4>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> @@ -631,8 +631,8 @@
->  			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
->  			       0x14 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 118 0x4>; /* Level high type */
-> -			interrupt-names = "intr";
-> +			interrupts = <0 118 0x4>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> @@ -655,8 +655,8 @@
->  			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
->  			       0x16 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 123 0x4>; /* Level high type */
-> -			interrupt-names = "intr";
-> +			interrupts = <0 123 0x4>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> -- 
-> 2.1.0.27.g96db324
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>   2. Using the nvmem DT bindings means we have to add more DT glue from the
+>      nvmem consumer(s) to the nvmem provider. As we need to provide backwards
+>      compatibility with old DTSes, this means we need more C code or DT fixup
+>      code to handle that.
+
+Ah I wasn't aware we were keeping backwards compatibility around.
+
+
+>   3. The nvmem subsystem may be overkill to provide access to a simple 32-bit
+>      read-only register that never changes value after boot.
+
+The nvmem subsystem is designed to read values from things that
+mostly never change. Overkill may be true, but the nice thing
+about using nvmem APIs is that the driver doesn't have to use
+some platform specific function that duplicates similar
+functionality. It's unfortunate that backwards incompatibility
+limits our ability to move to common linux frameworks when they
+are created after the binding is used.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
