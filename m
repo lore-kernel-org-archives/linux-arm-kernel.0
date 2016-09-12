@@ -1,45 +1,42 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 12 Sep 2016 13:38:35 -0700
-Subject: [PATCH v2 0/4] ARM: amlogic: Add spifc support to Amlogic's GXBB
- family
-In-Reply-To: <1473409738-27175-1-git-send-email-jbrunet@baylibre.com> (Jerome
- Brunet's message of "Fri, 9 Sep 2016 10:28:54 +0200")
-References: <1473409738-27175-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <7heg4oq2es.fsf@baylibre.com>
+Date: Mon, 12 Sep 2016 13:43:39 -0700
+Subject: [PATCH 2/3] ARM64: dts: amlogic: Add basic support for Amlogic
+ S905X
+In-Reply-To: <CAOQ7t2bWLq2XP2rKx3msf=1tUfXkQuBWagun46TaKk73qXr=FQ@mail.gmail.com>
+ (Carlo Caione's message of "Mon, 12 Sep 2016 19:18:10 +0200")
+References: <20160903082227.30559-1-narmstrong@baylibre.com>
+ <20160903082227.30559-3-narmstrong@baylibre.com>
+ <7e27e8c0-bb18-40d8-10d6-3928e66815c7@suse.de>
+ <CAOQ7t2bWLq2XP2rKx3msf=1tUfXkQuBWagun46TaKk73qXr=FQ@mail.gmail.com>
+Message-ID: <7ha8fcq26c.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+Carlo Caione <carlo@caione.org> writes:
 
-> This patch series adds the necessary pins, clocks and device tree nodes to
-> enable the spifc controller on the GXBB family. I had to add the nand pins
-> in pintctrl as the pinmux setting left by u-boot was conflicting with the
-> spifc pinmux during my test on the P200.
+> On Mon, Sep 12, 2016 at 6:28 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>
+>>> +Boards with the Amlogic Meson GXL SoC shall have the following properties:
+>>> +  Required root node property:
+>>> +    compatible: "amlogic,meson-gxl-s905x", "amlogic,meson-gxl";
+>>
+>> Can we please use "amlogic,s905x", "amlogic,meson-gxl"? No need to
+>> complicate the name. Also affects .dtsi and .dts below.
+>
+> gxl != s905x.
+>
+> AFAWK to the GXL family belong several different SoCs, like S905X,
+> S905D, etc... (see patch 3/3)
+> This is why we use meson-gxl-s905x, meson-gxl-s905d, etc...
 
-This series seems to be missing a patch which enables the SPIfc on the
-P200 board for use with the on-board NOR flash.
+Correct.
+
+> We could s/meson-gxl-s905x/meson-s905x/ and
+> s/meson-gxl-s905d/meson-s905d/ but I honestly prefer this way because
+> we can clearly see which family the SoC belongs to (the Amlogic naming
+> convention is already messy enough).
+> I mean, yes it's longer, but it's for the sake of documentation IMO.
+
++1
 
 Kevin
-
-> Changes since v1 at : http://lkml.kernel.org/r/1473261223-15412-1-git-send-email-jbrunet at baylibre.com
->  * Omit patches :
->   - dt-bindings: spi-meson: Add GXBB Compatible string
->   - spi: meson: Add GXBB compatible
->   Sent as dedicated series
->  * Omit patch:
->   - clk: gxbb: expose spifc clock
->   Already applied
->  * Rename SPI flash controller pins from spifc_* to nor_* to keep the
->    name aligned with the datasheet
->
-> Jerome Brunet (3):
->   pinctrl: amlogic: gxbb: add spi nor pins
->   pinctrl: amlogic: gxbb: add nand pins
->   ARM64: dts: amlogic: add spi nor pins
->
-> Neil Armstrong (1):
->   ARM64: dts: meson-gxbb: Add SPIFC node
->
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 19 +++++++++++++++
->  drivers/pinctrl/meson/pinctrl-meson-gxbb.c  | 37 +++++++++++++++++++++++++++++
->  2 files changed, 56 insertions(+)
