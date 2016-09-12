@@ -1,109 +1,86 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 12 Sep 2016 20:19:16 +0200 (CEST)
-Subject: [PATCH v2 2/6] ARM: dts: bcm283x: Define standard pinctrl
- groups in the gpio node.
-In-Reply-To: <1473668576-22256-3-git-send-email-kraxel@redhat.com>
-References: <1473668576-22256-1-git-send-email-kraxel@redhat.com>
- <1473668576-22256-3-git-send-email-kraxel@redhat.com>
-Message-ID: <1273800480.83718.15854341-2f8e-4e20-95f4-e76f81e6fd56.open-xchange@email.1und1.de>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 12 Sep 2016 14:19:40 -0400
+Subject: [PATCH v3] arm64: Improve kprobes test for atomic sequence
+In-Reply-To: <20160913012936.489d3dc7a0b5a9e0f0670745@kernel.org>
+References: <1473449169-16032-1-git-send-email-dave.long@linaro.org>
+ <20160910144841.1bbbffd8548128146df11a41@kernel.org>
+ <57D60AA7.6010304@linaro.org>
+ <20160913012936.489d3dc7a0b5a9e0f0670745@kernel.org>
+Message-ID: <57D6F1BC.7030700@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerd,
+On 09/12/2016 12:29 PM, Masami Hiramatsu wrote:
+> On Sun, 11 Sep 2016 21:53:43 -0400
+> David Long <dave.long@linaro.org> wrote:
+>
+>> On 09/10/2016 01:48 AM, Masami Hiramatsu wrote:
+>>> On Fri,  9 Sep 2016 15:26:09 -0400
+>>> David Long <dave.long@linaro.org> wrote:
+>>>
+>>>> From: "David A. Long" <dave.long@linaro.org>
+>>>>
+>>>> Kprobes searches backwards a finite number of instructions to determine if
+>>>> there is an attempt to probe a load/store exclusive sequence. It stops when
+>>>> it hits the maximum number of instructions or a load or store exclusive.
+>>>> However this means it can run up past the beginning of the function and
+>>>> start looking at literal constants. This has been shown to cause a false
+>>>> positive and blocks insertion of the probe. To fix this, further limit the
+>>>> backwards search to stop if it hits a symbol address from kallsyms. The
+>>>> presumption is that this is the entry point to this code (particularly for
+>>>> the common case of placing probes at the beginning of functions).
+>>>>
+>>>> This also improves efficiency by not searching code that is not part of the
+>>>> function. There may be some possibility that the label might not denote the
+>>>> entry path to the probed instruction but the likelihood seems low and this
+>>>> is just another example of how the kprobes user really needs to be
+>>>> careful about what they are doing.
+>>>
+>>> Of course user should be careful, but also, in such case, kernel can reject
+>>> to probe it.
+>>>
+>>
+>> I'm not exactly sure what you mean.  I'm just saying when everything
+>> goes right we still cannot promise perfection in detecting a probe
+>> within an atomic sequence.  This patch will reject a probe that is after
+>> a ldx and has no intervening kallsyms label (and assuming it's within
+>> the defined maximum count of subsequent instructions).
+>>
+>
+> Hmm, what I meant was the below code.
+>
+>>>> +	/*
+>>>> +	 * If there's a symbol defined in front of and near enough to
+>>>> +	 * the probe address assume it is the entry point to this
+>>>> +	 * code and use it to further limit how far back we search
+>>>> +	 * when determining if we're in an atomic sequence. If we could
+>>>> +	 * not find any symbol skip the atomic test altogether as we
+>>>> +	 * could otherwise end up searching irrelevant text/literals.
+>>>> +	 * KPROBES depends on KALLSYMS so this last case should never
+>>>> +	 * happen.
+>>>> +	 */
+>>>> +	if (kallsyms_lookup_size_offset((unsigned long) addr, &size, &offset)) {
+>>>> +		if (offset < (MAX_ATOMIC_CONTEXT_SIZE*sizeof(kprobe_opcode_t)))
+>>>> +			scan_end = addr - (offset / sizeof(kprobe_opcode_t));
+>>>> +		else
+>>>> +			scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
+>>>
+>>>           } else
+>>>                  return INSN_REJECTED;
+>>>
+>>>     that is what I expected...
+>
+> As you said above,
+>
+>>>> +	 * KPROBES depends on KALLSYMS so this last case should never
+>>>> +	 * happen.
+>
+> If it should never happen, it also would be better to reject it because
+> it is unexpected result.
+>
+> Thank you,
+>
 
-> Gerd Hoffmann <kraxel@redhat.com> hat am 12. September 2016 um 10:22
-> geschrieben:
-> 
-> 
-> From: Eric Anholt <eric@anholt.net>
-> 
-> The BCM2835-ARM-Peripherals.pdf documentation specifies what the
-> function selects do for the pins, and there are a bunch of obvious
-> groupings to be made.  With these created, we'll be able to replace
-> bcm2835-rpi.dtsi's main "set all of these pins to alt0" with
-> references to specific groups we want enabled.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> 
-> squashed in:
->   ARM: dts: bcm283x: Add the emmc pin group to bcm283x.dtsi.
->   ARM: dts: bcm283x: Add a group for mapping pins 48-53 to sdhost.
->   ARM: dts: bcm283x: Add a new EMMC pin group from the downstream tree.
-> 
-> fixups by kraxel:
->   * fix spi0 name
->   * sort & group entries
->   * use pull defines
->   * add dpi group
+OK, cool.  Sounds like we're on the same page.
 
-this looks like a changelog. Please move this at the proper place before the
-first "diff" and specify the version.
-
-> 
-> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
-> ---
->  arch/arm/boot/dts/bcm283x.dtsi | 203
-> +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 203 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-> index 4d9f3ab..7b03b63 100644
-> --- a/arch/arm/boot/dts/bcm283x.dtsi
-> +++ b/arch/arm/boot/dts/bcm283x.dtsi
-> @@ -131,6 +131,209 @@
->  
->  			interrupt-controller;
->  			#interrupt-cells = <2>;
-> +
-> +			/* Defines pin muxing groups according to
-> +			 * BCM2835-ARM-Peripherals.pdf page 102.
-> +			 *
-> +			 * While each pin can have its mux selected
-> +			 * for various functions individually, some
-> +			 * groups only make sense to switch to a
-> +			 * particular function together.
-> +			 */
-> +			dpi_gpio4: dpi_gpio4 {
-> +				brcm,pins = <0 1 2 3 4 5 6 7 8 9 10 11
-> +					     12 13 14 15 16 17 18 19
-> +					     20 21 22 23 24 25 26 27>;
-> +				brcm,function = <BCM2835_FSEL_ALT2>;
-> +			};
-
-s/dpi_gpio4/dpi_gpio0
-
-> +			emmc_gpio22: emmc_gpio22 {
-> +				brcm,pins = <22 23 24 25 26 27>;
-> +				brcm,function = <BCM2835_FSEL_ALT3>;
-> +			};
-> +			emmc_gpio34: emmc_gpio34 {
-> +				brcm,pins = <34 35 36 37 38 39>;
-> +				brcm,function = <BCM2835_FSEL_ALT3>;
-> +				brcm,pull = <BCM2835_PUD_OFF
-> +					     BCM2835_PUD_UP
-> +					     BCM2835_PUD_UP
-> +					     BCM2835_PUD_UP
-> +					     BCM2835_PUD_UP
-> +					     BCM2835_PUD_UP>;
-> +			};
-> +			emmc_gpio48: emmc_gpio48 {
-> +				brcm,pins = <48 49 50 51 52 53>;
-> +				brcm,function = <BCM2835_FSEL_ALT3>;
-> +			};
-
-Sorry, i didn't notice this before. The naming of these groups suggest 3 muxes
-for the same eMMC interface. I thought there is a eMMC interface and a SD host
-interface with different DMA channels.
-
-> +
-> ...
-> +
-> +			sdhost_gpio48: sdhost_gpio48 {
-> +				brcm,pins = <48 49 50 51 52 53>;
-> +				brcm,function = <BCM2835_FSEL_ALT0>;
-> +			};
-
-I think this incorrect. There is no function ALT0 for these pins, only ALT3.
-
-Regards
-Stefan
+-dl
