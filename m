@@ -1,124 +1,308 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 12 Sep 2016 11:49:57 -0700
-Subject: [PATCH v2 00/17] Make rpmsg a framework
-In-Reply-To: <bc618ac9-13c8-e9bf-c7e9-fe5b7309a585@codeaurora.org>
-References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
- <20160912165233.GB21885@linaro.org> <20160912180015.GH405@tuxbot>
- <bc618ac9-13c8-e9bf-c7e9-fe5b7309a585@codeaurora.org>
-Message-ID: <20160912184957.GI405@tuxbot>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 12 Sep 2016 20:52:44 +0200
+Subject: [PATCH] Revert "Input: bma150 - extend chip detection for bma180"
+In-Reply-To: <4809E76B-7BFE-4D95-8631-079262E958E2@goldelico.com>
+References: <20160911164321.23122-1-hdegoede@redhat.com>
+ <2C735D34-7559-4A62-A635-A5719C356D94@goldelico.com>
+ <a156f29f-43db-6811-7f7e-ac2c7682d766@redhat.com>
+ <4809E76B-7BFE-4D95-8631-079262E958E2@goldelico.com>
+Message-ID: <c3312699-4821-7311-0540-3c02c806dde7@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 12 Sep 11:13 PDT 2016, Jeffrey Hugo wrote:
+HI,
 
-> On 9/12/2016 12:00 PM, Bjorn Andersson wrote:
-> >On Mon 12 Sep 09:52 PDT 2016, Lina Iyer wrote:
-> >
-> >>Hi Bjorn,
-> >>
-> >>On Thu, Sep 01 2016 at 16:28 -0600, Bjorn Andersson wrote:
-> >>>This series splits the virtio rpmsg bus driver into a rpmsg bus and a virtio
-> >>>backend/wireformat.
-> >>>
-> >>>
-> >>>As we discussed the Qualcomm SMD implementation a couple of years back people
-> >>>suggested that I should make it "a rpmsg thingie". With the introduction of the
-> >>>Qualcomm 8996 platform, we must support a variant of the communication
-> >>>mechanism that share many of the characteristics of SMD, but are different
-> >>>enough that it can't be done in a single implementation. As such there is
-> >>>enough benefit to do the necessary work and being able to make SMD a "rpmsg
-> >>>thingie".
-> >>>
-> >>>On-top of this series I have patches to switch the current smd clients over to
-> >>>rpmsg (and by that drop the existing SMD implementation).
-> >>>
-> >>>All this allows me to implement the new backend and reuse all existing SMD
-> >>>drivers with the new mechanism.
-> >>>
-> >>
-> >>RPM Communication has to supported even when IRQs are disabled. The most
-> >>important use of this communication is to set the wake up time for the
-> >>CPU subsystem when all the CPUs are powered off.
-> >
-> >Can you point me to the downstream code where this is implemented so I
-> >can have a look? Do you expect to get the response on that request?
-> 
-> Have a look at -
-> smd_mask_receive_interrupt()
-> smd_is_pkt_avail()
-> 
+On 12-09-16 19:20, H. Nikolaus Schaller wrote:
+> Hi,
+>
+>> Am 12.09.2016 um 16:44 schrieb Hans de Goede <hdegoede@redhat.com>:
+>>
+>> Hi,
+>>
+>> On 12-09-16 16:31, H. Nikolaus Schaller wrote:
+>>> Hi,
+>>>
+>>>> Am 11.09.2016 um 18:43 schrieb Hans de Goede <hdegoede@redhat.com>:
+>>>>
+>>>> This reverts commit ef3714fdbc8d ("Input: bma150 - extend chip
+>>>> detection for bma180").
+>>>>
+>>>> The bma180 is not compatible with the bma150 at all, it has 14 bits
+>>>> resolution instead of 10, and it has quite different control registers.
+>>>>
+>>>> Treating the bma180 as a bma150 wrt its data registers will just result
+>>>> in throwing away the lowest 4 bits, which is not too bad. But the ctrl
+>>>> registers are a different story.
+>>>>
+>>>> It may be that things happen to just work (I don't have a bma180 to
+>>>> test with) but that certainly does not make this right.
+>>>
+>>> Yes, looks as if your observation is right. Thanks for pointing this out!
+>>>
+>>> This did need me some research to find an answer...
+>>>
+>>> If I remember correctly, the original patch was based on a recommendation
+>>> from someone I don't remember, who said that the chips are the same in a
+>>> different package. So we added the chip_id and it worked immediately as
+>>> expected. It looks as if we did not check the data sheets. So we did not
+>>> question this recommendation.
+>>>
+>>>>
+>>>> Removing the bma180 id also removes overlap wrt the ids in the iio
+>>>> bma180 driver which does treat the bma180 properly.
+>>>
+>>> Nack.
+>>>
+>>> The problem we get is that an iio driver is not an input driver and can't
+>>> easily replace it.
+>>
+>> Actually almost all accelerometer drivers in the Linux kernel are
+>> iio drivers,
+>
+> Yes, that is a good move indeed to make them more general.
+>
+>> the bma150 driver is the odd duck out,
+>
+> Indeed it seems to be in /misc for some reason.
+>
+>> that is why
+>> we've iio-sensor-proxy for apps which want the accelerometer
+>> to behave as an input device:
+>>
+>> https://github.com/hadess/iio-sensor-proxy
+>
+> Does this provide an input device /dev/input/event?
+> From a first look it seems to provide a D-Bus abstraction which is
+> not the same as an /dev/input/event.
 
-In msm-3.18 these still seems to only come from either
-msm_rpm_enter_sleep() and the rpm-clock driver, related to flushing
-cached sleep state requests.
+It also provides a /dev/input/event node through uinput:
 
-> Every request to the RPM generates a response.  The Linux RPM driver may
-> decide to let the response sit in the fifo, or it may need to read and
-> process it.
-> 
-
-Right, I presume we save some time by not waiting for these responses as
-we want to reach sleep as soon as possible. The answer I got last time
-this was discussed was that it was an optimization, not a functional
-requirement.
-
-
-I'm not at all against having the rpm driver cache the state
-information and the smd driver process read/writes from the rpm driver
-in IRQ context. I do however not know how to trigger the flush in a sane
-way.
-
-> >
-> >>In addition to that,
-> >>"sleep" votes that are sent by the application processor subsystem to
-> >>allow system to go into deep sleep modes can only be triggered when the
-> >>CPU PM domains are power collapsed, drivers do not have a knowledge of
-> >>when that happens.
-> >
-> >Do you mean the actual sleep votes can only be with the CPU PM domains
-> >collapsed?
-> >
-> >It's been a while since I dug through that code, but there was several
-> >cases where sleep votes would be sent out during normal execution as
-> >well, and then there's the optimization of flushing out all cached sleep
-> >votes when we're on the way down.
-> >
-> >>This has to be done by a platform code that registers
-> >>for CPU PM domain power_off/on callbacks.
-> >>
-> >
-> >Ok, sounds like we have a legit use case for improving this.
-> >
-> >>Using rpmsg may be nice for RPM SMD communication, but mutexes need to
-> >>go away for this driver to be any useful than bare bones active mode
-> >>resource requests for QCOM SoCs. By not doing that now, we lock
-> >>ourselves out of using this SMD driver in the near future when CPU PM
-> >>domains are available in the kernel with an ability to do system low
-> >>power modes.
-> >>
-> >
-> >The last time I looked at this there where no cases when it was
-> >_required_ to support transmitting requests to the rpm from IRQ context.
-> 
-> I no longer work on SMD, but when I did this was in fact a strict
-> requirement.
-
-When I dissected all the users of the API I came to the conclusion that
-this requirement (on the SMD driver) came from above mentioned
-optimization.
-
-> If I recall correctly, there was a parameter in the RPM driver
-> for the transmit function that indicated if the request was being made in
-> atomic context or not, which would change the behavior of how the transmit
-> was handled.
-> 
-
-You're correct, the question is still which of these code paths are
-actually needed and to motivate the endless maintenance of the extra
-code.
+https://github.com/hadess/iio-sensor-proxy/blob/master/src/fake-input-accelerometer.c
 
 
-Nice to see you on the mailing list again Jeff.
+> What about latency?
+> A kernel driver can react on a sensor interrupt, queue results
+> and sleep.
+>
+> Isn't a user-space process more resource hungry than a kernel thread?
+>
+>>
+>>> An input driver can be used for gesture applications (e.g. detecting
+>>> the device has been turned upside down) and can report X/Y/Z coordinates
+>>> to e.g. X11 for games similar to a mouse or joystick (which the iio driver
+>>> doesn't).
+>>
+>> See above.
+>>
+>>> So it should remain configurable which of both driver options is loaded,
+>>> to match user space API needs.
+>>>
+>>> BTW: id overlap is only a problem if both drivers are configured in parallel.
+>>
+>> Right, so it is "only" a problem to any generic distro which tries to
+>> support both bma150 and bma250 accelerometers, as both the input
+>> bma150 as well as the iio bma250 driver claim to be bma180 compatible.
+>
+> Well, it is only a problem if such a generic distro is really run on a device
+> which has a bma180 defined in DT. There do not seem to exist many of these.
+
+True, still the bma180 compatible is simply just wrong here, and as such
+it really should be removed (it really should never have been added).
+
+>>> Next, I have tried to find out which devices really use the bma150 and bma180.
+>>>
+>>> It appears that no in-tree device uses the bma150 while the GTA04 uses
+>>> the bma180 (in DT), but not in any defconfig (the GTA04 specific config
+>>> is not upstreamable since omap2plus_defconfig exists).
+>>>
+>>> In user-space the GTA04 requires and actively uses this input driver for Replicant.
+>>>
+>>> So I would conclude that this revert does not improve/fix any device using a
+>>> bma150 (if it exists at all), but breaks an existing device.
+>>>
+>>> What options do we have?
+>>>
+>>> a) add proper register number constants and choose conditionally (where they differ)
+>>> b) drop bma150 support completely and change registers for bma180
+>>> c) clone the bma150 input driver into an bma180 input driver and fix registers
+>>> d) extend the bma180 iio driver to optionally provide an input device
+>>> e) write a generic input/iio-accel wrapper (which should work with any iio accelerometer)
+>>>
+>>> I would favour approach e)
+>>
+>> Good, because that solution already exists :) See:
+>> https://github.com/hadess/iio-sensor-proxy
+>
+> No, it is yet another option. I would formulate it as:
+>
+> f) break user-space compatibility for existing systems and write / require
+>    a user-space workaround.
+>
+> This is something which is the least favorite in my view.
+
+I'm pretty sure that no-one, really no-one wants to do
+evdev emulation for iio devices in the kernel; and there
+is nothing wrong with doing it in userspace.
+
+> Since we have no control over the user space people have installed and IMHO
+> a kernel shouldn't break APIs too often or only for really good reasons
+> (e.g. completely new functions).
+>
+> And we have no means to force user-space developers to integrate such daemons :(
+>
+> So we break a device by upgrading to 4.9-kernel but can't give a solution.
+
+The only user of this seems to be the gta04, and I believe gta04 users
+will not just jump to 4.9 without getting that through some sort
+of central distribution point which can make sure userland gets
+fixed first.
+
+>>> but it has an issue I have no solution for:
+>>>
+>>> 	how to define in DT (or CONFIG?) which iio accelerometer(s) should
+>>> 	be wrapped and presented as input device(s).
+>>
+>> I believe currently iio-sensor-proxy simply wraps all accelerometers
+>> it can find, which seems the right thing to do. Usually we're running
+>> a generic desktop-ish OS / distro which wants these devices
+>> to be available as input devices;
+>> for special cases like actual
+>> robots and stuff running Linux, iio-sensor-proxy can simply be
+>> disabled; or not installed at all.
+>
+> Well, the GTA04 we talk about falls into a third category: a mobile device.
+>
+> Which is not running a desktop-ish OS / distro. It is running Replicant,
+
+For replicant there is:
+
+https://github.com/01org/android-iio-sensors-hal
+
+> QtMoko, SHR, FSO or other user spaces which partially rely on /dev/input/event
+> without starting a daemon.
+
+So either these have a gta04 specific version, which can then
+be fixed in parallel with the kernel, like one would do
+with normal distros in a case like this. Or these are generic
+in which case having them work with iio accelerometers is
+a good thing in general, and they may even already work.
+
+> At least in current releases and we have little
+> influence to have them use a new daemon.
+>
+> So I would strongly prefer if we can solve this in the kernel and keep the
+> user-space API for the bma180 input driver stable.
+>
+>>
+>> So all in all I believe that this is a solved problem, since
+>> solution e. from above is already implemented.
+>
+> Well it is also solved if we do not revert the patch at all, because it
+> works in practice (even if not exactly correct) and is compatible to
+> existing user-space.
+>
+> In summary I don't like option f) because it creates more problems than
+> it solves.
+>
+> If e) is ruled out, IMHO the second best option seems to be d) to add a
+> CONFIG_BMA180_INPUT_DEVICE and make it present some additional /dev/input/event
+> in parallel to the iio interface.
+
+Ugh, no we don't need more hacks here. I would greatly prefer to
+just keep the "bma180" is in the bma150 input driver over adding
+evdev event generation to iio drivers (either at the driver level
+or the core).
+
+I think that the best solution might be to do do something like this
+in drivers/input/misc/bma150.c
+
+static const struct i2c_device_id bma150_id[] = {
+         { "bma150", 0 },
+#ifndef CONFIG_BMA180 /* Avoid conflict with iio bma180 driver */
+         { "bma180", 0 },
+#endif
+         { "smb380", 0 },
+         { "bma023", 0 },
+         { }
+};
+
+Then people relying on this can keep using it, and iio user
+do not have to worry about it.
 
 Regards,
-Bjorn
+
+Hans
+
+
+
+> I already have a similar approach in my to-be-upstreamed queue for the tsc2007
+> touch screen driver to provide additional iio channels for raw values, chip
+> temperature and the auxiliary general purpose ADC (which is used as ambient
+> light sensor in the GTA04).
+>
+> So let's develop some patch for drivers/iio/accel/bma180.c before we revert
+> this bma150 patch and have nothing.
+>
+> BR,
+> Nikolaus Schaller
+>
+>>
+>> Regards,
+>>
+>> Hans
+>>
+>>
+>>
+>>>
+>>> Well, it could be as simple as defining a virtual "input-iio-accel" wrapper
+>>> driver with no real hardware behind and provide a reference to the iio DT node.
+>>> But I think such virtual devices are against DT style.
+>>>
+>>> So I don't know how to implement it in an acceptable way.
+>>>
+>>> Ideas?
+>>>
+>>> BR and thanks,
+>>> Nikolaus Schaller
+>>>
+>>>>
+>>>> Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>> drivers/input/misc/bma150.c | 4 +---
+>>>> 1 file changed, 1 insertion(+), 3 deletions(-)
+>>>>
+>>>> diff --git a/drivers/input/misc/bma150.c b/drivers/input/misc/bma150.c
+>>>> index b0d4453..cae4832 100644
+>>>> --- a/drivers/input/misc/bma150.c
+>>>> +++ b/drivers/input/misc/bma150.c
+>>>> @@ -70,7 +70,6 @@
+>>>> #define BMA150_CFG_5_REG	0x11
+>>>>
+>>>> #define BMA150_CHIP_ID		2
+>>>> -#define BMA180_CHIP_ID		3
+>>>> #define BMA150_CHIP_ID_REG	BMA150_DATA_0_REG
+>>>>
+>>>> #define BMA150_ACC_X_LSB_REG	BMA150_DATA_2_REG
+>>>> @@ -539,7 +538,7 @@ static int bma150_probe(struct i2c_client *client,
+>>>> 	}
+>>>>
+>>>> 	chip_id = i2c_smbus_read_byte_data(client, BMA150_CHIP_ID_REG);
+>>>> -	if (chip_id != BMA150_CHIP_ID && chip_id != BMA180_CHIP_ID) {
+>>>> +	if (chip_id != BMA150_CHIP_ID) {
+>>>> 		dev_err(&client->dev, "BMA150 chip id error: %d\n", chip_id);
+>>>> 		return -EINVAL;
+>>>> 	}
+>>>> @@ -643,7 +642,6 @@ static UNIVERSAL_DEV_PM_OPS(bma150_pm, bma150_suspend, bma150_resume, NULL);
+>>>>
+>>>> static const struct i2c_device_id bma150_id[] = {
+>>>> 	{ "bma150", 0 },
+>>>> -	{ "bma180", 0 },
+>>>> 	{ "smb380", 0 },
+>>>> 	{ "bma023", 0 },
+>>>> 	{ }
+>>>> --
+>>>> 2.9.3
+>>>>
+>>>
+>
