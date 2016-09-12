@@ -1,118 +1,79 @@
-From: kramasub@codeaurora.org (Karthikeyan Ramasubramanian)
-Date: Mon, 12 Sep 2016 15:36:25 -0600
-Subject: [PATCH v2 00/17] Make rpmsg a framework
-In-Reply-To: <20160912195854.GJ405@tuxbot>
-References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
- <20160912165233.GB21885@linaro.org> <20160912180015.GH405@tuxbot>
- <bc618ac9-13c8-e9bf-c7e9-fe5b7309a585@codeaurora.org>
- <20160912184957.GI405@tuxbot>
- <7682a26a-310b-b283-dfe8-56d114f92dcb@codeaurora.org>
- <20160912195854.GJ405@tuxbot>
-Message-ID: <57D71FD9.9070007@codeaurora.org>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 12 Sep 2016 23:43:55 +0200
+Subject: [PATCH 2/3] ARM64: dts: amlogic: Add basic support for Amlogic
+ S905X
+In-Reply-To: <7ha8fcq26c.fsf@baylibre.com>
+References: <20160903082227.30559-1-narmstrong@baylibre.com>
+ <20160903082227.30559-3-narmstrong@baylibre.com>
+ <7e27e8c0-bb18-40d8-10d6-3928e66815c7@suse.de>
+ <CAOQ7t2bWLq2XP2rKx3msf=1tUfXkQuBWagun46TaKk73qXr=FQ@mail.gmail.com>
+ <7ha8fcq26c.fsf@baylibre.com>
+Message-ID: <28d9160a-ce40-cbbb-b4e9-3ec34be52368@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/12/2016 1:58 PM, Bjorn Andersson wrote:
-> On Mon 12 Sep 12:21 PDT 2016, Jeffrey Hugo wrote:
->
->> On 9/12/2016 12:49 PM, Bjorn Andersson wrote:
->>> On Mon 12 Sep 11:13 PDT 2016, Jeffrey Hugo wrote:
+Am 12.09.2016 um 22:43 schrieb Kevin Hilman:
+> Carlo Caione <carlo@caione.org> writes:
+>> On Mon, Sep 12, 2016 at 6:28 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>
+>>>> +Boards with the Amlogic Meson GXL SoC shall have the following properties:
+>>>> +  Required root node property:
+>>>> +    compatible: "amlogic,meson-gxl-s905x", "amlogic,meson-gxl";
 >>>
->>>> On 9/12/2016 12:00 PM, Bjorn Andersson wrote:
-> [..]
->>>>> Can you point me to the downstream code where this is implemented so I
->>>>> can have a look? Do you expect to get the response on that request?
->>>>
->>>> Have a look at -
->>>> smd_mask_receive_interrupt()
->>>> smd_is_pkt_avail()
->>>>
->>>
->>> In msm-3.18 these still seems to only come from either
->>> msm_rpm_enter_sleep() and the rpm-clock driver, related to flushing
->>> cached sleep state requests.
->>>
->>>> Every request to the RPM generates a response.  The Linux RPM driver may
->>>> decide to let the response sit in the fifo, or it may need to read and
->>>> process it.
->>>>
->>>
->>> Right, I presume we save some time by not waiting for these responses as
->>> we want to reach sleep as soon as possible. The answer I got last time
->>> this was discussed was that it was an optimization, not a functional
->>> requirement.
+>>> Can we please use "amlogic,s905x", "amlogic,meson-gxl"? No need to
+>>> complicate the name. Also affects .dtsi and .dts below.
 >>
->> Two optimizations in play here.
->>
->> First, disabling interrupts prevents an immediate wakeup.  When the system
->> is entering sleep, IRQs are disabled.  The sleep request to RPM will trigger
->> a response, and the IRQ for that response will be queued. Once the sleep
->> processing is done, IRQs get enabled, so the pending IRQ from RPM will cause
->> an immediate wakeup.  The system will process the wakeup, and then go back
->> to sleep (sans request because nothing has changed).  This down-up-down
->> processing burns a lot of power.
->>
->
-> But which "sleep request" is this? The only one I can find is the
-> flushing of sleep state values from the rpm resource tables.
->
->> Second is not waiting for the response.  Linux doesn't really do anything
->> with the sleep request response, so we can enter sleep faster by not waiting
->> for the response and processing (discarding) it when the system wakes up as
->> scheduled.
->
-> Right, as long as the RPM code doesn't consider it a timeout don't have
-> a problem if those ack's are handled after the resume.
->
->> However, Linux needs to ensure there is enough fifo space to
->> hold that response while asleep, otherwise the RPM will panic and crash the
->> system.  Therefore, if there are a number of outstanding requests that would
->> fill the fifo, then the RPM driver on Linux needs to spin and drain requests
->> from the fifo until a minimum free space buffer to hold additional expected
->> pending responses is established.  This has to occur with IRQs disabled.
->>
->
-> Right. Which means that the RPM driver needs to know how large the rx
-> fifo is, what overhead the underlaying transport mechanism has and then
-> calculate how many responses it should leave room for.
->
-> [..]
->>>> If I recall correctly, there was a parameter in the RPM driver
->>>> for the transmit function that indicated if the request was being made in
->>>> atomic context or not, which would change the behavior of how the transmit
->>>> was handled.
->>>>
->>>
->>> You're correct, the question is still which of these code paths are
->>> actually needed and to motivate the endless maintenance of the extra
->>> code.
->>
->> If we are just talking about transmitting in atomic context (not necessarily
->> related to sleep), if I recall correctly, some bus requests are sent to RPM
->> in atomic context, some APR requests to the Audio DSP are done in atomic
->> context, and I think IPC Router uses atomic context in some cases.  As a
->> generic framework that should support usecases to all processors/subsystems,
->> I don't think transmitting in atomic context is a special case for
->> RPM/sleep.
->>
->
-> I have not looked through all of APR yet and don't know where msm_bus is
-> heading, but for IPC-router your correct that the downstream driver does
-> indeed require this; but that's a side effect of the downstream
-> ipcrouter implementation, not the problem itself.
->
-APR does send messages in atomic context in addition to the RPM Driver, 
-but IPC Router does not to the extent of my knowledge.
-> Regards,
-> Bjorn
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+>> gxl != s905x.
+
+Huh? You're seemingly completely missing my point...
+
+But you are right that _Neil's_ heading needs to be fixed, too:
+Clearly not all GXL SoCs need to have an S905X compatible string!
+So it should be "Boards with the Amlogic S905X SoC shall ..." or so.
+
+>> AFAWK to the GXL family belong several different SoCs, like S905X,
+>> S905D, etc... (see patch 3/3)
+
+Thanks, I already know that, that's why you have two compatible strings
+instead of just one like for GXBB. We can certainly prepend one for
+symmetry there, too, if it makes you happier.
+
+>> This is why we use meson-gxl-s905x, meson-gxl-s905d, etc...
+> 
+> Correct.
+> 
+>> We could s/meson-gxl-s905x/meson-s905x/ and
+>> s/meson-gxl-s905d/meson-s905d/ but I honestly prefer this way because
+>> we can clearly see which family the SoC belongs to (the Amlogic naming
+>> convention is already messy enough).
+>> I mean, yes it's longer, but it's for the sake of documentation IMO.
+> 
+> +1
+
+I still don't follow that conclusion. The board is called "amlogic,p231"
+because P231 is a unique identifier within the Amlogic namespace, so why
+not call the SoC "amlogic,s905x" for the same reason? The documentation
+is already there in having both "amlogic,s905x" _and_
+"amlogic,meson-gxl" - please re-read my post. There is no S905X in GXL
+family and another S905X in some other Amlogic SoC family, so it's
+unique and there is no reason to encode any hierarchies into its name
+other than vendor,name.
+
+I'm not arguing over the file name, where it perfectly makes sense to
+have a meson-gxl- prefix (already discussed), just about the compatible
+string where we don't have "amlogic,meson-gxl-s905x-p231" either because
+it is completely unnecessary and does _not_ add any value.
+
+Not that we're checking this string anywhere anyway... If you want to
+check for the GXL family you have to use "amlogic,meson-gxl"; if you
+want to check for the specific SoC you use "amlogic,s905x". Simple. We
+never match partial strings, so there is no sense in a hardcoded prefix
+that is duplicating information already available.
 
 Regards,
-Karthik.
+Andreas
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-  hosted by The Linux Foundation
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
