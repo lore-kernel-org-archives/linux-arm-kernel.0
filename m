@@ -1,101 +1,50 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 12 Sep 2016 12:01:10 +0100
-Subject: [PATCH V2 06/10] PM / Domains: Verify the PM domain is present when
- adding a provider
+Date: Mon, 12 Sep 2016 12:01:07 +0100
+Subject: [PATCH V2 03/10] staging: board: Remove calls to
+ of_genpd_get_from_provider()
 In-Reply-To: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
 References: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1473678074-15126-7-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1473678074-15126-4-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a PM domain provider is added, there is currently no way to tell if
-any PM domains associated with the provider are present. Naturally, the
-PM domain provider should not be registered if the PM domains have not
-been added. Nonetheless, verify that the PM domain(s) associated with a
-provider are present when registering the PM domain provider.
-
-This change adds a dependency on the function pm_genpd_present() when
-CONFIG_PM_GENERIC_DOMAINS_OF is enabled and so ensure this function is
-available when CONFIG_PM_GENERIC_DOMAINS_OF selected.
+Update the staging/board PM domain code to use the
+of_genpd_add_subdomain() and remove any calls to
+of_genpd_get_from_provider().
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/domain.c | 41 ++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 38 insertions(+), 3 deletions(-)
+ drivers/staging/board/board.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index c93aa3a64839..fc9f11c26eec 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -586,7 +586,7 @@ static int __init genpd_poweroff_unused(void)
- }
- late_initcall(genpd_poweroff_unused);
- 
--#ifdef CONFIG_PM_SLEEP
-+#if defined(CONFIG_PM_SLEEP) || defined(CONFIG_PM_GENERIC_DOMAINS_OF)
- 
- /**
-  * pm_genpd_present - Check if the given PM domain has been initialized.
-@@ -606,6 +606,10 @@ static bool pm_genpd_present(const struct generic_pm_domain *genpd)
- 	return false;
- }
- 
-+#endif
-+
-+#ifdef CONFIG_PM_SLEEP
-+
- static bool genpd_dev_active_wakeup(struct generic_pm_domain *genpd,
- 				    struct device *dev)
+diff --git a/drivers/staging/board/board.c b/drivers/staging/board/board.c
+index 45807d8287d1..86dc41101610 100644
+--- a/drivers/staging/board/board.c
++++ b/drivers/staging/board/board.c
+@@ -140,7 +140,6 @@ static int board_staging_add_dev_domain(struct platform_device *pdev,
+ 					const char *domain)
  {
-@@ -1453,7 +1457,19 @@ static int genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
- int of_genpd_add_provider_simple(struct device_node *np,
- 				 struct generic_pm_domain *genpd)
- {
--	return genpd_add_provider(np, genpd_xlate_simple, genpd);
-+	int ret = -EINVAL;
-+
-+	if (!np || !genpd)
-+		return -EINVAL;
-+
-+	mutex_lock(&gpd_list_lock);
-+
-+	if (pm_genpd_present(genpd))
-+		ret = genpd_add_provider(np, genpd_xlate_simple, genpd);
-+
-+	mutex_unlock(&gpd_list_lock);
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple);
+ 	struct of_phandle_args pd_args;
+-	struct generic_pm_domain *pd;
+ 	struct device_node *np;
  
-@@ -1465,7 +1481,26 @@ EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple);
- int of_genpd_add_provider_onecell(struct device_node *np,
- 				  struct genpd_onecell_data *data)
- {
--	return genpd_add_provider(np, genpd_xlate_onecell, data);
-+	unsigned int i;
-+	int ret;
-+
-+	if (!np || !data)
-+		return -EINVAL;
-+
-+	mutex_lock(&gpd_list_lock);
-+
-+	for (i = 0; i < data->num_domains; i++) {
-+		if (!pm_genpd_present(data->domains[i])) {
-+			mutex_unlock(&gpd_list_lock);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	ret = genpd_add_provider(np, genpd_xlate_onecell, data);
-+
-+	mutex_unlock(&gpd_list_lock);
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(of_genpd_add_provider_onecell);
+ 	np = of_find_node_by_path(domain);
+@@ -151,14 +150,8 @@ static int board_staging_add_dev_domain(struct platform_device *pdev,
  
+ 	pd_args.np = np;
+ 	pd_args.args_count = 0;
+-	pd = of_genpd_get_from_provider(&pd_args);
+-	if (IS_ERR(pd)) {
+-		pr_err("Cannot find genpd %s (%ld)\n", domain, PTR_ERR(pd));
+-		return PTR_ERR(pd);
+-	}
+-	pr_debug("Found genpd %s for device %s\n", pd->name, pdev->name);
+ 
+-	return pm_genpd_add_device(pd, &pdev->dev);
++	return of_genpd_add_device(&pd_args, &pdev->dev);
+ }
+ #else
+ static inline int board_staging_add_dev_domain(struct platform_device *pdev,
 -- 
 2.1.4
