@@ -1,40 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Sep 2016 14:22:46 +0200
-Subject: [PATCH 1/2] pinctrl: meson-gxbb: add the pins for the
- SDIO/sd_emmc_a controller
-In-Reply-To: <CAFBinCDm5quZyyC2t_1SQqT+p=eJQ0H_LoNZM6wfUZugvCi_7g@mail.gmail.com>
-References: <20160828164725.19429-1-martin.blumenstingl@googlemail.com>
- <20160828164725.19429-2-martin.blumenstingl@googlemail.com>
- <CACRpkdbPVeUA+BSPgQ1XmFJw_J6-V_2BM9h3kO2yq-vUfySsGQ@mail.gmail.com>
- <CAFBinCDm5quZyyC2t_1SQqT+p=eJQ0H_LoNZM6wfUZugvCi_7g@mail.gmail.com>
-Message-ID: <CACRpkdbEMCz4SJAKrb2G44_2=jjS+1KamALgjaS41wGGHobM=w@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 12 Sep 2016 08:24:31 -0400
+Subject: [PATCH v2 4/4] ARM: dts: imx28: Fix build warnings with W=1
+In-Reply-To: <20160912120908.GA7273@tiger>
+References: <1473103670-15922-1-git-send-email-festevam@gmail.com>
+ <1473103670-15922-4-git-send-email-festevam@gmail.com>
+ <20160908140338.GD16911@tiger>
+ <20160909091441.01b152ca@ipc1.ka-ro> <20160912120908.GA7273@tiger>
+Message-ID: <CABxcv=koZTjDuAoHBDw-y9ErGs6EyKNWc2iVRqiW3R0eUscvPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2016 at 8:55 PM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-> On Wed, Sep 7, 2016 at 4:24 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Sun, Aug 28, 2016 at 6:47 PM, Martin Blumenstingl
->> <martin.blumenstingl@googlemail.com> wrote:
+Hello Shawn,
+
+On Mon, Sep 12, 2016 at 8:09 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Fri, Sep 09, 2016 at 09:14:41AM +0200, Lothar Wa?mann wrote:
+>> Hi,
 >>
->>> sd_emmc_a is used a controller for the SDIO modules. This adds the pin
->>> configuration for the SDIO controller.
->>>
->>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>
->> No reply from maintainers, but you obviously know what you're doing so
->> patch applied.
-> I forgot to reply to this one as well (sorry about that):
-> I received a NACK off-list for both patches because the SDIO IRQ pin is missing.
+>> On Thu, 8 Sep 2016 22:03:38 +0800 Shawn Guo wrote:
+>> > On Mon, Sep 05, 2016 at 04:27:50PM -0300, Fabio Estevam wrote:
+>> > > diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+>> > > index 0ebbc83..b4d4dbb 100644
+>> > > --- a/arch/arm/boot/dts/imx28-tx28.dts
+>> > > +++ b/arch/arm/boot/dts/imx28-tx28.dts
+>> > > @@ -35,7 +35,8 @@
+>> > >           usbotg = &usb0;
+>> > >   };
+>> > >
+>> > > - memory {
+>> > > + memory at 0 {
+>> > > +         device_type = "memory";
+>> > >           reg = <0 0>; /* will be filled in by U-Boot */
+>> >
+>> > I'm curious to know if the unit-address will be fixed up or not when
+>> > 'reg' property gets updated by U-Boot.
+>> >
+>> No. U-Boot does not change the unit name, when updating in the reg
+>> property. But that does not do any harm (for now), thus the change is
+>> OK.
 >
-> Nothing is broken with this patch applied, just one pin is missing.
-> Depending on how you'd like to proceed you can:
-> - either drop the patch from your tree and wait for v2
-> - leave it in your tree and I'll send a patch on top of this one to
-> add the missing pin
+> This is confusing when people is looking at nodes in /proc/device-tree.
+> Why cannot we give it a reasonable default configuration instead of
+> <0 0>?
+>
 
-The latter at this point. Patch the patch.
+Another option is to not have a memory node if the start address is
+not known at build time, since U-boot creates a memory node if is not
+found in the FDT.
 
-Thanks!
+> Shawn
+>
 
-Linus Walleij
+Best regards,
+Javier
