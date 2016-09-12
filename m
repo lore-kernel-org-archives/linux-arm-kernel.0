@@ -1,55 +1,138 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Mon, 12 Sep 2016 16:54:33 +0300
-Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
-In-Reply-To: <20160909091857.7a263220@ipc1.ka-ro>
-References: <20141009151605.GA8818@ulmo.nvidia.com>
- <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
- <6c896634c4d6446df0388da2c0228232@agner.ch>
- <20160909091857.7a263220@ipc1.ka-ro>
-Message-ID: <cf4c3f2b-c9f1-b7ff-c5b9-5cf622957296@mentor.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 12 Sep 2016 14:56:46 +0100
+Subject: [PATCH v5 2/3] mfd: add support for Allwinner SoCs ADC
+In-Reply-To: <5dec118f-45ae-4fb6-dd1e-2028947add53@free-electrons.com>
+References: <1473344917-1524-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1473344917-1524-3-git-send-email-quentin.schulz@free-electrons.com>
+ <20160912091829.GB1873@dell>
+ <93bd339b-85ab-d0fc-5e80-e2aca290c0d7@free-electrons.com>
+ <20160912095923.GD1873@dell>
+ <5dec118f-45ae-4fb6-dd1e-2028947add53@free-electrons.com>
+Message-ID: <20160912135646.GB9789@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+On Mon, 12 Sep 2016, Quentin Schulz wrote:
+> On 12/09/2016 11:59, Lee Jones wrote:
+> > On Mon, 12 Sep 2016, Quentin Schulz wrote:
+> > 
+> >> On 12/09/2016 11:18, Lee Jones wrote:
+> >>> On Thu, 08 Sep 2016, Quentin Schulz wrote:
+> >>>
+> >> [...]
+> > 
+> > [...]
+> > 
+> >>>> +++ b/drivers/mfd/sun4i-gpadc-mfd.c
+> > 
+> > [...]
+> > 
+> >>>> +static struct mfd_cell sun4i_gpadc_mfd_cells[] = {
+> >>>> +	{
+> >>>> +		.name	= "sun4i-a10-gpadc-iio",
+> >>>> +		.resources = adc_resources,
+> >>>> +		.num_resources = ARRAY_SIZE(adc_resources),
+> >>>> +	}, {
+> >>>> +		.name = "iio_hwmon",
+> >>>> +	}
+> >>>
+> >>> Single line please
+> >>>
+> >>> { .name = "iio_hwmon" }
+> >>>
+> >>
+> >> +	{
+> >> +		.name	= "sun4i-a10-gpadc-iio",
+> >> +		.resources = adc_resources,
+> >> +		.num_resources = ARRAY_SIZE(adc_resources),
+> >> +	}, { .name = "iio_hwmon" }
+> >>
+> >> or
+> >>
+> >> +	{
+> >> +		.name	= "sun4i-a10-gpadc-iio",
+> >> +		.resources = adc_resources,
+> >> +		.num_resources = ARRAY_SIZE(adc_resources),
+> >> +	},
+> >> +	{ .name = "iio_hwmon" }
+> >>
+> >> ?
+> > 
+> > The latter.
+> > 
+> > [...]
+> > 
+> >>>> +static const struct of_device_id sun4i_gpadc_mfd_of_match[] = {
+> >>>> +	{
+> >>>> +		.compatible = "allwinner,sun4i-a10-ts",
+> >>>> +		.data = &sun4i_gpadc_mfd_cells,
+> >>>> +	}, {
+> >>>> +		.compatible = "allwinner,sun5i-a13-ts",
+> >>>> +		.data = &sun5i_gpadc_mfd_cells,
+> >>>> +	}, {
+> >>>> +		.compatible = "allwinner,sun6i-a31-ts",
+> >>>> +		.data = &sun6i_gpadc_mfd_cells,
+> >>>> +	}, { /* sentinel */ }
+> >>>> +};
+> >>>
+> >>> Don't mix OF and MFD functionality.
+> >>>
+> >>> Why don't you create a node for "iio_hwmon" and have
+> >>> platform_of_populate() do your bidding?
+> >>>
+> >>
+> >> We are using a stable binding which we cannot modify. This means, the DT
+> >> in its current state can only be modified to add features, which is not
+> >> the case of this driver (it is a rewriting of an existing driver which
+> >> uses the rtp node).
+> > 
+> > Then use .data = <defined model ID> and set up a switch() in .probe().
+> > 
+> >>>> +static int sun4i_gpadc_mfd_probe(struct platform_device *pdev)
+> >>>
+> >>> Remove all mention of "mfd" from this file.
+> >>>
+> >>> (Accept the calls to the MFD API of course).
+> >>>
+> >> [...]
+> >>>> +
+> >>>> +MODULE_DEVICE_TABLE(of, sun4i_gpadc_mfd_of_match);
+> >>>
+> >>> Place this directly under the table.
+> >>>
+> >>>> +static struct platform_driver sun4i_gpadc_mfd_driver = {
+> >>>> +	.driver = {
+> >>>> +		.name = "sun4i-adc-mfd",
+> >>>> +		.of_match_table = of_match_ptr(sun4i_gpadc_mfd_of_match),
+> >>>> +	},
+> >>>> +	.probe = sun4i_gpadc_mfd_probe,
+> >>>
+> >>> No .remove?
+> >>>
+> >>
+> >> No, everything in probe is handled with devm functions.
+> > 
+> > Don't you need to undo the register write you did?
+> > 
+> 
+> The regmap_write I use is there to disable all interrupts on hardware
+> side before the irq_chip handles all interrupts by itself. The
+> interrupts are not used in the MFD driver.
+> 
+> Thus, I chose to disable the hardware interrupts in the remove function
+> of drivers using the interrupts (only the IIO yet but the touchscreen
+> driver later also which will be using a third interrupt). When the MFD
+> driver is removed, the MFD cells will all be removed, thus calling their
+> own remove functions, thus disabling hardware interrupts used in each
+> driver. So the hardware interrupts disabling would be called twice.
 
-On 09/09/2016 10:18 AM, Lothar Wa?mann wrote:
-> Hi,
->
-> On Thu, 08 Sep 2016 15:15:57 -0700 Stefan Agner wrote:
->> On 2014-10-10 07:22, Lothar Wa?mann wrote:
->>> This patch series adds support for polarity inversion to the pwm-imx
->>> driver. The patches have been tested on i.MX6, i.MX53 and with the
->>> ti-ehrpwm.c driver.
->>
->> Do you know what prevented this patchset from getting merged?
->>
-> No idea.
->
->> We are looking for Polarity support in PWM for too, this is especially
->> useful for backlight control.
->>
-> Actually the PWM driver may be the wrong place to achieve this. When
-> the backlight driver sets the brightness to 0 to switch the backlight
-> off, it will disable the PWM. This will make the PWM pin go LOW and
-> thus turn the backlight to full brightness rather than off (unless there
-> is an additional GPIO that controls a backlight enable pin on the LCD).
->
+This does send some little alarm bells ringing.  I'd normally expect
+the .remove function to undo everything you did in .probe.  So, if you
+are disabling the IRQs from within the leaf drivers, shouldn't you be
+initialising them in the leaf driver's respective .probes?
 
-I've just realized that I had submitted practically the same change
-(excluding iMX specifics) and about the same time in October 2014, but
-my v1 is one and a half hours later than yours preceding v6 :)
-
-Since I've subscribed to the linux-pwm right before sending my changes,
-I don't have your changes in my mailbox. Would you mind to review my
-v3 "pwm: support backward compatibility of DTB extending PWM args":
-
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303833.html
-
-then incorporate anything you find useful into your series and resend
-v7? Or just resend the rebased v6 if nothing is found attracting?
-
-In my turn I'll spend time to review the series and test it on iMX.
-
---
-With best wishes,
-Vladimir
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
