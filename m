@@ -1,28 +1,75 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 12 Sep 2016 11:38:21 +0200
-Subject: [GIT PULL 1/4] ARM: exynos: SoC/Mach for v4.9
-In-Reply-To: <20160908192434.GA609@sam-MacBookPro>
-References: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
- <1472548739-20050-5-git-send-email-k.kozlowski@samsung.com>
- <5635206.ooNAZCeQOe@wuerfel> <20160902163244.GB5534@kozik-lap>
- <08dfc5c7-e844-023c-b5a8-9996dfb403ff@samsung.com>
- <20160908192434.GA609@sam-MacBookPro>
- <CGME20160912093826eucas1p1ac2f1f08b49026f456b52f507d0de9f4@eucas1p1.samsung.com>
-Message-ID: <9c7bb7bd-d347-03af-93c7-93534f43932d@samsung.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 12 Sep 2016 10:39:58 +0100
+Subject: [PATCH v3 6/8] ARM: Change MPIDR_AFFINITY_LEVEL to ignore Aff3
+In-Reply-To: <57D2EA7F.9030705@arm.com>
+References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
+ <1473350810-10857-7-git-send-email-vladimir.murzin@arm.com>
+ <57D2EA7F.9030705@arm.com>
+Message-ID: <57D677EE.4080706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2016 09:24 PM, Sam Van Den Berge wrote:
-> Thanks for the suggestion and apologies for the late response. Last couple of 
-> days I've been figuring out what this would involve and I decided that I want
-> to give this a try. I found this patch series [1] that I'll use as an example.
-> If I understand it correctly, I'll need to create a dma_slave_map and
-> pass that via the platform data into the s3c24xx-dma driver. There I'll
-> need to fill in the filter_map of the dma slave device. Right?
+On 09/09/16 17:59, Marc Zyngier wrote:
+> On 08/09/16 17:06, Vladimir Murzin wrote:
+>> vgic-v3 driver queries CPU affinity level up to Aff3, which is valid
+>> for arm64.  However, for arm up to Aff2 levels are supported, so
+>> querying for third level ends with upper bits of MPIDR are treated as
+>> valid affinity level which is not true. Make sure we report zero for
+>> any affinity level above two.
+>>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>  arch/arm/include/asm/cputype.h |    3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+>> index 1ee94c7..f08fac4 100644
+>> --- a/arch/arm/include/asm/cputype.h
+>> +++ b/arch/arm/include/asm/cputype.h
+>> @@ -55,9 +55,10 @@
+>>  
+>>  #define MPIDR_LEVEL_BITS 8
+>>  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
+>> +#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
+>>  
+>>  #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
+>> -	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
+>> +	(((mpidr & MPIDR_HWID_BITMASK) >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK)
+>>  
+>>  #define ARM_CPU_IMP_ARM			0x41
+>>  #define ARM_CPU_IMP_INTEL		0x69
+>>
+> 
+> There is something I don't quite get. Is this patch really necessary?
+> Are there cases where we construct a MPIDR that can have Aff3 set on 32bit?
 
-Yes, AFAIU that's what needs to be done.  Subsequently, related DMA
-clients could be updated to not use dma_request_slave_channel_compat().
+I've just checked and it seems that I've been keeping the change for
+MPIDR_AFFINITY_LEVEL() since vgic-old era where it was used with
 
--- 
-Thanks,
-Sylwester
+static u32 compress_mpidr(unsigned long mpidr)
+{
+        u32 ret;
+
+        ret = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+        ret |= MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8;
+        ret |= MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16;
+        ret |= MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24;
+
+        return ret;
+}
+
+and now that code gone and nobody passes level 3 into this macro, so I
+can drop this change.
+
+However, I do need MPIDR_LEVEL_SHIFT() macro since it is used in vgic-v3.
+
+Should I leave patch as is or you have something in mind?
+
+Cheers
+Vladimir
+
+> 
+> Thanks,
+> 
+> 	M.
+> 
