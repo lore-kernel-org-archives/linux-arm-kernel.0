@@ -1,35 +1,44 @@
-From: m.niestroj@grinn-global.com (Marcin Niestroj)
-Date: Mon, 12 Sep 2016 10:34:58 +0200
-Subject: [PATCH 1/2] ARM: dts: imx6ul: Add DTS for liteSOM module
-In-Reply-To: <CAOMZO5AmXRs9eqzvOc8WOVc_xzZJFN8DOoOddw22WALqU66u6w@mail.gmail.com>
-References: <20160909103906.15209-1-m.niestroj@grinn-global.com>
- <CAOMZO5AmXRs9eqzvOc8WOVc_xzZJFN8DOoOddw22WALqU66u6w@mail.gmail.com>
-Message-ID: <de2e41be-ad69-ce4b-57fe-3215bc9811ad@grinn-global.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 12 Sep 2016 10:35:59 +0200
+Subject: [PATCH 5/8] clk: renesas: r8a7796: Add CMT clocks
+In-Reply-To: <1473421394-9745-6-git-send-email-bd-phuc@jinso.co.jp>
+References: <1473421394-9745-1-git-send-email-bd-phuc@jinso.co.jp>
+ <1473421394-9745-6-git-send-email-bd-phuc@jinso.co.jp>
+Message-ID: <CAMuHMdWLtcHHw+nmKKN3j4yqkncsh3YwDu-yGEwqg3Du4-kncg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.09.2016 19:44, Fabio Estevam wrote:
-> On Fri, Sep 9, 2016 at 7:39 AM, Marcin Niestroj
-> <m.niestroj@grinn-global.com> wrote:
+On Fri, Sep 9, 2016 at 1:43 PM,  <bd-phuc@jinso.co.jp> wrote:
+> From: Bui Duc Phuc <bd-phuc@jinso.co.jp>
 >
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6ul-litesom.dtsi
->> @@ -0,0 +1,52 @@
->> +/*
->> + * Copyright (C) 2016 Grinn
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
+> This patch adds CMT module clocks for r8a7796 SoC.
 >
-> Is it possible to use a dual GPLv2/X11 license?
+> Signed-off-by: Bui Duc Phuc <bd-phuc@jinso.co.jp>
 
-It is possible. But why should we do that?
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
->
-> Patches look good.
->
+(will queue in clk-renesas-for-v4.9)
 
--- 
-Marcin Niestroj
+> --- a/drivers/clk/renesas/r8a7796-cpg-mssr.c
+> +++ b/drivers/clk/renesas/r8a7796-cpg-mssr.c
+> @@ -97,6 +97,10 @@ static const struct cpg_core_clk r8a7796_core_clks[] __initconst = {
+>  };
+>
+>  static const struct mssr_mod_clk r8a7796_mod_clks[] __initconst = {
+> +       DEF_MOD("cmt3",                  300,   R8A7796_CLK_R),
+> +       DEF_MOD("cmt2",                  301,   R8A7796_CLK_R),
+> +       DEF_MOD("cmt1",                  302,   R8A7796_CLK_R),
+> +       DEF_MOD("cmt0",                  303,   R8A7796_CLK_R),
+
+BTW, I've dropped the spaces before the TABs (also in the r8a7795 patch).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
