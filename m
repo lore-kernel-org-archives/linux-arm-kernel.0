@@ -1,228 +1,114 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 12 Sep 2016 17:13:42 +0100
-Subject: [PATCH v7 04/22] iommu: Introduce iommu_fwspec
+Date: Mon, 12 Sep 2016 17:13:46 +0100
+Subject: [PATCH v7 08/22] iommu/arm-smmu: Support non-PCI devices with SMMUv3
 In-Reply-To: <cover.1473695704.git.robin.murphy@arm.com>
 References: <cover.1473695704.git.robin.murphy@arm.com>
-Message-ID: <742a71630de502ac5a7a8641c6ed368d8409324d.1473695704.git.robin.murphy@arm.com>
+Message-ID: <a35b94e1fd034ccfd146c819ae71734f3fe075a7.1473695704.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a common structure to hold the per-device firmware data that
-most IOMMU drivers need to keep track of. This enables us to configure
-much of that data from common firmware code, and consolidate a lot of
-the equivalent implementations, device look-up tables, etc. which are
-currently strewn across IOMMU drivers.
+With the device <-> stream ID relationship suitably abstracted and
+of_xlate() hooked up, the PCI dependency now looks, and is, entirely
+arbitrary. Any bus using the of_dma_configure() mechanism will work,
+so extend support to the platform and AMBA buses which do just that.
 
-This will also be enable us to address the outstanding "multiple IOMMUs
-on the platform bus" problem by tweaking IOMMU API calls to prefer
-dev->fwspec->ops before falling back to dev->bus->iommu_ops, and thus
-gracefully handle those troublesome systems which we currently cannot.
-
-As the first user, hook up the OF IOMMU configuration mechanism. The
-driver-defined nature of DT cells means that we still need the drivers
-to translate and add the IDs themselves, but future users such as the
-much less free-form ACPI IORT will be much simpler and self-contained.
-
-CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Suggested-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-
 ---
+ drivers/iommu/Kconfig       |  2 +-
+ drivers/iommu/arm-smmu-v3.c | 37 +++++++++++++++++++++++++++++++------
+ 2 files changed, 32 insertions(+), 7 deletions(-)
 
-- Drop the 'gradual introduction' fiddling and go straight to struct
-  device and common code, as it prevents all the silly build issues
-  and ultimately makes life simpler for everyone
----
- drivers/iommu/iommu.c    | 56 ++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/iommu/of_iommu.c |  8 +++++--
- include/linux/device.h   |  3 +++
- include/linux/iommu.h    | 38 ++++++++++++++++++++++++++++++++
- 4 files changed, 103 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index b06d93594436..816e320d3ad8 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -31,6 +31,7 @@
- #include <linux/err.h>
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index d432ca828472..8ee54d71c7eb 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -309,7 +309,7 @@ config ARM_SMMU
+ 
+ config ARM_SMMU_V3
+ 	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
+-	depends on ARM64 && PCI
++	depends on ARM64
+ 	select IOMMU_API
+ 	select IOMMU_IO_PGTABLE_LPAE
+ 	select GENERIC_MSI_IRQ_DOMAIN
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 15ba80db6465..52860bcf80f2 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -35,6 +35,8 @@
  #include <linux/pci.h>
- #include <linux/bitops.h>
-+#include <linux/property.h>
- #include <trace/events/iommu.h>
+ #include <linux/platform_device.h>
  
- static struct kset *iommu_group_kset;
-@@ -1613,3 +1614,58 @@ out:
++#include <linux/amba/bus.h>
++
+ #include "io-pgtable.h"
  
- 	return ret;
- }
-+
-+int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
-+		      const struct iommu_ops *ops)
-+{
-+	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-+
-+	if (fwspec)
-+		return ops == fwspec->ops ? 0 : -EINVAL;
-+
-+	fwspec = kzalloc(sizeof(*fwspec), GFP_KERNEL);
-+	if (!fwspec)
-+		return -ENOMEM;
-+
-+	of_node_get(to_of_node(iommu_fwnode));
-+	fwspec->iommu_fwnode = iommu_fwnode;
-+	fwspec->ops = ops;
-+	dev->iommu_fwspec = fwspec;
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(iommu_fwspec_init);
-+
-+void iommu_fwspec_free(struct device *dev)
-+{
-+	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-+
-+	if (fwspec) {
-+		fwnode_handle_put(fwspec->iommu_fwnode);
-+		kfree(fwspec);
-+		dev->iommu_fwspec = NULL;
-+	}
-+}
-+EXPORT_SYMBOL_GPL(iommu_fwspec_free);
-+
-+int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
-+{
-+	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-+	size_t size;
-+	int i;
-+
-+	if (!fwspec)
-+		return -EINVAL;
-+
-+	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + num_ids]);
-+	fwspec = krealloc(dev->iommu_fwspec, size, GFP_KERNEL);
-+	if (!fwspec)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < num_ids; i++)
-+		fwspec->ids[fwspec->num_ids + i] = ids[i];
-+
-+	fwspec->num_ids += num_ids;
-+	dev->iommu_fwspec = fwspec;
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(iommu_fwspec_add_ids);
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 19e1e8f2f871..5b82862f571f 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -167,7 +167,9 @@ static const struct iommu_ops
- 		return NULL;
- 
- 	ops = of_iommu_get_ops(iommu_spec.np);
--	if (!ops || !ops->of_xlate || ops->of_xlate(&pdev->dev, &iommu_spec))
-+	if (!ops || !ops->of_xlate ||
-+	    iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
-+	    ops->of_xlate(&pdev->dev, &iommu_spec))
- 		ops = NULL;
- 
- 	of_node_put(iommu_spec.np);
-@@ -196,7 +198,9 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- 		np = iommu_spec.np;
- 		ops = of_iommu_get_ops(np);
- 
--		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
-+		if (!ops || !ops->of_xlate ||
-+		    iommu_fwspec_init(dev, &np->fwnode, ops) ||
-+		    ops->of_xlate(dev, &iommu_spec))
- 			goto err_put_node;
- 
- 		of_node_put(np);
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 38f02814d53a..bc41e87a969b 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -41,6 +41,7 @@ struct device_node;
- struct fwnode_handle;
- struct iommu_ops;
- struct iommu_group;
-+struct iommu_fwspec;
- 
- struct bus_attribute {
- 	struct attribute	attr;
-@@ -765,6 +766,7 @@ struct device_dma_parameters {
-  * 		gone away. This should be set by the allocator of the
-  * 		device (i.e. the bus driver that discovered the device).
-  * @iommu_group: IOMMU group the device belongs to.
-+ * @iommu_fwspec: IOMMU-specific properties supplied by firmware.
-  *
-  * @offline_disabled: If set, the device is permanently online.
-  * @offline:	Set after successful invocation of bus type's .offline().
-@@ -849,6 +851,7 @@ struct device {
- 
- 	void	(*release)(struct device *dev);
- 	struct iommu_group	*iommu_group;
-+	struct iommu_fwspec	*iommu_fwspec;
- 
- 	bool			offline_disabled:1;
- 	bool			offline:1;
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index a35fb8b42e1a..2ea15842e9f6 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -331,10 +331,32 @@ extern struct iommu_group *pci_device_group(struct device *dev);
- /* Generic device grouping function */
- extern struct iommu_group *generic_device_group(struct device *dev);
- 
-+/**
-+ * struct iommu_fwspec - per-device IOMMU instance data
-+ * @ops: ops for this device's IOMMU
-+ * @iommu_fwnode: firmware handle for this device's IOMMU
-+ * @iommu_priv: IOMMU driver private data for this device
-+ * @num_ids: number of associated device IDs
-+ * @ids: IDs which this device may present to the IOMMU
-+ */
-+struct iommu_fwspec {
-+	const struct iommu_ops	*ops;
-+	struct fwnode_handle	*iommu_fwnode;
-+	void			*iommu_priv;
-+	unsigned int		num_ids;
-+	u32			ids[];
-+};
-+
-+int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
-+		      const struct iommu_ops *ops);
-+void iommu_fwspec_free(struct device *dev);
-+int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
-+
- #else /* CONFIG_IOMMU_API */
- 
- struct iommu_ops {};
- struct iommu_group {};
-+struct iommu_fwspec {};
- 
- static inline bool iommu_present(struct bus_type *bus)
- {
-@@ -541,6 +563,22 @@ static inline void iommu_device_unlink(struct device *dev, struct device *link)
- {
+ /* MMIO registers */
+@@ -1805,6 +1807,23 @@ static void arm_smmu_remove_device(struct device *dev)
+ 	iommu_fwspec_free(dev);
  }
  
-+static inline int iommu_fwspec_init(struct device *dev,
-+				    struct fwnode_handle *iommu_fwnode,
-+				    const struct iommu_ops *ops)
++static struct iommu_group *arm_smmu_device_group(struct device *dev)
 +{
-+	return -ENODEV;
++	struct iommu_group *group;
++
++	/*
++	 * We don't support devices sharing stream IDs other than PCI RID
++	 * aliases, since the necessary ID-to-device lookup becomes rather
++	 * impractical given a potential sparse 32-bit stream ID space.
++	 */
++	if (dev_is_pci(dev))
++		group = pci_device_group(dev);
++	else
++		group = generic_device_group(dev);
++
++	return group;
 +}
 +
-+void iommu_fwspec_free(struct device *dev)
-+{
-+}
-+
-+int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
-+{
-+	return -ENODEV;
-+}
-+
- #endif /* CONFIG_IOMMU_API */
+ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+ 				    enum iommu_attr attr, void *data)
+ {
+@@ -1851,10 +1870,6 @@ out_unlock:
  
- #endif /* __LINUX_IOMMU_H */
+ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ {
+-	/* We only support PCI, for now */
+-	if (!dev_is_pci(dev))
+-		return -ENODEV;
+-
+ 	return iommu_fwspec_add_ids(dev, args->args, 1);
+ }
+ 
+@@ -1869,7 +1884,7 @@ static struct iommu_ops arm_smmu_ops = {
+ 	.iova_to_phys		= arm_smmu_iova_to_phys,
+ 	.add_device		= arm_smmu_add_device,
+ 	.remove_device		= arm_smmu_remove_device,
+-	.device_group		= pci_device_group,
++	.device_group		= arm_smmu_device_group,
+ 	.domain_get_attr	= arm_smmu_domain_get_attr,
+ 	.domain_set_attr	= arm_smmu_domain_set_attr,
+ 	.of_xlate		= arm_smmu_of_xlate,
+@@ -2613,8 +2628,18 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 
+ 	/* And we're up. Go go go! */
+ 	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
++#ifdef CONFIG_PCI
+ 	pci_request_acs();
+-	return bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
++	ret = bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
++	if (ret)
++		return ret;
++#endif
++#ifdef CONFIG_ARM_AMBA
++	ret = bus_set_iommu(&amba_bustype, &arm_smmu_ops);
++	if (ret)
++		return ret;
++#endif
++	return bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
+ }
+ 
+ static int arm_smmu_device_remove(struct platform_device *pdev)
 -- 
 2.8.1.dirty
