@@ -1,85 +1,92 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 Sep 2016 17:22:58 +0200
-Subject: [PATCH] BUG: atmel_serial: Interrupts not disabled on close
-In-Reply-To: <20160912133441.14597-1-richard.genoud@gmail.com>
-References: <20160912133441.14597-1-richard.genoud@gmail.com>
-Message-ID: <c98f5e6a-a971-aee1-cd9b-16a2ef36d9f8@atmel.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 12 Sep 2016 16:30:15 +0100
+Subject: [RFC PATCH 0/5] arm64: Signal context expansion
+In-Reply-To: <57D6C33D.9020003@arm.com>
+References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
+ <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
+ <20160909152047.GA3958@e103592.cambridge.arm.com>
+ <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
+ <20160912111749.GB3958@e103592.cambridge.arm.com>
+ <57D6C33D.9020003@arm.com>
+Message-ID: <20160912153015.GD3958@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/09/2016 ? 15:34, Richard Genoud a ?crit :
-> Since commit 18dfef9c7f87 ("serial: atmel: convert to irq handling
-> provided mctrl-gpio"), interrupts from GPIOs are not disabled any more
-> when the serial port is closed, leading to an oops when the one of the
-> input pin is toggled (CTS/DSR/DCD/RNG).
+On Mon, Sep 12, 2016 at 04:01:17PM +0100, Szabolcs Nagy wrote:
+> On 12/09/16 12:17, Dave Martin wrote:
+
+[...]
+
+> >> On 09/09/2016 05:21 PM, Dave Martin wrote:
+
+[...]
+
+> >>> I wonder whether we should make the signal stack size runtime
+> >>> discoverable through sysconf() instead...
+> > 
+> > I will likely suggest this for the future, but of course it doesn't help
+> > for current binaries.
+> > 
+> > 
+> > Note that MINSIGSTKSZ stared life wrong for arm64, and has since gone
+> > through a few ABI breaking changes.  I don't condone this, but we have
+> > form in this area :/
+> > 
+> > sigaltstack() already fails with ENOMEM for software that passes
+> > ss_size = MINSIGSTKSZ, and is built against glibc<2.22 [1], [2], running
+> > on linux>=4.3 [3], which is an ABI break in case where sigaltstack() is
+> > otherwise guaranteed to succeed.
+> > 
 > 
-> This is only the case if those pins are used as GPIOs, i.e. declared
-> like that:
-> usart1: serial at f8020000 {
->         /* CTS and DTS will be handled by GPIO */
->         status = "okay";
->         rts-gpios = <&pioB 17 GPIO_ACTIVE_LOW>;
->         cts-gpios = <&pioB 16 GPIO_ACTIVE_LOW>;
->         dtr-gpios = <&pioB 14 GPIO_ACTIVE_LOW>;
->         dsr-gpios = <&pioC 31 GPIO_ACTIVE_LOW>;
->         rng-gpios = <&pioB 12 GPIO_ACTIVE_LOW>;
->         dcd-gpios = <&pioB 15 GPIO_ACTIVE_LOW>;
-> };
+> yes, this was abi breaking change.
 > 
-> That's because modem interrupts used to be freed in atmel_shutdown().
-> After commit 18dfef9c7f87 ("serial: atmel: convert to irq handling
-> provided mctrl-gpio"), this code was just removed.
-> Calling atmel_disable_ms() disables the interrupts and everything works
-> fine again.
+> if glibc does not care about existing binaries
+> that use sigaltstack with MINSIGSTKSZ then it can
+> increase the size, but i think the kernel should
+> not change the abi (there are other libcs and libc
+> independent runtime systems on linux for aarch64
+> with their own sigaltstack setup, not all of them
+> may care about SVE).
 > 
-> Tested on at91sam9g35-cm
+> i assume the kernel can avoid saving SVE regs when
+> they are not used by the process.
+
+I can (and do), in my patches (not posted yet).
+
+The real issue here is that a recently updated shared library might be
+optimised to use SVE, where the program using it is an older, SVE-
+unaware binary.
+
+(think of an optimised math library using some new fancy SVE-based
+number crunching internally).
+
 > 
-> (This patch doesn't apply on -stable kernels, fixes for 4.4 and 4.7 will
-> be sent after this one is applied.)
+> > 
+> > The bottom line here is that the sigaltstack() API is broken with regard
+> > to extensibility, so we cannot extend the amount of signal state without
+> > breaking something.
+> > 
 > 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> Fixes: 18dfef9c7f87 ("serial: atmel: convert to irq handling provided mctrl-gpio")
-
-I thinks it's a bit late for "4.8-fixes".
-
-Greg, tell me if you want that I add the Cc: stable tag to this patch
-(as advised by Uwe) and re-send?
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks Richard!
-
-Best regards,
-
-> ---
->  drivers/tty/serial/atmel_serial.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> extending signal state can break things independently
+> of sigaltstack.
 > 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 2eaa18ddef61..8bbde52db376 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -1929,6 +1929,9 @@ static void atmel_shutdown(struct uart_port *port)
->  {
->  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->  
-> +	/* Disable modem control lines interrupts */
-> +	atmel_disable_ms(port);
-> +
->  	/* Disable interrupts at device level */
->  	atmel_uart_writel(port, ATMEL_US_IDR, -1);
->  
-> @@ -1979,8 +1982,6 @@ static void atmel_shutdown(struct uart_port *port)
->  	 */
->  	free_irq(port->irq, port);
->  
-> -	atmel_port->ms_irq_enabled = false;
-> -
->  	atmel_flush_buffer(port);
->  }
->  
-> 
+> binaries with strict guarantees about worst case stack
+> usage can change behaviour.
 
+Indeed, but this is not a new issue.  Software must run with enough
+stack in order to be portable, but there is no portable way to determine
+how much stack is needed.
 
--- 
-Nicolas Ferre
+> fortunately glibc PTHREAD_STACK_MIN is huge on aarch64
+> so applications using it are unlikely to break because
+> of the increased signal state.
+> (this also means it's impossible to have threads with
+> tiny stacks on glibc, so large amount of threads means
+> large amount of commit charge.)
+
+Again, not a new problem.
+
+[...]
+
+Cheers
+---Dave
