@@ -1,161 +1,428 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Sep 2016 09:05:52 -0500
-Subject: [linux-sunxi] Re: [RFC] misc: Add Allwinner Q8 tablet hardware
- manager
-In-Reply-To: <268244d0-55c3-167d-a70f-0e35e6b3dae6@redhat.com>
-References: <20160901190820.21987-1-hdegoede@redhat.com>
- <20160901190820.21987-2-hdegoede@redhat.com>
- <CAL_JsqLGS23JQxtdtUqNhkhDiV4mnKSBpMjdo4fx0=wuq_ydeg@mail.gmail.com>
- <268244d0-55c3-167d-a70f-0e35e6b3dae6@redhat.com>
-Message-ID: <20160912140552.GA30379@rob-hp-laptop>
+From: test.tberghammer@gmail.com (Pavel Labath)
+Date: Mon, 12 Sep 2016 15:07:24 +0100
+Subject: [PATCH] arm64: hw_breakpoint: Handle inexact watchpoint addresses
+Message-ID: <1473689244-147136-1-git-send-email-labath@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 10, 2016 at 08:12:32PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 09-09-16 23:41, Rob Herring wrote:
-> >On Thu, Sep 1, 2016 at 2:08 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> >>Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets
-> >>of which a new batch is produced every few weeks. Each batch uses a
-> >>different mix of touchscreen, accelerometer and wifi peripherals.
-> >>
-> >>Given that each batch is different creating a devicetree for each variant
-> >>is not desirable. This commit adds a Q8 tablet hardware manager which
-> >>auto-detects the touchscreen and accelerometer so that a single generic
-> >>dts can be used for these tablets.
-> >>
-> >>The wifi is connected to a discoverable bus (sdio or usb) and will be
-> >>autodetected by the mmc resp. usb subsystems.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>---
-> >> .../misc/allwinner,sunxi-q8-hardwaremgr.txt        |  52 +++
-> >> drivers/misc/Kconfig                               |  12 +
-> >> drivers/misc/Makefile                              |   1 +
-> >> drivers/misc/q8-hardwaremgr.c                      | 512 +++++++++++++++++++++
-> >> 4 files changed, 577 insertions(+)
-> >> create mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
-> >> create mode 100644 drivers/misc/q8-hardwaremgr.c
-> >>
-> >>diff --git a/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt b/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
-> >>new file mode 100644
-> >>index 0000000..f428bf5
-> >>--- /dev/null
-> >>+++ b/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
-> >>@@ -0,0 +1,52 @@
-> >>+Q8 tablet hardware manager
-> >>+--------------------------
-> >>+
-> >>+Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets of
-> >>+which a new batch is produced every few weeks. Each batch uses a different
-> >>+mix of touchscreen, accelerometer and wifi peripherals.
-> >>+
-> >>+Given that each batch is different creating a devicetree for each variant is
-> >>+not desirable. The Q8 tablet hardware manager bindings are bindings for an os
-> >>+module which auto-detects the touchscreen so that a single
-> >>+generic dts can be used for these tablets.
-> >>+
-> >>+The wifi is connected to a discoverable bus and will be autodetected by the os.
-> >>+
-> >>+Required properties:
-> >>+ - compatible         : "allwinner,sunxi-q8-hardwaremgr"
-> >>+ - touchscreen        : phandle of a template touchscreen node, this must be a
-> >>+                       child node of the touchscreen i2c bus
-> >>+
-> >>+Optional properties:
-> >>+ - touchscreen-supply : regulator phandle for the touchscreen vdd supply
-> >
-> >While I said I think you should be using overlays here, you could also
-> >do it without.
-> 
-> Good, because I believe that doing things without overlays will
-> be much easier. If you look at the actual implementation you will
-> see that it sets a lot of properties (touchscreen width, height,
-> inversion, axis-swapping, firmware-name) based on various sources,
-> the explosion of possible overlays from this is huge, and if
-> we're going to runtime patch the overlays then why use them at all
-> and not just runtime generate all the info ?
+Arm64 hardware does not always report a watchpoint hit address that
+matches one of the watchpoints set. It can also report an address
+"near" the watchpoint if a single instruction access both watched and
+unwatched addresses. There is no straight-forward way, short of
+disassembling the offending instruction, to map that address back to
+the watchpoint.
 
-That's fine if run-time makes more sense. I'd just like to move in the 
-direction of applying a hunk of changes rather than C code creating 
-nodes and properties one-by-one.
+Previously, when the hardware reported a watchpoint hit on an address
+that did not match our watchpoint (this happens in case of instructions
+which access large chunks of memory such as "stp") the process would
+enter a loop where we would be continually resuming it (because we did
+not recognise that watchpoint hit) and it would keep hitting the
+watchpoint again and again. The tracing process would never get
+notified of the watchpoint hit.
+
+This commit fixes the problem by looking at the watchpoints near the
+address reported by the hardware. If the address does not exactly match
+one of the watchpoints we have set, it attributes the hit to the
+nearest watchpoint we have.  This heuristic is a bit dodgy, but I don't
+think we can do much more, given the hardware limitations.
+I include a kernel selftest which triggers this code.
+
+Signed-off-by: Pavel Labath <labath@google.com>
+---
+ arch/arm64/kernel/hw_breakpoint.c                  | 104 +++++++---
+ tools/testing/selftests/breakpoints/Makefile       |   5 +-
+ .../selftests/breakpoints/breakpoint_test-arm.c    | 217 +++++++++++++++++++++
+ 3 files changed, 298 insertions(+), 28 deletions(-)
+ create mode 100644 tools/testing/selftests/breakpoints/breakpoint_test-arm.c
+
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index 26a6bf7..d0ebfe6 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -661,50 +661,80 @@ unlock:
+ }
+ NOKPROBE_SYMBOL(breakpoint_handler);
  
-> >However, this node has to go. It is not h/w, and you
-> >are putting it here purely to instantiate a driver.
-> 
-> With "this" in "this node has to go", do you mean the node
-> with the "allwinner,sunxi-q8-hardwaremgr" compatible, or
-> do you mean the touchscreen template node ?
-
-Given that this binding section above is concerning 
-allwinner,sunxi-q8-hardwaremgr, that is what I'm referring to.
-
-> 
-> >For the
-> >touchscreen property, surely you know where the touchscreen is located
-> >in the DT?
-> 
-> Nope q8 tablets come with A13, A23 or A33 SoCs, A23/A33 are pin
-> compatible with each other, but the A13 is not, this leads to
-> the touchscreen being on a different i2c bus, so I cannot hardcode
-> things, likewise the power-gpios and interrupt found in the
-> touchscreen node differ between the A13 vs A23/A33.
-
-Either the touchscreen node name is "touchscreen" or you can have 
-compatible string for q8-touchscreen and use of_find_node_by_name or 
-of_find_compatible_node. Doesn't matter what bus it is on. It only 
-requires that there is only 1 node.
-
-> I actually had a touchscreen-i2c-bus property containing a
-> phandle to the i2c controller for the bus which has the
-> touchscreen in an earlier revision + touchscreen-gpios
-> and touchscreen-supply properties, I can switch to that
-> if you prefer that over having a touchscreen template node.
-> 
-> > If not, of_find_node_by_name()?
-> 
-> Still a bit confused about what you do not like,
-> (touchscreen template node vs q8-hardwaremgr node).
-> 
-> I guess (based on context) you do not want the
-> q8-hardwaremgr node ?
-> 
-> So the q8-hardwaremgr code should activate based on
-> the machine compatible I presume? 
-
-Either that, or if you have the board specific compatible in the 
-touchscreen node, then you could have a driver for it. That driver would 
-need to probe the device and then create the "real" device.
++/*
++ * Arm64 hardware does not always report a watchpoint hit address that matches
++ * one of the watchpoints set. It can also report an address "near" the
++ * watchpoint if a single instruction access both watched and unwatched
++ * addresses. There is no straight-forward way, short of disassembling the
++ * offending instruction, to map that address back to the watchpoint. This
++ * function computes the distance of the memory access from the watchpoint as a
++ * heuristic for the likelyhood that a given access triggered the watchpoint.
++ *
++ * See Section D2.10.5 "Determining the memory location that caused a Watchpoint
++ * exception" of ARMv8 Architecture Reference Manual for details.
++ *
++ * The function returns the distance of the address from the bytes watched by
++ * the watchpoint. In case of an exact match, it returns 0.
++ */
++static u64 get_distance_from_watchpoint(unsigned long addr, int i,
++					struct arch_hw_breakpoint *info)
++{
++	u64 val, alignment_mask, wp_low, wp_high;
++	u32 ctrl_reg;
++	int first_bit;
++	struct arch_hw_breakpoint_ctrl ctrl;
++
++	/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
++	if (is_compat_task()) {
++		if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
++			alignment_mask = 0x7;
++		else
++			alignment_mask = 0x3;
++	} else {
++		alignment_mask = 0x7;
++	}
++
++	val = read_wb_reg(AARCH64_DBG_REG_WVR, i) & ~alignment_mask;
++
++	ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
++	decode_ctrl_reg(ctrl_reg, &ctrl);
++	first_bit = ffs(ctrl.len);
++	if (first_bit == 0)
++		return -1;
++	wp_low = val + first_bit - 1;
++	wp_high = val + fls(ctrl.len) - 1;
++	if (addr < wp_low)
++		return wp_low - addr;
++	else if (addr > wp_high)
++		return addr - wp_high;
++	else
++		return 0;
++
++}
++
+ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+ 			      struct pt_regs *regs)
+ {
+-	int i, step = 0, *kernel_step, access;
+-	u32 ctrl_reg;
+-	u64 val, alignment_mask;
++	int i, step = 0, *kernel_step, access, closest_match;
++	u64 min_dist = -1, dist;
+ 	struct perf_event *wp, **slots;
+ 	struct debug_info *debug_info;
+ 	struct arch_hw_breakpoint *info;
+-	struct arch_hw_breakpoint_ctrl ctrl;
  
-> How does that
-> work with module autoloading ?
-
-Can't non-DT based platform drivers do autoloading? Regardless, not 
-really my problem from a binding perspective.
-
-> If you do not want the q8-hardwaremgr node and thus
-> no touchscreen property them yes I can use
-> of_find_node_by_name(), but I thought that was
-> generally frowned up on?
-
-Generally we do prefer finding things by compatible strings. But there 
-are exceptions and doing fix-ups like this is a good example.
-
-> >For touchscreen-supply, I
-> >assume this is to turn on the supply so you can talk to the touch
-> >controller. There's no reason the supply can't just be in the
-> >touchscreen node itself.
-> 
-> Only a few q8 tablets actually use the regulator, so
-> the hardwaremgr first tries detecting the touchscreen
-> without it, and only if it does not find anything then
-> tries with it, and adds a property to the touchscreen
-> node for it, but I guess I can do this other way
-> around and have it be present in the (incomplete /
-> template) touchscreen node and delete it from it if
-> not necessary.
-
-Right.
-
-Rob
+ 	slots = this_cpu_ptr(wp_on_reg);
+ 	debug_info = &current->thread.debug;
+ 
++	/*
++	 * Find all watchpoints that match the reported address. If no exact
++	 * match is found. Attribute the hit to the closest watchpoint.
++	 */
+ 	for (i = 0; i < core_num_wrps; ++i) {
+ 		rcu_read_lock();
+ 
+ 		wp = slots[i];
+-
+ 		if (wp == NULL)
+ 			goto unlock;
+ 
+-		info = counter_arch_bp(wp);
+-		/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
+-		if (is_compat_task()) {
+-			if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
+-				alignment_mask = 0x7;
+-			else
+-				alignment_mask = 0x3;
+-		} else {
+-			alignment_mask = 0x7;
+-		}
+-
+-		/* Check if the watchpoint value matches. */
+-		val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
+-		if (val != (addr & ~alignment_mask))
+-			goto unlock;
+-
+-		/* Possible match, check the byte address select to confirm. */
+-		ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
+-		decode_ctrl_reg(ctrl_reg, &ctrl);
+-		if (!((1 << (addr & alignment_mask)) & ctrl.len))
+-			goto unlock;
+-
+ 		/*
+ 		 * Check that the access type matches.
+ 		 * 0 => load, otherwise => store
+@@ -714,6 +744,17 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+ 		if (!(access & hw_breakpoint_type(wp)))
+ 			goto unlock;
+ 
++		info = counter_arch_bp(wp);
++
++		dist = get_distance_from_watchpoint(addr, i, info);
++		if (dist < min_dist) {
++			min_dist = dist;
++			closest_match = i;
++		}
++		/* Is this an exact match? */
++		if (dist != 0)
++			goto unlock;
++
+ 		info->trigger = addr;
+ 		perf_bp_event(wp, regs);
+ 
+@@ -724,6 +765,15 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+ unlock:
+ 		rcu_read_unlock();
+ 	}
++	if (min_dist > 0 && min_dist != -1) {
++		/* No exact match found. */
++		rcu_read_lock();
++		wp = slots[closest_match];
++		info = counter_arch_bp(wp);
++		info->trigger = addr;
++		perf_bp_event(wp, regs);
++		rcu_read_unlock();
++	}
+ 
+ 	if (!step)
+ 		return 0;
+diff --git a/tools/testing/selftests/breakpoints/Makefile b/tools/testing/selftests/breakpoints/Makefile
+index 74e533f..458a31a 100644
+--- a/tools/testing/selftests/breakpoints/Makefile
++++ b/tools/testing/selftests/breakpoints/Makefile
+@@ -5,6 +5,9 @@ ARCH ?= $(shell echo $(uname_M) | sed -e s/i.86/x86/ -e s/x86_64/x86/)
+ ifeq ($(ARCH),x86)
+ TEST_PROGS := breakpoint_test
+ endif
++ifeq ($(ARCH),arm64)
++TEST_PROGS := breakpoint_test-arm
++endif
+ 
+ TEST_PROGS += step_after_suspend_test
+ 
+@@ -13,4 +16,4 @@ all: $(TEST_PROGS)
+ include ../lib.mk
+ 
+ clean:
+-	rm -fr breakpoint_test step_after_suspend_test
++	rm -fr breakpoint_test breakpoint_test-arm step_after_suspend_test
+diff --git a/tools/testing/selftests/breakpoints/breakpoint_test-arm.c b/tools/testing/selftests/breakpoints/breakpoint_test-arm.c
+new file mode 100644
+index 0000000..9f00ea6
+--- /dev/null
++++ b/tools/testing/selftests/breakpoints/breakpoint_test-arm.c
+@@ -0,0 +1,217 @@
++/*
++ * Copyright (C) 2016 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#define _GNU_SOURCE
++
++#include <sys/types.h>
++#include <sys/wait.h>
++#include <sys/ptrace.h>
++#include <sys/uio.h>
++#include <stdint.h>
++#include <stdbool.h>
++#include <stdio.h>
++#include <unistd.h>
++#include <elf.h>
++#include <signal.h>
++
++#include "../kselftest.h"
++
++enum Test {
++	TEST_WRITE_1, TEST_WRITE_2, TEST_WRITE_4, TEST_WRITE_8,
++	TEST_WRITE_16, TEST_WRITE_32, TEST_MAX
++};
++
++struct Data {
++	union {
++		uint8_t u8[32];
++		uint16_t u16[16];
++		uint32_t u32[8];
++		uint64_t u64[4];
++	};
++};
++volatile struct Data var __aligned(32);
++
++
++void child(enum Test test)
++{
++	if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) != 0) {
++		perror("ptrace(PTRACE_TRACEME) failed");
++		_exit(1);
++	}
++
++	if (raise(SIGSTOP) != 0) {
++		perror("raise(SIGSTOP) failed");
++		_exit(1);
++	}
++
++	switch (test) {
++	case TEST_WRITE_1:
++		var.u8[31] = 47;
++		break;
++	case TEST_WRITE_2:
++		var.u16[15] = 47;
++		break;
++	case TEST_WRITE_4:
++		var.u32[7] = 47;
++		break;
++	case TEST_WRITE_8:
++		var.u64[3] = 47;
++		break;
++	case TEST_WRITE_16:
++		__asm__ volatile ("stp x29, x30, %0" : "=m" (var.u64[2]));
++		break;
++	case TEST_WRITE_32:
++		__asm__ volatile ("stp q29, q30, %0" : "=m" (var));
++		break;
++	}
++
++	_exit(0);
++}
++
++static bool set_watchpoint(pid_t pid, const volatile void *address,
++			   size_t size)
++{
++	const unsigned byte_mask = (1 << size) - 1;
++	const unsigned type = 2; /* Write */
++	const unsigned enable = 1;
++	const unsigned control = byte_mask << 5 | type << 3 | enable;
++	struct user_hwdebug_state dreg_state;
++	struct iovec iov;
++
++	memset(&dreg_state, 0, sizeof(dreg_state));
++	dreg_state.dbg_regs[0].addr = (uintptr_t)address;
++	dreg_state.dbg_regs[0].ctrl = control;
++	iov.iov_base = &dreg_state;
++	iov.iov_len = offsetof(struct user_hwdebug_state, dbg_regs) +
++		      sizeof(dreg_state.dbg_regs[0]);
++	if (ptrace(PTRACE_SETREGSET, pid, NT_ARM_HW_WATCH, &iov) == 0)
++		return true;
++
++	if (errno == EIO) {
++		printf("ptrace(PTRACE_SETREGSET, NT_ARM_HW_WATCH) "
++		       "not supported on this hardware\n");
++		ksft_exit_skip();
++	}
++	perror("ptrace(PTRACE_SETREGSET, NT_ARM_HW_WATCH) failed");
++	return false;
++}
++
++
++bool run_test(enum Test test)
++{
++	int status;
++	siginfo_t siginfo;
++	pid_t pid = fork();
++	pid_t wpid;
++
++	if (pid < 0) {
++		perror("fork() failed");
++		return false;
++	}
++	if (pid == 0)
++		child(test);
++
++	wpid = waitpid(pid, &status, __WALL);
++	if (wpid != pid) {
++		perror("waitpid() failed");
++		return false;
++	}
++	if (!WIFSTOPPED(status)) {
++		printf("child did not stop\n");
++		return false;
++	}
++	if (WSTOPSIG(status) != SIGSTOP) {
++		printf("child did not stop with SIGSTOP\n");
++		return false;
++	}
++
++	if (!set_watchpoint(pid, &var.u64[3], 8))
++		return false;
++
++	if (ptrace(PTRACE_CONT, pid, NULL, NULL) < 0) {
++		perror("ptrace(PTRACE_SINGLESTEP) failed");
++		return false;
++	}
++
++	alarm(3);
++	wpid = waitpid(pid, &status, __WALL);
++	if (wpid != pid) {
++		perror("waitpid() failed");
++		return false;
++	}
++	alarm(0);
++	if (WIFEXITED(status)) {
++		printf("child did not single-step\n");
++		return false;
++	}
++	if (!WIFSTOPPED(status)) {
++		printf("child did not stop\n");
++		return false;
++	}
++	if (WSTOPSIG(status) != SIGTRAP) {
++		printf("child did not stop with SIGTRAP\n");
++		return false;
++	}
++	if (ptrace(PTRACE_GETSIGINFO, pid, NULL, &siginfo) != 0) {
++		perror("ptrace(PTRACE_GETSIGINFO)");
++		return false;
++	}
++	if (siginfo.si_code != TRAP_HWBKPT) {
++		printf("Unexpected si_code %d\n", siginfo.si_code);
++		return false;
++	}
++
++	kill(pid, SIGKILL);
++	wpid = waitpid(pid, &status, 0);
++	if (wpid != pid) {
++		perror("waitpid() failed");
++		return false;
++	}
++	return true;
++}
++
++void sigalrm(int sig)
++{
++}
++
++int main(int argc, char **argv)
++{
++	int opt;
++	bool succeeded = true;
++	enum Test test;
++	struct sigaction act;
++
++	act.sa_handler = sigalrm;
++	sigemptyset(&act.sa_mask);
++	act.sa_flags = 0;
++	sigaction(SIGALRM, &act, NULL);
++	for (test = 0; test < TEST_MAX; ++test) {
++		printf("Test %d ", test);
++		if (run_test(test)) {
++			printf("[OK]\n");
++			ksft_inc_pass_cnt();
++		} else {
++			printf("[FAILED]\n");
++			ksft_inc_fail_cnt();
++			succeeded = false;
++		}
++	}
++
++	ksft_print_cnts();
++	if (succeeded)
++		ksft_exit_pass();
++	else
++		ksft_exit_fail();
++}
++
+-- 
+2.8.0.rc3.226.g39d4020
