@@ -1,248 +1,157 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Mon, 12 Sep 2016 19:20:59 +0200
-Subject: [PATCH] Revert "Input: bma150 - extend chip detection for bma180"
-In-Reply-To: <a156f29f-43db-6811-7f7e-ac2c7682d766@redhat.com>
-References: <20160911164321.23122-1-hdegoede@redhat.com>
- <2C735D34-7559-4A62-A635-A5719C356D94@goldelico.com>
- <a156f29f-43db-6811-7f7e-ac2c7682d766@redhat.com>
-Message-ID: <4809E76B-7BFE-4D95-8631-079262E958E2@goldelico.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 12 Sep 2016 18:24:22 +0100
+Subject: [RFC PATCH 0/5] arm64: Signal context expansion
+In-Reply-To: <57D6DB80.4090105@arm.com>
+References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
+ <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
+ <20160909152047.GA3958@e103592.cambridge.arm.com>
+ <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
+ <20160912111749.GB3958@e103592.cambridge.arm.com>
+ <57D6C33D.9020003@arm.com>
+ <20160912153015.GD3958@e103592.cambridge.arm.com>
+ <57D6DB80.4090105@arm.com>
+Message-ID: <20160912172422.GE3958@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> Am 12.09.2016 um 16:44 schrieb Hans de Goede <hdegoede@redhat.com>:
+On Mon, Sep 12, 2016 at 05:44:48PM +0100, Szabolcs Nagy wrote:
+> On 12/09/16 16:30, Dave Martin wrote:
+> > On Mon, Sep 12, 2016 at 04:01:17PM +0100, Szabolcs Nagy wrote:
+> >> On 12/09/16 12:17, Dave Martin wrote:
+> > 
+> > [...]
+> > 
+> >>>> On 09/09/2016 05:21 PM, Dave Martin wrote:
+> > 
+> > [...]
+> > 
+> >>>>> I wonder whether we should make the signal stack size runtime
+> >>>>> discoverable through sysconf() instead...
+> >>>
+> >>> I will likely suggest this for the future, but of course it doesn't help
+> >>> for current binaries.
+> >>>
+> >>>
+> >>> Note that MINSIGSTKSZ stared life wrong for arm64, and has since gone
+> >>> through a few ABI breaking changes.  I don't condone this, but we have
+> >>> form in this area :/
+> >>>
+> >>> sigaltstack() already fails with ENOMEM for software that passes
+> >>> ss_size = MINSIGSTKSZ, and is built against glibc<2.22 [1], [2], running
+> >>> on linux>=4.3 [3], which is an ABI break in case where sigaltstack() is
+> >>> otherwise guaranteed to succeed.
+> >>>
+> >>
+> >> yes, this was abi breaking change.
+> >>
+> >> if glibc does not care about existing binaries
+> >> that use sigaltstack with MINSIGSTKSZ then it can
+> >> increase the size, but i think the kernel should
+> >> not change the abi (there are other libcs and libc
+> >> independent runtime systems on linux for aarch64
+> >> with their own sigaltstack setup, not all of them
+> >> may care about SVE).
+> >>
+> >> i assume the kernel can avoid saving SVE regs when
+> >> they are not used by the process.
+> > 
+> > I can (and do), in my patches (not posted yet).
+> > 
+> > The real issue here is that a recently updated shared library might be
+> > optimised to use SVE, where the program using it is an older, SVE-
+> > unaware binary.
+> > 
+> > (think of an optimised math library using some new fancy SVE-based
+> > number crunching internally).
+> > 
 > 
-> Hi,
+> this is why sve would be a new abi in an ideal world,
+> instead of subtly changing behaviour behind existing
+> binaries.
+
+Well, indeed.
+
+In an ideal world, we also like to be able to make use of new features
+though.
+
+> >>
+> >>>
+> >>> The bottom line here is that the sigaltstack() API is broken with regard
+> >>> to extensibility, so we cannot extend the amount of signal state without
+> >>> breaking something.
+> >>>
+> >>
+> >> extending signal state can break things independently
+> >> of sigaltstack.
+> >>
+> >> binaries with strict guarantees about worst case stack
+> >> usage can change behaviour.
+> > 
+> > Indeed, but this is not a new issue.  Software must run with enough
+> > stack in order to be portable, but there is no portable way to determine
+> > how much stack is needed.
+> > 
 > 
-> On 12-09-16 16:31, H. Nikolaus Schaller wrote:
->> Hi,
->> 
->>> Am 11.09.2016 um 18:43 schrieb Hans de Goede <hdegoede@redhat.com>:
->>> 
->>> This reverts commit ef3714fdbc8d ("Input: bma150 - extend chip
->>> detection for bma180").
->>> 
->>> The bma180 is not compatible with the bma150 at all, it has 14 bits
->>> resolution instead of 10, and it has quite different control registers.
->>> 
->>> Treating the bma180 as a bma150 wrt its data registers will just result
->>> in throwing away the lowest 4 bits, which is not too bad. But the ctrl
->>> registers are a different story.
->>> 
->>> It may be that things happen to just work (I don't have a bma180 to
->>> test with) but that certainly does not make this right.
->> 
->> Yes, looks as if your observation is right. Thanks for pointing this out!
->> 
->> This did need me some research to find an answer...
->> 
->> If I remember correctly, the original patch was based on a recommendation
->> from someone I don't remember, who said that the chips are the same in a
->> different package. So we added the chip_id and it worked immediately as
->> expected. It looks as if we did not check the data sheets. So we did not
->> question this recommendation.
->> 
->>> 
->>> Removing the bma180 id also removes overlap wrt the ids in the iio
->>> bma180 driver which does treat the bma180 properly.
->> 
->> Nack.
->> 
->> The problem we get is that an iio driver is not an input driver and can't
->> easily replace it.
+> why not?
 > 
-> Actually almost all accelerometer drivers in the Linux kernel are
-> iio drivers,
+> musl libc has stack usage guarantee that can be checked
+> by the compiler that built the libc on all supported
+> targets. (with some manual checks in a few cases.)
 
-Yes, that is a good move indeed to make them more general.
+"Requires some specific, nonstandard libc" = "not portable".
 
-> the bma150 driver is the odd duck out,
+I don't say that this isn't a good feature of musl libc, just that this
+feature is not generally available.
 
-Indeed it seems to be in /misc for some reason.
+> however as soon as targets change the signal frame size
+> randomly, these worst case guarantees get broken.
+> (musl's MINSIGSTKSZ was always 6k on aarch64, even
+> before the kernel changed it.)
 
-> that is why
-> we've iio-sensor-proxy for apps which want the accelerometer
-> to behave as an input device:
+Unfortunately, that is true.  Any component (including libc) that makes
+assumptions about the kernel signal stack overhead may break.
+
+(Whether musl should have invented its own magic number for MINSIGSTKSZ
+instead of adding its own known overhead to the kernel's MINSIGSTKSZ is
+debatable, but in this case it is lucky that it did.)
+
+> >> fortunately glibc PTHREAD_STACK_MIN is huge on aarch64
+> >> so applications using it are unlikely to break because
+> >> of the increased signal state.
+> >> (this also means it's impossible to have threads with
+> >> tiny stacks on glibc, so large amount of threads means
+> >> large amount of commit charge.)
+> > 
+> > Again, not a new problem.
+> > 
 > 
-> https://github.com/hadess/iio-sensor-proxy
-
-Does this provide an input device /dev/input/event?
->From a first look it seems to provide a D-Bus abstraction which is
-not the same as an /dev/input/event.
-
-What about latency?
-A kernel driver can react on a sensor interrupt, queue results
-and sleep.
-
-Isn't a user-space process more resource hungry than a kernel thread?
-
+> on musl PTHREAD_STACK_MIN is small, so the sve signal
+> state can break existing binaries that use tiny thread
+> stack (there is at least one linux distro that supports
+> musl+aarch64, although they don't distribute binary
+> packages yet).
 > 
->> An input driver can be used for gesture applications (e.g. detecting
->> the device has been turned upside down) and can report X/Y/Z coordinates
->> to e.g. X11 for games similar to a mouse or joystick (which the iio driver
->> doesn't).
+> so even if the glibc abi changes, i think the kernel
+> should not do the change, at least not immediately.
 > 
-> See above.
-> 
->> So it should remain configurable which of both driver options is loaded,
->> to match user space API needs.
->> 
->> BTW: id overlap is only a problem if both drivers are configured in parallel.
-> 
-> Right, so it is "only" a problem to any generic distro which tries to
-> support both bma150 and bma250 accelerometers, as both the input
-> bma150 as well as the iio bma250 driver claim to be bma180 compatible.
+> (and if the kernel decides to increase MINSIGSTKSZ
+> i think it should wait for distros picking up new
+> enough glibc with increased MINSIGSTKSZ to avoid
+> spuriously failing sigaltstack calls.)
 
-Well, it is only a problem if such a generic distro is really run on a device
-which has a bma180 defined in DT. There do not seem to exist many of these.
+So, increasing MINSIGSTKSZ doesn't look a great idea, partly because it
+breaks stuff, and partly because there is no correct value to change it
+to -- we may have to make the same break all over again, at some point
+in the future, or set it to something ridiculously large.
 
-> 
->> Next, I have tried to find out which devices really use the bma150 and bma180.
->> 
->> It appears that no in-tree device uses the bma150 while the GTA04 uses
->> the bma180 (in DT), but not in any defconfig (the GTA04 specific config
->> is not upstreamable since omap2plus_defconfig exists).
->> 
->> In user-space the GTA04 requires and actively uses this input driver for Replicant.
->> 
->> So I would conclude that this revert does not improve/fix any device using a
->> bma150 (if it exists at all), but breaks an existing device.
->> 
->> What options do we have?
->> 
->> a) add proper register number constants and choose conditionally (where they differ)
->> b) drop bma150 support completely and change registers for bma180
->> c) clone the bma150 input driver into an bma180 input driver and fix registers
->> d) extend the bma180 iio driver to optionally provide an input device
->> e) write a generic input/iio-accel wrapper (which should work with any iio accelerometer)
->> 
->> I would favour approach e)
-> 
-> Good, because that solution already exists :) See:
-> https://github.com/hadess/iio-sensor-proxy
 
-No, it is yet another option. I would formulate it as:
+I think it's clear that this series needs to honor (and refuse to
+overrun) the alternate signal stack size down to the "legacy"
+MINSIGSTKSZ (5K).
 
-f) break user-space compatibility for existing systems and write / require 
-   a user-space workaround.
+But how to ensure that software that was built "too small" a MINSIGSTKSZ
+for all arch extensions known to the running kernel is a separate
+problem that needs careful thought and libc involvement.
 
-This is something which is the least favorite in my view.
-
-Since we have no control over the user space people have installed and IMHO
-a kernel shouldn't break APIs too often or only for really good reasons
-(e.g. completely new functions).
-
-And we have no means to force user-space developers to integrate such daemons :(
-
-So we break a device by upgrading to 4.9-kernel but can't give a solution.
-
-> 
->> but it has an issue I have no solution for:
->> 
->> 	how to define in DT (or CONFIG?) which iio accelerometer(s) should
->> 	be wrapped and presented as input device(s).
-> 
-> I believe currently iio-sensor-proxy simply wraps all accelerometers
-> it can find, which seems the right thing to do. Usually we're running
-> a generic desktop-ish OS / distro which wants these devices
-> to be available as input devices;
-> for special cases like actual
-> robots and stuff running Linux, iio-sensor-proxy can simply be
-> disabled; or not installed at all.
-
-Well, the GTA04 we talk about falls into a third category: a mobile device.
-
-Which is not running a desktop-ish OS / distro. It is running Replicant,
-QtMoko, SHR, FSO or other user spaces which partially rely on /dev/input/event
-without starting a daemon. At least in current releases and we have little
-influence to have them use a new daemon.
-
-So I would strongly prefer if we can solve this in the kernel and keep the
-user-space API for the bma180 input driver stable.
-
-> 
-> So all in all I believe that this is a solved problem, since
-> solution e. from above is already implemented.
-
-Well it is also solved if we do not revert the patch at all, because it
-works in practice (even if not exactly correct) and is compatible to
-existing user-space.
-
-In summary I don't like option f) because it creates more problems than
-it solves.
-
-If e) is ruled out, IMHO the second best option seems to be d) to add a
-CONFIG_BMA180_INPUT_DEVICE and make it present some additional /dev/input/event
-in parallel to the iio interface.
-
-I already have a similar approach in my to-be-upstreamed queue for the tsc2007
-touch screen driver to provide additional iio channels for raw values, chip
-temperature and the auxiliary general purpose ADC (which is used as ambient
-light sensor in the GTA04).
-
-So let's develop some patch for drivers/iio/accel/bma180.c before we revert
-this bma150 patch and have nothing.
-
-BR,
-Nikolaus Schaller
-
-> 
-> Regards,
-> 
-> Hans
-> 
-> 
-> 
->> 
->> Well, it could be as simple as defining a virtual "input-iio-accel" wrapper
->> driver with no real hardware behind and provide a reference to the iio DT node.
->> But I think such virtual devices are against DT style.
->> 
->> So I don't know how to implement it in an acceptable way.
->> 
->> Ideas?
->> 
->> BR and thanks,
->> Nikolaus Schaller
->> 
->>> 
->>> Cc: Dr. H. Nikolaus Schaller <hns@goldelico.com>
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>> ---
->>> drivers/input/misc/bma150.c | 4 +---
->>> 1 file changed, 1 insertion(+), 3 deletions(-)
->>> 
->>> diff --git a/drivers/input/misc/bma150.c b/drivers/input/misc/bma150.c
->>> index b0d4453..cae4832 100644
->>> --- a/drivers/input/misc/bma150.c
->>> +++ b/drivers/input/misc/bma150.c
->>> @@ -70,7 +70,6 @@
->>> #define BMA150_CFG_5_REG	0x11
->>> 
->>> #define BMA150_CHIP_ID		2
->>> -#define BMA180_CHIP_ID		3
->>> #define BMA150_CHIP_ID_REG	BMA150_DATA_0_REG
->>> 
->>> #define BMA150_ACC_X_LSB_REG	BMA150_DATA_2_REG
->>> @@ -539,7 +538,7 @@ static int bma150_probe(struct i2c_client *client,
->>> 	}
->>> 
->>> 	chip_id = i2c_smbus_read_byte_data(client, BMA150_CHIP_ID_REG);
->>> -	if (chip_id != BMA150_CHIP_ID && chip_id != BMA180_CHIP_ID) {
->>> +	if (chip_id != BMA150_CHIP_ID) {
->>> 		dev_err(&client->dev, "BMA150 chip id error: %d\n", chip_id);
->>> 		return -EINVAL;
->>> 	}
->>> @@ -643,7 +642,6 @@ static UNIVERSAL_DEV_PM_OPS(bma150_pm, bma150_suspend, bma150_resume, NULL);
->>> 
->>> static const struct i2c_device_id bma150_id[] = {
->>> 	{ "bma150", 0 },
->>> -	{ "bma180", 0 },
->>> 	{ "smb380", 0 },
->>> 	{ "bma023", 0 },
->>> 	{ }
->>> --
->>> 2.9.3
->>> 
->> 
+Cheers
+---Dave
