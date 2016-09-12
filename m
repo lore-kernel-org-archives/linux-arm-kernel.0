@@ -1,70 +1,156 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 13 Sep 2016 00:16:45 +0200
-Subject: [PATCH v2] drivers: acpi: fix GIC irq model default PCI IRQ
- polarity
-In-Reply-To: <1473180663-20590-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1473180663-20590-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1512953.mRIMTKV6b1@vostro.rjw.lan>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 12 Sep 2016 17:13:58 -0500
+Subject: [PATCH v4 1/2] nxp/dts: add pcie aer interrupt-name property in
+ the dts
+In-Reply-To: <1472625442-23309-1-git-send-email-po.liu@nxp.com>
+References: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+ <1472625442-23309-1-git-send-email-po.liu@nxp.com>
+Message-ID: <20160912221358.GI23532@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 06, 2016 05:51:03 PM Lorenzo Pieralisi wrote:
-> On ACPI ARM based systems the GIC interrupt controller
-> and corresponding interrupt model permit only the high
-> polarity for level interrupts.
+On Wed, Aug 31, 2016 at 02:37:21PM +0800, Po Liu wrote:
+> NXP some platforms aer interrupt was not MSI/MSI-X/INTx
+> but using interrupt line independently. This patch add a "aer"
+> interrupt-names for aer interrupt.
+> With the interrupt-names "aer", code could probe aer interrupt
+> line for pcie root port, replace the aer interrupt service irq.
+> This is intend to fixup the Layerscape platforms which aer interrupt
+> was not MSI/MSI-X/INTx, but using interrupt line independently.
 > 
-> ACPI firmware describes PCI legacy IRQs through entries
-> in the _PRT objects. Entries in the _PRT can be of two types:
-> 
-> - Static: not configurable, trigger/polarity default to level-low,
->   _PRT entry defines the global GSI interrupt number
-> - Configurable: _PRT interrupt entry contains a reference to the
->   corresponding PCI interrupt link device (that in turn provides the
->   interrupt descriptor through its _CRS/_PRS methods)
-> 
-> Configurable IRQ entries are not currently allowed by the ACPI
-> specification on ARM since they can only be used for interrupt pins that
-> are routable, as per ACPI specifications (version 6.1, 6.2.13):
-> 
-> "[...] There are two ways that _PRT can be used. Typically, the
-> interrupt input that a given PCI interrupt is on is configurable. For
-> example, a given PCI interrupt might be configured for either IRQ 10 or
-> 11 on an 8259 interrupt controller. In this model, each interrupt is
-> represented in the ACPI namespace as a PCI Interrupt Link Device. [...]"
-> 
-> ARM platforms GIC configurations do not allow dynamic IRQ routing,
-> since routing is statically laid out at synthesis time; therefore PCI
-> interrupt links cannot be used for PCI legacy IRQ descriptions in the
-> _PRT on ARM systems.
-> 
-> On the other hand, current core ACPI code handling PCI legacy IRQs
-> consider IRQ trigger/polarity for static _PRT entries as level-low.
-> 
-> On ARM systems with a GIC interrupt controller and corresponding
-> ACPI interrupt model this does not work in that GIC interrupt
-> controller is only capable of handling level interrupts whose
-> polarity is high (for PCI legacy IRQs - that are level-low by
-> specification - this means that the legacy IRQs are inverted before
-> reaching the interrupt controller pin), resulting in IRQ allocation
-> failures such as:
-> 
-> genirq: Setting trigger mode 8 for irq 18 failed (gic_set_type+0x0/0x48)
-> 
-> Change the default polarity for PCI legacy IRQs to high on systems
-> booting wth ACPI on platforms with a GIC interrupt controller model,
-> fixing the discrepancy between specification and HW behaviour.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Tested-by: Duc Dang <dhdang@apm.com>
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Duc Dang <dhdang@apm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Sinan Kaya <okaya@codeaurora.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Po Liu <po.liu@nxp.com>
 
-Applied.
+Rob and Shawn had comments here, and I'm not sure they ever got resolved.
 
-Thanks,
-Rafael
+> ---
+> changes for V4:
+> 	- Add comments explain why to add this patch
+> 	- Move the binding changes to pci code patch
+> 
+>  arch/arm/boot/dts/ls1021a.dtsi                 |  6 ++++--
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 18 +++++++++---------
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 16 ++++++++--------
+>  3 files changed, 21 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index 368e219..443e50b 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -634,7 +634,8 @@
+>  			reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
+>  			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
+> +			interrupts = <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			fsl,pcie-scfg = <&scfg 0>;
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+> @@ -657,7 +658,8 @@
+>  			reg = <0x00 0x03500000 0x0 0x00010000   /* controller registers */
+>  			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			fsl,pcie-scfg = <&scfg 1>;
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> index e669fbd..654071d 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> @@ -527,9 +527,9 @@
+>  			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+>  			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 118 0x4>, /* controller interrupt */
+> -				     <0 117 0x4>; /* PME interrupt */
+> -			interrupt-names = "intr", "pme";
+> +			interrupts = <0 117 0x4>, /* PME interrupt */
+> +					 <0 118 0x4>; /* aer interrupt */
+> +			interrupt-names = "pme", "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> @@ -552,9 +552,9 @@
+>  			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+>  			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 128 0x4>,
+> -				     <0 127 0x4>;
+> -			interrupt-names = "intr", "pme";
+> +			interrupts = <0 127 0x4>,
+> +					 <0 128 0x4>;
+> +			interrupt-names = "pme", "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> @@ -577,9 +577,9 @@
+>  			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+>  			       0x50 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 162 0x4>,
+> -				     <0 161 0x4>;
+> -			interrupt-names = "intr", "pme";
+> +			interrupts = <0 161 0x4>,
+> +					 <0 162 0x4>;
+> +			interrupt-names = "pme", "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> index 21023a3..58844e8 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -583,8 +583,8 @@
+>  			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+>  			       0x10 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 108 0x4>; /* Level high type */
+> -			interrupt-names = "intr";
+> +			interrupts = <0 108 0x4>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> @@ -607,8 +607,8 @@
+>  			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+>  			       0x12 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 113 0x4>; /* Level high type */
+> -			interrupt-names = "intr";
+> +			interrupts = <0 113 0x4>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> @@ -631,8 +631,8 @@
+>  			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+>  			       0x14 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 118 0x4>; /* Level high type */
+> -			interrupt-names = "intr";
+> +			interrupts = <0 118 0x4>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> @@ -655,8 +655,8 @@
+>  			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
+>  			       0x16 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 123 0x4>; /* Level high type */
+> -			interrupt-names = "intr";
+> +			interrupts = <0 123 0x4>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> -- 
+> 2.1.0.27.g96db324
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
