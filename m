@@ -1,64 +1,59 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 12 Sep 2016 14:37:06 +0200
-Subject: [UPDATE PATCH V10 1/8] ACPI: I/O Remapping Table (IORT) initial
- support
-In-Reply-To: <20160909092012.GC19669@red-moon>
-References: <1473152938-17388-2-git-send-email-tn@semihalf.com>
- <1473249412-20226-1-git-send-email-tn@semihalf.com>
- <20160909092012.GC19669@red-moon>
-Message-ID: <38e36eee-cece-75db-4781-5727dd11c93d@semihalf.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Sep 2016 13:38:09 +0100
+Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
+In-Reply-To: <57D69FB1.2020801@laposte.net>
+References: <57BDAF2E.10502@laposte.net>
+ <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
+ <57D69FB1.2020801@laposte.net>
+Message-ID: <20160912123809.GB13741@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On Mon, Sep 12, 2016 at 02:29:37PM +0200, Sebastian Frias wrote:
+> My question is about submitting DT properties/nodes (describing some HW) for
+> which there is no Linux driver. Like register addresses for HW blocks,
+> including HW capabilities of said HW blocks, which may or may not be setup
+> by Linux directly.
+> 
+> The idea being that since DT describes the HW and is usually shared with the
+> bootloader (yet stored in the Linux kernel tree), all layers of the stack
+> could use the same DT and each layer would use relevant properties. So the
+> DT would describe the whole SoC even if not all HW blocks have a Linux
+> driver.
+> 
+> 3rd party users of said SoC could then write kernel modules for such HW
+> blocks using the DT description. The DT would thus become the authoritative
+> source of information regarding register programming for the SoC.
 
-On 09.09.2016 11:20, Lorenzo Pieralisi wrote:
-> Hi Rafael,
->
-> On Wed, Sep 07, 2016 at 01:56:52PM +0200, Tomasz Nowicki wrote:
->> IORT shows representation of IO topology for ARM based systems.
->> It describes how various components are connected together on
->> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
->> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
->>
->> Initial support allows to detect IORT table presence and save its
->> root pointer obtained through acpi_get_table(). The pointer validity
->> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
->> is not set while using IORT nodes we would dereference unmapped pointers.
->>
->> For the aforementioned reason call iort_table_detect() from acpi_init()
->> which guarantees acpi_gbl_permanent_mmap to be set at that point.
->>
->> Add generic helpers which are helpful for scanning and retrieving
->> information from IORT table content. List of the most important helpers:
->> - iort_find_dev_node() finds IORT node for a given device
->> - iort_node_map_rid() maps device RID and returns IORT node which provides
->>   final translation
->>
->> IORT support is placed under drivers/acpi/arm64/ new directory due to its
->> ARM64 specific nature. The code there is considered only for ARM64.
->> The long term plan is to keep all ARM64 specific tables support
->> in this place e.g. GTDT table.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> ---
->
-> Apart from the minor commit logs oversights we consider these two
-> patches ready to go, please let us know if there is something you want
-> changed since we are at risk of missing yet another merge window.
->
-> It is ARM64 specific code, we created and moved the code to its
-> ARM64 specific directory and we are happy to maintain it as such,
-> we need your ACK to get this done so if there is something you
-> want changed please let us know otherwise I would ask your ACK
-> on these two patches to give Marc a go-ahead for -next and
-> hopefully 4.9.
+I don't follow this part entirely. Why are you expecting thrid parties
+to write a driver for those blocks rather than upstreaming a driver for
+them?
 
-Kindly reminder. Is there anything we need to do more about these 
-patches? Please let us know. Note this is the major thing for incoming 
-IORT more advance feature.
+> Currently, HW blocks for which there is no public driver (that it is
+> accessed through user-mode libraries or firmware) require a separate
+> HW description (be it Documentation, headers, etc.)
+> 
+> Since the DT describes the HW, it would make sense to expose the HW through
+> DT, that would centralise the HW description.
+
+I would generally agree that the hardware should be described in DT.
+The difficulty is that without a 'real' user it's not always possible to
+tell if we're describing the thing correctly.
+
+Putting smoething together that's only sufficient to support some
+out-of-tree driver with implicit assumptions that we are not aware of is
+far from fantastic.
+
+> However, after discussing over IRC, it looks like there was no guidance on
+> this. Some people think submitting DT properties/nodes without a corresponding
+> Linux driver is frowned upon, while others thought it was an odd limitation
+> and suggested asking here.
+
+Unfortunately, I think that the area is sufficiently vague that there
+simply is no clear and general answer.
+
+For the sake of discussion, an example of a particular block, along with
+what you expect/need to describe would be helpful.
 
 Thanks,
-Tomasz
+Mark.
