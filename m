@@ -1,105 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 12 Sep 2016 16:35:48 +0200
-Subject: [PATCH v5 2/3] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <20160912135655.GC9789@dell>
-References: <1473344917-1524-1-git-send-email-quentin.schulz@free-electrons.com>
- <1473344917-1524-3-git-send-email-quentin.schulz@free-electrons.com>
- <20160912091829.GB1873@dell>
- <93bd339b-85ab-d0fc-5e80-e2aca290c0d7@free-electrons.com>
- <20160912095923.GD1873@dell> <20160912100719.GJ9449@lukather>
- <20160912104932.GF1873@dell>
- <c322d309-993c-a572-5ffd-bf4012e26134@free-electrons.com>
- <20160912135655.GC9789@dell>
-Message-ID: <20160912143548.GL9449@lukather>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Sep 2016 15:37:47 +0100
+Subject: [GIT PULL] ARM: module PLT optimizations
+In-Reply-To: <CAKv+Gu_q0BOYqNmap-BGe_p2Cm7qgRMuJ_eKZFMANpJiMwqbVg@mail.gmail.com>
+References: <CAKv+Gu-=C_WwO30D=0nZCx9FMhj7qrHFzvkk4xnG81Y0t1bdUw@mail.gmail.com>
+ <CAKv+Gu_q0BOYqNmap-BGe_p2Cm7qgRMuJ_eKZFMANpJiMwqbVg@mail.gmail.com>
+Message-ID: <20160912143747.GX1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 02:56:55PM +0100, Lee Jones wrote:
-> > >>> Then use .data = <defined model ID> and set up a switch() in .probe().
-> > >>
-> > >> Uh? Why? It just adds a non-standard indirection, while using
-> > >> of_match_device is very standard, and used extensively in Linux.
-> > > 
-> > > You still use of_match_device() to obtain the ID.
-> > > 
-> > > The "don't mix DT with the MFD API" is there to prevent some of the
-> > > nasty hacks I've seen previously.  This particular example doesn't
-> > > seem so bad, but it's a gateway to ridiculous hackery!
-> > 
-> > How am I supposed to get the .data without of_match_node then?
-> > What's more hackish in using .data field for specific data for each
-> > compatible than in using a random ID in .data and switching on it? The
-> > result is exactly the same, the switching case being more verbose and
-> > adding complexity to something that can be done in a straightforward manner.
+On Mon, Sep 12, 2016 at 03:35:53PM +0100, Ard Biesheuvel wrote:
+> On 30 August 2016 at 17:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > Hello Russell,
+> >
+> > The following changes since commit 3eab887a55424fc2c27553b7bfe32330df83f7b8:
+> >
+> >   Linux 4.8-rc4 (2016-08-28 15:04:33 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
+> >                                           tags/arm-plt-optimizations-for-v4.9
+> >
+> > for you to fetch changes up to 66e94ba3c8ea5ff5f1443a50441f953ef44010b1:
+> >
+> >   ARM: kernel: avoid brute force search on PLT generation
+> >                                           (2016-08-30 17:45:34 +0100)
+> >
+> > ----------------------------------------------------------------
+> > This series of 4 patches optimizes the ARM PLT generation code that
+> > is invoked at module load time, to get rid of the O(n^2) algorithm
+> > that results in pathological load times of 10 seconds or more for
+> > large modules on certain STB platforms
+> >
+> > ----------------------------------------------------------------
+> > Ard Biesheuvel (4):
+> >       ARM: kernel: merge core and init PLTs
+> >       ARM: kernel: allocate PLT entries only for external symbols
+> >       ARM: kernel: sort relocation sections before allocating PLTs
+> >       ARM: kernel: avoid brute force search on PLT generation
+> >
+> >  arch/arm/include/asm/module.h |   6 +-
+> >  arch/arm/kernel/module-plts.c | 243 +++++++++++++++++++++++++-----------------
+> >  arch/arm/kernel/module.lds    |   3 +-
+> >  3 files changed, 147 insertions(+), 105 deletions(-)
+> >
 > 
-> I've already agreed that your implementation isn't terrible, but I'd
-> still like to remain strict on the rules.
-> 
-> Better still, can you can dynamically test which platform you're on,
-> via a version register or similar?
-> 
-> Failing that, see how everyone else does it:
-> 
->  `git grep "\.data" -- drivers/mfd/`
+> Ping?
 
-Just to make sure, you prefer something like
-
-static struct my_struct data = {
-};
-
-static struct my_struct data2 = {
-};
-
-struct of_device_id matches[] = {
-       { compatible = "...", data = <ID> },
-       { compatible = "...", data = <ID2> },
-};
-
-of_id = of_match_device (dev, matches);
-switch (of_id->data) {
-case <ID>:
-     function(data);
-case <ID2>:
-     function(data2);
-};
-
-over
-
-static struct my_struct data = {
-};
-
-static struct my_struct data2 = {
-};
-
-struct of_device_id matches[] = {
-       { compatible = "...", data = data },
-       { compatible = "...", data = data2 },
-};
-
-of_id = of_match_device (dev, matches);
-function(of_id->data);
-
-?
-
-This is the *only* time this is going to be used in that driver. I can
-understand the need for a version if you need to apply quirks in
-several functions, but here it clearly looks suboptimal.
-
-And we are indeed using this construct in the AXP MFD, and it just
-doesn't scale either and become quite difficult to maintain when you
-have a significant number of variants, and then you have to patch
-*all* the switch instances to get something done.
-
-Maxime
+It's been pulled, been through testing and I'm going to be pushing it
+out into -next soon.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160912/a8dbac92/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
