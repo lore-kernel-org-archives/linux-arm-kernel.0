@@ -1,66 +1,90 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 12 Sep 2016 20:32:22 +0200
-Subject: [PATCH V11 3/8] PCI/MSI: Setup MSI domain on a per-device basis using
- IORT ACPI table
+Date: Mon, 12 Sep 2016 20:32:26 +0200
+Subject: [PATCH V11 7/8] irqchip/gicv3-its: Factor out PCI-MSI part that might
+ be reused for ACPI
 In-Reply-To: <1473705147-6588-1-git-send-email-tn@semihalf.com>
 References: <1473705147-6588-1-git-send-email-tn@semihalf.com>
-Message-ID: <1473705147-6588-4-git-send-email-tn@semihalf.com>
+Message-ID: <1473705147-6588-8-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible to provide information about which MSI controller to
-use on a per-device basis for DT. This patch supply this with ACPI support.
-
-Currently, IORT is the only one ACPI table which can provide such mapping.
-In order to plug IORT into MSI infrastructure we are adding ACPI
-equivalents for finding PCI device domain and its RID translation
-(pci_msi_domain_get_msi_rid and pci_msi_domain_get_msi_rid calls).
+Firmware agnostic code lands in common functions which do necessary
+domain initialization based on unique domain handler. DT specific
+code goes to DT specific init call.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/msi.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c | 44 +++++++++++++++++++++-----------
+ 1 file changed, 29 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 98f1222..137b4c5 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -19,6 +19,7 @@
- #include <linux/smp.h>
- #include <linux/errno.h>
- #include <linux/io.h>
-+#include <linux/acpi_iort.h>
- #include <linux/slab.h>
- #include <linux/irqdomain.h>
- #include <linux/of_irq.h>
-@@ -1502,8 +1503,8 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
- 	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
+diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+index aee60ed..d2c2496 100644
+--- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+@@ -106,34 +106,48 @@ static struct of_device_id its_device_id[] = {
+ 	{},
+ };
  
- 	of_node = irq_domain_get_of_node(domain);
--	if (of_node)
--		rid = of_msi_map_rid(&pdev->dev, of_node, rid);
-+	rid = of_node ? of_msi_map_rid(&pdev->dev, of_node, rid) :
-+			iort_msi_map_rid(&pdev->dev, rid);
- 
- 	return rid;
- }
-@@ -1519,9 +1520,13 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
-  */
- struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
+-static int __init its_pci_msi_init(void)
++static int __init its_pci_msi_init_one(struct fwnode_handle *handle,
++				       const char *name)
  {
-+	struct irq_domain *dom;
- 	u32 rid = 0;
+-	struct device_node *np;
+ 	struct irq_domain *parent;
  
- 	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
--	return of_msi_map_get_device_domain(&pdev->dev, rid);
-+	dom = of_msi_map_get_device_domain(&pdev->dev, rid);
-+	if (!dom)
-+		dom = iort_get_device_domain(&pdev->dev, rid);
-+	return dom;
++	parent = irq_find_matching_fwnode(handle, DOMAIN_BUS_NEXUS);
++	if (!parent || !msi_get_domain_info(parent)) {
++		pr_err("%s: Unable to locate ITS domain\n", name);
++		return -ENXIO;
++	}
++
++	if (!pci_msi_create_irq_domain(handle, &its_pci_msi_domain_info,
++				       parent)) {
++		pr_err("%s: Unable to create PCI domain\n", name);
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++static int __init its_pci_of_msi_init(void)
++{
++	struct device_node *np;
++
+ 	for (np = of_find_matching_node(NULL, its_device_id); np;
+ 	     np = of_find_matching_node(np, its_device_id)) {
+ 		if (!of_property_read_bool(np, "msi-controller"))
+ 			continue;
+ 
+-		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
+-		if (!parent || !msi_get_domain_info(parent)) {
+-			pr_err("%s: unable to locate ITS domain\n",
+-			       np->full_name);
++		if (its_pci_msi_init_one(of_node_to_fwnode(np), np->full_name))
+ 			continue;
+-		}
+-
+-		if (!pci_msi_create_irq_domain(of_node_to_fwnode(np),
+-					       &its_pci_msi_domain_info,
+-					       parent)) {
+-			pr_err("%s: unable to create PCI domain\n",
+-			       np->full_name);
+-			continue;
+-		}
+ 
+ 		pr_info("PCI/MSI: %s domain created\n", np->full_name);
+ 	}
+ 
+ 	return 0;
  }
- #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
++
++static int __init its_pci_msi_init(void)
++{
++	its_pci_of_msi_init();
++
++	return 0;
++}
+ early_initcall(its_pci_msi_init);
 -- 
 1.9.1
