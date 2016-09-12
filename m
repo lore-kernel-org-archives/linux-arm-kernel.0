@@ -1,37 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Sep 2016 13:59:48 +0100
-Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <20160912123027.GA13741@leverpostej>
-References: <1473469413-11019-1-git-send-email-oss@buserror.net>
- <1473469413-11019-3-git-send-email-oss@buserror.net>
- <20160912113615.GA20804@leverpostej>
- <20160912114406.GG23211@arm.com>
- <20160912123027.GA13741@leverpostej>
-Message-ID: <20160912125948.GB13899@leverpostej>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 12 Sep 2016 15:02:13 +0200
+Subject: [PATCH V2 00/10] PM / Domains: Add support for removing PM domains
+In-Reply-To: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
+References: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <CAPDyKFqd6vH=eCKBSQg0Q5w9x8sd0SiZ42E7yJn6ZDWP1OMuZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 01:30:28PM +0100, Mark Rutland wrote:
-> On Mon, Sep 12, 2016 at 12:44:07PM +0100, Will Deacon wrote:
-> > On Mon, Sep 12, 2016 at 12:36:15PM +0100, Mark Rutland wrote:
-> > > The changes in arm64's <asm/arch_timer.h> are going to conflict with
-> > > some cleanup [1,2] that just landed in the arm64 for-next/core branch.
-> > > 
-> > > Could you please rebase atop of that?
-> > 
-> > Well, we should figure out what tree this is going through first. There
-> > are a mixture of arm, arm64, driver and dts changes here and not all
-> > of it is carrying the appropriate acks for me to queue it.
-> 
-> Given that mix, I had assumed that this would all go through the arm64
-> tree -- I see that Rob has already acked the binding, and I'm happy to
-> give my ack for the driver once that's in shape.
+On 12 September 2016 at 13:01, Jon Hunter <jonathanh@nvidia.com> wrote:
+> In order to safely remove PM domains there are a few changes that need to be
+> made to ensure that no one is holding an external reference to a PM domain
+> after it has been removed. One solution, implemented here, solves this by
+> eliminating external references to PM domain.
+>
+> Changes from V1:
+> - Added test when removing a PM domain to ensure the PM domain provider
+>   has been removed.
+> - Re-organised patches 8-10 so that patch #8 adds the code to verify if
+>   the provider is present, patch #9 adds basic support for removing PM
+>   domains and patch #10 adds support for removing PM domains by provider.
+>
+> Changes from initial RFC:
+> - Renamed functions made static per Ulf's feedback.
+> - Added patch to clean-up provider/xlate APIs per Ulf's feedback
+> - Re-worked and simplified the association between PM domains and PM
+>   domain providers. Dropped the 'provider_data' variable from the
+>   generic_pm_domain structure in favour of using the fwnode_handle.
+> - Split patch for removing PM domains into multiple patches per Ulf's
+>   feedback.
+>
+> Jon Hunter (10):
+>   PM / Domains: Add new helper functions for device-tree
+>   ARM: EXYNOS: Remove calls to of_genpd_get_from_provider()
+>   staging: board: Remove calls to of_genpd_get_from_provider()
+>   PM / Domains: Don't expose generic_pm_domain structure to clients
+>   PM / Domains: Don't expose xlate and provider helper functions
+>   PM / Domains: Verify the PM domain is present when adding a provider
+>   PM / Domains: Prepare for adding support to remove PM domains
+>   PM / Domains: Store the provider in the PM domain structure
+>   PM / Domains: Add support for removing PM domains
+>   PM / Domains: Add support for removing nested PM domains by provider
+>
+>  drivers/base/power/domain.c      | 353 +++++++++++++++++++++++++++++++++++----
+>  drivers/soc/samsung/pm_domains.c |  23 +--
+>  drivers/staging/board/board.c    |   9 +-
+>  include/linux/pm_domain.h        |  74 ++++----
+>  4 files changed, 364 insertions(+), 95 deletions(-)
+>
+> --
+> 2.1.4
+>
 
-Now I see that I'd missed the arch/arm changes in patch 4, which lack a
-relevant ack.
+Jon, thanks for being patient and keep working on this series! I have
+now completed the review and I am happy with this version.
 
-Given that, I don't know what to suggest.
+Also, I remember Krzysztof requested an immutable branch for this
+series, I guess Rafael can arrange that if still needed!?
 
-Thanks,
-Mark.
+Kind regards
+Uffe
