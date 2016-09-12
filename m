@@ -1,54 +1,211 @@
-From: pku.leo@gmail.com (Leo Li)
-Date: Mon, 12 Sep 2016 11:27:13 -0500
-Subject: [PATCH v5] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <20160912102136.04c0728d@ipc1.ka-ro>
-References: <1471644322-22670-1-git-send-email-leoyang.li@nxp.com>
- <20160906185849.27pjhawadca5pwow@pengutronix.de>
- <CADRPPNQ+1qBNL5WA=Jo_keE7BPnoOs7a2T6CpTuciiF16qK6xQ@mail.gmail.com>
- <87ca69fb85848a0a86b34a9a9037a57b@agner.ch>
- <CADRPPNSPye45bmFshfwb+gDA0x0ygs4Ofa6HMYbKt9ER0oeccg@mail.gmail.com>
- <8f8f7ffc4aef513ef5064ba0491fbc63@agner.ch>
- <CADRPPNR4oiRVgFqaM=1=Zn_JzrVJDVmozWsouLByXRtaHCh=qQ@mail.gmail.com>
- <306f579a2f2362595a55c53e48657563@agner.ch>
- <CADRPPNS3PecYRaAMR+0RuzU+gE3y5ZN-x7HzqggrdDsN-CkArg@mail.gmail.com>
- <20160912102136.04c0728d@ipc1.ka-ro>
-Message-ID: <CADRPPNQbTCs9TLqUSNUTG6YBn3fs8F6FKUw1G582D4ExcL1oVQ@mail.gmail.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 12 Sep 2016 18:28:11 +0200
+Subject: [PATCH 2/3] ARM64: dts: amlogic: Add basic support for Amlogic
+ S905X
+In-Reply-To: <20160903082227.30559-3-narmstrong@baylibre.com>
+References: <20160903082227.30559-1-narmstrong@baylibre.com>
+ <20160903082227.30559-3-narmstrong@baylibre.com>
+Message-ID: <7e27e8c0-bb18-40d8-10d6-3928e66815c7@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 3:21 AM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> Hi,
->
-> On Fri, 9 Sep 2016 14:37:12 -0500 Leo Li wrote:
->> On Fri, Sep 9, 2016 at 11:51 AM, Stefan Agner <stefan@agner.ch> wrote:
->> > On 2016-09-08 16:57, Leo Li wrote:
-> [...]
->> >> people fix problem that they don't really care by deliberately enlarge
->> >> the problem.  That's why we don't panic() on any error we found.  For
->> >> those who do care about the bus recovery, they can get the information
->> >> from the console.
->> >
->> > IMHO, it is just stupid to ignore errors and then let the developer
->> > later on trace back what the initial issue was. Error out early is a
->> > common sense software design principle...
->> >
->> > I am not asking for a panic(), I am just suggesting to only ignore
->> > pinctrl if it returns -ENODEV, the case you care are about.
->>
->> It was just an analogy for enlarging the problem for getting
->> attention.  But you probably thought that it was not enlarging the
->> problem as you think pinctrl is required by the driver instead of an
->> optional thing.
->>
-> The I2C bus recovery is a feature which is not used during normal
-> operation and you won't find that it's not working unless something
-> unusual happens (probably only in a productive environment). It may even
-> be hard to trigger a condition to test the feature.
-> Thus IMO it is vital that the driver complains loudly if something is
-> missing to make this feature work if requested.
+Hi,
 
-I agree.  A message is already added in this patch to mention that bus
-recovery is not supported due to pinctrl when there is a problem.
+Am 03.09.2016 um 10:22 schrieb Neil Armstrong:
+> From: Carlo Caione <carlo@endlessm.com>
+> 
+> This patch introduces the basic support for the Amlogic S905X (Meson
+> GXL) and for the Amlogic evaluation board P212.
+> No documentation has been released yet for this SoC, so for now only the
+> bare minimum has been added in the DT.
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Andreas F?rber <afaerber@suse.de>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/arm/amlogic.txt  |  5 ++
+>  arch/arm64/boot/dts/amlogic/Makefile               |  1 +
+>  .../boot/dts/amlogic/meson-gxl-s905x-p212.dts      | 70 ++++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi   | 48 +++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 48 +++++++++++++++
+>  5 files changed, 172 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+> index fcc6f6c..702c911 100644
+> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+> @@ -17,6 +17,10 @@ Boards with the Amlogic Meson GXBaby SoC shall have the following properties:
+>    Required root node property:
+>      compatible: "amlogic,meson-gxbb";
+>  
+> +Boards with the Amlogic Meson GXL SoC shall have the following properties:
+> +  Required root node property:
+> +    compatible: "amlogic,meson-gxl-s905x", "amlogic,meson-gxl";
+
+Can we please use "amlogic,s905x", "amlogic,meson-gxl"? No need to
+complicate the name. Also affects .dtsi and .dts below.
+
+> +
+>  Board compatible values:
+>    - "geniatech,atv1200" (Meson6)
+>    - "minix,neo-x8" (Meson8)
+> @@ -28,3 +32,4 @@ Board compatible values:
+>    - "hardkernel,odroid-c2" (Meson gxbb)
+>    - "amlogic,p200" (Meson gxbb)
+>    - "amlogic,p201" (Meson gxbb)
+> +  - "amlogic,p212" (Meson gxl s905x)
+[...]
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+> new file mode 100644
+> index 0000000..e0df975
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+> @@ -0,0 +1,70 @@
+> +/*
+> + * Copyright (c) 2016 Endless Computers, Inc.
+> + * Author: Carlo Caione <carlo@endlessm.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "meson-gxl-s905x.dtsi"
+> +
+> +/ {
+> +	compatible = "amlogic,p212", "amlogic,meson-gxl-s905x", "amlogic,meson-gxl";
+> +	model = "Amlogic Meson GXL (S905X) P212 Development Board";
+
+Is that its official name? No objection, just wondering whether we need
+both GXL and S905X in the name, and then again the SoC name at all if
+the P212 is unique. Haven't compared the previous Pxxx ones.
+
+> +
+> +	aliases {
+> +		serial0 = &uart_AO;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x0 0x0 0x80000000>;
+> +	};
+> +};
+> +
+> +/* This UART is brought out to the DB9 connector */
+> +&uart_AO {
+> +	status = "okay";
+> +};
+> +
+
+Trailing white line - please watch out for that, git-am will complain.
+
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+> new file mode 100644
+> index 0000000..b9e94f1
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+> @@ -0,0 +1,48 @@
+> +/*
+> + * Copyright (c) 2016 Endless Computers, Inc.
+> + * Author: Carlo Caione <carlo@endlessm.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "meson-gxl.dtsi"
+> +
+> +/ {
+> +	compatible = "amlogic,meson-gxl", "amlogic,meson-gxl-s905x";
+
+This needs to be reversed.
+
+> +};
+[snip]
 
 Regards,
-Leo
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
