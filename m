@@ -1,71 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Sep 2016 09:51:43 +0100
-Subject: [PATCH v4 1/5] arm/arm64: vgic-new: Implement support for
- userspace access
-In-Reply-To: <CALicx6sHYqwGdW_zwE9d8BWO2BucQM6gEoLZAtJ6XG0AjAuGGw@mail.gmail.com>
-References: <1473510138-4719-1-git-send-email-vijay.kilari@gmail.com>
- <1473510138-4719-2-git-send-email-vijay.kilari@gmail.com>
- <57D66679.3020804@arm.com>
- <CALicx6sHYqwGdW_zwE9d8BWO2BucQM6gEoLZAtJ6XG0AjAuGGw@mail.gmail.com>
-Message-ID: <57D66C9F.8070003@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 12 Sep 2016 09:55:27 +0100
+Subject: Regmap regression in next caused by of_iomap change
+In-Reply-To: <4088076.eNNe5WgnxT@wuerfel>
+References: <20160908184111.vj3sb2ik6ydehkag@atomide.com>
+ <4088076.eNNe5WgnxT@wuerfel>
+Message-ID: <20160912085527.GA1873@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/16 09:46, Vijay Kilari wrote:
-> On Mon, Sep 12, 2016 at 1:55 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 10/09/16 13:22, vijay.kilari at gmail.com wrote:
->>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>>
->>> +
->>> +void vgic_uaccess_write_pending(struct kvm_vcpu *vcpu,
->>> +                             gpa_t addr, unsigned int len,
->>> +                             unsigned long val)
->>> +{
->>> +     u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
->>> +     int i;
->>> +
->>> +     for (i = 0; i < len * 8; i++) {
->>> +             struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->>> +
->>> +             spin_lock(&irq->irq_lock);
->>> +             if (test_bit(i, &val)) {
->>> +                     irq->pending = true;
->>> +                     irq->soft_pending = true;
->>> +                     vgic_queue_irq_unlock(vcpu->kvm, irq);
->>> +             } else {
->>> +                     irq->soft_pending = false;
->>> +                     if (irq->config == VGIC_CONFIG_EDGE ||
->>> +                         (irq->config == VGIC_CONFIG_LEVEL &&
->>> +                         !irq->line_level))
->>> +                             irq->pending = false;
->>> +                     spin_unlock(&irq->irq_lock);
->>> +             }
->>> +
->>> +             vgic_put_irq(vcpu->kvm, irq);
->>> +     }
->>> +}
->>> +
->>
->> These two functions only seems to be called from the GICv3 code. What is
->> the rational for making them globally accessible? Or should they also be
->> wired into the GICv2 code?
+On Thu, 08 Sep 2016, Arnd Bergmann wrote:
+
+> On Thursday, September 8, 2016 11:41:12 AM CEST Tony Lindgren wrote:
+> > Hi,
+> > 
+> > Looks like commit 39de2c4275a9 ("mfd: syscon: Make use of of_iomap")
+> > makes at least MMC PBIAS regulator stop working on omap3.
+> >
+> > That's probably because of_syscon_register uses the now unintialized
+> > struct resource res to set syscon_config.max_register.
 > 
-> Yes, probably this might be required for V2. But I don't have GICv2 platform
-> to implement and verify it. Also not aware if someone is looking at
-> migration with GICv2
-> platform with this new vgic code.
+> Looks correct. Lee, please send a revert of that patch to Linus
+> along with any other fixes you may have.
 
-Migration is already supported, and we can always verify it once you've
-made the change.
+No need.  It's not in Mainline.
 
+> > I have a strange deja vu feeling that we've been through this
+> > before  See commit ca668f0edfae ("mfd: syscon: Set regmap max_register
+> > in of_syscon_register")
+> > 
+> > Maybe we should add comments there instead?
 > 
-> Can be kept here for later to wire into GICv2 code.
+> I wonder why gcc didn't detect this case. I usually do my
+> test builds with -Wmaybe-uninitialized that should have
+> caught it but didn't.
 
-I don't think so. You are implementing this code, so please wire it into
-the potential users.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
