@@ -1,66 +1,92 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 12 Sep 2016 09:21:39 +0200
-Subject: [PATCH 08/10] PM / Domains: Add support for removing PM domains
-In-Reply-To: <63871fe6-cda6-2a95-9c09-e4b3ebfa3419@nvidia.com>
-References: <1471340976-5379-1-git-send-email-jonathanh@nvidia.com>
- <1471340976-5379-9-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFrVO9wb3ffmxA7HUUDt1_aYxe=aqa1v+xNpdrYiLt_m0A@mail.gmail.com>
- <c8498eca-6934-1cab-31d9-3d8ce4c74897@nvidia.com>
- <63871fe6-cda6-2a95-9c09-e4b3ebfa3419@nvidia.com>
-Message-ID: <CAPDyKFp+eDBLge40uv6aDuYOkaKAksgqZekqomLZijPrhDzj6A@mail.gmail.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon, 12 Sep 2016 08:24:24 +0100
+Subject: [PATCH v7 0/8] CPUs capacity information for heterogeneous systems
+In-Reply-To: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
+References: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
+Message-ID: <20160912072424.GL10409@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 September 2016 at 17:17, Jon Hunter <jonathanh@nvidia.com> wrote:
->
-> On 09/09/16 14:54, Jon Hunter wrote:
->> On 08/09/16 12:49, Ulf Hansson wrote:
->>> On 16 August 2016 at 11:49, Jon Hunter <jonathanh@nvidia.com> wrote:
->>>> The genpd framework allows users to add PM domains via the pm_genpd_init()
->>>> function, however, there is no corresponding function to remove a PM
->>>> domain. For most devices this may be fine as the PM domains are never
->>>> removed, however, for devices that wish to populate the PM domains from
->>>> within a driver, having the ability to remove a PM domain if the probing
->>>> of the device fails or the driver is unloaded is necessary.
->>>>
->>>> Add the function pm_genpd_remove() to remove a PM domain by referencing
->>>> it's generic_pm_domain structure.
->>>>
->>>> PM domains can only be removed if they are not a parent domain to
->>>> another PM domain and have no devices associated with them.
->>>
->>> I think we should also check if the there's is a provider registered
->>> for the genpd, as it should also prevent the genpd from being removed.
->>> Right?
->>
->> Yes I would agree. I had thought that after patch #4 of this series that
->> only the provider itself would be able to call this. However, we should
->> probably still verify that the provider has correctly remove itself.
->
-> So now I have the following. I am still not 100% happy. I cannot clear
-> the ->provider when calling of_genpd_del_provider() and so I cannot use
-> this to verify if the provider is present and so I need to check the
-> list of providers and it gets a bit messy. I have been wracking my
-> brains to find a better alternative (including a single function to
-> remove the provider and domains at once but there are issues with that
-> as well).
+Hi,
 
-Instead of using the ->provider pointer to know whether the genpd has
-a valid provider, why not just add an additional ->has_provider bool
-flag in the genpd struct?
+this is a ping for people interested in this series. Patches 2,4,7-8
+still needs ACKs.
 
-Simply set the flag when adding the provider and reset it when
-removing it. Wouldn't that work?
+I know it's only been a week since I posted v7, but this series would
+pair nicely with asym cpu capacity support bits already sitting in
+tip/sched/core. I also know that it might be already late for 4.9 merge
+window; nevertheless, still hoping we can make it.
 
->
-> I think that long term it may make sense to reference the providers
-> exclusively by the fwnode_handle and make the list of provider non-DT
-> specific. I could do it now, but it would increase the series.
+Thanks!
 
-Perhaps a good idea. Although I agree, let's not make that change as a
-part of this series.
+Best,
 
-[...]
+- Juri
 
-Kind regards
-Uffe
+On 05/09/16 15:22, Juri Lelli wrote:
+> Hi all,
+> 
+> version 7 of "CPUs capacity information for heterogeneous systems" patchset [1]
+> (please refer to previous postings to get some context).
+> 
+> A few changes from v6:
+> 
+>  - rebase on top of mainline (4.8-rc5)
+>  - some ACKs collected
+>  - changelogs fixes
+>  - use cpuinfo.max_freq
+>  - add delayed work to unregister notifier
+> 
+> Patches high level description:
+> 
+>  o 01/08 introduces documentation for the new optional DT binding
+>  o [02-06]/08 add cpu-capacity attribute to TC2, Juno and Juno r2 DTs and
+>    provide parsing of such information at boot time
+>  o [07-08]/08 introduce sysfs attribute
+> 
+> In case you would like to test this out, I pushed a branch here:
+> 
+>  git://linux-arm.org/linux-jl.git upstream/default_caps_v7
+> 
+> This branch contains additional patches, useful to better understand how CPU
+> capacity information is actually used by the scheduler.
+> 
+> These patches also form the basis for Morten/Dietmar's "Clean-ups and
+> asymmetric cpu capacity support" series [2] (and the EAS stack in general).
+> 
+> Best,
+> 
+> - Juri
+> 
+> [1] v1 - https://lkml.org/lkml/2015/11/23/391
+>     v2 - https://lkml.org/lkml/2016/1/8/417
+>     v3 - https://lkml.org/lkml/2016/2/3/405
+>     v4 - https://lkml.org/lkml/2016/3/18/350
+>     v5 - https://lkml.org/lkml/2016/6/15/291
+>     v6 - https://lkml.org/lkml/2016/7/19/419
+> [2] https://lkml.org/lkml/2016/8/31/292 
+> 
+> 
+> Juri Lelli (8):
+>   Documentation: arm: define DT cpu capacity-dmips-mhz bindings
+>   arm: parse cpu capacity-dmips-mhz from DT
+>   arm, dts: add TC2 cpu capacity-dmips-mhz information
+>   arm64: parse cpu capacity-dmips-mhz from DT
+>   arm64, dts: add Juno cpu capacity-dmips-mhz information
+>   arm64, dts: add Juno r2 cpu capacity-dmips-mhz information
+>   arm: add sysfs cpu_capacity attribute
+>   arm64: add sysfs cpu_capacity attribute
+> 
+>  .../devicetree/bindings/arm/cpu-capacity.txt       | 236 +++++++++++++++++++++
+>  Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |   5 +
+>  arch/arm/kernel/topology.c                         | 228 +++++++++++++++++++-
+>  arch/arm64/boot/dts/arm/juno-r2.dts                |   6 +
+>  arch/arm64/boot/dts/arm/juno.dts                   |   6 +
+>  arch/arm64/kernel/topology.c                       | 232 +++++++++++++++++++-
+>  7 files changed, 721 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/cpu-capacity.txt
+> 
+> -- 
+> 2.7.0
+> 
