@@ -1,194 +1,225 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 12 Sep 2016 10:42:22 +0100
-Subject: [PATCH v3 7/8] ARM: Move system register accessors to asm/cp15.h
-In-Reply-To: <57D2EBE4.4060107@arm.com>
-References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
- <1473350810-10857-8-git-send-email-vladimir.murzin@arm.com>
- <57D2EBE4.4060107@arm.com>
-Message-ID: <57D6787E.1050804@arm.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Mon, 12 Sep 2016 11:43:51 +0200
+Subject: [PATCH v5 2/3] mfd: add support for Allwinner SoCs ADC
+In-Reply-To: <20160912091829.GB1873@dell>
+References: <1473344917-1524-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1473344917-1524-3-git-send-email-quentin.schulz@free-electrons.com>
+ <20160912091829.GB1873@dell>
+Message-ID: <93bd339b-85ab-d0fc-5e80-e2aca290c0d7@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/16 18:05, Marc Zyngier wrote:
-> On 08/09/16 17:06, Vladimir Murzin wrote:
->> Headers linux/irqchip/arm-gic.v3.h and arch/arm/include/asm/kvm_hyp.h
->> are included in virt/kvm/arm/hyp/vgic-v3-sr.c and both define macros
->> called __ACCESS_CP15 and __ACCESS_CP15_64 which obviously creates a
->> conflict. These macros were introduced independently for GIC and KVM
->> and, in fact, do the same thing.
->>
->> As an option we could add prefixes to KVM and GIC version of macros so
->> they won't clash, but it'd introduce code duplication.  Alternatively,
->> we could keep macro in, say, GIC header and include it in KVM one (or
->> vice versa), but such dependency would not look nicer.
->>
->> So we follow arm64 way (it handles this via sysreg.h) and move only
->> single set of macros to asm/cp15.h
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> ---
->>  arch/arm/include/asm/arch_gicv3.h |   27 +++++++++++----------------
->>  arch/arm/include/asm/cp15.h       |   15 +++++++++++++++
->>  arch/arm/include/asm/kvm_hyp.h    |   15 +--------------
->>  3 files changed, 27 insertions(+), 30 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
->> index e08d151..af25c32 100644
->> --- a/arch/arm/include/asm/arch_gicv3.h
->> +++ b/arch/arm/include/asm/arch_gicv3.h
->> @@ -22,9 +22,7 @@
->>  
->>  #include <linux/io.h>
->>  #include <asm/barrier.h>
->> -
->> -#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	p15, Op1, %0, CRn, CRm, Op2
->> -#define __ACCESS_CP15_64(Op1, CRm)		p15, Op1, %Q0, %R0, CRm
->> +#include <asm/cp15.h>
->>  
->>  #define ICC_EOIR1			__ACCESS_CP15(c12, 0, c12, 1)
->>  #define ICC_DIR				__ACCESS_CP15(c12, 0, c11, 1)
->> @@ -102,58 +100,55 @@
->>  
->>  static inline void gic_write_eoir(u32 irq)
->>  {
->> -	asm volatile("mcr " __stringify(ICC_EOIR1) : : "r" (irq));
->> +	write_sysreg(irq, ICC_EOIR1);
->>  	isb();
->>  }
->>  
->>  static inline void gic_write_dir(u32 val)
->>  {
->> -	asm volatile("mcr " __stringify(ICC_DIR) : : "r" (val));
->> +	write_sysreg(val, ICC_DIR);
->>  	isb();
->>  }
->>  
->>  static inline u32 gic_read_iar(void)
->>  {
->> -	u32 irqstat;
->> +	u32 irqstat = read_sysreg(ICC_IAR1);
->>  
->> -	asm volatile("mrc " __stringify(ICC_IAR1) : "=r" (irqstat));
->>  	dsb(sy);
->> +
->>  	return irqstat;
->>  }
->>  
->>  static inline void gic_write_pmr(u32 val)
->>  {
->> -	asm volatile("mcr " __stringify(ICC_PMR) : : "r" (val));
->> +	write_sysreg(val, ICC_PMR);
->>  }
->>  
->>  static inline void gic_write_ctlr(u32 val)
->>  {
->> -	asm volatile("mcr " __stringify(ICC_CTLR) : : "r" (val));
->> +	write_sysreg(val, ICC_CTLR);
->>  	isb();
->>  }
->>  
->>  static inline void gic_write_grpen1(u32 val)
->>  {
->> -	asm volatile("mcr " __stringify(ICC_IGRPEN1) : : "r" (val));
->> +	write_sysreg(val, ICC_IGRPEN1);
->>  	isb();
->>  }
->>  
->>  static inline void gic_write_sgi1r(u64 val)
->>  {
->> -	asm volatile("mcrr " __stringify(ICC_SGI1R) : : "r" (val));
->> +	write_sysreg(val, ICC_SGI1R);
->>  }
->>  
->>  static inline u32 gic_read_sre(void)
->>  {
->> -	u32 val;
->> -
->> -	asm volatile("mrc " __stringify(ICC_SRE) : "=r" (val));
->> -	return val;
->> +	return read_sysreg(ICC_SRE);
->>  }
->>  
->>  static inline void gic_write_sre(u32 val)
->>  {
->> -	asm volatile("mcr " __stringify(ICC_SRE) : : "r" (val));
->> +	write_sysreg(val, ICC_SRE);
->>  	isb();
->>  }
->>  
->> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
->> index c3f1152..f661732 100644
->> --- a/arch/arm/include/asm/cp15.h
->> +++ b/arch/arm/include/asm/cp15.h
->> @@ -47,6 +47,21 @@
->>  #define vectors_high()	(0)
->>  #endif
->>  
->> +#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	\
->> +	"mrc", "mcr", __stringify(p15, Op1, %0, CRn, CRm, Op2), u32
->> +#define __ACCESS_CP15_64(Op1, CRm)		\
->> +	"mrrc", "mcrr", __stringify(p15, Op1, %Q0, %R0, CRm), u64
->> +
->> +#define __read_sysreg(r, w, c, t) ({				\
->> +	t __val;						\
->> +	asm volatile(r " " c : "=r" (__val));			\
->> +	__val;							\
->> +})
->> +#define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
->> +
->> +#define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
->> +#define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
->> +
+On 12/09/2016 11:18, Lee Jones wrote:
+> On Thu, 08 Sep 2016, Quentin Schulz wrote:
 > 
-> Shouldn't that be placed after the #ifdef below?
+[...]
+>> +	  To compile this driver as a module, choose M here: the module will be
+>> +	  called sun4i-gpadc-mfd.
 > 
->>  #ifdef CONFIG_CPU_CP15
->>  
->>  extern unsigned long cr_alignment;	/* defined in entry-armv.S */
->> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
->> index bd9434e..0b475d2 100644
->> --- a/arch/arm/include/asm/kvm_hyp.h
->> +++ b/arch/arm/include/asm/kvm_hyp.h
->> @@ -20,26 +20,13 @@
->>  
->>  #include <linux/compiler.h>
->>  #include <linux/kvm_host.h>
->> +#include <asm/cp15.h>
->>  #include <asm/kvm_mmu.h>
->>  #include <asm/vfp.h>
->>  
->> -#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	\
->> -	"mrc", "mcr", __stringify(p15, Op1, %0, CRn, CRm, Op2), u32
->> -#define __ACCESS_CP15_64(Op1, CRm)		\
->> -	"mrrc", "mcrr", __stringify(p15, Op1, %Q0, %R0, CRm), u64
->>  #define __ACCESS_VFP(CRn)			\
->>  	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
->>  
->> -#define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
->> -#define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
->> -
->> -#define __read_sysreg(r, w, c, t) ({				\
->> -	t __val;						\
->> -	asm volatile(r " " c : "=r" (__val));			\
->> -	__val;							\
->> -})
->> -#define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
->> -
->>  #define write_special(v, r)					\
->>  	asm volatile("msr " __stringify(r) ", %0" : : "r" (v))
->>  #define read_special(r) ({					\
->>
+> Drop the -mfd.
 > 
-> Could you please cc RMK on this, given that this touches a core arch/arm
-> file?
+>>  config MFD_AS3711
+>>  	bool "AMS AS3711"
+>>  	select MFD_CORE
+>> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+>> index 42a66e1..3b964d7 100644
+>> --- a/drivers/mfd/Makefile
+>> +++ b/drivers/mfd/Makefile
+>> @@ -205,3 +205,5 @@ intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
+>>  intel-soc-pmic-$(CONFIG_INTEL_PMC_IPC)	+= intel_soc_pmic_bxtwc.o
+>>  obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
+>>  obj-$(CONFIG_MFD_MT6397)	+= mt6397-core.o
+>> +
+>> +obj-$(CONFIG_MFD_SUN4I_GPADC)	+= sun4i-gpadc-mfd.o
+>> diff --git a/drivers/mfd/sun4i-gpadc-mfd.c b/drivers/mfd/sun4i-gpadc-mfd.c
+>> new file mode 100644
+>> index 0000000..b499545
+>> --- /dev/null
+>> +++ b/drivers/mfd/sun4i-gpadc-mfd.c
+> 
+> Drop the -mfd.
+> 
+>> @@ -0,0 +1,174 @@
+>> +/* ADC MFD core driver for sunxi platforms
+>> + *
+>> + * Copyright (c) 2016 Quentin Schulz <quentin.schulz@free-electrons.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms of the GNU General Public License version 2 as published by
+>> + * the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/interrupt.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/mfd/core.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/regmap.h>
+>> +
+>> +#include <linux/mfd/sun4i-gpadc-mfd.h>
+>> +
+>> +static struct resource adc_resources[] = {
+>> +	{
+>> +		.name	= "FIFO_DATA_PENDING",
+>> +		.start	= SUN4I_GPADC_IRQ_FIFO_DATA,
+>> +		.end	= SUN4I_GPADC_IRQ_FIFO_DATA,
+>> +		.flags	= IORESOURCE_IRQ,
+>> +	}, {
+>> +		.name	= "TEMP_DATA_PENDING",
+>> +		.start	= SUN4I_GPADC_IRQ_TEMP_DATA,
+>> +		.end	= SUN4I_GPADC_IRQ_TEMP_DATA,
+>> +		.flags	= IORESOURCE_IRQ,
+>> +	},
+>> +};
+> 
+> Use the RES_IRQ_* defines.
+> 
+>> +static const struct regmap_irq sun4i_gpadc_mfd_regmap_irq[] = {
+>> +	REGMAP_IRQ_REG(SUN4I_GPADC_IRQ_FIFO_DATA, 0,
+>> +		       SUN4I_GPADC_INT_FIFOC_TP_DATA_IRQ_EN),
+>> +	REGMAP_IRQ_REG(SUN4I_GPADC_IRQ_TEMP_DATA, 0,
+>> +		       SUN4I_GPADC_INT_FIFOC_TEMP_IRQ_EN),
+>> +};
+>> +
+>> +static const struct regmap_irq_chip sun4i_gpadc_mfd_regmap_irq_chip = {
+>> +	.name = "sun4i_gpadc_mfd_irq_chip",
+>> +	.status_base = SUN4I_GPADC_INT_FIFOS,
+>> +	.ack_base = SUN4I_GPADC_INT_FIFOS,
+>> +	.mask_base = SUN4I_GPADC_INT_FIFOC,
+>> +	.init_ack_masked = true,
+>> +	.mask_invert = true,
+>> +	.irqs = sun4i_gpadc_mfd_regmap_irq,
+>> +	.num_irqs = ARRAY_SIZE(sun4i_gpadc_mfd_regmap_irq),
+>> +	.num_regs = 1,
+>> +};
+>> +
+>> +static struct mfd_cell sun4i_gpadc_mfd_cells[] = {
+>> +	{
+>> +		.name	= "sun4i-a10-gpadc-iio",
+>> +		.resources = adc_resources,
+>> +		.num_resources = ARRAY_SIZE(adc_resources),
+>> +	}, {
+>> +		.name = "iio_hwmon",
+>> +	}
+> 
+> Single line please
+> 
+> { .name = "iio_hwmon" }
+>
 
-Ok. I'll cc/to him with the next re-spin.
++	{
++		.name	= "sun4i-a10-gpadc-iio",
++		.resources = adc_resources,
++		.num_resources = ARRAY_SIZE(adc_resources),
++	}, { .name = "iio_hwmon" }
 
-Cheers
-Vladimir
+or
 
++	{
++		.name	= "sun4i-a10-gpadc-iio",
++		.resources = adc_resources,
++		.num_resources = ARRAY_SIZE(adc_resources),
++	},
++	{ .name = "iio_hwmon" }
+
+?
+>> +};
+>> +
+>> +static struct mfd_cell sun5i_gpadc_mfd_cells[] = {
+>> +	{
+>> +		.name	= "sun5i-a13-gpadc-iio",
+>> +		.resources = adc_resources,
+>> +		.num_resources = ARRAY_SIZE(adc_resources),
+>> +	}, {
+>> +		.name = "iio_hwmon",
+>> +	},
+>> +};
 > 
-> Thanks,
+> As above.
 > 
-> 	M.
+>> +static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
+>> +	{
+>> +		.name	= "sun6i-a31-gpadc-iio",
+>> +		.resources = adc_resources,
+>> +		.num_resources = ARRAY_SIZE(adc_resources),
+>> +	}, {
+>> +		.name = "iio_hwmon",
+>> +	},
+>> +};
 > 
+> As above.
+> 
+>> +static const struct regmap_config sun4i_gpadc_mfd_regmap_config = {
+>> +	.reg_bits = 32,
+>> +	.val_bits = 32,
+>> +	.reg_stride = 4,
+>> +	.fast_io = true,
+>> +};
+>> +
+>> +static const struct of_device_id sun4i_gpadc_mfd_of_match[] = {
+>> +	{
+>> +		.compatible = "allwinner,sun4i-a10-ts",
+>> +		.data = &sun4i_gpadc_mfd_cells,
+>> +	}, {
+>> +		.compatible = "allwinner,sun5i-a13-ts",
+>> +		.data = &sun5i_gpadc_mfd_cells,
+>> +	}, {
+>> +		.compatible = "allwinner,sun6i-a31-ts",
+>> +		.data = &sun6i_gpadc_mfd_cells,
+>> +	}, { /* sentinel */ }
+>> +};
+> 
+> Don't mix OF and MFD functionality.
+> 
+> Why don't you create a node for "iio_hwmon" and have
+> platform_of_populate() do your bidding?
+> 
+
+We are using a stable binding which we cannot modify. This means, the DT
+in its current state can only be modified to add features, which is not
+the case of this driver (it is a rewriting of an existing driver which
+uses the rtp node).
+
+>> +static int sun4i_gpadc_mfd_probe(struct platform_device *pdev)
+> 
+> Remove all mention of "mfd" from this file.
+> 
+> (Accept the calls to the MFD API of course).
+> 
+[...]
+>> +
+>> +MODULE_DEVICE_TABLE(of, sun4i_gpadc_mfd_of_match);
+> 
+> Place this directly under the table.
+> 
+>> +static struct platform_driver sun4i_gpadc_mfd_driver = {
+>> +	.driver = {
+>> +		.name = "sun4i-adc-mfd",
+>> +		.of_match_table = of_match_ptr(sun4i_gpadc_mfd_of_match),
+>> +	},
+>> +	.probe = sun4i_gpadc_mfd_probe,
+> 
+> No .remove?
+> 
+
+No, everything in probe is handled with devm functions.
+
+[...]
+>> +struct sun4i_gpadc_mfd_dev {
+>> +	struct device			*dev;
+>> +	struct regmap			*regmap;
+>> +	struct regmap_irq_chip_data	*regmap_irqc;
+>> +	void __iomem			*regs;
+> 
+> It's *much* more common to call this 'base'.
+> 
+>> +};
+>> +
+>> +#endif
+> 
+
+ACK for everything else.
+
+Thanks,
+Quentin
