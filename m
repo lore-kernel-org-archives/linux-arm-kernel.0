@@ -1,108 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Sep 2016 13:57:10 +0100
-Subject: [PATCH] arm64: mm: move zero page from .bss to right before
- swapper_pg_dir
-In-Reply-To: <1473604714-5512-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1473604714-5512-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160912125710.GA13899@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Sep 2016 14:58:34 +0200
+Subject: [PATCH v4 6/9] pinctrl: Add IRQ support to STM32 gpios
+In-Reply-To: <0063a1ef-1b09-7cfc-f18b-76f2bb07eb84@st.com>
+References: <1473180341-1999-1-git-send-email-alexandre.torgue@st.com>
+ <1473180341-1999-7-git-send-email-alexandre.torgue@st.com>
+ <CACRpkdZ_r0phJeScTYs_LmEHavcjGo6YjHPEHo-rKAv+rLgiFg@mail.gmail.com>
+ <0063a1ef-1b09-7cfc-f18b-76f2bb07eb84@st.com>
+Message-ID: <CACRpkdYYoMqCqq=L53LFUxCM=q00q5YhcxB=+-ZhxkAUbJEB5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 8, 2016 at 5:47 PM, Alexandre Torgue
+<alexandre.torgue@st.com> wrote:
 
-On Sun, Sep 11, 2016 at 03:38:34PM +0100, Ard Biesheuvel wrote:
-> Move the statically allocated zero page from the .bss section to right
-> before swapper_pg_dir. This allows us to refer to its physical address
-> by simply reading TTBR1_EL1 (which always points to swapper_pg_dir and
-> always has its ASID field cleared), and subtracting PAGE_SIZE.
+> Just one question, when you say "super-complex irqchip in use", do you mean
+> I could use another (simplest) solution to handle this EXTI controller?
 
-On a conflicting note, I was hoping to move the zero page into .rodata
-so as to catch any erroneous modification.
+I don't know, GPIOLIB_IRQCHIP is to be used for some specific
+cases documented in Documentation/gpio/driver.txt.
 
-Given that we can't rely on TTBR1 poiting at the swapper_pg_dir, that
-leaves us with Image size reduction vs RO-ification.
+For anything complex, we either need to have this hairy code
+or invent new abstractions.
 
-Any thoughts/preference?
+For now, I assume this is needed...
 
-Thanks,
-Mark,
-
-> Inspired-by: http://marc.info/?l=linux-arm-kernel&m=147282867511801
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/mmu_context.h | 10 ++++++----
->  arch/arm64/kernel/head.S             |  1 -
->  arch/arm64/kernel/vmlinux.lds.S      |  2 ++
->  arch/arm64/mm/mmu.c                  |  1 -
->  4 files changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index b1892a0dbcb0..94461ba5febd 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -49,13 +49,15 @@ static inline void contextidr_thread_switch(struct task_struct *next)
->   */
->  static inline void cpu_set_reserved_ttbr0(void)
->  {
-> -	unsigned long ttbr = virt_to_phys(empty_zero_page);
-> +	unsigned long dummy;
->  
-> -	asm(
-> +	asm volatile(
-> +	"	mrs	%0, ttbr1_el1			// get TTBR1\n"
-> +	"	sub	%0, %0, %1			// subtract PAGE_SIZE\n"
->  	"	msr	ttbr0_el1, %0			// set TTBR0\n"
->  	"	isb"
-> -	:
-> -	: "r" (ttbr));
-> +	: "=&r" (dummy)
-> +	: "I" (PAGE_SIZE));
->  }
->  
->  /*
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 8bc9458f9add..6020b884b076 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -449,7 +449,6 @@ __primary_switched:
->  	adr_l	x2, __bss_stop
->  	sub	x2, x2, x0
->  	bl	__pi_memset
-> -	dsb	ishst				// Make zero page visible to PTW
->  
->  #ifdef CONFIG_KASAN
->  	bl	kasan_early_init
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 659963d40bb4..a14eb8ff5144 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -193,6 +193,8 @@ SECTIONS
->  	. = ALIGN(PAGE_SIZE);
->  	idmap_pg_dir = .;
->  	. += IDMAP_DIR_SIZE;
-> +	empty_zero_page = .;
-> +	. += PAGE_SIZE;
->  	swapper_pg_dir = .;
->  	. += SWAPPER_DIR_SIZE;
->  
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 4989948d1feb..539ce9d11325 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -53,7 +53,6 @@ EXPORT_SYMBOL(kimage_voffset);
->   * Empty_zero_page is a special page that is used for zero-initialized data
->   * and COW.
->   */
-> -unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)] __page_aligned_bss;
->  EXPORT_SYMBOL(empty_zero_page);
->  
->  static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Yours,
+Linus Walleij
