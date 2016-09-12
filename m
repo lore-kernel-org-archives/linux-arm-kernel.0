@@ -1,21 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 13 Sep 2016 00:03:44 +0200
-Subject: [PATCH 6/8 v2] arm: orion5x: Add DT-based support for Netgear
- WNR854T
-In-Reply-To: <2920481.EgEQnLmOkM@wuerfel>
-References: <1472203264-21089-7-git-send-email-jm@lentin.co.uk>
- <1473109646-23366-1-git-send-email-jm@lentin.co.uk>
- <20160912170625.GA7420@rob-hp-laptop> <2920481.EgEQnLmOkM@wuerfel>
-Message-ID: <20160912220344.GM11400@lunn.ch>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Mon, 12 Sep 2016 15:05:01 -0700
+Subject: [PATCH v4 03/22] usb: ulpi: Support device discovery via DT
+In-Reply-To: <20160907213519.27340-4-stephen.boyd@linaro.org>
+References: <20160907213519.27340-1-stephen.boyd@linaro.org>
+ <20160907213519.27340-4-stephen.boyd@linaro.org>
+Message-ID: <147371790115.20135.5378574586724662470@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Maybe we can instead leave out the PCI support from the new
-> file for now and not delete the legacy board file?
+Quoting Stephen Boyd (2016-09-07 14:35:00)
+> @@ -174,6 +219,21 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
+>         ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
+>         ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
+>  
+> +       /* Some ULPI devices don't have a vendor id so rely on OF match */
+> +       if (ulpi->id.vendor == 0)
+> +               goto err;
+> +
+> +       request_module("ulpi:v%04xp%04x", ulpi->id.vendor, ulpi->id.product);
+> +
+> +       return 0;
+> +err:
+> +       return of_device_request_module(&ulpi->dev);
 
-Jamie, which interrupt do you see the WiFi card using?  If it is
-IRQ_ORION5X_PCIE0_INT, (1 + 11), that is probably easier to deal with
-than if it uses GPIO 4.
-
-Thanks
-     Andrew
+This can't return the value of of_device_request_module() because that
+returns an error if the module is builtin or if module loading is
+disabled. I'll have to ignore the error here and just return success all
+the time.
