@@ -1,23 +1,31 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 12 Sep 2016 20:14:39 +0800
-Subject: [PATCH v4 2/3] arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
-In-Reply-To: <CABymUCMQQ-nqGwGdNafCsBB10PB=4KAtW4Dij2YzVdfLHS4-WA@mail.gmail.com>
-References: <1473141861-5033-1-git-send-email-jun.nie@linaro.org>
- <1473141861-5033-3-git-send-email-jun.nie@linaro.org>
- <20160908091103.GA16924@tiger>
- <CABymUCMQQ-nqGwGdNafCsBB10PB=4KAtW4Dij2YzVdfLHS4-WA@mail.gmail.com>
-Message-ID: <20160912121439.GA7373@tiger>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Sep 2016 14:17:46 +0200
+Subject: [PATCH] pinctrl/at91: Don't provide a default trigger type
+In-Reply-To: <1473170295-16712-1-git-send-email-marc.zyngier@arm.com>
+References: <1473170295-16712-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CACRpkdZZ96kKLRGtZdY3rpa6SgqzrQwEO=96FyMzV1KBkHBjgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 03:13:58PM +0800, Jun Nie wrote:
-> PLL clocks can be configured actually according to register. But I
-> prefer to keep them as fixed clocks due to two reasons:
->  1. ZTE do not want to expose too much information of PLL.
->  2. All clients blocks, such as MMC and video codec, assume the
-> related input clock's frequency as a derivation from PLL default
-> frequency value in block clock control register description.
+On Tue, Sep 6, 2016 at 3:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-Okay, just try to understand the reason behind it.  Thanks.
+> at91 used to set a default trigger type for GPIO interrupts in
+> order to cope with the old board files. These days are long gone,
+> and it all gets probed through DT.
+>
+> Andras Szemzo reported that the Ethernet device on his board was
+> bailing to be probed, due to a conflict in interrupt trigger.
+> Surely enough, this is due to this default trigger still being
+> present, and turning this into a IRQ_TYPE_NONE fixes the issue.
+>
+> Reported-by: Andras Szemzo <szemzo.andras@gmail.com>
+> Tested-by: Andras Szemzo <szemzo.andras@gmail.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Shawn
+Patch applied with Nico's ACK.
+
+Yours,
+Linus Walleij
