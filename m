@@ -1,61 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 12 Sep 2016 15:02:13 +0200
-Subject: [PATCH V2 00/10] PM / Domains: Add support for removing PM domains
-In-Reply-To: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
-References: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <CAPDyKFqd6vH=eCKBSQg0Q5w9x8sd0SiZ42E7yJn6ZDWP1OMuZg@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 12 Sep 2016 09:02:54 -0400
+Subject: [PATCH V2 00/10] dmaengine: qcom_hidma: add MSI interrupt support
+Message-ID: <1473685384-19913-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 September 2016 at 13:01, Jon Hunter <jonathanh@nvidia.com> wrote:
-> In order to safely remove PM domains there are a few changes that need to be
-> made to ensure that no one is holding an external reference to a PM domain
-> after it has been removed. One solution, implemented here, solves this by
-> eliminating external references to PM domain.
->
-> Changes from V1:
-> - Added test when removing a PM domain to ensure the PM domain provider
->   has been removed.
-> - Re-organised patches 8-10 so that patch #8 adds the code to verify if
->   the provider is present, patch #9 adds basic support for removing PM
->   domains and patch #10 adds support for removing PM domains by provider.
->
-> Changes from initial RFC:
-> - Renamed functions made static per Ulf's feedback.
-> - Added patch to clean-up provider/xlate APIs per Ulf's feedback
-> - Re-worked and simplified the association between PM domains and PM
->   domain providers. Dropped the 'provider_data' variable from the
->   generic_pm_domain structure in favour of using the fwnode_handle.
-> - Split patch for removing PM domains into multiple patches per Ulf's
->   feedback.
->
-> Jon Hunter (10):
->   PM / Domains: Add new helper functions for device-tree
->   ARM: EXYNOS: Remove calls to of_genpd_get_from_provider()
->   staging: board: Remove calls to of_genpd_get_from_provider()
->   PM / Domains: Don't expose generic_pm_domain structure to clients
->   PM / Domains: Don't expose xlate and provider helper functions
->   PM / Domains: Verify the PM domain is present when adding a provider
->   PM / Domains: Prepare for adding support to remove PM domains
->   PM / Domains: Store the provider in the PM domain structure
->   PM / Domains: Add support for removing PM domains
->   PM / Domains: Add support for removing nested PM domains by provider
->
->  drivers/base/power/domain.c      | 353 +++++++++++++++++++++++++++++++++++----
->  drivers/soc/samsung/pm_domains.c |  23 +--
->  drivers/staging/board/board.c    |   9 +-
->  include/linux/pm_domain.h        |  74 ++++----
->  4 files changed, 364 insertions(+), 95 deletions(-)
->
-> --
-> 2.1.4
->
+The new version of the HW supports MSI interrupts instead of wired
+interrupts. The MSI interrupts are especially useful for the guest machine
+execution. The wired interrupts usually trap to the hypervisor and then are
+relayed to the actual interrupt.
 
-Jon, thanks for being patient and keep working on this series! I have
-now completed the review and I am happy with this version.
+The MSI interrupts can be directly fed into the interrupt controller.
 
-Also, I remember Krzysztof requested an immutable branch for this
-series, I guess Rafael can arrange that if still needed!?
+Adding a new OF compat string (qcom,hidma-1.1) and ACPI string (QCOM8062)
+to distinguish newer HW from the older ones.
 
-Kind regards
-Uffe
+Changes from v1:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/444167.html
+* Documentation update for DT bindings
+* Rebased to slave-next
+* Dropped dmaengine: qcom_hidma: eliminate processed variables. Replaced it
+  with dmaengine: qcom_hidma: protect common data structures
+
+Sinan Kaya (10):
+  Documentation: DT: qcom_hidma: update binding for MSI
+  Documentation: DT: qcom_hidma: correct spelling mistakes
+  of: irq: make of_msi_configure accessible from modules
+  dmaengine: qcom_hidma: configure DMA and MSI for OF
+  dmaengine: qcom_hidma: make pending_tre_count atomic
+  dmaengine: qcom_hidma: make error and success path common
+  dmaengine: qcom_hidma: bring out interrupt cause
+  dmaengine: qcom_hidma: add a common API to setup the interrupt
+  dmaengine: qcom_hidma: protect common data structures
+  dmaengine: qcom_hidma: add MSI support for interrupts
+
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  17 +-
+ drivers/dma/qcom/hidma.c                           | 128 +++++++++-
+ drivers/dma/qcom/hidma.h                           |   6 +-
+ drivers/dma/qcom/hidma_dbg.c                       |   3 +-
+ drivers/dma/qcom/hidma_ll.c                        | 278 ++++++++++-----------
+ drivers/dma/qcom/hidma_mgmt.c                      |   5 +-
+ drivers/of/irq.c                                   |   1 +
+ 7 files changed, 279 insertions(+), 159 deletions(-)
+
+-- 
+1.9.1
