@@ -1,108 +1,83 @@
-From: dave.long@linaro.org (David Long)
-Date: Mon, 12 Sep 2016 14:21:27 -0400
-Subject: [PATCH v4] arm64: Improve kprobes test for atomic sequence
-Message-ID: <1473704487-6069-1-git-send-email-dave.long@linaro.org>
+From: hotran@apm.com (Hoan Tran)
+Date: Mon, 12 Sep 2016 11:23:00 -0700
+Subject: [PATCH v2 1/3] Documentation: dtb: xgene: Add PMD clock binding
+In-Reply-To: <20160912153703.GA26444@rob-hp-laptop>
+References: <1472863255-32337-1-git-send-email-hotran@apm.com>
+ <1472863255-32337-2-git-send-email-hotran@apm.com>
+ <20160912153703.GA26444@rob-hp-laptop>
+Message-ID: <CAFHUOYyrFqQciBXteXp8kE4r60w2mxa230fAX7U+UG44cFuSCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "David A. Long" <dave.long@linaro.org>
+On Mon, Sep 12, 2016 at 8:37 AM, Rob Herring <robh@kernel.org> wrote:
+> On Fri, Sep 02, 2016 at 05:40:53PM -0700, Hoan Tran wrote:
+>> Add APM X-Gene clock binding documentation for PMD clock.
+>>
+>> Signed-off-by: Hoan Tran <hotran@apm.com>
+>> ---
+>>  Documentation/devicetree/bindings/clock/xgene.txt | 18 ++++++++++++++++++
+>>  1 file changed, 18 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/xgene.txt b/Documentation/devicetree/bindings/clock/xgene.txt
+>> index 82f9638..e6e12ae 100644
+>> --- a/Documentation/devicetree/bindings/clock/xgene.txt
+>> +++ b/Documentation/devicetree/bindings/clock/xgene.txt
+>> @@ -8,6 +8,7 @@ Required properties:
+>>  - compatible : shall be one of the following:
+>>       "apm,xgene-socpll-clock" - for a X-Gene SoC PLL clock
+>>       "apm,xgene-pcppll-clock" - for a X-Gene PCP PLL clock
+>> +     "apm,xgene-pmd-clock" - for a X-Gene PMD clock
+>>       "apm,xgene-device-clock" - for a X-Gene device clock
+>>       "apm,xgene-socpll-v2-clock" - for a X-Gene SoC PLL v2 clock
+>>       "apm,xgene-pcppll-v2-clock" - for a X-Gene PCP PLL v2 clock
+>> @@ -22,6 +23,15 @@ Required properties for SoC or PCP PLL clocks:
+>>  Optional properties for PLL clocks:
+>>  - clock-names : shall be the name of the PLL. If missing, use the device name.
+>>
+>> +Required properties for PMD clocks:
+>> +- reg : shall be the physical register address for the pmd clock.
+>> +- clocks : shall be the input parent clock phandle for the clock.
+>> +- #clock-cells : shall be set to 1.
+>> +- clock-output-names : shall be the name of the clock referenced by derive
+>> +  clock.
+>> +Optional properties for PLL clocks:
+>> +- clock-names : shall be the name of the clock. If missing, use the device name.
+>> +
+>>  Required properties for device clocks:
+>>  - reg : shall be a list of address and length pairs describing the CSR
+>>           reset and/or the divider. Either may be omitted, but at least
+>> @@ -59,6 +69,14 @@ For example:
+>>               type = <0>;
+>>       };
+>>
+>> +     pmd0clk: pmd0clk {
+>
+> Needs a unit address.
+>
+>> +             compatible = "apm,xgene-pmd-clock";
+>> +             #clock-cells = <1>;
+>> +             clocks = <&pmdpll 0>;
+>> +             reg = <0x0 0x7E200200 0x0 0x10>;
+>
+> Lowercase hex please.
+>
+> With those,
+>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Kprobes searches backwards a finite number of instructions to determine if
-there is an attempt to probe a load/store exclusive sequence. It stops when
-it hits the maximum number of instructions or a load or store exclusive.
-However this means it can run up past the beginning of the function and
-start looking at literal constants. This has been shown to cause a false
-positive and blocks insertion of the probe. To fix this, further limit the
-backwards search to stop if it hits a symbol address from kallsyms. The
-presumption is that this is the entry point to this code (particularly for
-the common case of placing probes at the beginning of functions).
+Thanks, Rob ! I'll send another version soon.
 
-This also improves efficiency by not searching code that is not part of the
-function. There may be some possibility that the label might not denote the
-entry path to the probed instruction but the likelihood seems low and this
-is just another example of how the kprobes user really needs to be
-careful about what they are doing.
+Regards
+Hoan
 
-Signed-off-by: David A. Long <dave.long@linaro.org>
----
- arch/arm64/kernel/probes/decode-insn.c | 48 ++++++++++++++++------------------
- 1 file changed, 23 insertions(+), 25 deletions(-)
-
-diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
-index 37e47a9..d1731bf 100644
---- a/arch/arm64/kernel/probes/decode-insn.c
-+++ b/arch/arm64/kernel/probes/decode-insn.c
-@@ -16,6 +16,7 @@
- #include <linux/kernel.h>
- #include <linux/kprobes.h>
- #include <linux/module.h>
-+#include <linux/kallsyms.h>
- #include <asm/kprobes.h>
- #include <asm/insn.h>
- #include <asm/sections.h>
-@@ -122,7 +123,7 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
- static bool __kprobes
- is_probed_address_atomic(kprobe_opcode_t *scan_start, kprobe_opcode_t *scan_end)
- {
--	while (scan_start > scan_end) {
-+	while (scan_start >= scan_end) {
- 		/*
- 		 * atomic region starts from exclusive load and ends with
- 		 * exclusive store.
-@@ -142,33 +143,30 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
- {
- 	enum kprobe_insn decoded;
- 	kprobe_opcode_t insn = le32_to_cpu(*addr);
--	kprobe_opcode_t *scan_start = addr - 1;
--	kprobe_opcode_t *scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
--#if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
--	struct module *mod;
--#endif
--
--	if (addr >= (kprobe_opcode_t *)_text &&
--	    scan_end < (kprobe_opcode_t *)_text)
--		scan_end = (kprobe_opcode_t *)_text;
--#if defined(CONFIG_MODULES) && defined(MODULES_VADDR)
--	else {
--		preempt_disable();
--		mod = __module_address((unsigned long)addr);
--		if (mod && within_module_init((unsigned long)addr, mod) &&
--			!within_module_init((unsigned long)scan_end, mod))
--			scan_end = (kprobe_opcode_t *)mod->init_layout.base;
--		else if (mod && within_module_core((unsigned long)addr, mod) &&
--			!within_module_core((unsigned long)scan_end, mod))
--			scan_end = (kprobe_opcode_t *)mod->core_layout.base;
--		preempt_enable();
-+	kprobe_opcode_t *scan_end = NULL;
-+	unsigned long size = 0, offset = 0;
-+
-+	/*
-+	 * If there's a symbol defined in front of and near enough to
-+	 * the probe address assume it is the entry point to this
-+	 * code and use it to further limit how far back we search
-+	 * when determining if we're in an atomic sequence. If we could
-+	 * not find any symbol skip the atomic test altogether as we
-+	 * could otherwise end up searching irrelevant text/literals.
-+	 * KPROBES depends on KALLSYMS so this last case should never
-+	 * happen.
-+	 */
-+	if (kallsyms_lookup_size_offset((unsigned long) addr, &size, &offset)) {
-+		if (offset < (MAX_ATOMIC_CONTEXT_SIZE*sizeof(kprobe_opcode_t)))
-+			scan_end = addr - (offset / sizeof(kprobe_opcode_t));
-+		else
-+			scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
- 	}
--#endif
- 	decoded = arm_probe_decode_insn(insn, asi);
- 
--	if (decoded == INSN_REJECTED ||
--			is_probed_address_atomic(scan_start, scan_end))
--		return INSN_REJECTED;
-+	if (decoded != INSN_REJECTED && scan_end)
-+		if (is_probed_address_atomic(addr - 1, scan_end))
-+			return INSN_REJECTED;
- 
- 	return decoded;
- }
--- 
-2.5.0
+>
+>
+>> +             clock-output-names = "pmd0clk";
+>> +     };
+>> +
+>>       socpll: socpll at 17000120 {
+>>               compatible = "apm,xgene-socpll-clock";
+>>               #clock-cells = <1>;
+>> --
+>> 1.9.1
+>>
