@@ -1,9 +1,9 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 12 Sep 2016 17:02:27 +0800
-Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.9
+Date: Mon, 12 Sep 2016 17:02:28 +0800
+Subject: [GIT PULL 5/5] i.MX defconfig updates for 4.9
 In-Reply-To: <1473670948-4265-1-git-send-email-shawnguo@kernel.org>
 References: <1473670948-4265-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1473670948-4265-4-git-send-email-shawnguo@kernel.org>
+Message-ID: <1473670948-4265-5-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,35 +13,33 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.9
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.9
 
-for you to fetch changes up to e5f51a623a5d6dd24779e5136cf923611b032453:
+for you to fetch changes up to b2ab6f6cc3b1da42acf30e03ce2a4dad3f627272:
 
-  arm64: dts: ls2080a: Add 'dma-coherent' for ls2080a PCI nodes (2016-09-09 14:04:21 +0800)
-
-----------------------------------------------------------------
-i.MX arm64 device tree changes for 4.9:
- - Add property dma-coherent for ls2080a PCI device to save software
-   cache maintenance.
- - Update serial aliases and use stdout-path to sepecify console for
-   ls2080a and ls1043a boards.
- - Add DDR memory controller device node for ls2080a and ls1043a SoCs.
+  ARM: imx_v6_v7_defconfig: Select the wm8960 codec driver (2016-08-29 22:17:26 +0800)
 
 ----------------------------------------------------------------
-Liu Gang (1):
-      arm64: dts: ls2080a: Add 'dma-coherent' for ls2080a PCI nodes
+i.MX defconfig updates for 4.9:
+ - Enable i.MX6 SATA and cpufreq driver support in multi_v7_defconfig.
+ - Enable MPL3115, Etnaviv GPU, WM8960 Codec driver and more USB
+   functions support in imx_v6_v7_defconfig.
 
-Stuart Yoder (2):
-      arm64: dts: updates serial aliases for ls1043a rdb and qds boards
-      arm64: dts: add stdout-path to chosen node for ls2080a/ls1043a boards
+----------------------------------------------------------------
+Breno Lima (1):
+      ARM: imx_v6_v7_defconfig: Add CONFIG_MPL3115
 
-York Sun (1):
-      arm64: dts: Add DDR memory controller for Layerscape SoCs
+Fabio Estevam (2):
+      ARM: imx_v6_v7_defconfig: Enable GPU support
+      ARM: imx_v6_v7_defconfig: Select the wm8960 codec driver
 
- arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 14 ++++++++------
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts |  8 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi    |  7 +++++++
- arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts |  3 +++
- arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts |  4 ++++
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi    | 18 ++++++++++++++++++
- 6 files changed, 48 insertions(+), 6 deletions(-)
+Peter Chen (1):
+      ARM: imx_v6_v7_defconfig: enable more USB configurations
+
+Tuomas Tynkkynen (2):
+      ARM: multi_v7_defconfig: Enable AHCI_IMX
+      ARM: multi_v7_defconfig: Enable ARM_IMX6Q_CPUFREQ
+
+ arch/arm/configs/imx_v6_v7_defconfig | 17 +++++++++++------
+ arch/arm/configs/multi_v7_defconfig  |  3 +++
+ 2 files changed, 14 insertions(+), 6 deletions(-)
