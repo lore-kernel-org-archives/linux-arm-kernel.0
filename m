@@ -1,374 +1,201 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 12 Sep 2016 20:54:20 +0200
-Subject: [UPDATE PATCH V11 1/8] ACPI: I/O Remapping Table (IORT) initial
- support
-In-Reply-To: <1473705147-6588-2-git-send-email-tn@semihalf.com>
-References: <1473705147-6588-2-git-send-email-tn@semihalf.com>
-Message-ID: <1473706460-9037-1-git-send-email-tn@semihalf.com>
+From: tcminyard@gmail.com (Corey Minyard)
+Date: Mon, 12 Sep 2016 13:55:40 -0500
+Subject: [PATCH 1/3] misc: Add Aspeed BT IPMI host driver
+In-Reply-To: <c06a8afb-9143-6aef-3425-ad1e50cae35d@kaod.org>
+References: <1472664259-23933-1-git-send-email-clg@kaod.org>
+ <1472664259-23933-2-git-send-email-clg@kaod.org> <8157811.GypLEN0R9B@wuerfel>
+ <c06a8afb-9143-6aef-3425-ad1e50cae35d@kaod.org>
+Message-ID: <1ce6c4b4-5938-22fc-7467-d1efc220b772@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IORT shows representation of IO topology for ARM based systems.
-It describes how various components are connected together on
-parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
-http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+On 09/02/2016 08:22 AM, C?dric Le Goater wrote:
+> Hello,
+>
+> Adding Corey in cc: . I guess I should have done that in the first place.
 
-Initial support allows to detect IORT table presence and save its
-root pointer obtained through acpi_get_table(). The pointer validity
-depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
-is not set while using IORT nodes we would dereference unmapped pointers.
+Yes, probably so.  I've been travelling and didn't see it on the mailing
+lists until now.
 
-For the aforementioned reason call acpi_iort_init() from acpi_init()
-which guarantees acpi_gbl_permanent_mmap to be set at that point.
+There is already a BT driver in the kernel, in drivers/char/ipmi, why
+won't that work?
 
-Add generic helpers which are helpful for scanning and retrieving
-information from IORT table content. List of the most important helpers:
-- iort_find_dev_node() finds IORT node for a given device
-- iort_node_map_rid() maps device RID and returns IORT node which provides
-  final translation
+-corey
 
-IORT support is placed under drivers/acpi/arm64/ new directory due to its
-ARM64 specific nature. The code there is considered only for ARM64.
-The long term plan is to keep all ARM64 specific tables support
-in this place e.g. GTDT table.
-
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- drivers/acpi/Kconfig        |   4 +
- drivers/acpi/Makefile       |   2 +
- drivers/acpi/arm64/Kconfig  |   6 ++
- drivers/acpi/arm64/Makefile |   1 +
- drivers/acpi/arm64/iort.c   | 216 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/acpi/bus.c          |   2 +
- include/linux/acpi_iort.h   |  30 ++++++
- 7 files changed, 261 insertions(+)
- create mode 100644 drivers/acpi/arm64/Kconfig
- create mode 100644 drivers/acpi/arm64/Makefile
- create mode 100644 drivers/acpi/arm64/iort.c
- create mode 100644 include/linux/acpi_iort.h
-
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 445ce28..d5c0614 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -521,4 +521,8 @@ config ACPI_CONFIGFS
- 	  userspace. The configurable ACPI groups will be visible under
- 	  /config/acpi, assuming configfs is mounted under /config.
- 
-+if ARM64
-+source "drivers/acpi/arm64/Kconfig"
-+endif
-+
- endif	# ACPI
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 5ae9d85..e5ada78 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -105,3 +105,5 @@ obj-$(CONFIG_ACPI_CONFIGFS)	+= acpi_configfs.o
- 
- video-objs			+= acpi_video.o video_detect.o
- obj-y				+= dptf/
-+
-+obj-$(CONFIG_ARM64)		+= arm64/
-diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
-new file mode 100644
-index 0000000..4616da4
---- /dev/null
-+++ b/drivers/acpi/arm64/Kconfig
-@@ -0,0 +1,6 @@
-+#
-+# ACPI Configuration for ARM64
-+#
-+
-+config ACPI_IORT
-+	bool
-diff --git a/drivers/acpi/arm64/Makefile b/drivers/acpi/arm64/Makefile
-new file mode 100644
-index 0000000..72331f2
---- /dev/null
-+++ b/drivers/acpi/arm64/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ACPI_IORT) 	+= iort.o
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-new file mode 100644
-index 0000000..5279a35
---- /dev/null
-+++ b/drivers/acpi/arm64/iort.c
-@@ -0,0 +1,216 @@
-+/*
-+ * Copyright (C) 2016, Semihalf
-+ *	Author: Tomasz Nowicki <tn@semihalf.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * This file implements early detection/parsing of I/O mapping
-+ * reported to OS through firmware via I/O Remapping Table (IORT)
-+ * IORT document number: ARM DEN 0049A
-+ */
-+
-+#define pr_fmt(fmt)	"ACPI: IORT: " fmt
-+
-+#include <linux/acpi_iort.h>
-+#include <linux/kernel.h>
-+#include <linux/pci.h>
-+
-+typedef acpi_status (*iort_find_node_callback)
-+	(struct acpi_iort_node *node, void *context);
-+
-+/* Root pointer to the mapped IORT table */
-+static struct acpi_table_header *iort_table;
-+
-+static LIST_HEAD(iort_msi_chip_list);
-+static DEFINE_SPINLOCK(iort_msi_chip_lock);
-+
-+static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
-+					     iort_find_node_callback callback,
-+					     void *context)
-+{
-+	struct acpi_iort_node *iort_node, *iort_end;
-+	struct acpi_table_iort *iort;
-+	int i;
-+
-+	if (!iort_table)
-+		return NULL;
-+
-+	/* Get the first IORT node */
-+	iort = (struct acpi_table_iort *)iort_table;
-+	iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort,
-+				 iort->node_offset);
-+	iort_end = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-+				iort_table->length);
-+
-+	for (i = 0; i < iort->node_count; i++) {
-+		if (WARN_TAINT(iort_node >= iort_end, TAINT_FIRMWARE_WORKAROUND,
-+			       "IORT node pointer overflows, bad table!\n"))
-+			return NULL;
-+
-+		if (iort_node->type == type &&
-+		    ACPI_SUCCESS(callback(iort_node, context)))
-+				return iort_node;
-+
-+		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
-+					 iort_node->length);
-+	}
-+
-+	return NULL;
-+}
-+
-+static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
-+					    void *context)
-+{
-+	struct device *dev = context;
-+	acpi_status status;
-+
-+	if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT) {
-+		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
-+		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
-+		struct acpi_iort_named_component *ncomp;
-+
-+		if (!adev) {
-+			status = AE_NOT_FOUND;
-+			goto out;
-+		}
-+
-+		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
-+		if (ACPI_FAILURE(status)) {
-+			dev_warn(dev, "Can't get device full path name\n");
-+			goto out;
-+		}
-+
-+		ncomp = (struct acpi_iort_named_component *)node->node_data;
-+		status = !strcmp(ncomp->device_name, buf.pointer) ?
-+							AE_OK : AE_NOT_FOUND;
-+		acpi_os_free(buf.pointer);
-+	} else if (node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-+		struct acpi_iort_root_complex *pci_rc;
-+		struct pci_bus *bus;
-+
-+		bus = to_pci_bus(dev);
-+		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
-+
-+		/*
-+		 * It is assumed that PCI segment numbers maps one-to-one
-+		 * with root complexes. Each segment number can represent only
-+		 * one root complex.
-+		 */
-+		status = pci_rc->pci_segment_number == pci_domain_nr(bus) ?
-+							AE_OK : AE_NOT_FOUND;
-+	} else {
-+		status = AE_NOT_FOUND;
-+	}
-+out:
-+	return status;
-+}
-+
-+static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
-+		       u32 *rid_out)
-+{
-+	/* Single mapping does not care for input id */
-+	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
-+		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
-+		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-+			*rid_out = map->output_base;
-+			return 0;
-+		}
-+
-+		pr_warn(FW_BUG "[map %p] SINGLE MAPPING flag not allowed for node type %d, skipping ID map\n",
-+			map, type);
-+		return -ENXIO;
-+	}
-+
-+	if (rid_in < map->input_base ||
-+	    (rid_in >= map->input_base + map->id_count))
-+		return -ENXIO;
-+
-+	*rid_out = map->output_base + (rid_in - map->input_base);
-+	return 0;
-+}
-+
-+static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
-+						u32 rid_in, u32 *rid_out,
-+						u8 type)
-+{
-+	u32 rid = rid_in;
-+
-+	/* Parse the ID mapping tree to find specified node type */
-+	while (node) {
-+		struct acpi_iort_id_mapping *map;
-+		int i;
-+
-+		if (node->type == type) {
-+			if (rid_out)
-+				*rid_out = rid;
-+			return node;
-+		}
-+
-+		if (!node->mapping_offset || !node->mapping_count)
-+			goto fail_map;
-+
-+		map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-+				   node->mapping_offset);
-+
-+		/* Firmware bug! */
-+		if (!map->output_reference) {
-+			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
-+			       node, node->type);
-+			goto fail_map;
-+		}
-+
-+		/* Do the RID translation */
-+		for (i = 0; i < node->mapping_count; i++, map++) {
-+			if (!iort_id_map(map, node->type, rid, &rid))
-+				break;
-+		}
-+
-+		if (i == node->mapping_count)
-+			goto fail_map;
-+
-+		node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-+				    map->output_reference);
-+	}
-+
-+fail_map:
-+	/* Map input RID to output RID unchanged on mapping failure*/
-+	if (rid_out)
-+		*rid_out = rid_in;
-+
-+	return NULL;
-+}
-+
-+static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
-+{
-+	struct pci_bus *pbus;
-+
-+	if (!dev_is_pci(dev))
-+		return iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-+				      iort_match_node_callback, dev);
-+
-+	/* Find a PCI root bus */
-+	pbus = to_pci_dev(dev)->bus;
-+	while (!pci_is_root_bus(pbus))
-+		pbus = pbus->parent;
-+
-+	return iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
-+			      iort_match_node_callback, &pbus->dev);
-+}
-+
-+void __init acpi_iort_init(void)
-+{
-+	acpi_status status;
-+
-+	status = acpi_get_table(ACPI_SIG_IORT, 0, &iort_table);
-+	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-+		const char *msg = acpi_format_exception(status);
-+		pr_err("Failed to get table, %s\n", msg);
-+	}
-+}
-diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
-index 85b7d07..e56e643 100644
---- a/drivers/acpi/bus.c
-+++ b/drivers/acpi/bus.c
-@@ -36,6 +36,7 @@
- #ifdef CONFIG_X86
- #include <asm/mpspec.h>
- #endif
-+#include <linux/acpi_iort.h>
- #include <linux/pci.h>
- #include <acpi/apei.h>
- #include <linux/dmi.h>
-@@ -1186,6 +1187,7 @@ static int __init acpi_init(void)
- 	}
- 
- 	pci_mmcfg_late_init();
-+	acpi_iort_init();
- 	acpi_scan_init();
- 	acpi_ec_init();
- 	acpi_debugfs_init();
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-new file mode 100644
-index 0000000..fcacaf7
---- /dev/null
-+++ b/include/linux/acpi_iort.h
-@@ -0,0 +1,30 @@
-+/*
-+ * Copyright (C) 2016, Semihalf
-+ *	Author: Tomasz Nowicki <tn@semihalf.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-+ * Place - Suite 330, Boston, MA 02111-1307 USA.
-+ */
-+
-+#ifndef __ACPI_IORT_H__
-+#define __ACPI_IORT_H__
-+
-+#include <linux/acpi.h>
-+
-+#ifdef CONFIG_ACPI_IORT
-+void acpi_iort_init(void);
-+#else
-+static inline void acpi_iort_init(void) { }
-+#endif
-+
-+#endif /* __ACPI_IORT_H__ */
--- 
-1.9.1
+>
+> Arnd is suggesting to put this IPMI BT driver under drivers/char/ipmi
+> which is indeed a better place than drivers/misc.
+>
+> Below some comments,
+>
+> On 08/31/2016 09:57 PM, Arnd Bergmann wrote:
+>> On Wednesday, August 31, 2016 7:24:17 PM CEST C?dric Le Goater wrote:
+>>> From: Alistair Popple <alistair@popple.id.au>
+>>>
+>>> This patch adds a simple device driver to expose the iBT interface on
+>>> Aspeed chips as a character device (/dev/bt).
+>>>
+>>> The iBT interface is used to perform in-band IPMI communication from a
+>>> BMC to the host.
+>>>
+>>> Signed-off-by: Alistair Popple <alistair@popple.id.au>
+>>> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+>>> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>>> [clg: checkpatch fixes
+>>>        devicetree binding documentation]
+>>> Signed-off-by: C?dric Le Goater <clg@kaod.org>
+>>> ---
+>>>   .../devicetree/bindings/misc/aspeed,bt-host.txt    |  19 +
+>>>   drivers/misc/Kconfig                               |   5 +
+>>>   drivers/misc/Makefile                              |   1 +
+>>>   drivers/misc/bt-host.c                             | 433 +++++++++++++++++++++
+>>>   include/uapi/linux/Kbuild                          |   1 +
+>>>   include/uapi/linux/bt-host.h                       |  18 +
+>>>   6 files changed, 477 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/misc/aspeed,bt-host.txt
+>>>   create mode 100644 drivers/misc/bt-host.c
+>>>   create mode 100644 include/uapi/linux/bt-host.h
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/misc/aspeed,bt-host.txt b/Documentation/devicetree/bindings/misc/aspeed,bt-host.txt
+>>> new file mode 100644
+>>> index 000000000000..938c5998c331
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/misc/aspeed,bt-host.txt
+>> "misc" seems like a bad category here. Does this fit nowhere else?
+>>
+>>> @@ -0,0 +1,19 @@
+>>> +* Aspeed BT IPMI interface
+>> What does "BT" stand for? IPMI is a more commonly known acronym,
+>> but maybe list both with their full name as well.
+> "Block Transfer" which is described in the IPMI specs.
+>
+> yes, I need to rephrase the commit log a bit and put some references
+> to the specs.
+>
+>>> diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+>>> index 7410c6d9a34d..71a7b9feb0f0 100644
+>>> --- a/drivers/misc/Makefile
+>>> +++ b/drivers/misc/Makefile
+>>> @@ -57,6 +57,7 @@ obj-$(CONFIG_ECHO)		+= echo/
+>>>   obj-$(CONFIG_VEXPRESS_SYSCFG)	+= vexpress-syscfg.o
+>>>   obj-$(CONFIG_CXL_BASE)		+= cxl/
+>>>   obj-$(CONFIG_PANEL)             += panel.o
+>>> +obj-$(CONFIG_ASPEED_BT_IPMI_HOST)	+= bt-host.o
+>>>   
+>>>   lkdtm-$(CONFIG_LKDTM)		+= lkdtm_core.o
+>>>   lkdtm-$(CONFIG_LKDTM)		+= lkdtm_bugs.o
+>> Maybe put this in a subdirectory of drivers/char/ipmi?
+>> I understand that this is the other end of the protocol,
+>> but they are closely related after all.
+> I agree. There are also some definitions we could make common.
+>
+> Let's see what Corey thinks about it.
+>
+>>> +#define DEVICE_NAME	"bt-host"
+>> here maybe "ipmi/bt-host" or "ipmi-bt-host"?
+> yes. a name containing 'ipmi' is certainly wanted.
+>    
+>>> +static ssize_t bt_host_read(struct file *file, char __user *buf,
+>>> +				size_t count, loff_t *ppos)
+>>> +{
+>>> +	struct bt_host *bt_host = file_bt_host(file);
+>>> +	char __user *p = buf;
+>>> +	u8 len;
+>>> +
+>>> +	if (!access_ok(VERIFY_WRITE, buf, count))
+>>> +		return -EFAULT;
+>>> +
+>>> +	WARN_ON(*ppos);
+>>> +
+>>> +	if (wait_event_interruptible(bt_host->queue,
+>>> +				bt_inb(bt_host, BT_CTRL) & BT_CTRL_H2B_ATN))
+>>> +		return -ERESTARTSYS;
+>>> +
+>>> +	set_b_busy(bt_host);
+>>> +	clr_h2b_atn(bt_host);
+>>> +	clr_rd_ptr(bt_host);
+>>> +
+>>> +	len = bt_read(bt_host);
+>>> +	__put_user(len, p++);
+>>> +
+>>> +	/* We pass the length back as well */
+>>> +	if (len + 1 > count)
+>>> +		len = count - 1;
+>>> +
+>>> +	while (len) {
+>>> +		if (__put_user(bt_read(bt_host), p))
+>>> +			return -EFAULT;
+>>> +		len--; p++;
+>>> +	}
+>> If there are larger chunks of data to be transferred,
+>> using a temporary buffer with copy_from_user/copy_to_user
+>> would be more efficient. Since the size appears to
+>> be limited to 256 bytes anyway, that easily fits on the stack.
+> ok. I will change that.
+>
+>>> +
+>>> +	clr_b_busy(bt_host);
+>>> +
+>>> +	return p - buf;
+>>> +}
+>> What is the motivation for only allowing complete messages
+>> to be transferred or truncated for short buffers?
+>>
+>> Have you considered reading the message into a device specific
+>> buffer and allowing continued reads?
+>>
+>> I don't see an obvious reason one way or another, and I suppose
+>> you had an idea of what you were doing, so maybe explain it
+>> in a comment.
+> The interface is not byte oriented. It is called 'Block Transfer'
+> because an entire message is buffered and then the host or the bmc
+> is notified that there is data to be read.
+>
+> I will add a comment on that.
+>
+>>> +static long bt_host_ioctl(struct file *file, unsigned int cmd,
+>>> +		unsigned long param)
+>>> +{
+>>> +	struct bt_host *bt_host = file_bt_host(file);
+>>> +
+>>> +	switch (cmd) {
+>>> +	case BT_HOST_IOCTL_SMS_ATN:
+>>> +		set_sms_atn(bt_host);
+>>> +		return 0;
+>>> +	}
+>>> +	return -EINVAL;
+>>> +}
+>> Is this ioctl interface defined in a way that makes sense on
+>> any IPMI host hardware, or did you just do it like this because
+>> it is the easiest way  on the hardware.
+> This platform runs OpenBMC on which a dbus daemon acts as a proxy
+> between the IPMI BT char device and the rest of the system. So yes,
+> the ioctl is relatively easy to use.
+>
+>> I think it's important for the user interface to be extensible
+>> to other implementations if we ever add any.
+> I agree but I don't know of any other BMC side implementations.
+> May be others ?
+>
+>>> +static int bt_host_config_irq(struct bt_host *bt_host,
+>>> +		struct platform_device *pdev)
+>>> +{
+>>> +	struct device *dev = &pdev->dev;
+>>> +	uint32_t reg;
+>>> +	int rc;
+>>> +
+>>> +	bt_host->irq = irq_of_parse_and_map(dev->of_node, 0);
+>>> +	if (!bt_host->irq)
+>>> +		return -ENODEV;
+>> I think platform_get_irq() is the preferred interface here.
+> OK.
+>
+> Thanks,
+>
+> C.
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
