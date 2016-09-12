@@ -1,209 +1,102 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Mon, 12 Sep 2016 20:01:06 +0800
-Subject: [PATCH v8 3/9] drm/mediatek: add shadow register support
+Date: Mon, 12 Sep 2016 20:01:07 +0800
+Subject: [PATCH v8 4/9] drm/mediatek: update display module connections
 In-Reply-To: <1473681672-47144-1-git-send-email-yt.shen@mediatek.com>
 References: <1473681672-47144-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1473681672-47144-4-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1473681672-47144-5-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to acquire mutex before using the resources,
-and need to release it after finished.
-So we don't need to write registers in the blanking period.
+update connections for OVL, RDMA, BLS, DSI
 
 Signed-off-by: YT Shen <yt.shen@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 75 ++++++++++++++++++++-------------
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c  | 25 +++++++++++
- drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |  2 +
- drivers/gpu/drm/mediatek/mtk_drm_drv.h  |  1 +
- 4 files changed, 74 insertions(+), 29 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 25 +++++++++++++++++++++++++
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  1 +
+ 2 files changed, 26 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-index 24aa3ba..80d9641 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-@@ -315,6 +315,42 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
- 	pm_runtime_put(drm->dev);
- }
- 
-+static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
-+{
-+	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-+	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
-+	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
-+	unsigned int i;
-+
-+	/*
-+	 * TODO: instead of updating the registers here, we should prepare
-+	 * working registers in atomic_commit and let the hardware command
-+	 * queue update module registers on vblank.
-+	 */
-+	if (state->pending_config) {
-+		mtk_ddp_comp_config(ovl, state->pending_width,
-+				    state->pending_height,
-+				    state->pending_vrefresh);
-+
-+		state->pending_config = false;
-+	}
-+
-+	if (mtk_crtc->pending_planes) {
-+		for (i = 0; i < OVL_LAYER_NR; i++) {
-+			struct drm_plane *plane = &mtk_crtc->planes[i].base;
-+			struct mtk_plane_state *plane_state;
-+
-+			plane_state = to_mtk_plane_state(plane->state);
-+
-+			if (plane_state->pending.config) {
-+				mtk_ddp_comp_layer_config(ovl, i, plane_state);
-+				plane_state->pending.config = false;
-+			}
-+		}
-+		mtk_crtc->pending_planes = false;
-+	}
-+}
-+
- static void mtk_drm_crtc_enable(struct drm_crtc *crtc)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-@@ -391,6 +427,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
- 				      struct drm_crtc_state *old_crtc_state)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-+	struct mtk_drm_private *priv = crtc->dev->dev_private;
- 	unsigned int pending_planes = 0;
- 	int i;
- 
-@@ -409,6 +446,12 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
- 	}
- 	if (pending_planes)
- 		mtk_crtc->pending_planes = true;
-+
-+	if (priv->data->shadow_register) {
-+		mtk_disp_mutex_acquire(mtk_crtc->mutex);
-+		mtk_crtc_ddp_config(crtc);
-+		mtk_disp_mutex_release(mtk_crtc->mutex);
-+	}
- }
- 
- static const struct drm_crtc_funcs mtk_crtc_funcs = {
-@@ -453,36 +496,10 @@ err_cleanup_crtc:
- void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
--	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
--	unsigned int i;
-+	struct mtk_drm_private *priv = crtc->dev->dev_private;
- 
--	/*
--	 * TODO: instead of updating the registers here, we should prepare
--	 * working registers in atomic_commit and let the hardware command
--	 * queue update module registers on vblank.
--	 */
--	if (state->pending_config) {
--		mtk_ddp_comp_config(ovl, state->pending_width,
--				    state->pending_height,
--				    state->pending_vrefresh);
--
--		state->pending_config = false;
--	}
--
--	if (mtk_crtc->pending_planes) {
--		for (i = 0; i < OVL_LAYER_NR; i++) {
--			struct drm_plane *plane = &mtk_crtc->planes[i].base;
--			struct mtk_plane_state *plane_state;
--
--			plane_state = to_mtk_plane_state(plane->state);
--
--			if (plane_state->pending.config) {
--				mtk_ddp_comp_layer_config(ovl, i, plane_state);
--				plane_state->pending.config = false;
--			}
--		}
--		mtk_crtc->pending_planes = false;
--	}
-+	if (!priv->data->shadow_register)
-+		mtk_crtc_ddp_config(crtc);
- 
- 	mtk_drm_finish_page_flip(mtk_crtc);
- }
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 8030769..b77d456 100644
+index b77d456..a9b209c 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -12,6 +12,7 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/iopoll.h>
- #include <linux/module.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
-@@ -32,10 +33,13 @@
+@@ -32,6 +32,10 @@
+ #define DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN	0x0c8
  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
  
- #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
-+#define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
- #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
- #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
- #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
- 
-+#define INT_MUTEX				BIT(1)
++#define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
++#define DISP_REG_CONFIG_OUT_SEL			0x04c
++#define DISP_REG_CONFIG_DSI_SEL			0x050
 +
- #define MT8173_MUTEX_MOD_DISP_OVL0		BIT(11)
- #define MT8173_MUTEX_MOD_DISP_OVL1		BIT(12)
- #define MT8173_MUTEX_MOD_DISP_RDMA0		BIT(13)
-@@ -300,6 +304,27 @@ void mtk_disp_mutex_disable(struct mtk_disp_mutex *mutex)
- 	writel(0, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+ #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
+ #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+ #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
+@@ -71,6 +75,10 @@
+ #define DPI0_SEL_IN_RDMA1		0x1
+ #define COLOR1_SEL_IN_OVL1		0x1
+ 
++#define OVL_MOUT_EN_RDMA		0x1
++#define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
++#define DSI_SEL_IN_BLS			0x0
++
+ struct mtk_disp_mutex {
+ 	int id;
+ 	bool claimed;
+@@ -111,6 +119,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+ 	if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_COLOR0) {
+ 		*addr = DISP_REG_CONFIG_DISP_OVL0_MOUT_EN;
+ 		value = OVL0_MOUT_EN_COLOR0;
++	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
++		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
++		value = OVL_MOUT_EN_RDMA;
+ 	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
+ 		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
+ 		value = OD_MOUT_EN_RDMA0;
+@@ -148,6 +159,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+ 	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
+ 		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
+ 		value = COLOR1_SEL_IN_OVL1;
++	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
++		*addr = DISP_REG_CONFIG_DSI_SEL;
++		value = DSI_SEL_IN_BLS;
+ 	} else {
+ 		value = 0;
+ 	}
+@@ -155,6 +169,15 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+ 	return value;
  }
  
-+void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex)
++static void mtk_ddp_sout_sel(void __iomem *config_regs,
++			     enum mtk_ddp_comp_id cur,
++			     enum mtk_ddp_comp_id next)
 +{
-+	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
-+					   mutex[mutex->id]);
-+	u32 tmp;
-+
-+	writel(1, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
-+	writel(1, ddp->regs + DISP_REG_MUTEX(mutex->id));
-+	if (readl_poll_timeout_atomic(ddp->regs + DISP_REG_MUTEX(mutex->id),
-+				      tmp, tmp & INT_MUTEX, 1, 10000))
-+		pr_err("could not acquire mutex %d\n", mutex->id);
++	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
++		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
++			       config_regs + DISP_REG_CONFIG_OUT_SEL);
 +}
 +
-+void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex)
-+{
-+	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
-+					   mutex[mutex->id]);
-+
-+	writel(0, ddp->regs + DISP_REG_MUTEX(mutex->id));
-+}
-+
- static int mtk_ddp_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-index 92c1175..f9a7991 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-@@ -37,5 +37,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
- 				enum mtk_ddp_comp_id id);
- void mtk_disp_mutex_unprepare(struct mtk_disp_mutex *mutex);
- void mtk_disp_mutex_put(struct mtk_disp_mutex *mutex);
-+void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex);
-+void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex);
+ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
+ 			      enum mtk_ddp_comp_id cur,
+ 			      enum mtk_ddp_comp_id next)
+@@ -167,6 +190,8 @@ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
+ 		writel_relaxed(reg, config_regs + addr);
+ 	}
  
- #endif /* MTK_DRM_DDP_H */
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-index fa0b106..94f8b66 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-@@ -33,6 +33,7 @@ struct mtk_mmsys_driver_data {
- 	unsigned int main_len;
- 	const enum mtk_ddp_comp_id *ext_path;
- 	unsigned int ext_len;
-+	bool shadow_register;
- };
++	mtk_ddp_sout_sel(config_regs, cur, next);
++
+ 	value = mtk_ddp_sel_in(cur, next, &addr);
+ 	if (value) {
+ 		reg = readl_relaxed(config_regs + addr) | value;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+index 53065c7..0850aa4 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+@@ -40,6 +40,7 @@ enum mtk_ddp_comp_type {
  
- struct mtk_drm_private {
+ enum mtk_ddp_comp_id {
+ 	DDP_COMPONENT_AAL,
++	DDP_COMPONENT_BLS,
+ 	DDP_COMPONENT_COLOR0,
+ 	DDP_COMPONENT_COLOR1,
+ 	DDP_COMPONENT_DPI0,
 -- 
 1.9.1
