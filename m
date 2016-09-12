@@ -1,31 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Sep 2016 10:55:05 +0200
-Subject: Regmap regression in next caused by of_iomap change
-In-Reply-To: <20160912085527.GA1873@dell>
-References: <20160908184111.vj3sb2ik6ydehkag@atomide.com>
- <4088076.eNNe5WgnxT@wuerfel> <20160912085527.GA1873@dell>
-Message-ID: <8219758.tTI1XNJXoH@wuerfel>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon, 12 Sep 2016 09:55:39 +0100
+Subject: [PATCH v7 2/8] arm: parse cpu capacity-dmips-mhz from DT
+In-Reply-To: <CAKfTPtDEmAwLR58hOFeAVgfKaSVCQaLrr3VyH_QMkcuty5YiKQ@mail.gmail.com>
+References: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
+ <1473085372-2840-3-git-send-email-juri.lelli@arm.com>
+ <CAKfTPtDEmAwLR58hOFeAVgfKaSVCQaLrr3VyH_QMkcuty5YiKQ@mail.gmail.com>
+Message-ID: <20160912085539.GM10409@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 12, 2016 9:55:27 AM CEST Lee Jones wrote:
-> On Thu, 08 Sep 2016, Arnd Bergmann wrote:
+Hi,
+
+On 12/09/16 10:36, Vincent Guittot wrote:
+> Hi Juri,
 > 
-> > On Thursday, September 8, 2016 11:41:12 AM CEST Tony Lindgren wrote:
-> > > Hi,
-> > > 
-> > > Looks like commit 39de2c4275a9 ("mfd: syscon: Make use of of_iomap")
-> > > makes at least MMC PBIAS regulator stop working on omap3.
-> > >
-> > > That's probably because of_syscon_register uses the now unintialized
-> > > struct resource res to set syscon_config.max_register.
-> > 
-> > Looks correct. Lee, please send a revert of that patch to Linus
-> > along with any other fixes you may have.
+> On 5 September 2016 at 16:22, Juri Lelli <juri.lelli@arm.com> wrote:
+> > With the introduction of cpu capacity-dmips-mhz bindings, CPU capacities
+> > can now be calculated from values extracted from DT and information
+> > coming from cpufreq. Add parsing of DT information at boot time, and
+> > complement it with cpufreq information. We keep code that can produce
+> > same information, based on different DT properties and hard-coded
+> > values, as fall-back for backward compatibility.
+> >
+> > Caveat: the information provided by this patch will start to be used in
+> > the future. We need to #define arch_scale_cpu_capacity to something
+> > provided in arch, so that scheduler's default implementation (which gets
+> > used if arch_scale_cpu_capacity is not defined) is overwritten.
+> >
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 > 
-> No need.  It's not in Mainline.
+> Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
 > 
 
-Ah, good, I misread the history then.
+Thanks!
 
-	Arnd
+Best,
+
+- Juri
