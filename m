@@ -1,241 +1,113 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 12 Sep 2016 20:32:21 +0200
-Subject: [PATCH V11 2/8] ACPI: Add new IORT functions to support MSI domain
- handling
+Date: Mon, 12 Sep 2016 20:32:23 +0200
+Subject: [PATCH V11 4/8] irqchip/gicv3-its: Cleanup for ITS domain
+ initialization
 In-Reply-To: <1473705147-6588-1-git-send-email-tn@semihalf.com>
 References: <1473705147-6588-1-git-send-email-tn@semihalf.com>
-Message-ID: <1473705147-6588-3-git-send-email-tn@semihalf.com>
+Message-ID: <1473705147-6588-5-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For ITS, MSI functionality consists on building domain stack and
-during that process we need to reference to domain stack components
-e.g. before we create new DOMAIN_BUS_PCI_MSI domain we need to specify
-its DOMAIN_BUS_NEXUS parent domain. In order to manage that process
-properly, maintain list which elements contain domain token
-(unique for MSI domain stack) and ITS ID: iort_register_domain_token()
-and iort_deregister_domain_token(). Then retrieve domain token
-any time later with ITS ID being key off: iort_find_domain_token().
-With domain token and domain type we are able to find corresponding
-IRQ domain.
-
-Since IORT is prepared to describe MSI domain on a per-device basis,
-use existing IORT helpers and implement two calls:
-1. iort_msi_map_rid() to map MSI RID for a device
-2. iort_get_device_domain() to find domain token for a device
+There is no point to initialize ITS without having msi-controller
+property in corresponding DT node. However, its_probe is checking
+msi-controller presence at the end, so we can save our time and do that
+check prior to its_probe call. Also, for the code clarity purpose,
+we put domain initialization to separate function.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/acpi/arm64/iort.c | 152 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/acpi_iort.h |  12 ++++
- 2 files changed, 164 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 57 ++++++++++++++++++++++++----------------
+ 1 file changed, 34 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 3eaeb66..c669fdab 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -22,6 +22,12 @@
- #include <linux/kernel.h>
- #include <linux/pci.h>
- 
-+struct iort_its_msi_chip {
-+	struct list_head	list;
-+	struct fwnode_handle	*fw_node;
-+	u32			translation_id;
-+};
-+
- typedef acpi_status (*iort_find_node_callback)
- 	(struct acpi_iort_node *node, void *context);
- 
-@@ -31,6 +37,76 @@ static struct acpi_table_header *iort_table;
- static LIST_HEAD(iort_msi_chip_list);
- static DEFINE_SPINLOCK(iort_msi_chip_lock);
- 
-+/**
-+ * iort_register_domain_token() - register domain token and related ITS ID
-+ * to the list from where we can get it back later on.
-+ * @trans_id: ITS ID.
-+ * @fw_node: Domain token.
-+ *
-+ * Returns: 0 on success, -ENOMEM if no memory when allocating list element
-+ */
-+int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
-+{
-+	struct iort_its_msi_chip *its_msi_chip;
-+
-+	its_msi_chip = kzalloc(sizeof(*its_msi_chip), GFP_KERNEL);
-+	if (!its_msi_chip)
-+		return -ENOMEM;
-+
-+	its_msi_chip->fw_node = fw_node;
-+	its_msi_chip->translation_id = trans_id;
-+
-+	spin_lock(&iort_msi_chip_lock);
-+	list_add(&its_msi_chip->list, &iort_msi_chip_list);
-+	spin_unlock(&iort_msi_chip_lock);
-+
-+	return 0;
-+}
-+
-+/**
-+ * iort_deregister_domain_token() - Deregister domain token based on ITS ID
-+ * @trans_id: ITS ID.
-+ *
-+ * Returns: none.
-+ */
-+void iort_deregister_domain_token(int trans_id)
-+{
-+	struct iort_its_msi_chip *its_msi_chip, *t;
-+
-+	spin_lock(&iort_msi_chip_lock);
-+	list_for_each_entry_safe(its_msi_chip, t, &iort_msi_chip_list, list) {
-+		if (its_msi_chip->translation_id == trans_id) {
-+			list_del(&its_msi_chip->list);
-+			kfree(its_msi_chip);
-+			break;
-+		}
-+	}
-+	spin_unlock(&iort_msi_chip_lock);
-+}
-+
-+/**
-+ * iort_find_domain_token() - Find domain token based on given ITS ID
-+ * @trans_id: ITS ID.
-+ *
-+ * Returns: domain token when find on the list, NULL otherwise
-+ */
-+struct fwnode_handle *iort_find_domain_token(int trans_id)
-+{
-+	struct fwnode_handle *fw_node = NULL;
-+	struct iort_its_msi_chip *its_msi_chip;
-+
-+	spin_lock(&iort_msi_chip_lock);
-+	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-+		if (its_msi_chip->translation_id == trans_id) {
-+			fw_node = its_msi_chip->fw_node;
-+			break;
-+		}
-+	}
-+	spin_unlock(&iort_msi_chip_lock);
-+
-+	return fw_node;
-+}
-+
- static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
- 					     iort_find_node_callback callback,
- 					     void *context)
-@@ -202,6 +278,82 @@ static struct acpi_iort_node *iort_find_dev_node(struct device *dev)
- 			      iort_match_node_callback, &pbus->dev);
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 36b9c28..943442d 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1614,13 +1614,37 @@ static void its_enable_quirks(struct its_node *its)
+ 	gic_enable_quirks(iidr, its_quirks, its);
  }
  
-+/**
-+ * iort_msi_map_rid() - Map a MSI requester ID for a device
-+ * @dev: The device for which the mapping is to be done.
-+ * @req_id: The device requester ID.
-+ *
-+ * Returns: mapped MSI RID on success, input requester ID otherwise
-+ */
-+u32 iort_msi_map_rid(struct device *dev, u32 req_id)
++static int its_init_domain(struct device_node *node, struct its_node *its,
++			   struct irq_domain *parent)
 +{
-+	struct acpi_iort_node *node;
-+	u32 dev_id;
++	struct irq_domain *inner_domain;
++	struct msi_domain_info *info;
 +
-+	node = iort_find_dev_node(dev);
-+	if (!node)
-+		return req_id;
++	info = kzalloc(sizeof(*info), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
 +
-+	iort_node_map_rid(node, req_id, &dev_id, ACPI_IORT_NODE_ITS_GROUP);
-+	return dev_id;
-+}
-+
-+/**
-+ * iort_dev_find_its_id() - Find the ITS identifier for a device
-+ * @dev: The device.
-+ * @idx: Index of the ITS identifier list.
-+ * @its_id: ITS identifier.
-+ *
-+ * Returns: 0 on success, appropriate error value otherwise
-+ */
-+static int iort_dev_find_its_id(struct device *dev, u32 req_id,
-+				unsigned int idx, int *its_id)
-+{
-+	struct acpi_iort_its_group *its;
-+	struct acpi_iort_node *node;
-+
-+	node = iort_find_dev_node(dev);
-+	if (!node)
-+		return -ENXIO;
-+
-+	node = iort_node_map_rid(node, req_id, NULL, ACPI_IORT_NODE_ITS_GROUP);
-+	if (!node)
-+		return -ENXIO;
-+
-+	/* Move to ITS specific data */
-+	its = (struct acpi_iort_its_group *)node->node_data;
-+	if (idx > its->its_count) {
-+		dev_err(dev, "requested ITS ID index [%d] is greater than available [%d]\n",
-+			idx, its->its_count);
-+		return -ENXIO;
++	inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
++	if (!inner_domain) {
++		kfree(info);
++		return -ENOMEM;
 +	}
 +
-+	*its_id = its->identifiers[idx];
++	inner_domain->parent = parent;
++	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
++	info->ops = &its_msi_domain_ops;
++	info->data = its;
++	inner_domain->host_data = info;
++
 +	return 0;
 +}
 +
-+/**
-+ * iort_get_device_domain() - Find MSI domain related to a device
-+ * @dev: The device.
-+ * @req_id: Requester ID for the device.
-+ *
-+ * Returns: the MSI domain for this device, NULL otherwise
-+ */
-+struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id)
-+{
-+	struct fwnode_handle *handle;
-+	int its_id;
-+
-+	if (iort_dev_find_its_id(dev, req_id, 0, &its_id))
-+		return NULL;
-+
-+	handle = iort_find_domain_token(its_id);
-+	if (!handle)
-+		return NULL;
-+
-+	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
-+}
-+
- void __init acpi_iort_init(void)
+ static int __init its_probe(struct device_node *node,
+ 			    struct irq_domain *parent)
  {
- 	acpi_status status;
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index fcacaf7..0e32dac 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -20,11 +20,23 @@
- #define __ACPI_IORT_H__
+ 	struct resource res;
+ 	struct its_node *its;
+ 	void __iomem *its_base;
+-	struct irq_domain *inner_domain;
+ 	u32 val;
+ 	u64 baser, tmp;
+ 	int err;
+@@ -1712,28 +1736,9 @@ static int __init its_probe(struct device_node *node,
+ 	writeq_relaxed(0, its->base + GITS_CWRITER);
+ 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
  
- #include <linux/acpi.h>
-+#include <linux/fwnode.h>
-+#include <linux/irqdomain.h>
+-	if (of_property_read_bool(node, "msi-controller")) {
+-		struct msi_domain_info *info;
+-
+-		info = kzalloc(sizeof(*info), GFP_KERNEL);
+-		if (!info) {
+-			err = -ENOMEM;
+-			goto out_free_tables;
+-		}
+-
+-		inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
+-		if (!inner_domain) {
+-			err = -ENOMEM;
+-			kfree(info);
+-			goto out_free_tables;
+-		}
+-
+-		inner_domain->parent = parent;
+-		inner_domain->bus_token = DOMAIN_BUS_NEXUS;
+-		info->ops = &its_msi_domain_ops;
+-		info->data = its;
+-		inner_domain->host_data = info;
+-	}
++	err = its_init_domain(node, its, parent);
++	if (err)
++		goto out_free_tables;
  
-+int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
-+void iort_deregister_domain_token(int trans_id);
-+struct fwnode_handle *iort_find_domain_token(int trans_id);
- #ifdef CONFIG_ACPI_IORT
- void acpi_iort_init(void);
-+u32 iort_msi_map_rid(struct device *dev, u32 req_id);
-+struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
- #else
- static inline void acpi_iort_init(void) { }
-+static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
-+{ return req_id; }
-+static inline struct irq_domain *iort_get_device_domain(struct device *dev,
-+							u32 req_id)
-+{ return NULL; }
- #endif
+ 	spin_lock(&its_lock);
+ 	list_add(&its->entry, &its_nodes);
+@@ -1784,6 +1789,12 @@ int __init its_init(struct device_node *node, struct rdists *rdists,
  
- #endif /* __ACPI_IORT_H__ */
+ 	for (np = of_find_matching_node(node, its_device_id); np;
+ 	     np = of_find_matching_node(np, its_device_id)) {
++		if (!of_property_read_bool(np, "msi-controller")) {
++			pr_warn("%s: no msi-controller property, ITS ignored\n",
++				np->full_name);
++			continue;
++		}
++
+ 		its_probe(np, parent_domain);
+ 	}
+ 
 -- 
 1.9.1
