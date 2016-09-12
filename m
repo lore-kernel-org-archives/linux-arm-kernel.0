@@ -1,43 +1,40 @@
-From: clemens.gruber@pqgruber.com (Clemens Gruber)
-Date: Mon, 12 Sep 2016 23:12:54 +0200
-Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
-In-Reply-To: <20160912200021.fsnfdgnng4it354g@pengutronix.de>
-References: <20141009151605.GA8818@ulmo.nvidia.com>
- <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
- <6c896634c4d6446df0388da2c0228232@agner.ch>
- <20160909091857.7a263220@ipc1.ka-ro>
- <20160912124553.aqgv7b4vsx4urogi@piout.net>
- <20160912140401.qkezay7sqqavsf4i@pengutronix.de>
- <074eed0df23199bc82f8d221690596d3@agner.ch>
- <20160912200021.fsnfdgnng4it354g@pengutronix.de>
-Message-ID: <20160912211254.GA4637@archie.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Sep 2016 23:13:33 +0200
+Subject: [PATCH 6/8 v2] arm: orion5x: Add DT-based support for Netgear
+ WNR854T
+In-Reply-To: <20160912170625.GA7420@rob-hp-laptop>
+References: <1472203264-21089-7-git-send-email-jm@lentin.co.uk>
+ <1473109646-23366-1-git-send-email-jm@lentin.co.uk>
+ <20160912170625.GA7420@rob-hp-laptop>
+Message-ID: <2920481.EgEQnLmOkM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Monday, September 12, 2016 12:06:25 PM CEST Rob Herring wrote:
+> On Mon, Sep 05, 2016 at 10:07:26PM +0100, Jamie Lentin wrote:
+> > This is a router based on the mv88f5181 chipset.
+> > 
+> > http://www.netgear.com/support/product/WNR854T.aspx
+> > http://wiki.openwrt.org/toh/netgear/wnr854t
+> > 
+> > Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> > ---
+> > This removes the contentious vendor partitioning scheme and goes back
+> > to the original partitioning scheme used in non-DT ports to this board.
+> > Using the same partitioning scheme should mean less surprises for
+> > someone trying to upgrade their router.
+> > 
+> > The non-DT PCI setup is still here, as there are other orion5x DT boards
+> > doing very similar things, and can all be converted at the same time.
+> 
+> If we keep accepting this duplicated, legacy PCI setup, who is going to 
+> be motivated to clean things up. But it's ultimately up to Arnd and 
+> Olof.
+> 
 
-On Mon, Sep 12, 2016 at 10:00:21PM +0200, Uwe Kleine-K?nig wrote:
-> I want that the pwm driver disables its clock on pwm_config(mypwm, 0,
-> someperiod) such that the consumer doesn't need to call
-> pwm_disable(mypwm) to save power (assuming it's safe to do so, which
-> only the pwm provider knows).
+I mentioned before that I'm feeling a bit uneasy about this too.
 
-I am not sure if this is such a good idea, because there are use cases
-where you want to keep the PWM driver enabled the whole time but still
-be able to change the duty cycle to 0 for some time without adding
-unnecessary delays when changing the duty cycle back to something else.
+Maybe we can instead leave out the PCI support from the new
+file for now and not delete the legacy board file?
 
-We have an application where we control fluid valves in a beer
-dispensing system through PWMs and these valves are pulsed with
-different PWM duty cycles for a short time. In-between the duty cycle
-is also 0. For example: Start at 0%, 100ms 90%, 200ms 70%, 300ms 0%,
-100ms 90%, and so on..
-There it is critical that the change from and to 0 duty cycle is not
-delayed by disabling and reenabling the clock.
-The oscillator (if there is one) should be up and running, only the duty
-cycle should be 0 for a short time.
-
-This would not be possible anymore with your API change, right?
-
-Regards,
-Clemens
+	Arnd
