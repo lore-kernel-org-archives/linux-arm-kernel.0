@@ -1,13 +1,13 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 12 Sep 2016 17:51:03 +0200
-Subject: [GIT PULL] ARM: mediatek: dts64 updates for v4.9
-Message-ID: <786a9070-5ea7-02d2-dce6-1f069f75ca18@gmail.com>
+Date: Mon, 12 Sep 2016 17:52:30 +0200
+Subject: [GIT PULL] ARM: mediatek: soc updates for v4.9
+Message-ID: <dd55c369-3684-2a27-6b66-7a98fa485627@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi all,
 
-Please pull the following changes.
+Please pull the following change.
 
 Thanks,
 Matthias
@@ -20,24 +20,21 @@ The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
 are available in the git repository at:
 
-   https://github.com/mbgg/linux-mediatek.git tags/v4.8-next-dts64
+   https://github.com/mbgg/linux-mediatek.git tags/v4.8-next-soc
 
-for you to fetch changes up to 7475e27b45554d350f6a28edc8d0bfcf13f801c4:
+for you to fetch changes up to e180f887ba40a916153e29e6ad48c34d28966740:
 
-   arm64: dts: mt8173-evb: enable HDMI output (2016-08-22 19:12:08 +0200)
-
-----------------------------------------------------------------
-- add HDMI related nodes to mt8173
-- enable the HDMI output on mt8173-evb
+   soc: mediatek: PMIC wrap: Extend the waiting time to 10ms. 
+(2016-08-22 19:31:36 +0200)
 
 ----------------------------------------------------------------
-CK Hu (1):
-       arm64: dts: mt8173: Add HDMI related nodes
+- extent the waiting time of the pmic wrapper to 10 ms which
+reduces the failure rate on the data transfer between pmic and
+pmic wrapper.
 
-Philipp Zabel (1):
-       arm64: dts: mt8173-evb: enable HDMI output
+----------------------------------------------------------------
+Henry Chen (1):
+       soc: mediatek: PMIC wrap: Extend the waiting time to 10ms.
 
-  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 38 ++++++++++++++
-  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 77 
-+++++++++++++++++++++++++++++
-  2 files changed, 115 insertions(+)
+  drivers/soc/mediatek/mtk-pmic-wrap.c | 2 +-
+  1 file changed, 1 insertion(+), 1 deletion(-)
