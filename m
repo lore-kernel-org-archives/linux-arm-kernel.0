@@ -1,44 +1,88 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 12 Sep 2016 14:45:53 +0200
-Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
-In-Reply-To: <20160909091857.7a263220@ipc1.ka-ro>
-References: <20141009151605.GA8818@ulmo.nvidia.com>
- <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
- <6c896634c4d6446df0388da2c0228232@agner.ch>
- <20160909091857.7a263220@ipc1.ka-ro>
-Message-ID: <20160912124553.aqgv7b4vsx4urogi@piout.net>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 12 Sep 2016 15:47:44 +0300
+Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
+In-Reply-To: <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
+References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
+ <20160908073748.GF8913@lukather>
+ <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
+Message-ID: <1975640.ctuo4Obpao@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2016 at 09:18:57 +0200, Lothar Wa?mann wrote :
-> Hi,
-> 
-> On Thu, 08 Sep 2016 15:15:57 -0700 Stefan Agner wrote:
-> > On 2014-10-10 07:22, Lothar Wa?mann wrote:
-> > > This patch series adds support for polarity inversion to the pwm-imx
-> > > driver. The patches have been tested on i.MX6, i.MX53 and with the
-> > > ti-ehrpwm.c driver.
-> > 
-> > Do you know what prevented this patchset from getting merged?
-> > 
-> No idea.
-> 
-> > We are looking for Polarity support in PWM for too, this is especially
-> > useful for backlight control.
-> > 
-> Actually the PWM driver may be the wrong place to achieve this. When
-> the backlight driver sets the brightness to 0 to switch the backlight
-> off, it will disable the PWM. This will make the PWM pin go LOW and
-> thus turn the backlight to full brightness rather than off (unless there
-> is an additional GPIO that controls a backlight enable pin on the LCD).
-> 
+Hi Linus,
 
-Isn't a properly designed PWM putting a high level on its pin when
-disabled and configured with inversed polarity ?
-If the HW is capable of it, the driver should be fixed.
+On Monday 12 Sep 2016 14:40:15 Linus Walleij wrote:
+> On Thu, Sep 8, 2016 at 9:37 AM, Maxime Ripard wrote:
+> > On Thu, Sep 08, 2016 at 12:46:14PM +0800, Chen-Yu Tsai wrote:
+> >> Also, I think we are needlessly using pin groups, 1 pin per group.
+> >> Can pinconf/pinctrl work without them? Would there be any harm
+> >> converting the sunxi driver to work directly with pins? This would
+> >> make it match generic pinconf parsing, and make it easier to get
+> >> both working together.
+> > 
+> > I think it comes from a requirement that you had to have groups at
+> > some point (I don't know if it's still the case), which is why we
+> > ended up with single-pin groups, because we can mux each pins entirely
+> > separately.
+> > 
+> > If it's not required anymore, then yes, it makes total sense to remove
+> > it.
+> 
+> The groups vs individual pins is an eternal debate that has
+> been going on since the inception of pinctrl.
+> 
+> If you see it from the point of the programmer, you may just see
+> a register for each pin and they seem all independent. This is
+> why pinctrl-single exist, and that driver is for this purpose: one
+> register per pin, software-wise independent.
+> 
+> HOWEVER it often turns out that while you can programmatically
+> and individually set pins to any function (and biasing etc), the
+> person designing the hardware was not thinking that you should
+> be able to do whatever you like, e.g. even if it is possible to
+> take two pins and use one of them for half an SPI bus and the
+> other for half an I2C bus, that doesn't mean that this is useful
+> or makes any kind of electronic sense, it just makes "software
+> sense".
+> 
+> So for a deeper understanding, several SoCs (amongst them
+> my own and Qualcomm etc) define groups that are not really
+> about software restrictions for what you can do with the pins, but
+> about usecase and electronic restrictions for what can be done
+> with the pins.
+> 
+> E.g. it makes *sense* to have a group for muxing I2C on two
+> pins, and not allow one of them to be muxed to I2C and the other
+> not, because it does not make electronic sense.
+> 
+> One-group-per-pin groups is usually coming from a failure or
+> inability to identify these electronically sound and usecase
+> oriented pingroups.
 
+I'd argue that you would find out about lots of clever/insane use cases that 
+don't fit this model if you looked at all the hardware available out there, 
+especially non-phone devices. Your SPI example is a good one, I've seen SPI 
+being used in unidirectional mode only, with only MISO or MOSI mattering. In 
+that case the other pin could be used as a GPIO for a totally unrelated 
+purpose when the design is short on GPIOs or when GPIOs have been allocated 
+without any knowledge of the Linux pinctrl subsystem.
+
+Looking at the sh-pfc driver, I wish the hardware had followed the pinctrl-
+single model. sh-pfc is a good example of how bloated a pinctrl driver can 
+become when there is no choice but model all the relationships betweens pins 
+and functions in C code.
+
+> Some (like pinctrl-single) say they don't care, and wish to
+> see things as the world is just software and one register per
+> pin, removing those electric usecase restrictions, and only
+> keeping the muxing restrictions to e.g. the four different functions
+> that can be muxed on that pin, disregarding the bigger picture.
+> 
+> I don't know about this driver or the pins it manages,
+> I seldom have time or brains to dive in and review things
+> deeply enough :(
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+
+Laurent Pinchart
