@@ -1,74 +1,61 @@
-From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Mon, 12 Sep 2016 20:12:47 +0200
-Subject: [PATCH v5 5/5] dts: sun8i-h3: add I2C0-2 peripherals to H3 SOC
-In-Reply-To: <1473703967-21356-1-git-send-email-jorik@kippendief.biz>
-References: <1473703967-21356-1-git-send-email-jorik@kippendief.biz>
-Message-ID: <1473703967-21356-6-git-send-email-jorik@kippendief.biz>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 12 Sep 2016 20:18:28 +0200
+Subject: [PATCH 4/9] mtd: nand: Add function to convert ONFI mode to
+ data_interface
+In-Reply-To: <20160912063511.flb3se54dy4itlru@pengutronix.de>
+References: <1473422712-12359-1-git-send-email-s.hauer@pengutronix.de>
+ <1473422712-12359-5-git-send-email-s.hauer@pengutronix.de>
+ <20160909143522.6a3b6975@bbrezillon>
+ <20160912063511.flb3se54dy4itlru@pengutronix.de>
+Message-ID: <20160912201828.52c60232@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jorik Jonker <jorik@kippendief.biz>
+On Mon, 12 Sep 2016 08:35:11 +0200
+Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-These peripherals can only be muxed to these pins, so they are
-associated in the DTSI instead of the board files. This makes it very
-easy to enable them using overlays or u-boot commands:
+> On Fri, Sep 09, 2016 at 02:35:22PM +0200, Boris Brezillon wrote:
+> > On Fri,  9 Sep 2016 14:05:07 +0200
+> > Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >   
+> > > onfi_init_data_interface() initializes a data interface with
+> > > values from a given ONFI mode.
+> > > 
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > > ---
+> > >  drivers/mtd/nand/nand_timings.c | 16 ++++++++++++++++
+> > >  include/linux/mtd/nand.h        |  2 ++
+> > >  2 files changed, 18 insertions(+)
+> > > 
+> > > diff --git a/drivers/mtd/nand/nand_timings.c b/drivers/mtd/nand/nand_timings.c
+> > > index 9af2ebc..ece4ff2 100644
+> > > --- a/drivers/mtd/nand/nand_timings.c
+> > > +++ b/drivers/mtd/nand/nand_timings.c
+> > > @@ -269,3 +269,19 @@ const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode)
+> > >  	return &onfi_sdr_timings[mode].timings.sdr;
+> > >  }
+> > >  EXPORT_SYMBOL(onfi_async_timing_mode_to_sdr_timings);
+> > > +
+> > > +/**
+> > > + * onfi_init_data_interface - [NAND Interface] Initialize a data interface from
+> > > + * given ONFI mode
+> > > + * @iface: The data interface to be initialized
+> > > + * @mode: The ONFI timing mode
+> > > + */
+> > > +int onfi_init_data_interface(struct nand_data_interface *iface, int mode)  
+> > 
+> > Can we choose a more future proof prototype (like the one I suggested)
+> > for this function. Passing the nand_chip will later allow to extract
+> > extended timings (tR, tPROG, tCCS, ...) from the param page, and
+> > passing the interface type makes it compatible with DDR mode.  
+> 
+> Ok, will change as you suggested to:
+> 
+> int onfi_init_data_interface(struct nand_chip *chip,
+>                              struct nand_data_interface *iface,
+>                              enum nand_data_interface_type type,
+>                              int timing_mode)
+> 
+> Before I send another round: Are the other patches ok?
 
- => fdt set /soc/i2c at 01c2ac00 status okay
-
-Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index ed6628d..bfc9200 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -483,6 +483,45 @@
- 			status = "disabled";
- 		};
- 
-+		i2c0: i2c at 01c2ac00 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C0>;
-+			resets = <&ccu RST_BUS_I2C0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C1>;
-+			resets = <&ccu RST_BUS_I2C1>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C2>;
-+			resets = <&ccu RST_BUS_I2C2>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		gic: interrupt-controller at 01c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
--- 
-2.7.4
+Yes.
