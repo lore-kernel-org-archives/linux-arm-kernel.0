@@ -1,100 +1,134 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 12 Sep 2016 09:51:26 -0700
-Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
-In-Reply-To: <20160912140401.qkezay7sqqavsf4i@pengutronix.de>
-References: <20141009151605.GA8818@ulmo.nvidia.com>
- <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
- <6c896634c4d6446df0388da2c0228232@agner.ch>
- <20160909091857.7a263220@ipc1.ka-ro>
- <20160912124553.aqgv7b4vsx4urogi@piout.net>
- <20160912140401.qkezay7sqqavsf4i@pengutronix.de>
-Message-ID: <074eed0df23199bc82f8d221690596d3@agner.ch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Sep 2016 17:56:37 +0100
+Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
+In-Reply-To: <57D6D2A9.3010006@laposte.net>
+References: <57BDAF2E.10502@laposte.net>
+ <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
+ <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
+ <57D6AA54.6000208@laposte.net> <20160912135549.GA14165@leverpostej>
+ <57D6D2A9.3010006@laposte.net>
+Message-ID: <20160912165637.GF14165@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 12, 2016 at 06:07:05PM +0200, Sebastian Frias wrote:
+> On 09/12/2016 04:01 PM, Mark Rutland wrote:
+> > Few devices these says are entirely independent, and most devices can be
+> > instantiated multiple times (even if there happens to only be a single
+> > instance in practice). For the example of a userspace driver there are
+> > very real ABI concerns, such as how the device(s) are discovered, how
+> > any related components like regulators and clocks are controlled, etc.
+> > 
+> > There are ramifications here, and it's a dangerous over simplification
+> > to say that this doesn't matter because we're not changing kernel code.
+> > 
+> >> Besides, what "makes sense now" may "not make sense tomorrow" depending on
+> >> how the HW is modified.
+> > 
+> > That's always the case when a new generation of hardware comes out, so I
+> > don't think that's relevant to the topic at hand.
+> 
+> Exactly, that's why to I'm having trouble to understand why there is so much
+> insistence on "getting the DT 100% right", since a HW change could imply
+> that what made 100% sense yesterday, does not today.
+> Since that is a possibility we have to live with, then the "100% right" goal
+> is most likely unachievable.
+> That's different from "backwards compatibility" for which some technique,
+> like alternate descriptions, can be put in place.
 
-Thanks for that insight Uwe!
+I'm not on about "100% right", but more "a reasonable chance of being
+good enough". The latter is extremely difficult to judge when you just
+get a binding document with little or no additional context.
 
-On 2016-09-12 07:04, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Mon, Sep 12, 2016 at 02:45:53PM +0200, Alexandre Belloni wrote:
->> Isn't a properly designed PWM putting a high level on its pin when
->> disabled and configured with inversed polarity ?
-> 
-> it's not well defined. When trying several times over the years to
-> properly define and document it, I didn't manage to agree with Thierry
-> what is the right thing to define.
-> 
-> IMHO it would be sensible to make it explicitly undefined what happens
-> when a PMW is disabled. This would simplify drivers from
-> 
-> 	pwm_config(mypwm, value, period);
-> 	if (!value)
-> 		pwm_disable(mypwm)
-> 	else
-> 		pwm_enable(led_dat->pwm);
-> 
-> to
-> 
-> 	pwm_config(mypwm, value, period);
-> 
-> and let the pwm driver disable it's clock (or whatever) when value is 0
-> and there are energy saving benefits that don't hurt the expected
-> behaviour of the pin. So the hardware specific stuff is handled in the
-> hardware specific driver and usage in pwm-consumers is simplified.
-> Moreover this also simplifies some pwm drivers because they don't have
-> to catch in software the cases where the hardware differs from the
-> expectation[1].
+Backwards compatibility is with regards to new software supporting old
+bindings. If new HW comes out, we can create new bindings. Old bindings
+should remain supported regardless.
 
-That sounds like a sane definition to me and what I would have expected
-from the PWM framework. That the pin is not defined after pwm_disable is
-totally understandable. It is usually a case which the board designer
-anyway needs to take care of (e.g. what is the state right after power
-on? If the designer cares about, he will put a pull-up/down in place).
-
-And it seems also Sascha suggested that:
-https://lkml.org/lkml/2013/1/4/139
-
-I did not found where Thierry disagreed to that...?
-
-> Looking at drivers/leds/leds-pwm.c it doesn't ensure that each
-> pwm_enable is paired by an pwm_disable (e.g. on .remove). Is this a bug?
-> With my purposed semantics of .config and .disable this would be much
-> easier to fix.
-
-That looks like a bug to me.
-
+> >> Actually, I think it would encourage more SoC manufacturers to use DT as a way
+> >> to document their HW, which is a good thing.
+> > 
+> > Writing and reviewing bindings is a very tricky topic, as it can require
+> > fairly intimate knowledge of a piece of hardware. I've repeatedly found
+> > that binding descriptions did not match the realities of the hardware,
+> > and I've only managed to do so by looking at accompanying driver code.
+> > 
+> > Given that manuals and other information on devices are often not freely
+> > available (if they exist at all), the proposal effectively limits myself
+> > and others to spot common (anti)patterns, which is far less than ideal,
+> > and will result in more mistakes.
+> > 
+> > As it stands, the proposal asks for effort for the community (in terms
+> > of review and maintenance of bindings), with no benefit to the kernel
+> > community, and a number of pitfalls that we would rather avoid.
 > 
-> Regarding your question: Yeah, maybe all properly designed PWMs behave
-> like you expect. But reality isn't only about properly designed
-> hardware, so I wouldn't expect all hardware to behave. The inverse
-> property might be software emulated and so on pwm_disable the pin might
-> become 0.
-> 
-> The obvious downside of my suggestion is that this is a change in what
-> most people expect (because it was "safe" to call pwm_enable before),
-> but the resulting code is simpler and cleaner.
-> 
-> Today it's a (maybe small) bug, when a pwm consumer calls pwm_config with
-> value=0 and doesn't disable it afterwards. IMHO that's a bug in the pwm
-> API that pwm_config with value=0 doesn't imply (the wanted effects of)
-> pwm_disable.
+> Could you be more precise on those two issues? Namely:
+> "the effort" and the "lack of benefit for the community"?
 
-I don't quite get what you are saying here. What wanted effects of
-pwm_disable would you like to move into pwm_config with value=0?
+As above, reviewing is tricky. One has to spend the time gaining an
+understanding of a particular piece of hardware, the class of hardware
+it falls in, and also the bigger picture that it fits in. Once you have
+that, you have to review the binding in that context, and that takes
+time and effort.
 
---
-Stefan
+As things evolve, perhaps mistakes or inconsistencies are found, or new
+ways to generalise things. As that occurs, there is a maintenance burden
+for existing bindings.
 
+All of that takes time and effort.
+
+If, at the end of that, a proprietary vendor driver is using a different
+version of the binding anyway, because "there's no backward
+compatibility to guarantee", then there is no benefit to the document.
+
+Even if that proprietary driver does remain stable, the Linux community
+will have done work that only benefits the authors of that driver. We
+would prefer that the results of our efforts are open, and benefit all.
+
+> I can understand the effort it takes to review a binding and some
+> driver, but if there's no driver, why would it matter if the DT binding is
+> 100% right? Hence, why would it take more effort?
+> Furthermore, if there's no driver, there's no backward compatibility to
+> guarantee. Shouldn't it require less effort?
+
+I don't follow. If there's no compatibility to guarantee, why do you
+want a binding?
+
+A binding is a form of contract -- if you describe the HW this way, then
+some software will understand it. You can extend a binding over time,
+certainly, but if the baseline of that binding is a moving target, that
+benefits nobody.
+
+[...]
+
+> >> But if I understood correctly your comment, you are basically saying that
+> >> without an example is hard to say.
+> >> Since the question seems understood, do you have an example of other SoC's
+> >> doing something similar?
+> > 
+> > I do not have an example. I know that others are using DT for data
+> > beyond what Linux or another OS requires, but it's my understanding that
+> > that is typically in a separate DTB.
 > 
-> Best regards
-> Uwe
-> 
-> [1] This might even be impossible: Consider a PWM that gets 0 (or
-> high-z) on hw-disable independent of configured duty or inversion. The
-> driver now sees for an inverted pwm: pwm_config(this, 0, 100);
-> pwm_disable(this); The driver cannot know if it should continue to drive
-> the pin at 1, or if the pwm consumer stopped caring about the pwm and
-> disabling the hardware is OK.
+> I see, although I don't understand how accepting such solution (i.e.: having the
+> information in a different DT) benefits the open-source community, since it
+> basically means that the open-source community settles for less information.
+
+As with all things, it depends on context. If someone's using a DT to
+describe details of the secure world of a platform with trustzone to a
+secure OS, then not all of that information is relevant to Linux.
+Likewise if configuration details specific to FW are embedded.
+
+If there's information relevant to a general purpose OS, then I would
+expect it to be described. By the same token, I would expect a general
+purpose OS to actually be making use of the information. In practice,
+we've used Linux as the benchmark for that. That needn't necessarily be
+the case if another OS can demonstrate that the binding is worthwhile --
+ideally we'd have multiple OSs using bindings so as to "keep us honest"
+and free from implementation details.
+
+As I mentioned before, an example would help. The theoretical envelope
+is very large and likely far beyond what you envisage. We need something
+to focus on, or we're arguing about what we conceive differently.
+
+Thanks,
+Mark.
