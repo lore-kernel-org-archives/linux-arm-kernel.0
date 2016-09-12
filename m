@@ -1,45 +1,43 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 12 Sep 2016 14:06:09 +0100
-Subject: [PATCH] ARM: dma-mapping: add in missing white space in error
- message text
-In-Reply-To: <20160912125212.32739-1-colin.king@canonical.com>
-References: <20160912125212.32739-1-colin.king@canonical.com>
-Message-ID: <db1758f8-0335-6661-e797-b2021682a087@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Sep 2016 14:07:25 +0100
+Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <20160912125948.GB13899@leverpostej>
+References: <1473469413-11019-1-git-send-email-oss@buserror.net>
+ <1473469413-11019-3-git-send-email-oss@buserror.net>
+ <20160912113615.GA20804@leverpostej> <20160912114406.GG23211@arm.com>
+ <20160912123027.GA13741@leverpostej> <20160912125948.GB13899@leverpostej>
+Message-ID: <57D6A88D.7000002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/16 13:52, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
+On 12/09/16 13:59, Mark Rutland wrote:
+> On Mon, Sep 12, 2016 at 01:30:28PM +0100, Mark Rutland wrote:
+>> On Mon, Sep 12, 2016 at 12:44:07PM +0100, Will Deacon wrote:
+>>> On Mon, Sep 12, 2016 at 12:36:15PM +0100, Mark Rutland wrote:
+>>>> The changes in arm64's <asm/arch_timer.h> are going to conflict with
+>>>> some cleanup [1,2] that just landed in the arm64 for-next/core branch.
+>>>>
+>>>> Could you please rebase atop of that?
+>>>
+>>> Well, we should figure out what tree this is going through first. There
+>>> are a mixture of arm, arm64, driver and dts changes here and not all
+>>> of it is carrying the appropriate acks for me to queue it.
+>>
+>> Given that mix, I had assumed that this would all go through the arm64
+>> tree -- I see that Rob has already acked the binding, and I'm happy to
+>> give my ack for the driver once that's in shape.
 > 
-> A dev_warn message spans two lines and the literal string is missing
-> a white space between words. Add the white space.
+> Now I see that I'd missed the arch/arm changes in patch 4, which lack a
+> relevant ack.
 > 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  arch/arm/common/dmabounce.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-> index 3012816..f47767b 100644
-> --- a/arch/arm/common/dmabounce.c
-> +++ b/arch/arm/common/dmabounce.c
-> @@ -547,7 +547,7 @@ void dmabounce_unregister_dev(struct device *dev)
->  
->  	if (!device_info) {
->  		dev_warn(dev,
-> -			 "Never registered with dmabounce but attempting"
-> +			 "Never registered with dmabounce but attempting "
->  			 "to unregister!\n");
+> Given that, I don't know what to suggest.
 
-Per Documentation/CodingStyle, better to put the whole thing onto one
-line so that, say, "git grep 'attempting to unregister'" doesn't leave
-one scratching ones head in confusion.
+I wouldn't mind delaying patch 4 until it gets acked by RMK, as it
+doesn't impact the functionality.
 
-Of course, even better would be to get rid of the whole thing and
-convert ARM to use SWIOTLB, but hey, one thing at a time ;)
+Thanks,
 
-Robin.
-
->  		return;
->  	}
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
