@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 12 Sep 2016 20:12:28 +0100
-Subject: Applied "spi: meson: Add GXBB compatible" to the spi tree
-In-Reply-To: <1473261223-15412-5-git-send-email-jbrunet@baylibre.com>
-Message-ID: <E1bjWea-0003hH-1K@debutante>
+Date: Mon, 12 Sep 2016 20:12:36 +0100
+Subject: Applied "spi: meson: Add GXBB Compatible string" to the spi tree
+In-Reply-To: <1473261223-15412-6-git-send-email-jbrunet@baylibre.com>
+Message-ID: <E1bjWei-0003iJ-IE@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: meson: Add GXBB compatible
+   spi: meson: Add GXBB Compatible string
 
 has been applied to the spi tree at
 
@@ -33,29 +33,30 @@ to this mail.
 Thanks,
 Mark
 
->From 2f58ea64bd8931bd7709732fe0a96e0bfb44a00b Mon Sep 17 00:00:00 2001
+>From 164c5cd5ffabfa7a060999f8184927017287c39b Mon Sep 17 00:00:00 2001
 From: Neil Armstrong <narmstrong@baylibre.com>
-Date: Thu, 8 Sep 2016 09:53:26 +0200
-Subject: [PATCH] spi: meson: Add GXBB compatible
+Date: Thu, 8 Sep 2016 09:53:25 +0200
+Subject: [PATCH] spi: meson: Add GXBB Compatible string
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 Acked-by: Kevin Hilman <khilman@baylibre.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-meson-spifc.c | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/spi/spi-meson.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-meson-spifc.c b/drivers/spi/spi-meson-spifc.c
-index 2465259f6241..616566e793c6 100644
---- a/drivers/spi/spi-meson-spifc.c
-+++ b/drivers/spi/spi-meson-spifc.c
-@@ -442,6 +442,7 @@ static const struct dev_pm_ops meson_spifc_pm_ops = {
+diff --git a/Documentation/devicetree/bindings/spi/spi-meson.txt b/Documentation/devicetree/bindings/spi/spi-meson.txt
+index bb52a86f3365..dc6d0313324a 100644
+--- a/Documentation/devicetree/bindings/spi/spi-meson.txt
++++ b/Documentation/devicetree/bindings/spi/spi-meson.txt
+@@ -7,7 +7,7 @@ NOR memories, without DMA support and a 64-byte unified transmit /
+ receive buffer.
  
- static const struct of_device_id meson_spifc_dt_match[] = {
- 	{ .compatible = "amlogic,meson6-spifc", },
-+	{ .compatible = "amlogic,meson-gxbb-spifc", },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, meson_spifc_dt_match);
+ Required properties:
+- - compatible: should be "amlogic,meson6-spifc"
++ - compatible: should be "amlogic,meson6-spifc" or "amlogic,meson-gxbb-spifc"
+  - reg: physical base address and length of the controller registers
+  - clocks: phandle of the input clock for the baud rate generator
+  - #address-cells: should be 1
 -- 
 2.8.1
