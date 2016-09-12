@@ -1,76 +1,161 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 12 Sep 2016 16:04:01 +0200
-Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
-In-Reply-To: <20160912124553.aqgv7b4vsx4urogi@piout.net>
-References: <20141009151605.GA8818@ulmo.nvidia.com>
- <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
- <6c896634c4d6446df0388da2c0228232@agner.ch>
- <20160909091857.7a263220@ipc1.ka-ro>
- <20160912124553.aqgv7b4vsx4urogi@piout.net>
-Message-ID: <20160912140401.qkezay7sqqavsf4i@pengutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 12 Sep 2016 09:05:52 -0500
+Subject: [linux-sunxi] Re: [RFC] misc: Add Allwinner Q8 tablet hardware
+ manager
+In-Reply-To: <268244d0-55c3-167d-a70f-0e35e6b3dae6@redhat.com>
+References: <20160901190820.21987-1-hdegoede@redhat.com>
+ <20160901190820.21987-2-hdegoede@redhat.com>
+ <CAL_JsqLGS23JQxtdtUqNhkhDiV4mnKSBpMjdo4fx0=wuq_ydeg@mail.gmail.com>
+ <268244d0-55c3-167d-a70f-0e35e6b3dae6@redhat.com>
+Message-ID: <20160912140552.GA30379@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, Sep 10, 2016 at 08:12:32PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 09-09-16 23:41, Rob Herring wrote:
+> >On Thu, Sep 1, 2016 at 2:08 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> >>Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets
+> >>of which a new batch is produced every few weeks. Each batch uses a
+> >>different mix of touchscreen, accelerometer and wifi peripherals.
+> >>
+> >>Given that each batch is different creating a devicetree for each variant
+> >>is not desirable. This commit adds a Q8 tablet hardware manager which
+> >>auto-detects the touchscreen and accelerometer so that a single generic
+> >>dts can be used for these tablets.
+> >>
+> >>The wifi is connected to a discoverable bus (sdio or usb) and will be
+> >>autodetected by the mmc resp. usb subsystems.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >> .../misc/allwinner,sunxi-q8-hardwaremgr.txt        |  52 +++
+> >> drivers/misc/Kconfig                               |  12 +
+> >> drivers/misc/Makefile                              |   1 +
+> >> drivers/misc/q8-hardwaremgr.c                      | 512 +++++++++++++++++++++
+> >> 4 files changed, 577 insertions(+)
+> >> create mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
+> >> create mode 100644 drivers/misc/q8-hardwaremgr.c
+> >>
+> >>diff --git a/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt b/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
+> >>new file mode 100644
+> >>index 0000000..f428bf5
+> >>--- /dev/null
+> >>+++ b/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
+> >>@@ -0,0 +1,52 @@
+> >>+Q8 tablet hardware manager
+> >>+--------------------------
+> >>+
+> >>+Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets of
+> >>+which a new batch is produced every few weeks. Each batch uses a different
+> >>+mix of touchscreen, accelerometer and wifi peripherals.
+> >>+
+> >>+Given that each batch is different creating a devicetree for each variant is
+> >>+not desirable. The Q8 tablet hardware manager bindings are bindings for an os
+> >>+module which auto-detects the touchscreen so that a single
+> >>+generic dts can be used for these tablets.
+> >>+
+> >>+The wifi is connected to a discoverable bus and will be autodetected by the os.
+> >>+
+> >>+Required properties:
+> >>+ - compatible         : "allwinner,sunxi-q8-hardwaremgr"
+> >>+ - touchscreen        : phandle of a template touchscreen node, this must be a
+> >>+                       child node of the touchscreen i2c bus
+> >>+
+> >>+Optional properties:
+> >>+ - touchscreen-supply : regulator phandle for the touchscreen vdd supply
+> >
+> >While I said I think you should be using overlays here, you could also
+> >do it without.
+> 
+> Good, because I believe that doing things without overlays will
+> be much easier. If you look at the actual implementation you will
+> see that it sets a lot of properties (touchscreen width, height,
+> inversion, axis-swapping, firmware-name) based on various sources,
+> the explosion of possible overlays from this is huge, and if
+> we're going to runtime patch the overlays then why use them at all
+> and not just runtime generate all the info ?
 
-On Mon, Sep 12, 2016 at 02:45:53PM +0200, Alexandre Belloni wrote:
-> Isn't a properly designed PWM putting a high level on its pin when
-> disabled and configured with inversed polarity ?
+That's fine if run-time makes more sense. I'd just like to move in the 
+direction of applying a hunk of changes rather than C code creating 
+nodes and properties one-by-one.
+ 
+> >However, this node has to go. It is not h/w, and you
+> >are putting it here purely to instantiate a driver.
+> 
+> With "this" in "this node has to go", do you mean the node
+> with the "allwinner,sunxi-q8-hardwaremgr" compatible, or
+> do you mean the touchscreen template node ?
 
-it's not well defined. When trying several times over the years to
-properly define and document it, I didn't manage to agree with Thierry
-what is the right thing to define.
+Given that this binding section above is concerning 
+allwinner,sunxi-q8-hardwaremgr, that is what I'm referring to.
 
-IMHO it would be sensible to make it explicitly undefined what happens
-when a PMW is disabled. This would simplify drivers from
+> 
+> >For the
+> >touchscreen property, surely you know where the touchscreen is located
+> >in the DT?
+> 
+> Nope q8 tablets come with A13, A23 or A33 SoCs, A23/A33 are pin
+> compatible with each other, but the A13 is not, this leads to
+> the touchscreen being on a different i2c bus, so I cannot hardcode
+> things, likewise the power-gpios and interrupt found in the
+> touchscreen node differ between the A13 vs A23/A33.
 
-	pwm_config(mypwm, value, period);
-	if (!value)
-		pwm_disable(mypwm)
-	else
-		pwm_enable(led_dat->pwm);
+Either the touchscreen node name is "touchscreen" or you can have 
+compatible string for q8-touchscreen and use of_find_node_by_name or 
+of_find_compatible_node. Doesn't matter what bus it is on. It only 
+requires that there is only 1 node.
 
-to
+> I actually had a touchscreen-i2c-bus property containing a
+> phandle to the i2c controller for the bus which has the
+> touchscreen in an earlier revision + touchscreen-gpios
+> and touchscreen-supply properties, I can switch to that
+> if you prefer that over having a touchscreen template node.
+> 
+> > If not, of_find_node_by_name()?
+> 
+> Still a bit confused about what you do not like,
+> (touchscreen template node vs q8-hardwaremgr node).
+> 
+> I guess (based on context) you do not want the
+> q8-hardwaremgr node ?
+> 
+> So the q8-hardwaremgr code should activate based on
+> the machine compatible I presume? 
 
-	pwm_config(mypwm, value, period);
+Either that, or if you have the board specific compatible in the 
+touchscreen node, then you could have a driver for it. That driver would 
+need to probe the device and then create the "real" device.
+ 
+> How does that
+> work with module autoloading ?
 
-and let the pwm driver disable it's clock (or whatever) when value is 0
-and there are energy saving benefits that don't hurt the expected
-behaviour of the pin. So the hardware specific stuff is handled in the
-hardware specific driver and usage in pwm-consumers is simplified.
-Moreover this also simplifies some pwm drivers because they don't have
-to catch in software the cases where the hardware differs from the
-expectation[1].
-Looking at drivers/leds/leds-pwm.c it doesn't ensure that each
-pwm_enable is paired by an pwm_disable (e.g. on .remove). Is this a bug?
-With my purposed semantics of .config and .disable this would be much
-easier to fix.
+Can't non-DT based platform drivers do autoloading? Regardless, not 
+really my problem from a binding perspective.
 
-Regarding your question: Yeah, maybe all properly designed PWMs behave
-like you expect. But reality isn't only about properly designed
-hardware, so I wouldn't expect all hardware to behave. The inverse
-property might be software emulated and so on pwm_disable the pin might
-become 0.
+> If you do not want the q8-hardwaremgr node and thus
+> no touchscreen property them yes I can use
+> of_find_node_by_name(), but I thought that was
+> generally frowned up on?
 
-The obvious downside of my suggestion is that this is a change in what
-most people expect (because it was "safe" to call pwm_enable before),
-but the resulting code is simpler and cleaner.
+Generally we do prefer finding things by compatible strings. But there 
+are exceptions and doing fix-ups like this is a good example.
 
-Today it's a (maybe small) bug, when a pwm consumer calls pwm_config with
-value=0 and doesn't disable it afterwards. IMHO that's a bug in the pwm
-API that pwm_config with value=0 doesn't imply (the wanted effects of)
-pwm_disable.
+> >For touchscreen-supply, I
+> >assume this is to turn on the supply so you can talk to the touch
+> >controller. There's no reason the supply can't just be in the
+> >touchscreen node itself.
+> 
+> Only a few q8 tablets actually use the regulator, so
+> the hardwaremgr first tries detecting the touchscreen
+> without it, and only if it does not find anything then
+> tries with it, and adds a property to the touchscreen
+> node for it, but I guess I can do this other way
+> around and have it be present in the (incomplete /
+> template) touchscreen node and delete it from it if
+> not necessary.
 
-Best regards
-Uwe
+Right.
 
-[1] This might even be impossible: Consider a PWM that gets 0 (or
-high-z) on hw-disable independent of configured duty or inversion. The
-driver now sees for an inverted pwm: pwm_config(this, 0, 100);
-pwm_disable(this); The driver cannot know if it should continue to drive
-the pin at 1, or if the pwm consumer stopped caring about the pwm and
-disabling the hardware is OK.
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Rob
