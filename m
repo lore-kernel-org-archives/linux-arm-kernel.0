@@ -1,124 +1,129 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Mon, 12 Sep 2016 17:01:25 +0200
-Subject: [PATCH v3 3/9] ARM: sun8i: dt: Add DT bindings documentation for
- Allwinner sun8i-emac
-In-Reply-To: <20160909140413.GD30871@lunn.ch>
-References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
- <1473425117-18645-4-git-send-email-clabbe.montjoie@gmail.com>
- <20160909140413.GD30871@lunn.ch>
-Message-ID: <20160912150125.GA15570@Red>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 12 Sep 2016 16:07:15 +0100
+Subject: [PATCH v5 2/3] mfd: add support for Allwinner SoCs ADC
+In-Reply-To: <20160912143548.GL9449@lukather>
+References: <1473344917-1524-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1473344917-1524-3-git-send-email-quentin.schulz@free-electrons.com>
+ <20160912091829.GB1873@dell>
+ <93bd339b-85ab-d0fc-5e80-e2aca290c0d7@free-electrons.com>
+ <20160912095923.GD1873@dell> <20160912100719.GJ9449@lukather>
+ <20160912104932.GF1873@dell>
+ <c322d309-993c-a572-5ffd-bf4012e26134@free-electrons.com>
+ <20160912135655.GC9789@dell> <20160912143548.GL9449@lukather>
+Message-ID: <20160912150715.GG9789@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 04:04:13PM +0200, Andrew Lunn wrote:
-> > +The device node referenced by "phy" or "phy-handle" should be a child node
-> > +of this node. See phy.txt for the generic PHY bindings.
-> 
-> I've not looked at the code yet, but is this really true? Generally
-> there is not this limitation. You can point to any Ethernet phy
-> anyway, so long as it is on am MDIO bus.
-> 
-> > +
-> > +Optional properties:
-> > +- allwinner,tx-delay: TX clock delay chain value. Range value is 0-0x07. Default is 0)
-> > +- allwinner,rx-delay: RX clock delay chain value. Range value is 0-0x1F. Default is 0)
-> > +
-> > +The TX/RX clock delay chain settings are board specific.
-> > +
-> > +Optional properties for "allwinner,sun8i-h3-emac":
-> > +- allwinner,leds-active-low: EPHY LEDs are active low
-> > +
-> > +Example:
-> > +
-> > +emac: ethernet at 01c0b000 {
-> > +	compatible = "allwinner,sun8i-h3-emac";
-> > +	syscon = <&syscon>;
-> > +	reg = <0x01c0b000 0x104>;
-> > +	reg-names = "emac";
-> > +	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-> > +	resets = <&ccu RST_BUS_EMAC>, <<&ccu RST_BUS_EPHY>;
-> > +	reset-names = "ahb", "ephy";
-> > +	clocks = <&ccu CLK_BUS_EMAC>, <&ccu CLK_BUS_EPHY>;
-> > +	clock-names = "ahb", "ephy";
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> > +
-> > +	phy = <&phy1>;
-> 
-> ethernet.txt say:
-> 
-> - phy: the same as "phy-handle" property, not recommended for new bindings.
-> 
-> This is a new binding, please don't support it.
-> 
-> > +	phy-mode = "mii";
-> > +	allwinner,leds-active-low;
-> > +
-> > +	phy1: ethernet-phy at 1 {
-> > +		reg = <1>;
-> > +	};
-> 
-> It is normal to place these phy nodes inside an container node called
-> mdio.
-> 
+On Mon, 12 Sep 2016, Maxime Ripard wrote:
 
-Hello
+> On Mon, Sep 12, 2016 at 02:56:55PM +0100, Lee Jones wrote:
+> > > >>> Then use .data = <defined model ID> and set up a switch() in .probe().
+> > > >>
+> > > >> Uh? Why? It just adds a non-standard indirection, while using
+> > > >> of_match_device is very standard, and used extensively in Linux.
+> > > > 
+> > > > You still use of_match_device() to obtain the ID.
+> > > > 
+> > > > The "don't mix DT with the MFD API" is there to prevent some of the
+> > > > nasty hacks I've seen previously.  This particular example doesn't
+> > > > seem so bad, but it's a gateway to ridiculous hackery!
+> > > 
+> > > How am I supposed to get the .data without of_match_node then?
+> > > What's more hackish in using .data field for specific data for each
+> > > compatible than in using a random ID in .data and switching on it? The
+> > > result is exactly the same, the switching case being more verbose and
+> > > adding complexity to something that can be done in a straightforward manner.
+> > 
+> > I've already agreed that your implementation isn't terrible, but I'd
+> > still like to remain strict on the rules.
+> > 
+> > Better still, can you can dynamically test which platform you're on,
+> > via a version register or similar?
+> > 
+> > Failing that, see how everyone else does it:
+> > 
+> >  `git grep "\.data" -- drivers/mfd/`
+> 
+> Just to make sure, you prefer something like
+> 
+> static struct my_struct data = {
+> };
+> 
+> static struct my_struct data2 = {
+> };
+> 
+> struct of_device_id matches[] = {
+>        { compatible = "...", data = <ID> },
+>        { compatible = "...", data = <ID2> },
+> };
+> 
+> of_id = of_match_device (dev, matches);
+> switch (of_id->data) {
+> case <ID>:
+>      function(data);
+> case <ID2>:
+>      function(data2);
+> };
+> 
+> over
+> 
+> static struct my_struct data = {
+> };
+> 
+> static struct my_struct data2 = {
+> };
+> 
+> struct of_device_id matches[] = {
+>        { compatible = "...", data = data },
+>        { compatible = "...", data = data2 },
+> };
+> 
+> of_id = of_match_device (dev, matches);
+> function(of_id->data);
+> 
+> ?
+> 
+> This is the *only* time this is going to be used in that driver. I can
+> understand the need for a version if you need to apply quirks in
+> several functions, but here it clearly looks suboptimal.
+> 
+> And we are indeed using this construct in the AXP MFD, and it just
+> doesn't scale either and become quite difficult to maintain when you
+> have a significant number of variants, and then you have to patch
+> *all* the switch instances to get something done.
 
-Since the MDIO bus is a part of the sun8i-emac, does I really need to create such a mdio node ?
-All example I found are mdio bus with separate driver. (others driver have the phy directly in [eg]mac node.
+static struct my_struct data = {
+};
 
-Anyway I try the following patch to solve your comments, but it breaks the PHY finding(Could not attach to PHY).
+static struct my_struct data2 = {
+};
 
-Regards
+struct of_device_id matches[] = {
+       { compatible = "...", data = <ID> },
+       { compatible = "...", data = <ID2> },
+};
 
--->8--
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -166,14 +166,18 @@
-        status = "okay";
- };
- 
-+&mdio {
-+       reg = <1>;
-+       phy1: ethernet-phy at 1 {
-+               reg = <1>;
-+       };
-+};
-+
- &emac {
--       phy = <&phy1>;
-+       phy-handle = <&phy1>;
-        phy-mode = "mii";
-        allwinner,leds-active-low;
-        status = "okay";
--       phy1: ethernet-phy at 1 {
--               reg = <1>;
--       };
- };/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -474,6 +474,11 @@
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-                        status = "disabled";
-+
-+                       mdio: mdio at 0 {
-+                               #address-cells = <1>;
-+                               #size-cells = <0>;
-+                       };
-                };
- 
-                crypto: crypto at 1c15000 {
---- a/drivers/net/ethernet/allwinner/sun8i-emac.c
-+++ b/drivers/net/ethernet/allwinner/sun8i-emac.c
-@@ -2122,7 +2122,7 @@ static int sun8i_emac_probe(struct platform_device *pdev)
-                return -EINVAL;
-        }
- 
--       priv->phy_node = of_parse_phandle(node, "phy", 0);
-+       priv->phy_node = of_parse_phandle(node, "phy-handle", 0);
-        if (!priv->phy_node) {
-                netdev_err(ndev, "No associated PHY\n");
-                return -ENODEV;
+int probe()
+{
+	struct mfd_cell *cell;
 
- 
- &crypto {
+	of_id = of_match_device (dev, matches);
+	switch (of_id->data) {
+	case <ID>:
+     	     cell = data;
+	case <ID2>:
+     	     cell = data2;
+	};
+
+	mfd_add_devices(..., cell, ...)
+};
+
+It's an extra few lines, but worth it to unbind MFD from DT.
+
+Is there really no way to obtain this information dynamically?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
