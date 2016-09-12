@@ -1,60 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 12 Sep 2016 10:32:49 +0100
-Subject: [kernel-hardening] Re: [PATCH v2 3/7] arm64: Introduce
- uaccess_{disable, enable} functionality based on TTBR0_EL1
-In-Reply-To: <CAKv+Gu8GMU=Lgh4awFLda-7K=orpg03D18kPDVVQEP6KzB5++g@mail.gmail.com>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <1472828533-28197-4-git-send-email-catalin.marinas@arm.com>
- <20160905172038.GC27305@leverpostej>
- <20160906102741.GF19605@e104818-lin.cambridge.arm.com>
- <20160906104514.GC1425@leverpostej>
- <CAKv+Gu8GMU=Lgh4awFLda-7K=orpg03D18kPDVVQEP6KzB5++g@mail.gmail.com>
-Message-ID: <20160912093249.GA2492@e104818-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 12 Sep 2016 11:38:21 +0200
+Subject: [GIT PULL 1/4] ARM: exynos: SoC/Mach for v4.9
+In-Reply-To: <20160908192434.GA609@sam-MacBookPro>
+References: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
+ <1472548739-20050-5-git-send-email-k.kozlowski@samsung.com>
+ <5635206.ooNAZCeQOe@wuerfel> <20160902163244.GB5534@kozik-lap>
+ <08dfc5c7-e844-023c-b5a8-9996dfb403ff@samsung.com>
+ <20160908192434.GA609@sam-MacBookPro>
+ <CGME20160912093826eucas1p1ac2f1f08b49026f456b52f507d0de9f4@eucas1p1.samsung.com>
+Message-ID: <9c7bb7bd-d347-03af-93c7-93534f43932d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 11, 2016 at 02:55:12PM +0100, Ard Biesheuvel wrote:
-> On 6 September 2016 at 11:45, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Tue, Sep 06, 2016 at 11:27:42AM +0100, Catalin Marinas wrote:
-> >> On Mon, Sep 05, 2016 at 06:20:38PM +0100, Mark Rutland wrote:
-> >> > On Fri, Sep 02, 2016 at 04:02:09PM +0100, Catalin Marinas wrote:
-> >> > >    * tables again to remove any speculatively loaded cache lines.
-> >> > >    */
-> >> > >   mov     x0, x25
-> >> > > - add     x1, x26, #SWAPPER_DIR_SIZE
-> >> > > + add     x1, x26, #SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE
-> >> > >   dmb     sy
-> >> > >   bl      __inval_cache_range
-> >> > >
-> >> > > diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> >> > > index 659963d40bb4..fe393ccf9352 100644
-> >> > > --- a/arch/arm64/kernel/vmlinux.lds.S
-> >> > > +++ b/arch/arm64/kernel/vmlinux.lds.S
-> >> > > @@ -196,6 +196,11 @@ SECTIONS
-> >> > >   swapper_pg_dir = .;
-> >> > >   . += SWAPPER_DIR_SIZE;
-> >> > >
-> >> > > +#ifdef CONFIG_ARM64_TTBR0_PAN
-> >> > > + reserved_ttbr0 = .;
-> >> > > + . += PAGE_SIZE;
-> >> > > +#endif
-> >> >
-> >> > Surely RESERVED_TTBR0_SIZE, as elsewhere?
-> >>
-> >> I'll try to move it somewhere where it can be included in vmlinux.lds.S
-> >> (I can probably include cpufeature.h directly).
-> 
-> Do we really need another zero page? The ordinary zero page is already
-> statically allocated these days, so we could simply move it between
-> idmap_pg_dir[] and swapper_pg_dir[], and get all the changes in the
-> early boot code for free (given that it covers the range between the
-> start of idmap_pg_dir[] and the end of swapper_pg_dir[])
-> 
-> That way, we could refer to __pa(empty_zero_page) anywhere by reading
-> ttbr1_el1 and subtracting PAGE_SIZE
+On 09/08/2016 09:24 PM, Sam Van Den Berge wrote:
+> Thanks for the suggestion and apologies for the late response. Last couple of 
+> days I've been figuring out what this would involve and I decided that I want
+> to give this a try. I found this patch series [1] that I'll use as an example.
+> If I understand it correctly, I'll need to create a dma_slave_map and
+> pass that via the platform data into the s3c24xx-dma driver. There I'll
+> need to fill in the filter_map of the dma slave device. Right?
 
-That's fine by me. I'll cherry-pick your patch and rebase this series on
-top.
+Yes, AFAIU that's what needs to be done.  Subsequently, related DMA
+clients could be updated to not use dma_request_slave_channel_compat().
 
 -- 
-Catalin
+Thanks,
+Sylwester
