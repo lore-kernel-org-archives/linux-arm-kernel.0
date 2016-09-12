@@ -1,57 +1,62 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Mon, 12 Sep 2016 18:16:53 +0800
-Subject: [PATCH v7 9/9] drm/mediatek: add support for Mediatek SoC MT2701
-In-Reply-To: <1473226653.11736.33.camel@mtksdaap41>
-References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
- <1472815484-43821-10-git-send-email-yt.shen@mediatek.com>
- <1473226653.11736.33.camel@mtksdaap41>
-Message-ID: <1473675413.12398.29.camel@mtksdaap41>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 12 Sep 2016 12:18:56 +0200
+Subject: [PATCH 1/5] clk: add support for runtime pm
+In-Reply-To: <20160908001943.GC13062@codeaurora.org>
+References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
+ <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
+ <20160908001943.GC13062@codeaurora.org>
+ <CGME20160912101857eucas1p29b2bbd5ac0eda92284091ad1b86decc4@eucas1p2.samsung.com>
+Message-ID: <f18fee35-cb5d-abce-0415-a98b58e3a302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi CK,
+Hi Stephen,
 
-On Wed, 2016-09-07 at 13:37 +0800, CK Hu wrote:
-> Hi, YT:
-> 
-> On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
-> > This patch add support for the Mediatek MT2701 DISP subsystem.
-> > There is only one OVL engine in MT2701.
-> > 
-> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> 
-> [snip...]
-> 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> > index 4b4e449..465819b 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> > @@ -112,6 +112,7 @@ struct mtk_ddp_comp_match {
-> >  
-> >  static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
-> >  	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, NULL },
-> > +	[DDP_COMPONENT_BLS]	= { MTK_DISP_PWM,	0, NULL },
-> 
-> I think BLS is different than PWM, so this statement should be
-> 
-> [DDP_COMPONENT_BLS] = { MTK_DISP_BLS, 0, NULL };
-The BLS module actually is a multifunction device, one of them is the
-PWM function.  We only upstream PWM function [1] now, and it is
-accepted.  When there are real use case (gamma function), we will update
-this part.  What do you think?
 
-Regards,
-yt.shen
+On 2016-09-08 02:19, Stephen Boyd wrote:
+> On 09/01, Marek Szyprowski wrote:
+>> Registers for some clocks might be located in the SOC area, which are under the
+>> power domain. To enable access to those registers respective domain has to be
+>> turned on. Additionally, registers for such clocks will usually loose its
+>> contents when power domain is turned off, so additional saving and restoring of
+>> them might be needed in the clock controller driver.
+>>
+>> This patch adds basic infrastructure in the clocks core to allow implementing
+>> driver for such clocks under power domains. Clock provider can supply a
+>> struct device pointer, which is the used by clock core for tracking and managing
+>> clock's controller runtime pm state. Each clk_prepare() operation
+>> will first call pm_runtime_get_sync() on the supplied device, while
+>> clk_unprepare() will do pm_runtime_put() at the end.
+>>
+>> Additional calls to pm_runtime_get/put functions are required to ensure that any
+>> register access (like calculating/chaning clock rates) will be done with clock
+>> controller in active runtime state.
+>>
+>> Special handling of the case when runtime pm is disabled for clock controller's
+>> device is needed to let this feature work properly also during system sleep
+>> suspend/resume operations (runtime pm is first disabled before entering sleep
+>> state's, but controller is usually still operational until its suspend pm
+>> callback is called).
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> My "knee jerk" concern is that we're going to take a runtime PM
+> lock underneath the prepare lock. That seems like a situation
+> where we could hit a lock inversion if the runtime PM callbacks
+> themselves acquire the prepare lock by calling clk APIs? But this
+> concern is false right? We release the runtime PM lock before
+> calling the PM callback, so we shouldn't hit any deadlock and
+> lockdep won't complain?
 
-[1] https://patchwork.kernel.org/patch/9223001/
+Runtime PM uses fine grained locking based on per-device locks, so there
+should be no problem with global clock prepare lock. The only lock 
+interaction
+is between clock controller device's rpm lock and clocks global prepare 
+lock, but
+it always done with the same access pattern. I've tested it extensively 
+(also
+with lock dep) with various use cases and found no problems.
 
-> 
-> 
-> >  	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, &ddp_color },
-> >  	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, &ddp_color },
-> >  	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
-> 
-> Regards,
-> CK
-> 
-> 
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
