@@ -1,78 +1,78 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Mon, 12 Sep 2016 11:21:29 -0500
-Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
-In-Reply-To: <57D6D2A9.3010006@laposte.net>
-References: <57BDAF2E.10502@laposte.net>
- <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
- <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
- <57D6AA54.6000208@laposte.net> <20160912135549.GA14165@leverpostej>
- <57D6D2A9.3010006@laposte.net>
-Message-ID: <57D6D609.1090702@tabi.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 12 Sep 2016 17:26:23 +0100
+Subject: [PATCH v2 1/7] arm64: Factor out PAN enabling/disabling into
+ separate uaccess_* macros
+In-Reply-To: <20160912150958.GC14165@leverpostej>
+References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+ <1472828533-28197-2-git-send-email-catalin.marinas@arm.com>
+ <20160905153828.GA27305@leverpostej>
+ <20160912145219.GC2492@e104818-lin.cambridge.arm.com>
+ <20160912150958.GC14165@leverpostej>
+Message-ID: <20160912162622.GD2492@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian Frias wrote:
->> You're not changing the code, but you are creating a binding.
->> Bindings
->>> are intended to be stable (i.e. a working DTB from today should
->>> continue to work in future), and thus there are ramifications.
+On Mon, Sep 12, 2016 at 04:09:59PM +0100, Mark Rutland wrote:
+> On Mon, Sep 12, 2016 at 03:52:19PM +0100, Catalin Marinas wrote:
+> > On Mon, Sep 05, 2016 at 04:38:28PM +0100, Mark Rutland wrote:
+> > > On Fri, Sep 02, 2016 at 04:02:07PM +0100, Catalin Marinas wrote:
+> > > >  /*
+> > > > + * User access enabling/disabling.
+> > > > + */
+> > > > +#define uaccess_disable(alt)						\
+> > > > +do {									\
+> > > > +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,			\
+> > > > +			CONFIG_ARM64_PAN));				\
+> > > > +} while (0)
+> > > > +
+> > > > +#define uaccess_enable(alt)						\
+> > > > +do {									\
+> > > > +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,			\
+> > > > +			CONFIG_ARM64_PAN));				\
+> > > > +} while (0)
+> > > 
+> > > Passing the alternative down is somewhat confusing. e.g. in the futex
+> > > case it looks like we're only doing something when PAN is present,
+> > > whereas we'll manipulate TTBR0 in the absence of PAN.
+> > 
+> > I agree it's confusing (I got it wrong first time as well and used the
+> > wrong alternative for futex).
+> > 
+> > > If I've understood correctly, we need this to distinguish regular
+> > > load/store uaccess sequences (eg. the futex code) from potentially
+> > > patched unprivileged load/store sequences (e.g. {get,put}_user) when
+> > > poking PSTATE.PAN.
+> > > 
+> > > So perhaps we could ahve something like:
+> > > 
+> > > * privileged_uaccess_{enable,disable}()
+> > >   Which toggle TTBR0, or PAN (always).
+> > >   These would handle cases like the futex/swp code.
+> > >  
+> > > * (unprivileged_)uaccess_{enable,disable}()
+> > >   Which toggle TTBR0, or PAN (in the absence of UAO).
+> > >   These would handle cases like the {get,put}_user sequences.
+> > > 
+> > > Though perhaps that is just as confusing. ;)
+> > 
+> > I find it more confusing. 
+> 
+> Fair enough. :)
+> 
+> > In the non-UAO case, get_user etc. would
+> > normally have to use privileged_uaccess_enable() since ldr is not
+> > replaced with ldtr. Maybe uaccess_enable_for_exclusives() but it doesn't
+> > look any better. 
+> 
+> I strongly prefer uaccess_enable_exclusives(), or something of that sort
+> to both of the above. ;)
 
-> Ok, but who is responsible for such guarantee?
+I think we would need a few more uaccess_enable_* variants (cache
+maintenance, Xen) which makes this impractical.
 
-The developers who create the driver and modify it.  Only upstream 
-contributions count.
+We can consider the PAN_NOT_UAO the special case and if we assume that
+UAO also implies PAN (ARMv8.2), we can define uaccess_enable_not_uao()
+for the get_user etc. cases. We would use uaccess_enable() for the rest.
 
-> How is it enforced and verified?
-
-The upstream reviewers verify it, and if they see a problem, they reject 
-the patch.
-
-> Exactly, that's why to I'm having trouble to understand why there is
->  so much insistence on "getting the DT 100% right", since a HW change
->  could imply that what made 100% sense yesterday, does not today.
-
-I'm not sure what you're getting at. Everything is best-effort. The 
-binding for a given device is supposed to accurately, but minimally, 
-describe the hardware so that the driver can program the device 
-properly. Specific properties are added to the binding to handle 
-specific cases. If a binding includes a description of properties that 
-are not used by the driver, the developer is typically asked to remove 
-those.
-
-So I don't understand the "100% right" comment.
-
-> Could you be more precise on those two issues? Namely: "the effort"
-> and the "lack of benefit for the community"?
-
-1) The effort = the effort by upstream developers to review the binding.
-
-2) lack of benefit = proprietary and out-of-tree drivers do not benefit 
-the community.
-
-> I can understand the effort it takes to review a binding and some
-> driver, but if there's no driver, why would it matter if the DT
-> binding is 100% right?
-
-Why bother creating a binding if there's no driver to use it?
-
- > Hence, why would it take more effort?
-> Furthermore, if there's no driver, there's no backward compatibility
->  to guarantee. Shouldn't it require less effort?
-
-If a developer creates a binding without a driver, then it's very hard 
-to know if that binding is correct.  That's like creating a recipe 
-without attempting to make the food.  How do you know it actually tastes 
-good?  No one would ever ask a chef to create a "technically correct" 
-recipe without cooking it first and tasting it.
-
-> Also, what sort of "benefits" does the community expects or
-> requires? Because the idea behind the proposal is to put the HW
-> description in DT, so basically the HW would be documented. Maybe
-> there wouldn't be a driver right away, but the HW description would
-> allow for drivers to exist.
-
-I'm not sure how many times we need to repeat this, but the idea that 
-the DT binding documentation can be used as official documentation for 
-the hardware is absurd.  What's wrong with the ACTUAL hardware 
-documentation provided by the manufacturer in PDF format?  The DT 
-binding has no value without an actual driver.
+-- 
+Catalin
