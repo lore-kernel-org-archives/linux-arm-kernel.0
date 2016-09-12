@@ -1,64 +1,117 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 12 Sep 2016 15:16:40 -0700
-Subject: [PATCH/RFC v3 00/22] soc: renesas: Add R-Car RST driver for
- obtaining mode pin state
-In-Reply-To: <CAMuHMdWu34OQSS6J3bf=0-1TYULc=coiVomBjtBatwGta5F3HQ@mail.gmail.com>
-References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
- <20160630201407.GA27880@codeaurora.org>
- <CAMuHMdWu34OQSS6J3bf=0-1TYULc=coiVomBjtBatwGta5F3HQ@mail.gmail.com>
-Message-ID: <20160912221640.GG7243@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 12 Sep 2016 17:21:38 -0500
+Subject: [PATCH 1/6] PCI: xilinx: Keep both legacy and MSI interrupt
+ references.
+In-Reply-To: <1472724886-28301-1-git-send-email-bharatku@xilinx.com>
+References: <1472724886-28301-1-git-send-email-bharatku@xilinx.com>
+Message-ID: <20160912222138.GK23532@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01, Geert Uytterhoeven wrote:
-> Hi Stephen,
+On Thu, Sep 01, 2016 at 03:44:41PM +0530, Bharat Kumar Gogada wrote:
+> When built with MSI support the legacy domain reference is being
+> overwritten with MSI.
+> Instead creating two separate domains for MSI and legacy interrupts.
 > 
-> On Thu, Jun 30, 2016 at 10:14 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 06/01, Geert Uytterhoeven wrote:
-> >> Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
-> >> state of the mode pins either by a call from the board code, or directly
-> >> by using a hardcoded register access. This is a bit messy, and creates a
-> >> dependency between driver and platform code.
-> >>
-> >> This RFC patch series converts the various Renesas R-Car clock drivers
-> >> and support code from reading the mode pin states using a hardcoded
-> >> register access to using a new R-Car RST driver.
-> >
-> > Dumb question, can we use the nvmem reading APIs instead of an
-> > SoC specific function to read the modes?
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+
+I'm looking for an ack from Michal for these...
+
+> ---
+>  drivers/pci/host/pcie-xilinx.c | 26 +++++++++++++++-----------
+>  1 file changed, 15 insertions(+), 11 deletions(-)
 > 
-> Thanks for your suggestion, the nvmem API indeed looks like a suitable API,
-> as it does support read-only nvmems.
+> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> index a30e016..bd64677 100644
+> --- a/drivers/pci/host/pcie-xilinx.c
+> +++ b/drivers/pci/host/pcie-xilinx.c
+> @@ -101,7 +101,8 @@
+>   * @msi_pages: MSI pages
+>   * @root_busno: Root Bus number
+>   * @dev: Device pointer
+> - * @irq_domain: IRQ domain pointer
+> + * @msi_domain: MSI IRQ domain pointer
+> + * @leg_domain: Legacy IRQ domain pointer
+>   * @resources: Bus Resources
+>   */
+>  struct xilinx_pcie_port {
+> @@ -110,7 +111,8 @@ struct xilinx_pcie_port {
+>  	unsigned long msi_pages;
+>  	u8 root_busno;
+>  	struct device *dev;
+> -	struct irq_domain *irq_domain;
+> +	struct irq_domain *msi_domain;
+> +	struct irq_domain *leg_domain;
+>  	struct list_head resources;
+>  };
+>  
+> @@ -281,7 +283,7 @@ static int xilinx_pcie_msi_setup_irq(struct msi_controller *chip,
+>  	if (hwirq < 0)
+>  		return hwirq;
+>  
+> -	irq = irq_create_mapping(port->irq_domain, hwirq);
+> +	irq = irq_create_mapping(port->msi_domain, hwirq);
+>  	if (!irq)
+>  		return -EINVAL;
+>  
+> @@ -443,7 +445,7 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
+>  			/* Handle INTx Interrupt */
+>  			val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
+>  				XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
+> -			generic_handle_irq(irq_find_mapping(port->irq_domain,
+> +			generic_handle_irq(irq_find_mapping(port->leg_domain,
+>  							    val));
+>  		}
+>  	}
+> @@ -526,12 +528,14 @@ static void xilinx_pcie_free_irq_domain(struct xilinx_pcie_port *port)
+>  	}
+>  
+>  	for (i = 0; i < num_irqs; i++) {
+> -		irq = irq_find_mapping(port->irq_domain, i);
+> +		irq = irq_find_mapping(port->leg_domain, i);
+>  		if (irq > 0)
+>  			irq_dispose_mapping(irq);
+>  	}
+> -
+> -	irq_domain_remove(port->irq_domain);
+> +	if (port->leg_domain)
+> +		irq_domain_remove(port->leg_domain);
+> +	if (port->msi_domain)
+> +		irq_domain_remove(port->msi_domain);
+>  }
+>  
+>  /**
+> @@ -553,21 +557,21 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
+>  		return -ENODEV;
+>  	}
+>  
+> -	port->irq_domain = irq_domain_add_linear(pcie_intc_node, 4,
+> +	port->leg_domain = irq_domain_add_linear(pcie_intc_node, 4,
+>  						 &intx_domain_ops,
+>  						 port);
+> -	if (!port->irq_domain) {
+> +	if (!port->leg_domain) {
+>  		dev_err(dev, "Failed to get a INTx IRQ domain\n");
+>  		return -ENODEV;
+>  	}
+>  
+>  	/* Setup MSI */
+>  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> -		port->irq_domain = irq_domain_add_linear(node,
+> +		port->msi_domain = irq_domain_add_linear(node,
+>  							 XILINX_NUM_MSI_IRQS,
+>  							 &msi_domain_ops,
+>  							 &xilinx_pcie_msi_chip);
+> -		if (!port->irq_domain) {
+> +		if (!port->msi_domain) {
+>  			dev_err(dev, "Failed to get a MSI IRQ domain\n");
+>  			return -ENODEV;
+>  		}
+> -- 
+> 2.1.1
 > 
-> Unfortunately I also see a few disadvantages:
->   1. nvmem_init() is a subsys_initcall(), while most of our users (except for
->      the recent renesas-cpg-mssr driver) are clock drivers using
->      CLK_OF_DECLARE(), and are thus initialized from of_clk_init() at much
->      earlier time_init() time.
->      Of course the mvmem subsystem and/or the clock drivers can be changed, if
->      deemed useful.
-
-Sounds like this is solvable.
-
->   2. Using the nvmem DT bindings means we have to add more DT glue from the
->      nvmem consumer(s) to the nvmem provider. As we need to provide backwards
->      compatibility with old DTSes, this means we need more C code or DT fixup
->      code to handle that.
-
-Ah I wasn't aware we were keeping backwards compatibility around.
-
-
->   3. The nvmem subsystem may be overkill to provide access to a simple 32-bit
->      read-only register that never changes value after boot.
-
-The nvmem subsystem is designed to read values from things that
-mostly never change. Overkill may be true, but the nice thing
-about using nvmem APIs is that the driver doesn't have to use
-some platform specific function that duplicates similar
-functionality. It's unfortunate that backwards incompatibility
-limits our ability to move to common linux frameworks when they
-are created after the binding is used.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
