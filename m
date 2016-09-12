@@ -1,114 +1,111 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 12 Sep 2016 17:13:46 +0100
-Subject: [PATCH v7 08/22] iommu/arm-smmu: Support non-PCI devices with SMMUv3
+Date: Mon, 12 Sep 2016 17:13:56 +0100
+Subject: [PATCH v7 18/22] Docs: dt: document ARM SMMU generic binding usage
 In-Reply-To: <cover.1473695704.git.robin.murphy@arm.com>
 References: <cover.1473695704.git.robin.murphy@arm.com>
-Message-ID: <a35b94e1fd034ccfd146c819ae71734f3fe075a7.1473695704.git.robin.murphy@arm.com>
+Message-ID: <145a4e2cd695af51c32d907e305f9c605c819cea.1473695704.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the device <-> stream ID relationship suitably abstracted and
-of_xlate() hooked up, the PCI dependency now looks, and is, entirely
-arbitrary. Any bus using the of_dma_configure() mechanism will work,
-so extend support to the platform and AMBA buses which do just that.
+Document how the generic "iommus" binding should be used to describe ARM
+SMMU stream IDs instead of the old "mmu-masters" binding.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/Kconfig       |  2 +-
- drivers/iommu/arm-smmu-v3.c | 37 +++++++++++++++++++++++++++++++------
- 2 files changed, 32 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index d432ca828472..8ee54d71c7eb 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -309,7 +309,7 @@ config ARM_SMMU
+---
+
+- Remove missed reference to old "mmu-masters" example
+---
+ .../devicetree/bindings/iommu/arm,smmu.txt         | 63 ++++++++++++++++------
+ 1 file changed, 48 insertions(+), 15 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+index 19fe6f2c83f6..e862d1485205 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -35,12 +35,16 @@ conditions.
+                   interrupt per context bank. In the case of a single,
+                   combined interrupt, it must be listed multiple times.
  
- config ARM_SMMU_V3
- 	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
--	depends on ARM64 && PCI
-+	depends on ARM64
- 	select IOMMU_API
- 	select IOMMU_IO_PGTABLE_LPAE
- 	select GENERIC_MSI_IRQ_DOMAIN
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 15ba80db6465..52860bcf80f2 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -35,6 +35,8 @@
- #include <linux/pci.h>
- #include <linux/platform_device.h>
- 
-+#include <linux/amba/bus.h>
+-- mmu-masters   : A list of phandles to device nodes representing bus
+-                  masters for which the SMMU can provide a translation
+-                  and their corresponding StreamIDs (see example below).
+-                  Each device node linked from this list must have a
+-                  "#stream-id-cells" property, indicating the number of
+-                  StreamIDs associated with it.
++- #iommu-cells  : See Documentation/devicetree/bindings/iommu/iommu.txt
++                  for details. With a value of 1, each "iommus" entry
++                  represents a distinct stream ID emitted by that device
++                  into the relevant SMMU.
 +
- #include "io-pgtable.h"
++                  SMMUs with stream matching support and complex masters
++                  may use a value of 2, where the second cell represents
++                  an SMR mask to combine with the ID in the first cell.
++                  Care must be taken to ensure the set of matched IDs
++                  does not result in conflicts.
  
- /* MMIO registers */
-@@ -1805,6 +1807,23 @@ static void arm_smmu_remove_device(struct device *dev)
- 	iommu_fwspec_free(dev);
- }
+ ** System MMU optional properties:
  
-+static struct iommu_group *arm_smmu_device_group(struct device *dev)
-+{
-+	struct iommu_group *group;
-+
-+	/*
-+	 * We don't support devices sharing stream IDs other than PCI RID
-+	 * aliases, since the necessary ID-to-device lookup becomes rather
-+	 * impractical given a potential sparse 32-bit stream ID space.
-+	 */
-+	if (dev_is_pci(dev))
-+		group = pci_device_group(dev);
-+	else
-+		group = generic_device_group(dev);
-+
-+	return group;
-+}
-+
- static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
- 				    enum iommu_attr attr, void *data)
- {
-@@ -1851,10 +1870,6 @@ out_unlock:
+@@ -56,9 +60,20 @@ conditions.
+                   aliases of secure registers have to be used during
+                   SMMU configuration.
  
- static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
- {
--	/* We only support PCI, for now */
--	if (!dev_is_pci(dev))
--		return -ENODEV;
+-Example:
++** Deprecated properties:
+ 
+-        smmu {
++- mmu-masters (deprecated in favour of the generic "iommus" binding) :
++                  A list of phandles to device nodes representing bus
++                  masters for which the SMMU can provide a translation
++                  and their corresponding Stream IDs. Each device node
++                  linked from this list must have a "#stream-id-cells"
++                  property, indicating the number of Stream ID
++                  arguments associated with its phandle.
++
++** Examples:
++
++        /* SMMU with stream matching or stream indexing */
++        smmu1: iommu {
+                 compatible = "arm,smmu-v1";
+                 reg = <0xba5e0000 0x10000>;
+                 #global-interrupts = <2>;
+@@ -68,11 +83,29 @@ Example:
+                              <0 35 4>,
+                              <0 36 4>,
+                              <0 37 4>;
 -
- 	return iommu_fwspec_add_ids(dev, args->args, 1);
- }
- 
-@@ -1869,7 +1884,7 @@ static struct iommu_ops arm_smmu_ops = {
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
- 	.add_device		= arm_smmu_add_device,
- 	.remove_device		= arm_smmu_remove_device,
--	.device_group		= pci_device_group,
-+	.device_group		= arm_smmu_device_group,
- 	.domain_get_attr	= arm_smmu_domain_get_attr,
- 	.domain_set_attr	= arm_smmu_domain_set_attr,
- 	.of_xlate		= arm_smmu_of_xlate,
-@@ -2613,8 +2628,18 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 
- 	/* And we're up. Go go go! */
- 	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
-+#ifdef CONFIG_PCI
- 	pci_request_acs();
--	return bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
-+	ret = bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
-+	if (ret)
-+		return ret;
-+#endif
-+#ifdef CONFIG_ARM_AMBA
-+	ret = bus_set_iommu(&amba_bustype, &arm_smmu_ops);
-+	if (ret)
-+		return ret;
-+#endif
-+	return bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
- }
- 
- static int arm_smmu_device_remove(struct platform_device *pdev)
+-                /*
+-                 * Two DMA controllers, the first with two StreamIDs (0xd01d
+-                 * and 0xd01e) and the second with only one (0xd11c).
+-                 */
+-                mmu-masters = <&dma0 0xd01d 0xd01e>,
+-                              <&dma1 0xd11c>;
++                #iommu-cells = <1>;
++        };
++
++        /* device with two stream IDs, 0 and 7 */
++        master1 {
++                iommus = <&smmu1 0>,
++                         <&smmu1 7>;
++        };
++
++
++        /* SMMU with stream matching */
++        smmu2: iommu {
++                ...
++                #iommu-cells = <2>;
++        };
++
++        /* device with stream IDs 0 and 7 */
++        master2 {
++                iommus = <&smmu2 0 0>,
++                         <&smmu2 7 0>;
++        };
++
++        /* device with stream IDs 1, 17, 33 and 49 */
++        master3 {
++                iommus = <&smmu2 1 0x30>;
+         };
 -- 
 2.8.1.dirty
