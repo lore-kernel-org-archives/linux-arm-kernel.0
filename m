@@ -1,222 +1,76 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 12 Sep 2016 09:03:03 -0400
-Subject: [PATCH V2 09/10] dmaengine: qcom_hidma: protect common data structures
-In-Reply-To: <1473685384-19913-1-git-send-email-okaya@codeaurora.org>
-References: <1473685384-19913-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1473685384-19913-10-git-send-email-okaya@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Sep 2016 14:04:29 +0100
+Subject: [UPDATE PATCH V10 1/8] ACPI: I/O Remapping Table (IORT) initial
+ support
+In-Reply-To: <38e36eee-cece-75db-4781-5727dd11c93d@semihalf.com>
+References: <1473152938-17388-2-git-send-email-tn@semihalf.com>
+ <1473249412-20226-1-git-send-email-tn@semihalf.com>
+ <20160909092012.GC19669@red-moon>
+ <38e36eee-cece-75db-4781-5727dd11c93d@semihalf.com>
+Message-ID: <57D6A7DD.1060305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When MSI interrupts are supported, error and the transfer interrupt can
-come from multiple processor contexts.
+On 12/09/16 13:37, Tomasz Nowicki wrote:
+> Hi Rafael,
+> 
+> On 09.09.2016 11:20, Lorenzo Pieralisi wrote:
+>> Hi Rafael,
+>>
+>> On Wed, Sep 07, 2016 at 01:56:52PM +0200, Tomasz Nowicki wrote:
+>>> IORT shows representation of IO topology for ARM based systems.
+>>> It describes how various components are connected together on
+>>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+>>> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+>>>
+>>> Initial support allows to detect IORT table presence and save its
+>>> root pointer obtained through acpi_get_table(). The pointer validity
+>>> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+>>> is not set while using IORT nodes we would dereference unmapped pointers.
+>>>
+>>> For the aforementioned reason call iort_table_detect() from acpi_init()
+>>> which guarantees acpi_gbl_permanent_mmap to be set at that point.
+>>>
+>>> Add generic helpers which are helpful for scanning and retrieving
+>>> information from IORT table content. List of the most important helpers:
+>>> - iort_find_dev_node() finds IORT node for a given device
+>>> - iort_node_map_rid() maps device RID and returns IORT node which provides
+>>>   final translation
+>>>
+>>> IORT support is placed under drivers/acpi/arm64/ new directory due to its
+>>> ARM64 specific nature. The code there is considered only for ARM64.
+>>> The long term plan is to keep all ARM64 specific tables support
+>>> in this place e.g. GTDT table.
+>>>
+>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> ---
+>>
+>> Apart from the minor commit logs oversights we consider these two
+>> patches ready to go, please let us know if there is something you want
+>> changed since we are at risk of missing yet another merge window.
+>>
+>> It is ARM64 specific code, we created and moved the code to its
+>> ARM64 specific directory and we are happy to maintain it as such,
+>> we need your ACK to get this done so if there is something you
+>> want changed please let us know otherwise I would ask your ACK
+>> on these two patches to give Marc a go-ahead for -next and
+>> hopefully 4.9.
+> 
+> Kindly reminder. Is there anything we need to do more about these 
+> patches? Please let us know. Note this is the major thing for incoming 
+> IORT more advance feature.
 
-Each error interrupt is an MSI interrupt. If the channel is disabled by
-the first error interrupt, the remaining error interrupts will gracefully
-return in the interrupt handler.
+May I convey a slight sense of urgency here? I'd like to cut the irqchip
+branch for 4.9 pretty soon (this week), in order to let it sink in -next
+for a few days at the very least.
 
-If an error is observed while servicing the completions in success case,
-the posting of the completions will be aborted as soon as channel disabled
-state is observed. The error interrupt handler will take it from there and
-finish the remaining completions. We don't want to create multiple success
-and error messages to be delivered to the client in mixed order.
+It'd be a bit disappointing if these patches missed the boat this time
+again.
 
-Also got rid of hidma_post_completed method and moved the locks inside
-hidma_ll_int_handler_internal function. Rearranged the assignments so that
-variables are updated only when a lock is held.
+Thanks,
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma_ll.c | 142 ++++++++++++++++++--------------------------
- 1 file changed, 58 insertions(+), 84 deletions(-)
-
-diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index f0630e0..386a64c 100644
---- a/drivers/dma/qcom/hidma_ll.c
-+++ b/drivers/dma/qcom/hidma_ll.c
-@@ -198,18 +198,50 @@ static void hidma_ll_tre_complete(unsigned long arg)
- 	}
- }
- 
--static int hidma_post_completed(struct hidma_lldev *lldev, int tre_iterator,
--				u8 err_info, u8 err_code)
-+/*
-+ * Called to handle the interrupt for the channel.
-+ * Return a positive number if TRE or EVRE were consumed on this run.
-+ * Return a positive number if there are pending TREs or EVREs.
-+ * Return 0 if there is nothing to consume or no pending TREs/EVREs found.
-+ */
-+static int hidma_handle_tre_completion(struct hidma_lldev *lldev, u8 err_info,
-+				       u8 err_code)
- {
-+	u32 *current_evre;
- 	struct hidma_tre *tre;
- 	unsigned long flags;
-+	u32 evre_write_off;
-+	u32 cfg;
-+	u32 offset;
-+
-+	evre_write_off = readl_relaxed(lldev->evca + HIDMA_EVCA_WRITE_PTR_REG);
-+	if ((evre_write_off > lldev->evre_ring_size) ||
-+			(evre_write_off % HIDMA_EVRE_SIZE)) {
-+		dev_err(lldev->dev, "HW reports invalid EVRE write offset\n");
-+		return -EINVAL;
-+	}
- 
- 	spin_lock_irqsave(&lldev->lock, flags);
--	tre = lldev->pending_tre_list[tre_iterator / HIDMA_TRE_SIZE];
-+	if (lldev->evre_processed_off == evre_write_off) {
-+		spin_unlock_irqrestore(&lldev->lock, flags);
-+		return 0;
-+	}
-+	current_evre = lldev->evre_ring + lldev->evre_processed_off;
-+	cfg = current_evre[HIDMA_EVRE_CFG_IDX];
-+	if (!err_info) {
-+		err_info = cfg >> HIDMA_EVRE_ERRINFO_BIT_POS;
-+		err_info &= HIDMA_EVRE_ERRINFO_MASK;
-+	}
-+	if (!err_code)
-+		err_code = (cfg >> HIDMA_EVRE_CODE_BIT_POS) &
-+					HIDMA_EVRE_CODE_MASK;
-+
-+	offset = lldev->tre_processed_off;
-+	tre = lldev->pending_tre_list[offset / HIDMA_TRE_SIZE];
- 	if (!tre) {
- 		spin_unlock_irqrestore(&lldev->lock, flags);
- 		dev_warn(lldev->dev, "tre_index [%d] and tre out of sync\n",
--			 tre_iterator / HIDMA_TRE_SIZE);
-+			 lldev->tre_processed_off / HIDMA_TRE_SIZE);
- 		return -EINVAL;
- 	}
- 	lldev->pending_tre_list[tre->tre_index] = NULL;
-@@ -223,6 +255,14 @@ static int hidma_post_completed(struct hidma_lldev *lldev, int tre_iterator,
- 		atomic_set(&lldev->pending_tre_count, 0);
- 	}
- 
-+
-+	HIDMA_INCREMENT_ITERATOR(lldev->tre_processed_off, HIDMA_TRE_SIZE,
-+				 lldev->tre_ring_size);
-+	HIDMA_INCREMENT_ITERATOR(lldev->evre_processed_off, HIDMA_EVRE_SIZE,
-+				 lldev->evre_ring_size);
-+
-+	writel(lldev->evre_processed_off,
-+			lldev->evca + HIDMA_EVCA_DOORBELL_REG);
- 	spin_unlock_irqrestore(&lldev->lock, flags);
- 
- 	tre->err_info = err_info;
-@@ -232,86 +272,7 @@ static int hidma_post_completed(struct hidma_lldev *lldev, int tre_iterator,
- 	kfifo_put(&lldev->handoff_fifo, tre);
- 	tasklet_schedule(&lldev->task);
- 
--	return 0;
--}
--
--/*
-- * Called to handle the interrupt for the channel.
-- * Return a positive number if TRE or EVRE were consumed on this run.
-- * Return a positive number if there are pending TREs or EVREs.
-- * Return 0 if there is nothing to consume or no pending TREs/EVREs found.
-- */
--static int hidma_handle_tre_completion(struct hidma_lldev *lldev, u8 err_info,
--				       u8 err_code)
--{
--	u32 evre_ring_size = lldev->evre_ring_size;
--	u32 tre_ring_size = lldev->tre_ring_size;
--	u32 tre_iterator, evre_iterator;
--	u32 num_completed = 0;
--
--	evre_write_off = readl_relaxed(lldev->evca + HIDMA_EVCA_WRITE_PTR_REG);
--	tre_iterator = lldev->tre_processed_off;
--	evre_iterator = lldev->evre_processed_off;
--
--	if ((evre_write_off > evre_ring_size) ||
--	    (evre_write_off % HIDMA_EVRE_SIZE)) {
--		dev_err(lldev->dev, "HW reports invalid EVRE write offset\n");
--		return 0;
--	}
--
--	/*
--	 * By the time control reaches here the number of EVREs and TREs
--	 * may not match. Only consume the ones that hardware told us.
--	 */
--	while ((evre_iterator != evre_write_off)) {
--		u32 *current_evre = lldev->evre_ring + evre_iterator;
--		u32 cfg;
--
--		cfg = current_evre[HIDMA_EVRE_CFG_IDX];
--		if (!err_info) {
--			err_info = cfg >> HIDMA_EVRE_ERRINFO_BIT_POS;
--			err_info &= HIDMA_EVRE_ERRINFO_MASK;
--		}
--		if (!err_code)
--			err_code = (cfg >> HIDMA_EVRE_CODE_BIT_POS) &
--					HIDMA_EVRE_CODE_MASK;
--
--		if (hidma_post_completed(lldev, tre_iterator, err_info,
--					 err_code))
--			break;
--
--		HIDMA_INCREMENT_ITERATOR(tre_iterator, HIDMA_TRE_SIZE,
--					 tre_ring_size);
--		HIDMA_INCREMENT_ITERATOR(evre_iterator, HIDMA_EVRE_SIZE,
--					 evre_ring_size);
--
--		/*
--		 * Read the new event descriptor written by the HW.
--		 * As we are processing the delivered events, other events
--		 * get queued to the SW for processing.
--		 */
--		evre_write_off =
--		    readl_relaxed(lldev->evca + HIDMA_EVCA_WRITE_PTR_REG);
--		num_completed++;
--	}
--
--	if (num_completed) {
--		u32 evre_read_off = (lldev->evre_processed_off +
--				     HIDMA_EVRE_SIZE * num_completed);
--		u32 tre_read_off = (lldev->tre_processed_off +
--				    HIDMA_TRE_SIZE * num_completed);
--
--		evre_read_off = evre_read_off % evre_ring_size;
--		tre_read_off = tre_read_off % tre_ring_size;
--
--		writel(evre_read_off, lldev->evca + HIDMA_EVCA_DOORBELL_REG);
--
--		/* record the last processed tre offset */
--		lldev->tre_processed_off = tre_read_off;
--		lldev->evre_processed_off = evre_read_off;
--	}
--
--	return num_completed;
-+	return 1;
- }
- 
- void hidma_cleanup_pending_tre(struct hidma_lldev *lldev, u8 err_info,
-@@ -399,6 +360,16 @@ static int hidma_ll_reset(struct hidma_lldev *lldev)
-  */
- static void hidma_ll_int_handler_internal(struct hidma_lldev *lldev, int cause)
- {
-+	if ((lldev->trch_state == HIDMA_CH_DISABLED) ||
-+		(lldev->evch_state == HIDMA_CH_DISABLED)) {
-+		dev_err(lldev->dev, "error 0x%x, already disabled...\n",
-+			cause);
-+
-+		/* Clear out pending interrupts */
-+		writel(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
-+		return;
-+	}
-+
- 	if (cause & HIDMA_ERR_INT_MASK) {
- 		dev_err(lldev->dev, "error 0x%x, disabling...\n",
- 				cause);
-@@ -430,6 +401,9 @@ static void hidma_ll_int_handler_internal(struct hidma_lldev *lldev, int cause)
- 		 */
- 		if (hidma_handle_tre_completion(lldev, 0, 0))
- 			break;
-+		if ((lldev->trch_state == HIDMA_CH_DISABLED) ||
-+				(lldev->evch_state == HIDMA_CH_DISABLED))
-+			break;
- 	}
- 
- 	/* We consumed TREs or there are pending TREs or EVREs. */
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
