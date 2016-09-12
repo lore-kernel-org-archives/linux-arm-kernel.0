@@ -1,131 +1,108 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 12 Sep 2016 15:49:15 +0100
-Subject: [PATCH v4 01/10] arm64: KVM: Use static keys for selecting the GIC
- backend
+Date: Mon, 12 Sep 2016 15:49:18 +0100
+Subject: [PATCH v4 04/10] KVM: arm64: vgic-its: Introduce config option to
+ guard ITS specific code
 In-Reply-To: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
 References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1473691764-29424-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1473691764-29424-5-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently GIC backend is selected via alternative framework and this
-is fine. We are going to introduce vgic-v3 to 32-bit world and there
-we don't have patching framework in hand, so we can either check
-support for GICv3 every time we need to choose which backend to use or
-try to optimise it by using static keys. The later looks quite
-promising because we can share logic involved in selecting GIC backend
-between architectures if both uses static keys.
-
-This patch moves arm64 from alternative to static keys framework for
-selecting GIC backend. For that we embed static key into vgic_global
-and enable the key during vgic initialisation based on what has
-already been exposed by the host GIC driver.
+By now ITS code guarded with KVM_ARM_VGIC_V3 config option which was
+introduced to hide everything specific to vgic-v3 from 32-bit world.
+We are going to support vgic-v3 in 32-bit world and KVM_ARM_VGIC_V3
+will gone, but we don't have support for ITS there yet and we need to
+continue keeping ITS away.
+Introduce the new config option to prevent ITS code being build in
+32-bit mode when support for vgic-v3 is done.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c   |   21 +++++++++++----------
- include/kvm/arm_vgic.h        |    4 ++++
- virt/kvm/arm/vgic/vgic-init.c |    4 ++++
- virt/kvm/arm/vgic/vgic.c      |    2 +-
- 4 files changed, 20 insertions(+), 11 deletions(-)
+ arch/arm64/kvm/Kconfig              |    4 ++++
+ virt/kvm/arm/vgic/vgic-kvm-device.c |    3 +++
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    |    2 ++
+ virt/kvm/arm/vgic/vgic.h            |    4 ++++
+ 4 files changed, 13 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 5a84b45..d5c4cc5 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -16,6 +16,8 @@
-  */
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 9c9edc9..7ba9164 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -16,6 +16,9 @@ menuconfig VIRTUALIZATION
  
- #include <linux/types.h>
-+#include <linux/jump_label.h>
+ if VIRTUALIZATION
+ 
++config KVM_ARM_VGIC_V3_ITS
++	bool
 +
- #include <asm/kvm_asm.h>
- #include <asm/kvm_hyp.h>
+ config KVM_ARM_VGIC_V3
+ 	bool
  
-@@ -126,17 +128,13 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
- 	write_sysreg(0, vttbr_el2);
- }
- 
--static hyp_alternate_select(__vgic_call_save_state,
--			    __vgic_v2_save_state, __vgic_v3_save_state,
--			    ARM64_HAS_SYSREG_GIC_CPUIF);
--
--static hyp_alternate_select(__vgic_call_restore_state,
--			    __vgic_v2_restore_state, __vgic_v3_restore_state,
--			    ARM64_HAS_SYSREG_GIC_CPUIF);
--
- static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
- {
--	__vgic_call_save_state()(vcpu);
-+	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
-+		__vgic_v3_save_state(vcpu);
-+	else
-+		__vgic_v2_save_state(vcpu);
+@@ -35,6 +38,7 @@ config KVM
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	select KVM_ARM_VGIC_V3
++	select KVM_ARM_VGIC_V3_ITS
+ 	select KVM_ARM_PMU if HW_PERF_EVENTS
+ 	select HAVE_KVM_MSI
+ 	select HAVE_KVM_IRQCHIP
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 1813f93..f3811b3 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -223,9 +223,12 @@ int kvm_register_vgic_device(unsigned long type)
+ 	case KVM_DEV_TYPE_ARM_VGIC_V3:
+ 		ret = kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
+ 					      KVM_DEV_TYPE_ARM_VGIC_V3);
 +
- 	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
- }
- 
-@@ -149,7 +147,10 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
- 	val |= vcpu->arch.irq_lines;
- 	write_sysreg(val, hcr_el2);
- 
--	__vgic_call_restore_state()(vcpu);
-+	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
-+		__vgic_v3_restore_state(vcpu);
-+	else
-+		__vgic_v2_restore_state(vcpu);
- }
- 
- static bool __hyp_text __true_value(void)
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 19b698e..994665a 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -23,6 +23,7 @@
- #include <linux/types.h>
- #include <kvm/iodev.h>
- #include <linux/list.h>
-+#include <linux/jump_label.h>
- 
- #define VGIC_V3_MAX_CPUS	255
- #define VGIC_V2_MAX_CPUS	8
-@@ -63,6 +64,9 @@ struct vgic_global {
- 
- 	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
- 	bool			can_emulate_gicv2;
-+
-+	/* GIC system register CPU interface */
-+	struct static_key_false gicv3_cpuif;
- };
- 
- extern struct vgic_global kvm_vgic_global_state;
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 83777c1..14d6718 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -405,6 +405,10 @@ int kvm_vgic_hyp_init(void)
++#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+ 		if (ret)
+ 			break;
+ 		ret = kvm_vgic_register_its_device();
++#endif
  		break;
- 	case GIC_V3:
- 		ret = vgic_v3_probe(gic_kvm_info);
-+		if (!ret) {
-+			static_branch_enable(&kvm_vgic_global_state.gicv3_cpuif);
-+			kvm_info("GIC system register CPU interface\n");
-+		}
- 		break;
- 	default:
- 		ret = -ENODEV;
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index e83b7fe..8a529a7 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -29,7 +29,7 @@
- #define DEBUG_SPINLOCK_BUG_ON(p)
  #endif
+ 	}
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 90d8181..acbe691 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -42,6 +42,7 @@ u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+ 	return reg | ((u64)val << lower);
+ }
  
--struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
-+struct vgic_global __section(.hyp.text) kvm_vgic_global_state = {.gicv3_cpuif = STATIC_KEY_FALSE_INIT,};
++#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+ bool vgic_has_its(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+@@ -51,6 +52,7 @@ bool vgic_has_its(struct kvm *kvm)
  
- /*
-  * Locking order is always:
+ 	return dist->has_its;
+ }
++#endif
+ 
+ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+ 					    gpa_t addr, unsigned int len)
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 6c4625c..100045f 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -84,11 +84,15 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
+ int vgic_v3_probe(const struct gic_kvm_info *info);
+ int vgic_v3_map_resources(struct kvm *kvm);
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
++
++#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+ int vgic_register_its_iodevs(struct kvm *kvm);
+ bool vgic_has_its(struct kvm *kvm);
+ int kvm_vgic_register_its_device(void);
+ void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
++#endif
++
+ #else
+ static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+ {
 -- 
 1.7.9.5
