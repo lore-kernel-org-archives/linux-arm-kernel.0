@@ -1,86 +1,88 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 12 Sep 2016 10:16:00 -0600
-Subject: [PATCH v5 02/16] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <87sht59mcw.fsf@arm.com>
-References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
- <1472242678-33700-3-git-send-email-lina.iyer@linaro.org>
- <0b233802-f459-c6bb-ff42-70745a225cfb@arm.com>
- <20160902201605.GA1705@linaro.org> <87sht59mcw.fsf@arm.com>
-Message-ID: <20160912161600.GA21885@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 12 Sep 2016 11:18:37 -0500
+Subject: [PATCH v10 1/5] Documentation: bindings: add dt documentation
+ for dfi controller
+In-Reply-To: <1473051971-5500-2-git-send-email-hl@rock-chips.com>
+References: <1473051971-5500-1-git-send-email-hl@rock-chips.com>
+ <1473051971-5500-2-git-send-email-hl@rock-chips.com>
+Message-ID: <20160912161836.GA16533@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12 2016 at 09:19 -0600, Brendan Jackman wrote:
->
->Hi Lina,
->
->Sorry for the delay here, Sudeep and I were both been on holiday last week.
->
->On Fri, Sep 02 2016 at 21:16, Lina Iyer wrote:
->> On Fri, Sep 02 2016 at 07:21 -0700, Sudeep Holla wrote:
->[...]
->>>This version is *not very descriptive*. Also the discussion we had on v3
->>>version has not yet concluded IMO. So can I take that we agreed on what
->>>was proposed there or not ?
->>>
->> Sorry, this example is not very descriptive. Pls. check the 8916 dtsi
->> for the new changes in the following patches. Let me know if that makes
->> sense.
->
->The not-yet-concluded discussion Sudeep is referring to is at [1].
->
->In that thread we initially proposed the idea of, instead of splitting
->state phandles between cpu-idle-states and domain-idle-states, putting
->CPUs in their own domains and using domain-idle-states for _all_
->phandles, deprecating cpu-idle-states. I've brought this up in other
->threads [2] but discussion keeps petering out, and neither this example
->nor the 8916 dtsi in this patch series reflect the idea.
->
-Brendan, while your idea is good and will work for CPUs, I do not expect
-other domains and possibly CPU domains on some architectures to follow
-this model. There is nothing that prevents you from doing this today,
-you can specify domains around CPUs in your devicetree and CPU PM will
-handle the hierarchy. I don't think its fair to force it on all SoCs
-using CPU domains. This patchset does not restrict you from organizing
-the idle states the way you want it. This revision of the series, clubs
-CPU and domain idle states under idle-states umbrella. So part of your
-requirement is also satisfied.
+On Mon, Sep 05, 2016 at 01:06:07PM +0800, Lin Huang wrote:
+> This patch adds the documentation for rockchip dfi devfreq-event driver.
+> 
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+> Changes in v10:
+> - None
+> 
+> Changes in v9:
+> - reorder compatible and reg
+> 
+> Changes in v8:
+> - delete a unuse blank line
+> 
+> Changes in v7:
+> - None
+> 
+> Changes in v6:
+> - None
+> 
+> Changes in v5:
+> - None
+> 
+> Changes in v4:
+> - None
+> 
+> Changes in v3:
+> - None
+> 
+> Changes in v2:
+> - None 
+> 
+> Changes in v1:
+> - None
+> 
+>  .../bindings/devfreq/event/rockchip-dfi.txt           | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt b/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
+> new file mode 100644
+> index 0000000..f223313
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
+> @@ -0,0 +1,19 @@
+> +
+> +* Rockchip rk3399 DFI device
+> +
+> +Required properties:
+> +- compatible: Must be "rockchip,rk3399-dfi".
+> +- reg: physical base address of each DFI and length of memory mapped region
+> +- rockchip,pmu: phandle to the syscon managing the "pmu general register files"
+> +- clocks: phandles for clock specified in "clock-names" property
+> +- clock-names : the name of clock used by the DFI, must be "pclk_ddr_mon";
+> +
+> +Example:
+> +	dfi: dfi at 0xff630000 {
 
-You can follow up the series with your new additions, I don't see a
-conflict with this change.
+Drop the '0x'. With that,
 
-Thanks,
-Lina
+Acked-by: Rob Herring <robh@kernel.org>
 
-
->It would be great if we could go back to the thread at [1] where Sudeep
->has posted examples and come to a clear consensus on the binding design
->before reviewing implementation patches. Ideally with input from Ulf,
->Rob and Kevin.
->
->[1] https://patchwork.kernel.org/patch/9264507
->[2] http://www.spinics.net/lists/devicetree/msg141024.html
->>
->> Thanks,
->> Lina
->>
->>>We could have better example above *really* based on the discussions we
->>>had so far. This example always makes me think it's well crafted to
->>>avoid any sort of discussions. We need to consider different use-cases
->>>e.g. what about CPU level states ?
->>>
->>>IMO, we need to discuss this DT binding in detail and arrive at someq
->>>conclusion before you take all the troubles to respin the series.
->>>Also it's better to keep the DT binding separate until we have some
->>>conclusion instead of posting the implementation for each version.
->>>That's just my opinion(I would be least bothered about implementation
->>>until I know it will be accepted before I can peek into the code, others
->>>may differ.
->>>
->>>--
->>>Regards,
->>>Sudeep
->
->Cheers,
->Brendan
+> +		compatible = "rockchip,rk3399-dfi";
+> +		reg = <0x00 0xff630000 0x00 0x4000>;
+> +		rockchip,pmu = <&pmugrf>;
+> +		clocks = <&cru PCLK_DDR_MON>;
+> +		clock-names = "pclk_ddr_mon";
+> +		status = "disabled";
+> +	};
+> -- 
+> 2.6.6
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
