@@ -1,83 +1,76 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 12 Sep 2016 10:51:08 +0100
-Subject: [PATCH v3 6/8] ARM: Change MPIDR_AFFINITY_LEVEL to ignore Aff3
-In-Reply-To: <57D67A06.8090107@arm.com>
-References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
- <1473350810-10857-7-git-send-email-vladimir.murzin@arm.com>
- <57D2EA7F.9030705@arm.com> <57D677EE.4080706@arm.com>
- <57D67A06.8090107@arm.com>
-Message-ID: <57D67A8C.5080103@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 12 Sep 2016 11:53:17 +0200
+Subject: [PATCHv2 3/3] tty/serial: at91: fix hardware handshake on SAM9x5
+ (without GPIOs)
+In-Reply-To: <20160912094733.21501-4-richard.genoud@gmail.com>
+References: <20160912094733.21501-1-richard.genoud@gmail.com>
+ <20160912094733.21501-4-richard.genoud@gmail.com>
+Message-ID: <20160912095317.74e5xiedrq5nh3v4@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/16 10:48, Marc Zyngier wrote:
-> On 12/09/16 10:39, Vladimir Murzin wrote:
->> On 09/09/16 17:59, Marc Zyngier wrote:
->>> On 08/09/16 17:06, Vladimir Murzin wrote:
->>>> vgic-v3 driver queries CPU affinity level up to Aff3, which is valid
->>>> for arm64.  However, for arm up to Aff2 levels are supported, so
->>>> querying for third level ends with upper bits of MPIDR are treated as
->>>> valid affinity level which is not true. Make sure we report zero for
->>>> any affinity level above two.
->>>>
->>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>>> ---
->>>>  arch/arm/include/asm/cputype.h |    3 ++-
->>>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
->>>> index 1ee94c7..f08fac4 100644
->>>> --- a/arch/arm/include/asm/cputype.h
->>>> +++ b/arch/arm/include/asm/cputype.h
->>>> @@ -55,9 +55,10 @@
->>>>  
->>>>  #define MPIDR_LEVEL_BITS 8
->>>>  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
->>>> +#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
->>>>  
->>>>  #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
->>>> -	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
->>>> +	(((mpidr & MPIDR_HWID_BITMASK) >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK)
->>>>  
->>>>  #define ARM_CPU_IMP_ARM			0x41
->>>>  #define ARM_CPU_IMP_INTEL		0x69
->>>>
->>>
->>> There is something I don't quite get. Is this patch really necessary?
->>> Are there cases where we construct a MPIDR that can have Aff3 set on 32bit?
->>
->> I've just checked and it seems that I've been keeping the change for
->> MPIDR_AFFINITY_LEVEL() since vgic-old era where it was used with
->>
->> static u32 compress_mpidr(unsigned long mpidr)
->> {
->>         u32 ret;
->>
->>         ret = MPIDR_AFFINITY_LEVEL(mpidr, 0);
->>         ret |= MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8;
->>         ret |= MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16;
->>         ret |= MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24;
->>
->>         return ret;
->> }
->>
->> and now that code gone and nobody passes level 3 into this macro, so I
->> can drop this change.
->>
->> However, I do need MPIDR_LEVEL_SHIFT() macro since it is used in vgic-v3.
->>
->> Should I leave patch as is or you have something in mind?
+On 12/09/2016 at 11:47:33 +0200, Richard Genoud wrote :
+> Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
+> hardware handshake is enabled") broke the hardware handshake on SAM9x5
+> platforms.
 > 
-> I think that for the sake of keeping the change minimal, it'd be better
-> to just add the MPIDR_LEVEL_SHIFT macro, and drop the other changes.
+> On Atmel platforms, the USART can only handle the handware handshake
+> (ATMEL_US_USMODE_HWHS) if FIFOs or PDC are used.
+> 
+> Thus, ATMEL_US_USMODE_HWHS mode should only be used in this case.
+> 
+> For SAM9x5, there's no FIFOs nor PDC for the USART, so the mode should
+> be ATMEL_US_USMODE_NORMAL and the RTS pin should be controlled by the
+> driver.
+> 
+> NB: -stable is not Cced because it doesn't cleanly apply on 4.1+
+> 
+> Tested on SAM9G35-CM with and without DMA
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when hardware handshake is enabled")
+> ---
+>  drivers/tty/serial/atmel_serial.c | 18 +++++++++++-------
+>  1 file changed, 11 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index e9b4fbf88c2d..32154e7231ce 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -2130,15 +2130,19 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  	} else if ((termios->c_cflag & CRTSCTS) &&
+>  		   !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
+>  		/*
+> -		 * RS232 with hardware handshake (RTS/CTS)
+> -		 * handled by the controller.
+> +		 * Automatic hardware handshake (RTS/CTS) only work with
+> +		 * FIFOs or PDC.
+> +		 * Meaning that on SAM9x5 the controller can't handle
+> +		 * the hardware handshake (no FIFOs nor PDC on these platforms).
+>  		 */
+> -		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
+> -			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
+> -			termios->c_cflag &= ~CRTSCTS;
+> -		} else {
+> +		if (atmel_use_pdc_rx(port) || atmel_use_fifo(port))
+>  			mode |= ATMEL_US_USMODE_HWHS;
+> -		}
+> +		else
+> +			/*
+> +			 * The hardware handshake won't be handle by the
+> +			 * controller but by the driver.
+> +			 */
+> +			mode |= ATMEL_US_USMODE_NORMAL;
 
-Noted!
+You still need the case where HWHS is impossible and there are no gpio
+configured. You need to inform userspace that the configuration was not
+applied instead of silently ignoring the error.
 
-Thanks
-Vladimir
+>  	} else {
+>  		/* RS232 without hadware handshake or controlled by GPIOs */
+>  		mode |= ATMEL_US_USMODE_NORMAL;
 
-> 
-> Thanks,
-> 
-> 	M.
-> 
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
