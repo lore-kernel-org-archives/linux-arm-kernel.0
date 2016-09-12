@@ -1,49 +1,30 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 12 Sep 2016 15:56:43 -0500
-Subject: [PATCH v2 1/2] Documentation: dt: add bindings for ti-cpufreq
-In-Reply-To: <20160908033557.GQ27345@vireshk-i7>
-References: <20160901025328.376-1-d-gerlach@ti.com>
- <20160901025328.376-2-d-gerlach@ti.com> <20160907051215.GN27345@vireshk-i7>
- <57D025E8.6030202@ti.com> <20160908033557.GQ27345@vireshk-i7>
-Message-ID: <57D7168B.5070708@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Sep 2016 23:12:17 +0200
+Subject: [PATCH 4/8] arm: orion5x: Alias uart0 to serial0 for all orion5x
+In-Reply-To: <1472203264-21089-5-git-send-email-jm@lentin.co.uk>
+References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+ <1472203264-21089-1-git-send-email-jm@lentin.co.uk>
+ <1472203264-21089-5-git-send-email-jm@lentin.co.uk>
+Message-ID: <3268478.o1X7VU1Eq9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
-On 09/07/2016 10:35 PM, Viresh Kumar wrote:
-> On 07-09-16, 09:36, Dave Gerlach wrote:
->> On 09/07/2016 12:12 AM, Viresh Kumar wrote:
->>> On 31-08-16, 21:53, Dave Gerlach wrote:
->>>> +In 'operating-points-v2' table:
->>>> +- compatible: Should be
->>>> +	- 'operating-points-v2-ti-am3352-cpu' for am335x SoCs
->>>> +	- 'operating-points-v2-ti-am4372-cpu' for am43xx SoCs
->>>> +	- 'operating-points-v2-ti-dra7-cpu' for dra7xx/am57xx SoCs
->>>
->>> Why do you need SoC specific compatible here? Are you defining new
->>> fields in OPP tables for your SoC ? How are the tables for your case
->>> going to differ from the ones using "operating-points-v2" compatible
->>> string?
->>>
->>
->> I thought you had suggested that I do this in your comments from v1, but I
->> guess that was dependent on whether or not I put the properties I have
->> inserted into the cpu node into the operating-points table instead.
->
-> Yes.
->
->> I still
->> have gotten no comments from any DT maintainers so I left it as is. I am
->> still not sure if that is acceptable.
->
-> @Rob: Can you please share your views on the new properties being
-> added to the CPU node ?
->
+On Friday, August 26, 2016 10:21:00 AM CEST Jamie Lentin wrote:
+> diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+> index fbccfbb..001613d 100644
+> --- a/arch/arm/boot/dts/orion5x.dtsi
+> +++ b/arch/arm/boot/dts/orion5x.dtsi
+> @@ -17,6 +17,7 @@
+>  
+>         aliases {
+>                 gpio0 = &gpio0;
+> +               serial0 = &uart0;
+>         };
+>  
+> 
 
-I am fine moving the properties in the operating-points-v2 node or 
-leaving it as is, whichever is preferred.
+Please put the alias for the serial port in the board specific .dts file,
+it's possible that some boards have more than one uart in use,
+and that they don't label them the same way as the SoC internal numbering.
 
-Viresh, thanks for your comments.
-
-Regards,
-Dave
+	Arnd
