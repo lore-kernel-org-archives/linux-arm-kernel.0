@@ -1,27 +1,34 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon, 12 Sep 2016 17:45:11 +0800
-Subject: [PATCH v15.1 3/5] drm/rockchip: cdn-dp: add cdn DP support for
- rk3399
-In-Reply-To: <20160912091339.GY27946@sirena.org.uk>
-References: <1473473748-22331-4-git-send-email-zyw@rock-chips.com>
- <1473480966-21572-1-git-send-email-zyw@rock-chips.com>
- <20160912091339.GY27946@sirena.org.uk>
-Message-ID: <57D67927.7070109@rock-chips.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 12 Sep 2016 11:47:30 +0200
+Subject: [PATCHv2 0/3] Fix handware handshake on SAM9x5 platforms
+Message-ID: <20160912094733.21501-1-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark
+Since commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
+hardware handshake is enabled"), hardware handshake is not working
+anymore on SAM9x5 platforms.
 
-OK, thanks.
-I will send the whole series next time, hope it will not bother anyone
+The first two patches fix the hardware handshake when CTS/RTS pins are
+handle by GPIOs.
+
+The last patch fixes hardware handshake when CTS/RTS pins are not GPIOs.
+
+Changes since v1:
+ - Correct patch 1 with the error found by kbuild.
+ - Add Alexandre's Acked-by on patch 2
+ - Rewrite patch 3 logic in the light of the on-going discussion
+   with Cyrille and Alexandre.
+
+NB: patch 2 NEEDS patch 1 to compile.
 
 
-On 09/12/2016 05:13 PM, Mark Brown wrote:
-> On Fri, Sep 09, 2016 at 09:16:06PM -0700, Chris Zhong wrote:
->> Add support for cdn DP controller which is embedded in the rk3399
->> SoCs. The DP is compliant with DisplayPort Specification,
-> Please don't new patches in reply to old serieses, especially not
-> individual patches in the middle of the series - it just makes
-> everything more confusing.  It becomes difficult to tell what the
-> version of the series that's actually expected is.  Please send the
-> whole series.
+Richard Genoud (3):
+  serial: mctrl_gpio: implement mctrl_gpio_use_rtscts
+  tty/serial: at91: fix hardware handshake with GPIOs
+  tty/serial: at91: fix hardware handshake when DMA is not used
+
+ drivers/tty/serial/atmel_serial.c      | 25 +++++++++++++++++--------
+ drivers/tty/serial/serial_mctrl_gpio.c |  8 ++++++++
+ drivers/tty/serial/serial_mctrl_gpio.h | 10 ++++++++++
+ 3 files changed, 35 insertions(+), 8 deletions(-)
