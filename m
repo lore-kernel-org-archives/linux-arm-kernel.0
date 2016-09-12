@@ -1,36 +1,47 @@
-From: imp@bsdimp.com (Warner Losh)
-Date: Mon, 12 Sep 2016 08:26:53 -0600
-Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
-In-Reply-To: <20160912135549.GA14165@leverpostej>
-References: <57BDAF2E.10502@laposte.net>
- <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
- <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
- <57D6AA54.6000208@laposte.net> <20160912135549.GA14165@leverpostej>
-Message-ID: <CANCZdfri+T59FA4XTaH5JbW0BaJHt3w5eaSkpD8NrJn6nZrZbA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Sep 2016 15:28:50 +0100
+Subject: [PATCH][V2] dma-mapping: add in missing white space in error
+ message text
+In-Reply-To: <20160912130952.2778-1-colin.king@canonical.com>
+References: <20160912130952.2778-1-colin.king@canonical.com>
+Message-ID: <20160912142849.GV1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 8:01 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> Since the question seems understood, do you have an example of other SoC's
->> doing something similar?
->
-> I do not have an example. I know that others are using DT for data
-> beyond what Linux or another OS requires, but it's my understanding that
-> that is typically in a separate DTB.
+On Mon, Sep 12, 2016 at 02:09:52PM +0100, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> A dev_warn message spans two lines and the literal string is missing
+> a white space between words. Add the white space and reformat the
+> message to not span multiple lines.
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  arch/arm/common/dmabounce.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+> index 3012816..afeb5e3 100644
+> --- a/arch/arm/common/dmabounce.c
+> +++ b/arch/arm/common/dmabounce.c
+> @@ -546,9 +546,7 @@ void dmabounce_unregister_dev(struct device *dev)
+>  	set_dma_ops(dev, NULL);
+>  
+>  	if (!device_info) {
+> -		dev_warn(dev,
+> -			 "Never registered with dmabounce but attempting"
+> -			 "to unregister!\n");
+> +		dev_warn(dev, "Never registered with dmabounce but attempting to unregister!\n");
 
-Just to clarify: FreeBSD uses, for the most part, the DTB's that the
-'vendor' ships, which is quite often the same ones included in Linux.
-There's some exceptions where the bindings weren't really hardware
-independent, or where the abstraction model was really Linux specific
-(for things like the HDMI stack).
+Almost!
 
-However, with the advent of overlays, one would think that a vendor
-could easily include an overlay with the DTB data for the devices they
-don't wish to, or cannot for other reasons release. It seems like the
-perfect mechanism to comply with the rules about inclusion of nodes in
-the DTS. Vendors are free to document these nodes and don't require
-the Linux kernel include them in the Documents directory to do so.
-There have been recent efforts to move this documentation to a third
-party to maintain.
+		dev_warn(dev,
+			 "Never registered with dmabounce but attempting to unregister!\n");
 
-Warner
+The point is that the string is as greppable as possible, while trying to
+keep to the rest of the style.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
