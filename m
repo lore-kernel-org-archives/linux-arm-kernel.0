@@ -1,139 +1,42 @@
-From: andrea.merello@gmail.com (Andrea Merello)
-Date: Mon, 12 Sep 2016 08:48:00 +0200
-Subject: [PATCH] clk: stm32f4: don't assume 48MHz clock is derived from
- primary PLL
-In-Reply-To: <b39d3544-9512-9e0b-2f5b-4135835009f9@st.com>
-References: <1473318063-21782-1-git-send-email-andrea.merello@gmail.com>
- <b39d3544-9512-9e0b-2f5b-4135835009f9@st.com>
-Message-ID: <CAN8YU5MFX0cwUv34fAL3PSaRQNhgPZFO3PiXBdE+fVeLgGJ8ZQ@mail.gmail.com>
+From: sramana@codeaurora.org (Srinivas Ramana)
+Date: Mon, 12 Sep 2016 12:27:00 +0530
+Subject: [PATCH] ARM: decompressor: reset ttbcr fields to use TTBR0 on ARMv7
+In-Reply-To: <57D3C06D.4030908@codeaurora.org>
+References: <57D3C06D.4030908@codeaurora.org>
+Message-ID: <1473663420-18629-1-git-send-email-sramana@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 9, 2016 at 11:57 AM, Alexandre Torgue
-<alexandre.torgue@st.com> wrote:
-> Hi Andrea,
->
-> On 09/08/2016 09:01 AM, Andrea Merello wrote:
->>
->> This driver just look at the PLLs configurations set by the
->> bootloader, but it assumes the 48MHz clock is derived from the primary
->> PLL; however using PLLSAI is another option for generating the 48MHz
->> clock.
->>
->> This patch make the driver to check for this, and eventually adjust the
->> clock tree accordingly
->
->
-> Another patch-set is ongoing concerning RTC clock for stm32f4. It is
-> developed by Gabriel Fernandez (I add him directly in this reply).
-> Can you check with him how he plans to manage this RTC clock in order to
-> have something similar / coherent for SAI clocks, 48MHz ....
->
-> Concerning this patch,
-> When I look at the clock tree I see that 48 MHz is only provided by pll
-> named "PLL". So If you use PLL SAI to provide a clock at 48 MHz, you
-> actually use SAI_A or SAI_B clock. I'm right ?
+If the bootloader uses the long descriptor format and jumps to
+kernel decompressor code, TTBCR may not be in a right state.
+Before enabling the MMU, it is required to clear the TTBCR.PD0
+field to use TTBR0 for translation table walks.
 
-No, SAI_A and SAI_B are two other clocks output, that comes from
-PLLSAI through other divisors and muxes; here I simply look at if the
-bootloader selected the "PLL48CLK" output of the SAI PLL instead of
-the "PLL48CLK" of the primary PLL.
+The 'commit dbece45894d3a ("ARM: 7501/1: decompressor:
+reset ttbcr for VMSA ARMv7 cores")' does the reset of TTBCR.N, but
+doesn't consider all the bits for the size of TTBCR.N.
 
-> I think we need to have something more configurable. Each special clock (SAI
-> / RTC /LCd ...) have to be configurable and each "parents" (PLL / PLLI2S /
-> PLLSAI) should be described at least in the driver.
+Clear TTBCR.PD0 field and reset all the three bits of TTBCR.N to
+indicate the use of TTBR0 and the correct base address width.
 
-Yes, there are probably other possible clock configurations that the
-driver does not recognize yet; I just added this one because I found
-it useful in real-world scenario (USB/SDcard working and core running
-at the max speed at the same time).
+Signed-off-by: Srinivas Ramana <sramana@codeaurora.org>
+---
+ arch/arm/boot/compressed/head.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->
-> Gabriel,
->
-> Can you send a draft of your patch-set for RTC clock to Andrea, in order to
-> discuss about this topic.
->
-> Thanks
->
-> Alex
->
->
->
->>
->> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
->> Cc: Michael Turquette <mturquette@baylibre.com>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> Cc: Alexandre Torgue <alexandre.torgue@st.com>
->> Cc: Bruno Herrera <bruherrera@gmail.com>
->> ---
->>  drivers/clk/clk-stm32f4.c | 26 ++++++++++++++++++++++++--
->>  1 file changed, 24 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
->> index 02d6810..7f1ba8f 100644
->> --- a/drivers/clk/clk-stm32f4.c
->> +++ b/drivers/clk/clk-stm32f4.c
->> @@ -24,6 +24,7 @@
->>  #include <linux/of.h>
->>  #include <linux/of_address.h>
->>
->> +#define STM32F4_RCC_CR                 0x00
->>  #define STM32F4_RCC_PLLCFGR            0x04
->>  #define STM32F4_RCC_CFGR               0x08
->>  #define STM32F4_RCC_AHB1ENR            0x30
->> @@ -31,6 +32,8 @@
->>  #define STM32F4_RCC_AHB3ENR            0x38
->>  #define STM32F4_RCC_APB1ENR            0x40
->>  #define STM32F4_RCC_APB2ENR            0x44
->> +#define STM32F4_RCC_PLLSAICFGR         0x88
->> +#define STM32F4_RCC_DCKCFGR            0x8C
->>
->>  struct stm32f4_gate_data {
->>         u8      offset;
->> @@ -238,16 +241,35 @@ static struct clk *clk_register_apb_mul(struct
->> device *dev, const char *name,
->>  static void stm32f4_rcc_register_pll(const char *hse_clk, const char
->> *hsi_clk)
->>  {
->>         unsigned long pllcfgr = readl(base + STM32F4_RCC_PLLCFGR);
->> -
->> +       unsigned long pllsaicfgr = readl(base + STM32F4_RCC_PLLSAICFGR);
->> +       unsigned long dckcfgr = readl(base + STM32F4_RCC_DCKCFGR);
->> +       unsigned long rcccr = readl(base + STM32F4_RCC_CR);
->> +       bool saien = rcccr & BIT(28);
->>         unsigned long pllm   = pllcfgr & 0x3f;
->>         unsigned long plln   = (pllcfgr >> 6) & 0x1ff;
->>         unsigned long pllp   = BIT(((pllcfgr >> 16) & 3) + 1);
->>         const char   *pllsrc = pllcfgr & BIT(22) ? hse_clk : hsi_clk;
->>         unsigned long pllq   = (pllcfgr >> 24) & 0xf;
->> +       bool src48_sai = dckcfgr & BIT(27);
->> +       unsigned long pllsain = (pllsaicfgr >> 6) & 0x1ff;
->> +       unsigned long pllsaip = BIT(((pllsaicfgr >> 16) & 3) + 1);
->>
->>         clk_register_fixed_factor(NULL, "vco", pllsrc, 0, plln, pllm);
->>         clk_register_fixed_factor(NULL, "pll", "vco", 0, 1, pllp);
->> -       clk_register_fixed_factor(NULL, "pll48", "vco", 0, 1, pllq);
->> +
->> +       if (src48_sai && !saien) {
->> +               pr_err("48MHz derived from SAI PLL, but SAI PLL disabled
->> (blame the bootloader)\n");
->> +               return;
->> +       }
->> +
->> +       if (saien)
->> +               clk_register_fixed_factor(NULL, "sai",
->> +                                       pllsrc, 0, pllsain, pllm);
->> +
->> +       if (src48_sai)
->> +               clk_register_fixed_factor(NULL, "pll48", "sai", 0, 1,
->> pllsaip);
->> +       else
->> +               clk_register_fixed_factor(NULL, "pll48", "vco", 0, 1,
->> pllq);
->>  }
->>
->>  /*
->>
->
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index af11c2f8f3b7..fc6d541549a2 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -779,7 +779,7 @@ __armv7_mmu_cache_on:
+ 		orrne	r0, r0, #1		@ MMU enabled
+ 		movne	r1, #0xfffffffd		@ domain 0 = client
+ 		bic     r6, r6, #1 << 31        @ 32-bit translation system
+-		bic     r6, r6, #3 << 0         @ use only ttbr0
++		bic     r6, r6, #(7 << 0) | (1 << 4)	@ use only ttbr0
+ 		mcrne	p15, 0, r3, c2, c0, 0	@ load page table pointer
+ 		mcrne	p15, 0, r1, c3, c0, 0	@ load domain access control
+ 		mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, Inc., 
+is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
