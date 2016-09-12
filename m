@@ -1,62 +1,39 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 12 Sep 2016 12:18:56 +0200
-Subject: [PATCH 1/5] clk: add support for runtime pm
-In-Reply-To: <20160908001943.GC13062@codeaurora.org>
-References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
- <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
- <20160908001943.GC13062@codeaurora.org>
- <CGME20160912101857eucas1p29b2bbd5ac0eda92284091ad1b86decc4@eucas1p2.samsung.com>
-Message-ID: <f18fee35-cb5d-abce-0415-a98b58e3a302@samsung.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 12 Sep 2016 12:22:39 +0200
+Subject: [PATCHv3 0/3] Devicetree bindings for Ion
+In-Reply-To: <1472601869-19469-1-git-send-email-labbott@redhat.com>
+References: <1472601869-19469-1-git-send-email-labbott@redhat.com>
+Message-ID: <20160912102239.GA5034@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Tue, Aug 30, 2016 at 05:04:26PM -0700, Laura Abbott wrote:
+> Hi,
+> 
+> This is a long overdue resend and slight update from the last version[1] of
+> Ion devicetree bindings.
+> 
+> The goal here is to keep the Ion bindings minimalist. I experimented with
+> dropping all but a dummy devicetree node and just matching on the machine
+> name in the platform file. This ends up being a nightmare for the DMA (i.e. CMA)
+> heap type. That heap requires a device structure to do its allocation and
+> setting up a device structure properly isn't pretty. I have other ideas for
+> working with that heap if this gets NAKed.
+> 
+> I've thought about the idea of a devicetree overlay for specifying more
+> platform configuration but that a) requires Android actually load the overlay
+> at the right time in the framework and b) opens up an entirely new can of
+> worms.
+> 
+> In conclusion, if we assume that Ion platform support is something anyone
+> actually wants, this is still the least bad and intrusive idea I've come up
+> with. There exists hisilicon Ion code but it came in without being fully acked.
+> I've converted it over as an example of how it might look.
+> 
+> As always, feedback appreciated.
 
+Give a total lack of feeback, I've now applied these patches :)
 
-On 2016-09-08 02:19, Stephen Boyd wrote:
-> On 09/01, Marek Szyprowski wrote:
->> Registers for some clocks might be located in the SOC area, which are under the
->> power domain. To enable access to those registers respective domain has to be
->> turned on. Additionally, registers for such clocks will usually loose its
->> contents when power domain is turned off, so additional saving and restoring of
->> them might be needed in the clock controller driver.
->>
->> This patch adds basic infrastructure in the clocks core to allow implementing
->> driver for such clocks under power domains. Clock provider can supply a
->> struct device pointer, which is the used by clock core for tracking and managing
->> clock's controller runtime pm state. Each clk_prepare() operation
->> will first call pm_runtime_get_sync() on the supplied device, while
->> clk_unprepare() will do pm_runtime_put() at the end.
->>
->> Additional calls to pm_runtime_get/put functions are required to ensure that any
->> register access (like calculating/chaning clock rates) will be done with clock
->> controller in active runtime state.
->>
->> Special handling of the case when runtime pm is disabled for clock controller's
->> device is needed to let this feature work properly also during system sleep
->> suspend/resume operations (runtime pm is first disabled before entering sleep
->> state's, but controller is usually still operational until its suspend pm
->> callback is called).
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> My "knee jerk" concern is that we're going to take a runtime PM
-> lock underneath the prepare lock. That seems like a situation
-> where we could hit a lock inversion if the runtime PM callbacks
-> themselves acquire the prepare lock by calling clk APIs? But this
-> concern is false right? We release the runtime PM lock before
-> calling the PM callback, so we shouldn't hit any deadlock and
-> lockdep won't complain?
+thanks,
 
-Runtime PM uses fine grained locking based on per-device locks, so there
-should be no problem with global clock prepare lock. The only lock 
-interaction
-is between clock controller device's rpm lock and clocks global prepare 
-lock, but
-it always done with the same access pattern. I've tested it extensively 
-(also
-with lock dep) with various use cases and found no problems.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+greg k-h
