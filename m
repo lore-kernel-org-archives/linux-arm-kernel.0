@@ -1,129 +1,79 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 12 Sep 2016 16:07:15 +0100
-Subject: [PATCH v5 2/3] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <20160912143548.GL9449@lukather>
-References: <1473344917-1524-1-git-send-email-quentin.schulz@free-electrons.com>
- <1473344917-1524-3-git-send-email-quentin.schulz@free-electrons.com>
- <20160912091829.GB1873@dell>
- <93bd339b-85ab-d0fc-5e80-e2aca290c0d7@free-electrons.com>
- <20160912095923.GD1873@dell> <20160912100719.GJ9449@lukather>
- <20160912104932.GF1873@dell>
- <c322d309-993c-a572-5ffd-bf4012e26134@free-electrons.com>
- <20160912135655.GC9789@dell> <20160912143548.GL9449@lukather>
-Message-ID: <20160912150715.GG9789@dell>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Sep 2016 16:09:59 +0100
+Subject: [PATCH v2 1/7] arm64: Factor out PAN enabling/disabling into
+ separate uaccess_* macros
+In-Reply-To: <20160912145219.GC2492@e104818-lin.cambridge.arm.com>
+References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
+ <1472828533-28197-2-git-send-email-catalin.marinas@arm.com>
+ <20160905153828.GA27305@leverpostej>
+ <20160912145219.GC2492@e104818-lin.cambridge.arm.com>
+Message-ID: <20160912150958.GC14165@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Sep 2016, Maxime Ripard wrote:
-
-> On Mon, Sep 12, 2016 at 02:56:55PM +0100, Lee Jones wrote:
-> > > >>> Then use .data = <defined model ID> and set up a switch() in .probe().
-> > > >>
-> > > >> Uh? Why? It just adds a non-standard indirection, while using
-> > > >> of_match_device is very standard, and used extensively in Linux.
-> > > > 
-> > > > You still use of_match_device() to obtain the ID.
-> > > > 
-> > > > The "don't mix DT with the MFD API" is there to prevent some of the
-> > > > nasty hacks I've seen previously.  This particular example doesn't
-> > > > seem so bad, but it's a gateway to ridiculous hackery!
-> > > 
-> > > How am I supposed to get the .data without of_match_node then?
-> > > What's more hackish in using .data field for specific data for each
-> > > compatible than in using a random ID in .data and switching on it? The
-> > > result is exactly the same, the switching case being more verbose and
-> > > adding complexity to something that can be done in a straightforward manner.
+On Mon, Sep 12, 2016 at 03:52:19PM +0100, Catalin Marinas wrote:
+> On Mon, Sep 05, 2016 at 04:38:28PM +0100, Mark Rutland wrote:
+> > On Fri, Sep 02, 2016 at 04:02:07PM +0100, Catalin Marinas wrote:
+> > >  /*
+> > > + * User access enabling/disabling.
+> > > + */
+> > > +#define uaccess_disable(alt)						\
+> > > +do {									\
+> > > +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,			\
+> > > +			CONFIG_ARM64_PAN));				\
+> > > +} while (0)
+> > > +
+> > > +#define uaccess_enable(alt)						\
+> > > +do {									\
+> > > +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,			\
+> > > +			CONFIG_ARM64_PAN));				\
+> > > +} while (0)
 > > 
-> > I've already agreed that your implementation isn't terrible, but I'd
-> > still like to remain strict on the rules.
+> > Passing the alternative down is somewhat confusing. e.g. in the futex
+> > case it looks like we're only doing something when PAN is present,
+> > whereas we'll manipulate TTBR0 in the absence of PAN.
+> 
+> I agree it's confusing (I got it wrong first time as well and used the
+> wrong alternative for futex).
+> 
+> > If I've understood correctly, we need this to distinguish regular
+> > load/store uaccess sequences (eg. the futex code) from potentially
+> > patched unprivileged load/store sequences (e.g. {get,put}_user) when
+> > poking PSTATE.PAN.
 > > 
-> > Better still, can you can dynamically test which platform you're on,
-> > via a version register or similar?
+> > So perhaps we could ahve something like:
 > > 
-> > Failing that, see how everyone else does it:
+> > * privileged_uaccess_{enable,disable}()
+> >   Which toggle TTBR0, or PAN (always).
+> >   These would handle cases like the futex/swp code.
+> >  
+> > * (unprivileged_)uaccess_{enable,disable}()
+> >   Which toggle TTBR0, or PAN (in the absence of UAO).
+> >   These would handle cases like the {get,put}_user sequences.
 > > 
-> >  `git grep "\.data" -- drivers/mfd/`
+> > Though perhaps that is just as confusing. ;)
 > 
-> Just to make sure, you prefer something like
-> 
-> static struct my_struct data = {
-> };
-> 
-> static struct my_struct data2 = {
-> };
-> 
-> struct of_device_id matches[] = {
->        { compatible = "...", data = <ID> },
->        { compatible = "...", data = <ID2> },
-> };
-> 
-> of_id = of_match_device (dev, matches);
-> switch (of_id->data) {
-> case <ID>:
->      function(data);
-> case <ID2>:
->      function(data2);
-> };
-> 
-> over
-> 
-> static struct my_struct data = {
-> };
-> 
-> static struct my_struct data2 = {
-> };
-> 
-> struct of_device_id matches[] = {
->        { compatible = "...", data = data },
->        { compatible = "...", data = data2 },
-> };
-> 
-> of_id = of_match_device (dev, matches);
-> function(of_id->data);
-> 
-> ?
-> 
-> This is the *only* time this is going to be used in that driver. I can
-> understand the need for a version if you need to apply quirks in
-> several functions, but here it clearly looks suboptimal.
-> 
-> And we are indeed using this construct in the AXP MFD, and it just
-> doesn't scale either and become quite difficult to maintain when you
-> have a significant number of variants, and then you have to patch
-> *all* the switch instances to get something done.
+> I find it more confusing. 
 
-static struct my_struct data = {
-};
+Fair enough. :)
 
-static struct my_struct data2 = {
-};
+> In the non-UAO case, get_user etc. would
+> normally have to use privileged_uaccess_enable() since ldr is not
+> replaced with ldtr. Maybe uaccess_enable_for_exclusives() but it doesn't
+> look any better. 
 
-struct of_device_id matches[] = {
-       { compatible = "...", data = <ID> },
-       { compatible = "...", data = <ID2> },
-};
+I strongly prefer uaccess_enable_exclusives(), or something of that sort
+to both of the above. ;)
 
-int probe()
-{
-	struct mfd_cell *cell;
+> I think adding some comments to the code (uaccess_enable macro) would
+> work better, clarifying what the alternative is for.
 
-	of_id = of_match_device (dev, matches);
-	switch (of_id->data) {
-	case <ID>:
-     	     cell = data;
-	case <ID2>:
-     	     cell = data2;
-	};
+That will make things smoewhat clearer, though only after one reads the
+comments. In contrast, uaccess_enable_exclusives() would be
+self-documenting w.r.t. the intented use-case.
 
-	mfd_add_devices(..., cell, ...)
-};
+Do we ever want to use the 8.1 atomics for futexes? If so, perhaps
+uaccess_enable_atomics()?
 
-It's an extra few lines, but worth it to unbind MFD from DT.
-
-Is there really no way to obtain this information dynamically?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Mark.
