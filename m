@@ -1,151 +1,64 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 12 Sep 2016 14:35:23 +0200
-Subject: [PATCH 4/4] mmc: sdhci-st: Handle interconnect clock
-In-Reply-To: <20160908115849.GS4921@dell>
-References: <20160908091136.17301-1-lee.jones@linaro.org>
- <20160908091136.17301-5-lee.jones@linaro.org>
- <20160908115849.GS4921@dell>
-Message-ID: <CAPDyKFpVKYzJEAWkHsp2ZZdS=tQmVjFRymkXFHxyGqmgteNbUw@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 12 Sep 2016 14:37:06 +0200
+Subject: [UPDATE PATCH V10 1/8] ACPI: I/O Remapping Table (IORT) initial
+ support
+In-Reply-To: <20160909092012.GC19669@red-moon>
+References: <1473152938-17388-2-git-send-email-tn@semihalf.com>
+ <1473249412-20226-1-git-send-email-tn@semihalf.com>
+ <20160909092012.GC19669@red-moon>
+Message-ID: <38e36eee-cece-75db-4781-5727dd11c93d@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2016 at 13:58, Lee Jones <lee.jones@linaro.org> wrote:
-> Sorry Adrian, left you of the list.  Rectifying.
+Hi Rafael,
+
+On 09.09.2016 11:20, Lorenzo Pieralisi wrote:
+> Hi Rafael,
 >
-> FYI, this patch is due for the v4.8 -rcs:
->
->   http://www.spinics.net/lists/kernel/msg2338219.html
->
->> Some ST platforms contain interconnect (ICN) clocks which must be handed
->> correctly in order to obtain full functionality of a given IP.  In this
->> case, if the ICN clocks are not handled properly by the ST SDHCI driver
->> MMC will break and the following output can be observed:
+> On Wed, Sep 07, 2016 at 01:56:52PM +0200, Tomasz Nowicki wrote:
+>> IORT shows representation of IO topology for ARM based systems.
+>> It describes how various components are connected together on
+>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+>> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
 >>
->>     [   13.916949] mmc0: Timeout waiting for hardware interrupt.
->>     [   13.922349] sdhci: =========== REGISTER DUMP (mmc0)===========
->>     [   13.928175] sdhci: Sys addr: 0x00000000 | Version:  0x00001002
->>     [   13.933999] sdhci: Blk size: 0x00007040 | Blk cnt:  0x00000001
->>     [   13.939825] sdhci: Argument: 0x00fffff0 | Trn mode: 0x00000013
->>     [   13.945650] sdhci: Present:  0x1fff0206 | Host ctl: 0x00000011
->>     [   13.951475] sdhci: Power:    0x0000000f | Blk gap:  0x00000080
->>     [   13.957300] sdhci: Wake-up:  0x00000000 | Clock:    0x00003f07
->>     [   13.963126] sdhci: Timeout:  0x00000004 | Int stat: 0x00000000
->>     [   13.968952] sdhci: Int enab: 0x02ff008b | Sig enab: 0x02ff008b
->>     [   13.974777] sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
->>     [   13.980602] sdhci: Caps:     0x21ed3281 | Caps_1:   0x00000000
->>     [   13.986428] sdhci: Cmd:      0x0000063a | Max curr: 0x00000000
->>     [   13.992252] sdhci: Host ctl2: 0x00000000
->>     [   13.996166] sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x7c048200
->>     [   14.001990] sdhci: ===========================================
->>     [   14.009802] mmc0: Got data interrupt 0x02000000 even though no data operation was in progress.
+>> Initial support allows to detect IORT table presence and save its
+>> root pointer obtained through acpi_get_table(). The pointer validity
+>> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+>> is not set while using IORT nodes we would dereference unmapped pointers.
 >>
->> A decent point was raised about minimising the use of a local variable that
->> we 'could' do without.  I've chosen consistency over the possibility of
->> reducing the local variable count by 1.  Thinking that it's more important
->> for the code to be grouped and authoured in a similar manner/style for
->> greater maintainability/readability.
+>> For the aforementioned reason call iort_table_detect() from acpi_init()
+>> which guarantees acpi_gbl_permanent_mmap to be set at that point.
 >>
->> Cc: stable at vger.kernel.org
->> Tested-by: Peter Griffin <peter.griffin@linaro.org>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-Thanks, applied for fixes!
-
-Adrian, please tell if you have any objections else I intend to send
-this for the rcs later this week.
-
-Kind regards
-Uffe
-
+>> Add generic helpers which are helpful for scanning and retrieving
+>> information from IORT table content. List of the most important helpers:
+>> - iort_find_dev_node() finds IORT node for a given device
+>> - iort_node_map_rid() maps device RID and returns IORT node which provides
+>>   final translation
+>>
+>> IORT support is placed under drivers/acpi/arm64/ new directory due to its
+>> ARM64 specific nature. The code there is considered only for ARM64.
+>> The long term plan is to keep all ARM64 specific tables support
+>> in this place e.g. GTDT table.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 >> ---
->>  drivers/mmc/host/sdhci-st.c | 15 ++++++++++++++-
->>  1 file changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
->> index c95ba83..ed92ce7 100644
->> --- a/drivers/mmc/host/sdhci-st.c
->> +++ b/drivers/mmc/host/sdhci-st.c
->> @@ -28,6 +28,7 @@
->>
->>  struct st_mmc_platform_data {
->>       struct  reset_control *rstc;
->> +     struct  clk *icnclk;
->>       void __iomem *top_ioaddr;
->>  };
->>
->> @@ -353,7 +354,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
->>       struct sdhci_host *host;
->>       struct st_mmc_platform_data *pdata;
->>       struct sdhci_pltfm_host *pltfm_host;
->> -     struct clk *clk;
->> +     struct clk *clk, *icnclk;
->>       int ret = 0;
->>       u16 host_version;
->>       struct resource *res;
->> @@ -365,6 +366,11 @@ static int sdhci_st_probe(struct platform_device *pdev)
->>               return PTR_ERR(clk);
->>       }
->>
->> +     /* ICN clock isn't compulsory, but use it if it's provided. */
->> +     icnclk = devm_clk_get(&pdev->dev, "icn");
->> +     if (IS_ERR(icnclk))
->> +             icnclk = NULL;
->> +
->>       rstc = devm_reset_control_get(&pdev->dev, NULL);
->>       if (IS_ERR(rstc))
->>               rstc = NULL;
->> @@ -389,6 +395,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
->>       }
->>
->>       clk_prepare_enable(clk);
->> +     clk_prepare_enable(icnclk);
->>
->>       /* Configure the FlashSS Top registers for setting eMMC TX/RX delay */
->>       res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->> @@ -400,6 +407,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
->>       }
->>
->>       pltfm_host->clk = clk;
->> +     pdata->icnclk = icnclk;
->>
->>       /* Configure the Arasan HC inside the flashSS */
->>       st_mmcss_cconfig(np, host);
->> @@ -422,6 +430,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
->>       return 0;
->>
->>  err_out:
->> +     clk_disable_unprepare(icnclk);
->>       clk_disable_unprepare(clk);
->>  err_of:
->>       sdhci_pltfm_free(pdev);
->> @@ -442,6 +451,8 @@ static int sdhci_st_remove(struct platform_device *pdev)
->>
->>       ret = sdhci_pltfm_unregister(pdev);
->>
->> +     clk_disable_unprepare(pdata->icnclk);
->> +
->>       if (rstc)
->>               reset_control_assert(rstc);
->>
->> @@ -462,6 +473,7 @@ static int sdhci_st_suspend(struct device *dev)
->>       if (pdata->rstc)
->>               reset_control_assert(pdata->rstc);
->>
->> +     clk_disable_unprepare(pdata->icnclk);
->>       clk_disable_unprepare(pltfm_host->clk);
->>  out:
->>       return ret;
->> @@ -475,6 +487,7 @@ static int sdhci_st_resume(struct device *dev)
->>       struct device_node *np = dev->of_node;
->>
->>       clk_prepare_enable(pltfm_host->clk);
->> +     clk_prepare_enable(pdata->icnclk);
->>
->>       if (pdata->rstc)
->>               reset_control_deassert(pdata->rstc);
 >
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> Apart from the minor commit logs oversights we consider these two
+> patches ready to go, please let us know if there is something you want
+> changed since we are at risk of missing yet another merge window.
+>
+> It is ARM64 specific code, we created and moved the code to its
+> ARM64 specific directory and we are happy to maintain it as such,
+> we need your ACK to get this done so if there is something you
+> want changed please let us know otherwise I would ask your ACK
+> on these two patches to give Marc a go-ahead for -next and
+> hopefully 4.9.
+
+Kindly reminder. Is there anything we need to do more about these 
+patches? Please let us know. Note this is the major thing for incoming 
+IORT more advance feature.
+
+Thanks,
+Tomasz
