@@ -1,88 +1,76 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 12 Sep 2016 15:47:44 +0300
-Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
-References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
- <20160908073748.GF8913@lukather>
- <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
-Message-ID: <1975640.ctuo4Obpao@avalon>
+From: fweimer@redhat.com (Florian Weimer)
+Date: Mon, 12 Sep 2016 14:49:20 +0200
+Subject: [RFC PATCH 0/5] arm64: Signal context expansion
+In-Reply-To: <20160912111749.GB3958@e103592.cambridge.arm.com>
+References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
+ <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
+ <20160909152047.GA3958@e103592.cambridge.arm.com>
+ <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
+ <20160912111749.GB3958@e103592.cambridge.arm.com>
+Message-ID: <1acabcd8-a259-4129-cee3-100401074c9d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 09/12/2016 01:17 PM, Dave Martin wrote:
 
-On Monday 12 Sep 2016 14:40:15 Linus Walleij wrote:
-> On Thu, Sep 8, 2016 at 9:37 AM, Maxime Ripard wrote:
-> > On Thu, Sep 08, 2016 at 12:46:14PM +0800, Chen-Yu Tsai wrote:
-> >> Also, I think we are needlessly using pin groups, 1 pin per group.
-> >> Can pinconf/pinctrl work without them? Would there be any harm
-> >> converting the sunxi driver to work directly with pins? This would
-> >> make it match generic pinconf parsing, and make it easier to get
-> >> both working together.
-> > 
-> > I think it comes from a requirement that you had to have groups at
-> > some point (I don't know if it's still the case), which is why we
-> > ended up with single-pin groups, because we can mux each pins entirely
-> > separately.
-> > 
-> > If it's not required anymore, then yes, it makes total sense to remove
-> > it.
-> 
-> The groups vs individual pins is an eternal debate that has
-> been going on since the inception of pinctrl.
-> 
-> If you see it from the point of the programmer, you may just see
-> a register for each pin and they seem all independent. This is
-> why pinctrl-single exist, and that driver is for this purpose: one
-> register per pin, software-wise independent.
-> 
-> HOWEVER it often turns out that while you can programmatically
-> and individually set pins to any function (and biasing etc), the
-> person designing the hardware was not thinking that you should
-> be able to do whatever you like, e.g. even if it is possible to
-> take two pins and use one of them for half an SPI bus and the
-> other for half an I2C bus, that doesn't mean that this is useful
-> or makes any kind of electronic sense, it just makes "software
-> sense".
-> 
-> So for a deeper understanding, several SoCs (amongst them
-> my own and Qualcomm etc) define groups that are not really
-> about software restrictions for what you can do with the pins, but
-> about usecase and electronic restrictions for what can be done
-> with the pins.
-> 
-> E.g. it makes *sense* to have a group for muxing I2C on two
-> pins, and not allow one of them to be muxed to I2C and the other
-> not, because it does not make electronic sense.
-> 
-> One-group-per-pin groups is usually coming from a failure or
-> inability to identify these electronically sound and usecase
-> oriented pingroups.
+>>> If the stack isn't large enough, we'll still have to SEGV the task
+>>> though.
+>>
+>> You could skip copying the data and not install a pointer to it in the
+>> existing signal context.
+>
+> We could, but then we'd corrupt the task state in sigreturn, since
+> we wouldn't have been able to save/restore part of the state.
 
-I'd argue that you would find out about lots of clever/insane use cases that 
-don't fit this model if you looked at all the hardware available out there, 
-especially non-phone devices. Your SPI example is a good one, I've seen SPI 
-being used in unidirectional mode only, with only MISO or MOSI mattering. In 
-that case the other pin could be used as a GPIO for a totally unrelated 
-purpose when the design is short on GPIOs or when GPIOs have been allocated 
-without any knowledge of the Linux pinctrl subsystem.
+Ah, I wasn't aware that the kernel doesn't have a copy of the state. 
+Could the kernel reserve space for it when sigaltstack is called?
 
-Looking at the sh-pfc driver, I wish the hardware had followed the pinctrl-
-single model. sh-pfc is a good example of how bloated a pinctrl driver can 
-become when there is no choice but model all the relationships betweens pins 
-and functions in C code.
+> The least-wrong thing I can think of to do is:
+>
+> * deprecate but continue to support the existing sigaltstack API/ABI
+> with today's {,MIN}SIGSTKSZ definitions
 
-> Some (like pinctrl-single) say they don't care, and wish to
-> see things as the world is just software and one register per
-> pin, removing those electric usecase restrictions, and only
-> keeping the muxing restrictions to e.g. the four different functions
-> that can be muxed on that pin, disregarding the bigger picture.
-> 
-> I don't know about this driver or the pins it manages,
-> I seldom have time or brains to dive in and review things
-> deeply enough :(
+There is also PTHREAD_STACK_MIN.  The glibc default for that (which is 
+overriden by some architectures) is 16 KiB.  It is also quite small; see 
+the sequence of events mentioned here:
 
--- 
-Regards,
+   <https://sourceware.org/bugzilla/show_bug.cgi?id=20249>
 
-Laurent Pinchart
+> * guarantee (as much as possible) that software using this ABI continues
+> to work (by saving/restoring only data that _must_ be saved/restored at
+> each signal, which may be small enough to fit)
+>
+> * providing a clean failure mode (fatal signal) when this proves
+> impossible at signal delivery/return time;
+>
+> * define a new interface for runtime-querying the required signal stack
+> size;
+>
+> * define a new syscall or new stack_t.ss_flags flags (say, SS_STRICT)
+> that permits the kernel to enforce a runtime-determined minimum greater
+> than MINSIGSTKSZ when calling sigaltstack().
+>
+>
+> Another option would be:
+>
+> * define a new interface for runtime-querying the required signal stack
+> size, and
+>
+> * support the current API/ABI, but make a call to sigaltstack() SEGV or
+> SIGILL the caller if it specifies ss_stack >= MINSIGSTKSZ but smaller
+> than the actual runtime minimum.
+>
+> (this would cause old software to break immediately in an obvious way on
+> new systems, forcing people to fix their software -- which they might or
+> might not actually bother to do).
+
+The second option looks a bit problematic from a support perspective.
+
+Do you think it would be possible to block access to hardware features 
+that cause signal stack bloat on a per-process basis?  Then we could 
+bump the kernel requirement enforced by sigaltstack directly for the 
+default, and define a compatibility personality that minimizes the 
+signal stack size for old applications.  (A way to query the required 
+alternative signal stack size would still come in handy, though.)
+
+Florian
