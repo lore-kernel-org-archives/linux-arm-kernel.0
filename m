@@ -1,204 +1,265 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 12 Sep 2016 12:07:05 +0530
-Subject: [PATCH V2] cpufreq: create link to policy only for registered CPUs
-In-Reply-To: <20160819110032.GM1041@n2100.armlinux.org.uk>
-References: <20160819110032.GM1041@n2100.armlinux.org.uk>
-Message-ID: <59daae7da84077fbf845b1aad2962933585f8e35.1473662181.git.viresh.kumar@linaro.org>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Mon, 12 Sep 2016 06:39:45 +0000
+Subject: [v11, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
+In-Reply-To: <1473392840.30217.170.camel@buserror.net>
+References: <1473150503-9550-1-git-send-email-yangbo.lu@nxp.com>
+ <1473150503-9550-6-git-send-email-yangbo.lu@nxp.com>
+ <1473392840.30217.170.camel@buserror.net>
+Message-ID: <HE1PR04MB08892D8354E38EC32F549E98F8FF0@HE1PR04MB0889.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a cpufreq driver is registered very early in the boot stage (e.g.
-registered from postcore_initcall()), then cpufreq core may generate
-kernel warnings for it.
+Hi Scott,
 
-In this case, the CPUs are brought online, then the cpufreq driver is
-registered, and then the CPU topology devices are registered. However,
-by the time cpufreq_add_dev() gets called, the cpu device isn't stored
-in the per-cpu variable (cpu_sys_devices,) which is read by
-get_cpu_device().
+Thanks for your review :)
+See my comment inline.
 
-So the cpufreq core fails to get device for the CPU, for which
-cpufreq_add_dev() was called in the first place and we will hit a
-WARN_ON(!cpu_dev).
+> -----Original Message-----
+> From: Scott Wood [mailto:oss at buserror.net]
+> Sent: Friday, September 09, 2016 11:47 AM
+> To: Y.B. Lu; linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Arnd
+> Bergmann
+> Cc: linuxppc-dev at lists.ozlabs.org; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
+> foundation.org; netdev at vger.kernel.org; Mark Rutland; Rob Herring;
+> Russell King; Jochen Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh
+> Sharma; Qiang Zhao; Kumar Gala; Santosh Shilimkar; Leo Li; X.B. Xie
+> Subject: Re: [v11, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
+> 
+> On Tue, 2016-09-06 at 16:28 +0800, Yangbo Lu wrote:
+> > The global utilities block controls power management, I/O device
+> > enabling, power-onreset(POR) configuration monitoring, alternate
+> > function selection for multiplexed signals,and clock control.
+> >
+> > This patch adds a driver to manage and access global utilities block.
+> > Initially only reading SVR and registering soc device are supported.
+> > Other guts accesses, such as reading RCW, should eventually be moved
+> > into this driver as well.
+> >
+> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> > Signed-off-by: Scott Wood <oss@buserror.net>
+> 
+> Don't put my signoff on patches that I didn't put it on
+> myself. ?Definitely don't put mine *after* yours on patches that were
+> last modified by you.
+> 
+> If you want to mention that the soc_id encoding was my suggestion, then
+> do so explicitly.
+> 
 
-Even if we reuse the 'dev' parameter passed to cpufreq_add_dev() to
-avoid that warning, there might be other CPUs online that share the
-policy with the cpu for which cpufreq_add_dev() is called. Eventually
-get_cpu_device() will return NULL for them as well, and we will hit the
-same WARN_ON() again.
+[Lu Yangbo-B47093] I found your 'signoff' on this patch at below link.
+http://patchwork.ozlabs.org/patch/649211/
 
-In order to fix these issues, change cpufreq core to create links to the
-policy for a cpu only when cpufreq_add_dev() is called for that CPU.
+So, let me just change the order in next version ?
+Signed-off-by: Scott Wood <oss@buserror.net>
+Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 
-Reuse the 'real_cpus' mask to track that as well.
+> > +/* SoC attribute definition for QorIQ platform */ static const struct
+> > +soc_device_attribute qoriq_soc[] = { #ifdef CONFIG_PPC
+> > +	/*
+> > +	?* Power Architecture-based SoCs T Series
+> > +	?*/
+> > +
+> > +	/* SoC: T1024/T1014/T1023/T1013 Rev: 1.0 */
+> > +	{ .soc_id	= "svr:0x85400010,name:T1024,die:T1024",
+> > +	??.revision	= "1.0",
+> > +	},
+> > +	{ .soc_id	= "svr:0x85480010,name:T1024E,die:T1024",
+> > +	??.revision	= "1.0",
+> > +	},
+> 
+> Revision could be computed from the low 8 bits of SVR (just as you do for
+> unknown SVRs).
+>
+ 
+[Lu Yangbo-B47093] Yes, you're right. Will remove it here.
 
-Note that cpufreq_remove_dev() already handles removal of the links for
-individual CPUs and cpufreq_add_dev() has aligned with that now.
+> We could move the die name into .family:
+> 
+> 	{
+> 		.soc_id = "svr:0x85490010,name:T1023E,",
+> 		.family = "QorIQ T1024",
+> 	}
+> 
+> I see you dropped svre (and the trailing comma), though I guess the vast
+> majority of potential users will be looking at .family. ?In which case do
+> we even need name? ?If we just make the soc_id be "svr:0xnnnnnnnn" then
+> we could shrink the table to an svr+mask that identifies each die. ?I'd
+> still want to keep the "svr:" even if we're giving up on the general
+> tagging system, to make it clear what the number refers to, and to
+> provide some defense against users who match only against soc_id rather
+> than soc_id+family. ?Or we could go further and format soc_id as "QorIQ
+> SVR 0xnnnnnnnn" so that soc_id-only matches are fully acceptable rather
+> than just less dangerous.
 
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
-V1->V2:
-- Updated changelog based on suggestions from Russell
-- Tested by from Russell
+[Lu Yangbo-B47093] It's a good idea to move die into .family I think.
+In my opinion, it's better to keep svr and name in soc_id just like your suggestion above.
+> 	{
+> 		.soc_id = "svr:0x85490010,name:T1023E,",
+> 		.family = "QorIQ T1024",
+> 	}
+The user probably don?t like to learn the svr value. What they want is just to match the soc they use.
+It's convenient to use name+rev for them to match a soc.
 
- drivers/cpufreq/cpufreq.c | 89 +++++++++++++++--------------------------------
- 1 file changed, 28 insertions(+), 61 deletions(-)
+Regarding shrinking the table, I think it's hard to use svr+mask. Because I find many platforms use different masks.
+We couldn?t know the mask according svr value.
 
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index 13fb589b6d2c..3a64136bf21b 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -916,58 +916,18 @@ static struct kobj_type ktype_cpufreq = {
- 	.release	= cpufreq_sysfs_release,
- };
+> 
+> > +static const struct soc_device_attribute *fsl_soc_device_match(
+> > +	unsigned int svr, const struct soc_device_attribute *matches) {
+> > +	char svr_match[50];
+> > +	int n;
+> > +
+> > +	n = sprintf(svr_match, "*%08x*", svr);
+> 
+> n = sprintf(svr_match, "svr:0x%08x,*", svr);
+> 
+> (according to the current encoding)
+> 
+
+[Lu Yangbo-B47093] Ok. Will do that.
+
+> > +
+> > +	do {
+> > +		if (!matches->soc_id)
+> > +			return NULL;
+> > +		if (glob_match(svr_match, matches->soc_id))
+> > +			break;
+> > +	} while (matches++);
+> 
+> Are you expecting "matches++" to ever evaluate as false?
+
+[Lu Yangbo-B47093] Yes, this is used to match the soc we use in qoriq_soc array until getting true. 
+We need to get the name and die information defined in array.
+
+> 
+> > +	/* Register soc device */
+> > +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+> > +	if (!soc_dev_attr) {
+> > +		ret = -ENOMEM;
+> > +		goto out_unmap;
+> > +	}
+> 
+> Couldn't this be statically allocated?
+
+[Lu Yangbo-B47093] Do you mean we define this struct statically ?
+
+static struct soc_device_attribute soc_dev_attr;
+
+> 
+> > +
+> > +	machine = of_flat_dt_get_machine_name();
+> > +	if (machine)
+> > +		soc_dev_attr->machine = kasprintf(GFP_KERNEL, "%s",
+> > machine);
+> > +
+> > +	soc_dev_attr->family = kasprintf(GFP_KERNEL, "QorIQ");
+> > +
+> > +	svr = fsl_guts_get_svr();
+> > +	fsl_soc = fsl_soc_device_match(svr, qoriq_soc);
+> > +	if (fsl_soc) {
+> > +		soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%s",
+> > +						?fsl_soc->soc_id);
+> 
+> You can use kstrdup() if you're just copying the string as is.
+
+[Lu Yangbo-B47093] Ok. Will do that.
+
+> 
+> > +		soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%s",
+> > +						???fsl_soc->revision);
+> > +	} else {
+> > +		soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "0x%08x",
+> > svr);
+> 
+> 	kasprintf(GFP_KERNEL, "svr:0x%08x,", svr);
+
+[Lu Yangbo-B47093] Sorry, will add that.
+
+> 
+> 
+> > +
+> > +	soc_dev = soc_device_register(soc_dev_attr);
+> > +	if (IS_ERR(soc_dev)) {
+> > +		ret = -ENODEV;
+> 
+> Why are you changing the error code?
+
+[Lu Yangbo-B47093] What error code should we use ? :)
+
+> 
+> > +		goto out;
+> > +	} else {
+> 
+> Unnecessary "else".
+
+[Lu Yangbo-B47093] Oh.. Correct!
+
+> 
+> > +		pr_info("Detected: %s\n", soc_dev_attr->machine);
+> 
+> Machine: %s
+
+[Lu Yangbo-B47093] Ok. Will do that.
+
+> 
+> > +		pr_info("Detected SoC family: %s\n", soc_dev_attr->family);
+> > +		pr_info("Detected SoC ID: %s, revision: %s\n",
+> > +			soc_dev_attr->soc_id, soc_dev_attr->revision);
+> 
+> s/Detected //g
+
+[Lu Yangbo-B47093] Ok, will do that.
+
+> 
+> 
+> > +	}
+> > +	return 0;
+> > +out:
+> > +	kfree(soc_dev_attr->machine);
+> > +	kfree(soc_dev_attr->family);
+> > +	kfree(soc_dev_attr->soc_id);
+> > +	kfree(soc_dev_attr->revision);
+> > +	kfree(soc_dev_attr);
+> > +out_unmap:
+> > +	iounmap(guts->regs);
+> > +out_free:
+> > +	kfree(guts);
+> 
+> devm
+
+[Lu Yangbo-B47093] What's the devm meaning here :)
  
--static int add_cpu_dev_symlink(struct cpufreq_policy *policy, int cpu)
-+static int add_cpu_dev_symlink(struct cpufreq_policy *policy,
-+			       struct device *dev)
- {
--	struct device *cpu_dev;
--
--	pr_debug("%s: Adding symlink for CPU: %u\n", __func__, cpu);
--
--	if (!policy)
--		return 0;
--
--	cpu_dev = get_cpu_device(cpu);
--	if (WARN_ON(!cpu_dev))
--		return 0;
--
--	return sysfs_create_link(&cpu_dev->kobj, &policy->kobj, "cpufreq");
-+	dev_dbg(dev, "%s: Adding symlink\n", __func__);
-+	return sysfs_create_link(&dev->kobj, &policy->kobj, "cpufreq");
- }
- 
--static void remove_cpu_dev_symlink(struct cpufreq_policy *policy, int cpu)
-+static void remove_cpu_dev_symlink(struct cpufreq_policy *policy,
-+				   struct device *dev)
- {
--	struct device *cpu_dev;
--
--	pr_debug("%s: Removing symlink for CPU: %u\n", __func__, cpu);
--
--	cpu_dev = get_cpu_device(cpu);
--	if (WARN_ON(!cpu_dev))
--		return;
--
--	sysfs_remove_link(&cpu_dev->kobj, "cpufreq");
--}
--
--/* Add/remove symlinks for all related CPUs */
--static int cpufreq_add_dev_symlink(struct cpufreq_policy *policy)
--{
--	unsigned int j;
--	int ret = 0;
--
--	/* Some related CPUs might not be present (physically hotplugged) */
--	for_each_cpu(j, policy->real_cpus) {
--		ret = add_cpu_dev_symlink(policy, j);
--		if (ret)
--			break;
--	}
--
--	return ret;
--}
--
--static void cpufreq_remove_dev_symlink(struct cpufreq_policy *policy)
--{
--	unsigned int j;
--
--	/* Some related CPUs might not be present (physically hotplugged) */
--	for_each_cpu(j, policy->real_cpus)
--		remove_cpu_dev_symlink(policy, j);
-+	dev_dbg(dev, "%s: Removing symlink\n", __func__);
-+	sysfs_remove_link(&dev->kobj, "cpufreq");
- }
- 
- static int cpufreq_add_dev_interface(struct cpufreq_policy *policy)
-@@ -999,7 +959,7 @@ static int cpufreq_add_dev_interface(struct cpufreq_policy *policy)
- 			return ret;
- 	}
- 
--	return cpufreq_add_dev_symlink(policy);
-+	return 0;
- }
- 
- __weak struct cpufreq_governor *cpufreq_default_governor(void)
-@@ -1129,7 +1089,6 @@ static void cpufreq_policy_put_kobj(struct cpufreq_policy *policy, bool notify)
- 
- 	down_write(&policy->rwsem);
- 	cpufreq_stats_free_table(policy);
--	cpufreq_remove_dev_symlink(policy);
- 	kobj = &policy->kobj;
- 	cmp = &policy->kobj_unregister;
- 	up_write(&policy->rwsem);
-@@ -1211,8 +1170,8 @@ static int cpufreq_online(unsigned int cpu)
- 	if (new_policy) {
- 		/* related_cpus should at least include policy->cpus. */
- 		cpumask_copy(policy->related_cpus, policy->cpus);
--		/* Remember CPUs present at the policy creation time. */
--		cpumask_and(policy->real_cpus, policy->cpus, cpu_present_mask);
-+		/* Clear mask of registered CPUs */
-+		cpumask_clear(policy->real_cpus);
- 	}
- 
- 	/*
-@@ -1327,6 +1286,8 @@ static int cpufreq_online(unsigned int cpu)
- 	return ret;
- }
- 
-+static void cpufreq_offline(unsigned int cpu);
-+
- /**
-  * cpufreq_add_dev - the cpufreq interface for a CPU device.
-  * @dev: CPU device.
-@@ -1336,22 +1297,28 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
- {
- 	struct cpufreq_policy *policy;
- 	unsigned cpu = dev->id;
-+	int ret;
- 
- 	dev_dbg(dev, "%s: adding CPU%u\n", __func__, cpu);
- 
--	if (cpu_online(cpu))
--		return cpufreq_online(cpu);
-+	if (cpu_online(cpu)) {
-+		ret = cpufreq_online(cpu);
-+		if (ret)
-+			return ret;
-+	}
- 
--	/*
--	 * A hotplug notifier will follow and we will handle it as CPU online
--	 * then.  For now, just create the sysfs link, unless there is no policy
--	 * or the link is already present.
--	 */
-+	/* Create sysfs link on CPU registration */
- 	policy = per_cpu(cpufreq_cpu_data, cpu);
- 	if (!policy || cpumask_test_and_set_cpu(cpu, policy->real_cpus))
- 		return 0;
- 
--	return add_cpu_dev_symlink(policy, cpu);
-+	ret = add_cpu_dev_symlink(policy, dev);
-+	if (ret) {
-+		cpumask_clear_cpu(cpu, policy->real_cpus);
-+		cpufreq_offline(cpu);
-+	}
-+
-+	return ret;
- }
- 
- static void cpufreq_offline(unsigned int cpu)
-@@ -1432,7 +1399,7 @@ static void cpufreq_remove_dev(struct device *dev, struct subsys_interface *sif)
- 		cpufreq_offline(cpu);
- 
- 	cpumask_clear_cpu(cpu, policy->real_cpus);
--	remove_cpu_dev_symlink(policy, cpu);
-+	remove_cpu_dev_symlink(policy, dev);
- 
- 	if (cpumask_empty(policy->real_cpus))
- 		cpufreq_policy_free(policy, true);
--- 
-2.7.1.410.g6faf27b
+> 
+> > +static int fsl_guts_remove(struct platform_device *dev) {
+> > +	kfree(soc_dev_attr->machine);
+> > +	kfree(soc_dev_attr->family);
+> > +	kfree(soc_dev_attr->soc_id);
+> > +	kfree(soc_dev_attr->revision);
+> > +	kfree(soc_dev_attr);
+> > +	soc_device_unregister(soc_dev);
+> > +	iounmap(guts->regs);
+> > +	kfree(guts);
+> > +	return 0;
+> > +}
+> 
+> Don't free the memory before you unregister the device that uses it (moot
+> if you use devm).
+
+[Lu Yangbo-B47093] The soc.c driver mentions that.
+Ensure soc_dev->attr is freed prior to calling soc_device_unregister.
+
+> 
+> >
+> > +#ifdef CONFIG_FSL_GUTS
+> > +unsigned int fsl_guts_get_svr(void);
+> > +#endif
+> 
+> Don't ifdef prototypes (unless you're going to provide a stub
+> alternative).
+
+[Lu Yangbo-B47093] Ok, will remove ifdef.
+
+> 
+> -Scott
