@@ -1,123 +1,132 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Mon, 12 Sep 2016 17:22:30 -0500
-Subject: [PATCH v7] i2c: imx: make bus recovery through pinctrl optional
-Message-ID: <1473718950-6667-1-git-send-email-leoyang.li@nxp.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 12 Sep 2016 15:28:52 -0700
+Subject: [PATCH 4/5] ARM: dts: exynos: add support for ISP power domain
+ to exynos4x12 clocks device
+In-Reply-To: <f340cca5-6cd6-6bd1-3b9a-ccd58cbc0091@samsung.com>
+References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
+ <1472737551-15272-5-git-send-email-m.szyprowski@samsung.com>
+ <20160908002254.GD13062@codeaurora.org>
+ <CGME20160912102332eucas1p145e79669788329b44343da62dcbe50ca@eucas1p1.samsung.com>
+ <f340cca5-6cd6-6bd1-3b9a-ccd58cbc0091@samsung.com>
+Message-ID: <20160912222852.GH7243@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 1c4b6c3bcf30 ("i2c: imx: implement bus recovery") the
-driver starts to use gpio/pinctrl to support optional bus recovery
-feature.  But pinctrl is not always usable.  There are platforms such
-as ls1021a and ls1043a that don't support pinctrl, and it could just
-be broken due to old/broken device tree.  The patch makes it really
-optional that the probe function won't bailout on pinctrl problems
-instead it just disables bus recovery and prints out notification when
-there is problem with pinctrl.  Since pinctrl is only used by bus
-recovery in this driver, move pinctrl initialization into bus recovery
-init function to prevent confusion.
+On 09/12, Marek Szyprowski wrote:
+> Hi Stephen,
+> 
+> 
+> On 2016-09-08 02:22, Stephen Boyd wrote:
+> >On 09/01, Marek Szyprowski wrote:
+> >>Exynos4412 clock controller contains some additional clocks for FIMC-ISP
+> >>(Camera ISP) subsystem. Registers for those clocks are partially located
+> >>in the SOC area, which belongs to ISP power domain.
+> >>
+> >>This patch extends clock controller node with ISP clock sub-node and link
+> >>(phandle) to ISP power domain.
+> >>
+> >>Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >>---
+> >>  arch/arm/boot/dts/exynos4x12.dtsi | 5 +++++
+> >>  1 file changed, 5 insertions(+)
+> >>
+> >>diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+> >>index 3394bdcf10ae..4daea67546b9 100644
+> >>--- a/arch/arm/boot/dts/exynos4x12.dtsi
+> >>+++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> >>@@ -74,6 +74,11 @@
+> >>  		compatible = "samsung,exynos4412-clock";
+> >>  		reg = <0x10030000 0x20000>;
+> >>  		#clock-cells = <1>;
+> >>+
+> >>+		isp-clock-controller {
+> >>+			compatible = "samsung,exynos4412-isp-clock";
+> >>+			power-domains = <&pd_isp>;
+> >>+		};
+> >Why can't we extend support in power domains code to have
+> >multiple domains for a single device node? i.e. power-domains =
+> ><&pd_isp>, <&pd_foo>, <&pd_bar>, and then pick the right one with
+> >power-domain-names or something like that? Making a subnode
+> >(which seems to turn into a child platform device?) seems like a
+> >quick solution for larger problems.
+> 
+> The larger problem here is the fact that clock controller is
+> partially located
+> in different power areas of SoC. Majority of the clock controllers
+> is located
+> in the area which is typically always powered (besides system sleep case),
+> while a few Camera ISP registers are located in the ISP block, which have
+> separate power domain. Having a separate nodes for sub-parts of the
+> device is
+> rather common approach, already practices by some more complex devices.
+> 
+> I see some serious design problems with multiple entries in power domains
+> property. First how to show that some part of the device IS NOT in
+> any domain?
 
-Signed-off-by: Li Yang <leoyang.li@nxp.com>
-Cc: Gao Pan <pandy.gao@nxp.com>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
-v7:
-Move pinctrl init into the i2c_imx_init_recovery_info()
-Update commit message and code comment
+Is that even possible? Every device should be in some power
+domain, even if it's just an "always on" power domain that we
+don't really control from software.
 
-v6:
-Update code comment
+> The question is how the automated assignment to domains would be handled for
+> such case?
 
-v5:
-Revert the last minute change of recovery info initialization timing, it
-will cause problem if initialized after i2c_add_numbered_adapter()
+I don't get this part. Do you mean how we indicate to the driver
+which power domain to use at the right time?
 
-v4:
-Remove the use of IS_ERR_OR_NULL
-Move the condition judgement to i2c_imx_init_recovery_info()
-Change the timing of recovery initialization to be after bus registration
+> 
+> The second is related to Linux kernel internals. Right now device
+> drivers are
+> not aware of the power domains - there are no direct calls to power domains
+> code, everything is hidden behind runtime pm which does all the hard work.
 
-v3:
-Rebased to Wolfram's for-next branch
-Added acked-by from Linus Walleij
-Update to use new nxp email addresses due to company merge
+Right. Runtime PM will need to be improved to allow this case.
 
- drivers/i2c/busses/i2c-imx.c | 31 ++++++++++++++++++++++---------
- 1 file changed, 22 insertions(+), 9 deletions(-)
+> 
+> Similar situation is on Exynos 542x/5800, which will look more or less like
+> this:
+> 
+>         clock: clock-controller at 10010000 {
+>              compatible = "samsung,exynos5420-clock";
+>              reg = <0x10010000 0x30000>;
+>              #clock-cells = <1>;
+> +
+> +            gsc-clock-controller {
+> +                 compatible = "samsung,exynos5420-gsc-clock";
+> +                 power-domains = <&gsc_pd>;
+> +            };
+> +
+> +            isp-clock-controller {
+> +                 compatible = "samsung,exynos5420-isp-clock";
+> +                 power-domains = <&isp_pd>;
+> +            };
+> +
+> +            mfc-clock-controller {
+> +                 compatible = "samsung,exynos5420-mfc-clock";
+> +                 power-domains = <&mfc_pd>;
+> +            };
+> +
+> +            msc-clock-controller {
+> +                 compatible = "samsung,exynos5420-msc-clock";
+> +                 power-domains = <&msc_pd>;
+> +            };
+> +
+> +            disp-clock-controller {
+> +                 compatible = "samsung,exynos5420-disp-clock";
+> +                 power-domains = <&disp_pd>;
+> +            };
+>          };
+> 
+> The patch is not yet ready, so I didn't include it in this patchset.
 
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 1844bc9..54ce9c1 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -984,11 +984,24 @@ static void i2c_imx_unprepare_recovery(struct i2c_adapter *adap)
- 	pinctrl_select_state(i2c_imx->pinctrl, i2c_imx->pinctrl_pins_default);
- }
- 
--static void i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
-+/*
-+ * We switch SCL and SDA to their GPIO function and do some bitbanging
-+ * for bus recovery. These alternative pinmux settings can be
-+ * described in the device tree by a separate pinctrl state "gpio". If
-+ * this is missing this is not a big problem, the only implication is
-+ * that we can't do bus recovery.
-+ */
-+static int i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
- 		struct platform_device *pdev)
- {
- 	struct i2c_bus_recovery_info *rinfo = &i2c_imx->rinfo;
- 
-+	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
-+	if (!i2c_imx->pinctrl || IS_ERR(i2c_imx->pinctrl)) {
-+		dev_info(&pdev->dev, "can't get pinctrl, bus recovery not supported\n");
-+		return PTR_ERR(i2c_imx->pinctrl);
-+	}
-+
- 	i2c_imx->pinctrl_pins_default = pinctrl_lookup_state(i2c_imx->pinctrl,
- 			PINCTRL_STATE_DEFAULT);
- 	i2c_imx->pinctrl_pins_gpio = pinctrl_lookup_state(i2c_imx->pinctrl,
-@@ -1001,7 +1014,7 @@ static void i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
- 	    IS_ERR(i2c_imx->pinctrl_pins_default) ||
- 	    IS_ERR(i2c_imx->pinctrl_pins_gpio)) {
- 		dev_dbg(&pdev->dev, "recovery information incomplete\n");
--		return;
-+		return 0;
- 	}
- 
- 	dev_dbg(&pdev->dev, "using scl-gpio %d and sda-gpio %d for recovery\n",
-@@ -1011,6 +1024,8 @@ static void i2c_imx_init_recovery_info(struct imx_i2c_struct *i2c_imx,
- 	rinfo->unprepare_recovery = i2c_imx_unprepare_recovery;
- 	rinfo->recover_bus = i2c_generic_gpio_recovery;
- 	i2c_imx->adapter.bus_recovery_info = rinfo;
-+
-+	return 0;
- }
- 
- static u32 i2c_imx_func(struct i2c_adapter *adapter)
-@@ -1081,12 +1096,6 @@ static int i2c_imx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
--	if (IS_ERR(i2c_imx->pinctrl)) {
--		ret = PTR_ERR(i2c_imx->pinctrl);
--		goto clk_disable;
--	}
--
- 	/* Request IRQ */
- 	ret = devm_request_irq(&pdev->dev, irq, i2c_imx_isr, 0,
- 				pdev->name, i2c_imx);
-@@ -1125,7 +1134,11 @@ static int i2c_imx_probe(struct platform_device *pdev)
- 			i2c_imx, IMX_I2C_I2CR);
- 	imx_i2c_write_reg(i2c_imx->hwdata->i2sr_clr_opcode, i2c_imx, IMX_I2C_I2SR);
- 
--	i2c_imx_init_recovery_info(i2c_imx, pdev);
-+	/* Init optional bus recovery function */
-+	ret = i2c_imx_init_recovery_info(i2c_imx, pdev);
-+	/* Give it another chance if pinctrl used is not ready yet */
-+	if (ret == -EPROBE_DEFER)
-+		goto rpm_disable;
- 
- 	/* Add I2C adapter */
- 	ret = i2c_add_numbered_adapter(&i2c_imx->adapter);
+Ok. From a DT perspective the sub-nodes seem to be a workaround
+for how the linux device model is mapped to power domains. I'm
+not sure we want to make subnodes in the clk controller just to
+make sub devices that we can target from the clk registration
+path. Those sub nodes aren't devices at all. I understand why
+it's being done this way, I just don't see how it fits into DT
+design methodologies.
+
 -- 
-1.9.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
