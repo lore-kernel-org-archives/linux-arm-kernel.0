@@ -1,137 +1,31 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon, 12 Sep 2016 13:08:42 +0200
-Subject: [PATCH v5 2/3] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <20160912095923.GD1873@dell>
-References: <1473344917-1524-1-git-send-email-quentin.schulz@free-electrons.com>
- <1473344917-1524-3-git-send-email-quentin.schulz@free-electrons.com>
- <20160912091829.GB1873@dell>
- <93bd339b-85ab-d0fc-5e80-e2aca290c0d7@free-electrons.com>
- <20160912095923.GD1873@dell>
-Message-ID: <5dec118f-45ae-4fb6-dd1e-2028947add53@free-electrons.com>
+From: m.niestroj@grinn-global.com (Marcin Niestroj)
+Date: Mon, 12 Sep 2016 13:16:49 +0200
+Subject: [PATCH 1/2] ARM: dts: imx6ul: Add DTS for liteSOM module
+In-Reply-To: <CAOMZO5Cp_ihOa9Z1r5_NiDqiGB+ZfpUn4n5xG95DMA27T=WX0A@mail.gmail.com>
+References: <20160909103906.15209-1-m.niestroj@grinn-global.com>
+ <CAOMZO5AmXRs9eqzvOc8WOVc_xzZJFN8DOoOddw22WALqU66u6w@mail.gmail.com>
+ <de2e41be-ad69-ce4b-57fe-3215bc9811ad@grinn-global.com>
+ <CAOMZO5Cp_ihOa9Z1r5_NiDqiGB+ZfpUn4n5xG95DMA27T=WX0A@mail.gmail.com>
+Message-ID: <b9766440-d35d-b931-2883-3dcc11425337@grinn-global.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 12.09.2016 12:36, Fabio Estevam wrote:
+> On Mon, Sep 12, 2016 at 5:34 AM, Marcin Niestroj
+> <m.niestroj@grinn-global.com> wrote:
+>
+>>> Is it possible to use a dual GPLv2/X11 license?
+>>
+>> It is possible. But why should we do that?
+>
+> So that non-Linux users could reuse the dts. There are many dual
+> licence examples in arch/arm/boot/dts.
+
+We are including imx6ul.dtsi which is GPLv2 only. Do you plan to
+relicense it?
+
+What do you mean by non-Linux users? What other projects are using dts?
 
 
-On 12/09/2016 11:59, Lee Jones wrote:
-> On Mon, 12 Sep 2016, Quentin Schulz wrote:
-> 
->> On 12/09/2016 11:18, Lee Jones wrote:
->>> On Thu, 08 Sep 2016, Quentin Schulz wrote:
->>>
->> [...]
-> 
-> [...]
-> 
->>>> +++ b/drivers/mfd/sun4i-gpadc-mfd.c
-> 
-> [...]
-> 
->>>> +static struct mfd_cell sun4i_gpadc_mfd_cells[] = {
->>>> +	{
->>>> +		.name	= "sun4i-a10-gpadc-iio",
->>>> +		.resources = adc_resources,
->>>> +		.num_resources = ARRAY_SIZE(adc_resources),
->>>> +	}, {
->>>> +		.name = "iio_hwmon",
->>>> +	}
->>>
->>> Single line please
->>>
->>> { .name = "iio_hwmon" }
->>>
->>
->> +	{
->> +		.name	= "sun4i-a10-gpadc-iio",
->> +		.resources = adc_resources,
->> +		.num_resources = ARRAY_SIZE(adc_resources),
->> +	}, { .name = "iio_hwmon" }
->>
->> or
->>
->> +	{
->> +		.name	= "sun4i-a10-gpadc-iio",
->> +		.resources = adc_resources,
->> +		.num_resources = ARRAY_SIZE(adc_resources),
->> +	},
->> +	{ .name = "iio_hwmon" }
->>
->> ?
-> 
-> The latter.
-> 
-> [...]
-> 
->>>> +static const struct of_device_id sun4i_gpadc_mfd_of_match[] = {
->>>> +	{
->>>> +		.compatible = "allwinner,sun4i-a10-ts",
->>>> +		.data = &sun4i_gpadc_mfd_cells,
->>>> +	}, {
->>>> +		.compatible = "allwinner,sun5i-a13-ts",
->>>> +		.data = &sun5i_gpadc_mfd_cells,
->>>> +	}, {
->>>> +		.compatible = "allwinner,sun6i-a31-ts",
->>>> +		.data = &sun6i_gpadc_mfd_cells,
->>>> +	}, { /* sentinel */ }
->>>> +};
->>>
->>> Don't mix OF and MFD functionality.
->>>
->>> Why don't you create a node for "iio_hwmon" and have
->>> platform_of_populate() do your bidding?
->>>
->>
->> We are using a stable binding which we cannot modify. This means, the DT
->> in its current state can only be modified to add features, which is not
->> the case of this driver (it is a rewriting of an existing driver which
->> uses the rtp node).
-> 
-> Then use .data = <defined model ID> and set up a switch() in .probe().
-> 
->>>> +static int sun4i_gpadc_mfd_probe(struct platform_device *pdev)
->>>
->>> Remove all mention of "mfd" from this file.
->>>
->>> (Accept the calls to the MFD API of course).
->>>
->> [...]
->>>> +
->>>> +MODULE_DEVICE_TABLE(of, sun4i_gpadc_mfd_of_match);
->>>
->>> Place this directly under the table.
->>>
->>>> +static struct platform_driver sun4i_gpadc_mfd_driver = {
->>>> +	.driver = {
->>>> +		.name = "sun4i-adc-mfd",
->>>> +		.of_match_table = of_match_ptr(sun4i_gpadc_mfd_of_match),
->>>> +	},
->>>> +	.probe = sun4i_gpadc_mfd_probe,
->>>
->>> No .remove?
->>>
->>
->> No, everything in probe is handled with devm functions.
-> 
-> Don't you need to undo the register write you did?
-> 
-
-The regmap_write I use is there to disable all interrupts on hardware
-side before the irq_chip handles all interrupts by itself. The
-interrupts are not used in the MFD driver.
-
-Thus, I chose to disable the hardware interrupts in the remove function
-of drivers using the interrupts (only the IIO yet but the touchscreen
-driver later also which will be using a third interrupt). When the MFD
-driver is removed, the MFD cells will all be removed, thus calling their
-own remove functions, thus disabling hardware interrupts used in each
-driver. So the hardware interrupts disabling would be called twice.
-
-Quentin
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160912/4f94c3f0/attachment.sig>
+-- 
+Marcin Niestroj
