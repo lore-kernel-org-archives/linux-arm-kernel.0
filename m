@@ -1,117 +1,105 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 12 Sep 2016 17:21:38 -0500
-Subject: [PATCH 1/6] PCI: xilinx: Keep both legacy and MSI interrupt
- references.
-In-Reply-To: <1472724886-28301-1-git-send-email-bharatku@xilinx.com>
-References: <1472724886-28301-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <20160912222138.GK23532@localhost>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 12 Sep 2016 16:22:40 -0600
+Subject: [PATCH v2 00/17] Make rpmsg a framework
+In-Reply-To: <20160912165233.GB21885@linaro.org>
+References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
+ <20160912165233.GB21885@linaro.org>
+Message-ID: <20160912222240.GA28944@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 03:44:41PM +0530, Bharat Kumar Gogada wrote:
-> When built with MSI support the legacy domain reference is being
-> overwritten with MSI.
-> Instead creating two separate domains for MSI and legacy interrupts.
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+On Mon, Sep 12 2016 at 10:52 -0600, Lina Iyer wrote:
+>Hi Bjorn,
+>
+>On Thu, Sep 01 2016 at 16:28 -0600, Bjorn Andersson wrote:
+>>This series splits the virtio rpmsg bus driver into a rpmsg bus and a virtio
+>>backend/wireformat.
+>>
+>>
+>>As we discussed the Qualcomm SMD implementation a couple of years back people
+>>suggested that I should make it "a rpmsg thingie". With the introduction of the
+>>Qualcomm 8996 platform, we must support a variant of the communication
+>>mechanism that share many of the characteristics of SMD, but are different
+>>enough that it can't be done in a single implementation. As such there is
+>>enough benefit to do the necessary work and being able to make SMD a "rpmsg
+>>thingie".
+>>
+>>On-top of this series I have patches to switch the current smd clients over to
+>>rpmsg (and by that drop the existing SMD implementation).
+>>
+>>All this allows me to implement the new backend and reuse all existing SMD
+>>drivers with the new mechanism.
+>>
+>
+>RPM Communication has to supported even when IRQs are disabled. The most
+>important use of this communication is to set the wake up time for the
+>CPU subsystem when all the CPUs are powered off. In addition to that,
+>"sleep" votes that are sent by the application processor subsystem to
+>allow system to go into deep sleep modes can only be triggered when the
+>CPU PM domains are power collapsed, drivers do not have a knowledge of
+>when that happens. This has to be done by a platform code that registers
+>for CPU PM domain power_off/on callbacks.
+>
+Ok, my bad. These two cases are not critical for the SoC supported by
+this driver. So you are good to go from cpuidle perspective
 
-I'm looking for an ack from Michal for these...
-
-> ---
->  drivers/pci/host/pcie-xilinx.c | 26 +++++++++++++++-----------
->  1 file changed, 15 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index a30e016..bd64677 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -101,7 +101,8 @@
->   * @msi_pages: MSI pages
->   * @root_busno: Root Bus number
->   * @dev: Device pointer
-> - * @irq_domain: IRQ domain pointer
-> + * @msi_domain: MSI IRQ domain pointer
-> + * @leg_domain: Legacy IRQ domain pointer
->   * @resources: Bus Resources
->   */
->  struct xilinx_pcie_port {
-> @@ -110,7 +111,8 @@ struct xilinx_pcie_port {
->  	unsigned long msi_pages;
->  	u8 root_busno;
->  	struct device *dev;
-> -	struct irq_domain *irq_domain;
-> +	struct irq_domain *msi_domain;
-> +	struct irq_domain *leg_domain;
->  	struct list_head resources;
->  };
->  
-> @@ -281,7 +283,7 @@ static int xilinx_pcie_msi_setup_irq(struct msi_controller *chip,
->  	if (hwirq < 0)
->  		return hwirq;
->  
-> -	irq = irq_create_mapping(port->irq_domain, hwirq);
-> +	irq = irq_create_mapping(port->msi_domain, hwirq);
->  	if (!irq)
->  		return -EINVAL;
->  
-> @@ -443,7 +445,7 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
->  			/* Handle INTx Interrupt */
->  			val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
->  				XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
-> -			generic_handle_irq(irq_find_mapping(port->irq_domain,
-> +			generic_handle_irq(irq_find_mapping(port->leg_domain,
->  							    val));
->  		}
->  	}
-> @@ -526,12 +528,14 @@ static void xilinx_pcie_free_irq_domain(struct xilinx_pcie_port *port)
->  	}
->  
->  	for (i = 0; i < num_irqs; i++) {
-> -		irq = irq_find_mapping(port->irq_domain, i);
-> +		irq = irq_find_mapping(port->leg_domain, i);
->  		if (irq > 0)
->  			irq_dispose_mapping(irq);
->  	}
-> -
-> -	irq_domain_remove(port->irq_domain);
-> +	if (port->leg_domain)
-> +		irq_domain_remove(port->leg_domain);
-> +	if (port->msi_domain)
-> +		irq_domain_remove(port->msi_domain);
->  }
->  
->  /**
-> @@ -553,21 +557,21 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
->  		return -ENODEV;
->  	}
->  
-> -	port->irq_domain = irq_domain_add_linear(pcie_intc_node, 4,
-> +	port->leg_domain = irq_domain_add_linear(pcie_intc_node, 4,
->  						 &intx_domain_ops,
->  						 port);
-> -	if (!port->irq_domain) {
-> +	if (!port->leg_domain) {
->  		dev_err(dev, "Failed to get a INTx IRQ domain\n");
->  		return -ENODEV;
->  	}
->  
->  	/* Setup MSI */
->  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> -		port->irq_domain = irq_domain_add_linear(node,
-> +		port->msi_domain = irq_domain_add_linear(node,
->  							 XILINX_NUM_MSI_IRQS,
->  							 &msi_domain_ops,
->  							 &xilinx_pcie_msi_chip);
-> -		if (!port->irq_domain) {
-> +		if (!port->msi_domain) {
->  			dev_err(dev, "Failed to get a MSI IRQ domain\n");
->  			return -ENODEV;
->  		}
-> -- 
-> 2.1.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>Using rpmsg may be nice for RPM SMD communication, but mutexes need to
+>go away for this driver to be any useful than bare bones active mode
+>resource requests for QCOM SoCs. By not doing that now, we lock
+>ourselves out of using this SMD driver in the near future when CPU PM
+>domains are available in the kernel with an ability to do system low
+>power modes.
+>
+>I hope you would make rpmsg work in IRQ disabled contexts first before
+>porting the SMD driver.
+>
+>Thanks,
+>Lina
+>
+>>
+>>Changes from v1:
+>>- Split up the patch moving core code to rpmsg_core into several commits
+>>- Dropped the wrapping struct in rpmsg_core and just added the ops to the
+>> public API (but hid the implementation details)
+>>- Reordered things to reduce the size of the later patches
+>>
+>>Bjorn Andersson (17):
+>> rpmsg: Enable matching devices with drivers based on DT
+>> rpmsg: Name rpmsg devices based on channel id
+>> rpmsg: rpmsg_send() operations takes rpmsg_endpoint
+>> rpmsg: Make rpmsg_create_ept() take channel_info struct
+>> rpmsg: Clean up rpmsg device vs channel naming
+>> rpmsg: Introduce indirection table for rpmsg_device operations
+>> rpmsg: Move rpmsg_device API to new file
+>> rpmsg: Indirection table for rpmsg_endpoint operations
+>> rpmsg: Move endpoint related interface to rpmsg core
+>> rpmsg: Move helper for finding rpmsg devices to core
+>> rpmsg: Split off generic tail of create_channel()
+>> rpmsg: Split rpmsg core and virtio backend
+>> rpmsg: Hide rpmsg indirection tables
+>> rpmsg: virtio: Hide vrp pointer from the public API
+>> rpmsg: Move virtio specifics from public header
+>> rpmsg: Allow callback to return errors
+>> rpmsg: Introduce Qualcomm SMD backend
+>>
+>>drivers/remoteproc/Kconfig          |    4 +-
+>>drivers/rpmsg/Kconfig               |   14 +
+>>drivers/rpmsg/Makefile              |    4 +-
+>>drivers/rpmsg/qcom_smd.c            | 1434 +++++++++++++++++++++++++++++++++++
+>>drivers/rpmsg/rpmsg_core.c          |  498 ++++++++++++
+>>drivers/rpmsg/rpmsg_internal.h      |   82 ++
+>>drivers/rpmsg/virtio_rpmsg_bus.c    |  487 +++++-------
+>>include/linux/rpmsg.h               |  246 +-----
+>>samples/rpmsg/rpmsg_client_sample.c |   14 +-
+>>9 files changed, 2266 insertions(+), 517 deletions(-)
+>>create mode 100644 drivers/rpmsg/qcom_smd.c
+>>create mode 100644 drivers/rpmsg/rpmsg_core.c
+>>create mode 100644 drivers/rpmsg/rpmsg_internal.h
+>>
+>>-- 
+>>2.5.0
+>>
+>>--
+>>To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>>the body of a message to majordomo at vger.kernel.org
+>>More majordomo info at  http://vger.kernel.org/majordomo-info.html
