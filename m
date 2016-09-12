@@ -1,105 +1,156 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 12 Sep 2016 16:22:40 -0600
-Subject: [PATCH v2 00/17] Make rpmsg a framework
-In-Reply-To: <20160912165233.GB21885@linaro.org>
-References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
- <20160912165233.GB21885@linaro.org>
-Message-ID: <20160912222240.GA28944@linaro.org>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 12 Sep 2016 15:24:05 -0700
+Subject: [PATCH V6 2/5] PCI/ACPI: Check platform specific ECAM quirks
+In-Reply-To: <1473449047-10499-3-git-send-email-tn@semihalf.com>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <1473449047-10499-3-git-send-email-tn@semihalf.com>
+Message-ID: <CADaLNDk0JPJYT_pqjWYwrMBvbyWkpL+6=dEDU9H9qDGMhnQvyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12 2016 at 10:52 -0600, Lina Iyer wrote:
->Hi Bjorn,
+On Fri, Sep 9, 2016 at 12:24 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
 >
->On Thu, Sep 01 2016 at 16:28 -0600, Bjorn Andersson wrote:
->>This series splits the virtio rpmsg bus driver into a rpmsg bus and a virtio
->>backend/wireformat.
->>
->>
->>As we discussed the Qualcomm SMD implementation a couple of years back people
->>suggested that I should make it "a rpmsg thingie". With the introduction of the
->>Qualcomm 8996 platform, we must support a variant of the communication
->>mechanism that share many of the characteristics of SMD, but are different
->>enough that it can't be done in a single implementation. As such there is
->>enough benefit to do the necessary work and being able to make SMD a "rpmsg
->>thingie".
->>
->>On-top of this series I have patches to switch the current smd clients over to
->>rpmsg (and by that drop the existing SMD implementation).
->>
->>All this allows me to implement the new backend and reuse all existing SMD
->>drivers with the new mechanism.
->>
+> Some platforms may not be fully compliant with generic set of PCI config
+> accessors. For these cases we implement the way to overwrite CFG accessors
+> set and configuration space range.
 >
->RPM Communication has to supported even when IRQs are disabled. The most
->important use of this communication is to set the wake up time for the
->CPU subsystem when all the CPUs are powered off. In addition to that,
->"sleep" votes that are sent by the application processor subsystem to
->allow system to go into deep sleep modes can only be triggered when the
->CPU PM domains are power collapsed, drivers do not have a knowledge of
->when that happens. This has to be done by a platform code that registers
->for CPU PM domain power_off/on callbacks.
+> In first place pci_mcfg_parse() saves machine's IDs and revision number
+> (these come from MCFG header) in order to match against known quirk entries.
+> Then the algorithm traverses available quirk list (static array),
+> matches against <oem_id, oem_table_id, rev, domain, bus number range> and
+> returns custom PCI config ops and/or CFG resource structure.
 >
-Ok, my bad. These two cases are not critical for the SoC supported by
-this driver. So you are good to go from cpuidle perspective
+> When adding new quirk there are two possibilities:
+> 1. Override default pci_generic_ecam_ops ops but CFG resource comes from MCFG
+> { "OEM_ID", "OEM_TABLE_ID", <REV>, <DOMAIN>, <BUS_NR>, &foo_ops, MCFG_RES_EMPTY },
+> 2. Override default pci_generic_ecam_ops ops and CFG resource. For this case
+> it is also allowed get CFG resource from quirk entry w/o having it in MCFG.
+> { "OEM_ID", "OEM_TABLE_ID", <REV>, <DOMAIN>, <BUS_NR>, &boo_ops,
+>   DEFINE_RES_MEM(START, SIZE) },
+>
+> pci_generic_ecam_ops and MCFG entries will be used for platforms
+> free from quirks.
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> ---
+>  drivers/acpi/pci_mcfg.c | 80 +++++++++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 74 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> index ffcc651..2b8acc7 100644
+> --- a/drivers/acpi/pci_mcfg.c
+> +++ b/drivers/acpi/pci_mcfg.c
+> @@ -32,6 +32,59 @@ struct mcfg_entry {
+>         u8                      bus_start;
+>         u8                      bus_end;
+>  };
+> +struct mcfg_fixup {
+> +       char oem_id[ACPI_OEM_ID_SIZE + 1];
+> +       char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
+> +       u32 oem_revision;
+> +       u16 seg;
+> +       struct resource bus_range;
+> +       struct pci_ecam_ops *ops;
+> +       struct resource cfgres;
+> +};
+> +
+> +#define MCFG_DOM_ANY                   (-1)
+> +#define MCFG_BUS_RANGE(start, end)     DEFINE_RES_NAMED((start),       \
+> +                                               ((end) - (start) + 1),  \
+> +                                               NULL, IORESOURCE_BUS)
+> +#define MCFG_BUS_ANY           MCFG_BUS_RANGE(0x0, 0xff)
+> +#define MCFG_RES_EMPTY         DEFINE_RES_NAMED(0, 0, NULL, 0)
+> +
+> +static struct mcfg_fixup mcfg_quirks[] = {
+> +/*     { OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, cfgres, ops }, */
+> +};
+> +
+> +static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
+> +static char mcfg_oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
+> +static u32 mcfg_oem_revision;
+> +
+> +static void pci_mcfg_match_quirks(struct acpi_pci_root *root,
+> +                                 struct resource *cfgres,
+> +                                 struct pci_ecam_ops **ecam_ops)
+> +{
+> +       struct mcfg_fixup *f;
+> +       int i;
+> +
+> +       /*
+> +        * First match against PCI topology <domain:bus> then use OEM ID, OEM
+> +        * table ID, and OEM revision from MCFG table standard header.
+> +        */
+> +       for (i = 0, f = mcfg_quirks; i < ARRAY_SIZE(mcfg_quirks); i++, f++) {
+> +               if (f->seg == root->segment &&
 
->Using rpmsg may be nice for RPM SMD communication, but mutexes need to
->go away for this driver to be any useful than bare bones active mode
->resource requests for QCOM SoCs. By not doing that now, we lock
->ourselves out of using this SMD driver in the near future when CPU PM
->domains are available in the kernel with an ability to do system low
->power modes.
+Is dropping the comparison with MCFG_DOM_ANY intended? It is useful if
+all the controllers (segs) can use the same quirk (X-Gene case).
+If you decide to drop it, then we can remove MCFG_DOM_ANY definition as well.
+
+> +                   resource_contains(&f->bus_range, &root->secondary) &&
+> +                   !memcmp(f->oem_id, mcfg_oem_id, ACPI_OEM_ID_SIZE) &&
+> +                   !memcmp(f->oem_table_id, mcfg_oem_table_id,
+> +                           ACPI_OEM_TABLE_ID_SIZE) &&
+> +                   f->oem_revision == mcfg_oem_revision) {
+> +                       if (f->cfgres.start)
+> +                               *cfgres = f->cfgres;
+> +                       if (f->ops)
+> +                               *ecam_ops =  f->ops;
+> +                       dev_info(&root->device->dev, "Applying PCI MCFG quirks for %s %s rev: %d\n",
+> +                                f->oem_id, f->oem_table_id, f->oem_revision);
+> +                       return;
+> +               }
+> +       }
+> +}
 >
->I hope you would make rpmsg work in IRQ disabled contexts first before
->porting the SMD driver.
+>  /* List to save MCFG entries */
+>  static LIST_HEAD(pci_mcfg_list);
+> @@ -61,14 +114,24 @@ int pci_mcfg_lookup(struct acpi_pci_root *root, struct resource *cfgres,
 >
->Thanks,
->Lina
+>         }
 >
->>
->>Changes from v1:
->>- Split up the patch moving core code to rpmsg_core into several commits
->>- Dropped the wrapping struct in rpmsg_core and just added the ops to the
->> public API (but hid the implementation details)
->>- Reordered things to reduce the size of the later patches
->>
->>Bjorn Andersson (17):
->> rpmsg: Enable matching devices with drivers based on DT
->> rpmsg: Name rpmsg devices based on channel id
->> rpmsg: rpmsg_send() operations takes rpmsg_endpoint
->> rpmsg: Make rpmsg_create_ept() take channel_info struct
->> rpmsg: Clean up rpmsg device vs channel naming
->> rpmsg: Introduce indirection table for rpmsg_device operations
->> rpmsg: Move rpmsg_device API to new file
->> rpmsg: Indirection table for rpmsg_endpoint operations
->> rpmsg: Move endpoint related interface to rpmsg core
->> rpmsg: Move helper for finding rpmsg devices to core
->> rpmsg: Split off generic tail of create_channel()
->> rpmsg: Split rpmsg core and virtio backend
->> rpmsg: Hide rpmsg indirection tables
->> rpmsg: virtio: Hide vrp pointer from the public API
->> rpmsg: Move virtio specifics from public header
->> rpmsg: Allow callback to return errors
->> rpmsg: Introduce Qualcomm SMD backend
->>
->>drivers/remoteproc/Kconfig          |    4 +-
->>drivers/rpmsg/Kconfig               |   14 +
->>drivers/rpmsg/Makefile              |    4 +-
->>drivers/rpmsg/qcom_smd.c            | 1434 +++++++++++++++++++++++++++++++++++
->>drivers/rpmsg/rpmsg_core.c          |  498 ++++++++++++
->>drivers/rpmsg/rpmsg_internal.h      |   82 ++
->>drivers/rpmsg/virtio_rpmsg_bus.c    |  487 +++++-------
->>include/linux/rpmsg.h               |  246 +-----
->>samples/rpmsg/rpmsg_client_sample.c |   14 +-
->>9 files changed, 2266 insertions(+), 517 deletions(-)
->>create mode 100644 drivers/rpmsg/qcom_smd.c
->>create mode 100644 drivers/rpmsg/rpmsg_core.c
->>create mode 100644 drivers/rpmsg/rpmsg_internal.h
->>
->>-- 
->>2.5.0
->>
->>--
->>To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->>the body of a message to majordomo at vger.kernel.org
->>More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> -       if (!root->mcfg_addr)
+> -               return -ENXIO;
+> -
+>  skip_lookup:
+>         memset(&res, 0, sizeof(res));
+> -       res.start = root->mcfg_addr + (bus_res->start << 20);
+> -       res.end = res.start + (resource_size(bus_res) << 20) - 1;
+> -       res.flags = IORESOURCE_MEM;
+> +       if (root->mcfg_addr) {
+> +               res.start = root->mcfg_addr + (bus_res->start << 20);
+> +               res.end = res.start + (resource_size(bus_res) << 20) - 1;
+> +               res.flags = IORESOURCE_MEM;
+> +       }
+> +
+> +       /*
+> +        * Let to override default ECAM ops and CFG resource range.
+> +        * Also, this might even retrieve CFG resource range in case MCFG
+> +        * does not have it. Invalid CFG start address means MCFG firmware bug
+> +        * or we need another quirk in array.
+> +        */
+> +       pci_mcfg_match_quirks(root, &res, &ops);
+> +       if (!res.start)
+> +               return -ENXIO;
+> +
+>         *cfgres = res;
+>         *ecam_ops = ops;
+>         return 0;
+> @@ -101,6 +164,11 @@ static __init int pci_mcfg_parse(struct acpi_table_header *header)
+>                 list_add(&e->list, &pci_mcfg_list);
+>         }
+>
+> +       /* Save MCFG IDs and revision for quirks matching */
+> +       memcpy(mcfg_oem_id, header->oem_id, ACPI_OEM_ID_SIZE);
+> +       memcpy(mcfg_oem_table_id, header->oem_table_id, ACPI_OEM_TABLE_ID_SIZE);
+> +       mcfg_oem_revision = header->revision;
+> +
+>         pr_info("MCFG table detected, %d entries\n", n);
+>         return 0;
+>  }
+> --
+> 1.9.1
+Regards,
+Duc Dang.
