@@ -1,43 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Sep 2016 14:07:25 +0100
-Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <20160912125948.GB13899@leverpostej>
-References: <1473469413-11019-1-git-send-email-oss@buserror.net>
- <1473469413-11019-3-git-send-email-oss@buserror.net>
- <20160912113615.GA20804@leverpostej> <20160912114406.GG23211@arm.com>
- <20160912123027.GA13741@leverpostej> <20160912125948.GB13899@leverpostej>
-Message-ID: <57D6A88D.7000002@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 12 Sep 2016 08:10:38 -0500
+Subject: [PATCHv2 1/3] Documentation: dt: Add TI SCI clock driver
+In-Reply-To: <1472733635-22661-2-git-send-email-t-kristo@ti.com>
+References: <1472733635-22661-1-git-send-email-t-kristo@ti.com>
+ <1472733635-22661-2-git-send-email-t-kristo@ti.com>
+Message-ID: <20160912131038.GA13103@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/16 13:59, Mark Rutland wrote:
-> On Mon, Sep 12, 2016 at 01:30:28PM +0100, Mark Rutland wrote:
->> On Mon, Sep 12, 2016 at 12:44:07PM +0100, Will Deacon wrote:
->>> On Mon, Sep 12, 2016 at 12:36:15PM +0100, Mark Rutland wrote:
->>>> The changes in arm64's <asm/arch_timer.h> are going to conflict with
->>>> some cleanup [1,2] that just landed in the arm64 for-next/core branch.
->>>>
->>>> Could you please rebase atop of that?
->>>
->>> Well, we should figure out what tree this is going through first. There
->>> are a mixture of arm, arm64, driver and dts changes here and not all
->>> of it is carrying the appropriate acks for me to queue it.
->>
->> Given that mix, I had assumed that this would all go through the arm64
->> tree -- I see that Rob has already acked the binding, and I'm happy to
->> give my ack for the driver once that's in shape.
+On Thu, Sep 01, 2016 at 03:40:33PM +0300, Tero Kristo wrote:
+> Add a clock implementation, TI SCI clock, that will hook to the common
+> clock framework, and allow each clock to be controlled via TI SCI
+> protocol.
 > 
-> Now I see that I'd missed the arch/arm changes in patch 4, which lack a
-> relevant ack.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Tested-by: Dave Gerlach <d-gerlach@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+>  .../devicetree/bindings/clock/ti,sci-clk.txt       | 51 ++++++++++++++++++++++
+>  MAINTAINERS                                        |  1 +
+>  2 files changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/ti,sci-clk.txt
 > 
-> Given that, I don't know what to suggest.
+> diff --git a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+> new file mode 100644
+> index 0000000..231cb80
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+> @@ -0,0 +1,51 @@
+> +Texas Instruments TI-SCI Clocks
+> +===============================
+> +
+> +All clocks on Texas Instruments' SoCs that contain a System Controller,
+> +are only controlled by this entity. Communication between a host processor
+> +running an OS and the System Controller happens through a protocol known
+> +as TI-SCI[1]. This clock implementation plugs into the common clock
+> +framework and makes use of the TI-SCI protocol on clock API requests.
+> +
+> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> +
+> +Required properties:
+> +-------------------
+> +- compatible: Must be "ti,sci-clk"
+> +- #clock-cells: Shall be 2.
+> +  In clock consumers, this cell represents the device ID and clock ID
+> +  exposed by the PM firmware. The assignments can be found in the header
+> +  files <dt-bindings/genpd/<soc>.h> (which covers the device IDs) and
+> +  <dt-bindings/clock/<soc>.h> (which covers the clock IDs), where <soc>
+> +  is the SoC involved, for example 'k2g'.
+> +- ti,sci: Phandle to the TI SCI device to use for managing the clocks
+> +
+> +Optional properties:
+> +-------------------
+> +- ti,ssc-clocks: Array of phandle clocks that shall enable spread spectrum
+> +		 clocking while enabled
+> +- ti,allow-freq-change-clocks: Array of phandle clocks that shall allow
+> +			       dynamic clock frequency changes by firmware
+> +- ti,input-term-clocks: Array of phandle clocks that shall enable input
+> +			termination
 
-I wouldn't mind delaying patch 4 until it gets acked by RMK, as it
-doesn't impact the functionality.
+These seem like a random set of features to control. What determines the 
+clocks for these? If it is based on the SoC, then make your compatible 
+string SoC specific and don't put this into DT.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Rob
