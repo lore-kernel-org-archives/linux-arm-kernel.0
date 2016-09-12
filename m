@@ -1,265 +1,386 @@
-From: yangbo.lu@nxp.com (Y.B. Lu)
-Date: Mon, 12 Sep 2016 06:39:45 +0000
-Subject: [v11, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
-In-Reply-To: <1473392840.30217.170.camel@buserror.net>
-References: <1473150503-9550-1-git-send-email-yangbo.lu@nxp.com>
- <1473150503-9550-6-git-send-email-yangbo.lu@nxp.com>
- <1473392840.30217.170.camel@buserror.net>
-Message-ID: <HE1PR04MB08892D8354E38EC32F549E98F8FF0@HE1PR04MB0889.eurprd04.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 12 Sep 2016 14:42:50 +0800
+Subject: [PATCH v3 1/4] drm/bridge: Add RGB to VGA bridge support
+In-Reply-To: <20160908121751.16911-2-maxime.ripard@free-electrons.com>
+References: <20160908121751.16911-1-maxime.ripard@free-electrons.com>
+ <20160908121751.16911-2-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66YW5L9KoP3rOshznKXbSE17qM+XAj-h_5+3t1r1ZFvAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Scott,
+Hi,
 
-Thanks for your review :)
-See my comment inline.
-
-> -----Original Message-----
-> From: Scott Wood [mailto:oss at buserror.net]
-> Sent: Friday, September 09, 2016 11:47 AM
-> To: Y.B. Lu; linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Arnd
-> Bergmann
-> Cc: linuxppc-dev at lists.ozlabs.org; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
-> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
-> foundation.org; netdev at vger.kernel.org; Mark Rutland; Rob Herring;
-> Russell King; Jochen Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh
-> Sharma; Qiang Zhao; Kumar Gala; Santosh Shilimkar; Leo Li; X.B. Xie
-> Subject: Re: [v11, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
-> 
-> On Tue, 2016-09-06 at 16:28 +0800, Yangbo Lu wrote:
-> > The global utilities block controls power management, I/O device
-> > enabling, power-onreset(POR) configuration monitoring, alternate
-> > function selection for multiplexed signals,and clock control.
-> >
-> > This patch adds a driver to manage and access global utilities block.
-> > Initially only reading SVR and registering soc device are supported.
-> > Other guts accesses, such as reading RCW, should eventually be moved
-> > into this driver as well.
-> >
-> > Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> > Signed-off-by: Scott Wood <oss@buserror.net>
-> 
-> Don't put my signoff on patches that I didn't put it on
-> myself. ?Definitely don't put mine *after* yours on patches that were
-> last modified by you.
-> 
-> If you want to mention that the soc_id encoding was my suggestion, then
-> do so explicitly.
-> 
-
-[Lu Yangbo-B47093] I found your 'signoff' on this patch at below link.
-http://patchwork.ozlabs.org/patch/649211/
-
-So, let me just change the order in next version ?
-Signed-off-by: Scott Wood <oss@buserror.net>
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-
-> > +/* SoC attribute definition for QorIQ platform */ static const struct
-> > +soc_device_attribute qoriq_soc[] = { #ifdef CONFIG_PPC
-> > +	/*
-> > +	?* Power Architecture-based SoCs T Series
-> > +	?*/
-> > +
-> > +	/* SoC: T1024/T1014/T1023/T1013 Rev: 1.0 */
-> > +	{ .soc_id	= "svr:0x85400010,name:T1024,die:T1024",
-> > +	??.revision	= "1.0",
-> > +	},
-> > +	{ .soc_id	= "svr:0x85480010,name:T1024E,die:T1024",
-> > +	??.revision	= "1.0",
-> > +	},
-> 
-> Revision could be computed from the low 8 bits of SVR (just as you do for
-> unknown SVRs).
+On Thu, Sep 8, 2016 at 8:17 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Some boards have an entirely passive RGB to VGA bridge, based on either
+> DACs or resistor ladders.
 >
- 
-[Lu Yangbo-B47093] Yes, you're right. Will remove it here.
+> Those might or might not have an i2c bus routed to the VGA connector in
+> order to access the screen EDIDs.
+>
+> Add a bridge that doesn't do anything but expose the modes available on the
+> screen, either based on the EDIDs if available, or based on the XGA
+> standards.
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  .../bindings/display/bridge/rgb-to-vga-bridge.txt  |  52 +++++
+>  drivers/gpu/drm/bridge/Kconfig                     |   6 +
+>  drivers/gpu/drm/bridge/Makefile                    |   1 +
+>  drivers/gpu/drm/bridge/rgb-to-vga.c                | 232 +++++++++++++++++++++
+>  4 files changed, 291 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
+>  create mode 100644 drivers/gpu/drm/bridge/rgb-to-vga.c
+>
+> diff --git a/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
+> new file mode 100644
+> index 000000000000..83a053fb51a0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
+> @@ -0,0 +1,52 @@
+> +Passive RGB to VGA bridge
+> +-------------------------
+> +
+> +This binding is aimed for entirely passive RGB to VGA bridges that do not
+> +require any configuration.
+> +
+> +Required properties:
+> +
+> +- compatible: Must be "rgb-to-vga-bridge"
+> +
+> +Required nodes:
+> +
+> +This device has two video ports. Their connections are modeled using the OF
+> +graph bindings specified in Documentation/devicetree/bindings/graph.txt.
+> +
+> +- Video port 0 for RGB input
+> +- Video port 1 for VGA output
+> +
+> +
+> +Example
+> +-------
+> +
+> +bridge {
+> +       compatible = "rgb-to-vga-bridge";
+> +       #address-cells = <1>;
+> +       #size-cells = <0>;
+> +
+> +       ports {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               port at 0 {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <0>;
+> +
+> +                       vga_bridge_in: endpoint {
+> +                               remote-endpoint = <&tcon0_out_vga>;
+> +                       };
+> +               };
+> +
+> +               port at 1 {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <1>;
+> +
+> +                       vga_bridge_out: endpoint {
+> +                               remote-endpoint = <&vga_con_in>;
+> +                       };
+> +               };
+> +       };
+> +};
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> index b590e678052d..42b95adf5091 100644
+> --- a/drivers/gpu/drm/bridge/Kconfig
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -17,6 +17,12 @@ config DRM_ANALOGIX_ANX78XX
+>           the HDMI output of an application processor to MyDP
+>           or DisplayPort.
+>
+> +config DRM_RGB_TO_VGA
+> +       tristate "Dumb RGB to VGA Bridge support"
+> +       select DRM_KMS_HELPER
+> +       help
+> +         Support for passive RGB to VGA bridges
+> +
+>  config DRM_DW_HDMI
+>         tristate
+>         select DRM_KMS_HELPER
+> diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+> index efdb07e878f5..3bb8cbe09fe9 100644
+> --- a/drivers/gpu/drm/bridge/Makefile
+> +++ b/drivers/gpu/drm/bridge/Makefile
+> @@ -1,6 +1,7 @@
+>  ccflags-y := -Iinclude/drm
+>
+>  obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
+> +obj-$(CONFIG_DRM_RGB_TO_VGA) += rgb-to-vga.o
+>  obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
+>  obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
+>  obj-$(CONFIG_DRM_NXP_PTN3460) += nxp-ptn3460.o
+> diff --git a/drivers/gpu/drm/bridge/rgb-to-vga.c b/drivers/gpu/drm/bridge/rgb-to-vga.c
+> new file mode 100644
+> index 000000000000..84b1b10198a4
+> --- /dev/null
+> +++ b/drivers/gpu/drm/bridge/rgb-to-vga.c
+> @@ -0,0 +1,232 @@
 
-> We could move the die name into .family:
-> 
-> 	{
-> 		.soc_id = "svr:0x85490010,name:T1023E,",
-> 		.family = "QorIQ T1024",
-> 	}
-> 
-> I see you dropped svre (and the trailing comma), though I guess the vast
-> majority of potential users will be looking at .family. ?In which case do
-> we even need name? ?If we just make the soc_id be "svr:0xnnnnnnnn" then
-> we could shrink the table to an svr+mask that identifies each die. ?I'd
-> still want to keep the "svr:" even if we're giving up on the general
-> tagging system, to make it clear what the number refers to, and to
-> provide some defense against users who match only against soc_id rather
-> than soc_id+family. ?Or we could go further and format soc_id as "QorIQ
-> SVR 0xnnnnnnnn" so that soc_id-only matches are fully acceptable rather
-> than just less dangerous.
+No beginning file header / copyright statement?
 
-[Lu Yangbo-B47093] It's a good idea to move die into .family I think.
-In my opinion, it's better to keep svr and name in soc_id just like your suggestion above.
-> 	{
-> 		.soc_id = "svr:0x85490010,name:T1023E,",
-> 		.family = "QorIQ T1024",
-> 	}
-The user probably don?t like to learn the svr value. What they want is just to match the soc they use.
-It's convenient to use name+rev for them to match a soc.
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_graph.h>
+> +
+> +#include <drm/drmP.h>
+> +#include <drm/drm_atomic_helper.h>
+> +#include <drm/drm_crtc.h>
+> +#include <drm/drm_crtc_helper.h>
+> +
+> +struct dumb_vga {
+> +       struct drm_bridge       bridge;
+> +       struct drm_connector    connector;
+> +
+> +       struct i2c_adapter      *ddc;
+> +};
+> +
+> +static inline struct dumb_vga *
+> +drm_bridge_to_dumb_vga(struct drm_bridge *bridge)
+> +{
+> +       return container_of(bridge, struct dumb_vga, bridge);
+> +}
+> +
+> +static inline struct dumb_vga *
+> +drm_connector_to_dumb_vga(struct drm_connector *connector)
+> +{
+> +       return container_of(connector, struct dumb_vga, connector);
+> +}
+> +
+> +static int dumb_vga_get_modes(struct drm_connector *connector)
+> +{
+> +       struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
+> +       struct edid *edid;
+> +       int ret;
+> +
+> +       if (IS_ERR(vga->ddc))
+> +               goto fallback;
+> +
+> +       edid = drm_get_edid(connector, vga->ddc);
+> +       if (!edid) {
+> +               DRM_INFO("EDID readout failed, falling back to standard modes\n");
+> +               goto fallback;
+> +       }
+> +
+> +       drm_mode_connector_update_edid_property(connector, edid);
+> +       return drm_add_edid_modes(connector, edid);
+> +
+> +fallback:
+> +       /*
+> +        * In case we cannot retrieve the EDIDs (broken or missing i2c
+> +        * bus), fallback on the XGA standards
+> +        */
+> +       ret = drm_add_modes_noedid(connector, 1920, 1200);
+> +
+> +       /* And prefer a mode pretty much anyone can handle */
+> +       drm_set_preferred_mode(connector, 1024, 768);
+> +
+> +       return ret;
+> +}
+> +
+> +static struct drm_encoder *
+> +dumb_vga_best_encoder(struct drm_connector *connector)
+> +{
+> +       struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
+> +
+> +       return vga->bridge.encoder;
+> +}
+> +
+> +static struct drm_connector_helper_funcs dumb_vga_con_helper_funcs = {
+> +       .get_modes      = dumb_vga_get_modes,
+> +       .best_encoder   = dumb_vga_best_encoder,
 
-Regarding shrinking the table, I think it's hard to use svr+mask. Because I find many platforms use different masks.
-We couldn?t know the mask according svr value.
+drm_modeset_helper_vtables.h says the following about .best_encoder:
 
-> 
-> > +static const struct soc_device_attribute *fsl_soc_device_match(
-> > +	unsigned int svr, const struct soc_device_attribute *matches) {
-> > +	char svr_match[50];
-> > +	int n;
-> > +
-> > +	n = sprintf(svr_match, "*%08x*", svr);
-> 
-> n = sprintf(svr_match, "svr:0x%08x,*", svr);
-> 
-> (according to the current encoding)
-> 
+    You can leave this function to NULL if the connector is only
+    attached to a single encoder and you are using the atomic helpers.
+    In this case, the core will call drm_atomic_helper_best_encoder()
+    for you.
 
-[Lu Yangbo-B47093] Ok. Will do that.
+IMHO you can drop the callback here.
 
-> > +
-> > +	do {
-> > +		if (!matches->soc_id)
-> > +			return NULL;
-> > +		if (glob_match(svr_match, matches->soc_id))
-> > +			break;
-> > +	} while (matches++);
-> 
-> Are you expecting "matches++" to ever evaluate as false?
+> +};
+> +
+> +static enum drm_connector_status
+> +dumb_vga_connector_detect(struct drm_connector *connector, bool force)
+> +{
+> +       struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
+> +
+> +       /*
+> +        * Even if we have an I2C bus, we can't assume that the cable
+> +        * is disconnected if drm_probe_ddc. Some cables don't wire
+> +        * the DDC pins, or the I2C bus might be disfunctional.
+> +        */
+> +       if (!IS_ERR(vga->ddc) && drm_probe_ddc(vga->ddc))
+> +               return connector_status_connected;
+> +
+> +       return connector_status_unknown;
+> +}
+> +
+> +static void
+> +dumb_vga_connector_destroy(struct drm_connector *connector)
+> +{
+> +       drm_connector_cleanup(connector);
+> +}
+> +
+> +static struct drm_connector_funcs dumb_vga_con_funcs = {
+> +       .dpms                   = drm_atomic_helper_connector_dpms,
+> +       .detect                 = dumb_vga_connector_detect,
+> +       .fill_modes             = drm_helper_probe_single_connector_modes,
+> +       .destroy                = dumb_vga_connector_destroy,
+> +       .reset                  = drm_atomic_helper_connector_reset,
+> +       .atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+> +       .atomic_destroy_state   = drm_atomic_helper_connector_destroy_state,
+> +};
+> +
+> +static int dumb_vga_attach(struct drm_bridge *bridge)
+> +{
+> +       struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+> +       int ret;
+> +
+> +       if (!bridge->encoder) {
+> +               DRM_ERROR("Missing encoder\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +       drm_connector_helper_add(&vga->connector,
+> +                                &dumb_vga_con_helper_funcs);
+> +       ret = drm_connector_init(bridge->dev, &vga->connector,
+> +                                &dumb_vga_con_funcs, DRM_MODE_CONNECTOR_VGA);
+> +       if (ret) {
+> +               DRM_ERROR("Failed to initialize connector\n");
+> +               return ret;
+> +       }
+> +
+> +       drm_mode_connector_attach_encoder(&vga->connector,
+> +                                         bridge->encoder);
+> +
+> +       return 0;
+> +}
+> +
+> +static void dumb_vga_nop(struct drm_bridge *bridge) {};
+> +
+> +static struct drm_bridge_funcs dumb_vga_bridge_funcs = {
 
-[Lu Yangbo-B47093] Yes, this is used to match the soc we use in qoriq_soc array until getting true. 
-We need to get the name and die information defined in array.
+const?
 
-> 
-> > +	/* Register soc device */
-> > +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> > +	if (!soc_dev_attr) {
-> > +		ret = -ENOMEM;
-> > +		goto out_unmap;
-> > +	}
-> 
-> Couldn't this be statically allocated?
+> +       .attach         = dumb_vga_attach,
+> +       .enable         = dumb_vga_nop,
+> +       .disable        = dumb_vga_nop,
+> +       .pre_enable     = dumb_vga_nop,
+> +       .post_disable   = dumb_vga_nop,
 
-[Lu Yangbo-B47093] Do you mean we define this struct statically ?
+Nit: The 4 nops can be dropped. The header file states these
+callbacks are optional.
 
-static struct soc_device_attribute soc_dev_attr;
+> +};
+> +
+> +static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
+> +{
+> +       struct device_node *end_node, *phandle, *remote;
+> +       struct i2c_adapter *ddc;
+> +
+> +       end_node = of_graph_get_endpoint_by_regs(dev->of_node, 1, -1);
+> +       if (!end_node) {
+> +               dev_err(dev, "Missing connector endpoint\n");
+> +               return ERR_PTR(-ENODEV);
+> +       }
+> +
+> +       remote = of_graph_get_remote_port_parent(end_node);
+> +       of_node_put(end_node);
+> +       if (!remote) {
+> +               dev_err(dev, "Enable to parse remote node\n");
+> +               return ERR_PTR(-EINVAL);
+> +       }
+> +
+> +       phandle = of_parse_phandle(remote, "ddc-i2c-bus", 0);
+> +       of_node_put(remote);
+> +       if (!phandle)
+> +               return ERR_PTR(-ENODEV);
+> +
+> +       ddc = of_get_i2c_adapter_by_node(phandle);
+> +       of_node_put(phandle);
+> +       if (!ddc)
+> +               return ERR_PTR(-EPROBE_DEFER);
+> +
+> +       return ddc;
+> +}
+> +
+> +static int dumb_vga_probe(struct platform_device *pdev)
+> +{
+> +       struct dumb_vga *vga;
+> +       int ret;
+> +
+> +       vga = devm_kzalloc(&pdev->dev, sizeof(*vga), GFP_KERNEL);
+> +       if (!vga)
+> +               return -ENOMEM;
+> +       platform_set_drvdata(pdev, vga);
+> +
+> +       vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
+> +       if (IS_ERR(vga->ddc)) {
+> +               if (PTR_ERR(vga->ddc) == -ENODEV) {
+> +                       dev_info(&pdev->dev,
+> +                                "No i2c bus specified... Disabling EDID readout\n");
+> +               } else {
+> +                       dev_err(&pdev->dev, "Couldn't retrieve i2c bus\n");
+> +                       return PTR_ERR(vga->ddc);
+> +               }
+> +       }
+> +
+> +       vga->bridge.funcs = &dumb_vga_bridge_funcs;
+> +       vga->bridge.of_node = pdev->dev.of_node;
+> +
+> +       ret = drm_bridge_add(&vga->bridge);
+> +       if (ret && !IS_ERR(vga->ddc))
+> +               i2c_put_adapter(vga->ddc);
+> +
+> +       return ret;
+> +}
+> +
+> +static int dumb_vga_remove(struct platform_device *pdev)
+> +{
+> +       struct dumb_vga *vga = platform_get_drvdata(pdev);
+> +
+> +       drm_bridge_remove(&vga->bridge);
+> +
+> +       if (!IS_ERR(vga->ddc))
+> +               i2c_put_adapter(vga->ddc);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id dumb_vga_match[] = {
+> +       { .compatible = "rgb-to-vga-bridge" },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(of, dumb_vga_match);
+> +
+> +struct platform_driver dumb_vga_driver = {
+> +       .probe  = dumb_vga_probe,
+> +       .remove = dumb_vga_remove,
+> +       .driver         = {
+> +               .name           = "rgb-to-vga-bridge",
+> +               .of_match_table = dumb_vga_match,
+> +       },
+> +};
+> +module_platform_driver(dumb_vga_driver);
+> +
+> +MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
+> +MODULE_DESCRIPTION("Dumb RGB to VGA bridge driver");
+> +MODULE_LICENSE("GPL");
 
-> 
-> > +
-> > +	machine = of_flat_dt_get_machine_name();
-> > +	if (machine)
-> > +		soc_dev_attr->machine = kasprintf(GFP_KERNEL, "%s",
-> > machine);
-> > +
-> > +	soc_dev_attr->family = kasprintf(GFP_KERNEL, "QorIQ");
-> > +
-> > +	svr = fsl_guts_get_svr();
-> > +	fsl_soc = fsl_soc_device_match(svr, qoriq_soc);
-> > +	if (fsl_soc) {
-> > +		soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%s",
-> > +						?fsl_soc->soc_id);
-> 
-> You can use kstrdup() if you're just copying the string as is.
+FWIW the rest looks fine.
 
-[Lu Yangbo-B47093] Ok. Will do that.
 
-> 
-> > +		soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%s",
-> > +						???fsl_soc->revision);
-> > +	} else {
-> > +		soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "0x%08x",
-> > svr);
-> 
-> 	kasprintf(GFP_KERNEL, "svr:0x%08x,", svr);
-
-[Lu Yangbo-B47093] Sorry, will add that.
-
-> 
-> 
-> > +
-> > +	soc_dev = soc_device_register(soc_dev_attr);
-> > +	if (IS_ERR(soc_dev)) {
-> > +		ret = -ENODEV;
-> 
-> Why are you changing the error code?
-
-[Lu Yangbo-B47093] What error code should we use ? :)
-
-> 
-> > +		goto out;
-> > +	} else {
-> 
-> Unnecessary "else".
-
-[Lu Yangbo-B47093] Oh.. Correct!
-
-> 
-> > +		pr_info("Detected: %s\n", soc_dev_attr->machine);
-> 
-> Machine: %s
-
-[Lu Yangbo-B47093] Ok. Will do that.
-
-> 
-> > +		pr_info("Detected SoC family: %s\n", soc_dev_attr->family);
-> > +		pr_info("Detected SoC ID: %s, revision: %s\n",
-> > +			soc_dev_attr->soc_id, soc_dev_attr->revision);
-> 
-> s/Detected //g
-
-[Lu Yangbo-B47093] Ok, will do that.
-
-> 
-> 
-> > +	}
-> > +	return 0;
-> > +out:
-> > +	kfree(soc_dev_attr->machine);
-> > +	kfree(soc_dev_attr->family);
-> > +	kfree(soc_dev_attr->soc_id);
-> > +	kfree(soc_dev_attr->revision);
-> > +	kfree(soc_dev_attr);
-> > +out_unmap:
-> > +	iounmap(guts->regs);
-> > +out_free:
-> > +	kfree(guts);
-> 
-> devm
-
-[Lu Yangbo-B47093] What's the devm meaning here :)
- 
-> 
-> > +static int fsl_guts_remove(struct platform_device *dev) {
-> > +	kfree(soc_dev_attr->machine);
-> > +	kfree(soc_dev_attr->family);
-> > +	kfree(soc_dev_attr->soc_id);
-> > +	kfree(soc_dev_attr->revision);
-> > +	kfree(soc_dev_attr);
-> > +	soc_device_unregister(soc_dev);
-> > +	iounmap(guts->regs);
-> > +	kfree(guts);
-> > +	return 0;
-> > +}
-> 
-> Don't free the memory before you unregister the device that uses it (moot
-> if you use devm).
-
-[Lu Yangbo-B47093] The soc.c driver mentions that.
-Ensure soc_dev->attr is freed prior to calling soc_device_unregister.
-
-> 
-> >
-> > +#ifdef CONFIG_FSL_GUTS
-> > +unsigned int fsl_guts_get_svr(void);
-> > +#endif
-> 
-> Don't ifdef prototypes (unless you're going to provide a stub
-> alternative).
-
-[Lu Yangbo-B47093] Ok, will remove ifdef.
-
-> 
-> -Scott
+Regards
+ChenYu
