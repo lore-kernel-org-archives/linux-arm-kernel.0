@@ -1,76 +1,126 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 12 Sep 2016 14:56:55 +0100
-Subject: [PATCH v5 2/3] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <c322d309-993c-a572-5ffd-bf4012e26134@free-electrons.com>
-References: <1473344917-1524-1-git-send-email-quentin.schulz@free-electrons.com>
- <1473344917-1524-3-git-send-email-quentin.schulz@free-electrons.com>
- <20160912091829.GB1873@dell>
- <93bd339b-85ab-d0fc-5e80-e2aca290c0d7@free-electrons.com>
- <20160912095923.GD1873@dell> <20160912100719.GJ9449@lukather>
- <20160912104932.GF1873@dell>
- <c322d309-993c-a572-5ffd-bf4012e26134@free-electrons.com>
-Message-ID: <20160912135655.GC9789@dell>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Sep 2016 15:01:40 +0100
+Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
+In-Reply-To: <57D6AA54.6000208@laposte.net>
+References: <57BDAF2E.10502@laposte.net>
+ <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
+ <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
+ <57D6AA54.6000208@laposte.net>
+Message-ID: <20160912135549.GA14165@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Sep 2016, Quentin Schulz wrote:
-> On 12/09/2016 12:49, Lee Jones wrote:
-> > On Mon, 12 Sep 2016, Maxime Ripard wrote:
-> > 
-> >> On Mon, Sep 12, 2016 at 10:59:23AM +0100, Lee Jones wrote:
-> >>>>>> +static const struct of_device_id sun4i_gpadc_mfd_of_match[] = {
-> >>>>>> +	{
-> >>>>>> +		.compatible = "allwinner,sun4i-a10-ts",
-> >>>>>> +		.data = &sun4i_gpadc_mfd_cells,
-> >>>>>> +	}, {
-> >>>>>> +		.compatible = "allwinner,sun5i-a13-ts",
-> >>>>>> +		.data = &sun5i_gpadc_mfd_cells,
-> >>>>>> +	}, {
-> >>>>>> +		.compatible = "allwinner,sun6i-a31-ts",
-> >>>>>> +		.data = &sun6i_gpadc_mfd_cells,
-> >>>>>> +	}, { /* sentinel */ }
-> >>>>>> +};
-> >>>>>
-> >>>>> Don't mix OF and MFD functionality.
-> >>>>>
-> >>>>> Why don't you create a node for "iio_hwmon" and have
-> >>>>> platform_of_populate() do your bidding?
-> >>>>>
-> >>>>
-> >>>> We are using a stable binding which we cannot modify. This means, the DT
-> >>>> in its current state can only be modified to add features, which is not
-> >>>> the case of this driver (it is a rewriting of an existing driver which
-> >>>> uses the rtp node).
-> >>>
-> >>> Then use .data = <defined model ID> and set up a switch() in .probe().
+Hi,
+
+On Mon, Sep 12, 2016 at 03:15:00PM +0200, Sebastian Frias wrote:
+> On 09/12/2016 02:38 PM, Mark Rutland wrote:
 > >>
-> >> Uh? Why? It just adds a non-standard indirection, while using
-> >> of_match_device is very standard, and used extensively in Linux.
+> >> 3rd party users of said SoC could then write kernel modules for such HW
+> >> blocks using the DT description. The DT would thus become the authoritative
+> >> source of information regarding register programming for the SoC.
 > > 
-> > You still use of_match_device() to obtain the ID.
-> > 
-> > The "don't mix DT with the MFD API" is there to prevent some of the
-> > nasty hacks I've seen previously.  This particular example doesn't
-> > seem so bad, but it's a gateway to ridiculous hackery!
+> > I don't follow this part entirely. Why are you expecting thrid parties
+> > to write a driver for those blocks rather than upstreaming a driver for
+> > them?
 > 
-> How am I supposed to get the .data without of_match_node then?
-> What's more hackish in using .data field for specific data for each
-> compatible than in using a random ID in .data and switching on it? The
-> result is exactly the same, the switching case being more verbose and
-> adding complexity to something that can be done in a straightforward manner.
+> 3rd parties could choose to write a driver (as opposed to use say, a user-mode
+> library) if it fits their programming model better, if they think they would
+> have better performance, or other reasons.
 
-I've already agreed that your implementation isn't terrible, but I'd
-still like to remain strict on the rules.
+A vendor can always choose to "add value" in this manner. The general
+expectation of *some* driver being upstreamed remains.
 
-Better still, can you can dynamically test which platform you're on,
-via a version register or similar?
+> > I would generally agree that the hardware should be described in DT.
+> > The difficulty is that without a 'real' user it's not always possible to
+> > tell if we're describing the thing correctly.
+> 
+> That may be true, but so far we are not discussing changing DT's API so it
+> should not have big ramifications.
 
-Failing that, see how everyone else does it:
+You're not changing the code, but you are creating a binding. Bindings
+are intended to be stable (i.e. a working DTB from today should continue
+to work in future), and thus there are ramifications.
 
- `git grep "\.data" -- drivers/mfd/`
+Few devices these says are entirely independent, and most devices can be
+instantiated multiple times (even if there happens to only be a single
+instance in practice). For the example of a userspace driver there are
+very real ABI concerns, such as how the device(s) are discovered, how
+any related components like regulators and clocks are controlled, etc.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+There are ramifications here, and it's a dangerous over simplification
+to say that this doesn't matter because we're not changing kernel code.
+
+> Besides, what "makes sense now" may "not make sense tomorrow" depending on
+> how the HW is modified.
+
+That's always the case when a new generation of hardware comes out, so I
+don't think that's relevant to the topic at hand.
+
+> We have somehow learned the hard-way that "le mieux est l'ennemi du bien"
+> (the better is the enemy of the good) and we are trying to take a more
+> practical (and flexible) approach.
+> 
+> > Putting smoething together that's only sufficient to support some
+> > out-of-tree driver with implicit assumptions that we are not aware of is
+> > far from fantastic.
+> 
+> That does not seem very positive and it is not the case anyway, otherwise we
+> would not be consulting here :-)
+> Agreed, right now this whole thing seems like a really hypothetical question,
+> but the intention is good.
+> 
+> Actually, I think it would encourage more SoC manufacturers to use DT as a way
+> to document their HW, which is a good thing.
+
+Writing and reviewing bindings is a very tricky topic, as it can require
+fairly intimate knowledge of a piece of hardware. I've repeatedly found
+that binding descriptions did not match the realities of the hardware,
+and I've only managed to do so by looking at accompanying driver code.
+
+Given that manuals and other information on devices are often not freely
+available (if they exist at all), the proposal effectively limits myself
+and others to spot common (anti)patterns, which is far less than ideal,
+and will result in more mistakes.
+
+As it stands, the proposal asks for effort for the community (in terms
+of review and maintenance of bindings), with no benefit to the kernel
+community, and a number of pitfalls that we would rather avoid.
+
+In an ideal world, writing and reviewing bindings would be a simple
+affair, and this could happen separately from work on any particular OS.
+In practice, things are sufficiently complicated that you need *some*
+demonstration that a binding is suitable, which is what I'm personally
+after when I ask for a Linux driver.
+
+> >> However, after discussing over IRC, it looks like there was no guidance on
+> >> this. Some people think submitting DT properties/nodes without a corresponding
+> >> Linux driver is frowned upon, while others thought it was an odd limitation
+> >> and suggested asking here.
+> > 
+> > Unfortunately, I think that the area is sufficiently vague that there
+> > simply is no clear and general answer.
+> > 
+> > For the sake of discussion, an example of a particular block, along with
+> > what you expect/need to describe would be helpful.
+> 
+> I don't have a more concrete example now.
+
+For this discussion to go somewhere, we need an example. Otherwise we're
+all coming at this with differing implicit assumptions and no clear
+evidence for any assertions.
+
+> As I stated, right now HW description is not centralised, and thus different
+> bits of information are cherry-picked by hand from HW description into DT for
+> bootloader, DT for Linux, Documentation/headers for 3rd-parties, etc.
+> 
+> But if I understood correctly your comment, you are basically saying that
+> without an example is hard to say.
+> Since the question seems understood, do you have an example of other SoC's
+> doing something similar?
+
+I do not have an example. I know that others are using DT for data
+beyond what Linux or another OS requires, but it's my understanding that
+that is typically in a separate DTB.
+
+Thanks,
+Mark.
