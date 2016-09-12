@@ -1,56 +1,57 @@
-From: tcminyard@gmail.com (Corey Minyard)
-Date: Mon, 12 Sep 2016 15:33:57 -0500
-Subject: [PATCH 1/3] misc: Add Aspeed BT IPMI host driver
-In-Reply-To: <4727554.yt7pF8chOH@wuerfel>
-References: <1472664259-23933-1-git-send-email-clg@kaod.org>
- <c06a8afb-9143-6aef-3425-ad1e50cae35d@kaod.org>
- <1ce6c4b4-5938-22fc-7467-d1efc220b772@gmail.com> <4727554.yt7pF8chOH@wuerfel>
-Message-ID: <7db5ada0-49ea-55eb-089e-d979941ceff5@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Sep 2016 22:34:19 +0200
+Subject: [GIT PULL] CLCD graphics for the Nomadik NHK15
+Message-ID: <CACRpkdZH+aFe-PSR-vmEVNJgKZ5nTgiUJroyhdYfVweQFh0s9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2016 02:15 PM, Arnd Bergmann wrote:
-> On Monday, September 12, 2016 1:55:40 PM CEST Corey Minyard wrote:
->> On 09/02/2016 08:22 AM, C?dric Le Goater wrote:
->>> Hello,
->>>
->>> Adding Corey in cc: . I guess I should have done that in the first place.
->> Yes, probably so.  I've been travelling and didn't see it on the mailing
->> lists until now.
->>
->> There is already a BT driver in the kernel, in drivers/char/ipmi, why
->> won't that work?
-> The new driver is the host side (running on the BMC), the existing one
-> is the client (running on the PC).
->
-> 	Arnd
+Hi ARM SoC folks,
 
-Ok, that's not really clear from the documentation or the Kconfig.
-In the IPMI spec the "host" side is the computer side, not the BMC
-side.  Like:
+this adds CLCD graphics to the Nomadik NHK15 following
+Tomi's merge of the required FBDEV changes.
 
-    11.6.1 BT Host Interface Registers
-    The Host BT interface provides an independent set of registers and
-    interrupts to allow the Host driver to
-    communicate with the baseboard management controller without
-    conflicting with the O/S ACPI driver.
+It is all device tree changes except for a oneliner selecting
+MFD_SYSCON from the Nomadik Kconfig, as there are
+no other Nomadik changes pending and nothing else
+should be changing the Nomadik, and since it is pretty
+much in context with the DTS changes, I chose to include
+it here.
 
-In light of that, this should probably be named the bt-bmc driver.
+Please pull it in!
 
-I haven't reviewed this in detail, but I'm ok with putting it in
-drivers/char/ipmi.  The state machine part looks reasonably
-generic.  The configuration part isn't, but that could be split
-out later if necessary.
+Yours,
+Linus Walleij
 
-The biggest thing I don't like is the byte at a time interfaces
-from userspace.  That seems fairly inefficient if the system
-does extra work for each userspace access.  IIRC some
-systems do and some don't.
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
--corey
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+tags/clcd-nomadik
+
+for you to fetch changes up to 17470b7da11c137267c74ff0d2d4cca56f595c60:
+
+  ARM: dts: add the CLCD LCD display to the NHK15 (2016-09-09 23:16:07 +0200)
+
+----------------------------------------------------------------
+CLCD graphics on the Nomadik NHK15
+
+----------------------------------------------------------------
+Linus Walleij (6):
+      ARM: dts: add STMPE PWM to the NHK15 device tree
+      dt-bindings: add vendor TPO
+      dt-bindings: Add TPO TPG110 binding
+      ARM: nomadik: select MFD_SYSCON
+      ARM: dts: add PMU to the NHK15 device tree
+      ARM: dts: add the CLCD LCD display to the NHK15
+
+ .../bindings/display/panel/tpo,tpg110.txt          | 47 +++++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/boot/dts/ste-nomadik-nhk15.dts            | 68 ++++++++++++++++++++++
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 28 +++++++++
+ arch/arm/mach-nomadik/Kconfig                      |  1 +
+ 5 files changed, 145 insertions(+)
+ create mode 100644
+Documentation/devicetree/bindings/display/panel/tpo,tpg110.txt
