@@ -1,190 +1,137 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 12 Sep 2016 18:55:12 +0300
-Subject: [PATCH v10 0/4] ACPI: parse the SPCR table
-In-Reply-To: <20160905123617.18775-1-aleksey.makarov@linaro.org>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
-Message-ID: <cceaa257-723c-245d-64de-0730fa60f234@linaro.org>
+From: sf84@laposte.net (Sebastian Frias)
+Date: Mon, 12 Sep 2016 18:07:05 +0200
+Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
+In-Reply-To: <20160912135549.GA14165@leverpostej>
+References: <57BDAF2E.10502@laposte.net>
+ <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
+ <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
+ <57D6AA54.6000208@laposte.net> <20160912135549.GA14165@leverpostej>
+Message-ID: <57D6D2A9.3010006@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
 
-On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
-> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port Console
-> Redirection Table) [2] as a mandatory ACPI table that specifies the
-> configuration of serial console.
+On 09/12/2016 04:01 PM, Mark Rutland wrote:
+>> 3rd parties could choose to write a driver (as opposed to use say, a user-mode
+>> library) if it fits their programming model better, if they think they would
+>> have better performance, or other reasons.
+> 
+> A vendor can always choose to "add value" in this manner. The general
+> expectation of *some* driver being upstreamed remains.
 
-Hi Rafael,
+Yes, that's the idea.
 
-Could you pull these patches please?
-Each of them is ACKed now.
+>>
+>> That may be true, but so far we are not discussing changing DT's API so it
+>> should not have big ramifications.
+> 
+> You're not changing the code, but you are creating a binding. Bindings
+> are intended to be stable (i.e. a working DTB from today should continue
+> to work in future), and thus there are ramifications.
 
-Thank you
-Aleksey Makarov
+Ok, but who is responsible for such guarantee?
+How is it enforced and verified?
 
-> Move "earlycon" early_param handling to earlycon.c to parse this option once
 > 
-> Parse SPCR table, setup earlycon and register specified console.
+> Few devices these says are entirely independent, and most devices can be
+> instantiated multiple times (even if there happens to only be a single
+> instance in practice). For the example of a userspace driver there are
+> very real ABI concerns, such as how the device(s) are discovered, how
+> any related components like regulators and clocks are controlled, etc.
 > 
-> Enable parsing this table on ARM64.  Earlycon should be set up as early as
-> possible.  ACPI boot tables are mapped in
-> arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch() and
-> that's where we parse spcr.  So it has to be opted-in per-arch. When
-> ACPI_SPCR_TABLE is defined initialization of DT earlycon is deferred until the
-> DT/ACPI decision is done.
+> There are ramifications here, and it's a dangerous over simplification
+> to say that this doesn't matter because we're not changing kernel code.
 > 
-> Implement console_match() for pl011.
+>> Besides, what "makes sense now" may "not make sense tomorrow" depending on
+>> how the HW is modified.
 > 
-> Based on the work by Leif Lindholm [3]
-> Thanks to Peter Hurley for explaining how this should work.
+> That's always the case when a new generation of hardware comes out, so I
+> don't think that's relevant to the topic at hand.
+
+Exactly, that's why to I'm having trouble to understand why there is so much
+insistence on "getting the DT 100% right", since a HW change could imply
+that what made 100% sense yesterday, does not today.
+Since that is a possibility we have to live with, then the "100% right" goal
+is most likely unachievable.
+That's different from "backwards compatibility" for which some technique,
+like alternate descriptions, can be put in place.
+
+Maybe I will get a better understanding of this once my previous question
+about who and how guarantees the stability of a given DT blob.
+
+>>
+>> Actually, I think it would encourage more SoC manufacturers to use DT as a way
+>> to document their HW, which is a good thing.
 > 
-> Should be applied to v4.8-rc5
-> Tested on QEMU and ThunderX.
-> SPCR support is included in QEMU's ARM64 mach-virt since 2.4 release.
+> Writing and reviewing bindings is a very tricky topic, as it can require
+> fairly intimate knowledge of a piece of hardware. I've repeatedly found
+> that binding descriptions did not match the realities of the hardware,
+> and I've only managed to do so by looking at accompanying driver code.
 > 
-> v10:
-> - rebase to v4.8-rc5
-> - fix the issue with comparing the console name in pl011_console_match()
->   (Russell King)
-> - fix build on sh arch (kbuild test robot)
-> - add Acked-by: Russell King <rmk+kernel@armlinux.org.uk> for 4/4
-> - add Tested-by: Christopher Covington <cov@codeaurora.org>
+> Given that manuals and other information on devices are often not freely
+> available (if they exist at all), the proposal effectively limits myself
+> and others to spot common (anti)patterns, which is far less than ideal,
+> and will result in more mistakes.
 > 
-> v9:
-> https://lkml.kernel.org/g/20160811153152.755-1-aleksey.makarov at linaro.org
-> - rebase to v4.8-rc1
-> - fix compilation for !CONFIG_SERIAL_EARLYCON case
-> - add Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com> for ACPI part
-> - move constant check out of loop (Yury Norov)
-> - add '\n' to info message
+> As it stands, the proposal asks for effort for the community (in terms
+> of review and maintenance of bindings), with no benefit to the kernel
+> community, and a number of pitfalls that we would rather avoid.
+
+Could you be more precise on those two issues? Namely:
+"the effort" and the "lack of benefit for the community"?
+
+I can understand the effort it takes to review a binding and some
+driver, but if there's no driver, why would it matter if the DT binding is
+100% right? Hence, why would it take more effort?
+Furthermore, if there's no driver, there's no backward compatibility to
+guarantee. Shouldn't it require less effort?
+
+Also, what sort of "benefits" does the community expects or requires?
+Because the idea behind the proposal is to put the HW description in DT, so
+basically the HW would be documented. Maybe there wouldn't be a driver right
+away, but the HW description would allow for drivers to exist.
+
 > 
-> v8:
-> https://lkml.kernel.org/g/1463749405-11640-1-git-send-email-aleksey.makarov at linaro.org
-> - rebase to next-20160520
-> - remove the patch "ACPICA: Headers: Add new constants for the DBG2 ACPI table"
->   as it have got to linux-next
-> - add Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Reviewed-by:
->   Peter Hurley <peter@hurleysoftware.com> (but see below)
-> - fix the patch "serial: pl011: add console matching function".  The patch by
->   Christopher Covington [4] specifies that SBSA uart does 32-bit access to
->   registers and this breaks the match function.  In this series the function
->   was changed to match when SPCR specifies both mmio32 and mmio access.
->   I removed Acked-by: Greg from this patch because of these changes.
+> In an ideal world, writing and reviewing bindings would be a simple
+> affair, and this could happen separately from work on any particular OS.
+> In practice, things are sufficiently complicated that you need *some*
+> demonstration that a binding is suitable, which is what I'm personally
+> after when I ask for a Linux driver.
 > 
-> v7:
-> https://lkml.kernel.org/g/1459431629-27934-1-git-send-email-aleksey.makarov at linaro.org
-> - add Acked-by: Rob Herring for "of/serial: move earlycon early_param handling
->   to serial"
-> - call DT earlycon initialization from the arch ACPI code, not from parse_spcr()
->   (Rafael J. Wysocki)
-> - fix a few minor issues (Rafael J. Wysocki)
+>>>> However, after discussing over IRC, it looks like there was no guidance on
+>>>> this. Some people think submitting DT properties/nodes without a corresponding
+>>>> Linux driver is frowned upon, while others thought it was an odd limitation
+>>>> and suggested asking here.
+>>>
+>>> Unfortunately, I think that the area is sufficiently vague that there
+>>> simply is no clear and general answer.
+>>>
+>>> For the sake of discussion, an example of a particular block, along with
+>>> what you expect/need to describe would be helpful.
+>>
+>> I don't have a more concrete example now.
 > 
-> v6:
-> https://lkml.kernel.org/g/1458823925-19560-1-git-send-email-aleksey.makarov at linaro.org
-> - add documentation for parse_spcr() functioin (Yury Norov)
-> - don't initialize err variable (Yury Norov)
-> - add __initdata for the earlycon_init_is_deferred flag variable
-> - rename the function exported in "of/serial: move earlycon early_param handling
->   to serial" to avoid clash with the function from arch/microblaze/kernel/prom.c
-> - defer initialization of DT earlycon until DT/ACPI decision is made
->   (Rob Herring, Peter Hurley)
-> - use snprintf instead of sprintf (Andy Shevchenko)
-> - drop patch that adds EARLYCON_DECLARE for pl011 as EARLYCON_DECLARE is
->   equivalent to OF_EARLYCON_DECLARE for 4.6+ (Peter Hurley).  This means that
->   SPCR earlycon will not work on the kernels before 4.6
+> For this discussion to go somewhere, we need an example. Otherwise we're
+> all coming at this with differing implicit assumptions and no clear
+> evidence for any assertions.
+
+Ok, I'll try to come up with some example.
+
+>> But if I understood correctly your comment, you are basically saying that
+>> without an example is hard to say.
+>> Since the question seems understood, do you have an example of other SoC's
+>> doing something similar?
 > 
-> v5:
-> https://lkml.kernel.org/g/1458643595-14719-1-git-send-email-aleksey.makarov at linaro.org
-> - drop patch "serial: pl011: use ACPI SPCR to setup 32-bit access" because
->   it is ugly. Also because Christopher Covington came with a better solution [4]
-> - remove error message when the table is not provided by ACPI (Andy Shevchenko)
-> - rewrite spcr.c following the suggestions by Peter Hurley
-> - add console_match() for pl011 in a separate patch
-> - add EARLYCON_DECLARE for pl011 in a separate patch
-> - add patch "of/serial: move earlycon early_param handling to serial" from
->   the GDB2 series
+> I do not have an example. I know that others are using DT for data
+> beyond what Linux or another OS requires, but it's my understanding that
+> that is typically in a separate DTB.
 > 
-> v4:
-> https://lkml.kernel.org/g/1456747355-15692-1-git-send-email-aleksey.makarov at linaro.org
-> - drop patch "ACPI: change __init to __ref for early_acpi_os_unmap_memory()"
->   ACPI developers work on a new API and asked not to do that.
->   Instead, use acpi_get_table_with_size()/early_acpi_os_unmap_memory() once
->   and cache the result. (Lv Zheng)
-> - fix some style issues (Yury Norov)
-> 
-> v3:
-> https://lkml.kernel.org/g/1455559532-8305-1-git-send-email-aleksey.makarov at linaro.org
-> 
-> Greg Kroah-Hartman did not like v2 so I have rewritten this patchset:
-> 
-> - drop acpi_match() member of struct console
-> - drop implementations of this member for pl011 and 8250
-> - drop the patch that renames some vars in printk.c as it is not needed anymore
-> - drop patch that introduces system wide acpi_table_parse2().
->   Instead introduce a custom acpi_table_parse_spcr() in spcr.c
-> 
-> Instead of introducing a new match_acpi() member of struct console,
-> this patchset introduces a new function acpi_console_check().
-> This function is called when a new uart is registered at serial_core.c
-> the same way OF code checks for console.  If the registered uart is the
-> console specified by SPCR table, this function calls add_preferred_console()
-> 
-> The restrictions of this approach are:
-> 
-> - only serial consoles can be set up
-> - only consoles specified by the memory/io address can be set up
->   (SPCR can specify devices by PCI id/PCI address)
-> 
-> v2:
-> https://lkml.kernel.org/g/1455299022-11641-1-git-send-email-aleksey.makarov at linaro.org
-> - don't use SPCR if user specified console in command line
-> - fix initialization order of newcon->index = 0
-> - rename some variables at printk.c (Joe Perches, Peter Hurley)
-> - enable ACPI_SPCR_TABLE in a separate patch (Andy Shevchenko)
-> - remove the retry loop for console registering (Peter Hurley).
->   Instead, obtain SPCR with acpi_get_table().  That works after
->   call to acpi_early_init() i. e. in any *_initcall()
-> - describe design decision behind introducing acpi_match() (Peter Hurley)
-> - fix compilation for x86 + ACPI (Graeme Gregory)
-> - introduce DBG2 constants in a separate patch (Andy Shevchenko)
-> - fix a typo in DBG2 constants (Andy Shevchenko)
-> - add ACPI_DBG2_ARM_SBSA_32BIT constant (Christopher Covington)
-> - add support for ACPI_DBG2_ARM_SBSA_* consoles (Christopher Covington)
-> - add documentation for functions
-> - add a patch that uses SPCR to find if SBSA serial driver should use 32-bit
->   accessor functions (Christopher Covington)
-> - change __init to __ref for early_acpi_os_unmap_memory() in a separate patch
-> - introduce acpi_table_parse2() in a separate patch
-> - fix fetching the SPCR table early (Mark Salter)
-> - add a patch from Mark Salter that introduces support for matching 8250-based
->   consoles
-> 
-> v1:
-> https://lkml.kernel.org/g/1453722324-22407-1-git-send-email-aleksey.makarov at linaro.org
-> 
-> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
-> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
-> [3] https://lkml.kernel.org/g/1441716217-23786-1-git-send-email-leif.lindholm at linaro.org
-> [4] https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
-> 
-> Aleksey Makarov (3):
->   ACPI: parse SPCR and enable matching console
->   ARM64: ACPI: enable ACPI_SPCR_TABLE
->   serial: pl011: add console matching function
-> 
-> Leif Lindholm (1):
->   of/serial: move earlycon early_param handling to serial
-> 
->  arch/arm64/Kconfig              |   1 +
->  arch/arm64/kernel/acpi.c        |  11 +++-
->  drivers/acpi/Kconfig            |   3 ++
->  drivers/acpi/Makefile           |   1 +
->  drivers/acpi/spcr.c             | 111 ++++++++++++++++++++++++++++++++++++++++
->  drivers/of/fdt.c                |  11 +---
->  drivers/tty/serial/amba-pl011.c |  55 ++++++++++++++++++++
->  drivers/tty/serial/earlycon.c   |  19 ++++++-
->  include/linux/acpi.h            |   6 +++
->  include/linux/of_fdt.h          |   3 ++
->  include/linux/serial_core.h     |   9 +++-
->  11 files changed, 216 insertions(+), 14 deletions(-)
->  create mode 100644 drivers/acpi/spcr.c
-> 
+
+I see, although I don't understand how accepting such solution (i.e.: having the
+information in a different DT) benefits the open-source community, since it
+basically means that the open-source community settles for less information.
+
+Best regards,
+
+Sebastian
