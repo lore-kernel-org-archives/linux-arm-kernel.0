@@ -1,59 +1,73 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Mon, 12 Sep 2016 23:23:41 +0200
-Subject: [PATCH 1/3] misc: Add Aspeed BT IPMI host driver
-In-Reply-To: <7db5ada0-49ea-55eb-089e-d979941ceff5@gmail.com>
-References: <1472664259-23933-1-git-send-email-clg@kaod.org>
- <c06a8afb-9143-6aef-3425-ad1e50cae35d@kaod.org>
- <1ce6c4b4-5938-22fc-7467-d1efc220b772@gmail.com> <4727554.yt7pF8chOH@wuerfel>
- <7db5ada0-49ea-55eb-089e-d979941ceff5@gmail.com>
-Message-ID: <b42f1b61-8b00-2412-d51d-6207da8afcd6@kaod.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 12 Sep 2016 14:32:53 -0700
+Subject: [RFCv3][PATCH 0/5] Cleanup Ion mapping/caching
+Message-ID: <1473715978-11633-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, 
+Hi,
 
-On 09/12/2016 10:33 PM, Corey Minyard wrote:
-> On 09/12/2016 02:15 PM, Arnd Bergmann wrote:
->> On Monday, September 12, 2016 1:55:40 PM CEST Corey Minyard wrote:
->>> On 09/02/2016 08:22 AM, C?dric Le Goater wrote:
->>>> Hello,
->>>>
->>>> Adding Corey in cc: . I guess I should have done that in the first place.
->>> Yes, probably so.  I've been travelling and didn't see it on the mailing
->>> lists until now.
->>>
->>> There is already a BT driver in the kernel, in drivers/char/ipmi, why
->>> won't that work?
->> The new driver is the host side (running on the BMC), the existing one
->> is the client (running on the PC).
->>
->>     Arnd
-> 
-> Ok, that's not really clear from the documentation or the Kconfig.
-> In the IPMI spec the "host" side is the computer side, not the BMC
-> side.  Like:
-> 
->    11.6.1 BT Host Interface Registers
->    The Host BT interface provides an independent set of registers and
->    interrupts to allow the Host driver to
->    communicate with the baseboard management controller without
->    conflicting with the O/S ACPI driver.
-> 
-> In light of that, this should probably be named the bt-bmc driver.
-> 
-> I haven't reviewed this in detail, but I'm ok with putting it in
-> drivers/char/ipmi.  The state machine part looks reasonably
-> generic.  The configuration part isn't, but that could be split
-> out later if necessary.
-> 
-> The biggest thing I don't like is the byte at a time interfaces
-> from userspace.  That seems fairly inefficient if the system
-> does extra work for each userspace access.  IIRC some
-> systems do and some don't.
+This is v3 on the attempt to remove the misuse of the DMA cache APIS from Ion.
 
-What about the ioctl to send an SMS ATN event to the host ? Is 
-that ok for you ?
+As from before:
+The APIs created are kernel_force_cache_clean and kernel_force_cache_invalidate.
+They force a clean and invalidate of the cache, respectively. The aim was to
+take the semantics of dma_sync and turn them into something that isn't
+dma_sync. This series includes a nominal implementation for arm/arm64, mostly
+for demonstration purposes.
+
+The major change from v2 is that the implementations no longer leverage the
+DMA abstractions. Russell King noted that dma_map and dma_unmap just 'happen'
+to do the right thing but they aren't guaranteed.
+
+I'm hoping at v3 there are no objections to the general concept but if they
+exist please express them.
 
 Thanks,
+Laura
 
-C.
+[1]http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg49406.html
+
+Laura Abbott (5):
+  Documentation: Introduce kernel_force_cache_* APIs
+  arm: Impelment ARCH_HAS_FORCE_CACHE
+  arm64: Implement ARCH_HAS_FORCE_CACHE
+  staging: android: ion: Convert to the kernel_force_cache APIs
+  staging: ion: Add support for syncing with DMA_BUF_IOCTL_SYNC
+
+ Documentation/cachetlb.txt                      | 18 ++++++-
+ arch/arm/include/asm/cacheflush.h               | 11 ++++
+ arch/arm/include/asm/glue-cache.h               |  2 +
+ arch/arm/mm/Makefile                            |  2 +-
+ arch/arm/mm/cache-fa.S                          |  8 +++
+ arch/arm/mm/cache-nop.S                         |  6 +++
+ arch/arm/mm/cache-v4.S                          | 10 ++++
+ arch/arm/mm/cache-v4wb.S                        |  8 +++
+ arch/arm/mm/cache-v4wt.S                        |  8 +++
+ arch/arm/mm/cache-v6.S                          |  8 +++
+ arch/arm/mm/cache-v7.S                          | 13 +++++
+ arch/arm/mm/cacheflush.c                        | 71 +++++++++++++++++++++++++
+ arch/arm/mm/proc-arm920.S                       |  8 +++
+ arch/arm/mm/proc-arm922.S                       |  8 +++
+ arch/arm/mm/proc-arm925.S                       |  8 +++
+ arch/arm/mm/proc-arm926.S                       |  8 +++
+ arch/arm/mm/proc-feroceon.S                     | 11 ++++
+ arch/arm/mm/proc-macros.S                       |  2 +
+ arch/arm/mm/proc-xsc3.S                         |  9 ++++
+ arch/arm/mm/proc-xscale.S                       |  9 ++++
+ arch/arm64/include/asm/cacheflush.h             |  8 +++
+ arch/arm64/mm/cache.S                           | 24 +++++++--
+ arch/arm64/mm/flush.c                           | 11 ++++
+ drivers/staging/android/ion/ion.c               | 53 +++++++++++-------
+ drivers/staging/android/ion/ion_carveout_heap.c |  8 +--
+ drivers/staging/android/ion/ion_chunk_heap.c    | 12 +++--
+ drivers/staging/android/ion/ion_page_pool.c     |  7 +--
+ drivers/staging/android/ion/ion_priv.h          | 11 ----
+ drivers/staging/android/ion/ion_system_heap.c   |  6 +--
+ include/linux/cacheflush.h                      | 11 ++++
+ 30 files changed, 330 insertions(+), 49 deletions(-)
+ create mode 100644 arch/arm/mm/cacheflush.c
+ create mode 100644 include/linux/cacheflush.h
+
+-- 
+2.7.4
