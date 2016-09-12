@@ -1,36 +1,40 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 12 Sep 2016 20:18:00 +0800
-Subject: [PATCH v4 2/3] arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
-In-Reply-To: <20160909115336.GB16924@tiger>
-References: <1473141861-5033-1-git-send-email-jun.nie@linaro.org>
- <1473141861-5033-3-git-send-email-jun.nie@linaro.org>
- <20160909115336.GB16924@tiger>
-Message-ID: <20160912121800.GB7373@tiger>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Sep 2016 14:22:46 +0200
+Subject: [PATCH 1/2] pinctrl: meson-gxbb: add the pins for the
+ SDIO/sd_emmc_a controller
+In-Reply-To: <CAFBinCDm5quZyyC2t_1SQqT+p=eJQ0H_LoNZM6wfUZugvCi_7g@mail.gmail.com>
+References: <20160828164725.19429-1-martin.blumenstingl@googlemail.com>
+ <20160828164725.19429-2-martin.blumenstingl@googlemail.com>
+ <CACRpkdbPVeUA+BSPgQ1XmFJw_J6-V_2BM9h3kO2yq-vUfySsGQ@mail.gmail.com>
+ <CAFBinCDm5quZyyC2t_1SQqT+p=eJQ0H_LoNZM6wfUZugvCi_7g@mail.gmail.com>
+Message-ID: <CACRpkdbEMCz4SJAKrb2G44_2=jjS+1KamALgjaS41wGGHobM=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2016 at 07:53:36PM +0800, Shawn Guo wrote:
-> A bit more comments as below ...
-> 
-> On Tue, Sep 06, 2016 at 02:04:20PM +0800, Jun Nie wrote:
-> > +	soc {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		compatible = "simple-bus";
-> > +		interrupt-parent = <&gic>;
-> > +		ranges;
-> > +
-> > +		timer {
-> > +			compatible = "arm,armv8-timer";
-> > +			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
-> > +				     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
-> > +				     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
-> > +				     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-> 
-> Affinity bits are missing for PPI interrupt.  You can use a bit help
-> from defines in include/dt-bindings/interrupt-controller/arm-gic.h.
+On Wed, Sep 7, 2016 at 8:55 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> On Wed, Sep 7, 2016 at 4:24 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Sun, Aug 28, 2016 at 6:47 PM, Martin Blumenstingl
+>> <martin.blumenstingl@googlemail.com> wrote:
+>>
+>>> sd_emmc_a is used a controller for the SDIO modules. This adds the pin
+>>> configuration for the SDIO controller.
+>>>
+>>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>>
+>> No reply from maintainers, but you obviously know what you're doing so
+>> patch applied.
+> I forgot to reply to this one as well (sorry about that):
+> I received a NACK off-list for both patches because the SDIO IRQ pin is missing.
+>
+> Nothing is broken with this patch applied, just one pin is missing.
+> Depending on how you'd like to proceed you can:
+> - either drop the patch from your tree and wait for v2
+> - leave it in your tree and I'll send a patch on top of this one to
+> add the missing pin
 
-Sorry, I missed the fact that affinity bits is only required for gic-v2,
-while what we have here is a gic-v3.  So please ignore the comment.
+The latter at this point. Patch the patch.
 
-Shawn
+Thanks!
+
+Linus Walleij
