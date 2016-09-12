@@ -1,101 +1,55 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 12 Sep 2016 15:49:23 +0100
-Subject: [PATCH v4 09/10] ARM: gic-v3: Introduce 32-to-64-bit mappings for
- GICv3 cpu registers
+Date: Mon, 12 Sep 2016 15:49:20 +0100
+Subject: [PATCH v4 06/10] KVM: arm: vgic: Support 64-bit data manipulation on
+ 32-bit host systems
 In-Reply-To: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
 References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1473691764-29424-10-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1473691764-29424-7-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vgic-v3 save/restore routines are written in such way that they map
-arm64 system register naming nicely, but it does not fit to arm
-world. To keep virt/kvm/arm/hyp/vgic-v3-sr.c untouched we create a
-mapping with a function for each register mapping the 32-bit to the
-64-bit accessors.
+We have couple of 64-bit registers defined in GICv3 architecture, so
+unsigned long accesses to these registers will only access a single
+32-bit part of that regitser. On the other hand these registers can't
+be accessed as 64-bit with a single instruction like ldrd/strd or
+ldmia/stmia if we run a 32-bit host because KVM does not support
+access to MMIO space done by these instructions.
 
-Please, note that 64-bit wide ICH_LR is split in two 32-bit halves
-(ICH_LR and ICH_LRC) accessed independently.
+It means that a 32-bit guest accesses these registers in 32-bit
+chunks, so the only thing we need to do is to ensure that
+extract_bytes() always takes 64-bit data.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/arch_gicv3.h |   64 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c |    2 +-
+ virt/kvm/arm/vgic/vgic-mmio.h    |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-index af25c32..996848e 100644
---- a/arch/arm/include/asm/arch_gicv3.h
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -96,6 +96,70 @@
- #define ICH_AP1R2			__AP1Rx(2)
- #define ICH_AP1R3			__AP1Rx(3)
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 6385ed5..0d3c76a 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -23,7 +23,7 @@
+ #include "vgic-mmio.h"
  
-+/* A32-to-A64 mappings used by VGIC save/restore */
-+
-+#define CPUIF_MAP(a32, a64)			\
-+static inline void write_ ## a64(u32 val)	\
-+{						\
-+	write_sysreg(val, a32);			\
-+}						\
-+static inline u32 read_ ## a64(void)		\
-+{						\
-+	return read_sysreg(a32); 		\
-+}						\
-+
-+#define CPUIF_MAP_LO_HI(a32lo, a32hi, a64)	\
-+static inline void write_ ## a64(u64 val)	\
-+{						\
-+	write_sysreg(lower_32_bits(val), a32lo);\
-+	write_sysreg(upper_32_bits(val), a32hi);\
-+}						\
-+static inline u64 read_ ## a64(void)		\
-+{						\
-+	u64 val = read_sysreg(a32lo);		\
-+						\
-+	val |=	(u64)read_sysreg(a32hi) << 32;	\
-+						\
-+	return val; 				\
-+}
-+
-+CPUIF_MAP(ICH_HCR, ICH_HCR_EL2)
-+CPUIF_MAP(ICH_VTR, ICH_VTR_EL2)
-+CPUIF_MAP(ICH_MISR, ICH_MISR_EL2)
-+CPUIF_MAP(ICH_EISR, ICH_EISR_EL2)
-+CPUIF_MAP(ICH_ELSR, ICH_ELSR_EL2)
-+CPUIF_MAP(ICH_VMCR, ICH_VMCR_EL2)
-+CPUIF_MAP(ICH_AP0R3, ICH_AP0R3_EL2)
-+CPUIF_MAP(ICH_AP0R2, ICH_AP0R2_EL2)
-+CPUIF_MAP(ICH_AP0R1, ICH_AP0R1_EL2)
-+CPUIF_MAP(ICH_AP0R0, ICH_AP0R0_EL2)
-+CPUIF_MAP(ICH_AP1R3, ICH_AP1R3_EL2)
-+CPUIF_MAP(ICH_AP1R2, ICH_AP1R2_EL2)
-+CPUIF_MAP(ICH_AP1R1, ICH_AP1R1_EL2)
-+CPUIF_MAP(ICH_AP1R0, ICH_AP1R0_EL2)
-+CPUIF_MAP(ICC_HSRE, ICC_SRE_EL2)
-+CPUIF_MAP(ICC_SRE, ICC_SRE_EL1)
-+
-+CPUIF_MAP_LO_HI(ICH_LR15, ICH_LRC15, ICH_LR15_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR14, ICH_LRC14, ICH_LR14_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR13, ICH_LRC13, ICH_LR13_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR12, ICH_LRC12, ICH_LR12_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR11, ICH_LRC11, ICH_LR11_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR10, ICH_LRC10, ICH_LR10_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR9, ICH_LRC9, ICH_LR9_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR8, ICH_LRC8, ICH_LR8_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR7, ICH_LRC7, ICH_LR7_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR6, ICH_LRC6, ICH_LR6_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR5, ICH_LRC5, ICH_LR5_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR4, ICH_LRC4, ICH_LR4_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR3, ICH_LRC3, ICH_LR3_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR2, ICH_LRC2, ICH_LR2_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR1, ICH_LRC1, ICH_LR1_EL2)
-+CPUIF_MAP_LO_HI(ICH_LR0, ICH_LRC0, ICH_LR0_EL2)
-+
-+#define read_gicreg(r)                 read_##r()
-+#define write_gicreg(v, r)             write_##r(v)
-+
- /* Low-level accessors */
+ /* extract @num bytes at @offset bytes offset in data */
+-unsigned long extract_bytes(unsigned long data, unsigned int offset,
++unsigned long extract_bytes(u64 data, unsigned int offset,
+ 			    unsigned int num)
+ {
+ 	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 0b3ecf9..80f92ce 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -96,7 +96,7 @@ unsigned long vgic_data_mmio_bus_to_host(const void *val, unsigned int len);
+ void vgic_data_host_to_mmio_bus(void *buf, unsigned int len,
+ 				unsigned long data);
  
- static inline void gic_write_eoir(u32 irq)
+-unsigned long extract_bytes(unsigned long data, unsigned int offset,
++unsigned long extract_bytes(u64 data, unsigned int offset,
+ 			    unsigned int num);
+ 
+ u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
 -- 
 1.7.9.5
