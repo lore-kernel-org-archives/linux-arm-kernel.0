@@ -1,59 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 12 Sep 2016 13:38:09 +0100
-Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
-In-Reply-To: <57D69FB1.2020801@laposte.net>
-References: <57BDAF2E.10502@laposte.net>
- <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
- <57D69FB1.2020801@laposte.net>
-Message-ID: <20160912123809.GB13741@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Sep 2016 14:40:15 +0200
+Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
+In-Reply-To: <20160908073748.GF8913@lukather>
+References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
+ <20160907145400.27192-4-maxime.ripard@free-electrons.com>
+ <CACRpkdZsxA7avmO85R=-Quu7FQwSVMPhQMDmmgL+xbkVTB-2HQ@mail.gmail.com>
+ <CAGb2v64h7kq2jWzUJ74vDdOOQOXPxjx3ruSsJMXvyr7fP63BGg@mail.gmail.com>
+ <20160908073748.GF8913@lukather>
+Message-ID: <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 02:29:37PM +0200, Sebastian Frias wrote:
-> My question is about submitting DT properties/nodes (describing some HW) for
-> which there is no Linux driver. Like register addresses for HW blocks,
-> including HW capabilities of said HW blocks, which may or may not be setup
-> by Linux directly.
-> 
-> The idea being that since DT describes the HW and is usually shared with the
-> bootloader (yet stored in the Linux kernel tree), all layers of the stack
-> could use the same DT and each layer would use relevant properties. So the
-> DT would describe the whole SoC even if not all HW blocks have a Linux
-> driver.
-> 
-> 3rd party users of said SoC could then write kernel modules for such HW
-> blocks using the DT description. The DT would thus become the authoritative
-> source of information regarding register programming for the SoC.
+On Thu, Sep 8, 2016 at 9:37 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Sep 08, 2016 at 12:46:14PM +0800, Chen-Yu Tsai wrote:
 
-I don't follow this part entirely. Why are you expecting thrid parties
-to write a driver for those blocks rather than upstreaming a driver for
-them?
+>> Also, I think we are needlessly using pin groups, 1 pin per group.
+>> Can pinconf/pinctrl work without them? Would there be any harm
+>> converting the sunxi driver to work directly with pins? This would
+>> make it match generic pinconf parsing, and make it easier to get
+>> both working together.
+>
+> I think it comes from a requirement that you had to have groups at
+> some point (I don't know if it's still the case), which is why we
+> ended up with single-pin groups, because we can mux each pins entirely
+> separately.
+>
+> If it's not required anymore, then yes, it makes total sense to remove
+> it.
 
-> Currently, HW blocks for which there is no public driver (that it is
-> accessed through user-mode libraries or firmware) require a separate
-> HW description (be it Documentation, headers, etc.)
-> 
-> Since the DT describes the HW, it would make sense to expose the HW through
-> DT, that would centralise the HW description.
+The groups vs individual pins is an eternal debate that has
+been going on since the inception of pinctrl.
 
-I would generally agree that the hardware should be described in DT.
-The difficulty is that without a 'real' user it's not always possible to
-tell if we're describing the thing correctly.
+If you see it from the point of the programmer, you may just see
+a register for each pin and they seem all independent. This is
+why pinctrl-single exist, and that driver is for this purpose: one
+register per pin, software-wise independent.
 
-Putting smoething together that's only sufficient to support some
-out-of-tree driver with implicit assumptions that we are not aware of is
-far from fantastic.
+HOWEVER it often turns out that while you can programmatically
+and individually set pins to any function (and biasing etc), the
+person designing the hardware was not thinking that you should
+be able to do whatever you like, e.g. even if it is possible to
+take two pins and use one of them for half an SPI bus and the
+other for half an I2C bus, that doesn't mean that this is useful
+or makes any kind of electronic sense, it just makes "software
+sense".
 
-> However, after discussing over IRC, it looks like there was no guidance on
-> this. Some people think submitting DT properties/nodes without a corresponding
-> Linux driver is frowned upon, while others thought it was an odd limitation
-> and suggested asking here.
+So for a deeper understanding, several SoCs (amongst them
+my own and Qualcomm etc) define groups that are not really
+about software restrictions for what you can do with the pins, but
+about usecase and electronic restrictions for what can be done
+with the pins.
 
-Unfortunately, I think that the area is sufficiently vague that there
-simply is no clear and general answer.
+E.g. it makes *sense* to have a group for muxing I2C on two
+pins, and not allow one of them to be muxed to I2C and the other
+not, because it does not make electronic sense.
 
-For the sake of discussion, an example of a particular block, along with
-what you expect/need to describe would be helpful.
+One-group-per-pin groups is usually coming from a failure or
+inability to identify these electronically sound and usecase
+oriented pingroups.
 
-Thanks,
-Mark.
+Some (like pinctrl-single) say they don't care, and wish to
+see things as the world is just software and one register per
+pin, removing those electric usecase restrictions, and only
+keeping the muxing restrictions to e.g. the four different functions
+that can be muxed on that pin, disregarding the bigger picture.
+
+I don't know about this driver or the pins it manages,
+I seldom have time or brains to dive in and review things
+deeply enough :(
+
+Yours,
+Linus Walleij
