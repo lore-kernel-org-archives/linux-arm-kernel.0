@@ -1,62 +1,156 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 12 Sep 2016 15:52:19 +0100
-Subject: [PATCH v2 1/7] arm64: Factor out PAN enabling/disabling into
- separate uaccess_* macros
-In-Reply-To: <20160905153828.GA27305@leverpostej>
-References: <1472828533-28197-1-git-send-email-catalin.marinas@arm.com>
- <1472828533-28197-2-git-send-email-catalin.marinas@arm.com>
- <20160905153828.GA27305@leverpostej>
-Message-ID: <20160912145219.GC2492@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Sep 2016 15:59:31 +0100
+Subject: [PATCH] arm64: mm: move zero page from .bss to right before
+ swapper_pg_dir
+In-Reply-To: <1473689784-29745-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1473689784-29745-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160912145931.GB14165@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2016 at 04:38:28PM +0100, Mark Rutland wrote:
-> On Fri, Sep 02, 2016 at 04:02:07PM +0100, Catalin Marinas wrote:
-> >  /*
-> > + * User access enabling/disabling.
-> > + */
-> > +#define uaccess_disable(alt)						\
-> > +do {									\
-> > +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,			\
-> > +			CONFIG_ARM64_PAN));				\
-> > +} while (0)
-> > +
-> > +#define uaccess_enable(alt)						\
-> > +do {									\
-> > +	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,			\
-> > +			CONFIG_ARM64_PAN));				\
-> > +} while (0)
-> 
-> Passing the alternative down is somewhat confusing. e.g. in the futex
-> case it looks like we're only doing something when PAN is present,
-> whereas we'll manipulate TTBR0 in the absence of PAN.
+Hi Ard,
 
-I agree it's confusing (I got it wrong first time as well and used the
-wrong alternative for futex).
+On Mon, Sep 12, 2016 at 03:16:24PM +0100, Ard Biesheuvel wrote:
+>  static inline void cpu_set_reserved_ttbr0(void)
+>  {
+> -	unsigned long ttbr = virt_to_phys(empty_zero_page);
+> -
+> -	asm(
+> -	"	msr	ttbr0_el1, %0			// set TTBR0\n"
+> -	"	isb"
+> -	:
+> -	: "r" (ttbr));
+> +	/*
+> +	 * The zero page is located right before swapper_pg_dir, whose
+> +	 * physical address we can easily fetch from TTBR1_EL1.
+> +	 */
+> +	write_sysreg(read_sysreg(ttbr1_el1) - PAGE_SIZE, ttbr0_el1);
+> +	isb();
+>  }
 
-> If I've understood correctly, we need this to distinguish regular
-> load/store uaccess sequences (eg. the futex code) from potentially
-> patched unprivileged load/store sequences (e.g. {get,put}_user) when
-> poking PSTATE.PAN.
-> 
-> So perhaps we could ahve something like:
-> 
-> * privileged_uaccess_{enable,disable}()
->   Which toggle TTBR0, or PAN (always).
->   These would handle cases like the futex/swp code.
+As a heads-up, in arm64 for-next/core this is a write_sysreg() and an
+isb() thanks to [1,2]. This will need a rebase to avoid conflict.
+
+>  /*
+> @@ -109,7 +108,8 @@ static inline void cpu_uninstall_idmap(void)
+>  {
+>  	struct mm_struct *mm = current->active_mm;
 >  
-> * (unprivileged_)uaccess_{enable,disable}()
->   Which toggle TTBR0, or PAN (in the absence of UAO).
->   These would handle cases like the {get,put}_user sequences.
-> 
-> Though perhaps that is just as confusing. ;)
+> -	cpu_set_reserved_ttbr0();
+> +	write_sysreg(virt_to_phys(empty_zero_page), ttbr0_el1);
+> +	isb();
+>  	local_flush_tlb_all();
+>  	cpu_set_default_tcr_t0sz();
+>  
+> @@ -119,7 +119,8 @@ static inline void cpu_uninstall_idmap(void)
+>  
+>  static inline void cpu_install_idmap(void)
+>  {
+> -	cpu_set_reserved_ttbr0();
+> +	write_sysreg(virt_to_phys(empty_zero_page), ttbr0_el1);
+> +	isb();
+>  	local_flush_tlb_all();
+>  	cpu_set_idmap_tcr_t0sz();
 
-I find it more confusing. In the non-UAO case, get_user etc. would
-normally have to use privileged_uaccess_enable() since ldr is not
-replaced with ldtr. Maybe uaccess_enable_for_exclusives() but it doesn't
-look any better. I think adding some comments to the code
-(uaccess_enable macro) would work better, clarifying what the
-alternative is for.
+It would be worth a comment as to why we have to open-code these, so as
+to avoid "obvious" / "trivial cleanup" patches to this later. e.g.
+expand the comment in cpu_set_reserved_ttbr0 with:
 
--- 
-Catalin
+* In some cases (e.g. where cpu_replace_ttbr1 is used), TTBR1 may not
+* point at swapper_pg_dir, and this helper cannot be used.
+
+... and add /* see cpu_set_reserved_ttbr0 */ to both of these above the
+write_sysreg().
+
+> diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
+> index 4e7e7067afdb..44e94e234ba0 100644
+> --- a/arch/arm64/include/asm/sections.h
+> +++ b/arch/arm64/include/asm/sections.h
+> @@ -26,5 +26,6 @@ extern char __hyp_text_start[], __hyp_text_end[];
+>  extern char __idmap_text_start[], __idmap_text_end[];
+>  extern char __irqentry_text_start[], __irqentry_text_end[];
+>  extern char __mmuoff_data_start[], __mmuoff_data_end[];
+> +extern char __robss_start[], __robss_end[];
+>  
+>  #endif /* __ASM_SECTIONS_H */
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 5ce9b2929e0d..eae5036dc725 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -209,9 +209,19 @@ SECTIONS
+>  
+>  	BSS_SECTION(0, 0, 0)
+>  
+> -	. = ALIGN(PAGE_SIZE);
+> +	. = ALIGN(SEGMENT_ALIGN);
+> +	__robss_start = .;
+>  	idmap_pg_dir = .;
+> -	. += IDMAP_DIR_SIZE;
+> +	. = ALIGN(. + IDMAP_DIR_SIZE + PAGE_SIZE, SEGMENT_ALIGN);
+> +	__robss_end = .;
+
+Is it really worth aligning this beyond PAGE_SIZE?
+
+We shouldn't be poking these very often, the padding is always larger
+than the number of used pages, and the swapper dir is relegated to page
+mappings regardless.
+
+> +	/*
+> +	 * Put the zero page right before swapper_pg_dir so we can easily
+> +	 * obtain its physical address by subtracting PAGE_SIZE from the
+> +	 * contents of TTBR1_EL1.
+> +	 */
+> +	empty_zero_page = __robss_end - PAGE_SIZE;
+
+Further to the above, I think this would be clearer if defined in-line
+as with the idmap and swapper pgdirs (with page alignment).
+
+[...]
+
+>  	/*
+> -	 * Map the linear alias of the [_text, __init_begin) interval as
+> -	 * read-only/non-executable. This makes the contents of the
+> -	 * region accessible to subsystems such as hibernate, but
+> -	 * protects it from inadvertent modification or execution.
+> +	 * Map the linear alias of the intervals [_text, __init_begin) and
+> +	 * [robss_start, robss_end) as read-only/non-executable. This makes
+> +	 * the contents of these regions accessible to subsystems such
+> +	 * as hibernate, but protects them from inadvertent modification or
+> +	 * execution.
+
+For completeness, it may also be worth stating that we're mapping the
+gap between those as usual, since this will be freed.
+
+Then again, maybe not. ;)
+
+[...]
+
+> @@ -436,13 +442,19 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+>   */
+>  static void __init map_kernel(pgd_t *pgd)
+>  {
+> -	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
+> +	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init,
+> +		vmlinux_data, vmlinux_robss, vmlinux_tail;
+>  
+>  	map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
+>  	map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
+>  	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
+>  			   &vmlinux_init);
+> -	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
+> +	map_kernel_segment(pgd, _data, __robss_start, PAGE_KERNEL,
+> +			   &vmlinux_data);
+> +	map_kernel_segment(pgd, __robss_start, __robss_end, PAGE_KERNEL_RO,
+> +			   &vmlinux_robss);
+> +	map_kernel_segment(pgd, __robss_end, _end, PAGE_KERNEL,
+> +			   &vmlinux_tail);
+
+Perhaps s/tail/swapper/ or s/tail/pgdir/ to make this clearer?
+
+Modulo the above, this looks good to me.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/455284.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/455290.html
