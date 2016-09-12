@@ -1,50 +1,82 @@
-From: sf84@laposte.net (Sebastian Frias)
-Date: Mon, 12 Sep 2016 18:29:06 +0200
-Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
-In-Reply-To: <CANCZdfri+T59FA4XTaH5JbW0BaJHt3w5eaSkpD8NrJn6nZrZbA@mail.gmail.com>
-References: <57BDAF2E.10502@laposte.net>
- <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
- <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
- <57D6AA54.6000208@laposte.net> <20160912135549.GA14165@leverpostej>
- <CANCZdfri+T59FA4XTaH5JbW0BaJHt3w5eaSkpD8NrJn6nZrZbA@mail.gmail.com>
-Message-ID: <57D6D7D2.7030507@laposte.net>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Tue, 13 Sep 2016 01:29:36 +0900
+Subject: [PATCH v3] arm64: Improve kprobes test for atomic sequence
+In-Reply-To: <57D60AA7.6010304@linaro.org>
+References: <1473449169-16032-1-git-send-email-dave.long@linaro.org>
+ <20160910144841.1bbbffd8548128146df11a41@kernel.org>
+ <57D60AA7.6010304@linaro.org>
+Message-ID: <20160913012936.489d3dc7a0b5a9e0f0670745@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Warner,
+On Sun, 11 Sep 2016 21:53:43 -0400
+David Long <dave.long@linaro.org> wrote:
 
-On 09/12/2016 04:26 PM, Warner Losh wrote:
-> On Mon, Sep 12, 2016 at 8:01 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> Since the question seems understood, do you have an example of other SoC's
->>> doing something similar?
->>
->> I do not have an example. I know that others are using DT for data
->> beyond what Linux or another OS requires, but it's my understanding that
->> that is typically in a separate DTB.
+> On 09/10/2016 01:48 AM, Masami Hiramatsu wrote:
+> > On Fri,  9 Sep 2016 15:26:09 -0400
+> > David Long <dave.long@linaro.org> wrote:
+> >
+> >> From: "David A. Long" <dave.long@linaro.org>
+> >>
+> >> Kprobes searches backwards a finite number of instructions to determine if
+> >> there is an attempt to probe a load/store exclusive sequence. It stops when
+> >> it hits the maximum number of instructions or a load or store exclusive.
+> >> However this means it can run up past the beginning of the function and
+> >> start looking at literal constants. This has been shown to cause a false
+> >> positive and blocks insertion of the probe. To fix this, further limit the
+> >> backwards search to stop if it hits a symbol address from kallsyms. The
+> >> presumption is that this is the entry point to this code (particularly for
+> >> the common case of placing probes at the beginning of functions).
+> >>
+> >> This also improves efficiency by not searching code that is not part of the
+> >> function. There may be some possibility that the label might not denote the
+> >> entry path to the probed instruction but the likelihood seems low and this
+> >> is just another example of how the kprobes user really needs to be
+> >> careful about what they are doing.
+> >
+> > Of course user should be careful, but also, in such case, kernel can reject
+> > to probe it.
+> >
 > 
-> Just to clarify: FreeBSD uses, for the most part, the DTB's that the
-> 'vendor' ships, which is quite often the same ones included in Linux.
-> There's some exceptions where the bindings weren't really hardware
-> independent, or where the abstraction model was really Linux specific
-> (for things like the HDMI stack).
+> I'm not exactly sure what you mean.  I'm just saying when everything 
+> goes right we still cannot promise perfection in detecting a probe 
+> within an atomic sequence.  This patch will reject a probe that is after 
+> a ldx and has no intervening kallsyms label (and assuming it's within 
+> the defined maximum count of subsequent instructions).
 > 
-> However, with the advent of overlays, one would think that a vendor
-> could easily include an overlay with the DTB data for the devices they
-> don't wish to, or cannot for other reasons release. It seems like the
-> perfect mechanism to comply with the rules about inclusion of nodes in
-> the DTS. Vendors are free to document these nodes and don't require
-> the Linux kernel include them in the Documents directory to do so.
-> There have been recent efforts to move this documentation to a third
-> party to maintain.
 
-This is very interesting, do you have a more concrete example of such
-usage?
+Hmm, what I meant was the below code.
 
-The overlay technique could be a solution, but so is forking and
-distributing a non-documented DT. That's why I'd put this solution a
-little bit lower than just exposing the entire HW description through
-the DT.
+> >> +	/*
+> >> +	 * If there's a symbol defined in front of and near enough to
+> >> +	 * the probe address assume it is the entry point to this
+> >> +	 * code and use it to further limit how far back we search
+> >> +	 * when determining if we're in an atomic sequence. If we could
+> >> +	 * not find any symbol skip the atomic test altogether as we
+> >> +	 * could otherwise end up searching irrelevant text/literals.
+> >> +	 * KPROBES depends on KALLSYMS so this last case should never
+> >> +	 * happen.
+> >> +	 */
+> >> +	if (kallsyms_lookup_size_offset((unsigned long) addr, &size, &offset)) {
+> >> +		if (offset < (MAX_ATOMIC_CONTEXT_SIZE*sizeof(kprobe_opcode_t)))
+> >> +			scan_end = addr - (offset / sizeof(kprobe_opcode_t));
+> >> +		else
+> >> +			scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
+> >
+> >          } else
+> >                 return INSN_REJECTED;
+> >
+> >    that is what I expected...
 
-Best regards,
+As you said above,
 
-Sebastian
+> >> +	 * KPROBES depends on KALLSYMS so this last case should never
+> >> +	 * happen.
+
+If it should never happen, it also would be better to reject it because
+it is unexpected result.
+
+Thank you,
+
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
