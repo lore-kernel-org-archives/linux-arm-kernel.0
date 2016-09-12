@@ -1,37 +1,27 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 12 Sep 2016 10:44:51 +0100
-Subject: [PATCH v3 7/8] ARM: Move system register accessors to asm/cp15.h
-In-Reply-To: <57D2EBE4.4060107@arm.com>
-References: <1473350810-10857-1-git-send-email-vladimir.murzin@arm.com>
- <1473350810-10857-8-git-send-email-vladimir.murzin@arm.com>
- <57D2EBE4.4060107@arm.com>
-Message-ID: <57D67913.807@arm.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Mon, 12 Sep 2016 17:45:11 +0800
+Subject: [PATCH v15.1 3/5] drm/rockchip: cdn-dp: add cdn DP support for
+ rk3399
+In-Reply-To: <20160912091339.GY27946@sirena.org.uk>
+References: <1473473748-22331-4-git-send-email-zyw@rock-chips.com>
+ <1473480966-21572-1-git-send-email-zyw@rock-chips.com>
+ <20160912091339.GY27946@sirena.org.uk>
+Message-ID: <57D67927.7070109@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, missed this part...
+Hi Mark
 
-On 09/09/16 18:05, Marc Zyngier wrote:
->>  
->> > +#define __ACCESS_CP15(CRn, Op1, CRm, Op2)	\
->> > +	"mrc", "mcr", __stringify(p15, Op1, %0, CRn, CRm, Op2), u32
->> > +#define __ACCESS_CP15_64(Op1, CRm)		\
->> > +	"mrrc", "mcrr", __stringify(p15, Op1, %Q0, %R0, CRm), u64
->> > +
->> > +#define __read_sysreg(r, w, c, t) ({				\
->> > +	t __val;						\
->> > +	asm volatile(r " " c : "=r" (__val));			\
->> > +	__val;							\
->> > +})
->> > +#define read_sysreg(...)		__read_sysreg(__VA_ARGS__)
->> > +
->> > +#define __write_sysreg(v, r, w, c, t)	asm volatile(w " " c : : "r" ((t)(v)))
->> > +#define write_sysreg(v, ...)		__write_sysreg(v, __VA_ARGS__)
->> > +
-> Shouldn't that be placed after the #ifdef below?
-> 
+OK, thanks.
+I will send the whole series next time, hope it will not bother anyone
 
-Yes, I'll move it under #ifdef.
 
-Thanks
-Vladimir
+On 09/12/2016 05:13 PM, Mark Brown wrote:
+> On Fri, Sep 09, 2016 at 09:16:06PM -0700, Chris Zhong wrote:
+>> Add support for cdn DP controller which is embedded in the rk3399
+>> SoCs. The DP is compliant with DisplayPort Specification,
+> Please don't new patches in reply to old serieses, especially not
+> individual patches in the middle of the series - it just makes
+> everything more confusing.  It becomes difficult to tell what the
+> version of the series that's actually expected is.  Please send the
+> whole series.
