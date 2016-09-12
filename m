@@ -1,48 +1,40 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 12 Sep 2016 09:02:55 -0400
-Subject: [PATCH V2 01/10] Documentation: DT: qcom_hidma: update binding for MSI
+Date: Mon, 12 Sep 2016 09:02:56 -0400
+Subject: [PATCH V2 02/10] Documentation: DT: qcom_hidma: correct spelling
+ mistakes
 In-Reply-To: <1473685384-19913-1-git-send-email-okaya@codeaurora.org>
 References: <1473685384-19913-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1473685384-19913-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <1473685384-19913-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding a new binding for qcom,hidma-1.1 to distinguish HW supporting
-MSI interrupts from the older revision.
+Fix the spelling mistakes and extra and statements in the sentences.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-index fd5618b..47bfb5a 100644
+index 47bfb5a..f99f642 100644
 --- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
 +++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-@@ -47,12 +47,23 @@ When the OS is not in control of the management interface (i.e. it's a guest),
- the channel nodes appear on their own, not under a management node.
+@@ -5,13 +5,13 @@ memcpy and memset capabilities. It has been designed for virtualized
+ environments.
  
- Required properties:
--- compatible: must contain "qcom,hidma-1.0"
-+- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
-+for MSI capable HW.
- - reg: Addresses for the transfer and event channel
- - interrupts: Should contain the event interrupt
- - desc-count: Number of asynchronous requests this channel can handle
- - iommus: required a iommu node
+ Each HIDMA HW instance consists of multiple DMA channels. These channels
+-share the same bandwidth. The bandwidth utilization can be parititioned
++share the same bandwidth. The bandwidth utilization can be partitioned
+ among channels based on the priority and weight assignments.
  
-+Optional properties for MSI:
-+- msi-parent: pointer to the MSI controller object with the DeviceID in use.
-+
-+Example:
-+ msi_parent: <&msi0 0x80024>
-+
-+msi0 is the MSI controller in the system. Bits 0-5 is the channel ID. 4
-+is the channel ID. Bits 5-8 is the instance number. This is for the HIDMA
-+instance 1.
-+
- Example:
+ There are only two priority levels and 15 weigh assignments possible.
  
- Hypervisor OS configuration:
+ Other parameters here determine how much of the system bus this HIDMA
+-instance can use like maximum read/write request and and number of bytes to
++instance can use like maximum read/write request and number of bytes to
+ read/write in a single burst.
+ 
+ Main node required properties:
 -- 
 1.9.1
