@@ -1,31 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Sep 2016 14:17:46 +0200
-Subject: [PATCH] pinctrl/at91: Don't provide a default trigger type
-In-Reply-To: <1473170295-16712-1-git-send-email-marc.zyngier@arm.com>
-References: <1473170295-16712-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CACRpkdZZ96kKLRGtZdY3rpa6SgqzrQwEO=96FyMzV1KBkHBjgQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 12 Sep 2016 20:18:00 +0800
+Subject: [PATCH v4 2/3] arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
+In-Reply-To: <20160909115336.GB16924@tiger>
+References: <1473141861-5033-1-git-send-email-jun.nie@linaro.org>
+ <1473141861-5033-3-git-send-email-jun.nie@linaro.org>
+ <20160909115336.GB16924@tiger>
+Message-ID: <20160912121800.GB7373@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 6, 2016 at 3:58 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+On Fri, Sep 09, 2016 at 07:53:36PM +0800, Shawn Guo wrote:
+> A bit more comments as below ...
+> 
+> On Tue, Sep 06, 2016 at 02:04:20PM +0800, Jun Nie wrote:
+> > +	soc {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		compatible = "simple-bus";
+> > +		interrupt-parent = <&gic>;
+> > +		ranges;
+> > +
+> > +		timer {
+> > +			compatible = "arm,armv8-timer";
+> > +			interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
+> > +				     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+> > +				     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+> > +				     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
+> 
+> Affinity bits are missing for PPI interrupt.  You can use a bit help
+> from defines in include/dt-bindings/interrupt-controller/arm-gic.h.
 
-> at91 used to set a default trigger type for GPIO interrupts in
-> order to cope with the old board files. These days are long gone,
-> and it all gets probed through DT.
->
-> Andras Szemzo reported that the Ethernet device on his board was
-> bailing to be probed, due to a conflict in interrupt trigger.
-> Surely enough, this is due to this default trigger still being
-> present, and turning this into a IRQ_TYPE_NONE fixes the issue.
->
-> Reported-by: Andras Szemzo <szemzo.andras@gmail.com>
-> Tested-by: Andras Szemzo <szemzo.andras@gmail.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Sorry, I missed the fact that affinity bits is only required for gic-v2,
+while what we have here is a gic-v3.  So please ignore the comment.
 
-Patch applied with Nico's ACK.
-
-Yours,
-Linus Walleij
+Shawn
