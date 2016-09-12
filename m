@@ -1,100 +1,100 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 12 Sep 2016 10:52:33 -0600
-Subject: [PATCH v2 00/17] Make rpmsg a framework
-In-Reply-To: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
-References: <1472768889-3906-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <20160912165233.GB21885@linaro.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 12 Sep 2016 09:51:26 -0700
+Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
+In-Reply-To: <20160912140401.qkezay7sqqavsf4i@pengutronix.de>
+References: <20141009151605.GA8818@ulmo.nvidia.com>
+ <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
+ <6c896634c4d6446df0388da2c0228232@agner.ch>
+ <20160909091857.7a263220@ipc1.ka-ro>
+ <20160912124553.aqgv7b4vsx4urogi@piout.net>
+ <20160912140401.qkezay7sqqavsf4i@pengutronix.de>
+Message-ID: <074eed0df23199bc82f8d221690596d3@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi,
 
-On Thu, Sep 01 2016 at 16:28 -0600, Bjorn Andersson wrote:
->This series splits the virtio rpmsg bus driver into a rpmsg bus and a virtio
->backend/wireformat.
->
->
->As we discussed the Qualcomm SMD implementation a couple of years back people
->suggested that I should make it "a rpmsg thingie". With the introduction of the
->Qualcomm 8996 platform, we must support a variant of the communication
->mechanism that share many of the characteristics of SMD, but are different
->enough that it can't be done in a single implementation. As such there is
->enough benefit to do the necessary work and being able to make SMD a "rpmsg
->thingie".
->
->On-top of this series I have patches to switch the current smd clients over to
->rpmsg (and by that drop the existing SMD implementation).
->
->All this allows me to implement the new backend and reuse all existing SMD
->drivers with the new mechanism.
->
+Thanks for that insight Uwe!
 
-RPM Communication has to supported even when IRQs are disabled. The most
-important use of this communication is to set the wake up time for the
-CPU subsystem when all the CPUs are powered off. In addition to that,
-"sleep" votes that are sent by the application processor subsystem to
-allow system to go into deep sleep modes can only be triggered when the
-CPU PM domains are power collapsed, drivers do not have a knowledge of
-when that happens. This has to be done by a platform code that registers
-for CPU PM domain power_off/on callbacks.
+On 2016-09-12 07:04, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Mon, Sep 12, 2016 at 02:45:53PM +0200, Alexandre Belloni wrote:
+>> Isn't a properly designed PWM putting a high level on its pin when
+>> disabled and configured with inversed polarity ?
+> 
+> it's not well defined. When trying several times over the years to
+> properly define and document it, I didn't manage to agree with Thierry
+> what is the right thing to define.
+> 
+> IMHO it would be sensible to make it explicitly undefined what happens
+> when a PMW is disabled. This would simplify drivers from
+> 
+> 	pwm_config(mypwm, value, period);
+> 	if (!value)
+> 		pwm_disable(mypwm)
+> 	else
+> 		pwm_enable(led_dat->pwm);
+> 
+> to
+> 
+> 	pwm_config(mypwm, value, period);
+> 
+> and let the pwm driver disable it's clock (or whatever) when value is 0
+> and there are energy saving benefits that don't hurt the expected
+> behaviour of the pin. So the hardware specific stuff is handled in the
+> hardware specific driver and usage in pwm-consumers is simplified.
+> Moreover this also simplifies some pwm drivers because they don't have
+> to catch in software the cases where the hardware differs from the
+> expectation[1].
 
-Using rpmsg may be nice for RPM SMD communication, but mutexes need to
-go away for this driver to be any useful than bare bones active mode
-resource requests for QCOM SoCs. By not doing that now, we lock
-ourselves out of using this SMD driver in the near future when CPU PM
-domains are available in the kernel with an ability to do system low
-power modes.
+That sounds like a sane definition to me and what I would have expected
+from the PWM framework. That the pin is not defined after pwm_disable is
+totally understandable. It is usually a case which the board designer
+anyway needs to take care of (e.g. what is the state right after power
+on? If the designer cares about, he will put a pull-up/down in place).
 
-I hope you would make rpmsg work in IRQ disabled contexts first before
-porting the SMD driver.
+And it seems also Sascha suggested that:
+https://lkml.org/lkml/2013/1/4/139
 
-Thanks,
-Lina
+I did not found where Thierry disagreed to that...?
 
->
->Changes from v1:
->- Split up the patch moving core code to rpmsg_core into several commits
->- Dropped the wrapping struct in rpmsg_core and just added the ops to the
->  public API (but hid the implementation details)
->- Reordered things to reduce the size of the later patches
->
->Bjorn Andersson (17):
->  rpmsg: Enable matching devices with drivers based on DT
->  rpmsg: Name rpmsg devices based on channel id
->  rpmsg: rpmsg_send() operations takes rpmsg_endpoint
->  rpmsg: Make rpmsg_create_ept() take channel_info struct
->  rpmsg: Clean up rpmsg device vs channel naming
->  rpmsg: Introduce indirection table for rpmsg_device operations
->  rpmsg: Move rpmsg_device API to new file
->  rpmsg: Indirection table for rpmsg_endpoint operations
->  rpmsg: Move endpoint related interface to rpmsg core
->  rpmsg: Move helper for finding rpmsg devices to core
->  rpmsg: Split off generic tail of create_channel()
->  rpmsg: Split rpmsg core and virtio backend
->  rpmsg: Hide rpmsg indirection tables
->  rpmsg: virtio: Hide vrp pointer from the public API
->  rpmsg: Move virtio specifics from public header
->  rpmsg: Allow callback to return errors
->  rpmsg: Introduce Qualcomm SMD backend
->
-> drivers/remoteproc/Kconfig          |    4 +-
-> drivers/rpmsg/Kconfig               |   14 +
-> drivers/rpmsg/Makefile              |    4 +-
-> drivers/rpmsg/qcom_smd.c            | 1434 +++++++++++++++++++++++++++++++++++
-> drivers/rpmsg/rpmsg_core.c          |  498 ++++++++++++
-> drivers/rpmsg/rpmsg_internal.h      |   82 ++
-> drivers/rpmsg/virtio_rpmsg_bus.c    |  487 +++++-------
-> include/linux/rpmsg.h               |  246 +-----
-> samples/rpmsg/rpmsg_client_sample.c |   14 +-
-> 9 files changed, 2266 insertions(+), 517 deletions(-)
-> create mode 100644 drivers/rpmsg/qcom_smd.c
-> create mode 100644 drivers/rpmsg/rpmsg_core.c
-> create mode 100644 drivers/rpmsg/rpmsg_internal.h
->
->-- 
->2.5.0
->
->--
->To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->the body of a message to majordomo at vger.kernel.org
->More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Looking at drivers/leds/leds-pwm.c it doesn't ensure that each
+> pwm_enable is paired by an pwm_disable (e.g. on .remove). Is this a bug?
+> With my purposed semantics of .config and .disable this would be much
+> easier to fix.
+
+That looks like a bug to me.
+
+> 
+> Regarding your question: Yeah, maybe all properly designed PWMs behave
+> like you expect. But reality isn't only about properly designed
+> hardware, so I wouldn't expect all hardware to behave. The inverse
+> property might be software emulated and so on pwm_disable the pin might
+> become 0.
+> 
+> The obvious downside of my suggestion is that this is a change in what
+> most people expect (because it was "safe" to call pwm_enable before),
+> but the resulting code is simpler and cleaner.
+> 
+> Today it's a (maybe small) bug, when a pwm consumer calls pwm_config with
+> value=0 and doesn't disable it afterwards. IMHO that's a bug in the pwm
+> API that pwm_config with value=0 doesn't imply (the wanted effects of)
+> pwm_disable.
+
+I don't quite get what you are saying here. What wanted effects of
+pwm_disable would you like to move into pwm_config with value=0?
+
+--
+Stefan
+
+> 
+> Best regards
+> Uwe
+> 
+> [1] This might even be impossible: Consider a PWM that gets 0 (or
+> high-z) on hw-disable independent of configured duty or inversion. The
+> driver now sees for an inverted pwm: pwm_config(this, 0, 100);
+> pwm_disable(this); The driver cannot know if it should continue to drive
+> the pin at 1, or if the pwm consumer stopped caring about the pwm and
+> disabling the hardware is OK.
