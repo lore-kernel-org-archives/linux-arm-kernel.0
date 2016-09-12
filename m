@@ -1,49 +1,145 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 12 Sep 2016 17:13:58 +0100
-Subject: [PATCH v7 20/22] iommu/arm-smmu: Set domain geometry
+Date: Mon, 12 Sep 2016 17:13:52 +0100
+Subject: [PATCH v7 14/22] iommu/arm-smmu: Streamline SMMU data lookups
 In-Reply-To: <cover.1473695704.git.robin.murphy@arm.com>
 References: <cover.1473695704.git.robin.murphy@arm.com>
-Message-ID: <f5e1003cbd75f426ed8f89715923c90cb18f6603.1473695704.git.robin.murphy@arm.com>
+Message-ID: <b93f589c46d56a602733b02f96b90457c8bb1da0.1473695704.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For non-aperture-based IOMMUs, the domain geometry seems to have become
-the de-facto way of indicating the input address space size. That is
-quite a useful thing from the users' perspective, so let's do the same.
+Simplify things somewhat by stashing our arm_smmu_device instance in
+drvdata, so that it's readily available to our driver model callbacks.
+Then we can excise the private list entirely, since the driver core
+already has a perfectly good list of SMMU devices we can use in the one
+instance we actually need to. Finally, make a further modest code saving
+with the relatively new of_device_get_match_data() helper.
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 2 ++
- drivers/iommu/arm-smmu.c    | 2 ++
- 2 files changed, 4 insertions(+)
+ drivers/iommu/arm-smmu.c | 44 +++++++++++---------------------------------
+ 1 file changed, 11 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 0c45c1e02e04..15c01c3cd540 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1551,6 +1551,8 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- 		return -ENOMEM;
- 
- 	domain->pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
-+	domain->geometry.aperture_end = (1UL << ias) - 1;
-+	domain->geometry.force_aperture = true;
- 	smmu_domain->pgtbl_ops = pgtbl_ops;
- 
- 	ret = finalise_stage_fn(smmu_domain, &pgtbl_cfg);
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index f143dbc549b9..fa892d25004d 100644
+index 0a628f2c9297..3962add0c33b 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -940,6 +940,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+@@ -41,6 +41,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/pci.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+@@ -370,8 +371,6 @@ struct arm_smmu_device {
+ 	u32				num_context_irqs;
+ 	unsigned int			*irqs;
  
- 	/* Update the domain's page sizes to reflect the page table format */
- 	domain->pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
-+	domain->geometry.aperture_end = (1UL << ias) - 1;
-+	domain->geometry.force_aperture = true;
+-	struct list_head		list;
+-
+ 	u32				cavium_id_base; /* Specific to Cavium */
+ };
  
- 	/* Initialise the context bank with our page table cfg */
- 	arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
+@@ -409,9 +408,6 @@ struct arm_smmu_domain {
+ 	struct iommu_domain		domain;
+ };
+ 
+-static DEFINE_SPINLOCK(arm_smmu_devices_lock);
+-static LIST_HEAD(arm_smmu_devices);
+-
+ struct arm_smmu_option_prop {
+ 	u32 opt;
+ 	const char *prop;
+@@ -478,6 +474,8 @@ static int __find_legacy_master_phandle(struct device *dev, void *data)
+ 	return err;
+ }
+ 
++static struct platform_driver arm_smmu_driver;
++
+ static int arm_smmu_register_legacy_master(struct device *dev)
+ {
+ 	struct arm_smmu_device *smmu;
+@@ -495,19 +493,16 @@ static int arm_smmu_register_legacy_master(struct device *dev)
+ 	}
+ 
+ 	it.node = np;
+-	spin_lock(&arm_smmu_devices_lock);
+-	list_for_each_entry(smmu, &arm_smmu_devices, list) {
+-		err = __find_legacy_master_phandle(smmu->dev, &data);
+-		if (err)
+-			break;
+-	}
+-	spin_unlock(&arm_smmu_devices_lock);
++	err = driver_for_each_device(&arm_smmu_driver.driver, NULL, &data,
++				     __find_legacy_master_phandle);
+ 	of_node_put(np);
+ 	if (err == 0)
+ 		return -ENODEV;
+ 	if (err < 0)
+ 		return err;
+ 
++	smmu = dev_get_drvdata(data);
++
+ 	if (it.cur_count > MAX_MASTER_STREAMIDS) {
+ 		dev_err(smmu->dev,
+ 			"reached maximum number (%d) of stream IDs for master device %s\n",
+@@ -1816,7 +1811,6 @@ MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
+ 
+ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ {
+-	const struct of_device_id *of_id;
+ 	const struct arm_smmu_match_data *data;
+ 	struct resource *res;
+ 	struct arm_smmu_device *smmu;
+@@ -1830,8 +1824,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	}
+ 	smmu->dev = dev;
+ 
+-	of_id = of_match_node(arm_smmu_of_match, dev->of_node);
+-	data = of_id->data;
++	data = of_device_get_match_data(dev);
+ 	smmu->version = data->version;
+ 	smmu->model = data->model;
+ 
+@@ -1904,35 +1897,20 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	INIT_LIST_HEAD(&smmu->list);
+-	spin_lock(&arm_smmu_devices_lock);
+-	list_add(&smmu->list, &arm_smmu_devices);
+-	spin_unlock(&arm_smmu_devices_lock);
+-
++	platform_set_drvdata(pdev, smmu);
+ 	arm_smmu_device_reset(smmu);
+ 	return 0;
+ }
+ 
+ static int arm_smmu_device_remove(struct platform_device *pdev)
+ {
+-	struct device *dev = &pdev->dev;
+-	struct arm_smmu_device *curr, *smmu = NULL;
+-
+-	spin_lock(&arm_smmu_devices_lock);
+-	list_for_each_entry(curr, &arm_smmu_devices, list) {
+-		if (curr->dev == dev) {
+-			smmu = curr;
+-			list_del(&smmu->list);
+-			break;
+-		}
+-	}
+-	spin_unlock(&arm_smmu_devices_lock);
++	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+ 
+ 	if (!smmu)
+ 		return -ENODEV;
+ 
+ 	if (!bitmap_empty(smmu->context_map, ARM_SMMU_MAX_CBS))
+-		dev_err(dev, "removing device with active domains!\n");
++		dev_err(&pdev->dev, "removing device with active domains!\n");
+ 
+ 	/* Turn the thing off */
+ 	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
 -- 
 2.8.1.dirty
