@@ -1,176 +1,83 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Tue, 13 Sep 2016 03:02:05 +0000
-Subject: [PATCH v4 1/2] nxp/dts: add pcie aer interrupt-name property in
- the dts
-In-Reply-To: <20160912221358.GI23532@localhost>
-References: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
- <1472625442-23309-1-git-send-email-po.liu@nxp.com>
- <20160912221358.GI23532@localhost>
-Message-ID: <VI1PR0401MB170970A4F177949FCE4827A892FE0@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 12 Sep 2016 20:51:03 -0700
+Subject: [PATCH] ARM: dts: msm8974: Add definitions for QCE & cryptobam
+In-Reply-To: <20160830153740.13275-1-voker57@gmail.com>
+References: <20160830153740.13275-1-voker57@gmail.com>
+Message-ID: <20160913035103.GA21438@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn, Shawn, Rob,
+On Tue 30 Aug 08:37 PDT 2016, Iaroslav Gridin wrote:
 
-Thanks for reply. I'll upload new patches:
- - separate the patches with arm and arm64 dts for new version.
- - Modify the binding comments to make it clear for explain the 'aer' property.
-
-Best regards,
-Liu Po
-
------Original Message-----
-From: Bjorn Helgaas [mailto:helgaas at kernel.org] 
-Sent: Tuesday, September 13, 2016 6:14 AM
-To: Po Liu
-Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Bjorn Helgaas; Shawn Guo; Marc Zyngier; Rob Herring; Roy Zang; Vincent Hu; Stuart Yoder; Leo Li; Arnd Bergmann; M.H. Lian; Murali Karicheri
-Subject: Re: [PATCH v4 1/2] nxp/dts: add pcie aer interrupt-name property in the dts
-
-On Wed, Aug 31, 2016 at 02:37:21PM +0800, Po Liu wrote:
-> NXP some platforms aer interrupt was not MSI/MSI-X/INTx but using 
-> interrupt line independently. This patch add a "aer"
-> interrupt-names for aer interrupt.
-> With the interrupt-names "aer", code could probe aer interrupt line 
-> for pcie root port, replace the aer interrupt service irq.
-> This is intend to fixup the Layerscape platforms which aer interrupt 
-> was not MSI/MSI-X/INTx, but using interrupt line independently.
+> From: Voker57 <voker57@gmail.com>
 > 
-> Signed-off-by: Po Liu <po.liu@nxp.com>
-
-Rob and Shawn had comments here, and I'm not sure they ever got resolved.
-
+> Add device tree definitions for Qualcomm Cryptography engine and its BAM
+> Signed-off-by: Iaroslav Gridin <voker57@gmail.com>
 > ---
-> changes for V4:
-> 	- Add comments explain why to add this patch
-> 	- Move the binding changes to pci code patch
+>  arch/arm/boot/dts/qcom-msm8974.dtsi | 42 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
 > 
->  arch/arm/boot/dts/ls1021a.dtsi                 |  6 ++++--
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 18 
-> +++++++++---------  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 
-> 16 ++++++++--------
->  3 files changed, 21 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi 
-> b/arch/arm/boot/dts/ls1021a.dtsi index 368e219..443e50b 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -634,7 +634,8 @@
->  			reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
->  			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
-> +			interrupts = <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			fsl,pcie-scfg = <&scfg 0>;
->  			#address-cells = <3>;
->  			#size-cells = <2>;
-> @@ -657,7 +658,8 @@
->  			reg = <0x00 0x03500000 0x0 0x00010000   /* controller registers */
->  			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			fsl,pcie-scfg = <&scfg 1>;
->  			#address-cells = <3>;
->  			#size-cells = <2>;
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi 
-> b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> index e669fbd..654071d 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> @@ -527,9 +527,9 @@
->  			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
->  			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 118 0x4>, /* controller interrupt */
-> -				     <0 117 0x4>; /* PME interrupt */
-> -			interrupt-names = "intr", "pme";
-> +			interrupts = <0 117 0x4>, /* PME interrupt */
-> +					 <0 118 0x4>; /* aer interrupt */
-> +			interrupt-names = "pme", "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> @@ -552,9 +552,9 @@
->  			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
->  			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 128 0x4>,
-> -				     <0 127 0x4>;
-> -			interrupt-names = "intr", "pme";
-> +			interrupts = <0 127 0x4>,
-> +					 <0 128 0x4>;
-> +			interrupt-names = "pme", "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> @@ -577,9 +577,9 @@
->  			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
->  			       0x50 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 162 0x4>,
-> -				     <0 161 0x4>;
-> -			interrupt-names = "intr", "pme";
-> +			interrupts = <0 161 0x4>,
-> +					 <0 162 0x4>;
-> +			interrupt-names = "pme", "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi 
-> b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> index 21023a3..58844e8 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> @@ -583,8 +583,8 @@
->  			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
->  			       0x10 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 108 0x4>; /* Level high type */
-> -			interrupt-names = "intr";
-> +			interrupts = <0 108 0x4>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> @@ -607,8 +607,8 @@
->  			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
->  			       0x12 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 113 0x4>; /* Level high type */
-> -			interrupt-names = "intr";
-> +			interrupts = <0 113 0x4>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> @@ -631,8 +631,8 @@
->  			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
->  			       0x14 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 118 0x4>; /* Level high type */
-> -			interrupt-names = "intr";
-> +			interrupts = <0 118 0x4>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> @@ -655,8 +655,8 @@
->  			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
->  			       0x16 0x00000000 0x0 0x00002000>; /* configuration space */
->  			reg-names = "regs", "config";
-> -			interrupts = <0 123 0x4>; /* Level high type */
-> -			interrupt-names = "intr";
-> +			interrupts = <0 123 0x4>; /* aer interrupt */
-> +			interrupt-names = "aer";
->  			#address-cells = <3>;
->  			#size-cells = <2>;
->  			device_type = "pci";
-> --
-> 2.1.0.27.g96db324
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" 
-> in the body of a message to majordomo at vger.kernel.org More majordomo 
-> info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> index 561d4d1..c0da739 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> @@ -287,6 +287,48 @@
+>  			reg = <0xf9011000 0x1000>;
+>  		};
+>  
+> +		cryptobam: dma at fd444000 {
+> +			compatible = "qcom,bam-v1.4.0";
+> +			reg = <0xfd444000 0x15000>;
+> +			interrupts = <0 236 0>;
+> +			clocks = <&gcc GCC_CE2_AHB_CLK>,
+> +				 <&gcc GCC_CE2_AXI_CLK>,
+> +				 <&gcc GCC_CE2_CLK>;
+> +			clock-names = "bam_clk", "axi_clk", "core_clk";
+> +			#dma-cells = <1>;
+> +			qcom,ee = <1>;
+> +			qcom,controlled-remotely;
+> +			};
+
+As Stan noted, please shift this '}' one step left (the rest looks well
+indented.
+
+> +
+> +		qcom,qcrypto at fd440000 {
+
+Rename this "qcrypto" and make sure the address matches the reg
+property.
+
+> +			compatible = "qcom,crypto-v5.1";
+> +			reg = <0xfd45a000 0x6000>;
+> +			reg-names = "crypto-base";
+> +			interrupts = <0 236 0>;
+> +			qcom,bam-pipe-pair = <2>;
+> +			qcom,ce-hw-instance = <1>;
+> +			qcom,ce-device = <0>;
+> +			clocks = <&gcc GCC_CE2_CLK>,
+> +				 <&gcc GCC_CE2_AHB_CLK>,
+> +				 <&gcc GCC_CE2_AXI_CLK>,
+> +				 <&gcc CE2_CLK_SRC>;
+> +
+> +			dmas = <&cryptobam 2>, <&cryptobam 3>;
+> +			dma-names = "rx", "tx";
+> +			clock-names = "core", "iface", "bus", "core_src";
+> +			qcom,clk-mgmt-sus-res;
+> +			qcom,msm-bus,name = "qcrypto-noc";
+> +
+> +			qcom,msm-bus,num-cases = <2>;
+> +			qcom,msm-bus,num-paths = <1>;
+> +			qcom,use-sw-aes-cbc-ecb-ctr-algo;
+> +			qcom,use-sw-aes-xts-algo;
+> +			qcom,use-sw-ahash-algo;
+> +			qcom,msm-bus,vectors-KBps = <56 512 0 0>,
+> +						    <56 512 3936000 393600>;
+> +			};
+> +
+> +
+>  		timer at f9020000 {
+
+It's nice to keep the nodes within a group ordered by address.
+
+Regards,
+Bjorn
