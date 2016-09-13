@@ -1,44 +1,27 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 13 Sep 2016 16:04:52 +0200
-Subject: [PATCH] iommu/io-pgtable-arm: Check for v7s-incapable systems
-In-Reply-To: <2e473e263ac469bd6d3b09e7756c138325e10969.1473773198.git.robin.murphy@arm.com>
-References: <2e473e263ac469bd6d3b09e7756c138325e10969.1473773198.git.robin.murphy@arm.com>
-Message-ID: <79a0ef0e-f035-2c2a-2991-05a7ff3223e5@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 13 Sep 2016 16:05:44 +0200
+Subject: [PATCH 0/3] ARM: dts: artpec6.dtsi updates
+In-Reply-To: <cover.1471959733.git.larper@axis.com>
+References: <cover.1471959733.git.larper@axis.com>
+Message-ID: <2398929.KttRDJeEu5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 13/09/2016 15:26, Robin Murphy wrote:
-> On machines with no 32-bit addressable RAM whatsoever, we shouldn't
-> even touch the v7s format as it's never going to work.
+On Tuesday, August 23, 2016 4:00:49 PM CEST Lars Persson wrote:
+> This brings the dtsi up to date with with tested and optimized settings from the
+> Axis tree.
 > 
-> Fixes: e5fc9753b1a8 ("iommu/io-pgtable: Add ARMv7 short descriptor support")
-> Reported-by: Eric Auger <eric.auger@redhat.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/io-pgtable-arm-v7s.c | 3 +++
->  1 file changed, 3 insertions(+)
+> Lars Persson (3):
+>   ARM: dts: artpec: use clock binding header
+>   ARM: dts: artpec: use optimized pl310 settings
+>   ARM: dts: artpec: set irq affinity on pmu interrupts
 > 
-> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-> index def8ca1c982d..b7759a48f4ed 100644
-> --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> @@ -633,6 +633,9 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
->  {
->  	struct arm_v7s_io_pgtable *data;
->  
-> +	if (upper_32_bits(PHYS_OFFSET))
-> +		return NULL;
-> +
->  	if (cfg->ias > ARM_V7S_ADDR_BITS || cfg->oas > ARM_V7S_ADDR_BITS)
->  		return NULL;
->  
+>  arch/arm/boot/dts/artpec6.dtsi | 31 ++++++++++++++++++++-----------
+>  1 file changed, 20 insertions(+), 11 deletions(-)
 > 
-Fixes the oops on AMD Overdrive
-(CONFIG_IOMMU_IO_PGTABLE_ARMV7S_SELFTEST=y and no DMA_API)
+> 
 
-Tested-by: Eric Auger <eric.auger@redhat.com>
+Applied all three to next/dt, thanks for your patience and sorry
+for the delay on my side.
 
-Thanks
-
-Eric
+	Arnd
