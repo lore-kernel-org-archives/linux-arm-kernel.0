@@ -1,67 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Sep 2016 11:12:16 +0100
-Subject: [PATCH v4 07/10] ARM: Introduce MPIDR_LEVEL_SHIFT macro
-In-Reply-To: <57D7C111.7000405@arm.com>
-References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
- <1473691764-29424-8-git-send-email-vladimir.murzin@arm.com>
- <20160913083855.GC5680@cbox> <57D7C111.7000405@arm.com>
-Message-ID: <57D7D100.3040908@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 13 Sep 2016 11:16:02 +0100
+Subject: [PATCH 0/7] Add support for monitoring guest TLB operations
+Message-ID: <1473761769-30572-1-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/09/16 10:04, Vladimir Murzin wrote:
-> On 13/09/16 09:38, Christoffer Dall wrote:
->> On Mon, Sep 12, 2016 at 03:49:21PM +0100, Vladimir Murzin wrote:
->>> vgic-v3 driver uses architecture specific MPIDR_LEVEL_SHIFT macro to
->>> encode the affinity in a form compatible with ICC_SGI* registers.
->>> Unfortunately, that macro is missing on ARM, so let's add it.
->>>
->>> Cc: Russell King <rmk+kernel@armlinux.org.uk>
->>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>> ---
->>>  arch/arm/include/asm/cputype.h |    1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
->>> index 1ee94c7..e2d94c1 100644
->>> --- a/arch/arm/include/asm/cputype.h
->>> +++ b/arch/arm/include/asm/cputype.h
->>> @@ -55,6 +55,7 @@
->>>  
->>>  #define MPIDR_LEVEL_BITS 8
->>>  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
->>> +#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
->>>  
->>
->> I'm not sure I follow the correctness of this completely.
->>
->> This is called from vgic_v3_dispatch_sgi, which takes a u64 value, which
->> may have something in the Aff3 field, which we now shift left 24 bits,
->> but that is not the Aff3 field of AArch32's MPIDR.
->>
->> What is the rationale for this making sense again?
-> 
-> IIUC, in such case we construct mpidr which won't match in match_mpidr()
-> with the value we get from kvm_vcpu_get_mpidr_aff() and no SGI will be
-> sent to the guest.
-> 
-> Since we get that u64 value from the guest, I'd think it is something
-> wrong is going on in the guest in case Aff3 is non-zero; however, we can
-> hide it by zeroing out SGI Aff3 bits in access_gic_sgi().
+Hi,
 
-I don't think zeroing Aff3 is the right move, as the spec doesn't say
-that Aff3 should be ignored in a write to ICC_SGI1R. On the other hand,
-the spec says (in the context of the target list): "If a bit is 1 and
-the bit does not correspond to a valid target PE, the bit must be
-ignored by the Distributor".
+Although there are no PMU events to monitor TLB operations, ARMv8
+supports trapping guest TLB maintenance operations to the
+hypervisor. This trapping mechanism can be used to monitor the use of
+guest TLB instructions.
 
-This makes me think that, unless ICC_SGI1R.IMR is set, we should simply
-ignore that SGI because there is no way we can actually deliver it.
+As taking a trap for every TLB operation can have significant
+overhead, trapping should only be enabled -
 
-Could you cook a small patch that would go on top of this series?
+* on user request
+* for the VM of interest
+
+This patchset adds support to listen to perf trace event state change
+notifications. The notifications and associated context are then used
+to enable trapping of guest TLB operations when requested by the
+user. The trap handling generates trace events (kvm_tlb_invalidate)
+which can already be counted using existing perf trace functionality.
+
+I would appreciate feedback on the approach to tie the control of TLB
+monitoring with perf trace events (Patch 1) especially if there are
+any suggestions on avoiding (or reducing) the overhead of "perf trace"
+notifications.
+
+I looked at using regfunc/unregfunc tracepoint hooks but they don't
+include the event context. But the bigger problem was that the
+callbacks are only called on the first instance of simultaneously
+executing perf stat invocations.
+
+The patchset is based on v4.8-rc5 and adds support for monitoring
+guest TLB operations on 64bit hosts. If the approach taken in the
+patches is acceptable, I'll add 32bit host support as well.
+
+Earlier discussion on this patchset can be found at [0][1].
+
+Changes:
+
+RFC v2 -> v1
+* Dropped the RFC tag
+* Patch 2 - Use VM thread group id for identification
+* Patch 4 - Update comment for clarity
+* Patch 6 - Add comment explaining switch to hype-role when VHE is enabled
+* Patch 7 - Add comment to clarify struct kvm_trace_hook
+
+RFC -> RFC v2
+* Patch 4 - Rename left-over TLBI macro to __TLBI
+* Patch 6 - Replace individual TLB operation emulation with
+  invalidating all stage 1 TLB for the VM. TLB monitoring is expected
+  to be a debug feature and performance is not critical.
+
+With this patchset, 'perf' tool when attached to a VM process can be
+used to monitor the TLB operations. E.g., to monitor a VM with process
+id 4166 -
+
+# perf stat -e "kvm:kvm_tlb_invalidate" -p 4166
+
+Perform some operations in VM (running 'make -j 7' on the kernel
+sources in this instance). Breaking out of perf shows -
+
+Performance counter stats for process id '4166':
+
+         7,471,974      kvm:kvm_tlb_invalidate
+
+     374.235405282 seconds time elapsed
+
+All feedback welcome.
 
 Thanks,
+Punit
 
-	M.
+[0] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1210715.html
+[1] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1224353.html
+
+Mark Rutland (2):
+  arm64: tlbflush.h: add __tlbi() macro
+  arm64/kvm: hyp: tlb: use __tlbi() helper
+
+Punit Agrawal (5):
+  perf/trace: Add notification for perf trace events
+  KVM: Track the pid of the VM process
+  KVM: arm/arm64: Register perf trace event notifier
+  arm64: KVM: Handle trappable TLB instructions
+  arm64: KVM: Enable selective trapping of TLB instructions
+
+ arch/arm/include/asm/kvm_host.h   |   3 +
+ arch/arm/kvm/arm.c                |   2 +
+ arch/arm64/include/asm/kvm_asm.h  |   1 +
+ arch/arm64/include/asm/kvm_host.h |   8 ++
+ arch/arm64/include/asm/tlbflush.h |  34 +++++++--
+ arch/arm64/kvm/Kconfig            |   4 +
+ arch/arm64/kvm/Makefile           |   1 +
+ arch/arm64/kvm/hyp/tlb.c          |  87 +++++++++++++++++++--
+ arch/arm64/kvm/perf_trace.c       | 154 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/sys_regs.c         |  81 ++++++++++++++++++++
+ arch/arm64/kvm/trace.h            |  16 ++++
+ include/linux/kvm_host.h          |   1 +
+ include/linux/trace_events.h      |   3 +
+ kernel/trace/trace_event_perf.c   |  24 ++++++
+ virt/kvm/kvm_main.c               |   2 +
+ 15 files changed, 407 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm64/kvm/perf_trace.c
+
 -- 
-Jazz is not dead. It just smells funny...
+2.8.1
