@@ -1,201 +1,234 @@
-From: m.niestroj@grinn-global.com (Marcin Niestroj)
-Date: Tue, 13 Sep 2016 11:49:51 +0200
-Subject: [PATCH v2 2/2] ARM: dts: imx6ul: Add DTS for liteBoard
-In-Reply-To: <20160913094951.26394-1-m.niestroj@grinn-global.com>
-References: <20160913094951.26394-1-m.niestroj@grinn-global.com>
-Message-ID: <20160913094951.26394-2-m.niestroj@grinn-global.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 13 Sep 2016 10:54:14 +0100
+Subject: [PATCH v7.1 04/22] iommu: Introduce iommu_fwspec
+In-Reply-To: <742a71630de502ac5a7a8641c6ed368d8409324d.1473695704.git.robin.murphy@arm.com>
+References: <cover.1473695704.git.robin.murphy@arm.com>
+ <742a71630de502ac5a7a8641c6ed368d8409324d.1473695704.git.robin.murphy@arm.com>
+Message-ID: <0050305e05655fd34eb7134dd7fb800f48e4d1ac.1473760250.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-liteBoard is a development board which uses liteSOM as its base.
+Introduce a common structure to hold the per-device firmware data that
+most IOMMU drivers need to keep track of. This enables us to configure
+much of that data from common firmware code, and consolidate a lot of
+the equivalent implementations, device look-up tables, etc. which are
+currently strewn across IOMMU drivers.
 
-Hardware specification:
- * liteSOM (i.MX6UL, DRAM, eMMC)
- * Ethernet PHY (id 0)
- * USB host (usb_otg1)
- * MicroSD slot (uSDHC1)
+This will also be enable us to address the outstanding "multiple IOMMUs
+on the platform bus" problem by tweaking IOMMU API calls to prefer
+dev->fwspec->ops before falling back to dev->bus->iommu_ops, and thus
+gracefully handle those troublesome systems which we currently cannot.
 
-Signed-off-by: Marcin Niestroj <m.niestroj@grinn-global.com>
+As the first user, hook up the OF IOMMU configuration mechanism. The
+driver-defined nature of DT cells means that we still need the drivers
+to translate and add the IDs themselves, but future users such as the
+much less free-form ACPI IORT will be much simpler and self-contained.
+
+CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Suggested-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+
 ---
-Changes v1 -> v2:
- * Use dual license
- * Fix typo "defaullt" -> "default"
 
- arch/arm/boot/dts/Makefile             |   1 +
- arch/arm/boot/dts/imx6ul-liteboard.dts | 153 +++++++++++++++++++++++++++++++++
- 2 files changed, 154 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6ul-liteboard.dts
+- Drop the 'gradual introduction' fiddling and go straight to struct
+  device and common code, as it prevents all the silly build issues
+  and ultimately makes life simpler for everyone
+- This time without missing "static inline"s on the stubs...
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faacd52..b149313 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -407,6 +407,7 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-sdb.dtb
- dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ul-14x14-evk.dtb \
-+	imx6ul-liteboard.dtb \
- 	imx6ul-pico-hobbit.dtb \
- 	imx6ul-tx6ul-0010.dtb \
- 	imx6ul-tx6ul-0011.dtb \
-diff --git a/arch/arm/boot/dts/imx6ul-liteboard.dts b/arch/arm/boot/dts/imx6ul-liteboard.dts
-new file mode 100644
-index 0000000..f2e04f2
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ul-liteboard.dts
-@@ -0,0 +1,153 @@
-+/*
-+ * Copyright 2016 Grinn
-+ *
-+ * Author: Marcin Niestroj <m.niestroj@grinn-global.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
+---
+ drivers/iommu/iommu.c    | 58 ++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/iommu/of_iommu.c |  8 +++++--
+ include/linux/device.h   |  3 +++
+ include/linux/iommu.h    | 39 ++++++++++++++++++++++++++++++++
+ 4 files changed, 106 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index b06d93594436..9a2f1960873b 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -31,6 +31,7 @@
+ #include <linux/err.h>
+ #include <linux/pci.h>
+ #include <linux/bitops.h>
++#include <linux/property.h>
+ #include <trace/events/iommu.h>
+ 
+ static struct kset *iommu_group_kset;
+@@ -1613,3 +1614,60 @@ out:
+ 
+ 	return ret;
+ }
++
++int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
++		      const struct iommu_ops *ops)
++{
++	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
++
++	if (fwspec)
++		return ops == fwspec->ops ? 0 : -EINVAL;
++
++	fwspec = kzalloc(sizeof(*fwspec), GFP_KERNEL);
++	if (!fwspec)
++		return -ENOMEM;
++
++	of_node_get(to_of_node(iommu_fwnode));
++	fwspec->iommu_fwnode = iommu_fwnode;
++	fwspec->ops = ops;
++	dev->iommu_fwspec = fwspec;
++	return 0;
++}
++EXPORT_SYMBOL_GPL(iommu_fwspec_init);
++
++void iommu_fwspec_free(struct device *dev)
++{
++	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
++
++	if (fwspec) {
++		fwnode_handle_put(fwspec->iommu_fwnode);
++		kfree(fwspec);
++		dev->iommu_fwspec = NULL;
++	}
++}
++EXPORT_SYMBOL_GPL(iommu_fwspec_free);
++
++int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
++{
++	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
++	size_t size;
++	int i;
++
++	if (!fwspec)
++		return -EINVAL;
++
++	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + num_ids]);
++	if (size > sizeof(*fwspec)) {
++		fwspec = krealloc(dev->iommu_fwspec, size, GFP_KERNEL);
++		if (!fwspec)
++			return -ENOMEM;
++	}
++
++	for (i = 0; i < num_ids; i++)
++		fwspec->ids[fwspec->num_ids + i] = ids[i];
++
++	fwspec->num_ids += num_ids;
++	dev->iommu_fwspec = fwspec;
++	return 0;
++}
++EXPORT_SYMBOL_GPL(iommu_fwspec_add_ids);
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 19e1e8f2f871..5b82862f571f 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -167,7 +167,9 @@ static const struct iommu_ops
+ 		return NULL;
+ 
+ 	ops = of_iommu_get_ops(iommu_spec.np);
+-	if (!ops || !ops->of_xlate || ops->of_xlate(&pdev->dev, &iommu_spec))
++	if (!ops || !ops->of_xlate ||
++	    iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
++	    ops->of_xlate(&pdev->dev, &iommu_spec))
+ 		ops = NULL;
+ 
+ 	of_node_put(iommu_spec.np);
+@@ -196,7 +198,9 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 		np = iommu_spec.np;
+ 		ops = of_iommu_get_ops(np);
+ 
+-		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
++		if (!ops || !ops->of_xlate ||
++		    iommu_fwspec_init(dev, &np->fwnode, ops) ||
++		    ops->of_xlate(dev, &iommu_spec))
+ 			goto err_put_node;
+ 
+ 		of_node_put(np);
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 38f02814d53a..bc41e87a969b 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -41,6 +41,7 @@ struct device_node;
+ struct fwnode_handle;
+ struct iommu_ops;
+ struct iommu_group;
++struct iommu_fwspec;
+ 
+ struct bus_attribute {
+ 	struct attribute	attr;
+@@ -765,6 +766,7 @@ struct device_dma_parameters {
+  * 		gone away. This should be set by the allocator of the
+  * 		device (i.e. the bus driver that discovered the device).
+  * @iommu_group: IOMMU group the device belongs to.
++ * @iommu_fwspec: IOMMU-specific properties supplied by firmware.
+  *
+  * @offline_disabled: If set, the device is permanently online.
+  * @offline:	Set after successful invocation of bus type's .offline().
+@@ -849,6 +851,7 @@ struct device {
+ 
+ 	void	(*release)(struct device *dev);
+ 	struct iommu_group	*iommu_group;
++	struct iommu_fwspec	*iommu_fwspec;
+ 
+ 	bool			offline_disabled:1;
+ 	bool			offline:1;
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index a35fb8b42e1a..436dc21318af 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -331,10 +331,32 @@ extern struct iommu_group *pci_device_group(struct device *dev);
+ /* Generic device grouping function */
+ extern struct iommu_group *generic_device_group(struct device *dev);
+ 
++/**
++ * struct iommu_fwspec - per-device IOMMU instance data
++ * @ops: ops for this device's IOMMU
++ * @iommu_fwnode: firmware handle for this device's IOMMU
++ * @iommu_priv: IOMMU driver private data for this device
++ * @num_ids: number of associated device IDs
++ * @ids: IDs which this device may present to the IOMMU
 + */
-+
-+/dts-v1/;
-+
-+#include "imx6ul-litesom.dtsi"
-+
-+/ {
-+	model = "Grinn i.MX6UL liteBoard";
-+	compatible = "grinn,imx6ul-liteboard", "grinn,imx6ul-litesom",
-+		     "fsl,imx6ul";
-+
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_usb_otg1_vbus: usb_otg1_regulator {
-+			compatible = "regulator-fixed";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb_otg1_vbus>;
-+			regulator-name = "usb_otg1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio2 8 GPIO_ACTIVE_LOW>;
-+		};
-+	};
++struct iommu_fwspec {
++	const struct iommu_ops	*ops;
++	struct fwnode_handle	*iommu_fwnode;
++	void			*iommu_priv;
++	unsigned int		num_ids;
++	u32			ids[1];
 +};
 +
-+&iomuxc {
-+	pinctrl_enet1: enet1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_GPIO1_IO07__ENET1_MDC		0x1b0b0
-+			MX6UL_PAD_GPIO1_IO06__ENET1_MDIO	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_EN__ENET1_RX_EN	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_ER__ENET1_RX_ER	0x1b0b0
-+			MX6UL_PAD_ENET1_RX_DATA0__ENET1_RDATA00 0x1b0b0
-+			MX6UL_PAD_ENET1_RX_DATA1__ENET1_RDATA01 0x1b0b0
-+			MX6UL_PAD_ENET1_TX_EN__ENET1_TX_EN	0x1b0b0
-+			MX6UL_PAD_ENET1_TX_DATA0__ENET1_TDATA00 0x1b0b0
-+			MX6UL_PAD_ENET1_TX_DATA1__ENET1_TDATA01 0x1b0b0
-+			MX6UL_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x4001b031
-+		>;
-+	};
++int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
++		      const struct iommu_ops *ops);
++void iommu_fwspec_free(struct device *dev);
++int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
 +
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX	0x1b0b1
-+			MX6UL_PAD_UART1_RX_DATA__UART1_DCE_RX	0x1b0b1
-+		>;
-+	};
+ #else /* CONFIG_IOMMU_API */
+ 
+ struct iommu_ops {};
+ struct iommu_group {};
++struct iommu_fwspec {};
+ 
+ static inline bool iommu_present(struct bus_type *bus)
+ {
+@@ -541,6 +563,23 @@ static inline void iommu_device_unlink(struct device *dev, struct device *link)
+ {
+ }
+ 
++static inline int iommu_fwspec_init(struct device *dev,
++				    struct fwnode_handle *iommu_fwnode,
++				    const struct iommu_ops *ops)
++{
++	return -ENODEV;
++}
 +
-+	pinctrl_usdhc1: usdhc1grp {
-+		fsl,pins = <
-+			MX6UL_PAD_UART1_RTS_B__GPIO1_IO19	0x17059
-+			MX6UL_PAD_SD1_CMD__USDHC1_CMD		0x17059
-+			MX6UL_PAD_SD1_CLK__USDHC1_CLK		0x10071
-+			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0	0x17059
-+			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1	0x17059
-+			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2	0x17059
-+			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3	0x17059
-+		>;
-+	};
++static inline void iommu_fwspec_free(struct device *dev)
++{
++}
 +
-+	pinctrl_usb_otg1_vbus: usb_otg1_vbus {
-+		fsl,pins = <
-+			MX6UL_PAD_ENET2_RX_DATA0__GPIO2_IO08	0x79
-+		>;
-+	};
-+};
++static inline int iommu_fwspec_add_ids(struct device *dev, u32 *ids,
++				       int num_ids)
++{
++	return -ENODEV;
++}
 +
-+&fec1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet1>;
-+	phy-mode = "rmii";
-+	phy-handle = <&ethphy0>;
-+	status = "okay";
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy0: ethernet-phy at 0 {
-+			reg = <0>;
-+		};
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&usbotg1 {
-+	vbus-supply = <&reg_usb_otg1_vbus>;
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc1>;
-+	cd-gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	status = "okay";
-+};
+ #endif /* CONFIG_IOMMU_API */
+ 
+ #endif /* __LINUX_IOMMU_H */
 -- 
-2.9.3
+2.8.1.dirty
