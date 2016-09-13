@@ -1,107 +1,36 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 13 Sep 2016 10:18:05 -0500
-Subject: [PATCH 1/3] PCI: Xilinx NWL PCIe: Expanding PCIe core errors and
- printing event occurred.
-In-Reply-To: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
-References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <20160913151805.GD27748@localhost>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 13 Sep 2016 17:21:26 +0200 (CEST)
+Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
+ support
+In-Reply-To: <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
+References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
+ <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
+Message-ID: <alpine.DEB.2.20.1609131713490.6233@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2016 at 04:09:16PM +0530, Bharat Kumar Gogada wrote:
-> The current driver prints pcie core error, for all core events.
-> Instead of just printing PCIe core error, now adding prints to show
-> individual core events occurred.
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+On Fri, 9 Sep 2016, Alexandre TORGUE wrote:
+> +static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
+> +			    unsigned int nr_irqs)
+> +{
+> +	struct irq_data *data = irq_get_irq_data(virq);
+> +
+> +	irq_gc_mask_clr_bit(data->parent_data);
 
-I applied the first two patches to pci/host-xilinx for v4.9, thanks!
+I have a hard time to understand this. The irq domain is not hierarchical.
 
-I'd like to work on the third one a little more, as I mentioned in my
-response to it.
+> +	irq_domain_reset_irq_data(data);
 
-> ---
->  drivers/pci/host/pcie-xilinx-nwl.c | 48 +++++++++++++++++++++++++++++++-------
->  1 file changed, 40 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-> index 3479d30..86c1834 100644
-> --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> @@ -85,10 +85,15 @@
->  #define MSGF_MISC_SR_MASTER_ERR		BIT(5)
->  #define MSGF_MISC_SR_I_ADDR_ERR		BIT(6)
->  #define MSGF_MISC_SR_E_ADDR_ERR		BIT(7)
-> -#define MSGF_MISC_SR_UR_DETECT          BIT(20)
-> -
-> -#define MSGF_MISC_SR_PCIE_CORE		GENMASK(18, 16)
-> -#define MSGF_MISC_SR_PCIE_CORE_ERR	GENMASK(31, 22)
-> +#define MSGF_MISC_SR_FATAL_AER		BIT(16)
-> +#define MSGF_MISC_SR_NON_FATAL_AER	BIT(17)
-> +#define MSGF_MISC_SR_CORR_AER		BIT(18)
-> +#define MSGF_MISC_SR_UR_DETECT		BIT(20)
-> +#define MSGF_MISC_SR_NON_FATAL_DEV	BIT(22)
-> +#define MSGF_MISC_SR_FATAL_DEV		BIT(23)
-> +#define MSGF_MISC_SR_LINK_DOWN		BIT(24)
-> +#define MSGF_MSIC_SR_LINK_AUTO_BWIDTH	BIT(25)
-> +#define MSGF_MSIC_SR_LINK_BWIDTH	BIT(26)
->  
->  #define MSGF_MISC_SR_MASKALL		(MSGF_MISC_SR_RXMSG_AVAIL | \
->  					MSGF_MISC_SR_RXMSG_OVER | \
-> @@ -96,9 +101,15 @@
->  					MSGF_MISC_SR_MASTER_ERR | \
->  					MSGF_MISC_SR_I_ADDR_ERR | \
->  					MSGF_MISC_SR_E_ADDR_ERR | \
-> +					MSGF_MISC_SR_FATAL_AER | \
-> +					MSGF_MISC_SR_NON_FATAL_AER | \
-> +					MSGF_MISC_SR_CORR_AER | \
->  					MSGF_MISC_SR_UR_DETECT | \
-> -					MSGF_MISC_SR_PCIE_CORE | \
-> -					MSGF_MISC_SR_PCIE_CORE_ERR)
-> +					MSGF_MISC_SR_NON_FATAL_DEV | \
-> +					MSGF_MISC_SR_FATAL_DEV | \
-> +					MSGF_MISC_SR_LINK_DOWN | \
-> +					MSGF_MSIC_SR_LINK_AUTO_BWIDTH | \
-> +					MSGF_MSIC_SR_LINK_BWIDTH)
->  
->  /* Legacy interrupt status mask bits */
->  #define MSGF_LEG_SR_INTA		BIT(0)
-> @@ -291,8 +302,29 @@ static irqreturn_t nwl_pcie_misc_handler(int irq, void *data)
->  		dev_err(pcie->dev,
->  			"In Misc Egress address translation error\n");
->  
-> -	if (misc_stat & MSGF_MISC_SR_PCIE_CORE_ERR)
-> -		dev_err(pcie->dev, "PCIe Core error\n");
-> +	if (misc_stat & MSGF_MISC_SR_FATAL_AER)
-> +		dev_err(pcie->dev, "Fatal Error in AER Capability\n");
-> +
-> +	if (misc_stat & MSGF_MISC_SR_NON_FATAL_AER)
-> +		dev_err(pcie->dev, "Non-Fatal Error in AER Capability\n");
-> +
-> +	if (misc_stat & MSGF_MISC_SR_CORR_AER)
-> +		dev_err(pcie->dev, "Correctable Error in AER Capability\n");
-> +
-> +	if (misc_stat & MSGF_MISC_SR_UR_DETECT)
-> +		dev_err(pcie->dev, "Unsupported request Detected\n");
-> +
-> +	if (misc_stat & MSGF_MISC_SR_NON_FATAL_DEV)
-> +		dev_err(pcie->dev, "Non-Fatal Error Detected\n");
-> +
-> +	if (misc_stat & MSGF_MISC_SR_FATAL_DEV)
-> +		dev_err(pcie->dev, "Fatal Error Detected\n");
-> +
-> +	if (misc_stat & MSGF_MSIC_SR_LINK_AUTO_BWIDTH)
-> +		dev_info(pcie->dev, "Link Autonomous Bandwidth Management Status bit set\n");
-> +
-> +	if (misc_stat & MSGF_MSIC_SR_LINK_BWIDTH)
-> +		dev_info(pcie->dev, "Link Bandwidth Management Status bit set\n");
->  
->  	/* Clear misc interrupt status */
->  	nwl_bridge_writel(pcie, misc_stat, MSGF_MISC_STATUS);
-> -- 
-> 2.1.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +	domain = irq_domain_add_linear(node, nr_exti,
+> +				       &irq_exti_domain_ops, NULL);
+
+It's a simple linear domain. So how can data->parent_data be a valid
+irq_data pointer? Answer: It can't!
+
+But it doesn't blow up in your face simply because the alloc/free callbacks
+are never invoked for simple non hierarchical domains. So you should have
+removed that stuff after copying some other irqchip driver.
+
+Thanks,
+
+	tglx
