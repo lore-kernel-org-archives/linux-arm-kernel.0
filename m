@@ -1,36 +1,40 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Tue, 13 Sep 2016 19:51:37 +0800
-Subject: [PATCH v11 5/8] clocksource/drivers/arm_arch_timer: Simplify ACPI
- support code.
-In-Reply-To: <57D7E543.3060301@codeaurora.org>
-References: <1473168352-5156-1-git-send-email-fu.wei@linaro.org>
- <1473168352-5156-6-git-send-email-fu.wei@linaro.org>
- <alpine.DEB.2.20.1609061635000.5647@nanos>
- <CADyBb7uX79UP=mUxvP-EPGi56-46y2SCMPsWO=Uw-=N0GQERhA@mail.gmail.com>
- <CADyBb7v-b1bKGBdH6J78UhfCcQd=BJLFoZ16GNgmrd2EucjYDA@mail.gmail.com>
- <57D7E543.3060301@codeaurora.org>
-Message-ID: <1919ec70-6f24-365c-b5f2-6db56bb81e3f@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 13 Sep 2016 13:02:44 +0100
+Subject: [GIT PULL] Immutable branch between MFD and Regulator due for the
+ v4.9 merge window
+In-Reply-To: <20160827075544.26316-4-wens@csie.org>
+References: <20160827075544.26316-1-wens@csie.org>
+ <20160827075544.26316-4-wens@csie.org>
+Message-ID: <20160913120244.GA28894@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur
+Mark,
 
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-On 09/13/2016 07:38 PM, Timur Tabi wrote:
-> Fu Wei wrote:
->> I have prepared v12 (rebase to rc6 and on the top of IORT v11),
->> should I send it now
->
-> Yes.
->
-> Please don't wait to release new versions of your patches.  Time is running out to get these into 4.9.
->
-yes, v12 is posted
-working on v13(improving memory-mapped timer code following Marc's suggestion)
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-regulator-v4.9
+
+for you to fetch changes up to 2ca342d391e3d8b56ed64626db8cfba8101b7c1d:
+
+  regulator: axp20x: Support AXP806 variant (2016-09-13 12:49:45 +0100)
+
+----------------------------------------------------------------
+Immutable branch between MFD and Regulator due for the v4.9 merge window
+
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+      regulator: axp20x: Support AXP806 variant
+
+ drivers/regulator/axp20x-regulator.c | 118 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 111 insertions(+), 7 deletions(-)
 
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
