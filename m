@@ -1,98 +1,61 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 13 Sep 2016 08:37:19 +0200
-Subject: [PATCH V6 2/5] PCI/ACPI: Check platform specific ECAM quirks
-In-Reply-To: <CADaLNDk0JPJYT_pqjWYwrMBvbyWkpL+6=dEDU9H9qDGMhnQvyw@mail.gmail.com>
-References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <1473449047-10499-3-git-send-email-tn@semihalf.com>
- <CADaLNDk0JPJYT_pqjWYwrMBvbyWkpL+6=dEDU9H9qDGMhnQvyw@mail.gmail.com>
-Message-ID: <5bb5d2c3-32b1-7d88-8376-dc3e77bb665e@semihalf.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 13 Sep 2016 08:45:52 +0200
+Subject: [PATCHv6 0/3] pwm: imx: support output polarity inversion
+In-Reply-To: <20160912211254.GA4637@archie.localdomain>
+References: <20141009151605.GA8818@ulmo.nvidia.com>
+ <1412950949-7505-1-git-send-email-LW@KARO-electronics.de>
+ <6c896634c4d6446df0388da2c0228232@agner.ch>
+ <20160909091857.7a263220@ipc1.ka-ro>
+ <20160912124553.aqgv7b4vsx4urogi@piout.net>
+ <20160912140401.qkezay7sqqavsf4i@pengutronix.de>
+ <074eed0df23199bc82f8d221690596d3@agner.ch>
+ <20160912200021.fsnfdgnng4it354g@pengutronix.de>
+ <20160912211254.GA4637@archie.localdomain>
+Message-ID: <20160913064552.oywq74iqo3fecsgz@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.09.2016 00:24, Duc Dang wrote:
-> On Fri, Sep 9, 2016 at 12:24 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
->>
->> Some platforms may not be fully compliant with generic set of PCI config
->> accessors. For these cases we implement the way to overwrite CFG accessors
->> set and configuration space range.
->>
->> In first place pci_mcfg_parse() saves machine's IDs and revision number
->> (these come from MCFG header) in order to match against known quirk entries.
->> Then the algorithm traverses available quirk list (static array),
->> matches against <oem_id, oem_table_id, rev, domain, bus number range> and
->> returns custom PCI config ops and/or CFG resource structure.
->>
->> When adding new quirk there are two possibilities:
->> 1. Override default pci_generic_ecam_ops ops but CFG resource comes from MCFG
->> { "OEM_ID", "OEM_TABLE_ID", <REV>, <DOMAIN>, <BUS_NR>, &foo_ops, MCFG_RES_EMPTY },
->> 2. Override default pci_generic_ecam_ops ops and CFG resource. For this case
->> it is also allowed get CFG resource from quirk entry w/o having it in MCFG.
->> { "OEM_ID", "OEM_TABLE_ID", <REV>, <DOMAIN>, <BUS_NR>, &boo_ops,
->>   DEFINE_RES_MEM(START, SIZE) },
->>
->> pci_generic_ecam_ops and MCFG entries will be used for platforms
->> free from quirks.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->> ---
->>  drivers/acpi/pci_mcfg.c | 80 +++++++++++++++++++++++++++++++++++++++++++++----
->>  1 file changed, 74 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->> index ffcc651..2b8acc7 100644
->> --- a/drivers/acpi/pci_mcfg.c
->> +++ b/drivers/acpi/pci_mcfg.c
->> @@ -32,6 +32,59 @@ struct mcfg_entry {
->>         u8                      bus_start;
->>         u8                      bus_end;
->>  };
->> +struct mcfg_fixup {
->> +       char oem_id[ACPI_OEM_ID_SIZE + 1];
->> +       char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
->> +       u32 oem_revision;
->> +       u16 seg;
->> +       struct resource bus_range;
->> +       struct pci_ecam_ops *ops;
->> +       struct resource cfgres;
->> +};
->> +
->> +#define MCFG_DOM_ANY                   (-1)
->> +#define MCFG_BUS_RANGE(start, end)     DEFINE_RES_NAMED((start),       \
->> +                                               ((end) - (start) + 1),  \
->> +                                               NULL, IORESOURCE_BUS)
->> +#define MCFG_BUS_ANY           MCFG_BUS_RANGE(0x0, 0xff)
->> +#define MCFG_RES_EMPTY         DEFINE_RES_NAMED(0, 0, NULL, 0)
->> +
->> +static struct mcfg_fixup mcfg_quirks[] = {
->> +/*     { OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, cfgres, ops }, */
->> +};
->> +
->> +static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
->> +static char mcfg_oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
->> +static u32 mcfg_oem_revision;
->> +
->> +static void pci_mcfg_match_quirks(struct acpi_pci_root *root,
->> +                                 struct resource *cfgres,
->> +                                 struct pci_ecam_ops **ecam_ops)
->> +{
->> +       struct mcfg_fixup *f;
->> +       int i;
->> +
->> +       /*
->> +        * First match against PCI topology <domain:bus> then use OEM ID, OEM
->> +        * table ID, and OEM revision from MCFG table standard header.
->> +        */
->> +       for (i = 0, f = mcfg_quirks; i < ARRAY_SIZE(mcfg_quirks); i++, f++) {
->> +               if (f->seg == root->segment &&
->
-> Is dropping the comparison with MCFG_DOM_ANY intended? It is useful if
-> all the controllers (segs) can use the same quirk (X-Gene case).
+Hello Clemens,
 
-MCFG_DOM_ANY makes sense only if we want to use the same ops for segment 
-range, but not for CFG range manipulation. So we can add MCFG_DOM_ANY 
-back here in the hope it will be used properly.
+On Mon, Sep 12, 2016 at 11:12:54PM +0200, Clemens Gruber wrote:
+> On Mon, Sep 12, 2016 at 10:00:21PM +0200, Uwe Kleine-K?nig wrote:
+> > I want that the pwm driver disables its clock on pwm_config(mypwm, 0,
+> > someperiod) such that the consumer doesn't need to call
+> > pwm_disable(mypwm) to save power (assuming it's safe to do so, which
+> > only the pwm provider knows).
+> 
+> I am not sure if this is such a good idea, because there are use cases
+> where you want to keep the PWM driver enabled the whole time but still
+> be able to change the duty cycle to 0 for some time without adding
+> unnecessary delays when changing the duty cycle back to something else.
+> 
+> We have an application where we control fluid valves in a beer
+> dispensing system through PWMs and these valves are pulsed with
+> different PWM duty cycles for a short time. In-between the duty cycle
+> is also 0. For example: Start at 0%, 100ms 90%, 200ms 70%, 300ms 0%,
+> 100ms 90%, and so on..
+> There it is critical that the change from and to 0 duty cycle is not
+> delayed by disabling and reenabling the clock.
+> The oscillator (if there is one) should be up and running, only the duty
+> cycle should be 0 for a short time.
 
-Thanks,
-Tomasz
+I don't think it is sensible to map this requirement in the pwm api. The
+trade-off between performance and power saving is common between all
+types of devices and there are other mechanisms to handle this.
+
+Also only some pwms are affected by this because disabling the clock
+doesn't introduce a measurable overhead for all of them.
+
+With write(2) there is also no way to define if the hard disk should
+spin down after the request is completed. And this wouldn't make sense
+for an ssd.
+
+So yes, there would be no way to prohibit stopping the pwm with the pwm
+API, but you could implement runtime pm for your device.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
