@@ -1,67 +1,151 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Tue, 13 Sep 2016 15:15:23 +0100
-Subject: [PATCH 6/8 v2] arm: orion5x: Add DT-based support for Netgear
- WNR854T
-In-Reply-To: <20160913123639.GB15332@lunn.ch>
-References: <1472203264-21089-7-git-send-email-jm@lentin.co.uk>
- <1473109646-23366-1-git-send-email-jm@lentin.co.uk>
- <20160912170625.GA7420@rob-hp-laptop> <2920481.EgEQnLmOkM@wuerfel>
- <20160912220344.GM11400@lunn.ch>
- <88e40f0c6cafec244dc16af5a03cfb44@jamie.lentin.co.uk>
- <20160913123639.GB15332@lunn.ch>
-Message-ID: <b7d442f9d26249976d7698b6a32db2a3@jamie.lentin.co.uk>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 13 Sep 2016 08:18:10 -0600
+Subject: [PATCH V5] perf tools: adding support for address filters
+In-Reply-To: <cd7b9dc9-686c-813e-ff9f-97faba377799@intel.com>
+References: <1473702794-8493-1-git-send-email-mathieu.poirier@linaro.org>
+ <cd7b9dc9-686c-813e-ff9f-97faba377799@intel.com>
+Message-ID: <CANLsYkz_rQ5uhJQ0x9EDi6vcx4xHrbjjSdwxA=X1ssHq4ucALQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-09-13 13:36, Andrew Lunn wrote:
-> On Tue, Sep 13, 2016 at 10:10:41AM +0100, Jamie Lentin wrote:
->> On 2016-09-12 23:03, Andrew Lunn wrote:
->> >>Maybe we can instead leave out the PCI support from the new
->> >>file for now and not delete the legacy board file?
->> 
->> This seems a reasonable compromise. The PCI card the router comes
->> with isn't supported by mwl8k mainline anyway (There's STA-only
->> firmware that can be extracted from a windows driver and PCI IDs
->> added, but stats reporting uses a different format), so it's not a
->> huge loss, although many did replace the card with something
->> Atheros-based.
-> 
-> O.K. So dropping the PCI code gets us going forward.
+On 13 September 2016 at 04:01, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> On 12/09/16 20:53, Mathieu Poirier wrote:
+>> This patch makes it possible to use the current filter
+>> framework with address filters.  That way address filters for
+>> HW tracers such as CoreSight and IntelPT can be communicated
+>> to the kernel drivers.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>
+>> ---
+>> Changes for V5:
+>>  - Modified perf_evsel__append_filter() to take a string format
+>>    rather than an operation.
+>
+> Hope I'm not being a pain, but aren't there other places calling
+> perf_evsel__append_filter() that need to be changed.  Might make
+> sense as a separate patch.
 
-Is an arch/arm/mach-mvebu/orion5x.c also required? Or is continuing to 
-use arch/arm/mach-orion5x/board-dt.c until everything has been converted 
-the favoured approach?
+No no, you're right - I completely overlooked that.
 
-> Have we missed the merge window?
+But shouldn't it be in the same patch?  That way a git bisect would
+stay consistent...
 
-I got the impression Gregory Clement had merged them? If not a good 
-portion of this patchset is uncontroversial generic orion5x stuff, it'd 
-be nice to get those in even if none of the router-specific stuff 
-doesn't make it.
-
->> Unfortunately the power regulator on my spare router has stopped
->> regulating, which will make more development tricky.
-> 
-> The Green Light of death?
-
-Seems that way, the 3.3v line is only getting up to 2.8v. My routers 
-have had their power supply sections hacked in comparison to photos I've 
-seen on GLOD pages, so I presumed this was fixed. Apparently not. Maybe 
-I can persuade it to be useful with 5v + 3.3v in the right places.
-
->> >Jamie, which interrupt do you see the WiFi card using?  If it is
->> >IRQ_ORION5X_PCIE0_INT, (1 + 11), that is probably easier to deal with
->> >than if it uses GPIO 4.
->> 
->> Definitely uses GPIO 4.
-> 
-> O.K, that makes it more interesting. As far as i can see, no other
-> PCIe system uses a GPIO for its interrupt. There is no core support
-> for this, or any bus driver doing it. So there is no binding to
-> follow.
-
-Not sure if the difference is relevant at this point but it's regular 
-PCI, not PCIe.
-
-> 
-> 	Andrew
+>
+>>
+>> Changes for V4:
+>>  - Added support for address filters over more than one
+>>    nibble.
+>>  - Removed Jiri's ack, this version is too different from
+>>    what was reviewed.
+>>
+>> Changes for V3:
+>>  - Added Jiri's ack.
+>>  - Rebased to v4.8-rc5.
+>>
+>> Changes for V2:
+>>  - Rebased to v4.8-rc4.
+>>  - Revisited error path.
+>>
+>>
+>>  tools/perf/util/evsel.c        |  4 ++--
+>>  tools/perf/util/evsel.h        |  2 +-
+>>  tools/perf/util/parse-events.c | 40 +++++++++++++++++++++++++++++++++++-----
+>>  3 files changed, 38 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+>> index d40f852d2de2..a9bb277f221f 100644
+>> --- a/tools/perf/util/evsel.c
+>> +++ b/tools/perf/util/evsel.c
+>> @@ -1047,14 +1047,14 @@ int perf_evsel__set_filter(struct perf_evsel *evsel, const char *filter)
+>>  }
+>>
+>>  int perf_evsel__append_filter(struct perf_evsel *evsel,
+>> -                           const char *op, const char *filter)
+>> +                           const char *fmt, const char *filter)
+>>  {
+>>       char *new_filter;
+>>
+>>       if (evsel->filter == NULL)
+>>               return perf_evsel__set_filter(evsel, filter);
+>>
+>> -     if (asprintf(&new_filter,"(%s) %s (%s)", evsel->filter, op, filter) > 0) {
+>> +     if (asprintf(&new_filter, fmt, evsel->filter, filter) > 0) {
+>>               free(evsel->filter);
+>>               evsel->filter = new_filter;
+>>               return 0;
+>> diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
+>> index 8ceb7ebb51f5..50595c8c7207 100644
+>> --- a/tools/perf/util/evsel.h
+>> +++ b/tools/perf/util/evsel.h
+>> @@ -236,7 +236,7 @@ void perf_evsel__set_sample_id(struct perf_evsel *evsel,
+>>
+>>  int perf_evsel__set_filter(struct perf_evsel *evsel, const char *filter);
+>>  int perf_evsel__append_filter(struct perf_evsel *evsel,
+>> -                           const char *op, const char *filter);
+>> +                           const char *fmt, const char *filter);
+>>  int perf_evsel__apply_filter(struct perf_evsel *evsel, int ncpus, int nthreads,
+>>                            const char *filter);
+>>  int perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
+>> diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
+>> index 2eb8b1ed4cc8..8e683979ccd8 100644
+>> --- a/tools/perf/util/parse-events.c
+>> +++ b/tools/perf/util/parse-events.c
+>> @@ -1760,20 +1760,50 @@ foreach_evsel_in_last_glob(struct perf_evlist *evlist,
+>>  static int set_filter(struct perf_evsel *evsel, const void *arg)
+>>  {
+>>       const char *str = arg;
+>> +     bool found = false;
+>> +     int nr_addr_filters = 0;
+>> +     struct perf_pmu *pmu = NULL;
+>>
+>> -     if (evsel == NULL || evsel->attr.type != PERF_TYPE_TRACEPOINT) {
+>> -             fprintf(stderr,
+>> -                     "--filter option should follow a -e tracepoint option\n");
+>> -             return -1;
+>> +     if (evsel == NULL)
+>> +             goto err;
+>> +
+>> +     if (evsel->attr.type == PERF_TYPE_TRACEPOINT) {
+>> +             if (perf_evsel__append_filter(evsel,
+>> +                                           "(%s) && (%s)", str) < 0) {
+>> +                     fprintf(stderr,
+>> +                             "not enough memory to hold filter string\n");
+>> +                     return -1;
+>> +             }
+>> +
+>> +             return 0;
+>>       }
+>>
+>> -     if (perf_evsel__append_filter(evsel, "&&", str) < 0) {
+>> +     while ((pmu = perf_pmu__scan(pmu)) != NULL)
+>> +             if (pmu->type == evsel->attr.type) {
+>> +                     found = true;
+>> +                     break;
+>> +             }
+>> +
+>> +     if (found)
+>> +             perf_pmu__scan_file(pmu, "nr_addr_filters",
+>> +                                 "%d", &nr_addr_filters);
+>> +
+>> +     if (!nr_addr_filters)
+>> +             goto err;
+>> +
+>> +     if (perf_evsel__append_filter(evsel, "%s,%s", str) < 0) {
+>>               fprintf(stderr,
+>>                       "not enough memory to hold filter string\n");
+>>               return -1;
+>>       }
+>>
+>>       return 0;
+>> +
+>> +err:
+>> +     fprintf(stderr,
+>> +             "--filter option should follow a -e tracepoint or HW tracer option\n");
+>> +
+>> +     return -1;
+>>  }
+>>
+>>  int parse_filter(const struct option *opt, const char *str,
+>>
+>
