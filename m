@@ -1,28 +1,28 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 13 Sep 2016 10:06:56 +0200
-Subject: [PATCH 0/5] ARM: dts: sun8i: Add touchscreen node to various
- tablets
-In-Reply-To: <20160913075953.GA9805@lukather>
-References: <20160911182327.824-1-hdegoede@redhat.com>
- <20160913075953.GA9805@lukather>
-Message-ID: <fee7e6fe-d22b-9233-121e-b403d6ee20f1@redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Sep 2016 10:12:23 +0200
+Subject: [PATCH v5 5/9] Documentation: dt-bindings: Add IRQ related
+ properties of STM32 pinctrl
+In-Reply-To: <1473432124-6784-6-git-send-email-alexandre.torgue@st.com>
+References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
+ <1473432124-6784-6-git-send-email-alexandre.torgue@st.com>
+Message-ID: <CACRpkdYJP59B7Qf0Q6017q5-81Bf-fJ_JTcyqG7XSEhh63CNjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 9, 2016 at 4:42 PM, Alexandre TORGUE
+<alexandre.torgue@st.com> wrote:
 
-On 13-09-16 09:59, Maxime Ripard wrote:
-> On Sun, Sep 11, 2016 at 08:23:22PM +0200, Hans de Goede wrote:
->> Hi Maxime,
->>
->> Now that Dmitry has queued up the firmware-name property changes
->> in his for-linus branch, these dt patches are ready for merging.
->
-> I queued this for 4.10.
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-4.10 ? Is next already frozen ? Note either way is fine
-just wondering.
+Patch applied to the pinctrl tree.
 
-Regards,
+I am happy with this solution.
 
-Hans
+As I see it, it doesn't hurt to add this into the pinctrl
+tree while the irqchip stuff and DTS stuff get merged
+into different trees orthogonally.
+
+Yours,
+Linus Walleij
