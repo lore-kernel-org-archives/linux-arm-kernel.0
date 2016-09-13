@@ -1,99 +1,80 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Tue, 13 Sep 2016 18:21:22 +0800
-Subject: [PATCH v11 5/8] clocksource/drivers/arm_arch_timer: Simplify ACPI
- support code.
-In-Reply-To: <CADyBb7v-b1bKGBdH6J78UhfCcQd=BJLFoZ16GNgmrd2EucjYDA@mail.gmail.com>
-References: <1473168352-5156-1-git-send-email-fu.wei@linaro.org>
- <1473168352-5156-6-git-send-email-fu.wei@linaro.org>
- <alpine.DEB.2.20.1609061635000.5647@nanos>
- <CADyBb7uX79UP=mUxvP-EPGi56-46y2SCMPsWO=Uw-=N0GQERhA@mail.gmail.com>
- <CADyBb7v-b1bKGBdH6J78UhfCcQd=BJLFoZ16GNgmrd2EucjYDA@mail.gmail.com>
-Message-ID: <CADyBb7tWP=_zu+Pu0UC1E6u+yAgH06peh8rt3hS6-O42K3kPNQ@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 13 Sep 2016 11:32:34 +0100
+Subject: [PATCH v4 07/10] ARM: Introduce MPIDR_LEVEL_SHIFT macro
+In-Reply-To: <57D7D100.3040908@arm.com>
+References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
+ <1473691764-29424-8-git-send-email-vladimir.murzin@arm.com>
+ <20160913083855.GC5680@cbox> <57D7C111.7000405@arm.com>
+ <57D7D100.3040908@arm.com>
+Message-ID: <57D7D5C2.6020105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark, Marc,
-
-Sorry for missing you in the cc list
-Do you have any suggestion for the  arm_arch_timer patches?
-Could you help me to review these patches ?
-
-Great thanks !
-
-On 13 September 2016 at 17:22, Fu Wei <fu.wei@linaro.org> wrote:
-> Hi Thomas, Daniel,
->
-> For these  arm_arch_timer patches, do you have any other suggestion or comment?
-> I have deleted "skipping" in the error message.
->
-> I have prepared v12 (rebase to rc6 and on the top of IORT v11),
-> should I send it now (if you are OK with my arm_arch_timer patches ),
-> or anything I can do to improve this patchset ?
->
-> Thanks.
->
-> On 7 September 2016 at 17:23, Fu Wei <fu.wei@linaro.org> wrote:
->> Hi Thomas
->>
->> On 6 September 2016 at 22:36, Thomas Gleixner <tglx@linutronix.de> wrote:
->>> On Tue, 6 Sep 2016, fu.wei at linaro.org wrote:
->>>> +     if (timer_count < 0)
->>>> +             pr_err("Failed to get platform timer info, skipping.\n");
+On 13/09/16 11:12, Marc Zyngier wrote:
+> On 13/09/16 10:04, Vladimir Murzin wrote:
+>> On 13/09/16 09:38, Christoffer Dall wrote:
+>>> On Mon, Sep 12, 2016 at 03:49:21PM +0100, Vladimir Murzin wrote:
+>>>> vgic-v3 driver uses architecture specific MPIDR_LEVEL_SHIFT macro to
+>>>> encode the affinity in a form compatible with ICC_SGI* registers.
+>>>> Unfortunately, that macro is missing on ARM, so let's add it.
+>>>>
+>>>> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+>>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>>>> ---
+>>>>  arch/arm/include/asm/cputype.h |    1 +
+>>>>  1 file changed, 1 insertion(+)
+>>>>
+>>>> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+>>>> index 1ee94c7..e2d94c1 100644
+>>>> --- a/arch/arm/include/asm/cputype.h
+>>>> +++ b/arch/arm/include/asm/cputype.h
+>>>> @@ -55,6 +55,7 @@
+>>>>  
+>>>>  #define MPIDR_LEVEL_BITS 8
+>>>>  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
+>>>> +#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
+>>>>  
 >>>
->>> So this prints something about skipping. But then it continues as if
->>> nothing went wrong. That's either wrong or confusing or both.
->>
->> yes, you are right, this info is confusing.
->> maybe we just delete the "skipping" ?
->>
->> ?timer_count < 0? is caused by some firmware bug, in gtdt.c:
->> ----
->> int __init acpi_gtdt_init(struct acpi_table_header *table)
->> {
->> ......
->>         if (start < (void *)table + sizeof(struct acpi_table_gtdt)) {
->>         pr_err(FW_BUG "Failed to retrieve timer info from firmware:
->> invalid data.\n");
->>         return -EINVAL;
->> ......
->> }
->> ----
->>
->> But in this situation( without platform timers ), system still can work.
->> So I thing we just need to print a error.
->>
+>>> I'm not sure I follow the correctness of this completely.
 >>>
->>>> -     arch_timer_init();
->>>> -     return 0;
->>>> +     return arch_timer_init();
+>>> This is called from vgic_v3_dispatch_sgi, which takes a u64 value, which
+>>> may have something in the Aff3 field, which we now shift left 24 bits,
+>>> but that is not the Aff3 field of AArch32's MPIDR.
 >>>
->>> Thanks,
->>>
->>>         tglx
+>>> What is the rationale for this making sense again?
 >>
+>> IIUC, in such case we construct mpidr which won't match in match_mpidr()
+>> with the value we get from kvm_vcpu_get_mpidr_aff() and no SGI will be
+>> sent to the guest.
 >>
->>
->> --
->> Best regards,
->>
->> Fu Wei
->> Software Engineer
->> Red Hat
->
->
->
-> --
-> Best regards,
->
-> Fu Wei
-> Software Engineer
-> Red Hat
+>> Since we get that u64 value from the guest, I'd think it is something
+>> wrong is going on in the guest in case Aff3 is non-zero; however, we can
+>> hide it by zeroing out SGI Aff3 bits in access_gic_sgi().
+> 
+> I don't think zeroing Aff3 is the right move, as the spec doesn't say
+> that Aff3 should be ignored in a write to ICC_SGI1R. On the other hand,
+> the spec says (in the context of the target list): "If a bit is 1 and
+> the bit does not correspond to a valid target PE, the bit must be
+> ignored by the Distributor".
+> 
+> This makes me think that, unless ICC_SGI1R.IMR is set, we should simply
+> ignore that SGI because there is no way we can actually deliver it.
+> 
+> Could you cook a small patch that would go on top of this series?
 
+I assume you've meant ICC_SGI1R.IRM, aka broadcast. In this case,
+vgic_v3_dispatch_sgi() seems already matches the logic you've described:
 
+- if IRM == 1, send to everyone except self without check for mpidr
+- if IRM == 0, send to target iff matched to a valid mpidr
 
--- 
-Best regards,
+Am I missing something?
 
-Fu Wei
-Software Engineer
-Red Hat
+Thanks
+Vladimir
+
+> 
+> Thanks,
+> 
+> 	M.
+> 
