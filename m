@@ -1,67 +1,77 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Sep 2016 11:09:53 +0200
-Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <1975640.ctuo4Obpao@avalon>
-References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
- <20160908073748.GF8913@lukather>
- <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
- <1975640.ctuo4Obpao@avalon>
-Message-ID: <CACRpkdapvA89yexwROCxr4t+MijCwidBrpYTow+zDx6D0WdSGw@mail.gmail.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Tue, 13 Sep 2016 10:10:41 +0100
+Subject: [PATCH 6/8 v2] arm: orion5x: Add DT-based support for Netgear
+ WNR854T
+In-Reply-To: <20160912220344.GM11400@lunn.ch>
+References: <1472203264-21089-7-git-send-email-jm@lentin.co.uk>
+ <1473109646-23366-1-git-send-email-jm@lentin.co.uk>
+ <20160912170625.GA7420@rob-hp-laptop> <2920481.EgEQnLmOkM@wuerfel>
+ <20160912220344.GM11400@lunn.ch>
+Message-ID: <88e40f0c6cafec244dc16af5a03cfb44@jamie.lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 2:47 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Monday 12 Sep 2016 14:40:15 Linus Walleij wrote:
+On 2016-09-12 23:03, Andrew Lunn wrote:
+>> Maybe we can instead leave out the PCI support from the new
+>> file for now and not delete the legacy board file?
 
->> HOWEVER it often turns out that while you can programmatically
->> and individually set pins to any function (and biasing etc), the
->> person designing the hardware was not thinking that you should
->> be able to do whatever you like, e.g. even if it is possible to
->> take two pins and use one of them for half an SPI bus and the
->> other for half an I2C bus, that doesn't mean that this is useful
->> or makes any kind of electronic sense, it just makes "software
->> sense".
-(...)
-> I'd argue that you would find out about lots of clever/insane use cases that
-> don't fit this model if you looked at all the hardware available out there,
-> especially non-phone devices. Your SPI example is a good one, I've seen SPI
-> being used in unidirectional mode only, with only MISO or MOSI mattering. In
-> that case the other pin could be used as a GPIO for a totally unrelated
-> purpose when the design is short on GPIOs or when GPIOs have been allocated
-> without any knowledge of the Linux pinctrl subsystem.
+This seems a reasonable compromise. The PCI card the router comes with 
+isn't supported by mwl8k mainline anyway (There's STA-only firmware that 
+can be extracted from a windows driver and PCI IDs added, but stats 
+reporting uses a different format), so it's not a huge loss, although 
+many did replace the card with something Atheros-based.
 
-That is true sometimes. It is a tradeoff, I can also imagine actually
-driving an I2C bus just to use the SCL line as a clock for something,
-constantly feeding nonsense data through the I2C block and
-ignoring SDA and reusing that pin as GPIO. (And a lot of other
-theoretical usecases.)
+Unfortunately the power regulator on my spare router has stopped 
+regulating, which will make more development tricky. But will have a 
+look at the PCI conversion if I can get hold of another.
 
-Some pin controller hardware helpully only let you select groups
-and makes such hacks impossible.
+> Jamie, which interrupt do you see the WiFi card using?  If it is
+> IRQ_ORION5X_PCIE0_INT, (1 + 11), that is probably easier to deal with
+> than if it uses GPIO 4.
 
-Also I guess the target audience of the SoC will affect the
-hackishness of the usecases, and affect what they might attempt
-to shoehorn into the design.
+Definitely uses GPIO 4.
 
-So model on whatever makes most sense, is usually how I think about
-it. Or as the IETF says "rough consensus and running code".
+# cat /proc/interrupts
+            CPU0
+  17:     165966  bridge-interrupt-ctrl   2 Edge      orion_event
+  22:       5119  interrupt-controller   3 Edge      serial
+  24:          0  bridge-interrupt-ctrl   3 Edge      orion_wdt
+  25:      89504  interrupt-controller  22 Edge      f1072004.mdio-bus
+  28:          1  f1010100.gpio   1 Edge      Reset Button
+  31:        598  f1010100.gpio   4 Level     mwl8k
+  59:        985  interrupt-controller  21 Edge      eth0
+Err:          0
+# iw dev wlan0 scan > /dev/null ; cat /proc/interrupts
+            CPU0
+  17:     166424  bridge-interrupt-ctrl   2 Edge      orion_event
+  22:       5250  interrupt-controller   3 Edge      serial
+  24:          0  bridge-interrupt-ctrl   3 Edge      orion_wdt
+  25:      89748  interrupt-controller  22 Edge      f1072004.mdio-bus
+  28:          1  f1010100.gpio   1 Edge      Reset Button
+  31:        708  f1010100.gpio   4 Level     mwl8k
+  59:        985  interrupt-controller  21 Edge      eth0
+Err:          0
+# sleep 10 ; cat /proc/interrupts
+            CPU0
+  17:     167985  bridge-interrupt-ctrl   2 Edge      orion_event
+  22:       5349  interrupt-controller   3 Edge      serial
+  24:          0  bridge-interrupt-ctrl   3 Edge      orion_wdt
+  25:      90603  interrupt-controller  22 Edge      f1072004.mdio-bus
+  28:          1  f1010100.gpio   1 Edge      Reset Button
+  31:        708  f1010100.gpio   4 Level     mwl8k
+  59:        995  interrupt-controller  21 Edge      eth0
+Err:          0
+# iw dev wlan0 scan > /dev/null ; cat /proc/interrupts
+            CPU0
+  17:     168270  bridge-interrupt-ctrl   2 Edge      orion_event
+  22:       5480  interrupt-controller   3 Edge      serial
+  24:          0  bridge-interrupt-ctrl   3 Edge      orion_wdt
+  25:      90727  interrupt-controller  22 Edge      f1072004.mdio-bus
+  28:          1  f1010100.gpio   1 Edge      Reset Button
+  31:        818  f1010100.gpio   4 Level     mwl8k
+  59:        996  interrupt-controller  21 Edge      eth0
+Err:          0
 
-I guess it is a bit of grayzone, and that is why both solutions coexist.
-
-> Looking at the sh-pfc driver, I wish the hardware had followed the pinctrl-
-> single model. sh-pfc is a good example of how bloated a pinctrl driver can
-> become when there is no choice but model all the relationships betweens pins
-> and functions in C code.
-
-It might be true, there are so many variables to the equation that
-I cannot tell.
-
-Debuggability and readability of code and device trees and different
-groups of people reading code vs device trees is another factor.
-
-Scaringly, what is best for me as subsystem maintainer (that all
-drivers look identical) is not always best for the users.
-
-Yours,
-Linus Walleij
+> 
+> Thanks
+>      Andrew
