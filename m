@@ -1,80 +1,124 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 13 Sep 2016 11:32:34 +0100
-Subject: [PATCH v4 07/10] ARM: Introduce MPIDR_LEVEL_SHIFT macro
-In-Reply-To: <57D7D100.3040908@arm.com>
-References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
- <1473691764-29424-8-git-send-email-vladimir.murzin@arm.com>
- <20160913083855.GC5680@cbox> <57D7C111.7000405@arm.com>
- <57D7D100.3040908@arm.com>
-Message-ID: <57D7D5C2.6020105@arm.com>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Tue, 13 Sep 2016 18:38:56 +0800
+Subject: [PATCH v12 0/8] acpi,
+ clocksource: add GTDT driver and GTDT support in arm_arch_timer
+Message-ID: <1473763144-5653-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/09/16 11:12, Marc Zyngier wrote:
-> On 13/09/16 10:04, Vladimir Murzin wrote:
->> On 13/09/16 09:38, Christoffer Dall wrote:
->>> On Mon, Sep 12, 2016 at 03:49:21PM +0100, Vladimir Murzin wrote:
->>>> vgic-v3 driver uses architecture specific MPIDR_LEVEL_SHIFT macro to
->>>> encode the affinity in a form compatible with ICC_SGI* registers.
->>>> Unfortunately, that macro is missing on ARM, so let's add it.
->>>>
->>>> Cc: Russell King <rmk+kernel@armlinux.org.uk>
->>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>>> ---
->>>>  arch/arm/include/asm/cputype.h |    1 +
->>>>  1 file changed, 1 insertion(+)
->>>>
->>>> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
->>>> index 1ee94c7..e2d94c1 100644
->>>> --- a/arch/arm/include/asm/cputype.h
->>>> +++ b/arch/arm/include/asm/cputype.h
->>>> @@ -55,6 +55,7 @@
->>>>  
->>>>  #define MPIDR_LEVEL_BITS 8
->>>>  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
->>>> +#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
->>>>  
->>>
->>> I'm not sure I follow the correctness of this completely.
->>>
->>> This is called from vgic_v3_dispatch_sgi, which takes a u64 value, which
->>> may have something in the Aff3 field, which we now shift left 24 bits,
->>> but that is not the Aff3 field of AArch32's MPIDR.
->>>
->>> What is the rationale for this making sense again?
->>
->> IIUC, in such case we construct mpidr which won't match in match_mpidr()
->> with the value we get from kvm_vcpu_get_mpidr_aff() and no SGI will be
->> sent to the guest.
->>
->> Since we get that u64 value from the guest, I'd think it is something
->> wrong is going on in the guest in case Aff3 is non-zero; however, we can
->> hide it by zeroing out SGI Aff3 bits in access_gic_sgi().
-> 
-> I don't think zeroing Aff3 is the right move, as the spec doesn't say
-> that Aff3 should be ignored in a write to ICC_SGI1R. On the other hand,
-> the spec says (in the context of the target list): "If a bit is 1 and
-> the bit does not correspond to a valid target PE, the bit must be
-> ignored by the Distributor".
-> 
-> This makes me think that, unless ICC_SGI1R.IMR is set, we should simply
-> ignore that SGI because there is no way we can actually deliver it.
-> 
-> Could you cook a small patch that would go on top of this series?
+From: Fu Wei <fu.wei@linaro.org>
 
-I assume you've meant ICC_SGI1R.IRM, aka broadcast. In this case,
-vgic_v3_dispatch_sgi() seems already matches the logic you've described:
+This patchset:
+    (1)Preparation for adding GTDT support in arm_arch_timer:
+        1. Move some enums and marcos to header file;
+        2. Add a new enum for spi type;
+        3. Improve printk relevant code.
 
-- if IRM == 1, send to everyone except self without check for mpidr
-- if IRM == 0, send to target iff matched to a valid mpidr
+    (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+    Parse all kinds of timer in GTDT table of ACPI:arch timer,
+    memory-mapped timer and SBSA Generic Watchdog timer.
+    This driver can help to simplify all the relevant timer drivers,
+    and separate all the ACPI GTDT knowledge from them.
 
-Am I missing something?
+    (3)Simplify ACPI code for arm_arch_timer
 
-Thanks
-Vladimir
+    (4)Add GTDT support for ARM memory-mapped timer
 
-> 
-> Thanks,
-> 
-> 	M.
-> 
+This patchset depends on the following patchset:
+[UPDATE PATCH V11 1/8] ACPI: I/O Remapping Table (IORT) initial support
+https://lkml.org/lkml/2016/9/12/949
+
+This patchset has been tested on the following platforms:
+    (1)ARM Foundation v8 model
+
+Changelog:
+v12: https://lkml.org/lkml/2016/9/13/
+     Rebase to latest Linux 4.8-rc6
+     Delete the confusing "skipping" in the error message.
+
+V11: https://lkml.org/lkml/2016/9/6/354
+     Rebase to latest Linux 4.8-rc5
+     Delete typedef (suggested by checkpatch.pl)
+
+V10: https://lkml.org/lkml/2016/7/26/215
+     Drop the "readq" patch.
+     Rebase to latest Linux 4.7.
+
+V9: https://lkml.org/lkml/2016/7/25/345
+    Improve pr_err message in acpi gtdt driver.
+    Update Commit message for 7/9
+    shorten the irq mapping function name
+    Improve GTDT driver for memory-mapped timer
+
+v8: https://lkml.org/lkml/2016/7/19/660
+    Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+    and also improve printk message.
+    Simplify is_timer_block and is_watchdog.
+    Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
+    Delete __init in include/linux/acpi.h for GTDT API
+    Make ARM64 select GTDT.
+    Delete "#include <linux/module.h>" from acpi_gtdt.c
+    Simplify GT block parse code.
+
+v7: https://lkml.org/lkml/2016/7/13/769
+    Move the GTDT driver to drivers/acpi/arm64
+    Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+    Merge 3 patches of GTDT parser driver.
+    Fix the for_each_platform_timer bug.
+
+v6: https://lkml.org/lkml/2016/6/29/580
+    split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+    and SBSA Generic Watchdog timer
+    Improve driver by suggestions and example code from Daniel Lezcano
+
+v5: https://lkml.org/lkml/2016/5/24/356
+    Sorting out all patches, simplify the API of GTDT driver:
+    GTDT driver just fills the data struct for arm_arch_timer driver.
+
+v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+    Delete the kvm relevant patches
+    Separate two patches for sorting out the code for arm_arch_timer.
+    Improve irq info export code to allow missing irq info in GTDT table.
+
+v3: https://lkml.org/lkml/2016/2/1/658
+    Improve GTDT driver code:
+      (1)improve pr_* by defining pr_fmt(fmt)
+      (2)simplify gtdt_sbsa_gwdt_init
+      (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+      to get GTDT table.
+    Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+    Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+
+v2: https://lkml.org/lkml/2015/12/2/10
+    Rebase to latest kernel version(4.4-rc3).
+    Fix the bug about the config problem,
+    use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+
+v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+
+Fu Wei (8):
+  clocksource/drivers/arm_arch_timer: Move enums and defines to header
+    file
+  clocksource/drivers/arm_arch_timer: Add a new enum for spi type
+  clocksource/drivers/arm_arch_timer: Improve printk relevant code
+  acpi/arm64: Add GTDT table parse driver
+  clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
+  acpi/arm64: Add memory-mapped timer support in GTDT driver
+  clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
+    timer
+  acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+
+ arch/arm64/Kconfig                   |   1 +
+ drivers/acpi/arm64/Kconfig           |   3 +
+ drivers/acpi/arm64/Makefile          |   1 +
+ drivers/acpi/arm64/gtdt.c            | 309 +++++++++++++++++++++++++++++++++++
+ drivers/clocksource/Kconfig          |   2 +-
+ drivers/clocksource/arm_arch_timer.c | 225 +++++++++++++++++--------
+ drivers/watchdog/Kconfig             |   1 +
+ include/clocksource/arm_arch_timer.h |  32 ++++
+ include/linux/acpi.h                 |   7 +
+ 9 files changed, 510 insertions(+), 71 deletions(-)
+ create mode 100644 drivers/acpi/arm64/gtdt.c
+
+-- 
+2.7.4
