@@ -1,33 +1,45 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 13 Sep 2016 18:12:38 +0200
-Subject: [PATCH 0/3] nvmem: add lpc18xx OTP memory driver
-Message-ID: <20160913161241.22492-1-manabian@gmail.com>
+Date: Tue, 13 Sep 2016 18:12:40 +0200
+Subject: [PATCH 2/3] nvmem: dt: document lpc1850 OTP binding
+In-Reply-To: <20160913161241.22492-1-manabian@gmail.com>
+References: <20160913161241.22492-1-manabian@gmail.com>
+Message-ID: <20160913161241.22492-3-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds a simple read-only nvmem driver for the
-internal OTP (One Time Programmable) memory found on all
-LPC18xx/43xx devices. Write support is coming later when
-the required firmware driver for the boot ROM goes upstream.
+Documenation for the LPC18xx/43xx OTP memory bindings.
 
-Note that dtsi patch is only included for reference. I intend
-to take it myself through the lpc18xx tree once the bindings
-are accepted and the driver goes upstream.
-
-
-Joachim Eastwood (3):
-  nvmem: add NXP LPC18xx OTP driver
-  nvmem: dt: document lpc1850 OTP binding
-  ARM: dts: lpc18xx: add otp node
-
- .../devicetree/bindings/nvmem/lpc1850-otp.txt      |  20 ++++
- arch/arm/boot/dts/lpc18xx.dtsi                     |  12 ++
- drivers/nvmem/Kconfig                              |  10 ++
- drivers/nvmem/Makefile                             |   2 +
- drivers/nvmem/lpc18xx_otp.c                        | 123 +++++++++++++++++++++
- 5 files changed, 167 insertions(+)
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ .../devicetree/bindings/nvmem/lpc1850-otp.txt        | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
- create mode 100644 drivers/nvmem/lpc18xx_otp.c
 
+diff --git a/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt b/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
+new file mode 100644
+index 0000000..853b6a7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
+@@ -0,0 +1,20 @@
++* NXP LPC18xx OTP memory
++
++Internal OTP (One Time Programmable) memory for NXP LPC18xx/43xx devices.
++
++Required properties:
++  - compatible: Should be "nxp,lpc1850-otp"
++  - reg: Must contain an entry with the physical base address and length
++    for each entry in reg-names.
++  - address-cells: must be set to 1.
++  - size-cells: must be set to 1.
++
++See nvmem.txt for more information.
++
++Example:
++  otp: otp at 40045000 {
++    compatible = "nxp,lpc1850-otp";
++    reg = <0x40045000 0x1000>;
++    #address-cells = <1>;
++    #size-cells = <1>;
++  };
 -- 
 2.9.3
