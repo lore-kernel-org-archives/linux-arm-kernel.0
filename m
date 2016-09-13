@@ -1,55 +1,46 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 13 Sep 2016 14:34:48 +0200
-Subject: [PATCH v5 5/9] Documentation: dt-bindings: Add IRQ related
- properties of STM32 pinctrl
-In-Reply-To: <CACRpkdbZtNscuJ0bQMYt09ZKACQ0PBG8XMmGo7XnDy5fMGk9_g@mail.gmail.com>
-References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
- <1473432124-6784-6-git-send-email-alexandre.torgue@st.com>
- <CACRpkdbZtNscuJ0bQMYt09ZKACQ0PBG8XMmGo7XnDy5fMGk9_g@mail.gmail.com>
-Message-ID: <0359b2c7-cda5-b744-7051-4b19af0fcfcd@st.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 13 Sep 2016 14:36:39 +0200
+Subject: [PATCH 6/8 v2] arm: orion5x: Add DT-based support for Netgear
+ WNR854T
+In-Reply-To: <88e40f0c6cafec244dc16af5a03cfb44@jamie.lentin.co.uk>
+References: <1472203264-21089-7-git-send-email-jm@lentin.co.uk>
+ <1473109646-23366-1-git-send-email-jm@lentin.co.uk>
+ <20160912170625.GA7420@rob-hp-laptop> <2920481.EgEQnLmOkM@wuerfel>
+ <20160912220344.GM11400@lunn.ch>
+ <88e40f0c6cafec244dc16af5a03cfb44@jamie.lentin.co.uk>
+Message-ID: <20160913123639.GB15332@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Sep 13, 2016 at 10:10:41AM +0100, Jamie Lentin wrote:
+> On 2016-09-12 23:03, Andrew Lunn wrote:
+> >>Maybe we can instead leave out the PCI support from the new
+> >>file for now and not delete the legacy board file?
+> 
+> This seems a reasonable compromise. The PCI card the router comes
+> with isn't supported by mwl8k mainline anyway (There's STA-only
+> firmware that can be extracted from a windows driver and PCI IDs
+> added, but stats reporting uses a different format), so it's not a
+> huge loss, although many did replace the card with something
+> Atheros-based.
 
-On 09/13/2016 10:18 AM, Linus Walleij wrote:
-> On Fri, Sep 9, 2016 at 4:42 PM, Alexandre TORGUE
-> <alexandre.torgue@st.com> wrote:
->
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>
->> diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->> index 587bffb..a0eed99 100644
->> --- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->> @@ -14,6 +14,9 @@ Required properies:
->>   - #size-cells : The value of this property must be 1
->>   - ranges      : defines mapping between pin controller node (parent) to
->>     gpio-bank node (children).
->> + - interrupt-parent: phandle of the interrupt parent to which the external
->> +   GPIO interrupts are forwarded to.
->> + - st,syscfg: phandle of the syscfg node used for IRQ mux selection.
->
-> Actually this doc is incomplete.
->
-> This is a phandle + offset, not just a phandle.
->
-> It is a small detail so I don't care much, either send a patch to
-> fix up this doc (I have already merged it) or patch the driver
-> to not retrieve the offset and instead use
-> #define SYSCFG_OFFSET 0x08
-> or something...
+O.K. So dropping the PCI code gets us going forward.
+Have we missed the merge window?
 
-I'll send a patch for Documentation.
-Do I need to wait  this series is officially released (4.9-rc1) or can I 
-send it now ?
+> Unfortunately the power regulator on my spare router has stopped
+> regulating, which will make more development tricky.
 
-Regards
-Alex
+The Green Light of death?
 
->
-> Yours,
-> Linus Walleij
->
+> >Jamie, which interrupt do you see the WiFi card using?  If it is
+> >IRQ_ORION5X_PCIE0_INT, (1 + 11), that is probably easier to deal with
+> >than if it uses GPIO 4.
+> 
+> Definitely uses GPIO 4.
+
+O.K, that makes it more interesting. As far as i can see, no other
+PCIe system uses a GPIO for its interrupt. There is no core support
+for this, or any bus driver doing it. So there is no binding to
+follow.
+
+	Andrew
