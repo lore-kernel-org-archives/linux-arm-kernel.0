@@ -1,21 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Sep 2016 17:34:23 +0200
-Subject: [GIT PULL] LPC18xx DTS changes for v4.9 part2
-In-Reply-To: <20160906201600.31373-1-manabian@gmail.com>
-References: <20160906201600.31373-1-manabian@gmail.com>
-Message-ID: <6413359.trH5GThMIi@wuerfel>
+Date: Tue, 13 Sep 2016 17:35:25 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v4.9
+In-Reply-To: <cover.1473234371.git.horms+renesas@verge.net.au>
+References: <cover.1473234371.git.horms+renesas@verge.net.au>
+Message-ID: <14474684.Hhngk1emgJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 6, 2016 10:16:00 PM CEST Joachim Eastwood wrote:
-> Device Tree clean up for LPC18xx platform
+On Wednesday, September 7, 2016 9:49:30 AM CEST Simon Horman wrote:
+> Second Round of Renesas ARM Based SoC DT Updates for v4.9
 > 
-> * Removal of skeleton.dtsi from the common armv7-m dtsi together
->   with lpc18xx and efm32 platforms.
+> Fixes (for v4.9):
+> * Correct PWM clock parent on r8a7794 SoC
 > 
-> * Fix for unit address warnings from the dtc on lpc18xx/efm32.
->   That is made possible with skeleton.dtsi gone.
+> Clean-up:
+> * Remove obsolete vsp1 properties from r8a779[01] SoCs
 > 
+> New boards:
+> * Add r8a7792/wheat and r7s72100/rskrza1 boards
+> 
+> Enablement:
+> * Enable LEDs, DU, SDHI on r8a7792/blanche board
+> * Enable MMCIF and SDHI on r8a7794/alt board
+> * Add SPI and VSP1 to r8a7792 SoC
+> * Add ethernet to r7s72100 SoC
 > 
 
 Pulled into next/dt, thanks!
