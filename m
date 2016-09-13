@@ -1,45 +1,43 @@
-From: fweimer@redhat.com (Florian Weimer)
-Date: Tue, 13 Sep 2016 11:28:21 +0200
-Subject: [RFC PATCH 0/5] arm64: Signal context expansion
-In-Reply-To: <20160912153015.GD3958@e103592.cambridge.arm.com>
-References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
- <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
- <20160909152047.GA3958@e103592.cambridge.arm.com>
- <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
- <20160912111749.GB3958@e103592.cambridge.arm.com> <57D6C33D.9020003@arm.com>
- <20160912153015.GD3958@e103592.cambridge.arm.com>
-Message-ID: <9969568a-f969-d904-52b3-14f80c3abec4@redhat.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 13 Sep 2016 10:31:07 +0100
+Subject: [PATCH v9 00/19] Add support for FDMA DMA controller and slim
+ core rproc found on STi chipsets
+In-Reply-To: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
+References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160913093107.GA10953@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2016 05:30 PM, Dave Martin wrote:
-> On Mon, Sep 12, 2016 at 04:01:17PM +0100, Szabolcs Nagy wrote:
->> i assume the kernel can avoid saving SVE regs when
->> they are not used by the process.
->
-> I can (and do), in my patches (not posted yet).
->
-> The real issue here is that a recently updated shared library might be
-> optimised to use SVE, where the program using it is an older, SVE-
-> unaware binary.
->
-> (think of an optimised math library using some new fancy SVE-based
-> number crunching internally).
+Hi Vinod & Bjorn,
 
-In my little world, binaries are expected to do run-time CPU feature 
-discovery and fall back to the baseline ABI if the system does not 
-support ABI extensions.  This means that a personality flag can disable 
-the extension, the optimized math libraries run with the slower baseline 
-code instead, and the rest of the application sees the expected kernel 
-interface.
+[..]
 
- From this perspective, it is quite important that it is possible to get 
-legacy applications running on newer hardware, preferably with out 
-wrapping them in a dedicated VM.
+On Mon, 05 Sep 2016, Peter Griffin wrote:
 
-I understand that there are other environments were this is less of a 
-concern, but I also believe that the age of an architecture factors less 
-into this than one might want.
+> v8 actions some review feedback from Bjorn to the slim rproc driver, and also includes
+> a patch which fixes a recursive Kconfig error which is triggered when st_fdma selects
+> slim_rproc driver. The series has also been rebased on v4.8-rc3.
+> 
+> v9 actions some review feedback from Bjorn, Lee and Vinod. See below. Importantly a bug
+> was found during testing now that the platform boots without clk_ignore_unused parameter
+> whereby the clocks would not be enabled properly before firmware loading was attempted.
+> 
+> regards,
+> 
+> Peter.
+> 
+> Changes since v8:
+>  - Add MODULE_ALIAS (Vinod)
+>  - devm_kzalloc to devm_kcalloc (Vinod)
+>  - quisce tasklet initialised by vchan_init() (Vinod)
+>  - Don't make SLIM rproc user selectable (Bjorn)
+>  - slim_rproc: Ensure clocks enabled before firmware load (Peter)
+>  - Various code style nits / commit message change (Lee)
+>  - Separate patch for '\n' kconfig removal (Vinod)
 
-Thanks,
-Florian
+I hate to send a ping, but do you think we can merge this fdma series? It has gone
+through quite a few review rounds now.
+
+regards,
+
+Peter.
