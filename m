@@ -1,59 +1,49 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 13 Sep 2016 11:06:16 -0700
-Subject: [PATCH v9 00/19] Add support for FDMA DMA controller and slim
- core rproc found on STi chipsets
-In-Reply-To: <20160913093107.GA10953@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <20160913093107.GA10953@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20160913180616.GD21438@tuxbot>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 14 Sep 2016 02:12:30 +0800
+Subject: [arm:sa1100 80/81] arch/arm/mach-pxa/mainstone.c:560: undefined
+ reference to `gpio_reg_init'
+Message-ID: <201609140228.hC8MtpFb%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 13 Sep 02:31 PDT 2016, Peter Griffin wrote:
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
+head:   36b075e9681a293ef57aaa107ab394bc879a0807
+commit: 4c76c25bd4f755e2302807f99b75ff9954c036d1 [80/81] ARM: pxa/mainstone: convert PCMCIA to use MAX1600 driver and gpiod APIs
+config: arm-mainstone_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 4c76c25bd4f755e2302807f99b75ff9954c036d1
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> Hi Vinod & Bjorn,
-> 
-> [..]
-> 
-> On Mon, 05 Sep 2016, Peter Griffin wrote:
-> 
-> > v8 actions some review feedback from Bjorn to the slim rproc driver, and also includes
-> > a patch which fixes a recursive Kconfig error which is triggered when st_fdma selects
-> > slim_rproc driver. The series has also been rebased on v4.8-rc3.
-> > 
-> > v9 actions some review feedback from Bjorn, Lee and Vinod. See below. Importantly a bug
-> > was found during testing now that the platform boots without clk_ignore_unused parameter
-> > whereby the clocks would not be enabled properly before firmware loading was attempted.
-> > 
-> > regards,
-> > 
-> > Peter.
-> > 
-> > Changes since v8:
-> >  - Add MODULE_ALIAS (Vinod)
-> >  - devm_kzalloc to devm_kcalloc (Vinod)
-> >  - quisce tasklet initialised by vchan_init() (Vinod)
-> >  - Don't make SLIM rproc user selectable (Bjorn)
-> >  - slim_rproc: Ensure clocks enabled before firmware load (Peter)
-> >  - Various code style nits / commit message change (Lee)
-> >  - Separate patch for '\n' kconfig removal (Vinod)
-> 
-> I hate to send a ping,
+All errors (new ones prefixed by >>):
 
-Sorry about that.
+   arch/arm/mach-pxa/built-in.o: In function `mainstone_init':
+>> arch/arm/mach-pxa/mainstone.c:560: undefined reference to `gpio_reg_init'
+   arch/arm/mach-pxa/mainstone.c:563: undefined reference to `gpio_reg_init'
 
-> but do you think we can merge this fdma series? It has gone
-> through quite a few review rounds now.
-> 
+vim +560 arch/arm/mach-pxa/mainstone.c
 
-I think the remoteproc part looks good.
+   554	{
+   555		int SW7 = 0;  /* FIXME: get from SCR (Mst doc section 3.2.1.1) */
+   556	
+   557		pxa2xx_mfp_config(ARRAY_AND_SIZE(mainstone_pin_config));
+   558	
+   559		/* Register board control register(s) as GPIOs */
+ > 560		gpio_reg_init(NULL, (void __iomem *)&MST_PCMCIA0, -1, 11,
+   561			      "mst-pcmcia0", MST_PCMCIA_INPUTS, 0, NULL,
+   562			      NULL, mst_pcmcia0_irqs);
+   563		gpio_reg_init(NULL, (void __iomem *)&MST_PCMCIA1, -1, 11,
 
-Vinod, I don't have any changes queued in remoteproc that should cause
-merge issues. If you want to you could take the remoteproc patch
-through your tree.
-
-
-I do however think that the dts patches should go through arm-soc.
-
-Regards,
-Bjorn
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 12287 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160914/c8dff7fd/attachment.obj>
