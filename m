@@ -1,98 +1,22 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 13 Sep 2016 16:26:12 +0800
-Subject: [PATCH v5 12/14] drivers: acpi: iort: replace rid map type with
- type mask
-In-Reply-To: <20160909142343.13314-13-lorenzo.pieralisi@arm.com>
-References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
- <20160909142343.13314-13-lorenzo.pieralisi@arm.com>
-Message-ID: <1dee1475-79e1-257a-1ebd-d1a9ac033ca4@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Sep 2016 10:35:49 +0200
+Subject: [PATCH 1/6] gpio: constify gpio_chip structures
+In-Reply-To: <1473596082-32690-2-git-send-email-Julia.Lawall@lip6.fr>
+References: <1473596082-32690-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1473596082-32690-2-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CACRpkdbA41W+8oA3S-1iMJ33+hSa0ng4Q-XHO3E6FA24KpUa6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Sun, Sep 11, 2016 at 2:14 PM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
 
-On 2016/9/9 22:23, Lorenzo Pieralisi wrote:
-> IORT tables provide data that allow the kernel to carry out
-> device ID mappings between endpoints and system components
-> (eg interrupt controllers, IOMMUs). When the mapping for a
-> given device ID is carried out, the translation mechanism
-> is done on a per-subsystem basis rather than a component
-> subtype (ie the IOMMU kernel layer will look for mappings
-> from a device to all IORT node types corresponding to IOMMU
-> components), therefore the corresponding mapping API should
-> work on a range (ie mask) of IORT node types corresponding
-> to a common set of components (eg IOMMUs) rather than a
-> specific node type.
+> These structures are only used to copy into other structures, so declare
+> them as const.
+(...)
 >
-> Upgrade the IORT iort_node_map_rid() API to work with a
-> type mask instead of a single node type so that it can
-> be used for mappings that span multiple components types
-> (ie IOMMUs).
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> ---
->  drivers/acpi/arm64/iort.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index a12dda9..36ea93e 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -25,6 +25,9 @@
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->
-> +#define IORT_TYPE_MASK(type)	(1 << (type))
-> +#define IORT_MSI_TYPE		(1 << ACPI_IORT_NODE_ITS_GROUP)
-> +
->  struct iort_its_msi_chip {
->  	struct list_head	list;
->  	struct fwnode_handle	*fw_node;
-> @@ -283,7 +286,7 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
->
->  static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
->  						u32 rid_in, u32 *rid_out,
-> -						u8 type)
-> +						u8 type_mask)
->  {
->  	u32 rid = rid_in;
->
-> @@ -292,7 +295,7 @@ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
->  		struct acpi_iort_id_mapping *map;
->  		int i;
->
-> -		if (node->type == type) {
-> +		if (IORT_TYPE_MASK(node->type) & type_mask) {
->  			if (rid_out)
->  				*rid_out = rid;
->  			return node;
-> @@ -365,7 +368,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
->  	if (!node)
->  		return req_id;
->
-> -	iort_node_map_rid(node, req_id, &dev_id, ACPI_IORT_NODE_ITS_GROUP);
-> +	iort_node_map_rid(node, req_id, &dev_id, IORT_MSI_TYPE);
->  	return dev_id;
->  }
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-I think you forgot to update another function which is ok in your v4
-patch set:
+Patch applied, awesome work as always, thanks!
 
-@@ -411,7 +414,7 @@ iort_dev_find_its_id(struct device *dev, u32 req_id, 
-unsigned int idx,
-  		return -ENXIO;
-  	}
-
--	node = iort_node_map_rid(node, req_id, NULL, ACPI_IORT_NODE_ITS_GROUP);
-+	node = iort_node_map_rid(node, req_id, NULL, IORT_MSI_TYPE);
-  	if (!node) {
-  		dev_err(dev, "can't find related ITS node\n");
-  		return -ENXIO;
-
-Others are look good to me.
-
-Thanks
-Hanjun
+Yours,
+Linus Walleij
