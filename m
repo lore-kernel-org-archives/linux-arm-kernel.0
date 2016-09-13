@@ -1,82 +1,47 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 13 Sep 2016 09:06:34 +0200
-Subject: [PATCH v5 2/3] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <20160912135646.GB9789@dell>
-References: <1473344917-1524-1-git-send-email-quentin.schulz@free-electrons.com>
- <1473344917-1524-3-git-send-email-quentin.schulz@free-electrons.com>
- <20160912091829.GB1873@dell>
- <93bd339b-85ab-d0fc-5e80-e2aca290c0d7@free-electrons.com>
- <20160912095923.GD1873@dell>
- <5dec118f-45ae-4fb6-dd1e-2028947add53@free-electrons.com>
- <20160912135646.GB9789@dell>
-Message-ID: <a48580b4-1494-d474-b33c-007f898b29b7@free-electrons.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 13 Sep 2016 15:21:46 +0800
+Subject: [PATCH v5 0/3] Add ZTE ZX296718 support
+In-Reply-To: <1473730926-1034-1-git-send-email-jun.nie@linaro.org>
+References: <1473730926-1034-1-git-send-email-jun.nie@linaro.org>
+Message-ID: <20160913072146.GA7398@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2016 15:56, Lee Jones wrote:
-> On Mon, 12 Sep 2016, Quentin Schulz wrote:
->> On 12/09/2016 11:59, Lee Jones wrote:
->>> On Mon, 12 Sep 2016, Quentin Schulz wrote:
->>>
->>>> On 12/09/2016 11:18, Lee Jones wrote:
->>>>> On Thu, 08 Sep 2016, Quentin Schulz wrote:
->>>>> [...]
->>>>>> +
->>>>>> +MODULE_DEVICE_TABLE(of, sun4i_gpadc_mfd_of_match);
->>>>>
->>>>> Place this directly under the table.
->>>>>
->>>>>> +static struct platform_driver sun4i_gpadc_mfd_driver = {
->>>>>> +	.driver = {
->>>>>> +		.name = "sun4i-adc-mfd",
->>>>>> +		.of_match_table = of_match_ptr(sun4i_gpadc_mfd_of_match),
->>>>>> +	},
->>>>>> +	.probe = sun4i_gpadc_mfd_probe,
->>>>>
->>>>> No .remove?
->>>>>
->>>>
->>>> No, everything in probe is handled with devm functions.
->>>
->>> Don't you need to undo the register write you did?
->>>
->>
->> The regmap_write I use is there to disable all interrupts on hardware
->> side before the irq_chip handles all interrupts by itself. The
->> interrupts are not used in the MFD driver.
->>
->> Thus, I chose to disable the hardware interrupts in the remove function
->> of drivers using the interrupts (only the IIO yet but the touchscreen
->> driver later also which will be using a third interrupt). When the MFD
->> driver is removed, the MFD cells will all be removed, thus calling their
->> own remove functions, thus disabling hardware interrupts used in each
->> driver. So the hardware interrupts disabling would be called twice.
+On Tue, Sep 13, 2016 at 09:42:03AM +0800, Jun Nie wrote:
+> Changes in version5:
+>   - Add GPL license to new files.
+>   - Unify clocks dts nodes names.
+>   - Move interrupt parents info to root nodes in dts, move
+>     pmu and timer node out of soc node.
 > 
-> This does send some little alarm bells ringing.  I'd normally expect
-> the .remove function to undo everything you did in .probe.  So, if you
-> are disabling the IRQs from within the leaf drivers, shouldn't you be
-> initialising them in the leaf driver's respective .probes?
+> Changes in version4:
+>   - Change dts file name to align with compatible name.
+>   - Reorder dts nodes with reg address sequence.
+>   - Move nodes out of soc, which do not have soc simple
+>     bus address or share soc interrupt.
+>   - Change some nodes name to align with convention.
 > 
+> Changes in version3:
+>   - Remove unnecessary flag of gic in dts.
+> 
+> Changes in version2:
+>   - Use more precise cpu and pmu compatible name in dts.
+>   - fix minor coding style issue.
+> 
+> 
+> Jun Nie (3):
+>   arm64: add ZTE ZX SoC family
+>   arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
+>   arm64: defconfig: enable ZTE ZX related config
 
-I use the regmap_write in the MFD driver's probe to disable all
-interrupts before requesting irq_chip to guarantee the interrupts are in
-a known state, being disabled. It is to insure no interrupt will occur
-unwittingly before we want the leaf drivers to handle them.
+For the series,
 
-The disabling of irqs in the remove is handled rather by
-devm_regmap_del_irq_chip than by an explicit regmap_write in the
-driver's removal function. It performs the exact same thing.
+Reviewed-by: Shawn Guo <shawnguo@kernel.org>
 
-I always use devm functions for requesting either an irq_chip or the
-irqs themselves. In that case, when the device is removed, the irqs are
-freed on leaf drivers' (where the irqs are requested) removal while the
-removal of irq_chip in the MFD driver will also free all irqs mapped to
-this irq_chip thanks to devm_regmap_del_irq_chip. Therefore, the
-interrupts are disabled by devm functions.
+Arnd, Olof,
 
-The regmap_update_bits in probe and removal of the ADC driver to disable
-irqs are actually redundant because the devm functions already handle
-the irqs disabling.
+If you like, I can help collect ZTE DTS patches to reduce your
+maintenance burden, considering we have an established pull-request
+work flow and I get ZTE platform on hands to test patches.
 
-Thanks,
-Quentin
+Shawn
