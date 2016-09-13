@@ -1,54 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 13 Sep 2016 09:24:44 +0200
-Subject: [PATCH 1/5] clk: add support for runtime pm
-In-Reply-To: <20160908001943.GC13062@codeaurora.org>
-References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
- <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
- <20160908001943.GC13062@codeaurora.org>
-Message-ID: <CAPDyKFrSYkke8LsQ68oxdarxg1mMeiEEwqYKVTqDLAEApEEHYA@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 13 Sep 2016 09:36:01 +0200
+Subject: [PATCH 2/3] ARM64: dts: amlogic: Add basic support for Amlogic
+ S905X
+In-Reply-To: <CAOQ7t2ZjDjZbUfCKwUf4PHywOZx-UiQmy37TEQhWDNYRg0BOag@mail.gmail.com>
+References: <20160903082227.30559-1-narmstrong@baylibre.com>
+ <20160903082227.30559-3-narmstrong@baylibre.com>
+ <7e27e8c0-bb18-40d8-10d6-3928e66815c7@suse.de>
+ <CAOQ7t2bWLq2XP2rKx3msf=1tUfXkQuBWagun46TaKk73qXr=FQ@mail.gmail.com>
+ <7ha8fcq26c.fsf@baylibre.com> <28d9160a-ce40-cbbb-b4e9-3ec34be52368@suse.de>
+ <CAOQ7t2ZjDjZbUfCKwUf4PHywOZx-UiQmy37TEQhWDNYRg0BOag@mail.gmail.com>
+Message-ID: <7755ed8c-6083-4e2a-620c-85f55ca1d16e@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2016 at 02:19, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 09/01, Marek Szyprowski wrote:
->> Registers for some clocks might be located in the SOC area, which are under the
->> power domain. To enable access to those registers respective domain has to be
->> turned on. Additionally, registers for such clocks will usually loose its
->> contents when power domain is turned off, so additional saving and restoring of
->> them might be needed in the clock controller driver.
+On 09/13/2016 08:14 AM, Carlo Caione wrote:
+> On Mon, Sep 12, 2016 at 11:43 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> 
+> [cut]
+>> I'm not arguing over the file name, where it perfectly makes sense to
+>> have a meson-gxl- prefix (already discussed), just about the compatible
+>> string where we don't have "amlogic,meson-gxl-s905x-p231" either because
+>> it is completely unnecessary and does _not_ add any value.
 >>
->> This patch adds basic infrastructure in the clocks core to allow implementing
->> driver for such clocks under power domains. Clock provider can supply a
->> struct device pointer, which is the used by clock core for tracking and managing
->> clock's controller runtime pm state. Each clk_prepare() operation
->> will first call pm_runtime_get_sync() on the supplied device, while
->> clk_unprepare() will do pm_runtime_put() at the end.
->>
->> Additional calls to pm_runtime_get/put functions are required to ensure that any
->> register access (like calculating/chaning clock rates) will be done with clock
->> controller in active runtime state.
->>
->> Special handling of the case when runtime pm is disabled for clock controller's
->> device is needed to let this feature work properly also during system sleep
->> suspend/resume operations (runtime pm is first disabled before entering sleep
->> state's, but controller is usually still operational until its suspend pm
->> callback is called).
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->
-> My "knee jerk" concern is that we're going to take a runtime PM
-> lock underneath the prepare lock. That seems like a situation
-> where we could hit a lock inversion if the runtime PM callbacks
-> themselves acquire the prepare lock by calling clk APIs? But this
-> concern is false right? We release the runtime PM lock before
-> calling the PM callback, so we shouldn't hit any deadlock and
-> lockdep won't complain?
+>> Not that we're checking this string anywhere anyway... If you want to
+>> check for the GXL family you have to use "amlogic,meson-gxl"; if you
+>> want to check for the specific SoC you use "amlogic,s905x". Simple. We
+>> never match partial strings, so there is no sense in a hardcoded prefix
+>> that is duplicating information already available.
+> 
+> Ok, then. Fine with me.
+> 
+> Neil, do you want to resend my patch or you can take care of the fixes
+> for the whole patchset?
+> 
+> Thanks,
+> 
 
-You assumption is correct!
+Ok, I still need to synchronize with kevin for when and where to rebase from.
 
-Before the runtime PM core invokes a runtime PM callback it will
-unlock the -">dev->power.lock" spinlock. When the callback returns it
-will re-lock the spinlock.
-
-Kind regards
-Uffe
+Neil
