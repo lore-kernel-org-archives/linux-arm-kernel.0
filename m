@@ -1,90 +1,45 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 13 Sep 2016 17:25:54 +0800
-Subject: [PATCH v7 7/9] drm/mediatek: add dsi transfer function
-In-Reply-To: <1473675381.12398.27.camel@mtksdaap41>
-References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
- <1472815484-43821-8-git-send-email-yt.shen@mediatek.com>
- <1473215632.11736.21.camel@mtksdaap41>
- <1473675381.12398.27.camel@mtksdaap41>
-Message-ID: <1473758754.28437.40.camel@mtksdaap41>
+From: fweimer@redhat.com (Florian Weimer)
+Date: Tue, 13 Sep 2016 11:28:21 +0200
+Subject: [RFC PATCH 0/5] arm64: Signal context expansion
+In-Reply-To: <20160912153015.GD3958@e103592.cambridge.arm.com>
+References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
+ <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
+ <20160909152047.GA3958@e103592.cambridge.arm.com>
+ <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
+ <20160912111749.GB3958@e103592.cambridge.arm.com> <57D6C33D.9020003@arm.com>
+ <20160912153015.GD3958@e103592.cambridge.arm.com>
+Message-ID: <9969568a-f969-d904-52b3-14f80c3abec4@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+On 09/12/2016 05:30 PM, Dave Martin wrote:
+> On Mon, Sep 12, 2016 at 04:01:17PM +0100, Szabolcs Nagy wrote:
+>> i assume the kernel can avoid saving SVE regs when
+>> they are not used by the process.
+>
+> I can (and do), in my patches (not posted yet).
+>
+> The real issue here is that a recently updated shared library might be
+> optimised to use SVE, where the program using it is an older, SVE-
+> unaware binary.
+>
+> (think of an optimised math library using some new fancy SVE-based
+> number crunching internally).
 
-On Mon, 2016-09-12 at 18:16 +0800, YT Shen wrote:
-> Hi CK,
-> 
-> On Wed, 2016-09-07 at 10:33 +0800, CK Hu wrote:
-> > Hi, YT:
-> > 
-> > On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
-> > > From: shaoming chen <shaoming.chen@mediatek.com>
-> > > 
-> > > add dsi read/write commands for transfer function
-> > > 
-> > > Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> > > ---
-> > >  drivers/gpu/drm/mediatek/mtk_dsi.c | 188 +++++++++++++++++++++++++++++++++++++
-> > >  1 file changed, 188 insertions(+)
-> > > 
-> > 
-> > [snip...]
-> > 
-> > >  
-> > > +static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
-> > > +{
-> > > +	dsi->irq_data &= ~irq_bit;
-> > > +}
-> > > +
-> > 
-> > [snip...]
-> > 
-> > > +
-> > > +static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-> > > +				     unsigned int timeout)
-> > > +{
-> > > +	s32 ret = 0;
-> > > +	unsigned long jiffies = msecs_to_jiffies(timeout);
-> > > +
-> > > +	ret = wait_event_interruptible_timeout(_dsi_irq_wait_queue,
-> > > +					       dsi->irq_data & irq_flag,
-> > > +					       jiffies);
-> > > +	if (ret == 0) {
-> > > +		dev_info(dsi->dev, "Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
-> > > +
-> > > +		mtk_dsi_enable(dsi);
-> > > +		mtk_dsi_reset_engine(dsi);
-> > > +	}
-> > > +
-> > > +	return ret;
-> > > +}
-> > 
-> > I think mtk_dsi_irq_data_clear() and mtk_dsi_wait_for_irq_done() should
-> > be moved to the 6th patch [1] of this series because these two functions
-> > deal the irq control.
-> We will move mtk_dsi_irq_data_clear() to patch "drm/mediatek: add dsi
-> interrupt control" and put mtk_dsi_wait_for_irq_done() here, because it
-> is used in the transfer function.
+In my little world, binaries are expected to do run-time CPU feature 
+discovery and fall back to the baseline ABI if the system does not 
+support ABI extensions.  This means that a personality flag can disable 
+the extension, the optimized math libraries run with the slower baseline 
+code instead, and the rest of the application sees the expected kernel 
+interface.
 
-mtk_dsi_irq_data_clear() is also only used in transfer function now. I
-think both function could be used for other application rather than
-transfer function, so these two function are general function for irq
-control.
+ From this perspective, it is quite important that it is possible to get 
+legacy applications running on newer hardware, preferably with out 
+wrapping them in a dedicated VM.
 
-Regards,
-CK
+I understand that there are other environments were this is less of a 
+concern, but I also believe that the age of an architecture factors less 
+into this than one might want.
 
-> 
-> Regards,
-> yt.shen
-> > 
-> > 
-> > [1] https://patchwork.kernel.org/patch/9310819/
-> > 
-> > 
-> > Regards,
-> > CK
-> > 
-> 
-> 
+Thanks,
+Florian
