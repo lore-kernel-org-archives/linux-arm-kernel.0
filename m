@@ -1,41 +1,121 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 13 Sep 2016 09:36:01 +0200
-Subject: [PATCH 2/3] ARM64: dts: amlogic: Add basic support for Amlogic
- S905X
-In-Reply-To: <CAOQ7t2ZjDjZbUfCKwUf4PHywOZx-UiQmy37TEQhWDNYRg0BOag@mail.gmail.com>
-References: <20160903082227.30559-1-narmstrong@baylibre.com>
- <20160903082227.30559-3-narmstrong@baylibre.com>
- <7e27e8c0-bb18-40d8-10d6-3928e66815c7@suse.de>
- <CAOQ7t2bWLq2XP2rKx3msf=1tUfXkQuBWagun46TaKk73qXr=FQ@mail.gmail.com>
- <7ha8fcq26c.fsf@baylibre.com> <28d9160a-ce40-cbbb-b4e9-3ec34be52368@suse.de>
- <CAOQ7t2ZjDjZbUfCKwUf4PHywOZx-UiQmy37TEQhWDNYRg0BOag@mail.gmail.com>
-Message-ID: <7755ed8c-6083-4e2a-620c-85f55ca1d16e@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Sep 2016 08:41:28 +0100
+Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
+ device for legacy interrupts.
+In-Reply-To: <20160912220241.GG23532@localhost>
+References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
+ <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
+ <57C57975.7040306@arm.com>
+ <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <57C59FE8.30307@arm.com>
+ <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <57C6B7F1.5000001@arm.com>
+ <8520D5D51A55D047800579B094147198258D2C99@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160912220241.GG23532@localhost>
+Message-ID: <57D7ADA8.5060201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2016 08:14 AM, Carlo Caione wrote:
-> On Mon, Sep 12, 2016 at 11:43 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> 
-> [cut]
->> I'm not arguing over the file name, where it perfectly makes sense to
->> have a meson-gxl- prefix (already discussed), just about the compatible
->> string where we don't have "amlogic,meson-gxl-s905x-p231" either because
->> it is completely unnecessary and does _not_ add any value.
+On 12/09/16 23:02, Bjorn Helgaas wrote:
+> On Thu, Sep 01, 2016 at 05:19:55AM +0000, Bharat Kumar Gogada wrote:
+>>>>>>> Hi Bharat,
+>>>>>>>> @@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct
+>>>>>>>> nwl_pcie
+>>>>>>> *pcie)
+>>>>>>>>     }
+>>>>>>>>
+>>>>>>>>     pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
+>>>>>>>> -                                                   INTX_NUM,
+>>>>>>>> +                                                   INTX_NUM + 1,
+>>>>>>>>                                                     &legacy_domain_ops,
+>>>>>>>>                                                     pcie);
+>>>>>>>
+>>>>>>> This feels like the wrong thing to do. You have INTX_NUM irqs, so
+>>>>>>> the domain allocation should reflect this. On the other hand, the
+>>>>>>> way the driver currently deals with mappings is quite broken
+>>>>>>> (consistently adding 1 to
+>>>>> the HW interrupt).
+>>>>>>>
+>>>>>> Hi Marc,
+>>>>>>
+>>>>>> Without above change I get following crash in kernel while booting.
+>>>>>>
+>>>>>> [    2.441684] error: hwirq 0x4 is too large for dummy
+>>>>>>
+>>>>>> [    2.441694] ------------[ cut here ]------------
+>>>>>>
+>>>>>> [    2.441698] WARNING: at kernel/irq/irqdomain.c:344
+>>>>>>
+>>>>>> [    2.441702] Modules linked in:
+>>>>>>
+>>>>>> [    2.441706]
+>>>>>>
+>>>>>> [    2.441714] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.4.0 #8
+>>>>>>
+>>>>>> [    2.441718] Hardware name: xlnx,zynqmp (DT)
+>>>>>>
+>>>>>> [    2.441723] task: ffffffc071886b80 ti: ffffffc071888000 task.ti:
+>>>>> ffffffc071888000
+>>>>>>
+>>>>>> [    2.441732] PC is at irq_domain_associate+0x138/0x1c0
+>>>>>>
+>>>>>> [    2.441738] LR is at irq_domain_associate+0x138/0x1c0
+>>>>>>
+>>>>>> In kernel/irq/irqdomain.c function irq_domain_associate
+>>>>>>
+>>>>>> if (WARN(hwirq >= domain->hwirq_max,
+>>>>>>                  "error: hwirq 0x%x is too large for %s\n", (int)hwirq, domain-
+>>>> name))
+>>>>>>                 return -EINVAL;
+>>>>>>
+>>>>>> Here the hwirq and hwirq_max are equal to 4 without the above
+>>>>>> condition
+>>>>> (INTX_NUM + 1) due to which crash is coming.
+>>>>>> This is happening as the legacy interrupts are starting from 1 (INTA).
+>>>>>
+>>>>> I understood that. I'm still persisting in saying that you have the wrong fix.
+>>>>>
+>>>>> Your domain should always allocate many interrupts as you have
+>>>>> interrupt sources. These interrupts (hwirq) should be numbered from 0 to (n-
+>>> 1).
+>>>>
+>>>> Agreed, but here comes the problem the hwirq for legacy interrupts
+>>>> will start at 0x1 to 0x4 (INTA to INTD) and these values are as per
+>>>> PCIe specification for legacy interrupts. So these cannot be numbered
+>>>> from 0. So when 0x4 (INTD) for a multi-function device comes the crash
+>>>> occurs.
+>>>
+>>> So who provides this hwirq? Who calls irq_domain_associate() with hwirq set to
+>>> 4?
+>>>
+>> PCIe subsystem invokes pcibios_add_device function in arch/arm64/kernel/pci.c for every pci device.
+>> The purpose of this function is to assign dev->irq using of_irq_parse_and_map_pci.
+>> of_irq_parse_and_map_pci invokes of_irq_parse_pci where it reads PCI_INTERRUPT_PIN from configuration space and saves it
+>> in parameter of struct of_phandle_args.
+>> This structure is passed to irq_create_of_mapping where it invokes irq_create_fwspec_mapping.
+>> irq_create_fwspec_mapping invokes irq_domain_translate and gets hwirq, here the above saved PCI_INTERRUPT_PIN value is assigned 
+>> to hwirq (*hwirq = fwspec->param[0]).
+>> And then using this hwirq irq_create_mapping -> irq_domain_associate were invoked and mapping is created for virtual irq with this hwirq.
+>> So for any end point PCI_INTERRUPT_PIN value starts from 0x1 to 0x4 and so hwirq starts from 0x1 to 0x4.
 >>
->> Not that we're checking this string anywhere anyway... If you want to
->> check for the GXL family you have to use "amlogic,meson-gxl"; if you
->> want to check for the specific SoC you use "amlogic,s905x". Simple. We
->> never match partial strings, so there is no sense in a hardcoded prefix
->> that is duplicating information already available.
+>> So the values are more generic w.r.t to protocol, that's why hwirq will range from 0x1 to 0x4. 
+>> And then if you check pcie-altera.c they are doing this adding one in their handler and while creating legacy domain.
 > 
-> Ok, then. Fine with me.
-> 
-> Neil, do you want to resend my patch or you can take care of the fixes
-> for the whole patchset?
-> 
-> Thanks,
-> 
+> Is this resolved yet?  Marc, are you happy, or should we iterate on this
+> again?
 
-Ok, I still need to synchronize with kevin for when and where to rebase from.
 
-Neil
+Ah, sorry to have dropped the ball on this patch.
+
+I guess that given that the infrastructure imposes the hwirq range on
+the host drivers, Bharat's approach is the only way (and a number of
+other host drivers are already slightly broken). I'll try and have a
+look at solving this at the generic level. In the meantime:
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
