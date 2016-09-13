@@ -1,47 +1,35 @@
 From: jun.nie@linaro.org (Jun Nie)
-Date: Tue, 13 Sep 2016 09:42:03 +0800
-Subject: [PATCH v5 0/3] Add ZTE ZX296718 support
-Message-ID: <1473730926-1034-1-git-send-email-jun.nie@linaro.org>
+Date: Tue, 13 Sep 2016 09:42:04 +0800
+Subject: [PATCH v5 1/3] arm64: add ZTE ZX SoC family
+In-Reply-To: <1473730926-1034-1-git-send-email-jun.nie@linaro.org>
+References: <1473730926-1034-1-git-send-email-jun.nie@linaro.org>
+Message-ID: <1473730926-1034-2-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in version5:
-  - Add GPL license to new files.
-  - Unify clocks dts nodes names.
-  - Move interrupt parents info to root nodes in dts, move
-    pmu and timer node out of soc node.
+This patch introduces ARCH_ZX to add the support of the ZTE ZX SoC
+family for the arm64 architecture.
 
-Changes in version4:
-  - Change dts file name to align with compatible name.
-  - Reorder dts nodes with reg address sequence.
-  - Move nodes out of soc, which do not have soc simple
-    bus address or share soc interrupt.
-  - Change some nodes name to align with convention.
+Signed-off-by: Jun Nie <jun.nie@linaro.org>
+---
+ arch/arm64/Kconfig.platforms | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Changes in version3:
-  - Remove unnecessary flag of gic in dts.
-
-Changes in version2:
-  - Use more precise cpu and pmu compatible name in dts.
-  - fix minor coding style issue.
-
-
-Jun Nie (3):
-  arm64: add ZTE ZX SoC family
-  arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
-  arm64: defconfig: enable ZTE ZX related config
-
- Documentation/devicetree/bindings/arm/zte.txt |  24 +++
- arch/arm64/Kconfig.platforms                  |   5 +
- arch/arm64/boot/dts/Makefile                  |   1 +
- arch/arm64/boot/dts/zte/Makefile              |   5 +
- arch/arm64/boot/dts/zte/zx296718-evb.dts      |  25 +++
- arch/arm64/boot/dts/zte/zx296718.dtsi         | 254 ++++++++++++++++++++++++++
- arch/arm64/configs/defconfig                  |   1 +
- 7 files changed, 315 insertions(+)
- create mode 100644 arch/arm64/boot/dts/zte/Makefile
- create mode 100644 arch/arm64/boot/dts/zte/zx296718-evb.dts
- create mode 100644 arch/arm64/boot/dts/zte/zx296718.dtsi
-
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index be5d824..bc75fd2 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -204,6 +204,11 @@ config ARCH_XGENE
+ 	help
+ 	  This enables support for AppliedMicro X-Gene SOC Family
+ 
++config ARCH_ZX
++	bool "ZTE ZX SoC Family"
++	help
++	  This enables support for ZTE ZX SoC Family
++
+ config ARCH_ZYNQMP
+ 	bool "Xilinx ZynqMP Family"
+ 	help
 -- 
 1.9.1
