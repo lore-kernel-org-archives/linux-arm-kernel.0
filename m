@@ -1,31 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Sep 2016 17:43:19 +0200
-Subject: [GIT PULL 3/5] i.MX device tree updates for 4.9
-In-Reply-To: <1473670948-4265-3-git-send-email-shawnguo@kernel.org>
-References: <1473670948-4265-1-git-send-email-shawnguo@kernel.org>
- <1473670948-4265-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <48242366.xxuzqMPmUj@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Sep 2016 16:47:30 +0100
+Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
+In-Reply-To: <57D8137F.8040508@laposte.net>
+References: <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
+ <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
+ <57D6AA54.6000208@laposte.net> <20160912135549.GA14165@leverpostej>
+ <57D6D2A9.3010006@laposte.net> <20160912165637.GF14165@leverpostej>
+ <57D7CF17.2050905@laposte.net> <20160913131208.GA23336@leverpostej>
+ <57D8137F.8040508@laposte.net>
+Message-ID: <20160913154722.GD23336@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 12, 2016 5:02:26 PM CEST Shawn Guo wrote:
-> i.MX device tree changes for 4.9:
->  - Add SoC support for i.MX7 Solo which is a reduced version of i.MX7
->    Dual.
->  - New board support: Gateworks Ventana i.MX6Q/DL GW553x, Inverse Path
->    i.MX53 USB armory, i.MX6Q/DL TS-4900 from Technologic Systems,
->    i.MX6UL GEA M6UL modules from Engicam, i.MX7 Solo Warp7 board.
->  - Add DMA and IPU CSI devices for i.MX53 SoC support.
->  - Refine i.MX7 Dual SoC DTS as a preparation of i.MX7 Solo support.
->  - Use of_graph dt nodes to describe the panel for vf610-colibri and
->    ls1021a-twr boards.
->  - Add gpio-ranges property to i.MX6 GPIO controllers, which will be
->    useful when GPIO driver is changed to request pad configuration as
->    GPIO function.
->  - Random device additions or small changes for various board support.
+On Tue, Sep 13, 2016 at 04:55:59PM +0200, Sebastian Frias wrote:
+> On 09/13/2016 03:12 PM, Mark Rutland wrote:
+> >> Exactly, that is why I was thinking it would take less "review" time.
+> >> Indeed, if there is no driver, why would it matter what those bindings
+> >> are?
+> > 
+> > If you believe that the bindings don't matter, then there is absolutely
+> > no reason for them to exist in the first place.
+> > 
+> > If those binding matter to *anyone*, then those collating the bindings
+> > have some responsibility of stewardship, and that includes
+> > review/maintenance/etc.
 > 
+> The thing is that right now it seems the "responsibility of stewardship"
+> lies only within "Linux", whereas DT is proposed as open for everybody,
+> Bootloaders, FreeBSD, etc.
 > 
+> In that case, shouldn't the "responsibility" be shared?
 
-Pulled into next/dt, thanks!
+Ideally, yes.
 
-	Arnd
+Which is one of the reasons devicetree.org was set up as a common forum
+for projects to collaborate on devicetree.
+
+Thanks,
+Mark.
