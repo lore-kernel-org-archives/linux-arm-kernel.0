@@ -1,29 +1,62 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 13 Sep 2016 09:00:04 +0200
-Subject: [PATCH net-next 0/2] mvneta xmit_more and bql support
-Message-ID: <1473750006-21199-1-git-send-email-mw@semihalf.com>
+Date: Tue, 13 Sep 2016 09:00:05 +0200
+Subject: [PATCH net-next 1/2] net: mvneta: add xmit_more support
+In-Reply-To: <1473750006-21199-1-git-send-email-mw@semihalf.com>
+References: <1473750006-21199-1-git-send-email-mw@semihalf.com>
+Message-ID: <1473750006-21199-2-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Simon Guinot <simon.guinot@sequanux.org>
 
-This short patchset introduces two enhancements to mvneta driver
-TX packets concatenation support using xmit_more mechanism and also
-byte queue limit in order to decrease latency on saturated links.
+Basing on xmit_more flag of the skb, TX descriptors can be concatenated
+before flushing. This commit delay Tx descriptor flush if the queue is
+running and if there is more skb's to send.
 
-Any comments or feedback would be welcome.
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-Best regards,
-Marcin
-
-Marcin Wojtas (1):
-  net: mvneta: add BQL support
-
-Simon Guinot (1):
-  net: mvneta: add xmit_more support
-
- drivers/net/ethernet/marvell/mvneta.c | 33 +++++++++++++++++++++++++++------
- 1 file changed, 27 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index d41c28d..b9dccea 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -512,6 +512,7 @@ struct mvneta_tx_queue {
+ 	 * descriptor ring
+ 	 */
+ 	int count;
++	int pending;
+ 	int tx_stop_threshold;
+ 	int tx_wake_threshold;
+ 
+@@ -802,8 +803,9 @@ static void mvneta_txq_pend_desc_add(struct mvneta_port *pp,
+ 	/* Only 255 descriptors can be added at once ; Assume caller
+ 	 * process TX desriptors in quanta less than 256
+ 	 */
+-	val = pend_desc;
++	val = pend_desc + txq->pending;
+ 	mvreg_write(pp, MVNETA_TXQ_UPDATE_REG(txq->id), val);
++	txq->pending = 0;
+ }
+ 
+ /* Get pointer to next TX descriptor to be processed (send) by HW */
+@@ -2357,11 +2359,14 @@ out:
+ 		struct netdev_queue *nq = netdev_get_tx_queue(dev, txq_id);
+ 
+ 		txq->count += frags;
+-		mvneta_txq_pend_desc_add(pp, txq, frags);
+-
+ 		if (txq->count >= txq->tx_stop_threshold)
+ 			netif_tx_stop_queue(nq);
+ 
++		if (!skb->xmit_more || netif_xmit_stopped(nq))
++			mvneta_txq_pend_desc_add(pp, txq, frags);
++		else
++			txq->pending += frags;
++
+ 		u64_stats_update_begin(&stats->syncp);
+ 		stats->tx_packets++;
+ 		stats->tx_bytes  += len;
 -- 
 1.8.3.1
