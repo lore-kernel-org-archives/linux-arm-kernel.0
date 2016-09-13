@@ -1,26 +1,68 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Tue, 13 Sep 2016 15:42:15 +0200
-Subject: [PATCH v3 8/9] ARM: sunxi: Enable sun8i-emac driver on
- sunxi_defconfig
-In-Reply-To: <20160912073008.GD9449@lukather>
-References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
- <1473425117-18645-9-git-send-email-clabbe.montjoie@gmail.com>
- <20160912073008.GD9449@lukather>
-Message-ID: <20160913134215.GE31990@Red>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 13 Sep 2016 15:45:56 +0200
+Subject: [PATCHv2 3/3] tty/serial: at91: fix hardware handshake on SAM9x5
+ (without GPIOs)
+In-Reply-To: <CACQ1gAhNdPgtkpt1QPaiKjKi5oaq5vHbt4kKL5tQfwLvDBDo0w@mail.gmail.com>
+References: <20160912094733.21501-1-richard.genoud@gmail.com>
+ <20160912094733.21501-4-richard.genoud@gmail.com>
+ <20160912095317.74e5xiedrq5nh3v4@piout.net>
+ <CACQ1gAhNdPgtkpt1QPaiKjKi5oaq5vHbt4kKL5tQfwLvDBDo0w@mail.gmail.com>
+Message-ID: <20160913134556.wpodujgk6yn7rfxz@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 09:30:08AM +0200, Maxime Ripard wrote:
-> Hi,
+On 12/09/2016 at 12:50:38 +0200, Richard Genoud wrote :
+> >> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> >> index e9b4fbf88c2d..32154e7231ce 100644
+> >> --- a/drivers/tty/serial/atmel_serial.c
+> >> +++ b/drivers/tty/serial/atmel_serial.c
+> >> @@ -2130,15 +2130,19 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+> >>       } else if ((termios->c_cflag & CRTSCTS) &&
+> >>                  !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
+> >>               /*
+> >> -              * RS232 with hardware handshake (RTS/CTS)
+> >> -              * handled by the controller.
+> >> +              * Automatic hardware handshake (RTS/CTS) only work with
+> >> +              * FIFOs or PDC.
+> >> +              * Meaning that on SAM9x5 the controller can't handle
+> >> +              * the hardware handshake (no FIFOs nor PDC on these platforms).
+> >>                */
+> >> -             if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
+> >> -                     dev_info(port->dev, "not enabling hardware flow control because DMA is used");
+> >> -                     termios->c_cflag &= ~CRTSCTS;
+> >> -             } else {
+> >> +             if (atmel_use_pdc_rx(port) || atmel_use_fifo(port))
+> >>                       mode |= ATMEL_US_USMODE_HWHS;
+> >> -             }
+> >> +             else
+> >> +                     /*
+> >> +                      * The hardware handshake won't be handle by the
+> >> +                      * controller but by the driver.
+> >> +                      */
+> >> +                     mode |= ATMEL_US_USMODE_NORMAL;
+> >
+> > You still need the case where HWHS is impossible and there are no gpio
+> > configured. You need to inform userspace that the configuration was not
+> > applied instead of silently ignoring the error.
 > 
-> On Fri, Sep 09, 2016 at 02:45:16PM +0200, Corentin Labbe wrote:
-> > Enable the sun8i-emac driver in the sunxi default configuration
-> > 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> Could you explain which case it is ?
+> The only one I can see is when there's no GPIO declared for RTS/CTS
+> AND, there's no pin muxed for RTS/CTS either.
 > 
-> Could you make the same patch for multi_v7 ?
+> Have you got another example in mind ?
 > 
 
-I will
+Hum, actually, it is that case. The other one (CRTSCTS and gpios) is
+handled in the else below. I think you need to keep the termios->c_cflag
+&= ~CRTSCTS; here so that userspace knows configuring it failed.
 
-Thanks
+> >
+> >>       } else {
+> >>               /* RS232 without hadware handshake or controlled by GPIOs */
+> >>               mode |= ATMEL_US_USMODE_NORMAL;
+> >
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
