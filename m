@@ -1,163 +1,73 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 13 Sep 2016 17:29:25 +0100
-Subject: [PATCH v5 07/14] drivers: acpi: iort: add support for ARM SMMU
- platform devices creation
-In-Reply-To: <b0de32c2-01a5-2437-daa0-13044526b474@arm.com>
-References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
- <20160909142343.13314-8-lorenzo.pieralisi@arm.com>
- <b0de32c2-01a5-2437-daa0-13044526b474@arm.com>
-Message-ID: <20160913162925.GC2436@red-moon>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 13 Sep 2016 18:29:36 +0200
+Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
+ support
+In-Reply-To: <alpine.DEB.2.20.1609131713490.6233@nanos>
+References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
+ <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
+ <alpine.DEB.2.20.1609131713490.6233@nanos>
+Message-ID: <6941f61d-0b33-4108-0135-b11887cd0488@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 04:25:55PM +0100, Robin Murphy wrote:
+Hi Thomas,
 
-[...]
+On 09/13/2016 05:21 PM, Thomas Gleixner wrote:
+> On Fri, 9 Sep 2016, Alexandre TORGUE wrote:
+>> +static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
+>> +			    unsigned int nr_irqs)
+>> +{
+>> +	struct irq_data *data = irq_get_irq_data(virq);
+>> +
+>> +	irq_gc_mask_clr_bit(data->parent_data);
+>
+> I have a hard time to understand this. The irq domain is not hierarchical.
 
-> > +/**
-> > + * iort_add_smmu_platform_device() - Allocate a platform device for SMMU
-> > + * @fwnode: IORT node associated fwnode handle
-> > + * @node: Pointer to SMMU ACPI IORT node
-> > + *
-> > + * Returns: 0 on success, <0 failure
-> > + */
-> > +static int __init iort_add_smmu_platform_device(struct fwnode_handle *fwnode,
-> > +						struct acpi_iort_node *node)
-> > +{
-> > +	struct platform_device *pdev;
-> > +	struct resource *r;
-> > +	enum dev_dma_attr attr;
-> > +	int ret, count;
-> > +	const struct iort_iommu_config *ops = iort_get_iommu_cfg(node);
-> > +
-> > +	if (!ops)
-> > +		return -ENODEV;
-> > +
-> > +	pdev = platform_device_alloc(ops->name, PLATFORM_DEVID_AUTO);
-> > +	if (!pdev)
-> > +		return PTR_ERR(pdev);
-> > +
-> > +	count = ops->iommu_count_resources(node);
-> > +
-> > +	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
-> > +	if (!r) {
-> > +		ret = -ENOMEM;
-> > +		goto dev_put;
-> > +	}
-> > +
-> > +	ops->iommu_init_resources(r, node);
-> > +
-> > +	ret = platform_device_add_resources(pdev, r, count);
-> > +	/*
-> > +	 * Resources are duplicated in platform_device_add_resources,
-> > +	 * free their allocated memory
-> > +	 */
-> > +	kfree(r);
-> > +
-> > +	if (ret)
-> > +		goto dev_put;
-> > +
-> > +	/*
-> > +	 * Add a copy of IORT node pointer to platform_data to
-> > +	 * be used to retrieve IORT data information.
-> > +	 */
-> > +	ret = platform_device_add_data(pdev, &node, sizeof(node));
-> > +	if (ret)
-> > +		goto dev_put;
-> > +
-> > +	pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask), GFP_KERNEL);
-> > +	if (!pdev->dev.dma_mask) {
-> > +		ret = -ENOMEM;
-> > +		goto dev_put;
-> > +	}
-> 
-> Since this is exclusively for creating SMMUs, and we know they should
-> never have weird shenanigans going on requiring different masks, I'd be
-> inclined to just point dev.dma_mask at dev.coherent_dma_mask and be done
-> with it.
+Actually, I wanted to test ".free" callback function of gpio_irq_domain 
+in STM32 pinctrl driver. To do that I modified gpio driver: just after 
+getting virq through gpio_to_irq, I called "irq_dispose_mapping(virq)".
+I know it is dirty but I thought it was the only way to test.
 
-That sounds reasonable yes, I will do.
+Doing that, I see that ".free" callback of gpio domain is called but as 
+it is hirerchical ".free" callback for parent domain (exti one) is also 
+called. I observed that virq was well unmapped, but not masked at exti 
+level. It is for this reason than I added 
+"irq_gc_mask_clr_bit(data->parent_data);" which mask interrupt at exti 
+level.
 
-> > +
-> > +	pdev->dev.fwnode = fwnode;
-> > +
-> > +	/*
-> > +	 * Set default dma mask value for the table walker,
-> > +	 * to be overridden on probing with correct value.
-> > +	 */
-> > +	*pdev->dev.dma_mask = DMA_BIT_MASK(32);
-> > +	pdev->dev.coherent_dma_mask = *pdev->dev.dma_mask;
-> > +
-> > +	attr = ops->iommu_is_coherent(node) ?
-> > +			     DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
-> > +
-> > +	/* Configure DMA for the page table walker */
-> > +	acpi_dma_configure(&pdev->dev, attr);
-> 
-> Oh look, some more code which would be simpler if acpi_dma_configure()
-> set the default mask itself ;)
+Maybe this use case can never happen ? (and in this case all this stuff 
+is not needed)
 
-Eheh I have no objections, apart from the effect that change can
-have on non-ARM probing paths, it could also help remove some code
-from ACPI core while at it.
+>
+>> +	irq_domain_reset_irq_data(data);
+>
+>> +	domain = irq_domain_add_linear(node, nr_exti,
+>> +				       &irq_exti_domain_ops, NULL);
+>
+> It's a simple linear domain. So how can data->parent_data be a valid
+> irq_data pointer? Answer: It can't!
 
-Thanks !
-Lorenzo
+This Exti domain is parent of stm32 gpio domain. When ".free" callback 
+of stm32 gpio domain is called then ".free" callback of Exti domain will 
+be automatically called. Those both ".free" callbacks are called with 
+"virq". This virq is created through stm32 gpio domain (in stm32 pinctrl 
+driver), data and parent->data are then associated to it.
 
-> 
-> Robin.
-> 
-> > +
-> > +	ret = platform_device_add(pdev);
-> > +	if (ret)
-> > +		goto dma_deconfigure;
-> > +
-> > +	return 0;
-> > +
-> > +dma_deconfigure:
-> > +	acpi_dma_deconfigure(&pdev->dev);
-> > +	kfree(pdev->dev.dma_mask);
-> > +
-> > +dev_put:
-> > +	platform_device_put(pdev);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static acpi_status __init iort_match_iommu_callback(struct acpi_iort_node *node,
-> > +						    void *context)
-> > +{
-> > +	int ret;
-> > +	struct fwnode_handle *fwnode;
-> > +
-> > +	fwnode = iort_get_fwnode(node);
-> > +
-> > +	if (!fwnode)
-> > +		return AE_NOT_FOUND;
-> > +
-> > +	ret = iort_add_smmu_platform_device(fwnode, node);
-> > +	if (ret) {
-> > +		pr_err("Error in platform device creation\n");
-> > +		return AE_ERROR;
-> > +	}
-> > +
-> > +	return AE_OK;
-> > +}
-> > +
-> > +static void __init iort_smmu_init(void)
-> > +{
-> > +	iort_scan_node(ACPI_IORT_NODE_SMMU, iort_match_iommu_callback, NULL);
-> > +	iort_scan_node(ACPI_IORT_NODE_SMMU_V3, iort_match_iommu_callback, NULL);
-> > +}
-> > +
-> >  void __init acpi_iort_init(void)
-> >  {
-> >  	acpi_status status;
-> > @@ -436,4 +566,5 @@ void __init acpi_iort_init(void)
-> >  	}
-> >  
-> >  	acpi_probe_device_table(iort);
-> > +	iort_smmu_init();
-> >  }
-> > 
-> 
+Sorry if it is not clear.
+
+Regards
+
+Alex
+
+>
+> But it doesn't blow up in your face simply because the alloc/free callbacks
+> are never invoked for simple non hierarchical domains. So you should have
+> removed that stuff after copying some other irqchip driver.
+
+
+
+>
+> Thanks,
+>
+> 	tglx
+>
