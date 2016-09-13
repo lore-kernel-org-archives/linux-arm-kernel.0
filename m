@@ -1,114 +1,83 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Tue, 13 Sep 2016 12:40:59 +0800
-Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <1473741659-17618-1-git-send-email-po.liu@nxp.com>
-References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
- <1473741659-17618-1-git-send-email-po.liu@nxp.com>
-Message-ID: <1473741659-17618-3-git-send-email-po.liu@nxp.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 13 Sep 2016 13:32:23 +0800
+Subject: [PATCH v7 9/9] drm/mediatek: add support for Mediatek SoC MT2701
+In-Reply-To: <1473675413.12398.29.camel@mtksdaap41>
+References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
+ <1472815484-43821-10-git-send-email-yt.shen@mediatek.com>
+ <1473226653.11736.33.camel@mtksdaap41>
+ <1473675413.12398.29.camel@mtksdaap41>
+Message-ID: <1473744743.28437.26.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-maybe there is interrupt line for aer pme etc. Search the interrupt
-number in the fdt file. Then fixup the dev->irq with it.
+Hi, YT:
 
-Signed-off-by: Po Liu <po.liu@nxp.com>
----
-changes for v5:
-	- Add clear 'aer' interrup-names description
+On Mon, 2016-09-12 at 18:16 +0800, YT Shen wrote:
+> Hi CK,
+> 
+> On Wed, 2016-09-07 at 13:37 +0800, CK Hu wrote:
+> > Hi, YT:
+> > 
+> > On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
+> > > This patch add support for the Mediatek MT2701 DISP subsystem.
+> > > There is only one OVL engine in MT2701.
+> > > 
+> > > Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> > 
+> > [snip...]
+> > 
+> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > > index 4b4e449..465819b 100644
+> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> > > @@ -112,6 +112,7 @@ struct mtk_ddp_comp_match {
+> > >  
+> > >  static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+> > >  	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, NULL },
+> > > +	[DDP_COMPONENT_BLS]	= { MTK_DISP_PWM,	0, NULL },
+> > 
+> > I think BLS is different than PWM, so this statement should be
+> > 
+> > [DDP_COMPONENT_BLS] = { MTK_DISP_BLS, 0, NULL };
+> The BLS module actually is a multifunction device, one of them is the
+> PWM function.  We only upstream PWM function [1] now, and it is
+> accepted.  When there are real use case (gamma function), we will update
+> this part.  What do you think?
 
- .../devicetree/bindings/pci/layerscape-pci.txt     | 11 +++++---
- drivers/pci/pcie/portdrv_core.c                    | 31 +++++++++++++++++++---
- 2 files changed, 35 insertions(+), 7 deletions(-)
+I think BLS = PWM + GAMMA and the device with register range from
+0x1400a000 to 0x1400afff should be called BLS. I think this device is
+called PWM in [1] because it just use its PWM function and it's not
+suitable. At least in DRM driver, we should use the term BLS rather than
+PWM. Maybe we should define as below:
 
-diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-index 41e9f55..101d0a7 100644
---- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-@@ -18,8 +18,10 @@ Required properties:
- - reg: base addresses and lengths of the PCIe controller
- - interrupts: A list of interrupt outputs of the controller. Must contain an
-   entry for each entry in the interrupt-names property.
--- interrupt-names: Must include the following entries:
--  "intr": The interrupt that is asserted for controller interrupts
-+- interrupt-names: It may be include the following entries:
-+  "aer": The interrupt that is asserted for aer interrupt
-+  "pme": The interrupt that is asserted for pme interrupt
-+  ......
- - fsl,pcie-scfg: Must include two entries.
-   The first entry must be a link to the SCFG device node
-   The second entry must be '0' or '1' based on physical PCIe controller index.
-@@ -35,8 +37,9 @@ Example:
- 		reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
- 		       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
- 		reg-names = "regs", "config";
--		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
--		interrupt-names = "intr";
-+		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>, /* aer interrupt */
-+			<GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* pme interrupt */
-+		interrupt-names = "aer", "pme";
- 		fsl,pcie-scfg = <&scfg 0>;
- 		#address-cells = <3>;
- 		#size-cells = <2>;
-diff --git a/drivers/pci/pcie/portdrv_core.c b/drivers/pci/pcie/portdrv_core.c
-index e9270b4..7c4943d 100644
---- a/drivers/pci/pcie/portdrv_core.c
-+++ b/drivers/pci/pcie/portdrv_core.c
-@@ -16,6 +16,7 @@
- #include <linux/slab.h>
- #include <linux/pcieport_if.h>
- #include <linux/aer.h>
-+#include <linux/of_irq.h>
- 
- #include "../pci.h"
- #include "portdrv.h"
-@@ -200,6 +201,28 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *vectors, int mask)
- static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
- {
- 	int i, irq = -1;
-+	int ret;
-+	struct device_node *np = NULL;
-+
-+	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
-+		irqs[i] = 0;
-+
-+	if (dev->bus->dev.of_node)
-+		np = dev->bus->dev.of_node;
-+
-+	/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
-+	 * request irq for aer
-+	 */
-+	if (IS_ENABLED(CONFIG_OF_IRQ) && np &&
-+			(mask & PCIE_PORT_SERVICE_PME)) {
-+		ret = of_irq_get_byname(np, "aer");
-+		if (ret > 0) {
-+			irqs[PCIE_PORT_SERVICE_AER_SHIFT] = ret;
-+			if (dev->irq)
-+				irq = dev->irq;
-+			goto no_msi;
-+		}
-+	}
- 
- 	/*
- 	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
-@@ -225,11 +248,13 @@ static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
- 		irq = dev->irq;
- 
-  no_msi:
--	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
--		irqs[i] = irq;
-+	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
-+		if (!irqs[i])
-+			irqs[i] = irq;
-+	}
- 	irqs[PCIE_PORT_SERVICE_VC_SHIFT] = -1;
- 
--	if (irq < 0)
-+	if (irq < 0 && irqs[PCIE_PORT_SERVICE_AER_SHIFT] < 0)
- 		return -ENODEV;
- 	return 0;
- }
--- 
-2.1.0.27.g96db324
+[DDP_COMPONENT_BLS] = { MTK_DISP_BLS, 0, NULL };
+
+and
+
+{ .compatible = "mediatek,mt2701-disp-pwm",   .data = (void
+*)MTK_DISP_BLS },
+
+
+Regards,
+CK
+
+[1] https://patchwork.kernel.org/patch/9223001/
+
+> 
+> Regards,
+> yt.shen
+> 
+> [1] https://patchwork.kernel.org/patch/9223001/
+> 
+> > 
+> > 
+> > >  	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, &ddp_color },
+> > >  	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, &ddp_color },
+> > >  	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
+> > 
+> > Regards,
+> > CK
+> > 
+> > 
+> 
+> 
