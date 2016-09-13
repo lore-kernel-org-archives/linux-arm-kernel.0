@@ -1,49 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 13 Sep 2016 14:31:27 +0100
-Subject: [GIT PULL] Immutable branch between MFD and Regulator due for
- the v4.9 merge window
-In-Reply-To: <20160913120244.GA28894@dell>
-References: <20160827075544.26316-1-wens@csie.org>
- <20160827075544.26316-4-wens@csie.org>
- <20160913120244.GA28894@dell>
-Message-ID: <20160913133127.GC31719@dell>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Tue, 13 Sep 2016 15:33:01 +0200
+Subject: [PATCH v3 1/9] ethernet: add sun8i-emac driver
+In-Reply-To: <20160909141527.GE30871@lunn.ch>
+References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1473425117-18645-2-git-send-email-clabbe.montjoie@gmail.com>
+ <20160909141527.GE30871@lunn.ch>
+Message-ID: <20160913133301.GB31990@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On Fri, Sep 09, 2016 at 04:15:27PM +0200, Andrew Lunn wrote:
+> Hi Corentin
+> 
+> > +static int sun8i_emac_mdio_register(struct net_device *ndev)
+> > +{
+> > +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
+> > +	struct mii_bus *bus;
+> > +	int ret;
+> > +
+> > +	bus = mdiobus_alloc();
+> 
+> You can use devm_mdiobus_alloc() which will simplify your error
+> handling and unregister code.
+> 
+> 	 Andrew
 
-Try this instead.
+Hello
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+Since the mdio bus is allocated on ndev/open, it need to be removed when ndev/stop is called.
+So devm_mdiobus_alloc cannot be used.
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+Regards
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-regulator-v4.9
-
-for you to fetch changes up to 8824ee8573483e1c91691b5be3d3730e75551dce:
-
-  mfd: axp20x: Add support for AXP806 PMIC (2016-09-13 14:10:04 +0100)
-
-----------------------------------------------------------------
-Immutable branch between MFD and Regualtor due for the v4.9 merge window
-
-----------------------------------------------------------------
-Chen-Yu Tsai (3):
-      regulator: axp20x: Support AXP806 variant
-      mfd: axp20x: Add bindings for AXP806 PMIC
-      mfd: axp20x: Add support for AXP806 PMIC
-
- Documentation/devicetree/bindings/mfd/axp20x.txt |  28 +++++-
- drivers/mfd/axp20x-rsb.c                         |   1 +
- drivers/mfd/axp20x.c                             |  72 ++++++++++++++
- drivers/regulator/axp20x-regulator.c             | 118 +++++++++++++++++++++--
- include/linux/mfd/axp20x.h                       |  60 ++++++++++++
- 5 files changed, 270 insertions(+), 9 deletions(-)
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Corentin Labbe
