@@ -1,146 +1,104 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 13 Sep 2016 18:44:42 -0400
-Subject: [PATCH 2/2] PCI: add CRS support to error handling path
-In-Reply-To: <20160913214709.GI4138@localhost>
-References: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
- <1472770801-30671-2-git-send-email-okaya@codeaurora.org>
- <20160913200152.GE4138@localhost>
- <dd6d9d71-1ba0-84c8-7cab-21fe8b555f1c@codeaurora.org>
- <20160913214709.GI4138@localhost>
-Message-ID: <a2e05b37-7ebc-7969-046d-017866509416@codeaurora.org>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 13 Sep 2016 16:06:31 -0700
+Subject: [PATCH] usb: chipidea: Properly mark little endian descriptors
+Message-ID: <20160913230631.6727-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/13/2016 5:47 PM, Bjorn Helgaas wrote:
-> On Tue, Sep 13, 2016 at 05:04:49PM -0400, Sinan Kaya wrote:
->> On 9/13/2016 4:01 PM, Bjorn Helgaas wrote:
->>> On Thu, Sep 01, 2016 at 07:00:01PM -0400, Sinan Kaya wrote:
->>>> The PCIE spec allows an endpoint device to extend the initialization time
->>>> beyond 1 second by issuing Configuration Request Retry Status (CRS) for a
->>>> vendor ID read request.
->>>>
->>>> This basically means "I'm busy now, please call me back later".
->>>>
->>>> There are two moving parts to CRS support from the SW perspective. One part
->>>> is to determine if CRS is supported or not. The second part is to set the
->>>> CRS visibility register.
->>>>
->>>> As part of the probe, the Linux kernel sets the above two conditions in
->>>> pci_enable_crs function. The kernel is also honoring the returned CRS in
->>>> pci_bus_read_dev_vendor_id function if supported. The function will poll up
->>>> to specified amount of time while endpoint is returning CRS response.
->>>>
->>>> The PCIe spec also allows CRS to be issued during cold, warm, hot and FLR
->>>> resets.
->>>>
->>>> The hot reset is initiated by starting a secondary bus reset. This patch is
->>>> adding vendor ID read immediately after a bus reset so that the
->>>> initialization procedure can be extended by the amount of time endpoint
->>>> requires.
->>>>
->>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->>>> ---
->>>>  drivers/pci/pci.c | 39 +++++++++++++++++++++++++++++++++++++++
->>>>  1 file changed, 39 insertions(+)
->>>>
->>>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->>>> index b209378..ebd0fc6 100644
->>>> --- a/drivers/pci/pci.c
->>>> +++ b/drivers/pci/pci.c
->>>> @@ -3829,6 +3829,44 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
->>>>  	return 0;
->>>>  }
->>>>  
->>>> +/*
->>>> + * Mostly copy paste from pci_walk_bus with the exceptions of hard coded
->>>> + * work and removed locks.
->>>> + */
->>>> +static void pci_bus_probe_crs(struct pci_bus *top)
->>>> +{
->>>> +	struct pci_dev *dev;
->>>> +	struct pci_bus *bus;
->>>> +	struct list_head *next;
->>>> +	int retval;
->>>> +	u32 l;
->>>> +
->>>> +	bus = top;
->>>> +	next = top->devices.next;
->>>> +	for (;;) {
->>>> +		if (next == &bus->devices) {
->>>> +			/* end of this bus, go up or finish */
->>>> +			if (bus == top)
->>>> +				break;
->>>> +			next = bus->self->bus_list.next;
->>>> +			bus = bus->self->bus;
->>>> +			continue;
->>>> +		}
->>>> +		dev = list_entry(next, struct pci_dev, bus_list);
->>>> +		if (dev->subordinate) {
->>>> +			/* this is a pci-pci bridge, do its devices next */
->>>> +			next = dev->subordinate->devices.next;
->>>> +			bus = dev->subordinate;
->>>> +		} else
->>>> +			next = dev->bus_list.next;
->>>> +
->>>> +		retval = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l,
->>>> +						    60 * 1000);
->>>> +		if (retval)
->>>> +			break;
->>>> +	}
->>>> +}
->>>
->>> Sigh.  Man, this is ugly.  Maybe we're locked into the current
->>> strategy and don't really have a choice, but I really don't like it.
->>
->> I can add a locked version of the walkbus API. 
->> Then, I can minimize this code to a couple of lines. How does that sound?
-> 
-> I didn't mean that, I meant the whole idea of having to walk the whole
-> hierarchy and touch each device.  It's sort of like we're enumerating
-> things, but not really, so this checking is kinda sorta parallel to
-> the enumeration path.
+The DMA descriptors are little endian, and we do a pretty good
+job of handling them with the proper le32_to_cpu() markings, but
+we don't actually mark them as __le32. This means checkers like
+sparse can't easily find new bugs. Let's mark the members of
+structures properly and fix the few places where we're missing
+conversions.
 
-Well, we have to do this to run the CRS algorithm against all the devices
-that are issuing the CRS. Hot reset is a broadcast message. There could
-be multiple devices issuing a CRS in the tree. We should not start talking
-to the device before CRS procedure is finished for the device.
+Cc: Peter Chen <peter.chen@nxp.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
+ drivers/usb/chipidea/udc.c |  6 +++---
+ drivers/usb/chipidea/udc.h | 12 ++++++------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-The restore_bus routine blindly assumes that all devices under this tree
-are accessible. 
-
-However, I take your concern about save and restore. We could potentially
-get rid of both save, restore and CRS code and then, try to re-enumerate. 
-I am afraid that can also interfere with the AER error handling notifications
-present in the AER driver. A device driver wouldn't get a chance to quiesce
-itself before re-enumeration and can leave dangling threads around.
-
-I'm curious if there is any way we can rescan the bus without involving
-the endpoint drivers. If we can do that then this could potentially work.
-Re-enumeration can also potentially assign different resources that the endpoint
-already has mapped. I see even a bigger problem there.
-
-
-> 
->>> You mentioned several kinds of reset where CRS is allowed.  Doesn't this
->>> fix only one of them?  I know we support at least FLR reset also.
->>
->> The CRS is for hot reset, warm reset and FLR reset. There is nothing we can do in SW
->> for warm reset. This patch is to address hot reset caused by SBR. 
->>
->> I was hoping that Alex would help us for directions on the FLR reset later.
-> 
-> What sort of help from Alex were you hoping for?  Is fixing the FLR
-> path harder than this one?  If we're going to fix one path, I'd prefer
-> to fix them all at the same time rather than tripping over this again
-> later.
-> 
-
-I don't mind taking a stab at all paths if possible. Last time I checked,
-there is already some code trying to find the endpoint. Alex is on the CC.
-he can always review my change. 
-
-
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index 6acf4dba395e..61a65d1d05f2 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -364,7 +364,7 @@ static int add_td_to_list(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq,
+ 		if (hwreq->req.length == 0
+ 				|| hwreq->req.length % hwep->ep.maxpacket)
+ 			mul++;
+-		node->ptr->token |= mul << __ffs(TD_MULTO);
++		node->ptr->token |= cpu_to_le32(mul << __ffs(TD_MULTO));
+ 	}
+ 
+ 	temp = (u32) (hwreq->req.dma + hwreq->req.actual);
+@@ -503,7 +503,7 @@ static int _hardware_enqueue(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq)
+ 		if (hwreq->req.length == 0
+ 				|| hwreq->req.length % hwep->ep.maxpacket)
+ 			mul++;
+-		hwep->qh.ptr->cap |= mul << __ffs(QH_MULT);
++		hwep->qh.ptr->cap |= cpu_to_le32(mul << __ffs(QH_MULT));
+ 	}
+ 
+ 	wmb();   /* synchronize before ep prime */
+@@ -530,7 +530,7 @@ static void free_pending_td(struct ci_hw_ep *hwep)
+ static int reprime_dtd(struct ci_hdrc *ci, struct ci_hw_ep *hwep,
+ 					   struct td_node *node)
+ {
+-	hwep->qh.ptr->td.next = node->dma;
++	hwep->qh.ptr->td.next = cpu_to_le32(node->dma);
+ 	hwep->qh.ptr->td.token &=
+ 		cpu_to_le32(~(TD_STATUS_HALTED | TD_STATUS_ACTIVE));
+ 
+diff --git a/drivers/usb/chipidea/udc.h b/drivers/usb/chipidea/udc.h
+index e66df0020bd4..2ecd1174d66c 100644
+--- a/drivers/usb/chipidea/udc.h
++++ b/drivers/usb/chipidea/udc.h
+@@ -22,11 +22,11 @@
+ /* DMA layout of transfer descriptors */
+ struct ci_hw_td {
+ 	/* 0 */
+-	u32 next;
++	__le32 next;
+ #define TD_TERMINATE          BIT(0)
+ #define TD_ADDR_MASK          (0xFFFFFFEUL << 5)
+ 	/* 1 */
+-	u32 token;
++	__le32 token;
+ #define TD_STATUS             (0x00FFUL <<  0)
+ #define TD_STATUS_TR_ERR      BIT(3)
+ #define TD_STATUS_DT_ERR      BIT(5)
+@@ -36,7 +36,7 @@ struct ci_hw_td {
+ #define TD_IOC                BIT(15)
+ #define TD_TOTAL_BYTES        (0x7FFFUL << 16)
+ 	/* 2 */
+-	u32 page[5];
++	__le32 page[5];
+ #define TD_CURR_OFFSET        (0x0FFFUL <<  0)
+ #define TD_FRAME_NUM          (0x07FFUL <<  0)
+ #define TD_RESERVED_MASK      (0x0FFFUL <<  0)
+@@ -45,18 +45,18 @@ struct ci_hw_td {
+ /* DMA layout of queue heads */
+ struct ci_hw_qh {
+ 	/* 0 */
+-	u32 cap;
++	__le32 cap;
+ #define QH_IOS                BIT(15)
+ #define QH_MAX_PKT            (0x07FFUL << 16)
+ #define QH_ZLT                BIT(29)
+ #define QH_MULT               (0x0003UL << 30)
+ #define QH_ISO_MULT(x)		((x >> 11) & 0x03)
+ 	/* 1 */
+-	u32 curr;
++	__le32 curr;
+ 	/* 2 - 8 */
+ 	struct ci_hw_td		td;
+ 	/* 9 */
+-	u32 RESERVED;
++	__le32 RESERVED;
+ 	struct usb_ctrlrequest   setup;
+ } __attribute__ ((packed, aligned(4)));
+ 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.9.0.rc2.8.ga28705d
