@@ -1,67 +1,43 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 13 Sep 2016 16:48:15 +0800
-Subject: [PATCH v5 07/14] drivers: acpi: iort: add support for ARM SMMU
- platform devices creation
-In-Reply-To: <20160913082441.GA28804@red-moon>
-References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
- <20160909142343.13314-8-lorenzo.pieralisi@arm.com>
- <7a63cf312b6e9714cdce1d0aca88cf4d@codeaurora.org>
- <fb4acfd5-b7fd-636f-53f3-13dc6fb8b713@linaro.org>
- <20160913082441.GA28804@red-moon>
-Message-ID: <93e202e3-2f61-a79e-2592-9f0e0355767e@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 13 Sep 2016 09:48:52 +0100
+Subject: [PATCH 1/2] crypto: arm/aes-ctr: fix NULL dereference in tail
+ processing
+Message-ID: <1473756533-21078-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/9/13 16:24, Lorenzo Pieralisi wrote:
-> On Tue, Sep 13, 2016 at 04:15:31PM +0800, Hanjun Guo wrote:
->
-> [...]
->
->>>> +static acpi_status __init iort_match_iommu_callback(struct
->>>> acpi_iort_node *node,
->>>> +                            void *context)
->>>> +{
->>>> +    int ret;
->>>> +    struct fwnode_handle *fwnode;
->>>> +
->>>> +    fwnode = iort_get_fwnode(node);
->>>> +
->>>> +    if (!fwnode)
->>>> +        return AE_NOT_FOUND;
->>>> +
->>>> +    ret = iort_add_smmu_platform_device(fwnode, node);
->>>> +    if (ret) {
->>>> +        pr_err("Error in platform device creation\n");
->>>> +        return AE_ERROR;
->>>> +    }
->>>> +
->>>> +    return AE_OK;
->>>> +}
->>>> +
->>>> +static void __init iort_smmu_init(void)
->>>> +{
->>>> +    iort_scan_node(ACPI_IORT_NODE_SMMU, iort_match_iommu_callback,
->>>> NULL);
->>>> +    iort_scan_node(ACPI_IORT_NODE_SMMU_V3, iort_match_iommu_callback,
->>>> NULL);
->>>
->>> Since iort_scan_node() returns after the first successful match it finds,
->>> only the first SMMU_V3 in my IORT is being enumerated. I think you need
->>> to go back to the "iterator" like approach you had been using or make
->>> iort_match_iommu_callback() always return a non-AE_OK value so the scan
->>> continues and has a chance to visit all of the SMMU_V3 nodes.
->>
->> Please use the updated version of IORT patch (aka Tomasz's v11)
->> then things will work fine.
->
-> Nate is right, I was too keen on using iort_scan_node(), it does
-> not really work here (unless as he said I return a value !AE_OK in
-> the callback, which is horrible), I reverted back to the iterator
-> approach and I can push out a fixed up branch if useful before next
-> posting.
+The AES-CTR glue code avoids calling into the blkcipher API for the
+tail portion of the walk, by comparing the remainder of walk.nbytes
+modulo AES_BLOCK_SIZE with the residual nbytes, and jumping straight
+into the tail processing block if they are equal. This tail processing
+block checks whether nbytes != 0, and does nothing otherwise.
 
-Ah, sorry, I just noticed "the first SMMU_V3" which is pretty similar
-with the second problem which is noticed by Nate...
+However, in case of an allocation failure in the blkcipher layer, we
+may enter this code with walk.nbytes == 0, while nbytes > 0. In this
+case, we should not dereference the source and destination pointers,
+since they may be NULL. So instead of checking for nbytes != 0, check
+for (walk.nbytes % AES_BLOCK_SIZE) != 0, which implies the former in
+non-error conditions.
 
-Thanks
-Hanjun
+Fixes: 86464859cc77 ("crypto: arm - AES in ECB/CBC/CTR/XTS modes using ARMv8 Crypto Extensions")
+Reported-by: xiakaixu <xiakaixu@huawei.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/crypto/aes-ce-glue.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/crypto/aes-ce-glue.c b/arch/arm/crypto/aes-ce-glue.c
+index da3c0428507b..aef022a87c53 100644
+--- a/arch/arm/crypto/aes-ce-glue.c
++++ b/arch/arm/crypto/aes-ce-glue.c
+@@ -284,7 +284,7 @@ static int ctr_encrypt(struct blkcipher_desc *desc, struct scatterlist *dst,
+ 		err = blkcipher_walk_done(desc, &walk,
+ 					  walk.nbytes % AES_BLOCK_SIZE);
+ 	}
+-	if (nbytes) {
++	if (walk.nbytes % AES_BLOCK_SIZE) {
+ 		u8 *tdst = walk.dst.virt.addr + blocks * AES_BLOCK_SIZE;
+ 		u8 *tsrc = walk.src.virt.addr + blocks * AES_BLOCK_SIZE;
+ 		u8 __aligned(8) tail[AES_BLOCK_SIZE];
+-- 
+2.7.4
