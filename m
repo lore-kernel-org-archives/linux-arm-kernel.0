@@ -1,41 +1,38 @@
 From: shh.xie@gmail.com (shh.xie at gmail.com)
-Date: Tue, 13 Sep 2016 16:09:56 +0800
-Subject: [PATCH 03/10][v3] dt-bindings: i2c: adds two more nxp devices
+Date: Tue, 13 Sep 2016 16:09:57 +0800
+Subject: [PATCH 04/10] [v3] dt-bindings: qoriq-clock: update for more SoCs
 In-Reply-To: <1473754203-22970-1-git-send-email-shh.xie@gmail.com>
 References: <1473754203-22970-1-git-send-email-shh.xie@gmail.com>
-Message-ID: <1473754203-22970-4-git-send-email-shh.xie@gmail.com>
+Message-ID: <1473754203-22970-5-git-send-email-shh.xie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shaohui Xie <Shaohui.Xie@nxp.com>
 
-"nxp,pcf2127" and "nxp,pcf2129" are I2c devices, adds them to the list
-of trivial i2c devices.
+Adds compatible for SoCs which use clockgen, the SoCs are LS1043A,
+LS1046A, LS2080A.
 
 Signed-off-by: Shaohui Xie <Shaohui.Xie@nxp.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
-changes in V3:
-1. none.
-
-changes in V2:
+change in v3:
 1. new patch.
 
- Documentation/devicetree/bindings/i2c/trivial-devices.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/clock/qoriq-clock.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-index 5c70ce9..677b168 100644
---- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-+++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-@@ -129,6 +129,8 @@ nuvoton,npct501		i2c trusted platform module (TPM)
- nuvoton,npct601		i2c trusted platform module (TPM2)
- nxp,pca9556		Octal SMBus and I2C registered interface
- nxp,pca9557		8-bit I2C-bus and SMBus I/O port with reset
-+nxp,pcf2127		Real-time clock
-+nxp,pcf2129		Real-time clock
- nxp,pcf8563		Real-time clock/calendar
- nxp,pcf85063		Tiny Real-Time Clock
- oki,ml86v7667		OKI ML86V7667 video decoder
+diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+index 16a3ec4..df9cb5a 100644
+--- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
++++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+@@ -32,6 +32,9 @@ Required properties:
+ 	* "fsl,b4420-clockgen"
+ 	* "fsl,b4860-clockgen"
+ 	* "fsl,ls1021a-clockgen"
++	* "fsl,ls1043a-clockgen"
++	* "fsl,ls1046a-clockgen"
++	* "fsl,ls2080a-clockgen"
+ 	Chassis-version clock strings include:
+ 	* "fsl,qoriq-clockgen-1.0": for chassis 1.0 clocks
+ 	* "fsl,qoriq-clockgen-2.0": for chassis 2.0 clocks
 -- 
 2.1.0.27.g96db324
