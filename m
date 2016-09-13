@@ -1,46 +1,37 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 13 Sep 2016 21:51:16 +0200
-Subject: [PATCH 2/3] firmware: dt: document lpc1850 boot ROM bindings
+Date: Tue, 13 Sep 2016 21:51:17 +0200
+Subject: [PATCH 3/3] ARM: dts: lpc18xx: add boot rom node
 In-Reply-To: <20160913195117.2887-1-manabian@gmail.com>
 References: <20160913195117.2887-1-manabian@gmail.com>
-Message-ID: <20160913195117.2887-3-manabian@gmail.com>
+Message-ID: <20160913195117.2887-4-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Binding documentation for the NXP LPC boot ROM.
+Add node for the boot ROM found on all NXP LPC18xx/43xx devices.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- .../devicetree/bindings/firmware/nxp,boot-rom.txt   | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
+ arch/arm/boot/dts/lpc18xx.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt b/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
-new file mode 100644
-index 0000000..5f3a044
---- /dev/null
-+++ b/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
-@@ -0,0 +1,21 @@
-+* NXP LPC boot ROM
+diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
+index 631e6f6c..9f94f3e 100644
+--- a/arch/arm/boot/dts/lpc18xx.dtsi
++++ b/arch/arm/boot/dts/lpc18xx.dtsi
+@@ -81,6 +81,14 @@
+ 			status = "disabled";
+ 		};
+ 
++		boot_rom: firmware at 10400000 {
++			compatible = "nxp,lpc1850-boot-rom";
++			reg = <0x10400000 0x10000>;
++			syscon = <&creg>;
++			nvmem-cells = <&part_id>;
++			nvmem-cell-names = "PartID";
++		};
 +
-+NXP LPC microcontrollers contains a boot ROM used to retrieve part information
-+and access internal Flash memory and OTP memory. Note that the Flash API is
-+not available on Flashless devices.
-+
-+Required properties:
-+- compatible: must contain the following: "nxp,lpc1850-boot-rom".
-+- reg: physical base address of the ROM and length of memory mapped region.
-+- syscon: handle to NXP CREG (Configuration Registers) syscon block.
-+- nvmem-cells: = handle to OTP memory cell which contain the part ID.
-+- nvmem-cell-names: must contain "PartID".
-+
-+Example:
-+boot_rom: firmware at 10400000 {
-+	compatible = "nxp,lpc1850-boot-rom";
-+	reg = <0x10400000 0x10000>;
-+	syscon = <&creg>;
-+	nvmem-cells = <&part_id>;
-+	nvmem-cell-names = "PartID";
-+};
+ 		dmac: dma-controller at 40002000 {
+ 			compatible = "arm,pl080", "arm,primecell";
+ 			arm,primecell-periphid = <0x00041080>;
 -- 
 2.9.3
