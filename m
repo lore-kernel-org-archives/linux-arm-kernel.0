@@ -1,115 +1,129 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 13 Sep 2016 15:01:52 -0500
-Subject: [PATCH 2/2] PCI: add CRS support to error handling path
-In-Reply-To: <1472770801-30671-2-git-send-email-okaya@codeaurora.org>
-References: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
- <1472770801-30671-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <20160913200152.GE4138@localhost>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Tue, 13 Sep 2016 17:06:14 -0300
+Subject: [RESEND][PATCH V7 0/5] perf: Driver specific configuration for PMU
+In-Reply-To: <1473179837-3293-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1473179837-3293-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20160913200614.GB10582@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 07:00:01PM -0400, Sinan Kaya wrote:
-> The PCIE spec allows an endpoint device to extend the initialization time
-> beyond 1 second by issuing Configuration Request Retry Status (CRS) for a
-> vendor ID read request.
-> 
-> This basically means "I'm busy now, please call me back later".
-> 
-> There are two moving parts to CRS support from the SW perspective. One part
-> is to determine if CRS is supported or not. The second part is to set the
-> CRS visibility register.
-> 
-> As part of the probe, the Linux kernel sets the above two conditions in
-> pci_enable_crs function. The kernel is also honoring the returned CRS in
-> pci_bus_read_dev_vendor_id function if supported. The function will poll up
-> to specified amount of time while endpoint is returning CRS response.
-> 
-> The PCIe spec also allows CRS to be issued during cold, warm, hot and FLR
-> resets.
-> 
-> The hot reset is initiated by starting a secondary bus reset. This patch is
-> adding vendor ID read immediately after a bus reset so that the
-> initialization procedure can be extended by the amount of time endpoint
-> requires.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci.c | 39 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index b209378..ebd0fc6 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -3829,6 +3829,44 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
->  	return 0;
->  }
->  
-> +/*
-> + * Mostly copy paste from pci_walk_bus with the exceptions of hard coded
-> + * work and removed locks.
-> + */
-> +static void pci_bus_probe_crs(struct pci_bus *top)
-> +{
-> +	struct pci_dev *dev;
-> +	struct pci_bus *bus;
-> +	struct list_head *next;
-> +	int retval;
-> +	u32 l;
-> +
-> +	bus = top;
-> +	next = top->devices.next;
-> +	for (;;) {
-> +		if (next == &bus->devices) {
-> +			/* end of this bus, go up or finish */
-> +			if (bus == top)
-> +				break;
-> +			next = bus->self->bus_list.next;
-> +			bus = bus->self->bus;
-> +			continue;
-> +		}
-> +		dev = list_entry(next, struct pci_dev, bus_list);
-> +		if (dev->subordinate) {
-> +			/* this is a pci-pci bridge, do its devices next */
-> +			next = dev->subordinate->devices.next;
-> +			bus = dev->subordinate;
-> +		} else
-> +			next = dev->bus_list.next;
-> +
-> +		retval = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l,
-> +						    60 * 1000);
-> +		if (retval)
-> +			break;
-> +	}
-> +}
+Em Tue, Sep 06, 2016 at 10:37:12AM -0600, Mathieu Poirier escreveu:
+> Original blurb:
+> ---------------
 
-Sigh.  Man, this is ugly.  Maybe we're locked into the current
-strategy and don't really have a choice, but I really don't like it.
+So, I managed to apply "perf tools: add infrastructure for PMU specific
+configuration", the first, as we discussed, needs splitting, some don't
+apply due to the first not being applied, and one fails 'perf test
+python', which I'll look at tomorrow.
 
-> +
->  void pci_reset_secondary_bus(struct pci_dev *dev)
->  {
->  	u16 ctrl;
-> @@ -4361,6 +4399,7 @@ void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
->  	pci_bus_save_and_disable(dev->bus);
->  	pcibios_reset_secondary_bus(dev);
->  	pci_bus_restore(dev->bus);
-> +	pci_bus_probe_crs(dev->subordinate);
-
-This looks backwards -- pci_bus_restore() uses config accesses, so surely
-you want to do the CRS check *before* that, right?  Oh, never mind, I see
-you already caught this.
-
-You mentioned several kinds of reset where CRS is allowed.  Doesn't this
-fix only one of them?  I know we support at least FLR reset also.
-
->  }
->  EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
->  
+- Arnaldo
+ 
+> This patchset adds the possiblity of specifying PMU driver configuration
+> directly from the perf command line.  Anything that falls within the
+> event specifiers '/.../' and that is preceded by the '@' symbol is
+> treated as a configurable.  Two formats are supported, @cfg and
+> @cfg=config.
+> 
+> For example:
+> 
+> perf record -e some_event/@cfg1/ ...
+> 
+> or
+> 
+> perf record -e some_event/@cfg2=config/ ...
+> 
+> or
+> 
+> perf record -e some_event/@cfg1, at cfg2=config/ ...
+> 
+> The above are all valid configuration and will see the strings 'cfg1'
+> and 'cfg2=config' sent to the PMU driver for parsing and interpretation
+> using the existing ioctl() mechanism.
+> 
+> The primary customers for this feature are the CoreSight drivers where
+> the selection of a sink (where trace data is accumulated) needs to be
+> done in a previous, and separated step, from the launching of the perf
+> command.
+> 
+> As such something that used to be a two-step process:
+> 
+> # echo 1 > /sys/bus/coresight/devices/20070000.etr/enable_sink
+> # perf record -e cs_etm//u --per-thread  uname
+> 
+> is integrated in a single command:
+> 
+> # perf record -e cs_etm/@20070000.etr/u --per-thread  uname
+> 
+> Thanks,
+> Mathieu
+> 
+> Changes for V7:
+> - Got rid of a miscellaneous debug message.
+> - Rebased to v4.8-rc4
+> - Added Jiri Olsa's Acked-by.
+> 
+> Changes for V6:
+> - Using sysFS rather than an ioctl() to communicate command line
+>   parameters to the CoreSight PMU.
+> 
+> Changes for V5:
+> - Made commit log in 5/9 more descriptive.
+> - Addressed missing return code in builtin-top.c.
+> - Overhauled the kernel portion to do parsing in the core.
+> 
+> Changes for V4:
+> - Pushing PMU driver configuration for 'perf top'.
+> - Rebased to the latest perf/core branch[1]. 
+> 
+> Changes for V3:
+> - Added comment for function drv_str() that explains the reason for
+>   keeping the entire token intact.
+> - Added driver config terms to the existing list of config terms.
+> - Added documenation for driver specific configuration.
+> - Pushing PMU driver configuration for 'perf stat' as well.  
+> - Preventing users from selecting a sink from sysFS _and_ perf.
+> 
+> Changes for V2:
+> - Rebased to [1] as per Jiri's request.
+> 
+> 
+> Mathieu Poirier (5):
+>   perf tools: making coresight PMU listable
+>   perf tools: adding coresight etm PMU record capabilities
+>   perf tools: add infrastructure for PMU specific configuration
+>   perf tools: Pushing configuration down to PMU driver
+>   perf tools: adding sink configuration for cs_etm PMU
+> 
+>  MAINTAINERS                              |   5 +
+>  tools/perf/Documentation/perf-record.txt |  12 +
+>  tools/perf/Makefile.config               |  11 +-
+>  tools/perf/arch/arm/util/Build           |   2 +
+>  tools/perf/arch/arm/util/auxtrace.c      |  54 +++
+>  tools/perf/arch/arm/util/cs-etm.c        | 615 +++++++++++++++++++++++++++++++
+>  tools/perf/arch/arm/util/cs-etm.h        |  26 ++
+>  tools/perf/arch/arm/util/pmu.c           |  37 ++
+>  tools/perf/arch/arm64/util/Build         |   4 +
+>  tools/perf/builtin-record.c              |   9 +
+>  tools/perf/builtin-stat.c                |   8 +
+>  tools/perf/builtin-top.c                 |  12 +
+>  tools/perf/util/auxtrace.c               |   1 +
+>  tools/perf/util/auxtrace.h               |   1 +
+>  tools/perf/util/cs-etm.h                 |  74 ++++
+>  tools/perf/util/evlist.c                 |  18 +
+>  tools/perf/util/evlist.h                 |   3 +
+>  tools/perf/util/evsel.c                  |  40 ++
+>  tools/perf/util/evsel.h                  |   4 +
+>  tools/perf/util/parse-events.c           |   7 +-
+>  tools/perf/util/parse-events.h           |   1 +
+>  tools/perf/util/parse-events.l           |  22 ++
+>  tools/perf/util/parse-events.y           |  11 +
+>  tools/perf/util/pmu.h                    |   2 +
+>  24 files changed, 974 insertions(+), 5 deletions(-)
+>  create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+>  create mode 100644 tools/perf/arch/arm/util/cs-etm.c
+>  create mode 100644 tools/perf/arch/arm/util/cs-etm.h
+>  create mode 100644 tools/perf/arch/arm/util/pmu.c
+>  create mode 100644 tools/perf/util/cs-etm.h
+> 
 > -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 2.7.4
