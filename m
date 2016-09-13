@@ -1,48 +1,106 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 13 Sep 2016 12:27:50 +0100
-Subject: [PATCH] mfd: atmel-hlcdc: Do not sleep in atomic context
-In-Reply-To: <1473164369-10033-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1473164369-10033-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160913112750.GC26864@dell>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 13 Sep 2016 19:31:36 +0800
+Subject: [PATCH v12 7/8] clocksource/drivers/arm_arch_timer: Add GTDT
+ support for memory-mapped timer
+In-Reply-To: <57D7DC59.6000705@arm.com>
+References: <1473763144-5653-1-git-send-email-fu.wei@linaro.org>
+ <1473763144-5653-8-git-send-email-fu.wei@linaro.org>
+ <57D7DC59.6000705@arm.com>
+Message-ID: <cc5a4eea-a8d9-3657-1938-610d2b4e855e@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 06 Sep 2016, Boris Brezillon wrote:
+Hi Marc,
 
-> readl_poll_timeout() calls usleep_range(), but
-> regmap_atmel_hlcdc_reg_write() is called in atomic context (regmap
-> spinlock held).
-> 
-> Replace the readl_poll_timeout() call by readl_poll_timeout_atomic().
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Fixes: ea31c0cf9b07 ("mfd: atmel-hlcdc: Implement config synchronization")
-> Cc: <stable@vger.kernel.org>
-> ---
->  drivers/mfd/atmel-hlcdc.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
 
-Applied, thanks.
+On 09/13/2016 07:00 PM, Marc Zyngier wrote:
+> Argh, new version...
+>
+> On 13/09/16 11:39, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> The patch add memory-mapped timer register support by using the information
+>> provided by the new GTDT driver of ACPI.
+>>
+>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> ---
+>>  drivers/clocksource/arm_arch_timer.c | 127 ++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 124 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index 0197ef9..d33802b 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -888,7 +888,128 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
+>>  		       arch_timer_mem_init);
+>>  
+>>  #ifdef CONFIG_ACPI_GTDT
+>> -/* Initialize per-processor generic timer */
+>> +static struct gt_timer_data __init *arch_timer_mem_get_timer(
+>> +						struct gt_block_data *gt_blocks)
+>> +{
+>> +	struct gt_block_data *gt_block = gt_blocks;
+>> +	struct gt_timer_data *best_frame = NULL;
+>> +	void __iomem *cntctlbase;
+>> +	u32 cnttidr;
+>> +	int i;
+>> +
+>> +	/*
+>> +	 * According to ARMv8 Architecture Reference Manual(ARM),
+>> +	 * the size of CNTCTLBase frame of memory-mapped timer
+>> +	 * is SZ_4K(Offset 0x000 ? 0xFFF).
+>> +	 */
+>> +	cntctlbase = ioremap(gt_block->cntctlbase_phy, SZ_4K);
+>> +	if (!cntctlbase) {
+>> +		pr_err("Failed to map mem timer control frame base address\n");
+>> +		return NULL;
+>> +	}
+>> +	cnttidr = readl_relaxed(cntctlbase + CNTTIDR);
+>> +
+>> +	/*
+>> +	 * Try to find a virtual capable frame. Otherwise fall back to a
+>> +	 * physical capable frame.
+>> +	 */
+>> +	for (i = 0; i < gt_block->timer_count; i++) {
+>> +		int n;
+>> +		u32 cntacr;
+>> +
+>> +		n = gt_block->timer[i].frame_nr;
+>> +
+>> +		/* Try enabling everything, and see what sticks */
+>> +		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
+>> +			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
+>> +		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
+>> +		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
+>> +
+>> +		if ((cnttidr & CNTTIDR_VIRT(n)) &&
+>> +		    !(~cntacr & (CNTACR_RWVT | CNTACR_RVCT))) {
+>> +			best_frame = &gt_block->timer[i];
+>> +			arch_timer_mem_use_virtual = true;
+>> +			break;
+>> +		}
+>> +
+>> +		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
+>> +			continue;
+>> +
+>> +		best_frame = &gt_block->timer[i];
+>> +	}
+>> +	iounmap(cntctlbase);
+> As I just said in my reply to the same patch in v11, all of this is
+> duplicating existing infrastructure that already exists for DT. Please
+> consider decoupling the core driver code from the firmware side and make
+> this reusable.
 
-> diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
-> index eca7ea69b81c..4b15b0840f16 100644
-> --- a/drivers/mfd/atmel-hlcdc.c
-> +++ b/drivers/mfd/atmel-hlcdc.c
-> @@ -50,8 +50,9 @@ static int regmap_atmel_hlcdc_reg_write(void *context, unsigned int reg,
->  	if (reg <= ATMEL_HLCDC_DIS) {
->  		u32 status;
->  
-> -		readl_poll_timeout(hregmap->regs + ATMEL_HLCDC_SR, status,
-> -				   !(status & ATMEL_HLCDC_SIP), 1, 100);
-> +		readl_poll_timeout_atomic(hregmap->regs + ATMEL_HLCDC_SR,
-> +					  status, !(status & ATMEL_HLCDC_SIP),
-> +					  1, 100);
->  	}
->  
->  	writel(val, hregmap->regs + reg);
+Great thanks for your help, I am working on it now.
+Any suggestion for other arm_arch_timer patches?
+
+> Thanks,
+>
+> 	M.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat 
