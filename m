@@ -1,158 +1,182 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 13 Sep 2016 10:20:19 +0200
-Subject: [PATCH v4 01/10] arm64: KVM: Use static keys for selecting the
- GIC backend
-In-Reply-To: <1473691764-29424-2-git-send-email-vladimir.murzin@arm.com>
-References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
- <1473691764-29424-2-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20160913082019.GB5680@cbox>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 13 Sep 2016 16:18:01 +0800
+Subject: [PATCH v5 14/14] drivers: acpi: iort: introduce
+ iort_iommu_configure
+In-Reply-To: <57647b7518907dd9bd682e5e5a55ca80@codeaurora.org>
+References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
+ <20160909142343.13314-15-lorenzo.pieralisi@arm.com>
+ <57647b7518907dd9bd682e5e5a55ca80@codeaurora.org>
+Message-ID: <54744f49-f1f5-be5e-313e-e38e51c0004e@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 03:49:15PM +0100, Vladimir Murzin wrote:
-> Currently GIC backend is selected via alternative framework and this
-> is fine. We are going to introduce vgic-v3 to 32-bit world and there
-> we don't have patching framework in hand, so we can either check
-> support for GICv3 every time we need to choose which backend to use or
-> try to optimise it by using static keys. The later looks quite
-> promising because we can share logic involved in selecting GIC backend
-> between architectures if both uses static keys.
-> 
-> This patch moves arm64 from alternative to static keys framework for
-> selecting GIC backend. For that we embed static key into vgic_global
-> and enable the key during vgic initialisation based on what has
-> already been exposed by the host GIC driver.
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  arch/arm64/kvm/hyp/switch.c   |   21 +++++++++++----------
->  include/kvm/arm_vgic.h        |    4 ++++
->  virt/kvm/arm/vgic/vgic-init.c |    4 ++++
->  virt/kvm/arm/vgic/vgic.c      |    2 +-
->  4 files changed, 20 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 5a84b45..d5c4cc5 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -16,6 +16,8 @@
->   */
->  
->  #include <linux/types.h>
-> +#include <linux/jump_label.h>
-> +
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_hyp.h>
->  
-> @@ -126,17 +128,13 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
->  	write_sysreg(0, vttbr_el2);
->  }
->  
-> -static hyp_alternate_select(__vgic_call_save_state,
-> -			    __vgic_v2_save_state, __vgic_v3_save_state,
-> -			    ARM64_HAS_SYSREG_GIC_CPUIF);
-> -
-> -static hyp_alternate_select(__vgic_call_restore_state,
-> -			    __vgic_v2_restore_state, __vgic_v3_restore_state,
-> -			    ARM64_HAS_SYSREG_GIC_CPUIF);
-> -
->  static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
->  {
-> -	__vgic_call_save_state()(vcpu);
-> +	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+Hi Nate,
 
-It's a bit weird that we use _unlikely for GICv3 (at least if/when GICv3
-hardware becomes mainstream), but as we don't have another primitive for
-the 'default disabled' case, I suppose that's the best we can do.
+On 2016/9/13 16:14, Nate Watterson wrote:
+> On 2016-09-09 10:23, Lorenzo Pieralisi wrote:
+>> DT based systems have a generic kernel API to configure IOMMUs
+>> for devices (ie of_iommu_configure()).
+>>
+>> On ARM based ACPI systems, the of_iommu_configure() equivalent can
+>> be implemented atop ACPI IORT kernel API, with the corresponding
+>> functions to map device identifiers to IOMMUs and retrieve the
+>> corresponding IOMMU operations necessary for DMA operations set-up.
+>>
+>> By relying on the iommu_fwspec generic kernel infrastructure,
+>> implement the IORT based IOMMU configuration for ARM ACPI systems
+>> and hook it up in the ACPI kernel layer that implements DMA
+>> configuration for a device.
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+>> Cc: Tomasz Nowicki <tn@semihalf.com>
+>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>> ---
+>>  drivers/acpi/arm64/iort.c | 96
+>> +++++++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/acpi/scan.c       |  7 +++-
+>>  include/linux/acpi_iort.h |  6 +++
+>>  3 files changed, 108 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>> index 7c68eb4..55a4ae9 100644
+>> --- a/drivers/acpi/arm64/iort.c
+>> +++ b/drivers/acpi/arm64/iort.c
+>> @@ -19,6 +19,7 @@
+>>  #define pr_fmt(fmt)    "ACPI: IORT: " fmt
+>>
+>>  #include <linux/acpi_iort.h>
+>> +#include <linux/iommu-fwspec.h>
+>>  #include <linux/kernel.h>
+>>  #include <linux/list.h>
+>>  #include <linux/pci.h>
+>> @@ -27,6 +28,8 @@
+>>
+>>  #define IORT_TYPE_MASK(type)    (1 << (type))
+>>  #define IORT_MSI_TYPE        (1 << ACPI_IORT_NODE_ITS_GROUP)
+>> +#define IORT_IOMMU_TYPE        ((1 << ACPI_IORT_NODE_SMMU) |    \
+>> +                (1 << ACPI_IORT_NODE_SMMU_V3))
+>>
+>>  struct iort_its_msi_chip {
+>>      struct list_head    list;
+>> @@ -467,6 +470,99 @@ struct irq_domain *iort_get_device_domain(struct
+>> device *dev, u32 req_id)
+>>      return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
+>>  }
+>>
+>> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>> +{
+>> +    u32 *rid = data;
+>> +
+>> +    *rid = alias;
+>> +    return 0;
+>> +}
+>> +
+>> +static int arm_smmu_iort_xlate(struct device *dev, u32 streamid,
+>> +                   struct fwnode_handle *fwnode)
+>> +{
+>> +    int ret = iommu_fwspec_init(dev, fwnode);
+>> +
+>> +    if (!ret)
+>> +        ret = iommu_fwspec_add_ids(dev, &streamid, 1);
+>> +
+>> +    return ret;
+>> +}
+>> +
+>> +static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+>> +                    struct acpi_iort_node *node,
+>> +                    u32 streamid)
+>> +{
+>> +    struct fwnode_handle *iort_fwnode = NULL;
+>> +    int ret;
+>> +
+>> +    if (node) {
+>> +        iort_fwnode = iort_get_fwnode(node);
+>> +        if (!iort_fwnode)
+>> +            return NULL;
+>> +
+>> +        ret = arm_smmu_iort_xlate(dev, streamid,
+>> +                      iort_fwnode);
+>> +        if (!ret)
+>> +            return fwspec_iommu_get_ops(iort_fwnode);
+>> +    }
+>> +
+>> +    return NULL;
+>> +}
+>> +
+>> +/**
+>> + * iort_iommu_configure - Set-up IOMMU configuration for a device.
+>> + *
+>> + * @dev: device to configure
+>> + *
+>> + * Returns: iommu_ops pointer on configuration success
+>> + *          NULL on configuration failure
+>> + */
+>> +const struct iommu_ops *iort_iommu_configure(struct device *dev)
+>> +{
+>> +    struct acpi_iort_node *node, *parent;
+>> +    const struct iommu_ops *ops = NULL;
+>> +    u32 streamid = 0;
+>> +
+>> +    if (dev_is_pci(dev)) {
+>> +        struct pci_bus *bus = to_pci_dev(dev)->bus;
+>> +        u32 rid;
+>> +
+>> +        pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
+>> +                       &rid);
+>> +
+>> +        node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+>> +                      iort_match_node_callback, &bus->dev);
+>> +        if (!node)
+>> +            return NULL;
+>> +
+>> +        parent = iort_node_map_rid(node, rid, &streamid,
+>> +                       IORT_IOMMU_TYPE);
+>> +
+>> +        ops = iort_iommu_xlate(dev, parent, streamid);
+>> +
+>> +    } else {
+>> +        int i = 0;
+>> +
+>> +        node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+>> +                      iort_match_node_callback, dev);
+>> +        if (!node)
+>> +            return NULL;
+>> +
+>
+> Nothing wrong with your code here, but wanted to warn you that there
+> appears to be a bug in iort_match_node_callback() for NAMED_COMPONENTS.
+>
+> iort_match_node_callback() {
+>     acpi_status status = AE_NOT_FOUND;
+>     ...
+>     case ACPI_IORT_NODE_NAMED_COMPONENT: {
+>         ...
+>         status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
+>         if (ACPI_FAILURE(status)) {
+>             dev_warn(dev, "Can't get device full path name\n");
+>             break;
+>         }
+>
+>         ncomp = (struct acpi_iort_named_component *)node->node_data;
+>         if (!strcmp(ncomp->device_name, buf.pointer))
+>             status = AE_OK;
+>
+>         acpi_os_free(buf.pointer);
+>         break;
+>     }
+>     ...
+>     return status;
+> }
+>
+> Notice how if strcmp() fails, status remains set to the status of the call
+> to acpi_get_name() which must have been OK since we would have broken out
+> of the switch statement otherwise. This is causing all manner of platform
+> devices not even described in the IORT to get hooked up using the IDs of
+> the first properly iommu-attached NAMED_COMPONENT device found in the IORT.
 
-> +		__vgic_v3_save_state(vcpu);
-> +	else
-> +		__vgic_v2_save_state(vcpu);
-> +
->  	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
->  }
->  
-> @@ -149,7 +147,10 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
->  	val |= vcpu->arch.irq_lines;
->  	write_sysreg(val, hcr_el2);
->  
-> -	__vgic_call_restore_state()(vcpu);
-> +	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
-> +		__vgic_v3_restore_state(vcpu);
-> +	else
-> +		__vgic_v2_restore_state(vcpu);
->  }
->  
->  static bool __hyp_text __true_value(void)
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 19b698e..994665a 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -23,6 +23,7 @@
->  #include <linux/types.h>
->  #include <kvm/iodev.h>
->  #include <linux/list.h>
-> +#include <linux/jump_label.h>
->  
->  #define VGIC_V3_MAX_CPUS	255
->  #define VGIC_V2_MAX_CPUS	8
-> @@ -63,6 +64,9 @@ struct vgic_global {
->  
->  	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
->  	bool			can_emulate_gicv2;
-> +
-> +	/* GIC system register CPU interface */
-> +	struct static_key_false gicv3_cpuif;
+As I said in previous email, please use the new version of IORT patch
+set :)
 
-Documentation/static-keys.txt says that we are not supposed to use
-struct static_key_false directly.  This will obviously work quite
-nicely, but we could consider adding a pair of
-DECLARE_STATIC_KEY_TRUE/FALSE macros that don't have the assignments,
-but obviously this will need an ack from other maintainers.
-
-Thoughts?
-
-
->  };
->  
->  extern struct vgic_global kvm_vgic_global_state;
-> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> index 83777c1..14d6718 100644
-> --- a/virt/kvm/arm/vgic/vgic-init.c
-> +++ b/virt/kvm/arm/vgic/vgic-init.c
-> @@ -405,6 +405,10 @@ int kvm_vgic_hyp_init(void)
->  		break;
->  	case GIC_V3:
->  		ret = vgic_v3_probe(gic_kvm_info);
-> +		if (!ret) {
-> +			static_branch_enable(&kvm_vgic_global_state.gicv3_cpuif);
-> +			kvm_info("GIC system register CPU interface\n");
-
-nit: add enabled to the info message?
-
-> +		}
->  		break;
->  	default:
->  		ret = -ENODEV;
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index e83b7fe..8a529a7 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -29,7 +29,7 @@
->  #define DEBUG_SPINLOCK_BUG_ON(p)
->  #endif
->  
-> -struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
-> +struct vgic_global __section(.hyp.text) kvm_vgic_global_state = {.gicv3_cpuif = STATIC_KEY_FALSE_INIT,};
->  
->  /*
->   * Locking order is always:
-> -- 
-> 1.7.9.5
-> 
-
-Overall this looks really nice, as long as we're clear on the static
-keys stuff.
-
-Thanks!
--Christoffer
+Thanks
+Hanjun
