@@ -1,319 +1,70 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 13 Sep 2016 10:49:48 +0200
-Subject: [PATCH 1/5] clk: add support for runtime pm
-In-Reply-To: <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
-References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
- <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAPDyKFo7R1f1H1R5Q78L4e_nHfngRYfo8jP_Dfi3uf_OGWvZCg@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 13 Sep 2016 16:55:04 +0800
+Subject: [PATCH v8 6/9] drm/mediatek: add dsi interrupt control
+In-Reply-To: <1473681672-47144-7-git-send-email-yt.shen@mediatek.com>
+References: <1473681672-47144-1-git-send-email-yt.shen@mediatek.com>
+ <1473681672-47144-7-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1473756904.28437.32.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 September 2016 at 15:45, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Registers for some clocks might be located in the SOC area, which are under the
-> power domain. To enable access to those registers respective domain has to be
-> turned on. Additionally, registers for such clocks will usually loose its
-> contents when power domain is turned off, so additional saving and restoring of
-> them might be needed in the clock controller driver.
+Hi, YT:
 
-This is indeed correct, I can confirm that the UX500 SoC's PRCC clock
-controllers also needs to be managed like this.
-
->
-> This patch adds basic infrastructure in the clocks core to allow implementing
-> driver for such clocks under power domains. Clock provider can supply a
-> struct device pointer, which is the used by clock core for tracking and managing
-> clock's controller runtime pm state. Each clk_prepare() operation
-> will first call pm_runtime_get_sync() on the supplied device, while
-> clk_unprepare() will do pm_runtime_put() at the end.
-
-This make sense!
-
->
-> Additional calls to pm_runtime_get/put functions are required to ensure that any
-> register access (like calculating/chaning clock rates) will be done with clock
-
-/s/chaning/changing
-
-> controller in active runtime state.
-
-/s/active runtime/runtime resumed
-
->
-> Special handling of the case when runtime pm is disabled for clock controller's
-> device is needed to let this feature work properly also during system sleep
-> suspend/resume operations (runtime pm is first disabled before entering sleep
-> state's, but controller is usually still operational until its suspend pm
-> callback is called).
-
-This needs to be clarified. I agree we need to cover system PM as
-well, but let's try be a bit more precise about it.
-
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-I would also like to extend the change log to describe a little bit of
-how a clk provider should interact with this new and nice feature.
-Something like:
-
-*) It needs to provide a struct device to the core when registering
-the provider.
-**) It needs to enable runtime PM.
-***) It needs to make sure the runtime PM status of the controller
-device reflects the HW state.
-
+On Mon, 2016-09-12 at 20:01 +0800, YT Shen wrote:
+> From: shaoming chen <shaoming.chen@mediatek.com>
+> 
+> add dsi interrupt control
+> 
+> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
 > ---
->  drivers/clk/clk.c | 84 +++++++++++++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 76 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 820a939fb6bb..a1934e9b4e95 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -21,6 +21,7 @@
->  #include <linux/of.h>
->  #include <linux/device.h>
->  #include <linux/init.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/sched.h>
->  #include <linux/clkdev.h>
->
-> @@ -46,6 +47,7 @@ struct clk_core {
->         const struct clk_ops    *ops;
->         struct clk_hw           *hw;
->         struct module           *owner;
-> +       struct device           *dev;
->         struct clk_core         *parent;
->         const char              **parent_names;
->         struct clk_core         **parents;
-> @@ -87,6 +89,42 @@ struct clk {
->         struct hlist_node clks_node;
->  };
->
-> +/***           runtime pm          ***/
-> +static int clk_pm_runtime_get(struct clk_core *core)
+>  drivers/gpu/drm/mediatek/mtk_dsi.c | 78 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 78 insertions(+)
+> 
+
+[snip...]
+
+>  
+> +static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
 > +{
-> +       int ret = 0;
+> +	u32 inten = DSI_INT_ALL_BITS;
 > +
-> +       if (!core->dev)
-> +               return 0;
+> +	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO)
+> +		inten &= ~(TE_RDY_INT_FLAG | EXT_TE_RDY_INT_FLAG);
 > +
-> +       if (pm_runtime_enabled(core->dev)) {
-
-Why do you need to check for this?
-
-> +               ret = pm_runtime_get_sync(core->dev);
-> +       } else {
-> +               if (!pm_runtime_status_suspended(core->dev))
-> +                       pm_runtime_get_noresume(core->dev);
-
-This looks weird. I guess it's related to the system PM case somehow?
-
-> +       }
-> +       return ret < 0 ? ret : 0;
+> +	writel(inten, dsi->regs + DSI_INTEN);
 > +}
 > +
-> +static void clk_pm_runtime_put(struct clk_core *core)
-> +{
 
-Similar comments as for clk_pm_runtime_get().
+[snip...]
 
-> +       if (!core->dev)
-> +               return;
 > +
-> +       if (pm_runtime_enabled(core->dev))
-> +               pm_runtime_put(core->dev);
-> +       else
-> +               pm_runtime_put_noidle(core->dev);
+> +static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
+> +{
+> +	struct mtk_dsi *dsi = dev_id;
+> +	u32 status, tmp;
+> +	u32 flag = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
+
+Why do you only process these three irq? You also enable TE_RDY_INT_FLAG
+& EXT_TE_RDY_INT_FLAG in mtk_dsi_set_interrupt_enable(). Process these
+two irq here or not enable them in mtk_dsi_set_interrupt_enable().
+
+Regards,
+CK
+
+> +
+> +	status = readl(dsi->regs + DSI_INTSTA) & flag;
+> +
+> +	if (status) {
+> +		do {
+> +			mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
+> +			tmp = readl(dsi->regs + DSI_INTSTA);
+> +		} while (tmp & DSI_BUSY);
+> +
+> +		mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
+> +		mtk_dsi_irq_data_set(dsi, status);
+> +		wake_up_interruptible(&dsi->irq_wait_queue);
+> +	}
+> +
+> +	return IRQ_HANDLED;
 > +}
 > +
-> +static bool clk_pm_runtime_suspended(struct clk_core *core)
-> +{
-> +       if (!core->dev)
-> +               return 0;
-> +
-> +       return pm_runtime_suspended(core->dev);
-> +}
-> +
->  /***           locking             ***/
->  static void clk_prepare_lock(void)
->  {
-> @@ -150,6 +188,9 @@ static void clk_enable_unlock(unsigned long flags)
->
->  static bool clk_core_is_prepared(struct clk_core *core)
->  {
-> +       if (clk_pm_runtime_suspended(core))
-> +               return false;
-> +
-
-This isn't safe, as even if the clock controller is runtime resumed at
-this point, that's *not* a guarantee that is stays runtime resumed
-while invoking the ->ops->is_prepared().
-
-Instead you must call a pm_runtime_get_noresume() before you check the
-runtime PM status, as that should avoid the device from being runtime
-suspended. Then when the ->ops->is_prepared() has been invoked, we
-should call pm_runtime_put().
-
-Although, I am not sure the above change becomes entirely correct as I
-think we are mixing the runtime PM status with the clock prepare
-status here. In other words, the next time the clock controller
-becomes runtime resumed, it may very well restore some register
-context which may prepare the clock, unless someone explicitly has
-unprepared it.
-
-Of course, it all depends on how clk_core_is_prepared() is used by the
-clock framework.
-
->         /*
->          * .is_prepared is optional for clocks that can prepare
->          * fall back to software usage counter if it is missing
-> @@ -162,6 +203,9 @@ static bool clk_core_is_prepared(struct clk_core *core)
->
->  static bool clk_core_is_enabled(struct clk_core *core)
->  {
-> +       if (clk_pm_runtime_suspended(core))
-> +               return false;
-> +
-
-Similar comment as for clk_core_is_prepared().
-
->         /*
->          * .is_enabled is only mandatory for clocks that gate
->          * fall back to software usage counter if .is_enabled is missing
-> @@ -489,6 +533,8 @@ static void clk_core_unprepare(struct clk_core *core)
->         if (core->ops->unprepare)
->                 core->ops->unprepare(core->hw);
->
-> +       clk_pm_runtime_put(core);
-> +
->         trace_clk_unprepare_complete(core);
->         clk_core_unprepare(core->parent);
->  }
-> @@ -530,10 +576,14 @@ static int clk_core_prepare(struct clk_core *core)
->                 return 0;
->
->         if (core->prepare_count == 0) {
-> -               ret = clk_core_prepare(core->parent);
-> +               ret = clk_pm_runtime_get(core);
->                 if (ret)
->                         return ret;
->
-> +               ret = clk_core_prepare(core->parent);
-> +               if (ret)
-> +                       goto runtime_put;
-> +
->                 trace_clk_prepare(core);
->
->                 if (core->ops->prepare)
-> @@ -541,15 +591,18 @@ static int clk_core_prepare(struct clk_core *core)
->
->                 trace_clk_prepare_complete(core);
->
-> -               if (ret) {
-> -                       clk_core_unprepare(core->parent);
-> -                       return ret;
-> -               }
-> +               if (ret)
-> +                       goto unprepare;
->         }
->
->         core->prepare_count++;
->
->         return 0;
-> +unprepare:
-> +       clk_core_unprepare(core->parent);
-> +runtime_put:
-> +       clk_pm_runtime_put(core);
-> +       return ret;
->  }
->
->  static int clk_core_prepare_lock(struct clk_core *core)
-> @@ -1563,6 +1616,7 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
->  {
->         struct clk_core *top, *fail_clk;
->         unsigned long rate = req_rate;
-> +       int ret = 0;
->
->         if (!core)
->                 return 0;
-> @@ -1579,21 +1633,28 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
->         if (!top)
->                 return -EINVAL;
->
-> +       ret = clk_pm_runtime_get(core);
-> +       if (ret)
-> +               return ret;
-> +
->         /* notify that we are about to change rates */
->         fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
->         if (fail_clk) {
->                 pr_debug("%s: failed to set %s rate\n", __func__,
->                                 fail_clk->name);
->                 clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
-> -               return -EBUSY;
-> +               ret = -EBUSY;
-> +               goto err;
->         }
->
->         /* change the rates */
->         clk_change_rate(top);
->
->         core->req_rate = req_rate;
-> +err:
-> +       clk_pm_runtime_put(core);
->
-> -       return 0;
-> +       return ret;
->  }
->
->  /**
-> @@ -1824,12 +1885,16 @@ static int clk_core_set_parent(struct clk_core *core, struct clk_core *parent)
->                 p_rate = parent->rate;
->         }
->
-> +       ret = clk_pm_runtime_get(core);
-> +       if (ret)
-> +               goto out;
-> +
->         /* propagate PRE_RATE_CHANGE notifications */
->         ret = __clk_speculate_rates(core, p_rate);
->
->         /* abort if a driver objects */
->         if (ret & NOTIFY_STOP_MASK)
-> -               goto out;
-> +               goto runtime_put;
->
->         /* do the re-parent */
->         ret = __clk_set_parent(core, parent, p_index);
-> @@ -1842,6 +1907,8 @@ static int clk_core_set_parent(struct clk_core *core, struct clk_core *parent)
->                 __clk_recalc_accuracies(core);
->         }
->
-> +runtime_put:
-> +       clk_pm_runtime_put(core);
->  out:
->         clk_prepare_unlock();
->
-> @@ -2546,6 +2613,7 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
->                 goto fail_name;
->         }
->         core->ops = hw->init->ops;
-> +       core->dev = dev;
->         if (dev && dev->driver)
->                 core->owner = dev->driver->owner;
->         core->hw = hw;
-> --
-> 1.9.1
->
-
-I believe we are also accessing the clock controller HW from the
-late_initcall_sync(clk_disable_unused) function.
-
-More precisely, in clk_disable_unused_subtree(), we probably need a
-pm_runtime_get_sync() before calling clk_core_is_enabled(). And then
-restore that with a pm_runtime_put() after the clock has been
-disabled.
-The similar is needed in clk_unprepare_unused_subtree().
-
-Kind regards
-Uffe
