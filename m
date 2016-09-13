@@ -1,35 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Sep 2016 17:27:32 +0200
-Subject: [GIT PULL] STi DT updates for v4.9
-In-Reply-To: <c83fda3c-5120-a55b-dfb0-f550cbaf777a@st.com>
-References: <c83fda3c-5120-a55b-dfb0-f550cbaf777a@st.com>
-Message-ID: <4599921.Xv3Qd3jgsj@wuerfel>
+Date: Tue, 13 Sep 2016 17:28:33 +0200
+Subject: [PATCHv2] ARM: dts: explicitly mark skeleton.dtsi as deprecated
+In-Reply-To: <1472834090-24528-1-git-send-email-mark.rutland@arm.com>
+References: <1472834090-24528-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <2855680.gsrh9qO4OM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 3:58:00 PM CEST Patrice Chotard wrote:
->   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
+On Friday, September 2, 2016 5:34:50 PM CEST Mark Rutland wrote:
+> As noted in commit 3ebee5a2e141496b ("arm64: dts: kill skeleton.dtsi"),
+> there are a number of problems with skeleton.dtsi, and it would be
+> prefereable to remove it entirely. As there are a large number of
+> existing users, fixing these up will take a while.
 > 
-> for you to fetch changes up to ba5ba11906d5462993f5fd4e3da4d234505427a0:
+> This patch adds a note to arm's skeleton.dtsi noting that this is the
+> case, to make this more obvious and hopefully minimize new uptake of
+> skeleton.dtsi in the mean time.
 > 
->   ARM: dts: STiH41x-b2020: Update gpio specifier (2016-09-02 15:15:14 +0200)
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> ---
+>  arch/arm/boot/dts/skeleton.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> ----------------------------------------------------------------
+> Arnd, Olof, could you please pick this up?
 > 
-> STi dts fixes and new STi 96board support:
-> 
-> Add thermal node for STiH407 family boards
-> Add specific nodes for STMicroelectronics 96Board
-> Add new B2260 STi board file = 96Board
-> Fix ahci issue on STiH407 family
-> Fix debugfs/pinctrl kernel warning
-> Update gpio-cells and gpio specifier
 > 
 
-Pulled into next/dt. The URL had no tag name, but I found the tag "sti-dt-for-v4.9-1"
-in your tree with that commit ID, so I pulled that.
-    
-Not sure what went wrong on your end, it wasn't a big deal but please
-try to always include the tag. Thanks!
+Applied to next/dt, thanks!
 
 	Arnd
