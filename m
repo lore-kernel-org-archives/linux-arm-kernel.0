@@ -1,457 +1,224 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 13 Sep 2016 14:14:01 +0200
-Subject: [PATCH v1 1/2] ARM: dts: add rockchip PX3 Evaluation board
-In-Reply-To: <1473529440-6202-1-git-send-email-andy.yan@rock-chips.com>
-References: <1473529249-6151-1-git-send-email-andy.yan@rock-chips.com>
- <1473529440-6202-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <64f4be31-1b19-60e3-da7c-f2fec186fab9@suse.de>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 13 Sep 2016 14:14:34 +0200
+Subject: [PATCH v7 00/22] Generic DT bindings for PCI IOMMUs and ARM SMMU
+In-Reply-To: <cover.1473695704.git.robin.murphy@arm.com>
+References: <cover.1473695704.git.robin.murphy@arm.com>
+Message-ID: <92f27a6b-9752-516d-3924-c552fc6a5ace@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Hi Robin
 
-This patch didn't make it to linux-rockchip list somehow...
-Not sure why I'm CC'ed, I don't have access to such a board to check, so
-just a couple formal nitpicks:
-
-Am 10.09.2016 um 19:44 schrieb Andy Yan:
-> PX3 EVB is designed by Rockchip for automotive field,
-> which intergrated with CVBS(TP2825)/MIPI DSI/LVDS/HDMI
-
-"integrated"
-but the grammar is somewhat incorrect with "which" referring to field -
-I assume you meant "with integrated CVBS..."?
-
-> video input/output interface, WIFI/BT/GPS(on a module
-
-Also please always leave a space before an opening parenthesis in
-English text. Similarly above, spaces around "/" would help recognize
-that MIPI DSI belongs together rather than being two lists.
-
-If nothing else applies below then maybe Heiko can edit it for you?
-
-> named S500 which based on MT6620), Gsensor BMA250E and
-> light&proximity sensor STK3410.
+On 12/09/2016 18:13, Robin Murphy wrote:
+> Hi all,
 > 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> To any more confusing fixups and crazily numbered extra patches, here's
+> a quick v7 with everything rebased into the right order. The significant
+> change this time is to implement iommu_fwspec properly from the start,
+> which ends up being far simpler and more robust than faffing about
+> introducing it somewhere 'less intrusive' to move toward core code later.
 > 
-> ---
+> New branch in the logical place:
 > 
-> Changes in v1:
-> - board rename
-> - add vendor prefix for i2c interfaced sensors
-> - use stdout-path to set the default console
+> git://linux-arm.org/linux-rm iommu/generic-v7
+I just tested your branch on AMD overdrive *without* updating the device
+tree description according to the new syntax and I get a kernel oops.
+See logs attached. Continuing my investigations ...
+
+Best Regards
+
+Eric
 > 
->  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/rk3188-px3-evb.dts               | 337 +++++++++++++++++++++
->  3 files changed, 342 insertions(+)
->  create mode 100644 arch/arm/boot/dts/rk3188-px3-evb.dts
+> Robin.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-> index 6668645..6da3881 100644
-> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> @@ -21,6 +21,10 @@ Rockchip platforms device tree bindings
->      Required root node properties:
->        - compatible = "radxa,rock", "rockchip,rk3188";
->  
-> +- Rockchip PX3 Evaluation board:
-> +    Required root node properties:
-> +      - compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
+> Mark Rutland (1):
+>   Docs: dt: add PCI IOMMU map bindings
+> 
+> Robin Murphy (21):
+>   of/irq: Break out msi-map lookup (again)
+>   iommu/of: Handle iommu-map property for PCI
+>   iommu: Introduce iommu_fwspec
+>   Docs: dt: document ARM SMMUv3 generic binding usage
+>   iommu/arm-smmu: Fall back to global bypass
+>   iommu/arm-smmu: Implement of_xlate() for SMMUv3
+>   iommu/arm-smmu: Support non-PCI devices with SMMUv3
+>   iommu/arm-smmu: Set PRIVCFG in stage 1 STEs
+>   iommu/arm-smmu: Handle stream IDs more dynamically
+>   iommu/arm-smmu: Consolidate stream map entry state
+>   iommu/arm-smmu: Keep track of S2CR state
+>   iommu/arm-smmu: Refactor mmu-masters handling
+>   iommu/arm-smmu: Streamline SMMU data lookups
+>   iommu/arm-smmu: Add a stream map entry iterator
+>   iommu/arm-smmu: Intelligent SMR allocation
+>   iommu/arm-smmu: Convert to iommu_fwspec
+>   Docs: dt: document ARM SMMU generic binding usage
+>   iommu/arm-smmu: Wire up generic configuration support
+>   iommu/arm-smmu: Set domain geometry
+>   iommu/dma: Add support for mapping MSIs
+>   iommu/dma: Avoid PCI host bridge windows
+> 
+>  .../devicetree/bindings/iommu/arm,smmu-v3.txt      |   8 +-
+>  .../devicetree/bindings/iommu/arm,smmu.txt         |  63 +-
+>  .../devicetree/bindings/pci/pci-iommu.txt          | 171 ++++
+>  arch/arm64/mm/dma-mapping.c                        |   2 +-
+>  drivers/gpu/drm/exynos/exynos_drm_iommu.h          |   2 +-
+>  drivers/iommu/Kconfig                              |   2 +-
+>  drivers/iommu/arm-smmu-v3.c                        | 386 +++++----
+>  drivers/iommu/arm-smmu.c                           | 962 ++++++++++-----------
+>  drivers/iommu/dma-iommu.c                          | 161 +++-
+>  drivers/iommu/iommu.c                              |  56 ++
+>  drivers/iommu/of_iommu.c                           |  52 +-
+>  drivers/irqchip/irq-gic-v2m.c                      |   3 +
+>  drivers/irqchip/irq-gic-v3-its.c                   |   3 +
+>  drivers/of/irq.c                                   |  78 +-
+>  drivers/of/of_pci.c                                | 102 +++
+>  include/linux/device.h                             |   3 +
+>  include/linux/dma-iommu.h                          |  12 +-
+>  include/linux/iommu.h                              |  38 +
+>  include/linux/of_pci.h                             |  10 +
+>  19 files changed, 1323 insertions(+), 791 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/pci-iommu.txt
+> 
 
-How compatible is PX3 with RK3188? It is a separate SoC product:
 
-http://www.rock-chips.com/a/en/products/rkpower/2015/1125/730.html
 
-Wondering whether or not to drop the third compatible string.
-
-> +
->  - Radxa Rock2 Square board:
->      Required root node properties:
->        - compatible = "radxa,rock2-square", "rockchip,rk3288";
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index faacd52..88d27a2 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -620,6 +620,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->  	rk3066a-marsboard.dtb \
->  	rk3066a-rayeager.dtb \
->  	rk3188-radxarock.dtb \
-> +	rk3188-px3-evb.dtb \
-
-Affects file naming as well: px3-evb.dtb?
-
->  	rk3228-evb.dtb \
->  	rk3229-evb.dtb \
->  	rk3288-evb-act8846.dtb \
-> diff --git a/arch/arm/boot/dts/rk3188-px3-evb.dts b/arch/arm/boot/dts/rk3188-px3-evb.dts
-> new file mode 100644
-> index 0000000..f6bc738
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rk3188-px3-evb.dts
-> @@ -0,0 +1,337 @@
-> +/*
-> + * Copyright (c) 2016 Andy Yan <andy.yan@rock-chips.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include <dt-bindings/input/input.h>
-> +#include "rk3188.dtsi"
-
-I'm surprised there is no [rk3188-]px3.dtsi here! Surely some automotive
-vendor may design their own board with it and should have at least the
-two trailing compatible strings pre-set.
-
-> +
-> +/ {
-> +	model = "Rockchip PX3-EVB";
-> +	compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
-> +
-> +	chosen {
-> +		stdout-path = "serial2:115200n8";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x60000000 0x80000000>;
-> +	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		autorepeat;
-> +
-> +		power {
-> +			gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
-> +			linux,code = <KEY_POWER>;
-> +			label = "GPIO Key Power";
-> +			linux,input-type = <1>;
-> +			wakeup-source;
-> +			debounce-interval = <100>;
-> +		};
-> +	};
-> +
-> +	vcc_sys: vsys-regulator {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vsys";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-boot-on;
-> +	};
-> +};
-> +
-> +&cpu0 {
-> +	cpu0-supply = <&vdd_cpu>;
-> +};
-> +
-> +&i2c0 {
-> +	status = "okay";
-> +
-> +	 /* Accelerometer */
-
-Space after tab intentional?
-
-> +	bma250 at 18 {
-> +		compatible = "bosch,bma250";
-> +		reg = <0x18>;
-> +		interrupt-parent = <&gpio0>;
-> +		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
-> +	};
-> +
-> +	stk3410 at 48 {
-> +		compatible = "sensortek,STK3310";
-> +		reg = <0x48>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
-> +	};
-
-Generally it is undesired to repeat the compatible name as node name -
-did you compare other .dts files? (e.g., accelerometer at 18 would be
-self-documenting) If this is a copy from an existing .dts then please
-ignore this comment.
-
-> +};
-> +
-> +&i2c1 {
-> +	status = "okay";
-> +	clock-frequency = <400000>;
-
-Insert white line?
-
-> +	rk808: pmic at 1c {
-> +		compatible = "rockchip,rk818";
-> +		reg = <0x1c>;
-> +		interrupt-parent = <&gpio0>;
-> +		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
-> +		rockchip,system-power-controller;
-> +		wakeup-source;
-> +		#clock-cells = <1>;
-> +		clock-output-names = "xin32k", "rk808-clkout2";
-> +
-> +		vcc1-supply = <&vcc_sys>;
-> +		vcc2-supply = <&vcc_sys>;
-> +		vcc3-supply = <&vcc_sys>;
-> +		vcc4-supply = <&vcc_sys>;
-> +		vcc6-supply = <&vcc_sys>;
-> +		vcc7-supply = <&vcc_sys>;
-> +		vcc8-supply = <&vcc_io>;
-> +		vcc9-supply = <&vcc_io>;
-> +
-> +		regulators {
-> +			vdd_cpu: DCDC_REG1 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <750000>;
-> +				regulator-max-microvolt = <1350000>;
-> +				regulator-name = "vdd_arm";
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			vdd_gpu: DCDC_REG2 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <850000>;
-> +				regulator-max-microvolt = <1250000>;
-> +				regulator-name = "vdd_gpu";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <1000000>;
-> +				};
-> +			};
-> +
-> +			vcc_ddr: DCDC_REG3 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-name = "vcc_ddr";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +				};
-> +			};
-> +
-> +			vcc_io: DCDC_REG4 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc_io";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <3300000>;
-> +				};
-> +			};
-> +
-> +			vcc_cif: LDO_REG1 {
-> +				 regulator-min-microvolt = <3300000>;
-> +				 regulator-max-microvolt = <3300000>;
-> +				 regulator-name = "vcc_cif";
-> +			};
-> +
-> +			vcc_jetta33: LDO_REG2 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc_jetta33";
-> +			};
-> +
-> +			vdd_10: LDO_REG3 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1000000>;
-> +				regulator-name = "vdd_10";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <1000000>;
-> +				};
-> +			};
-> +
-> +			lvds_12: LDO_REG4 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-name = "lvds_12";
-> +			};
-> +
-> +			lvds_25: LDO_REG5 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "lvds_25";
-> +			};
-> +
-> +			cif_18: LDO_REG6 {
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1000000>;
-> +				regulator-name = "cif_18";
-> +			};
-> +
-> +			vcc_sd: LDO_REG7 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc_sd";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <3300000>;
-> +				};
-> +			};
-> +
-> +			wl_18: LDO_REG8 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "wl_18";
-> +			};
-> +
-> +			lcd_33: SWITCH_REG1 {
-> +				regulator-name = "lcd_33";
-> +			};
-> +		};
-> +	};
-> +
-> +};
-> +
-> +&i2c2 {
-> +	gsl1680: touchscreen at 40 {
-> +		compatible = "silead,gsl1680";
-> +		reg = <0x40>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
-> +		power-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
-> +		touchscreen-size-x = <800>;
-> +		touchscreen-size-y = <1280>;
-> +		silead,max-fingers = <5>;
-> +	};
-> +};
-> +
-> +&emmc {
-> +	bus-width = <8>;
-> +	cap-mmc-highspeed;
-> +	disable-wp;
-> +	non-removable;
-> +	num-slots = <1>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_rst>;
-> +	status = "okay";
-> +};
-> +
-> +&mmc0 {
-> +	num-slots = <1>;
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sd0_clk>, <&sd0_cmd>, <&sd0_cd>, <&sd0_bus4>;
-> +	vmmc-supply = <&vcc_sd>;
-> +
-> +	bus-width = <4>;
-> +	cap-mmc-highspeed;
-> +	cap-sd-highspeed;
-> +	disable-wp;
-> +};
-> +
-> +&pwm1 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm2 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm3 {
-> +	status = "okay";
-> +};
-> +
-> +&pinctrl {
-> +	pcfg_output_low: pcfg-output-low {
-> +		output-low;
-> +	};
-> +
-> +	usb {
-> +		host_vbus_drv: host-vbus-drv {
-> +			rockchip,pins = <0 3 RK_FUNC_GPIO &pcfg_pull_none>;
-> +		};
-> +		otg_vbus_drv: otg-vbus-drv {
-> +			rockchip,pins = <2 31 RK_FUNC_GPIO &pcfg_pull_none>;
-> +		};
-> +	};
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	status = "okay";
-> +};
-> +
-> +&uart3 {
-> +	status = "okay";
-> +};
-> +
-> +&usbphy {
-> +	status = "okay";
-> +};
-> +
-> +&usb_host {
-> +	status = "okay";
-> +};
-> +
-> +&usb_otg {
-> +	status = "okay";
-> +};
-> +
-> +&wdt {
-> +	status = "okay";
-> +};
-
-Otherwise formally looks fine.
-
-Cheers,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+-------------- next part --------------
+[    3.185447] CPU features: detected feature: 32-bit EL0 Support
+[    3.185455] CPU: All CPU(s) started at EL2
+[    3.185475] alternatives: patching kernel code
+[    3.188549] devtmpfs: initialized
+[    3.189484] SMBIOS 3.0.0 present.
+[    3.189570] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[    3.189750] pinctrl core: initialized pinctrl subsystem
+[    3.190113] NET: Registered protocol family 16
+[    3.205134] cpuidle: using governor menu
+[    3.205292] arm-smmu: deprecated "mmu-masters" DT property in use; DMA API support unavailable
+[    3.205319] arm-smmu e0600000.smmu: probing hardware configuration...
+[    3.205326] arm-smmu e0600000.smmu: SMMUv1 with:
+[    3.205334] arm-smmu e0600000.smmu: 	stage 2 translation
+[    3.205341] arm-smmu e0600000.smmu: 	non-coherent table walk
+[    3.205348] arm-smmu e0600000.smmu: 	(IDR0.CTTW overridden by dma-coherent property)
+[    3.205358] arm-smmu e0600000.smmu: 	stream matching with 32 register groups, mask 0x7fff
+[    3.205369] arm-smmu e0600000.smmu: 	8 context banks (8 stage-2 only)
+[    3.205377] arm-smmu e0600000.smmu: 	Supported page sizes: 0x60211000
+[    3.205384] arm-smmu e0600000.smmu: 	Stage-2: 40-bit IPA -> 40-bit PA
+[    3.205489] arm-smmu: deprecated "mmu-masters" DT property in use; DMA API support unavailable
+[    3.205512] arm-smmu e0800000.smmu: probing hardware configuration...
+[    3.205519] arm-smmu e0800000.smmu: SMMUv1 with:
+[    3.205525] arm-smmu e0800000.smmu: 	stage 2 translation
+[    3.205533] arm-smmu e0800000.smmu: 	non-coherent table walk
+[    3.205539] arm-smmu e0800000.smmu: 	(IDR0.CTTW overridden by dma-coherent property)
+[    3.205550] arm-smmu e0800000.smmu: 	stream matching with 32 register groups, mask 0x7fff
+[    3.205560] arm-smmu e0800000.smmu: 	8 context banks (8 stage-2 only)
+[    3.205567] arm-smmu e0800000.smmu: 	Supported page sizes: 0x60211000
+[    3.205574] arm-smmu e0800000.smmu: 	Stage-2: 40-bit IPA -> 40-bit PA
+[    3.205670] arm-smmu: deprecated "mmu-masters" DT property in use; DMA API support unavailable
+[    3.205692] arm-smmu e0a00000.smmu: probing hardware configuration...
+[    3.205699] arm-smmu e0a00000.smmu: SMMUv1 with:
+[    3.205705] arm-smmu e0a00000.smmu: 	stage 2 translation
+[    3.205712] arm-smmu e0a00000.smmu: 	non-coherent table walk
+[    3.205719] arm-smmu e0a00000.smmu: 	(IDR0.CTTW overridden by dma-coherent property)
+[    3.205729] arm-smmu e0a00000.smmu: 	stream matching with 32 register groups, mask 0x7fff
+[    3.205738] arm-smmu e0a00000.smmu: 	8 context banks (8 stage-2 only)
+[    3.205745] arm-smmu e0a00000.smmu: 	Supported page sizes: 0x60211000
+[    3.205752] arm-smmu e0a00000.smmu: 	Stage-2: 40-bit IPA -> 40-bit PA
+[    3.205801] vdso: 2 pages (1 code @ ffff0000088c6000, 1 data @ ffff000008dd4000)
+[    3.205814] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[    3.206098] DMA: preallocated 256 KiB pool for atomic allocations
+[    3.206186] Serial: AMBA PL011 UART driver
+[    3.207040] e1010000.serial: ttyAMA0 at MMIO 0xe1010000 (irq = 20, base_baud = 0) is a PL011 rev3
+[    3.995110] console [ttyAMA0] enabled
+[    3.999198] OF: amba_device_add() failed (-19) for /smb/gpio at e0020000
+[    4.006287] iommu: Adding device e0700000.xgmac to group 0
+[    4.027943] HugeTLB registered 2 MB page size, pre-allocated 0 pages
+[    4.034596] ACPI: Interpreter disabled.
+[    4.038537] Unable to handle kernel paging request at virtual address ffffff8030010000
+[    4.046452] pgd = ffff000008f61000
+[    4.049845] [ffffff8030010000] *pgd=0000000000000000
+[    4.054807] Internal error: Oops: 96000004 [#1] PREEMPT SMP
+[    4.060371] Modules linked in:
+[    4.063419] CPU: 3 PID: 1 Comm: swapper/0 Not tainted 4.8.0-rc4-26782-g83cf8c5 #14
+[    4.070982] Hardware name: Default string Default string/Default string, BIOS WOD5527X 05/25/2015
+[    4.079846] task: ffff8003ec108000 task.stack: ffff8003ec110000
+[    4.085761] PC is at __arm_v7s_map+0x1cc/0x378
+[    4.090196] LR is at __arm_v7s_map+0xb4/0x378
+[    4.094543] pc : [<ffff000008522604>] lr : [<ffff0000085224ec>] pstate: 20000045
+[    4.101931] sp : ffff8003ec113bf0
+[    4.105236] x29: ffff8003ec113bf0 x28: 0000000000001000 
+[    4.110543] x27: ffffff8030010000 x26: ffff8003eb47e518 
+[    4.115850] x25: 0000000000000001 x24: ffffff8030010004 
+[    4.121155] x23: 000000000000000c x22: ffff8003eb47e500 
+[    4.126461] x21: 0000000000001000 x20: 0000000000000000 
+[    4.131767] x19: ffffff8030010000 x18: 000000000000000e 
+[    4.137072] x17: 00000000000040ff x16: 0000000000000000 
+[    4.142379] x15: 000000000000008c x14: 0000000000000006 
+[    4.147684] x13: 0000000000000007 x12: 0000000000000020 
+[    4.152990] x11: 0000000000000003 x10: ffff000008dd6000 
+[    4.158295] x9 : 0000000000000004 x8 : 0000000000000e71 
+[    4.163601] x7 : ffffff8030010000 x6 : ffffff8030010000 
+[    4.168907] x5 : 0000000000000002 x4 : 0000000000000000 
+[    4.174212] x3 : 0000000000000001 x2 : 0000000000000001 
+[    4.179518] x1 : 0000000000000e7d x0 : 0000000000000004 
+[    4.184824] 
+[    4.186306] Process swapper/0 (pid: 1, stack limit = 0xffff8003ec110020)
+[    4.192998] Stack: (0xffff8003ec113bf0 to 0xffff8003ec114000)
+[    4.198735] 3be0:                                   ffff8003ec113c70 ffff0000085224ec
+[    4.206558] 3c00: 0000000000001000 0000000000000000 0000000000000000 ffff8003eb47e500
+[    4.214381] 3c20: 0000000000000014 0000000000001000 0000000000000000 ffff8003eb47e518
+[    4.222203] 3c40: ffff800030008000 0000000000001000 0000000000000000 ffff8003eb47e518
+[    4.230026] 3c60: ffff8003ec113c70 ffffff8030010000 ffff8003ec113cf0 ffff0000085227f8
+[    4.237848] 3c80: ffff8003eb47e568 0000000000001000 0000000000000000 000000000000002a
+[    4.245671] 3ca0: 0000000000000001 0000000000001000 0000000000000001 ffff8003ec113d88
+[    4.253493] 3cc0: ffff8003ec113d80 0000000000001000 0000000000000002 000000000000000f
+[    4.261315] 3ce0: ffff800030010000 ffff000008bc2520 ffff8003ec113d20 ffff000008d0036c
+[    4.269137] 3d00: ffff8003eb47e568 000000000000000c 0000000000000000 000000000000002a
+[    4.276960] 3d20: ffff8003ec113dd0 ffff00000808335c ffff000008d0019c ffff8003ec110000
+[    4.284782] 3d40: 0000000000000000 ffff000008f1c000 ffff000008cc0498 ffff000008cad0a0
+[    4.292605] 3d60: ffff000008d2ab20 ffff000008f1c000 0000000000000109 0000000000000000
+[    4.300427] 3d80: 0000000000000001 0000000001111000 0000002000000020 ffff000008e750b0
+[    4.308249] 3da0: 0000000000000000 000000003000806a 4000400000000020 00000000800b8204
+[    4.316072] 3dc0: 0000000000000000 0000000000000000 ffff8003ec113e40 ffff000008cc0d54
+[    4.323894] 3de0: ffff000008d95df0 ffff000008d2aa70 0000000000000004 ffff000008f1c000
+[    4.331717] 3e00: ffff8003ec113e00 ffff000008ef8f38 0000000000000000 0000000400000004
+[    4.339539] 3e20: ffff000008ef8ec0 0000000000000000 ffff000008cc0498 ffff000008cad0a0
+[    4.347361] 3e40: ffff8003ec113ea0 ffff0000088a7f88 ffff0000088a7f78 0000000000000000
+[    4.355183] 3e60: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.363006] 3e80: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.370828] 3ea0: 0000000000000000 ffff000008082e90 ffff0000088a7f78 0000000000000000
+[    4.378650] 3ec0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.386473] 3ee0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.394295] 3f00: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.402117] 3f20: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.409940] 3f40: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.417762] 3f60: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.425584] 3f80: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.433406] 3fa0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.441229] 3fc0: 0000000000000000 0000000000000005 0000000000000000 0000000000000000
+[    4.449051] 3fe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[    4.456873] Call trace:
+[    4.459310] Exception stack(0xffff8003ec113a20 to 0xffff8003ec113b50)
+[    4.465742] 3a20: ffffff8030010000 0001000000000000 ffff8003ec113bf0 ffff000008522604
+[    4.473565] 3a40: 0000000002088021 ffff8003eb47e518 ffff8003fff4db00 ffff8003ffe81400
+[    4.481388] 3a60: ffff000008dd5000 0208802100008001 0000000000000000 0000000000000000
+[    4.489210] 3a80: ffff8003ec113b80 ffff00000820247c 0000000000000040 0000000000000000
+[    4.497032] 3aa0: ffff8003ec110000 0000000000000003 0000000002088021 ffff000008521cbc
+[    4.504854] 3ac0: 0000000000000004 0000000000000e7d 0000000000000001 0000000000000001
+[    4.512677] 3ae0: 0000000000000000 0000000000000002 ffffff8030010000 ffffff8030010000
+[    4.520499] 3b00: 0000000000000e71 0000000000000004 ffff000008dd6000 0000000000000003
+[    4.528321] 3b20: 0000000000000020 0000000000000007 0000000000000006 000000000000008c
+[    4.536143] 3b40: 0000000000000000 00000000000040ff
+[    4.541012] [<ffff000008522604>] __arm_v7s_map+0x1cc/0x378
+[    4.546489] [<ffff0000085224ec>] __arm_v7s_map+0xb4/0x378
+[    4.551879] [<ffff0000085227f8>] arm_v7s_map+0x48/0xc4
+[    4.557010] [<ffff000008d0036c>] arm_v7s_do_selftests+0x1d0/0x4b4
+[    4.563096] [<ffff00000808335c>] do_one_initcall+0x38/0x12c
+[    4.568662] [<ffff000008cc0d54>] kernel_init_freeable+0x1a8/0x24c
+[    4.574748] [<ffff0000088a7f88>] kernel_init+0x10/0xfc
+[    4.579878] [<ffff000008082e90>] ret_from_fork+0x10/0x40
+[    4.585181] Code: aa1b03f3 8b180378 f9003fa7 710004bf (b9400266) 
+[    4.591280] ---[ end trace d091d1618c2826ea ]---
+[    4.595897] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+[    4.595897] 
+[    4.605024] SMP: stopping secondary CPUs
+[    4.608942] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+[    4.608942] 
