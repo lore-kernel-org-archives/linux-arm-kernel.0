@@ -1,27 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 13 Sep 2016 13:38:34 +0200
-Subject: [PATCH v2 1/2] pinctrl: meson-gxbb: add the missing SDIO
- interrupt pin
-In-Reply-To: <20160911123903.20027-2-martin.blumenstingl@googlemail.com>
-References: <20160828164725.19429-1-martin.blumenstingl@googlemail.com>
- <20160911123903.20027-1-martin.blumenstingl@googlemail.com>
- <20160911123903.20027-2-martin.blumenstingl@googlemail.com>
-Message-ID: <CACRpkdaRzbVuK2SPGLf9UwFJXq28iU3pRzo9ozaxAB-Nop9GKQ@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 13 Sep 2016 06:38:43 -0500
+Subject: [PATCH v11 5/8] clocksource/drivers/arm_arch_timer: Simplify ACPI
+ support code.
+In-Reply-To: <CADyBb7v-b1bKGBdH6J78UhfCcQd=BJLFoZ16GNgmrd2EucjYDA@mail.gmail.com>
+References: <1473168352-5156-1-git-send-email-fu.wei@linaro.org>
+ <1473168352-5156-6-git-send-email-fu.wei@linaro.org>
+ <alpine.DEB.2.20.1609061635000.5647@nanos>
+ <CADyBb7uX79UP=mUxvP-EPGi56-46y2SCMPsWO=Uw-=N0GQERhA@mail.gmail.com>
+ <CADyBb7v-b1bKGBdH6J78UhfCcQd=BJLFoZ16GNgmrd2EucjYDA@mail.gmail.com>
+Message-ID: <57D7E543.3060301@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 11, 2016 at 2:39 PM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
+Fu Wei wrote:
+> I have prepared v12 (rebase to rc6 and on the top of IORT v11),
+> should I send it now
 
-> This adds the SDIO interrupt pin which can be used by sd_emmc_a.
->
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Suggested-by: Neil Armstrong <narmstrong@baylibre.com>
->
-> Fixes: 29885a656511 ("pinctrl: meson-gxbb: add the pins for the
-> SDIO/sd_emmc_a controller")
+Yes.
 
-Patch applied with Kevin's ACK.
+Please don't wait to release new versions of your patches.  Time is 
+running out to get these into 4.9.
 
-Yours,
-Linus Walleij
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
