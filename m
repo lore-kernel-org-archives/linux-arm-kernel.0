@@ -1,43 +1,85 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 13 Sep 2016 10:31:07 +0100
-Subject: [PATCH v9 00/19] Add support for FDMA DMA controller and slim
- core rproc found on STi chipsets
-In-Reply-To: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
-References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160913093107.GA10953@griffinp-ThinkPad-X1-Carbon-2nd>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Tue, 13 Sep 2016 09:34:16 +0000
+Subject: [PATCH V5 0/6] thermal: bcm2835: add thermal driver
+Message-ID: <1473759262-27031-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod & Bjorn,
+From: Martin Sperl <kernel@martin.sperl.org>
 
-[..]
+Add a thermal driver for the TSENSE device of the bcm2835/6/7 SOC.
 
-On Mon, 05 Sep 2016, Peter Griffin wrote:
+If the firmware enables the HW, then the configuration is not touched.
+In case the firmware has not enabled the device, then we try to set
+it up correctly (which unfortunately can not get tested).
 
-> v8 actions some review feedback from Bjorn to the slim rproc driver, and also includes
-> a patch which fixes a recursive Kconfig error which is triggered when st_fdma selects
-> slim_rproc driver. The series has also been rebased on v4.8-rc3.
-> 
-> v9 actions some review feedback from Bjorn, Lee and Vinod. See below. Importantly a bug
-> was found during testing now that the platform boots without clk_ignore_unused parameter
-> whereby the clocks would not be enabled properly before firmware loading was attempted.
-> 
-> regards,
-> 
-> Peter.
-> 
-> Changes since v8:
->  - Add MODULE_ALIAS (Vinod)
->  - devm_kzalloc to devm_kcalloc (Vinod)
->  - quisce tasklet initialised by vchan_init() (Vinod)
->  - Don't make SLIM rproc user selectable (Bjorn)
->  - slim_rproc: Ensure clocks enabled before firmware load (Peter)
->  - Various code style nits / commit message change (Lee)
->  - Separate patch for '\n' kconfig removal (Vinod)
+It exposes temperature and a critical trip point
+(using a hardcoded default of 80C or the temperature configured
+in the control register by the firmware, which reads as
+407C currently)
 
-I hate to send a ping, but do you think we can merge this fdma series? It has gone
-through quite a few review rounds now.
+The calibrations are (potentially) different for bcm2835, bcm2836
+and bcm2837 and can get selected by the compatible property
+in the device tree.
 
-regards,
+The driver also exposes the registers via debugfs.
 
-Peter.
+Possible future enhancements:
+* the device has the ability to trigger interrupts on reaching
+  the programmed critical temperature.
+  I have no knowledge which interrupt could be responsible
+  for this on the ARM side, so if we get to know which irq
+  it is we can implement that.
+  Instead the driver right now implements polling in 1 second intervals
+* the device can also reset the HW after the trip point
+  has been reached (also with some delay, so that corrective
+  actions can get taken) - this is currently not enabled by the
+  firmware, but could.
+* we could define more trip points for THERMAL_TRIP_HOT
+* make the trip point limits modifiable (ops.set_trip_temp)
+
+Note:
+  No support for 32-bit arm bcm2837, as there is no
+  arch/arm/boot/dts/bcm2836.dtsi upstream as of now.
+  64-bit arm support is not tested
+
+Changelog:
+ V1 -> V2: renamed dt-binding documentation file
+       	   added specific settings depending on compatible
+	   added trip point based on register
+	   setting up ctrl-register if HW is not enabled by firmware
+	     as per recommendation of Eric (untested)
+	   check that clock frequency is in range
+	     (1.9 - 5MHz - as per comment in clk-bcm2835.c)
+ 	   added driver to multi_v7_defconfig
+ V2 -> V3: made a module in multi_v7_defconfig
+           fixed typo in dt-binding document
+ V3 -> V4: moved driver back to thermal (not using bcm sub-directory)
+       	   set polling interval to 1second (was 0ms, so interrupt driven)
+ V4 -> V5: use correct compatiblity for different soc versions in dt
+       	   support ARM64 for bcm2837 in devicetree and defconfig
+
+Martin Sperl (6):
+  dt: bindings: add thermal device driver for bcm2835
+  thermal: bcm2835: add thermal driver for bcm2835 soc
+  ARM: bcm2835: dts: add thermal node to device-tree of bcm283x
+  ARM64: bcm2835: dts: add thermal node to device-tree of bcm2837
+  ARM: bcm2835: add thermal driver to default_config
+  ARM64: bcm2835: add thermal driver to default_config
+
+ .../bindings/thermal/brcm,bcm2835-thermal.txt      |  17 ++
+ arch/arm/boot/dts/bcm2835.dtsi                     |   6 +
+ arch/arm/boot/dts/bcm2836.dtsi                     |   6 +
+ arch/arm/boot/dts/bcm283x.dtsi                     |   7 +
+ arch/arm/configs/bcm2835_defconfig                 |   2 +
+ arch/arm64/boot/dts/broadcom/bcm2837.dtsi          |   6 +
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/thermal/Kconfig                            |   5 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/bcm2835_thermal.c                  | 327 +++++++++++++++++++++
+ 10 files changed, 378 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/brcm,bcm2835-thermal.txt
+ create mode 100644 drivers/thermal/bcm2835_thermal.c
+
+--
+2.1.4
