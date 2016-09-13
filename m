@@ -1,70 +1,85 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 13 Sep 2016 16:55:04 +0800
-Subject: [PATCH v8 6/9] drm/mediatek: add dsi interrupt control
-In-Reply-To: <1473681672-47144-7-git-send-email-yt.shen@mediatek.com>
-References: <1473681672-47144-1-git-send-email-yt.shen@mediatek.com>
- <1473681672-47144-7-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1473756904.28437.32.camel@mtksdaap41>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 13 Sep 2016 09:57:04 +0100
+Subject: [PATCH 1/3] arm64: alternative: add auto-nop infrastructure
+In-Reply-To: <CAKv+Gu-KHePVj3gs+Q0wfgkVrD0nB0Yi+xLdbnGz-YZTTsPxFw@mail.gmail.com>
+References: <1473242830-26246-1-git-send-email-mark.rutland@arm.com>
+ <1473242830-26246-2-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu-KHePVj3gs+Q0wfgkVrD0nB0Yi+xLdbnGz-YZTTsPxFw@mail.gmail.com>
+Message-ID: <20160913085704.GC19689@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+On Tue, Sep 13, 2016 at 09:36:14AM +0100, Ard Biesheuvel wrote:
+> On 7 September 2016 at 11:07, Mark Rutland <mark.rutland@arm.com> wrote:
+> > In some cases, one side of an alternative sequence is simply a number of
+> > NOPs used to balance the other side. Keeping track of this manually is
+> > tedious, and the presence of large chains of NOPs makes the code more
+> > painful to read than necessary.
+> >
+> > To ameliorate matters, this patch adds a new alternative_else_nop_endif,
+> > which automatically balances an alternative sequence with a trivial NOP
+> > sled.
+> >
+> > In many cases, we would like a NOP-sled in the default case, and
+> > instructions patched in in the presence of a feature. To enable the NOPs
+> > to be generated automatically for this case, this patch also adds a new
+> > alternative_if, and updates alternative_else and alternative_endif to
+> > work with either alternative_if or alternative_endif.
 
-On Mon, 2016-09-12 at 20:01 +0800, YT Shen wrote:
-> From: shaoming chen <shaoming.chen@mediatek.com>
+[...]
+
+> > +/*
+> > + * Begin an alternative code sequence.
+> >   */
+> >  .macro alternative_if_not cap
+> > +       .set .Lasm_alt_mode, 0
 > 
-> add dsi interrupt control
-> 
-> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_dsi.c | 78 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 78 insertions(+)
-> 
+> Given that only a single copy of this symbol will exist in an object
+> file, is it still possible to use both variants in a single
+> compilation/assembly unit?
 
-[snip...]
+Yes.
 
->  
-> +static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
-> +{
-> +	u32 inten = DSI_INT_ALL_BITS;
-> +
-> +	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO)
-> +		inten &= ~(TE_RDY_INT_FLAG | EXT_TE_RDY_INT_FLAG);
-> +
-> +	writel(inten, dsi->regs + DSI_INTEN);
-> +}
-> +
+GAS allows the symbol to be set multiple times (so long as the
+assignments are constant values). The last assignment "wins" when it
+comes to output, but assembler macros are evaluated before this, and use
+the most recent assignment.
 
-[snip...]
+In testing I hacked __kvm_call_hyp to use both:
 
-> +
-> +static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
-> +{
-> +	struct mtk_dsi *dsi = dev_id;
-> +	u32 status, tmp;
-> +	u32 flag = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
+	ENTRY(__kvm_call_hyp)
+	alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+		str     lr, [sp, #-16]!
+		hvc     #0
+		ldr     lr, [sp], #16
+		ret
+	alternative_else_nop_endif
+	alternative_if ARM64_HAS_VIRT_HOST_EXTN
+		hvc     #0x539
+	alternative_else_nop_endif
+		b       __vhe_hyp_call
+	ENDPROC(__kvm_call_hyp)
 
-Why do you only process these three irq? You also enable TE_RDY_INT_FLAG
-& EXT_TE_RDY_INT_FLAG in mtk_dsi_set_interrupt_enable(). Process these
-two irq here or not enable them in mtk_dsi_set_interrupt_enable().
+Which, according to objdump gives me the expected result:
 
-Regards,
-CK
+	Disassembly of section .text:
 
-> +
-> +	status = readl(dsi->regs + DSI_INTSTA) & flag;
-> +
-> +	if (status) {
-> +		do {
-> +			mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
-> +			tmp = readl(dsi->regs + DSI_INTSTA);
-> +		} while (tmp & DSI_BUSY);
-> +
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
-> +		mtk_dsi_irq_data_set(dsi, status);
-> +		wake_up_interruptible(&dsi->irq_wait_queue);
-> +	}
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
+	0000000000000000 <__kvm_call_hyp>:
+	   0:   f81f0ffe        str     x30, [sp,#-16]!
+	   4:   d4000002        hvc     #0x0
+	   8:   f84107fe        ldr     x30, [sp],#16
+	   c:   d65f03c0        ret
+	  10:   d503201f        nop
+	  14:   14000000        b       0 <__vhe_hyp_call>
+
+	Disassembly of section .altinstr_replacement:
+
+	0000000000000000 <.altinstr_replacement>:
+	   0:   d503201f        nop
+	   4:   d503201f        nop
+	   8:   d503201f        nop
+	   c:   d503201f        nop
+	  10:   d400a722        hvc     #0x539
+
+Thanks,
+Mark.
