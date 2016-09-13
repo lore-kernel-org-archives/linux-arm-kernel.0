@@ -1,66 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 13 Sep 2016 12:56:57 +0200
-Subject: [PATCH v7 00/11] ARM, arm64: renesas: Enable UHS-I SDR-104
-Message-ID: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue, 13 Sep 2016 12:57:01 +0200
+Subject: [PATCH v7 04/11] ARM: dts: r8a7791: set maximum frequency for SDHI
+ clocks
+In-Reply-To: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
+References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1473764228-24768-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Define the upper limit otherwise the driver cannot utilize max speeds.
 
-this series enables SDHI UHS-I SDR-104 on:
-* r8a7790/lager
-* r8a7791/koelsch
-* r8a7794/alt
-* r8a7795/salvator-x
-* r8a7796/salvator-x
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7791.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-It is based on renesas-next-20160908-v4.8-rc1.
-
-
-For functional SDR-104 support the following dependencies are needed:
-* [PATCH v7 0/6] UHS-I SDR-104 support for sh_mobile_sdhi
-* [PATCH/RFT,v2,2/8] clk: renesas: r8a7796: Add SDIF clocks
-* [PATCH] pinctrl: sh-pfc: r8a7796: Add voltage switch operations for SDHI
-* [PATCH v2 0/3] pinctrl: sh-pfc: r8a779[14]: Implement voltage switching for SDHI
-
-To aid review the following git branches are provided:
-* This patchset:
-  https:://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/sdr104-integration-v7
-* This patch-set and above dependencies
-  https:://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/sdr104-v7
-
-Furthermore DMA support for R-Car Gen3 is need to achive higher
-transfer rates on the r8a7795 and r8a7796. For convenience a
-branch containing a merge of topic/sdr104-v7 (see above) and
-"[PATCH/RFC v3 0/6] mmc: renesas_sdhi: add R-Car Gen-3 DMA support"
-(rebased) is provided as:
-
-* https:://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/sdr104-v7+sdhi-dma-v3
-
-Simon Horman (10):
-  ARM: dts: lager: Enable UHS-I SDR-104
-  arm64: dts: r8a7795: salvator-x: Enable UHS-I SDR-104
-  ARM: dts: r8a7791: set maximum frequency for SDHI clocks
-  ARM: dts: koelsch: Enable UHS-I SDR-50 and SDR-104
-  ARM: dts: r8a7794: set maximum frequency for SDHI clocks
-  ARM: dts: alt: Enable UHS-I SDR-50 and SDR-104
-  arm64: dts: r8a7796: add SDHI nodes
-  arm64: dts: r8a7796: salvator-x: enable SDHI0 & 3
-  arm64: dts: r8a7796: salvator-x: enable UHS for SDHI 0 & 3
-  arm64: dts: r8a7796: salvator-x: Enable UHS-I SDR-104
-
-Wolfram Sang (1):
-  arm64: dts: r8a7795: salvator-x: enable UHS for SDHI 0 & 3
-
- arch/arm/boot/dts/r8a7790-lager.dts                |   1 +
- arch/arm/boot/dts/r8a7791-koelsch.dts              |  34 ++++++-
- arch/arm/boot/dts/r8a7791.dtsi                     |   3 +
- arch/arm/boot/dts/r8a7794-alt.dts                  |  23 ++++-
- arch/arm/boot/dts/r8a7794.dtsi                     |   3 +
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  24 ++++-
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 104 +++++++++++++++++++++
- arch/arm64/boot/dts/renesas/r8a7796.dtsi           |  42 +++++++++
- 8 files changed, 227 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 162b55c665a3..b07c799f72f2 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -584,6 +584,7 @@
+ 		dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
+ 		       <&dmac1 0xcd>, <&dmac1 0xce>;
+ 		dma-names = "tx", "rx", "tx", "rx";
++		max-frequency = <195000000>;
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+ 		status = "disabled";
+ 	};
+@@ -596,6 +597,7 @@
+ 		dmas = <&dmac0 0xc1>, <&dmac0 0xc2>,
+ 		       <&dmac1 0xc1>, <&dmac1 0xc2>;
+ 		dma-names = "tx", "rx", "tx", "rx";
++		max-frequency = <97500000>;
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+ 		status = "disabled";
+ 	};
+@@ -608,6 +610,7 @@
+ 		dmas = <&dmac0 0xd3>, <&dmac0 0xd4>,
+ 		       <&dmac1 0xd3>, <&dmac1 0xd4>;
+ 		dma-names = "tx", "rx", "tx", "rx";
++		max-frequency = <97500000>;
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+ 		status = "disabled";
+ 	};
 -- 
 2.7.0.rc3.207.g0ac5344
