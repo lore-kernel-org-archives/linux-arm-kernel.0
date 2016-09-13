@@ -1,167 +1,86 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue, 13 Sep 2016 18:39:03 +0800
-Subject: [PATCH v12 7/8] clocksource/drivers/arm_arch_timer: Add GTDT support
- for memory-mapped timer
-In-Reply-To: <1473763144-5653-1-git-send-email-fu.wei@linaro.org>
-References: <1473763144-5653-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1473763144-5653-8-git-send-email-fu.wei@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Sep 2016 11:44:31 +0100
+Subject: [PATCH v4 07/10] ARM: Introduce MPIDR_LEVEL_SHIFT macro
+In-Reply-To: <57D7D5C2.6020105@arm.com>
+References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
+ <1473691764-29424-8-git-send-email-vladimir.murzin@arm.com>
+ <20160913083855.GC5680@cbox> <57D7C111.7000405@arm.com>
+ <57D7D100.3040908@arm.com> <57D7D5C2.6020105@arm.com>
+Message-ID: <57D7D88F.805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On 13/09/16 11:32, Vladimir Murzin wrote:
+> On 13/09/16 11:12, Marc Zyngier wrote:
+>> On 13/09/16 10:04, Vladimir Murzin wrote:
+>>> On 13/09/16 09:38, Christoffer Dall wrote:
+>>>> On Mon, Sep 12, 2016 at 03:49:21PM +0100, Vladimir Murzin wrote:
+>>>>> vgic-v3 driver uses architecture specific MPIDR_LEVEL_SHIFT macro to
+>>>>> encode the affinity in a form compatible with ICC_SGI* registers.
+>>>>> Unfortunately, that macro is missing on ARM, so let's add it.
+>>>>>
+>>>>> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+>>>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>>>>> ---
+>>>>>  arch/arm/include/asm/cputype.h |    1 +
+>>>>>  1 file changed, 1 insertion(+)
+>>>>>
+>>>>> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+>>>>> index 1ee94c7..e2d94c1 100644
+>>>>> --- a/arch/arm/include/asm/cputype.h
+>>>>> +++ b/arch/arm/include/asm/cputype.h
+>>>>> @@ -55,6 +55,7 @@
+>>>>>  
+>>>>>  #define MPIDR_LEVEL_BITS 8
+>>>>>  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
+>>>>> +#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
+>>>>>  
+>>>>
+>>>> I'm not sure I follow the correctness of this completely.
+>>>>
+>>>> This is called from vgic_v3_dispatch_sgi, which takes a u64 value, which
+>>>> may have something in the Aff3 field, which we now shift left 24 bits,
+>>>> but that is not the Aff3 field of AArch32's MPIDR.
+>>>>
+>>>> What is the rationale for this making sense again?
+>>>
+>>> IIUC, in such case we construct mpidr which won't match in match_mpidr()
+>>> with the value we get from kvm_vcpu_get_mpidr_aff() and no SGI will be
+>>> sent to the guest.
+>>>
+>>> Since we get that u64 value from the guest, I'd think it is something
+>>> wrong is going on in the guest in case Aff3 is non-zero; however, we can
+>>> hide it by zeroing out SGI Aff3 bits in access_gic_sgi().
+>>
+>> I don't think zeroing Aff3 is the right move, as the spec doesn't say
+>> that Aff3 should be ignored in a write to ICC_SGI1R. On the other hand,
+>> the spec says (in the context of the target list): "If a bit is 1 and
+>> the bit does not correspond to a valid target PE, the bit must be
+>> ignored by the Distributor".
+>>
+>> This makes me think that, unless ICC_SGI1R.IMR is set, we should simply
+>> ignore that SGI because there is no way we can actually deliver it.
+>>
+>> Could you cook a small patch that would go on top of this series?
+> 
+> I assume you've meant ICC_SGI1R.IRM, aka broadcast. In this case,
 
-The patch add memory-mapped timer register support by using the information
-provided by the new GTDT driver of ACPI.
+Yes, sorry.
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
----
- drivers/clocksource/arm_arch_timer.c | 127 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 124 insertions(+), 3 deletions(-)
+> vgic_v3_dispatch_sgi() seems already matches the logic you've described:
+> 
+> - if IRM == 1, send to everyone except self without check for mpidr
+> - if IRM == 0, send to target iff matched to a valid mpidr
+> 
+> Am I missing something?
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 0197ef9..d33802b 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -888,7 +888,128 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
- 		       arch_timer_mem_init);
- 
- #ifdef CONFIG_ACPI_GTDT
--/* Initialize per-processor generic timer */
-+static struct gt_timer_data __init *arch_timer_mem_get_timer(
-+						struct gt_block_data *gt_blocks)
-+{
-+	struct gt_block_data *gt_block = gt_blocks;
-+	struct gt_timer_data *best_frame = NULL;
-+	void __iomem *cntctlbase;
-+	u32 cnttidr;
-+	int i;
-+
-+	/*
-+	 * According to ARMv8 Architecture Reference Manual(ARM),
-+	 * the size of CNTCTLBase frame of memory-mapped timer
-+	 * is SZ_4K(Offset 0x000 ? 0xFFF).
-+	 */
-+	cntctlbase = ioremap(gt_block->cntctlbase_phy, SZ_4K);
-+	if (!cntctlbase) {
-+		pr_err("Failed to map mem timer control frame base address\n");
-+		return NULL;
-+	}
-+	cnttidr = readl_relaxed(cntctlbase + CNTTIDR);
-+
-+	/*
-+	 * Try to find a virtual capable frame. Otherwise fall back to a
-+	 * physical capable frame.
-+	 */
-+	for (i = 0; i < gt_block->timer_count; i++) {
-+		int n;
-+		u32 cntacr;
-+
-+		n = gt_block->timer[i].frame_nr;
-+
-+		/* Try enabling everything, and see what sticks */
-+		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
-+			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
-+		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
-+		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
-+
-+		if ((cnttidr & CNTTIDR_VIRT(n)) &&
-+		    !(~cntacr & (CNTACR_RWVT | CNTACR_RVCT))) {
-+			best_frame = &gt_block->timer[i];
-+			arch_timer_mem_use_virtual = true;
-+			break;
-+		}
-+
-+		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
-+			continue;
-+
-+		best_frame = &gt_block->timer[i];
-+	}
-+	iounmap(cntctlbase);
-+
-+	return best_frame;
-+}
-+
-+static int __init arch_timer_mem_acpi_init(size_t timer_count)
-+{
-+	struct gt_block_data *gt_blocks;
-+	struct gt_timer_data *gt_timer;
-+	void __iomem *timer_cntbase;
-+	int ret = -EINVAL;
-+	int timer_irq;
-+
-+	/*
-+	 * If we don't have any Platform Timer Structures, just return.
-+	 */
-+	if (!timer_count)
-+		return 0;
-+
-+	/*
-+	 * before really check all the Platform Timer Structures,
-+	 * we assume they are GT block, and allocate memory for them.
-+	 * We will free these memory once we finish the initialization.
-+	 */
-+	gt_blocks = kcalloc(timer_count, sizeof(*gt_blocks), GFP_KERNEL);
-+	if (!gt_blocks)
-+		return -ENOMEM;
-+
-+	if (gtdt_arch_timer_mem_init(gt_blocks) > 0) {
-+		gt_timer = arch_timer_mem_get_timer(gt_blocks);
-+		if (!gt_timer) {
-+			pr_err("Failed to get mem timer info.\n");
-+			goto error;
-+		}
-+
-+		if (arch_timer_mem_use_virtual)
-+			timer_irq = gt_timer->virtual_irq;
-+		else
-+			timer_irq = gt_timer->irq;
-+		if (!timer_irq) {
-+			pr_err("Failed to get %s irq for mem timer.",
-+			       arch_timer_mem_use_virtual ? "virt" : "phys");
-+			goto error;
-+		}
-+
-+		/*
-+		 * According to ARMv8 Architecture Reference Manual(ARM),
-+		 * the size of CNTBaseN frames of memory-mapped timer
-+		 * is SZ_4K(Offset 0x000 ? 0xFFF).
-+		 */
-+		timer_cntbase = ioremap(gt_timer->cntbase_phy, SZ_4K);
-+		if (!timer_cntbase) {
-+			pr_err("Failed to map mem timer base address.\n");
-+			goto error;
-+		}
-+
-+		ret = arch_timer_mem_register(timer_cntbase, timer_irq);
-+		if (ret) {
-+			iounmap(timer_cntbase);
-+			pr_err("Failed to register mem timer.\n");
-+			goto error;
-+		}
-+
-+		arch_counter_base = timer_cntbase;
-+		arch_timers_present |= ARCH_MEM_TIMER;
-+	}
-+
-+error:
-+	kfree(gt_blocks);
-+	return ret;
-+}
-+
-+/* Initialize per-processor generic timer and memory-mapped timer(if present) */
- static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- {
- 	int timer_count;
-@@ -912,8 +1033,8 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	/* Get the frequency from CNTFRQ */
- 	arch_timer_detect_rate(NULL, NULL);
- 
--	if (timer_count < 0)
--		pr_err("Failed to get platform timer info.\n");
-+	if (timer_count < 0 || arch_timer_mem_acpi_init((size_t)timer_count))
-+		pr_err("Failed to initialize memory-mapped timer.\n");
- 
- 	return arch_timer_init();
- }
+Not much. My only ask was that if Aff3 was set, we could take the
+shortcut of not calling vgic_v3_dispatch_sgi() at all and return
+immediately. But as you said, we already deal with the case of invalid
+MPIDRs.
+
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
