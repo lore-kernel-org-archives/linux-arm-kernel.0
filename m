@@ -1,171 +1,53 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 13 Sep 2016 08:32:01 +0200
-Subject: [PATCH V6 2/5] PCI/ACPI: Check platform specific ECAM quirks
-In-Reply-To: <57D76626.1050109@huawei.com>
-References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <1473449047-10499-3-git-send-email-tn@semihalf.com>
- <57D76626.1050109@huawei.com>
-Message-ID: <bac9f822-ce0a-7070-94df-4d66fc30f774@semihalf.com>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Tue, 13 Sep 2016 08:34:38 +0200
+Subject: [PATCH v2 2/6] ARM: dts: bcm283x: Define standard pinctrl
+ groups in the gpio node.
+In-Reply-To: <103847685.101383.df740dd1-92f3-4978-9442-1f1b3a81e9da.open-xchange@email.1und1.de>
+References: <1473668576-22256-1-git-send-email-kraxel@redhat.com>
+ <1473668576-22256-3-git-send-email-kraxel@redhat.com>
+ <1273800480.83718.15854341-2f8e-4e20-95f4-e76f81e6fd56.open-xchange@email.1und1.de>
+ <103847685.101383.df740dd1-92f3-4978-9442-1f1b3a81e9da.open-xchange@email.1und1.de>
+Message-ID: <1473748478.11547.19.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liu,
+  Hi,
 
-On 13.09.2016 04:36, Dongdong Liu wrote:
-> Hi Tomasz
->
-> ? 2016/9/10 3:24, Tomasz Nowicki ??:
->> Some platforms may not be fully compliant with generic set of PCI config
->> accessors. For these cases we implement the way to overwrite CFG
->> accessors
->> set and configuration space range.
->>
->> In first place pci_mcfg_parse() saves machine's IDs and revision number
->> (these come from MCFG header) in order to match against known quirk
->> entries.
->> Then the algorithm traverses available quirk list (static array),
->> matches against <oem_id, oem_table_id, rev, domain, bus number range> and
->> returns custom PCI config ops and/or CFG resource structure.
->>
->> When adding new quirk there are two possibilities:
->> 1. Override default pci_generic_ecam_ops ops but CFG resource comes
->> from MCFG
->> { "OEM_ID", "OEM_TABLE_ID", <REV>, <DOMAIN>, <BUS_NR>, &foo_ops,
->> MCFG_RES_EMPTY },
->> 2. Override default pci_generic_ecam_ops ops and CFG resource. For
->> this case
->> it is also allowed get CFG resource from quirk entry w/o having it in
->> MCFG.
->> { "OEM_ID", "OEM_TABLE_ID", <REV>, <DOMAIN>, <BUS_NR>, &boo_ops,
->>    DEFINE_RES_MEM(START, SIZE) },
->>
->> pci_generic_ecam_ops and MCFG entries will be used for platforms
->> free from quirks.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->> ---
->>   drivers/acpi/pci_mcfg.c | 80
->> +++++++++++++++++++++++++++++++++++++++++++++----
->>   1 file changed, 74 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->> index ffcc651..2b8acc7 100644
->> --- a/drivers/acpi/pci_mcfg.c
->> +++ b/drivers/acpi/pci_mcfg.c
->> @@ -32,6 +32,59 @@ struct mcfg_entry {
->>       u8            bus_start;
->>       u8            bus_end;
->>   };
->> +struct mcfg_fixup {
->> +    char oem_id[ACPI_OEM_ID_SIZE + 1];
->> +    char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
->> +    u32 oem_revision;
->> +    u16 seg;
->> +    struct resource bus_range;
->> +    struct pci_ecam_ops *ops;
->> +    struct resource cfgres;
->> +};
->> +
->> +#define MCFG_DOM_ANY            (-1)
->> +#define MCFG_BUS_RANGE(start, end)    DEFINE_RES_NAMED((start),    \
->> +                        ((end) - (start) + 1),    \
->> +                        NULL, IORESOURCE_BUS)
->> +#define MCFG_BUS_ANY        MCFG_BUS_RANGE(0x0, 0xff)
->> +#define MCFG_RES_EMPTY        DEFINE_RES_NAMED(0, 0, NULL, 0)
->> +
->> +static struct mcfg_fixup mcfg_quirks[] = {
->> +/*    { OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, cfgres, ops }, */
->> +};
->> +
->> +static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
->> +static char mcfg_oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
->> +static u32 mcfg_oem_revision;
->> +
->> +static void pci_mcfg_match_quirks(struct acpi_pci_root *root,
->> +                  struct resource *cfgres,
->> +                  struct pci_ecam_ops **ecam_ops)
->> +{
->> +    struct mcfg_fixup *f;
->> +    int i;
->> +
->> +    /*
->> +     * First match against PCI topology <domain:bus> then use OEM ID,
->> OEM
->> +     * table ID, and OEM revision from MCFG table standard header.
->> +     */
->> +    for (i = 0, f = mcfg_quirks; i < ARRAY_SIZE(mcfg_quirks); i++,
->> f++) {
->> +        if (f->seg == root->segment &&
->
-> why not use MCFG_DOM_RANGE, I think MCFG_DOM_RANGE is better.
-> if drop MCFG_DOM_RANGE, mcfg_quirks[] will be more complex.
->
-> static struct mcfg_fixup mcfg_quirks[] = {
-> /*    { OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, cfgres, ops }, */
-> #ifdef CONFIG_PCI_HOST_THUNDER_ECAM
->     /* SoC pass1.x */
->     { "CAVIUM", "THUNDERX", 2, 0, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
->       MCFG_RES_EMPTY},
->     { "CAVIUM", "THUNDERX", 2, 1, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
->       MCFG_RES_EMPTY},
->     { "CAVIUM", "THUNDERX", 2, 2, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
->       MCFG_RES_EMPTY},
->     { "CAVIUM", "THUNDERX", 2, 3, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
->       MCFG_RES_EMPTY},
->     { "CAVIUM", "THUNDERX", 2, 10, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
->       MCFG_RES_EMPTY},
->     { "CAVIUM", "THUNDERX", 2, 11, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
->       MCFG_RES_EMPTY},
->     { "CAVIUM", "THUNDERX", 2, 12, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
->       MCFG_RES_EMPTY},
->     { "CAVIUM", "THUNDERX", 2, 13, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
->       MCFG_RES_EMPTY},
-> #endif
-> .....
-> };
->
-> As PATCH v5 we only need define mcfg_quirks as below, It looks better.
-> static struct pci_cfg_fixup mcfg_quirks[] __initconst = {
-> /*    { OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, pci_ops, init_hook
-> }, */
-> #ifdef CONFIG_PCI_HOST_THUNDER_PEM
->     /* Pass2.0 */
->     { "CAVIUM", "THUNDERX", 1, MCFG_DOM_RANGE(4, 9), MCFG_BUS_ANY, NULL,
->       thunder_pem_cfg_init },
->     { "CAVIUM", "THUNDERX", 1, MCFG_DOM_RANGE(14, 19), MCFG_BUS_ANY, NULL,
->       thunder_pem_cfg_init },
-> #endif
-> #ifdef CONFIG_PCI_HISI_ACPI
->     { "HISI  ", "HIP05   ", 0, MCFG_DOM_RANGE(0, 3), MCFG_BUS_ANY,
->       NULL, hisi_pcie_acpi_hip05_init},
->     { "HISI  ", "HIP06   ", 0, MCFG_DOM_RANGE(0, 3), MCFG_BUS_ANY,
->       NULL, hisi_pcie_acpi_hip06_init},
->     { "HISI  ", "HIP07   ", 0, MCFG_DOM_RANGE(0, 15), MCFG_BUS_ANY,
->       NULL, hisi_pcie_acpi_hip07_init},
-> #endif
-> };
+> > > +			emmc_gpio48: emmc_gpio48 {
+> > > +				brcm,pins = <48 49 50 51 52 53>;
+> > > +				brcm,function = <BCM2835_FSEL_ALT3>;
+> > > +			};
+> > 
+> > Sorry, i didn't notice this before. The naming of these groups suggest 3 muxes
+> > for the same eMMC interface. I thought there is a eMMC interface and a SD host
+> > interface with different DMA channels.
+> > 
+> > > +
+> > > ...
+> > > +
+> > > +			sdhost_gpio48: sdhost_gpio48 {
+> > > +				brcm,pins = <48 49 50 51 52 53>;
+> > > +				brcm,function = <BCM2835_FSEL_ALT0>;
+> > > +			};
+> > 
+> > I think this incorrect. There is no function ALT0 for these pins, only ALT3.
+> 
+> please forget my last 2 comments. According to this page [1] eMMC is selected by
+> ALT3 and sdhost is selected by ALT0.
+> 
+> Do you know a reliable source where all muxes for both interface are documented?
+> The datasheet isn't very helpful here.
 
-Note this series disallow hisi_pcie_acpi_hip07_init() call. According to 
-the Bjorn suggestion I rework quirk code to override ops and CFG 
-resources only. Giving that I do not see the way to use MCFG_DOM_RANGE 
-macro. For HISI you would need to get CFG range for each possible case:
+No, I don't know any source better than the datasheet @ github.
+Yes, I tried to double-check things with the sheet too.
 
-#ifdef CONFIG_PCI_HISI_ACPI
-     { "HISI  ", "HIP05   ", 0, 0, MCFG_BUS_ANY, &hisi_pcie_ops,
-	  DEFINE_RES_MEM(start0, size0)},
-     { "HISI  ", "HIP05   ", 0, 1, MCFG_BUS_ANY, &hisi_pcie_ops,
-	  DEFINE_RES_MEM(start1, size1)},
-     { "HISI  ", "HIP05   ", 0, 2, MCFG_BUS_ANY, &hisi_pcie_ops,
-	  DEFINE_RES_MEM(start2, size2)},
-     { "HISI  ", "HIP05   ", 0, 3, MCFG_BUS_ANY, &hisi_pcie_ops,
-	  DEFINE_RES_MEM(start3, size3)},
-[...]
-#endif
+IIRC Eric mentioned a while back in some mail or patch that he checked
+something for the rpi device tree with non-public docs, not fully sure
+though whenever it was emmc/sdhost or something else.  But I'm basically
+trusting Eric here ...
 
-Indeed there are more entries here but you do not have to define the 
-same resource array in driver.
+cheers,
+  Gerd
 
-Thanks,
-Tomasz
+PS: This is exactly why I think it us useful to have all those entries
+    in the dt file even if unused:  To serve as documentation.
