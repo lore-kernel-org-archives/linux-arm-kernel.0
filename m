@@ -1,87 +1,67 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 13 Sep 2016 11:07:45 +0200
-Subject: [PATCH 1/5] clk: add support for runtime pm
-In-Reply-To: <20160912223105.GI7243@codeaurora.org>
-References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
- <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
- <20160908001943.GC13062@codeaurora.org>
- <CGME20160912101857eucas1p29b2bbd5ac0eda92284091ad1b86decc4@eucas1p2.samsung.com>
- <f18fee35-cb5d-abce-0415-a98b58e3a302@samsung.com>
- <20160912223105.GI7243@codeaurora.org>
-Message-ID: <e3cceb9a-7a30-c662-dba4-bc453f6fddb6@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Sep 2016 11:09:53 +0200
+Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
+In-Reply-To: <1975640.ctuo4Obpao@avalon>
+References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
+ <20160908073748.GF8913@lukather>
+ <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
+ <1975640.ctuo4Obpao@avalon>
+Message-ID: <CACRpkdapvA89yexwROCxr4t+MijCwidBrpYTow+zDx6D0WdSGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Mon, Sep 12, 2016 at 2:47 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Monday 12 Sep 2016 14:40:15 Linus Walleij wrote:
 
+>> HOWEVER it often turns out that while you can programmatically
+>> and individually set pins to any function (and biasing etc), the
+>> person designing the hardware was not thinking that you should
+>> be able to do whatever you like, e.g. even if it is possible to
+>> take two pins and use one of them for half an SPI bus and the
+>> other for half an I2C bus, that doesn't mean that this is useful
+>> or makes any kind of electronic sense, it just makes "software
+>> sense".
+(...)
+> I'd argue that you would find out about lots of clever/insane use cases that
+> don't fit this model if you looked at all the hardware available out there,
+> especially non-phone devices. Your SPI example is a good one, I've seen SPI
+> being used in unidirectional mode only, with only MISO or MOSI mattering. In
+> that case the other pin could be used as a GPIO for a totally unrelated
+> purpose when the design is short on GPIOs or when GPIOs have been allocated
+> without any knowledge of the Linux pinctrl subsystem.
 
-On 2016-09-13 00:31, Stephen Boyd wrote:
-> On 09/12, Marek Szyprowski wrote:
->> Hi Stephen,
->>
->>
->> On 2016-09-08 02:19, Stephen Boyd wrote:
->>> On 09/01, Marek Szyprowski wrote:
->>>> Registers for some clocks might be located in the SOC area, which are under the
->>>> power domain. To enable access to those registers respective domain has to be
->>>> turned on. Additionally, registers for such clocks will usually loose its
->>>> contents when power domain is turned off, so additional saving and restoring of
->>>> them might be needed in the clock controller driver.
->>>>
->>>> This patch adds basic infrastructure in the clocks core to allow implementing
->>>> driver for such clocks under power domains. Clock provider can supply a
->>>> struct device pointer, which is the used by clock core for tracking and managing
->>>> clock's controller runtime pm state. Each clk_prepare() operation
->>>> will first call pm_runtime_get_sync() on the supplied device, while
->>>> clk_unprepare() will do pm_runtime_put() at the end.
->>>>
->>>> Additional calls to pm_runtime_get/put functions are required to ensure that any
->>>> register access (like calculating/chaning clock rates) will be done with clock
->>>> controller in active runtime state.
->>>>
->>>> Special handling of the case when runtime pm is disabled for clock controller's
->>>> device is needed to let this feature work properly also during system sleep
->>>> suspend/resume operations (runtime pm is first disabled before entering sleep
->>>> state's, but controller is usually still operational until its suspend pm
->>>> callback is called).
->>>>
->>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> My "knee jerk" concern is that we're going to take a runtime PM
->>> lock underneath the prepare lock. That seems like a situation
->>> where we could hit a lock inversion if the runtime PM callbacks
->>> themselves acquire the prepare lock by calling clk APIs? But this
->>> concern is false right? We release the runtime PM lock before
->>> calling the PM callback, so we shouldn't hit any deadlock and
->>> lockdep won't complain?
->> Runtime PM uses fine grained locking based on per-device locks, so there
->> should be no problem with global clock prepare lock. The only lock
->> interaction
->> is between clock controller device's rpm lock and clocks global
->> prepare lock, but
->> it always done with the same access pattern. I've tested it
->> extensively (also
->> with lock dep) with various use cases and found no problems.
->>
-> Great! So you have runtime PM callbacks that are calling
-> clk_prepare/unprepare?
+That is true sometimes. It is a tradeoff, I can also imagine actually
+driving an I2C bus just to use the SCL line as a clock for something,
+constantly feeding nonsense data through the I2C block and
+ignoring SDA and reusing that pin as GPIO. (And a lot of other
+theoretical usecases.)
 
-Well, not really. clock controller's runtime pm functions must not call
-clk_prepare/unprepare yet.
+Some pin controller hardware helpully only let you select groups
+and makes such hacks impossible.
 
-I didn't get your question. I thought that you are asking if my change
-won't introduce any deadlock related to prepare and dev->pm locks. My
-runtime pm functions doesn't do any call to clk_prepare/unprepare.
-Although global clock prepare lock is re-entrant from the same process, it
-would cause deadlock if called from runtime pm functions, because runtime
-pm functions might be called from the worker running on the different
-cpu/process.
+Also I guess the target audience of the SoC will affect the
+hackishness of the usecases, and affect what they might attempt
+to shoehorn into the design.
 
-I hope that the work started by Krzysztof Kozlowski on splitting prepare
-lock on per-controller basis will solve limitation and one would be able
-to call clk_prapare/unprepare on clocks from other controllers even from
-the runtime pm functions.
+So model on whatever makes most sense, is usually how I think about
+it. Or as the IETF says "rough consensus and running code".
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+I guess it is a bit of grayzone, and that is why both solutions coexist.
+
+> Looking at the sh-pfc driver, I wish the hardware had followed the pinctrl-
+> single model. sh-pfc is a good example of how bloated a pinctrl driver can
+> become when there is no choice but model all the relationships betweens pins
+> and functions in C code.
+
+It might be true, there are so many variables to the equation that
+I cannot tell.
+
+Debuggability and readability of code and device trees and different
+groups of people reading code vs device trees is another factor.
+
+Scaringly, what is best for me as subsystem maintainer (that all
+drivers look identical) is not always best for the users.
+
+Yours,
+Linus Walleij
