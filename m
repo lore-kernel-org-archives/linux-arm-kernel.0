@@ -1,201 +1,158 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 13 Sep 2016 16:15:31 +0800
-Subject: [PATCH v5 07/14] drivers: acpi: iort: add support for ARM SMMU
- platform devices creation
-In-Reply-To: <7a63cf312b6e9714cdce1d0aca88cf4d@codeaurora.org>
-References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
- <20160909142343.13314-8-lorenzo.pieralisi@arm.com>
- <7a63cf312b6e9714cdce1d0aca88cf4d@codeaurora.org>
-Message-ID: <fb4acfd5-b7fd-636f-53f3-13dc6fb8b713@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 13 Sep 2016 10:20:19 +0200
+Subject: [PATCH v4 01/10] arm64: KVM: Use static keys for selecting the
+ GIC backend
+In-Reply-To: <1473691764-29424-2-git-send-email-vladimir.murzin@arm.com>
+References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
+ <1473691764-29424-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20160913082019.GB5680@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/9/13 15:46, nwatters at codeaurora.org wrote:
-> On 2016-09-09 10:23, Lorenzo Pieralisi wrote:
->> In ARM ACPI systems, IOMMU components are specified through static
->> IORT table entries. In order to create platform devices for the
->> corresponding ARM SMMU components, IORT kernel code should be made
->> able to parse IORT table entries and create platform devices
->> dynamically.
->>
->> This patch adds the generic IORT infrastructure required to create
->> platform devices for ARM SMMUs.
->>
->> ARM SMMU versions have different resources requirement therefore this
->> patch also introduces an IORT specific structure (ie iort_iommu_config)
->> that contains hooks (to be defined when the corresponding ARM SMMU
->> driver support is added to the kernel) to be used to define the
->> platform devices names, init the IOMMUs, count their resources and
->> finally initialize them.
->>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Hanjun Guo <hanjun.guo@linaro.org>
->> Cc: Tomasz Nowicki <tn@semihalf.com>
->> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->> ---
->>  drivers/acpi/arm64/iort.c | 131
->> ++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 131 insertions(+)
->>
->> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->> index b89b3d3..e0a9b16 100644
->> --- a/drivers/acpi/arm64/iort.c
->> +++ b/drivers/acpi/arm64/iort.c
->> @@ -22,6 +22,7 @@
->>  #include <linux/kernel.h>
->>  #include <linux/list.h>
->>  #include <linux/pci.h>
->> +#include <linux/platform_device.h>
->>  #include <linux/slab.h>
->>
->>  struct iort_its_msi_chip {
->> @@ -424,6 +425,135 @@ struct irq_domain *iort_get_device_domain(struct
->> device *dev, u32 req_id)
->>      return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
->>  }
->>
->> +struct iort_iommu_config {
->> +    const char *name;
->> +    int (*iommu_init)(struct acpi_iort_node *node);
->> +    bool (*iommu_is_coherent)(struct acpi_iort_node *node);
->> +    int (*iommu_count_resources)(struct acpi_iort_node *node);
->> +    void (*iommu_init_resources)(struct resource *res,
->> +                     struct acpi_iort_node *node);
->> +};
->> +
->> +static __init
->> +const struct iort_iommu_config *iort_get_iommu_cfg(struct
->> acpi_iort_node *node)
->> +{
->> +    return NULL;
->> +}
->> +
->> +/**
->> + * iort_add_smmu_platform_device() - Allocate a platform device for SMMU
->> + * @fwnode: IORT node associated fwnode handle
->> + * @node: Pointer to SMMU ACPI IORT node
->> + *
->> + * Returns: 0 on success, <0 failure
->> + */
->> +static int __init iort_add_smmu_platform_device(struct fwnode_handle
->> *fwnode,
->> +                        struct acpi_iort_node *node)
->> +{
->> +    struct platform_device *pdev;
->> +    struct resource *r;
->> +    enum dev_dma_attr attr;
->> +    int ret, count;
->> +    const struct iort_iommu_config *ops = iort_get_iommu_cfg(node);
->> +
->> +    if (!ops)
->> +        return -ENODEV;
->> +
->> +    pdev = platform_device_alloc(ops->name, PLATFORM_DEVID_AUTO);
->> +    if (!pdev)
->> +        return PTR_ERR(pdev);
->> +
->> +    count = ops->iommu_count_resources(node);
->> +
->> +    r = kcalloc(count, sizeof(*r), GFP_KERNEL);
->> +    if (!r) {
->> +        ret = -ENOMEM;
->> +        goto dev_put;
->> +    }
->> +
->> +    ops->iommu_init_resources(r, node);
->> +
->> +    ret = platform_device_add_resources(pdev, r, count);
->> +    /*
->> +     * Resources are duplicated in platform_device_add_resources,
->> +     * free their allocated memory
->> +     */
->> +    kfree(r);
->> +
->> +    if (ret)
->> +        goto dev_put;
->> +
->> +    /*
->> +     * Add a copy of IORT node pointer to platform_data to
->> +     * be used to retrieve IORT data information.
->> +     */
->> +    ret = platform_device_add_data(pdev, &node, sizeof(node));
->> +    if (ret)
->> +        goto dev_put;
->> +
->> +    pdev->dev.dma_mask = kmalloc(sizeof(*pdev->dev.dma_mask),
->> GFP_KERNEL);
->> +    if (!pdev->dev.dma_mask) {
->> +        ret = -ENOMEM;
->> +        goto dev_put;
->> +    }
->> +
->> +    pdev->dev.fwnode = fwnode;
->> +
->> +    /*
->> +     * Set default dma mask value for the table walker,
->> +     * to be overridden on probing with correct value.
->> +     */
->> +    *pdev->dev.dma_mask = DMA_BIT_MASK(32);
->> +    pdev->dev.coherent_dma_mask = *pdev->dev.dma_mask;
->> +
->> +    attr = ops->iommu_is_coherent(node) ?
->> +                 DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
->> +
->> +    /* Configure DMA for the page table walker */
->> +    acpi_dma_configure(&pdev->dev, attr);
->> +
->> +    ret = platform_device_add(pdev);
->> +    if (ret)
->> +        goto dma_deconfigure;
->> +
->> +    return 0;
->> +
->> +dma_deconfigure:
->> +    acpi_dma_deconfigure(&pdev->dev);
->> +    kfree(pdev->dev.dma_mask);
->> +
->> +dev_put:
->> +    platform_device_put(pdev);
->> +
->> +    return ret;
->> +}
->> +
->> +static acpi_status __init iort_match_iommu_callback(struct
->> acpi_iort_node *node,
->> +                            void *context)
->> +{
->> +    int ret;
->> +    struct fwnode_handle *fwnode;
->> +
->> +    fwnode = iort_get_fwnode(node);
->> +
->> +    if (!fwnode)
->> +        return AE_NOT_FOUND;
->> +
->> +    ret = iort_add_smmu_platform_device(fwnode, node);
->> +    if (ret) {
->> +        pr_err("Error in platform device creation\n");
->> +        return AE_ERROR;
->> +    }
->> +
->> +    return AE_OK;
->> +}
->> +
->> +static void __init iort_smmu_init(void)
->> +{
->> +    iort_scan_node(ACPI_IORT_NODE_SMMU, iort_match_iommu_callback,
->> NULL);
->> +    iort_scan_node(ACPI_IORT_NODE_SMMU_V3, iort_match_iommu_callback,
->> NULL);
->
-> Since iort_scan_node() returns after the first successful match it finds,
-> only the first SMMU_V3 in my IORT is being enumerated. I think you need
-> to go back to the "iterator" like approach you had been using or make
-> iort_match_iommu_callback() always return a non-AE_OK value so the scan
-> continues and has a chance to visit all of the SMMU_V3 nodes.
+On Mon, Sep 12, 2016 at 03:49:15PM +0100, Vladimir Murzin wrote:
+> Currently GIC backend is selected via alternative framework and this
+> is fine. We are going to introduce vgic-v3 to 32-bit world and there
+> we don't have patching framework in hand, so we can either check
+> support for GICv3 every time we need to choose which backend to use or
+> try to optimise it by using static keys. The later looks quite
+> promising because we can share logic involved in selecting GIC backend
+> between architectures if both uses static keys.
+> 
+> This patch moves arm64 from alternative to static keys framework for
+> selecting GIC backend. For that we embed static key into vgic_global
+> and enable the key during vgic initialisation based on what has
+> already been exposed by the host GIC driver.
+> 
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/switch.c   |   21 +++++++++++----------
+>  include/kvm/arm_vgic.h        |    4 ++++
+>  virt/kvm/arm/vgic/vgic-init.c |    4 ++++
+>  virt/kvm/arm/vgic/vgic.c      |    2 +-
+>  4 files changed, 20 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 5a84b45..d5c4cc5 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -16,6 +16,8 @@
+>   */
+>  
+>  #include <linux/types.h>
+> +#include <linux/jump_label.h>
+> +
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_hyp.h>
+>  
+> @@ -126,17 +128,13 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+>  	write_sysreg(0, vttbr_el2);
+>  }
+>  
+> -static hyp_alternate_select(__vgic_call_save_state,
+> -			    __vgic_v2_save_state, __vgic_v3_save_state,
+> -			    ARM64_HAS_SYSREG_GIC_CPUIF);
+> -
+> -static hyp_alternate_select(__vgic_call_restore_state,
+> -			    __vgic_v2_restore_state, __vgic_v3_restore_state,
+> -			    ARM64_HAS_SYSREG_GIC_CPUIF);
+> -
+>  static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+>  {
+> -	__vgic_call_save_state()(vcpu);
+> +	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
 
-Please use the updated version of IORT patch (aka Tomasz's v11)
-then things will work fine.
+It's a bit weird that we use _unlikely for GICv3 (at least if/when GICv3
+hardware becomes mainstream), but as we don't have another primitive for
+the 'default disabled' case, I suppose that's the best we can do.
 
-Thanks
-Hanjun
+> +		__vgic_v3_save_state(vcpu);
+> +	else
+> +		__vgic_v2_save_state(vcpu);
+> +
+>  	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
+>  }
+>  
+> @@ -149,7 +147,10 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+>  	val |= vcpu->arch.irq_lines;
+>  	write_sysreg(val, hcr_el2);
+>  
+> -	__vgic_call_restore_state()(vcpu);
+> +	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> +		__vgic_v3_restore_state(vcpu);
+> +	else
+> +		__vgic_v2_restore_state(vcpu);
+>  }
+>  
+>  static bool __hyp_text __true_value(void)
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 19b698e..994665a 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -23,6 +23,7 @@
+>  #include <linux/types.h>
+>  #include <kvm/iodev.h>
+>  #include <linux/list.h>
+> +#include <linux/jump_label.h>
+>  
+>  #define VGIC_V3_MAX_CPUS	255
+>  #define VGIC_V2_MAX_CPUS	8
+> @@ -63,6 +64,9 @@ struct vgic_global {
+>  
+>  	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
+>  	bool			can_emulate_gicv2;
+> +
+> +	/* GIC system register CPU interface */
+> +	struct static_key_false gicv3_cpuif;
+
+Documentation/static-keys.txt says that we are not supposed to use
+struct static_key_false directly.  This will obviously work quite
+nicely, but we could consider adding a pair of
+DECLARE_STATIC_KEY_TRUE/FALSE macros that don't have the assignments,
+but obviously this will need an ack from other maintainers.
+
+Thoughts?
+
+
+>  };
+>  
+>  extern struct vgic_global kvm_vgic_global_state;
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 83777c1..14d6718 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -405,6 +405,10 @@ int kvm_vgic_hyp_init(void)
+>  		break;
+>  	case GIC_V3:
+>  		ret = vgic_v3_probe(gic_kvm_info);
+> +		if (!ret) {
+> +			static_branch_enable(&kvm_vgic_global_state.gicv3_cpuif);
+> +			kvm_info("GIC system register CPU interface\n");
+
+nit: add enabled to the info message?
+
+> +		}
+>  		break;
+>  	default:
+>  		ret = -ENODEV;
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index e83b7fe..8a529a7 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -29,7 +29,7 @@
+>  #define DEBUG_SPINLOCK_BUG_ON(p)
+>  #endif
+>  
+> -struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
+> +struct vgic_global __section(.hyp.text) kvm_vgic_global_state = {.gicv3_cpuif = STATIC_KEY_FALSE_INIT,};
+>  
+>  /*
+>   * Locking order is always:
+> -- 
+> 1.7.9.5
+> 
+
+Overall this looks really nice, as long as we're clear on the static
+keys stuff.
+
+Thanks!
+-Christoffer
