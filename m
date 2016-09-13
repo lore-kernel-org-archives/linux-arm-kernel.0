@@ -1,68 +1,52 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 13 Sep 2016 11:41:19 -0700
-Subject: [RFCv3][PATCH 3/5] arm64: Implement ARCH_HAS_FORCE_CACHE
-In-Reply-To: <20160913151325.GF17731@arm.com>
-References: <1473715978-11633-1-git-send-email-labbott@redhat.com>
- <1473715978-11633-4-git-send-email-labbott@redhat.com>
- <20160913091946.GB7467@arm.com>
- <27805ccf-1f2d-81ea-044e-b21207be8e7f@redhat.com>
- <20160913151325.GF17731@arm.com>
-Message-ID: <b4a92c52-cbe8-9009-43bf-4c7b49e31916@redhat.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 13 Sep 2016 14:45:56 -0400
+Subject: [PATCH v10 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
+In-Reply-To: <706e4bc9-1010-ba2d-55ec-dc6f24611bd3@linaro.org>
+References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
+ <20160905123617.18775-4-aleksey.makarov@linaro.org>
+ <7e5486cc-4080-2d1e-8f6d-98874379887d@gmail.com>
+ <20160908111654.GH1493@arm.com> <1473352456.21193.8.camel@redhat.com>
+ <706e4bc9-1010-ba2d-55ec-dc6f24611bd3@linaro.org>
+Message-ID: <1473792356.31972.0.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2016 08:14 AM, Will Deacon wrote:
-> On Tue, Sep 13, 2016 at 08:02:20AM -0700, Laura Abbott wrote:
->> On 09/13/2016 02:19 AM, Will Deacon wrote:
->>> On Mon, Sep 12, 2016 at 02:32:56PM -0700, Laura Abbott wrote:
->>>>
->>>> arm64 may need to guarantee the caches are synced. Implement versions of
->>>> the kernel_force_cache API to allow this.
->>>>
->>>> Signed-off-by: Laura Abbott <labbott@redhat.com>
->>>> ---
->>>> v3: Switch to calling cache operations directly instead of relying on
->>>> DMA mapping.
->>>> ---
->>>> arch/arm64/include/asm/cacheflush.h |  8 ++++++++
->>>> arch/arm64/mm/cache.S               | 24 ++++++++++++++++++++----
->>>> arch/arm64/mm/flush.c               | 11 +++++++++++
->>>> 3 files changed, 39 insertions(+), 4 deletions(-)
->>>
->>> I'm really hesitant to expose these cache routines as an API solely to
->>> support a driver sitting in staging/. I appreciate that there's a chicken
->>> and egg problem here, but we *really* don't want people using these routines
->>> in preference to the DMA API, and I fear that we'll simply grow a bunch
->>> more users of these things if we promote it as an API like you're proposing.
->>>
->>> Can the code not be contained under staging/, as part of ion?
->>>
->>
->> I proposed that in V1 and it was suggested I make it a proper API
->>
->> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47654.html
->> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47672.html
->
-> :/ then I guess we're in disagreement. If ion really needs this stuff
-> (which I don't fully grok), perhaps we should be exposing something at
-> a higher level from the architecture, so it really can't be used for
-> anything other than ion.
+On Fri, 2016-09-09 at 17:28 +0800, Hanjun Guo wrote:
+> On 2016/9/9 0:34, Mark Salter wrote:
+> > 
+> > On Thu, 2016-09-08 at 12:16 +0100, Will Deacon wrote:
+> > > 
+> > > On Wed, Sep 07, 2016 at 12:30:19PM +0300, Aleksey Makarov wrote:
+> > > > 
+> > > > 
+> > > > 
+> > > > On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
+> > > > > 
+> > > > > 
+> > > > > SBBR mentions SPCR as a mandatory ACPI table.??So enable it for ARM64
+> > > > > 
+> > > > > Earlycon should be set up as early as possible.??ACPI boot tables are
+> > > > > mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
+> > > > > is called from setup_arch() and that's where we parse SPCR.
+> > > > > So it has to be opted-in per-arch.
+> > > > > 
+> > > > > When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
+> > > > > deferred until the DT/ACPI decision is done.??Initialize DT earlycon
+> > > > > if ACPI is disabled.
+> > > > Hi Will, Catalin,
+> > > > 
+> > > > Can you review this patch and consider ACKing it please?
+> > > Hanjun, Al, Mark, Graeme -- any comments on this?
+> > > 
+> > > Will
+> > I think there is a problem still with systems using 32-bit access to 8250
+> > UARTs (i.e. Mustang) but that will need a DBG2 table spec change and
+> > followup patch to resolve.
+> Hmm, I think you mean we can add patches later with the spec updated,
+> and this patch works with SBSA pl011 can go for now?
 
-I talked/complained about this at a past plumbers. The gist is that Ion
-ends up acting as a fake DMA layer for clients. It doesn't match nicely
-because clients can allocate both coherent and non-coherent memory.
-Trying to use dma_map doesn't work because a) a device for coherency isn't
-known at allocation time b) it kills performance. Part of the motivation
-for taking this approach is to avoid the need to rework the existing
-Android userspace and keep the existing behavior, as terrible as it
-is. Having Ion out of staging and not actually usable isn't helpful.
+Yes, I think this series is fine for now.
 
-I'll give this all some more thought and hopefully have one or two more
-proposals before Connect/Plumbers.
-
->
-> Will
->
-
-Thanks,
-Laura
+> 
+> Thanks
+> Hanjun
