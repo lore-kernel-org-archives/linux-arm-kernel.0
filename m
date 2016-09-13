@@ -1,123 +1,114 @@
 From: po.liu@nxp.com (Po Liu)
-Date: Tue, 13 Sep 2016 12:40:58 +0800
-Subject: [PATCH v5 2/3] arm64/dts: add pcie aer interrupt-name property in the
- dts
+Date: Tue, 13 Sep 2016 12:40:59 +0800
+Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
+ MSI/MSI-X/INTx mode
 In-Reply-To: <1473741659-17618-1-git-send-email-po.liu@nxp.com>
 References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
  <1473741659-17618-1-git-send-email-po.liu@nxp.com>
-Message-ID: <1473741659-17618-2-git-send-email-po.liu@nxp.com>
+Message-ID: <1473741659-17618-3-git-send-email-po.liu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms(NXP Layerscape for example) aer interrupt was not
-MSI/MSI-X/INTx but using interrupt line independently. This patch
-add a "aer" interrupt-names for aer interrupt.
-
-With the interrupt-names "aer", code could probe aer interrupt line
-for pcie root port, replace the aer interrupt service irq.
-
-This is intend to fixup the Layerscape platforms which aer interrupt
-was not MSI/MSI-X/INTx, but using interrupt line independently.
+On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
+When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
+maybe there is interrupt line for aer pme etc. Search the interrupt
+number in the fdt file. Then fixup the dev->irq with it.
 
 Signed-off-by: Po Liu <po.liu@nxp.com>
 ---
 changes for v5:
-	- Seperate arm and arm64 dts modification into two patches
+	- Add clear 'aer' interrup-names description
 
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 18 +++++++++---------
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 16 ++++++++--------
- 2 files changed, 17 insertions(+), 17 deletions(-)
+ .../devicetree/bindings/pci/layerscape-pci.txt     | 11 +++++---
+ drivers/pci/pcie/portdrv_core.c                    | 31 +++++++++++++++++++---
+ 2 files changed, 35 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index e669fbd..654071d 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -527,9 +527,9 @@
- 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
- 			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 118 0x4>, /* controller interrupt */
--				     <0 117 0x4>; /* PME interrupt */
--			interrupt-names = "intr", "pme";
-+			interrupts = <0 117 0x4>, /* PME interrupt */
-+					 <0 118 0x4>; /* aer interrupt */
-+			interrupt-names = "pme", "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-@@ -552,9 +552,9 @@
- 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
- 			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 128 0x4>,
--				     <0 127 0x4>;
--			interrupt-names = "intr", "pme";
-+			interrupts = <0 127 0x4>,
-+					 <0 128 0x4>;
-+			interrupt-names = "pme", "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-@@ -577,9 +577,9 @@
- 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
- 			       0x50 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 162 0x4>,
--				     <0 161 0x4>;
--			interrupt-names = "intr", "pme";
-+			interrupts = <0 161 0x4>,
-+					 <0 162 0x4>;
-+			interrupt-names = "pme", "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index 21023a3..58844e8 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -583,8 +583,8 @@
- 			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
- 			       0x10 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 108 0x4>; /* Level high type */
--			interrupt-names = "intr";
-+			interrupts = <0 108 0x4>; /* aer interrupt */
-+			interrupt-names = "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-@@ -607,8 +607,8 @@
- 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
- 			       0x12 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 113 0x4>; /* Level high type */
--			interrupt-names = "intr";
-+			interrupts = <0 113 0x4>; /* aer interrupt */
-+			interrupt-names = "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-@@ -631,8 +631,8 @@
- 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
- 			       0x14 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 118 0x4>; /* Level high type */
--			interrupt-names = "intr";
-+			interrupts = <0 118 0x4>; /* aer interrupt */
-+			interrupt-names = "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
-@@ -655,8 +655,8 @@
- 			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
- 			       0x16 0x00000000 0x0 0x00002000>; /* configuration space */
- 			reg-names = "regs", "config";
--			interrupts = <0 123 0x4>; /* Level high type */
--			interrupt-names = "intr";
-+			interrupts = <0 123 0x4>; /* aer interrupt */
-+			interrupt-names = "aer";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+index 41e9f55..101d0a7 100644
+--- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+@@ -18,8 +18,10 @@ Required properties:
+ - reg: base addresses and lengths of the PCIe controller
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+   entry for each entry in the interrupt-names property.
+-- interrupt-names: Must include the following entries:
+-  "intr": The interrupt that is asserted for controller interrupts
++- interrupt-names: It may be include the following entries:
++  "aer": The interrupt that is asserted for aer interrupt
++  "pme": The interrupt that is asserted for pme interrupt
++  ......
+ - fsl,pcie-scfg: Must include two entries.
+   The first entry must be a link to the SCFG device node
+   The second entry must be '0' or '1' based on physical PCIe controller index.
+@@ -35,8 +37,9 @@ Example:
+ 		reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
+ 		       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+ 		reg-names = "regs", "config";
+-		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
+-		interrupt-names = "intr";
++		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>, /* aer interrupt */
++			<GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* pme interrupt */
++		interrupt-names = "aer", "pme";
+ 		fsl,pcie-scfg = <&scfg 0>;
+ 		#address-cells = <3>;
+ 		#size-cells = <2>;
+diff --git a/drivers/pci/pcie/portdrv_core.c b/drivers/pci/pcie/portdrv_core.c
+index e9270b4..7c4943d 100644
+--- a/drivers/pci/pcie/portdrv_core.c
++++ b/drivers/pci/pcie/portdrv_core.c
+@@ -16,6 +16,7 @@
+ #include <linux/slab.h>
+ #include <linux/pcieport_if.h>
+ #include <linux/aer.h>
++#include <linux/of_irq.h>
+ 
+ #include "../pci.h"
+ #include "portdrv.h"
+@@ -200,6 +201,28 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *vectors, int mask)
+ static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
+ {
+ 	int i, irq = -1;
++	int ret;
++	struct device_node *np = NULL;
++
++	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
++		irqs[i] = 0;
++
++	if (dev->bus->dev.of_node)
++		np = dev->bus->dev.of_node;
++
++	/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
++	 * request irq for aer
++	 */
++	if (IS_ENABLED(CONFIG_OF_IRQ) && np &&
++			(mask & PCIE_PORT_SERVICE_PME)) {
++		ret = of_irq_get_byname(np, "aer");
++		if (ret > 0) {
++			irqs[PCIE_PORT_SERVICE_AER_SHIFT] = ret;
++			if (dev->irq)
++				irq = dev->irq;
++			goto no_msi;
++		}
++	}
+ 
+ 	/*
+ 	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
+@@ -225,11 +248,13 @@ static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
+ 		irq = dev->irq;
+ 
+  no_msi:
+-	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
+-		irqs[i] = irq;
++	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
++		if (!irqs[i])
++			irqs[i] = irq;
++	}
+ 	irqs[PCIE_PORT_SERVICE_VC_SHIFT] = -1;
+ 
+-	if (irq < 0)
++	if (irq < 0 && irqs[PCIE_PORT_SERVICE_AER_SHIFT] < 0)
+ 		return -ENODEV;
+ 	return 0;
+ }
 -- 
 2.1.0.27.g96db324
