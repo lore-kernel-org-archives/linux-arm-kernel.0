@@ -1,39 +1,93 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 13 Sep 2016 13:41:44 -0700
-Subject: [PATCH v4 22/22] phy: Add support for Qualcomm's USB HS phy
-In-Reply-To: <20160913070358.GB30425@b29397-desktop>
-References: <20160907213519.27340-1-stephen.boyd@linaro.org>
- <20160907213519.27340-23-stephen.boyd@linaro.org>
- <20160913070358.GB30425@b29397-desktop>
-Message-ID: <147379930484.27460.3849356366746983941@sboyd-linaro>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 13 Sep 2016 13:45:21 -0700
+Subject: [PATCH v3 3/7] arm64: Introduce uaccess_{disable,enable}
+ functionality based on TTBR0_EL1
+In-Reply-To: <1473788797-10879-4-git-send-email-catalin.marinas@arm.com>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+ <1473788797-10879-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <CAGXu5jJETdRtuonhtkSxMf+sgCdBj2t2_U8yW2cDwcoGY=qvJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-09-13 00:03:58)
-> On Wed, Sep 07, 2016 at 02:35:19PM -0700, Stephen Boyd wrote:
-> > The high-speed phy on qcom SoCs is controlled via the ULPI
-> > viewport.
-> > 
-> 
-> Hi Stephen, I am a little puzzled how this driver co-work with chipidea
-> driver. According to nxp IC guys, the ULPI PHY's clock needs to be enabled
-> before access portsc.pts (calling hw_phymode_configure), otherwise,
-> the system will hang. But I find you call hw_phymode_configure before
-> phy->power_on, doesn't your design have this requirement?
+On Tue, Sep 13, 2016 at 10:46 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> This patch adds the uaccess macros/functions to disable access to user
+> space by setting TTBR0_EL1 to a reserved zeroed page. Since the value
+> written to TTBR0_EL1 must be a physical address, for simplicity this
+> patch introduces a reserved_ttbr0 page at a constant offset from
+> swapper_pg_dir. The uaccess_disable code uses the ttbr1_el1 value
+> adjusted by the reserved_ttbr0 offset.
+>
+> Enabling access to user is done by restoring TTBR0_EL1 with the value
+> from the struct thread_info ttbr0 variable. Interrupts must be disabled
+> during the uaccess_ttbr0_enable code to ensure the atomicity of the
+> thread_info.ttbr0 read and TTBR0_EL1 write. This patch also moves the
+> get_thread_info asm macro from entry.S to assembler.h for reuse in the
+> uaccess_ttbr0_* macros.
+>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+> [...]
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 7099f26e3702..042d49c7b231 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -216,6 +216,12 @@ static inline bool system_supports_mixed_endian_el0(void)
+>         return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
+>  }
+>
+> +static inline bool system_uses_ttbr0_pan(void)
+> +{
+> +       return IS_ENABLED(CONFIG_ARM64_SW_TTBR0_PAN) &&
+> +               !cpus_have_cap(ARM64_HAS_PAN);
+> +}
+> +
+>  #endif /* __ASSEMBLY__ */
+>
+>  #endif
+> [...]
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index cc6c32d4dcc4..115b5fa8dc3f 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> [...]
+> @@ -116,16 +117,57 @@ static inline void set_fs(mm_segment_t fs)
+> [...]
+>  #define __uaccess_disable(alt)                                         \
+>  do {                                                                   \
+> -       asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,                  \
+> -                       CONFIG_ARM64_PAN));                             \
+> +       if (system_uses_ttbr0_pan())                                    \
+> +               uaccess_ttbr0_disable();                                \
+> +       else                                                            \
+> +               asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), alt,          \
+> +                               CONFIG_ARM64_PAN));                     \
+>  } while (0)
+>
+>  #define __uaccess_enable(alt)                                          \
+>  do {                                                                   \
+> -       asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,                  \
+> -                       CONFIG_ARM64_PAN));                             \
+> +       if (system_uses_ttbr0_pan())                                    \
+> +               uaccess_ttbr0_enable();                                 \
+> +       else                                                            \
+> +               asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,          \
+> +                               CONFIG_ARM64_PAN));                     \
+>  } while (0)
 
-Which clk needs to be enabled? The xcvr_clk? I believe that clk
-corresponds to the "core" clk that we enable in the msm glue driver
-layer. When that clk is enabled, the ULPI phy is able to respond to
-register read/writes via the ULPI viewport.
+Does this mean that with CONFIG_ARM64_SW_TTBR0_PAN, even with ARMv8.1,
+a cpu capability bitmask check is done each time we go through
+__uaccess_{en,dis}able?
 
->        
-> Besides, you read ulpi id before phy->power_on, how can read work before
-> phy power on?
-> 
+Could the alternative get moved around slightly to avoid this, or am I
+misunderstanding something here?
 
-I've found that even having the link clk enabled before phy->power_on
-doesn't mean it's possible to read the id registers though. That's
-because there can be other power supplies, like regulators, which need
-to be on for the phy to operate properly.
+-Kees
 
-Either way, the system does not hang.
+-- 
+Kees Cook
+Nexus Security
