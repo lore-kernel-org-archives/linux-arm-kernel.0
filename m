@@ -1,107 +1,141 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 13 Sep 2016 17:03:07 +0200
-Subject: [PATCH 1/5] clk: add support for runtime pm
-In-Reply-To: <76bb5b71-dd4e-e1ad-df0b-b84833812502@samsung.com>
-References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
- <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
- <CGME20160913084956eucas1p2433fb17456cea4620de2729efbbf78c7@eucas1p2.samsung.com>
- <CAPDyKFo7R1f1H1R5Q78L4e_nHfngRYfo8jP_Dfi3uf_OGWvZCg@mail.gmail.com>
- <76bb5b71-dd4e-e1ad-df0b-b84833812502@samsung.com>
-Message-ID: <CAPDyKFqufBW0TmPVBx-noSnCvk26WBk9jP4PjgS5wKVuq6cJmA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 13 Sep 2016 10:05:11 -0500
+Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
+ device for legacy interrupts.
+In-Reply-To: <57D7ADA8.5060201@arm.com>
+References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
+ <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
+ <57C57975.7040306@arm.com>
+ <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <57C59FE8.30307@arm.com>
+ <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <57C6B7F1.5000001@arm.com>
+ <8520D5D51A55D047800579B094147198258D2C99@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160912220241.GG23532@localhost> <57D7ADA8.5060201@arm.com>
+Message-ID: <20160913150511.GC27748@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Tue, Sep 13, 2016 at 08:41:28AM +0100, Marc Zyngier wrote:
+> On 12/09/16 23:02, Bjorn Helgaas wrote:
+> > On Thu, Sep 01, 2016 at 05:19:55AM +0000, Bharat Kumar Gogada wrote:
+> >>>>>>> Hi Bharat,
+> >>>>>>>> @@ -561,7 +561,7 @@ static int nwl_pcie_init_irq_domain(struct
+> >>>>>>>> nwl_pcie
+> >>>>>>> *pcie)
+> >>>>>>>>     }
+> >>>>>>>>
+> >>>>>>>>     pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node,
+> >>>>>>>> -                                                   INTX_NUM,
+> >>>>>>>> +                                                   INTX_NUM + 1,
+> >>>>>>>>                                                     &legacy_domain_ops,
+> >>>>>>>>                                                     pcie);
+> >>>>>>>
+> >>>>>>> This feels like the wrong thing to do. You have INTX_NUM irqs, so
+> >>>>>>> the domain allocation should reflect this. On the other hand, the
+> >>>>>>> way the driver currently deals with mappings is quite broken
+> >>>>>>> (consistently adding 1 to
+> >>>>> the HW interrupt).
+> >>>>>>>
+> >>>>>> Hi Marc,
+> >>>>>>
+> >>>>>> Without above change I get following crash in kernel while booting.
+> >>>>>>
+> >>>>>> [    2.441684] error: hwirq 0x4 is too large for dummy
+> >>>>>>
+> >>>>>> [    2.441694] ------------[ cut here ]------------
+> >>>>>>
+> >>>>>> [    2.441698] WARNING: at kernel/irq/irqdomain.c:344
+> >>>>>>
+> >>>>>> [    2.441702] Modules linked in:
+> >>>>>>
+> >>>>>> [    2.441706]
+> >>>>>>
+> >>>>>> [    2.441714] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.4.0 #8
+> >>>>>>
+> >>>>>> [    2.441718] Hardware name: xlnx,zynqmp (DT)
+> >>>>>>
+> >>>>>> [    2.441723] task: ffffffc071886b80 ti: ffffffc071888000 task.ti:
+> >>>>> ffffffc071888000
+> >>>>>>
+> >>>>>> [    2.441732] PC is at irq_domain_associate+0x138/0x1c0
+> >>>>>>
+> >>>>>> [    2.441738] LR is at irq_domain_associate+0x138/0x1c0
+> >>>>>>
+> >>>>>> In kernel/irq/irqdomain.c function irq_domain_associate
+> >>>>>>
+> >>>>>> if (WARN(hwirq >= domain->hwirq_max,
+> >>>>>>                  "error: hwirq 0x%x is too large for %s\n", (int)hwirq, domain-
+> >>>> name))
+> >>>>>>                 return -EINVAL;
+> >>>>>>
+> >>>>>> Here the hwirq and hwirq_max are equal to 4 without the above
+> >>>>>> condition
+> >>>>> (INTX_NUM + 1) due to which crash is coming.
+> >>>>>> This is happening as the legacy interrupts are starting from 1 (INTA).
+> >>>>>
+> >>>>> I understood that. I'm still persisting in saying that you have the wrong fix.
+> >>>>>
+> >>>>> Your domain should always allocate many interrupts as you have
+> >>>>> interrupt sources. These interrupts (hwirq) should be numbered from 0 to (n-
+> >>> 1).
+> >>>>
+> >>>> Agreed, but here comes the problem the hwirq for legacy interrupts
+> >>>> will start at 0x1 to 0x4 (INTA to INTD) and these values are as per
+> >>>> PCIe specification for legacy interrupts. So these cannot be numbered
+> >>>> from 0. So when 0x4 (INTD) for a multi-function device comes the crash
+> >>>> occurs.
+> >>>
+> >>> So who provides this hwirq? Who calls irq_domain_associate() with hwirq set to
+> >>> 4?
+> >>>
+> >> PCIe subsystem invokes pcibios_add_device function in arch/arm64/kernel/pci.c for every pci device.
+> >> The purpose of this function is to assign dev->irq using of_irq_parse_and_map_pci.
+> >> of_irq_parse_and_map_pci invokes of_irq_parse_pci where it reads PCI_INTERRUPT_PIN from configuration space and saves it
+> >> in parameter of struct of_phandle_args.
+> >> This structure is passed to irq_create_of_mapping where it invokes irq_create_fwspec_mapping.
+> >> irq_create_fwspec_mapping invokes irq_domain_translate and gets hwirq, here the above saved PCI_INTERRUPT_PIN value is assigned 
+> >> to hwirq (*hwirq = fwspec->param[0]).
+> >> And then using this hwirq irq_create_mapping -> irq_domain_associate were invoked and mapping is created for virtual irq with this hwirq.
+> >> So for any end point PCI_INTERRUPT_PIN value starts from 0x1 to 0x4 and so hwirq starts from 0x1 to 0x4.
+> >>
+> >> So the values are more generic w.r.t to protocol, that's why hwirq will range from 0x1 to 0x4. 
+> >> And then if you check pcie-altera.c they are doing this adding one in their handler and while creating legacy domain.
+> > 
+> > Is this resolved yet?  Marc, are you happy, or should we iterate on this
+> > again?
+> 
+> Ah, sorry to have dropped the ball on this patch.
 
->>
->> This needs to be clarified. I agree we need to cover system PM as
->> well, but let's try be a bit more precise about it.
->
->
-> Right, I wasn't precise here. I've developed this code on older (v4.1 and
-> v4.6)
-> kernels, which had a code which disables runtime pm during system sleep
-> transition
-> time. Maybe I need to revisit it and consider your change merged to
-> v4.8-rc1, which
-> keeps runtime pm enabled during system sleep transitions.
+No problem, I wasn't making forward progress anyway.
 
-Right, I see.
+> I guess that given that the infrastructure imposes the hwirq range on
+> the host drivers, Bharat's approach is the only way (and a number of
+> other host drivers are already slightly broken). I'll try and have a
+> look at solving this at the generic level. In the meantime:
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
->>>   static bool clk_core_is_prepared(struct clk_core *core)
->>>   {
->>> +       if (clk_pm_runtime_suspended(core))
->>> +               return false;
->>> +
->>
->> This isn't safe, as even if the clock controller is runtime resumed at
->> this point, that's *not* a guarantee that is stays runtime resumed
->> while invoking the ->ops->is_prepared().
->>
->> Instead you must call a pm_runtime_get_noresume() before you check the
->> runtime PM status, as that should avoid the device from being runtime
->> suspended. Then when the ->ops->is_prepared() has been invoked, we
->> should call pm_runtime_put().
->>
->> Although, I am not sure the above change becomes entirely correct as I
->> think we are mixing the runtime PM status with the clock prepare
->> status here. In other words, the next time the clock controller
->> becomes runtime resumed, it may very well restore some register
->> context which may prepare the clock, unless someone explicitly has
->> unprepared it.
->>
->> Of course, it all depends on how clk_core_is_prepared() is used by the
->> clock framework.
->
->
-> clk_core_is_prepared() is mainly used by disable_unused_tree_*. You are
-> right that it mixes a bit clock prepared state with runtime pm active
-> state of clock controller's, but I assumed here that clock cannot be
-> prepared if runtime pm state of controller is suspended. Other approach
-> here would be to call pm_runtime_get(), check status and then
-> pm_runtime_put(). If you prefer such approach, I will change it.
+After looking at this myself, I'm not happy with this either.  It feels
+like there are bugs lurking here and we're just hiding one of them.
 
-Using pm_runtime_get|put() would work for the clk_core_is_prepared()
-case, although perhaps not for the clk_core_is_enabled() case.
+Here are the callers of irq_domain_add_linear() for legacy INTx in
+drivers/pci/host:
 
-The reason is that I guess the clk_core_is_enabled() API may be called
-from atomic context? Thus we would need to enable
-pm_runtime_irq_safe() for the clock provider device, which I *really*
-would like to avoid.
+  advk_pcie_init_irq_domain    LEGACY_IRQ_NUM   (4)
+  dra7xx_pcie_init_irq_domain  4
+  ks_dw_pcie_host_init         MAX_LEGACY_IRQS  (4)
+  altera_pcie_init_irq_domain  INTX_NUM + 1     (5)
+  nwl_pcie_init_irq_domain     INTX_NUM + 1     (5)
+  xilinx_pcie_init_irq_domain  4
 
-[...]
+I think all of these use the of_irq_parse_and_map_pci() path you
+mentioned, so if the problem is in the way that path works, I would
+think these should *all* be requesting the same number of interrupts
+in the domain.
 
->>
->> I believe we are also accessing the clock controller HW from the
->> late_initcall_sync(clk_disable_unused) function.
->
->
-> This was indirectly handled by the runtime pm state check in is_prepared
-> and is_enabled().
+I agree with Marc that we should request 4 IRQs, because that's what
+we need.  If we can't do that for some reason, we ought to at least
+make all these callers the same.
 
-I see.
-
-Although, I was thinking that you explicitly would like to
-disable/unprepare unused clocks in this phase, so then it isn't
-sufficient to rely on the runtime PM status to know whether the clock
-is prepared/enabled.
-
-Perhaps, this is the only case when you actually need a
-pm_runtime_get|put() around the ->is_enabled|prepared()!?
-
->
->> More precisely, in clk_disable_unused_subtree(), we probably need a
->> pm_runtime_get_sync() before calling clk_core_is_enabled(). And then
->> restore that with a pm_runtime_put() after the clock has been
->> disabled.
->> The similar is needed in clk_unprepare_unused_subtree().
->
->
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
-
-Kind regards
-Uffe
+Bjorn
