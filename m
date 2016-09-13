@@ -1,34 +1,25 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 13 Sep 2016 20:43:54 +0800
-Subject: [PATCH 1/2] crypto: arm/aes-ctr: fix NULL dereference in tail
- processing
-In-Reply-To: <1473756533-21078-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1473756533-21078-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160913124354.GI31835@gondor.apana.org.au>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 13 Sep 2016 22:14:33 +0930
+Subject: [PATCH v3 0/7] aspeed: Integrate pinctrl and gpio drivers
+In-Reply-To: <20160830075600.11559-1-andrew@aj.id.au>
+References: <20160830075600.11559-1-andrew@aj.id.au>
+Message-ID: <CACPK8XdM9V=7tqbu_MYR8=LApCN8s+3dav=E6mck6ixU8PhA9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 09:48:52AM +0100, Ard Biesheuvel wrote:
-> The AES-CTR glue code avoids calling into the blkcipher API for the
-> tail portion of the walk, by comparing the remainder of walk.nbytes
-> modulo AES_BLOCK_SIZE with the residual nbytes, and jumping straight
-> into the tail processing block if they are equal. This tail processing
-> block checks whether nbytes != 0, and does nothing otherwise.
-> 
-> However, in case of an allocation failure in the blkcipher layer, we
-> may enter this code with walk.nbytes == 0, while nbytes > 0. In this
-> case, we should not dereference the source and destination pointers,
-> since they may be NULL. So instead of checking for nbytes != 0, check
-> for (walk.nbytes % AES_BLOCK_SIZE) != 0, which implies the former in
-> non-error conditions.
-> 
-> Fixes: 86464859cc77 ("crypto: arm - AES in ECB/CBC/CTR/XTS modes using ARMv8 Crypto Extensions")
-> Reported-by: xiakaixu <xiakaixu@huawei.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
+On Tue, Aug 30, 2016 at 5:25 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> Here's v3 of the Aspeed pinctrl and gpio driver integration patches. v2 of the
+> integration series can be found at:
+>
+>   https://lkml.org/lkml/2016/8/19/403
 
-Both patches applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Looks good to me. I commented on the two patches that I don't think we
+want to include. If you're happy with that I will send a tree to Arnd.
+
+Arnd, the pinctrl driver is staged for 4.9. We're adding the symbol to
+arch/arm/mach-aspeed, so the tree I send will have a dependency on the
+pinctrl tree. How do I proceed in this case?
+
+Cheers,
+
+Joel
