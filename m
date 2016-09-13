@@ -1,44 +1,48 @@
-From: sf84@laposte.net (Sebastian Frias)
-Date: Tue, 13 Sep 2016 16:55:59 +0200
-Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
-In-Reply-To: <20160913131208.GA23336@leverpostej>
-References: <57BDAF2E.10502@laposte.net>
- <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
- <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
- <57D6AA54.6000208@laposte.net> <20160912135549.GA14165@leverpostej>
- <57D6D2A9.3010006@laposte.net> <20160912165637.GF14165@leverpostej>
- <57D7CF17.2050905@laposte.net> <20160913131208.GA23336@leverpostej>
-Message-ID: <57D8137F.8040508@laposte.net>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 13 Sep 2016 08:02:20 -0700
+Subject: [RFCv3][PATCH 3/5] arm64: Implement ARCH_HAS_FORCE_CACHE
+In-Reply-To: <20160913091946.GB7467@arm.com>
+References: <1473715978-11633-1-git-send-email-labbott@redhat.com>
+ <1473715978-11633-4-git-send-email-labbott@redhat.com>
+ <20160913091946.GB7467@arm.com>
+Message-ID: <27805ccf-1f2d-81ea-044e-b21207be8e7f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 09/13/2016 02:19 AM, Will Deacon wrote:
+> Hi Laura,
+>
+> On Mon, Sep 12, 2016 at 02:32:56PM -0700, Laura Abbott wrote:
+>>
+>> arm64 may need to guarantee the caches are synced. Implement versions of
+>> the kernel_force_cache API to allow this.
+>>
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>> ---
+>> v3: Switch to calling cache operations directly instead of relying on
+>> DMA mapping.
+>> ---
+>>  arch/arm64/include/asm/cacheflush.h |  8 ++++++++
+>>  arch/arm64/mm/cache.S               | 24 ++++++++++++++++++++----
+>>  arch/arm64/mm/flush.c               | 11 +++++++++++
+>>  3 files changed, 39 insertions(+), 4 deletions(-)
+>
+> I'm really hesitant to expose these cache routines as an API solely to
+> support a driver sitting in staging/. I appreciate that there's a chicken
+> and egg problem here, but we *really* don't want people using these routines
+> in preference to the DMA API, and I fear that we'll simply grow a bunch
+> more users of these things if we promote it as an API like you're proposing.
+>
+> Can the code not be contained under staging/, as part of ion?
+>
 
-On 09/13/2016 03:12 PM, Mark Rutland wrote:
->> Exactly, that is why I was thinking it would take less "review" time.
->> Indeed, if there is no driver, why would it matter what those bindings
->> are?
-> 
-> If you believe that the bindings don't matter, then there is absolutely
-> no reason for them to exist in the first place.
-> 
-> If those binding matter to *anyone*, then those collating the bindings
-> have some responsibility of stewardship, and that includes
-> review/maintenance/etc.
+I proposed that in V1 and it was suggested I make it a proper API
 
-The thing is that right now it seems the "responsibility of stewardship"
-lies only within "Linux", whereas DT is proposed as open for everybody,
-Bootloaders, FreeBSD, etc.
+http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47654.html
+http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47672.html
 
-In that case, shouldn't the "responsibility" be shared?
-Alternatively, maybe 'borders' could be created, in order to enable the
-allocation of responsibility of different sections to different parties,
-right?
-Obviously, moving properties/nodes from one 'section' to another crossing
-responsibility 'borders' would require agreements.
+> Will
+>
 
-Shouldn't that be something good to think about?
-
-Best regards,
-
-Sebastian
+Thanks,
+Laura
