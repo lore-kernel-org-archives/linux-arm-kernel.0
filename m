@@ -1,45 +1,61 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Sep 2016 09:48:53 +0100
-Subject: [PATCH 2/2] crypto: arm64/aes-ctr: fix NULL dereference in tail
- processing
-In-Reply-To: <1473756533-21078-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1473756533-21078-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1473756533-21078-2-git-send-email-ard.biesheuvel@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 13 Sep 2016 10:51:58 +0200
+Subject: [PATCH v4 06/10] KVM: arm: vgic: Support 64-bit data
+ manipulation on 32-bit host systems
+In-Reply-To: <1473691764-29424-7-git-send-email-vladimir.murzin@arm.com>
+References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
+ <1473691764-29424-7-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20160913085158.GG5680@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AES-CTR glue code avoids calling into the blkcipher API for the
-tail portion of the walk, by comparing the remainder of walk.nbytes
-modulo AES_BLOCK_SIZE with the residual nbytes, and jumping straight
-into the tail processing block if they are equal. This tail processing
-block checks whether nbytes != 0, and does nothing otherwise.
+On Mon, Sep 12, 2016 at 03:49:20PM +0100, Vladimir Murzin wrote:
+> We have couple of 64-bit registers defined in GICv3 architecture, so
+> unsigned long accesses to these registers will only access a single
+> 32-bit part of that regitser. On the other hand these registers can't
+> be accessed as 64-bit with a single instruction like ldrd/strd or
+> ldmia/stmia if we run a 32-bit host because KVM does not support
+> access to MMIO space done by these instructions.
+> 
+> It means that a 32-bit guest accesses these registers in 32-bit
+> chunks, so the only thing we need to do is to ensure that
+> extract_bytes() always takes 64-bit data.
+> 
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
-However, in case of an allocation failure in the blkcipher layer, we
-may enter this code with walk.nbytes == 0, while nbytes > 0. In this
-case, we should not dereference the source and destination pointers,
-since they may be NULL. So instead of checking for nbytes != 0, check
-for (walk.nbytes % AES_BLOCK_SIZE) != 0, which implies the former in
-non-error conditions.
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Fixes: 49788fe2a128 ("arm64/crypto: AES-ECB/CBC/CTR/XTS using ARMv8 NEON and Crypto Extensions")
-Reported-by: xiakaixu <xiakaixu@huawei.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/crypto/aes-glue.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
-index 5c888049d061..6b2aa0fd6cd0 100644
---- a/arch/arm64/crypto/aes-glue.c
-+++ b/arch/arm64/crypto/aes-glue.c
-@@ -216,7 +216,7 @@ static int ctr_encrypt(struct blkcipher_desc *desc, struct scatterlist *dst,
- 		err = blkcipher_walk_done(desc, &walk,
- 					  walk.nbytes % AES_BLOCK_SIZE);
- 	}
--	if (nbytes) {
-+	if (walk.nbytes % AES_BLOCK_SIZE) {
- 		u8 *tdst = walk.dst.virt.addr + blocks * AES_BLOCK_SIZE;
- 		u8 *tsrc = walk.src.virt.addr + blocks * AES_BLOCK_SIZE;
- 		u8 __aligned(8) tail[AES_BLOCK_SIZE];
--- 
-2.7.4
+> ---
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c |    2 +-
+>  virt/kvm/arm/vgic/vgic-mmio.h    |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 6385ed5..0d3c76a 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -23,7 +23,7 @@
+>  #include "vgic-mmio.h"
+>  
+>  /* extract @num bytes at @offset bytes offset in data */
+> -unsigned long extract_bytes(unsigned long data, unsigned int offset,
+> +unsigned long extract_bytes(u64 data, unsigned int offset,
+>  			    unsigned int num)
+>  {
+>  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 0b3ecf9..80f92ce 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -96,7 +96,7 @@ unsigned long vgic_data_mmio_bus_to_host(const void *val, unsigned int len);
+>  void vgic_data_host_to_mmio_bus(void *buf, unsigned int len,
+>  				unsigned long data);
+>  
+> -unsigned long extract_bytes(unsigned long data, unsigned int offset,
+> +unsigned long extract_bytes(u64 data, unsigned int offset,
+>  			    unsigned int num);
+>  
+>  u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+> -- 
+> 1.7.9.5
+> 
