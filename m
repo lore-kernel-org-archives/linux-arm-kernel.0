@@ -1,73 +1,112 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Tue, 13 Sep 2016 18:29:36 +0200
-Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
- support
-In-Reply-To: <alpine.DEB.2.20.1609131713490.6233@nanos>
-References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
- <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
- <alpine.DEB.2.20.1609131713490.6233@nanos>
-Message-ID: <6941f61d-0b33-4108-0135-b11887cd0488@st.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 13 Sep 2016 11:42:05 -0500
+Subject: [PATCH 1/2] PCI: save and restore device state during bus reset
+In-Reply-To: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
+References: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160913164205.GD4138@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Thu, Sep 01, 2016 at 07:00:00PM -0400, Sinan Kaya wrote:
+> A secondary bus reset causes settings to be lost by all downstream
+> devices on the tree. The code is currently saving and restoring device
+> states only when called from the VFIO path via pci_probe_reset_bus
+> and pci_reset_bus functions.
+> 
+> Moving the save and restore into pci_reset_bridge_secondary_bus
+> so that all users of the API have the same behavior.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pci.c | 36 +++++++++++++++---------------------
+>  1 file changed, 15 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index aab9d51..b209378 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3860,19 +3860,6 @@ void __weak pcibios_reset_secondary_bus(struct pci_dev *dev)
+>  	pci_reset_secondary_bus(dev);
+>  }
+>  
+> -/**
+> - * pci_reset_bridge_secondary_bus - Reset the secondary bus on a PCI bridge.
+> - * @dev: Bridge device
+> - *
+> - * Use the bridge control register to assert reset on the secondary bus.
+> - * Devices on the secondary bus are left in power-on state.
+> - */
+> -void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
+> -{
+> -	pcibios_reset_secondary_bus(dev);
+> -}
+> -EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
+> -
+>  static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
+>  {
+>  	struct pci_dev *pdev;
+> @@ -4362,6 +4349,21 @@ static void pci_slot_restore(struct pci_slot *slot)
+>  	}
+>  }
+>  
+> +/**
+> + * pci_reset_bridge_secondary_bus - Reset the secondary bus on a PCI bridge.
+> + * @dev: Bridge device
+> + *
+> + * Use the bridge control register to assert reset on the secondary bus.
+> + * Devices on the secondary bus are left in power-on state.
 
-On 09/13/2016 05:21 PM, Thomas Gleixner wrote:
-> On Fri, 9 Sep 2016, Alexandre TORGUE wrote:
->> +static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
->> +			    unsigned int nr_irqs)
->> +{
->> +	struct irq_data *data = irq_get_irq_data(virq);
->> +
->> +	irq_gc_mask_clr_bit(data->parent_data);
->
-> I have a hard time to understand this. The irq domain is not hierarchical.
+This comment is no longer correct (you don't leave the devices in
+power-on state).
 
-Actually, I wanted to test ".free" callback function of gpio_irq_domain 
-in STM32 pinctrl driver. To do that I modified gpio driver: just after 
-getting virq through gpio_to_irq, I called "irq_dispose_mapping(virq)".
-I know it is dirty but I thought it was the only way to test.
+> + */
+> +void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
+> +{
+> +	pci_bus_save_and_disable(dev->bus);
 
-Doing that, I see that ".free" callback of gpio domain is called but as 
-it is hirerchical ".free" callback for parent domain (exti one) is also 
-called. I observed that virq was well unmapped, but not masked at exti 
-level. It is for this reason than I added 
-"irq_gc_mask_clr_bit(data->parent_data);" which mask interrupt at exti 
-level.
+"dev" is a bridge, and dev->bus is the bus on the *primary* side of
+the bridge, so I think this saves and disables the bridge itself.
+Don't you want dev->subordinate here instead?
 
-Maybe this use case can never happen ? (and in this case all this stuff 
-is not needed)
-
->
->> +	irq_domain_reset_irq_data(data);
->
->> +	domain = irq_domain_add_linear(node, nr_exti,
->> +				       &irq_exti_domain_ops, NULL);
->
-> It's a simple linear domain. So how can data->parent_data be a valid
-> irq_data pointer? Answer: It can't!
-
-This Exti domain is parent of stm32 gpio domain. When ".free" callback 
-of stm32 gpio domain is called then ".free" callback of Exti domain will 
-be automatically called. Those both ".free" callbacks are called with 
-"virq". This virq is created through stm32 gpio domain (in stm32 pinctrl 
-driver), data and parent->data are then associated to it.
-
-Sorry if it is not clear.
-
-Regards
-
-Alex
-
->
-> But it doesn't blow up in your face simply because the alloc/free callbacks
-> are never invoked for simple non hierarchical domains. So you should have
-> removed that stuff after copying some other irqchip driver.
-
-
-
->
-> Thanks,
->
-> 	tglx
->
+> +	pcibios_reset_secondary_bus(dev);
+> +	pci_bus_restore(dev->bus);
+> +}
+> +EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
+> +
+>  static int pci_slot_reset(struct pci_slot *slot, int probe)
+>  {
+>  	int rc;
+> @@ -4504,12 +4506,8 @@ int pci_reset_bus(struct pci_bus *bus)
+>  	if (rc)
+>  		return rc;
+>  
+> -	pci_bus_save_and_disable(bus);
+> -
+>  	rc = pci_bus_reset(bus, 0);
+>  
+> -	pci_bus_restore(bus);
+> -
+>  	return rc;
+>  }
+>  EXPORT_SYMBOL_GPL(pci_reset_bus);
+> @@ -4528,8 +4526,6 @@ int pci_try_reset_bus(struct pci_bus *bus)
+>  	if (rc)
+>  		return rc;
+>  
+> -	pci_bus_save_and_disable(bus);
+> -
+>  	if (pci_bus_trylock(bus)) {
+>  		might_sleep();
+>  		pci_reset_bridge_secondary_bus(bus->self);
+> @@ -4537,8 +4533,6 @@ int pci_try_reset_bus(struct pci_bus *bus)
+>  	} else
+>  		rc = -EAGAIN;
+>  
+> -	pci_bus_restore(bus);
+> -
+>  	return rc;
+>  }
+>  EXPORT_SYMBOL_GPL(pci_try_reset_bus);
+> -- 
+> 1.9.1
+> 
