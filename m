@@ -1,94 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 13 Sep 2016 12:00:41 +0100
-Subject: [PATCH v12 7/8] clocksource/drivers/arm_arch_timer: Add GTDT
- support for memory-mapped timer
-In-Reply-To: <1473763144-5653-8-git-send-email-fu.wei@linaro.org>
-References: <1473763144-5653-1-git-send-email-fu.wei@linaro.org>
- <1473763144-5653-8-git-send-email-fu.wei@linaro.org>
-Message-ID: <57D7DC59.6000705@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 13 Sep 2016 13:04:25 +0200
+Subject: [PATCH v1 1/2] ARM: dts: add rockchip PX3 Evaluation board
+In-Reply-To: <94379f31-00bb-4873-5a93-f6eeead55180@rock-chips.com>
+References: <1473529249-6151-1-git-send-email-andy.yan@rock-chips.com>
+ <1473529440-6202-1-git-send-email-andy.yan@rock-chips.com>
+ <94379f31-00bb-4873-5a93-f6eeead55180@rock-chips.com>
+Message-ID: <1473786122.FM2XgiQb2U@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Argh, new version...
+Hi Andy,
 
-On 13/09/16 11:39, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+Am Dienstag, 13. September 2016, 18:06:12 CEST schrieb Andy Yan:
+> Hi Heiko:
 > 
-> The patch add memory-mapped timer register support by using the information
-> provided by the new GTDT driver of ACPI.
-> 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 127 ++++++++++++++++++++++++++++++++++-
->  1 file changed, 124 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 0197ef9..d33802b 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -888,7 +888,128 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
->  		       arch_timer_mem_init);
->  
->  #ifdef CONFIG_ACPI_GTDT
-> -/* Initialize per-processor generic timer */
-> +static struct gt_timer_data __init *arch_timer_mem_get_timer(
-> +						struct gt_block_data *gt_blocks)
-> +{
-> +	struct gt_block_data *gt_block = gt_blocks;
-> +	struct gt_timer_data *best_frame = NULL;
-> +	void __iomem *cntctlbase;
-> +	u32 cnttidr;
-> +	int i;
-> +
-> +	/*
-> +	 * According to ARMv8 Architecture Reference Manual(ARM),
-> +	 * the size of CNTCTLBase frame of memory-mapped timer
-> +	 * is SZ_4K(Offset 0x000 ? 0xFFF).
-> +	 */
-> +	cntctlbase = ioremap(gt_block->cntctlbase_phy, SZ_4K);
-> +	if (!cntctlbase) {
-> +		pr_err("Failed to map mem timer control frame base address\n");
-> +		return NULL;
-> +	}
-> +	cnttidr = readl_relaxed(cntctlbase + CNTTIDR);
-> +
-> +	/*
-> +	 * Try to find a virtual capable frame. Otherwise fall back to a
-> +	 * physical capable frame.
-> +	 */
-> +	for (i = 0; i < gt_block->timer_count; i++) {
-> +		int n;
-> +		u32 cntacr;
-> +
-> +		n = gt_block->timer[i].frame_nr;
-> +
-> +		/* Try enabling everything, and see what sticks */
-> +		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
-> +			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
-> +		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
-> +		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
-> +
-> +		if ((cnttidr & CNTTIDR_VIRT(n)) &&
-> +		    !(~cntacr & (CNTACR_RWVT | CNTACR_RVCT))) {
-> +			best_frame = &gt_block->timer[i];
-> +			arch_timer_mem_use_virtual = true;
-> +			break;
-> +		}
-> +
-> +		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
-> +			continue;
-> +
-> +		best_frame = &gt_block->timer[i];
-> +	}
-> +	iounmap(cntctlbase);
+>      Is there any further suggestion about this series?
 
-As I just said in my reply to the same patch in v11, all of this is
-duplicating existing infrastructure that already exists for DT. Please
-consider decoupling the core driver code from the firmware side and make
-this reusable.
+nope, all fine. I've now applied both patches, after moving some minor stuff
+around (alphabetical ordering etc). While it is in branches targeted at 4.9 it
+may very well only make it into 4.10.
 
-Thanks,
+I've also dropped the stk3310 i2c node from both until the binding is figured
+out and moved the px3 board binding to the px5 patch, so that we can sort
+entries correctly but don't produce merge conflicts.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+If you have time, please give it a final look:
+https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=a55e2f1b7423ab8b1c3fefbac7ae752e8a4b7edc
+https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=d42f818e056116237ac8b6a3f72e5bfc38681589
+
+
+Heiko
