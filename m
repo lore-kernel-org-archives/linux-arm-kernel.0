@@ -1,20 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Sep 2016 16:11:26 +0200
-Subject: [GIT PULL 2/4] ARM: dts: exynos: DeviceTree for v4.9
-In-Reply-To: <1472548739-20050-3-git-send-email-k.kozlowski@samsung.com>
-References: <1472548739-20050-1-git-send-email-k.kozlowski@samsung.com>
- <1472548739-20050-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <2370086.8mTLarxo32@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 13 Sep 2016 16:12:02 +0200
+Subject: [PATCH v3 3/9] ARM: sun8i: dt: Add DT bindings documentation for
+ Allwinner sun8i-emac
+In-Reply-To: <20160913133417.GC31990@Red>
+References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1473425117-18645-4-git-send-email-clabbe.montjoie@gmail.com>
+ <20160909141710.GF30871@lunn.ch> <20160913133417.GC31990@Red>
+Message-ID: <20160913141202.GO11400@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 30, 2016 11:18:57 AM CEST Krzysztof Kozlowski wrote:
-> Samsung DeviceTree update for v4.9:
-> 1. Set chosen serial bitrate which allows proper serial output when
->    bootloader does pass all the data in command line.
-> 2. Cleanup.
+On Tue, Sep 13, 2016 at 03:34:17PM +0200, LABBE Corentin wrote:
+> On Fri, Sep 09, 2016 at 04:17:10PM +0200, Andrew Lunn wrote:
+> > > +Optional properties:
+> > > +- allwinner,tx-delay: TX clock delay chain value. Range value is 0-0x07. Default is 0)
+> > > +- allwinner,rx-delay: RX clock delay chain value. Range value is 0-0x1F. Default is 0)
+> > 
+> > What are the units? pS? nS?
+> > 
+> >      Andrew
 > 
+> No units, only raw number.
+> I will add a comment for this.
 
-Pulled into next/dt, thanks!
+And it is likely it will get NACKed by the device tree
+maintainers. You should use real unit here.
 
-	Arnd
+       Andrew
