@@ -1,42 +1,28 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 13 Sep 2016 18:12:41 +0200
-Subject: [PATCH 3/3] ARM: dts: lpc18xx: add otp node
-In-Reply-To: <20160913161241.22492-1-manabian@gmail.com>
-References: <20160913161241.22492-1-manabian@gmail.com>
-Message-ID: <20160913161241.22492-4-manabian@gmail.com>
+From: kyle@infradead.org (Kyle McMartin)
+Date: Tue, 13 Sep 2016 12:14:10 -0400
+Subject: pull request: linux-firmware: Update Mediatek MT8173 VPU firmware
+In-Reply-To: <1473337757-19723-1-git-send-email-andrew-ct.chen@mediatek.com>
+References: <1473337757-19723-1-git-send-email-andrew-ct.chen@mediatek.com>
+Message-ID: <20160913161410.GC7853@merlin.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node for the internal OTP (One Time Programmable) memory found
-on all LPC18xx/43xx SoCs.
+On Thu, Sep 08, 2016 at 08:29:16PM +0800, Andrew-CT Chen wrote:
+> Hi linux-firmware maintainers,
+> 
+> The following changes since commit c883a6b6186bb2415761d287cbac773062911212:
+> 
+>   rtl_bt: Add firmware and config file for RTL8822BE (2016-08-31 02:38:31 +0100)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/andrewct-chen/linux_fw_vpu_v1.0.2.git decoder_mdp
+> 
+> for you to fetch changes up to 5b0873b6e750f906fe4244fd173df919c66e1b73:
+> 
+>   mediatek: Update firmware for decoder and MDP (2016-09-08 18:58:37 +0800)
+> 
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/arm/boot/dts/lpc18xx.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Pulled, thanks.
 
-diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
-index c6508ed..7ef0bc8 100644
---- a/arch/arm/boot/dts/lpc18xx.dtsi
-+++ b/arch/arm/boot/dts/lpc18xx.dtsi
-@@ -250,6 +250,18 @@
- 			};
- 		};
- 
-+		otp at 40045000 {
-+			compatible = "nxp,lpc1850-otp";
-+			reg = <0x40045000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			/* Flashless devices has part ID in OTP bank 0 */
-+			part_id: identification at 0 {
-+				reg = <0x0 0x10>;
-+			};
-+		};
-+
- 		rtc: rtc at 40046000 {
- 			compatible = "nxp,lpc1850-rtc", "nxp,lpc1788-rtc";
- 			reg = <0x40046000 0x1000>;
--- 
-2.9.3
+regards, --Kyle
