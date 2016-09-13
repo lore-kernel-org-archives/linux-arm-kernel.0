@@ -1,123 +1,52 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 13 Sep 2016 09:32:02 -0500
-Subject: [PATCH 1/3] PCI: Xilinx NWL PCIe: Expanding PCIe core errors and
- printing event occurred.
-In-Reply-To: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
-References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <20160913143202.GB27748@localhost>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Tue, 13 Sep 2016 07:33:02 -0700
+Subject: [PATCH net-next 1/2] net: mvneta: add xmit_more support
+In-Reply-To: <1473750006-21199-2-git-send-email-mw@semihalf.com>
+References: <1473750006-21199-1-git-send-email-mw@semihalf.com>
+ <1473750006-21199-2-git-send-email-mw@semihalf.com>
+Message-ID: <1473777182.18970.118.camel@edumazet-glaptop3.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bharat,
-
-On Tue, Aug 30, 2016 at 04:09:16PM +0530, Bharat Kumar Gogada wrote:
-> The current driver prints pcie core error, for all core events.
-> Instead of just printing PCIe core error, now adding prints to show
-> individual core events occurred.
+On Tue, 2016-09-13 at 09:00 +0200, Marcin Wojtas wrote:
+> From: Simon Guinot <simon.guinot@sequanux.org>
 > 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> Basing on xmit_more flag of the skb, TX descriptors can be concatenated
+> before flushing. This commit delay Tx descriptor flush if the queue is
+> running and if there is more skb's to send.
+> 
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
 > ---
->  drivers/pci/host/pcie-xilinx-nwl.c | 48 +++++++++++++++++++++++++++++++-------
->  1 file changed, 40 insertions(+), 8 deletions(-)
+>  drivers/net/ethernet/marvell/mvneta.c | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-> index 3479d30..86c1834 100644
-> --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> @@ -85,10 +85,15 @@
->  #define MSGF_MISC_SR_MASTER_ERR		BIT(5)
->  #define MSGF_MISC_SR_I_ADDR_ERR		BIT(6)
->  #define MSGF_MISC_SR_E_ADDR_ERR		BIT(7)
-> -#define MSGF_MISC_SR_UR_DETECT          BIT(20)
-> -
-> -#define MSGF_MISC_SR_PCIE_CORE		GENMASK(18, 16)
-> -#define MSGF_MISC_SR_PCIE_CORE_ERR	GENMASK(31, 22)
-> +#define MSGF_MISC_SR_FATAL_AER		BIT(16)
-> +#define MSGF_MISC_SR_NON_FATAL_AER	BIT(17)
-> +#define MSGF_MISC_SR_CORR_AER		BIT(18)
-> +#define MSGF_MISC_SR_UR_DETECT		BIT(20)
-> +#define MSGF_MISC_SR_NON_FATAL_DEV	BIT(22)
-> +#define MSGF_MISC_SR_FATAL_DEV		BIT(23)
-> +#define MSGF_MISC_SR_LINK_DOWN		BIT(24)
-> +#define MSGF_MSIC_SR_LINK_AUTO_BWIDTH	BIT(25)
-> +#define MSGF_MSIC_SR_LINK_BWIDTH	BIT(26)
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index d41c28d..b9dccea 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -512,6 +512,7 @@ struct mvneta_tx_queue {
+>  	 * descriptor ring
+>  	 */
+>  	int count;
+> +	int pending;
+>  	int tx_stop_threshold;
+>  	int tx_wake_threshold;
 >  
->  #define MSGF_MISC_SR_MASKALL		(MSGF_MISC_SR_RXMSG_AVAIL | \
->  					MSGF_MISC_SR_RXMSG_OVER | \
-> @@ -96,9 +101,15 @@
->  					MSGF_MISC_SR_MASTER_ERR | \
->  					MSGF_MISC_SR_I_ADDR_ERR | \
->  					MSGF_MISC_SR_E_ADDR_ERR | \
-> +					MSGF_MISC_SR_FATAL_AER | \
-> +					MSGF_MISC_SR_NON_FATAL_AER | \
-> +					MSGF_MISC_SR_CORR_AER | \
->  					MSGF_MISC_SR_UR_DETECT | \
-> -					MSGF_MISC_SR_PCIE_CORE | \
-> -					MSGF_MISC_SR_PCIE_CORE_ERR)
-> +					MSGF_MISC_SR_NON_FATAL_DEV | \
-> +					MSGF_MISC_SR_FATAL_DEV | \
-> +					MSGF_MISC_SR_LINK_DOWN | \
-> +					MSGF_MSIC_SR_LINK_AUTO_BWIDTH | \
-> +					MSGF_MSIC_SR_LINK_BWIDTH)
->  
->  /* Legacy interrupt status mask bits */
->  #define MSGF_LEG_SR_INTA		BIT(0)
-> @@ -291,8 +302,29 @@ static irqreturn_t nwl_pcie_misc_handler(int irq, void *data)
->  		dev_err(pcie->dev,
->  			"In Misc Egress address translation error\n");
->  
-> -	if (misc_stat & MSGF_MISC_SR_PCIE_CORE_ERR)
-> -		dev_err(pcie->dev, "PCIe Core error\n");
-> +	if (misc_stat & MSGF_MISC_SR_FATAL_AER)
-> +		dev_err(pcie->dev, "Fatal Error in AER Capability\n");
-> +
-> +	if (misc_stat & MSGF_MISC_SR_NON_FATAL_AER)
-> +		dev_err(pcie->dev, "Non-Fatal Error in AER Capability\n");
-> +
-> +	if (misc_stat & MSGF_MISC_SR_CORR_AER)
-> +		dev_err(pcie->dev, "Correctable Error in AER Capability\n");
-> +
-> +	if (misc_stat & MSGF_MISC_SR_UR_DETECT)
-> +		dev_err(pcie->dev, "Unsupported request Detected\n");
-> +
-> +	if (misc_stat & MSGF_MISC_SR_NON_FATAL_DEV)
-> +		dev_err(pcie->dev, "Non-Fatal Error Detected\n");
-> +
-> +	if (misc_stat & MSGF_MISC_SR_FATAL_DEV)
-> +		dev_err(pcie->dev, "Fatal Error Detected\n");
-> +
-> +	if (misc_stat & MSGF_MSIC_SR_LINK_AUTO_BWIDTH)
-> +		dev_info(pcie->dev, "Link Autonomous Bandwidth Management Status bit set\n");
-> +
-> +	if (misc_stat & MSGF_MSIC_SR_LINK_BWIDTH)
-> +		dev_info(pcie->dev, "Link Bandwidth Management Status bit set\n");
->  
->  	/* Clear misc interrupt status */
->  	nwl_bridge_writel(pcie, misc_stat, MSGF_MISC_STATUS);
+> @@ -802,8 +803,9 @@ static void mvneta_txq_pend_desc_add(struct mvneta_port *pp,
+>  	/* Only 255 descriptors can be added at once ; Assume caller
+>  	 * process TX desriptors in quanta less than 256
+>  	 */
 
-This patch looks fine, but looking at the code as a whole, I have a
-question.  You basically have this:
+Hi Marcin
 
-  misc_stat = nwl_bridge_readl(pcie, MSGF_MISC_STATUS) & MSGF_MISC_SR_MASKALL;
-  if (!misc_stat)
-    return IRQ_NONE;
-  ...
-  nwl_bridge_writel(pcie, misc_stat, MSGF_MISC_STATUS);
+Well, given the above comment, and fact that MVNETA_MAX_TXD == 532, it
+looks like you might add a bug if more than 256 skb are given to your
+ndo_start_xmit() with skb->xmit_more = 1
 
-The masking with MSGF_MISC_SR_MASKALL seems wrong.  Let's say
-MSGF_MISC_STATUS had some other bit set, e.g., BIT(31), indicating
-some yet-unsupported interrupt cause.  BIT(31) is not in
-MSGF_MISC_SR_MASKALL, so we return IRQ_NONE without clearing the
-interrupt bit in MSGF_MISC_STATUS.  Won't that cause an interrupt
-storm where the interrupt is continually re-asserted because we never
-clear it?
+I therefore suggest you make sure it does not happen.
 
-It seems like it would make more sense to do this:
-
-  misc_stat = nwl_bridge_readl(pcie, MSGF_MISC_STATUS);
-  if (!misc_stat)
-    return IRQ_NONE;
-  ...
-  if (misc_stat != (misc_stat & MSGF_MISC_SR_MASKALL))
-    dev_err(dev, "unexpected IRQ, MSGF_MISC_STATUS %#010x\n", misc_stat);
-  nwl_bridge_writel(pcie, misc_stat, MSGF_MISC_STATUS);
+txq->pending += frags;
+if (!skb->xmit_more ||
+    txq->pending > 256 - MVNETA_MAX_SKB_DESCS ||
+    netif_xmit_stopped(nq))
+	mvneta_txq_pend_desc_add(pp, txq)
