@@ -1,25 +1,36 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?Q?S=c3=a9bastien_Szymanski?=)
-Date: Tue, 13 Sep 2016 13:52:48 +0200
-Subject: [PATCH v2 1/2] ARM: dts: imx6ul: Add DTS for liteSOM module
-In-Reply-To: <20160913094951.26394-1-m.niestroj@grinn-global.com>
-References: <20160913094951.26394-1-m.niestroj@grinn-global.com>
-Message-ID: <5c6db9d0-e7b2-e3fd-11e6-be1bde6e65e7@armadeus.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 13 Sep 2016 19:51:37 +0800
+Subject: [PATCH v11 5/8] clocksource/drivers/arm_arch_timer: Simplify ACPI
+ support code.
+In-Reply-To: <57D7E543.3060301@codeaurora.org>
+References: <1473168352-5156-1-git-send-email-fu.wei@linaro.org>
+ <1473168352-5156-6-git-send-email-fu.wei@linaro.org>
+ <alpine.DEB.2.20.1609061635000.5647@nanos>
+ <CADyBb7uX79UP=mUxvP-EPGi56-46y2SCMPsWO=Uw-=N0GQERhA@mail.gmail.com>
+ <CADyBb7v-b1bKGBdH6J78UhfCcQd=BJLFoZ16GNgmrd2EucjYDA@mail.gmail.com>
+ <57D7E543.3060301@codeaurora.org>
+Message-ID: <1919ec70-6f24-365c-b5f2-6db56bb81e3f@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Timur
 
-On 09/13/2016 11:49 AM, Marcin Niestroj wrote:
 
-> +
-> +&cpu0 {
-> +	arm-supply = <&reg_arm>;
-> +	soc-supply = <&reg_soc>;
-> +};
-
-These supplies are already set in the imx6ul.dtsi file.
-
-Regards,
+On 09/13/2016 07:38 PM, Timur Tabi wrote:
+> Fu Wei wrote:
+>> I have prepared v12 (rebase to rc6 and on the top of IORT v11),
+>> should I send it now
+>
+> Yes.
+>
+> Please don't wait to release new versions of your patches.  Time is running out to get these into 4.9.
+>
+yes, v12 is posted
+working on v13(improving memory-mapped timer code following Marc's suggestion)
 
 -- 
-S?bastien Szymanski
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat 
