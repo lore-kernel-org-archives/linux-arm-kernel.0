@@ -1,122 +1,186 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 13 Sep 2016 10:56:41 -0500
-Subject: [PATCH 1/6] PCI: xilinx: Keep both legacy and MSI interrupt
- references.
-In-Reply-To: <1472724886-28301-1-git-send-email-bharatku@xilinx.com>
-References: <1472724886-28301-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <20160913155641.GB4138@localhost>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 13 Sep 2016 17:00:05 +0100
+Subject: [PATCH v5 06/14] drivers: acpi: implement acpi_dma_configure
+In-Reply-To: <ea01f486-8be6-f87a-caed-96fadade054c@arm.com>
+References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
+ <20160909142343.13314-7-lorenzo.pieralisi@arm.com>
+ <ea01f486-8be6-f87a-caed-96fadade054c@arm.com>
+Message-ID: <20160913160005.GB2436@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 03:44:41PM +0530, Bharat Kumar Gogada wrote:
-> When built with MSI support the legacy domain reference is being
-> overwritten with MSI.
-> Instead creating two separate domains for MSI and legacy interrupts.
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+On Tue, Sep 13, 2016 at 03:41:06PM +0100, Robin Murphy wrote:
+> On 09/09/16 15:23, Lorenzo Pieralisi wrote:
+> > On DT based systems, the of_dma_configure() API implements DMA
+> > configuration for a given device. On ACPI systems an API equivalent to
+> > of_dma_configure() is missing which implies that it is currently not
+> > possible to set-up DMA operations for devices through the ACPI generic
+> > kernel layer.
+> > 
+> > This patch fills the gap by introducing acpi_dma_configure/deconfigure()
+> > calls that for now are just wrappers around arch_setup_dma_ops() and
+> > arch_teardown_dma_ops() and also updates ACPI and PCI core code to use
+> > the newly introduced acpi_dma_configure/acpi_dma_deconfigure functions.
+> > 
+> > The DMA range size passed to arch_setup_dma_ops() is sized according
+> > to the device coherent_dma_mask (starting at address 0x0), mirroring the
+> > DT probing path behaviour when a dma-ranges property is not provided
+> > for the device being probed; this changes the current arch_setup_dma_ops()
+> > call parameters in the ACPI probing case, but since arch_setup_dma_ops()
+> > is a NOP on all architectures but ARM/ARM64 this patch does not change
+> > the current kernel behaviour on them.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Acked-by: Bjorn Helgaas <bhelgaas@google.com> [pci]
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Robin Murphy <robin.murphy@arm.com>
+> > Cc: Tomasz Nowicki <tn@semihalf.com>
+> > Cc: Joerg Roedel <joro@8bytes.org>
+> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> > ---
+> >  drivers/acpi/glue.c     |  4 ++--
+> >  drivers/acpi/scan.c     | 24 ++++++++++++++++++++++++
+> >  drivers/pci/probe.c     |  3 +--
+> >  include/acpi/acpi_bus.h |  2 ++
+> >  include/linux/acpi.h    |  5 +++++
+> >  5 files changed, 34 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+> > index 5ea5dc2..f8d6564 100644
+> > --- a/drivers/acpi/glue.c
+> > +++ b/drivers/acpi/glue.c
+> > @@ -227,8 +227,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+> >  
+> >  	attr = acpi_get_dma_attr(acpi_dev);
+> >  	if (attr != DEV_DMA_NOT_SUPPORTED)
+> > -		arch_setup_dma_ops(dev, 0, 0, NULL,
+> > -				   attr == DEV_DMA_COHERENT);
+> > +		acpi_dma_configure(dev, attr);
 
-Applied all these (except [5/6]) with Michal's ack to pci/host-xilinx for
-v4.9, thanks!
+Here's the call for non-PCI devices ;-)
 
-I already applied Po Liu's patch ("PCI: xilinx: Relax device number
-checking to allow SR-IOV") to pci/virtualization.  This is identical to
-[5/6], so I dropped [5/6] to avoid a conflict.
+> >  	acpi_physnode_link_name(physical_node_name, node_id);
+> >  	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
+> > @@ -251,6 +250,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+> >  	return 0;
+> >  
+> >   err:
+> > +	acpi_dma_deconfigure(dev);
+> >  	ACPI_COMPANION_SET(dev, NULL);
+> >  	put_device(dev);
+> >  	put_device(&acpi_dev->dev);
+> > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> > index e878fc7..9614232 100644
+> > --- a/drivers/acpi/scan.c
+> > +++ b/drivers/acpi/scan.c
+> > @@ -1370,6 +1370,30 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+> >  		return DEV_DMA_NON_COHERENT;
+> >  }
+> >  
+> > +/**
+> > + * acpi_dma_configure - Set-up DMA configuration for the device.
+> > + * @dev: The pointer to the device
+> > + * @attr: device dma attributes
+> > + */
+> > +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+> > +{
+> > +	/*
+> > +	 * Assume dma valid range starts at 0 and covers the whole
+> > +	 * coherent_dma_mask.
+> > +	 */
+> > +	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, NULL,
+> > +			   attr == DEV_DMA_COHERENT);
+> 
+> This looks a bit hairy - if we're setting up the DMA configuration at
+> this point can we really always rely on the device already having a
+> valid DMA mask? I think it would make sense to at least check, and apply
+> the standard default 32-bit mask  if not.
 
-> ---
->  drivers/pci/host/pcie-xilinx.c | 26 +++++++++++++++-----------
->  1 file changed, 15 insertions(+), 11 deletions(-)
+That's a good point, but we would be changing the x86/IA64 probing path
+if we do what you suggest; so I think you are right and it should be a
+safe change to make but I still need to make sure we do not break
+anything in the process.
+
+> > +}
+> > +
+> > +/**
+> > + * acpi_dma_deconfigure - Tear-down DMA configuration for the device.
+> > + * @dev: The pointer to the device
+> > + */
+> > +void acpi_dma_deconfigure(struct device *dev)
+> > +{
+> > +	arch_teardown_dma_ops(dev);
+> > +}
 > 
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index a30e016..bd64677 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -101,7 +101,8 @@
->   * @msi_pages: MSI pages
->   * @root_busno: Root Bus number
->   * @dev: Device pointer
-> - * @irq_domain: IRQ domain pointer
-> + * @msi_domain: MSI IRQ domain pointer
-> + * @leg_domain: Legacy IRQ domain pointer
->   * @resources: Bus Resources
->   */
->  struct xilinx_pcie_port {
-> @@ -110,7 +111,8 @@ struct xilinx_pcie_port {
->  	unsigned long msi_pages;
->  	u8 root_busno;
->  	struct device *dev;
-> -	struct irq_domain *irq_domain;
-> +	struct irq_domain *msi_domain;
-> +	struct irq_domain *leg_domain;
->  	struct list_head resources;
->  };
->  
-> @@ -281,7 +283,7 @@ static int xilinx_pcie_msi_setup_irq(struct msi_controller *chip,
->  	if (hwirq < 0)
->  		return hwirq;
->  
-> -	irq = irq_create_mapping(port->irq_domain, hwirq);
-> +	irq = irq_create_mapping(port->msi_domain, hwirq);
->  	if (!irq)
->  		return -EINVAL;
->  
-> @@ -443,7 +445,7 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
->  			/* Handle INTx Interrupt */
->  			val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
->  				XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
-> -			generic_handle_irq(irq_find_mapping(port->irq_domain,
-> +			generic_handle_irq(irq_find_mapping(port->leg_domain,
->  							    val));
->  		}
->  	}
-> @@ -526,12 +528,14 @@ static void xilinx_pcie_free_irq_domain(struct xilinx_pcie_port *port)
->  	}
->  
->  	for (i = 0; i < num_irqs; i++) {
-> -		irq = irq_find_mapping(port->irq_domain, i);
-> +		irq = irq_find_mapping(port->leg_domain, i);
->  		if (irq > 0)
->  			irq_dispose_mapping(irq);
->  	}
-> -
-> -	irq_domain_remove(port->irq_domain);
-> +	if (port->leg_domain)
-> +		irq_domain_remove(port->leg_domain);
-> +	if (port->msi_domain)
-> +		irq_domain_remove(port->msi_domain);
->  }
->  
->  /**
-> @@ -553,21 +557,21 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
->  		return -ENODEV;
->  	}
->  
-> -	port->irq_domain = irq_domain_add_linear(pcie_intc_node, 4,
-> +	port->leg_domain = irq_domain_add_linear(pcie_intc_node, 4,
->  						 &intx_domain_ops,
->  						 port);
-> -	if (!port->irq_domain) {
-> +	if (!port->leg_domain) {
->  		dev_err(dev, "Failed to get a INTx IRQ domain\n");
->  		return -ENODEV;
->  	}
->  
->  	/* Setup MSI */
->  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> -		port->irq_domain = irq_domain_add_linear(node,
-> +		port->msi_domain = irq_domain_add_linear(node,
->  							 XILINX_NUM_MSI_IRQS,
->  							 &msi_domain_ops,
->  							 &xilinx_pcie_msi_chip);
-> -		if (!port->irq_domain) {
-> +		if (!port->msi_domain) {
->  			dev_err(dev, "Failed to get a MSI IRQ domain\n");
->  			return -ENODEV;
->  		}
-> -- 
-> 2.1.1
+> As touched upon in the dwc-usb3 thread, is it worth exporting these for
+> the benefit of modular bus/glue code, to match of_dma_configure()?
+
+I think yes, I will do.
+
+> >  static void acpi_init_coherency(struct acpi_device *adev)
+> >  {
+> >  	unsigned long long cca = 0;
+> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> > index 93f280d..e96d482 100644
+> > --- a/drivers/pci/probe.c
+> > +++ b/drivers/pci/probe.c
+> > @@ -1734,8 +1734,7 @@ static void pci_dma_configure(struct pci_dev *dev)
+> >  		if (attr == DEV_DMA_NOT_SUPPORTED)
+> >  			dev_warn(&dev->dev, "DMA not supported.\n");
+> >  		else
+> > -			arch_setup_dma_ops(&dev->dev, 0, 0, NULL,
+> > -					   attr == DEV_DMA_COHERENT);
+> > +			acpi_dma_configure(&dev->dev, attr);
+> >  	}
 > 
+> What about non-PCI stuff? I see there's at least an
+> acpi_create_platform_device() which I'd also kind of expect to see as a
+> caller (which indeed might also tie in with the aforementioned default
+> mask initialisation).
+
+See above (acpi_bind_one()).
+
+Thanks for having a look,
+Lorenzo
+
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Robin.
+> 
+> >  
+> >  	pci_put_host_bridge_device(bridge);
+> > diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+> > index c1a524d..4242c31 100644
+> > --- a/include/acpi/acpi_bus.h
+> > +++ b/include/acpi/acpi_bus.h
+> > @@ -573,6 +573,8 @@ struct acpi_pci_root {
+> >  
+> >  bool acpi_dma_supported(struct acpi_device *adev);
+> >  enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev);
+> > +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
+> > +void acpi_dma_deconfigure(struct device *dev);
+> >  
+> >  struct acpi_device *acpi_find_child_device(struct acpi_device *parent,
+> >  					   u64 address, bool check_children);
+> > diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> > index c5eaf2f..05d4e48 100644
+> > --- a/include/linux/acpi.h
+> > +++ b/include/linux/acpi.h
+> > @@ -729,6 +729,11 @@ static inline enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+> >  	return DEV_DMA_NOT_SUPPORTED;
+> >  }
+> >  
+> > +static inline void acpi_dma_configure(struct device *dev,
+> > +				      enum dev_dma_attr attr) { }
+> > +
+> > +static inline void acpi_dma_deconfigure(struct device *dev) { }
+> > +
+> >  #define ACPI_PTR(_ptr)	(NULL)
+> >  
+> >  static inline void acpi_device_set_enumerated(struct acpi_device *adev)
+> > 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
