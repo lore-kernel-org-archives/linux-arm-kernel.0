@@ -1,83 +1,81 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 12 Sep 2016 20:51:03 -0700
-Subject: [PATCH] ARM: dts: msm8974: Add definitions for QCE & cryptobam
-In-Reply-To: <20160830153740.13275-1-voker57@gmail.com>
-References: <20160830153740.13275-1-voker57@gmail.com>
-Message-ID: <20160913035103.GA21438@tuxbot>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 12 Sep 2016 21:43:04 -0700
+Subject: [PATCH 2/3] ARM64: dts: amlogic: Add basic support for Amlogic
+ S905X
+In-Reply-To: <28d9160a-ce40-cbbb-b4e9-3ec34be52368@suse.de>
+References: <20160903082227.30559-1-narmstrong@baylibre.com>
+ <20160903082227.30559-3-narmstrong@baylibre.com>
+ <7e27e8c0-bb18-40d8-10d6-3928e66815c7@suse.de>
+ <CAOQ7t2bWLq2XP2rKx3msf=1tUfXkQuBWagun46TaKk73qXr=FQ@mail.gmail.com>
+ <7ha8fcq26c.fsf@baylibre.com> <28d9160a-ce40-cbbb-b4e9-3ec34be52368@suse.de>
+Message-ID: <CAOi56cV+T0zCFuQfnZXUoDi3EvbyQvwBxpp==1Qu0H_S4r5Vsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 30 Aug 08:37 PDT 2016, Iaroslav Gridin wrote:
+On Mon, Sep 12, 2016 at 2:43 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Am 12.09.2016 um 22:43 schrieb Kevin Hilman:
+>> Carlo Caione <carlo@caione.org> writes:
+>>> On Mon, Sep 12, 2016 at 6:28 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>>>
+>>>>> +Boards with the Amlogic Meson GXL SoC shall have the following properties:
+>>>>> +  Required root node property:
+>>>>> +    compatible: "amlogic,meson-gxl-s905x", "amlogic,meson-gxl";
+>>>>
+>>>> Can we please use "amlogic,s905x", "amlogic,meson-gxl"? No need to
+>>>> complicate the name. Also affects .dtsi and .dts below.
+>>>
+>>> gxl != s905x.
+>
+> Huh? You're seemingly completely missing my point...
+>
+> But you are right that _Neil's_ heading needs to be fixed, too:
+> Clearly not all GXL SoCs need to have an S905X compatible string!
+> So it should be "Boards with the Amlogic S905X SoC shall ..." or so.
+>
+>>> AFAWK to the GXL family belong several different SoCs, like S905X,
+>>> S905D, etc... (see patch 3/3)
+>
+> Thanks, I already know that, that's why you have two compatible strings
+> instead of just one like for GXBB. We can certainly prepend one for
+> symmetry there, too, if it makes you happier.
+>
+>>> This is why we use meson-gxl-s905x, meson-gxl-s905d, etc...
+>>
+>> Correct.
+>>
+>>> We could s/meson-gxl-s905x/meson-s905x/ and
+>>> s/meson-gxl-s905d/meson-s905d/ but I honestly prefer this way because
+>>> we can clearly see which family the SoC belongs to (the Amlogic naming
+>>> convention is already messy enough).
+>>> I mean, yes it's longer, but it's for the sake of documentation IMO.
+>>
+>> +1
+>
+> I still don't follow that conclusion. The board is called "amlogic,p231"
+> because P231 is a unique identifier within the Amlogic namespace, so why
+> not call the SoC "amlogic,s905x" for the same reason? The documentation
+> is already there in having both "amlogic,s905x" _and_
+> "amlogic,meson-gxl" - please re-read my post. There is no S905X in GXL
+> family and another S905X in some other Amlogic SoC family, so it's
+> unique and there is no reason to encode any hierarchies into its name
+> other than vendor,name.
+>
+> I'm not arguing over the file name, where it perfectly makes sense to
+> have a meson-gxl- prefix (already discussed), just about the compatible
+> string where we don't have "amlogic,meson-gxl-s905x-p231" either because
+> it is completely unnecessary and does _not_ add any value.
 
-> From: Voker57 <voker57@gmail.com>
-> 
-> Add device tree definitions for Qualcomm Cryptography engine and its BAM
-> Signed-off-by: Iaroslav Gridin <voker57@gmail.com>
-> ---
->  arch/arm/boot/dts/qcom-msm8974.dtsi | 42 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> index 561d4d1..c0da739 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> @@ -287,6 +287,48 @@
->  			reg = <0xf9011000 0x1000>;
->  		};
->  
-> +		cryptobam: dma at fd444000 {
-> +			compatible = "qcom,bam-v1.4.0";
-> +			reg = <0xfd444000 0x15000>;
-> +			interrupts = <0 236 0>;
-> +			clocks = <&gcc GCC_CE2_AHB_CLK>,
-> +				 <&gcc GCC_CE2_AXI_CLK>,
-> +				 <&gcc GCC_CE2_CLK>;
-> +			clock-names = "bam_clk", "axi_clk", "core_clk";
-> +			#dma-cells = <1>;
-> +			qcom,ee = <1>;
-> +			qcom,controlled-remotely;
-> +			};
+Sorry, I'm guilty of not fully reading the original post.  I was
+thinking only of the filenames, which it seems were already agreed on
+to be long.
 
-As Stan noted, please shift this '}' one step left (the rest looks well
-indented.
+> Not that we're checking this string anywhere anyway... If you want to
+> check for the GXL family you have to use "amlogic,meson-gxl"; if you
+> want to check for the specific SoC you use "amlogic,s905x". Simple. We
+> never match partial strings, so there is no sense in a hardcoded prefix
+> that is duplicating information already available.
 
-> +
-> +		qcom,qcrypto at fd440000 {
+For the compatible strings, I think your proposed shorter (but still
+unique) forms are fine with me.
 
-Rename this "qcrypto" and make sure the address matches the reg
-property.
-
-> +			compatible = "qcom,crypto-v5.1";
-> +			reg = <0xfd45a000 0x6000>;
-> +			reg-names = "crypto-base";
-> +			interrupts = <0 236 0>;
-> +			qcom,bam-pipe-pair = <2>;
-> +			qcom,ce-hw-instance = <1>;
-> +			qcom,ce-device = <0>;
-> +			clocks = <&gcc GCC_CE2_CLK>,
-> +				 <&gcc GCC_CE2_AHB_CLK>,
-> +				 <&gcc GCC_CE2_AXI_CLK>,
-> +				 <&gcc CE2_CLK_SRC>;
-> +
-> +			dmas = <&cryptobam 2>, <&cryptobam 3>;
-> +			dma-names = "rx", "tx";
-> +			clock-names = "core", "iface", "bus", "core_src";
-> +			qcom,clk-mgmt-sus-res;
-> +			qcom,msm-bus,name = "qcrypto-noc";
-> +
-> +			qcom,msm-bus,num-cases = <2>;
-> +			qcom,msm-bus,num-paths = <1>;
-> +			qcom,use-sw-aes-cbc-ecb-ctr-algo;
-> +			qcom,use-sw-aes-xts-algo;
-> +			qcom,use-sw-ahash-algo;
-> +			qcom,msm-bus,vectors-KBps = <56 512 0 0>,
-> +						    <56 512 3936000 393600>;
-> +			};
-> +
-> +
->  		timer at f9020000 {
-
-It's nice to keep the nodes within a group ordered by address.
-
-Regards,
-Bjorn
+Kevin
