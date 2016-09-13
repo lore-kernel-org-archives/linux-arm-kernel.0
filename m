@@ -1,76 +1,78 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 13 Sep 2016 11:16:09 +0100
-Subject: [PATCH 7/7] arm64: KVM: Enable selective trapping of TLB instructions
+Date: Tue, 13 Sep 2016 11:16:07 +0100
+Subject: [PATCH 5/7] arm64/kvm: hyp: tlb: use __tlbi() helper
 In-Reply-To: <1473761769-30572-1-git-send-email-punit.agrawal@arm.com>
 References: <1473761769-30572-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1473761769-30572-8-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1473761769-30572-6-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TTLB bit of Hypervisor Control Register (HCR_EL2) controls the
-trapping of guest TLB maintenance instructions. Taking the trap requires
-a switch to the hypervisor and is an expensive operation.
+From: Mark Rutland <mark.rutland@arm.com>
 
-Enable selective trapping of guest TLB instructions when the associated
-perf trace event is enabled for a specific virtual machine.
+Now that we have a __tlbi() helper, make use of this in the arm64 KVM hyp
+code to get rid of asm() boilerplate. At the same time, we simplify
+__tlb_flush_vm_context by using __flush_icache_all(), as this has the
+appropriate instruction cache maintenance and barrier.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+[ rename tlbi -> __tlbi, convert additional sites, update commit log ]
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/perf_trace.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm64/kvm/hyp/tlb.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kvm/perf_trace.c b/arch/arm64/kvm/perf_trace.c
-index 1cafbc9..649ca55 100644
---- a/arch/arm64/kvm/perf_trace.c
-+++ b/arch/arm64/kvm/perf_trace.c
-@@ -17,6 +17,8 @@
- #include <linux/kvm_host.h>
- #include <linux/trace_events.h>
+diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+index be8177c..4cda100 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
++++ b/arch/arm64/kvm/hyp/tlb.c
+@@ -16,6 +16,7 @@
+  */
  
-+#include <asm/kvm_emulate.h>
-+
- typedef int (*perf_trace_callback_fn)(struct kvm *kvm, bool enable);
+ #include <asm/kvm_hyp.h>
++#include <asm/tlbflush.h>
  
- struct kvm_trace_hook {
-@@ -24,7 +26,37 @@ struct kvm_trace_hook {
- 	perf_trace_callback_fn setup_fn;
- };
+ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+@@ -32,7 +33,7 @@ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 	 * whole of Stage-1. Weep...
+ 	 */
+ 	ipa >>= 12;
+-	asm volatile("tlbi ipas2e1is, %0" : : "r" (ipa));
++	__tlbi(ipas2e1is, ipa);
  
-+static int tlb_invalidate_trap(struct kvm *kvm, bool enable)
-+{
-+	int i;
-+	struct kvm_vcpu *vcpu;
-+
-+	/*
-+	 * Halt the VM to ensure atomic update across all vcpus (this
-+	 * avoids racy behaviour against other modifications of
-+	 * HCR_EL2 such as kvm_toggle_cache/kvm_set_way_flush).
-+	 */
-+	kvm_arm_halt_guest(kvm);
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		unsigned long hcr = vcpu_get_hcr(vcpu);
-+
-+		if (enable)
-+			hcr |= HCR_TTLB;
-+		else
-+			hcr &= ~HCR_TTLB;
-+
-+		vcpu_set_hcr(vcpu, hcr);
-+	}
-+	kvm_arm_resume_guest(kvm);
-+
-+	return 0;
-+}
-+
- static struct kvm_trace_hook trace_hook[] = {
-+	{
-+		.key = "kvm_tlb_invalidate",
-+		.setup_fn = tlb_invalidate_trap,
-+	},
- 	{ },
- };
+ 	/*
+ 	 * We have to ensure completion of the invalidation at Stage-2,
+@@ -41,7 +42,7 @@ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 	 * the Stage-1 invalidation happened first.
+ 	 */
+ 	dsb(ish);
+-	asm volatile("tlbi vmalle1is" : : );
++	__tlbi(vmalle1is);
+ 	dsb(ish);
+ 	isb();
  
+@@ -60,7 +61,7 @@ static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
+ 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+ 	isb();
+ 
+-	asm volatile("tlbi vmalls12e1is" : : );
++	__tlbi(vmalls12e1is);
+ 	dsb(ish);
+ 	isb();
+ 
+@@ -72,9 +73,8 @@ __alias(__tlb_flush_vmid) void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ static void __hyp_text __tlb_flush_vm_context(void)
+ {
+ 	dsb(ishst);
+-	asm volatile("tlbi alle1is	\n"
+-		     "ic ialluis	  ": : );
+-	dsb(ish);
++	__tlbi(alle1is);
++	__flush_icache_all(); /* contains a dsb(ish) */
+ }
+ 
+ __alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
 -- 
 2.8.1
