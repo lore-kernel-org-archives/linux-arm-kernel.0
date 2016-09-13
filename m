@@ -1,23 +1,32 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 13 Sep 2016 20:41:28 +0800
-Subject: [PATCH -next] hwrng: st - Fix missing clk_disable_unprepare() on
- error in st_rng_probe()
-In-Reply-To: <1473509022-3478-1-git-send-email-weiyj.lk@gmail.com>
-References: <1473509022-3478-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <20160913124128.GE31835@gondor.apana.org.au>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 13 Sep 2016 22:13:38 +0930
+Subject: [PATCH v3 2/7] mach-aspeed: Select GPIO driver
+In-Reply-To: <20160830075600.11559-3-andrew@aj.id.au>
+References: <20160830075600.11559-1-andrew@aj.id.au>
+ <20160830075600.11559-3-andrew@aj.id.au>
+Message-ID: <CACPK8XdM2Q_DdO7vat+QASxFJht7dYZQautZROE8D3zuT3qXWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 10, 2016 at 12:03:42PM +0000, Wei Yongjun wrote:
-> From: Wei Yongjun <weiyongjun1@huawei.com>
-> 
-> Fix the missing clk_disable_unprepare() before return
-> from st_rng_probe() in the error handling case.
-> 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+On Tue, Aug 30, 2016 at 5:25 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> diff --git a/arch/arm/mach-aspeed/Kconfig b/arch/arm/mach-aspeed/Kconfig
+> index f3f8c5c658db..5aba9598f821 100644
+> --- a/arch/arm/mach-aspeed/Kconfig
+> +++ b/arch/arm/mach-aspeed/Kconfig
+> @@ -7,6 +7,8 @@ menuconfig ARCH_ASPEED
+>         select MOXART_TIMER
+>         select MFD_SYSCON
+>         select PINCTRL
+> +       select GPIOLIB
+> +       select GPIO_ASPEED
 
-Patch applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+GPIO_ASPEED is a tristate, so if we select it in ARCH_ASPEED all users
+of the driver will have it selected.
+
+I think I will drop this patch so we still have the option of building
+the gpio driver as a module. Otherwise, we should change the GPIO
+driver to be built in.
+
+Cheers,
+
+Joel
