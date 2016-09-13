@@ -1,73 +1,81 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 13 Sep 2016 18:46:32 +0100
-Subject: [PATCH v3 2/7] arm64: Factor out TTBR0_EL1 post-update workaround
- into a specific asm macro
-In-Reply-To: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1473788797-10879-3-git-send-email-catalin.marinas@arm.com>
+Date: Tue, 13 Sep 2016 18:46:30 +0100
+Subject: [PATCH v3 0/7] arm64: Privileged Access Never using TTBR0_EL1
+ switching
+Message-ID: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch takes the errata workaround code out of cpu_do_switch_mm into
-a dedicated post_ttbr0_update_workaround macro which will be reused in a
-subsequent patch.
+This is the third version of the arm64 PAN emulation using TTBR0_EL1
+switching. The series has not yet included the alternative nop patches
+from Mark Rutland, nor the empty_zero_page from Ard B. This will be done
+in a subsequent version once 4.9-rc1 is out (which will include Mark's
+alternative nop patches).
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/include/asm/assembler.h | 17 +++++++++++++++++
- arch/arm64/mm/proc.S               | 11 +----------
- 2 files changed, 18 insertions(+), 10 deletions(-)
+Changes since v2:
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index d5025c69ca81..0a47632787d9 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -350,4 +350,21 @@ alternative_endif
- 	movk	\reg, :abs_g0_nc:\val
- 	.endm
- 
-+/*
-+ * Errata workaround post TTBR0_EL1 update.
-+ */
-+	.macro	post_ttbr0_update_workaround
-+#ifdef CONFIG_CAVIUM_ERRATUM_27456
-+alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
-+	nop
-+	nop
-+	nop
-+alternative_else
-+	ic	iallu
-+	dsb	nsh
-+	isb
-+alternative_endif
-+#endif
-+	.endm
-+
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 5bb61de23201..8292784d44c9 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -125,17 +125,8 @@ ENTRY(cpu_do_switch_mm)
- 	bfi	x0, x1, #48, #16		// set the ASID
- 	msr	ttbr0_el1, x0			// set TTBR0
- 	isb
--alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
-+	post_ttbr0_update_workaround
- 	ret
--	nop
--	nop
--	nop
--alternative_else
--	ic	iallu
--	dsb	nsh
--	isb
--	ret
--alternative_endif
- ENDPROC(cpu_do_switch_mm)
- 
- 	.pushsection ".idmap.text", "ax"
+- efi_set_pgd() reworked to update the saved ttbr0 during run-time
+  services as this value is used during exception return
+
+- uaccess_(enable|disable) C macros no longer take an 'alt' parameter
+  Instead, uaccess_(enable|disable)_not_uao are introduced for the case
+  where hardware PAN switching is not required when UAO is present
+
+- post_ttbr0_update_workaround macro no longer takes a 'ret' parameter
+
+- system_supports_ttbr0_pan renamed to system_uses_ttbr0_pan
+
+- init_thread_info.ttbr0 moved towards the end of the setup_arch()
+  function and comment updated
+
+- vmlinux.lds.S fixed to use RESERVED_TTBR0_SIZE
+
+- Config option changed to ARM64_SW_TTBR0_PAN
+
+- Some comment clean-ups and commit log updates
+
+Catalin Marinas (7):
+  arm64: Factor out PAN enabling/disabling into separate uaccess_*
+    macros
+  arm64: Factor out TTBR0_EL1 post-update workaround into a specific asm
+    macro
+  arm64: Introduce uaccess_{disable,enable} functionality based on
+    TTBR0_EL1
+  arm64: Disable TTBR0_EL1 during normal kernel execution
+  arm64: Handle faults caused by inadvertent user access with PAN
+    enabled
+  arm64: xen: Enable user access before a privcmd hvc call
+  arm64: Enable CONFIG_ARM64_SW_TTBR0_PAN
+
+The patches are also available on this branch:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux ttbr0-pan
+
+Thanks for reviewing/testing.
+
+ arch/arm64/Kconfig                      |   8 ++
+ arch/arm64/include/asm/assembler.h      |  33 +++++++
+ arch/arm64/include/asm/cpufeature.h     |   6 ++
+ arch/arm64/include/asm/efi.h            |  26 ++++-
+ arch/arm64/include/asm/futex.h          |  14 +--
+ arch/arm64/include/asm/kernel-pgtable.h |   7 ++
+ arch/arm64/include/asm/mmu_context.h    |  51 +++++++---
+ arch/arm64/include/asm/ptrace.h         |   2 +
+ arch/arm64/include/asm/thread_info.h    |   3 +
+ arch/arm64/include/asm/uaccess.h        | 163 ++++++++++++++++++++++++++++++--
+ arch/arm64/kernel/armv8_deprecated.c    |  10 +-
+ arch/arm64/kernel/asm-offsets.c         |   3 +
+ arch/arm64/kernel/cpufeature.c          |   1 +
+ arch/arm64/kernel/entry.S               |  71 +++++++++++++-
+ arch/arm64/kernel/head.S                |   6 +-
+ arch/arm64/kernel/setup.c               |   9 ++
+ arch/arm64/kernel/vmlinux.lds.S         |   5 +
+ arch/arm64/lib/clear_user.S             |   8 +-
+ arch/arm64/lib/copy_from_user.S         |   8 +-
+ arch/arm64/lib/copy_in_user.S           |   8 +-
+ arch/arm64/lib/copy_to_user.S           |   8 +-
+ arch/arm64/mm/context.c                 |   7 +-
+ arch/arm64/mm/fault.c                   |  22 +++--
+ arch/arm64/mm/proc.S                    |  11 +--
+ arch/arm64/xen/hypercall.S              |  19 ++++
+ 25 files changed, 428 insertions(+), 81 deletions(-)
