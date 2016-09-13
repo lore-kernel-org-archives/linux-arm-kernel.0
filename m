@@ -1,64 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 13 Sep 2016 18:46:36 +0100
-Subject: [PATCH v3 6/7] arm64: xen: Enable user access before a privcmd hvc
- call
-In-Reply-To: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1473788797-10879-7-git-send-email-catalin.marinas@arm.com>
+From: brendan.jackman@arm.com (Brendan Jackman)
+Date: Tue, 13 Sep 2016 18:50:17 +0100
+Subject: [PATCH v5 02/16] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <a4fc71ae-6fa5-4142-6dd4-7bc96eb20186@arm.com>
+References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
+ <1472242678-33700-3-git-send-email-lina.iyer@linaro.org>
+ <0b233802-f459-c6bb-ff42-70745a225cfb@arm.com>
+ <20160902201605.GA1705@linaro.org> <87sht59mcw.fsf@arm.com>
+ <20160912161600.GA21885@linaro.org>
+ <a4fc71ae-6fa5-4142-6dd4-7bc96eb20186@arm.com>
+Message-ID: <87intz665i.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Privcmd calls are issued by the userspace. The kernel needs to enable
-access to TTBR0_EL1 as the hypervisor would issue stage 1 translations
-to user memory via AT instructions. Since AT instructions are not
-affected by the PAN bit (ARMv8.1), we only need the explicit
-uaccess_enable/disable if the TTBR0 PAN option is enabled.
 
-Reviewed-by: Julien Grall <julien.grall@arm.com>
-Acked-by: Stefano Stabellini <sstabellini@kernel.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/xen/hypercall.S | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+On Mon, Sep 12 2016 at 18:09, Sudeep Holla wrote:
+> On 12/09/16 17:16, Lina Iyer wrote:
+>> On Mon, Sep 12 2016 at 09:19 -0600, Brendan Jackman wrote:
+>>>
+>>> Hi Lina,
+>>>
+>>> Sorry for the delay here, Sudeep and I were both been on holiday last
+>>> week.
+>>>
+>>> On Fri, Sep 02 2016 at 21:16, Lina Iyer wrote:
+>>>> On Fri, Sep 02 2016 at 07:21 -0700, Sudeep Holla wrote:
+>>> [...]
+>>>>> This version is *not very descriptive*. Also the discussion we had
+>>>>> on v3
+>>>>> version has not yet concluded IMO. So can I take that we agreed on what
+>>>>> was proposed there or not ?
+>>>>>
+>>>> Sorry, this example is not very descriptive. Pls. check the 8916 dtsi
+>>>> for the new changes in the following patches. Let me know if that makes
+>>>> sense.
+>
+> Please add all possible use-cases in the bindings. Though one can refer
+> the usage examples, it might not cover all usage descriptions. It helps
+> preventing people from defining their own when they don't see examples.
+> Again DT bindings are like specifications, it should be descriptive
+> especially this kind of generic ones.
+>
+>>>
+>>> The not-yet-concluded discussion Sudeep is referring to is at [1].
+>>>
+>>> In that thread we initially proposed the idea of, instead of splitting
+>>> state phandles between cpu-idle-states and domain-idle-states, putting
+>>> CPUs in their own domains and using domain-idle-states for _all_
+>>> phandles, deprecating cpu-idle-states. I've brought this up in other
+>>> threads [2] but discussion keeps petering out, and neither this example
+>>> nor the 8916 dtsi in this patch series reflect the idea.
+>>>
+>> Brendan, while your idea is good and will work for CPUs, I do not expect
+>> other domains and possibly CPU domains on some architectures to follow
+>> this model. There is nothing that prevents you from doing this today,
 
-diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
-index 329c8027b0a9..a23b2e8f2647 100644
---- a/arch/arm64/xen/hypercall.S
-+++ b/arch/arm64/xen/hypercall.S
-@@ -49,6 +49,7 @@
- 
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-+#include <asm/uaccess.h>
- #include <xen/interface/xen.h>
- 
- 
-@@ -91,6 +92,24 @@ ENTRY(privcmd_call)
- 	mov x2, x3
- 	mov x3, x4
- 	mov x4, x5
-+#ifdef CONFIG_ARM64_SW_TTBR0_PAN
-+	/*
-+	 * Privcmd calls are issued by the userspace. The kernel needs to
-+	 * enable access to TTBR0_EL1 as the hypervisor would issue stage 1
-+	 * translations to user memory via AT instructions. Since AT
-+	 * instructions are not affected by the PAN bit (ARMv8.1), we only
-+	 * need the explicit uaccess_enable/disable if the TTBR0 PAN emulation
-+	 * is enabled (it implies that hardware UAO and PAN disabled).
-+	 */
-+	uaccess_enable_not_uao x6, x7
-+#endif
- 	hvc XEN_IMM
-+
-+#ifdef CONFIG_ARM64_SW_TTBR0_PAN
-+	/*
-+	 * Disable userspace access from kernel once the hyp call completed.
-+	 */
-+	uaccess_disable_not_uao x6
-+#endif
- 	ret
- ENDPROC(privcmd_call);
+As I understand it your opposition to this approach is this:
+
+There may be devices/CPUs which have idle states which do not constitute
+"power off". If we put those  devices in their own power domain for the
+purpose of putting their (non-power-off) idle state phandles in
+domain-idle-states, we are "lying" because no true power domain exists
+there.
+
+Am I correct that that's your opposition?
+
+If so, it seems we essentially disagree on the definition of a power
+domain, i.e. you define it as a set of devices that are powered on/off
+together while I define it as a set of devices whose power states
+(including idle states, not just on/off) are tied together. I said
+something similar on another thread [1] which died out.
+
+Do you agree that this is basically where we disagree, or am I missing
+something else?
+
+[2] http://www.spinics.net/lists/devicetree/msg141050.html
+
+>> you can specify domains around CPUs in your devicetree and CPU PM will
+>> handle the hierarchy. I don't think its fair to force it on all SoCs
+>> using CPU domains.
+>
+> I disagree. We are defining DT bindings here and it *should* be same for
+> all the SoC unless there is a compelling reason not to. I am fine if
+> those reasons are stated and agreed.
+>
+>> This patchset does not restrict you from organizing
+>> the idle states the way you want it. This revision of the series, clubs
+>> CPU and domain idle states under idle-states umbrella. So part of your
+>> requirement is also satisfied.
+>>
+>
+> I will look at the DTS changes in the series. But we *must* have more
+> description with more examples in the binding document.
+>
+>> You can follow up the series with your new additions, I don't see a
+>> conflict with this change.
+>>
+>
+> If we just need additions, then it should be fine.
