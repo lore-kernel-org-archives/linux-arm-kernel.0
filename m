@@ -1,68 +1,59 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 13 Sep 2016 17:50:28 +0200
-Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
- device for legacy interrupts.
-In-Reply-To: <20160913153402.GA4138@localhost>
-References: <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
- <57C57975.7040306@arm.com>
- <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
- <57C59FE8.30307@arm.com>
- <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
- <57C6B7F1.5000001@arm.com>
- <8520D5D51A55D047800579B094147198258D2C99@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160912220241.GG23532@localhost> <57D7ADA8.5060201@arm.com>
- <20160913150511.GC27748@localhost>
- <20160913153402.GA4138@localhost>
-Message-ID: <20160913175028.0642d82f@free-electrons.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 13 Sep 2016 16:52:21 +0100
+Subject: [RFC PATCH 0/5] arm64: Signal context expansion
+In-Reply-To: <9969568a-f969-d904-52b3-14f80c3abec4@redhat.com>
+References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
+ <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
+ <20160909152047.GA3958@e103592.cambridge.arm.com>
+ <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
+ <20160912111749.GB3958@e103592.cambridge.arm.com>
+ <57D6C33D.9020003@arm.com>
+ <20160912153015.GD3958@e103592.cambridge.arm.com>
+ <9969568a-f969-d904-52b3-14f80c3abec4@redhat.com>
+Message-ID: <20160913155151.GA1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, 13 Sep 2016 10:34:02 -0500, Bjorn Helgaas wrote:
-
-> > After looking at this myself, I'm not happy with this either.  It feels
-> > like there are bugs lurking here and we're just hiding one of them.
-> > 
-> > Here are the callers of irq_domain_add_linear() for legacy INTx in
-> > drivers/pci/host:
-> > 
-> >   advk_pcie_init_irq_domain    LEGACY_IRQ_NUM   (4)
-> >   dra7xx_pcie_init_irq_domain  4
-> >   ks_dw_pcie_host_init         MAX_LEGACY_IRQS  (4)
-> >   altera_pcie_init_irq_domain  INTX_NUM + 1     (5)
-> >   nwl_pcie_init_irq_domain     INTX_NUM + 1     (5)
-> >   xilinx_pcie_init_irq_domain  4  
+On Tue, Sep 13, 2016 at 11:28:21AM +0200, Florian Weimer wrote:
+> On 09/12/2016 05:30 PM, Dave Martin wrote:
+> >On Mon, Sep 12, 2016 at 04:01:17PM +0100, Szabolcs Nagy wrote:
+> >>i assume the kernel can avoid saving SVE regs when
+> >>they are not used by the process.
+> >
+> >I can (and do), in my patches (not posted yet).
+> >
+> >The real issue here is that a recently updated shared library might be
+> >optimised to use SVE, where the program using it is an older, SVE-
+> >unaware binary.
+> >
+> >(think of an optimised math library using some new fancy SVE-based
+> >number crunching internally).
 > 
-> The altera change corresponding to this was 99496bd2971f ("PCI: altera: Fix
-> error when INTx is 4").  I should have noticed this inconsistency back
-> then.
+> In my little world, binaries are expected to do run-time CPU feature
+> discovery and fall back to the baseline ABI if the system does not support
+> ABI extensions.  This means that a personality flag can disable the
+> extension, the optimized math libraries run with the slower baseline code
+> instead, and the rest of the application sees the expected kernel interface.
 > 
-> Are aardvark, dra7xx, keystone, and xilinx (non-NWL) broken because they
-> only request 4 IRQs and only INTA, INTB, and INTC work?
+> From this perspective, it is quite important that it is possible to get
+> legacy applications running on newer hardware, preferably with out wrapping
+> them in a dedicated VM.
 > 
-> > I think all of these use the of_irq_parse_and_map_pci() path you
-> > mentioned, so if the problem is in the way that path works, I would
-> > think these should *all* be requesting the same number of interrupts
-> > in the domain.
-> > 
-> > I agree with Marc that we should request 4 IRQs, because that's what
-> > we need.  If we can't do that for some reason, we ought to at least
-> > make all these callers the same.
+> I understand that there are other environments were this is less of a
+> concern, but I also believe that the age of an architecture factors less
+> into this than one might want.
 
-Thanks for Cc'ing about this issue. Indeed, the Aardvark driver
-supports all of INT{A,B,C,D}, so the current situation doesn't work. As
-suggested, the simplest solution is to just allocate an irq domain with
-5 IRQs, like is done in the Altera driver.
+Agreed.  I'll need to think some more about how this should work in
+general.
 
-However, my feeling is that a more correct solution would be to have a
-translation between the PCI_INTERRUPT_PIN value (in the range 0x1 to
-0x4) to the hwirq value (in the range 0x0 to 0x3).
+This series by itself doesn't change the ABI unless something allocates
+enough signal frame data to exceed the historical frame size -- which
+for now cannot happen.
 
-Best regards,
+What I may do is split off the extra_context part of the series (without
+which the signal frame never grows).
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+SVE will still fit if the vector length is below a certain limit.
+
+Cheers
+---Dave
