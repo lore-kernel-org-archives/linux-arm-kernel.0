@@ -1,89 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 13 Sep 2016 09:21:26 +0100
-Subject: [PATCH v5 2/3] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <a48580b4-1494-d474-b33c-007f898b29b7@free-electrons.com>
-References: <1473344917-1524-1-git-send-email-quentin.schulz@free-electrons.com>
- <1473344917-1524-3-git-send-email-quentin.schulz@free-electrons.com>
- <20160912091829.GB1873@dell>
- <93bd339b-85ab-d0fc-5e80-e2aca290c0d7@free-electrons.com>
- <20160912095923.GD1873@dell>
- <5dec118f-45ae-4fb6-dd1e-2028947add53@free-electrons.com>
- <20160912135646.GB9789@dell>
- <a48580b4-1494-d474-b33c-007f898b29b7@free-electrons.com>
-Message-ID: <20160913082126.GA22903@dell>
+From: shh.xie@gmail.com (shh.xie at gmail.com)
+Date: Tue, 13 Sep 2016 16:09:53 +0800
+Subject: [PATCH 00/10] [v3] arm64: dts: add QorIQ LS1046A SoC and boards
+ support
+Message-ID: <1473754203-22970-1-git-send-email-shh.xie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Sep 2016, Quentin Schulz wrote:
-> On 12/09/2016 15:56, Lee Jones wrote:
-> > On Mon, 12 Sep 2016, Quentin Schulz wrote:
-> >> On 12/09/2016 11:59, Lee Jones wrote:
-> >>> On Mon, 12 Sep 2016, Quentin Schulz wrote:
-> >>>
-> >>>> On 12/09/2016 11:18, Lee Jones wrote:
-> >>>>> On Thu, 08 Sep 2016, Quentin Schulz wrote:
-> >>>>> [...]
-> >>>>>> +
-> >>>>>> +MODULE_DEVICE_TABLE(of, sun4i_gpadc_mfd_of_match);
-> >>>>>
-> >>>>> Place this directly under the table.
-> >>>>>
-> >>>>>> +static struct platform_driver sun4i_gpadc_mfd_driver = {
-> >>>>>> +	.driver = {
-> >>>>>> +		.name = "sun4i-adc-mfd",
-> >>>>>> +		.of_match_table = of_match_ptr(sun4i_gpadc_mfd_of_match),
-> >>>>>> +	},
-> >>>>>> +	.probe = sun4i_gpadc_mfd_probe,
-> >>>>>
-> >>>>> No .remove?
-> >>>>>
-> >>>>
-> >>>> No, everything in probe is handled with devm functions.
-> >>>
-> >>> Don't you need to undo the register write you did?
-> >>>
-> >>
-> >> The regmap_write I use is there to disable all interrupts on hardware
-> >> side before the irq_chip handles all interrupts by itself. The
-> >> interrupts are not used in the MFD driver.
-> >>
-> >> Thus, I chose to disable the hardware interrupts in the remove function
-> >> of drivers using the interrupts (only the IIO yet but the touchscreen
-> >> driver later also which will be using a third interrupt). When the MFD
-> >> driver is removed, the MFD cells will all be removed, thus calling their
-> >> own remove functions, thus disabling hardware interrupts used in each
-> >> driver. So the hardware interrupts disabling would be called twice.
-> > 
-> > This does send some little alarm bells ringing.  I'd normally expect
-> > the .remove function to undo everything you did in .probe.  So, if you
-> > are disabling the IRQs from within the leaf drivers, shouldn't you be
-> > initialising them in the leaf driver's respective .probes?
-> > 
-> 
-> I use the regmap_write in the MFD driver's probe to disable all
-> interrupts before requesting irq_chip to guarantee the interrupts are in
-> a known state, being disabled. It is to insure no interrupt will occur
-> unwittingly before we want the leaf drivers to handle them.
-> 
-> The disabling of irqs in the remove is handled rather by
-> devm_regmap_del_irq_chip than by an explicit regmap_write in the
-> driver's removal function. It performs the exact same thing.
-> 
-> I always use devm functions for requesting either an irq_chip or the
-> irqs themselves. In that case, when the device is removed, the irqs are
-> freed on leaf drivers' (where the irqs are requested) removal while the
-> removal of irq_chip in the MFD driver will also free all irqs mapped to
-> this irq_chip thanks to devm_regmap_del_irq_chip. Therefore, the
-> interrupts are disabled by devm functions.
-> 
-> The regmap_update_bits in probe and removal of the ADC driver to disable
-> irqs are actually redundant because the devm functions already handle
-> the irqs disabling.
+From: Shaohui Xie <Shaohui.Xie@nxp.com>
 
-Okay.  So long as you've thought about it, I'm happy.
+This patchest adds support for QorIQ LS1046A SoC which is based on ARMv8
+architecture, also adds LS1046A-RDB and LS1046A-QDS board support.
+
+Also, updates bindings for SoC-specific devices SCFG and DCFG,
+I2C devices, qoriq-clock and ahci-fsl-qoriq.
+
+Mingkai Hu (2):
+  arm64: dts: add QorIQ LS1046A SoC support
+  arm64: dts: add LS1046A-RDB board support
+
+Shaohui Xie (8):
+  dt-bindings: fsl: update for more SoCs
+  dt-bindings: fsl: updates bindings for some SoC-specific devices
+  dt-bindings: i2c: adds two more nxp devices
+  dt-bindings: qoriq-clock: update for more SoCs
+  dt-bindings: ahci-fsl-qoriq: updated for SoC ls1046a
+  Documentation: DT: Add entry for QorIQ LS1046A-RDB board
+  Documentation: DT: Add entry for QorIQ LS1046A-QDS board
+  arm64: dts: add LS1046A-QDS board support
+
+ Documentation/devicetree/bindings/arm/fsl.txt      |  34 +-
+ .../devicetree/bindings/ata/ahci-fsl-qoriq.txt     |   2 +-
+ .../devicetree/bindings/clock/qoriq-clock.txt      |   3 +
+ .../devicetree/bindings/i2c/trivial-devices.txt    |   2 +
+ arch/arm64/boot/dts/freescale/Makefile             |   2 +
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts  | 212 +++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  | 150 ++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 515 +++++++++++++++++++++
+ 8 files changed, 916 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.0.27.g96db324
