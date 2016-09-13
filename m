@@ -1,24 +1,40 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 13 Sep 2016 10:51:48 +0200
-Subject: [PATCH v4 04/10] KVM: arm64: vgic-its: Introduce config option
- to guard ITS specific code
-In-Reply-To: <1473691764-29424-5-git-send-email-vladimir.murzin@arm.com>
+Date: Tue, 13 Sep 2016 10:51:53 +0200
+Subject: [PATCH v4 05/10] KVM: arm: vgic: Fix compiler warnings when
+ built for 32-bit
+In-Reply-To: <1473691764-29424-6-git-send-email-vladimir.murzin@arm.com>
 References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
- <1473691764-29424-5-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20160913085148.GE5680@cbox>
+ <1473691764-29424-6-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20160913085153.GF5680@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 03:49:18PM +0100, Vladimir Murzin wrote:
-> By now ITS code guarded with KVM_ARM_VGIC_V3 config option which was
-> introduced to hide everything specific to vgic-v3 from 32-bit world.
-> We are going to support vgic-v3 in 32-bit world and KVM_ARM_VGIC_V3
-> will gone, but we don't have support for ITS there yet and we need to
-> continue keeping ITS away.
-> Introduce the new config option to prevent ITS code being build in
-> 32-bit mode when support for vgic-v3 is done.
+On Mon, Sep 12, 2016 at 03:49:19PM +0100, Vladimir Murzin wrote:
+> Well, this patch is looking ahead of time, but we'll get following
+> compiler warnings as soon as we introduce vgic-v3 to 32-bit world
+> 
+>   CC      arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.o
+> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.c: In function 'vgic_mmio_read_v3r_typer':
+> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.c:184:35: warning: left shift count >= width of type [-Wshift-count-overflow]
+>   value = (mpidr & GENMASK(23, 0)) << 32;
+>                                    ^
+> In file included from ./include/linux/kernel.h:10:0,
+>                  from ./include/asm-generic/bug.h:13,
+>                  from ./arch/arm/include/asm/bug.h:59,
+>                  from ./include/linux/bug.h:4,
+>                  from ./include/linux/io.h:23,
+>                  from ./arch/arm/include/asm/arch_gicv3.h:23,
+>                  from ./include/linux/irqchip/arm-gic-v3.h:411,
+>                  from arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.c:14:
+> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.c: In function 'vgic_v3_dispatch_sgi':
+> ./include/linux/bitops.h:6:24: warning: left shift count >= width of type [-Wshift-count-overflow]
+>  #define BIT(nr)   (1UL << (nr))
+>                         ^
+> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio-v3.c:614:20: note: in expansion of macro 'BIT'
+>   broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
+>                     ^
+> Let's fix them now.
 > 
 > Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
