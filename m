@@ -1,197 +1,176 @@
-From: liudongdong3@huawei.com (Dongdong Liu)
-Date: Tue, 13 Sep 2016 10:36:22 +0800
-Subject: [PATCH V6 2/5] PCI/ACPI: Check platform specific ECAM quirks
-In-Reply-To: <1473449047-10499-3-git-send-email-tn@semihalf.com>
-References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <1473449047-10499-3-git-send-email-tn@semihalf.com>
-Message-ID: <57D76626.1050109@huawei.com>
+From: po.liu@nxp.com (Po Liu)
+Date: Tue, 13 Sep 2016 03:02:05 +0000
+Subject: [PATCH v4 1/2] nxp/dts: add pcie aer interrupt-name property in
+ the dts
+In-Reply-To: <20160912221358.GI23532@localhost>
+References: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+ <1472625442-23309-1-git-send-email-po.liu@nxp.com>
+ <20160912221358.GI23532@localhost>
+Message-ID: <VI1PR0401MB170970A4F177949FCE4827A892FE0@VI1PR0401MB1709.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz
+Hi Bjorn, Shawn, Rob,
 
-? 2016/9/10 3:24, Tomasz Nowicki ??:
-> Some platforms may not be fully compliant with generic set of PCI config
-> accessors. For these cases we implement the way to overwrite CFG accessors
-> set and configuration space range.
->
-> In first place pci_mcfg_parse() saves machine's IDs and revision number
-> (these come from MCFG header) in order to match against known quirk entries.
-> Then the algorithm traverses available quirk list (static array),
-> matches against <oem_id, oem_table_id, rev, domain, bus number range> and
-> returns custom PCI config ops and/or CFG resource structure.
->
-> When adding new quirk there are two possibilities:
-> 1. Override default pci_generic_ecam_ops ops but CFG resource comes from MCFG
-> { "OEM_ID", "OEM_TABLE_ID", <REV>, <DOMAIN>, <BUS_NR>, &foo_ops, MCFG_RES_EMPTY },
-> 2. Override default pci_generic_ecam_ops ops and CFG resource. For this case
-> it is also allowed get CFG resource from quirk entry w/o having it in MCFG.
-> { "OEM_ID", "OEM_TABLE_ID", <REV>, <DOMAIN>, <BUS_NR>, &boo_ops,
->    DEFINE_RES_MEM(START, SIZE) },
->
-> pci_generic_ecam_ops and MCFG entries will be used for platforms
-> free from quirks.
->
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+Thanks for reply. I'll upload new patches:
+ - separate the patches with arm and arm64 dts for new version.
+ - Modify the binding comments to make it clear for explain the 'aer' property.
+
+Best regards,
+Liu Po
+
+-----Original Message-----
+From: Bjorn Helgaas [mailto:helgaas at kernel.org] 
+Sent: Tuesday, September 13, 2016 6:14 AM
+To: Po Liu
+Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Bjorn Helgaas; Shawn Guo; Marc Zyngier; Rob Herring; Roy Zang; Vincent Hu; Stuart Yoder; Leo Li; Arnd Bergmann; M.H. Lian; Murali Karicheri
+Subject: Re: [PATCH v4 1/2] nxp/dts: add pcie aer interrupt-name property in the dts
+
+On Wed, Aug 31, 2016 at 02:37:21PM +0800, Po Liu wrote:
+> NXP some platforms aer interrupt was not MSI/MSI-X/INTx but using 
+> interrupt line independently. This patch add a "aer"
+> interrupt-names for aer interrupt.
+> With the interrupt-names "aer", code could probe aer interrupt line 
+> for pcie root port, replace the aer interrupt service irq.
+> This is intend to fixup the Layerscape platforms which aer interrupt 
+> was not MSI/MSI-X/INTx, but using interrupt line independently.
+> 
+> Signed-off-by: Po Liu <po.liu@nxp.com>
+
+Rob and Shawn had comments here, and I'm not sure they ever got resolved.
+
 > ---
->   drivers/acpi/pci_mcfg.c | 80 +++++++++++++++++++++++++++++++++++++++++++++----
->   1 file changed, 74 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-> index ffcc651..2b8acc7 100644
-> --- a/drivers/acpi/pci_mcfg.c
-> +++ b/drivers/acpi/pci_mcfg.c
-> @@ -32,6 +32,59 @@ struct mcfg_entry {
->   	u8			bus_start;
->   	u8			bus_end;
->   };
-> +struct mcfg_fixup {
-> +	char oem_id[ACPI_OEM_ID_SIZE + 1];
-> +	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
-> +	u32 oem_revision;
-> +	u16 seg;
-> +	struct resource bus_range;
-> +	struct pci_ecam_ops *ops;
-> +	struct resource cfgres;
-> +};
-> +
-> +#define MCFG_DOM_ANY			(-1)
-> +#define MCFG_BUS_RANGE(start, end)	DEFINE_RES_NAMED((start),	\
-> +						((end) - (start) + 1),	\
-> +						NULL, IORESOURCE_BUS)
-> +#define MCFG_BUS_ANY		MCFG_BUS_RANGE(0x0, 0xff)
-> +#define MCFG_RES_EMPTY		DEFINE_RES_NAMED(0, 0, NULL, 0)
-> +
-> +static struct mcfg_fixup mcfg_quirks[] = {
-> +/*	{ OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, cfgres, ops }, */
-> +};
-> +
-> +static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
-> +static char mcfg_oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
-> +static u32 mcfg_oem_revision;
-> +
-> +static void pci_mcfg_match_quirks(struct acpi_pci_root *root,
-> +				  struct resource *cfgres,
-> +				  struct pci_ecam_ops **ecam_ops)
-> +{
-> +	struct mcfg_fixup *f;
-> +	int i;
-> +
-> +	/*
-> +	 * First match against PCI topology <domain:bus> then use OEM ID, OEM
-> +	 * table ID, and OEM revision from MCFG table standard header.
-> +	 */
-> +	for (i = 0, f = mcfg_quirks; i < ARRAY_SIZE(mcfg_quirks); i++, f++) {
-> +		if (f->seg == root->segment &&
-
-why not use MCFG_DOM_RANGE, I think MCFG_DOM_RANGE is better.
-if drop MCFG_DOM_RANGE, mcfg_quirks[] will be more complex.
-
-static struct mcfg_fixup mcfg_quirks[] = {
-/*	{ OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, cfgres, ops }, */
-#ifdef CONFIG_PCI_HOST_THUNDER_ECAM
-	/* SoC pass1.x */
-	{ "CAVIUM", "THUNDERX", 2, 0, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-	  MCFG_RES_EMPTY},
-	{ "CAVIUM", "THUNDERX", 2, 1, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-	  MCFG_RES_EMPTY},
-	{ "CAVIUM", "THUNDERX", 2, 2, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-	  MCFG_RES_EMPTY},
-	{ "CAVIUM", "THUNDERX", 2, 3, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-	  MCFG_RES_EMPTY},
-	{ "CAVIUM", "THUNDERX", 2, 10, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-	  MCFG_RES_EMPTY},
-	{ "CAVIUM", "THUNDERX", 2, 11, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-	  MCFG_RES_EMPTY},
-	{ "CAVIUM", "THUNDERX", 2, 12, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-	  MCFG_RES_EMPTY},
-	{ "CAVIUM", "THUNDERX", 2, 13, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
-	  MCFG_RES_EMPTY},
-#endif
-.....
-};
-
-As PATCH v5 we only need define mcfg_quirks as below, It looks better.
-static struct pci_cfg_fixup mcfg_quirks[] __initconst = {
-/*	{ OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, pci_ops, init_hook }, */
-#ifdef CONFIG_PCI_HOST_THUNDER_PEM
-	/* Pass2.0 */
-	{ "CAVIUM", "THUNDERX", 1, MCFG_DOM_RANGE(4, 9), MCFG_BUS_ANY, NULL,
-	  thunder_pem_cfg_init },
-	{ "CAVIUM", "THUNDERX", 1, MCFG_DOM_RANGE(14, 19), MCFG_BUS_ANY, NULL,
-	  thunder_pem_cfg_init },
-#endif
-#ifdef CONFIG_PCI_HISI_ACPI
-	{ "HISI  ", "HIP05   ", 0, MCFG_DOM_RANGE(0, 3), MCFG_BUS_ANY,
-	  NULL, hisi_pcie_acpi_hip05_init},
-	{ "HISI  ", "HIP06   ", 0, MCFG_DOM_RANGE(0, 3), MCFG_BUS_ANY,
-	  NULL, hisi_pcie_acpi_hip06_init},
-	{ "HISI  ", "HIP07   ", 0, MCFG_DOM_RANGE(0, 15), MCFG_BUS_ANY,
-	  NULL, hisi_pcie_acpi_hip07_init},
-#endif
-};
-
-> +		    resource_contains(&f->bus_range, &root->secondary) &&
-> +		    !memcmp(f->oem_id, mcfg_oem_id, ACPI_OEM_ID_SIZE) &&
-> +		    !memcmp(f->oem_table_id, mcfg_oem_table_id,
-> +		            ACPI_OEM_TABLE_ID_SIZE) &&
-> +		    f->oem_revision == mcfg_oem_revision) {
-> +			if (f->cfgres.start)
-> +				*cfgres = f->cfgres;
-> +			if (f->ops)
-> +				*ecam_ops =  f->ops;
-> +			dev_info(&root->device->dev, "Applying PCI MCFG quirks for %s %s rev: %d\n",
-> +				 f->oem_id, f->oem_table_id, f->oem_revision);
-> +			return;
-> +		}
-> +	}
-> +}
->
->   /* List to save MCFG entries */
->   static LIST_HEAD(pci_mcfg_list);
-> @@ -61,14 +114,24 @@ int pci_mcfg_lookup(struct acpi_pci_root *root, struct resource *cfgres,
->
->   	}
->
-> -	if (!root->mcfg_addr)
-> -		return -ENXIO;
-> -
->   skip_lookup:
->   	memset(&res, 0, sizeof(res));
-> -	res.start = root->mcfg_addr + (bus_res->start << 20);
-> -	res.end = res.start + (resource_size(bus_res) << 20) - 1;
-> -	res.flags = IORESOURCE_MEM;
-> +	if (root->mcfg_addr) {
-> +		res.start = root->mcfg_addr + (bus_res->start << 20);
-> +		res.end = res.start + (resource_size(bus_res) << 20) - 1;
-> +		res.flags = IORESOURCE_MEM;
-> +	}
-> +
-> +	/*
-> +	 * Let to override default ECAM ops and CFG resource range.
-> +	 * Also, this might even retrieve CFG resource range in case MCFG
-> +	 * does not have it. Invalid CFG start address means MCFG firmware bug
-> +	 * or we need another quirk in array.
-> +	 */
-> +	pci_mcfg_match_quirks(root, &res, &ops);
-> +	if (!res.start)
-> +		return -ENXIO;
-> +
->   	*cfgres = res;
->   	*ecam_ops = ops;
->   	return 0;
-> @@ -101,6 +164,11 @@ static __init int pci_mcfg_parse(struct acpi_table_header *header)
->   		list_add(&e->list, &pci_mcfg_list);
->   	}
->
-> +	/* Save MCFG IDs and revision for quirks matching */
-> +	memcpy(mcfg_oem_id, header->oem_id, ACPI_OEM_ID_SIZE);
-> +	memcpy(mcfg_oem_table_id, header->oem_table_id, ACPI_OEM_TABLE_ID_SIZE);
-> +	mcfg_oem_revision = header->revision;
-> +
->   	pr_info("MCFG table detected, %d entries\n", n);
->   	return 0;
->   }
->
+> changes for V4:
+> 	- Add comments explain why to add this patch
+> 	- Move the binding changes to pci code patch
+> 
+>  arch/arm/boot/dts/ls1021a.dtsi                 |  6 ++++--
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 18 
+> +++++++++---------  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 
+> 16 ++++++++--------
+>  3 files changed, 21 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi 
+> b/arch/arm/boot/dts/ls1021a.dtsi index 368e219..443e50b 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -634,7 +634,8 @@
+>  			reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
+>  			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
+> +			interrupts = <GIC_SPI 183 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			fsl,pcie-scfg = <&scfg 0>;
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+> @@ -657,7 +658,8 @@
+>  			reg = <0x00 0x03500000 0x0 0x00010000   /* controller registers */
+>  			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			fsl,pcie-scfg = <&scfg 1>;
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi 
+> b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> index e669fbd..654071d 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> @@ -527,9 +527,9 @@
+>  			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+>  			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 118 0x4>, /* controller interrupt */
+> -				     <0 117 0x4>; /* PME interrupt */
+> -			interrupt-names = "intr", "pme";
+> +			interrupts = <0 117 0x4>, /* PME interrupt */
+> +					 <0 118 0x4>; /* aer interrupt */
+> +			interrupt-names = "pme", "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> @@ -552,9 +552,9 @@
+>  			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+>  			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 128 0x4>,
+> -				     <0 127 0x4>;
+> -			interrupt-names = "intr", "pme";
+> +			interrupts = <0 127 0x4>,
+> +					 <0 128 0x4>;
+> +			interrupt-names = "pme", "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> @@ -577,9 +577,9 @@
+>  			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+>  			       0x50 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 162 0x4>,
+> -				     <0 161 0x4>;
+> -			interrupt-names = "intr", "pme";
+> +			interrupts = <0 161 0x4>,
+> +					 <0 162 0x4>;
+> +			interrupt-names = "pme", "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi 
+> b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> index 21023a3..58844e8 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -583,8 +583,8 @@
+>  			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+>  			       0x10 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 108 0x4>; /* Level high type */
+> -			interrupt-names = "intr";
+> +			interrupts = <0 108 0x4>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> @@ -607,8 +607,8 @@
+>  			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+>  			       0x12 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 113 0x4>; /* Level high type */
+> -			interrupt-names = "intr";
+> +			interrupts = <0 113 0x4>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> @@ -631,8 +631,8 @@
+>  			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+>  			       0x14 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 118 0x4>; /* Level high type */
+> -			interrupt-names = "intr";
+> +			interrupts = <0 118 0x4>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> @@ -655,8 +655,8 @@
+>  			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
+>  			       0x16 0x00000000 0x0 0x00002000>; /* configuration space */
+>  			reg-names = "regs", "config";
+> -			interrupts = <0 123 0x4>; /* Level high type */
+> -			interrupt-names = "intr";
+> +			interrupts = <0 123 0x4>; /* aer interrupt */
+> +			interrupt-names = "aer";
+>  			#address-cells = <3>;
+>  			#size-cells = <2>;
+>  			device_type = "pci";
+> --
+> 2.1.0.27.g96db324
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" 
+> in the body of a message to majordomo at vger.kernel.org More majordomo 
+> info at  http://vger.kernel.org/majordomo-info.html
