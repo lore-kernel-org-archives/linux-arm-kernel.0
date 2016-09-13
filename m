@@ -1,40 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 13 Sep 2016 16:47:30 +0100
-Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
-In-Reply-To: <57D8137F.8040508@laposte.net>
-References: <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
- <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
- <57D6AA54.6000208@laposte.net> <20160912135549.GA14165@leverpostej>
- <57D6D2A9.3010006@laposte.net> <20160912165637.GF14165@leverpostej>
- <57D7CF17.2050905@laposte.net> <20160913131208.GA23336@leverpostej>
- <57D8137F.8040508@laposte.net>
-Message-ID: <20160913154722.GD23336@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 13 Sep 2016 17:50:28 +0200
+Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
+ device for legacy interrupts.
+In-Reply-To: <20160913153402.GA4138@localhost>
+References: <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
+ <57C57975.7040306@arm.com>
+ <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <57C59FE8.30307@arm.com>
+ <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <57C6B7F1.5000001@arm.com>
+ <8520D5D51A55D047800579B094147198258D2C99@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160912220241.GG23532@localhost> <57D7ADA8.5060201@arm.com>
+ <20160913150511.GC27748@localhost>
+ <20160913153402.GA4138@localhost>
+Message-ID: <20160913175028.0642d82f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 04:55:59PM +0200, Sebastian Frias wrote:
-> On 09/13/2016 03:12 PM, Mark Rutland wrote:
-> >> Exactly, that is why I was thinking it would take less "review" time.
-> >> Indeed, if there is no driver, why would it matter what those bindings
-> >> are?
+Hello,
+
+On Tue, 13 Sep 2016 10:34:02 -0500, Bjorn Helgaas wrote:
+
+> > After looking at this myself, I'm not happy with this either.  It feels
+> > like there are bugs lurking here and we're just hiding one of them.
 > > 
-> > If you believe that the bindings don't matter, then there is absolutely
-> > no reason for them to exist in the first place.
+> > Here are the callers of irq_domain_add_linear() for legacy INTx in
+> > drivers/pci/host:
 > > 
-> > If those binding matter to *anyone*, then those collating the bindings
-> > have some responsibility of stewardship, and that includes
-> > review/maintenance/etc.
+> >   advk_pcie_init_irq_domain    LEGACY_IRQ_NUM   (4)
+> >   dra7xx_pcie_init_irq_domain  4
+> >   ks_dw_pcie_host_init         MAX_LEGACY_IRQS  (4)
+> >   altera_pcie_init_irq_domain  INTX_NUM + 1     (5)
+> >   nwl_pcie_init_irq_domain     INTX_NUM + 1     (5)
+> >   xilinx_pcie_init_irq_domain  4  
 > 
-> The thing is that right now it seems the "responsibility of stewardship"
-> lies only within "Linux", whereas DT is proposed as open for everybody,
-> Bootloaders, FreeBSD, etc.
+> The altera change corresponding to this was 99496bd2971f ("PCI: altera: Fix
+> error when INTx is 4").  I should have noticed this inconsistency back
+> then.
 > 
-> In that case, shouldn't the "responsibility" be shared?
+> Are aardvark, dra7xx, keystone, and xilinx (non-NWL) broken because they
+> only request 4 IRQs and only INTA, INTB, and INTC work?
+> 
+> > I think all of these use the of_irq_parse_and_map_pci() path you
+> > mentioned, so if the problem is in the way that path works, I would
+> > think these should *all* be requesting the same number of interrupts
+> > in the domain.
+> > 
+> > I agree with Marc that we should request 4 IRQs, because that's what
+> > we need.  If we can't do that for some reason, we ought to at least
+> > make all these callers the same.
 
-Ideally, yes.
+Thanks for Cc'ing about this issue. Indeed, the Aardvark driver
+supports all of INT{A,B,C,D}, so the current situation doesn't work. As
+suggested, the simplest solution is to just allocate an irq domain with
+5 IRQs, like is done in the Altera driver.
 
-Which is one of the reasons devicetree.org was set up as a common forum
-for projects to collaborate on devicetree.
+However, my feeling is that a more correct solution would be to have a
+translation between the PCI_INTERRUPT_PIN value (in the range 0x1 to
+0x4) to the hwirq value (in the range 0x0 to 0x3).
 
-Thanks,
-Mark.
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
