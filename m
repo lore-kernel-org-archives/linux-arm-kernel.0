@@ -1,89 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Sep 2016 09:59:55 +0100
-Subject: [PATCH 1/3] arm64: alternative: add auto-nop infrastructure
-In-Reply-To: <20160913085704.GC19689@leverpostej>
-References: <1473242830-26246-1-git-send-email-mark.rutland@arm.com>
- <1473242830-26246-2-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu-KHePVj3gs+Q0wfgkVrD0nB0Yi+xLdbnGz-YZTTsPxFw@mail.gmail.com>
- <20160913085704.GC19689@leverpostej>
-Message-ID: <CAKv+Gu_S535p04Kaef8t+AQypopVWQ7jA1VwG7Y2Yf5010THnA@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 13 Sep 2016 10:04:17 +0100
+Subject: [PATCH v4 07/10] ARM: Introduce MPIDR_LEVEL_SHIFT macro
+In-Reply-To: <20160913083855.GC5680@cbox>
+References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
+ <1473691764-29424-8-git-send-email-vladimir.murzin@arm.com>
+ <20160913083855.GC5680@cbox>
+Message-ID: <57D7C111.7000405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2016 at 09:57, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Sep 13, 2016 at 09:36:14AM +0100, Ard Biesheuvel wrote:
->> On 7 September 2016 at 11:07, Mark Rutland <mark.rutland@arm.com> wrote:
->> > In some cases, one side of an alternative sequence is simply a number of
->> > NOPs used to balance the other side. Keeping track of this manually is
->> > tedious, and the presence of large chains of NOPs makes the code more
->> > painful to read than necessary.
->> >
->> > To ameliorate matters, this patch adds a new alternative_else_nop_endif,
->> > which automatically balances an alternative sequence with a trivial NOP
->> > sled.
->> >
->> > In many cases, we would like a NOP-sled in the default case, and
->> > instructions patched in in the presence of a feature. To enable the NOPs
->> > to be generated automatically for this case, this patch also adds a new
->> > alternative_if, and updates alternative_else and alternative_endif to
->> > work with either alternative_if or alternative_endif.
->
-> [...]
->
->> > +/*
->> > + * Begin an alternative code sequence.
->> >   */
->> >  .macro alternative_if_not cap
->> > +       .set .Lasm_alt_mode, 0
+On 13/09/16 09:38, Christoffer Dall wrote:
+> On Mon, Sep 12, 2016 at 03:49:21PM +0100, Vladimir Murzin wrote:
+>> vgic-v3 driver uses architecture specific MPIDR_LEVEL_SHIFT macro to
+>> encode the affinity in a form compatible with ICC_SGI* registers.
+>> Unfortunately, that macro is missing on ARM, so let's add it.
 >>
->> Given that only a single copy of this symbol will exist in an object
->> file, is it still possible to use both variants in a single
->> compilation/assembly unit?
->
-> Yes.
->
-> GAS allows the symbol to be set multiple times (so long as the
-> assignments are constant values). The last assignment "wins" when it
-> comes to output, but assembler macros are evaluated before this, and use
-> the most recent assignment.
->
-> In testing I hacked __kvm_call_hyp to use both:
->
->         ENTRY(__kvm_call_hyp)
->         alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
->                 str     lr, [sp, #-16]!
->                 hvc     #0
->                 ldr     lr, [sp], #16
->                 ret
->         alternative_else_nop_endif
->         alternative_if ARM64_HAS_VIRT_HOST_EXTN
->                 hvc     #0x539
->         alternative_else_nop_endif
->                 b       __vhe_hyp_call
->         ENDPROC(__kvm_call_hyp)
->
-> Which, according to objdump gives me the expected result:
->
->         Disassembly of section .text:
->
->         0000000000000000 <__kvm_call_hyp>:
->            0:   f81f0ffe        str     x30, [sp,#-16]!
->            4:   d4000002        hvc     #0x0
->            8:   f84107fe        ldr     x30, [sp],#16
->            c:   d65f03c0        ret
->           10:   d503201f        nop
->           14:   14000000        b       0 <__vhe_hyp_call>
->
->         Disassembly of section .altinstr_replacement:
->
->         0000000000000000 <.altinstr_replacement>:
->            0:   d503201f        nop
->            4:   d503201f        nop
->            8:   d503201f        nop
->            c:   d503201f        nop
->           10:   d400a722        hvc     #0x539
->
+>> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>  arch/arm/include/asm/cputype.h |    1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+>> index 1ee94c7..e2d94c1 100644
+>> --- a/arch/arm/include/asm/cputype.h
+>> +++ b/arch/arm/include/asm/cputype.h
+>> @@ -55,6 +55,7 @@
+>>  
+>>  #define MPIDR_LEVEL_BITS 8
+>>  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
+>> +#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
+>>  
+> 
+> I'm not sure I follow the correctness of this completely.
+> 
+> This is called from vgic_v3_dispatch_sgi, which takes a u64 value, which
+> may have something in the Aff3 field, which we now shift left 24 bits,
+> but that is not the Aff3 field of AArch32's MPIDR.
+> 
+> What is the rationale for this making sense again?
 
-Thanks for the clarification,
+IIUC, in such case we construct mpidr which won't match in match_mpidr()
+with the value we get from kvm_vcpu_get_mpidr_aff() and no SGI will be
+sent to the guest.
 
-Ard.
+Since we get that u64 value from the guest, I'd think it is something
+wrong is going on in the guest in case Aff3 is non-zero; however, we can
+hide it by zeroing out SGI Aff3 bits in access_gic_sgi().
+
+Cheers
+Vladimir
+
+> 
+> Thanks,
+> -Christoffer
+> 
+>>  #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
+>>  	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
+>> -- 
+>> 1.7.9.5
+>>
+> 
+> 
