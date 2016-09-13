@@ -1,142 +1,67 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 13 Sep 2016 13:01:46 +0300
-Subject: [PATCH V5] perf tools: adding support for address filters
-In-Reply-To: <1473702794-8493-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1473702794-8493-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <cd7b9dc9-686c-813e-ff9f-97faba377799@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 13 Sep 2016 11:12:16 +0100
+Subject: [PATCH v4 07/10] ARM: Introduce MPIDR_LEVEL_SHIFT macro
+In-Reply-To: <57D7C111.7000405@arm.com>
+References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
+ <1473691764-29424-8-git-send-email-vladimir.murzin@arm.com>
+ <20160913083855.GC5680@cbox> <57D7C111.7000405@arm.com>
+Message-ID: <57D7D100.3040908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/16 20:53, Mathieu Poirier wrote:
-> This patch makes it possible to use the current filter
-> framework with address filters.  That way address filters for
-> HW tracers such as CoreSight and IntelPT can be communicated
-> to the kernel drivers.
+On 13/09/16 10:04, Vladimir Murzin wrote:
+> On 13/09/16 09:38, Christoffer Dall wrote:
+>> On Mon, Sep 12, 2016 at 03:49:21PM +0100, Vladimir Murzin wrote:
+>>> vgic-v3 driver uses architecture specific MPIDR_LEVEL_SHIFT macro to
+>>> encode the affinity in a form compatible with ICC_SGI* registers.
+>>> Unfortunately, that macro is missing on ARM, so let's add it.
+>>>
+>>> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>>> ---
+>>>  arch/arm/include/asm/cputype.h |    1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+>>> index 1ee94c7..e2d94c1 100644
+>>> --- a/arch/arm/include/asm/cputype.h
+>>> +++ b/arch/arm/include/asm/cputype.h
+>>> @@ -55,6 +55,7 @@
+>>>  
+>>>  #define MPIDR_LEVEL_BITS 8
+>>>  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
+>>> +#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
+>>>  
+>>
+>> I'm not sure I follow the correctness of this completely.
+>>
+>> This is called from vgic_v3_dispatch_sgi, which takes a u64 value, which
+>> may have something in the Aff3 field, which we now shift left 24 bits,
+>> but that is not the Aff3 field of AArch32's MPIDR.
+>>
+>> What is the rationale for this making sense again?
 > 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> IIUC, in such case we construct mpidr which won't match in match_mpidr()
+> with the value we get from kvm_vcpu_get_mpidr_aff() and no SGI will be
+> sent to the guest.
 > 
-> ---
-> Changes for V5:
->  - Modified perf_evsel__append_filter() to take a string format
->    rather than an operation.
+> Since we get that u64 value from the guest, I'd think it is something
+> wrong is going on in the guest in case Aff3 is non-zero; however, we can
+> hide it by zeroing out SGI Aff3 bits in access_gic_sgi().
 
-Hope I'm not being a pain, but aren't there other places calling
-perf_evsel__append_filter() that need to be changed.  Might make
-sense as a separate patch.
+I don't think zeroing Aff3 is the right move, as the spec doesn't say
+that Aff3 should be ignored in a write to ICC_SGI1R. On the other hand,
+the spec says (in the context of the target list): "If a bit is 1 and
+the bit does not correspond to a valid target PE, the bit must be
+ignored by the Distributor".
 
-> 
-> Changes for V4:
->  - Added support for address filters over more than one
->    nibble.
->  - Removed Jiri's ack, this version is too different from
->    what was reviewed.
-> 
-> Changes for V3:
->  - Added Jiri's ack.
->  - Rebased to v4.8-rc5.
-> 
-> Changes for V2:
->  - Rebased to v4.8-rc4.
->  - Revisited error path.
-> 
-> 
->  tools/perf/util/evsel.c        |  4 ++--
->  tools/perf/util/evsel.h        |  2 +-
->  tools/perf/util/parse-events.c | 40 +++++++++++++++++++++++++++++++++++-----
->  3 files changed, 38 insertions(+), 8 deletions(-)
-> 
-> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-> index d40f852d2de2..a9bb277f221f 100644
-> --- a/tools/perf/util/evsel.c
-> +++ b/tools/perf/util/evsel.c
-> @@ -1047,14 +1047,14 @@ int perf_evsel__set_filter(struct perf_evsel *evsel, const char *filter)
->  }
->  
->  int perf_evsel__append_filter(struct perf_evsel *evsel,
-> -			      const char *op, const char *filter)
-> +			      const char *fmt, const char *filter)
->  {
->  	char *new_filter;
->  
->  	if (evsel->filter == NULL)
->  		return perf_evsel__set_filter(evsel, filter);
->  
-> -	if (asprintf(&new_filter,"(%s) %s (%s)", evsel->filter, op, filter) > 0) {
-> +	if (asprintf(&new_filter, fmt, evsel->filter, filter) > 0) {
->  		free(evsel->filter);
->  		evsel->filter = new_filter;
->  		return 0;
-> diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
-> index 8ceb7ebb51f5..50595c8c7207 100644
-> --- a/tools/perf/util/evsel.h
-> +++ b/tools/perf/util/evsel.h
-> @@ -236,7 +236,7 @@ void perf_evsel__set_sample_id(struct perf_evsel *evsel,
->  
->  int perf_evsel__set_filter(struct perf_evsel *evsel, const char *filter);
->  int perf_evsel__append_filter(struct perf_evsel *evsel,
-> -			      const char *op, const char *filter);
-> +			      const char *fmt, const char *filter);
->  int perf_evsel__apply_filter(struct perf_evsel *evsel, int ncpus, int nthreads,
->  			     const char *filter);
->  int perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
-> diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-> index 2eb8b1ed4cc8..8e683979ccd8 100644
-> --- a/tools/perf/util/parse-events.c
-> +++ b/tools/perf/util/parse-events.c
-> @@ -1760,20 +1760,50 @@ foreach_evsel_in_last_glob(struct perf_evlist *evlist,
->  static int set_filter(struct perf_evsel *evsel, const void *arg)
->  {
->  	const char *str = arg;
-> +	bool found = false;
-> +	int nr_addr_filters = 0;
-> +	struct perf_pmu *pmu = NULL;
->  
-> -	if (evsel == NULL || evsel->attr.type != PERF_TYPE_TRACEPOINT) {
-> -		fprintf(stderr,
-> -			"--filter option should follow a -e tracepoint option\n");
-> -		return -1;
-> +	if (evsel == NULL)
-> +		goto err;
-> +
-> +	if (evsel->attr.type == PERF_TYPE_TRACEPOINT) {
-> +		if (perf_evsel__append_filter(evsel,
-> +					      "(%s) && (%s)", str) < 0) {
-> +			fprintf(stderr,
-> +				"not enough memory to hold filter string\n");
-> +			return -1;
-> +		}
-> +
-> +		return 0;
->  	}
->  
-> -	if (perf_evsel__append_filter(evsel, "&&", str) < 0) {
-> +	while ((pmu = perf_pmu__scan(pmu)) != NULL)
-> +		if (pmu->type == evsel->attr.type) {
-> +			found = true;
-> +			break;
-> +		}
-> +
-> +	if (found)
-> +		perf_pmu__scan_file(pmu, "nr_addr_filters",
-> +				    "%d", &nr_addr_filters);
-> +
-> +	if (!nr_addr_filters)
-> +		goto err;
-> +
-> +	if (perf_evsel__append_filter(evsel, "%s,%s", str) < 0) {
->  		fprintf(stderr,
->  			"not enough memory to hold filter string\n");
->  		return -1;
->  	}
->  
->  	return 0;
-> +
-> +err:
-> +	fprintf(stderr,
-> +		"--filter option should follow a -e tracepoint or HW tracer option\n");
-> +
-> +	return -1;
->  }
->  
->  int parse_filter(const struct option *opt, const char *str,
-> 
+This makes me think that, unless ICC_SGI1R.IMR is set, we should simply
+ignore that SGI because there is no way we can actually deliver it.
+
+Could you cook a small patch that would go on top of this series?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
