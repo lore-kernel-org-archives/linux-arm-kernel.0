@@ -1,78 +1,49 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 13 Sep 2016 17:12:22 +0200
-Subject: [RESEND PATCH v2 2/4] pinctrl: amlogic: gxbb: add nand pins
-In-Reply-To: <1473779542-2635-1-git-send-email-jbrunet@baylibre.com>
-References: <1473779542-2635-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <1473779542-2635-2-git-send-email-jbrunet@baylibre.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 13 Sep 2016 16:14:03 +0100
+Subject: [RFCv3][PATCH 3/5] arm64: Implement ARCH_HAS_FORCE_CACHE
+In-Reply-To: <27805ccf-1f2d-81ea-044e-b21207be8e7f@redhat.com>
+References: <1473715978-11633-1-git-send-email-labbott@redhat.com>
+ <1473715978-11633-4-git-send-email-labbott@redhat.com>
+ <20160913091946.GB7467@arm.com>
+ <27805ccf-1f2d-81ea-044e-b21207be8e7f@redhat.com>
+Message-ID: <20160913151325.GF17731@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add EE domains pins for the NAND flash controller.
-Even tough we have no driver for the NAND flash controller yet, we need
-to have these pins in pinctrl as the actual pin are shared with the spifc
-controller. The bootloader on the S905-P200 setup pinmux for the NAND
-controller so we need the kernel to properly deactivate this if necessary.
+On Tue, Sep 13, 2016 at 08:02:20AM -0700, Laura Abbott wrote:
+> On 09/13/2016 02:19 AM, Will Deacon wrote:
+> >On Mon, Sep 12, 2016 at 02:32:56PM -0700, Laura Abbott wrote:
+> >>
+> >>arm64 may need to guarantee the caches are synced. Implement versions of
+> >>the kernel_force_cache API to allow this.
+> >>
+> >>Signed-off-by: Laura Abbott <labbott@redhat.com>
+> >>---
+> >>v3: Switch to calling cache operations directly instead of relying on
+> >>DMA mapping.
+> >>---
+> >> arch/arm64/include/asm/cacheflush.h |  8 ++++++++
+> >> arch/arm64/mm/cache.S               | 24 ++++++++++++++++++++----
+> >> arch/arm64/mm/flush.c               | 11 +++++++++++
+> >> 3 files changed, 39 insertions(+), 4 deletions(-)
+> >
+> >I'm really hesitant to expose these cache routines as an API solely to
+> >support a driver sitting in staging/. I appreciate that there's a chicken
+> >and egg problem here, but we *really* don't want people using these routines
+> >in preference to the DMA API, and I fear that we'll simply grow a bunch
+> >more users of these things if we promote it as an API like you're proposing.
+> >
+> >Can the code not be contained under staging/, as part of ion?
+> >
+> 
+> I proposed that in V1 and it was suggested I make it a proper API
+> 
+> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47654.html
+> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47672.html
 
-Acked-by: Kevin Hilman <khilman@baylibre.com>
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+:/ then I guess we're in disagreement. If ion really needs this stuff
+(which I don't fully grok), perhaps we should be exposing something at
+a higher level from the architecture, so it really can't be used for
+anything other than ion.
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-index 573901887cee..b06cc12f2500 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-@@ -176,6 +176,15 @@ static const unsigned int sdio_cmd_pins[] = { PIN(GPIOX_4, EE_OFF) };
- static const unsigned int sdio_clk_pins[] = { PIN(GPIOX_5, EE_OFF) };
- static const unsigned int sdio_irq_pins[] = { PIN(GPIOX_7, EE_OFF) };
- 
-+static const unsigned int nand_ce0_pins[]	= { PIN(BOOT_8, EE_OFF) };
-+static const unsigned int nand_ce1_pins[]	= { PIN(BOOT_9, EE_OFF) };
-+static const unsigned int nand_rb0_pins[]	= { PIN(BOOT_10, EE_OFF) };
-+static const unsigned int nand_ale_pins[]	= { PIN(BOOT_11, EE_OFF) };
-+static const unsigned int nand_cle_pins[]	= { PIN(BOOT_12, EE_OFF) };
-+static const unsigned int nand_wen_clk_pins[]	= { PIN(BOOT_13, EE_OFF) };
-+static const unsigned int nand_ren_wr_pins[]	= { PIN(BOOT_14, EE_OFF) };
-+static const unsigned int nand_dqs_pins[]	= { PIN(BOOT_15, EE_OFF) };
-+
- static const unsigned int uart_tx_a_pins[]	= { PIN(GPIOX_12, EE_OFF) };
- static const unsigned int uart_rx_a_pins[]	= { PIN(GPIOX_13, EE_OFF) };
- static const unsigned int uart_cts_a_pins[]	= { PIN(GPIOX_14, EE_OFF) };
-@@ -439,6 +448,14 @@ static struct meson_pmx_group meson_gxbb_periphs_groups[] = {
- 	GROUP(nor_q,		5,	3),
- 	GROUP(nor_c,		5,	2),
- 	GROUP(nor_cs,		5,	0),
-+	GROUP(nand_ce0,		4,	26),
-+	GROUP(nand_ce1,		4,	27),
-+	GROUP(nand_rb0,		4,	25),
-+	GROUP(nand_ale,		4,	24),
-+	GROUP(nand_cle,		4,	23),
-+	GROUP(nand_wen_clk,	4,	22),
-+	GROUP(nand_ren_wr,	4,	21),
-+	GROUP(nand_dqs,		4,	20),
- 
- 	/* Bank CARD */
- 	GROUP(sdcard_d1,	2,	14),
-@@ -540,6 +557,11 @@ static const char * const sdio_groups[] = {
- 	"sdio_cmd", "sdio_clk", "sdio_irq",
- };
- 
-+static const char * const nand_groups[] = {
-+	"nand_ce0", "nand_ce1", "nand_rb0", "nand_ale", "nand_cle",
-+	"nand_wen_clk", "nand_ren_wr", "nand_dqs",
-+};
-+
- static const char * const uart_a_groups[] = {
- 	"uart_tx_a", "uart_rx_a", "uart_cts_a", "uart_rts_a",
- };
-@@ -635,6 +657,7 @@ static struct meson_pmx_func meson_gxbb_periphs_functions[] = {
- 	FUNCTION(nor),
- 	FUNCTION(sdcard),
- 	FUNCTION(sdio),
-+	FUNCTION(nand),
- 	FUNCTION(uart_a),
- 	FUNCTION(uart_b),
- 	FUNCTION(uart_c),
--- 
-2.7.4
+Will
