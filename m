@@ -1,78 +1,99 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 13 Sep 2016 11:16:07 +0100
-Subject: [PATCH 5/7] arm64/kvm: hyp: tlb: use __tlbi() helper
-In-Reply-To: <1473761769-30572-1-git-send-email-punit.agrawal@arm.com>
-References: <1473761769-30572-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1473761769-30572-6-git-send-email-punit.agrawal@arm.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 13 Sep 2016 18:21:22 +0800
+Subject: [PATCH v11 5/8] clocksource/drivers/arm_arch_timer: Simplify ACPI
+ support code.
+In-Reply-To: <CADyBb7v-b1bKGBdH6J78UhfCcQd=BJLFoZ16GNgmrd2EucjYDA@mail.gmail.com>
+References: <1473168352-5156-1-git-send-email-fu.wei@linaro.org>
+ <1473168352-5156-6-git-send-email-fu.wei@linaro.org>
+ <alpine.DEB.2.20.1609061635000.5647@nanos>
+ <CADyBb7uX79UP=mUxvP-EPGi56-46y2SCMPsWO=Uw-=N0GQERhA@mail.gmail.com>
+ <CADyBb7v-b1bKGBdH6J78UhfCcQd=BJLFoZ16GNgmrd2EucjYDA@mail.gmail.com>
+Message-ID: <CADyBb7tWP=_zu+Pu0UC1E6u+yAgH06peh8rt3hS6-O42K3kPNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+Hi Mark, Marc,
 
-Now that we have a __tlbi() helper, make use of this in the arm64 KVM hyp
-code to get rid of asm() boilerplate. At the same time, we simplify
-__tlb_flush_vm_context by using __flush_icache_all(), as this has the
-appropriate instruction cache maintenance and barrier.
+Sorry for missing you in the cc list
+Do you have any suggestion for the  arm_arch_timer patches?
+Could you help me to review these patches ?
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-[ rename tlbi -> __tlbi, convert additional sites, update commit log ]
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/kvm/hyp/tlb.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Great thanks !
 
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-index be8177c..4cda100 100644
---- a/arch/arm64/kvm/hyp/tlb.c
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -16,6 +16,7 @@
-  */
- 
- #include <asm/kvm_hyp.h>
-+#include <asm/tlbflush.h>
- 
- static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
-@@ -32,7 +33,7 @@ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 	 * whole of Stage-1. Weep...
- 	 */
- 	ipa >>= 12;
--	asm volatile("tlbi ipas2e1is, %0" : : "r" (ipa));
-+	__tlbi(ipas2e1is, ipa);
- 
- 	/*
- 	 * We have to ensure completion of the invalidation at Stage-2,
-@@ -41,7 +42,7 @@ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 	 * the Stage-1 invalidation happened first.
- 	 */
- 	dsb(ish);
--	asm volatile("tlbi vmalle1is" : : );
-+	__tlbi(vmalle1is);
- 	dsb(ish);
- 	isb();
- 
-@@ -60,7 +61,7 @@ static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
- 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
- 	isb();
- 
--	asm volatile("tlbi vmalls12e1is" : : );
-+	__tlbi(vmalls12e1is);
- 	dsb(ish);
- 	isb();
- 
-@@ -72,9 +73,8 @@ __alias(__tlb_flush_vmid) void __kvm_tlb_flush_vmid(struct kvm *kvm);
- static void __hyp_text __tlb_flush_vm_context(void)
- {
- 	dsb(ishst);
--	asm volatile("tlbi alle1is	\n"
--		     "ic ialluis	  ": : );
--	dsb(ish);
-+	__tlbi(alle1is);
-+	__flush_icache_all(); /* contains a dsb(ish) */
- }
- 
- __alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
+On 13 September 2016 at 17:22, Fu Wei <fu.wei@linaro.org> wrote:
+> Hi Thomas, Daniel,
+>
+> For these  arm_arch_timer patches, do you have any other suggestion or comment?
+> I have deleted "skipping" in the error message.
+>
+> I have prepared v12 (rebase to rc6 and on the top of IORT v11),
+> should I send it now (if you are OK with my arm_arch_timer patches ),
+> or anything I can do to improve this patchset ?
+>
+> Thanks.
+>
+> On 7 September 2016 at 17:23, Fu Wei <fu.wei@linaro.org> wrote:
+>> Hi Thomas
+>>
+>> On 6 September 2016 at 22:36, Thomas Gleixner <tglx@linutronix.de> wrote:
+>>> On Tue, 6 Sep 2016, fu.wei at linaro.org wrote:
+>>>> +     if (timer_count < 0)
+>>>> +             pr_err("Failed to get platform timer info, skipping.\n");
+>>>
+>>> So this prints something about skipping. But then it continues as if
+>>> nothing went wrong. That's either wrong or confusing or both.
+>>
+>> yes, you are right, this info is confusing.
+>> maybe we just delete the "skipping" ?
+>>
+>> ?timer_count < 0? is caused by some firmware bug, in gtdt.c:
+>> ----
+>> int __init acpi_gtdt_init(struct acpi_table_header *table)
+>> {
+>> ......
+>>         if (start < (void *)table + sizeof(struct acpi_table_gtdt)) {
+>>         pr_err(FW_BUG "Failed to retrieve timer info from firmware:
+>> invalid data.\n");
+>>         return -EINVAL;
+>> ......
+>> }
+>> ----
+>>
+>> But in this situation( without platform timers ), system still can work.
+>> So I thing we just need to print a error.
+>>
+>>>
+>>>> -     arch_timer_init();
+>>>> -     return 0;
+>>>> +     return arch_timer_init();
+>>>
+>>> Thanks,
+>>>
+>>>         tglx
+>>
+>>
+>>
+>> --
+>> Best regards,
+>>
+>> Fu Wei
+>> Software Engineer
+>> Red Hat
+>
+>
+>
+> --
+> Best regards,
+>
+> Fu Wei
+> Software Engineer
+> Red Hat
+
+
+
 -- 
-2.8.1
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
