@@ -1,105 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 13 Sep 2016 12:57:02 +0200
-Subject: [PATCH v7 05/11] ARM: dts: koelsch: Enable UHS-I SDR-50 and SDR-104
+Date: Tue, 13 Sep 2016 12:57:03 +0200
+Subject: [PATCH v7 06/11] ARM: dts: r8a7794: set maximum frequency for SDHI
+ clocks
 In-Reply-To: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
 References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1473764228-24768-6-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1473764228-24768-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,1,2}.
-And the sd-uhs-sdr104 property to SDHI0.
+Define the upper limit otherwise the driver cannot utilize max speeds.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 34 +++++++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7794.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index f8a7d090fd01..be90639d2635 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -360,16 +360,37 @@
- 	sdhi0_pins: sd0 {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi0_pins_uhs: sd0_uhs {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+		power-source = <1800>;
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 9365580a194f..57e0d27cb82e 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -731,6 +731,7 @@
+ 		dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
+ 		       <&dmac1 0xcd>, <&dmac1 0xce>;
+ 		dma-names = "tx", "rx", "tx", "rx";
++		max-frequency = <195000000>;
+ 		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
+ 		status = "disabled";
  	};
- 
- 	sdhi1_pins: sd1 {
- 		groups = "sdhi1_data4", "sdhi1_ctrl";
- 		function = "sdhi1";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi1_pins_uhs: sd1_uhs {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <1800>;
+@@ -743,6 +744,7 @@
+ 		dmas = <&dmac0 0xc1>, <&dmac0 0xc2>,
+ 		       <&dmac1 0xc1>, <&dmac1 0xc2>;
+ 		dma-names = "tx", "rx", "tx", "rx";
++		max-frequency = <97500000>;
+ 		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
+ 		status = "disabled";
  	};
- 
- 	sdhi2_pins: sd2 {
- 		groups = "sdhi2_data4", "sdhi2_ctrl";
- 		function = "sdhi2";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi2_pins_uhs: sd2_uhs {
-+		groups = "sdhi2_data4", "sdhi2_ctrl";
-+		function = "sdhi2";
-+		power-source = <1800>;
+@@ -755,6 +757,7 @@
+ 		dmas = <&dmac0 0xd3>, <&dmac0 0xd4>,
+ 		       <&dmac1 0xd3>, <&dmac1 0xd4>;
+ 		dma-names = "tx", "rx", "tx", "rx";
++		max-frequency = <97500000>;
+ 		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
+ 		status = "disabled";
  	};
- 
- 	qspi_pins: qspi {
-@@ -454,33 +475,40 @@
- 
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi0_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi0>;
- 	vqmmc-supply = <&vccq_sdhi0>;
- 	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- 	status = "okay";
- };
- 
- &sdhi1 {
- 	pinctrl-0 = <&sdhi1_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi1_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi1>;
- 	vqmmc-supply = <&vccq_sdhi1>;
- 	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
- &sdhi2 {
- 	pinctrl-0 = <&sdhi2_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi2_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi2>;
- 	vqmmc-supply = <&vccq_sdhi2>;
- 	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
 -- 
 2.7.0.rc3.207.g0ac5344
