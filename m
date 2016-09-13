@@ -1,48 +1,107 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 13 Sep 2016 08:02:20 -0700
-Subject: [RFCv3][PATCH 3/5] arm64: Implement ARCH_HAS_FORCE_CACHE
-In-Reply-To: <20160913091946.GB7467@arm.com>
-References: <1473715978-11633-1-git-send-email-labbott@redhat.com>
- <1473715978-11633-4-git-send-email-labbott@redhat.com>
- <20160913091946.GB7467@arm.com>
-Message-ID: <27805ccf-1f2d-81ea-044e-b21207be8e7f@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 13 Sep 2016 17:03:07 +0200
+Subject: [PATCH 1/5] clk: add support for runtime pm
+In-Reply-To: <76bb5b71-dd4e-e1ad-df0b-b84833812502@samsung.com>
+References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
+ <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
+ <CGME20160913084956eucas1p2433fb17456cea4620de2729efbbf78c7@eucas1p2.samsung.com>
+ <CAPDyKFo7R1f1H1R5Q78L4e_nHfngRYfo8jP_Dfi3uf_OGWvZCg@mail.gmail.com>
+ <76bb5b71-dd4e-e1ad-df0b-b84833812502@samsung.com>
+Message-ID: <CAPDyKFqufBW0TmPVBx-noSnCvk26WBk9jP4PjgS5wKVuq6cJmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2016 02:19 AM, Will Deacon wrote:
-> Hi Laura,
->
-> On Mon, Sep 12, 2016 at 02:32:56PM -0700, Laura Abbott wrote:
+[...]
+
 >>
->> arm64 may need to guarantee the caches are synced. Implement versions of
->> the kernel_force_cache API to allow this.
+>> This needs to be clarified. I agree we need to cover system PM as
+>> well, but let's try be a bit more precise about it.
+>
+>
+> Right, I wasn't precise here. I've developed this code on older (v4.1 and
+> v4.6)
+> kernels, which had a code which disables runtime pm during system sleep
+> transition
+> time. Maybe I need to revisit it and consider your change merged to
+> v4.8-rc1, which
+> keeps runtime pm enabled during system sleep transitions.
+
+Right, I see.
+
+>>>   static bool clk_core_is_prepared(struct clk_core *core)
+>>>   {
+>>> +       if (clk_pm_runtime_suspended(core))
+>>> +               return false;
+>>> +
 >>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->> v3: Switch to calling cache operations directly instead of relying on
->> DMA mapping.
->> ---
->>  arch/arm64/include/asm/cacheflush.h |  8 ++++++++
->>  arch/arm64/mm/cache.S               | 24 ++++++++++++++++++++----
->>  arch/arm64/mm/flush.c               | 11 +++++++++++
->>  3 files changed, 39 insertions(+), 4 deletions(-)
+>> This isn't safe, as even if the clock controller is runtime resumed at
+>> this point, that's *not* a guarantee that is stays runtime resumed
+>> while invoking the ->ops->is_prepared().
+>>
+>> Instead you must call a pm_runtime_get_noresume() before you check the
+>> runtime PM status, as that should avoid the device from being runtime
+>> suspended. Then when the ->ops->is_prepared() has been invoked, we
+>> should call pm_runtime_put().
+>>
+>> Although, I am not sure the above change becomes entirely correct as I
+>> think we are mixing the runtime PM status with the clock prepare
+>> status here. In other words, the next time the clock controller
+>> becomes runtime resumed, it may very well restore some register
+>> context which may prepare the clock, unless someone explicitly has
+>> unprepared it.
+>>
+>> Of course, it all depends on how clk_core_is_prepared() is used by the
+>> clock framework.
 >
-> I'm really hesitant to expose these cache routines as an API solely to
-> support a driver sitting in staging/. I appreciate that there's a chicken
-> and egg problem here, but we *really* don't want people using these routines
-> in preference to the DMA API, and I fear that we'll simply grow a bunch
-> more users of these things if we promote it as an API like you're proposing.
 >
-> Can the code not be contained under staging/, as part of ion?
+> clk_core_is_prepared() is mainly used by disable_unused_tree_*. You are
+> right that it mixes a bit clock prepared state with runtime pm active
+> state of clock controller's, but I assumed here that clock cannot be
+> prepared if runtime pm state of controller is suspended. Other approach
+> here would be to call pm_runtime_get(), check status and then
+> pm_runtime_put(). If you prefer such approach, I will change it.
+
+Using pm_runtime_get|put() would work for the clk_core_is_prepared()
+case, although perhaps not for the clk_core_is_enabled() case.
+
+The reason is that I guess the clk_core_is_enabled() API may be called
+from atomic context? Thus we would need to enable
+pm_runtime_irq_safe() for the clock provider device, which I *really*
+would like to avoid.
+
+[...]
+
+>>
+>> I believe we are also accessing the clock controller HW from the
+>> late_initcall_sync(clk_disable_unused) function.
+>
+>
+> This was indirectly handled by the runtime pm state check in is_prepared
+> and is_enabled().
+
+I see.
+
+Although, I was thinking that you explicitly would like to
+disable/unprepare unused clocks in this phase, so then it isn't
+sufficient to rely on the runtime PM status to know whether the clock
+is prepared/enabled.
+
+Perhaps, this is the only case when you actually need a
+pm_runtime_get|put() around the ->is_enabled|prepared()!?
+
+>
+>> More precisely, in clk_disable_unused_subtree(), we probably need a
+>> pm_runtime_get_sync() before calling clk_core_is_enabled(). And then
+>> restore that with a pm_runtime_put() after the clock has been
+>> disabled.
+>> The similar is needed in clk_unprepare_unused_subtree().
+>
+>
+> Best regards
+> --
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
 >
 
-I proposed that in V1 and it was suggested I make it a proper API
-
-http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47654.html
-http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47672.html
-
-> Will
->
-
-Thanks,
-Laura
+Kind regards
+Uffe
