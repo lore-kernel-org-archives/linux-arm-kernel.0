@@ -1,112 +1,117 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 13 Sep 2016 16:47:09 -0500
-Subject: [PATCH 2/2] PCI: add CRS support to error handling path
-In-Reply-To: <dd6d9d71-1ba0-84c8-7cab-21fe8b555f1c@codeaurora.org>
+Date: Tue, 13 Sep 2016 16:53:15 -0500
+Subject: [PATCH 1/2] PCI: save and restore device state during bus reset
+In-Reply-To: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
 References: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
- <1472770801-30671-2-git-send-email-okaya@codeaurora.org>
- <20160913200152.GE4138@localhost>
- <dd6d9d71-1ba0-84c8-7cab-21fe8b555f1c@codeaurora.org>
-Message-ID: <20160913214709.GI4138@localhost>
+Message-ID: <20160913215315.GJ4138@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 05:04:49PM -0400, Sinan Kaya wrote:
-> On 9/13/2016 4:01 PM, Bjorn Helgaas wrote:
-> > On Thu, Sep 01, 2016 at 07:00:01PM -0400, Sinan Kaya wrote:
-> >> The PCIE spec allows an endpoint device to extend the initialization time
-> >> beyond 1 second by issuing Configuration Request Retry Status (CRS) for a
-> >> vendor ID read request.
-> >>
-> >> This basically means "I'm busy now, please call me back later".
-> >>
-> >> There are two moving parts to CRS support from the SW perspective. One part
-> >> is to determine if CRS is supported or not. The second part is to set the
-> >> CRS visibility register.
-> >>
-> >> As part of the probe, the Linux kernel sets the above two conditions in
-> >> pci_enable_crs function. The kernel is also honoring the returned CRS in
-> >> pci_bus_read_dev_vendor_id function if supported. The function will poll up
-> >> to specified amount of time while endpoint is returning CRS response.
-> >>
-> >> The PCIe spec also allows CRS to be issued during cold, warm, hot and FLR
-> >> resets.
-> >>
-> >> The hot reset is initiated by starting a secondary bus reset. This patch is
-> >> adding vendor ID read immediately after a bus reset so that the
-> >> initialization procedure can be extended by the amount of time endpoint
-> >> requires.
-> >>
-> >> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> >> ---
-> >>  drivers/pci/pci.c | 39 +++++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 39 insertions(+)
-> >>
-> >> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> >> index b209378..ebd0fc6 100644
-> >> --- a/drivers/pci/pci.c
-> >> +++ b/drivers/pci/pci.c
-> >> @@ -3829,6 +3829,44 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
-> >>  	return 0;
-> >>  }
-> >>  
-> >> +/*
-> >> + * Mostly copy paste from pci_walk_bus with the exceptions of hard coded
-> >> + * work and removed locks.
-> >> + */
-> >> +static void pci_bus_probe_crs(struct pci_bus *top)
-> >> +{
-> >> +	struct pci_dev *dev;
-> >> +	struct pci_bus *bus;
-> >> +	struct list_head *next;
-> >> +	int retval;
-> >> +	u32 l;
-> >> +
-> >> +	bus = top;
-> >> +	next = top->devices.next;
-> >> +	for (;;) {
-> >> +		if (next == &bus->devices) {
-> >> +			/* end of this bus, go up or finish */
-> >> +			if (bus == top)
-> >> +				break;
-> >> +			next = bus->self->bus_list.next;
-> >> +			bus = bus->self->bus;
-> >> +			continue;
-> >> +		}
-> >> +		dev = list_entry(next, struct pci_dev, bus_list);
-> >> +		if (dev->subordinate) {
-> >> +			/* this is a pci-pci bridge, do its devices next */
-> >> +			next = dev->subordinate->devices.next;
-> >> +			bus = dev->subordinate;
-> >> +		} else
-> >> +			next = dev->bus_list.next;
-> >> +
-> >> +		retval = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l,
-> >> +						    60 * 1000);
-> >> +		if (retval)
-> >> +			break;
-> >> +	}
-> >> +}
-> > 
-> > Sigh.  Man, this is ugly.  Maybe we're locked into the current
-> > strategy and don't really have a choice, but I really don't like it.
+On Thu, Sep 01, 2016 at 07:00:00PM -0400, Sinan Kaya wrote:
+> A secondary bus reset causes settings to be lost by all downstream
+> devices on the tree. The code is currently saving and restoring device
+> states only when called from the VFIO path via pci_probe_reset_bus
+> and pci_reset_bus functions.
 > 
-> I can add a locked version of the walkbus API. 
-> Then, I can minimize this code to a couple of lines. How does that sound?
-
-I didn't mean that, I meant the whole idea of having to walk the whole
-hierarchy and touch each device.  It's sort of like we're enumerating
-things, but not really, so this checking is kinda sorta parallel to
-the enumeration path.
-
-> > You mentioned several kinds of reset where CRS is allowed.  Doesn't this
-> > fix only one of them?  I know we support at least FLR reset also.
+> Moving the save and restore into pci_reset_bridge_secondary_bus
+> so that all users of the API have the same behavior.
 > 
-> The CRS is for hot reset, warm reset and FLR reset. There is nothing we can do in SW
-> for warm reset. This patch is to address hot reset caused by SBR. 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pci.c | 36 +++++++++++++++---------------------
+>  1 file changed, 15 insertions(+), 21 deletions(-)
 > 
-> I was hoping that Alex would help us for directions on the FLR reset later.
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index aab9d51..b209378 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3860,19 +3860,6 @@ void __weak pcibios_reset_secondary_bus(struct pci_dev *dev)
+>  	pci_reset_secondary_bus(dev);
+>  }
+>  
+> -/**
+> - * pci_reset_bridge_secondary_bus - Reset the secondary bus on a PCI bridge.
+> - * @dev: Bridge device
+> - *
+> - * Use the bridge control register to assert reset on the secondary bus.
+> - * Devices on the secondary bus are left in power-on state.
+> - */
+> -void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
+> -{
+> -	pcibios_reset_secondary_bus(dev);
+> -}
+> -EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
+> -
+>  static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
+>  {
+>  	struct pci_dev *pdev;
+> @@ -4362,6 +4349,21 @@ static void pci_slot_restore(struct pci_slot *slot)
+>  	}
+>  }
+>  
+> +/**
+> + * pci_reset_bridge_secondary_bus - Reset the secondary bus on a PCI bridge.
+> + * @dev: Bridge device
+> + *
+> + * Use the bridge control register to assert reset on the secondary bus.
+> + * Devices on the secondary bus are left in power-on state.
+> + */
+> +void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
+> +{
+> +	pci_bus_save_and_disable(dev->bus);
+> +	pcibios_reset_secondary_bus(dev);
+> +	pci_bus_restore(dev->bus);
 
-What sort of help from Alex were you hoping for?  Is fixing the FLR
-path harder than this one?  If we're going to fix one path, I'd prefer
-to fix them all at the same time rather than tripping over this again
-later.
+This path eventually writes the Bridge Control register:
+
+  pci_reset_bridge_secondary_bus
+    pcibios_reset_secondary_bus
+      pci_reset_secondary_bus
+        pci_write_config_word(dev, PCI_BRIDGE_CONTROL, ctrl)
+
+But I think it'd be easy to call this on a non-bridge device, and I
+don't think there's anything in the path that checks whether this is
+actually a bridge.  I wonder if we should check that somewhere, or
+maybe even change the interface so it takes a struct pci_bus instead
+of a pci_dev.
+
+> +}
+> +EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
+> +
+>  static int pci_slot_reset(struct pci_slot *slot, int probe)
+>  {
+>  	int rc;
+> @@ -4504,12 +4506,8 @@ int pci_reset_bus(struct pci_bus *bus)
+>  	if (rc)
+>  		return rc;
+>  
+> -	pci_bus_save_and_disable(bus);
+> -
+>  	rc = pci_bus_reset(bus, 0);
+>  
+> -	pci_bus_restore(bus);
+> -
+>  	return rc;
+>  }
+>  EXPORT_SYMBOL_GPL(pci_reset_bus);
+> @@ -4528,8 +4526,6 @@ int pci_try_reset_bus(struct pci_bus *bus)
+>  	if (rc)
+>  		return rc;
+>  
+> -	pci_bus_save_and_disable(bus);
+> -
+>  	if (pci_bus_trylock(bus)) {
+>  		might_sleep();
+>  		pci_reset_bridge_secondary_bus(bus->self);
+> @@ -4537,8 +4533,6 @@ int pci_try_reset_bus(struct pci_bus *bus)
+>  	} else
+>  		rc = -EAGAIN;
+>  
+> -	pci_bus_restore(bus);
+> -
+>  	return rc;
+>  }
+>  EXPORT_SYMBOL_GPL(pci_try_reset_bus);
+> -- 
+> 1.9.1
+> 
