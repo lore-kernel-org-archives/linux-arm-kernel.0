@@ -1,41 +1,120 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 13 Sep 2016 17:41:03 +0800
-Subject: [PATCH v8 4/9] drm/mediatek: update display module connections
-In-Reply-To: <1473681672-47144-5-git-send-email-yt.shen@mediatek.com>
-References: <1473681672-47144-1-git-send-email-yt.shen@mediatek.com>
- <1473681672-47144-5-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1473759663.28437.45.camel@mtksdaap41>
+From: m.niestroj@grinn-global.com (Marcin Niestroj)
+Date: Tue, 13 Sep 2016 11:49:50 +0200
+Subject: [PATCH v2 1/2] ARM: dts: imx6ul: Add DTS for liteSOM module
+Message-ID: <20160913094951.26394-1-m.niestroj@grinn-global.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+This is a SOM (System on Module), so it will be part of another boards.
+Hence, this is a "dtsi" file that will be included from another device
+tree files.
 
-On Mon, 2016-09-12 at 20:01 +0800, YT Shen wrote:
-> update connections for OVL, RDMA, BLS, DSI
-> 
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> ---
+Hardware specification:
+ * Freescale i.MX6UL SoC
+ * up to 512 MB RAM
+ * eMMC on uSDHC2
 
-[snip...]
+Signed-off-by: Marcin Niestroj <m.niestroj@grinn-global.com>
+---
+Changes v1 -> v2:
+ * Use dual license
 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> index 53065c7..0850aa4 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> @@ -40,6 +40,7 @@ enum mtk_ddp_comp_type {
->  
->  enum mtk_ddp_comp_id {
->  	DDP_COMPONENT_AAL,
-> +	DDP_COMPONENT_BLS,
+ arch/arm/boot/dts/imx6ul-litesom.dtsi | 87 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6ul-litesom.dtsi
 
-I think this should be moved to an independent patch and title of it
-should be "Add BLS component." If you keep it in this patch, title of
-this patch should be modified as "Add BLS component and update display
-module connections."
-
-Regards,
-CK
-
->  	DDP_COMPONENT_COLOR0,
->  	DDP_COMPONENT_COLOR1,
->  	DDP_COMPONENT_DPI0,
+diff --git a/arch/arm/boot/dts/imx6ul-litesom.dtsi b/arch/arm/boot/dts/imx6ul-litesom.dtsi
+new file mode 100644
+index 0000000..c0345b4
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6ul-litesom.dtsi
+@@ -0,0 +1,87 @@
++/*
++ * Copyright 2016 Grinn
++ *
++ * Author: Marcin Niestroj <m.niestroj@grinn-global.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "imx6ul.dtsi"
++
++/ {
++	model = "Grinn i.MX6UL liteSOM";
++	compatible = "grinn,imx6ul-litesom", "fsl,imx6ul";
++
++	memory {
++		reg = <0x80000000 0x20000000>;
++	};
++};
++
++&cpu0 {
++	arm-supply = <&reg_arm>;
++	soc-supply = <&reg_soc>;
++};
++
++&iomuxc {
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX6UL_PAD_NAND_RE_B__USDHC2_CLK	    0x10069
++			MX6UL_PAD_NAND_WE_B__USDHC2_CMD	    0x17059
++			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0 0x17059
++			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1 0x17059
++			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2 0x17059
++			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3 0x17059
++			MX6UL_PAD_NAND_DATA04__USDHC2_DATA4 0x17059
++			MX6UL_PAD_NAND_DATA05__USDHC2_DATA5 0x17059
++			MX6UL_PAD_NAND_DATA06__USDHC2_DATA6 0x17059
++			MX6UL_PAD_NAND_DATA07__USDHC2_DATA7 0x17059
++			MX6UL_PAD_NAND_ALE__USDHC2_RESET_B  0x17059
++		>;
++	};
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	no-1-8-v;
++	non-removable;
++	keep-power-in-suspend;
++	wakeup-source;
++	bus-width = <8>;
++	status = "okay";
++};
+-- 
+2.9.3
