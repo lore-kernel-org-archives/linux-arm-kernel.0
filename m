@@ -1,33 +1,29 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 13 Sep 2016 14:26:38 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Check for v7s-incapable systems
-Message-ID: <2e473e263ac469bd6d3b09e7756c138325e10969.1473773198.git.robin.murphy@arm.com>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Tue, 13 Sep 2016 15:28:12 +0200
+Subject: [PATCH] Documentation: dt-bindings: Fix "st,
+ syscfg" definition for STM32 pinctrl
+Message-ID: <1473773292-10225-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On machines with no 32-bit addressable RAM whatsoever, we shouldn't
-even touch the v7s format as it's never going to work.
+"st,syscfg" entry was bad described.
 
-Fixes: e5fc9753b1a8 ("iommu/io-pgtable: Add ARMv7 short descriptor support")
-Reported-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/io-pgtable-arm-v7s.c | 3 +++
- 1 file changed, 3 insertions(+)
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index def8ca1c982d..b7759a48f4ed 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -633,6 +633,9 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
- {
- 	struct arm_v7s_io_pgtable *data;
- 
-+	if (upper_32_bits(PHYS_OFFSET))
-+		return NULL;
-+
- 	if (cfg->ias > ARM_V7S_ADDR_BITS || cfg->oas > ARM_V7S_ADDR_BITS)
- 		return NULL;
+diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+index a0eed99..f9753c4 100644
+--- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+@@ -16,7 +16,9 @@ Required properies:
+    gpio-bank node (children).
+  - interrupt-parent: phandle of the interrupt parent to which the external
+    GPIO interrupts are forwarded to.
+- - st,syscfg: phandle of the syscfg node used for IRQ mux selection.
++ - st,syscfg: Should be phandle/offset pair. The phandle to the syscon node
++   which includes IRQ mux selection register, and the offset of the IRQ mux
++   selection register.
+  - pins-are-numbered: Specify the subnodes are using numbered pinmux to
+    specify pins.
  
 -- 
-2.8.1.dirty
+1.9.1
