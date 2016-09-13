@@ -1,68 +1,322 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 13 Sep 2016 15:45:56 +0200
-Subject: [PATCHv2 3/3] tty/serial: at91: fix hardware handshake on SAM9x5
- (without GPIOs)
-In-Reply-To: <CACQ1gAhNdPgtkpt1QPaiKjKi5oaq5vHbt4kKL5tQfwLvDBDo0w@mail.gmail.com>
-References: <20160912094733.21501-1-richard.genoud@gmail.com>
- <20160912094733.21501-4-richard.genoud@gmail.com>
- <20160912095317.74e5xiedrq5nh3v4@piout.net>
- <CACQ1gAhNdPgtkpt1QPaiKjKi5oaq5vHbt4kKL5tQfwLvDBDo0w@mail.gmail.com>
-Message-ID: <20160913134556.wpodujgk6yn7rfxz@piout.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 13 Sep 2016 14:55:17 +0100
+Subject: [PATCH v5 05/14] drivers: iommu: make iommu_fwspec OF agnostic
+In-Reply-To: <4e8110c4-edf3-15db-206c-b83794f138a0@arm.com>
+References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
+ <20160909142343.13314-6-lorenzo.pieralisi@arm.com>
+ <4e8110c4-edf3-15db-206c-b83794f138a0@arm.com>
+Message-ID: <20160913135517.GA2334@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/09/2016 at 12:50:38 +0200, Richard Genoud wrote :
-> >> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> >> index e9b4fbf88c2d..32154e7231ce 100644
-> >> --- a/drivers/tty/serial/atmel_serial.c
-> >> +++ b/drivers/tty/serial/atmel_serial.c
-> >> @@ -2130,15 +2130,19 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
-> >>       } else if ((termios->c_cflag & CRTSCTS) &&
-> >>                  !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
-> >>               /*
-> >> -              * RS232 with hardware handshake (RTS/CTS)
-> >> -              * handled by the controller.
-> >> +              * Automatic hardware handshake (RTS/CTS) only work with
-> >> +              * FIFOs or PDC.
-> >> +              * Meaning that on SAM9x5 the controller can't handle
-> >> +              * the hardware handshake (no FIFOs nor PDC on these platforms).
-> >>                */
-> >> -             if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
-> >> -                     dev_info(port->dev, "not enabling hardware flow control because DMA is used");
-> >> -                     termios->c_cflag &= ~CRTSCTS;
-> >> -             } else {
-> >> +             if (atmel_use_pdc_rx(port) || atmel_use_fifo(port))
-> >>                       mode |= ATMEL_US_USMODE_HWHS;
-> >> -             }
-> >> +             else
-> >> +                     /*
-> >> +                      * The hardware handshake won't be handle by the
-> >> +                      * controller but by the driver.
-> >> +                      */
-> >> +                     mode |= ATMEL_US_USMODE_NORMAL;
-> >
-> > You still need the case where HWHS is impossible and there are no gpio
-> > configured. You need to inform userspace that the configuration was not
-> > applied instead of silently ignoring the error.
+On Tue, Sep 13, 2016 at 02:38:35PM +0100, Robin Murphy wrote:
+> >  static int arm_smmu_match_node(struct device *dev, void *data)
+> >  {
+> > -	return dev->of_node == data;
+> > +	struct fwnode_handle *fwnode;
+> > +
+> > +	fwnode = dev->of_node ? &dev->of_node->fwnode : dev->fwnode;
+> > +
+> > +	return fwnode == data;
+> >  }
 > 
-> Could you explain which case it is ?
-> The only one I can see is when there's no GPIO declared for RTS/CTS
-> AND, there's no pin muxed for RTS/CTS either.
+> Maybe we should hoist the dev_fwnode() helper from property.c up to
+> property.h so we can just have "return dev_fwnode(dev) == data;" here?
+
+Yes, that's one way of doing it. The other would be initializing
+dev->fwnode to &dev->of_node->fwnode in the DT probe path but first
+I need to understand why that is not done in the first place.
+
+[...]
+
+> > +int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
+> > +{
+> > +	struct iommu_fwspec *fwspec = arch_get_iommu_fwspec(dev);
+> > +	size_t size;
+> > +
+> > +	if (!fwspec)
+> > +		return -EINVAL;
+> > +
+> > +	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + 1]);
+> > +	fwspec = krealloc(fwspec, size, GFP_KERNEL);
+> > +	if (!fwspec)
+> > +		return -ENOMEM;
+> > +
+> > +	while (num_ids--)
+> > +		fwspec->ids[fwspec->num_ids++] = *ids++;
 > 
-> Have you got another example in mind ?
+> You've still got the +1 bug and incomprehensible loop from the old code
+> here, rather than the fixed version being removed below. Although now
+> that I've taken the plunge and done it properly in core code from the
+> outset, that should hopefully become moot.
+
+Gah sorry, rebase mistake. I will wait for the dust to settle before
+churning out a new series, it is hard to respin without a stable
+base (hopefully your series will make this patch useless).
+
+Thanks !
+Lorenzo
+
+> Robin.
 > 
-
-Hum, actually, it is that case. The other one (CRTSCTS and gpios) is
-handled in the else below. I think you need to keep the termios->c_cflag
-&= ~CRTSCTS; here so that userspace knows configuring it failed.
-
-> >
-> >>       } else {
-> >>               /* RS232 without hadware handshake or controlled by GPIOs */
-> >>               mode |= ATMEL_US_USMODE_NORMAL;
-> >
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> > +
+> > +	arch_set_iommu_fwspec(dev, fwspec);
+> > +	return 0;
+> > +}
+> > +
+> > +inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
+> > +{
+> > +	return arch_get_iommu_fwspec(dev);
+> > +}
+> > diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> > index 38669b8..ab3c069 100644
+> > --- a/drivers/iommu/of_iommu.c
+> > +++ b/drivers/iommu/of_iommu.c
+> > @@ -96,45 +96,6 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+> >  }
+> >  EXPORT_SYMBOL_GPL(of_get_dma_window);
+> >  
+> > -struct of_iommu_node {
+> > -	struct list_head list;
+> > -	struct device_node *np;
+> > -	const struct iommu_ops *ops;
+> > -};
+> > -static LIST_HEAD(of_iommu_list);
+> > -static DEFINE_SPINLOCK(of_iommu_lock);
+> > -
+> > -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops)
+> > -{
+> > -	struct of_iommu_node *iommu = kzalloc(sizeof(*iommu), GFP_KERNEL);
+> > -
+> > -	if (WARN_ON(!iommu))
+> > -		return;
+> > -
+> > -	of_node_get(np);
+> > -	INIT_LIST_HEAD(&iommu->list);
+> > -	iommu->np = np;
+> > -	iommu->ops = ops;
+> > -	spin_lock(&of_iommu_lock);
+> > -	list_add_tail(&iommu->list, &of_iommu_list);
+> > -	spin_unlock(&of_iommu_lock);
+> > -}
+> > -
+> > -const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> > -{
+> > -	struct of_iommu_node *node;
+> > -	const struct iommu_ops *ops = NULL;
+> > -
+> > -	spin_lock(&of_iommu_lock);
+> > -	list_for_each_entry(node, &of_iommu_list, list)
+> > -		if (node->np == np) {
+> > -			ops = node->ops;
+> > -			break;
+> > -		}
+> > -	spin_unlock(&of_iommu_lock);
+> > -	return ops;
+> > -}
+> > -
+> >  static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+> >  {
+> >  	struct of_phandle_args *iommu_spec = data;
+> > @@ -226,57 +187,3 @@ static int __init of_iommu_init(void)
+> >  	return 0;
+> >  }
+> >  postcore_initcall_sync(of_iommu_init);
+> > -
+> > -int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np)
+> > -{
+> > -	struct iommu_fwspec *fwspec = arch_get_iommu_fwspec(dev);
+> > -
+> > -	if (fwspec)
+> > -		return 0;
+> > -
+> > -	fwspec = kzalloc(sizeof(*fwspec), GFP_KERNEL);
+> > -	if (!fwspec)
+> > -		return -ENOMEM;
+> > -
+> > -	fwspec->iommu_np = of_node_get(iommu_np);
+> > -	fwspec->iommu_ops = of_iommu_get_ops(iommu_np);
+> > -	arch_set_iommu_fwspec(dev, fwspec);
+> > -	return 0;
+> > -}
+> > -
+> > -void iommu_fwspec_free(struct device *dev)
+> > -{
+> > -	struct iommu_fwspec *fwspec = arch_get_iommu_fwspec(dev);
+> > -
+> > -	if (fwspec) {
+> > -		of_node_put(fwspec->iommu_np);
+> > -		kfree(fwspec);
+> > -	}
+> > -}
+> > -
+> > -int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
+> > -{
+> > -	struct iommu_fwspec *fwspec = arch_get_iommu_fwspec(dev);
+> > -	size_t size;
+> > -	int i;
+> > -
+> > -	if (!fwspec)
+> > -		return -EINVAL;
+> > -
+> > -	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + num_ids]);
+> > -	fwspec = krealloc(fwspec, size, GFP_KERNEL);
+> > -	if (!fwspec)
+> > -		return -ENOMEM;
+> > -
+> > -	for (i = 0; i < num_ids; i++)
+> > -		fwspec->ids[fwspec->num_ids + i] = ids[i];
+> > -
+> > -	fwspec->num_ids += num_ids;
+> > -	arch_set_iommu_fwspec(dev, fwspec);
+> > -	return 0;
+> > -}
+> > -
+> > -inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
+> > -{
+> > -	return arch_get_iommu_fwspec(dev);
+> > -}
+> > diff --git a/include/linux/iommu-fwspec.h b/include/linux/iommu-fwspec.h
+> > new file mode 100644
+> > index 0000000..f88b635
+> > --- /dev/null
+> > +++ b/include/linux/iommu-fwspec.h
+> > @@ -0,0 +1,70 @@
+> > +#ifndef __IOMMU_FWSPEC_H
+> > +#define __IOMMU_FWSPEC_H
+> > +
+> > +#include <linux/device.h>
+> > +#include <linux/iommu.h>
+> > +
+> > +struct iommu_fwspec {
+> > +	const struct iommu_ops	*iommu_ops;
+> > +	struct fwnode_handle	*iommu_fwnode;
+> > +	void			*iommu_priv;
+> > +	unsigned int		num_ids;
+> > +	u32			ids[];
+> > +};
+> > +
+> > +#ifdef CONFIG_IOMMU_FWSPEC
+> > +int iommu_fwspec_init(struct device *dev,
+> > +		      struct fwnode_handle *iommu_fwnode);
+> > +void iommu_fwspec_free(struct device *dev);
+> > +int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
+> > +struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
+> > +
+> > +void fwspec_iommu_set_ops(struct fwnode_handle *fwnode,
+> > +			  const struct iommu_ops *ops);
+> > +const struct iommu_ops *fwspec_iommu_get_ops(struct fwnode_handle *fwnode);
+> > +
+> > +#ifdef CONFIG_HAVE_IOMMU_FWSPEC
+> > +#include <asm/iommu-fwspec.h>
+> > +#else /* !CONFIG_HAVE_IOMMU_FWSPEC */
+> > +static inline void arch_set_iommu_fwspec(struct device *dev,
+> > +					 struct iommu_fwspec *fwspec) {}
+> > +
+> > +static inline struct iommu_fwspec *
+> > +arch_get_iommu_fwspec(struct device *dev) { return NULL; }
+> > +#endif
+> > +#else /* CONFIG_IOMMU_FWSPEC */
+> > +static inline int iommu_fwspec_init(struct device *dev,
+> > +				    struct fwnode_handle *iommu_fwnode)
+> > +{
+> > +	return -ENODEV;
+> > +}
+> > +
+> > +static inline void iommu_fwspec_free(struct device *dev)
+> > +{
+> > +}
+> > +
+> > +static inline int iommu_fwspec_add_ids(struct device *dev, u32 *ids,
+> > +				       int num_ids)
+> > +{
+> > +	return -ENODEV;
+> > +}
+> > +
+> > +static inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
+> > +{
+> > +	return NULL;
+> > +}
+> > +
+> > +static inline void fwspec_iommu_set_ops(struct fwnode_handle *fwnode,
+> > +					const struct iommu_ops *ops)
+> > +{
+> > +}
+> > +
+> > +static inline const struct iommu_ops *
+> > +fwspec_iommu_get_ops(struct fwnode_handle *fwnode)
+> > +{
+> > +	return NULL;
+> > +}
+> > +
+> > +#endif /* CONFIG_IOMMU_FWSPEC */
+> > +
+> > +#endif /* __IOMMU_FWSPEC_H */
+> > diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> > index 358db49..4b02861 100644
+> > --- a/include/linux/of_iommu.h
+> > +++ b/include/linux/of_iommu.h
+> > @@ -3,6 +3,7 @@
+> >  
+> >  #include <linux/device.h>
+> >  #include <linux/iommu.h>
+> > +#include <linux/iommu-fwspec.h>
+> >  #include <linux/of.h>
+> >  
+> >  #ifdef CONFIG_OF_IOMMU
+> > @@ -14,14 +15,6 @@ extern int of_get_dma_window(struct device_node *dn, const char *prefix,
+> >  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
+> >  					struct device_node *master_np);
+> >  
+> > -struct iommu_fwspec {
+> > -	const struct iommu_ops	*iommu_ops;
+> > -	struct device_node	*iommu_np;
+> > -	void			*iommu_priv;
+> > -	unsigned int		num_ids;
+> > -	u32			ids[];
+> > -};
+> > -
+> >  #else
+> >  
+> >  static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+> > @@ -36,28 +29,19 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+> >  {
+> >  	return NULL;
+> >  }
+> > -
+> > -struct iommu_fwspec;
+> > -
+> >  #endif	/* CONFIG_OF_IOMMU */
+> >  
+> > -int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
+> > -void iommu_fwspec_free(struct device *dev);
+> > -int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
+> > -struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
+> > -
+> > -#ifdef CONFIG_HAVE_IOMMU_FWSPEC
+> > -#include <asm/iommu-fwspec.h>
+> > -#else /* !CONFIG_HAVE_IOMMU_FWSPEC */
+> > -static inline void arch_set_iommu_fwspec(struct device *dev,
+> > -					 struct iommu_fwspec *fwspec) {}
+> > -
+> > -static inline struct iommu_fwspec *
+> > -arch_get_iommu_fwspec(struct device *dev) { return NULL; }
+> > -#endif
+> > +static inline void of_iommu_set_ops(struct device_node *np,
+> > +				    const struct iommu_ops *ops)
+> > +{
+> > +	fwspec_iommu_set_ops(&np->fwnode, ops);
+> > +}
+> >  
+> > -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
+> > -const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+> > +static inline const struct iommu_ops *
+> > +of_iommu_get_ops(struct device_node *np)
+> > +{
+> > +	return fwspec_iommu_get_ops(&np->fwnode);
+> > +}
+> >  
+> >  extern struct of_device_id __iommu_of_table;
+> >  
+> > 
+> 
