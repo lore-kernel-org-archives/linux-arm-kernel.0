@@ -1,37 +1,59 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 13 Sep 2016 08:14:36 +0200
-Subject: [PATCH 2/3] ARM64: dts: amlogic: Add basic support for Amlogic
- S905X
-In-Reply-To: <28d9160a-ce40-cbbb-b4e9-3ec34be52368@suse.de>
-References: <20160903082227.30559-1-narmstrong@baylibre.com>
- <20160903082227.30559-3-narmstrong@baylibre.com>
- <7e27e8c0-bb18-40d8-10d6-3928e66815c7@suse.de>
- <CAOQ7t2bWLq2XP2rKx3msf=1tUfXkQuBWagun46TaKk73qXr=FQ@mail.gmail.com>
- <7ha8fcq26c.fsf@baylibre.com> <28d9160a-ce40-cbbb-b4e9-3ec34be52368@suse.de>
-Message-ID: <CAOQ7t2ZjDjZbUfCKwUf4PHywOZx-UiQmy37TEQhWDNYRg0BOag@mail.gmail.com>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Tue, 13 Sep 2016 08:22:40 +0200
+Subject: [PATCH v2 2/6] ARM: dts: bcm283x: Define standard pinctrl
+ groups in the gpio node.
+In-Reply-To: <1273800480.83718.15854341-2f8e-4e20-95f4-e76f81e6fd56.open-xchange@email.1und1.de>
+References: <1473668576-22256-1-git-send-email-kraxel@redhat.com>
+ <1473668576-22256-3-git-send-email-kraxel@redhat.com>
+ <1273800480.83718.15854341-2f8e-4e20-95f4-e76f81e6fd56.open-xchange@email.1und1.de>
+Message-ID: <1473747760.11547.7.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 11:43 PM, Andreas F?rber <afaerber@suse.de> wrote:
+On Mo, 2016-09-12 at 20:19 +0200, Stefan Wahren wrote:
+> Hi Gerd,
+> 
+> > Gerd Hoffmann <kraxel@redhat.com> hat am 12. September 2016 um 10:22
+> > geschrieben:
+> > 
+> > 
+> > From: Eric Anholt <eric@anholt.net>
+> > 
+> > The BCM2835-ARM-Peripherals.pdf documentation specifies what the
+> > function selects do for the pins, and there are a bunch of obvious
+> > groupings to be made.  With these created, we'll be able to replace
+> > bcm2835-rpi.dtsi's main "set all of these pins to alt0" with
+> > references to specific groups we want enabled.
+> > 
+> > Signed-off-by: Eric Anholt <eric@anholt.net>
+> > 
+> > squashed in:
+> >   ARM: dts: bcm283x: Add the emmc pin group to bcm283x.dtsi.
+> >   ARM: dts: bcm283x: Add a group for mapping pins 48-53 to sdhost.
+> >   ARM: dts: bcm283x: Add a new EMMC pin group from the downstream tree.
+> > 
+> > fixups by kraxel:
+> >   * fix spi0 name
+> >   * sort & group entries
+> >   * use pull defines
+> >   * add dpi group
+> 
+> this looks like a changelog.
 
-[cut]
-> I'm not arguing over the file name, where it perfectly makes sense to
-> have a meson-gxl- prefix (already discussed), just about the compatible
-> string where we don't have "amlogic,meson-gxl-s905x-p231" either because
-> it is completely unnecessary and does _not_ add any value.
->
-> Not that we're checking this string anywhere anyway... If you want to
-> check for the GXL family you have to use "amlogic,meson-gxl"; if you
-> want to check for the specific SoC you use "amlogic,s905x". Simple. We
-> never match partial strings, so there is no sense in a hardcoded prefix
-> that is duplicating information already available.
+It actually is, trying to keep track of what comes from Eric and what
+comes from me.  But I guess I can also simply summarize that as "based
+on a patch from Eric".
 
-Ok, then. Fine with me.
+> > +			dpi_gpio4: dpi_gpio4 {
+> > +				brcm,pins = <0 1 2 3 4 5 6 7 8 9 10 11
+> > +					     12 13 14 15 16 17 18 19
+> > +					     20 21 22 23 24 25 26 27>;
+> > +				brcm,function = <BCM2835_FSEL_ALT2>;
+> > +			};
+> 
+> s/dpi_gpio4/dpi_gpio0
 
-Neil, do you want to resend my patch or you can take care of the fixes
-for the whole patchset?
+Yea, right, will fix.
 
-Thanks,
-
--- 
-Carlo Caione
+cheers,
+  Gerd
