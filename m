@@ -1,27 +1,23 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 13 Sep 2016 06:38:43 -0500
-Subject: [PATCH v11 5/8] clocksource/drivers/arm_arch_timer: Simplify ACPI
- support code.
-In-Reply-To: <CADyBb7v-b1bKGBdH6J78UhfCcQd=BJLFoZ16GNgmrd2EucjYDA@mail.gmail.com>
-References: <1473168352-5156-1-git-send-email-fu.wei@linaro.org>
- <1473168352-5156-6-git-send-email-fu.wei@linaro.org>
- <alpine.DEB.2.20.1609061635000.5647@nanos>
- <CADyBb7uX79UP=mUxvP-EPGi56-46y2SCMPsWO=Uw-=N0GQERhA@mail.gmail.com>
- <CADyBb7v-b1bKGBdH6J78UhfCcQd=BJLFoZ16GNgmrd2EucjYDA@mail.gmail.com>
-Message-ID: <57D7E543.3060301@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Sep 2016 13:39:47 +0200
+Subject: [PATCH] dmaengine: cleanup with list_first_entry_or_null()
+In-Reply-To: <1473703697-903-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1473703697-903-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdZVhdU2shx5MpcbWwL3xvuPsNt25-bbrAmUXG7p29miNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fu Wei wrote:
-> I have prepared v12 (rebase to rc6 and on the top of IORT v11),
-> should I send it now
+On Mon, Sep 12, 2016 at 8:08 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-Yes.
+> The combo of list_empty() check and return list_first_entry()
+> can be replaced with list_first_entry_or_null().
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Please don't wait to release new versions of your patches.  Time is 
-running out to get these into 4.9.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Excellent deep semantics patch!
+
+Yours,
+Linus Walleij
