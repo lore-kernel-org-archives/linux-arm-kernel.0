@@ -1,35 +1,41 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Tue, 13 Sep 2016 09:34:22 +0000
-Subject: [PATCH V5 6/6] ARM64: bcm2835: add thermal driver to default_config
-In-Reply-To: <1473759262-27031-1-git-send-email-kernel@martin.sperl.org>
-References: <1473759262-27031-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1473759262-27031-7-git-send-email-kernel@martin.sperl.org>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 13 Sep 2016 17:41:03 +0800
+Subject: [PATCH v8 4/9] drm/mediatek: update display module connections
+In-Reply-To: <1473681672-47144-5-git-send-email-yt.shen@mediatek.com>
+References: <1473681672-47144-1-git-send-email-yt.shen@mediatek.com>
+ <1473681672-47144-5-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1473759663.28437.45.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+Hi, YT:
 
-Add the thermal driver for bcm2837 to list of compiled modules
-in the default config.
+On Mon, 2016-09-12 at 20:01 +0800, YT Shen wrote:
+> update connections for OVL, RDMA, BLS, DSI
+> 
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> ---
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+[snip...]
 
-Note: untested as I have no 64 bit test system.
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> index 53065c7..0850aa4 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> @@ -40,6 +40,7 @@ enum mtk_ddp_comp_type {
+>  
+>  enum mtk_ddp_comp_id {
+>  	DDP_COMPONENT_AAL,
+> +	DDP_COMPONENT_BLS,
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index eadf485..372f981 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -252,6 +252,7 @@ CONFIG_SENSORS_INA2XX=m
- CONFIG_SENSORS_ARM_SCPI=y
- CONFIG_THERMAL=y
- CONFIG_THERMAL_EMULATION=y
-+CONFIG_BCM2835_THERMAL=y
- CONFIG_EXYNOS_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_RENESAS_WDT=y
---
-2.1.4
+I think this should be moved to an independent patch and title of it
+should be "Add BLS component." If you keep it in this patch, title of
+this patch should be modified as "Add BLS component and update display
+module connections."
+
+Regards,
+CK
+
+>  	DDP_COMPONENT_COLOR0,
+>  	DDP_COMPONENT_COLOR1,
+>  	DDP_COMPONENT_DPI0,
