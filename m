@@ -1,112 +1,41 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 13 Sep 2016 11:42:05 -0500
-Subject: [PATCH 1/2] PCI: save and restore device state during bus reset
-In-Reply-To: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
-References: <1472770801-30671-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20160913164205.GD4138@localhost>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 13 Sep 2016 18:02:02 +0100
+Subject: [PATCH v2] iommu/io-pgtable-arm: Check for v7s-incapable systems
+In-Reply-To: <2e473e263ac469bd6d3b09e7756c138325e10969.1473773198.git.robin.murphy@arm.com>
+References: <2e473e263ac469bd6d3b09e7756c138325e10969.1473773198.git.robin.murphy@arm.com>
+Message-ID: <7f89c687b96bec17f11c4ccfde5211eba2f1d2f2.1473785823.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 07:00:00PM -0400, Sinan Kaya wrote:
-> A secondary bus reset causes settings to be lost by all downstream
-> devices on the tree. The code is currently saving and restoring device
-> states only when called from the VFIO path via pci_probe_reset_bus
-> and pci_reset_bus functions.
-> 
-> Moving the save and restore into pci_reset_bridge_secondary_bus
-> so that all users of the API have the same behavior.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci.c | 36 +++++++++++++++---------------------
->  1 file changed, 15 insertions(+), 21 deletions(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index aab9d51..b209378 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -3860,19 +3860,6 @@ void __weak pcibios_reset_secondary_bus(struct pci_dev *dev)
->  	pci_reset_secondary_bus(dev);
->  }
->  
-> -/**
-> - * pci_reset_bridge_secondary_bus - Reset the secondary bus on a PCI bridge.
-> - * @dev: Bridge device
-> - *
-> - * Use the bridge control register to assert reset on the secondary bus.
-> - * Devices on the secondary bus are left in power-on state.
-> - */
-> -void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
-> -{
-> -	pcibios_reset_secondary_bus(dev);
-> -}
-> -EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
-> -
->  static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
->  {
->  	struct pci_dev *pdev;
-> @@ -4362,6 +4349,21 @@ static void pci_slot_restore(struct pci_slot *slot)
->  	}
->  }
->  
-> +/**
-> + * pci_reset_bridge_secondary_bus - Reset the secondary bus on a PCI bridge.
-> + * @dev: Bridge device
-> + *
-> + * Use the bridge control register to assert reset on the secondary bus.
-> + * Devices on the secondary bus are left in power-on state.
+On machines with no 32-bit addressable RAM whatsoever, we shouldn't
+even touch the v7s format as it's never going to work.
 
-This comment is no longer correct (you don't leave the devices in
-power-on state).
+Fixes: e5fc9753b1a8 ("iommu/io-pgtable: Add ARMv7 short descriptor support")
+Reported-by: Eric Auger <eric.auger@redhat.com>
+Tested-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-> + */
-> +void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
-> +{
-> +	pci_bus_save_and_disable(dev->bus);
+Apparently, in my haste, I overlooked that not everything that can do
+COMPILE_TEST also has a PHYS_OFFSET.
 
-"dev" is a bridge, and dev->bus is the bus on the *primary* side of
-the bridge, so I think this saves and disables the bridge itself.
-Don't you want dev->subordinate here instead?
+ drivers/iommu/io-pgtable-arm-v7s.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> +	pcibios_reset_secondary_bus(dev);
-> +	pci_bus_restore(dev->bus);
-> +}
-> +EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
-> +
->  static int pci_slot_reset(struct pci_slot *slot, int probe)
->  {
->  	int rc;
-> @@ -4504,12 +4506,8 @@ int pci_reset_bus(struct pci_bus *bus)
->  	if (rc)
->  		return rc;
->  
-> -	pci_bus_save_and_disable(bus);
-> -
->  	rc = pci_bus_reset(bus, 0);
->  
-> -	pci_bus_restore(bus);
-> -
->  	return rc;
->  }
->  EXPORT_SYMBOL_GPL(pci_reset_bus);
-> @@ -4528,8 +4526,6 @@ int pci_try_reset_bus(struct pci_bus *bus)
->  	if (rc)
->  		return rc;
->  
-> -	pci_bus_save_and_disable(bus);
-> -
->  	if (pci_bus_trylock(bus)) {
->  		might_sleep();
->  		pci_reset_bridge_secondary_bus(bus->self);
-> @@ -4537,8 +4533,6 @@ int pci_try_reset_bus(struct pci_bus *bus)
->  	} else
->  		rc = -EAGAIN;
->  
-> -	pci_bus_restore(bus);
-> -
->  	return rc;
->  }
->  EXPORT_SYMBOL_GPL(pci_try_reset_bus);
-> -- 
-> 1.9.1
-> 
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index def8ca1c982d..f50e51c1a9c8 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -633,6 +633,10 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
+ {
+ 	struct arm_v7s_io_pgtable *data;
+ 
++#ifdef PHYS_OFFSET
++	if (upper_32_bits(PHYS_OFFSET))
++		return NULL;
++#endif
+ 	if (cfg->ias > ARM_V7S_ADDR_BITS || cfg->oas > ARM_V7S_ADDR_BITS)
+ 		return NULL;
+ 
+-- 
+2.8.1.dirty
