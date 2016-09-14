@@ -1,34 +1,22 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 14 Sep 2016 15:41:37 -0500
-Subject: [PATCH] cpufreq: ti: Use generic platdev driver
-Message-ID: <20160914204137.20346-1-d-gerlach@ti.com>
+From: david.brown@linaro.org (David Brown)
+Date: Wed, 14 Sep 2016 14:54:25 -0600
+Subject: [kernel-hardening] [PATCH v3 0/7] arm64: Privileged Access Never
+ using TTBR0_EL1 switching
+In-Reply-To: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20160914205425.GA15021@davidb.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the cpufreq-dt-platdev is used to create the cpufreq-dt platform
-device for all OMAP platforms and the platform code that did it
-before has been removed, add ti,am33xx and ti,dra7xx to the machine list
-in cpufreq-dt-platdev which had relied on the removed platform code to do
-this previously.
+On Tue, Sep 13, 2016 at 06:46:30PM +0100, Catalin Marinas wrote:
 
-Fixes: 7694ca6e1d6f ("cpufreq: omap: Use generic platdev driver")
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
- 1 file changed, 2 insertions(+)
+>This is the third version of the arm64 PAN emulation using TTBR0_EL1
+>switching. The series has not yet included the alternative nop patches
+>from Mark Rutland, nor the empty_zero_page from Ard B. This will be done
+>in a subsequent version once 4.9-rc1 is out (which will include Mark's
+>alternative nop patches).
 
-diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 0bb44d5b5df4..d5e8ba50f8a3 100644
---- a/drivers/cpufreq/cpufreq-dt-platdev.c
-+++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -68,6 +68,8 @@ static const struct of_device_id machines[] __initconst = {
- 
- 	{ .compatible = "sigma,tango4" },
- 
-+	{ .compatible = "ti,am33xx", },
-+	{ .compatible = "ti,dra7", },
- 	{ .compatible = "ti,omap2", },
- 	{ .compatible = "ti,omap3", },
- 	{ .compatible = "ti,omap4", },
--- 
-2.9.3
+I've tested these with a bunch of reboots in both qemu and HiKey and
+have not seen the efi failure.
+
+David
