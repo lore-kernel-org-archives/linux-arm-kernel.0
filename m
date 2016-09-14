@@ -1,21 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 14:34:59 +0200
-Subject: [PATCH V2 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <57D79D31.8090607@gmail.com>
-References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
- <74367472.RYBpLsaIy1@wuerfel> <57D79D31.8090607@gmail.com>
-Message-ID: <2177841.jeJr0YpaiD@wuerfel>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 14 Sep 2016 14:35:30 +0200
+Subject: [PATCH v7 22/22] iommu/dma: Avoid PCI host bridge windows
+In-Reply-To: <49c51c4f-cb00-445d-b8f8-b632babf2b3e@arm.com>
+References: <cover.1473695704.git.robin.murphy@arm.com>
+ <CGME20160912161514eucas1p10818019bf2302609421ad9c35d1af4b8@eucas1p1.samsung.com>
+ <5f7bfee298f98d29a35933d3e0252d32b83d62b8.1473695704.git.robin.murphy@arm.com>
+ <ab8693f6-20d6-2a95-9f1f-0607e72bc012@samsung.com>
+ <49c51c4f-cb00-445d-b8f8-b632babf2b3e@arm.com>
+Message-ID: <dc9f945f-2756-ab70-d061-9fdc7c5afdee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 13, 2016 2:31:13 PM CEST zhichang wrote:
-> > 
-> > What are the other LPC cycle types that could be supported?
-> O. memory and firmware operations are supported too. But at this moment, we only use IO cycle.
+Hi Robin,
 
-What are firmware operations?
 
-Are the memory operations directly mapped or do you also have to go through
-an indirect function call?
+On 2016-09-14 13:10, Robin Murphy wrote:
+> On 14/09/16 11:55, Marek Szyprowski wrote:
+>> On 2016-09-12 18:14, Robin Murphy wrote:
+>>> With our DMA ops enabled for PCI devices, we should avoid allocating
+>>> IOVAs which a host bridge might misinterpret as peer-to-peer DMA and
+>>> lead to faults, corruption or other badness. To be safe, punch out holes
+>>> for all of the relevant host bridge's windows when initialising a DMA
+>>> domain for a PCI device.
+>>>
+>>> CC: Marek Szyprowski <m.szyprowski@samsung.com>
+>>> CC: Inki Dae <inki.dae@samsung.com>
+>>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> I don't know much about PCI and their IOMMU integration, but can't we use
+>> the direct mapping region feature of iommu core for it? There are already
+>> iommu_get_dm_regions(), iommu_put_dm_regions() and
+>> iommu_request_dm_for_dev()
+>> functions for handling them...
+> It's rather the opposite problem - in the direct-mapping case, we're
+> making sure the iommu_domain has translations installed for the given
+> IOVAs (which are also the corresponding physical address) before it goes
+> live, whereas what we need to do here is make sure the these addresses
+> never get used as IOVAs at all, because any attempt to do so them will
+> likely go wrong. Thus we carve them out of the iova_domain such that
+> they will never get near an actual IOMMU API call.
+>
+> This is a slightly generalised equivalent of e.g. amd_iommu.c's
+> init_reserved_iova_ranges().
 
-	Arnd
+Hmmm. Each dm_region have protection parameter. Can't we reuse them to
+create prohibited/reserved regions by setting it to 0 (no read / no write)
+and mapping to physical 0 address? That's just a quick idea, because
+dm_regions and the proposed code for pci looks a bit similar for me...
+
+[...]
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
