@@ -1,160 +1,128 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 14 Sep 2016 10:48:01 +0800
-Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <20160908074155.GH8913@lukather>
-References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
- <20160907145400.27192-4-maxime.ripard@free-electrons.com>
- <CAGb2v67WLn6Sv9ie9CrA52zHf0xbwVd7YrJ_2pF3UW8LmxVvRQ@mail.gmail.com>
- <20160908074155.GH8913@lukather>
-Message-ID: <CAGb2v67JHTXj=coc=zHJZEJ5vd87h0K+0_Ps6_z63pgfA7QLHA@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 14 Sep 2016 10:50:45 +0800
+Subject: [PATCH] usb: chipidea: Properly mark little endian descriptors
+In-Reply-To: <20160914023740.GC30760@b29397-desktop>
+References: <20160913230631.6727-1-stephen.boyd@linaro.org>
+ <20160914023740.GC30760@b29397-desktop>
+Message-ID: <20160914025045.GD30760@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2016 at 3:41 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Sep 08, 2016 at 12:32:48AM +0800, Chen-Yu Tsai wrote:
->> On Wed, Sep 7, 2016 at 10:53 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > From: Myl?ne Josserand <mylene.josserand@free-electrons.com>
->> >
->> > The GR8 is an SoC made by Nextthing loosely based on the sun5i family.
->> >
->> > Since it's not clear yet what we can factor out and merge with the A10s and
->> > A13 support, let's keep it out of the sun5i.dtsi include tree. We will
->> > figure out what can be shared when things settle down.
->> >
->> > Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  arch/arm/boot/dts/ntc-gr8.dtsi | 1080 ++++++++++++++++++++++++++++++++++++++++
->> >  1 file changed, 1080 insertions(+)
->> >  create mode 100644 arch/arm/boot/dts/ntc-gr8.dtsi
->> >
->> > diff --git a/arch/arm/boot/dts/ntc-gr8.dtsi b/arch/arm/boot/dts/ntc-gr8.dtsi
->> > new file mode 100644
->> > index 000000000000..d21cfa3f3c14
->> > --- /dev/null
->> > +++ b/arch/arm/boot/dts/ntc-gr8.dtsi
->> > @@ -0,0 +1,1080 @@
->>
->> [...]
->>
->> > +               pll3x2: pll3x2_clk {
->> > +                       compatible = "fixed-factor-clock";
->>
->> I think you want "allwinner,sun4i-a10-pll3-2x-clk"?
->
-> Indeed.
->
->> > +               tcon_ch1_clk: clk at 01c2012c {
->> > +                       #clock-cells = <0>;
->> > +                       compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
->> > +                       reg = <0x01c2012c 0x4>;
->> > +                       clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
->> > +                       clock-output-names = "tcon-ch1-sclk";
->> > +               };
->>
->> Nit: Is there a ve_clk we could add?
->
-> I don't know. No one uses it, and the next item on my todo list is to
-> move the sun5i SoCs to sunxi-ng, so it seems a bit useless to add that
-> one.
+On Wed, Sep 14, 2016 at 10:37:40AM +0800, Peter Chen wrote:
+> On Tue, Sep 13, 2016 at 04:06:31PM -0700, Stephen Boyd wrote:
+> > The DMA descriptors are little endian, and we do a pretty good
+> > job of handling them with the proper le32_to_cpu() markings, but
+> > we don't actually mark them as __le32. This means checkers like
+> > sparse can't easily find new bugs. Let's mark the members of
+> > structures properly and fix the few places where we're missing
+> > conversions.
+> > 
+> > Cc: Peter Chen <peter.chen@nxp.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > ---
+> >  drivers/usb/chipidea/udc.c |  6 +++---
+> >  drivers/usb/chipidea/udc.h | 12 ++++++------
+> >  2 files changed, 9 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > index 6acf4dba395e..61a65d1d05f2 100644
+> > --- a/drivers/usb/chipidea/udc.c
+> > +++ b/drivers/usb/chipidea/udc.c
+> > @@ -364,7 +364,7 @@ static int add_td_to_list(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq,
+> >  		if (hwreq->req.length == 0
+> >  				|| hwreq->req.length % hwep->ep.maxpacket)
+> >  			mul++;
+> > -		node->ptr->token |= mul << __ffs(TD_MULTO);
+> > +		node->ptr->token |= cpu_to_le32(mul << __ffs(TD_MULTO));
+> >  	}
+> >  
+> >  	temp = (u32) (hwreq->req.dma + hwreq->req.actual);
+> > @@ -503,7 +503,7 @@ static int _hardware_enqueue(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq)
+> >  		if (hwreq->req.length == 0
+> >  				|| hwreq->req.length % hwep->ep.maxpacket)
+> >  			mul++;
+> > -		hwep->qh.ptr->cap |= mul << __ffs(QH_MULT);
+> > +		hwep->qh.ptr->cap |= cpu_to_le32(mul << __ffs(QH_MULT));
+> >  	}
+> >  
+> >  	wmb();   /* synchronize before ep prime */
+> > @@ -530,7 +530,7 @@ static void free_pending_td(struct ci_hw_ep *hwep)
+> >  static int reprime_dtd(struct ci_hdrc *ci, struct ci_hw_ep *hwep,
+> >  					   struct td_node *node)
+> >  {
+> > -	hwep->qh.ptr->td.next = node->dma;
+> > +	hwep->qh.ptr->td.next = cpu_to_le32(node->dma);
+> >  	hwep->qh.ptr->td.token &=
+> >  		cpu_to_le32(~(TD_STATUS_HALTED | TD_STATUS_ACTIVE));
+> >  
+> > diff --git a/drivers/usb/chipidea/udc.h b/drivers/usb/chipidea/udc.h
+> > index e66df0020bd4..2ecd1174d66c 100644
+> > --- a/drivers/usb/chipidea/udc.h
+> > +++ b/drivers/usb/chipidea/udc.h
+> > @@ -22,11 +22,11 @@
+> >  /* DMA layout of transfer descriptors */
+> >  struct ci_hw_td {
+> >  	/* 0 */
+> > -	u32 next;
+> > +	__le32 next;
+> >  #define TD_TERMINATE          BIT(0)
+> >  #define TD_ADDR_MASK          (0xFFFFFFEUL << 5)
+> >  	/* 1 */
+> > -	u32 token;
+> > +	__le32 token;
+> >  #define TD_STATUS             (0x00FFUL <<  0)
+> >  #define TD_STATUS_TR_ERR      BIT(3)
+> >  #define TD_STATUS_DT_ERR      BIT(5)
+> > @@ -36,7 +36,7 @@ struct ci_hw_td {
+> >  #define TD_IOC                BIT(15)
+> >  #define TD_TOTAL_BYTES        (0x7FFFUL << 16)
+> >  	/* 2 */
+> > -	u32 page[5];
+> > +	__le32 page[5];
+> >  #define TD_CURR_OFFSET        (0x0FFFUL <<  0)
+> >  #define TD_FRAME_NUM          (0x07FFUL <<  0)
+> >  #define TD_RESERVED_MASK      (0x0FFFUL <<  0)
+> > @@ -45,18 +45,18 @@ struct ci_hw_td {
+> >  /* DMA layout of queue heads */
+> >  struct ci_hw_qh {
+> >  	/* 0 */
+> > -	u32 cap;
+> > +	__le32 cap;
+> >  #define QH_IOS                BIT(15)
+> >  #define QH_MAX_PKT            (0x07FFUL << 16)
+> >  #define QH_ZLT                BIT(29)
+> >  #define QH_MULT               (0x0003UL << 30)
+> >  #define QH_ISO_MULT(x)		((x >> 11) & 0x03)
+> >  	/* 1 */
+> > -	u32 curr;
+> > +	__le32 curr;
+> >  	/* 2 - 8 */
+> >  	struct ci_hw_td		td;
+> >  	/* 9 */
+> > -	u32 RESERVED;
+> > +	__le32 RESERVED;
+> >  	struct usb_ctrlrequest   setup;
+> >  } __attribute__ ((packed, aligned(4)));
+> >  
+> > -- 
 
-Makes sense. Thanks!
+I am afraid I can't apply for testing
 
-ChenYu
+Applying: usb: chipidea: Properly mark little endian descriptors
+fatal: sha1 information is lacking or useless
+(drivers/usb/chipidea/udc.c).
+error: could not build fake ancestor
+Patch failed at 0001 usb: chipidea: Properly mark little endian
+descriptors
+The copy of the patch that failed is found in: .git/rebase-apply/patch
+When you have resolved this problem, run "git am --continue".
+If you prefer to skip this patch, run "git am --skip" instead.
+To restore the original branch and stop patching, run "git am --abort".
 
->
->>
->> [...]
->>
->> > +               pio: pinctrl at 01c20800 {
->> > +                       compatible = "nextthing,gr8-pinctrl";
->> > +                       reg = <0x01c20800 0x400>;
->> > +                       interrupts = <28>;
->> > +                       clocks = <&apb0_gates 5>;
->> > +                       gpio-controller;
->> > +                       interrupt-controller;
->> > +                       #interrupt-cells = <3>;
->> > +                       #gpio-cells = <3>;
->> > +
->> > +                       i2c0_pins_a: i2c0 at 0 {
->> > +                               allwinner,pins = "PB0", "PB1";
->> > +                               allwinner,function = "i2c0";
->> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> > +                       };
->> > +
->> > +                       i2c1_pins_a: i2c1 at 0 {
->> > +                               allwinner,pins = "PB15", "PB16";
->> > +                               allwinner,function = "i2c1";
->> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> > +                       };
->> > +
->> > +                       i2c2_pins_a: i2c2 at 0 {
->> > +                               allwinner,pins = "PB17", "PB18";
->> > +                               allwinner,function = "i2c2";
->> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> > +                       };
->> > +
->> > +                       i2s0_pins_a: i2s0 at 0 {
->> > +                               allwinner,pins = "PB5", "PB6", "PB7", "PB8", "PB9";
->> > +                               allwinner,function = "i2s0";
->> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> > +                       };
->>
->> You may want to split out the MCLK pin. Some codecs don't need it, and the
->> pin can be allocated for other uses.
->
-> ACK.
->
->>
->> > +
->> > +                       ir0_rx_pins_a: ir0 at 0 {
->> > +                               allwinner,pins = "PB4";
->> > +                               allwinner,function = "ir0";
->> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> > +                       };
->> > +
->> > +                       lcd_rgb666_pins: lcd_rgb666 at 0 {
->> > +                               allwinner,pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
->> > +                                                "PD10", "PD11", "PD12", "PD13", "PD14", "PD15",
->> > +                                                "PD18", "PD19", "PD20", "PD21", "PD22", "PD23",
->> > +                                                "PD24", "PD25", "PD26", "PD27";
->> > +                               allwinner,function = "lcd0";
->> > +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> > +                       };
->> > +
->> > +                       mmc0_pins_a: mmc0 at 0 {
->> > +                               allwinner,pins = "PF0", "PF1", "PF2", "PF3",
->> > +                                                "PF4", "PF5";
->> > +                               allwinner,function = "mmc0";
->> > +                               allwinner,drive = <SUN4I_PINCTRL_30_MA>;
->> > +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->> > +                       };
->> > +
->> > +                       nand_pins_a: nand_base0 at 0 {
->> > +                               allwinner,pins = "PC0", "PC1", "PC2",
->> > +                                               "PC5", "PC8", "PC9", "PC10",
->> > +                                               "PC11", "PC12", "PC13", "PC14",
->> > +                                               "PC15";
->> > +                               allwinner,function = "nand0";
->> > +                               allwinner,drive = <0>;
->> > +                               allwinner,pull = <0>;
->>
->> Macros for the nand pins?
->
-> Indeed.
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Would you please rebase my ci-for-usb-next branch?
+
+-- 
+
+Best Regards,
+Peter Chen
