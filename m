@@ -1,517 +1,201 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 14 Sep 2016 09:30:52 +0100
-Subject: [PATCH v9 01/19] remoteproc: st_slim_rproc: add a slimcore rproc
- driver
-In-Reply-To: <20160913175656.GC21438@tuxbot>
-References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <1473081421-16555-2-git-send-email-peter.griffin@linaro.org>
- <20160913175656.GC21438@tuxbot>
-Message-ID: <20160914083052.GA638@dell>
+From: sf84@laposte.net (Sebastian Frias)
+Date: Wed, 14 Sep 2016 10:32:19 +0200
+Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
+In-Reply-To: <20160913145126.GC23336@leverpostej>
+References: <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
+ <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
+ <57D6AA54.6000208@laposte.net> <20160912135549.GA14165@leverpostej>
+ <57D6D2A9.3010006@laposte.net> <20160912165637.GF14165@leverpostej>
+ <57D7CF17.2050905@laposte.net> <20160913131208.GA23336@leverpostej>
+ <57D80B91.4020306@laposte.net> <20160913145126.GC23336@leverpostej>
+Message-ID: <57D90B13.2020200@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Sep 2016, Bjorn Andersson wrote:
+Hi Mark,
 
-> On Mon 05 Sep 06:16 PDT 2016, Peter Griffin wrote:
+On 09/13/2016 04:51 PM, Mark Rutland wrote:
+> Hi,
 > 
-> > slim core is used as a basis for many IPs in the STi
-> > chipsets such as fdma and demux. To avoid duplicating
-> > the elf loading code in each device driver a slim
-> > rproc driver has been created.
-> > 
-> > This driver is designed to be used by other device drivers
-> > such as fdma, or demux whose IP is based around a slim core.
-> > The device driver can call slim_rproc_alloc() to allocate
-> > a slim rproc and slim_rproc_put() when finished.
-> > 
-> > This driver takes care of ioremapping the slim
-> > registers (dmem, imem, slimcore, peripherals), whose offsets
-> > and sizes can change between IP's. It also obtains and enables
-> > any clocks used by the device. This approach avoids having
-> > a double mapping of the registers as slim_rproc does not register
-> > its own platform device. It also maps well to device tree
-> > abstraction as it allows us to have one dt node for the whole
-> > device.
-> > 
-> > All of the generic rproc elf loading code can be reused, and
-> > we provide start() stop() hooks to start and stop the slim
-> > core once the firmware has been loaded. This has been tested
-> > successfully with fdma driver.
-> > 
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> On Tue, Sep 13, 2016 at 04:22:09PM +0200, Sebastian Frias wrote:
+>> On 09/13/2016 03:12 PM, Mark Rutland wrote:
 > 
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> [context was deleted, TL;DR: binding review is necessary, and takes
+> effort, regardless of presence/absence of a driver]
 
-What's preventing this from being applied right away?
+Ok, I see you deleted the part where I was asking about the 'staging' folders.
 
-> > ---
-> >  drivers/remoteproc/Kconfig               |   4 +
-> >  drivers/remoteproc/Makefile              |   1 +
-> >  drivers/remoteproc/st_slim_rproc.c       | 364 +++++++++++++++++++++++++++++++
-> >  include/linux/remoteproc/st_slim_rproc.h |  58 +++++
-> >  4 files changed, 427 insertions(+)
-> >  create mode 100644 drivers/remoteproc/st_slim_rproc.c
-> >  create mode 100644 include/linux/remoteproc/st_slim_rproc.h
-> > 
-> > diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-> > index 1a8bf76a..a7bedc6 100644
-> > --- a/drivers/remoteproc/Kconfig
-> > +++ b/drivers/remoteproc/Kconfig
-> > @@ -100,4 +100,8 @@ config ST_REMOTEPROC
-> >  	  processor framework.
-> >  	  This can be either built-in or a loadable module.
-> >  
-> > +config ST_SLIM_REMOTEPROC
-> > +	tristate
-> > +	select REMOTEPROC
-> > +
-> >  endmenu
-> > diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
-> > index 92d3758..db1dae7 100644
-> > --- a/drivers/remoteproc/Makefile
-> > +++ b/drivers/remoteproc/Makefile
-> > @@ -14,3 +14,4 @@ obj-$(CONFIG_DA8XX_REMOTEPROC)		+= da8xx_remoteproc.o
-> >  obj-$(CONFIG_QCOM_MDT_LOADER)		+= qcom_mdt_loader.o
-> >  obj-$(CONFIG_QCOM_Q6V5_PIL)		+= qcom_q6v5_pil.o
-> >  obj-$(CONFIG_ST_REMOTEPROC)		+= st_remoteproc.o
-> > +obj-$(CONFIG_ST_SLIM_REMOTEPROC)	+= st_slim_rproc.o
-> > diff --git a/drivers/remoteproc/st_slim_rproc.c b/drivers/remoteproc/st_slim_rproc.c
-> > new file mode 100644
-> > index 0000000..1484e97
-> > --- /dev/null
-> > +++ b/drivers/remoteproc/st_slim_rproc.c
-> > @@ -0,0 +1,364 @@
-> > +/*
-> > + * SLIM core rproc driver
-> > + *
-> > + * Copyright (C) 2016 STMicroelectronics
-> > + *
-> > + * Author: Peter Griffin <peter.griffin@linaro.org>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/err.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/remoteproc.h>
-> > +#include <linux/remoteproc/st_slim_rproc.h>
-> > +#include "remoteproc_internal.h"
-> > +
-> > +/* SLIM core registers */
-> > +#define SLIM_ID_OFST		0x0
-> > +#define SLIM_VER_OFST		0x4
-> > +
-> > +#define SLIM_EN_OFST		0x8
-> > +#define SLIM_EN_RUN			BIT(0)
-> > +
-> > +#define SLIM_CLK_GATE_OFST	0xC
-> > +#define SLIM_CLK_GATE_DIS		BIT(0)
-> > +#define SLIM_CLK_GATE_RESET		BIT(2)
-> > +
-> > +#define SLIM_SLIM_PC_OFST	0x20
-> > +
-> > +/* DMEM registers */
-> > +#define SLIM_REV_ID_OFST	0x0
-> > +#define SLIM_REV_ID_MIN_MASK		GENMASK(15, 8)
-> > +#define SLIM_REV_ID_MIN(id)		((id & SLIM_REV_ID_MIN_MASK) >> 8)
-> > +#define SLIM_REV_ID_MAJ_MASK		GENMASK(23, 16)
-> > +#define SLIM_REV_ID_MAJ(id)		((id & SLIM_REV_ID_MAJ_MASK) >> 16)
-> > +
-> > +
-> > +/* peripherals registers */
-> > +#define SLIM_STBUS_SYNC_OFST	0xF88
-> > +#define SLIM_STBUS_SYNC_DIS		BIT(0)
-> > +
-> > +#define SLIM_INT_SET_OFST	0xFD4
-> > +#define SLIM_INT_CLR_OFST	0xFD8
-> > +#define SLIM_INT_MASK_OFST	0xFDC
-> > +
-> > +#define SLIM_CMD_CLR_OFST	0xFC8
-> > +#define SLIM_CMD_MASK_OFST	0xFCC
-> > +
-> > +static const char *mem_names[ST_SLIM_MEM_MAX] = {
-> > +	[ST_SLIM_DMEM]	= "dmem",
-> > +	[ST_SLIM_IMEM]	= "imem",
-> > +};
-> > +
-> > +static int slim_clk_get(struct st_slim_rproc *slim_rproc, struct device *dev)
-> > +{
-> > +	int clk, err;
-> > +
-> > +	for (clk = 0; clk < ST_SLIM_MAX_CLK; clk++) {
-> > +		slim_rproc->clks[clk] = of_clk_get(dev->of_node, clk);
-> > +		if (IS_ERR(slim_rproc->clks[clk])) {
-> > +			err = PTR_ERR(slim_rproc->clks[clk]);
-> > +			if (err == -EPROBE_DEFER)
-> > +				goto err_put_clks;
-> > +			slim_rproc->clks[clk] = NULL;
-> > +			break;
-> > +		}
-> > +	}
-> > +
-> > +	return 0;
-> > +
-> > +err_put_clks:
-> > +	while (--clk >= 0)
-> > +		clk_put(slim_rproc->clks[clk]);
-> > +
-> > +	return err;
-> > +}
-> > +
-> > +static void slim_clk_disable(struct st_slim_rproc *slim_rproc)
-> > +{
-> > +	int clk;
-> > +
-> > +	for (clk = 0; clk < ST_SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++)
-> > +		clk_disable_unprepare(slim_rproc->clks[clk]);
-> > +}
-> > +
-> > +static int slim_clk_enable(struct st_slim_rproc *slim_rproc)
-> > +{
-> > +	int clk, ret;
-> > +
-> > +	for (clk = 0; clk < ST_SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++) {
-> > +		ret = clk_prepare_enable(slim_rproc->clks[clk]);
-> > +		if (ret)
-> > +			goto err_disable_clks;
-> > +	}
-> > +
-> > +	return 0;
-> > +
-> > +err_disable_clks:
-> > +	while (--clk >= 0)
-> > +		clk_disable_unprepare(slim_rproc->clks[clk]);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +/*
-> > + * Remoteproc slim specific device handlers
-> > + */
-> > +static int slim_rproc_start(struct rproc *rproc)
-> > +{
-> > +	struct device *dev = &rproc->dev;
-> > +	struct st_slim_rproc *slim_rproc = rproc->priv;
-> > +	unsigned long hw_id, hw_ver, fw_rev;
-> > +	u32 val;
-> > +
-> > +	/* disable CPU pipeline clock & reset CPU pipeline */
-> > +	val = SLIM_CLK_GATE_DIS | SLIM_CLK_GATE_RESET;
-> > +	writel(val, slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-> > +
-> > +	/* disable SLIM core STBus sync */
-> > +	writel(SLIM_STBUS_SYNC_DIS, slim_rproc->peri + SLIM_STBUS_SYNC_OFST);
-> > +
-> > +	/* enable cpu pipeline clock */
-> > +	writel(!SLIM_CLK_GATE_DIS,
-> > +		slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-> > +
-> > +	/* clear int & cmd mailbox */
-> > +	writel(~0U, slim_rproc->peri + SLIM_INT_CLR_OFST);
-> > +	writel(~0U, slim_rproc->peri + SLIM_CMD_CLR_OFST);
-> > +
-> > +	/* enable all channels cmd & int */
-> > +	writel(~0U, slim_rproc->peri + SLIM_INT_MASK_OFST);
-> > +	writel(~0U, slim_rproc->peri + SLIM_CMD_MASK_OFST);
-> > +
-> > +	/* enable cpu */
-> > +	writel(SLIM_EN_RUN, slim_rproc->slimcore + SLIM_EN_OFST);
-> > +
-> > +	hw_id = readl_relaxed(slim_rproc->slimcore + SLIM_ID_OFST);
-> > +	hw_ver = readl_relaxed(slim_rproc->slimcore + SLIM_VER_OFST);
-> > +
-> > +	fw_rev = readl(slim_rproc->mem[ST_SLIM_DMEM].cpu_addr +
-> > +			SLIM_REV_ID_OFST);
-> > +
-> > +	dev_info(dev, "fw rev:%ld.%ld on SLIM %ld.%ld\n",
-> > +		 SLIM_REV_ID_MAJ(fw_rev), SLIM_REV_ID_MIN(fw_rev),
-> > +		 hw_id, hw_ver);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int slim_rproc_stop(struct rproc *rproc)
-> > +{
-> > +	struct st_slim_rproc *slim_rproc = rproc->priv;
-> > +	u32 val;
-> > +
-> > +	/* mask all (cmd & int) channels */
-> > +	writel(0UL, slim_rproc->peri + SLIM_INT_MASK_OFST);
-> > +	writel(0UL, slim_rproc->peri + SLIM_CMD_MASK_OFST);
-> > +
-> > +	/* disable cpu pipeline clock */
-> > +	writel(SLIM_CLK_GATE_DIS, slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-> > +
-> > +	writel(!SLIM_EN_RUN, slim_rproc->slimcore + SLIM_EN_OFST);
-> > +
-> > +	val = readl(slim_rproc->slimcore + SLIM_EN_OFST);
-> > +	if (val & SLIM_EN_RUN)
-> > +		dev_warn(&rproc->dev, "Failed to disable SLIM");
-> > +
-> > +	dev_dbg(&rproc->dev, "slim stopped\n");
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static void *slim_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
-> > +{
-> > +	struct st_slim_rproc *slim_rproc = rproc->priv;
-> > +	void *va = NULL;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < ST_SLIM_MEM_MAX; i++) {
-> > +		if (da != slim_rproc->mem[i].bus_addr)
-> > +			continue;
-> > +
-> > +		if (len <= slim_rproc->mem[i].size) {
-> > +			/* __force to make sparse happy with type conversion */
-> > +			va = (__force void *)slim_rproc->mem[i].cpu_addr;
-> > +			break;
-> > +		}
-> > +	}
-> > +
-> > +	dev_dbg(&rproc->dev, "da = 0x%llx len = 0x%x va = 0x%p\n", da, len, va);
-> > +
-> > +	return va;
-> > +}
-> > +
-> > +static struct rproc_ops slim_rproc_ops = {
-> > +	.start		= slim_rproc_start,
-> > +	.stop		= slim_rproc_stop,
-> > +	.da_to_va       = slim_rproc_da_to_va,
-> > +};
-> > +
-> > +/*
-> > + * Firmware handler operations: sanity, boot address, load ...
-> > + */
-> > +
-> > +static struct resource_table empty_rsc_tbl = {
-> > +	.ver = 1,
-> > +	.num = 0,
-> > +};
-> > +
-> > +static struct resource_table *slim_rproc_find_rsc_table(struct rproc *rproc,
-> > +					       const struct firmware *fw,
-> > +					       int *tablesz)
-> > +{
-> > +	*tablesz = sizeof(empty_rsc_tbl);
-> > +	return &empty_rsc_tbl;
-> > +}
-> > +
-> > +static struct rproc_fw_ops slim_rproc_fw_ops = {
-> > +	.find_rsc_table = slim_rproc_find_rsc_table,
-> > +};
-> > +
-> > +/**
-> > + * st_slim_rproc_alloc() - allocate and initialise slim rproc
-> > + * @pdev: Pointer to the platform_device struct
-> > + * @fw_name: Name of firmware for rproc to use
-> > + *
-> > + * Function for allocating and initialising a slim rproc for use by
-> > + * device drivers whose IP is based around the SLIM core. It
-> > + * obtains and enables any clocks required by the SLIM core and also
-> > + * ioremaps the various IO.
-> > + *
-> > + * Returns st_slim_rproc pointer or PTR_ERR() on error.
-> > + */
-> > +
-> > +struct st_slim_rproc *st_slim_rproc_alloc(struct platform_device *pdev,
-> > +				char *fw_name)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct st_slim_rproc *slim_rproc;
-> > +	struct device_node *np = dev->of_node;
-> > +	struct rproc *rproc;
-> > +	struct resource *res;
-> > +	int err, i;
-> > +	const struct rproc_fw_ops *elf_ops;
-> > +
-> > +	if (!fw_name)
-> > +		return ERR_PTR(-EINVAL);
-> > +
-> > +	if (!of_device_is_compatible(np, "st,slim-rproc"))
-> > +		return ERR_PTR(-EINVAL);
-> > +
-> > +	rproc = rproc_alloc(dev, np->name, &slim_rproc_ops,
-> > +			fw_name, sizeof(*slim_rproc));
-> > +	if (!rproc)
-> > +		return ERR_PTR(-ENOMEM);
-> > +
-> > +	rproc->has_iommu = false;
-> > +
-> > +	slim_rproc = rproc->priv;
-> > +	slim_rproc->rproc = rproc;
-> > +
-> > +	elf_ops = rproc->fw_ops;
-> > +	/* Use some generic elf ops */
-> > +	slim_rproc_fw_ops.load = elf_ops->load;
-> > +	slim_rproc_fw_ops.sanity_check = elf_ops->sanity_check;
-> > +
-> > +	rproc->fw_ops = &slim_rproc_fw_ops;
-> > +
-> > +	/* get imem and dmem */
-> > +	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
-> > +		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> > +						mem_names[i]);
-> > +
-> > +		slim_rproc->mem[i].cpu_addr = devm_ioremap_resource(dev, res);
-> > +		if (IS_ERR(slim_rproc->mem[i].cpu_addr)) {
-> > +			dev_err(&pdev->dev, "devm_ioremap_resource failed\n");
-> > +			err = PTR_ERR(slim_rproc->mem[i].cpu_addr);
-> > +			goto err;
-> > +		}
-> > +		slim_rproc->mem[i].bus_addr = res->start;
-> > +		slim_rproc->mem[i].size = resource_size(res);
-> > +	}
-> > +
-> > +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "slimcore");
-> > +	slim_rproc->slimcore = devm_ioremap_resource(dev, res);
-> > +	if (IS_ERR(slim_rproc->slimcore)) {
-> > +		dev_err(&pdev->dev, "failed to ioremap slimcore IO\n");
-> > +		err = PTR_ERR(slim_rproc->slimcore);
-> > +		goto err;
-> > +	}
-> > +
-> > +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "peripherals");
-> > +	slim_rproc->peri = devm_ioremap_resource(dev, res);
-> > +	if (IS_ERR(slim_rproc->peri)) {
-> > +		dev_err(&pdev->dev, "failed to ioremap peripherals IO\n");
-> > +		err = PTR_ERR(slim_rproc->peri);
-> > +		goto err;
-> > +	}
-> > +
-> > +	err = slim_clk_get(slim_rproc, dev);
-> > +	if (err)
-> > +		goto err;
-> > +
-> > +	err = slim_clk_enable(slim_rproc);
-> > +	if (err) {
-> > +		dev_err(dev, "Failed to enable clocks\n");
-> > +		goto err_clk_put;
-> > +	}
-> > +
-> > +	/* Register as a remoteproc device */
-> > +	err = rproc_add(rproc);
-> > +	if (err) {
-> > +		dev_err(dev, "registration of slim remoteproc failed\n");
-> > +		goto err_clk_dis;
-> > +	}
-> > +
-> > +	return slim_rproc;
-> > +
-> > +err_clk_dis:
-> > +	slim_clk_disable(slim_rproc);
-> > +err_clk_put:
-> > +	for (i = 0; i < ST_SLIM_MAX_CLK && slim_rproc->clks[i]; i++)
-> > +		clk_put(slim_rproc->clks[i]);
-> > +err:
-> > +	rproc_put(rproc);
-> > +	return ERR_PTR(err);
-> > +}
-> > +EXPORT_SYMBOL(st_slim_rproc_alloc);
-> > +
-> > +/**
-> > +  * st_slim_rproc_put() - put slim rproc resources
-> > +  * @slim_rproc: Pointer to the st_slim_rproc struct
-> > +  *
-> > +  * Function for calling respective _put() functions on slim_rproc resources.
-> > +  *
-> > +  */
-> > +void st_slim_rproc_put(struct st_slim_rproc *slim_rproc)
-> > +{
-> > +	int clk;
-> > +
-> > +	if (!slim_rproc)
-> > +		return;
-> > +
-> > +	slim_clk_disable(slim_rproc);
-> > +
-> > +	for (clk = 0; clk < ST_SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++)
-> > +		clk_put(slim_rproc->clks[clk]);
-> > +
-> > +	rproc_del(slim_rproc->rproc);
-> > +	rproc_put(slim_rproc->rproc);
-> > +}
-> > +EXPORT_SYMBOL(st_slim_rproc_put);
-> > +
-> > +MODULE_AUTHOR("Peter Griffin <peter.griffin@linaro.org>");
-> > +MODULE_DESCRIPTION("STMicroelectronics SLIM core rproc driver");
-> > +MODULE_LICENSE("GPL v2");
-> > diff --git a/include/linux/remoteproc/st_slim_rproc.h b/include/linux/remoteproc/st_slim_rproc.h
-> > new file mode 100644
-> > index 0000000..4155556
-> > --- /dev/null
-> > +++ b/include/linux/remoteproc/st_slim_rproc.h
-> > @@ -0,0 +1,58 @@
-> > +/*
-> > + * SLIM core rproc driver header
-> > + *
-> > + * Copyright (C) 2016 STMicroelectronics
-> > + *
-> > + * Author: Peter Griffin <peter.griffin@linaro.org>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + */
-> > +#ifndef _ST_REMOTEPROC_SLIM_H
-> > +#define _ST_REMOTEPROC_SLIM_H
-> > +
-> > +#define ST_SLIM_MEM_MAX 2
-> > +#define ST_SLIM_MAX_CLK 4
-> > +
-> > +enum {
-> > +	ST_SLIM_DMEM,
-> > +	ST_SLIM_IMEM,
-> > +};
-> > +
-> > +/**
-> > + * struct st_slim_mem - slim internal memory structure
-> > + * @cpu_addr: MPU virtual address of the memory region
-> > + * @bus_addr: Bus address used to access the memory region
-> > + * @size: Size of the memory region
-> > + */
-> > +struct st_slim_mem {
-> > +	void __iomem *cpu_addr;
-> > +	phys_addr_t bus_addr;
-> > +	size_t size;
-> > +};
-> > +
-> > +/**
-> > + * struct st_slim_rproc - SLIM slim core
-> > + * @rproc: rproc handle
-> > + * @mem: slim memory information
-> > + * @slimcore: slim slimcore regs
-> > + * @peri: slim peripheral regs
-> > + * @clks: slim clocks
-> > + */
-> > +struct st_slim_rproc {
-> > +	struct rproc *rproc;
-> > +	struct st_slim_mem mem[ST_SLIM_MEM_MAX];
-> > +	void __iomem *slimcore;
-> > +	void __iomem *peri;
-> > +
-> > +	/* st_slim_rproc private */
-> > +	struct clk *clks[ST_SLIM_MAX_CLK];
-> > +};
-> > +
-> > +struct st_slim_rproc *st_slim_rproc_alloc(struct platform_device *pdev,
-> > +					char *fw_name);
-> > +void st_slim_rproc_put(struct st_slim_rproc *slim_rproc);
-> > +
-> > +#endif
+$ find . -name 'stag*'
+./Documentation/devicetree/bindings/staging
+./drivers/staging
+...
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I don't know if that was intended (since you said you did not read it) but
+I think it would be interesting for the discussion to give a little overview
+on that.
+My understanding is that there's a 'staging' area for bindings, couldn't the
+nodes/properties from my example be put in there?
+
+>>> Go and take a look at all the effort that went into sorting out generic
+>>> IOMMU bindings, when driver support was written after a large amount of
+>>> review to sort out fundamental concepts. We had to sort out fundamentals
+>>> before prototype driver code could be written, and while we knew drivers
+>>> were coming, an awful lot of review effort came first.
+>>
+>> Again, you are talking about drivers, but it is not the case at hand.
+> 
+> No, I am not. Please do not presume to put words in my mouth.
+
+I'm sorry, that was not my intention.
+I just assumed that because your paragraph mentioned the word "driver" and
+appears to have been Linux-only effort geared towards writing drivers:
+   "...We had to sort out fundamentals before prototype driver code could be
+written, and while we knew drivers were coming..."
+
+Maybe I miss some more context on that example.
+
+> 
+> I explicitly described a case where binding review took effort, and the
+> presence or absence of drivers was irrelevant. We later had drivers,
+> yes, but we had to understand the hardware to get the binding right
+> first.
+
+I see.
+So if I understood correctly, it was a cleanup, or a way to unify some
+bindings, so that drivers could be written easier?
+
+I can see that taking time, but the underlying idea of this discussion is
+that the DT could be divided in different sections.
+
+I think this would allow and encourage SoC manufacturers to publish more
+details, since they could use them internally as well.
+
+Obviously, this is not strictly necessary, and I'm sure SoC manufacturers
+could choose to just avoid having to deal with the open-source community
+entirely by using forks.
+
+However, that does not benefit the community and allows a "one-way" street,
+with companies "profiting" from open-source software (in this example,
+they would profit unwillingly, yet out of the necessity to avoid dealing
+with outside 'restrictions' perceived as unnecessary).
+
+It seems it is a similar case to that of allowing or not binary
+drivers/blobs.
+If they were not allowed, less companies would choose Linux.
+I don't want to go into that discussion, but it seems similar enough to
+this one for it to be worth mentioning.
+
+> If there's data which has no consumer, it has no value being in the DT.
+> Placing data with no consumer in the DT comes with a number of issues,
+> e.g.
+> 
+> a) Some DTS authors will ignore it, and not place data according to it
+>    in DTs. Hence there's no gain in consistency.
+
+Ok, but in this case the DT author (SoC manufacturer) would have interest
+in using it.
+
+> 
+> b) Though some accident (perhaps a typo, perhaps a misunderstanding of
+>    the binding), a DT will come to have erroneous data, yet this will go
+>    unnoticed, as there is no consumer. When later a consumer appears, it
+>    can't trust existing DTs, and has to either ignore the binding
+>    entirely, or bodge around each and every broken DT.
+> 
+
+I think it is likely this has already happened, even with the current
+constraints on review.
+
+> c) When a consumer eventually appears, it turned out we didn't capture
+>    details of the hardware sufficiently, and the binding turns out to be
+>    useless. At worst, this boils down to (b), at best, we require
+>    additional properties. In this case absolutely nothing is gained.
+
+Case c) could happen even when a driver is provided, for example if the
+driver writer got incomplete documentation.
+
+At any rate, since there was no user, even if the bindings need amending,
+it should be easy to do, since there's no backwards compatibility to keep.
+
+> In all cases, all we end up doing is enlarging DTBs, and risk causing
+> even more work.
+> 
+> If there *is* going to be a consumer, and if information regarding that
+> will be provided, then matters are different, and we can consider a
+> binding on its own merit. We need a specific example for that.
+> 
+>> If the "user of the binding" is not Linux, under what circumstances
+>> could "Linux" have the legitimacy of guaranteeing or enforcing any Linux-
+>> specific commitment?
+> 
+> To at least the extent that if someone says they're not going to bother,
+> we clearly have no reason to bother supporting them.
+
+I have the impression that this basically means that DT is Linux only.
+Did I misunderstood?
+
+What legitimacy does Linux expects to have when dealing with bindings whose
+users are not Linux? For example, FreeBSD, U-Boot or others.
+In other words, why would Linux usage and policies regarding DT have to affect
+other users of DT?
+
+That essentially limits DT usage;
+Of course, it can be forked, etc. like you state below, but that is not the
+best outcome for everybody, because this basically forces the use of
+undocumented binary DT overlays.
+
+> Note that *nothing* stops you from using the DT container format for
+> your own purposes, in violation of every binding and rule we have.
+> However, for those cases we clearly won't document them as the standard
+> mechanism.
+
+Yes, I'm aware of that possibility, but in that case we would not be having
+this conversation :-)
+
+Basically, IMHO there is no reason for this thing to be black or white when
+it could be gray and have a win-win situation, that's all.
+
+> There are other things build atop of the DTB format, e.g. FIT, which
+> aren't quite devicetree in the usual sense.
+> 
+>>> I understand that goal, and I've asked for a specific example, as this
+>>> is not clear-cut. e.g. there has been work on describing secure devices
+>>> for QEMU, but this isn't necessarily something we want to expose Linux
+>>> to in general.
+>>
+>> Interesting, do you know where in QEMU's code should I look for that?
+> 
+> Documentation/devicetree/bindings/arm/secure.txt for the basics.
+> 
+> Generally, I'd expect that even if the secure OS were using DT in this
+> fashion, the non-secure general purpose OS would be handed a DT
+> containing only the non-secure world portions.
+> 
+
+I see that you did not comment on my example, was that intended?
+
+>> IMHO, they apply only when there's a Linux driver, or any other public
+>> user of such bindings. But if there's no user, it seems like an unnecessary
+>> constraint.
+> 
+> If there's no user, there's no need for the binding.
+
+But you said earlier that bindings for users different from Linux are considered.
+Did I miss something?
+
+> If there's some user somewhere, and that user wants the binding
+> rubber-stamped as an "official" binding, they need to follow the usual
+> rules for bindings.
+> 
+> If there is a user, and they don't want to follow the usual rules,
+> there's no point trying to get the binding rubber-stamped.
+
+I understand, but nothing prevents the creation of DT 'sections':
+- a section using rubber-stamped "official" bindings
+- a section using 'staging' bindings
+right?
+What technical issues would this have?
+
+Best regards,
+
+Sebastian
