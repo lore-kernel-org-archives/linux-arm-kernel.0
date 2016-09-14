@@ -1,32 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 17:53:12 +0200
-Subject: [GIT PULL 2/3] DaVinci dts updates for v4.9
-In-Reply-To: <20160824110006.1866-2-nsekhar@ti.com>
-References: <20160824110006.1866-1-nsekhar@ti.com>
- <20160824110006.1866-2-nsekhar@ti.com>
-Message-ID: <3347114.RAnckMhlMa@wuerfel>
+Date: Wed, 14 Sep 2016 17:56:47 +0200
+Subject: [GIT PULL] Integrator cleanups and DTS
+In-Reply-To: <CACRpkdYBB0rw3uQZnmpsuc_=mf5Ra-HmbRfdm6aT0kn9rn41Lg@mail.gmail.com>
+References: <CACRpkdYBB0rw3uQZnmpsuc_=mf5Ra-HmbRfdm6aT0kn9rn41Lg@mail.gmail.com>
+Message-ID: <3954604.JGQyd7kqGb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 24, 2016 4:30:05 PM CEST Sekhar Nori wrote:
-> DaVinci DA850 device-tree enhancements include:
+On Wednesday, August 31, 2016 9:44:55 AM CEST Linus Walleij wrote:
+> Hi ARM SoC people,
 > 
-> - Support for new board OMAP-L138 LCDK
-> - Add AEMIF node on DA850 EVM and use it for NAND
-> - Audio support for LCDK
-> - Cleanups for PWM and UART
+> this is a request to pull a combined cleanup and DTS changes batch
+> for the Integrators.
 > 
+> Since I have commits such as "move CLCD display to DTS" that is
+> a single functional change deleting stuff from the boardfile and adding
+> the same to the DTS, it is a combination of DTS and boardfile patches.
+> All with the goal to cut down on boardfile code and move to device tree.
+> 
+> The changes require the corresponding changes from the video/fbdev
+> and clk subsystems to come in, but these are orthogonal and depend
+> solely on the DTS things coming in place. As the DTS repository is
+> "kind of external" I am deliverately relaxed about synchronizing changes
+> here and just optimistically assume they will come in during the merge
+> window and start working.
+> 
+> There are no compile-time dependencies on fbdev or clk, just runtime,
+> with the DT changes. This cleanup can be merged totally orthogonally,
+> and when ARM SoC, fbdev and clk are all merged in the merge window,
+> the result will compile and boot nicely.
+> 
+> I don't expect any conflicting changes to the Integrator in this merge
+> window, neither to board files nor DTS.
 > 
 
-This one fails to build:
+I've put this into next/late since it's not just dts changes. I considered
+putting it into next/cleanup, but then again it's also not just cleanups.
 
-
-ERROR (phandle_references): Reference to non-existent node or label "nand_cs3_pins"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-  DTC     arch/arm/boot/dts/bcm47081-asus-rt-n18u.dtb
-
-
-Can you send a fixed version please?
+Given the dependency on the fbdev and clk trees, next/late seems appropriate
+anyway, thanks!
 
 	Arnd
