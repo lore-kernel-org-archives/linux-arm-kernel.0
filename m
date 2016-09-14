@@ -1,145 +1,33 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 14 Sep 2016 16:10:53 -0500
-Subject: [PATCH 1/2] pci/layercape: disable all iATUs before initialization
-In-Reply-To: <1473315950-6396-1-git-send-email-Minghuan.Lian@nxp.com>
-References: <1473315950-6396-1-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <20160914211053.GD13189@localhost>
+From: jaret.cantu@timesys.com (Jaret Cantu)
+Date: Wed, 14 Sep 2016 17:14:49 -0400
+Subject: [PATCH] ARM: dts: imx: b650v3: Calibrate USB PHY to pass eye diagram
+ test
+Message-ID: <1473887689-10792-1-git-send-email-jaret.cantu@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2016 at 02:25:49PM +0800, Minghuan Lian wrote:
-> Layerscape PCIe has 6 outbound iATUs. The bootloader such as
-> u-boot uses 4 iATUs for CFG0 CFG1 IO and MEM separately. But
-> Designware driver only uses two outbound iATUs. To avoid
-> conflict between enabled but unused iATUs with used iATUs
-> under Linux and unexpected behavior, the patch disables all
-> iATUs before initialization.
+Calibrate the USB PHY TX settings to pass the eye diagram signal
+integrity test.  The settings are taken from the i.MX6 reference
+manual's recommended configuration for USB certification (66.2.6).
 
-Do we need similar changes in other DesignWare-based drivers?
+Signed-off-by: Jaret Cantu <jaret.cantu@timesys.com>
+---
+ arch/arm/boot/dts/imx6q-b650v3.dts |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> ---
->  drivers/pci/host/pci-layerscape.c  | 17 +++++++++++++++--
->  drivers/pci/host/pcie-designware.c |  7 +++++++
->  drivers/pci/host/pcie-designware.h |  1 +
->  3 files changed, 23 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-> index 114ba81..cf783ad 100644
-> --- a/drivers/pci/host/pci-layerscape.c
-> +++ b/drivers/pci/host/pci-layerscape.c
-> @@ -38,6 +38,8 @@
->  /* PEX LUT registers */
->  #define PCIE_LUT_DBG		0x7FC /* PEX LUT Debug Register */
->  
-> +#define PCIE_IATU_NUM		6
-> +
->  struct ls_pcie_drvdata {
->  	u32 lut_offset;
->  	u32 ltssm_shift;
-> @@ -55,6 +57,8 @@ struct ls_pcie {
->  
->  #define to_ls_pcie(x)	container_of(x, struct ls_pcie, pp)
->  
-> +static void ls_pcie_host_init(struct pcie_port *pp);
-
-I would prefer to reorder the function definitions so the forward
-declaration is not necessary.  This would be two patches:
-
-  1) Reorder functions (no functional change)
-  2) Disable iATUs
-
->  static bool ls_pcie_is_bridge(struct ls_pcie *pcie)
->  {
->  	u32 header_type;
-> @@ -87,6 +91,14 @@ static void ls_pcie_drop_msg_tlp(struct ls_pcie *pcie)
->  	iowrite32(val, pcie->dbi + PCIE_STRFMR1);
->  }
->  
-> +static void ls_pcie_disable_outbound_atus(struct ls_pcie *pcie)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < PCIE_IATU_NUM; i++)
-> +		dw_pcie_disable_outbound_atu(&pcie->pp, i);
-
-It looks like maybe the DesignWare ATUs are generic enough that we could
-move the loop into the generic code, e.g.,
-
-  void dw_pcie_disable_outbound_atu(struct pcie_port *pp, int count)
-  {
-    int i;
-
-    for (i = 0; i < count; i++) {
-      dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | i, PCIE_ATU_VIEWPORT);
-      dw_pcie_writel_rc(pp, 0, PCIE_ATU_CR2);
-    }
-  }
-
-> +}
-> +
->  static int ls1021_pcie_link_up(struct pcie_port *pp)
->  {
->  	u32 state;
-> @@ -124,9 +136,8 @@ static void ls1021_pcie_host_init(struct pcie_port *pp)
->  	}
->  	pcie->index = index[1];
->  
-> +	ls_pcie_host_init(pp);
->  	dw_pcie_setup_rc(pp);
-> -
-> -	ls_pcie_drop_msg_tlp(pcie);
-
-Can you split this to a separate patch?  This hunk changes
-ls1021_pcie_host_init() so it does several things in addition to
-ls_pcie_drop_msg_tlp(), and it is unrelated to the "disable iATU" change.
-
->  }
->  
->  static int ls_pcie_link_up(struct pcie_port *pp)
-> @@ -153,6 +164,8 @@ static void ls_pcie_host_init(struct pcie_port *pp)
->  	ls_pcie_clear_multifunction(pcie);
->  	ls_pcie_drop_msg_tlp(pcie);
->  	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);
-> +
-> +	ls_pcie_disable_outbound_atus(pcie);
->  }
->  
->  static int ls_pcie_msi_host_init(struct pcie_port *pp,
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 12afce1..e4d1203 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -172,6 +172,13 @@ static void dw_pcie_prog_outbound_atu(struct pcie_port *pp, int index,
->  	dw_pcie_readl_rc(pp, PCIE_ATU_CR2, &val);
->  }
->  
-> +void dw_pcie_disable_outbound_atu(struct pcie_port *pp, int index)
-> +{
-> +	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | index,
-> +			  PCIE_ATU_VIEWPORT);
-> +	dw_pcie_writel_rc(pp, 0, PCIE_ATU_CR2);
-> +}
-> +
->  static struct irq_chip dw_msi_irq_chip = {
->  	.name = "PCI-MSI",
->  	.irq_enable = pci_msi_unmask_irq,
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index f437f9b..e998bfc 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -85,5 +85,6 @@ int dw_pcie_wait_for_link(struct pcie_port *pp);
->  int dw_pcie_link_up(struct pcie_port *pp);
->  void dw_pcie_setup_rc(struct pcie_port *pp);
->  int dw_pcie_host_init(struct pcie_port *pp);
-> +void dw_pcie_disable_outbound_atu(struct pcie_port *pp, int index);
->  
->  #endif /* _PCIE_DESIGNWARE_H */
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/imx6q-b650v3.dts b/arch/arm/boot/dts/imx6q-b650v3.dts
+index 33cb71a..c266bd2 100644
+--- a/arch/arm/boot/dts/imx6q-b650v3.dts
++++ b/arch/arm/boot/dts/imx6q-b650v3.dts
+@@ -89,3 +89,9 @@
+ 		};
+ 	};
+ };
++
++&usbphy1 {
++	fsl,tx-cal-45-dn-ohms = <55>;
++	fsl,tx-cal-45-dp-ohms = <55>;
++	fsl,tx-d-cal = <100>;
++};
+-- 
+1.7.10.4
