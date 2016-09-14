@@ -1,48 +1,32 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Sep 2016 10:06:02 +0100
-Subject: [PATCH 18/33] pcmcia: sa1100: provide generic CF support
-In-Reply-To: <CACRpkda7qHx4JVdVv+q3=twTup9rDD2ke8K-tSH9CkhZMQqemg@mail.gmail.com>
-References: <20160829102328.GA28796@n2100.armlinux.org.uk>
- <E1beJl3-0000nS-Nw@rmk-PC.armlinux.org.uk>
- <CACRpkda7qHx4JVdVv+q3=twTup9rDD2ke8K-tSH9CkhZMQqemg@mail.gmail.com>
-Message-ID: <20160914090602.GB1041@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 14 Sep 2016 10:20:52 +0100
+Subject: [PATCH v7 00/22] Generic DT bindings for PCI IOMMUs and ARM SMMU
+In-Reply-To: <11ebd81e-2ea5-5ff3-35b3-be95f03e05bd@redhat.com>
+References: <cover.1473695704.git.robin.murphy@arm.com>
+ <11ebd81e-2ea5-5ff3-35b3-be95f03e05bd@redhat.com>
+Message-ID: <20160914092051.GB19622@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 10:52:39AM +0200, Linus Walleij wrote:
-> On Mon, Aug 29, 2016 at 12:25 PM, Russell King
-> <rmk+kernel@armlinux.org.uk> wrote:
-> 
-> > Provide generic non-voltage sensing socket support for StrongARM
-> > platforms using the gpiolib and regulator subsystems to obtain the
-> > resources to control the socket.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> (...)
-> 
-> > +static int sa11x0_drv_pcmcia_probe(struct platform_device *pdev)
-> > +{
-> > +       struct soc_pcmcia_socket *skt;
-> > +       struct device *dev = &pdev->dev;
-> > +
-> > +       if (dev->id == -1)
-> > +               return sa11x0_drv_pcmcia_legacy_probe(pdev);
-> 
-> There is a typo there, it should be pdev->id rather than dev->id.
-> 
-> After fixing this, my legacy h3600 PCMCIA started probing again.
+On Wed, Sep 14, 2016 at 10:41:57AM +0200, Auger Eric wrote:
+> Hi,
 
-Thanks, I've included a change there, should be part of the branch by
-the time you get this email - sa1100 head should be 9ad0f8181616.  If
-not, it's probably still being pushed out over my slow 'net link.
+Hi Eric,
 
-> (It revealed another bug in fetching GPIOs but it is an orthogobal
-> problem altogether, looking into it.)
+> On 12/09/2016 18:13, Robin Murphy wrote:
+> > To any more confusing fixups and crazily numbered extra patches, here's
+> > a quick v7 with everything rebased into the right order. The significant
+> > change this time is to implement iommu_fwspec properly from the start,
+> > which ends up being far simpler and more robust than faffing about
+> > introducing it somewhere 'less intrusive' to move toward core code later.
+> > 
+> > New branch in the logical place:
+> > 
+> > git://linux-arm.org/linux-rm iommu/generic-v7
+> 
+> For information, as discussed privately with Robin I experience some
+> regressions with the former and now deprecated dt description.
 
-If you're referring to the generic sa1100 pcmcia code, there's a fix
-for that already in my branch.
+Please can you share the DT you're using so we can reproduce this locally?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Will
