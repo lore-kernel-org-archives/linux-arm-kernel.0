@@ -1,22 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 14 Sep 2016 13:55:56 -0700
-Subject: [PATCH v3 3/3] arm64: dts: xgene: Add DT node for APM X-Gene 2
- CPU clocks
-In-Reply-To: <1473704605-28126-4-git-send-email-hotran@apm.com>
-References: <1473704605-28126-1-git-send-email-hotran@apm.com>
- <1473704605-28126-4-git-send-email-hotran@apm.com>
-Message-ID: <20160914205556.GC7243@codeaurora.org>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 14 Sep 2016 15:57:14 -0500
+Subject: [PATCH 0/3] ARM: dts: am33xx/dra7xx: Fix cpufreq regression
+Message-ID: <20160914205717.21975-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12, Hoan Tran wrote:
-> Add DT nodes to enable APM X-Gene 2 CPU clocks.
-> 
-> Signed-off-by: Hoan Tran <hotran@apm.com>
-> ---
+Hi,
+CPUFreq on am335x and dra7 platforms got broken by two things:
+ - Updated OPPv2 nodes in device tree were merged before driver to
+   handle them was accepted.
+ - OMAP platforms now use the new cpufreq-dt-platdev driver to create
+   cpufreq-dt platform device but non OMAP TI devices were not changed
+   over to this driver.
 
-This can go through arm-soc? I'm not applying this.
+This series addresses the first issue listed above by reverting three of
+the dts patches that got merged to restore OPPv1 tables. The second issue
+is addressed by [1].
+
+With both this series and that patch we will have the existing cpufreq
+support restored on am335x and dra7xx.
+
+Regards,
+Dave
+
+[1] http://marc.info/?l=linux-pm&m=147388573513082&w=2
+
+Dave Gerlach (3):
+  Revert "ARM: dts: am335x-boneblack: Enable 1GHz OPP for cpu"
+  Revert "ARM: dts: am33xx: Move to operating-points-v2 table and
+    ti-cpufreq driver"
+  Revert "ARM: dts: dra7: Move to operating-points-v2 table"
+
+ arch/arm/boot/dts/am335x-boneblack.dts | 11 -----
+ arch/arm/boot/dts/am33xx.dtsi          | 88 +++++-----------------------------
+ arch/arm/boot/dts/dra7.dtsi            | 26 ++--------
+ arch/arm/boot/dts/dra74x.dtsi          |  1 -
+ 4 files changed, 18 insertions(+), 108 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.9.3
