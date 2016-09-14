@@ -1,45 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Sep 2016 09:56:38 -0700
-Subject: [PATCH v2 0/3] ARM: dts: Add operating-points-v2 tables for TI
- platforms
-In-Reply-To: <57D97E9A.90400@ti.com>
-References: <20160901024816.32390-1-d-gerlach@ti.com>
- <20160913220244.txdiak6ikujvwzjk@atomide.com>
- <57D97E9A.90400@ti.com>
-Message-ID: <20160914165635.h4afluenzlfhcyo5@atomide.com>
+From: florian.fainelli@broadcom.com (Florian Fainelli)
+Date: Wed, 14 Sep 2016 10:07:48 -0700
+Subject: [GIT PULL 4/4] Broadcom devicetree-arm64 changes for 4.9
+In-Reply-To: <4089229.OUTltm1bc5@wuerfel>
+References: <1473213558-11782-1-git-send-email-f.fainelli@gmail.com>
+ <1473213558-11782-4-git-send-email-f.fainelli@gmail.com>
+ <4089229.OUTltm1bc5@wuerfel>
+Message-ID: <8d7d7a8b-0bac-e2a0-f6cd-ef8fc8269678@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [160914 09:45]:
-> On 09/13/2016 05:02 PM, Tony Lindgren wrote:
-> > Assuming this will have to wait based on what you mentioned about
-> > am335x cpufreq regression. I guess you'll instead send few patches
-> > to revert?
-> > 
+On 09/14/2016 08:20 AM, Arnd Bergmann wrote:
+> On Tuesday, September 6, 2016 6:59:18 PM CEST Florian Fainelli wrote:
+>> This pull request contains Broadcom ARM64-based SoC Device Tree changes for
+>> v4.9, please pull the folllowing:
+>>
+>> - Dhanajay adds the PWM Device Tree nodes to the Northstar 2 DTS files
+>>
 > 
-> Correct, these should not be merged, I will be sending a fixup series until
-> this series is ready.
-
-OK
-
-> I needed to resend the ti-cpufreq driver at [2] to get a response about the
-> dt binding and other updates Viresh asked for and sent this to update the
-> merged nodes so they would work with the driver. But the driver has not been
-> merged yet, so in order to re-enable the previously existing cpufreq support
-> on those platforms I must revert three patches from v1 [1] of this series
-> that got merged, which I will send.
+> Pulled into next/dt64, thanks!
 > 
-> I also found that 7694ca6e1d6f ("cpufreq: omap: Use generic platdev driver")
-> which went in v4.6-rc1 had already broken the existing cpufreq support on
-> am335x and dra7xx, so it's been missing for some time. I can send a patch
-> fixing that as well but I will need to remove it once the ti-cpufreq driver
-> in [2] below gets merged as that driver must create the cpufreq-dt platform
-> device instead of cpufreq-dt-platdev. So I will send a series that can fix
-> cpufreq until ti-cpufreq is ready which will give us better support for more
-> OPPs on am335x, am437x (which has no implementation today), and dra7xx.
+> I did the pull requests for next/dt yesterday but evidently missed yours.
+> Don't worry about it, I've already looked at it and it's fine. We'll
+> pick it up in the next few days along with your other two pull requests.
 
-OK yeah let's fix the regression & thanks for the update.
+(plaintext this time)
 
-Regards,
-
-Tony
+No worries, would you need me to change anything in the submission
+process to help? Out of curiosity do you have a patchwork or other patch
+tracking tool at arm at kernel.org?
+-- 
+Florian
