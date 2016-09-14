@@ -1,38 +1,60 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 14 Sep 2016 14:27:48 +0100
-Subject: [PATCH 10/19] watchdog: bindings: Remove obsolete platforms from dt
+Date: Wed, 14 Sep 2016 14:27:50 +0100
+Subject: [PATCH 12/19] reset: sti: Remove obsolete platforms from dt binding
  doc.
 In-Reply-To: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
 References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1473859677-9231-11-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1473859677-9231-13-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STiH415/6 SoC support is being removed from the kernel
-so update the dt bding document to reflect this.
+STiH415/6 SoC support is being removed from the kernel.
+This patch updates the sti dt powerdown bindings and
+removes references to these obsolete platforms.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Cc: <wim@iguana.be>
-Cc: <linux@roeck-us.net>
+Cc: <p.zabel@pengutronix.de>
 Cc: <robh+dt@kernel.org>
-Cc: <linux-watchdog@vger.kernel.org>
 ---
- Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ Documentation/devicetree/bindings/reset/st,sti-powerdown.txt | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt b/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
-index 039c5ca..b949039 100644
---- a/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
-@@ -9,8 +9,7 @@ functionality.
+diff --git a/Documentation/devicetree/bindings/reset/st,sti-powerdown.txt b/Documentation/devicetree/bindings/reset/st,sti-powerdown.txt
+index 1cfd21d..9252713 100644
+--- a/Documentation/devicetree/bindings/reset/st,sti-powerdown.txt
++++ b/Documentation/devicetree/bindings/reset/st,sti-powerdown.txt
+@@ -16,15 +16,14 @@ Please refer to reset.txt in this directory for common reset
+ controller binding usage.
  
- Required properties
+ Required properties:
+-- compatible: Should be "st,<chip>-powerdown"
+-	ex: "st,stih415-powerdown", "st,stih416-powerdown"
++- compatible: Should be "st,stih407-powerdown"
+ - #reset-cells: 1, see below
  
--- compatible 	: Must be one of: "st,stih407-lpc" "st,stih416-lpc"
--				  "st,stih415-lpc" "st,stid127-lpc"
-+- compatible 	: Should be: "st,stih407-lpc"
- - reg		: LPC registers base address + size
- - interrupts    : LPC interrupt line number and associated flags
- - clocks	: Clock used by LPC device (See: ../clock/clock-bindings.txt)
+ example:
+ 
+ 	powerdown: powerdown-controller {
++		compatible = "st,stih407-powerdown";
+ 		#reset-cells = <1>;
+-		compatible = "st,stih415-powerdown";
+ 	};
+ 
+ 
+@@ -37,11 +36,10 @@ index specifying which channel to use, as described in reset.txt
+ 
+ example:
+ 
+-	usb1: usb at fe200000 {
+-		resets	= <&powerdown STIH41X_USB1_POWERDOWN>;
++	st_dwc3: dwc3 at 8f94000 {
++		resets          = <&powerdown STIH407_USB3_POWERDOWN>,
+ 	};
+ 
+ Macro definitions for the supported reset channels can be found in:
+ 
+-include/dt-bindings/reset/stih415-resets.h
+-include/dt-bindings/reset/stih416-resets.h
++include/dt-bindings/reset/stih407-resets.h
 -- 
 1.9.1
