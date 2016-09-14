@@ -1,54 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 14 Sep 2016 15:58:51 +0100
-Subject: [RESEND PATCH] arm64: kgdb: fix single stepping
-In-Reply-To: <1429578793-3971-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1429578793-3971-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20160914145850.GE19622@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Sep 2016 16:59:50 +0200
+Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.9 -
+ part1
+In-Reply-To: <CADaLNDkZdAipxx6cfLJ6yrzTrcLPS_Ciw8+T5EUFVcRRw+fjPw@mail.gmail.com>
+References: <CADaLNDkZdAipxx6cfLJ6yrzTrcLPS_Ciw8+T5EUFVcRRw+fjPw@mail.gmail.com>
+Message-ID: <6041122.z65jfDXEcc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+On Friday, September 2, 2016 11:46:31 AM CEST Duc Dang wrote:
+> Hi Arnd, Olof,
+> 
+> This is the first part of DTS changes for X-Gene platforms targeted for 4.9.
+> 
+> The changes include:
+> + X-Gene Soc PMU support patch set from Tai Nguyen (v10 reviewed by
+> Mark, DT binding document acked by Rob [1] and was suggested to merge
+> via am-soc tree by Will [2])
+> + Follow up patch to enable DT entry for SoC PMU on X-Gene v2
+> + Correct PCIe legacy interrupt mode to level-active high
+> + DTS entry for X-Gene hwmon (v4 acked by Guenter, DT binding document
+> and driver is in linux-next now [3])
+> 
+> Regards,
+> Duc Dang.
 
-On Tue, Apr 21, 2015 at 02:13:13AM +0100, AKASHI Takahiro wrote:
-> Could you please review my patch below?
-> See also arm64 maintainer's comment:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313712.html
+Sorry for the long delay, I've just now started looking at the dts changes
+for arm64. The changes to arch/arm64/boot/dts look fine, but I don't
+want to mix driver changes with dts changes, as we use separate
+branches for those.
 
--ETIMEDOUT waiting for the kdgb folk to comment. Ppeople have reported
-that this patch is required for kgdb to work correctly on arm64, so I'm
-happy to merge it.
+Please send this again as two pull requests, one for the dts changes, and
+one for the rest (pmu driver, binding and MAINTAINERS file). Please
+also include an explanation in the tag description about why this gets
+merged through arm-soc. I see that Will suggested doing it that way,
+but I don't see what the reason is. We normally don't touch that directory.
 
-However, as detailed in your comment log:
+	Arnd
 
-> This patch
-> (1) moves kgdb_disable_single_step() from 'c' command handling to single
->     step handler.
->     This makes sure that single stepping gets effective at every 's' command.
->     Please note that, under the current implementation, single step bit in
->     spsr, which is cleared by the first single stepping, will not be set
->     again for the consecutive 's' commands because single step bit in mdscr
->     is still kept on (that is, kernel_active_single_step() in
->     kgdb_arch_handle_exception() is true).
-> (2) re-implements kgdb_roundup_cpus() because the current implementation
->     enabled interrupts naively. See below.
-> (3) removes 'enable_dbg' in el1_dbg.
->     Single step bit in mdscr is turned on in do_handle_exception()->
->     kgdb_handle_expection() before returning to debugged context, and if
->     debug exception is enabled in el1_dbg, we will see unexpected single-
->     stepping in el1_dbg.
->     Since v3.18, the following patch does the same:
->       commit 1059c6bf8534 ("arm64: debug: don't re-enable debug exceptions
->       on return from el1_dbg)
-> (4) masks interrupts while single-stepping one instruction.
->     If an interrupt is caught during processing a single-stepping, debug
->     exception is unintentionally enabled by el1_irq's 'enable_dbg' before
->     returning to debugged context.
->     Thus, like in (2), we will see unexpected single-stepping in el1_irq.
-
-this patch is doing *far* too much in one go. Could you please repost it
-as a series of self-contained fixes with clear commit messages, so I can
-queue them and cc stable where appropriate?
-
-Thanks,
-
-Will
+> 
+> [1]: https://lkml.org/lkml/2016/7/15/563
+> [2]: https://lkml.org/lkml/2016/7/20/224
+> [3]: http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=893485e74c37669aeecf0b648dbfbd8e2f0471c3
+> ------
+> 
+> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+> 
+>   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.9-part1
+> 
+> for you to fetch changes up to 1c983fc9369420748192712bde2429af3e580390:
+> 
+>   arm64: dts: apm: Add X-Gene SoC hwmon to device tree (2016-09-02
+> 10:43:41 -0700)
+> 
+> ----------------------------------------------------------------
+> X-Gene DTS changes queued for v4.9 - part 1
+> 
+> This patch set includes:
+> + X-Gene v1 SoC Performance Monitoring Unit (PMU) support
+> + DTS entry to enable SoC PMU for X-Gene v2 SoC
+> + PCIe legacy interrupt polarity fix for X-Gene
+> + X-Gene SoC hwmon DTS entry
+> 
