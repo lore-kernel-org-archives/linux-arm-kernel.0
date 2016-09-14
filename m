@@ -1,78 +1,93 @@
-From: zhichang.yuan02@gmail.com (zhichang)
-Date: Wed, 14 Sep 2016 19:26:22 +0800
-Subject: [PATCH V2 4/4] ARM64 LPC: support earlycon for UART connected to
- LPC
-In-Reply-To: <7585762.SZVHZyJdka@wuerfel>
-References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
- <4291379.IHAA72aKCk@wuerfel> <57D137AF.9070306@gmail.com>
- <7585762.SZVHZyJdka@wuerfel>
-Message-ID: <6e890161-0cd8-6027-f4e5-a222ceddd597@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Sep 2016 13:29:04 +0200
+Subject: [PATCH 10/33] pcmcia: soc_common: switch to using gpio_descs
+In-Reply-To: <E1beJkO-0000mg-Lu@rmk-PC.armlinux.org.uk>
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <E1beJkO-0000mg-Lu@rmk-PC.armlinux.org.uk>
+Message-ID: <CACRpkdZvNnVG5U3XQPm5KJDLci76xFP7JOO78AZ3a8QVBs0ZQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Aug 29, 2016 at 12:24 PM, Russell King
+<rmk+kernel@armlinux.org.uk> wrote:
+
+> Switch to using the gpiod_* consumer API rather than the legacy API.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+(...)
+
+> +int soc_pcmcia_request_gpiods(struct soc_pcmcia_socket *skt)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(skt->stat); i++) {
+> +               struct gpio_desc *desc;
+> +
+
+Here I inserted:
+
+        /* Skip over unnamed GPIOs, assume unused */
+        if (!skt->stat[i].name)
+            continue;
+
+to get it working again on h3600.
+
+> +               desc = gpiod_get(skt->socket.dev.parent,
+> +                                skt->stat[i].name, GPIOD_IN);
+> +               if (IS_ERR(desc)) {
+> +                       dev_err(skt->socket.dev.parent,
+> +                               "Failed to get GPIO for %s: %ld\n",
+> +                               skt->stat[i].name, PTR_ERR(desc));
+> +                       __soc_pcmcia_hw_shutdown(skt, i);
+> +                       return PTR_ERR(desc);
+> +               }
 
 
-On 2016?09?08? 19:04, Arnd Bergmann wrote:
-> On Thursday, September 8, 2016 6:04:31 PM CEST zhichang wrote:
->> Hi, Arnd,
->>
->> On 2016?09?07? 22:52, Arnd Bergmann wrote:
->>> On Wednesday, September 7, 2016 9:33:53 PM CEST Zhichang Yuan wrote:
->>>> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
->>>>
->>>> This patch support the earlycon for UART connected to LPC on Hip06.
->>>> This patch is depended on the LPC driver.
->>>>
->>>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
->>>>
->>>
->>> I'm skeptical about this too. Is this just needed because the 8250
->>> earlycon support comes before the lpc bus initialization?
->> I think you wonder why early_serial8250_setup can not be used direclty for this earlycon of LPC uart.
->>
->> 1. the earlycon kernel parameter format of LPC uart is different from 8250. something like that
->> "earlycon=hisilpcuart,mmio,0xa01b0000,0,0x2f8". You see, there is one more parameter after the baudrate.
-> 
-> We should never need to specify the addresses manually like this,
-> it's actually supposed to work if you just list "earlycon" here.
+It bugs out for me on the legacy h3600, since it only defines
+two of these pins not all of the ARRAY_SIZE(skt->stat) pins
+will succeed and we get an error message like this:
 
-Do you mean flat-tree earlycon?
-Ok, will support this in V3.
+sa11x0-pcmcia sa11x0-pcmcia: Failed to get GPIO for (null): -2
+sa11x0-pcmcia: probe of sa11x0-pcmcia failed with error -2
 
-> 
-> The first membase is apparently only used during setup:
-> 
-> +       writel(LPC_IRQ_CLEAR, device->port.membase + LPC_REG_IRQ_ST);
-> +       /* ensure the LPC is available */
-> +       while (!(readl(device->port.membase + LPC_REG_OP_STATUS) &
-> +                       LPC_STATUS_IDLE))
-> 
-> Why doesn't the firmware do this before handing off control of
-> the kernel to the console?
-This is a checking on the LPC controller status.
-I think we can keep this here.
+With the patch above it goes away and the log is silent.
+The debugfs gpio file looks like this:
 
-> 
->> Hip06 LPC uart need two base addresses for earlycon.
->> 2. the IO type is mmio to introduce a memory base address to access LPC register file. But the real uart
->> IO type is UPIO_PORT. This is spcial...
-> 
-> This sounds like a deficiency in the of_setup_earlycon() function,
-> which can only handle MMIO addresses, and won't actually
-> be able to understand nodes without a "ranges" property like
-> you have here.
-> 
-Yes.
-The current of_setup_earlycon only support MMIO and the first reg property must be memory.
+cat gpio
+gpiochip0: GPIOs 0-27, gpio:
+ gpio-0   (                    |Power Button        ) in  hi
+ gpio-10  (                    |pcmcia1-detect      ) in  hi
+ gpio-11  (                    |pcmcia1-ready       ) in  hi
+ gpio-17  (                    |pcmcia0-detect      ) in  hi
+ gpio-18  (                    |Action button       ) in  hi
+ gpio-21  (                    |pcmcia0-ready       ) in  hi
+ gpio-23  (                    |dcd                 ) in  hi
+ gpio-25  (                    |cts                 ) in  lo
+ gpio-26  (                    |rts                 ) out lo
 
-We can not support our LPC uart without any new code.
-But we can implement a private earlycon setup function and register it to the __earlycon_table, things will be ok.
-I will do it in V3.
+gpiochip1: GPIOs 28-43, parent: platform/htc-egpio, htc-egpio:
+ gpio-28  (                    |Flash Vpp           ) out lo
+ gpio-29  (                    |PCMCIA CARD RESET   ) out lo
+ gpio-30  (                    |OPT RESET           ) out lo
+ gpio-32  (                    |OPT NVRAM ON        ) out lo
+ gpio-33  (                    |OPT ON              ) out lo
+ gpio-34  (                    |LCD power           ) out lo
+ gpio-36  (                    |LCD control         ) out lo
+ gpio-42  (                    |LCD 5v              ) out lo
+ gpio-43  (                    |LCD 9v/-6.5v        ) out lo
 
-Best,
-Zhichang
+Which seems like before the patch series.
 
-> I think we need to add a special case for port ranges here.
-> 
-> 	Arnd
-> 
+I still suspect the PCMCIA is not really working but I have
+limited experience of the bus so I don't really know how
+to test it deeply or have my PCMCIA ethernet or harddrive
+probe properly.
+
+There are no regressions however, so with something like
+the above patch applied:
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+
+For the whole patch series on H3600.
+
+Yours,
+Linus Walleij
