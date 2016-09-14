@@ -1,68 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 16:59:50 +0200
-Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.9 -
- part1
-In-Reply-To: <CADaLNDkZdAipxx6cfLJ6yrzTrcLPS_Ciw8+T5EUFVcRRw+fjPw@mail.gmail.com>
-References: <CADaLNDkZdAipxx6cfLJ6yrzTrcLPS_Ciw8+T5EUFVcRRw+fjPw@mail.gmail.com>
-Message-ID: <6041122.z65jfDXEcc@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 14 Sep 2016 16:01:24 +0100
+Subject: [PATCH] of/platform: Initialise dev->fwnode appropriately
+Message-ID: <38259ab3716da072fab37f06d034329244491c13.1473865096.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 11:46:31 AM CEST Duc Dang wrote:
-> Hi Arnd, Olof,
-> 
-> This is the first part of DTS changes for X-Gene platforms targeted for 4.9.
-> 
-> The changes include:
-> + X-Gene Soc PMU support patch set from Tai Nguyen (v10 reviewed by
-> Mark, DT binding document acked by Rob [1] and was suggested to merge
-> via am-soc tree by Will [2])
-> + Follow up patch to enable DT entry for SoC PMU on X-Gene v2
-> + Correct PCIe legacy interrupt mode to level-active high
-> + DTS entry for X-Gene hwmon (v4 acked by Guenter, DT binding document
-> and driver is in linux-next now [3])
-> 
-> Regards,
-> Duc Dang.
+Whilst we're some of the way towards a universal firmware property
+interface, drivers which deal with both OF and ACPI probing end up
+having to do things like this:
 
-Sorry for the long delay, I've just now started looking at the dts changes
-for arm64. The changes to arch/arm64/boot/dts look fine, but I don't
-want to mix driver changes with dts changes, as we use separate
-branches for those.
+    dev->of_node ? &dev->of_node->fwnode : dev->fwnode
 
-Please send this again as two pull requests, one for the dts changes, and
-one for the rest (pmu driver, binding and MAINTAINERS file). Please
-also include an explanation in the tag description about why this gets
-merged through arm-soc. I see that Will suggested doing it that way,
-but I don't see what the reason is. We normally don't touch that directory.
+This seems unnecessary, when the OF code could instead simply fill in
+the device's fwnode when binding the of_node, and let the drivers use
+dev->fwnode either way. Let's give it a go and see what falls out.
 
-	Arnd
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/of/platform.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> 
-> [1]: https://lkml.org/lkml/2016/7/15/563
-> [2]: https://lkml.org/lkml/2016/7/20/224
-> [3]: http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=893485e74c37669aeecf0b648dbfbd8e2f0471c3
-> ------
-> 
-> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-> 
->   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.9-part1
-> 
-> for you to fetch changes up to 1c983fc9369420748192712bde2429af3e580390:
-> 
->   arm64: dts: apm: Add X-Gene SoC hwmon to device tree (2016-09-02
-> 10:43:41 -0700)
-> 
-> ----------------------------------------------------------------
-> X-Gene DTS changes queued for v4.9 - part 1
-> 
-> This patch set includes:
-> + X-Gene v1 SoC Performance Monitoring Unit (PMU) support
-> + DTS entry to enable SoC PMU for X-Gene v2 SoC
-> + PCIe legacy interrupt polarity fix for X-Gene
-> + X-Gene SoC hwmon DTS entry
-> 
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index f39ccd5aa701..f811d2796437 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -142,6 +142,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ 	}
+ 
+ 	dev->dev.of_node = of_node_get(np);
++	dev->dev.fwnode = &np->fwnode;
+ 	dev->dev.parent = parent ? : &platform_bus;
+ 
+ 	if (bus_id)
+@@ -241,6 +242,7 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+ 
+ 	/* setup generic device info */
+ 	dev->dev.of_node = of_node_get(node);
++	dev->dev.fwnode = &node->fwnode;
+ 	dev->dev.parent = parent ? : &platform_bus;
+ 	dev->dev.platform_data = platform_data;
+ 	if (bus_id)
+-- 
+2.8.1.dirty
