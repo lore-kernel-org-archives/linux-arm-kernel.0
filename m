@@ -1,21 +1,21 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 14 Sep 2016 11:25:06 -0700
-Subject: [PATCH 1/4] clk: gxbb: expose i2c clocks
-In-Reply-To: <1473847568-20163-2-git-send-email-jbrunet@baylibre.com>
-References: <1473847568-20163-1-git-send-email-jbrunet@baylibre.com>
- <1473847568-20163-2-git-send-email-jbrunet@baylibre.com>
-Message-ID: <20160914182506.GS7243@codeaurora.org>
+Date: Wed, 14 Sep 2016 11:28:11 -0700
+Subject: [PATCH 1/2] ARM: clk-imx35: fix name for ckil clk
+In-Reply-To: <1473327022-8065-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1473327022-8065-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20160914182811.GT7243@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14, Jerome Brunet wrote:
-> I2C and AO_I2C clocks are needed for the i2c driver, expose to DT
-> (and comment out in clk driver)
+On 09/08, Uwe Kleine-K?nig wrote:
+> This fixes
+> 	[    0.000000] i.MX clk 82: register failed with -17
+> because the name is duplicated.
 > 
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > ---
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
