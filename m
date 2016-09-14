@@ -1,16 +1,17 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 00:05:25 +0200
-Subject: [GIT PULL] Qualcomm ARM64 Defconfig Updates for v4.9
-In-Reply-To: <1472875060-17967-1-git-send-email-andy.gross@linaro.org>
-References: <1472875060-17967-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <10448021.BWm4Z2Q7Dg@wuerfel>
+Date: Thu, 15 Sep 2016 00:06:49 +0200
+Subject: [GIT PULL] ARM: mvebu: defconfig64 for v4.9 (#1)
+In-Reply-To: <87k2erzmiq.fsf@free-electrons.com>
+References: <87k2erzmiq.fsf@free-electrons.com>
+Message-ID: <5509219.ql3tkDVBQx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 10:57:40 PM CEST Andy Gross wrote:
-> Qualcomm ARM64 Based defconfig Updates for v4.9
+On Sunday, September 4, 2016 5:56:45 PM CEST Gregory CLEMENT wrote:
+> mvebu defconfig64 for 4.9 (part 1)
 > 
-> * Enable defconfig options for QDF2432
+> - add PCIe driver for Aardvark for Armada 3700
+> - enable xhci-platform for A7K/A8K
 > 
 
 Pulled into next/arm64, thanks!
