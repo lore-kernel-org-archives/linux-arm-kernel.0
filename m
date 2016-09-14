@@ -1,50 +1,47 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 14 Sep 2016 02:58:34 +0200
-Subject: [PATCH V2 00/10] PM / Domains: Add support for removing PM domains
-In-Reply-To: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
-References: <1473678074-15126-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <14914984.irHbtjz3da@vostro.rjw.lan>
+Date: Wed, 14 Sep 2016 03:00:55 +0200
+Subject: [PATCH V2] cpufreq: create link to policy only for registered CPUs
+In-Reply-To: <59daae7da84077fbf845b1aad2962933585f8e35.1473662181.git.viresh.kumar@linaro.org>
+References: <20160819110032.GM1041@n2100.armlinux.org.uk>
+ <59daae7da84077fbf845b1aad2962933585f8e35.1473662181.git.viresh.kumar@linaro.org>
+Message-ID: <1733771.eFmsFmZ21e@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 12, 2016 12:01:04 PM Jon Hunter wrote:
-> In order to safely remove PM domains there are a few changes that need to be
-> made to ensure that no one is holding an external reference to a PM domain
-> after it has been removed. One solution, implemented here, solves this by
-> eliminating external references to PM domain.
+On Monday, September 12, 2016 12:07:05 PM Viresh Kumar wrote:
+> If a cpufreq driver is registered very early in the boot stage (e.g.
+> registered from postcore_initcall()), then cpufreq core may generate
+> kernel warnings for it.
 > 
-> Changes from V1:
-> - Added test when removing a PM domain to ensure the PM domain provider
->   has been removed.
-> - Re-organised patches 8-10 so that patch #8 adds the code to verify if
->   the provider is present, patch #9 adds basic support for removing PM
->   domains and patch #10 adds support for removing PM domains by provider.
+> In this case, the CPUs are brought online, then the cpufreq driver is
+> registered, and then the CPU topology devices are registered. However,
+> by the time cpufreq_add_dev() gets called, the cpu device isn't stored
+> in the per-cpu variable (cpu_sys_devices,) which is read by
+> get_cpu_device().
 > 
-> Changes from initial RFC:
-> - Renamed functions made static per Ulf's feedback.
-> - Added patch to clean-up provider/xlate APIs per Ulf's feedback
-> - Re-worked and simplified the association between PM domains and PM
->   domain providers. Dropped the 'provider_data' variable from the
->   generic_pm_domain structure in favour of using the fwnode_handle.
-> - Split patch for removing PM domains into multiple patches per Ulf's
->   feedback.
+> So the cpufreq core fails to get device for the CPU, for which
+> cpufreq_add_dev() was called in the first place and we will hit a
+> WARN_ON(!cpu_dev).
 > 
-> Jon Hunter (10):
->   PM / Domains: Add new helper functions for device-tree
->   ARM: EXYNOS: Remove calls to of_genpd_get_from_provider()
->   staging: board: Remove calls to of_genpd_get_from_provider()
->   PM / Domains: Don't expose generic_pm_domain structure to clients
->   PM / Domains: Don't expose xlate and provider helper functions
->   PM / Domains: Verify the PM domain is present when adding a provider
->   PM / Domains: Prepare for adding support to remove PM domains
->   PM / Domains: Store the provider in the PM domain structure
->   PM / Domains: Add support for removing PM domains
->   PM / Domains: Add support for removing nested PM domains by provider
+> Even if we reuse the 'dev' parameter passed to cpufreq_add_dev() to
+> avoid that warning, there might be other CPUs online that share the
+> policy with the cpu for which cpufreq_add_dev() is called. Eventually
+> get_cpu_device() will return NULL for them as well, and we will hit the
+> same WARN_ON() again.
+> 
+> In order to fix these issues, change cpufreq core to create links to the
+> policy for a cpu only when cpufreq_add_dev() is called for that CPU.
+> 
+> Reuse the 'real_cpus' mask to track that as well.
+> 
+> Note that cpufreq_remove_dev() already handles removal of the links for
+> individual CPUs and cpufreq_add_dev() has aligned with that now.
+> 
+> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-All applied.
-
-I'll expose a branch containing them after they've spent a couple of days in
-linux-next.
+Applied.
 
 Thanks,
 Rafael
