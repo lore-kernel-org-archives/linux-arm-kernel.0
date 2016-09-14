@@ -1,22 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 00:11:17 +0200
-Subject: [GIT PULL 2/4] Broadcom soc-arm64 changes for 4.9
-In-Reply-To: <1473213558-11782-2-git-send-email-f.fainelli@gmail.com>
-References: <1473213558-11782-1-git-send-email-f.fainelli@gmail.com>
- <1473213558-11782-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <67577927.JVKFx08kS9@wuerfel>
+Date: Thu, 15 Sep 2016 00:13:25 +0200
+Subject: [GIT PULL] Amlogic driver updates for v4.9
+In-Reply-To: <7hfuph25v4.fsf@baylibre.com>
+References: <7hfuph25v4.fsf@baylibre.com>
+Message-ID: <7274915.InCMftSViT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 6, 2016 6:59:16 PM CEST Florian Fainelli wrote:
-> This pull request contains Broadcom ARM64-based SoC changes for 4.9, please pull
-> the following:
+On Friday, September 2, 2016 5:18:23 PM CEST Kevin Hilman wrote:
+> Amlogic drivers for v4.9
+> - add secure monitor and eFuse driver
+> - add IR remote driver
 > 
-> - collective effort from Florian, Doug and Markus to add the ARCH_BRCMSTB Kconfig
->   symbol to the ARM64 kernel build, which is purposedly the same as the ARM/Linux
->   one in order not to update any driver dependencies
 > 
 
-Pulled into next/arm64, thanks!
+Pulled into next/drivers, thanks!
 
 	Arnd
