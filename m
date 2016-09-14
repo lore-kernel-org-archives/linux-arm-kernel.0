@@ -1,106 +1,93 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Wed, 14 Sep 2016 14:19:06 +0800
-Subject: [PATCH v7 7/9] drm/mediatek: add dsi transfer function
-In-Reply-To: <1473758754.28437.40.camel@mtksdaap41>
-References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
- <1472815484-43821-8-git-send-email-yt.shen@mediatek.com>
- <1473215632.11736.21.camel@mtksdaap41>
- <1473675381.12398.27.camel@mtksdaap41>
- <1473758754.28437.40.camel@mtksdaap41>
-Message-ID: <1473833946.24354.8.camel@mtksdaap41>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 13 Sep 2016 23:29:12 -0700
+Subject: [PATCH v4 22/22] phy: Add support for Qualcomm's USB HS phy
+In-Reply-To: <20160914021133.GB30760@b29397-desktop>
+References: <20160907213519.27340-1-stephen.boyd@linaro.org>
+ <20160907213519.27340-23-stephen.boyd@linaro.org>
+ <20160913070358.GB30425@b29397-desktop>
+ <147379930484.27460.3849356366746983941@sboyd-linaro>
+ <20160914021133.GB30760@b29397-desktop>
+Message-ID: <147383455256.1541.16582625295760921275@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi CK,
-
-On Tue, 2016-09-13 at 17:25 +0800, CK Hu wrote:
-> Hi, YT:
-> 
-> On Mon, 2016-09-12 at 18:16 +0800, YT Shen wrote:
-> > Hi CK,
-> > 
-> > On Wed, 2016-09-07 at 10:33 +0800, CK Hu wrote:
-> > > Hi, YT:
-> > > 
-> > > On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
-> > > > From: shaoming chen <shaoming.chen@mediatek.com>
-> > > > 
-> > > > add dsi read/write commands for transfer function
-> > > > 
-> > > > Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> > > > ---
-> > > >  drivers/gpu/drm/mediatek/mtk_dsi.c | 188 +++++++++++++++++++++++++++++++++++++
-> > > >  1 file changed, 188 insertions(+)
+Quoting Peter Chen (2016-09-13 19:11:33)
+> On Tue, Sep 13, 2016 at 01:41:44PM -0700, Stephen Boyd wrote:
+> > Quoting Peter Chen (2016-09-13 00:03:58)
+> > > On Wed, Sep 07, 2016 at 02:35:19PM -0700, Stephen Boyd wrote:
+> > > > The high-speed phy on qcom SoCs is controlled via the ULPI
+> > > > viewport.
 > > > > 
 > > > 
-> > > [snip...]
-> > > 
-> > > >  
-> > > > +static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
-> > > > +{
-> > > > +	dsi->irq_data &= ~irq_bit;
-> > > > +}
-> > > > +
-> > > 
-> > > [snip...]
-> > > 
-> > > > +
-> > > > +static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-> > > > +				     unsigned int timeout)
-> > > > +{
-> > > > +	s32 ret = 0;
-> > > > +	unsigned long jiffies = msecs_to_jiffies(timeout);
-> > > > +
-> > > > +	ret = wait_event_interruptible_timeout(_dsi_irq_wait_queue,
-> > > > +					       dsi->irq_data & irq_flag,
-> > > > +					       jiffies);
-> > > > +	if (ret == 0) {
-> > > > +		dev_info(dsi->dev, "Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
-> > > > +
-> > > > +		mtk_dsi_enable(dsi);
-> > > > +		mtk_dsi_reset_engine(dsi);
-> > > > +	}
-> > > > +
-> > > > +	return ret;
-> > > > +}
-> > > 
-> > > I think mtk_dsi_irq_data_clear() and mtk_dsi_wait_for_irq_done() should
-> > > be moved to the 6th patch [1] of this series because these two functions
-> > > deal the irq control.
-> > We will move mtk_dsi_irq_data_clear() to patch "drm/mediatek: add dsi
-> > interrupt control" and put mtk_dsi_wait_for_irq_done() here, because it
-> > is used in the transfer function.
+> > > Hi Stephen, I am a little puzzled how this driver co-work with chipidea
+> > > driver. According to nxp IC guys, the ULPI PHY's clock needs to be enabled
+> > > before access portsc.pts (calling hw_phymode_configure), otherwise,
+> > > the system will hang. But I find you call hw_phymode_configure before
+> > > phy->power_on, doesn't your design have this requirement?
+> > 
+> > Which clk needs to be enabled? The xcvr_clk? I believe that clk
+> > corresponds to the "core" clk that we enable in the msm glue driver
+> > layer. When that clk is enabled, the ULPI phy is able to respond to
+> > register read/writes via the ULPI viewport.
+> > 
 > 
-> mtk_dsi_irq_data_clear() is also only used in transfer function now. I
-> think both function could be used for other application rather than
-> transfer function, so these two function are general function for irq
-> control.
-We will rollback the changes here.  Move mtk_dsi_irq_data_clear() to
-original place.
+> The input clock for ULPI PHY, maybe it is ref_clk at this PHY driver, 
+> so in your platform, even PHY clock is gated, you can still access
+> portsc.pts to configure PHY mode at controller register?
 
-Add new functions could be used in the future will have problems.
-warning: 'mtk_dsi_wait_for_irq_done' defined but not used
-[-Wunused-function]
- static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-warning: 'mtk_dsi_irq_data_clear' defined but not used
-[-Wunused-function]
- static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
+There are a couple input clocks for this phy. I'm not sure which one the
+nxp IC guys think needs to be enabled. Typically, the ref_clk is always
+on so it's hard for me to test a scenario where it isn't enabled. But
+I'm not sure that the ref_clk is what we're talking about anyway. Would
+you know the frequency perhaps? The ref_clk is usually 19.2MHz on these
+SoCs. That would match up with the "crystal input" pin in the ULPI
+spec[1].
 
-> Regards,
-> CK
+Do you know if this is documented anywhere in the chipidea manual?
+I'll have to look again and see if there's something in there, but I
+didn't see anything like this.
+
+I would guess that we're talking about the xcvr clock though, because
+from what I see in the manual, this is used to clock the interface
+between the ULPI phy and the controller. In the ULPI spec, this matches
+up with the "clock" signal for the ULPI phy and that usually runs at
+something >= 60MHz. 
+
 > 
-> > 
-> > Regards,
-> > yt.shen
-> > > 
-> > > 
-> > > [1] https://patchwork.kernel.org/patch/9310819/
-> > > 
-> > > 
-> > > Regards,
-> > > CK
+> > >        
+> > > Besides, you read ulpi id before phy->power_on, how can read work before
+> > > phy power on?
 > > > 
 > > 
+> > I've found that even having the link clk enabled before phy->power_on
+> > doesn't mean it's possible to read the id registers though. That's
+> > because there can be other power supplies, like regulators, which need
+> > to be on for the phy to operate properly.
 > > 
 > 
+> Then I am puzzled the current initialization for your case, in my mind,
+> it should like below:
 > 
+> qcom_usb_hs_phy_probe->qcom_usb_hs_phy_power_on->ci_ulpi_init
+> 
+> Like other PHYs, it should get PHY first, then power on it, after that,
+> you can access its register.
+> 
+
+Hmm.. maybe the confusion is in which registers we should be able to
+access? Are we talking about the ULPI viewport MMIO register space or
+the ULPI registers that we access through the viewport? I have a
+hw_phymode_configure() inside of of ci_ulpi_init() so that the
+identification registers through the ULPI viewport read properly
+(assuming there aren't other power requirements like regulators). If we
+don't set the portsc.pts before using the viewport, the viewport doesn't
+work and reads timeout. So we really don't touch the ULPI registers
+except for the scratch space and the id registers until after the phy is
+properly powered on with clks and regulators, because the only place we
+touch them after doing the id checking is in this phy driver in
+qcom_usb_hs_phy_power_on(). We've "solved" the chicken-egg problem where
+we don't know which device driver to probe because the phy needs to be
+powered on to read the id registers to know which device driver to use
+by using DT to match up device drivers instead.
+
+[1] https://www.sparkfun.com/datasheets/Components/SMD/ULPI_v1_1.pdf
