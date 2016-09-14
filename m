@@ -1,57 +1,149 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Sep 2016 11:48:01 +0100
-Subject: [PATCH v3 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-In-Reply-To: <20160914103632.GD14330@leverpostej>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
- <CAKv+Gu-zHmExwk-YqXVg2ZuVi1M8L4BbJb6-iARxQ7b_2eH-rA@mail.gmail.com>
- <20160914102659.GC14330@leverpostej>
- <CAKv+Gu_ww5+_vcKfnFsUgG6h1v87-CWhLp_o7qHS6=3nd6-cow@mail.gmail.com>
- <20160914103632.GD14330@leverpostej>
-Message-ID: <20160914104732.GE14330@leverpostej>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 14 Sep 2016 12:55:45 +0200
+Subject: [PATCH v7 22/22] iommu/dma: Avoid PCI host bridge windows
+In-Reply-To: <5f7bfee298f98d29a35933d3e0252d32b83d62b8.1473695704.git.robin.murphy@arm.com>
+References: <cover.1473695704.git.robin.murphy@arm.com>
+ <CGME20160912161514eucas1p10818019bf2302609421ad9c35d1af4b8@eucas1p1.samsung.com>
+ <5f7bfee298f98d29a35933d3e0252d32b83d62b8.1473695704.git.robin.murphy@arm.com>
+Message-ID: <ab8693f6-20d6-2a95-9f1f-0607e72bc012@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 11:36:46AM +0100, Mark Rutland wrote:
-> On Wed, Sep 14, 2016 at 11:30:05AM +0100, Ard Biesheuvel wrote:
-> > On 14 September 2016 at 11:27, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > On Wed, Sep 14, 2016 at 11:13:33AM +0100, Ard Biesheuvel wrote:
-> > >> On 13 September 2016 at 18:46, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > >> > This is the third version of the arm64 PAN emulation using TTBR0_EL1
-> > >> > switching.
-> > >
-> > >> Given that every __get_user() call now incurs the PAN switch overhead,
-> > >> I wonder if it would be worth it to stash the real TTBR0_EL1 value in,
-> > >> e.g., TPIDRRO_EL0 rather than load it from memory each time. We'd have
-> > >> to reload the real value of TPIDRRO_EL0 at kernel exit every time, but
-> > >> only for compat tasks, and not nearly as often, obviously.
-> > >
-> > > FWIW, my plan for vmap'd stacks involves clobbering TPIDRRO_EL0 early
-> > > upon kernel entry to reliably detect/handle stack overflow (as we need
-> > > to free up GPR to detect overflow, and we need to detect that before we
-> > > try to store to the stack).
-> > >
-> > > For non-compat tasks we must restore zero, so either way we'll end up
-> > > with a load (to determine compat-ness or to load the precise value).
-> > 
-> > Are you saying that with vmapped stacks, we'll end up clobbering it
-> > (and thus restoring it) anyway when entering the kernel, and so we
-> > could use it for free afterwards while running in the kernel,
-> > potentially for the real value of TTBR0_EL1?
-> 
-> Yes, assuming that we end up following my current plan for how to
-> implement that.
+Hi Robin,
 
-Actually, after thinknig for more than a picosecond, no we can't.
 
-We need to be able to clbober it on EL1 -> EL1 exceptions, to catch
-kernel stack overflow.
+On 2016-09-12 18:14, Robin Murphy wrote:
+> With our DMA ops enabled for PCI devices, we should avoid allocating
+> IOVAs which a host bridge might misinterpret as peer-to-peer DMA and
+> lead to faults, corruption or other badness. To be safe, punch out holes
+> for all of the relevant host bridge's windows when initialising a DMA
+> domain for a PCI device.
+>
+> CC: Marek Szyprowski <m.szyprowski@samsung.com>
+> CC: Inki Dae <inki.dae@samsung.com>
+> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-So if anything, the two approaches are mutually exclusive, unless we
-restore the stashed TTBR0 value back into TPIDRRO_EL0 before returning
-from EL1 -> EL1.
+I don't know much about PCI and their IOMMU integration, but can't we use
+the direct mapping region feature of iommu core for it? There are already
+iommu_get_dm_regions(), iommu_put_dm_regions() and 
+iommu_request_dm_for_dev()
+functions for handling them...
 
-/me fetches some more coffee.
+> ---
+>
+> - Squash in the previous drm/exynos fixup
+> - If need be, this one can probably wait
+> ---
+>   arch/arm64/mm/dma-mapping.c               |  2 +-
+>   drivers/gpu/drm/exynos/exynos_drm_iommu.h |  2 +-
+>   drivers/iommu/dma-iommu.c                 | 25 ++++++++++++++++++++++++-
+>   include/linux/dma-iommu.h                 |  3 ++-
+>   4 files changed, 28 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index c4284c432ae8..610d8e53011e 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -827,7 +827,7 @@ static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
+>   	 * then the IOMMU core will have already configured a group for this
+>   	 * device, and allocated the default domain for that group.
+>   	 */
+> -	if (!domain || iommu_dma_init_domain(domain, dma_base, size)) {
+> +	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
+>   		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
+>   			dev_name(dev));
+>   		return false;
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_iommu.h b/drivers/gpu/drm/exynos/exynos_drm_iommu.h
+> index c8de4913fdbe..87f6b5672e11 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_iommu.h
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_iommu.h
+> @@ -66,7 +66,7 @@ static inline int __exynos_iommu_create_mapping(struct exynos_drm_private *priv,
+>   	if (ret)
+>   		goto free_domain;
+>   
+> -	ret = iommu_dma_init_domain(domain, start, size);
+> +	ret = iommu_dma_init_domain(domain, start, size, NULL);
+>   	if (ret)
+>   		goto put_cookie;
+>   
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index 4329d18080cf..c5ab8667e6f2 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -27,6 +27,7 @@
+>   #include <linux/iova.h>
+>   #include <linux/irq.h>
+>   #include <linux/mm.h>
+> +#include <linux/pci.h>
+>   #include <linux/scatterlist.h>
+>   #include <linux/vmalloc.h>
+>   
+> @@ -103,18 +104,38 @@ void iommu_put_dma_cookie(struct iommu_domain *domain)
+>   }
+>   EXPORT_SYMBOL(iommu_put_dma_cookie);
+>   
+> +static void iova_reserve_pci_windows(struct pci_dev *dev,
+> +		struct iova_domain *iovad)
+> +{
+> +	struct pci_host_bridge *bridge = pci_find_host_bridge(dev->bus);
+> +	struct resource_entry *window;
+> +	unsigned long lo, hi;
+> +
+> +	resource_list_for_each_entry(window, &bridge->windows) {
+> +		if (resource_type(window->res) != IORESOURCE_MEM &&
+> +		    resource_type(window->res) != IORESOURCE_IO)
+> +			continue;
+> +
+> +		lo = iova_pfn(iovad, window->res->start - window->offset);
+> +		hi = iova_pfn(iovad, window->res->end - window->offset);
+> +		reserve_iova(iovad, lo, hi);
+> +	}
+> +}
+> +
+>   /**
+>    * iommu_dma_init_domain - Initialise a DMA mapping domain
+>    * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
+>    * @base: IOVA at which the mappable address space starts
+>    * @size: Size of IOVA space
+> + * @dev: Device the domain is being initialised for
+>    *
+>    * @base and @size should be exact multiples of IOMMU page granularity to
+>    * avoid rounding surprises. If necessary, we reserve the page at address 0
+>    * to ensure it is an invalid IOVA. It is safe to reinitialise a domain, but
+>    * any change which could make prior IOVAs invalid will fail.
+>    */
+> -int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size)
+> +int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+> +		u64 size, struct device *dev)
+>   {
+>   	struct iova_domain *iovad = cookie_iovad(domain);
+>   	unsigned long order, base_pfn, end_pfn;
+> @@ -152,6 +173,8 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size
+>   		iovad->dma_32bit_pfn = end_pfn;
+>   	} else {
+>   		init_iova_domain(iovad, 1UL << order, base_pfn, end_pfn);
+> +		if (dev && dev_is_pci(dev))
+> +			iova_reserve_pci_windows(to_pci_dev(dev), iovad);
+>   	}
+>   	return 0;
+>   }
+> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+> index 5ee806e41b5c..32c589062bd9 100644
+> --- a/include/linux/dma-iommu.h
+> +++ b/include/linux/dma-iommu.h
+> @@ -30,7 +30,8 @@ int iommu_get_dma_cookie(struct iommu_domain *domain);
+>   void iommu_put_dma_cookie(struct iommu_domain *domain);
+>   
+>   /* Setup call for arch DMA mapping code */
+> -int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size);
+> +int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+> +		u64 size, struct device *dev);
+>   
+>   /* General helpers for DMA-API <-> IOMMU-API interaction */
+>   int dma_direction_to_prot(enum dma_data_direction dir, bool coherent);
 
-Thanks,
-Mark.
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
