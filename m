@@ -1,22 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 00:32:04 +0200
-Subject: [GIT PULL 2/4] soc/tegra: Changes for v4.9-rc1
-In-Reply-To: <20160909152032.9550-2-thierry.reding@gmail.com>
-References: <20160909152032.9550-1-thierry.reding@gmail.com>
- <20160909152032.9550-2-thierry.reding@gmail.com>
-Message-ID: <9462882.Qh35FHRZfK@wuerfel>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 14 Sep 2016 17:32:29 -0500
+Subject: [PATCH v9 01/10] arm64: pmu: add fallback probe table
+In-Reply-To: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
+References: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1473892358-22574-2-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 9, 2016 5:20:30 PM CEST Thierry Reding wrote:
-> soc/tegra: Changes for v4.9-rc1
-> 
-> This contains a single patch to fix an issue with setting the deep power
-> down mode of I/O rails.
-> 
+From: Mark Salter <msalter@redhat.com>
 
-Pulled into next/soc. Should this be backported to stable kernels?
+In preparation for ACPI support, add a pmu_probe_info table to
+the arm_pmu_device_probe() call. This table gets used when
+probing in the absence of a devicetree node for PMU.
 
-Thanks,
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/kernel/perf_event.c | 13 ++++++++++++-
+ drivers/perf/arm_pmu.c         |  2 +-
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
-	Arnd
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 838ccf1..3aac598 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -24,6 +24,7 @@
+ #include <asm/sysreg.h>
+ #include <asm/virt.h>
+ 
++#include <linux/acpi.h>
+ #include <linux/of.h>
+ #include <linux/perf/arm_pmu.h>
+ #include <linux/platform_device.h>
+@@ -1044,9 +1045,19 @@ static const struct of_device_id armv8_pmu_of_device_ids[] = {
+ 	{},
+ };
+ 
++static const struct pmu_probe_info armv8_pmu_probe_table[] = {
++	PMU_PROBE(0, 0, armv8_pmuv3_init), /* if all else fails... */
++	{ /* sentinel value */ }
++};
++
+ static int armv8_pmu_device_probe(struct platform_device *pdev)
+ {
+-	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids, NULL);
++	if (acpi_disabled)
++		return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
++					    NULL);
++
++	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
++				    armv8_pmu_probe_table);
+ }
+ 
+ static struct platform_driver armv8_pmu_driver = {
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index f5e1008..58117d7 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -1029,7 +1029,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 		ret = of_pmu_irq_cfg(pmu);
+ 		if (!ret)
+ 			ret = init_fn(pmu);
+-	} else {
++	} else if (probe_table) {
+ 		cpumask_setall(&pmu->supported_cpus);
+ 		ret = probe_current_pmu(pmu, probe_table);
+ 	}
+-- 
+2.5.5
