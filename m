@@ -1,22 +1,39 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 14 Sep 2016 09:09:26 +0100
-Subject: [PATCH v5 0/3] arm64: hibernate: Resume when hibernate image
- created on non-boot CPU
-In-Reply-To: <1915054.tgNoUpZ8kP@vostro.rjw.lan>
-References: <1471438227-8747-1-git-send-email-james.morse@arm.com>
- <1915054.tgNoUpZ8kP@vostro.rjw.lan>
-Message-ID: <57D905B6.3090504@arm.com>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Wed, 14 Sep 2016 10:23:32 +0200
+Subject: [PATCH v3 3/6] ARM: dts: bcm283x: add pinctrl group to &pwm,
+ drop pins from &gpio
+In-Reply-To: <1473841415-937-1-git-send-email-kraxel@redhat.com>
+References: <1473841415-937-1-git-send-email-kraxel@redhat.com>
+Message-ID: <1473841415-937-4-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+---
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-On 14/09/16 02:07, Rafael J. Wysocki wrote:
-> What's the status of this?
-
-Will has queued it in his for-next/core branch.
-
-
-Thanks,
-
-James
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 88bcd0c..ff62236 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -38,7 +38,7 @@
+ 	};
+ 
+ 	alt0: alt0 {
+-		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11 40 45>;
++		brcm,pins = <0 1 2 3 4 5 7 8 9 10 11>;
+ 		brcm,function = <BCM2835_FSEL_ALT0>;
+ 	};
+ 
+@@ -68,6 +68,8 @@
+ };
+ 
+ &pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
+ 	status = "okay";
+ };
+ 
+-- 
+1.8.3.1
