@@ -1,144 +1,53 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 14 Sep 2016 08:38:04 -0600
-Subject: [RESEND][PATCH V7 0/5] perf: Driver specific configuration for PMU
-In-Reply-To: <20160913200614.GB10582@kernel.org>
-References: <1473179837-3293-1-git-send-email-mathieu.poirier@linaro.org>
- <20160913200614.GB10582@kernel.org>
-Message-ID: <CANLsYkyqJvNUfJb4bMbUeNsSU+q+yK5W+RK+770TeUKuqQ2qOg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 14 Sep 2016 16:38:25 +0200
+Subject: [PATCH 4/4] ARM: orion5x: remove extraneous NO_IRQ
+In-Reply-To: <20160906140623.2853066-4-arnd@arndb.de> (Arnd Bergmann's message
+ of "Tue, 6 Sep 2016 16:06:23 +0200")
+References: <20160906140623.2853066-1-arnd@arndb.de>
+ <20160906140623.2853066-4-arnd@arndb.de>
+Message-ID: <87fup2bl7i.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2016 at 14:06, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
-> Em Tue, Sep 06, 2016 at 10:37:12AM -0600, Mathieu Poirier escreveu:
->> Original blurb:
->> ---------------
+Hi Arnd,
+ 
+ On mar., sept. 06 2016, Arnd Bergmann <arnd@arndb.de> wrote:
+
+> rd88f6183ap-ge passes NO_IRQ as the interrupt line for its m25p80
+> NOR flash. However, this device never uses an interrupt and the
+> driver doesn't care, so we can simply remove the deprecated constant
+> here.
 >
-> So, I managed to apply "perf tools: add infrastructure for PMU specific
-> configuration", the first, as we discussed, needs splitting, some don't
-> apply due to the first not being applied, and one fails 'perf test
-> python', which I'll look at tomorrow.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I have a patchset where the first patch was split ready to go.  My
-plan was to wait for your comments but I can send it out right away if
-it makes it easier for you.  You can then make comments on that
-version if you need to - whichever makes your life easier.
-
-What's this "perf test python" thing you're referring to?  With a
-little more information I can dig into it.
+Applied on mvebu/soc with Reviewed-by tag from Andrew Lunn
 
 Thanks,
-Mathieu
 
+Gregory
 
+> ---
+>  arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c | 1 -
+>  1 file changed, 1 deletion(-)
 >
-> - Arnaldo
+> diff --git a/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c b/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
+> index 4bf80dd5478c..8ffaead76771 100644
+> --- a/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
+> +++ b/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
+> @@ -71,7 +71,6 @@ static struct spi_board_info __initdata rd88f6183ap_ge_spi_slave_info[] = {
+>  	{
+>  		.modalias	= "m25p80",
+>  		.platform_data	= &rd88f6183ap_ge_spi_slave_data,
+> -		.irq		= NO_IRQ,
+>  		.max_speed_hz	= 20000000,
+>  		.bus_num	= 0,
+>  		.chip_select	= 0,
+> -- 
+> 2.9.0
 >
->> This patchset adds the possiblity of specifying PMU driver configuration
->> directly from the perf command line.  Anything that falls within the
->> event specifiers '/.../' and that is preceded by the '@' symbol is
->> treated as a configurable.  Two formats are supported, @cfg and
->> @cfg=config.
->>
->> For example:
->>
->> perf record -e some_event/@cfg1/ ...
->>
->> or
->>
->> perf record -e some_event/@cfg2=config/ ...
->>
->> or
->>
->> perf record -e some_event/@cfg1, at cfg2=config/ ...
->>
->> The above are all valid configuration and will see the strings 'cfg1'
->> and 'cfg2=config' sent to the PMU driver for parsing and interpretation
->> using the existing ioctl() mechanism.
->>
->> The primary customers for this feature are the CoreSight drivers where
->> the selection of a sink (where trace data is accumulated) needs to be
->> done in a previous, and separated step, from the launching of the perf
->> command.
->>
->> As such something that used to be a two-step process:
->>
->> # echo 1 > /sys/bus/coresight/devices/20070000.etr/enable_sink
->> # perf record -e cs_etm//u --per-thread  uname
->>
->> is integrated in a single command:
->>
->> # perf record -e cs_etm/@20070000.etr/u --per-thread  uname
->>
->> Thanks,
->> Mathieu
->>
->> Changes for V7:
->> - Got rid of a miscellaneous debug message.
->> - Rebased to v4.8-rc4
->> - Added Jiri Olsa's Acked-by.
->>
->> Changes for V6:
->> - Using sysFS rather than an ioctl() to communicate command line
->>   parameters to the CoreSight PMU.
->>
->> Changes for V5:
->> - Made commit log in 5/9 more descriptive.
->> - Addressed missing return code in builtin-top.c.
->> - Overhauled the kernel portion to do parsing in the core.
->>
->> Changes for V4:
->> - Pushing PMU driver configuration for 'perf top'.
->> - Rebased to the latest perf/core branch[1].
->>
->> Changes for V3:
->> - Added comment for function drv_str() that explains the reason for
->>   keeping the entire token intact.
->> - Added driver config terms to the existing list of config terms.
->> - Added documenation for driver specific configuration.
->> - Pushing PMU driver configuration for 'perf stat' as well.
->> - Preventing users from selecting a sink from sysFS _and_ perf.
->>
->> Changes for V2:
->> - Rebased to [1] as per Jiri's request.
->>
->>
->> Mathieu Poirier (5):
->>   perf tools: making coresight PMU listable
->>   perf tools: adding coresight etm PMU record capabilities
->>   perf tools: add infrastructure for PMU specific configuration
->>   perf tools: Pushing configuration down to PMU driver
->>   perf tools: adding sink configuration for cs_etm PMU
->>
->>  MAINTAINERS                              |   5 +
->>  tools/perf/Documentation/perf-record.txt |  12 +
->>  tools/perf/Makefile.config               |  11 +-
->>  tools/perf/arch/arm/util/Build           |   2 +
->>  tools/perf/arch/arm/util/auxtrace.c      |  54 +++
->>  tools/perf/arch/arm/util/cs-etm.c        | 615 +++++++++++++++++++++++++++++++
->>  tools/perf/arch/arm/util/cs-etm.h        |  26 ++
->>  tools/perf/arch/arm/util/pmu.c           |  37 ++
->>  tools/perf/arch/arm64/util/Build         |   4 +
->>  tools/perf/builtin-record.c              |   9 +
->>  tools/perf/builtin-stat.c                |   8 +
->>  tools/perf/builtin-top.c                 |  12 +
->>  tools/perf/util/auxtrace.c               |   1 +
->>  tools/perf/util/auxtrace.h               |   1 +
->>  tools/perf/util/cs-etm.h                 |  74 ++++
->>  tools/perf/util/evlist.c                 |  18 +
->>  tools/perf/util/evlist.h                 |   3 +
->>  tools/perf/util/evsel.c                  |  40 ++
->>  tools/perf/util/evsel.h                  |   4 +
->>  tools/perf/util/parse-events.c           |   7 +-
->>  tools/perf/util/parse-events.h           |   1 +
->>  tools/perf/util/parse-events.l           |  22 ++
->>  tools/perf/util/parse-events.y           |  11 +
->>  tools/perf/util/pmu.h                    |   2 +
->>  24 files changed, 974 insertions(+), 5 deletions(-)
->>  create mode 100644 tools/perf/arch/arm/util/auxtrace.c
->>  create mode 100644 tools/perf/arch/arm/util/cs-etm.c
->>  create mode 100644 tools/perf/arch/arm/util/cs-etm.h
->>  create mode 100644 tools/perf/arch/arm/util/pmu.c
->>  create mode 100644 tools/perf/util/cs-etm.h
->>
->> --
->> 2.7.4
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
