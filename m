@@ -1,62 +1,117 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 14 Sep 2016 11:36:38 -0700
-Subject: [PATCH v2 1/6] usb: dwc2: add support for Meson8b and GXBB SoCs
-In-Reply-To: <40e49082-3635-5b99-863b-f51f97258864@synopsys.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160911134111.31141-1-martin.blumenstingl@googlemail.com>
- <20160911134111.31141-2-martin.blumenstingl@googlemail.com>
- <m24m5ixxyu.fsf@baylibre.com>
- <0d587b46-4c6e-c2ec-a62e-5d0c5a5bd902@synopsys.com>
- <CAOi56cW+zJ8_Gf6xKMyKNk7YB1+MpWHrtmv=+Xxs0PZy9rAXqQ@mail.gmail.com>
- <40e49082-3635-5b99-863b-f51f97258864@synopsys.com>
-Message-ID: <CAOi56cWOwRJWJMhKDmnY0KdaOBMM3Cz2ZS2gTzGd-Hi1wig3jg@mail.gmail.com>
+Date: Wed, 14 Sep 2016 12:02:40 -0700
+Subject: [GIT PULL] Amlogic driver updates for v4.9, 2nd round
+Message-ID: <7hoa3ql2y7.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 11:26 AM, John Youn <John.Youn@synopsys.com> wrote:
-> On 9/14/2016 11:17 AM, Kevin Hilman wrote:
->> On Wed, Sep 14, 2016 at 11:12 AM, John Youn <John.Youn@synopsys.com> wrote:
->>> On 9/14/2016 9:11 AM, Kevin Hilman wrote:
->>>> Hi John,
->>>>
->>>> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
->>>>
->>>>> From: Jerome Brunet <jbrunet@baylibre.com>
->>>>>
->>>>> Add compatible strings for amlogic Meson8b and GXBB SoCs with the
->>>>> corresponding configuration parameters.
->>>>>
->>>>> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
->>>>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>>>
->>>> Are you OK with adding this platform for v4.9?  I know you mentioned
->>>> you're working on new bindings to replace the current way, but since
->>>> that hasn't been posted AFAICT, it would be nice to get this merged now
->>>> and we can help test the new bindings when you're ready.
->>>>
->>>> If you're OK with that, and with your Ack, I can take merge the driver
->>>> changes through the arm-soc tree along with the rest of the DT patches.
->>>>
->>>
->>> Sure. Unfortunately, I wasn't able to complete it for 4.9.
->>>
->>> You can add my acked-by on this:
->>>
->>> Acked-by: John Youn <johnyoun@synopsys.com>
->>
->> Great, thanks!  I assume you're OK with PATCH 2/2 for the bindings as
->> well (at least for now until you rework them?)
->>
->> Kevin
->>
->
-> Do you mean PATCH 2/6 from this series?
+Hi Arnd, Olof,
 
-Yes.
+Below is the 2nd round of driver updates for Amlogic SoCs.  All patches
+have acks from appropriate maintainers.
 
-> It doesn't seem to add or remove any bindings in dwc2 so I'm fine with
-> it.
+There is a dependency on the immutable clk-meson-gxbb branch of the
+clock tree, which is merged into this branch.  The reason is that clock
+maintainers wanted me to start taking the simple patcches that just
+expose clock IDs for use by DT files.
 
-Thanks.
+Due to the dependency, I recommend adding this to next/late so it will
+go upstream after the clock dependencies.
+
+I'll also have a round of dt64 changes coming shortly that depend on
+this branch (due to the clock IDs.)
 
 Kevin
+
+
+The following changes since commit ad855eae6caf0d1dd17bce5bcd8e07759adc9903:
+
+  nvmem: amlogic: Add Amlogic Meson EFUSE driver (2016-09-01 14:24:21 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-drivers-2
+
+for you to fetch changes up to dfdd7d4af6ebee027be7bf2636b2314937948da6:
+
+  clk: gxbb: expose i2c clocks (2016-09-14 11:24:04 -0700)
+
+----------------------------------------------------------------
+Amlogic driver updates for v4.9, 2nd round
+- media: update IR support for newer SoCs
+- firmware: add secure monitor driver
+- net: new stmmac glue driver
+- usb: udd DWC2 support for meson-gxbb
+- clocks: expose more clock IDs for use by DT
+- DT binding updates
+
+----------------------------------------------------------------
+Alexander M?ller (6):
+      clk: meson: Rename meson8b-clkc.c to reflect gxbb naming convention
+      meson: clk: Move register definitions to meson8b.h
+      meson: clk: Rename register names according to Amlogic datasheet
+      clk: meson: Copy meson8b CLKID defines to private header file
+      gxbb: clk: Adjust MESON_GATE macro to be shared with meson8b
+      meson: clk: Add support for clock gates
+
+Jerome Brunet (3):
+      usb: dwc2: add support for Meson8b and GXBB SoCs
+      clk: gxbb: expose spifc clock
+      clk: gxbb: expose i2c clocks
+
+Joachim Eastwood (1):
+      stmmac: introduce get_stmmac_bsp_priv() helper
+
+Kevin Hilman (2):
+      clk: gxbb: add MMC gate clocks, and expose for DT
+      Merge branch 'clk-meson-gxbb' of git://git.kernel.org/.../clk/linux into v4.8/drivers
+
+Martin Blumenstingl (6):
+      net: dt-bindings: Document the new Meson8b and GXBB DWMAC bindings
+      net: stmmac: add a glue driver for the Amlogic Meson 8b / GXBB DWMAC
+      net: stmmac: update the module description of the dwmac-meson driver
+      Documentation: dt-bindings: Add documentation for the Meson USB2 PHYs
+      clk: gxbb: expose MPLL2 clock for use by DT
+      clk: gxbb: expose USB clocks
+
+Michael Turquette (1):
+      Merge remote-tracking branch 'clk/clk-meson-gxbb-ao' into clk-meson-gxbb
+
+Neil Armstrong (3):
+      dt-bindings: clock: reset: Add GXBB AO Clock and Reset Bindings
+      clk: meson: Add GXBB AO Clock and Reset controller driver
+      clk: meson-gxbb: Export PWM related clocks for DT
+
+Wei Yongjun (1):
+      clk: meson: Fix invalid use of sizeof in gxbb_aoclkc_probe()
+
+ Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt |  45 ++++++++++++
+ Documentation/devicetree/bindings/net/meson-dwmac.txt           |  45 +++++++++---
+ Documentation/devicetree/bindings/phy/meson-usb2-phy.txt        |  27 ++++++++
+ Documentation/devicetree/bindings/usb/dwc2.txt                  |   2 +
+ drivers/clk/meson/Makefile                                      |   4 +-
+ drivers/clk/meson/clkc.h                                        |   2 +-
+ drivers/clk/meson/gxbb-aoclk.c                                  | 191 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/meson/gxbb.c                                        | 171 +++++++++++++++++++++++----------------------
+ drivers/clk/meson/gxbb.h                                        |  31 +++++----
+ drivers/clk/meson/{meson8b-clkc.c => meson8b.c}                 | 293 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------
+ drivers/clk/meson/meson8b.h                                     | 151 ++++++++++++++++++++++++++++++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/Kconfig                     |   6 +-
+ drivers/net/ethernet/stmicro/stmmac/Makefile                    |   2 +-
+ drivers/net/ethernet/stmicro/stmmac/dwmac-meson.c               |   4 +-
+ drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c             | 324 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h           |   8 +++
+ drivers/usb/dwc2/platform.c                                     |  34 +++++++++
+ include/dt-bindings/clock/gxbb-aoclkc.h                         |  66 ++++++++++++++++++
+ include/dt-bindings/clock/gxbb-clkc.h                           |  16 +++++
+ include/dt-bindings/clock/meson8b-clkc.h                        |   2 -
+ include/dt-bindings/reset/gxbb-aoclkc.h                         |  66 ++++++++++++++++++
+ 21 files changed, 1346 insertions(+), 144 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
+ create mode 100644 drivers/clk/meson/gxbb-aoclk.c
+ rename drivers/clk/meson/{meson8b-clkc.c => meson8b.c} (51%)
+ create mode 100644 drivers/clk/meson/meson8b.h
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
+ create mode 100644 include/dt-bindings/clock/gxbb-aoclkc.h
+ create mode 100644 include/dt-bindings/reset/gxbb-aoclkc.h
