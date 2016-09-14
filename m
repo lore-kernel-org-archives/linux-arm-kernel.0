@@ -1,47 +1,57 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 14 Sep 2016 03:00:55 +0200
-Subject: [PATCH V2] cpufreq: create link to policy only for registered CPUs
-In-Reply-To: <59daae7da84077fbf845b1aad2962933585f8e35.1473662181.git.viresh.kumar@linaro.org>
-References: <20160819110032.GM1041@n2100.armlinux.org.uk>
- <59daae7da84077fbf845b1aad2962933585f8e35.1473662181.git.viresh.kumar@linaro.org>
-Message-ID: <1733771.eFmsFmZ21e@vostro.rjw.lan>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 13 Sep 2016 17:59:11 -0700
+Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
+In-Reply-To: <CAFBinCC+izGS72TZuiiBu=DjtSmoZXRZ6r76M6rC8W7UTpSD6g@mail.gmail.com>
+ (Martin Blumenstingl's message of "Tue, 13 Sep 2016 20:38:06 +0200")
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
+ <m260q6jibf.fsf@baylibre.com>
+ <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
+ <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
+ <m2eg4ui0nl.fsf@baylibre.com>
+ <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
+ <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
+ <m2sht9gkau.fsf@baylibre.com>
+ <CAFBinCDohOoFP_3GC+=tt6S7sPS308ao-yf+oGhdfwo-N-JnAA@mail.gmail.com>
+ <1473780508.10237.22.camel@pengutronix.de>
+ <CAFBinCC+izGS72TZuiiBu=DjtSmoZXRZ6r76M6rC8W7UTpSD6g@mail.gmail.com>
+Message-ID: <7hzinbmh40.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 12, 2016 12:07:05 PM Viresh Kumar wrote:
-> If a cpufreq driver is registered very early in the boot stage (e.g.
-> registered from postcore_initcall()), then cpufreq core may generate
-> kernel warnings for it.
-> 
-> In this case, the CPUs are brought online, then the cpufreq driver is
-> registered, and then the CPU topology devices are registered. However,
-> by the time cpufreq_add_dev() gets called, the cpu device isn't stored
-> in the per-cpu variable (cpu_sys_devices,) which is read by
-> get_cpu_device().
-> 
-> So the cpufreq core fails to get device for the CPU, for which
-> cpufreq_add_dev() was called in the first place and we will hit a
-> WARN_ON(!cpu_dev).
-> 
-> Even if we reuse the 'dev' parameter passed to cpufreq_add_dev() to
-> avoid that warning, there might be other CPUs online that share the
-> policy with the cpu for which cpufreq_add_dev() is called. Eventually
-> get_cpu_device() will return NULL for them as well, and we will hit the
-> same WARN_ON() again.
-> 
-> In order to fix these issues, change cpufreq core to create links to the
-> policy for a cpu only when cpufreq_add_dev() is called for that CPU.
-> 
-> Reuse the 'real_cpus' mask to track that as well.
-> 
-> Note that cpufreq_remove_dev() already handles removal of the links for
-> individual CPUs and cpufreq_add_dev() has aligned with that now.
-> 
-> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Applied.
+> On Tue, Sep 13, 2016 at 5:28 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
 
-Thanks,
-Rafael
+[...]
+
+>>> I added Philipp and Hans to this thread - maybe they can comment on this.
+>>> To sum it up, our problem is:
+>>> - there are two separate USB PHYs on Meson GXBB
+>>> - both are sharing the same reset line (provided by the reset-meson driver)
+>>> - during initialization of the PHYs we must only call
+>>> reset_control_reset(rstc) once (if we do it for the first *and* second
+>>> PHY then the first PHY gets confused once the second PHY uses the
+>>> reset because the first PHY's state is reset as well)
+>>
+>> If you have an initially asserted reset line and you can enable the
+>> first module by deasserting the reset via reset_control_deassert (and
+>> reset_control_assert to signal when the module may be disabled again
+>> after use), shared resets are for you.
+>>
+>> If you need a reset pulse or have no direct control over the reset line,
+>> (device_reset), the reset framework currently has no solution for this.
+>> The ugly thing about reset_control_once would be that it can't re-reset
+>> modules when unloading and reloading driver modules.
+>
+> The corresponding reset driver in question is reset-meson, which only
+> implements reset (assert/deassert are not implemented). However, I
+> don't know if this is due to hardware design.
+> I think the hardware implements the latter, but maybe Neil can give
+> more information here (I currently don't have access to my board so I
+> cannot test how the hardware actually behaves).
+
+It's implemented that way because the hardware only supports a reset
+pulse.
+
+Kevin
