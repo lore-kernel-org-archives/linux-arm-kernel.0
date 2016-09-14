@@ -1,53 +1,118 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 14 Sep 2016 16:38:25 +0200
-Subject: [PATCH 4/4] ARM: orion5x: remove extraneous NO_IRQ
-In-Reply-To: <20160906140623.2853066-4-arnd@arndb.de> (Arnd Bergmann's message
- of "Tue, 6 Sep 2016 16:06:23 +0200")
-References: <20160906140623.2853066-1-arnd@arndb.de>
- <20160906140623.2853066-4-arnd@arndb.de>
-Message-ID: <87fup2bl7i.fsf@free-electrons.com>
+From: yuanzhichang@hisilicon.com (zhichang.yuan)
+Date: Wed, 14 Sep 2016 22:50:44 +0800
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <5140357.dcW9ibtZJ6@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1473855354-150093-3-git-send-email-yuanzhichang@hisilicon.com>
+ <5140357.dcW9ibtZJ6@wuerfel>
+Message-ID: <57D963C4.4010406@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On mar., sept. 06 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> rd88f6183ap-ge passes NO_IRQ as the interrupt line for its m25p80
-> NOR flash. However, this device never uses an interrupt and the
-> driver doesn't care, so we can simply remove the deprecated constant
-> here.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Applied on mvebu/soc with Reviewed-by tag from Andrew Lunn
+On 2016/9/14 20:33, Arnd Bergmann wrote:
+> On Wednesday, September 14, 2016 8:15:52 PM CEST Zhichang Yuan wrote:
+> 
+>> +Required properties:
+>> +- compatible: should be "hisilicon,low-pin-count"
+>> +- #address-cells: must be 2 which stick to the ISA/EISA binding doc.
+>> +- #size-cells: must be 1 which stick to the ISA/EISA binding doc.
+>> +- reg: base address and length of the register set for the device.
+>> +- ranges: define a 1:1 mapping between the I/O space of the child device and
+>> +	  the parent.
+> 
+> Do we still need the "ranges" here? The property in your example seems
+> wrong.
 
-Thanks,
+I think "ranges" is needed.
+without this, of_translate_address --> __of_translate_address --> of_translate_one will fail when translating the child's IO resource.
 
-Gregory
+> 
+>> +	ranges = <0x01 0xe4 0x0 0xe4 0x1000>;
+> 
+> You translate I/O port 0x00e4 through 0x10e4 to CPU address 0x0e4?
+The hip06 LPC is defined as isa type.
+So, 0x01 0xe4 is the local IO address of 0xe4. With this ranges, 0xe4 of child will be 1:1 mapped as 0xe4.
+It means no translation.
 
-> ---
->  arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c b/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
-> index 4bf80dd5478c..8ffaead76771 100644
-> --- a/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
-> +++ b/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
-> @@ -71,7 +71,6 @@ static struct spi_board_info __initdata rd88f6183ap_ge_spi_slave_info[] = {
->  	{
->  		.modalias	= "m25p80",
->  		.platform_data	= &rd88f6183ap_ge_spi_slave_data,
-> -		.irq		= NO_IRQ,
->  		.max_speed_hz	= 20000000,
->  		.bus_num	= 0,
->  		.chip_select	= 0,
-> -- 
-> 2.9.0
->
+> 
+>> +/**
+>> + * hisilpc_children_map_sysio - setup the mapping between system Io and
+>> + *			physical IO
+>> + *
+>> + * @child: the device whose IO is handling
+>> + * @data: some device specific data. For ACPI device, should be NULL.
+>> + *
+>> + * Returns >=0 means the mapping is successfully created;
+>> + * others mean some failures.
+>> + */
+>> +static int hisilpc_children_map_sysio(struct device * child, void * data)
+>> +{
+>> +	struct resource *iores;
+>> +	unsigned long cpuio;
+>> +	struct extio_ops *opsnode;
+>> +	int ret;
+>> +	struct hisilpc_dev *lpcdev;
+>> +
+>> +	if (!child || !child->parent)
+>> +		return -EINVAL;
+>> +
+>> +	iores = platform_get_resource_byname(to_platform_device(child),
+>> +					IORESOURCE_IO, "dev_io");
+>> +	if (!iores)
+>> +		return -ENODEV;
+>> +
+>> +	/*
+>> +	 * can not use devm_kzalloc to allocate slab for child before its driver
+>> +	 * start probing. Here allocate the slab with the name of parent.
+>> +	 */
+>> +	opsnode = devm_kzalloc(child->parent, sizeof(*opsnode), GFP_KERNEL);
+>> +	if (!opsnode)
+>> +		return -ENOMEM;
+>> +
+>> +	cpuio = data ? *((unsigned long *)data) : 0;
+>> +
+>> +	opsnode->start = iores->start;
+>> +	opsnode->end = iores->end;
+>> +	opsnode->ptoffset = cpuio ? (cpuio - iores->start) : 0;
+>> +
+>> +	dev_info(child, "map sys port[%lx - %lx] offset=0x%lx",
+>> +				(unsigned long)iores->start,
+>> +				(unsigned long)iores->end,
+>> +				opsnode->ptoffset);
+>> +
+>> +	opsnode->pfin = hisilpc_comm_inb;
+>> +	opsnode->pfout = hisilpc_comm_outb;
+>> +
+>> +	lpcdev = platform_get_drvdata(to_platform_device(child->parent));
+>> +	opsnode->devpara = lpcdev;
+>> +
+>> +	/* only apply indirect-IO to ipmi child device */
+> 
+> I don't get this part. The bus driver should not care what its
+> children are, just register and PIO ranges that the bus can handle
+> in theory, i.e. from 0x000 to 0xfff.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Just as we discussed in V2, the legacy PIO range is specific to some device, such as for ipmi bt, 0xe4 - 0xe7 will be populated.
+I don't want to occupy a larger PIO range in which only small part PIOs are used by our LPC. At this moment, two PIO ranges are using
+through the device property configuration, 0xe4-0xe7, 0x2f8-0x2ff.
+If we configure 0-0x1000 for the LPC to cover those two ranges, most PIO are wasted and other PIO device on other buses lose the chance to use the PIO below 0x1000.
+Otherwise, PIO conflict will happen. So, My idea is only occupied the PIO ranges which are really needed for the children.
+
+And there are probably multiple child devices under LPC, the global arm64_extio_ops only can cover one PIO range. It is fortunate only ipmi driver can not support I/O
+operation registering, serial driver has serial_in/serial_out to be registered. So, only the PIO range for ipmi device is stored in arm64_extio_ops and the indirect-IO
+works well for ipmi device.
+
+If we think it is nearly no chance that LPC PIO range conflict with other buses, we can allocate 0xe4 - 0x2ff to LPC and store it to arm64_extio_ops. In this case,
+the special processing for ipmi device is not needed.
+
+Best,
+Zhichang
+
+> 
+> 	Arnd
+> 
+> 
+> .
+> 
