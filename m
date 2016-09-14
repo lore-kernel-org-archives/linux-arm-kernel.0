@@ -1,27 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 00:04:21 +0200
-Subject: [PATCH] arm64: defconfig: enable HW random as module
-In-Reply-To: <20160903001301.32289-1-khilman@baylibre.com>
-References: <20160903001301.32289-1-khilman@baylibre.com>
-Message-ID: <5985387.ppWVMBzPQU@wuerfel>
+Date: Thu, 15 Sep 2016 00:05:25 +0200
+Subject: [GIT PULL] Qualcomm ARM64 Defconfig Updates for v4.9
+In-Reply-To: <1472875060-17967-1-git-send-email-andy.gross@linaro.org>
+References: <1472875060-17967-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <10448021.BWm4Z2Q7Dg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 5:13:00 PM CEST Kevin Hilman wrote:
-> drivers/char/hw_random/Kconfig has 'default m', so
-> simply removing this entry from the defconfig will
-> enable building HW random drivers as modules.
+On Friday, September 2, 2016 10:57:40 PM CEST Andy Gross wrote:
+> Qualcomm ARM64 Based defconfig Updates for v4.9
 > 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
+> * Enable defconfig options for QDF2432
+> 
 
-Applied four patches to next/arm64:
-
-699189c arm64: defconfig: enable meson I2C
-5a9a9cf arm64: defconfig: enable meson SPI as module
-19b9869 arm64: defconfig: enable meson WDT as modules
-5012a09 arm64: defconfig: enable HW random as module
-
-Thanks,
+Pulled into next/arm64, thanks!
 
 	Arnd
