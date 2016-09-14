@@ -1,88 +1,256 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 14 Sep 2016 10:56:56 +0800
-Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
-In-Reply-To: <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
-References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
- <20160907145400.27192-4-maxime.ripard@free-electrons.com>
- <CACRpkdZsxA7avmO85R=-Quu7FQwSVMPhQMDmmgL+xbkVTB-2HQ@mail.gmail.com>
- <CAGb2v64h7kq2jWzUJ74vDdOOQOXPxjx3ruSsJMXvyr7fP63BGg@mail.gmail.com>
- <20160908073748.GF8913@lukather>
- <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
-Message-ID: <CAGb2v66YUOcHXkE521zXNOmqCJ60oJ7+LQA=LS371ZPdEXdrqg@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 14 Sep 2016 11:32:00 +0800
+Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
+In-Reply-To: <20160914014246.31847-1-stephen.boyd@linaro.org>
+References: <20160914014246.31847-1-stephen.boyd@linaro.org>
+Message-ID: <20160914033200.GE30760@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Sep 13, 2016 at 06:42:46PM -0700, Stephen Boyd wrote:
+> On the db410c 96boards platform we have a TC7USB40MU[1] on the
+> board to mux the D+/D- lines from the SoC between a micro usb
+> "device" port and a USB hub for "host" roles. Upon a role switch,
+> we need to change this mux to forward the D+/D- lines to either
+> the port or the hub. Therefore, introduce a driver for this
+> device that intercepts extcon USB_HOST events and logically
+> asserts a gpio to mux the "host" D+/D- lines when a host cable is
+> attached. When the cable goes away, it will logically deassert
+> the gpio and mux the "device" lines.
 
-On Mon, Sep 12, 2016 at 8:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Sep 8, 2016 at 9:37 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> On Thu, Sep 08, 2016 at 12:46:14PM +0800, Chen-Yu Tsai wrote:
->
->>> Also, I think we are needlessly using pin groups, 1 pin per group.
->>> Can pinconf/pinctrl work without them? Would there be any harm
->>> converting the sunxi driver to work directly with pins? This would
->>> make it match generic pinconf parsing, and make it easier to get
->>> both working together.
->>
->> I think it comes from a requirement that you had to have groups at
->> some point (I don't know if it's still the case), which is why we
->> ended up with single-pin groups, because we can mux each pins entirely
->> separately.
->>
->> If it's not required anymore, then yes, it makes total sense to remove
->> it.
->
-> The groups vs individual pins is an eternal debate that has
-> been going on since the inception of pinctrl.
->
-> If you see it from the point of the programmer, you may just see
-> a register for each pin and they seem all independent. This is
-> why pinctrl-single exist, and that driver is for this purpose: one
-> register per pin, software-wise independent.
->
-> HOWEVER it often turns out that while you can programmatically
-> and individually set pins to any function (and biasing etc), the
-> person designing the hardware was not thinking that you should
-> be able to do whatever you like, e.g. even if it is possible to
-> take two pins and use one of them for half an SPI bus and the
-> other for half an I2C bus, that doesn't mean that this is useful
-> or makes any kind of electronic sense, it just makes "software
-> sense".
->
-> So for a deeper understanding, several SoCs (amongst them
-> my own and Qualcomm etc) define groups that are not really
-> about software restrictions for what you can do with the pins, but
-> about usecase and electronic restrictions for what can be done
-> with the pins.
->
-> E.g. it makes *sense* to have a group for muxing I2C on two
-> pins, and not allow one of them to be muxed to I2C and the other
-> not, because it does not make electronic sense.
->
-> One-group-per-pin groups is usually coming from a failure or
-> inability to identify these electronically sound and usecase
-> oriented pingroups.
->
-> Some (like pinctrl-single) say they don't care, and wish to
-> see things as the world is just software and one register per
-> pin, removing those electric usecase restrictions, and only
-> keeping the muxing restrictions to e.g. the four different functions
-> that can be muxed on that pin, disregarding the bigger picture.
->
-> I don't know about this driver or the pins it manages,
-> I seldom have time or brains to dive in and review things
-> deeply enough :(
+Would you please draw the design? It can also help me review your
+chipidea patch well.
 
-Thanks for the explanation. I suppose sunxi falls into the "don't
-care" group. We mainly enforce proper use cases through the DT
-pinmux settings. Of course this doesn't prevent the user from
-using weird settings out of tree, but then again what's preventing
-them from hacking the kernel anyway.
+1. How many ports on the board?
+2. How the lines are connected on the board?
 
-Back to my original question: is it possible to drop the pin group
-support completely? Looking at struct pinctrl_ops the answer seems
-to be no.
+Peter
+> 
+> [1] https://toshiba.semicon-storage.com/ap-en/product/logic/bus-switch/detail.TC7USB40MU.html
+> 
+> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+> 
+> Should I make the extcon part optional? I could see a case where there are two
+> "OTG" ports connected to the mux (or two hubs), and for some reason the
+> software may want to mux between them at runtime. If we mandate an extcon,
+> that won't be possible to support. Perhaps it would be better to have
+> the node, but connect it to the usb controller with a phandle (maybe of_graph
+> endpoints would be useful too) so that when the controller wants to mux over
+> a port it can do so.
+> 
+> Muxing the ports this way based on ID cable is pretty much a software
+> design decision. We could mux the ports during the role switch, and the
+> role switch can be entirely userspace driven with the chipidea controller
+> that I'm using (see the role switching support in the "role" file for
+> debugfs support in that driver). So extcon cables don't come into the picture
+> in that scenario.
+> 
+>  .../devicetree/bindings/usb/toshiba,tc7usb40mu.txt |  34 +++++++
+>  drivers/usb/misc/Kconfig                           |   9 ++
+>  drivers/usb/misc/Makefile                          |   1 +
+>  drivers/usb/misc/tc7usb40mu.c                      | 107 +++++++++++++++++++++
+>  4 files changed, 151 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/toshiba,tc7usb40mu.txt
+>  create mode 100644 drivers/usb/misc/tc7usb40mu.c
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/toshiba,tc7usb40mu.txt b/Documentation/devicetree/bindings/usb/toshiba,tc7usb40mu.txt
+> new file mode 100644
+> index 000000000000..18e6607408fa
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/toshiba,tc7usb40mu.txt
+> @@ -0,0 +1,34 @@
+> +Toshiba TC7USB40MU
+> +
+> +This device muxes USB D+/D- lines between two outputs called 1D+/1D- and 2D+/2D-.
+> +When the switch pin is asserted, we mux out 2D+/2D-, and when it's deasserted we
+> +select 1D+/1D-.
+> +
+> +This can be used to mux USB D+/D- lines between a USB hub and an OTG port.
+> +
+> +PROPERTIES
+> +
+> +- compatible:
+> +    Usage: required
+> +    Value type: <string>
+> +    Definition: Should contain "toshiba,tc7usb40mu"
+> +
+> +- switch-gpios:
+> +    Usage: required
+> +    Value type: <prop-encoded-array>
+> +    Definition: Should contain the gpio used to toggle the switch. Logically
+> +                asserting the gpio will cause the device to mux the "host"
+> +                D+/D- lines instead of the "device" lines.
+> +
+> +- extcon:
+> +    Usage: required
+> +    Value type: <prop-encoded-array>
+> +    Definition: Should contain the extcon device for USB_HOST cable events
+> +
+> +Example:
+> +
+> +	usb-switch {
+> +		compatible = "toshiba,tc7usb40mu";
+> +		switch-gpios = <&gpio 10 GPIO_ACTIVE_HIGH>;
+> +		extcon = <&usb_id>;
+> +	};
+> diff --git a/drivers/usb/misc/Kconfig b/drivers/usb/misc/Kconfig
+> index 47b357760afc..3da568c751d2 100644
+> --- a/drivers/usb/misc/Kconfig
+> +++ b/drivers/usb/misc/Kconfig
+> @@ -46,6 +46,15 @@ config USB_SEVSEG
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called usbsevseg.
+>  
+> +config USB_TC7USB40MU
+> +	tristate "TC7USB40MU USB mux support"
+> +	depends on (GPIOLIB && EXTCON) || COMPILE_TEST
+> +	help
+> +	  Say Y here if you have a TC7USB40MU by Toshiba. If a USB ID cable is
+> +	  present, a gpio will be asserted to mux out "host" D+/D- lines and when
+> +	  the ID cable is removed, a gpio will be deasserted to mux out "device"
+> +	  D+/D- lines.
+> +
+>  config USB_RIO500
+>  	tristate "USB Diamond Rio500 support"
+>  	help
+> diff --git a/drivers/usb/misc/Makefile b/drivers/usb/misc/Makefile
+> index 3d1992750da4..d8f9ad1dee13 100644
+> --- a/drivers/usb/misc/Makefile
+> +++ b/drivers/usb/misc/Makefile
+> @@ -19,6 +19,7 @@ obj-$(CONFIG_USB_LEGOTOWER)		+= legousbtower.o
+>  obj-$(CONFIG_USB_RIO500)		+= rio500.o
+>  obj-$(CONFIG_USB_TEST)			+= usbtest.o
+>  obj-$(CONFIG_USB_EHSET_TEST_FIXTURE)    += ehset.o
+> +obj-$(CONFIG_USB_TC7USB40MU)		+= tc7usb40mu.o
+>  obj-$(CONFIG_USB_TRANCEVIBRATOR)	+= trancevibrator.o
+>  obj-$(CONFIG_USB_USS720)		+= uss720.o
+>  obj-$(CONFIG_USB_SEVSEG)		+= usbsevseg.o
+> diff --git a/drivers/usb/misc/tc7usb40mu.c b/drivers/usb/misc/tc7usb40mu.c
+> new file mode 100644
+> index 000000000000..9edcfe577ae4
+> --- /dev/null
+> +++ b/drivers/usb/misc/tc7usb40mu.c
+> @@ -0,0 +1,107 @@
+> +/**
+> + * Copyright (C) 2016 Linaro Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/platform_device.h>
+> +#include <linux/module.h>
+> +#include <linux/extcon.h>
+> +#include <linux/gpio/consumer.h>
+> +#include <linux/notifier.h>
+> +
+> +struct tc7usb40mu_drv {
+> +	struct gpio_desc *gpio;
+> +	struct extcon_dev *edev;
+> +	struct notifier_block notify;
+> +};
+> +
+> +static int tc7usb40mu_notify(struct notifier_block *nb, unsigned long event,
+> +			     void *ptr)
+> +{
+> +	struct tc7usb40mu_drv *drv;
+> +
+> +	drv = container_of(nb, struct tc7usb40mu_drv, notify);
+> +	if (event)
+> +		gpiod_set_value_cansleep(drv->gpio, 1); /* USB HUB */
+> +	else
+> +		gpiod_set_value_cansleep(drv->gpio, 0); /* device connector */
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +static int tc7usb40mu_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct tc7usb40mu_drv *drv;
+> +	int state, ret;
+> +	enum gpiod_flags flags;
+> +
+> +	drv = devm_kzalloc(dev, sizeof(*drv), GFP_KERNEL);
+> +	if (!drv)
+> +		return -ENOMEM;
+> +
+> +	drv->edev = extcon_get_edev_by_phandle(dev, 0);
+> +	if (IS_ERR(drv->edev))
+> +		return PTR_ERR(drv->edev);
+> +
+> +	/*
+> +	 * TODO: This can race with extcon changing state before we request the
+> +	 * gpio or the extcon changing state before we register the notifier
+> +	 */
+> +	state = extcon_get_cable_state_(drv->edev, EXTCON_USB_HOST);
+> +	if (state)
+> +		flags = GPIOD_OUT_HIGH;
+> +	else
+> +		flags = GPIOD_OUT_LOW;
+> +
+> +	drv->gpio = devm_gpiod_get(dev, "switch", flags);
+> +	if (IS_ERR(drv->gpio))
+> +		return PTR_ERR(drv->gpio);
+> +
+> +	drv->notify.notifier_call = tc7usb40mu_notify;
+> +	ret = extcon_register_notifier(drv->edev, EXTCON_USB_HOST, &drv->notify);
+> +	if (ret)
+> +		return ret;
+> +
+> +	platform_set_drvdata(pdev, drv);
+> +
+> +	return 0;
+> +}
+> +
+> +static int tc7usb40mu_remove(struct platform_device *pdev)
+> +{
+> +	struct tc7usb40mu_drv *drv;
+> +
+> +	drv = platform_get_drvdata(pdev);
+> +	extcon_unregister_notifier(drv->edev, EXTCON_USB_HOST, &drv->notify);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id tc7usb40mu_dt_match[] = {
+> +	{ .compatible = "toshiba,tc7usb40mu", },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, tc7usb40mu_dt_match);
+> +
+> +static struct platform_driver tc7usb40mu_driver = {
+> +	.probe		= tc7usb40mu_probe,
+> +	.remove		= tc7usb40mu_remove,
+> +	.driver		= {
+> +		.name	= "tc7usb40mu",
+> +		.of_match_table = tc7usb40mu_dt_match,
+> +	},
+> +};
+> +module_platform_driver(tc7usb40mu_driver);
+> +
+> +MODULE_AUTHOR("Stephen Boyd <stephen.boyd@linaro.org>");
+> +MODULE_DESCRIPTION("TC7USB40MU USB multiplexer driver");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 2.9.0.rc2.8.ga28705d
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Regards
-ChenYu
+-- 
+
+Best Regards,
+Peter Chen
