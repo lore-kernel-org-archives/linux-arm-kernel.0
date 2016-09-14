@@ -1,316 +1,140 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 14 Sep 2016 15:26:46 +0100
-Subject: [PATCH v7.1 19/22] iommu/arm-smmu: Wire up generic configuration
- support
-In-Reply-To: <228dc6c675f10ae7481640d4ef2f4960c170621f.1473695704.git.robin.murphy@arm.com>
-References: <cover.1473695704.git.robin.murphy@arm.com>
- <228dc6c675f10ae7481640d4ef2f4960c170621f.1473695704.git.robin.murphy@arm.com>
-Message-ID: <6cd2bae967642fe75e15cdc7d5ddfc6586af0b12.1473863011.git.robin.murphy@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Sep 2016 16:23:39 +0200
+Subject: [PATCH V3 1/4] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <57D95BBC.9030405@hisilicon.com>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <8337589.pzGt0MZ9xn@wuerfel> <57D95BBC.9030405@hisilicon.com>
+Message-ID: <5264074.nuyDhEuOR4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With everything else now in place, fill in an of_xlate callback and the
-appropriate registration to plumb into the generic configuration
-machinery, and watch everything just work.
+On Wednesday, September 14, 2016 10:16:28 PM CEST zhichang.yuan wrote:
+> > 
+> > No need to guard includes with an #ifdef.
+> If remove #ifdef here, extio.h should not contain any function external declarations whose definitions are in
+> extio.c compiled only when CONFIG_ARM64_INDIRECT_PIO is yes.
+ 
+There is no problem with making declarations visible for functions that
+are not part of the kernel, we do that all the time.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >> +#define BUILDS_RW(bwl, type)                                                \
+> >> +static inline void reads##bwl(const volatile void __iomem *addr,    \
+> >> +                            void *buffer, unsigned int count)       \
+> >> +{                                                                   \
+> >> +    if (count) {                                                    \
+> >> +            type *buf = buffer;                                     \
+> >> +                                                                    \
+> >> +            do {                                                    \
+> >> +                    type x = __raw_read##bwl(addr);                 \
+> >> +                    *buf++ = x;                                     \
+> >> +            } while (--count);                                      \
+> >> +    }                                                               \
+> >> +}                                                                   \
+> >> +                                                                    \
+> >> +static inline void writes##bwl(volatile void __iomem *addr,         \
+> >> +                            const void *buffer, unsigned int count) \
+> >> +{                                                                   \
+> >> +    if (count) {                                                    \
+> >> +            const type *buf = buffer;                               \
+> >> +                                                                    \
+> >> +            do {                                                    \
+> >> +                    __raw_write##bwl(*buf++, addr);                 \
+> >> +            } while (--count);                                      \
+> >> +    }                                                               \
+> >> +}
+> >> +
+> >> +BUILDS_RW(b, u8)
+> > 
+> > Why is this in here?
+> the readsb/writesb are defined in asm-generic/io.h which is included later, but the redefined insb/outsb need
+> to call them. Without these readsb/writesb definition before insb/outsb redefined, compile error occur.
+> 
+> It seems that copy all the definitions of "asm-generic/io.h" is not a good idea, so I move the definitions of
+> those function needed here....
+> 
+> Ok. I think your idea below defining in(s)/out(s) in a c file can solve this issue.
+> 
+> #ifdef CONFIG_ARM64_INDIRECT_PIO
+> #define inb inb
+> extern u8 inb(unsigned long addr);
+> 
+> #define outb outb
+> extern void outb(u8 value, unsigned long addr);
+> 
+> #define insb insb
+> extern void insb(unsigned long addr, void *buffer, unsigned int count);
+> 
+> #define outsb outsb
+> extern void outsb(unsigned long addr, const void *buffer, unsigned int count);
+> #endif
+> 
+> and definitions of all these functions are in extio.c :
+> 
+> u8 inb(unsigned long addr)
+> {
+>         if (!arm64_extio_ops || arm64_extio_ops->start > addr ||
+>                         arm64_extio_ops->end < addr)
+>                 return readb(PCI_IOBASE + addr);
+>         else
+>                 return arm64_extio_ops->pfin ?
+>                         arm64_extio_ops->pfin(arm64_extio_ops->devpara,
+>                                 addr + arm64_extio_ops->ptoffset, NULL,
+>                                 sizeof(u8), 1) : -1;
+> }
+> .....
 
----
+Yes, sounds good.
 
-- Don't pull in of_platform.h for no reason (was an old leftover)
-- Don't spam deprecated binding message when multiple SMMUs are using it
+> >> @@ -149,6 +185,60 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+> >>  #define IO_SPACE_LIMIT              (PCI_IO_SIZE - 1)
+> >>  #define PCI_IOBASE          ((void __iomem *)PCI_IO_START)
+> >>  
+> >> +
+> >> +/*
+> >> + * redefine the in(s)b/out(s)b for indirect-IO.
+> >> + */
+> >> +#define inb inb
+> >> +static inline u8 inb(unsigned long addr)
+> >> +{
+> >> +#ifdef CONFIG_ARM64_INDIRECT_PIO
+> >> +    if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
+> >> +                    addr <= arm64_extio_ops->end)
+> >> +            return extio_inb(addr);
+> >> +#endif
+> >> +    return readb(PCI_IOBASE + addr);
+> >> +}
+> >> +
+> > 
+> > Looks ok, but you only seem to do this for the 8-bit
+> > accessors, when it should be done for 16-bit and 32-bit
+> > ones as well for consistency.
+> Hip06 LPC only support 8-bit I/O operations on the designated port.
 
----
- drivers/iommu/arm-smmu.c | 168 ++++++++++++++++++++++++++++++-----------------
- 1 file changed, 108 insertions(+), 60 deletions(-)
+That is an interesting limitation. Maybe still call the extio operations
+and have them do WARN_ON_ONCE() instead?
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 9dbb6a37e625..fd6cc19c4ced 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -418,6 +418,8 @@ struct arm_smmu_option_prop {
- 
- static atomic_t cavium_smmu_context_count = ATOMIC_INIT(0);
- 
-+static bool using_legacy_binding, using_generic_binding;
-+
- static struct arm_smmu_option_prop arm_smmu_options[] = {
- 	{ ARM_SMMU_OPT_SECURE_CFG_ACCESS, "calxeda,smmu-secure-config-access" },
- 	{ 0, NULL},
-@@ -817,12 +819,6 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	if (smmu_domain->smmu)
- 		goto out_unlock;
- 
--	/* We're bypassing these SIDs, so don't allocate an actual context */
--	if (domain->type == IOMMU_DOMAIN_DMA) {
--		smmu_domain->smmu = smmu;
--		goto out_unlock;
--	}
--
- 	/*
- 	 * Mapping the requested stage onto what we support is surprisingly
- 	 * complicated, mainly because the spec allows S1+S2 SMMUs without
-@@ -981,7 +977,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
- 	void __iomem *cb_base;
- 	int irq;
- 
--	if (!smmu || domain->type == IOMMU_DOMAIN_DMA)
-+	if (!smmu)
- 		return;
- 
- 	/*
-@@ -1015,8 +1011,8 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 	if (!smmu_domain)
- 		return NULL;
- 
--	if (type == IOMMU_DOMAIN_DMA &&
--	    iommu_get_dma_cookie(&smmu_domain->domain)) {
-+	if (type == IOMMU_DOMAIN_DMA && (using_legacy_binding ||
-+	    iommu_get_dma_cookie(&smmu_domain->domain))) {
- 		kfree(smmu_domain);
- 		return NULL;
- 	}
-@@ -1133,19 +1129,22 @@ static int arm_smmu_master_alloc_smes(struct device *dev)
- 	mutex_lock(&smmu->stream_map_mutex);
- 	/* Figure out a viable stream map entry allocation */
- 	for_each_cfg_sme(fwspec, i, idx) {
-+		u16 sid = fwspec->ids[i];
-+		u16 mask = fwspec->ids[i] >> SMR_MASK_SHIFT;
-+
- 		if (idx != INVALID_SMENDX) {
- 			ret = -EEXIST;
- 			goto out_err;
- 		}
- 
--		ret = arm_smmu_find_sme(smmu, fwspec->ids[i], 0);
-+		ret = arm_smmu_find_sme(smmu, sid, mask);
- 		if (ret < 0)
- 			goto out_err;
- 
- 		idx = ret;
- 		if (smrs && smmu->s2crs[idx].count == 0) {
--			smrs[idx].id = fwspec->ids[i];
--			smrs[idx].mask = 0; /* We don't currently share SMRs */
-+			smrs[idx].id = sid;
-+			smrs[idx].mask = mask;
- 			smrs[idx].valid = true;
- 		}
- 		smmu->s2crs[idx].count++;
-@@ -1203,15 +1202,6 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
- 	u8 cbndx = smmu_domain->cfg.cbndx;
- 	int i, idx;
- 
--	/*
--	 * FIXME: This won't be needed once we have IOMMU-backed DMA ops
--	 * for all devices behind the SMMU. Note that we need to take
--	 * care configuring SMRs for devices both a platform_device and
--	 * and a PCI device (i.e. a PCI host controller)
--	 */
--	if (smmu_domain->domain.type == IOMMU_DOMAIN_DMA)
--		type = S2CR_TYPE_BYPASS;
--
- 	for_each_cfg_sme(fwspec, i, idx) {
- 		if (type == s2cr[idx].type && cbndx == s2cr[idx].cbndx)
- 			continue;
-@@ -1373,25 +1363,50 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- 	}
- }
- 
-+static int arm_smmu_match_node(struct device *dev, void *data)
-+{
-+	return dev->of_node == data;
-+}
-+
-+static struct arm_smmu_device *arm_smmu_get_by_node(struct device_node *np)
-+{
-+	struct device *dev = driver_find_device(&arm_smmu_driver.driver, NULL,
-+						np, arm_smmu_match_node);
-+	put_device(dev);
-+	return dev ? dev_get_drvdata(dev) : NULL;
-+}
-+
- static int arm_smmu_add_device(struct device *dev)
- {
- 	struct arm_smmu_device *smmu;
- 	struct arm_smmu_master_cfg *cfg;
--	struct iommu_fwspec *fwspec;
-+	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
- 	int i, ret;
- 
--	ret = arm_smmu_register_legacy_master(dev, &smmu);
--	fwspec = dev->iommu_fwspec;
--	if (ret)
--		goto out_free;
-+	if (using_legacy_binding) {
-+		ret = arm_smmu_register_legacy_master(dev, &smmu);
-+		fwspec = dev->iommu_fwspec;
-+		if (ret)
-+			goto out_free;
-+	} else if (fwspec) {
-+		smmu = arm_smmu_get_by_node(to_of_node(fwspec->iommu_fwnode));
-+	} else {
-+		return -ENODEV;
-+	}
- 
- 	ret = -EINVAL;
- 	for (i = 0; i < fwspec->num_ids; i++) {
- 		u16 sid = fwspec->ids[i];
-+		u16 mask = fwspec->ids[i] >> SMR_MASK_SHIFT;
- 
- 		if (sid & ~smmu->streamid_mask) {
- 			dev_err(dev, "stream ID 0x%x out of range for SMMU (0x%x)\n",
--				sid, cfg->smmu->streamid_mask);
-+				sid, smmu->streamid_mask);
-+			goto out_free;
-+		}
-+		if (mask & ~smmu->smr_mask_mask) {
-+			dev_err(dev, "SMR mask 0x%x out of range for SMMU (0x%x)\n",
-+				sid, smmu->smr_mask_mask);
- 			goto out_free;
- 		}
- 	}
-@@ -1503,6 +1518,19 @@ out_unlock:
- 	return ret;
- }
- 
-+static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
-+{
-+	u32 fwid = 0;
-+
-+	if (args->args_count > 0)
-+		fwid |= (u16)args->args[0];
-+
-+	if (args->args_count > 1)
-+		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
-+
-+	return iommu_fwspec_add_ids(dev, &fwid, 1);
-+}
-+
- static struct iommu_ops arm_smmu_ops = {
- 	.capable		= arm_smmu_capable,
- 	.domain_alloc		= arm_smmu_domain_alloc,
-@@ -1517,6 +1545,7 @@ static struct iommu_ops arm_smmu_ops = {
- 	.device_group		= arm_smmu_device_group,
- 	.domain_get_attr	= arm_smmu_domain_get_attr,
- 	.domain_set_attr	= arm_smmu_domain_set_attr,
-+	.of_xlate		= arm_smmu_of_xlate,
- 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
- };
- 
-@@ -1870,6 +1899,19 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	struct arm_smmu_device *smmu;
- 	struct device *dev = &pdev->dev;
- 	int num_irqs, i, err;
-+	bool legacy_binding;
-+
-+	legacy_binding = of_find_property(dev->of_node, "mmu-masters", NULL);
-+	if (legacy_binding && !using_generic_binding) {
-+		if (!using_legacy_binding)
-+			pr_notice("deprecated \"mmu-masters\" DT property in use; DMA API support unavailable\n");
-+		using_legacy_binding = true;
-+	} else if (!legacy_binding && !using_legacy_binding) {
-+		using_generic_binding = true;
-+	} else {
-+		dev_err(dev, "not probing due to mismatched DT properties\n");
-+		return -ENODEV;
-+	}
- 
- 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
- 	if (!smmu) {
-@@ -1954,6 +1996,20 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
- 	platform_set_drvdata(pdev, smmu);
- 	arm_smmu_device_reset(smmu);
-+
-+	/* Oh, for a proper bus abstraction */
-+	if (!iommu_present(&platform_bus_type))
-+		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
-+#ifdef CONFIG_ARM_AMBA
-+	if (!iommu_present(&amba_bustype))
-+		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
-+#endif
-+#ifdef CONFIG_PCI
-+	if (!iommu_present(&pci_bus_type)) {
-+		pci_request_acs();
-+		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
-+	}
-+#endif
- 	return 0;
- }
- 
-@@ -1983,41 +2039,14 @@ static struct platform_driver arm_smmu_driver = {
- 
- static int __init arm_smmu_init(void)
- {
--	struct device_node *np;
--	int ret;
-+	static bool registered;
-+	int ret = 0;
- 
--	/*
--	 * Play nice with systems that don't have an ARM SMMU by checking that
--	 * an ARM SMMU exists in the system before proceeding with the driver
--	 * and IOMMU bus operation registration.
--	 */
--	np = of_find_matching_node(NULL, arm_smmu_of_match);
--	if (!np)
--		return 0;
--
--	of_node_put(np);
--
--	ret = platform_driver_register(&arm_smmu_driver);
--	if (ret)
--		return ret;
--
--	/* Oh, for a proper bus abstraction */
--	if (!iommu_present(&platform_bus_type))
--		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
--
--#ifdef CONFIG_ARM_AMBA
--	if (!iommu_present(&amba_bustype))
--		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
--#endif
--
--#ifdef CONFIG_PCI
--	if (!iommu_present(&pci_bus_type)) {
--		pci_request_acs();
--		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
-+	if (!registered) {
-+		ret = platform_driver_register(&arm_smmu_driver);
-+		registered = !ret;
- 	}
--#endif
--
--	return 0;
-+	return ret;
- }
- 
- static void __exit arm_smmu_exit(void)
-@@ -2028,6 +2057,25 @@ static void __exit arm_smmu_exit(void)
- subsys_initcall(arm_smmu_init);
- module_exit(arm_smmu_exit);
- 
-+static int __init arm_smmu_of_init(struct device_node *np)
-+{
-+	int ret = arm_smmu_init();
-+
-+	if (ret)
-+		return ret;
-+
-+	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
-+		return -ENODEV;
-+
-+	return 0;
-+}
-+IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", arm_smmu_of_init);
-+IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", arm_smmu_of_init);
-+IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", arm_smmu_of_init);
-+IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", arm_smmu_of_init);
-+IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", arm_smmu_of_init);
-+IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", arm_smmu_of_init);
-+
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
- MODULE_LICENSE("GPL v2");
--- 
-2.8.1.dirty
+If you get a driver that calls inw/outw on the range that is owned
+by the LPC bus, you otherwise get an unhandled page fault in kernel
+space, which is not as nice.
+
+> >> diff --git a/drivers/bus/extio.c b/drivers/bus/extio.c
+> >> new file mode 100644
+> >> index 0000000..1e7a9c5
+> >> --- /dev/null
+> >> +++ b/drivers/bus/extio.c
+> >> @@ -0,0 +1,66 @@
+> > 
+> > This is in a globally visible directory
+> > 
+> >> +
+> >> +struct extio_ops *arm64_extio_ops;
+> > 
+> > But the identifier uses an architecture specific prefix. Either
+> > move the whole file into arch/arm64, or make the naming so that
+> > it can be used for everything.
+> 
+> I perfer to move the whole file into arch/arm64, extio.h will be moved to arch/arm64/include/asm;
+
+Ok, that simplifies it a lot, you can just do everything in asm/io.h then.
+
+	Arnd
