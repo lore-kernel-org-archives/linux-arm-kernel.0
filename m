@@ -1,42 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Sep 2016 11:19:11 +0100
-Subject: [PATCH v3] arm64: mm: move zero page from .bss to right before
- swapper_pg_dir
-In-Reply-To: <CAKv+Gu8MJL=PP8Kc_BdMUnn-r9+QLhERHehpqF+si6+ZpZCBYg@mail.gmail.com>
-References: <1473696925-26156-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160913173507.GA29678@leverpostej>
- <CAKv+Gu90AokunA3zOcNhwXsFpCpoY_juipnr3y68nefZk9Ff0w@mail.gmail.com>
- <20160913202410.GA2947@remoulade>
- <CAKv+Gu8MJL=PP8Kc_BdMUnn-r9+QLhERHehpqF+si6+ZpZCBYg@mail.gmail.com>
-Message-ID: <20160914101710.GB14330@leverpostej>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 14 Sep 2016 15:49:04 +0530
+Subject: [PATCH v4 0/2] ARM: cleanup PCI specific configs
+Message-ID: <1473848346-17905-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 09:29:50PM +0100, Ard Biesheuvel wrote:
-> On 13 September 2016 at 21:24, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Tue, Sep 13, 2016 at 08:18:52PM +0100, Ard Biesheuvel wrote:
-> >> On 13 September 2016 at 18:35, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> Thanks. But actually, I think it makes sense to make the first
-> >> swapper_pg_dir page read-only as well, given that it is only modified
-> >> via the fixmap, and we can trivially extend the r/o bss region to end
-> >> at 'swapper_pg_dir + PAGE_SIZE'
-> >>
-> >> Thoughts?
-> >
-> > I thought that we lazy-allocated the vmalloc region at runtime, and initialised
-> > pgd level entries.
-> >
-> > From a quick dig it looks like a vmalloc() could eventually call
-> > pgd_populate(), which seems to set a pgd entry without using a fixmap slot.
-> >
-> > Is there some reason that won't happen at runtime?
-> 
-> Ah, right. I thought all swapper_pg_dir manipulations went via the
-> arch64/mm/mmu.c routines that use the fixmap slots, but apparently
-> this is not the case.
+This series was initially sent to add support for two PCIe
+ports in dra7. This included selecting PCI_DOMAINS config
+in SOC_DRA7XX.
 
-For better or worse, we only use a fixmap'd pgd under paging_init, and
-only for the temporary pgd, not the "real" swapper pgd.
+However from the review, PCI_DOMAINS can instead be selected
+from ARCH_MULTIPLATFORM. This is fixed in this series along
+with removing PCI_DOMAINS from other configs.
 
-Thanks,
-Mark.
+Changes from v3:
+*) Added *Acked-by:*
+*) Fixed $subject to not have *Fix*
+
+Kishon Vijay Abraham I (2):
+  ARM: stop *MIGHT_HAVE_PCI* config from being selected redundantly
+  ARM: select PCI_DOMAINS config from ARCH_MULTIPLATFORM
+
+ arch/arm/Kconfig                 |    1 +
+ arch/arm/mach-at91/Kconfig       |    1 -
+ arch/arm/mach-axxia/Kconfig      |    2 --
+ arch/arm/mach-cns3xxx/Kconfig    |    1 -
+ arch/arm/mach-exynos/Kconfig     |    2 --
+ arch/arm/mach-imx/Kconfig        |    2 --
+ arch/arm/mach-integrator/Kconfig |    1 -
+ arch/arm/mach-keystone/Kconfig   |    2 --
+ arch/arm/mach-shmobile/Kconfig   |    1 -
+ arch/arm/mach-spear/Kconfig      |    1 -
+ arch/arm/mach-versatile/Kconfig  |    1 -
+ 11 files changed, 1 insertion(+), 14 deletions(-)
+
+-- 
+1.7.9.5
