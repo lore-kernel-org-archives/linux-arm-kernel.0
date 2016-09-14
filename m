@@ -1,56 +1,38 @@
-From: sf84@laposte.net (Sebastian Frias)
-Date: Wed, 14 Sep 2016 10:24:51 +0200
-Subject: ARM, SoC: About the use DT-defined properties by 3rd-party drivers
-In-Reply-To: <20160913154722.GD23336@leverpostej>
-References: <CAOZdJXVjsR3NTWiJX33yT3jYk=FU65raWoMooTLD7OMN3sqP-A@mail.gmail.com>
- <57D69FB1.2020801@laposte.net> <20160912123809.GB13741@leverpostej>
- <57D6AA54.6000208@laposte.net> <20160912135549.GA14165@leverpostej>
- <57D6D2A9.3010006@laposte.net> <20160912165637.GF14165@leverpostej>
- <57D7CF17.2050905@laposte.net> <20160913131208.GA23336@leverpostej>
- <57D8137F.8040508@laposte.net> <20160913154722.GD23336@leverpostej>
-Message-ID: <57D90953.9030701@laposte.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 14 Sep 2016 10:28:12 +0200
+Subject: [GIT PULL] ARM: at91: dt for 4.9
+Message-ID: <20160914082812.tmlrrqwkeudcybui@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Arnd, Olof
 
-On 09/13/2016 05:47 PM, Mark Rutland wrote:
->>> If you believe that the bindings don't matter, then there is absolutely
->>> no reason for them to exist in the first place.
->>>
->>> If those binding matter to *anyone*, then those collating the bindings
->>> have some responsibility of stewardship, and that includes
->>> review/maintenance/etc.
->>
->> The thing is that right now it seems the "responsibility of stewardship"
->> lies only within "Linux", whereas DT is proposed as open for everybody,
->> Bootloaders, FreeBSD, etc.
->>
->> In that case, shouldn't the "responsibility" be shared?
-> 
-> Ideally, yes.
-> 
-> Which is one of the reasons devicetree.org was set up as a common forum
-> for projects to collaborate on devicetree.
+Only a single DT patch for this release:
 
-I see, what about using different 'sections' on a DT to allow different
-parties be responsible for their 'section'?
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-- 'generic' sections (i.e.: those using bindings used by Linux drivers)
-would be under stewardship of Linux.
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
-- 'specific' sections (i.e.: my example, bindings *not used by Linux*, but
-they could be bindings for other OSs as you said) would be under a
-different stewardship.
+are available in the git repository at:
 
-DT seems essentially free-form, like XML.
-One could imagine that some tool could then be used to guarantee that
-some parts of DT conform to a given XML schema, including backwards
-compatibility, while at the same time ignoring 'staging'/'specific' stuff.
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.9-dt1
 
-NOTE: this appears to be possible using 'overlays' as Warner suggested, but
-in that case not all parts are public, which limits public information.
+for you to fetch changes up to e46f48ad86f4483dfaa5947a7b7dbd4a63b0398a:
 
-Best regards,
+  ARM: dts: at91: sama5d2: add ETM and ETB nodes (2016-08-08 12:08:00 +0200)
 
-Sebastian
+----------------------------------------------------------------
+DT Changes for 4.9:
+ - add ETM and ETB nodes on sama5d2
+
+----------------------------------------------------------------
+Olivier Schonken (1):
+      ARM: dts: at91: sama5d2: add ETM and ETB nodes
+
+ arch/arm/boot/dts/sama5d2.dtsi | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
