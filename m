@@ -1,81 +1,62 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 14 Sep 2016 15:07:22 -0500
-Subject: [GIT PULL] Greybus driver subsystem for 4.9-rc1
-In-Reply-To: <20160914180754.GA16053@kroah.com>
-References: <20160914100949.GA6179@kroah.com>
- <20160914173625.GB15356@leverpostej>
- <20160914180754.GA16053@kroah.com>
-Message-ID: <CAL_JsqJtDs-DrPDN4=9ET=EdEDTKxP-gRDkMziimQAz4LG457A@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 14 Sep 2016 22:08:55 +0200
+Subject: [PATCH v2 0/3] ARM64: amlogic: Add support for GXL SoC Family
+Message-ID: <20160914200858.7799-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 1:07 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Wed, Sep 14, 2016 at 06:36:26PM +0100, Mark Rutland wrote:
->> Hi Greg,
->>
->> On Wed, Sep 14, 2016 at 12:09:49PM +0200, Greg KH wrote:
->> > Given that it's never a good idea to keep subsystems out of the mainline
->> > kernel, I've put together this pull request that adds the greybus driver
->> > layer to drivers/greybus/.  Because this was 2 1/2 years of work, with
->> > many many developers contributing, I didn't want to flatten all of their
->> > effort into a few small patches, as that wouldn't be very fair.  So I've
->> > built a git tree with all of the changes going back to the first commit,
->> > and merged it into the kernel tree, just like btrfs was merged into the
->> > kernel.
->>
->> > Unless people point out some major problems with this, I'd like to get
->> > it merged into 4.9-rc1.
->>
->> I'm extremely concerned that these patches have *never* seen upstream
->> review, and this pull request gives no real opportunity for people to
->> make a judgement regarding the code, as many relevant parties have not
->> been Cc'd.
->
-> As I said, I will send a set of simple patches, I wanted to get this out
-> as soon as possible and other things came up today.  Will do it in the
-> morning, sorry.
->
->> From a quick scan of the git tree, I can see code (that isn't even
->> placed under staging/) for which I have fundamental objections to as a
->> maintainer, and has not been Cc'd to a relevant list.
->>
->> For example, I see commit 5a450477311fbfe2 ("greybus: timesync: Add
->> timesync core driver"). This states that it directly accesses the ARMv7
->> architected timer, though it's unclear as to precisely what it's doing
->> since it introduces an (undocumented) compatible string, and what should
->> be an unnecessary devicetree property.
->>
->> That's never gone to the linux-arm-kernel mainline list, myself or Marc
->> (as maintainers of the arch timer driver), nor has the binding seen any
->> review on the devicetree mailing list.
->
-> Hm, odd, I thought we had Rob review all of the device tree bindings,
-> but maybe the timesync stuff missed him.  And timesync is "odd" to say
-> the least, wait until you see the firmware side of it :)
+The new Amlogic GXL SoCs (S905X and S905D) are part of the Meson GX family and
+share some common features that can be described in a common GX dtsi file used
+by the Meson GXBB and Meson GXL Family dtsi.
 
-I have not. There weren't any when I was involved (other than SOC
-related bindings). Some like USB devices were discussed at least, but
-at the time there was no common definition of how to deal with
-soldered, on-board USB devices. And that was also what's good enough
-to move forward with development, not ready for mainline. There's a
-binding now for USB, but what's there for arche predates it IIRC. This
-is the first I've heard of timesync having a binding. I can't imagine
-why it needs one.
+This patchset introduces the common GX dtsi and switches the GXBB to use
+the common GX dtsi.
+Then it introduces the GXL S905X SoC with the GXL common dtsi, then the S905D
+dtsi and the p212 board dts.
+Finally the GXL S905D SoC is introduced with a S905D dtsi using the GXL common
+and the p23x Board dtsi for the p231 and p230 development boards.
 
-I was going to stay out of this, but now that I'm here...
+Changes since v1 at http://lkml.kernel.org/r/20160903082227.30559-1-narmstrong at baylibre.com :
+ - Add missing copyrigh in gx dtsi
+ - Rename gxl SoCs compatibles to amlogic,s905x and amlogic,s905d
 
-I'm not all that worried about the quality of the code, but do
-question whether this really makes sense to merge at this time. While
-I worked on Ara and would like to see all this code be used, I'm
-pretty doubtful it will be. Yes, Motorola is using a version of it,
-but they forked it some time back and changed who knows what. So what
-is upstream won't likely even work with any publicly available device.
-And how long that Motorola phone lasts is unknown. Sure it is self
-contained, but maintenance to keep it in tree is not 0.
+Changes since RFC v1:
+ - Merge GX common and GXBB changes in a single patch
+ - Integrate GXL S905X patch
+ - Add support for S905D and the p23x boards
 
-There's also things that never got solved. Like how do you describe
-devices on I2C, SPI, UART, etc. behind a greybus device? The plan was
-to use DT overlays, but that was never solved and brings a whole set
-of problems to solve upstream.
+Note: This patchset integrates the patch "ARM64: dts: amlogic: Add basic support for Amlogic S905X" [1]
+from Carlo Caione.
 
-Rob
+[1] http://lkml.kernel.org/r/1472382113-10754-1-git-send-email-carlo at caione.org
+
+Carlo Caione (1):
+  ARM64: dts: amlogic: Add basic support for Amlogic S905X
+
+Neil Armstrong (2):
+  ARM64: dts: amlogic: Add Meson GX dtsi from GXBB
+  ARM64: dts: amlogic: Add basic support for Amlogic S905D
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |  11 +
+ arch/arm64/boot/dts/amlogic/Makefile               |   3 +
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 200 +++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 895 +++++++++------------
+ .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |  51 ++
+ .../boot/dts/amlogic/meson-gxl-s905d-p231.dts      |  51 ++
+ .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     |  64 ++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi   |  48 ++
+ .../boot/dts/amlogic/meson-gxl-s905x-p212.dts      |  69 ++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi   |  48 ++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |  48 ++
+ 11 files changed, 972 insertions(+), 516 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+
+-- 
+2.7.0
