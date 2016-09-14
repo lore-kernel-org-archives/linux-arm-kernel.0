@@ -1,20 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 00:03:05 +0200
-Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.9
-In-Reply-To: <57C95675.5060504@hisilicon.com>
-References: <57C95675.5060504@hisilicon.com>
-Message-ID: <9688524.ke398xgQyd@wuerfel>
+Date: Thu, 15 Sep 2016 00:04:21 +0200
+Subject: [PATCH] arm64: defconfig: enable HW random as module
+In-Reply-To: <20160903001301.32289-1-khilman@baylibre.com>
+References: <20160903001301.32289-1-khilman@baylibre.com>
+Message-ID: <5985387.ppWVMBzPQU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 11:37:41 AM CEST Wei Xu wrote:
-> ARM64: hisilicon: defconfig updates for 4.9
+On Friday, September 2, 2016 5:13:00 PM CEST Kevin Hilman wrote:
+> drivers/char/hw_random/Kconfig has 'default m', so
+> simply removing this entry from the defconfig will
+> enable building HW random drivers as modules.
 > 
-> - Enable hisilicon SAS and XGE for hip05 and hip06
-> - Enable drm, powerkey, bluetooth and adv7511/adv7533 for hikey
-> - Add PINCTRL to HISI platform
-> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
 
-Pulled into next/arm64, thanks!
+Applied four patches to next/arm64:
+
+699189c arm64: defconfig: enable meson I2C
+5a9a9cf arm64: defconfig: enable meson SPI as module
+19b9869 arm64: defconfig: enable meson WDT as modules
+5012a09 arm64: defconfig: enable HW random as module
+
+Thanks,
 
 	Arnd
