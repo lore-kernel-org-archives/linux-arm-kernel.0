@@ -1,37 +1,48 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 14 Sep 2016 17:32:38 -0500
-Subject: [PATCH v9 10/10] MAINTAINERS: Tweak ARM PMU maintainers
+Date: Wed, 14 Sep 2016 17:32:33 -0500
+Subject: [PATCH v9 05/10] arm: arm64: Add routine to determine cpuid of other
+ cpus
 In-Reply-To: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
 References: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1473892358-22574-11-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1473892358-22574-6-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the ARM PMU file list, and add the arm mailing list.
+It is helpful if we can read the cpuid/midr of other CPUs
+in the system independent of arm/arm64.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- MAINTAINERS | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/cputype.h   | 2 ++
+ arch/arm64/include/asm/cputype.h | 3 +++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1fbd77d..246b427 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -915,12 +915,13 @@ ARM PMU PROFILING AND DEBUGGING
- M:	Will Deacon <will.deacon@arm.com>
- R:	Mark Rutland <mark.rutland@arm.com>
- S:	Maintained
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- F:	arch/arm*/kernel/perf_*
- F:	arch/arm/oprofile/common.c
- F:	arch/arm*/kernel/hw_breakpoint.c
- F:	arch/arm*/include/asm/hw_breakpoint.h
- F:	arch/arm*/include/asm/perf_event.h
--F:	drivers/perf/arm_pmu.c
-+F:	drivers/perf/arm_pmu*
- F:	include/linux/perf/arm_pmu.h
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index 1ee94c7..d5900a2 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -208,6 +208,8 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
+ 	return read_cpuid(CPUID_MPIDR);
+ }
  
- ARM PORT
++#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->cpuid
++
+ /*
+  * Intel's XScale3 core supports some v6 features (supersections, L2)
+  * but advertises itself as v5 as it does not support the v6 ISA.  For
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 9d9fd4b..beb95dc 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -128,6 +128,9 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
+ {
+ 	return read_cpuid(CTR_EL0);
+ }
++
++#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->reg_midr
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
 -- 
 2.5.5
