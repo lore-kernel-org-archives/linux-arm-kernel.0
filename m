@@ -1,140 +1,135 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 16:23:39 +0200
-Subject: [PATCH V3 1/4] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <57D95BBC.9030405@hisilicon.com>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <8337589.pzGt0MZ9xn@wuerfel> <57D95BBC.9030405@hisilicon.com>
-Message-ID: <5264074.nuyDhEuOR4@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 14 Sep 2016 16:37:07 +0200
+Subject: [PATCH 1/4] ARM: mv78xx0: simplify ethernet device creation
+In-Reply-To: <20160906140623.2853066-1-arnd@arndb.de> (Arnd Bergmann's message
+ of "Tue, 6 Sep 2016 16:06:20 +0200")
+References: <20160906140623.2853066-1-arnd@arndb.de>
+Message-ID: <87sht2bl9o.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 14, 2016 10:16:28 PM CEST zhichang.yuan wrote:
-> > 
-> > No need to guard includes with an #ifdef.
-> If remove #ifdef here, extio.h should not contain any function external declarations whose definitions are in
-> extio.c compiled only when CONFIG_ARM64_INDIRECT_PIO is yes.
+Hi Arnd,
  
-There is no problem with making declarations visible for functions that
-are not part of the kernel, we do that all the time.
+ On mar., sept. 06 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> >> +#define BUILDS_RW(bwl, type)                                                \
-> >> +static inline void reads##bwl(const volatile void __iomem *addr,    \
-> >> +                            void *buffer, unsigned int count)       \
-> >> +{                                                                   \
-> >> +    if (count) {                                                    \
-> >> +            type *buf = buffer;                                     \
-> >> +                                                                    \
-> >> +            do {                                                    \
-> >> +                    type x = __raw_read##bwl(addr);                 \
-> >> +                    *buf++ = x;                                     \
-> >> +            } while (--count);                                      \
-> >> +    }                                                               \
-> >> +}                                                                   \
-> >> +                                                                    \
-> >> +static inline void writes##bwl(volatile void __iomem *addr,         \
-> >> +                            const void *buffer, unsigned int count) \
-> >> +{                                                                   \
-> >> +    if (count) {                                                    \
-> >> +            const type *buf = buffer;                               \
-> >> +                                                                    \
-> >> +            do {                                                    \
-> >> +                    __raw_write##bwl(*buf++, addr);                 \
-> >> +            } while (--count);                                      \
-> >> +    }                                                               \
-> >> +}
-> >> +
-> >> +BUILDS_RW(b, u8)
-> > 
-> > Why is this in here?
-> the readsb/writesb are defined in asm-generic/io.h which is included later, but the redefined insb/outsb need
-> to call them. Without these readsb/writesb definition before insb/outsb redefined, compile error occur.
-> 
-> It seems that copy all the definitions of "asm-generic/io.h" is not a good idea, so I move the definitions of
-> those function needed here....
-> 
-> Ok. I think your idea below defining in(s)/out(s) in a c file can solve this issue.
-> 
-> #ifdef CONFIG_ARM64_INDIRECT_PIO
-> #define inb inb
-> extern u8 inb(unsigned long addr);
-> 
-> #define outb outb
-> extern void outb(u8 value, unsigned long addr);
-> 
-> #define insb insb
-> extern void insb(unsigned long addr, void *buffer, unsigned int count);
-> 
-> #define outsb outsb
-> extern void outsb(unsigned long addr, const void *buffer, unsigned int count);
-> #endif
-> 
-> and definitions of all these functions are in extio.c :
-> 
-> u8 inb(unsigned long addr)
-> {
->         if (!arm64_extio_ops || arm64_extio_ops->start > addr ||
->                         arm64_extio_ops->end < addr)
->                 return readb(PCI_IOBASE + addr);
->         else
->                 return arm64_extio_ops->pfin ?
->                         arm64_extio_ops->pfin(arm64_extio_ops->devpara,
->                                 addr + arm64_extio_ops->ptoffset, NULL,
->                                 sizeof(u8), 1) : -1;
-> }
-> .....
+> Out of the four ethernet devices on mv78xx0, only the first one
+> has an error interrupt line, for the other ones we pass NO_IRQ
+> and then ignore the argument.
+>
+> In order to get closer to complete remove of NO_IRQ, this simply
+> drops the unused function arguments.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Yes, sounds good.
+Applied on mvebu/soc with Reviewed-by tag from  Andrew Lunn
 
-> >> @@ -149,6 +185,60 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
-> >>  #define IO_SPACE_LIMIT              (PCI_IO_SIZE - 1)
-> >>  #define PCI_IOBASE          ((void __iomem *)PCI_IO_START)
-> >>  
-> >> +
-> >> +/*
-> >> + * redefine the in(s)b/out(s)b for indirect-IO.
-> >> + */
-> >> +#define inb inb
-> >> +static inline u8 inb(unsigned long addr)
-> >> +{
-> >> +#ifdef CONFIG_ARM64_INDIRECT_PIO
-> >> +    if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
-> >> +                    addr <= arm64_extio_ops->end)
-> >> +            return extio_inb(addr);
-> >> +#endif
-> >> +    return readb(PCI_IOBASE + addr);
-> >> +}
-> >> +
-> > 
-> > Looks ok, but you only seem to do this for the 8-bit
-> > accessors, when it should be done for 16-bit and 32-bit
-> > ones as well for consistency.
-> Hip06 LPC only support 8-bit I/O operations on the designated port.
+Thanks,
 
-That is an interesting limitation. Maybe still call the extio operations
-and have them do WARN_ON_ONCE() instead?
+Gregory
 
-If you get a driver that calls inw/outw on the range that is owned
-by the LPC bus, you otherwise get an unhandled page fault in kernel
-space, which is not as nice.
+> ---
+>  arch/arm/mach-mv78xx0/common.c            | 9 ++-------
+>  arch/arm/plat-orion/common.c              | 7 ++-----
+>  arch/arm/plat-orion/include/plat/common.h | 7 ++-----
+>  3 files changed, 6 insertions(+), 17 deletions(-)
+>
+> diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
+> index 6af5430d0d97..f72e1e9f5fc5 100644
+> --- a/arch/arm/mach-mv78xx0/common.c
+> +++ b/arch/arm/mach-mv78xx0/common.c
+> @@ -219,7 +219,6 @@ void __init mv78xx0_ge01_init(struct mv643xx_eth_platform_data *eth_data)
+>  {
+>  	orion_ge01_init(eth_data,
+>  			GE01_PHYS_BASE, IRQ_MV78XX0_GE01_SUM,
+> -			NO_IRQ,
+>  			MV643XX_TX_CSUM_DEFAULT_LIMIT);
+>  }
+>  
+> @@ -242,9 +241,7 @@ void __init mv78xx0_ge10_init(struct mv643xx_eth_platform_data *eth_data)
+>  		eth_data->duplex = DUPLEX_FULL;
+>  	}
+>  
+> -	orion_ge10_init(eth_data,
+> -			GE10_PHYS_BASE, IRQ_MV78XX0_GE10_SUM,
+> -			NO_IRQ);
+> +	orion_ge10_init(eth_data, GE10_PHYS_BASE, IRQ_MV78XX0_GE10_SUM);
+>  }
+>  
+>  
+> @@ -266,9 +263,7 @@ void __init mv78xx0_ge11_init(struct mv643xx_eth_platform_data *eth_data)
+>  		eth_data->duplex = DUPLEX_FULL;
+>  	}
+>  
+> -	orion_ge11_init(eth_data,
+> -			GE11_PHYS_BASE, IRQ_MV78XX0_GE11_SUM,
+> -			NO_IRQ);
+> +	orion_ge11_init(eth_data, GE11_PHYS_BASE, IRQ_MV78XX0_GE11_SUM);
+>  }
+>  
+>  /*****************************************************************************
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index 78c8bf4043c0..7757f71fe709 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -354,7 +354,6 @@ static struct platform_device orion_ge01 = {
+>  void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
+>  			    unsigned long mapbase,
+>  			    unsigned long irq,
+> -			    unsigned long irq_err,
+>  			    unsigned int tx_csum_limit)
+>  {
+>  	fill_resources(&orion_ge01_shared, orion_ge01_shared_resources,
+> @@ -404,8 +403,7 @@ static struct platform_device orion_ge10 = {
+>  
+>  void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
+>  			    unsigned long mapbase,
+> -			    unsigned long irq,
+> -			    unsigned long irq_err)
+> +			    unsigned long irq)
+>  {
+>  	fill_resources(&orion_ge10_shared, orion_ge10_shared_resources,
+>  		       mapbase + 0x2000, SZ_16K - 1, NO_IRQ);
+> @@ -453,8 +451,7 @@ static struct platform_device orion_ge11 = {
+>  
+>  void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+>  			    unsigned long mapbase,
+> -			    unsigned long irq,
+> -			    unsigned long irq_err)
+> +			    unsigned long irq)
+>  {
+>  	fill_resources(&orion_ge11_shared, orion_ge11_shared_resources,
+>  		       mapbase + 0x2000, SZ_16K - 1, NO_IRQ);
+> diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
+> index 9e6d76ad48a9..8519727faa5e 100644
+> --- a/arch/arm/plat-orion/include/plat/common.h
+> +++ b/arch/arm/plat-orion/include/plat/common.h
+> @@ -47,18 +47,15 @@ void __init orion_ge00_init(struct mv643xx_eth_platform_data *eth_data,
+>  void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
+>  			    unsigned long mapbase,
+>  			    unsigned long irq,
+> -			    unsigned long irq_err,
+>  			    unsigned int tx_csum_limit);
+>  
+>  void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
+>  			    unsigned long mapbase,
+> -			    unsigned long irq,
+> -			    unsigned long irq_err);
+> +			    unsigned long irq);
+>  
+>  void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+>  			    unsigned long mapbase,
+> -			    unsigned long irq,
+> -			    unsigned long irq_err);
+> +			    unsigned long irq);
+>  
+>  void __init orion_ge00_switch_init(struct dsa_platform_data *d,
+>  				   int irq);
+> -- 
+> 2.9.0
+>
 
-> >> diff --git a/drivers/bus/extio.c b/drivers/bus/extio.c
-> >> new file mode 100644
-> >> index 0000000..1e7a9c5
-> >> --- /dev/null
-> >> +++ b/drivers/bus/extio.c
-> >> @@ -0,0 +1,66 @@
-> > 
-> > This is in a globally visible directory
-> > 
-> >> +
-> >> +struct extio_ops *arm64_extio_ops;
-> > 
-> > But the identifier uses an architecture specific prefix. Either
-> > move the whole file into arch/arm64, or make the naming so that
-> > it can be used for everything.
-> 
-> I perfer to move the whole file into arch/arm64, extio.h will be moved to arch/arm64/include/asm;
-
-Ok, that simplifies it a lot, you can just do everything in asm/io.h then.
-
-	Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
