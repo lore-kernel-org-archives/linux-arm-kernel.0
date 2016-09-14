@@ -1,29 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 23:33:56 +0200
-Subject: [PATCH V3 3/4] ARM64 LPC: support serial based on low-pin-count
-In-Reply-To: <57D96701.4050700@hisilicon.com>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <4340181.AghlmQIy28@wuerfel> <57D96701.4050700@hisilicon.com>
-Message-ID: <5525856.MfDSSsiP5d@wuerfel>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 14 Sep 2016 16:36:02 -0500
+Subject: [PATCH] cpufreq: ti: Use generic platdev driver
+In-Reply-To: <20160914204137.20346-1-d-gerlach@ti.com>
+References: <20160914204137.20346-1-d-gerlach@ti.com>
+Message-ID: <57D9C2C2.6070807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 14, 2016 11:04:33 PM CEST zhichang.yuan wrote:
-> The 8250_hisi_lpc.c support both ACPI and dts similar to 8250_dw :
-> 
-> +static struct platform_driver hs_lpc8250_driver = {
-> +       .driver = {
-> +               .name           = "hisi-lpc-uart",
-> +               .of_match_table = hs8250_of_match,
-> +               .acpi_match_table = ACPI_PTR(hs8250_acpi_match),
-> 
-> So, I am a little confused why we need to support dts in 8250_of.c and support ACPI in another
-> driver file.
-> 
+On 09/14/2016 03:41 PM, Dave Gerlach wrote:
+> Now that the cpufreq-dt-platdev is used to create the cpufreq-dt platform
+> device for all OMAP platforms and the platform code that did it
+> before has been removed, add ti,am33xx and ti,dra7xx to the machine list
+> in cpufreq-dt-platdev which had relied on the removed platform code to do
+> this previously.
+>
+> Fixes: 7694ca6e1d6f ("cpufreq: omap: Use generic platdev driver")
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
 
-After looking again, I'm pretty sure that drivers/tty/serial/8250/8250_pnp.c
-will handle the ACPI case without modifications, you just need to adapt
-the 8250_of driver to handle IORESOURCE_IO ports. This will be required
-anyway with the next version once the LPC bridge is on the PCI bus.
+This got left out when OMAP was originally added to the 
+cpufreq-dt-platdev, so cpufreq disappeared on am335x and dra7 platforms. 
+This patch together with the series here [1] will fix this regression.
 
-	Arnd
+Regards,
+Dave
+
+[1] http://marc.info/?l=linux-pm&m=147388667613317&w=2
+
+>   drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> index 0bb44d5b5df4..d5e8ba50f8a3 100644
+> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> @@ -68,6 +68,8 @@ static const struct of_device_id machines[] __initconst = {
+>
+>   	{ .compatible = "sigma,tango4" },
+>
+> +	{ .compatible = "ti,am33xx", },
+> +	{ .compatible = "ti,dra7", },
+>   	{ .compatible = "ti,omap2", },
+>   	{ .compatible = "ti,omap3", },
+>   	{ .compatible = "ti,omap4", },
+>
