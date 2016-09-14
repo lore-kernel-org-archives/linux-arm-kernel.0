@@ -1,45 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 14 Sep 2016 18:14:09 +0200
-Subject: [PATCH 0/5] ARM: dts: sun8i: Add touchscreen node to various
- tablets
-In-Reply-To: <fee7e6fe-d22b-9233-121e-b403d6ee20f1@redhat.com>
-References: <20160911182327.824-1-hdegoede@redhat.com>
- <20160913075953.GA9805@lukather>
- <fee7e6fe-d22b-9233-121e-b403d6ee20f1@redhat.com>
-Message-ID: <20160914161409.GH4668@lukather>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 14 Sep 2016 09:27:33 -0700
+Subject: [kernel-hardening] Re: [PATCH v3 3/7] arm64: Introduce
+ uaccess_{disable,enable} functionality based on TTBR0_EL1
+In-Reply-To: <20160914085159.GA13121@leverpostej>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+ <1473788797-10879-4-git-send-email-catalin.marinas@arm.com>
+ <CAGXu5jJETdRtuonhtkSxMf+sgCdBj2t2_U8yW2cDwcoGY=qvJw@mail.gmail.com>
+ <20160914085159.GA13121@leverpostej>
+Message-ID: <CAGXu5jJOfYadrV20KAfN_LC8Jy6ayg1dGS3dkSNpXXhnmz=h4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On Wed, Sep 14, 2016 at 1:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Sep 13, 2016 at 01:45:21PM -0700, Kees Cook wrote:
+>> On Tue, Sep 13, 2016 at 10:46 AM, Catalin Marinas
+>> > +static inline bool system_uses_ttbr0_pan(void)
+>> > +{
+>> > +       return IS_ENABLED(CONFIG_ARM64_SW_TTBR0_PAN) &&
+>> > +               !cpus_have_cap(ARM64_HAS_PAN);
+>> > +}
+>> > +
+>
+> [...]
+>
+>> >  #define __uaccess_enable(alt)                                          \
+>> >  do {                                                                   \
+>> > -       asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,                  \
+>> > -                       CONFIG_ARM64_PAN));                             \
+>> > +       if (system_uses_ttbr0_pan())                                    \
+>> > +               uaccess_ttbr0_enable();                                 \
+>> > +       else                                                            \
+>> > +               asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,          \
+>> > +                               CONFIG_ARM64_PAN));                     \
+>> >  } while (0)
+>>
+>> Does this mean that with CONFIG_ARM64_SW_TTBR0_PAN, even with ARMv8.1,
+>> a cpu capability bitmask check is done each time we go through
+>> __uaccess_{en,dis}able?
+>
+> Catalin reworked cpus_have_cap() to use static keys [1], and that's
+> queued in the arm64 for-next/core branch [2].
 
-On Tue, Sep 13, 2016 at 10:06:56AM +0200, Hans de Goede wrote:
-> On 13-09-16 09:59, Maxime Ripard wrote:
-> >On Sun, Sep 11, 2016 at 08:23:22PM +0200, Hans de Goede wrote:
-> >>Hi Maxime,
-> >>
-> >>Now that Dmitry has queued up the firmware-name property changes
-> >>in his for-linus branch, these dt patches are ready for merging.
-> >
-> >I queued this for 4.10.
-> 
-> 4.10 ? Is next already frozen ? Note either way is fine
-> just wondering.
+Oh awesome! Okay, thanks.
 
-Yes, the arm-soc maintainers usually stop merging PR after -rc6. It's
-still a bit flexible is something major and not really huge comes up,
-but for that kind of patches, I usually start queuing patches for the
-next release when -rc6 is out.
+> So this should expand to a single branch or nop that we patch when we
+> detect the presence/absence of PAN. There should be no bitmap check.
 
-Maxime
+/me is looking forward to v4.9 :)
+
+>
+> Thanks,
+> Mark.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/454025.html
+> [2] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+
+-Kees
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160914/0586166c/attachment.sig>
+Kees Cook
+Nexus Security
