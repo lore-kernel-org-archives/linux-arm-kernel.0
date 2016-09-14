@@ -1,39 +1,79 @@
 From: patrice.chotard@st.com (Patrice Chotard)
-Date: Wed, 14 Sep 2016 14:01:00 +0200
-Subject: [PATCH v9 13/19] ARM: STi: DT: STiH407: Add sti-sasg-codec dt node
-In-Reply-To: <1473081421-16555-14-git-send-email-peter.griffin@linaro.org>
+Date: Wed, 14 Sep 2016 14:01:46 +0200
+Subject: [PATCH v9 16/19] ARM: DT: STi: stihxxx-b2120: Add DT nodes for
+ STi audio card
+In-Reply-To: <1473081421-16555-17-git-send-email-peter.griffin@linaro.org>
 References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <1473081421-16555-14-git-send-email-peter.griffin@linaro.org>
-Message-ID: <142f56d1-4353-a57c-2dce-59abc3ba4cea@st.com>
+ <1473081421-16555-17-git-send-email-peter.griffin@linaro.org>
+Message-ID: <27eec291-dde4-846a-995a-fab6a2c76110@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Peter
 
 On 09/05/2016 03:16 PM, Peter Griffin wrote:
-> This patch adds the dt node for the internal audio
-> codec IP.
+> This patch enables the uniperif players 2 & 3 for b2120 boards
+> and also adds the "simple-audio-card" device node to interconnect
+> the SoC sound device and the codec.
 > 
 > Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
->  arch/arm/boot/dts/stih407-family.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  arch/arm/boot/dts/stihxxx-b2120.dtsi | 45 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index 45cab30..d1258d5 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -873,5 +873,12 @@
->  				<&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
->  				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> index 722c63f..4939501 100644
+> --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> @@ -131,5 +131,50 @@
+>  				dvb-card	= <STV0367_TDA18212_NIMA_1>;
+>  			};
 >  		};
 > +
+> +		sti_uni_player2: sti-uni-player at 8d82000 {
+> +			status = "okay";
+> +		};
+> +
+> +		sti_uni_player3: sti-uni-player at 8d85000 {
+> +			status = "okay";
+> +		};
+> +
 > +		sti_sasg_codec: sti-sasg-codec {
-> +			compatible = "st,stih407-sas-codec";
-> +			#sound-dai-cells = <1>;
-> +			status = "disabled";
-> +			st,syscfg = <&syscfg_core>;
+> +			status = "okay";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_spdif_out>;
+> +		};
+> +
+> +		sound {
+> +			compatible = "simple-audio-card";
+> +			simple-audio-card,name = "sti audio card";
+> +			status = "okay";
+> +
+> +			simple-audio-card,dai-link at 0 {
+> +				/* DAC */
+> +				format = "i2s";
+> +				mclk-fs = <256>;
+> +				cpu {
+> +					sound-dai = <&sti_uni_player2>;
+> +				};
+> +
+> +				codec {
+> +					sound-dai = <&sti_sasg_codec 1>;
+> +				};
+> +			};
+> +			simple-audio-card,dai-link at 1 {
+> +				/* SPDIF */
+> +				format = "left_j";
+> +				mclk-fs = <128>;
+> +				cpu {
+> +					sound-dai = <&sti_uni_player3>;
+> +				};
+> +
+> +				codec {
+> +					sound-dai = <&sti_sasg_codec 0>;
+> +				};
+> +			};
 > +		};
 >  	};
 >  };
