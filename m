@@ -1,98 +1,78 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 14 Sep 2016 16:21:41 +0200
-Subject: [PATCH 2/2] arm64: dts: marvell: enable MSI for PCIe on Armada
- 7K/8K
-In-Reply-To: <1472744484-19132-3-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Thu, 1 Sep 2016 17:41:24 +0200")
-References: <1472744484-19132-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1472744484-19132-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <871t0md0ju.fsf@free-electrons.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 14 Sep 2016 22:21:09 +0800
+Subject: [RFC PATCH v2 01/11] irqchip: gicv3-its: platform-msi: refactor
+ its_pmsi_prepare()
+In-Reply-To: <1473862879-7769-1-git-send-email-guohanjun@huawei.com>
+References: <1473862879-7769-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1473862879-7769-2-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+From: Hanjun Guo <hanjun.guo@linaro.org>
+
+Adding ACPI support for platform MSI, we need to retrieve the
+dev id in ACPI way instead of device tree, we already have
+a well formed function its_pmsi_prepare() to get the dev id
+but it's OF dependent, so collect OF related code and put them
+into a single function to make its_pmsi_prepare() more friendly
+to ACPI later.
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+index 470b4aa..3c94278 100644
+--- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+@@ -24,15 +24,11 @@ static struct irq_chip its_pmsi_irq_chip = {
+ 	.name			= "ITS-pMSI",
+ };
  
- On jeu., sept. 01 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-
-> This commit adds a reference to the appropriate MSI controller in the
-> description of the PCIe controllers on Marvel Armada 7K and 8K
-> platforms.
-
-Applied on mvebu/dt64
-
-Thanks,
-
-Gregory
-
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 +++
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 +++
->  2 files changed, 6 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index ceb83b0..ff469e1 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -177,6 +177,7 @@
->  			#interrupt-cells = <1>;
->  			device_type = "pci";
->  			dma-coherent;
-> +			msi-parent = <&gic_v2m0>;
->  
->  			bus-range = <0 0xff>;
->  			ranges =
-> @@ -202,6 +203,7 @@
->  			#interrupt-cells = <1>;
->  			device_type = "pci";
->  			dma-coherent;
-> +			msi-parent = <&gic_v2m0>;
->  
->  			bus-range = <0 0xff>;
->  			ranges =
-> @@ -228,6 +230,7 @@
->  			#interrupt-cells = <1>;
->  			device_type = "pci";
->  			dma-coherent;
-> +			msi-parent = <&gic_v2m0>;
->  
->  			bus-range = <0 0xff>;
->  			ranges =
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index 2d863f2..43cecf0 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -177,6 +177,7 @@
->  			#interrupt-cells = <1>;
->  			device_type = "pci";
->  			dma-coherent;
-> +			msi-parent = <&gic_v2m0>;
->  
->  			bus-range = <0 0xff>;
->  			ranges =
-> @@ -202,6 +203,7 @@
->  			#interrupt-cells = <1>;
->  			device_type = "pci";
->  			dma-coherent;
-> +			msi-parent = <&gic_v2m0>;
->  
->  			bus-range = <0 0xff>;
->  			ranges =
-> @@ -228,6 +230,7 @@
->  			#interrupt-cells = <1>;
->  			device_type = "pci";
->  			dma-coherent;
-> +			msi-parent = <&gic_v2m0>;
->  
->  			bus-range = <0 0xff>;
->  			ranges =
-> -- 
-> 2.7.4
->
-
+-static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
+-			    int nvec, msi_alloc_info_t *info)
++static int of_pmsi_get_dev_id(struct irq_domain *domain, struct device *dev,
++				  u32 *dev_id)
+ {
+-	struct msi_domain_info *msi_info;
+-	u32 dev_id;
+ 	int ret, index = 0;
+ 
+-	msi_info = msi_get_domain_info(domain->parent);
+-
+ 	/* Suck the DeviceID out of the msi-parent property */
+ 	do {
+ 		struct of_phandle_args args;
+@@ -43,11 +39,24 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
+ 		if (args.np == irq_domain_get_of_node(domain)) {
+ 			if (WARN_ON(args.args_count != 1))
+ 				return -EINVAL;
+-			dev_id = args.args[0];
++			*dev_id = args.args[0];
+ 			break;
+ 		}
+ 	} while (!ret);
+ 
++	return ret;
++}
++
++static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
++			    int nvec, msi_alloc_info_t *info)
++{
++	struct msi_domain_info *msi_info;
++	u32 dev_id;
++	int ret;
++
++	msi_info = msi_get_domain_info(domain->parent);
++
++	ret = of_pmsi_get_dev_id(domain, dev, &dev_id);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.12.4
