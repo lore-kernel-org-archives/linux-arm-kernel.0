@@ -1,50 +1,51 @@
 From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 14 Sep 2016 21:54:53 +0900
-Subject: [PATCH 0/8] drm/rockchip: Flip wait clean-up
-Message-ID: <1473857701-9250-1-git-send-email-tfiga@chromium.org>
+Date: Wed, 14 Sep 2016 21:54:54 +0900
+Subject: [PATCH 1/8] drm/rockchip: Clear interrupt status bits before enabling
+In-Reply-To: <1473857701-9250-1-git-send-email-tfiga@chromium.org>
+References: <1473857701-9250-1-git-send-email-tfiga@chromium.org>
+Message-ID: <1473857701-9250-2-git-send-email-tfiga@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display controller found on Rockchip SoCs supported by Rockchip DRM
-driver (VOP) is a bit problematic, because it does not provide hardware
-vblank counter. Because vblank interrupt is used to feed the software
-counter, the driver had custom code to wait for flip completion to avoid
-race between atomic flush and vblank interrupt handler.
+The enable register only masks the raw status bits to signal CPU
+interrupt only for enabled interrupts. The status bits are activated
+regardless of the enable register. This means that we might have an old
+interrupt event queued, which we are not interested in. To avoid getting
+a spurious interrupt signalled, we have to clear the old bit before we
+update the enable register.
 
-This, however, brought a different set of issues. In fact, even with the
-custom wait code, there is stil a race between the handler and driver
-state update (of the values used to compare with registers to determine
-if flip has completed). On top of that, legacy cursor updates are not
-implemented properly and have to wait for vblank to complete, which
-is against the API specification.
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-This series attempts to clean up the driver from this custom waiting code,
-eliminating related races and bringing correct handling of legacy cursor
-plane. It also gives a nice effect of more than 100 lines of code removed.
-
-This is a forward port of patches from 4.4 kernel used by ChromiumOS and
-tested there. Even though the code base has not changed significantly, it
-would be nice if someone with proper testing environment could give them
-a try.
-
-Based on for-next branch of Sean Paul's dogwood tree:
-https://cgit.freedesktop.org/~seanpaul/dogwood/log/?h=for-next
-git://people.freedesktop.org/~seanpaul/dogwood
-
-Tomasz Figa (8):
-  drm/rockchip: Clear interrupt status bits before enabling
-  drm/rockchip: Get rid of some unnecessary code
-  drm/rockchip: Avoid race with vblank count increment
-  drm/rockchip: Unreference framebuffers from flip work
-  drm/rockchip: Replace custom wait_for_vblanks with helper
-  drm/rockchip: Do not enable vblank without event
-  drm/rockchip: Always signal event in next vblank after cfg_done
-  drm/rockchip: Kill vop_plane_state
-
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   1 -
- drivers/gpu/drm/rockchip/rockchip_drm_fb.c  |  64 +------
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 247 +++++++++++-----------------
- 3 files changed, 95 insertions(+), 217 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 209167b..7e811cf 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -414,6 +414,7 @@ static void vop_dsp_hold_valid_irq_enable(struct vop *vop)
+ 
+ 	spin_lock_irqsave(&vop->irq_lock, flags);
+ 
++	VOP_INTR_SET_TYPE(vop, clear, DSP_HOLD_VALID_INTR, 1);
+ 	VOP_INTR_SET_TYPE(vop, enable, DSP_HOLD_VALID_INTR, 1);
+ 
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
+@@ -479,6 +480,7 @@ static void vop_line_flag_irq_enable(struct vop *vop, int line_num)
+ 	spin_lock_irqsave(&vop->irq_lock, flags);
+ 
+ 	VOP_CTRL_SET(vop, line_flag_num[0], line_num);
++	VOP_INTR_SET_TYPE(vop, clear, LINE_FLAG_INTR, 1);
+ 	VOP_INTR_SET_TYPE(vop, enable, LINE_FLAG_INTR, 1);
+ 
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
+@@ -921,6 +923,7 @@ static int vop_crtc_enable_vblank(struct drm_crtc *crtc)
+ 
+ 	spin_lock_irqsave(&vop->irq_lock, flags);
+ 
++	VOP_INTR_SET_TYPE(vop, clear, FS_INTR, 1);
+ 	VOP_INTR_SET_TYPE(vop, enable, FS_INTR, 1);
+ 
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
 -- 
 2.8.0.rc3.226.g39d4020
