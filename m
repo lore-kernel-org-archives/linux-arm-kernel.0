@@ -1,70 +1,46 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 14 Sep 2016 17:32:32 -0500
-Subject: [PATCH v9 04/10] arm64: Rename the common MADT parse routine
+Date: Wed, 14 Sep 2016 17:32:31 -0500
+Subject: [PATCH v9 03/10] arm64: pmu: Hoist pmu platform device name
 In-Reply-To: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
 References: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1473892358-22574-5-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1473892358-22574-4-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MADT parser in smp.c is now being used to parse
-out NUMA, PMU and ACPI parking protocol information as
-well as the GIC information for which it was originally
-created. Rename it to avoid a misleading name.
+Move the PMU name into a common header file so it may
+be referenced by other users.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/kernel/smp.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ arch/arm64/kernel/perf_event.c | 2 +-
+ include/linux/perf/arm_pmu.h   | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index d93d433..a6552fe 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -506,13 +506,14 @@ static unsigned int cpu_count = 1;
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index f650548..356fa6c 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -1099,7 +1099,7 @@ static int armv8_pmu_device_probe(struct platform_device *pdev)
  
- #ifdef CONFIG_ACPI
- /*
-- * acpi_map_gic_cpu_interface - parse processor MADT entry
-+ * acpi_verify_and_map_madt - parse processor MADT entry
-  *
-  * Carry out sanity checks on MADT processor entry and initialize
-- * cpu_logical_map on success
-+ * cpu_logical_map, the ACPI parking protocol, NUMA mapping
-+ * and the PMU interrupts on success
-  */
- static void __init
--acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
-+acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
- {
- 	u64 hwid = processor->arm_mpidr;
+ static struct platform_driver armv8_pmu_driver = {
+ 	.driver		= {
+-		.name	= "armv8-pmu",
++		.name	= ARMV8_PMU_PDEV_NAME,
+ 		.of_match_table = armv8_pmu_of_device_ids,
+ 	},
+ 	.probe		= armv8_pmu_device_probe,
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index e188438..eab9014 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -151,6 +151,8 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct of_device_id *of_table,
+ 			 const struct pmu_probe_info *probe_table);
  
-@@ -565,7 +566,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
- }
++#define ARMV8_PMU_PDEV_NAME "armv8-pmu"
++
+ #endif /* CONFIG_ARM_PMU */
  
- static int __init
--acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-+acpi_parse_madt_common(struct acpi_subtable_header *header,
- 			     const unsigned long end)
- {
- 	struct acpi_madt_generic_interrupt *processor;
-@@ -576,7 +577,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
- 
- 	acpi_table_print_madt_entry(header);
- 
--	acpi_map_gic_cpu_interface(processor);
-+	acpi_verify_and_map_madt(processor);
- 
- 	return 0;
- }
-@@ -659,7 +660,7 @@ void __init smp_init_cpus(void)
- 		 * we need for SMP init
- 		 */
- 		acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
--				      acpi_parse_gic_cpu_interface, 0);
-+				      acpi_parse_madt_common, 0);
- 
- 	if (cpu_count > nr_cpu_ids)
- 		pr_warn("Number of cores (%d) exceeds configured maximum of %d - clipping\n",
+ #endif /* __ARM_PMU_H__ */
 -- 
 2.5.5
