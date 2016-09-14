@@ -1,40 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 23:45:39 +0200
-Subject: [GIT PULL 4/4] Broadcom devicetree-arm64 changes for 4.9
-In-Reply-To: <8d7d7a8b-0bac-e2a0-f6cd-ef8fc8269678@broadcom.com>
-References: <1473213558-11782-1-git-send-email-f.fainelli@gmail.com>
- <4089229.OUTltm1bc5@wuerfel>
- <8d7d7a8b-0bac-e2a0-f6cd-ef8fc8269678@broadcom.com>
-Message-ID: <6132360.lprDRujYd6@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 14 Sep 2016 14:45:54 -0700
+Subject: [PATCH v2 1/4] clk: sunxi-ng: Add A64 clocks
+In-Reply-To: <20160909201029.24530-2-maxime.ripard@free-electrons.com>
+References: <20160909201029.24530-1-maxime.ripard@free-electrons.com>
+ <20160909201029.24530-2-maxime.ripard@free-electrons.com>
+Message-ID: <20160914214554.GH7243@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 14, 2016 10:07:48 AM CEST Florian Fainelli wrote:
-> On 09/14/2016 08:20 AM, Arnd Bergmann wrote:
-> > On Tuesday, September 6, 2016 6:59:18 PM CEST Florian Fainelli wrote:
-> >> This pull request contains Broadcom ARM64-based SoC Device Tree changes for
-> >> v4.9, please pull the folllowing:
-> >>
-> >> - Dhanajay adds the PWM Device Tree nodes to the Northstar 2 DTS files
-> >>
-> > 
-> > Pulled into next/dt64, thanks!
-> > 
-> > I did the pull requests for next/dt yesterday but evidently missed yours.
-> > Don't worry about it, I've already looked at it and it's fine. We'll
-> > pick it up in the next few days along with your other two pull requests.
-> 
-> (plaintext this time)
-> 
-> No worries, would you need me to change anything in the submission
-> process to help? Out of curiosity do you have a patchwork or other patch
-> tracking tool at arm at kernel.org?
+On 09/09, Maxime Ripard wrote:
+> index 106cba27c331..964f22091a10 100644
+> --- a/drivers/clk/sunxi-ng/Makefile
+> +++ b/drivers/clk/sunxi-ng/Makefile
+> @@ -22,3 +22,4 @@ obj-$(CONFIG_SUN6I_A31_CCU)	+= ccu-sun6i-a31.o
+>  obj-$(CONFIG_SUN8I_A23_CCU)	+= ccu-sun8i-a23.o
+>  obj-$(CONFIG_SUN8I_A33_CCU)	+= ccu-sun8i-a33.o
+>  obj-$(CONFIG_SUN8I_H3_CCU)	+= ccu-sun8i-h3.o
+> +obj-$(CONFIG_SUN50I_A64_CCU)	+= ccu-sun50i-a64.o
 
-No, you did everything just right, I was just not paying attention
-at the right moment when going through my folder.
+Maybe do alphanumeric ordering?
 
-We don't use patchwork or anything like that, just filtering on
-the inbox. Usually Olof and I both go through the lists separately
-to make sure that the other one hasn't missed stuff.
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> new file mode 100644
+> index 000000000000..d51ee416f515
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> @@ -0,0 +1,870 @@
+> +
+> +static void __init sun50i_a64_ccu_setup(struct device_node *node)
+> +{
+> +	void __iomem *reg;
+> +	u32 val;
+> +
+> +	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> +	if (IS_ERR(reg)) {
+> +		pr_err("%s: Could not map the clock registers\n",
+> +		       of_node_full_name(node));
+> +		return;
+> +	}
+> +
+> +	/* Force the PLL-Audio-1x divider to 4 */
+> +	val = readl(reg + SUN50I_A64_PLL_AUDIO_REG);
+> +	val &= ~GENMASK(19, 16);
+> +	writel(val | (3 << 16), reg + SUN50I_A64_PLL_AUDIO_REG);
+> +
+> +	writel(0x515, reg + SUN50I_A64_PLL_MIPI_REG);
+> +
+> +	sunxi_ccu_probe(node, reg, &sun50i_a64_ccu_desc);
+> +}
+> +CLK_OF_DECLARE(sun50i_a64_ccu, "allwinner,sun50i-a64-ccu",
+> +	       sun50i_a64_ccu_setup);
 
-	Arnd
+Is there a reason it can't be a platform driver?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
