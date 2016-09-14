@@ -1,162 +1,67 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 14 Sep 2016 15:34:57 +0800
-Subject: [PATCH v7 7/9] drm/mediatek: add dsi transfer function
-In-Reply-To: <1473837742.24354.28.camel@mtksdaap41>
-References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
- <1472815484-43821-8-git-send-email-yt.shen@mediatek.com>
- <1473215632.11736.21.camel@mtksdaap41>
- <1473675381.12398.27.camel@mtksdaap41>
- <1473758754.28437.40.camel@mtksdaap41>
- <1473833946.24354.8.camel@mtksdaap41> <1473835151.10216.2.camel@mtksdaap41>
- <1473837742.24354.28.camel@mtksdaap41>
-Message-ID: <1473838497.10216.5.camel@mtksdaap41>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 14 Sep 2016 16:03:21 +0800
+Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
+In-Reply-To: <147383270635.1464.10706917860873291816@sboyd-linaro>
+References: <20160914014246.31847-1-stephen.boyd@linaro.org>
+ <20160914033200.GE30760@b29397-desktop>
+ <147383270635.1464.10706917860873291816@sboyd-linaro>
+Message-ID: <20160914080321.GA21674@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+On Tue, Sep 13, 2016 at 10:58:26PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-09-13 20:32:00)
+> > On Tue, Sep 13, 2016 at 06:42:46PM -0700, Stephen Boyd wrote:
+> > > On the db410c 96boards platform we have a TC7USB40MU[1] on the
+> > > board to mux the D+/D- lines from the SoC between a micro usb
+> > > "device" port and a USB hub for "host" roles. Upon a role switch,
+> > > we need to change this mux to forward the D+/D- lines to either
+> > > the port or the hub. Therefore, introduce a driver for this
+> > > device that intercepts extcon USB_HOST events and logically
+> > > asserts a gpio to mux the "host" D+/D- lines when a host cable is
+> > > attached. When the cable goes away, it will logically deassert
+> > > the gpio and mux the "device" lines.
+> > 
+> > Would you please draw the design? It can also help me review your
+> > chipidea patch well.
+> > 
+> > 1. How many ports on the board?
+> > 2. How the lines are connected on the board?
+> > 
+> 
+> The schematic for the db410c is publically available here[2][3].
+> 
+> There's also the 96boards spec[4] which talks about this switch based
+> design a little bit. See the section titled "Single USB port Example".
+> 
+> [2] https://github.com/96boards/documentation/blob/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
+> [3] https://github.com/96boards/documentation/raw/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
+> [4] https://www.96boards.org/wp-content/uploads/2015/02/96BoardsCESpecificationv1.0-EA1.pdf
 
-On Wed, 2016-09-14 at 15:22 +0800, YT Shen wrote:
-> Hi CK,
-> 
-> On Wed, 2016-09-14 at 14:39 +0800, CK Hu wrote:
-> > Hi, YT:
-> > 
-> > On Wed, 2016-09-14 at 14:19 +0800, YT Shen wrote:
-> > > Hi CK,
-> > > 
-> > > On Tue, 2016-09-13 at 17:25 +0800, CK Hu wrote:
-> > > > Hi, YT:
-> > > > 
-> > > > On Mon, 2016-09-12 at 18:16 +0800, YT Shen wrote:
-> > > > > Hi CK,
-> > > > > 
-> > > > > On Wed, 2016-09-07 at 10:33 +0800, CK Hu wrote:
-> > > > > > Hi, YT:
-> > > > > > 
-> > > > > > On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
-> > > > > > > From: shaoming chen <shaoming.chen@mediatek.com>
-> > > > > > > 
-> > > > > > > add dsi read/write commands for transfer function
-> > > > > > > 
-> > > > > > > Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> > > > > > > ---
-> > > > > > >  drivers/gpu/drm/mediatek/mtk_dsi.c | 188 +++++++++++++++++++++++++++++++++++++
-> > > > > > >  1 file changed, 188 insertions(+)
-> > > > > > > 
-> > > > > > 
-> > > > > > [snip...]
-> > > > > > 
-> > > > > > >  
-> > > > > > > +static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
-> > > > > > > +{
-> > > > > > > +	dsi->irq_data &= ~irq_bit;
-> > > > > > > +}
-> > > > > > > +
-> > > > > > 
-> > > > > > [snip...]
-> > > > > > 
-> > > > > > > +
-> > > > > > > +static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-> > > > > > > +				     unsigned int timeout)
-> > > > > > > +{
-> > > > > > > +	s32 ret = 0;
-> > > > > > > +	unsigned long jiffies = msecs_to_jiffies(timeout);
-> > > > > > > +
-> > > > > > > +	ret = wait_event_interruptible_timeout(_dsi_irq_wait_queue,
-> > > > > > > +					       dsi->irq_data & irq_flag,
-> > > > > > > +					       jiffies);
-> > > > > > > +	if (ret == 0) {
-> > > > > > > +		dev_info(dsi->dev, "Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
-> > > > > > > +
-> > > > > > > +		mtk_dsi_enable(dsi);
-> > > > > > > +		mtk_dsi_reset_engine(dsi);
-> > > > > > > +	}
-> > > > > > > +
-> > > > > > > +	return ret;
-> > > > > > > +}
-> > > > > > 
-> > > > > > I think mtk_dsi_irq_data_clear() and mtk_dsi_wait_for_irq_done() should
-> > > > > > be moved to the 6th patch [1] of this series because these two functions
-> > > > > > deal the irq control.
-> > > > > We will move mtk_dsi_irq_data_clear() to patch "drm/mediatek: add dsi
-> > > > > interrupt control" and put mtk_dsi_wait_for_irq_done() here, because it
-> > > > > is used in the transfer function.
-> > > > 
-> > > > mtk_dsi_irq_data_clear() is also only used in transfer function now. I
-> > > > think both function could be used for other application rather than
-> > > > transfer function, so these two function are general function for irq
-> > > > control.
-> > > We will rollback the changes here.  Move mtk_dsi_irq_data_clear() to
-> > > original place.
-> > > 
-> > > Add new functions could be used in the future will have problems.
-> > > warning: 'mtk_dsi_wait_for_irq_done' defined but not used
-> > > [-Wunused-function]
-> > >  static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-> > > warning: 'mtk_dsi_irq_data_clear' defined but not used
-> > > [-Wunused-function]
-> > >  static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
-> > 
-> > Please refer to [1], '__maybe_unused' can fix your problem.
-> > 
-> > [1]
-> > http://lxr.free-electrons.com/source/drivers/gpu/drm/panel/panel-sharp-lq101r1sx01.c#L76
-> Add __maybe_unused just let GCC not produce a warning for this function.
-> So you want add patch like this?
-> 
-> [PATCH v7 6/9] drm/mediatek: add dsi interrupt control
-> +static __maybe_unused s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi
-> *dsi, u32 irq_flag,
-> 
-> +static __maybe_unused void mtk_dsi_irq_data_set(struct mtk_dsi *dsi,
-> u32 irq_bit)
-> 
-> [PATCH v7 7/9] drm/mediatek: add dsi transfer function
-> -static __maybe_unused s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi
-> *dsi, u32 irq_flag,
-> +static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-> 
-> -static __maybe_unused void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi,
-> u32 irq_bit)
-> +static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
-> 
-> Put the static function earlier and add __maybe_unused annotations.
-> Then remove _maybe_unused annotations later.  Or you want to keep
-> __maybe_unused annotations inside?  Sounds unnecessary, it is different
-> from your reference sharp_panel_read().
+Ok, I see several use cases for this role switch
 
-Removing '__maybe_unused' in later patch looks good to me.
+1. Using the hardware switch (218-4LPST)
+In this case, you can set USB_SW_SEL as input gpio, and use
+extcon-usb-gpio.c like before, just set this gpio as active
+low at dts.
 
-Regards,
-CK
+2. Using USB_HS_ID as vbus-gpio (input), and USB_SW_SEL as id-gpio (output)
+I can't find hardware relationship between each other, maybe I miss
+something.
+This use case (design) seems strange, usually, we use ID pin controls
+vbus, but seldom use vbus pin control ID.
+How you would like to implement it? When the USB cable is connected
+(between PC), it receives vbus-gpio interrupt, then you set USB_SW_SEL
+as low? If disconnected, you set USB_SW_SEL as high?
+When the USB controller works at Host mode, what will happen if the user
+connects USB cable at device port?
 
-> 
-> > 
-> > Regards,
-> > CK
-> > 
-> > > 
-> > > > Regards,
-> > > > CK
-> > > > 
-> > > > > 
-> > > > > Regards,
-> > > > > yt.shen
-> > > > > > 
-> > > > > > 
-> > > > > > [1] https://patchwork.kernel.org/patch/9310819/
-> > > > > > 
-> > > > > > 
-> > > > > > Regards,
-> > > > > > CK
-> > > > > > 
-> > > > > 
-> > > > > 
-> > > > 
-> > > > 
-> > > 
-> > > 
-> > 
-> > 
-> 
-> 
+3. Using sysfs to switch the role
+Set USB_SW_SEL according to "role" at debugfs
+
+Which one you would like to implement? Or anything else I miss?
+
+-- 
+
+Best Regards,
+Peter Chen
