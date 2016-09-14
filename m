@@ -1,23 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 17:06:00 +0200
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.9
-In-Reply-To: <57C95594.40105@hisilicon.com>
-References: <57C95594.40105@hisilicon.com>
-Message-ID: <4112756.vQdZALs121@wuerfel>
+Date: Wed, 14 Sep 2016 17:08:20 +0200
+Subject: [GIT PULL] Qualcomm ARM64 DT Updates for v4.9
+In-Reply-To: <1472875085-18017-1-git-send-email-andy.gross@linaro.org>
+References: <1472875085-18017-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <4717013.GEWhg6s4yY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 11:33:56 AM CEST Wei Xu wrote:
-> ARM64: DT: Hisilicon SoC DT updates for 4.9
+On Friday, September 2, 2016 10:58:05 PM CEST Andy Gross wrote:
+> Qualcomm ARM64 Updates for v4.9
 > 
-> - Set UART1 clock frequency to 150MHz for higher baud rates on hikey
-> - Add display subsystem, HDMI and cma nodes on hikey to support display
-> - Add syscon-reboot-mode support on hikey
-> - Add pstore support on hikey
-> - Add resets and sd-uhs-sdr property dwmmc ndoe on hikey
-> - Remove hip05_hns.dtsi since it can not be built without mbigenv1
-> - Update system controller bingding document for hip05 and hip06
-> - Add xge and sas support on hip06
+> * Updates for MSM8916 including TSCR, SMSM/SMP2P, and MBA reserve
+> * Update SCM node to denote being a reset-controller
+> * Fix broken interrupt settings
+> * Add TSENS nodes for MSM8916/MSM8996
+> * Add DB820c support
+> * Add MSM8916/APQ8016 display support
 > 
 
 Pulled into next/dt64, thanks!
