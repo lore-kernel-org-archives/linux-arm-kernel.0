@@ -1,42 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 14 Sep 2016 14:39:03 -0700
-Subject: [PATCH 1/5] clk: add support for runtime pm
-In-Reply-To: <e3cceb9a-7a30-c662-dba4-bc453f6fddb6@samsung.com>
-References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
- <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
- <20160908001943.GC13062@codeaurora.org>
- <CGME20160912101857eucas1p29b2bbd5ac0eda92284091ad1b86decc4@eucas1p2.samsung.com>
- <f18fee35-cb5d-abce-0415-a98b58e3a302@samsung.com>
- <20160912223105.GI7243@codeaurora.org>
- <e3cceb9a-7a30-c662-dba4-bc453f6fddb6@samsung.com>
-Message-ID: <20160914213903.GG7243@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Sep 2016 23:45:39 +0200
+Subject: [GIT PULL 4/4] Broadcom devicetree-arm64 changes for 4.9
+In-Reply-To: <8d7d7a8b-0bac-e2a0-f6cd-ef8fc8269678@broadcom.com>
+References: <1473213558-11782-1-git-send-email-f.fainelli@gmail.com>
+ <4089229.OUTltm1bc5@wuerfel>
+ <8d7d7a8b-0bac-e2a0-f6cd-ef8fc8269678@broadcom.com>
+Message-ID: <6132360.lprDRujYd6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13, Marek Szyprowski wrote:
-> On 2016-09-13 00:31, Stephen Boyd wrote:
-> >
-> >Great! So you have runtime PM callbacks that are calling
-> >clk_prepare/unprepare?
+On Wednesday, September 14, 2016 10:07:48 AM CEST Florian Fainelli wrote:
+> On 09/14/2016 08:20 AM, Arnd Bergmann wrote:
+> > On Tuesday, September 6, 2016 6:59:18 PM CEST Florian Fainelli wrote:
+> >> This pull request contains Broadcom ARM64-based SoC Device Tree changes for
+> >> v4.9, please pull the folllowing:
+> >>
+> >> - Dhanajay adds the PWM Device Tree nodes to the Northstar 2 DTS files
+> >>
+> > 
+> > Pulled into next/dt64, thanks!
+> > 
+> > I did the pull requests for next/dt yesterday but evidently missed yours.
+> > Don't worry about it, I've already looked at it and it's fine. We'll
+> > pick it up in the next few days along with your other two pull requests.
 > 
-> Well, not really. clock controller's runtime pm functions must not call
-> clk_prepare/unprepare yet.
+> (plaintext this time)
 > 
-> I didn't get your question. I thought that you are asking if my change
-> won't introduce any deadlock related to prepare and dev->pm locks. My
-> runtime pm functions doesn't do any call to clk_prepare/unprepare.
-> Although global clock prepare lock is re-entrant from the same process, it
-> would cause deadlock if called from runtime pm functions, because runtime
-> pm functions might be called from the worker running on the different
-> cpu/process.
+> No worries, would you need me to change anything in the submission
+> process to help? Out of curiosity do you have a patchwork or other patch
+> tracking tool at arm at kernel.org?
 
-I mean non-clk controller driver based runtime PM callbacks that
-call clk_prepare/unprepare in them. For example, some i2c or spi
-device driver that has clk operations in the runtime PM
-callbacks. That would allow lockdep to see any potential deadlock
-because of aliasing lock classes for the device power lock and
-the global prepare lock.
+No, you did everything just right, I was just not paying attention
+at the right moment when going through my folder.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+We don't use patchwork or anything like that, just filtering on
+the inbox. Usually Olof and I both go through the lists separately
+to make sure that the other one hasn't missed stuff.
+
+	Arnd
