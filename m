@@ -1,46 +1,22 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 14 Sep 2016 11:17:35 -0700
-Subject: [PATCH v2 1/6] usb: dwc2: add support for Meson8b and GXBB SoCs
-In-Reply-To: <0d587b46-4c6e-c2ec-a62e-5d0c5a5bd902@synopsys.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160911134111.31141-1-martin.blumenstingl@googlemail.com>
- <20160911134111.31141-2-martin.blumenstingl@googlemail.com>
- <m24m5ixxyu.fsf@baylibre.com>
- <0d587b46-4c6e-c2ec-a62e-5d0c5a5bd902@synopsys.com>
-Message-ID: <CAOi56cW+zJ8_Gf6xKMyKNk7YB1+MpWHrtmv=+Xxs0PZy9rAXqQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 14 Sep 2016 11:25:06 -0700
+Subject: [PATCH 1/4] clk: gxbb: expose i2c clocks
+In-Reply-To: <1473847568-20163-2-git-send-email-jbrunet@baylibre.com>
+References: <1473847568-20163-1-git-send-email-jbrunet@baylibre.com>
+ <1473847568-20163-2-git-send-email-jbrunet@baylibre.com>
+Message-ID: <20160914182506.GS7243@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 11:12 AM, John Youn <John.Youn@synopsys.com> wrote:
-> On 9/14/2016 9:11 AM, Kevin Hilman wrote:
->> Hi John,
->>
->> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
->>
->>> From: Jerome Brunet <jbrunet@baylibre.com>
->>>
->>> Add compatible strings for amlogic Meson8b and GXBB SoCs with the
->>> corresponding configuration parameters.
->>>
->>> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
->>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>
->> Are you OK with adding this platform for v4.9?  I know you mentioned
->> you're working on new bindings to replace the current way, but since
->> that hasn't been posted AFAICT, it would be nice to get this merged now
->> and we can help test the new bindings when you're ready.
->>
->> If you're OK with that, and with your Ack, I can take merge the driver
->> changes through the arm-soc tree along with the rest of the DT patches.
->>
->
-> Sure. Unfortunately, I wasn't able to complete it for 4.9.
->
-> You can add my acked-by on this:
->
-> Acked-by: John Youn <johnyoun@synopsys.com>
+On 09/14, Jerome Brunet wrote:
+> I2C and AO_I2C clocks are needed for the i2c driver, expose to DT
+> (and comment out in clk driver)
+> 
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
 
-Great, thanks!  I assume you're OK with PATCH 2/2 for the bindings as
-well (at least for now until you rework them?)
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Kevin
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
