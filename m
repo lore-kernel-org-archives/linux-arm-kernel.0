@@ -1,88 +1,44 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 14 Sep 2016 11:35:53 +0100
-Subject: [PATCH v7 00/22] Generic DT bindings for PCI IOMMUs and ARM SMMU
-In-Reply-To: <11ebd81e-2ea5-5ff3-35b3-be95f03e05bd@redhat.com>
-References: <cover.1473695704.git.robin.murphy@arm.com>
- <11ebd81e-2ea5-5ff3-35b3-be95f03e05bd@redhat.com>
-Message-ID: <d03ea5e7-59f1-8b49-4ba2-d05fc2030ebc@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Sep 2016 11:36:46 +0100
+Subject: [PATCH v3 0/7] arm64: Privileged Access Never using TTBR0_EL1
+ switching
+In-Reply-To: <CAKv+Gu_ww5+_vcKfnFsUgG6h1v87-CWhLp_o7qHS6=3nd6-cow@mail.gmail.com>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+ <CAKv+Gu-zHmExwk-YqXVg2ZuVi1M8L4BbJb6-iARxQ7b_2eH-rA@mail.gmail.com>
+ <20160914102659.GC14330@leverpostej>
+ <CAKv+Gu_ww5+_vcKfnFsUgG6h1v87-CWhLp_o7qHS6=3nd6-cow@mail.gmail.com>
+Message-ID: <20160914103632.GD14330@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/16 09:41, Auger Eric wrote:
-> Hi,
+On Wed, Sep 14, 2016 at 11:30:05AM +0100, Ard Biesheuvel wrote:
+> On 14 September 2016 at 11:27, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Sep 14, 2016 at 11:13:33AM +0100, Ard Biesheuvel wrote:
+> >> On 13 September 2016 at 18:46, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > This is the third version of the arm64 PAN emulation using TTBR0_EL1
+> >> > switching.
+> >
+> >> Given that every __get_user() call now incurs the PAN switch overhead,
+> >> I wonder if it would be worth it to stash the real TTBR0_EL1 value in,
+> >> e.g., TPIDRRO_EL0 rather than load it from memory each time. We'd have
+> >> to reload the real value of TPIDRRO_EL0 at kernel exit every time, but
+> >> only for compat tasks, and not nearly as often, obviously.
+> >
+> > FWIW, my plan for vmap'd stacks involves clobbering TPIDRRO_EL0 early
+> > upon kernel entry to reliably detect/handle stack overflow (as we need
+> > to free up GPR to detect overflow, and we need to detect that before we
+> > try to store to the stack).
+> >
+> > For non-compat tasks we must restore zero, so either way we'll end up
+> > with a load (to determine compat-ness or to load the precise value).
 > 
-> On 12/09/2016 18:13, Robin Murphy wrote:
->> Hi all,
->>
->> To any more confusing fixups and crazily numbered extra patches, here's
->> a quick v7 with everything rebased into the right order. The significant
->> change this time is to implement iommu_fwspec properly from the start,
->> which ends up being far simpler and more robust than faffing about
->> introducing it somewhere 'less intrusive' to move toward core code later.
->>
->> New branch in the logical place:
->>
->> git://linux-arm.org/linux-rm iommu/generic-v7
-> 
-> For information, as discussed privately with Robin I experience some
-> regressions with the former and now deprecated dt description.
-> 
-> on my AMD Overdrive board and my old dt description I now only see a
-> single group:
-> 
-> /sys/kernel/iommu_groups/
-> /sys/kernel/iommu_groups/0
-> /sys/kernel/iommu_groups/0/devices
-> /sys/kernel/iommu_groups/0/devices/e0700000.xgmac
-> 
-> whereas I formerly see
-> 
-> /sys/kernel/iommu_groups/
-> /sys/kernel/iommu_groups/3
-> /sys/kernel/iommu_groups/3/devices
-> /sys/kernel/iommu_groups/3/devices/0000:00:00.0
-> /sys/kernel/iommu_groups/1
-> /sys/kernel/iommu_groups/1/devices
-> /sys/kernel/iommu_groups/1/devices/e0700000.xgmac
-> /sys/kernel/iommu_groups/4
-> /sys/kernel/iommu_groups/4/devices
-> /sys/kernel/iommu_groups/4/devices/0000:00:02.2
-> /sys/kernel/iommu_groups/4/devices/0000:01:00.1
-> /sys/kernel/iommu_groups/4/devices/0000:00:02.0
-> /sys/kernel/iommu_groups/4/devices/0000:01:00.0
-> /sys/kernel/iommu_groups/2
-> /sys/kernel/iommu_groups/2/devices
-> /sys/kernel/iommu_groups/2/devices/e0900000.xgmac
-> /sys/kernel/iommu_groups/0
-> /sys/kernel/iommu_groups/0/devices
-> /sys/kernel/iommu_groups/0/devices/f0000000.pcie
-> 
-> This is the group topology without ACS override. Applying the non
-> upstreamed "pci: Enable overrides for missing ACS capabilities" I used
-> to see separate groups for each PCIe components. Now I don't see any
-> difference with and without ACS override.
+> Are you saying that with vmapped stacks, we'll end up clobbering it
+> (and thus restoring it) anyway when entering the kernel, and so we
+> could use it for free afterwards while running in the kernel,
+> potentially for the real value of TTBR0_EL1?
 
-OK, having reproduced on my Juno, the problem looks to be that
-of_for_each_phandle() leaves err set to -ENOENT after successfully
-walking a phandle list, which makes __find_legacy_master_phandle()
-always bail out after the first SMMU.
+Yes, assuming that we end up following my current plan for how to
+implement that.
 
-Can you confirm that the following diff fixes things for you?
-
-Robin
-
---->8---
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index fa892d25004d..ac4aab97c93a 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -477,7 +477,7 @@ static int __find_legacy_master_phandle(struct
-device *dev, void *data)
- 			return 1;
- 		}
- 	it->node = np;
--	return err;
-+	return err == -ENOENT ? 0 : err;
- }
-
- static struct platform_driver arm_smmu_driver;
+Thanks,
+Mark.
