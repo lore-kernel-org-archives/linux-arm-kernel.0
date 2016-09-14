@@ -1,67 +1,31 @@
-From: xhnjupt@gmail.com (Han Xu)
-Date: Wed, 14 Sep 2016 14:49:23 -0500
-Subject: [PATCH v3 9/9] mtd: fsl-quadspi: add multi flash chip R/W on
- ls2080a
-In-Reply-To: <1471505884-33996-9-git-send-email-B56489@freescale.com>
-References: <1471505884-33996-1-git-send-email-B56489@freescale.com>
- <1471505884-33996-9-git-send-email-B56489@freescale.com>
-Message-ID: <CA+EcR20QhaN1LmNTcHVnCaPf=F3m=PDHdM+ptViMWKmUJJeOOQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 14 Sep 2016 20:58:30 +0100
+Subject: next-20160914 build: 2 failures 3 warnings (next-20160914)
+In-Reply-To: <20160914171137.GF27974@sirena.org.uk>
+References: <E1bk5OS-0000Vu-1C@optimist> <20160914171137.GF27974@sirena.org.uk>
+Message-ID: <20160914195830.GF638@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 2:38 AM, Yunhui Cui <B56489@freescale.com> wrote:
-> From: Yunhui Cui <yunhui.cui@nxp.com>
->
-> There is a hardware feature that qspi_amba_base is added
-> internally by SOC design on ls2080a. so memmap_phy need not
-> be added in driver. If memmap_phy is added, the flash A1
-> addr space is [0, memmap_phy] which far more than flash size.
-> The AMBA memory will be divided into four parts and assign to
-> every chipselect. Every channel will has two valid chipselects.
->
-> Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
-> ---
->  drivers/mtd/spi-nor/fsl-quadspi.c | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-> index 193e81b..8c9746c 100644
-> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
-> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-> @@ -736,11 +736,17 @@ static void fsl_qspi_set_map_addr(struct fsl_qspi *q)
->  {
->         int nor_size = q->nor_size;
->         void __iomem *base = q->iobase;
-> +       u32 mem_base;
->
-> -       qspi_writel(q, nor_size + q->memmap_phy, base + QUADSPI_SFA1AD);
-> -       qspi_writel(q, nor_size * 2 + q->memmap_phy, base + QUADSPI_SFA2AD);
-> -       qspi_writel(q, nor_size * 3 + q->memmap_phy, base + QUADSPI_SFB1AD);
-> -       qspi_writel(q, nor_size * 4 + q->memmap_phy, base + QUADSPI_SFB2AD);
-> +       if (has_added_amba_base_internal(q))
-> +               mem_base = 0x0;
-> +       else
-> +               mem_base = q->memmap_phy;
-> +
-> +       qspi_writel(q, nor_size + mem_base, base + QUADSPI_SFA1AD);
-> +       qspi_writel(q, nor_size * 2 + mem_base, base + QUADSPI_SFA2AD);
-> +       qspi_writel(q, nor_size * 3 + mem_base, base + QUADSPI_SFB1AD);
-> +       qspi_writel(q, nor_size * 4 + mem_base, base + QUADSPI_SFB2AD);
->  }
->
->  /*
-> --
-> 2.1.0.27.g96db324
->
->
-Acked-by: Han xu <han.xu@nxp.com>
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+On Wed, 14 Sep 2016, Mark Brown wrote:
 
+> On Wed, Sep 14, 2016 at 09:18:08AM +0100, Build bot for Mark Brown wrote:
+> 
+> Today's -next fails to build both arm and arm64 allmodconfig due to:
+> 
+> > 	arm64-allmodconfig
+> > ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+> > 
+> > 	arm-allmodconfig
+> > ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+> 
+> due to 262d5cc6ceb293 (mfd: tps65217: Add support for IRQs) since
+> irq_set_parent() isn't exported.
 
+Arnd is talking to Thomas about a possible solution.
 
 -- 
-Sincerely,
-
-Han XU
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
