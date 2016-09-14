@@ -1,81 +1,17 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 14 Sep 2016 15:16:58 -0700
-Subject: [PATCH 11/19] watchdog: st_wdt: Remove support for obsolete
- platforms
-In-Reply-To: <1473859677-9231-12-git-send-email-peter.griffin@linaro.org>
-References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
- <1473859677-9231-12-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160914221658.GF14003@roeck-us.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Sep 2016 00:18:32 +0200
+Subject: [GIT PULL] ARM: at91: drivers for 4.9
+In-Reply-To: <20160914084054.5k5ke4ovfj7ze2fg@piout.net>
+References: <20160914084054.5k5ke4ovfj7ze2fg@piout.net>
+Message-ID: <8649173.qEG8Q5Lyvp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 02:27:49PM +0100, Peter Griffin wrote:
-> STiH415/6 SoC support is being removed from the kernel.
-> This patch updates the watchdog driver to remove references
-> to these obsolete platforms.
+On Wednesday, September 14, 2016 10:40:54 AM CEST Alexandre Belloni wrote:
+> Drivers for 4.9:
+>  - Coccinelle fixes for atmel-ebi and atmel-sdramc
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Cc: <wim@iguana.be>
-> Cc: <linux@roeck-us.net>
-> Cc: <linux-watchdog@vger.kernel.org>
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Pulled into next/drivers, thanks!
 
-> ---
->  drivers/watchdog/st_lpc_wdt.c | 33 ---------------------------------
->  1 file changed, 33 deletions(-)
-> 
-> diff --git a/drivers/watchdog/st_lpc_wdt.c b/drivers/watchdog/st_lpc_wdt.c
-> index 14e9bad..e6100e4 100644
-> --- a/drivers/watchdog/st_lpc_wdt.c
-> +++ b/drivers/watchdog/st_lpc_wdt.c
-> @@ -52,27 +52,6 @@ struct st_wdog {
->  	bool warm_reset;
->  };
->  
-> -static struct st_wdog_syscfg stid127_syscfg = {
-> -	.reset_type_reg		= 0x004,
-> -	.reset_type_mask	= BIT(2),
-> -	.enable_reg		= 0x000,
-> -	.enable_mask		= BIT(2),
-> -};
-> -
-> -static struct st_wdog_syscfg stih415_syscfg = {
-> -	.reset_type_reg		= 0x0B8,
-> -	.reset_type_mask	= BIT(6),
-> -	.enable_reg		= 0x0B4,
-> -	.enable_mask		= BIT(7),
-> -};
-> -
-> -static struct st_wdog_syscfg stih416_syscfg = {
-> -	.reset_type_reg		= 0x88C,
-> -	.reset_type_mask	= BIT(6),
-> -	.enable_reg		= 0x888,
-> -	.enable_mask		= BIT(7),
-> -};
-> -
->  static struct st_wdog_syscfg stih407_syscfg = {
->  	.enable_reg		= 0x204,
->  	.enable_mask		= BIT(19),
-> @@ -83,18 +62,6 @@ static const struct of_device_id st_wdog_match[] = {
->  		.compatible = "st,stih407-lpc",
->  		.data = &stih407_syscfg,
->  	},
-> -	{
-> -		.compatible = "st,stih416-lpc",
-> -		.data = &stih416_syscfg,
-> -	},
-> -	{
-> -		.compatible = "st,stih415-lpc",
-> -		.data = &stih415_syscfg,
-> -	},
-> -	{
-> -		.compatible = "st,stid127-lpc",
-> -		.data = &stid127_syscfg,
-> -	},
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, st_wdog_match);
-> -- 
-> 1.9.1
-> 
+	Arnd
