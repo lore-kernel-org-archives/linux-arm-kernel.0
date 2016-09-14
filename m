@@ -1,109 +1,207 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 14 Sep 2016 13:10:56 +0100
-Subject: [PATCH 10/33] pcmcia: soc_common: switch to using gpio_descs
-In-Reply-To: <CACRpkdZvNnVG5U3XQPm5KJDLci76xFP7JOO78AZ3a8QVBs0ZQg@mail.gmail.com>
-References: <20160829102328.GA28796@n2100.armlinux.org.uk>
- <E1beJkO-0000mg-Lu@rmk-PC.armlinux.org.uk>
- <CACRpkdZvNnVG5U3XQPm5KJDLci76xFP7JOO78AZ3a8QVBs0ZQg@mail.gmail.com>
-Message-ID: <20160914121056.GC1041@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Sep 2016 14:24:30 +0200
+Subject: [PATCH V3 1/4] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <1473855354-150093-2-git-send-email-yuanzhichang@hisilicon.com>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1473855354-150093-2-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <8337589.pzGt0MZ9xn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 01:29:04PM +0200, Linus Walleij wrote:
-> On Mon, Aug 29, 2016 at 12:24 PM, Russell King
-> <rmk+kernel@armlinux.org.uk> wrote:
+On Wednesday, September 14, 2016 8:15:51 PM CEST Zhichang Yuan wrote:
+> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
 > 
-> > Switch to using the gpiod_* consumer API rather than the legacy API.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> (...)
+> For arm64, there is no I/O space as other architectural platforms, such as
+> X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
+> such as Hip06, when accessing some legacy ISA devices connected to LPC, those
+> known port addresses are used to control the corresponding target devices, for
+> example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
+> normal MMIO mode in using.
 > 
-> > +int soc_pcmcia_request_gpiods(struct soc_pcmcia_socket *skt)
-> > +{
-> > +       int i;
-> > +
-> > +       for (i = 0; i < ARRAY_SIZE(skt->stat); i++) {
-> > +               struct gpio_desc *desc;
-> > +
+> To drive these devices, this patch introduces a method named indirect-IO.
+> In this method the in/out pair in arch/arm64/include/asm/io.h will be
+> redefined. When upper layer drivers call in/out with those known legacy port
+> addresses to access the peripherals, the hooking functions corrresponding to
+> those target peripherals will be called. Through this way, those upper layer
+> drivers which depend on in/out can run on Hip06 without any changes.
 > 
-> Here I inserted:
-> 
->         /* Skip over unnamed GPIOs, assume unused */
->         if (!skt->stat[i].name)
->             continue;
-> 
-> to get it working again on h3600.
+> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
 
-Thanks, I'll add that.
+Looks ok overall, but I have a couple of comments for details.
 
-> > +               desc = gpiod_get(skt->socket.dev.parent,
-> > +                                skt->stat[i].name, GPIOD_IN);
-> > +               if (IS_ERR(desc)) {
-> > +                       dev_err(skt->socket.dev.parent,
-> > +                               "Failed to get GPIO for %s: %ld\n",
-> > +                               skt->stat[i].name, PTR_ERR(desc));
-> > +                       __soc_pcmcia_hw_shutdown(skt, i);
-> > +                       return PTR_ERR(desc);
-> > +               }
-> 
-> 
-> It bugs out for me on the legacy h3600, since it only defines
-> two of these pins not all of the ARRAY_SIZE(skt->stat) pins
-> will succeed and we get an error message like this:
-> 
-> sa11x0-pcmcia sa11x0-pcmcia: Failed to get GPIO for (null): -2
-> sa11x0-pcmcia: probe of sa11x0-pcmcia failed with error -2
-> 
-> With the patch above it goes away and the log is silent.
-> The debugfs gpio file looks like this:
-> 
-> cat gpio
-> gpiochip0: GPIOs 0-27, gpio:
->  gpio-0   (                    |Power Button        ) in  hi
->  gpio-10  (                    |pcmcia1-detect      ) in  hi
->  gpio-11  (                    |pcmcia1-ready       ) in  hi
->  gpio-17  (                    |pcmcia0-detect      ) in  hi
->  gpio-18  (                    |Action button       ) in  hi
->  gpio-21  (                    |pcmcia0-ready       ) in  hi
->  gpio-23  (                    |dcd                 ) in  hi
->  gpio-25  (                    |cts                 ) in  lo
->  gpio-26  (                    |rts                 ) out lo
-> 
-> gpiochip1: GPIOs 28-43, parent: platform/htc-egpio, htc-egpio:
->  gpio-28  (                    |Flash Vpp           ) out lo
->  gpio-29  (                    |PCMCIA CARD RESET   ) out lo
->  gpio-30  (                    |OPT RESET           ) out lo
->  gpio-32  (                    |OPT NVRAM ON        ) out lo
->  gpio-33  (                    |OPT ON              ) out lo
->  gpio-34  (                    |LCD power           ) out lo
->  gpio-36  (                    |LCD control         ) out lo
->  gpio-42  (                    |LCD 5v              ) out lo
->  gpio-43  (                    |LCD 9v/-6.5v        ) out lo
-> 
-> Which seems like before the patch series.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index bc3f00f..9579479 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -161,6 +161,12 @@ config ARCH_MMAP_RND_COMPAT_BITS_MIN
+>  config ARCH_MMAP_RND_COMPAT_BITS_MAX
+>         default 16
+>  
+> +config ARM64_INDIRECT_PIO
+> +	def_bool n
 
-Yay.
+'def_bool n' is the same as the shorter and more common 'bool'.
 
-> I still suspect the PCMCIA is not really working but I have
-> limited experience of the bus so I don't really know how
-> to test it deeply or have my PCMCIA ethernet or harddrive
-> probe properly.
+> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> index 9b6e408..d3acf1f 100644
+> --- a/arch/arm64/include/asm/io.h
+> +++ b/arch/arm64/include/asm/io.h
+> @@ -34,6 +34,10 @@
+>  
+>  #include <xen/xen.h>
+>  
+> +#ifdef CONFIG_ARM64_INDIRECT_PIO
+> +#include <linux/extio.h>
+> +#endif
 
-Yes, to me the H3600 code looks really really really weird - the way
-H3XXX_EGPIO_CARD_RESET is "shared" (badly) between both sockets is
-certainly racy.  I've no idea what the semantics there are supposed
-to be - I suspect that H3600 PCMCIA hasn't worked for a very long
-time, or if it has, it's probably not been reliable.
+No need to guard includes with an #ifdef.
 
-> There are no regressions however, so with something like
-> the above patch applied:
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> For the whole patch series on H3600.
+> +#define BUILDS_RW(bwl, type)						\
+> +static inline void reads##bwl(const volatile void __iomem *addr,	\
+> +				void *buffer, unsigned int count)	\
+> +{									\
+> +	if (count) {							\
+> +		type *buf = buffer;					\
+> +									\
+> +		do {							\
+> +			type x = __raw_read##bwl(addr);			\
+> +			*buf++ = x;					\
+> +		} while (--count);					\
+> +	}								\
+> +}									\
+> +									\
+> +static inline void writes##bwl(volatile void __iomem *addr,		\
+> +				const void *buffer, unsigned int count)	\
+> +{									\
+> +	if (count) {							\
+> +		const type *buf = buffer;				\
+> +									\
+> +		do {							\
+> +			__raw_write##bwl(*buf++, addr);			\
+> +		} while (--count);					\
+> +	}								\
+> +}
+> +
+> +BUILDS_RW(b, u8)
 
-Thanks!
+Why is this in here?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> @@ -149,6 +185,60 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+>  #define IO_SPACE_LIMIT		(PCI_IO_SIZE - 1)
+>  #define PCI_IOBASE		((void __iomem *)PCI_IO_START)
+>  
+> +
+> +/*
+> + * redefine the in(s)b/out(s)b for indirect-IO.
+> + */
+> +#define inb inb
+> +static inline u8 inb(unsigned long addr)
+> +{
+> +#ifdef CONFIG_ARM64_INDIRECT_PIO
+> +	if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
+> +			addr <= arm64_extio_ops->end)
+> +		return extio_inb(addr);
+> +#endif
+> +	return readb(PCI_IOBASE + addr);
+> +}
+> +
+
+Looks ok, but you only seem to do this for the 8-bit
+accessors, when it should be done for 16-bit and 32-bit
+ones as well for consistency.
+
+> diff --git a/drivers/bus/extio.c b/drivers/bus/extio.c
+> new file mode 100644
+> index 0000000..1e7a9c5
+> --- /dev/null
+> +++ b/drivers/bus/extio.c
+> @@ -0,0 +1,66 @@
+
+This is in a globally visible directory
+
+> +
+> +struct extio_ops *arm64_extio_ops;
+
+But the identifier uses an architecture specific prefix. Either
+move the whole file into arch/arm64, or make the naming so that
+it can be used for everything.
+
+> +u8 __weak extio_inb(unsigned long addr)
+> +{
+> +	return arm64_extio_ops->pfin ?
+> +		arm64_extio_ops->pfin(arm64_extio_ops->devpara,
+> +			addr + arm64_extio_ops->ptoffset, NULL,
+> +			sizeof(u8), 1) : -1;
+> +}
+
+No need for the __weak attribute, just make sure that the
+code is always built-in when needed.
+
+Also, it doesn't seem necessary to have an extern function if
+all it does is call the one callback that you have already 
+checked earlier. Either put it all into the inline
+definition in asm/io.h, or put it all into the extern
+version like this.
+
+#ifdef CONFIG_ARM64_INDIRECT_PIO /* otherwise use default from asm-generic */
+#define inb inb
+extern u8 inb(unsigned long addr);
+#endif
+
+u8 inb(unsigned long addr)
+{
+	if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
+			addr <= arm64_extio_ops->end)
+		arm64_extio_ops->pfin(arm64_extio_ops->devpara,addr + arm64_extio_ops->ptoffset, NULL,sizeof(u8), 1) : -1;
+	return extio_inb(addr);
+}
+
+> +#define inb inb
+> +static inline u8 inb(unsigned long addr)
+> +{
+> +#ifdef CONFIG_ARM64_INDIRECT_PIO
+> +	if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
+> +			addr <= arm64_extio_ops->end)
+> +		return extio_inb(addr);
+> +#endif
+> +	return readb(PCI_IOBASE + addr);
+> +}
+
+> diff --git a/include/linux/extio.h b/include/linux/extio.h
+> new file mode 100644
+> index 0000000..08d1fca
+> --- /dev/null
+> +++ b/include/linux/extio.h
+> @@ -0,0 +1,49 @@
+> +/*
+> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
+> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
+> + * Author: Zou Rongrong <@huawei.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef __LINUX_EXTIO_H
+> +#define __LINUX_EXTIO_H
+> +
+> +
+> +typedef u64 (*inhook)(void *devobj, unsigned long ptaddr, void *inbuf,
+> +				size_t dlen, unsigned int count);
+> +typedef void (*outhook)(void *devobj, unsigned long ptaddr,
+> +				const void *outbuf, size_t dlen,
+> +				unsigned int count);
+
+I would drop the typedef and just declare the types directly in the
+only place that references them.
+
+	Arnd
