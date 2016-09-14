@@ -1,92 +1,34 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 14 Sep 2016 14:27:54 +0100
-Subject: [PATCH 16/19] power: reset: st-poweroff: Remove obsolete platforms.
+Date: Wed, 14 Sep 2016 14:27:42 +0100
+Subject: [PATCH 04/19] MAINTAINERS: Remove phy-stih41x-usb.c entry from STi
+ arch
 In-Reply-To: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
 References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1473859677-9231-17-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1473859677-9231-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes support for STiH415/6 SoC's from the
-st-poweroff driver, as support for these platforms is
-being removed from the kernel.
+Remove this driver as the IP is only found on STiH415/6
+silicon, and support for these SoC's is being removed
+from the kernel.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Cc: <dwmw2@infradead.org>
-Cc: <dbaryshkov@gmail.com>
-Cc: <sre@kernel.org>
-Cc: <linux-pm@vger.kernel.org>
+Cc: <kishon@ti.com>
 ---
- drivers/power/reset/st-poweroff.c | 41 ---------------------------------------
- 1 file changed, 41 deletions(-)
+ MAINTAINERS | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/power/reset/st-poweroff.c b/drivers/power/reset/st-poweroff.c
-index a488877..2046b31 100644
---- a/drivers/power/reset/st-poweroff.c
-+++ b/drivers/power/reset/st-poweroff.c
-@@ -28,28 +28,6 @@ struct reset_syscfg {
- 	unsigned int mask_rst_msk;
- };
- 
--/* STiH415 */
--#define STIH415_SYSCFG_11	0x2c
--#define STIH415_SYSCFG_15	0x3c
--
--static struct reset_syscfg stih415_reset = {
--	.offset_rst = STIH415_SYSCFG_11,
--	.mask_rst = BIT(0),
--	.offset_rst_msk = STIH415_SYSCFG_15,
--	.mask_rst_msk = BIT(0)
--};
--
--/* STiH416 */
--#define STIH416_SYSCFG_500	0x7d0
--#define STIH416_SYSCFG_504	0x7e0
--
--static struct reset_syscfg stih416_reset = {
--	.offset_rst = STIH416_SYSCFG_500,
--	.mask_rst = BIT(0),
--	.offset_rst_msk = STIH416_SYSCFG_504,
--	.mask_rst_msk = BIT(0)
--};
--
- /* STiH407 */
- #define STIH407_SYSCFG_4000	0x0
- #define STIH407_SYSCFG_4008	0x20
-@@ -61,16 +39,6 @@ static struct reset_syscfg stih407_reset = {
- 	.mask_rst_msk = BIT(0)
- };
- 
--/* STiD127 */
--#define STID127_SYSCFG_700	0x0
--#define STID127_SYSCFG_773	0x124
--
--static struct reset_syscfg stid127_reset = {
--	.offset_rst = STID127_SYSCFG_773,
--	.mask_rst = BIT(0),
--	.offset_rst_msk = STID127_SYSCFG_700,
--	.mask_rst_msk = BIT(8)
--};
- 
- static struct reset_syscfg *st_restart_syscfg;
- 
-@@ -99,17 +67,8 @@ static struct notifier_block st_restart_nb = {
- 
- static const struct of_device_id st_reset_of_match[] = {
- 	{
--		.compatible = "st,stih415-restart",
--		.data = (void *)&stih415_reset,
--	}, {
--		.compatible = "st,stih416-restart",
--		.data = (void *)&stih416_reset,
--	}, {
- 		.compatible = "st,stih407-restart",
- 		.data = (void *)&stih407_reset,
--	}, {
--		.compatible = "st,stid127-restart",
--		.data = (void *)&stid127_reset,
- 	},
- 	{}
- };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 12c271c..6a278b9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1755,7 +1755,6 @@ F:	drivers/media/platform/sti/c8sectpfe/
+ F:	drivers/mmc/host/sdhci-st.c
+ F:	drivers/phy/phy-miphy28lp.c
+ F:	drivers/phy/phy-stih407-usb.c
+-F:	drivers/phy/phy-stih41x-usb.c
+ F:	drivers/pinctrl/pinctrl-st.c
+ F:	drivers/remoteproc/st_remoteproc.c
+ F:	drivers/reset/sti/
 -- 
 1.9.1
