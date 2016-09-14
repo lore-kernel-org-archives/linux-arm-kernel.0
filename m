@@ -1,118 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 15:25:41 +0200
-Subject: [RFC PATCH 00/11] pci: support for configurable PCI endpoint
-In-Reply-To: <1473829927-20466-1-git-send-email-kishon@ti.com>
-References: <1473829927-20466-1-git-send-email-kishon@ti.com>
-Message-ID: <2837059.ka7z3gzjF2@wuerfel>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 14 Sep 2016 14:27:38 +0100
+Subject: [PATCH 00/19] [RESEND] Remove STiH415 and STiH416 SoC platform support
+Message-ID: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 14, 2016 10:41:56 AM CEST Kishon Vijay Abraham I wrote:
-> This patch series
-> 	*) adds PCI endpoint core layer
-> 	*) modifies designware/dra7xx driver to be configured in EP mode
-> 	*) adds a PCI endpoint *test* function driver
+Resending due to incorrect Cc tags.
 
-Hi Kishon,
+ST have sent patches which remove clock support for these SoCs [1]
+which once applied mean the platform will no longer boot.
 
-I think this is a great start, thanks for posting early with a clear
-list of limitations and TODO items.
+This series cleans up various STi platform drivers which have
+support for these SoC's, by removing code, and updating the DT
+documentation accordingly. Some drivers such as miphy365 and
+stih41x-usb can be removed completely because the IP is only
+found on these legacy SoC's.
 
-I've added the drivers/ntb maintainers to Cc, given that there is
-a certain degree of overlap between your work and the existing
-code, I think they should be part of the discussion.
- 
-> Known Limitation:
-> 	*) Does not support multi-function devices
+Once this series is applied, drm display driver, and ALSA SoC
+are the main two remaining references to the legacy SoCs, other
+than clocks which already have patches on the ML.
 
-If I understand it right, this was a problem for USB and adding
-it later made it somewhat inconsistent. Maybe we can at least
-try to come up with an idea of how multi-function devices
-could be handled even if we don't implement it until someone
-actually needs it.
+regards,
 
-Is your hardware able to make the PCIe endpoint look like
-a device with multiple PCI functions, or would one have to
-do this in software inside of a single PCI function if we
-ever need it?
+Peter.
 
-> TODO:
-> 	*) access buffers in RC
-> 	*) raise MSI interrupts
-> 	*) Enable user space control for the RC side PCI driver
+[1] https://patchwork.kernel.org/patch/9157571/
 
-The user space control would end up just being one of several
-gadget drivers, right? E.g. gadget drivers for standard hardware
-(8250 uart, ATA, NVMe, some ethernet) could be done as kernel
-drivers while a user space driver can be used for things that
-are more unusual and that don't need to interface to another
-part of the kernel?
+Peter Griffin (19):
+  phy: phy-miphy365x: Remove miphy365 driver and dt binding
+    documentation.
+  phy: stih41x-usb: Remove usb phy driver and dt binding documentation.
+  MAINTAINERS: Remove phy-miphy365x.c entry from STi arch
+  MAINTAINERS: Remove phy-stih41x-usb.c entry from STi arch
+  ARM: multi_v7_defconfig: Remove miphy365 phy.
+  ARM: multi_v7_defconfig: Remove stih41x phy Kconfig symbol.
+  ahci: st: Remove STiH416 dt example
+  thermal: sti: Remove obsolete platforms from the DT doc.
+  thermal: sti: Remove obsolete STiH416 platform support.
+  watchdog: bindings: Remove obsolete platforms from dt doc.
+  watchdog: st_wdt: Remove support for obsolete platforms
+  reset: sti: Remove obsolete platforms from dt binding doc.
+  pinctrl: st: Remove STiH415/6 SoC pinctrl driver support.
+  pinctrl: st: Remove obsolete platforms from pinctrl-st dt doc
+  reset: sti: Remove STiH415/6 reset support
+  power: reset: st-poweroff: Remove obsolete platforms.
+  power: reset: st: Remove obsolete platforms from dt doc
+  stmmac: dwmac-sti: Remove obsolete STi platforms
+  reset: sti: softreset: Remove obsolete platforms from dt binding doc.
 
-> 	*) Adapt all other users of designware to use the new design (only
-> 	   dra7xx has been adapted)
+ Documentation/devicetree/bindings/ata/ahci-st.txt  |  15 -
+ .../devicetree/bindings/net/sti-dwmac.txt          |   3 +-
+ .../devicetree/bindings/phy/phy-miphy365x.txt      |  77 ---
+ .../devicetree/bindings/phy/phy-stih41x-usb.txt    |  24 -
+ .../devicetree/bindings/pinctrl/pinctrl-st.txt     |  33 +-
+ .../devicetree/bindings/power/reset/st-reset.txt   |   7 +-
+ .../devicetree/bindings/reset/st,sti-powerdown.txt |  12 +-
+ .../devicetree/bindings/reset/st,sti-softreset.txt |   8 +-
+ .../devicetree/bindings/thermal/st-thermal.txt     |  28 +-
+ .../devicetree/bindings/watchdog/st_lpc_wdt.txt    |   3 +-
+ MAINTAINERS                                        |   2 -
+ arch/arm/configs/multi_v7_defconfig                |   2 -
+ arch/arm/mach-sti/Kconfig                          |   2 -
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    |  37 --
+ drivers/phy/Kconfig                                |  18 -
+ drivers/phy/Makefile                               |   2 -
+ drivers/phy/phy-miphy365x.c                        | 625 ---------------------
+ drivers/phy/phy-stih41x-usb.c                      | 188 -------
+ drivers/pinctrl/pinctrl-st.c                       |  76 +--
+ drivers/power/reset/st-poweroff.c                  |  41 --
+ drivers/reset/sti/Kconfig                          |   8 -
+ drivers/reset/sti/Makefile                         |   2 -
+ drivers/reset/sti/reset-stih415.c                  | 112 ----
+ drivers/reset/sti/reset-stih416.c                  | 143 -----
+ drivers/thermal/st/st_thermal_memmap.c             |  34 +-
+ drivers/watchdog/st_lpc_wdt.c                      |  33 --
+ 26 files changed, 65 insertions(+), 1470 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+ delete mode 100644 Documentation/devicetree/bindings/phy/phy-stih41x-usb.txt
+ delete mode 100644 drivers/phy/phy-miphy365x.c
+ delete mode 100644 drivers/phy/phy-stih41x-usb.c
+ delete mode 100644 drivers/reset/sti/reset-stih415.c
+ delete mode 100644 drivers/reset/sti/reset-stih416.c
 
-I don't fully understand this part. Does every designware based
-driver need modifications, or are the changes to the
-generic parts of the designware driver enough to make it
-work for the simpler platforms?
-
-> HOW TO:
-> 
-> ON THE EP SIDE:
-> ***************
-> 
-> /* EP function is configured using configfs */
-> # mount -t configfs none /sys/kernel/config
-> 
-> /* PCI EP core layer creates "pci_ep" entry in configfs */
-> # cd /sys/kernel/config/pci_ep/
-> 
-> /*
->  * This is the 1st step in creating an endpoint function. This
->  * creates the endpoint function device *instance*. The string
->  * before the .<num> suffix will identify the driver this
->  * EP function will bind to.
->  * Just pci_epf_test is also valid. The .<num> suffix is used
->  * if there are multiple PCI controllers and all of them wants
->  * to use the same function.
->  */
-> # mkdir pci_epf_test.0
-
-I haven't used USB gadgets, but I assume this is modeled around
-the same interface. If there are notable differences, please mention
-what they are. Otherwise the general concept seems rather nice to me.
-
->  drivers/pci/{host => controller}/Kconfig           |  109 +++++-
->  drivers/pci/{host => controller}/Makefile          |    2 +
->  drivers/pci/{host => controller}/pci-aardvark.c    |    0
->  drivers/pci/{host => controller}/pci-dra7xx.c      |  340 +++++++++++++----
->  drivers/pci/{host => controller}/pci-exynos.c      |    0
->  drivers/pci/{host => controller}/pci-host-common.c |    0
->  .../pci/{host => controller}/pci-host-generic.c    |    0
->  drivers/pci/{host => controller}/pci-hyperv.c      |    0
->  drivers/pci/{host => controller}/pci-imx6.c        |    0
->  drivers/pci/{host => controller}/pci-keystone-dw.c |    0
->  drivers/pci/{host => controller}/pci-keystone.c    |    0
->  drivers/pci/{host => controller}/pci-keystone.h    |    0
-
-Maybe it's better to wait before moving it around, this will make
-it harder for you to rebase the patch series while you are working on
-it and other people are working on the existing code.
-
-I'd suggest dropping the rename patches for the moment and just work
-in drivers/pci/host.
-
-Let's talk (high-level) about the DT binding. I see that the way
-you have done it here, one will need to have a different .dtb file
-for a machine depending on whether the PCIe is used in host or
-endpoint mode. The advantage of this way is that it's a much
-cleaner binding (PCIe host bindings are a mess, and adding more
-options to it will only make it worse), the downside is that
-you can't decide at runtime what you want to use it for. E.g.
-connecting two identical machines over PCIe requires deciding
-in the bootloader which one is the endpoint, or using DT
-overlays, which may be awkward for some users. Is this a realistic
-use case, or do you expect that all machines will only ever be
-used in one of the two ways?
-
-	Arnd
+-- 
+1.9.1
