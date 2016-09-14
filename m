@@ -1,188 +1,106 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 14 Sep 2016 10:42:00 +0530
-Subject: [RFC PATCH 04/11] pci: endpoint: functions: add an EP function to
- test PCI
+Date: Wed, 14 Sep 2016 10:42:03 +0530
+Subject: [RFC PATCH 07/11] pci: controller: designware: Add EP mode support
 In-Reply-To: <1473829927-20466-1-git-send-email-kishon@ti.com>
 References: <1473829927-20466-1-git-send-email-kishon@ti.com>
-Message-ID: <1473829927-20466-5-git-send-email-kishon@ti.com>
+Message-ID: <1473829927-20466-8-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a new endpoint function driver (to program the virtual
-test device) making use of the EP-core library. The complete
-usage of the test function is described in
-Documentation/PCI/pci-test.txt (included in this commit).
+Add endpoint mode support to designware driver. This uses the
+EP Core layer introduced recently to add endpoint mode support.
+*Any* function driver can now use this designware device
+to achieve the EP functionality.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/PCI/00-INDEX                    |    3 +
- Documentation/PCI/pci-test.txt                |   79 +++++++
- drivers/pci/endpoint/Kconfig                  |    2 +
- drivers/pci/endpoint/Makefile                 |    2 +-
- drivers/pci/endpoint/functions/Kconfig        |   12 ++
- drivers/pci/endpoint/functions/Makefile       |    5 +
- drivers/pci/endpoint/functions/pci-epf-test.c |  272 +++++++++++++++++++++++++
- 7 files changed, 374 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/PCI/pci-test.txt
- create mode 100644 drivers/pci/endpoint/functions/Kconfig
- create mode 100644 drivers/pci/endpoint/functions/Makefile
- create mode 100644 drivers/pci/endpoint/functions/pci-epf-test.c
+ .../devicetree/bindings/pci/designware-pcie.txt    |   26 ++-
+ drivers/pci/controller/Kconfig                     |    5 +
+ drivers/pci/controller/Makefile                    |    1 +
+ drivers/pci/controller/pcie-designware-ep.c        |  228 ++++++++++++++++++++
+ drivers/pci/controller/pcie-designware.c           |   30 +++
+ drivers/pci/controller/pcie-designware.h           |   45 ++++
+ 6 files changed, 324 insertions(+), 11 deletions(-)
+ create mode 100644 drivers/pci/controller/pcie-designware-ep.c
 
-diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
-index e422b8151..e5a583c 100644
---- a/Documentation/PCI/00-INDEX
-+++ b/Documentation/PCI/00-INDEX
-@@ -14,3 +14,6 @@ pcieaer-howto.txt
- 	- the PCI Express Advanced Error Reporting Driver Guide HOWTO
- pci-endpoint.txt
- 	- guide to add endpoint controller driver and endpoint function driver.
-+pci-test.txt
-+	- description of the PCI EP function that can be used to test PCI
-+	  functionality
-diff --git a/Documentation/PCI/pci-test.txt b/Documentation/PCI/pci-test.txt
-new file mode 100644
-index 0000000..2bc796b
---- /dev/null
-+++ b/Documentation/PCI/pci-test.txt
-@@ -0,0 +1,79 @@
-+				PCI TEST
-+		    Kishon Vijay Abraham I <kishon@ti.com>
-+
-+Traditionally PCI RC has always been validated by using standard
-+PCI cards like ethernet PCI cards or USB PCI cards or SATA PCI cards.
-+However with the addition of EP-core in linux kernel, it is possible
-+to configure a PCI controller that can operate in EP mode to work as
-+a test device.
-+
-+The PCI endpoint test device is a completely software device used to
-+test the endpoint functionality and serve as a sample driver for other
-+PCI endpoint devices.
-+
-+The PCI endpoint test device has four registers:
-+
-+	1) PCI_ENDPOINT_TEST_COMMAND
-+	2) PCI_ENDPOINT_TEST_STATUS
-+	3) PCI_ENDPOINT_TEST_SRC_ADDR
-+	4) PCI_ENDPOINT_TEST_DST_ADDR
-+
-+Since this is a virtual device, all these registers will be present
-+in RAM and will be allocated using one of the standard memory allocation
-+API (in this case dma_alloc_coherent)
-+
-+*) PCI_ENDPOINT_TEST_COMMAND:
-+
-+This register will be used by the host driver to indicate the function
-+that the endpoint device must perform.
-+
-+Bitfield Description:
-+  Bit 0: reset the PCI endpoint device
-+  Bit 1: raise irq
-+  Bit 2: Copy the data from source addr to destination address
-+
-+*) PCI_ENDPOINT_TEST_STATUS
-+
-+This register reflects the status of the PCI endpoint device.
-+
-+Bitfield Description:
-+  Bit 0: PCI endpoint device is in initialized state
-+  Bit 1: Copy is in progress
-+  Bit 2: Copy is done
-+  Bit 3: IRQ is raised
-+  Bit 4: Source address is invalid
-+  Bit 5: Destination address is invalid
-+
-+*) PCI_ENDPOINT_TEST_SRC_ADDR
-+
-+This register contains the source address for the COPY command.
-+
-+*) PCI_ENDPOINT_TEST_DST_ADDR
-+
-+This register contains the destination address for the COPY command.
-+
-+PCI ENDPOINT TEST DRIVER (EP SIDE)
-+==================================
-+
-+The Endpoint side function driver is present in
-+drivers/pci/endpoint/functions/pci-epf-test.c
-+
-+This function driver creates the PCI endpoint test device and then
-+waits for commands from the host driver. If the host driver sets
-+Bit 1 (raise irq) in the COMMAND register, the endpoint driver
-+will raise an irq. Similarly it resets the device if Bit 0 is set
-+and starts copying the data if Bit 2 is set.
-+
-+The function driver is also responsible for updating the STATUS
-+register.
-+
-+PCI ENDPOINT TEST DRIVER (HOST SIDE)
-+====================================
-+
-+The host side PCI driver is present in
-+drivers/misc/pci_endpoint_test.c
-+
-+The PCI driver for the test device performs 3 tests
-+	*) Verifying addresses programmed in BAR
-+	*) Raise legacy IRQ
-+	*) Copy data from source address to destination address (TODO)
-diff --git a/drivers/pci/endpoint/Kconfig b/drivers/pci/endpoint/Kconfig
-index f1dd206..0e3dc8c 100644
---- a/drivers/pci/endpoint/Kconfig
-+++ b/drivers/pci/endpoint/Kconfig
-@@ -19,5 +19,7 @@ config PCI_ENDPOINT
+diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+index 6c5322c..bb0b789 100644
+--- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+@@ -6,23 +6,27 @@ Required properties:
+ - reg-names: Must be "config" for the PCIe configuration space.
+     (The old way of getting the configuration address space from "ranges"
+     is deprecated and should be avoided.)
+-- #address-cells: set to <3>
+-- #size-cells: set to <2>
+-- device_type: set to "pci"
+-- ranges: ranges for the PCI memory and I/O regions
+-- #interrupt-cells: set to <1>
+-- interrupt-map-mask and interrupt-map: standard PCI properties
+-	to define the mapping of the PCIe interface to interrupt
++- #address-cells (only for host mode): set to <3>
++- #size-cells (only for host mode): set to <2>
++- device_type (only for host mode): set to "pci"
++- ranges (only for host mode): ranges for the PCI memory and I/O regions
++- num-ib-windows (only for EP mode): number of inbound address translation
++	windows
++- num-ob-windows (only for EP mode): number of outbound address translation
++	windows
++- #interrupt-cells (only for host mode): set to <1>
++- interrupt-map-mask and interrupt-map (only for host mode): standard PCI
++	properties to define the mapping of the PCIe interface to interrupt
+ 	numbers.
+ - num-lanes: number of lanes to use
  
- 	   If in doubt, say "N" to disable Endpoint support.
+ Optional properties:
+ - num-lanes: number of lanes to use (this property should be specified unless
+   the link is brought already up in BIOS)
+-- reset-gpio: gpio pin number of power good signal
+-- bus-range: PCI bus numbers covered (it is recommended for new devicetrees to
+-  specify this property, to keep backwards compatibility a range of 0x00-0xff
+-  is assumed if not present)
++- reset-gpio (only for host mode): gpio pin number of power good signal
++- bus-range (only for host mode): PCI bus numbers covered (it is recommended
++  for new devicetrees to specify this property, to keep backwards compatibility
++  a range of 0x00-0xff is assumed if not present)
+ - clocks: Must contain an entry for each entry in clock-names.
+ 	See ../clocks/clock-bindings.txt for details.
+ - clock-names: Must include the following entries:
+diff --git a/drivers/pci/controller/Kconfig b/drivers/pci/controller/Kconfig
+index 249db74..8574828 100644
+--- a/drivers/pci/controller/Kconfig
++++ b/drivers/pci/controller/Kconfig
+@@ -78,6 +78,11 @@ config PCIE_DW_HOST
+ 	depends on PCI
+ 	select PCIE_DW
  
-+source "drivers/pci/endpoint/functions/Kconfig"
-+
- endmenu
- 
-diff --git a/drivers/pci/endpoint/Makefile b/drivers/pci/endpoint/Makefile
-index 67c88bf..89310d1 100644
---- a/drivers/pci/endpoint/Makefile
-+++ b/drivers/pci/endpoint/Makefile
-@@ -3,4 +3,4 @@
- #
- 
- obj-$(CONFIG_PCI_ENDPOINT)		:= pci-epc-core.o pci-epf-core.o \
--					   pci-ep-cfs.o
-+					   pci-ep-cfs.o functions/
-diff --git a/drivers/pci/endpoint/functions/Kconfig b/drivers/pci/endpoint/functions/Kconfig
-new file mode 100644
-index 0000000..175edad
---- /dev/null
-+++ b/drivers/pci/endpoint/functions/Kconfig
-@@ -0,0 +1,12 @@
-+#
-+# PCI Endpoint Functions
-+#
-+
-+config PCI_EPF_TEST
-+	tristate "PCI Endpoint Test driver"
++config PCIE_DW_EP
++	bool
 +	depends on PCI_ENDPOINT
-+	help
-+	   Enable this configuration option to enable the test driver
-+	   for PCI Endpoint.
++	select PCIE_DW
 +
-+	   If in doubt, say "N" to disable Endpoint test driver.
-diff --git a/drivers/pci/endpoint/functions/Makefile b/drivers/pci/endpoint/functions/Makefile
+ config PCI_EXYNOS
+ 	bool "Samsung Exynos PCIe controller"
+ 	depends on SOC_EXYNOS5440
+diff --git a/drivers/pci/controller/Makefile b/drivers/pci/controller/Makefile
+index ee6bb85..11ef1e6 100644
+--- a/drivers/pci/controller/Makefile
++++ b/drivers/pci/controller/Makefile
+@@ -1,5 +1,6 @@
+ obj-$(CONFIG_PCIE_DW) += pcie-designware.o
+ obj-$(CONFIG_PCIE_DW_HOST) += pcie-designware-host.o
++obj-$(CONFIG_PCIE_DW_EP) += pcie-designware-ep.o
+ obj-$(CONFIG_PCIE_DW_PLAT) += pcie-designware-plat.o
+ obj-$(CONFIG_PCI_DRA7XX) += pci-dra7xx.o
+ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
+diff --git a/drivers/pci/controller/pcie-designware-ep.c b/drivers/pci/controller/pcie-designware-ep.c
 new file mode 100644
-index 0000000..53c120e
+index 0000000..f683be9
 --- /dev/null
-+++ b/drivers/pci/endpoint/functions/Makefile
-@@ -0,0 +1,5 @@
-+#
-+# Makefile for PCI Endpoint Functions
-+#
-+
-+obj-$(CONFIG_PCI_EPF_TEST)		:= pci-epf-test.o
-diff --git a/drivers/pci/endpoint/functions/pci-epf-test.c b/drivers/pci/endpoint/functions/pci-epf-test.c
-new file mode 100644
-index 0000000..a7585b1
---- /dev/null
-+++ b/drivers/pci/endpoint/functions/pci-epf-test.c
-@@ -0,0 +1,272 @@
++++ b/drivers/pci/controller/pcie-designware-ep.c
+@@ -0,0 +1,228 @@
 +/**
-+ * pci-epf-test.c - Test driver to test endpoint functionality
++ * pci-designware-ep.c - Synopsys Designware PCIe Endpoint controller driver
 + *
 + * Copyright (C) 2016 Texas Instruments
 + * Author: Kishon Vijay Abraham I <kishon@ti.com>
@@ -201,257 +119,347 @@ index 0000000..a7585b1
 + */
 +
 +#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/pci_ids.h>
++#include <linux/of.h>
 +
-+#include <linux/pci-epc.h>
-+#include <linux/pci-epf.h>
-+#include <linux/pci_regs.h>
++#include "pcie-designware.h"
 +
-+#define COMMAND_RESET			BIT(0)
-+#define COMMAND_RAISE_IRQ		BIT(1)
-+#define COMMAND_COPY			BIT(2)
-+
-+#define STATUS_INITIALIZED		BIT(0)
-+#define STATUS_COPY_PROGRESS		BIT(1)
-+#define STATUS_COPY_DONE		BIT(2)
-+#define STATUS_IRQ_RAISED		BIT(3)
-+#define STATUS_SOURCE_ADDR_INVALID	BIT(4)
-+#define STATUS_DEST_ADDR_INVALID	BIT(5)
-+
-+#define TIMER_RESOLUTION		5
-+
-+struct pci_epf_test {
-+	struct timer_list	timer;
-+	void			*reg[6];
-+	struct pci_epf		*epf;
-+};
-+
-+struct pci_epf_test_reg {
-+	u32	command;
-+	u32	status;
-+	u64	src_addr;
-+	u64	dst_addr;
-+};
-+
-+struct pci_epf_header test_header = {
-+	.vendorid	= PCI_ANY_ID,
-+	.deviceid	= PCI_ANY_ID,
-+	.baseclass_code = PCI_CLASS_OTHERS,
-+	.interrupt_pin	= PCI_INTERRUPT_INTA,
-+};
-+
-+static int bar_size[] = { 512, 1024, 16384, 131072, 1048576};
-+
-+static void pci_epf_test_cmd_handler(unsigned long data)
++static void dw_pcie_ep_reset_bar(struct dw_pcie *pci, enum pci_barno bar)
 +{
-+	struct pci_epf_test *epf_test = (struct pci_epf_test *)data;
-+	struct pci_epf *epf = epf_test->epf;
-+	struct pci_epc *epc = epf->epc;
-+	struct pci_epf_test_reg *reg = epf_test->reg[0];
-+	unsigned long timer;
++	u32 reg;
 +
-+	if (!reg->command)
-+		goto reset_handler;
-+
-+	if (reg->command & COMMAND_RESET)
-+		reg->status = STATUS_INITIALIZED;
-+
-+	if (reg->command & COMMAND_RAISE_IRQ) {
-+		reg->status |= STATUS_IRQ_RAISED;
-+		pci_epc_raise_irq(epc, PCI_EPC_IRQ_LEGACY);
-+	}
-+
-+	reg->command = 0;
-+
-+reset_handler:
-+	timer = jiffies + msecs_to_jiffies(TIMER_RESOLUTION);
-+	mod_timer(&epf_test->timer, timer);
++	reg = PCI_BASE_ADDRESS_0 + (4 * bar);
++	dw_pcie_write_dbi(pci, pci->dbi_base2, reg, 0x4, 0x0);
++	dw_pcie_write_dbi(pci, pci->dbi_base, reg, 0x4, 0x0);
 +}
 +
-+static void pci_epf_test_linkup(struct pci_epf *epf)
++static int dw_pcie_ep_write_header(struct pci_epc *epc,
++				   struct pci_epf_header *hdr)
 +{
-+	struct pci_epf_test *epf_test = epf_get_drvdata(epf);
-+	unsigned long timer;
++	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
++	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
++	void __iomem *base = pci->dbi_base;
 +
-+	setup_timer(&epf_test->timer, pci_epf_test_cmd_handler,
-+		    (unsigned long)epf_test);
-+	timer = jiffies + msecs_to_jiffies(TIMER_RESOLUTION);
-+	mod_timer(&epf_test->timer, timer);
-+}
-+
-+static void pci_epf_test_unbind(struct pci_epf *epf)
-+{
-+	struct pci_epf_test *epf_test = epf_get_drvdata(epf);
-+	struct pci_epc *epc = epf->epc;
-+	int bar;
-+
-+	del_timer(&epf_test->timer);
-+	pci_epc_stop(epc);
-+	for (bar = BAR_0; bar <= BAR_5; bar++) {
-+		if (epf_test->reg[bar]) {
-+			pci_epf_free_space(epf, epf_test->reg[bar], bar);
-+			pci_epc_clear_bar(epc, bar);
-+		}
-+	}
-+
-+	epf->pci_epc_name = NULL;
-+}
-+
-+static int pci_epf_test_set_bar(struct pci_epf *epf)
-+{
-+	int flags;
-+	int bar;
-+	int ret;
-+	struct pci_epf_bar *epf_bar;
-+	struct pci_epc *epc = epf->epc;
-+	struct device *dev = &epf->dev;
-+	struct pci_epf_test *epf_test = epf_get_drvdata(epf);
-+
-+	flags = PCI_BASE_ADDRESS_SPACE_MEMORY | PCI_BASE_ADDRESS_MEM_TYPE_32;
-+	if (sizeof(dma_addr_t) == 0x8)
-+		flags |= PCI_BASE_ADDRESS_MEM_TYPE_64;
-+
-+	for (bar = BAR_0; bar <= BAR_5; bar++) {
-+		epf_bar = &epf->bar[bar];
-+		ret = pci_epc_set_bar(epc, bar, epf_bar->phys_addr,
-+				      epf_bar->size, flags);
-+		if (ret) {
-+			pci_epf_free_space(epf, epf_test->reg[bar], bar);
-+			dev_err(dev, "failed to set BAR%d\n", bar);
-+			if (bar == BAR_0)
-+				return ret;
-+		}
-+	}
++	dw_pcie_write_dbi(pci, base, PCI_VENDOR_ID, 0x2, hdr->vendorid);
++	dw_pcie_write_dbi(pci, base, PCI_DEVICE_ID, 0x2, hdr->deviceid);
++	dw_pcie_write_dbi(pci, base, PCI_REVISION_ID, 0x1, hdr->revid);
++	dw_pcie_write_dbi(pci, base, PCI_CLASS_PROG, 0x1, hdr->progif_code);
++	dw_pcie_write_dbi(pci, base, PCI_CLASS_DEVICE, 0x2,
++			  hdr->subclass_code | hdr->baseclass_code << 8);
++	dw_pcie_write_dbi(pci, base, PCI_CACHE_LINE_SIZE, 0x1,
++			  hdr->cache_line_size);
++	dw_pcie_write_dbi(pci, base, PCI_SUBSYSTEM_VENDOR_ID, 0x2,
++			  hdr->subsys_vendor_id);
++	dw_pcie_write_dbi(pci, base, PCI_SUBSYSTEM_ID, 0x2, hdr->subsys_id);
++	dw_pcie_write_dbi(pci, base, PCI_INTERRUPT_PIN, 0x1,
++			  hdr->interrupt_pin);
 +
 +	return 0;
 +}
 +
-+static int pci_epf_test_alloc_space(struct pci_epf *epf)
-+{
-+	struct pci_epf_test *epf_test = epf_get_drvdata(epf);
-+	struct device *dev = &epf->dev;
-+	void *base;
-+	int bar;
-+
-+	base = pci_epf_alloc_space(epf, sizeof(struct pci_epf_test_reg),
-+				   BAR_0);
-+	if (!base) {
-+		dev_err(dev, "failed to allocated register space\n");
-+		return -ENOMEM;
-+	}
-+	epf_test->reg[0] = base;
-+
-+	for (bar = BAR_1; bar <= BAR_5; bar++) {
-+		base = pci_epf_alloc_space(epf, bar_size[bar - 1], bar);
-+		if (!base)
-+			dev_err(dev, "failed to allocate space for BAR%d\n",
-+				bar);
-+		epf_test->reg[bar] = base;
-+	}
-+
-+	return 0;
-+}
-+
-+static int pci_epf_test_bind(struct pci_epf *epf)
++static int dw_pcie_ep_inbound_atu(struct dw_pcie_ep *ep, enum pci_barno bar,
++				  dma_addr_t cpu_addr,
++				  enum dw_pcie_as_type as_type)
 +{
 +	int ret;
-+	struct pci_epf_header *header = epf->header;
-+	struct pci_epc *epc = epf->epc;
-+	struct device *dev = &epf->dev;
++	u32 free_win;
++	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
 +
-+	ret = pci_epc_write_header(epc, header);
-+	if (ret) {
-+		dev_err(dev, "configuration header write failed\n");
++	free_win = find_first_zero_bit(&ep->ib_window_map,
++				       sizeof(ep->ib_window_map));
++	if (free_win >= ep->num_ib_windows) {
++		dev_err(pci->dev, "no free inbound window\n");
++		return -EINVAL;
++	}
++
++	ret = dw_pcie_prog_inbound_atu(pci, free_win, bar, cpu_addr,
++				       as_type);
++	if (ret < 0) {
++		dev_err(pci->dev, "Failed to program IB window\n");
 +		return ret;
 +	}
 +
-+	ret = pci_epf_test_alloc_space(epf);
++	ep->bar_to_atu[bar] = free_win;
++	set_bit(free_win, &ep->ib_window_map);
++
++	return 0;
++}
++
++static int dw_pcie_ep_set_bar(struct pci_epc *epc, enum pci_barno bar,
++			      dma_addr_t bar_phys, size_t size, int flags)
++{
++	int ret;
++	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
++	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
++	enum dw_pcie_as_type as_type;
++	u32 reg = PCI_BASE_ADDRESS_0 + (4 * bar);
++
++	if (!(flags & PCI_BASE_ADDRESS_SPACE))
++		as_type = DW_PCIE_AS_MEM;
++	else
++		as_type = DW_PCIE_AS_IO;
++
++	ret = dw_pcie_ep_inbound_atu(ep, bar, bar_phys, as_type);
 +	if (ret)
 +		return ret;
 +
-+	ret = pci_epf_test_set_bar(epf);
-+	if (ret)
-+		return ret;
-+
-+	ret = pci_epc_start(epc);
-+	if (ret) {
-+		dev_err(dev, "failed to start endpoint controller\n");
-+		return ret;
-+	}
++	dw_pcie_write_dbi(pci, pci->dbi_base2, reg, 0x4, size - 1);
++	dw_pcie_write_dbi(pci, pci->dbi_base, reg, 0x4, flags);
 +
 +	return 0;
 +}
 +
-+static int pci_epf_test_probe(struct pci_epf *epf)
++static void dw_pcie_ep_clear_bar(struct pci_epc *epc, enum pci_barno bar)
 +{
-+	struct pci_epf_test *epf_test;
-+	struct device *dev = &epf->dev;
++	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
++	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
++	void __iomem *base = pci->dbi_base;
 +
-+	epf_test = devm_kzalloc(dev, sizeof(*epf_test), GFP_KERNEL);
-+	if (!epf)
-+		return -ENOMEM;
++	dw_pcie_ep_reset_bar(pci, bar);
 +
-+	epf->header = &test_header;
-+	epf_test->epf = epf;
-+
-+	epf_set_drvdata(epf, epf_test);
-+	return 0;
++	dw_pcie_write_dbi(pci, base, PCIE_ATU_VIEWPORT, 0x4,
++			  PCIE_ATU_REGION_INBOUND | ep->bar_to_atu[bar]);
++	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR2, 0x4, ~PCIE_ATU_ENABLE);
 +}
 +
-+static int pci_epf_test_remove(struct pci_epf *epf)
++static void *dw_pcie_ep_alloc_addr(struct pci_epc *epc, size_t size)
 +{
-+	struct pci_epf_test *epf_test = epf_get_drvdata(epf);
-+
-+	pci_epc_unbind_epf(epf_test->epf);
-+	kfree(epf_test);
-+	return 0;
++	/* TODO */
++	return NULL;
 +}
 +
-+struct pci_epf_ops ops = {
-+	.unbind	= pci_epf_test_unbind,
-+	.bind	= pci_epf_test_bind,
-+	.linkup = pci_epf_test_linkup,
++static void dw_pcie_ep_free_addr(struct pci_epc *epc)
++{
++	/* TODO */
++}
++
++static int dw_pcie_ep_raise_irq(struct pci_epc *epc,
++				enum pci_epc_irq_type type)
++{
++	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
++
++	if (!ep->ops->raise_irq)
++		return -EINVAL;
++
++	return ep->ops->raise_irq(ep, type);
++}
++
++static int dw_pcie_ep_start(struct pci_epc *epc)
++{
++	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
++	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
++
++	if (!pci->ops->start_link)
++		return -EINVAL;
++
++	return pci->ops->start_link(pci);
++}
++
++static void dw_pcie_ep_stop(struct pci_epc *epc)
++{
++	struct dw_pcie_ep *ep = epc_get_drvdata(epc);
++	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
++
++	if (!pci->ops->stop_link)
++		return;
++
++	pci->ops->stop_link(pci);
++}
++
++void dw_pcie_ep_linkup(struct dw_pcie_ep *ep)
++{
++	struct pci_epc *epc = ep->epc;
++	struct pci_epf *epf = epc->epf;
++
++	pci_epf_linkup(epf);
++}
++
++const struct pci_epc_ops epc_ops = {
++	.write_header		= dw_pcie_ep_write_header,
++	.set_bar		= dw_pcie_ep_set_bar,
++	.clear_bar		= dw_pcie_ep_clear_bar,
++	.alloc_addr_space	= dw_pcie_ep_alloc_addr,
++	.free_addr_space	= dw_pcie_ep_free_addr,
++	.raise_irq		= dw_pcie_ep_raise_irq,
++	.start			= dw_pcie_ep_start,
++	.stop			= dw_pcie_ep_stop,
 +};
 +
-+static const struct pci_epf_device_id pci_epf_test_ids[] = {
-+	{
-+		.name = "pci_epf_test",
-+	},
-+	{},
-+};
-+
-+static struct pci_epf_driver test_driver = {
-+	.driver.name	= "pci_epf_test",
-+	.probe		= pci_epf_test_probe,
-+	.remove		= pci_epf_test_remove,
-+	.id_table	= pci_epf_test_ids,
-+	.ops		= &ops,
-+	.owner		= THIS_MODULE,
-+};
-+
-+static int __init pci_epf_test_init(void)
++int dw_pcie_ep_init(struct dw_pcie_ep *ep)
 +{
 +	int ret;
++	enum pci_barno bar;
++	struct pci_epc *epc;
++	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
++	struct device *dev = pci->dev;
++	struct device_node *np = dev->of_node;
 +
-+	ret = pci_epf_register_driver(&test_driver);
-+	if (ret) {
-+		pr_err("failed to register pci epf test driver --> %d\n", ret);
++	ret = of_property_read_u32(np, "num-ib-windows", &ep->num_ib_windows);
++	if (ret < 0) {
++		dev_err(dev, "unable to read *num-ib-windows* property\n");
 +		return ret;
 +	}
 +
++	ret = of_property_read_u32(np, "num-ob-windows", &ep->num_ob_windows);
++	if (ret < 0) {
++		dev_err(dev, "unable to read *num-ob-windows* property\n");
++		return ret;
++	}
++
++	for (bar = BAR_0; bar <= BAR_5; bar++)
++		dw_pcie_ep_reset_bar(pci, bar);
++
++	if (ep->ops->ep_init)
++		ep->ops->ep_init(ep);
++
++	epc = devm_pci_epc_create(dev, &epc_ops);
++	if (IS_ERR(epc)) {
++		dev_err(dev, "failed to create epc device\n");
++		return PTR_ERR(epc);
++	}
++
++	ep->epc = epc;
++	epc_set_drvdata(epc, ep);
++	dw_pcie_setup(pci);
++
 +	return 0;
 +}
-+module_init(pci_epf_test_init);
 +
-+static void __exit pci_epf_test_exit(void)
-+{
-+	pci_epf_unregister_driver(&test_driver);
-+}
-+module_exit(pci_epf_test_exit);
-+
-+MODULE_DESCRIPTION("PCI EPF TEST DRIVER");
++MODULE_DESCRIPTION("Designware PCIe endpoint controller driver");
 +MODULE_AUTHOR("Kishon Vijay Abraham I <kishon@ti.com>");
 +MODULE_LICENSE("GPL v2");
+diff --git a/drivers/pci/controller/pcie-designware.c b/drivers/pci/controller/pcie-designware.c
+index e52a020..4c091ff 100644
+--- a/drivers/pci/controller/pcie-designware.c
++++ b/drivers/pci/controller/pcie-designware.c
+@@ -115,6 +115,36 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+ 	dw_pcie_read_dbi(pci, base, PCIE_ATU_CR2, 0x4, &val);
+ }
+ 
++int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
++			     u64 cpu_addr, enum dw_pcie_as_type as_type)
++{
++	int type;
++	void __iomem *base = pci->dbi_base;
++
++	dw_pcie_write_dbi(pci, base, PCIE_ATU_VIEWPORT, 0x4,
++			  PCIE_ATU_REGION_INBOUND | index);
++	dw_pcie_write_dbi(pci, base, PCIE_ATU_LOWER_TARGET, 0x4,
++			  lower_32_bits(cpu_addr));
++	dw_pcie_write_dbi(pci, base, PCIE_ATU_UPPER_TARGET, 0x4,
++			   upper_32_bits(cpu_addr));
++
++	switch (as_type) {
++	case DW_PCIE_AS_MEM:
++		type = PCIE_ATU_TYPE_MEM;
++		break;
++	case DW_PCIE_AS_IO:
++		type = PCIE_ATU_TYPE_IO;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR1, 0x4, type);
++	dw_pcie_write_dbi(pci, base, PCIE_ATU_CR2, 0x4, PCIE_ATU_ENABLE |
++			  PCIE_ATU_BAR_MODE_ENABLE | (bar << 8));
++	return 0;
++}
++
+ int dw_pcie_wait_for_link(struct dw_pcie *pci)
+ {
+ 	int retries;
+diff --git a/drivers/pci/controller/pcie-designware.h b/drivers/pci/controller/pcie-designware.h
+index 53eaa50..773bd35 100644
+--- a/drivers/pci/controller/pcie-designware.h
++++ b/drivers/pci/controller/pcie-designware.h
+@@ -18,6 +18,9 @@
+ #include <linux/msi.h>
+ #include <linux/pci.h>
+ 
++#include <linux/pci-epc.h>
++#include <linux/pci-epf.h>
++
+ /* Synopsis specific PCIE configuration registers */
+ #define PCIE_PORT_LINK_CONTROL		0x710
+ #define PORT_LINK_MODE_MASK		(0x3f << 16)
+@@ -82,6 +85,7 @@
+ 
+ struct dw_pcie;
+ struct pcie_port;
++struct dw_pcie_ep;
+ 
+ enum dw_pcie_device_mode {
+ 	DW_PCIE_UNKNOWN_TYPE,
+@@ -132,6 +136,27 @@ struct pcie_port {
+ 	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
+ };
+ 
++enum dw_pcie_as_type {
++	DW_PCIE_AS_UNKNOWN,
++	DW_PCIE_AS_MEM,
++	DW_PCIE_AS_IO,
++};
++
++struct dw_pcie_ep_ops {
++	void	(*ep_init)(struct dw_pcie_ep *ep);
++	int	(*raise_irq)(struct dw_pcie_ep *ep, enum pci_epc_irq_type type);
++};
++
++struct dw_pcie_ep {
++	struct pci_epc		*epc;
++	struct dw_pcie_ep_ops	*ops;
++	u8			bar_to_atu[6];
++	unsigned long		ib_window_map;
++	unsigned long		ob_window_map;
++	u32			num_ib_windows;
++	u32			num_ob_windows;
++};
++
+ struct dw_pcie_ops {
+ 	void	(*read_dbi)(struct dw_pcie *pcie, void __iomem *base, int size,
+ 			    u32 *val);
+@@ -149,15 +174,21 @@ struct dw_pcie {
+ 	u32			lanes;
+ 	const struct dw_pcie_ops *ops;
+ 	struct pcie_port	pp;
++	struct dw_pcie_ep	ep;
+ };
+ 
+ #define to_dw_pcie_from_pp(port) container_of((port), struct dw_pcie, pp)
+ 
++#define to_dw_pcie_from_ep(endpoint)   \
++		container_of((endpoint), struct dw_pcie, ep)
++
+ int dw_pcie_wait_for_link(struct dw_pcie *pci);
+ int dw_pcie_link_up(struct dw_pcie *pci);
+ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+ 			       int type, u64 cpu_addr, u64 pci_addr,
+ 			       u32 size);
++int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
++			     u64 cpu_addr, enum dw_pcie_as_type as_type);
+ int dw_pcie_read(void __iomem *addr, int size, u32 *val);
+ int dw_pcie_write(void __iomem *addr, int size, u32 val);
+ void dw_pcie_read_dbi(struct dw_pcie *pci, void __iomem *base,
+@@ -166,6 +197,20 @@ void dw_pcie_write_dbi(struct dw_pcie *pci, void *base, u32 reg,
+ 		       int size, u32 val);
+ void dw_pcie_setup(struct dw_pcie *pci);
+ 
++#ifdef CONFIG_PCIE_DW_EP
++void dw_pcie_ep_linkup(struct dw_pcie_ep *ep);
++int dw_pcie_ep_init(struct dw_pcie_ep *ep);
++#else
++static inline void dw_pcie_ep_linkup(struct dw_pcie_ep *ep)
++{
++}
++
++static inline int dw_pcie_ep_init(struct dw_pcie_ep *ep)
++{
++	return 0;
++}
++#endif
++
+ #ifdef CONFIG_PCIE_DW_HOST
+ irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
+ void dw_pcie_msi_init(struct pcie_port *pp);
 -- 
 1.7.9.5
