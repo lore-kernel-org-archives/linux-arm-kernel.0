@@ -1,49 +1,47 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Wed, 14 Sep 2016 12:05:05 +0530
-Subject: [PATCH v1 3/3] ARM: dts: imx6qdl-apalis: Use enable-gpios property
- for backlight
-In-Reply-To: <9d2c17aa2e00e6ff4349a53de8247860d2382607.1473833908.git.maitysanchayan@gmail.com>
-References: <9d2c17aa2e00e6ff4349a53de8247860d2382607.1473833908.git.maitysanchayan@gmail.com>
-Message-ID: <dff8d58c4021719184af2c83773e86f175ad910e.1473833908.git.maitysanchayan@gmail.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Wed, 14 Sep 2016 08:54:25 +0200
+Subject: [GIT PULL] STi DT updates for v4.9
+In-Reply-To: <4599921.Xv3Qd3jgsj@wuerfel>
+References: <c83fda3c-5120-a55b-dfb0-f550cbaf777a@st.com>
+ <4599921.Xv3Qd3jgsj@wuerfel>
+Message-ID: <45b2a5fb-d573-e196-fac2-de60f42efb24@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use enable-gpios property of PWM backlight driver for backlight
-control. While at it also fix the use of brightness levels required
-by EDT displays which require inverted PWM's.
+Hi Arnd
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- arch/arm/boot/dts/imx6qdl-apalis.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+On 09/13/2016 05:27 PM, Arnd Bergmann wrote:
+> On Friday, September 2, 2016 3:58:00 PM CEST Patrice Chotard wrote:
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
+>>
+>> for you to fetch changes up to ba5ba11906d5462993f5fd4e3da4d234505427a0:
+>>
+>>   ARM: dts: STiH41x-b2020: Update gpio specifier (2016-09-02 15:15:14 +0200)
+>>
+>> ----------------------------------------------------------------
+>>
+>> STi dts fixes and new STi 96board support:
+>>
+>> Add thermal node for STiH407 family boards
+>> Add specific nodes for STMicroelectronics 96Board
+>> Add new B2260 STi board file = 96Board
+>> Fix ahci issue on STiH407 family
+>> Fix debugfs/pinctrl kernel warning
+>> Update gpio-cells and gpio specifier
+>>
+> 
+> Pulled into next/dt. The URL had no tag name, but I found the tag "sti-dt-for-v4.9-1"
 
-diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-index 8c67dd8..9100bde 100644
---- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-@@ -49,7 +49,10 @@
- 
- 	backlight: backlight {
- 		compatible = "pwm-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_bl_on>;
- 		pwms = <&pwm4 0 5000000>;
-+		enable-gpios = <&gpio3 13 GPIO_ACTIVE_HIGH>;
- 		status = "disabled";
- 	};
- 
-@@ -614,6 +617,12 @@
- 		>;
- 	};
- 
-+	pinctrl_gpio_bl_on: gpioblon {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_DA13__GPIO3_IO13 0x1b0b0
-+		>;
-+	};
-+
- 	pinctrl_gpio_keys: gpio1io04grp {
- 		fsl,pins = <
- 			/* Power button */
--- 
-2.9.3
+OK i will check that point.
+
+> in your tree with that commit ID, so I pulled that.
+
+Perfect !
+
+Thanks
+>     
+> Not sure what went wrong on your end, it wasn't a big deal but please
+> try to always include the tag. Thanks!
+> 
+> 	Arnd
+> 
