@@ -1,29 +1,34 @@
 From: hotran@apm.com (Hoan Tran)
-Date: Wed, 14 Sep 2016 14:05:31 -0700
-Subject: [PATCH v3 3/3] arm64: dts: xgene: Add DT node for APM X-Gene 2
- CPU clocks
-In-Reply-To: <20160914205556.GC7243@codeaurora.org>
+Date: Wed, 14 Sep 2016 14:06:09 -0700
+Subject: [PATCH v3 2/3] clk: xgene: Add PMD clock
+In-Reply-To: <20160914205541.GB7243@codeaurora.org>
 References: <1473704605-28126-1-git-send-email-hotran@apm.com>
- <1473704605-28126-4-git-send-email-hotran@apm.com>
- <20160914205556.GC7243@codeaurora.org>
-Message-ID: <CAFHUOYyMHfTSGRBL7LVFJvwOKT7mgbg_N1hG6xkmjduzFCdfkg@mail.gmail.com>
+ <1473704605-28126-3-git-send-email-hotran@apm.com>
+ <20160914205541.GB7243@codeaurora.org>
+Message-ID: <CAFHUOYxc0PBx675j6ZtMWw_nFawT7UMXHa9EE+L=sGyfm=8UmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
 On Wed, Sep 14, 2016 at 1:55 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 > On 09/12, Hoan Tran wrote:
->> Add DT nodes to enable APM X-Gene 2 CPU clocks.
+>> Add X-Gene PMD clock support.
+>>
+>> PMD clock is implemented for a single register field.
+>>   Output rate = parent_rate * (denominator - scale) / denominator
+>> with
+>>   - denominator = bitmask of register field + 1
+>>   - scale = values of register field
+>>
+>> For example, for bitmask is 0x7, denominator will be 8 and scale
+>> will be computed and programmed accordingly.
 >>
 >> Signed-off-by: Hoan Tran <hotran@apm.com>
 >> ---
 >
-> This can go through arm-soc? I'm not applying this.
+> Applied to clk-next
 
-Yes, I can go through arm-soc.
+Thanks, Stephen !
 
-Thanks
 Hoan
 
 >
