@@ -1,340 +1,182 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 14 Sep 2016 14:53:50 +0100
-Subject: [PATCH] coresight: tmc: Cleanup operation mode handling
-Message-ID: <1473861230-5666-1-git-send-email-suzuki.poulose@arm.com>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Wed, 14 Sep 2016 16:03:04 +0200
+Subject: [RFC PATCH 9/9] ethernet: sun8i-emac: add pm_runtime support
+In-Reply-To: <20160912204451.GO9449@lukather>
+References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1473425117-18645-10-git-send-email-clabbe.montjoie@gmail.com>
+ <20160912204451.GO9449@lukather>
+Message-ID: <20160914140304.GA27639@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mode of operation of the TMC tracked in drvdata->mode is defined
-as a local_t type. This is always checked and modified under the
-drvdata->spinlock and hence we don't need local_t for it and the
-unnecessary synchronisation instructions that comes with it. This
-change makes the code a bit more cleaner.
+On Mon, Sep 12, 2016 at 10:44:51PM +0200, Maxime Ripard wrote:
+> Hi,
+> 
+> On Fri, Sep 09, 2016 at 02:45:17PM +0200, Corentin Labbe wrote:
+> > This patch add pm_runtime support to sun8i-emac.
+> > For the moment, only basic support is added, (the device is marked as
+> > used when net/open)
+> > 
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  drivers/net/ethernet/allwinner/sun8i-emac.c | 62 ++++++++++++++++++++++++++++-
+> >  1 file changed, 60 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/net/ethernet/allwinner/sun8i-emac.c b/drivers/net/ethernet/allwinner/sun8i-emac.c
+> > index 1c4bc80..cce886e 100644
+> > --- a/drivers/net/ethernet/allwinner/sun8i-emac.c
+> > +++ b/drivers/net/ethernet/allwinner/sun8i-emac.c
+> > @@ -9,7 +9,6 @@
+> >   * - MAC filtering
+> >   * - Jumbo frame
+> >   * - features rx-all (NETIF_F_RXALL_BIT)
+> > - * - PM runtime
+> >   */
+> >  #include <linux/bitops.h>
+> >  #include <linux/clk.h>
+> > @@ -27,6 +26,7 @@
+> >  #include <linux/pinctrl/consumer.h>
+> >  #include <linux/pinctrl/pinctrl.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/pm_runtime.h>
+> >  #include <linux/reset.h>
+> >  #include <linux/scatterlist.h>
+> >  #include <linux/skbuff.h>
+> > @@ -1301,11 +1301,18 @@ static int sun8i_emac_open(struct net_device *ndev)
+> >  	int err;
+> >  	u32 v;
+> >  
+> > +	err = pm_runtime_get_sync(priv->dev);
+> > +	if (err) {
+> > +		pm_runtime_put_noidle(priv->dev);
+> > +		dev_err(priv->dev, "pm_runtime error: %d\n", err);
+> > +		return err;
+> > +	}
+> > +
+> >  	err = request_irq(priv->irq, sun8i_emac_dma_interrupt, 0,
+> >  			  dev_name(priv->dev), ndev);
+> >  	if (err) {
+> >  		dev_err(priv->dev, "Cannot request IRQ: %d\n", err);
+> > -		return err;
+> > +		goto err_runtime;
+> >  	}
+> >  
+> >  	/* Set interface mode (and configure internal PHY on H3) */
+> > @@ -1395,6 +1402,8 @@ err_syscon:
+> >  	sun8i_emac_unset_syscon(ndev);
+> >  err_irq:
+> >  	free_irq(priv->irq, ndev);
+> > +err_runtime:
+> > +	pm_runtime_put(priv->dev);
+> >  	return err;
+> >  }
+> >  
+> > @@ -1483,6 +1492,8 @@ static int sun8i_emac_stop(struct net_device *ndev)
+> >  	dma_free_coherent(priv->dev, priv->nbdesc_tx * sizeof(struct dma_desc),
+> >  			  priv->dd_tx, priv->dd_tx_phy);
+> >  
+> > +	pm_runtime_put(priv->dev);
+> > +
+> >  	return 0;
+> >  }
+> >  
+> > @@ -2210,6 +2221,8 @@ static int sun8i_emac_probe(struct platform_device *pdev)
+> >  		goto probe_err;
+> >  	}
+> >  
+> > +	pm_runtime_enable(priv->dev);
+> > +
+> >  	return 0;
+> >  
+> >  probe_err:
+> > @@ -2221,6 +2234,8 @@ static int sun8i_emac_remove(struct platform_device *pdev)
+> >  {
+> >  	struct net_device *ndev = platform_get_drvdata(pdev);
+> >  
+> > +	pm_runtime_disable(&pdev->dev);
+> > +
+> >  	unregister_netdev(ndev);
+> >  	platform_set_drvdata(pdev, NULL);
+> >  	free_netdev(ndev);
+> > @@ -2228,6 +2243,47 @@ static int sun8i_emac_remove(struct platform_device *pdev)
+> >  	return 0;
+> >  }
+> >  
+> > +static int __maybe_unused sun8i_emac_suspend(struct platform_device *pdev, pm_message_t state)
+> > +{
+> > +	struct net_device *ndev = platform_get_drvdata(pdev);
+> > +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
+> > +
+> > +	napi_disable(&priv->napi);
+> > +
+> > +	if (netif_running(ndev))
+> > +		netif_device_detach(ndev);
+> > +
+> > +	sun8i_emac_stop_tx(ndev);
+> > +	sun8i_emac_stop_rx(ndev);
+> > +
+> > +	sun8i_emac_rx_clean(ndev);
+> > +	sun8i_emac_tx_clean(ndev);
+> > +
+> > +	phy_stop(ndev->phydev);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int __maybe_unused sun8i_emac_resume(struct platform_device *pdev)
+> > +{
+> > +	struct net_device *ndev = platform_get_drvdata(pdev);
+> > +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
+> > +
+> > +	phy_start(ndev->phydev);
+> > +
+> > +	sun8i_emac_start_tx(ndev);
+> > +	sun8i_emac_start_rx(ndev);
+> > +
+> > +	if (netif_running(ndev))
+> > +		netif_device_attach(ndev);
+> > +
+> > +	netif_start_queue(ndev);
+> > +
+> > +	napi_enable(&priv->napi);
+> > +
+> > +	return 0;
+> > +}
+> 
+> The main idea behind the runtime PM hooks is that they bring the
+> device to a working state and shuts it down when it's not needed
+> anymore.
+> 
 
-Also fixes the order in which we update the drvdata->mode to
-CS_MODE_DISABLED. i.e, in tmc_disable_etX_sink we change the
-mode to CS_MODE_DISABLED before invoking tmc_disable_etX_hw()
-which in turn depends on the mode to decide whether to dump the
-trace to a buffer.
+I expect that the first part (all pm_runtime_xxx) of the patch bring that.
+When the interface is not opened:
+cat /sys/devices/platform/soc/1c30000.ethernet/power/runtime_status 
+suspended
 
-Applies on mathieu's coresight/next tree [1]
+> However, they shouldn't be called when the device is still in used, so
+> all the mangling with NAPI, the phy and so on is irrelevant here, but
+> the clocks, resets, for example, are.
+> 
 
-https://git.linaro.org/kernel/coresight.git next
+I do the same as other ethernet driver for suspend/resume.
 
-Reported-by: Venkatesh Vivekanandan <venkatesh.vivekanandan@broadcom.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 32 +++++++++++--------------
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 30 ++++++++++-------------
- drivers/hwtracing/coresight/coresight-tmc.h     |  2 +-
- 3 files changed, 28 insertions(+), 36 deletions(-)
+> >  static const struct of_device_id sun8i_emac_of_match_table[] = {
+> >  	{ .compatible = "allwinner,sun8i-a83t-emac",
+> >  	  .data = &emac_variant_a83t },
+> > @@ -2246,6 +2302,8 @@ static struct platform_driver sun8i_emac_driver = {
+> >  		.name           = "sun8i-emac",
+> >  		.of_match_table	= sun8i_emac_of_match_table,
+> >  	},
+> > +	.suspend	= sun8i_emac_suspend,
+> > +	.resume		= sun8i_emac_resume,
+> 
+> These are not the runtime PM hooks. How did you test that?
+> 
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index d6941ea..c51ce45 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -70,7 +70,7 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
- 	 * When operating in sysFS mode the content of the buffer needs to be
- 	 * read before the TMC is disabled.
- 	 */
--	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		tmc_etb_dump_hw(drvdata);
- 	tmc_disable_hw(drvdata);
- 
-@@ -108,7 +108,6 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
- 	int ret = 0;
- 	bool used = false;
- 	char *buf = NULL;
--	long val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -138,13 +137,12 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
- 		goto out;
- 	}
- 
--	val = local_xchg(&drvdata->mode, mode);
- 	/*
- 	 * In sysFS mode we can have multiple writers per sink.  Since this
- 	 * sink is already enabled no memory is needed and the HW need not be
- 	 * touched.
- 	 */
--	if (val == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		goto out;
- 
- 	/*
-@@ -163,6 +161,7 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
- 		drvdata->buf = buf;
- 	}
- 
-+	drvdata->mode = CS_MODE_SYSFS;
- 	tmc_etb_enable_hw(drvdata);
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-@@ -180,7 +179,6 @@ out:
- static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32 mode)
- {
- 	int ret = 0;
--	long val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -194,17 +192,17 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32 mode)
- 		goto out;
- 	}
- 
--	val = local_xchg(&drvdata->mode, mode);
- 	/*
- 	 * In Perf mode there can be only one writer per sink.  There
- 	 * is also no need to continue if the ETB/ETR is already operated
- 	 * from sysFS.
- 	 */
--	if (val != CS_MODE_DISABLED) {
-+	if (drvdata->mode != CS_MODE_DISABLED) {
- 		ret = -EINVAL;
- 		goto out;
- 	}
- 
-+	drvdata->mode = mode;
- 	tmc_etb_enable_hw(drvdata);
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-@@ -227,7 +225,6 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
- 
- static void tmc_disable_etf_sink(struct coresight_device *csdev)
- {
--	long val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -237,10 +234,11 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
- 		return;
- 	}
- 
--	val = local_xchg(&drvdata->mode, CS_MODE_DISABLED);
- 	/* Disable the TMC only if it needs to */
--	if (val != CS_MODE_DISABLED)
-+	if (drvdata->mode != CS_MODE_DISABLED) {
- 		tmc_etb_disable_hw(drvdata);
-+		drvdata->mode = CS_MODE_DISABLED;
-+	}
- 
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-@@ -260,7 +258,7 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
- 	}
- 
- 	tmc_etf_enable_hw(drvdata);
--	local_set(&drvdata->mode, CS_MODE_SYSFS);
-+	drvdata->mode = CS_MODE_SYSFS;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
- 	dev_info(drvdata->dev, "TMC-ETF enabled\n");
-@@ -279,8 +277,8 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
- 		return;
- 	}
- 
-+	drvdata->mode = CS_MODE_DISABLED;
- 	tmc_etf_disable_hw(drvdata);
--	local_set(&drvdata->mode, CS_MODE_DISABLED);
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
- 	dev_info(drvdata->dev, "TMC disabled\n");
-@@ -383,7 +381,7 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
- 		return;
- 
- 	/* This shouldn't happen */
--	if (WARN_ON_ONCE(local_read(&drvdata->mode) != CS_MODE_PERF))
-+	if (WARN_ON_ONCE(drvdata->mode != CS_MODE_PERF))
- 		return;
- 
- 	CS_UNLOCK(drvdata->base);
-@@ -504,7 +502,6 @@ const struct coresight_ops tmc_etf_cs_ops = {
- 
- int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
- {
--	long val;
- 	enum tmc_mode mode;
- 	int ret = 0;
- 	unsigned long flags;
-@@ -528,9 +525,8 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
- 		goto out;
- 	}
- 
--	val = local_read(&drvdata->mode);
- 	/* Don't interfere if operated from Perf */
--	if (val == CS_MODE_PERF) {
-+	if (drvdata->mode == CS_MODE_PERF) {
- 		ret = -EINVAL;
- 		goto out;
- 	}
-@@ -542,7 +538,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
- 	}
- 
- 	/* Disable the TMC if need be */
--	if (val == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		tmc_etb_disable_hw(drvdata);
- 
- 	drvdata->reading = true;
-@@ -573,7 +569,7 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
- 	}
- 
- 	/* Re-enable the TMC if need be */
--	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
-+	if (drvdata->mode == CS_MODE_SYSFS) {
- 		/*
- 		 * The trace run will continue with the same allocated trace
- 		 * buffer. As such zero-out the buffer so that we don't end
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 886ea83..cf2bf60 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -86,7 +86,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
- 	 * When operating in sysFS mode the content of the buffer needs to be
- 	 * read before the TMC is disabled.
- 	 */
--	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		tmc_etr_dump_hw(drvdata);
- 	tmc_disable_hw(drvdata);
- 
-@@ -97,7 +97,6 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
- {
- 	int ret = 0;
- 	bool used = false;
--	long val;
- 	unsigned long flags;
- 	void __iomem *vaddr = NULL;
- 	dma_addr_t paddr;
-@@ -134,13 +133,12 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
- 		goto out;
- 	}
- 
--	val = local_xchg(&drvdata->mode, mode);
- 	/*
- 	 * In sysFS mode we can have multiple writers per sink.  Since this
- 	 * sink is already enabled no memory is needed and the HW need not be
- 	 * touched.
- 	 */
--	if (val == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		goto out;
- 
- 	/*
-@@ -157,6 +155,7 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
- 
- 	memset(drvdata->vaddr, 0, drvdata->size);
- 
-+	drvdata->mode = CS_MODE_SYSFS;
- 	tmc_etr_enable_hw(drvdata);
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-@@ -174,7 +173,6 @@ out:
- static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32 mode)
- {
- 	int ret = 0;
--	long val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -188,18 +186,18 @@ static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32 mode)
- 		goto out;
- 	}
- 
--	val = local_xchg(&drvdata->mode, mode);
- 	/*
- 	 * In Perf mode there can be only one writer per sink.  There
- 	 * is also no need to continue if the ETR is already operated
- 	 * from sysFS.
- 	 */
--	if (val != CS_MODE_DISABLED) {
-+	if (drvdata->mode == CS_MODE_DISABLED) {
-+		drvdata->mode = CS_MODE_PERF;
-+		tmc_etr_enable_hw(drvdata);
-+	} else {
- 		ret = -EINVAL;
--		goto out;
- 	}
- 
--	tmc_etr_enable_hw(drvdata);
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-@@ -221,7 +219,6 @@ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
- 
- static void tmc_disable_etr_sink(struct coresight_device *csdev)
- {
--	long val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -231,10 +228,11 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev)
- 		return;
- 	}
- 
--	val = local_xchg(&drvdata->mode, CS_MODE_DISABLED);
- 	/* Disable the TMC only if it needs to */
--	if (val != CS_MODE_DISABLED)
-+	if (drvdata->mode != CS_MODE_DISABLED) {
- 		tmc_etr_disable_hw(drvdata);
-+		drvdata->mode = CS_MODE_DISABLED;
-+	}
- 
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-@@ -253,7 +251,6 @@ const struct coresight_ops tmc_etr_cs_ops = {
- int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
- {
- 	int ret = 0;
--	long val;
- 	unsigned long flags;
- 
- 	/* config types are set a boot time and never change */
-@@ -266,9 +263,8 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
- 		goto out;
- 	}
- 
--	val = local_read(&drvdata->mode);
- 	/* Don't interfere if operated from Perf */
--	if (val == CS_MODE_PERF) {
-+	if (drvdata->mode == CS_MODE_PERF) {
- 		ret = -EINVAL;
- 		goto out;
- 	}
-@@ -280,7 +276,7 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
- 	}
- 
- 	/* Disable the TMC if need be */
--	if (val == CS_MODE_SYSFS)
-+	if (drvdata->mode == CS_MODE_SYSFS)
- 		tmc_etr_disable_hw(drvdata);
- 
- 	drvdata->reading = true;
-@@ -303,7 +299,7 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 
- 	/* RE-enable the TMC if need be */
--	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
-+	if (drvdata->mode == CS_MODE_SYSFS) {
- 		/*
- 		 * The trace run will continue with the same allocated trace
- 		 * buffer. The trace buffer is cleared in tmc_etr_enable_hw(),
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 44b3ae3..51c0185 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -117,7 +117,7 @@ struct tmc_drvdata {
- 	void __iomem		*vaddr;
- 	u32			size;
- 	u32			len;
--	local_t			mode;
-+	u32			mode;
- 	enum tmc_config_type	config_type;
- 	enum tmc_mem_intf_width	memwidth;
- 	u32			trigger_cntr;
--- 
-2.7.4
+Anyway I didnt test suspend/resume so I will remove it until I successfully found how to hibernate my board.
+
+Thanks
+
+Regards
+
+Corentin Labbe
