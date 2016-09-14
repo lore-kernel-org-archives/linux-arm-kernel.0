@@ -1,35 +1,61 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 14 Sep 2016 12:06:04 +0200
-Subject: [PATCH 0/4] ARM: amlogic: add i2c support to Amlogic's gxbb family
-Message-ID: <1473847568-20163-1-git-send-email-jbrunet@baylibre.com>
+Date: Wed, 14 Sep 2016 12:06:05 +0200
+Subject: [PATCH 1/4] clk: gxbb: expose i2c clocks
+In-Reply-To: <1473847568-20163-1-git-send-email-jbrunet@baylibre.com>
+References: <1473847568-20163-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <1473847568-20163-2-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the meson i2c controller found on the gxbb SoC family
-This patchset adds 1 i2c in the AO domain and 3 in the EE domain (A,B,C).
-There is 1 last i2c in the EE domain (D) but it is actually not connected
-to the pad of the SoC, so there is no point in adding it here.
+I2C and AO_I2C clocks are needed for the i2c driver, expose to DT
+(and comment out in clk driver)
 
-Patches for the i2c [0] driver and pinctrl [1] have been sent in
-dedicated series
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ drivers/clk/meson/gxbb.h              | 4 ++--
+ include/dt-bindings/clock/gxbb-clkc.h | 2 ++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-[0]: http://lkml.kernel.org/r/1473846557-18123-1-git-send-email-jbrunet at baylibre.com
-[1]: http://lkml.kernel.org/r/1473846328-17339-1-git-send-email-jbrunet at baylibre.com
-
-Jerome Brunet (3):
-  clk: gxbb: expose i2c clocks
-  ARM64: dts: meson-gxbb: add pins for I2C
-  ARM64: dts: gxbb: add i2c bus
-
-Neil Armstrong (1):
-  ARM64: dts: meson-gxbb: add I2C nodes
-
- .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |  6 ++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    |  6 ++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 72 ++++++++++++++++++++++
- drivers/clk/meson/gxbb.h                           |  4 +-
- include/dt-bindings/clock/gxbb-clkc.h              |  2 +
- 5 files changed, 88 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+index 044fc44e9144..0252939ba58f 100644
+--- a/drivers/clk/meson/gxbb.h
++++ b/drivers/clk/meson/gxbb.h
+@@ -190,7 +190,7 @@
+ #define CLKID_PL301		  19
+ #define CLKID_PERIPHS		  20
+ #define CLKID_SPICC		  21
+-#define CLKID_I2C		  22
++/* CLKID_I2C */
+ #define CLKID_SAR_ADC		  23
+ #define CLKID_SMART_CARD	  24
+ #define CLKID_RNG0		  25
+@@ -261,7 +261,7 @@
+ #define CLKID_AO_AHB_SRAM	  90
+ #define CLKID_AO_AHB_BUS	  91
+ #define CLKID_AO_IFACE		  92
+-#define CLKID_AO_I2C		  93
++/* CLKID_AO_I2C */
+ /* CLKID_SD_EMMC_A */
+ /* CLKID_SD_EMMC_B */
+ /* CLKID_SD_EMMC_C */
+diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+index 743c45b40361..baade6f429d0 100644
+--- a/include/dt-bindings/clock/gxbb-clkc.h
++++ b/include/dt-bindings/clock/gxbb-clkc.h
+@@ -13,12 +13,14 @@
+ #define CLKID_CLK81		12
+ #define CLKID_MPLL2		15
+ #define CLKID_SPI		34
++#define CLKID_I2C		22
+ #define CLKID_ETH		36
+ #define CLKID_USB0		50
+ #define CLKID_USB1		51
+ #define CLKID_USB		55
+ #define CLKID_USB1_DDR_BRIDGE	64
+ #define CLKID_USB0_DDR_BRIDGE	65
++#define CLKID_AO_I2C		93
+ #define CLKID_SD_EMMC_A		94
+ #define CLKID_SD_EMMC_B		95
+ #define CLKID_SD_EMMC_C		96
 -- 
 2.7.4
