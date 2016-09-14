@@ -1,26 +1,31 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 14 Sep 2016 10:21:45 -0700
-Subject: [PATCH] arm64: defconfig: enable meson I2C
-Message-ID: <20160914172145.17799-1-khilman@baylibre.com>
+Date: Wed, 14 Sep 2016 10:24:38 -0700
+Subject: [PATCH v2] ARM: dts: da850-lcdk: Add NAND to DT
+In-Reply-To: <20160908183324.32389-1-khilman@baylibre.com>
+References: <20160908183324.32389-1-khilman@baylibre.com>
+Message-ID: <CAOi56cWJpx-+s7h_+qypj-0HOcC2vDs2PLtZbdMO92TzdvECpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Hi Sekhar,
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 17d26e958a3a..8fa341d645ee 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -181,6 +181,7 @@ CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_IMX=y
-+CONFIG_I2C_MESON=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_QUP=y
- CONFIG_I2C_TEGRA=y
--- 
-2.9.3
+On Thu, Sep 8, 2016 at 11:33 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> From: Karl Beldan <kbeldan@baylibre.com>
+>
+> This adds DT support for the NAND connected to the SoC AEMIF.
+> Passed torture hashing a 40MB file on top of UBIFS using subpages.
+>
+> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+> [khilman: add back default partitions from an earlier patch]
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+> Applies on Sekhar's v4.9/dts branch.
+>
+
+Looks like you need to respin your DT series for arm-soc due to build
+errors.  Can you add this while you're at it so we have 4-bit ECC in
+v4.9?
+
+Thanks,
+
+Kevin
