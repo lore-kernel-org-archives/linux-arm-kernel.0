@@ -1,105 +1,70 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 14 Sep 2016 01:45:04 -0700
-Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
-In-Reply-To: <20160914080321.GA21674@b29397-desktop>
-References: <20160914014246.31847-1-stephen.boyd@linaro.org>
- <20160914033200.GE30760@b29397-desktop>
- <147383270635.1464.10706917860873291816@sboyd-linaro>
- <20160914080321.GA21674@b29397-desktop>
-Message-ID: <147384270449.13546.495288874027868435@sboyd-linaro>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Sep 2016 10:50:12 +0200
+Subject: [PATCH 05/33] gpio: add generic single-register fixed-direction
+ GPIO driver
+In-Reply-To: <CACRpkdZkCHqYYpYKA+Nvj4XY1zecdbZxMuRe=bbdziJL2fHf6w@mail.gmail.com>
+References: <20160829102328.GA28796@n2100.armlinux.org.uk>
+ <E1beJjz-0000mA-0o@rmk-PC.armlinux.org.uk>
+ <87eg57e54l.fsf@belgarion.home> <20160830091805.GL1041@n2100.armlinux.org.uk>
+ <87k2eycip0.fsf@belgarion.home> <20160830184612.GO1041@n2100.armlinux.org.uk>
+ <87fupmc59b.fsf@belgarion.home> <20160831084938.GQ1041@n2100.armlinux.org.uk>
+ <CACRpkdZBNH=4qZEfcLzqZAN=tum2f3YeoQj0D5PsH+P0Cf+7LQ@mail.gmail.com>
+ <20160905122611.GO1041@n2100.armlinux.org.uk>
+ <CACRpkdZkCHqYYpYKA+Nvj4XY1zecdbZxMuRe=bbdziJL2fHf6w@mail.gmail.com>
+Message-ID: <CACRpkda3jzCOXG5Qrmqo95gnF4vcAe=i-sanJ2k_4BdrE08PkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-09-14 01:03:21)
-> On Tue, Sep 13, 2016 at 10:58:26PM -0700, Stephen Boyd wrote:
-> > Quoting Peter Chen (2016-09-13 20:32:00)
-> > > On Tue, Sep 13, 2016 at 06:42:46PM -0700, Stephen Boyd wrote:
-> > > > On the db410c 96boards platform we have a TC7USB40MU[1] on the
-> > > > board to mux the D+/D- lines from the SoC between a micro usb
-> > > > "device" port and a USB hub for "host" roles. Upon a role switch,
-> > > > we need to change this mux to forward the D+/D- lines to either
-> > > > the port or the hub. Therefore, introduce a driver for this
-> > > > device that intercepts extcon USB_HOST events and logically
-> > > > asserts a gpio to mux the "host" D+/D- lines when a host cable is
-> > > > attached. When the cable goes away, it will logically deassert
-> > > > the gpio and mux the "device" lines.
-> > > 
-> > > Would you please draw the design? It can also help me review your
-> > > chipidea patch well.
-> > > 
-> > > 1. How many ports on the board?
-> > > 2. How the lines are connected on the board?
-> > > 
-> > 
-> > The schematic for the db410c is publically available here[2][3].
-> > 
-> > There's also the 96boards spec[4] which talks about this switch based
-> > design a little bit. See the section titled "Single USB port Example".
-> > 
-> > [2] https://github.com/96boards/documentation/blob/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
-> > [3] https://github.com/96boards/documentation/raw/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
-> > [4] https://www.96boards.org/wp-content/uploads/2015/02/96BoardsCESpecificationv1.0-EA1.pdf
-> 
-> Ok, I see several use cases for this role switch
-> 
-> 1. Using the hardware switch (218-4LPST)
-> In this case, you can set USB_SW_SEL as input gpio, and use
-> extcon-usb-gpio.c like before, just set this gpio as active
-> low at dts.
+On Thu, Sep 8, 2016 at 3:21 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Sep 5, 2016 at 2:26 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+>> On Mon, Sep 05, 2016 at 11:06:28AM +0200, Linus Walleij wrote:
+>>> I couldn't resist testing on the Compaq iPAQ h3600. It works the
+>>> same as before so:
+>>> Tested-by: Linus Walleij <linus.walleij@linaro.org> [for Compaq iPAQ H3600]
+>>
+>> Great news.  I've been thinking about digging out my h3600, but it's
+>> very old, and hasn't been turned on for many years.  I'm not sure what
+>> state it's in.
+>>
+>> I've been hoping to try booting some kernels with qemu-system-arm, but
+>> so far I've completely failed to get qemu-system-arm to do anything
+>> useful - it just sits there doing apparently nothing, irrespective of
+>> which platform I choose or which kernel I give it.
+>>
+>>> The only news in the bootlog is this:
+>>> sa11x0-pcmcia: probe of sa11x0-pcmcia failed with error -2
+>>
+>> Not so great news - that's -ENOENT.  Did that happen before these
+>> changes?  That could be that the gpiod lookup table isn't found.
+>> However, if that were the case, I'd have expected an error message
+>> along the lines of:
+>>
+>> Failed to get GPIO for xxx: -nnn
+>>
+>> from soc_pcmcia_request_gpiods().  The other possibility is that
+>> we're not getting to sa11x0_drv_pcmcia_legacy_probe() but instead
+>> trying to initialise it as a generic sa11x0 socket, and
+>> sa11x0_pcmcia_hw_init() is failing as a result.
+>>
+>> We should be using the legacy probe on H3600, so sa11x0_pcmcia_hw_init()
+>> should never be reached.
+>
+> However that is what happens, this is my callstack after
+> adding some prints:
+>
+> sa11x0_pcmcia_init
+> sa11x0_drv_pcmcia_probe
+> soc_pcmcia_init_one
+> soc_pcmcia_add_one
+> soc_pcmcia_hw_init
+> sa11x0_pcmcia_hw_init
+> soc_pcmcia_add_one: pcmcia HW init failed
+> sa11x0-pcmcia: probe of sa11x0-pcmcia failed with error -2
 
-Nice! I didn't think of this case but it's good that we can support
-that with some work.
+Bah I found the cause, just a simple oneliner typo in one of
+the patches. I will comment on the patch in question so you can
+fix it up on your branch.
 
-> 
-> 2. Using USB_HS_ID as vbus-gpio (input), and USB_SW_SEL as id-gpio (output)
-
-This is pretty much what has been implemented. USB_HS_ID is an
-extcon-usb-gpio.c device.
-
-> I can't find hardware relationship between each other, maybe I miss
-> something.
-
-I believe USB_SW_SEL is the physical switch (218-4LPST) while
-USB_SW_SEL_PM is the software controllable part using a GPIO. USB_HS_ID
-is just the vbus line from the uB connector and that line goes straight
-into the SoC via a GPIO.
-
-> This use case (design) seems strange, usually, we use ID pin controls
-> vbus, but seldom use vbus pin control ID.
-> How you would like to implement it? When the USB cable is connected
-> (between PC), it receives vbus-gpio interrupt, then you set USB_SW_SEL
-> as low? If disconnected, you set USB_SW_SEL as high?
-
-Right. The documented behavior is to detect the micro-usb cable and
-drive USB_SW_SEL low. When the cable is unplugged we drive USB_SW_SEL
-high. Maybe that should be changed though? If we always sampled
-USB_SW_SEL as a USB_HOST extcon and the vbus line as a USB extcon then
-we could allow the user to decide either with the physical switch or
-with some sort of software control to toggle that gpio.
-
-> When the USB controller works at Host mode, what will happen if the user
-> connects USB cable at device port?
-
-The devices on the two type-A connectors will be disconnected and we'll
-switch from host mode to device mode.
-
-> 
-> 3. Using sysfs to switch the role
-> Set USB_SW_SEL according to "role" at debugfs
-
-sysfs isn't debugfs, but yes I wonder if we need to worry about the
-debugfs role switching support here and toggle the gpio manually without
-involving extcon. That would mean we need to have a way for the chipidea
-controller to toggle this gpio/mux itself.
-
-> 
-> Which one you would like to implement? Or anything else I miss?
-> 
-
-Mostly #2, but I'm concerned that the DT binding is going to force that
-decision on others who may have the same switch and want to do #1 or #3.
-So how to design it in a way that makes it work in all cases? Also, what
-to do if the USB_SW_SEL switch is driven high by the physical switch?
-That will "override" any software control we might be able to use, so
-hopefully we can detect this somehow and prevent the role switch from
-happening.
+Yours,
+Linus Walleij
