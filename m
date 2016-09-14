@@ -1,163 +1,85 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 14 Sep 2016 14:32:57 +0200
-Subject: [PATCH v7 00/22] Generic DT bindings for PCI IOMMUs and ARM SMMU
-In-Reply-To: <d03ea5e7-59f1-8b49-4ba2-d05fc2030ebc@arm.com>
-References: <cover.1473695704.git.robin.murphy@arm.com>
- <11ebd81e-2ea5-5ff3-35b3-be95f03e05bd@redhat.com>
- <d03ea5e7-59f1-8b49-4ba2-d05fc2030ebc@arm.com>
-Message-ID: <04a0a682-4fdc-8d62-57cd-efdf730582c6@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Sep 2016 14:33:21 +0200
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <1473855354-150093-3-git-send-email-yuanzhichang@hisilicon.com>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1473855354-150093-3-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <5140357.dcW9ibtZJ6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 14/09/2016 12:35, Robin Murphy wrote:
-> On 14/09/16 09:41, Auger Eric wrote:
->> Hi,
->>
->> On 12/09/2016 18:13, Robin Murphy wrote:
->>> Hi all,
->>>
->>> To any more confusing fixups and crazily numbered extra patches, here's
->>> a quick v7 with everything rebased into the right order. The significant
->>> change this time is to implement iommu_fwspec properly from the start,
->>> which ends up being far simpler and more robust than faffing about
->>> introducing it somewhere 'less intrusive' to move toward core code later.
->>>
->>> New branch in the logical place:
->>>
->>> git://linux-arm.org/linux-rm iommu/generic-v7
->>
->> For information, as discussed privately with Robin I experience some
->> regressions with the former and now deprecated dt description.
->>
->> on my AMD Overdrive board and my old dt description I now only see a
->> single group:
->>
->> /sys/kernel/iommu_groups/
->> /sys/kernel/iommu_groups/0
->> /sys/kernel/iommu_groups/0/devices
->> /sys/kernel/iommu_groups/0/devices/e0700000.xgmac
->>
->> whereas I formerly see
->>
->> /sys/kernel/iommu_groups/
->> /sys/kernel/iommu_groups/3
->> /sys/kernel/iommu_groups/3/devices
->> /sys/kernel/iommu_groups/3/devices/0000:00:00.0
->> /sys/kernel/iommu_groups/1
->> /sys/kernel/iommu_groups/1/devices
->> /sys/kernel/iommu_groups/1/devices/e0700000.xgmac
->> /sys/kernel/iommu_groups/4
->> /sys/kernel/iommu_groups/4/devices
->> /sys/kernel/iommu_groups/4/devices/0000:00:02.2
->> /sys/kernel/iommu_groups/4/devices/0000:01:00.1
->> /sys/kernel/iommu_groups/4/devices/0000:00:02.0
->> /sys/kernel/iommu_groups/4/devices/0000:01:00.0
->> /sys/kernel/iommu_groups/2
->> /sys/kernel/iommu_groups/2/devices
->> /sys/kernel/iommu_groups/2/devices/e0900000.xgmac
->> /sys/kernel/iommu_groups/0
->> /sys/kernel/iommu_groups/0/devices
->> /sys/kernel/iommu_groups/0/devices/f0000000.pcie
->>
->> This is the group topology without ACS override. Applying the non
->> upstreamed "pci: Enable overrides for missing ACS capabilities" I used
->> to see separate groups for each PCIe components. Now I don't see any
->> difference with and without ACS override.
-> 
-> OK, having reproduced on my Juno, the problem looks to be that
-> of_for_each_phandle() leaves err set to -ENOENT after successfully
-> walking a phandle list, which makes __find_legacy_master_phandle()
-> always bail out after the first SMMU.
-> 
-> Can you confirm that the following diff fixes things for you?
+On Wednesday, September 14, 2016 8:15:52 PM CEST Zhichang Yuan wrote:
 
-Well it improves but there are still differences in the group topology.
-The PFs now are in group 0.
+> +Required properties:
+> +- compatible: should be "hisilicon,low-pin-count"
+> +- #address-cells: must be 2 which stick to the ISA/EISA binding doc.
+> +- #size-cells: must be 1 which stick to the ISA/EISA binding doc.
+> +- reg: base address and length of the register set for the device.
+> +- ranges: define a 1:1 mapping between the I/O space of the child device and
+> +	  the parent.
 
-root at trusty:~# lspci -nk
-00:00.0 0600: 1022:1a00
-        Subsystem: 1022:1a00
-00:02.0 0600: 1022:1a01
-00:02.2 0604: 1022:1a02
-        Kernel driver in use: pcieport
-01:00.0 0200: 8086:1521 (rev 01)
-        Subsystem: 8086:0002
-        Kernel driver in use: igb
-01:00.1 0200: 8086:1521 (rev 01)
-        Subsystem: 8086:0002
-        Kernel driver in use: igb
+Do we still need the "ranges" here? The property in your example seems
+wrong.
 
+> +	ranges = <0x01 0xe4 0x0 0xe4 0x1000>;
 
-with your series + fix:
-/sys/kernel/iommu_groups/
-/sys/kernel/iommu_groups/3
-/sys/kernel/iommu_groups/3/devices
-/sys/kernel/iommu_groups/3/devices/0000:00:00.0
-/sys/kernel/iommu_groups/1
-/sys/kernel/iommu_groups/1/devices
-/sys/kernel/iommu_groups/1/devices/e0700000.xgmac
-/sys/kernel/iommu_groups/4
-/sys/kernel/iommu_groups/4/devices
-/sys/kernel/iommu_groups/4/devices/0000:00:02.2
-/sys/kernel/iommu_groups/4/devices/0000:00:02.0
-/sys/kernel/iommu_groups/2
-/sys/kernel/iommu_groups/2/devices
-/sys/kernel/iommu_groups/2/devices/e0900000.xgmac
-/sys/kernel/iommu_groups/0
-/sys/kernel/iommu_groups/0/devices
-/sys/kernel/iommu_groups/0/devices/0000:01:00.1
-/sys/kernel/iommu_groups/0/devices/f0000000.pcie
-/sys/kernel/iommu_groups/0/devices/0000:01:00.0
+You translate I/O port 0x00e4 through 0x10e4 to CPU address 0x0e4?
 
-Before (4.8-rc5):
+> +/**
+> + * hisilpc_children_map_sysio - setup the mapping between system Io and
+> + *			physical IO
+> + *
+> + * @child: the device whose IO is handling
+> + * @data: some device specific data. For ACPI device, should be NULL.
+> + *
+> + * Returns >=0 means the mapping is successfully created;
+> + * others mean some failures.
+> + */
+> +static int hisilpc_children_map_sysio(struct device * child, void * data)
+> +{
+> +	struct resource *iores;
+> +	unsigned long cpuio;
+> +	struct extio_ops *opsnode;
+> +	int ret;
+> +	struct hisilpc_dev *lpcdev;
+> +
+> +	if (!child || !child->parent)
+> +		return -EINVAL;
+> +
+> +	iores = platform_get_resource_byname(to_platform_device(child),
+> +					IORESOURCE_IO, "dev_io");
+> +	if (!iores)
+> +		return -ENODEV;
+> +
+> +	/*
+> +	 * can not use devm_kzalloc to allocate slab for child before its driver
+> +	 * start probing. Here allocate the slab with the name of parent.
+> +	 */
+> +	opsnode = devm_kzalloc(child->parent, sizeof(*opsnode), GFP_KERNEL);
+> +	if (!opsnode)
+> +		return -ENOMEM;
+> +
+> +	cpuio = data ? *((unsigned long *)data) : 0;
+> +
+> +	opsnode->start = iores->start;
+> +	opsnode->end = iores->end;
+> +	opsnode->ptoffset = cpuio ? (cpuio - iores->start) : 0;
+> +
+> +	dev_info(child, "map sys port[%lx - %lx] offset=0x%lx",
+> +				(unsigned long)iores->start,
+> +				(unsigned long)iores->end,
+> +				opsnode->ptoffset);
+> +
+> +	opsnode->pfin = hisilpc_comm_inb;
+> +	opsnode->pfout = hisilpc_comm_outb;
+> +
+> +	lpcdev = platform_get_drvdata(to_platform_device(child->parent));
+> +	opsnode->devpara = lpcdev;
+> +
+> +	/* only apply indirect-IO to ipmi child device */
 
-/sys/kernel/iommu_groups/
-/sys/kernel/iommu_groups/3
-/sys/kernel/iommu_groups/3/devices
-/sys/kernel/iommu_groups/3/devices/0000:00:00.0
-/sys/kernel/iommu_groups/1
-/sys/kernel/iommu_groups/1/devices
-/sys/kernel/iommu_groups/1/devices/e0700000.xgmac
-/sys/kernel/iommu_groups/4
-/sys/kernel/iommu_groups/4/devices
-/sys/kernel/iommu_groups/4/devices/0000:00:02.2
-/sys/kernel/iommu_groups/4/devices/0000:01:00.1
-/sys/kernel/iommu_groups/4/devices/0000:00:02.0
-/sys/kernel/iommu_groups/4/devices/0000:01:00.0
-/sys/kernel/iommu_groups/2
-/sys/kernel/iommu_groups/2/devices
-/sys/kernel/iommu_groups/2/devices/e0900000.xgmac
-/sys/kernel/iommu_groups/0
-/sys/kernel/iommu_groups/0/devices
-/sys/kernel/iommu_groups/0/devices/f0000000.pcie
+I don't get this part. The bus driver should not care what its
+children are, just register and PIO ranges that the bus can handle
+in theory, i.e. from 0x000 to 0xfff.
 
-Thanks
-
-Eric
-
-> 
-> Robin
-> 
-> --->8---
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index fa892d25004d..ac4aab97c93a 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -477,7 +477,7 @@ static int __find_legacy_master_phandle(struct
-> device *dev, void *data)
->  			return 1;
->  		}
->  	it->node = np;
-> -	return err;
-> +	return err == -ENOENT ? 0 : err;
->  }
-> 
->  static struct platform_driver arm_smmu_driver;
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+	Arnd
