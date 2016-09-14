@@ -1,54 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Sep 2016 16:32:32 -0700
-Subject: [PATCH 0/3] ARM: dts: am33xx/dra7xx: Fix cpufreq regression
-In-Reply-To: <20160914205717.21975-1-d-gerlach@ti.com>
-References: <20160914205717.21975-1-d-gerlach@ti.com>
-Message-ID: <20160914233230.xhbzxpscpvb7d6vj@atomide.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Thu, 15 Sep 2016 09:49:46 +1000
+Subject: next-20160914 build: 2 failures 3 warnings (next-20160914)
+In-Reply-To: <20160914171137.GF27974@sirena.org.uk>
+References: <E1bk5OS-0000Vu-1C@optimist> <20160914171137.GF27974@sirena.org.uk>
+Message-ID: <87d1k6nisl.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [160914 13:57]:
-> Hi,
-> CPUFreq on am335x and dra7 platforms got broken by two things:
->  - Updated OPPv2 nodes in device tree were merged before driver to
->    handle them was accepted.
->  - OMAP platforms now use the new cpufreq-dt-platdev driver to create
->    cpufreq-dt platform device but non OMAP TI devices were not changed
->    over to this driver.
-> 
-> This series addresses the first issue listed above by reverting three of
-> the dts patches that got merged to restore OPPv1 tables. The second issue
-> is addressed by [1].
-> 
-> With both this series and that patch we will have the existing cpufreq
-> support restored on am335x and dra7xx.
+Mark Brown <broonie@kernel.org> writes:
 
-OK thanks I've applied these into am335x-cpufreq-regression branch
-and merging that into omap-for-v4.9/dt-v2 branch as well. Seems
-like no huge rush to get these into v4.8-rc series as nobody has
-noticed since May. And we can request these for stable inclusion
-after they hit mainline. If there is need to have these in v4.8-rc,
-let me know and I'll send a pull request for am335x-cpufreq-regression
-separately.
+> [ Unknown signature status ]
+> On Wed, Sep 14, 2016 at 09:18:08AM +0100, Build bot for Mark Brown wrote:
+>
+> Today's -next fails to build both arm and arm64 allmodconfig due to:
+>
+>> 	arm64-allmodconfig
+>> ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+>> 
+>> 	arm-allmodconfig
+>> ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+>
+> due to 262d5cc6ceb293 (mfd: tps65217: Add support for IRQs) since
+> irq_set_parent() isn't exported.
 
-Regards,
+And powerpc too.
 
-Tony
-
-> [1] http://marc.info/?l=linux-pm&m=147388573513082&w=2
-> 
-> Dave Gerlach (3):
->   Revert "ARM: dts: am335x-boneblack: Enable 1GHz OPP for cpu"
->   Revert "ARM: dts: am33xx: Move to operating-points-v2 table and
->     ti-cpufreq driver"
->   Revert "ARM: dts: dra7: Move to operating-points-v2 table"
-> 
->  arch/arm/boot/dts/am335x-boneblack.dts | 11 -----
->  arch/arm/boot/dts/am33xx.dtsi          | 88 +++++-----------------------------
->  arch/arm/boot/dts/dra7.dtsi            | 26 ++--------
->  arch/arm/boot/dts/dra74x.dtsi          |  1 -
->  4 files changed, 18 insertions(+), 108 deletions(-)
-> 
-> -- 
-> 2.9.3
-> 
+cheers
