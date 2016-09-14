@@ -1,25 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 17:27:27 +0200
-Subject: [GIT PULL 4/4] arm64: tegra: Device tree changes for v4.9-rc1
-In-Reply-To: <20160909152032.9550-4-thierry.reding@gmail.com>
-References: <20160909152032.9550-1-thierry.reding@gmail.com>
- <20160909152032.9550-4-thierry.reding@gmail.com>
-Message-ID: <2773980.1MuS3EVqLd@wuerfel>
+Date: Wed, 14 Sep 2016 17:30:49 +0200
+Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.9
+In-Reply-To: <1473670948-4265-4-git-send-email-shawnguo@kernel.org>
+References: <1473670948-4265-1-git-send-email-shawnguo@kernel.org>
+ <1473670948-4265-4-git-send-email-shawnguo@kernel.org>
+Message-ID: <2241121.MvRjeYAnGC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 9, 2016 5:20:32 PM CEST Thierry Reding wrote:
-> arm64: tegra: Device tree changes for v4.9-rc1
-> 
-> Add a couple of devices (AGIC, ADMA) on Tegra210 and enable them on
-> Smaug. Also enable DPAUX on Smaug to allow the I2C bus that shares pads
-> with the DPAUX to be used to access various audio devices. Furthermore,
-> enable the XUSB controller on Smaug for USB 3.0 support.
-> 
-> Finally, select PM_GENERIC_DOMAINS for 64-bit Tegra devices to make sure
-> devices are probed only after their power partitions have been enabled.
+On Monday, September 12, 2016 5:02:27 PM CEST Shawn Guo wrote:
+> i.MX arm64 device tree changes for 4.9:
+>  - Add property dma-coherent for ls2080a PCI device to save software
+>    cache maintenance.
+>  - Update serial aliases and use stdout-path to sepecify console for
+>    ls2080a and ls1043a boards.
+>  - Add DDR memory controller device node for ls2080a and ls1043a SoCs.
 > 
 
 Pulled into next/dt64, thanks!
+
+The "dma-coherent" change sounds like a bugfix, should that be backported
+to stable kernels? Usually if you lack that property on a device that
+is actually coherent, you can get silent data corruption by treating it as
+non-coherent.
 
 	Arnd
