@@ -1,28 +1,40 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Wed, 14 Sep 2016 15:32:44 +0000
-Subject: [PATCH 1/6] PCI: xilinx: Keep both legacy and MSI interrupt
- references.
-In-Reply-To: <20160913155641.GB4138@localhost>
-References: <1472724886-28301-1-git-send-email-bharatku@xilinx.com>
- <20160913155641.GB4138@localhost>
-Message-ID: <8520D5D51A55D047800579B094147198258D6418@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 14 Sep 2016 17:33:12 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.9 (#2)
+Message-ID: <87d1k6bio7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2016 at 03:44:41PM +0530, Bharat Kumar Gogada wrote:
-> When built with MSI support the legacy domain reference is being 
-> overwritten with MSI.
-> Instead creating two separate domains for MSI and legacy interrupts.
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+Hi,
 
-Applied all these (except [5/6]) with Michal's ack to pci/host-xilinx for v4.9, thanks!
+Here is the second pull request for dt64 for mvebu for v4.9.
 
-I already applied Po Liu's patch ("PCI: xilinx: Relax device number checking to allow SR-IOV") to pci/virtualization.  This is identical to [5/6], so I dropped [5/6] to avoid a conflict.
+This one is not related to the convert orion5x based SoC Netgear WNR854T
+to devicetree, but it is just a small update on the device tree.
 
-Thanks Bjorn. 
-Some how I couldn't find Po Liu's patch, can you provide git link of patch that was applied. 
-Hope it wouldn't take much time of you. 
+Gregory
 
-Thanks & Regards,
-Bharat
+The following changes since commit 98e45c1675a018e1121c1244985cf80b790fb6c4:
+
+  arm64: dts: marvell: describe the PIC and PMU on Armada 7K/8K (2016-08-26 10:57:20 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.9-2
+
+for you to fetch changes up to 93970e67bdaec174ba8dad93e5ebb55be98f8d61:
+
+  arm64: dts: marvell: enable MSI for PCIe on Armada 7K/8K (2016-09-14 16:21:09 +0200)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.9 (part 2)
+
+- enable MSI for PCIe on Armada 7K/8K
+
+----------------------------------------------------------------
+Thomas Petazzoni (1):
+      arm64: dts: marvell: enable MSI for PCIe on Armada 7K/8K
+
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 +++
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 +++
+ 2 files changed, 6 insertions(+)
