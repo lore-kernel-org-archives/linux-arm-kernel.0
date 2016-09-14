@@ -1,121 +1,109 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 14 Sep 2016 14:39:11 +0800
-Subject: [PATCH v7 7/9] drm/mediatek: add dsi transfer function
-In-Reply-To: <1473833946.24354.8.camel@mtksdaap41>
-References: <1472815484-43821-1-git-send-email-yt.shen@mediatek.com>
- <1472815484-43821-8-git-send-email-yt.shen@mediatek.com>
- <1473215632.11736.21.camel@mtksdaap41>
- <1473675381.12398.27.camel@mtksdaap41>
- <1473758754.28437.40.camel@mtksdaap41>
- <1473833946.24354.8.camel@mtksdaap41>
-Message-ID: <1473835151.10216.2.camel@mtksdaap41>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Wed, 14 Sep 2016 12:05:03 +0530
+Subject: [PATCH v1 1/3] ARM: dts: imx6qdl-apalis: Do not rely on DDC I2C bus
+ bitbang for HDMI
+Message-ID: <9d2c17aa2e00e6ff4349a53de8247860d2382607.1473833908.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+Remove the use of DDC I2C bus bitbang to support reading of EDID
+and rely on support from internal HDMI I2C master controller instead.
+As a result remove the device tree property ddc-i2c-bus.
 
-On Wed, 2016-09-14 at 14:19 +0800, YT Shen wrote:
-> Hi CK,
-> 
-> On Tue, 2016-09-13 at 17:25 +0800, CK Hu wrote:
-> > Hi, YT:
-> > 
-> > On Mon, 2016-09-12 at 18:16 +0800, YT Shen wrote:
-> > > Hi CK,
-> > > 
-> > > On Wed, 2016-09-07 at 10:33 +0800, CK Hu wrote:
-> > > > Hi, YT:
-> > > > 
-> > > > On Fri, 2016-09-02 at 19:24 +0800, YT Shen wrote:
-> > > > > From: shaoming chen <shaoming.chen@mediatek.com>
-> > > > > 
-> > > > > add dsi read/write commands for transfer function
-> > > > > 
-> > > > > Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> > > > > ---
-> > > > >  drivers/gpu/drm/mediatek/mtk_dsi.c | 188 +++++++++++++++++++++++++++++++++++++
-> > > > >  1 file changed, 188 insertions(+)
-> > > > > 
-> > > > 
-> > > > [snip...]
-> > > > 
-> > > > >  
-> > > > > +static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
-> > > > > +{
-> > > > > +	dsi->irq_data &= ~irq_bit;
-> > > > > +}
-> > > > > +
-> > > > 
-> > > > [snip...]
-> > > > 
-> > > > > +
-> > > > > +static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-> > > > > +				     unsigned int timeout)
-> > > > > +{
-> > > > > +	s32 ret = 0;
-> > > > > +	unsigned long jiffies = msecs_to_jiffies(timeout);
-> > > > > +
-> > > > > +	ret = wait_event_interruptible_timeout(_dsi_irq_wait_queue,
-> > > > > +					       dsi->irq_data & irq_flag,
-> > > > > +					       jiffies);
-> > > > > +	if (ret == 0) {
-> > > > > +		dev_info(dsi->dev, "Wait DSI IRQ(0x%08x) Timeout\n", irq_flag);
-> > > > > +
-> > > > > +		mtk_dsi_enable(dsi);
-> > > > > +		mtk_dsi_reset_engine(dsi);
-> > > > > +	}
-> > > > > +
-> > > > > +	return ret;
-> > > > > +}
-> > > > 
-> > > > I think mtk_dsi_irq_data_clear() and mtk_dsi_wait_for_irq_done() should
-> > > > be moved to the 6th patch [1] of this series because these two functions
-> > > > deal the irq control.
-> > > We will move mtk_dsi_irq_data_clear() to patch "drm/mediatek: add dsi
-> > > interrupt control" and put mtk_dsi_wait_for_irq_done() here, because it
-> > > is used in the transfer function.
-> > 
-> > mtk_dsi_irq_data_clear() is also only used in transfer function now. I
-> > think both function could be used for other application rather than
-> > transfer function, so these two function are general function for irq
-> > control.
-> We will rollback the changes here.  Move mtk_dsi_irq_data_clear() to
-> original place.
-> 
-> Add new functions could be used in the future will have problems.
-> warning: 'mtk_dsi_wait_for_irq_done' defined but not used
-> [-Wunused-function]
->  static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
-> warning: 'mtk_dsi_irq_data_clear' defined but not used
-> [-Wunused-function]
->  static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+Hello,
 
-Please refer to [1], '__maybe_unused' can fix your problem.
+This patch is tested with the following patch applied
+https://patchwork.kernel.org/patch/9296883/
 
-[1]
-http://lxr.free-electrons.com/source/drivers/gpu/drm/panel/panel-sharp-lq101r1sx01.c#L76
+and is based on the suggestions from Vladimir
+https://lkml.org/lkml/2016/8/29/322
+
+This and following two patches are based on top of shawn's
+for-next branch.
 
 Regards,
-CK
+Sanchayan.
+---
+ arch/arm/boot/dts/imx6q-apalis-ixora.dts |  6 ------
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi    | 25 +++++++++----------------
+ 2 files changed, 9 insertions(+), 22 deletions(-)
 
-> 
-> > Regards,
-> > CK
-> > 
-> > > 
-> > > Regards,
-> > > yt.shen
-> > > > 
-> > > > 
-> > > > [1] https://patchwork.kernel.org/patch/9310819/
-> > > > 
-> > > > 
-> > > > Regards,
-> > > > CK
-> > > > 
-> > > 
-> > > 
-> > 
-> > 
-> 
-> 
+diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+index 207b85b..d99979e 100644
+--- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
++++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+@@ -55,7 +55,6 @@
+ 		     "fsl,imx6q";
+ 
+ 	aliases {
+-		i2c0 = &i2cddc;
+ 		i2c1 = &i2c1;
+ 		i2c2 = &i2c2;
+ 		i2c3 = &i2c3;
+@@ -186,11 +185,6 @@
+ };
+ 
+ &hdmi {
+-	ddc-i2c-bus = <&i2cddc>;
+-	status = "okay";
+-};
+-
+-&i2cddc {
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+index 99e323b..8c67dd8 100644
+--- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+@@ -53,18 +53,6 @@
+ 		status = "disabled";
+ 	};
+ 
+-	/* DDC_I2C: I2C2_SDA/SCL on MXM3 205/207 */
+-	i2cddc: i2c at 0 {
+-		compatible = "i2c-gpio";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_i2c_ddc>;
+-		gpios = <&gpio3 16 GPIO_ACTIVE_HIGH /* sda */
+-			 &gpio2 30 GPIO_ACTIVE_HIGH /* scl */
+-			>;
+-		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+-		status = "disabled";
+-	};
+-
+ 	reg_1p8v: regulator-1p8v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "1P8V";
+@@ -209,6 +197,12 @@
+ 	};
+ };
+ 
++&hdmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hdmi_ddc>;
++	status = "disabled";
++};
++
+ /*
+  * GEN1_I2C: I2C1_SDA/SCL on MXM3 209/211 (e.g. RTC on carrier
+  * board)
+@@ -633,11 +627,10 @@
+ 		>;
+ 	};
+ 
+-	pinctrl_i2c_ddc: gpioi2cddcgrp {
++	pinctrl_hdmi_ddc: hdmiddcgrp {
+ 		fsl,pins = <
+-			/* DDC bitbang */
+-			MX6QDL_PAD_EIM_EB2__GPIO2_IO30 0x1b0b0
+-			MX6QDL_PAD_EIM_D16__GPIO3_IO16 0x1b0b0
++			MX6QDL_PAD_EIM_EB2__HDMI_TX_DDC_SCL 0x4001b8b1
++			MX6QDL_PAD_EIM_D16__HDMI_TX_DDC_SDA 0x4001b8b1
+ 		>;
+ 	};
+ 
+-- 
+2.9.3
