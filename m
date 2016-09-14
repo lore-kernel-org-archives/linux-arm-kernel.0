@@ -1,179 +1,127 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 14 Sep 2016 13:42:21 +0800
-Subject: [PATCH v8 8/9] drm/mediatek: update DSI sub driver flow
-In-Reply-To: <1473681672-47144-9-git-send-email-yt.shen@mediatek.com>
-References: <1473681672-47144-1-git-send-email-yt.shen@mediatek.com>
- <1473681672-47144-9-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1473831741.28437.78.camel@mtksdaap41>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 13 Sep 2016 22:53:02 -0700
+Subject: [PATCH/REBASED] usb: chipidea: Properly mark little endian descriptors
+In-Reply-To: <20160914025045.GD30760@b29397-desktop>
+Message-ID: <20160914055302.1132-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+The DMA descriptors are little endian, and we do a pretty good
+job of handling them with the proper le32_to_cpu() markings, but
+we don't actually mark them as __le32. This means checkers like
+sparse can't easily find new bugs. Let's mark the members of
+structures properly and fix the few places where we're missing
+conversions.
 
-On Mon, 2016-09-12 at 20:01 +0800, YT Shen wrote:
-> This patch update enable/disable flow of DSI module and MIPI TX module.
-> Original flow works on there is a bridge chip: DSI -> bridge -> panel.
-> In this case: DSI -> panel, the DSI sub driver flow should be updated.
-> We need to initialize DSI first so that we can send commands to panel.
+Cc: Peter Chen <peter.chen@nxp.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
+
+Peter Chen wrote:
+>
+> I am afraid I can't apply for testing
 > 
-> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> ---
->  
+> Applying: usb: chipidea: Properly mark little endian descriptors
+> fatal: sha1 information is lacking or useless
+> (drivers/usb/chipidea/udc.c).
+> error: could not build fake ancestor
+> Patch failed at 0001 usb: chipidea: Properly mark little endian
+> descriptors
+> The copy of the patch that failed is found in: .git/rebase-apply/patch
+> When you have resolved this problem, run "git am --continue".
+> If you prefer to skip this patch, run "git am --skip" instead.
+> To restore the original branch and stop patching, run "git am --abort".
+> 
+> Would you please rebase my ci-for-usb-next branch?
 
-[snip...]
+Sure no problem. Maybe you shouldn't specify a 3 way merge so that
+it attempts to apply without building a fake ancestor? Anyway, here
+it is.
 
->  
-> +static void mtk_dsi_switch_to_cmd_mode(struct mtk_dsi *dsi)
-> +{
-> +	s32 ret = 0;
-> +	unsigned long timeout = msecs_to_jiffies(500);
-> +
-> +	mtk_dsi_irq_data_clear(dsi, VM_DONE_INT_FLAG);
-> +	mtk_dsi_set_cmd_mode(dsi);
-> +
-> +	ret = wait_event_interruptible_timeout(dsi->irq_wait_queue,
-> +					       dsi->irq_data & VM_DONE_INT_FLAG,
-> +					       timeout);
-> +	if (ret == 0) {
-> +		dev_info(dsi->dev, "dsi wait engine idle timeout\n");
-> +
-> +		mtk_dsi_enable(dsi);
-> +		mtk_dsi_reset_engine(dsi);
-> +	}
+ drivers/usb/chipidea/udc.c |  6 +++---
+ drivers/usb/chipidea/udc.h | 12 ++++++------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-I think you should replace this event-waiting with
-mtk_dsi_wait_for_irq_done(). And this is a reason for moving
-mtk_dsi_wait_for_irq_done() to the patch of irq control.
-
-> +}
-> +
->  static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
->  {
->  	if (WARN_ON(dsi->refcount == 0))
-> @@ -528,6 +574,17 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
->  	if (--dsi->refcount != 0)
->  		return;
->  
-> +	mtk_dsi_switch_to_cmd_mode(dsi);
-> +
-> +	if (dsi->panel) {
-> +		if (drm_panel_unprepare(dsi->panel)) {
-> +			DRM_ERROR("failed to unprepare the panel\n");
-> +			return;
-> +		}
-> +	}
-
-I think drm_panel_unprepare should be placed after dsi is disabled. So
-move this part after calling mtk_dsi_poweroff() in
-mtk_output_dsi_disable().
-
-> +
-> +	mtk_dsi_reset_engine(dsi);
-> +
->  	mtk_dsi_lane0_ulp_mode_enter(dsi);
->  	mtk_dsi_clk_ulp_mode_enter(dsi);
->  
-> @@ -546,29 +603,37 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
->  	if (dsi->enabled)
->  		return;
->  
-> -	if (dsi->panel) {
-> -		if (drm_panel_prepare(dsi->panel)) {
-> -			DRM_ERROR("failed to setup the panel\n");
-> -			return;
-> -		}
-> -	}
-> -
->  	ret = mtk_dsi_poweron(dsi);
->  	if (ret < 0) {
->  		DRM_ERROR("failed to power on dsi\n");
->  		return;
->  	}
->  
-> +	usleep_range(20000, 21000);
-> +
->  	mtk_dsi_rxtx_control(dsi);
-> +	mtk_dsi_phy_timconfig(dsi);
-> +	mtk_dsi_ps_control_vact(dsi);
-> +	mtk_dsi_set_vm_cmd(dsi);
-> +	mtk_dsi_config_vdo_timing(dsi);
-> +	mtk_dsi_set_interrupt_enable(dsi);
->  
-> +	mtk_dsi_enable(dsi);
->  	mtk_dsi_clk_ulp_mode_leave(dsi);
->  	mtk_dsi_lane0_ulp_mode_leave(dsi);
->  	mtk_dsi_clk_hs_mode(dsi, 0);
-> -	mtk_dsi_set_mode(dsi);
->  
-> -	mtk_dsi_ps_control_vact(dsi);
-> -	mtk_dsi_config_vdo_timing(dsi);
-> -	mtk_dsi_set_interrupt_enable(dsi);
-> +	if (dsi->panel) {
-> +		if (drm_panel_prepare(dsi->panel)) {
-> +			DRM_ERROR("failed to prepare the panel\n");
-> +			return;
-> +		}
-> +
-> +		if (drm_panel_enable(dsi->panel)) {
-> +			DRM_ERROR("failed to enable the panel\n");
-> +			return;
-> +		}
-> +	}
-
-I think drm_panel_prepare() should be called before DSI is enabled and
-drm_panel_enable() should be called after DSI is enabled. But you may
-encounter the problem that panel need transfer data when prepare and you
-can refer to [1].
-
-[1]
-http://lxr.free-electrons.com/source/drivers/gpu/drm/exynos/exynos_drm_dsi.c#L1431
-
->  
->  	mtk_dsi_set_mode(dsi);
->  	mtk_dsi_clk_hs_mode(dsi, 1);
-> @@ -590,6 +655,7 @@ static void mtk_output_dsi_disable(struct mtk_dsi *dsi)
->  		}
->  	}
->  
-> +	mtk_dsi_stop(dsi);
->  	mtk_dsi_poweroff(dsi);
->  
->  	dsi->enabled = false;
-> diff --git a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-> index 108d31a..34e95c6 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-> @@ -177,7 +177,9 @@ static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
->  
->  	dev_dbg(mipi_tx->dev, "prepare: %u Hz\n", mipi_tx->data_rate);
->  
-> -	if (mipi_tx->data_rate >= 500000000) {
-> +	if (mipi_tx->data_rate > 1250000000) {
-> +		return -EINVAL;
-> +	} else if (mipi_tx->data_rate >= 500000000) {
-
-What is the relationship of this part and "DSI driver flow"? Would this
-be an independent patch?
-
->  		txdiv = 1;
->  		txdiv0 = 0;
->  		txdiv1 = 0;
-> @@ -201,6 +203,10 @@ static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
->  		return -EINVAL;
->  	}
->  
-> +	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_TOP_CON,
-> +				RG_DSI_LNT_IMP_CAL_CODE | RG_DSI_LNT_HS_BIAS_EN,
-> +				(8 << 4) | RG_DSI_LNT_HS_BIAS_EN);
-> +
->  	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_BG_CON,
->  				RG_DSI_VOUT_MSK |
->  				RG_DSI_BG_CKEN | RG_DSI_BG_CORE_EN,
->  
-
-You modify many place without 'if (dsi->panel)'. Are all these
-modifications compatible with bridge case?
-
-Regards,
-CK
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index 661f43fe0f9e..a9b07befd398 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -365,7 +365,7 @@ static int add_td_to_list(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq,
+ 		if (hwreq->req.length == 0
+ 				|| hwreq->req.length % hwep->ep.maxpacket)
+ 			mul++;
+-		node->ptr->token |= mul << __ffs(TD_MULTO);
++		node->ptr->token |= cpu_to_le32(mul << __ffs(TD_MULTO));
+ 	}
+ 
+ 	temp = (u32) (hwreq->req.dma + hwreq->req.actual);
+@@ -504,7 +504,7 @@ static int _hardware_enqueue(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq)
+ 		if (hwreq->req.length == 0
+ 				|| hwreq->req.length % hwep->ep.maxpacket)
+ 			mul++;
+-		hwep->qh.ptr->cap |= mul << __ffs(QH_MULT);
++		hwep->qh.ptr->cap |= cpu_to_le32(mul << __ffs(QH_MULT));
+ 	}
+ 
+ 	ret = hw_ep_prime(ci, hwep->num, hwep->dir,
+@@ -529,7 +529,7 @@ static void free_pending_td(struct ci_hw_ep *hwep)
+ static int reprime_dtd(struct ci_hdrc *ci, struct ci_hw_ep *hwep,
+ 					   struct td_node *node)
+ {
+-	hwep->qh.ptr->td.next = node->dma;
++	hwep->qh.ptr->td.next = cpu_to_le32(node->dma);
+ 	hwep->qh.ptr->td.token &=
+ 		cpu_to_le32(~(TD_STATUS_HALTED | TD_STATUS_ACTIVE));
+ 
+diff --git a/drivers/usb/chipidea/udc.h b/drivers/usb/chipidea/udc.h
+index e66df0020bd4..2ecd1174d66c 100644
+--- a/drivers/usb/chipidea/udc.h
++++ b/drivers/usb/chipidea/udc.h
+@@ -22,11 +22,11 @@
+ /* DMA layout of transfer descriptors */
+ struct ci_hw_td {
+ 	/* 0 */
+-	u32 next;
++	__le32 next;
+ #define TD_TERMINATE          BIT(0)
+ #define TD_ADDR_MASK          (0xFFFFFFEUL << 5)
+ 	/* 1 */
+-	u32 token;
++	__le32 token;
+ #define TD_STATUS             (0x00FFUL <<  0)
+ #define TD_STATUS_TR_ERR      BIT(3)
+ #define TD_STATUS_DT_ERR      BIT(5)
+@@ -36,7 +36,7 @@ struct ci_hw_td {
+ #define TD_IOC                BIT(15)
+ #define TD_TOTAL_BYTES        (0x7FFFUL << 16)
+ 	/* 2 */
+-	u32 page[5];
++	__le32 page[5];
+ #define TD_CURR_OFFSET        (0x0FFFUL <<  0)
+ #define TD_FRAME_NUM          (0x07FFUL <<  0)
+ #define TD_RESERVED_MASK      (0x0FFFUL <<  0)
+@@ -45,18 +45,18 @@ struct ci_hw_td {
+ /* DMA layout of queue heads */
+ struct ci_hw_qh {
+ 	/* 0 */
+-	u32 cap;
++	__le32 cap;
+ #define QH_IOS                BIT(15)
+ #define QH_MAX_PKT            (0x07FFUL << 16)
+ #define QH_ZLT                BIT(29)
+ #define QH_MULT               (0x0003UL << 30)
+ #define QH_ISO_MULT(x)		((x >> 11) & 0x03)
+ 	/* 1 */
+-	u32 curr;
++	__le32 curr;
+ 	/* 2 - 8 */
+ 	struct ci_hw_td		td;
+ 	/* 9 */
+-	u32 RESERVED;
++	__le32 RESERVED;
+ 	struct usb_ctrlrequest   setup;
+ } __attribute__ ((packed, aligned(4)));
+ 
+-- 
+2.9.0.rc2.8.ga28705d
