@@ -1,49 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Sep 2016 09:52:29 +0100
-Subject: [PATCH v3 3/7] arm64: Introduce uaccess_{disable,enable}
- functionality based on TTBR0_EL1
-In-Reply-To: <CAGXu5jJETdRtuonhtkSxMf+sgCdBj2t2_U8yW2cDwcoGY=qvJw@mail.gmail.com>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
- <1473788797-10879-4-git-send-email-catalin.marinas@arm.com>
- <CAGXu5jJETdRtuonhtkSxMf+sgCdBj2t2_U8yW2cDwcoGY=qvJw@mail.gmail.com>
-Message-ID: <20160914085159.GA13121@leverpostej>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Wed, 14 Sep 2016 10:54:38 +0200
+Subject: [PATCH v3 5/9] ARM: dts: sun8i-h3: add sun8i-emac ethernet driver
+In-Reply-To: <20160912072933.GC9449@lukather>
+References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1473425117-18645-6-git-send-email-clabbe.montjoie@gmail.com>
+ <20160912072933.GC9449@lukather>
+Message-ID: <20160914085438.GA9672@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 01:45:21PM -0700, Kees Cook wrote:
-> On Tue, Sep 13, 2016 at 10:46 AM, Catalin Marinas
-> > +static inline bool system_uses_ttbr0_pan(void)
-> > +{
-> > +       return IS_ENABLED(CONFIG_ARM64_SW_TTBR0_PAN) &&
-> > +               !cpus_have_cap(ARM64_HAS_PAN);
-> > +}
+On Mon, Sep 12, 2016 at 09:29:33AM +0200, Maxime Ripard wrote:
+> On Fri, Sep 09, 2016 at 02:45:13PM +0200, Corentin Labbe wrote:
+> > The sun8i-emac is an ethernet MAC hardware that support 10/100/1000
+> > speed.
+> > 
+> > This patch enable the sun8i-emac on the Allwinner H3 SoC Device-tree.
+> > The SoC H3 have an internal PHY, so optionals syscon and ephy are set.
+> > 
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/sun8i-h3.dtsi | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > index a39da6f..a3ac476 100644
+> > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > @@ -50,6 +50,10 @@
+> >  / {
+> >  	interrupt-parent = <&gic>;
+> >  
+> > +	aliases {
+> > +		ethernet0 = &emac;
+> > +	};
 > > +
-
-[...]
-
-> >  #define __uaccess_enable(alt)                                          \
-> >  do {                                                                   \
-> > -       asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,                  \
-> > -                       CONFIG_ARM64_PAN));                             \
-> > +       if (system_uses_ttbr0_pan())                                    \
-> > +               uaccess_ttbr0_enable();                                 \
-> > +       else                                                            \
-> > +               asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,          \
-> > +                               CONFIG_ARM64_PAN));                     \
-> >  } while (0)
 > 
-> Does this mean that with CONFIG_ARM64_SW_TTBR0_PAN, even with ARMv8.1,
-> a cpu capability bitmask check is done each time we go through
-> __uaccess_{en,dis}able?
+> This needs to be done at the board level.
+> 
 
-Catalin reworked cpus_have_cap() to use static keys [1], and that's
-queued in the arm64 for-next/core branch [2].
+ok
 
-So this should expand to a single branch or nop that we patch when we
-detect the presence/absence of PAN. There should be no bitmap check.
+> >  	cpus {
+> >  		#address-cells = <1>;
+> >  		#size-cells = <0>;
+> > @@ -446,6 +450,21 @@
+> >  			status = "disabled";
+> >  		};
+> >  
+> > +		emac: ethernet at 1c30000 {
+> > +			compatible = "allwinner,sun8i-h3-emac";
+> > +			syscon = <&syscon>;
+> > +			reg = <0x01c30000 0x104>;
+> > +			reg-names = "emac";
+> 
+> You don't need reg-names anymore.
+> 
 
-Thanks,
-Mark.
+ok
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/454025.html
-[2] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+> > +			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> > +			resets = <&ccu RST_BUS_EMAC>, <&ccu RST_BUS_EPHY>;
+> > +			reset-names = "ahb", "ephy";
+> > +			clocks = <&ccu CLK_BUS_EMAC>, <&ccu CLK_BUS_EPHY>;
+> > +			clock-names = "ahb", "ephy";
+> 
+> I still believe that having the same node for both the PHY and the MAC
+> is wrong.
+> 
+
+Ok I have moved clock/reset of ephy in its node.
+
+Thanks
+
+Regards
+
+Corentin Labbe
