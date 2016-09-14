@@ -1,57 +1,33 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 13 Sep 2016 17:59:11 -0700
-Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
-In-Reply-To: <CAFBinCC+izGS72TZuiiBu=DjtSmoZXRZ6r76M6rC8W7UTpSD6g@mail.gmail.com>
- (Martin Blumenstingl's message of "Tue, 13 Sep 2016 20:38:06 +0200")
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
- <m260q6jibf.fsf@baylibre.com>
- <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
- <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
- <m2eg4ui0nl.fsf@baylibre.com>
- <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
- <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
- <m2sht9gkau.fsf@baylibre.com>
- <CAFBinCDohOoFP_3GC+=tt6S7sPS308ao-yf+oGhdfwo-N-JnAA@mail.gmail.com>
- <1473780508.10237.22.camel@pengutronix.de>
- <CAFBinCC+izGS72TZuiiBu=DjtSmoZXRZ6r76M6rC8W7UTpSD6g@mail.gmail.com>
-Message-ID: <7hzinbmh40.fsf@baylibre.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 14 Sep 2016 10:29:07 +0930
+Subject: [PATCH v3 4/7] palmetto: Request relevant mux functions in
+ devicetree
+In-Reply-To: <1473800295.8689.295.camel@kernel.crashing.org>
+References: <20160830075600.11559-1-andrew@aj.id.au>
+ <20160830075600.11559-5-andrew@aj.id.au>
+ <CACPK8Xe-dowcwXkO8rDH2reMzGadUMSq5ZtV=23FP4virt+DUQ@mail.gmail.com>
+ <1473800295.8689.295.camel@kernel.crashing.org>
+Message-ID: <CACPK8XdskPDwnuMVx7xU6rNWn+o-s17FZ3=VQAK1mu4kkfctMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
-
-> On Tue, Sep 13, 2016 at 5:28 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-
-[...]
-
->>> I added Philipp and Hans to this thread - maybe they can comment on this.
->>> To sum it up, our problem is:
->>> - there are two separate USB PHYs on Meson GXBB
->>> - both are sharing the same reset line (provided by the reset-meson driver)
->>> - during initialization of the PHYs we must only call
->>> reset_control_reset(rstc) once (if we do it for the first *and* second
->>> PHY then the first PHY gets confused once the second PHY uses the
->>> reset because the first PHY's state is reset as well)
->>
->> If you have an initially asserted reset line and you can enable the
->> first module by deasserting the reset via reset_control_deassert (and
->> reset_control_assert to signal when the module may be disabled again
->> after use), shared resets are for you.
->>
->> If you need a reset pulse or have no direct control over the reset line,
->> (device_reset), the reset framework currently has no solution for this.
->> The ugly thing about reset_control_once would be that it can't re-reset
->> modules when unloading and reloading driver modules.
+On Wed, Sep 14, 2016 at 6:28 AM, Benjamin Herrenschmidt
+<benh@kernel.crashing.org> wrote:
+> On Tue, 2016-09-13 at 22:11 +0930, Joel Stanley wrote:
+>> It's not clear that all systems use these pins in that way. I will
+>> not
+>> include this one for now.
 >
-> The corresponding reset driver in question is reset-meson, which only
-> implements reset (assert/deassert are not implemented). However, I
-> don't know if this is due to hardware design.
-> I think the hardware implements the latter, but maybe Neil can give
-> more information here (I currently don't have access to my board so I
-> cannot test how the hardware actually behaves).
+> Well, it has VGA so the VGA hsync, vsync and DDC should be there at
+> least...
 
-It's implemented that way because the hardware only supports a reset
-pulse.
+True. When we enable VGA in our tree these pins will be requested as
+part of the VGA driver's device node, so they don't need to be hogged
+by the pinctrl node like this.
 
-Kevin
+The ones I'm not clear on are bmc_flack and bmc_int. Andrew, do you
+have a recommendation here?
+
+Cheers,
+
+Joel
