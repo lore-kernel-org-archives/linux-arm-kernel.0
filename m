@@ -1,70 +1,70 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 14 Sep 2016 17:32:29 -0500
-Subject: [PATCH v9 01/10] arm64: pmu: add fallback probe table
+Date: Wed, 14 Sep 2016 17:32:32 -0500
+Subject: [PATCH v9 04/10] arm64: Rename the common MADT parse routine
 In-Reply-To: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
 References: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1473892358-22574-2-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1473892358-22574-5-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Salter <msalter@redhat.com>
+The MADT parser in smp.c is now being used to parse
+out NUMA, PMU and ACPI parking protocol information as
+well as the GIC information for which it was originally
+created. Rename it to avoid a misleading name.
 
-In preparation for ACPI support, add a pmu_probe_info table to
-the arm_pmu_device_probe() call. This table gets used when
-probing in the absence of a devicetree node for PMU.
-
-Signed-off-by: Mark Salter <msalter@redhat.com>
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/kernel/perf_event.c | 13 ++++++++++++-
- drivers/perf/arm_pmu.c         |  2 +-
- 2 files changed, 13 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/smp.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 838ccf1..3aac598 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -24,6 +24,7 @@
- #include <asm/sysreg.h>
- #include <asm/virt.h>
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index d93d433..a6552fe 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -506,13 +506,14 @@ static unsigned int cpu_count = 1;
  
-+#include <linux/acpi.h>
- #include <linux/of.h>
- #include <linux/perf/arm_pmu.h>
- #include <linux/platform_device.h>
-@@ -1044,9 +1045,19 @@ static const struct of_device_id armv8_pmu_of_device_ids[] = {
- 	{},
- };
- 
-+static const struct pmu_probe_info armv8_pmu_probe_table[] = {
-+	PMU_PROBE(0, 0, armv8_pmuv3_init), /* if all else fails... */
-+	{ /* sentinel value */ }
-+};
-+
- static int armv8_pmu_device_probe(struct platform_device *pdev)
+ #ifdef CONFIG_ACPI
+ /*
+- * acpi_map_gic_cpu_interface - parse processor MADT entry
++ * acpi_verify_and_map_madt - parse processor MADT entry
+  *
+  * Carry out sanity checks on MADT processor entry and initialize
+- * cpu_logical_map on success
++ * cpu_logical_map, the ACPI parking protocol, NUMA mapping
++ * and the PMU interrupts on success
+  */
+ static void __init
+-acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
++acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
  {
--	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids, NULL);
-+	if (acpi_disabled)
-+		return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
-+					    NULL);
-+
-+	return arm_pmu_device_probe(pdev, armv8_pmu_of_device_ids,
-+				    armv8_pmu_probe_table);
+ 	u64 hwid = processor->arm_mpidr;
+ 
+@@ -565,7 +566,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
  }
  
- static struct platform_driver armv8_pmu_driver = {
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index f5e1008..58117d7 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -1029,7 +1029,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 		ret = of_pmu_irq_cfg(pmu);
- 		if (!ret)
- 			ret = init_fn(pmu);
--	} else {
-+	} else if (probe_table) {
- 		cpumask_setall(&pmu->supported_cpus);
- 		ret = probe_current_pmu(pmu, probe_table);
- 	}
+ static int __init
+-acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
++acpi_parse_madt_common(struct acpi_subtable_header *header,
+ 			     const unsigned long end)
+ {
+ 	struct acpi_madt_generic_interrupt *processor;
+@@ -576,7 +577,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+ 
+ 	acpi_table_print_madt_entry(header);
+ 
+-	acpi_map_gic_cpu_interface(processor);
++	acpi_verify_and_map_madt(processor);
+ 
+ 	return 0;
+ }
+@@ -659,7 +660,7 @@ void __init smp_init_cpus(void)
+ 		 * we need for SMP init
+ 		 */
+ 		acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+-				      acpi_parse_gic_cpu_interface, 0);
++				      acpi_parse_madt_common, 0);
+ 
+ 	if (cpu_count > nr_cpu_ids)
+ 		pr_warn("Number of cores (%d) exceeds configured maximum of %d - clipping\n",
 -- 
 2.5.5
