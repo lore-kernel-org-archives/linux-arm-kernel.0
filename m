@@ -1,18 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 00:44:38 +0200
-Subject: [GIT PULL] Allwinner arm64 config changes for 4.9
-In-Reply-To: <20160911211957.GA20927@lukather>
-References: <20160911211957.GA20927@lukather>
-Message-ID: <6845463.zivT1S9VCZ@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Sep 2016 16:32:32 -0700
+Subject: [PATCH 0/3] ARM: dts: am33xx/dra7xx: Fix cpufreq regression
+In-Reply-To: <20160914205717.21975-1-d-gerlach@ti.com>
+References: <20160914205717.21975-1-d-gerlach@ti.com>
+Message-ID: <20160914233230.xhbzxpscpvb7d6vj@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, September 11, 2016 11:19:57 PM CEST Maxime Ripard wrote:
-> Allwinner ARM64 Kconfig changes
+* Dave Gerlach <d-gerlach@ti.com> [160914 13:57]:
+> Hi,
+> CPUFreq on am335x and dra7 platforms got broken by two things:
+>  - Updated OPPv2 nodes in device tree were merged before driver to
+>    handle them was accepted.
+>  - OMAP platforms now use the new cpufreq-dt-platdev driver to create
+>    cpufreq-dt platform device but non OMAP TI devices were not changed
+>    over to this driver.
 > 
-> Select the pinctrl driver in kconfig
+> This series addresses the first issue listed above by reverting three of
+> the dts patches that got merged to restore OPPv1 tables. The second issue
+> is addressed by [1].
 > 
+> With both this series and that patch we will have the existing cpufreq
+> support restored on am335x and dra7xx.
 
-Pulled into next/arm64, thanks!
+OK thanks I've applied these into am335x-cpufreq-regression branch
+and merging that into omap-for-v4.9/dt-v2 branch as well. Seems
+like no huge rush to get these into v4.8-rc series as nobody has
+noticed since May. And we can request these for stable inclusion
+after they hit mainline. If there is need to have these in v4.8-rc,
+let me know and I'll send a pull request for am335x-cpufreq-regression
+separately.
 
-	Arnd
+Regards,
+
+Tony
+
+> [1] http://marc.info/?l=linux-pm&m=147388573513082&w=2
+> 
+> Dave Gerlach (3):
+>   Revert "ARM: dts: am335x-boneblack: Enable 1GHz OPP for cpu"
+>   Revert "ARM: dts: am33xx: Move to operating-points-v2 table and
+>     ti-cpufreq driver"
+>   Revert "ARM: dts: dra7: Move to operating-points-v2 table"
+> 
+>  arch/arm/boot/dts/am335x-boneblack.dts | 11 -----
+>  arch/arm/boot/dts/am33xx.dtsi          | 88 +++++-----------------------------
+>  arch/arm/boot/dts/dra7.dtsi            | 26 ++--------
+>  arch/arm/boot/dts/dra74x.dtsi          |  1 -
+>  4 files changed, 18 insertions(+), 108 deletions(-)
+> 
+> -- 
+> 2.9.3
+> 
