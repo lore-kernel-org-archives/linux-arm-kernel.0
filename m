@@ -1,7 +1,7 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 13 Sep 2016 17:42:50 -0700
+Date: Tue, 13 Sep 2016 17:43:12 -0700
 Subject: [PATCH v3 0/2] MMC: add driver for Amlogic GXBB SoCs
-Message-ID: <20160914004252.512-1-khilman@baylibre.com>
+Message-ID: <20160914004314.682-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
