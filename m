@@ -1,25 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 00:40:32 +0200
-Subject: [GIT PULL 2/4] soc/tegra: Changes for v4.9-rc1
-In-Reply-To: <9462882.Qh35FHRZfK@wuerfel>
-References: <20160909152032.9550-1-thierry.reding@gmail.com>
- <20160909152032.9550-2-thierry.reding@gmail.com> <9462882.Qh35FHRZfK@wuerfel>
-Message-ID: <5777274.tbFdIa53BH@wuerfel>
+Date: Thu, 15 Sep 2016 00:42:39 +0200
+Subject: [GIT PULL] Allwinner core changes for 4.9
+In-Reply-To: <20160911211325.GA18519@lukather>
+References: <20160911211325.GA18519@lukather>
+Message-ID: <5492851.QNYpWXhKBL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 15, 2016 12:32:04 AM CEST Arnd Bergmann wrote:
-> On Friday, September 9, 2016 5:20:30 PM CEST Thierry Reding wrote:
-> > soc/tegra: Changes for v4.9-rc1
-> > 
-> > This contains a single patch to fix an issue with setting the deep power
-> > down mode of I/O rails.
-> > 
+On Sunday, September 11, 2016 11:13:25 PM CEST Maxime Ripard wrote:
+> Allwinner core changes for 4.9
 > 
-> Pulled into next/soc. 
+> Add support for big endian on the Allwinner A20, and the Nextthing GR8 SoC
+> 
+> 
 
-I made up my mind and put it into next/drivers instead of next/soc.
+Pulled into next/soc, thanks!
 
 	Arnd
-
-> Should this be backported to stable kernels?
