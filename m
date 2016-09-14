@@ -1,26 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 00:30:35 +0200
-Subject: [GIT PULL] pxa for v4.9
-In-Reply-To: <87zinhf0fi.fsf@belgarion.home>
-References: <87zinhf0fi.fsf@belgarion.home>
-Message-ID: <6127657.SjoUjIm78t@wuerfel>
+Date: Thu, 15 Sep 2016 00:32:04 +0200
+Subject: [GIT PULL 2/4] soc/tegra: Changes for v4.9-rc1
+In-Reply-To: <20160909152032.9550-2-thierry.reding@gmail.com>
+References: <20160909152032.9550-1-thierry.reding@gmail.com>
+ <20160909152032.9550-2-thierry.reding@gmail.com>
+Message-ID: <9462882.Qh35FHRZfK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 9, 2016 7:27:45 PM CEST Robert Jarzmik wrote:
-> This is the pxa changes for v4.9 cycle.
+On Friday, September 9, 2016 5:20:30 PM CEST Thierry Reding wrote:
+> soc/tegra: Changes for v4.9-rc1
 > 
-> This cycle is covering :
->  - the removal of the legacy DMA API
->    This is the major contributor to the negative diffstat, as dmaengine
->    have taken over in this area.
+> This contains a single patch to fix an issue with setting the deep power
+> down mode of I/O rails.
+> 
 
-Very nice!
+Pulled into next/soc. Should this be backported to stable kernels?
 
->  - IDE subsystem defconfig fixes
->  - preparation for pxa25x to be device-tree compliant
->  - various irq related fixes
-
-Pulled into next/soc, thanks!
+Thanks,
 
 	Arnd
