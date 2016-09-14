@@ -1,171 +1,120 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 14 Sep 2016 12:10:54 +0100
-Subject: [PATCH v7 22/22] iommu/dma: Avoid PCI host bridge windows
-In-Reply-To: <ab8693f6-20d6-2a95-9f1f-0607e72bc012@samsung.com>
-References: <cover.1473695704.git.robin.murphy@arm.com>
- <CGME20160912161514eucas1p10818019bf2302609421ad9c35d1af4b8@eucas1p1.samsung.com>
- <5f7bfee298f98d29a35933d3e0252d32b83d62b8.1473695704.git.robin.murphy@arm.com>
- <ab8693f6-20d6-2a95-9f1f-0607e72bc012@samsung.com>
-Message-ID: <49c51c4f-cb00-445d-b8f8-b632babf2b3e@arm.com>
+From: m.niestroj@grinn-global.com (Marcin Niestroj)
+Date: Wed, 14 Sep 2016 13:13:03 +0200
+Subject: [PATCH v3 1/2] ARM: dts: imx6ul: Add DTS for liteSOM module
+Message-ID: <20160914111304.2583-1-m.niestroj@grinn-global.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+This is a SOM (System on Module), so it will be part of another boards.
+Hence, this is a "dtsi" file that will be included from another device
+tree files.
 
-On 14/09/16 11:55, Marek Szyprowski wrote:
-> Hi Robin,
-> 
-> 
-> On 2016-09-12 18:14, Robin Murphy wrote:
->> With our DMA ops enabled for PCI devices, we should avoid allocating
->> IOVAs which a host bridge might misinterpret as peer-to-peer DMA and
->> lead to faults, corruption or other badness. To be safe, punch out holes
->> for all of the relevant host bridge's windows when initialising a DMA
->> domain for a PCI device.
->>
->> CC: Marek Szyprowski <m.szyprowski@samsung.com>
->> CC: Inki Dae <inki.dae@samsung.com>
->> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> I don't know much about PCI and their IOMMU integration, but can't we use
-> the direct mapping region feature of iommu core for it? There are already
-> iommu_get_dm_regions(), iommu_put_dm_regions() and
-> iommu_request_dm_for_dev()
-> functions for handling them...
+Hardware specification:
+ * Freescale i.MX6UL SoC
+ * up to 512 MB RAM
+ * eMMC on uSDHC2
 
-It's rather the opposite problem - in the direct-mapping case, we're
-making sure the iommu_domain has translations installed for the given
-IOVAs (which are also the corresponding physical address) before it goes
-live, whereas what we need to do here is make sure the these addresses
-never get used as IOVAs at all, because any attempt to do so them will
-likely go wrong. Thus we carve them out of the iova_domain such that
-they will never get near an actual IOMMU API call.
+Signed-off-by: Marcin Niestroj <m.niestroj@grinn-global.com>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes v2 -> v3:
+ * Remove cpu0 supplies (arm-supply, soc-supply), as they were already
+   set in imx6ul.dtsi file (reported by S?bastien Szymanski)
 
-This is a slightly generalised equivalent of e.g. amd_iommu.c's
-init_reserved_iova_ranges().
+Changes v1 -> v2:
+ * Use dual license
 
-Robin.
+ arch/arm/boot/dts/imx6ul-litesom.dtsi | 82 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 82 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6ul-litesom.dtsi
 
-> 
->> ---
->>
->> - Squash in the previous drm/exynos fixup
->> - If need be, this one can probably wait
->> ---
->>   arch/arm64/mm/dma-mapping.c               |  2 +-
->>   drivers/gpu/drm/exynos/exynos_drm_iommu.h |  2 +-
->>   drivers/iommu/dma-iommu.c                 | 25
->> ++++++++++++++++++++++++-
->>   include/linux/dma-iommu.h                 |  3 ++-
->>   4 files changed, 28 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index c4284c432ae8..610d8e53011e 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -827,7 +827,7 @@ static bool do_iommu_attach(struct device *dev,
->> const struct iommu_ops *ops,
->>        * then the IOMMU core will have already configured a group for
->> this
->>        * device, and allocated the default domain for that group.
->>        */
->> -    if (!domain || iommu_dma_init_domain(domain, dma_base, size)) {
->> +    if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
->>           pr_warn("Failed to set up IOMMU for device %s; retaining
->> platform DMA ops\n",
->>               dev_name(dev));
->>           return false;
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_iommu.h
->> b/drivers/gpu/drm/exynos/exynos_drm_iommu.h
->> index c8de4913fdbe..87f6b5672e11 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_iommu.h
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_iommu.h
->> @@ -66,7 +66,7 @@ static inline int
->> __exynos_iommu_create_mapping(struct exynos_drm_private *priv,
->>       if (ret)
->>           goto free_domain;
->>   -    ret = iommu_dma_init_domain(domain, start, size);
->> +    ret = iommu_dma_init_domain(domain, start, size, NULL);
->>       if (ret)
->>           goto put_cookie;
->>   diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index 4329d18080cf..c5ab8667e6f2 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -27,6 +27,7 @@
->>   #include <linux/iova.h>
->>   #include <linux/irq.h>
->>   #include <linux/mm.h>
->> +#include <linux/pci.h>
->>   #include <linux/scatterlist.h>
->>   #include <linux/vmalloc.h>
->>   @@ -103,18 +104,38 @@ void iommu_put_dma_cookie(struct iommu_domain
->> *domain)
->>   }
->>   EXPORT_SYMBOL(iommu_put_dma_cookie);
->>   +static void iova_reserve_pci_windows(struct pci_dev *dev,
->> +        struct iova_domain *iovad)
->> +{
->> +    struct pci_host_bridge *bridge = pci_find_host_bridge(dev->bus);
->> +    struct resource_entry *window;
->> +    unsigned long lo, hi;
->> +
->> +    resource_list_for_each_entry(window, &bridge->windows) {
->> +        if (resource_type(window->res) != IORESOURCE_MEM &&
->> +            resource_type(window->res) != IORESOURCE_IO)
->> +            continue;
->> +
->> +        lo = iova_pfn(iovad, window->res->start - window->offset);
->> +        hi = iova_pfn(iovad, window->res->end - window->offset);
->> +        reserve_iova(iovad, lo, hi);
->> +    }
->> +}
->> +
->>   /**
->>    * iommu_dma_init_domain - Initialise a DMA mapping domain
->>    * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
->>    * @base: IOVA at which the mappable address space starts
->>    * @size: Size of IOVA space
->> + * @dev: Device the domain is being initialised for
->>    *
->>    * @base and @size should be exact multiples of IOMMU page
->> granularity to
->>    * avoid rounding surprises. If necessary, we reserve the page at
->> address 0
->>    * to ensure it is an invalid IOVA. It is safe to reinitialise a
->> domain, but
->>    * any change which could make prior IOVAs invalid will fail.
->>    */
->> -int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t
->> base, u64 size)
->> +int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
->> +        u64 size, struct device *dev)
->>   {
->>       struct iova_domain *iovad = cookie_iovad(domain);
->>       unsigned long order, base_pfn, end_pfn;
->> @@ -152,6 +173,8 @@ int iommu_dma_init_domain(struct iommu_domain
->> *domain, dma_addr_t base, u64 size
->>           iovad->dma_32bit_pfn = end_pfn;
->>       } else {
->>           init_iova_domain(iovad, 1UL << order, base_pfn, end_pfn);
->> +        if (dev && dev_is_pci(dev))
->> +            iova_reserve_pci_windows(to_pci_dev(dev), iovad);
->>       }
->>       return 0;
->>   }
->> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
->> index 5ee806e41b5c..32c589062bd9 100644
->> --- a/include/linux/dma-iommu.h
->> +++ b/include/linux/dma-iommu.h
->> @@ -30,7 +30,8 @@ int iommu_get_dma_cookie(struct iommu_domain *domain);
->>   void iommu_put_dma_cookie(struct iommu_domain *domain);
->>     /* Setup call for arch DMA mapping code */
->> -int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t
->> base, u64 size);
->> +int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
->> +        u64 size, struct device *dev);
->>     /* General helpers for DMA-API <-> IOMMU-API interaction */
->>   int dma_direction_to_prot(enum dma_data_direction dir, bool coherent);
-> 
-> Best regards
+diff --git a/arch/arm/boot/dts/imx6ul-litesom.dtsi b/arch/arm/boot/dts/imx6ul-litesom.dtsi
+new file mode 100644
+index 0000000..461292d
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6ul-litesom.dtsi
+@@ -0,0 +1,82 @@
++/*
++ * Copyright 2016 Grinn
++ *
++ * Author: Marcin Niestroj <m.niestroj@grinn-global.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "imx6ul.dtsi"
++
++/ {
++	model = "Grinn i.MX6UL liteSOM";
++	compatible = "grinn,imx6ul-litesom", "fsl,imx6ul";
++
++	memory {
++		reg = <0x80000000 0x20000000>;
++	};
++};
++
++&iomuxc {
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX6UL_PAD_NAND_RE_B__USDHC2_CLK	    0x10069
++			MX6UL_PAD_NAND_WE_B__USDHC2_CMD	    0x17059
++			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0 0x17059
++			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1 0x17059
++			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2 0x17059
++			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3 0x17059
++			MX6UL_PAD_NAND_DATA04__USDHC2_DATA4 0x17059
++			MX6UL_PAD_NAND_DATA05__USDHC2_DATA5 0x17059
++			MX6UL_PAD_NAND_DATA06__USDHC2_DATA6 0x17059
++			MX6UL_PAD_NAND_DATA07__USDHC2_DATA7 0x17059
++			MX6UL_PAD_NAND_ALE__USDHC2_RESET_B  0x17059
++		>;
++	};
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	no-1-8-v;
++	non-removable;
++	keep-power-in-suspend;
++	wakeup-source;
++	bus-width = <8>;
++	status = "okay";
++};
+-- 
+2.9.3
