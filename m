@@ -1,42 +1,45 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 14 Sep 2016 10:41:43 +0100
-Subject: [PATCH V5 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <1473759262-27031-3-git-send-email-kernel@martin.sperl.org>
-References: <1473759262-27031-1-git-send-email-kernel@martin.sperl.org>
- <1473759262-27031-3-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87lgyurf6w.fsf@eliezer.anholt.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 14 Sep 2016 11:13:33 +0100
+Subject: [PATCH v3 0/7] arm64: Privileged Access Never using TTBR0_EL1
+ switching
+In-Reply-To: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <CAKv+Gu-zHmExwk-YqXVg2ZuVi1M8L4BbJb6-iARxQ7b_2eH-rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+On 13 September 2016 at 18:46, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> This is the third version of the arm64 PAN emulation using TTBR0_EL1
+> switching. The series has not yet included the alternative nop patches
+> from Mark Rutland, nor the empty_zero_page from Ard B. This will be done
+> in a subsequent version once 4.9-rc1 is out (which will include Mark's
+> alternative nop patches).
+>
+> Changes since v2:
+>
+> - efi_set_pgd() reworked to update the saved ttbr0 during run-time
+>   services as this value is used during exception return
+>
+> - uaccess_(enable|disable) C macros no longer take an 'alt' parameter
+>   Instead, uaccess_(enable|disable)_not_uao are introduced for the case
+>   where hardware PAN switching is not required when UAO is present
+>
+> - post_ttbr0_update_workaround macro no longer takes a 'ret' parameter
+>
+> - system_supports_ttbr0_pan renamed to system_uses_ttbr0_pan
+>
+> - init_thread_info.ttbr0 moved towards the end of the setup_arch()
+>   function and comment updated
+>
+> - vmlinux.lds.S fixed to use RESERVED_TTBR0_SIZE
+>
+> - Config option changed to ARM64_SW_TTBR0_PAN
+>
+> - Some comment clean-ups and commit log updates
+>
 
-> From: Martin Sperl <kernel@martin.sperl.org>
->
-> Add basic thermal driver for bcm2835 SOC.
->
-> This driver currently relies on the firmware setting up the
-> tsense HW block and does not set it up itself.
->
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->
-> ChangeLog:
->  V1 -> V2: added specific settings depending on compatiblity
-> 	   added trip point based on register
-> 	   setting up ctrl-register if HW is not enabled by firmware
-> 	     as per recommendation of Eric (untested)
-> 	   check that clock frequency is in range
-> 	     (1.9 - 5MHz - as per comment in clk-bcm2835.c)
->  V2 -> V4: moved back to thermal (not using bcm sub-directory)
->        	   set polling interval to 1second (was 0ms, so interrupt driven)
-
-This is still:
-
-Acked-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160914/703cb871/attachment.sig>
+Given that every __get_user() call now incurs the PAN switch overhead,
+I wonder if it would be worth it to stash the real TTBR0_EL1 value in,
+e.g., TPIDRRO_EL0 rather than load it from memory each time. We'd have
+to reload the real value of TPIDRRO_EL0 at kernel exit every time, but
+only for compat tasks, and not nearly as often, obviously.
