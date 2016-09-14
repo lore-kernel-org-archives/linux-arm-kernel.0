@@ -1,57 +1,36 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 14 Sep 2016 21:54:55 +0900
-Subject: [PATCH 2/8] drm/rockchip: Get rid of some unnecessary code
-In-Reply-To: <1473857701-9250-1-git-send-email-tfiga@chromium.org>
-References: <1473857701-9250-1-git-send-email-tfiga@chromium.org>
-Message-ID: <1473857701-9250-3-git-send-email-tfiga@chromium.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Sep 2016 18:37:40 +0530
+Subject: [PATCH v9 00/19] Add support for FDMA DMA controller and slim
+ core rproc found on STi chipsets
+In-Reply-To: <20160913180616.GD21438@tuxbot>
+References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
+ <20160913093107.GA10953@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160913180616.GD21438@tuxbot>
+Message-ID: <20160914130739.GE13920@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current code implements prepare_fb and cleanup_fb callbacks only to
-grab/release fb references, which is already done by atomic framework
-when creating/destryoing plane state. Let's remove these
-unused bits.
+On Tue, Sep 13, 2016 at 11:06:16AM -0700, Bjorn Andersson wrote:
+> > I hate to send a ping,
+> 
+> Sorry about that.
+> 
+> > but do you think we can merge this fdma series? It has gone
+> > through quite a few review rounds now.
+> > 
+> 
+> I think the remoteproc part looks good.
 
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 18 ------------------
- 1 file changed, 18 deletions(-)
+yeah I was waiting for ack on other patches. But looks like at least
+remoteproc ones have it
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 7e811cf..68988c6 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -641,22 +641,6 @@ static void vop_plane_destroy(struct drm_plane *plane)
- 	drm_plane_cleanup(plane);
- }
- 
--static int vop_plane_prepare_fb(struct drm_plane *plane,
--				struct drm_plane_state *new_state)
--{
--	if (plane->state->fb)
--		drm_framebuffer_reference(plane->state->fb);
--
--	return 0;
--}
--
--static void vop_plane_cleanup_fb(struct drm_plane *plane,
--				 struct drm_plane_state *old_state)
--{
--	if (old_state->fb)
--		drm_framebuffer_unreference(old_state->fb);
--}
--
- static int vop_plane_atomic_check(struct drm_plane *plane,
- 			   struct drm_plane_state *state)
- {
-@@ -849,8 +833,6 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
- }
- 
- static const struct drm_plane_helper_funcs plane_helper_funcs = {
--	.prepare_fb = vop_plane_prepare_fb,
--	.cleanup_fb = vop_plane_cleanup_fb,
- 	.atomic_check = vop_plane_atomic_check,
- 	.atomic_update = vop_plane_atomic_update,
- 	.atomic_disable = vop_plane_atomic_disable,
+
+> Vinod, I don't have any changes queued in remoteproc that should cause
+> merge issues. If you want to you could take the remoteproc patch
+> through your tree.
+
+I rechecked the dma part, they look good to me, so I should be able to apply
+these. I will wait a day for ack/nacks. It is the time to speak up :)
+
 -- 
-2.8.0.rc3.226.g39d4020
+~Vinod
