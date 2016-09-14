@@ -1,23 +1,193 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 17:08:20 +0200
-Subject: [GIT PULL] Qualcomm ARM64 DT Updates for v4.9
-In-Reply-To: <1472875085-18017-1-git-send-email-andy.gross@linaro.org>
-References: <1472875085-18017-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <4717013.GEWhg6s4yY@wuerfel>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Wed, 14 Sep 2016 12:14:24 -0300
+Subject: [RESEND][PATCH V7 0/5] perf: Driver specific configuration for PMU
+In-Reply-To: <CANLsYkyqJvNUfJb4bMbUeNsSU+q+yK5W+RK+770TeUKuqQ2qOg@mail.gmail.com>
+References: <1473179837-3293-1-git-send-email-mathieu.poirier@linaro.org>
+ <20160913200614.GB10582@kernel.org>
+ <CANLsYkyqJvNUfJb4bMbUeNsSU+q+yK5W+RK+770TeUKuqQ2qOg@mail.gmail.com>
+Message-ID: <20160914151424.GA12022@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 10:58:05 PM CEST Andy Gross wrote:
-> Qualcomm ARM64 Updates for v4.9
+Em Wed, Sep 14, 2016 at 08:38:04AM -0600, Mathieu Poirier escreveu:
+> On 13 September 2016 at 14:06, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> > Em Tue, Sep 06, 2016 at 10:37:12AM -0600, Mathieu Poirier escreveu:
+> >> Original blurb:
+> >> ---------------
+> >
+> > So, I managed to apply "perf tools: add infrastructure for PMU specific
+> > configuration", the first, as we discussed, needs splitting, some don't
+> > apply due to the first not being applied, and one fails 'perf test
+> > python', which I'll look at tomorrow.
 > 
-> * Updates for MSM8916 including TSCR, SMSM/SMP2P, and MBA reserve
-> * Update SCM node to denote being a reset-controller
-> * Fix broken interrupt settings
-> * Add TSENS nodes for MSM8916/MSM8996
-> * Add DB820c support
-> * Add MSM8916/APQ8016 display support
+> I have a patchset where the first patch was split ready to go.  My
+> plan was to wait for your comments but I can send it out right away if
+> it makes it easier for you.  You can then make comments on that
+> version if you need to - whichever makes your life easier.
 > 
+> What's this "perf test python" thing you're referring to?  With a
+> little more information I can dig into it.
 
-Pulled into next/dt64, thanks!
+Well, just run:
 
-	Arnd
+  perf test
+
+before sending any patches :-)
+
+In this specific case, just run:
+
+  perf test python
+
+After a fresh build, and it should run that specific test, to see
+details, use verbose mode:
+
+  perf test -v python
+
+What happened was that you added a call to a function that is not in the
+list of objects linked for the python binding, that is at:
+
+  tools/perf/util/python-ext-sources
+
+Either we move this function to some file not in that list or if we drag
+along what is needed to get the python binding without any missing
+dependency.
+
+I have to put together a tools/perf/Documentation/SubmittingPatches
+file. :-\
+
+There is also this:
+
+  make -C tools/perf build-test
+
+that I run before sending pull requests to Ingo, that can catch other
+problems, and the usage of the docker build containers:
+
+https://hub.docker.com/search/?q=acmel
+
+But for now what would be really nice would be for you to do:
+
+  perf test
+  make -C tools/perf build-test
+
+Before sending patchkits to me,
+
+Thanks,
+
+- Arnaldo
+ 
+> Thanks,
+> Mathieu
+> 
+> 
+> >
+> > - Arnaldo
+> >
+> >> This patchset adds the possiblity of specifying PMU driver configuration
+> >> directly from the perf command line.  Anything that falls within the
+> >> event specifiers '/.../' and that is preceded by the '@' symbol is
+> >> treated as a configurable.  Two formats are supported, @cfg and
+> >> @cfg=config.
+> >>
+> >> For example:
+> >>
+> >> perf record -e some_event/@cfg1/ ...
+> >>
+> >> or
+> >>
+> >> perf record -e some_event/@cfg2=config/ ...
+> >>
+> >> or
+> >>
+> >> perf record -e some_event/@cfg1, at cfg2=config/ ...
+> >>
+> >> The above are all valid configuration and will see the strings 'cfg1'
+> >> and 'cfg2=config' sent to the PMU driver for parsing and interpretation
+> >> using the existing ioctl() mechanism.
+> >>
+> >> The primary customers for this feature are the CoreSight drivers where
+> >> the selection of a sink (where trace data is accumulated) needs to be
+> >> done in a previous, and separated step, from the launching of the perf
+> >> command.
+> >>
+> >> As such something that used to be a two-step process:
+> >>
+> >> # echo 1 > /sys/bus/coresight/devices/20070000.etr/enable_sink
+> >> # perf record -e cs_etm//u --per-thread  uname
+> >>
+> >> is integrated in a single command:
+> >>
+> >> # perf record -e cs_etm/@20070000.etr/u --per-thread  uname
+> >>
+> >> Thanks,
+> >> Mathieu
+> >>
+> >> Changes for V7:
+> >> - Got rid of a miscellaneous debug message.
+> >> - Rebased to v4.8-rc4
+> >> - Added Jiri Olsa's Acked-by.
+> >>
+> >> Changes for V6:
+> >> - Using sysFS rather than an ioctl() to communicate command line
+> >>   parameters to the CoreSight PMU.
+> >>
+> >> Changes for V5:
+> >> - Made commit log in 5/9 more descriptive.
+> >> - Addressed missing return code in builtin-top.c.
+> >> - Overhauled the kernel portion to do parsing in the core.
+> >>
+> >> Changes for V4:
+> >> - Pushing PMU driver configuration for 'perf top'.
+> >> - Rebased to the latest perf/core branch[1].
+> >>
+> >> Changes for V3:
+> >> - Added comment for function drv_str() that explains the reason for
+> >>   keeping the entire token intact.
+> >> - Added driver config terms to the existing list of config terms.
+> >> - Added documenation for driver specific configuration.
+> >> - Pushing PMU driver configuration for 'perf stat' as well.
+> >> - Preventing users from selecting a sink from sysFS _and_ perf.
+> >>
+> >> Changes for V2:
+> >> - Rebased to [1] as per Jiri's request.
+> >>
+> >>
+> >> Mathieu Poirier (5):
+> >>   perf tools: making coresight PMU listable
+> >>   perf tools: adding coresight etm PMU record capabilities
+> >>   perf tools: add infrastructure for PMU specific configuration
+> >>   perf tools: Pushing configuration down to PMU driver
+> >>   perf tools: adding sink configuration for cs_etm PMU
+> >>
+> >>  MAINTAINERS                              |   5 +
+> >>  tools/perf/Documentation/perf-record.txt |  12 +
+> >>  tools/perf/Makefile.config               |  11 +-
+> >>  tools/perf/arch/arm/util/Build           |   2 +
+> >>  tools/perf/arch/arm/util/auxtrace.c      |  54 +++
+> >>  tools/perf/arch/arm/util/cs-etm.c        | 615 +++++++++++++++++++++++++++++++
+> >>  tools/perf/arch/arm/util/cs-etm.h        |  26 ++
+> >>  tools/perf/arch/arm/util/pmu.c           |  37 ++
+> >>  tools/perf/arch/arm64/util/Build         |   4 +
+> >>  tools/perf/builtin-record.c              |   9 +
+> >>  tools/perf/builtin-stat.c                |   8 +
+> >>  tools/perf/builtin-top.c                 |  12 +
+> >>  tools/perf/util/auxtrace.c               |   1 +
+> >>  tools/perf/util/auxtrace.h               |   1 +
+> >>  tools/perf/util/cs-etm.h                 |  74 ++++
+> >>  tools/perf/util/evlist.c                 |  18 +
+> >>  tools/perf/util/evlist.h                 |   3 +
+> >>  tools/perf/util/evsel.c                  |  40 ++
+> >>  tools/perf/util/evsel.h                  |   4 +
+> >>  tools/perf/util/parse-events.c           |   7 +-
+> >>  tools/perf/util/parse-events.h           |   1 +
+> >>  tools/perf/util/parse-events.l           |  22 ++
+> >>  tools/perf/util/parse-events.y           |  11 +
+> >>  tools/perf/util/pmu.h                    |   2 +
+> >>  24 files changed, 974 insertions(+), 5 deletions(-)
+> >>  create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+> >>  create mode 100644 tools/perf/arch/arm/util/cs-etm.c
+> >>  create mode 100644 tools/perf/arch/arm/util/cs-etm.h
+> >>  create mode 100644 tools/perf/arch/arm/util/pmu.c
+> >>  create mode 100644 tools/perf/util/cs-etm.h
+> >>
+> >> --
+> >> 2.7.4
