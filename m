@@ -1,47 +1,43 @@
 From: patrice.chotard@st.com (Patrice Chotard)
-Date: Wed, 14 Sep 2016 14:00:45 +0200
-Subject: [PATCH v9 12/19] ARM: DT: STiH407: Add spdif_out pinctrl config
-In-Reply-To: <1473081421-16555-13-git-send-email-peter.griffin@linaro.org>
+Date: Wed, 14 Sep 2016 14:01:00 +0200
+Subject: [PATCH v9 13/19] ARM: STi: DT: STiH407: Add sti-sasg-codec dt node
+In-Reply-To: <1473081421-16555-14-git-send-email-peter.griffin@linaro.org>
 References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <1473081421-16555-13-git-send-email-peter.griffin@linaro.org>
-Message-ID: <d05117cc-cccf-b39d-cd25-d9aa182e3f31@st.com>
+ <1473081421-16555-14-git-send-email-peter.griffin@linaro.org>
+Message-ID: <142f56d1-4353-a57c-2dce-59abc3ba4cea@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Peter
 
 On 09/05/2016 03:16 PM, Peter Griffin wrote:
-> This patch adds the pinctrl config for the spidf out
-> pins used by the sasg codec IP.
+> This patch adds the dt node for the internal audio
+> codec IP.
 > 
 > Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  arch/arm/boot/dts/stih407-pinctrl.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
+>  arch/arm/boot/dts/stih407-family.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> index 537db7e..598dbab 100644
-> --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> @@ -1114,6 +1114,14 @@
->  				};
->  			};
->  
-> +			spdif_out {
-> +				pinctrl_spdif_out: spdif_out{
-> +					st,pins {
-> +						spdif_out = <&pio34 7 ALT1 OUT>;
-> +					};
-> +				};
-> +			};
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index 45cab30..d1258d5 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -873,5 +873,12 @@
+>  				<&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
+>  				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
+>  		};
 > +
->  			serial3 {
->  				pinctrl_serial3: serial3-0 {
->  					st,pins {
+> +		sti_sasg_codec: sti-sasg-codec {
+> +			compatible = "st,stih407-sas-codec";
+> +			#sound-dai-cells = <1>;
+> +			status = "disabled";
+> +			st,syscfg = <&syscfg_core>;
+> +		};
+>  	};
+>  };
 > 
-
 
 
 Applied for STi next
