@@ -1,162 +1,179 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Wed, 14 Sep 2016 05:34:19 +0000
-Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
- device for legacy interrupts.
-In-Reply-To: <20160913153402.GA4138@localhost>
-References: <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
- <57C57975.7040306@arm.com>
- <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
- <57C59FE8.30307@arm.com>
- <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
- <57C6B7F1.5000001@arm.com>
- <8520D5D51A55D047800579B094147198258D2C99@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160912220241.GG23532@localhost> <57D7ADA8.5060201@arm.com>
- <20160913150511.GC27748@localhost> <20160913153402.GA4138@localhost>
-Message-ID: <8520D5D51A55D047800579B094147198258D6182@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 14 Sep 2016 13:42:21 +0800
+Subject: [PATCH v8 8/9] drm/mediatek: update DSI sub driver flow
+In-Reply-To: <1473681672-47144-9-git-send-email-yt.shen@mediatek.com>
+References: <1473681672-47144-1-git-send-email-yt.shen@mediatek.com>
+ <1473681672-47144-9-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1473831741.28437.78.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> [+cc Ley Foon (altera), Thomas (aardvark), Kishon (dra7xx), Murali (keystone)]
-> 
-> On Tue, Sep 13, 2016 at 10:05:11AM -0500, Bjorn Helgaas wrote:
-> > On Tue, Sep 13, 2016 at 08:41:28AM +0100, Marc Zyngier wrote:
-> > > On 12/09/16 23:02, Bjorn Helgaas wrote:
-> > > > On Thu, Sep 01, 2016 at 05:19:55AM +0000, Bharat Kumar Gogada wrote:
-> > > >>>>>>> Hi Bharat,
-> > > >>>>>>>> @@ -561,7 +561,7 @@ static int
-> > > >>>>>>>> nwl_pcie_init_irq_domain(struct nwl_pcie
-> > > >>>>>>> *pcie)
-> > > >>>>>>>>     }
-> > > >>>>>>>>
-> > > >>>>>>>>     pcie->legacy_irq_domain =
-> irq_domain_add_linear(legacy_intc_node,
-> > > >>>>>>>> -                                                   INTX_NUM,
-> > > >>>>>>>> +
-> > > >>>>>>>> + INTX_NUM + 1,
-> > > >>>>>>>>                                                     &legacy_domain_ops,
-> > > >>>>>>>>                                                     pcie);
-> > > >>>>>>>
-> > > >>>>>>> This feels like the wrong thing to do. You have INTX_NUM
-> > > >>>>>>> irqs, so the domain allocation should reflect this. On the
-> > > >>>>>>> other hand, the way the driver currently deals with mappings
-> > > >>>>>>> is quite broken (consistently adding 1 to
-> > > >>>>> the HW interrupt).
-> > > >>>>>>>
-> > > >>>>>> Hi Marc,
-> > > >>>>>>
-> > > >>>>>> Without above change I get following crash in kernel while booting.
-> > > >>>>>>
-> > > >>>>>> [    2.441684] error: hwirq 0x4 is too large for dummy
-> > > >>>>>>
-> > > >>>>>> [    2.441694] ------------[ cut here ]------------
-> > > >>>>>>
-> > > >>>>>> [    2.441698] WARNING: at kernel/irq/irqdomain.c:344
-> > > >>>>>>
-> > > >>>>>> [    2.441702] Modules linked in:
-> > > >>>>>>
-> > > >>>>>> [    2.441706]
-> > > >>>>>>
-> > > >>>>>> [    2.441714] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.4.0 #8
-> > > >>>>>>
-> > > >>>>>> [    2.441718] Hardware name: xlnx,zynqmp (DT)
-> > > >>>>>>
-> > > >>>>>> [    2.441723] task: ffffffc071886b80 ti: ffffffc071888000 task.ti:
-> > > >>>>> ffffffc071888000
-> > > >>>>>>
-> > > >>>>>> [    2.441732] PC is at irq_domain_associate+0x138/0x1c0
-> > > >>>>>>
-> > > >>>>>> [    2.441738] LR is at irq_domain_associate+0x138/0x1c0
-> > > >>>>>>
-> > > >>>>>> In kernel/irq/irqdomain.c function irq_domain_associate
-> > > >>>>>>
-> > > >>>>>> if (WARN(hwirq >= domain->hwirq_max,
-> > > >>>>>>                  "error: hwirq 0x%x is too large for %s\n",
-> > > >>>>>> (int)hwirq, domain-
-> > > >>>> name))
-> > > >>>>>>                 return -EINVAL;
-> > > >>>>>>
-> > > >>>>>> Here the hwirq and hwirq_max are equal to 4 without the above
-> > > >>>>>> condition
-> > > >>>>> (INTX_NUM + 1) due to which crash is coming.
-> > > >>>>>> This is happening as the legacy interrupts are starting from 1 (INTA).
-> > > >>>>>
-> > > >>>>> I understood that. I'm still persisting in saying that you have the wrong
-> fix.
-> > > >>>>>
-> > > >>>>> Your domain should always allocate many interrupts as you have
-> > > >>>>> interrupt sources. These interrupts (hwirq) should be numbered
-> > > >>>>> from 0 to (n-
-> > > >>> 1).
-> > > >>>>
-> > > >>>> Agreed, but here comes the problem the hwirq for legacy
-> > > >>>> interrupts will start at 0x1 to 0x4 (INTA to INTD) and these
-> > > >>>> values are as per PCIe specification for legacy interrupts. So
-> > > >>>> these cannot be numbered from 0. So when 0x4 (INTD) for a
-> > > >>>> multi-function device comes the crash occurs.
-> > > >>>
-> > > >>> So who provides this hwirq? Who calls irq_domain_associate()
-> > > >>> with hwirq set to 4?
-> > > >>>
-> > > >> PCIe subsystem invokes pcibios_add_device function in
-> arch/arm64/kernel/pci.c for every pci device.
-> > > >> The purpose of this function is to assign dev->irq using
-> of_irq_parse_and_map_pci.
-> > > >> of_irq_parse_and_map_pci invokes of_irq_parse_pci where it reads
-> > > >> PCI_INTERRUPT_PIN from configuration space and saves it in parameter
-> of struct of_phandle_args.
-> > > >> This structure is passed to irq_create_of_mapping where it invokes
-> irq_create_fwspec_mapping.
-> > > >> irq_create_fwspec_mapping invokes irq_domain_translate and gets
-> > > >> hwirq, here the above saved PCI_INTERRUPT_PIN value is assigned to
-> hwirq (*hwirq = fwspec->param[0]).
-> > > >> And then using this hwirq irq_create_mapping -> irq_domain_associate
-> were invoked and mapping is created for virtual irq with this hwirq.
-> > > >> So for any end point PCI_INTERRUPT_PIN value starts from 0x1 to 0x4
-> and so hwirq starts from 0x1 to 0x4.
-> > > >>
-> > > >> So the values are more generic w.r.t to protocol, that's why hwirq will
-> range from 0x1 to 0x4.
-> > > >> And then if you check pcie-altera.c they are doing this adding one in their
-> handler and while creating legacy domain.
-> > > >
-> > > > Is this resolved yet?  Marc, are you happy, or should we iterate
-> > > > on this again?
-> > >
-> > > Ah, sorry to have dropped the ball on this patch.
-> >
-> > No problem, I wasn't making forward progress anyway.
-> >
-> > > I guess that given that the infrastructure imposes the hwirq range
-> > > on the host drivers, Bharat's approach is the only way (and a number
-> > > of other host drivers are already slightly broken). I'll try and
-> > > have a look at solving this at the generic level. In the meantime:
-> > >
-> > > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> >
-> > After looking at this myself, I'm not happy with this either.  It
-> > feels like there are bugs lurking here and we're just hiding one of them.
-> >
-> > Here are the callers of irq_domain_add_linear() for legacy INTx in
-> > drivers/pci/host:
-> >
-> >   advk_pcie_init_irq_domain    LEGACY_IRQ_NUM   (4)
-> >   dra7xx_pcie_init_irq_domain  4
-> >   ks_dw_pcie_host_init         MAX_LEGACY_IRQS  (4)
-> >   altera_pcie_init_irq_domain  INTX_NUM + 1     (5)
-> >   nwl_pcie_init_irq_domain     INTX_NUM + 1     (5)
-> >   xilinx_pcie_init_irq_domain  4
-> 
-> The altera change corresponding to this was 99496bd2971f ("PCI: altera: Fix
-> error when INTx is 4").  I should have noticed this inconsistency back then.
-> 
-> Are aardvark, dra7xx, keystone, and xilinx (non-NWL) broken because they only
-> request 4 IRQs and only INTA, INTB, and INTC work?
-> 
-Hi Bjorn,
+Hi, YT:
 
-xilinx (non-NWL) will also work with all 4 INTA, INTB, INTc and INTD, but I haven't sent patches
-for this yet, because by that time marc has already raised issue regarding the fix w.r.t this. So
-once a proper fix was agreed upon for Xilinx-nwl, I will send fix for this also.
+On Mon, 2016-09-12 at 20:01 +0800, YT Shen wrote:
+> This patch update enable/disable flow of DSI module and MIPI TX module.
+> Original flow works on there is a bridge chip: DSI -> bridge -> panel.
+> In this case: DSI -> panel, the DSI sub driver flow should be updated.
+> We need to initialize DSI first so that we can send commands to panel.
+> 
+> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> ---
+>  
 
-Thanks & Regards,
-Bharat
+[snip...]
+
+>  
+> +static void mtk_dsi_switch_to_cmd_mode(struct mtk_dsi *dsi)
+> +{
+> +	s32 ret = 0;
+> +	unsigned long timeout = msecs_to_jiffies(500);
+> +
+> +	mtk_dsi_irq_data_clear(dsi, VM_DONE_INT_FLAG);
+> +	mtk_dsi_set_cmd_mode(dsi);
+> +
+> +	ret = wait_event_interruptible_timeout(dsi->irq_wait_queue,
+> +					       dsi->irq_data & VM_DONE_INT_FLAG,
+> +					       timeout);
+> +	if (ret == 0) {
+> +		dev_info(dsi->dev, "dsi wait engine idle timeout\n");
+> +
+> +		mtk_dsi_enable(dsi);
+> +		mtk_dsi_reset_engine(dsi);
+> +	}
+
+I think you should replace this event-waiting with
+mtk_dsi_wait_for_irq_done(). And this is a reason for moving
+mtk_dsi_wait_for_irq_done() to the patch of irq control.
+
+> +}
+> +
+>  static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+>  {
+>  	if (WARN_ON(dsi->refcount == 0))
+> @@ -528,6 +574,17 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+>  	if (--dsi->refcount != 0)
+>  		return;
+>  
+> +	mtk_dsi_switch_to_cmd_mode(dsi);
+> +
+> +	if (dsi->panel) {
+> +		if (drm_panel_unprepare(dsi->panel)) {
+> +			DRM_ERROR("failed to unprepare the panel\n");
+> +			return;
+> +		}
+> +	}
+
+I think drm_panel_unprepare should be placed after dsi is disabled. So
+move this part after calling mtk_dsi_poweroff() in
+mtk_output_dsi_disable().
+
+> +
+> +	mtk_dsi_reset_engine(dsi);
+> +
+>  	mtk_dsi_lane0_ulp_mode_enter(dsi);
+>  	mtk_dsi_clk_ulp_mode_enter(dsi);
+>  
+> @@ -546,29 +603,37 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+>  	if (dsi->enabled)
+>  		return;
+>  
+> -	if (dsi->panel) {
+> -		if (drm_panel_prepare(dsi->panel)) {
+> -			DRM_ERROR("failed to setup the panel\n");
+> -			return;
+> -		}
+> -	}
+> -
+>  	ret = mtk_dsi_poweron(dsi);
+>  	if (ret < 0) {
+>  		DRM_ERROR("failed to power on dsi\n");
+>  		return;
+>  	}
+>  
+> +	usleep_range(20000, 21000);
+> +
+>  	mtk_dsi_rxtx_control(dsi);
+> +	mtk_dsi_phy_timconfig(dsi);
+> +	mtk_dsi_ps_control_vact(dsi);
+> +	mtk_dsi_set_vm_cmd(dsi);
+> +	mtk_dsi_config_vdo_timing(dsi);
+> +	mtk_dsi_set_interrupt_enable(dsi);
+>  
+> +	mtk_dsi_enable(dsi);
+>  	mtk_dsi_clk_ulp_mode_leave(dsi);
+>  	mtk_dsi_lane0_ulp_mode_leave(dsi);
+>  	mtk_dsi_clk_hs_mode(dsi, 0);
+> -	mtk_dsi_set_mode(dsi);
+>  
+> -	mtk_dsi_ps_control_vact(dsi);
+> -	mtk_dsi_config_vdo_timing(dsi);
+> -	mtk_dsi_set_interrupt_enable(dsi);
+> +	if (dsi->panel) {
+> +		if (drm_panel_prepare(dsi->panel)) {
+> +			DRM_ERROR("failed to prepare the panel\n");
+> +			return;
+> +		}
+> +
+> +		if (drm_panel_enable(dsi->panel)) {
+> +			DRM_ERROR("failed to enable the panel\n");
+> +			return;
+> +		}
+> +	}
+
+I think drm_panel_prepare() should be called before DSI is enabled and
+drm_panel_enable() should be called after DSI is enabled. But you may
+encounter the problem that panel need transfer data when prepare and you
+can refer to [1].
+
+[1]
+http://lxr.free-electrons.com/source/drivers/gpu/drm/exynos/exynos_drm_dsi.c#L1431
+
+>  
+>  	mtk_dsi_set_mode(dsi);
+>  	mtk_dsi_clk_hs_mode(dsi, 1);
+> @@ -590,6 +655,7 @@ static void mtk_output_dsi_disable(struct mtk_dsi *dsi)
+>  		}
+>  	}
+>  
+> +	mtk_dsi_stop(dsi);
+>  	mtk_dsi_poweroff(dsi);
+>  
+>  	dsi->enabled = false;
+> diff --git a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+> index 108d31a..34e95c6 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+> @@ -177,7 +177,9 @@ static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
+>  
+>  	dev_dbg(mipi_tx->dev, "prepare: %u Hz\n", mipi_tx->data_rate);
+>  
+> -	if (mipi_tx->data_rate >= 500000000) {
+> +	if (mipi_tx->data_rate > 1250000000) {
+> +		return -EINVAL;
+> +	} else if (mipi_tx->data_rate >= 500000000) {
+
+What is the relationship of this part and "DSI driver flow"? Would this
+be an independent patch?
+
+>  		txdiv = 1;
+>  		txdiv0 = 0;
+>  		txdiv1 = 0;
+> @@ -201,6 +203,10 @@ static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
+>  		return -EINVAL;
+>  	}
+>  
+> +	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_TOP_CON,
+> +				RG_DSI_LNT_IMP_CAL_CODE | RG_DSI_LNT_HS_BIAS_EN,
+> +				(8 << 4) | RG_DSI_LNT_HS_BIAS_EN);
+> +
+>  	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_BG_CON,
+>  				RG_DSI_VOUT_MSK |
+>  				RG_DSI_BG_CKEN | RG_DSI_BG_CORE_EN,
+>  
+
+You modify many place without 'if (dsi->panel)'. Are all these
+modifications compatible with bridge case?
+
+Regards,
+CK
