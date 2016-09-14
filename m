@@ -1,9 +1,10 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 14 Sep 2016 14:27:43 +0100
-Subject: [PATCH 05/19] ARM: multi_v7_defconfig: Remove miphy365 phy.
+Date: Wed, 14 Sep 2016 14:27:44 +0100
+Subject: [PATCH 06/19] ARM: multi_v7_defconfig: Remove stih41x phy Kconfig
+ symbol.
 In-Reply-To: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
 References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1473859677-9231-6-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1473859677-9231-7-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,16 +18,16 @@ Cc: <kishon@ti.com>
  1 file changed, 1 deletion(-)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 2c8665c..949ab7f 100644
+index 949ab7f..b26a541 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -854,7 +854,6 @@ CONFIG_PHY_ROCKCHIP_DP=m
- CONFIG_PHY_ROCKCHIP_USB=m
+@@ -855,7 +855,6 @@ CONFIG_PHY_ROCKCHIP_USB=m
  CONFIG_PHY_QCOM_APQ8064_SATA=m
  CONFIG_PHY_MIPHY28LP=y
--CONFIG_PHY_MIPHY365X=y
  CONFIG_PHY_RCAR_GEN2=m
- CONFIG_PHY_STIH41X_USB=y
+-CONFIG_PHY_STIH41X_USB=y
  CONFIG_PHY_STIH407_USB=y
+ CONFIG_PHY_SUN4I_USB=y
+ CONFIG_PHY_SUN9I_USB=y
 -- 
 1.9.1
