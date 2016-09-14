@@ -1,25 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 17:41:37 +0200
-Subject: [GIT PULL] Amlogic 64-bit DT changes for v4.9
-In-Reply-To: <7h7fat25g4.fsf@baylibre.com>
-References: <7h7fat25g4.fsf@baylibre.com>
-Message-ID: <9855488.GIzjicgLjX@wuerfel>
+Date: Wed, 14 Sep 2016 17:43:28 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.9
+In-Reply-To: <cover.1473320411.git.horms+renesas@verge.net.au>
+References: <cover.1473320411.git.horms+renesas@verge.net.au>
+Message-ID: <2389310.c0bpgXKe6T@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 2, 2016 5:27:23 PM CEST Kevin Hilman wrote:
-> The pull request below is for the DT changes for 64-bit Amlogic
-> platforms.
+On Thursday, September 8, 2016 9:43:24 AM CEST Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> The DT additions for the new clock/reset support are dependent on DT
-> bindings/includes that were merged via the clock tree, so this branch
-> includes a merge of an immtable branch (clk/clk-gxbb-meson-ao) from the
-> clock tree to handle those dependencies.
+> Please consider these Renesas ARM64 based SoC DT updates for v4.9.
 > 
-> Due to the dependency, it's fine with me if this goes into next/late
-> instead of next/dt64.
+> This pull request is based on the sh-pfc-for-v4.9-tag2 of
+> Geert Uytterhoeven's renesas-driver's tree which is included in the
+> devel and for-next branches of Linus Walleij's linux-pinctrl tree.
+> 
 > 
 
-Pulled into next/late, thanks!
+Pulled into next/late because of the dependency.
+
+We'll send it during the merge window after the dependencies
+are all merged upstream. Thanks,
 
 	Arnd
