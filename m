@@ -1,277 +1,604 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Wed, 14 Sep 2016 22:16:28 +0800
-Subject: [PATCH V3 1/4] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <8337589.pzGt0MZ9xn@wuerfel>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <1473855354-150093-2-git-send-email-yuanzhichang@hisilicon.com>
- <8337589.pzGt0MZ9xn@wuerfel>
-Message-ID: <57D95BBC.9030405@hisilicon.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 14 Sep 2016 15:21:39 +0100
+Subject: [PATCH v7.1 13/22] iommu/arm-smmu: Refactor mmu-masters handling
+In-Reply-To: <046d2d21f988d6ece916fc45b0af0804a7f200f2.1473695704.git.robin.murphy@arm.com>
+References: <cover.1473695704.git.robin.murphy@arm.com>
+ <046d2d21f988d6ece916fc45b0af0804a7f200f2.1473695704.git.robin.murphy@arm.com>
+Message-ID: <df29c62b18d1bf96fd87b7733df66f09a6be5ce2.1473862626.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd
+To be able to support the generic bindings and handle of_xlate() calls,
+we need to be able to associate SMMUs and stream IDs directly with
+devices *before* allocating IOMMU groups. Furthermore, to support real
+default domains with multi-device groups we also have to handle domain
+attach on a per-device basis, as the "whole group at a time" assumption
+fails to properly handle subsequent devices added to a group after the
+first has already triggered default domain creation and attachment.
 
-On 2016/9/14 20:24, Arnd Bergmann wrote:
-> On Wednesday, September 14, 2016 8:15:51 PM CEST Zhichang Yuan wrote:
->> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
->>
->> For arm64, there is no I/O space as other architectural platforms, such as
->> X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
->> such as Hip06, when accessing some legacy ISA devices connected to LPC, those
->> known port addresses are used to control the corresponding target devices, for
->> example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
->> normal MMIO mode in using.
->>
->> To drive these devices, this patch introduces a method named indirect-IO.
->> In this method the in/out pair in arch/arm64/include/asm/io.h will be
->> redefined. When upper layer drivers call in/out with those known legacy port
->> addresses to access the peripherals, the hooking functions corrresponding to
->> those target peripherals will be called. Through this way, those upper layer
->> drivers which depend on in/out can run on Hip06 without any changes.
->>
->> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
-> 
-> Looks ok overall, but I have a couple of comments for details.
-> 
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index bc3f00f..9579479 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -161,6 +161,12 @@ config ARCH_MMAP_RND_COMPAT_BITS_MIN
->>  config ARCH_MMAP_RND_COMPAT_BITS_MAX
->>         default 16
->>  
->> +config ARM64_INDIRECT_PIO
->> +	def_bool n
-> 
-> 'def_bool n' is the same as the shorter and more common 'bool'.
-Yes. Will modify as bool "access peripherals with legacy I/O port"
+To that end, use the now-vacant dev->archdata.iommu field for easy
+config and SMMU instance lookup, and unify config management by chopping
+down the platform-device-specific tree and probing the "mmu-masters"
+property on-demand instead. This may add a bit of one-off overhead to
+initially adding a new device, but we're about to deprecate that binding
+in favour of the inherently-more-efficient generic ones anyway.
 
-> 
->> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
->> index 9b6e408..d3acf1f 100644
->> --- a/arch/arm64/include/asm/io.h
->> +++ b/arch/arm64/include/asm/io.h
->> @@ -34,6 +34,10 @@
->>  
->>  #include <xen/xen.h>
->>  
->> +#ifdef CONFIG_ARM64_INDIRECT_PIO
->> +#include <linux/extio.h>
->> +#endif
-> 
-> No need to guard includes with an #ifdef.
-If remove #ifdef here, extio.h should not contain any function external declarations whose definitions are in
-extio.c compiled only when CONFIG_ARM64_INDIRECT_PIO is yes.
+For the sake of simplicity, this patch does temporarily regress the case
+of aliasing PCI devices by losing the duplicate stream ID detection that
+the previous per-group config had. Stay tuned, because we'll be back to
+fix that in a better and more general way momentarily...
 
+Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-How about removing everything about the configure item "ARM64_INDIRECT_PIO"?
-This will make the indirect-IO mechanism global on ARM64.
-I worry about this mechanism is not so common, so using "ARM64_INDIRECT_PIO" make this feature optional.
+- Fix __find_legacy_master_phandle() to properly cope with more than 
+  one SMMU using the legacy binding.
 
-> 
->> +#define BUILDS_RW(bwl, type)						\
->> +static inline void reads##bwl(const volatile void __iomem *addr,	\
->> +				void *buffer, unsigned int count)	\
->> +{									\
->> +	if (count) {							\
->> +		type *buf = buffer;					\
->> +									\
->> +		do {							\
->> +			type x = __raw_read##bwl(addr);			\
->> +			*buf++ = x;					\
->> +		} while (--count);					\
->> +	}								\
->> +}									\
->> +									\
->> +static inline void writes##bwl(volatile void __iomem *addr,		\
->> +				const void *buffer, unsigned int count)	\
->> +{									\
->> +	if (count) {							\
->> +		const type *buf = buffer;				\
->> +									\
->> +		do {							\
->> +			__raw_write##bwl(*buf++, addr);			\
->> +		} while (--count);					\
->> +	}								\
->> +}
->> +
->> +BUILDS_RW(b, u8)
-> 
-> Why is this in here?
-the readsb/writesb are defined in asm-generic/io.h which is included later, but the redefined insb/outsb need
-to call them. Without these readsb/writesb definition before insb/outsb redefined, compile error occur.
+ drivers/iommu/arm-smmu.c | 382 +++++++++++++----------------------------------
+ 1 file changed, 107 insertions(+), 275 deletions(-)
 
-It seems that copy all the definitions of "asm-generic/io.h" is not a good idea, so I move the definitions of
-those function needed here....
-
-Ok. I think your idea below defining in(s)/out(s) in a c file can solve this issue.
-
-#ifdef CONFIG_ARM64_INDIRECT_PIO
-#define inb inb
-extern u8 inb(unsigned long addr);
-
-#define outb outb
-extern void outb(u8 value, unsigned long addr);
-
-#define insb insb
-extern void insb(unsigned long addr, void *buffer, unsigned int count);
-
-#define outsb outsb
-extern void outsb(unsigned long addr, const void *buffer, unsigned int count);
-#endif
-
-and definitions of all these functions are in extio.c :
-
-u8 inb(unsigned long addr)
-{
-	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||
-			arm64_extio_ops->end < addr)
-		return readb(PCI_IOBASE + addr);
-	else
-		return arm64_extio_ops->pfin ?
-			arm64_extio_ops->pfin(arm64_extio_ops->devpara,
-				addr + arm64_extio_ops->ptoffset, NULL,
-				sizeof(u8), 1) : -1;
-}
-.....
-
-
-> 
->> @@ -149,6 +185,60 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
->>  #define IO_SPACE_LIMIT		(PCI_IO_SIZE - 1)
->>  #define PCI_IOBASE		((void __iomem *)PCI_IO_START)
->>  
->> +
->> +/*
->> + * redefine the in(s)b/out(s)b for indirect-IO.
->> + */
->> +#define inb inb
->> +static inline u8 inb(unsigned long addr)
->> +{
->> +#ifdef CONFIG_ARM64_INDIRECT_PIO
->> +	if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
->> +			addr <= arm64_extio_ops->end)
->> +		return extio_inb(addr);
->> +#endif
->> +	return readb(PCI_IOBASE + addr);
->> +}
->> +
-> 
-> Looks ok, but you only seem to do this for the 8-bit
-> accessors, when it should be done for 16-bit and 32-bit
-> ones as well for consistency.
-Hip06 LPC only support 8-bit I/O operations on the designated port.
-
-> 
->> diff --git a/drivers/bus/extio.c b/drivers/bus/extio.c
->> new file mode 100644
->> index 0000000..1e7a9c5
->> --- /dev/null
->> +++ b/drivers/bus/extio.c
->> @@ -0,0 +1,66 @@
-> 
-> This is in a globally visible directory
-> 
->> +
->> +struct extio_ops *arm64_extio_ops;
-> 
-> But the identifier uses an architecture specific prefix. Either
-> move the whole file into arch/arm64, or make the naming so that
-> it can be used for everything.
-
-I perfer to move the whole file into arch/arm64, extio.h will be moved to arch/arm64/include/asm;
-
-> 
->> +u8 __weak extio_inb(unsigned long addr)
->> +{
->> +	return arm64_extio_ops->pfin ?
->> +		arm64_extio_ops->pfin(arm64_extio_ops->devpara,
->> +			addr + arm64_extio_ops->ptoffset, NULL,
->> +			sizeof(u8), 1) : -1;
->> +}
-> 
-> No need for the __weak attribute, just make sure that the
-> code is always built-in when needed.
-> 
-> Also, it doesn't seem necessary to have an extern function if
-> all it does is call the one callback that you have already 
-> checked earlier. Either put it all into the inline
-> definition in asm/io.h, or put it all into the extern
-> version like this.
-> 
-> #ifdef CONFIG_ARM64_INDIRECT_PIO /* otherwise use default from asm-generic */
-> #define inb inb
-> extern u8 inb(unsigned long addr);
-> #endif
-> 
-Yes. This is good!
-Although the in(s)/out(s) are not inline anymore.
-
-I had applied this way above.
-
-> u8 inb(unsigned long addr)
-> {
-> 	if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
-> 			addr <= arm64_extio_ops->end)
-> 		arm64_extio_ops->pfin(arm64_extio_ops->devpara,addr + arm64_extio_ops->ptoffset, NULL,sizeof(u8), 1) : -1;
-> 	return extio_inb(addr);
-> }
-> 
->> +#define inb inb
->> +static inline u8 inb(unsigned long addr)
->> +{
->> +#ifdef CONFIG_ARM64_INDIRECT_PIO
->> +	if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
->> +			addr <= arm64_extio_ops->end)
->> +		return extio_inb(addr);
->> +#endif
->> +	return readb(PCI_IOBASE + addr);
->> +}
-> 
->> diff --git a/include/linux/extio.h b/include/linux/extio.h
->> new file mode 100644
->> index 0000000..08d1fca
->> --- /dev/null
->> +++ b/include/linux/extio.h
->> @@ -0,0 +1,49 @@
->> +/*
->> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
->> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
->> + * Author: Zou Rongrong <@huawei.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#ifndef __LINUX_EXTIO_H
->> +#define __LINUX_EXTIO_H
->> +
->> +
->> +typedef u64 (*inhook)(void *devobj, unsigned long ptaddr, void *inbuf,
->> +				size_t dlen, unsigned int count);
->> +typedef void (*outhook)(void *devobj, unsigned long ptaddr,
->> +				const void *outbuf, size_t dlen,
->> +				unsigned int count);
-> 
-> I would drop the typedef and just declare the types directly in the
-> only place that references them.
-> 
-Ok. Will apply it.
-
-Thanks!
-Zhichang
-
-> 	Arnd
-> 
-> .
-> 
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 69b6cab65421..2023a77015a0 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -317,18 +317,13 @@ struct arm_smmu_smr {
+ };
+ 
+ struct arm_smmu_master_cfg {
++	struct arm_smmu_device		*smmu;
+ 	int				num_streamids;
+ 	u16				streamids[MAX_MASTER_STREAMIDS];
+ 	s16				smendx[MAX_MASTER_STREAMIDS];
+ };
+ #define INVALID_SMENDX			-1
+ 
+-struct arm_smmu_master {
+-	struct device_node		*of_node;
+-	struct rb_node			node;
+-	struct arm_smmu_master_cfg	cfg;
+-};
+-
+ struct arm_smmu_device {
+ 	struct device			*dev;
+ 
+@@ -376,7 +371,6 @@ struct arm_smmu_device {
+ 	unsigned int			*irqs;
+ 
+ 	struct list_head		list;
+-	struct rb_root			masters;
+ 
+ 	u32				cavium_id_base; /* Specific to Cavium */
+ };
+@@ -415,12 +409,6 @@ struct arm_smmu_domain {
+ 	struct iommu_domain		domain;
+ };
+ 
+-struct arm_smmu_phandle_args {
+-	struct device_node *np;
+-	int args_count;
+-	uint32_t args[MAX_MASTER_STREAMIDS];
+-};
+-
+ static DEFINE_SPINLOCK(arm_smmu_devices_lock);
+ static LIST_HEAD(arm_smmu_devices);
+ 
+@@ -462,132 +450,89 @@ static struct device_node *dev_get_dev_node(struct device *dev)
+ 
+ 		while (!pci_is_root_bus(bus))
+ 			bus = bus->parent;
+-		return bus->bridge->parent->of_node;
++		return of_node_get(bus->bridge->parent->of_node);
+ 	}
+ 
+-	return dev->of_node;
++	return of_node_get(dev->of_node);
+ }
+ 
+-static struct arm_smmu_master *find_smmu_master(struct arm_smmu_device *smmu,
+-						struct device_node *dev_node)
++static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void *data)
+ {
+-	struct rb_node *node = smmu->masters.rb_node;
+-
+-	while (node) {
+-		struct arm_smmu_master *master;
+-
+-		master = container_of(node, struct arm_smmu_master, node);
+-
+-		if (dev_node < master->of_node)
+-			node = node->rb_left;
+-		else if (dev_node > master->of_node)
+-			node = node->rb_right;
+-		else
+-			return master;
+-	}
+-
+-	return NULL;
++	*((__be32 *)data) = cpu_to_be32(alias);
++	return 0; /* Continue walking */
+ }
+ 
+-static struct arm_smmu_master_cfg *
+-find_smmu_master_cfg(struct device *dev)
++static int __find_legacy_master_phandle(struct device *dev, void *data)
+ {
+-	struct arm_smmu_master_cfg *cfg = NULL;
+-	struct iommu_group *group = iommu_group_get(dev);
++	struct of_phandle_iterator *it = *(void **)data;
++	struct device_node *np = it->node;
++	int err;
+ 
+-	if (group) {
+-		cfg = iommu_group_get_iommudata(group);
+-		iommu_group_put(group);
+-	}
+-
+-	return cfg;
+-}
+-
+-static int insert_smmu_master(struct arm_smmu_device *smmu,
+-			      struct arm_smmu_master *master)
+-{
+-	struct rb_node **new, *parent;
+-
+-	new = &smmu->masters.rb_node;
+-	parent = NULL;
+-	while (*new) {
+-		struct arm_smmu_master *this
+-			= container_of(*new, struct arm_smmu_master, node);
+-
+-		parent = *new;
+-		if (master->of_node < this->of_node)
+-			new = &((*new)->rb_left);
+-		else if (master->of_node > this->of_node)
+-			new = &((*new)->rb_right);
+-		else
+-			return -EEXIST;
+-	}
+-
+-	rb_link_node(&master->node, parent, new);
+-	rb_insert_color(&master->node, &smmu->masters);
+-	return 0;
+-}
+-
+-static int register_smmu_master(struct arm_smmu_device *smmu,
+-				struct device *dev,
+-				struct arm_smmu_phandle_args *masterspec)
+-{
+-	int i;
+-	struct arm_smmu_master *master;
+-
+-	master = find_smmu_master(smmu, masterspec->np);
+-	if (master) {
+-		dev_err(dev,
+-			"rejecting multiple registrations for master device %s\n",
+-			masterspec->np->name);
+-		return -EBUSY;
+-	}
+-
+-	if (masterspec->args_count > MAX_MASTER_STREAMIDS) {
+-		dev_err(dev,
+-			"reached maximum number (%d) of stream IDs for master device %s\n",
+-			MAX_MASTER_STREAMIDS, masterspec->np->name);
+-		return -ENOSPC;
+-	}
+-
+-	master = devm_kzalloc(dev, sizeof(*master), GFP_KERNEL);
+-	if (!master)
+-		return -ENOMEM;
+-
+-	master->of_node			= masterspec->np;
+-	master->cfg.num_streamids	= masterspec->args_count;
+-
+-	for (i = 0; i < master->cfg.num_streamids; ++i) {
+-		u16 streamid = masterspec->args[i];
+-
+-		if (!(smmu->features & ARM_SMMU_FEAT_STREAM_MATCH) &&
+-		     (streamid >= smmu->num_mapping_groups)) {
+-			dev_err(dev,
+-				"stream ID for master device %s greater than maximum allowed (%d)\n",
+-				masterspec->np->name, smmu->num_mapping_groups);
+-			return -ERANGE;
++	of_for_each_phandle(it, err, dev->of_node, "mmu-masters",
++			    "#stream-id-cells", 0)
++		if (it->node == np) {
++			*(void **)data = dev;
++			return 1;
+ 		}
+-		master->cfg.streamids[i] = streamid;
+-		master->cfg.smendx[i] = INVALID_SMENDX;
+-	}
+-	return insert_smmu_master(smmu, master);
++	it->node = np;
++	return err == -ENOENT ? 0 : err;
+ }
+ 
+-static struct arm_smmu_device *find_smmu_for_device(struct device *dev)
++static int arm_smmu_register_legacy_master(struct device *dev)
+ {
+ 	struct arm_smmu_device *smmu;
+-	struct arm_smmu_master *master = NULL;
+-	struct device_node *dev_node = dev_get_dev_node(dev);
++	struct arm_smmu_master_cfg *cfg;
++	struct device_node *np;
++	struct of_phandle_iterator it;
++	void *data = &it;
++	__be32 pci_sid;
++	int err;
+ 
++	np = dev_get_dev_node(dev);
++	if (!np || !of_find_property(np, "#stream-id-cells", NULL)) {
++		of_node_put(np);
++		return -ENODEV;
++	}
++
++	it.node = np;
+ 	spin_lock(&arm_smmu_devices_lock);
+ 	list_for_each_entry(smmu, &arm_smmu_devices, list) {
+-		master = find_smmu_master(smmu, dev_node);
+-		if (master)
++		err = __find_legacy_master_phandle(smmu->dev, &data);
++		if (err)
+ 			break;
+ 	}
+ 	spin_unlock(&arm_smmu_devices_lock);
++	of_node_put(np);
++	if (err == 0)
++		return -ENODEV;
++	if (err < 0)
++		return err;
+ 
+-	return master ? smmu : NULL;
++	if (it.cur_count > MAX_MASTER_STREAMIDS) {
++		dev_err(smmu->dev,
++			"reached maximum number (%d) of stream IDs for master device %s\n",
++			MAX_MASTER_STREAMIDS, dev_name(dev));
++		return -ENOSPC;
++	}
++	if (dev_is_pci(dev)) {
++		/* "mmu-masters" assumes Stream ID == Requester ID */
++		pci_for_each_dma_alias(to_pci_dev(dev), __arm_smmu_get_pci_sid,
++				       &pci_sid);
++		it.cur = &pci_sid;
++		it.cur_count = 1;
++	}
++
++	cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
++	if (!cfg)
++		return -ENOMEM;
++
++	cfg->smmu = smmu;
++	dev->archdata.iommu = cfg;
++
++	while (it.cur_count--)
++		cfg->streamids[cfg->num_streamids++] = be32_to_cpup(it.cur++);
++
++	return 0;
+ }
+ 
+ static int __arm_smmu_alloc_bitmap(unsigned long *map, int start, int end)
+@@ -1119,8 +1064,7 @@ static void arm_smmu_free_smr(struct arm_smmu_device *smmu, int idx)
+ static void arm_smmu_write_smr(struct arm_smmu_device *smmu, int idx)
+ {
+ 	struct arm_smmu_smr *smr = smmu->smrs + idx;
+-	u32 reg = (smr->id & smmu->streamid_mask) << SMR_ID_SHIFT |
+-		  (smr->mask & smmu->smr_mask_mask) << SMR_MASK_SHIFT;
++	u32 reg = smr->id << SMR_ID_SHIFT | smr->mask << SMR_MASK_SHIFT;
+ 
+ 	if (smr->valid)
+ 		reg |= SMR_VALID;
+@@ -1189,9 +1133,9 @@ err_free_smrs:
+ 	return -ENOSPC;
+ }
+ 
+-static void arm_smmu_master_free_smes(struct arm_smmu_device *smmu,
+-				      struct arm_smmu_master_cfg *cfg)
++static void arm_smmu_master_free_smes(struct arm_smmu_master_cfg *cfg)
+ {
++	struct arm_smmu_device *smmu = cfg->smmu;
+ 	int i;
+ 
+ 	/*
+@@ -1262,17 +1206,15 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ {
+ 	int ret;
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+-	struct arm_smmu_device *smmu;
+-	struct arm_smmu_master_cfg *cfg;
++	struct arm_smmu_master_cfg *cfg = dev->archdata.iommu;
+ 
+-	smmu = find_smmu_for_device(dev);
+-	if (!smmu) {
++	if (!cfg) {
+ 		dev_err(dev, "cannot attach to SMMU, is it on the same bus?\n");
+ 		return -ENXIO;
+ 	}
+ 
+ 	/* Ensure that the domain is finalised */
+-	ret = arm_smmu_init_domain_context(domain, smmu);
++	ret = arm_smmu_init_domain_context(domain, cfg->smmu);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -1280,18 +1222,14 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+ 	 * Sanity check the domain. We don't support domains across
+ 	 * different SMMUs.
+ 	 */
+-	if (smmu_domain->smmu != smmu) {
++	if (smmu_domain->smmu != cfg->smmu) {
+ 		dev_err(dev,
+ 			"cannot attach to SMMU %s whilst already attached to domain on SMMU %s\n",
+-			dev_name(smmu_domain->smmu->dev), dev_name(smmu->dev));
++			dev_name(smmu_domain->smmu->dev), dev_name(cfg->smmu->dev));
+ 		return -EINVAL;
+ 	}
+ 
+ 	/* Looks ok, so add the device to the domain */
+-	cfg = find_smmu_master_cfg(dev);
+-	if (!cfg)
+-		return -ENODEV;
+-
+ 	return arm_smmu_domain_add_master(smmu_domain, cfg);
+ }
+ 
+@@ -1411,120 +1349,65 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+ 	}
+ }
+ 
+-static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void *data)
+-{
+-	*((u16 *)data) = alias;
+-	return 0; /* Continue walking */
+-}
+-
+-static void __arm_smmu_release_pci_iommudata(void *data)
+-{
+-	kfree(data);
+-}
+-
+-static int arm_smmu_init_pci_device(struct pci_dev *pdev,
+-				    struct iommu_group *group)
+-{
+-	struct arm_smmu_master_cfg *cfg;
+-	u16 sid;
+-	int i;
+-
+-	cfg = iommu_group_get_iommudata(group);
+-	if (!cfg) {
+-		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
+-		if (!cfg)
+-			return -ENOMEM;
+-
+-		iommu_group_set_iommudata(group, cfg,
+-					  __arm_smmu_release_pci_iommudata);
+-	}
+-
+-	if (cfg->num_streamids >= MAX_MASTER_STREAMIDS)
+-		return -ENOSPC;
+-
+-	/*
+-	 * Assume Stream ID == Requester ID for now.
+-	 * We need a way to describe the ID mappings in FDT.
+-	 */
+-	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
+-	for (i = 0; i < cfg->num_streamids; ++i)
+-		if (cfg->streamids[i] == sid)
+-			break;
+-
+-	/* Avoid duplicate SIDs, as this can lead to SMR conflicts */
+-	if (i == cfg->num_streamids) {
+-		cfg->streamids[i] = sid;
+-		cfg->smendx[i] = INVALID_SMENDX;
+-		cfg->num_streamids++;
+-	}
+-
+-	return 0;
+-}
+-
+-static int arm_smmu_init_platform_device(struct device *dev,
+-					 struct iommu_group *group)
+-{
+-	struct arm_smmu_device *smmu = find_smmu_for_device(dev);
+-	struct arm_smmu_master *master;
+-
+-	if (!smmu)
+-		return -ENODEV;
+-
+-	master = find_smmu_master(smmu, dev->of_node);
+-	if (!master)
+-		return -ENODEV;
+-
+-	iommu_group_set_iommudata(group, &master->cfg, NULL);
+-
+-	return 0;
+-}
+-
+ static int arm_smmu_add_device(struct device *dev)
+ {
++	struct arm_smmu_master_cfg *cfg;
+ 	struct iommu_group *group;
++	int i, ret;
++
++	ret = arm_smmu_register_legacy_master(dev);
++	cfg = dev->archdata.iommu;
++	if (ret)
++		goto out_free;
++
++	ret = -EINVAL;
++	for (i = 0; i < cfg->num_streamids; i++) {
++		u16 sid = cfg->streamids[i];
++
++		if (sid & ~cfg->smmu->streamid_mask) {
++			dev_err(dev, "stream ID 0x%x out of range for SMMU (0x%x)\n",
++				sid, cfg->smmu->streamid_mask);
++			goto out_free;
++		}
++		cfg->smendx[i] = INVALID_SMENDX;
++	}
+ 
+ 	group = iommu_group_get_for_dev(dev);
+-	if (IS_ERR(group))
+-		return PTR_ERR(group);
+-
++	if (IS_ERR(group)) {
++		ret = PTR_ERR(group);
++		goto out_free;
++	}
+ 	iommu_group_put(group);
+ 	return 0;
++
++out_free:
++	kfree(cfg);
++	dev->archdata.iommu = NULL;
++	return ret;
+ }
+ 
+ static void arm_smmu_remove_device(struct device *dev)
+ {
+-	struct arm_smmu_device *smmu = find_smmu_for_device(dev);
+-	struct arm_smmu_master_cfg *cfg = find_smmu_master_cfg(dev);
++	struct arm_smmu_master_cfg *cfg = dev->archdata.iommu;
+ 
+-	if (smmu && cfg)
+-		arm_smmu_master_free_smes(smmu, cfg);
++	if (!cfg)
++		return;
+ 
++	arm_smmu_master_free_smes(cfg);
+ 	iommu_group_remove_device(dev);
++	kfree(cfg);
++	dev->archdata.iommu = NULL;
+ }
+ 
+ static struct iommu_group *arm_smmu_device_group(struct device *dev)
+ {
+ 	struct iommu_group *group;
+-	int ret;
+ 
+ 	if (dev_is_pci(dev))
+ 		group = pci_device_group(dev);
+ 	else
+ 		group = generic_device_group(dev);
+ 
+-	if (IS_ERR(group))
+-		return group;
+-
+-	if (dev_is_pci(dev))
+-		ret = arm_smmu_init_pci_device(to_pci_dev(dev), group);
+-	else
+-		ret = arm_smmu_init_platform_device(dev, group);
+-
+-	if (ret) {
+-		iommu_group_put(group);
+-		group = ERR_PTR(ret);
+-	}
+-
+ 	return group;
+ }
+ 
+@@ -1938,9 +1821,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct arm_smmu_device *smmu;
+ 	struct device *dev = &pdev->dev;
+-	struct rb_node *node;
+-	struct of_phandle_iterator it;
+-	struct arm_smmu_phandle_args *masterspec;
+ 	int num_irqs, i, err;
+ 
+ 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
+@@ -2001,37 +1881,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	if (err)
+ 		return err;
+ 
+-	i = 0;
+-	smmu->masters = RB_ROOT;
+-
+-	err = -ENOMEM;
+-	/* No need to zero the memory for masterspec */
+-	masterspec = kmalloc(sizeof(*masterspec), GFP_KERNEL);
+-	if (!masterspec)
+-		goto out_put_masters;
+-
+-	of_for_each_phandle(&it, err, dev->of_node,
+-			    "mmu-masters", "#stream-id-cells", 0) {
+-		int count = of_phandle_iterator_args(&it, masterspec->args,
+-						     MAX_MASTER_STREAMIDS);
+-		masterspec->np		= of_node_get(it.node);
+-		masterspec->args_count	= count;
+-
+-		err = register_smmu_master(smmu, dev, masterspec);
+-		if (err) {
+-			dev_err(dev, "failed to add master %s\n",
+-				masterspec->np->name);
+-			kfree(masterspec);
+-			goto out_put_masters;
+-		}
+-
+-		i++;
+-	}
+-
+-	dev_notice(dev, "registered %d master devices\n", i);
+-
+-	kfree(masterspec);
+-
+ 	parse_driver_options(smmu);
+ 
+ 	if (smmu->version == ARM_SMMU_V2 &&
+@@ -2039,8 +1888,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		dev_err(dev,
+ 			"found only %d context interrupt(s) but %d required\n",
+ 			smmu->num_context_irqs, smmu->num_context_banks);
+-		err = -ENODEV;
+-		goto out_put_masters;
++		return -ENODEV;
+ 	}
+ 
+ 	for (i = 0; i < smmu->num_global_irqs; ++i) {
+@@ -2052,7 +1900,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		if (err) {
+ 			dev_err(dev, "failed to request global IRQ %d (%u)\n",
+ 				i, smmu->irqs[i]);
+-			goto out_put_masters;
++			return err;
+ 		}
+ 	}
+ 
+@@ -2063,22 +1911,12 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 
+ 	arm_smmu_device_reset(smmu);
+ 	return 0;
+-
+-out_put_masters:
+-	for (node = rb_first(&smmu->masters); node; node = rb_next(node)) {
+-		struct arm_smmu_master *master
+-			= container_of(node, struct arm_smmu_master, node);
+-		of_node_put(master->of_node);
+-	}
+-
+-	return err;
+ }
+ 
+ static int arm_smmu_device_remove(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct arm_smmu_device *curr, *smmu = NULL;
+-	struct rb_node *node;
+ 
+ 	spin_lock(&arm_smmu_devices_lock);
+ 	list_for_each_entry(curr, &arm_smmu_devices, list) {
+@@ -2093,12 +1931,6 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ 	if (!smmu)
+ 		return -ENODEV;
+ 
+-	for (node = rb_first(&smmu->masters); node; node = rb_next(node)) {
+-		struct arm_smmu_master *master
+-			= container_of(node, struct arm_smmu_master, node);
+-		of_node_put(master->of_node);
+-	}
+-
+ 	if (!bitmap_empty(smmu->context_map, ARM_SMMU_MAX_CBS))
+ 		dev_err(dev, "removing device with active domains!\n");
+ 
+-- 
+2.8.1.dirty
