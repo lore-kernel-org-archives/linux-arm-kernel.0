@@ -1,128 +1,88 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 14 Sep 2016 10:50:45 +0800
-Subject: [PATCH] usb: chipidea: Properly mark little endian descriptors
-In-Reply-To: <20160914023740.GC30760@b29397-desktop>
-References: <20160913230631.6727-1-stephen.boyd@linaro.org>
- <20160914023740.GC30760@b29397-desktop>
-Message-ID: <20160914025045.GD30760@b29397-desktop>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 14 Sep 2016 10:56:56 +0800
+Subject: [PATCH v2 3/4] ARM: dts: Add NextThing GR8 dtsi
+In-Reply-To: <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
+References: <20160907145400.27192-1-maxime.ripard@free-electrons.com>
+ <20160907145400.27192-4-maxime.ripard@free-electrons.com>
+ <CACRpkdZsxA7avmO85R=-Quu7FQwSVMPhQMDmmgL+xbkVTB-2HQ@mail.gmail.com>
+ <CAGb2v64h7kq2jWzUJ74vDdOOQOXPxjx3ruSsJMXvyr7fP63BGg@mail.gmail.com>
+ <20160908073748.GF8913@lukather>
+ <CACRpkdbrvDZGM3OJsAMk4T5awSSbrJ4MDyKXV2C45ZSE7zUVNQ@mail.gmail.com>
+Message-ID: <CAGb2v66YUOcHXkE521zXNOmqCJ60oJ7+LQA=LS371ZPdEXdrqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 10:37:40AM +0800, Peter Chen wrote:
-> On Tue, Sep 13, 2016 at 04:06:31PM -0700, Stephen Boyd wrote:
-> > The DMA descriptors are little endian, and we do a pretty good
-> > job of handling them with the proper le32_to_cpu() markings, but
-> > we don't actually mark them as __le32. This means checkers like
-> > sparse can't easily find new bugs. Let's mark the members of
-> > structures properly and fix the few places where we're missing
-> > conversions.
-> > 
-> > Cc: Peter Chen <peter.chen@nxp.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> > ---
-> >  drivers/usb/chipidea/udc.c |  6 +++---
-> >  drivers/usb/chipidea/udc.h | 12 ++++++------
-> >  2 files changed, 9 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> > index 6acf4dba395e..61a65d1d05f2 100644
-> > --- a/drivers/usb/chipidea/udc.c
-> > +++ b/drivers/usb/chipidea/udc.c
-> > @@ -364,7 +364,7 @@ static int add_td_to_list(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq,
-> >  		if (hwreq->req.length == 0
-> >  				|| hwreq->req.length % hwep->ep.maxpacket)
-> >  			mul++;
-> > -		node->ptr->token |= mul << __ffs(TD_MULTO);
-> > +		node->ptr->token |= cpu_to_le32(mul << __ffs(TD_MULTO));
-> >  	}
-> >  
-> >  	temp = (u32) (hwreq->req.dma + hwreq->req.actual);
-> > @@ -503,7 +503,7 @@ static int _hardware_enqueue(struct ci_hw_ep *hwep, struct ci_hw_req *hwreq)
-> >  		if (hwreq->req.length == 0
-> >  				|| hwreq->req.length % hwep->ep.maxpacket)
-> >  			mul++;
-> > -		hwep->qh.ptr->cap |= mul << __ffs(QH_MULT);
-> > +		hwep->qh.ptr->cap |= cpu_to_le32(mul << __ffs(QH_MULT));
-> >  	}
-> >  
-> >  	wmb();   /* synchronize before ep prime */
-> > @@ -530,7 +530,7 @@ static void free_pending_td(struct ci_hw_ep *hwep)
-> >  static int reprime_dtd(struct ci_hdrc *ci, struct ci_hw_ep *hwep,
-> >  					   struct td_node *node)
-> >  {
-> > -	hwep->qh.ptr->td.next = node->dma;
-> > +	hwep->qh.ptr->td.next = cpu_to_le32(node->dma);
-> >  	hwep->qh.ptr->td.token &=
-> >  		cpu_to_le32(~(TD_STATUS_HALTED | TD_STATUS_ACTIVE));
-> >  
-> > diff --git a/drivers/usb/chipidea/udc.h b/drivers/usb/chipidea/udc.h
-> > index e66df0020bd4..2ecd1174d66c 100644
-> > --- a/drivers/usb/chipidea/udc.h
-> > +++ b/drivers/usb/chipidea/udc.h
-> > @@ -22,11 +22,11 @@
-> >  /* DMA layout of transfer descriptors */
-> >  struct ci_hw_td {
-> >  	/* 0 */
-> > -	u32 next;
-> > +	__le32 next;
-> >  #define TD_TERMINATE          BIT(0)
-> >  #define TD_ADDR_MASK          (0xFFFFFFEUL << 5)
-> >  	/* 1 */
-> > -	u32 token;
-> > +	__le32 token;
-> >  #define TD_STATUS             (0x00FFUL <<  0)
-> >  #define TD_STATUS_TR_ERR      BIT(3)
-> >  #define TD_STATUS_DT_ERR      BIT(5)
-> > @@ -36,7 +36,7 @@ struct ci_hw_td {
-> >  #define TD_IOC                BIT(15)
-> >  #define TD_TOTAL_BYTES        (0x7FFFUL << 16)
-> >  	/* 2 */
-> > -	u32 page[5];
-> > +	__le32 page[5];
-> >  #define TD_CURR_OFFSET        (0x0FFFUL <<  0)
-> >  #define TD_FRAME_NUM          (0x07FFUL <<  0)
-> >  #define TD_RESERVED_MASK      (0x0FFFUL <<  0)
-> > @@ -45,18 +45,18 @@ struct ci_hw_td {
-> >  /* DMA layout of queue heads */
-> >  struct ci_hw_qh {
-> >  	/* 0 */
-> > -	u32 cap;
-> > +	__le32 cap;
-> >  #define QH_IOS                BIT(15)
-> >  #define QH_MAX_PKT            (0x07FFUL << 16)
-> >  #define QH_ZLT                BIT(29)
-> >  #define QH_MULT               (0x0003UL << 30)
-> >  #define QH_ISO_MULT(x)		((x >> 11) & 0x03)
-> >  	/* 1 */
-> > -	u32 curr;
-> > +	__le32 curr;
-> >  	/* 2 - 8 */
-> >  	struct ci_hw_td		td;
-> >  	/* 9 */
-> > -	u32 RESERVED;
-> > +	__le32 RESERVED;
-> >  	struct usb_ctrlrequest   setup;
-> >  } __attribute__ ((packed, aligned(4)));
-> >  
-> > -- 
+Hi Linus,
 
-I am afraid I can't apply for testing
+On Mon, Sep 12, 2016 at 8:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Sep 8, 2016 at 9:37 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> On Thu, Sep 08, 2016 at 12:46:14PM +0800, Chen-Yu Tsai wrote:
+>
+>>> Also, I think we are needlessly using pin groups, 1 pin per group.
+>>> Can pinconf/pinctrl work without them? Would there be any harm
+>>> converting the sunxi driver to work directly with pins? This would
+>>> make it match generic pinconf parsing, and make it easier to get
+>>> both working together.
+>>
+>> I think it comes from a requirement that you had to have groups at
+>> some point (I don't know if it's still the case), which is why we
+>> ended up with single-pin groups, because we can mux each pins entirely
+>> separately.
+>>
+>> If it's not required anymore, then yes, it makes total sense to remove
+>> it.
+>
+> The groups vs individual pins is an eternal debate that has
+> been going on since the inception of pinctrl.
+>
+> If you see it from the point of the programmer, you may just see
+> a register for each pin and they seem all independent. This is
+> why pinctrl-single exist, and that driver is for this purpose: one
+> register per pin, software-wise independent.
+>
+> HOWEVER it often turns out that while you can programmatically
+> and individually set pins to any function (and biasing etc), the
+> person designing the hardware was not thinking that you should
+> be able to do whatever you like, e.g. even if it is possible to
+> take two pins and use one of them for half an SPI bus and the
+> other for half an I2C bus, that doesn't mean that this is useful
+> or makes any kind of electronic sense, it just makes "software
+> sense".
+>
+> So for a deeper understanding, several SoCs (amongst them
+> my own and Qualcomm etc) define groups that are not really
+> about software restrictions for what you can do with the pins, but
+> about usecase and electronic restrictions for what can be done
+> with the pins.
+>
+> E.g. it makes *sense* to have a group for muxing I2C on two
+> pins, and not allow one of them to be muxed to I2C and the other
+> not, because it does not make electronic sense.
+>
+> One-group-per-pin groups is usually coming from a failure or
+> inability to identify these electronically sound and usecase
+> oriented pingroups.
+>
+> Some (like pinctrl-single) say they don't care, and wish to
+> see things as the world is just software and one register per
+> pin, removing those electric usecase restrictions, and only
+> keeping the muxing restrictions to e.g. the four different functions
+> that can be muxed on that pin, disregarding the bigger picture.
+>
+> I don't know about this driver or the pins it manages,
+> I seldom have time or brains to dive in and review things
+> deeply enough :(
 
-Applying: usb: chipidea: Properly mark little endian descriptors
-fatal: sha1 information is lacking or useless
-(drivers/usb/chipidea/udc.c).
-error: could not build fake ancestor
-Patch failed at 0001 usb: chipidea: Properly mark little endian
-descriptors
-The copy of the patch that failed is found in: .git/rebase-apply/patch
-When you have resolved this problem, run "git am --continue".
-If you prefer to skip this patch, run "git am --skip" instead.
-To restore the original branch and stop patching, run "git am --abort".
+Thanks for the explanation. I suppose sunxi falls into the "don't
+care" group. We mainly enforce proper use cases through the DT
+pinmux settings. Of course this doesn't prevent the user from
+using weird settings out of tree, but then again what's preventing
+them from hacking the kernel anyway.
 
-Would you please rebase my ci-for-usb-next branch?
+Back to my original question: is it possible to drop the pin group
+support completely? Looking at struct pinctrl_ops the answer seems
+to be no.
 
--- 
-
-Best Regards,
-Peter Chen
+Regards
+ChenYu
