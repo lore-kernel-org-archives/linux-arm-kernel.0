@@ -1,10 +1,11 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 14 Sep 2016 16:37:07 +0200
-Subject: [PATCH 1/4] ARM: mv78xx0: simplify ethernet device creation
-In-Reply-To: <20160906140623.2853066-1-arnd@arndb.de> (Arnd Bergmann's message
- of "Tue, 6 Sep 2016 16:06:20 +0200")
+Date: Wed, 14 Sep 2016 16:37:20 +0200
+Subject: [PATCH 2/4] ARM: mvebu/orion: remove NO_IRQ check from device init
+In-Reply-To: <20160906140623.2853066-2-arnd@arndb.de> (Arnd Bergmann's message
+ of "Tue, 6 Sep 2016 16:06:21 +0200")
 References: <20160906140623.2853066-1-arnd@arndb.de>
-Message-ID: <87sht2bl9o.fsf@free-electrons.com>
+ <20160906140623.2853066-2-arnd@arndb.de>
+Message-ID: <87oa3qbl9b.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,118 +13,190 @@ Hi Arnd,
  
  On mar., sept. 06 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> Out of the four ethernet devices on mv78xx0, only the first one
-> has an error interrupt line, for the other ones we pass NO_IRQ
-> and then ignore the argument.
->
-> In order to get closer to complete remove of NO_IRQ, this simply
-> drops the unused function arguments.
+> For most devices, we know in advance whether they have an
+> interrupt line or not, so we can avoid passing NO_IRQ and
+> instead split fill_resources() into two interfaces, with
+> only the new fill_resources_irq() function taking an irq
+> argument, which it then can use unconditionally.
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Applied on mvebu/soc with Reviewed-by tag from  Andrew Lunn
+Applied on mvebu/soc
 
 Thanks,
 
 Gregory
-
 > ---
->  arch/arm/mach-mv78xx0/common.c            | 9 ++-------
->  arch/arm/plat-orion/common.c              | 7 ++-----
->  arch/arm/plat-orion/include/plat/common.h | 7 ++-----
->  3 files changed, 6 insertions(+), 17 deletions(-)
+>  arch/arm/plat-orion/common.c | 52 ++++++++++++++++++++++++--------------------
+>  1 file changed, 29 insertions(+), 23 deletions(-)
 >
-> diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-> index 6af5430d0d97..f72e1e9f5fc5 100644
-> --- a/arch/arm/mach-mv78xx0/common.c
-> +++ b/arch/arm/mach-mv78xx0/common.c
-> @@ -219,7 +219,6 @@ void __init mv78xx0_ge01_init(struct mv643xx_eth_platform_data *eth_data)
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index 7757f71fe709..7b9b70785a54 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -52,21 +52,27 @@ void __init orion_clkdev_init(struct clk *tclk)
+>  static void fill_resources(struct platform_device *device,
+>  			   struct resource *resources,
+>  			   resource_size_t mapbase,
+> -			   resource_size_t size,
+> -			   unsigned int irq)
+> +			   resource_size_t size)
 >  {
->  	orion_ge01_init(eth_data,
->  			GE01_PHYS_BASE, IRQ_MV78XX0_GE01_SUM,
-> -			NO_IRQ,
->  			MV643XX_TX_CSUM_DEFAULT_LIMIT);
->  }
+>  	device->resource = resources;
+>  	device->num_resources = 1;
+>  	resources[0].flags = IORESOURCE_MEM;
+>  	resources[0].start = mapbase;
+>  	resources[0].end = mapbase + size;
+> +}
 >  
-> @@ -242,9 +241,7 @@ void __init mv78xx0_ge10_init(struct mv643xx_eth_platform_data *eth_data)
->  		eth_data->duplex = DUPLEX_FULL;
->  	}
->  
-> -	orion_ge10_init(eth_data,
-> -			GE10_PHYS_BASE, IRQ_MV78XX0_GE10_SUM,
-> -			NO_IRQ);
-> +	orion_ge10_init(eth_data, GE10_PHYS_BASE, IRQ_MV78XX0_GE10_SUM);
->  }
->  
->  
-> @@ -266,9 +263,7 @@ void __init mv78xx0_ge11_init(struct mv643xx_eth_platform_data *eth_data)
->  		eth_data->duplex = DUPLEX_FULL;
->  	}
->  
-> -	orion_ge11_init(eth_data,
-> -			GE11_PHYS_BASE, IRQ_MV78XX0_GE11_SUM,
-> -			NO_IRQ);
-> +	orion_ge11_init(eth_data, GE11_PHYS_BASE, IRQ_MV78XX0_GE11_SUM);
+> -	if (irq != NO_IRQ) {
+> -		device->num_resources++;
+> -		resources[1].flags = IORESOURCE_IRQ;
+> -		resources[1].start = irq;
+> -		resources[1].end = irq;
+> -	}
+> +static void fill_resources_irq(struct platform_device *device,
+> +			       struct resource *resources,
+> +			       resource_size_t mapbase,
+> +			       resource_size_t size,
+> +			       unsigned int irq)
+> +{
+> +	fill_resources(device, resources, mapbase, size);
+> +
+> +	device->num_resources++;
+> +	resources[1].flags = IORESOURCE_IRQ;
+> +	resources[1].start = irq;
+> +	resources[1].end = irq;
 >  }
 >  
 >  /*****************************************************************************
-> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-> index 78c8bf4043c0..7757f71fe709 100644
-> --- a/arch/arm/plat-orion/common.c
-> +++ b/arch/arm/plat-orion/common.c
-> @@ -354,7 +354,6 @@ static struct platform_device orion_ge01 = {
->  void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
->  			    unsigned long mapbase,
->  			    unsigned long irq,
-> -			    unsigned long irq_err,
+> @@ -93,7 +99,7 @@ static void __init uart_complete(
+>  	data->uartclk = uart_get_clk_rate(clk);
+>  	orion_uart->dev.platform_data = data;
+>  
+> -	fill_resources(orion_uart, resources, mapbase, 0xff, irq);
+> +	fill_resources_irq(orion_uart, resources, mapbase, 0xff, irq);
+>  	platform_device_register(orion_uart);
+>  }
+>  
+> @@ -305,8 +311,8 @@ void __init orion_ge00_init(struct mv643xx_eth_platform_data *eth_data,
+>  			    unsigned int tx_csum_limit)
+>  {
+>  	fill_resources(&orion_ge00_shared, orion_ge00_shared_resources,
+> -		       mapbase + 0x2000, SZ_16K - 1, NO_IRQ);
+> -	fill_resources(&orion_ge_mvmdio, orion_ge_mvmdio_resources,
+> +		       mapbase + 0x2000, SZ_16K - 1);
+> +	fill_resources_irq(&orion_ge_mvmdio, orion_ge_mvmdio_resources,
+>  			mapbase + 0x2004, 0x84 - 1, irq_err);
+>  	orion_ge00_shared_data.tx_csum_limit = tx_csum_limit;
+>  	ge_complete(&orion_ge00_shared_data,
+> @@ -357,7 +363,7 @@ void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
 >  			    unsigned int tx_csum_limit)
 >  {
 >  	fill_resources(&orion_ge01_shared, orion_ge01_shared_resources,
-> @@ -404,8 +403,7 @@ static struct platform_device orion_ge10 = {
->  
->  void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
->  			    unsigned long mapbase,
-> -			    unsigned long irq,
-> -			    unsigned long irq_err)
-> +			    unsigned long irq)
+> -		       mapbase + 0x2000, SZ_16K - 1, NO_IRQ);
+> +		       mapbase + 0x2000, SZ_16K - 1);
+>  	orion_ge01_shared_data.tx_csum_limit = tx_csum_limit;
+>  	ge_complete(&orion_ge01_shared_data,
+>  		    orion_ge01_resources, irq, &orion_ge01_shared,
+> @@ -406,7 +412,7 @@ void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
+>  			    unsigned long irq)
 >  {
 >  	fill_resources(&orion_ge10_shared, orion_ge10_shared_resources,
->  		       mapbase + 0x2000, SZ_16K - 1, NO_IRQ);
-> @@ -453,8 +451,7 @@ static struct platform_device orion_ge11 = {
->  
->  void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
->  			    unsigned long mapbase,
-> -			    unsigned long irq,
-> -			    unsigned long irq_err)
-> +			    unsigned long irq)
+> -		       mapbase + 0x2000, SZ_16K - 1, NO_IRQ);
+> +		       mapbase + 0x2000, SZ_16K - 1);
+>  	ge_complete(&orion_ge10_shared_data,
+>  		    orion_ge10_resources, irq, &orion_ge10_shared,
+>  		    NULL,
+> @@ -454,7 +460,7 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+>  			    unsigned long irq)
 >  {
 >  	fill_resources(&orion_ge11_shared, orion_ge11_shared_resources,
->  		       mapbase + 0x2000, SZ_16K - 1, NO_IRQ);
-> diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
-> index 9e6d76ad48a9..8519727faa5e 100644
-> --- a/arch/arm/plat-orion/include/plat/common.h
-> +++ b/arch/arm/plat-orion/include/plat/common.h
-> @@ -47,18 +47,15 @@ void __init orion_ge00_init(struct mv643xx_eth_platform_data *eth_data,
->  void __init orion_ge01_init(struct mv643xx_eth_platform_data *eth_data,
->  			    unsigned long mapbase,
->  			    unsigned long irq,
-> -			    unsigned long irq_err,
->  			    unsigned int tx_csum_limit);
+> -		       mapbase + 0x2000, SZ_16K - 1, NO_IRQ);
+> +		       mapbase + 0x2000, SZ_16K - 1);
+>  	ge_complete(&orion_ge11_shared_data,
+>  		    orion_ge11_resources, irq, &orion_ge11_shared,
+>  		    NULL,
+> @@ -535,7 +541,7 @@ void __init orion_i2c_init(unsigned long mapbase,
+>  			   unsigned long freq_m)
+>  {
+>  	orion_i2c_pdata.freq_m = freq_m;
+> -	fill_resources(&orion_i2c, orion_i2c_resources, mapbase,
+> +	fill_resources_irq(&orion_i2c, orion_i2c_resources, mapbase,
+>  		       SZ_32 - 1, irq);
+>  	platform_device_register(&orion_i2c);
+>  }
+> @@ -545,7 +551,7 @@ void __init orion_i2c_1_init(unsigned long mapbase,
+>  			     unsigned long freq_m)
+>  {
+>  	orion_i2c_1_pdata.freq_m = freq_m;
+> -	fill_resources(&orion_i2c_1, orion_i2c_1_resources, mapbase,
+> +	fill_resources_irq(&orion_i2c_1, orion_i2c_1_resources, mapbase,
+>  		       SZ_32 - 1, irq);
+>  	platform_device_register(&orion_i2c_1);
+>  }
+> @@ -573,14 +579,14 @@ static struct platform_device orion_spi_1 = {
+>  void __init orion_spi_init(unsigned long mapbase)
+>  {
+>  	fill_resources(&orion_spi, &orion_spi_resources,
+> -		       mapbase, SZ_512 - 1, NO_IRQ);
+> +		       mapbase, SZ_512 - 1);
+>  	platform_device_register(&orion_spi);
+>  }
 >  
->  void __init orion_ge10_init(struct mv643xx_eth_platform_data *eth_data,
->  			    unsigned long mapbase,
-> -			    unsigned long irq,
-> -			    unsigned long irq_err);
-> +			    unsigned long irq);
+>  void __init orion_spi_1_init(unsigned long mapbase)
+>  {
+>  	fill_resources(&orion_spi_1, &orion_spi_1_resources,
+> -		       mapbase, SZ_512 - 1, NO_IRQ);
+> +		       mapbase, SZ_512 - 1);
+>  	platform_device_register(&orion_spi_1);
+>  }
 >  
->  void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
->  			    unsigned long mapbase,
-> -			    unsigned long irq,
-> -			    unsigned long irq_err);
-> +			    unsigned long irq);
+> @@ -738,7 +744,7 @@ void __init orion_ehci_init(unsigned long mapbase,
+>  			    enum orion_ehci_phy_ver phy_version)
+>  {
+>  	orion_ehci_data.phy_version = phy_version;
+> -	fill_resources(&orion_ehci, orion_ehci_resources, mapbase, SZ_4K - 1,
+> +	fill_resources_irq(&orion_ehci, orion_ehci_resources, mapbase, SZ_4K - 1,
+>  		       irq);
 >  
->  void __init orion_ge00_switch_init(struct dsa_platform_data *d,
->  				   int irq);
+>  	platform_device_register(&orion_ehci);
+> @@ -762,7 +768,7 @@ static struct platform_device orion_ehci_1 = {
+>  void __init orion_ehci_1_init(unsigned long mapbase,
+>  			      unsigned long irq)
+>  {
+> -	fill_resources(&orion_ehci_1, orion_ehci_1_resources,
+> +	fill_resources_irq(&orion_ehci_1, orion_ehci_1_resources,
+>  		       mapbase, SZ_4K - 1, irq);
+>  
+>  	platform_device_register(&orion_ehci_1);
+> @@ -786,7 +792,7 @@ static struct platform_device orion_ehci_2 = {
+>  void __init orion_ehci_2_init(unsigned long mapbase,
+>  			      unsigned long irq)
+>  {
+> -	fill_resources(&orion_ehci_2, orion_ehci_2_resources,
+> +	fill_resources_irq(&orion_ehci_2, orion_ehci_2_resources,
+>  		       mapbase, SZ_4K - 1, irq);
+>  
+>  	platform_device_register(&orion_ehci_2);
+> @@ -816,7 +822,7 @@ void __init orion_sata_init(struct mv_sata_platform_data *sata_data,
+>  			    unsigned long irq)
+>  {
+>  	orion_sata.dev.platform_data = sata_data;
+> -	fill_resources(&orion_sata, orion_sata_resources,
+> +	fill_resources_irq(&orion_sata, orion_sata_resources,
+>  		       mapbase, 0x5000 - 1, irq);
+>  
+>  	platform_device_register(&orion_sata);
+> @@ -846,7 +852,7 @@ void __init orion_crypto_init(unsigned long mapbase,
+>  			      unsigned long sram_size,
+>  			      unsigned long irq)
+>  {
+> -	fill_resources(&orion_crypto, orion_crypto_resources,
+> +	fill_resources_irq(&orion_crypto, orion_crypto_resources,
+>  		       mapbase, 0xffff, irq);
+>  	orion_crypto.num_resources = 3;
+>  	orion_crypto_resources[2].start = srambase;
 > -- 
 > 2.9.0
 >
