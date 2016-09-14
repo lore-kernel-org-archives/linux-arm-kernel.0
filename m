@@ -1,112 +1,74 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 14 Sep 2016 14:27:47 +0100
-Subject: [PATCH 09/19] thermal: sti: Remove obsolete STiH416 platform support.
+Date: Wed, 14 Sep 2016 14:27:49 +0100
+Subject: [PATCH 11/19] watchdog: st_wdt: Remove support for obsolete platforms
 In-Reply-To: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
 References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1473859677-9231-10-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1473859677-9231-12-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 STiH415/6 SoC support is being removed from the kernel.
-This patch removes support from the thermal driver.
-Also it updates the register defines and removes
-the SoC and die prefix as neither of these are relevant
-in the context of STiH407 based silicon (STiH415/6 were
-dual die SoCs with an MPE die and SAS die).
+This patch updates the watchdog driver to remove references
+to these obsolete platforms.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Cc: <rui.zhang@intel.com>
-Cc: <edubezval@gmail.com>
+Cc: <wim@iguana.be>
+Cc: <linux@roeck-us.net>
+Cc: <linux-watchdog@vger.kernel.org>
 ---
- drivers/thermal/st/st_thermal_memmap.c | 34 ++++++++++++----------------------
- 1 file changed, 12 insertions(+), 22 deletions(-)
+ drivers/watchdog/st_lpc_wdt.c | 33 ---------------------------------
+ 1 file changed, 33 deletions(-)
 
-diff --git a/drivers/thermal/st/st_thermal_memmap.c b/drivers/thermal/st/st_thermal_memmap.c
-index fc0c9e1..d53965d 100644
---- a/drivers/thermal/st/st_thermal_memmap.c
-+++ b/drivers/thermal/st/st_thermal_memmap.c
-@@ -15,10 +15,10 @@
- 
- #include "st_thermal.h"
- 
--#define STIH416_MPE_CONF			0x0
--#define STIH416_MPE_STATUS			0x4
--#define STIH416_MPE_INT_THRESH			0x8
--#define STIH416_MPE_INT_EN			0xC
-+#define CONF                       0x0
-+#define STATUS                     0x4
-+#define INT_THRESH                 0x8
-+#define INT_EN                     0xC
- 
- /* Power control bits for the memory mapped thermal sensor */
- #define THERMAL_PDN				BIT(4)
-@@ -31,11 +31,11 @@ static const struct reg_field st_mmap_thermal_regfields[MAX_REGFIELDS] = {
- 	 * written simultaneously for powering on and off the temperature
- 	 * sensor. regmap_update_bits() will be used to update the register.
- 	 */
--	[INT_THRESH_HI]	= REG_FIELD(STIH416_MPE_INT_THRESH, 	0,  7),
--	[DCORRECT]	= REG_FIELD(STIH416_MPE_CONF,		5,  9),
--	[OVERFLOW]	= REG_FIELD(STIH416_MPE_STATUS,		9,  9),
--	[DATA]		= REG_FIELD(STIH416_MPE_STATUS,		11, 18),
--	[INT_ENABLE]	= REG_FIELD(STIH416_MPE_INT_EN,		0,  0),
-+	[INT_THRESH_HI]	= REG_FIELD(INT_THRESH,		0,  7),
-+	[DCORRECT]	= REG_FIELD(CONF,		5,  9),
-+	[OVERFLOW]	= REG_FIELD(STATUS,		9,  9),
-+	[DATA]		= REG_FIELD(STATUS,		11, 18),
-+	[INT_ENABLE]	= REG_FIELD(INT_EN,		0,  0),
+diff --git a/drivers/watchdog/st_lpc_wdt.c b/drivers/watchdog/st_lpc_wdt.c
+index 14e9bad..e6100e4 100644
+--- a/drivers/watchdog/st_lpc_wdt.c
++++ b/drivers/watchdog/st_lpc_wdt.c
+@@ -52,27 +52,6 @@ struct st_wdog {
+ 	bool warm_reset;
  };
  
- static irqreturn_t st_mmap_thermal_trip_handler(int irq, void *sdata)
-@@ -54,7 +54,7 @@ static int st_mmap_power_ctrl(struct st_thermal_sensor *sensor,
- 	const unsigned int mask = (THERMAL_PDN | THERMAL_SRSTN);
- 	const unsigned int val = power_state ? mask : 0;
- 
--	return regmap_update_bits(sensor->regmap, STIH416_MPE_CONF, mask, val);
-+	return regmap_update_bits(sensor->regmap, CONF, mask, val);
- }
- 
- static int st_mmap_alloc_regfields(struct st_thermal_sensor *sensor)
-@@ -114,7 +114,7 @@ static int st_mmap_register_enable_irq(struct st_thermal_sensor *sensor)
- 	return st_mmap_enable_irq(sensor);
- }
- 
--static const struct regmap_config st_416mpe_regmap_config = {
-+static const struct regmap_config st_thermal_regmap_config = {
- 	.reg_bits = 32,
- 	.val_bits = 32,
- 	.reg_stride = 4,
-@@ -139,7 +139,7 @@ static int st_mmap_regmap_init(struct st_thermal_sensor *sensor)
- 	}
- 
- 	sensor->regmap = devm_regmap_init_mmio(dev, sensor->mmio_base,
--				&st_416mpe_regmap_config);
-+				&st_thermal_regmap_config);
- 	if (IS_ERR(sensor->regmap)) {
- 		dev_err(dev, "failed to initialise regmap\n");
- 		return PTR_ERR(sensor->regmap);
-@@ -156,15 +156,6 @@ static const struct st_thermal_sensor_ops st_mmap_sensor_ops = {
- 	.enable_irq		= st_mmap_enable_irq,
- };
- 
--/* Compatible device data stih416 mpe thermal sensor */
--static const struct st_thermal_compat_data st_416mpe_cdata = {
--	.reg_fields		= st_mmap_thermal_regfields,
--	.ops			= &st_mmap_sensor_ops,
--	.calibration_val	= 14,
--	.temp_adjust_val	= -95,
--	.crit_temp		= 120,
+-static struct st_wdog_syscfg stid127_syscfg = {
+-	.reset_type_reg		= 0x004,
+-	.reset_type_mask	= BIT(2),
+-	.enable_reg		= 0x000,
+-	.enable_mask		= BIT(2),
 -};
 -
- /* Compatible device data stih407 thermal sensor */
- static const struct st_thermal_compat_data st_407_cdata = {
- 	.reg_fields		= st_mmap_thermal_regfields,
-@@ -175,7 +166,6 @@ static const struct st_thermal_compat_data st_407_cdata = {
+-static struct st_wdog_syscfg stih415_syscfg = {
+-	.reset_type_reg		= 0x0B8,
+-	.reset_type_mask	= BIT(6),
+-	.enable_reg		= 0x0B4,
+-	.enable_mask		= BIT(7),
+-};
+-
+-static struct st_wdog_syscfg stih416_syscfg = {
+-	.reset_type_reg		= 0x88C,
+-	.reset_type_mask	= BIT(6),
+-	.enable_reg		= 0x888,
+-	.enable_mask		= BIT(7),
+-};
+-
+ static struct st_wdog_syscfg stih407_syscfg = {
+ 	.enable_reg		= 0x204,
+ 	.enable_mask		= BIT(19),
+@@ -83,18 +62,6 @@ static const struct of_device_id st_wdog_match[] = {
+ 		.compatible = "st,stih407-lpc",
+ 		.data = &stih407_syscfg,
+ 	},
+-	{
+-		.compatible = "st,stih416-lpc",
+-		.data = &stih416_syscfg,
+-	},
+-	{
+-		.compatible = "st,stih415-lpc",
+-		.data = &stih415_syscfg,
+-	},
+-	{
+-		.compatible = "st,stid127-lpc",
+-		.data = &stid127_syscfg,
+-	},
+ 	{},
  };
- 
- static const struct of_device_id st_mmap_thermal_of_match[] = {
--	{ .compatible = "st,stih416-mpe-thermal", .data = &st_416mpe_cdata },
- 	{ .compatible = "st,stih407-thermal",     .data = &st_407_cdata },
- 	{ /* sentinel */ }
- };
+ MODULE_DEVICE_TABLE(of, st_wdog_match);
 -- 
 1.9.1
