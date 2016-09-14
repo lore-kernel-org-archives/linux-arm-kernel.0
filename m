@@ -1,58 +1,352 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 14 Sep 2016 20:07:54 +0200
-Subject: [GIT PULL] Greybus driver subsystem for 4.9-rc1
-In-Reply-To: <20160914173625.GB15356@leverpostej>
-References: <20160914100949.GA6179@kroah.com>
- <20160914173625.GB15356@leverpostej>
-Message-ID: <20160914180754.GA16053@kroah.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 14 Sep 2016 19:09:33 +0100
+Subject: [PATCH v26 2/7] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <20160907042908.6232-3-takahiro.akashi@linaro.org>
+References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
+ <20160907042908.6232-3-takahiro.akashi@linaro.org>
+Message-ID: <57D9925D.5000508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 06:36:26PM +0100, Mark Rutland wrote:
-> Hi Greg,
+Hi Akashi,
+
+(CC: Marc who knows how this irqchip wizardry works
+ Cover letter: https://www.spinics.net/lists/arm-kernel/msg529520.html )
+
+On 07/09/16 05:29, AKASHI Takahiro wrote:
+> Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
+> and save registers' status in per-cpu ELF notes before starting crash
+> dump kernel. See kernel_kexec().
+> Even if not all secondary cpus have shut down, we do kdump anyway.
 > 
-> On Wed, Sep 14, 2016 at 12:09:49PM +0200, Greg KH wrote:
-> > Given that it's never a good idea to keep subsystems out of the mainline
-> > kernel, I've put together this pull request that adds the greybus driver
-> > layer to drivers/greybus/.  Because this was 2 1/2 years of work, with
-> > many many developers contributing, I didn't want to flatten all of their
-> > effort into a few small patches, as that wouldn't be very fair.  So I've
-> > built a git tree with all of the changes going back to the first commit,
-> > and merged it into the kernel tree, just like btrfs was merged into the
-> > kernel.
+> As we don't have to make non-boot(crashed) cpus offline (to preserve
+> correct status of cpus at crash dump) before shutting down, this patch
+> also adds a variant of smp_send_stop().
 > 
-> > Unless people point out some major problems with this, I'd like to get
-> > it merged into 4.9-rc1.
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/include/asm/hardirq.h  |  2 +-
+>  arch/arm64/include/asm/kexec.h    | 41 ++++++++++++++++++++++++-
+>  arch/arm64/include/asm/smp.h      |  2 ++
+>  arch/arm64/kernel/machine_kexec.c | 56 ++++++++++++++++++++++++++++++++--
+>  arch/arm64/kernel/smp.c           | 63 +++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 159 insertions(+), 5 deletions(-)
 > 
-> I'm extremely concerned that these patches have *never* seen upstream
-> review, and this pull request gives no real opportunity for people to
-> make a judgement regarding the code, as many relevant parties have not
-> been Cc'd.
+> diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+> index 8740297..1473fc2 100644
+> --- a/arch/arm64/include/asm/hardirq.h
+> +++ b/arch/arm64/include/asm/hardirq.h
+> @@ -20,7 +20,7 @@
+>  #include <linux/threads.h>
+>  #include <asm/irq.h>
+>  
+> -#define NR_IPI	6
+> +#define NR_IPI	7
+>  
+>  typedef struct {
+>  	unsigned int __softirq_pending;
+> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+> index 04744dc..a908958 100644
+> --- a/arch/arm64/include/asm/kexec.h
+> +++ b/arch/arm64/include/asm/kexec.h
+> @@ -40,7 +40,46 @@
+>  static inline void crash_setup_regs(struct pt_regs *newregs,
+>  				    struct pt_regs *oldregs)
+>  {
+> -	/* Empty routine needed to avoid build errors. */
+> +	if (oldregs) {
+> +		memcpy(newregs, oldregs, sizeof(*newregs));
+> +	} else {
+> +		u64 tmp1, tmp2;
+> +
+> +		__asm__ __volatile__ (
+> +			"stp	 x0,   x1, [%2, #16 *  0]\n"
+> +			"stp	 x2,   x3, [%2, #16 *  1]\n"
+> +			"stp	 x4,   x5, [%2, #16 *  2]\n"
+> +			"stp	 x6,   x7, [%2, #16 *  3]\n"
+> +			"stp	 x8,   x9, [%2, #16 *  4]\n"
+> +			"stp	x10,  x11, [%2, #16 *  5]\n"
+> +			"stp	x12,  x13, [%2, #16 *  6]\n"
+> +			"stp	x14,  x15, [%2, #16 *  7]\n"
+> +			"stp	x16,  x17, [%2, #16 *  8]\n"
+> +			"stp	x18,  x19, [%2, #16 *  9]\n"
+> +			"stp	x20,  x21, [%2, #16 * 10]\n"
+> +			"stp	x22,  x23, [%2, #16 * 11]\n"
+> +			"stp	x24,  x25, [%2, #16 * 12]\n"
+> +			"stp	x26,  x27, [%2, #16 * 13]\n"
+> +			"stp	x28,  x29, [%2, #16 * 14]\n"
+> +			"mov	 %0,  sp\n"
+> +			"stp	x30,  %0,  [%2, #16 * 15]\n"
+> +
+> +			"/* faked current PSTATE */\n"
+> +			"mrs	 %0, CurrentEL\n"
+> +			"mrs	 %1, DAIF\n"
+> +			"orr	 %0, %0, %1\n"
+> +			"mrs	 %1, NZCV\n"
+> +			"orr	 %0, %0, %1\n"
+> +
 
-As I said, I will send a set of simple patches, I wanted to get this out
-as soon as possible and other things came up today.  Will do it in the
-morning, sorry.
+What about SPSEL? While we don't use it, it is correctly preserved for
+everything except a CPU that calls panic()...
 
-> From a quick scan of the git tree, I can see code (that isn't even
-> placed under staging/) for which I have fundamental objections to as a
-> maintainer, and has not been Cc'd to a relevant list.
+
+> +			/* pc */
+> +			"adr	 %1, 1f\n"
+> +		"1:\n"
+> +			"stp	 %1, %0,   [%2, #16 * 16]\n"
+> +			: "=r" (tmp1), "=r" (tmp2), "+r" (newregs)
+> +			:
+> +			: "memory"
+> +		);
+> +	}
+>  }
+>  
+>  #endif /* __ASSEMBLY__ */
+> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+> index 0226447..6b0f2c7 100644
+> --- a/arch/arm64/include/asm/smp.h
+> +++ b/arch/arm64/include/asm/smp.h
+> @@ -136,6 +136,8 @@ static inline void cpu_panic_kernel(void)
+>   */
+>  bool cpus_are_stuck_in_kernel(void);
+>  
+> +extern void smp_send_crash_stop(void);
+> +
+>  #endif /* ifndef __ASSEMBLY__ */
+>  
+>  #endif /* ifndef __ASM_SMP_H */
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> index bc96c8a..8ac9dba8 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -9,6 +9,9 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/kernel.h>
+>  #include <linux/kexec.h>
+>  #include <linux/smp.h>
+>  
+> @@ -22,6 +25,7 @@
+>  extern const unsigned char arm64_relocate_new_kernel[];
+>  extern const unsigned long arm64_relocate_new_kernel_size;
+>  
+> +bool in_crash_kexec;
+
+static?
+
+
+>  static unsigned long kimage_start;
+>  
+>  /**
+> @@ -148,7 +152,8 @@ void machine_kexec(struct kimage *kimage)
+>  	/*
+>  	 * New cpus may have become stuck_in_kernel after we loaded the image.
+>  	 */
+> -	BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
+> +	BUG_ON((cpus_are_stuck_in_kernel() || (num_online_cpus() > 1)) &&
+> +			!WARN_ON(in_crash_kexec));
+
+In the kdump case, num_online_cpus() is unchanged as ipi_cpu_crash_stop()
+doesn't update the online cpu masks, so this WARN_ON always fires. This is
+confusing as the 'failed to stop secondary CPUs' message doesn't appear, because
+those CPUs did stop, and waiting_for_crash_ipi has the expected value...
+
+
+>  
+>  	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
+>  	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+> @@ -200,13 +205,58 @@ void machine_kexec(struct kimage *kimage)
+>  	 * relocation is complete.
+>  	 */
+>  
+> -	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
+> +	cpu_soft_restart(!in_crash_kexec, reboot_code_buffer_phys, kimage->head,
+>  		kimage_start, 0);
+>  
+>  	BUG(); /* Should never get here. */
+>  }
+
+
+
+> +static void machine_kexec_mask_interrupts(void)
+> +{
+> +	unsigned int i;
+> +	struct irq_desc *desc;
+> +
+> +	for_each_irq_desc(i, desc) {
+> +		struct irq_chip *chip;
+> +		int ret;
+> +
+> +		chip = irq_desc_get_chip(desc);
+> +		if (!chip)
+> +			continue;
+> +
+> +		/*
+> +		 * First try to remove the active state. If this
+> +		 * fails, try to EOI the interrupt.
+> +		 */
+> +		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
+> +
+> +		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
+> +		    chip->irq_eoi)
+> +			chip->irq_eoi(&desc->irq_data);
+> +
+> +		if (chip->irq_mask)
+> +			chip->irq_mask(&desc->irq_data);
+> +
+> +		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
+> +			chip->irq_disable(&desc->irq_data);
+> +	}
+> +}
+
+This function is over my head ... I have no idea how this works, I can only
+comment that its different to the version under arch/arm
+
+/me adds Marc Z to CC.
+
+
+> +/**
+> + * machine_crash_shutdown - shutdown non-crashing cpus and save registers
+> + */
+>  void machine_crash_shutdown(struct pt_regs *regs)
+>  {
+> -	/* Empty routine needed to avoid build errors. */
+> +	local_irq_disable();
+> +
+> +	in_crash_kexec = true;
+> +
+> +	/* shutdown non-crashing cpus */
+> +	smp_send_crash_stop();
+> +
+> +	/* for crashing cpu */
+> +	crash_save_cpu(regs, smp_processor_id());
+> +	machine_kexec_mask_interrupts();
+> +
+> +	pr_info("Starting crashdump kernel...\n");
+>  }
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index d93d433..b401b25 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -37,6 +37,7 @@
+>  #include <linux/completion.h>
+>  #include <linux/of.h>
+>  #include <linux/irq_work.h>
+> +#include <linux/kexec.h>
+>  
+>  #include <asm/alternative.h>
+>  #include <asm/atomic.h>
+> @@ -71,6 +72,7 @@ enum ipi_msg_type {
+>  	IPI_RESCHEDULE,
+>  	IPI_CALL_FUNC,
+>  	IPI_CPU_STOP,
+> +	IPI_CPU_CRASH_STOP,
+>  	IPI_TIMER,
+>  	IPI_IRQ_WORK,
+>  	IPI_WAKEUP
+> @@ -734,6 +736,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
+>  	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
+>  	S(IPI_CALL_FUNC, "Function call interrupts"),
+>  	S(IPI_CPU_STOP, "CPU stop interrupts"),
+> +	S(IPI_CPU_CRASH_STOP, "CPU stop (for crash dump) interrupts"),
+>  	S(IPI_TIMER, "Timer broadcast interrupts"),
+>  	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+>  	S(IPI_WAKEUP, "CPU wake-up interrupts"),
+> @@ -808,6 +811,29 @@ static void ipi_cpu_stop(unsigned int cpu)
+>  		cpu_relax();
+>  }
+>  
+> +#ifdef CONFIG_KEXEC_CORE
+> +static atomic_t waiting_for_crash_ipi;
+> +#endif
+> +
+> +static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
+> +{
+> +#ifdef CONFIG_KEXEC_CORE
+> +	crash_save_cpu(regs, cpu);
+> +
+> +	atomic_dec(&waiting_for_crash_ipi);
+> +
+> +	local_irq_disable();
+> +
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +	if (cpu_ops[cpu]->cpu_die)
+> +		cpu_ops[cpu]->cpu_die(cpu);
+> +#endif
+> +
+> +	/* just in case */
+> +	cpu_park_loop();
+> +#endif
+> +}
+> +
+>  /*
+>   * Main handler for inter-processor interrupts
+>   */
+> @@ -838,6 +864,15 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+>  		irq_exit();
+>  		break;
+>  
+> +	case IPI_CPU_CRASH_STOP:
+> +		if (IS_ENABLED(CONFIG_KEXEC_CORE)) {
+> +			irq_enter();
+> +			ipi_cpu_crash_stop(cpu, regs);
+> +
+> +			unreachable();
+> +		}
+> +		break;
+> +
+>  #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+>  	case IPI_TIMER:
+>  		irq_enter();
+> @@ -910,6 +945,34 @@ void smp_send_stop(void)
+>  			   cpumask_pr_args(cpu_online_mask));
+>  }
+>  
+> +#ifdef CONFIG_KEXEC_CORE
+> +void smp_send_crash_stop(void)
+> +{
+> +	cpumask_t mask;
+> +	unsigned long timeout;
+> +
+> +	if (num_online_cpus() == 1)
+> +		return;
+> +
+> +	cpumask_copy(&mask, cpu_online_mask);
+> +	cpumask_clear_cpu(smp_processor_id(), &mask);
+> +
+> +	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
+> +
+> +	pr_crit("SMP: stopping secondary CPUs\n");
+> +	smp_cross_call(&mask, IPI_CPU_CRASH_STOP);
+> +
+> +	/* Wait up to one second for other CPUs to stop */
+> +	timeout = USEC_PER_SEC;
+> +	while ((atomic_read(&waiting_for_crash_ipi) > 0) && timeout--)
+> +		udelay(1);
+> +
+> +	if (atomic_read(&waiting_for_crash_ipi) > 0)
+> +		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
+> +			   cpumask_pr_args(cpu_online_mask));
+> +}
+> +#endif
+
+This is very similar to smp_send_stop() which also has the timeout. Is it
+possible to merge them? You could use in_crash_kexec to choose the IPI type.
+
+
+> +
+>  /*
+>   * not supported here
+>   */
 > 
-> For example, I see commit 5a450477311fbfe2 ("greybus: timesync: Add
-> timesync core driver"). This states that it directly accesses the ARMv7
-> architected timer, though it's unclear as to precisely what it's doing
-> since it introduces an (undocumented) compatible string, and what should
-> be an unnecessary devicetree property.
-> 
-> That's never gone to the linux-arm-kernel mainline list, myself or Marc
-> (as maintainers of the arch timer driver), nor has the binding seen any
-> review on the devicetree mailing list.
 
-Hm, odd, I thought we had Rob review all of the device tree bindings,
-but maybe the timesync stuff missed him.  And timesync is "odd" to say
-the least, wait until you see the firmware side of it :)
 
-Let me post the patches tomorrow and then we can review them.
+Reviewed-by: James Morse <james.morse@arm.com>
 
-thanks,
 
-greg k-h
+Thanks,
+
+James
