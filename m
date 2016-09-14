@@ -1,37 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 14 Sep 2016 10:52:39 +0200
-Subject: [PATCH 18/33] pcmcia: sa1100: provide generic CF support
-In-Reply-To: <E1beJl3-0000nS-Nw@rmk-PC.armlinux.org.uk>
-References: <20160829102328.GA28796@n2100.armlinux.org.uk>
- <E1beJl3-0000nS-Nw@rmk-PC.armlinux.org.uk>
-Message-ID: <CACRpkda7qHx4JVdVv+q3=twTup9rDD2ke8K-tSH9CkhZMQqemg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Sep 2016 09:52:29 +0100
+Subject: [PATCH v3 3/7] arm64: Introduce uaccess_{disable,enable}
+ functionality based on TTBR0_EL1
+In-Reply-To: <CAGXu5jJETdRtuonhtkSxMf+sgCdBj2t2_U8yW2cDwcoGY=qvJw@mail.gmail.com>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+ <1473788797-10879-4-git-send-email-catalin.marinas@arm.com>
+ <CAGXu5jJETdRtuonhtkSxMf+sgCdBj2t2_U8yW2cDwcoGY=qvJw@mail.gmail.com>
+Message-ID: <20160914085159.GA13121@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2016 at 12:25 PM, Russell King
-<rmk+kernel@armlinux.org.uk> wrote:
+On Tue, Sep 13, 2016 at 01:45:21PM -0700, Kees Cook wrote:
+> On Tue, Sep 13, 2016 at 10:46 AM, Catalin Marinas
+> > +static inline bool system_uses_ttbr0_pan(void)
+> > +{
+> > +       return IS_ENABLED(CONFIG_ARM64_SW_TTBR0_PAN) &&
+> > +               !cpus_have_cap(ARM64_HAS_PAN);
+> > +}
+> > +
 
-> Provide generic non-voltage sensing socket support for StrongARM
-> platforms using the gpiolib and regulator subsystems to obtain the
-> resources to control the socket.
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-(...)
+[...]
 
-> +static int sa11x0_drv_pcmcia_probe(struct platform_device *pdev)
-> +{
-> +       struct soc_pcmcia_socket *skt;
-> +       struct device *dev = &pdev->dev;
-> +
-> +       if (dev->id == -1)
-> +               return sa11x0_drv_pcmcia_legacy_probe(pdev);
+> >  #define __uaccess_enable(alt)                                          \
+> >  do {                                                                   \
+> > -       asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,                  \
+> > -                       CONFIG_ARM64_PAN));                             \
+> > +       if (system_uses_ttbr0_pan())                                    \
+> > +               uaccess_ttbr0_enable();                                 \
+> > +       else                                                            \
+> > +               asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), alt,          \
+> > +                               CONFIG_ARM64_PAN));                     \
+> >  } while (0)
+> 
+> Does this mean that with CONFIG_ARM64_SW_TTBR0_PAN, even with ARMv8.1,
+> a cpu capability bitmask check is done each time we go through
+> __uaccess_{en,dis}able?
 
-There is a typo there, it should be pdev->id rather than dev->id.
+Catalin reworked cpus_have_cap() to use static keys [1], and that's
+queued in the arm64 for-next/core branch [2].
 
-After fixing this, my legacy h3600 PCMCIA started probing again.
+So this should expand to a single branch or nop that we patch when we
+detect the presence/absence of PAN. There should be no bitmap check.
 
-(It revealed another bug in fetching GPIOs but it is an orthogobal
-problem altogether, looking into it.)
+Thanks,
+Mark.
 
-Yours,
-Linus Walleij
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/454025.html
+[2] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
