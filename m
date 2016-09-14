@@ -1,70 +1,77 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 14 Sep 2016 15:05:55 +0200
-Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
- support
-In-Reply-To: <alpine.DEB.2.20.1609141103420.6233@nanos>
-References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
- <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
- <alpine.DEB.2.20.1609131713490.6233@nanos>
- <6941f61d-0b33-4108-0135-b11887cd0488@st.com>
- <alpine.DEB.2.20.1609141103420.6233@nanos>
-Message-ID: <facd1c7c-d696-eae1-02e4-5a0c9285add0@st.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Wed, 14 Sep 2016 15:15:22 +0200
+Subject: [GIT PULL] STi DT update for v4.9
+Message-ID: <ede2d2b6-7e0c-f31e-72bd-06aae5838327@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Arnd, Kevin, Olof
 
-On 09/14/2016 11:19 AM, Thomas Gleixner wrote:
-> On Tue, 13 Sep 2016, Alexandre Torgue wrote:
->> On 09/13/2016 05:21 PM, Thomas Gleixner wrote:
->>> On Fri, 9 Sep 2016, Alexandre TORGUE wrote:
->>>> +static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
->>>> +			    unsigned int nr_irqs)
->>>> +{
->>>> +	struct irq_data *data = irq_get_irq_data(virq);
->>>> +
->>>> +	irq_gc_mask_clr_bit(data->parent_data);
->>>
->>> I have a hard time to understand this. The irq domain is not hierarchical.
->>
->> Actually, I wanted to test ".free" callback function of gpio_irq_domain in
->> STM32 pinctrl driver. To do that I modified gpio driver: just after getting
->> virq through gpio_to_irq, I called "irq_dispose_mapping(virq)".
->> I know it is dirty but I thought it was the only way to test.
->>
->> Doing that, I see that ".free" callback of gpio domain is called but as it is
->> hirerchical ".free" callback for parent domain (exti one) is also called. I
->> observed that virq was well unmapped, but not masked at exti level. It is for
->> this reason than I added "irq_gc_mask_clr_bit(data->parent_data);" which mask
->> interrupt at exti level.
->
-> Aargh. I really misread the patch, but this is entirely non obvious and you
-> should do:
->
->        struct irq_data *data = irq_domain_get_irq_data(d, virq);
->
->        irq_gc_mask_clr_bit(d);
->
-> Then it is entirely clear that you mask the interrupt of _this_ (the exti)
-> domain.
+PLease consider this next batch for v4.9
 
-Ok, it's easier to understand like that.
+The following changes since commit ba5ba11906d5462993f5fd4e3da4d234505427a0:
 
->
-> Now what really bugs me is that you do that at all. An interrupt which is
-> freed must be masked already. Why is it unmasked in the first place?
+  ARM: dts: STiH41x-b2020: Update gpio specifier (2016-09-02 15:15:14 +0200)
 
-Honestly I don't know. When "devm_free_irq" is called to release virq, 
-there is no issue and interrupt is well masked. But, when I tried to use
-"irq_dispose_mapping(virq)" I observed that .free is called (child and 
-parent domain) but interrupt is not masked.
+are available in the git repository at:
 
-Regards
+  git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-dt-for-v4.9-2
 
-Alex
+for you to fetch changes up to 443fd7c92f5a000796b02683157d17b2575450e1:
 
->
-> Thanks,
->
-> 	tglx
->
+  ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi audio card (2016-09-14 13:37:29 +0200)
+
+----------------------------------------------------------------
+STi dts update:
+
+Update gpio-cells and gpio specifier for STiH415/416
+Add PWM capture support for STiH416 and STiH407 family
+Add USB3 support for B2260
+Add HVA support for STiH410
+Add clk_ignore_unused in bootargs of B2260
+Add Flexible Direct Memory Access (FDMA) support for STiH407 family
+Add internal audio codec IP spport for STiH407 family
+Add uniperif player/reader IP blocks for STiH407 family
+
+----------------------------------------------------------------
+Jean-Christophe Trotin (1):
+      ARM: dts: STiH410: Add hva dt nodes
+
+Lee Jones (6):
+      ARM: dts: STiH407: Supply PWM Capture IRQ
+      ARM: dts: STiH407: Declare PWM Capture data lines via Pinctrl
+      ARM: dts: STiH416: Supply PWM Capture IRQs
+      ARM: dts: STiH416: Declare PWM Capture data lines via Pinctrl
+      ARM: dts: STiH416: Define PWM Capture clock
+      ARM: dts: STiH416: Define the number of PWM Capture channels
+
+Patrice Chotard (7):
+      ARM: dts: STiH415-pinctrl: update gpio-cells to 2
+      ARM: dts: STiH416-pinctrl: update gpio-cells to 2
+      ARM: dts: STiHxxx-b2120: update gpio specifier
+      ARM: dts: STiH41x-b2000: update gpio specifier
+      ARM: dts: STiH416-b2020e: update gpio specifier
+      ARM: dts: STiH410-b2260: add USB3 node
+      ARM: dts: STiH410-b2260: add clk_ignore_unused in bootargs
+
+Peter Griffin (8):
+      ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
+      ARM: DT: STiH407: Add i2s_out pinctrl configuration
+      ARM: DT: STiH407: Add i2s_in pinctrl configuration
+      ARM: DT: STiH407: Add spdif_out pinctrl config
+      ARM: STi: DT: STiH407: Add sti-sasg-codec dt node
+      ARM: STi: DT: STiH407: Add uniperif player dt nodes
+      ARM: STi: DT: STiH407: Add uniperif reader dt nodes
+      ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi audio card
+
+ arch/arm/boot/dts/stih407-family.dtsi  | 168 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih407-pinctrl.dtsi |  58 ++++++++++++
+ arch/arm/boot/dts/stih410-b2260.dts    |   6 +-
+ arch/arm/boot/dts/stih410.dtsi         |  10 ++
+ arch/arm/boot/dts/stih415-pinctrl.dtsi |  54 +++++------
+ arch/arm/boot/dts/stih416-b2020e.dts   |   6 +-
+ arch/arm/boot/dts/stih416-pinctrl.dtsi |  65 +++++++------
+ arch/arm/boot/dts/stih416.dtsi         |   8 +-
+ arch/arm/boot/dts/stih41x-b2000.dtsi   |   5 +-
+ arch/arm/boot/dts/stihxxx-b2120.dtsi   |  51 +++++++++-
+ 10 files changed, 362 insertions(+), 69 deletions(-)
