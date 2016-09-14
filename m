@@ -1,80 +1,130 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 14 Sep 2016 15:57:17 -0500
-Subject: [PATCH 3/3] Revert "ARM: dts: dra7: Move to operating-points-v2 table"
+Date: Wed, 14 Sep 2016 15:57:16 -0500
+Subject: [PATCH 2/3] Revert "ARM: dts: am33xx: Move to operating-points-v2
+ table and ti-cpufreq driver"
 In-Reply-To: <20160914205717.21975-1-d-gerlach@ti.com>
 References: <20160914205717.21975-1-d-gerlach@ti.com>
-Message-ID: <20160914205717.21975-4-d-gerlach@ti.com>
+Message-ID: <20160914205717.21975-3-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit f80bc97fd0a9711ef11bdb3e63c2c01115a82c47.
+This reverts commit 4317be1162108bcdf50dc53dfb48eac94dcff25c.
 
 The original commit updated the cpufreq operating points tables for
-dra7xx but was merged before the driver making use of the node was
+am33xx but was merged before the driver making use of the node was
 merged, which breaks the existing cpufreq implementation on the system,
 so revert the patch until the ti-cpufreq driver is merged.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi   | 26 +++++---------------------
- arch/arm/boot/dts/dra74x.dtsi |  1 -
- 2 files changed, 5 insertions(+), 22 deletions(-)
+ arch/arm/boot/dts/am33xx.dtsi | 88 +++++++------------------------------------
+ 1 file changed, 13 insertions(+), 75 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index d9bfb94a2992..a0fbbf18d50c 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -82,9 +82,11 @@
- 			compatible = "arm,cortex-a15";
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 98748c61ed99..9e214bfd32d2 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -45,9 +45,19 @@
+ 			device_type = "cpu";
  			reg = <0>;
  
 -			operating-points-v2 = <&cpu0_opp_table>;
--			ti,syscon-efuse = <&scm_wkup 0x20c 0xf80000 19>;
--			ti,syscon-rev = <&scm_wkup 0x204>;
+-			ti,syscon-efuse = <&scm_conf 0x7fc 0x1fff 0>;
+-			ti,syscon-rev = <&scm_conf 0x600>;
++			/*
++			 * To consider voltage drop between PMIC and SoC,
++			 * tolerance value is reduced to 2% from 4% and
++			 * voltage value is increased as a precaution.
++			 */
 +			operating-points = <
 +				/* kHz    uV */
-+				1000000	1060000
-+				1176000	1160000
-+				>;
++				720000  1285000
++				600000  1225000
++				500000  1125000
++				275000  1125000
++			>;
++			voltage-tolerance = <2>; /* 2 percentage */
  
  			clocks = <&dpll_mpu_ck>;
  			clock-names = "cpu";
-@@ -98,24 +100,6 @@
+@@ -56,78 +66,6 @@
  		};
  	};
  
 -	cpu0_opp_table: opp_table0 {
 -		compatible = "operating-points-v2";
--		opp-shared;
 -
--		opp_nom at 1000000000 {
--			opp-hz = /bits/ 64 <1000000000>;
--			opp-microvolt = <1060000 850000 1150000>;
--			opp-supported-hw = <0xFF 0x01>;
+-		/*
+-		 * The three following nodes are marked with opp-suspend
+-		 * because the can not be enabled simultaneously on a
+-		 * single SoC.
+-		 */
+-		opp50 at 300000000 {
+-			opp-hz = /bits/ 64 <300000000>;
+-			opp-microvolt = <950000 931000 969000>;
+-			opp-supported-hw = <0x06 0x0010>;
 -			opp-suspend;
 -		};
 -
--		opp_od at 1176000000 {
--			opp-hz = /bits/ 64 <1176000000>;
--			opp-microvolt = <1160000 885000 1160000>;
--			opp-supported-hw = <0xFF 0x02>;
+-		opp100 at 275000000 {
+-			opp-hz = /bits/ 64 <275000000>;
+-			opp-microvolt = <1100000 1078000 1122000>;
+-			opp-supported-hw = <0x01 0x00FF>;
+-			opp-suspend;
+-		};
+-
+-		opp100 at 300000000 {
+-			opp-hz = /bits/ 64 <300000000>;
+-			opp-microvolt = <1100000 1078000 1122000>;
+-			opp-supported-hw = <0x06 0x0020>;
+-			opp-suspend;
+-		};
+-
+-		opp100 at 500000000 {
+-			opp-hz = /bits/ 64 <500000000>;
+-			opp-microvolt = <1100000 1078000 1122000>;
+-			opp-supported-hw = <0x01 0xFFFF>;
+-		};
+-
+-		opp100 at 600000000 {
+-			opp-hz = /bits/ 64 <600000000>;
+-			opp-microvolt = <1100000 1078000 1122000>;
+-			opp-supported-hw = <0x06 0x0040>;
+-		};
+-
+-		opp120 at 600000000 {
+-			opp-hz = /bits/ 64 <600000000>;
+-			opp-microvolt = <1200000 1176000 1224000>;
+-			opp-supported-hw = <0x01 0xFFFF>;
+-		};
+-
+-		opp120 at 720000000 {
+-			opp-hz = /bits/ 64 <720000000>;
+-			opp-microvolt = <1200000 1176000 1224000>;
+-			opp-supported-hw = <0x06 0x0080>;
+-		};
+-
+-		oppturbo at 720000000 {
+-			opp-hz = /bits/ 64 <720000000>;
+-			opp-microvolt = <1260000 1234800 1285200>;
+-			opp-supported-hw = <0x01 0xFFFF>;
+-		};
+-
+-		oppturbo at 800000000 {
+-			opp-hz = /bits/ 64 <800000000>;
+-			opp-microvolt = <1260000 1234800 1285200>;
+-			opp-supported-hw = <0x06 0x0100>;
+-		};
+-
+-		oppnitro at 1000000000 {
+-			opp-hz = /bits/ 64 <1000000000>;
+-			opp-microvolt = <1325000 1298500 1351500>;
+-			opp-supported-hw = <0x04 0x0200>;
 -		};
 -	};
 -
- 	/*
- 	 * The soc node represents the soc top level view. It is used for IPs
- 	 * that are not memory mapped in the MPU view or for the MPU itself.
-diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
-index 8987b3e180a1..0a78347e6615 100644
---- a/arch/arm/boot/dts/dra74x.dtsi
-+++ b/arch/arm/boot/dts/dra74x.dtsi
-@@ -17,7 +17,6 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <1>;
--			operating-points-v2 = <&cpu0_opp_table>;
- 		};
- 	};
- 
+ 	pmu {
+ 		compatible = "arm,cortex-a8-pmu";
+ 		interrupts = <3>;
 -- 
 2.9.3
