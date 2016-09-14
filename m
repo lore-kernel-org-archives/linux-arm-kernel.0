@@ -1,68 +1,37 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Wed, 14 Sep 2016 14:01:28 +0200
-Subject: [PATCH v9 15/19] ARM: STi: DT: STiH407: Add uniperif reader dt
- nodes
-In-Reply-To: <1473081421-16555-16-git-send-email-peter.griffin@linaro.org>
-References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <1473081421-16555-16-git-send-email-peter.griffin@linaro.org>
-Message-ID: <71053640-c050-7875-2a3c-a6206864beb0@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 14 Sep 2016 14:07:22 +0200
+Subject: [PATCH V2 3/4] ARM64 LPC: support serial based on low-pin-count
+In-Reply-To: <57D93921.50303@hisilicon.com>
+References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
+ <2531252.L41vzyMSKX@wuerfel> <57D93921.50303@hisilicon.com>
+Message-ID: <13406676.rztgqQLiFa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter
+On Wednesday, September 14, 2016 7:48:49 PM CEST zhichang.yuan wrote:
+> On 2016/9/8 17:58, Arnd Bergmann wrote:
+> > On Thursday, September 8, 2016 5:51:25 PM CEST zhichang wrote:
+> >> On 2016?09?07? 22:50, Arnd Bergmann wrote:
+> >>> On Wednesday, September 7, 2016 9:33:52 PM CEST Zhichang Yuan wrote:
+> >>>> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
+> >>>>
+> >>>> On Hip06 platform, a 16550 compatible UART is connected to low-pin-count and
+> >>>> controlled through the LPC I/O cycles. This patch drives the UART port with
+> >>>> the specific serial in/out function pair based on the indirect-IO mechanism
+> >>>> introduced by Hip06 LPC driver.
+> >>>>
+> >>>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+> >>>
+> >>> Any reason this cannot just use the regular drivers/tty/serial/8250/8250_of.c
+> >>> driver?
+> >> I think two reasons for that:
+> >> 1. 8250_of.c is only for devicetree, but we need to support ACPI device too;
+> > 
+> > ACPI has its own way of describing serial ports, use that instead.
+> Could you give me some info about ACPI serial ports?
+> I found there is _CRS specific for serial, but it seems no serial driver use that.
 
-On 09/05/2016 03:16 PM, Peter Griffin wrote:
-> This patch adds the DT node for the uniperif reader
-> IP block found on STiH407 family silicon.
-> 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/boot/dts/stih407-family.dtsi | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index 1edc36c..883019a 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -960,5 +960,33 @@
->  
->  			status = "disabled";
->  		};
-> +
-> +		sti_uni_reader0: sti-uni-reader at 8d83000 {
-> +			compatible = "st,sti-uni-reader";
-> +			#sound-dai-cells = <0>;
-> +			st,syscfg = <&syscfg_core>;
-> +			reg = <0x8d83000 0x158>;
-> +			interrupts = <GIC_SPI 87 IRQ_TYPE_NONE>;
-> +			dmas = <&fdma0 5 0 1>;
-> +			dma-names = "rx";
-> +			dai-name = "Uni Reader #0 (PCM IN)";
-> +			st,version = <3>;
-> +
-> +			status = "disabled";
-> +		};
-> +
-> +		sti_uni_reader1: sti-uni-reader at 8d84000 {
-> +			compatible = "st,sti-uni-reader";
-> +			#sound-dai-cells = <0>;
-> +			st,syscfg = <&syscfg_core>;
-> +			reg = <0x8d84000 0x158>;
-> +			interrupts = <GIC_SPI 88 IRQ_TYPE_NONE>;
-> +			dmas = <&fdma0 6 0 1>;
-> +			dma-names = "rx";
-> +			dai-name = "Uni Reader #1 (HDMI RX)";
-> +			st,version = <3>;
-> +
-> +			status = "disabled";
-> +		};
->  	};
->  };
-> 
+drivers/tty/serial/8250/8250_dw.c is a driver that uses ACPI matching,
+and possibly drivers/tty/serial/8250/8250_pnp.c could work as well.
 
-
-
-Applied for STi next
-
-Thanks
+	Arnd
