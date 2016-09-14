@@ -1,82 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 14 Sep 2016 13:37:10 +0200
-Subject: [PATCH v5 02/16] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <87h99i6b5d.fsf@arm.com>
-References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
- <1472242678-33700-3-git-send-email-lina.iyer@linaro.org>
- <0b233802-f459-c6bb-ff42-70745a225cfb@arm.com>
- <20160902201605.GA1705@linaro.org> <87sht59mcw.fsf@arm.com>
- <20160912161600.GA21885@linaro.org>
- <a4fc71ae-6fa5-4142-6dd4-7bc96eb20186@arm.com>
- <87intz665i.fsf@arm.com> <20160913193844.GB28944@linaro.org>
- <87h99i6b5d.fsf@arm.com>
-Message-ID: <CAPDyKFrrOjNv1a7VzT9_KWEBDmbE7dnC3RUtg6r+QEbCsbXh9A@mail.gmail.com>
+From: yuanzhichang@hisilicon.com (zhichang.yuan)
+Date: Wed, 14 Sep 2016 19:48:49 +0800
+Subject: [PATCH V2 3/4] ARM64 LPC: support serial based on low-pin-count
+In-Reply-To: <2531252.L41vzyMSKX@wuerfel>
+References: <1473255233-154297-1-git-send-email-yuanzhichang@hisilicon.com>
+ <5345060.9D0B4ujt5e@wuerfel> <57D1349D.8070905@gmail.com>
+ <2531252.L41vzyMSKX@wuerfel>
+Message-ID: <57D93921.50303@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
+
+On 2016/9/8 17:58, Arnd Bergmann wrote:
+> On Thursday, September 8, 2016 5:51:25 PM CEST zhichang wrote:
+>> On 2016?09?07? 22:50, Arnd Bergmann wrote:
+>>> On Wednesday, September 7, 2016 9:33:52 PM CEST Zhichang Yuan wrote:
+>>>> From: "zhichang.yuan" <yuanzhichang@hisilicon.com>
+>>>>
+>>>> On Hip06 platform, a 16550 compatible UART is connected to low-pin-count and
+>>>> controlled through the LPC I/O cycles. This patch drives the UART port with
+>>>> the specific serial in/out function pair based on the indirect-IO mechanism
+>>>> introduced by Hip06 LPC driver.
+>>>>
+>>>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
 >>>
->> Yes, you are right, I disagree with the definition of a domain around a
->> device.
+>>> Any reason this cannot just use the regular drivers/tty/serial/8250/8250_of.c
+>>> driver?
+>> I think two reasons for that:
+>> 1. 8250_of.c is only for devicetree, but we need to support ACPI device too;
+> 
+> ACPI has its own way of describing serial ports, use that instead.
+Could you give me some info about ACPI serial ports?
+I found there is _CRS specific for serial, but it seems no serial driver use that.
 
-To fill in, I agree with Lina (and Kevin).
+Thanks!
+Zhichang
 
->From my point of view, a domain is per definition containing resources
-which are shared among devices. Having one device per domain, does in
-general not make sense.
-
-> OK, great.
->> However, as long as you don't force SoC's to define devices in
->> the CPU PM domain to have their own virtual domains, I have no problem.
->> You are welcome to define it the way you want for Juno or any other
->> platform.
-> I don't think that's true; the bindings have to work the same way for
-> all platforms. If for Juno we put CPU idle state phandles in a
-> domain-idle-states property for per-CPU domains then, with the current
-> implementation, the CPU-level idle states would be duplicated between
-> cpuidle and the CPU PM domains.
->> I don't want that to be the forced and expected out of all
->> SoCs. All I am saying here is that the current implementation would
->> handle your case as well.
->
-> The current implementation certainly does cover the work I want to
-> do. The suggestion of per-device power domains for devices/CPUs with
-> their own idle states is simply intended to minimise the binding design,
-> since we'd no longer need cpu-idle-states or device-idle-states
-> (the latter was proposed elsewhere).
-
-I see your point, but IMHO that would be to simplify the description
-of the hardware. And I don't think it's sufficient to cover all
-existing cases.
-
->
-> I am fine with the bindings as they are implemented currently so long
-> as:
->
-> - The binding doc makes clear how idle state phandles should be split
->   between cpu-idle-states and domain-idle-states. It should make it
->   obvious that no phandle should ever appear in both properties. It
->   would even be worth briefly going over the backward-compatibility
->   implications (e.g. what happens with old-kernel/new-DT and
->   new-kernel/old-DT combos if a platform has OSI and PC support and we
->   move cluster-level idle state phandles out of cpu-idle-states and into
->   domai-idle-states).
->
-> - We have a reason against the definition of power domains as "a set of
->   devices bound by a common power (including idle) state", since that
->   definition would simplify the bindings. In my view, "nobody thinks
->   that's what a power domain is" _is_ a compelling reason, so if others
->   on the list get involved I'm convinced. I think I speak for Sudeep
->   here too.
->
-
->From a CPU point of view, I think it may very well be considered as
-any other device. Yes, we have treated them in a specific manner
-regarding the idle state definitions we currently have - and we can
-continue to do that.
-
-Although, in the long run, I think we needs something more flexible
-that can be used for domains and devices.
-
-Kind regards
-Uffe
+> 
+>> 2. It seems UPIO_PORT is not supported there.
+> 
+> Should be easy enough to add.
+> 
+> 	Arnd
+> 
+> .
+> 
