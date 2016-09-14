@@ -1,168 +1,91 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 14 Sep 2016 22:21:18 +0800
-Subject: [RFC PATCH v2 10/11] irqchip: mbigen: Add ACPI support
+Date: Wed, 14 Sep 2016 22:21:12 +0800
+Subject: [RFC PATCH v2 04/11] irqchip: gicv3-its: platform-msi: scan MADT to
+ create platform msi domain
 In-Reply-To: <1473862879-7769-1-git-send-email-guohanjun@huawei.com>
 References: <1473862879-7769-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1473862879-7769-11-git-send-email-guohanjun@huawei.com>
+Message-ID: <1473862879-7769-5-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-With the preparation of platform msi support and interrupt producer
-in DSDT, we can add mbigen ACPI support now.
+With the introduction of its_pmsi_init_one(), we can add some code
+on top for ACPI support of platform MSI.
 
-We are using _PRS methd to indicate number of irq pins instead
-of num_pins in DT.
-
-For mbi-gen,
-    Device(MBI0) {
-          Name(_HID, "HISI0152")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                  Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-          })
-
-          Name (_PRS, ResourceTemplate() {
-		  Interrupt(ResourceProducer,...) {12,14,....}
-          })
-    }
-
-For devices,
-
-   Device(COM0) {
-          Name(_HID, "ACPIIDxx")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                 Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
-		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
-          })
-    }
-
-With the helpe of platform msi and interrupt producer, then devices
-will get the virq from mbi-gen's irqdomain.
+We are scanning the MADT table to get the ITS entry(ies), then use
+the information to create the platform msi domain for devices connect
+to it, just like the PCI MSI for ITS did.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ma Jun <majun258@huawei.com>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 67 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 37 +++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index 9484ea0..ca6add1 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -16,6 +16,7 @@
+diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+index a80ecd7..e9dade9 100644
+--- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+@@ -15,6 +15,7 @@
   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
   */
  
 +#include <linux/acpi.h>
- #include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/module.h>
-@@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
- 				    unsigned long *hwirq,
- 				    unsigned int *type)
- {
--	if (is_of_node(fwspec->fwnode)) {
-+	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
- 		if (fwspec->param_count != 2)
- 			return -EINVAL;
- 
-@@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
+ #include <linux/device.h>
+ #include <linux/acpi_iort.h>
+ #include <linux/msi.h>
+@@ -105,6 +106,41 @@ static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
  	return 0;
  }
  
 +#ifdef CONFIG_ACPI
-+static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
-+					     void *context)
++static int __init
++its_pmsi_parse_madt(struct acpi_subtable_header *header,
++			const unsigned long end)
 +{
-+	struct acpi_resource_extended_irq *ext_irq;
-+	u32 *num_irqs = context;
++	struct acpi_madt_generic_translator *its_entry;
++	struct fwnode_handle *domain_handle;
++	const char *node_name;
++	int err = -ENXIO;
 +
-+	switch (ares->type) {
-+	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-+		ext_irq = &ares->data.extended_irq;
-+		*num_irqs += ext_irq->interrupt_count;
-+		break;
-+	default:
-+		break;
++	its_entry = (struct acpi_madt_generic_translator *)header;
++	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
++			      (long)its_entry->base_address);
++	domain_handle = iort_find_domain_token(its_entry->translation_id);
++	if (!domain_handle) {
++		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
++		goto out;
 +	}
 +
-+	return AE_OK;
++	err = its_pmsi_init_one(domain_handle, node_name);
++
++out:
++	kfree(node_name);
++	return err;
 +}
 +
-+static int mbigen_acpi_create_domain(struct platform_device *pdev,
-+				     struct mbigen_device *mgn_chip)
++static void __init its_acpi_pmsi_init(void)
 +{
-+	struct irq_domain *domain;
-+	u32 num_msis = 0;
-+	acpi_status status;
-+
-+	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__PRS,
-+				     mbigen_acpi_process_resource, &num_msis);
-+        if (ACPI_FAILURE(status) || num_msis == 0)
-+		return -EINVAL;
-+
-+	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
-+						   mbigen_write_msg,
-+						   &mbigen_domain_ops,
-+						   mgn_chip);
-+	if (!domain)
-+		return -ENOMEM;
-+
-+	return 0;
++	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
++			      its_pmsi_parse_madt, 0);
 +}
 +#else
-+static int mbigen_acpi_create_domain(struct platform_device *pdev,
-+				     struct mbigen_device *mgn_chip)
-+{
-+	return -ENODEV;
-+}
++static inline void its_acpi_pmsi_init(void) { }
 +#endif
 +
- static int mbigen_device_probe(struct platform_device *pdev)
+ static void __init its_pmsi_of_init(void)
  {
- 	struct mbigen_device *mgn_chip;
-@@ -288,9 +337,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
- 	if (IS_ERR(mgn_chip->base))
- 		return PTR_ERR(mgn_chip->base);
- 
--	err = mbigen_of_create_domain(pdev, mgn_chip);
--	if (err)
-+	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-+		err = mbigen_of_create_domain(pdev, mgn_chip);
-+	else if (ACPI_COMPANION(&pdev->dev))
-+		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-+	else
-+		err = -EINVAL;
-+
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
- 		return err;
-+	}
- 
- 	platform_set_drvdata(pdev, mgn_chip);
+ 	struct device_node *np;
+@@ -121,6 +157,7 @@ static void __init its_pmsi_of_init(void)
+ static int __init its_pmsi_init(void)
+ {
+ 	its_pmsi_of_init();
++	its_acpi_pmsi_init();
  	return 0;
-@@ -302,10 +359,17 @@ static const struct of_device_id mbigen_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, mbigen_of_match);
- 
-+static const struct acpi_device_id mbigen_acpi_match[] = {
-+        { "HISI0152", 0 },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-+
- static struct platform_driver mbigen_platform_driver = {
- 	.driver = {
- 		.name		= "Hisilicon MBIGEN-V2",
- 		.of_match_table	= mbigen_of_match,
-+		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
- 	},
- 	.probe			= mbigen_device_probe,
- };
+ }
+ early_initcall(its_pmsi_init);
 -- 
 1.7.12.4
