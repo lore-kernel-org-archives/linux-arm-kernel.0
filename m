@@ -1,18 +1,17 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Sep 2016 17:17:13 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.9 (#1)
-In-Reply-To: <87h99vzmhi.fsf@free-electrons.com>
-References: <87h99vzmhi.fsf@free-electrons.com>
-Message-ID: <2474636.4s87rE1o0I@wuerfel>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 14 Sep 2016 08:18:18 -0700
+Subject: [PATCH] pintctrl: amlogic: gxbb: add i2c pins
+In-Reply-To: <1473846328-17339-1-git-send-email-jbrunet@baylibre.com> (Jerome
+ Brunet's message of "Wed, 14 Sep 2016 11:45:28 +0200")
+References: <1473846328-17339-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <7hvaxymrwl.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, September 4, 2016 5:57:29 PM CEST Gregory CLEMENT wrote:
-> mvebu dt64 for 4.9 (part 1)
-> 
-> - add description for the new Armada 8040 dev board
-> - add the PIC and PMU on Armada 7K/8K
-> 
-Pulled into next/dt64, thanks
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-	Arnd
+> Add EE domains pins for the i2c devices A,B,C
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+
+Acked-by: Kevin Hilman <khilman@baylibre.com>
