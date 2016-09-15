@@ -1,57 +1,216 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 15 Sep 2016 17:07:22 +0200
-Subject: [PATCH] usb: gadget: udc: atmel: fix endpoint name
-Message-ID: <20160915150722.13103-1-alexandre.belloni@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Sep 2016 16:10:45 +0100
+Subject: [PATCH v3 1/7] arm64: Factor out PAN enabling/disabling into
+ separate uaccess_* macros
+In-Reply-To: <1473788797-10879-2-git-send-email-catalin.marinas@arm.com>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+ <1473788797-10879-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20160915151045.GD9316@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit c32b5bcfa3c4 ("ARM: dts: at91: Fix USB endpoint nodes"),
-atmel_usba_udc fails with:
+Hi Catalin,
 
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 0 at include/linux/usb/gadget.h:405
-ecm_do_notify+0x188/0x1a0
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.7.0+ #15
-Hardware name: Atmel SAMA5
-[<c010ccfc>] (unwind_backtrace) from [<c010a7ec>] (show_stack+0x10/0x14)
-[<c010a7ec>] (show_stack) from [<c0115c10>] (__warn+0xe4/0xfc)
-[<c0115c10>] (__warn) from [<c0115cd8>] (warn_slowpath_null+0x20/0x28)
-[<c0115cd8>] (warn_slowpath_null) from [<c04377ac>] (ecm_do_notify+0x188/0x1a0)
-[<c04377ac>] (ecm_do_notify) from [<c04379a4>] (ecm_set_alt+0x74/0x1ac)
-[<c04379a4>] (ecm_set_alt) from [<c042f74c>] (composite_setup+0xfc0/0x19f8)
-[<c042f74c>] (composite_setup) from [<c04356e8>] (usba_udc_irq+0x8f4/0xd9c)
-[<c04356e8>] (usba_udc_irq) from [<c013ec9c>] (handle_irq_event_percpu+0x9c/0x158)
-[<c013ec9c>] (handle_irq_event_percpu) from [<c013ed80>] (handle_irq_event+0x28/0x3c)
-[<c013ed80>] (handle_irq_event) from [<c01416d4>] (handle_fasteoi_irq+0xa0/0x168)
-[<c01416d4>] (handle_fasteoi_irq) from [<c013e3f8>] (generic_handle_irq+0x24/0x34)
-[<c013e3f8>] (generic_handle_irq) from [<c013e640>] (__handle_domain_irq+0x54/0xa8)
-[<c013e640>] (__handle_domain_irq) from [<c010b214>] (__irq_svc+0x54/0x70)
-[<c010b214>] (__irq_svc) from [<c0107eb0>] (arch_cpu_idle+0x38/0x3c)
-[<c0107eb0>] (arch_cpu_idle) from [<c0137300>] (cpu_startup_entry+0x9c/0xdc)
-[<c0137300>] (cpu_startup_entry) from [<c0900c40>] (start_kernel+0x354/0x360)
-[<c0900c40>] (start_kernel) from [<20008078>] (0x20008078)
----[ end trace e7cf9dcebf4815a6 ]---
+On Tue, Sep 13, 2016 at 06:46:31PM +0100, Catalin Marinas wrote:
+> This patch moves the directly coded alternatives for turning PAN on/off
+> into separate uaccess_{enable,disable} macros or functions. The asm
+> macros take a few arguments which will be used in subsequent patches.
+> 
+> Note that any (unlikely) access that the compiler might generate between
+> uaccess_enable() and uaccess_disable(), other than those explicitly
+> specified by the user access code, will not be protected by PAN.
 
-Fixes: c32b5bcfa3c4 ("ARM: dts: at91: Fix USB endpoint nodes")
-Reported-by: Richard Genoud <richard.genoud@gmail.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/usb/gadget/udc/atmel_usba_udc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+There's one missing include that I've noted below, along with a number
+we can now drop. Otherwise, the important parts all look good to me.
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index bb1f6c8f0f01..45bc997d0711 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -1978,7 +1978,7 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
- 			goto err;
- 		}
--		ep->ep.name = name;
-+		ep->ep.name = kasprintf(GFP_KERNEL, "ep%d", ep->index);
- 
- 		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
- 		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
--- 
-2.9.3
+With the includes fixed up:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+[...]
+
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm64/include/asm/futex.h       | 14 +++----
+>  arch/arm64/include/asm/uaccess.h     | 79 ++++++++++++++++++++++++++++++++----
+>  arch/arm64/kernel/armv8_deprecated.c | 10 ++---
+>  arch/arm64/lib/clear_user.S          |  8 ++--
+>  arch/arm64/lib/copy_from_user.S      |  8 ++--
+>  arch/arm64/lib/copy_in_user.S        |  8 ++--
+>  arch/arm64/lib/copy_to_user.S        |  8 ++--
+>  7 files changed, 95 insertions(+), 40 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
+> index f2585cdd32c2..71dfa3b42313 100644
+> --- a/arch/arm64/include/asm/futex.h
+> +++ b/arch/arm64/include/asm/futex.h
+> @@ -27,9 +27,9 @@
+>  #include <asm/sysreg.h>
+>  
+>  #define __futex_atomic_op(insn, ret, oldval, uaddr, tmp, oparg)		\
+> +do {									\
+> +	uaccess_enable();						\
+>  	asm volatile(							\
+> -	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,		\
+> -		    CONFIG_ARM64_PAN)					\
+>  "	prfm	pstl1strm, %2\n"					\
+>  "1:	ldxr	%w1, %2\n"						\
+>  	insn "\n"							\
+> @@ -44,11 +44,11 @@
+>  "	.popsection\n"							\
+>  	_ASM_EXTABLE(1b, 4b)						\
+>  	_ASM_EXTABLE(2b, 4b)						\
+> -	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,		\
+> -		    CONFIG_ARM64_PAN)					\
+>  	: "=&r" (ret), "=&r" (oldval), "+Q" (*uaddr), "=&r" (tmp)	\
+>  	: "r" (oparg), "Ir" (-EFAULT)					\
+> -	: "memory")
+> +	: "memory");							\
+> +	uaccess_disable();						\
+> +} while (0)
+
+With the uaccess_{enable,disable}* macros, we can drop the includes for
+<asm/alternative.h>, <asm/cpufeature.h>, and <asm/sysreg.h> from
+futex.h, as we no longer (directly) use anything from those.
+
+[...]
+
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index c47257c91b77..cc6c32d4dcc4 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+
+> @@ -321,4 +357,31 @@ extern long strncpy_from_user(char *dest, const char __user *src, long count);
+>  extern __must_check long strlen_user(const char __user *str);
+>  extern __must_check long strnlen_user(const char __user *str, long n);
+>  
+> +#else	/* __ASSEMBLY__ */
+> +
+> +#include <asm/alternative.h>
+> +#include <asm/assembler.h>
+
+We also need <asm/sysreg.h> for SET_PSTATE_PAN()
+
+Given we use that and <asm/alternative.h> either way, should we pull
+those above the #ifdef __ASSEMBLY__? I have no feeling either way.
+
+[...]
+
+> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+> index 42ffdb54e162..7156e7bfcd89 100644
+> --- a/arch/arm64/kernel/armv8_deprecated.c
+> +++ b/arch/arm64/kernel/armv8_deprecated.c
+> @@ -281,9 +281,9 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
+>   * Error-checking SWP macros implemented using ldxr{b}/stxr{b}
+>   */
+>  #define __user_swpX_asm(data, addr, res, temp, B)		\
+> +do {								\
+> +	uaccess_enable();					\
+>  	__asm__ __volatile__(					\
+> -	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
+> -		    CONFIG_ARM64_PAN)				\
+>  	"0:	ldxr"B"		%w2, [%3]\n"			\
+>  	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
+>  	"	cbz		%w0, 2f\n"			\
+> @@ -299,11 +299,11 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
+>  	"	.popsection"					\
+>  	_ASM_EXTABLE(0b, 4b)					\
+>  	_ASM_EXTABLE(1b, 4b)					\
+> -	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
+> -		CONFIG_ARM64_PAN)				\
+>  	: "=&r" (res), "+r" (data), "=&r" (temp)		\
+>  	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
+> -	: "memory")
+> +	: "memory");						\
+> +	uaccess_disable();					\
+> +} while (0)
+
+With this, we can drop the include of <asm/alternative.h>, though unlike
+futex.h we need to keep <asm/cpufeature.h> and <asm/sysreg.h>.
+
+[...]
+
+> diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
+> index 5d1cad3ce6d6..08b5f18ba604 100644
+> --- a/arch/arm64/lib/clear_user.S
+> +++ b/arch/arm64/lib/clear_user.S
+> @@ -17,10 +17,10 @@
+>   */
+>  #include <linux/linkage.h>
+>  
+> -#include <asm/alternative.h>
+>  #include <asm/assembler.h>
+>  #include <asm/cpufeature.h>
+>  #include <asm/sysreg.h>
+> +#include <asm/uaccess.h>
+
+As with futex.h, we can drop <asm/assembler.h>, <asm/cpufeature.h>, and
+<asm/sysreg.h>, as the uaccess_{enable,disable}* macros mean we no
+longer use anything from those directly.
+
+[...]
+
+> diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
+> index 0b90497d4424..6505ec81f1da 100644
+> --- a/arch/arm64/lib/copy_from_user.S
+> +++ b/arch/arm64/lib/copy_from_user.S
+> @@ -16,11 +16,11 @@
+>  
+>  #include <linux/linkage.h>
+>  
+> -#include <asm/alternative.h>
+>  #include <asm/assembler.h>
+>  #include <asm/cache.h>
+>  #include <asm/cpufeature.h>
+>  #include <asm/sysreg.h>
+> +#include <asm/uaccess.h>
+
+Likewise, we can also drop <asm/assembler.h>, <asm/cpufeature.h>, and
+<asm/sysreg.h> here.
+
+[...]
+
+> diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
+> index f7292dd08c84..9b04ff3ab610 100644
+> --- a/arch/arm64/lib/copy_in_user.S
+> +++ b/arch/arm64/lib/copy_in_user.S
+> @@ -18,11 +18,11 @@
+>  
+>  #include <linux/linkage.h>
+>  
+> -#include <asm/alternative.h>
+>  #include <asm/assembler.h>
+>  #include <asm/cache.h>
+>  #include <asm/cpufeature.h>
+>  #include <asm/sysreg.h>
+> +#include <asm/uaccess.h>
+
+Likewise, we can also drop <asm/assembler.h>, <asm/cpufeature.h>, and
+<asm/sysreg.h> here.
+
+[...]
+
+> diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
+> index 7a7efe255034..8077e4f34d56 100644
+> --- a/arch/arm64/lib/copy_to_user.S
+> +++ b/arch/arm64/lib/copy_to_user.S
+> @@ -16,11 +16,11 @@
+>  
+>  #include <linux/linkage.h>
+>  
+> -#include <asm/alternative.h>
+>  #include <asm/assembler.h>
+>  #include <asm/cache.h>
+>  #include <asm/cpufeature.h>
+>  #include <asm/sysreg.h>
+> +#include <asm/uaccess.h>
+
+Likewise, we can also drop <asm/assembler.h>, <asm/cpufeature.h>, and
+<asm/sysreg.h> here.
+
+Thanks,
+Mark.
