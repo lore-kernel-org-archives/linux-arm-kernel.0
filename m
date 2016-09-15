@@ -1,40 +1,54 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 15 Sep 2016 13:22:38 -0400
-Subject: [PATCH V3 02/10] Documentation: DT: qcom_hidma: correct spelling
- mistakes
-In-Reply-To: <1473960166-30155-1-git-send-email-okaya@codeaurora.org>
-References: <1473960166-30155-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1473960166-30155-3-git-send-email-okaya@codeaurora.org>
+Date: Thu, 15 Sep 2016 13:22:36 -0400
+Subject: [PATCH V3 00/10] dmaengine: qcom_hidma: add MSI interrupt support
+Message-ID: <1473960166-30155-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the spelling mistakes and extra and statements in the sentences.
+The new version of the HW supports MSI interrupts instead of wired
+interrupts. The MSI interrupts are especially useful for the guest machine
+execution. The wired interrupts usually trap to the hypervisor and then are
+relayed to the actual interrupt.
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The MSI interrupts can be directly fed into the interrupt controller.
 
-diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-index 47bfb5a..f99f642 100644
---- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-+++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-@@ -5,13 +5,13 @@ memcpy and memset capabilities. It has been designed for virtualized
- environments.
- 
- Each HIDMA HW instance consists of multiple DMA channels. These channels
--share the same bandwidth. The bandwidth utilization can be parititioned
-+share the same bandwidth. The bandwidth utilization can be partitioned
- among channels based on the priority and weight assignments.
- 
- There are only two priority levels and 15 weigh assignments possible.
- 
- Other parameters here determine how much of the system bus this HIDMA
--instance can use like maximum read/write request and and number of bytes to
-+instance can use like maximum read/write request and number of bytes to
- read/write in a single burst.
- 
- Main node required properties:
+Adding a new OF compat string (qcom,hidma-1.1) and ACPI string (QCOM8062)
+to distinguish newer HW from the older ones.
+
+v3:
+* day 0 fix for when ACPI is not compiled in
+
+v2:
+https://patchwork.kernel.org/patch/9326399/
+* Documentation update for DT bindings
+* Rebased to slave-next
+* Dropped dmaengine: qcom_hidma: eliminate processed variables. Replaced it
+  with dmaengine: qcom_hidma: protect common data structures
+
+v1:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/444167.html
+* initial implementation
+
+Sinan Kaya (10):
+  Documentation: DT: qcom_hidma: update binding for MSI
+  Documentation: DT: qcom_hidma: correct spelling mistakes
+  of: irq: make of_msi_configure accessible from modules
+  dmaengine: qcom_hidma: configure DMA and MSI for OF
+  dmaengine: qcom_hidma: make pending_tre_count atomic
+  dmaengine: qcom_hidma: make error and success path common
+  dmaengine: qcom_hidma: bring out interrupt cause
+  dmaengine: qcom_hidma: add a common API to setup the interrupt
+  dmaengine: qcom_hidma: protect common data structures
+  dmaengine: qcom_hidma: add MSI support for interrupts
+
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  17 +-
+ drivers/dma/qcom/hidma.c                           | 129 +++++++++-
+ drivers/dma/qcom/hidma.h                           |   6 +-
+ drivers/dma/qcom/hidma_dbg.c                       |   3 +-
+ drivers/dma/qcom/hidma_ll.c                        | 278 ++++++++++-----------
+ drivers/dma/qcom/hidma_mgmt.c                      |   5 +-
+ drivers/of/irq.c                                   |   1 +
+ 7 files changed, 280 insertions(+), 159 deletions(-)
+
 -- 
 1.9.1
