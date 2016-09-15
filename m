@@ -1,32 +1,32 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 15 Sep 2016 22:05:49 +0530
-Subject: [PATCH] arm64: kprobe: Always clear pstate.D in breakpoint
- exception handler
-In-Reply-To: <20160915161828.GH3380@arm.com>
-References: <1059f6762466c2cebf32aa40e4d7974731a68726.1471848065.git.panand@redhat.com>
- <20160823000531.b12ac14c18ce8e9d3abc74ec@kernel.org>
- <CAAOGbpwcx3G8Jdf1AfNRLrkZJQLaCcLWQPRppjvpy3=hSrffjg@mail.gmail.com>
- <20160824100644.GB4408@localhost.localdomain>
- <CAHB_Guods-iED+tOLeJ9XCWDvAVoButwz2XWSiP+eMYDzFhfyQ@mail.gmail.com>
- <20160915161828.GH3380@arm.com>
-Message-ID: <CAHB_Gurqntj+j8YgR2TcD212Cv_0xy5DRBdVTZuXTUMJj3uTKA@mail.gmail.com>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Thu, 15 Sep 2016 18:36:27 +0200
+Subject: [PATCH v4 0/3] ASoC: sun4i-codec: Distinguish sun4i from sun7i
+Message-ID: <20160915163630.18026-1-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 9:48 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Sep 15, 2016 at 09:45:09PM +0530, Pratyush Anand wrote:
->> On Wed, Aug 24, 2016 at 3:36 PM, Pratyush Anand <panand@redhat.com> wrote:
->> > On 23/08/2016:04:33:08 PM, Sandeepa Prabhu wrote:
->> >> Thanks for the fix, feel free to add my ACK as well. Has it been tested on
->> >> guest kernel?
->> >
->> > have not tested on guest kernel.Will do.
->>
->> I tested it with guest kernel, and it worked there too :-).
->>
->> @Catalin: any more comment for this patch? If not, then may be you can take it.
->
-> I already queued this on the arm64 for-next/core branch.
->
+ASoC: sun4i-codec: Introduce mechanism to detect sun7i and provide a
+different regmap different compared to sun4i Allwinner A10.
+ 
+The controls will be extended in a forthcoming patch - it is necessary
+to distinguish between sun4i and sun7i controls because they have different
+registers.
+ 
+Renamed SUN4I_CODEC_AC_SYS_VERI to SUN7I_CODEC_AC_DAC_CAL and renamed
+SUN4I_CODEC_AC_MIC_PHONE_CAL to SUN7I_CODEC_AC_MIC_PHONE_CAL because these
+are actually not present on Allwinner A10.
 
-Thanks Will :-)
+Handle quirks by regmap config and codec and select the correct quirks
+automatically.  
+
+Danny Milosavljevic (3):
+  ASoC: sun4i-codec: rename "sun4i_codec_widgets" to
+    "sun4i_codec_controls" for consistency with the struct field name.
+  ASoC: rename "SUN4I_CODEC_SYS_VERI" to "SUN7I_CODEC_AC_DAC_CAL";
+    rename "SUN4I_CODEC_AC_MIC_PHONE_CAL" to
+    "SUN7I_CODEC_AC_MIC_PHONE_CAL".
+  ASoC: sun4i-codec: Add custom regmap configs for the A10 and A20
+    variants.
+
+ sound/soc/sunxi/sun4i-codec.c | 45 ++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 36 insertions(+), 9 deletions(-)
