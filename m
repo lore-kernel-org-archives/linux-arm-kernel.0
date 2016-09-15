@@ -1,52 +1,58 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 15 Sep 2016 12:33:28 +0200
-Subject: [PATCH] BUG: atmel_serial: Interrupts not disabled on close
-In-Reply-To: <c98f5e6a-a971-aee1-cd9b-16a2ef36d9f8@atmel.com>
-References: <20160912133441.14597-1-richard.genoud@gmail.com>
- <c98f5e6a-a971-aee1-cd9b-16a2ef36d9f8@atmel.com>
-Message-ID: <20160915103328.GA23118@kroah.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 15 Sep 2016 11:33:58 +0100
+Subject: [PATCH v4 00/10] ARM: KVM: Support for vgic-v3
+In-Reply-To: <20160915091334.GB23629@cbox>
+References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
+ <20160915091334.GB23629@cbox>
+Message-ID: <57DA7916.4060706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 05:22:58PM +0200, Nicolas Ferre wrote:
-> Le 12/09/2016 ? 15:34, Richard Genoud a ?crit :
-> > Since commit 18dfef9c7f87 ("serial: atmel: convert to irq handling
-> > provided mctrl-gpio"), interrupts from GPIOs are not disabled any more
-> > when the serial port is closed, leading to an oops when the one of the
-> > input pin is toggled (CTS/DSR/DCD/RNG).
-> > 
-> > This is only the case if those pins are used as GPIOs, i.e. declared
-> > like that:
-> > usart1: serial at f8020000 {
-> >         /* CTS and DTS will be handled by GPIO */
-> >         status = "okay";
-> >         rts-gpios = <&pioB 17 GPIO_ACTIVE_LOW>;
-> >         cts-gpios = <&pioB 16 GPIO_ACTIVE_LOW>;
-> >         dtr-gpios = <&pioB 14 GPIO_ACTIVE_LOW>;
-> >         dsr-gpios = <&pioC 31 GPIO_ACTIVE_LOW>;
-> >         rng-gpios = <&pioB 12 GPIO_ACTIVE_LOW>;
-> >         dcd-gpios = <&pioB 15 GPIO_ACTIVE_LOW>;
-> > };
-> > 
-> > That's because modem interrupts used to be freed in atmel_shutdown().
-> > After commit 18dfef9c7f87 ("serial: atmel: convert to irq handling
-> > provided mctrl-gpio"), this code was just removed.
-> > Calling atmel_disable_ms() disables the interrupts and everything works
-> > fine again.
-> > 
-> > Tested on at91sam9g35-cm
-> > 
-> > (This patch doesn't apply on -stable kernels, fixes for 4.4 and 4.7 will
-> > be sent after this one is applied.)
-> > 
-> > Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> > Fixes: 18dfef9c7f87 ("serial: atmel: convert to irq handling provided mctrl-gpio")
-> 
-> I thinks it's a bit late for "4.8-fixes".
-> 
-> Greg, tell me if you want that I add the Cc: stable tag to this patch
-> (as advised by Uwe) and re-send?
+Hi Christoffer,
 
-I'll add it, no worries.
+On 15/09/16 10:13, Christoffer Dall wrote:
+> Hi Valdimir,
+> 
+> On Mon, Sep 12, 2016 at 03:49:14PM +0100, Vladimir Murzin wrote:
+>> Hi,
+>>
+>> This is an attempt to make use vgic-v3 under arch/arm since
+>> save-restore functionality got re-written in C and can be shared
+>> between arm/arm64 like it has already been done for vgic-v2 and timer.
+>>
+>> With this patches I'm able to get 32 core an AArch32 ARMv8 guest boot:
+>>
+>> ...
+>> GICv3: CPU31: found redistributor 703 region 0:0x000000003ffd0000
+>> CPU31: thread -1, cpu 3, socket 7, mpidr 80000703
+>> Brought up 32 CPUs
+>> SMP: Total of 32 processors activated (768.00 BogoMIPS).
+>> CPU: All CPU(s) started in SVC mode.
+>> ...
+>>
+>> Additionally, quite lightweight test based on Self IPI guest test[1]
+>> has been run with up to 255 cpus.
+>>
+> I have applied this to kvmarm/queue, fixing up a few trivial conflicts,
+> and I have changed the kvm_info message.
 
-greg k-h
+Great!
+
+> 
+> If you could test the integrated branch with GICv3 on a 32-bit platform,
+> that would be great.
+
+I've just pulled kvmarm/queue and started testing.
+
+> 
+> I'll give people a few days to give their acks to the non-KVM part of
+> the series and will then put it in next.
+> 
+
+Thanks!
+Vladimir
+
+> Thanks for the work,
+> -Christoffer
+> 
+> 
