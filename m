@@ -1,31 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 Sep 2016 16:56:04 +0200
-Subject: [PATCH v2 6/8] ARM: dts: sun9i: a80-optimus: Add AXP806 PMIC
- device node and regulators
-In-Reply-To: <CAGb2v65cQR9F1=0_9mM6guKrMhOX7TqMqfHJU5hJxUXtBZiYaw@mail.gmail.com>
-References: <20160827075544.26316-1-wens@csie.org>
- <20160827075544.26316-7-wens@csie.org>
- <CAGb2v65cQR9F1=0_9mM6guKrMhOX7TqMqfHJU5hJxUXtBZiYaw@mail.gmail.com>
-Message-ID: <20160915145604.GJ10128@lukather>
+Date: Thu, 15 Sep 2016 16:58:16 +0200
+Subject: [PATCH v5 0/5] dts: sun8i-h3: complete UART I2C for H3
+In-Reply-To: <1473703967-21356-1-git-send-email-jorik@kippendief.biz>
+References: <1473703967-21356-1-git-send-email-jorik@kippendief.biz>
+Message-ID: <20160915145816.GK10128@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 10:33:50PM +0800, Chen-Yu Tsai wrote:
-> Hi Maxime,
+On Mon, Sep 12, 2016 at 08:12:42PM +0200, jorik at kippendief.biz wrote:
+> From: Jorik Jonker <jorik@kippendief.biz>
 > 
-> On Sat, Aug 27, 2016 at 3:55 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> > The AXP806 PMIC is the secondary PMIC. It provides various supply
-> > voltages for the SoC and other peripherals. The PMIC's interrupt
-> > line is connected to NMI pin of the SoC.
-> >
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> This is my fifth attempt to complete the UART/I2C definitions on H3.
 > 
-> The driver patches have all been merged into the mfd tree. Could
-> you queue up the dts patches?
+> Many thanks to Maxime and Chen-Yu for helping me understand the 
+> philosophy behind the DTS/DTSI structure. I hope I get it and five
+> times is a charm :-)
 
-I just did.
-
-Thanks for the remainder,
+I queued it, thanks!
 Maxime
 
 -- 
@@ -38,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160915/7d725958/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160915/87dc4dd1/attachment.sig>
