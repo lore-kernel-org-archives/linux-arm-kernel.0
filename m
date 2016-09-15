@@ -1,27 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 15:24:06 +0200
-Subject: [PATCH v5 0/3] Add ZTE ZX296718 support
-In-Reply-To: <20160913072146.GA7398@tiger>
-References: <1473730926-1034-1-git-send-email-jun.nie@linaro.org>
- <20160913072146.GA7398@tiger>
-Message-ID: <3220973.vrdeeLxHSS@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 15 Sep 2016 08:36:57 -0500
+Subject: [PATCH] of/platform: Initialise dev->fwnode appropriately
+In-Reply-To: <38259ab3716da072fab37f06d034329244491c13.1473865096.git.robin.murphy@arm.com>
+References: <38259ab3716da072fab37f06d034329244491c13.1473865096.git.robin.murphy@arm.com>
+Message-ID: <20160915133657.GB14424@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 13, 2016 3:21:46 PM CEST Shawn Guo wrote:
+On Wed, Sep 14, 2016 at 04:01:24PM +0100, Robin Murphy wrote:
+> Whilst we're some of the way towards a universal firmware property
+> interface, drivers which deal with both OF and ACPI probing end up
+> having to do things like this:
 > 
-> Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+>     dev->of_node ? &dev->of_node->fwnode : dev->fwnode
 > 
-> Arnd, Olof,
+> This seems unnecessary, when the OF code could instead simply fill in
+> the device's fwnode when binding the of_node, and let the drivers use
+> dev->fwnode either way. Let's give it a go and see what falls out.
 > 
-> If you like, I can help collect ZTE DTS patches to reduce your
-> maintenance burden, considering we have an established pull-request
-> work flow and I get ZTE platform on hands to test patches.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/of/platform.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
-Thanks, I think that would be a good idea. I was going to apply
-the patches manually, but I'll just wait for you to forward
-them to me.
+I've applied this, but what about non-platform devices such as i2c?
 
-Also thanks for your thorough reviews of the patch series!
-
-	Arnd
+Rob
