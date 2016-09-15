@@ -1,94 +1,83 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 15 Sep 2016 08:48:37 +0800
-Subject: [clk:clk-next 19/25] drivers/clk/zte/clk-zx296718.c:554:35: warning:
- cast from pointer to integer of different size
-Message-ID: <201609150835.X8m7MFub%fengguang.wu@intel.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Wed, 14 Sep 2016 18:57:59 -0700
+Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.9 -
+ part1
+In-Reply-To: <6041122.z65jfDXEcc@wuerfel>
+References: <CADaLNDkZdAipxx6cfLJ6yrzTrcLPS_Ciw8+T5EUFVcRRw+fjPw@mail.gmail.com>
+ <6041122.z65jfDXEcc@wuerfel>
+Message-ID: <CADaLNDmMEWEd4o-tf4Kcqy7PP-abBg=Q1-Qdvv5CoDdoLEvi=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-head:   f5644f10dcfbab90ffd27da1d8d51ffc13e1bc84
-commit: ca0233285a93222b2b0c7384b9345711b3d68b5c [19/25] clk: zx: register ZX296718 clocks
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout ca0233285a93222b2b0c7384b9345711b3d68b5c
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Wed, Sep 14, 2016 at 7:59 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday, September 2, 2016 11:46:31 AM CEST Duc Dang wrote:
+>> Hi Arnd, Olof,
+>>
+>> This is the first part of DTS changes for X-Gene platforms targeted for 4.9.
+>>
+>> The changes include:
+>> + X-Gene Soc PMU support patch set from Tai Nguyen (v10 reviewed by
+>> Mark, DT binding document acked by Rob [1] and was suggested to merge
+>> via am-soc tree by Will [2])
+>> + Follow up patch to enable DT entry for SoC PMU on X-Gene v2
+>> + Correct PCIe legacy interrupt mode to level-active high
+>> + DTS entry for X-Gene hwmon (v4 acked by Guenter, DT binding document
+>> and driver is in linux-next now [3])
+>>
+>> Regards,
+>> Duc Dang.
+>
+> Sorry for the long delay, I've just now started looking at the dts changes
+> for arm64. The changes to arch/arm64/boot/dts look fine, but I don't
+> want to mix driver changes with dts changes, as we use separate
+> branches for those.
+>
+> Please send this again as two pull requests, one for the dts changes, and
+> one for the rest (pmu driver, binding and MAINTAINERS file). Please
+> also include an explanation in the tag description about why this gets
+> merged through arm-soc. I see that Will suggested doing it that way,
+> but I don't see what the reason is. We normally don't touch that directory.
+Hi Arnd,
 
-All warnings (new ones prefixed by >>):
+I am not clear about the reason either. Probably we don't have a
+dedicated tree for SoC PMU?
 
-   drivers/clk/zte/clk-zx296718.c: In function 'top_clocks_init':
->> drivers/clk/zte/clk-zx296718.c:554:35: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-      zx296718_pll_clk[i].reg_base += (u64)reg_base;
-                                      ^
-   drivers/clk/zte/clk-zx296718.c:579:29: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-      top_mux_clk[i].mux.reg += (u64)reg_base;
-                                ^
-   drivers/clk/zte/clk-zx296718.c:592:31: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-      top_gate_clk[i].gate.reg += (u64)reg_base;
-                                  ^
-   drivers/clk/zte/clk-zx296718.c:605:29: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-      top_div_clk[i].div.reg += (u64)reg_base;
-                                ^
-   drivers/clk/zte/clk-zx296718.c: In function 'lsp0_clocks_init':
-   drivers/clk/zte/clk-zx296718.c:745:30: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-      lsp0_mux_clk[i].mux.reg += (u64)reg_base;
-                                 ^
-   drivers/clk/zte/clk-zx296718.c:758:32: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-      lsp0_gate_clk[i].gate.reg += (u64)reg_base;
-                                   ^
-   drivers/clk/zte/clk-zx296718.c:771:30: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-      lsp0_div_clk[i].div.reg += (u64)reg_base;
-                                 ^
-   drivers/clk/zte/clk-zx296718.c: In function 'lsp1_clocks_init':
-   drivers/clk/zte/clk-zx296718.c:850:30: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-      lsp1_mux_clk[i].mux.reg += (u64)reg_base;
-                                 ^
-   drivers/clk/zte/clk-zx296718.c:863:32: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-      lsp1_gate_clk[i].gate.reg += (u64)reg_base;
-                                   ^
-   drivers/clk/zte/clk-zx296718.c:876:30: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-      lsp1_div_clk[i].div.reg += (u64)reg_base;
-                                 ^
+Hi Will,
 
-vim +554 drivers/clk/zte/clk-zx296718.c
+Can you please comment?
 
-   538			[TOP_NR_CLKS - 1] = NULL,
-   539		},
-   540	};
-   541	
-   542	static int __init top_clocks_init(struct device_node *np)
-   543	{
-   544		void __iomem *reg_base;
-   545		int i, ret;
-   546	
-   547		reg_base = of_iomap(np, 0);
-   548		if (!reg_base) {
-   549			pr_err("%s: Unable to map clk base\n", __func__);
-   550			return -ENXIO;
-   551		}
-   552	
-   553		for (i = 0; i < ARRAY_SIZE(zx296718_pll_clk); i++) {
- > 554			zx296718_pll_clk[i].reg_base += (u64)reg_base;
-   555			ret = clk_hw_register(NULL, &zx296718_pll_clk[i].hw);
-   556			if (ret) {
-   557				pr_warn("top clk %s init error!\n",
-   558					zx296718_pll_clk[i].hw.init->name);
-   559			}
-   560		}
-   561	
-   562		for (i = 0; i < ARRAY_SIZE(top_ffactor_clk); i++) {
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 58522 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160915/1d2cc8ea/attachment-0001.obj>
+Regards,
+Duc Dang.
+>
+>         Arnd
+>
+>>
+>> [1]: https://lkml.org/lkml/2016/7/15/563
+>> [2]: https://lkml.org/lkml/2016/7/20/224
+>> [3]: http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=893485e74c37669aeecf0b648dbfbd8e2f0471c3
+>> ------
+>>
+>> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+>>
+>>   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.9-part1
+>>
+>> for you to fetch changes up to 1c983fc9369420748192712bde2429af3e580390:
+>>
+>>   arm64: dts: apm: Add X-Gene SoC hwmon to device tree (2016-09-02
+>> 10:43:41 -0700)
+>>
+>> ----------------------------------------------------------------
+>> X-Gene DTS changes queued for v4.9 - part 1
+>>
+>> This patch set includes:
+>> + X-Gene v1 SoC Performance Monitoring Unit (PMU) support
+>> + DTS entry to enable SoC PMU for X-Gene v2 SoC
+>> + PCIe legacy interrupt polarity fix for X-Gene
+>> + X-Gene SoC hwmon DTS entry
+>>
+>
+>
