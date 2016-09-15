@@ -1,23 +1,19 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 15 Sep 2016 14:17:55 +0200
-Subject: v4.8-rc: GSM audio causes trouble
-Message-ID: <20160915121755.GA5264@amd>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Sep 2016 14:21:18 +0200
+Subject: [PATCH] pintctrl: amlogic: gxbb: add i2c pins
+In-Reply-To: <1473846328-17339-1-git-send-email-jbrunet@baylibre.com>
+References: <1473846328-17339-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <CACRpkdbCRhD_VUXWBZZ2XrXE+nDQqZ+ThrT54+CexQUz2kr0Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, Sep 14, 2016 at 11:45 AM, Jerome Brunet <jbrunet@baylibre.com> wrote:
 
-I was trying to improve GSM call quality, and hit problems in
-v4.8-rc. Sound only worked for a while, then I tried to kill
-cmtspeech_ofono_test, and could not, not even with -9 and could not
-even reboot.
+> Add EE domains pins for the i2c devices A,B,C
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 
-I went back to v4.1 (ok, quite far, I see), and problems are gone.
+Patch applied with Kevin's ACK.
 
-Does it work for you? Any ideas what to try... besides bisect?
-
-Best regards,
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Yours,
+Linus Walleij
