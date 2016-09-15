@@ -1,287 +1,266 @@
 From: netz.kernel@gmail.com (Marty Plummer)
-Date: Thu, 15 Sep 2016 16:05:05 -0500
-Subject: [RFC PATCH v2 5/5] ARM: hisi: add devicetree for hi3520
+Date: Thu, 15 Sep 2016 16:05:01 -0500
+Subject: [RFC PATCH v2 1/5] ARM: hisi: Make 3620 explicit, remove wildcards
 In-Reply-To: <20160915210505.21878-1-netz.kernel@gmail.com>
 References: <20160915210505.21878-1-netz.kernel@gmail.com>
-Message-ID: <20160915210505.21878-6-netz.kernel@gmail.com>
+Message-ID: <20160915210505.21878-2-netz.kernel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Probably needs a lot more work, but as of right now this can get me into
-a basic busybox userspace 
 Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
 ---
- arch/arm/boot/dts/Makefile              |   2 +
- arch/arm/boot/dts/hi3520-1176-dm77a.dts |  62 +++++++++++
- arch/arm/boot/dts/hi3520-1176.dtsi      | 178 ++++++++++++++++++++++++++++++++
- 3 files changed, 242 insertions(+)
- create mode 100644 arch/arm/boot/dts/hi3520-1176-dm77a.dts
- create mode 100644 arch/arm/boot/dts/hi3520-1176.dtsi
+ arch/arm/Kconfig.debug              |  2 +-
+ arch/arm/boot/dts/Makefile          |  2 +-
+ arch/arm/configs/hisi_defconfig     |  2 +-
+ arch/arm/configs/multi_v7_defconfig |  2 +-
+ arch/arm/mach-hisi/Kconfig          |  4 ++--
+ arch/arm/mach-hisi/core.h           | 10 +++++-----
+ arch/arm/mach-hisi/hisilicon.c      |  6 +++---
+ arch/arm/mach-hisi/hotplug.c        | 16 ++++++++--------
+ arch/arm/mach-hisi/platsmp.c        | 24 ++++++++++++------------
+ 9 files changed, 34 insertions(+), 34 deletions(-)
 
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index a9693b6..9094ca6 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -280,7 +280,7 @@ choice
+ 
+ 	config DEBUG_HI3620_UART
+ 		bool "Hisilicon HI3620 Debug UART"
+-		depends on ARCH_HI3xxx
++		depends on ARCH_HI3620
+ 		select DEBUG_UART_PL01X
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7ffd3a3..285f56a 100644
+index faacd52..7ffd3a3 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -154,6 +154,8 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
+@@ -154,7 +154,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
  	exynos5440-sd5v1.dtb \
  	exynos5440-ssdk5440.dtb \
  	exynos5800-peach-pi.dtb
-+dtb-$(CONFIG_ARCH_HI3520_1176) += \
-+	hi3520-1176-dm77a.dtb
- dtb-$(CONFIG_ARCH_HI3620) += \
+-dtb-$(CONFIG_ARCH_HI3xxx) += \
++dtb-$(CONFIG_ARCH_HI3620) += \
  	hi3620-hi4511.dtb
  dtb-$(CONFIG_ARCH_HIGHBANK) += \
-diff --git a/arch/arm/boot/dts/hi3520-1176-dm77a.dts b/arch/arm/boot/dts/hi3520-1176-dm77a.dts
-new file mode 100644
-index 0000000..c87a18e
---- /dev/null
-+++ b/arch/arm/boot/dts/hi3520-1176-dm77a.dts
-@@ -0,0 +1,62 @@
-+/*
-+ * Copyright (C) 2016  Marty Plummer <netz.kernel@gmail.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, either version 3 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 	highbank.dtb \
+diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
+index b2e340b..14c8da6 100644
+--- a/arch/arm/configs/hisi_defconfig
++++ b/arch/arm/configs/hisi_defconfig
+@@ -4,7 +4,7 @@ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_RD_LZMA=y
+ CONFIG_ARCH_HISI=y
+-CONFIG_ARCH_HI3xxx=y
++CONFIG_ARCH_HI3620=y
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_CMDLINE_PARTITION=y
+ CONFIG_ARCH_HIX5HD2=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2c8665c..a63865e 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -45,7 +45,7 @@ CONFIG_MACH_BERLIN_BG2Q=y
+ CONFIG_ARCH_DIGICOLOR=y
+ CONFIG_ARCH_HIGHBANK=y
+ CONFIG_ARCH_HISI=y
+-CONFIG_ARCH_HI3xxx=y
++CONFIG_ARCH_HI3620=y
+ CONFIG_ARCH_HIX5HD2=y
+ CONFIG_ARCH_HIP01=y
+ CONFIG_ARCH_HIP04=y
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index a3b091a..8a552c3 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -12,8 +12,8 @@ if ARCH_HISI
+ 
+ menu "Hisilicon platform type"
+ 
+-config ARCH_HI3xxx
+-	bool "Hisilicon Hi36xx family"
++config ARCH_HI3620
++	bool "Hisilicon Hi3620 family"
+ 	depends on ARCH_MULTI_V7
+ 	select CACHE_L2X0
+ 	select HAVE_ARM_SCU if SMP
+diff --git a/arch/arm/mach-hisi/core.h b/arch/arm/mach-hisi/core.h
+index e883583..cb7bc84 100644
+--- a/arch/arm/mach-hisi/core.h
++++ b/arch/arm/mach-hisi/core.h
+@@ -3,13 +3,13 @@
+ 
+ #include <linux/reboot.h>
+ 
+-extern void hi3xxx_set_cpu_jump(int cpu, void *jump_addr);
+-extern int hi3xxx_get_cpu_jump(int cpu);
++extern void hi3620_set_cpu_jump(int cpu, void *jump_addr);
++extern int hi3620_get_cpu_jump(int cpu);
+ extern void secondary_startup(void);
+ 
+-extern void hi3xxx_cpu_die(unsigned int cpu);
+-extern int hi3xxx_cpu_kill(unsigned int cpu);
+-extern void hi3xxx_set_cpu(int cpu, bool enable);
++extern void hi3620_cpu_die(unsigned int cpu);
++extern int hi3620_cpu_kill(unsigned int cpu);
++extern void hi3620_set_cpu(int cpu, bool enable);
+ 
+ extern void hix5hd2_set_cpu(int cpu, bool enable);
+ extern void hix5hd2_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
+index c08c44e..dfa1ee8 100644
+--- a/arch/arm/mach-hisi/hisilicon.c
++++ b/arch/arm/mach-hisi/hisilicon.c
+@@ -9,7 +9,7 @@
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+-*/
 + */
-+
-+/dts-v1/;
-+#include "hi3520-1176.dtsi"
-+
-+/ {
-+	model = "Nightowl zeus-dvr";
-+	compatible = "hisilicon,hi3520-1176";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
-+
-+	/* chosen { */
-+	/* 	bootargs = "mem=72M console=ttyAMA0,115200 root=/dev/ram"; */
-+	/* 	stdout-path = "serial0:115200n8"; */
-+	/* }; */
-+
-+	memory at e2000000 {
-+		device_type = "memory";
-+		reg = <0xe2000000 0x4800000>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&dual_timer0 {
-+	status = "okay";
-+};
-+
-+&gmac0 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	phy-handle = <&phy1>;
-+	phy-mode = "mii";
-+	mac-address = [00 00 00 00 00 00];
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/hi3520-1176.dtsi b/arch/arm/boot/dts/hi3520-1176.dtsi
-new file mode 100644
-index 0000000..a7dbc16
---- /dev/null
-+++ b/arch/arm/boot/dts/hi3520-1176.dtsi
-@@ -0,0 +1,178 @@
-+/*
-+ * Copyright (C) 2016  Marty Plummer <netz.kernel@gmail.com>
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation, either version 3 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	/* interrupt-parent = <&vic0>; */
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,arm1176jzf-s";
-+			reg = <0>;
-+		};
-+	};
-+
-+	uartclk: uartclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <101000000>;
-+	};
-+
-+	clk_3m: clk_3m {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <101000000>;
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+
-+		vic0: interrupt-controller at 10070000 {
-+			compatible = "arm,pl190-vic";
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			reg = <0x10070000 0x1000>;
-+		};
-+
-+		vic1: interrupt-controller at 10080000 {
-+			compatible = "arm,pl190-vic";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0x10080000 0x1000>;
-+		};
-+
-+		amba {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "simple-bus";
-+			ranges;
-+
-+			uart0: uart at 20090000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x20090000 0x1000>;
-+				clocks = <&uartclk &clk_3m>;
-+				clock-names = "uartclk", "apb_pclk";
-+				interrupts-extended = <&vic0 12 4>;
-+				status = "disable";
-+			};
-+
-+			uart1: uart at 200a0000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x200a0000 0x1000>;
-+				clocks = <&uartclk &clk_3m>;
-+				clock-names = "uartclk", "apb_pclk";
-+				interrupts-extended = <&vic0 12 4>;
-+			};
-+
-+			uart2: uart at 200b0000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x200b0000 0x1000>;
-+				clocks = <&uartclk &clk_3m>;
-+				clock-names = "uartclk", "apb_pclk";
-+				interrupts-extended = <&vic0 13 4>;
-+			};
-+
-+			uart3: uart at 200c0000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x200c0000 0x1000>;
-+				clocks = <&uartclk &clk_3m>;
-+				clock-names = "uartclk", "apb_pclk";
-+				interrupts-extended = <&vic0 13 4>;
-+			};
-+
-+			gpio0: gpio at 20150000 {
-+				compatible = "arm,pl061", "arm,primecell";
-+				reg = <0x20150000 0x1000>;
-+				interrupts-extended = <&vic1 6 4>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				clocks = <&uartclk &clk_3m>;
-+				clock-names = "apb_pclk";
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				status = "disabled";
-+			};
-+
-+			dual_timer0: dual_timer at 20000000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x20000000 0x1000>;
-+				interrupts-extended = <&vic0 4 4>, <&vic0 4 4>;
-+				clocks = <&clk_3m>;
-+				clock-names = "apb_pclk";
-+				status = "disable";
-+			};
-+
-+			dual_timer1: dual_timer at 20010000 {
-+				compatible = "arm,sp804", "arm,primecell";
-+				reg = <0x20010000 0x1000>;
-+				interrupts-extended = <&vic0 5 4>, <&vic0 5 4>;
-+				clocks = <&clk_3m>;
-+				clock-names = "apb_pclk";
-+				status = "disable";
-+			};
-+
-+			spi_bus0: spi at 200e0000 {
-+				compatible = "arm,pl022", "arm,primecell";
-+				reg = <0x200e0000 0x1000>;
-+				interrupts-extended = <&vic0 11 4>;
-+				num-cs = <1>;
-+			};
-+		};
-+
-+		sysctrl: system-controller at 20050000 {
-+			compatible = "hisilicon,hi3520-sysctrl", "syscon";
-+			reg = <0x20050000 0x1000>;
-+		};
-+
-+		reboot {
-+			compatible = "syscon-reboot";
-+			regmap = <&sysctrl>;
-+			offset = <0x4>;
-+			mask = <0xdeadbeef>;
-+		};
-+
-+		/* gmac0: ethernet at 10090000 { */
-+		/* 	compatible = "hisilicon,hix5hd2-gmac"; */
-+		/* 	reg = <0x10090000 0x1000>,<0x20050000 0x1000>; */
-+		/* 	interrupts-extended = <&vic0 14 4>; */
-+		/* 	clocks = <&clk_3m>; */
-+		/* 	status = "disabled"; */
-+		/* }; */
-+
-+		usb0: ehci at 100b0000 {
-+			compatible = "generic-ehci";
-+			reg = <0x100b0000 0x1000>;
-+			interrupts-extended = <&vic0 23 4>;
-+			clocks = <&clk_3m>;
-+		};
-+
-+		usb1: ohci at 100a0000 {
-+			compatible = "generic-ohci";
-+			reg = <0x100a0000 0x1000>;
-+			interrupts-extended = <&vic0 22 4>;
-+			clocks = <&clk_3m>;
-+		};
-+	};
-+};
+ 
+ #include <linux/clocksource.h>
+ #include <linux/irqchip.h>
+@@ -44,12 +44,12 @@ static void __init hi3620_map_io(void)
+ 	iotable_init(hi3620_io_desc, ARRAY_SIZE(hi3620_io_desc));
+ }
+ 
+-static const char *const hi3xxx_compat[] __initconst = {
++static const char *const hi3620_compat[] __initconst = {
+ 	"hisilicon,hi3620-hi4511",
+ 	NULL,
+ };
+ 
+ DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
+ 	.map_io		= hi3620_map_io,
+-	.dt_compat	= hi3xxx_compat,
++	.dt_compat	= hi3620_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-hisi/hotplug.c b/arch/arm/mach-hisi/hotplug.c
+index a129aae..f06b428 100644
+--- a/arch/arm/mach-hisi/hotplug.c
++++ b/arch/arm/mach-hisi/hotplug.c
+@@ -143,7 +143,7 @@ static void set_cpu_hi3620(int cpu, bool enable)
+ 	}
+ }
+ 
+-static int hi3xxx_hotplug_init(void)
++static int hi3620_hotplug_init(void)
+ {
+ 	struct device_node *node;
+ 
+@@ -157,10 +157,10 @@ static int hi3xxx_hotplug_init(void)
+ 	return -ENOENT;
+ }
+ 
+-void hi3xxx_set_cpu(int cpu, bool enable)
++void hi3620_set_cpu(int cpu, bool enable)
+ {
+ 	if (!ctrl_base) {
+-		if (hi3xxx_hotplug_init() < 0)
++		if (hi3620_hotplug_init() < 0)
+ 			return;
+ 	}
+ 
+@@ -262,24 +262,24 @@ static inline void cpu_enter_lowpower(void)
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-void hi3xxx_cpu_die(unsigned int cpu)
++void hi3620_cpu_die(unsigned int cpu)
+ {
+ 	cpu_enter_lowpower();
+-	hi3xxx_set_cpu_jump(cpu, phys_to_virt(0));
++	hi3620_set_cpu_jump(cpu, phys_to_virt(0));
+ 	cpu_do_idle();
+ 
+ 	/* We should have never returned from idle */
+ 	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
+ }
+ 
+-int hi3xxx_cpu_kill(unsigned int cpu)
++int hi3620_cpu_kill(unsigned int cpu)
+ {
+ 	unsigned long timeout = jiffies + msecs_to_jiffies(50);
+ 
+-	while (hi3xxx_get_cpu_jump(cpu))
++	while (hi3620_get_cpu_jump(cpu))
+ 		if (time_after(jiffies, timeout))
+ 			return 0;
+-	hi3xxx_set_cpu(cpu, false);
++	hi3620_set_cpu(cpu, false);
+ 	return 1;
+ }
+ 
+diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
+index e1d6764..e36783e 100644
+--- a/arch/arm/mach-hisi/platsmp.c
++++ b/arch/arm/mach-hisi/platsmp.c
+@@ -23,7 +23,7 @@
+ 
+ static void __iomem *ctrl_base;
+ 
+-void hi3xxx_set_cpu_jump(int cpu, void *jump_addr)
++void hi3620_set_cpu_jump(int cpu, void *jump_addr)
+ {
+ 	cpu = cpu_logical_map(cpu);
+ 	if (!cpu || !ctrl_base)
+@@ -31,7 +31,7 @@ void hi3xxx_set_cpu_jump(int cpu, void *jump_addr)
+ 	writel_relaxed(virt_to_phys(jump_addr), ctrl_base + ((cpu - 1) << 2));
+ }
+ 
+-int hi3xxx_get_cpu_jump(int cpu)
++int hi3620_get_cpu_jump(int cpu)
+ {
+ 	cpu = cpu_logical_map(cpu);
+ 	if (!cpu || !ctrl_base)
+@@ -56,7 +56,7 @@ static void __init hisi_enable_scu_a9(void)
+ 	}
+ }
+ 
+-static void __init hi3xxx_smp_prepare_cpus(unsigned int max_cpus)
++static void __init hi3620_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	struct device_node *np = NULL;
+ 	u32 offset = 0;
+@@ -81,20 +81,20 @@ static void __init hi3xxx_smp_prepare_cpus(unsigned int max_cpus)
+ 	}
+ }
+ 
+-static int hi3xxx_boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int hi3620_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+-	hi3xxx_set_cpu(cpu, true);
+-	hi3xxx_set_cpu_jump(cpu, secondary_startup);
++	hi3620_set_cpu(cpu, true);
++	hi3620_set_cpu_jump(cpu, secondary_startup);
+ 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+ 	return 0;
+ }
+ 
+-static const struct smp_operations hi3xxx_smp_ops __initconst = {
+-	.smp_prepare_cpus	= hi3xxx_smp_prepare_cpus,
+-	.smp_boot_secondary	= hi3xxx_boot_secondary,
++static const struct smp_operations hi3620_smp_ops __initconst = {
++	.smp_prepare_cpus	= hi3620_smp_prepare_cpus,
++	.smp_boot_secondary	= hi3620_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+-	.cpu_die		= hi3xxx_cpu_die,
+-	.cpu_kill		= hi3xxx_cpu_kill,
++	.cpu_die		= hi3620_cpu_die,
++	.cpu_kill		= hi3620_cpu_kill,
+ #endif
+ };
+ 
+@@ -181,6 +181,6 @@ static const struct smp_operations hip01_smp_ops __initconst = {
+ 	.smp_boot_secondary     = hip01_boot_secondary,
+ };
+ 
+-CPU_METHOD_OF_DECLARE(hi3xxx_smp, "hisilicon,hi3620-smp", &hi3xxx_smp_ops);
++CPU_METHOD_OF_DECLARE(hi3620_smp, "hisilicon,hi3620-smp", &hi3620_smp_ops);
+ CPU_METHOD_OF_DECLARE(hix5hd2_smp, "hisilicon,hix5hd2-smp", &hix5hd2_smp_ops);
+ CPU_METHOD_OF_DECLARE(hip01_smp, "hisilicon,hip01-smp", &hip01_smp_ops);
 -- 
 2.9.3
