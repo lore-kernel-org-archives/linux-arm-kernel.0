@@ -1,65 +1,55 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Thu, 15 Sep 2016 08:57:50 +0200
-Subject: [PATCH v3 00/14] Clock improvement for video playback
-In-Reply-To: <20160914183620.GV7243@codeaurora.org>
-References: <1472473626-15398-1-git-send-email-gabriel.fernandez@st.com>
- <20160914183620.GV7243@codeaurora.org>
-Message-ID: <af43c05e-4485-d756-3362-19a76aa40307@st.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 15 Sep 2016 08:01:39 +0100
+Subject: [PATCH 00/19] [RESEND] Remove STiH415 and STiH416 SoC platform
+ support
+In-Reply-To: <7524458.uFhxDUCqEo@wuerfel>
+References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
+ <7524458.uFhxDUCqEo@wuerfel>
+Message-ID: <20160915070139.GA14319@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
+On Wed, 14 Sep 2016, Arnd Bergmann wrote:
 
-On 09/14/2016 08:36 PM, Stephen Boyd wrote:
-> On 08/29, gabriel.fernandez at st.com wrote:
->> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>
->> v3:
->>   - Rebase to v4.8-rc1
->>   - Tipo fix in st,clkgen-pll.txt
->>   - Add Ack of Peter for the series
->>   - Add missed patch: "ARM: DT: STiH4xx: Simplify clock binding of STiH4xx platforms"
->>
->> v2:
->>   - Simpliflication of clock binding
->>     remark from Rob https://lkml.org/lkml/2016/5/25/492
->>   - Suppression of stih415-416 support for the clocks (in order
->> 	to help simplification of clock binding)
->>     (others patchs for the machine and drivers will come)
->>
->> This serie allows to increase video resolutions and make audio
->> adjustment during a video playback.
->>
->> Gabriel Fernandez (14):
->>   drivers: clk: st: Remove stih415-416 clock support
->>   drivers: clk: st: Simplify clock binding of STiH4xx platforms
->>   ARM: DT: STiH4xx: Simplify clock binding of STiH4xx platforms
->>   drivers: clk: st: Add fs660c32 synthesizer algorithm
->>   drivers: clk: st: Add clock propagation for audio clocks
->>   drivers: clk: st: Handle clk synchronous mode for video clocks
->>   ARM: DT: STiH407: Enable clock propagation for audio clocks
->>   ARM: DT: STiH410: Enable clock propagation for audio clocks
->>   ARM: DT: STiH418: Enable clock propagation for audio clocks
->>   ARM: DT: STiH407: Enable synchronous clock mode for video clocks
->>   ARM: DT: STiH410: Enable synchronous clock mode for video clocks
->>   ARM: DT: STiH418: Enable synchronous clock mode for video clocks
->>   ARM: DT: STi: STiH407: clock configuration to address 720p and 1080p
->>   ARM: DT: STi: STiH410: clock configuration to address 720p and 1080p
+> On Wednesday, September 14, 2016 2:27:38 PM CEST Peter Griffin wrote:
+> > Resending due to incorrect Cc tags.
+> > 
+> > ST have sent patches which remove clock support for these SoCs [1]
+> > which once applied mean the platform will no longer boot.
+> > 
+> > This series cleans up various STi platform drivers which have
+> > support for these SoC's, by removing code, and updating the DT
+> > documentation accordingly. Some drivers such as miphy365 and
+> > stih41x-usb can be removed completely because the IP is only
+> > found on these legacy SoC's.
+> > 
+> > Once this series is applied, drm display driver, and ALSA SoC
+> > are the main two remaining references to the legacy SoCs, other
+> > than clocks which already have patches on the ML.
 > 
+> It would be good to have a better explanation that "it's already
+> broken by some other commit". Is this a platform that never shipped
+> to end-users, or is it possible that someone out there actually
+> has a machine with one of these SoCs?
 
-Hi Stephen
+STiH415 I'm sure never shipped. I'm reasonably sure STiH416 didn't
+either. These SoCs were considered legacy even when I was at ST
+~3 years ago.
 
-> The order of patches intermingles clk changes and dts changes.
-> I'd prefer to not take any patches for dts through the clk tree,
-> so can those be deferred to an arm-soc PR? 
+Also remember these are STB SoC's, so JTAG fuses are blown in
+production boxes, and also full security is enabled. This means the
+primary bootloader will only boot a signed kernel. So if a end user
+did happen to have a box they would be unable to upgrade their kernel.
 
-No problem, i will take all DTS patches and submit a pull request to arm-soc.
+>From the landing team perspective they were interesting in that they
+shared many IPs with the STiH407 family on which future chipsets were
+based, and were available to us when that silicon was harder to get
+hold of. So we used it as a vehicle for upstreaming so that upstream
+support was already quite good when STiH407 silicon did land on our
+desk.
 
-Assuming that works,
-> I'd just pick 1-2, and 4-6 into the clk tree and the rest can go
-> on top through arm-soc.
-> 
+regards,
 
-Perfect 
-
-Thanks
+Peter.
