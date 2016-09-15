@@ -1,44 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 10:22:23 +0200
-Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F871B01@lhreml507-mbx>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <5869118.UilSPY9Sai@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F871B01@lhreml507-mbx>
-Message-ID: <8360154.kzsE8V8pTW@wuerfel>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 15 Sep 2016 10:32:04 +0200
+Subject: [PATCH 1/5] clk: add support for runtime pm
+In-Reply-To: <20160914213903.GG7243@codeaurora.org>
+References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
+ <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
+ <20160908001943.GC13062@codeaurora.org>
+ <CGME20160912101857eucas1p29b2bbd5ac0eda92284091ad1b86decc4@eucas1p2.samsung.com>
+ <f18fee35-cb5d-abce-0415-a98b58e3a302@samsung.com>
+ <20160912223105.GI7243@codeaurora.org>
+ <e3cceb9a-7a30-c662-dba4-bc453f6fddb6@samsung.com>
+ <20160914213903.GG7243@codeaurora.org>
+Message-ID: <648b0ce0-dcc5-d32d-5c4e-b7e0c0f10d4c@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 15, 2016 8:02:27 AM CEST Gabriele Paoloni wrote:
-> 
-> From <<3.1.1. Open Firmware Properties for Bus Nodes>> in 
-> http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
-> 
-> I quote:
-> "There shall be an entry in the "ranges" property for each
-> of the Memory and/or I/O spaces if that address space is
-> mapped through the bridge."
-> 
-> It seems to me that it is ok to have 1:1 address mapping and that
-> therefore of_translate_address() should fail if "ranges" is not
-> present.
+Hi Stephen,
 
-The key here is the definition of "mapped through the bridge".
-I can only understand this as "directly mapped", i.e. an I/O
-port of the child bus corresponds directly to a memory address
-on the parent bus, but this is not the case here.
 
-The problem with adding the mapping here is that it looks
-like it should be valid to create a page table entry for
-the address returned from the translation and access it through
-a pointer dereference, but that is clearly not possible.
+On 2016-09-14 23:39, Stephen Boyd wrote:
+> On 09/13, Marek Szyprowski wrote:
+>> On 2016-09-13 00:31, Stephen Boyd wrote:
+>>> Great! So you have runtime PM callbacks that are calling
+>>> clk_prepare/unprepare?
+>> Well, not really. clock controller's runtime pm functions must not call
+>> clk_prepare/unprepare yet.
+>>
+>> I didn't get your question. I thought that you are asking if my change
+>> won't introduce any deadlock related to prepare and dev->pm locks. My
+>> runtime pm functions doesn't do any call to clk_prepare/unprepare.
+>> Although global clock prepare lock is re-entrant from the same process, it
+>> would cause deadlock if called from runtime pm functions, because runtime
+>> pm functions might be called from the worker running on the different
+>> cpu/process.
+> I mean non-clk controller driver based runtime PM callbacks that
+> call clk_prepare/unprepare in them. For example, some i2c or spi
+> device driver that has clk operations in the runtime PM
+> callbacks. That would allow lockdep to see any potential deadlock
+> because of aliasing lock classes for the device power lock and
+> the global prepare lock.
 
-> This is also explained quite well in
-> http://lxr.free-electrons.com/source/drivers/of/address.c#L490
-> 
-> what do you think?
+This works perfectly fine. Runtime pm callbacks are called with power lock
+released, so there is no deadlock possible related to dev->power.lock.
+See __rpm_callback() function in drivers/base/power/runtime.c
 
-This is a separate issue, and only relevant for Apple Macintosh
-machines as well as the PA-Semi sdc.
-
-	Arnd
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
