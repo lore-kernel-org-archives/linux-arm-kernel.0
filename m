@@ -1,32 +1,32 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Sep 2016 11:45:14 +0100
-Subject: [PATCH 0/7] mfd: Fix all W=1 warnings
-Message-ID: <20160915104521.14286-1-lee.jones@linaro.org>
+Date: Thu, 15 Sep 2016 11:45:15 +0100
+Subject: [PATCH 1/7] mfd: max8997-irq: 'inline' should be at the beginning of
+ the declaration
+In-Reply-To: <20160915104521.14286-1-lee.jones@linaro.org>
+References: <20160915104521.14286-1-lee.jones@linaro.org>
+Message-ID: <20160915104521.14286-2-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It really is as simple as it sounds!
+Reported by [-Wold-style-declaration].
 
-Lee Jones (7):
-  mfd: max8997-irq: 'inline' should be at the beginning of the
-    declaration
-  mfd: ab8500-debugfs: Prevent initialised field from being over-written
-  mfd: db8500-prcmu: Remove unused *prcmu_set_ddr_opp() calls
-  mfd: ab8500-debugfs: Remove ab8500_dump_all_banks_to_mem()
-  mfd: ab8500-debugfs: Remove 'weak' function
-    suspend_test_wake_cause_interrupt_is_mine()
-  mfd: omap-usb-host: Return value is not 'const int'
-  mfd: cros_ec_spi: Remove unused variable 'request'
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/max8997-irq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/mfd/ab8500-debugfs.c      | 114 ++++++++------------------------------
- drivers/mfd/cros_ec_spi.c         |   2 -
- drivers/mfd/db8500-prcmu.c        |  19 -------
- drivers/mfd/max8997-irq.c         |   2 +-
- drivers/mfd/omap-usb-host.c       |   2 +-
- include/linux/mfd/abx500/ab8500.h |   2 +
- include/linux/mfd/db8500-prcmu.h  |   6 --
- include/linux/mfd/dbx500-prcmu.h  |   9 ---
- 8 files changed, 26 insertions(+), 130 deletions(-)
-
+diff --git a/drivers/mfd/max8997-irq.c b/drivers/mfd/max8997-irq.c
+index b95a46d7..326f17b 100644
+--- a/drivers/mfd/max8997-irq.c
++++ b/drivers/mfd/max8997-irq.c
+@@ -139,7 +139,7 @@ static void max8997_irq_sync_unlock(struct irq_data *data)
+ 	mutex_unlock(&max8997->irqlock);
+ }
+ 
+-static const inline struct max8997_irq_data *
++inline static const struct max8997_irq_data *
+ irq_to_max8997_irq(struct max8997_dev *max8997, struct irq_data *data)
+ {
+ 	return &max8997_irqs[data->hwirq];
 -- 
 2.9.3
