@@ -1,184 +1,134 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Sep 2016 11:03:38 +0200
-Subject: [PATCH v4 01/10] arm64: KVM: Use static keys for selecting the
- GIC backend
-In-Reply-To: <57D96AA0.2010607@arm.com>
-References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
- <1473691764-29424-2-git-send-email-vladimir.murzin@arm.com>
- <20160913082019.GB5680@cbox> <57D7C2AE.908@arm.com>
- <20160913092234.GA30056@cbox> <57D96AA0.2010607@arm.com>
-Message-ID: <20160915090338.GA23629@cbox>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 15 Sep 2016 17:01:58 +0800
+Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
+In-Reply-To: <147384270449.13546.495288874027868435@sboyd-linaro>
+References: <20160914014246.31847-1-stephen.boyd@linaro.org>
+ <20160914033200.GE30760@b29397-desktop>
+ <147383270635.1464.10706917860873291816@sboyd-linaro>
+ <20160914080321.GA21674@b29397-desktop>
+ <147384270449.13546.495288874027868435@sboyd-linaro>
+Message-ID: <20160915090158.GB6919@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 04:20:00PM +0100, Vladimir Murzin wrote:
-> On 13/09/16 10:22, Christoffer Dall wrote:
-> > On Tue, Sep 13, 2016 at 10:11:10AM +0100, Marc Zyngier wrote:
-> >> On 13/09/16 09:20, Christoffer Dall wrote:
-> >>> On Mon, Sep 12, 2016 at 03:49:15PM +0100, Vladimir Murzin wrote:
-> >>>> Currently GIC backend is selected via alternative framework and this
-> >>>> is fine. We are going to introduce vgic-v3 to 32-bit world and there
-> >>>> we don't have patching framework in hand, so we can either check
-> >>>> support for GICv3 every time we need to choose which backend to use or
-> >>>> try to optimise it by using static keys. The later looks quite
-> >>>> promising because we can share logic involved in selecting GIC backend
-> >>>> between architectures if both uses static keys.
-> >>>>
-> >>>> This patch moves arm64 from alternative to static keys framework for
-> >>>> selecting GIC backend. For that we embed static key into vgic_global
-> >>>> and enable the key during vgic initialisation based on what has
-> >>>> already been exposed by the host GIC driver.
-> >>>>
-> >>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> >>>> ---
-> >>>>  arch/arm64/kvm/hyp/switch.c   |   21 +++++++++++----------
-> >>>>  include/kvm/arm_vgic.h        |    4 ++++
-> >>>>  virt/kvm/arm/vgic/vgic-init.c |    4 ++++
-> >>>>  virt/kvm/arm/vgic/vgic.c      |    2 +-
-> >>>>  4 files changed, 20 insertions(+), 11 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> >>>> index 5a84b45..d5c4cc5 100644
-> >>>> --- a/arch/arm64/kvm/hyp/switch.c
-> >>>> +++ b/arch/arm64/kvm/hyp/switch.c
-> >>>> @@ -16,6 +16,8 @@
-> >>>>   */
-> >>>>  
-> >>>>  #include <linux/types.h>
-> >>>> +#include <linux/jump_label.h>
-> >>>> +
-> >>>>  #include <asm/kvm_asm.h>
-> >>>>  #include <asm/kvm_hyp.h>
-> >>>>  
-> >>>> @@ -126,17 +128,13 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
-> >>>>  	write_sysreg(0, vttbr_el2);
-> >>>>  }
-> >>>>  
-> >>>> -static hyp_alternate_select(__vgic_call_save_state,
-> >>>> -			    __vgic_v2_save_state, __vgic_v3_save_state,
-> >>>> -			    ARM64_HAS_SYSREG_GIC_CPUIF);
-> >>>> -
-> >>>> -static hyp_alternate_select(__vgic_call_restore_state,
-> >>>> -			    __vgic_v2_restore_state, __vgic_v3_restore_state,
-> >>>> -			    ARM64_HAS_SYSREG_GIC_CPUIF);
-> >>>> -
-> >>>>  static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
-> >>>>  {
-> >>>> -	__vgic_call_save_state()(vcpu);
-> >>>> +	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
-> >>>
-> >>> It's a bit weird that we use _unlikely for GICv3 (at least if/when GICv3
-> >>> hardware becomes mainstream), but as we don't have another primitive for
-> >>> the 'default disabled' case, I suppose that's the best we can do.
-> >>
-> >> We could always revert the "likelihood" of that test once GICv3 has
-> >> conquered the world. Or start patching the 32bit kernel like we do for
-> >> 64bit...
-> >>
-> >>>
-> >>>> +		__vgic_v3_save_state(vcpu);
-> >>>> +	else
-> >>>> +		__vgic_v2_save_state(vcpu);
-> >>>> +
-> >>>>  	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
-> >>>>  }
-> >>>>  
-> >>>> @@ -149,7 +147,10 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
-> >>>>  	val |= vcpu->arch.irq_lines;
-> >>>>  	write_sysreg(val, hcr_el2);
-> >>>>  
-> >>>> -	__vgic_call_restore_state()(vcpu);
-> >>>> +	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
-> >>>> +		__vgic_v3_restore_state(vcpu);
-> >>>> +	else
-> >>>> +		__vgic_v2_restore_state(vcpu);
-> >>>>  }
-> >>>>  
-> >>>>  static bool __hyp_text __true_value(void)
-> >>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> >>>> index 19b698e..994665a 100644
-> >>>> --- a/include/kvm/arm_vgic.h
-> >>>> +++ b/include/kvm/arm_vgic.h
-> >>>> @@ -23,6 +23,7 @@
-> >>>>  #include <linux/types.h>
-> >>>>  #include <kvm/iodev.h>
-> >>>>  #include <linux/list.h>
-> >>>> +#include <linux/jump_label.h>
-> >>>>  
-> >>>>  #define VGIC_V3_MAX_CPUS	255
-> >>>>  #define VGIC_V2_MAX_CPUS	8
-> >>>> @@ -63,6 +64,9 @@ struct vgic_global {
-> >>>>  
-> >>>>  	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
-> >>>>  	bool			can_emulate_gicv2;
-> >>>> +
-> >>>> +	/* GIC system register CPU interface */
-> >>>> +	struct static_key_false gicv3_cpuif;
-> >>>
-> >>> Documentation/static-keys.txt says that we are not supposed to use
-> >>> struct static_key_false directly.  This will obviously work quite
-> >>> nicely, but we could consider adding a pair of
-> >>> DECLARE_STATIC_KEY_TRUE/FALSE macros that don't have the assignments,
-> >>> but obviously this will need an ack from other maintainers.
-> >>>
-> >>> Thoughts?
-> >>
-> >> Grepping through the tree shows that we're not the only abusers of this
-> >> (dynamic debug is far worse!). Happy to write the additional macros and
-> >> submit them if nobody beats me to it.
-> >>
-> >>>
-> >>>
-> >>>>  };
-> >>>>  
-> >>>>  extern struct vgic_global kvm_vgic_global_state;
-> >>>> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> >>>> index 83777c1..14d6718 100644
-> >>>> --- a/virt/kvm/arm/vgic/vgic-init.c
-> >>>> +++ b/virt/kvm/arm/vgic/vgic-init.c
-> >>>> @@ -405,6 +405,10 @@ int kvm_vgic_hyp_init(void)
-> >>>>  		break;
-> >>>>  	case GIC_V3:
-> >>>>  		ret = vgic_v3_probe(gic_kvm_info);
-> >>>> +		if (!ret) {
-> >>>> +			static_branch_enable(&kvm_vgic_global_state.gicv3_cpuif);
-> >>>> +			kvm_info("GIC system register CPU interface\n");
-> >>>
-> >>> nit: add enabled to the info message?
-> >>>
-> >>>> +		}
-> >>>>  		break;
-> >>>>  	default:
-> >>>>  		ret = -ENODEV;
-> >>>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> >>>> index e83b7fe..8a529a7 100644
-> >>>> --- a/virt/kvm/arm/vgic/vgic.c
-> >>>> +++ b/virt/kvm/arm/vgic/vgic.c
-> >>>> @@ -29,7 +29,7 @@
-> >>>>  #define DEBUG_SPINLOCK_BUG_ON(p)
-> >>>>  #endif
-> >>>>  
-> >>>> -struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
-> >>>> +struct vgic_global __section(.hyp.text) kvm_vgic_global_state = {.gicv3_cpuif = STATIC_KEY_FALSE_INIT,};
-> >>>>  
-> >>>>  /*
-> >>>>   * Locking order is always:
-> >>>> -- 
-> >>>> 1.7.9.5
-> >>>>
-> >>>
-> >>> Overall this looks really nice, as long as we're clear on the static
-> >>> keys stuff.
-> >>
-> >> Indeed, we should get this sorted, though I'm not sure this should be a
-> >> blocker for this code.
-> >>
-> > Agreed, let's ship it!
+On Wed, Sep 14, 2016 at 01:45:04AM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-09-14 01:03:21)
+> > On Tue, Sep 13, 2016 at 10:58:26PM -0700, Stephen Boyd wrote:
+> > > Quoting Peter Chen (2016-09-13 20:32:00)
+> > > > On Tue, Sep 13, 2016 at 06:42:46PM -0700, Stephen Boyd wrote:
+> > > > > On the db410c 96boards platform we have a TC7USB40MU[1] on the
+> > > > > board to mux the D+/D- lines from the SoC between a micro usb
+> > > > > "device" port and a USB hub for "host" roles. Upon a role switch,
+> > > > > we need to change this mux to forward the D+/D- lines to either
+> > > > > the port or the hub. Therefore, introduce a driver for this
+> > > > > device that intercepts extcon USB_HOST events and logically
+> > > > > asserts a gpio to mux the "host" D+/D- lines when a host cable is
+> > > > > attached. When the cable goes away, it will logically deassert
+> > > > > the gpio and mux the "device" lines.
+> > > > 
+> > > > Would you please draw the design? It can also help me review your
+> > > > chipidea patch well.
+> > > > 
+> > > > 1. How many ports on the board?
+> > > > 2. How the lines are connected on the board?
+> > > > 
+> > > 
+> > > The schematic for the db410c is publically available here[2][3].
+> > > 
+> > > There's also the 96boards spec[4] which talks about this switch based
+> > > design a little bit. See the section titled "Single USB port Example".
+> > > 
+> > > [2] https://github.com/96boards/documentation/blob/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
+> > > [3] https://github.com/96boards/documentation/raw/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
+> > > [4] https://www.96boards.org/wp-content/uploads/2015/02/96BoardsCESpecificationv1.0-EA1.pdf
+> > 
+> > Ok, I see several use cases for this role switch
+> > 
+> > 1. Using the hardware switch (218-4LPST)
+> > In this case, you can set USB_SW_SEL as input gpio, and use
+> > extcon-usb-gpio.c like before, just set this gpio as active
+> > low at dts.
 > 
-> To make it clear, should I respin with "enabled" into the info message
-> and macros for static keys?
+> Nice! I didn't think of this case but it's good that we can support
+> that with some work.
 > 
-No, I can fix up the info message and we can worry aboutt he macros
-later.  Marc said he would be happy to do that :)
 
--Christoffer
+After looking more, I find the main purpose of this switch is
+what it writes, FORCE DSI SELECTION TO USB HOST MODE
+
+When the switch is on, the system is host-only.
+When the switch is off, the default role is device mode, and
+switch the role through gpio USB_SW_SEL_PM by software.
+
+> > 
+> > 2. Using USB_HS_ID as vbus-gpio (input), and USB_SW_SEL as id-gpio (output)
+> 
+> This is pretty much what has been implemented. USB_HS_ID is an
+> extcon-usb-gpio.c device.
+
+At some designs, this gpio is tied to ID pin at MicroB connector, and
+using a Mirco-AB cable to switch the role.
+
+> 
+> > I can't find hardware relationship between each other, maybe I miss
+> > something.
+> 
+> I believe USB_SW_SEL is the physical switch (218-4LPST) while
+> USB_SW_SEL_PM is the software controllable part using a GPIO. USB_HS_ID
+> is just the vbus line from the uB connector and that line goes straight
+> into the SoC via a GPIO.
+> 
+> > This use case (design) seems strange, usually, we use ID pin controls
+> > vbus, but seldom use vbus pin control ID.
+> > How you would like to implement it? When the USB cable is connected
+> > (between PC), it receives vbus-gpio interrupt, then you set USB_SW_SEL
+> > as low? If disconnected, you set USB_SW_SEL as high?
+> 
+> Right. The documented behavior is to detect the micro-usb cable and
+> drive USB_SW_SEL low. When the cable is unplugged we drive USB_SW_SEL
+> high. Maybe that should be changed though? If we always sampled
+> USB_SW_SEL as a USB_HOST extcon and the vbus line as a USB extcon then
+> we could allow the user to decide either with the physical switch or
+> with some sort of software control to toggle that gpio.
+> 
+> > When the USB controller works at Host mode, what will happen if the user
+> > connects USB cable at device port?
+> 
+> The devices on the two type-A connectors will be disconnected and we'll
+> switch from host mode to device mode.
+> 
+> > 
+> > 3. Using sysfs to switch the role
+> > Set USB_SW_SEL according to "role" at debugfs
+> 
+> sysfs isn't debugfs, but yes I wonder if we need to worry about the
+> debugfs role switching support here and toggle the gpio manually without
+> involving extcon. That would mean we need to have a way for the chipidea
+> controller to toggle this gpio/mux itself.
+> 
+> > 
+> > Which one you would like to implement? Or anything else I miss?
+> > 
+> 
+> Mostly #2, but I'm concerned that the DT binding is going to force that
+> decision on others who may have the same switch and want to do #1 or #3.
+> So how to design it in a way that makes it work in all cases? Also, what
+> to do if the USB_SW_SEL switch is driven high by the physical switch?
+> That will "override" any software control we might be able to use, so
+> hopefully we can detect this somehow and prevent the role switch from
+> happening.
+
+>From my point, the physical switch is only used to force host mode. The
+#1 and #2 can't be supported at the same time. For #3, it is not the
+use case for this design. #3 is usually used for the single port which
+needs to support switching role on the fly without disconnection.
+So, you may only need to consider #2, you can't use extcon-usb-gpio.c
+directly since you need to set one gpio to mux the dp/dm, Baolu Lu had
+USB MUX patch set before which may satisfy your requirement. [1]
+
+[1] https://lkml.org/lkml/2016/5/30/36
+
+-- 
+
+Best Regards,
+Peter Chen
