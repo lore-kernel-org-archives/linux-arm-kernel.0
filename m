@@ -1,100 +1,147 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 15 Sep 2016 12:05:51 +0000
-Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <8360154.kzsE8V8pTW@wuerfel>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <5869118.UilSPY9Sai@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F871B01@lhreml507-mbx>
- <8360154.kzsE8V8pTW@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F871F72@lhreml507-mbx>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 15 Sep 2016 14:06:18 +0200
+Subject: [PATCH 4/5] ARM: dts: exynos: add support for ISP power domain to
+ exynos4x12 clocks device
+In-Reply-To: <20160912222852.GH7243@codeaurora.org>
+References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
+ <1472737551-15272-5-git-send-email-m.szyprowski@samsung.com>
+ <20160908002254.GD13062@codeaurora.org>
+ <CGME20160912102332eucas1p145e79669788329b44343da62dcbe50ca@eucas1p1.samsung.com>
+ <f340cca5-6cd6-6bd1-3b9a-ccd58cbc0091@samsung.com>
+ <20160912222852.GH7243@codeaurora.org>
+Message-ID: <6e52af56-8b0e-d8c4-62c2-6efeee0e912d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Hi Stephen,
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 15 September 2016 09:22
-> To: Gabriele Paoloni
-> Cc: linux-arm-kernel at lists.infradead.org; Yuanzhichang;
-> devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com; minyard at acm.org;
-> gregkh at linuxfoundation.org; benh at kernel.crashing.org; John Garry;
-> will.deacon at arm.com; linux-kernel at vger.kernel.org; xuwei (O); Linuxarm;
-> linux-serial at vger.kernel.org; linux-pci at vger.kernel.org;
-> zourongrong at gmail.com; liviu.dudau at arm.com; kantyzc at 163.com;
-> zhichang.yuan02 at gmail.com
-> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
-> Hip06
-> 
-> On Thursday, September 15, 2016 8:02:27 AM CEST Gabriele Paoloni wrote:
-> >
-> > From <<3.1.1. Open Firmware Properties for Bus Nodes>> in
-> > http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
-> >
-> > I quote:
-> > "There shall be an entry in the "ranges" property for each
-> > of the Memory and/or I/O spaces if that address space is
-> > mapped through the bridge."
-> >
-> > It seems to me that it is ok to have 1:1 address mapping and that
-> > therefore of_translate_address() should fail if "ranges" is not
-> > present.
-> 
-> The key here is the definition of "mapped through the bridge".
-> I can only understand this as "directly mapped", i.e. an I/O
-> port of the child bus corresponds directly to a memory address
-> on the parent bus, but this is not the case here.
-> 
-> The problem with adding the mapping here is that it looks
-> like it should be valid to create a page table entry for
-> the address returned from the translation and access it through
-> a pointer dereference, but that is clearly not possible.
+On 2016-09-13 00:28, Stephen Boyd wrote:
+> On 09/12, Marek Szyprowski wrote:
+>> On 2016-09-08 02:22, Stephen Boyd wrote:
+>>> On 09/01, Marek Szyprowski wrote:
+>>>> Exynos4412 clock controller contains some additional clocks for FIMC-ISP
+>>>> (Camera ISP) subsystem. Registers for those clocks are partially located
+>>>> in the SOC area, which belongs to ISP power domain.
+>>>>
+>>>> This patch extends clock controller node with ISP clock sub-node and link
+>>>> (phandle) to ISP power domain.
+>>>>
+>>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>> ---
+>>>>   arch/arm/boot/dts/exynos4x12.dtsi | 5 +++++
+>>>>   1 file changed, 5 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+>>>> index 3394bdcf10ae..4daea67546b9 100644
+>>>> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+>>>> @@ -74,6 +74,11 @@
+>>>>   		compatible = "samsung,exynos4412-clock";
+>>>>   		reg = <0x10030000 0x20000>;
+>>>>   		#clock-cells = <1>;
+>>>> +
+>>>> +		isp-clock-controller {
+>>>> +			compatible = "samsung,exynos4412-isp-clock";
+>>>> +			power-domains = <&pd_isp>;
+>>>> +		};
+>>> Why can't we extend support in power domains code to have
+>>> multiple domains for a single device node? i.e. power-domains =
+>>> <&pd_isp>, <&pd_foo>, <&pd_bar>, and then pick the right one with
+>>> power-domain-names or something like that? Making a subnode
+>>> (which seems to turn into a child platform device?) seems like a
+>>> quick solution for larger problems.
+>> The larger problem here is the fact that clock controller is
+>> partially located
+>> in different power areas of SoC. Majority of the clock controllers
+>> is located
+>> in the area which is typically always powered (besides system sleep case),
+>> while a few Camera ISP registers are located in the ISP block, which have
+>> separate power domain. Having a separate nodes for sub-parts of the
+>> device is
+>> rather common approach, already practices by some more complex devices.
+>>
+>> I see some serious design problems with multiple entries in power domains
+>> property. First how to show that some part of the device IS NOT in
+>> any domain?
+> Is that even possible? Every device should be in some power
+> domain, even if it's just an "always on" power domain that we
+> don't really control from software.
 
-I understand that somehow we are abusing of the ranges property
-here however the point is that with the current implementation ranges
-is needed because otherwise the ipmi driver probe will fail here:
+Right now none dts of which I'm aware of doesn't define the power domain for
+the parts of the SoC, which are always on and doesn't need any additional
+management.
 
-of_ipmi_probe -> of_address_to_resource -> __of_address_to_resource
--> of_translate_address -> __of_translate_address
+>
+>> The question is how the automated assignment to domains would be handled for
+>> such case?
+> I don't get this part. Do you mean how we indicate to the driver
+> which power domain to use at the right time?
 
-Now we had a bit of discussion internally and to avoid
-having ranges we came up with two possible solutions:
+This was about Linux device core, which assigns device to its power domain
+and ensures that the power domain is in right state during device probe and
+then during device operation. Currently core supports only one domain per
+device, so the question was which domain to chose if there are more than
+one listed.
 
-1) Using bit 3 of phys.hi cell in 2.2.1 of
-http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
-This would mean reworking of_bus_isa_get_flags in 
-http://lxr.free-electrons.com/source/drivers/of/address.c#L398
-and setting a new flag to be checked in __of_address_to_resource
+>
+>> The second is related to Linux kernel internals. Right now device
+>> drivers are
+>> not aware of the power domains - there are no direct calls to power domains
+>> code, everything is hidden behind runtime pm which does all the hard work.
+> Right. Runtime PM will need to be improved to allow this case.
+>
+>> Similar situation is on Exynos 542x/5800, which will look more or less like
+>> this:
+>>
+>>          clock: clock-controller at 10010000 {
+>>               compatible = "samsung,exynos5420-clock";
+>>               reg = <0x10010000 0x30000>;
+>>               #clock-cells = <1>;
+>> +
+>> +            gsc-clock-controller {
+>> +                 compatible = "samsung,exynos5420-gsc-clock";
+>> +                 power-domains = <&gsc_pd>;
+>> +            };
+>> +
+>> +            isp-clock-controller {
+>> +                 compatible = "samsung,exynos5420-isp-clock";
+>> +                 power-domains = <&isp_pd>;
+>> +            };
+>> +
+>> +            mfc-clock-controller {
+>> +                 compatible = "samsung,exynos5420-mfc-clock";
+>> +                 power-domains = <&mfc_pd>;
+>> +            };
+>> +
+>> +            msc-clock-controller {
+>> +                 compatible = "samsung,exynos5420-msc-clock";
+>> +                 power-domains = <&msc_pd>;
+>> +            };
+>> +
+>> +            disp-clock-controller {
+>> +                 compatible = "samsung,exynos5420-disp-clock";
+>> +                 power-domains = <&disp_pd>;
+>> +            };
+>>           };
+>>
+>> The patch is not yet ready, so I didn't include it in this patchset.
+> Ok. From a DT perspective the sub-nodes seem to be a workaround
+> for how the linux device model is mapped to power domains. I'm
+> not sure we want to make subnodes in the clk controller just to
+> make sub devices that we can target from the clk registration
+> path. Those sub nodes aren't devices at all. I understand why
+> it's being done this way, I just don't see how it fits into DT
+> design methodologies.
 
-2) Adding a property in the bindings of each device that is
-a child of our LPC bus and modify __of_address_to_resource
-to check if the property is in the DT and eventually bypass
-of_translate_address
+I don't think that using sub-nodes for describing details of the given
+hardware block is something uncommon in DT. Please check pin control
+or PMICs (especially regulator providers). Same for various "port"
+sub-nodes often used by various video/display devices and bridges.
 
-However in both 1) and 2) there are some issues:
-in 1) we are not complying with the isa binding doc (we use
-a bit that should be zero); in 2) we need to modify the
-bindings documentation of the devices that are connected
-to our LPC controller (therefore modifying other devices
-bindings to fit our special case).
+The above presented method describes well which sub-part of clock
+controller is placed in which power domain.
 
-I think that maybe having the 1:1 range mapping doesn't
-reflect well the reality but it is the less painful
-solution...
-
-What's your view?
- 
-Many Thanks
-
-Gab
-
-> 
-> > This is also explained quite well in
-> > http://lxr.free-electrons.com/source/drivers/of/address.c#L490
-> >
-> > what do you think?
-> 
-> This is a separate issue, and only relevant for Apple Macintosh
-> machines as well as the PA-Semi sdc.
-> 
-> 	Arnd
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
