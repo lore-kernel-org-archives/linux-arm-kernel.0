@@ -1,81 +1,56 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Thu, 15 Sep 2016 18:36:30 +0200
-Subject: [PATCH v4 3/3] ASoC: sun4i-codec: Add custom regmap configs
-In-Reply-To: <20160915163630.18026-1-dannym@scratchpost.org>
-References: <20160915163630.18026-1-dannym@scratchpost.org>
-Message-ID: <20160915163630.18026-4-dannym@scratchpost.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 15 Sep 2016 10:37:05 -0600
+Subject: [PATCH V6 0/3] Adding support for address filters
+Message-ID: <1473957428-28311-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ASoC: sun4i-codec: The A20 has a few extra registers that the A10
-doesn't have.
-Therefore, use different regmaps for A10 as compared to A20.
+This patch set makes it possible to use the current filter
+framework with address filters.  That way address filters for
+HW tracers such as CoreSight and IntelPT can be communicated
+to the kernel drivers.
 
-Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
+In this revision precursor work is done to make function
+perf_evsel__append_filter() generic, along with changes to
+current customers.  From there the work on address filters is
+introduced.
+
+Thanks,
+Mathieu
+
 ---
- sound/soc/sunxi/sun4i-codec.c | 33 ++++++++++++++++++++++++++++++---
- 1 file changed, 30 insertions(+), 3 deletions(-)
+Changes for V6:
+ - Split work in 3 (small) patches.
+ - Adding tracepoint and address filter append() functions
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 3b53b78..c5d6d84c 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -682,12 +682,37 @@ static const struct regmap_config sun4i_codec_regmap_config = {
- 	.reg_bits	= 32,
- 	.reg_stride	= 4,
- 	.val_bits	= 32,
-+	.max_register	= SUN4I_CODEC_ADC_RXCNT,
-+};
-+
-+static const struct regmap_config sun7i_codec_regmap_config = {
-+	.reg_bits	= 32,
-+	.reg_stride	= 4,
-+	.val_bits	= 32,
- 	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
- };
- 
-+struct sun4i_codec_quirks {
-+	const struct regmap_config *regmap_config;
-+};
-+
-+static const struct sun4i_codec_quirks sun4i_codec_quirks = {
-+	.regmap_config = &sun4i_codec_regmap_config,
-+};
-+
-+static const struct sun4i_codec_quirks sun7i_codec_quirks = {
-+	.regmap_config = &sun7i_codec_regmap_config,
-+};
-+
- static const struct of_device_id sun4i_codec_of_match[] = {
--	{ .compatible = "allwinner,sun4i-a10-codec" },
--	{ .compatible = "allwinner,sun7i-a20-codec" },
-+	{
-+		.compatible = "allwinner,sun4i-a10-codec",
-+		.data = &sun4i_codec_quirks,
-+	},
-+	{
-+		.compatible = "allwinner,sun7i-a20-codec",
-+		.data = &sun7i_codec_quirks,
-+	},
- 	{}
- };
- MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
-@@ -760,6 +785,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card;
- 	struct sun4i_codec *scodec;
-+	const struct sun4i_codec_quirks *quirks;
- 	struct resource *res;
- 	void __iomem *base;
- 	int ret;
-@@ -777,8 +803,9 @@ static int sun4i_codec_probe(struct platform_device *pdev)
- 		return PTR_ERR(base);
- 	}
- 
-+	quirks = of_device_get_match_data(&pdev->dev);
- 	scodec->regmap = devm_regmap_init_mmio(&pdev->dev, base,
--					     &sun4i_codec_regmap_config);
-+					       quirks->regmap_config);
- 	if (IS_ERR(scodec->regmap)) {
- 		dev_err(&pdev->dev, "Failed to create our regmap\n");
- 		return PTR_ERR(scodec->regmap);
+Changes for V5:
+ - Modified perf_evsel__append_filter() to take a string format
+   rather than an operation.
+
+Changes for V4:
+ - Added support for address filters over more than one
+   nibble.
+ - Removed Jiri's ack, this version is too different from
+   what was reviewed.
+
+Changes for V3:
+ - Added Jiri's ack.
+ - Rebased to v4.8-rc5.
+
+Changes for V2:
+ - Rebased to v4.8-rc4.
+ - Revisited error path.
+
+Mathieu Poirier (3):
+  perf tools: making perf_evsel__append_filter() generic
+  perf tools: new tracepoint specific function
+  perf tools: adding support for address filters
+
+ tools/perf/builtin-trace.c     |  8 ++++++--
+ tools/perf/util/evsel.c        | 16 +++++++++++++---
+ tools/perf/util/evsel.h        |  5 +++--
+ tools/perf/util/parse-events.c | 41 +++++++++++++++++++++++++++++++++++------
+ 4 files changed, 57 insertions(+), 13 deletions(-)
+
+-- 
+2.7.4
