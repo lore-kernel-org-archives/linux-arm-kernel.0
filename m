@@ -1,30 +1,76 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Sep 2016 14:44:35 +0200
-Subject: [PATCH 0/7] mfd: Fix all W=1 warnings
-In-Reply-To: <20160915104521.14286-1-lee.jones@linaro.org>
-References: <20160915104521.14286-1-lee.jones@linaro.org>
-Message-ID: <CACRpkdYGW4bkWXZp6JWMLCxne0a7cp9rNkipA_tZmzL=9CRjfw@mail.gmail.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Thu, 15 Sep 2016 14:44:02 +0200
+Subject: [PATCH v6 0/2] add support for Allwinner SoCs ADC
+Message-ID: <1473943444-23979-1-git-send-email-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 12:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
+The Allwinner SoCs all have an ADC that can also act as a touchscreen
+controller and a thermal sensor. The first four channels can be used either
+for the ADC or the touchscreen and the fifth channel is used for the
+thermal sensor. We currently have a driver for the two latter functions in
+drivers/input/touchscreen/sun4i-ts.c but we don't have access to the ADC
+feature at all. It is meant to replace the current driver by using MFD and
+subdrivers.
 
-> It really is as simple as it sounds!
->
-> Lee Jones (7):
->   mfd: max8997-irq: 'inline' should be at the beginning of the
->     declaration
->   mfd: ab8500-debugfs: Prevent initialised field from being over-written
->   mfd: db8500-prcmu: Remove unused *prcmu_set_ddr_opp() calls
->   mfd: ab8500-debugfs: Remove ab8500_dump_all_banks_to_mem()
->   mfd: ab8500-debugfs: Remove 'weak' function
->     suspend_test_wake_cause_interrupt_is_mine()
->   mfd: omap-usb-host: Return value is not 'const int'
->   mfd: cros_ec_spi: Remove unused variable 'request'
+This adds initial support for Allwinner SoCs ADC with all features. Yet,
+the touchscreen is not implemented but will be added later. To switch
+between touchscreen and ADC modes, you need to poke a few bits in registers
+and (de)activate an interrupt (pen-up).
+An MFD is provided to let the input driver activate the pen-up interrupt
+through a virtual interrupt, poke a few bits via regmap and read data from
+the ADC driver while both (and iio_hwmon) are probed by the MFD.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+There are slight variations between the different SoCs ADC like the address
+of some registers and the scale and offset to apply to raw thermal sensor
+values. These variations are handled by using different platform_device_id,
+passed to the sub-drivers when they are probed by the MFD.
 
-For all the ab8500 and db8500 stuff.
+Removal of proposed patch for iio_hwmon's iio channel's label in v3. The
+patch induces irreversible ABI changes and will be handled as a separate
+patch since I think it is not absolutely necessary to have labels yet in
+iio_hwmon.
 
-Yours,
-Linus Walleij
+Removal of proposed patch for reattaching of_node of the MFD to the MFD
+cell device structure in v3. As Lee Jones said, this patch might cause
+"unintended side-effects for existing drivers.". Moreover, this patch
+introduced a bug of multiple probe of this MFD driver I haven't identified
+yet. This patch aimed at allowing the ADC driver (which is a child of the
+MFD and not present in the DT) to register in the thermal framework. The
+thermal driver has a phandle to the MFD node which is used to match against
+the MFD of_node but since the ADC driver has no node in the DT, could not
+register in the thermal framework. The other solution is to "impersonate"
+the MFD when registering in the thermal framework since the device is only
+used to match the phandle and the of_node, an other structure passed by
+parameter being used to compute temperatures.
+
+(in the ADC driver, probed by the MFD driver) instead of:
+tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, info,
+					   &sun4i_ts_tz_ops);
+we now have:
+tzd = devm_thermal_zone_of_sensor_register(pdev->dev.parent, 0, info,
+					   &sun4i_ts_tz_ops);
+
+Removal of proposed patch to use late_initcall for iio_hwmon probe deferring.
+
+Removal of patch for iio_hwmon probe deferring due to being applied to -next by
+Guenter Roeck.
+
+Quentin Schulz (2):
+  mfd: add support for Allwinner SoCs ADC
+  iio: adc: add support for Allwinner SoCs ADC
+
+ drivers/iio/adc/Kconfig           |  13 +
+ drivers/iio/adc/Makefile          |   1 +
+ drivers/iio/adc/sun4i-gpadc-iio.c | 522 ++++++++++++++++++++++++++++++++++++++
+ drivers/mfd/Kconfig               |  15 ++
+ drivers/mfd/Makefile              |   2 +
+ drivers/mfd/sun4i-gpadc.c         | 181 +++++++++++++
+ include/linux/mfd/sun4i-gpadc.h   |  94 +++++++
+ 7 files changed, 828 insertions(+)
+ create mode 100644 drivers/iio/adc/sun4i-gpadc-iio.c
+ create mode 100644 drivers/mfd/sun4i-gpadc.c
+ create mode 100644 include/linux/mfd/sun4i-gpadc.h
+
+-- 
+2.5.0
