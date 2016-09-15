@@ -1,29 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Sep 2016 17:18:29 +0100
-Subject: [PATCH] arm64: kprobe: Always clear pstate.D in breakpoint
- exception handler
-In-Reply-To: <CAHB_Guods-iED+tOLeJ9XCWDvAVoButwz2XWSiP+eMYDzFhfyQ@mail.gmail.com>
-References: <1059f6762466c2cebf32aa40e4d7974731a68726.1471848065.git.panand@redhat.com>
- <20160823000531.b12ac14c18ce8e9d3abc74ec@kernel.org>
- <CAAOGbpwcx3G8Jdf1AfNRLrkZJQLaCcLWQPRppjvpy3=hSrffjg@mail.gmail.com>
- <20160824100644.GB4408@localhost.localdomain>
- <CAHB_Guods-iED+tOLeJ9XCWDvAVoButwz2XWSiP+eMYDzFhfyQ@mail.gmail.com>
-Message-ID: <20160915161828.GH3380@arm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 15 Sep 2016 21:56:51 +0530
+Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <20160810173710.GK9681@localhost>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+ <20160810173710.GK9681@localhost>
+Message-ID: <20160915162650.GZ13920@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 09:45:09PM +0530, Pratyush Anand wrote:
-> On Wed, Aug 24, 2016 at 3:36 PM, Pratyush Anand <panand@redhat.com> wrote:
-> > On 23/08/2016:04:33:08 PM, Sandeepa Prabhu wrote:
-> >> Thanks for the fix, feel free to add my ACK as well. Has it been tested on
-> >> guest kernel?
-> >
-> > have not tested on guest kernel.Will do.
+On Wed, Aug 10, 2016 at 11:07:10PM +0530, Vinod Koul wrote:
+> On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
+> > Hi,
+> > 
+> > This series tries to solve the problem with DMA with device registers
+> > (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
+> > recent patch '9575632 (dmaengine: make slave address physical)'
+> > clarifies that DMA slave address provided by clients is the physical
+> > address. This puts the task of mapping the DMA slave address from a
+> > phys_addr_t to a dma_addr_t on the DMA engine.
+> > 
+> > Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
+> > the same and no special care is needed. However if you have a IOMMU you
+> > need to map the DMA slave phys_addr_t to a dma_addr_t using something
+> > like this.
+> > 
+> > This series is based on top of v4.8-rc1. And I'm hoping to be able to collect a
+> > Ack from Russell King on patch 4/6 that adds the ARM specific part and then be
+> > able to take the whole series through the dmaengine tree. If this is not the
+> > best route I'm more then happy to do it another way.
+> > 
+> > It's tested on a Koelsch with CONFIG_IPMMU_VMSA and by enabling the
+> > ipmmu_ds node in r8a7791.dtsi. I verified operation by interacting with
+> > /dev/mmcblk1, i2c and the serial console which are devices behind the
+> > iommu.
 > 
-> I tested it with guest kernel, and it worked there too :-).
-> 
-> @Catalin: any more comment for this patch? If not, then may be you can take it.
+> As I said in last one, the dmaengine parts look fine to me. But to go thru
+> dmaengine tree I would need ACK on non dmaengine patches.
 
-I already queued this on the arm64 for-next/core branch.
+I havent heard back from this one and I am inclined to merge this one now.
+If anyone has any objects, please speak up now...
 
-Will
+Also ACKs welcome...
+
+-- 
+~Vinod
