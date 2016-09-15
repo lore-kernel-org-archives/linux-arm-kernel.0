@@ -1,72 +1,62 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Thu, 15 Sep 2016 09:48:03 +0200
-Subject: [PATCH v3 14/14] ARM: DT: STi: STiH410: clock configuration to
- address 720p and 1080p
-In-Reply-To: <1472473626-15398-15-git-send-email-gabriel.fernandez@st.com>
-References: <1472473626-15398-1-git-send-email-gabriel.fernandez@st.com>
- <1472473626-15398-15-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <8042275a-1699-d6f8-b425-e2947e196889@st.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 15 Sep 2016 16:56:18 +0900
+Subject: [RESEND PATCH] arm64: kgdb: fix single stepping
+In-Reply-To: <20160914145850.GE19622@arm.com>
+References: <1429578793-3971-1-git-send-email-takahiro.akashi@linaro.org>
+ <20160914145850.GE19622@arm.com>
+Message-ID: <20160915075617.GJ16712@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/29/2016 02:27 PM, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On Wed, Sep 14, 2016 at 03:58:51PM +0100, Will Deacon wrote:
+> Hi Akashi,
 > 
-> It is necessary to properly configure these clocks in order
-> to address 720p and 1080p HDMI resolution.
+> On Tue, Apr 21, 2015 at 02:13:13AM +0100, AKASHI Takahiro wrote:
+> > Could you please review my patch below?
+> > See also arm64 maintainer's comment:
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313712.html
 > 
-> Signed-off-by: Vincent Abriou <vincent.abriou@st.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> Acked-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/boot/dts/stih410.dtsi | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
-> index 18ed1ad..7eec729 100644
-> --- a/arch/arm/boot/dts/stih410.dtsi
-> +++ b/arch/arm/boot/dts/stih410.dtsi
-> @@ -103,7 +103,10 @@
->  			#size-cells = <1>;
->  
->  			assigned-clocks	= <&clk_s_d2_quadfs 0>,
-> -					  <&clk_s_d2_quadfs 0>,
-> +					  <&clk_s_d2_quadfs 1>,
-> +					  <&clk_s_c0_pll1 0>,
-> +					  <&clk_s_c0_flexgen CLK_COMPO_DVP>,
-> +					  <&clk_s_c0_flexgen CLK_MAIN_DISP>,
->  					  <&clk_s_d2_flexgen CLK_PIX_MAIN_DISP>,
->  					  <&clk_s_d2_flexgen CLK_PIX_AUX_DISP>,
->  					  <&clk_s_d2_flexgen CLK_PIX_GDP1>,
-> @@ -113,14 +116,21 @@
->  
->  			assigned-clock-parents = <0>,
->  						 <0>,
-> +						 <0>,
-> +						 <&clk_s_c0_pll1 0>,
-> +						 <&clk_s_c0_pll1 0>,
->  						 <&clk_s_d2_quadfs 0>,
-> -						 <&clk_s_d2_quadfs 0>,
-> +						 <&clk_s_d2_quadfs 1>,
->  						 <&clk_s_d2_quadfs 0>,
->  						 <&clk_s_d2_quadfs 0>,
->  						 <&clk_s_d2_quadfs 0>,
->  						 <&clk_s_d2_quadfs 0>;
->  
-> -			assigned-clock-rates = <297000000>, <297000000>;
-> +			assigned-clock-rates = <297000000>,
-> +					       <108000000>,
-> +					       <0>,
-> +					       <400000000>,
-> +					       <400000000>;
->  
->  			ranges;
->  
-> 
-Hi Gabriel
+> -ETIMEDOUT waiting for the kdgb folk to comment. Ppeople have reported
+> that this patch is required for kgdb to work correctly on arm64, so I'm
+> happy to merge it.
 
-Applied on STi tree for v4.9
+I'm happy, too.
 
-Thanks
+> However, as detailed in your comment log:
+> 
+> > This patch
+> > (1) moves kgdb_disable_single_step() from 'c' command handling to single
+> >     step handler.
+> >     This makes sure that single stepping gets effective at every 's' command.
+> >     Please note that, under the current implementation, single step bit in
+> >     spsr, which is cleared by the first single stepping, will not be set
+> >     again for the consecutive 's' commands because single step bit in mdscr
+> >     is still kept on (that is, kernel_active_single_step() in
+> >     kgdb_arch_handle_exception() is true).
+> > (2) re-implements kgdb_roundup_cpus() because the current implementation
+> >     enabled interrupts naively. See below.
+> > (3) removes 'enable_dbg' in el1_dbg.
+> >     Single step bit in mdscr is turned on in do_handle_exception()->
+> >     kgdb_handle_expection() before returning to debugged context, and if
+> >     debug exception is enabled in el1_dbg, we will see unexpected single-
+> >     stepping in el1_dbg.
+> >     Since v3.18, the following patch does the same:
+> >       commit 1059c6bf8534 ("arm64: debug: don't re-enable debug exceptions
+> >       on return from el1_dbg)
+> > (4) masks interrupts while single-stepping one instruction.
+> >     If an interrupt is caught during processing a single-stepping, debug
+> >     exception is unintentionally enabled by el1_irq's 'enable_dbg' before
+> >     returning to debugged context.
+> >     Thus, like in (2), we will see unexpected single-stepping in el1_irq.
+> 
+> this patch is doing *far* too much in one go. Could you please repost it
+> as a series of self-contained fixes with clear commit messages, so I can
+> queue them and cc stable where appropriate?
+
+Sure, but I need to refresh my memory here.
+
+-Takahiro AKASHI
+
+> Thanks,
+> 
+> Will
