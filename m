@@ -1,77 +1,58 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 15 Sep 2016 09:08:10 +0200
-Subject: [PATCH v7 22/22] iommu/dma: Avoid PCI host bridge windows
-In-Reply-To: <bbdc42fa-ea35-945f-3e2a-e0ab03fc997d@arm.com>
-References: <cover.1473695704.git.robin.murphy@arm.com>
- <CGME20160912161514eucas1p10818019bf2302609421ad9c35d1af4b8@eucas1p1.samsung.com>
- <5f7bfee298f98d29a35933d3e0252d32b83d62b8.1473695704.git.robin.murphy@arm.com>
- <ab8693f6-20d6-2a95-9f1f-0607e72bc012@samsung.com>
- <49c51c4f-cb00-445d-b8f8-b632babf2b3e@arm.com>
- <dc9f945f-2756-ab70-d061-9fdc7c5afdee@samsung.com>
- <bbdc42fa-ea35-945f-3e2a-e0ab03fc997d@arm.com>
-Message-ID: <a7082074-0492-7522-6ddc-f7f95c6e0db6@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Sep 2016 08:30:30 +0100
+Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.9 -
+ part1
+In-Reply-To: <CADaLNDmMEWEd4o-tf4Kcqy7PP-abBg=Q1-Qdvv5CoDdoLEvi=Q@mail.gmail.com>
+References: <CADaLNDkZdAipxx6cfLJ6yrzTrcLPS_Ciw8+T5EUFVcRRw+fjPw@mail.gmail.com>
+ <6041122.z65jfDXEcc@wuerfel>
+ <CADaLNDmMEWEd4o-tf4Kcqy7PP-abBg=Q1-Qdvv5CoDdoLEvi=Q@mail.gmail.com>
+Message-ID: <20160915072709.GA3380@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Wed, Sep 14, 2016 at 06:57:59PM -0700, Duc Dang wrote:
+> On Wed, Sep 14, 2016 at 7:59 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday, September 2, 2016 11:46:31 AM CEST Duc Dang wrote:
+> >> Hi Arnd, Olof,
+> >>
+> >> This is the first part of DTS changes for X-Gene platforms targeted for 4.9.
+> >>
+> >> The changes include:
+> >> + X-Gene Soc PMU support patch set from Tai Nguyen (v10 reviewed by
+> >> Mark, DT binding document acked by Rob [1] and was suggested to merge
+> >> via am-soc tree by Will [2])
+> >> + Follow up patch to enable DT entry for SoC PMU on X-Gene v2
+> >> + Correct PCIe legacy interrupt mode to level-active high
+> >> + DTS entry for X-Gene hwmon (v4 acked by Guenter, DT binding document
+> >> and driver is in linux-next now [3])
+> >>
+> >> Regards,
+> >> Duc Dang.
+> >
+> > Sorry for the long delay, I've just now started looking at the dts changes
+> > for arm64. The changes to arch/arm64/boot/dts look fine, but I don't
+> > want to mix driver changes with dts changes, as we use separate
+> > branches for those.
+> >
+> > Please send this again as two pull requests, one for the dts changes, and
+> > one for the rest (pmu driver, binding and MAINTAINERS file). Please
+> > also include an explanation in the tag description about why this gets
+> > merged through arm-soc. I see that Will suggested doing it that way,
+> > but I don't see what the reason is. We normally don't touch that directory.
+> Hi Arnd,
+> 
+> I am not clear about the reason either. Probably we don't have a
+> dedicated tree for SoC PMU?
 
+That's right, there isn't a dedicated tree for SoC PMUs. I tend to handle
+the architected PMUs (e.g. the ones in the CPUs), but other PMUs have
+been ad-hoc in the past. That said, Mark and I do tend to review PMU
+drivers, because the internal perf interface is pretty easy to get wrong.
 
-On 2016-09-14 15:25, Robin Murphy wrote:
-> On 14/09/16 13:35, Marek Szyprowski wrote:
->> On 2016-09-14 13:10, Robin Murphy wrote:
->>> On 14/09/16 11:55, Marek Szyprowski wrote:
->>>> On 2016-09-12 18:14, Robin Murphy wrote:
->>>>> With our DMA ops enabled for PCI devices, we should avoid allocating
->>>>> IOVAs which a host bridge might misinterpret as peer-to-peer DMA and
->>>>> lead to faults, corruption or other badness. To be safe, punch out
->>>>> holes
->>>>> for all of the relevant host bridge's windows when initialising a DMA
->>>>> domain for a PCI device.
->>>>>
->>>>> CC: Marek Szyprowski <m.szyprowski@samsung.com>
->>>>> CC: Inki Dae <inki.dae@samsung.com>
->>>>> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>>> I don't know much about PCI and their IOMMU integration, but can't we
->>>> use
->>>> the direct mapping region feature of iommu core for it? There are
->>>> already
->>>> iommu_get_dm_regions(), iommu_put_dm_regions() and
->>>> iommu_request_dm_for_dev()
->>>> functions for handling them...
->>> It's rather the opposite problem - in the direct-mapping case, we're
->>> making sure the iommu_domain has translations installed for the given
->>> IOVAs (which are also the corresponding physical address) before it goes
->>> live, whereas what we need to do here is make sure the these addresses
->>> never get used as IOVAs at all, because any attempt to do so them will
->>> likely go wrong. Thus we carve them out of the iova_domain such that
->>> they will never get near an actual IOMMU API call.
->>>
->>> This is a slightly generalised equivalent of e.g. amd_iommu.c's
->>> init_reserved_iova_ranges().
->> Hmmm. Each dm_region have protection parameter. Can't we reuse them to
->> create prohibited/reserved regions by setting it to 0 (no read / no write)
->> and mapping to physical 0 address? That's just a quick idea, because
->> dm_regions and the proposed code for pci looks a bit similar for me...
-> It might look similar, but at different levels (iommu_domain vs.
-> iova_domain) and with the opposite intent. The dm_region prot flag is
-> just the standard flag as passed to iommu_map() - trying to map a region
-> with no access in an empty pagetable isn't going to achieve anything
-> anyway (it's effectively unmapping addresses that are already unmapped).
->
-> But for this case, even if you _did_ map something in the pagetable
-> (i.e. the iommu_domain), it wouldn't make any difference, because the
-> thing we're mitigating against is handing out addresses which are going
-> to cause a device's accesses to blow up inside the PCI root complex
-> without ever even reaching the IOMMU. In short, dm_regions are about
-> "these addresses are already being used for DMA, so make sure the IOMMU
-> API doesn't block them", whereas reserved ranges are about "these
-> addresses are unusable for DMA, so make sure the DMA API can't allocate
-> them".
+Arnd -- what would you like to see here? I could collect SoC PMU patches
+together and send you a pull request, or would you like me to take them via
+the arm64 tree? It's worth noting that we have PMU drivers under drivers/bus
+and drivers/hwtracing too, and I *think* arm-soc has handled those in the
+past.
 
-Okay, thanks for the explanation.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Will
