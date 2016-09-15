@@ -1,109 +1,97 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 16 Sep 2016 00:31:57 +0200
-Subject: [PATCH] soc: rockchip: power-domain: Handle errors from
- of_genpd_add_provider_onecell
-In-Reply-To: <14744126.0kYUlUJ0mc@diego>
-References: <1473936221-9248-1-git-send-email-tomeu.vizoso@collabora.com>
- <14744126.0kYUlUJ0mc@diego>
-Message-ID: <6250295.kzQYkblnJM@diego>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 15 Sep 2016 15:59:54 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.9, round 2 (for next/late)
+Message-ID: <7h37l0kbv9.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 15. September 2016, 16:39:34 schrieb Heiko St?bner:
-> Am Donnerstag, 15. September 2016, 12:43:41 schrieb Tomeu Vizoso:
-> > It was a bit surprising that the device was reported to have probed just
-> > fine, but the provider hadn't been registered.
-> > 
-> > So handle any errors when registering the provider and fail the probe
-> > accordingly.
-> > 
-> > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> > Cc: Caesar Wang <wxt@rock-chips.com>
-> > ---
-> > 
-> >  drivers/soc/rockchip/pm_domains.c | 6 +++++-
-> >  1 file changed, 5 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/soc/rockchip/pm_domains.c
-> > b/drivers/soc/rockchip/pm_domains.c index 7acd1517dd37..57e920128cb2
-> > 100644
-> > --- a/drivers/soc/rockchip/pm_domains.c
-> > +++ b/drivers/soc/rockchip/pm_domains.c
-> > @@ -627,7 +627,11 @@ static int rockchip_pm_domain_probe(struct
-> > platform_device *pdev) goto err_out;
-> > 
-> >  	}
-> > 
-> > -	of_genpd_add_provider_onecell(np, &pmu->genpd_data);
-> > +	error = of_genpd_add_provider_onecell(np, &pmu->genpd_data);
-> > +	if (error) {
-> > +		dev_err(dev, "failed to add provider: %d\n", error);
-> > +		goto err_out;
-> > +	}
-> > 
-> >  	return 0;
-> 
-> Looks good in itself, but seems to trigger some issue in the genpd code
-> when applied alone on top of linux-next-20160915. Looks like genpd
-> is missing counter-initialization somewhere, as I'm seeing now:
-> 
-> [    1.664744] genpd_poweroff_unused disabling (null)
-> [    1.669553] ------------[ cut here ]------------
-> [    1.674169] WARNING: CPU: 0 PID: 1 at ../kernel/workqueue.c:1440
-> __queue_work+0x2b8/0x3f8 [    1.682337] Modules linked in:
-> [    1.685401] CPU: 0 PID: 1 Comm: swapper/0 Not tainted
-> 4.8.0-rc6-next-20160915-00001-g7432710-dirty #5 [    1.694608] Hardware
-> name: Rockchip (Device Tree)
-> [    1.699312] [<c0310388>] (unwind_backtrace) from [<c030ba04>]
-> (show_stack+0x10/0x14) [    1.707050] [<c030ba04>] (show_stack) from
-> [<c0599c90>] (dump_stack+0x90/0xa4) [    1.714267] [<c0599c90>]
-> (dump_stack) from [<c0341bc0>] (__warn+0xe8/0x100) [    1.721221]
-> [<c0341bc0>] (__warn) from [<c0341c88>] (warn_slowpath_null+0x20/0x28) [   
-> 1.728785] [<c0341c88>] (warn_slowpath_null) from [<c0355b28>]
-> (__queue_work+0x2b8/0x3f8) [    1.737041] [<c0355b28>] (__queue_work) from
-> [<c0355ca8>] (queue_work_on+0x40/0x4c) [    1.744692] [<c0355ca8>]
-> (queue_work_on) from [<c103e8b8>] (genpd_poweroff_unused+0x78/0x9c) [   
-> 1.753123] [<c103e8b8>] (genpd_poweroff_unused) from [<c0301e78>]
-> (do_one_initcall+0x40/0x170) [    1.761815] [<c0301e78>] (do_one_initcall)
-> from [<c1000dc8>] (kernel_init_freeable+0x15c/0x1fc) [    1.770507]
-> [<c1000dc8>] (kernel_init_freeable) from [<c0bb7ba0>]
-> (kernel_init+0x8/0x114) [    1.778678] [<c0bb7ba0>] (kernel_init) from
-> [<c0307df8>] (ret_from_fork+0x14/0x3c) [    1.786240] ---[ end trace
-> b38c51ace1463add ]---
-> [    1.790875] genpd_poweroff_unused disabling ??????
-> [    1.795856] genpd_poweroff_unused disabling ??????
-> [    1.800830] ------------[ cut here ]------------
-> [    1.805443] WARNING: CPU: 0 PID: 1 at ../kernel/workqueue.c:1440
-> __queue_work+0x2b8/0x3f8 [    1.813610] Modules linked in:
-> [    1.816673] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W      
-> 4.8.0-rc6-next-20160915-00001-g7432710-dirty #5 [    1.827094] Hardware
-> name: Rockchip (Device Tree)
-> [    1.831795] [<c0310388>] (unwind_backtrace) from [<c030ba04>]
-> (show_stack+0x10/0x14) [    1.839532] [<c030ba04>] (show_stack) from
-> [<c0599c90>] (dump_stack+0x90/0xa4) [    1.846747] [<c0599c90>]
-> (dump_stack) from [<c0341bc0>] (__warn+0xe8/0x100) [    1.853700]
-> [<c0341bc0>] (__warn) from [<c0341c88>] (warn_slowpath_null+0x20/0x28) [   
-> 1.861264] [<c0341c88>] (warn_slowpath_null) from [<c0355b28>]
-> (__queue_work+0x2b8/0x3f8) [    1.869521] [<c0355b28>] (__queue_work) from
-> [<c0355ca8>] (queue_work_on+0x40/0x4c) [    1.877170] [<c0355ca8>]
-> (queue_work_on) from [<c103e8b8>] (genpd_poweroff_unused+0x78/0x9c) [   
-> 1.885600] [<c103e8b8>] (genpd_poweroff_unused) from [<c0301e78>]
-> (do_one_initcall+0x40/0x170) [    1.894290] [<c0301e78>] (do_one_initcall)
-> from [<c1000dc8>] (kernel_init_freeable+0x15c/0x1fc) [    1.902981]
-> [<c1000dc8>] (kernel_init_freeable) from [<c0bb7ba0>]
-> (kernel_init+0x8/0x114) [    1.911152] [<c0bb7ba0>] (kernel_init) from
-> [<c0307df8>] (ret_from_fork+0x14/0x3c) [    1.918713] ---[ end trace
-> b38c51ace1463ade ]---
-> [    1.923338] genpd_poweroff_unused disabling ??????
-> [    1.928325] genpd_poweroff_unused disabling ??????
-> 
-> [+ millions more of those]
+Hi Arnd, Olof,
 
-just for completenes sake, I've included your patch in a series of my
-own [0] which adds the necessary  pm_genpd_remove prequisite to prevent
-the errors shown above.
+Here is round 2 of the 64-bit DT changes for v4.9.
+
+Based on my drivers pull (round 2), this is targetted at next/late also
+since the DT patches here are using clock IDs that come from my 2nd
+drivers pull (which itself has merged an immtable branch from the clock
+tree.)
+
+Please pull,
+
+Kevin
 
 
-Heiko
+The following changes since commit dfdd7d4af6ebee027be7bf2636b2314937948da6:
 
-[0] "[PATCH 0/2] soc: rockchip: fix probe error path in power-domain driver"
+  clk: gxbb: expose i2c clocks (2016-09-14 11:24:04 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
+
+for you to fetch changes up to e1e4a1a4fad203f8a02b887149809966e128a3d8:
+
+  Merge branch 'v4.8/dt64' into v4.8/dt64-2 (2016-09-15 15:35:50 -0700)
+
+----------------------------------------------------------------
+Amlogic 64-bit DT changes for v4.9, round 2
+
+Primarily adding support for newly added drivers
+
+- USB host
+- I2C
+- SPI flash controller
+- PWM
+- mailbox, MHU
+- pinctrl: add pins for SPI, I2C, SDIO
+
+and then enabling these drivers on various boards.
+
+----------------------------------------------------------------
+Carlo Caione (4):
+      documentation: Add secure monitor bindings documentation
+      ARM64: dts: amlogic: gxbb: Enable secure monitor
+      documentation: Add nvmem bindings documentation
+      ARM64: dts: amlogic: gxbb: Enable NVMEM
+
+Jerome Brunet (4):
+      ARM64: dts: amlogic: add spi nor pins
+      ARM64: dts: meson-gxbb: add pins for I2C
+      ARM64: dts: gxbb: add i2c bus
+      ARM64: dts: meson-gxbb-p20x: Enable USB Nodes
+
+Kevin Hilman (6):
+      ARM64: DTS: meson-gxbb: switch ethernet to real clock
+      Merge branch 'clk-meson-gxbb-ao' of git://git.kernel.org/.../clk/linux into v4.8/dt64
+      ARM64: dts: amlogic: add the input pin for the IR remote
+      ARM64: dts: meson-gxbb: Add PWM pinctrl nodes
+      Merge tag 'amlogic-drivers-2' into v4.8/dt64-2
+      Merge branch 'v4.8/dt64' into v4.8/dt64-2
+
+Martin Blumenstingl (5):
+      ARM64: dts: meson-gxbb: Enable the the IR decoder on supported boards
+      ARM64: dts: amlogic: enable ethernet on all Tronsmart Vega S95 devices
+      ARM64: dts: meson-gxbb: use the new GXBB DWMAC glue driver
+      ARM64: dts: meson-gxbb: add USB Nodes
+      ARM64: dts: meson-gxbb-vega-s95: Enable USB Nodes
+
+Neil Armstrong (9):
+      ARM64: dts: amlogic: meson-gxbb: Add watchdog node
+      ARM64: dts: meson-gxbb: Add GXBB AO Clock and Reset node
+      dt-bindings: media: meson-ir: Add Meson8b and GXBB compatible strings
+      ARM64: dts: meson-gxbb: Add Infrared Remote Controller decoder
+      ARM64: dts: meson-gxbb: Add Meson MHU Node
+      ARM64: dts: meson-gxbb: Add Meson GXBB PWM Controller nodes
+      ARM64: dts: meson-gxbb: add the SDIO pins
+      ARM64: dts: meson-gxbb: Add SPIFC node
+      ARM64: dts: meson-gxbb: add I2C nodes
+
+ Documentation/devicetree/bindings/firmware/meson/meson_sm.txt |  15 ++++
+ Documentation/devicetree/bindings/media/meson-ir.txt          |   5 +-
+ Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt     |  39 +++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts           |  11 +++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts               |   6 ++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi              |  35 ++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi          |  42 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                   | 329 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 8 files changed, 478 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/amlogic-efuse.txt
