@@ -1,38 +1,43 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Sep 2016 23:14:02 +0800
-Subject: [PATCH 4/4] drm/sun4i: dotclock: Round to closest clock rate
+Date: Thu, 15 Sep 2016 23:13:59 +0800
+Subject: [PATCH 1/4] drm/sun4i: rgb: Declare RGB encoder and connector as MIPI
+ DPI
 In-Reply-To: <20160915151402.15992-1-wens@csie.org>
 References: <20160915151402.15992-1-wens@csie.org>
-Message-ID: <20160915151402.15992-5-wens@csie.org>
+Message-ID: <20160915151402.15992-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With display pixel clocks we want to have the closest possible clock
-rate, to minimize timing and refresh rate skews. Whether the actual
-clock rate is higher or lower than the requested rate is less important.
-
-Also check candidates against the requested rate, rather than the
-ideal parent rate, the varying dividers also influence the difference
-between the requested rate and the rounded rate.
+The 18 or 24 bit parallel RGB LCD panel interface found on Allwinner
+SoCs matches the description of MIPI DPI. Declare the RGB encoder and
+connector as MIPI DPI.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_dotclock.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_rgb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-index 3eb99784f371..d401156490f3 100644
---- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-@@ -90,7 +90,8 @@ static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
- 			goto out;
- 		}
- 
--		if ((rounded < ideal) && (rounded > best_parent)) {
-+		if (abs(rate - rounded / i) <
-+		    abs(rate - best_parent / best_div)) {
- 			best_parent = rounded;
- 			best_div = i;
- 		}
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index c3ff10f559cc..8b520d9f5bd9 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -240,7 +240,7 @@ int sun4i_rgb_init(struct drm_device *drm)
+ 	ret = drm_encoder_init(drm,
+ 			       &rgb->encoder,
+ 			       &sun4i_rgb_enc_funcs,
+-			       DRM_MODE_ENCODER_NONE,
++			       DRM_MODE_ENCODER_DPI,
+ 			       NULL);
+ 	if (ret) {
+ 		dev_err(drm->dev, "Couldn't initialise the rgb encoder\n");
+@@ -255,7 +255,7 @@ int sun4i_rgb_init(struct drm_device *drm)
+ 					 &sun4i_rgb_con_helper_funcs);
+ 		ret = drm_connector_init(drm, &rgb->connector,
+ 					 &sun4i_rgb_con_funcs,
+-					 DRM_MODE_CONNECTOR_Unknown);
++					 DRM_MODE_CONNECTOR_DPI);
+ 		if (ret) {
+ 			dev_err(drm->dev, "Couldn't initialise the rgb connector\n");
+ 			goto err_cleanup_connector;
 -- 
 2.9.3
