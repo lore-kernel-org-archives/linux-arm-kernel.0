@@ -1,19 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Sep 2016 14:01:29 -0700
-Subject: [PATCH] ARM: dts: am57xx-beagle-x15-common: Fix wrong pinctrl
- selection for mmc2
-In-Reply-To: <20160915191059.18190-1-nm@ti.com>
-References: <20160915191059.18190-1-nm@ti.com>
-Message-ID: <20160915210126.jpuslamqltlahimv@atomide.com>
+From: netz.kernel@gmail.com (Marty Plummer)
+Date: Thu, 15 Sep 2016 16:05:03 -0500
+Subject: [RFC PATCH v2 3/5] dmaengine: hi3620: Make hi3620 explicit,
+ remove wildcard
+In-Reply-To: <20160915210505.21878-1-netz.kernel@gmail.com>
+References: <20160915210505.21878-1-netz.kernel@gmail.com>
+Message-ID: <20160915210505.21878-4-netz.kernel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [160915 12:11]:
-> Commit d20f997b4d1f ("ARM: dts: am57xx-beagle-x15: Remove pinmux
-> configurations for erratum i869") fat fingered a change in which
-> basically replaced mmc2_pinctrl_default with mmc1_pinctrl_default. And
-> kernel dutifully reports conflict of usage.
+Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
+---
+ drivers/dma/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks applying into omap-for-v4.9/dt-v2.
-
-Tony
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 739f797..74bab9d0 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -279,7 +279,7 @@ config INTEL_MIC_X100_DMA
+ 
+ config K3_DMA
+ 	tristate "Hisilicon K3 DMA support"
+-	depends on ARCH_HI3xxx
++	depends on ARCH_HI3620
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+ 	help
+-- 
+2.9.3
