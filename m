@@ -1,74 +1,137 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 15 Sep 2016 11:41:55 +0100
-Subject: [RESEND PATCH] arm64: kgdb: fix single stepping
-In-Reply-To: <20160915075617.GJ16712@linaro.org>
-References: <1429578793-3971-1-git-send-email-takahiro.akashi@linaro.org>
- <20160914145850.GE19622@arm.com> <20160915075617.GJ16712@linaro.org>
-Message-ID: <5fd52bac-a303-81c8-1b91-daa55d6cd53f@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 15 Sep 2016 11:45:16 +0100
+Subject: [PATCH 2/7] mfd: ab8500-debugfs: Prevent initialised field from being
+ over-written
+In-Reply-To: <20160915104521.14286-1-lee.jones@linaro.org>
+References: <20160915104521.14286-1-lee.jones@linaro.org>
+Message-ID: <20160915104521.14286-3-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/16 08:56, AKASHI Takahiro wrote:
-> On Wed, Sep 14, 2016 at 03:58:51PM +0100, Will Deacon wrote:
->> Hi Akashi,
->>
->> On Tue, Apr 21, 2015 at 02:13:13AM +0100, AKASHI Takahiro wrote:
->>> Could you please review my patch below?
->>> See also arm64 maintainer's comment:
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313712.html
->>
->> -ETIMEDOUT waiting for the kdgb folk to comment. Ppeople have reported
->> that this patch is required for kgdb to work correctly on arm64, so I'm
->> happy to merge it.
->
-> I'm happy, too.
+Due to the lack of parity in the way array fields have been named/
+numbered, a mistake was made where more debug fields were declared
+than actually existed.  In doing so, 2 fields were added, which
+although unclear, were already declared in the array.  The result
+was that the latter declarations trashed the former ones.
 
-I'll keep an eye out and FWIW see if I can throw in a review. I'm not  
-really one of "kgdb folk" but did examine it fairly deeply in the early  
-stages of the FIQ/NMI work (and which has since stopped focussing on kgdb).
+This patch places the array back in the correct order and removes
+the offending NULL entries.
 
-I have some equally elderly, albeit rather less critical, kdb patches  
-that I should have pushed harder for so I'm sympathetic here ;-)
+While we're at it, let's ensure this doesn't happen again by naming
+each field properly and add a new *_LAST define to describe how
+many fields there should be.
 
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/ab8500-debugfs.c      | 50 ++++++++++++++++-----------------------
+ include/linux/mfd/abx500/ab8500.h |  2 ++
+ 2 files changed, 23 insertions(+), 29 deletions(-)
 
-Daniel.
-
-
->> However, as detailed in your comment log:
->>
->>> This patch
->>> (1) moves kgdb_disable_single_step() from 'c' command handling to single
->>>     step handler.
->>>     This makes sure that single stepping gets effective at every 's' command.
->>>     Please note that, under the current implementation, single step bit in
->>>     spsr, which is cleared by the first single stepping, will not be set
->>>     again for the consecutive 's' commands because single step bit in mdscr
->>>     is still kept on (that is, kernel_active_single_step() in
->>>     kgdb_arch_handle_exception() is true).
->>> (2) re-implements kgdb_roundup_cpus() because the current implementation
->>>     enabled interrupts naively. See below.
->>> (3) removes 'enable_dbg' in el1_dbg.
->>>     Single step bit in mdscr is turned on in do_handle_exception()->
->>>     kgdb_handle_expection() before returning to debugged context, and if
->>>     debug exception is enabled in el1_dbg, we will see unexpected single-
->>>     stepping in el1_dbg.
->>>     Since v3.18, the following patch does the same:
->>>       commit 1059c6bf8534 ("arm64: debug: don't re-enable debug exceptions
->>>       on return from el1_dbg)
->>> (4) masks interrupts while single-stepping one instruction.
->>>     If an interrupt is caught during processing a single-stepping, debug
->>>     exception is unintentionally enabled by el1_irq's 'enable_dbg' before
->>>     returning to debugged context.
->>>     Thus, like in (2), we will see unexpected single-stepping in el1_irq.
->>
->> this patch is doing *far* too much in one go. Could you please repost it
->> as a series of self-contained fixes with clear commit messages, so I can
->> queue them and cc stable where appropriate?
->
-> Sure, but I need to refresh my memory here.
->
-> -Takahiro AKASHI
->
->> Thanks,
->>
->> Will
+diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
+index 0aecd7b..6c913c4 100644
+--- a/drivers/mfd/ab8500-debugfs.c
++++ b/drivers/mfd/ab8500-debugfs.c
+@@ -153,14 +153,14 @@ static struct hwreg_cfg hwreg_cfg = {
+ 
+ #define AB8500_NAME_STRING "ab8500"
+ #define AB8500_ADC_NAME_STRING "gpadc"
+-#define AB8500_NUM_BANKS 24
++#define AB8500_NUM_BANKS AB8500_DEBUG_FIELD_LAST
+ 
+ #define AB8500_REV_REG 0x80
+ 
+ static struct ab8500_prcmu_ranges *debug_ranges;
+ 
+ static struct ab8500_prcmu_ranges ab8500_debug_ranges[AB8500_NUM_BANKS] = {
+-	[0x0] = {
++	[AB8500_M_FSM_RANK] = {
+ 		.num_ranges = 0,
+ 		.range = NULL,
+ 	},
+@@ -315,7 +315,7 @@ static struct ab8500_prcmu_ranges ab8500_debug_ranges[AB8500_NUM_BANKS] = {
+ 			},
+ 		},
+ 	},
+-	[0x9] = {
++	[AB8500_RESERVED] = {
+ 		.num_ranges = 0,
+ 		.range = NULL,
+ 	},
+@@ -386,24 +386,6 @@ static struct ab8500_prcmu_ranges ab8500_debug_ranges[AB8500_NUM_BANKS] = {
+ 			},
+ 		},
+ 	},
+-	[AB8500_DEVELOPMENT] = {
+-		.num_ranges = 1,
+-		.range = (struct ab8500_reg_range[]) {
+-			{
+-				.first = 0x00,
+-				.last = 0x00,
+-			},
+-		},
+-	},
+-	[AB8500_DEBUG] = {
+-		.num_ranges = 1,
+-		.range = (struct ab8500_reg_range[]) {
+-			{
+-				.first = 0x05,
+-				.last = 0x07,
+-			},
+-		},
+-	},
+ 	[AB8500_AUDIO] = {
+ 		.num_ranges = 1,
+ 		.range = (struct ab8500_reg_range[]) {
+@@ -463,19 +445,29 @@ static struct ab8500_prcmu_ranges ab8500_debug_ranges[AB8500_NUM_BANKS] = {
+ 			},
+ 		},
+ 	},
+-	[0x11] = {
+-		.num_ranges = 0,
+-		.range = NULL,
++	[AB8500_DEVELOPMENT] = {
++		.num_ranges = 1,
++		.range = (struct ab8500_reg_range[]) {
++			{
++				.first = 0x00,
++				.last = 0x00,
++			},
++		},
+ 	},
+-	[0x12] = {
+-		.num_ranges = 0,
+-		.range = NULL,
++	[AB8500_DEBUG] = {
++		.num_ranges = 1,
++		.range = (struct ab8500_reg_range[]) {
++			{
++				.first = 0x05,
++				.last = 0x07,
++			},
++		},
+ 	},
+-	[0x13] = {
++	[AB8500_PROD_TEST] = {
+ 		.num_ranges = 0,
+ 		.range = NULL,
+ 	},
+-	[0x14] = {
++	[AB8500_STE_TEST] = {
+ 		.num_ranges = 0,
+ 		.range = NULL,
+ 	},
+diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
+index 9475fee..d33c245 100644
+--- a/include/linux/mfd/abx500/ab8500.h
++++ b/include/linux/mfd/abx500/ab8500.h
+@@ -63,6 +63,8 @@ enum ab8500_version {
+ #define AB8500_STE_TEST		0x14
+ #define AB8500_OTP_EMUL		0x15
+ 
++#define AB8500_DEBUG_FIELD_LAST	0x16
++
+ /*
+  * Interrupts
+  * Values used to index into array ab8500_irq_regoffset[] defined in
+-- 
+2.9.3
