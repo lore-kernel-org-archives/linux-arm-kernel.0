@@ -1,50 +1,79 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Sep 2016 14:49:04 +0100
-Subject: [RFC PATCH 3/8] arm64: thread_info remove stale items
+Date: Thu, 15 Sep 2016 14:49:06 +0100
+Subject: [RFC PATCH 5/8] arm64: assembler: introduce ldr_this_cpu
 In-Reply-To: <1473947349-14521-1-git-send-email-mark.rutland@arm.com>
 References: <1473947349-14521-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1473947349-14521-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1473947349-14521-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have a comment claiming __switch_to() cares about where cpu_context
-is located relative to cpu_domain in thread_info. However arm64 has
-never had a thread_info::cpu_domain field, and neither __switch_to nor
-cpu_switch_to care where the cpu_context field is relative to others.
+Shortly we will want to load a percpu variable in the return from
+userspace path. We can save an instruction by folding the addition of
+the percpu offset into the load instruction, and this patch adds a new
+helper to do so.
 
-Additionally, the init_thread_info alias is never used anywhere in the
-kernel, and will shortly become problematic when thread_info is moved
-into task_struct.
-
-This patch removes both.
+At the same time, we clean up this_cpu_ptr for consistency. As with
+{adr,ldr,str}_l, we change the template to take the destination register
+first, and name this dst. Secondly, we rename the macro to adr_this_cpu,
+following the scheme of adr_l, and matching the newly added
+ldr_this_cpu.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/thread_info.h | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/include/asm/assembler.h | 19 +++++++++++++++----
+ arch/arm64/kernel/entry.S          |  2 +-
+ 2 files changed, 16 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index abd64bd..796af24 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -42,7 +42,6 @@ typedef unsigned long mm_segment_t;
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index d5025c6..265fd81 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -193,14 +193,25 @@ lr	.req	x30		// link register
+ 	.endm
+ 
+ 	/*
++	 * @dst: Result of per_cpu(sym, smp_processor_id())
+ 	 * @sym: The name of the per-cpu variable
+-	 * @reg: Result of per_cpu(sym, smp_processor_id())
+ 	 * @tmp: scratch register
+ 	 */
+-	.macro this_cpu_ptr, sym, reg, tmp
+-	adr_l	\reg, \sym
++	.macro adr_this_cpu, dst, sym, tmp
++	adr_l	\dst, \sym
+ 	mrs	\tmp, tpidr_el1
+-	add	\reg, \reg, \tmp
++	add	\dst, \dst, \tmp
++	.endm
++
++	/*
++	 * @dst: Result of READ_ONCE(per_cpu(sym, smp_processor_id()))
++	 * @sym: The name of the per-cpu variable
++	 * @tmp: scratch register
++	 */
++	.macro ldr_this_cpu dst, sym, tmp
++	adr_l	\dst, \sym
++	mrs	\tmp, tpidr_el1
++	ldr	\dst, [\dst, \tmp]
+ 	.endm
  
  /*
-  * low level task data that entry.S needs immediate access to.
-- * __switch_to() assumes cpu_context follows immediately after cpu_domain.
-  */
- struct thread_info {
- 	unsigned long		flags;		/* low level flags */
-@@ -60,7 +59,6 @@ struct thread_info {
- 	.addr_limit	= KERNEL_DS,					\
- }
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 441420c..52b4241 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -206,7 +206,7 @@ alternative_endif
+ 	cmp	x25, tsk
+ 	b.ne	9998f
  
--#define init_thread_info	(init_thread_union.thread_info)
- #define init_stack		(init_thread_union.stack)
+-	this_cpu_ptr irq_stack, x25, x26
++	adr_this_cpu x25, irq_stack, x26
+ 	mov	x26, #IRQ_STACK_START_SP
+ 	add	x26, x25, x26
  
- /*
 -- 
 1.9.1
