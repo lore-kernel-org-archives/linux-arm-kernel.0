@@ -1,95 +1,35 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 15 Sep 2016 10:22:18 +0800
-Subject: [PATCH] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
-In-Reply-To: <20160915021504.65483-1-icenowy@aosc.xyz>
-References: <20160915021504.65483-1-icenowy@aosc.xyz>
-Message-ID: <1262161473906138@web14h.yandex.ru>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Thu, 15 Sep 2016 03:25:58 +0000
+Subject: [PATCH -next] drm/sun4i: backend: remove redundant dev_err call in
+ sun4i_backend_bind()
+Message-ID: <1473909958-30216-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
+There is a error message within devm_ioremap_resource
+already, so remove the dev_err call to avoid redundant
+error message.
 
-15.09.2016, 10:15, "Icenowy Zheng" <icenowy@aosc.xyz>:
-> UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
-> on iNet D978 Rev2 board.
->
-> Enable the UART1 to make it possible to use the modified hciattach by
-> Realtek to drive the BT part of RTL8723BS.
->
-> On the board no r_uart pins are found now (the onboard RX/TX pins are
-> wired to PF2/PF4, which is muxed with mmc0), so also disabled it.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Oh I forgot to add a patch version number...
-It's PATCH v3.
-
-(But it seems that I should send a v4 to split the dtsi change and dts change.)
-
-> ---
-> ?arch/arm/boot/dts/sun8i-a23-a33.dtsi | 14 ++++++++++++++
-> ?arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 20 ++++++++++++++++++++
-> ?2 files changed, 34 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> index 7e05e09..c340885 100644
-> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> @@ -361,6 +361,20 @@
-> ?????????????????????????????????allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> ?????????????????????????};
->
-> + uart1_pins_a: uart1 at 0 {
-> + allwinner,pins = "PG6", "PG7";
-> + allwinner,function = "uart1";
-> + allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> + allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> + };
-> +
-> + uart1_pins_cts_rts_a: uart1-cts-rts at 0 {
-> + allwinner,pins = "PG8", "PG9";
-> + allwinner,function = "uart1";
-> + allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> + allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> + };
-> +
-> ?????????????????????????mmc0_pins_a: mmc0 at 0 {
-> ?????????????????????????????????allwinner,pins = "PF0", "PF1", "PF2",
-> ??????????????????????????????????????????????????"PF3", "PF4", "PF5";
-> diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> index 0f52cd9..fb46655 100644
-> --- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> +++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-> @@ -49,6 +49,15 @@
-> ?????????model = "INet-D978 Rev 02";
-> ?????????compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
->
-> + aliases {
-> + serial0 = &uart1;
-> + };
-> +
-> + chosen {
-> + /* Delete debug UART as serial0 is the UART for bluetooth */
-> + /delete-property/stdout-path;
-> + };
-> +
-> ?????????leds {
-> ?????????????????compatible = "gpio-leds";
-> ?????????????????pinctrl-names = "default";
-> @@ -86,3 +95,14 @@
-> ?????????????????allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> ?????????};
-> ?};
-> +
-> +&r_uart {
-> + status = "disabled";
-> +};
-> +
-> +&uart1 {
-> + pinctrl-names = "default";
-> + pinctrl-0 = <&uart1_pins_a>,
-> + <&uart1_pins_cts_rts_a>;
-> + status = "okay";
-> +};
-> --
-> 2.9.3
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 91a7022..fcd4e91 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -288,10 +288,8 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	regs = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(regs)) {
+-		dev_err(dev, "Couldn't map the backend registers\n");
++	if (IS_ERR(regs))
+ 		return PTR_ERR(regs);
+-	}
+ 
+ 	backend->regs = devm_regmap_init_mmio(dev, regs,
+ 					      &sun4i_backend_regmap_config);
