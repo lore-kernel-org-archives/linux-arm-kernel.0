@@ -1,35 +1,80 @@
-From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
-Date: Thu, 15 Sep 2016 17:09:06 +0100
-Subject: [GIT PULL] Greybus driver subsystem for 4.9-rc1
-In-Reply-To: <20160915154736.GA19214@leverpostej>
-References: <20160914173625.GB15356@leverpostej>
- <20160914180754.GA16053@kroah.com> <20160914182952.GA21615@kroah.com>
- <1473932133.10230.25.camel@nexus-software.ie>
- <20160915101330.GB6718@leverpostej>
- <1473935756.10230.42.camel@nexus-software.ie>
- <20160915112029.GC6718@leverpostej>
- <1473940088.10230.65.camel@nexus-software.ie>
- <20160915124601.GA9316@leverpostej>
- <1473954000.4035.5.camel@nexus-software.ie>
- <20160915154736.GA19214@leverpostej>
-Message-ID: <1473955746.4035.23.camel@nexus-software.ie>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 15 Sep 2016 18:06:05 +0200
+Subject: [PATCH BUGFIX] mtd: nand: mxc: fix obiwan error in
+ mxc_nand_v[12]_ooblayout_free() functions
+In-Reply-To: <1473432251-24728-1-git-send-email-LW@KARO-electronics.de>
+References: <1473432251-24728-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20160915180605.4aed48d3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-09-15 at 16:47 +0100, Mark Rutland wrote:
-> On?
-> I can't say this any more explicitly:
+Hi Lothar,
+
+On Fri,  9 Sep 2016 16:44:11 +0200
+Lothar Wa?mann <LW@KARO-electronics.de> wrote:
+
+> commit a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
+> introduced a regression accessing the OOB area from the mxc_nand
+> driver due to an Obiwan error in the mxc_nand_v[12]_ooblayout_free()
+> functions. They report a bogus oobregion { 64, 7 } which leads to
+> errors accessing bogus data when reading the oob area.
 > 
-> ****************************************************
-> * The DT *cannot* know anything about get_cycles() *
-> ****************************************************
+> Prior to the commit the mtd-oobtest module could be run without any
+> errors. With the offending commit, this test fails with results like:
+> |Running mtd-oobtest
+> |
+> |=================================================
+> |mtd_oobtest: MTD device: 5
+> |mtd_oobtest: MTD device size 524288, eraseblock size 131072, page size 2048, count of eraseblocks 4, pages per eraseblock 64, OOB size 64
+> |mtd_test: scanning for bad eraseblocks
+> |mtd_test: scanned 4 eraseblocks, 0 are bad
+> |mtd_oobtest: test 1 of 5
+> |mtd_oobtest: writing OOBs of whole device
+> |mtd_oobtest: written up to eraseblock 0
+> |mtd_oobtest: written 4 eraseblocks
+> |mtd_oobtest: verifying all eraseblocks
+> |mtd_oobtest: error @addr[0x0:0x19] 0x9a -> 0x78 diff 0xe2
+> |mtd_oobtest: error @addr[0x0:0x1a] 0xcc -> 0x0 diff 0xcc
+> |mtd_oobtest: error @addr[0x0:0x1b] 0xe0 -> 0x85 diff 0x65
+> |mtd_oobtest: error @addr[0x0:0x1c] 0x60 -> 0x62 diff 0x2
+> |mtd_oobtest: error @addr[0x0:0x1d] 0x69 -> 0x45 diff 0x2c
+> |mtd_oobtest: error @addr[0x0:0x1e] 0xcd -> 0xa0 diff 0x6d
+> |mtd_oobtest: error @addr[0x0:0x1f] 0xf2 -> 0x60 diff 0x92
+> |mtd_oobtest: error: verify failed at 0x0
+> [...]
 > 
-> It's no more complex than that.
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  drivers/mtd/nand/mxc_nand.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 5173fad..fdee907 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -893,7 +893,7 @@ static int mxc_v1_ooblayout_free(struct mtd_info *mtd, int section,
+>  {
+>  	struct nand_chip *nand_chip = mtd_to_nand(mtd);
+>  
+> -	if (section > nand_chip->ecc.steps)
+> +	if (section >= nand_chip->ecc.steps)
+>  		return -ERANGE;
 
-Sure think Mark I understand your point.
+Hm, looking at the commit you're pointing to, it seems that this test
+is correct (we have X + 1 free sections, where X is the number of ECC
+steps).
 
-I think to satisfy your objection the most sensible change to make is
-using arch_timer_get_rate() compared to a desired rate of 19200000.
+>  
+>  	if (!section) {
+> @@ -943,7 +943,7 @@ static int mxc_v2_ooblayout_free(struct mtd_info *mtd, int section,
+>  	struct nand_chip *nand_chip = mtd_to_nand(mtd);
+>  	int stepsize = nand_chip->ecc.bytes == 9 ? 16 : 26;
+>  
+> -	if (section > nand_chip->ecc.steps)
+> +	if (section >= nand_chip->ecc.steps)
+>  		return -ERANGE;
 
----
-bod
+Yep, this one is a real bug.
+
+>  
+>  	if (!section) {
