@@ -1,31 +1,29 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 15 Sep 2016 21:54:49 +0530
-Subject: [PATCH] ARM: s3c24xx: Add dma_slave_map for s3c2440 devices
-In-Reply-To: <2fa402bf-0e3f-0495-41ca-7a3c89eaa2e1@samsung.com>
-References: <CGME20160914183040eucas1p22a61e6b39333cfe1aa9a6b63e74a1bcf@eucas1p2.samsung.com>
- <1473877775-7537-1-git-send-email-sam.van.den.berge@telenet.be>
- <2fa402bf-0e3f-0495-41ca-7a3c89eaa2e1@samsung.com>
-Message-ID: <20160915162449.GY13920@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 15 Sep 2016 17:18:29 +0100
+Subject: [PATCH] arm64: kprobe: Always clear pstate.D in breakpoint
+ exception handler
+In-Reply-To: <CAHB_Guods-iED+tOLeJ9XCWDvAVoButwz2XWSiP+eMYDzFhfyQ@mail.gmail.com>
+References: <1059f6762466c2cebf32aa40e4d7974731a68726.1471848065.git.panand@redhat.com>
+ <20160823000531.b12ac14c18ce8e9d3abc74ec@kernel.org>
+ <CAAOGbpwcx3G8Jdf1AfNRLrkZJQLaCcLWQPRppjvpy3=hSrffjg@mail.gmail.com>
+ <20160824100644.GB4408@localhost.localdomain>
+ <CAHB_Guods-iED+tOLeJ9XCWDvAVoButwz2XWSiP+eMYDzFhfyQ@mail.gmail.com>
+Message-ID: <20160915161828.GH3380@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 11:05:12AM +0200, Sylwester Nawrocki wrote:
-> On 09/14/2016 08:29 PM, Sam Van Den Berge wrote:
-> > +static const struct dma_slave_map s3c2440_dma_slave_map[] = {
-> ...
-> > +	{ "3c2440-sdi", "rx", (void *)DMACH_SDI },
-> > +	{ "3c2440-sdi", "tx", (void *)DMACH_SDI },
+On Thu, Sep 15, 2016 at 09:45:09PM +0530, Pratyush Anand wrote:
+> On Wed, Aug 24, 2016 at 3:36 PM, Pratyush Anand <panand@redhat.com> wrote:
+> > On 23/08/2016:04:33:08 PM, Sandeepa Prabhu wrote:
+> >> Thanks for the fix, feel free to add my ACK as well. Has it been tested on
+> >> guest kernel?
+> >
+> > have not tested on guest kernel.Will do.
 > 
-> The device names seem misspelled here, and looking at what
-> drivers/mmc/host/s3cmci.c driver does we need just a single common
-> entry for rx and tx
+> I tested it with guest kernel, and it worked there too :-).
 > 
-> 	{ "s3c2440-sdi", "rx-tx", (void *)DMACH_SDI },
-> 
-> With this fixed feel free to add
+> @Catalin: any more comment for this patch? If not, then may be you can take it.
 
-And please change the title to dmaengine and NOT arm... I was about ti skip
-this!
+I already queued this on the arm64 for-next/core branch.
 
--- 
-~Vinod
+Will
