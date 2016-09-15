@@ -1,129 +1,101 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 15 Sep 2016 08:02:27 +0000
-Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <5869118.UilSPY9Sai@wuerfel>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <5140357.dcW9ibtZJ6@wuerfel> <57D963C4.4010406@hisilicon.com>
- <5869118.UilSPY9Sai@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F871B01@lhreml507-mbx>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Sep 2016 09:13:49 +0100
+Subject: [PATCH v26 2/7] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <57D9925D.5000508@arm.com>
+References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
+ <20160907042908.6232-3-takahiro.akashi@linaro.org> <57D9925D.5000508@arm.com>
+Message-ID: <57DA583D.9030900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Hi James,
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 14 September 2016 22:32
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Yuanzhichang; devicetree at vger.kernel.org;
-> lorenzo.pieralisi at arm.com; Gabriele Paoloni; minyard at acm.org;
-> gregkh at linuxfoundation.org; benh at kernel.crashing.org; John Garry;
-> will.deacon at arm.com; linux-kernel at vger.kernel.org; xuwei (O); Linuxarm;
-> linux-serial at vger.kernel.org; linux-pci at vger.kernel.org;
-> zourongrong at gmail.com; liviu.dudau at arm.com; kantyzc at 163.com;
-> zhichang.yuan02 at gmail.com
-> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
-> Hip06
-> 
-> On Wednesday, September 14, 2016 10:50:44 PM CEST zhichang.yuan wrote:
-> >
-> > On 2016/9/14 20:33, Arnd Bergmann wrote:
-> > > On Wednesday, September 14, 2016 8:15:52 PM CEST Zhichang Yuan
-> wrote:
-> > >
-> > >> +Required properties:
-> > >> +- compatible: should be "hisilicon,low-pin-count"
-> > >> +- #address-cells: must be 2 which stick to the ISA/EISA binding
-> doc.
-> > >> +- #size-cells: must be 1 which stick to the ISA/EISA binding doc.
-> > >> +- reg: base address and length of the register set for the
-> device.
-> > >> +- ranges: define a 1:1 mapping between the I/O space of the child
-> device and
-> > >> +	  the parent.
-> > >
-> > > Do we still need the "ranges" here? The property in your example
-> seems
-> > > wrong.
-> >
-> > I think "ranges" is needed.
-> > without this, of_translate_address --> __of_translate_address -->
-> of_translate_one will fail when translating the child's IO resource.
-> >
-> > >
-> > >> +	ranges = <0x01 0xe4 0x0 0xe4 0x1000>;
-> > >
-> > > You translate I/O port 0x00e4 through 0x10e4 to CPU address 0x0e4?
-> > The hip06 LPC is defined as isa type.
-> > So, 0x01 0xe4 is the local IO address of 0xe4. With this ranges, 0xe4
-> of child will be 1:1 mapped as 0xe4.
-> > It means no translation.
-> 
-> No, "no translation" would be leaving out the ranges, we should
-> fix the code so it handles this case according to the specification
-> of the ISA DT binding, rather than adding an incorrect ranges
-> property to make it work with the incorrect Linux implementation.
-> 
-> of_translate_address() should fail here, and whichever code calls
-> it should try something else, possibly something we have to
-> implement that can return the correct IORESOURCE_* type.
+Thanks for cc-ing me.
 
->From <<3.1.1. Open Firmware Properties for Bus Nodes>> in 
-http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
-
-I quote:
-"There shall be an entry in the "ranges" property for each
-of the Memory and/or I/O spaces if that address space is
-mapped through the bridge."
-
-It seems to me that it is ok to have 1:1 address mapping and that
-therefore of_translate_address() should fail if "ranges" is not
-present.
-
-This is also explained quite well in
-http://lxr.free-electrons.com/source/drivers/of/address.c#L490
-
-what do you think?
-
-Thanks
-
-Gab
-
+On 14/09/16 19:09, James Morse wrote:
+> Hi Akashi,
 > 
-> > >
-> > > I don't get this part. The bus driver should not care what its
-> > > children are, just register and PIO ranges that the bus can handle
-> > > in theory, i.e. from 0x000 to 0xfff.
-> >
-> > Just as we discussed in V2, the legacy PIO range is specific to some
-> > device, such as for ipmi bt, 0xe4 - 0xe7 will be populated.
-> > I don't want to occupy a larger PIO range in which only small part
-> PIOs
-> > are used by our LPC. At this moment, two PIO ranges are using
-> > through the device property configuration, 0xe4-0xe7, 0x2f8-0x2ff.
-> >
-> > If we configure 0-0x1000 for the LPC to cover those two ranges, most
-> > PIO are wasted and other PIO device on other buses lose the chance to
-> > use the PIO below 0x1000.
-> > Otherwise, PIO conflict will happen. So, My idea is only occupied
-> > the PIO ranges which are really needed for the children.
+> (CC: Marc who knows how this irqchip wizardry works
+>  Cover letter: https://www.spinics.net/lists/arm-kernel/msg529520.html )
 > 
-> The only thing it can realistically conflict with would be another
-> LPC bus behind on a PCI host bridge. On ARM64, all regular PCI
-> devices that have IORESOURCE_IO ports are intentionally moved
-> to (bus) port numbers above 0x1000.
+> On 07/09/16 05:29, AKASHI Takahiro wrote:
+>> Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
+>> and save registers' status in per-cpu ELF notes before starting crash
+>> dump kernel. See kernel_kexec().
+>> Even if not all secondary cpus have shut down, we do kdump anyway.
+>>
+>> As we don't have to make non-boot(crashed) cpus offline (to preserve
+>> correct status of cpus at crash dump) before shutting down, this patch
+>> also adds a variant of smp_send_stop().
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/hardirq.h  |  2 +-
+>>  arch/arm64/include/asm/kexec.h    | 41 ++++++++++++++++++++++++-
+>>  arch/arm64/include/asm/smp.h      |  2 ++
+>>  arch/arm64/kernel/machine_kexec.c | 56 ++++++++++++++++++++++++++++++++--
+>>  arch/arm64/kernel/smp.c           | 63 +++++++++++++++++++++++++++++++++++++++
+>>  5 files changed, 159 insertions(+), 5 deletions(-)
+
+[...]
+
+>> +static void machine_kexec_mask_interrupts(void)
+>> +{
+>> +	unsigned int i;
+>> +	struct irq_desc *desc;
+>> +
+>> +	for_each_irq_desc(i, desc) {
+>> +		struct irq_chip *chip;
+>> +		int ret;
+>> +
+>> +		chip = irq_desc_get_chip(desc);
+>> +		if (!chip)
+>> +			continue;
+>> +
+>> +		/*
+>> +		 * First try to remove the active state. If this
+>> +		 * fails, try to EOI the interrupt.
+>> +		 */
+>> +		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
+>> +
+>> +		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
+>> +		    chip->irq_eoi)
+>> +			chip->irq_eoi(&desc->irq_data);
+>> +
+>> +		if (chip->irq_mask)
+>> +			chip->irq_mask(&desc->irq_data);
+>> +
+>> +		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
+>> +			chip->irq_disable(&desc->irq_data);
+>> +	}
+>> +}
 > 
-> > And there are probably multiple child devices under LPC, the global
-> arm64_extio_ops only can cover one PIO range. It is fortunate only ipmi
-> driver can not support I/O
-> > operation registering, serial driver has serial_in/serial_out to
-> > be registered. So, only the PIO range for ipmi device is stored
-> > in arm64_extio_ops and the indirect-IO
-> > works well for ipmi device.
+> This function is over my head ... I have no idea how this works, I can only
+> comment that its different to the version under arch/arm
 > 
-> You should not do that in the serial driver, please just use the
-> normal 8250 driver that works fine once you handle the entire
-> port range.
-> 
-> 
-> 	Arnd
+> /me adds Marc Z to CC.
+
+I wrote the damn code! ;-)
+
+The main idea is that simply EOIing an interrupt is not good enough if
+the interrupt has been offloaded to a VM. It needs to be actively
+deactivated for the state machine to be reset.
+
+But realistically, even that is not enough. What we need is a way to
+completely shut off the GIC, irrespective of the state of the various
+interrupts. A "panic button" of some sort, with no return.
+
+That would probably work for GICv3 (assuming that we don't need to
+involve the secure side of things), but anything GICv2 based would be
+difficult to deal with (you cannot access the other CPU private
+interrupt configuration). Maybe that'd be enough, maybe not. Trying to
+boot a crash kernel is like buying a lottery ticket anyway (and with
+similar odds...).
+
+I'll have a look.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
