@@ -1,25 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Sep 2016 17:41:14 +0100
-Subject: [PATCH v3 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-In-Reply-To: <20160915162044.GB19214@leverpostej>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
- <20160915162044.GB19214@leverpostej>
-Message-ID: <20160915164114.GC19214@leverpostej>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Thu, 15 Sep 2016 18:42:43 +0200
+Subject: [PATCH 11/11] ARM: DT: STM32: add dma for usart1 on F429
+In-Reply-To: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
+References: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1473957763-30629-12-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 05:20:45PM +0100, Mark Rutland wrote:
-> Don't we need to fix up do_sysinstr() (which performs raw cache
-> maintenance ops on __user addresses) with
-> uaccess_{enable,disable}_not_uao()?
+Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-Actually, we don't even need to do anything in the case of PAN since
-cache ops aren't affected by PAN/UAO; we just need to map/unmap in the
-TTBR0-switching case to ensure we don't get stup fixing things up
-forever.
-
-/me commences name bikeshedding.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 35df462..227376b 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -161,6 +161,9 @@
+ 			interrupts = <37>;
+ 			clocks = <&rcc 0 164>;
+ 			status = "disabled";
++			dmas = <&dma2 2 4 0x414 0x0>,
++			       <&dma2 7 4 0x414 0x0>;
++			dma-names = "rx", "tx";
+ 		};
+ 
+ 		usart6: serial at 40011400 {
+-- 
+1.9.1
