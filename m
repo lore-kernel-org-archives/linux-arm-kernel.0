@@ -1,30 +1,37 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Sep 2016 10:52:32 +0100
-Subject: [kernel-hardening] [PATCH v3 0/7] arm64: Privileged Access Never
- using TTBR0_EL1 switching
-In-Reply-To: <20160914205425.GA15021@davidb.org>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
- <20160914205425.GA15021@davidb.org>
-Message-ID: <20160915095232.GF2492@e104818-lin.cambridge.arm.com>
+Date: Thu, 15 Sep 2016 11:02:31 +0100
+Subject: [PATCH] arm64: Enable HIBERNATION in defconfig
+In-Reply-To: <1473932534-2710-1-git-send-email-catalin.marinas@arm.com>
+References: <1473932534-2710-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20160915100231.GG2492@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 02:54:25PM -0600, David Brown wrote:
-> On Tue, Sep 13, 2016 at 06:46:30PM +0100, Catalin Marinas wrote:
+On Thu, Sep 15, 2016 at 10:42:14AM +0100, Catalin Marinas wrote:
+> This patch adds CONFIG_HIBERNATION to the arm64 defconfig.
 > 
-> >This is the third version of the arm64 PAN emulation using TTBR0_EL1
-> >switching. The series has not yet included the alternative nop patches
-> >from Mark Rutland, nor the empty_zero_page from Ard B. This will be done
-> >in a subsequent version once 4.9-rc1 is out (which will include Mark's
-> >alternative nop patches).
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> I've tested these with a bunch of reboots in both qemu and HiKey and
-> have not seen the efi failure.
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index eadf4855ad2d..91a7592029e3 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -80,6 +80,7 @@ CONFIG_KEXEC=y
+>  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+>  CONFIG_COMPAT=y
+>  CONFIG_CPU_IDLE=y
+> +CONFIG_HIBERNATION=y
+>  CONFIG_ARM_CPUIDLE=y
+>  CONFIG_CPU_FREQ=y
+>  CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
 
-Thanks for testing. I'll defer adding your tested-by until I post the
-hopefully final version after 4.9-rc1 (it's pretty late to merge these
-patches now, I still need to do more testing on models with PAN or
-PAN+UAO present).
+Or maybe it could go through arm-soc as it seems Arnd has picked up a
+few other defconfig patches.
+
+Thanks.
 
 -- 
 Catalin
