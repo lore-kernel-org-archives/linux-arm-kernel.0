@@ -1,172 +1,124 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 15 Sep 2016 11:15:37 +0100
-Subject: [PATCH v7 00/22] Generic DT bindings for PCI IOMMUs and ARM SMMU
-In-Reply-To: <4d87d5f2-0350-b5f8-ffc3-4e9377cf1f87@redhat.com>
-References: <cover.1473695704.git.robin.murphy@arm.com>
- <11ebd81e-2ea5-5ff3-35b3-be95f03e05bd@redhat.com>
- <d03ea5e7-59f1-8b49-4ba2-d05fc2030ebc@arm.com>
- <04a0a682-4fdc-8d62-57cd-efdf730582c6@redhat.com>
- <c2645c5e-edd3-2b31-4311-0ca621a915e2@arm.com>
- <4d87d5f2-0350-b5f8-ffc3-4e9377cf1f87@redhat.com>
-Message-ID: <fc4ce398-4eeb-f2ca-b964-e9f466be79c4@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 15 Sep 2016 12:17:41 +0200
+Subject: [GIT PULL] Greybus driver subsystem for 4.9-rc1
+In-Reply-To: <CAL_JsqJtDs-DrPDN4=9ET=EdEDTKxP-gRDkMziimQAz4LG457A@mail.gmail.com>
+References: <20160914100949.GA6179@kroah.com>
+ <20160914173625.GB15356@leverpostej>
+ <20160914180754.GA16053@kroah.com>
+ <CAL_JsqJtDs-DrPDN4=9ET=EdEDTKxP-gRDkMziimQAz4LG457A@mail.gmail.com>
+Message-ID: <20160915101741.GA21567@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/16 10:29, Auger Eric wrote:
-> Hi Robin,
+On Wed, Sep 14, 2016 at 03:07:22PM -0500, Rob Herring wrote:
+> On Wed, Sep 14, 2016 at 1:07 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> > On Wed, Sep 14, 2016 at 06:36:26PM +0100, Mark Rutland wrote:
+> >> Hi Greg,
+> >>
+> >> On Wed, Sep 14, 2016 at 12:09:49PM +0200, Greg KH wrote:
+> >> > Given that it's never a good idea to keep subsystems out of the mainline
+> >> > kernel, I've put together this pull request that adds the greybus driver
+> >> > layer to drivers/greybus/.  Because this was 2 1/2 years of work, with
+> >> > many many developers contributing, I didn't want to flatten all of their
+> >> > effort into a few small patches, as that wouldn't be very fair.  So I've
+> >> > built a git tree with all of the changes going back to the first commit,
+> >> > and merged it into the kernel tree, just like btrfs was merged into the
+> >> > kernel.
+> >>
+> >> > Unless people point out some major problems with this, I'd like to get
+> >> > it merged into 4.9-rc1.
+> >>
+> >> I'm extremely concerned that these patches have *never* seen upstream
+> >> review, and this pull request gives no real opportunity for people to
+> >> make a judgement regarding the code, as many relevant parties have not
+> >> been Cc'd.
+> >
+> > As I said, I will send a set of simple patches, I wanted to get this out
+> > as soon as possible and other things came up today.  Will do it in the
+> > morning, sorry.
+> >
+> >> From a quick scan of the git tree, I can see code (that isn't even
+> >> placed under staging/) for which I have fundamental objections to as a
+> >> maintainer, and has not been Cc'd to a relevant list.
+> >>
+> >> For example, I see commit 5a450477311fbfe2 ("greybus: timesync: Add
+> >> timesync core driver"). This states that it directly accesses the ARMv7
+> >> architected timer, though it's unclear as to precisely what it's doing
+> >> since it introduces an (undocumented) compatible string, and what should
+> >> be an unnecessary devicetree property.
+> >>
+> >> That's never gone to the linux-arm-kernel mainline list, myself or Marc
+> >> (as maintainers of the arch timer driver), nor has the binding seen any
+> >> review on the devicetree mailing list.
+> >
+> > Hm, odd, I thought we had Rob review all of the device tree bindings,
+> > but maybe the timesync stuff missed him.  And timesync is "odd" to say
+> > the least, wait until you see the firmware side of it :)
 > 
-> On 14/09/2016 14:53, Robin Murphy wrote:
->> On 14/09/16 13:32, Auger Eric wrote:
->>> Hi,
->>> On 14/09/2016 12:35, Robin Murphy wrote:
->>>> On 14/09/16 09:41, Auger Eric wrote:
->>>>> Hi,
->>>>>
->>>>> On 12/09/2016 18:13, Robin Murphy wrote:
->>>>>> Hi all,
->>>>>>
->>>>>> To any more confusing fixups and crazily numbered extra patches, here's
->>>>>> a quick v7 with everything rebased into the right order. The significant
->>>>>> change this time is to implement iommu_fwspec properly from the start,
->>>>>> which ends up being far simpler and more robust than faffing about
->>>>>> introducing it somewhere 'less intrusive' to move toward core code later.
->>>>>>
->>>>>> New branch in the logical place:
->>>>>>
->>>>>> git://linux-arm.org/linux-rm iommu/generic-v7
->>>>>
->>>>> For information, as discussed privately with Robin I experience some
->>>>> regressions with the former and now deprecated dt description.
->>>>>
->>>>> on my AMD Overdrive board and my old dt description I now only see a
->>>>> single group:
->>>>>
->>>>> /sys/kernel/iommu_groups/
->>>>> /sys/kernel/iommu_groups/0
->>>>> /sys/kernel/iommu_groups/0/devices
->>>>> /sys/kernel/iommu_groups/0/devices/e0700000.xgmac
->>>>>
->>>>> whereas I formerly see
->>>>>
->>>>> /sys/kernel/iommu_groups/
->>>>> /sys/kernel/iommu_groups/3
->>>>> /sys/kernel/iommu_groups/3/devices
->>>>> /sys/kernel/iommu_groups/3/devices/0000:00:00.0
->>>>> /sys/kernel/iommu_groups/1
->>>>> /sys/kernel/iommu_groups/1/devices
->>>>> /sys/kernel/iommu_groups/1/devices/e0700000.xgmac
->>>>> /sys/kernel/iommu_groups/4
->>>>> /sys/kernel/iommu_groups/4/devices
->>>>> /sys/kernel/iommu_groups/4/devices/0000:00:02.2
->>>>> /sys/kernel/iommu_groups/4/devices/0000:01:00.1
->>>>> /sys/kernel/iommu_groups/4/devices/0000:00:02.0
->>>>> /sys/kernel/iommu_groups/4/devices/0000:01:00.0
->>>>> /sys/kernel/iommu_groups/2
->>>>> /sys/kernel/iommu_groups/2/devices
->>>>> /sys/kernel/iommu_groups/2/devices/e0900000.xgmac
->>>>> /sys/kernel/iommu_groups/0
->>>>> /sys/kernel/iommu_groups/0/devices
->>>>> /sys/kernel/iommu_groups/0/devices/f0000000.pcie
->>>>>
->>>>> This is the group topology without ACS override. Applying the non
->>>>> upstreamed "pci: Enable overrides for missing ACS capabilities" I used
->>>>> to see separate groups for each PCIe components. Now I don't see any
->>>>> difference with and without ACS override.
->>>>
->>>> OK, having reproduced on my Juno, the problem looks to be that
->>>> of_for_each_phandle() leaves err set to -ENOENT after successfully
->>>> walking a phandle list, which makes __find_legacy_master_phandle()
->>>> always bail out after the first SMMU.
->>>>
->>>> Can you confirm that the following diff fixes things for you?
->>>
->>> Well it improves but there are still differences in the group topology.
->>> The PFs now are in group 0.
->>>
->>> root at trusty:~# lspci -nk
->>> 00:00.0 0600: 1022:1a00
->>>         Subsystem: 1022:1a00
->>> 00:02.0 0600: 1022:1a01
->>> 00:02.2 0604: 1022:1a02
->>>         Kernel driver in use: pcieport
->>> 01:00.0 0200: 8086:1521 (rev 01)
->>>         Subsystem: 8086:0002
->>>         Kernel driver in use: igb
->>> 01:00.1 0200: 8086:1521 (rev 01)
->>>         Subsystem: 8086:0002
->>>         Kernel driver in use: igb
->>>
->>>
->>> with your series + fix:
->>> /sys/kernel/iommu_groups/
->>> /sys/kernel/iommu_groups/3
->>> /sys/kernel/iommu_groups/3/devices
->>> /sys/kernel/iommu_groups/3/devices/0000:00:00.0
->>> /sys/kernel/iommu_groups/1
->>> /sys/kernel/iommu_groups/1/devices
->>> /sys/kernel/iommu_groups/1/devices/e0700000.xgmac
->>> /sys/kernel/iommu_groups/4
->>> /sys/kernel/iommu_groups/4/devices
->>> /sys/kernel/iommu_groups/4/devices/0000:00:02.2
->>> /sys/kernel/iommu_groups/4/devices/0000:00:02.0
->>> /sys/kernel/iommu_groups/2
->>> /sys/kernel/iommu_groups/2/devices
->>> /sys/kernel/iommu_groups/2/devices/e0900000.xgmac
->>> /sys/kernel/iommu_groups/0
->>> /sys/kernel/iommu_groups/0/devices
->>> /sys/kernel/iommu_groups/0/devices/0000:01:00.1
->>> /sys/kernel/iommu_groups/0/devices/f0000000.pcie
->>> /sys/kernel/iommu_groups/0/devices/0000:01:00.0
->>>
->>> Before (4.8-rc5):
->>>
->>> /sys/kernel/iommu_groups/
->>> /sys/kernel/iommu_groups/3
->>> /sys/kernel/iommu_groups/3/devices
->>> /sys/kernel/iommu_groups/3/devices/0000:00:00.0
->>> /sys/kernel/iommu_groups/1
->>> /sys/kernel/iommu_groups/1/devices
->>> /sys/kernel/iommu_groups/1/devices/e0700000.xgmac
->>> /sys/kernel/iommu_groups/4
->>> /sys/kernel/iommu_groups/4/devices
->>> /sys/kernel/iommu_groups/4/devices/0000:00:02.2
->>> /sys/kernel/iommu_groups/4/devices/0000:01:00.1
->>> /sys/kernel/iommu_groups/4/devices/0000:00:02.0
->>> /sys/kernel/iommu_groups/4/devices/0000:01:00.0
->>> /sys/kernel/iommu_groups/2
->>> /sys/kernel/iommu_groups/2/devices
->>> /sys/kernel/iommu_groups/2/devices/e0900000.xgmac
->>> /sys/kernel/iommu_groups/0
->>> /sys/kernel/iommu_groups/0/devices
->>> /sys/kernel/iommu_groups/0/devices/f0000000.pcie
->>
->> Your DT claims that f0000000.pcie (i.e. the "platform device" side of
->> the host controller) owns the IDs 0x100 0x101 0x102 0x103 0x200 0x201
->> 0x202 0x203 0x300 0x301 0x302 0x303 0x400 0x401 0x402 0x403. Thus when
->> new devices (the PCI PFs) come along *also* claiming those IDs (via the
->> RID-to-SID assumption), we now detect the aliasing and assign them to
->> the existing group.
->>
->> The only way that DT worked without SMR conflicts before is that
->> f0000000.pcie wasn't actually getting attached to a domain, thus wasn't
->> getting SMRs allocated (ISTR you _did_ get conflicts back when we first
->> tried to switch on default domains; that was probably the reason).
+> I have not. There weren't any when I was involved (other than SOC
+> related bindings). Some like USB devices were discussed at least, but
+> at the time there was no common definition of how to deal with
+> soldered, on-board USB devices. And that was also what's good enough
+> to move forward with development, not ready for mainline. There's a
+> binding now for USB, but what's there for arche predates it IIRC. This
+> is the first I've heard of timesync having a binding. I can't imagine
+> why it needs one.
+
+Ah, I'll let Bryan answer that one :)
+
+> I was going to stay out of this, but now that I'm here...
 > 
-> Thanks for your explanations. meanwhile I converted the overdrive dt to
-> the new syntax and it works properly.
+> I'm not all that worried about the quality of the code, but do
+> question whether this really makes sense to merge at this time. While
+> I worked on Ara and would like to see all this code be used, I'm
+> pretty doubtful it will be. Yes, Motorola is using a version of it,
+> but they forked it some time back and changed who knows what. So what
+> is upstream won't likely even work with any publicly available device.
+> And how long that Motorola phone lasts is unknown. Sure it is self
+> contained, but maintenance to keep it in tree is not 0.
 
-Yay!
+We have people who are willing to maintain it (me and Johan) and others
+on the cc: have expressed interest in doing things with it (Rui has
+great ideas about extending gbsim in ways to make it easier to test and
+use).
 
-> However I noticed there are MSI frame iommu mapping although the
-> device's domain is the default one. There is no check currently in
-> 21/22. I guess this isn't needed?
+And there is never a restriction on accepting kernel code for "publicly
+availble devices only", remember, we have ripped CPU code out of the
+kernel for chips that never shipped.  It just has to not affect others
+in ways that would affect them.
 
-Au contraire ;) With the generic binding, default domains are properly
-implemented, i.e. they have translation, so anything not mapped will
-fault. I *had* to write patch 21 as part of this series, since having
-DMA ops for PCI devices at the cost of breaking all MSIs was clearly not
-a viable solution. If you see mappings, then it's because someone is
-using MSIs - so if you fancy, you can try rewinding back to patch 19 or
-20 to watch them get stuck.
+I merge new driver subsystems to the kernel every release that are much
+larger than this, and have almost no users out there, so this shouldn't
+be a surprise to anyone (who here has a most-bus device?  A unisys
+visorbus device?  MCB device?  I can go on :)
 
-Robin.
+And with gbsim, you can run this code today on your laptop, or directly
+on a target system like a beagle bone black or minnowboard.  There's a
+talk about how to use greybus over IP at ELC in a few weeks, and someone
+is working on porting the firmware side to an arduino to make it simper
+to control the devices on such a target from a host computer using the
+greybus protocol.
+
+And getting Motorola to merge back in with this upstream code is a good
+goal, having it upstream is a neutral place where everyone can work
+together on it.  Keeping it in a random github project makes forks
+almost inevitable, as we all know.
+
+> There's also things that never got solved. Like how do you describe
+> devices on I2C, SPI, UART, etc. behind a greybus device? The plan was
+> to use DT overlays, but that was never solved and brings a whole set
+> of problems to solve upstream.
+
+That is only an issue if you want to bind a kernel driver for an
+existing i2c/spi chip to an i2c/spi greybus device.  With the code we
+have today, we do it for a specific SPI chip (for firmware download),
+but rely on everything to be userspace-only accesses to make it simpler
+at this point in time.
+
+When DT overlays get more settled down, yes, I want to revisit this idea
+of how to do it for greybus devices, but that's a long-term goal and is
+not required at all right now to have a working system and devices.
+
+thanks,
+
+greg k-h
