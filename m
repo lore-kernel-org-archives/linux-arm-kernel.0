@@ -1,41 +1,36 @@
 From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Thu, 15 Sep 2016 18:42:39 +0200
-Subject: [PATCH 07/11] dt-bindings: Add DMA bindings for STM32 USART
+Date: Thu, 15 Sep 2016 18:42:41 +0200
+Subject: [PATCH 09/11] serial: stm32: fix spin_lock management
 In-Reply-To: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
 References: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1473957763-30629-8-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1473957763-30629-10-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
 Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-index 75b1400..85ec5f2 100644
---- a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-+++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-@@ -12,6 +12,8 @@ stm32(f4) or stm32f7.
- Optional properties:
- - pinctrl: The reference on the pins configuration
- - st,hw-flow-ctrl: bool flag to enable hardware flow control.
-+- dmas: phandle(s) to DMA controller node(s). Refer to stm32-dma.txt
-+- dma-names: "rx" and/or "tx"
+diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
+index 24c4d82..3b99d79 100644
+--- a/drivers/tty/serial/stm32-usart.c
++++ b/drivers/tty/serial/stm32-usart.c
+@@ -321,6 +321,8 @@ static irqreturn_t stm32_interrupt(int irq, void *ptr)
+ 	struct stm32_usart_offsets *ofs = &stm32_port->info->ofs;
+ 	u32 sr;
  
- Examples:
- usart4: serial at 40004c00 {
-@@ -32,3 +34,13 @@ usart2: serial at 40004400 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usart2 &pinctrl_usart2_rtscts>;
- };
++	spin_lock(&port->lock);
 +
-+usart1: serial at 40011000 {
-+	compatible = "st,stm32-usart", "st,stm32-uart";
-+	reg = <0x40011000 0x400>;
-+	interrupts = <37>;
-+	clocks = <&rcc 0 164>;
-+	dmas = <&dma2 2 4 0x414 0x0>,
-+	       <&dma2 7 4 0x414 0x0>;
-+	dma-names = "rx", "tx";
-+};
+ 	sr = readl_relaxed(port->membase + ofs->isr);
+ 
+ 	if ((sr & USART_SR_RXNE) && !(stm32_port->rx_ch))
+@@ -329,6 +331,8 @@ static irqreturn_t stm32_interrupt(int irq, void *ptr)
+ 	if ((sr & USART_SR_TXE) && !(stm32_port->tx_ch))
+ 		stm32_transmit_chars(port);
+ 
++	spin_unlock(&port->lock);
++
+ 	if (stm32_port->rx_ch)
+ 		return IRQ_WAKE_THREAD;
+ 	else
 -- 
 1.9.1
