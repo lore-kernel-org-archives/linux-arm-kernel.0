@@ -1,154 +1,213 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Sep 2016 10:32:51 +0200
-Subject: [PATCH 7/9] mtd: nand: sunxi: switch from manual to automated timing
- config
-In-Reply-To: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
-References: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1473928373-8680-8-git-send-email-s.hauer@pengutronix.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 15 Sep 2016 14:03:05 +0530
+Subject: [RFC PATCH 00/11] pci: support for configurable PCI endpoint
+In-Reply-To: <2837059.ka7z3gzjF2@wuerfel>
+References: <1473829927-20466-1-git-send-email-kishon@ti.com>
+ <2837059.ka7z3gzjF2@wuerfel>
+Message-ID: <57DA5CC1.6030502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND framework is now able to select the best NAND timings for us.
-All we have to do is implement a ->setup_data_interface() function to
-apply those timings and remove the timing selection code from the sunxi
-driver.
+Hi Arnd,
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/mtd/nand/sunxi_nand.c | 76 ++++++++-----------------------------------
- 1 file changed, 14 insertions(+), 62 deletions(-)
+On Wednesday 14 September 2016 06:55 PM, Arnd Bergmann wrote:
+> On Wednesday, September 14, 2016 10:41:56 AM CEST Kishon Vijay Abraham I wrote:
+>> This patch series
+>> 	*) adds PCI endpoint core layer
+>> 	*) modifies designware/dra7xx driver to be configured in EP mode
+>> 	*) adds a PCI endpoint *test* function driver
+> 
+> Hi Kishon,
+> 
+> I think this is a great start, thanks for posting early with a clear
+> list of limitations and TODO items.
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index e414b31..8c59a10 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -1572,14 +1572,22 @@ static int _sunxi_nand_lookup_timing(const s32 *lut, int lut_size, u32 duration,
- #define sunxi_nand_lookup_timing(l, p, c) \
- 			_sunxi_nand_lookup_timing(l, ARRAY_SIZE(l), p, c)
- 
--static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
--				       const struct nand_sdr_timings *timings)
-+static int sunxi_nfc_setup_data_interface(struct mtd_info *mtd,
-+					    const struct nand_data_interface *conf,
-+					    bool check_only)
- {
-+	struct nand_chip *nand = mtd_to_nand(mtd);
-+	struct sunxi_nand_chip *chip = to_sunxi_nand(nand);
- 	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->nand.controller);
-+	const struct nand_sdr_timings *timings;
- 	u32 min_clk_period = 0;
- 	s32 tWB, tADL, tWHR, tRHW, tCAD;
- 	long real_clk_rate;
- 
-+	timings = nand_get_sdr_timings(conf);
-+	if (IS_ERR(timings))
-+		return -ENOTSUPP;
-+
- 	/* T1 <=> tCLS */
- 	if (timings->tCLS_min > min_clk_period)
- 		min_clk_period = timings->tCLS_min;
-@@ -1679,6 +1687,9 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 		return tRHW;
- 	}
- 
-+	if (check_only)
-+		return 0;
-+
- 	/*
- 	 * TODO: according to ONFI specs this value only applies for DDR NAND,
- 	 * but Allwinner seems to set this to 0x7. Mimic them for now.
-@@ -1712,44 +1723,6 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
- 	return 0;
- }
- 
--static int sunxi_nand_chip_init_timings(struct sunxi_nand_chip *chip,
--					struct device_node *np)
--{
--	struct mtd_info *mtd = nand_to_mtd(&chip->nand);
--	const struct nand_sdr_timings *timings;
--	int ret;
--	int mode;
--
--	mode = onfi_get_async_timing_mode(&chip->nand);
--	if (mode == ONFI_TIMING_MODE_UNKNOWN) {
--		mode = chip->nand.onfi_timing_mode_default;
--	} else {
--		uint8_t feature[ONFI_SUBFEATURE_PARAM_LEN] = {};
--		int i;
--
--		mode = fls(mode) - 1;
--		if (mode < 0)
--			mode = 0;
--
--		feature[0] = mode;
--		for (i = 0; i < chip->nsels; i++) {
--			chip->nand.select_chip(mtd, i);
--			ret = chip->nand.onfi_set_features(mtd,	&chip->nand,
--						ONFI_FEATURE_ADDR_TIMING_MODE,
--						feature);
--			chip->nand.select_chip(mtd, -1);
--			if (ret)
--				return ret;
--		}
--	}
--
--	timings = onfi_async_timing_mode_to_sdr_timings(mode);
--	if (IS_ERR(timings))
--		return PTR_ERR(timings);
--
--	return sunxi_nand_chip_set_timings(chip, timings);
--}
--
- static int sunxi_nand_ooblayout_ecc(struct mtd_info *mtd, int section,
- 				    struct mtd_oob_region *oobregion)
- {
-@@ -1975,7 +1948,6 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
- static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 				struct device_node *np)
- {
--	const struct nand_sdr_timings *timings;
- 	struct sunxi_nand_chip *chip;
- 	struct mtd_info *mtd;
- 	struct nand_chip *nand;
-@@ -2065,25 +2037,11 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 	nand->read_buf = sunxi_nfc_read_buf;
- 	nand->write_buf = sunxi_nfc_write_buf;
- 	nand->read_byte = sunxi_nfc_read_byte;
-+	nand->setup_data_interface = sunxi_nfc_setup_data_interface;
- 
- 	mtd = nand_to_mtd(nand);
- 	mtd->dev.parent = dev;
- 
--	timings = onfi_async_timing_mode_to_sdr_timings(0);
--	if (IS_ERR(timings)) {
--		ret = PTR_ERR(timings);
--		dev_err(dev,
--			"could not retrieve timings for ONFI mode 0: %d\n",
--			ret);
--		return ret;
--	}
--
--	ret = sunxi_nand_chip_set_timings(chip, timings);
--	if (ret) {
--		dev_err(dev, "could not configure chip timings: %d\n", ret);
--		return ret;
--	}
--
- 	ret = nand_scan_ident(mtd, nsels, NULL);
- 	if (ret)
- 		return ret;
-@@ -2096,12 +2054,6 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 
- 	nand->options |= NAND_SUBPAGE_READ;
- 
--	ret = sunxi_nand_chip_init_timings(chip, np);
--	if (ret) {
--		dev_err(dev, "could not configure chip timings: %d\n", ret);
--		return ret;
--	}
--
- 	ret = sunxi_nand_ecc_init(mtd, &nand->ecc, np);
- 	if (ret) {
- 		dev_err(dev, "ECC init failed: %d\n", ret);
--- 
-2.8.1
+Thank you :-)
+> 
+> I've added the drivers/ntb maintainers to Cc, given that there is
+> a certain degree of overlap between your work and the existing
+> code, I think they should be part of the discussion.
+>  
+>> Known Limitation:
+>> 	*) Does not support multi-function devices
+> 
+> If I understand it right, this was a problem for USB and adding
+> it later made it somewhat inconsistent. Maybe we can at least
+> try to come up with an idea of how multi-function devices
+> could be handled even if we don't implement it until someone
+> actually needs it.
+
+Actually IMO multi-function device in PCI should be much simpler than it is for
+USB. In the case of USB, all the functions in a multi-function device will
+share the same *usb configuration* . (USB device can have multiple
+configuration but only one can be enabled at a time). A multi-function USB
+device will still have a single vendor-id/product-id/class... So I think a
+separate library (composite.c) in USB makes sense.
+
+But in the case of PCI, every function can be treated independently since all
+the functions have it's own 4KB configuration space. Each function can be
+configured independently. Each can have it's own vendor-id/product-id/class..
+I'm not sure if we'll need a separate library for PCI like we have for USB.
+
+Now the restriction for not allowing multi-function device is because of the
+following structure definition.
+
+struct pci_epc {
+	..
+        struct pci_epf *epf;
+	..
+};
+
+EPC has a single reference to EPF and it is used *only* to notify the function
+driver when the link is up. (If this can be changed to use notification
+mechanism, multi-function devices can be supported here)
+
+One more place where this restriction arises is in designware driver
+
+struct dw_pcie_ep {
+	..
+        u8 bar_to_atu[6];
+	..
+};
+
+We use single ATU window to configure a BAR (in BAR). If there are multiple
+functions, then this should also be modified since each function has 6 BARs.
+
+This can be fixed without much effort unless some other issue props up.
+
+> 
+> Is your hardware able to make the PCIe endpoint look like
+> a device with multiple PCI functions, or would one have to
+> do this in software inside of a single PCI function if we
+> ever need it?
+
+The hardware I have doesn't support multiple PCI functions (like having a
+separate configuration space for each function). It has a dedicated space for
+configuration space supporting only one function. [Section 24.9.7.3.2
+PCIe_SS_EP_CFG_DBICS Register Description in  [1]].
+
+yeah, it has to be done in software (but that won't be multi-function device in
+PCI terms).
+
+[1] -> http://www.ti.com/lit/ug/spruhz6g/spruhz6g.pdf
+> 
+>> TODO:
+>> 	*) access buffers in RC
+>> 	*) raise MSI interrupts
+>> 	*) Enable user space control for the RC side PCI driver
+> 
+> The user space control would end up just being one of several
+> gadget drivers, right? E.g. gadget drivers for standard hardware
+> (8250 uart, ATA, NVMe, some ethernet) could be done as kernel
+> drivers while a user space driver can be used for things that
+> are more unusual and that don't need to interface to another
+> part of the kernel?
+
+Actually I didn't mean that. It was more with respect to the host side PCI test
+driver (drivers/misc/pci_endpoint_test.c). Right now it validates BAR, irq
+itself. I wanted to change this so that the user controls which tests to run.
+(Like for USB gadget zero tests, testusb.c invokes ioctls to perform various
+tests). Similarly I want to have a userspace program invoke pci_endpoint_test
+to perform various PCI tests.
+> 
+>> 	*) Adapt all other users of designware to use the new design (only
+>> 	   dra7xx has been adapted)
+> 
+> I don't fully understand this part. Does every designware based
+> driver need modifications, or are the changes to the
+> generic parts of the designware driver enough to make it
+> work for the simpler platforms?
+
+I have changed the core designware driver structures (like previously the
+platform drivers will only use pcie_port, but now I introduced struct dw_pcie
+to support both host and endpoint). This will break (compilation failure) all
+the designware based drivers (except dra7xx). All these drivers should be
+adapted to the new change (even if they work only in host mode these has to be
+adapted).
+> 
+>> HOW TO:
+>>
+>> ON THE EP SIDE:
+>> ***************
+>>
+>> /* EP function is configured using configfs */
+>> # mount -t configfs none /sys/kernel/config
+>>
+>> /* PCI EP core layer creates "pci_ep" entry in configfs */
+>> # cd /sys/kernel/config/pci_ep/
+>>
+>> /*
+>>  * This is the 1st step in creating an endpoint function. This
+>>  * creates the endpoint function device *instance*. The string
+>>  * before the .<num> suffix will identify the driver this
+>>  * EP function will bind to.
+>>  * Just pci_epf_test is also valid. The .<num> suffix is used
+>>  * if there are multiple PCI controllers and all of them wants
+>>  * to use the same function.
+>>  */
+>> # mkdir pci_epf_test.0
+> 
+> I haven't used USB gadgets, but I assume this is modeled around
+> the same interface. If there are notable differences, please mention
+> what they are. Otherwise the general concept seems rather nice to me.
+
+Yeah, both USB gadget and PCI endpoint use configfs interface but the semantics
+are quite different.
+
+Every directory in *usb_gadget* corresponds to a gadget device, and the gadget
+device has a functions sub-directory which has the USB functions. And these
+directories have fields or attributes specific to USB.
+
+But in the case of PCI, every directory in *pci_ep* corresponds to a PCI
+function and it has fields or attributes specific to PCI function.
+
+The main reason for using configfs for PCI endpoint is to give the users to
+control "which function has to be bound to which controller". The same concept
+is used for USB gadget as well but there it is "which gadget device has to be
+bound to which controller".
+> 
+>>  drivers/pci/{host => controller}/Kconfig           |  109 +++++-
+>>  drivers/pci/{host => controller}/Makefile          |    2 +
+>>  drivers/pci/{host => controller}/pci-aardvark.c    |    0
+>>  drivers/pci/{host => controller}/pci-dra7xx.c      |  340 +++++++++++++----
+>>  drivers/pci/{host => controller}/pci-exynos.c      |    0
+>>  drivers/pci/{host => controller}/pci-host-common.c |    0
+>>  .../pci/{host => controller}/pci-host-generic.c    |    0
+>>  drivers/pci/{host => controller}/pci-hyperv.c      |    0
+>>  drivers/pci/{host => controller}/pci-imx6.c        |    0
+>>  drivers/pci/{host => controller}/pci-keystone-dw.c |    0
+>>  drivers/pci/{host => controller}/pci-keystone.c    |    0
+>>  drivers/pci/{host => controller}/pci-keystone.h    |    0
+> 
+> Maybe it's better to wait before moving it around, this will make
+> it harder for you to rebase the patch series while you are working on
+> it and other people are working on the existing code.
+
+These patches just do "mv drivers/pci/host  drivers/pci/controller", so I guess
+irrespective of the changes in the existing driver it should just move. Anyways
+I have to check this.
+> 
+> I'd suggest dropping the rename patches for the moment and just work
+> in drivers/pci/host.
+
+Okay.
+> 
+> Let's talk (high-level) about the DT binding. I see that the way
+> you have done it here, one will need to have a different .dtb file
+> for a machine depending on whether the PCIe is used in host or
+> endpoint mode. The advantage of this way is that it's a much
+> cleaner binding (PCIe host bindings are a mess, and adding more
+> options to it will only make it worse), the downside is that
+> you can't decide at runtime what you want to use it for. E.g.
+> connecting two identical machines over PCIe requires deciding
+> in the bootloader which one is the endpoint, or using DT
+> overlays, which may be awkward for some users. Is this a realistic
+> use case, or do you expect that all machines will only ever be
+> used in one of the two ways?
+
+It would definitely be nice to select the mode at runtime. Even for this patch
+series, I added a temporary dtsi patch to configure the pci controller in EP
+mode (which can't be merged since the same controller is also used to test RC).
+
+Thanks
+Kishon
