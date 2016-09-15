@@ -1,29 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Sep 2016 12:22:59 -0700
-Subject: [PATCH v4 5/8] ARM: dts: am335x-boneblack: Add
- blue-and-red-wiring -property to LCDC node
-In-Reply-To: <d9dcc43b-6884-aab1-ff82-c66ecf6e96b6@ti.com>
-References: <cover.1472719892.git.jsarha@ti.com>
- <fad833a6a4368196f4fc131a54d90f5b90169393.1472719892.git.jsarha@ti.com>
- <d9dcc43b-6884-aab1-ff82-c66ecf6e96b6@ti.com>
-Message-ID: <20160915192257.hbz4vqxgd5thesfq@atomide.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 15 Sep 2016 21:41:47 +0200
+Subject: [PATCH 0/2] i2c: meson: add gxbb compatible string
+In-Reply-To: <1473846557-18123-1-git-send-email-jbrunet@baylibre.com>
+References: <1473846557-18123-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <20160915194146.GB7863@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jyri Sarha <jsarha@ti.com> [160915 02:44]:
-> Tony,
-> The functional changes are now merged. But let's not merge this bbb dts
-> patch just yet, so we do not cause a conflict with the other bbb hdmi
-> audio dts change[1] that slipped into tda998x pull request. The patch
-> can very well wait until v4.10 if needed.
+On Wed, Sep 14, 2016 at 11:49:15AM +0200, Jerome Brunet wrote:
+> This patchset adds a specific compatible string in the Meson I2C driver
+> for the Amlogic Meson gxbb SoC.
 > 
-> However, the other three dts patches[2] can be merged. Should I rebase
-> those on top of some branch and resend them?
+> Other patch series (pinctrl and device tree) are being sent to complete
+> the i2c support on meson gxbb
+> 
+> Neil Armstrong (2):
+>   i2c: meson: add gxbb compatible string
+>   dt-bindings: i2c-meson: add gxbb compatible string
 
-Sorry I've lost count of all the patches and about tag all my emails
-as read for v4.9 merge window. So yeah it's best to resend the dts
-changes separately :)
+Squashed both patches and applied to for-next, thanks!
 
-Regards,
-
-Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160915/7caf8a41/attachment.sig>
