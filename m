@@ -1,36 +1,25 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Thu, 15 Sep 2016 18:42:41 +0200
-Subject: [PATCH 09/11] serial: stm32: fix spin_lock management
-In-Reply-To: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
-References: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1473957763-30629-10-git-send-email-alexandre.torgue@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Sep 2016 17:41:14 +0100
+Subject: [PATCH v3 0/7] arm64: Privileged Access Never using TTBR0_EL1
+ switching
+In-Reply-To: <20160915162044.GB19214@leverpostej>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+ <20160915162044.GB19214@leverpostej>
+Message-ID: <20160915164114.GC19214@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+On Thu, Sep 15, 2016 at 05:20:45PM +0100, Mark Rutland wrote:
+> Don't we need to fix up do_sysinstr() (which performs raw cache
+> maintenance ops on __user addresses) with
+> uaccess_{enable,disable}_not_uao()?
 
-diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
-index 24c4d82..3b99d79 100644
---- a/drivers/tty/serial/stm32-usart.c
-+++ b/drivers/tty/serial/stm32-usart.c
-@@ -321,6 +321,8 @@ static irqreturn_t stm32_interrupt(int irq, void *ptr)
- 	struct stm32_usart_offsets *ofs = &stm32_port->info->ofs;
- 	u32 sr;
- 
-+	spin_lock(&port->lock);
-+
- 	sr = readl_relaxed(port->membase + ofs->isr);
- 
- 	if ((sr & USART_SR_RXNE) && !(stm32_port->rx_ch))
-@@ -329,6 +331,8 @@ static irqreturn_t stm32_interrupt(int irq, void *ptr)
- 	if ((sr & USART_SR_TXE) && !(stm32_port->tx_ch))
- 		stm32_transmit_chars(port);
- 
-+	spin_unlock(&port->lock);
-+
- 	if (stm32_port->rx_ch)
- 		return IRQ_WAKE_THREAD;
- 	else
--- 
-1.9.1
+Actually, we don't even need to do anything in the case of PAN since
+cache ops aren't affected by PAN/UAO; we just need to map/unmap in the
+TTBR0-switching case to ensure we don't get stup fixing things up
+forever.
+
+/me commences name bikeshedding.
+
+Thanks,
+Mark.
