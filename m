@@ -1,42 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 15 Sep 2016 11:13:34 +0200
-Subject: [PATCH v4 00/10] ARM: KVM: Support for vgic-v3
-In-Reply-To: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
-References: <1473691764-29424-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20160915091334.GB23629@cbox>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 15 Sep 2016 12:12:19 +0300
+Subject: [PATCHv3 00/11] crypto: omap HW crypto fixes
+In-Reply-To: <20160913123849.GA31890@gondor.apana.org.au>
+References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
+ <20160913123849.GA31890@gondor.apana.org.au>
+Message-ID: <6996d5d9-2622-b6c4-3b96-7fd79de86be4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Valdimir,
+On 13/09/16 15:38, Herbert Xu wrote:
+> On Thu, Aug 04, 2016 at 01:28:35PM +0300, Tero Kristo wrote:
+>> Hi,
+>>
+>> This revision took quite a bit time to craft due to the rework needed
+>> for sham buffer handling and export/import. I ended up implementing
+>> a flush functionality for draining out the sham buffer when doing
+>> export/import; just shrinking the buffer to sufficiently small size
+>> impacted the performance with small data chunks too much so I dropped
+>> this approach.
+>>
+>> The series also fixes a couple of existing issues with omap2/omap3
+>> hardware acceleration, I ran a full boot test / crypto manager
+>> test suite on all boards accessible to me now.
+>>
+>> Based on top of latest mainline, which is somewhere before 4.8-rc1
+>> as of writing this, I am unable to rebase the series during the next
+>> three weeks so wanted to get this out now. Targeted for 4.9 merge
+>> window, some fixes could be picked up earlier though if needed.
+>
+> I have applied patches 1,4-5,7-11.  Some of them didn't apply
+> cleanly so please check the result in my tree.
+>
+> Thanks,
+>
 
-On Mon, Sep 12, 2016 at 03:49:14PM +0100, Vladimir Murzin wrote:
-> Hi,
-> 
-> This is an attempt to make use vgic-v3 under arch/arm since
-> save-restore functionality got re-written in C and can be shared
-> between arm/arm64 like it has already been done for vgic-v2 and timer.
-> 
-> With this patches I'm able to get 32 core an AArch32 ARMv8 guest boot:
-> 
-> ...
-> GICv3: CPU31: found redistributor 703 region 0:0x000000003ffd0000
-> CPU31: thread -1, cpu 3, socket 7, mpidr 80000703
-> Brought up 32 CPUs
-> SMP: Total of 32 processors activated (768.00 BogoMIPS).
-> CPU: All CPU(s) started in SVC mode.
-> ...
-> 
-> Additionally, quite lightweight test based on Self IPI guest test[1]
-> has been run with up to 255 cpus.
-> 
-I have applied this to kvmarm/queue, fixing up a few trivial conflicts,
-and I have changed the kvm_info message.
+Thanks Herbert,
 
-If you could test the integrated branch with GICv3 on a 32-bit platform,
-that would be great.
+I just gave a trial for your branch, and seems to be working for me. 
+Also checked the patches you applied and they seem fine also.
 
-I'll give people a few days to give their acks to the non-KVM part of
-the series and will then put it in next.
+I have also a new version of the sha buffer handling and export/import 
+available now, but need to cleanup it quite a bit, and figure out how to 
+split the patch properly.
 
-Thanks for the work,
--Christoffer
+  drivers/crypto/omap-sham.c | 532 
+++++++++++++++++++++++++++-------------------
+
+... It now uses sg for xmitting data where possible, and avoids the need 
+for a large internal buffer. The buffer size is also now properly 
+configurable, which can be used to overcome the performance issues if 
+needed (this however, requires the max statesize hack within the 
+crypto/ahash.c file, but thats fine.) I'll hopefully post this out maybe 
+tomorrow, but its going to be targeted for 4.10 I believe due to the 
+(ahem, rather) intrusive changes.
+
+-Tero
