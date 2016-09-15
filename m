@@ -1,85 +1,29 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 15 Sep 2016 16:39:34 +0200
-Subject: [PATCH] soc: rockchip: power-domain: Handle errors from
- of_genpd_add_provider_onecell
-In-Reply-To: <1473936221-9248-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1473936221-9248-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <14744126.0kYUlUJ0mc@diego>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 15 Sep 2016 20:14:22 +0530
+Subject: [GIT PULL] DaVinci DTS updates for v4.9 (part 2)
+Message-ID: <d231c316-a14b-1534-2bcd-29f0898b0b1c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 15. September 2016, 12:43:41 schrieb Tomeu Vizoso:
-> It was a bit surprising that the device was reported to have probed just
-> fine, but the provider hadn't been registered.
-> 
-> So handle any errors when registering the provider and fail the probe
-> accordingly.
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Cc: Caesar Wang <wxt@rock-chips.com>
-> ---
->  drivers/soc/rockchip/pm_domains.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/soc/rockchip/pm_domains.c
-> b/drivers/soc/rockchip/pm_domains.c index 7acd1517dd37..57e920128cb2 100644
-> --- a/drivers/soc/rockchip/pm_domains.c
-> +++ b/drivers/soc/rockchip/pm_domains.c
-> @@ -627,7 +627,11 @@ static int rockchip_pm_domain_probe(struct
-> platform_device *pdev) goto err_out;
->  	}
-> 
-> -	of_genpd_add_provider_onecell(np, &pmu->genpd_data);
-> +	error = of_genpd_add_provider_onecell(np, &pmu->genpd_data);
-> +	if (error) {
-> +		dev_err(dev, "failed to add provider: %d\n", error);
-> +		goto err_out;
-> +	}
-> 
->  	return 0;
+The following changes since commit 9d05b389846312751108b16f3f8fccd51fa92715:
 
-Looks good in itself, but seems to trigger some issue in the genpd code
-when applied alone on top of linux-next-20160915. Looks like genpd
-is missing counter-initialization somewhere, as I'm seeing now:
+  ARM: dts: da850-lcdk: Audio support via simple-card (2016-08-19 17:51:27 +0530)
 
-[    1.664744] genpd_poweroff_unused disabling (null)
-[    1.669553] ------------[ cut here ]------------
-[    1.674169] WARNING: CPU: 0 PID: 1 at ../kernel/workqueue.c:1440 __queue_work+0x2b8/0x3f8
-[    1.682337] Modules linked in:
-[    1.685401] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.8.0-rc6-next-20160915-00001-g7432710-dirty #5
-[    1.694608] Hardware name: Rockchip (Device Tree)
-[    1.699312] [<c0310388>] (unwind_backtrace) from [<c030ba04>] (show_stack+0x10/0x14)
-[    1.707050] [<c030ba04>] (show_stack) from [<c0599c90>] (dump_stack+0x90/0xa4)
-[    1.714267] [<c0599c90>] (dump_stack) from [<c0341bc0>] (__warn+0xe8/0x100)
-[    1.721221] [<c0341bc0>] (__warn) from [<c0341c88>] (warn_slowpath_null+0x20/0x28)
-[    1.728785] [<c0341c88>] (warn_slowpath_null) from [<c0355b28>] (__queue_work+0x2b8/0x3f8)
-[    1.737041] [<c0355b28>] (__queue_work) from [<c0355ca8>] (queue_work_on+0x40/0x4c)
-[    1.744692] [<c0355ca8>] (queue_work_on) from [<c103e8b8>] (genpd_poweroff_unused+0x78/0x9c)
-[    1.753123] [<c103e8b8>] (genpd_poweroff_unused) from [<c0301e78>] (do_one_initcall+0x40/0x170)
-[    1.761815] [<c0301e78>] (do_one_initcall) from [<c1000dc8>] (kernel_init_freeable+0x15c/0x1fc)
-[    1.770507] [<c1000dc8>] (kernel_init_freeable) from [<c0bb7ba0>] (kernel_init+0x8/0x114)
-[    1.778678] [<c0bb7ba0>] (kernel_init) from [<c0307df8>] (ret_from_fork+0x14/0x3c)
-[    1.786240] ---[ end trace b38c51ace1463add ]---
-[    1.790875] genpd_poweroff_unused disabling ??????
-[    1.795856] genpd_poweroff_unused disabling ??????
-[    1.800830] ------------[ cut here ]------------
-[    1.805443] WARNING: CPU: 0 PID: 1 at ../kernel/workqueue.c:1440 __queue_work+0x2b8/0x3f8
-[    1.813610] Modules linked in:
-[    1.816673] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W       4.8.0-rc6-next-20160915-00001-g7432710-dirty #5
-[    1.827094] Hardware name: Rockchip (Device Tree)
-[    1.831795] [<c0310388>] (unwind_backtrace) from [<c030ba04>] (show_stack+0x10/0x14)
-[    1.839532] [<c030ba04>] (show_stack) from [<c0599c90>] (dump_stack+0x90/0xa4)
-[    1.846747] [<c0599c90>] (dump_stack) from [<c0341bc0>] (__warn+0xe8/0x100)
-[    1.853700] [<c0341bc0>] (__warn) from [<c0341c88>] (warn_slowpath_null+0x20/0x28)
-[    1.861264] [<c0341c88>] (warn_slowpath_null) from [<c0355b28>] (__queue_work+0x2b8/0x3f8)
-[    1.869521] [<c0355b28>] (__queue_work) from [<c0355ca8>] (queue_work_on+0x40/0x4c)
-[    1.877170] [<c0355ca8>] (queue_work_on) from [<c103e8b8>] (genpd_poweroff_unused+0x78/0x9c)
-[    1.885600] [<c103e8b8>] (genpd_poweroff_unused) from [<c0301e78>] (do_one_initcall+0x40/0x170)
-[    1.894290] [<c0301e78>] (do_one_initcall) from [<c1000dc8>] (kernel_init_freeable+0x15c/0x1fc)
-[    1.902981] [<c1000dc8>] (kernel_init_freeable) from [<c0bb7ba0>] (kernel_init+0x8/0x114)
-[    1.911152] [<c0bb7ba0>] (kernel_init) from [<c0307df8>] (ret_from_fork+0x14/0x3c)
-[    1.918713] ---[ end trace b38c51ace1463ade ]---
-[    1.923338] genpd_poweroff_unused disabling ??????
-[    1.928325] genpd_poweroff_unused disabling ??????
+are available in the git repository at:
 
-[+ millions more of those]
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.9/dts-p2
+
+for you to fetch changes up to 9304af1b9ffa95dcb37d642852f8c67b98ea349a:
+
+  ARM: dts: da850-lcdk: Add NAND to DT (2016-09-15 19:37:32 +0530)
+
+----------------------------------------------------------------
+This pull request adds NAND support to
+DA850 based LCDK board.
+
+----------------------------------------------------------------
+Karl Beldan (1):
+      ARM: dts: da850-lcdk: Add NAND to DT
+
+ arch/arm/boot/dts/da850-lcdk.dts | 83 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
