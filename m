@@ -1,27 +1,13 @@
 From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Fri, 16 Sep 2016 00:46:55 +0530
-Subject: [PATCH v5 6/6] ARM: dts: imx6qdl-icore: Add FEC support
+Date: Fri, 16 Sep 2016 00:46:54 +0530
+Subject: [PATCH v5 5/6] ARM: dts: imx6qdl-icore: Add usbotg support
 In-Reply-To: <1473967015-8523-1-git-send-email-jagan@amarulasolutions.com>
 References: <1473967015-8523-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1473967015-8523-7-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <1473967015-8523-6-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add FEC support for Engicam i.CoreM6 dql modules.
-
-Observed similar 'eth0: link is not ready' issue which was
-discussed in [1] due rmii mode with external ref_clk, so added
-clock node along with the properties mentioned by Shawn in [2]
-
-FEC link log:
-------------
-$ ifconfig eth0 up
-[   27.905187] SMSC LAN8710/LAN8720 2188000.ethernet:00: attached PHY driver
-               [SMSC LAN8710/LAN8720] (mii_bus:phy_addr=2188000.ethernet:00, irq=-1)
-[   27.918982] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
-
-[1] https://patchwork.kernel.org/patch/3491061/
-[2] https://patchwork.kernel.org/patch/3490511/
+Add usbotg support for Engicam i.CoreM6 dql modules.
 
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
@@ -31,72 +17,60 @@ Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v5:
+	- none
+Changes for v4:
 	- new patch
 
- arch/arm/boot/dts/imx6qdl-icore.dtsi | 37 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ arch/arm/boot/dts/imx6qdl-icore.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-index a0ca442..77df730 100644
+index fb77a47..a0ca442 100644
 --- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-@@ -48,6 +48,18 @@
- 		reg = <0x10000000 0x80000000>;
+@@ -63,6 +63,15 @@
+ 		regulator-boot-on;
+ 		regulator-always-on;
  	};
- 
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
 +
-+		rmii_clk: clock at 0 {
-+			compatible = "fixed-clock";
-+			reg = <0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;  /* 25MHz for example */
-+		};
++	reg_usb_otg_vbus: usb_otg_vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-boot-on;
++		regulator-always-on;
 +	};
-+
- 	reg_3p3v: regulator-3p3v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "3P3V";
-@@ -91,6 +103,15 @@
- 	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
  };
  
-+&fec {
+ &can1 {
+@@ -122,6 +131,14 @@
+ 	status = "okay";
+ };
+ 
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+	clocks = <&clks 117>, <&clks 117>, <&rmii_clk>;
-+	phy-mode = "rmii";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	disable-over-current;
 +	status = "okay";
 +};
 +
- &gpmi {
+ &usdhc1 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_gpmi_nand>;
-@@ -148,6 +169,22 @@
- };
+ 	pinctrl-0 = <&pinctrl_usdhc1>;
+@@ -196,6 +213,12 @@
+ 		>;
+ 	};
  
- &iomuxc {
-+	pinctrl_enet: enetgrp {
++	pinctrl_usbotg: usbotggrp {
 +		fsl,pins = <
-+			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
-+			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x1b0b1
-+			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__GPIO1_IO23	0x1b0b0
-+			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b0
++			MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x17059
 +		>;
 +	};
 +
- 	pinctrl_flexcan1: flexcan1grp {
+ 	pinctrl_usdhc1: usdhc1grp {
  		fsl,pins = <
- 			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x1b020
+ 			MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17070
 -- 
 2.7.4
