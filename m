@@ -1,49 +1,76 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 15 Sep 2016 10:32:04 +0200
-Subject: [PATCH 1/5] clk: add support for runtime pm
-In-Reply-To: <20160914213903.GG7243@codeaurora.org>
-References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
- <1472737551-15272-2-git-send-email-m.szyprowski@samsung.com>
- <20160908001943.GC13062@codeaurora.org>
- <CGME20160912101857eucas1p29b2bbd5ac0eda92284091ad1b86decc4@eucas1p2.samsung.com>
- <f18fee35-cb5d-abce-0415-a98b58e3a302@samsung.com>
- <20160912223105.GI7243@codeaurora.org>
- <e3cceb9a-7a30-c662-dba4-bc453f6fddb6@samsung.com>
- <20160914213903.GG7243@codeaurora.org>
-Message-ID: <648b0ce0-dcc5-d32d-5c4e-b7e0c0f10d4c@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Sep 2016 10:32:44 +0200
+Subject: [PATCH v4] mtd: nand: automate NAND timings selection
+Message-ID: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
 
+This series aims at automating the NAND timings selection which is
+currently supposed to be done in each NAND controller driver, thus
+simplifying drivers implementation.
 
-On 2016-09-14 23:39, Stephen Boyd wrote:
-> On 09/13, Marek Szyprowski wrote:
->> On 2016-09-13 00:31, Stephen Boyd wrote:
->>> Great! So you have runtime PM callbacks that are calling
->>> clk_prepare/unprepare?
->> Well, not really. clock controller's runtime pm functions must not call
->> clk_prepare/unprepare yet.
->>
->> I didn't get your question. I thought that you are asking if my change
->> won't introduce any deadlock related to prepare and dev->pm locks. My
->> runtime pm functions doesn't do any call to clk_prepare/unprepare.
->> Although global clock prepare lock is re-entrant from the same process, it
->> would cause deadlock if called from runtime pm functions, because runtime
->> pm functions might be called from the worker running on the different
->> cpu/process.
-> I mean non-clk controller driver based runtime PM callbacks that
-> call clk_prepare/unprepare in them. For example, some i2c or spi
-> device driver that has clk operations in the runtime PM
-> callbacks. That would allow lockdep to see any potential deadlock
-> because of aliasing lock classes for the device power lock and
-> the global prepare lock.
+As suggested by Boris this version of the series introduces a nand_reset()
+function which replaces the several open coded NAND_CMD_RESET commands
+in the code. This makes sure we can apply the timing each time after
+after reset.
 
-This works perfectly fine. Runtime pm callbacks are called with power lock
-released, so there is no deadlock possible related to dev->power.lock.
-See __rpm_callback() function in drivers/base/power/runtime.c
+Also I have brought back the conversion patch for teh sunxi driver whic
+was part of Boris initial posting. It's untested due to the lack of hardware,
+so please test before applying.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Sascha
+
+Changes since v4:
+- Change onfi_init_data_interface() prototype to be more future proof as
+  requested by Boris
+
+Changes since v3:
+- Bring back patch dropped in v3
+- Use statically allocated default timing for all chips and store one
+  optimized timing in struct nand_chip
+
+Changes since v2:
+- Add accessor function to get the SDR timing from struct nand_data_interface
+- Change nand_reset() argument to struct nand_chip
+- Drop conversion of nand_timing array to struct nand_data_interface
+- Recalculate timing whenever needed instead of storing a pointer in struct
+  nand_chip
+- some more refactoring
+
+Changes since v1:
+- create a nand_reset() function to create a single place to reset NAND
+  chips and to apply timings
+- Add patch to convert sunxi driver for automated timing setup
+- split into more patches
+
+Changes since the initial posting from Boris:
+
+- Integrate Feedback from Ezequiel Garcia
+- When iterating over the chips calling onfi_set_features() for each
+  bail out when any of the calls fail, not only the last one.
+- When one of the onfi_set_features() calls fail then reset the chipi
+  afterwards.
+- Drop Sunxi example, add patch for the mxc_nand controller instead.
+
+----------------------------------------------------------------
+
+Boris Brezillon (1):
+      mtd: nand: automate NAND timings selection
+
+Sascha Hauer (8):
+      mtd: nand: Create a NAND reset function
+      mtd: nand: Introduce nand_data_interface
+      mtd: nand: convert ONFI mode into data interface
+      mtd: nand: Add function to convert ONFI mode to data_interface
+      mtd: nand: Expose data interface for ONFI mode 0
+      mtd: nand: sunxi: switch from manual to automated timing config
+      mtd: nand: mxc: implement onfi get/set features
+      mtd: nand: mxc: Add timing setup for v2 controllers
+
+ drivers/mtd/nand/mxc_nand.c     | 133 ++++++++++++
+ drivers/mtd/nand/nand_base.c    | 179 ++++++++++++++-
+ drivers/mtd/nand/nand_timings.c | 469 ++++++++++++++++++++++------------------
+ drivers/mtd/nand/sunxi_nand.c   |  76 ++-----
+ include/linux/mtd/nand.h        | 190 +++++++++++-----
+ 5 files changed, 721 insertions(+), 326 deletions(-)
