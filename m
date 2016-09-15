@@ -1,51 +1,109 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 15 Sep 2016 12:30:50 +0200
-Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
-In-Reply-To: <CAFBinCDuj_nHtQ9xs0LMmqZT7Yr9SUw24_H2nAwULT7e9kRXag@mail.gmail.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
- <m260q6jibf.fsf@baylibre.com>
- <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
- <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
- <m2eg4ui0nl.fsf@baylibre.com>
- <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
- <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
- <m2sht9gkau.fsf@baylibre.com>
- <CAFBinCDohOoFP_3GC+=tt6S7sPS308ao-yf+oGhdfwo-N-JnAA@mail.gmail.com>
- <1473780508.10237.22.camel@pengutronix.de>
- <CAFBinCC+izGS72TZuiiBu=DjtSmoZXRZ6r76M6rC8W7UTpSD6g@mail.gmail.com>
- <1473842236.6816.0.camel@pengutronix.de>
- <CAFBinCDuj_nHtQ9xs0LMmqZT7Yr9SUw24_H2nAwULT7e9kRXag@mail.gmail.com>
-Message-ID: <1473935450.5624.12.camel@pengutronix.de>
+From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
+Date: Thu, 15 Sep 2016 11:35:56 +0100
+Subject: [GIT PULL] Greybus driver subsystem for 4.9-rc1
+In-Reply-To: <20160915101330.GB6718@leverpostej>
+References: <20160914100949.GA6179@kroah.com>
+ <20160914173625.GB15356@leverpostej> <20160914180754.GA16053@kroah.com>
+ <20160914182952.GA21615@kroah.com>
+ <1473932133.10230.25.camel@nexus-software.ie>
+ <20160915101330.GB6718@leverpostej>
+Message-ID: <1473935756.10230.42.camel@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+On Thu, 2016-09-15 at 11:13 +0100, Mark Rutland wrote:
+> On Thu, Sep 15, 2016 at 10:35:33AM +0100, Bryan O'Donoghue wrote:
+> >?
+> I don't think the history matters, 
 
-Am Mittwoch, den 14.09.2016, 23:23 +0200 schrieb Martin Blumenstingl:
-[...]
-> > We could add a triggered flag or a counter to struct reset_control, and
-> > have reset_control_reset_once do nothing if it is already set /
-> > incremented. Since the reset_control goes away with the last consumer,
-> > the shared reset line would get triggered again after unbinding both PHY
-> > devices.
-> I guess that'd do the trick for us:
-> - we could use devm_reset_control_get_optional_shared() during probe
-> - power_on would then call reset_control_reset()
-> - the code in reset_control_reset would be changed: the if
-> (WARN_ON(rstc->shared)) would be removed. then we return 0 if
-> (rstc->shared && atomic_read(&rstc->shared_triggered)). otherwise we
-> proceed with the old logic, except that we use
-> atomic_set(&rstc->shared_triggerred, 1) in case of success (if an
-> error was returned we leave it as "not triggered").
+Your comment seemed to indicate you thought we were reading a
+architectural timer directly - which we aren't.
+
+> and I don't think that one can rely
+> on get_cycles() in this manner outside of arch code.
+
+I don't follow your meaning. What's wrong with get_cycles() ? You've
+already said you don't think reading an architectural timer directly is
+correct.
+
+The objective is to read one of the free-running counters in MSM8994,
+clocked by the PMIC. The refclk provided by PMIC is distributed to each
+processor in the system.
+
+>  Looking at the
+> state of the tree [1] as of the final commit [2] in the greybus
+> branch,
+> my points still stand:
 > 
-> Let me know if you want me to (at least try to) implement that and send an RFC.
+> * The "google,greybus-frame-time-counter" node is superfluous. It
+> does
+> ? not describe a particular device,
 
-Yes, please give it a try. reset_control_reset should still WARN if the
-deassert count is set, and reset_(de)assert should do so if triggered is
-set. Mixing the two won't work. And it should be documented that shared
-reset_control_reset may do nothing if the reset was already triggered by
-another consumer.
+It describes a timer running @ 19.2MHz, clocked by PMIC refclk.
 
-regards
-Philipp
+>  and duplicates information we have
+> ? elsewhere.
+
+Can you give an example ?
+
+>  It does not explicitly define the relationship with the
+> ? underlying clocksource.
+
+
+> * The clock-frequency property isn't necessary. The architected timer
+> ? drivers know the frequency of the architected timers (MMIO or
+> sysreg),
+> ? and they should be queried as to the frequency.
+
+OK so if I'm understanding you. You think get_cycles() is fine but that
+instead of encoding a "greybus-frame-time-counter" the platform code
+should interrogate the frequency provided - is that correct ?
+
+> Beyond that, the fallback code using cpufreq and presumably an actual
+> cycle counter will be broken in a number of cases
+
+Of course the fallback will be broken... it's not supposed to work if
+you don't have a timer that can be used - just compile, run and print a
+complaint - i.e., this won't really do FrameTime on an x86... then
+again since so much of the underlying greybus/unipro hardware -
+requires a 19.2MHz refclk - if you were to try to do greybus on x86
+you'd need to solve that problem.
+
+> 
+> Per the comment at the top of the file, it looks like you want a
+> system-wide stable clocksource. If you want that, you need to use a
+> generic API that allows drivers and arch code to actually provide
+> that,
+> rather than building one yourself that doesn't work.
+
+Hmm. The objective is to read one of the timers clocked by the PMIC
+refclk input. refclk is provided to each processor in the system - and
+on MSM8994 clocks the MMIO timers. It's used to drive the PLL on the
+other processors - which in turn drive the timers that the Modules use
+to read their own local counters. We want to read that counter on MSM
+directly - get_cycles() has worked nicely so far.
+
+> 
+> If you're trying to synchronise with other agents in the system that
+> are
+> reading from the MMIO arch timers,
+
+No. The MMIO timers are useful only to the MSM. We don't have any type
+of parallel (or serial) bus that can access that on-chip resource.
+
+MSM8994 -- > USB
+? ? ? ? ? ? ?APBridge (timer) -> UniPro bus
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? -> Module with a UART
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? -> Module with a GPIO
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? -> Module with an etc, etc
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? -> SPI bus
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? -> SVC
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Owns FrameTime
+
+So the SVC owns FrameTime and diseminates that to other entities in the
+system by way of a GPIO and greybus. It's up to the MSM8994 to select a
+timer that works for it - the other processors in the system are
+responsible for their own timers.
+
+---
+bod
