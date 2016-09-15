@@ -1,52 +1,35 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Thu, 15 Sep 2016 08:51:41 +0200
-Subject: [PATCH 1/3] misc: Add Aspeed BT IPMI host driver
-In-Reply-To: <7db5ada0-49ea-55eb-089e-d979941ceff5@gmail.com>
-References: <1472664259-23933-1-git-send-email-clg@kaod.org>
- <c06a8afb-9143-6aef-3425-ad1e50cae35d@kaod.org>
- <1ce6c4b4-5938-22fc-7467-d1efc220b772@gmail.com> <4727554.yt7pF8chOH@wuerfel>
- <7db5ada0-49ea-55eb-089e-d979941ceff5@gmail.com>
-Message-ID: <3e2658cc-7089-abd2-23b3-ffd468edbd11@kaod.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 15 Sep 2016 14:57:37 +0800
+Subject: [PATCH 0/3] clk: sunxi-ng: sun6i-a31: Register offset and clk flag
+ fixes
+Message-ID: <20160915065740.13664-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2016 10:33 PM, Corey Minyard wrote:
-> On 09/12/2016 02:15 PM, Arnd Bergmann wrote:
->> On Monday, September 12, 2016 1:55:40 PM CEST Corey Minyard wrote:
->>> On 09/02/2016 08:22 AM, C?dric Le Goater wrote:
->>>> Hello,
->>>>
->>>> Adding Corey in cc: . I guess I should have done that in the first place.
->>> Yes, probably so.  I've been travelling and didn't see it on the mailing
->>> lists until now.
->>>
->>> There is already a BT driver in the kernel, in drivers/char/ipmi, why
->>> won't that work?
->> The new driver is the host side (running on the BMC), the existing one
->> is the client (running on the PC).
->>
->>     Arnd
-> 
-> Ok, that's not really clear from the documentation or the Kconfig.
-> In the IPMI spec the "host" side is the computer side, not the BMC
-> side.  Like:
-> 
->    11.6.1 BT Host Interface Registers
->    The Host BT interface provides an independent set of registers and
->    interrupts to allow the Host driver to
->    communicate with the baseboard management controller without
->    conflicting with the O/S ACPI driver.
-> 
-> In light of that, this should probably be named the bt-bmc driver.
-> 
-> I haven't reviewed this in detail, but I'm ok with putting it in
-> drivers/char/ipmi.  The state machine part looks reasonably
-> generic.  The configuration part isn't, but that could be split
-> out later if necessary.
+Hi,
 
-what do you mean by configuration ? I am ready to send a v2. May be
-I can add a few other things.
+Here are 3 fixes for the new sunxi-ng clk driver for sun6i-a31 recently
+introduced for 4.9. The issues were noticed while working on the display
+pipeline for the A31/A31s. The second patch follows what Maxime has done
+for the A33 CCU driver. The third issue was noticed while doing the first
+patch.
 
-Thanks,
+I hope we can get this into 4.9 as well, either right in -rc1, or in a
+later -rc.
 
-C. 
+Thanks!
+
+Regards
+ChenYu
+
+Chen-Yu Tsai (3):
+  clk: sunxi-ng: sun6i-a31: Set CLK_SET_RATE_PARENT for display output
+    clocks
+  clk: sunxi-ng: sun6i-a31: set CLK_SET_RATE_UNGATE for all PLLs
+  clk: sunxi-ng: sun6i-a31: Fix register offset for mipi-csi clk
+
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 44 ++++++++++++++++++++----------------
+ 1 file changed, 24 insertions(+), 20 deletions(-)
+
+-- 
+2.9.3
