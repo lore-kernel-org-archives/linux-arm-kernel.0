@@ -1,43 +1,36 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Sep 2016 23:13:59 +0800
-Subject: [PATCH 1/4] drm/sun4i: rgb: Declare RGB encoder and connector as MIPI
- DPI
+Date: Thu, 15 Sep 2016 23:14:01 +0800
+Subject: [PATCH 3/4] drm/sun4i: dotclock: Allow divider = 127
 In-Reply-To: <20160915151402.15992-1-wens@csie.org>
 References: <20160915151402.15992-1-wens@csie.org>
-Message-ID: <20160915151402.15992-2-wens@csie.org>
+Message-ID: <20160915151402.15992-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 18 or 24 bit parallel RGB LCD panel interface found on Allwinner
-SoCs matches the description of MIPI DPI. Declare the RGB encoder and
-connector as MIPI DPI.
+The dot clock divider is 7 bits wide, and the divider range is 1 ~ 127,
+or 6 ~ 127 if phase offsets are used. The 0 register value also
+represents a divider of 1 or bypass.
+
+Make the end condition of the for loop inclusive of 127 in the
+round_rate callback.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_rgb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_dotclock.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index c3ff10f559cc..8b520d9f5bd9 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -240,7 +240,7 @@ int sun4i_rgb_init(struct drm_device *drm)
- 	ret = drm_encoder_init(drm,
- 			       &rgb->encoder,
- 			       &sun4i_rgb_enc_funcs,
--			       DRM_MODE_ENCODER_NONE,
-+			       DRM_MODE_ENCODER_DPI,
- 			       NULL);
- 	if (ret) {
- 		dev_err(drm->dev, "Couldn't initialise the rgb encoder\n");
-@@ -255,7 +255,7 @@ int sun4i_rgb_init(struct drm_device *drm)
- 					 &sun4i_rgb_con_helper_funcs);
- 		ret = drm_connector_init(drm, &rgb->connector,
- 					 &sun4i_rgb_con_funcs,
--					 DRM_MODE_CONNECTOR_Unknown);
-+					 DRM_MODE_CONNECTOR_DPI);
- 		if (ret) {
- 			dev_err(drm->dev, "Couldn't initialise the rgb connector\n");
- 			goto err_cleanup_connector;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+index 1b6c2253192e..3eb99784f371 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
++++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+@@ -77,7 +77,7 @@ static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	u8 best_div = 1;
+ 	int i;
+ 
+-	for (i = 6; i < 127; i++) {
++	for (i = 6; i <= 127; i++) {
+ 		unsigned long ideal = rate * i;
+ 		unsigned long rounded;
+ 
 -- 
 2.9.3
