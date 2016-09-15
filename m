@@ -1,127 +1,62 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 15 Sep 2016 14:28:06 +0000
-Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <26171742.fWcrANu6EP@wuerfel>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <8360154.kzsE8V8pTW@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F871F72@lhreml507-mbx>
- <26171742.fWcrANu6EP@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F872391@lhreml507-mbx>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 15 Sep 2016 15:28:20 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: enable CONFIG_EFI
+Message-ID: <1473949700-12814-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 15 September 2016 13:25
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Gabriele Paoloni; devicetree at vger.kernel.org;
-> lorenzo.pieralisi at arm.com; minyard at acm.org; linux-pci at vger.kernel.org;
-> gregkh at linuxfoundation.org; John Garry; will.deacon at arm.com; linux-
-> kernel at vger.kernel.org; Yuanzhichang; Linuxarm; xuwei (O); linux-
-> serial at vger.kernel.org; benh at kernel.crashing.org;
-> zourongrong at gmail.com; liviu.dudau at arm.com; kantyzc at 163.com;
-> zhichang.yuan02 at gmail.com
-> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
-> Hip06
-> 
-> On Thursday, September 15, 2016 12:05:51 PM CEST Gabriele Paoloni
-> wrote:
-> > > -----Original Message-----
-> > > On Thursday, September 15, 2016 8:02:27 AM CEST Gabriele Paoloni
-> wrote:
-> > > >
-> > > > From <<3.1.1. Open Firmware Properties for Bus Nodes>> in
-> > > > http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
-> > > >
-> > > > I quote:
-> > > > "There shall be an entry in the "ranges" property for each
-> > > > of the Memory and/or I/O spaces if that address space is
-> > > > mapped through the bridge."
-> > > >
-> > > > It seems to me that it is ok to have 1:1 address mapping and that
-> > > > therefore of_translate_address() should fail if "ranges" is not
-> > > > present.
-> > >
-> > > The key here is the definition of "mapped through the bridge".
-> > > I can only understand this as "directly mapped", i.e. an I/O
-> > > port of the child bus corresponds directly to a memory address
-> > > on the parent bus, but this is not the case here.
-> > >
-> > > The problem with adding the mapping here is that it looks
-> > > like it should be valid to create a page table entry for
-> > > the address returned from the translation and access it through
-> > > a pointer dereference, but that is clearly not possible.
-> >
-> > I understand that somehow we are abusing of the ranges property
-> > here however the point is that with the current implementation ranges
-> > is needed because otherwise the ipmi driver probe will fail here:
-> >
-> > of_ipmi_probe -> of_address_to_resource -> __of_address_to_resource
-> > -> of_translate_address -> __of_translate_address
-> >
-> > Now we had a bit of discussion internally and to avoid
-> > having ranges we came up with two possible solutions:
-> >
-> > 1) Using bit 3 of phys.hi cell in 2.2.1 of
-> > http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
-> > This would mean reworking of_bus_isa_get_flags in
-> > http://lxr.free-electrons.com/source/drivers/of/address.c#L398
-> > and setting a new flag to be checked in __of_address_to_resource
-> >
-> > 2) Adding a property in the bindings of each device that is
-> > a child of our LPC bus and modify __of_address_to_resource
-> > to check if the property is in the DT and eventually bypass
-> > of_translate_address
-> >
-> > However in both 1) and 2) there are some issues:
-> > in 1) we are not complying with the isa binding doc (we use
-> > a bit that should be zero); in 2) we need to modify the
-> > bindings documentation of the devices that are connected
-> > to our LPC controller (therefore modifying other devices
-> > bindings to fit our special case).
-> >
-> > I think that maybe having the 1:1 range mapping doesn't
-> > reflect well the reality but it is the less painful
-> > solution...
-> >
-> > What's your view?
-> 
-> We can check the 'i' bit for I/O space in of_bus_isa_get_flags,
-> and that should be enough to translate the I/O port number.
-> 
-> The only part we need to change here is to not go through
-> the crazy conversion all the way from PCI I/O space to a
-> physical address and back to a (logical) port number
-> that we do today with of_translate_address/pci_address_to_pio.
-> 
-> I can think of a several of ways to fix __of_address_to_resource
-> to just do the right thing according to the ISA binding to
-> make the normal drivers work.
-> 
-> The easiest solution is probably to hook into the
-> "taddr == OF_BAD_ADDR" case in __of_address_to_resource
-> and add a lookup for ISA buses there, and instead check
-> if some special I/O port operations were registered
-> for the port number, using an architecture specific
-> function that arm64 implements. Other architectures
-> like x86 that don't have a direct mapping between I/O
-> ports and MMIO addresses would implement that same
-> function differently.
+This enables CONFIG_EFI for multi_v7_defconfig, which adds support for
+booting via EFI, and for the EFI framebuffer as builtin options. It
+also enables the EFI rtc, the EFI variable pseudo-filesystem and the
+EFI capsule loader as modules.
 
-So with respect to this patchset once we enter the
-"taddr == OF_BAD_ADDR" case you would add an arch
-specific function that checks if the resource is an I/O 
-resource, if the parent node is an ISA bus (calling 
-of_bus_isa_match) and if arm64_extio_ops is non NULL. 
- 
-I think it can work for us and it doesn't affect current
-devices. I will talk to Zhichang about this for the next
-patchset version.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-Many Thanks for your ideas
+We have been happily booting multi_v7_defconfig+CONFIG_EFI=y kernels on
+kernelci for months now, so please consider enabling this by default.
+The increase in compressed kernel footprint is ~30 KB, for the uncompressed
+kernel it's ~10 KB, some of which is .init code.
 
-Gab
+ arch/arm/configs/multi_v7_defconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-
-> 
-> 	Arnd
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2c8665cd9dc5..f30e8b44ea0d 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -129,6 +129,7 @@ CONFIG_CMA=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_KEXEC=y
++CONFIG_EFI=y
+ CONFIG_CPU_FREQ=y
+ CONFIG_CPU_FREQ_STAT_DETAILS=y
+ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+@@ -593,6 +594,7 @@ CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_DRM_STI=m
+ CONFIG_DRM_VC4=y
+ CONFIG_FB_ARMCLCD=y
++CONFIG_FB_EFI=y
+ CONFIG_FB_WM8505=y
+ CONFIG_FB_SH_MOBILE_LCDC=y
+ CONFIG_FB_SIMPLE=y
+@@ -750,6 +752,7 @@ CONFIG_RTC_DRV_S35390A=m
+ CONFIG_RTC_DRV_RX8581=m
+ CONFIG_RTC_DRV_EM3027=y
+ CONFIG_RTC_DRV_DA9063=m
++CONFIG_RTC_DRV_EFI=m
+ CONFIG_RTC_DRV_DIGICOLOR=m
+ CONFIG_RTC_DRV_S5M=m
+ CONFIG_RTC_DRV_S3C=m
+@@ -867,6 +870,8 @@ CONFIG_NVMEM=y
+ CONFIG_NVMEM_SUNXI_SID=y
+ CONFIG_BCM2835_MBOX=y
+ CONFIG_RASPBERRYPI_FIRMWARE=y
++CONFIG_EFI_VARS=m
++CONFIG_EFI_CAPSULE_LOADER=m
+ CONFIG_EXT4_FS=y
+ CONFIG_AUTOFS4_FS=y
+ CONFIG_MSDOS_FS=y
+-- 
+2.7.4
