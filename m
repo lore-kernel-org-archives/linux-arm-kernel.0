@@ -1,73 +1,102 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 15 Sep 2016 14:56:25 +0200
-Subject: [PATCH 5/9] mtd: nand: Expose data interface for ONFI mode 0
-In-Reply-To: <1473928373-8680-6-git-send-email-s.hauer@pengutronix.de>
-References: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
- <1473928373-8680-6-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160915145625.15e81012@bbrezillon>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 15 Sep 2016 15:01:49 +0200
+Subject: [GIT PULL] STi DT update for v4.9
+In-Reply-To: <ede2d2b6-7e0c-f31e-72bd-06aae5838327@st.com>
+References: <ede2d2b6-7e0c-f31e-72bd-06aae5838327@st.com>
+Message-ID: <499175b9-d743-1f2c-be62-236ec5f3577e@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Sep 2016 10:32:49 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
-> The nand layer will need ONFI mode 0 to use it as timing mode
-> before and right after reset.
+On 09/14/2016 03:15 PM, Patrice Chotard wrote:
+> Hi Arnd, Kevin, Olof
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/mtd/nand/nand_timings.c | 11 +++++++++++
->  include/linux/mtd/nand.h        |  2 ++
->  2 files changed, 13 insertions(+)
+> PLease consider this next batch for v4.9
 > 
-> diff --git a/drivers/mtd/nand/nand_timings.c b/drivers/mtd/nand/nand_timings.c
-> index 608d098..9cdbc16 100644
-> --- a/drivers/mtd/nand/nand_timings.c
-> +++ b/drivers/mtd/nand/nand_timings.c
-> @@ -297,3 +297,14 @@ int onfi_init_data_interface(struct nand_chip *chip,
->  
->  	return 0;
->  }
-> +
-> +/**
-> + * nand_get_default_data_interface - [NAND Interface] Retrieve NAND
-> + * data interface for mode 0. This is used as default timing after
-> + * reset.
-> + */
-> +const struct nand_data_interface *nand_get_default_data_interface(void)
-> +{
-> +	return &onfi_sdr_timings[0];
-> +}
-> +EXPORT_SYMBOL(nand_get_default_data_interface);
+> The following changes since commit ba5ba11906d5462993f5fd4e3da4d234505427a0:
+> 
+>   ARM: dts: STiH41x-b2020: Update gpio specifier (2016-09-02 15:15:14 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-dt-for-v4.9-2
+> 
+> for you to fetch changes up to 443fd7c92f5a000796b02683157d17b2575450e1:
+> 
+>   ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi audio card (2016-09-14 13:37:29 +0200)
+> 
+> ----------------------------------------------------------------
+> STi dts update:
+> 
+> Update gpio-cells and gpio specifier for STiH415/416
+> Add PWM capture support for STiH416 and STiH407 family
+> Add USB3 support for B2260
+> Add HVA support for STiH410
+> Add clk_ignore_unused in bootargs of B2260
+> Add Flexible Direct Memory Access (FDMA) support for STiH407 family
+> Add internal audio codec IP spport for STiH407 family
+> Add uniperif player/reader IP blocks for STiH407 family
+> 
+> ----------------------------------------------------------------
+> Jean-Christophe Trotin (1):
+>       ARM: dts: STiH410: Add hva dt nodes
+> 
+> Lee Jones (6):
+>       ARM: dts: STiH407: Supply PWM Capture IRQ
+>       ARM: dts: STiH407: Declare PWM Capture data lines via Pinctrl
+>       ARM: dts: STiH416: Supply PWM Capture IRQs
+>       ARM: dts: STiH416: Declare PWM Capture data lines via Pinctrl
+>       ARM: dts: STiH416: Define PWM Capture clock
+>       ARM: dts: STiH416: Define the number of PWM Capture channels
+> 
+> Patrice Chotard (7):
+>       ARM: dts: STiH415-pinctrl: update gpio-cells to 2
+>       ARM: dts: STiH416-pinctrl: update gpio-cells to 2
+>       ARM: dts: STiHxxx-b2120: update gpio specifier
+>       ARM: dts: STiH41x-b2000: update gpio specifier
+>       ARM: dts: STiH416-b2020e: update gpio specifier
+>       ARM: dts: STiH410-b2260: add USB3 node
+>       ARM: dts: STiH410-b2260: add clk_ignore_unused in bootargs
+> 
+> Peter Griffin (8):
+>       ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
+>       ARM: DT: STiH407: Add i2s_out pinctrl configuration
+>       ARM: DT: STiH407: Add i2s_in pinctrl configuration
+>       ARM: DT: STiH407: Add spdif_out pinctrl config
+>       ARM: STi: DT: STiH407: Add sti-sasg-codec dt node
+>       ARM: STi: DT: STiH407: Add uniperif player dt nodes
+>       ARM: STi: DT: STiH407: Add uniperif reader dt nodes
+>       ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi audio card
+> 
+>  arch/arm/boot/dts/stih407-family.dtsi  | 168 +++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/stih407-pinctrl.dtsi |  58 ++++++++++++
+>  arch/arm/boot/dts/stih410-b2260.dts    |   6 +-
+>  arch/arm/boot/dts/stih410.dtsi         |  10 ++
+>  arch/arm/boot/dts/stih415-pinctrl.dtsi |  54 +++++------
+>  arch/arm/boot/dts/stih416-b2020e.dts   |   6 +-
+>  arch/arm/boot/dts/stih416-pinctrl.dtsi |  65 +++++++------
+>  arch/arm/boot/dts/stih416.dtsi         |   8 +-
+>  arch/arm/boot/dts/stih41x-b2000.dtsi   |   5 +-
+>  arch/arm/boot/dts/stihxxx-b2120.dtsi   |  51 +++++++++-
+>  10 files changed, 362 insertions(+), 69 deletions(-)
+> 
 
-You export nand_get_default_data_interface() here, but you don't export
-onfi_init_data_interface().
-None of these functions should be called from NAND controller drivers,
-so they don't need to be exported. ITOH, the prototypes are public
-(defined in nand.h), so nothing prevents a driver from calling these
-functions.
+Hi Arnd
 
-I don't know what's the best solution here:
-1/ Export both nand_get_default_data_interface() and
-   onfi_init_data_interface()
-2/ Do not export them, but keep their prototypes in nand.h with a
-   comment saying that they should not be directly called by NAND
-   controller drivers
-3/ Removing the prototypes from nand.h and defining them in nand_base.c
-   (or in a private header).
+1) As you indicated on IRC, this pull request has been send after the 
+11th September, it must be applied as well on arm-soc/for-next.
 
-Brian, Richard, Sascha, any comments?
+2) This morning we just had confirmation from Stephen Boyd that a 
+STi clocks series will be applied as well. This series was submitted 
+since a while for v4.8 but unfortunately, clock maintainers forgot to 
+merge it and we missed v4.8 merge window.
 
-> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-> index 7216f54..29ae324 100644
-> --- a/include/linux/mtd/nand.h
-> +++ b/include/linux/mtd/nand.h
-> @@ -1146,6 +1146,8 @@ static inline int jedec_feature(struct nand_chip *chip)
->  
->  /* get timing characteristics from ONFI timing mode. */
->  const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode);
-> +/* get data interface from ONFI timing mode 0, used after reset. */
-> +const struct nand_data_interface *nand_get_default_data_interface(void);
->  
->  int nand_check_erased_ecc_chunk(void *data, int datalen,
->  				void *ecc, int ecclen,
+It's important for us to get it in v4.9 which will support the 
+new ST's 96Board. 
+Will you accept the STi DT counterpart of this clocks series ? 
+If yes, i have a STi clocks DT pull request to send (already ready, 
+just to push the button ;-) )
+
+Thanks
+
+Patrice
