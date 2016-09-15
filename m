@@ -1,42 +1,41 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Thu, 15 Sep 2016 16:39:20 +0200
-Subject: [PATCH v3 1/3] ASoC: sun4i-codec: rename "sun4i_codec_widgets" to
- "sun4i_codec_controls" for consistency with the struct field name.
-In-Reply-To: <20160915143922.4890-1-dannym@scratchpost.org>
-References: <20160915143922.4890-1-dannym@scratchpost.org>
-Message-ID: <20160915143922.4890-2-dannym@scratchpost.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 15 Sep 2016 16:56:04 +0200
+Subject: [PATCH v2 6/8] ARM: dts: sun9i: a80-optimus: Add AXP806 PMIC
+ device node and regulators
+In-Reply-To: <CAGb2v65cQR9F1=0_9mM6guKrMhOX7TqMqfHJU5hJxUXtBZiYaw@mail.gmail.com>
+References: <20160827075544.26316-1-wens@csie.org>
+ <20160827075544.26316-7-wens@csie.org>
+ <CAGb2v65cQR9F1=0_9mM6guKrMhOX7TqMqfHJU5hJxUXtBZiYaw@mail.gmail.com>
+Message-ID: <20160915145604.GJ10128@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ASoC: sun4i-codec: rename "sun4i_codec_widgets" to "sun4i_codec_controls" for
-consistency with the struct field name.
+On Thu, Sep 15, 2016 at 10:33:50PM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
+> 
+> On Sat, Aug 27, 2016 at 3:55 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> > The AXP806 PMIC is the secondary PMIC. It provides various supply
+> > voltages for the SoC and other peripherals. The PMIC's interrupt
+> > line is connected to NMI pin of the SoC.
+> >
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> The driver patches have all been merged into the mfd tree. Could
+> you queue up the dts patches?
 
-Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
----
- sound/soc/sunxi/sun4i-codec.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+I just did.
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 0e19c50..c2c0583 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -509,7 +509,7 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
- 
- static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
- 
--static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
-+static const struct snd_kcontrol_new sun4i_codec_controls[] = {
- 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
- 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
- 		       sun4i_codec_pa_volume_scale),
-@@ -629,8 +629,8 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 
- static struct snd_soc_codec_driver sun4i_codec_codec = {
- 	.component_driver = {
--		.controls		= sun4i_codec_widgets,
--		.num_controls		= ARRAY_SIZE(sun4i_codec_widgets),
-+		.controls		= sun4i_codec_controls,
-+		.num_controls		= ARRAY_SIZE(sun4i_codec_controls),
- 		.dapm_widgets		= sun4i_codec_codec_dapm_widgets,
- 		.num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
- 		.dapm_routes		= sun4i_codec_codec_dapm_routes,
+Thanks for the remainder,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160915/7d725958/attachment.sig>
