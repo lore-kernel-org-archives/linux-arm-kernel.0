@@ -1,32 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Sep 2016 11:45:15 +0100
-Subject: [PATCH 1/7] mfd: max8997-irq: 'inline' should be at the beginning of
- the declaration
+Date: Thu, 15 Sep 2016 11:45:21 +0100
+Subject: [PATCH 7/7] mfd: cros_ec_spi: Remove unused variable 'request'
 In-Reply-To: <20160915104521.14286-1-lee.jones@linaro.org>
 References: <20160915104521.14286-1-lee.jones@linaro.org>
-Message-ID: <20160915104521.14286-2-lee.jones@linaro.org>
+Message-ID: <20160915104521.14286-8-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reported by [-Wold-style-declaration].
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/max8997-irq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mfd/cros_ec_spi.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/mfd/max8997-irq.c b/drivers/mfd/max8997-irq.c
-index b95a46d7..326f17b 100644
---- a/drivers/mfd/max8997-irq.c
-+++ b/drivers/mfd/max8997-irq.c
-@@ -139,7 +139,7 @@ static void max8997_irq_sync_unlock(struct irq_data *data)
- 	mutex_unlock(&max8997->irqlock);
- }
- 
--static const inline struct max8997_irq_data *
-+inline static const struct max8997_irq_data *
- irq_to_max8997_irq(struct max8997_dev *max8997, struct irq_data *data)
+diff --git a/drivers/mfd/cros_ec_spi.c b/drivers/mfd/cros_ec_spi.c
+index ebe9b94..a518832 100644
+--- a/drivers/mfd/cros_ec_spi.c
++++ b/drivers/mfd/cros_ec_spi.c
+@@ -366,7 +366,6 @@ static int cros_ec_spi_receive_response(struct cros_ec_device *ec_dev,
+ static int cros_ec_pkt_xfer_spi(struct cros_ec_device *ec_dev,
+ 				struct cros_ec_command *ec_msg)
  {
- 	return &max8997_irqs[data->hwirq];
+-	struct ec_host_request *request;
+ 	struct ec_host_response *response;
+ 	struct cros_ec_spi *ec_spi = ec_dev->priv;
+ 	struct spi_transfer trans, trans_delay;
+@@ -378,7 +377,6 @@ static int cros_ec_pkt_xfer_spi(struct cros_ec_device *ec_dev,
+ 	int ret = 0, final_ret;
+ 
+ 	len = cros_ec_prepare_tx(ec_dev, ec_msg);
+-	request = (struct ec_host_request *)ec_dev->dout;
+ 	dev_dbg(ec_dev->dev, "prepared, len=%d\n", len);
+ 
+ 	/* If it's too soon to do another transaction, wait */
 -- 
 2.9.3
