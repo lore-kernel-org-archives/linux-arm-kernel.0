@@ -1,186 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Sep 2016 09:49:27 +0100
-Subject: [RFC PATCH v2 10/11] irqchip: mbigen: Add ACPI support
-In-Reply-To: <1473862879-7769-11-git-send-email-guohanjun@huawei.com>
-References: <1473862879-7769-1-git-send-email-guohanjun@huawei.com>
- <1473862879-7769-11-git-send-email-guohanjun@huawei.com>
-Message-ID: <57DA6097.8060105@arm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 15 Sep 2016 09:51:51 +0100
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.9
+In-Reply-To: <4112756.vQdZALs121@wuerfel>
+References: <57C95594.40105@hisilicon.com> <4112756.vQdZALs121@wuerfel>
+Message-ID: <57DA6127.8050707@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/16 15:21, Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
-> 
-> With the preparation of platform msi support and interrupt producer
-> in DSDT, we can add mbigen ACPI support now.
-> 
-> We are using _PRS methd to indicate number of irq pins instead
-> of num_pins in DT.
-> 
-> For mbi-gen,
->     Device(MBI0) {
->           Name(_HID, "HISI0152")
->           Name(_UID, Zero)
->           Name(_CRS, ResourceTemplate() {
->                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
->           })
-> 
->           Name (_PRS, ResourceTemplate() {
-> 		  Interrupt(ResourceProducer,...) {12,14,....}
->           })
+Hi Arnd,
 
-Since I know next to nothing about all of this, I'm going to play the
-village idiot. What makes it legal to use _PRS as a way to describe the
-interrupts that are exposed by MBI0? Looking at the 6.0 spec, I do not
-see why the interrupts would be put there instead of _CRS, and why you'd
-have a _PRS at all.
+On 14/09/2016 16:06, Arnd Bergmann wrote:
+> On Friday, September 2, 2016 11:33:56 AM CEST Wei Xu wrote:
+>> ARM64: DT: Hisilicon SoC DT updates for 4.9
+>>
+>> - Set UART1 clock frequency to 150MHz for higher baud rates on hikey
+>> - Add display subsystem, HDMI and cma nodes on hikey to support display
+>> - Add syscon-reboot-mode support on hikey
+>> - Add pstore support on hikey
+>> - Add resets and sd-uhs-sdr property dwmmc ndoe on hikey
+>> - Remove hip05_hns.dtsi since it can not be built without mbigenv1
+>> - Update system controller bingding document for hip05 and hip06
+>> - Add xge and sas support on hip06
+>>
+> 
+> Pulled into next/dt64, thanks!
 
-Also, are you going to exhaustively describe all the possible interrupts
-via this method? Knowing that the mbigen can expose thousands of
-interrupts, I find it slightly mad. Can't you express a range?
+Thanks!
 
->     }
-> 
-> For devices,
-> 
->    Device(COM0) {
->           Name(_HID, "ACPIIDxx")
->           Name(_UID, Zero)
->           Name(_CRS, ResourceTemplate() {
->                  Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
-> 		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
->           })
->     }
-> 
-> With the helpe of platform msi and interrupt producer, then devices
-> will get the virq from mbi-gen's irqdomain.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ma Jun <majun258@huawei.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 67 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-> index 9484ea0..ca6add1 100644
-> --- a/drivers/irqchip/irq-mbigen.c
-> +++ b/drivers/irqchip/irq-mbigen.c
-> @@ -16,6 +16,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/acpi.h>
->  #include <linux/interrupt.h>
->  #include <linux/irqchip.h>
->  #include <linux/module.h>
-> @@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
->  				    unsigned long *hwirq,
->  				    unsigned int *type)
->  {
-> -	if (is_of_node(fwspec->fwnode)) {
-> +	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
->  		if (fwspec->param_count != 2)
->  			return -EINVAL;
->  
-> @@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
-> +					     void *context)
-> +{
-> +	struct acpi_resource_extended_irq *ext_irq;
-> +	u32 *num_irqs = context;
-> +
-> +	switch (ares->type) {
-> +	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-> +		ext_irq = &ares->data.extended_irq;
-> +		*num_irqs += ext_irq->interrupt_count;
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return AE_OK;
-> +}
-> +
-> +static int mbigen_acpi_create_domain(struct platform_device *pdev,
-> +				     struct mbigen_device *mgn_chip)
-> +{
-> +	struct irq_domain *domain;
-> +	u32 num_msis = 0;
-> +	acpi_status status;
-> +
-> +	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__PRS,
-> +				     mbigen_acpi_process_resource, &num_msis);
-> +        if (ACPI_FAILURE(status) || num_msis == 0)
-> +		return -EINVAL;
-> +
-> +	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
-> +						   mbigen_write_msg,
-> +						   &mbigen_domain_ops,
-> +						   mgn_chip);
-> +	if (!domain)
-> +		return -ENOMEM;
-> +
-> +	return 0;
-> +}
-> +#else
-> +static int mbigen_acpi_create_domain(struct platform_device *pdev,
-> +				     struct mbigen_device *mgn_chip)
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif
-> +
->  static int mbigen_device_probe(struct platform_device *pdev)
->  {
->  	struct mbigen_device *mgn_chip;
-> @@ -288,9 +337,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
->  	if (IS_ERR(mgn_chip->base))
->  		return PTR_ERR(mgn_chip->base);
->  
-> -	err = mbigen_of_create_domain(pdev, mgn_chip);
-> -	if (err)
-> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-> +		err = mbigen_of_create_domain(pdev, mgn_chip);
-> +	else if (ACPI_COMPANION(&pdev->dev))
-> +		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-> +	else
-> +		err = -EINVAL;
-> +
-> +	if (err) {
-> +		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
->  		return err;
-> +	}
->  
->  	platform_set_drvdata(pdev, mgn_chip);
->  	return 0;
-> @@ -302,10 +359,17 @@ static const struct of_device_id mbigen_of_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, mbigen_of_match);
->  
-> +static const struct acpi_device_id mbigen_acpi_match[] = {
-> +        { "HISI0152", 0 },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-> +
->  static struct platform_driver mbigen_platform_driver = {
->  	.driver = {
->  		.name		= "Hisilicon MBIGEN-V2",
->  		.of_match_table	= mbigen_of_match,
-> +		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
->  	},
->  	.probe			= mbigen_device_probe,
->  };
-> 
+Best Regards,
+Wei
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> 	Arnd
+> 
+> 
+> .
+> 
