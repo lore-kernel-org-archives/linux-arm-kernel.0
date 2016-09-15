@@ -1,43 +1,37 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 15 Sep 2016 09:38:38 -0700
-Subject: [PATCH v2] ARM: dts: da850-lcdk: Add NAND to DT
-In-Reply-To: <15cf4422-0ad6-9927-92fe-b32ab61f86d5@ti.com> (Sekhar Nori's
- message of "Thu, 15 Sep 2016 20:16:15 +0530")
-References: <20160908183324.32389-1-khilman@baylibre.com>
- <CAOi56cWJpx-+s7h_+qypj-0HOcC2vDs2PLtZbdMO92TzdvECpQ@mail.gmail.com>
- <15cf4422-0ad6-9927-92fe-b32ab61f86d5@ti.com>
-Message-ID: <7hbmzpktip.fsf@baylibre.com>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Thu, 15 Sep 2016 18:42:32 +0200
+Subject: [PATCH 00/11] STM32 USART: fixes and new MCU support
+Message-ID: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
+This series adds some fixes for stm32 uart, add DMA support for improve IP
+behaviour, and add usart support of STM32F7 MCU.
 
-> Hi Kevin,
->
-> On Wednesday 14 September 2016 10:54 PM, Kevin Hilman wrote:
->> Hi Sekhar,
->> 
->> On Thu, Sep 8, 2016 at 11:33 AM, Kevin Hilman <khilman@baylibre.com> wrote:
->>> From: Karl Beldan <kbeldan@baylibre.com>
->>>
->>> This adds DT support for the NAND connected to the SoC AEMIF.
->>> Passed torture hashing a 40MB file on top of UBIFS using subpages.
->>>
->>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
->>> [khilman: add back default partitions from an earlier patch]
->>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->>> ---
->>> Applies on Sekhar's v4.9/dts branch.
->>>
->> 
->> Looks like you need to respin your DT series for arm-soc due to build
->> errors.  Can you add this while you're at it so we have 4-bit ECC in
->> v4.9?
->
-> The comments in the patch were fine. I applied this patch and just sent
-> a pull request for ARM-SoC maintainers too. Hopefully its not too late
-> for v4.9
+Regards
 
-Thanks!
+Alex
 
-Kevin
+Alexandre TORGUE (11):
+  serial: stm32: adding support for stm32f7
+  DOCUMENTATION: dt-bindings: Document the STM32 USART bindings
+  serial: stm32: header file creation
+  serial: stm32: disable tx and rx during shutdown
+  serial: stm32: correct flow control property spelling
+  serial: stm32: clock disabling management
+  dt-bindings: Add DMA bindings for STM32 USART
+  serial: stm32: adding dma support
+  serial: stm32: fix spin_lock management
+  serial: stm32: fix uart enable management
+  ARM: DT: STM32: add dma for usart1 on F429
+
+ .../devicetree/bindings/serial/st,stm32-usart.txt  |  46 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   |   3 +
+ drivers/tty/serial/stm32-usart.c                   | 612 ++++++++++++++++-----
+ drivers/tty/serial/stm32-usart.h                   | 229 ++++++++
+ 4 files changed, 739 insertions(+), 151 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+ create mode 100644 drivers/tty/serial/stm32-usart.h
+
+-- 
+1.9.1
