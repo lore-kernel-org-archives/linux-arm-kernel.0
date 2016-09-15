@@ -1,36 +1,43 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Sep 2016 23:14:00 +0800
-Subject: [PATCH 2/4] drm/sun4i: dotclock: Fix clock rate read back calcation
-In-Reply-To: <20160915151402.15992-1-wens@csie.org>
-References: <20160915151402.15992-1-wens@csie.org>
-Message-ID: <20160915151402.15992-3-wens@csie.org>
+Date: Thu, 15 Sep 2016 23:13:58 +0800
+Subject: [PATCH 0/4] drm/sun4i: rgb and dotclock misc fixes and improvements
+Message-ID: <20160915151402.15992-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When reading back the divider set in the register, we mask off the
-bits that aren't part of the divider. Unfortunately the mask used
-here was not converted from the field width.
+Hi Maxime,
 
-Fix this by converting the field width to a proper bit mask.
+Here are a few small fixes and improvements to the sun4i drm driver.
 
-Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/gpu/drm/sun4i/sun4i_dotclock.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Patch 1 declares the LCD panel RGB interface encoder and connector types
+as MIPI DPI. AFAIK DPI is the parallel RGB variant.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-index 4332da48b1b3..1b6c2253192e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-@@ -62,7 +62,7 @@ static unsigned long sun4i_dclk_recalc_rate(struct clk_hw *hw,
- 	regmap_read(dclk->regmap, SUN4I_TCON0_DCLK_REG, &val);
- 
- 	val >>= SUN4I_TCON0_DCLK_DIV_SHIFT;
--	val &= SUN4I_TCON0_DCLK_DIV_WIDTH;
-+	val &= (1 << SUN4I_TCON0_DCLK_DIV_WIDTH) - 1;
- 
- 	if (!val)
- 		val = 1;
+Patch 2 fixes the weird clock rates I was getting on the dot clock when
+testing the RGB-to-VGA bridge patches. You may want to queue this as a
+fix for 4.8.
+
+Patch 3 increases the dot clock divider upper bound by 1 to 127. AFAIK
+127 is a valid divider. I doubt we will ever use it, since the parents
+will go way higher than they are supposed to, but getting it right is
+nicer.
+
+Patch 4 changes the dot clock's behavior to make it round to the closest
+clock rate. I think this would make it easier to match the LCD panel's
+timings. More on the LCD timings in a later patch set.
+
+
+Regards
+ChenYu
+
+Chen-Yu Tsai (4):
+  drm/sun4i: rgb: Declare RGB encoder and connector as MIPI DPI
+  drm/sun4i: dotclock: Fix clock rate read back calcation
+  drm/sun4i: dotclock: Allow divider = 127
+  drm/sun4i: dotclock: Round to closest clock rate
+
+ drivers/gpu/drm/sun4i/sun4i_dotclock.c | 7 ++++---
+ drivers/gpu/drm/sun4i/sun4i_rgb.c      | 4 ++--
+ 2 files changed, 6 insertions(+), 5 deletions(-)
+
 -- 
 2.9.3
