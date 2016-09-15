@@ -1,25 +1,80 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Sep 2016 22:33:50 +0800
-Subject: [PATCH v2 6/8] ARM: dts: sun9i: a80-optimus: Add AXP806 PMIC
- device node and regulators
-In-Reply-To: <20160827075544.26316-7-wens@csie.org>
-References: <20160827075544.26316-1-wens@csie.org>
- <20160827075544.26316-7-wens@csie.org>
-Message-ID: <CAGb2v65cQR9F1=0_9mM6guKrMhOX7TqMqfHJU5hJxUXtBZiYaw@mail.gmail.com>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Thu, 15 Sep 2016 16:39:22 +0200
+Subject: [PATCH v3 3/3] ASoC: sun4i-codec: Add custom regmap configs for the
+ A10 and A20 variants.
+In-Reply-To: <20160915143922.4890-1-dannym@scratchpost.org>
+References: <20160915143922.4890-1-dannym@scratchpost.org>
+Message-ID: <20160915143922.4890-4-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+ASoC: sun4i-codec: Add custom regmap configs for the A10 and A20 variants.
 
-On Sat, Aug 27, 2016 at 3:55 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> The AXP806 PMIC is the secondary PMIC. It provides various supply
-> voltages for the SoC and other peripherals. The PMIC's interrupt
-> line is connected to NMI pin of the SoC.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
+---
+ sound/soc/sunxi/sun4i-codec.c | 33 ++++++++++++++++++++++++++++++---
+ 1 file changed, 30 insertions(+), 3 deletions(-)
 
-The driver patches have all been merged into the mfd tree. Could
-you queue up the dts patches?
-
-Thanks
-ChenYu
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 3b53b78..c5d6d84c 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -682,12 +682,37 @@ static const struct regmap_config sun4i_codec_regmap_config = {
+ 	.reg_bits	= 32,
+ 	.reg_stride	= 4,
+ 	.val_bits	= 32,
++	.max_register	= SUN4I_CODEC_ADC_RXCNT,
++};
++
++static const struct regmap_config sun7i_codec_regmap_config = {
++	.reg_bits	= 32,
++	.reg_stride	= 4,
++	.val_bits	= 32,
+ 	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
+ };
+ 
++struct sun4i_codec_quirks {
++	const struct regmap_config *regmap_config;
++};
++
++static const struct sun4i_codec_quirks sun4i_codec_quirks = {
++	.regmap_config = &sun4i_codec_regmap_config,
++};
++
++static const struct sun4i_codec_quirks sun7i_codec_quirks = {
++	.regmap_config = &sun7i_codec_regmap_config,
++};
++
+ static const struct of_device_id sun4i_codec_of_match[] = {
+-	{ .compatible = "allwinner,sun4i-a10-codec" },
+-	{ .compatible = "allwinner,sun7i-a20-codec" },
++	{
++		.compatible = "allwinner,sun4i-a10-codec",
++		.data = &sun4i_codec_quirks,
++	},
++	{
++		.compatible = "allwinner,sun7i-a20-codec",
++		.data = &sun7i_codec_quirks,
++	},
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
+@@ -760,6 +785,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card;
+ 	struct sun4i_codec *scodec;
++	const struct sun4i_codec_quirks *quirks;
+ 	struct resource *res;
+ 	void __iomem *base;
+ 	int ret;
+@@ -777,8 +803,9 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+ 		return PTR_ERR(base);
+ 	}
+ 
++	quirks = of_device_get_match_data(&pdev->dev);
+ 	scodec->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+-					     &sun4i_codec_regmap_config);
++					       quirks->regmap_config);
+ 	if (IS_ERR(scodec->regmap)) {
+ 		dev_err(&pdev->dev, "Failed to create our regmap\n");
+ 		return PTR_ERR(scodec->regmap);
