@@ -1,68 +1,93 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Sep 2016 16:19:05 +0100
-Subject: [PATCH v3 2/7] arm64: Factor out TTBR0_EL1 post-update
- workaround into a specific asm macro
-In-Reply-To: <1473788797-10879-3-git-send-email-catalin.marinas@arm.com>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
- <1473788797-10879-3-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20160915151905.GE9316@leverpostej>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 15 Sep 2016 23:19:26 +0800
+Subject: [PATCH v3 3/3] ASoC: sun4i-codec: Add custom regmap configs for
+ the A10 and A20 variants.
+In-Reply-To: <20160915143922.4890-4-dannym@scratchpost.org>
+References: <20160915143922.4890-1-dannym@scratchpost.org>
+ <20160915143922.4890-4-dannym@scratchpost.org>
+Message-ID: <CAGb2v64jTGa-z6yXOEoKiY2NyHdu=Y42EYGm7tiK1dyPstYn1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 06:46:32PM +0100, Catalin Marinas wrote:
-> This patch takes the errata workaround code out of cpu_do_switch_mm into
-> a dedicated post_ttbr0_update_workaround macro which will be reused in a
-> subsequent patch.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+On Thu, Sep 15, 2016 at 10:39 PM, Danny Milosavljevic
+<dannym@scratchpost.org> wrote:
+> ASoC: sun4i-codec: Add custom regmap configs for the A10 and A20 variants.
+
+The commit message should be a straight forward description about what
+the patch does and why you did it, not a direct copy of the subject.
+
+Something along the lines of "The A20 has a few extra registers that
+the A10 doesn't have ..." will do for the why.
+
+Regards
+ChenYu
+
+>
+> Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
 > ---
->  arch/arm64/include/asm/assembler.h | 17 +++++++++++++++++
->  arch/arm64/mm/proc.S               | 11 +----------
->  2 files changed, 18 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index d5025c69ca81..0a47632787d9 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -350,4 +350,21 @@ alternative_endif
->  	movk	\reg, :abs_g0_nc:\val
->  	.endm
->  
-> +/*
-> + * Errata workaround post TTBR0_EL1 update.
-> + */
-> +	.macro	post_ttbr0_update_workaround
-> +#ifdef CONFIG_CAVIUM_ERRATUM_27456
-> +alternative_if_not ARM64_WORKAROUND_CAVIUM_27456
-> +	nop
-> +	nop
-> +	nop
-> +alternative_else
-> +	ic	iallu
-> +	dsb	nsh
-> +	isb
-> +alternative_endif
-> +#endif
-> +	.endm
+>  sound/soc/sunxi/sun4i-codec.c | 33 ++++++++++++++++++++++++++++++---
+>  1 file changed, 30 insertions(+), 3 deletions(-)
+>
+> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+> index 3b53b78..c5d6d84c 100644
+> --- a/sound/soc/sunxi/sun4i-codec.c
+> +++ b/sound/soc/sunxi/sun4i-codec.c
+> @@ -682,12 +682,37 @@ static const struct regmap_config sun4i_codec_regmap_config = {
+>         .reg_bits       = 32,
+>         .reg_stride     = 4,
+>         .val_bits       = 32,
+> +       .max_register   = SUN4I_CODEC_ADC_RXCNT,
+> +};
 > +
->  #endif	/* __ASM_ASSEMBLER_H */
-
-As a general note, it's unfortunate that we put asm with alternatives in
-<asm/assembler.h>, as that's included by <asm/alternative.h>, so we're
-relying on things that aren't defined yet, and users have to remember to
-include <asm/alternative.h>.
-
-That's already the case for dcache_by_line_op, so I guess that's
-something to deal with another day.
-
-Otherwise, this looks good, and I guess this wil be auto-nopped in a
-subsqeuent version, so FWIW:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+> +static const struct regmap_config sun7i_codec_regmap_config = {
+> +       .reg_bits       = 32,
+> +       .reg_stride     = 4,
+> +       .val_bits       = 32,
+>         .max_register   = SUN7I_CODEC_AC_MIC_PHONE_CAL,
+>  };
+>
+> +struct sun4i_codec_quirks {
+> +       const struct regmap_config *regmap_config;
+> +};
+> +
+> +static const struct sun4i_codec_quirks sun4i_codec_quirks = {
+> +       .regmap_config = &sun4i_codec_regmap_config,
+> +};
+> +
+> +static const struct sun4i_codec_quirks sun7i_codec_quirks = {
+> +       .regmap_config = &sun7i_codec_regmap_config,
+> +};
+> +
+>  static const struct of_device_id sun4i_codec_of_match[] = {
+> -       { .compatible = "allwinner,sun4i-a10-codec" },
+> -       { .compatible = "allwinner,sun7i-a20-codec" },
+> +       {
+> +               .compatible = "allwinner,sun4i-a10-codec",
+> +               .data = &sun4i_codec_quirks,
+> +       },
+> +       {
+> +               .compatible = "allwinner,sun7i-a20-codec",
+> +               .data = &sun7i_codec_quirks,
+> +       },
+>         {}
+>  };
+>  MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
+> @@ -760,6 +785,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+>  {
+>         struct snd_soc_card *card;
+>         struct sun4i_codec *scodec;
+> +       const struct sun4i_codec_quirks *quirks;
+>         struct resource *res;
+>         void __iomem *base;
+>         int ret;
+> @@ -777,8 +803,9 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+>                 return PTR_ERR(base);
+>         }
+>
+> +       quirks = of_device_get_match_data(&pdev->dev);
+>         scodec->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> -                                            &sun4i_codec_regmap_config);
+> +                                              quirks->regmap_config);
+>         if (IS_ERR(scodec->regmap)) {
+>                 dev_err(&pdev->dev, "Failed to create our regmap\n");
+>                 return PTR_ERR(scodec->regmap);
