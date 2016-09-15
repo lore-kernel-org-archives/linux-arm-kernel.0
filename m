@@ -1,13 +1,27 @@
 From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Fri, 16 Sep 2016 00:46:53 +0530
-Subject: [PATCH v5 4/6] ARM: dts: imx6qdl-icore: Add usbhost support
+Date: Fri, 16 Sep 2016 00:46:55 +0530
+Subject: [PATCH v5 6/6] ARM: dts: imx6qdl-icore: Add FEC support
 In-Reply-To: <1473967015-8523-1-git-send-email-jagan@amarulasolutions.com>
 References: <1473967015-8523-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1473967015-8523-5-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <1473967015-8523-7-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usbhost support for Engicam i.CoreM6 dql modules.
+Add FEC support for Engicam i.CoreM6 dql modules.
+
+Observed similar 'eth0: link is not ready' issue which was
+discussed in [1] due rmii mode with external ref_clk, so added
+clock node along with the properties mentioned by Shawn in [2]
+
+FEC link log:
+------------
+$ ifconfig eth0 up
+[   27.905187] SMSC LAN8710/LAN8720 2188000.ethernet:00: attached PHY driver
+               [SMSC LAN8710/LAN8720] (mii_bus:phy_addr=2188000.ethernet:00, irq=-1)
+[   27.918982] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+
+[1] https://patchwork.kernel.org/patch/3491061/
+[2] https://patchwork.kernel.org/patch/3490511/
 
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
@@ -17,45 +31,72 @@ Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v5:
-	- none
-Changes for v4:
 	- new patch
 
- arch/arm/boot/dts/imx6qdl-icore.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/imx6qdl-icore.dtsi | 37 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-index b7f7102..fb77a47 100644
+index a0ca442..77df730 100644
 --- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-@@ -54,6 +54,15 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
+@@ -48,6 +48,18 @@
+ 		reg = <0x10000000 0x80000000>;
  	};
+ 
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+	reg_usb_h1_vbus: usb_h1_vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+		regulator-always-on;
++		rmii_clk: clock at 0 {
++			compatible = "fixed-clock";
++			reg = <0>;
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;  /* 25MHz for example */
++		};
 +	};
++
+ 	reg_3p3v: regulator-3p3v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "3P3V";
+@@ -91,6 +103,15 @@
+ 	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
  };
  
- &can1 {
-@@ -107,6 +116,12 @@
- 	status = "okay";
- };
- 
-+&usbh1 {
-+	vbus-supply = <&reg_usb_h1_vbus>;
-+	disable-over-current;
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	phy-reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
++	clocks = <&clks 117>, <&clks 117>, <&rmii_clk>;
++	phy-mode = "rmii";
 +	status = "okay";
 +};
 +
- &usdhc1 {
+ &gpmi {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc1>;
+ 	pinctrl-0 = <&pinctrl_gpmi_nand>;
+@@ -148,6 +169,22 @@
+ };
+ 
+ &iomuxc {
++	pinctrl_enet: enetgrp {
++		fsl,pins = <
++			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
++			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x1b0b1
++			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
++			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
++			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
++			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
++			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
++			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
++			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
++			MX6QDL_PAD_ENET_REF_CLK__GPIO1_IO23	0x1b0b0
++			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b0
++		>;
++	};
++
+ 	pinctrl_flexcan1: flexcan1grp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x1b020
 -- 
 2.7.4
