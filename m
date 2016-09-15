@@ -1,36 +1,34 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 15 Sep 2016 21:45:27 +0200
-Subject: [PATCH v7] i2c: imx: make bus recovery through pinctrl optional
-In-Reply-To: <1473718950-6667-1-git-send-email-leoyang.li@nxp.com>
-References: <1473718950-6667-1-git-send-email-leoyang.li@nxp.com>
-Message-ID: <20160915194526.GC7863@katana>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 15 Sep 2016 22:51:42 +0200
+Subject: v4.8-rc: GSM audio causes trouble
+In-Reply-To: <20160915121755.GA5264@amd>
+References: <20160915121755.GA5264@amd>
+Message-ID: <20160915205142.GA6747@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 05:22:30PM -0500, Li Yang wrote:
-> Since commit 1c4b6c3bcf30 ("i2c: imx: implement bus recovery") the
-> driver starts to use gpio/pinctrl to support optional bus recovery
-> feature.  But pinctrl is not always usable.  There are platforms such
-> as ls1021a and ls1043a that don't support pinctrl, and it could just
-> be broken due to old/broken device tree.  The patch makes it really
-> optional that the probe function won't bailout on pinctrl problems
-> instead it just disables bus recovery and prints out notification when
-> there is problem with pinctrl.  Since pinctrl is only used by bus
-> recovery in this driver, move pinctrl initialization into bus recovery
-> init function to prevent confusion.
+Hi!
+
+> I was trying to improve GSM call quality, and hit problems in
+> v4.8-rc. Sound only worked for a while, then I tried to kill
+> cmtspeech_ofono_test, and could not, not even with -9 and could not
+> even reboot.
 > 
-> Signed-off-by: Li Yang <leoyang.li@nxp.com>
-> Cc: Gao Pan <pandy.gao@nxp.com>
-> Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> I went back to v4.1 (ok, quite far, I see), and problems are gone.
+> 
+> Does it work for you? Any ideas what to try... besides bisect?
 
-Applied to for-next. Thanks to all reviewers and to Li Yang for keeping
-at it!
+v4.7 is okay.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160915/aaf07857/attachment.sig>
+v4.8 with
+
+git diff ..mini-v4.7 drivers/hsi/ | git apply
+
+Seems to work ok.
+
+Best regards,
+								Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
