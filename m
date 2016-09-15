@@ -1,38 +1,41 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 15 Sep 2016 12:15:28 +0300
-Subject: [PATCHv3 06/11] crypto: omap-des: Fix support for unequal lengths
-In-Reply-To: <20160913093506.GA30561@gondor.apana.org.au>
-References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
- <1470306526-27219-7-git-send-email-t-kristo@ti.com>
- <20160913093506.GA30561@gondor.apana.org.au>
-Message-ID: <a1b80dda-f344-c09d-4165-bfbd92e669fd@ti.com>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Thu, 15 Sep 2016 14:45:30 +0530
+Subject: [PATCH v2 2/3] devicetree: bindings: uart: Add new compatible string
+ for ZynqMP
+In-Reply-To: <1473930931-1034-1-git-send-email-navam@xilinx.com>
+References: <1473930931-1034-1-git-send-email-navam@xilinx.com>
+Message-ID: <1473930931-1034-2-git-send-email-navam@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/09/16 12:35, Herbert Xu wrote:
-> On Thu, Aug 04, 2016 at 01:28:41PM +0300, Tero Kristo wrote:
->> From: Lokesh Vutla <a0131933@ti.com>
->>
->> For cases where total length of an input SGs is not same as
->> length of the input data for encryption, omap-des driver
->> crashes. This happens in the case when IPsec is trying to use
->> omap-des driver.
->>
->> To avoid this, we copy all the pages from the input SG list
->> into a contiguous buffer and prepare a single element SG list
->> for this buffer with length as the total bytes to crypt, which is
->> similar thing that is done in case of unaligned lengths.
->
-> Ugh, that means copying every single packet, right?
->
-> So if it's just the SG list that's the problem, why don't you
-> copy that instead? That is, allocate a new SG list and set it
-> up so that there is no excess data.
->
-> Cheers,
->
+From: Nava kishore Manne <nava.manne@xilinx.com>
 
-I'll take a look at this. I have this kind of solution in place for the 
-re-worked SHA driver, so can probably re-use it here.
+Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+[stelford at cadence.com: cherry picked from
+https://github.com/Xilinx/linux-xlnx commit
+37b8a9780766422b2437f5166ddef3767bb60887]
+Signed-off-by: Scott Telford <stelford@cadence.com>
+---
+Changes for v2:
+		-None
 
--Tero
+ Documentation/devicetree/bindings/serial/cdns,uart.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/serial/cdns,uart.txt b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+index a3eb154..4fe7aae 100644
+--- a/Documentation/devicetree/bindings/serial/cdns,uart.txt
++++ b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+@@ -1,7 +1,8 @@
+ Binding for Cadence UART Controller
+ 
+ Required properties:
+-- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps"
++- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps" for Zynq and
++               "cdns,uart-r1p12" for Zynq Ultrascale+ MPSoC uart controller.
+ - reg: Should contain UART controller registers location and length.
+ - interrupts: Should contain UART controller interrupts.
+ - clocks: Must contain phandles to the UART clocks
+-- 
+2.1.2
