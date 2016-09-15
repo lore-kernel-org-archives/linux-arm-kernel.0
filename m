@@ -1,54 +1,29 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 15 Sep 2016 14:10:59 -0500
-Subject: [PATCH] ARM: dts: am57xx-beagle-x15-common: Fix wrong pinctrl
- selection for mmc2
-Message-ID: <20160915191059.18190-1-nm@ti.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Fri, 16 Sep 2016 00:46:49 +0530
+Subject: [PATCH v5 0/6] ARM: dts: imx6q: Add Engicam i.CoreM6 dts
+Message-ID: <1473967015-8523-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d20f997b4d1f ("ARM: dts: am57xx-beagle-x15: Remove pinmux
-configurations for erratum i869") fat fingered a change in which
-basically replaced mmc2_pinctrl_default with mmc1_pinctrl_default. And
-kernel dutifully reports conflict of usage.
+This is series add dts support for Engicam I.Core M6 qdl modules.
 
-[...]
-[    4.767335] pinctrl-single 4a003400.pinmux: pin 4a00376c.0 already requested by 4809c000.mmc; cannot claim for 480b4000.mmc
-[    4.778976] pinctrl-single 4a003400.pinmux: pin-219 (480b4000.mmc) status -22
-[    4.786427] pinctrl-single 4a003400.pinmux: could not request pin 219 (4a00376c.0) from group mmc1_pins_default  on device pinctrl-single
-[    4.799328] omap_hsmmc 480b4000.mmc: Error applying setting, reverse things back
-[    4.807110] omap_hsmmc 480b4000.mmc: could not initialize pin control state
-[...]
+Jagan Teki (6):
+  of: Add vendor prefix for Engicam s.r.l company
+  ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual initial support
+  ARM: dts: imx6q: Add Engicam i.CoreM6 DualLite/Solo initial support
+  ARM: dts: imx6qdl-icore: Add usbhost support
+  ARM: dts: imx6qdl-icore: Add usbotg support
+  ARM: dts: imx6qdl-icore: Add FEC support
 
-But, thanks to the fact that we were in fact setting all the muxes in
-U-Boot, all the MMC devices were still properly detected.
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx6dl-icore.dts                 |  59 +++++
+ arch/arm/boot/dts/imx6q-icore.dts                  |  59 +++++
+ arch/arm/boot/dts/imx6qdl-icore.dtsi               | 269 +++++++++++++++++++++
+ 5 files changed, 390 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-icore.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-icore.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-icore.dtsi
 
-Fix the typo.
-
-Fixes: d20f997b4d1f ("ARM: dts: am57xx-beagle-x15: Remove pinmux configurations for erratum i869")
-
-Reported-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-
-Patch based on: omap-for-v4.9/dt-pt2-signed git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-Before this patch (as in the original series http://pastebin.ubuntu.com/23124704/ - error visible, but was'nt caught)
-After this patch, on rev B1: http://pastebin.ubuntu.com/23183323/
-
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-index ec85ff9004e8..6df7829a2c15 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi
-@@ -451,7 +451,7 @@
- 	status = "okay";
- 
- 	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_default>;
-+	pinctrl-0 = <&mmc2_pins_default>;
- 
- 	vmmc-supply = <&vdd_3v3>;
- 	bus-width = <8>;
 -- 
-2.10.0
+2.7.4
