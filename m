@@ -1,353 +1,171 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Sep 2016 14:49:09 +0100
-Subject: [RFC PATCH 8/8] arm64: split thread_info from task stack
-In-Reply-To: <1473947349-14521-1-git-send-email-mark.rutland@arm.com>
-References: <1473947349-14521-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1473947349-14521-9-git-send-email-mark.rutland@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 15 Sep 2016 15:50:55 +0200
+Subject: [REGRESSION] BISECTED : ethernet gadget not working anymore on
+ several atmel platforms
+In-Reply-To: <CACQ1gAhUDq4G5Prjp0Fp2yY7++c3TNHuHZj=_st4JTVCLO1wRA@mail.gmail.com>
+References: <CACQ1gAhUDq4G5Prjp0Fp2yY7++c3TNHuHZj=_st4JTVCLO1wRA@mail.gmail.com>
+Message-ID: <20160915135055.tycoar3bvoqturcq@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves arm64's struct thread_info from the task stack into
-task_struct. This protects thread_info from corruption in the case of
-stack overflows, and makes its address harder to determine if stack
-addresses are leaked, making a number of attacks more difficult. Precise
-detection and handling of overflow is left for subsequent patches.
+Hi,
 
-Largely, this involves changing code to store the task_struct in sp_el0,
-and acquire the thread_info from the task struct (which is the opposite
-way around to the current code). Both secondary entry and idle are
-updated to stash the sp and task pointer separately.
+On 15/09/2016 at 14:29:24 +0200, Richard Genoud wrote :
+> Since:
+> commit c32b5bcfa3c43a3c9bb59f65b5e76adb7384c4c8
+> Author: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Date:   Tue Jul 12 22:45:59 2016 +0200
+> 
+>     ARM: dts: at91: Fix USB endpoint nodes
+> 
+>     Endpoint nodes have a reg property. Add their mandatory unit-address.
+> 
+> Booting with an USB gadget configured as Ethernet gadget + RNDIS
 
-Userspace clobbers sp_el0, and we can no longer restore this from the
-stack. Instead, the current task is cached in a per-cpu variable that we
-can safely access from early assembly as interrupts are disabled (and we
-are thus not preemptible).
+Good catch, I seem to have forgotten a patch in that series. I4ll send
+that shortly.
 
-There remain opportunities for improvement. Currently we cannot remove
-thread_info::cpu and always use task_struct::cpu, as this would result
-in a circular include dependency for raw_smp_processor_id():
+> Gives a warning:
+> 
+> On AT91SAM9x5 platform (g35) :
+> g_ether gadget: high-speed config #1: CDC Ethernet (ECM)
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at drivers/usb/gadget/udc/core.c:264
+> usb_ep_queue+0x4c/0xec
+> CPU: 0 PID: 1 Comm: swapper Not tainted 4.8.0-rc6-00071-gcc183ac148d0 #134
+> Hardware name: Atmel AT91SAM9
+> [<c000f164>] (unwind_backtrace) from [<c000d158>] (show_stack+0x20/0x24)
+> [<c000d158>] (show_stack) from [<c01ba940>] (dump_stack+0x20/0x28)
+> [<c01ba940>] (dump_stack) from [<c0017f30>] (__warn+0xe0/0x10c)
+> [<c0017f30>] (__warn) from [<c001802c>] (warn_slowpath_null+0x30/0x38)
+> [<c001802c>] (warn_slowpath_null) from [<c02cd78c>] (usb_ep_queue+0x4c/0xec)
+> [<c02cd78c>] (usb_ep_queue) from [<c02d55b8>] (ecm_do_notify+0x134/0x150)
+> [<c02d55b8>] (ecm_do_notify) from [<c02d5840>] (ecm_set_alt+0x14c/0x154)
+> [<c02d5840>] (ecm_set_alt) from [<c02c9144>] (composite_setup+0xa2c/0x13c0)
+> [<c02c9144>] (composite_setup) from [<c02d3a90>] (usba_udc_irq+0x888/0xb4c)
+> [<c02d3a90>] (usba_udc_irq) from [<c00458a0>]
+> (__handle_irq_event_percpu+0x74/0x1dc)
+> [<c00458a0>] (__handle_irq_event_percpu) from [<c0045a34>]
+> (handle_irq_event_percpu+0x2c/0x68)
+> [<c0045a34>] (handle_irq_event_percpu) from [<c0045aa8>]
+> (handle_irq_event+0x38/0x4c)
+> [<c0045aa8>] (handle_irq_event) from [<c0048a94>]
+> (handle_fasteoi_irq+0xa0/0x114)
+> [<c0048a94>] (handle_fasteoi_irq) from [<c004512c>]
+> (generic_handle_irq+0x28/0x38)
+> [<c004512c>] (generic_handle_irq) from [<c00451cc>]
+> (__handle_domain_irq+0x90/0xb8)
+> [<c00451cc>] (__handle_domain_irq) from [<c0009450>] (aic_handle+0xb0/0xb8)
+> [<c0009450>] (aic_handle) from [<c000dca8>] (__irq_svc+0x68/0x84)
+> Exception stack(0xc788dc68 to 0xc788dcb0)
+> dc60:                   00000151 000004f6 00000151 c7075b70 c89693b0 c8964000
+> dc80: c79c7400 000060e8 c79aa000 c7bd55c0 00000023 c788dd3c c788dd00 c788dcb8
+> dca0: c0319cc0 c0319cd4 80000013 ffffffff
+> [<c000dca8>] (__irq_svc) from [<c0319cd4>] (ubi_attach_fastmap+0x858/0xcc8)
+> [<c0319cd4>] (ubi_attach_fastmap) from [<c0278744>]
+> (ubi_scan_fastmap+0x644/0x854)
+> [<c0278744>] (ubi_scan_fastmap) from [<c027542c>] (scan_fast+0x10c/0x17c)
+> [<c027542c>] (scan_fast) from [<c02757c0>] (ubi_attach+0xb0/0x21c)
+> [<c02757c0>] (ubi_attach) from [<c0269520>] (ubi_attach_mtd_dev+0x320/0x820)
+> [<c0269520>] (ubi_attach_mtd_dev) from [<c06b42d4>] (ubi_init+0x1a8/0x248)
+> [<c06b42d4>] (ubi_init) from [<c0697df0>] (do_one_initcall+0xb4/0x16c)
+> [<c0697df0>] (do_one_initcall) from [<c0697fb0>]
+> (kernel_init_freeable+0x108/0x1d4)
+> [<c0697fb0>] (kernel_init_freeable) from [<c04e3c84>] (kernel_init+0x18/0x100)
+> [<c04e3c84>] (kernel_init) from [<c000a470>] (ret_from_fork+0x14/0x24)
+> ---[ end trace 8150ab0dc38dec93 ]---
+> 
+> Same on SAMA5D3:
+> g_ether gadget: high-speed config #1: CDC Ethernet (ECM)
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 0 at drivers/usb/gadget/udc/core.c:264
+> usb_ep_queue+0x5c/0x64
+> Modules linked in:
+> CPU: 0 PID: 0 Comm: swapper Not tainted 4.8.0-rc6+ #135
+> Hardware name: Atmel SAMA5
+> [<c010ce70>] (unwind_backtrace) from [<c010a88c>] (show_stack+0x10/0x14)
+> [<c010a88c>] (show_stack) from [<c0115bb0>] (__warn+0xe4/0xfc)
+> [<c0115bb0>] (__warn) from [<c0115c78>] (warn_slowpath_null+0x20/0x28)
+> [<c0115c78>] (warn_slowpath_null) from [<c03cc608>] (usb_ep_queue+0x5c/0x64)
+> [<c03cc608>] (usb_ep_queue) from [<c03d1124>] (ecm_do_notify+0xec/0x14c)
+> [<c03d1124>] (ecm_do_notify) from [<c03d130c>] (ecm_set_alt+0x74/0x150)
+> [<c03d130c>] (ecm_set_alt) from [<c03c9364>] (composite_setup+0xb84/0x1570)
+> [<c03c9364>] (composite_setup) from [<c03cf364>] (usba_udc_irq+0x878/0xd4c)
+> [<c03cf364>] (usba_udc_irq) from [<c013f12c>]
+> (__handle_irq_event_percpu+0x88/0x124)
+> [<c013f12c>] (__handle_irq_event_percpu) from [<c013f1e4>]
+> (handle_irq_event_percpu+0x1c/0x58)
+> [<c013f1e4>] (handle_irq_event_percpu) from [<c013f248>]
+> (handle_irq_event+0x28/0x3c)
+> [<c013f248>] (handle_irq_event) from [<c0141c8c>]
+> (handle_fasteoi_irq+0xa0/0x168)
+> [<c0141c8c>] (handle_fasteoi_irq) from [<c013e87c>]
+> (generic_handle_irq+0x24/0x34)
+> [<c013e87c>] (generic_handle_irq) from [<c013ead8>]
+> (__handle_domain_irq+0x54/0xa8)
+> [<c013ead8>] (__handle_domain_irq) from [<c010b34c>] (__irq_svc+0x6c/0x90)
+> [<c010b34c>] (__irq_svc) from [<c0130be4>] (finish_task_switch+0x4c/0x144)
+> [<c0130be4>] (finish_task_switch) from [<c054b9d0>] (schedule+0x44/0x9c)
+> [<c054b9d0>] (schedule) from [<c054bbd4>] (schedule_preempt_disabled+0xc/0x10)
+> [<c054bbd4>] (schedule_preempt_disabled) from [<c01374b8>]
+> (cpu_startup_entry+0x98/0xf4)
+> [<c01374b8>] (cpu_startup_entry) from [<c0800c38>] (start_kernel+0x35c/0x368)
+> [<c0800c38>] (start_kernel) from [<20008078>] (0x20008078)
+> ---[ end trace 27b3e952067e1be6 ]---
+> 
+> And I guess it's the same on g45, 9rl, sama5d[2-4].
+> 
+> Bisect done with a 4.8-rc6 kernel.
+> Here's the bisect log:
+> git bisect start 'arch/arm/boot/dts/'
+> # good: [882bd9fc46321c9d4721b376039a142cbfe8a17a] usb: gadget: udc:
+> atmel: Also get regmap for at91sam9x5-pmc
+> git bisect good 882bd9fc46321c9d4721b376039a142cbfe8a17a
+> # bad: [694d0d0bb2030d2e36df73e2d23d5770511dbc8d] Linux 4.8-rc2
+> git bisect bad 694d0d0bb2030d2e36df73e2d23d5770511dbc8d
+> # good: [ab4b4340c7d74310a132cb457665bf3d98fdff79] Merge tag
+> 'imx-dt-4.8' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux into
+> next/dt
+> git bisect good ab4b4340c7d74310a132cb457665bf3d98fdff79
+> # good: [349f9d5239c3dae3b984679fc9ee00b8deec542b] Merge tag
+> 'sunxi-dt-for-4.8' of
+> https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux into
+> next/dt
+> git bisect good 349f9d5239c3dae3b984679fc9ee00b8deec542b
+> # bad: [262a5d84b2aea8deb67eca813dc3008836330596] Merge tag
+> 'sunxi-dt-for-4.8-2-bis' of
+> https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux into
+> next/dt
+> git bisect bad 262a5d84b2aea8deb67eca813dc3008836330596
+> # good: [cda1c2bdf6df90c12363877fda594a0a1b7ac74a] Merge tag
+> 'sti-late-v4.8' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti into
+> next/late
+> git bisect good cda1c2bdf6df90c12363877fda594a0a1b7ac74a
+> # good: [a0e4eb4b81b44663f21b289d8126ca6f6dc8a863] ARM: dts: sun8i:
+> Use sun8i-reference-design-tablet for polaroid mid2809pxe04
+> git bisect good a0e4eb4b81b44663f21b289d8126ca6f6dc8a863
+> # bad: [d3c1c7181f55f3464529decad189f2317a2932da] ARM: dts: at91:
+> vinco: fix regulator name
+> git bisect bad d3c1c7181f55f3464529decad189f2317a2932da
+> # bad: [a63f6a64cc1e78366382657cab70772240b6dcc2] ARM: dts: at91:
+> sama5d3_xplained: fix regulator name
+> git bisect bad a63f6a64cc1e78366382657cab70772240b6dcc2
+> # bad: [c32b5bcfa3c43a3c9bb59f65b5e76adb7384c4c8] ARM: dts: at91: Fix
+> USB endpoint nodes
+> git bisect bad c32b5bcfa3c43a3c9bb59f65b5e76adb7384c4c8
+> # good: [c94afa132b6d7f8e412a12da44da6203d2cd23d4] ARM: dts: at91: Fix
+> ADC trigger nodes
+> git bisect good c94afa132b6d7f8e412a12da44da6203d2cd23d4
+> # first bad commit: [c32b5bcfa3c43a3c9bb59f65b5e76adb7384c4c8] ARM:
+> dts: at91: Fix USB endpoint nodes
+> 
+> on xplained board, I used at91-sama5d3_xplained.dtb and sama5_defconfig plus :
+> CONFIG_USB_ETH=y
+> CONFIG_USB_ETH_RNDIS=y
 
-  <asm/smp.h> -> <linux/sched.h> -> <linux/smp.h> -> <asm/smp.h>
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Andy Lutomirski <luto@kernel.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Kconfig                   |  2 ++
- arch/arm64/include/asm/Kbuild        |  1 -
- arch/arm64/include/asm/current.h     | 22 ++++++++++++++++++++++
- arch/arm64/include/asm/smp.h         |  1 +
- arch/arm64/include/asm/thread_info.h | 19 -------------------
- arch/arm64/kernel/asm-offsets.c      |  1 +
- arch/arm64/kernel/entry.S            |  4 ++--
- arch/arm64/kernel/head.S             | 11 +++++------
- arch/arm64/kernel/process.c          | 31 ++++++++++++++++++++++++++-----
- arch/arm64/kernel/smp.c              |  2 ++
- arch/arm64/kernel/stacktrace.c       |  5 +++++
- 11 files changed, 66 insertions(+), 33 deletions(-)
- create mode 100644 arch/arm64/include/asm/current.h
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index bc3f00f..9f57318 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -11,6 +11,7 @@ config ARM64
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAS_KCOV
- 	select ARCH_HAS_SG_CHAIN
-+	select ARCH_HAS_OWN_THREAD_INFO
- 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
- 	select ARCH_USE_CMPXCHG_LOCKREF
- 	select ARCH_SUPPORTS_ATOMIC_RMW
-@@ -110,6 +111,7 @@ config ARM64
- 	select POWER_SUPPLY
- 	select SPARSE_IRQ
- 	select SYSCTL_EXCEPTION_TRACE
-+	select THREAD_INFO_IN_TASK
- 	help
- 	  ARM 64-bit (AArch64) Linux support.
- 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index f43d2c4..a716c6f 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -2,7 +2,6 @@ generic-y += bug.h
- generic-y += bugs.h
- generic-y += clkdev.h
- generic-y += cputime.h
--generic-y += current.h
- generic-y += delay.h
- generic-y += div64.h
- generic-y += dma.h
-diff --git a/arch/arm64/include/asm/current.h b/arch/arm64/include/asm/current.h
-new file mode 100644
-index 0000000..f2bcbe2
---- /dev/null
-+++ b/arch/arm64/include/asm/current.h
-@@ -0,0 +1,22 @@
-+#ifndef __ASM_CURRENT_H
-+#define __ASM_CURRENT_H
-+
-+#include <linux/compiler.h>
-+
-+#include <asm/sysreg.h>
-+
-+#ifndef __ASSEMBLY__
-+
-+struct task_struct;
-+
-+static __always_inline struct task_struct *get_current(void)
-+{
-+	return (struct task_struct *)read_sysreg(sp_el0);
-+}
-+
-+#define current get_current()
-+
-+#endif /* __ASSEMBLY__ */
-+
-+#endif /* __ASM_CURRENT_H */
-+
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index 0226447..fef90c0 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -73,6 +73,7 @@ asmlinkage void secondary_start_kernel(void);
-  */
- struct secondary_data {
- 	void *stack;
-+	struct task_struct *task;
- 	long status;
- };
- 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 796af24..5b16b34 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -46,14 +46,12 @@ typedef unsigned long mm_segment_t;
- struct thread_info {
- 	unsigned long		flags;		/* low level flags */
- 	mm_segment_t		addr_limit;	/* address limit */
--	struct task_struct	*task;		/* main task structure */
- 	int			preempt_count;	/* 0 => preemptable, <0 => bug */
- 	int			cpu;		/* cpu */
- };
- 
- #define INIT_THREAD_INFO(tsk)						\
- {									\
--	.task		= &tsk,						\
- 	.flags		= 0,						\
- 	.preempt_count	= INIT_PREEMPT_COUNT,				\
- 	.addr_limit	= KERNEL_DS,					\
-@@ -66,23 +64,6 @@ struct thread_info {
-  */
- register unsigned long current_stack_pointer asm ("sp");
- 
--/*
-- * how to get the thread information struct from C
-- */
--static inline struct thread_info *current_thread_info(void) __attribute_const__;
--
--/*
-- * struct thread_info can be accessed directly via sp_el0.
-- */
--static inline struct thread_info *current_thread_info(void)
--{
--	unsigned long sp_el0;
--
--	asm ("mrs %0, sp_el0" : "=r" (sp_el0));
--
--	return (struct thread_info *)sp_el0;
--}
--
- #define thread_saved_pc(tsk)	\
- 	((unsigned long)(tsk->thread.cpu_context.pc))
- #define thread_saved_sp(tsk)	\
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index ee764eb..242fe909 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -120,6 +120,7 @@ int main(void)
-   DEFINE(TZ_DSTTIME,		offsetof(struct timezone, tz_dsttime));
-   BLANK();
-   DEFINE(CPU_BOOT_STACK,	offsetof(struct secondary_data, stack));
-+  DEFINE(CPU_BOOT_TASK,		offsetof(struct secondary_data, task));
-   BLANK();
- #ifdef CONFIG_KVM_ARM_HOST
-   DEFINE(VCPU_CONTEXT,		offsetof(struct kvm_vcpu, arch.ctxt));
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 52b4241..f844e7f 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -123,6 +123,7 @@
- 	 * Set sp_el0 to current thread_info.
- 	 */
- 	.if	\el == 0
-+	ldr_this_cpu	tsk, __entry_task, x21
- 	msr	sp_el0, tsk
- 	.endif
- 
-@@ -680,8 +681,7 @@ ENTRY(cpu_switch_to)
- 	ldp	x29, x9, [x8], #16
- 	ldr	lr, [x8]
- 	mov	sp, x9
--	and	x9, x9, #~(THREAD_SIZE - 1)
--	msr	sp_el0, x9
-+	msr	sp_el0, x1
- 	ret
- ENDPROC(cpu_switch_to)
- 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b77f583..abc7330 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -433,8 +433,7 @@ __primary_switched:
- 	dsb	ishst				// Make zero page visible to PTW
- 
- 	adr_l	sp, initial_sp, x4
--	mov	x4, sp
--	and	x4, x4, #~(THREAD_SIZE - 1)
-+	adr_l	x4, init_task
- 	msr	sp_el0, x4			// Save thread_info
- 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
- 
-@@ -680,10 +679,10 @@ __secondary_switched:
- 	isb
- 
- 	adr_l	x0, secondary_data
--	ldr	x0, [x0, #CPU_BOOT_STACK]	// get secondary_data.stack
--	mov	sp, x0
--	and	x0, x0, #~(THREAD_SIZE - 1)
--	msr	sp_el0, x0			// save thread_info
-+	ldr	x1, [x0, #CPU_BOOT_STACK]	// get secondary_data.stack
-+	mov	sp, x1
-+	ldr	x2, [x0, #CPU_BOOT_TASK]
-+	msr	sp_el0, x2
- 	mov	x29, #0
- 	b	secondary_start_kernel
- ENDPROC(__secondary_switched)
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 6cd2612..e35043d 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -45,6 +45,7 @@
- #include <linux/personality.h>
- #include <linux/notifier.h>
- #include <trace/events/power.h>
-+#include <linux/percpu.h>
- 
- #include <asm/alternative.h>
- #include <asm/compat.h>
-@@ -314,6 +315,17 @@ static void uao_thread_switch(struct task_struct *next)
- }
- 
- /*
-+ * We store our current task in sp_el0, which is clobbered by userspace. Keep a
-+ * shadow copy so that we can restore this upon entry from userspace.
-+ */
-+DEFINE_PER_CPU(struct task_struct *, __entry_task) = &init_task;
-+
-+static void entry_task_switch(struct task_struct *next)
-+{
-+	__this_cpu_write(__entry_task, next);
-+}
-+
-+/*
-  * Thread switching.
-  */
- struct task_struct *__switch_to(struct task_struct *prev,
-@@ -325,6 +337,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
- 	tls_thread_switch(next);
- 	hw_breakpoint_thread_switch(next);
- 	contextidr_thread_switch(next);
-+	entry_task_switch(next);
- 	uao_thread_switch(next);
- 
- 	/*
-@@ -342,11 +355,14 @@ struct task_struct *__switch_to(struct task_struct *prev,
- unsigned long get_wchan(struct task_struct *p)
- {
- 	struct stackframe frame;
--	unsigned long stack_page;
-+	unsigned long stack_page, ret = 0;
- 	int count = 0;
- 	if (!p || p == current || p->state == TASK_RUNNING)
- 		return 0;
- 
-+	if (!try_get_task_stack(p))
-+		return 0;
-+
- 	frame.fp = thread_saved_fp(p);
- 	frame.sp = thread_saved_sp(p);
- 	frame.pc = thread_saved_pc(p);
-@@ -358,11 +374,16 @@ unsigned long get_wchan(struct task_struct *p)
- 		if (frame.sp < stack_page ||
- 		    frame.sp >= stack_page + THREAD_SIZE ||
- 		    unwind_frame(p, &frame))
--			return 0;
--		if (!in_sched_functions(frame.pc))
--			return frame.pc;
-+			goto out;
-+		if (!in_sched_functions(frame.pc)) {
-+			ret = frame.pc;
-+			goto out;
-+		}
- 	} while (count ++ < 16);
--	return 0;
-+
-+out:
-+	put_task_stack(p);
-+	return ret;
- }
- 
- unsigned long arch_align_stack(unsigned long sp)
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index d93d433..d84be9db 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -146,6 +146,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	 * We need to tell the secondary core where to find its stack and the
- 	 * page tables.
- 	 */
-+	secondary_data.task = idle;
- 	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
- 	update_cpu_boot_status(CPU_MMU_OFF);
- 	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
-@@ -170,6 +171,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 		pr_err("CPU%u: failed to boot: %d\n", cpu, ret);
- 	}
- 
-+	secondary_data.task = NULL;
- 	secondary_data.stack = NULL;
- 	status = READ_ONCE(secondary_data.status);
- 	if (ret && status) {
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index d9751a4..4e0efe8 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -157,6 +157,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 	struct stack_trace_data data;
- 	struct stackframe frame;
- 
-+	if (!try_get_task_stack(tsk))
-+		return;
-+
- 	data.trace = trace;
- 	data.skip = trace->skip;
- 
-@@ -178,6 +181,8 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 	walk_stackframe(tsk, &frame, save_trace, &data);
- 	if (trace->nr_entries < trace->max_entries)
- 		trace->entries[trace->nr_entries++] = ULONG_MAX;
-+
-+	put_task_stack(tsk);
- }
- 
- void save_stack_trace(struct stack_trace *trace)
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
