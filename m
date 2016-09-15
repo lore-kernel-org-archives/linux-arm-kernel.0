@@ -1,60 +1,222 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 15 Sep 2016 17:45:45 +0100
-Subject: [RFC PATCH 0/5] arm64: Signal context expansion
-In-Reply-To: <d2e8f4f5-1229-9733-174d-b3123c5e887b@redhat.com>
-References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
- <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
- <20160909152047.GA3958@e103592.cambridge.arm.com>
- <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
- <20160912111749.GB3958@e103592.cambridge.arm.com>
- <57D6C33D.9020003@arm.com>
- <20160912153015.GD3958@e103592.cambridge.arm.com>
- <9969568a-f969-d904-52b3-14f80c3abec4@redhat.com>
- <20160913155151.GA1574@e103592.cambridge.arm.com>
- <d2e8f4f5-1229-9733-174d-b3123c5e887b@redhat.com>
-Message-ID: <20160915164543.GB1574@e103592.cambridge.arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 15 Sep 2016 18:46:47 +0200
+Subject: [PATCH v7 00/22] Generic DT bindings for PCI IOMMUs and ARM SMMU
+In-Reply-To: <fc4ce398-4eeb-f2ca-b964-e9f466be79c4@arm.com>
+References: <cover.1473695704.git.robin.murphy@arm.com>
+ <11ebd81e-2ea5-5ff3-35b3-be95f03e05bd@redhat.com>
+ <d03ea5e7-59f1-8b49-4ba2-d05fc2030ebc@arm.com>
+ <04a0a682-4fdc-8d62-57cd-efdf730582c6@redhat.com>
+ <c2645c5e-edd3-2b31-4311-0ca621a915e2@arm.com>
+ <4d87d5f2-0350-b5f8-ffc3-4e9377cf1f87@redhat.com>
+ <fc4ce398-4eeb-f2ca-b964-e9f466be79c4@arm.com>
+Message-ID: <1838c65d-5944-8946-781c-b420bea1acab@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 06:02:45PM +0200, Florian Weimer wrote:
-> On 09/13/2016 05:52 PM, Dave Martin wrote:
+Hi Robin,
+On 15/09/2016 12:15, Robin Murphy wrote:
+> On 15/09/16 10:29, Auger Eric wrote:
+>> Hi Robin,
+>>
+>> On 14/09/2016 14:53, Robin Murphy wrote:
+>>> On 14/09/16 13:32, Auger Eric wrote:
+>>>> Hi,
+>>>> On 14/09/2016 12:35, Robin Murphy wrote:
+>>>>> On 14/09/16 09:41, Auger Eric wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 12/09/2016 18:13, Robin Murphy wrote:
+>>>>>>> Hi all,
+>>>>>>>
+>>>>>>> To any more confusing fixups and crazily numbered extra patches, here's
+>>>>>>> a quick v7 with everything rebased into the right order. The significant
+>>>>>>> change this time is to implement iommu_fwspec properly from the start,
+>>>>>>> which ends up being far simpler and more robust than faffing about
+>>>>>>> introducing it somewhere 'less intrusive' to move toward core code later.
+>>>>>>>
+>>>>>>> New branch in the logical place:
+>>>>>>>
+>>>>>>> git://linux-arm.org/linux-rm iommu/generic-v7
+>>>>>>
+>>>>>> For information, as discussed privately with Robin I experience some
+>>>>>> regressions with the former and now deprecated dt description.
+>>>>>>
+>>>>>> on my AMD Overdrive board and my old dt description I now only see a
+>>>>>> single group:
+>>>>>>
+>>>>>> /sys/kernel/iommu_groups/
+>>>>>> /sys/kernel/iommu_groups/0
+>>>>>> /sys/kernel/iommu_groups/0/devices
+>>>>>> /sys/kernel/iommu_groups/0/devices/e0700000.xgmac
+>>>>>>
+>>>>>> whereas I formerly see
+>>>>>>
+>>>>>> /sys/kernel/iommu_groups/
+>>>>>> /sys/kernel/iommu_groups/3
+>>>>>> /sys/kernel/iommu_groups/3/devices
+>>>>>> /sys/kernel/iommu_groups/3/devices/0000:00:00.0
+>>>>>> /sys/kernel/iommu_groups/1
+>>>>>> /sys/kernel/iommu_groups/1/devices
+>>>>>> /sys/kernel/iommu_groups/1/devices/e0700000.xgmac
+>>>>>> /sys/kernel/iommu_groups/4
+>>>>>> /sys/kernel/iommu_groups/4/devices
+>>>>>> /sys/kernel/iommu_groups/4/devices/0000:00:02.2
+>>>>>> /sys/kernel/iommu_groups/4/devices/0000:01:00.1
+>>>>>> /sys/kernel/iommu_groups/4/devices/0000:00:02.0
+>>>>>> /sys/kernel/iommu_groups/4/devices/0000:01:00.0
+>>>>>> /sys/kernel/iommu_groups/2
+>>>>>> /sys/kernel/iommu_groups/2/devices
+>>>>>> /sys/kernel/iommu_groups/2/devices/e0900000.xgmac
+>>>>>> /sys/kernel/iommu_groups/0
+>>>>>> /sys/kernel/iommu_groups/0/devices
+>>>>>> /sys/kernel/iommu_groups/0/devices/f0000000.pcie
+>>>>>>
+>>>>>> This is the group topology without ACS override. Applying the non
+>>>>>> upstreamed "pci: Enable overrides for missing ACS capabilities" I used
+>>>>>> to see separate groups for each PCIe components. Now I don't see any
+>>>>>> difference with and without ACS override.
+>>>>>
+>>>>> OK, having reproduced on my Juno, the problem looks to be that
+>>>>> of_for_each_phandle() leaves err set to -ENOENT after successfully
+>>>>> walking a phandle list, which makes __find_legacy_master_phandle()
+>>>>> always bail out after the first SMMU.
+>>>>>
+>>>>> Can you confirm that the following diff fixes things for you?
+>>>>
+>>>> Well it improves but there are still differences in the group topology.
+>>>> The PFs now are in group 0.
+>>>>
+>>>> root at trusty:~# lspci -nk
+>>>> 00:00.0 0600: 1022:1a00
+>>>>         Subsystem: 1022:1a00
+>>>> 00:02.0 0600: 1022:1a01
+>>>> 00:02.2 0604: 1022:1a02
+>>>>         Kernel driver in use: pcieport
+>>>> 01:00.0 0200: 8086:1521 (rev 01)
+>>>>         Subsystem: 8086:0002
+>>>>         Kernel driver in use: igb
+>>>> 01:00.1 0200: 8086:1521 (rev 01)
+>>>>         Subsystem: 8086:0002
+>>>>         Kernel driver in use: igb
+>>>>
+>>>>
+>>>> with your series + fix:
+>>>> /sys/kernel/iommu_groups/
+>>>> /sys/kernel/iommu_groups/3
+>>>> /sys/kernel/iommu_groups/3/devices
+>>>> /sys/kernel/iommu_groups/3/devices/0000:00:00.0
+>>>> /sys/kernel/iommu_groups/1
+>>>> /sys/kernel/iommu_groups/1/devices
+>>>> /sys/kernel/iommu_groups/1/devices/e0700000.xgmac
+>>>> /sys/kernel/iommu_groups/4
+>>>> /sys/kernel/iommu_groups/4/devices
+>>>> /sys/kernel/iommu_groups/4/devices/0000:00:02.2
+>>>> /sys/kernel/iommu_groups/4/devices/0000:00:02.0
+>>>> /sys/kernel/iommu_groups/2
+>>>> /sys/kernel/iommu_groups/2/devices
+>>>> /sys/kernel/iommu_groups/2/devices/e0900000.xgmac
+>>>> /sys/kernel/iommu_groups/0
+>>>> /sys/kernel/iommu_groups/0/devices
+>>>> /sys/kernel/iommu_groups/0/devices/0000:01:00.1
+>>>> /sys/kernel/iommu_groups/0/devices/f0000000.pcie
+>>>> /sys/kernel/iommu_groups/0/devices/0000:01:00.0
+>>>>
+>>>> Before (4.8-rc5):
+>>>>
+>>>> /sys/kernel/iommu_groups/
+>>>> /sys/kernel/iommu_groups/3
+>>>> /sys/kernel/iommu_groups/3/devices
+>>>> /sys/kernel/iommu_groups/3/devices/0000:00:00.0
+>>>> /sys/kernel/iommu_groups/1
+>>>> /sys/kernel/iommu_groups/1/devices
+>>>> /sys/kernel/iommu_groups/1/devices/e0700000.xgmac
+>>>> /sys/kernel/iommu_groups/4
+>>>> /sys/kernel/iommu_groups/4/devices
+>>>> /sys/kernel/iommu_groups/4/devices/0000:00:02.2
+>>>> /sys/kernel/iommu_groups/4/devices/0000:01:00.1
+>>>> /sys/kernel/iommu_groups/4/devices/0000:00:02.0
+>>>> /sys/kernel/iommu_groups/4/devices/0000:01:00.0
+>>>> /sys/kernel/iommu_groups/2
+>>>> /sys/kernel/iommu_groups/2/devices
+>>>> /sys/kernel/iommu_groups/2/devices/e0900000.xgmac
+>>>> /sys/kernel/iommu_groups/0
+>>>> /sys/kernel/iommu_groups/0/devices
+>>>> /sys/kernel/iommu_groups/0/devices/f0000000.pcie
+>>>
+>>> Your DT claims that f0000000.pcie (i.e. the "platform device" side of
+>>> the host controller) owns the IDs 0x100 0x101 0x102 0x103 0x200 0x201
+>>> 0x202 0x203 0x300 0x301 0x302 0x303 0x400 0x401 0x402 0x403. Thus when
+>>> new devices (the PCI PFs) come along *also* claiming those IDs (via the
+>>> RID-to-SID assumption), we now detect the aliasing and assign them to
+>>> the existing group.
+>>>
+>>> The only way that DT worked without SMR conflicts before is that
+>>> f0000000.pcie wasn't actually getting attached to a domain, thus wasn't
+>>> getting SMRs allocated (ISTR you _did_ get conflicts back when we first
+>>> tried to switch on default domains; that was probably the reason).
+>>
+>> Thanks for your explanations. meanwhile I converted the overdrive dt to
+>> the new syntax and it works properly.
 > 
-> >Agreed.  I'll need to think some more about how this should work in
-> >general.
+> Yay!
 > 
-> Thanks.
+>> However I noticed there are MSI frame iommu mapping although the
+>> device's domain is the default one. There is no check currently in
+>> 21/22. I guess this isn't needed?
 > 
-> Depending on some SVE implementations details (which I know nothing about, I
-> only saw some public overview slides), we may also need additional storage
-> space to preserve SVE registers in the dynamic linker.  Due to lazy binding,
-> this code cn be called from a signal handler, so this needs to be factored
-> into stack size requirements as well.
+> Au contraire ;)
+;-)
 
-Yes and no.  The kernel SIGSTKSZ constants don't care about ld.so --
-that's userspace overhead, not kernel overhead.
+ With the generic binding, default domains are properly
+> implemented, i.e. they have translation, so anything not mapped will
+> fault. I *had* to write patch 21 as part of this series, since having
+> DMA ops for PCI devices at the cost of breaking all MSIs was clearly not
+> a viable solution. If you see mappings, then it's because someone is
+> using MSIs - so if you fancy, you can try rewinding back to patch 19 or
+> 20 to watch them get stuck.
+Hum OK; thanks for the explanation. With that implementation however,
+don't we face back the issue we encountered in early stage of default
+domain implementation:
 
-But it is a potential ABI issue for userspace; libc will need to massage
-the constants appropriately for its own implementation, and we do need
-to make sure that the kernel doesn't use up more stack on signal delivery
-than userspace expects.
+With this sample config (AMD overdrive + I350-T2 + 2VFs per PF) I fill
+the 8 context banks. Whereas practically we didn't need them before?
 
-> Problematic are register width extensions used for argument passing and
-> callee-saved registers whose width has been extended.  Both are particularly
-> challenging to deal with if existing vector instructions clear the extension
-> part (which may be desirable for other reasons).
+00:00.0 0600: 1022:1a00
+	Subsystem: 1022:1a00
+00:02.0 0600: 1022:1a01
+00:02.2 0604: 1022:1a02
+	Kernel driver in use: pcieport
+01:00.0 0200: 8086:1521 (rev 01)
+	Subsystem: 8086:0002
+	Kernel driver in use: igb
+01:00.1 0200: 8086:1521 (rev 01)
+	Subsystem: 8086:0002
+	Kernel driver in use: igb
+01:10.0 0200: 8086:1520 (rev 01) -> context 5
+	Subsystem: 8086:0002
+	Kernel driver in use: vfio-pci
+01:10.1 0200: 8086:1520 (rev 01) -> context 7
+	Subsystem: 8086:0002
+	Kernel driver in use: igbvf
+01:10.4 0200: 8086:1520 (rev 01) -> context 6
+	Subsystem: 8086:0002
+	Kernel driver in use: igbvf
+01:10.5 0200: 8086:1520 (rev 01) -> shortage
+	Subsystem: 8086:0002
+	Kernel driver in use: igbvf
+
+So I can't even do passthrough anymore with that config. Is there
+anything wrong in my setup/understanding?
+
+Thanks
+
+Eric
+
 > 
-> The size of the jmp_buf type is a concern as well.
-
-The default PCS for SVE will not be introducing any extra save/restore
-requirements for SVE -- i.e., everything is caller-save at public
-interfaces, except for the FPSIMD register bits that are already callee-
-save under the existing PCS.
-
-Some work will be needed as and when support is introduced for using an
-SVE-specific PCS at public interfaces.
-
-Interprocedural optimisation and LTO within individual shared libs need
-not depend on this, but I'm not sure how it will work in detail.
-
-Cheers
----Dave
+> Robin.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
