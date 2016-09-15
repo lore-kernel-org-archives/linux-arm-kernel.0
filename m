@@ -1,90 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 13:35:30 +0200
-Subject: [PATCH 0/7] mfd: Fix all W=1 warnings
-In-Reply-To: <20160915104521.14286-1-lee.jones@linaro.org>
-References: <20160915104521.14286-1-lee.jones@linaro.org>
-Message-ID: <5506538.euWBouSNJd@wuerfel>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 15 Sep 2016 13:42:20 +0200
+Subject: [PATCH v3 00/14] Clock improvement for video playback
+In-Reply-To: <af43c05e-4485-d756-3362-19a76aa40307@st.com>
+References: <1472473626-15398-1-git-send-email-gabriel.fernandez@st.com>
+ <20160914183620.GV7243@codeaurora.org>
+ <af43c05e-4485-d756-3362-19a76aa40307@st.com>
+Message-ID: <8257df40-272d-af63-d9b7-13d6aaea39a2@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 15, 2016 11:45:14 AM CEST Lee Jones wrote:
-> It really is as simple as it sounds!
+
+
+On 09/15/2016 08:57 AM, Patrice Chotard wrote:
 > 
+> 
+> On 09/14/2016 08:36 PM, Stephen Boyd wrote:
+>> On 08/29, gabriel.fernandez at st.com wrote:
+>>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>
+>>> v3:
+>>>   - Rebase to v4.8-rc1
+>>>   - Tipo fix in st,clkgen-pll.txt
+>>>   - Add Ack of Peter for the series
+>>>   - Add missed patch: "ARM: DT: STiH4xx: Simplify clock binding of STiH4xx platforms"
+>>>
+>>> v2:
+>>>   - Simpliflication of clock binding
+>>>     remark from Rob https://lkml.org/lkml/2016/5/25/492
+>>>   - Suppression of stih415-416 support for the clocks (in order
+>>> 	to help simplification of clock binding)
+>>>     (others patchs for the machine and drivers will come)
+>>>
+>>> This serie allows to increase video resolutions and make audio
+>>> adjustment during a video playback.
+>>>
+>>> Gabriel Fernandez (14):
+>>>   drivers: clk: st: Remove stih415-416 clock support
+>>>   drivers: clk: st: Simplify clock binding of STiH4xx platforms
+>>>   ARM: DT: STiH4xx: Simplify clock binding of STiH4xx platforms
+>>>   drivers: clk: st: Add fs660c32 synthesizer algorithm
+>>>   drivers: clk: st: Add clock propagation for audio clocks
+>>>   drivers: clk: st: Handle clk synchronous mode for video clocks
+>>>   ARM: DT: STiH407: Enable clock propagation for audio clocks
+>>>   ARM: DT: STiH410: Enable clock propagation for audio clocks
+>>>   ARM: DT: STiH418: Enable clock propagation for audio clocks
+>>>   ARM: DT: STiH407: Enable synchronous clock mode for video clocks
+>>>   ARM: DT: STiH410: Enable synchronous clock mode for video clocks
+>>>   ARM: DT: STiH418: Enable synchronous clock mode for video clocks
+>>>   ARM: DT: STi: STiH407: clock configuration to address 720p and 1080p
+>>>   ARM: DT: STi: STiH410: clock configuration to address 720p and 1080p
+>>
+> 
+> Hi Stephen
+> 
+>> The order of patches intermingles clk changes and dts changes.
+>> I'd prefer to not take any patches for dts through the clk tree,
+>> so can those be deferred to an arm-soc PR? 
+> 
+> No problem, i will take all DTS patches and submit a pull request to arm-soc.
+> 
+> Assuming that works,
+>> I'd just pick 1-2, and 4-6 into the clk tree and the rest can go
+>> on top through arm-soc.
 
-I seem to have one that you didn't find.
+Stephen
 
-	Arnd
+Just to confirm, these patches will be merged into clk-next tree ? so dedicated for v4.9 ?
 
-8<--------
->From 6c63171eba728fc6d8bc6358884deaccd4cee33d Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 4 Aug 2016 15:28:51 +0200
-Subject: [PATCH] mfd: tps65912: move regmap config into core driver
+Thanks
 
-When building with extra warnings enabled, most files including
-linux/mfd/tps65912.h warn about a static variable defined in the
-header:
+Patrice
 
-include/linux/mfd/tps65912.h:331:35: warning: 'tps65912_regmap_config' defined but not used [-Wunused-const-variable=]
-
-We also duplicate the data structure between the i2c and spi front-end
-drivers. Moving it into the driver code avoids the warning and
-the duplication.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/mfd/tps65912-core.c b/drivers/mfd/tps65912-core.c
-index a88cfa80dbc4..f33567bc428d 100644
---- a/drivers/mfd/tps65912-core.c
-+++ b/drivers/mfd/tps65912-core.c
-@@ -77,6 +77,23 @@ static struct regmap_irq_chip tps65912_irq_chip = {
- 	.init_ack_masked = true,
- };
- 
-+static const struct regmap_range tps65912_yes_ranges[] = {
-+	regmap_reg_range(TPS65912_INT_STS, TPS65912_GPIO5),
-+};
-+
-+static const struct regmap_access_table tps65912_volatile_table = {
-+	.yes_ranges = tps65912_yes_ranges,
-+	.n_yes_ranges = ARRAY_SIZE(tps65912_yes_ranges),
-+};
-+
-+const struct regmap_config tps65912_regmap_config = {
-+	.reg_bits = 8,
-+	.val_bits = 8,
-+	.cache_type = REGCACHE_RBTREE,
-+	.volatile_table = &tps65912_volatile_table,
-+};
-+EXPORT_SYMBOL_GPL(tps65912_regmap_config);
-+
- int tps65912_device_init(struct tps65912 *tps)
- {
- 	int ret;
-diff --git a/include/linux/mfd/tps65912.h b/include/linux/mfd/tps65912.h
-index 1a603701550e..b25d0297ba88 100644
---- a/include/linux/mfd/tps65912.h
-+++ b/include/linux/mfd/tps65912.h
-@@ -319,21 +319,7 @@ struct tps65912 {
- 	struct regmap_irq_chip_data *irq_data;
- };
- 
--static const struct regmap_range tps65912_yes_ranges[] = {
--	regmap_reg_range(TPS65912_INT_STS, TPS65912_GPIO5),
--};
--
--static const struct regmap_access_table tps65912_volatile_table = {
--	.yes_ranges = tps65912_yes_ranges,
--	.n_yes_ranges = ARRAY_SIZE(tps65912_yes_ranges),
--};
--
--static const struct regmap_config tps65912_regmap_config = {
--	.reg_bits = 8,
--	.val_bits = 8,
--	.cache_type = REGCACHE_RBTREE,
--	.volatile_table = &tps65912_volatile_table,
--};
-+extern const struct regmap_config tps65912_regmap_config;
- 
- int tps65912_device_init(struct tps65912 *tps);
- int tps65912_device_exit(struct tps65912 *tps);
+>>
+> 
+> Perfect 
+> 
+> Thanks
+> 
+> 
+> 
