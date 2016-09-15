@@ -1,43 +1,32 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 15 Sep 2016 11:45:19 +0100
-Subject: [PATCH 5/7] mfd: ab8500-debugfs: Remove 'weak' function
- suspend_test_wake_cause_interrupt_is_mine()
+Date: Thu, 15 Sep 2016 11:45:20 +0100
+Subject: [PATCH 6/7] mfd: omap-usb-host: Return value is not 'const int'
 In-Reply-To: <20160915104521.14286-1-lee.jones@linaro.org>
 References: <20160915104521.14286-1-lee.jones@linaro.org>
-Message-ID: <20160915104521.14286-6-lee.jones@linaro.org>
+Message-ID: <20160915104521.14286-7-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no other functions which can over-ride it.
+Change from 'const int' to just 'int'.
 
+Cc: <robh+dt@kernel.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/ab8500-debugfs.c | 10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
+ drivers/mfd/omap-usb-host.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index b948088..acf6c00 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -1522,18 +1522,10 @@ static u32 num_interrupts[AB8500_MAX_NR_IRQS];
- static u32 num_wake_interrupts[AB8500_MAX_NR_IRQS];
- static int num_interrupt_lines;
- 
--bool __attribute__((weak)) suspend_test_wake_cause_interrupt_is_mine(u32 my_int)
--{
--	return false;
--}
--
- void ab8500_debug_register_interrupt(int line)
+diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+index 1d924d1..7aab376 100644
+--- a/drivers/mfd/omap-usb-host.c
++++ b/drivers/mfd/omap-usb-host.c
+@@ -162,7 +162,7 @@ static const char * const port_modes[] = {
+  * provided port mode string as per the port_modes table.
+  * If no match is found it returns -ENODEV
+  */
+-static const int omap_usbhs_get_dt_port_mode(const char *mode)
++static int omap_usbhs_get_dt_port_mode(const char *mode)
  {
--	if (line < num_interrupt_lines) {
-+	if (line < num_interrupt_lines)
- 		num_interrupts[line]++;
--		if (suspend_test_wake_cause_interrupt_is_mine(irq_ab8500))
--			num_wake_interrupts[line]++;
--	}
- }
+ 	int i;
  
- static int ab8500_interrupts_print(struct seq_file *s, void *p)
 -- 
 2.9.3
