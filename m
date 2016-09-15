@@ -1,61 +1,94 @@
-From: minyard@acm.org (Corey Minyard)
-Date: Thu, 15 Sep 2016 07:23:08 -0500
-Subject: [PATCH 1/3] misc: Add Aspeed BT IPMI host driver
-In-Reply-To: <3e2658cc-7089-abd2-23b3-ffd468edbd11@kaod.org>
-References: <1472664259-23933-1-git-send-email-clg@kaod.org>
- <c06a8afb-9143-6aef-3425-ad1e50cae35d@kaod.org>
- <1ce6c4b4-5938-22fc-7467-d1efc220b772@gmail.com> <4727554.yt7pF8chOH@wuerfel>
- <7db5ada0-49ea-55eb-089e-d979941ceff5@gmail.com>
- <3e2658cc-7089-abd2-23b3-ffd468edbd11@kaod.org>
-Message-ID: <c16a0c73-310b-9534-d269-4f02bd00161d@acm.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Sep 2016 14:24:38 +0200
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F871F72@lhreml507-mbx>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <8360154.kzsE8V8pTW@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F871F72@lhreml507-mbx>
+Message-ID: <26171742.fWcrANu6EP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2016 01:51 AM, C?dric Le Goater wrote:
-> On 09/12/2016 10:33 PM, Corey Minyard wrote:
->> On 09/12/2016 02:15 PM, Arnd Bergmann wrote:
->>> On Monday, September 12, 2016 1:55:40 PM CEST Corey Minyard wrote:
->>>> On 09/02/2016 08:22 AM, C?dric Le Goater wrote:
->>>>> Hello,
->>>>>
->>>>> Adding Corey in cc: . I guess I should have done that in the first place.
->>>> Yes, probably so.  I've been travelling and didn't see it on the mailing
->>>> lists until now.
->>>>
->>>> There is already a BT driver in the kernel, in drivers/char/ipmi, why
->>>> won't that work?
->>> The new driver is the host side (running on the BMC), the existing one
->>> is the client (running on the PC).
->>>
->>>      Arnd
->> Ok, that's not really clear from the documentation or the Kconfig.
->> In the IPMI spec the "host" side is the computer side, not the BMC
->> side.  Like:
->>
->>     11.6.1 BT Host Interface Registers
->>     The Host BT interface provides an independent set of registers and
->>     interrupts to allow the Host driver to
->>     communicate with the baseboard management controller without
->>     conflicting with the O/S ACPI driver.
->>
->> In light of that, this should probably be named the bt-bmc driver.
->>
->> I haven't reviewed this in detail, but I'm ok with putting it in
->> drivers/char/ipmi.  The state machine part looks reasonably
->> generic.  The configuration part isn't, but that could be split
->> out later if necessary.
-> what do you mean by configuration ? I am ready to send a v2. May be
-> I can add a few other things.
+On Thursday, September 15, 2016 12:05:51 PM CEST Gabriele Paoloni wrote:
+> > -----Original Message-----
+> > On Thursday, September 15, 2016 8:02:27 AM CEST Gabriele Paoloni wrote:
+> > >
+> > > From <<3.1.1. Open Firmware Properties for Bus Nodes>> in
+> > > http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
+> > >
+> > > I quote:
+> > > "There shall be an entry in the "ranges" property for each
+> > > of the Memory and/or I/O spaces if that address space is
+> > > mapped through the bridge."
+> > >
+> > > It seems to me that it is ok to have 1:1 address mapping and that
+> > > therefore of_translate_address() should fail if "ranges" is not
+> > > present.
+> > 
+> > The key here is the definition of "mapped through the bridge".
+> > I can only understand this as "directly mapped", i.e. an I/O
+> > port of the child bus corresponds directly to a memory address
+> > on the parent bus, but this is not the case here.
+> > 
+> > The problem with adding the mapping here is that it looks
+> > like it should be valid to create a page table entry for
+> > the address returned from the translation and access it through
+> > a pointer dereference, but that is clearly not possible.
+> 
+> I understand that somehow we are abusing of the ranges property
+> here however the point is that with the current implementation ranges
+> is needed because otherwise the ipmi driver probe will fail here:
+> 
+> of_ipmi_probe -> of_address_to_resource -> __of_address_to_resource
+> -> of_translate_address -> __of_translate_address
+> 
+> Now we had a bit of discussion internally and to avoid
+> having ranges we came up with two possible solutions:
+> 
+> 1) Using bit 3 of phys.hi cell in 2.2.1 of
+> http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
+> This would mean reworking of_bus_isa_get_flags in 
+> http://lxr.free-electrons.com/source/drivers/of/address.c#L398
+> and setting a new flag to be checked in __of_address_to_resource
+> 
+> 2) Adding a property in the bindings of each device that is
+> a child of our LPC bus and modify __of_address_to_resource
+> to check if the property is in the DT and eventually bypass
+> of_translate_address
+> 
+> However in both 1) and 2) there are some issues:
+> in 1) we are not complying with the isa binding doc (we use
+> a bit that should be zero); in 2) we need to modify the
+> bindings documentation of the devices that are connected
+> to our LPC controller (therefore modifying other devices
+> bindings to fit our special case).
+> 
+> I think that maybe having the 1:1 range mapping doesn't
+> reflect well the reality but it is the less painful
+> solution...
+> 
+> What's your view?
 
-The part that sets everything up, basically everything from
-bt_host_fops down.
+We can check the 'i' bit for I/O space in of_bus_isa_get_flags,
+and that should be enough to translate the I/O port number.
 
-If you were to use this on another system, that code would have to be
-made more generic and the machine-specific part split into different
-files, but that's not necessary now, I don't think.
+The only part we need to change here is to not go through
+the crazy conversion all the way from PCI I/O space to a
+physical address and back to a (logical) port number
+that we do today with of_translate_address/pci_address_to_pio.
 
--corey
+I can think of a several of ways to fix __of_address_to_resource
+to just do the right thing according to the ISA binding to
+make the normal drivers work.
 
-> Thanks,
->
-> C.
+The easiest solution is probably to hook into the
+"taddr == OF_BAD_ADDR" case in __of_address_to_resource
+and add a lookup for ISA buses there, and instead check
+if some special I/O port operations were registered
+for the port number, using an architecture specific
+function that arm64 implements. Other architectures
+like x86 that don't have a direct mapping between I/O
+ports and MMIO addresses would implement that same
+function differently.
+
+	Arnd
