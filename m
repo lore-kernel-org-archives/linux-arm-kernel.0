@@ -1,56 +1,42 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 15 Sep 2016 10:37:05 -0600
-Subject: [PATCH V6 0/3] Adding support for address filters
-Message-ID: <1473957428-28311-1-git-send-email-mathieu.poirier@linaro.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 15 Sep 2016 09:37:26 -0700
+Subject: [PATCH] MMC: meson: remove unused variable
+In-Reply-To: <20160915154349.3005248-1-arnd@arndb.de> (Arnd Bergmann's message
+ of "Thu, 15 Sep 2016 17:43:35 +0200")
+References: <20160915154349.3005248-1-arnd@arndb.de>
+Message-ID: <7hh99hktkp.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set makes it possible to use the current filter
-framework with address filters.  That way address filters for
-HW tracers such as CoreSight and IntelPT can be communicated
-to the kernel drivers.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-In this revision precursor work is done to make function
-perf_evsel__append_filter() generic, along with changes to
-current customers.  From there the work on address filters is
-introduced.
+> The newly added meson mmc driver causes a build warning from an unused
+> variable:
+>
+> drivers/mmc/host/meson-gxbb.c: In function 'meson_mmc_request_done':
+> drivers/mmc/host/meson-gxbb.c:411:22: error: unused variable 'cmd' [-Werror=unused-variable]
+>
+> This removes the variable.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 4b331229dda9 ("MMC: meson: initial support for GXBB platforms")
 
-Thanks,
-Mathieu
+kbuild test robot reported this also, so I already fixed it for linux-next.
 
----
-Changes for V6:
- - Split work in 3 (small) patches.
- - Adding tracepoint and address filter append() functions
+Kevin
 
-Changes for V5:
- - Modified perf_evsel__append_filter() to take a string format
-   rather than an operation.
-
-Changes for V4:
- - Added support for address filters over more than one
-   nibble.
- - Removed Jiri's ack, this version is too different from
-   what was reviewed.
-
-Changes for V3:
- - Added Jiri's ack.
- - Rebased to v4.8-rc5.
-
-Changes for V2:
- - Rebased to v4.8-rc4.
- - Revisited error path.
-
-Mathieu Poirier (3):
-  perf tools: making perf_evsel__append_filter() generic
-  perf tools: new tracepoint specific function
-  perf tools: adding support for address filters
-
- tools/perf/builtin-trace.c     |  8 ++++++--
- tools/perf/util/evsel.c        | 16 +++++++++++++---
- tools/perf/util/evsel.h        |  5 +++--
- tools/perf/util/parse-events.c | 41 +++++++++++++++++++++++++++++++++++------
- 4 files changed, 57 insertions(+), 13 deletions(-)
-
--- 
-2.7.4
+> ---
+>  drivers/mmc/host/meson-gxbb.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/meson-gxbb.c b/drivers/mmc/host/meson-gxbb.c
+> index c73c62178764..193d343d0afe 100644
+> --- a/drivers/mmc/host/meson-gxbb.c
+> +++ b/drivers/mmc/host/meson-gxbb.c
+> @@ -408,7 +408,6 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  static int meson_mmc_request_done(struct mmc_host *mmc, struct mmc_request *mrq)
+>  {
+>  	struct meson_host *host = mmc_priv(mmc);
+> -	struct mmc_command *cmd = host->cmd;
+>  
+>  	WARN_ON(host->mrq != mrq);
