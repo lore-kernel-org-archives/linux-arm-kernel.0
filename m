@@ -1,38 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 15 Sep 2016 20:16:15 +0530
-Subject: [PATCH v2] ARM: dts: da850-lcdk: Add NAND to DT
-In-Reply-To: <CAOi56cWJpx-+s7h_+qypj-0HOcC2vDs2PLtZbdMO92TzdvECpQ@mail.gmail.com>
-References: <20160908183324.32389-1-khilman@baylibre.com>
- <CAOi56cWJpx-+s7h_+qypj-0HOcC2vDs2PLtZbdMO92TzdvECpQ@mail.gmail.com>
-Message-ID: <15cf4422-0ad6-9927-92fe-b32ab61f86d5@ti.com>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Thu, 15 Sep 2016 16:39:20 +0200
+Subject: [PATCH v3 1/3] ASoC: sun4i-codec: rename "sun4i_codec_widgets" to
+ "sun4i_codec_controls" for consistency with the struct field name.
+In-Reply-To: <20160915143922.4890-1-dannym@scratchpost.org>
+References: <20160915143922.4890-1-dannym@scratchpost.org>
+Message-ID: <20160915143922.4890-2-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+ASoC: sun4i-codec: rename "sun4i_codec_widgets" to "sun4i_codec_controls" for
+consistency with the struct field name.
 
-On Wednesday 14 September 2016 10:54 PM, Kevin Hilman wrote:
-> Hi Sekhar,
-> 
-> On Thu, Sep 8, 2016 at 11:33 AM, Kevin Hilman <khilman@baylibre.com> wrote:
->> From: Karl Beldan <kbeldan@baylibre.com>
->>
->> This adds DT support for the NAND connected to the SoC AEMIF.
->> Passed torture hashing a 40MB file on top of UBIFS using subpages.
->>
->> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
->> [khilman: add back default partitions from an earlier patch]
->> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->> ---
->> Applies on Sekhar's v4.9/dts branch.
->>
-> 
-> Looks like you need to respin your DT series for arm-soc due to build
-> errors.  Can you add this while you're at it so we have 4-bit ECC in
-> v4.9?
+Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
+---
+ sound/soc/sunxi/sun4i-codec.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-The comments in the patch were fine. I applied this patch and just sent
-a pull request for ARM-SoC maintainers too. Hopefully its not too late
-for v4.9
-
-Thanks,
-Sekhar
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 0e19c50..c2c0583 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -509,7 +509,7 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
+ 
+ static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
+ 
+-static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
++static const struct snd_kcontrol_new sun4i_codec_controls[] = {
+ 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
+ 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
+ 		       sun4i_codec_pa_volume_scale),
+@@ -629,8 +629,8 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+ 
+ static struct snd_soc_codec_driver sun4i_codec_codec = {
+ 	.component_driver = {
+-		.controls		= sun4i_codec_widgets,
+-		.num_controls		= ARRAY_SIZE(sun4i_codec_widgets),
++		.controls		= sun4i_codec_controls,
++		.num_controls		= ARRAY_SIZE(sun4i_codec_controls),
+ 		.dapm_widgets		= sun4i_codec_codec_dapm_widgets,
+ 		.num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
+ 		.dapm_routes		= sun4i_codec_codec_dapm_routes,
