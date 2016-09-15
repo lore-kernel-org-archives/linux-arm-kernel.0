@@ -1,26 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Sep 2016 10:42:14 +0100
-Subject: [PATCH] arm64: Enable HIBERNATION in defconfig
-Message-ID: <1473932534-2710-1-git-send-email-catalin.marinas@arm.com>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Thu, 15 Sep 2016 12:44:25 +0300
+Subject: [PATCH v4 5/8] ARM: dts: am335x-boneblack: Add
+ blue-and-red-wiring -property to LCDC node
+In-Reply-To: <fad833a6a4368196f4fc131a54d90f5b90169393.1472719892.git.jsarha@ti.com>
+References: <cover.1472719892.git.jsarha@ti.com>
+ <fad833a6a4368196f4fc131a54d90f5b90169393.1472719892.git.jsarha@ti.com>
+Message-ID: <d9dcc43b-6884-aab1-ff82-c66ecf6e96b6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds CONFIG_HIBERNATION to the arm64 defconfig.
+Tony,
+The functional changes are now merged. But let's not merge this bbb dts
+patch just yet, so we do not cause a conflict with the other bbb hdmi
+audio dts change[1] that slipped into tda998x pull request. The patch
+can very well wait until v4.10 if needed.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+However, the other three dts patches[2] can be merged. Should I rebase
+those on top of some branch and resend them?
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index eadf4855ad2d..91a7592029e3 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -80,6 +80,7 @@ CONFIG_KEXEC=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_COMPAT=y
- CONFIG_CPU_IDLE=y
-+CONFIG_HIBERNATION=y
- CONFIG_ARM_CPUIDLE=y
- CONFIG_CPU_FREQ=y
- CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
+Best regards,
+Jyri
+
+[1] https://lists.freedesktop.org/archives/dri-devel/2016-August/115269.html
+
+[2]
+https://lists.freedesktop.org/archives/dri-devel/2016-September/117282.html
+https://lists.freedesktop.org/archives/dri-devel/2016-September/117283.html
+https://lists.freedesktop.org/archives/dri-devel/2016-September/117284.html
+
+On 09/01/16 12:09, Jyri Sarha wrote:
+> Add blue-and-red-wiring -property to LCDC node. Also adds comments on
+> how to get support 24 bit RGB mode. After this patch am335x-boneblack
+> support RGB565, BGR888, and XBGR8888 color formats. See details in
+> Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt.
+> 
+> The BBB has straight color wiring from am335x to tda19988, however the
+> tda19988 can be configured to cross the blue and red wires. The
+> comments show how to do that with video-ports property of tda19988
+> node and how to tell LCDC that blue and red wires are crossed, with
+> blue-and-red-wiring LCDC node property. This changes supported color
+> formats from 16 bit RGB and 24 bit BGR to 16 bit BGR and 24 bit RGB.
+> 
+> Signed-off-by: Jyri Sarha <jsarha@ti.com>
+> ---
+>  arch/arm/boot/dts/am335x-boneblack.dts | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+> index 528559b..a32d73a 100644
+> --- a/arch/arm/boot/dts/am335x-boneblack.dts
+> +++ b/arch/arm/boot/dts/am335x-boneblack.dts
+> @@ -90,6 +90,14 @@
+>  
+>  &lcdc {
+>  	status = "okay";
+> +
+> +	/* If you want to get 24 bit RGB and 16 BGR mode instead of
+> +	 * current 16 bit RGB and 24 BGR modes, set the propety
+> +	 * below to "crossed" and uncomment the video-ports -property
+> +	 * in tda19988 node.
+> +	 */
+> +	blue-and-red-wiring = "straight";
+> +
+>  	port {
+>  		lcdc_0: endpoint at 0 {
+>  			remote-endpoint = <&hdmi_0>;
+> @@ -106,6 +114,9 @@
+>  		pinctrl-0 = <&nxp_hdmi_bonelt_pins>;
+>  		pinctrl-1 = <&nxp_hdmi_bonelt_off_pins>;
+>  
+> +		/* Convert 24bit BGR to RGB, e.g. cross red and blue wiring */
+> +		/* video-ports = <0x234501>; */
+> +
+>  		#sound-dai-cells = <0>;
+>  		audio-ports = <	TDA998x_I2S	0x03>;
+>  
+> 
