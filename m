@@ -1,42 +1,127 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 15 Sep 2016 16:13:31 +0200
-Subject: [PATCH 4/5] ARM: dts: exynos: add support for ISP power domain to
- exynos4x12 clocks device
-In-Reply-To: <6e52af56-8b0e-d8c4-62c2-6efeee0e912d@samsung.com>
-References: <1472737551-15272-1-git-send-email-m.szyprowski@samsung.com>
- <1472737551-15272-5-git-send-email-m.szyprowski@samsung.com>
- <20160908002254.GD13062@codeaurora.org>
- <CGME20160912102332eucas1p145e79669788329b44343da62dcbe50ca@eucas1p1.samsung.com>
- <f340cca5-6cd6-6bd1-3b9a-ccd58cbc0091@samsung.com>
- <20160912222852.GH7243@codeaurora.org>
- <6e52af56-8b0e-d8c4-62c2-6efeee0e912d@samsung.com>
-Message-ID: <CAPDyKFpibwe2fgviT8z3atd4RJUBx1PMNuG3txbjAa5qY8o_dg@mail.gmail.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 15 Sep 2016 14:28:06 +0000
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <26171742.fWcrANu6EP@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <8360154.kzsE8V8pTW@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F871F72@lhreml507-mbx>
+ <26171742.fWcrANu6EP@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F872391@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 15 September 2016 13:25
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Gabriele Paoloni; devicetree at vger.kernel.org;
+> lorenzo.pieralisi at arm.com; minyard at acm.org; linux-pci at vger.kernel.org;
+> gregkh at linuxfoundation.org; John Garry; will.deacon at arm.com; linux-
+> kernel at vger.kernel.org; Yuanzhichang; Linuxarm; xuwei (O); linux-
+> serial at vger.kernel.org; benh at kernel.crashing.org;
+> zourongrong at gmail.com; liviu.dudau at arm.com; kantyzc at 163.com;
+> zhichang.yuan02 at gmail.com
+> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
+> Hip06
+> 
+> On Thursday, September 15, 2016 12:05:51 PM CEST Gabriele Paoloni
+> wrote:
+> > > -----Original Message-----
+> > > On Thursday, September 15, 2016 8:02:27 AM CEST Gabriele Paoloni
+> wrote:
+> > > >
+> > > > From <<3.1.1. Open Firmware Properties for Bus Nodes>> in
+> > > > http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
+> > > >
+> > > > I quote:
+> > > > "There shall be an entry in the "ranges" property for each
+> > > > of the Memory and/or I/O spaces if that address space is
+> > > > mapped through the bridge."
+> > > >
+> > > > It seems to me that it is ok to have 1:1 address mapping and that
+> > > > therefore of_translate_address() should fail if "ranges" is not
+> > > > present.
+> > >
+> > > The key here is the definition of "mapped through the bridge".
+> > > I can only understand this as "directly mapped", i.e. an I/O
+> > > port of the child bus corresponds directly to a memory address
+> > > on the parent bus, but this is not the case here.
+> > >
+> > > The problem with adding the mapping here is that it looks
+> > > like it should be valid to create a page table entry for
+> > > the address returned from the translation and access it through
+> > > a pointer dereference, but that is clearly not possible.
+> >
+> > I understand that somehow we are abusing of the ranges property
+> > here however the point is that with the current implementation ranges
+> > is needed because otherwise the ipmi driver probe will fail here:
+> >
+> > of_ipmi_probe -> of_address_to_resource -> __of_address_to_resource
+> > -> of_translate_address -> __of_translate_address
+> >
+> > Now we had a bit of discussion internally and to avoid
+> > having ranges we came up with two possible solutions:
+> >
+> > 1) Using bit 3 of phys.hi cell in 2.2.1 of
+> > http://www.firmware.org/1275/bindings/isa/isa0_4d.ps
+> > This would mean reworking of_bus_isa_get_flags in
+> > http://lxr.free-electrons.com/source/drivers/of/address.c#L398
+> > and setting a new flag to be checked in __of_address_to_resource
+> >
+> > 2) Adding a property in the bindings of each device that is
+> > a child of our LPC bus and modify __of_address_to_resource
+> > to check if the property is in the DT and eventually bypass
+> > of_translate_address
+> >
+> > However in both 1) and 2) there are some issues:
+> > in 1) we are not complying with the isa binding doc (we use
+> > a bit that should be zero); in 2) we need to modify the
+> > bindings documentation of the devices that are connected
+> > to our LPC controller (therefore modifying other devices
+> > bindings to fit our special case).
+> >
+> > I think that maybe having the 1:1 range mapping doesn't
+> > reflect well the reality but it is the less painful
+> > solution...
+> >
+> > What's your view?
+> 
+> We can check the 'i' bit for I/O space in of_bus_isa_get_flags,
+> and that should be enough to translate the I/O port number.
+> 
+> The only part we need to change here is to not go through
+> the crazy conversion all the way from PCI I/O space to a
+> physical address and back to a (logical) port number
+> that we do today with of_translate_address/pci_address_to_pio.
+> 
+> I can think of a several of ways to fix __of_address_to_resource
+> to just do the right thing according to the ISA binding to
+> make the normal drivers work.
+> 
+> The easiest solution is probably to hook into the
+> "taddr == OF_BAD_ADDR" case in __of_address_to_resource
+> and add a lookup for ISA buses there, and instead check
+> if some special I/O port operations were registered
+> for the port number, using an architecture specific
+> function that arm64 implements. Other architectures
+> like x86 that don't have a direct mapping between I/O
+> ports and MMIO addresses would implement that same
+> function differently.
 
->>> I see some serious design problems with multiple entries in power domains
->>> property. First how to show that some part of the device IS NOT in
->>> any domain?
->>
->> Is that even possible? Every device should be in some power
->> domain, even if it's just an "always on" power domain that we
->> don't really control from software.
->
->
-> Right now none dts of which I'm aware of doesn't define the power domain for
-> the parts of the SoC, which are always on and doesn't need any additional
-> management.
+So with respect to this patchset once we enter the
+"taddr == OF_BAD_ADDR" case you would add an arch
+specific function that checks if the resource is an I/O 
+resource, if the parent node is an ISA bus (calling 
+of_bus_isa_match) and if arm64_extio_ops is non NULL. 
+ 
+I think it can work for us and it doesn't affect current
+devices. I will talk to Zhichang about this for the next
+patchset version.
 
-Actually there's is one reason for doing this, as it would allow
-devices to be monitored for device PM QoS constraints by the genpd
-governor.
+Many Thanks for your ideas
 
-Although, I doubt's someone actually does it because of this benefit,
-at least yet.
+Gab
 
-[...]
 
-Kind regards
-Uffe
+> 
+> 	Arnd
