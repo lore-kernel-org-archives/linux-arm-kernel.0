@@ -1,73 +1,154 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 15 Sep 2016 10:32:48 +0200
-Subject: [PATCH 4/9] mtd: nand: Add function to convert ONFI mode to
- data_interface
+Date: Thu, 15 Sep 2016 10:32:51 +0200
+Subject: [PATCH 7/9] mtd: nand: sunxi: switch from manual to automated timing
+ config
 In-Reply-To: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
 References: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1473928373-8680-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1473928373-8680-8-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-onfi_init_data_interface() initializes a data interface with
-values from a given ONFI mode.
+The NAND framework is now able to select the best NAND timings for us.
+All we have to do is implement a ->setup_data_interface() function to
+apply those timings and remove the timing selection code from the sunxi
+driver.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mtd/nand/nand_timings.c | 28 ++++++++++++++++++++++++++++
- include/linux/mtd/nand.h        |  5 +++++
- 2 files changed, 33 insertions(+)
+ drivers/mtd/nand/sunxi_nand.c | 76 ++++++++-----------------------------------
+ 1 file changed, 14 insertions(+), 62 deletions(-)
 
-diff --git a/drivers/mtd/nand/nand_timings.c b/drivers/mtd/nand/nand_timings.c
-index 9af2ebc..608d098 100644
---- a/drivers/mtd/nand/nand_timings.c
-+++ b/drivers/mtd/nand/nand_timings.c
-@@ -269,3 +269,31 @@ const struct nand_sdr_timings *onfi_async_timing_mode_to_sdr_timings(int mode)
- 	return &onfi_sdr_timings[mode].timings.sdr;
- }
- EXPORT_SYMBOL(onfi_async_timing_mode_to_sdr_timings);
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index e414b31..8c59a10 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -1572,14 +1572,22 @@ static int _sunxi_nand_lookup_timing(const s32 *lut, int lut_size, u32 duration,
+ #define sunxi_nand_lookup_timing(l, p, c) \
+ 			_sunxi_nand_lookup_timing(l, ARRAY_SIZE(l), p, c)
+ 
+-static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+-				       const struct nand_sdr_timings *timings)
++static int sunxi_nfc_setup_data_interface(struct mtd_info *mtd,
++					    const struct nand_data_interface *conf,
++					    bool check_only)
+ {
++	struct nand_chip *nand = mtd_to_nand(mtd);
++	struct sunxi_nand_chip *chip = to_sunxi_nand(nand);
+ 	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->nand.controller);
++	const struct nand_sdr_timings *timings;
+ 	u32 min_clk_period = 0;
+ 	s32 tWB, tADL, tWHR, tRHW, tCAD;
+ 	long real_clk_rate;
+ 
++	timings = nand_get_sdr_timings(conf);
++	if (IS_ERR(timings))
++		return -ENOTSUPP;
 +
-+/**
-+ * onfi_init_data_interface - [NAND Interface] Initialize a data interface from
-+ * given ONFI mode
-+ * @iface: The data interface to be initialized
-+ * @mode: The ONFI timing mode
-+ */
-+int onfi_init_data_interface(struct nand_chip *chip,
-+			     struct nand_data_interface *iface,
-+			     enum nand_data_interface_type type,
-+			     int timing_mode)
-+{
-+	if (type != NAND_SDR_IFACE)
-+		return -EINVAL;
+ 	/* T1 <=> tCLS */
+ 	if (timings->tCLS_min > min_clk_period)
+ 		min_clk_period = timings->tCLS_min;
+@@ -1679,6 +1687,9 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 		return tRHW;
+ 	}
+ 
++	if (check_only)
++		return 0;
 +
-+	if (timing_mode < 0 || timing_mode >= ARRAY_SIZE(onfi_sdr_timings))
-+		return -EINVAL;
-+
-+	*iface = onfi_sdr_timings[timing_mode];
-+
-+	/*
-+         * TODO: initialize timings that cannot be deduced from timing mode:
-+         * tR, tPROG, tCCS, ...
-+         * These information are part of the ONFI parameter page.
-+         */
-+
-+	return 0;
-+}
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index f305bed..7216f54 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -1104,6 +1104,11 @@ static inline int onfi_get_sync_timing_mode(struct nand_chip *chip)
- 	return le16_to_cpu(chip->onfi_params.src_sync_timing_mode);
+ 	/*
+ 	 * TODO: according to ONFI specs this value only applies for DDR NAND,
+ 	 * but Allwinner seems to set this to 0x7. Mimic them for now.
+@@ -1712,44 +1723,6 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
+ 	return 0;
  }
  
-+int onfi_init_data_interface(struct nand_chip *chip,
-+			     struct nand_data_interface *iface,
-+			     enum nand_data_interface_type type,
-+			     int timing_mode);
-+
- /*
-  * Check if it is a SLC nand.
-  * The !nand_is_slc() can be used to check the MLC/TLC nand chips.
+-static int sunxi_nand_chip_init_timings(struct sunxi_nand_chip *chip,
+-					struct device_node *np)
+-{
+-	struct mtd_info *mtd = nand_to_mtd(&chip->nand);
+-	const struct nand_sdr_timings *timings;
+-	int ret;
+-	int mode;
+-
+-	mode = onfi_get_async_timing_mode(&chip->nand);
+-	if (mode == ONFI_TIMING_MODE_UNKNOWN) {
+-		mode = chip->nand.onfi_timing_mode_default;
+-	} else {
+-		uint8_t feature[ONFI_SUBFEATURE_PARAM_LEN] = {};
+-		int i;
+-
+-		mode = fls(mode) - 1;
+-		if (mode < 0)
+-			mode = 0;
+-
+-		feature[0] = mode;
+-		for (i = 0; i < chip->nsels; i++) {
+-			chip->nand.select_chip(mtd, i);
+-			ret = chip->nand.onfi_set_features(mtd,	&chip->nand,
+-						ONFI_FEATURE_ADDR_TIMING_MODE,
+-						feature);
+-			chip->nand.select_chip(mtd, -1);
+-			if (ret)
+-				return ret;
+-		}
+-	}
+-
+-	timings = onfi_async_timing_mode_to_sdr_timings(mode);
+-	if (IS_ERR(timings))
+-		return PTR_ERR(timings);
+-
+-	return sunxi_nand_chip_set_timings(chip, timings);
+-}
+-
+ static int sunxi_nand_ooblayout_ecc(struct mtd_info *mtd, int section,
+ 				    struct mtd_oob_region *oobregion)
+ {
+@@ -1975,7 +1948,6 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
+ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 				struct device_node *np)
+ {
+-	const struct nand_sdr_timings *timings;
+ 	struct sunxi_nand_chip *chip;
+ 	struct mtd_info *mtd;
+ 	struct nand_chip *nand;
+@@ -2065,25 +2037,11 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 	nand->read_buf = sunxi_nfc_read_buf;
+ 	nand->write_buf = sunxi_nfc_write_buf;
+ 	nand->read_byte = sunxi_nfc_read_byte;
++	nand->setup_data_interface = sunxi_nfc_setup_data_interface;
+ 
+ 	mtd = nand_to_mtd(nand);
+ 	mtd->dev.parent = dev;
+ 
+-	timings = onfi_async_timing_mode_to_sdr_timings(0);
+-	if (IS_ERR(timings)) {
+-		ret = PTR_ERR(timings);
+-		dev_err(dev,
+-			"could not retrieve timings for ONFI mode 0: %d\n",
+-			ret);
+-		return ret;
+-	}
+-
+-	ret = sunxi_nand_chip_set_timings(chip, timings);
+-	if (ret) {
+-		dev_err(dev, "could not configure chip timings: %d\n", ret);
+-		return ret;
+-	}
+-
+ 	ret = nand_scan_ident(mtd, nsels, NULL);
+ 	if (ret)
+ 		return ret;
+@@ -2096,12 +2054,6 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 
+ 	nand->options |= NAND_SUBPAGE_READ;
+ 
+-	ret = sunxi_nand_chip_init_timings(chip, np);
+-	if (ret) {
+-		dev_err(dev, "could not configure chip timings: %d\n", ret);
+-		return ret;
+-	}
+-
+ 	ret = sunxi_nand_ecc_init(mtd, &nand->ecc, np);
+ 	if (ret) {
+ 		dev_err(dev, "ECC init failed: %d\n", ret);
 -- 
 2.8.1
