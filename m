@@ -1,266 +1,88 @@
-From: netz.kernel@gmail.com (Marty Plummer)
-Date: Thu, 15 Sep 2016 16:05:01 -0500
-Subject: [RFC PATCH v2 1/5] ARM: hisi: Make 3620 explicit, remove wildcards
-In-Reply-To: <20160915210505.21878-1-netz.kernel@gmail.com>
-References: <20160915210505.21878-1-netz.kernel@gmail.com>
-Message-ID: <20160915210505.21878-2-netz.kernel@gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 15 Sep 2016 16:18:42 -0500
+Subject: [PATCH] ARM: dts: msm8974: Add definitions for QCE & cryptobam
+In-Reply-To: <20160830153740.13275-1-voker57@gmail.com>
+References: <20160830153740.13275-1-voker57@gmail.com>
+Message-ID: <20160915211842.GB5431@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
----
- arch/arm/Kconfig.debug              |  2 +-
- arch/arm/boot/dts/Makefile          |  2 +-
- arch/arm/configs/hisi_defconfig     |  2 +-
- arch/arm/configs/multi_v7_defconfig |  2 +-
- arch/arm/mach-hisi/Kconfig          |  4 ++--
- arch/arm/mach-hisi/core.h           | 10 +++++-----
- arch/arm/mach-hisi/hisilicon.c      |  6 +++---
- arch/arm/mach-hisi/hotplug.c        | 16 ++++++++--------
- arch/arm/mach-hisi/platsmp.c        | 24 ++++++++++++------------
- 9 files changed, 34 insertions(+), 34 deletions(-)
+On Tue, Aug 30, 2016 at 06:37:40PM +0300, Iaroslav Gridin wrote:
+> From: Voker57 <voker57@gmail.com>
+> 
+> Add device tree definitions for Qualcomm Cryptography engine and its BAM
+> Signed-off-by: Iaroslav Gridin <voker57@gmail.com>
+> ---
+>  arch/arm/boot/dts/qcom-msm8974.dtsi | 42 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> index 561d4d1..c0da739 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> @@ -287,6 +287,48 @@
+>  			reg = <0xf9011000 0x1000>;
+>  		};
+>  
+> +		cryptobam: dma at fd444000 {
+> +			compatible = "qcom,bam-v1.4.0";
+> +			reg = <0xfd444000 0x15000>;
+> +			interrupts = <0 236 0>;
+> +			clocks = <&gcc GCC_CE2_AHB_CLK>,
+> +				 <&gcc GCC_CE2_AXI_CLK>,
+> +				 <&gcc GCC_CE2_CLK>;
+> +			clock-names = "bam_clk", "axi_clk", "core_clk";
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index a9693b6..9094ca6 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -280,7 +280,7 @@ choice
- 
- 	config DEBUG_HI3620_UART
- 		bool "Hisilicon HI3620 Debug UART"
--		depends on ARCH_HI3xxx
-+		depends on ARCH_HI3620
- 		select DEBUG_UART_PL01X
- 		help
- 		  Say Y here if you want kernel low-level debugging support
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faacd52..7ffd3a3 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -154,7 +154,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
- 	exynos5440-sd5v1.dtb \
- 	exynos5440-ssdk5440.dtb \
- 	exynos5800-peach-pi.dtb
--dtb-$(CONFIG_ARCH_HI3xxx) += \
-+dtb-$(CONFIG_ARCH_HI3620) += \
- 	hi3620-hi4511.dtb
- dtb-$(CONFIG_ARCH_HIGHBANK) += \
- 	highbank.dtb \
-diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
-index b2e340b..14c8da6 100644
---- a/arch/arm/configs/hisi_defconfig
-+++ b/arch/arm/configs/hisi_defconfig
-@@ -4,7 +4,7 @@ CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_RD_LZMA=y
- CONFIG_ARCH_HISI=y
--CONFIG_ARCH_HI3xxx=y
-+CONFIG_ARCH_HI3620=y
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_CMDLINE_PARTITION=y
- CONFIG_ARCH_HIX5HD2=y
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 2c8665c..a63865e 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -45,7 +45,7 @@ CONFIG_MACH_BERLIN_BG2Q=y
- CONFIG_ARCH_DIGICOLOR=y
- CONFIG_ARCH_HIGHBANK=y
- CONFIG_ARCH_HISI=y
--CONFIG_ARCH_HI3xxx=y
-+CONFIG_ARCH_HI3620=y
- CONFIG_ARCH_HIX5HD2=y
- CONFIG_ARCH_HIP01=y
- CONFIG_ARCH_HIP04=y
-diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-index a3b091a..8a552c3 100644
---- a/arch/arm/mach-hisi/Kconfig
-+++ b/arch/arm/mach-hisi/Kconfig
-@@ -12,8 +12,8 @@ if ARCH_HISI
- 
- menu "Hisilicon platform type"
- 
--config ARCH_HI3xxx
--	bool "Hisilicon Hi36xx family"
-+config ARCH_HI3620
-+	bool "Hisilicon Hi3620 family"
- 	depends on ARCH_MULTI_V7
- 	select CACHE_L2X0
- 	select HAVE_ARM_SCU if SMP
-diff --git a/arch/arm/mach-hisi/core.h b/arch/arm/mach-hisi/core.h
-index e883583..cb7bc84 100644
---- a/arch/arm/mach-hisi/core.h
-+++ b/arch/arm/mach-hisi/core.h
-@@ -3,13 +3,13 @@
- 
- #include <linux/reboot.h>
- 
--extern void hi3xxx_set_cpu_jump(int cpu, void *jump_addr);
--extern int hi3xxx_get_cpu_jump(int cpu);
-+extern void hi3620_set_cpu_jump(int cpu, void *jump_addr);
-+extern int hi3620_get_cpu_jump(int cpu);
- extern void secondary_startup(void);
- 
--extern void hi3xxx_cpu_die(unsigned int cpu);
--extern int hi3xxx_cpu_kill(unsigned int cpu);
--extern void hi3xxx_set_cpu(int cpu, bool enable);
-+extern void hi3620_cpu_die(unsigned int cpu);
-+extern int hi3620_cpu_kill(unsigned int cpu);
-+extern void hi3620_set_cpu(int cpu, bool enable);
- 
- extern void hix5hd2_set_cpu(int cpu, bool enable);
- extern void hix5hd2_cpu_die(unsigned int cpu);
-diff --git a/arch/arm/mach-hisi/hisilicon.c b/arch/arm/mach-hisi/hisilicon.c
-index c08c44e..dfa1ee8 100644
---- a/arch/arm/mach-hisi/hisilicon.c
-+++ b/arch/arm/mach-hisi/hisilicon.c
-@@ -9,7 +9,7 @@
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
--*/
-+ */
- 
- #include <linux/clocksource.h>
- #include <linux/irqchip.h>
-@@ -44,12 +44,12 @@ static void __init hi3620_map_io(void)
- 	iotable_init(hi3620_io_desc, ARRAY_SIZE(hi3620_io_desc));
- }
- 
--static const char *const hi3xxx_compat[] __initconst = {
-+static const char *const hi3620_compat[] __initconst = {
- 	"hisilicon,hi3620-hi4511",
- 	NULL,
- };
- 
- DT_MACHINE_START(HI3620, "Hisilicon Hi3620 (Flattened Device Tree)")
- 	.map_io		= hi3620_map_io,
--	.dt_compat	= hi3xxx_compat,
-+	.dt_compat	= hi3620_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-hisi/hotplug.c b/arch/arm/mach-hisi/hotplug.c
-index a129aae..f06b428 100644
---- a/arch/arm/mach-hisi/hotplug.c
-+++ b/arch/arm/mach-hisi/hotplug.c
-@@ -143,7 +143,7 @@ static void set_cpu_hi3620(int cpu, bool enable)
- 	}
- }
- 
--static int hi3xxx_hotplug_init(void)
-+static int hi3620_hotplug_init(void)
- {
- 	struct device_node *node;
- 
-@@ -157,10 +157,10 @@ static int hi3xxx_hotplug_init(void)
- 	return -ENOENT;
- }
- 
--void hi3xxx_set_cpu(int cpu, bool enable)
-+void hi3620_set_cpu(int cpu, bool enable)
- {
- 	if (!ctrl_base) {
--		if (hi3xxx_hotplug_init() < 0)
-+		if (hi3620_hotplug_init() < 0)
- 			return;
- 	}
- 
-@@ -262,24 +262,24 @@ static inline void cpu_enter_lowpower(void)
- }
- 
- #ifdef CONFIG_HOTPLUG_CPU
--void hi3xxx_cpu_die(unsigned int cpu)
-+void hi3620_cpu_die(unsigned int cpu)
- {
- 	cpu_enter_lowpower();
--	hi3xxx_set_cpu_jump(cpu, phys_to_virt(0));
-+	hi3620_set_cpu_jump(cpu, phys_to_virt(0));
- 	cpu_do_idle();
- 
- 	/* We should have never returned from idle */
- 	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
- }
- 
--int hi3xxx_cpu_kill(unsigned int cpu)
-+int hi3620_cpu_kill(unsigned int cpu)
- {
- 	unsigned long timeout = jiffies + msecs_to_jiffies(50);
- 
--	while (hi3xxx_get_cpu_jump(cpu))
-+	while (hi3620_get_cpu_jump(cpu))
- 		if (time_after(jiffies, timeout))
- 			return 0;
--	hi3xxx_set_cpu(cpu, false);
-+	hi3620_set_cpu(cpu, false);
- 	return 1;
- }
- 
-diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
-index e1d6764..e36783e 100644
---- a/arch/arm/mach-hisi/platsmp.c
-+++ b/arch/arm/mach-hisi/platsmp.c
-@@ -23,7 +23,7 @@
- 
- static void __iomem *ctrl_base;
- 
--void hi3xxx_set_cpu_jump(int cpu, void *jump_addr)
-+void hi3620_set_cpu_jump(int cpu, void *jump_addr)
- {
- 	cpu = cpu_logical_map(cpu);
- 	if (!cpu || !ctrl_base)
-@@ -31,7 +31,7 @@ void hi3xxx_set_cpu_jump(int cpu, void *jump_addr)
- 	writel_relaxed(virt_to_phys(jump_addr), ctrl_base + ((cpu - 1) << 2));
- }
- 
--int hi3xxx_get_cpu_jump(int cpu)
-+int hi3620_get_cpu_jump(int cpu)
- {
- 	cpu = cpu_logical_map(cpu);
- 	if (!cpu || !ctrl_base)
-@@ -56,7 +56,7 @@ static void __init hisi_enable_scu_a9(void)
- 	}
- }
- 
--static void __init hi3xxx_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init hi3620_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	struct device_node *np = NULL;
- 	u32 offset = 0;
-@@ -81,20 +81,20 @@ static void __init hi3xxx_smp_prepare_cpus(unsigned int max_cpus)
- 	}
- }
- 
--static int hi3xxx_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+static int hi3620_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
--	hi3xxx_set_cpu(cpu, true);
--	hi3xxx_set_cpu_jump(cpu, secondary_startup);
-+	hi3620_set_cpu(cpu, true);
-+	hi3620_set_cpu_jump(cpu, secondary_startup);
- 	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
- 	return 0;
- }
- 
--static const struct smp_operations hi3xxx_smp_ops __initconst = {
--	.smp_prepare_cpus	= hi3xxx_smp_prepare_cpus,
--	.smp_boot_secondary	= hi3xxx_boot_secondary,
-+static const struct smp_operations hi3620_smp_ops __initconst = {
-+	.smp_prepare_cpus	= hi3620_smp_prepare_cpus,
-+	.smp_boot_secondary	= hi3620_boot_secondary,
- #ifdef CONFIG_HOTPLUG_CPU
--	.cpu_die		= hi3xxx_cpu_die,
--	.cpu_kill		= hi3xxx_cpu_kill,
-+	.cpu_die		= hi3620_cpu_die,
-+	.cpu_kill		= hi3620_cpu_kill,
- #endif
- };
- 
-@@ -181,6 +181,6 @@ static const struct smp_operations hip01_smp_ops __initconst = {
- 	.smp_boot_secondary     = hip01_boot_secondary,
- };
- 
--CPU_METHOD_OF_DECLARE(hi3xxx_smp, "hisilicon,hi3620-smp", &hi3xxx_smp_ops);
-+CPU_METHOD_OF_DECLARE(hi3620_smp, "hisilicon,hi3620-smp", &hi3620_smp_ops);
- CPU_METHOD_OF_DECLARE(hix5hd2_smp, "hisilicon,hix5hd2-smp", &hix5hd2_smp_ops);
- CPU_METHOD_OF_DECLARE(hip01_smp, "hisilicon,hip01-smp", &hip01_smp_ops);
--- 
-2.9.3
+Actually, on thinking about this more, the bam block itself only requires the
+single clock.  The peripheral it is attached to has to keep its sanity during
+the duration of the transfer (crypto).  The crypto requires 3 clocks, one of
+which is the same clk the bam requires.
+
+You can access the BAM registers with the bam_clk only, correct?
+
+
+> +			#dma-cells = <1>;
+> +			qcom,ee = <1>;
+> +			qcom,controlled-remotely;
+> +			};
+> +
+> +		qcom,qcrypto at fd440000 {
+> +			compatible = "qcom,crypto-v5.1";
+> +			reg = <0xfd45a000 0x6000>;
+> +			reg-names = "crypto-base";
+> +			interrupts = <0 236 0>;
+> +			qcom,bam-pipe-pair = <2>;
+> +			qcom,ce-hw-instance = <1>;
+> +			qcom,ce-device = <0>;
+> +			clocks = <&gcc GCC_CE2_CLK>,
+> +				 <&gcc GCC_CE2_AHB_CLK>,
+> +				 <&gcc GCC_CE2_AXI_CLK>,
+> +				 <&gcc CE2_CLK_SRC>;
+
+The CLK_SRC is unnecessary.  Or should be at least.  That gets turned on by
+getting the CE2_CLK.  I vaguely remember a parent issue that was fixed.
+
+> +
+> +			dmas = <&cryptobam 2>, <&cryptobam 3>;
+> +			dma-names = "rx", "tx";
+> +			clock-names = "core", "iface", "bus", "core_src";
+> +			qcom,clk-mgmt-sus-res;
+> +			qcom,msm-bus,name = "qcrypto-noc";
+> +
+> +			qcom,msm-bus,num-cases = <2>;
+> +			qcom,msm-bus,num-paths = <1>;
+> +			qcom,use-sw-aes-cbc-ecb-ctr-algo;
+> +			qcom,use-sw-aes-xts-algo;
+> +			qcom,use-sw-ahash-algo;
+> +			qcom,msm-bus,vectors-KBps = <56 512 0 0>,
+> +						    <56 512 3936000 393600>;
+> +			};
+> +
+> +
+>  		timer at f9020000 {
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+
+Regards,
+
+Andy
