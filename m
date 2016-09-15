@@ -1,32 +1,25 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 15 Sep 2016 16:58:16 +0200
-Subject: [PATCH v5 0/5] dts: sun8i-h3: complete UART I2C for H3
-In-Reply-To: <1473703967-21356-1-git-send-email-jorik@kippendief.biz>
-References: <1473703967-21356-1-git-send-email-jorik@kippendief.biz>
-Message-ID: <20160915145816.GK10128@lukather>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Thu, 15 Sep 2016 08:01:54 -0700
+Subject: linux-next: Tree for Sep 15 (phy/phy-meson-usb2.c)
+In-Reply-To: <20160915165008.40acdecf@canb.auug.org.au>
+References: <20160915165008.40acdecf@canb.auug.org.au>
+Message-ID: <d8adb2cf-ac81-7bf7-8dae-aca9475fe736@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 08:12:42PM +0200, jorik at kippendief.biz wrote:
-> From: Jorik Jonker <jorik@kippendief.biz>
+On 09/14/16 23:50, Stephen Rothwell wrote:
+> Hi all,
 > 
-> This is my fifth attempt to complete the UART/I2C definitions on H3.
+> Changes since 20160914:
 > 
-> Many thanks to Maxime and Chen-Yu for helping me understand the 
-> philosophy behind the DTS/DTSI structure. I hope I get it and five
-> times is a charm :-)
 
-I queued it, thanks!
-Maxime
+on x86_64:
+
+drivers/built-in.o: In function `phy_meson_usb2_probe':
+phy-meson-usb2.c:(.text+0x350c): undefined reference to `of_usb_get_dr_mode_by_phy'
+
+
+when CONFIG_USB_SUPPORT is not enabled.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160915/87dc4dd1/attachment.sig>
+~Randy
