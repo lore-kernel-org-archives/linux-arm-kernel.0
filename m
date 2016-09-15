@@ -1,125 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Sep 2016 17:45:57 +0200
-Subject: [PATCH] clk: zx: fix pointer case warnings
-Message-ID: <20160915154618.3007024-1-arnd@arndb.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Sep 2016 16:47:36 +0100
+Subject: [GIT PULL] Greybus driver subsystem for 4.9-rc1
+In-Reply-To: <1473954000.4035.5.camel@nexus-software.ie>
+References: <20160914173625.GB15356@leverpostej>
+ <20160914180754.GA16053@kroah.com>
+ <20160914182952.GA21615@kroah.com>
+ <1473932133.10230.25.camel@nexus-software.ie>
+ <20160915101330.GB6718@leverpostej>
+ <1473935756.10230.42.camel@nexus-software.ie>
+ <20160915112029.GC6718@leverpostej>
+ <1473940088.10230.65.camel@nexus-software.ie>
+ <20160915124601.GA9316@leverpostej>
+ <1473954000.4035.5.camel@nexus-software.ie>
+Message-ID: <20160915154736.GA19214@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The zx296718 clock driver has a creative way of assigning the register
-values for each clock, by initializing an __iomem pointer to an
-offset and then later adding the base (from ioremap) on top
-with a cast to u64. This fail on all 32-bit architectures during
-compile testing:
+On Thu, Sep 15, 2016 at 04:40:00PM +0100, Bryan O'Donoghue wrote:
+> On Thu, 2016-09-15 at 13:46 +0100, Mark Rutland wrote:
+> > On Thu, Sep 15, 2016 at 12:48:08PM +0100, Bryan O'Donoghue wrote:
+> > > On Thu, 2016-09-15 at 12:20 +0100, Mark Rutland wrote:
+> > > > For example, you have absolutely no guarantee as to what backs
+> > > > get_cycles(). Despite this, the code assumes that get_cycles() is
+> > > > backed by something running at the frequency described in a
+> > > > "google,greybus-frame-time-counter" node.
+> > > > 
+> > > > Even if this *happens* to match what some piece of arch code
+> > > > provides
+> > > > today on some platform, it is in no way *guaranteed*.
+> > > That's the point though, if you declare "google,greybus-frame-time-
+> > > counter" in your platform code - then you can use 'get_cycles()' in
+> > > this manner
+> > To be clear, *some* properties (and perhaps additional nodes) may
+> > need
+> > to be in the DT, in order to capture the hardware property or
+> > relationship that you are reliant upon.
+> 
+> Sure but on the relevant platform we know?
+> 
+> 1. get_cycles() is derived from an architectured MMIO timer
+> 2. What is clocking that timer
+> 
+> So any platform that declares that property must be aware of what its
+> doing.
 
-drivers/clk/zte/clk-zx296718.c: In function 'top_clocks_init':
-drivers/clk/zte/clk-zx296718.c:554:35: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
-   zx296718_pll_clk[i].reg_base += (u64)reg_base;
-drivers/clk/zte/clk-zx296718.c:579:29: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
-drivers/clk/zte/clk-zx296718.c:592:31: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+I can't say this any more explicitly:
 
-It would be nice to avoid all the casts, but I decided to simply
-shut up the warnings by changing the type from u64 to uintptr_t,
-which does the right thing in practice.
+****************************************************
+* The DT *cannot* know anything about get_cycles() *
+****************************************************
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: ca0233285a93 ("clk: zx: register ZX296718 clocks")
----
- drivers/clk/zte/clk-zx296718.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+It's no more complex than that.
 
-diff --git a/drivers/clk/zte/clk-zx296718.c b/drivers/clk/zte/clk-zx296718.c
-index 025e324fab5c..b34402d0cd69 100644
---- a/drivers/clk/zte/clk-zx296718.c
-+++ b/drivers/clk/zte/clk-zx296718.c
-@@ -551,7 +551,7 @@ static int __init top_clocks_init(struct device_node *np)
- 	}
- 
- 	for (i = 0; i < ARRAY_SIZE(zx296718_pll_clk); i++) {
--		zx296718_pll_clk[i].reg_base += (u64)reg_base;
-+		zx296718_pll_clk[i].reg_base += (uintptr_t)reg_base;
- 		ret = clk_hw_register(NULL, &zx296718_pll_clk[i].hw);
- 		if (ret) {
- 			pr_warn("top clk %s init error!\n",
-@@ -576,7 +576,7 @@ static int __init top_clocks_init(struct device_node *np)
- 			top_hw_onecell_data.hws[top_mux_clk[i].id] =
- 					&top_mux_clk[i].mux.hw;
- 
--		top_mux_clk[i].mux.reg += (u64)reg_base;
-+		top_mux_clk[i].mux.reg += (uintptr_t)reg_base;
- 		ret = clk_hw_register(NULL, &top_mux_clk[i].mux.hw);
- 		if (ret) {
- 			pr_warn("top clk %s init error!\n",
-@@ -589,7 +589,7 @@ static int __init top_clocks_init(struct device_node *np)
- 			top_hw_onecell_data.hws[top_gate_clk[i].id] =
- 					&top_gate_clk[i].gate.hw;
- 
--		top_gate_clk[i].gate.reg += (u64)reg_base;
-+		top_gate_clk[i].gate.reg += (uintptr_t)reg_base;
- 		ret = clk_hw_register(NULL, &top_gate_clk[i].gate.hw);
- 		if (ret) {
- 			pr_warn("top clk %s init error!\n",
-@@ -602,7 +602,7 @@ static int __init top_clocks_init(struct device_node *np)
- 			top_hw_onecell_data.hws[top_div_clk[i].id] =
- 					&top_div_clk[i].div.hw;
- 
--		top_div_clk[i].div.reg += (u64)reg_base;
-+		top_div_clk[i].div.reg += (uintptr_t)reg_base;
- 		ret = clk_hw_register(NULL, &top_div_clk[i].div.hw);
- 		if (ret) {
- 			pr_warn("top clk %s init error!\n",
-@@ -742,7 +742,7 @@ static int __init lsp0_clocks_init(struct device_node *np)
- 			lsp0_hw_onecell_data.hws[lsp0_mux_clk[i].id] =
- 					&lsp0_mux_clk[i].mux.hw;
- 
--		lsp0_mux_clk[i].mux.reg += (u64)reg_base;
-+		lsp0_mux_clk[i].mux.reg += (uintptr_t)reg_base;
- 		ret = clk_hw_register(NULL, &lsp0_mux_clk[i].mux.hw);
- 		if (ret) {
- 			pr_warn("lsp0 clk %s init error!\n",
-@@ -755,7 +755,7 @@ static int __init lsp0_clocks_init(struct device_node *np)
- 			lsp0_hw_onecell_data.hws[lsp0_gate_clk[i].id] =
- 					&lsp0_gate_clk[i].gate.hw;
- 
--		lsp0_gate_clk[i].gate.reg += (u64)reg_base;
-+		lsp0_gate_clk[i].gate.reg += (uintptr_t)reg_base;
- 		ret = clk_hw_register(NULL, &lsp0_gate_clk[i].gate.hw);
- 		if (ret) {
- 			pr_warn("lsp0 clk %s init error!\n",
-@@ -768,7 +768,7 @@ static int __init lsp0_clocks_init(struct device_node *np)
- 			lsp0_hw_onecell_data.hws[lsp0_div_clk[i].id] =
- 					&lsp0_div_clk[i].div.hw;
- 
--		lsp0_div_clk[i].div.reg += (u64)reg_base;
-+		lsp0_div_clk[i].div.reg += (uintptr_t)reg_base;
- 		ret = clk_hw_register(NULL, &lsp0_div_clk[i].div.hw);
- 		if (ret) {
- 			pr_warn("lsp0 clk %s init error!\n",
-@@ -847,7 +847,7 @@ static int __init lsp1_clocks_init(struct device_node *np)
- 			lsp1_hw_onecell_data.hws[lsp1_mux_clk[i].id] =
- 					&lsp0_mux_clk[i].mux.hw;
- 
--		lsp1_mux_clk[i].mux.reg += (u64)reg_base;
-+		lsp1_mux_clk[i].mux.reg += (uintptr_t)reg_base;
- 		ret = clk_hw_register(NULL, &lsp1_mux_clk[i].mux.hw);
- 		if (ret) {
- 			pr_warn("lsp1 clk %s init error!\n",
-@@ -860,7 +860,7 @@ static int __init lsp1_clocks_init(struct device_node *np)
- 			lsp1_hw_onecell_data.hws[lsp1_gate_clk[i].id] =
- 					&lsp1_gate_clk[i].gate.hw;
- 
--		lsp1_gate_clk[i].gate.reg += (u64)reg_base;
-+		lsp1_gate_clk[i].gate.reg += (uintptr_t)reg_base;
- 		ret = clk_hw_register(NULL, &lsp1_gate_clk[i].gate.hw);
- 		if (ret) {
- 			pr_warn("lsp1 clk %s init error!\n",
-@@ -873,7 +873,7 @@ static int __init lsp1_clocks_init(struct device_node *np)
- 			lsp1_hw_onecell_data.hws[lsp1_div_clk[i].id] =
- 					&lsp1_div_clk[i].div.hw;
- 
--		lsp1_div_clk[i].div.reg += (u64)reg_base;
-+		lsp1_div_clk[i].div.reg += (uintptr_t)reg_base;
- 		ret = clk_hw_register(NULL, &lsp1_div_clk[i].div.hw);
- 		if (ret) {
- 			pr_warn("lsp1 clk %s init error!\n",
--- 
-2.9.0
+Thanks,
+Mark.
