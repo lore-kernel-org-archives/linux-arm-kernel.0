@@ -1,58 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Sep 2016 17:20:45 +0100
-Subject: [PATCH v3 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-In-Reply-To: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20160915162044.GB19214@leverpostej>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 15 Sep 2016 22:05:49 +0530
+Subject: [PATCH] arm64: kprobe: Always clear pstate.D in breakpoint
+ exception handler
+In-Reply-To: <20160915161828.GH3380@arm.com>
+References: <1059f6762466c2cebf32aa40e4d7974731a68726.1471848065.git.panand@redhat.com>
+ <20160823000531.b12ac14c18ce8e9d3abc74ec@kernel.org>
+ <CAAOGbpwcx3G8Jdf1AfNRLrkZJQLaCcLWQPRppjvpy3=hSrffjg@mail.gmail.com>
+ <20160824100644.GB4408@localhost.localdomain>
+ <CAHB_Guods-iED+tOLeJ9XCWDvAVoButwz2XWSiP+eMYDzFhfyQ@mail.gmail.com>
+ <20160915161828.GH3380@arm.com>
+Message-ID: <CAHB_Gurqntj+j8YgR2TcD212Cv_0xy5DRBdVTZuXTUMJj3uTKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Thu, Sep 15, 2016 at 9:48 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Sep 15, 2016 at 09:45:09PM +0530, Pratyush Anand wrote:
+>> On Wed, Aug 24, 2016 at 3:36 PM, Pratyush Anand <panand@redhat.com> wrote:
+>> > On 23/08/2016:04:33:08 PM, Sandeepa Prabhu wrote:
+>> >> Thanks for the fix, feel free to add my ACK as well. Has it been tested on
+>> >> guest kernel?
+>> >
+>> > have not tested on guest kernel.Will do.
+>>
+>> I tested it with guest kernel, and it worked there too :-).
+>>
+>> @Catalin: any more comment for this patch? If not, then may be you can take it.
+>
+> I already queued this on the arm64 for-next/core branch.
+>
 
-On Tue, Sep 13, 2016 at 06:46:30PM +0100, Catalin Marinas wrote:
-> This is the third version of the arm64 PAN emulation using TTBR0_EL1
-> switching. The series has not yet included the alternative nop patches
-> from Mark Rutland, nor the empty_zero_page from Ard B. This will be done
-> in a subsequent version once 4.9-rc1 is out (which will include Mark's
-> alternative nop patches).
- 
->  arch/arm64/Kconfig                      |   8 ++
->  arch/arm64/include/asm/assembler.h      |  33 +++++++
->  arch/arm64/include/asm/cpufeature.h     |   6 ++
->  arch/arm64/include/asm/efi.h            |  26 ++++-
->  arch/arm64/include/asm/futex.h          |  14 +--
->  arch/arm64/include/asm/kernel-pgtable.h |   7 ++
->  arch/arm64/include/asm/mmu_context.h    |  51 +++++++---
->  arch/arm64/include/asm/ptrace.h         |   2 +
->  arch/arm64/include/asm/thread_info.h    |   3 +
->  arch/arm64/include/asm/uaccess.h        | 163 ++++++++++++++++++++++++++++++--
->  arch/arm64/kernel/armv8_deprecated.c    |  10 +-
->  arch/arm64/kernel/asm-offsets.c         |   3 +
->  arch/arm64/kernel/cpufeature.c          |   1 +
->  arch/arm64/kernel/entry.S               |  71 +++++++++++++-
->  arch/arm64/kernel/head.S                |   6 +-
->  arch/arm64/kernel/setup.c               |   9 ++
->  arch/arm64/kernel/vmlinux.lds.S         |   5 +
->  arch/arm64/lib/clear_user.S             |   8 +-
->  arch/arm64/lib/copy_from_user.S         |   8 +-
->  arch/arm64/lib/copy_in_user.S           |   8 +-
->  arch/arm64/lib/copy_to_user.S           |   8 +-
->  arch/arm64/mm/context.c                 |   7 +-
->  arch/arm64/mm/fault.c                   |  22 +++--
->  arch/arm64/mm/proc.S                    |  11 +--
->  arch/arm64/xen/hypercall.S              |  19 ++++
->  25 files changed, 428 insertions(+), 81 deletions(-)
-
-I don't seee traps.c there. Don't we need to fix up do_sysinstr() (which
-performs raw cache maintenance ops on __user addresses) with
-uaccess_{enable,disable}_not_uao()?
-
-Likewise, how do we handle __flush_cache_user_range and
-flush_icache_range? Some callers (e.g. __do_compat_cache_op) pass in
-__user addresses.
-
-I hope we have some tests lying around for those. ;)
-
-Thanks,
-Mark.
+Thanks Will :-)
