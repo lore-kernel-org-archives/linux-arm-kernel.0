@@ -1,226 +1,61 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 16 Sep 2016 13:22:00 +0200
+Date: Fri, 16 Sep 2016 13:25:46 +0200
 Subject: [PATCH v2] ARM: dts: exynos: Add entries for sound support on
  Odroid-XU board
-Message-ID: <1474024920-32744-1-git-send-email-s.nawrocki@samsung.com>
+In-Reply-To: <1474024920-32744-1-git-send-email-s.nawrocki@samsung.com>
+References: <CGME20160916112217eucas1p1694395dda2a1e8cdf562007ed8141542@eucas1p1.samsung.com>
+ <1474024920-32744-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <f4d204d8-b6b8-5173-c530-bfea1ec9ed7d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device nodes for the AUDSS clock controller,
-peripheral DMA 0/1 controllers and the Audio Subsystem I2S controller.
-These entries are required for sound support on Odroid-XU board.
+On 09/16/2016 01:22 PM, Sylwester Nawrocki wrote:
+> This patch adds device nodes for the AUDSS clock controller,
+> peripheral DMA 0/1 controllers and the Audio Subsystem I2S controller.
+> These entries are required for sound support on Odroid-XU board.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+> This patch depends on a patch adding clock ID macro definitions.
+> I'm going to provide a topic branch containing required changes.
+> 
+> Changes since v1:
+>  - GIC_SPI, IRQ_TYPE_NONE used in the PDMA and max98080 interrupt
+>    specifiers,
+>  - assigned-clock-* properties moved to respective controller
+>    nodes.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
-This patch depends on a patch adding clock ID macro definitions.
-I'm going to provide a topic branch containing required changes.
+And here is a pull request containing clk dependency patches:
 
-Changes since v1:
- - GIC_SPI, IRQ_TYPE_NONE used in the PDMA and max98080 interrupt
-   specifiers,
- - assigned-clock-* properties moved to respective controller
-   nodes.
----
- arch/arm/boot/dts/exynos5410-odroidxu.dts | 69 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5410-pinctrl.dtsi |  9 ++++
- arch/arm/boot/dts/exynos5410.dtsi         | 59 ++++++++++++++++++++++++++
- 3 files changed, 137 insertions(+)
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-index d949931..8a70d18 100644
---- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
-+++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-@@ -15,6 +15,7 @@
- #include <dt-bindings/clock/maxim,max77802.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/sound/samsung-i2s.h>
- #include "exynos54xx-odroidxu-leds.dtsi"
- 
- / {
-@@ -56,6 +57,61 @@
- 		compatible = "samsung,secure-firmware";
- 		reg = <0x02073000 0x1000>;
- 	};
-+
-+	sound: sound {
-+		compatible = "simple-audio-card";
-+
-+		simple-audio-card,name = "Odroid-XU";
-+		simple-audio-card,widgets =
-+			"Headphone", "Headphone Jack",
-+			"Speakers", "Speakers";
-+		simple-audio-card,routing =
-+			"Headphone Jack", "HPL",
-+			"Headphone Jack", "HPR",
-+			"Headphone Jack", "MICBIAS",
-+			"IN1", "Headphone Jack",
-+			"Speakers", "SPKL",
-+			"Speakers", "SPKR";
-+
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&link0_codec>;
-+		simple-audio-card,frame-master = <&link0_codec>;
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&audi2s0 0>;
-+			system-clock-frequency = <19200000>;
-+		};
-+
-+		link0_codec: simple-audio-card,codec {
-+			sound-dai = <&max98090>;
-+			clocks = <&audi2s0 CLK_I2S_CDCLK>;
-+		};
-+	};
-+};
-+
-+&audi2s0 {
-+	status = "okay";
-+};
-+
-+&clock {
-+	clocks = <&fin_pll>;
-+	assigned-clocks = <&clock CLK_FOUT_EPLL>;
-+	assigned-clock-rates = <192000000>;
-+};
-+
-+&clock_audss {
-+	assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
-+			<&clock_audss EXYNOS_MOUT_I2S>,
-+			<&clock_audss EXYNOS_DOUT_SRP>,
-+			<&clock_audss EXYNOS_DOUT_AUD_BUS>;
-+
-+	assigned-clock-parents = <&clock CLK_FOUT_EPLL>,
-+			<&clock_audss EXYNOS_MOUT_AUDSS>;
-+
-+	assigned-clock-rates =  <0>,
-+				<0>,
-+				<96000000>,
-+				<19200000>;
- };
- 
- &cpu0_thermal {
-@@ -439,6 +495,19 @@
- 	};
- };
- 
-+&i2c_1 {
-+	status = "okay";
-+	max98090: max98090 at 10 {
-+		compatible = "maxim,max98090";
-+		reg = <0x10>;
-+		interrupt-parent = <&gpj3>;
-+		interrupts = <0 IRQ_TYPE_NONE>;
-+		clocks = <&audi2s0 CLK_I2S_CDCLK>;
-+		clock-names = "mclk";
-+		#sound-dai-cells = <0>;
-+	};
-+};
-+
- &mmc_0 {
- 	status = "okay";
- 	mmc-pwrseq = <&emmc_pwrseq>;
-diff --git a/arch/arm/boot/dts/exynos5410-pinctrl.dtsi b/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
-index b58a0f2..31f08a3 100644
---- a/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
-@@ -613,4 +613,13 @@
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
- 	};
-+
-+	audi2s0_bus: audi2s0-bus {
-+		samsung,pins = "gpz-0", "gpz-1", "gpz-2", "gpz-3",
-+				"gpz-4";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <0>;
-+		samsung,pin-drv = <0>;
-+	};
-+
- };
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index 137f484..9a91685 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -16,6 +16,7 @@
- #include "exynos54xx.dtsi"
- #include "exynos-syscon-restart.dtsi"
- #include <dt-bindings/clock/exynos5410.h>
-+#include <dt-bindings/clock/exynos-audss-clk.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
-@@ -82,6 +83,14 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		clock_audss: audss-clock-controller at 3810000 {
-+			compatible = "samsung,exynos5410-audss-clock";
-+			reg = <0x03810000 0x0C>;
-+			#clock-cells = <1>;
-+			clocks = <&fin_pll>, <&clock CLK_FOUT_EPLL>;
-+			clock-names = "pll_ref", "pll_in";
-+		};
-+
- 		tmu_cpu0: tmu at 10060000 {
- 			compatible = "samsung,exynos5420-tmu";
- 			reg = <0x10060000 0x100>;
-@@ -183,6 +192,56 @@
- 			reg = <0x03860000 0x1000>;
- 			interrupts = <0 47 0>;
- 		};
-+
-+		amba {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "simple-bus";
-+			interrupt-parent = <&gic>;
-+			ranges;
-+
-+			pdma0: pdma at 12680000 {
-+				compatible = "arm,pl330", "arm,primecell";
-+				reg = <0x121A0000 0x1000>;
-+				interrupts = <GIC_SPI 34 IRQ_TYPE_NONE>;
-+				clocks = <&clock CLK_PDMA0>;
-+				clock-names = "apb_pclk";
-+				#dma-cells = <1>;
-+				#dma-channels = <8>;
-+				#dma-requests = <32>;
-+			};
-+
-+			pdma1: pdma at 12690000 {
-+				compatible = "arm,pl330", "arm,primecell";
-+				reg = <0x121B0000 0x1000>;
-+				interrupts = <GIC_SPI 35 IRQ_TYPE_NONE>;
-+				clocks = <&clock CLK_PDMA1>;
-+				clock-names = "apb_pclk";
-+				#dma-cells = <1>;
-+				#dma-channels = <8>;
-+				#dma-requests = <32>;
-+			};
-+		};
-+
-+		audi2s0: i2s at 03830000 {
-+			compatible = "samsung,exynos5420-i2s";
-+			reg = <0x03830000 0x100>;
-+			dmas = <&pdma0 10
-+				&pdma0 9
-+				&pdma0 8>;
-+			dma-names = "tx", "rx", "tx-sec";
-+			clocks = <&clock_audss EXYNOS_I2S_BUS>,
-+				<&clock_audss EXYNOS_I2S_BUS>,
-+				<&clock_audss EXYNOS_SCLK_I2S>;
-+			clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-+			#clock-cells = <1>;
-+			clock-output-names = "i2s_cdclk0";
-+			#sound-dai-cells = <1>;
-+			samsung,idma-addr = <0x03000000>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&audi2s0_bus>;
-+			status = "disabled";
-+		};
- 	};
- 
- 	thermal-zones {
--- 
-1.9.1
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.9-exynos54x0-dt
+
+for you to fetch changes up to 58d6506f327e3d192998ba03632f546da221b8d8:
+
+  clk: samsung: exynos5410: Add clock IDs for PDMA and EPLL clocks (2016-09-09
+10:13:02 +0200)
+
+----------------------------------------------------------------
+Adition of clock index definitions for exynos5420 SoC DRAM controller
+and exynos5410 SoC sound subsystem (EPLL, PDMA) related clocks.
+
+----------------------------------------------------------------
+Chanwoo Choi (1):
+      clk: samsung: Add clock IDs for the CMU_CDREX (DRAM Express Controller)
+
+Sylwester Nawrocki (1):
+      clk: samsung: exynos5410: Add clock IDs for PDMA and EPLL clocks
+
+ include/dt-bindings/clock/exynos5410.h |  3 +++
+ include/dt-bindings/clock/exynos5420.h | 11 ++++++++++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+
+--
+Thanks,
+Sylwester
