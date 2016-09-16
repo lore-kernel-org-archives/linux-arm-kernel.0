@@ -1,66 +1,48 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Fri, 16 Sep 2016 00:01:28 -0700
-Subject: [GIT PULL 2/2] arm64: X-Gene platforms DTS changes queued for 4.9
-Message-ID: <CADaLNDk7uP8Gv+YB6oJfLqyRgjVVY82jQoPrQMk6y8xXGokyUQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 16 Sep 2016 09:10:08 +0200
+Subject: [GIT PULL] ARM: exynos: Fixes for v4.8, secound round
+References: <CGME20160916071017eucas1p155978eec97e20211d9c54ef670e319eb@eucas1p1.samsung.com>
+Message-ID: <1474009808-8520-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi,
 
-This is the DTS changes for X-Gene platforms targeted for 4.9.
+Remaining fix for this release cycle. It waited in my tree for some time
+because of travel.
 
-The changes include:
-+ X-Gene Soc PMU DTS entry from X-Gene PMU patch set of Tai Nguyen [1]
-+ Follow up patch to enable DTS entry for SoC PMU on X-Gene v2
-+ Correct PCIe legacy interrupt mode to level-active high
-+ DTS entry for X-Gene hwmon (v4 acked by Guenter, DT binding document
-and driver is in linux-next now [2])
-+ DTS entries for X-Gene v2 CPU clock from X-Gene PMD clock patch set
-(v3 already accepted by Stephen into clk-next [3])
+Best regards,
+Krzysztof
 
-Regards,
-Duc Dang.
 
-[1]: https://lkml.org/lkml/2016/7/15/563
-[2]: http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=893485e74c37669aeecf0b648dbfbd8e2f0471c3
-[3]: https://lkml.org/lkml/2016/9/12/907
--------
+The following changes since commit 326dce0734b63c3b82b6a88e5645eab8b54c6692:
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+  MAINTAINERS: Switch to kernel.org account for Krzysztof Kozlowski (2016-08-17 17:54:56 +0200)
 
 are available in the git repository at:
 
-  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.9
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.8-2
 
-for you to fetch changes up to 39936ae1ab1dee28cc1479294bd76d16f3ea7792:
+for you to fetch changes up to b030485220caf862c71db6fb8b8ad016ce7f7565:
 
-  arm64: dts: apm: Add DT node for APM X-Gene 2 CPU clocks (2016-09-15
-11:19:39 -0700)
-
-----------------------------------------------------------------
-X-gene DTS changes queued for v4.9
-
-This change set includes:
-+ DTS entry to enable SoC PMU for X-Gene v1 SoC
-+ DTS entry to enable SoC PMU for X-Gene v2 SoC
-+ PCIe legacy interrupt polarity fix for X-Gene
-+ X-Gene SoC hwmon DTS entry
-+ DTS entries for X-Gene v2 CPU clock
+  ARM: EXYNOS: Clear OF_POPULATED flag from PMU node in IRQ init callback (2016-08-30 10:49:18 +0200)
 
 ----------------------------------------------------------------
-Duc Dang (2):
-      arm64: dts: apm: Add APM X-Gene v2 SoC PMU DTS entries
-      arm64: dts: apm: Fix interrupt polarity for X-Gene PCIe legacy interrupts
+1. A recent change in populating irqchip devices from Device Tree
+   broke Suspend to RAM on Exynos boards due to lack of probing of
+   PMU (Power Management Unit) driver.  Multiple drivers attach to
+   the PMU's DT node: irqchip, clock controller and PMU platform
+   driver for handling suspend.  The new irqchip code marked the
+   PMU's DT node as OF_POPULATED but we need to attach to this
+   node also PMU platform driver.
 
-Tai Nguyen (1):
-      arm64: dts: apm: Add APM X-Gene SoC PMU DTS entries
+2. Add Javier as additional reviewer for Exynos patches.
 
-hotran (2):
-      arm64: dts: apm: Add X-Gene SoC hwmon to device tree
-      arm64: dts: apm: Add DT node for APM X-Gene 2 CPU clocks
+----------------------------------------------------------------
+Javier Martinez Canillas (2):
+      MAINTAINERS: Add myself as reviewer for Samsung Exynos support
+      ARM: EXYNOS: Clear OF_POPULATED flag from PMU node in IRQ init callback
 
- arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 135 +++++++++++++++++++++++++++--
- arch/arm64/boot/dts/apm/apm-storm.dtsi     | 103 +++++++++++++++++-----
- 2 files changed, 210 insertions(+), 28 deletions(-)
+ MAINTAINERS                    | 1 +
+ arch/arm/mach-exynos/suspend.c | 6 ++++++
+ 2 files changed, 7 insertions(+)
