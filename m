@@ -1,63 +1,49 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Fri, 16 Sep 2016 15:46:19 +0200
-Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
-In-Reply-To: <20160916133027.GA27036@cbox>
-References: <1474007187-18673-1-git-send-email-agraf@suse.de>
- <57DBC782.7080305@arm.com>
- <7beb406b-6194-8451-2d92-9a4394ef91dd@redhat.com>
- <20160916123039.GB14140@cbox>
- <da8191ca-6fb1-f960-872c-d6bc27172db8@redhat.com>
- <20160916133027.GA27036@cbox>
-Message-ID: <20160916134619.jjiaplhxgkkl5qri@kamzik.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Sep 2016 15:47:43 +0200
+Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
+In-Reply-To: <57DBAB2F.3040905@ti.com>
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <CAFBinCCDDwydB+RP0CZKoAW5Suxotn224ZFVWvt2OGW3gNJR1g@mail.gmail.com>
+ <57DBAB2F.3040905@ti.com>
+Message-ID: <2190413.jSIVEWUDcp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 03:30:27PM +0200, Christoffer Dall wrote:
-> On Fri, Sep 16, 2016 at 02:31:42PM +0200, Paolo Bonzini wrote:
-> > 
-> > 
-> > On 16/09/2016 14:30, Christoffer Dall wrote:
-> > > > > > This patch set allows user space to receive vtimer events as well as mask
-> > > > > > them, so that we can handle all vtimer related interrupt injection from user
-> > > > > > space, enabling us to use architected timer with user space gic emulation.
-> > > > >
-> > > > > I have already voiced my concerns in the past, including face to face,
-> > > > > and I'm going to repeat it: I not keen at all on adding a new userspace
-> > > > > interface that is going to bitrot extremely quickly.
-> > > > 
-> > > > You don't have automated tests set up?  It's not going to bitrot if you
-> > > > test it, either with kvm-unit-tests or just by smoke-testing Linux.
-> > > > It's _for_ the raspi, but it's not limited to it.
-> > > 
-> > > Our automated testing situation is not great, no.  Something we're
-> > > looking at, but have resource problems with.
-> > 
-> > But it's not a good reason to hold back a feature...
-> > 
+On Friday, September 16, 2016 1:49:59 PM CEST Kishon Vijay Abraham I wrote:
 > 
-> I didn't say that exactly, but choosing not to merge something we cannot
-> maintain and which we're not paid to look after and where there's a
-> minimal interest, is not entirely unreasonable.
+> I think the offset information can come from the devicetree too. The phy can be
+> modeled something like below.
 > 
-> That being said, I'm not categorically against these patches, but I
-> share Marc's view that we've already seen that non-vgic support had been
-> broken for multiple versions without anyone complaining, and without
-> automated testing or substantial interest in the work, the patches
-> really are likely to bit-rot.
+>                 usb-phys at c0000000 {
+>                         compatible = "amlogic,meson-gxbb-usb2-phy";
+>                         reg = <0x0 0xc0000000 0x0 0x40>;
+>                         #address-cells = <2>;
+>                         #size-cells = <2>;
+>                         ranges = <0x0 0x0 0x0 0xc0000000 0x0 0x40>;
+>                         resets = <&reset 34>;
 > 
-> But I haven't even looked at the patches in detail, I was just replying
-> to the comment about testing.
+>                         usb0_phy: usb_phy at 0 {
+>                                 #phy-cells = <0>;
+>                                 reg = <0x0 0x0 0x0 0x20>;
+>                                 clocks = <&clkc CLKID_USB &clkc CLKID_USB0>;
+>                                 clock-names = "usb_general", "usb";
+>                                 status = "disabled";
+>                         };
+> 
+>                         usb1_phy: usb_phy at 20 {
+>                                 #phy-cells = <0>;
+>                                 reg = <0x0 0x20 0x0 0x20>;
+>                                 clocks = <&clkc CLKID_USB &clkc CLKID_USB1>;
+>                                 clock-names = "usb_general", "usb";
+>                                 status = "disabled";
+>                         };
+>                 };
+> 
+> This way the driver will be probed only once (the reset can be done during
+> probe). The phy driver should scan the dt node and for every sub-node it
+> invokes phy_create?
 
-This may be a great time to start encouraging feature writers to submit
-kvm-unit-tests patches at the same time as the feature (Hi Alex :-) I'm
-happy to help when a test isn't easy to write due to a lack of framework,
-but don't have nearly enough bandwidth to write all the tests myself.
+Why not just use #phy-cells=<1> and pass the phy number as an argument
+in the reference?
 
-As for additional motivation for this series, I'll point out that it's
-good for bug isolation. When a guest fails to boot over KVM I can try
-TCG. If that works, then I've likely narrowed it to KVM. If I can
-further try kernel_irqchip=no, then I may further narrow it down to
-the vgic implementation.
-
-Thanks,
-drew
+	Arnd
