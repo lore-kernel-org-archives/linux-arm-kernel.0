@@ -1,433 +1,140 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 16 Sep 2016 01:15:20 +0200
-Subject: [PATCH] KVM: arm/arm64: Route vtimer events to user space
-Message-ID: <1473981320-25387-1-git-send-email-agraf@suse.de>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Thu, 15 Sep 2016 18:16:38 -0700
+Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
+In-Reply-To: <20160915090158.GB6919@b29397-desktop>
+References: <20160914014246.31847-1-stephen.boyd@linaro.org>
+ <20160914033200.GE30760@b29397-desktop>
+ <147383270635.1464.10706917860873291816@sboyd-linaro>
+ <20160914080321.GA21674@b29397-desktop>
+ <147384270449.13546.495288874027868435@sboyd-linaro>
+ <20160915090158.GB6919@b29397-desktop>
+Message-ID: <147398859894.4997.6486248242638696855@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have 2 modes for dealing with interrupts in the ARM world. We can either
-handle them all using hardware acceleration through the vgic or we can emulate
-a gic in user space and only drive CPU IRQ pins from there.
+Quoting Peter Chen (2016-09-15 02:01:58)
+> On Wed, Sep 14, 2016 at 01:45:04AM -0700, Stephen Boyd wrote:
+> > Quoting Peter Chen (2016-09-14 01:03:21)
+> > > On Tue, Sep 13, 2016 at 10:58:26PM -0700, Stephen Boyd wrote:
+> > > > Quoting Peter Chen (2016-09-13 20:32:00)
+> > > > > On Tue, Sep 13, 2016 at 06:42:46PM -0700, Stephen Boyd wrote:
+> > > > > > On the db410c 96boards platform we have a TC7USB40MU[1] on the
+> > > > > > board to mux the D+/D- lines from the SoC between a micro usb
+> > > > > > "device" port and a USB hub for "host" roles. Upon a role switch,
+> > > > > > we need to change this mux to forward the D+/D- lines to either
+> > > > > > the port or the hub. Therefore, introduce a driver for this
+> > > > > > device that intercepts extcon USB_HOST events and logically
+> > > > > > asserts a gpio to mux the "host" D+/D- lines when a host cable is
+> > > > > > attached. When the cable goes away, it will logically deassert
+> > > > > > the gpio and mux the "device" lines.
+> > > > > 
+> > > > > Would you please draw the design? It can also help me review your
+> > > > > chipidea patch well.
+> > > > > 
+> > > > > 1. How many ports on the board?
+> > > > > 2. How the lines are connected on the board?
+> > > > > 
+> > > > 
+> > > > The schematic for the db410c is publically available here[2][3].
+> > > > 
+> > > > There's also the 96boards spec[4] which talks about this switch based
+> > > > design a little bit. See the section titled "Single USB port Example".
+> > > > 
+> > > > [2] https://github.com/96boards/documentation/blob/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
+> > > > [3] https://github.com/96boards/documentation/raw/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
+> > > > [4] https://www.96boards.org/wp-content/uploads/2015/02/96BoardsCESpecificationv1.0-EA1.pdf
+> > > 
+> > > Ok, I see several use cases for this role switch
+> > > 
+> > > 1. Using the hardware switch (218-4LPST)
+> > > In this case, you can set USB_SW_SEL as input gpio, and use
+> > > extcon-usb-gpio.c like before, just set this gpio as active
+> > > low at dts.
+> > 
+> > Nice! I didn't think of this case but it's good that we can support
+> > that with some work.
+> > 
+> 
+> After looking more, I find the main purpose of this switch is
+> what it writes, FORCE DSI SELECTION TO USB HOST MODE
+> 
+> When the switch is on, the system is host-only.
+> When the switch is off, the default role is device mode, and
+> switch the role through gpio USB_SW_SEL_PM by software.
 
-Unfortunately, when driving IRQs from user space, we never tell user space
-about timer events that may result in interrupt line state changes, so we
-lose out on timer events if we run with user space gic emulation.
+Correct.
 
-This patch set fixes that by routing vtimer expiration events to user space.
-With this patch I can successfully run edk2 and Linux with user space gic
-emulation.
+> 
+> > > 
+> > > 2. Using USB_HS_ID as vbus-gpio (input), and USB_SW_SEL as id-gpio (output)
+> > 
+> > This is pretty much what has been implemented. USB_HS_ID is an
+> > extcon-usb-gpio.c device.
+> 
+> At some designs, this gpio is tied to ID pin at MicroB connector, and
+> using a Mirco-AB cable to switch the role.
+> 
+> > 
+> > > I can't find hardware relationship between each other, maybe I miss
+> > > something.
+> > 
+> > I believe USB_SW_SEL is the physical switch (218-4LPST) while
+> > USB_SW_SEL_PM is the software controllable part using a GPIO. USB_HS_ID
+> > is just the vbus line from the uB connector and that line goes straight
+> > into the SoC via a GPIO.
+> > 
+> > > This use case (design) seems strange, usually, we use ID pin controls
+> > > vbus, but seldom use vbus pin control ID.
+> > > How you would like to implement it? When the USB cable is connected
+> > > (between PC), it receives vbus-gpio interrupt, then you set USB_SW_SEL
+> > > as low? If disconnected, you set USB_SW_SEL as high?
+> > 
+> > Right. The documented behavior is to detect the micro-usb cable and
+> > drive USB_SW_SEL low. When the cable is unplugged we drive USB_SW_SEL
+> > high. Maybe that should be changed though? If we always sampled
+> > USB_SW_SEL as a USB_HOST extcon and the vbus line as a USB extcon then
+> > we could allow the user to decide either with the physical switch or
+> > with some sort of software control to toggle that gpio.
+> > 
+> > > When the USB controller works at Host mode, what will happen if the user
+> > > connects USB cable at device port?
+> > 
+> > The devices on the two type-A connectors will be disconnected and we'll
+> > switch from host mode to device mode.
+> > 
+> > > 
+> > > 3. Using sysfs to switch the role
+> > > Set USB_SW_SEL according to "role" at debugfs
+> > 
+> > sysfs isn't debugfs, but yes I wonder if we need to worry about the
+> > debugfs role switching support here and toggle the gpio manually without
+> > involving extcon. That would mean we need to have a way for the chipidea
+> > controller to toggle this gpio/mux itself.
+> > 
+> > > 
+> > > Which one you would like to implement? Or anything else I miss?
+> > > 
+> > 
+> > Mostly #2, but I'm concerned that the DT binding is going to force that
+> > decision on others who may have the same switch and want to do #1 or #3.
+> > So how to design it in a way that makes it work in all cases? Also, what
+> > to do if the USB_SW_SEL switch is driven high by the physical switch?
+> > That will "override" any software control we might be able to use, so
+> > hopefully we can detect this somehow and prevent the role switch from
+> > happening.
+> 
+> From my point, the physical switch is only used to force host mode. The
+> #1 and #2 can't be supported at the same time.
 
-Signed-off-by: Alexander Graf <agraf@suse.de>
+Sure. I mean to say support all use cases with the same DT binding.
 
----
+> For #3, it is not the
+> use case for this design. #3 is usually used for the single port which
+> needs to support switching role on the fly without disconnection.
+> So, you may only need to consider #2, you can't use extcon-usb-gpio.c
+> directly since you need to set one gpio to mux the dp/dm, Baolu Lu had
+> USB MUX patch set before which may satisfy your requirement. [1]
 
-A branch with WIP QEMU code can be found here:
-
-  https://github.com/agraf/qemu.git no-kvm-irqchip
----
- Documentation/virtual/kvm/api.txt |  28 ++++++++-
- arch/arm/include/asm/kvm_host.h   |   3 +
- arch/arm/kvm/arm.c                |  46 +++++++++++---
- arch/arm64/include/asm/kvm_host.h |   3 +
- include/uapi/linux/kvm.h          |  14 +++++
- virt/kvm/arm/arch_timer.c         | 126 ++++++++++++++++++++++++++++----------
- 6 files changed, 177 insertions(+), 43 deletions(-)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 739db9a..6a64c53 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -997,7 +997,9 @@ documentation when it pops into existence).
- 
- Capability: KVM_CAP_ENABLE_CAP, KVM_CAP_ENABLE_CAP_VM
- Architectures: x86 (only KVM_CAP_ENABLE_CAP_VM),
--	       mips (only KVM_CAP_ENABLE_CAP), ppc, s390
-+	       mips (only KVM_CAP_ENABLE_CAP), ppc, s390,
-+	       arm (only KVM_CAP_ENABLE_CAP),
-+	       arm64 (only only KVM_CAP_ENABLE_CAP)
- Type: vcpu ioctl, vm ioctl (with KVM_CAP_ENABLE_CAP_VM)
- Parameters: struct kvm_enable_cap (in)
- Returns: 0 on success; -1 on error
-@@ -3200,8 +3202,10 @@ struct kvm_run {
- 	/* in */
- 	__u8 request_interrupt_window;
- 
--Request that KVM_RUN return when it becomes possible to inject external
-+[x86] Request that KVM_RUN return when it becomes possible to inject external
- interrupts into the guest.  Useful in conjunction with KVM_INTERRUPT.
-+[arm*] Bits set to 1 in here mask IRQ lines that would otherwise potentially
-+trigger forever. Useful with KVM_CAP_ARM_TIMER.
- 
- 	__u8 padding1[7];
- 
-@@ -3517,6 +3521,16 @@ Hyper-V SynIC state change. Notification is used to remap SynIC
- event/message pages and to enable/disable SynIC messages/events processing
- in userspace.
- 
-+		/* KVM_EXIT_ARM_TIMER */
-+		struct {
-+			__u8 timesource;
-+		} arm_timer;
-+
-+Indicates that a timer triggered that user space needs to handle and
-+potentially mask with vcpu->run->request_interrupt_window to allow the
-+guest to proceed. This only happens for timers that got enabled through
-+KVM_CAP_ARM_TIMER.
-+
- 		/* Fix the size of the union. */
- 		char padding[256];
- 	};
-@@ -3737,6 +3751,16 @@ Once this is done the KVM_REG_MIPS_VEC_* and KVM_REG_MIPS_MSA_* registers can be
- accessed, and the Config5.MSAEn bit is accessible via the KVM API and also from
- the guest.
- 
-+6.11 KVM_CAP_ARM_TIMER
-+
-+Architectures: arm, arm64
-+Target: vcpu
-+Parameters: args[0] contains a bitmap of timers to enable
-+
-+This capability allows to route per-core timers into user space. When it's
-+enabled, the enabled timers trigger KVM_EXIT_ARM_TIMER guest exits when they
-+are pending, unless masked by vcpu->run->request_interrupt_window.
-+
- 7. Capabilities that can be enabled on VMs
- ------------------------------------------
- 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index de338d9..77d1f73 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -180,6 +180,9 @@ struct kvm_vcpu_arch {
- 
- 	/* Detect first run of a vcpu */
- 	bool has_run_once;
-+
-+	/* User space wants timer notifications */
-+	bool user_space_arm_timers;
- };
- 
- struct kvm_vm_stat {
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 75f130e..1b4b9a6 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -187,6 +187,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_PSCI_0_2:
- 	case KVM_CAP_READONLY_MEM:
- 	case KVM_CAP_MP_STATE:
-+	case KVM_CAP_ARM_TIMER:
- 		r = 1;
- 		break;
- 	case KVM_CAP_COALESCED_MMIO:
-@@ -474,13 +475,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 			return ret;
- 	}
- 
--	/*
--	 * Enable the arch timers only if we have an in-kernel VGIC
--	 * and it has been properly initialized, since we cannot handle
--	 * interrupts from the virtual timer with a userspace gic.
--	 */
--	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
--		ret = kvm_timer_enable(vcpu);
-+	ret = kvm_timer_enable(vcpu);
- 
- 	return ret;
- }
-@@ -601,6 +596,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			run->exit_reason = KVM_EXIT_INTR;
- 		}
- 
-+		if (kvm_check_request(KVM_REQ_PENDING_TIMER, vcpu)) {
-+			/* Tell user space about the pending vtimer */
-+			ret = 0;
-+			run->exit_reason = KVM_EXIT_ARM_TIMER;
-+			run->arm_timer.timesource = KVM_ARM_TIMER_VTIMER;
-+		}
-+
- 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
- 			vcpu->arch.power_off || vcpu->arch.pause) {
- 			local_irq_enable();
-@@ -878,6 +880,29 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
- 	return ret;
- }
- 
-+static int kvm_vcpu_ioctl_enable_cap(struct kvm_vcpu *vcpu,
-+				     struct kvm_enable_cap *cap)
-+{
-+	int r;
-+
-+	if (cap->flags)
-+		return -EINVAL;
-+
-+	switch (cap->cap) {
-+	case KVM_CAP_ARM_TIMER:
-+		r = 0;
-+		if (cap->args[0] != KVM_ARM_TIMER_VTIMER)
-+			return -EINVAL;
-+		vcpu->arch.user_space_arm_timers = true;
-+		break;
-+	default:
-+		r = -EINVAL;
-+		break;
-+	}
-+
-+	return r;
-+}
-+
- long kvm_arch_vcpu_ioctl(struct file *filp,
- 			 unsigned int ioctl, unsigned long arg)
- {
-@@ -940,6 +965,13 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 		if (copy_from_user(&attr, argp, sizeof(attr)))
- 			return -EFAULT;
- 		return kvm_arm_vcpu_has_attr(vcpu, &attr);
-+	case KVM_ENABLE_CAP:
-+	{
-+		struct kvm_enable_cap cap;
-+
-+		if (copy_from_user(&cap, argp, sizeof(cap)))
-+			return -EFAULT;
-+		return kvm_vcpu_ioctl_enable_cap(vcpu, &cap);
- 	}
- 	default:
- 		return -EINVAL;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 3eda975..3d01481 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -270,6 +270,9 @@ struct kvm_vcpu_arch {
- 
- 	/* Detect first run of a vcpu */
- 	bool has_run_once;
-+
-+	/* User space wants timer notifications */
-+	bool user_space_arm_timers;
- };
- 
- #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 300ef25..00f4948 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -205,6 +205,7 @@ struct kvm_hyperv_exit {
- #define KVM_EXIT_S390_STSI        25
- #define KVM_EXIT_IOAPIC_EOI       26
- #define KVM_EXIT_HYPERV           27
-+#define KVM_EXIT_ARM_TIMER        28
- 
- /* For KVM_EXIT_INTERNAL_ERROR */
- /* Emulate instruction failed. */
-@@ -361,6 +362,10 @@ struct kvm_run {
- 		} eoi;
- 		/* KVM_EXIT_HYPERV */
- 		struct kvm_hyperv_exit hyperv;
-+		/* KVM_EXIT_ARM_TIMER */
-+		struct {
-+			__u8 timesource;
-+		} arm_timer;
- 		/* Fix the size of the union. */
- 		char padding[256];
- 	};
-@@ -870,6 +875,7 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_S390_USER_INSTR0 130
- #define KVM_CAP_MSI_DEVID 131
- #define KVM_CAP_PPC_HTM 132
-+#define KVM_CAP_ARM_TIMER 133
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
-@@ -1327,4 +1333,12 @@ struct kvm_assigned_msix_entry {
- #define KVM_X2APIC_API_USE_32BIT_IDS            (1ULL << 0)
- #define KVM_X2APIC_API_DISABLE_BROADCAST_QUIRK  (1ULL << 1)
- 
-+/* Available with KVM_CAP_ARM_TIMER */
-+
-+/* Bits for run->request_interrupt_window */
-+#define KVM_IRQWINDOW_VTIMER		(1 << 0)
-+
-+/* Bits for run->arm_timer.timesource */
-+#define KVM_ARM_TIMER_VTIMER		(1 << 0)
-+
- #endif /* __LINUX_KVM_H */
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 4309b60..d0e999d 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -24,6 +24,7 @@
- 
- #include <clocksource/arm_arch_timer.h>
- #include <asm/arch_timer.h>
-+#include <asm/kvm_emulate.h>
- 
- #include <kvm/arm_vgic.h>
- #include <kvm/arm_arch_timer.h>
-@@ -170,16 +171,45 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
- {
- 	int ret;
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+	struct kvm_run *run = vcpu->run;
- 
--	BUG_ON(!vgic_initialized(vcpu->kvm));
-+	BUG_ON(irqchip_in_kernel(vcpu->kvm) && !vgic_initialized(vcpu->kvm));
- 
- 	timer->active_cleared_last = false;
- 	timer->irq.level = new_level;
--	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
-+	trace_kvm_timer_update_irq(vcpu->vcpu_id, host_vtimer_irq,
- 				   timer->irq.level);
--	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
--					 timer->irq.irq,
--					 timer->irq.level);
-+
-+	if (irqchip_in_kernel(vcpu->kvm) && vgic_initialized(vcpu->kvm)) {
-+		/* Fire the timer in the VGIC */
-+
-+		ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
-+						 timer->irq.irq,
-+						 timer->irq.level);
-+	} else if (!vcpu->arch.user_space_arm_timers) {
-+		/* User space has not activated timer use */
-+		ret = 0;
-+	} else {
-+		/*
-+		 * Set PENDING_TIMER so that user space can handle the event if
-+		 *
-+		 *   1) Level is high
-+		 *   2) The vtimer is not suppressed by user space
-+		 *   3) We are not in the timer trigger exit path
-+		 */
-+		if (new_level &&
-+		    !(run->request_interrupt_window & KVM_IRQWINDOW_VTIMER) &&
-+		    (run->exit_reason != KVM_EXIT_ARM_TIMER)) {
-+			/* KVM_REQ_PENDING_TIMER means vtimer triggered */
-+			kvm_make_request(KVM_REQ_PENDING_TIMER, vcpu);
-+		}
-+
-+		/* Force a new level high check on next entry */
-+		timer->irq.level = 0;
-+
-+		ret = 0;
-+	}
-+
- 	WARN_ON(ret);
- }
- 
-@@ -197,7 +227,8 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	 * because the guest would never see the interrupt.  Instead wait
- 	 * until we call this function from kvm_timer_flush_hwstate.
- 	 */
--	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
-+	if ((irqchip_in_kernel(vcpu->kvm) && !vgic_initialized(vcpu->kvm)) ||
-+	    !timer->enabled)
- 		return -ENODEV;
- 
- 	if (kvm_timer_should_fire(vcpu) != timer->irq.level)
-@@ -275,35 +306,57 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 	* to ensure that hardware interrupts from the timer triggers a guest
- 	* exit.
- 	*/
--	phys_active = timer->irq.level ||
--			kvm_vgic_map_is_active(vcpu, timer->irq.irq);
--
--	/*
--	 * We want to avoid hitting the (re)distributor as much as
--	 * possible, as this is a potentially expensive MMIO access
--	 * (not to mention locks in the irq layer), and a solution for
--	 * this is to cache the "active" state in memory.
--	 *
--	 * Things to consider: we cannot cache an "active set" state,
--	 * because the HW can change this behind our back (it becomes
--	 * "clear" in the HW). We must then restrict the caching to
--	 * the "clear" state.
--	 *
--	 * The cache is invalidated on:
--	 * - vcpu put, indicating that the HW cannot be trusted to be
--	 *   in a sane state on the next vcpu load,
--	 * - any change in the interrupt state
--	 *
--	 * Usage conditions:
--	 * - cached value is "active clear"
--	 * - value to be programmed is "active clear"
--	 */
--	if (timer->active_cleared_last && !phys_active)
--		return;
-+	if (irqchip_in_kernel(vcpu->kvm) && vgic_initialized(vcpu->kvm)) {
-+		phys_active = timer->irq.level ||
-+				kvm_vgic_map_is_active(vcpu, timer->irq.irq);
-+
-+		/*
-+		 * We want to avoid hitting the (re)distributor as much as
-+		 * possible, as this is a potentially expensive MMIO access
-+		 * (not to mention locks in the irq layer), and a solution for
-+		 * this is to cache the "active" state in memory.
-+		 *
-+		 * Things to consider: we cannot cache an "active set" state,
-+		 * because the HW can change this behind our back (it becomes
-+		 * "clear" in the HW). We must then restrict the caching to
-+		 * the "clear" state.
-+		 *
-+		 * The cache is invalidated on:
-+		 * - vcpu put, indicating that the HW cannot be trusted to be
-+		 *   in a sane state on the next vcpu load,
-+		 * - any change in the interrupt state
-+		 *
-+		 * Usage conditions:
-+		 * - cached value is "active clear"
-+		 * - value to be programmed is "active clear"
-+		 */
-+		if (timer->active_cleared_last && !phys_active)
-+			return;
-+
-+		ret = irq_set_irqchip_state(host_vtimer_irq,
-+					    IRQCHIP_STATE_ACTIVE,
-+					    phys_active);
-+	} else {
-+		/* User space tells us whether the timer is in active mode */
-+		phys_active = vcpu->run->request_interrupt_window &
-+			      KVM_IRQWINDOW_VTIMER;
-+
-+		/* However if the line is high, we exit anyway, so we want
-+		 * to keep the IRQ masked */
-+		phys_active = phys_active || timer->irq.level;
-+
-+		/*
-+		 * So we can just explicitly mask or unmask the IRQ, gaining
-+		 * more compatibility with oddball irq controllers.
-+		 */
-+		if (phys_active)
-+			disable_percpu_irq(host_vtimer_irq);
-+		else
-+			enable_percpu_irq(host_vtimer_irq, 0);
-+
-+		ret = 0;
-+	}
- 
--	ret = irq_set_irqchip_state(host_vtimer_irq,
--				    IRQCHIP_STATE_ACTIVE,
--				    phys_active);
- 	WARN_ON(ret);
- 
- 	timer->active_cleared_last = !phys_active;
-@@ -479,6 +532,10 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	if (timer->enabled)
- 		return 0;
- 
-+	/* No need to route physical IRQs when we don't use the vgic */
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		goto no_vgic;
-+
- 	/*
- 	 * Find the physical IRQ number corresponding to the host_vtimer_irq
- 	 */
-@@ -502,6 +559,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	if (ret)
- 		return ret;
- 
-+no_vgic:
- 
- 	/*
- 	 * There is a potential race here between VCPUs starting for the first
--- 
-2.6.6
+Ok. Did the usb mux patches go anywhere? It seemed to get tangled up in
+DRD framework and I haven't been following along. I'll look into these
+patches more.
