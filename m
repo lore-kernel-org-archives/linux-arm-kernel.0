@@ -1,20 +1,68 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Sep 2016 13:58:05 +0200
-Subject: [PATCH v2 0/3] ARM: aspeed: add support for the BT IPMI interface
-In-Reply-To: <1474022367-21029-1-git-send-email-clg@kaod.org>
-References: <1474022367-21029-1-git-send-email-clg@kaod.org>
-Message-ID: <2566577.tsq2Sf5xZr@wuerfel>
+Date: Fri, 16 Sep 2016 14:02:35 +0200
+Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <2210422.ogrYIr1eQU@avalon>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+ <3152956.IVRykDnfF6@wuerfel> <2210422.ogrYIr1eQU@avalon>
+Message-ID: <2277430.yNKNTgNkoj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 16, 2016 12:39:24 PM CEST C?dric Le Goater wrote:
+On Friday, September 16, 2016 12:48:23 PM CEST Laurent Pinchart wrote:
+> On Friday 16 Sep 2016 11:07:48 Arnd Bergmann wrote:
+> > On Thursday, September 15, 2016 9:56:51 PM CEST Vinod Koul wrote:
+> > > On Wed, Aug 10, 2016 at 11:07:10PM +0530, Vinod Koul wrote:
+> > >> On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
+> > I had not looked at the series earlier, but this version looks entirely
+> > reasonable to me, so
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > 
+> > One concern I have is that we might get an awkward situation if we ever
+> > encounter one DMA engine hardware that is used in different systems that all
+> > have an IOMMU, but on some of them the connection between the DMA master and
+> > the slave FIFO bypasses the IOMMU while on others the IOMMU is required.
 > 
-> C?dric Le Goater (2):
->   ARM: aspeed: Add defconfigs for CONFIG_ASPEED_BT_IPMI_BMC
->   ARM: dts: aspeed: Enable BT IPMI BMC device
+> Do you mean systems where some of the channels of a specific DMA engine go 
+> through the IOMMU while others do not ? We indeed have no solution today for 
+> such a situation.
 
-These two should go through the arm-soc tree, I assume Joel
-will forward them to arm at kernel.org once the driver gets
-picked up into the ipmi tree.
+I wasn't thinking quite that far, though that is also a theoretical
+problem. However, the simple solution would be to have a bit in the DMA
+specifier let the driver know whether translation is needed or not.
+
+The simpler case I was thinking of is where the entire DMA engine
+either goes through an IOMMU or doesn't (depending on the integration
+into the SoC), so we'd have to find out through some DT property
+or compatible string in the DMA enginen driver.
+
+> The problem is a bit broader than that, we'll also have an issue with DMA 
+> engines that have different channels served by different IOMMUs.
+
+Do you mean a theoretical problem, or a chip that you already know exists?
+
+> I recall 
+> discussing this in the past with you, and the solution you proposed was to add 
+> a channel index to struct dma_attrs seems good to me. To support the case 
+> where some channels don't go through an IOMMU we would only need support for 
+> null entries in the IOMMUs list associated with a device (for instance in the 
+> DT case null entries in the iommus property).
+> 
+> Now I see that struct dma_attrs has been replaced by unsigned long in
+> 
+> commit 00085f1efa387a8ce100e3734920f7639c80caa3
+> Author: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Date:   Wed Aug 3 13:46:00 2016 -0700
+> 
+>     dma-mapping: use unsigned long for dma_attrs
+> 
+> We still have enough bits to reserve some of them for a channel number, but 
+> I'm not very happy with that patch as I can see how a future proposal to 
+> handle the channel number through the DMA attributes will get rejected on the 
+> grounds of bits starvation then :-(
+
+Agreed, that can become interesting.
 
 	Arnd
