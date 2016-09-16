@@ -1,59 +1,49 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 16 Sep 2016 07:16:11 +0200
-Subject: [PATCH] KVM: arm/arm64: timer: Fix hw sync for user space irqchip path
-Message-ID: <1474002971-31434-1-git-send-email-agraf@suse.de>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri, 16 Sep 2016 13:49:17 +0800
+Subject: [PATCH] clocksource: arm_arch_timer: Don't assume clock runs in
+ suspend
+Message-ID: <20160916054917.16930-1-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While adding the new vgic implementation, apparently nobody tested
-the non-vgic path where user space controls the vgic, so two functions
-slipped through the cracks that get called in generic code but don't
-check whether hardware support is enabled.
+Since commit 4fbcdc813fb9 ("clocksource: arm_arch_timer: Use clocksource
+for suspend timekeeping"), this driver assumes that the ARM architected
+timer keeps running in suspend. This is not the case for some ARM SoCs,
+depending on the HW state used for system suspend. Let's not assume that
+all SoCs support this, and instead only support this if the device tree
+explicitly tells us it's "always on". In all other cases, just fall back
+to the RTC. This should be relatively harmless.
 
-This patch guards them with proper checks to ensure we only try to
-use vgic data structures if they are available. Without this, I get
-a stack trace:
+It seems fair to key the system-suspend behavior off the same property
+used for C3STOP, since if the timer doesn't keep context for CPU sleep,
+it likely doesn't for system sleep either.
 
-[   74.363037] Unable to handle kernel paging request at virtual address ffffffffffffffe8
-[...]
-[   74.929654] [<ffff000008824bcc>] _raw_spin_lock+0x1c/0x58
-[   74.935133] [<ffff0000080b7f20>] kvm_vgic_flush_hwstate+0x88/0x288
-[   74.941406] [<ffff0000080ab0b4>] kvm_arch_vcpu_ioctl_run+0xfc/0x630
-[   74.947766] [<ffff0000080a15bc>] kvm_vcpu_ioctl+0x2f4/0x710
-[   74.953420] [<ffff0000082788a8>] do_vfs_ioctl+0xb0/0x728
-[   74.958807] [<ffff000008278fb4>] SyS_ioctl+0x94/0xa8
-[   74.963844] [<ffff000008083744>] el0_svc_naked+0x38/0x3c
-
-Fixes: 0919e84c0
-Cc: stable at vger.kernel.org
-Signed-off-by: Alexander Graf <agraf@suse.de>
+Signed-off-by: Brian Norris <briannorris@chromium.org>
 ---
- virt/kvm/arm/vgic/vgic.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index e83b7fe..9f312ba 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -645,6 +645,9 @@ next:
- /* Sync back the hardware VGIC state into our emulation after a guest's run. */
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
-+	if (!vcpu->kvm->arch.vgic.enabled)
-+		return;
-+
- 	vgic_process_maintenance_interrupt(vcpu);
- 	vgic_fold_lr_state(vcpu);
- 	vgic_prune_ap_list(vcpu);
-@@ -653,6 +656,9 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- /* Flush our emulation state into the GIC hardware before entering the guest. */
- void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- {
-+	if (!vcpu->kvm->arch.vgic.enabled)
-+		return;
-+
- 	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
- 	vgic_flush_lr_state(vcpu);
- 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 57700541f951..e28677a34f02 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -490,7 +490,7 @@ static struct clocksource clocksource_counter = {
+ 	.rating	= 400,
+ 	.read	= arch_counter_read,
+ 	.mask	= CLOCKSOURCE_MASK(56),
+-	.flags	= CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_SUSPEND_NONSTOP,
++	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+ static struct cyclecounter cyclecounter = {
+@@ -526,6 +526,8 @@ static void __init arch_counter_register(unsigned type)
+ 		clocksource_counter.name = "arch_mem_counter";
+ 	}
+ 
++	if (!arch_timer_c3stop)
++		clocksource_counter.flags |= CLOCK_SOURCE_SUSPEND_NONSTOP;
+ 	start_count = arch_timer_read_counter();
+ 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+ 	cyclecounter.mult = clocksource_counter.mult;
 -- 
-2.6.6
+2.8.1.340.g018a5d0.dirty
