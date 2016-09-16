@@ -1,97 +1,95 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 16 Sep 2016 18:39:37 +0100
-Subject: [PATCH v5 02/16] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <7hpoo3ix80.fsf@baylibre.com>
-References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
- <1472242678-33700-3-git-send-email-lina.iyer@linaro.org>
- <0b233802-f459-c6bb-ff42-70745a225cfb@arm.com>
- <20160902201605.GA1705@linaro.org> <87sht59mcw.fsf@arm.com>
- <20160912161600.GA21885@linaro.org>
- <a4fc71ae-6fa5-4142-6dd4-7bc96eb20186@arm.com> <87intz665i.fsf@arm.com>
- <20160913193844.GB28944@linaro.org> <87h99i6b5d.fsf@arm.com>
- <7hpoo3ix80.fsf@baylibre.com>
-Message-ID: <7af4c2d7-70a3-1881-2980-8ea49e594e5b@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 16 Sep 2016 18:39:45 +0100
+Subject: [RFC PATCH 0/5] arm64: Signal context expansion
+In-Reply-To: <ad89f920-897c-47cb-d584-4b306bc24d1c@redhat.com>
+References: <20160909152047.GA3958@e103592.cambridge.arm.com>
+ <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
+ <20160912111749.GB3958@e103592.cambridge.arm.com>
+ <57D6C33D.9020003@arm.com>
+ <20160912153015.GD3958@e103592.cambridge.arm.com>
+ <9969568a-f969-d904-52b3-14f80c3abec4@redhat.com>
+ <20160913155151.GA1574@e103592.cambridge.arm.com>
+ <d2e8f4f5-1229-9733-174d-b3123c5e887b@redhat.com>
+ <20160915164543.GB1574@e103592.cambridge.arm.com>
+ <ad89f920-897c-47cb-d584-4b306bc24d1c@redhat.com>
+Message-ID: <20160916173942.GC1574@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Fri, Sep 16, 2016 at 02:10:53PM +0200, Florian Weimer wrote:
+> On 09/15/2016 06:45 PM, Dave Martin wrote:
+> >On Tue, Sep 13, 2016 at 06:02:45PM +0200, Florian Weimer wrote:
+> >>On 09/13/2016 05:52 PM, Dave Martin wrote:
+> >>
+> >>>Agreed.  I'll need to think some more about how this should work in
+> >>>general.
+> >>
+> >>Thanks.
+> >>
+> >>Depending on some SVE implementations details (which I know nothing about, I
+> >>only saw some public overview slides), we may also need additional storage
+> >>space to preserve SVE registers in the dynamic linker.  Due to lazy binding,
+> >>this code cn be called from a signal handler, so this needs to be factored
+> >>into stack size requirements as well.
+> >
+> >Yes and no.  The kernel SIGSTKSZ constants don't care about ld.so --
+> >that's userspace overhead, not kernel overhead.
+> 
+> Well yes, so is jmp_buf.  But I think you still should consider the full
+> picture. :)
+> 
+> At least the lazy binding stack overhead can be avoided with LD_BIND_NOW=1.
 
-Thanks for looking at this and simplifying various discussions we had so
-far. I was thinking of summarizing something very similar. I couldn't
-due to lack of time.
+I am considering the wider picture, but we're a bit out of scope for the
+patch series, except that I will split out the ability to grow the
+signal frame out as a separate patch.
 
-On 16/09/16 18:13, Kevin Hilman wrote:
+> 
+> >>Problematic are register width extensions used for argument passing and
+> >>callee-saved registers whose width has been extended.  Both are particularly
+> >>challenging to deal with if existing vector instructions clear the extension
+> >>part (which may be desirable for other reasons).
+> >>
+> >>The size of the jmp_buf type is a concern as well.
+> >
+> >The default PCS for SVE will not be introducing any extra save/restore
+> >requirements for SVE -- i.e., everything is caller-save at public
+> >interfaces, except for the FPSIMD register bits that are already callee-
+> >save under the existing PCS.
+> 
+> Is it possible to pass arguments in the register extension parts?  If
+> existing non-SVE code can clobber these bits, we need some adjustments in
+> libc to save and restore SVE state in some places (which may need further
+> stack space).
+
+Arguments can be passed the the extended vector registers in theory, but
+this is expected only at private interfaces and within compilation units
+to begin with.  General-purpose libraries including libc would not be
+using those bits at their interfaces, at least for now.
+
+When calling any public interface using the default PCS, all the SVE
+registers can be clobbered -- the caller must compensate for this if
+it cares.  So, the compensation is always in the _new_ binaries where
+code gen in the compiler can take care of it automatically -- not
+the current and non-SVE binaries.  libc needs to update for this
+specifically, so long as only the default PCS is supported for all
+dynamic symbols (which I think will be the case to begin with).
+
+A similar argument applies to all libc entry points, including
+setjmp()/longjmp()/jmp_buf.
+
+Notwithstanding this, a binary built for SVE _may_ use more stack
+than a binary built without SVE support.  This can always happen when
+compiling with different options or even after a minor compiler or
+library upgrade, so any software that doesn't already have some safety
+buffer in its stack allocations is running a risk even without SVE.  SVE
+will probably tend to grow frames rather than shrink them, so there will
+be increased pressure on stack allocations, but I don't have a good
+answer about the scale of the impact at this point.
+
+For now, I don't expect to fix everything in one go.
 
 [...]
 
-> I think we're having some terminology issues...
->
-> FWIW, the kernel terminolgy is actually "PM domain", not power domain.
-> This was intentional because the goal of the PM domain was to group
-> devices that some PM features.  To be very specific to the kernel, they
-> us the same set of PM callbacks.  Today, this is most commonly used to
-> model power domains, where a group of devices share a power rail, but it
-> does not need to be limited to that.
->
-
-Agreed/Understood.
-
-> That being said, I'm having a hard time understanding the root of the
-> disagreement.
->
-
-Yes. I tried to convey the same earlier, but have failed. The only
-disagreement is about a small part of this DT bindings. We would like to
-make it completely hierarchical up to CPU nodes. More comments on that
-below.
-
-> It seems that you and Sudeep would like to use domain-idle-states to
-> replace/superceed cpu-idle-states with the primary goal (and benefit)
-> being that it simplifies the DT bindings.  Is that correct?
->
-
-Correct, we want to deprecate cpu-idle-states with the introduction of
-this hierarchical PM bindings. Yes IMO, it simplifies things and avoids
-any ABI break we might trigger if we miss to consider some use-case now.
-
-> The objections have come in because that means that implies that CPUs
-> become their own domains, which may not be the case in hardware in the
-> sense that they share a power rail.
->
-
-Agreed.
-
-> However, IMO, thinking of a CPU as it's own "PM domain" may make some
-> sense based on the terminology above.
->
-
-Thanks for that, we do understand that it may not be 100% correct when
-we strictly considers hardware terminologies instead of above ones.
-As along as we see no issues with the above terminologies it should be fine.
-
-> I think the other objection may be that using a genpd to model domain
-> with only a single device in it may be overkill, and I agree with that.
-
-I too agree with that. Just because we represent that in DT in that way
-doesn't mean we need to create a genpd to model domain. We can always
-skip that if not required. That's pure implementation specifics and I
-have tried to convey the same in my previous emails. I must say you have
-summarized it very clearly in this email. Thanks again for that.
-
-> But, I'm not sure if making CPUs use domain-idle-states implies that
-> they necessarily have to use genpd is what you are proposing.  Maybe
-> someone could clarify that?
->
-
-No, I have not proposing anything around implementation in the whole
-discussion so far. I have constrained myself just to DT bindings so far.
-That's the main reason why I was opposed to mentions of OS vs platform
-co-ordinated modes of CPU suspend in this discussion. IMO that's
-completely out of scope of this DT binding we are defining here.
-
-Hope that helps/clarifies the misunderstanding/disagreement.
-
--- 
-Regards,
-Sudeep
+Cheers
+---Dave
