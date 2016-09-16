@@ -1,40 +1,32 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 16 Sep 2016 09:47:03 +0800
-Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.9
-In-Reply-To: <2241121.MvRjeYAnGC@wuerfel>
-References: <1473670948-4265-1-git-send-email-shawnguo@kernel.org>
- <1473670948-4265-4-git-send-email-shawnguo@kernel.org>
- <2241121.MvRjeYAnGC@wuerfel>
-Message-ID: <20160916014703.GC7398@tiger>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Fri, 16 Sep 2016 01:52:00 +0000
+Subject: [PATCH -next] dma: mv_xor: fix invalid use of sizeof in
+ orion_ge00_switch_init()
+Message-ID: <1473990720-20605-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 05:30:49PM +0200, Arnd Bergmann wrote:
-> On Monday, September 12, 2016 5:02:27 PM CEST Shawn Guo wrote:
-> > i.MX arm64 device tree changes for 4.9:
-> >  - Add property dma-coherent for ls2080a PCI device to save software
-> >    cache maintenance.
-> >  - Update serial aliases and use stdout-path to sepecify console for
-> >    ls2080a and ls1043a boards.
-> >  - Add DDR memory controller device node for ls2080a and ls1043a SoCs.
-> > 
-> 
-> Pulled into next/dt64, thanks!
-> 
-> The "dma-coherent" change sounds like a bugfix, should that be backported
-> to stable kernels? Usually if you lack that property on a device that
-> is actually coherent, you can get silent data corruption by treating it as
-> non-coherent.
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-My impression is that those cache maintenance enforced for non-coherent
-device will hurt performance on coherent device.  I don't know it will
-cause data corruption.
+sizeof() when applied to a pointer typed expression gives the
+size of the pointer, not that of the pointed data.
 
-@Liu Gang,
+Fixes: fe158a17c1e0 ("ARM: orion: simplify orion_ge00_switch_init")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ arch/arm/plat-orion/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Did you experience any functional issue with PCI device before adding
-"dma-coherent" property?  If not, can you please do more testing to
-confirm this is only about performance?  Otherwise, you should follow
-Arnd's suggestion to send the change for stable kernel.
-
-Shawn
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 272f49b..23a975a 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -478,7 +478,7 @@ void __init orion_ge00_switch_init(struct dsa_platform_data *d)
+ 	for (i = 0; i < d->nr_chips; i++)
+ 		d->chip[i].host_dev = &orion_ge_mvmdio.dev;
+ 
+-	platform_device_register_data(NULL, "dsa", 0, d, sizeof(d));
++	platform_device_register_data(NULL, "dsa", 0, d, sizeof(*d));
+ }
+ 
+ /*****************************************************************************
