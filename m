@@ -1,35 +1,72 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 16 Sep 2016 14:28:55 +0200
-Subject: [PATCH v2] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <20160916094433.GA4794@cbox>
-References: <1474002553-30079-1-git-send-email-agraf@suse.de>
- <20160916094433.GA4794@cbox>
-Message-ID: <68EDCDEF-5D07-405C-9601-F489F55056F7@suse.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 16 Sep 2016 14:29:37 +0200
+Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
+In-Reply-To: <060ADA14-786E-400E-9B11-61C34B7081B5@suse.de>
+References: <1474007187-18673-1-git-send-email-agraf@suse.de>
+ <57DBC782.7080305@arm.com>
+ <060ADA14-786E-400E-9B11-61C34B7081B5@suse.de>
+Message-ID: <20160916122937.GA14140@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On 16 Sep 2016, at 11:44, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+On Fri, Sep 16, 2016 at 02:25:01PM +0200, Alexander Graf wrote:
 > 
-> Alex,
+> > On 16 Sep 2016, at 12:20, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > 
+> > Hi Alex,
+> > 
+> > On 16/09/16 07:26, Alexander Graf wrote:
+> >> Some systems out there (well, one type in particular - the Raspberry Pi series)
+> >> do have virtualization capabilities in the core, but no ARM GIC interrupt
+> >> controller.
+> >> 
+> >> To run on these systems, the cleanest route is to just handle all
+> >> interrupt delivery in user space and only deal with IRQ pins in the core
+> >> side in KVM.
+> >> 
+> >> This works pretty well already, but breaks when the guest starts to use
+> >> architected timers, as these are handled straight inside kernel space today.
+> >> 
+> >> This patch set allows user space to receive vtimer events as well as mask
+> >> them, so that we can handle all vtimer related interrupt injection from user
+> >> space, enabling us to use architected timer with user space gic emulation.
+> > 
+> > I have already voiced my concerns in the past, including face to face,
+> > and I'm going to repeat it: I not keen at all on adding a new userspace
+> > interface that is going to bitrot extremely quickly.
+> > 
+> > Let's face it, this new ABI will have a single user, with a limited
+> > shelf life. I understand that the RPi is a popular product, but it looks
+> > fairly obvious that this kind of sub-standard HW will eventually
+> > disappear. We'll then be left with a userspace ABI that will break at
 > 
-> On Fri, Sep 16, 2016 at 07:09:13AM +0200, Alexander Graf wrote:
->> We have 2 modes for dealing with interrupts in the ARM world. We can either
->> handle them all using hardware acceleration through the vgic or we can emulate
->> a gic in user space and only drive CPU IRQ pins from there.
->> 
->> Unfortunately, when driving IRQs from user space, we never tell user space
->> about timer events that may result in interrupt line state changes, so we
->> lose out on timer events if we run with user space gic emulation.
->> 
->> This patch set fixes that by routing vtimer expiration events to user space.
->> With this patch I can successfully run edk2 and Linux with user space gic
->> emulation.
+> I?m not 100% convinced that this is the case. Emulating the GIC in user space can have other interesting use cases. For example, it might come in handy for nesting. It may be useful for migrating a gicv2 VM to a gicv3 host without gicv2 emulation as well.
 > 
-> I have two versions of v2.  Are there any differences or did it just go
-> out twice or got duplicated somehow on my end?
 
-Just ignore v2. I shouldn?t send emails that early in the morning. v3 is much better ;)
+I don't see why you'd do this; the VGIC hardware can perfectly well be
+used for nesting as well, and this works rather well.
 
+> > every single release, given that nobody in the RPi community actually
+> > uses a mainline kernel.
+> 
+> I actually verified all of this patch on 4.8-rc5 upstream, which is the only 64bit kernel you can find for the RPi. So I?d expect the situation to change with 64bit.
+> 
+> > And breaking this ABI will introduce userspace exploitable bugs, like
+> > the one you've already shown. If anything, I would have loved to
+> > completely kill the whole userspace GIC, because nobody cares. Yes, I
+> > understand it is fun to have KVM running on the RPi. But the maintenance
+> > costs far outweigh the fun aspect already.
+> 
+> Having CPU pins accessible is very useful for use cases of KVM that are beyond your traditional VM.
+> 
+> > You could still run KVM with an external emulated timer (not the arch
+> > timer). No need for a new ABI for that.
+> 
+> That?s what I thought too, but turns out that it?s not quite as simple as I hoped ;).
 
-Alex
+Why not?  I thought a few people had this running recently.  What were
+the issues?  Perhaps I can convince someone to submit the patches they
+used if useful.
+
+Thanks,
+-Christoffer
