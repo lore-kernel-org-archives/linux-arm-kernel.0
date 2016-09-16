@@ -1,27 +1,30 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 16 Sep 2016 12:22:34 +0200
-Subject: [PATCH v7 02/11] arm64: dts: r8a7795: salvator-x: enable UHS for
- SDHI 0 & 3
-In-Reply-To: <20160916095500.GG14562@verge.net.au>
+Date: Fri, 16 Sep 2016 12:23:22 +0200
+Subject: [PATCH v7 05/11] ARM: dts: koelsch: Enable UHS-I SDR-50 and
+ SDR-104
+In-Reply-To: <20160916100031.GH14562@verge.net.au>
 References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
- <1473764228-24768-3-git-send-email-horms+renesas@verge.net.au>
- <20160916095500.GG14562@verge.net.au>
-Message-ID: <20160916102234.GG1411@katana>
+ <1473764228-24768-6-git-send-email-horms+renesas@verge.net.au>
+ <20160916100031.GH14562@verge.net.au>
+Message-ID: <20160916102322.GH1411@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 11:55:00AM +0200, Simon Horman wrote:
-> On Tue, Sep 13, 2016 at 12:56:59PM +0200, Simon Horman wrote:
-> > From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+On Fri, Sep 16, 2016 at 12:00:32PM +0200, Simon Horman wrote:
+> On Tue, Sep 13, 2016 at 12:57:02PM +0200, Simon Horman wrote:
+> > Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,1,2}.
+> > And the sd-uhs-sdr104 property to SDHI0.
 > > 
-> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
 > As SDR50 support is present in the driver in mainline (correct me if I am
-> wrong!) I am queuing this up.
+> wrong!) I have queued this up after dropping the sdr104 portion and
+> updating the changelog accordingly.
+
+Looks good!
 
 Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -29,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160916/dbe6ea4b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160916/685f0fe7/attachment.sig>
