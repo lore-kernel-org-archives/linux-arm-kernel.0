@@ -1,26 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Sep 2016 16:53:17 +0100
-Subject: [PATCH] musb: Export musb_root_disconnect for use in modules
-In-Reply-To: <20160916154701.GA20742@kroah.com>
-References: <20160916145936.3297-1-hdegoede@redhat.com>
- <20160916154701.GA20742@kroah.com>
-Message-ID: <20160916155317.GE27974@sirena.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 16 Sep 2016 11:54:49 -0400
+Subject: [PATCH 07/19] ahci: st: Remove STiH416 dt example
+In-Reply-To: <1473859677-9231-8-git-send-email-peter.griffin@linaro.org>
+References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
+ <1473859677-9231-8-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160916155449.GB26371@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 05:47:01PM +0200, Greg Kroah-Hartman wrote:
-> On Fri, Sep 16, 2016 at 04:59:36PM +0200, Hans de Goede wrote:
+On Wed, Sep 14, 2016 at 02:27:45PM +0100, Peter Griffin wrote:
+> This platform is being removed from the kernel so remove
+> the dt example.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Cc: <tj@kernel.org>
+> Cc: <robh+dt@kernel.org>
+> Cc: <linux-ide@vger.kernel.org>
 
-> > +EXPORT_SYMBOL_GPL(musb_root_disconnect);
+This is gonna go through dt tree, right?  If it should go through
+libata, please let me know.
 
-> Does this fix a build error somehow?  Who reported it?
+Thanks.
 
-Yes, the sunxi driver uses this symbol and the build bots reported it
-yesterday.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160916/1c94a40d/attachment-0001.sig>
+-- 
+tejun
