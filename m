@@ -1,77 +1,60 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 16 Sep 2016 12:57:20 -0500
-Subject: [PATCH v9 08/10] arm64: pmu: Detect and enable multiple PMUs in
- an ACPI system
-In-Reply-To: <87bmznu61q.fsf@e105922-lin.cambridge.arm.com>
-References: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
- <1473892358-22574-9-git-send-email-jeremy.linton@arm.com>
- <87y42st1e3.fsf@e105922-lin.cambridge.arm.com>
- <6e0b08db-2e13-be49-5208-c396bf51fe68@arm.com>
- <87bmznu61q.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <b8b27aa5-e80e-f7cc-3410-4b2ac44c69e5@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 16 Sep 2016 14:09:15 -0400
+Subject: [PATCH v6 2/3] ARM: dts: add TOPEET itop elite based board
+In-Reply-To: <20160916172110.GA7511@kozik-lap>
+References: <1473285535-21996-1-git-send-email-ayaka@soulik.info>
+ <1473285535-21996-3-git-send-email-ayaka@soulik.info>
+ <CGME20160916072303eucas1p2941ba2907605055f5ea5abb2e6891d77@eucas1p2.samsung.com>
+ <6bd9905d-0818-a917-8b8e-6abce134a3d3@kernel.org>
+ <865b9f84-385f-fea8-2e3d-2b31e3bfe84c@soulik.info>
+ <20160916172110.GA7511@kozik-lap>
+Message-ID: <1e4335db-9004-bb7c-6dc1-e435e66b8126@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2016 12:07 PM, Punit Agrawal wrote:
-> Jeremy Linton <jeremy.linton@arm.com> writes:
->
->> Hi,
->>
->> On 09/16/2016 08:33 AM, Punit Agrawal wrote:
->>> Jeremy Linton <jeremy.linton@arm.com> writes:
->>>
->>>> Its possible that an ACPI system has multiple CPU types in it
->>>> with differing PMU counters. Iterate the CPU's and make a determination
->>>> about how many of each type exist in the system. Then take and create
->>>> a PMU platform device for each type, and assign it the interrupts parsed
->>>> from the MADT. Creating a platform device is necessary because the PMUs
->>>> are not described as devices in the DSDT table.
->>>>
->>>> This code is loosely based on earlier work by Mark Salter.
->>
->> (trimming)
->>
->>>> +
->>>> +	list_for_each_entry_safe(pmu, safe_temp, &pmus, list) {
->>>> +		if (unused_madt_entries)
->>>> +			pmu->cpu_count = num_possible_cpus();
->>>
->>> So if there is any unbooted cpu ...
->>>
->>>> +
->>>> +		res = kcalloc(pmu->cpu_count,
->>>> +				  sizeof(struct resource), GFP_KERNEL);
->>>
->>> ... we allocate potentially large number (num_possible_cpus()) of
->>> resources for each PMU.
->>>
->>> This is needlessly wasteful. Under what conditions have you found
->>> reg_midr to be 0?
->>
->> Unused MADT entries, in place for potentially unbooted/hotplug
->> CPUs.
->
-> Is linux able to deal with booting secondaries that have unused MADT
-> entries?
+Hello Randy,
 
-Uh, yah I think so, that is how i've been testing it, maybe we are 
-saying different things. When i'm talking about "unused" I mean MADT 
-entries that don't have started/running cpus. Obviously they stop being 
-unused when a cpu is booted.
+On 09/16/2016 01:21 PM, Krzysztof Kozlowski wrote:
 
->
->> In those cases you don't know for sure which PMU the CPU belongs
->> to until it comes online and the MIDR can be read. I'm open to
->> suggestions on how to deal with this, outside of pushing my luck and
->> further breaking the platform device encapsulation by trying to
->> reallocate the resource structure while its active. Besides its only
->> wasteful for ACPI+big.little, which at the moment only applies to a
->> development platform.
->
-> I don't have any ideas to solve this problem, but in the interest of
-> helping review, please move all the changes arising from hotplug/unused
-> MADT entries in this patch to the next one.
+[snip]
 
-Which is sort of the opposite of the last 3 months, of complaints about 
-how hard it was to review this module with multiple patches adding 
-features to the code...
+>>>> +	
+>>>> +	beep {
+>>>> +		compatible = "pwm-beeper";
+>>>> +		pwms = <&pwm 0 4000000 PWM_POLARITY_INVERTED>;
+>>> I have serious doubts that you run this code... if it does not even
+>>> compile. Sorry, I cannot accept code that does not compile and was not
+>>> tested.
+>>>
+>>> Please, test your DTS on top of current Linux tree, which would be one of:
+>>> 1. Linus' master branch: v4.8-rc6,
+>>> 2. one of my branches (for-next, next/dt etc),
+>> When I sent those patches, I tested in "Add linux-next specific files for
+>> 20160907"
+>
+> OK, good, but please tell me why kbuild reported that build error?
+>
+
+I agree with Krzysztof, it doesn't seem that you tested the exact version
+that was posted. You will need the following change to make the DTS build
+in latest linux-next:
+
+diff --git a/arch/arm/boot/dts/exynos4412-itop-elite.dts b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+index dd83689892ff..8559f891a740 100644
+--- a/arch/arm/boot/dts/exynos4412-itop-elite.dts
++++ b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+@@ -14,6 +14,7 @@
+ */
+ 
+ /dts-v1/;
++#include <dt-bindings/pwm/pwm.h>
+ #include <dt-bindings/sound/samsung-i2s.h>
+ #include "exynos4412-itop-scp-core.dtsi"
+
+So please squash that change and resend.
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
