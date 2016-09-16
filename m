@@ -1,32 +1,52 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 16 Sep 2016 12:11:39 +0200
-Subject: [PATCH] ARM: dts: wheat: add DU support
-In-Reply-To: <ba5b2f8e-13f8-6c7d-17c1-44988d30a947@cogentembedded.com>
-References: <34968644.DhifNderY8@wasted.cogentembedded.com>
- <15676050.WJW1jK1n2R@wasted.cogentembedded.com>
- <ba5b2f8e-13f8-6c7d-17c1-44988d30a947@cogentembedded.com>
-Message-ID: <20160916101139.GI14562@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Sep 2016 11:20:50 +0100
+Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
+In-Reply-To: <1474007187-18673-1-git-send-email-agraf@suse.de>
+References: <1474007187-18673-1-git-send-email-agraf@suse.de>
+Message-ID: <57DBC782.7080305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 08:52:40PM +0300, Sergei Shtylyov wrote:
-> On 09/02/2016 12:29 AM, Sergei Shtylyov wrote:
-> 
-> >Define  the  Wheat board dependent  part of the DU device node.
-> >Add the device nodes for the Analog Devices ADV7513 HDMI transmitters
-> >connected to DU0/1.  Add the necessary subnodes to interconnect DU with
-> >HDMI transmitters/connectors.
-> >
-> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >
-> >---
-> >This patch is against the 'renesas-devel-20160901-v4.8-rc4' of Simon Horman's
-> >'renesas.git' repo plus the Wheat CAN and SDHI patches posted earlier...
-> >The path depends on the 2 DRM patches just posted in order to work correctly!
-> 
->    In principle, both these patches have been queued by the maintainers...
-> Simon, are you going to wait till they hit media_tree.git? Linus' tree?
+Hi Alex,
 
-I don't think that is necessary. I was waiting for some review.
-But in any case it looks like this patch no longer applies cleanly.
-Could you rebase?
+On 16/09/16 07:26, Alexander Graf wrote:
+> Some systems out there (well, one type in particular - the Raspberry Pi series)
+> do have virtualization capabilities in the core, but no ARM GIC interrupt
+> controller.
+> 
+> To run on these systems, the cleanest route is to just handle all
+> interrupt delivery in user space and only deal with IRQ pins in the core
+> side in KVM.
+> 
+> This works pretty well already, but breaks when the guest starts to use
+> architected timers, as these are handled straight inside kernel space today.
+> 
+> This patch set allows user space to receive vtimer events as well as mask
+> them, so that we can handle all vtimer related interrupt injection from user
+> space, enabling us to use architected timer with user space gic emulation.
+
+I have already voiced my concerns in the past, including face to face,
+and I'm going to repeat it: I not keen at all on adding a new userspace
+interface that is going to bitrot extremely quickly.
+
+Let's face it, this new ABI will have a single user, with a limited
+shelf life. I understand that the RPi is a popular product, but it looks
+fairly obvious that this kind of sub-standard HW will eventually
+disappear. We'll then be left with a userspace ABI that will break at
+every single release, given that nobody in the RPi community actually
+uses a mainline kernel.
+
+And breaking this ABI will introduce userspace exploitable bugs, like
+the one you've already shown. If anything, I would have loved to
+completely kill the whole userspace GIC, because nobody cares. Yes, I
+understand it is fun to have KVM running on the RPi. But the maintenance
+costs far outweigh the fun aspect already.
+
+You could still run KVM with an external emulated timer (not the arch
+timer). No need for a new ABI for that.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
