@@ -1,84 +1,61 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 16 Sep 2016 16:38:38 +0300
-Subject: [PATCH RFC 8/8] ARM: dts: sk-rzg1m: initial device tree
-In-Reply-To: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
-References: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
-Message-ID: <2097453.1xPZsJcFmC@wasted.cogentembedded.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Fri, 16 Sep 2016 13:38:45 +0000
+Subject: [PATCH v1 2/3] ARM: dts: imx6q-apalis-ixora: Remove use of
+ pwm-leds
+In-Reply-To: <6111feb57b5fbaa29eeb6ba089bb2824bbf2f8ff.1473833908.git.maitysanchayan@gmail.com>
+References: <9d2c17aa2e00e6ff4349a53de8247860d2382607.1473833908.git.maitysanchayan@gmail.com>
+ <6111feb57b5fbaa29eeb6ba089bb2824bbf2f8ff.1473833908.git.maitysanchayan@gmail.com>
+Message-ID: <1474033125.3103.26.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial device  tree for the R8A7743 SoC based SK-RZG1M board.
-The board has one debug serial port (SCIF0); include support for it, so
-that  the serial  console  can work.
+On Wed, 2016-09-14 at 12:05 +0530, Sanchayan Maity wrote:
+> Remove use of pwm-leds and use the standard /sys/class/pwm
+> interface from PWM subsystem.
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+Acked-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> ---
+> ?arch/arm/boot/dts/imx6q-apalis-ixora.dts | 22 ----------------------
+> ?1 file changed, 22 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+> b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+> index d99979e..70a3da0 100644
+> --- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+> +++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+> @@ -146,28 +146,6 @@
+> ?			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
+> ?		};
+> ?	};
+> -
+> -	pwmleds {
+> -		compatible = "pwm-leds";
+> -
+> -		ledpwm1 {
+> -			label = "PWM1";
+> -			pwms = <&pwm1 0 50000>;
+> -			max-brightness = <255>;
+> -		};
+> -
+> -		ledpwm2 {
+> -			label = "PWM2";
+> -			pwms = <&pwm2 0 50000>;
+> -			max-brightness = <255>;
+> -		};
+> -
+> -		ledpwm3 {
+> -			label = "PWM3";
+> -			pwms = <&pwm3 0 50000>;
+> -			max-brightness = <255>;
+> -		};
+> -	};
+> ?};
+> ?
+> ?&backlight {
 
----
- arch/arm/boot/dts/Makefile             |    1 
- arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   44 +++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+)
+Tested working fine analogous to what we documented for Vybrid:
 
-Index: renesas/arch/arm/boot/dts/Makefile
-===================================================================
---- renesas.orig/arch/arm/boot/dts/Makefile
-+++ renesas/arch/arm/boot/dts/Makefile
-@@ -654,6 +654,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
- 	r7s72100-rskrza1.dtb \
- 	r8a73a4-ape6evm.dtb \
- 	r8a7740-armadillo800eva.dtb \
-+	r8a7743-sk-rzg1m.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7779-marzen.dtb \
- 	r8a7790-lager.dtb \
-Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-===================================================================
---- /dev/null
-+++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-@@ -0,0 +1,44 @@
-+/*
-+ * Device Tree Source for the SK-RZG1M board
-+ *
-+ * Copyright (C) 2016 Cogent Embedded, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2. This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r8a7743.dtsi"
-+
-+/ {
-+	model = "SK-RZG1M";
-+	compatible = "renesas,sk-rzg1m", "renesas,r8a7743";
-+
-+	aliases {
-+		serial0 = &scif0;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x40000000>;
-+	};
-+
-+	memory at 200000000 {
-+		device_type = "memory";
-+		reg = <2 0x00000000 0 0x40000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <20000000>;
-+};
-+
-+&scif0 {
-+	status = "okay";
-+};
+http://developer.toradex.com/knowledge-base/pwm-(linux)#Colibri_VFxx
