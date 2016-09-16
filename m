@@ -1,52 +1,83 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 16 Sep 2016 11:32:02 -0500
-Subject: [PATCH v9 08/10] arm64: pmu: Detect and enable multiple PMUs in
- an ACPI system
-In-Reply-To: <87y42st1e3.fsf@e105922-lin.cambridge.arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 16 Sep 2016 17:37:41 +0100
+Subject: [PATCH v9 07/10] arm: arm64: pmu: Assign platform PMU CPU affinity
+In-Reply-To: <1473892358-22574-8-git-send-email-jeremy.linton@arm.com> (Jeremy
+ Linton's message of "Wed, 14 Sep 2016 17:32:35 -0500")
 References: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
- <1473892358-22574-9-git-send-email-jeremy.linton@arm.com>
- <87y42st1e3.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <6e0b08db-2e13-be49-5208-c396bf51fe68@arm.com>
+ <1473892358-22574-8-git-send-email-jeremy.linton@arm.com>
+Message-ID: <87h99fu7fu.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jeremy,
 
-On 09/16/2016 08:33 AM, Punit Agrawal wrote:
-> Jeremy Linton <jeremy.linton@arm.com> writes:
->
->> Its possible that an ACPI system has multiple CPU types in it
->> with differing PMU counters. Iterate the CPU's and make a determination
->> about how many of each type exist in the system. Then take and create
->> a PMU platform device for each type, and assign it the interrupts parsed
->> from the MADT. Creating a platform device is necessary because the PMUs
->> are not described as devices in the DSDT table.
->>
->> This code is loosely based on earlier work by Mark Salter.
+One comment below.
 
-(trimming)
+Jeremy Linton <jeremy.linton@arm.com> writes:
 
->> +
->> +	list_for_each_entry_safe(pmu, safe_temp, &pmus, list) {
->> +		if (unused_madt_entries)
->> +			pmu->cpu_count = num_possible_cpus();
+> On systems with multiple PMU types the PMU to CPU affinity
+> needs to be detected and set. The CPU to interrupt affinity
+> should also be set.
 >
-> So if there is any unbooted cpu ...
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  drivers/perf/arm_pmu.c | 63 ++++++++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 53 insertions(+), 10 deletions(-)
 >
->> +
->> +		res = kcalloc(pmu->cpu_count,
->> +				  sizeof(struct resource), GFP_KERNEL);
->
-> ... we allocate potentially large number (num_possible_cpus()) of
-> resources for each PMU.
->
-> This is needlessly wasteful. Under what conditions have you found
-> reg_midr to be 0?
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 58117d7..63f16a5 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -11,6 +11,7 @@
+>   */
+>  #define pr_fmt(fmt) "hw perfevents: " fmt
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/bitmap.h>
+>  #include <linux/cpumask.h>
+>  #include <linux/cpu_pm.h>
+> @@ -24,6 +25,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/irqdesc.h>
+>  
+> +#include <asm/cpu.h>
+>  #include <asm/cputype.h>
+>  #include <asm/irq_regs.h>
+>  
+> @@ -876,25 +878,67 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+>  }
+>  
+>  /*
+> - * CPU PMU identification and probing.
+> + * CPU PMU identification and probing. Its possible to have
+> + * multiple CPU types in an ARM machine. Assure that we are
+> + * picking the right PMU types based on the CPU in question
+>   */
+> -static int probe_current_pmu(struct arm_pmu *pmu,
+> -			     const struct pmu_probe_info *info)
+> +static int probe_plat_pmu(struct arm_pmu *pmu,
+> +			     const struct pmu_probe_info *info,
+> +			     unsigned int pmuid)
+>  {
+> -	int cpu = get_cpu();
+> -	unsigned int cpuid = read_cpuid_id();
+>  	int ret = -ENODEV;
+> +	int cpu;
+> +	int aff_ctr = 0;
+> +	static int duplicate_pmus;
+> +	struct platform_device *pdev = pmu->plat_device;
+> +	int irq = platform_get_irq(pdev, 0);
+>  
+> -	pr_info("probing PMU on CPU %d\n", cpu);
+> +	if (irq >= 0 && !irq_is_percpu(irq)) {
 
-Unused MADT entries, in place for potentially unbooted/hotplug CPUs. In 
-those cases you don't know for sure which PMU the CPU belongs to until 
-it comes online and the MIDR can be read. I'm open to suggestions on how 
-to deal with this, outside of pushing my luck and further breaking the 
-platform device encapsulation by trying to reallocate the resource 
-structure while its active. Besides its only wasteful for 
-ACPI+big.little, which at the moment only applies to a development platform.
+Marc's got a patch[0] changing all instances of "irq >= 0" in this file to
+"irq > 0" on the basis that irq 0 is an error.
+
+If this version doesn't get merged, please drop the "=" for the next
+version.
+
+[0] http://marc.info/?l=linux-arm-kernel&m=147318284923863
+
+
+[...]
