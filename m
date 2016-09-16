@@ -1,31 +1,29 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 16 Sep 2016 16:59:03 +0200
-Subject: next-20160915 build: 2 failures 16 warnings (next-20160915)
-In-Reply-To: <20160915154140.GM27974@sirena.org.uk>
-References: <E1bkV4u-0004AY-TY@optimist> <20160915154140.GM27974@sirena.org.uk>
-Message-ID: <ae530830-21c0-444a-85df-fc3ddebb7ec6@redhat.com>
+Date: Fri, 16 Sep 2016 16:59:36 +0200
+Subject: [PATCH] musb: Export musb_root_disconnect for use in modules
+Message-ID: <20160916145936.3297-1-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Export musb_root_disconnect for use in modules, so that musb glue
+code build as module can use it.
 
-On 15-09-16 17:41, Mark Brown wrote:
-> On Thu, Sep 15, 2016 at 12:43:41PM +0100, Build bot for Mark Brown wrote:
->
-> Today's -next fails to build both arm and arm64 allmodconfigs due to:
->
->> 	arm64-allmodconfig
->> ERROR: "musb_root_disconnect" [drivers/usb/musb/sunxi.ko] undefined!
->
->> 	arm-allmodconfig
->> ERROR: "musb_root_disconnect" [drivers/usb/musb/sunxi.ko] undefined!
->
-> due to 7cba17ec9adc8cf (musb: sunxi: Add support for platform_set_mode)
-> which adds a call to that non-exported function to a module.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/usb/musb/musb_virthub.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thank you for catching / reporting this. One patch fixing this
-coming up.
-
-Regards,
-
-Hans
+diff --git a/drivers/usb/musb/musb_virthub.c b/drivers/usb/musb/musb_virthub.c
+index fe08e77..61b5f1c 100644
+--- a/drivers/usb/musb/musb_virthub.c
++++ b/drivers/usb/musb/musb_virthub.c
+@@ -245,6 +245,7 @@ void musb_root_disconnect(struct musb *musb)
+ 			usb_otg_state_string(musb->xceiv->otg->state));
+ 	}
+ }
++EXPORT_SYMBOL_GPL(musb_root_disconnect);
+ 
+ 
+ /*---------------------------------------------------------------------*/
+-- 
+2.9.3
