@@ -1,156 +1,211 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 16 Sep 2016 10:13:51 -0700
-Subject: [PATCH v5 02/16] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <87h99i6b5d.fsf@arm.com> (Brendan Jackman's message of "Wed, 14
- Sep 2016 11:14:38 +0100")
-References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
- <1472242678-33700-3-git-send-email-lina.iyer@linaro.org>
- <0b233802-f459-c6bb-ff42-70745a225cfb@arm.com>
- <20160902201605.GA1705@linaro.org> <87sht59mcw.fsf@arm.com>
- <20160912161600.GA21885@linaro.org>
- <a4fc71ae-6fa5-4142-6dd4-7bc96eb20186@arm.com>
- <87intz665i.fsf@arm.com> <20160913193844.GB28944@linaro.org>
- <87h99i6b5d.fsf@arm.com>
-Message-ID: <7hpoo3ix80.fsf@baylibre.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 16 Sep 2016 19:21:10 +0200
+Subject: [PATCH v6 2/3] ARM: dts: add TOPEET itop elite based board
+In-Reply-To: <865b9f84-385f-fea8-2e3d-2b31e3bfe84c@soulik.info>
+References: <1473285535-21996-1-git-send-email-ayaka@soulik.info>
+ <1473285535-21996-3-git-send-email-ayaka@soulik.info>
+ <CGME20160916072303eucas1p2941ba2907605055f5ea5abb2e6891d77@eucas1p2.samsung.com>
+ <6bd9905d-0818-a917-8b8e-6abce134a3d3@kernel.org>
+ <865b9f84-385f-fea8-2e3d-2b31e3bfe84c@soulik.info>
+Message-ID: <20160916172110.GA7511@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Brendan Jackman <brendan.jackman@arm.com> writes:
+On Fri, Sep 16, 2016 at 10:04:29PM +0800, ayaka wrote:
+> On 09/16/2016 03:23 PM, Krzysztof Kozlowski wrote:
+> >On 09/07/2016 11:58 PM, Randy Li wrote:
+> >>The TOPEET itop exynos 4412 have three versions base board. The
+> >>Elite version is the cheap one without too much peripheral devices
+> >>on it.
+> >>
+> >>Currently supported are serial console, wired networking(USB),
+> >>USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
+> >>PWM beeper, ADC and LEDs. The WM8960 analog audio codec is also
+> >>enabled.
+> >>
+> >>The FIMC is not used for camera currently, I enabled it just for a
+> >>colorspace convertor.
+> >>
+> >>Signed-off-by: Randy Li <ayaka@soulik.info>
+> >>---
+> >>  .../bindings/arm/samsung/samsung-boards.txt        |   3 +
+> >>  arch/arm/boot/dts/Makefile                         |   1 +
+> >>  arch/arm/boot/dts/exynos4412-itop-elite.dts        | 239 +++++++++++++++++++++
+> >>  3 files changed, 243 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/exynos4412-itop-elite.dts
+> >>
+> >>diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> >>index 0ea7f14..c7159ac 100644
+> >>--- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> >>+++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> >>@@ -22,6 +22,9 @@ Required root node properties:
+> >>    * FriendlyARM
+> >>  	- "friendlyarm,tiny4412"  - for Exynos4412-based FriendlyARM
+> >>  				    TINY4412 board.
+> >>+  * TOPEET
+> >>+	- "topeet,itop4412-elite" - for Exynos4412-based TOPEET
+> >>+                                    Elite base board.
+> >>    * Google
+> >>  	- "google,pi"		- for Exynos5800-based Google Peach Pi
+> >>diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >>index 207f96f..0b39d00 100644
+> >>--- a/arch/arm/boot/dts/Makefile
+> >>+++ b/arch/arm/boot/dts/Makefile
+> >>@@ -130,6 +130,7 @@ dtb-$(CONFIG_ARCH_EXYNOS4) += \
+> >>  	exynos4210-smdkv310.dtb \
+> >>  	exynos4210-trats.dtb \
+> >>  	exynos4210-universal_c210.dtb \
+> >>+	exynos4412-itop-elite.dtb \
+> >>  	exynos4412-odroidu3.dtb \
+> >>  	exynos4412-odroidx.dtb \
+> >>  	exynos4412-odroidx2.dtb \
+> >>diff --git a/arch/arm/boot/dts/exynos4412-itop-elite.dts b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+> >>new file mode 100644
+> >>index 0000000..dd83689
+> >>--- /dev/null
+> >>+++ b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+> >>@@ -0,0 +1,239 @@
+> >>+/*
+> >>+ * TOPEET's Exynos4412 based itop board device tree source
+> >>+ *
+> >>+ * Copyright (c) 2016 SUMOMO Computer Association
+> >>+ *			https://www.sumomo.mobi
+> >>+ *			Randy Li <ayaka@soulik.info>
+> >>+ *			
+> >>+ * Device tree source file for TOPEET iTop Exynos 4412 core board
+> >>+ * which is based on Samsung's Exynos4412 SoC.
+> >>+ *
+> >>+ * This program is free software; you can redistribute it and/or modify
+> >>+ * it under the terms of the GNU General Public License version 2 as
+> >>+ * published by the Free Software Foundation.
+> >>+*/
+> >>+
+> >>+/dts-v1/;
+> >>+#include <dt-bindings/sound/samsung-i2s.h>
+> >>+#include "exynos4412-itop-scp-core.dtsi"
+> >>+
+> >>+/ {
+> >>+	model = "TOPEET iTop 4412 Elite board based on Exynos4412";
+> >>+	compatible = "topeet,itop4412-elite", "samsung,exynos4412", "samsung,exynos4";
+> >>+
+> >>+	chosen {
+> >>+		bootargs = "root=/dev/mmcblk0p2 rw rootfstype=ext4 rootwait";
+> >>+		stdout-path = "serial2:115200n8";
+> >>+	};
+> >>+	
+> >>+	leds {
+> >>+		compatible = "gpio-leds";
+> >>+		
+> >>+		led2 {
+> >>+			label = "red:system";
+> >>+			gpios = <&gpx1 0 GPIO_ACTIVE_HIGH>;
+> >>+			default-state = "off";
+> >>+			linux,default-trigger = "heartbeat";
+> >>+		};
+> >>+
+> >>+		led3 {
+> >>+			label = "red:user";
+> >>+			gpios = <&gpk1 1 GPIO_ACTIVE_HIGH>;
+> >>+			default-state = "off";
+> >>+		};
+> >>+	};
+> >>+
+> >>+	gpio-keys {
+> >>+		compatible = "gpio-keys";
+> >>+		
+> >>+		home {
+> >>+			label = "GPIO Key Home";
+> >>+			linux,code = <KEY_HOME>;
+> >>+			gpios = <&gpx1 1 GPIO_ACTIVE_LOW>;
+> >>+		};
+> >>+
+> >>+		back {
+> >>+			label = "GPIO Key Back";
+> >>+			linux,code = <KEY_BACK>;
+> >>+			gpios = <&gpx1 2 GPIO_ACTIVE_LOW>;
+> >>+		};
+> >>+
+> >>+		sleep {
+> >>+			label = "GPIO Key Sleep";
+> >>+			linux,code = <KEY_POWER>;
+> >>+			gpios = <&gpx3 3 GPIO_ACTIVE_LOW>;
+> >>+		};
+> >>+
+> >>+		vol-up {
+> >>+			label = "GPIO Key Vol+";
+> >>+			linux,code = <KEY_UP>;
+> >>+			gpios = <&gpx2 1 GPIO_ACTIVE_LOW>;
+> >>+		};
+> >>+
+> >>+		vol-down {
+> >>+			label = "GPIO Key Vol-";
+> >>+			linux,code = <KEY_DOWN>;
+> >>+			gpios = <&gpx2 0 GPIO_ACTIVE_LOW>;
+> >>+		};
+> >>+	};
+> >>+
+> >>+	sound {
+> >>+		compatible = "simple-audio-card";
+> >>+		simple-audio-card,name = "wm-sound";
+> >>+
+> >>+		assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
+> >>+				<&clock_audss EXYNOS_MOUT_I2S>,
+> >>+				<&clock_audss EXYNOS_DOUT_SRP>,
+> >>+				<&clock_audss EXYNOS_DOUT_AUD_BUS>;
+> >>+		assigned-clock-parents = <&clock CLK_FOUT_EPLL>,
+> >>+				<&clock_audss EXYNOS_MOUT_AUDSS>;
+> >>+		assigned-clock-rates = <0>,
+> >>+				<0>,
+> >>+				<112896000>,
+> >>+				<11289600>;
+> >>+
+> >>+		simple-audio-card,format = "i2s";
+> >>+		simple-audio-card,bitclock-master = <&link0_codec>;
+> >>+		simple-audio-card,frame-master = <&link0_codec>;
+> >>+
+> >>+		simple-audio-card,widgets =
+> >>+			"Microphone", "Mic Jack",
+> >>+			"Line", "Line In",
+> >>+			"Line", "Line Out",
+> >>+			"Speaker", "Speaker",
+> >>+			"Headphone", "Headphone Jack";
+> >>+		simple-audio-card,routing =
+> >>+			"Headphone Jack", "HP_L",
+> >>+			"Headphone Jack", "HP_R",
+> >>+			"Speaker", "SPK_LP",
+> >>+			"Speaker", "SPK_LN",
+> >>+			"Speaker", "SPK_RP",
+> >>+			"Speaker", "SPK_RN",
+> >>+			"LINPUT1", "Mic Jack",
+> >>+			"LINPUT3", "Mic Jack",
+> >>+			"RINPUT1", "Mic Jack",
+> >>+			"RINPUT2", "Mic Jack";
+> >>+
+> >>+		simple-audio-card,cpu {
+> >>+			sound-dai = <&i2s0 0>;
+> >>+		};
+> >>+
+> >>+		link0_codec: simple-audio-card,codec {
+> >>+			sound-dai = <&codec>;
+> >>+			clocks = <&i2s0 CLK_I2S_CDCLK>;
+> >>+			system-clock-frequency = <11289600>;
+> >>+		};
+> >>+	};
+> >>+	
+> >>+	beep {
+> >>+		compatible = "pwm-beeper";
+> >>+		pwms = <&pwm 0 4000000 PWM_POLARITY_INVERTED>;
+> >I have serious doubts that you run this code... if it does not even
+> >compile. Sorry, I cannot accept code that does not compile and was not
+> >tested.
+> >
+> >Please, test your DTS on top of current Linux tree, which would be one of:
+> >1. Linus' master branch: v4.8-rc6,
+> >2. one of my branches (for-next, next/dt etc),
+> When I sent those patches, I tested in "Add linux-next specific files for
+> 20160907"
 
-> On Tue, Sep 13 2016 at 20:38, Lina Iyer wrote:
->> On Tue, Sep 13 2016 at 11:50 -0600, Brendan Jackman wrote:
->>>
->>>On Mon, Sep 12 2016 at 18:09, Sudeep Holla wrote:
->>>> On 12/09/16 17:16, Lina Iyer wrote:
->>>>> On Mon, Sep 12 2016 at 09:19 -0600, Brendan Jackman wrote:
->>>>>>
->>>>>> Hi Lina,
->>>>>>
->>>>>> Sorry for the delay here, Sudeep and I were both been on holiday last
->>>>>> week.
->>>>>>
->>>>>> On Fri, Sep 02 2016 at 21:16, Lina Iyer wrote:
->>>>>>> On Fri, Sep 02 2016 at 07:21 -0700, Sudeep Holla wrote:
->>>>>> [...]
->>>>>>>> This version is *not very descriptive*. Also the discussion we had
->>>>>>>> on v3
->>>>>>>> version has not yet concluded IMO. So can I take that we agreed on what
->>>>>>>> was proposed there or not ?
->>>>>>>>
->>>>>>> Sorry, this example is not very descriptive. Pls. check the 8916 dtsi
->>>>>>> for the new changes in the following patches. Let me know if that makes
->>>>>>> sense.
->>>>
->>>> Please add all possible use-cases in the bindings. Though one can refer
->>>> the usage examples, it might not cover all usage descriptions. It helps
->>>> preventing people from defining their own when they don't see examples.
->>>> Again DT bindings are like specifications, it should be descriptive
->>>> especially this kind of generic ones.
->>>>
->>>>>>
->>>>>> The not-yet-concluded discussion Sudeep is referring to is at [1].
->>>>>>
->>>>>> In that thread we initially proposed the idea of, instead of splitting
->>>>>> state phandles between cpu-idle-states and domain-idle-states, putting
->>>>>> CPUs in their own domains and using domain-idle-states for _all_
->>>>>> phandles, deprecating cpu-idle-states. I've brought this up in other
->>>>>> threads [2] but discussion keeps petering out, and neither this example
->>>>>> nor the 8916 dtsi in this patch series reflect the idea.
->>>>>>
->>>>> Brendan, while your idea is good and will work for CPUs, I do not expect
->>>>> other domains and possibly CPU domains on some architectures to follow
->>>>> this model. There is nothing that prevents you from doing this today,
->>>
->>>As I understand it your opposition to this approach is this:
->>>
->>>There may be devices/CPUs which have idle states which do not constitute
->>>"power off". If we put those  devices in their own power domain for the
->>>purpose of putting their (non-power-off) idle state phandles in
->>>domain-idle-states, we are "lying" because no true power domain exists
->>>there.
->>>
->>>Am I correct that that's your opposition?
->>>
->>>If so, it seems we essentially disagree on the definition of a power
->>>domain, i.e. you define it as a set of devices that are powered on/off
->>>together while I define it as a set of devices whose power states
->>>(including idle states, not just on/off) are tied together. I said
->>>something similar on another thread [1] which died out.
->>>
->>>Do you agree that this is basically where we disagree, or am I missing
->>>something else?
->>>
->>>[2] http://www.spinics.net/lists/devicetree/msg141050.html
->>>
->> Yes, you are right, I disagree with the definition of a domain around a
->> device.
-> OK, great.
->> However, as long as you don't force SoC's to define devices in
->> the CPU PM domain to have their own virtual domains, I have no problem.
->> You are welcome to define it the way you want for Juno or any other
->> platform.
-> I don't think that's true; the bindings have to work the same way for
-> all platforms. If for Juno we put CPU idle state phandles in a
-> domain-idle-states property for per-CPU domains then, with the current
-> implementation, the CPU-level idle states would be duplicated between
-> cpuidle and the CPU PM domains.
->> I don't want that to be the forced and expected out of all
->> SoCs. All I am saying here is that the current implementation would
->> handle your case as well.
->
-> The current implementation certainly does cover the work I want to
-> do. The suggestion of per-device power domains for devices/CPUs with
-> their own idle states is simply intended to minimise the binding design,
-> since we'd no longer need cpu-idle-states or device-idle-states
-> (the latter was proposed elsewhere).
->
-> I am fine with the bindings as they are implemented currently so long
-> as:
->
-> - The binding doc makes clear how idle state phandles should be split
->   between cpu-idle-states and domain-idle-states. It should make it
->   obvious that no phandle should ever appear in both properties. It
->   would even be worth briefly going over the backward-compatibility
->   implications (e.g. what happens with old-kernel/new-DT and
->   new-kernel/old-DT combos if a platform has OSI and PC support and we
->   move cluster-level idle state phandles out of cpu-idle-states and into
->   domai-idle-states).
->
-> - We have a reason against the definition of power domains as "a set of
->   devices bound by a common power (including idle) state", since that
->   definition would simplify the bindings. In my view, "nobody thinks
->   that's what a power domain is" _is_ a compelling reason, so if others
->   on the list get involved I'm convinced. I think I speak for Sudeep
->   here too.
+OK, good, but please tell me why kbuild reported that build error?
 
-I think we're having some terminology issues...
-
-FWIW, the kernel terminolgy is actually "PM domain", not power domain.
-This was intentional because the goal of the PM domain was to group
-devices that some PM features.  To be very specific to the kernel, they
-us the same set of PM callbacks.  Today, this is most commonly used to
-model power domains, where a group of devices share a power rail, but it
-does not need to be limited to that.
-
-That being said, I'm having a hard time understanding the root of the
-disagreement.
-
-It seems that you and Sudeep would like to use domain-idle-states to
-replace/superceed cpu-idle-states with the primary goal (and benefit)
-being that it simplifies the DT bindings.  Is that correct?
-
-The objections have come in because that means that implies that CPUs
-become their own domains, which may not be the case in hardware in the
-sense that they share a power rail.
-
-However, IMO, thinking of a CPU as it's own "PM domain" may make some
-sense based on the terminology above.
-
-I think the other objection may be that using a genpd to model domain
-with only a single device in it may be overkill, and I agree with that.
-But, I'm not sure if making CPUs use domain-idle-states implies that
-they necessarily have to use genpd is what you are proposing.  Maybe
-someone could clarify that?
-
-Kevin
+Best regards,
+Krzysztof
