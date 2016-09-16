@@ -1,130 +1,173 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 16 Sep 2016 09:50:03 -0600
-Subject: [PATCH V8 6/7] perf tools: adding PMU configuration to tools
+Date: Fri, 16 Sep 2016 09:50:02 -0600
+Subject: [PATCH V8 5/7] perf tools: pushing configuration down to PMU driver
 In-Reply-To: <1474041004-13956-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1474041004-13956-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1474041004-13956-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1474041004-13956-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the required mechanic is there to deal with PMU specific
-configuration, add the functionality to the tools where events
-can be selected.
+This patch adds a PMU callback and the required mechanic so that
+drivers can process the command line configuration elements found
+in evsel::config_terms.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Acked-by: Jiri Olsa <jolsa@kernel.org>
 ---
- tools/perf/builtin-record.c | 10 ++++++++++
- tools/perf/builtin-stat.c   |  9 +++++++++
- tools/perf/builtin-top.c    | 13 +++++++++++++
- 3 files changed, 32 insertions(+)
+ tools/perf/util/Build         |  1 +
+ tools/perf/util/drv_configs.c | 77 +++++++++++++++++++++++++++++++++++++++++++
+ tools/perf/util/drv_configs.h | 26 +++++++++++++++
+ tools/perf/util/pmu.h         |  2 ++
+ 4 files changed, 106 insertions(+)
+ create mode 100644 tools/perf/util/drv_configs.c
+ create mode 100644 tools/perf/util/drv_configs.h
 
-diff --git a/tools/perf/builtin-record.c b/tools/perf/builtin-record.c
-index 6355902fbfc8..ada7fa29ec3f 100644
---- a/tools/perf/builtin-record.c
-+++ b/tools/perf/builtin-record.c
-@@ -22,6 +22,7 @@
- #include "util/evlist.h"
- #include "util/evsel.h"
- #include "util/debug.h"
-+#include "util/drv_configs.h"
- #include "util/session.h"
- #include "util/tool.h"
- #include "util/symbol.h"
-@@ -383,6 +384,7 @@ static int record__open(struct record *rec)
- 	struct perf_evlist *evlist = rec->evlist;
- 	struct perf_session *session = rec->session;
- 	struct record_opts *opts = &rec->opts;
-+	struct perf_evsel_config_term *err_term;
- 	int rc = 0;
+diff --git a/tools/perf/util/Build b/tools/perf/util/Build
+index 91c5f6e1af59..53cbbbb6ddb9 100644
+--- a/tools/perf/util/Build
++++ b/tools/perf/util/Build
+@@ -85,6 +85,7 @@ libperf-y += term.o
+ libperf-y += help-unknown-cmd.o
+ libperf-y += mem-events.o
+ libperf-y += vsprintf.o
++libperf-y += drv_configs.o
  
- 	perf_evlist__config(evlist, opts, &callchain_param);
-@@ -412,6 +414,14 @@ try_again:
- 		goto out;
- 	}
- 
-+	if (perf_evlist__apply_drv_configs(evlist, &pos, &err_term)) {
-+		error("failed to set config \"%s\" on event %s with %d (%s)\n",
-+		      err_term->val.drv_cfg, perf_evsel__name(pos), errno,
-+		      strerror_r(errno, msg, sizeof(msg)));
-+		rc = -1;
-+		goto out;
+ libperf-$(CONFIG_LIBBPF) += bpf-loader.o
+ libperf-$(CONFIG_BPF_PROLOGUE) += bpf-prologue.o
+diff --git a/tools/perf/util/drv_configs.c b/tools/perf/util/drv_configs.c
+new file mode 100644
+index 000000000000..1647f285c629
+--- /dev/null
++++ b/tools/perf/util/drv_configs.c
+@@ -0,0 +1,77 @@
++/*
++ * drv_configs.h: Interface to apply PMU specific configuration
++ * Copyright (c) 2016-2018, Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
++
++#include "drv_configs.h"
++#include "evlist.h"
++#include "evsel.h"
++#include "pmu.h"
++
++static int
++perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
++			      struct perf_evsel_config_term **err_term)
++{
++	bool found = false;
++	int err = 0;
++	struct perf_evsel_config_term *term;
++	struct perf_pmu *pmu = NULL;
++
++	while ((pmu = perf_pmu__scan(pmu)) != NULL)
++		if (pmu->type == evsel->attr.type) {
++			found = true;
++			break;
++		}
++
++	list_for_each_entry(term, &evsel->config_terms, list) {
++		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
++			continue;
++
++		/*
++		 * We have a configuration term, report an error if we
++		 * can't find the PMU or if the PMU driver doesn't support
++		 * cmd line driver configuration.
++		 */
++		if (!found || !pmu->set_drv_config) {
++			err = -EINVAL;
++			*err_term = term;
++			break;
++		}
++
++		err = pmu->set_drv_config(term);
++		if (err) {
++			*err_term = term;
++			break;
++		}
 +	}
 +
- 	rc = record__mmap(rec);
- 	if (rc)
- 		goto out;
-diff --git a/tools/perf/builtin-stat.c b/tools/perf/builtin-stat.c
-index 3c7452b39f57..6b85eecdd1bc 100644
---- a/tools/perf/builtin-stat.c
-+++ b/tools/perf/builtin-stat.c
-@@ -52,6 +52,7 @@
- #include "util/evlist.h"
- #include "util/evsel.h"
- #include "util/debug.h"
-+#include "util/drv_configs.h"
- #include "util/color.h"
- #include "util/stat.h"
- #include "util/header.h"
-@@ -539,6 +540,7 @@ static int __run_perf_stat(int argc, const char **argv)
- 	int status = 0;
- 	const bool forks = (argc > 0);
- 	bool is_pipe = STAT_RECORD ? perf_stat.file.is_pipe : false;
-+	struct perf_evsel_config_term *err_term;
- 
- 	if (interval) {
- 		ts.tv_sec  = interval / 1000;
-@@ -610,6 +612,13 @@ try_again:
- 		return -1;
- 	}
- 
-+	if (perf_evlist__apply_drv_configs(evsel_list, &counter, &err_term)) {
-+		error("failed to set config \"%s\" on event %s with %d (%s)\n",
-+		      err_term->val.drv_cfg, perf_evsel__name(counter), errno,
-+		      strerror_r(errno, msg, sizeof(msg)));
-+		return -1;
++	return err;
++}
++
++int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
++				   struct perf_evsel **err_evsel,
++				   struct perf_evsel_config_term **err_term)
++{
++	struct perf_evsel *evsel;
++	int err = 0;
++
++	evlist__for_each_entry(evlist, evsel) {
++		err = perf_evsel__apply_drv_configs(evsel, err_term);
++		if (err) {
++			*err_evsel = evsel;
++			break;
++		}
 +	}
 +
- 	if (STAT_RECORD) {
- 		int err, fd = perf_data_file__fd(&perf_stat.file);
- 
-diff --git a/tools/perf/builtin-top.c b/tools/perf/builtin-top.c
-index 418ed94756d3..0ce3852daaa0 100644
---- a/tools/perf/builtin-top.c
-+++ b/tools/perf/builtin-top.c
-@@ -24,6 +24,7 @@
- #include "util/annotate.h"
- #include "util/config.h"
- #include "util/color.h"
-+#include "util/drv_configs.h"
- #include "util/evlist.h"
- #include "util/evsel.h"
- #include "util/machine.h"
-@@ -940,6 +941,10 @@ static int callchain_param__setup_sample_type(struct callchain_param *callchain)
- 
- static int __cmd_top(struct perf_top *top)
- {
-+	char msg[512];
-+	struct perf_evsel *pos;
-+	struct perf_evsel_config_term *err_term;
-+	struct perf_evlist *evlist = top->evlist;
- 	struct record_opts *opts = &top->record_opts;
- 	pthread_t thread;
- 	int ret;
-@@ -976,6 +981,14 @@ static int __cmd_top(struct perf_top *top)
- 	if (ret)
- 		goto out_delete;
- 
-+	ret = perf_evlist__apply_drv_configs(evlist, &pos, &err_term);
-+	if (ret) {
-+		error("failed to set config \"%s\" on event %s with %d (%s)\n",
-+			err_term->val.drv_cfg, perf_evsel__name(pos), errno,
-+			strerror_r(errno, msg, sizeof(msg)));
-+		goto out_delete;
-+	}
++	return err;
++}
+diff --git a/tools/perf/util/drv_configs.h b/tools/perf/util/drv_configs.h
+new file mode 100644
+index 000000000000..32bc9babc2e0
+--- /dev/null
++++ b/tools/perf/util/drv_configs.h
+@@ -0,0 +1,26 @@
++/*
++ * drv_configs.h: Interface to apply PMU specific configuration
++ * Copyright (c) 2016-2018, Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
 +
- 	top->session->evlist = top->evlist;
- 	perf_session__set_id_hdr_size(top->session);
++#ifndef __PERF_DRV_CONFIGS_H
++#define __PERF_DRV_CONFIGS_H
++
++#include "drv_configs.h"
++#include "evlist.h"
++#include "evsel.h"
++
++int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
++				   struct perf_evsel **err_evsel,
++				   struct perf_evsel_config_term **term);
++#endif
+diff --git a/tools/perf/util/pmu.h b/tools/perf/util/pmu.h
+index 5d7e84466bee..743422ad900b 100644
+--- a/tools/perf/util/pmu.h
++++ b/tools/perf/util/pmu.h
+@@ -4,6 +4,7 @@
+ #include <linux/bitmap.h>
+ #include <linux/perf_event.h>
+ #include <stdbool.h>
++#include "evsel.h"
+ #include "parse-events.h"
  
+ enum {
+@@ -25,6 +26,7 @@ struct perf_pmu {
+ 	struct list_head format;  /* HEAD struct perf_pmu_format -> list */
+ 	struct list_head aliases; /* HEAD struct perf_pmu_alias -> list */
+ 	struct list_head list;    /* ELEM */
++	int (*set_drv_config)	(struct perf_evsel_config_term *term);
+ };
+ 
+ struct perf_pmu_info {
 -- 
 2.7.4
