@@ -1,52 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Sep 2016 11:20:50 +0100
-Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
-In-Reply-To: <1474007187-18673-1-git-send-email-agraf@suse.de>
-References: <1474007187-18673-1-git-send-email-agraf@suse.de>
-Message-ID: <57DBC782.7080305@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 16 Sep 2016 12:22:34 +0200
+Subject: [PATCH v7 02/11] arm64: dts: r8a7795: salvator-x: enable UHS for
+ SDHI 0 & 3
+In-Reply-To: <20160916095500.GG14562@verge.net.au>
+References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
+ <1473764228-24768-3-git-send-email-horms+renesas@verge.net.au>
+ <20160916095500.GG14562@verge.net.au>
+Message-ID: <20160916102234.GG1411@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-
-On 16/09/16 07:26, Alexander Graf wrote:
-> Some systems out there (well, one type in particular - the Raspberry Pi series)
-> do have virtualization capabilities in the core, but no ARM GIC interrupt
-> controller.
+On Fri, Sep 16, 2016 at 11:55:00AM +0200, Simon Horman wrote:
+> On Tue, Sep 13, 2016 at 12:56:59PM +0200, Simon Horman wrote:
+> > From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > 
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> To run on these systems, the cleanest route is to just handle all
-> interrupt delivery in user space and only deal with IRQ pins in the core
-> side in KVM.
-> 
-> This works pretty well already, but breaks when the guest starts to use
-> architected timers, as these are handled straight inside kernel space today.
-> 
-> This patch set allows user space to receive vtimer events as well as mask
-> them, so that we can handle all vtimer related interrupt injection from user
-> space, enabling us to use architected timer with user space gic emulation.
+> As SDR50 support is present in the driver in mainline (correct me if I am
+> wrong!) I am queuing this up.
 
-I have already voiced my concerns in the past, including face to face,
-and I'm going to repeat it: I not keen at all on adding a new userspace
-interface that is going to bitrot extremely quickly.
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Let's face it, this new ABI will have a single user, with a limited
-shelf life. I understand that the RPi is a popular product, but it looks
-fairly obvious that this kind of sub-standard HW will eventually
-disappear. We'll then be left with a userspace ABI that will break at
-every single release, given that nobody in the RPi community actually
-uses a mainline kernel.
-
-And breaking this ABI will introduce userspace exploitable bugs, like
-the one you've already shown. If anything, I would have loved to
-completely kill the whole userspace GIC, because nobody cares. Yes, I
-understand it is fun to have KVM running on the RPi. But the maintenance
-costs far outweigh the fun aspect already.
-
-You could still run KVM with an external emulated timer (not the arch
-timer). No need for a new ABI for that.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160916/dbe6ea4b/attachment.sig>
