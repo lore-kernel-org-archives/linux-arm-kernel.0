@@ -1,48 +1,63 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Fri, 16 Sep 2016 09:55:01 +0200
-Subject: [GIT PULL] STi DT update for v4.9, round 3
-Message-ID: <e51819f2-a354-7153-3b86-a92e99b85213@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Sep 2016 08:55:24 +0100
+Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
+In-Reply-To: <20160704101132.GC1639@arm.com>
+References: <cover.1457539621.git.jglauber@cavium.com>
+ <20160628102419.GA5425@arm.com> <20160628140459.GA27541@hardcore>
+ <20160704101132.GC1639@arm.com>
+Message-ID: <20160916075523.GJ3380@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof
+Hi Jan,
 
-PLease consider this next batch for v4.9, dedicated for clock improvements
+On Mon, Jul 04, 2016 at 11:11:32AM +0100, Will Deacon wrote:
+> On Tue, Jun 28, 2016 at 04:04:59PM +0200, Jan Glauber wrote:
+> > On Tue, Jun 28, 2016 at 11:24:20AM +0100, Will Deacon wrote:
+> > > On Wed, Mar 09, 2016 at 05:21:02PM +0100, Jan Glauber wrote:
+> > > > This patch series provides access to various counters on the ThunderX SOC.
+> > > > 
+> > > > For details of the uncore implementation see patch #1.
+> > > > 
+> > > > Patches #2-5 add the various ThunderX specific PMUs.
+> > > > 
+> > > > As suggested I've put the files under drivers/perf/uncore. I would
+> > > > prefer this location over drivers/bus because not all of the uncore
+> > > > drivers are bus related.
+> > > 
+> > > What's the status of these patches? Were you planning to send a new
+> > > version?
+> >
+> > I was half-way through with addressing Mark's review comments when
+> > got side-tracked.
+> > 
+> > The principle question these patches raised remains open though in my
+> > opinion, how to determine the socket a device belongs to.
+> > 
+> > There is no first-class interface to ask a device or the firmware
+> > which socket the device lives on.
+> > 
+> > The options I see are:
+> > A) Using NUMA node information, depends on CONFIG_NUMA
+> > B) Decoding the socket bits of the PCI BAR address
+> > C) Using PCI topology information
+> > 
+> > A is what I tried, but I agree that depending on CONFIG_NUMA is not a good
+> > solution. B would be easy but looks not very future-proof. So option C
+> > is what is left...
+> 
+> Sorry to go full circle on this, but "depends on NUMA" sounds better
+> than deriving NUMA topology from PCI to me. The only worry I have is if
+> the NUMA information ends up being insufficient in the long-term, and we
+> end up with a mixture of the three options above in order to figure out
+> the PMU topology.
+> 
+> As long as you're happy that the PMU:NUMA topology remains 1:1, then I
+> have no objections. The moment you need extra hacks on the side, we should
+> probably drop the NUMA dependency altogether and figure it out some other
+> way.
 
-The following changes since commit 443fd7c92f5a000796b02683157d17b2575450e1:
+Any news on this series, or did I miss a v3? I was hoping to have this in
+for 4.9, but it seems to have stalled :(
 
-  ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi audio card (2016-09-14 13:37:29 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-dt-for-v4.9-3
-
-for you to fetch changes up to 3a74152ce62e7ec1b8a5604b10e40d2a66d8f43b:
-
-  ARM: dts: STiH410: clock configuration to address 720p and 1080p (2016-09-16 09:42:13 +0200)
-
-----------------------------------------------------------------
-
-Clock improvement for video playback
-
-This serie allows to increase video resolutions and make audio
-adjustment during a video playback for STiH407 family socs.
-
-----------------------------------------------------------------
-Gabriel Fernandez (9):
-      ARM: dts: STiH4xx: Simplify clock binding of STiH4xx platforms
-      ARM: dts: STiH407: Enable clock propagation for audio clocks
-      ARM: dts: STiH410: Enable clock propagation for audio clocks
-      ARM: dts: STiH418: Enable clock propagation for audio clocks
-      ARM: dts: STiH407: Enable synchronous clock mode for video clocks
-      ARM: dts: STiH410: Enable synchronous clock mode for video clocks
-      ARM: dts: STiH418: Enable synchronous clock mode for video clocks
-      ARM: dts: STi: STiH407: clock configuration to address 720p and 1080p
-      ARM: dts: STiH410: clock configuration to address 720p and 1080p
-
- arch/arm/boot/dts/stih407-clock.dtsi | 22 +++++++++++-----------
- arch/arm/boot/dts/stih407.dtsi       | 16 +++++++++++++---
- arch/arm/boot/dts/stih410-clock.dtsi | 20 ++++++++++----------
- arch/arm/boot/dts/stih410.dtsi       | 16 +++++++++++++---
- arch/arm/boot/dts/stih418-clock.dtsi | 20 ++++++++++----------
- 5 files changed, 57 insertions(+), 37 deletions(-)
+Will
