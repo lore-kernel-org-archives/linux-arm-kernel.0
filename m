@@ -1,51 +1,38 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 16 Sep 2016 11:33:17 +0300
-Subject: [PATCH 2/9] dmaengine: edma: Use enum for eDMA binding type (legacy
- vs TPCC)
+Date: Fri, 16 Sep 2016 11:33:16 +0300
+Subject: [PATCH 1/9] dmaengine: edma: Add missing MODULE_DEVICE_TABLE() for
+ of_device_id structs
 In-Reply-To: <20160916083324.29133-1-peter.ujfalusi@ti.com>
 References: <20160916083324.29133-1-peter.ujfalusi@ti.com>
-Message-ID: <20160916083324.29133-3-peter.ujfalusi@ti.com>
+Message-ID: <20160916083324.29133-2-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following warning when compiling the driver for 64bit
-architectures (x86_64 for example):
-drivers/dma/edma.c:2185:16: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-   if (match && (u32)match->data == EDMA_BINDING_TPCC)
-                ^
+The MODULE_DEVICE_TABLE() were missing from the driver for the of_device_id
+structures.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/edma.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ drivers/dma/edma.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index c2098a4b4dcf..4c8818278fcc 100644
+index 3d277fa76c1a..c2098a4b4dcf 100644
 --- a/drivers/dma/edma.c
 +++ b/drivers/dma/edma.c
-@@ -261,8 +261,11 @@ static const struct edmacc_param dummy_paramset = {
- 	.ccnt = 1,
+@@ -274,11 +274,13 @@ static const struct of_device_id edma_of_ids[] = {
+ 	},
+ 	{}
  };
++MODULE_DEVICE_TABLE(of, edma_of_ids);
  
--#define EDMA_BINDING_LEGACY	0
--#define EDMA_BINDING_TPCC	1
-+enum edma_binding_type {
-+	EDMA_BINDING_LEGACY = 0,
-+	EDMA_BINDING_TPCC,
-+};
-+
- static const struct of_device_id edma_of_ids[] = {
- 	{
- 		.compatible = "ti,edma3",
-@@ -2184,7 +2187,8 @@ static int edma_probe(struct platform_device *pdev)
- 		const struct of_device_id *match;
+ static const struct of_device_id edma_tptc_of_ids[] = {
+ 	{ .compatible = "ti,edma3-tptc", },
+ 	{}
+ };
++MODULE_DEVICE_TABLE(of, edma_tptc_of_ids);
  
- 		match = of_match_node(edma_of_ids, node);
--		if (match && (u32)match->data == EDMA_BINDING_TPCC)
-+		if (match &&
-+		    (enum edma_binding_type)match->data == EDMA_BINDING_TPCC)
- 			legacy_mode = false;
- 
- 		info = edma_setup_info_from_dt(dev, legacy_mode);
+ static inline unsigned int edma_read(struct edma_cc *ecc, int offset)
+ {
 -- 
 2.10.0
