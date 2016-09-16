@@ -1,84 +1,111 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Fri, 16 Sep 2016 13:28:42 +0000
-Subject: [PATCH v5 1/2] ARM: dts: imx6: Add support for Toradex Apalis
- iMX6Q/D SoM
-In-Reply-To: <97a3d506-35a0-2a15-18ef-2719c0596cc1@mentor.com>
-References: <1454688741-4238-1-git-send-email-marcel.ziswiler@toradex.com>
- <1454688741-4238-2-git-send-email-marcel.ziswiler@toradex.com>
- <97a3d506-35a0-2a15-18ef-2719c0596cc1@mentor.com>
-Message-ID: <1474032521.3103.17.camel@toradex.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Sep 2016 14:29:53 +0100
+Subject: [PATCH v9 07/10] arm: arm64: pmu: Assign platform PMU CPU affinity
+In-Reply-To: <1473892358-22574-8-git-send-email-jeremy.linton@arm.com>
+References: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
+ <1473892358-22574-8-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20160916132953.GR3380@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir
+On Wed, Sep 14, 2016 at 05:32:35PM -0500, Jeremy Linton wrote:
+> On systems with multiple PMU types the PMU to CPU affinity
+> needs to be detected and set. The CPU to interrupt affinity
+> should also be set.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  drivers/perf/arm_pmu.c | 63 ++++++++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 53 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 58117d7..63f16a5 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -11,6 +11,7 @@
+>   */
+>  #define pr_fmt(fmt) "hw perfevents: " fmt
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/bitmap.h>
+>  #include <linux/cpumask.h>
+>  #include <linux/cpu_pm.h>
+> @@ -24,6 +25,7 @@
+>  #include <linux/irq.h>
+>  #include <linux/irqdesc.h>
+>  
+> +#include <asm/cpu.h>
+>  #include <asm/cputype.h>
+>  #include <asm/irq_regs.h>
+>  
+> @@ -876,25 +878,67 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+>  }
+>  
+>  /*
+> - * CPU PMU identification and probing.
+> + * CPU PMU identification and probing. Its possible to have
+> + * multiple CPU types in an ARM machine. Assure that we are
+> + * picking the right PMU types based on the CPU in question
+>   */
+> -static int probe_current_pmu(struct arm_pmu *pmu,
+> -			     const struct pmu_probe_info *info)
+> +static int probe_plat_pmu(struct arm_pmu *pmu,
+> +			     const struct pmu_probe_info *info,
+> +			     unsigned int pmuid)
+>  {
+> -	int cpu = get_cpu();
+> -	unsigned int cpuid = read_cpuid_id();
+>  	int ret = -ENODEV;
+> +	int cpu;
+> +	int aff_ctr = 0;
+> +	static int duplicate_pmus;
+> +	struct platform_device *pdev = pmu->plat_device;
+> +	int irq = platform_get_irq(pdev, 0);
+>  
+> -	pr_info("probing PMU on CPU %d\n", cpu);
+> +	if (irq >= 0 && !irq_is_percpu(irq)) {
+> +		pmu->irq_affinity = kcalloc(pdev->num_resources, sizeof(int),
+> +					    GFP_KERNEL);
+> +		if (!pmu->irq_affinity)
+> +			return -ENOMEM;
+> +	}
+>  
+> +	for_each_possible_cpu(cpu) {
+> +		unsigned int cpuid = read_specific_cpuid(cpu);
+> +
+> +		if (cpuid == pmuid) {
+> +			cpumask_set_cpu(cpu, &pmu->supported_cpus);
+> +			if (pmu->irq_affinity) {
+> +				pmu->irq_affinity[aff_ctr] = cpu;
+> +				aff_ctr++;
+> +			}
+> +		}
+> +	}
+> +
+> +	/* find the type of PMU given the CPU */
+>  	for (; info->init != NULL; info++) {
+> -		if ((cpuid & info->mask) != info->cpuid)
+> +		if ((pmuid & info->mask) != info->cpuid)
+>  			continue;
+>  		ret = info->init(pmu);
+> +		/*
+> +		 * if this pmu declaration is unspecified and we have
+> +		 * previously found a PMU on this platform then append
+> +		 * a PMU number to the pmu name. This avoids changing
+> +		 * the names of PMUs that are specific to a class of CPUs.
+> +		 * The assumption is that if we match a specific PMU in the
+> +		 * provided pmu_probe_info then it's unique, and another PMU
+> +		 * in the system will match a different entry rather than
+> +		 * needing the _number to assure its unique.
+> +		 */
+> +		if ((!info->cpuid) && (duplicate_pmus)) {
 
-On Mon, 2016-08-29 at 16:28 +0300, Vladimir Zapolskiy wrote:
-> Hi Marcel,
-> 
-> On 02/05/2016 06:12 PM, Marcel Ziswiler wrote:
-> > 
-> > From: Petr ?tetiar <ynezz@true.cz>
-> > 
-> > Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> > Signed-off-by: Petr ?tetiar <ynezz@true.cz>
-> > Reviewed-by: Stefan Agner <stefan@agner.ch>
-> > ---
-> > 
-> because the change is in mainline now below is kind of out of date
-> information, but you may find it helpful.
-> 
-> [snip]
-> 
-> > 
-> > - fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
-> This is not needed.
-> 
-> [snip]
-> 
-> > 
-> > +	/* DDC_I2C: I2C2_SDA/SCL on MXM3 205/207 */
-> > +	i2cddc: i2c at 0 {
-> > +		compatible = "i2c-gpio";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_i2c_ddc>;
-> > +		gpios = <&gpio3 16 GPIO_ACTIVE_HIGH /* sda */
-> > +			?&gpio2 30 GPIO_ACTIVE_HIGH /* scl */
-> > +			>;
-> > +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> > +		status = "disabled";
-> > +	};
-> > +
-> This is not needed.
-> 
-> [snip]
-> 
-> > 
-> > +	pinctrl_i2c_ddc: gpioi2cddcgrp {
-> > +		fsl,pins = <
-> > +			/* DDC bitbang */
-> > +			MX6QDL_PAD_EIM_EB2__GPIO2_IO30 0x1b0b0
-> > +			MX6QDL_PAD_EIM_D16__GPIO3_IO16 0x1b0b0
-> > +		>;
-> > +	};
-> > +
-> Practically you don't need this overcomplicated GPIO-based bitbanging
-> to emulate I2C, because the DW HDMI controller has a reduced I2C
-> controller on board, you may take a look at its support published
-> here:
-> 
-> ????http://www.spinics.net/lists/dri-devel/msg116308.html
-> 
-> To utilize it the pads should be set to HDMI function instead of
-> I2C or GPIO.
+Hmm, the duplicate_pmus check looks a little odd here. Doesn't it mean
+that you'd end up with things like:
 
-Works nicely indeed, thanks for letting us know.
+"arm,armv8-pmuv3"
+"arm,armv8-pmuv3_1"
 
-> --
-> With best wishes,
-> Vladimir
+which looks needlessly fiddly to parse. Is this intentional?
 
-Best wishes to you too!
-
-Cheers
-
-Marcel
+Will
