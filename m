@@ -1,120 +1,85 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 16 Sep 2016 15:44:30 +0300
-Subject: [PATCH V6 3/3] perf tools: adding support for address filters
-In-Reply-To: <1473957428-28311-4-git-send-email-mathieu.poirier@linaro.org>
-References: <1473957428-28311-1-git-send-email-mathieu.poirier@linaro.org>
- <1473957428-28311-4-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <a157cb6b-9743-4c63-d5d4-3f7d467f1b59@intel.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 16 Sep 2016 13:49:21 +0100
+Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <1757972.L4qX7sAfEW@avalon>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+ <2210422.ogrYIr1eQU@avalon> <55e0ee95-fcbb-918a-da94-85f3aeb6ed37@arm.com>
+ <1757972.L4qX7sAfEW@avalon>
+Message-ID: <cea119f1-18d5-675d-ee33-c22b0c8e7693@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/16 19:37, Mathieu Poirier wrote:
-> This patch makes it possible to use the current filter
-> framework with address filters.  That way address filters for
-> HW tracers such as CoreSight and IntelPT can be communicated
-
-IntelPT -> Intel PT
-
-> to the kernel drivers.
+On 16/09/16 13:05, Laurent Pinchart wrote:
+[...]
+>>>> One concern I have is that we might get an awkward situation if we ever
+>>>> encounter one DMA engine hardware that is used in different systems that
+>>>> all have an IOMMU, but on some of them the connection between the DMA
+>>>> master and the slave FIFO bypasses the IOMMU while on others the IOMMU
+>>>> is required.
+>>>
+>>> Do you mean systems where some of the channels of a specific DMA engine go
+>>> through the IOMMU while others do not ? We indeed have no solution today
+>>> for such a situation.
+>>>
+>>> The problem is a bit broader than that, we'll also have an issue with DMA
+>>> engines that have different channels served by different IOMMUs. I recall
+>>> discussing this in the past with you, and the solution you proposed was to
+>>> add a channel index to struct dma_attrs seems good to me. To support the
+>>> case where some channels don't go through an IOMMU we would only need
+>>> support for null entries in the IOMMUs list associated with a device (for
+>>> instance in the DT case null entries in the iommus property).
+>>
+>> I think at that point we just create the channels as child devices of
+>> the main dmaengine device so they each get their own DMA ops, and can do
+>> whatever. The Qualcomm HIDMA driver already does that for a very similar
+>> reason (so that the IOMMU can map individual channels into different
+>> guest VMs).
 > 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> That's another option, but it seems more like a workaround to me, instead of a 
+> proper solution to fix the more global problem of multiple memory paths within 
+> a single device. I have other hardware devices that can act as bus masters 
+> through different paths (for instance a display-related device that fetches 
+> data and commands through different paths). Luckily so far all those paths are 
+> served by the same IOMMU, but there's no guarantee this will remain true in 
+> the future. Furthermore, even today, the IOMMU connected to that device has 
+> the ability to selectively enable and disable its ports. I have to keep them 
+> all enabled due to the lack of channel information in the DMA mapping and 
+> IOMMU APIs, leading to increased power consumption.
 
-Otherwise:
+Indeed, I think both the Exynos and Rockchip IOMMU drivers already do
+cater for a device mastering though multiple discrete IOMMUs, not being
+the fancy multi-port multi-context ones like yours and mine.
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+I guess what we could really do with is a decent abstraction of
+multi-master peripherals at the device level; a "threads within the same
+process" sort of granularity, as it were. I'd envisage it more along the
+lines of how we handle NUMA, i.e. dma_map_page_attrs(...) becomes a
+wrapper for dma_map_page_attrs_multi(..., CHANNEL_ALL), and trickier
+users can call the latter with the a more specific channel(s) argument
+(maybe it's a bitmask rather than an index). Meanwhile,
+dev->archdata.dma_ops may point to a device-specific array of
+dma_map_ops, which the DMA API backend iterates over if necessary.
 
-> ---
->  tools/perf/util/evsel.c        |  5 +++++
->  tools/perf/util/evsel.h        |  2 ++
->  tools/perf/util/parse-events.c | 39 ++++++++++++++++++++++++++++++++++-----
->  3 files changed, 41 insertions(+), 5 deletions(-)
+Strangely, that doesn't actually sound too horrible.
+
+Robin.
+
 > 
-> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-> index a99e82d97df2..e0bb399dcdd4 100644
-> --- a/tools/perf/util/evsel.c
-> +++ b/tools/perf/util/evsel.c
-> @@ -1067,6 +1067,11 @@ int perf_evsel__append_tp_filter(struct perf_evsel *evsel, const char *filter)
->  	return perf_evsel__append_filter(evsel, "(%s) && (%s)", filter);
->  }
->  
-> +int perf_evsel__append_addr_filter(struct perf_evsel *evsel, const char *filter)
-> +{
-> +	return perf_evsel__append_filter(evsel, "%s,%s", filter);
-> +}
-> +
->  int perf_evsel__enable(struct perf_evsel *evsel)
->  {
->  	int nthreads = thread_map__nr(evsel->threads);
-> diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
-> index 36ed0997e65b..49c51fb3d05c 100644
-> --- a/tools/perf/util/evsel.h
-> +++ b/tools/perf/util/evsel.h
-> @@ -234,6 +234,8 @@ void perf_evsel__set_sample_id(struct perf_evsel *evsel,
->  
->  int perf_evsel__set_filter(struct perf_evsel *evsel, const char *filter);
->  int perf_evsel__append_tp_filter(struct perf_evsel *evsel, const char *filter);
-> +int perf_evsel__append_addr_filter(struct perf_evsel *evsel,
-> +				   const char *filter);
->  int perf_evsel__apply_filter(struct perf_evsel *evsel, int ncpus, int nthreads,
->  			     const char *filter);
->  int perf_evsel__enable(struct perf_evsel *evsel);
-> diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-> index 751b48fc641c..c23f2d5fc134 100644
-> --- a/tools/perf/util/parse-events.c
-> +++ b/tools/perf/util/parse-events.c
-> @@ -1755,20 +1755,49 @@ foreach_evsel_in_last_glob(struct perf_evlist *evlist,
->  static int set_filter(struct perf_evsel *evsel, const void *arg)
->  {
->  	const char *str = arg;
-> +	bool found = false;
-> +	int nr_addr_filters = 0;
-> +	struct perf_pmu *pmu = NULL;
->  
-> -	if (evsel == NULL || evsel->attr.type != PERF_TYPE_TRACEPOINT) {
-> -		fprintf(stderr,
-> -			"--filter option should follow a -e tracepoint option\n");
-> -		return -1;
-> +	if (evsel == NULL)
-> +		goto err;
-> +
-> +	if (evsel->attr.type == PERF_TYPE_TRACEPOINT) {
-> +		if (perf_evsel__append_tp_filter(evsel, str) < 0) {
-> +			fprintf(stderr,
-> +				"not enough memory to hold filter string\n");
-> +			return -1;
-> +		}
-> +
-> +		return 0;
->  	}
->  
-> -	if (perf_evsel__append_tp_filter(evsel, str) < 0) {
-> +	while ((pmu = perf_pmu__scan(pmu)) != NULL)
-> +		if (pmu->type == evsel->attr.type) {
-> +			found = true;
-> +			break;
-> +		}
-> +
-> +	if (found)
-> +		perf_pmu__scan_file(pmu, "nr_addr_filters",
-> +				    "%d", &nr_addr_filters);
-> +
-> +	if (!nr_addr_filters)
-> +		goto err;
-> +
-> +	if (perf_evsel__append_addr_filter(evsel, str) < 0) {
->  		fprintf(stderr,
->  			"not enough memory to hold filter string\n");
->  		return -1;
->  	}
->  
->  	return 0;
-> +
-> +err:
-> +	fprintf(stderr,
-> +		"--filter option should follow a -e tracepoint or HW tracer option\n");
-> +
-> +	return -1;
->  }
->  
->  int parse_filter(const struct option *opt, const char *str,
+>>> Now I see that struct dma_attrs has been replaced by unsigned long in
+>>>
+>>> commit 00085f1efa387a8ce100e3734920f7639c80caa3
+>>> Author: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> Date:   Wed Aug 3 13:46:00 2016 -0700
+>>>
+>>>     dma-mapping: use unsigned long for dma_attrs
+>>>
+>>> We still have enough bits to reserve some of them for a channel number,
+>>> but I'm not very happy with that patch as I can see how a future proposal
+>>> to handle the channel number through the DMA attributes will get rejected
+>>> on the grounds of bits starvation then :-(
+>>>
+>>>> I don't have any idea for how this could be handled in a generic way, so
+>>>> my best answer here is to hope we never get there, and if we do, handle
+>>>> it using some local hack in the driver.
 > 
