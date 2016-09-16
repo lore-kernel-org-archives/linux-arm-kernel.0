@@ -1,7 +1,7 @@
 From: agraf@suse.de (Alexander Graf)
-Date: Fri, 16 Sep 2016 07:06:19 +0200
+Date: Fri, 16 Sep 2016 07:09:13 +0200
 Subject: [PATCH v2] KVM: arm/arm64: Route vtimer events to user space
-Message-ID: <1474002379-29214-1-git-send-email-agraf@suse.de>
+Message-ID: <1474002553-30079-1-git-send-email-agraf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,15 +27,16 @@ A branch with WIP QEMU code can be found here:
 
 v1 -> v2:
 
-  - Add back curly brace that got lost
+  - Add back curly brace that got lost (and is very stubborn, sorry for
+    the resubmit to actually add it back for real)
 ---
  Documentation/virtual/kvm/api.txt |  28 ++++++++-
  arch/arm/include/asm/kvm_host.h   |   3 +
- arch/arm/kvm/arm.c                |  46 +++++++++++---
+ arch/arm/kvm/arm.c                |  47 +++++++++++---
  arch/arm64/include/asm/kvm_host.h |   3 +
  include/uapi/linux/kvm.h          |  14 +++++
  virt/kvm/arm/arch_timer.c         | 126 ++++++++++++++++++++++++++++----------
- 6 files changed, 177 insertions(+), 43 deletions(-)
+ 6 files changed, 178 insertions(+), 43 deletions(-)
 
 diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
 index 739db9a..6a64c53 100644
@@ -113,7 +114,7 @@ index de338d9..77d1f73 100644
  
  struct kvm_vm_stat {
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 75f130e..1b4b9a6 100644
+index 75f130e..57bdb71 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
 @@ -187,6 +187,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
@@ -183,10 +184,10 @@ index 75f130e..1b4b9a6 100644
  long kvm_arch_vcpu_ioctl(struct file *filp,
  			 unsigned int ioctl, unsigned long arg)
  {
-@@ -940,6 +965,13 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 		if (copy_from_user(&attr, argp, sizeof(attr)))
+@@ -941,6 +966,14 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
  			return -EFAULT;
  		return kvm_arm_vcpu_has_attr(vcpu, &attr);
+ 	}
 +	case KVM_ENABLE_CAP:
 +	{
 +		struct kvm_enable_cap cap;
@@ -194,9 +195,10 @@ index 75f130e..1b4b9a6 100644
 +		if (copy_from_user(&cap, argp, sizeof(cap)))
 +			return -EFAULT;
 +		return kvm_vcpu_ioctl_enable_cap(vcpu, &cap);
- 	}
++	}
  	default:
  		return -EINVAL;
+ 	}
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
 index 3eda975..3d01481 100644
 --- a/arch/arm64/include/asm/kvm_host.h
