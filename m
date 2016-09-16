@@ -1,37 +1,80 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri, 16 Sep 2016 15:50:26 +0200
-Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
-In-Reply-To: <20160916133027.GA27036@cbox>
-References: <1474007187-18673-1-git-send-email-agraf@suse.de>
- <57DBC782.7080305@arm.com>
- <7beb406b-6194-8451-2d92-9a4394ef91dd@redhat.com>
- <20160916123039.GB14140@cbox>
- <da8191ca-6fb1-f960-872c-d6bc27172db8@redhat.com>
- <20160916133027.GA27036@cbox>
-Message-ID: <1474033826.7158.10.camel@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Sep 2016 14:54:48 +0100
+Subject: [PATCH v5 4/6] arm/arm64: vgic-new: Introduce VENG0 and VENG1
+ fields to vmcr struct
+In-Reply-To: <1474028453-29132-5-git-send-email-vijay.kilari@gmail.com>
+References: <1474028453-29132-1-git-send-email-vijay.kilari@gmail.com>
+ <1474028453-29132-5-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <57DBF9A8.5040604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi,
+On 16/09/16 13:20, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> 
+> ICC_VMCR_EL2 supports virtual access to ICC_IGRPEN1_EL1.Enable
+> and ICC_IGRPEN0_EL1.Enable fields. Add grpen0 and grpen1 member
+> variables to struct vmcr to support read and write of these fields.
+> 
+> ICH_VMCR_CTLR_MASK is changed to mask only ICC_CTLR_EL1 fields.
 
-> That being said, I'm not categorically against these patches, but I
-> share Marc's view that we've already seen that non-vgic support had been
-> broken for multiple versions without anyone complaining,
+This comment doesn't match the patch.
 
-Oh, did this ever work?  Work as in "can actually run a virtual
-machine", not as in "kvm doesn't throw an error on initialization".
+> Also refactor vgic_set_vmcr and vgic_get_vmcr() code.
+> 
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> ---
+>  include/linux/irqchip/arm-gic-v3.h | 15 +++++++++++----
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c   | 16 ----------------
+>  virt/kvm/arm/vgic/vgic-mmio.c      | 16 ++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-v3.c        | 10 ++++++++--
+>  virt/kvm/arm/vgic/vgic.h           |  5 +++++
+>  5 files changed, 40 insertions(+), 22 deletions(-)
+> 
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 99ac022..88d83d3 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -352,8 +352,9 @@
+>  /*
+>   * CPU interface registers
+>   */
+> -#define ICC_CTLR_EL1_EOImode_drop_dir	(0U << 1)
+> -#define ICC_CTLR_EL1_EOImode_drop	(1U << 1)
+> +#define ICC_CTLR_EL1_EOImode_SHIFT	(1)
+> +#define ICC_CTLR_EL1_EOImode_drop_dir	(0U << ICC_CTLR_EL1_EOImode_SHIFT)
+> +#define ICC_CTLR_EL1_EOImode_drop	(1U << ICC_CTLR_EL1_EOImode_SHIFT)
+>  #define ICC_SRE_EL1_SRE			(1U << 0)
+>  
+>  /*
+> @@ -382,14 +383,20 @@
+>  #define ICH_HCR_EN			(1 << 0)
+>  #define ICH_HCR_UIE			(1 << 1)
+>  
+> -#define ICH_VMCR_CTLR_SHIFT		0
+> -#define ICH_VMCR_CTLR_MASK		(0x21f << ICH_VMCR_CTLR_SHIFT)
+> +#define ICH_VMCR_CBPR_SHIFT		4
+> +#define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
+> +#define ICH_VMCR_EOIM_SHIFT		9
+> +#define ICH_VMCR_EOIM_MASK		(1 << ICH_VMCR_EOIM_SHIFT)
+>  #define ICH_VMCR_BPR1_SHIFT		18
+>  #define ICH_VMCR_BPR1_MASK		(7 << ICH_VMCR_BPR1_SHIFT)
+>  #define ICH_VMCR_BPR0_SHIFT		21
+>  #define ICH_VMCR_BPR0_MASK		(7 << ICH_VMCR_BPR0_SHIFT)
+>  #define ICH_VMCR_PMR_SHIFT		24
+>  #define ICH_VMCR_PMR_MASK		(0xffUL << ICH_VMCR_PMR_SHIFT)
+> +#define ICH_VMCR_ENG0_SHIFT		0
+> +#define ICH_VMCR_ENG0_MASK		(1 << ICH_VMCR_ENG0_SHIFT)
+> +#define ICH_VMCR_ENG1_SHIFT		1
+> +#define ICH_VMCR_ENG1_MASK		(1 << ICH_VMCR_ENG1_SHIFT)
+>  
+>  #define ICC_IAR1_EL1_SPURIOUS		0x3ff
 
-> and without
-> automated testing or substantial interest in the work, the patches
-> really are likely to bit-rot.
+I've asked you to make this a separate patch, which you've ignored.
+Please make this change a separate patch, independent of any KVM change.
 
-Well, as far I know the rpi3 is the *only* aarch64 hardware which is
-easily available and can (with these patches) run kvm.
+Thanks,
 
-More powerful stuff with more ram and sata storage and gbit network
-(which I'd love to have to play with arm virt on real hardware) is
-announced to be available really soon now since ...  half a year at
-least?
-
-cheers,
-  Gerd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
