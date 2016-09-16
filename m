@@ -1,36 +1,30 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 16 Sep 2016 02:19:13 +0000
-Subject: [PATCH -next v2] ARM: orion: fix invalid use of sizeof in
- orion_ge00_switch_init()
-In-Reply-To: <1473990720-20605-1-git-send-email-weiyj.lk@gmail.com>
-References: <1473990720-20605-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <1473992353-7151-1-git-send-email-weiyj.lk@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 16 Sep 2016 10:55:51 +0800
+Subject: [PATCH v5 2/3] arm64: dts: Add ZTE ZX296718 SoC dts and Makefile
+In-Reply-To: <1473730926-1034-3-git-send-email-jun.nie@linaro.org>
+References: <1473730926-1034-1-git-send-email-jun.nie@linaro.org>
+ <1473730926-1034-3-git-send-email-jun.nie@linaro.org>
+Message-ID: <20160916025551.GD7398@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+On Tue, Sep 13, 2016 at 09:42:05AM +0800, Jun Nie wrote:
+> diff --git a/arch/arm64/boot/dts/zte/zx296718-evb.dts b/arch/arm64/boot/dts/zte/zx296718-evb.dts
+> new file mode 100644
+> index 0000000..820fe1c
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/zte/zx296718-evb.dts
+> @@ -0,0 +1,29 @@
+> +/*
+> + * ZTE Ltd. zx296718 Plaform
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * publishhed by the Free Software Foundation.
+> + *
+> + */
 
-sizeof() when applied to a pointer typed expression gives the
-size of the pointer, not that of the pointed data.
+Just found this is still not what's recommended, i.e. GPL/X11 dual
+license.  I updated it and applied all 3 patches.
 
-Fixes: fe158a17c1e0 ("ARM: orion: simplify orion_ge00_switch_init")
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
-v1 -> v2: fix file module name in subject
----
- arch/arm/plat-orion/common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index 272f49b..23a975a 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -478,7 +478,7 @@ void __init orion_ge00_switch_init(struct dsa_platform_data *d)
- 	for (i = 0; i < d->nr_chips; i++)
- 		d->chip[i].host_dev = &orion_ge_mvmdio.dev;
- 
--	platform_device_register_data(NULL, "dsa", 0, d, sizeof(d));
-+	platform_device_register_data(NULL, "dsa", 0, d, sizeof(*d));
- }
- 
- /*****************************************************************************
+Shawn
