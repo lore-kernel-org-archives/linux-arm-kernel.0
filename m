@@ -1,48 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 16 Sep 2016 13:58:32 +0200
-Subject: [PATCH v2] ARM: dts: exynos: Add entries for sound support on
- Odroid-XU board
-In-Reply-To: <f4d204d8-b6b8-5173-c530-bfea1ec9ed7d@samsung.com>
-References: <CGME20160916112217eucas1p1694395dda2a1e8cdf562007ed8141542@eucas1p1.samsung.com>
- <1474024920-32744-1-git-send-email-s.nawrocki@samsung.com>
- <f4d204d8-b6b8-5173-c530-bfea1ec9ed7d@samsung.com>
-Message-ID: <71286ef8-4b7f-cfde-7bb9-9f3bd2289527@samsung.com>
+From: voker57@gmail.com (Iaroslav Gridin)
+Date: Fri, 16 Sep 2016 14:59:15 +0300
+Subject: [PATCH] ARM: dts: msm8974: Add definitions for QCE & cryptobam
+In-Reply-To: <20160915211842.GB5431@hector.attlocal.net>
+References: <20160830153740.13275-1-voker57@gmail.com>
+ <20160915211842.GB5431@hector.attlocal.net>
+Message-ID: <20160916115915.7zuaai6rxha32g6j@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2016 01:25 PM, Sylwester Nawrocki wrote:
-> On 09/16/2016 01:22 PM, Sylwester Nawrocki wrote:
->> This patch adds device nodes for the AUDSS clock controller,
->> peripheral DMA 0/1 controllers and the Audio Subsystem I2S controller.
->> These entries are required for sound support on Odroid-XU board.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> ---
->> This patch depends on a patch adding clock ID macro definitions.
->> I'm going to provide a topic branch containing required changes.
->>
->> Changes since v1:
->>  - GIC_SPI, IRQ_TYPE_NONE used in the PDMA and max98080 interrupt
->>    specifiers,
->>  - assigned-clock-* properties moved to respective controller
->>    nodes.
+On Thu, Sep 15, 2016 at 04:18:42PM -0500, Andy Gross wrote:
+> Actually, on thinking about this more, the bam block itself only
+> requires the
+> single clock.  The peripheral it is attached to has to keep its sanity
+> during
+> the duration of the transfer (crypto).  The crypto requires 3 clocks,
+> one of
+> which is the same clk the bam requires.
 > 
-> And here is a pull request containing clk dependency patches:
-> 
-> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-> 
->   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.9-exynos54x0-dt
-> 
-> for you to fetch changes up to 58d6506f327e3d192998ba03632f546da221b8d8:
-> 
->   clk: samsung: exynos5410: Add clock IDs for PDMA and EPLL clocks (2016-09-09
-> 10:13:02 +0200)
-> 
+> You can access the BAM registers with the bam_clk only, correct?
 
-Pulled and applied, thanks!
+No, with only bam_clk board reboots. In fact, core_clk is the only
+required one.
 
-Krzysztof
+> The CLK_SRC is unnecessary.  Or should be at least.  That gets turned
+> on by
+> getting the CE2_CLK.  I vaguely remember a parent issue that was
+> fixed.
+
+Yes, I thought it was required to change its speed to achieve maximum
+QCE performance but as it have been pointed out, same adjustment on core
+clock does the same.
