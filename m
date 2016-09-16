@@ -1,54 +1,55 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 16 Sep 2016 11:16:11 +0200
-Subject: [PATCH 2/2] clk: imx6: initialize GPU clocks
-In-Reply-To: <1474017371-28966-1-git-send-email-l.stach@pengutronix.de>
-References: <1474017371-28966-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1474017371-28966-2-git-send-email-l.stach@pengutronix.de>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 16 Sep 2016 18:17:22 +0900
+Subject: [PATCH] drm/rockchip: Respect page offset for PRIME mmap calls
+Message-ID: <1474017442-7262-1-git-send-email-tfiga@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize the GPU clock muxes to sane inputs. Until now they have
-not been changed from their default values, which means that both
-GPU3D shader and GPU2D core were fed by clock inputs whose rates
-exceed the maximium allowed frequency of the cores by as much as
-200MHz.
+From: ?rjan Eide <orjan.eide@arm.com>
 
-This fixes a severe GPU stability issue on i.MX6DL.
+When mapping external DMA-bufs through the PRIME mmap call, we might be
+given an offset which has to be respected. However for the internal DRM
+GEM mmap path, we have to ignore the fake mmap offset used to identify
+the buffer only. Currently the code always zeroes out vma->vm_pgoff,
+which breaks the former.
 
+This patch fixes the problem by moving the vm_pgoff assignment to a
+function that is used only for GEM mmap path, so that the PRIME path
+retains the original offset.
+
+Fixes: a8594f2 ("drm/rockchip: unset pgoff when mmap'ing gems")
+
+Signed-off-by: ?rjan Eide <orjan.eide@arm.com>
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 Cc: stable at vger.kernel.org
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/clk/imx/clk-imx6q.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index 64c243173395..751c3e7d5843 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -633,6 +633,24 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	if (IS_ENABLED(CONFIG_PCI_IMX6))
- 		clk_set_parent(clk[IMX6QDL_CLK_LVDS1_SEL], clk[IMX6QDL_CLK_SATA_REF_100M]);
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+index b70f942..cab4d60 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -64,7 +64,6 @@ static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
+ 	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
+ 	 */
+ 	vma->vm_flags &= ~VM_PFNMAP;
+-	vma->vm_pgoff = 0;
+ 
+ 	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
+ 			     obj->size, rk_obj->dma_attrs);
+@@ -96,6 +95,12 @@ int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
+ 	if (ret)
+ 		return ret;
  
 +	/*
-+	 * Initialize the GPU clock muxes, so that the maximum specified clock
-+	 * rates for the respective SoC are not exceeded.
++	 * Set vm_pgoff (used as a fake buffer offset by DRM) to 0 and map the
++	 * whole buffer from the start.
 +	 */
-+	if (clk_on_imx6dl()) {
-+		clk_set_parent(clk[IMX6QDL_CLK_GPU3D_CORE_SEL],
-+		               clk[IMX6QDL_CLK_PLL2_PFD1_594M]);
-+		clk_set_parent(clk[IMX6QDL_CLK_GPU2D_CORE_SEL],
-+		               clk[IMX6QDL_CLK_PLL2_PFD1_594M]);
-+	} else if (clk_on_imx6q()) {
-+		clk_set_parent(clk[IMX6QDL_CLK_GPU3D_CORE_SEL],
-+		               clk[IMX6QDL_CLK_MMDC_CH0_AXI]);
-+		clk_set_parent(clk[IMX6QDL_CLK_GPU3D_SHADER_SEL],
-+		               clk[IMX6QDL_CLK_PLL2_PFD1_594M]);
-+		clk_set_parent(clk[IMX6QDL_CLK_GPU2D_CORE_SEL],
-+		               clk[IMX6QDL_CLK_PLL3_USB_OTG]);
-+	}
++	vma->vm_pgoff = 0;
 +
- 	imx_register_uart_clocks(uart_clks);
- }
- CLK_OF_DECLARE(imx6q, "fsl,imx6q-ccm", imx6q_clocks_init);
+ 	obj = vma->vm_private_data;
+ 
+ 	return rockchip_drm_gem_object_mmap(obj, vma);
 -- 
-2.8.1
+2.8.0.rc3.226.g39d4020
