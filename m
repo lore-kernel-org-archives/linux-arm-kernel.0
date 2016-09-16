@@ -1,110 +1,120 @@
 From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Fri, 16 Sep 2016 15:43:53 +0300
-Subject: [PATCH V6 2/3] perf tools: new tracepoint specific function
-In-Reply-To: <1473957428-28311-3-git-send-email-mathieu.poirier@linaro.org>
+Date: Fri, 16 Sep 2016 15:44:30 +0300
+Subject: [PATCH V6 3/3] perf tools: adding support for address filters
+In-Reply-To: <1473957428-28311-4-git-send-email-mathieu.poirier@linaro.org>
 References: <1473957428-28311-1-git-send-email-mathieu.poirier@linaro.org>
- <1473957428-28311-3-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <2f60edf3-e5f0-9fce-3a17-bd12cd33b835@intel.com>
+ <1473957428-28311-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <a157cb6b-9743-4c63-d5d4-3f7d467f1b59@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 15/09/16 19:37, Mathieu Poirier wrote:
-> Making function perf_evsel__append_filter() static and
-> introducing a new tracepoint specific function to append
-> filters.  That way we eliminate redundant code and avoid
-> formatting mistake.
+> This patch makes it possible to use the current filter
+> framework with address filters.  That way address filters for
+> HW tracers such as CoreSight and IntelPT can be communicated
+
+IntelPT -> Intel PT
+
+> to the kernel drivers.
 > 
 > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+
+Otherwise:
 
 Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
 > ---
->  tools/perf/builtin-trace.c     | 7 +++----
->  tools/perf/util/evsel.c        | 9 +++++++--
->  tools/perf/util/evsel.h        | 3 +--
->  tools/perf/util/parse-events.c | 4 ++--
->  4 files changed, 13 insertions(+), 10 deletions(-)
+>  tools/perf/util/evsel.c        |  5 +++++
+>  tools/perf/util/evsel.h        |  2 ++
+>  tools/perf/util/parse-events.c | 39 ++++++++++++++++++++++++++++++++++-----
+>  3 files changed, 41 insertions(+), 5 deletions(-)
 > 
-> diff --git a/tools/perf/builtin-trace.c b/tools/perf/builtin-trace.c
-> index 4c2704332c14..34effab09f39 100644
-> --- a/tools/perf/builtin-trace.c
-> +++ b/tools/perf/builtin-trace.c
-> @@ -2148,11 +2148,10 @@ static int trace__set_ev_qualifier_filter(struct trace *trace)
->  	if (filter == NULL)
->  		goto out_enomem;
->  
-> -	if (!perf_evsel__append_filter(trace->syscalls.events.sys_enter,
-> -				       "(%s) && (%s)", filter)) {
-> +	if (!perf_evsel__append_tp_filter(trace->syscalls.events.sys_enter,
-> +					  filter)) {
->  		sys_exit = trace->syscalls.events.sys_exit;
-> -		err = perf_evsel__append_filter(sys_exit,
-> -						"(%s) && (%s)", filter);
-> +		err = perf_evsel__append_tp_filter(sys_exit, filter);
->  	}
->  
->  	free(filter);
 > diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-> index b93369745e08..a99e82d97df2 100644
+> index a99e82d97df2..e0bb399dcdd4 100644
 > --- a/tools/perf/util/evsel.c
 > +++ b/tools/perf/util/evsel.c
-> @@ -1045,8 +1045,8 @@ int perf_evsel__set_filter(struct perf_evsel *evsel, const char *filter)
->  	return -1;
+> @@ -1067,6 +1067,11 @@ int perf_evsel__append_tp_filter(struct perf_evsel *evsel, const char *filter)
+>  	return perf_evsel__append_filter(evsel, "(%s) && (%s)", filter);
 >  }
 >  
-> -int perf_evsel__append_filter(struct perf_evsel *evsel,
-> -			      const char *fmt, const char *filter)
-> +static int perf_evsel__append_filter(struct perf_evsel *evsel,
-> +				     const char *fmt, const char *filter)
->  {
->  	char *new_filter;
->  
-> @@ -1062,6 +1062,11 @@ int perf_evsel__append_filter(struct perf_evsel *evsel,
->  	return -1;
->  }
->  
-> +int perf_evsel__append_tp_filter(struct perf_evsel *evsel, const char *filter)
+> +int perf_evsel__append_addr_filter(struct perf_evsel *evsel, const char *filter)
 > +{
-> +	return perf_evsel__append_filter(evsel, "(%s) && (%s)", filter);
+> +	return perf_evsel__append_filter(evsel, "%s,%s", filter);
 > +}
 > +
 >  int perf_evsel__enable(struct perf_evsel *evsel)
 >  {
 >  	int nthreads = thread_map__nr(evsel->threads);
 > diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
-> index 7ab59f15892f..36ed0997e65b 100644
+> index 36ed0997e65b..49c51fb3d05c 100644
 > --- a/tools/perf/util/evsel.h
 > +++ b/tools/perf/util/evsel.h
-> @@ -233,8 +233,7 @@ void perf_evsel__set_sample_id(struct perf_evsel *evsel,
->  			       bool use_sample_identifier);
+> @@ -234,6 +234,8 @@ void perf_evsel__set_sample_id(struct perf_evsel *evsel,
 >  
 >  int perf_evsel__set_filter(struct perf_evsel *evsel, const char *filter);
-> -int perf_evsel__append_filter(struct perf_evsel *evsel,
-> -			      const char *fmt, const char *filter);
-> +int perf_evsel__append_tp_filter(struct perf_evsel *evsel, const char *filter);
+>  int perf_evsel__append_tp_filter(struct perf_evsel *evsel, const char *filter);
+> +int perf_evsel__append_addr_filter(struct perf_evsel *evsel,
+> +				   const char *filter);
 >  int perf_evsel__apply_filter(struct perf_evsel *evsel, int ncpus, int nthreads,
 >  			     const char *filter);
 >  int perf_evsel__enable(struct perf_evsel *evsel);
 > diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-> index 9692300585f6..751b48fc641c 100644
+> index 751b48fc641c..c23f2d5fc134 100644
 > --- a/tools/perf/util/parse-events.c
 > +++ b/tools/perf/util/parse-events.c
-> @@ -1762,7 +1762,7 @@ static int set_filter(struct perf_evsel *evsel, const void *arg)
+> @@ -1755,20 +1755,49 @@ foreach_evsel_in_last_glob(struct perf_evlist *evlist,
+>  static int set_filter(struct perf_evsel *evsel, const void *arg)
+>  {
+>  	const char *str = arg;
+> +	bool found = false;
+> +	int nr_addr_filters = 0;
+> +	struct perf_pmu *pmu = NULL;
+>  
+> -	if (evsel == NULL || evsel->attr.type != PERF_TYPE_TRACEPOINT) {
+> -		fprintf(stderr,
+> -			"--filter option should follow a -e tracepoint option\n");
+> -		return -1;
+> +	if (evsel == NULL)
+> +		goto err;
+> +
+> +	if (evsel->attr.type == PERF_TYPE_TRACEPOINT) {
+> +		if (perf_evsel__append_tp_filter(evsel, str) < 0) {
+> +			fprintf(stderr,
+> +				"not enough memory to hold filter string\n");
+> +			return -1;
+> +		}
+> +
+> +		return 0;
+>  	}
+>  
+> -	if (perf_evsel__append_tp_filter(evsel, str) < 0) {
+> +	while ((pmu = perf_pmu__scan(pmu)) != NULL)
+> +		if (pmu->type == evsel->attr.type) {
+> +			found = true;
+> +			break;
+> +		}
+> +
+> +	if (found)
+> +		perf_pmu__scan_file(pmu, "nr_addr_filters",
+> +				    "%d", &nr_addr_filters);
+> +
+> +	if (!nr_addr_filters)
+> +		goto err;
+> +
+> +	if (perf_evsel__append_addr_filter(evsel, str) < 0) {
+>  		fprintf(stderr,
+>  			"not enough memory to hold filter string\n");
 >  		return -1;
 >  	}
 >  
-> -	if (perf_evsel__append_filter(evsel, "(%s) && (%s)", str) < 0) {
-> +	if (perf_evsel__append_tp_filter(evsel, str) < 0) {
->  		fprintf(stderr,
->  			"not enough memory to hold filter string\n");
->  		return -1;
-> @@ -1793,7 +1793,7 @@ static int add_exclude_perf_filter(struct perf_evsel *evsel,
+>  	return 0;
+> +
+> +err:
+> +	fprintf(stderr,
+> +		"--filter option should follow a -e tracepoint or HW tracer option\n");
+> +
+> +	return -1;
+>  }
 >  
->  	snprintf(new_filter, sizeof(new_filter), "common_pid != %d", getpid());
->  
-> -	if (perf_evsel__append_filter(evsel, "(%s) && (%s)", new_filter) < 0) {
-> +	if (perf_evsel__append_tp_filter(evsel, new_filter) < 0) {
->  		fprintf(stderr,
->  			"not enough memory to hold filter string\n");
->  		return -1;
+>  int parse_filter(const struct option *opt, const char *str,
 > 
