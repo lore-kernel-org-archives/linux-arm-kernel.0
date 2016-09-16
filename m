@@ -1,176 +1,49 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 16 Sep 2016 09:02:15 +0000
-Subject: [PATCH V6 2/5] PCI/ACPI: Check platform specific ECAM quirks
-In-Reply-To: <20160915105849.GA10345@red-moon>
-References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <1473449047-10499-3-git-send-email-tn@semihalf.com>
- <57D76626.1050109@huawei.com>
- <bac9f822-ce0a-7070-94df-4d66fc30f774@semihalf.com>
- <57D7E53F.1000106@huawei.com> <20160915105849.GA10345@red-moon>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F8730EA@lhreml507-mbx>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 16 Sep 2016 11:08:00 +0200
+Subject: v4.8-rc: GSM audio causes trouble
+In-Reply-To: <20160916055249.h7zw6hguvwwe2zwu@earth>
+References: <20160915121755.GA5264@amd> <20160915205142.GA6747@amd>
+ <20160916055249.h7zw6hguvwwe2zwu@earth>
+Message-ID: <20160916090800.GA7599@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo and Tomasz
-
-Many Thanks for looking at this
-
-> -----Original Message-----
-> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> Sent: 15 September 2016 11:59
-> To: liudongdong (C)
-> Cc: Tomasz Nowicki; helgaas at kernel.org; will.deacon at arm.com;
-> catalin.marinas at arm.com; rafael at kernel.org; arnd at arndb.de;
-> hanjun.guo at linaro.org; okaya at codeaurora.org; jchandra at broadcom.com;
-> cov at codeaurora.org; dhdang at apm.com; ard.biesheuvel at linaro.org;
-> robert.richter at caviumnetworks.com; mw at semihalf.com;
-> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
-> msalter at redhat.com; linux-pci at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linaro-acpi at lists.linaro.org;
-> jcm at redhat.com; andrea.gallo at linaro.org; jeremy.linton at arm.com;
-> Gabriele Paoloni; jhugo at codeaurora.org; linux-acpi at vger.kernel.org;
-> linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH V6 2/5] PCI/ACPI: Check platform specific ECAM
-> quirks
+On Fri 2016-09-16 07:52:50, Sebastian Reichel wrote:
+> Hi,
 > 
-> On Tue, Sep 13, 2016 at 07:38:39PM +0800, Dongdong Liu wrote:
-> 
-> [...]
-> 
-> > Our host bridge is non ECAM only for the RC bus config space;
-> > for any other bus underneath the root bus we support ECAM access.
-> >
-> > RC config resource with hardcode as DEFINE_RES_MEM(0xb0070000,
-> SZ_4K),
-> > EP config resource we get it from MCFG table.
-> > So we need to override ops, but config resource we only need to
-> hardcode with RC config resource.
-> >
-> > Our host controller ACPI support patch can be found:
-> > https://lkml.org/lkml/2016/8/31/340
-> 
-> Sorry I misread your code. IIUC you create an array of resources that
-> represent non-ECAM config space (and incidentally contain debug
-> registers to check the link status - that you need to check for every
-> given config access (?)), but you still need to have an MCFG entry that
+> On Thu, Sep 15, 2016 at 10:51:42PM +0200, Pavel Machek wrote:
+> > > I was trying to improve GSM call quality, and hit problems in
+> > > v4.8-rc. Sound only worked for a while, then I tried to kill
+> > > cmtspeech_ofono_test, and could not, not even with -9 and could not
+> > > even reboot.
+> > > 
+> > > I went back to v4.1 (ok, quite far, I see), and problems are gone.
+> > > 
+> > > Does it work for you? Any ideas what to try... besides bisect?
+> > 
+> > v4.7 is okay.
+> > 
+> > v4.8 with
+> > 
+> > git diff ..mini-v4.7 drivers/hsi/ | git apply
+> > 
+> > Seems to work ok.
 
-The link status check is inherited from the designware framework (see
-http://lxr.free-electrons.com/source/drivers/pci/host/pcie-designware.c#L678)
+Hmm. I guess I made some error with the testing, because reverting
+just drivers/hsi to v4.7 state results in non-compiling kernel
 
-However I think that in this case we can just check the link status
-in our init function and return an error if the link is down
+> hsi changes from 4.7 to 4.8 are basically runtime PM enablement.
+> Does 4.8 work for you with just 9c99e5e51988 reverted?
 
-> covers the bus number subject to quirk to make sure this mechanism
-> works. Correct ?
+No, according to the notes. But see above... and let me retry with
+drivers/hsi _and_ include/linux/hsi reverted. No GSM audio and same
+problem with shutdown. Oops. Sorry about the confusion.
 
-Well we need the quirks for the root bus numbers but if read this v6
-quirk mechanism correctly even if we do not specify an mcfg entry for
-bus 0 oci_mcfg_match_quirks() is called anyway and we can set our
-special configuration space addresses for the root buses (i.e. I think
-we can have a clean MCFG table with entries only for those bus ranges
-that are really ECAM)  
+Does it work for you? Any ideas what could be wrong?
 
-> 
-> This also means that, with the MCFG tables you have and current
-> mainline kernel you are able to probe a root bridge (because the MCFG
-> table covers the bus number that is not ECAM), with enumeration
-> going haywire because it is trying to carry out ECAM accesses on
-> non-ECAM space.
+Best regards,
 
-Yes correct, we cannot access the host controller configuration space
-with our current MCFG table and current Linux mainline
-
-> 
-> Is my reading correct ?
-> 
-> Anyway, that's not stricly related to this discussion, it is time we
-> converge on this patchset, we can add a domain range if that
-> simplifies things.
-
-IMO it would be better to have the domain range to avoid
-a very large and repetitive static quirk array
-
-Thanks
-
-Gab
-
-> 
-> Thanks,
-> Lorenzo
-> 
-> > This patch is based on RFC V5 quirk mechanism.
-> >
-> > Based on V6 quirk mechanism, we have to change it as below:
-> >
-> > #ifdef CONFIG_PCI_HISI_ACPI
-> > 	{ "HISI ", "HIP05 ", 0, 0, MCFG_BUS_ANY, &hisi_pcie_hip05_ops,
-> > 	  MCFG_RES_EMPTY},
-> > 	{ "HISI ", "HIP05 ", 0, 1, MCFG_BUS_ANY, &hisi_pcie_hip05_ops,
-> > 	  MCFG_RES_EMPTY},
-> > 	{ "HISI ", "HIP05 ", 0, 2, MCFG_BUS_ANY, &hisi_pcie_hip05_ops,
-> > 	  MCFG_RES_EMPTY},
-> > 	{ "HISI ", "HIP05 ", 0, 3, MCFG_BUS_ANY, &hisi_pcie_hip05_ops,
-> > 	  MCFG_RES_EMPTY},
-> > 	{ "HISI ", "HIP06 ", 0, 0, MCFG_BUS_ANY, &hisi_pcie_hip06_ops,
-> > 	  MCFG_RES_EMPTY},
-> > 	{ "HISI ", "HIP06 ", 0, 1, MCFG_BUS_ANY, &hisi_pcie_hip06_ops,
-> > 	  MCFG_RES_EMPTY},
-> > 	{ "HISI ", "HIP06 ", 0, 2, MCFG_BUS_ANY, &hisi_pcie_hip06_ops,
-> > 	  MCFG_RES_EMPTY},
-> > 	{ "HISI ", "HIP06 ", 0, 3, MCFG_BUS_ANY, &hisi_pcie_hip06_ops,
-> >          MCFG_RES_EMPTY},
-> > 	{ "HISI ", "HIP07 ", 0, 0, MCFG_BUS_ANY, &hisi_pcie_hip07_ops,
-> > 	  MCFG_RES_EMPTY},
-> > 	{ "HISI ", "HIP07 ", 0, 1, MCFG_BUS_ANY, &hisi_pcie_hip07_ops,
-> > 	  MCFG_RES_EMPTY},
-> > 	....
-> >
-> > 	{ "HISI ", "HIP07 ", 0, 15, MCFG_BUS_ANY, &hisi_pcie_hip07_ops,
-> > 	  MCFG_RES_EMPTY},
-> >
-> > #endif
-> >
-> > struct pci_ecam_ops hisi_pci_hip05_ops = {
-> > 	.bus_shift	= 20,
-> > 	.init		=  hisi_pci_hip05_init,
-> > 	.pci_ops	= {
-> > 		.map_bus	= pci_ecam_map_bus,
-> > 		.read		= hisi_pcie_acpi_rd_conf,
-> > 		.write		= hisi_pcie_acpi_wr_conf,
-> > 	}
-> > };
-> >
-> > struct pci_ecam_ops hisi_pci_hip06_ops = {
-> > 	.bus_shift = 20,
-> > 	.init = hisi_pci_hip06_init,
-> > 	.pci_ops = {
-> > 		.map_bus = pci_ecam_map_bus,
-> > 		.read = hisi_pcie_acpi_rd_conf,
-> > 		.write = hisi_pcie_acpi_wr_conf,
-> > 	}
-> > };
-> >
-> > hisi_pci_hipxx_init function is used to get RC config resource with
-> hardcode.
-> > .....
-> >
-> > So I hope we can use MCFG_DOM_RANGE, Then I can change it as below.
-> >
-> > #ifdef CONFIG_PCI_HISI_ACPI
-> > 	{ "HISI  ", "HIP05   ", 0, MCFG_DOM_RANGE(0, 3), MCFG_BUS_ANY,
-> > 	 &hisi_pcie_hip05_ops, MCFG_RES_EMPTY},
-> > 	{ "HISI  ", "HIP06   ", 0, MCFG_DOM_RANGE(0, 3), MCFG_BUS_ANY,
-> > 	 &hisi_pcie_hip06_ops, MCFG_RES_EMPTY},
-> > 	{ "HISI  ", "HIP07   ", 0, MCFG_DOM_RANGE(0, 15), MCFG_BUS_ANY,
-> > 	  &hisi_pcie_hip07_ops, MCFG_RES_EMPTY},
-> > #endif
-> >
-> > Thanks
-> > Dongdong
-> > >
-> > >Thanks,
-> > >Tomasz
-> > >
-> > >.
-> > >
-> >
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
