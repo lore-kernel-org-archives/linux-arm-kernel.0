@@ -1,135 +1,130 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 16 Sep 2016 09:50:04 -0600
-Subject: [PATCH V8 7/7] perf tools: adding sink configuration for cs_etm PMU
+Date: Fri, 16 Sep 2016 09:50:03 -0600
+Subject: [PATCH V8 6/7] perf tools: adding PMU configuration to tools
 In-Reply-To: <1474041004-13956-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1474041004-13956-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1474041004-13956-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1474041004-13956-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the PMU::set_drv_config() callback to enable the CoreSight
-sink that will be used for the trace session.
+Now that the required mechanic is there to deal with PMU specific
+configuration, add the functionality to the tools where events
+can be selected.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Acked-by: Jiri Olsa <jolsa@kernel.org>
 ---
- tools/perf/arch/arm/util/cs-etm.c | 58 +++++++++++++++++++++++++++++++++++++++
- tools/perf/arch/arm/util/cs-etm.h |  3 ++
- tools/perf/arch/arm/util/pmu.c    |  2 ++
- 3 files changed, 63 insertions(+)
+ tools/perf/builtin-record.c | 10 ++++++++++
+ tools/perf/builtin-stat.c   |  9 +++++++++
+ tools/perf/builtin-top.c    | 13 +++++++++++++
+ 3 files changed, 32 insertions(+)
 
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 829c479614f1..47d584da5819 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -27,12 +27,16 @@
- #include "../../util/auxtrace.h"
- #include "../../util/cpumap.h"
- #include "../../util/evlist.h"
-+#include "../../util/evsel.h"
- #include "../../util/pmu.h"
- #include "../../util/thread_map.h"
- #include "../../util/cs-etm.h"
+diff --git a/tools/perf/builtin-record.c b/tools/perf/builtin-record.c
+index 6355902fbfc8..ada7fa29ec3f 100644
+--- a/tools/perf/builtin-record.c
++++ b/tools/perf/builtin-record.c
+@@ -22,6 +22,7 @@
+ #include "util/evlist.h"
+ #include "util/evsel.h"
+ #include "util/debug.h"
++#include "util/drv_configs.h"
+ #include "util/session.h"
+ #include "util/tool.h"
+ #include "util/symbol.h"
+@@ -383,6 +384,7 @@ static int record__open(struct record *rec)
+ 	struct perf_evlist *evlist = rec->evlist;
+ 	struct perf_session *session = rec->session;
+ 	struct record_opts *opts = &rec->opts;
++	struct perf_evsel_config_term *err_term;
+ 	int rc = 0;
  
- #include <stdlib.h>
- 
-+#define ENABLE_SINK_MAX	128
-+#define CS_BUS_DEVICE_PATH "/bus/coresight/devices/"
-+
- struct cs_etm_recording {
- 	struct auxtrace_record	itr;
- 	struct perf_pmu		*cs_etm_pmu;
-@@ -557,3 +561,57 @@ struct auxtrace_record *cs_etm_record_init(int *err)
- out:
- 	return NULL;
- }
-+
-+static FILE *cs_device__open_file(const char *name)
-+{
-+	struct stat st;
-+	char path[PATH_MAX];
-+	const char *sysfs;
-+
-+	sysfs = sysfs__mountpoint();
-+	if (!sysfs)
-+		return NULL;
-+
-+	snprintf(path, PATH_MAX,
-+		 "%s" CS_BUS_DEVICE_PATH "%s", sysfs, name);
-+
-+	printf("path: %s\n", path);
-+
-+	if (stat(path, &st) < 0)
-+		return NULL;
-+
-+	return fopen(path, "w");
-+
-+}
-+
-+static __attribute__((format(printf, 2, 3)))
-+int cs_device__print_file(const char *name, const char *fmt, ...)
-+{
-+	va_list args;
-+	FILE *file;
-+	int ret = -EINVAL;
-+
-+	va_start(args, fmt);
-+	file = cs_device__open_file(name);
-+	if (file) {
-+		ret = vfprintf(file, fmt, args);
-+		fclose(file);
-+	}
-+	va_end(args);
-+	return ret;
-+}
-+
-+int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
-+{
-+	int ret;
-+	char enable_sink[ENABLE_SINK_MAX];
-+
-+	snprintf(enable_sink, ENABLE_SINK_MAX, "%s/%s",
-+		 term->val.drv_cfg, "enable_sink");
-+
-+	ret = cs_device__print_file(enable_sink, "%d", 1);
-+	if (ret < 0)
-+		return ret;
-+
-+	return 0;
-+}
-diff --git a/tools/perf/arch/arm/util/cs-etm.h b/tools/perf/arch/arm/util/cs-etm.h
-index 909f486d02d1..5256741be549 100644
---- a/tools/perf/arch/arm/util/cs-etm.h
-+++ b/tools/perf/arch/arm/util/cs-etm.h
-@@ -18,6 +18,9 @@
- #ifndef INCLUDE__PERF_CS_ETM_H__
- #define INCLUDE__PERF_CS_ETM_H__
- 
-+#include "../../util/evsel.h"
-+
- struct auxtrace_record *cs_etm_record_init(int *err);
-+int cs_etm_set_drv_config(struct perf_evsel_config_term *term);
- 
- #endif
-diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
-index af9fb666b44f..98d67399a0d6 100644
---- a/tools/perf/arch/arm/util/pmu.c
-+++ b/tools/perf/arch/arm/util/pmu.c
-@@ -19,6 +19,7 @@
- #include <linux/coresight-pmu.h>
- #include <linux/perf_event.h>
- 
-+#include "cs-etm.h"
- #include "../../util/pmu.h"
- 
- struct perf_event_attr
-@@ -28,6 +29,7 @@ struct perf_event_attr
- 	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
- 		/* add ETM default config here */
- 		pmu->selectable = true;
-+		pmu->set_drv_config = cs_etm_set_drv_config;
+ 	perf_evlist__config(evlist, opts, &callchain_param);
+@@ -412,6 +414,14 @@ try_again:
+ 		goto out;
  	}
- #endif
- 	return NULL;
+ 
++	if (perf_evlist__apply_drv_configs(evlist, &pos, &err_term)) {
++		error("failed to set config \"%s\" on event %s with %d (%s)\n",
++		      err_term->val.drv_cfg, perf_evsel__name(pos), errno,
++		      strerror_r(errno, msg, sizeof(msg)));
++		rc = -1;
++		goto out;
++	}
++
+ 	rc = record__mmap(rec);
+ 	if (rc)
+ 		goto out;
+diff --git a/tools/perf/builtin-stat.c b/tools/perf/builtin-stat.c
+index 3c7452b39f57..6b85eecdd1bc 100644
+--- a/tools/perf/builtin-stat.c
++++ b/tools/perf/builtin-stat.c
+@@ -52,6 +52,7 @@
+ #include "util/evlist.h"
+ #include "util/evsel.h"
+ #include "util/debug.h"
++#include "util/drv_configs.h"
+ #include "util/color.h"
+ #include "util/stat.h"
+ #include "util/header.h"
+@@ -539,6 +540,7 @@ static int __run_perf_stat(int argc, const char **argv)
+ 	int status = 0;
+ 	const bool forks = (argc > 0);
+ 	bool is_pipe = STAT_RECORD ? perf_stat.file.is_pipe : false;
++	struct perf_evsel_config_term *err_term;
+ 
+ 	if (interval) {
+ 		ts.tv_sec  = interval / 1000;
+@@ -610,6 +612,13 @@ try_again:
+ 		return -1;
+ 	}
+ 
++	if (perf_evlist__apply_drv_configs(evsel_list, &counter, &err_term)) {
++		error("failed to set config \"%s\" on event %s with %d (%s)\n",
++		      err_term->val.drv_cfg, perf_evsel__name(counter), errno,
++		      strerror_r(errno, msg, sizeof(msg)));
++		return -1;
++	}
++
+ 	if (STAT_RECORD) {
+ 		int err, fd = perf_data_file__fd(&perf_stat.file);
+ 
+diff --git a/tools/perf/builtin-top.c b/tools/perf/builtin-top.c
+index 418ed94756d3..0ce3852daaa0 100644
+--- a/tools/perf/builtin-top.c
++++ b/tools/perf/builtin-top.c
+@@ -24,6 +24,7 @@
+ #include "util/annotate.h"
+ #include "util/config.h"
+ #include "util/color.h"
++#include "util/drv_configs.h"
+ #include "util/evlist.h"
+ #include "util/evsel.h"
+ #include "util/machine.h"
+@@ -940,6 +941,10 @@ static int callchain_param__setup_sample_type(struct callchain_param *callchain)
+ 
+ static int __cmd_top(struct perf_top *top)
+ {
++	char msg[512];
++	struct perf_evsel *pos;
++	struct perf_evsel_config_term *err_term;
++	struct perf_evlist *evlist = top->evlist;
+ 	struct record_opts *opts = &top->record_opts;
+ 	pthread_t thread;
+ 	int ret;
+@@ -976,6 +981,14 @@ static int __cmd_top(struct perf_top *top)
+ 	if (ret)
+ 		goto out_delete;
+ 
++	ret = perf_evlist__apply_drv_configs(evlist, &pos, &err_term);
++	if (ret) {
++		error("failed to set config \"%s\" on event %s with %d (%s)\n",
++			err_term->val.drv_cfg, perf_evsel__name(pos), errno,
++			strerror_r(errno, msg, sizeof(msg)));
++		goto out_delete;
++	}
++
+ 	top->session->evlist = top->evlist;
+ 	perf_session__set_id_hdr_size(top->session);
+ 
 -- 
 2.7.4
