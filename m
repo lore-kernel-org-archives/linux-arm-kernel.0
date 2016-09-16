@@ -1,38 +1,58 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 16 Sep 2016 09:56:23 +0200
-Subject: [PATCH v3 01/17] pinctrl: dt-bindings: samsung: Add header with
- values used for configuration
-In-Reply-To: <CACRpkdb9gq0Zez=_NW8XB6YKiJteC3GB12e-Wi9my52b4Q-C7A@mail.gmail.com>
-References: <1472987060-28293-1-git-send-email-krzk@kernel.org>
- <1472987060-28293-2-git-send-email-krzk@kernel.org>
- <CACRpkdb9gq0Zez=_NW8XB6YKiJteC3GB12e-Wi9my52b4Q-C7A@mail.gmail.com>
- <CGME20160916075624eucas1p23a12de912f92f0c557f17fbd394b186e@eucas1p2.samsung.com>
-Message-ID: <5e0deae4-cb77-93e2-e22c-74184064adab@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Sep 2016 09:56:52 +0200
+Subject: [RFC PATCH v2 4/5] ARM: hisi: enable devicetree support for hi3520
+In-Reply-To: <20160915210505.21878-5-netz.kernel@gmail.com>
+References: <20160915210505.21878-1-netz.kernel@gmail.com>
+ <20160915210505.21878-5-netz.kernel@gmail.com>
+Message-ID: <2438843.7Op0NuNt2B@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2016 11:18 PM, Linus Walleij wrote:
-> On Sun, Sep 4, 2016 at 1:04 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> 
->> From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> Hard-coded pinctrl configuration values are scattered through DTS files.
->> The numbers are difficult to decode by human, especially without the
->> datasheet.  Additionally the drive strength differs between S3C64xx,
->> S5PV210 and Exynos SoC families increasing the confusion.
->>
->> The header will help making this more readable and maintainable.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Take this with the rest of the changes into ARM SoC.
+On Thursday, September 15, 2016 4:05:04 PM CEST Marty Plummer wrote:
+> @@ -24,17 +31,19 @@ config ARCH_HI3620
+>  	  Support for Hisilicon Hi36xx SoC family
+>  
+>  config ARCH_HIP01
+> -       bool "Hisilicon HIP01 family"
+> -       depends on ARCH_MULTI_V7
+> -       select HAVE_ARM_SCU if SMP
+> -       select HAVE_ARM_TWD if SMP
+> -       select ARM_GLOBAL_TIMER
+> -       help
+> -         Support for Hisilicon HIP01 SoC family
+> +	bool "Hisilicon HIP01 family"
+> +	depends on ARCH_MULTI_V7
+> +	select ARM_GIC
+> +	select HAVE_ARM_SCU if SMP
+> +	select HAVE_ARM_TWD if SMP
+> +	select ARM_GLOBAL_TIMER
+> +	help
+> +	  Support for Hisilicon HIP01 SoC family
+>  
 
-Thanks!
+This change doesn't belong in here.
 
-Applied entire patchset.
+> @@ -28,6 +30,16 @@
+>   * spaces wasted since ioremap() may be called multi times for the same
+>   * IO space.
+>   */
+> +static struct map_desc hi3520_1176_io_desc[] __initdata = {
+> +	{
+> +		/* sysctrl */
+> +		.virtual	= HI3520_1176_SYSCTRL_VIRT_BASE,
+> +		.pfn		= __phys_to_pfn(HI3520_1176_SYSCTRL_PHYS_BASE),
+> +		.length		= 0x10000,
+> +		.type		= MT_DEVICE,
+> +	},
+> +};
+> +
+>  static struct map_desc hi3620_io_desc[] __initdata = {
+>  	{
+>  		/* sysctrl */
 
-Best regards,
-Krzysztof
+
+What do you need this for? I think it would be better to map the
+device manually from whichever code uses itby looking it up 
+in the DT.
+
+	Arnd
