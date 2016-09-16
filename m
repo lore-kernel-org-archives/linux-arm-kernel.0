@@ -1,59 +1,49 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 16 Sep 2016 10:30:53 +0200
-Subject: v4.8-rc: GSM audio causes trouble
-In-Reply-To: <20160915205142.GA6747@amd>
-References: <20160915121755.GA5264@amd>
- <20160915205142.GA6747@amd>
-Message-ID: <20160916083053.GA9252@amd>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 16 Sep 2016 10:32:40 +0200
+Subject: [PATCH v3 2/2] ARM: exynos_defconfig: Remove old non-working MIPI
+ driver
+In-Reply-To: <1474014760-23173-1-git-send-email-k.kozlowski@samsung.com>
+References: <1474014760-23173-1-git-send-email-k.kozlowski@samsung.com>
+ <CGME20160916083252eucas1p12f57a9bc08176e10b8e07c3b421bb0ad@eucas1p1.samsung.com>
+Message-ID: <1474014760-23173-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2016-09-15 22:51:42, Pavel Machek wrote:
-> Hi!
-> 
-> > I was trying to improve GSM call quality, and hit problems in
-> > v4.8-rc. Sound only worked for a while, then I tried to kill
-> > cmtspeech_ofono_test, and could not, not even with -9 and could not
-> > even reboot.
-> > 
-> > I went back to v4.1 (ok, quite far, I see), and problems are gone.
-> > 
-> > Does it work for you? Any ideas what to try... besides bisect?
-> 
-> v4.7 is okay.
-> 
-> v4.8 with
-> 
-> git diff ..mini-v4.7 drivers/hsi/ | git apply
+The Exynos MIPI driver does not work anymore (it is board file only) so
+it is removed.  Remove also config options.
 
-I believe I tried just reverting
-9c99e5e51988798af2a687ef9b1716dd79388550 before, but that did not
-help.
+Cc: Inki Dae <inki.dae@samsung.com>
+Cc: Donghwa Lee <dh09.lee@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-I guess I'll try with these reverted, next:
+---
 
-pavel at amd:/data/l/linux-n900$ git show
-9c99e5e51988798af2a687ef9b1716dd79388550 | git apply -R
-pavel at amd:/data/l/linux-n900$ git show
-ad60db2f9fe3367e60a21fc0afe19999516f8b27 | git apply -R
-pavel at amd:/data/l/linux-n900$ git show
-4e552310cdf0c81210b5fc9173f7cf497eeb9feb | git apply -R
-pavel at amd:/data/l/linux-n900$ git show
-604fdfa45886f04ad6070c1b8266c7f4154bc497 | git apply -R
-pavel at amd:/data/l/linux-n900$ git show
-d2b8d695c61c4d2864eee900bebc2ced4f425645 | git apply -R
-pavel at amd:/data/l/linux-n900$ git show
-fa1572d956ee072e965da01d2c46f10d2b67d017 | git apply -R
-pavel at amd:/data/l/linux-n900$ git show
-62aa292b3eae920a80c2fd0ed0601a70328627f6 | git apply -R
-pavel at amd:/data/l/linux-n900$
+This does not really depend on patch #1. The driver is dysfunctional and
+it does not work so defconfig change can be applied separately.
 
-...seems to be broken already. I guess its time to
-bisect... hmm. Tried bisecting, but soundcard does not work
-there. Will do it manually...
+Changes since v2:
+1. Remove also EXYNOS_MIPI_DSI, pointed out by Tomi Valkeinen.
 
-Best regards,
-							Pavel
+Changes since v1:
+1. New patch.
+---
+ arch/arm/configs/exynos_defconfig | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 4e484f406419..c58f6841f8aa 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -168,8 +168,6 @@ CONFIG_DRM_PANEL_SAMSUNG_LD9040=y
+ CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
+ CONFIG_DRM_NXP_PTN3460=y
+ CONFIG_DRM_PARADE_PS8622=y
+-CONFIG_EXYNOS_VIDEO=y
+-CONFIG_EXYNOS_MIPI_DSI=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_PLATFORM=y
+ CONFIG_BACKLIGHT_PWM=y
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
