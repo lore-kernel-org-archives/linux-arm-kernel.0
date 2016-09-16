@@ -1,122 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 16 Sep 2016 12:00:32 +0200
-Subject: [PATCH v7 05/11] ARM: dts: koelsch: Enable UHS-I SDR-50 and
- SDR-104
-In-Reply-To: <1473764228-24768-6-git-send-email-horms+renesas@verge.net.au>
-References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
- <1473764228-24768-6-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20160916100031.GH14562@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Sep 2016 12:04:54 +0200
+Subject: [PATCH] ARM: dts: gose: use generic pinctrl properties in SDHI nodes
+Message-ID: <1474020294-1544-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 12:57:02PM +0200, Simon Horman wrote:
-> Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,1,2}.
-> And the sd-uhs-sdr104 property to SDHI0.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-As SDR50 support is present in the driver in mainline (correct me if I am
-wrong!) I have queued this up after dropping the sdr104 portion and
-updating the changelog accordingly.
-
-The result is as follows:
-
-From: Simon Horman <horms+renesas@verge.net.au>
-Date: Tue, 13 Sep 2016 12:57:02 +0200
-Subject: [PATCH] ARM: dts: koelsch: arm64: dts: r8a7795: salvator-x: enable
- UHS for SDHI 0, 1 & 3
-
-Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,1,2}.
+Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
+groups properties") renesas pfc drivers accept generic "function", "pins"
+and "groups" properties.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 33 ++++++++++++++++++++++++++++++---
- 1 file changed, 30 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index f8a7d090fd01..f17bfa000f73 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -360,16 +360,37 @@
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 90af18600124..dc311eba4444 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -346,18 +346,18 @@
+ 	};
+ 
  	sdhi0_pins: sd0 {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi0_pins_uhs: sd0_uhs {
+-		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
+-		renesas,function = "sdhi0";
 +		groups = "sdhi0_data4", "sdhi0_ctrl";
 +		function = "sdhi0";
-+		power-source = <1800>;
  	};
  
  	sdhi1_pins: sd1 {
- 		groups = "sdhi1_data4", "sdhi1_ctrl";
- 		function = "sdhi1";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi1_pins_uhs: sd1_uhs {
+-		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
+-		renesas,function = "sdhi1";
 +		groups = "sdhi1_data4", "sdhi1_ctrl";
 +		function = "sdhi1";
-+		power-source = <1800>;
  	};
  
  	sdhi2_pins: sd2 {
- 		groups = "sdhi2_data4", "sdhi2_ctrl";
- 		function = "sdhi2";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi2_pins_uhs: sd2_uhs {
+-		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
+-		renesas,function = "sdhi2";
 +		groups = "sdhi2_data4", "sdhi2_ctrl";
 +		function = "sdhi2";
-+		power-source = <1800>;
  	};
  
  	qspi_pins: qspi {
-@@ -454,33 +475,39 @@
- 
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi0_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi0>;
- 	vqmmc-supply = <&vccq_sdhi0>;
- 	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
- &sdhi1 {
- 	pinctrl-0 = <&sdhi1_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi1_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi1>;
- 	vqmmc-supply = <&vccq_sdhi1>;
- 	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
- &sdhi2 {
- 	pinctrl-0 = <&sdhi2_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi2_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi2>;
- 	vqmmc-supply = <&vccq_sdhi2>;
- 	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
 -- 
 2.7.0.rc3.207.g0ac5344
