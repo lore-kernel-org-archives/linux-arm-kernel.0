@@ -1,74 +1,71 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 16 Sep 2016 13:08:53 +0200
-Subject: [PATCH] ARM: Kconfig: select GENERIC_CLOCKEVENTS_BROADCAST also
- on UP
-In-Reply-To: <alpine.DEB.2.20.1609161223311.5384@nanos>
-References: <1467993522-9176-1-git-send-email-l.stach@pengutronix.de>
- <1474018340.2243.103.camel@pengutronix.de>
- <20160916102051.GG1041@n2100.armlinux.org.uk>
- <alpine.DEB.2.20.1609161223311.5384@nanos>
-Message-ID: <1474024133.2243.117.camel@pengutronix.de>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Fri, 16 Sep 2016 13:09:24 +0200
+Subject: [PATCH v12 1/4] dt/bindings: add bindings for optee
+In-Reply-To: <1474024167-23253-1-git-send-email-jens.wiklander@linaro.org>
+References: <1474024167-23253-1-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <1474024167-23253-2-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 16.09.2016, 12:30 +0200 schrieb Thomas Gleixner:
-> On Fri, 16 Sep 2016, Russell King - ARM Linux wrote:
-> > On Fri, Sep 16, 2016 at 11:32:20AM +0200, Lucas Stach wrote:
-> > > Hi Russell,
-> > > 
-> > > can you please take a look at this and tell if there is something wrong
-> > > about it, or if you think it can go in?
-> > > 
-> > > Without this patch the kernel is unable to use the deeper CPU idle
-> > > states on i.MX6S if it isn't built with SMP support enabled.
-> > 
-> > Without spending a lot of time digging into this code, working out what
-> > these configuration symbols do, I frankly don't know if it's a sensible
-> > thing to do or not.  I guess tglx knows this code like the back of his
-> > hand, and would be in a better position to comment.
-> > 
-> > There's two factors there:
-> > 1. the amount of undocumented code in the kernel needing the code to be
-> >    read and understood to understand various aspects of it from the
-> >    architecture point of view.
-> 
-> Yeah. I know that this stuff lacks documentation.
->  
-> > 2. your architecture maintainer has done very little actual platform
-> >    development (not through his own choice) for the last 10 or so years,
-> >    which means he's not had to dig into these areas.
-> > 
-> > So, I'm afraid I feel less than qualified on this at the moment.  I'll
-> > try to look into this and talk to tglx to work out whether it's a
-> > sensible change. 
-> 
-> The broadcast feature has the following functionality:
-> 
->     It lets you use fast accessible (cpu local) timers for normal operation
->     and in case of deep idle sleeps where the cpu local timer stops switch
->     to broadcast operation, which arms a slower to access (global) timer
->     device which does not stop in deep idle.
-> 
->     On UP we usually just use the global device, but on SMP we need the cpu
->     local timers for normal (non idle) operation. Though there is no reason
->     to restrict this UP from a technical POV especially when the local
->     timer is way cheaper to access than the other device.
-> 
-> Hope that helps.
+Introduces linaro prefix and adds bindings for ARM TrustZone based OP-TEE
+implementation.
 
-What I take from this is that the i.MX6 decision to use the local timer
-for normal operation on UP is sane, as it's both cheaper to access, as
-well as providing higher accuracy.
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ .../bindings/arm/firmware/linaro,optee-tz.txt      | 31 ++++++++++++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ 2 files changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
 
-In fact this behavior has been explicitly enabled by a patch "ARM: imx:
-always use TWD on IMX6Q" from Sebastian Andrzej Siewior to get better
-responsiveness in cyclictest.
-
-So the subject patch is actually a regression fix, as we now need the
-timer broadcast infrastructure to be able to use the deeper idle states,
-instead of having them enabled by always using the global timer on UP.
-
-Russell, okay to put it in the patch system?
-
-Regards,
-Lucas
+diff --git a/Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt b/Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
+new file mode 100644
+index 0000000..d38834c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
+@@ -0,0 +1,31 @@
++OP-TEE Device Tree Bindings
++
++OP-TEE is a piece of software using hardware features to provide a Trusted
++Execution Environment. The security can be provided with ARM TrustZone, but
++also by virtualization or a separate chip.
++
++We're using "linaro" as the first part of the compatible property for
++the reference implementation maintained by Linaro.
++
++* OP-TEE based on ARM TrustZone required properties:
++
++- compatible     : should contain "linaro,optee-tz"
++
++- method         : The method of calling the OP-TEE Trusted OS. Permitted
++                   values are:
++
++                   "smc" : SMC #0, with the register assignments specified
++		           in drivers/tee/optee/optee_smc.h
++
++                   "hvc" : HVC #0, with the register assignments specified
++		           in drivers/tee/optee/optee_smc.h
++
++
++
++Example:
++	firmware {
++		optee {
++			compatible = "linaro,optee-tz";
++			method = "smc";
++		};
++	};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 1992aa9..e62c0ae 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -148,6 +148,7 @@ lacie	LaCie
+ lantiq	Lantiq Semiconductor
+ lenovo	Lenovo Group Ltd.
+ lg	LG Corporation
++linaro	Linaro Limited
+ linux	Linux-specific binding
+ lsi	LSI Corp. (LSI Logic)
+ lltc	Linear Technology Corporation
+-- 
+1.9.1
