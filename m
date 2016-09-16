@@ -1,80 +1,67 @@
-From: a0393675@ti.com (Keerthy)
-Date: Fri, 16 Sep 2016 17:12:38 +0530
-Subject: [PATCH v7 0/5] mfd: tps65218: Clean ups
-In-Reply-To: <1470833641-29546-1-git-send-email-j-keerthy@ti.com>
-References: <1470833641-29546-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <ab94aff0-8470-57e5-2039-12f09bb0ca33@ti.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 16 Sep 2016 19:56:13 +0800
+Subject: [PATCH] dmaengine: mv_xor: Add support for scatter-gather DMA mode
+In-Reply-To: <20160916093518.14889-1-sr@denx.de>
+Message-ID: <201609161945.4zey9JGT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stefan,
 
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.8-rc6 next-20160916]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
 
-On Wednesday 10 August 2016 06:24 PM, Keerthy wrote:
-> The series cleans up mainly the regulator driver and implements
-> the device tree parsing using the regulator framework. Removes
-> all the redundant compatibles for the individual regulators.
-> Adds platform_device_id table for the gpio and power button modules.
->
-> One of the patch removes redundant read wrapper and makes
-> use of regmap_read wherever necessary.
+url:    https://github.com/0day-ci/linux/commits/Stefan-Roese/dmaengine-mv_xor-Add-support-for-scatter-gather-DMA-mode/20160916-175703
+config: x86_64-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Mark,
+All error/warnings (new ones prefixed by >>):
 
-Should i repost this series? I do not see this series in linux-next yet.
+   drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_sg':
+>> drivers/dma/mv_xor.c:631:24: warning: format '%d' expects argument of type 'int', but argument 3 has type 'size_t {aka long unsigned int}' [-Wformat=]
+        "Transfer size of %d too small!\n", len);
+                           ^
+>> drivers/dma/mv_xor.c:641:9: error: implicit declaration of function 'mv_xor_add_io_win' [-Werror=implicit-function-declaration]
+      ret = mv_xor_add_io_win(mv_chan, dma_dst);
+            ^~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
-Regards,
-Keerthy
->
-> The series is checked for all the regulator registrations on
-> am437x-gp-evm.
->
-> Boot log: http://pastebin.ubuntu.com/22905402/
->
-> The series is based on linux-next on top of series titled:
-> [PATCH v3 0/2] regulator: Enable suspend configuration
->
-> Do not have the link of the above series available at the moment.
->
-> Changes in v7:
->
-> Rebasing to latest next branch. GPIO patch of this series
-> pushed to linux-next by Linus. Hence posting the remaining
-> patches with respective Acks from the domain Maintainers.
->
-> Changes in v6:
->
-> Rebased regulator/mfd clean up patches against linux-next +
-> https://lkml.org/lkml/2016/6/24/122 series.
->
-> Changes in v5:
->
-> Rebased regulator clean up patch against linux-next.
->
-> Changes in v4:
->
-> For gpio-tps65218 reatined the compatible table.
-> Fixed missing ';' in the power button patch.
-> Fixed comments on the Documentation patch.
-> Split the Device Tree patches to a separate series.
->
-> Changes in v3:
->
-> Missed making corresponding changes in the power button and gpio
-> drivers. Added couple of patches to fix them to use mfd_cell way
-> of parsing.
->
-> Keerthy (5):
->   mfd: tps65218: Remove redundant read wrapper
->   Documentation: regulator: tps65218: Update examples
->   input: tps65218-pwrbutton: Add platform_device_id table
->   mfd: tps65218: Use mfd_add_devices instead of of_platform_populate
->   regulator: tps65218: Remove all the compatibles
->
->  .../devicetree/bindings/regulator/tps65218.txt     |  87 +++++++++---
->  drivers/gpio/gpio-tps65218.c                       |   3 +-
->  drivers/input/misc/tps65218-pwrbutton.c            |  10 +-
->  drivers/mfd/tps65218.c                             |  34 ++---
->  drivers/regulator/tps65218-regulator.c             | 153 ++++++++-------------
->  include/linux/mfd/tps65218.h                       |   3 +-
->  6 files changed, 158 insertions(+), 132 deletions(-)
->
+vim +/mv_xor_add_io_win +641 drivers/dma/mv_xor.c
+
+   625			len = min_t(size_t, len, MV_XOR_MAX_BYTE_COUNT);
+   626			if (len == 0)
+   627				goto fetch;
+   628	
+   629			if (len < MV_XOR_MIN_BYTE_COUNT) {
+   630				dev_err(mv_chan_to_devp(mv_chan),
+ > 631					"Transfer size of %d too small!\n", len);
+   632				goto err;
+   633			}
+   634	
+   635			dma_dst = sg_dma_address(dst_sg) + sg_dma_len(dst_sg) -
+   636				dst_avail;
+   637			dma_src = sg_dma_address(src_sg) + sg_dma_len(src_sg) -
+   638				src_avail;
+   639	
+   640			/* Check if a new window needs to get added for 'dst' */
+ > 641			ret = mv_xor_add_io_win(mv_chan, dma_dst);
+   642			if (ret)
+   643				goto err;
+   644	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 55517 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160916/4e701470/attachment-0001.obj>
