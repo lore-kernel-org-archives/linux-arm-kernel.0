@@ -1,32 +1,20 @@
-From: voker57@gmail.com (Iaroslav Gridin)
-Date: Fri, 16 Sep 2016 14:59:15 +0300
-Subject: [PATCH] ARM: dts: msm8974: Add definitions for QCE & cryptobam
-In-Reply-To: <20160915211842.GB5431@hector.attlocal.net>
-References: <20160830153740.13275-1-voker57@gmail.com>
- <20160915211842.GB5431@hector.attlocal.net>
-Message-ID: <20160916115915.7zuaai6rxha32g6j@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Sep 2016 13:58:05 +0200
+Subject: [PATCH v2 0/3] ARM: aspeed: add support for the BT IPMI interface
+In-Reply-To: <1474022367-21029-1-git-send-email-clg@kaod.org>
+References: <1474022367-21029-1-git-send-email-clg@kaod.org>
+Message-ID: <2566577.tsq2Sf5xZr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 04:18:42PM -0500, Andy Gross wrote:
-> Actually, on thinking about this more, the bam block itself only
-> requires the
-> single clock.  The peripheral it is attached to has to keep its sanity
-> during
-> the duration of the transfer (crypto).  The crypto requires 3 clocks,
-> one of
-> which is the same clk the bam requires.
+On Friday, September 16, 2016 12:39:24 PM CEST C?dric Le Goater wrote:
 > 
-> You can access the BAM registers with the bam_clk only, correct?
+> C?dric Le Goater (2):
+>   ARM: aspeed: Add defconfigs for CONFIG_ASPEED_BT_IPMI_BMC
+>   ARM: dts: aspeed: Enable BT IPMI BMC device
 
-No, with only bam_clk board reboots. In fact, core_clk is the only
-required one.
+These two should go through the arm-soc tree, I assume Joel
+will forward them to arm at kernel.org once the driver gets
+picked up into the ipmi tree.
 
-> The CLK_SRC is unnecessary.  Or should be at least.  That gets turned
-> on by
-> getting the CE2_CLK.  I vaguely remember a parent issue that was
-> fixed.
-
-Yes, I thought it was required to change its speed to achieve maximum
-QCE performance but as it have been pointed out, same adjustment on core
-clock does the same.
+	Arnd
