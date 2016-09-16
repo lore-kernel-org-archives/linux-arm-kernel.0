@@ -1,45 +1,157 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Sep 2016 15:42:07 +0200
-Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.9
-In-Reply-To: <20160916014703.GC7398@tiger>
-References: <1473670948-4265-1-git-send-email-shawnguo@kernel.org>
- <2241121.MvRjeYAnGC@wuerfel> <20160916014703.GC7398@tiger>
-Message-ID: <6140062.uQFBQdfrcg@wuerfel>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 16 Sep 2016 13:42:02 +0000
+Subject: [PATCH V6 2/5] PCI/ACPI: Check platform specific ECAM quirks
+In-Reply-To: <42c3f965-b40c-f2bb-e12c-34da6af1a4b7@codeaurora.org>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <1473449047-10499-3-git-send-email-tn@semihalf.com>
+ <57D76626.1050109@huawei.com>
+ <bac9f822-ce0a-7070-94df-4d66fc30f774@semihalf.com>
+ <57D7E53F.1000106@huawei.com> <20160915105849.GA10345@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F8730EA@lhreml507-mbx>
+ <42c3f965-b40c-f2bb-e12c-34da6af1a4b7@codeaurora.org>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F8754AD@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 16, 2016 9:47:03 AM CEST Shawn Guo wrote:
-> On Wed, Sep 14, 2016 at 05:30:49PM +0200, Arnd Bergmann wrote:
-> > On Monday, September 12, 2016 5:02:27 PM CEST Shawn Guo wrote:
-> > > i.MX arm64 device tree changes for 4.9:
-> > >  - Add property dma-coherent for ls2080a PCI device to save software
-> > >    cache maintenance.
-> > >  - Update serial aliases and use stdout-path to sepecify console for
-> > >    ls2080a and ls1043a boards.
-> > >  - Add DDR memory controller device node for ls2080a and ls1043a SoCs.
-> > > 
-> > 
-> > Pulled into next/dt64, thanks!
-> > 
-> > The "dma-coherent" change sounds like a bugfix, should that be backported
-> > to stable kernels? Usually if you lack that property on a device that
-> > is actually coherent, you can get silent data corruption by treating it as
-> > non-coherent.
+Hi Cov
+
+> -----Original Message-----
+> From: Christopher Covington [mailto:cov at codeaurora.org]
+> Sent: 16 September 2016 13:28
+> To: Gabriele Paoloni; Lorenzo Pieralisi; liudongdong (C)
+> Cc: Tomasz Nowicki; helgaas at kernel.org; will.deacon at arm.com;
+> catalin.marinas at arm.com; rafael at kernel.org; arnd at arndb.de;
+> hanjun.guo at linaro.org; okaya at codeaurora.org; jchandra at broadcom.com;
+> dhdang at apm.com; ard.biesheuvel at linaro.org;
+> robert.richter at caviumnetworks.com; mw at semihalf.com;
+> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
+> msalter at redhat.com; linux-pci at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linaro-acpi at lists.linaro.org;
+> jcm at redhat.com; andrea.gallo at linaro.org; jeremy.linton at arm.com;
+> jhugo at codeaurora.org; linux-acpi at vger.kernel.org; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [PATCH V6 2/5] PCI/ACPI: Check platform specific ECAM
+> quirks
 > 
-> My impression is that those cache maintenance enforced for non-coherent
-> device will hurt performance on coherent device.  I don't know it will
-> cause data corruption.
+> On 09/16/2016 05:02 AM, Gabriele Paoloni wrote:
+> > Hi Lorenzo and Tomasz
+> >
+> > Many Thanks for looking at this
+> >
+> >> -----Original Message-----
+> >> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> >> Sent: 15 September 2016 11:59
+> >> To: liudongdong (C)
+> >> Cc: Tomasz Nowicki; helgaas at kernel.org; will.deacon at arm.com;
+> >> catalin.marinas at arm.com; rafael at kernel.org; arnd at arndb.de;
+> >> hanjun.guo at linaro.org; okaya at codeaurora.org; jchandra at broadcom.com;
+> >> cov at codeaurora.org; dhdang at apm.com; ard.biesheuvel at linaro.org;
+> >> robert.richter at caviumnetworks.com; mw at semihalf.com;
+> >> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
+> >> msalter at redhat.com; linux-pci at vger.kernel.org; linux-arm-
+> >> kernel at lists.infradead.org; linaro-acpi at lists.linaro.org;
+> >> jcm at redhat.com; andrea.gallo at linaro.org; jeremy.linton at arm.com;
+> >> Gabriele Paoloni; jhugo at codeaurora.org; linux-acpi at vger.kernel.org;
+> >> linux-kernel at vger.kernel.org
+> >> Subject: Re: [PATCH V6 2/5] PCI/ACPI: Check platform specific ECAM
+> >> quirks
+> >>
+> >> On Tue, Sep 13, 2016 at 07:38:39PM +0800, Dongdong Liu wrote:
+> >>
+> >> [...]
+> >>
+> >>> Our host bridge is non ECAM only for the RC bus config space;
+> >>> for any other bus underneath the root bus we support ECAM access.
+> >>>
+> >>> RC config resource with hardcode as DEFINE_RES_MEM(0xb0070000,
+> >> SZ_4K),
+> >>> EP config resource we get it from MCFG table.
+> >>> So we need to override ops, but config resource we only need to
+> >> hardcode with RC config resource.
+> >>>
+> >>> Our host controller ACPI support patch can be found:
+> >>> https://lkml.org/lkml/2016/8/31/340
+> >>
+> >> Sorry I misread your code. IIUC you create an array of resources
+> that
+> >> represent non-ECAM config space (and incidentally contain debug
+> >> registers to check the link status - that you need to check for
+> every
+> >> given config access (?)), but you still need to have an MCFG entry
+> that
+> >
+> > The link status check is inherited from the designware framework (see
+> > http://lxr.free-electrons.com/source/drivers/pci/host/pcie-
+> designware.c#L678)
+> >
+> > However I think that in this case we can just check the link status
+> > in our init function and return an error if the link is down
+> >
+> >> covers the bus number subject to quirk to make sure this mechanism
+> >> works. Correct ?
+> >
+> > Well we need the quirks for the root bus numbers but if read this v6
+> > quirk mechanism correctly even if we do not specify an mcfg entry for
+> > bus 0 oci_mcfg_match_quirks() is called anyway and we can set our
+> > special configuration space addresses for the root buses (i.e. I
+> think
+> > we can have a clean MCFG table with entries only for those bus ranges
+> > that are really ECAM)
+> >
+> >>
+> >> This also means that, with the MCFG tables you have and current
+> >> mainline kernel you are able to probe a root bridge (because the
+> MCFG
+> >> table covers the bus number that is not ECAM), with enumeration
+> >> going haywire because it is trying to carry out ECAM accesses on
+> >> non-ECAM space.
+> >
+> > Yes correct, we cannot access the host controller configuration space
+> > with our current MCFG table and current Linux mainline
+> >
+> >>
+> >> Is my reading correct ?
+> >>
+> >> Anyway, that's not stricly related to this discussion, it is time we
+> >> converge on this patchset, we can add a domain range if that
+> >> simplifies things.
+> >
+> > IMO it would be better to have the domain range to avoid
+> > a very large and repetitive static quirk array
+> 
+> The v6 framework requires what, 21 additional lines of quirk data? What
+> if you were to define some preprocessor macros to slim it down? I think
+> something like the following would bring it down to roughly 7
+> additional
+> lines.
 
-The problem is that the device in this case is accessing data from
-the cache, while the CPU bypasses the cache for coherent mappings.
-The cache might have a stale cache line as the device reads data, or
-it could be in a writeback configuration, where the data written
-from the device to the cache has not made it into RAM at the time it
-is accessed by the CPU.
+Thanks, yes this would work as well. To be honest this is not a big issue.
+So either we go this way or we introduce domain range...
 
-For streaming mappings, the CPU will invalidate cache lines
-before reading the data, so again if the device has written data
-into the cache but not yet into memory, we will see stale data
-after dma_unmap_single().
+Cheers
 
-	Arnd
+Gab
+
+> 
+> #define PCI_ACPI_QUIRK_QUAD_DOM(rev, dom, ops) \
+>     { "HISI ", rev, 0, dom+0, MCFG_BUS_ANY, ops,
+>       MCFG_RES_EMPTY}, \
+>     { "HISI ", rev, 0, dom+1, MCFG_BUS_ANY, ops,
+>       MCFG_RES_EMPTY}, \
+>     { "HISI ", rev, 0, dom+2, MCFG_BUS_ANY, ops,
+>       MCFG_RES_EMPTY}, \
+>     { "HISI ", rev, 0, dom+3, MCFG_BUS_ANY, ops,
+>       MCFG_RES_EMPTY},
+> 
+> PCI_ACPI_QUIRK_QUAD_DOM("HIP05 ", 0, &hisi_pcie_hip05_ops)
+> PCI_ACPI_QUIRK_QUAD_DOM("HIP06 ", 0, &hisi_pcie_hip05_ops)
+> PCI_ACPI_QUIRK_QUAD_DOM("HIP07 ", 0, &hisi_pcie_hip06_ops)
+> PCI_ACPI_QUIRK_QUAD_DOM("HIP07 ", 4, &hisi_pcie_hip07_ops)
+> PCI_ACPI_QUIRK_QUAD_DOM("HIP07 ", 8, &hisi_pcie_hip07_ops)
+> PCI_ACPI_QUIRK_QUAD_DOM("HIP07 ", 12, &hisi_pcie_hip07_ops)
+> 
+> Cov
+> --
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+> Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+> Aurora Forum, a Linux Foundation Collaborative Project.
