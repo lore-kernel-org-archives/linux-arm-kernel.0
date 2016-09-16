@@ -1,64 +1,197 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Sep 2016 11:07:48 +0200
-Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <20160915162650.GZ13920@localhost>
-References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
- <20160810173710.GK9681@localhost> <20160915162650.GZ13920@localhost>
-Message-ID: <3152956.IVRykDnfF6@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 16 Sep 2016 09:58:25 +0100
+Subject: [PATCH] arm64: hw_breakpoint: Handle inexact watchpoint addresses
+In-Reply-To: <1473689244-147136-1-git-send-email-labath@google.com>
+References: <1473689244-147136-1-git-send-email-labath@google.com>
+Message-ID: <20160916085825.GL3380@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 15, 2016 9:56:51 PM CEST Vinod Koul wrote:
-> On Wed, Aug 10, 2016 at 11:07:10PM +0530, Vinod Koul wrote:
-> > On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
-> > > Hi,
-> > > 
-> > > This series tries to solve the problem with DMA with device registers
-> > > (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
-> > > recent patch '9575632 (dmaengine: make slave address physical)'
-> > > clarifies that DMA slave address provided by clients is the physical
-> > > address. This puts the task of mapping the DMA slave address from a
-> > > phys_addr_t to a dma_addr_t on the DMA engine.
-> > > 
-> > > Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
-> > > the same and no special care is needed. However if you have a IOMMU you
-> > > need to map the DMA slave phys_addr_t to a dma_addr_t using something
-> > > like this.
-> > > 
-> > > This series is based on top of v4.8-rc1. And I'm hoping to be able to collect a
-> > > Ack from Russell King on patch 4/6 that adds the ARM specific part and then be
-> > > able to take the whole series through the dmaengine tree. If this is not the
-> > > best route I'm more then happy to do it another way.
-> > > 
-> > > It's tested on a Koelsch with CONFIG_IPMMU_VMSA and by enabling the
-> > > ipmmu_ds node in r8a7791.dtsi. I verified operation by interacting with
-> > > /dev/mmcblk1, i2c and the serial console which are devices behind the
-> > > iommu.
-> > 
-> > As I said in last one, the dmaengine parts look fine to me. But to go thru
-> > dmaengine tree I would need ACK on non dmaengine patches.
+Hi Pavel,
+
+On Mon, Sep 12, 2016 at 03:07:24PM +0100, Pavel Labath wrote:
+> Arm64 hardware does not always report a watchpoint hit address that
+> matches one of the watchpoints set. It can also report an address
+> "near" the watchpoint if a single instruction access both watched and
+> unwatched addresses. There is no straight-forward way, short of
+> disassembling the offending instruction, to map that address back to
+> the watchpoint.
 > 
-> I havent heard back from this one and I am inclined to merge this one now.
-> If anyone has any objects, please speak up now...
+> Previously, when the hardware reported a watchpoint hit on an address
+> that did not match our watchpoint (this happens in case of instructions
+> which access large chunks of memory such as "stp") the process would
+> enter a loop where we would be continually resuming it (because we did
+> not recognise that watchpoint hit) and it would keep hitting the
+> watchpoint again and again. The tracing process would never get
+> notified of the watchpoint hit.
 > 
-> Also ACKs welcome...
-> 
+> This commit fixes the problem by looking at the watchpoints near the
+> address reported by the hardware. If the address does not exactly match
+> one of the watchpoints we have set, it attributes the hit to the
+> nearest watchpoint we have.  This heuristic is a bit dodgy, but I don't
+> think we can do much more, given the hardware limitations.
+> I include a kernel selftest which triggers this code.
 
+Thanks for the patch. Comments inline.
 
-I had not looked at the series earlier, but this version looks entirely
-reasonable to me, so
+> Signed-off-by: Pavel Labath <labath@google.com>
+> ---
+>  arch/arm64/kernel/hw_breakpoint.c                  | 104 +++++++---
+>  tools/testing/selftests/breakpoints/Makefile       |   5 +-
+>  .../selftests/breakpoints/breakpoint_test-arm.c    | 217 +++++++++++++++++++++
+>  3 files changed, 298 insertions(+), 28 deletions(-)
+>  create mode 100644 tools/testing/selftests/breakpoints/breakpoint_test-arm.c
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Could you split the test out into a separate patch please?
 
+> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+> index 26a6bf7..d0ebfe6 100644
+> --- a/arch/arm64/kernel/hw_breakpoint.c
+> +++ b/arch/arm64/kernel/hw_breakpoint.c
+> @@ -661,50 +661,80 @@ unlock:
+>  }
+>  NOKPROBE_SYMBOL(breakpoint_handler);
+>  
+> +/*
+> + * Arm64 hardware does not always report a watchpoint hit address that matches
+> + * one of the watchpoints set. It can also report an address "near" the
+> + * watchpoint if a single instruction access both watched and unwatched
+> + * addresses. There is no straight-forward way, short of disassembling the
+> + * offending instruction, to map that address back to the watchpoint. This
+> + * function computes the distance of the memory access from the watchpoint as a
+> + * heuristic for the likelyhood that a given access triggered the watchpoint.
+> + *
+> + * See Section D2.10.5 "Determining the memory location that caused a Watchpoint
+> + * exception" of ARMv8 Architecture Reference Manual for details.
+> + *
+> + * The function returns the distance of the address from the bytes watched by
+> + * the watchpoint. In case of an exact match, it returns 0.
+> + */
+> +static u64 get_distance_from_watchpoint(unsigned long addr, int i,
+> +					struct arch_hw_breakpoint *info)
+> +{
+> +	u64 val, alignment_mask, wp_low, wp_high;
+> +	u32 ctrl_reg;
+> +	int first_bit;
+> +	struct arch_hw_breakpoint_ctrl ctrl;
+> +
+> +	/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
+> +	if (is_compat_task()) {
+> +		if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
+> +			alignment_mask = 0x7;
+> +		else
+> +			alignment_mask = 0x3;
+> +	} else {
+> +		alignment_mask = 0x7;
+> +	}
 
-One concern I have is that we might get an awkward situation if we
-ever encounter one DMA engine hardware that is used in different
-systems that all have an IOMMU, but on some of them the connection
-between the DMA master and the slave FIFO bypasses the IOMMU
-while on others the IOMMU is required. I don't have any idea for
-how this could be handled in a generic way, so my best answer
-here is to hope we never get there, and if we do, handle it
-using some local hack in the driver.
+We have identical logic elsewhere in this file, so please stick this into
+a get_watchpoint_alignment_mask function.
 
-	Arnd
+> +
+> +	val = read_wb_reg(AARCH64_DBG_REG_WVR, i) & ~alignment_mask;
+> +
+> +	ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
+> +	decode_ctrl_reg(ctrl_reg, &ctrl);
+> +	first_bit = ffs(ctrl.len);
+> +	if (first_bit == 0)
+> +		return -1;
+> +	wp_low = val + first_bit - 1;
+> +	wp_high = val + fls(ctrl.len) - 1;
+> +	if (addr < wp_low)
+> +		return wp_low - addr;
+> +	else if (addr > wp_high)
+> +		return addr - wp_high;
+
+Why do you need to read the control register? We already have the length
+in the arch_hw_breakpoint, and that should be sufficient for the check, no?
+
+>  static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>  			      struct pt_regs *regs)
+>  {
+> -	int i, step = 0, *kernel_step, access;
+> -	u32 ctrl_reg;
+> -	u64 val, alignment_mask;
+> +	int i, step = 0, *kernel_step, access, closest_match;
+> +	u64 min_dist = -1, dist;
+>  	struct perf_event *wp, **slots;
+>  	struct debug_info *debug_info;
+>  	struct arch_hw_breakpoint *info;
+> -	struct arch_hw_breakpoint_ctrl ctrl;
+>  
+>  	slots = this_cpu_ptr(wp_on_reg);
+>  	debug_info = &current->thread.debug;
+>  
+> +	/*
+> +	 * Find all watchpoints that match the reported address. If no exact
+> +	 * match is found. Attribute the hit to the closest watchpoint.
+> +	 */
+>  	for (i = 0; i < core_num_wrps; ++i) {
+>  		rcu_read_lock();
+>  
+>  		wp = slots[i];
+> -
+>  		if (wp == NULL)
+>  			goto unlock;
+>  
+> -		info = counter_arch_bp(wp);
+> -		/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
+> -		if (is_compat_task()) {
+> -			if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
+> -				alignment_mask = 0x7;
+> -			else
+> -				alignment_mask = 0x3;
+> -		} else {
+> -			alignment_mask = 0x7;
+> -		}
+> -
+> -		/* Check if the watchpoint value matches. */
+> -		val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
+> -		if (val != (addr & ~alignment_mask))
+> -			goto unlock;
+> -
+> -		/* Possible match, check the byte address select to confirm. */
+> -		ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
+> -		decode_ctrl_reg(ctrl_reg, &ctrl);
+> -		if (!((1 << (addr & alignment_mask)) & ctrl.len))
+> -			goto unlock;
+> -
+>  		/*
+>  		 * Check that the access type matches.
+>  		 * 0 => load, otherwise => store
+> @@ -714,6 +744,17 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>  		if (!(access & hw_breakpoint_type(wp)))
+>  			goto unlock;
+>  
+> +		info = counter_arch_bp(wp);
+> +
+> +		dist = get_distance_from_watchpoint(addr, i, info);
+> +		if (dist < min_dist) {
+> +			min_dist = dist;
+> +			closest_match = i;
+> +		}
+> +		/* Is this an exact match? */
+> +		if (dist != 0)
+> +			goto unlock;
+> +
+>  		info->trigger = addr;
+>  		perf_bp_event(wp, regs);
+>  
+> @@ -724,6 +765,15 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>  unlock:
+>  		rcu_read_unlock();
+>  	}
+> +	if (min_dist > 0 && min_dist != -1) {
+> +		/* No exact match found. */
+> +		rcu_read_lock();
+> +		wp = slots[closest_match];
+> +		info = counter_arch_bp(wp);
+> +		info->trigger = addr;
+> +		perf_bp_event(wp, regs);
+> +		rcu_read_unlock();
+
+Hmm, are you sure it's safe to drop and retake the RCU lock here? If the
+event is destroyed before we retake the RCU lock, won't htis go horribly
+wrong? It's probably best to hold the lock outside the loop :(
+
+Will
