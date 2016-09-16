@@ -1,32 +1,63 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 16 Sep 2016 23:59:40 +0200
-Subject: [PATCH] cpufreq: ti: Use generic platdev driver
-In-Reply-To: <57DC6420.20706@ti.com>
-References: <20160914204137.20346-1-d-gerlach@ti.com>
- <20160915062507.GA30169@vireshk-i7> <57DC6420.20706@ti.com>
-Message-ID: <4712275.44limO7TAi@vostro.rjw.lan>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 16 Sep 2016 16:01:01 -0700
+Subject: [PATCHv2 3/3] clk: keystone: Add sci-clk driver support
+In-Reply-To: <827e0a46-3771-67a8-1414-0cbaf0e2548e@ti.com>
+References: <1472733635-22661-1-git-send-email-t-kristo@ti.com>
+ <1472733635-22661-4-git-send-email-t-kristo@ti.com>
+ <20160902233235.GM12510@codeaurora.org>
+ <827e0a46-3771-67a8-1414-0cbaf0e2548e@ti.com>
+Message-ID: <20160916230101.GM7243@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 16, 2016 04:29:04 PM Dave Gerlach wrote:
-> Hi,
-> On 09/15/2016 01:25 AM, Viresh Kumar wrote:
-> > On 14-09-16, 15:41, Dave Gerlach wrote:
-> >> Now that the cpufreq-dt-platdev is used to create the cpufreq-dt platform
-> >> device for all OMAP platforms and the platform code that did it
-> >> before has been removed, add ti,am33xx and ti,dra7xx to the machine list
-> >> in cpufreq-dt-platdev which had relied on the removed platform code to do
-> >> this previously.
-> >>
-> >> Fixes: 7694ca6e1d6f ("cpufreq: omap: Use generic platdev driver")
-> >> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> >
-> > Any stable trees you want this to be added to ?
+On 09/05, Tero Kristo wrote:
+> On 03/09/16 02:32, Stephen Boyd wrote:
+> >I still don't get it. We should be registering hw pointers in
+> >probe and handing them out in the xlate function. Not register
+> >hws in the xlate function and then handing them out as well. I
+> >haven't reviewed anything else in this patch.
 > 
-> I suppose it'll go for 4.7-stable as the change happened in v4.6.
+> Ok, let me try to explain the functionality.
+> 
+> Probe time hw pointer registration is only needed for special clocks
+> that require extra flags, like adding the spread spectrum flag.
+> There is ever going to be only handful of these.
+> 
+> Xlate checks out the sci_clk list, and picks up an existing hw clock
+> if it is there. If not, it will create a new one. The reason this is
+> done like this, the device IDs / clock IDs don't mean anything to
+> the driver itself, the driver just passes these forward to the
+> underlying SCI fwk. And, we don't have inherent knowledge of valid
+> device / clock IDs either, the SCI fwk returns a failure if a
+> specific clock ID is bad. The device / clock IDs are going to be
+> different between different generations of SoC also, and in addition
+> there can be holes in the ID ranges.
 
-The commit in the fixes tag went in during the 4.7 cycle, so the fix should
-go into 4.7.y, but I'm not going to push it as urgent material for 4.8.
+Ok. Thanks for the explanation.
 
-Thanks,
-Rafael
+I understand the desire to make this SoC agnostic and consumer/dt
+driven. Constructor pattern and all. Unfortunately the OF clk
+provider is a getter pattern; not a constructor pattern. I'm
+seriously concerned about the locking here because we're in the
+framework creating a clk and tying it into a consumer list which
+could cause all sorts of problems if we want to reenter the
+framework and register more clks. Recursion abounds and my head
+explodes! The recursive clk prepare mutex is not something anyone
+should be thrilled about keeping around.
+
+So, just don't do this. Instead, register the clks during probe
+that exist for the firmware. That list could be discoverable with
+firmware calls, or known based on different compatible strings
+from DT that have the soc name in it, or something else. Even
+scanning the entire DT tree for
+
+	clocks = <&my_clk_node x y>
+	
+would be better, but probably hugely inefficient and outright
+buggy with DT overlays so don't do it. If the firmware can't tell
+us what clks are there, just have a table based on compatible
+string and be done.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
