@@ -1,35 +1,36 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Sep 2016 16:06:31 -0400
-Subject: [PATCH V2 2/5] IB/hfi1: replace pci_reset_bridge_secondary_bus with
- pci_reset_bus
+Date: Fri, 16 Sep 2016 16:06:34 -0400
+Subject: [PATCH V2 5/5] PCI: handle CRS returned by device after FLR
 In-Reply-To: <1474056395-21843-1-git-send-email-okaya@codeaurora.org>
 References: <1474056395-21843-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1474056395-21843-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1474056395-21843-6-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save and restore the settings on other devices impacted by the secondary
-bus reset downstream.
+An endpoint is allowed to issue CRS following an FLR request to indicate
+that it is not ready to accept new requests. Changing the polling mechanism
+in FLR wait function to go read the vendor ID instead of the command/status
+register. A CRS indication will only be given if the address to be read is
+vendor ID.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/infiniband/hw/hfi1/pcie.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/pci/pci.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
-index 89c68da..f8f21fb 100644
---- a/drivers/infiniband/hw/hfi1/pcie.c
-+++ b/drivers/infiniband/hw/hfi1/pcie.c
-@@ -861,9 +861,7 @@ static int trigger_sbr(struct hfi1_devdata *dd)
- 	 * delay after a reset is required.  Per spec requirements,
- 	 * the link is either working or not after that point.
- 	 */
--	pci_reset_bridge_secondary_bus(dev->bus->self);
--
--	return 0;
-+	return pci_reset_bus(dev->bus);
- }
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index e913467..1def11e 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3729,7 +3729,8 @@ static void pci_flr_wait(struct pci_dev *dev)
  
- /*
+ 	do {
+ 		msleep(100);
+-		pci_read_config_dword(dev, PCI_COMMAND, &id);
++		pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
++					   60 * 1000);
+ 	} while (i++ < 10 && id == ~0);
+ 
+ 	if (id == ~0)
 -- 
 1.9.1
