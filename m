@@ -1,63 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Sep 2016 12:33:25 +0100
-Subject: [PATCH v3 5/7] arm64: Handle faults caused by inadvertent user
- access with PAN enabled
-In-Reply-To: <1473788797-10879-6-git-send-email-catalin.marinas@arm.com>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
- <1473788797-10879-6-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20160916113325.GB21702@leverpostej>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 16 Sep 2016 13:42:41 +0200
+Subject: [PATCH v2 00/10] pinctrl: exynos/samsung: Add header with values
+ used for configuration
+In-Reply-To: <CACRpkdZuRym=SuAiBA_UsNmKd7N5n9g=z=ZxwcEk7J0BcXDsFw@mail.gmail.com>
+References: <1472714638-15676-1-git-send-email-k.kozlowski@samsung.com>
+ <CACRpkdZuRym=SuAiBA_UsNmKd7N5n9g=z=ZxwcEk7J0BcXDsFw@mail.gmail.com>
+ <CGME20160916114244eucas1p2f585ef754b0523022a04a5646a06da36@eucas1p2.samsung.com>
+Message-ID: <3a004c08-26b3-d5cd-dbc3-bc0f47814570@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 06:46:35PM +0100, Catalin Marinas wrote:
-> When TTBR0_EL1 is set to the reserved page, an erroneous kernel access
-> to user space would generate a translation fault. This patch adds the
-> checks for the software-set PSR_PAN_BIT to emulate a permission fault
-> and report it accordingly.
+On 09/07/2016 10:20 PM, Linus Walleij wrote:
+> I have one comment though, if you're anyway making changes to all
+> the DTS files:
+> 
+> On Thu, Sep 1, 2016 at 9:23 AM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+> 
+>> -               samsung,pin-function = <2>;
+>> -               samsung,pin-pud = <0>;
+>> -               samsung,pin-drv = <0>;
+>> +               samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+>> +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+>> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
+> 
+> Nowadays we have standard bindings for this, see
+> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> 
+> Section "Generic pin multiplexing node content".
+> 
+> By patching the driver and bindings to accept also the standard
+> bindings with just function and pins and also adding support
+> for standard pin configurations like bias-disable
+> bias-pull-up with the old samsung,* bindings as a fallback
+> etc you can actually modernize the whole binding and
+> DTS looks to something simpler.
+> 
+> You will find that this is how newer platforms do it.
+> 
+> But it is admittedly a bigger project.
 
-Why do we need to treat this case as a permission fault? It looks like a
-fault that wasn't a deliberate uaccess (which thus doesn't have a fixup
-handler) should have do_page_fault call __do_kernel_fault, where we
-should die().
+Indeed it would be nice to support generic bindings. Almost certainly I
+won't have time for implementing this but it looks like a good task for
+newcomers.
 
-Is this just for more consistent reporting of erroneous accesses to user
-memory? Or does this fix some other issue?
-
-> This patch also updates the description of the synchronous external
-> aborts on translation table walks.
-
-This sounds fine, though it might be better as a separate/preparatory
-patch.
-
-> -static inline bool is_permission_fault(unsigned int esr)
-> +static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs)
->  {
->  	unsigned int ec       = ESR_ELx_EC(esr);
->  	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
->  
-> -	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM) ||
-> -	       (ec == ESR_ELx_EC_IABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
-> +	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
-> +		return false;
-> +
-> +	if (system_uses_ttbr0_pan())
-> +		return fsc_type == ESR_ELx_FSC_FAULT &&
-> +			(regs->pstate & PSR_PAN_BIT);
-> +	else
-> +		return fsc_type == ESR_ELx_FSC_PERM;
->  }
-
-
-Since the entry code will clear the PAN bit in the SPSR when we see the
-reserved ASID, faults in EFI runtime services will still be correctly
-reported, though that's somewhat subtle (and it took me a while to
-convince myself that was the case).
-
-Also, I think that faults elsewhere may be misreported, e.g. in cold
-entry to kernel paths (idle, hotplug) where we have a global mapping in
-TTBR0, and it looks like we're using the reserved ASID.
-
-I'm not immediately sure how to distinguish those cases.
-
-Thanks,
-Mark.
+Best regards,
+Krzysztof
