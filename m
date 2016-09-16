@@ -1,46 +1,66 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 16 Sep 2016 23:16:41 +0800
-Subject: [PATCH v4 1/2] ARM: dts: sun8i: add pinmux for UART1 at PG
-Message-ID: <20160916151642.27907-1-icenowy@aosc.xyz>
+From: zach.brown@ni.com (Zach Brown)
+Date: Fri, 16 Sep 2016 10:01:41 -0500
+Subject: [RESEND PATCH v7 1/2] sdhci-of-arasan: Add device tree parameter xlnx,
+ fails-without-test-cd bit
+Message-ID: <1474038102-20937-1-git-send-email-zach.brown@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UART1 at PG (PG6, PG7, PG8, PG9) is, in the Allwinner's reference
-tablet design of A23/33, used to connect to UART Bluetooth cards.
+The sdhci controller on xilinx zynq devices will not function unless
+the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+In cases where it is impossible to provide the CD bit in hardware,
+setting the controller to test mode and then setting inserted to true
+will get the controller to function without the CD bit.
 
-Add the pinmux for it.
+The device property "xlnx,fails-without-test-cd" will let the arasan
+driver know the controller does not have the CD line wired and that the
+controller does not function without it.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Signed-off-by: Zach Brown <zach.brown@ni.com>
 ---
-This patch is splited in v4.
+v2:
+ * improved commit messages
+ * removed fake-cd device property
+ * removed fake-cd quirk
+ * use broken-cd device property
+ * documented new usage of broken-cd
+v3:
+ * removed new usage of broken-cd
+ * created fails-without-test-cd device property
+ * created arasan controller specific quirk
+v4:
+ * changed fails-without-test-cd to xlnx-fails-without-test-cd
+ * removed extra blank line
+v5:
+ * Fixed style mistake
+ * Changed (1 << 0 ) to BIT(0)
+v6:
+ * Fixed style mistakes
+ * Condensed unnecessarily long variable names
+ * Removed line wraps that were no longer necessary.
+ * Rebased changes off Ulf's mmc tree's next branch.
+v7:
+ * Removed erroneous re-creation of Optional Properties section
+ * Changed xlnx-fails-without-test-cd to xlnx,fails-without-test-cd
+ * Changed of_get_property to of_property_read_bool
 
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 7e05e09..c340885 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -361,6 +361,20 @@
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+ Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+index 3404afa..49df630 100644
+--- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
++++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+@@ -36,6 +36,9 @@ Optional Properties:
+   - #clock-cells: If specified this should be the value <0>.  With this property
+     in place we will export a clock representing the Card Clock.  This clock
+     is expected to be consumed by our PHY.  You must also specify
++  - xlnx,fails-without-test-cd: when present, the controller doesn't work when
++    the CD line is not connected properly, and the line is not connected
++    properly. Test mode can be used to force the controller to function.
  
-+			uart1_pins_a: uart1 at 0 {
-+				allwinner,pins = "PG6", "PG7";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart1_pins_cts_rts_a: uart1-cts-rts at 0 {
-+				allwinner,pins = "PG8", "PG9";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
- 			mmc0_pins_a: mmc0 at 0 {
- 				allwinner,pins = "PF0", "PF1", "PF2",
- 						 "PF3", "PF4", "PF5";
+ Example:
+ 	sdhci at e0100000 {
 -- 
-2.9.3
+2.7.4
