@@ -1,326 +1,236 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 16 Sep 2016 14:33:40 +0100
-Subject: [PATCH v9 08/10] arm64: pmu: Detect and enable multiple PMUs in
- an ACPI system
-In-Reply-To: <1473892358-22574-9-git-send-email-jeremy.linton@arm.com> (Jeremy
- Linton's message of "Wed, 14 Sep 2016 17:32:36 -0500")
-References: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
- <1473892358-22574-9-git-send-email-jeremy.linton@arm.com>
-Message-ID: <87y42st1e3.fsf@e105922-lin.cambridge.arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 16 Sep 2016 16:35:08 +0300
+Subject: [PATCH RFC 5/8] ARM: dts: r8a7743: initial SoC device tree
+In-Reply-To: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
+References: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
+Message-ID: <1679762.ECpvSkQAyM@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeremy Linton <jeremy.linton@arm.com> writes:
+The initial R8A7743 SoC device tree including CPU cores, GIC, timer, SYSC,
+and the required  clock descriptions.
 
-> Its possible that an ACPI system has multiple CPU types in it
-> with differing PMU counters. Iterate the CPU's and make a determination
-> about how many of each type exist in the system. Then take and create
-> a PMU platform device for each type, and assign it the interrupts parsed
-> from the MADT. Creating a platform device is necessary because the PMUs
-> are not described as devices in the DSDT table.
->
-> This code is loosely based on earlier work by Mark Salter.
->
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  drivers/perf/arm_pmu.c      |   8 +-
->  drivers/perf/arm_pmu_acpi.c | 224 ++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 231 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index 63f16a5..47ab4e9 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -1074,7 +1074,13 @@ int arm_pmu_device_probe(struct platform_device *pdev,
->  		if (!ret)
->  			ret = init_fn(pmu);
->  	} else if (probe_table) {
-> -		ret = probe_plat_pmu(pmu, probe_table, read_cpuid_id());
-> +		if (acpi_disabled) {
-> +			/* use the current cpu. */
-> +			ret = probe_plat_pmu(pmu, probe_table,
-> +					     read_cpuid_id());
-> +		} else {
-> +			ret = probe_plat_pmu(pmu, probe_table, pdev->id);
-> +		}
->  	}
->  
->  	if (ret) {
-> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-> index dbd4e10..7c56ee4 100644
-> --- a/drivers/perf/arm_pmu_acpi.c
-> +++ b/drivers/perf/arm_pmu_acpi.c
-> @@ -2,13 +2,17 @@
->   * ARM ACPI PMU support
->   *
->   * Copyright (C) 2015 Red Hat Inc.
-> + * Copyright (C) 2016 ARM Ltd.
->   * Author: Mark Salter <msalter@redhat.com>
-> + *	   Jeremy Linton <jeremy.linton@arm.com>
->   *
->   * This work is licensed under the terms of the GNU GPL, version 2.  See
->   * the COPYING file in the top-level directory.
->   *
->   */
->  
-> +#define pr_fmt(fmt) "ACPI-PMU: " fmt
-> +
->  #include <asm/cpu.h>
->  #include <linux/acpi.h>
->  #include <linux/irq.h>
-> @@ -23,6 +27,12 @@ struct pmu_irq {
->  	bool registered;
->  };
->  
-> +struct pmu_types {
-> +	struct list_head list;
-> +	int		 cpu_type;
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
 
-Apologies for not noticing this earlier but cpu_type should be u32 to
-match partnum (which is derived from reg_midr).
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> +	int		 cpu_count;
-> +};
-> +
->  static struct pmu_irq pmu_irqs[NR_CPUS];
->  
->  /*
-> @@ -38,3 +48,217 @@ void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
->  	else
->  		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
->  }
-> +
-> +static void __init arm_pmu_acpi_handle_alloc_failure(struct list_head *pmus)
-> +{
-> +	struct pmu_types *pmu, *safe_temp;
-> +
-> +	list_for_each_entry_safe(pmu, safe_temp, pmus, list) {
-> +		list_del(&pmu->list);
-> +		kfree(pmu);
-> +	}
-> +}
-> +
-> +/* Count number and type of CPU cores in the system. */
-> +static bool __init arm_pmu_acpi_determine_cpu_types(struct list_head *pmus)
-> +{
-> +	int i;
-> +	bool unused_madt_entries = false;
-> +
-> +	for_each_possible_cpu(i) {
-> +		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
-> +		u32 partnum = MIDR_PARTNUM(cinfo->reg_midr);
-> +		struct pmu_types *pmu;
-> +
-> +		if (cinfo->reg_midr == 0) {
+---
+ arch/arm/boot/dts/r8a7743.dtsi |  210 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 210 insertions(+)
 
-When can the above condition be true? Worth a comment.
-
-> +			unused_madt_entries = true;
-> +			continue;
-> +		}
-> +
-> +		list_for_each_entry(pmu, pmus, list) {
-> +			if (pmu->cpu_type == partnum) {
-> +				pmu->cpu_count++;
-> +				break;
-> +			}
-> +		}
-> +
-> +		/* we didn't find the CPU type, add an entry to identify it */
-> +		if (&pmu->list == pmus) {
-> +			pmu = kzalloc(sizeof(struct pmu_types), GFP_KERNEL);
-> +			if (!pmu) {
-> +				pr_err("Unable to allocate pmu_types\n");
-> +				/*
-> +				 * Instead of waiting to cleanup possible
-> +				 * allocation failures in the caller clean
-> +				 * them up immediately. Functionally this
-> +				 * doesn't make any difference, except in
-> +				 * genuine heterogeneous systems where it
-> +				 * guarantees the whole subsystem is
-> +				 * disabled rather than running with just
-> +				 * a single set of homogeneous CPU's PMU
-> +				 * active. That assumes there aren't
-> +				 * any further memory allocation failures.
-> +				 */
-> +				arm_pmu_acpi_handle_alloc_failure(pmus);
-> +				break;
-> +			} else {
-> +				pmu->cpu_type = partnum;
-> +				pmu->cpu_count++;
-> +				list_add_tail(&pmu->list, pmus);
-> +			}
-> +		}
-> +	}
-> +
-> +	return unused_madt_entries;
-> +}
-> +
-> +/*
-> + * Registers the group of PMU interfaces which correspond to the 'last_cpu_id'.
-> + * This group utilizes 'count' resources in the 'res'.
-> + */
-> +static int __init arm_pmu_acpi_register_pmu(int count, struct resource *res,
-> +					    int last_cpu_id)
-> +{
-> +	int i;
-> +	int err = -ENOMEM;
-> +	bool free_gsi = false;
-> +	struct platform_device *pdev;
-> +
-> +	if (count) {
-> +		pdev = platform_device_alloc(ARMV8_PMU_PDEV_NAME, last_cpu_id);
-> +		if (pdev) {
-> +			err = platform_device_add_resources(pdev, res, count);
-> +			if (!err) {
-> +				err = platform_device_add(pdev);
-> +				if (err) {
-> +					pr_warn("Unable to register PMU device\n");
-> +					free_gsi = true;
-> +				}
-> +			} else {
-> +				pr_warn("Unable to add resources to device\n");
-> +				free_gsi = true;
-> +				platform_device_put(pdev);
-> +			}
-> +		} else {
-> +			pr_warn("Unable to allocate platform device\n");
-> +			free_gsi = true;
-> +		}
-> +	}
-
-The above if block is quite hard to review. I've had the same comment on
-previous versions as well.
-
-> +
-> +	/* unmark (and possibly unregister) registered GSIs */
-> +	for_each_possible_cpu(i) {
-> +		if (pmu_irqs[i].registered) {
-> +			if (free_gsi)
-> +				acpi_unregister_gsi(pmu_irqs[i].gsi);
-> +			pmu_irqs[i].registered = false;
-> +		}
-> +	}
-> +
-> +	return err;
-> +}
-> +
-> +int arm_pmu_acpi_retrieve_irq(struct resource *res, int cpu)
-
-The return value of this function isn't used anywhere. Any reason it
-can't be void?
-
-> +{
-> +	int irq = -ENODEV;
-> +
-> +	if (pmu_irqs[cpu].registered) {
-> +		pr_info("CPU %d's interrupt is already registered\n", cpu);
-> +	} else {
-> +		irq = acpi_register_gsi(NULL, pmu_irqs[cpu].gsi,
-> +					pmu_irqs[cpu].trigger,
-> +					ACPI_ACTIVE_HIGH);
-> +		pmu_irqs[cpu].registered = true;
-> +		res->start = irq;
-> +		res->end = irq;
-> +		res->flags = IORESOURCE_IRQ;
-> +		if (pmu_irqs[cpu].trigger == ACPI_EDGE_SENSITIVE)
-> +			res->flags |= IORESOURCE_IRQ_HIGHEDGE;
-> +		else
-> +			res->flags |= IORESOURCE_IRQ_HIGHLEVEL;
-> +	}
-> +	return irq;
-> +}
-> +
-> +/*
-> + * For the given cpu/pmu type, walk all known GSIs, register them, and add
-> + * them to the resource structure. Return the number of GSI's contained
-> + * in the res structure, and the id of the last CPU/PMU we added.
-> + */
-> +static int __init arm_pmu_acpi_gsi_res(struct pmu_types *pmus,
-> +				       struct resource *res, int *last_cpu_id)
-> +{
-> +	int i, count;
-> +
-> +	/* lets group all the PMU's from similar CPU's together */
-> +	count = 0;
-> +	for_each_possible_cpu(i) {
-> +		struct cpuinfo_arm64 *cinfo = per_cpu_ptr(&cpu_data, i);
-> +
-> +		if (pmus->cpu_type == MIDR_PARTNUM(cinfo->reg_midr)) {
-> +			if ((pmu_irqs[i].gsi == 0) && (cinfo->reg_midr != 0)) {
-> +				pr_info("CPU %d is assigned interrupt 0\n", i);
-> +				continue;
-> +			}
-> +			/* likely not online */
-> +			if (!cinfo->reg_midr)
-> +				continue;
-> +
-> +			arm_pmu_acpi_retrieve_irq(&res[count], i);
-> +			count++;
-> +			(*last_cpu_id) = cinfo->reg_midr;
-> +		}
-> +	}
-> +	return count;
-> +}
-> +
-> +static int __init pmu_acpi_init(void)
-> +{
-> +	struct resource	*res;
-> +	int err = -ENOMEM;
-> +	int count, cpu_id;
-> +	struct pmu_types *pmu, *safe_temp;
-> +	bool unused_madt_entries;
-> +	LIST_HEAD(pmus);
-> +
-> +	if (acpi_disabled)
-> +		return 0;
-> +
-> +	unused_madt_entries = arm_pmu_acpi_determine_cpu_types(&pmus);
-> +
-> +	list_for_each_entry_safe(pmu, safe_temp, &pmus, list) {
-> +		if (unused_madt_entries)
-> +			pmu->cpu_count = num_possible_cpus();
-
-So if there is any unbooted cpu ...
-
-> +
-> +		res = kcalloc(pmu->cpu_count,
-> +				  sizeof(struct resource), GFP_KERNEL);
-
-... we allocate potentially large number (num_possible_cpus()) of
-resources for each PMU.
-
-This is needlessly wasteful. Under what conditions have you found
-reg_midr to be 0?
-
-> +
-> +		/* for a given PMU type collect all the GSIs. */
-> +		if (res) {
-> +			count = arm_pmu_acpi_gsi_res(pmu, res,
-> +						     &cpu_id);
-> +			/*
-> +			 * register this set of interrupts
-> +			 * with a new PMU device
-> +			 */
-> +			if (count) {
-> +				if (unused_madt_entries)
-> +					count = num_possible_cpus();
-> +				err = arm_pmu_acpi_register_pmu(count, res,
-> +								cpu_id);
-> +				if (!err)
-> +					pr_info("Register %d devices for %X\n",
-> +						count, pmu->cpu_type);
-> +				kfree(res);
-> +			}
-> +		} else {
-> +			pr_warn("PMU unable to allocate interrupt resource\n");
-> +		}
-> +
-> +		list_del(&pmu->list);
-> +		kfree(pmu);
-> +	}
-> +
-> +	return err;
-> +}
-> +
-> +arch_initcall(pmu_acpi_init);
+Index: renesas/arch/arm/boot/dts/r8a7743.dtsi
+===================================================================
+--- /dev/null
++++ renesas/arch/arm/boot/dts/r8a7743.dtsi
+@@ -0,0 +1,210 @@
++/*
++ * Device Tree Source for the r8a7743 SoC
++ *
++ * Copyright (C) 2016 Cogent Embedded Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2. This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/r8a7743-clock.h>
++#include <dt-bindings/power/r8a7743-sysc.h>
++
++/ {
++	compatible = "renesas,r8a7743";
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0>;
++			clock-frequency = <1500000000>;
++			clocks = <&cpg_clocks R8A7743_CLK_Z>;
++			power-domains = <&sysc R8A7743_PD_CA15_CPU0>;
++			next-level-cache = <&L2_CA15>;
++		};
++
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <1>;
++			clock-frequency = <1500000000>;
++			power-domains = <&sysc R8A7743_PD_CA15_CPU1>;
++			next-level-cache = <&L2_CA15>;
++		};
++
++		L2_CA15: cache-controller at 0 {
++			compatible = "cache";
++			reg = <0>;
++			cache-unified;
++			cache-level = <2>;
++			power-domains = <&sysc R8A7743_PD_CA15_SCU>;
++		};
++	};
++
++	soc {
++		compatible = "simple-bus";
++		interrupt-parent = <&gic>;
++
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		gic: interrupt-controller at f1001000 {
++			compatible = "arm,gic-400";
++			#interrupt-cells = <3>;
++			#address-cells = <0>;
++			interrupt-controller;
++			reg = <0 0xf1001000 0 0x1000>,
++			      <0 0xf1002000 0 0x1000>,
++			      <0 0xf1004000 0 0x2000>,
++			      <0 0xf1006000 0 0x2000>;
++			interrupts = <GIC_PPI 9
++				     (GIC_CPU_MASK_SIMPLE(2) |
++				      IRQ_TYPE_LEVEL_HIGH)>;
++		};
++
++		timer {
++			compatible = "arm,armv7-timer";
++			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
++				      IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
++				      IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
++				      IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
++				      IRQ_TYPE_LEVEL_LOW)>;
++		};
++
++		sysc: system-controller at e6180000 {
++			compatible = "renesas,r8a7743-sysc";
++			reg = <0 0xe6180000 0 0x0200>;
++			#power-domain-cells = <1>;
++		};
++
++		/* Special CPG clocks */
++		cpg_clocks: cpg_clocks at e6150000 {
++			compatible = "renesas,r8a7743-cpg-clocks",
++				     "renesas,rcar-gen2-cpg-clocks";
++			reg = <0 0xe6150000 0 0x1000>;
++			clocks = <&extal_clk &usb_extal_clk>;
++			#clock-cells = <1>;
++			clock-output-names = "main", "pll0", "pll1", "pll3",
++					     "lb", "qspi", "sdh", "sd0", "z",
++					     "rcan";
++			#power-domain-cells = <0>;
++		};
++
++		/* Fixed factor clocks */
++		pll1_div2_clk: pll1_div2 {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7743_CLK_PLL1>;
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++		};
++		zs_clk: zs {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7743_CLK_PLL1>;
++			#clock-cells = <0>;
++			clock-div = <6>;
++			clock-mult = <1>;
++		};
++		p_clk: p {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7743_CLK_PLL1>;
++			#clock-cells = <0>;
++			clock-div = <24>;
++			clock-mult = <1>;
++		};
++		mp_clk: mp {
++			compatible = "fixed-factor-clock";
++			clocks = <&pll1_div2_clk>;
++			#clock-cells = <0>;
++			clock-div = <15>;
++			clock-mult = <1>;
++		};
++
++		/* Gate clocks */
++		mstp2_clks: mstp2_clks at e6150138 {
++			compatible = "renesas,r8a7743-mstp-clocks",
++				     "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150138 0 4>, <0 0xe6150040 0 4>;
++			clocks = <&mp_clk>, <&mp_clk>, <&mp_clk>, <&mp_clk>,
++				 <&mp_clk>, <&mp_clk>, <&zs_clk>, <&zs_clk>;
++			#clock-cells = <1>;
++			clock-indices = <
++				R8A7743_CLK_SCIFA2 R8A7743_CLK_SCIFA1
++				R8A7743_CLK_SCIFA0 R8A7743_CLK_SCIFB0
++				R8A7743_CLK_SCIFB1 R8A7743_CLK_SCIFB2
++				R8A7743_CLK_SYS_DMAC1 R8A7743_CLK_SYS_DMAC0
++			>;
++			clock-output-names =
++				"scifa2", "scifa1", "scifa0",
++				"scifb0", "scifb1", "scifb2",
++				"sys-dmac1", "sys-dmac0";
++		};
++		mstp7_clks: mstp7_clks at e615014c {
++			compatible = "renesas,r8a7743-mstp-clocks",
++				     "renesas,cpg-mstp-clocks";
++			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
++			clocks = <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
++				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
++				 <&p_clk>;
++			#clock-cells = <1>;
++			clock-indices = <
++				R8A7743_CLK_HSCIF2 R8A7743_CLK_SCIF5
++				R8A7743_CLK_SCIF4 R8A7743_CLK_HSCIF1
++				R8A7743_CLK_HSCIF0 R8A7743_CLK_SCIF3
++				R8A7743_CLK_SCIF2 R8A7743_CLK_SCIF1
++				R8A7743_CLK_SCIF0
++			>;
++			clock-output-names =
++				"hscif2", "scif5", "scif4", "hscif1", "hscif0",
++				"scif3", "scif2", "scif1", "scif0";
++		};
++		mstp11_clks: mstp11_clks at e615099c {
++			compatible = "renesas,r8a7743-mstp-clocks",
++				     "renesas,cpg-mstp-clocks";
++			reg = <0 0xe615099c 0 4>, <0 0xe61509ac 0 4>;
++			clocks = <&mp_clk>, <&mp_clk>, <&mp_clk>;
++			#clock-cells = <1>;
++			clock-indices = <
++				R8A7743_CLK_SCIFA3 R8A7743_CLK_SCIFA4
++				R8A7743_CLK_SCIFA5
++			>;
++			clock-output-names = "scifa3", "scifa4", "scifa5";
++		};
++	};
++
++	/* External root clock */
++	extal_clk: extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overriden by the board. */
++		clock-frequency = <0>;
++	};
++
++	/* External USB clock - can be overridden by the board */
++	usb_extal_clk: usb_extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <48000000>;
++	};
++
++	/* External SCIF clock */
++	scif_clk: scif {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++};
