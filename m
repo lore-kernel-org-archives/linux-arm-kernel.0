@@ -1,105 +1,156 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 16 Sep 2016 18:13:09 +0100
-Subject: [PATCH v9 00/10] Enable PMUs in ACPI systems
-In-Reply-To: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com> (Jeremy
- Linton's message of "Wed, 14 Sep 2016 17:32:28 -0500")
-References: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <8760pvu5sq.fsf@e105922-lin.cambridge.arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 16 Sep 2016 10:13:51 -0700
+Subject: [PATCH v5 02/16] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <87h99i6b5d.fsf@arm.com> (Brendan Jackman's message of "Wed, 14
+ Sep 2016 11:14:38 +0100")
+References: <1472242678-33700-1-git-send-email-lina.iyer@linaro.org>
+ <1472242678-33700-3-git-send-email-lina.iyer@linaro.org>
+ <0b233802-f459-c6bb-ff42-70745a225cfb@arm.com>
+ <20160902201605.GA1705@linaro.org> <87sht59mcw.fsf@arm.com>
+ <20160912161600.GA21885@linaro.org>
+ <a4fc71ae-6fa5-4142-6dd4-7bc96eb20186@arm.com>
+ <87intz665i.fsf@arm.com> <20160913193844.GB28944@linaro.org>
+ <87h99i6b5d.fsf@arm.com>
+Message-ID: <7hpoo3ix80.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+Brendan Jackman <brendan.jackman@arm.com> writes:
 
-Jeremy Linton <jeremy.linton@arm.com> writes:
+> On Tue, Sep 13 2016 at 20:38, Lina Iyer wrote:
+>> On Tue, Sep 13 2016 at 11:50 -0600, Brendan Jackman wrote:
+>>>
+>>>On Mon, Sep 12 2016 at 18:09, Sudeep Holla wrote:
+>>>> On 12/09/16 17:16, Lina Iyer wrote:
+>>>>> On Mon, Sep 12 2016 at 09:19 -0600, Brendan Jackman wrote:
+>>>>>>
+>>>>>> Hi Lina,
+>>>>>>
+>>>>>> Sorry for the delay here, Sudeep and I were both been on holiday last
+>>>>>> week.
+>>>>>>
+>>>>>> On Fri, Sep 02 2016 at 21:16, Lina Iyer wrote:
+>>>>>>> On Fri, Sep 02 2016 at 07:21 -0700, Sudeep Holla wrote:
+>>>>>> [...]
+>>>>>>>> This version is *not very descriptive*. Also the discussion we had
+>>>>>>>> on v3
+>>>>>>>> version has not yet concluded IMO. So can I take that we agreed on what
+>>>>>>>> was proposed there or not ?
+>>>>>>>>
+>>>>>>> Sorry, this example is not very descriptive. Pls. check the 8916 dtsi
+>>>>>>> for the new changes in the following patches. Let me know if that makes
+>>>>>>> sense.
+>>>>
+>>>> Please add all possible use-cases in the bindings. Though one can refer
+>>>> the usage examples, it might not cover all usage descriptions. It helps
+>>>> preventing people from defining their own when they don't see examples.
+>>>> Again DT bindings are like specifications, it should be descriptive
+>>>> especially this kind of generic ones.
+>>>>
+>>>>>>
+>>>>>> The not-yet-concluded discussion Sudeep is referring to is at [1].
+>>>>>>
+>>>>>> In that thread we initially proposed the idea of, instead of splitting
+>>>>>> state phandles between cpu-idle-states and domain-idle-states, putting
+>>>>>> CPUs in their own domains and using domain-idle-states for _all_
+>>>>>> phandles, deprecating cpu-idle-states. I've brought this up in other
+>>>>>> threads [2] but discussion keeps petering out, and neither this example
+>>>>>> nor the 8916 dtsi in this patch series reflect the idea.
+>>>>>>
+>>>>> Brendan, while your idea is good and will work for CPUs, I do not expect
+>>>>> other domains and possibly CPU domains on some architectures to follow
+>>>>> this model. There is nothing that prevents you from doing this today,
+>>>
+>>>As I understand it your opposition to this approach is this:
+>>>
+>>>There may be devices/CPUs which have idle states which do not constitute
+>>>"power off". If we put those  devices in their own power domain for the
+>>>purpose of putting their (non-power-off) idle state phandles in
+>>>domain-idle-states, we are "lying" because no true power domain exists
+>>>there.
+>>>
+>>>Am I correct that that's your opposition?
+>>>
+>>>If so, it seems we essentially disagree on the definition of a power
+>>>domain, i.e. you define it as a set of devices that are powered on/off
+>>>together while I define it as a set of devices whose power states
+>>>(including idle states, not just on/off) are tied together. I said
+>>>something similar on another thread [1] which died out.
+>>>
+>>>Do you agree that this is basically where we disagree, or am I missing
+>>>something else?
+>>>
+>>>[2] http://www.spinics.net/lists/devicetree/msg141050.html
+>>>
+>> Yes, you are right, I disagree with the definition of a domain around a
+>> device.
+> OK, great.
+>> However, as long as you don't force SoC's to define devices in
+>> the CPU PM domain to have their own virtual domains, I have no problem.
+>> You are welcome to define it the way you want for Juno or any other
+>> platform.
+> I don't think that's true; the bindings have to work the same way for
+> all platforms. If for Juno we put CPU idle state phandles in a
+> domain-idle-states property for per-CPU domains then, with the current
+> implementation, the CPU-level idle states would be duplicated between
+> cpuidle and the CPU PM domains.
+>> I don't want that to be the forced and expected out of all
+>> SoCs. All I am saying here is that the current implementation would
+>> handle your case as well.
+>
+> The current implementation certainly does cover the work I want to
+> do. The suggestion of per-device power domains for devices/CPUs with
+> their own idle states is simply intended to minimise the binding design,
+> since we'd no longer need cpu-idle-states or device-idle-states
+> (the latter was proposed elsewhere).
+>
+> I am fine with the bindings as they are implemented currently so long
+> as:
+>
+> - The binding doc makes clear how idle state phandles should be split
+>   between cpu-idle-states and domain-idle-states. It should make it
+>   obvious that no phandle should ever appear in both properties. It
+>   would even be worth briefly going over the backward-compatibility
+>   implications (e.g. what happens with old-kernel/new-DT and
+>   new-kernel/old-DT combos if a platform has OSI and PC support and we
+>   move cluster-level idle state phandles out of cpu-idle-states and into
+>   domai-idle-states).
+>
+> - We have a reason against the definition of power domains as "a set of
+>   devices bound by a common power (including idle) state", since that
+>   definition would simplify the bindings. In my view, "nobody thinks
+>   that's what a power domain is" _is_ a compelling reason, so if others
+>   on the list get involved I'm convinced. I think I speak for Sudeep
+>   here too.
 
-> This patch expands and reworks the patches published by Mark Salter
-> in order to clean up a few of the previous review comments, as well as
-> add support for newer CPUs and big/little configurations.
->
-> v9:
-> Add/cleanup an additional hotplug patch I've had sitting around. This
-> patch brings the ACPI PMU mostly on par with the DT functionality with
-> respect to having CPUs offline during boot. This should help clarify
-> some of the code structuring.
-> Cleanup the list of PMU types early if we fail to allocate memory for an
-> additional pmu type.
+I think we're having some terminology issues...
 
-The earlier patches in the series look OK but there are still
-unaddressed comments on Patch 8 from previous versions - coding style,
-excessive indentation, complicated logic etc.
+FWIW, the kernel terminolgy is actually "PM domain", not power domain.
+This was intentional because the goal of the PM domain was to group
+devices that some PM features.  To be very specific to the kernel, they
+us the same set of PM callbacks.  Today, this is most commonly used to
+model power domains, where a group of devices share a power rail, but it
+does not need to be limited to that.
 
-Additionally, I'd suggest moving hotplug/unsed MADT related changes out
-of Patch 8 to later patches, i.e., add support for hotplug on top.
+That being said, I'm having a hard time understanding the root of the
+disagreement.
 
-Thanks,
-Punit
+It seems that you and Sudeep would like to use domain-idle-states to
+replace/superceed cpu-idle-states with the primary goal (and benefit)
+being that it simplifies the DT bindings.  Is that correct?
 
->
-> v8:
-> Rebase to 4.8rc4
-> Assorted minor comment/hunk placement/etc tweaks per Punit Agrawal
->
-> v7:
-> Rebase to 4.8rc3
-> Remove cpu affinity sysfs entry. While providing a CPU mask for
-> ARMv8 PMU's is really helpful in big/little environments, reworking
-> the PMU code to support the cpumask attribute for !arm64 PMUs is out
-> of the scope of this patch set.
-> Fix CPU miscount problem where an alloc failure followed by successfully
-> allocating the structure can result in under counting the CPUs associated
-> with the PMU. This bug was created in v6 with the conversion to a linked
-> list.
-> Remove initial platform device creation code by Mark Salter, and re-squash
-> multiple platform device creation code together with helper routines.
-> Other minor tweakage.
->
-> v6:
-> Added cpu affinity sysfs entry
-> Converted pmu_types array, to linked list
-> Restrict use of the armv8_pmu_probe_table to ACPI systems
-> Rename MADT parsing routines in smp.c
-> Convert sysfs PMU name to use index rather than partnum
-> Remove pr_devel statements
-> Other Minor cleanups
-> Add Partial Ack-by Will Deacon
->
-> v5:
-> Remove list of CPU types for ACPI systems. We now match a generic
-> event list, and use the PMCIED[01] to select events which exist on
-> the given PMU. This avoids the need to update the kernel every time
-> a new CPU is released.
-> Update the maintainers list to include the new file.
->
-> v4:
-> Correct build issues with ARM (!ARM64) kernels.
-> Add ThunderX to list of PMU types.
->
-> v3:
-> Enable ARM performance monitoring units on ACPI/arm64 machines.
->
-> Jeremy Linton (8):
->   arm64: pmu: Probe default hw/cache counters
->   arm64: pmu: Hoist pmu platform device name
->   arm64: Rename the common MADT parse routine
->   arm: arm64: Add routine to determine cpuid of other cpus
->   arm: arm64: pmu: Assign platform PMU CPU affinity
->   arm64: pmu: Detect and enable multiple PMUs in an ACPI system
->   arm: pmu: Add PMU definitions for hot-plugged CPUs
->   MAINTAINERS: Tweak ARM PMU maintainers
->
-> Mark Salter (2):
->   arm64: pmu: add fallback probe table
->   arm64: pmu: Cache PMU interrupt numbers from MADT parse
->
->  MAINTAINERS                      |   3 +-
->  arch/arm/include/asm/cputype.h   |   2 +
->  arch/arm64/include/asm/cputype.h |   3 +
->  arch/arm64/kernel/perf_event.c   |  58 ++++++++-
->  arch/arm64/kernel/smp.c          |  18 ++-
->  drivers/perf/Kconfig             |   4 +
->  drivers/perf/Makefile            |   1 +
->  drivers/perf/arm_pmu.c           | 110 ++++++++++++++--
->  drivers/perf/arm_pmu_acpi.c      | 264 +++++++++++++++++++++++++++++++++++++++
->  include/linux/perf/arm_pmu.h     |  13 ++
->  10 files changed, 452 insertions(+), 24 deletions(-)
->  create mode 100644 drivers/perf/arm_pmu_acpi.c
+The objections have come in because that means that implies that CPUs
+become their own domains, which may not be the case in hardware in the
+sense that they share a power rail.
+
+However, IMO, thinking of a CPU as it's own "PM domain" may make some
+sense based on the terminology above.
+
+I think the other objection may be that using a genpd to model domain
+with only a single device in it may be overkill, and I agree with that.
+But, I'm not sure if making CPUs use domain-idle-states implies that
+they necessarily have to use genpd is what you are proposing.  Maybe
+someone could clarify that?
+
+Kevin
