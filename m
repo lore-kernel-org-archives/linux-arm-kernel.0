@@ -1,23 +1,21 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 16 Sep 2016 16:02:57 -0700
-Subject: [PATCH v3 02/14] drivers: clk: st: Simplify clock binding of
- STiH4xx platforms
-In-Reply-To: <1472473626-15398-3-git-send-email-gabriel.fernandez@st.com>
-References: <1472473626-15398-1-git-send-email-gabriel.fernandez@st.com>
- <1472473626-15398-3-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20160916230257.GO7243@codeaurora.org>
+Date: Fri, 16 Sep 2016 16:04:07 -0700
+Subject: [PATCH 1/3] clk: sunxi-ng: sun6i-a31: Set CLK_SET_RATE_PARENT
+ for display output clocks
+In-Reply-To: <20160915065740.13664-2-wens@csie.org>
+References: <20160915065740.13664-1-wens@csie.org>
+ <20160915065740.13664-2-wens@csie.org>
+Message-ID: <20160916230407.GS7243@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On 09/15, Chen-Yu Tsai wrote:
+> The LCD controller and HDMI controller use the LCDx-CHy and HDMI clocks
+> to generate their dot clocks. To be able to generate a full range of
+> possible clock rates, the parent PLL clock rates should also be changed.
 > 
-> This patch reworks the clock binding to avoid too much detail in DT.
-> Now we have only compatible string per type of clock
-> (remark from Rob https://lkml.org/lkml/2016/5/25/492)
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> Acked-by: Peter Griffin <peter.griffin@linaro.org>
+> Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
 
 Applied to clk-next
