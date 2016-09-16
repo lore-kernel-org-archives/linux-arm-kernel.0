@@ -1,49 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 16 Sep 2016 10:32:40 +0200
-Subject: [PATCH v3 2/2] ARM: exynos_defconfig: Remove old non-working MIPI
- driver
-In-Reply-To: <1474014760-23173-1-git-send-email-k.kozlowski@samsung.com>
-References: <1474014760-23173-1-git-send-email-k.kozlowski@samsung.com>
- <CGME20160916083252eucas1p12f57a9bc08176e10b8e07c3b421bb0ad@eucas1p1.samsung.com>
-Message-ID: <1474014760-23173-2-git-send-email-k.kozlowski@samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 16 Sep 2016 11:33:18 +0300
+Subject: [PATCH 3/9] dmaengine: edma: Use correct type for of_find_property()
+ third parameter
+In-Reply-To: <20160916083324.29133-1-peter.ujfalusi@ti.com>
+References: <20160916083324.29133-1-peter.ujfalusi@ti.com>
+Message-ID: <20160916083324.29133-4-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos MIPI driver does not work anymore (it is board file only) so
-it is removed.  Remove also config options.
+The correct type is int and not for the third parameter of
+of_find_property().
+Fixes compilation for 64bit architectures (x86_64, aarch64).
 
-Cc: Inki Dae <inki.dae@samsung.com>
-Cc: Donghwa Lee <dh09.lee@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
+ drivers/dma/edma.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-This does not really depend on patch #1. The driver is dysfunctional and
-it does not work so defconfig change can be applied separately.
-
-Changes since v2:
-1. Remove also EXYNOS_MIPI_DSI, pointed out by Tomi Valkeinen.
-
-Changes since v1:
-1. New patch.
----
- arch/arm/configs/exynos_defconfig | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 4e484f406419..c58f6841f8aa 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -168,8 +168,6 @@ CONFIG_DRM_PANEL_SAMSUNG_LD9040=y
- CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
- CONFIG_DRM_NXP_PTN3460=y
- CONFIG_DRM_PARADE_PS8622=y
--CONFIG_EXYNOS_VIDEO=y
--CONFIG_EXYNOS_MIPI_DSI=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_PLATFORM=y
- CONFIG_BACKLIGHT_PWM=y
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 4c8818278fcc..16c0bb92fa4d 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -2024,8 +2024,7 @@ static struct edma_soc_info *edma_setup_info_from_dt(struct device *dev,
+ {
+ 	struct edma_soc_info *info;
+ 	struct property *prop;
+-	size_t sz;
+-	int ret;
++	int sz, ret;
+ 
+ 	info = devm_kzalloc(dev, sizeof(struct edma_soc_info), GFP_KERNEL);
+ 	if (!info)
 -- 
-1.9.1
+2.10.0
