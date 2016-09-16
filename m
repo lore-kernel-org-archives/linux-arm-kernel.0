@@ -1,173 +1,85 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 16 Sep 2016 09:50:02 -0600
-Subject: [PATCH V8 5/7] perf tools: pushing configuration down to PMU driver
-In-Reply-To: <1474041004-13956-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1474041004-13956-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1474041004-13956-6-git-send-email-mathieu.poirier@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Sep 2016 16:55:51 +0100
+Subject: [PATCH v3 5/7] arm64: Handle faults caused by inadvertent user
+ access with PAN enabled
+In-Reply-To: <20160916113325.GB21702@leverpostej>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+ <1473788797-10879-6-git-send-email-catalin.marinas@arm.com>
+ <20160916113325.GB21702@leverpostej>
+Message-ID: <20160916155550.GC1904@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a PMU callback and the required mechanic so that
-drivers can process the command line configuration elements found
-in evsel::config_terms.
+On Fri, Sep 16, 2016 at 12:33:25PM +0100, Mark Rutland wrote:
+> On Tue, Sep 13, 2016 at 06:46:35PM +0100, Catalin Marinas wrote:
+> > When TTBR0_EL1 is set to the reserved page, an erroneous kernel access
+> > to user space would generate a translation fault. This patch adds the
+> > checks for the software-set PSR_PAN_BIT to emulate a permission fault
+> > and report it accordingly.
+> 
+> Why do we need to treat this case as a permission fault? It looks like a
+> fault that wasn't a deliberate uaccess (which thus doesn't have a fixup
+> handler) should have do_page_fault call __do_kernel_fault, where we
+> should die().
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Acked-by: Jiri Olsa <jolsa@kernel.org>
----
- tools/perf/util/Build         |  1 +
- tools/perf/util/drv_configs.c | 77 +++++++++++++++++++++++++++++++++++++++++++
- tools/perf/util/drv_configs.h | 26 +++++++++++++++
- tools/perf/util/pmu.h         |  2 ++
- 4 files changed, 106 insertions(+)
- create mode 100644 tools/perf/util/drv_configs.c
- create mode 100644 tools/perf/util/drv_configs.h
+We don't always check the exception table for a dedicated uaccess. The
+only cases where the exception table is checked is when
+down_read_trylock(mmap_sem) fails or CONFIG_DEBUG_VM is enabled. This is
+a slight optimisation of the fast path of the page fault handling. So,
+without is_permission_fault() (which much quicker than
+search_exception_tables()) the kernel would keep restarting the same
+instruction.
 
-diff --git a/tools/perf/util/Build b/tools/perf/util/Build
-index 91c5f6e1af59..53cbbbb6ddb9 100644
---- a/tools/perf/util/Build
-+++ b/tools/perf/util/Build
-@@ -85,6 +85,7 @@ libperf-y += term.o
- libperf-y += help-unknown-cmd.o
- libperf-y += mem-events.o
- libperf-y += vsprintf.o
-+libperf-y += drv_configs.o
- 
- libperf-$(CONFIG_LIBBPF) += bpf-loader.o
- libperf-$(CONFIG_BPF_PROLOGUE) += bpf-prologue.o
-diff --git a/tools/perf/util/drv_configs.c b/tools/perf/util/drv_configs.c
-new file mode 100644
-index 000000000000..1647f285c629
---- /dev/null
-+++ b/tools/perf/util/drv_configs.c
-@@ -0,0 +1,77 @@
-+/*
-+ * drv_configs.h: Interface to apply PMU specific configuration
-+ * Copyright (c) 2016-2018, Linaro Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ */
-+
-+#include "drv_configs.h"
-+#include "evlist.h"
-+#include "evsel.h"
-+#include "pmu.h"
-+
-+static int
-+perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
-+			      struct perf_evsel_config_term **err_term)
-+{
-+	bool found = false;
-+	int err = 0;
-+	struct perf_evsel_config_term *term;
-+	struct perf_pmu *pmu = NULL;
-+
-+	while ((pmu = perf_pmu__scan(pmu)) != NULL)
-+		if (pmu->type == evsel->attr.type) {
-+			found = true;
-+			break;
-+		}
-+
-+	list_for_each_entry(term, &evsel->config_terms, list) {
-+		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
-+			continue;
-+
-+		/*
-+		 * We have a configuration term, report an error if we
-+		 * can't find the PMU or if the PMU driver doesn't support
-+		 * cmd line driver configuration.
-+		 */
-+		if (!found || !pmu->set_drv_config) {
-+			err = -EINVAL;
-+			*err_term = term;
-+			break;
-+		}
-+
-+		err = pmu->set_drv_config(term);
-+		if (err) {
-+			*err_term = term;
-+			break;
-+		}
-+	}
-+
-+	return err;
-+}
-+
-+int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
-+				   struct perf_evsel **err_evsel,
-+				   struct perf_evsel_config_term **err_term)
-+{
-+	struct perf_evsel *evsel;
-+	int err = 0;
-+
-+	evlist__for_each_entry(evlist, evsel) {
-+		err = perf_evsel__apply_drv_configs(evsel, err_term);
-+		if (err) {
-+			*err_evsel = evsel;
-+			break;
-+		}
-+	}
-+
-+	return err;
-+}
-diff --git a/tools/perf/util/drv_configs.h b/tools/perf/util/drv_configs.h
-new file mode 100644
-index 000000000000..32bc9babc2e0
---- /dev/null
-+++ b/tools/perf/util/drv_configs.h
-@@ -0,0 +1,26 @@
-+/*
-+ * drv_configs.h: Interface to apply PMU specific configuration
-+ * Copyright (c) 2016-2018, Linaro Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ */
-+
-+#ifndef __PERF_DRV_CONFIGS_H
-+#define __PERF_DRV_CONFIGS_H
-+
-+#include "drv_configs.h"
-+#include "evlist.h"
-+#include "evsel.h"
-+
-+int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
-+				   struct perf_evsel **err_evsel,
-+				   struct perf_evsel_config_term **term);
-+#endif
-diff --git a/tools/perf/util/pmu.h b/tools/perf/util/pmu.h
-index 5d7e84466bee..743422ad900b 100644
---- a/tools/perf/util/pmu.h
-+++ b/tools/perf/util/pmu.h
-@@ -4,6 +4,7 @@
- #include <linux/bitmap.h>
- #include <linux/perf_event.h>
- #include <stdbool.h>
-+#include "evsel.h"
- #include "parse-events.h"
- 
- enum {
-@@ -25,6 +26,7 @@ struct perf_pmu {
- 	struct list_head format;  /* HEAD struct perf_pmu_format -> list */
- 	struct list_head aliases; /* HEAD struct perf_pmu_alias -> list */
- 	struct list_head list;    /* ELEM */
-+	int (*set_drv_config)	(struct perf_evsel_config_term *term);
- };
- 
- struct perf_pmu_info {
+> > -static inline bool is_permission_fault(unsigned int esr)
+> > +static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs)
+> >  {
+> >  	unsigned int ec       = ESR_ELx_EC(esr);
+> >  	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
+> >  
+> > -	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM) ||
+> > -	       (ec == ESR_ELx_EC_IABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
+> > +	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
+> > +		return false;
+> > +
+> > +	if (system_uses_ttbr0_pan())
+> > +		return fsc_type == ESR_ELx_FSC_FAULT &&
+> > +			(regs->pstate & PSR_PAN_BIT);
+> > +	else
+> > +		return fsc_type == ESR_ELx_FSC_PERM;
+> >  }
+> 
+> Since the entry code will clear the PAN bit in the SPSR when we see the
+> reserved ASID,
+
+It actually sets the PAN bit in regs->pstate when it sees the reserved
+ASID.
+
+> faults in EFI runtime services will still be correctly reported,
+> though that's somewhat subtle (and it took me a while to convince
+> myself that was the case).
+
+The EFI runtime services use a non-reserved ASID, so a fault taken while
+executing EFI services would clear the PAN bit in regs->pstate. Such
+faults would not trigger is_permission_fault() == true above.
+
+> Also, I think that faults elsewhere may be misreported, e.g. in cold
+> entry to kernel paths (idle, hotplug) where we have a global mapping in
+> TTBR0, and it looks like we're using the reserved ASID.
+> 
+> I'm not immediately sure how to distinguish those cases.
+
+We don't normally expect faults on those paths. If we get one, they are
+usually fatal, so the kernel still dies but with a slightly misleading
+message.
+
+We could improve this I think if we can distinguished between
+reserved_ttbr0 after swapper (set on exception entry) and the reserved
+TTBR0_EL1 pointing to empty_zero_page (and not merging Ard's patch). Is
+it worth having such distinction? I'm not convinced, the only thing you
+probably save is not printing "Accessing user space memory outside
+uaccess.h routines" during fault (there may be other ways to mark these
+special cases maybe by checking the current thread_info but it needs
+more thinking).
+
 -- 
-2.7.4
+Catalin
