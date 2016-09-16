@@ -1,66 +1,67 @@
-From: zach.brown@ni.com (Zach Brown)
-Date: Fri, 16 Sep 2016 10:01:41 -0500
-Subject: [RESEND PATCH v7 1/2] sdhci-of-arasan: Add device tree parameter xlnx,
- fails-without-test-cd bit
-Message-ID: <1474038102-20937-1-git-send-email-zach.brown@ni.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 16 Sep 2016 23:16:42 +0800
+Subject: [PATCH v4 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
+In-Reply-To: <20160916151642.27907-1-icenowy@aosc.xyz>
+References: <20160916151642.27907-1-icenowy@aosc.xyz>
+Message-ID: <20160916151642.27907-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sdhci controller on xilinx zynq devices will not function unless
-the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
-In cases where it is impossible to provide the CD bit in hardware,
-setting the controller to test mode and then setting inserted to true
-will get the controller to function without the CD bit.
+UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
+on iNet D978 Rev2 board.
 
-The device property "xlnx,fails-without-test-cd" will let the arasan
-driver know the controller does not have the CD line wired and that the
-controller does not function without it.
+Enable the UART1 to make it possible to use the modified hciattach by
+Realtek to drive the BT part of RTL8723BS.
 
-Signed-off-by: Zach Brown <zach.brown@ni.com>
+On the board no r_uart pins are found now (the onboard RX/TX pins are
+wired to PF2/PF4, which is muxed with mmc0), so also disabled it.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
-v2:
- * improved commit messages
- * removed fake-cd device property
- * removed fake-cd quirk
- * use broken-cd device property
- * documented new usage of broken-cd
-v3:
- * removed new usage of broken-cd
- * created fails-without-test-cd device property
- * created arasan controller specific quirk
-v4:
- * changed fails-without-test-cd to xlnx-fails-without-test-cd
- * removed extra blank line
-v5:
- * Fixed style mistake
- * Changed (1 << 0 ) to BIT(0)
-v6:
- * Fixed style mistakes
- * Condensed unnecessarily long variable names
- * Removed line wraps that were no longer necessary.
- * Rebased changes off Ulf's mmc tree's next branch.
-v7:
- * Removed erroneous re-creation of Optional Properties section
- * Changed xlnx-fails-without-test-cd to xlnx,fails-without-test-cd
- * Changed of_get_property to of_property_read_bool
+Changes since v4:
+- Split the pinmux part into another patch.
+Changes since v3:
+- Change bluetooth to serial0.
+Changes since v2:
+- Remove stdout-path.
 
+ arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
- Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-index 3404afa..49df630 100644
---- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-+++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-@@ -36,6 +36,9 @@ Optional Properties:
-   - #clock-cells: If specified this should be the value <0>.  With this property
-     in place we will export a clock representing the Card Clock.  This clock
-     is expected to be consumed by our PHY.  You must also specify
-+  - xlnx,fails-without-test-cd: when present, the controller doesn't work when
-+    the CD line is not connected properly, and the line is not connected
-+    properly. Test mode can be used to force the controller to function.
+diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+index 0f52cd9..fb46655 100644
+--- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
++++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
+@@ -49,6 +49,15 @@
+ 	model = "INet-D978 Rev 02";
+ 	compatible = "primux,inet-d978-rev2", "allwinner,sun8i-a33";
  
- Example:
- 	sdhci at e0100000 {
++	aliases {
++		serial0 = &uart1;
++	};
++
++	chosen {
++		/* Delete debug UART as serial0 is the UART for bluetooth */
++		/delete-property/stdout-path;
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+@@ -86,3 +95,14 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
+ };
++
++&r_uart {
++	status = "disabled";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins_a>,
++		    <&uart1_pins_cts_rts_a>;
++	status = "okay";
++};
 -- 
-2.7.4
+2.9.3
