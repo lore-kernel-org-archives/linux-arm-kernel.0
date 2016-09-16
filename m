@@ -1,60 +1,32 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 16 Sep 2016 14:09:15 -0400
-Subject: [PATCH v6 2/3] ARM: dts: add TOPEET itop elite based board
-In-Reply-To: <20160916172110.GA7511@kozik-lap>
-References: <1473285535-21996-1-git-send-email-ayaka@soulik.info>
- <1473285535-21996-3-git-send-email-ayaka@soulik.info>
- <CGME20160916072303eucas1p2941ba2907605055f5ea5abb2e6891d77@eucas1p2.samsung.com>
- <6bd9905d-0818-a917-8b8e-6abce134a3d3@kernel.org>
- <865b9f84-385f-fea8-2e3d-2b31e3bfe84c@soulik.info>
- <20160916172110.GA7511@kozik-lap>
-Message-ID: <1e4335db-9004-bb7c-6dc1-e435e66b8126@osg.samsung.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 16 Sep 2016 13:50:12 -0500
+Subject: [PATCH] ARM: dts: msm8974: Add definitions for QCE & cryptobam
+In-Reply-To: <20160916173800.r264xg5wqmer77wr@localhost>
+References: <20160830153740.13275-1-voker57@gmail.com>
+ <20160915211842.GB5431@hector.attlocal.net>
+ <20160916173800.r264xg5wqmer77wr@localhost>
+Message-ID: <20160916185012.GC5431@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Randy,
+On Fri, Sep 16, 2016 at 08:38:01PM +0300, Iaroslav Gridin wrote:
+> On Thu, Sep 15, 2016 at 04:18:42PM -0500, Andy Gross wrote:
+>  
+> > Actually, on thinking about this more, the bam block itself only requires the
+> > single clock.  The peripheral it is attached to has to keep its sanity during
+> > the duration of the transfer (crypto).  The crypto requires 3 clocks, one of
+> > which is the same clk the bam requires.
+> > 
+> > You can access the BAM registers with the bam_clk only, correct?
+> 
+> Not preparing bam_clk degrades QCE performance about 3x, though.
 
-On 09/16/2016 01:21 PM, Krzysztof Kozlowski wrote:
+If the CE2_CLK is the only required clk, that makes it the "bam_clk".  I see the
+crypto requires getting all three clocks: AXI (bus), AHB (iface), and CE2 (core)
 
-[snip]
+If the crypto is active during DMA transfers, which it has to be, then the
+performance shouldn't degrade due to the BAM not preparing the AHB.
 
->>>> +	
->>>> +	beep {
->>>> +		compatible = "pwm-beeper";
->>>> +		pwms = <&pwm 0 4000000 PWM_POLARITY_INVERTED>;
->>> I have serious doubts that you run this code... if it does not even
->>> compile. Sorry, I cannot accept code that does not compile and was not
->>> tested.
->>>
->>> Please, test your DTS on top of current Linux tree, which would be one of:
->>> 1. Linus' master branch: v4.8-rc6,
->>> 2. one of my branches (for-next, next/dt etc),
->> When I sent those patches, I tested in "Add linux-next specific files for
->> 20160907"
->
-> OK, good, but please tell me why kbuild reported that build error?
->
+Regards,
 
-I agree with Krzysztof, it doesn't seem that you tested the exact version
-that was posted. You will need the following change to make the DTS build
-in latest linux-next:
-
-diff --git a/arch/arm/boot/dts/exynos4412-itop-elite.dts b/arch/arm/boot/dts/exynos4412-itop-elite.dts
-index dd83689892ff..8559f891a740 100644
---- a/arch/arm/boot/dts/exynos4412-itop-elite.dts
-+++ b/arch/arm/boot/dts/exynos4412-itop-elite.dts
-@@ -14,6 +14,7 @@
- */
- 
- /dts-v1/;
-+#include <dt-bindings/pwm/pwm.h>
- #include <dt-bindings/sound/samsung-i2s.h>
- #include "exynos4412-itop-scp-core.dtsi"
-
-So please squash that change and resend.
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Andy
