@@ -1,49 +1,64 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 16 Sep 2016 11:08:00 +0200
-Subject: v4.8-rc: GSM audio causes trouble
-In-Reply-To: <20160916055249.h7zw6hguvwwe2zwu@earth>
-References: <20160915121755.GA5264@amd> <20160915205142.GA6747@amd>
- <20160916055249.h7zw6hguvwwe2zwu@earth>
-Message-ID: <20160916090800.GA7599@amd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Sep 2016 11:07:48 +0200
+Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <20160915162650.GZ13920@localhost>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+ <20160810173710.GK9681@localhost> <20160915162650.GZ13920@localhost>
+Message-ID: <3152956.IVRykDnfF6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2016-09-16 07:52:50, Sebastian Reichel wrote:
-> Hi,
+On Thursday, September 15, 2016 9:56:51 PM CEST Vinod Koul wrote:
+> On Wed, Aug 10, 2016 at 11:07:10PM +0530, Vinod Koul wrote:
+> > On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
+> > > Hi,
+> > > 
+> > > This series tries to solve the problem with DMA with device registers
+> > > (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
+> > > recent patch '9575632 (dmaengine: make slave address physical)'
+> > > clarifies that DMA slave address provided by clients is the physical
+> > > address. This puts the task of mapping the DMA slave address from a
+> > > phys_addr_t to a dma_addr_t on the DMA engine.
+> > > 
+> > > Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
+> > > the same and no special care is needed. However if you have a IOMMU you
+> > > need to map the DMA slave phys_addr_t to a dma_addr_t using something
+> > > like this.
+> > > 
+> > > This series is based on top of v4.8-rc1. And I'm hoping to be able to collect a
+> > > Ack from Russell King on patch 4/6 that adds the ARM specific part and then be
+> > > able to take the whole series through the dmaengine tree. If this is not the
+> > > best route I'm more then happy to do it another way.
+> > > 
+> > > It's tested on a Koelsch with CONFIG_IPMMU_VMSA and by enabling the
+> > > ipmmu_ds node in r8a7791.dtsi. I verified operation by interacting with
+> > > /dev/mmcblk1, i2c and the serial console which are devices behind the
+> > > iommu.
+> > 
+> > As I said in last one, the dmaengine parts look fine to me. But to go thru
+> > dmaengine tree I would need ACK on non dmaengine patches.
 > 
-> On Thu, Sep 15, 2016 at 10:51:42PM +0200, Pavel Machek wrote:
-> > > I was trying to improve GSM call quality, and hit problems in
-> > > v4.8-rc. Sound only worked for a while, then I tried to kill
-> > > cmtspeech_ofono_test, and could not, not even with -9 and could not
-> > > even reboot.
-> > > 
-> > > I went back to v4.1 (ok, quite far, I see), and problems are gone.
-> > > 
-> > > Does it work for you? Any ideas what to try... besides bisect?
-> > 
-> > v4.7 is okay.
-> > 
-> > v4.8 with
-> > 
-> > git diff ..mini-v4.7 drivers/hsi/ | git apply
-> > 
-> > Seems to work ok.
+> I havent heard back from this one and I am inclined to merge this one now.
+> If anyone has any objects, please speak up now...
+> 
+> Also ACKs welcome...
+> 
 
-Hmm. I guess I made some error with the testing, because reverting
-just drivers/hsi to v4.7 state results in non-compiling kernel
 
-> hsi changes from 4.7 to 4.8 are basically runtime PM enablement.
-> Does 4.8 work for you with just 9c99e5e51988 reverted?
+I had not looked at the series earlier, but this version looks entirely
+reasonable to me, so
 
-No, according to the notes. But see above... and let me retry with
-drivers/hsi _and_ include/linux/hsi reverted. No GSM audio and same
-problem with shutdown. Oops. Sorry about the confusion.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Does it work for you? Any ideas what could be wrong?
 
-Best regards,
+One concern I have is that we might get an awkward situation if we
+ever encounter one DMA engine hardware that is used in different
+systems that all have an IOMMU, but on some of them the connection
+between the DMA master and the slave FIFO bypasses the IOMMU
+while on others the IOMMU is required. I don't have any idea for
+how this could be handled in a generic way, so my best answer
+here is to hope we never get there, and if we do, handle it
+using some local hack in the driver.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+	Arnd
