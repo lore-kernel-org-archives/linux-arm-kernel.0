@@ -1,77 +1,76 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Sep 2016 09:06:55 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: Don't assume clock runs in
- suspend
-In-Reply-To: <20160916054917.16930-1-briannorris@chromium.org>
-References: <20160916054917.16930-1-briannorris@chromium.org>
-Message-ID: <57DBA81F.2060404@arm.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 16 Sep 2016 10:09:25 +0200
+Subject: [PATCH BUGFIX] mtd: nand: mxc: fix obiwan error in
+ mxc_nand_v[12]_ooblayout_free() functions
+In-Reply-To: <20160915180605.4aed48d3@bbrezillon>
+References: <1473432251-24728-1-git-send-email-LW@KARO-electronics.de>
+ <20160915180605.4aed48d3@bbrezillon>
+Message-ID: <20160916100925.1a4d1af7@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
+Hi,
 
-On 16/09/16 06:49, Brian Norris wrote:
-> Since commit 4fbcdc813fb9 ("clocksource: arm_arch_timer: Use clocksource
-> for suspend timekeeping"), this driver assumes that the ARM architected
-> timer keeps running in suspend. This is not the case for some ARM SoCs,
-> depending on the HW state used for system suspend. Let's not assume that
-> all SoCs support this, and instead only support this if the device tree
-> explicitly tells us it's "always on". In all other cases, just fall back
-> to the RTC. This should be relatively harmless.
-
-I'm afraid you're confusing two things:
-- the counter, which *must* carry on counting no matter what, as
-(quoting the ARM ARM) "The system counter must be implemented in an
-always-on power domain"
-- the timer, which is allowed to be powered off, and can be tagged with
-the "always-on" property to indicate that it is guaranteed to stay up
-(which in practice only exists in virtual machines and never on real HW).
-
-If your counter does stop counting when suspended, then this is starting
-to either feel like a HW bug, or someone is killing the clock that feeds
-this counter when entering suspend.
-
-If this is the former, then we need a separate quirk to indicate the
-non-standard behaviour. If it is the latter, don't do it! ;-)
-
+On Thu, 15 Sep 2016 18:06:05 +0200 Boris Brezillon wrote:
+> Hi Lothar,
 > 
-> It seems fair to key the system-suspend behavior off the same property
-> used for C3STOP, since if the timer doesn't keep context for CPU sleep,
-> it likely doesn't for system sleep either.
+> On Fri,  9 Sep 2016 16:44:11 +0200
+> Lothar Wa?mann <LW@KARO-electronics.de> wrote:
 > 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+> > commit a894cf6c5a82 ("mtd: nand: mxc: switch to mtd_ooblayout_ops")
+> > introduced a regression accessing the OOB area from the mxc_nand
+> > driver due to an Obiwan error in the mxc_nand_v[12]_ooblayout_free()
+> > functions. They report a bogus oobregion { 64, 7 } which leads to
+> > errors accessing bogus data when reading the oob area.
+> > 
+> > Prior to the commit the mtd-oobtest module could be run without any
+> > errors. With the offending commit, this test fails with results like:
+> > |Running mtd-oobtest
+> > |
+> > |=================================================
+> > |mtd_oobtest: MTD device: 5
+> > |mtd_oobtest: MTD device size 524288, eraseblock size 131072, page size 2048, count of eraseblocks 4, pages per eraseblock 64, OOB size 64
+> > |mtd_test: scanning for bad eraseblocks
+> > |mtd_test: scanned 4 eraseblocks, 0 are bad
+> > |mtd_oobtest: test 1 of 5
+> > |mtd_oobtest: writing OOBs of whole device
+> > |mtd_oobtest: written up to eraseblock 0
+> > |mtd_oobtest: written 4 eraseblocks
+> > |mtd_oobtest: verifying all eraseblocks
+> > |mtd_oobtest: error @addr[0x0:0x19] 0x9a -> 0x78 diff 0xe2
+> > |mtd_oobtest: error @addr[0x0:0x1a] 0xcc -> 0x0 diff 0xcc
+> > |mtd_oobtest: error @addr[0x0:0x1b] 0xe0 -> 0x85 diff 0x65
+> > |mtd_oobtest: error @addr[0x0:0x1c] 0x60 -> 0x62 diff 0x2
+> > |mtd_oobtest: error @addr[0x0:0x1d] 0x69 -> 0x45 diff 0x2c
+> > |mtd_oobtest: error @addr[0x0:0x1e] 0xcd -> 0xa0 diff 0x6d
+> > |mtd_oobtest: error @addr[0x0:0x1f] 0xf2 -> 0x60 diff 0x92
+> > |mtd_oobtest: error: verify failed at 0x0
+> > [...]
+> > 
+> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > ---
+> >  drivers/mtd/nand/mxc_nand.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> > index 5173fad..fdee907 100644
+> > --- a/drivers/mtd/nand/mxc_nand.c
+> > +++ b/drivers/mtd/nand/mxc_nand.c
+> > @@ -893,7 +893,7 @@ static int mxc_v1_ooblayout_free(struct mtd_info *mtd, int section,
+> >  {
+> >  	struct nand_chip *nand_chip = mtd_to_nand(mtd);
+> >  
+> > -	if (section > nand_chip->ecc.steps)
+> > +	if (section >= nand_chip->ecc.steps)
+> >  		return -ERANGE;
 > 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 57700541f951..e28677a34f02 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -490,7 +490,7 @@ static struct clocksource clocksource_counter = {
->  	.rating	= 400,
->  	.read	= arch_counter_read,
->  	.mask	= CLOCKSOURCE_MASK(56),
-> -	.flags	= CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_SUSPEND_NONSTOP,
-> +	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
->  };
->  
->  static struct cyclecounter cyclecounter = {
-> @@ -526,6 +526,8 @@ static void __init arch_counter_register(unsigned type)
->  		clocksource_counter.name = "arch_mem_counter";
->  	}
->  
-> +	if (!arch_timer_c3stop)
-> +		clocksource_counter.flags |= CLOCK_SOURCE_SUSPEND_NONSTOP;
->  	start_count = arch_timer_read_counter();
->  	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
->  	cyclecounter.mult = clocksource_counter.mult;
+> Hm, looking at the commit you're pointing to, it seems that this test
+> is correct (we have X + 1 free sections, where X is the number of ECC
+> steps).
 > 
+You are right. I didn't verify the v1 case (for which I have no HW here
+any more).
+I'll send a corrected patch.
 
-Given the above, I don't think this patch is acceptable.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Lothar Wa?mann
