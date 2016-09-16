@@ -1,34 +1,60 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 16 Sep 2016 13:10:48 +0200
-Subject: [PATCH v2 1/7] clocksource: exynos_mct: Add the support for ARM64
-In-Reply-To: <562e232f-7e69-6d54-e49d-36042d166800@linaro.org>
-References: <1472046551-703-1-git-send-email-cw00.choi@samsung.com>
- <1472046551-703-2-git-send-email-cw00.choi@samsung.com>
- <562e232f-7e69-6d54-e49d-36042d166800@linaro.org>
- <CGME20160916111052eucas1p1fb19531ab7b3e53f6fdeb4fa0e8a5449@eucas1p1.samsung.com>
-Message-ID: <18cb09bb-7a03-df7f-706d-5309b34e222b@kernel.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 16 Sep 2016 12:12:07 +0100
+Subject: [PATCH] of/platform: Initialise dev->fwnode appropriately
+In-Reply-To: <20160915133657.GB14424@rob-hp-laptop>
+References: <38259ab3716da072fab37f06d034329244491c13.1473865096.git.robin.murphy@arm.com>
+ <20160915133657.GB14424@rob-hp-laptop>
+Message-ID: <20160916111207.GA32342@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2016 01:04 PM, Daniel Lezcano wrote:
-> On 24/08/2016 15:49, Chanwoo Choi wrote:
->> This patch adds the support for ARM 64bit. The delay_timer is only supported
->> on ARM 32bit.
->>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> ---
+On Thu, Sep 15, 2016 at 08:36:57AM -0500, Rob Herring wrote:
+> On Wed, Sep 14, 2016 at 04:01:24PM +0100, Robin Murphy wrote:
+> > Whilst we're some of the way towards a universal firmware property
+> > interface, drivers which deal with both OF and ACPI probing end up
+> > having to do things like this:
+> > 
+> >     dev->of_node ? &dev->of_node->fwnode : dev->fwnode
+> > 
+> > This seems unnecessary, when the OF code could instead simply fill in
+> > the device's fwnode when binding the of_node, and let the drivers use
+> > dev->fwnode either way. Let's give it a go and see what falls out.
+> > 
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> >  drivers/of/platform.c | 2 ++
+> >  1 file changed, 2 insertions(+)
 > 
-> I don't really like #ifdef in the code itself but I suppose there is no
-> much choice.
-> 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> I've applied this, but what about non-platform devices such as i2c?
 
-Thanks, applied.
-If needed, I can provide a stable tag to base on top of it.
+Thanks ! Patch below should do for mfd and i2c (to be confirmed) but
+I am pretty certain it is still missing some devices, are we going
+to convert them on a case-by-case policy (ie when/if needed) ?
 
-Best regards,
-Krzysztof
+Lorenzo
+
+-- >8 --
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index da3a02e..667a393 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -1574,6 +1574,7 @@ static struct i2c_client *of_i2c_register_device(struct i2c_adapter *adap,
+ 
+ 	info.addr = addr;
+ 	info.of_node = of_node_get(node);
++	info.fwnode = &node->fwnode;
+ 	info.archdata = &dev_ad;
+ 
+ 	if (of_get_property(node, "wakeup-source", NULL))
+diff --git a/drivers/mfd/mfd-core.c b/drivers/mfd/mfd-core.c
+index 3ac486a..c264bf5 100644
+--- a/drivers/mfd/mfd-core.c
++++ b/drivers/mfd/mfd-core.c
+@@ -179,6 +179,7 @@ static int mfd_add_device(struct device *parent, int id,
+ 		for_each_child_of_node(parent->of_node, np) {
+ 			if (of_device_is_compatible(np, cell->of_compatible)) {
+ 				pdev->dev.of_node = np;
++				pdev->dev.fwnode = &np->fwnode;
+ 				break;
+ 			}
+ 		}
