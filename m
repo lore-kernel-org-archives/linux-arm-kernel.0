@@ -1,197 +1,106 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 Sep 2016 09:58:25 +0100
-Subject: [PATCH] arm64: hw_breakpoint: Handle inexact watchpoint addresses
-In-Reply-To: <1473689244-147136-1-git-send-email-labath@google.com>
-References: <1473689244-147136-1-git-send-email-labath@google.com>
-Message-ID: <20160916085825.GL3380@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 16 Sep 2016 10:11:12 +0100
+Subject: [PATCH v3 2/2] KVM: arm/arm64: Route vtimer events to user space
+In-Reply-To: <1474007187-18673-3-git-send-email-agraf@suse.de>
+References: <1474007187-18673-1-git-send-email-agraf@suse.de>
+ <1474007187-18673-3-git-send-email-agraf@suse.de>
+Message-ID: <CAFEAcA_SGmQVg0COoVArhVtC3TFEEMB3bdT-UTPYvnuwLKANYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On 16 September 2016 at 07:26, Alexander Graf <agraf@suse.de> wrote:
+> We have 2 modes for dealing with interrupts in the ARM world. We can either
+> handle them all using hardware acceleration through the vgic or we can emulate
+> a gic in user space and only drive CPU IRQ pins from there.
+>
+> Unfortunately, when driving IRQs from user space, we never tell user space
+> about timer events that may result in interrupt line state changes, so we
+> lose out on timer events if we run with user space gic emulation.
+>
+> This patch fixes that by routing vtimer expiration events to user space.
+> With this patch I can successfully run edk2 and Linux with user space gic
+> emulation.
 
-On Mon, Sep 12, 2016 at 03:07:24PM +0100, Pavel Labath wrote:
-> Arm64 hardware does not always report a watchpoint hit address that
-> matches one of the watchpoints set. It can also report an address
-> "near" the watchpoint if a single instruction access both watched and
-> unwatched addresses. There is no straight-forward way, short of
-> disassembling the offending instruction, to map that address back to
-> the watchpoint.
-> 
-> Previously, when the hardware reported a watchpoint hit on an address
-> that did not match our watchpoint (this happens in case of instructions
-> which access large chunks of memory such as "stp") the process would
-> enter a loop where we would be continually resuming it (because we did
-> not recognise that watchpoint hit) and it would keep hitting the
-> watchpoint again and again. The tracing process would never get
-> notified of the watchpoint hit.
-> 
-> This commit fixes the problem by looking at the watchpoints near the
-> address reported by the hardware. If the address does not exactly match
-> one of the watchpoints we have set, it attributes the hit to the
-> nearest watchpoint we have.  This heuristic is a bit dodgy, but I don't
-> think we can do much more, given the hardware limitations.
-> I include a kernel selftest which triggers this code.
+Hi Alex. I have some comments just on the userspace API docs.
+These are mostly requests for clarification or expansion, and they
+boil down to "if you gave me this API document change I wouldn't be
+able to deduce from it the necessary changes to QEMU or kvmtool to
+use this functionality".
 
-Thanks for the patch. Comments inline.
+> Signed-off-by: Alexander Graf <agraf@suse.de>
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 23937e0..dec1a78 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -3202,8 +3202,10 @@ struct kvm_run {
+>         /* in */
+>         __u8 request_interrupt_window;
+>
+> -Request that KVM_RUN return when it becomes possible to inject external
+> +[x86] Request that KVM_RUN return when it becomes possible to inject external
+>  interrupts into the guest.  Useful in conjunction with KVM_INTERRUPT.
+> +[arm*] Bits set to 1 in here mask IRQ lines that would otherwise potentially
+> +trigger forever. Useful with KVM_CAP_ARM_TIMER.
 
-> Signed-off-by: Pavel Labath <labath@google.com>
-> ---
->  arch/arm64/kernel/hw_breakpoint.c                  | 104 +++++++---
->  tools/testing/selftests/breakpoints/Makefile       |   5 +-
->  .../selftests/breakpoints/breakpoint_test-arm.c    | 217 +++++++++++++++++++++
->  3 files changed, 298 insertions(+), 28 deletions(-)
->  create mode 100644 tools/testing/selftests/breakpoints/breakpoint_test-arm.c
+It's only a _u8 and there's more than 8 IRQ lines -- which ones
+can you mask this way?
 
-Could you split the test out into a separate patch please?
-
-> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-> index 26a6bf7..d0ebfe6 100644
-> --- a/arch/arm64/kernel/hw_breakpoint.c
-> +++ b/arch/arm64/kernel/hw_breakpoint.c
-> @@ -661,50 +661,80 @@ unlock:
->  }
->  NOKPROBE_SYMBOL(breakpoint_handler);
->  
-> +/*
-> + * Arm64 hardware does not always report a watchpoint hit address that matches
-> + * one of the watchpoints set. It can also report an address "near" the
-> + * watchpoint if a single instruction access both watched and unwatched
-> + * addresses. There is no straight-forward way, short of disassembling the
-> + * offending instruction, to map that address back to the watchpoint. This
-> + * function computes the distance of the memory access from the watchpoint as a
-> + * heuristic for the likelyhood that a given access triggered the watchpoint.
-> + *
-> + * See Section D2.10.5 "Determining the memory location that caused a Watchpoint
-> + * exception" of ARMv8 Architecture Reference Manual for details.
-> + *
-> + * The function returns the distance of the address from the bytes watched by
-> + * the watchpoint. In case of an exact match, it returns 0.
-> + */
-> +static u64 get_distance_from_watchpoint(unsigned long addr, int i,
-> +					struct arch_hw_breakpoint *info)
-> +{
-> +	u64 val, alignment_mask, wp_low, wp_high;
-> +	u32 ctrl_reg;
-> +	int first_bit;
-> +	struct arch_hw_breakpoint_ctrl ctrl;
+>         __u8 padding1[7];
+>
+> @@ -3519,6 +3521,16 @@ Hyper-V SynIC state change. Notification is used to remap SynIC
+>  event/message pages and to enable/disable SynIC messages/events processing
+>  in userspace.
+>
+> +               /* KVM_EXIT_ARM_TIMER */
+> +               struct {
+> +                       __u8 timesource;
+> +               } arm_timer;
 > +
-> +	/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
-> +	if (is_compat_task()) {
-> +		if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
-> +			alignment_mask = 0x7;
-> +		else
-> +			alignment_mask = 0x3;
-> +	} else {
-> +		alignment_mask = 0x7;
-> +	}
+> +Indicates that a timer triggered that user space needs to handle and
+> +potentially mask with vcpu->run->request_interrupt_window to allow the
+> +guest to proceed. This only happens for timers that got enabled through
+> +KVM_CAP_ARM_TIMER.
 
-We have identical logic elsewhere in this file, so please stick this into
-a get_watchpoint_alignment_mask function.
+What values can the timesource field contain?
 
 > +
-> +	val = read_wb_reg(AARCH64_DBG_REG_WVR, i) & ~alignment_mask;
+>                 /* Fix the size of the union. */
+>                 char padding[256];
+>         };
+> @@ -3739,6 +3751,16 @@ Once this is done the KVM_REG_MIPS_VEC_* and KVM_REG_MIPS_MSA_* registers can be
+>  accessed, and the Config5.MSAEn bit is accessible via the KVM API and also from
+>  the guest.
+>
+> +6.11 KVM_CAP_ARM_TIMER
 > +
-> +	ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
-> +	decode_ctrl_reg(ctrl_reg, &ctrl);
-> +	first_bit = ffs(ctrl.len);
-> +	if (first_bit == 0)
-> +		return -1;
-> +	wp_low = val + first_bit - 1;
-> +	wp_high = val + fls(ctrl.len) - 1;
-> +	if (addr < wp_low)
-> +		return wp_low - addr;
-> +	else if (addr > wp_high)
-> +		return addr - wp_high;
-
-Why do you need to read the control register? We already have the length
-in the arch_hw_breakpoint, and that should be sufficient for the check, no?
-
->  static int watchpoint_handler(unsigned long addr, unsigned int esr,
->  			      struct pt_regs *regs)
->  {
-> -	int i, step = 0, *kernel_step, access;
-> -	u32 ctrl_reg;
-> -	u64 val, alignment_mask;
-> +	int i, step = 0, *kernel_step, access, closest_match;
-> +	u64 min_dist = -1, dist;
->  	struct perf_event *wp, **slots;
->  	struct debug_info *debug_info;
->  	struct arch_hw_breakpoint *info;
-> -	struct arch_hw_breakpoint_ctrl ctrl;
->  
->  	slots = this_cpu_ptr(wp_on_reg);
->  	debug_info = &current->thread.debug;
->  
-> +	/*
-> +	 * Find all watchpoints that match the reported address. If no exact
-> +	 * match is found. Attribute the hit to the closest watchpoint.
-> +	 */
->  	for (i = 0; i < core_num_wrps; ++i) {
->  		rcu_read_lock();
->  
->  		wp = slots[i];
-> -
->  		if (wp == NULL)
->  			goto unlock;
->  
-> -		info = counter_arch_bp(wp);
-> -		/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
-> -		if (is_compat_task()) {
-> -			if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
-> -				alignment_mask = 0x7;
-> -			else
-> -				alignment_mask = 0x3;
-> -		} else {
-> -			alignment_mask = 0x7;
-> -		}
-> -
-> -		/* Check if the watchpoint value matches. */
-> -		val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
-> -		if (val != (addr & ~alignment_mask))
-> -			goto unlock;
-> -
-> -		/* Possible match, check the byte address select to confirm. */
-> -		ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
-> -		decode_ctrl_reg(ctrl_reg, &ctrl);
-> -		if (!((1 << (addr & alignment_mask)) & ctrl.len))
-> -			goto unlock;
-> -
->  		/*
->  		 * Check that the access type matches.
->  		 * 0 => load, otherwise => store
-> @@ -714,6 +744,17 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
->  		if (!(access & hw_breakpoint_type(wp)))
->  			goto unlock;
->  
-> +		info = counter_arch_bp(wp);
+> +Architectures: arm, arm64
+> +Target: vcpu
+> +Parameters: args[0] contains a bitmap of timers to enable
 > +
-> +		dist = get_distance_from_watchpoint(addr, i, info);
-> +		if (dist < min_dist) {
-> +			min_dist = dist;
-> +			closest_match = i;
-> +		}
-> +		/* Is this an exact match? */
-> +		if (dist != 0)
-> +			goto unlock;
+> +This capability allows to route per-core timers into user space. When it's
+> +enabled, the enabled timers trigger KVM_EXIT_ARM_TIMER guest exits when they
+> +are pending, unless masked by vcpu->run->request_interrupt_window.
+
+How are the timers enumerated within the bitmap? Which timers can
+be enabled like this?
+
+Shouldn't this be talking about "timers to route to userspace"
+rather than "timers to enable", since AIUI the timers are always
+enabled regardless of what you set here ?
+
+The KVM_CAP constant name seems rather generic given this is an
+obscure corner of the API.
+
+
+What is the mechanism for the kernel to tell userspace when the
+timer *stops* being pending, so it can update the interrupt
+level for it in userspace? (What you really want I think is
+for the kernel to notify "timer level goes high" and "timer
+level goes low" and handle the masking internally.)
+
 > +
->  		info->trigger = addr;
->  		perf_bp_event(wp, regs);
->  
-> @@ -724,6 +765,15 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
->  unlock:
->  		rcu_read_unlock();
->  	}
-> +	if (min_dist > 0 && min_dist != -1) {
-> +		/* No exact match found. */
-> +		rcu_read_lock();
-> +		wp = slots[closest_match];
-> +		info = counter_arch_bp(wp);
-> +		info->trigger = addr;
-> +		perf_bp_event(wp, regs);
-> +		rcu_read_unlock();
+>  7. Capabilities that can be enabled on VMs
+>  ------------------------------------------
 
-Hmm, are you sure it's safe to drop and retake the RCU lock here? If the
-event is destroyed before we retake the RCU lock, won't htis go horribly
-wrong? It's probably best to hold the lock outside the loop :(
-
-Will
+thanks
+-- PMM
