@@ -1,8 +1,10 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 16 Sep 2016 01:52:00 +0000
-Subject: [PATCH -next] dma: mv_xor: fix invalid use of sizeof in
+Date: Fri, 16 Sep 2016 02:19:13 +0000
+Subject: [PATCH -next v2] ARM: orion: fix invalid use of sizeof in
  orion_ge00_switch_init()
-Message-ID: <1473990720-20605-1-git-send-email-weiyj.lk@gmail.com>
+In-Reply-To: <1473990720-20605-1-git-send-email-weiyj.lk@gmail.com>
+References: <1473990720-20605-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <1473992353-7151-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,6 +15,8 @@ size of the pointer, not that of the pointed data.
 
 Fixes: fe158a17c1e0 ("ARM: orion: simplify orion_ge00_switch_init")
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+v1 -> v2: fix file module name in subject
 ---
  arch/arm/plat-orion/common.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
