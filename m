@@ -1,43 +1,48 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Sep 2016 16:06:29 -0400
-Subject: [PATCH V2 0/5] PCI: error handling clean up and add CRS support
-Message-ID: <1474056395-21843-1-git-send-email-okaya@codeaurora.org>
+Date: Fri, 16 Sep 2016 16:06:30 -0400
+Subject: [PATCH V2 1/5] PCI/AER: replace pci_reset_bridge_secondary_bus with
+ pci_reset_bus
+In-Reply-To: <1474056395-21843-1-git-send-email-okaya@codeaurora.org>
+References: <1474056395-21843-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1474056395-21843-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device states on the bus are not saved and restored for some of the bus
-reset paths as:
+The error handling path is not saving and restoring the settings on
+other devices getting impacted by a secondary bus reset. Using a better
+API to take care of this.
 
-1. IB/hfi1 via pci_reset_bridge_secondary_bus
-2. PCI/AER via pci_reset_bridge_secondary_bus
-3. PCI: dev_reset via parent bus reset
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pcie/aer/aerdrv.c      | 2 +-
+ drivers/pci/pcie/aer/aerdrv_core.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Changing the external API usage to pci_reset_bus outside of PCI code and
-adding save/restore into pci_parent_bus_reset function. Note that
-pci_parent_bus_reset is called with a device lock held.
-
-A PCIe endpoint is allowed to issue CRS following an FLR request to
-indicate that it is not ready to accept new requests. Changing the polling
-mechanism in FLR wait function to go read the vendor ID instead of the
-command/status register. A CRS indication will only be given if the address
-to be read is vendor ID.
-
-v1:
-http://www.spinics.net/lists/linux-pci/msg53596.html
-* initial implementation
-
-Sinan Kaya (5):
-  PCI/AER: replace pci_reset_bridge_secondary_bus with pci_reset_bus
-  IB/hfi1: replace pci_reset_bridge_secondary_bus with pci_reset_bus
-  PCI: save and restore bus on parent bus reset
-  PCI: add CRS support to error handling path
-  PCI: handle CRS returned by device after FLR
-
- drivers/infiniband/hw/hfi1/pcie.c  |  4 +---
- drivers/pci/pci.c                  | 28 +++++++++++++++++++++++++++-
- drivers/pci/pcie/aer/aerdrv.c      |  2 +-
- drivers/pci/pcie/aer/aerdrv_core.c |  2 +-
- 4 files changed, 30 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/pci/pcie/aer/aerdrv.c b/drivers/pci/pcie/aer/aerdrv.c
+index 48d21e0..7880cd1 100644
+--- a/drivers/pci/pcie/aer/aerdrv.c
++++ b/drivers/pci/pcie/aer/aerdrv.c
+@@ -350,7 +350,7 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
+ 	reg32 &= ~ROOT_PORT_INTR_ON_MESG_MASK;
+ 	pci_write_config_dword(dev, pos + PCI_ERR_ROOT_COMMAND, reg32);
+ 
+-	pci_reset_bridge_secondary_bus(dev);
++	pci_reset_bus(dev->subordinate);
+ 	dev_printk(KERN_DEBUG, &dev->dev, "Root Port link has been reset\n");
+ 
+ 	/* Clear Root Error Status */
+diff --git a/drivers/pci/pcie/aer/aerdrv_core.c b/drivers/pci/pcie/aer/aerdrv_core.c
+index 521e39c..0339cc3 100644
+--- a/drivers/pci/pcie/aer/aerdrv_core.c
++++ b/drivers/pci/pcie/aer/aerdrv_core.c
+@@ -403,7 +403,7 @@ static pci_ers_result_t broadcast_error_message(struct pci_dev *dev,
+  */
+ static pci_ers_result_t default_reset_link(struct pci_dev *dev)
+ {
+-	pci_reset_bridge_secondary_bus(dev);
++	pci_reset_bus(dev->subordinate);
+ 	dev_printk(KERN_DEBUG, &dev->dev, "downstream link has been reset\n");
+ 	return PCI_ERS_RESULT_RECOVERED;
+ }
 -- 
 1.9.1
