@@ -1,50 +1,100 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Sep 2016 11:33:26 +0100
-Subject: [RFC PATCH 2/8] thread_info: allow custom in-task thread_info
-In-Reply-To: <CALCETrWni0aZ71r-R6oYG98kZvZA8a184UR0YURk_=tXu8HXMw@mail.gmail.com>
-References: <1473947349-14521-1-git-send-email-mark.rutland@arm.com>
- <1473947349-14521-3-git-send-email-mark.rutland@arm.com>
- <CALCETrWni0aZ71r-R6oYG98kZvZA8a184UR0YURk_=tXu8HXMw@mail.gmail.com>
-Message-ID: <20160916103101.GA21702@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 16 Sep 2016 11:36:29 +0100
+Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <2210422.ogrYIr1eQU@avalon>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+ <20160915162650.GZ13920@localhost> <3152956.IVRykDnfF6@wuerfel>
+ <2210422.ogrYIr1eQU@avalon>
+Message-ID: <55e0ee95-fcbb-918a-da94-85f3aeb6ed37@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 11:37:47AM -0700, Andy Lutomirski wrote:
-> On Thu, Sep 15, 2016 at 6:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Currently, task_struct is defined in <linux/sched.h>, which (indirectly)
-> > pulls in a number of low-level arch headers such as <asm/preempt.h>
-> > through a number of other headers. Thus, code and structures in these
-> > headers can't rely on the definition of task_struct. Some of these
-> > headers are necessary for the definition of task_struct, so moving
-> > task_struct into its own header is insufficient tio avoid circular
-> > includes.
+On 16/09/16 10:48, Laurent Pinchart wrote:
+> Hi Arnd,
 > 
-> The flippant answer is to fix the headers, but I tried that myself and
-> gave up :(
-
-Agreed; likewise (though I gave up quicker, I suspect). :(
-
-Longer-term I'd still hope that we can do this.
-
-> But how about this slightly less duplicative alternative:
+> On Friday 16 Sep 2016 11:07:48 Arnd Bergmann wrote:
+>> On Thursday, September 15, 2016 9:56:51 PM CEST Vinod Koul wrote:
+>>> On Wed, Aug 10, 2016 at 11:07:10PM +0530, Vinod Koul wrote:
+>>>> On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
+>>>>> Hi,
+>>>>>
+>>>>> This series tries to solve the problem with DMA with device registers
+>>>>> (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
+>>>>> recent patch '9575632 (dmaengine: make slave address physical)'
+>>>>> clarifies that DMA slave address provided by clients is the physical
+>>>>> address. This puts the task of mapping the DMA slave address from a
+>>>>> phys_addr_t to a dma_addr_t on the DMA engine.
+>>>>>
+>>>>> Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
+>>>>> the same and no special care is needed. However if you have a IOMMU
+>>>>> you need to map the DMA slave phys_addr_t to a dma_addr_t using
+>>>>> something like this.
+>>>>>
+>>>>> This series is based on top of v4.8-rc1. And I'm hoping to be able to
+>>>>> collect a Ack from Russell King on patch 4/6 that adds the ARM
+>>>>> specific part and then be able to take the whole series through the
+>>>>> dmaengine tree. If this is not the best route I'm more then happy to
+>>>>> do it another way.
+>>>>>
+>>>>> It's tested on a Koelsch with CONFIG_IPMMU_VMSA and by enabling the
+>>>>> ipmmu_ds node in r8a7791.dtsi. I verified operation by interacting
+>>>>> with /dev/mmcblk1, i2c and the serial console which are devices behind
+>>>>> the iommu.
+>>>>
+>>>> As I said in last one, the dmaengine parts look fine to me. But to go
+>>>> thru dmaengine tree I would need ACK on non dmaengine patches.
+>>>
+>>> I havent heard back from this one and I am inclined to merge this one now.
+>>> If anyone has any objects, please speak up now...
+>>>
+>>> Also ACKs welcome...
+>>
+>> I had not looked at the series earlier, but this version looks entirely
+>> reasonable to me, so
+>>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>>
+>> One concern I have is that we might get an awkward situation if we ever
+>> encounter one DMA engine hardware that is used in different systems that all
+>> have an IOMMU, but on some of them the connection between the DMA master and
+>> the slave FIFO bypasses the IOMMU while on others the IOMMU is required.
 > 
-> struct thread_info {
-> #ifdef arch_thread_info
->   struct arch_thread_info arch_ti;
-> #endif
-> };
+> Do you mean systems where some of the channels of a specific DMA engine go 
+> through the IOMMU while others do not ? We indeed have no solution today for 
+> such a situation.
+> 
+> The problem is a bit broader than that, we'll also have an issue with DMA 
+> engines that have different channels served by different IOMMUs. I recall 
+> discussing this in the past with you, and the solution you proposed was to add 
+> a channel index to struct dma_attrs seems good to me. To support the case 
+> where some channels don't go through an IOMMU we would only need support for 
+> null entries in the IOMMUs list associated with a device (for instance in the 
+> DT case null entries in the iommus property).
 
-I'm happy to have an arch_thread_info.
+I think at that point we just create the channels as child devices of
+the main dmaengine device so they each get their own DMA ops, and can do
+whatever. The Qualcomm HIDMA driver already does that for a very similar
+reason (so that the IOMMU can map individual channels into different
+guest VMs).
 
-Just to check, what do you mean to happen with the flags field? Should
-that always be in the generic thread_info? e.g.
+Robin.
 
-struct thread_info {
-	u32 flags;
-#ifdef arch_thread_info
-	struct arch_thread_info arch_ti;
-#endif
-};
-
-Thanks,
-Mark,
+> Now I see that struct dma_attrs has been replaced by unsigned long in
+> 
+> commit 00085f1efa387a8ce100e3734920f7639c80caa3
+> Author: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Date:   Wed Aug 3 13:46:00 2016 -0700
+> 
+>     dma-mapping: use unsigned long for dma_attrs
+> 
+> We still have enough bits to reserve some of them for a channel number, but 
+> I'm not very happy with that patch as I can see how a future proposal to 
+> handle the channel number through the DMA attributes will get rejected on the 
+> grounds of bits starvation then :-(
+> 
+>> I don't have any idea for how this could be handled in a generic way, so my
+>> best answer here is to hope we never get there, and if we do, handle it
+>> using some local hack in the driver.
+> 
