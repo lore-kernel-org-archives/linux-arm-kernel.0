@@ -1,25 +1,62 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 16 Sep 2016 12:53:22 +0200
-Subject: [PATCH v7 08/11] arm64: dts: r8a7796: add SDHI nodes
-In-Reply-To: <20160916103048.GL1411@katana>
-References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
- <1473764228-24768-9-git-send-email-horms+renesas@verge.net.au>
- <20160916103048.GL1411@katana>
-Message-ID: <20160916105321.GB7566@verge.net.au>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 16 Sep 2016 13:53:15 +0300
+Subject: [PATCH] dmaengine: omap-dma: Enable burst and data pack for SG
+Message-ID: <20160916105315.28320-1-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 12:30:48PM +0200, Wolfram Sang wrote:
-> On Tue, Sep 13, 2016 at 12:57:05PM +0200, Simon Horman wrote:
-> > Add SDHI nodes to the DT of the r8a7796 SoC.
-> > 
-> > Based on the DT of the r8a7795 SoC.
-> > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> If you remove the two lines you removed from H3 already:
+From: Misael Lopez Cruz <misael.lopez@ti.com>
 
-Thanks, done.
+Enable the burst and data pack modes for the scatter-gather
+in order to improve the throughput of the data transfers.
 
-> Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+The improvement has been verified with MMC HS200 mode in
+the DRA72 EVM using the iozone tool to compare the read
+throughput (in kB/s) with and without burst/pack for
+different reclens (in kB).
+
+                              With
+    reclen    Baseline   sDMA burst/pack
+    ------    --------   ---------------
+       64       46568         50820
+      128       57564         63413
+      256       65634         74937
+      512       72427         83483
+     1024       74563         84504
+     2048       76265         86079
+     4096       78045         87335
+     8192       78989         88154
+    16384       81265         91034
+
+Signed-off-by: Misael Lopez Cruz <misael.lopez@ti.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ drivers/dma/omap-dma.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index 1b7f5f32bf74..7ca27d4b1c54 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -904,13 +904,16 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
+ 	d->es = es;
+ 
+ 	d->ccr = c->ccr | CCR_SYNC_FRAME;
+-	if (dir == DMA_DEV_TO_MEM)
++	if (dir == DMA_DEV_TO_MEM) {
+ 		d->ccr |= CCR_DST_AMODE_POSTINC | CCR_SRC_AMODE_CONSTANT;
+-	else
++		d->csdp = CSDP_DST_BURST_64 | CSDP_DST_PACKED;
++	} else {
+ 		d->ccr |= CCR_DST_AMODE_CONSTANT | CCR_SRC_AMODE_POSTINC;
++		d->csdp = CSDP_SRC_BURST_64 | CSDP_SRC_PACKED;
++	}
+ 
+ 	d->cicr = CICR_DROP_IE | CICR_BLOCK_IE;
+-	d->csdp = es;
++	d->csdp |= es;
+ 
+ 	if (dma_omap1()) {
+ 		d->cicr |= CICR_TOUT_IE;
+-- 
+2.10.0
