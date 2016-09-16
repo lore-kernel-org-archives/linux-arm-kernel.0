@@ -1,61 +1,63 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 16 Sep 2016 13:25:46 +0200
-Subject: [PATCH v2] ARM: dts: exynos: Add entries for sound support on
- Odroid-XU board
-In-Reply-To: <1474024920-32744-1-git-send-email-s.nawrocki@samsung.com>
-References: <CGME20160916112217eucas1p1694395dda2a1e8cdf562007ed8141542@eucas1p1.samsung.com>
- <1474024920-32744-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <f4d204d8-b6b8-5173-c530-bfea1ec9ed7d@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Sep 2016 12:33:25 +0100
+Subject: [PATCH v3 5/7] arm64: Handle faults caused by inadvertent user
+ access with PAN enabled
+In-Reply-To: <1473788797-10879-6-git-send-email-catalin.marinas@arm.com>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+ <1473788797-10879-6-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20160916113325.GB21702@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2016 01:22 PM, Sylwester Nawrocki wrote:
-> This patch adds device nodes for the AUDSS clock controller,
-> peripheral DMA 0/1 controllers and the Audio Subsystem I2S controller.
-> These entries are required for sound support on Odroid-XU board.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
-> This patch depends on a patch adding clock ID macro definitions.
-> I'm going to provide a topic branch containing required changes.
-> 
-> Changes since v1:
->  - GIC_SPI, IRQ_TYPE_NONE used in the PDMA and max98080 interrupt
->    specifiers,
->  - assigned-clock-* properties moved to respective controller
->    nodes.
+On Tue, Sep 13, 2016 at 06:46:35PM +0100, Catalin Marinas wrote:
+> When TTBR0_EL1 is set to the reserved page, an erroneous kernel access
+> to user space would generate a translation fault. This patch adds the
+> checks for the software-set PSR_PAN_BIT to emulate a permission fault
+> and report it accordingly.
 
-And here is a pull request containing clk dependency patches:
+Why do we need to treat this case as a permission fault? It looks like a
+fault that wasn't a deliberate uaccess (which thus doesn't have a fixup
+handler) should have do_page_fault call __do_kernel_fault, where we
+should die().
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+Is this just for more consistent reporting of erroneous accesses to user
+memory? Or does this fix some other issue?
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+> This patch also updates the description of the synchronous external
+> aborts on translation table walks.
 
-are available in the git repository at:
+This sounds fine, though it might be better as a separate/preparatory
+patch.
 
-  git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.9-exynos54x0-dt
-
-for you to fetch changes up to 58d6506f327e3d192998ba03632f546da221b8d8:
-
-  clk: samsung: exynos5410: Add clock IDs for PDMA and EPLL clocks (2016-09-09
-10:13:02 +0200)
-
-----------------------------------------------------------------
-Adition of clock index definitions for exynos5420 SoC DRAM controller
-and exynos5410 SoC sound subsystem (EPLL, PDMA) related clocks.
-
-----------------------------------------------------------------
-Chanwoo Choi (1):
-      clk: samsung: Add clock IDs for the CMU_CDREX (DRAM Express Controller)
-
-Sylwester Nawrocki (1):
-      clk: samsung: exynos5410: Add clock IDs for PDMA and EPLL clocks
-
- include/dt-bindings/clock/exynos5410.h |  3 +++
- include/dt-bindings/clock/exynos5420.h | 11 ++++++++++-
- 2 files changed, 13 insertions(+), 1 deletion(-)
+> -static inline bool is_permission_fault(unsigned int esr)
+> +static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs)
+>  {
+>  	unsigned int ec       = ESR_ELx_EC(esr);
+>  	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
+>  
+> -	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM) ||
+> -	       (ec == ESR_ELx_EC_IABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
+> +	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
+> +		return false;
+> +
+> +	if (system_uses_ttbr0_pan())
+> +		return fsc_type == ESR_ELx_FSC_FAULT &&
+> +			(regs->pstate & PSR_PAN_BIT);
+> +	else
+> +		return fsc_type == ESR_ELx_FSC_PERM;
+>  }
 
 
---
+Since the entry code will clear the PAN bit in the SPSR when we see the
+reserved ASID, faults in EFI runtime services will still be correctly
+reported, though that's somewhat subtle (and it took me a while to
+convince myself that was the case).
+
+Also, I think that faults elsewhere may be misreported, e.g. in cold
+entry to kernel paths (idle, hotplug) where we have a global mapping in
+TTBR0, and it looks like we're using the reserved ASID.
+
+I'm not immediately sure how to distinguish those cases.
+
 Thanks,
-Sylwester
+Mark.
