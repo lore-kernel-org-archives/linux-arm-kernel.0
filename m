@@ -1,87 +1,63 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 16 Sep 2016 15:09:29 +0300
-Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <2277430.yNKNTgNkoj@wuerfel>
-References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
- <2210422.ogrYIr1eQU@avalon> <2277430.yNKNTgNkoj@wuerfel>
-Message-ID: <5489283.7nVYvaYEH8@avalon>
+From: fweimer@redhat.com (Florian Weimer)
+Date: Fri, 16 Sep 2016 14:10:53 +0200
+Subject: [RFC PATCH 0/5] arm64: Signal context expansion
+In-Reply-To: <20160915164543.GB1574@e103592.cambridge.arm.com>
+References: <1473430576-20792-1-git-send-email-Dave.Martin@arm.com>
+ <dad2e7cc-f8cb-4e33-99c7-66effa7a6f5e@redhat.com>
+ <20160909152047.GA3958@e103592.cambridge.arm.com>
+ <d7fa9069-f952-0642-9668-2fea640cdb20@redhat.com>
+ <20160912111749.GB3958@e103592.cambridge.arm.com> <57D6C33D.9020003@arm.com>
+ <20160912153015.GD3958@e103592.cambridge.arm.com>
+ <9969568a-f969-d904-52b3-14f80c3abec4@redhat.com>
+ <20160913155151.GA1574@e103592.cambridge.arm.com>
+ <d2e8f4f5-1229-9733-174d-b3123c5e887b@redhat.com>
+ <20160915164543.GB1574@e103592.cambridge.arm.com>
+Message-ID: <ad89f920-897c-47cb-d584-4b306bc24d1c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 09/15/2016 06:45 PM, Dave Martin wrote:
+> On Tue, Sep 13, 2016 at 06:02:45PM +0200, Florian Weimer wrote:
+>> On 09/13/2016 05:52 PM, Dave Martin wrote:
+>>
+>>> Agreed.  I'll need to think some more about how this should work in
+>>> general.
+>>
+>> Thanks.
+>>
+>> Depending on some SVE implementations details (which I know nothing about, I
+>> only saw some public overview slides), we may also need additional storage
+>> space to preserve SVE registers in the dynamic linker.  Due to lazy binding,
+>> this code cn be called from a signal handler, so this needs to be factored
+>> into stack size requirements as well.
+>
+> Yes and no.  The kernel SIGSTKSZ constants don't care about ld.so --
+> that's userspace overhead, not kernel overhead.
 
-On Friday 16 Sep 2016 14:02:35 Arnd Bergmann wrote:
-> On Friday, September 16, 2016 12:48:23 PM CEST Laurent Pinchart wrote:
-> > On Friday 16 Sep 2016 11:07:48 Arnd Bergmann wrote:
-> >> On Thursday, September 15, 2016 9:56:51 PM CEST Vinod Koul wrote:
-> >>> On Wed, Aug 10, 2016 at 11:07:10PM +0530, Vinod Koul wrote:
-> >>>> On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
-> >>
-> >> I had not looked at the series earlier, but this version looks entirely
-> >> reasonable to me, so
-> >> 
-> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >> 
-> >> 
-> >> One concern I have is that we might get an awkward situation if we ever
-> >> encounter one DMA engine hardware that is used in different systems that
-> >> all have an IOMMU, but on some of them the connection between the DMA
-> >> master and the slave FIFO bypasses the IOMMU while on others the IOMMU
-> >> is required.
-> >
-> > Do you mean systems where some of the channels of a specific DMA engine go
-> > through the IOMMU while others do not ? We indeed have no solution today
-> > for such a situation.
-> 
-> I wasn't thinking quite that far, though that is also a theoretical
-> problem. However, the simple solution would be to have a bit in the DMA
-> specifier let the driver know whether translation is needed or not.
-> 
-> The simpler case I was thinking of is where the entire DMA engine
-> either goes through an IOMMU or doesn't (depending on the integration
-> into the SoC), so we'd have to find out through some DT property
-> or compatible string in the DMA enginen driver.
+Well yes, so is jmp_buf.  But I think you still should consider the full 
+picture. :)
 
-Don't we already get that information from the iommus DT property ? If the DMA 
-engine goes through an IOMMU the property will be set, otherwise it will not.
+At least the lazy binding stack overhead can be avoided with LD_BIND_NOW=1.
 
-> > The problem is a bit broader than that, we'll also have an issue with DMA
-> > engines that have different channels served by different IOMMUs.
-> 
-> Do you mean a theoretical problem, or a chip that you already know exists?
+>> Problematic are register width extensions used for argument passing and
+>> callee-saved registers whose width has been extended.  Both are particularly
+>> challenging to deal with if existing vector instructions clear the extension
+>> part (which may be desirable for other reasons).
+>>
+>> The size of the jmp_buf type is a concern as well.
+>
+> The default PCS for SVE will not be introducing any extra save/restore
+> requirements for SVE -- i.e., everything is caller-save at public
+> interfaces, except for the FPSIMD register bits that are already callee-
+> save under the existing PCS.
 
-That's theoretical. The problem I'm facing today is a DMA engine whose 
-channels are served by different ports of the same IOMMU. This works in a 
-suboptimal way because I have to keep all the IOMMU ports enabled regardless 
-of whether they're used or not, as the DMA engine and IOMMU APIs don't carry 
-channel information.
+Is it possible to pass arguments in the register extension parts?  If 
+existing non-SVE code can clobber these bits, we need some adjustments 
+in libc to save and restore SVE state in some places (which may need 
+further stack space).
 
-> > I recall discussing this in the past with you, and the solution you
-> > proposed was to add a channel index to struct dma_attrs seems good to me.
-> > To support the case where some channels don't go through an IOMMU we would
-> > only need support for null entries in the IOMMUs list associated with a
-> > device (for instance in the DT case null entries in the iommus property).
-> > 
-> > Now I see that struct dma_attrs has been replaced by unsigned long in
-> > 
-> > commit 00085f1efa387a8ce100e3734920f7639c80caa3
-> > Author: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Date:   Wed Aug 3 13:46:00 2016 -0700
-> > 
-> >     dma-mapping: use unsigned long for dma_attrs
-> > 
-> > We still have enough bits to reserve some of them for a channel number,
-> > but I'm not very happy with that patch as I can see how a future proposal
-> > to handle the channel number through the DMA attributes will get rejected
-> > on the grounds of bits starvation then :-(
-> 
-> Agreed, that can become interesting.
+Again, for lazy binding, LD_BIND_NOW=1 will help temporarily, but 
+profiling code may need a separate fix.
 
-Does the above-mentioned patch really fix a performance, memory consumption or 
-other issue ?
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+Florian
