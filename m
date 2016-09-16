@@ -1,48 +1,87 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 16 Sep 2016 13:07:14 +0100
-Subject: [PATCH] of/platform: Initialise dev->fwnode appropriately
-In-Reply-To: <20160915133657.GB14424@rob-hp-laptop>
-References: <38259ab3716da072fab37f06d034329244491c13.1473865096.git.robin.murphy@arm.com>
- <20160915133657.GB14424@rob-hp-laptop>
-Message-ID: <a3974505-7b0e-e1a8-bf84-ee5f62047662@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 16 Sep 2016 15:09:29 +0300
+Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <2277430.yNKNTgNkoj@wuerfel>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+ <2210422.ogrYIr1eQU@avalon> <2277430.yNKNTgNkoj@wuerfel>
+Message-ID: <5489283.7nVYvaYEH8@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/09/16 14:36, Rob Herring wrote:
-> On Wed, Sep 14, 2016 at 04:01:24PM +0100, Robin Murphy wrote:
->> Whilst we're some of the way towards a universal firmware property
->> interface, drivers which deal with both OF and ACPI probing end up
->> having to do things like this:
->>
->>     dev->of_node ? &dev->of_node->fwnode : dev->fwnode
->>
->> This seems unnecessary, when the OF code could instead simply fill in
->> the device's fwnode when binding the of_node, and let the drivers use
->> dev->fwnode either way. Let's give it a go and see what falls out.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>  drivers/of/platform.c | 2 ++
->>  1 file changed, 2 insertions(+)
+Hi Arnd,
+
+On Friday 16 Sep 2016 14:02:35 Arnd Bergmann wrote:
+> On Friday, September 16, 2016 12:48:23 PM CEST Laurent Pinchart wrote:
+> > On Friday 16 Sep 2016 11:07:48 Arnd Bergmann wrote:
+> >> On Thursday, September 15, 2016 9:56:51 PM CEST Vinod Koul wrote:
+> >>> On Wed, Aug 10, 2016 at 11:07:10PM +0530, Vinod Koul wrote:
+> >>>> On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
+> >>
+> >> I had not looked at the series earlier, but this version looks entirely
+> >> reasonable to me, so
+> >> 
+> >> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> >> 
+> >> 
+> >> One concern I have is that we might get an awkward situation if we ever
+> >> encounter one DMA engine hardware that is used in different systems that
+> >> all have an IOMMU, but on some of them the connection between the DMA
+> >> master and the slave FIFO bypasses the IOMMU while on others the IOMMU
+> >> is required.
+> >
+> > Do you mean systems where some of the channels of a specific DMA engine go
+> > through the IOMMU while others do not ? We indeed have no solution today
+> > for such a situation.
 > 
-> I've applied this, but what about non-platform devices such as i2c?
-
-I was indeed wondering that, coming from the perspective of DMA/IOMMU
-configuration which doesn't really apply beyond the PCI and platform
-buses. More generally, at this point it's largely for the benefit of
-subsystems which need to chuck around firmware data for other devices
-that don't exist yet (or at all), which maybe is just the DMA and IRQ
-layers.
-
-I guess beyond that it comes down to auditing the intersection between
-callers of the property API and OF-probed buses, then killing the
-dev_fwnode() helper in property.c and making sure nothing else breaks.
-The possible alternative would be pushing this right down into
-device_initialize(), but that seems a bit wrong.
-
-Thanks,
-Robin.
-
+> I wasn't thinking quite that far, though that is also a theoretical
+> problem. However, the simple solution would be to have a bit in the DMA
+> specifier let the driver know whether translation is needed or not.
 > 
-> Rob
+> The simpler case I was thinking of is where the entire DMA engine
+> either goes through an IOMMU or doesn't (depending on the integration
+> into the SoC), so we'd have to find out through some DT property
+> or compatible string in the DMA enginen driver.
+
+Don't we already get that information from the iommus DT property ? If the DMA 
+engine goes through an IOMMU the property will be set, otherwise it will not.
+
+> > The problem is a bit broader than that, we'll also have an issue with DMA
+> > engines that have different channels served by different IOMMUs.
 > 
+> Do you mean a theoretical problem, or a chip that you already know exists?
+
+That's theoretical. The problem I'm facing today is a DMA engine whose 
+channels are served by different ports of the same IOMMU. This works in a 
+suboptimal way because I have to keep all the IOMMU ports enabled regardless 
+of whether they're used or not, as the DMA engine and IOMMU APIs don't carry 
+channel information.
+
+> > I recall discussing this in the past with you, and the solution you
+> > proposed was to add a channel index to struct dma_attrs seems good to me.
+> > To support the case where some channels don't go through an IOMMU we would
+> > only need support for null entries in the IOMMUs list associated with a
+> > device (for instance in the DT case null entries in the iommus property).
+> > 
+> > Now I see that struct dma_attrs has been replaced by unsigned long in
+> > 
+> > commit 00085f1efa387a8ce100e3734920f7639c80caa3
+> > Author: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Date:   Wed Aug 3 13:46:00 2016 -0700
+> > 
+> >     dma-mapping: use unsigned long for dma_attrs
+> > 
+> > We still have enough bits to reserve some of them for a channel number,
+> > but I'm not very happy with that patch as I can see how a future proposal
+> > to handle the channel number through the DMA attributes will get rejected
+> > on the grounds of bits starvation then :-(
+> 
+> Agreed, that can become interesting.
+
+Does the above-mentioned patch really fix a performance, memory consumption or 
+other issue ?
+
+-- 
+Regards,
+
+Laurent Pinchart
