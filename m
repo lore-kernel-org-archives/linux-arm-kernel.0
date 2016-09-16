@@ -1,52 +1,45 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Fri, 16 Sep 2016 13:38:54 +0000
-Subject: [PATCH v1 3/3] ARM: dts: imx6qdl-apalis: Use enable-gpios
- property for backlight
-In-Reply-To: <dff8d58c4021719184af2c83773e86f175ad910e.1473833908.git.maitysanchayan@gmail.com>
-References: <9d2c17aa2e00e6ff4349a53de8247860d2382607.1473833908.git.maitysanchayan@gmail.com>
- <dff8d58c4021719184af2c83773e86f175ad910e.1473833908.git.maitysanchayan@gmail.com>
-Message-ID: <1474033134.3103.27.camel@toradex.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Sep 2016 15:42:07 +0200
+Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.9
+In-Reply-To: <20160916014703.GC7398@tiger>
+References: <1473670948-4265-1-git-send-email-shawnguo@kernel.org>
+ <2241121.MvRjeYAnGC@wuerfel> <20160916014703.GC7398@tiger>
+Message-ID: <6140062.uQFBQdfrcg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-09-14 at 12:05 +0530, Sanchayan Maity wrote:
-> Use enable-gpios property of PWM backlight driver for backlight
-> control. While at it also fix the use of brightness levels required
-> by EDT displays which require inverted PWM's.
-
-That part I am missing below. Did you forget to include it?
-
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
-> ?arch/arm/boot/dts/imx6qdl-apalis.dtsi | 9 +++++++++
-> ?1 file changed, 9 insertions(+)
+On Friday, September 16, 2016 9:47:03 AM CEST Shawn Guo wrote:
+> On Wed, Sep 14, 2016 at 05:30:49PM +0200, Arnd Bergmann wrote:
+> > On Monday, September 12, 2016 5:02:27 PM CEST Shawn Guo wrote:
+> > > i.MX arm64 device tree changes for 4.9:
+> > >  - Add property dma-coherent for ls2080a PCI device to save software
+> > >    cache maintenance.
+> > >  - Update serial aliases and use stdout-path to sepecify console for
+> > >    ls2080a and ls1043a boards.
+> > >  - Add DDR memory controller device node for ls2080a and ls1043a SoCs.
+> > > 
+> > 
+> > Pulled into next/dt64, thanks!
+> > 
+> > The "dma-coherent" change sounds like a bugfix, should that be backported
+> > to stable kernels? Usually if you lack that property on a device that
+> > is actually coherent, you can get silent data corruption by treating it as
+> > non-coherent.
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> index 8c67dd8..9100bde 100644
-> --- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> @@ -49,7 +49,10 @@
-> ?
-> ?	backlight: backlight {
-> ?		compatible = "pwm-backlight";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_gpio_bl_on>;
-> ?		pwms = <&pwm4 0 5000000>;
-> +		enable-gpios = <&gpio3 13 GPIO_ACTIVE_HIGH>;
-> ?		status = "disabled";
-> ?	};
-> ?
-> @@ -614,6 +617,12 @@
-> ?		>;
-> ?	};
-> ?
-> +	pinctrl_gpio_bl_on: gpioblon {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_EIM_DA13__GPIO3_IO13 0x1b0b0
-> +		>;
-> +	};
-> +
-> ?	pinctrl_gpio_keys: gpio1io04grp {
-> ?		fsl,pins = <
-> ?			/* Power button */
+> My impression is that those cache maintenance enforced for non-coherent
+> device will hurt performance on coherent device.  I don't know it will
+> cause data corruption.
+
+The problem is that the device in this case is accessing data from
+the cache, while the CPU bypasses the cache for coherent mappings.
+The cache might have a stale cache line as the device reads data, or
+it could be in a writeback configuration, where the data written
+from the device to the cache has not made it into RAM at the time it
+is accessed by the CPU.
+
+For streaming mappings, the CPU will invalidate cache lines
+before reading the data, so again if the device has written data
+into the cache but not yet into memory, we will see stale data
+after dma_unmap_single().
+
+	Arnd
