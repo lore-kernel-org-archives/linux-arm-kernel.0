@@ -1,25 +1,84 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 16 Sep 2016 16:26:38 +0300
-Subject: [PATCH RFC 0/8] Add R8A7743/SK-RZG1M board support
-Message-ID: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Fri, 16 Sep 2016 13:28:42 +0000
+Subject: [PATCH v5 1/2] ARM: dts: imx6: Add support for Toradex Apalis
+ iMX6Q/D SoM
+In-Reply-To: <97a3d506-35a0-2a15-18ef-2719c0596cc1@mentor.com>
+References: <1454688741-4238-1-git-send-email-marcel.ziswiler@toradex.com>
+ <1454688741-4238-2-git-send-email-marcel.ziswiler@toradex.com>
+ <97a3d506-35a0-2a15-18ef-2719c0596cc1@mentor.com>
+Message-ID: <1474032521.3103.17.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Vladimir
 
-   Here's the set of 8 patches against Simon Horman's 'renesas.git' repo,
-'renesas-devel-20160916-v4.8-rc6' tag. I'm adding the device tree support for
-the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the board
-seems  identical to the R8A7791/Porter board. Only serial console is supported
-for now, no DHCP/NFS support yet, it will be done RSN... :-)
+On Mon, 2016-08-29 at 16:28 +0300, Vladimir Zapolskiy wrote:
+> Hi Marcel,
+> 
+> On 02/05/2016 06:12 PM, Marcel Ziswiler wrote:
+> > 
+> > From: Petr ?tetiar <ynezz@true.cz>
+> > 
+> > Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> > Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+> > Reviewed-by: Stefan Agner <stefan@agner.ch>
+> > ---
+> > 
+> because the change is in mainline now below is kind of out of date
+> information, but you may find it helpful.
+> 
+> [snip]
+> 
+> > 
+> > - fixed HDMI DDC (requires GPIO-based bitbanging I2C to be enabled)
+> This is not needed.
+> 
+> [snip]
+> 
+> > 
+> > +	/* DDC_I2C: I2C2_SDA/SCL on MXM3 205/207 */
+> > +	i2cddc: i2c at 0 {
+> > +		compatible = "i2c-gpio";
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&pinctrl_i2c_ddc>;
+> > +		gpios = <&gpio3 16 GPIO_ACTIVE_HIGH /* sda */
+> > +			?&gpio2 30 GPIO_ACTIVE_HIGH /* scl */
+> > +			>;
+> > +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+> > +		status = "disabled";
+> > +	};
+> > +
+> This is not needed.
+> 
+> [snip]
+> 
+> > 
+> > +	pinctrl_i2c_ddc: gpioi2cddcgrp {
+> > +		fsl,pins = <
+> > +			/* DDC bitbang */
+> > +			MX6QDL_PAD_EIM_EB2__GPIO2_IO30 0x1b0b0
+> > +			MX6QDL_PAD_EIM_D16__GPIO3_IO16 0x1b0b0
+> > +		>;
+> > +	};
+> > +
+> Practically you don't need this overcomplicated GPIO-based bitbanging
+> to emulate I2C, because the DW HDMI controller has a reduced I2C
+> controller on board, you may take a look at its support published
+> here:
+> 
+> ????http://www.spinics.net/lists/dri-devel/msg116308.html
+> 
+> To utilize it the pads should be set to HDMI function instead of
+> I2C or GPIO.
 
-[1/8] ARM: shmobile: r8a7743: add clock index macros
-[2/8] ARM: shmobile: r8a7743: add power domain index macros
-[3/8] soc: renesas: rcar-sysc: add R8A7743 support
-[4/8] ARM: shmobile: r8a7743: basic SoC support
-[5/8] ARM: dts: r8a7743: initial SoC device tree
-[6/8] ARM: dts: r8a7743: add SYS-DMAC support
-[7/8] ARM: dts: r8a7743: add [H]SCIF support
-[8/8] ARM: dts: sk-rzg1m: initial device tree
+Works nicely indeed, thanks for letting us know.
 
-WBR, Sergei
+> --
+> With best wishes,
+> Vladimir
+
+Best wishes to you too!
+
+Cheers
+
+Marcel
