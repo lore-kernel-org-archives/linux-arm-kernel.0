@@ -1,55 +1,101 @@
-From: clg@kaod.org (=?UTF-8?q?C=C3=A9dric=20Le=20Goater?=)
-Date: Fri, 16 Sep 2016 12:39:27 +0200
-Subject: [PATCH v2 3/3] ARM: dts: aspeed: Enable BT IPMI BMC device
-In-Reply-To: <1474022367-21029-1-git-send-email-clg@kaod.org>
-References: <1474022367-21029-1-git-send-email-clg@kaod.org>
-Message-ID: <1474022367-21029-4-git-send-email-clg@kaod.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 16 Sep 2016 12:44:43 +0200
+Subject: [PATCH v7 07/11] ARM: dts: alt: Enable UHS-I SDR-50 and SDR-104
+In-Reply-To: <20160916102710.GJ1411@katana>
+References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
+ <1473764228-24768-8-git-send-email-horms+renesas@verge.net.au>
+ <20160916102710.GJ1411@katana>
+Message-ID: <20160916104443.GA7566@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: C?dric Le Goater <clg@kaod.org>
+On Fri, Sep 16, 2016 at 12:27:10PM +0200, Wolfram Sang wrote:
+> On Tue, Sep 13, 2016 at 12:57:04PM +0200, Simon Horman wrote:
+> > Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,1}.
+> > And the sd-uhs-sdr104 property to SDHI0.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> If you drop sdr104 here for now as well:
+> 
+> Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+
+Thanks, done.
+
+The result is as follows:
+
+From: Simon Horman <horms+renesas@verge.net.au>
+Date: Tue, 13 Sep 2016 12:57:04 +0200
+Subject: [PATCH] ARM: dts: alt: enable UHS for SDHI 0 & 1
+
+Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,1}.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Changes since v1:
+ arch/arm/boot/dts/r8a7794-alt.dts | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
- - added the soc name ast2400 in the compatible cell 
-
- arch/arm/boot/dts/aspeed-g4.dtsi | 6 ++++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 6 ++++++
- 2 files changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 22dee5937d5c..7bb00b6f13d8 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -82,6 +82,12 @@
- 				clocks = <&clk_apb>;
- 			};
- 
-+			ibt: ibt at 1e789140 {
-+				compatible = "aspeed,ast2400-bt-bmc";
-+				reg = <0x1e789140 0x18>;
-+				interrupts = <8>;
-+			};
+diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+index 8d1b35afaf82..325d3f972c57 100644
+--- a/arch/arm/boot/dts/r8a7794-alt.dts
++++ b/arch/arm/boot/dts/r8a7794-alt.dts
+@@ -207,11 +207,25 @@
+ 	sdhi0_pins: sd0 {
+ 		groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		function = "sdhi0";
++		power-source = <3300>;
++	};
 +
- 			wdt1: wdt at 1e785000 {
- 				compatible = "aspeed,wdt";
- 				reg = <0x1e785000 0x1c>;
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index dd94d9361fda..1d8f81b548b3 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -86,6 +86,12 @@
- 				clocks = <&clk_apb>;
- 			};
++	sdhi0_pins_uhs: sd0_uhs {
++		groups = "sdhi0_data4", "sdhi0_ctrl";
++		function = "sdhi0";
++		power-source = <1800>;
+ 	};
  
-+			ibt: ibt at 1e789140 {
-+				compatible = "aspeed,ast2400-bt-bmc";
-+				reg = <0x1e789140 0x18>;
-+				interrupts = <8>;
-+			};
+ 	sdhi1_pins: sd1 {
+ 		groups = "sdhi1_data4", "sdhi1_ctrl";
+ 		function = "sdhi1";
++		power-source = <3300>;
++	};
 +
- 			wdt1: wdt at 1e785000 {
- 				compatible = "aspeed,wdt";
- 				reg = <0x1e785000 0x1c>;
++	sdhi1_pins_uhs: sd1_uhs {
++		groups = "sdhi1_data4", "sdhi1_ctrl";
++		function = "sdhi1";
++		power-source = <1800>;
+ 	};
+ };
+ 
+@@ -255,23 +269,27 @@
+ 
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
+-	pinctrl-names = "default";
++	pinctrl-1 = <&sdhi0_pins_uhs>;
++	pinctrl-names = "default", "state_uhs";
+ 
+ 	vmmc-supply = <&vcc_sdhi0>;
+ 	vqmmc-supply = <&vccq_sdhi0>;
+ 	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
+ 	wp-gpios = <&gpio6 7 GPIO_ACTIVE_LOW>;
++	sd-uhs-sdr50;
+ 	status = "okay";
+ };
+ 
+ &sdhi1 {
+ 	pinctrl-0 = <&sdhi1_pins>;
+-	pinctrl-names = "default";
++	pinctrl-1 = <&sdhi1_pins_uhs>;
++	pinctrl-names = "default", "state_uhs";
+ 
+ 	vmmc-supply = <&vcc_sdhi1>;
+ 	vqmmc-supply = <&vccq_sdhi1>;
+ 	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
+ 	wp-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
++	sd-uhs-sdr50;
+ 	status = "okay";
+ };
+ 
 -- 
-2.7.4
+2.7.0.rc3.207.g0ac5344
