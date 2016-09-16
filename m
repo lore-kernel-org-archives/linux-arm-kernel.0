@@ -1,391 +1,123 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 16 Sep 2016 12:21:02 +0900
-Subject: [PATCH v26 2/7] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <57D9925D.5000508@arm.com>
-References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
- <20160907042908.6232-3-takahiro.akashi@linaro.org>
- <57D9925D.5000508@arm.com>
-Message-ID: <20160915114815.GK16712@linaro.org>
+Date: Fri, 16 Sep 2016 13:32:19 +0900
+Subject: [RESEND PATCH] arm64: kgdb: fix single stepping
+In-Reply-To: <0ea7dfad-e25d-2919-2d03-17b850d7ba91@windriver.com>
+References: <1429578793-3971-1-git-send-email-takahiro.akashi@linaro.org>
+ <0ea7dfad-e25d-2919-2d03-17b850d7ba91@windriver.com>
+Message-ID: <20160916043218.GA30248@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
+Hi Jason,
 
-Thank you for your review.
+Welcome back to mainline development.
+I've been looking forward to your comments.
 
-On Wed, Sep 14, 2016 at 07:09:33PM +0100, James Morse wrote:
-> Hi Akashi,
+On Thu, Sep 15, 2016 at 08:04:57AM -0500, Jason Wessel wrote:
+> On 04/20/2015 08:13 PM, AKASHI Takahiro wrote:
+> >Jason,
+> >
+> >Could you please review my patch below?
+> >See also arm64 maintainer's comment:
+> >http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/313712.html
+> >
+> >Thanks,
+> >-Takahiro AKASHI
+> >
+> >I tried to verify kgdb in vanilla kernel on fast model, but it seems that
+> >the single stepping with kgdb doesn't work correctly since its first
+> >appearance at v3.15.
+> >
+> >On v3.15, 'stepi' command after breaking the kernel at some breakpoint
+> >steps forward to the next instruction, but the succeeding 'stepi' never
+> >goes beyond that.
+> >On v3.16, 'stepi' moves forward and stops at the next instruction just
+> >after enable_dbg in el1_dbg, and never goes beyond that. This variance of
+> >behavior seems to come in with the following patch in v3.16:
+> >
+> >    commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
+> >    paths where possible")
+> >
+> >This patch
+> >(1) moves kgdb_disable_single_step() from 'c' command handling to single
+> >    step handler.
+> >    This makes sure that single stepping gets effective at every 's' command.
+> >    Please note that, under the current implementation, single step bit in
+> >    spsr, which is cleared by the first single stepping, will not be set
+> >    again for the consecutive 's' commands because single step bit in mdscr
+> >    is still kept on (that is, kernel_active_single_step() in
+> >    kgdb_arch_handle_exception() is true).
+> >(2) re-implements kgdb_roundup_cpus() because the current implementation
+> >    enabled interrupts naively. See below.
+> >(3) removes 'enable_dbg' in el1_dbg.
+> >    Single step bit in mdscr is turned on in do_handle_exception()->
+> >    kgdb_handle_expection() before returning to debugged context, and if
+> >    debug exception is enabled in el1_dbg, we will see unexpected single-
+> >    stepping in el1_dbg.
+> >    Since v3.18, the following patch does the same:
+> >      commit 1059c6bf8534 ("arm64: debug: don't re-enable debug exceptions
+> >      on return from el1_dbg)
+> >(4) masks interrupts while single-stepping one instruction.
+> >    If an interrupt is caught during processing a single-stepping, debug
+> >    exception is unintentionally enabled by el1_irq's 'enable_dbg' before
+> >    returning to debugged context.
+> >    Thus, like in (2), we will see unexpected single-stepping in el1_irq.
+> >
+> >Basically (1) and (2) are for v3.15, (3) and (4) for v3.1[67].
+> >
+> >@@ -176,18 +183,14 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
+> > 		 * over and over again.
+> > 		 */
+> > 		kgdb_arch_update_addr(linux_regs, remcom_in_buffer);
+> >-		atomic_set(&kgdb_cpu_doing_single_step, -1);
+> >-		kgdb_single_step =  0;
 > 
-> (CC: Marc who knows how this irqchip wizardry works
->  Cover letter: https://www.spinics.net/lists/arm-kernel/msg529520.html )
 > 
-> On 07/09/16 05:29, AKASHI Takahiro wrote:
-> > Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
-> > and save registers' status in per-cpu ELF notes before starting crash
-> > dump kernel. See kernel_kexec().
-> > Even if not all secondary cpus have shut down, we do kdump anyway.
-> > 
-> > As we don't have to make non-boot(crashed) cpus offline (to preserve
-> > correct status of cpus at crash dump) before shutting down, this patch
-> > also adds a variant of smp_send_stop().
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/hardirq.h  |  2 +-
-> >  arch/arm64/include/asm/kexec.h    | 41 ++++++++++++++++++++++++-
-> >  arch/arm64/include/asm/smp.h      |  2 ++
-> >  arch/arm64/kernel/machine_kexec.c | 56 ++++++++++++++++++++++++++++++++--
-> >  arch/arm64/kernel/smp.c           | 63 +++++++++++++++++++++++++++++++++++++++
-> >  5 files changed, 159 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
-> > index 8740297..1473fc2 100644
-> > --- a/arch/arm64/include/asm/hardirq.h
-> > +++ b/arch/arm64/include/asm/hardirq.h
-> > @@ -20,7 +20,7 @@
-> >  #include <linux/threads.h>
-> >  #include <asm/irq.h>
-> >  
-> > -#define NR_IPI	6
-> > +#define NR_IPI	7
-> >  
-> >  typedef struct {
-> >  	unsigned int __softirq_pending;
-> > diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-> > index 04744dc..a908958 100644
-> > --- a/arch/arm64/include/asm/kexec.h
-> > +++ b/arch/arm64/include/asm/kexec.h
-> > @@ -40,7 +40,46 @@
-> >  static inline void crash_setup_regs(struct pt_regs *newregs,
-> >  				    struct pt_regs *oldregs)
-> >  {
-> > -	/* Empty routine needed to avoid build errors. */
-> > +	if (oldregs) {
-> > +		memcpy(newregs, oldregs, sizeof(*newregs));
-> > +	} else {
-> > +		u64 tmp1, tmp2;
-> > +
-> > +		__asm__ __volatile__ (
-> > +			"stp	 x0,   x1, [%2, #16 *  0]\n"
-> > +			"stp	 x2,   x3, [%2, #16 *  1]\n"
-> > +			"stp	 x4,   x5, [%2, #16 *  2]\n"
-> > +			"stp	 x6,   x7, [%2, #16 *  3]\n"
-> > +			"stp	 x8,   x9, [%2, #16 *  4]\n"
-> > +			"stp	x10,  x11, [%2, #16 *  5]\n"
-> > +			"stp	x12,  x13, [%2, #16 *  6]\n"
-> > +			"stp	x14,  x15, [%2, #16 *  7]\n"
-> > +			"stp	x16,  x17, [%2, #16 *  8]\n"
-> > +			"stp	x18,  x19, [%2, #16 *  9]\n"
-> > +			"stp	x20,  x21, [%2, #16 * 10]\n"
-> > +			"stp	x22,  x23, [%2, #16 * 11]\n"
-> > +			"stp	x24,  x25, [%2, #16 * 12]\n"
-> > +			"stp	x26,  x27, [%2, #16 * 13]\n"
-> > +			"stp	x28,  x29, [%2, #16 * 14]\n"
-> > +			"mov	 %0,  sp\n"
-> > +			"stp	x30,  %0,  [%2, #16 * 15]\n"
-> > +
-> > +			"/* faked current PSTATE */\n"
-> > +			"mrs	 %0, CurrentEL\n"
-> > +			"mrs	 %1, DAIF\n"
-> > +			"orr	 %0, %0, %1\n"
-> > +			"mrs	 %1, NZCV\n"
-> > +			"orr	 %0, %0, %1\n"
-> > +
-> 
-> What about SPSEL? While we don't use it, it is correctly preserved for
-> everything except a CPU that calls panic()...
+> This is a subtle change, but I assume it is what you intended?  All the CPUs will get released into the run state when exiting the kgdb exception handler.
 
-My comment above might be confusing, but what I want to fake
-here is "spsr" as pt_regs.pstate is normally set based on spsr_el1.
-So there is no corresponding field of SPSEL in spsr.
+You are talking about "- kgdb_single_step = 0." Right?
+Do you think that there is any (negative) side effect of this change?
+Since most of architectures, including x86, don't handle this variable
+explicitly, I didn't expect that it was essential.
 
 > 
-> > +			/* pc */
-> > +			"adr	 %1, 1f\n"
-> > +		"1:\n"
-> > +			"stp	 %1, %0,   [%2, #16 * 16]\n"
-> > +			: "=r" (tmp1), "=r" (tmp2), "+r" (newregs)
-> > +			:
-> > +			: "memory"
-> > +		);
-> > +	}
-> >  }
-> >  
-> >  #endif /* __ASSEMBLY__ */
-> > diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-> > index 0226447..6b0f2c7 100644
-> > --- a/arch/arm64/include/asm/smp.h
-> > +++ b/arch/arm64/include/asm/smp.h
-> > @@ -136,6 +136,8 @@ static inline void cpu_panic_kernel(void)
-> >   */
-> >  bool cpus_are_stuck_in_kernel(void);
-> >  
-> > +extern void smp_send_crash_stop(void);
-> > +
-> >  #endif /* ifndef __ASSEMBLY__ */
-> >  
-> >  #endif /* ifndef __ASM_SMP_H */
-> > diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> > index bc96c8a..8ac9dba8 100644
-> > --- a/arch/arm64/kernel/machine_kexec.c
-> > +++ b/arch/arm64/kernel/machine_kexec.c
-> > @@ -9,6 +9,9 @@
-> >   * published by the Free Software Foundation.
-> >   */
-> >  
-> > +#include <linux/interrupt.h>
-> > +#include <linux/irq.h>
-> > +#include <linux/kernel.h>
-> >  #include <linux/kexec.h>
-> >  #include <linux/smp.h>
-> >  
-> > @@ -22,6 +25,7 @@
-> >  extern const unsigned char arm64_relocate_new_kernel[];
-> >  extern const unsigned long arm64_relocate_new_kernel_size;
-> >  
-> > +bool in_crash_kexec;
+> >-
+> >-		/*
+> >-		 * Received continue command, disable single step
+> >-		 */
+> >-		if (kernel_active_single_step())
+> >-			kernel_disable_single_step();
+> >
 > 
-> static?
+> 
+> I see why this is not needed above any more given that you have a function that cleans up the state on entry to the kgdb exception handler.
 
-Yes, it can be.
+Yeah, the point here is that, on arm64, we need to set SS (Software step)
+bit in SPSR as well as MDSCR before returning from the exception handler
+in order to enable a hardware single step according to ARM ARM D2.12
+("Software Step exceptions").
+So it might be good enough just to call kernel_enable_single_step()
+at 's' command unconditionally instead of "if (!kernel_active_single_step)".
+(Please note that, as I mentioned in the commit message, SPSR.SS bit will
+be cleared while MDSCR.SS bit is kept on after a hardware single step.)
 
-> >  static unsigned long kimage_start;
-> >  
-> >  /**
-> > @@ -148,7 +152,8 @@ void machine_kexec(struct kimage *kimage)
-> >  	/*
-> >  	 * New cpus may have become stuck_in_kernel after we loaded the image.
-> >  	 */
-> > -	BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
-> > +	BUG_ON((cpus_are_stuck_in_kernel() || (num_online_cpus() > 1)) &&
-> > +			!WARN_ON(in_crash_kexec));
-> 
-> In the kdump case, num_online_cpus() is unchanged as ipi_cpu_crash_stop()
-> doesn't update the online cpu masks, so this WARN_ON always fires. This is
-> confusing as the 'failed to stop secondary CPUs' message doesn't appear, because
-> those CPUs did stop, and waiting_for_crash_ipi has the expected value...
+But anyhow, I believe that the hunk above is redundant in my implementation.
 
-Good catch! I've never noticed that the message was wrong.
-The line should be changed to:
-	BUG_ON((cpus_are_stuck_in_kernel() || (num_online_cpus() > 1)) &&
-			!in_crash_kexec);
+> The rest of the patch is fine.
 
-> >  
-> >  	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
-> >  	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
-> > @@ -200,13 +205,58 @@ void machine_kexec(struct kimage *kimage)
-> >  	 * relocation is complete.
-> >  	 */
-> >  
-> > -	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
-> > +	cpu_soft_restart(!in_crash_kexec, reboot_code_buffer_phys, kimage->head,
-> >  		kimage_start, 0);
-> >  
-> >  	BUG(); /* Should never get here. */
-> >  }
-> 
-> 
-> 
-> > +static void machine_kexec_mask_interrupts(void)
-> > +{
-> > +	unsigned int i;
-> > +	struct irq_desc *desc;
-> > +
-> > +	for_each_irq_desc(i, desc) {
-> > +		struct irq_chip *chip;
-> > +		int ret;
-> > +
-> > +		chip = irq_desc_get_chip(desc);
-> > +		if (!chip)
-> > +			continue;
-> > +
-> > +		/*
-> > +		 * First try to remove the active state. If this
-> > +		 * fails, try to EOI the interrupt.
-> > +		 */
-> > +		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
-> > +
-> > +		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
-> > +		    chip->irq_eoi)
-> > +			chip->irq_eoi(&desc->irq_data);
-> > +
-> > +		if (chip->irq_mask)
-> > +			chip->irq_mask(&desc->irq_data);
-> > +
-> > +		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
-> > +			chip->irq_disable(&desc->irq_data);
-> > +	}
-> > +}
-> 
-> This function is over my head ... I have no idea how this works, I can only
-> comment that its different to the version under arch/arm
-> 
-> /me adds Marc Z to CC.
+Thank you.
 
-This function was once borrowed from arch/arm, then dropped temporarily
-and revamped based on Marc's comment IIRC.
-So I would like to defer to Marc.
-
+> I added the patch to kgdb-next after fixing up the context since it no longer applied to the mainline ( https://git.kernel.org/cgit/linux/kernel/git/jwessel/kgdb.git/log/?h=kgdb-next).  If there is further discussion on the point above, another patch can be added, but it I am assuming this is the way you desire it to work as there are some other architectures that use the same behaviour.  I do not presently have any ARM64 hardware to validate this particular change.
 > 
-> > +/**
-> > + * machine_crash_shutdown - shutdown non-crashing cpus and save registers
-> > + */
-> >  void machine_crash_shutdown(struct pt_regs *regs)
-> >  {
-> > -	/* Empty routine needed to avoid build errors. */
-> > +	local_irq_disable();
-> > +
-> > +	in_crash_kexec = true;
-> > +
-> > +	/* shutdown non-crashing cpus */
-> > +	smp_send_crash_stop();
-> > +
-> > +	/* for crashing cpu */
-> > +	crash_save_cpu(regs, smp_processor_id());
-> > +	machine_kexec_mask_interrupts();
-> > +
-> > +	pr_info("Starting crashdump kernel...\n");
-> >  }
-> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> > index d93d433..b401b25 100644
-> > --- a/arch/arm64/kernel/smp.c
-> > +++ b/arch/arm64/kernel/smp.c
-> > @@ -37,6 +37,7 @@
-> >  #include <linux/completion.h>
-> >  #include <linux/of.h>
-> >  #include <linux/irq_work.h>
-> > +#include <linux/kexec.h>
-> >  
-> >  #include <asm/alternative.h>
-> >  #include <asm/atomic.h>
-> > @@ -71,6 +72,7 @@ enum ipi_msg_type {
-> >  	IPI_RESCHEDULE,
-> >  	IPI_CALL_FUNC,
-> >  	IPI_CPU_STOP,
-> > +	IPI_CPU_CRASH_STOP,
-> >  	IPI_TIMER,
-> >  	IPI_IRQ_WORK,
-> >  	IPI_WAKEUP
-> > @@ -734,6 +736,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
-> >  	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
-> >  	S(IPI_CALL_FUNC, "Function call interrupts"),
-> >  	S(IPI_CPU_STOP, "CPU stop interrupts"),
-> > +	S(IPI_CPU_CRASH_STOP, "CPU stop (for crash dump) interrupts"),
-> >  	S(IPI_TIMER, "Timer broadcast interrupts"),
-> >  	S(IPI_IRQ_WORK, "IRQ work interrupts"),
-> >  	S(IPI_WAKEUP, "CPU wake-up interrupts"),
-> > @@ -808,6 +811,29 @@ static void ipi_cpu_stop(unsigned int cpu)
-> >  		cpu_relax();
-> >  }
-> >  
-> > +#ifdef CONFIG_KEXEC_CORE
-> > +static atomic_t waiting_for_crash_ipi;
-> > +#endif
-> > +
-> > +static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
-> > +{
-> > +#ifdef CONFIG_KEXEC_CORE
-> > +	crash_save_cpu(regs, cpu);
-> > +
-> > +	atomic_dec(&waiting_for_crash_ipi);
-> > +
-> > +	local_irq_disable();
-> > +
-> > +#ifdef CONFIG_HOTPLUG_CPU
-> > +	if (cpu_ops[cpu]->cpu_die)
-> > +		cpu_ops[cpu]->cpu_die(cpu);
-> > +#endif
-> > +
-> > +	/* just in case */
-> > +	cpu_park_loop();
-> > +#endif
-> > +}
-> > +
-> >  /*
-> >   * Main handler for inter-processor interrupts
-> >   */
-> > @@ -838,6 +864,15 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
-> >  		irq_exit();
-> >  		break;
-> >  
-> > +	case IPI_CPU_CRASH_STOP:
-> > +		if (IS_ENABLED(CONFIG_KEXEC_CORE)) {
-> > +			irq_enter();
-> > +			ipi_cpu_crash_stop(cpu, regs);
-> > +
-> > +			unreachable();
-> > +		}
-> > +		break;
-> > +
-> >  #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
-> >  	case IPI_TIMER:
-> >  		irq_enter();
-> > @@ -910,6 +945,34 @@ void smp_send_stop(void)
-> >  			   cpumask_pr_args(cpu_online_mask));
-> >  }
-> >  
-> > +#ifdef CONFIG_KEXEC_CORE
-> > +void smp_send_crash_stop(void)
-> > +{
-> > +	cpumask_t mask;
-> > +	unsigned long timeout;
-> > +
-> > +	if (num_online_cpus() == 1)
-> > +		return;
-> > +
-> > +	cpumask_copy(&mask, cpu_online_mask);
-> > +	cpumask_clear_cpu(smp_processor_id(), &mask);
-> > +
-> > +	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-> > +
-> > +	pr_crit("SMP: stopping secondary CPUs\n");
-> > +	smp_cross_call(&mask, IPI_CPU_CRASH_STOP);
-> > +
-> > +	/* Wait up to one second for other CPUs to stop */
-> > +	timeout = USEC_PER_SEC;
-> > +	while ((atomic_read(&waiting_for_crash_ipi) > 0) && timeout--)
-> > +		udelay(1);
-> > +
-> > +	if (atomic_read(&waiting_for_crash_ipi) > 0)
-> > +		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
-> > +			   cpumask_pr_args(cpu_online_mask));
-> > +}
-> > +#endif
-> 
-> This is very similar to smp_send_stop() which also has the timeout. Is it
-> possible to merge them? You could use in_crash_kexec to choose the IPI type.
+> I also added to the patch a "Cc: linux-stable <stable@vger.kernel.org>" so we can have this appear on some of the older kernels.
 
-Yeah, we could merge them along with ipi_cpu_(crash_)stop().
-But the resulting code would be quite noisy if each line
-is switched by "if (in_crash_kexec)."
-Otherwise, we may have one big "if" like:
-void smp_send_stop(void)
-{
-    if (in_crash_kexec)
-        ...
-    else
-        ...
-}
-It seems to me that it is not much different from the current code.
-What do you think?
+Since Will asked me to split this patch into a few, I need some reworks
+to clarify which hunks in the patch are necessary for which version of kernel.
 
+Thanks,
 -Takahiro AKASHI
 
-
-> 
-> > +
-> >  /*
-> >   * not supported here
-> >   */
-> > 
-> 
-> 
-> Reviewed-by: James Morse <james.morse@arm.com>
-> 
 > 
 > Thanks,
-> 
-> James
-> 
-> 
+> Jason.
 > 
