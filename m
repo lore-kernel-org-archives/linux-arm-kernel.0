@@ -1,53 +1,68 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Sep 2016 16:06:32 -0400
-Subject: [PATCH V2 3/5] PCI: save and restore bus on parent bus reset
+Date: Fri, 16 Sep 2016 16:06:33 -0400
+Subject: [PATCH V2 4/5] PCI: add CRS support to error handling path
 In-Reply-To: <1474056395-21843-1-git-send-email-okaya@codeaurora.org>
 References: <1474056395-21843-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1474056395-21843-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1474056395-21843-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device states on the bus are saved and restored for all bus resets except
-the one initiated through pci_dev_reset. Filling the hole.
+The PCIE spec allows an endpoint device to extend the initialization time
+beyond 1 second by issuing Configuration Request Retry Status (CRS) for a
+vendor ID read request.
+
+This basically means "I'm busy now, please call me back later".
+
+There are two moving parts to CRS support from the SW perspective. One part
+is to determine if CRS is supported or not. The second part is to set the
+CRS visibility register.
+
+As part of the probe, the Linux kernel sets the above two conditions in
+pci_enable_crs function. The kernel is also honoring the returned CRS in
+pci_bus_read_dev_vendor_id function if supported. The function will poll up
+to specified amount of time while endpoint is returning CRS response.
+
+The PCIe spec also allows CRS to be issued during cold, warm, hot and FLR
+resets.
+
+The hot reset is initiated by starting a secondary bus reset. This patch is
+adding vendor ID read immediately after a bus reset so that the
+initialization procedure can be extended by the amount of time endpoint
+requires.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pci.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/pci/pci.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index aab9d51..8aecab1 100644
+index 8aecab1..e913467 100644
 --- a/drivers/pci/pci.c
 +++ b/drivers/pci/pci.c
-@@ -51,6 +51,10 @@ static void pci_pme_list_scan(struct work_struct *work);
- static LIST_HEAD(pci_pme_list);
- static DEFINE_MUTEX(pci_pme_list_mutex);
- static DECLARE_DELAYED_WORK(pci_pme_work, pci_pme_list_scan);
-+static void pci_dev_lock(struct pci_dev *dev);
-+static void pci_dev_unlock(struct pci_dev *dev);
-+static void pci_bus_save_and_disable(struct pci_bus *bus);
-+static void pci_bus_restore(struct pci_bus *bus);
- 
- struct pci_pme_device {
- 	struct list_head list;
-@@ -3888,8 +3892,18 @@ static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
- 	if (probe)
- 		return 0;
- 
-+	if (!probe) {
-+		pci_dev_unlock(dev);
-+		pci_bus_save_and_disable(dev->bus);
-+	}
-+
- 	pci_reset_bridge_secondary_bus(dev->bus->self);
- 
-+	if (!probe) {
-+		pci_bus_restore(dev->bus);
-+		pci_dev_lock(dev);
-+	}
-+
+@@ -3833,6 +3833,16 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
  	return 0;
  }
+ 
++static int pci_dev_probe_crs(struct pci_dev *dev, void *data)
++{
++	u32 l;
++
++	pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l,
++				   60 * 1000);
++
++	return 0;
++}
++
+ void pci_reset_secondary_bus(struct pci_dev *dev)
+ {
+ 	u16 ctrl;
+@@ -3874,6 +3884,7 @@ void __weak pcibios_reset_secondary_bus(struct pci_dev *dev)
+ void pci_reset_bridge_secondary_bus(struct pci_dev *dev)
+ {
+ 	pcibios_reset_secondary_bus(dev);
++	pci_walk_bus(dev->subordinate, pci_dev_probe_crs, NULL);
+ }
+ EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
  
 -- 
 1.9.1
