@@ -1,62 +1,65 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 16 Sep 2016 21:36:42 +0200
-Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
-In-Reply-To: <20160916134619.jjiaplhxgkkl5qri@kamzik.localdomain>
-References: <1474007187-18673-1-git-send-email-agraf@suse.de>
- <57DBC782.7080305@arm.com> <7beb406b-6194-8451-2d92-9a4394ef91dd@redhat.com>
- <20160916123039.GB14140@cbox>
- <da8191ca-6fb1-f960-872c-d6bc27172db8@redhat.com>
- <20160916133027.GA27036@cbox>
- <20160916134619.jjiaplhxgkkl5qri@kamzik.localdomain>
-Message-ID: <B88B95A5-3631-4AEF-80DC-7762C415A811@suse.de>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 16 Sep 2016 14:41:01 -0500
+Subject: [PATCH v6 1/2] sdhci-of-arasan: Add device tree parameter
+ xlnx-fails-without-test-cd bit
+In-Reply-To: <1473363766-12652-1-git-send-email-zach.brown@ni.com>
+References: <1473363766-12652-1-git-send-email-zach.brown@ni.com>
+Message-ID: <20160916194101.GA3161@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> Am 16.09.2016 um 15:46 schrieb Andrew Jones <drjones@redhat.com>:
+On Thu, Sep 08, 2016 at 02:42:45PM -0500, Zach Brown wrote:
+> The sdhci controller on xilinx zynq devices will not function unless
+> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+> In cases where it is impossible to provide the CD bit in hardware,
+> setting the controller to test mode and then setting inserted to true
+> will get the controller to function without the CD bit.
 > 
->> On Fri, Sep 16, 2016 at 03:30:27PM +0200, Christoffer Dall wrote:
->>> On Fri, Sep 16, 2016 at 02:31:42PM +0200, Paolo Bonzini wrote:
->>> 
->>> 
->>> On 16/09/2016 14:30, Christoffer Dall wrote:
->>>>>>> This patch set allows user space to receive vtimer events as well as mask
->>>>>>> them, so that we can handle all vtimer related interrupt injection from user
->>>>>>> space, enabling us to use architected timer with user space gic emulation.
->>>>>> 
->>>>>> I have already voiced my concerns in the past, including face to face,
->>>>>> and I'm going to repeat it: I not keen at all on adding a new userspace
->>>>>> interface that is going to bitrot extremely quickly.
->>>>> 
->>>>> You don't have automated tests set up?  It's not going to bitrot if you
->>>>> test it, either with kvm-unit-tests or just by smoke-testing Linux.
->>>>> It's _for_ the raspi, but it's not limited to it.
->>>> 
->>>> Our automated testing situation is not great, no.  Something we're
->>>> looking at, but have resource problems with.
->>> 
->>> But it's not a good reason to hold back a feature...
->> 
->> I didn't say that exactly, but choosing not to merge something we cannot
->> maintain and which we're not paid to look after and where there's a
->> minimal interest, is not entirely unreasonable.
->> 
->> That being said, I'm not categorically against these patches, but I
->> share Marc's view that we've already seen that non-vgic support had been
->> broken for multiple versions without anyone complaining, and without
->> automated testing or substantial interest in the work, the patches
->> really are likely to bit-rot.
->> 
->> But I haven't even looked at the patches in detail, I was just replying
->> to the comment about testing.
+> The device property "xlnx-fails-without-test-cd" will let the arasan
+> driver know the controller does not have the CD line wired and that the
+> controller does not function without it.
 > 
-> This may be a great time to start encouraging feature writers to submit
-> kvm-unit-tests patches at the same time as the feature (Hi Alex :-)
+> Signed-off-by: Zach Brown <zach.brown@ni.com>
+> ---
+> v2:
+>  * improved commit messages
+>  * removed fake-cd device property
+>  * removed fake-cd quirk
+>  * use broken-cd device property
+>  * documented new usage of broken-cd
+> v3:
+>  * removed new usage of broken-cd
+>  * created fails-without-test-cd device property
+>  * created arasan controller specific quirk
+> v4:
+>  * changed fails-without-test-cd to xlnx-fails-without-test-cd
+>  * removed extra blank line
+> v5:
+>  * Fixed style mistake
+>  * Changed (1 << 0 ) to BIT(0)
+> v6:
+>  * Fixed style mistakes
+>  * Condensed unnecessarily long variable names
+>  * Removed line wraps that were no longer necessary.
+>  * Rebased changes off Ulf's mmc tree's next branch.
+> 
+> 
+>  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> df --gt /Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> index 3404afa..e71f043 100644
+> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> @@ -21,6 +21,10 @@ Required Properties:
+>    - interrupts: Interrupt specifier
+>    - interrupt-parent: Phandle for the interrupt controller that services
+>  		      interrupts for this device.
+> +Optional Properties:
+> +- xlnx-fails-without-test-cd: when present, the controller doesn't work when
 
-I actually started off implementing this with the help of kvm-unit-tests. It's awesome!
+xlnx,fails...
 
-I'm lacking actual irq support to make the test reasonable though and wanted to get the kernel bits out first :). But I'll sit down on that again soon I hope.
+With that,
 
-
-Alex
+Acked-by: Rob Herring <robh@kernel.org>
