@@ -1,31 +1,33 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 16 Sep 2016 11:33:19 +0300
-Subject: [PATCH 4/9] dmaengine: edma: enable COMPILE_TEST
-In-Reply-To: <20160916083324.29133-1-peter.ujfalusi@ti.com>
-References: <20160916083324.29133-1-peter.ujfalusi@ti.com>
-Message-ID: <20160916083324.29133-5-peter.ujfalusi@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 16 Sep 2016 10:33:45 +0200
+Subject: [PATCH] ARM: dts: exynos: Remove "simple-bus" compatible from fimc-is
+ node
+Message-ID: <1474014825-28969-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To get more coverage, enable COMPILE_TEST for this driver.
+The "simple-bus" compatible was originally added for fimc-is only
+to ensure the child devices instantiation.  The child devices are
+now being created by the parent device driver so remove the
+"simple-bus" compatible.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- drivers/dma/Kconfig | 2 +-
+ arch/arm/boot/dts/exynos4x12.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index fe2dbb811e19..4348249b943a 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -515,7 +515,7 @@ config TI_DMA_CROSSBAR
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index c452499..e8d0678 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -147,7 +147,7 @@
+ 		};
  
- config TI_EDMA
- 	bool "TI EDMA support"
--	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE
-+	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE || COMPILE_TEST
- 	select DMA_ENGINE
- 	select DMA_VIRTUAL_CHANNELS
- 	select TI_DMA_CROSSBAR if ARCH_OMAP
+ 		fimc_is: fimc-is at 12000000 {
+-			compatible = "samsung,exynos4212-fimc-is", "simple-bus";
++			compatible = "samsung,exynos4212-fimc-is";
+ 			reg = <0x12000000 0x260000>;
+ 			interrupts = <0 90 0>, <0 95 0>;
+ 			power-domains = <&pd_isp>;
 -- 
-2.10.0
+1.9.1
