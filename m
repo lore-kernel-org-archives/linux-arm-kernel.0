@@ -1,47 +1,59 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 16 Sep 2016 10:25:37 +0200
-Subject: [PATCH v2 2/2] ARM: exynos_defconfig: Remove old non-working MIPI
- driver
-In-Reply-To: <2b3688bb-8dcb-24d4-8112-a0cc56573e48@ti.com>
-References: <1472730589-18683-1-git-send-email-k.kozlowski@samsung.com>
- <1472730589-18683-2-git-send-email-k.kozlowski@samsung.com>
- <2b3688bb-8dcb-24d4-8112-a0cc56573e48@ti.com>
- <CGME20160916082538eucas1p159a895a88dcfd33ef45a62ef66508fae@eucas1p1.samsung.com>
-Message-ID: <7a214673-b40c-d901-a0cf-133b28521b86@samsung.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 16 Sep 2016 10:30:53 +0200
+Subject: v4.8-rc: GSM audio causes trouble
+In-Reply-To: <20160915205142.GA6747@amd>
+References: <20160915121755.GA5264@amd>
+ <20160915205142.GA6747@amd>
+Message-ID: <20160916083053.GA9252@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/2016 10:14 AM, Tomi Valkeinen wrote:
-> On 01/09/16 14:49, Krzysztof Kozlowski wrote:
->> The Exynos MIPI driver does not work anymore (it is board file only) so
->> it is removed.  Remove also config option.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> ---
->>
->> Changes since v1:
->> 1. New patch.
->> ---
->>  arch/arm/configs/exynos_defconfig | 1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
->> index 4e484f406419..fea8edef1534 100644
->> --- a/arch/arm/configs/exynos_defconfig
->> +++ b/arch/arm/configs/exynos_defconfig
->> @@ -168,7 +168,6 @@ CONFIG_DRM_PANEL_SAMSUNG_LD9040=y
->>  CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
->>  CONFIG_DRM_NXP_PTN3460=y
->>  CONFIG_DRM_PARADE_PS8622=y
->> -CONFIG_EXYNOS_VIDEO=y
->>  CONFIG_EXYNOS_MIPI_DSI=y
+On Thu 2016-09-15 22:51:42, Pavel Machek wrote:
+> Hi!
 > 
-> EXYNOS_MIPI_DSI too?
+> > I was trying to improve GSM call quality, and hit problems in
+> > v4.8-rc. Sound only worked for a while, then I tried to kill
+> > cmtspeech_ofono_test, and could not, not even with -9 and could not
+> > even reboot.
+> > 
+> > I went back to v4.1 (ok, quite far, I see), and problems are gone.
+> > 
+> > Does it work for you? Any ideas what to try... besides bisect?
+> 
+> v4.7 is okay.
+> 
+> v4.8 with
+> 
+> git diff ..mini-v4.7 drivers/hsi/ | git apply
 
-Yes, this one too. I'll send a v2. I think these patches can safely go
-through different trees (removal of driver through your tree and
-defconfig through arm-soc).
+I believe I tried just reverting
+9c99e5e51988798af2a687ef9b1716dd79388550 before, but that did not
+help.
+
+I guess I'll try with these reverted, next:
+
+pavel at amd:/data/l/linux-n900$ git show
+9c99e5e51988798af2a687ef9b1716dd79388550 | git apply -R
+pavel at amd:/data/l/linux-n900$ git show
+ad60db2f9fe3367e60a21fc0afe19999516f8b27 | git apply -R
+pavel at amd:/data/l/linux-n900$ git show
+4e552310cdf0c81210b5fc9173f7cf497eeb9feb | git apply -R
+pavel at amd:/data/l/linux-n900$ git show
+604fdfa45886f04ad6070c1b8266c7f4154bc497 | git apply -R
+pavel at amd:/data/l/linux-n900$ git show
+d2b8d695c61c4d2864eee900bebc2ced4f425645 | git apply -R
+pavel at amd:/data/l/linux-n900$ git show
+fa1572d956ee072e965da01d2c46f10d2b67d017 | git apply -R
+pavel at amd:/data/l/linux-n900$ git show
+62aa292b3eae920a80c2fd0ed0601a70328627f6 | git apply -R
+pavel at amd:/data/l/linux-n900$
+
+...seems to be broken already. I guess its time to
+bisect... hmm. Tried bisecting, but soundcard does not work
+there. Will do it manually...
 
 Best regards,
-Krzysztof
+							Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
