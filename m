@@ -1,54 +1,40 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 16 Sep 2016 09:36:21 +0800
-Subject: [PATCH v5 3/3] clk: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <CAOMZO5DkMaRFwzH7HY872pLUdDrZfMq0xqLG+Xv88ut3Jd5Saw@mail.gmail.com>
-References: <1468235521-3163-1-git-send-email-p.zabel@pengutronix.de>
- <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
- <5787C558.5060904@gmail.com> <2499789.N9zTF3cNAV@diplodocus>
- <CAOMZO5CPM9YfVqfpuyLmhGn9jC7p73Ocnc7LxE9=xA9ouawNQQ@mail.gmail.com>
- <CACrMeVA8CdL-Fqa4NwmBUPvzBXsi=o8bpB_tY2-Z0-xCoMX3xA@mail.gmail.com>
- <CAOMZO5DkMaRFwzH7HY872pLUdDrZfMq0xqLG+Xv88ut3Jd5Saw@mail.gmail.com>
-Message-ID: <20160916013621.GB7398@tiger>
+Date: Fri, 16 Sep 2016 09:47:03 +0800
+Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.9
+In-Reply-To: <2241121.MvRjeYAnGC@wuerfel>
+References: <1473670948-4265-1-git-send-email-shawnguo@kernel.org>
+ <1473670948-4265-4-git-send-email-shawnguo@kernel.org>
+ <2241121.MvRjeYAnGC@wuerfel>
+Message-ID: <20160916014703.GC7398@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 12:15:40PM -0300, Fabio Estevam wrote:
-> Hi Akshay and Charles,
+On Wed, Sep 14, 2016 at 05:30:49PM +0200, Arnd Bergmann wrote:
+> On Monday, September 12, 2016 5:02:27 PM CEST Shawn Guo wrote:
+> > i.MX arm64 device tree changes for 4.9:
+> >  - Add property dma-coherent for ls2080a PCI device to save software
+> >    cache maintenance.
+> >  - Update serial aliases and use stdout-path to sepecify console for
+> >    ls2080a and ls1043a boards.
+> >  - Add DDR memory controller device node for ls2080a and ls1043a SoCs.
+> > 
 > 
-> On Mon, Sep 12, 2016 at 12:09 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
+> Pulled into next/dt64, thanks!
 > 
-> > Hi Fabio, Shawn,
-> >
-> > Advantech tested the v5 patch series on imx6q-b450v3 board (with 4.7
-> > kernel) and confirmed the patch fixes the lvds blank display issue
-> > being seen on some imx6q-b450v3 boards.
-> >
-> > Details below:
-> > With the patch applied:
-> > Board # 1: 100 times power on/off, no LVDS display failure
-> > Board # 2: 100 times power on/off, no LVDS display failure
-> >
-> > Without the patch:
-> > Board # 1: LVDS display failure (blank display output) at 4th time power on/off.
-> > Board # 2: LVDS display failure (blank display output) at 3rd time power on/off.
-> >
-> > Tested-by: Charles Kang <Charles.Kang@advantech.com.tw>
-> 
-> Thanks for testing it.
-> 
-> > Since the patch has been reviewed and confirmed to fix display
-> > failures on 2 different boards (imx6q-evi and imx6q-b450v3), can it be
-> > applied?
-> 
-> Yes, I think this series is in a good shape now.
-> 
-> Shawn,
-> 
-> Are you happy with it?
+> The "dma-coherent" change sounds like a bugfix, should that be backported
+> to stable kernels? Usually if you lack that property on a device that
+> is actually coherent, you can get silent data corruption by treating it as
+> non-coherent.
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+My impression is that those cache maintenance enforced for non-coherent
+device will hurt performance on coherent device.  I don't know it will
+cause data corruption.
 
-Please send it to clk maintainers for applying.
+@Liu Gang,
+
+Did you experience any functional issue with PCI device before adding
+"dma-coherent" property?  If not, can you please do more testing to
+confirm this is only about performance?  Otherwise, you should follow
+Arnd's suggestion to send the change for stable kernel.
 
 Shawn
