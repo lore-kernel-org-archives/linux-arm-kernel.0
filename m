@@ -1,32 +1,89 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Sep 2016 14:31:53 +0100
-Subject: [PATCH v7 0/5] mfd: tps65218: Clean ups
-In-Reply-To: <ab94aff0-8470-57e5-2039-12f09bb0ca33@ti.com>
-References: <1470833641-29546-1-git-send-email-j-keerthy@ti.com>
- <ab94aff0-8470-57e5-2039-12f09bb0ca33@ti.com>
-Message-ID: <20160916133153.GB27974@sirena.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 16 Sep 2016 16:33:35 +0300
+Subject: [PATCH RFC 4/8] ARM: shmobile: r8a7743: basic SoC support
+In-Reply-To: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
+References: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
+Message-ID: <7093322.WFIWVqz40g@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 05:12:38PM +0530, Keerthy wrote:
+Add minimal support for the RZ/G1M (R8A7743) SoC.
 
-> Should i repost this series? I do not see this series in linux-next yet.
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
 
-Please don't send content free pings and please allow a reasonable time
-for review.  People get busy, go on holiday, attend conferences and so 
-on so unless there is some reason for urgency (like critical bug fixes)
-please allow at least a couple of weeks for review.  If there have been
-review comments then people may be waiting for those to be addressed.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Sending content free pings adds to the mail volume (if they are seen at
-all) which is often the problem and since they can't be reviewed
-directly if something has gone wrong you'll have to resend the patches
-anyway, though there are some other maintainers who like them - if in
-doubt look at how patches for the subsystem are normally handled.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160916/aff69cd5/attachment.sig>
+---
+ arch/arm/mach-shmobile/Kconfig         |    5 ++++
+ arch/arm/mach-shmobile/Makefile        |    1 
+ arch/arm/mach-shmobile/setup-r8a7743.c |   34 +++++++++++++++++++++++++++++++++
+ 3 files changed, 40 insertions(+)
+
+Index: renesas/arch/arm/mach-shmobile/Kconfig
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/Kconfig
++++ renesas/arch/arm/mach-shmobile/Kconfig
+@@ -68,6 +68,11 @@ config ARCH_R8A7740
+ 	select ARCH_RMOBILE
+ 	select RENESAS_INTC_IRQPIN
+ 
++config ARCH_R8A7743
++	bool "RZ/G1M (R8A77430)"
++	select ARCH_RCAR_GEN2
++	select I2C
++
+ config ARCH_R8A7778
+ 	bool "R-Car M1A (R8A77781)"
+ 	select ARCH_RCAR_GEN1
+Index: renesas/arch/arm/mach-shmobile/Makefile
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/Makefile
++++ renesas/arch/arm/mach-shmobile/Makefile
+@@ -9,6 +9,7 @@ obj-y				:= timer.o
+ obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o
+ obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o
+ obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o
++obj-$(CONFIG_ARCH_R8A7743)	+= setup-r8a7743.o
+ obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o pm-r8a7779.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
+Index: renesas/arch/arm/mach-shmobile/setup-r8a7743.c
+===================================================================
+--- /dev/null
++++ renesas/arch/arm/mach-shmobile/setup-r8a7743.c
+@@ -0,0 +1,34 @@
++/*
++ * r8a7743 processor support
++ *
++ * Copyright (C) 2016 Cogent Embedded, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation; of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++
++#include <asm/mach/arch.h>
++
++#include "common.h"
++#include "rcar-gen2.h"
++
++static const char * const r8a7743_boards_compat_dt[] __initconst = {
++	"renesas,r8a7743",
++	NULL,
++};
++
++DT_MACHINE_START(R8A7743_DT, "Generic R8A7743 (Flattened Device Tree)")
++	.init_early	= shmobile_init_delay,
++	.init_time	= rcar_gen2_timer_init,
++	.init_late	= shmobile_init_late,
++	.reserve	= rcar_gen2_reserve,
++	.dt_compat	= r8a7743_boards_compat_dt,
++MACHINE_END
