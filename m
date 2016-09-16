@@ -1,119 +1,84 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Fri, 16 Sep 2016 13:38:35 +0000
-Subject: [PATCH v1 1/3] ARM: dts: imx6qdl-apalis: Do not rely on DDC I2C
- bus bitbang for HDMI
-In-Reply-To: <9d2c17aa2e00e6ff4349a53de8247860d2382607.1473833908.git.maitysanchayan@gmail.com>
-References: <9d2c17aa2e00e6ff4349a53de8247860d2382607.1473833908.git.maitysanchayan@gmail.com>
-Message-ID: <1474033114.3103.25.camel@toradex.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 16 Sep 2016 16:38:38 +0300
+Subject: [PATCH RFC 8/8] ARM: dts: sk-rzg1m: initial device tree
+In-Reply-To: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
+References: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
+Message-ID: <2097453.1xPZsJcFmC@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-09-14 at 12:05 +0530, Sanchayan Maity wrote:
-> Remove the use of DDC I2C bus bitbang to support reading of EDID
-> and rely on support from internal HDMI I2C master controller instead.
-> As a result remove the device tree property ddc-i2c-bus.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
-> Hello,
-> 
-> This patch is tested with the following patch applied
-> https://patchwork.kernel.org/patch/9296883/
-> 
-> and is based on the suggestions from Vladimir
-> https://lkml.org/lkml/2016/8/29/322
-> 
-> This and following two patches are based on top of shawn's
-> for-next branch.
-> 
-> Regards,
-> Sanchayan.
-> ---
-> ?arch/arm/boot/dts/imx6q-apalis-ixora.dts |??6 ------
-> ?arch/arm/boot/dts/imx6qdl-apalis.dtsi????| 25 +++++++++-------------
-> ---
-> ?2 files changed, 9 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> index 207b85b..d99979e 100644
-> --- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> +++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> @@ -55,7 +55,6 @@
-> ?		?????"fsl,imx6q";
-> ?
-> ?	aliases {
-> -		i2c0 = &i2cddc;
-> ?		i2c1 = &i2c1;
-> ?		i2c2 = &i2c2;
-> ?		i2c3 = &i2c3;
+Add the initial device  tree for the R8A7743 SoC based SK-RZG1M board.
+The board has one debug serial port (SCIF0); include support for it, so
+that  the serial  console  can work.
 
-I would suggest rising them up in rank.
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
 
-> @@ -186,11 +185,6 @@
-> ?};
-> ?
-> ?&hdmi {
-> -	ddc-i2c-bus = <&i2cddc>;
-> -	status = "okay";
-> -};
-> -
-> -&i2cddc {
-> ?	status = "okay";
-> ?};
-> ?
-> diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> index 99e323b..8c67dd8 100644
-> --- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> @@ -53,18 +53,6 @@
-> ?		status = "disabled";
-> ?	};
-> ?
-> -	/* DDC_I2C: I2C2_SDA/SCL on MXM3 205/207 */
-> -	i2cddc: i2c at 0 {
-> -		compatible = "i2c-gpio";
-> -		pinctrl-names = "default";
-> -		pinctrl-0 = <&pinctrl_i2c_ddc>;
-> -		gpios = <&gpio3 16 GPIO_ACTIVE_HIGH /* sda */
-> -			?&gpio2 30 GPIO_ACTIVE_HIGH /* scl */
-> -			>;
-> -		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> -		status = "disabled";
-> -	};
-> -
-> ?	reg_1p8v: regulator-1p8v {
-> ?		compatible = "regulator-fixed";
-> ?		regulator-name = "1P8V";
-> @@ -209,6 +197,12 @@
-> ?	};
-> ?};
-> ?
-> +&hdmi {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hdmi_ddc>;
-> +	status = "disabled";
-> +};
-> +
-> ?/*
-> ? * GEN1_I2C: I2C1_SDA/SCL on MXM3 209/211 (e.g. RTC on carrier
-> ? * board)
-> @@ -633,11 +627,10 @@
-> ?		>;
-> ?	};
-> ?
-> -	pinctrl_i2c_ddc: gpioi2cddcgrp {
-> +	pinctrl_hdmi_ddc: hdmiddcgrp {
-> ?		fsl,pins = <
-> -			/* DDC bitbang */
-> -			MX6QDL_PAD_EIM_EB2__GPIO2_IO30 0x1b0b0
-> -			MX6QDL_PAD_EIM_D16__GPIO3_IO16 0x1b0b0
-> +			MX6QDL_PAD_EIM_EB2__HDMI_TX_DDC_SCL
-> 0x4001b8b1
-> +			MX6QDL_PAD_EIM_D16__HDMI_TX_DDC_SDA
-> 0x4001b8b1
-> ?		>;
-> ?	};
-?
-Rest looks fine and tested working fine on top of 4.8.0-rc6-next-20160916.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+---
+ arch/arm/boot/dts/Makefile             |    1 
+ arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   44 +++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/Makefile
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/Makefile
++++ renesas/arch/arm/boot/dts/Makefile
+@@ -654,6 +654,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	r7s72100-rskrza1.dtb \
+ 	r8a73a4-ape6evm.dtb \
+ 	r8a7740-armadillo800eva.dtb \
++	r8a7743-sk-rzg1m.dtb \
+ 	r8a7778-bockw.dtb \
+ 	r8a7779-marzen.dtb \
+ 	r8a7790-lager.dtb \
+Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+===================================================================
+--- /dev/null
++++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+@@ -0,0 +1,44 @@
++/*
++ * Device Tree Source for the SK-RZG1M board
++ *
++ * Copyright (C) 2016 Cogent Embedded, Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2. This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "r8a7743.dtsi"
++
++/ {
++	model = "SK-RZG1M";
++	compatible = "renesas,sk-rzg1m", "renesas,r8a7743";
++
++	aliases {
++		serial0 = &scif0;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
++	};
++
++	memory at 200000000 {
++		device_type = "memory";
++		reg = <2 0x00000000 0 0x40000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
++};
++
++&scif0 {
++	status = "okay";
++};
