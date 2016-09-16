@@ -1,72 +1,26 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 16 Sep 2016 18:07:45 +0100
-Subject: [PATCH v9 08/10] arm64: pmu: Detect and enable multiple PMUs in
- an ACPI system
-In-Reply-To: <6e0b08db-2e13-be49-5208-c396bf51fe68@arm.com> (Jeremy Linton's
- message of "Fri, 16 Sep 2016 11:32:02 -0500")
-References: <1473892358-22574-1-git-send-email-jeremy.linton@arm.com>
- <1473892358-22574-9-git-send-email-jeremy.linton@arm.com>
- <87y42st1e3.fsf@e105922-lin.cambridge.arm.com>
- <6e0b08db-2e13-be49-5208-c396bf51fe68@arm.com>
-Message-ID: <87bmznu61q.fsf@e105922-lin.cambridge.arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 16 Sep 2016 12:11:05 -0500
+Subject: [PATCH v3 1/3] tty: amba-pl011: define flag register bits for ZTE
+ device
+In-Reply-To: <20160916163952.GH1041@n2100.armlinux.org.uk>
+References: <1467968441-4056-1-git-send-email-shawn.guo@linaro.org>
+ <1467968441-4056-2-git-send-email-shawn.guo@linaro.org>
+ <b549cd51-a81f-b693-e3c2-9e3c598d3d9e@arm.com>
+ <20160916163952.GH1041@n2100.armlinux.org.uk>
+Message-ID: <57DC27A9.3060307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeremy Linton <jeremy.linton@arm.com> writes:
+Russell King - ARM Linux wrote:
+> Maybe what we should've done with ZTE is insisted that they implement
+> a complete new driver, rather than trying to shoe-horn it into PL011
+> even though it is in theory PL011.
 
-> Hi,
->
-> On 09/16/2016 08:33 AM, Punit Agrawal wrote:
->> Jeremy Linton <jeremy.linton@arm.com> writes:
->>
->>> Its possible that an ACPI system has multiple CPU types in it
->>> with differing PMU counters. Iterate the CPU's and make a determination
->>> about how many of each type exist in the system. Then take and create
->>> a PMU platform device for each type, and assign it the interrupts parsed
->>> from the MADT. Creating a platform device is necessary because the PMUs
->>> are not described as devices in the DSDT table.
->>>
->>> This code is loosely based on earlier work by Mark Salter.
->
-> (trimming)
->
->>> +
->>> +	list_for_each_entry_safe(pmu, safe_temp, &pmus, list) {
->>> +		if (unused_madt_entries)
->>> +			pmu->cpu_count = num_possible_cpus();
->>
->> So if there is any unbooted cpu ...
->>
->>> +
->>> +		res = kcalloc(pmu->cpu_count,
->>> +				  sizeof(struct resource), GFP_KERNEL);
->>
->> ... we allocate potentially large number (num_possible_cpus()) of
->> resources for each PMU.
->>
->> This is needlessly wasteful. Under what conditions have you found
->> reg_midr to be 0?
->
-> Unused MADT entries, in place for potentially unbooted/hotplug
-> CPUs.
+When I suggested that a year ago, I was shot down:
 
-Is linux able to deal with booting secondaries that have unused MADT
-entries?
+http://www.spinics.net/lists/arm-kernel/msg455888.html
 
-> In those cases you don't know for sure which PMU the CPU belongs
-> to until it comes online and the MIDR can be read. I'm open to
-> suggestions on how to deal with this, outside of pushing my luck and
-> further breaking the platform device encapsulation by trying to
-> reallocate the resource structure while its active. Besides its only
-> wasteful for ACPI+big.little, which at the moment only applies to a
-> development platform.
-
-I don't have any ideas to solve this problem, but in the interest of
-helping review, please move all the changes arising from hotplug/unused
-MADT entries in this patch to the next one.
-
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
