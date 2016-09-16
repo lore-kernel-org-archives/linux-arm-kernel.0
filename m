@@ -1,26 +1,50 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 16 Sep 2016 12:33:17 +0200
-Subject: [PATCH v7 10/11] arm64: dts: r8a7796: salvator-x: enable UHS for
- SDHI 0 & 3
-In-Reply-To: <1473764228-24768-11-git-send-email-horms+renesas@verge.net.au>
-References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
- <1473764228-24768-11-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20160916103317.GN1411@katana>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 16 Sep 2016 11:33:26 +0100
+Subject: [RFC PATCH 2/8] thread_info: allow custom in-task thread_info
+In-Reply-To: <CALCETrWni0aZ71r-R6oYG98kZvZA8a184UR0YURk_=tXu8HXMw@mail.gmail.com>
+References: <1473947349-14521-1-git-send-email-mark.rutland@arm.com>
+ <1473947349-14521-3-git-send-email-mark.rutland@arm.com>
+ <CALCETrWni0aZ71r-R6oYG98kZvZA8a184UR0YURk_=tXu8HXMw@mail.gmail.com>
+Message-ID: <20160916103101.GA21702@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 12:57:07PM +0200, Simon Horman wrote:
-> Based on work for the r8a7796 by Wolfram Sang.
+On Thu, Sep 15, 2016 at 11:37:47AM -0700, Andy Lutomirski wrote:
+> On Thu, Sep 15, 2016 at 6:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Currently, task_struct is defined in <linux/sched.h>, which (indirectly)
+> > pulls in a number of low-level arch headers such as <asm/preempt.h>
+> > through a number of other headers. Thus, code and structures in these
+> > headers can't rely on the definition of task_struct. Some of these
+> > headers are necessary for the definition of task_struct, so moving
+> > task_struct into its own header is insufficient tio avoid circular
+> > includes.
 > 
-> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> The flippant answer is to fix the headers, but I tried that myself and
+> gave up :(
 
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Agreed; likewise (though I gave up quicker, I suspect). :(
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160916/713b8378/attachment.sig>
+Longer-term I'd still hope that we can do this.
+
+> But how about this slightly less duplicative alternative:
+> 
+> struct thread_info {
+> #ifdef arch_thread_info
+>   struct arch_thread_info arch_ti;
+> #endif
+> };
+
+I'm happy to have an arch_thread_info.
+
+Just to check, what do you mean to happen with the flags field? Should
+that always be in the generic thread_info? e.g.
+
+struct thread_info {
+	u32 flags;
+#ifdef arch_thread_info
+	struct arch_thread_info arch_ti;
+#endif
+};
+
+Thanks,
+Mark,
