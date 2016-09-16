@@ -1,97 +1,25 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 16 Sep 2016 15:23:57 +0100
-Subject: [PATCH v3 1/3] tty: amba-pl011: define flag register bits for ZTE
- device
-In-Reply-To: <1467968441-4056-2-git-send-email-shawn.guo@linaro.org>
-References: <1467968441-4056-1-git-send-email-shawn.guo@linaro.org>
- <1467968441-4056-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <b549cd51-a81f-b693-e3c2-9e3c598d3d9e@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Sep 2016 16:31:32 +0200
+Subject: [GIT PULL] ARM: exynos: Fixes for v4.8, secound round
+In-Reply-To: <1474009808-8520-1-git-send-email-k.kozlowski@samsung.com>
+References: <CGME20160916071017eucas1p155978eec97e20211d9c54ef670e319eb@eucas1p1.samsung.com>
+ <1474009808-8520-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <6792013.IrD9SrjCDf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn, Russell,
+On Friday, September 16, 2016 9:10:08 AM CEST Krzysztof Kozlowski wrote:
+> 1. A recent change in populating irqchip devices from Device Tree
+>    broke Suspend to RAM on Exynos boards due to lack of probing of
+>    PMU (Power Management Unit) driver.  Multiple drivers attach to
+>    the PMU's DT node: irqchip, clock controller and PMU platform
+>    driver for handling suspend.  The new irqchip code marked the
+>    PMU's DT node as OF_POPULATED but we need to attach to this
+>    node also PMU platform driver.
+> 
+> 2. Add Javier as additional reviewer for Exynos patches.
+> 
 
-I noticed this change is in linux-next and but I happen to hit an issue
-with this as I tested it with earlycon enabled today for the first time.
+Pulled into fixes, thanks!
 
-On 08/07/16 10:00, Shawn Guo wrote:
-> For some reason we do not really understand, ZTE hardware designers
-> choose to define PL011 Flag Register bit positions differently from
-> standard ones as below.
->
-> 	Bit		Standard	ZTE
-> 	-----------------------------------
-> 	CTS		0		1
-> 	DSR		1		3
-> 	BUSY		3		8
-> 	RI		8		0
->
-> Let's define these bits into vendor data and get ZTE PL011 supported
-> properly.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-
-[...]
-
-> @@ -2303,13 +2325,16 @@ static struct console amba_console = {
->
->  static void pl011_putc(struct uart_port *port, int c)
->  {
-> +	struct uart_amba_port *uap =
-> +		container_of(port, struct uart_amba_port, port);
-> +
->  	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
->  		cpu_relax();
->  	if (port->iotype == UPIO_MEM32)
->  		writel(c, port->membase + UART01x_DR);
->  	else
->  		writeb(c, port->membase + UART01x_DR);
-> -	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
-> +	while (readl(port->membase + UART01x_FR) & uap->vendor->fr_busy)
->  		cpu_relax();
->  }
-
-The above hunk won't work for early console devices. The earlycon_device
-just has uart_port and is not uart_amba_port. I don't know how to fix
-this properly but I thought we could reuse private_data in uart_port for
-early_con devices. Something like below(incomplete for other vendors,
-works only for ARM)
-
-Regards,
-Sudeep
-
--->8
-
-diff --git i/drivers/tty/serial/amba-pl011.c 
-w/drivers/tty/serial/amba-pl011.c
-index 0b78b04e895e..abe88223790c 100644
---- i/drivers/tty/serial/amba-pl011.c
-+++ w/drivers/tty/serial/amba-pl011.c
-@@ -2330,8 +2330,7 @@ static struct console amba_console = {
-
-  static void pl011_putc(struct uart_port *port, int c)
-  {
--       struct uart_amba_port *uap =
--               container_of(port, struct uart_amba_port, port);
-+       struct vendor_data *vendor = port->private_data;
-
-         while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
-                 cpu_relax();
-@@ -2339,7 +2338,7 @@ static void pl011_putc(struct uart_port *port, int c)
-                 writel(c, port->membase + UART01x_DR);
-         else
-                 writeb(c, port->membase + UART01x_DR);
--       while (readl(port->membase + UART01x_FR) & uap->vendor->fr_busy)
-+       while (readl(port->membase + UART01x_FR) & vendor->fr_busy)
-                 cpu_relax();
-  }
-
-@@ -2356,6 +2355,7 @@ static int __init pl011_early_console_setup(struct 
-earlycon_device *device,
-         if (!device->port.membase)
-                 return -ENODEV;
-
-+       device->port.private_data = &vendor_arm;
-         device->con->write = pl011_early_write;
-         return 0;
-  }
+	Arnd
