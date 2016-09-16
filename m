@@ -1,236 +1,26 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 16 Sep 2016 16:35:08 +0300
-Subject: [PATCH RFC 5/8] ARM: dts: r8a7743: initial SoC device tree
-In-Reply-To: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
-References: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
-Message-ID: <1679762.ECpvSkQAyM@wasted.cogentembedded.com>
+From: alban.browaeys@gmail.com (Alban Browaeys)
+Date: Fri, 16 Sep 2016 15:35:50 +0200
+Subject: genirq: Setting trigger mode 0 for irq 11 failed
+ (txx9_irq_set_type+0x0/0xb8)
+In-Reply-To: <57DBEBC8.7000209@arm.com>
+References: <CAMuHMdVW1eTn20=EtYcJ8hkVwohaSuH_yQXrY2MGBEvZ8fpFOg@mail.gmail.com>
+ <1473980577.17787.21.camel@gmail.com> <57DBA464.9010506@arm.com>
+ <1474023805.17258.10.camel@gmail.com> <57DBEBC8.7000209@arm.com>
+Message-ID: <1474032950.9425.12.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The initial R8A7743 SoC device tree including CPU cores, GIC, timer, SYSC,
-and the required  clock descriptions.
+Le vendredi 16 septembre 2016 ? 13:55 +0100, Marc Zyngier a ?crit?:
+> At that stage, I'm not sure I should care. Does the workaround make
+> your
+> platform usable?
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+However awkward this was all about logs and clearing worries. There was
+no change in behavior ?between the three cases : upstream, upstream
+commit reverted and patched upstream.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Mind this hardware (the Odroid U2) has no hardware buttons. Only power
+on plug.
 
----
- arch/arm/boot/dts/r8a7743.dtsi |  210 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 210 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7743.dtsi
-===================================================================
---- /dev/null
-+++ renesas/arch/arm/boot/dts/r8a7743.dtsi
-@@ -0,0 +1,210 @@
-+/*
-+ * Device Tree Source for the r8a7743 SoC
-+ *
-+ * Copyright (C) 2016 Cogent Embedded Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2. This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/r8a7743-clock.h>
-+#include <dt-bindings/power/r8a7743-sysc.h>
-+
-+/ {
-+	compatible = "renesas,r8a7743";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+			clock-frequency = <1500000000>;
-+			clocks = <&cpg_clocks R8A7743_CLK_Z>;
-+			power-domains = <&sysc R8A7743_PD_CA15_CPU0>;
-+			next-level-cache = <&L2_CA15>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+			clock-frequency = <1500000000>;
-+			power-domains = <&sysc R8A7743_PD_CA15_CPU1>;
-+			next-level-cache = <&L2_CA15>;
-+		};
-+
-+		L2_CA15: cache-controller at 0 {
-+			compatible = "cache";
-+			reg = <0>;
-+			cache-unified;
-+			cache-level = <2>;
-+			power-domains = <&sysc R8A7743_PD_CA15_SCU>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		gic: interrupt-controller at f1001000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0 0xf1001000 0 0x1000>,
-+			      <0 0xf1002000 0 0x1000>,
-+			      <0 0xf1004000 0 0x2000>,
-+			      <0 0xf1006000 0 0x2000>;
-+			interrupts = <GIC_PPI 9
-+				     (GIC_CPU_MASK_SIMPLE(2) |
-+				      IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		timer {
-+			compatible = "arm,armv7-timer";
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-+				      IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
-+				      IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
-+				      IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
-+				      IRQ_TYPE_LEVEL_LOW)>;
-+		};
-+
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a7743-sysc";
-+			reg = <0 0xe6180000 0 0x0200>;
-+			#power-domain-cells = <1>;
-+		};
-+
-+		/* Special CPG clocks */
-+		cpg_clocks: cpg_clocks at e6150000 {
-+			compatible = "renesas,r8a7743-cpg-clocks",
-+				     "renesas,rcar-gen2-cpg-clocks";
-+			reg = <0 0xe6150000 0 0x1000>;
-+			clocks = <&extal_clk &usb_extal_clk>;
-+			#clock-cells = <1>;
-+			clock-output-names = "main", "pll0", "pll1", "pll3",
-+					     "lb", "qspi", "sdh", "sd0", "z",
-+					     "rcan";
-+			#power-domain-cells = <0>;
-+		};
-+
-+		/* Fixed factor clocks */
-+		pll1_div2_clk: pll1_div2 {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7743_CLK_PLL1>;
-+			#clock-cells = <0>;
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+		};
-+		zs_clk: zs {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7743_CLK_PLL1>;
-+			#clock-cells = <0>;
-+			clock-div = <6>;
-+			clock-mult = <1>;
-+		};
-+		p_clk: p {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7743_CLK_PLL1>;
-+			#clock-cells = <0>;
-+			clock-div = <24>;
-+			clock-mult = <1>;
-+		};
-+		mp_clk: mp {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&pll1_div2_clk>;
-+			#clock-cells = <0>;
-+			clock-div = <15>;
-+			clock-mult = <1>;
-+		};
-+
-+		/* Gate clocks */
-+		mstp2_clks: mstp2_clks at e6150138 {
-+			compatible = "renesas,r8a7743-mstp-clocks",
-+				     "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe6150138 0 4>, <0 0xe6150040 0 4>;
-+			clocks = <&mp_clk>, <&mp_clk>, <&mp_clk>, <&mp_clk>,
-+				 <&mp_clk>, <&mp_clk>, <&zs_clk>, <&zs_clk>;
-+			#clock-cells = <1>;
-+			clock-indices = <
-+				R8A7743_CLK_SCIFA2 R8A7743_CLK_SCIFA1
-+				R8A7743_CLK_SCIFA0 R8A7743_CLK_SCIFB0
-+				R8A7743_CLK_SCIFB1 R8A7743_CLK_SCIFB2
-+				R8A7743_CLK_SYS_DMAC1 R8A7743_CLK_SYS_DMAC0
-+			>;
-+			clock-output-names =
-+				"scifa2", "scifa1", "scifa0",
-+				"scifb0", "scifb1", "scifb2",
-+				"sys-dmac1", "sys-dmac0";
-+		};
-+		mstp7_clks: mstp7_clks at e615014c {
-+			compatible = "renesas,r8a7743-mstp-clocks",
-+				     "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-+			clocks = <&zs_clk>, <&p_clk>, <&p_clk>, <&zs_clk>,
-+				 <&zs_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
-+				 <&p_clk>;
-+			#clock-cells = <1>;
-+			clock-indices = <
-+				R8A7743_CLK_HSCIF2 R8A7743_CLK_SCIF5
-+				R8A7743_CLK_SCIF4 R8A7743_CLK_HSCIF1
-+				R8A7743_CLK_HSCIF0 R8A7743_CLK_SCIF3
-+				R8A7743_CLK_SCIF2 R8A7743_CLK_SCIF1
-+				R8A7743_CLK_SCIF0
-+			>;
-+			clock-output-names =
-+				"hscif2", "scif5", "scif4", "hscif1", "hscif0",
-+				"scif3", "scif2", "scif1", "scif0";
-+		};
-+		mstp11_clks: mstp11_clks at e615099c {
-+			compatible = "renesas,r8a7743-mstp-clocks",
-+				     "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe615099c 0 4>, <0 0xe61509ac 0 4>;
-+			clocks = <&mp_clk>, <&mp_clk>, <&mp_clk>;
-+			#clock-cells = <1>;
-+			clock-indices = <
-+				R8A7743_CLK_SCIFA3 R8A7743_CLK_SCIFA4
-+				R8A7743_CLK_SCIFA5
-+			>;
-+			clock-output-names = "scifa3", "scifa4", "scifa5";
-+		};
-+	};
-+
-+	/* External root clock */
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overriden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External USB clock - can be overridden by the board */
-+	usb_extal_clk: usb_extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <48000000>;
-+	};
-+
-+	/* External SCIF clock */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+};
+Best regards,
+Alban
