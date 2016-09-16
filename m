@@ -1,40 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 16 Sep 2016 10:04:14 +0200
-Subject: [RFC PATCH v2 3/5] dmaengine: hi3620: Make hi3620 explicit,
+Date: Fri, 16 Sep 2016 10:05:04 +0200
+Subject: [RFC PATCH v2 2/5] clk: hi3620: Make 3620 explicit,
  remove wildcard
-In-Reply-To: <20160915210505.21878-4-netz.kernel@gmail.com>
+In-Reply-To: <20160915210505.21878-3-netz.kernel@gmail.com>
 References: <20160915210505.21878-1-netz.kernel@gmail.com>
- <20160915210505.21878-4-netz.kernel@gmail.com>
-Message-ID: <2803421.aLdooP5OTy@wuerfel>
+ <20160915210505.21878-3-netz.kernel@gmail.com>
+Message-ID: <2638700.UBf5xKAQsK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 15, 2016 4:05:03 PM CEST Marty Plummer wrote:
-> Signed-off-by: Marty Plummer <netz.kernel@gmail.com>
-> ---
->  drivers/dma/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index 739f797..74bab9d0 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -279,7 +279,7 @@ config INTEL_MIC_X100_DMA
+On Thursday, September 15, 2016 4:05:02 PM CEST Marty Plummer wrote:
+> diff --git a/drivers/clk/hisilicon/Makefile b/drivers/clk/hisilicon/Makefile
+> index e169ec7..2edf3b5 100644
+> --- a/drivers/clk/hisilicon/Makefile
+> +++ b/drivers/clk/hisilicon/Makefile
+> @@ -4,7 +4,7 @@
 >  
->  config K3_DMA
->         tristate "Hisilicon K3 DMA support"
-> -       depends on ARCH_HI3xxx
-> +       depends on ARCH_HI3620
->         select DMA_ENGINE
->         select DMA_VIRTUAL_CHANNELS
->         help
-> 
+>  obj-y  += clk.o clkgate-separated.o clkdivider-hi6220.o
+>  
+> -obj-$(CONFIG_ARCH_HI3xxx)      += clk-hi3620.o
+> +obj-$(CONFIG_ARCH_HI3620)      += clk-hi3620.o
+>  obj-$(CONFIG_ARCH_HIP04)       += clk-hip04.o
+>  obj-$(CONFIG_ARCH_HIX5HD2)     += clk-hix5hd2.o
+>  obj-$(CONFIG_COMMON_CLK_HI3519)        += clk-hi3519.o
 
-This can not be applied until the first patch is merged.
-If we leave a ARCH_HI3xxx Kconfig symbol in place indefinitely,
-I think it's ok to just leave it the way it is right now
-and drop the patch: there are many other drivers for hardware
-you don't have and we just leave them disabled in the .config,
-so we can do the same here.
+I'd suggest instead adding a new Kconfig symbol for the clock driver
+the same way we handle hi3519.
 
 	Arnd
