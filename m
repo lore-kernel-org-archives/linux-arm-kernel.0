@@ -1,50 +1,55 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 16 Sep 2016 16:29:04 -0500
-Subject: [PATCH] cpufreq: ti: Use generic platdev driver
-In-Reply-To: <20160915062507.GA30169@vireshk-i7>
-References: <20160914204137.20346-1-d-gerlach@ti.com>
- <20160915062507.GA30169@vireshk-i7>
-Message-ID: <57DC6420.20706@ti.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 16 Sep 2016 23:41:55 +0200
+Subject: [PATCH 0/7] ARM: dts: exynos Use human-friendly symbols for interrupt
+ properties
+Message-ID: <1474062122-22720-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
-On 09/15/2016 01:25 AM, Viresh Kumar wrote:
-> On 14-09-16, 15:41, Dave Gerlach wrote:
->> Now that the cpufreq-dt-platdev is used to create the cpufreq-dt platform
->> device for all OMAP platforms and the platform code that did it
->> before has been removed, add ti,am33xx and ti,dra7xx to the machine list
->> in cpufreq-dt-platdev which had relied on the removed platform code to do
->> this previously.
->>
->> Fixes: 7694ca6e1d6f ("cpufreq: omap: Use generic platdev driver")
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->
-> Any stable trees you want this to be added to ?
 
-I suppose it'll go for 4.7-stable as the change happened in v4.6.
+Based on top of [1]. Shouldn't make any difference - tested with dtx_diff.
 
->
->> ---
->>   drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
->> index 0bb44d5b5df4..d5e8ba50f8a3 100644
->> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
->> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
->> @@ -68,6 +68,8 @@ static const struct of_device_id machines[] __initconst = {
->>
->>   	{ .compatible = "sigma,tango4" },
->>
->> +	{ .compatible = "ti,am33xx", },
->> +	{ .compatible = "ti,dra7", },
->>   	{ .compatible = "ti,omap2", },
->>   	{ .compatible = "ti,omap3", },
->>   	{ .compatible = "ti,omap4", },
->
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->
+Best regards,
+Krzysztof
 
-Thanks,
-Dave
+[1] http://www.spinics.net/lists/arm-kernel/msg532489.html
+
+
+Krzysztof Kozlowski (7):
+  arm64: dts: exynos: Use human-friendly symbols for interrupt
+    properties in exynos7
+  ARM: dts: exynos: Use human-friendly symbols for interrupt properties
+    in exynos3250
+  ARM: dts: exynos: Use human-friendly symbols for interrupt properties
+    in exynos4
+  ARM: dts: exynos: Use human-friendly symbols for interrupt properties
+    in exynos5
+  ARM: dts: exynos: Use human-friendly symbols for interrupt properties
+    in exynos4415
+  ARM: dts: exynos: Use human-friendly symbols for interrupt properties
+    in exynos5260
+  ARM: dts: exynos: Use human-friendly symbols for interrupt properties
+    in exynos5440
+
+ arch/arm/boot/dts/exynos3250-pinctrl.dtsi       |  32 +++----
+ arch/arm/boot/dts/exynos3250.dtsi               | 112 ++++++++++++------------
+ arch/arm/boot/dts/exynos4.dtsi                  |  99 ++++++++++-----------
+ arch/arm/boot/dts/exynos4210-pinctrl.dtsi       |  32 +++----
+ arch/arm/boot/dts/exynos4210.dtsi               |  40 ++++-----
+ arch/arm/boot/dts/exynos4415-pinctrl.dtsi       |  32 +++----
+ arch/arm/boot/dts/exynos4415.dtsi               | 108 ++++++++++++-----------
+ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi       |  32 +++----
+ arch/arm/boot/dts/exynos4x12.dtsi               |  60 ++++++-------
+ arch/arm/boot/dts/exynos5.dtsi                  |   4 +-
+ arch/arm/boot/dts/exynos5250.dtsi               |  76 ++++++++--------
+ arch/arm/boot/dts/exynos5260.dtsi               |  50 ++++++-----
+ arch/arm/boot/dts/exynos5410.dtsi               |  16 ++--
+ arch/arm/boot/dts/exynos5440.dtsi               |  80 ++++++++---------
+ arch/arm/boot/dts/exynos54xx.dtsi               |  18 ++--
+ arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi |  32 +++----
+ arch/arm64/boot/dts/exynos/exynos7.dtsi         |  70 +++++++--------
+ 17 files changed, 452 insertions(+), 441 deletions(-)
+
+-- 
+2.7.4
