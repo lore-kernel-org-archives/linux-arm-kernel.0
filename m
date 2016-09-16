@@ -1,99 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 16 Sep 2016 21:17:33 +0100
-Subject: [PATCH v26 0/7] arm64: add kdump support
-In-Reply-To: <57DC1812.6040906@arm.com>
-References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
- <57DC1812.6040906@arm.com>
-Message-ID: <CAKv+Gu_UvFnPtFHggaO6Z_ePuArdchEK1qYWPkkwpcgLus3Epw@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 16 Sep 2016 22:22:03 +0200
+Subject: [RFT] arm64 dts: exynos: Fix invalid GIC interrupt flags in
+ exynos7
+In-Reply-To: <1474056073-8071-1-git-send-email-krzk@kernel.org>
+References: <1474054971-16831-1-git-send-email-krzk@kernel.org>
+ <1474056073-8071-1-git-send-email-krzk@kernel.org>
+Message-ID: <20160916202203.GA25900@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 September 2016 at 17:04, James Morse <james.morse@arm.com> wrote:
-> (Cc: Ard),
->
-> Mark, Ard, how does/will reserved-memory work on an APCI only system?
->
+On Fri, Sep 16, 2016 at 10:01:13PM +0200, Krzysztof Kozlowski wrote:
+> Interrupt of type IRQ_TYPE_NONE is not allowed for GIC interrupts and
+> generates an error:
+> 	genirq: Setting trigger mode 0 for irq 16 failed (gic_set_type+0x0/0x68)
+> 
+> The GIC requires shared interrupts to be edge rising or level high.
+> Platform declares support for both.  Choose level high everywhere.
+> 
+> Reported-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Reported-by: Alban Browaeys <alban.browaeys@gmail.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi | 20 +++++--
+>  arch/arm64/boot/dts/exynos/exynos7.dtsi         | 69 +++++++++++++------------
+>  2 files changed, 51 insertions(+), 38 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi b/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+> index f77ddaf21d04..983c63ba38c8 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+> @@ -20,8 +20,14 @@
+>  		interrupt-controller;
+>  		interrupt-parent = <&gic>;
+>  		#interrupt-cells = <2>;
+> -		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+> -			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>;
+> +		interrupts = <0 0 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 1 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 2 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 3 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 4 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 5 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 6 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 7 IRQ_TYPE_LEVEL_HIGH>;
+>  	};
+>  
+>  	gpa1: gpa1 {
+> @@ -31,8 +37,14 @@
+>  		interrupt-controller;
+>  		interrupt-parent = <&gic>;
+>  		#interrupt-cells = <2>;
+> -		interrupts = <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+> -			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
+> +		interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 9 IRQ_TYPE_LEVEL_HIGH>
 
-It works by accident, at the moment. We used to ignore both
-/memreserve/s and the /reserved-memory node, but due to some unrelated
-refactoring, we ended up honouring the reserved-memory node when
-booting via UEFI
+There is an obvious typo here... but beside that it compiles. It is
+trivial so I won't resend now.
 
-I proposed some patches a while ago to at least check the
-reservations, given that UEFI itself is unaware of them and may end up
-occupying a region that should have been reserved.
-
-http://article.gmane.org/gmane.linux.kernel.efi/6464
-
->
-> On 07/09/16 05:29, AKASHI Takahiro wrote:
->>     v26-specific note: After a comment from Rob[0], an idea of adding
->>     "linux,usable-memory-range" was dropped. Instead, an existing
->>     "reserved-memory" node will be used to limit usable memory ranges
->>     on crash dump kernel.
->>     This works not only on UEFI/ACPI systems but also on DT-only systems,
->>     but if he really insists on using DT-specific "usable-memory" property,
->>     I will post additional patches for kexec-tools. Those would be
->>     redundant, though.
->>     Even in that case, the kernel will not have to be changed.
->
-> Some narrative on how the old memory ranges get reserved, as there is no longer
-> any code in the series doing this, (which is pretty neat!):
->
-> kexec-tools parses the list of memory ranges in /proc/iomem, and adds a node to
-> the /reserved-memory for System RAM ranges that don't cover the crash kernel.
-> Decompiling the crash-kernel DT from Seattle, it looks roughly like this:
->
->         reserved-memory {
->                 ranges;
->                 #size-cells = <0x2>;
->                 #address-cells = <0x2>;
->
->                 crash_dump at 83ffe50000 {
->                         no-map;
->                         reg = <0x83 0xffe50000 0x0 0x1b0000>;
->                 };
->
->                 [ ... ]
->         };
->
->
-> 'no-map' means its doing the same thing to memblock as
-> 'linux,usable-memory-range' did in earlier versions,
-> early_init_dt_reserve_memory_arch() takes no-map to mean memblock_remove().
-> We trigger the removing via early_init_fdt_scan_reserved_mem() in
-> arch/arm64/mm/init.c. This happens later than before, but its before the
-> crashkernel and cma ranges get reserved.
->
-> One difference I can see is that before we avoided memblock_remove()ing ranges
-> that were also in memblock.nomap. This was to avoid the ACPI tables getting
-> mapped as device memory by mistake, this is fixed by [1]. Now these ranges are
-> published in /proc/iomem as 'reserved' and won't get covered by a
-> reserved-memory node, and so we don't need to check memblock.nomap when
-> memblock_remove()ing.
->
->
-> The only odd thing I can see is for a (mythical?) pure-ACPI system. The EFI stub
-> will create a DT with a chosen node containing pointers to the memory map and
-> the efi command line. Now such as system may also grow a /reserved-memory node
-> after kdump. I don't think this is a problem, but it may not match how an
-> acpi-only system reserves memory. (how does that work?)
->
->
->> [1] "arm64: mark reserved memblock regions explicitly in iomem"
->>     http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/450433.html
->
-> This is queued in Will's arm64/for-next/core,
->
->> [2] "efi: arm64: treat regions with WT/WC set but WB cleared as memory"
->>     http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/451491.html
->
-> This is queued in tip, but I can't see why kdump depends on it. It only has an
-> effect if the uefi memory map has !WB regions that linux needs to use.
->
->
->
-> Thanks,
->
-> James
->
+Best regards,
+Krzysztof
