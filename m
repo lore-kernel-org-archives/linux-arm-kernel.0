@@ -1,30 +1,29 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 16 Sep 2016 14:38:21 +0800
-Subject: [PATCH v5 0/3] Add ZTE ZX296718 support
-In-Reply-To: <3220973.vrdeeLxHSS@wuerfel>
-References: <1473730926-1034-1-git-send-email-jun.nie@linaro.org>
- <20160913072146.GA7398@tiger> <3220973.vrdeeLxHSS@wuerfel>
-Message-ID: <20160916063820.GE7398@tiger>
+Date: Fri, 16 Sep 2016 14:50:39 +0800
+Subject: [GIT PULL 1/3] ZTE arm64 soc changes for 4.9
+Message-ID: <1474008641-30859-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 03:24:06PM +0200, Arnd Bergmann wrote:
-> On Tuesday, September 13, 2016 3:21:46 PM CEST Shawn Guo wrote:
-> > 
-> > Reviewed-by: Shawn Guo <shawnguo@kernel.org>
-> > 
-> > Arnd, Olof,
-> > 
-> > If you like, I can help collect ZTE DTS patches to reduce your
-> > maintenance burden, considering we have an established pull-request
-> > work flow and I get ZTE platform on hands to test patches.
-> 
-> Thanks, I think that would be a good idea. I was going to apply
-> the patches manually, but I'll just wait for you to forward
-> them to me.
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-I will send pull requests to you shortly.  We will likely have more ZTE
-DTS patches to come for the later releases, and doing so should ease
-your life, I hope.
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
-Shawn
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/zte-soc64-4.9
+
+for you to fetch changes up to 12496aea0887fc067ad9ba0aa28798317f47a1e0:
+
+  arm64: add ZTE ZX SoC family (2016-09-16 14:30:20 +0800)
+
+----------------------------------------------------------------
+ZTE arm64 SoC changes for 4.9:
+ - Add a Kconfig option for ZTE ZX SoC family support
+
+----------------------------------------------------------------
+Jun Nie (1):
+      arm64: add ZTE ZX SoC family
+
+ arch/arm64/Kconfig.platforms | 5 +++++
+ 1 file changed, 5 insertions(+)
