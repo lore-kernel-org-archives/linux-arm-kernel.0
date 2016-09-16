@@ -1,58 +1,34 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 16 Sep 2016 11:33:20 +0300
-Subject: [PATCH 5/9] dmaengine/ARM: omap-dma: Fix the DMAengine compile test
- on non OMAP configs
+Date: Fri, 16 Sep 2016 11:33:22 +0300
+Subject: [PATCH 7/9] dmaengine: ti-dma-crossbar: Correct type for
+ of_find_property() third parameter
 In-Reply-To: <20160916083324.29133-1-peter.ujfalusi@ti.com>
 References: <20160916083324.29133-1-peter.ujfalusi@ti.com>
-Message-ID: <20160916083324.29133-6-peter.ujfalusi@ti.com>
+Message-ID: <20160916083324.29133-8-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMAengine driver for omap-dma use three function calls from the
-plat-omap legacy driver. When the DMAengine driver is built when ARCH_OMAP
-is not set, the compilation will fail due to missing symbols.
-Add empty inline functions to allow the DMAengine driver to be compiled
-with COMPILE_TEST.
+The correct type is int and not for the third parameter of
+of_find_property().
+Fixes compilation for 64bit architectures (x86_64, aarch64).
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- include/linux/omap-dma.h | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/dma/ti-dma-crossbar.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/omap-dma.h b/include/linux/omap-dma.h
-index 1d99b61adc65..290081620b3e 100644
---- a/include/linux/omap-dma.h
-+++ b/include/linux/omap-dma.h
-@@ -297,6 +297,7 @@ struct omap_system_dma_plat_info {
- #define dma_omap15xx()	__dma_omap15xx(d)
- #define dma_omap16xx()	__dma_omap16xx(d)
+diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti-dma-crossbar.c
+index 5ae294b256a7..e4f3bd1ae264 100644
+--- a/drivers/dma/ti-dma-crossbar.c
++++ b/drivers/dma/ti-dma-crossbar.c
+@@ -311,7 +311,7 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
+ 	struct property *prop;
+ 	struct resource *res;
+ 	u32 safe_val;
+-	size_t sz;
++	int sz;
+ 	void __iomem *iomem;
+ 	int i, ret;
  
-+#if defined(CONFIG_ARCH_OMAP)
- extern struct omap_system_dma_plat_info *omap_get_plat_info(void);
- 
- extern void omap_set_dma_priority(int lch, int dst_port, int priority);
-@@ -355,4 +356,22 @@ static inline int omap_lcd_dma_running(void)
- }
- #endif
- 
-+#else /* CONFIG_ARCH_OMAP */
-+
-+static inline struct omap_system_dma_plat_info *omap_get_plat_info(void)
-+{
-+	return NULL;
-+}
-+
-+static inline int omap_request_dma(int dev_id, const char *dev_name,
-+			void (*callback)(int lch, u16 ch_status, void *data),
-+			void *data, int *dma_ch)
-+{
-+	return -ENODEV;
-+}
-+
-+static inline void omap_free_dma(int ch) { }
-+
-+#endif /* CONFIG_ARCH_OMAP */
-+
- #endif /* __LINUX_OMAP_DMA_H */
 -- 
 2.10.0
