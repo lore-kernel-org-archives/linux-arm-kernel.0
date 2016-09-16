@@ -1,140 +1,54 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu, 15 Sep 2016 18:16:38 -0700
-Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
-In-Reply-To: <20160915090158.GB6919@b29397-desktop>
-References: <20160914014246.31847-1-stephen.boyd@linaro.org>
- <20160914033200.GE30760@b29397-desktop>
- <147383270635.1464.10706917860873291816@sboyd-linaro>
- <20160914080321.GA21674@b29397-desktop>
- <147384270449.13546.495288874027868435@sboyd-linaro>
- <20160915090158.GB6919@b29397-desktop>
-Message-ID: <147398859894.4997.6486248242638696855@sboyd-linaro>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 16 Sep 2016 09:36:21 +0800
+Subject: [PATCH v5 3/3] clk: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <CAOMZO5DkMaRFwzH7HY872pLUdDrZfMq0xqLG+Xv88ut3Jd5Saw@mail.gmail.com>
+References: <1468235521-3163-1-git-send-email-p.zabel@pengutronix.de>
+ <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
+ <5787C558.5060904@gmail.com> <2499789.N9zTF3cNAV@diplodocus>
+ <CAOMZO5CPM9YfVqfpuyLmhGn9jC7p73Ocnc7LxE9=xA9ouawNQQ@mail.gmail.com>
+ <CACrMeVA8CdL-Fqa4NwmBUPvzBXsi=o8bpB_tY2-Z0-xCoMX3xA@mail.gmail.com>
+ <CAOMZO5DkMaRFwzH7HY872pLUdDrZfMq0xqLG+Xv88ut3Jd5Saw@mail.gmail.com>
+Message-ID: <20160916013621.GB7398@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-09-15 02:01:58)
-> On Wed, Sep 14, 2016 at 01:45:04AM -0700, Stephen Boyd wrote:
-> > Quoting Peter Chen (2016-09-14 01:03:21)
-> > > On Tue, Sep 13, 2016 at 10:58:26PM -0700, Stephen Boyd wrote:
-> > > > Quoting Peter Chen (2016-09-13 20:32:00)
-> > > > > On Tue, Sep 13, 2016 at 06:42:46PM -0700, Stephen Boyd wrote:
-> > > > > > On the db410c 96boards platform we have a TC7USB40MU[1] on the
-> > > > > > board to mux the D+/D- lines from the SoC between a micro usb
-> > > > > > "device" port and a USB hub for "host" roles. Upon a role switch,
-> > > > > > we need to change this mux to forward the D+/D- lines to either
-> > > > > > the port or the hub. Therefore, introduce a driver for this
-> > > > > > device that intercepts extcon USB_HOST events and logically
-> > > > > > asserts a gpio to mux the "host" D+/D- lines when a host cable is
-> > > > > > attached. When the cable goes away, it will logically deassert
-> > > > > > the gpio and mux the "device" lines.
-> > > > > 
-> > > > > Would you please draw the design? It can also help me review your
-> > > > > chipidea patch well.
-> > > > > 
-> > > > > 1. How many ports on the board?
-> > > > > 2. How the lines are connected on the board?
-> > > > > 
-> > > > 
-> > > > The schematic for the db410c is publically available here[2][3].
-> > > > 
-> > > > There's also the 96boards spec[4] which talks about this switch based
-> > > > design a little bit. See the section titled "Single USB port Example".
-> > > > 
-> > > > [2] https://github.com/96boards/documentation/blob/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
-> > > > [3] https://github.com/96boards/documentation/raw/master/ConsumerEdition/DragonBoard-410c/HardwareDocs/Schematics_DragonBoard.pdf
-> > > > [4] https://www.96boards.org/wp-content/uploads/2015/02/96BoardsCESpecificationv1.0-EA1.pdf
-> > > 
-> > > Ok, I see several use cases for this role switch
-> > > 
-> > > 1. Using the hardware switch (218-4LPST)
-> > > In this case, you can set USB_SW_SEL as input gpio, and use
-> > > extcon-usb-gpio.c like before, just set this gpio as active
-> > > low at dts.
-> > 
-> > Nice! I didn't think of this case but it's good that we can support
-> > that with some work.
-> > 
+On Mon, Sep 12, 2016 at 12:15:40PM -0300, Fabio Estevam wrote:
+> Hi Akshay and Charles,
 > 
-> After looking more, I find the main purpose of this switch is
-> what it writes, FORCE DSI SELECTION TO USB HOST MODE
+> On Mon, Sep 12, 2016 at 12:09 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
 > 
-> When the switch is on, the system is host-only.
-> When the switch is off, the default role is device mode, and
-> switch the role through gpio USB_SW_SEL_PM by software.
+> > Hi Fabio, Shawn,
+> >
+> > Advantech tested the v5 patch series on imx6q-b450v3 board (with 4.7
+> > kernel) and confirmed the patch fixes the lvds blank display issue
+> > being seen on some imx6q-b450v3 boards.
+> >
+> > Details below:
+> > With the patch applied:
+> > Board # 1: 100 times power on/off, no LVDS display failure
+> > Board # 2: 100 times power on/off, no LVDS display failure
+> >
+> > Without the patch:
+> > Board # 1: LVDS display failure (blank display output) at 4th time power on/off.
+> > Board # 2: LVDS display failure (blank display output) at 3rd time power on/off.
+> >
+> > Tested-by: Charles Kang <Charles.Kang@advantech.com.tw>
+> 
+> Thanks for testing it.
+> 
+> > Since the patch has been reviewed and confirmed to fix display
+> > failures on 2 different boards (imx6q-evi and imx6q-b450v3), can it be
+> > applied?
+> 
+> Yes, I think this series is in a good shape now.
+> 
+> Shawn,
+> 
+> Are you happy with it?
 
-Correct.
+Acked-by: Shawn Guo <shawnguo@kernel.org>
 
-> 
-> > > 
-> > > 2. Using USB_HS_ID as vbus-gpio (input), and USB_SW_SEL as id-gpio (output)
-> > 
-> > This is pretty much what has been implemented. USB_HS_ID is an
-> > extcon-usb-gpio.c device.
-> 
-> At some designs, this gpio is tied to ID pin at MicroB connector, and
-> using a Mirco-AB cable to switch the role.
-> 
-> > 
-> > > I can't find hardware relationship between each other, maybe I miss
-> > > something.
-> > 
-> > I believe USB_SW_SEL is the physical switch (218-4LPST) while
-> > USB_SW_SEL_PM is the software controllable part using a GPIO. USB_HS_ID
-> > is just the vbus line from the uB connector and that line goes straight
-> > into the SoC via a GPIO.
-> > 
-> > > This use case (design) seems strange, usually, we use ID pin controls
-> > > vbus, but seldom use vbus pin control ID.
-> > > How you would like to implement it? When the USB cable is connected
-> > > (between PC), it receives vbus-gpio interrupt, then you set USB_SW_SEL
-> > > as low? If disconnected, you set USB_SW_SEL as high?
-> > 
-> > Right. The documented behavior is to detect the micro-usb cable and
-> > drive USB_SW_SEL low. When the cable is unplugged we drive USB_SW_SEL
-> > high. Maybe that should be changed though? If we always sampled
-> > USB_SW_SEL as a USB_HOST extcon and the vbus line as a USB extcon then
-> > we could allow the user to decide either with the physical switch or
-> > with some sort of software control to toggle that gpio.
-> > 
-> > > When the USB controller works at Host mode, what will happen if the user
-> > > connects USB cable at device port?
-> > 
-> > The devices on the two type-A connectors will be disconnected and we'll
-> > switch from host mode to device mode.
-> > 
-> > > 
-> > > 3. Using sysfs to switch the role
-> > > Set USB_SW_SEL according to "role" at debugfs
-> > 
-> > sysfs isn't debugfs, but yes I wonder if we need to worry about the
-> > debugfs role switching support here and toggle the gpio manually without
-> > involving extcon. That would mean we need to have a way for the chipidea
-> > controller to toggle this gpio/mux itself.
-> > 
-> > > 
-> > > Which one you would like to implement? Or anything else I miss?
-> > > 
-> > 
-> > Mostly #2, but I'm concerned that the DT binding is going to force that
-> > decision on others who may have the same switch and want to do #1 or #3.
-> > So how to design it in a way that makes it work in all cases? Also, what
-> > to do if the USB_SW_SEL switch is driven high by the physical switch?
-> > That will "override" any software control we might be able to use, so
-> > hopefully we can detect this somehow and prevent the role switch from
-> > happening.
-> 
-> From my point, the physical switch is only used to force host mode. The
-> #1 and #2 can't be supported at the same time.
+Please send it to clk maintainers for applying.
 
-Sure. I mean to say support all use cases with the same DT binding.
-
-> For #3, it is not the
-> use case for this design. #3 is usually used for the single port which
-> needs to support switching role on the fly without disconnection.
-> So, you may only need to consider #2, you can't use extcon-usb-gpio.c
-> directly since you need to set one gpio to mux the dp/dm, Baolu Lu had
-> USB MUX patch set before which may satisfy your requirement. [1]
-
-Ok. Did the usb mux patches go anywhere? It seemed to get tangled up in
-DRD framework and I haven't been following along. I'll look into these
-patches more.
+Shawn
