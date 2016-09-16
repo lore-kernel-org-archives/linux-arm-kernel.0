@@ -1,62 +1,27 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 16 Sep 2016 13:53:15 +0300
-Subject: [PATCH] dmaengine: omap-dma: Enable burst and data pack for SG
-Message-ID: <20160916105315.28320-1-peter.ujfalusi@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 16 Sep 2016 13:00:12 +0200
+Subject: [PATCH v2] dmaengine: s3c24xx: Add dma_slave_map for s3c2440
+ devices
+In-Reply-To: <1473968506-4150-1-git-send-email-sam.van.den.berge@telenet.be>
+References: <CGME20160915194202eucas1p2fa3c4d1c9713e3713f956e1b114e1525@eucas1p2.samsung.com>
+ <1473968506-4150-1-git-send-email-sam.van.den.berge@telenet.be>
+Message-ID: <b8d6e8a9-4807-0dc0-95c8-a4aca89f18e7@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Misael Lopez Cruz <misael.lopez@ti.com>
+On 09/15/2016 09:41 PM, Sam Van Den Berge wrote:
+> @@ -445,10 +446,44 @@ static struct s3c24xx_dma_channel s3c2440_dma_channels[DMACH_MAX] = {
+>  	[DMACH_USB_EP4] = { S3C24XX_DMA_APB, true, S3C24XX_DMA_CHANREQ(4, 3), },
+>  };
+>  
+> +static const struct dma_slave_map s3c2440_dma_slave_map[] = {
+> +	/* TODO: DMACH_XD0 */
+> +	/* TODO: DMACH_XD1 */
+> +	{ "3c2440-sdi", "rx-tx", (void *)DMACH_SDI },
 
-Enable the burst and data pack modes for the scatter-gather
-in order to improve the throughput of the data transfers.
+Thanks for the patch, still device name needs to be changed here
+to "s3c2440-sdi".
 
-The improvement has been verified with MMC HS200 mode in
-the DRA72 EVM using the iozone tool to compare the read
-throughput (in kB/s) with and without burst/pack for
-different reclens (in kB).
-
-                              With
-    reclen    Baseline   sDMA burst/pack
-    ------    --------   ---------------
-       64       46568         50820
-      128       57564         63413
-      256       65634         74937
-      512       72427         83483
-     1024       74563         84504
-     2048       76265         86079
-     4096       78045         87335
-     8192       78989         88154
-    16384       81265         91034
-
-Signed-off-by: Misael Lopez Cruz <misael.lopez@ti.com>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- drivers/dma/omap-dma.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 1b7f5f32bf74..7ca27d4b1c54 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -904,13 +904,16 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
- 	d->es = es;
- 
- 	d->ccr = c->ccr | CCR_SYNC_FRAME;
--	if (dir == DMA_DEV_TO_MEM)
-+	if (dir == DMA_DEV_TO_MEM) {
- 		d->ccr |= CCR_DST_AMODE_POSTINC | CCR_SRC_AMODE_CONSTANT;
--	else
-+		d->csdp = CSDP_DST_BURST_64 | CSDP_DST_PACKED;
-+	} else {
- 		d->ccr |= CCR_DST_AMODE_CONSTANT | CCR_SRC_AMODE_POSTINC;
-+		d->csdp = CSDP_SRC_BURST_64 | CSDP_SRC_PACKED;
-+	}
- 
- 	d->cicr = CICR_DROP_IE | CICR_BLOCK_IE;
--	d->csdp = es;
-+	d->csdp |= es;
- 
- 	if (dma_omap1()) {
- 		d->cicr |= CICR_TOUT_IE;
--- 
-2.10.0
+--
+Regards,
+Sylwester
