@@ -1,90 +1,83 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 16 Sep 2016 14:19:18 +0200
-Subject: [PATCH v4] mtd: nand: automate NAND timings selection
-In-Reply-To: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
-References: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20160916141918.0353f65f@bbrezillon>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Fri, 16 Sep 2016 17:50:47 +0530
+Subject: [PATCH v5 0/6] arm/arm64: vgic-new: Implement API for vGICv3 live
+ migration
+Message-ID: <1474028453-29132-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Sep 2016 10:32:44 +0200
-Sascha Hauer <s.hauer@pengutronix.de> wrote:
+From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 
-> This series aims at automating the NAND timings selection which is
-> currently supposed to be done in each NAND controller driver, thus
-> simplifying drivers implementation.
-> 
-> As suggested by Boris this version of the series introduces a nand_reset()
-> function which replaces the several open coded NAND_CMD_RESET commands
-> in the code. This makes sure we can apply the timing each time after
-> after reset.
-> 
-> Also I have brought back the conversion patch for teh sunxi driver whic
-> was part of Boris initial posting. It's untested due to the lack of hardware,
-> so please test before applying.
+This patchset adds API for saving and restoring
+of VGICv3 registers to support live migration with new vgic feature.
+This API definition is as per version of VGICv3 specification
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
 
-Applied after fixing a few coding style issues (to make checkpatch
-happy), and exporting the onfi_init_data_interface() function (not sure
-it's the best solution, but at least, it's consistent with the other
-functions defined in nand_timings.c).
+Compatible live migration QEMU patches will be sent later.
 
-Thanks,
+The patch 3 & 4 are picked from the Pavel's previous implementation.
+http://www.spinics.net/lists/kvm/msg122040.html
 
-Boris
+v4 => v5:
+ - ICC_CTLR_EL1 access is updated to reflect HW values
+ - Updated ICC reg access mask and shift macros
+ - Introduced patch 4 for VMCR changes
+ - Other minor fixes.
+v3 => v4:
+ - Rebased to latest code base
+ - Moved vgic_uaccess() from vgic-mmio-v2.c to vgic-mmio.c
+ - Dropped macro REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED_UACCESS
+ - Dropped LE conversion for userspace access
+ - Introduced vgic_uaccess_write_pending() for ISPENDR write
+ - Change macro KVM_DEV_ARM_VGIC_V3_CPUID_MASK to KVM_DEV_ARM_VGIC_V3_MIDR_MASK
+ - Refactored some code as common code.
+ - Changed handing of ICC_* registers
+ - Allowed ICC_SRE_EL1 read by userspace
+ - Fixed KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_* macros
 
-> 
-> Sascha
-> 
-> Changes since v4:
-> - Change onfi_init_data_interface() prototype to be more future proof as
->   requested by Boris
-> 
-> Changes since v3:
-> - Bring back patch dropped in v3
-> - Use statically allocated default timing for all chips and store one
->   optimized timing in struct nand_chip
-> 
-> Changes since v2:
-> - Add accessor function to get the SDR timing from struct nand_data_interface
-> - Change nand_reset() argument to struct nand_chip
-> - Drop conversion of nand_timing array to struct nand_data_interface
-> - Recalculate timing whenever needed instead of storing a pointer in struct
->   nand_chip
-> - some more refactoring
-> 
-> Changes since v1:
-> - create a nand_reset() function to create a single place to reset NAND
->   chips and to apply timings
-> - Add patch to convert sunxi driver for automated timing setup
-> - split into more patches
-> 
-> Changes since the initial posting from Boris:
-> 
-> - Integrate Feedback from Ezequiel Garcia
-> - When iterating over the chips calling onfi_set_features() for each
->   bail out when any of the calls fail, not only the last one.
-> - When one of the onfi_set_features() calls fail then reset the chipi
->   afterwards.
-> - Drop Sunxi example, add patch for the mxc_nand controller instead.
-> 
-> ----------------------------------------------------------------
-> 
-> Boris Brezillon (1):
->       mtd: nand: automate NAND timings selection
-> 
-> Sascha Hauer (8):
->       mtd: nand: Create a NAND reset function
->       mtd: nand: Introduce nand_data_interface
->       mtd: nand: convert ONFI mode into data interface
->       mtd: nand: Add function to convert ONFI mode to data_interface
->       mtd: nand: Expose data interface for ONFI mode 0
->       mtd: nand: sunxi: switch from manual to automated timing config
->       mtd: nand: mxc: implement onfi get/set features
->       mtd: nand: mxc: Add timing setup for v2 controllers
-> 
->  drivers/mtd/nand/mxc_nand.c     | 133 ++++++++++++
->  drivers/mtd/nand/nand_base.c    | 179 ++++++++++++++-
->  drivers/mtd/nand/nand_timings.c | 469 ++++++++++++++++++++++------------------
->  drivers/mtd/nand/sunxi_nand.c   |  76 ++-----
->  include/linux/mtd/nand.h        | 190 +++++++++++-----
->  5 files changed, 721 insertions(+), 326 deletions(-)
+v2 => v3:
+ - Implemented separate API for ISPENDR and ICPENDR to
+   read soft_pending instead of pending for level triggerred interrupts
+ - Implemented ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO to access line level
+ - Rebased on top of Christoffer's patch set
+   http://www.spinics.net/lists/kvm/msg136840.html
+
+ NOTE: GICD_STATUSR and GICR_STATUSR are implemented as RAZ/WI.
+
+v1 => v2:
+ - The init sequence change patch is no more required.
+   Fixed in patch 2 by using static vgic_io_dev regions structure instead
+   of using dynamic allocation pointer.
+ - Updated commit message of patch 4.
+ - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
+   Used local variable for 32-bit access.
+ - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
+   arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
+
+
+Vijaya Kumar K (6):
+  arm/arm64: vgic-new: Implement support for userspace access
+  arm/arm64: vgic-new: Add distributor and redistributor access
+  arm/arm64: vgic-new: Introduce find_reg_by_id()
+  arm/arm64: vgic-new: Introduce VENG0 and VENG1 fields to vmcr struct
+  arm/arm64: vgic-new: Implement VGICv3 CPU interface access
+  arm/arm64: vgic-new: Implement KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+
+ arch/arm64/include/uapi/asm/kvm.h   |  13 ++
+ arch/arm64/kvm/Makefile             |   1 +
+ arch/arm64/kvm/sys_regs.c           |  22 ++-
+ arch/arm64/kvm/sys_regs.h           |   4 +
+ include/linux/irqchip/arm-gic-v3.h  |  45 +++++-
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 226 +++++++++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio-v2.c    |  57 +------
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    | 199 +++++++++++++++++++++---
+ virt/kvm/arm/vgic/vgic-mmio.c       | 149 +++++++++++++++++-
+ virt/kvm/arm/vgic/vgic-mmio.h       |  28 ++++
+ virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 296 ++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c         |  10 +-
+ virt/kvm/arm/vgic/vgic.h            |  23 +++
+ 13 files changed, 969 insertions(+), 104 deletions(-)
+ create mode 100644 virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+
+-- 
+1.9.1
