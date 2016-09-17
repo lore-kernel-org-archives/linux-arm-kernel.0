@@ -1,60 +1,43 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 17 Sep 2016 22:00:17 +0200
-Subject: [PATCH v2] ARM: dts: exynos: Add entries for sound support on
- Odroid-XU board
-In-Reply-To: <71286ef8-4b7f-cfde-7bb9-9f3bd2289527@samsung.com>
-References: <CGME20160916112217eucas1p1694395dda2a1e8cdf562007ed8141542@eucas1p1.samsung.com>
- <1474024920-32744-1-git-send-email-s.nawrocki@samsung.com>
- <f4d204d8-b6b8-5173-c530-bfea1ec9ed7d@samsung.com>
- <71286ef8-4b7f-cfde-7bb9-9f3bd2289527@samsung.com>
-Message-ID: <20160917200017.GA13666@kozik-lap>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sat, 17 Sep 2016 22:13:46 +0200
+Subject: [PATCH devicetree] ARM: BCM53573: Specify PMU and its ILP clock in
+ the DT
+Message-ID: <20160917201346.15060-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 01:58:32PM +0200, Krzysztof Kozlowski wrote:
-> On 09/16/2016 01:25 PM, Sylwester Nawrocki wrote:
-> > On 09/16/2016 01:22 PM, Sylwester Nawrocki wrote:
-> >> This patch adds device nodes for the AUDSS clock controller,
-> >> peripheral DMA 0/1 controllers and the Audio Subsystem I2S controller.
-> >> These entries are required for sound support on Odroid-XU board.
-> >>
-> >> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> >> ---
-> >> This patch depends on a patch adding clock ID macro definitions.
-> >> I'm going to provide a topic branch containing required changes.
-> >>
-> >> Changes since v1:
-> >>  - GIC_SPI, IRQ_TYPE_NONE used in the PDMA and max98080 interrupt
-> >>    specifiers,
-> >>  - assigned-clock-* properties moved to respective controller
-> >>    nodes.
-> > 
-> > And here is a pull request containing clk dependency patches:
-> > 
-> > The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
-> > 
-> >   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.9-exynos54x0-dt
-> > 
-> > for you to fetch changes up to 58d6506f327e3d192998ba03632f546da221b8d8:
-> > 
-> >   clk: samsung: exynos5410: Add clock IDs for PDMA and EPLL clocks (2016-09-09
-> > 10:13:02 +0200)
-> > 
-> 
-> Pulled and applied, thanks!
->
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-This does not boot...
-http://www.krzk.eu/builders/boot-odroid-xu-exynos/builds/216
-http://www.krzk.eu/builders/boot-odroid-xu-multi_v7/builds/195
+ILP clock (sometimes called a "slow clock") is a part of PMU (Power
+Management Unit). There has been recently added a driver for it, so add
+a proper entry in the DT as well.
 
-I am going to send pull request this weekend (or Monday) so probably this
-won't be included. If by any chance you prepare a fix soon, then it
-will save me from rebasing the branch.
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+ arch/arm/boot/dts/bcm53573.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/bcm53573.dtsi b/arch/arm/boot/dts/bcm53573.dtsi
+index efa07de..e2c496a 100644
+--- a/arch/arm/boot/dts/bcm53573.dtsi
++++ b/arch/arm/boot/dts/bcm53573.dtsi
+@@ -143,5 +143,17 @@
+ 		gmac1: ethernet at b000 {
+ 			reg = <0xb000 0x1000>;
+ 		};
++
++		pmu at 12000 {
++			compatible = "simple-mfd", "syscon";
++			reg = <0x00012000 0x00001000>;
++
++			ilp: ilp {
++				compatible = "brcm,bcm53573-ilp";
++				clocks = <&alp>;
++				#clock-cells = <0>;
++				clock-output-names = "ilp";
++			};
++		};
+ 	};
+ };
+-- 
+2.9.3
