@@ -1,36 +1,40 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 17 Sep 2016 12:08:10 +0200
-Subject: [PATCH v2] musb: Export musb_root_disconnect for use in modules
-Message-ID: <20160917100810.2406-1-hdegoede@redhat.com>
+Date: Sat, 17 Sep 2016 12:12:04 +0200
+Subject: [PATCH] musb: Export musb_root_disconnect for use in modules
+In-Reply-To: <20160916155608.GA31257@kroah.com>
+References: <20160916145936.3297-1-hdegoede@redhat.com>
+ <20160916154701.GA20742@kroah.com> <20160916155317.GE27974@sirena.org.uk>
+ <20160916155608.GA31257@kroah.com>
+Message-ID: <9e474920-2ebd-8d38-7c7b-d8e894dc2568@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export musb_root_disconnect for use in modules, so that musb glue
-code build as module can use it.
+Hi,
 
-This fixes the buildbot errors for -next in arm64-allmodconfig
-and arm-allmodconfig.
+On 16-09-16 17:56, Greg Kroah-Hartman wrote:
+> On Fri, Sep 16, 2016 at 04:53:17PM +0100, Mark Brown wrote:
+>> On Fri, Sep 16, 2016 at 05:47:01PM +0200, Greg Kroah-Hartman wrote:
+>>> On Fri, Sep 16, 2016 at 04:59:36PM +0200, Hans de Goede wrote:
+>>
+>>>> +EXPORT_SYMBOL_GPL(musb_root_disconnect);
+>>
+>>> Does this fix a build error somehow?  Who reported it?
+>>
+>> Yes, the sunxi driver uses this symbol and the build bots reported it
+>> yesterday.
+>
+> then all of that should have been in this patch :(
+>
+> So much for me trying to be subtle...
 
-Fixes: 7cba17ec9adc8cf ("musb: sunxi: Add support for platform_set_mode")
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Add Fixes tag and buildbot reference to the commit msg
----
- drivers/usb/musb/musb_virthub.c | 1 +
- 1 file changed, 1 insertion(+)
+Sorry, you're right, I'll add a Fixes tag, and I'll mention
+this fixes a buildbot reported error too.
 
-diff --git a/drivers/usb/musb/musb_virthub.c b/drivers/usb/musb/musb_virthub.c
-index fe08e77..61b5f1c 100644
---- a/drivers/usb/musb/musb_virthub.c
-+++ b/drivers/usb/musb/musb_virthub.c
-@@ -245,6 +245,7 @@ void musb_root_disconnect(struct musb *musb)
- 			usb_otg_state_string(musb->xceiv->otg->state));
- 	}
- }
-+EXPORT_SYMBOL_GPL(musb_root_disconnect);
- 
- 
- /*---------------------------------------------------------------------*/
--- 
-2.9.3
+I'll do a v2 with this right away.
+
+For the next time, is there any official format to
+mention the buildbot report or some such ?
+
+Regards,
+
+Hans
