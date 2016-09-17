@@ -1,45 +1,45 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sat, 17 Sep 2016 17:34:26 +0200
-Subject: [PATCH 22/24] ste_dma40: Rename a jump label in dma_tasklet()
+Date: Sat, 17 Sep 2016 17:35:31 +0200
+Subject: [PATCH 23/24] ste_dma40: Rename a jump label in
+ __d40_execute_command_phy()
 In-Reply-To: <92810066-69b6-94e7-dcec-a28594b1328f@users.sourceforge.net>
 References: <566ABCD9.1060404@users.sourceforge.net>
  <92810066-69b6-94e7-dcec-a28594b1328f@users.sourceforge.net>
-Message-ID: <85371665-dd15-287b-d459-1f54fcfd525b@users.sourceforge.net>
+Message-ID: <9c61e57a-13ea-0c0e-5dd3-046ffaaa9e98@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sat, 17 Sep 2016 16:23:43 +0200
+Date: Sat, 17 Sep 2016 16:28:54 +0200
 
 Adjust a jump label according to the current Linux coding style convention.
 
 Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 ---
- drivers/dma/ste_dma40.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/dma/ste_dma40.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 4a2f39b..0082ae0 100644
+index 0082ae0..01fe3a2 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -1606,7 +1606,7 @@ static void dma_tasklet(unsigned long data)
- 		/* Check if we have reached here for cyclic job */
- 		d40d = d40_first_active_get(d40c);
- 		if (d40d == NULL || !d40d->cyclic)
--			goto err;
-+			goto check_pending_tx;
+@@ -1083,7 +1083,7 @@ static int __d40_execute_command_phy(struct d40_chan *d40c,
+ 			D40_CHAN_POS(d40c->phy_chan->num);
+ 
+ 		if (status == D40_DMA_SUSPENDED || status == D40_DMA_STOP)
+-			goto done;
++			goto unlock;
  	}
  
- 	if (!d40d->cyclic)
-@@ -1648,8 +1648,7 @@ static void dma_tasklet(unsigned long data)
- 		dmaengine_desc_callback_invoke(&cb, NULL);
+ 	wmask = 0xffffffff & ~(D40_CHAN_POS_MASK(d40c->phy_chan->num));
+@@ -1119,7 +1119,7 @@ static int __d40_execute_command_phy(struct d40_chan *d40c,
+ 		}
  
- 	return;
--
--err:
-+ check_pending_tx:
- 	/* Rescue manouver if receiving double interrupts */
- 	if (d40c->pending_tx > 0)
- 		d40c->pending_tx--;
+ 	}
+-done:
++ unlock:
+ 	spin_unlock_irqrestore(&d40c->base->execmd_lock, flags);
+ 	return ret;
+ }
 -- 
 2.10.0
