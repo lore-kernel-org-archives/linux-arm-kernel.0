@@ -1,181 +1,359 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Sat, 17 Sep 2016 23:00:00 +0530
-Subject: [PATCH 06/10] ARM: dts: exynos: Fix invalid GIC interrupt flags
- in exynos5
-In-Reply-To: <1474054971-16831-7-git-send-email-krzk@kernel.org>
-References: <1474054971-16831-1-git-send-email-krzk@kernel.org>
- <1474054971-16831-7-git-send-email-krzk@kernel.org>
-Message-ID: <CAGOxZ52Aqp+_fcOMJuB2ouHzOMzX4s_mP1jDrgYYtNAx+rDXJg@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat, 17 Sep 2016 19:31:23 +0200
+Subject: [PATCH] mtd: s3c2410: add device tree support
+In-Reply-To: <1474125760-28168-1-git-send-email-sergio.prado@e-labworks.com>
+References: <1474125760-28168-1-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <20160917193123.762587d0@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 17, 2016 at 1:12 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> Interrupt of type IRQ_TYPE_NONE is not allowed for GIC interrupts and
-> generates an error:
->         genirq: Setting trigger mode 0 for irq 16 failed (gic_set_type+0x0/0x68)
->
-> The GIC requires shared interrupts to be edge rising or level high.
-> Platform declares support for both.  Choose level high everywhere.
->
-> Reported-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Reported-by: Alban Browaeys <alban.browaeys@gmail.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Hi Sergio,
+
+On Sat, 17 Sep 2016 12:22:40 -0300
+Sergio Prado <sergio.prado@e-labworks.com> wrote:
+
+> Tested on FriendlyARM Mini2440
+> 
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
 > ---
+>  .../devicetree/bindings/mtd/samsung-s3c2410.txt    |  70 +++++++++++
 
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+DT maintainers usually ask people to keep the DT bindings doc in a
+separate patch.
 
-Tested in exynos5800, so
+>  drivers/mtd/nand/s3c2410.c                         | 129 ++++++++++++++++++++-
+>  include/linux/platform_data/mtd-nand-s3c2410.h     |   1 +
+>  3 files changed, 195 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt b/Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
+> new file mode 100644
+> index 000000000000..1c39f6cf483b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
+> @@ -0,0 +1,70 @@
+> +* Samsung S3C2410 and compatible NAND flash controller
+> +
+> +Required properties:
+> +- compatible : The possible values are:
+> +	"samsung,s3c2410-nand"
+> +	"samsung,s3c2412-nand"
+> +	"samsung,s3c2440-nand"
+> +	"samsung,s3c6400-nand"
+> +- reg : register's location and length.
+> +- #address-cells, #size-cells : see nand.txt
+> +- clocks : phandle to the nand controller clock
+> +- clock-names : must contain "nand"
+> +
+> +Optional properties:
+> +- samsung,tacls : time for active CLE/ALE to nWE/nOE
+> +- samsung,twrph0 : active time for nWE/nOE
+> +- samsung,twrph1 : time for release CLE/ALE from nWE/nOE inactive
 
-Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
+Can you try to extract these information from the nand_sdr_timings
+struct instead of passing it in your DT?
 
->  arch/arm/boot/dts/exynos5.dtsi | 60 ++++++++++++++++++++++++++++++------------
->  1 file changed, 43 insertions(+), 17 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-> index 8f06609879f5..d9b1607db5ad 100644
-> --- a/arch/arm/boot/dts/exynos5.dtsi
-> +++ b/arch/arm/boot/dts/exynos5.dtsi
-> @@ -13,6 +13,7 @@
->   * published by the Free Software Foundation.
->   */
->
-> +#include <dt-bindings/interrupt-controller/irq.h>
->  #include "exynos-syscon-restart.dtsi"
->
->  / {
-> @@ -53,14 +54,38 @@
->                         interrupt-controller;
->                         samsung,combiner-nr = <32>;
->                         reg = <0x10440000 0x1000>;
-> -                       interrupts =    <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-> -                                       <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-> -                                       <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> -                                       <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
-> -                                       <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
-> -                                       <0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
-> -                                       <0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
-> -                                       <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
-> +                       interrupts = <0 0 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 1 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 2 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 3 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 4 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 5 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 6 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 7 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 8 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 9 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 10 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 11 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 12 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 13 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 14 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 15 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 16 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 17 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 18 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 19 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 20 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 21 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 22 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 23 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 24 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 25 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 26 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 27 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 28 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 29 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 30 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 31 IRQ_TYPE_LEVEL_HIGH>;
->                 };
->
->                 gic: interrupt-controller at 10481000 {
-> @@ -82,31 +107,31 @@
->                 serial_0: serial at 12C00000 {
->                         compatible = "samsung,exynos4210-uart";
->                         reg = <0x12C00000 0x100>;
-> -                       interrupts = <0 51 0>;
-> +                       interrupts = <0 51 IRQ_TYPE_LEVEL_HIGH>;
->                 };
->
->                 serial_1: serial at 12C10000 {
->                         compatible = "samsung,exynos4210-uart";
->                         reg = <0x12C10000 0x100>;
-> -                       interrupts = <0 52 0>;
-> +                       interrupts = <0 52 IRQ_TYPE_LEVEL_HIGH>;
->                 };
->
->                 serial_2: serial at 12C20000 {
->                         compatible = "samsung,exynos4210-uart";
->                         reg = <0x12C20000 0x100>;
-> -                       interrupts = <0 53 0>;
-> +                       interrupts = <0 53 IRQ_TYPE_LEVEL_HIGH>;
->                 };
->
->                 serial_3: serial at 12C30000 {
->                         compatible = "samsung,exynos4210-uart";
->                         reg = <0x12C30000 0x100>;
-> -                       interrupts = <0 54 0>;
-> +                       interrupts = <0 54 IRQ_TYPE_LEVEL_HIGH>;
->                 };
->
->                 i2c_0: i2c at 12C60000 {
->                         compatible = "samsung,s3c2440-i2c";
->                         reg = <0x12C60000 0x100>;
-> -                       interrupts = <0 56 0>;
-> +                       interrupts = <0 56 IRQ_TYPE_LEVEL_HIGH>;
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         samsung,sysreg-phandle = <&sysreg_system_controller>;
-> @@ -116,7 +141,7 @@
->                 i2c_1: i2c at 12C70000 {
->                         compatible = "samsung,s3c2440-i2c";
->                         reg = <0x12C70000 0x100>;
-> -                       interrupts = <0 57 0>;
-> +                       interrupts = <0 57 IRQ_TYPE_LEVEL_HIGH>;
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         samsung,sysreg-phandle = <&sysreg_system_controller>;
-> @@ -126,7 +151,7 @@
->                 i2c_2: i2c at 12C80000 {
->                         compatible = "samsung,s3c2440-i2c";
->                         reg = <0x12C80000 0x100>;
-> -                       interrupts = <0 58 0>;
-> +                       interrupts = <0 58 IRQ_TYPE_LEVEL_HIGH>;
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         samsung,sysreg-phandle = <&sysreg_system_controller>;
-> @@ -136,7 +161,7 @@
->                 i2c_3: i2c at 12C90000 {
->                         compatible = "samsung,s3c2440-i2c";
->                         reg = <0x12C90000 0x100>;
-> -                       interrupts = <0 59 0>;
-> +                       interrupts = <0 59 IRQ_TYPE_LEVEL_HIGH>;
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         samsung,sysreg-phandle = <&sysreg_system_controller>;
-> @@ -153,7 +178,8 @@
->                 rtc: rtc at 101E0000 {
->                         compatible = "samsung,s3c6410-rtc";
->                         reg = <0x101E0000 0x100>;
-> -                       interrupts = <0 43 0>, <0 44 0>;
-> +                       interrupts = <0 43 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <0 44 IRQ_TYPE_LEVEL_HIGH>;
->                         status = "disabled";
->                 };
->
-> --
-> 2.7.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +- samsung,ignore_unset_ecc : boolean to ignore error when we have
+> +                             0xff,0xff,0xff read ECC, on the
+> +                             assumption that it is an un-eccd page
+> +
+> +Optional children nodes:
+> +Children nodes representing the available nand chips.
+> +
+> +Optional children properties:
+> +- nand-ecc-mode : see nand.txt
+> +- nand-on-flash-bbt : see nand.txt
+> +
+> +Each children device node may optionally contain a 'partitions' sub-node,
+> +which further contains sub-nodes describing the flash partition mapping.
+> +See partition.txt for more detail.
+> +
+> +Example:
+> +
+> +nand at 4e000000 {
 
+s/nand/nand-controller/
 
+> +	compatible = "samsung,s3c2440-nand";
+> +	reg = <0x4e000000 0x40>;
+> +
+> +	#address-cells = <1>;
+> +        #size-cells = <0>;
+> +
+> +	clocks = <&clocks HCLK_NAND>;
+> +	clock-names = "nand";
+> +
+> +	samsung,tacls = <0>;
+> +	samsung,twrph0 = <25>;
+> +	samsung,twrph1 = <15>;
 
--- 
-Regards,
-Alim
+As said above, I think these timings can be extracted from the
+nand_sdr_timings struct, which is know automatically attached to
+nand_chip at detection time.
+
+> +	samsung,ignore_unset_ecc;
+
+Just discovered this ->ignore_unset_ecc property, and I don't
+understand why it's here for...
+Either you don't want to have ECC, and in this case you should set
+NAND_ECC_NONE, or you want to have ECC calculated, and in this case,
+the only valid situation where ECC bytes are 0xff is when the page is
+erased.
+
+If I'm right, please fix the driver instead of adding this DT property.
+If I'm wrong, could you explain in more detail when you have ECC bytes
+set to 0xff?
+
+> +
+> +	nand at 0 {
+
+@0 implies having a reg property. I don't see any in your example, and
+it's not document in the required property list.
+
+Is your controller able to connect to different CS?
+
+> +		nand-ecc-mode = "soft";
+> +		nand-on-flash-bbt;
+> +
+> +		partitions {
+> +			compatible = "fixed-partitions";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +
+> +			partition at 0 {
+> +				label = "u-boot";
+> +				reg = <0 0x040000>;
+> +			};
+> +
+> +			partition at 40000 {
+> +				label = "kernel";
+> +				reg = <0x040000 0x500000>;
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> index d9309cf0ce2e..ecbb9c9c1e9a 100644
+> --- a/drivers/mtd/nand/s3c2410.c
+> +++ b/drivers/mtd/nand/s3c2410.c
+> @@ -39,6 +39,8 @@
+>  #include <linux/slab.h>
+>  #include <linux/clk.h>
+>  #include <linux/cpufreq.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/nand.h>
+> @@ -185,6 +187,26 @@ struct s3c2410_nand_info {
+>  #endif
+>  };
+>  
+> +struct s3c24XX_nand_devtype_data {
+> +	enum s3c_cpu_type type;
+> +};
+> +
+> +struct s3c24XX_nand_devtype_data s3c2410_nand_devtype_data = {
+> +	.type = TYPE_S3C2410,
+> +};
+> +
+> +struct s3c24XX_nand_devtype_data s3c2412_nand_devtype_data = {
+> +	.type = TYPE_S3C2412,
+> +};
+> +
+> +struct s3c24XX_nand_devtype_data s3c2440_nand_devtype_data = {
+> +	.type = TYPE_S3C2440,
+> +};
+> +
+> +struct s3c24XX_nand_devtype_data s3c6400_nand_devtype_data = {
+> +	.type = TYPE_S3C2412,
+> +};
+> +
+>  /* conversion functions */
+>  
+>  static struct s3c2410_nand_mtd *s3c2410_nand_mtd_toours(struct mtd_info *mtd)
+> @@ -813,6 +835,8 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
+>  	struct nand_chip *chip = &nmtd->chip;
+>  	void __iomem *regs = info->regs;
+>  
+> +	nand_set_flash_node(chip, set->of_node);
+> +
+>  	chip->write_buf    = s3c2410_nand_write_buf;
+>  	chip->read_buf     = s3c2410_nand_read_buf;
+>  	chip->select_chip  = s3c2410_nand_select_chip;
+> @@ -947,6 +971,96 @@ static void s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
+>  	}
+>  }
+>  
+> +#ifdef CONFIG_OF_MTD
+
+Hm, I thought this symbol had been dropped, but apparently I forgot to
+remove it. You should make it dependent on CONFIG_OF, not CONFIG_OF_MTD.
+
+Anyway, I'm not even sure this ifdef is needed. Just test if
+pdev->dev.of_node is NULL in s3c24xx_nand_probe_dt() and return -1 in
+this case.
+
+> +static const struct of_device_id s3c24xx_nand_dt_ids[] = {
+> +	{
+> +		.compatible = "samsung,s3c2410-nand",
+> +		.data = &s3c2410_nand_devtype_data,
+> +	}, {
+> +		.compatible = "samsung,s3c2412-nand",
+> +		.data = &s3c2412_nand_devtype_data,
+> +	}, {
+> +		.compatible = "samsung,s3c2440-nand",
+> +		.data = &s3c2440_nand_devtype_data,
+> +	}, {
+> +		.compatible = "samsung,s3c6400-nand",
+> +		.data = &s3c6400_nand_devtype_data,
+> +	},
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, s3c24xx_nand_dt_ids);
+> +
+> +static int s3c24xx_nand_probe_dt(struct platform_device *pdev)
+> +{
+> +	const struct s3c24XX_nand_devtype_data *devtype_data;
+> +	struct s3c2410_platform_nand *pdata;
+> +	struct s3c2410_nand_info *info = platform_get_drvdata(pdev);
+> +	struct device_node *np = pdev->dev.of_node, *child;
+> +	const struct of_device_id *of_id;
+> +	struct s3c2410_nand_set *sets;
+> +
+> +	of_id = of_match_device(s3c24xx_nand_dt_ids, &pdev->dev);
+> +	if (!of_id)
+> +		return 1;
+> +
+> +	devtype_data = of_id->data;
+> +	info->cpu_type = devtype_data->type;
+> +
+> +	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata)
+> +		return -ENOMEM;
+> +
+> +	pdev->dev.platform_data = pdata;
+> +
+> +	of_property_read_u32(np, "samsung,tacls",  &pdata->tacls);
+> +	of_property_read_u32(np, "samsung,twrph0", &pdata->twrph0);
+> +	of_property_read_u32(np, "samsung,twrph1", &pdata->twrph1);
+> +
+> +	if (of_get_property(np, "samsung,ignore_unset_ecc", NULL))
+> +		pdata->ignore_unset_ecc = 1;
+> +
+> +	pdata->nr_sets = of_get_child_count(np);
+> +	if (!pdata->nr_sets)
+> +		return 0;
+> +
+> +	sets = devm_kzalloc(&pdev->dev, sizeof(*sets) * pdata->nr_sets,
+> +			   GFP_KERNEL);
+> +	if (!sets)
+> +		return -ENOMEM;
+> +
+> +	pdata->sets = sets;
+> +
+> +	for_each_available_child_of_node(np, child) {
+> +
+> +		sets->name = (char *)child->name;
+> +		sets->of_node = child;
+> +		sets->nr_chips = 1;
+> +
+> +		if (!of_property_match_string(child, "nand-ecc-mode", "none"))
+> +			sets->disable_ecc = 1;
+> +
+> +		if (of_get_property(child, "nand-on-flash-bbt", NULL))
+> +			sets->flash_bbt = 1;
+> +
+
+These properties are automatically extracted in nand_scan_ident(), why
+do you need to parse them twice?
+
+> +		sets++;
+> +	}
+> +
+> +	return 0;
+> +}
+> +#else
+> +static int s3c24xx_nand_probe_dt(struct platform_device *pdev)
+> +{
+> +	return 1;
+> +}
+> +#endif
+> +
+> +static void s3c24xx_nand_probe_pdata(struct platform_device *pdev)
+> +{
+> +	struct s3c2410_nand_info *info = platform_get_drvdata(pdev);
+> +
+> +	info->cpu_type = platform_get_device_id(pdev)->driver_data;
+> +}
+> +
+>  /* s3c24xx_nand_probe
+>   *
+>   * called by device layer when it finds a device matching
+> @@ -956,8 +1070,7 @@ static void s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
+>  */
+>  static int s3c24xx_nand_probe(struct platform_device *pdev)
+>  {
+> -	struct s3c2410_platform_nand *plat = to_nand_plat(pdev);
+> -	enum s3c_cpu_type cpu_type;
+> +	struct s3c2410_platform_nand *plat;
+>  	struct s3c2410_nand_info *info;
+>  	struct s3c2410_nand_mtd *nmtd;
+>  	struct s3c2410_nand_set *sets;
+> @@ -967,8 +1080,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+>  	int nr_sets;
+>  	int setno;
+>  
+> -	cpu_type = platform_get_device_id(pdev)->driver_data;
+> -
+>  	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
+>  	if (info == NULL) {
+>  		err = -ENOMEM;
+> @@ -991,6 +1102,14 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+>  
+>  	s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
+>  
+> +	err = s3c24xx_nand_probe_dt(pdev);
+> +	if (err > 0)
+> +		s3c24xx_nand_probe_pdata(pdev);
+> +	else if (err < 0)
+> +		goto exit_error;
+> +
+> +	plat = to_nand_plat(pdev);
+> +
+>  	/* allocate and map the resource */
+>  
+>  	/* currently we assume we have the one resource */
+> @@ -999,7 +1118,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+>  
+>  	info->device	= &pdev->dev;
+>  	info->platform	= plat;
+> -	info->cpu_type	= cpu_type;
+>  
+>  	info->regs = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(info->regs)) {
+> @@ -1156,6 +1274,7 @@ static struct platform_driver s3c24xx_nand_driver = {
+>  	.id_table	= s3c24xx_driver_ids,
+>  	.driver		= {
+>  		.name	= "s3c24xx-nand",
+> +		.of_match_table = s3c24xx_nand_dt_ids,
+
+If you keep the #ifdef CONFIG_OF section
+
+		.of_match_table = of_match_ptr(s3c24xx_nand_dt_ids),
+
+>  	},
+>  };
+>  
+> diff --git a/include/linux/platform_data/mtd-nand-s3c2410.h b/include/linux/platform_data/mtd-nand-s3c2410.h
+> index c55e42ee57fa..9d20871e4bbd 100644
+> --- a/include/linux/platform_data/mtd-nand-s3c2410.h
+> +++ b/include/linux/platform_data/mtd-nand-s3c2410.h
+> @@ -40,6 +40,7 @@ struct s3c2410_nand_set {
+>  	char			*name;
+>  	int			*nr_map;
+>  	struct mtd_partition	*partitions;
+> +	struct device_node	*of_node;
+>  };
+>  
+>  struct s3c2410_platform_nand {
