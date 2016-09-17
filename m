@@ -1,106 +1,113 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Sat, 17 Sep 2016 11:58:48 +0530
-Subject: [PATCH 5/6] arm/arm64: vgic-new: Implement VGICv3 CPU interface
- access
-In-Reply-To: <57DC26C5.2060800@arm.com>
-References: <1474028453-29132-1-git-send-email-vijay.kilari@gmail.com>
- <1474028453-29132-6-git-send-email-vijay.kilari@gmail.com>
- <57DC0366.8060304@arm.com>
- <CALicx6u-uYLY3DtDGMh3n6NbNH3kD9fn9aYHHJC=LVUQfFjTsQ@mail.gmail.com>
- <57DC26C5.2060800@arm.com>
-Message-ID: <CALicx6ucEH3w58Rhb8Urk0V5kRcqtUdwDYDtSLXrkas-Jatv=A@mail.gmail.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Sat, 17 Sep 2016 13:25:24 +0530
+Subject: [PATCH 1/3] arm: dts: imx6qdl: Fix "WARNING: please,
+ no space before tabs"
+Message-ID: <1474098926-5236-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 10:37 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 16/09/16 17:57, Vijay Kilari wrote:
->> On Fri, Sep 16, 2016 at 8:06 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On 16/09/16 13:20, vijay.kilari at gmail.com wrote:
->>>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>>>
->>>> VGICv3 CPU interface registers are accessed using
->>>> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
->>>> as 64-bit. The cpu MPIDR value is passed along with register id.
->>>> is used to identify the cpu for registers access.
->>>>
->>>> The version of VGIC v3 specification is define here
->>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
->>>>
->>>> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
->>>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>>> ---
->>>>  arch/arm64/include/uapi/asm/kvm.h   |   3 +
->>>>  arch/arm64/kvm/Makefile             |   1 +
->>>>  include/linux/irqchip/arm-gic-v3.h  |  30 ++++
->>>>  virt/kvm/arm/vgic/vgic-kvm-device.c |  27 ++++
->>>>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |  18 +++
->>>>  virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 296 ++++++++++++++++++++++++++++++++++++
->>>>  virt/kvm/arm/vgic/vgic.h            |  10 ++
->>>>  7 files changed, 385 insertions(+)
->
-> [...]
->
->>>> diff --git a/virt/kvm/arm/vgic/vgic-sys-reg-v3.c b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
->>>> new file mode 100644
->>>> index 0000000..8e4f403
->>>> --- /dev/null
->>>> +++ b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
->>>> @@ -0,0 +1,296 @@
->>>> +#include <linux/irqchip/arm-gic-v3.h>
->>>> +#include <linux/kvm.h>
->>>> +#include <linux/kvm_host.h>
->>>> +#include <kvm/iodev.h>
->>>> +#include <kvm/arm_vgic.h>
->>>> +#include <asm/kvm_emulate.h>
->>>> +#include <asm/kvm_arm.h>
->>>> +#include <asm/kvm_mmu.h>
->>>> +
->>>> +#include "vgic.h"
->>>> +#include "vgic-mmio.h"
->>>> +#include "sys_regs.h"
->>>> +
->>>> +static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->>>> +                         const struct sys_reg_desc *r)
->>>> +{
->>>> +     struct vgic_vmcr vmcr;
->>>> +     u64 val;
->>>> +     u32 ich_vtr;
->>>> +
->>>> +     vgic_get_vmcr(vcpu, &vmcr);
->>>> +     if (p->is_write) {
->>>> +             val = p->regval;
->>>> +             vmcr.ctlr &= ~(ICH_VMCR_CBPR_MASK | ICH_VMCR_EOIM_MASK);
->>>> +             vmcr.ctlr |= ((val & ICC_CTLR_EL1_CBPR_MASK) >>
->>>> +                           ICC_CTLR_EL1_CBPR_SHIFT) << ICH_VMCR_CBPR_SHIFT;
->>>> +             vmcr.ctlr |= ((val & ICC_CTLR_EL1_EOImode_MASK) >>
->>>> +                          ICC_CTLR_EL1_EOImode_SHIFT) << ICH_VMCR_EOIM_SHIFT;
->>>> +             vgic_set_vmcr(vcpu, &vmcr);
->>>
->>> You've ignored my comments again: "What if userspace writes something
->>> that is incompatible with the current configuration? Wrong number of ID
->>> bits, or number of priorities?"
->>
->> IMO, In case of incompatibility,
->> If ID bits and PRI bits are less than HW supported, it is ok.
->
-> Yes. But you also need to track of what the guest has programmed in
-> order to be able to migrate it back to its original configuration.
+From: Jagan Teki <jteki@openedev.com>
 
-You mean the vgic has to track/store the ID and PRI bits that guest
-has programmed
-and return the same when guest reads back instead of
-returning HW supported value for ICC_CTLR_EL1 reg access?.
+Fixed no space before tabs warnings in respetcive imx6qdl dtsi files.
 
->
->> If ID bits and PRI bits are greater than HW supported, then warn would be good
->> enough. Please suggest the behaviour that you think it should be.
->
-> No, it is an error, plain and simple. You cannot run in this condition.
->
-[...]
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
+Cc: Shawn Guo <shawnguo@kernel.org>
+Signed-off-by: Jagan Teki <jteki@openedev.com>
+---
+ arch/arm/boot/dts/imx6qdl-apf6dev.dtsi   | 14 +++++++-------
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi       | 32 ++++++++++++++++----------------
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi |  4 ++--
+ 3 files changed, 25 insertions(+), 25 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi b/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi
+index edbce22..5e7792d 100644
+--- a/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-apf6dev.dtsi
+@@ -347,13 +347,13 @@
+ 			fsl,pins = <
+ 				MX6QDL_PAD_DI0_PIN4__GPIO4_IO20		0x100b1
+ 				MX6QDL_PAD_DISP0_DAT18__GPIO5_IO12	0x100b1
+-				MX6QDL_PAD_DISP0_DAT19__GPIO5_IO13 	0x100b1
+-				MX6QDL_PAD_DISP0_DAT20__GPIO5_IO14 	0x100b1
+-				MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15 	0x100b1
+-				MX6QDL_PAD_DISP0_DAT22__GPIO5_IO16 	0x100b1
+-				MX6QDL_PAD_DISP0_DAT23__GPIO5_IO17 	0x100b1
+-				MX6QDL_PAD_CSI0_PIXCLK__GPIO5_IO18 	0x100b1
+-				MX6QDL_PAD_CSI0_VSYNC__GPIO5_IO21  	0x100b1
++				MX6QDL_PAD_DISP0_DAT19__GPIO5_IO13	0x100b1
++				MX6QDL_PAD_DISP0_DAT20__GPIO5_IO14	0x100b1
++				MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15	0x100b1
++				MX6QDL_PAD_DISP0_DAT22__GPIO5_IO16	0x100b1
++				MX6QDL_PAD_DISP0_DAT23__GPIO5_IO17	0x100b1
++				MX6QDL_PAD_CSI0_PIXCLK__GPIO5_IO18	0x100b1
++				MX6QDL_PAD_CSI0_VSYNC__GPIO5_IO21	0x100b1
+ 			>;
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-tx6.dtsi b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+index ac9529f..2bf2e62 100644
+--- a/arch/arm/boot/dts/imx6qdl-tx6.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-tx6.dtsi
+@@ -429,8 +429,8 @@
+ 	pinctrl_edt_ft5x06: edt-ft5x06grp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_NANDF_CS2__GPIO6_IO15	0x1b0b0 /* Interrupt */
+-			MX6QDL_PAD_EIM_A16__GPIO2_IO22  	0x1b0b0 /* Reset */
+-			MX6QDL_PAD_EIM_A17__GPIO2_IO21  	0x1b0b0 /* Wake */
++			MX6QDL_PAD_EIM_A16__GPIO2_IO22		0x1b0b0 /* Reset */
++			MX6QDL_PAD_EIM_A17__GPIO2_IO21		0x1b0b0 /* Wake */
+ 		>;
+ 	};
+ 
+@@ -481,21 +481,21 @@
+ 
+ 	pinctrl_gpmi_nand: gpminandgrp {
+ 		fsl,pins = <
+-			MX6QDL_PAD_NANDF_CLE__NAND_CLE    	0x0b0b1
+-			MX6QDL_PAD_NANDF_ALE__NAND_ALE    	0x0b0b1
+-			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B  	0x0b0b1
++			MX6QDL_PAD_NANDF_CLE__NAND_CLE		0x0b0b1
++			MX6QDL_PAD_NANDF_ALE__NAND_ALE		0x0b0b1
++			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0x0b0b1
+ 			MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0x0b000
+-			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B  	0x0b0b1
+-			MX6QDL_PAD_SD4_CMD__NAND_RE_B     	0x0b0b1
+-			MX6QDL_PAD_SD4_CLK__NAND_WE_B     	0x0b0b1
+-			MX6QDL_PAD_NANDF_D0__NAND_DATA00  	0x0b0b1
+-			MX6QDL_PAD_NANDF_D1__NAND_DATA01  	0x0b0b1
+-			MX6QDL_PAD_NANDF_D2__NAND_DATA02  	0x0b0b1
+-			MX6QDL_PAD_NANDF_D3__NAND_DATA03  	0x0b0b1
+-			MX6QDL_PAD_NANDF_D4__NAND_DATA04  	0x0b0b1
+-			MX6QDL_PAD_NANDF_D5__NAND_DATA05  	0x0b0b1
+-			MX6QDL_PAD_NANDF_D6__NAND_DATA06  	0x0b0b1
+-			MX6QDL_PAD_NANDF_D7__NAND_DATA07  	0x0b0b1
++			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0x0b0b1
++			MX6QDL_PAD_SD4_CMD__NAND_RE_B		0x0b0b1
++			MX6QDL_PAD_SD4_CLK__NAND_WE_B		0x0b0b1
++			MX6QDL_PAD_NANDF_D0__NAND_DATA00	0x0b0b1
++			MX6QDL_PAD_NANDF_D1__NAND_DATA01	0x0b0b1
++			MX6QDL_PAD_NANDF_D2__NAND_DATA02	0x0b0b1
++			MX6QDL_PAD_NANDF_D3__NAND_DATA03	0x0b0b1
++			MX6QDL_PAD_NANDF_D4__NAND_DATA04	0x0b0b1
++			MX6QDL_PAD_NANDF_D5__NAND_DATA05	0x0b0b1
++			MX6QDL_PAD_NANDF_D6__NAND_DATA06	0x0b0b1
++			MX6QDL_PAD_NANDF_D7__NAND_DATA07	0x0b0b1
+ 		>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index 2b9c2be..82dc5744 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -129,8 +129,8 @@
+ 
+ 		pinctrl_i2c1: i2c1grp {
+ 			fsl,pins = <
+-				MX6QDL_PAD_EIM_D21__I2C1_SCL 		0x4001b8b1
+-				MX6QDL_PAD_EIM_D28__I2C1_SDA 		0x4001b8b1
++				MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
++				MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
+ 			>;
+ 		};
+ 
+-- 
+2.7.4
