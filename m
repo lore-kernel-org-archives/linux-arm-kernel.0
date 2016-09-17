@@ -1,217 +1,57 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Sat, 17 Sep 2016 09:16:05 +0800
-Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
-In-Reply-To: <147384330268.13546.17843140335600627152@sboyd-linaro>
-References: <20160914014246.31847-1-stephen.boyd@linaro.org>
- <147384330268.13546.17843140335600627152@sboyd-linaro>
-Message-ID: <20160917011605.GB10392@b29397-desktop>
+From: a0393675@ti.com (Keerthy)
+Date: Sat, 17 Sep 2016 09:23:51 +0530
+Subject: [PATCH v7 0/5] mfd: tps65218: Clean ups
+In-Reply-To: <20160916173620.GB10189@sirena.org.uk>
+References: <1470833641-29546-1-git-send-email-j-keerthy@ti.com>
+ <ab94aff0-8470-57e5-2039-12f09bb0ca33@ti.com>
+ <20160916133153.GB27974@sirena.org.uk>
+ <0a30f210-0a23-0899-51b0-28f200ddd0a4@ti.com>
+ <20160916173620.GB10189@sirena.org.uk>
+Message-ID: <4c5b4ca3-4594-455e-8c0b-2f6cc4e6b8e2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 01:55:02AM -0700, Stephen Boyd wrote:
-> Quoting Stephen Boyd (2016-09-13 18:42:46)
-> > On the db410c 96boards platform we have a TC7USB40MU[1] on the
-> > board to mux the D+/D- lines from the SoC between a micro usb
-> > "device" port and a USB hub for "host" roles. Upon a role switch,
-> > we need to change this mux to forward the D+/D- lines to either
-> > the port or the hub. Therefore, introduce a driver for this
-> > device that intercepts extcon USB_HOST events and logically
-> > asserts a gpio to mux the "host" D+/D- lines when a host cable is
-> > attached. When the cable goes away, it will logically deassert
-> > the gpio and mux the "device" lines.
-> > 
-> > [1] https://toshiba.semicon-storage.com/ap-en/product/logic/bus-switch/detail.TC7USB40MU.html
-> > 
-> > Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-> > Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> > Cc: <devicetree@vger.kernel.org>
-> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> > ---
-> > 
-> > Should I make the extcon part optional? I could see a case where there are two
-> > "OTG" ports connected to the mux (or two hubs), and for some reason the
-> > software may want to mux between them at runtime. If we mandate an extcon,
-> > that won't be possible to support. Perhaps it would be better to have
-> > the node, but connect it to the usb controller with a phandle (maybe of_graph
-> > endpoints would be useful too) so that when the controller wants to mux over
-> > a port it can do so.
-> 
-> Here's some dts mock-up on top of the db410c for the of_graph stuff. I
-> haven't written any code around it, but the idea is to allow the binding
-> to specify how the mux is connected to upstream and downstream D+/D-
-> lines. This way, we can do some dt parsing of the endpoints and their
-> parent nodes to figure out if the mux needs to be set high or low to use
-> a device connector or a usb hub based on if the id cable is present.
-> Maybe I'm over thinking things though and we could just have a DT
-> property for that.
-> 
-> 	soc {
-> 		usb at 78d9000 {
-> 			extcon = <&usb_id>, <&usb_id>;
 
-Why you have two same extcon phandler? From my mind, one should id,
-another should is vbus. Besides, I find extcon-usb-gpio.c is lack of
-vbus support, how you support vbus detection for
-connection/disconnection with PC for your chipidea msm patch set?
 
-> 			usb-controller; // needed?
+On Friday 16 September 2016 11:06 PM, Mark Brown wrote:
+> On Fri, Sep 16, 2016 at 09:51:38PM +0530, Keerthy wrote:
+>> On Friday 16 September 2016 07:01 PM, Mark Brown wrote:
+>>> On Fri, Sep 16, 2016 at 05:12:38PM +0530, Keerthy wrote:
+>
+>>>> Should i repost this series? I do not see this series in linux-next yet.
+>
+>>> Please don't send content free pings and please allow a reasonable time
+>>> for review.  People get busy, go on holiday, attend conferences and so
+>
+>> I should have been clearer.
+>> The last Lee Jones conveyed that:
+>
+>> "I can't take this series yet, since it relies on a change which was
+>> taken into Mark's Regulator tree"
+>
+>> https://lkml.org/lkml/2016/8/31/312
+>
+>> So wanted to check if i needed to re-base/repost this series again.
+>> Sorry about the confusion i think that is because of $Subject goof up in the
+>> 0th patch of the series.
+>
+> I'm afraid I've no real idea what this series is about or what patches
+> it might depend on, sorry.  If you're waiting for me to do something
+> you'll need to tell me what it is but if it's a dependency that needs
+> cross merging then reposting this series isn't going to be needed.
 
-Not needed. You only need to describe controller, mux ic, and hub 
-(if you need platform stuffs the driver needs to know).
+The series cleans up mainly the regulator driver and implements
+the device tree parsing using the regulator framework. Removes
+all the redundant compatibles for the individual regulators.
+Adds platform_device_id table for the gpio and power button modules.
 
-Peter
-> 
-> 			ports {
-> 				#address-cells = <1>;
-> 				#size-cells = <0>;
-> 
-> 				port at 0 {
-> 					#address-cells = <1>;
-> 					#size-cells = <0>;
-> 					reg = <0>;
-> 
-> 					usb_output: endpoint at 0 { // USB D+/D-
-> 						reg = <0>;
-> 						remote-endpoint = <&usb_switch_input>;
-> 					};
-> 				};
-> 			};
-> 		};
-> 	};
-> 
-> 	usb2513 {
-> 		compatible = "smsc,usb3503";
-> 		reset-gpios = <&pm8916_gpios 3 GPIO_ACTIVE_LOW>;
-> 		initial-mode = <1>;
-> 		usb-hub; // indicate this is a hub
-> 
-> 		ports {
-> 			#address-cells = <1>;
-> 			#size-cells = <0>;
-> 
-> 			port at 0 {
-> 				#address-cells = <1>;
-> 				#size-cells = <0>;
-> 				reg = <0>;
-> 
-> 				usb_hub_input: endpoint at 0 { // USB{DP,DM}_UP
-> 					reg = <0>;
-> 					remote-endpoint = <&usb_switch_hub_ep>;
-> 				};
-> 
-> 				usb_hub_output1: endpoint at 1 { // USB{DP,DM}_DN1
-> 					reg = <1>;
-> 					remote-endpoint = <&usb_a2_connector>;
-> 				};
-> 
-> 				usb_hub_output2: endpoint at 2 { // USB{DP,DM}_DN2
-> 					reg = <2>;
-> 					remote-endpoint = <&usb_a1_connector>;
-> 				};
-> 
-> 				usb_hub_output3: endpoint at 3 { // USB{DP,DM}_DN3
-> 					reg = <3>;
-> 					// goes to expansion connector
-> 				};
-> 			};
-> 		};
-> 	};
-> 
-> 	usb_id: usb-id {
-> 		compatible = "linux,extcon-usb-gpio";
-> 		id-gpio = <&msmgpio 121 GPIO_ACTIVE_HIGH>;
-> 		pinctrl-names = "default";
-> 		pinctrl-0 = <&usb_id_default>;
-> 	};
-> 
-> 	usb-switch {
-> 		compatible = "toshiba,tc7usb40mu";
-> 		switch-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
-> 		extcon = <&usb_id>;
-> 		pinctrl-names = "default";
-> 		pinctrl-0 = <&usb_sw_sel_pm>;
-> 
-> 		ports {
-> 			#address-cells = <1>;
-> 			#size-cells = <0>;
-> 
-> 			port at 0 {
-> 				#address-cells = <1>;
-> 				#size-cells = <0>;
-> 				reg = <0>;
-> 
-> 				usb_switch_input: endpoint at 0 { // D+/D-
-> 					reg = <0>;
-> 					remote-endpoint = <&usb_output>;
-> 				};
-> 
-> 				usb_switch_device_ep: endpoint at 1 { // D1+/D1-
-> 					reg = <1>;
-> 					remote-endpoint = <&usb_ub_connector>;
-> 				};
-> 
-> 				usb_switch_hub_ep: endpoint at 2 { // D2+/D2-
-> 					reg = <2>;
-> 					remote-endpoint = <&usb_hub_input>;
-> 				};
-> 			};
-> 		};
-> 	};
-> 
-> 	uB-connector {
-> 		compatible = "usb-ub-connector";
-> 		#address-cells = <1>;
-> 		#size-cells = <0>;
-> 		usb-connector;
-> 		port at 0 {
-> 			#address-cells = <1>;
-> 			#size-cells = <0>;
-> 			reg = <0>;
-> 			usb_ub_connector: endpoint at 0 {
-> 				reg = <0>;
-> 				remote-endpoint = <&usb_switch_device_ep>;
-> 			};
-> 		};
-> 	};
-> 
-> 	usb-A-connector1 {
-> 		compatible = "usb-A-connector";
-> 		#address-cells = <1>;
-> 		#size-cells = <0>;
-> 		usb-connector;
-> 		port at 0 {
-> 			#address-cells = <1>;
-> 			#size-cells = <0>;
-> 			reg = <0>;
-> 			usb_a1_connector: endpoint at 0 {
-> 				reg = <0>;
-> 				remote-endpoint = <&usb_hub_output2>;
-> 			};
-> 		};
-> 	};
-> 
-> 	usb-A-connector2 {
-> 		compatible = "usb-A-connector";
-> 		#address-cells = <1>;
-> 		#size-cells = <0>;
-> 		usb-connector;
-> 		port at 0 {
-> 			#address-cells = <1>;
-> 			#size-cells = <0>;
-> 			reg = <0>;
-> 			usb_a2_connector: endpoint at 0 {
-> 				reg = <0>;
-> 				remote-endpoint = <&usb_hub_output1>;
-> 			};
-> 		};
-> 	};
-> };
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+This has been reviewed extensively.
 
--- 
+Looks like v7 no longer applies directly on the linux-next branch as it 
+conflicts with:
 
-Best Regards,
-Peter Chen
+https://kernel.googlesource.com/pub/scm/linux/kernel/git/dtor/input/+/722dc54628ca5cffd3b4581b523775aa422b55df
+
+I will rebase and repost on the current linux-next and post v8.
+
+>
