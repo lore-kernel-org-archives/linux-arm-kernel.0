@@ -1,49 +1,106 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 17 Sep 2016 14:14:38 +0800
-Subject: [PATCH] tty: amba-pl011: uart_amba_port is not available with
- earlycon function
-Message-ID: <1474092878-30034-1-git-send-email-shawn.guo@linaro.org>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Sat, 17 Sep 2016 11:58:48 +0530
+Subject: [PATCH 5/6] arm/arm64: vgic-new: Implement VGICv3 CPU interface
+ access
+In-Reply-To: <57DC26C5.2060800@arm.com>
+References: <1474028453-29132-1-git-send-email-vijay.kilari@gmail.com>
+ <1474028453-29132-6-git-send-email-vijay.kilari@gmail.com>
+ <57DC0366.8060304@arm.com>
+ <CALicx6u-uYLY3DtDGMh3n6NbNH3kD9fn9aYHHJC=LVUQfFjTsQ@mail.gmail.com>
+ <57DC26C5.2060800@arm.com>
+Message-ID: <CALicx6ucEH3w58Rhb8Urk0V5kRcqtUdwDYDtSLXrkas-Jatv=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0e125a5facf8 ("tty: amba-pl011: define flag register bits for ZTE
-device") changes earlycon function pl011_putc() to use a pointer to
-uart_amba_port.  This causes a regression when earlycon is enabled,
-because uart_amba_port is not available yet at earlycon time.  Let's
-revert the change on pl011_putc() to fix the regression.
+On Fri, Sep 16, 2016 at 10:37 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 16/09/16 17:57, Vijay Kilari wrote:
+>> On Fri, Sep 16, 2016 at 8:06 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 16/09/16 13:20, vijay.kilari at gmail.com wrote:
+>>>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>>>>
+>>>> VGICv3 CPU interface registers are accessed using
+>>>> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
+>>>> as 64-bit. The cpu MPIDR value is passed along with register id.
+>>>> is used to identify the cpu for registers access.
+>>>>
+>>>> The version of VGIC v3 specification is define here
+>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+>>>>
+>>>> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+>>>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>>>> ---
+>>>>  arch/arm64/include/uapi/asm/kvm.h   |   3 +
+>>>>  arch/arm64/kvm/Makefile             |   1 +
+>>>>  include/linux/irqchip/arm-gic-v3.h  |  30 ++++
+>>>>  virt/kvm/arm/vgic/vgic-kvm-device.c |  27 ++++
+>>>>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |  18 +++
+>>>>  virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 296 ++++++++++++++++++++++++++++++++++++
+>>>>  virt/kvm/arm/vgic/vgic.h            |  10 ++
+>>>>  7 files changed, 385 insertions(+)
+>
+> [...]
+>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-sys-reg-v3.c b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+>>>> new file mode 100644
+>>>> index 0000000..8e4f403
+>>>> --- /dev/null
+>>>> +++ b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+>>>> @@ -0,0 +1,296 @@
+>>>> +#include <linux/irqchip/arm-gic-v3.h>
+>>>> +#include <linux/kvm.h>
+>>>> +#include <linux/kvm_host.h>
+>>>> +#include <kvm/iodev.h>
+>>>> +#include <kvm/arm_vgic.h>
+>>>> +#include <asm/kvm_emulate.h>
+>>>> +#include <asm/kvm_arm.h>
+>>>> +#include <asm/kvm_mmu.h>
+>>>> +
+>>>> +#include "vgic.h"
+>>>> +#include "vgic-mmio.h"
+>>>> +#include "sys_regs.h"
+>>>> +
+>>>> +static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>>> +                         const struct sys_reg_desc *r)
+>>>> +{
+>>>> +     struct vgic_vmcr vmcr;
+>>>> +     u64 val;
+>>>> +     u32 ich_vtr;
+>>>> +
+>>>> +     vgic_get_vmcr(vcpu, &vmcr);
+>>>> +     if (p->is_write) {
+>>>> +             val = p->regval;
+>>>> +             vmcr.ctlr &= ~(ICH_VMCR_CBPR_MASK | ICH_VMCR_EOIM_MASK);
+>>>> +             vmcr.ctlr |= ((val & ICC_CTLR_EL1_CBPR_MASK) >>
+>>>> +                           ICC_CTLR_EL1_CBPR_SHIFT) << ICH_VMCR_CBPR_SHIFT;
+>>>> +             vmcr.ctlr |= ((val & ICC_CTLR_EL1_EOImode_MASK) >>
+>>>> +                          ICC_CTLR_EL1_EOImode_SHIFT) << ICH_VMCR_EOIM_SHIFT;
+>>>> +             vgic_set_vmcr(vcpu, &vmcr);
+>>>
+>>> You've ignored my comments again: "What if userspace writes something
+>>> that is incompatible with the current configuration? Wrong number of ID
+>>> bits, or number of priorities?"
+>>
+>> IMO, In case of incompatibility,
+>> If ID bits and PRI bits are less than HW supported, it is ok.
+>
+> Yes. But you also need to track of what the guest has programmed in
+> order to be able to migrate it back to its original configuration.
 
-The earlycon support for ZTE device can probably be added later by
-declaring a new earlycon setup function with a vendor specific
-compatible.
+You mean the vgic has to track/store the ID and PRI bits that guest
+has programmed
+and return the same when guest reads back instead of
+returning HW supported value for ICC_CTLR_EL1 reg access?.
 
-Reported-by: Sudeep Holla <sudeep.holla@arm.com>
-Fixes: 0e125a5facf8 ("tty: amba-pl011: define flag register bits for ZTE device")
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/tty/serial/amba-pl011.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 0b78b04e895e..2d9ffab16ffe 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2330,16 +2330,13 @@ static struct console amba_console = {
- 
- static void pl011_putc(struct uart_port *port, int c)
- {
--	struct uart_amba_port *uap =
--		container_of(port, struct uart_amba_port, port);
--
- 	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
- 		cpu_relax();
- 	if (port->iotype == UPIO_MEM32)
- 		writel(c, port->membase + UART01x_DR);
- 	else
- 		writeb(c, port->membase + UART01x_DR);
--	while (readl(port->membase + UART01x_FR) & uap->vendor->fr_busy)
-+	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
- 		cpu_relax();
- }
- 
--- 
-1.9.1
+>
+>> If ID bits and PRI bits are greater than HW supported, then warn would be good
+>> enough. Please suggest the behaviour that you think it should be.
+>
+> No, it is an error, plain and simple. You cannot run in this condition.
+>
+[...]
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
