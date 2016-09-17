@@ -1,31 +1,63 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 17 Sep 2016 17:47:50 +0100
-Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
-In-Reply-To: <CAFEAcA8JRscJox0Up3vRyDeOzy7PEHpm0p0cKBNeAYO6xeSZZQ@mail.gmail.com>
-References: <1474007187-18673-1-git-send-email-agraf@suse.de>
- <57DBC782.7080305@arm.com> <060ADA14-786E-400E-9B11-61C34B7081B5@suse.de>
- <20160916122937.GA14140@cbox>
- <6b92c411-8b27-a4c0-6969-38e32bbf18ab@redhat.com>
- <10C5B047-6A7F-4255-BE56-5358AF88DA5E@suse.de>
- <CAKv+Gu_+txUFT158VzJqeE3Jwdd1LL1n2kzOzYKuk03UFxW3NQ@mail.gmail.com>
- <CAFEAcA8JRscJox0Up3vRyDeOzy7PEHpm0p0cKBNeAYO6xeSZZQ@mail.gmail.com>
-Message-ID: <CAKv+Gu91FYx4QTWd9QO0zrMYH8k3wp=CQT9zMG4ZhMLZ2xrQQA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 17 Sep 2016 09:50:21 -0700
+Subject: [RFC PATCH 9/9] ethernet: sun8i-emac: add pm_runtime support
+In-Reply-To: <20160914140304.GA27639@Red>
+References: <1473425117-18645-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1473425117-18645-10-git-send-email-clabbe.montjoie@gmail.com>
+ <20160912204451.GO9449@lukather> <20160914140304.GA27639@Red>
+Message-ID: <da20e175-f178-3f63-102f-b84f3ecd5913@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 September 2016 at 16:38, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 17 September 2016 at 16:28, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> Another thing to keep in mind is that GICv2
->> compatibility is disabled on the non-secure side if the secure side
->> elects to configure its view of the GIC as v3 (i.e., in order to
->> support >8 cores)
->
-> If I'm reading the 'legacy configurations' chapter of the GICv3
-> spec correctly, that is true for the NS host OS (ie the one
-> handling physical interrupts) but a guest OS can still use
-> the old GICv2-compat interface (assuming it was implemented
-> in silicon at all).
->
+On 09/14/2016 07:03 AM, LABBE Corentin wrote:
+> On Mon, Sep 12, 2016 at 10:44:51PM +0200, Maxime Ripard wrote:
+>>> +static int __maybe_unused sun8i_emac_resume(struct platform_device *pdev)
+>>> +{
+>>> +	struct net_device *ndev = platform_get_drvdata(pdev);
+>>> +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
+>>> +
+>>> +	phy_start(ndev->phydev);
+>>> +
+>>> +	sun8i_emac_start_tx(ndev);
+>>> +	sun8i_emac_start_rx(ndev);
+>>> +
+>>> +	if (netif_running(ndev))
+>>> +		netif_device_attach(ndev);
+>>> +
+>>> +	netif_start_queue(ndev);
+>>> +
+>>> +	napi_enable(&priv->napi);
+>>> +
+>>> +	return 0;
+>>> +}
+>>
+>> The main idea behind the runtime PM hooks is that they bring the
+>> device to a working state and shuts it down when it's not needed
+>> anymore.
+>>
+> 
+> I expect that the first part (all pm_runtime_xxx) of the patch bring that.
+> When the interface is not opened:
+> cat /sys/devices/platform/soc/1c30000.ethernet/power/runtime_status 
+> suspended
 
-Ah right, apologies for spreading misinformation. But my first point
-is still valid.
+If your interface is not open, it should be in a low power state, only
+when it gets open (which means it is used) should you make it
+functional, that's pretty much the same thing as the runtime PM
+reference count usage here.
+
+I don't see a lot of value for using runtime_pm_* hooks here except
+calling into the existing suspend/resume functions that you have defined
+already, but then again, the code should be modular enough already in
+the driver.
+
+Runtime PM for network devices cannot be used as efficiently as you
+would with any kind of host-initiated bus/controller because your device
+needs to be able to receive packets without the host's ability to wake
+up the device to receive packets, so, with the exception of MDIO (which
+is host initiated), everything else besides except packet transmission
+(then again, I would not want to wait N ms to bring the interface in a
+state where it can now transmit packets, that's terrible for latency) is
+pretty much impossible to fully suspend due to its asynchronous nature.
+-- 
+Florian
