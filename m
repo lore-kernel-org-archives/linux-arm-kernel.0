@@ -1,8 +1,10 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 18 Sep 2016 18:50:17 +0200
-Subject: [PATCH 1/2] phy-sun4i-usb: Add sun4i_usb_phy_force_session_end()
- function
-Message-ID: <20160918165018.24547-1-hdegoede@redhat.com>
+Date: Sun, 18 Sep 2016 18:50:18 +0200
+Subject: [PATCH 2/2] musb: sunxi: Force session end on babble errors in
+ host-mode
+In-Reply-To: <20160918165018.24547-1-hdegoede@redhat.com>
+References: <20160918165018.24547-1-hdegoede@redhat.com>
+Message-ID: <20160918165018.24547-2-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,56 +16,41 @@ gets stuck in this state.
 
 Clearing this requires reporting Vbus low for 200 or more ms, but
 on some devices Vbus is simply always high (host-only mode, no Vbus
-control). The phy-sun4i-usb code already has code to force a session
-end for devices without Vbus control.
+control).
 
-This commit adds a sun4i_usb_phy_force_session_end() function exporting
-this functionality to the sunxi-musb glue, so that it can force a session
-end to fixup the stuck state after a babble error.
+This commit calls sun4i_usb_phy_force_session_end() on babble errors
+in host-mode, fixing the musb controller being stuck in this state
+on systems without Vbus control; and also fixes the need to unplug
+the usb-b -> usb-a cable to get out of this state on systems with
+Vbus control.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/phy/phy-sun4i-usb.c       | 11 +++++++++++
- include/linux/phy/phy-sun4i-usb.h |  7 +++++++
- 2 files changed, 18 insertions(+)
+ drivers/usb/musb/sunxi.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 43c0d98..06f4e11a 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -470,6 +470,17 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
- }
- EXPORT_SYMBOL_GPL(sun4i_usb_phy_set_squelch_detect);
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index 1408245..5079d90 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -192,8 +192,18 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
+ 	 * normally babble never happens treat it as disconnect.
+ 	 */
+ 	if ((musb->int_usb & MUSB_INTR_BABBLE) && is_host_active(musb)) {
++		struct sunxi_glue *glue =
++				dev_get_drvdata(musb->controller->parent);
++
++		dev_warn(musb->controller->parent, "babble, treating as disconnect\n");
++
+ 		musb->int_usb &= ~MUSB_INTR_BABBLE;
+ 		musb->int_usb |= MUSB_INTR_DISCONNECT;
++		/*
++		 * Fix the musb controller sometimes getting stuck in
++		 * bdevice state after a babble error.
++		 */
++		sun4i_usb_phy_force_session_end(glue->phy);
+ 	}
  
-+void sun4i_usb_phy_force_session_end(struct phy *_phy)
-+{
-+	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
-+	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
-+
-+	data->id_det = -1;
-+	data->force_session_end = true;
-+	queue_delayed_work(system_wq, &data->detect, 0);
-+}
-+EXPORT_SYMBOL_GPL(sun4i_usb_phy_force_session_end);
-+
- static const struct phy_ops sun4i_usb_phy_ops = {
- 	.init		= sun4i_usb_phy_init,
- 	.exit		= sun4i_usb_phy_exit,
-diff --git a/include/linux/phy/phy-sun4i-usb.h b/include/linux/phy/phy-sun4i-usb.h
-index 50aed92..3bb773f 100644
---- a/include/linux/phy/phy-sun4i-usb.h
-+++ b/include/linux/phy/phy-sun4i-usb.h
-@@ -23,4 +23,11 @@
-  */
- void sun4i_usb_phy_set_squelch_detect(struct phy *phy, bool enabled);
- 
-+/**
-+ * sun4i_usb_force_session_end() - Force the current session to end
-+ *				   by reporting VBus low for 200+ ms
-+ * @phy: reference to a sun4i usb phy
-+ */
-+void sun4i_usb_phy_force_session_end(struct phy *phy);
-+
- #endif
+ 	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
 -- 
 2.9.3
