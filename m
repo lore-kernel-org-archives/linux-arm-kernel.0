@@ -1,153 +1,71 @@
-From: zhichang.yuan02@gmail.com (zhichang)
-Date: Sun, 18 Sep 2016 11:38:45 +0800
-Subject: [PATCH V3 1/4] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <5264074.nuyDhEuOR4@wuerfel>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <8337589.pzGt0MZ9xn@wuerfel> <57D95BBC.9030405@hisilicon.com>
- <5264074.nuyDhEuOR4@wuerfel>
-Message-ID: <9ffcda2a-9a2b-7151-dfd9-e2bf6594c842@gmail.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Sun, 18 Sep 2016 13:01:53 +0900
+Subject: [PATCH 2/8] drm/rockchip: Get rid of some unnecessary code
+In-Reply-To: <57DDF2EE.5060807@rock-chips.com>
+References: <1473857701-9250-1-git-send-email-tfiga@chromium.org>
+ <1473857701-9250-3-git-send-email-tfiga@chromium.org>
+ <57DDF2EE.5060807@rock-chips.com>
+Message-ID: <CAAFQd5A0M6vAbXHhUDMMXsaWND0hzWcT71HzOsSSCHa--qh0dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd,
+Hi Mark,
 
+On Sun, Sep 18, 2016 at 10:50 AM, Mark yao <mark.yao@rock-chips.com> wrote:
+> On 2016?09?14? 20:54, Tomasz Figa wrote:
+>>
+>> Current code implements prepare_fb and cleanup_fb callbacks only to
+>> grab/release fb references, which is already done by atomic framework
+>> when creating/destryoing plane state. Let's remove these
+>> unused bits.
+>>
+>> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+>> ---
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 18 ------------------
+>>   1 file changed, 18 deletions(-)
+>
+>
+> Hi Tomasz
+>
+> I think we can't get rid of the prepare_fb and cleanup_fb
 
-On 2016?09?14? 22:23, Arnd Bergmann wrote:
-> On Wednesday, September 14, 2016 10:16:28 PM CEST zhichang.yuan wrote:
->>>
->>> No need to guard includes with an #ifdef.
->> If remove #ifdef here, extio.h should not contain any function external declarations whose definitions are in
->> extio.c compiled only when CONFIG_ARM64_INDIRECT_PIO is yes.
->  
-> There is no problem with making declarations visible for functions that
-> are not part of the kernel, we do that all the time.
-> 
->>>> +#define BUILDS_RW(bwl, type)                                                \
->>>> +static inline void reads##bwl(const volatile void __iomem *addr,    \
->>>> +                            void *buffer, unsigned int count)       \
->>>> +{                                                                   \
->>>> +    if (count) {                                                    \
->>>> +            type *buf = buffer;                                     \
->>>> +                                                                    \
->>>> +            do {                                                    \
->>>> +                    type x = __raw_read##bwl(addr);                 \
->>>> +                    *buf++ = x;                                     \
->>>> +            } while (--count);                                      \
->>>> +    }                                                               \
->>>> +}                                                                   \
->>>> +                                                                    \
->>>> +static inline void writes##bwl(volatile void __iomem *addr,         \
->>>> +                            const void *buffer, unsigned int count) \
->>>> +{                                                                   \
->>>> +    if (count) {                                                    \
->>>> +            const type *buf = buffer;                               \
->>>> +                                                                    \
->>>> +            do {                                                    \
->>>> +                    __raw_write##bwl(*buf++, addr);                 \
->>>> +            } while (--count);                                      \
->>>> +    }                                                               \
->>>> +}
->>>> +
->>>> +BUILDS_RW(b, u8)
->>>
->>> Why is this in here?
->> the readsb/writesb are defined in asm-generic/io.h which is included later, but the redefined insb/outsb need
->> to call them. Without these readsb/writesb definition before insb/outsb redefined, compile error occur.
->>
->> It seems that copy all the definitions of "asm-generic/io.h" is not a good idea, so I move the definitions of
->> those function needed here....
->>
->> Ok. I think your idea below defining in(s)/out(s) in a c file can solve this issue.
->>
->> #ifdef CONFIG_ARM64_INDIRECT_PIO
->> #define inb inb
->> extern u8 inb(unsigned long addr);
->>
->> #define outb outb
->> extern void outb(u8 value, unsigned long addr);
->>
->> #define insb insb
->> extern void insb(unsigned long addr, void *buffer, unsigned int count);
->>
->> #define outsb outsb
->> extern void outsb(unsigned long addr, const void *buffer, unsigned int count);
->> #endif
->>
->> and definitions of all these functions are in extio.c :
->>
->> u8 inb(unsigned long addr)
->> {
->>         if (!arm64_extio_ops || arm64_extio_ops->start > addr ||
->>                         arm64_extio_ops->end < addr)
->>                 return readb(PCI_IOBASE + addr);
->>         else
->>                 return arm64_extio_ops->pfin ?
->>                         arm64_extio_ops->pfin(arm64_extio_ops->devpara,
->>                                 addr + arm64_extio_ops->ptoffset, NULL,
->>                                 sizeof(u8), 1) : -1;
->> }
->> .....
-> 
-> Yes, sounds good.
-> 
->>>> @@ -149,6 +185,60 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
->>>>  #define IO_SPACE_LIMIT              (PCI_IO_SIZE - 1)
->>>>  #define PCI_IOBASE          ((void __iomem *)PCI_IO_START)
->>>>  
->>>> +
->>>> +/*
->>>> + * redefine the in(s)b/out(s)b for indirect-IO.
->>>> + */
->>>> +#define inb inb
->>>> +static inline u8 inb(unsigned long addr)
->>>> +{
->>>> +#ifdef CONFIG_ARM64_INDIRECT_PIO
->>>> +    if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
->>>> +                    addr <= arm64_extio_ops->end)
->>>> +            return extio_inb(addr);
->>>> +#endif
->>>> +    return readb(PCI_IOBASE + addr);
->>>> +}
->>>> +
->>>
->>> Looks ok, but you only seem to do this for the 8-bit
->>> accessors, when it should be done for 16-bit and 32-bit
->>> ones as well for consistency.
->> Hip06 LPC only support 8-bit I/O operations on the designated port.
-> 
-> That is an interesting limitation. Maybe still call the extio operations
-> and have them do WARN_ON_ONCE() instead?
-> 
-> If you get a driver that calls inw/outw on the range that is owned
-> by the LPC bus, you otherwise get an unhandled page fault in kernel
-> space, which is not as nice.
-> 
-Yes. It probably cause kernel panic.
-Will define the extio operations for other IO length and add the corresponding WARNINGS.
+I think I have to disagree. Please see below for detailed explanation.
 
-Best,
-Zhichang
+>
+> see the reason:
+> commit 44d0237a26395ac94160cf23f32769013b365590
+> Author: Mark Yao <mark.yao@rock-chips.com>
+> Date:   Fri Apr 29 11:37:20 2016 +0800
+>
+>     drm/rockchip: vop: fix iommu crash with async atomic
+>
+>     After async atomic_commit callback, drm_atomic_clean_old_fb will
+>     clean all old fb, but because async, the old fb may be also on
+>     the vop hardware, dma will access the old fb buffer, clean old
+>     fb will cause iommu page fault.
 
+I think the above is not quite right. Atomic plane state holds a
+reference to its fb and old state is not supposed to be destroyed
+until the flip completes.
 
->>>> diff --git a/drivers/bus/extio.c b/drivers/bus/extio.c
->>>> new file mode 100644
->>>> index 0000000..1e7a9c5
->>>> --- /dev/null
->>>> +++ b/drivers/bus/extio.c
->>>> @@ -0,0 +1,66 @@
->>>
->>> This is in a globally visible directory
->>>
->>>> +
->>>> +struct extio_ops *arm64_extio_ops;
->>>
->>> But the identifier uses an architecture specific prefix. Either
->>> move the whole file into arch/arm64, or make the naming so that
->>> it can be used for everything.
->>
->> I perfer to move the whole file into arch/arm64, extio.h will be moved to arch/arm64/include/asm;
-> 
-> Ok, that simplifies it a lot, you can just do everything in asm/io.h then.
-> 
-> 	Arnd
-> 
+Indeed current rockchip_atomic_commit implementation has following
+order of calls: rockchip_atomic_wait_for_complete(),
+drm_atomic_helper_cleanup_planes(), drm_atomic_state_free(). This
+means that .cleanup_fb() is called from
+drm_atomic_helper_cleanup_planes() just before drm_atomic_state_free()
+will release references by destroying old plane states. Note that both
+are called already after rockchip_atomic_wait_for_complete(), so it
+should be already safe to free the old fbs.
+
+So the above fix doesn't really do anything, possibly just covers the
+race condition of the original wait for vblank function by delaying
+drm_atomic_state_free() a bit.
+
+Moreover, the whole series has been thoroughly tested in Chrome OS 4.4
+kernel, including async commits. (There is still a possibility some
+newer upstream changes slightly modified the semantics, but I couldn't
+find such difference. Actually one of the advantages of atomic helpers
+was to avoid manually refcounting the fbs from the driver.)
+
+Best regards,
+Tomasz
