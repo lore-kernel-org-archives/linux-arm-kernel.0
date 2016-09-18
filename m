@@ -1,53 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 18 Sep 2016 21:16:48 +0200
-Subject: [PATCH 4/4] drm/sun4i: dotclock: Round to closest clock rate
-In-Reply-To: <20160915151402.15992-5-wens@csie.org>
-References: <20160915151402.15992-1-wens@csie.org>
- <20160915151402.15992-5-wens@csie.org>
-Message-ID: <20160918191648.GJ17518@lukather>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 18 Sep 2016 21:23:14 +0200
+Subject: [PATCH v7 2/3] ARM: dts: add TOPEET itop elite based board
+In-Reply-To: <1474207279-9662-3-git-send-email-ayaka@soulik.info>
+References: <1474207279-9662-1-git-send-email-ayaka@soulik.info>
+ <1474207279-9662-3-git-send-email-ayaka@soulik.info>
+Message-ID: <20160918192314.GA6676@kozik-book>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Sep 15, 2016 at 11:14:02PM +0800, Chen-Yu Tsai wrote:
-> With display pixel clocks we want to have the closest possible clock
-> rate, to minimize timing and refresh rate skews. Whether the actual
-> clock rate is higher or lower than the requested rate is less important.
+On Sun, Sep 18, 2016 at 10:01:18PM +0800, Randy Li wrote:
+> The TOPEET itop exynos 4412 have three versions base board. The
+> Elite version is the cheap one without too much peripheral devices
+> on it.
 > 
-> Also check candidates against the requested rate, rather than the
-> ideal parent rate, the varying dividers also influence the difference
-> between the requested rate and the rounded rate.
+> Currently supported are serial console, wired networking(USB),
+> USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
+> PWM beeper, ADC and LEDs. The WM8960 analog audio codec is also
+> enabled.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> The FIMC is not used for camera currently, I enabled it just for a
+> colorspace convertor.
+> 
+> Signed-off-by: Randy Li <ayaka@soulik.info>
 > ---
->  drivers/gpu/drm/sun4i/sun4i_dotclock.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-> index 3eb99784f371..d401156490f3 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-> @@ -90,7 +90,8 @@ static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
->  			goto out;
->  		}
->  
-> -		if ((rounded < ideal) && (rounded > best_parent)) {
-> +		if (abs(rate - rounded / i) <
-> +		    abs(rate - best_parent / best_div)) {
+>  .../bindings/arm/samsung/samsung-boards.txt        |   3 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/exynos4412-itop-elite.dts        | 240 +++++++++++++++++++++
+>  3 files changed, 244 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/exynos4412-itop-elite.dts
 
-I'm not sure what you're trying to do here. Why is the divider involved?
+Looks good to me, for the record:
 
-Maxime
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160918/6b595f6e/attachment.sig>
+You don't need to resend the third patch. Rob took it.
+
+Best regards,
+Krzysztof
