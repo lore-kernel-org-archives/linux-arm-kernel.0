@@ -1,71 +1,221 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Sun, 18 Sep 2016 13:01:53 +0900
-Subject: [PATCH 2/8] drm/rockchip: Get rid of some unnecessary code
-In-Reply-To: <57DDF2EE.5060807@rock-chips.com>
-References: <1473857701-9250-1-git-send-email-tfiga@chromium.org>
- <1473857701-9250-3-git-send-email-tfiga@chromium.org>
- <57DDF2EE.5060807@rock-chips.com>
-Message-ID: <CAAFQd5A0M6vAbXHhUDMMXsaWND0hzWcT71HzOsSSCHa--qh0dA@mail.gmail.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Sun, 18 Sep 2016 12:00:01 +0530
+Subject: [PATCH 5/6] arm/arm64: vgic-new: Implement VGICv3 CPU interface
+ access
+In-Reply-To: <57DC26C5.2060800@arm.com>
+References: <1474028453-29132-1-git-send-email-vijay.kilari@gmail.com>
+ <1474028453-29132-6-git-send-email-vijay.kilari@gmail.com>
+ <57DC0366.8060304@arm.com>
+ <CALicx6u-uYLY3DtDGMh3n6NbNH3kD9fn9aYHHJC=LVUQfFjTsQ@mail.gmail.com>
+ <57DC26C5.2060800@arm.com>
+Message-ID: <CALicx6vp-0igFshdSvdoeSBvVg-+E_WWyYf0z=9A278sAs2sKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Marc,
 
-On Sun, Sep 18, 2016 at 10:50 AM, Mark yao <mark.yao@rock-chips.com> wrote:
-> On 2016?09?14? 20:54, Tomasz Figa wrote:
+On Fri, Sep 16, 2016 at 10:37 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 16/09/16 17:57, Vijay Kilari wrote:
+>> On Fri, Sep 16, 2016 at 8:06 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 16/09/16 13:20, vijay.kilari at gmail.com wrote:
+>>>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>>>>
+>>>> VGICv3 CPU interface registers are accessed using
+>>>> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
+>>>> as 64-bit. The cpu MPIDR value is passed along with register id.
+>>>> is used to identify the cpu for registers access.
+>>>>
+>>>> The version of VGIC v3 specification is define here
+>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+>>>>
+>>>> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+>>>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>>>> ---
+>>>>  arch/arm64/include/uapi/asm/kvm.h   |   3 +
+>>>>  arch/arm64/kvm/Makefile             |   1 +
+>>>>  include/linux/irqchip/arm-gic-v3.h  |  30 ++++
+>>>>  virt/kvm/arm/vgic/vgic-kvm-device.c |  27 ++++
+>>>>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |  18 +++
+>>>>  virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 296 ++++++++++++++++++++++++++++++++++++
+>>>>  virt/kvm/arm/vgic/vgic.h            |  10 ++
+>>>>  7 files changed, 385 insertions(+)
+>
+> [...]
+>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-sys-reg-v3.c b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+>>>> new file mode 100644
+>>>> index 0000000..8e4f403
+>>>> --- /dev/null
+>>>> +++ b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+>>>> @@ -0,0 +1,296 @@
+>>>> +#include <linux/irqchip/arm-gic-v3.h>
+>>>> +#include <linux/kvm.h>
+>>>> +#include <linux/kvm_host.h>
+>>>> +#include <kvm/iodev.h>
+>>>> +#include <kvm/arm_vgic.h>
+>>>> +#include <asm/kvm_emulate.h>
+>>>> +#include <asm/kvm_arm.h>
+>>>> +#include <asm/kvm_mmu.h>
+>>>> +
+>>>> +#include "vgic.h"
+>>>> +#include "vgic-mmio.h"
+>>>> +#include "sys_regs.h"
+>>>> +
+>>>> +static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>>> +                         const struct sys_reg_desc *r)
+>>>> +{
+>>>> +     struct vgic_vmcr vmcr;
+>>>> +     u64 val;
+>>>> +     u32 ich_vtr;
+>>>> +
+>>>> +     vgic_get_vmcr(vcpu, &vmcr);
+>>>> +     if (p->is_write) {
+>>>> +             val = p->regval;
+>>>> +             vmcr.ctlr &= ~(ICH_VMCR_CBPR_MASK | ICH_VMCR_EOIM_MASK);
+>>>> +             vmcr.ctlr |= ((val & ICC_CTLR_EL1_CBPR_MASK) >>
+>>>> +                           ICC_CTLR_EL1_CBPR_SHIFT) << ICH_VMCR_CBPR_SHIFT;
+>>>> +             vmcr.ctlr |= ((val & ICC_CTLR_EL1_EOImode_MASK) >>
+>>>> +                          ICC_CTLR_EL1_EOImode_SHIFT) << ICH_VMCR_EOIM_SHIFT;
+>>>> +             vgic_set_vmcr(vcpu, &vmcr);
+>>>
+>>> You've ignored my comments again: "What if userspace writes something
+>>> that is incompatible with the current configuration? Wrong number of ID
+>>> bits, or number of priorities?"
 >>
->> Current code implements prepare_fb and cleanup_fb callbacks only to
->> grab/release fb references, which is already done by atomic framework
->> when creating/destryoing plane state. Let's remove these
->> unused bits.
+>> IMO, In case of incompatibility,
+>> If ID bits and PRI bits are less than HW supported, it is ok.
+>
+> Yes. But you also need to track of what the guest has programmed in
+> order to be able to migrate it back to its original configuration.
+>
+>> If ID bits and PRI bits are greater than HW supported, then warn would be good
+>> enough. Please suggest the behaviour that you think it should be.
+>
+> No, it is an error, plain and simple. You cannot run in this condition.
+>
 >>
->> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
->> ---
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 18 ------------------
->>   1 file changed, 18 deletions(-)
+>>>
+>>>> +     } else {
+>>>> +             ich_vtr = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
+>>>> +
+>>>> +             val = 0;
+>>>> +             val |= ((ich_vtr & ICH_VTR_PRI_BITS_MASK) >>
+>>>> +                     ICH_VTR_PRI_BITS_SHIFT) << ICC_CTLR_EL1_PRI_BITS_SHIFT;
+>>>> +             val |= ((ich_vtr & ICH_VTR_ID_BITS_MASK) >>
+>>>> +                     ICH_VTR_ID_BITS_SHIFT) << ICC_CTLR_EL1_ID_BITS_SHIFT;
+>>>> +             val |= ((ich_vtr & ICH_VTR_SEIS_MASK) >> ICH_VTR_SEIS_SHIFT)
+>>>> +                     << ICC_CTLR_EL1_SEIS_SHIFT;
+>>>> +             val |= ((ich_vtr & ICH_VTR_A3V_MASK) >> ICH_VTR_A3V_SHIFT)
+>>>> +                     << ICC_CTLR_EL1_A3V_SHIFT;
+>>>> +             val |= ((vmcr.ctlr & ICH_VMCR_CBPR_MASK) >>
+>>>> +                     ICH_VMCR_CBPR_SHIFT) << ICC_CTLR_EL1_CBPR_SHIFT;
+>>>> +             val |= ((vmcr.ctlr & ICH_VMCR_EOIM_MASK) >>
+>>>> +                     ICH_VMCR_EOIM_SHIFT) << ICC_CTLR_EL1_EOImode_SHIFT;
+>>>> +
+>>>> +             p->regval = val;
+>>>> +     }
+>>>> +
+>>>> +     return true;
+>>>> +}
+>>>> +
+>>>> +static bool access_gic_pmr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>>> +                        const struct sys_reg_desc *r)
+>>>> +{
+>>>> +     struct vgic_vmcr vmcr;
+>>>> +
+>>>> +     vgic_get_vmcr(vcpu, &vmcr);
+>>>> +     if (p->is_write) {
+>>>> +             vmcr.pmr = (p->regval & ICC_PMR_EL1_MASK) >> ICC_PMR_EL1_SHIFT;
+>>>> +             vgic_set_vmcr(vcpu, &vmcr);
+>>>> +     } else {
+>>>> +             p->regval = (vmcr.pmr << ICC_PMR_EL1_SHIFT) & ICC_PMR_EL1_MASK;
+>>>> +     }
+>>>> +
+>>>> +     return true;
+>>>> +}
+>>>> +
+>>>> +static bool access_gic_bpr0(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>>> +                         const struct sys_reg_desc *r)
+>>>> +{
+>>>> +     struct vgic_vmcr vmcr;
+>>>> +
+>>>> +     vgic_get_vmcr(vcpu, &vmcr);
+>>>> +     if (p->is_write) {
+>>>> +             vmcr.bpr = (p->regval & ICC_BPR0_EL1_MASK) >>
+>>>> +                         ICC_BPR0_EL1_SHIFT;
+>>>> +             vgic_set_vmcr(vcpu, &vmcr);
+>>>> +     } else {
+>>>> +             p->regval = (vmcr.bpr << ICC_BPR0_EL1_SHIFT) &
+>>>> +                          ICC_BPR0_EL1_MASK;
+>>>> +     }
+>>>> +
+>>>> +     return true;
+>>>> +}
+>>>> +
+>>>> +static bool access_gic_bpr1(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>>> +                         const struct sys_reg_desc *r)
+>>>> +{
+>>>> +     struct vgic_vmcr vmcr;
+>>>> +
+>>>> +     vgic_get_vmcr(vcpu, &vmcr);
+>>>> +     if (p->is_write) {
+>>>> +             vmcr.abpr = (p->regval & ICC_BPR1_EL1_MASK) >>
+>>>> +                          ICC_BPR1_EL1_SHIFT;
+>>>> +             vgic_set_vmcr(vcpu, &vmcr);
+>>>> +     } else {
+>>>> +             p->regval = (vmcr.abpr << ICC_BPR1_EL1_SHIFT) &
+>>>> +                          ICC_BPR1_EL1_MASK;
+>>>> +     }
+>>>> +
+>>>> +     return true;
+>>>> +}
+>>>> +
+>>>> +static bool access_gic_grpen0(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>>> +                           const struct sys_reg_desc *r)
+>>>> +{
+>>>> +     struct vgic_vmcr vmcr;
+>>>> +
+>>>> +     vgic_get_vmcr(vcpu, &vmcr);
+>>>> +     if (p->is_write) {
+>>>> +             vmcr.grpen0 = (p->regval & ICC_IGRPEN0_EL1_MASK) >>
+>>>> +                                   ICC_IGRPEN0_EL1_SHIFT;
+>>>> +             vgic_set_vmcr(vcpu, &vmcr);
+>>>> +     } else {
+>>>> +             p->regval = (vmcr.grpen0 << ICC_IGRPEN0_EL1_SHIFT) &
+>>>> +                          ICC_IGRPEN0_EL1_MASK;
+>>>> +     }
+>>>> +
+>>>> +     return true;
+>>>> +}
+>>>> +
+>>>> +static bool access_gic_grpen1(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>>>> +                           const struct sys_reg_desc *r)
+>>>> +{
+>>>> +     struct vgic_vmcr vmcr;
+>>>> +
+>>>> +     vgic_get_vmcr(vcpu, &vmcr);
+>>>> +     if (p->is_write) {
+>>>> +             vmcr.grpen1 = (p->regval & ICC_IGRPEN1_EL1_MASK) >>
+>>>> +                                   ICC_IGRPEN1_EL1_SHIFT;
+>>>> +             vgic_set_vmcr(vcpu, &vmcr);
+>>>> +     } else {
+>>>> +             p->regval = (vmcr.grpen1 << ICC_IGRPEN1_EL1_SHIFT) &
+>>>> +                          ICC_IGRPEN1_EL1_MASK;
+>>>
+>>> From the previous review comments: "Shouldn't this account for the
+>>> ICC_CTLR_EL1.CBPR setting?"
+>>
+>>  Ok. I think this comment is for ICC_BPR1_EL1 access.
 >
+> Yes, sorry about the misplaced comment.
 >
-> Hi Tomasz
+>> I will make a check on ICC_CTLR.EL1.CBPR for accessing ICC_BPR1_EL1.
 >
-> I think we can't get rid of the prepare_fb and cleanup_fb
-
-I think I have to disagree. Please see below for detailed explanation.
-
+> The reverse is also true: you also need to account the value of
+> ICC_BPR1_EL1 when accessing ICC_CTLR_EL1.
 >
-> see the reason:
-> commit 44d0237a26395ac94160cf23f32769013b365590
-> Author: Mark Yao <mark.yao@rock-chips.com>
-> Date:   Fri Apr 29 11:37:20 2016 +0800
->
->     drm/rockchip: vop: fix iommu crash with async atomic
->
->     After async atomic_commit callback, drm_atomic_clean_old_fb will
->     clean all old fb, but because async, the old fb may be also on
->     the vop hardware, dma will access the old fb buffer, clean old
->     fb will cause iommu page fault.
 
-I think the above is not quite right. Atomic plane state holds a
-reference to its fb and old state is not supposed to be destroyed
-until the flip completes.
+  ICC_CTLR_EL1 reg does not hold BPR1 value to account value of ICC_BPR1_EL1.
 
-Indeed current rockchip_atomic_commit implementation has following
-order of calls: rockchip_atomic_wait_for_complete(),
-drm_atomic_helper_cleanup_planes(), drm_atomic_state_free(). This
-means that .cleanup_fb() is called from
-drm_atomic_helper_cleanup_planes() just before drm_atomic_state_free()
-will release references by destroying old plane states. Note that both
-are called already after rockchip_atomic_wait_for_complete(), so it
-should be already safe to free the old fbs.
-
-So the above fix doesn't really do anything, possibly just covers the
-race condition of the original wait for vblank function by delaying
-drm_atomic_state_free() a bit.
-
-Moreover, the whole series has been thoroughly tested in Chrome OS 4.4
-kernel, including async commits. (There is still a possibility some
-newer upstream changes slightly modified the semantics, but I couldn't
-find such difference. Actually one of the advantages of atomic helpers
-was to avoid manually refcounting the fbs from the driver.)
-
-Best regards,
-Tomasz
+Regards
+Vijay
