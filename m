@@ -1,127 +1,105 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 18 Sep 2016 08:52:12 +0800
-Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <1473741659-17618-3-git-send-email-po.liu@nxp.com>
-References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
- <1473741659-17618-1-git-send-email-po.liu@nxp.com>
- <1473741659-17618-3-git-send-email-po.liu@nxp.com>
-Message-ID: <20160918005212.GF15478@tiger>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sun, 18 Sep 2016 09:21:52 +0800
+Subject: [PATCH v2 3/4] arm64: dts: add Allwinner A64 SoC .dtsi
+In-Reply-To: <20160917145121.GE17518@lukather>
+References: <20160909201029.24530-1-maxime.ripard@free-electrons.com>
+ <20160909201029.24530-4-maxime.ripard@free-electrons.com>
+ <fad78d40-b595-633c-6d43-6246ec893635@arm.com>
+ <20160917145121.GE17518@lukather>
+Message-ID: <1006111474161712@web13g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 12:40:59PM +0800, Po Liu wrote:
-> On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-> When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-> maybe there is interrupt line for aer pme etc. Search the interrupt
-> number in the fdt file. Then fixup the dev->irq with it.
-> 
-> Signed-off-by: Po Liu <po.liu@nxp.com>
 
-Will the new kernel work with existing/old DTB?  I'm trying to
-understand the dependency between driver and DTS changes.
 
-Shawn
+17.09.2016, 22:56, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Thu, Sep 15, 2016 at 01:08:45AM +0100, Andr? Przywara wrote:
+>> ?> --- a/MAINTAINERS
+>> ?> +++ b/MAINTAINERS
+>> ?> @@ -982,6 +982,7 @@ M: Chen-Yu Tsai <wens@csie.org>
+>> ?> L: linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>> ?> S: Maintained
+>> ?> N: sun[x456789]i
+>> ?> +F: arch/arm64/boot/dts/allwinner/
+>>
+>> ?If you promise to not break it needlessly ;-)
+>
+> We started doing so since 4.7, and we're already fighting needlessly
+> with maintainers because of that.
+>
+>> ?> + cpus {
+>> ?> + #address-cells = <1>;
+>> ?> + #size-cells = <0>;
+>> ?> +
+>> ?> + cpu at 0 {
+>>
+>> ?This is probably me to blame here since I put you up to it, but you need
+>> ?"cpux" names (e.g. "cpu0: cpu at 0 {") to match the ones that the PMU node
+>> ?references below. dtc will refuse to compile it otherwise.
+>
+> Gaah, yes, of course.
+>
+>> ?> + i2c1_pins: i2c1_pins {
+>> ?> + allwinner,pins = "PH2", "PH3";
+>> ?> + allwinner,function = "i2c1";
+>> ?> + allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> ?> + allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> ?> + };
+>> ?> +
+>> ?> + uart0_pins_a: uart0 at 0 {
+>> ?> + allwinner,pins = "PB8", "PB9";
+>> ?> + allwinner,function = "uart0";
+>> ?> + allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> ?> + allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>> ?> + };
+>>
+>> ?So did I get this right that there is a strict "no user - no pins"
+>> ?policy here?
+>> ?I don't see a reason why we shouldn't have at least the other UART pins
+>> ?described here as well - since they are a pure SoC property. That would
+>> ?make it easier for people to enable them (with a simple, scripted fdt
+>> ?one-liner command in U-Boot, for instance).
+>
+> To avoid having huge DT that are longer to load and parse, especially
+> since every one wires it in the exact same way all the time. And the
+> combination is just too high.
+>
+> On the A64, the UART0 can be exposed through PB9 and PF4 for TX, and
+> PB8 and PF2 for RX. Even though the common usage would be to use PB8
+> and PB9, or PF4 and PF6. But absolutely nothing prevents from using
+> PB8 and PF4.
+>
+> You can then add CTS and RTS into the mix, and multiply that by the
+> number of devices in the SoC.
+>
+>> ?I guess there will never be an official DT with more than 2 UARTs
+>> ?enabled, although we have actually five UARTs on the headers on the
+>> ?Pine64, for instance (and personally I am looking into using one as a
+>> ?terminal server).
+>
+> We relaxed the rule lately however. Boards that have access to those
+> UARTs on their headers can put a node in their DT with the right
+> muxing filled already. Which brings you the simple, script fdt
+> one-liner in U-Boot.
+>
+>> ?Also UART1 is connected to that WiFi/Bluetooth slot, having it enabled
+>> ?should make BT work without further ado (but I haven't tested this).
+>
+> That's probably not true. You'll most likely need to enable a few
+> regulators to have it working.
 
-> ---
-> changes for v5:
-> 	- Add clear 'aer' interrup-names description
-> 
->  .../devicetree/bindings/pci/layerscape-pci.txt     | 11 +++++---
->  drivers/pci/pcie/portdrv_core.c                    | 31 +++++++++++++++++++---
->  2 files changed, 35 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index 41e9f55..101d0a7 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -18,8 +18,10 @@ Required properties:
->  - reg: base addresses and lengths of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must contain an
->    entry for each entry in the interrupt-names property.
-> -- interrupt-names: Must include the following entries:
-> -  "intr": The interrupt that is asserted for controller interrupts
-> +- interrupt-names: It may be include the following entries:
-> +  "aer": The interrupt that is asserted for aer interrupt
-> +  "pme": The interrupt that is asserted for pme interrupt
-> +  ......
->  - fsl,pcie-scfg: Must include two entries.
->    The first entry must be a link to the SCFG device node
->    The second entry must be '0' or '1' based on physical PCIe controller index.
-> @@ -35,8 +37,9 @@ Example:
->  		reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
->  		       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
->  		reg-names = "regs", "config";
-> -		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
-> -		interrupt-names = "intr";
-> +		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>, /* aer interrupt */
-> +			<GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* pme interrupt */
-> +		interrupt-names = "aer", "pme";
->  		fsl,pcie-scfg = <&scfg 0>;
->  		#address-cells = <3>;
->  		#size-cells = <2>;
-> diff --git a/drivers/pci/pcie/portdrv_core.c b/drivers/pci/pcie/portdrv_core.c
-> index e9270b4..7c4943d 100644
-> --- a/drivers/pci/pcie/portdrv_core.c
-> +++ b/drivers/pci/pcie/portdrv_core.c
-> @@ -16,6 +16,7 @@
->  #include <linux/slab.h>
->  #include <linux/pcieport_if.h>
->  #include <linux/aer.h>
-> +#include <linux/of_irq.h>
->  
->  #include "../pci.h"
->  #include "portdrv.h"
-> @@ -200,6 +201,28 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *vectors, int mask)
->  static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
->  {
->  	int i, irq = -1;
-> +	int ret;
-> +	struct device_node *np = NULL;
-> +
-> +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
-> +		irqs[i] = 0;
-> +
-> +	if (dev->bus->dev.of_node)
-> +		np = dev->bus->dev.of_node;
-> +
-> +	/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
-> +	 * request irq for aer
-> +	 */
-> +	if (IS_ENABLED(CONFIG_OF_IRQ) && np &&
-> +			(mask & PCIE_PORT_SERVICE_PME)) {
-> +		ret = of_irq_get_byname(np, "aer");
-> +		if (ret > 0) {
-> +			irqs[PCIE_PORT_SERVICE_AER_SHIFT] = ret;
-> +			if (dev->irq)
-> +				irq = dev->irq;
-> +			goto no_msi;
-> +		}
-> +	}
->  
->  	/*
->  	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
-> @@ -225,11 +248,13 @@ static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
->  		irq = dev->irq;
->  
->   no_msi:
-> -	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
-> -		irqs[i] = irq;
-> +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
-> +		if (!irqs[i])
-> +			irqs[i] = irq;
-> +	}
->  	irqs[PCIE_PORT_SERVICE_VC_SHIFT] = -1;
->  
-> -	if (irq < 0)
-> +	if (irq < 0 && irqs[PCIE_PORT_SERVICE_AER_SHIFT] < 0)
->  		return -ENODEV;
->  	return 0;
->  }
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
+It seems that Andre has enabled the necessary regulator in the
+newest version of his ARM Trusted Firmware...
+
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+> ,
+>
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
