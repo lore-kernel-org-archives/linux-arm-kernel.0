@@ -1,8 +1,8 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 19 Sep 2016 02:59:19 +0900
-Subject: [PATCH v4] ARM: w90x900: let clk_disable() return immediately if clk
+Date: Mon, 19 Sep 2016 03:04:35 +0900
+Subject: [PATCH v4] MIPS: bcm63xx: let clk_disable() return immediately if clk
  is NULL
-Message-ID: <1474221559-21269-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1474221875-22687-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,7 +13,6 @@ Making it treewide consistent will allow clock consumers to call
 clk_disable() without NULL pointer check.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Acked-by: Wan Zongshun <mcuos.com@gmail.com>
 ---
 
 Changes in v4:
@@ -25,22 +24,22 @@ Changes in v3:
 Changes in v2:
   - Rebase on Linux 4.6-rc1
 
- arch/arm/mach-w90x900/clock.c | 3 +++
+ arch/mips/bcm63xx/clk.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
-index 2c371ff..ac6fd1a 100644
---- a/arch/arm/mach-w90x900/clock.c
-+++ b/arch/arm/mach-w90x900/clock.c
-@@ -46,6 +46,9 @@ void clk_disable(struct clk *clk)
- {
- 	unsigned long flags;
+diff --git a/arch/mips/bcm63xx/clk.c b/arch/mips/bcm63xx/clk.c
+index 6375652..b49fc9c 100644
+--- a/arch/mips/bcm63xx/clk.c
++++ b/arch/mips/bcm63xx/clk.c
+@@ -326,6 +326,9 @@ EXPORT_SYMBOL(clk_enable);
  
+ void clk_disable(struct clk *clk)
+ {
 +	if (!clk)
 +		return;
 +
- 	WARN_ON(clk->enabled == 0);
- 
- 	spin_lock_irqsave(&clocks_lock, flags);
+ 	mutex_lock(&clocks_mutex);
+ 	clk_disable_unlocked(clk);
+ 	mutex_unlock(&clocks_mutex);
 -- 
 1.9.1
