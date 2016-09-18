@@ -1,63 +1,38 @@
-From: ayaka@soulik.info (ayaka)
-Date: Sun, 18 Sep 2016 23:12:34 +0800
-Subject: [PATCH] ASoC: samsung: make audio interface/controller explicitly
-In-Reply-To: <20160918144247.GA11009@kozik-book>
-References: <1474207751-9804-1-git-send-email-ayaka@soulik.info>
- <1474207751-9804-2-git-send-email-ayaka@soulik.info>
- <20160918144247.GA11009@kozik-book>
-Message-ID: <1bc1a3db-8120-a2ae-0f55-a5c1bb154dc6@soulik.info>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Sun, 18 Sep 2016 11:17:04 -0400
+Subject: [PATCH 06/10] ARM: dts: exynos: Fix invalid GIC interrupt flags
+ in exynos5
+In-Reply-To: <1474054971-16831-7-git-send-email-krzk@kernel.org>
+References: <1474054971-16831-1-git-send-email-krzk@kernel.org>
+ <1474054971-16831-7-git-send-email-krzk@kernel.org>
+Message-ID: <c64744b1-eab5-350b-7f87-86c159abffb6@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Krzysztof,
 
+On 09/16/2016 03:42 PM, Krzysztof Kozlowski wrote:
+> Interrupt of type IRQ_TYPE_NONE is not allowed for GIC interrupts and
+> generates an error:
+> 	genirq: Setting trigger mode 0 for irq 16 failed (gic_set_type+0x0/0x68)
+> 
+> The GIC requires shared interrupts to be edge rising or level high.
+> Platform declares support for both.  Choose level high everywhere.
+> 
+> Reported-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Reported-by: Alban Browaeys <alban.browaeys@gmail.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
 
-On 09/18/2016 10:42 PM, Krzysztof Kozlowski wrote:
-> On Sun, Sep 18, 2016 at 10:09:11PM +0800, Randy Li wrote:
->> It is simple sound card time, we could assign different codec
->> to a interface without making a specific driver for it.
-> The description does not convince me and I do not see an example using
-> this. Could you provide one?
-Sorry, the board TOPEET iTop 4412 for exynos 4412 I posted supported 
-codec with I2S interface using the simple sound card. Anyway, it is no 
-harm to make them explicitly right? Or I have to enabled those codec 
-support for SMDK, which is not needed for the other board.
->
-> Best regards,
-> Krzysztof
->
->
->> Signed-off-by: Randy Li <ayaka@soulik.info>
->> ---
->>   sound/soc/samsung/Kconfig | 8 ++++----
->>   1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
->> index 7b722b0..b7b3a38 100644
->> --- a/sound/soc/samsung/Kconfig
->> +++ b/sound/soc/samsung/Kconfig
->> @@ -18,18 +18,18 @@ config SND_S3C2412_SOC_I2S
->>   	select SND_S3C_I2SV2_SOC
->>   
->>   config SND_SAMSUNG_PCM
->> -	tristate
->> +	tristate "Samsung PCM interface support"
->>   
->>   config SND_SAMSUNG_AC97
->> -	tristate
->> +	tristate "Samsung AC97 controller support"
->>   	select SND_SOC_AC97_BUS
->>   
->>   config SND_SAMSUNG_SPDIF
->> -	tristate
->> +	tristate "Samsung SPDIF transmitter support"
->>   	select SND_SOC_SPDIF
->>   
->>   config SND_SAMSUNG_I2S
->> -	tristate
->> +	tristate "Samsung I2S interface support"
->>   
->>   config SND_SOC_SAMSUNG_NEO1973_WM8753
->>   	tristate "Audio support for Openmoko Neo1973 Smartphones (GTA02)"
->> -- 
->> 2.7.4
->>
+I tested this patch on an Exynos5800 Peach Pi Chromebook and
+an Exynos5422 Odroid XU4 board and no regressions were found.
+
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
