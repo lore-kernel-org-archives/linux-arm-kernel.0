@@ -1,82 +1,80 @@
 From: ayaka@soulik.info (Randy Li)
-Date: Sun, 18 Sep 2016 22:27:37 +0800
-Subject: [RFC PATCH v2 0/2] adding panel claa070wp03xg support for exynos
-Message-ID: <1474208859-10045-1-git-send-email-ayaka@soulik.info>
+Date: Sun, 18 Sep 2016 22:27:39 +0800
+Subject: [RFC PATCH v2 2/2] drm/panel: Add support for Chunghwa CLAA070WP03XG
+ panel
+In-Reply-To: <1474208859-10045-1-git-send-email-ayaka@soulik.info>
+References: <1474208859-10045-1-git-send-email-ayaka@soulik.info>
+Message-ID: <1474208859-10045-3-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am trying to add LCD panel with LVDS interface for exynos 4412 topeet
-itop. That board using a bridge chip to convert the parallel RGB signal
-to LVDS signal. I could make a fb0 node appear in system now. But I can't
-make it work yet. redirecting the urandom to fb0 won't make anything
-change in panel.
+The Chunghwa CLAA070WP03XG is a 7" 1280x800 panel, which can be
+supported by the simple panel driver.
 
-The timing for this panel is calcuated from Hyundai T7, but it looks
-different to the vendor's kernel. But those timings settings is disabled, so
-I decided not to use it.
-
-I attach them as references:
-/* From Hyundai T7 */
-static struct s3cfb_lcd hs101h = {
-	.width = 1280,
-	.height = 800,
-	.bpp = 24,
-	.freq = 60,
-
-	.timing = {
-		.h_fp = 49,
-		.h_bp = 17,
-		.h_sw = 33,
-		.v_fp = 4,
-		.v_fpe = 1,
-		.v_bp = 15,
-		.v_bpe = 1,
-		.v_sw = 6,
-	},
-
-	.polarity = {
-		.rise_vclk = 0,
-		.inv_hsync = 1,
-		.inv_vsync = 1,
-		.inv_vden = 0,
-	},
-};
-/* From vendor */
-static struct s3cfb_lcd dummy_mipi_lcd = {                                                                                   
-	.width = 800,                                                                                 
-        .height = 1280,                                         
-        .bpp = 24,                                                                             
-        .freq = 60,                                                                                                 
-        .timing = {                                                                                                          
-                .h_fp = 16,                                                                                            
-                .h_bp = 140,                                                                                        
-                .h_sw = 14,                                                                                             
-                .v_fp = 8,                                                                                               
-                //.v_fpe = 2,                                                                                                 
-                .v_bp = 4,                                                                                               
-                //.v_bpe = 1,                                                                                                 
-                .v_sw = 4,                                                                                              
-                .cmd_allow_len = 4,                                                                                           
-        },                                                                                                                    
-                                                                                                                              
-        .polarity = {                                                                                                         
-                .rise_vclk = 0,                                                                                          
-                .inv_hsync = 0,                                                                                               
-                .inv_vsync = 0,                                                                                               
-                .inv_vden = 0,                                                                                                
-        },                                                                                                                    
-}
-
-
-Randy Li (2):
-  ARM: dts: samsung: add rga-lvds panel in itop elite
-  drm/panel: Add support for Chunghwa CLAA070WP03XG panel
-
- .../display/panel/chunghwa,claa070wp03xg.txt       |  7 +++
- arch/arm/boot/dts/exynos4412-itop-elite.dts        | 54 +++++++++++++++++++++-
- drivers/gpu/drm/panel/panel-simple.c               | 27 +++++++++++
- 3 files changed, 86 insertions(+), 2 deletions(-)
+Signed-off-by: Randy Li <ayaka@soulik.info>
+---
+ .../display/panel/chunghwa,claa070wp03xg.txt       |  7 ++++++
+ drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt
 
+diff --git a/Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt b/Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt
+new file mode 100644
+index 0000000..dd22685
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt
+@@ -0,0 +1,7 @@
++Chunghwa Picture Tubes Ltd. 7" WXGA TFT LCD panel
++
++Required properties:
++- compatible: should be "chunghwa,claa070wp03xg"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index f178998..3204e6b 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -583,6 +583,30 @@ static const struct panel_desc avic_tm070ddh03 = {
+ 	},
+ };
+ 
++static const struct drm_display_mode chunghwa_claa070wp03xg_mode = {
++	.clock = 66770,
++	.hdisplay = 800,
++	.hsync_start = 800 + 49,
++	.hsync_end = 800 + 49 + 33,
++	.htotal = 800 + 49 + 33 + 17,
++	.vdisplay = 1280,
++	.vsync_start = 1280 + 1,
++	.vsync_end = 1280 + 1 + 7,
++	.vtotal = 1280 + 1 + 7 + 15,
++	.vrefresh = 60,
++	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
++};
++
++static const struct panel_desc chunghwa_claa070wp03xg = {
++	.modes = &chunghwa_claa070wp03xg_mode,
++	.num_modes = 1,
++	.bpc = 6,
++	.size = {
++		.width = 94,
++		.height = 150,
++	},
++};
++
+ static const struct drm_display_mode chunghwa_claa101wa01a_mode = {
+ 	.clock = 72070,
+ 	.hdisplay = 1366,
+@@ -1544,6 +1568,9 @@ static const struct of_device_id platform_of_match[] = {
+ 		.compatible = "avic,tm070ddh03",
+ 		.data = &avic_tm070ddh03,
+ 	}, {
++		.compatible = "chunghwa,claa070wp03xg",
++		.data = &chunghwa_claa070wp03xg,
++	}, {
+ 		.compatible = "chunghwa,claa101wa01a",
+ 		.data = &chunghwa_claa101wa01a
+ 	}, {
 -- 
 2.7.4
