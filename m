@@ -1,29 +1,33 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Sun, 18 Sep 2016 11:20:43 -0400
-Subject: [PATCH 4/7] ARM: dts: exynos: Use human-friendly symbols for
- interrupt properties in exynos5
-In-Reply-To: <1474062122-22720-5-git-send-email-krzk@kernel.org>
-References: <1474062122-22720-1-git-send-email-krzk@kernel.org>
- <1474062122-22720-5-git-send-email-krzk@kernel.org>
-Message-ID: <f16ace70-f391-39fb-c8ee-ffbacb52f1ea@osg.samsung.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Sun, 18 Sep 2016 18:05:59 +0200
+Subject: [PATCH V5 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <1999564031.209213.6508fbdb-00c5-486b-a34e-3d60ae68fe88.open-xchange@email.1und1.de>
+References: <1473759262-27031-1-git-send-email-kernel@martin.sperl.org>
+ <1473759262-27031-3-git-send-email-kernel@martin.sperl.org>
+ <1999564031.209213.6508fbdb-00c5-486b-a34e-3d60ae68fe88.open-xchange@email.1und1.de>
+Message-ID: <4D9CBC7C-FB79-4B3F-8896-4E8341763248@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hi Stefan!
 
-On 09/16/2016 05:41 PM, Krzysztof Kozlowski wrote:
-> Replace hard-coded values of type of GIC interrupt and its flags with
-> respective macros from header to increase code readability
+> On 18.09.2016, at 13:31, Stefan Wahren <stefan.wahren@i2se.com> wrote:
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
+>> +	rate = clk_get_rate(data->clk);
+>> +	if ((rate < 1920000) || (rate > 5000000)) {
+>> +		dev_warn(&pdev->dev,
+>> +			 "Clock %pCn is running at %pCr Hz, which is outside the recommended range
+>> of 1.9 to 5.0 MHz\n",
+>> +			 data->clk, data->clk);
+> 
+> Instead of printing the clock name twice your intension would be to print the
+> actual clock rate?
+%pCn (and %pC) prints the clock name
+%pCr prints the clock rate - I guess I could use ?%lu? and rate instead
 
-On an Exynos5800 Peach Pi Chromebook and an Exynos5422 Odroid XU4 board:
+So I do not see an issue here - I will reword the text to shorten it.
 
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Everything else I will fix as mentioned.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Martin
