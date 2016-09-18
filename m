@@ -1,25 +1,24 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 18 Sep 2016 21:12:05 +0200
-Subject: [PATCH 1/4] drm/sun4i: rgb: Declare RGB encoder and connector as
- MIPI DPI
-In-Reply-To: <20160915151402.15992-2-wens@csie.org>
+Date: Sun, 18 Sep 2016 21:13:47 +0200
+Subject: [PATCH 3/4] drm/sun4i: dotclock: Allow divider = 127
+In-Reply-To: <20160915151402.15992-4-wens@csie.org>
 References: <20160915151402.15992-1-wens@csie.org>
- <20160915151402.15992-2-wens@csie.org>
-Message-ID: <20160918191205.GG17518@lukather>
+ <20160915151402.15992-4-wens@csie.org>
+Message-ID: <20160918191347.GH17518@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 15, 2016 at 11:14:01PM +0800, Chen-Yu Tsai wrote:
+> The dot clock divider is 7 bits wide, and the divider range is 1 ~ 127,
+> or 6 ~ 127 if phase offsets are used. The 0 register value also
+> represents a divider of 1 or bypass.
+> 
+> Make the end condition of the for loop inclusive of 127 in the
+> round_rate callback.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-On Thu, Sep 15, 2016 at 11:13:59PM +0800, Chen-Yu Tsai wrote:
-> The 18 or 24 bit parallel RGB LCD panel interface found on Allwinner
-> SoCs matches the description of MIPI DPI. Declare the RGB encoder and
-> connector as MIPI DPI.
-
-Unfortunately, even it that patch might be true (is there a public
-spec for that standard?), this breaks the user-space, so there's no
-way we change this.
-
+Applied, thanks!
 Maxime
 
 -- 
@@ -32,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160918/808e0518/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160918/34bb122f/attachment.sig>
