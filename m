@@ -1,11 +1,11 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Sun, 18 Sep 2016 11:17:04 -0400
-Subject: [PATCH 06/10] ARM: dts: exynos: Fix invalid GIC interrupt flags
- in exynos5
-In-Reply-To: <1474054971-16831-7-git-send-email-krzk@kernel.org>
+Date: Sun, 18 Sep 2016 11:18:13 -0400
+Subject: [PATCH 08/10] ARM: dts: exynos: Fix invalid GIC interrupt flags
+ in exynos5410/exynos542x
+In-Reply-To: <1474054971-16831-9-git-send-email-krzk@kernel.org>
 References: <1474054971-16831-1-git-send-email-krzk@kernel.org>
- <1474054971-16831-7-git-send-email-krzk@kernel.org>
-Message-ID: <c64744b1-eab5-350b-7f87-86c159abffb6@osg.samsung.com>
+ <1474054971-16831-9-git-send-email-krzk@kernel.org>
+Message-ID: <83ea3f1f-476a-0a49-abe5-1bafaa269dd2@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,9 +25,6 @@ On 09/16/2016 03:42 PM, Krzysztof Kozlowski wrote:
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
 > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
-
-I tested this patch on an Exynos5800 Peach Pi Chromebook and
-an Exynos5422 Odroid XU4 board and no regressions were found.
 
 Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
