@@ -1,43 +1,97 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun, 18 Sep 2016 16:13:11 +0200
-Subject: [PATCH] ARM: tegra: nyan: Enable GPU node and related supply
-Message-ID: <20160918141311.17140-1-contact@paulk.fr>
+From: ayaka@soulik.info (Randy Li)
+Date: Sun, 18 Sep 2016 22:27:38 +0800
+Subject: [RFC PATCH v2 1/2] ARM: dts: samsung: add rga-lvds panel in itop elite
+In-Reply-To: <1474208859-10045-1-git-send-email-ayaka@soulik.info>
+References: <1474208859-10045-1-git-send-email-ayaka@soulik.info>
+Message-ID: <1474208859-10045-2-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the GPU node for tegra124 nyan boards, which is required to
-get graphics acceleration with nouveau on these devices.
+It is actually a lvds panel connected through a rga-lvds bridge.
+The touchscreen is communicated with i2c bus but the driver is not
+support now.
 
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+Signed-off-by: Randy Li <ayaka@soulik.info>
 ---
- arch/arm/boot/dts/tegra124-nyan.dtsi | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos4412-itop-elite.dts | 54 +++++++++++++++++++++++++++--
+ 1 file changed, 52 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-index dab9509..225ca77 100644
---- a/arch/arm/boot/dts/tegra124-nyan.dtsi
-+++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-@@ -42,6 +42,12 @@
- 		};
+diff --git a/arch/arm/boot/dts/exynos4412-itop-elite.dts b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+index b08705e..9ef0505 100644
+--- a/arch/arm/boot/dts/exynos4412-itop-elite.dts
++++ b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+@@ -138,6 +138,36 @@
+ 		assigned-clocks = <&clock CLK_MOUT_CAM0>;
+ 		assigned-clock-parents = <&clock CLK_XUSBXTI>;
  	};
- 
-+	gpu at 0,57000000 {
-+		status = "okay";
 +
-+		vdd-supply = <&vdd_gpu>;
++	vcc_sys_lcd: sys-lcd {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
 +	};
 +
- 	serial at 70006000 {
- 		/* Debug connector on the bottom of the board near SD card. */
- 		status = "okay";
-@@ -214,7 +220,7 @@
- 					regulator-always-on;
- 				};
++	panel: panel at 0 {
++		compatible = "chunghwa,claa070wp03xg";
++
++		power-supply = <&vcc_sys_lcd>;
++		enable-gpios = <&gpl0 2 GPIO_ACTIVE_HIGH>;
++		backlight = <&bl>;
++
++		port {
++			lcd_ep: endpoint {
++				remote-endpoint = <&rga_lvds>;
++			};
++		};
++	};
++
++	bl: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm 1 5000000 PWM_POLARITY_INVERTED>;
++		brightness-levels = <0 5 12 16 32 64 128 255>;
++		default-brightness-level = <5>;
++		power-supply = <&vcc_sys_lcd>;
++	};
+ };
  
--				sd6 {
-+				vdd_gpu: sd6 {
- 					regulator-name = "+VDD_GPU_AP";
- 					regulator-min-microvolt = <650000>;
- 					regulator-max-microvolt = <1200000>;
+ &adc {
+@@ -215,9 +245,9 @@
+ 
+ &pwm {
+ 	status = "okay";
+-	pinctrl-0 = <&pwm0_out>;
++	pinctrl-0 = <&pwm0_out &pwm1_out>;
+ 	pinctrl-names = "default";
+-	samsung,pwm-outputs = <0>;
++	samsung,pwm-outputs = <0>, <1>;
+ };
+ 
+ &sdhci_2 {
+@@ -238,3 +268,23 @@
+ &serial_2 {
+ 	status = "okay";
+ };
++
++&i2c_3 {
++	status = "okay";
++};
++
++&fimd {
++	pinctrl-0 = <&lcd_clk &lcd_data24>;
++	pinctrl-names = "default";
++	status = "okay";
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		port at 3 {
++			reg = <3>;
++			rga_lvds: endpoint {
++				remote-endpoint = <&lcd_ep>;
++			};
++		};
++	};
++};
 -- 
-2.9.3
+2.7.4
