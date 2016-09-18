@@ -1,57 +1,124 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 18 Sep 2016 16:42:47 +0200
-Subject: [PATCH] ASoC: samsung: make audio interface/controller explicitly
-In-Reply-To: <1474207751-9804-2-git-send-email-ayaka@soulik.info>
-References: <1474207751-9804-1-git-send-email-ayaka@soulik.info>
- <1474207751-9804-2-git-send-email-ayaka@soulik.info>
-Message-ID: <20160918144247.GA11009@kozik-book>
+From: tremyfr@gmail.com (Philippe Reynes)
+Date: Sun, 18 Sep 2016 16:59:07 +0200
+Subject: [PATCH 2/2] net: ethernet: broadcom: bcm63xx: use new api
+ ethtool_{get|set}_link_ksettings
+In-Reply-To: <1474210747-19627-1-git-send-email-tremyfr@gmail.com>
+References: <1474210747-19627-1-git-send-email-tremyfr@gmail.com>
+Message-ID: <1474210747-19627-2-git-send-email-tremyfr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 18, 2016 at 10:09:11PM +0800, Randy Li wrote:
-> It is simple sound card time, we could assign different codec
-> to a interface without making a specific driver for it.
+The ethtool api {get|set}_settings is deprecated.
+We move this driver to new api {get|set}_link_ksettings.
 
-The description does not convince me and I do not see an example using
-this. Could you provide one?
+Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
+---
+ drivers/net/ethernet/broadcom/bcm63xx_enet.c |   52 ++++++++++++++------------
+ 1 files changed, 28 insertions(+), 24 deletions(-)
 
-Best regards,
-Krzysztof
-
-
-> 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
-> ---
->  sound/soc/samsung/Kconfig | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-> index 7b722b0..b7b3a38 100644
-> --- a/sound/soc/samsung/Kconfig
-> +++ b/sound/soc/samsung/Kconfig
-> @@ -18,18 +18,18 @@ config SND_S3C2412_SOC_I2S
->  	select SND_S3C_I2SV2_SOC
->  
->  config SND_SAMSUNG_PCM
-> -	tristate
-> +	tristate "Samsung PCM interface support"
->  
->  config SND_SAMSUNG_AC97
-> -	tristate
-> +	tristate "Samsung AC97 controller support"
->  	select SND_SOC_AC97_BUS
->  
->  config SND_SAMSUNG_SPDIF
-> -	tristate
-> +	tristate "Samsung SPDIF transmitter support"
->  	select SND_SOC_SPDIF
->  
->  config SND_SAMSUNG_I2S
-> -	tristate
-> +	tristate "Samsung I2S interface support"
->  
->  config SND_SOC_SAMSUNG_NEO1973_WM8753
->  	tristate "Audio support for Openmoko Neo1973 Smartphones (GTA02)"
-> -- 
-> 2.7.4
-> 
+diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+index 082f3f0..ae364c7 100644
+--- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
++++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+@@ -1442,39 +1442,40 @@ static int bcm_enet_nway_reset(struct net_device *dev)
+ 	return -EOPNOTSUPP;
+ }
+ 
+-static int bcm_enet_get_settings(struct net_device *dev,
+-				 struct ethtool_cmd *cmd)
++static int bcm_enet_get_link_ksettings(struct net_device *dev,
++				       struct ethtool_link_ksettings *cmd)
+ {
+ 	struct bcm_enet_priv *priv;
++	u32 supported, advertising;
+ 
+ 	priv = netdev_priv(dev);
+ 
+-	cmd->maxrxpkt = 0;
+-	cmd->maxtxpkt = 0;
+-
+ 	if (priv->has_phy) {
+ 		if (!dev->phydev)
+ 			return -ENODEV;
+-		return phy_ethtool_gset(dev->phydev, cmd);
++		return phy_ethtool_ksettings_get(dev->phydev, cmd);
+ 	} else {
+-		cmd->autoneg = 0;
+-		ethtool_cmd_speed_set(cmd, ((priv->force_speed_100)
+-					    ? SPEED_100 : SPEED_10));
+-		cmd->duplex = (priv->force_duplex_full) ?
++		cmd->base.autoneg = 0;
++		cmd->base.speed = (priv->force_speed_100) ?
++			SPEED_100 : SPEED_10;
++		cmd->base.duplex = (priv->force_duplex_full) ?
+ 			DUPLEX_FULL : DUPLEX_HALF;
+-		cmd->supported = ADVERTISED_10baseT_Half  |
++		supported = ADVERTISED_10baseT_Half |
+ 			ADVERTISED_10baseT_Full |
+ 			ADVERTISED_100baseT_Half |
+ 			ADVERTISED_100baseT_Full;
+-		cmd->advertising = 0;
+-		cmd->port = PORT_MII;
+-		cmd->transceiver = XCVR_EXTERNAL;
++		advertising = 0;
++		ethtool_convert_legacy_u32_to_link_mode(
++			cmd->link_modes.supported, supported);
++		ethtool_convert_legacy_u32_to_link_mode(
++			cmd->link_modes.advertising, advertising);
++		cmd->base.port = PORT_MII;
+ 	}
+ 	return 0;
+ }
+ 
+-static int bcm_enet_set_settings(struct net_device *dev,
+-				 struct ethtool_cmd *cmd)
++static int bcm_enet_set_link_ksettings(struct net_device *dev,
++				       const struct ethtool_link_ksettings *cmd)
+ {
+ 	struct bcm_enet_priv *priv;
+ 
+@@ -1482,16 +1483,19 @@ static int bcm_enet_set_settings(struct net_device *dev,
+ 	if (priv->has_phy) {
+ 		if (!dev->phydev)
+ 			return -ENODEV;
+-		return phy_ethtool_sset(dev->phydev, cmd);
++		return phy_ethtool_ksettings_set(dev->phydev, cmd);
+ 	} else {
+ 
+-		if (cmd->autoneg ||
+-		    (cmd->speed != SPEED_100 && cmd->speed != SPEED_10) ||
+-		    cmd->port != PORT_MII)
++		if (cmd->base.autoneg ||
++		    (cmd->base.speed != SPEED_100 &&
++		     cmd->base.speed != SPEED_10) ||
++		    cmd->base.port != PORT_MII)
+ 			return -EINVAL;
+ 
+-		priv->force_speed_100 = (cmd->speed == SPEED_100) ? 1 : 0;
+-		priv->force_duplex_full = (cmd->duplex == DUPLEX_FULL) ? 1 : 0;
++		priv->force_speed_100 =
++			(cmd->base.speed == SPEED_100) ? 1 : 0;
++		priv->force_duplex_full =
++			(cmd->base.duplex == DUPLEX_FULL) ? 1 : 0;
+ 
+ 		if (netif_running(dev))
+ 			bcm_enet_adjust_link(dev);
+@@ -1585,14 +1589,14 @@ static const struct ethtool_ops bcm_enet_ethtool_ops = {
+ 	.get_sset_count		= bcm_enet_get_sset_count,
+ 	.get_ethtool_stats      = bcm_enet_get_ethtool_stats,
+ 	.nway_reset		= bcm_enet_nway_reset,
+-	.get_settings		= bcm_enet_get_settings,
+-	.set_settings		= bcm_enet_set_settings,
+ 	.get_drvinfo		= bcm_enet_get_drvinfo,
+ 	.get_link		= ethtool_op_get_link,
+ 	.get_ringparam		= bcm_enet_get_ringparam,
+ 	.set_ringparam		= bcm_enet_set_ringparam,
+ 	.get_pauseparam		= bcm_enet_get_pauseparam,
+ 	.set_pauseparam		= bcm_enet_set_pauseparam,
++	.get_link_ksettings	= bcm_enet_get_link_ksettings,
++	.set_link_ksettings	= bcm_enet_set_link_ksettings,
+ };
+ 
+ static int bcm_enet_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+-- 
+1.7.4.4
