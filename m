@@ -1,94 +1,96 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 18 Sep 2016 18:39:47 +0200
-Subject: [GIT PULL 2/3] ARM: dts: exynos: DT for v4.9, second round
+Date: Sun, 18 Sep 2016 18:39:48 +0200
+Subject: [GIT PULL 3/3] ARM: dts: exynos: pinctrl cleanup for v4.9
 In-Reply-To: <1474216788-17282-1-git-send-email-krzk@kernel.org>
 References: <1474216788-17282-1-git-send-email-krzk@kernel.org>
-Message-ID: <1474216788-17282-3-git-send-email-krzk@kernel.org>
+Message-ID: <1474216788-17282-4-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
+Hi,
 
-The following changes since commit 05b01dd936b46f2c3cfbb10bc89c0ec79c745e5d:
+A separate topic branch with DT cleanup.
 
-  ARM: dts: exynos: Use 'hpd-gpios' instead of 'hpd-gpio' (2016-08-24 21:09:24 +0200)
+
+Best regards,
+Krzysztof
+
+
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.9-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-pinctrl-4.9
 
-for you to fetch changes up to 5271d002709e8ca27232ab031f35e0df1d0fe4ed:
+for you to fetch changes up to d13799237dee34e1b9cd377f0ced7bee24ac810f:
 
-  ARM: dts: s5p: Add missing unit name to memory nodes for S5PV210 boards (2016-09-16 09:17:00 +0200)
-
-----------------------------------------------------------------
-Samsung DeviceTree update for v4.9, second round:
-1. Enable HDMI on Arndale Octa board.
-2. Update list of clocks for FIMC-IS block on Exynos4x12.
-3. Remove skeleton.dtsi thus fixing DT compiler warning:
-	"Node /memory has a reg or ranges property, but no unit name"
-   This is a tree-wide effort by various people. Javier Martinez Canillas did
-   it for Exynos and S5PV210.
+  ARM: dts: s3c64xx: Use macros for pinctrl configuration (2016-09-16 13:32:27 +0200)
 
 ----------------------------------------------------------------
-Javier Martinez Canillas (9):
-      ARM: dts: exynos: Add missing memory node for Exynos5440 boards
-      ARM: dts: exynos: Remove skeleton.dtsi usage for Exynos3
-      ARM: dts: exynos: Remove skeleton.dtsi usage for Exynos4
-      ARM: dts: exynos: Remove skeleton.dtsi usage for Exynos5
-      ARM: dts: exynos: Add missing unit name to memory nodes in Exynos3 DTS
-      ARM: dts: exynos: Add missing unit name to memory nodes in Exynos4 DTS
-      ARM: dts: exynos: Add missing unit name to memory nodes in Exynos5 DTS
-      ARM: dts: s5p: Remove skeleton.dtsi inclusion for S5PV210
-      ARM: dts: s5p: Add missing unit name to memory nodes for S5PV210 boards
+Topic branch for Samsung DeviceTree cleanup for 4.9.
 
-Marek Szyprowski (1):
-      ARM: dts: exynos: Add all required FIMC-IS clocks to exynos4x12
+Replace in DT sources hard-coded values for pinctrl configuration like pull
+up/down, drive strength and function. This makes the DTS easier to read,
+especially that some drive strengths values are quite non-obvious.
 
-Milo Kim (1):
-      ARM: dts: exynos: Enable HDMI for Arndale Octa board
+----------------------------------------------------------------
+Krzysztof Kozlowski (17):
+      pinctrl: dt-bindings: samsung: Add header with values used for configuration
+      pinctrl: dt-bindings: samsung: Update documentation with new macros
+      ARM: dts: exynos: Use common macros for pinctrl configuration
+      ARM: dts: exynos: Use macros for pinctrl configuration on exynos3250
+      ARM: dts: exynos: Use macros for pinctrl configuration on exynos4210
+      ARM: dts: exynos: Use macros for pinctrl configuration on exynos4x12
+      ARM: dts: exynos: Use macros for pinctrl configuration on exynos4415
+      ARM: dts: exynos: Use macros for pinctrl configuration on exynos5250
+      ARM: dts: exynos: Use macros for pinctrl configuration on exynos5260
+      ARM: dts: exynos: Use macros for pinctrl configuration on exynos5410
+      ARM: dts: exynos: Use macros for pinctrl configuration on exynos542x/exynos5800
+      ARM: dts: exynos: Fix mismatched value for SD4 pull up/down configuration on exynos4210
+      ARM: dts: exynos: Fix mismatched values of SD drive strengh configuration on exynos4415
+      ARM: dts: s3c64xx: Use common macros for pinctrl configuration
+      ARM: dts: s5pv210: Use macros for pinctrl configuration
+      ARM: dts: s3c2416: Use macros for pinctrl configuration
+      ARM: dts: s3c64xx: Use macros for pinctrl configuration
 
- arch/arm/boot/dts/exynos3250-artik5.dtsi           |  3 ++-
- arch/arm/boot/dts/exynos3250-monk.dts              |  3 ++-
- arch/arm/boot/dts/exynos3250-rinato.dts            |  3 ++-
- arch/arm/boot/dts/exynos3250.dtsi                  |  3 ++-
- arch/arm/boot/dts/exynos4.dtsi                     |  3 ++-
- arch/arm/boot/dts/exynos4210-origen.dts            |  3 ++-
- arch/arm/boot/dts/exynos4210-smdkv310.dts          |  3 ++-
- arch/arm/boot/dts/exynos4210-trats.dts             |  3 ++-
- arch/arm/boot/dts/exynos4210-universal_c210.dts    |  3 ++-
- arch/arm/boot/dts/exynos4412-odroidu3.dts          |  3 ++-
- arch/arm/boot/dts/exynos4412-odroidx.dts           |  3 ++-
- arch/arm/boot/dts/exynos4412-odroidx2.dts          |  3 ++-
- arch/arm/boot/dts/exynos4412-origen.dts            |  3 ++-
- arch/arm/boot/dts/exynos4412-smdk4412.dts          |  3 ++-
- arch/arm/boot/dts/exynos4412-tiny4412.dts          |  3 ++-
- arch/arm/boot/dts/exynos4412-trats2.dts            |  3 ++-
- arch/arm/boot/dts/exynos4415.dtsi                  |  3 ++-
- arch/arm/boot/dts/exynos4x12.dtsi                  |  5 ++++-
- arch/arm/boot/dts/exynos5.dtsi                     |  3 ++-
- arch/arm/boot/dts/exynos5250-arndale.dts           |  3 ++-
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |  3 ++-
- arch/arm/boot/dts/exynos5250-snow-common.dtsi      |  3 ++-
- arch/arm/boot/dts/exynos5250-spring.dts            |  3 ++-
- arch/arm/boot/dts/exynos5260-xyref5260.dts         |  3 ++-
- arch/arm/boot/dts/exynos5260.dtsi                  |  4 ++--
- arch/arm/boot/dts/exynos5410-odroidxu.dts          |  3 ++-
- arch/arm/boot/dts/exynos5410-smdk5410.dts          |  3 ++-
- arch/arm/boot/dts/exynos5420-arndale-octa.dts      | 16 +++++++++++++++-
- arch/arm/boot/dts/exynos5420-peach-pit.dts         |  3 ++-
- arch/arm/boot/dts/exynos5420-smdk5420.dts          |  3 ++-
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  3 ++-
- arch/arm/boot/dts/exynos5440-sd5v1.dts             |  6 ++++++
- arch/arm/boot/dts/exynos5440-ssdk5440.dts          |  6 ++++++
- arch/arm/boot/dts/exynos5440.dtsi                  |  3 ++-
- arch/arm/boot/dts/exynos54xx.dtsi                  |  1 -
- arch/arm/boot/dts/exynos5800-peach-pi.dts          |  3 ++-
- arch/arm/boot/dts/s5pv210-aquila.dts               |  2 +-
- arch/arm/boot/dts/s5pv210-goni.dts                 |  2 +-
- arch/arm/boot/dts/s5pv210-smdkc110.dts             |  2 +-
- arch/arm/boot/dts/s5pv210-smdkv210.dts             |  2 +-
- arch/arm/boot/dts/s5pv210-torbreck.dts             |  2 +-
- arch/arm/boot/dts/s5pv210.dtsi                     |  4 +++-
- 42 files changed, 101 insertions(+), 41 deletions(-)
+ .../bindings/pinctrl/samsung-pinctrl.txt           |  44 +-
+ MAINTAINERS                                        |   2 +
+ arch/arm/boot/dts/exynos3250-pinctrl.dtsi          | 346 +++++++-------
+ arch/arm/boot/dts/exynos4210-pinctrl.dtsi          | 458 +++++++++---------
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |  12 +-
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |   8 +-
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |  14 +-
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |   2 +-
+ arch/arm/boot/dts/exynos4412-origen.dts            |  12 +-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts          |  12 +-
+ arch/arm/boot/dts/exynos4415-pinctrl.dtsi          | 296 ++++++------
+ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi          | 525 ++++++++++-----------
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi          | 404 ++++++++--------
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |   6 +-
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi      |  76 +--
+ arch/arm/boot/dts/exynos5250-snow-rev5.dts         |   6 +-
+ arch/arm/boot/dts/exynos5250-snow.dts              |   6 +-
+ arch/arm/boot/dts/exynos5250-spring.dts            |  72 +--
+ arch/arm/boot/dts/exynos5260-pinctrl.dtsi          | 280 ++++++-----
+ arch/arm/boot/dts/exynos5260-xyref5260.dts         |   6 +-
+ arch/arm/boot/dts/exynos5410-odroidxu.dts          |  30 +-
+ arch/arm/boot/dts/exynos5410-pinctrl.dtsi          | 182 +++----
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |  10 +-
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts      |   6 +-
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         | 126 ++---
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi          | 356 +++++++-------
+ arch/arm/boot/dts/exynos5420-smdk5420.dts          |  18 +-
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  18 +-
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          | 126 ++---
+ arch/arm/boot/dts/s3c2416-pinctrl.dtsi             |  38 +-
+ arch/arm/boot/dts/s3c6410-mini6410.dts             |   4 +-
+ arch/arm/boot/dts/s3c64xx-pinctrl.dtsi             | 356 +++++++-------
+ arch/arm/boot/dts/s5pv210-aquila.dts               |   4 +-
+ arch/arm/boot/dts/s5pv210-pinctrl.dtsi             | 476 +++++++++----------
+ include/dt-bindings/pinctrl/samsung.h              |  57 +++
+ 35 files changed, 2223 insertions(+), 2171 deletions(-)
+ create mode 100644 include/dt-bindings/pinctrl/samsung.h
