@@ -1,157 +1,153 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Sun, 18 Sep 2016 03:37:27 +0000
-Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <20160918005212.GF15478@tiger>
-References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
- <1473741659-17618-1-git-send-email-po.liu@nxp.com>
- <1473741659-17618-3-git-send-email-po.liu@nxp.com>
- <20160918005212.GF15478@tiger>
-Message-ID: <VI1PR0401MB1709F91B0C1EB6C80D741E4492F50@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: zhichang.yuan02@gmail.com (zhichang)
+Date: Sun, 18 Sep 2016 11:38:45 +0800
+Subject: [PATCH V3 1/4] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <5264074.nuyDhEuOR4@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <8337589.pzGt0MZ9xn@wuerfel> <57D95BBC.9030405@hisilicon.com>
+ <5264074.nuyDhEuOR4@wuerfel>
+Message-ID: <9ffcda2a-9a2b-7151-dfd9-e2bf6594c842@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi, Arnd,
 
 
->  -----Original Message-----
->  From: Shawn Guo [mailto:shawnguo at kernel.org]
->  Sent: Sunday, September 18, 2016 8:52 AM
->  To: Po Liu
->  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang; Arnd
->  Bergmann; Marc Zyngier; Stuart Yoder; Leo Li; M.H. Lian; Murali
->  Karicheri; Bjorn Helgaas; Mingkai Hu
->  Subject: Re: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
->  MSI/MSI-X/INTx mode
+On 2016?09?14? 22:23, Arnd Bergmann wrote:
+> On Wednesday, September 14, 2016 10:16:28 PM CEST zhichang.yuan wrote:
+>>>
+>>> No need to guard includes with an #ifdef.
+>> If remove #ifdef here, extio.h should not contain any function external declarations whose definitions are in
+>> extio.c compiled only when CONFIG_ARM64_INDIRECT_PIO is yes.
 >  
->  On Tue, Sep 13, 2016 at 12:40:59PM +0800, Po Liu wrote:
->  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
->  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
->  > maybe there is interrupt line for aer pme etc. Search the interrupt
->  > number in the fdt file. Then fixup the dev->irq with it.
->  >
->  > Signed-off-by: Po Liu <po.liu@nxp.com>
->  
->  Will the new kernel work with existing/old DTB?  I'm trying to
->  understand the dependency between driver and DTS changes.
+> There is no problem with making declarations visible for functions that
+> are not part of the kernel, we do that all the time.
+> 
+>>>> +#define BUILDS_RW(bwl, type)                                                \
+>>>> +static inline void reads##bwl(const volatile void __iomem *addr,    \
+>>>> +                            void *buffer, unsigned int count)       \
+>>>> +{                                                                   \
+>>>> +    if (count) {                                                    \
+>>>> +            type *buf = buffer;                                     \
+>>>> +                                                                    \
+>>>> +            do {                                                    \
+>>>> +                    type x = __raw_read##bwl(addr);                 \
+>>>> +                    *buf++ = x;                                     \
+>>>> +            } while (--count);                                      \
+>>>> +    }                                                               \
+>>>> +}                                                                   \
+>>>> +                                                                    \
+>>>> +static inline void writes##bwl(volatile void __iomem *addr,         \
+>>>> +                            const void *buffer, unsigned int count) \
+>>>> +{                                                                   \
+>>>> +    if (count) {                                                    \
+>>>> +            const type *buf = buffer;                               \
+>>>> +                                                                    \
+>>>> +            do {                                                    \
+>>>> +                    __raw_write##bwl(*buf++, addr);                 \
+>>>> +            } while (--count);                                      \
+>>>> +    }                                                               \
+>>>> +}
+>>>> +
+>>>> +BUILDS_RW(b, u8)
+>>>
+>>> Why is this in here?
+>> the readsb/writesb are defined in asm-generic/io.h which is included later, but the redefined insb/outsb need
+>> to call them. Without these readsb/writesb definition before insb/outsb redefined, compile error occur.
+>>
+>> It seems that copy all the definitions of "asm-generic/io.h" is not a good idea, so I move the definitions of
+>> those function needed here....
+>>
+>> Ok. I think your idea below defining in(s)/out(s) in a c file can solve this issue.
+>>
+>> #ifdef CONFIG_ARM64_INDIRECT_PIO
+>> #define inb inb
+>> extern u8 inb(unsigned long addr);
+>>
+>> #define outb outb
+>> extern void outb(u8 value, unsigned long addr);
+>>
+>> #define insb insb
+>> extern void insb(unsigned long addr, void *buffer, unsigned int count);
+>>
+>> #define outsb outsb
+>> extern void outsb(unsigned long addr, const void *buffer, unsigned int count);
+>> #endif
+>>
+>> and definitions of all these functions are in extio.c :
+>>
+>> u8 inb(unsigned long addr)
+>> {
+>>         if (!arm64_extio_ops || arm64_extio_ops->start > addr ||
+>>                         arm64_extio_ops->end < addr)
+>>                 return readb(PCI_IOBASE + addr);
+>>         else
+>>                 return arm64_extio_ops->pfin ?
+>>                         arm64_extio_ops->pfin(arm64_extio_ops->devpara,
+>>                                 addr + arm64_extio_ops->ptoffset, NULL,
+>>                                 sizeof(u8), 1) : -1;
+>> }
+>> .....
+> 
+> Yes, sounds good.
+> 
+>>>> @@ -149,6 +185,60 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+>>>>  #define IO_SPACE_LIMIT              (PCI_IO_SIZE - 1)
+>>>>  #define PCI_IOBASE          ((void __iomem *)PCI_IO_START)
+>>>>  
+>>>> +
+>>>> +/*
+>>>> + * redefine the in(s)b/out(s)b for indirect-IO.
+>>>> + */
+>>>> +#define inb inb
+>>>> +static inline u8 inb(unsigned long addr)
+>>>> +{
+>>>> +#ifdef CONFIG_ARM64_INDIRECT_PIO
+>>>> +    if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
+>>>> +                    addr <= arm64_extio_ops->end)
+>>>> +            return extio_inb(addr);
+>>>> +#endif
+>>>> +    return readb(PCI_IOBASE + addr);
+>>>> +}
+>>>> +
+>>>
+>>> Looks ok, but you only seem to do this for the 8-bit
+>>> accessors, when it should be done for 16-bit and 32-bit
+>>> ones as well for consistency.
+>> Hip06 LPC only support 8-bit I/O operations on the designated port.
+> 
+> That is an interesting limitation. Maybe still call the extio operations
+> and have them do WARN_ON_ONCE() instead?
+> 
+> If you get a driver that calls inw/outw on the range that is owned
+> by the LPC bus, you otherwise get an unhandled page fault in kernel
+> space, which is not as nice.
+> 
+Yes. It probably cause kernel panic.
+Will define the extio operations for other IO length and add the corresponding WARNINGS.
 
-Yes, We've never use name 'intr' before. So we remove it is ok. 
-'aer' is a dts name for researching it's true interrupt number by kernel. This patch is first time to use name 'aer'. So it must be compatible with existing/old DTB.
+Best,
+Zhichang
 
->  
->  Shawn
->  
->  > ---
->  > changes for v5:
->  > 	- Add clear 'aer' interrup-names description
->  >
->  >  .../devicetree/bindings/pci/layerscape-pci.txt     | 11 +++++---
->  >  drivers/pci/pcie/portdrv_core.c                    | 31
->  +++++++++++++++++++---
->  >  2 files changed, 35 insertions(+), 7 deletions(-)
->  >
->  > diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > index 41e9f55..101d0a7 100644
->  > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > @@ -18,8 +18,10 @@ Required properties:
->  >  - reg: base addresses and lengths of the PCIe controller
->  >  - interrupts: A list of interrupt outputs of the controller. Must
->  contain an
->  >    entry for each entry in the interrupt-names property.
->  > -- interrupt-names: Must include the following entries:
->  > -  "intr": The interrupt that is asserted for controller interrupts
->  > +- interrupt-names: It may be include the following entries:
->  > +  "aer": The interrupt that is asserted for aer interrupt
->  > +  "pme": The interrupt that is asserted for pme interrupt
->  > +  ......
->  >  - fsl,pcie-scfg: Must include two entries.
->  >    The first entry must be a link to the SCFG device node
->  >    The second entry must be '0' or '1' based on physical PCIe
->  controller index.
->  > @@ -35,8 +37,9 @@ Example:
->  >  		reg = <0x00 0x03400000 0x0 0x00010000   /* controller
->  registers */
->  >  		       0x40 0x00000000 0x0 0x00002000>; /* configuration
->  space */
->  >  		reg-names = "regs", "config";
->  > -		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /*
->  controller interrupt */
->  > -		interrupt-names = "intr";
->  > +		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>, /* aer
->  interrupt */
->  > +			<GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* pme interrupt */
->  > +		interrupt-names = "aer", "pme";
->  >  		fsl,pcie-scfg = <&scfg 0>;
->  >  		#address-cells = <3>;
->  >  		#size-cells = <2>;
->  > diff --git a/drivers/pci/pcie/portdrv_core.c
->  > b/drivers/pci/pcie/portdrv_core.c index e9270b4..7c4943d 100644
->  > --- a/drivers/pci/pcie/portdrv_core.c
->  > +++ b/drivers/pci/pcie/portdrv_core.c
->  > @@ -16,6 +16,7 @@
->  >  #include <linux/slab.h>
->  >  #include <linux/pcieport_if.h>
->  >  #include <linux/aer.h>
->  > +#include <linux/of_irq.h>
->  >
->  >  #include "../pci.h"
->  >  #include "portdrv.h"
->  > @@ -200,6 +201,28 @@ static int pcie_port_enable_msix(struct pci_dev
->  > *dev, int *vectors, int mask)  static int init_service_irqs(struct
->  > pci_dev *dev, int *irqs, int mask)  {
->  >  	int i, irq = -1;
->  > +	int ret;
->  > +	struct device_node *np = NULL;
->  > +
->  > +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
->  > +		irqs[i] = 0;
->  > +
->  > +	if (dev->bus->dev.of_node)
->  > +		np = dev->bus->dev.of_node;
->  > +
->  > +	/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
->  > +	 * request irq for aer
->  > +	 */
->  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np &&
->  > +			(mask & PCIE_PORT_SERVICE_PME)) {
->  > +		ret = of_irq_get_byname(np, "aer");
->  > +		if (ret > 0) {
->  > +			irqs[PCIE_PORT_SERVICE_AER_SHIFT] = ret;
->  > +			if (dev->irq)
->  > +				irq = dev->irq;
->  > +			goto no_msi;
->  > +		}
->  > +	}
->  >
->  >  	/*
->  >  	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
->  @@
->  > -225,11 +248,13 @@ static int init_service_irqs(struct pci_dev *dev,
->  int *irqs, int mask)
->  >  		irq = dev->irq;
->  >
->  >   no_msi:
->  > -	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
->  > -		irqs[i] = irq;
->  > +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
->  > +		if (!irqs[i])
->  > +			irqs[i] = irq;
->  > +	}
->  >  	irqs[PCIE_PORT_SERVICE_VC_SHIFT] = -1;
->  >
->  > -	if (irq < 0)
->  > +	if (irq < 0 && irqs[PCIE_PORT_SERVICE_AER_SHIFT] < 0)
->  >  		return -ENODEV;
->  >  	return 0;
->  >  }
->  > --
->  > 2.1.0.27.g96db324
->  >
->  >
->  > _______________________________________________
->  > linux-arm-kernel mailing list
->  > linux-arm-kernel at lists.infradead.org
->  > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+>>>> diff --git a/drivers/bus/extio.c b/drivers/bus/extio.c
+>>>> new file mode 100644
+>>>> index 0000000..1e7a9c5
+>>>> --- /dev/null
+>>>> +++ b/drivers/bus/extio.c
+>>>> @@ -0,0 +1,66 @@
+>>>
+>>> This is in a globally visible directory
+>>>
+>>>> +
+>>>> +struct extio_ops *arm64_extio_ops;
+>>>
+>>> But the identifier uses an architecture specific prefix. Either
+>>> move the whole file into arch/arm64, or make the naming so that
+>>> it can be used for everything.
+>>
+>> I perfer to move the whole file into arch/arm64, extio.h will be moved to arch/arm64/include/asm;
+> 
+> Ok, that simplifies it a lot, you can just do everything in asm/io.h then.
+> 
+> 	Arnd
+> 
