@@ -1,47 +1,78 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:35 +0100
-Subject: [PATCH 19/26] drm/rockchip: dw-mipi-dsi: improve PLL configuration
+Date: Mon, 19 Sep 2016 18:17:36 +0100
+Subject: [PATCH 20/27] drm/rockchip: dw-mipi-dsi: properly configure PHY timing
 In-Reply-To: <20160919171747.28512-1-john@metanate.com>
 References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-26-john@metanate.com>
+Message-ID: <20160919171747.28512-27-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The multiplication ratio for the PLL is required to be even due to the
-use of a "by 2 pre-scaler".  Currently we are likely to end up with an
-odd multiplier even though there is an equivalent set of parameters with
-an even multiplier.
+These values are specified as constant time periods but the PHY
+configuration is in terms of the current lane byte clock so using
+constant values guarantees that the timings will be outside the
+specification with some display configurations.
 
-For example, using the 324MHz bit rate with a reference clock of 24MHz
-we end up with M = 27, N = 2 whereas the example in the PHY databook
-gives M = 54, N = 4 for this bit rate and reference clock.
-
-By walking down through the available multiplier instead of up we are
-more likely to hit an even multiplier.  With the above example we do now
-get M = 54, N = 4 as given by the databook.
-
-While doing this, change the loop limits to encode the actual limits on
-the divisor, which are:
-
-	40MHz >= (pllref / N) >= 5MHz
+Derive the necessary configuration from the byte clock in order to
+ensure that the PHY configuration is correct.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 36 ++++++++++++++++++++++++++++++----
+ 1 file changed, 32 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 55237d72f3f9..7983b2749518 100644
+index 61cee02e5f72..911ddcbab00d 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -520,7 +520,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
- 	pllref = DIV_ROUND_UP(clk_get_rate(dsi->pllref_clk), USEC_PER_SEC);
- 	tmp = pllref;
+@@ -384,6 +384,26 @@ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
+ 	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLK | PHY_UNTESTCLR);
+ }
  
--	for (i = 1; i < 6; i++) {
-+	for (i = pllref / 5; i > (pllref / 40); i--) {
- 		pre = pllref / i;
- 		if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
- 			tmp = target_mbps % pre;
++/**
++ * ns2bc - Nanoseconds to byte clock cycles
++ */
++static inline unsigned int ns2bc(struct dw_mipi_dsi *dsi, int ns)
++{
++	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC / 8;
++
++	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
++}
++
++/**
++ * ns2ui - Nanoseconds to UI time periods
++ */
++static inline unsigned int ns2ui(struct dw_mipi_dsi *dsi, int ns)
++{
++	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC;
++
++	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
++}
++
+ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+ {
+ 	int ret, testdin, vco, val;
+@@ -435,10 +455,18 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+ 					 SETRD_MAX | POWER_MANAGE |
+ 					 TER_RESISTORS_ON);
+ 
+-
+-	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
+-	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
+-	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | 0xa);
++	dw_mipi_dsi_phy_write(dsi, 0x60, TLP_PROGRAM_EN | ns2bc(dsi, 500));
++	dw_mipi_dsi_phy_write(dsi, 0x61, THS_PRE_PROGRAM_EN | ns2ui(dsi, 40));
++	dw_mipi_dsi_phy_write(dsi, 0x62, THS_ZERO_PROGRAM_EN | ns2bc(dsi, 300));
++	dw_mipi_dsi_phy_write(dsi, 0x63, THS_PRE_PROGRAM_EN | ns2ui(dsi, 100));
++	dw_mipi_dsi_phy_write(dsi, 0x64, BIT(5) | ns2bc(dsi, 100));
++	dw_mipi_dsi_phy_write(dsi, 0x65, BIT(5) | (ns2bc(dsi, 60) + 7));
++
++	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | ns2bc(dsi, 500));
++	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | (ns2ui(dsi, 50) + 5));
++	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | (ns2bc(dsi, 140) + 2));
++	dw_mipi_dsi_phy_write(dsi, 0x73, THS_PRE_PROGRAM_EN | (ns2ui(dsi, 60) + 8));
++	dw_mipi_dsi_phy_write(dsi, 0x74, BIT(5) | ns2bc(dsi, 100));
+ 
+ 	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
+ 				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
 -- 
 2.10.0.278.g4f427b1.dirty
