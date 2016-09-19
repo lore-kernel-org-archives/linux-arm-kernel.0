@@ -1,22 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Sep 2016 16:55:34 +0200
-Subject: [GIT PULL 2/5] i.MX soc updates for 4.9
-In-Reply-To: <1473670948-4265-2-git-send-email-shawnguo@kernel.org>
-References: <1473670948-4265-1-git-send-email-shawnguo@kernel.org>
- <1473670948-4265-2-git-send-email-shawnguo@kernel.org>
-Message-ID: <2416459.S08fG0c66O@wuerfel>
+Date: Mon, 19 Sep 2016 17:02:40 +0200
+Subject: [GIT PULL 1/3] ARM: soc: exynos: Drivers for v4.9
+In-Reply-To: <1474216788-17282-2-git-send-email-krzk@kernel.org>
+References: <1474216788-17282-1-git-send-email-krzk@kernel.org>
+ <1474216788-17282-2-git-send-email-krzk@kernel.org>
+Message-ID: <2663426.T8oUku18qe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 12, 2016 5:02:25 PM CEST Shawn Guo wrote:
-> i.MX SoC updates for 4.9:
->  - Set INT_MEM_CLK_LPM bit to get proper WAIT mode support on i.MX6SX.
->    This is a workaround for i.MX6SX WAIT mode hardware issue.
->  - Enable cpuidle support with 3 low-power states (WFI, WAIT, POWER-OFF)
->    for i.MX6UL.
-> 
-> 
+On Sunday, September 18, 2016 6:39:46 PM CEST Krzysztof Kozlowski wrote:
+> Samsung drivers/soc update for v4.9:
+> 1. Allow compile testing of exynos-mct clocksource driver on ARM64.
+> 2. Document Exynos5433 PMU compatible (already used by clkout driver and more
+>    will be coming soon).
 
-Pulled into next/soc, thanks!
+Pulled into next/drivers, thanks
+
+Just for my understanding: why do we need the exynos-mct driver on ARM64
+but not the delay-timer portion of it?
+
+Is there an advantage in using MCT over the architected timer on these
+chips? If so, should we also have a way to use it as the delay timer?
 
 	Arnd
