@@ -1,60 +1,44 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 19 Sep 2016 19:01:13 +0100
-Subject: [RFC] arm64: Ensure proper addressing for ldnp/stnp
-In-Reply-To: <1474306586-25118-1-git-send-email-bdegraaf@codeaurora.org>
-References: <1474306586-25118-1-git-send-email-bdegraaf@codeaurora.org>
-Message-ID: <be5f5bfd-fd41-d202-cec9-0ca3fcad28db@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 19 Sep 2016 20:06:27 +0200
+Subject: [PATCH] arm: dts: fix rk3066a based boards vdd_log voltage
+ initialization
+In-Reply-To: <CAD=FV=UyW5cXGGmq5xUzZ1aV5NzbBYGOz1gO9V1itrFU-PigAw@mail.gmail.com>
+References: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
+ <1474274696-28090-1-git-send-email-andy.yan@rock-chips.com>
+ <CAD=FV=VawAOWBF_PoXqSj3oiVgfF8SnCBp56p8F==XsaVLmMcg@mail.gmail.com>
+ <2318029.f7g774Bk76@phil>
+ <CAD=FV=UOXcUZyXRj++GkKksyFedGt59vQz8958nhhF9UM7rOuw@mail.gmail.com>
+ <20160919191327.741a2b89@bbrezillon>
+ <CAD=FV=Ufmvg1P8suOPQ53kpOD1pei4N2dOpKUCxZk001XKj_OA@mail.gmail.com>
+ <20160919194844.0db7b307@bbrezillon>
+ <CAD=FV=UyW5cXGGmq5xUzZ1aV5NzbBYGOz1gO9V1itrFU-PigAw@mail.gmail.com>
+Message-ID: <20160919200627.3ca1aae4@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/16 18:36, Brent DeGraaf wrote:
-> According to section 6.3.8 of the ARM Programmer's Guide, non-temporal
-> loads and stores do not verify that address dependency is met between a
-> load of an address to a register and a subsequent non-temporal load or
-> store using that address on the executing PE. Therefore, context switch
-> code and subroutine calls that use non-temporally accessed addresses as
-> parameters that might depend on a load of an address into an argument
-> register must ensure that ordering requirements are met by introducing
-> a barrier prior to the successive non-temporal access.  Add appropriate
-> barriers whereever this specific situation comes into play.
-> 
-> Signed-off-by: Brent DeGraaf <bdegraaf@codeaurora.org>
-> ---
->  arch/arm64/kernel/entry.S  | 1 +
->  arch/arm64/lib/copy_page.S | 2 ++
->  2 files changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 441420c..982c4d3 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -679,6 +679,7 @@ ENTRY(cpu_switch_to)
->  	ldp	x27, x28, [x8], #16
->  	ldp	x29, x9, [x8], #16
->  	ldr	lr, [x8]
-> +	dmb	nshld	// Existence of instructions with loose load-use dependencies (e.g. ldnp/stnp) make this barrier necessary
->  	mov	sp, x9
->  	and	x9, x9, #~(THREAD_SIZE - 1)
->  	msr	sp_el0, x9
-> diff --git a/arch/arm64/lib/copy_page.S b/arch/arm64/lib/copy_page.S
-> index 4c1e700..21c6892 100644
-> --- a/arch/arm64/lib/copy_page.S
-> +++ b/arch/arm64/lib/copy_page.S
-> @@ -47,6 +47,8 @@ alternative_endif
->  	ldp	x14, x15, [x1, #96]
->  	ldp	x16, x17, [x1, #112]
->  
-> +	dmb	nshld // In case x0 (for stnp) is dependent on a load
+On Mon, 19 Sep 2016 10:52:51 -0700
+Doug Anderson <dianders@chromium.org> wrote:
 
-The ARMv8 ARM (B2.7.2 in issue j) says that when an address dependency
-exists between a load and a subsequent LDNP, *other* observers may
-observe those accesses in any order. How's that related to an STNP on
-the same CPU?
-
-Robin.
-
-> +
->  	mov	x18, #(PAGE_SIZE - 128)
->  	add	x1, x1, #128
->  1:
+> Hi,
 > 
+> On Mon, Sep 19, 2016 at 10:48 AM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+> > The PWM chip has always claimed the pins and muxed them to the PWM IP.
+> > So, this means it's broken from the beginning, and my patch is only
+> > uncovering the problem (unless the pins stay configured as input until
+> > the PWM is enabled, which I'm not sure is the case).  
+> 
+> Such a solution is achievable with the pinctrl APIs pretty easily.
+> You might not be able to use the automatic "init" state but you can do
+> something similar and switch to an "active" state once the PWM is
+> actually turned on the first time.
+
+But is it really the case here (I don't see any code requesting a
+specific pinmux depending on the PWM state)?
+
+Anyway, we really need to handle this case, we should define the
+typical voltage when the PWM is disabled. Same as what you suggested
+with voltage-when-input, but with a different naming (since the concept
+of pinmux is PWM hardware/driver specific).
+
+	voltage-when-pwm-disabled = <...>;
