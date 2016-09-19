@@ -1,83 +1,79 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Mon, 19 Sep 2016 19:53:45 +0530
-Subject: [PATCH 1/3] arm: dts: imx7: Update #pwm-cells for PWM polarity control
-In-Reply-To: <20160919142347.11342-1-bhuvanchandra.dv@toradex.com>
-References: <20160919142347.11342-1-bhuvanchandra.dv@toradex.com>
-Message-ID: <20160919142347.11342-2-bhuvanchandra.dv@toradex.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Mon, 19 Sep 2016 22:29:39 +0800
+Subject: [PATCH] ASoC: rk3399_gru_sound: fix recording pop at first attempt
+Message-ID: <1474295379-16936-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update #pwm-cells to 3 in order to support PWM signal polarity control.
+From: Wonjoon Lee <woojoo.lee@samsung.com>
 
-Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+Pop happens when mclk applied but dmic's own boot-time
+Specify dmic delay times in dt to make sure
+clocks are ready earlier than dmic working
+
+Signed-off-by: Wonjoon Lee <woojoo.lee@samsung.com>
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 ---
- Documentation/devicetree/bindings/pwm/imx-pwm.txt | 6 +++---
- arch/arm/boot/dts/imx7s.dtsi                      | 8 ++++----
- 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pwm/imx-pwm.txt b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-index e00c2e9..c61bdf8 100644
---- a/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-@@ -6,8 +6,8 @@ Required properties:
-   - "fsl,imx1-pwm" for PWM compatible with the one integrated on i.MX1
-   - "fsl,imx27-pwm" for PWM compatible with the one integrated on i.MX27
- - reg: physical base address and length of the controller's registers
--- #pwm-cells: should be 2. See pwm.txt in this directory for a description of
--  the cells format.
-+- #pwm-cells: 2 for i.MX1 and 3 for i.MX27 and newer SoCs. See pwm.txt
-+  in this directory for a description of the cells format.
- - clocks : Clock specifiers for both ipg and per clocks.
- - clock-names : Clock names should include both "ipg" and "per"
- See the clock consumer binding,
-@@ -17,7 +17,7 @@ See the clock consumer binding,
+ .../bindings/sound/rockchip,rk3399-gru-sound.txt   |    6 ++++++
+ sound/soc/rockchip/rk3399_gru_sound.c              |   14 ++++++++++++++
+ 2 files changed, 20 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+index f19b6c8..b7dd3ab 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+@@ -6,6 +6,12 @@ Required properties:
+   connected to the codecs
+ - rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
+ 
++Optional properties:
++- dmic-delay : specify delay time for DMIC ready.
++  If this option is specified, which means it's required dmic need
++  delay for DMIC to ready so that rt5514 can avoid recording before
++  DMIC send valid data
++
  Example:
  
- pwm1: pwm at 53fb4000 {
--	#pwm-cells = <2>;
-+	#pwm-cells = <3>;
- 	compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
- 	reg = <0x53fb4000 0x4000>;
- 	clocks = <&clks IMX5_CLK_PWM1_IPG_GATE>,
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 0d7d5ac..8d1d471 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -601,7 +601,7 @@
- 				clocks = <&clks IMX7D_PWM1_ROOT_CLK>,
- 					 <&clks IMX7D_PWM1_ROOT_CLK>;
- 				clock-names = "ipg", "per";
--				#pwm-cells = <2>;
-+				#pwm-cells = <3>;
- 				status = "disabled";
- 			};
+ sound {
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index 164b6da..6ab838b 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -37,6 +37,8 @@
  
-@@ -612,7 +612,7 @@
- 				clocks = <&clks IMX7D_PWM2_ROOT_CLK>,
- 					 <&clks IMX7D_PWM2_ROOT_CLK>;
- 				clock-names = "ipg", "per";
--				#pwm-cells = <2>;
-+				#pwm-cells = <3>;
- 				status = "disabled";
- 			};
+ #define SOUND_FS	256
  
-@@ -623,7 +623,7 @@
- 				clocks = <&clks IMX7D_PWM3_ROOT_CLK>,
- 					 <&clks IMX7D_PWM3_ROOT_CLK>;
- 				clock-names = "ipg", "per";
--				#pwm-cells = <2>;
-+				#pwm-cells = <3>;
- 				status = "disabled";
- 			};
++unsigned int rt5514_dmic_delay;
++
+ static struct snd_soc_jack rockchip_sound_jack;
  
-@@ -634,7 +634,7 @@
- 				clocks = <&clks IMX7D_PWM4_ROOT_CLK>,
- 					 <&clks IMX7D_PWM4_ROOT_CLK>;
- 				clock-names = "ipg", "per";
--				#pwm-cells = <2>;
-+				#pwm-cells = <3>;
- 				status = "disabled";
- 			};
+ static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
+@@ -122,6 +124,9 @@ static int rockchip_sound_rt5514_hw_params(struct snd_pcm_substream *substream,
+ 		return ret;
+ 	}
  
++	/* Wait for DMIC stable */
++	msleep(rt5514_dmic_delay);
++
+ 	return 0;
+ }
+ 
+@@ -334,6 +339,15 @@ static int rockchip_sound_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	/* Set DMIC delay */
++	ret = device_property_read_u32(&pdev->dev, "dmic-delay",
++					&rt5514_dmic_delay);
++	if (ret) {
++		rt5514_dmic_delay = 0;
++		dev_dbg(&pdev->dev,
++			"no optional property 'dmic-delay' found, default: no delay\n");
++	}
++
+ 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+ 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_dai_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+ 	rockchip_dailinks[DAILINK_RT5514_DSP].platform_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
 -- 
-2.9.2
+1.7.9.5
