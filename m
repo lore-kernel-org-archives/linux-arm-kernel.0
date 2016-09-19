@@ -1,96 +1,85 @@
-From: ayaka@soulik.info (Ayaka)
-Date: Mon, 19 Sep 2016 09:21:54 +0800
-Subject: [PATCH] ASoC: samsung: make audio interface/controller explicitly
-In-Reply-To: <20160918180938.GA19279@kozik-book>
-References: <1474207751-9804-1-git-send-email-ayaka@soulik.info>
- <1474207751-9804-2-git-send-email-ayaka@soulik.info>
- <20160918144247.GA11009@kozik-book>
- <1bc1a3db-8120-a2ae-0f55-a5c1bb154dc6@soulik.info>
- <20160918180938.GA19279@kozik-book>
-Message-ID: <30C748BE-359C-4212-96D3-C2A71E1094C3@soulik.info>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 19 Sep 2016 04:36:28 +0300
+Subject: [PATCH 00/19] ARM: imx legacy: move peripheral initializations to
+ .init_late
+Message-ID: <1474248988-10626-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The series moves registrations and initializations of all peripherals
+which are GPIO line consumers for all legacy (prior to DT) i.MX powered
+boards from .init_machine to .init_late init level. This is needed to
+proactively prevent boot time issues on the legacy boards due to the
+deprioritized init level of the GPIO controller driver (set lower than
+IOMUX controller driver init level), which is shared among all i.MX
+SoCs. The problem was reported and discussed on
 
+  https://lkml.org/lkml/2016/9/13/810
 
-??? iPad ??
+The changes are based on v4.8.0-rc1, please let me know if the series
+should be rebased or squashed. Some of the changes are quite simple,
+e.g. a one line change for qong board, and some of them are more
+sophisticated, thus to simplify review process and potential creation
+of revert commits the changes are split into separate patches one per
+board.
 
-> Krzysztof Kozlowski <krzk@kernel.org> ? 2016?9?19? ??2:09 ???
-> 
->> On Sun, Sep 18, 2016 at 11:12:34PM +0800, ayaka wrote:
->> 
->> 
->>> On 09/18/2016 10:42 PM, Krzysztof Kozlowski wrote:
->>>> On Sun, Sep 18, 2016 at 10:09:11PM +0800, Randy Li wrote:
->>>> It is simple sound card time, we could assign different codec
->>>> to a interface without making a specific driver for it.
->>> The description does not convince me and I do not see an example using
->>> this. Could you provide one?
->> Sorry, the board TOPEET iTop 4412 for exynos 4412 I posted supported codec
->> with I2S interface using the simple sound card. Anyway, it is no harm to
->> make them explicitly right?
-> 
-> kbuild gave you the answer...
-Not sure how comes, even time I sent patches to you, I at lease build and run it once.
-> 
->> Or I have to enabled those codec support for
->> SMDK, which is not needed for the other board.
-> 
-> If I understand correctly, the i2s/pcm etc are still needed but not
-> built in config choosing only simple-audio-card? I tried now such
-> configuration on Odroid XU and indeed the audio is missing.
-> 
-> The patch looks like needed but:
-> 1. You need to describe the rationale in commit message, why it is
-> needed.
-Sorry about English.
-> 2. You need to fix it... kbuild pointed build issues.
-I would check that.
-> 
-> Other solution would be to add a user-selectable option for generic
-> sound on Samsung using simple audio card. The option would then select
-> appropriate SND_SAMSUNG* options, just like specific drivers do. I see
-> that sh does like this. Personally this approach seems simpler to me -
-> the defconfig could just choose this generic sound instead of many
-> SND_SAMSUNG_* sub-options.
-I would just what  Freescale did. It included those options entries in a sub-menu.
-I don't those options should be bound either, as a board may only use one of interface or controller(like TOPEET iTOP would only use i2s. No place for SPDIF, AC97 nor PCM.)
-> 
-> Best regards,
-> Krzysztof
-> 
->>> 
->>> Best regards,
->>> Krzysztof
->>> 
->>> 
->>>> Signed-off-by: Randy Li <ayaka@soulik.info>
->>>> ---
->>>> sound/soc/samsung/Kconfig | 8 ++++----
->>>> 1 file changed, 4 insertions(+), 4 deletions(-)
->>>> 
->>>> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
->>>> index 7b722b0..b7b3a38 100644
->>>> --- a/sound/soc/samsung/Kconfig
->>>> +++ b/sound/soc/samsung/Kconfig
->>>> @@ -18,18 +18,18 @@ config SND_S3C2412_SOC_I2S
->>>>    select SND_S3C_I2SV2_SOC
->>>> config SND_SAMSUNG_PCM
->>>> -    tristate
->>>> +    tristate "Samsung PCM interface support"
->>>> config SND_SAMSUNG_AC97
->>>> -    tristate
->>>> +    tristate "Samsung AC97 controller support"
->>>>    select SND_SOC_AC97_BUS
->>>> config SND_SAMSUNG_SPDIF
->>>> -    tristate
->>>> +    tristate "Samsung SPDIF transmitter support"
->>>>    select SND_SOC_SPDIF
->>>> config SND_SAMSUNG_I2S
->>>> -    tristate
->>>> +    tristate "Samsung I2S interface support"
->>>> config SND_SOC_SAMSUNG_NEO1973_WM8753
->>>>    tristate "Audio support for Openmoko Neo1973 Smartphones (GTA02)"
->>>> -- 
->>>> 2.7.4
->> 
+Uwe suggested to add necessary error checks for all gpio_request()
+calls, which are missing on kzm, mx27-3ds, mx31lilly, mx31lite,
+mx31moboard, mx35-3ds and pca100 targets, this is out of the scope
+of this change, which is intended to move some registration and
+initialization calls only from one place to another. Adding error
+checks can be done later on, however for example -EPROBE_DEFER errors
+won't be handled as expected, because .init_machine and .init_late
+callbacks are one-shot.
+
+Only two legacy targets are tested, i.MX31 kzm qemu machine and
+changes for i.MX31 powered Logic PD mx31lite board. The rest of
+the legacy boards are compilation tested only, probably some of
+the proposed changes are excessive or may be insufficient.
+
+Vladimir Zapolskiy (19):
+  ARM: imx legacy: kzm: move peripheral initialization to .init_late
+  ARM: imx legacy: mx31lite: move peripheral initialization to .init_late
+  ARM: imx legacy: mx31ads: move peripheral initialization to .init_late
+  ARM: imx legacy: mx31lilly: move peripheral initialization to .init_late
+  ARM: imx legacy: pcm037: move peripheral initialization to .init_late
+  ARM: imx legacy: mx31-3ds: move peripheral initialization to .init_late
+  ARM: imx legacy: qong: move peripheral initialization to .init_late
+  ARM: imx legacy: armadillo5x0: move peripheral initialization to .init_late
+  ARM: imx legacy: mx31moboard: move peripheral initialization to .init_late
+  ARM: imx legacy: vpr200: move peripheral initialization to .init_late
+  ARM: imx legacy: imx27-visstrim-m10: move peripheral initialization to .init_late
+  ARM: imx legacy: mx27-3ds: move peripheral initialization to .init_late
+  ARM: imx legacy: mx35-3ds: move peripheral initialization to .init_late
+  ARM: imx legacy: apf9328: move peripheral initialization to .init_late
+  ARM: imx legacy: scb9328: move peripheral initialization to .init_late
+  ARM: imx legacy: pcm043: move peripheral initialization to .init_late
+  ARM: imx legacy: mx21ads: move peripheral initialization to .init_late
+  ARM: imx legacy: mx27ads: move peripheral initialization to .init_late
+  ARM: imx legacy: pca100: move peripheral initialization to .init_late
+
+ arch/arm/mach-imx/mach-apf9328.c            |  6 ++-
+ arch/arm/mach-imx/mach-armadillo5x0.c       | 39 ++++++++++-------
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c | 24 +++++++---
+ arch/arm/mach-imx/mach-kzm_arm11_01.c       |  9 +++-
+ arch/arm/mach-imx/mach-mx21ads.c            | 13 ++++--
+ arch/arm/mach-imx/mach-mx27_3ds.c           | 30 ++++++++-----
+ arch/arm/mach-imx/mach-mx27ads.c            | 13 ++++--
+ arch/arm/mach-imx/mach-mx31_3ds.c           | 39 ++++++++++-------
+ arch/arm/mach-imx/mach-mx31ads.c            | 18 ++++----
+ arch/arm/mach-imx/mach-mx31lilly.c          | 50 +++++++++++++++------
+ arch/arm/mach-imx/mach-mx31lite.c           | 68 ++++++++++++++++++++---------
+ arch/arm/mach-imx/mach-mx31moboard.c        | 23 ++++++----
+ arch/arm/mach-imx/mach-mx35_3ds.c           | 15 ++++---
+ arch/arm/mach-imx/mach-pca100.c             | 26 ++++++-----
+ arch/arm/mach-imx/mach-pcm037.c             | 67 ++++++++++++++--------------
+ arch/arm/mach-imx/mach-pcm043.c             | 10 ++++-
+ arch/arm/mach-imx/mach-qong.c               |  2 +-
+ arch/arm/mach-imx/mach-scb9328.c            |  7 ++-
+ arch/arm/mach-imx/mach-vpr200.c             | 29 +++++++-----
+ arch/arm/mach-imx/mx31lilly-db.c            | 20 ---------
+ arch/arm/mach-imx/mx31lite-db.c             | 33 --------------
+ 21 files changed, 312 insertions(+), 229 deletions(-)
+
+-- 
+2.8.1
