@@ -1,42 +1,29 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 19 Sep 2016 11:21:21 +0200
-Subject: [PATCH 0/1] fix rk3066a based boards boot issue on linux-4.8
-In-Reply-To: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
-References: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <20160919112121.2e0bc376@bbrezillon>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 19 Sep 2016 11:22:41 +0200
+Subject: [PATCH] ARM: mvebu: let Armada XP also select corediv clk
+Message-ID: <1474276961-4645-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+An Armada XP there is also a marvell,armada-370-corediv-clock
+compatible device that is needed to make the nand device work.
 
-On Mon, 19 Sep 2016 16:43:59 +0800
-Andy Yan <andy.yan@rock-chips.com> wrote:
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-mvebu/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> Hi, heiko:
->    I found my Rayeager board couldn't boot up on linux 4.8. After some
-> dig, I found the pwm-regulator for vdd_log register failed and found
-> some change in Boris's patch: commit 87248991a1de(regulator: pwm: Properly
-> initialize the ->state field).
-
-Hm, that's weird. This commit only makes sure that the regulator
-voltage state is correctly initialized (matching the hardware state),
-and I don't understand why changing the voltage-table make it work.
-
-Can you share the kernel logs? What are the symptoms?
-
-Thanks,
-
-Boris
-
->    I send this patch to make the pwm-regulator can register success on
-> this change.
-> 
-> 
-> Andy Yan (1):
->   arm: dts: fix rk3066a based boards vdd_log voltage initialization
-> 
->  arch/arm/boot/dts/rk3066a-bqcurie2.dts  | 2 +-
->  arch/arm/boot/dts/rk3066a-marsboard.dts | 2 +-
->  arch/arm/boot/dts/rk3066a-rayeager.dts  | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index f9b6bd306cfe..2979a9c454f6 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -97,6 +97,7 @@ config MACH_ARMADA_XP
+ 	select CPU_PJ4B
+ 	select MACH_MVEBU_V7
+ 	select PINCTRL_ARMADA_XP
++	select MVEBU_CLK_COREDIV
+ 	help
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Armada XP SoC with device tree.
+-- 
+2.8.1
