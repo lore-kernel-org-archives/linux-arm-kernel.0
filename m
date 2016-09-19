@@ -1,67 +1,36 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:43 +0100
-Subject: [PATCH 23/27] drm/rockchip: dw-mipi-dsi: support non-burst modes
+Date: Mon, 19 Sep 2016 18:17:45 +0100
+Subject: [PATCH 24/27] drm/rockchip: vop: test for P{H,V}SYNC
 In-Reply-To: <20160919171747.28512-1-john@metanate.com>
 References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-34-john@metanate.com>
+Message-ID: <20160919171747.28512-36-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When connected to the MIPI DSI output, we need to use N{H,V}SYNC for the
+internal connection but these flags are meaningless for DSI panels.
+Switch the test so that we do not set the P{H,V}SYNC bits unless the
+mode requires it.
+
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 5ecb03c24c2f..d93e620adea6 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -82,6 +82,7 @@
- #define FRAME_BTA_ACK			BIT(14)
- #define ENABLE_LOW_POWER		(0x3f << 8)
- #define ENABLE_LOW_POWER_MASK		(0x3f << 8)
-+#define VID_MODE_TYPE_NON_BURST_SYNC_EVENTS	0x1
- #define VID_MODE_TYPE_BURST_SYNC_PULSES		0x2
- #define VID_MODE_TYPE_MASK			0x3
- 
-@@ -286,6 +287,7 @@ struct dw_mipi_dsi {
- 	u32 format;
- 	u16 input_div;
- 	u16 feedback_div;
-+	unsigned long mode_flags;
- 
- 	const struct dw_mipi_dsi_plat_data *pdata;
- };
-@@ -549,15 +551,10 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
- 		return -EINVAL;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index d486049f9722..7c4ce1b2e694 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1030,8 +1030,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
  	}
  
--	if (!(device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) ||
--	    !(device->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)) {
--		dev_err(dsi->dev, "device mode is unsupported\n");
--		return -EINVAL;
--	}
--
- 	dsi->lanes = device->lanes;
- 	dsi->channel = device->channel;
- 	dsi->format = device->format;
-+	dsi->mode_flags = device->mode_flags;
- 	dsi->panel = of_drm_find_panel(device->dev.of_node);
- 	if (dsi->panel)
- 		return drm_panel_attach(dsi->panel, &dsi->connector);
-@@ -714,7 +711,12 @@ static void dw_mipi_dsi_video_mode_config(struct dw_mipi_dsi *dsi)
- {
- 	u32 val;
+ 	pin_pol = 0x8;
+-	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
+-	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
++	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PHSYNC) ? 1 : 0;
++	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PVSYNC) ? (1 << 1) : 0;
+ 	VOP_CTRL_SET(vop, pin_pol, pin_pol);
  
--	val = VID_MODE_TYPE_BURST_SYNC_PULSES | ENABLE_LOW_POWER;
-+	val = ENABLE_LOW_POWER;
-+
-+	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
-+		val |= VID_MODE_TYPE_BURST_SYNC_PULSES;
-+	else if (!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
-+		val |= VID_MODE_TYPE_NON_BURST_SYNC_EVENTS;
- 
- 	dsi_write(dsi, DSI_VID_MODE_CFG, val);
- }
+ 	switch (s->output_type) {
 -- 
 2.10.0.278.g4f427b1.dirty
