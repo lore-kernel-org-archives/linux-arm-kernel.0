@@ -1,79 +1,75 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Mon, 19 Sep 2016 22:29:39 +0800
-Subject: [PATCH] ASoC: rk3399_gru_sound: fix recording pop at first attempt
-Message-ID: <1474295379-16936-1-git-send-email-zhengxing@rock-chips.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 19 Sep 2016 16:41:12 +0200
+Subject: [PATCH] ARM: mvebu: Select corediv clk for all mvebu v7 SoC
+In-Reply-To: <20160919135230.3ukszs3ybd5fjfx2@pengutronix.de> ("Uwe
+ =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Mon, 19 Sep 2016 15:52:30
+ +0200")
+References: <20160919115207.19334-1-gregory.clement@free-electrons.com>
+ <20160919135230.3ukszs3ybd5fjfx2@pengutronix.de>
+Message-ID: <87eg4g7y0n.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wonjoon Lee <woojoo.lee@samsung.com>
+Hi Uwe,
+ 
+ On lun., sept. 19 2016, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
-Pop happens when mclk applied but dmic's own boot-time
-Specify dmic delay times in dt to make sure
-clocks are ready earlier than dmic working
+> On Mon, Sep 19, 2016 at 01:52:07PM +0200, Gregory CLEMENT wrote:
+>> Since the commit bd3677ff31a3 ("clk: mvebu: Remove corediv clock from
+>> Armada XP"), the corediv clk is no more selected for Armada XP, however
+>> this clock is used for Armada XP using the compatible
+>> armada-370-corediv-clock.
+>> 
+>> More over even if with the commit 1594d568c6e3 ("clk: mvebu: Move corediv
+>> config to mvebu config"), it was selected for Armada 38x and Armada 375,
+>> it was still not selected for Armada 39x.
+>
+> Instead of the above paragraph I'd write:
+>
+> 	While since commit 1594d568c6e3 ("clk: mvebu: Move corediv
+> 	config to mvebu config") Armada 38x and Armada 375 got corediv
+> 	support again, not only Armada XP was missed but also Armada
+> 	39x.
 
-Signed-off-by: Wonjoon Lee <woojoo.lee@samsung.com>
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+Thanks for your suggestion I will use it.
 
- .../bindings/sound/rockchip,rk3399-gru-sound.txt   |    6 ++++++
- sound/soc/rockchip/rk3399_gru_sound.c              |   14 ++++++++++++++
- 2 files changed, 20 insertions(+)
+>
+>> Actually all the SoC selecting MVEBU_V7 config need this clock:
+>> git grep "\-corediv-clock" arch/arm/boot/dts
+>> arch/arm/boot/dts/armada-370-xp.dtsi: compatible = "marvell,armada-370-corediv-clock";
+>> arch/arm/boot/dts/armada-375.dtsi:    compatible = "marvell,armada-375-corediv-clock";
+>> arch/arm/boot/dts/armada-38x.dtsi:    compatible = "marvell,armada-380-corediv-clock";
+>> arch/arm/boot/dts/armada-39x.dtsi:    compatible = "marvell,armada-390-corediv-clock"
+>> 
+>> This commit now fixes this behavior.
+>
+> ... by letting MVEBU_V7 select MVEBU_CLK_COREDIV.
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-index f19b6c8..b7dd3ab 100644
---- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-@@ -6,6 +6,12 @@ Required properties:
-   connected to the codecs
- - rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
- 
-+Optional properties:
-+- dmic-delay : specify delay time for DMIC ready.
-+  If this option is specified, which means it's required dmic need
-+  delay for DMIC to ready so that rt5514 can avoid recording before
-+  DMIC send valid data
-+
- Example:
- 
- sound {
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 164b6da..6ab838b 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -37,6 +37,8 @@
- 
- #define SOUND_FS	256
- 
-+unsigned int rt5514_dmic_delay;
-+
- static struct snd_soc_jack rockchip_sound_jack;
- 
- static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
-@@ -122,6 +124,9 @@ static int rockchip_sound_rt5514_hw_params(struct snd_pcm_substream *substream,
- 		return ret;
- 	}
- 
-+	/* Wait for DMIC stable */
-+	msleep(rt5514_dmic_delay);
-+
- 	return 0;
- }
- 
-@@ -334,6 +339,15 @@ static int rockchip_sound_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	/* Set DMIC delay */
-+	ret = device_property_read_u32(&pdev->dev, "dmic-delay",
-+					&rt5514_dmic_delay);
-+	if (ret) {
-+		rt5514_dmic_delay = 0;
-+		dev_dbg(&pdev->dev,
-+			"no optional property 'dmic-delay' found, default: no delay\n");
-+	}
-+
- 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
- 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_dai_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
- 	rockchip_dailinks[DAILINK_RT5514_DSP].platform_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+
+I didn't want describe the content of the patch but I don't mind adding
+it.
+
+Thanks,
+
+Gregory
+
+>> Fixes: bd3677ff31a3 ("clk: mvebu: Remove corediv clock from Armada XP")
+>> Cc: stable at vger.kernel.org
+>> Reported-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> BTW, I considered doing this, too, but failed to see that 39x is
+> missing, too, and so thought this to be wrong.
+>
+> Best regards
+> Uwe
+>
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
 -- 
-1.7.9.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
