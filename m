@@ -1,64 +1,23 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Sep 2016 18:07:07 +0100
-Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <1474304489.4283.6.camel@buserror.net>
-References: <1473469413-11019-1-git-send-email-oss@buserror.net>
- <1473469413-11019-3-git-send-email-oss@buserror.net>
- <20160912113615.GA20804@leverpostej>
- <1474260085.15220.17.camel@buserror.net>
- <20160919165258.GA30584@leverpostej>
- <1474304489.4283.6.camel@buserror.net>
-Message-ID: <20160919170707.GC30584@leverpostej>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 19 Sep 2016 18:07:23 +0100
+Subject: [PATCH] coresight: tmc: Cleanup operation mode handling
+In-Reply-To: <b693447b-e89c-d4ea-bc57-6c447d688055@arm.com>
+References: <1473861230-5666-1-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkxWSQFgBYHi6dosjut78uohCtX8Wv3Kw=eHk0L_7jmFVw@mail.gmail.com>
+ <b693447b-e89c-d4ea-bc57-6c447d688055@arm.com>
+Message-ID: <92fe89f2-af06-412b-c04b-cd506da391ac@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 12:01:29PM -0500, Scott Wood wrote:
-> On Mon, 2016-09-19 at 17:52 +0100, Mark Rutland wrote:
-> > > > > 
-> > > > > +static void fsl_a008585_set_sne(struct clock_event_device *clk)
-> > > > > +{
-> > > > > +#ifdef CONFIG_FSL_ERRATUM_A008585
-> > > > > +	if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
-> > > > > +		return;
-> > > > > +
-> > > > > +	if (arch_timer_uses_ppi == VIRT_PPI)
-> > > > > +		clk->set_next_event =
-> > > > > fsl_a008585_set_next_event_virt;
-> > > > > +	else
-> > > > > +		clk->set_next_event =
-> > > > > fsl_a008585_set_next_event_phys;
-> > > > > +#endif
-> > > > > +}
-> > > > > +
-> > > > I'm not keen on the magic hook to reset the function pointers, and the
-> > > > additional phys/virt stubs seem pointless. Instead, can we fold this
-> > > > into the existing set_next_event? e.g. have that do:
-> > > > 
-> > > > 	if (needs_fsl_a008585_workaround() {
-> > > > 		fsl_a008585_set_next_event(access, evt, clk);
-> > > > 		return;
-> > > > 	}
-> > > OK. ?I had been trying to avoid messing with the standard set_next_event,
-> > > but
-> > > it doesn't matter as much now that static branches are being used. ?In
-> > > that
-> > > case we can avoid duplicating the ctrl code, and only replace the tval
-> > > write.
-> > Reconsidering my suggestion, I realise this will also affect the MMIO
-> > timers, so that doesn't work.
-> > 
-> > So for the moment, I guess we have to keep fsl_a008585_set_next_event().
-> 
-> What is the problem with MMIO timers? ?needs_fsl_a008585_workaround() should
-> always be false for them.
+On 19/09/16 17:59, Suzuki K Poulose wrote:
+> On 16/09/16 18:07, Mathieu Poirier wrote:
+>> On 14 September 2016 at 07:53, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
 
-As suggested, needs_fsl_a008585_workaround() takes no parameter, and
-set_next_event is called for both cp15/sysreg and MMIO timers. So it
-would either be true for all, or false for all.
+> Cheers
+> Suzuki
+> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+>
 
-If it's true for all, we'd end up calling fsl_a008585_set_next_event()
-for the MMIO timers too.
+Bah, sorry about that. You are fine. This email is intended for the public list discussions.
 
-Thanks,
-Mark.
+Suzuki
