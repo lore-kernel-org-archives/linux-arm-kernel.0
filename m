@@ -1,57 +1,29 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 19 Sep 2016 18:22:12 +0300
-Subject: [PATCH 1/8] crypto: omap-sham: add context export/import stubs
-In-Reply-To: <1474298539-23897-1-git-send-email-t-kristo@ti.com>
-References: <1474298539-23897-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1474298539-23897-2-git-send-email-t-kristo@ti.com>
+Date: Mon, 19 Sep 2016 18:22:11 +0300
+Subject: [PATCH 0/8] crypto: omap-sham: convert to sg based data engine
+Message-ID: <1474298539-23897-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initially these just return -ENOTSUPP to indicate that they don't
-really do anything yet. Some sort of implementation is required
-for the driver to at least probe.
+Hi,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- drivers/crypto/omap-sham.c | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+This series converts the omap-sham buffer handling towards a scatterlist
+approach. This avoids the need to have a huge internal buffer within the
+driver, and also allows us to properly implement export/import for the
+driver. I tried splitting up the changes to some sane patches, but this
+was rather difficult due to the fact that this is largely a complete
+rewrite of portions of the driver. Patch #6 is a prime example of this
+being pretty large, but splitting this up would break bisectability.
+Hopefully the patch is still understandable though.
 
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index cf9f617c..74653c9 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -1340,6 +1340,16 @@ static void omap_sham_cra_exit(struct crypto_tfm *tfm)
- 	}
- }
- 
-+static int omap_sham_export(struct ahash_request *req, void *out)
-+{
-+	return -ENOTSUPP;
-+}
-+
-+static int omap_sham_import(struct ahash_request *req, const void *in)
-+{
-+	return -ENOTSUPP;
-+}
-+
- static struct ahash_alg algs_sha1_md5[] = {
- {
- 	.init		= omap_sham_init,
-@@ -1998,8 +2008,13 @@ static int omap_sham_probe(struct platform_device *pdev)
- 
- 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
- 		for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
--			err = crypto_register_ahash(
--					&dd->pdata->algs_info[i].algs_list[j]);
-+			struct ahash_alg *alg;
-+
-+			alg = &dd->pdata->algs_info[i].algs_list[j];
-+			alg->export = omap_sham_export;
-+			alg->import = omap_sham_import;
-+			alg->halg.statesize = sizeof(struct omap_sham_reqctx);
-+			err = crypto_register_ahash(alg);
- 			if (err)
- 				goto err_algs;
- 
--- 
-1.9.1
+Crypto manager tests work fine at least on omap3/am3/am4/dra7 SoC:s.
+(Something is broken with test farm again and could not try omap2/omap4.)
+
+Also tested tcrypt SHA performance on DRA7 and it seems to be working
+fine with different buffer sizes.
+
+My test branch is also available here for interested parties:
+tree: https://github.com/t-kristo/linux-pm.git
+breanch: 4.8-rc1-crypto
+
+-Tero
