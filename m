@@ -1,52 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Sep 2016 13:30:42 +0200
-Subject: next-20160914 build: 2 failures 3 warnings (next-20160914)
-In-Reply-To: <20160919105429.GK10189@sirena.org.uk>
-References: <E1bk5OS-0000Vu-1C@optimist> <2300987.vYzazfRX5F@wuerfel>
- <20160919105429.GK10189@sirena.org.uk>
-Message-ID: <1474883226.Je8NqnULCh@wuerfel>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 19 Sep 2016 13:41:38 +0200
+Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
+In-Reply-To: <43020f1f-6367-6f11-2534-b26ced13b540@suse.de>
+References: <1474007187-18673-1-git-send-email-agraf@suse.de>
+ <57DBC782.7080305@arm.com>
+ <7beb406b-6194-8451-2d92-9a4394ef91dd@redhat.com>
+ <20160916123039.GB14140@cbox>
+ <da8191ca-6fb1-f960-872c-d6bc27172db8@redhat.com>
+ <20160916133027.GA27036@cbox>
+ <43020f1f-6367-6f11-2534-b26ced13b540@suse.de>
+Message-ID: <20160919114138.GA15852@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 19, 2016 11:54:29 AM CEST Mark Brown wrote:
-> On Mon, Sep 19, 2016 at 12:31:04PM +0200, Arnd Bergmann wrote:
+On Mon, Sep 19, 2016 at 12:51:46PM +0200, Alexander Graf wrote:
 > 
-> > My guess is that this is indeed the correct fix, but I don't understand
-> > at all what the function does, and Marcin Niestroj said the same thing,
-> > he just copied the code from a driver that is always built-in.
 > 
-> Yes, most of the code is copied from regmap-irq.  Setting the parent is
-> needed for edge triggered interrupts that don't latch state when
-> disabled but isn't needed in the general case.
+> On 16.09.16 15:30, Christoffer Dall wrote:
 
-I found this in the tps65217 data sheet:
+[...]
 
- 9.3.7 Interrupt Pin (nINT)
- The interrupt pin is used to signal any event or fault
- condition to the host processor. Whenever a fault or event
- occurs in the IC the corresponding interrupt bit is set in
- the INT register, and the open-drain output is pulled low.
- The nINT pin is released (returns to Hi-Z state) and fault
- bits are cleared when the INT register is read by the
- host. However, if a failure persists, the corresponding
- INT bit remains set and the nINT pin is pulled low again
- after a maximum of 32 ?s.
+> > 
+> > That being said, I'm not categorically against these patches, but I
+> > share Marc's view that we've already seen that non-vgic support had been
+> > broken for multiple versions without anyone complaining, and without
+> > automated testing or substantial interest in the work, the patches
+> > really are likely to bit-rot.
+> 
+> I know that it's very hard to grasp from an upstream maintainer
+> perspective, 
 
- Interrupt events include pushbutton pressed/released, USB
- and AC voltage status change.
- The MASK bits in the INT register are used to mask events
- from generating interrupts. The MASK settings affect the
- nINT pin only and have no impact on protection and
- monitor circuits themselves. Note that persisting event
- conditions such as ISINK enabled shutdown can cause the
- nINT pin to be pulled low for an extended period of
- time which can keep the host in a loop trying to resolve
- the interrupt. If this behavior is not desired, set the
- corresponding mask bit after receiving the interrupt and
- keep polling the INT register to see when the event
- condition has disappeared. Then unmask the interrupt bit
- again.
+pfff
 
-Does this tell us if it's needed or not?
+> but keep in mind where the bulk of execution of kernel code
+> lies. The average life cycle of a "stable" Linux distribution's kernel
+> is a few years.
+> 
+> So far all regressions in the user space gic code have been found within
+> less than 1y of the respective code release. I'd say that counts for
+> quite a well used feature.
+> 
 
-	Arnd
+The only report I can think of about this was Pavel using an upstream
+kernel for in-house Samsung development on non-public hardware.
+
+But, again, I didn't look at the patches in detail yet, I'm not
+categorically against them, I will take a careful look at them like I do
+with all patches on the kvmarm list.  There's a risk they'll break in
+mainline unless we sort out our testing story, and it may just be
+something we'll have to live with.
+
+> > But I haven't even looked at the patches in detail, I was just replying
+> > to the comment about testing.
+> 
+> Also keep in mind that without the architected timer support (and/or
+> without qemu patches than enable user space timers) the user space gic
+> support is pretty unusable to most people, so you obviously get less
+> reports.
+>
+
+I don't disagree with this.  I don't know what this has to do with the
+part of my mail you're replying to, but I completely agree that the
+current userspace irqchip support has limited value.
+
+-Christoffer
