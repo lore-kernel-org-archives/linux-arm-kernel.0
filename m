@@ -1,106 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Sep 2016 11:44:51 +0100
-Subject: [RFC PATCH 2/8] thread_info: allow custom in-task thread_info
-In-Reply-To: <CALCETrUDWiDmLbMqw9sQYEzvDuSVfmT_UscxQXfmf8YYyTOC=Q@mail.gmail.com>
-References: <1473947349-14521-1-git-send-email-mark.rutland@arm.com>
- <1473947349-14521-3-git-send-email-mark.rutland@arm.com>
- <CALCETrWni0aZ71r-R6oYG98kZvZA8a184UR0YURk_=tXu8HXMw@mail.gmail.com>
- <20160916103101.GA21702@leverpostej>
- <CALCETrUDWiDmLbMqw9sQYEzvDuSVfmT_UscxQXfmf8YYyTOC=Q@mail.gmail.com>
-Message-ID: <20160919104254.GA12473@leverpostej>
+From: agraf@suse.de (Alexander Graf)
+Date: Mon, 19 Sep 2016 12:51:46 +0200
+Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
+In-Reply-To: <20160916133027.GA27036@cbox>
+References: <1474007187-18673-1-git-send-email-agraf@suse.de>
+ <57DBC782.7080305@arm.com> <7beb406b-6194-8451-2d92-9a4394ef91dd@redhat.com>
+ <20160916123039.GB14140@cbox>
+ <da8191ca-6fb1-f960-872c-d6bc27172db8@redhat.com>
+ <20160916133027.GA27036@cbox>
+Message-ID: <43020f1f-6367-6f11-2534-b26ced13b540@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Yosinori Sato for h8300]
 
-On Fri, Sep 16, 2016 at 08:11:14AM -0700, Andy Lutomirski wrote:
-> > On Thu, Sep 15, 2016 at 11:37:47AM -0700, Andy Lutomirski wrote:
-> > > On Thu, Sep 15, 2016 at 6:49 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Just to check, what do you mean to happen with the flags field? Should
-> > that always be in the generic thread_info? e.g.
-> >
-> > struct thread_info {
-> >         u32 flags;
-> > #ifdef arch_thread_info
-> >         struct arch_thread_info arch_ti;
-> > #endif
-> > };
+
+On 16.09.16 15:30, Christoffer Dall wrote:
+> On Fri, Sep 16, 2016 at 02:31:42PM +0200, Paolo Bonzini wrote:
+>>
+>>
+>> On 16/09/2016 14:30, Christoffer Dall wrote:
+>>>>>> This patch set allows user space to receive vtimer events as well as mask
+>>>>>> them, so that we can handle all vtimer related interrupt injection from user
+>>>>>> space, enabling us to use architected timer with user space gic emulation.
+>>>>>
+>>>>> I have already voiced my concerns in the past, including face to face,
+>>>>> and I'm going to repeat it: I not keen at all on adding a new userspace
+>>>>> interface that is going to bitrot extremely quickly.
+>>>>
+>>>> You don't have automated tests set up?  It's not going to bitrot if you
+>>>> test it, either with kvm-unit-tests or just by smoke-testing Linux.
+>>>> It's _for_ the raspi, but it's not limited to it.
+>>>
+>>> Our automated testing situation is not great, no.  Something we're
+>>> looking at, but have resource problems with.
+>>
+>> But it's not a good reason to hold back a feature...
+>>
 > 
-> Exactly.  Possibly with a comment that using thread_struct should be
-> preferred and that arch_thread_info should be used only if some header
-> file requires access via current_thread_info() or task_thread_info().
+> I didn't say that exactly, but choosing not to merge something we cannot
+> maintain and which we're not paid to look after and where there's a
+> minimal interest, is not entirely unreasonable.
+> 
+> That being said, I'm not categorically against these patches, but I
+> share Marc's view that we've already seen that non-vgic support had been
+> broken for multiple versions without anyone complaining, and without
+> automated testing or substantial interest in the work, the patches
+> really are likely to bit-rot.
 
-Sure thing.
+I know that it's very hard to grasp from an upstream maintainer
+perspective, but keep in mind where the bulk of execution of kernel code
+lies. The average life cycle of a "stable" Linux distribution's kernel
+is a few years.
 
-While looking at that, I spotted that would cause a circular include on
-h8300, but that appears to be because of a larger bug anyhow. It seems
-h8300 has thread_info::restart_block, and manipulates this in its signal
-code, yet core code manipulates task_struct::restart_block.
+So far all regressions in the user space gic code have been found within
+less than 1y of the respective code release. I'd say that counts for
+quite a well used feature.
 
-I think we need something like the below (which is completely untested).
+> But I haven't even looked at the patches in detail, I was just replying
+> to the comment about testing.
 
-Thanks,
-Mark.
+Also keep in mind that without the architected timer support (and/or
+without qemu patches than enable user space timers) the user space gic
+support is pretty unusable to most people, so you obviously get less
+reports.
 
----->8----
->From 4dfbdc7706bfb03a48999ff69e85e0c7361adffe Mon Sep 17 00:00:00 2001
-From: Mark Rutland <mark.rutland@arm.com>
-Date: Mon, 19 Sep 2016 11:33:42 +0100
-Subject: [PATCH] h8300: fix syscall restarting
 
-Back in commit f56141e3e2d9aabf ("all arches, signal: move restart_block
-to struct task_struct"), all architectures and core code were changed to
-use task_struct::restart_block. However, when h8300 support was
-subsequently restored in v4.2, it was not updated to account for this,
-and maintains thread_info::restart_block, which is not kept in sync.
-
-This patch drops the redundant restart_block from thread_info, and moves
-h8300 to the common one in task_struct, ensuring that syscall restarting
-always works as expected.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-Cc: stable at vger.kernel.org # v4.2+
----
- arch/h8300/include/asm/thread_info.h | 4 ----
- arch/h8300/kernel/signal.c           | 2 +-
- 2 files changed, 1 insertion(+), 5 deletions(-)
-
-diff --git a/arch/h8300/include/asm/thread_info.h b/arch/h8300/include/asm/thread_info.h
-index b408fe6..3cef068 100644
---- a/arch/h8300/include/asm/thread_info.h
-+++ b/arch/h8300/include/asm/thread_info.h
-@@ -31,7 +31,6 @@ struct thread_info {
- 	int		   cpu;			/* cpu we're on */
- 	int		   preempt_count;	/* 0 => preemptable, <0 => BUG */
- 	mm_segment_t		addr_limit;
--	struct restart_block restart_block;
- };
- 
- /*
-@@ -44,9 +43,6 @@ struct thread_info {
- 	.cpu =		0,			\
- 	.preempt_count = INIT_PREEMPT_COUNT,	\
- 	.addr_limit	= KERNEL_DS,		\
--	.restart_block	= {			\
--		.fn = do_no_restart_syscall,	\
--	},					\
- }
- 
- #define init_thread_info	(init_thread_union.thread_info)
-diff --git a/arch/h8300/kernel/signal.c b/arch/h8300/kernel/signal.c
-index ad1f81f..7138303 100644
---- a/arch/h8300/kernel/signal.c
-+++ b/arch/h8300/kernel/signal.c
-@@ -79,7 +79,7 @@ restore_sigcontext(struct sigcontext *usc, int *pd0)
- 	unsigned int er0;
- 
- 	/* Always make any pending restarted system calls return -EINTR */
--	current_thread_info()->restart_block.fn = do_no_restart_syscall;
-+	current->restart_block.fn = do_no_restart_syscall;
- 
- 	/* restore passed registers */
- #define COPY(r)  do { err |= get_user(regs->r, &usc->sc_##r); } while (0)
--- 
-1.9.1
+Alex
