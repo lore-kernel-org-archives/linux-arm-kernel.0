@@ -1,54 +1,52 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Mon, 19 Sep 2016 19:36:23 +0200
-Subject: [PATCH 1/3] i2c: bcm2835: Fix hang for writing messages larger
- than 16 bytes
-In-Reply-To: <87zin3omsa.fsf@eliezer.anholt.net>
-References: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
- <87zin3omsa.fsf@eliezer.anholt.net>
-Message-ID: <64c65af1-fdd9-bbe7-7c2b-6e8d87f08bb8@tronnes.org>
+From: bdegraaf@codeaurora.org (Brent DeGraaf)
+Date: Mon, 19 Sep 2016 13:36:26 -0400
+Subject: [RFC] arm64: Ensure proper addressing for ldnp/stnp
+Message-ID: <1474306586-25118-1-git-send-email-bdegraaf@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+According to section 6.3.8 of the ARM Programmer's Guide, non-temporal
+loads and stores do not verify that address dependency is met between a
+load of an address to a register and a subsequent non-temporal load or
+store using that address on the executing PE. Therefore, context switch
+code and subroutine calls that use non-temporally accessed addresses as
+parameters that might depend on a load of an address into an argument
+register must ensure that ordering requirements are met by introducing
+a barrier prior to the successive non-temporal access.  Add appropriate
+barriers whereever this specific situation comes into play.
 
-Den 19.09.2016 18:51, skrev Eric Anholt:
-> Noralf Tr?nnes <noralf@tronnes.org> writes:
->
->> Writing messages larger than the FIFO size results in a hang, rendering
->> the machine unusable. This is because the RXD status flag is set on the
->> first interrupt which results in bcm2835_drain_rxfifo() stealing bytes
->> from the buffer. The controller continues to trigger interrupts waiting
->> for the missing bytes, but bcm2835_fill_txfifo() has none to give.
->> In this situation wait_for_completion_timeout() apparently is unable to
->> stop the madness.
->>
->> The BCM2835 ARM Peripherals datasheet has this to say about the flags:
->>    TXD: is set when the FIFO has space for at least one byte of data.
->>    RXD: is set when the FIFO contains at least one byte of data.
->>    TXW: is set during a write transfer and the FIFO is less than full.
->>    RXR: is set during a read transfer and the FIFO is or more full.
->>
->> Implementing the logic from the downstream i2c-bcm2708 driver solved
->> the hang problem.
->>
->> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
-> Patches 1, 3 are:
->
-> Reviewed-by: Eric Anholt <eric@anholt.net>
->
-> For patch 2 I followed some of it, but couldn't quite say it's a review.
-> I trust your testing, and that the path has had a lot more testing in
-> the downstream tree, so it's:
+Signed-off-by: Brent DeGraaf <bdegraaf@codeaurora.org>
+---
+ arch/arm64/kernel/entry.S  | 1 +
+ arch/arm64/lib/copy_page.S | 2 ++
+ 2 files changed, 3 insertions(+)
 
-I don't know how much testing downstream really has had since this feature
-is disabled by default. So there is a possibility that this can break some
-devices (while at the same time enable others).
-I wondered about adding a module parameter so it could be disabled at
-runtime, but decided to see what the review would be first.
-It is of course possible to add a this module parameter later should it
-turn out to break some device.
-
-Noralf.
-
-> Acked-by: Eric Anholt <eric@anholt.net>
->
-> Thanks!
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 441420c..982c4d3 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -679,6 +679,7 @@ ENTRY(cpu_switch_to)
+ 	ldp	x27, x28, [x8], #16
+ 	ldp	x29, x9, [x8], #16
+ 	ldr	lr, [x8]
++	dmb	nshld	// Existence of instructions with loose load-use dependencies (e.g. ldnp/stnp) make this barrier necessary
+ 	mov	sp, x9
+ 	and	x9, x9, #~(THREAD_SIZE - 1)
+ 	msr	sp_el0, x9
+diff --git a/arch/arm64/lib/copy_page.S b/arch/arm64/lib/copy_page.S
+index 4c1e700..21c6892 100644
+--- a/arch/arm64/lib/copy_page.S
++++ b/arch/arm64/lib/copy_page.S
+@@ -47,6 +47,8 @@ alternative_endif
+ 	ldp	x14, x15, [x1, #96]
+ 	ldp	x16, x17, [x1, #112]
+ 
++	dmb	nshld // In case x0 (for stnp) is dependent on a load
++
+ 	mov	x18, #(PAGE_SIZE - 128)
+ 	add	x1, x1, #128
+ 1:
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
+Forum, a Linux Foundation Collaborative Project.
