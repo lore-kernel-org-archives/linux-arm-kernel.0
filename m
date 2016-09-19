@@ -1,69 +1,48 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 19 Sep 2016 17:38:55 -0400
-Subject: [PATCH] arm64: migrate exception table users off module.h and onto
- extable.h
-Message-ID: <20160919213855.5295-1-paul.gortmaker@windriver.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 19 Sep 2016 23:40:41 +0200
+Subject: [PATCH 1/4] ARM: dts: mxs: Add new M28EVK manufacturer compat
+Message-ID: <20160919214044.9615-1-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These files were only including module.h for exception table
-related functions.  We've now separated that content out into its
-own file "extable.h" so now move over to that and avoid all the
-extra header content in module.h that we don't really need to compile
-these files.
+The board is now manufactured by Aries Embedded GmbH, update compat string.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawnguo@kernel.org>
 ---
+ arch/arm/boot/dts/imx28-m28.dtsi   | 4 ++--
+ arch/arm/boot/dts/imx28-m28evk.dts | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-[see: https://lkml.org/lkml/2016/7/24/224 for additional context if needed]
-
- arch/arm64/kernel/probes/kprobes.c | 2 +-
- arch/arm64/mm/extable.c            | 2 +-
- arch/arm64/mm/fault.c              | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-index bf9768588288..9c1866ef3271 100644
---- a/arch/arm64/kernel/probes/kprobes.c
-+++ b/arch/arm64/kernel/probes/kprobes.c
-@@ -19,7 +19,7 @@
- #include <linux/kasan.h>
- #include <linux/kernel.h>
- #include <linux/kprobes.h>
--#include <linux/module.h>
-+#include <linux/extable.h>
- #include <linux/slab.h>
- #include <linux/stop_machine.h>
- #include <linux/stringify.h>
-diff --git a/arch/arm64/mm/extable.c b/arch/arm64/mm/extable.c
-index 81acd4706878..c9f118cd812b 100644
---- a/arch/arm64/mm/extable.c
-+++ b/arch/arm64/mm/extable.c
-@@ -2,7 +2,7 @@
-  * Based on arch/arm/mm/extable.c
-  */
+diff --git a/arch/arm/boot/dts/imx28-m28.dtsi b/arch/arm/boot/dts/imx28-m28.dtsi
+index 214bb15..a69856e 100644
+--- a/arch/arm/boot/dts/imx28-m28.dtsi
++++ b/arch/arm/boot/dts/imx28-m28.dtsi
+@@ -12,8 +12,8 @@
+ #include "imx28.dtsi"
  
--#include <linux/module.h>
-+#include <linux/extable.h>
- #include <linux/uaccess.h>
+ / {
+-	model = "DENX M28";
+-	compatible = "denx,m28", "fsl,imx28";
++	model = "Aries/DENX M28";
++	compatible = "aries,m28", "denx,m28", "fsl,imx28";
  
- int fixup_exception(struct pt_regs *regs)
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index c8beaa0da7df..427f2fd49463 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -18,7 +18,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+ 	memory {
+ 		reg = <0x40000000 0x08000000>;
+diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+index 8d04e57..dbfb8aa 100644
+--- a/arch/arm/boot/dts/imx28-m28evk.dts
++++ b/arch/arm/boot/dts/imx28-m28evk.dts
+@@ -13,8 +13,8 @@
+ #include "imx28-m28.dtsi"
  
--#include <linux/module.h>
-+#include <linux/extable.h>
- #include <linux/signal.h>
- #include <linux/mm.h>
- #include <linux/hardirq.h>
+ / {
+-	model = "DENX M28EVK";
+-	compatible = "denx,m28evk", "fsl,imx28";
++	model = "Aries/DENX M28EVK";
++	compatible = "aries,m28evk", "denx,m28evk", "fsl,imx28";
+ 
+ 	apb at 80000000 {
+ 		apbh at 80000000 {
 -- 
-2.8.4
+2.9.3
