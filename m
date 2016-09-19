@@ -1,45 +1,40 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:16 +0100
-Subject: [PATCH 06/26] drm/rockchip: dw-mipi-dsi: fix generic packet status
- check
+Date: Mon, 19 Sep 2016 18:17:17 +0100
+Subject: [PATCH 07/26] drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read on
+ tx_buf
 In-Reply-To: <20160919171747.28512-1-john@metanate.com>
 References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-7-john@metanate.com>
+Message-ID: <20160919171747.28512-8-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to check that both the GEN_CMD_EMPTY and GEN_PLD_W_EMPTY bits
-are set so we can't just check "val & mask" because that will be true if
-either bit is set.
+As a side-effect of this, encode the endianness explicitly rather than
+casting a u16.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 03915bf9c97d..f2bed2a0f907 100644
+index f2bed2a0f907..38186df8476e 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -546,7 +546,7 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
- static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
+@@ -573,8 +573,13 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
+ static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
+ 				       const struct mipi_dsi_msg *msg)
  {
- 	int ret;
--	u32 val;
-+	u32 val, mask;
+-	const u16 *tx_buf = msg->tx_buf;
+-	u32 val = GEN_HDATA(*tx_buf) | GEN_HTYPE(msg->type);
++	const u8 *tx_buf = msg->tx_buf;
++	u32 val = GEN_HTYPE(msg->type);
++
++	if (msg->tx_len > 0)
++		val |= GEN_HDATA(tx_buf[0]);
++	if (msg->tx_len > 1)
++		val |= GEN_HDATA(tx_buf[1] << 8);
  
- 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, !(val & GEN_CMD_FULL), 1000,
-@@ -558,8 +558,9 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- 
- 	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
- 
-+	mask = GEN_CMD_EMPTY | GEN_PLD_W_EMPTY;
- 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
--				 val, val & (GEN_CMD_EMPTY | GEN_PLD_W_EMPTY),
-+				 val, (val & mask) == mask,
- 				 1000, CMD_PKT_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
- 		dev_err(dsi->dev, "failed to write command FIFO\n");
+ 	if (msg->tx_len > 2) {
+ 		dev_err(dsi->dev, "too long tx buf length %zu for short write\n",
 -- 
 2.10.0.278.g4f427b1.dirty
