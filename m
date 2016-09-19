@@ -1,10 +1,10 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 19 Sep 2016 04:37:21 +0300
-Subject: [PATCH 09/19] ARM: imx legacy: mx31moboard: move peripheral
+Date: Mon, 19 Sep 2016 04:37:18 +0300
+Subject: [PATCH 06/19] ARM: imx legacy: mx31-3ds: move peripheral
  initialization to .init_late
 In-Reply-To: <1474248988-10626-1-git-send-email-vz@mleia.com>
 References: <1474248988-10626-1-git-send-email-vz@mleia.com>
-Message-ID: <1474249051-10718-9-git-send-email-vz@mleia.com>
+Message-ID: <1474249051-10718-6-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,69 +15,91 @@ initialization level after init level of i.MX IOMUXC driver.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/mach-imx/mach-mx31moboard.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+ arch/arm/mach-imx/mach-mx31_3ds.c | 39 +++++++++++++++++++++++----------------
+ 1 file changed, 23 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-index 4f2d998..cc86768 100644
---- a/arch/arm/mach-imx/mach-mx31moboard.c
-+++ b/arch/arm/mach-imx/mach-mx31moboard.c
-@@ -526,11 +526,9 @@ static void __init mx31moboard_init(void)
- 		"moboard");
+diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+index 65a0dc0..12b8a52 100644
+--- a/arch/arm/mach-imx/mach-mx31_3ds.c
++++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+@@ -694,8 +694,6 @@ static struct platform_device *devices[] __initdata = {
  
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
--	gpio_led_register_device(-1, &mx31moboard_led_pdata);
+ static void __init mx31_3ds_init(void)
+ {
+-	int ret;
+-
+ 	imx31_soc_init();
  
- 	imx31_add_imx2_wdt();
+ 	/* Configure SPI1 IOMUX */
+@@ -708,14 +706,31 @@ static void __init mx31_3ds_init(void)
+ 	imx31_add_mxc_nand(&mx31_3ds_nand_board_info);
  
--	moboard_uart0_init();
- 	imx31_add_imx_uart0(&uart0_pdata);
- 	imx31_add_imx_uart4(&uart4_pdata);
- 
-@@ -540,6 +538,19 @@ static void __init mx31moboard_init(void)
- 	imx31_add_spi_imx1(&moboard_spi1_pdata);
- 	imx31_add_spi_imx2(&moboard_spi2_pdata);
- 
-+	mx31moboard_init_cam();
+ 	imx31_add_spi_imx1(&spi1_pdata);
 +
-+	imx31_add_imx_ssi(0, &moboard_ssi_pdata);
++	imx31_add_imx_keypad(&mx31_3ds_keymap_data);
 +
-+	pm_power_off = mx31moboard_poweroff;
++	imx31_add_imx2_wdt();
++	imx31_add_imx_i2c0(&mx31_3ds_i2c0_data);
++
++	imx31_add_spi_imx0(&spi0_pdata);
++	imx31_add_ipu_core();
++	imx31_add_mx3_sdc_fb(&mx3fb_pdata);
++
++	imx31_add_imx_ssi(0, &mx31_3ds_ssi_pdata);
++
++	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
 +}
 +
-+static void __init mx31moboard_late(void)
++static void __init mx31_3ds_late(void)
 +{
-+	gpio_led_register_device(-1, &mx31moboard_led_pdata);
++	int ret;
 +
-+	moboard_uart0_init();
-+
- 	gpio_request(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3), "pmic-irq");
- 	gpio_direction_input(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3));
- 	moboard_spi_board_info[0].irq =
-@@ -549,18 +560,11 @@ static void __init mx31moboard_init(void)
+ 	mx31_3ds_spi_devs[0].irq = gpio_to_irq(IOMUX_TO_GPIO(MX31_PIN_GPIO1_3));
+ 	spi_register_board_info(mx31_3ds_spi_devs,
+-						ARRAY_SIZE(mx31_3ds_spi_devs));
++				ARRAY_SIZE(mx31_3ds_spi_devs));
  
- 	imx31_add_mxc_mmc(0, &sdhc1_pdata);
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
  
--	mx31moboard_init_cam();
+-	imx31_add_imx_keypad(&mx31_3ds_keymap_data);
 -
- 	usb_xcvr_reset();
--
- 	moboard_usbh2_init();
+ 	mx31_3ds_usbotg_init();
+ 	if (otg_mode_host) {
+ 		otg_pdata.otg = imx_otg_ulpi_create(ULPI_OTG_DRVVBUS |
+@@ -733,14 +748,9 @@ static void __init mx31_3ds_init(void)
  
--	imx31_add_imx_ssi(0, &moboard_ssi_pdata);
--
- 	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
+ 	if (mxc_expio_init(MX31_CS5_BASE_ADDR, IOMUX_TO_GPIO(MX31_PIN_GPIO1_1)))
+ 		printk(KERN_WARNING "Init of the debug board failed, all "
+-				    "devices on the debug board are unusable.\n");
+-	imx31_add_imx2_wdt();
+-	imx31_add_imx_i2c0(&mx31_3ds_i2c0_data);
+-	imx31_add_mxc_mmc(0, &sdhc1_pdata);
++		       "devices on the debug board are unusable.\n");
  
--	pm_power_off = mx31moboard_poweroff;
+-	imx31_add_spi_imx0(&spi0_pdata);
+-	imx31_add_ipu_core();
+-	imx31_add_mx3_sdc_fb(&mx3fb_pdata);
++	imx31_add_mxc_mmc(0, &sdhc1_pdata);
+ 
+ 	/* CSI */
+ 	/* Camera power: default - off */
+@@ -752,10 +762,6 @@ static void __init mx31_3ds_init(void)
+ 	}
+ 
+ 	mx31_3ds_init_camera();
 -
- 	switch (mx31moboard_baseboard) {
- 	case MX31NOBOARD:
- 		break;
-@@ -601,5 +605,6 @@ MACHINE_START(MX31MOBOARD, "EPFL Mobots mx31moboard")
+-	imx31_add_imx_ssi(0, &mx31_3ds_ssi_pdata);
+-
+-	imx_add_platform_device("imx_mc13783", 0, NULL, 0, NULL, 0);
+ }
+ 
+ static void __init mx31_3ds_timer_init(void)
+@@ -778,6 +784,7 @@ MACHINE_START(MX31_3DS, "Freescale MX31PDK (3DS)")
  	.init_irq = mx31_init_irq,
- 	.init_time	= mx31moboard_timer_init,
- 	.init_machine = mx31moboard_init,
-+	.init_late	= mx31moboard_late,
+ 	.init_time	= mx31_3ds_timer_init,
+ 	.init_machine = mx31_3ds_init,
++	.init_late	= mx31_3ds_late,
+ 	.reserve = mx31_3ds_reserve,
  	.restart	= mxc_restart,
  MACHINE_END
 -- 
