@@ -1,51 +1,49 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 19 Sep 2016 17:13:14 +0100
-Subject: [PATCH 3/3] arm64: Add the Raspberry Pi firmware's interface to the
- FXL6408.
-In-Reply-To: <20160919161314.25858-1-eric@anholt.net>
-References: <20160919161314.25858-1-eric@anholt.net>
-Message-ID: <20160919161314.25858-3-eric@anholt.net>
+Date: Mon, 19 Sep 2016 17:13:12 +0100
+Subject: [PATCH 1/3] dt-bindings: Add a binding for the RPi firmware GPIO
+ driver.
+Message-ID: <20160919161314.25858-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This gets us hotplug detection of HDMI, so that graphics now works at
-boot.  Tested with watching the output of xrandr while plugging and
-unplugging the HDMI cable.
+The RPi firmware exposes all of the board's GPIO lines through
+property calls.  Linux chooses to control most lines directly through
+the pinctrl driver, but for the FXL6408 GPIO expander on the Pi3, we
+need to access them through the firmware.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ .../bindings/gpio/gpio-raspberrypi-firmware.txt    | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
 
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-index 7841b724e340..2460b47737e9 100644
---- a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-+++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-@@ -23,8 +23,25 @@
- 			linux,default-trigger = "default-on";
- 		};
- 	};
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt b/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
+new file mode 100644
+index 000000000000..2b635c23a6f8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
+@@ -0,0 +1,22 @@
++Raspberry Pi power domain driver
 +
-+	soc {
-+		fxl6408: firmware-gpio-128 {
-+			compatible = "raspberrypi,firmware-gpio";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			firmware = <&firmware>;
-+			ngpios = <8>;
-+			gpio-line-names = "BT_ON", "WL_ON", "", "LAN_RUN", "HPD_N", "CAM_GPIO0", "CAM_GPIO1", "PWR_LOW_N";
++Required properties:
 +
-+			raspberrypi,firmware-gpio-offset = <128>;
-+		};
-+	};
- };
- 
- &uart1 {
- 	status = "okay";
- };
++- compatible:		Should be "raspberrypi,firmware-gpio"
++- gpio-controller:	Marks the device node as a gpio controller
++- #gpio-cells:		Should be <2> for GPIO number and flags
++- ngpios:		Number of GPIO lines to control.  See gpio.txt
++- firmware:		Reference to the RPi firmware device node
++- raspberrypi,firmware-gpio-offset:
++			Number the firmware uses for the first GPIO line
++			  controlled by this driver
 +
-+&hdmi {
-+	hpd-gpios = <&fxl6408 4 GPIO_ACTIVE_HIGH>;
++Example:
++fxl6408: firmware-gpio-128 {
++	compatible = "raspberrypi,firmware-gpio";
++	gpio-controller;
++	#gpio-cells = <2>;
++	firmware = <&firmware>;
++	ngpios = <8>;
++	raspberrypi,firmware-gpio-offset = <128>;
 +};
 -- 
 2.9.3
