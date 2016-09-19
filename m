@@ -1,34 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2016 00:16:41 +0200
-Subject: [GIT PULL] ARM: mvebu: drivers for v4.9 (#1)
-In-Reply-To: <87a8fabikx.fsf@free-electrons.com>
-References: <87a8fabikx.fsf@free-electrons.com>
-Message-ID: <4134529.ol6KhRYAQp@wuerfel>
+Date: Tue, 20 Sep 2016 00:18:18 +0200
+Subject: [PATCH] MAINTAINERS: update list of Oxnas maintainers
+In-Reply-To: <20160916080917.19162-1-narmstrong@baylibre.com>
+References: <20160916080917.19162-1-narmstrong@baylibre.com>
+Message-ID: <3713767.3M1oIJmzqL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 14, 2016 5:35:10 PM CEST Gregory CLEMENT wrote:
-> mvebu drivers for 4.9 (part 1)
+On Friday, September 16, 2016 10:09:17 AM CEST Neil Armstrong wrote:
+> Add a new list address in the MAINTAINERS file for the Oxnas platform.
 > 
-> - Add pinctrl and clk support for the Orion5x SoC mv88f5181 variant
-> 
-> ----------------------------------------------------------------
-> Jamie Lentin (2):
->       clk: mvebu: Add clk support for the orion5x SoC mv88f5181
->       pinctrl: mvebu: orion5x: Generalise mv88f5181l support for 88f5181
-> 
->  .../devicetree/bindings/clock/mvebu-core-clock.txt |  1 +
->  .../bindings/pinctrl/marvell,orion-pinctrl.txt     |  4 +-
->  drivers/clk/mvebu/orion.c                          | 70 ++++++++++++++++++++++
->  drivers/pinctrl/mvebu/pinctrl-orion.c              | 23 +++----
->  4 files changed, 86 insertions(+), 12 deletions(-)
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-I see this touches pinctrl and clk drivers, but none of the maintainers are
-on Cc for this pull request, nor have they provided an Ack for the patches
-according to your git log.
+Applied to next/soc, thanks!
 
-Why did you not send the driver changes to them?
-
-Not pulled for now, until this is resolved, sorry.
+When you send a single patch to be applied, please try to be specific
+about who you send it to, and put only the recipient (arm at kernel.org here)
+on "To:", while the mailing lists and any other people should all be on
+Cc.
 
 	Arnd
