@@ -1,36 +1,54 @@
-From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:45 +0100
-Subject: [PATCH 24/27] drm/rockchip: vop: test for P{H,V}SYNC
-In-Reply-To: <20160919171747.28512-1-john@metanate.com>
-References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-36-john@metanate.com>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Mon, 19 Sep 2016 19:36:23 +0200
+Subject: [PATCH 1/3] i2c: bcm2835: Fix hang for writing messages larger
+ than 16 bytes
+In-Reply-To: <87zin3omsa.fsf@eliezer.anholt.net>
+References: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
+ <87zin3omsa.fsf@eliezer.anholt.net>
+Message-ID: <64c65af1-fdd9-bbe7-7c2b-6e8d87f08bb8@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When connected to the MIPI DSI output, we need to use N{H,V}SYNC for the
-internal connection but these flags are meaningless for DSI panels.
-Switch the test so that we do not set the P{H,V}SYNC bits unless the
-mode requires it.
 
-Signed-off-by: John Keeping <john@metanate.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Den 19.09.2016 18:51, skrev Eric Anholt:
+> Noralf Tr?nnes <noralf@tronnes.org> writes:
+>
+>> Writing messages larger than the FIFO size results in a hang, rendering
+>> the machine unusable. This is because the RXD status flag is set on the
+>> first interrupt which results in bcm2835_drain_rxfifo() stealing bytes
+>> from the buffer. The controller continues to trigger interrupts waiting
+>> for the missing bytes, but bcm2835_fill_txfifo() has none to give.
+>> In this situation wait_for_completion_timeout() apparently is unable to
+>> stop the madness.
+>>
+>> The BCM2835 ARM Peripherals datasheet has this to say about the flags:
+>>    TXD: is set when the FIFO has space for at least one byte of data.
+>>    RXD: is set when the FIFO contains at least one byte of data.
+>>    TXW: is set during a write transfer and the FIFO is less than full.
+>>    RXR: is set during a read transfer and the FIFO is or more full.
+>>
+>> Implementing the logic from the downstream i2c-bcm2708 driver solved
+>> the hang problem.
+>>
+>> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
+> Patches 1, 3 are:
+>
+> Reviewed-by: Eric Anholt <eric@anholt.net>
+>
+> For patch 2 I followed some of it, but couldn't quite say it's a review.
+> I trust your testing, and that the path has had a lot more testing in
+> the downstream tree, so it's:
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index d486049f9722..7c4ce1b2e694 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1030,8 +1030,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 	}
- 
- 	pin_pol = 0x8;
--	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
--	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
-+	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PHSYNC) ? 1 : 0;
-+	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PVSYNC) ? (1 << 1) : 0;
- 	VOP_CTRL_SET(vop, pin_pol, pin_pol);
- 
- 	switch (s->output_type) {
--- 
-2.10.0.278.g4f427b1.dirty
+I don't know how much testing downstream really has had since this feature
+is disabled by default. So there is a possibility that this can break some
+devices (while at the same time enable others).
+I wondered about adding a module parameter so it could be disabled at
+runtime, but decided to see what the review would be first.
+It is of course possible to add a this module parameter later should it
+turn out to break some device.
+
+Noralf.
+
+> Acked-by: Eric Anholt <eric@anholt.net>
+>
+> Thanks!
