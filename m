@@ -1,59 +1,77 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 19 Sep 2016 18:41:29 +0100
-Subject: [RFC] Arm64 boot fail with numa enable in BIOS
-In-Reply-To: <20160919140709.GA17464@leverpostej>
-References: <7618d76d-bfa8-d8aa-59aa-06f9d90c1a98@huawei.com>
- <20160919140709.GA17464@leverpostej>
-Message-ID: <57E02349.10703@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 19 Sep 2016 19:48:44 +0200
+Subject: [PATCH] arm: dts: fix rk3066a based boards vdd_log voltage
+ initialization
+In-Reply-To: <CAD=FV=Ufmvg1P8suOPQ53kpOD1pei4N2dOpKUCxZk001XKj_OA@mail.gmail.com>
+References: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
+ <1474274696-28090-1-git-send-email-andy.yan@rock-chips.com>
+ <CAD=FV=VawAOWBF_PoXqSj3oiVgfF8SnCBp56p8F==XsaVLmMcg@mail.gmail.com>
+ <2318029.f7g774Bk76@phil>
+ <CAD=FV=UOXcUZyXRj++GkKksyFedGt59vQz8958nhhF9UM7rOuw@mail.gmail.com>
+ <20160919191327.741a2b89@bbrezillon>
+ <CAD=FV=Ufmvg1P8suOPQ53kpOD1pei4N2dOpKUCxZk001XKj_OA@mail.gmail.com>
+Message-ID: <20160919194844.0db7b307@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/16 15:07, Mark Rutland wrote:
-> On Mon, Sep 19, 2016 at 09:05:26PM +0800, Yisheng Xie wrote:
->> For the crash log, it seems caused by error number of cpumask.
->> Any ideas about it?
+On Mon, 19 Sep 2016 10:22:43 -0700
+Doug Anderson <dianders@chromium.org> wrote:
 
-> Much earlier in your log, there was a (non-fatal) warning, as below. Do
-> you see this without NUMA/SRAT enabled in your FW?
+> Hi,
+> 
+> On Mon, Sep 19, 2016 at 10:13 AM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+> > Correct me if I'm wrong, but the main problem here is that, when we try
+> > to detect the initial regulator state, we ran into a "missing entry in
+> > the duty-cycle <-> voltage table" error, which then triggers an -EINVAL
+> > error preventing the PWM regulator probe to succeed.
+> >
+> > Of course, adding an entry for the 0% dutycle case would solve the
+> > issue, but I wonder if we should not allow "unknown value" at probe
+> > time, and let the regulator user set the voltage output when it claims
+> > it.
+> >
+> > Another option would be to fake a valid value in this case (choose the
+> > closest entry in the voltage table?).  
+> 
+> If the goal is to avoid glitching the voltage at bootup, then the
+> above doesn't really solve it.
+> 
+> For instance, you could have:
+> 
+> 0% - 1.5V
+> 100% - 0.8V
+> When configured as input: 1.1V
+> Max useful value: 1.2V
+> 
+> So if firmware doesn't touch the PWM regulator then that means you're
+> booting up at 1.1V.
 
->> [    0.297337] Detected PIPT I-cache on CPU1
->> [    0.297347] GICv3: CPU1: found redistributor 10001 region 1:0x000000004d140000
->> [    0.297356] CPU1: Booted secondary processor [410fd082]
->> [    0.297375] ------------[ cut here ]------------
->> [    0.320390] WARNING: CPU: 1 PID: 0 at ./include/linux/cpumask.h:121 gic_raise_softirq+0x128/0x17c
->> [    0.329356] Modules linked in:
->> [    0.332434] 
->> [    0.333932] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc4-00163-g803ea3a #21
->> [    0.341581] Hardware name: Hisilicon Hi1616 Evaluation Board (DT)
->> [    0.347735] task: ffff8013e9dd0000 task.stack: ffff8013e9dcc000
->> [    0.353714] PC is at gic_raise_softirq+0x128/0x17c
->> [    0.358550] LR is at gic_raise_softirq+0xa0/0x17c
+Oh! I really didn't consider this case when developing the solution. I
+was assuming that the firmware/bootloader would configure the PWM
+correctly and leave it activating when booting the kernel.
 
-I've seen this first trace when built with DEBUG_PER_CPU_MAPS. My version of
-this trace[0] was just noise due to gic_compute_target_list() and
-gic_raise_softirq() sharing an iterator.
+> 
+> If you read out the PWM itself, it will claim that it's running at 0%.
+> While that's true, that doesn't mean that the voltage on the system is
+> actually 1.5V because at boot the system had configured the pinmux as
+> GPIO input.  ...so it's actually 1.1V because the PWM isn't actually
+> controlling the pins.
 
-This patch silenced it for me:
-https://lkml.org/lkml/2016/9/19/623
+The PWM chip has always claimed the pins and muxed them to the PWM IP.
+So, this means it's broken from the beginning, and my patch is only
+uncovering the problem (unless the pins stay configured as input until
+the PWM is enabled, which I'm not sure is the case).
 
-Yours may be a different problem with the same symptom.
+> 
+> So if you want to avoid glitching the line then you want to make sure
+> that you properly init to 1.1V, _not_ to 1.5V.
+> 
+> In the case above, it's possible that 1.5V isn't really so great for
+> the hardware lifespan because 1.2V is the maximum useful value.  You
+> could argue that the hardware is badly designed in this case, but I
+> have certainly seen boards designed where the maximum achievable value
+> is higher than the maximum "safe" value.
 
-
-Thanks,
-
-James
-
-
-[0] gicv3 trace when built with DEBUG_PER_CPU_MAPS
-[    3.077738] GICv3: CPU1: found redistributor 1 region 0:0x000000002f120000
-[    3.077943] CPU1: Booted secondary processor [410fd0f0]
-[    3.078542] ------------[ cut here ]------------
-[    3.078746] WARNING: CPU: 1 PID: 0 at ../include/linux/cpumask.h:121
-gic_raise_softirq+0x12c/0x170
-[    3.078812] Modules linked in:
-[    3.078869]
-[    3.078930] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc5+ #5188
-[    3.078994] Hardware name: Foundation-v8A (DT)
-[    3.079059] task: ffff80087a1a0080 task.stack: ffff80087a19c000
-[    3.079145] PC is at gic_raise_softirq+0x12c/0x170
-[    3.079226] LR is at gic_raise_softirq+0xa4/0x170
+> 
+> -Doug
