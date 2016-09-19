@@ -1,42 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Sep 2016 09:44:45 +0200
-Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <1474259324.15220.5.camel@buserror.net>
-References: <1473469413-11019-1-git-send-email-oss@buserror.net>
- <20160912123027.GA13741@leverpostej> <1474259324.15220.5.camel@buserror.net>
-Message-ID: <2134283.D1RaSsN7zL@wuerfel>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 19 Sep 2016 15:46:37 +0800
+Subject: [PATCH v6 0/8] power: add power sequence library
+In-Reply-To: <ecbc3c0d-4ce7-758d-7f7d-4b3f3003c1ac@linaro.org>
+References: <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
+ <20160824085335.GB27233@shlinux2>
+ <20160829111045.GB3736@b29397-desktop>
+ <3a45793f-18d9-0688-d2ab-ef79432c473c@linaro.org>
+ <20160831095220.GA11938@b29397-desktop>
+ <fd94340b-1c1d-2307-7e57-5b05f1655d2c@linaro.org>
+ <20160902011046.GB11262@shlinux2>
+ <eb032ff2-dac4-5efe-dda0-96404f290aa8@linaro.org>
+ <CAPDyKFp0w0mBGNgu6uk7UevUka_ha6MvaVyOzXjCg3S8kdF7tg@mail.gmail.com>
+ <ecbc3c0d-4ce7-758d-7f7d-4b3f3003c1ac@linaro.org>
+Message-ID: <20160919074637.GA10289@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, September 18, 2016 11:28:44 PM CEST Scott Wood wrote:
-> On Mon, 2016-09-12 at 13:30 +0100, Mark Rutland wrote:
-> > On Mon, Sep 12, 2016 at 12:44:07PM +0100, Will Deacon wrote:
-> > > 
-> > > On Mon, Sep 12, 2016 at 12:36:15PM +0100, Mark Rutland wrote:
-> > > > 
-> > > > The changes in arm64's <asm/arch_timer.h> are going to conflict with
-> > > > some cleanup [1,2] that just landed in the arm64 for-next/core branch.
-> > > > 
-> > > > Could you please rebase atop of that?
-> > > Well, we should figure out what tree this is going through first. There
-> > > are a mixture of arm, arm64, driver and dts changes here and not all
-> > > of it is carrying the appropriate acks for me to queue it.
-> > Given that mix, I had assumed that this would all go through the arm64
-> > tree -- I see that Rob has already acked the binding, and I'm happy to
-> > give my ack for the driver once that's in shape.
-> > 
-> > The dts change could go through arm-soc in parallel, I guess. It doesn't
-> > look like arm-soc have been Cc'd for that, though.
+On Mon, Sep 19, 2016 at 01:09:10PM +0530, Vaibhav Hiremath wrote:
 > 
-> The arm-soc section of MAINTAINERS says to e-mail linux-arm-kernel, which I
-> did.  There doesn't appear to be a separate arm-soc mailing list, nor is there
-> a request to CC Olof/Arnd.  I did CC Shawn Guo who has been handling the
-> device tree patches for these chips.
+> 
+> On Friday 09 September 2016 02:17 PM, Ulf Hansson wrote:
+> >[...]
+> >
+> >>>>>We had an agreement that keep mmc's pwrseq framework unchanging.
+> >>>>>Unless Ulf and rob both agree to change.
+> >>>>Why 2 separate approach for same problem ?
+> >>>>And I see this as possible duplication of code/functionality :)
+> >>>How the new kernel compatibles old dts? If we do not need to
+> >>>consider this problem, the mmc can try to use power sequence library
+> >>>too in future.
+> >>
+> >>I think we should attempt to get both MMC and USB power seq
+> >>come on one agreement, so that it can be reused.
+> >That would be nice. Although, to do that you would have to allow some
+> >DT bindings to be deprecated in the new generic power seq bindings, as
+> >otherwise you would break existing DTBs.
+> >
+> >I guess that is what Rob was objecting to!?
+> 
+> yeah, thats right.
+> 
+> So lets adopt similar implementation for USB as well instead of
+> library, but keeping MMC untouched as of now.
+> 
+> What I am trying to propose here is,
+> 
+> Lets have power-sequence framework (similar to V1 of this series),
+> with,
+> 
+> pwrseq: Core framework for power sequence.
+> pwrseq_generic/simple: for all generic control, like reset and clock
+> pwrseq_emmc: probably duplication of existing code - the idea
+>                           here is, all future code should be using this new
+>                           binding, so that we can deprecate the
+> drivers/mmc/core/pwrseq
+> pwrseq_arche: The usecase which I am dealing with today, which is more
+>                          complex in nature.
+> 
+> Then the respective drivers can add their drivers (if needed) based on
+> complexity.
+> 
+> comments ??
 
-That is the right way to do it. If the DT change is a bugfix that should
-get merged along with the rest, Shawn can also provide an Ack to have it
-merged through the arm64 tree, ideally warning us if there might be any
-conflicts with stuff that gets sent for arm-soc.
+The key point here is DT maintainer (Rob) doesn't agree with adding new node
+for power sequence at dts.
 
-	Arnd
+-- 
+
+Best Regards,
+Peter Chen
