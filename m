@@ -1,33 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 19 Sep 2016 10:19:20 +0200
-Subject: [PATCH RFC 6/8] ARM: dts: r8a7743: add SYS-DMAC support
-In-Reply-To: <1815255.1arMxK7TDL@wasted.cogentembedded.com>
-References: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
- <1815255.1arMxK7TDL@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdXz5K66AU7d-+NsPrAyc8V53mDxzggiUk-TrFRAwBFXOg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 19 Sep 2016 10:22:10 +0200
+Subject: [PATCH] pinctrl: nomadik: don't default-flag IRQs as falling
+Message-ID: <1474273330-15789-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 3:36 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> --- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7743.dtsi
-> @@ -90,6 +90,70 @@
->                         #power-domain-cells = <1>;
->                 };
->
-> +               dmac0: dma-controller at e6700000 {
-> +                       compatible = "renesas,dmac-r8a7743",
+There is no point in adding any default trigger for these
+GPIO interrupts: the device tree should contain all trigger
+information and the platforms using the driver boots
+exclusively from device tree.
 
-To be documented.
+Also the boot log is nagging me to fix this:
 
-Gr{oetje,eeting}s,
+[    0.771057] ------------[ cut here ]------------
+[    0.775695] WARNING: CPU: 0 PID: 1 at
+   ../drivers/gpio/gpiolib.c:1622 _gpiochip_irqchip_add+0x138/0x160
+[    0.785034] /soc/gpio at 8012e000: Ignoring 2 default trigger
+(...)
+[    0.942962] gpio 8012e000.gpio: at address e08f8000
+(etc ad nauseam)
 
-                        Geert
+Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+index 205fb399268a..d318ca055489 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+@@ -1177,7 +1177,7 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 				   irqchip,
+ 				   0,
+ 				   handle_edge_irq,
+-				   IRQ_TYPE_EDGE_FALLING);
++				   IRQ_TYPE_NONE);
+ 	if (ret) {
+ 		dev_err(&dev->dev, "could not add irqchip\n");
+ 		gpiochip_remove(&nmk_chip->chip);
+-- 
+2.7.4
