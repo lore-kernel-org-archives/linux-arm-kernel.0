@@ -1,49 +1,125 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 19 Sep 2016 15:17:43 +0200
-Subject: [PATCH v2 0/3] Armada 7k/8k CP110 system controller fixes
-In-Reply-To: <1473183117-11889-1-git-send-email-mw@semihalf.com>
-References: <1473183117-11889-1-git-send-email-mw@semihalf.com>
-Message-ID: <CAPv3WKdoas6nJngFh2bLU0wvz2OZMga6G40UMPkfz9aunRawVw@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 19 Sep 2016 14:31:50 +0100
+Subject: [PATCH] arm64: Add BCM2835 (Raspberry Pi 3) support to the defconfig
+Message-ID: <20160919133150.9371-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Most of the drivers are included as modules, except for serial (needed
+for early console), WDT (required for reboot), and the dependency
+chain of RASPBERRYPI_POWER (which is currently not buildable as a
+module, but should be changed).
 
-Did you have any chance to take a look at v2? Do you have any remarks?
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ arch/arm64/configs/defconfig | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Best regards.
-Marcin
-
-2016-09-06 19:31 GMT+02:00 Marcin Wojtas <mw@semihalf.com>:
-> Hi,
->
-> Here is the second version of the patchset adding fixes to CP110
-> system controller clock driver. As requested during review,
-> an additional patch is submitted, which covers migration of the
-> driver to clk_hw registration and API.
->
-> Any feedback would be very welcome.
->
-> Best regards,
-> Marcin
->
-> Changelog:
-> v1 -> v2
-> * replace setting CLK_IS_BASIC flag with clearing init structure fields
->   with memset
-> * minor improvements of allocation and error checking
-> * add migration to clk_hw
->
-> Marcin Wojtas (3):
->   clk: mvebu: fix setting unwanted flags in CP110 gate clock
->   clk: mvebu: dynamically allocate resources in Armada CP110 system
->     controller
->   clk: mvebu: migrate CP110 system controller to clk_hw API and
->     registration
->
->  drivers/clk/mvebu/cp110-system-controller.c | 155 +++++++++++++++-------------
->  1 file changed, 81 insertions(+), 74 deletions(-)
->
-> --
-> 1.8.3.1
->
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index fb8d84516e92..9748c4735a60 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -34,6 +34,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_ALPINE=y
++CONFIG_ARCH_BCM2835=y
+ CONFIG_ARCH_BCM_IPROC=y
+ CONFIG_ARCH_BERLIN=y
+ CONFIG_ARCH_EXYNOS=y
+@@ -193,6 +194,7 @@ CONFIG_USB_NET_SMSC75XX=m
+ CONFIG_USB_NET_SMSC95XX=m
+ CONFIG_USB_NET_PLUSB=m
+ CONFIG_USB_NET_MCS7830=m
++CONFIG_BRCMFMAC=m
+ CONFIG_WL18XX=m
+ CONFIG_WLCORE_SDIO=m
+ CONFIG_INPUT_EVDEV=y
+@@ -205,6 +207,9 @@ CONFIG_SERIO_AMBAKMI=y
+ CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_SHARE_IRQ=y
++CONFIG_SERIAL_8250_BCM2835AUX=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_8250_MT6577=y
+ CONFIG_SERIAL_8250_UNIPHIER=y
+@@ -228,6 +233,7 @@ CONFIG_VIRTIO_CONSOLE=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PCA954x=y
++CONFIG_I2C_BCM2835=m
+ CONFIG_I2C_DESIGNWARE_PLATFORM=y
+ CONFIG_I2C_IMX=y
+ CONFIG_I2C_MESON=y
+@@ -238,6 +244,8 @@ CONFIG_I2C_UNIPHIER_F=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_I2C_CROS_EC_TUNNEL=y
+ CONFIG_SPI=y
++CONFIG_SPI_BCM2835=m
++CONFIG_SPI_BCM2835AUX=m
+ CONFIG_SPI_MESON_SPIFC=m
+ CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+@@ -272,6 +280,7 @@ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_EXYNOS_THERMAL=y
+ CONFIG_WATCHDOG=y
++CONFIG_BCM2835_WDT=y
+ CONFIG_RENESAS_WDT=y
+ CONFIG_S3C2410_WATCHDOG=y
+ CONFIG_MESON_GXBB_WATCHDOG=m
+@@ -294,6 +303,7 @@ CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_DRM=m
+ CONFIG_DRM_NOUVEAU=m
+ CONFIG_DRM_TEGRA=m
++CONFIG_DRM_VC4=m
+ CONFIG_DRM_PANEL_SIMPLE=m
+ CONFIG_DRM_I2C_ADV7511=m
+ CONFIG_DRM_HISI_KIRIN=m
+@@ -308,6 +318,7 @@ CONFIG_LOGO=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
++CONFIG_SND_BCM2835_SOC_I2S=m
+ CONFIG_SND_SOC_RCAR=y
+ CONFIG_SND_SOC_SAMSUNG=y
+ CONFIG_SND_SOC_AK4613=y
+@@ -372,6 +383,7 @@ CONFIG_RTC_DRV_XGENE=y
+ CONFIG_RTC_DRV_S3C=y
+ CONFIG_DMADEVICES=y
+ CONFIG_PL330_DMA=y
++CONFIG_DMA_BCM2835=m
+ CONFIG_TEGRA20_APB_DMA=y
+ CONFIG_QCOM_BAM_DMA=y
+ CONFIG_QCOM_HIDMA_MGMT=y
+@@ -394,8 +406,10 @@ CONFIG_MSM_MMCC_8996=y
+ CONFIG_HWSPINLOCK_QCOM=y
+ CONFIG_MAILBOX=y
+ CONFIG_ARM_MHU=y
++CONFIG_BCM2835_MBOX=y
+ CONFIG_HI6220_MBOX=y
+ CONFIG_ARM_SMMU=y
++CONFIG_RASPBERRYPI_POWER=y
+ CONFIG_QCOM_SMEM=y
+ CONFIG_QCOM_SMD=y
+ CONFIG_QCOM_SMD_RPM=y
+@@ -403,6 +417,7 @@ CONFIG_ARCH_TEGRA_132_SOC=y
+ CONFIG_ARCH_TEGRA_210_SOC=y
+ CONFIG_EXTCON_USB_GPIO=y
+ CONFIG_PWM=y
++CONFIG_PWM_BCM2835=m
+ CONFIG_PWM_TEGRA=m
+ CONFIG_COMMON_RESET_HI6220=y
+ CONFIG_PHY_RCAR_GEN3_USB2=y
+@@ -414,6 +429,7 @@ CONFIG_ACPI=y
+ CONFIG_IIO=y
+ CONFIG_EXYNOS_ADC=y
+ CONFIG_PWM_SAMSUNG=y
++CONFIG_RASPBERRYPI_FIRMWARE=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT4_FS_POSIX_ACL=y
+-- 
+2.9.3
