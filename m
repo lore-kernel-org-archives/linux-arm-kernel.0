@@ -1,61 +1,95 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 19 Sep 2016 11:07:11 +0200
-Subject: [PATCH 2/2] clk: imx6: initialize GPU clocks
-In-Reply-To: <20160918001723.GC15478@tiger>
-References: <1474017371-28966-1-git-send-email-l.stach@pengutronix.de>
- <1474017371-28966-2-git-send-email-l.stach@pengutronix.de>
- <20160918001723.GC15478@tiger>
-Message-ID: <1474276031.31321.0.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 19 Sep 2016 10:11:55 +0100
+Subject: [PATCH] mtd: s3c2410: add device tree support
+In-Reply-To: <1474125760-28168-1-git-send-email-sergio.prado@e-labworks.com>
+References: <1474125760-28168-1-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <20160919091155.GB11118@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, den 18.09.2016, 08:17 +0800 schrieb Shawn Guo:
-> On Fri, Sep 16, 2016 at 11:16:11AM +0200, Lucas Stach wrote:
-> > Initialize the GPU clock muxes to sane inputs. Until now they have
-> > not been changed from their default values, which means that both
-> > GPU3D shader and GPU2D core were fed by clock inputs whose rates
-> > exceed the maximium allowed frequency of the cores by as much as
-> > 200MHz.
-> > 
-> > This fixes a severe GPU stability issue on i.MX6DL.
-> > 
-> > Cc: stable at vger.kernel.org
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > ---
-> >  drivers/clk/imx/clk-imx6q.c | 18 ++++++++++++++++++
-> >  1 file changed, 18 insertions(+)
-> > 
-> > diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-> > index 64c243173395..751c3e7d5843 100644
-> > --- a/drivers/clk/imx/clk-imx6q.c
-> > +++ b/drivers/clk/imx/clk-imx6q.c
-> > @@ -633,6 +633,24 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
-> >  	if (IS_ENABLED(CONFIG_PCI_IMX6))
-> >  		clk_set_parent(clk[IMX6QDL_CLK_LVDS1_SEL], clk[IMX6QDL_CLK_SATA_REF_100M]);
-> >  
-> > +	/*
-> > +	 * Initialize the GPU clock muxes, so that the maximum specified clock
-> > +	 * rates for the respective SoC are not exceeded.
-> > +	 */
-> > +	if (clk_on_imx6dl()) {
-> > +		clk_set_parent(clk[IMX6QDL_CLK_GPU3D_CORE_SEL],
-> > +		               clk[IMX6QDL_CLK_PLL2_PFD1_594M]);
-> > +		clk_set_parent(clk[IMX6QDL_CLK_GPU2D_CORE_SEL],
-> > +		               clk[IMX6QDL_CLK_PLL2_PFD1_594M]);
-> > +	} else if (clk_on_imx6q()) {
-> > +		clk_set_parent(clk[IMX6QDL_CLK_GPU3D_CORE_SEL],
-> > +		               clk[IMX6QDL_CLK_MMDC_CH0_AXI]);
-> > +		clk_set_parent(clk[IMX6QDL_CLK_GPU3D_SHADER_SEL],
-> > +		               clk[IMX6QDL_CLK_PLL2_PFD1_594M]);
-> > +		clk_set_parent(clk[IMX6QDL_CLK_GPU2D_CORE_SEL],
-> > +		               clk[IMX6QDL_CLK_PLL3_USB_OTG]);
-> > +	}
-> > +
+On Sat, Sep 17, 2016 at 12:22:40PM -0300, Sergio Prado wrote:
+> Tested on FriendlyARM Mini2440
 > 
-> Can we handle these with assigned-clock-parents from device tree?
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  .../devicetree/bindings/mtd/samsung-s3c2410.txt    |  70 +++++++++++
+>  drivers/mtd/nand/s3c2410.c                         | 129 ++++++++++++++++++++-
+>  include/linux/platform_data/mtd-nand-s3c2410.h     |   1 +
+>  3 files changed, 195 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
 > 
-No, we want to get rid of the GPU overclocking even with old DTs. DT
-stability rules and all that...
+> diff --git a/Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt b/Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
+> new file mode 100644
+> index 000000000000..1c39f6cf483b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
+> @@ -0,0 +1,70 @@
+> +* Samsung S3C2410 and compatible NAND flash controller
+> +
+> +Required properties:
+> +- compatible : The possible values are:
+> +	"samsung,s3c2410-nand"
+> +	"samsung,s3c2412-nand"
+> +	"samsung,s3c2440-nand"
+> +	"samsung,s3c6400-nand"
+> +- reg : register's location and length.
+> +- #address-cells, #size-cells : see nand.txt
+> +- clocks : phandle to the nand controller clock
+> +- clock-names : must contain "nand"
 
-Regards,
-Lucas
+Is there only one clock feeding into the NAND block? Is it actually
+called "nand", or does the datasheet not give the input a nme?
+
+> +
+> +Optional properties:
+> +- samsung,tacls : time for active CLE/ALE to nWE/nOE
+> +- samsung,twrph0 : active time for nWE/nOE
+> +- samsung,twrph1 : time for release CLE/ALE from nWE/nOE inactive
+
+If these are necessary, what units are these in?
+
+> +- samsung,ignore_unset_ecc : boolean to ignore error when we have
+> +                             0xff,0xff,0xff read ECC, on the
+> +                             assumption that it is an un-eccd page
+
+s/_/-/ in property names, please.
+
+That said, this name reads like policy rather than a HW description.
+Why/when is this necessary to set?
+
+[...]
+
+> +	of_property_read_u32(np, "samsung,tacls",  &pdata->tacls);
+> +	of_property_read_u32(np, "samsung,twrph0", &pdata->twrph0);
+> +	of_property_read_u32(np, "samsung,twrph1", &pdata->twrph1);
+
+Are all values in the range [0, 0xffffffff] valid for these? If not, it
+would be a good idea to sanity-check the values.
+
+> +	if (of_get_property(np, "samsung,ignore_unset_ecc", NULL))
+> +		pdata->ignore_unset_ecc = 1;
+
+Use of_property_read_bool();
+
+[...]
+
+> +	for_each_available_child_of_node(np, child) {
+> +
+> +		sets->name = (char *)child->name;
+> +		sets->of_node = child;
+
+Strictly speaking, you should increment the child node refcount here, as
+you maintain a reference to it and its name field.
+
+> +		sets->nr_chips = 1;
+> +
+> +		if (!of_property_match_string(child, "nand-ecc-mode", "none"))
+> +			sets->disable_ecc = 1;
+> +
+> +		if (of_get_property(child, "nand-on-flash-bbt", NULL))
+> +			sets->flash_bbt = 1;
+
+Use of_property_read_bool().
+
+Thanks,
+Mark.
