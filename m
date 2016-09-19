@@ -1,51 +1,35 @@
-From: hs.liao@mediatek.com (Horng-Shyang Liao)
-Date: Mon, 19 Sep 2016 14:43:59 +0800
-Subject: [PATCH v14 0/4] Mediatek MT8173 CMDQ support
-In-Reply-To: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
-References: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
-Message-ID: <1474267439.23652.2.camel@mtksdaap41>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Mon, 19 Sep 2016 09:19:45 +0200
+Subject: [PATCH 07/19] ahci: st: Remove STiH416 dt example
+In-Reply-To: <20160916155449.GB26371@htj.duckdns.org>
+References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
+ <1473859677-9231-8-git-send-email-peter.griffin@linaro.org>
+ <20160916155449.GB26371@htj.duckdns.org>
+Message-ID: <2d5feb77-49ed-1a2c-5195-82d4a1db38a8@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-09-05 at 09:44 +0800, HS Liao wrote:
-> Hi,
-> 
-> This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
-> to help write registers with critical time limitation, such as
-> updating display configuration during the vblank. It controls Global
-> Command Engine (GCE) hardware to achieve this requirement.
-> 
-> These patches have a build dependency on top of v4.8-rc1.
-> 
-> Changes since v13:
->  - move to mailbox folder
->  - simplify cmdq_thread_is_in_wfe
-> 
-> Best regards,
-> HS Liao
-> 
-> HS Liao (4):
->   dt-bindings: soc: Add documentation for the MediaTek GCE unit
->   CMDQ: Mediatek CMDQ driver
->   arm64: dts: mt8173: Add GCE node
->   CMDQ: save more energy in idle
-> 
->  .../devicetree/bindings/mailbox/mtk-gce.txt        |  43 +
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
->  drivers/mailbox/Kconfig                            |  10 +
->  drivers/mailbox/Makefile                           |   2 +
->  drivers/mailbox/mtk-cmdq.c                         | 965 +++++++++++++++++++++
->  include/linux/mailbox/mtk-cmdq.h                   | 180 ++++
->  6 files changed, 1210 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
->  create mode 100644 drivers/mailbox/mtk-cmdq.c
->  create mode 100644 include/linux/mailbox/mtk-cmdq.h
-> 
 
-Hi Jassi,
 
-Sorry to disturb you.
-Do you have any further comment on CMDQ v14?
+On 09/16/2016 05:54 PM, Tejun Heo wrote:
+> On Wed, Sep 14, 2016 at 02:27:45PM +0100, Peter Griffin wrote:
+>> This platform is being removed from the kernel so remove
+>> the dt example.
+>>
+>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+>> Cc: <tj@kernel.org>
+>> Cc: <robh+dt@kernel.org>
+>> Cc: <linux-ide@vger.kernel.org>
+> 
+> This is gonna go through dt tree, right?  If it should go through
+> libata, please let me know.
 
-Thanks.
-HS
+Hi Tejun
+
+I will take care of this patch and include it in the next STi DT pull request.
+
+Thanks
+
+> 
+> Thanks.
+> 
