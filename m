@@ -1,98 +1,68 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 19 Sep 2016 11:44:38 +0200
-Subject: [PATCH] arm: dts: fix rk3066a based boards vdd_log voltage
- initialization
-In-Reply-To: <66bc44e2-2549-c6d1-150c-5ddadf538f06@rock-chips.com>
-References: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
- <1474274696-28090-1-git-send-email-andy.yan@rock-chips.com>
- <20160919112522.5567b882@bbrezillon>
- <66bc44e2-2549-c6d1-150c-5ddadf538f06@rock-chips.com>
-Message-ID: <20160919114438.0f702782@bbrezillon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 19 Sep 2016 17:49:29 +0800
+Subject: [RFC PATCH v2 11/11] irqchip: mbigen: promote mbigen init
+In-Reply-To: <57DABD2F.1030606@arm.com>
+References: <1473862879-7769-1-git-send-email-guohanjun@huawei.com>
+ <1473862879-7769-12-git-send-email-guohanjun@huawei.com>
+ <57DABD2F.1030606@arm.com>
+Message-ID: <3f9b5a3e-13f4-75a4-15bc-f55e26740205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Sep 2016 17:38:10 +0800
-Andy Yan <andy.yan@rock-chips.com> wrote:
+On 2016/9/15 23:24, Marc Zyngier wrote:
+> On 14/09/16 15:21, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> mbigen is an irqchip and it needs to be probed before
+>> devices, same logic is used for SMMU and etc., let's
+>> use arch_initcall instead of platform init for mbigen.
+>>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Ma Jun <majun258@huawei.com>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  drivers/irqchip/irq-mbigen.c | 6 +++++-
+>>  1 file changed, 5 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+>> index ca6add1..3a33de6 100644
+>> --- a/drivers/irqchip/irq-mbigen.c
+>> +++ b/drivers/irqchip/irq-mbigen.c
+>> @@ -374,7 +374,11 @@ static struct platform_driver mbigen_platform_driver = {
+>>  	.probe			= mbigen_device_probe,
+>>  };
+>>
+>> -module_platform_driver(mbigen_platform_driver);
+>> +static __init int mbigen_init(void)
+>> +{
+>> +	return platform_driver_register(&mbigen_platform_driver);
+>> +}
+>> +arch_initcall(mbigen_init);
+>>
+>>  MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
+>>  MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
+>>
+>
+> I've already NACKed such a patch in the past, and I will carry on
+> NACKing it until all the other avenues (like properly tracking device
+> dependencies) have been explored and have been proven not to be fit for
+> purpose.
 
-> On 2016?09?19? 17:25, Boris Brezillon wrote:
-> > On Mon, 19 Sep 2016 16:44:56 +0800
-> > Andy Yan <andy.yan@rock-chips.com> wrote:
-> >  
-> >> The current rk3066a based boards(Rayeager, Bqcurie2, Marsboard) use
-> >> pwm modulate vdd_logic voltage, but the pwm is default disabled and
-> >> the pwm pin acts as a gpio before pwm regulator probed, so the pwm
-> >> regulator driver will get a zero dutycycle at probe time, so change
-> >> the initial dutycycle to zero to match pwm_regulator_init_state check.
-> >>
-> >> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> >>
-> >> ---
-> >>
-> >>   arch/arm/boot/dts/rk3066a-bqcurie2.dts  | 2 +-
-> >>   arch/arm/boot/dts/rk3066a-marsboard.dts | 2 +-
-> >>   arch/arm/boot/dts/rk3066a-rayeager.dts  | 2 +-
-> >>   3 files changed, 3 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-> >> index bc674ee..618450d 100644
-> >> --- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-> >> +++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
-> >> @@ -61,7 +61,7 @@
-> >>   		regulator-min-microvolt = <1200000>;
-> >>   		regulator-max-microvolt = <1200000>;
-> >>   		regulator-always-on;
-> >> -		voltage-table = <1000000 100>,
-> >> +		voltage-table = <1000000 0>,
-> >>   				<1200000 42>;  
-> > So, it seems you are reversing the PWM polarity here. Are you sure you
-> > shouldn't change the 2nd entry of this table (<1200000 58>)?  
-> 
-> 
->      no, 42% duty cycle give a stable 1.2v vdd_logic voltage on my 
-> board. As i explained in the commit, the pwm was default at a disabled 
-> state before regulator_register success at pwm_regulator probe, so 
-> pwm_regulator_init_state  function will get  a zero dutycycle from 
-> pwm_get_relative_dutycycle. I have to change the dutycycle of  fist 
-> table to zero to match the following check, other wise the function will 
-> return defualt value(-EINVAL), then the pwm regulator register failed.
+I'd happy to work on this to make progress.
 
-Is 0% duty really producing a 1V output, or are you just changing it to
-make it work?
+>
+> Rafael had proposed something around this subject last year, and I've
 
-BTW, I'm not sure we should fail when the current PWM state does not
-match one of the value in the voltage-table.
+Sorry, obviously I missed something, could you give me the link about
+Rafael's patches? I will pull back and test it on our hardware.
 
-> >  
-> >>   		status = "okay";
-> >>   	};
-> >> diff --git a/arch/arm/boot/dts/rk3066a-marsboard.dts b/arch/arm/boot/dts/rk3066a-marsboard.dts
-> >> index a2b763e..ddc680b 100644
-> >> --- a/arch/arm/boot/dts/rk3066a-marsboard.dts
-> >> +++ b/arch/arm/boot/dts/rk3066a-marsboard.dts
-> >> @@ -59,7 +59,7 @@
-> >>   		regulator-min-microvolt = <1200000>;
-> >>   		regulator-max-microvolt = <1200000>;
-> >>   		regulator-always-on;
-> >> -		voltage-table = <1000000 100>,
-> >> +		voltage-table = <1000000 0>,
-> >>   				<1200000 42>;
-> >>   		status = "okay";
-> >>   	};
-> >> diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts b/arch/arm/boot/dts/rk3066a-rayeager.dts
-> >> index 2536b3a..30aee99 100644
-> >> --- a/arch/arm/boot/dts/rk3066a-rayeager.dts
-> >> +++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
-> >> @@ -84,7 +84,7 @@
-> >>   		regulator-min-microvolt = <1200000>;
-> >>   		regulator-max-microvolt = <1200000>;
-> >>   		regulator-always-on;
-> >> -		voltage-table = <1000000 100>,
-> >> +		voltage-table = <1000000 0>,
-> >>   				<1200000 42>;
-> >>   		status = "okay";
-> >>   	};  
-> >
-> >
-> >  
-> 
-> 
+> been repeatedly advising you to work with him and others to make it
+> happen. You can choose to ignore this advise, but that doesn't make this
+> patch an acceptable approach.
+
+OK, I will drop this patch in next version, and work on the generic
+solution instead.
+
+Thanks
+Hanjun
