@@ -1,54 +1,30 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Mon, 19 Sep 2016 10:41:53 +0530
-Subject: [PATCH v2 3/3] ARM: dts: imx6qdl-apalis: Use enable-gpios property
- for backlight
-In-Reply-To: <2263d508999ada9476268138b2922702eb50131f.1474260360.git.maitysanchayan@gmail.com>
-References: <2263d508999ada9476268138b2922702eb50131f.1474260360.git.maitysanchayan@gmail.com>
-Message-ID: <2206aa18153f33a2b6763e2bc6c87bf83eadb674.1474260360.git.maitysanchayan@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 19 Sep 2016 07:55:30 +0200
+Subject: [PATCH] clk: imx31: fix potential stack corruption on clock
+ initialization
+In-Reply-To: <1474249708-11088-1-git-send-email-vz@mleia.com>
+References: <1474249708-11088-1-git-send-email-vz@mleia.com>
+Message-ID: <20160919055530.qyahv7ep6wbuhsnx@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use enable-gpios property of PWM backlight driver for backlight
-control.
+On Mon, Sep 19, 2016 at 04:48:28AM +0300, Vladimir Zapolskiy wrote:
+> Function mx31_clocks_init() is called during clock intialization on
+> legacy boards with reference clock frequency passed as its input
+> argument, this can be verified by examination of the function
+> declaration found in arch/arm/mach-imx/common.h and actual function
+> users which include that header file.
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
-Changes since v1:
+I don't think this can corrupt the stack. The caller puts a value in r0
+that is unused by mx31_clocks_init. And given that all callers pass
+26000000 there should happen nothing bad apart from a compiler warning.
 
-Fix commit message
+So: the change is fine, IMHO the commit log shouldn't mention stack
+corruption.
 
-v1: https://lkml.org/lkml/2016/9/14/55
----
- arch/arm/boot/dts/imx6qdl-apalis.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Best regards
+Uwe
 
-diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-index 8c67dd8..9100bde 100644
---- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-@@ -49,7 +49,10 @@
- 
- 	backlight: backlight {
- 		compatible = "pwm-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_bl_on>;
- 		pwms = <&pwm4 0 5000000>;
-+		enable-gpios = <&gpio3 13 GPIO_ACTIVE_HIGH>;
- 		status = "disabled";
- 	};
- 
-@@ -614,6 +617,12 @@
- 		>;
- 	};
- 
-+	pinctrl_gpio_bl_on: gpioblon {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_DA13__GPIO3_IO13 0x1b0b0
-+		>;
-+	};
-+
- 	pinctrl_gpio_keys: gpio1io04grp {
- 		fsl,pins = <
- 			/* Power button */
 -- 
-2.9.3
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
