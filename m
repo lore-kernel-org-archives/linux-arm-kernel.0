@@ -1,41 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 19 Sep 2016 08:43:02 +0200
-Subject: [PATCH v4] mtd: nand: automate NAND timings selection
-In-Reply-To: <20160916141918.0353f65f@bbrezillon>
-References: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
- <20160916141918.0353f65f@bbrezillon>
-Message-ID: <20160919064302.72upn6bd5dlyyv2v@pengutronix.de>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Mon, 19 Sep 2016 14:43:59 +0800
+Subject: [PATCH v14 0/4] Mediatek MT8173 CMDQ support
+In-Reply-To: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
+References: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
+Message-ID: <1474267439.23652.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 02:19:18PM +0200, Boris Brezillon wrote:
-> On Thu, 15 Sep 2016 10:32:44 +0200
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On Mon, 2016-09-05 at 09:44 +0800, HS Liao wrote:
+> Hi,
 > 
-> > This series aims at automating the NAND timings selection which is
-> > currently supposed to be done in each NAND controller driver, thus
-> > simplifying drivers implementation.
-> > 
-> > As suggested by Boris this version of the series introduces a nand_reset()
-> > function which replaces the several open coded NAND_CMD_RESET commands
-> > in the code. This makes sure we can apply the timing each time after
-> > after reset.
-> > 
-> > Also I have brought back the conversion patch for teh sunxi driver whic
-> > was part of Boris initial posting. It's untested due to the lack of hardware,
-> > so please test before applying.
+> This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+> to help write registers with critical time limitation, such as
+> updating display configuration during the vblank. It controls Global
+> Command Engine (GCE) hardware to achieve this requirement.
 > 
-> Applied after fixing a few coding style issues (to make checkpatch
-> happy), and exporting the onfi_init_data_interface() function (not sure
-> it's the best solution, but at least, it's consistent with the other
-> functions defined in nand_timings.c).
+> These patches have a build dependency on top of v4.8-rc1.
+> 
+> Changes since v13:
+>  - move to mailbox folder
+>  - simplify cmdq_thread_is_in_wfe
+> 
+> Best regards,
+> HS Liao
+> 
+> HS Liao (4):
+>   dt-bindings: soc: Add documentation for the MediaTek GCE unit
+>   CMDQ: Mediatek CMDQ driver
+>   arm64: dts: mt8173: Add GCE node
+>   CMDQ: save more energy in idle
+> 
+>  .../devicetree/bindings/mailbox/mtk-gce.txt        |  43 +
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
+>  drivers/mailbox/Kconfig                            |  10 +
+>  drivers/mailbox/Makefile                           |   2 +
+>  drivers/mailbox/mtk-cmdq.c                         | 965 +++++++++++++++++++++
+>  include/linux/mailbox/mtk-cmdq.h                   | 180 ++++
+>  6 files changed, 1210 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
+>  create mode 100644 drivers/mailbox/mtk-cmdq.c
+>  create mode 100644 include/linux/mailbox/mtk-cmdq.h
+> 
 
-Thanks Boris.
+Hi Jassi,
 
-Sascha
+Sorry to disturb you.
+Do you have any further comment on CMDQ v14?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks.
+HS
