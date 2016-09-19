@@ -1,141 +1,260 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Mon, 19 Sep 2016 11:49:30 -0700
-Subject: [PATCH] arm64, numa: Add cpu_to_node() implementation.
-Message-ID: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
+From: ayaka@soulik.info (Randy Li)
+Date: Tue, 20 Sep 2016 02:57:50 +0800
+Subject: [PATCH v3] ASoC: exynos: organize the asoc audio into a menu
+Message-ID: <1474311470-23175-1-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+It is simple sound card time, we could assign different codec
+to a interface without making a specific driver for it. The SPDIF
+and I2S interface for Samsung would be possible used by
+simple-sound-card, but not sure about the PCM.
 
-The wq_numa_init() function makes a private CPU to node map by calling
-cpu_to_node() early in the boot process, before the non-boot CPUs are
-brought online.  Since the default implementation of cpu_to_node()
-returns zero for CPUs that have never been brought online, the
-workqueue system's view is that *all* CPUs are on node zero.
+Those S3C time entries are left alone as I don't think any new board
+would need them.
 
-When the unbound workqueue for a non-zero node is created, the
-tsk_cpus_allowed() for the worker threads is the empty set because
-there are, in the view of the workqueue system, no CPUs on non-zero
-nodes.  The code in try_to_wake_up() using this empty cpumask ends up
-using the cpumask empty set value of NR_CPUS as an index into the
-per-CPU area pointer array, and gets garbage as it is one past the end
-of the array.  This results in:
-
-[    0.881970] Unable to handle kernel paging request at virtual address fffffb1008b926a4
-[    1.970095] pgd = fffffc00094b0000
-[    1.973530] [fffffb1008b926a4] *pgd=0000000000000000, *pud=0000000000000000, *pmd=0000000000000000
-[    1.982610] Internal error: Oops: 96000004 [#1] SMP
-[    1.987541] Modules linked in:
-[    1.990631] CPU: 48 PID: 295 Comm: cpuhp/48 Tainted: G        W       4.8.0-rc6-preempt-vol+ #9
-[    1.999435] Hardware name: Cavium ThunderX CN88XX board (DT)
-[    2.005159] task: fffffe0fe89cc300 task.stack: fffffe0fe8b8c000
-[    2.011158] PC is at try_to_wake_up+0x194/0x34c
-[    2.015737] LR is at try_to_wake_up+0x150/0x34c
-[    2.020318] pc : [<fffffc00080e7468>] lr : [<fffffc00080e7424>] pstate: 600000c5
-[    2.027803] sp : fffffe0fe8b8fb10
-[    2.031149] x29: fffffe0fe8b8fb10 x28: 0000000000000000
-[    2.036522] x27: fffffc0008c63bc8 x26: 0000000000001000
-[    2.041896] x25: fffffc0008c63c80 x24: fffffc0008bfb200
-[    2.047270] x23: 00000000000000c0 x22: 0000000000000004
-[    2.052642] x21: fffffe0fe89d25bc x20: 0000000000001000
-[    2.058014] x19: fffffe0fe89d1d00 x18: 0000000000000000
-[    2.063386] x17: 0000000000000000 x16: 0000000000000000
-[    2.068760] x15: 0000000000000018 x14: 0000000000000000
-[    2.074133] x13: 0000000000000000 x12: 0000000000000000
-[    2.079505] x11: 0000000000000000 x10: 0000000000000000
-[    2.084879] x9 : 0000000000000000 x8 : 0000000000000000
-[    2.090251] x7 : 0000000000000040 x6 : 0000000000000000
-[    2.095621] x5 : ffffffffffffffff x4 : 0000000000000000
-[    2.100991] x3 : 0000000000000000 x2 : 0000000000000000
-[    2.106364] x1 : fffffc0008be4c24 x0 : ffffff0ffffada80
-[    2.111737]
-[    2.113236] Process cpuhp/48 (pid: 295, stack limit = 0xfffffe0fe8b8c020)
-[    2.120102] Stack: (0xfffffe0fe8b8fb10 to 0xfffffe0fe8b90000)
-[    2.125914] fb00:                                   fffffe0fe8b8fb80 fffffc00080e7648
-.
-.
-.
-[    2.442859] Call trace:
-[    2.445327] Exception stack(0xfffffe0fe8b8f940 to 0xfffffe0fe8b8fa70)
-[    2.451843] f940: fffffe0fe89d1d00 0000040000000000 fffffe0fe8b8fb10 fffffc00080e7468
-[    2.459767] f960: fffffe0fe8b8f980 fffffc00080e4958 ffffff0ff91ab200 fffffc00080e4b64
-[    2.467690] f980: fffffe0fe8b8f9d0 fffffc00080e515c fffffe0fe8b8fa80 0000000000000000
-[    2.475614] f9a0: fffffe0fe8b8f9d0 fffffc00080e58e4 fffffe0fe8b8fa80 0000000000000000
-[    2.483540] f9c0: fffffe0fe8d10000 0000000000000040 fffffe0fe8b8fa50 fffffc00080e5ac4
-[    2.491465] f9e0: ffffff0ffffada80 fffffc0008be4c24 0000000000000000 0000000000000000
-[    2.499387] fa00: 0000000000000000 ffffffffffffffff 0000000000000000 0000000000000040
-[    2.507309] fa20: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-[    2.515233] fa40: 0000000000000000 0000000000000000 0000000000000000 0000000000000018
-[    2.523156] fa60: 0000000000000000 0000000000000000
-[    2.528089] [<fffffc00080e7468>] try_to_wake_up+0x194/0x34c
-[    2.533723] [<fffffc00080e7648>] wake_up_process+0x28/0x34
-[    2.539275] [<fffffc00080d3764>] create_worker+0x110/0x19c
-[    2.544824] [<fffffc00080d69dc>] alloc_unbound_pwq+0x3cc/0x4b0
-[    2.550724] [<fffffc00080d6bcc>] wq_update_unbound_numa+0x10c/0x1e4
-[    2.557066] [<fffffc00080d7d78>] workqueue_online_cpu+0x220/0x28c
-[    2.563234] [<fffffc00080bd288>] cpuhp_invoke_callback+0x6c/0x168
-[    2.569398] [<fffffc00080bdf74>] cpuhp_up_callbacks+0x44/0xe4
-[    2.575210] [<fffffc00080be194>] cpuhp_thread_fun+0x13c/0x148
-[    2.581027] [<fffffc00080dfbac>] smpboot_thread_fn+0x19c/0x1a8
-[    2.586929] [<fffffc00080dbd64>] kthread+0xdc/0xf0
-[    2.591776] [<fffffc0008083380>] ret_from_fork+0x10/0x50
-[    2.597147] Code: b00057e1 91304021 91005021 b8626822 (b8606821)
-[    2.603464] ---[ end trace 58c0cd36b88802bc ]---
-[    2.608138] Kernel panic - not syncing: Fatal exception
-
-Fix by supplying a cpu_to_node() implementation that returns correct
-node mappings.
-
-Cc: <stable@vger.kernel.org> # 4.7.x-
-Signed-off-by: David Daney <david.daney@cavium.com>
-
+Signed-off-by: Randy Li <ayaka@soulik.info>
 ---
- arch/arm64/include/asm/topology.h |  3 +++
- arch/arm64/mm/numa.c              | 18 ++++++++++++++++++
- 2 files changed, 21 insertions(+)
+ sound/soc/samsung/Kconfig | 57 ++++++++++++++++++++++++-----------------------
+ 1 file changed, 29 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-index 8b57339..8d935447 100644
---- a/arch/arm64/include/asm/topology.h
-+++ b/arch/arm64/include/asm/topology.h
-@@ -30,6 +30,9 @@ int pcibus_to_node(struct pci_bus *bus);
- 				 cpu_all_mask :				\
- 				 cpumask_of_node(pcibus_to_node(bus)))
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index 7b722b0..f6023b4 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -1,12 +1,14 @@
+-config SND_SOC_SAMSUNG
++menuconfig SND_SOC_SAMSUNG
+ 	tristate "ASoC support for Samsung"
+ 	depends on (PLAT_SAMSUNG || ARCH_EXYNOS)
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+-	help
++	---help---
+ 	  Say Y or M if you want to add support for codecs attached to
+ 	  the Samsung SoCs' Audio interfaces. You will also need to
+ 	  select the audio interfaces to support below.
  
-+int cpu_to_node(int cpu);
-+#define cpu_to_node cpu_to_node
++if SND_SOC_SAMSUNG
 +
- #endif /* CONFIG_NUMA */
+ config SND_S3C24XX_I2S
+ 	tristate
  
- #include <asm-generic/topology.h>
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 5bb15ea..e76281b 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -130,6 +130,24 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
- 	cpu_to_node_map[cpu] = nid;
- }
+@@ -18,22 +20,22 @@ config SND_S3C2412_SOC_I2S
+ 	select SND_S3C_I2SV2_SOC
  
-+int cpu_to_node(int cpu)
-+{
-+	int nid;
+ config SND_SAMSUNG_PCM
+-	tristate
++	tristate "Samsung PCM interface support"
+ 
+ config SND_SAMSUNG_AC97
+ 	tristate
+ 	select SND_SOC_AC97_BUS
+ 
+ config SND_SAMSUNG_SPDIF
+-	tristate
++	tristate "Samsung SPDIF transmitter support"
+ 	select SND_SOC_SPDIF
+ 
+ config SND_SAMSUNG_I2S
+-	tristate
++	tristate "Samsung I2S interface support"
+ 
+ config SND_SOC_SAMSUNG_NEO1973_WM8753
+ 	tristate "Audio support for Openmoko Neo1973 Smartphones (GTA02)"
+-	depends on SND_SOC_SAMSUNG && MACH_NEO1973_GTA02
++	depends on MACH_NEO1973_GTA02
+ 	select SND_S3C24XX_I2S
+ 	select SND_SOC_WM8753
+ 	select SND_SOC_BT_SCO
+@@ -43,7 +45,7 @@ config SND_SOC_SAMSUNG_NEO1973_WM8753
+ 
+ config SND_SOC_SAMSUNG_JIVE_WM8750
+ 	tristate "SoC I2S Audio support for Jive"
+-	depends on SND_SOC_SAMSUNG && MACH_JIVE && I2C
++	depends on MACH_JIVE && I2C
+ 	select SND_SOC_WM8750
+ 	select SND_S3C2412_SOC_I2S
+ 	help
+@@ -51,7 +53,7 @@ config SND_SOC_SAMSUNG_JIVE_WM8750
+ 
+ config SND_SOC_SAMSUNG_SMDK_WM8580
+ 	tristate "SoC I2S Audio support for WM8580 on SMDK"
+-	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110)
++	depends on MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110
+ 	depends on I2C
+ 	select SND_SOC_WM8580
+ 	select SND_SAMSUNG_I2S
+@@ -60,7 +62,6 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
+ 
+ config SND_SOC_SAMSUNG_SMDK_WM8994
+ 	tristate "SoC I2S Audio support for WM8994 on SMDK"
+-	depends on SND_SOC_SAMSUNG
+ 	depends on I2C=y
+ 	select MFD_WM8994
+ 	select SND_SOC_WM8994
+@@ -70,7 +71,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8994
+ 
+ config SND_SOC_SAMSUNG_SMDK2443_WM9710
+ 	tristate "SoC AC97 Audio support for SMDK2443 - WM9710"
+-	depends on SND_SOC_SAMSUNG && MACH_SMDK2443
++	depends on MACH_SMDK2443
+ 	select AC97_BUS
+ 	select SND_SOC_AC97_CODEC
+ 	select SND_SAMSUNG_AC97
+@@ -80,7 +81,7 @@ config SND_SOC_SAMSUNG_SMDK2443_WM9710
+ 
+ config SND_SOC_SAMSUNG_LN2440SBC_ALC650
+ 	tristate "SoC AC97 Audio support for LN2440SBC - ALC650"
+-	depends on SND_SOC_SAMSUNG && ARCH_S3C24XX
++	depends on ARCH_S3C24XX
+ 	select AC97_BUS
+ 	select SND_SOC_AC97_CODEC
+ 	select SND_SAMSUNG_AC97
+@@ -90,7 +91,7 @@ config SND_SOC_SAMSUNG_LN2440SBC_ALC650
+ 
+ config SND_SOC_SAMSUNG_S3C24XX_UDA134X
+ 	tristate "SoC I2S Audio support UDA134X wired to a S3C24XX"
+-	depends on SND_SOC_SAMSUNG && ARCH_S3C24XX
++	depends on ARCH_S3C24XX
+ 	select SND_S3C24XX_I2S
+ 	select SND_SOC_L3
+ 	select SND_SOC_UDA134X
+@@ -102,21 +103,21 @@ config SND_SOC_SAMSUNG_SIMTEC
+ 
+ config SND_SOC_SAMSUNG_SIMTEC_TLV320AIC23
+ 	tristate "SoC I2S Audio support for TLV320AIC23 on Simtec boards"
+-	depends on SND_SOC_SAMSUNG && ARCH_S3C24XX && I2C
++	depends on ARCH_S3C24XX && I2C
+ 	select SND_S3C24XX_I2S
+ 	select SND_SOC_TLV320AIC23_I2C
+ 	select SND_SOC_SAMSUNG_SIMTEC
+ 
+ config SND_SOC_SAMSUNG_SIMTEC_HERMES
+ 	tristate "SoC I2S Audio support for Simtec Hermes board"
+-	depends on SND_SOC_SAMSUNG && ARCH_S3C24XX && I2C
++	depends on ARCH_S3C24XX && I2C
+ 	select SND_S3C24XX_I2S
+ 	select SND_SOC_TLV320AIC3X
+ 	select SND_SOC_SAMSUNG_SIMTEC
+ 
+ config SND_SOC_SAMSUNG_H1940_UDA1380
+ 	tristate "Audio support for the HP iPAQ H1940"
+-	depends on SND_SOC_SAMSUNG && ARCH_H1940 && I2C
++	depends on ARCH_H1940 && I2C
+ 	select SND_S3C24XX_I2S
+ 	select SND_SOC_UDA1380
+ 	help
+@@ -124,7 +125,7 @@ config SND_SOC_SAMSUNG_H1940_UDA1380
+ 
+ config SND_SOC_SAMSUNG_RX1950_UDA1380
+ 	tristate "Audio support for the HP iPAQ RX1950"
+-	depends on SND_SOC_SAMSUNG && MACH_RX1950 && I2C
++	depends on MACH_RX1950 && I2C
+ 	select SND_S3C24XX_I2S
+ 	select SND_SOC_UDA1380
+ 	help
+@@ -132,7 +133,7 @@ config SND_SOC_SAMSUNG_RX1950_UDA1380
+ 
+ config SND_SOC_SAMSUNG_SMDK_WM9713
+ 	tristate "SoC AC97 Audio support for SMDK with WM9713"
+-	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110)
++	depends on MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110
+ 	select SND_SOC_WM9713
+ 	select SND_SAMSUNG_AC97
+ 	help
+@@ -140,20 +141,19 @@ config SND_SOC_SAMSUNG_SMDK_WM9713
+ 
+ config SND_SOC_SMARTQ
+ 	tristate "SoC I2S Audio support for SmartQ board"
+-	depends on SND_SOC_SAMSUNG && MACH_SMARTQ && I2C
++	depends on MACH_SMARTQ && I2C
+ 	select SND_SAMSUNG_I2S
+ 	select SND_SOC_WM8750
+ 
+ config SND_SOC_SAMSUNG_SMDK_SPDIF
+ 	tristate "SoC S/PDIF Audio support for SMDK"
+-	depends on SND_SOC_SAMSUNG
+ 	select SND_SAMSUNG_SPDIF
+ 	help
+ 	  Say Y if you want to add support for SoC S/PDIF audio on the SMDK.
+ 
+ config SND_SOC_SMDK_WM8580_PCM
+ 	tristate "SoC PCM Audio support for WM8580 on SMDK"
+-	depends on SND_SOC_SAMSUNG && (MACH_SMDKV210 || MACH_SMDKC110)
++	depends on MACH_SMDKV210 || MACH_SMDKC110
+ 	depends on I2C
+ 	select SND_SOC_WM8580
+ 	select SND_SAMSUNG_PCM
+@@ -162,7 +162,6 @@ config SND_SOC_SMDK_WM8580_PCM
+ 
+ config SND_SOC_SMDK_WM8994_PCM
+ 	tristate "SoC PCM Audio support for WM8994 on SMDK"
+-	depends on SND_SOC_SAMSUNG
+ 	depends on I2C=y
+ 	select MFD_WM8994
+ 	select SND_SOC_WM8994
+@@ -172,7 +171,7 @@ config SND_SOC_SMDK_WM8994_PCM
+ 
+ config SND_SOC_SPEYSIDE
+ 	tristate "Audio support for Wolfson Speyside"
+-	depends on SND_SOC_SAMSUNG && I2C && SPI_MASTER
++	depends on I2C && SPI_MASTER
+ 	depends on MACH_WLF_CRAGG_6410 || COMPILE_TEST
+ 	select SND_SAMSUNG_I2S
+ 	select SND_SOC_WM8996
+@@ -182,14 +181,14 @@ config SND_SOC_SPEYSIDE
+ 
+ config SND_SOC_TOBERMORY
+ 	tristate "Audio support for Wolfson Tobermory"
+-	depends on SND_SOC_SAMSUNG && INPUT && I2C
++	depends on INPUT && I2C
+ 	depends on MACH_WLF_CRAGG_6410 || COMPILE_TEST
+ 	select SND_SAMSUNG_I2S
+ 	select SND_SOC_WM8962
+ 
+ config SND_SOC_BELLS
+ 	tristate "Audio support for Wolfson Bells"
+-	depends on SND_SOC_SAMSUNG && MFD_ARIZONA && I2C && SPI_MASTER
++	depends on MFD_ARIZONA && I2C && SPI_MASTER
+ 	depends on MACH_WLF_CRAGG_6410 || COMPILE_TEST
+ 	select SND_SAMSUNG_I2S
+ 	select SND_SOC_WM5102
+@@ -200,7 +199,7 @@ config SND_SOC_BELLS
+ 
+ config SND_SOC_LOWLAND
+ 	tristate "Audio support for Wolfson Lowland"
+-	depends on SND_SOC_SAMSUNG && I2C
++	depends on I2C
+ 	depends on MACH_WLF_CRAGG_6410 || COMPILE_TEST
+ 	select SND_SAMSUNG_I2S
+ 	select SND_SOC_WM5100
+@@ -208,7 +207,7 @@ config SND_SOC_LOWLAND
+ 
+ config SND_SOC_LITTLEMILL
+ 	tristate "Audio support for Wolfson Littlemill"
+-	depends on SND_SOC_SAMSUNG && I2C
++	depends on I2C
+ 	depends on MACH_WLF_CRAGG_6410 || COMPILE_TEST
+ 	select SND_SAMSUNG_I2S
+ 	select MFD_WM8994
+@@ -216,7 +215,7 @@ config SND_SOC_LITTLEMILL
+ 
+ config SND_SOC_SNOW
+ 	tristate "Audio support for Google Snow boards"
+-	depends on SND_SOC_SAMSUNG && I2C
++	depends on I2C
+ 	select SND_SOC_MAX98090
+ 	select SND_SOC_MAX98095
+ 	select SND_SAMSUNG_I2S
+@@ -226,6 +225,8 @@ config SND_SOC_SNOW
+ 
+ config SND_SOC_ARNDALE_RT5631_ALC5631
+         tristate "Audio support for RT5631(ALC5631) on Arndale Board"
+-        depends on SND_SOC_SAMSUNG && I2C
++        depends on I2C
+         select SND_SAMSUNG_I2S
+         select SND_SOC_RT5631
 +
-+	/*
-+	 * Return 0 for unknown mapping so that we report something
-+	 * sensible if firmware doesn't supply a proper mapping.
-+	 */
-+	if (cpu < 0 || cpu >= NR_CPUS)
-+		return 0;
-+
-+	nid = cpu_to_node_map[cpu];
-+	if (nid == NUMA_NO_NODE)
-+		nid = 0;
-+	return nid;
-+}
-+EXPORT_SYMBOL(cpu_to_node);
-+
- /**
-  * numa_add_memblk - Set node id to memblk
-  * @nid: NUMA node ID of the new memblk
++endif #SND_SOC_SAMSUNG
 -- 
-1.8.3.1
+2.7.4
