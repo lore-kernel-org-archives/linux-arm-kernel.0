@@ -1,36 +1,38 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:31 +0100
-Subject: [PATCH 17/27] drm/rockchip: dw-mipi-dsi: ensure PHY is reset
+Date: Mon, 19 Sep 2016 18:17:29 +0100
+Subject: [PATCH 16/27] drm/rockchip: dw-mipi-dsi: fix escape clock rate
 In-Reply-To: <20160919171747.28512-1-john@metanate.com>
 References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-22-john@metanate.com>
+Message-ID: <20160919171747.28512-20-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also don't power up the DSI host at this point since this is not
-necessary in order to configure the PHY and we do so later when
-selecting video or command mode.
+Use the same calculation as the vendor kernel to derive the escape clock
+speed.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index e621b66b9617..e310c3d81bb8 100644
+index 7b4f4f150a0d..e621b66b9617 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -398,7 +398,10 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 		return testdin;
- 	}
+@@ -711,11 +711,13 @@ static void dw_mipi_dsi_disable(struct dw_mipi_dsi *dsi)
  
--	dsi_write(dsi, DSI_PWR_UP, POWERUP);
-+	/* Start by clearing PHY state */
-+	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
-+	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLR);
-+	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
+ static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
+ {
++	u32 esc_clk_division = (dsi->lane_mbps >> 3) / 20 + 1;
++
+ 	dsi_write(dsi, DSI_PWR_UP, RESET);
+ 	dsi_write(dsi, DSI_PHY_RSTZ, PHY_DISFORCEPLL | PHY_DISABLECLK
+ 		  | PHY_RSTZ | PHY_SHUTDOWNZ);
+ 	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
+-		  TX_ESC_CLK_DIVIDSION(7));
++		  TX_ESC_CLK_DIVIDSION(esc_clk_division));
+ }
  
- 	dw_mipi_dsi_phy_write(dsi, 0x10, BYPASS_VCO_RANGE |
- 					 VCO_RANGE_CON_SEL(vco) |
+ static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi)
 -- 
 2.10.0.278.g4f427b1.dirty
