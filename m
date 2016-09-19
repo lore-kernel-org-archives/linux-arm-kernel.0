@@ -1,29 +1,46 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 19 Sep 2016 11:07:17 +0100
-Subject: [PATCH v4 1/7] pinctrl: bcm2835: add pull defines to dt bindings
-In-Reply-To: <1474274603-24215-2-git-send-email-kraxel@redhat.com>
-References: <1474274603-24215-1-git-send-email-kraxel@redhat.com>
- <1474274603-24215-2-git-send-email-kraxel@redhat.com>
-Message-ID: <87zin49p9m.fsf@eliezer.anholt.net>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 19 Sep 2016 18:10:55 +0800
+Subject: [PATCH 1/2] arm64: defconfig: enable I2C and DW MMC controller on
+ rockchip platform
+In-Reply-To: <1473248790-27101-1-git-send-email-andy.yan@rock-chips.com>
+References: <1473248790-27101-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <d82132bc-1348-acb6-0b67-418a4969cf7a@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gerd Hoffmann <kraxel@redhat.com> writes:
+Hi :
 
-> Also delete (unused) private enum from driver.
-> The pull defines can be used instead if needed.
+   Respected maintainers, is there some suggestions for this patch?
+
+
+On 2016?09?07? 19:46, Andy Yan wrote:
+> I2C and MMC are very basic modules for a board to bootup, as I2C always
+> used to configure PMIC and MMC devices often used to store filesytem.
+> So enable them here to let the rockchip based arm64 boards can bootup.
 >
-> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
-
-Acked-by: Eric Anholt <eric@anholt.net>
-
-gpio maintainers, could I pull this through my dt tree?  Or does this
-need to be split in two?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160919/82c39ac2/attachment.sig>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> ---
+>
+>   arch/arm64/configs/defconfig | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index eadf485..427b6dc 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -222,6 +222,7 @@ CONFIG_I2C_QUP=y
+>   CONFIG_I2C_TEGRA=y
+>   CONFIG_I2C_UNIPHIER_F=y
+>   CONFIG_I2C_RCAR=y
+> +CONFIG_I2C_RK3X=y
+>   CONFIG_I2C_CROS_EC_TUNNEL=y
+>   CONFIG_SPI=y
+>   CONFIG_SPI_ORION=y
+> @@ -323,6 +324,7 @@ CONFIG_MMC_SPI=y
+>   CONFIG_MMC_DW=y
+>   CONFIG_MMC_DW_EXYNOS=y
+>   CONFIG_MMC_DW_K3=y
+> +CONFIG_MMC_DW_ROCKCHIP=y
+>   CONFIG_MMC_SUNXI=y
+>   CONFIG_NEW_LEDS=y
+>   CONFIG_LEDS_CLASS=y
