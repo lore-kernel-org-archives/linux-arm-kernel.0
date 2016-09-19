@@ -1,49 +1,76 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 19 Sep 2016 17:51:49 +0100
-Subject: [PATCH 1/3] i2c: bcm2835: Fix hang for writing messages larger
- than 16 bytes
-In-Reply-To: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
-References: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
-Message-ID: <87zin3omsa.fsf@eliezer.anholt.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 19 Sep 2016 17:52:58 +0100
+Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <1474260085.15220.17.camel@buserror.net>
+References: <1473469413-11019-1-git-send-email-oss@buserror.net>
+ <1473469413-11019-3-git-send-email-oss@buserror.net>
+ <20160912113615.GA20804@leverpostej>
+ <1474260085.15220.17.camel@buserror.net>
+Message-ID: <20160919165258.GA30584@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Noralf Tr?nnes <noralf@tronnes.org> writes:
+On Sun, Sep 18, 2016 at 11:41:25PM -0500, Scott Wood wrote:
+> On Mon, 2016-09-12 at 12:36 +0100, Mark Rutland wrote:
+> > On Fri, Sep 09, 2016 at 08:03:31PM -0500, Scott Wood wrote:
+> > > +static __always_inline void arch_timer_cval_write_cp15(int access, u64
+> > > val)
+> > > +{
+> > > +	if (access == ARCH_TIMER_PHYS_ACCESS)
+> > > +		asm volatile("msr cntp_cval_el0, %0" : : "r" (val));
+> > > +	else if (access == ARCH_TIMER_VIRT_ACCESS)
+> > > +		asm volatile("msr cntv_cval_el0, %0" : : "r" (val));
+> > > +
+> > > +	isb();
+> > > +}
+> > Please add ARCH_TIMER_REG_CVAL to enum arch_timer_reg, and move these
+> > accesses into arch_timer_reg_write_cp15().
+> 
+> Adding ARCH_TIMER_REG_CVAL to the enum means we get warnings from bunch of
+> switch statements that don't actually need a CVAL implementation -- or else we
+> have to add untested CVAL accessors for arm32 and mmio. ?The arm32 part would
+> add another dependency on getting an ack from RMK, that can't be postponed as
+> easily as the archdata/vdso patch.
 
-> Writing messages larger than the FIFO size results in a hang, rendering
-> the machine unusable. This is because the RXD status flag is set on the
-> first interrupt which results in bcm2835_drain_rxfifo() stealing bytes
-> from the buffer. The controller continues to trigger interrupts waiting
-> for the missing bytes, but bcm2835_fill_txfifo() has none to give.
-> In this situation wait_for_completion_timeout() apparently is unable to
-> stop the madness.
->
-> The BCM2835 ARM Peripherals datasheet has this to say about the flags:
->   TXD: is set when the FIFO has space for at least one byte of data.
->   RXD: is set when the FIFO contains at least one byte of data.
->   TXW: is set during a write transfer and the FIFO is less than full.
->   RXR: is set during a read transfer and the FIFO is or more full.
->
-> Implementing the logic from the downstream i2c-bcm2708 driver solved
-> the hang problem.
->
-> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
+That's annoying. Never mind, then.
 
-Patches 1, 3 are:
+> Since this is specific to an erratum rather than general cval support, I can
+> move the accesses into fsl_a008585_set_next_event (and convert to
+> write_sysreg).
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
+Ok. I think that's preferable given we have no other users.
 
-For patch 2 I followed some of it, but couldn't quite say it's a review.
-I trust your testing, and that the path has had a lot more testing in
-the downstream tree, so it's:
+> > > +static void fsl_a008585_set_sne(struct clock_event_device *clk)
+> > > +{
+> > > +#ifdef CONFIG_FSL_ERRATUM_A008585
+> > > +	if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
+> > > +		return;
+> > > +
+> > > +	if (arch_timer_uses_ppi == VIRT_PPI)
+> > > +		clk->set_next_event = fsl_a008585_set_next_event_virt;
+> > > +	else
+> > > +		clk->set_next_event = fsl_a008585_set_next_event_phys;
+> > > +#endif
+> > > +}
+> > > +
+> > I'm not keen on the magic hook to reset the function pointers, and the
+> > additional phys/virt stubs seem pointless. Instead, can we fold this
+> > into the existing set_next_event? e.g. have that do:
+> > 
+> > 	if (needs_fsl_a008585_workaround() {
+> > 		fsl_a008585_set_next_event(access, evt, clk);
+> > 		return;
+> > 	}
+> 
+> OK. ?I had been trying to avoid messing with the standard set_next_event, but
+> it doesn't matter as much now that static branches are being used. ?In that
+> case we can avoid duplicating the ctrl code, and only replace the tval write.
 
-Acked-by: Eric Anholt <eric@anholt.net>
+Reconsidering my suggestion, I realise this will also affect the MMIO
+timers, so that doesn't work.
 
-Thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160919/20ab542b/attachment.sig>
+So for the moment, I guess we have to keep fsl_a008585_set_next_event().
+
+Thanks,
+Mark.
