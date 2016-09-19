@@ -1,18 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Sep 2016 22:36:02 +0200
-Subject: [GIT PULL 3/3] ZTE arm64 defconfig changes for 4.9
-In-Reply-To: <1474008641-30859-3-git-send-email-shawnguo@kernel.org>
-References: <1474008641-30859-1-git-send-email-shawnguo@kernel.org>
- <1474008641-30859-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <6616205.TacP4h6fe9@wuerfel>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 19 Sep 2016 15:41:04 -0500
+Subject: [PATCH] cpufreq: ti: Use generic platdev driver
+In-Reply-To: <4712275.44limO7TAi@vostro.rjw.lan>
+References: <20160914204137.20346-1-d-gerlach@ti.com>
+ <20160915062507.GA30169@vireshk-i7> <57DC6420.20706@ti.com>
+ <4712275.44limO7TAi@vostro.rjw.lan>
+Message-ID: <57E04D60.2040402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 16, 2016 2:50:41 PM CEST Shawn Guo wrote:
-> ZTE arm64 defconfig updates for 4.9:
->  - Enable ZTE ZX family support in arm64 defconfig
-> 
+On 09/16/2016 04:59 PM, Rafael J. Wysocki wrote:
+> On Friday, September 16, 2016 04:29:04 PM Dave Gerlach wrote:
+>> Hi,
+>> On 09/15/2016 01:25 AM, Viresh Kumar wrote:
+>>> On 14-09-16, 15:41, Dave Gerlach wrote:
+>>>> Now that the cpufreq-dt-platdev is used to create the cpufreq-dt platform
+>>>> device for all OMAP platforms and the platform code that did it
+>>>> before has been removed, add ti,am33xx and ti,dra7xx to the machine list
+>>>> in cpufreq-dt-platdev which had relied on the removed platform code to do
+>>>> this previously.
+>>>>
+>>>> Fixes: 7694ca6e1d6f ("cpufreq: omap: Use generic platdev driver")
+>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>>
+>>> Any stable trees you want this to be added to ?
+>>
+>> I suppose it'll go for 4.7-stable as the change happened in v4.6.
+>
+> The commit in the fixes tag went in during the 4.7 cycle, so the fix should
+> go into 4.7.y, but I'm not going to push it as urgent material for 4.8.
+>
 
-Pulled into next/arm64, thanks!
+Yes, that is fine, thanks a lot!
 
-	Arnd
+Regards,
+Dave
+
+> Thanks,
+> Rafael
+>
