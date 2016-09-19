@@ -1,23 +1,30 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 19 Sep 2016 13:00:51 +0200
-Subject: [PATCH v4 0/7] ARM: dts: bcm283x: add and use pinctrl groups
-In-Reply-To: <1474274603-24215-1-git-send-email-kraxel@redhat.com>
-References: <1474274603-24215-1-git-send-email-kraxel@redhat.com>
-Message-ID: <c7b43dbc-7bfc-0aa6-b451-4ef9a11e456e@i2se.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon, 19 Sep 2016 12:10:03 +0100
+Subject: [PATCH v7 0/8] CPUs capacity information for heterogeneous systems
+In-Reply-To: <20160912072424.GL10409@e106622-lin>
+References: <1473085372-2840-1-git-send-email-juri.lelli@arm.com>
+ <20160912072424.GL10409@e106622-lin>
+Message-ID: <20160919111003.GB8357@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.09.2016 um 10:43 schrieb Gerd Hoffmann:
->   Hi,
->
-> New in v4:  Patch #6 has been splitted into two:  Patch 6 just moves
-> pinctrl from &gpio to &sdhci.  Removing the empty now alt3 group
-> -- including all references as pointed out by Stefan Wahren in review --
-> is done by the new patch 7.  Patches 1-5 are unchanged.
+Hi,
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+On 12/09/16 08:24, Juri Lelli wrote:
+> Hi,
+> 
+> this is a ping for people interested in this series. Patches 2,4,7-8
+> still needs ACKs.
+> 
 
-for the whole series.
+Weekly ping. :-)
 
-Thanks
-Stefan
+Best,
+
+- Juri
+
+> I know it's only been a week since I posted v7, but this series would
+> pair nicely with asym cpu capacity support bits already sitting in
+> tip/sched/core. I also know that it might be already late for 4.9 merge
+> window; nevertheless, still hoping we can make it.
+> 
