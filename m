@@ -1,25 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 19 Sep 2016 09:33:01 +0100
-Subject: [PATCH] make samsung interface entries explicitly
-In-Reply-To: <1474207751-9804-1-git-send-email-ayaka@soulik.info>
-References: <1474207751-9804-1-git-send-email-ayaka@soulik.info>
-Message-ID: <20160919083301.GD10189@sirena.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 19 Sep 2016 10:42:53 +0200
+Subject: [PATCH RFC 8/8] ARM: dts: sk-rzg1m: initial device tree
+In-Reply-To: <2097453.1xPZsJcFmC@wasted.cogentembedded.com>
+References: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
+ <2097453.1xPZsJcFmC@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdU8qb8P9p3dHRwSJY4ZUgnEjcdfGfte2naQ+WA3XyEiAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 18, 2016 at 10:09:10PM +0800, Randy Li wrote:
-> I found those modules should be selected directly, as I
-> only use the simple sound card.
+On Fri, Sep 16, 2016 at 3:38 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add the initial device  tree for the R8A7743 SoC based SK-RZG1M board.
+> The board has one debug serial port (SCIF0); include support for it, so
+> that  the serial  console  can work.
+>
+> Based on the original (and large) patch by Dmitry Shifrin
+> <dmitry.shifrin@cogentembedded.com>.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Please don't send cover letters for single patches, if there is anything
-that needs saying put it in the changelog of the patch or after the ---
-if it's administrative stuff.  This reduces mail volume and ensures that 
-any important information is recorded in the changelog rather than being
-lost. 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160919/23df5cd9/attachment-0001.sig>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+> --- /dev/null
+> +++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+> @@ -0,0 +1,44 @@
+
+> +       compatible = "renesas,sk-rzg1m", "renesas,r8a7743";
+
+To be documented in Documentation/devicetree/bindings/arm/shmobile.txt
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
