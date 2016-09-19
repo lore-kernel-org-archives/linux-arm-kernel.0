@@ -1,30 +1,37 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 19 Sep 2016 17:36:16 -0500
-Subject: [GIT PULL] Qualcomm EBI2 bindings and bus driver
-In-Reply-To: <4360974.U0qvolVKdi@wuerfel>
-References: <CACRpkdYvowN2htUuN46JNVdfaKNw3AEbBfzAeScHQcLU5o3ZUg@mail.gmail.com>
- <4360974.U0qvolVKdi@wuerfel>
-Message-ID: <20160919223616.GD5431@hector.attlocal.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Sep 2016 23:36:16 +0100
+Subject: [PATCH 3/4] watchdog: sa11x0/pxa: get rid of get_clock_tick_rate
+In-Reply-To: <20160919200816.GC29242@roeck-us.net>
+References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
+ <1474312335-20997-4-git-send-email-robert.jarzmik@free.fr>
+ <20160919200816.GC29242@roeck-us.net>
+Message-ID: <20160919223616.GN1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 12:12:33AM +0200, Arnd Bergmann wrote:
-> On Thursday, September 8, 2016 3:34:42 PM CEST Linus Walleij wrote:
-> > please pull this new EBI2 bus driver and its bindings into an
-> > apropriate branch in the ARM SoC tree. The binding now has
-> > Rob Herrings ACK and we have hopefully finally figured out how
-> > this should be done.
+On Mon, Sep 19, 2016 at 01:08:16PM -0700, Guenter Roeck wrote:
+> On Mon, Sep 19, 2016 at 09:12:14PM +0200, Robert Jarzmik wrote:
+> > The OS timer rate used for the watchdog can now be fetched from the
+> > standard clock API. This will remove the last user of
+> > get_clock_tick_rate() in both pxa and sa11x0 architectures.
 > > 
+> > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 > 
-> I just noticed that you sent the pull request directly to arm at kernel.org
-> rather than the Qualcomm maintainers (which are only on Cc).
-> 
-> Usually, I'd expect to see this forwarded from Andy, is there a
-> reason to do it differently here? If so, can I have an Ack
-> from him?
+> Did you test this ? Potential problem, if built into the kernel, could be that
+> the clocks might not be ready by the time the driver is instantiated. Unless
+> this is converted to a platform driver, it won't be able to handle a
+> -EPROBE_DEFER from the clock subsystem.
 
-When I looked at this last, I thought there were comments.  Sorry I missed it.
-If you want to pick it up Arnd, please do, otherwise I can send it along in the
-next pull request.
+Really not a problem at all.  The OSTIMER0 is required for the system
+tick, and if that's not present, the kernel will be without any kind
+of time keeping, so a missing watchdog driver is the least of the
+problems.
 
-Acked-by: Andy Gross <andy.gross@linaro.org>
+Therefore, both PXA and SA11x0 register their clocks really early to
+ensure that OSTIMER0 is available by the time_init() stage, which is
+way before driver probe time.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
