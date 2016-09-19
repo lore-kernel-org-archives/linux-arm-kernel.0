@@ -1,92 +1,22 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 19 Sep 2016 21:12:13 +0200
-Subject: [PATCH 2/4] ARM: sa11x0/pxa: acquire timer rate from the clock rate
-In-Reply-To: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
-References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1474312335-20997-3-git-send-email-robert.jarzmik@free.fr>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 19 Sep 2016 16:12:33 -0300
+Subject: [RFC PATCH v3 1/2] ARM: dts: samsung: add rga-lvds panel in itop
+ elite
+In-Reply-To: <1474311771-23321-2-git-send-email-ayaka@soulik.info>
+References: <1474311771-23321-1-git-send-email-ayaka@soulik.info>
+ <1474311771-23321-2-git-send-email-ayaka@soulik.info>
+Message-ID: <CAOMZO5Agngx7b24bo3w7S84xtwZV81c-wAszs0B96FZhMeMW8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As both pxa and sa1100 provide a clock to the timer, the rate can be
-inferred from the clock rather than hard encoded in a functional call.
+On Mon, Sep 19, 2016 at 4:02 PM, Randy Li <ayaka@soulik.info> wrote:
 
-This patch changes the pxa timer to have a mandatory clock which is used
-as the timer rate.
+> +       vcc_sys_lcd: sys-lcd {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "vcc_5v";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +               gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/generic.c     |  3 +--
- arch/arm/mach-sa1100/generic.c  |  2 +-
- drivers/clocksource/pxa_timer.c | 11 +++++------
- include/clocksource/pxa.h       |  3 +--
- 4 files changed, 8 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
-index ec510ecf8370..2a9297991d74 100644
---- a/arch/arm/mach-pxa/generic.c
-+++ b/arch/arm/mach-pxa/generic.c
-@@ -69,8 +69,7 @@ void __init pxa_timer_init(void)
- 		pxa27x_clocks_init();
- 	if (cpu_is_pxa3xx())
- 		pxa3xx_clocks_init();
--	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x40a00000),
--			    get_clock_tick_rate());
-+	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x40a00000));
- }
- 
- /*
-diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-index 3e09beddb6e8..2eb00691b07d 100644
---- a/arch/arm/mach-sa1100/generic.c
-+++ b/arch/arm/mach-sa1100/generic.c
-@@ -378,7 +378,7 @@ void __init sa1100_map_io(void)
- 
- void __init sa1100_timer_init(void)
- {
--	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x90000000), 3686400);
-+	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x90000000));
- }
- 
- static struct resource irq_resource =
-diff --git a/drivers/clocksource/pxa_timer.c b/drivers/clocksource/pxa_timer.c
-index 3e1cb512f3ce..9cae38eebec2 100644
---- a/drivers/clocksource/pxa_timer.c
-+++ b/drivers/clocksource/pxa_timer.c
-@@ -220,17 +220,16 @@ CLOCKSOURCE_OF_DECLARE(pxa_timer, "marvell,pxa-timer", pxa_timer_dt_init);
- /*
-  * Legacy timer init for non device-tree boards.
-  */
--void __init pxa_timer_nodt_init(int irq, void __iomem *base,
--	unsigned long clock_tick_rate)
-+void __init pxa_timer_nodt_init(int irq, void __iomem *base)
- {
- 	struct clk *clk;
- 
- 	timer_base = base;
- 	clk = clk_get(NULL, "OSTIMER0");
--	if (clk && !IS_ERR(clk))
-+	if (clk && !IS_ERR(clk)) {
- 		clk_prepare_enable(clk);
--	else
-+		pxa_timer_common_init(irq, clk_get_rate(clk));
-+	} else {
- 		pr_crit("%s: unable to get clk\n", __func__);
--
--	pxa_timer_common_init(irq, clock_tick_rate);
-+	}
- }
-diff --git a/include/clocksource/pxa.h b/include/clocksource/pxa.h
-index 1efbe5a66958..a9a0f03024a4 100644
---- a/include/clocksource/pxa.h
-+++ b/include/clocksource/pxa.h
-@@ -12,7 +12,6 @@
- #ifndef _CLOCKSOURCE_PXA_H
- #define _CLOCKSOURCE_PXA_H
- 
--extern void pxa_timer_nodt_init(int irq, void __iomem *base,
--			   unsigned long clock_tick_rate);
-+extern void pxa_timer_nodt_init(int irq, void __iomem *base);
- 
- #endif
--- 
-2.1.4
+Is this really active high? If so, you should add the
+'enable-active-high' property.
