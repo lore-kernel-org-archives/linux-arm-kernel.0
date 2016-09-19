@@ -1,95 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Sep 2016 10:11:55 +0100
-Subject: [PATCH] mtd: s3c2410: add device tree support
-In-Reply-To: <1474125760-28168-1-git-send-email-sergio.prado@e-labworks.com>
-References: <1474125760-28168-1-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <20160919091155.GB11118@leverpostej>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 19 Sep 2016 11:21:21 +0200
+Subject: [PATCH 0/1] fix rk3066a based boards boot issue on linux-4.8
+In-Reply-To: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
+References: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <20160919112121.2e0bc376@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 17, 2016 at 12:22:40PM -0300, Sergio Prado wrote:
-> Tested on FriendlyARM Mini2440
-> 
-> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> ---
->  .../devicetree/bindings/mtd/samsung-s3c2410.txt    |  70 +++++++++++
->  drivers/mtd/nand/s3c2410.c                         | 129 ++++++++++++++++++++-
->  include/linux/platform_data/mtd-nand-s3c2410.h     |   1 +
->  3 files changed, 195 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt b/Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
-> new file mode 100644
-> index 000000000000..1c39f6cf483b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
-> @@ -0,0 +1,70 @@
-> +* Samsung S3C2410 and compatible NAND flash controller
-> +
-> +Required properties:
-> +- compatible : The possible values are:
-> +	"samsung,s3c2410-nand"
-> +	"samsung,s3c2412-nand"
-> +	"samsung,s3c2440-nand"
-> +	"samsung,s3c6400-nand"
-> +- reg : register's location and length.
-> +- #address-cells, #size-cells : see nand.txt
-> +- clocks : phandle to the nand controller clock
-> +- clock-names : must contain "nand"
+Hi Andy,
 
-Is there only one clock feeding into the NAND block? Is it actually
-called "nand", or does the datasheet not give the input a nme?
+On Mon, 19 Sep 2016 16:43:59 +0800
+Andy Yan <andy.yan@rock-chips.com> wrote:
 
-> +
-> +Optional properties:
-> +- samsung,tacls : time for active CLE/ALE to nWE/nOE
-> +- samsung,twrph0 : active time for nWE/nOE
-> +- samsung,twrph1 : time for release CLE/ALE from nWE/nOE inactive
+> Hi, heiko:
+>    I found my Rayeager board couldn't boot up on linux 4.8. After some
+> dig, I found the pwm-regulator for vdd_log register failed and found
+> some change in Boris's patch: commit 87248991a1de(regulator: pwm: Properly
+> initialize the ->state field).
 
-If these are necessary, what units are these in?
+Hm, that's weird. This commit only makes sure that the regulator
+voltage state is correctly initialized (matching the hardware state),
+and I don't understand why changing the voltage-table make it work.
 
-> +- samsung,ignore_unset_ecc : boolean to ignore error when we have
-> +                             0xff,0xff,0xff read ECC, on the
-> +                             assumption that it is an un-eccd page
-
-s/_/-/ in property names, please.
-
-That said, this name reads like policy rather than a HW description.
-Why/when is this necessary to set?
-
-[...]
-
-> +	of_property_read_u32(np, "samsung,tacls",  &pdata->tacls);
-> +	of_property_read_u32(np, "samsung,twrph0", &pdata->twrph0);
-> +	of_property_read_u32(np, "samsung,twrph1", &pdata->twrph1);
-
-Are all values in the range [0, 0xffffffff] valid for these? If not, it
-would be a good idea to sanity-check the values.
-
-> +	if (of_get_property(np, "samsung,ignore_unset_ecc", NULL))
-> +		pdata->ignore_unset_ecc = 1;
-
-Use of_property_read_bool();
-
-[...]
-
-> +	for_each_available_child_of_node(np, child) {
-> +
-> +		sets->name = (char *)child->name;
-> +		sets->of_node = child;
-
-Strictly speaking, you should increment the child node refcount here, as
-you maintain a reference to it and its name field.
-
-> +		sets->nr_chips = 1;
-> +
-> +		if (!of_property_match_string(child, "nand-ecc-mode", "none"))
-> +			sets->disable_ecc = 1;
-> +
-> +		if (of_get_property(child, "nand-on-flash-bbt", NULL))
-> +			sets->flash_bbt = 1;
-
-Use of_property_read_bool().
+Can you share the kernel logs? What are the symptoms?
 
 Thanks,
-Mark.
+
+Boris
+
+>    I send this patch to make the pwm-regulator can register success on
+> this change.
+> 
+> 
+> Andy Yan (1):
+>   arm: dts: fix rk3066a based boards vdd_log voltage initialization
+> 
+>  arch/arm/boot/dts/rk3066a-bqcurie2.dts  | 2 +-
+>  arch/arm/boot/dts/rk3066a-marsboard.dts | 2 +-
+>  arch/arm/boot/dts/rk3066a-rayeager.dts  | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
