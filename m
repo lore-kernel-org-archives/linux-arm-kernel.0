@@ -1,37 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 19 Sep 2016 10:18:48 +0200
-Subject: [PATCH v4 2/2] ARM: dts: sun8i: enable UART1 for iNet D978 Rev2
- board
-In-Reply-To: <20160916151642.27907-2-icenowy@aosc.xyz>
-References: <20160916151642.27907-1-icenowy@aosc.xyz>
- <20160916151642.27907-2-icenowy@aosc.xyz>
-Message-ID: <20160919081848.GC8719@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 19 Sep 2016 10:19:20 +0200
+Subject: [PATCH RFC 6/8] ARM: dts: r8a7743: add SYS-DMAC support
+In-Reply-To: <1815255.1arMxK7TDL@wasted.cogentembedded.com>
+References: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
+ <1815255.1arMxK7TDL@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdXz5K66AU7d-+NsPrAyc8V53mDxzggiUk-TrFRAwBFXOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 11:16:42PM +0800, Icenowy Zheng wrote:
-> UART1 is connected to the bluetooth part of RTL8723BS WiFi/BT combo card
-> on iNet D978 Rev2 board.
-> 
-> Enable the UART1 to make it possible to use the modified hciattach by
-> Realtek to drive the BT part of RTL8723BS.
-> 
-> On the board no r_uart pins are found now (the onboard RX/TX pins are
-> wired to PF2/PF4, which is muxed with mmc0), so also disabled it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+On Fri, Sep 16, 2016 at 3:36 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> --- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7743.dtsi
+> @@ -90,6 +90,70 @@
+>                         #power-domain-cells = <1>;
+>                 };
+>
+> +               dmac0: dma-controller at e6700000 {
+> +                       compatible = "renesas,dmac-r8a7743",
 
-Applied, thanks!
-Maxime
+To be documented.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160919/3d283f19/attachment-0001.sig>
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
