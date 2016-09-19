@@ -1,67 +1,26 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Mon, 19 Sep 2016 12:51:46 +0200
-Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
-In-Reply-To: <20160916133027.GA27036@cbox>
-References: <1474007187-18673-1-git-send-email-agraf@suse.de>
- <57DBC782.7080305@arm.com> <7beb406b-6194-8451-2d92-9a4394ef91dd@redhat.com>
- <20160916123039.GB14140@cbox>
- <da8191ca-6fb1-f960-872c-d6bc27172db8@redhat.com>
- <20160916133027.GA27036@cbox>
-Message-ID: <43020f1f-6367-6f11-2534-b26ced13b540@suse.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 19 Sep 2016 11:54:29 +0100
+Subject: next-20160914 build: 2 failures 3 warnings (next-20160914)
+In-Reply-To: <2300987.vYzazfRX5F@wuerfel>
+References: <E1bk5OS-0000Vu-1C@optimist> <20160914171137.GF27974@sirena.org.uk>
+ <20160919102150.GI10189@sirena.org.uk> <2300987.vYzazfRX5F@wuerfel>
+Message-ID: <20160919105429.GK10189@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 19, 2016 at 12:31:04PM +0200, Arnd Bergmann wrote:
 
+> My guess is that this is indeed the correct fix, but I don't understand
+> at all what the function does, and Marcin Niestroj said the same thing,
+> he just copied the code from a driver that is always built-in.
 
-On 16.09.16 15:30, Christoffer Dall wrote:
-> On Fri, Sep 16, 2016 at 02:31:42PM +0200, Paolo Bonzini wrote:
->>
->>
->> On 16/09/2016 14:30, Christoffer Dall wrote:
->>>>>> This patch set allows user space to receive vtimer events as well as mask
->>>>>> them, so that we can handle all vtimer related interrupt injection from user
->>>>>> space, enabling us to use architected timer with user space gic emulation.
->>>>>
->>>>> I have already voiced my concerns in the past, including face to face,
->>>>> and I'm going to repeat it: I not keen at all on adding a new userspace
->>>>> interface that is going to bitrot extremely quickly.
->>>>
->>>> You don't have automated tests set up?  It's not going to bitrot if you
->>>> test it, either with kvm-unit-tests or just by smoke-testing Linux.
->>>> It's _for_ the raspi, but it's not limited to it.
->>>
->>> Our automated testing situation is not great, no.  Something we're
->>> looking at, but have resource problems with.
->>
->> But it's not a good reason to hold back a feature...
->>
-> 
-> I didn't say that exactly, but choosing not to merge something we cannot
-> maintain and which we're not paid to look after and where there's a
-> minimal interest, is not entirely unreasonable.
-> 
-> That being said, I'm not categorically against these patches, but I
-> share Marc's view that we've already seen that non-vgic support had been
-> broken for multiple versions without anyone complaining, and without
-> automated testing or substantial interest in the work, the patches
-> really are likely to bit-rot.
-
-I know that it's very hard to grasp from an upstream maintainer
-perspective, but keep in mind where the bulk of execution of kernel code
-lies. The average life cycle of a "stable" Linux distribution's kernel
-is a few years.
-
-So far all regressions in the user space gic code have been found within
-less than 1y of the respective code release. I'd say that counts for
-quite a well used feature.
-
-> But I haven't even looked at the patches in detail, I was just replying
-> to the comment about testing.
-
-Also keep in mind that without the architected timer support (and/or
-without qemu patches than enable user space timers) the user space gic
-support is pretty unusable to most people, so you obviously get less
-reports.
-
-
-Alex
+Yes, most of the code is copied from regmap-irq.  Setting the parent is
+needed for edge triggered interrupts that don't latch state when
+disabled but isn't needed in the general case.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160919/5befb5da/attachment.sig>
