@@ -1,36 +1,44 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 19 Sep 2016 21:12:12 +0200
-Subject: [PATCH 1/4] clk: pxa25x: OSTIMER0 clocks from the main oscillator
-In-Reply-To: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
-References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1474312335-20997-2-git-send-email-robert.jarzmik@free.fr>
+Date: Mon, 19 Sep 2016 21:12:11 +0200
+Subject: [PATCH 0/4] kill get_clock_tick_rate()
+Message-ID: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
+Hi,
 
-The OSTIMER0 clock ticks at the main oscillator rate, not the 32kHz
-oscillator rate.  Ensure that it is parented to the main oscillator.
+This serie aims at killing get_clock_tick_rate() from pxa and sa1100 and replace
+it by clock API calls.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- drivers/clk/pxa/clk-pxa25x.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'd like to have this reviewed and acked afterwards at least by :
+ - Russell for the mach-sa1100 and sa1100_wdt.c
+ - Stephen or Michael for the clk-pxa25x.c
+ - Thomas or Daniel for the clocksource part
+ - Wim for sa1100_wdt.c
 
-diff --git a/drivers/clk/pxa/clk-pxa25x.c b/drivers/clk/pxa/clk-pxa25x.c
-index a98b98e2a9e4..56b0a6027e38 100644
---- a/drivers/clk/pxa/clk-pxa25x.c
-+++ b/drivers/clk/pxa/clk-pxa25x.c
-@@ -230,7 +230,7 @@ static struct dummy_clk dummy_clks[] __initdata = {
- 	DUMMY_CLK("GPIO11_CLK", NULL, "osc_3_6864mhz"),
- 	DUMMY_CLK("GPIO12_CLK", NULL, "osc_32_768khz"),
- 	DUMMY_CLK(NULL, "sa1100-rtc", "osc_32_768khz"),
--	DUMMY_CLK("OSTIMER0", NULL, "osc_32_768khz"),
-+	DUMMY_CLK("OSTIMER0", NULL, "osc_3_6864mhz"),
- 	DUMMY_CLK("UARTCLK", "pxa2xx-ir", "STUART"),
- };
- 
+If the review converges, I'd also like to take it through the pxa/for-next tree,
+or alternatively Russell's tree if there is a dependency I'm not seeing, for
+v4.10 cycle.
+
+Cheers.
+
+Robert Jarzmik (3):
+  ARM: sa11x0/pxa: acquire timer rate from the clock rate
+  watchdog: sa11x0/pxa: get rid of get_clock_tick_rate
+  ARM: sa11x0/pxa: get rid of get_clock_tick_rate
+
+Russell King - ARM Linux (1):
+  clk: pxa25x: OSTIMER0 clocks from the main oscillator
+
+ arch/arm/mach-pxa/generic.c                  | 18 +-----------------
+ arch/arm/mach-pxa/include/mach/hardware.h    |  2 --
+ arch/arm/mach-sa1100/generic.c               |  2 +-
+ arch/arm/mach-sa1100/include/mach/hardware.h |  4 ----
+ drivers/clk/pxa/clk-pxa25x.c                 |  2 +-
+ drivers/clocksource/pxa_timer.c              | 11 +++++------
+ drivers/watchdog/sa1100_wdt.c                | 24 +++++++++++++++++++++++-
+ include/clocksource/pxa.h                    |  3 +--
+ 8 files changed, 32 insertions(+), 34 deletions(-)
+
 -- 
 2.1.4
