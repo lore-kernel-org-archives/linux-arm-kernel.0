@@ -1,72 +1,54 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 19 Sep 2016 17:59:04 +0100
-Subject: [PATCH] coresight: tmc: Cleanup operation mode handling
-In-Reply-To: <CANLsYkxWSQFgBYHi6dosjut78uohCtX8Wv3Kw=eHk0L_7jmFVw@mail.gmail.com>
-References: <1473861230-5666-1-git-send-email-suzuki.poulose@arm.com>
- <CANLsYkxWSQFgBYHi6dosjut78uohCtX8Wv3Kw=eHk0L_7jmFVw@mail.gmail.com>
-Message-ID: <b693447b-e89c-d4ea-bc57-6c447d688055@arm.com>
+From: oss@buserror.net (Scott Wood)
+Date: Mon, 19 Sep 2016 12:01:29 -0500
+Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <20160919165258.GA30584@leverpostej>
+References: <1473469413-11019-1-git-send-email-oss@buserror.net>
+ <1473469413-11019-3-git-send-email-oss@buserror.net>
+ <20160912113615.GA20804@leverpostej>
+ <1474260085.15220.17.camel@buserror.net>
+ <20160919165258.GA30584@leverpostej>
+Message-ID: <1474304489.4283.6.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/16 18:07, Mathieu Poirier wrote:
-> On 14 September 2016 at 07:53, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->> The mode of operation of the TMC tracked in drvdata->mode is defined
->> as a local_t type. This is always checked and modified under the
->> drvdata->spinlock and hence we don't need local_t for it and the
->> unnecessary synchronisation instructions that comes with it. This
->> change makes the code a bit more cleaner.
->>
->> Also fixes the order in which we update the drvdata->mode to
->> CS_MODE_DISABLED. i.e, in tmc_disable_etX_sink we change the
->> mode to CS_MODE_DISABLED before invoking tmc_disable_etX_hw()
->> which in turn depends on the mode to decide whether to dump the
->> trace to a buffer.
->
-> Thank you for the patch - just a few comments below.
->
+On Mon, 2016-09-19 at 17:52 +0100, Mark Rutland wrote:
+> > > > 
+> > > > +static void fsl_a008585_set_sne(struct clock_event_device *clk)
+> > > > +{
+> > > > +#ifdef CONFIG_FSL_ERRATUM_A008585
+> > > > +	if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
+> > > > +		return;
+> > > > +
+> > > > +	if (arch_timer_uses_ppi == VIRT_PPI)
+> > > > +		clk->set_next_event =
+> > > > fsl_a008585_set_next_event_virt;
+> > > > +	else
+> > > > +		clk->set_next_event =
+> > > > fsl_a008585_set_next_event_phys;
+> > > > +#endif
+> > > > +}
+> > > > +
+> > > I'm not keen on the magic hook to reset the function pointers, and the
+> > > additional phys/virt stubs seem pointless. Instead, can we fold this
+> > > into the existing set_next_event? e.g. have that do:
+> > > 
+> > > 	if (needs_fsl_a008585_workaround() {
+> > > 		fsl_a008585_set_next_event(access, evt, clk);
+> > > 		return;
+> > > 	}
+> > OK. ?I had been trying to avoid messing with the standard set_next_event,
+> > but
+> > it doesn't matter as much now that static branches are being used. ?In
+> > that
+> > case we can avoid duplicating the ctrl code, and only replace the tval
+> > write.
+> Reconsidering my suggestion, I realise this will also affect the MMIO
+> timers, so that doesn't work.
+> 
+> So for the moment, I guess we have to keep fsl_a008585_set_next_event().
 
+What is the problem with MMIO timers? ?needs_fsl_a008585_workaround() should
+always be false for them.
 
->> @@ -194,17 +192,17 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32 mode)
->>                 goto out;
->>         }
->>
->> -       val = local_xchg(&drvdata->mode, mode);
->>         /*
->>          * In Perf mode there can be only one writer per sink.  There
->>          * is also no need to continue if the ETB/ETR is already operated
->>          * from sysFS.
->>          */
->> -       if (val != CS_MODE_DISABLED) {
->> +       if (drvdata->mode != CS_MODE_DISABLED) {
->>                 ret = -EINVAL;
->>                 goto out;
->>         }
->>
->> +       drvdata->mode = mode;
->
-> Given the way tmc_enable_etf_sink_perf() is called in
-> tmc_enable_etf_sink(), I think it is time to get rid of the 'mode'
-> parameter - it doesn't do anything nowadays.  Same thing for
-> tmc_enable_etf_sink_sysfs() and ETR.
-
-Sure, makes sense. I will clean it up.
-
->> @@ -279,8 +277,8 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
->>                 return;
->>         }
->>
->> +       drvdata->mode = CS_MODE_DISABLED;
->>         tmc_etf_disable_hw(drvdata);
->> -       local_set(&drvdata->mode, CS_MODE_DISABLED);
->
-> I think setting the mode should come after tmc_etf_disable_hw(), as it
-> was before.
-
-You're right, I will change it.
-
-
-Thanks for the review. Will send the updated series soon.
-
-Cheers
-Suzuki
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+-Scott
