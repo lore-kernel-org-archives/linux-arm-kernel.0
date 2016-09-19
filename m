@@ -1,17 +1,16 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Sep 2016 17:37:43 +0200
-Subject: [GIT PULL] STi DT update for v4.9, round 3
-In-Reply-To: <e51819f2-a354-7153-3b86-a92e99b85213@st.com>
-References: <e51819f2-a354-7153-3b86-a92e99b85213@st.com>
-Message-ID: <4648857.OT4ZCTT3qq@wuerfel>
+Date: Mon, 19 Sep 2016 17:39:49 +0200
+Subject: [GIT PULL] DaVinci DTS updates for v4.9 (part 2)
+In-Reply-To: <d231c316-a14b-1534-2bcd-29f0898b0b1c@ti.com>
+References: <d231c316-a14b-1534-2bcd-29f0898b0b1c@ti.com>
+Message-ID: <2260703.ZTykBRJEey@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 16, 2016 9:55:01 AM CEST Patrice Chotard wrote:
-> Clock improvement for video playback
+On Thursday, September 15, 2016 8:14:22 PM CEST Sekhar Nori wrote:
+> This pull request adds NAND support to
+> DA850 based LCDK board.
 > 
-> This serie allows to increase video resolutions and make audio
-> adjustment during a video playback for STiH407 family socs.
 > 
 
 Pulled into next/dt, thanks!
