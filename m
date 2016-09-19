@@ -1,57 +1,71 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 19 Sep 2016 09:47:55 +0200
-Subject: [PATCH 11/11] ARM: DT: STM32: add dma for usart1 on F429
-In-Reply-To: <CAF3+TqcYuXnzokoR=vAsOofBkyA1WhuXvCc6HrekAovW2VejMQ@mail.gmail.com>
-References: <CAF3+TqcYuXnzokoR=vAsOofBkyA1WhuXvCc6HrekAovW2VejMQ@mail.gmail.com>
-Message-ID: <1f39f1b6-aca8-fca1-2618-2305cf72f94c@st.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 19 Sep 2016 09:52:17 +0200
+Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
+In-Reply-To: <B88B95A5-3631-4AEF-80DC-7762C415A811@suse.de>
+References: <1474007187-18673-1-git-send-email-agraf@suse.de>
+ <57DBC782.7080305@arm.com>
+ <7beb406b-6194-8451-2d92-9a4394ef91dd@redhat.com>
+ <20160916123039.GB14140@cbox>
+ <da8191ca-6fb1-f960-872c-d6bc27172db8@redhat.com>
+ <20160916133027.GA27036@cbox>
+ <20160916134619.jjiaplhxgkkl5qri@kamzik.localdomain>
+ <B88B95A5-3631-4AEF-80DC-7762C415A811@suse.de>
+Message-ID: <20160919075217.nlxdmoicjhmc2hy6@kamzik.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bruno,
+On Fri, Sep 16, 2016 at 09:36:42PM +0200, Alexander Graf wrote:
+> 
+> 
+> > Am 16.09.2016 um 15:46 schrieb Andrew Jones <drjones@redhat.com>:
+> > 
+> >> On Fri, Sep 16, 2016 at 03:30:27PM +0200, Christoffer Dall wrote:
+> >>> On Fri, Sep 16, 2016 at 02:31:42PM +0200, Paolo Bonzini wrote:
+> >>> 
+> >>> 
+> >>> On 16/09/2016 14:30, Christoffer Dall wrote:
+> >>>>>>> This patch set allows user space to receive vtimer events as well as mask
+> >>>>>>> them, so that we can handle all vtimer related interrupt injection from user
+> >>>>>>> space, enabling us to use architected timer with user space gic emulation.
+> >>>>>> 
+> >>>>>> I have already voiced my concerns in the past, including face to face,
+> >>>>>> and I'm going to repeat it: I not keen at all on adding a new userspace
+> >>>>>> interface that is going to bitrot extremely quickly.
+> >>>>> 
+> >>>>> You don't have automated tests set up?  It's not going to bitrot if you
+> >>>>> test it, either with kvm-unit-tests or just by smoke-testing Linux.
+> >>>>> It's _for_ the raspi, but it's not limited to it.
+> >>>> 
+> >>>> Our automated testing situation is not great, no.  Something we're
+> >>>> looking at, but have resource problems with.
+> >>> 
+> >>> But it's not a good reason to hold back a feature...
+> >> 
+> >> I didn't say that exactly, but choosing not to merge something we cannot
+> >> maintain and which we're not paid to look after and where there's a
+> >> minimal interest, is not entirely unreasonable.
+> >> 
+> >> That being said, I'm not categorically against these patches, but I
+> >> share Marc's view that we've already seen that non-vgic support had been
+> >> broken for multiple versions without anyone complaining, and without
+> >> automated testing or substantial interest in the work, the patches
+> >> really are likely to bit-rot.
+> >> 
+> >> But I haven't even looked at the patches in detail, I was just replying
+> >> to the comment about testing.
+> > 
+> > This may be a great time to start encouraging feature writers to submit
+> > kvm-unit-tests patches at the same time as the feature (Hi Alex :-)
+> 
+> I actually started off implementing this with the help of kvm-unit-tests. It's awesome!
+> 
+> I'm lacking actual irq support to make the test reasonable though and wanted to get the kernel bits out first :). But I'll sit down on that again soon I hope.
 
-On 09/19/2016 03:28 AM, Bruno Herrera wrote:
->> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
->> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->
-> I just tested your patch with success in two scenarios:
->
-> 1) STM32F469IDISCO board
-> 2) Custom board running STM32F439NI
->
-> Tested-by: Bruno Herrera <bruherrera@gmail.com>
->
-> One last comment I have bellow:
->
->>
->> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
->> index 35df462..227376b 100644
->> --- a/arch/arm/boot/dts/stm32f429.dtsi
->> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->> @@ -161,6 +161,9 @@
->>                         interrupts = <37>;
->>                         clocks = <&rcc 0 164>;
->>                         status = "disabled";
->> +                       dmas = <&dma2 2 4 0x414 0x0>,
->> +                              <&dma2 7 4 0x414 0x0>;
->
-> According to stm32-dma.txt documentation in the third parameter (32bit
-> mask) only the following bits can be set : 9,10,15,16,17 and 0x414 is
-> setting bits 2 and 4. It make sense if you look in the register itself
-> (DMA_SxCR) but as far I could see from the DMA driver code this bits
-> are set internally. The correct value should be 0x400.
+I'm glad it looks like a good base for you. I need to get this series
+https://github.com/rhdrjones/kvm-unit-tests/commits/arm/gic refreshed and
+merged, and also it's time to start looking into adding interrupt
+injection to chr-testdev. With those in place I hope it'll be an even
+better base for you.
 
-Thanks for you careful review: the dma issue you noticed is due to the 
-fact that this bit field binding changed between kernel 4.2 and 4.8. 
-Front of kernel 4.2, 0x414 was fine... but now it is no more, you are 
-right.
-I will fix it in my next pull request.
-
-Thanks
-Alex
-
->
->> +                       dma-names = "rx", "tx";
->>                 };
->>
->>                 usart6: serial at 40011400 {
-.
+Thanks,
+drew
