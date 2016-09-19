@@ -1,68 +1,47 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:25 +0100
-Subject: [PATCH 14/27] drm/rockchip: dw-mipi-dsi: use specific poll helper
+Date: Mon, 19 Sep 2016 18:17:35 +0100
+Subject: [PATCH 19/26] drm/rockchip: dw-mipi-dsi: improve PLL configuration
 In-Reply-To: <20160919171747.28512-1-john@metanate.com>
 References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-16-john@metanate.com>
+Message-ID: <20160919171747.28512-26-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the documentation for readx_poll_timeout says, we want to use the
-specialized macro for readl rather than using the generic version
-directly.
+The multiplication ratio for the PLL is required to be even due to the
+use of a "by 2 pre-scaler".  Currently we are likely to end up with an
+odd multiplier even though there is an equivalent set of parameters with
+an even multiplier.
+
+For example, using the 324MHz bit rate with a reference clock of 24MHz
+we end up with M = 27, N = 2 whereas the example in the PHY databook
+gives M = 54, N = 4 for this bit rate and reference clock.
+
+By walking down through the available multiplier instead of up we are
+more likely to hit an even multiplier.  With the above example we do now
+get M = 54, N = 4 as given by the databook.
+
+While doing this, change the loop limits to encode the actual limits on
+the divisor, which are:
+
+	40MHz >= (pllref / N) >= 5MHz
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 5e343b54f0d0..097b3b0af78f 100644
+index 55237d72f3f9..7983b2749518 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -440,14 +440,14 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+@@ -520,7 +520,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
+ 	pllref = DIV_ROUND_UP(clk_get_rate(dsi->pllref_clk), USEC_PER_SEC);
+ 	tmp = pllref;
  
- 
--	ret = readx_poll_timeout(readl, dsi->base + DSI_PHY_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
- 				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
- 		dev_err(dsi->dev, "failed to wait for phy lock state\n");
- 		return ret;
- 	}
- 
--	ret = readx_poll_timeout(readl, dsi->base + DSI_PHY_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
- 				 val, val & STOP_STATE_CLK_LANE, 1000,
- 				 PHY_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
-@@ -563,7 +563,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- 	int ret;
- 	u32 val, mask;
- 
--	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, !(val & GEN_CMD_FULL), 1000,
- 				 CMD_PKT_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
-@@ -574,7 +574,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- 	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
- 
- 	mask = GEN_CMD_EMPTY | GEN_PLD_W_EMPTY;
--	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, (val & mask) == mask,
- 				 1000, CMD_PKT_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
-@@ -633,7 +633,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- 			len -= pld_data_bytes;
- 		}
- 
--		ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-+		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
- 					 val, !(val & GEN_PLD_W_FULL), 1000,
- 					 CMD_PKT_STATUS_TIMEOUT_US);
- 		if (ret < 0) {
+-	for (i = 1; i < 6; i++) {
++	for (i = pllref / 5; i > (pllref / 40); i--) {
+ 		pre = pllref / i;
+ 		if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
+ 			tmp = target_mbps % pre;
 -- 
 2.10.0.278.g4f427b1.dirty
