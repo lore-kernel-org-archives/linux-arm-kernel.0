@@ -1,94 +1,18 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 19 Sep 2016 13:08:16 -0700
-Subject: [PATCH 3/4] watchdog: sa11x0/pxa: get rid of get_clock_tick_rate
-In-Reply-To: <1474312335-20997-4-git-send-email-robert.jarzmik@free.fr>
-References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
- <1474312335-20997-4-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20160919200816.GC29242@roeck-us.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Sep 2016 22:30:40 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.9 (#2)
+In-Reply-To: <87d1k6bio7.fsf@free-electrons.com>
+References: <87d1k6bio7.fsf@free-electrons.com>
+Message-ID: <7861229.KShLrquWNF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 09:12:14PM +0200, Robert Jarzmik wrote:
-> The OS timer rate used for the watchdog can now be fetched from the
-> standard clock API. This will remove the last user of
-> get_clock_tick_rate() in both pxa and sa11x0 architectures.
+On Wednesday, September 14, 2016 5:33:12 PM CEST Gregory CLEMENT wrote:
+> mvebu dt64 for 4.9 (part 2)
 > 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
-Did you test this ? Potential problem, if built into the kernel, could be that
-the clocks might not be ready by the time the driver is instantiated. Unless
-this is converted to a platform driver, it won't be able to handle a
--EPROBE_DEFER from the clock subsystem.
-
-Guenter
-
-> ---
->  drivers/watchdog/sa1100_wdt.c | 24 +++++++++++++++++++++++-
->  1 file changed, 23 insertions(+), 1 deletion(-)
+> - enable MSI for PCIe on Armada 7K/8K
 > 
-> diff --git a/drivers/watchdog/sa1100_wdt.c b/drivers/watchdog/sa1100_wdt.c
-> index e1d39a1e9628..8965e3f536c3 100644
-> --- a/drivers/watchdog/sa1100_wdt.c
-> +++ b/drivers/watchdog/sa1100_wdt.c
-> @@ -22,6 +22,7 @@
->  
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
-> +#include <linux/clk.h>
->  #include <linux/types.h>
->  #include <linux/kernel.h>
->  #include <linux/fs.h>
-> @@ -155,12 +156,27 @@ static struct miscdevice sa1100dog_miscdev = {
->  };
->  
->  static int margin __initdata = 60;		/* (secs) Default is 1 minute */
-> +static struct clk *clk;
->  
->  static int __init sa1100dog_init(void)
->  {
->  	int ret;
->  
-> -	oscr_freq = get_clock_tick_rate();
-> +	clk = clk_get(NULL, "OSTIMER0");
-> +	if (IS_ERR(clk)) {
-> +		pr_err("SA1100/PXA2xx Watchdog Timer: clock not found: %d\n",
-> +		       (int) PTR_ERR(clk));
-> +		return PTR_ERR(clk);
-> +	}
-> +
-> +	ret = clk_prepare_enable(clk);
-> +	if (ret) {
-> +		pr_err("SA1100/PXA2xx Watchdog Timer: clock failed to prepare+enable: %d\n",
-> +		       ret);
-> +		goto err;
-> +	}
-> +
-> +	oscr_freq = clk_get_rate(clk);
->  
->  	/*
->  	 * Read the reset status, and save it for later.  If
-> @@ -176,11 +192,17 @@ static int __init sa1100dog_init(void)
->  		pr_info("SA1100/PXA2xx Watchdog Timer: timer margin %d sec\n",
->  			margin);
->  	return ret;
-> +err:
-> +	clk_disable_unprepare(clk);
-> +	clk_put(clk);
-> +	return ret;
->  }
->  
->  static void __exit sa1100dog_exit(void)
->  {
->  	misc_deregister(&sa1100dog_miscdev);
-> +	clk_disable_unprepare(clk);
-> +	clk_put(clk);
->  }
->  
->  module_init(sa1100dog_init);
-> -- 
-> 2.1.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Pulled into next/dt64, thanks!
+
+	Arnd
