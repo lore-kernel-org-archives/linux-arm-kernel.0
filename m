@@ -1,63 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 19 Sep 2016 10:54:38 +0200
-Subject: [PATCH RFC 4/8] ARM: shmobile: r8a7743: basic SoC support
-In-Reply-To: <7093322.WFIWVqz40g@wasted.cogentembedded.com>
-References: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
- <7093322.WFIWVqz40g@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdXpoSYQFXu17hc-jt-GrbgMsXuzjkzubujZTY3UJ95BRg@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 19 Sep 2016 09:56:50 +0100
+Subject: [PATCH 00/19] [RESEND] Remove STiH415 and STiH416 SoC platform
+ support
+In-Reply-To: <10792443.jxCOopyCy4@wuerfel>
+References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
+ <7524458.uFhxDUCqEo@wuerfel>
+ <20160915070139.GA14319@griffinp-ThinkPad-X1-Carbon-2nd>
+ <10792443.jxCOopyCy4@wuerfel>
+Message-ID: <20160919085650.GA4948@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Arnd,
 
-On Fri, Sep 16, 2016 at 3:33 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Add minimal support for the RZ/G1M (R8A7743) SoC.
->
-> Based on the original (and large) patch by Dmitry Shifrin
-> <dmitry.shifrin@cogentembedded.com>.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> ---
->  arch/arm/mach-shmobile/Kconfig         |    5 ++++
->  arch/arm/mach-shmobile/Makefile        |    1
->  arch/arm/mach-shmobile/setup-r8a7743.c |   34 +++++++++++++++++++++++++++++++++
->  3 files changed, 40 insertions(+)
->
-> Index: renesas/arch/arm/mach-shmobile/Kconfig
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/Kconfig
-> +++ renesas/arch/arm/mach-shmobile/Kconfig
-> @@ -68,6 +68,11 @@ config ARCH_R8A7740
->         select ARCH_RMOBILE
->         select RENESAS_INTC_IRQPIN
->
-> +config ARCH_R8A7743
-> +       bool "RZ/G1M (R8A77430)"
-> +       select ARCH_RCAR_GEN2
-> +       select I2C
+On Thu, 15 Sep 2016, Arnd Bergmann wrote:
 
-The only reason R8A779[013] selects I2C is because they need
-regulator-quirk-rcar-gen2.c. Without schematics, it's hard to say if this is
-needed for SK-RZG1M, too.
+> On Thursday, September 15, 2016 8:01:39 AM CEST Peter Griffin wrote:
+> > 
+> > STiH415 I'm sure never shipped. I'm reasonably sure STiH416 didn't
+> > either. These SoCs were considered legacy even when I was at ST
+> > ~3 years ago.
+> > 
+> > Also remember these are STB SoC's, so JTAG fuses are blown in
+> > production boxes, and also full security is enabled. This means the
+> > primary bootloader will only boot a signed kernel. So if a end user
+> > did happen to have a box they would be unable to upgrade their kernel.
+> > 
+> > From the landing team perspective they were interesting in that they
+> > shared many IPs with the STiH407 family on which future chipsets were
+> > based, and were available to us when that silicon was harder to get
+> > hold of. So we used it as a vehicle for upstreaming so that upstream
+> > support was already quite good when STiH407 silicon did land on our
+> > desk.
+> 
+> Ok, makes sense. I did stumble over one machine basedon STiH412
+> the other day [1], but there probably isn't much shared with that
+> one. Since this a NAS server rather than an STB box, it's probably
+> less locked-down and potentially a target for OpenWRT or similar.
 
-The Board Hardware Manual states SK-RZG1M has both DA9063 and DA9210.
-It does state DA9063 is connected to IRQ2, but doesn't mention an interrupt
-line for DA9210, so we don't know if they share IRQ2. Note that the Koelsch
-fails to mention that DA9210 uses IRQ2, so this doesn't mean much.
-For Porter we do not have the quirk enabled, while it has both regulators, too.
+I just double checked with ST and STiH412 is a STiH407 family based SoC
+so support still exists for this upstream. No idea what if any security is
+enabled on this product though.
 
-You can try to enable regulator-quirk-rcar-gen2.c for "renesas,sk-rzg1m" too,
-and see what's printed by the kernel after a cold boot...
+Most probably the A/V stack on it will be SDK2, although native upstream
+multimedia drivers for this chipset are looking pretty good now.
 
-Gr{oetje,eeting}s,
+Peter.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> [1] http://www.heise.de/preisvergleich/synology-diskstation-ds216play-16tb-a1400885.html
