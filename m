@@ -1,80 +1,61 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Mon, 19 Sep 2016 13:45:49 +0200
-Subject: [PATCH v3 0/2] KVM: ARM: Enable vtimers with user space gic
-In-Reply-To: <20160919075217.nlxdmoicjhmc2hy6@kamzik.localdomain>
-References: <1474007187-18673-1-git-send-email-agraf@suse.de>
- <57DBC782.7080305@arm.com> <7beb406b-6194-8451-2d92-9a4394ef91dd@redhat.com>
- <20160916123039.GB14140@cbox>
- <da8191ca-6fb1-f960-872c-d6bc27172db8@redhat.com>
- <20160916133027.GA27036@cbox>
- <20160916134619.jjiaplhxgkkl5qri@kamzik.localdomain>
- <B88B95A5-3631-4AEF-80DC-7762C415A811@suse.de>
- <20160919075217.nlxdmoicjhmc2hy6@kamzik.localdomain>
-Message-ID: <78bc5455-22e2-f914-5677-983af6a33d47@suse.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 19 Sep 2016 13:50:54 +0200
+Subject: [PATCH] ARM: mvebu: let Armada XP also select corediv clk
+In-Reply-To: <1474276961-4645-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ ("Uwe =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Mon, 19 Sep 2016
+ 11:22:41 +0200")
+References: <1474276961-4645-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <87bmzk9kgx.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Uwe,
+ 
+ On lun., sept. 19 2016, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
+> An Armada XP there is also a marvell,armada-370-corediv-clock
+> compatible device that is needed to make the nand device work.
 
-On 19.09.16 09:52, Andrew Jones wrote:
-> On Fri, Sep 16, 2016 at 09:36:42PM +0200, Alexander Graf wrote:
->>
->>
->>> Am 16.09.2016 um 15:46 schrieb Andrew Jones <drjones@redhat.com>:
->>>
->>>> On Fri, Sep 16, 2016 at 03:30:27PM +0200, Christoffer Dall wrote:
->>>>> On Fri, Sep 16, 2016 at 02:31:42PM +0200, Paolo Bonzini wrote:
->>>>>
->>>>>
->>>>> On 16/09/2016 14:30, Christoffer Dall wrote:
->>>>>>>>> This patch set allows user space to receive vtimer events as well as mask
->>>>>>>>> them, so that we can handle all vtimer related interrupt injection from user
->>>>>>>>> space, enabling us to use architected timer with user space gic emulation.
->>>>>>>>
->>>>>>>> I have already voiced my concerns in the past, including face to face,
->>>>>>>> and I'm going to repeat it: I not keen at all on adding a new userspace
->>>>>>>> interface that is going to bitrot extremely quickly.
->>>>>>>
->>>>>>> You don't have automated tests set up?  It's not going to bitrot if you
->>>>>>> test it, either with kvm-unit-tests or just by smoke-testing Linux.
->>>>>>> It's _for_ the raspi, but it's not limited to it.
->>>>>>
->>>>>> Our automated testing situation is not great, no.  Something we're
->>>>>> looking at, but have resource problems with.
->>>>>
->>>>> But it's not a good reason to hold back a feature...
->>>>
->>>> I didn't say that exactly, but choosing not to merge something we cannot
->>>> maintain and which we're not paid to look after and where there's a
->>>> minimal interest, is not entirely unreasonable.
->>>>
->>>> That being said, I'm not categorically against these patches, but I
->>>> share Marc's view that we've already seen that non-vgic support had been
->>>> broken for multiple versions without anyone complaining, and without
->>>> automated testing or substantial interest in the work, the patches
->>>> really are likely to bit-rot.
->>>>
->>>> But I haven't even looked at the patches in detail, I was just replying
->>>> to the comment about testing.
->>>
->>> This may be a great time to start encouraging feature writers to submit
->>> kvm-unit-tests patches at the same time as the feature (Hi Alex :-)
->>
->> I actually started off implementing this with the help of kvm-unit-tests. It's awesome!
->>
->> I'm lacking actual irq support to make the test reasonable though and wanted to get the kernel bits out first :). But I'll sit down on that again soon I hope.
-> 
-> I'm glad it looks like a good base for you. I need to get this series
-> https://github.com/rhdrjones/kvm-unit-tests/commits/arm/gic refreshed and
-> merged, and also it's time to start looking into adding interrupt
-> injection to chr-testdev. With those in place I hope it'll be an even
-> better base for you.
+Indeed when I acked the commit bd3677ff31a3 ("clk: mvebu: Remove corediv clock from
+Armada XP") I missed that the armada-370-corediv-clock compatible sting
+was for Armada 370 and Armada XP. We didn't see it until now because I
+used the mvebu_v7_defconfig (or the multi_v7_defconfig) where all the
+mvebu SoC are enabled.
 
-Awesome. Let me know when you're further ahead with the gic work then so
-that we can actually trigger interrupts and measure irq latencies :).
+But the Armada 39x also need it and actually all the SoC selecting
+MVEBU_V7 config need this clock.
 
-Until then, I sent the simplistic version that I used for bringup to the
-list.
+So I am sending a patch to fix it and it will part of the pull request
+to arm-soc for the fix this week.
 
+Thanks,
 
-Alex
+Gregory
+
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-mvebu/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index f9b6bd306cfe..2979a9c454f6 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -97,6 +97,7 @@ config MACH_ARMADA_XP
+>  	select CPU_PJ4B
+>  	select MACH_MVEBU_V7
+>  	select PINCTRL_ARMADA_XP
+> +	select MVEBU_CLK_COREDIV
+>  	help
+>  	  Say 'Y' here if you want your kernel to support boards based
+>  	  on the Marvell Armada XP SoC with device tree.
+> -- 
+> 2.8.1
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
