@@ -1,77 +1,85 @@
-From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:46 +0100
-Subject: [PATCH 25/26] drm/rockchip: dw-mipi-dsi: add reset control
-In-Reply-To: <20160919171747.28512-1-john@metanate.com>
-References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-37-john@metanate.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 19 Sep 2016 18:29:15 +0100
+Subject: [PATCH] irqchip/gicv3: silence noisy DEBUG_PER_CPU_MAPS warning
+Message-ID: <1474306155-3303-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to fully reset the state of the MIPI controller we must assert
-this reset.
+gic_raise_softirq() walks the list of cpus using for_each_cpu(), it calls
+gic_compute_target_list() which advances the iterator by the number of
+CPUs in the cluster.
 
-This is slightly more complicated than it could be in order to maintain
-compatibility with device trees that do not specify the reset property.
+If gic_compute_target_list() reaches the last CPU it leaves the iterator
+pointing at the last CPU. This means the next time round the for_each_cpu()
+loop cpumask_next() will be called with an invalid CPU.
 
-Signed-off-by: John Keeping <john@metanate.com>
+This triggers a warning when built with CONFIG_DEBUG_PER_CPU_MAPS:
+[    3.077738] GICv3: CPU1: found redistributor 1 region 0:0x000000002f120000
+[    3.077943] CPU1: Booted secondary processor [410fd0f0]
+[    3.078542] ------------[ cut here ]------------
+[    3.078746] WARNING: CPU: 1 PID: 0 at ../include/linux/cpumask.h:121 gic_raise_softirq+0x12c/0x170
+[    3.078812] Modules linked in:
+[    3.078869]
+[    3.078930] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc5+ #5188
+[    3.078994] Hardware name: Foundation-v8A (DT)
+[    3.079059] task: ffff80087a1a0080 task.stack: ffff80087a19c000
+[    3.079145] PC is at gic_raise_softirq+0x12c/0x170
+[    3.079226] LR is at gic_raise_softirq+0xa4/0x170
+[    3.079296] pc : [<ffff0000083ead24>] lr : [<ffff0000083eac9c>] pstate: 200001c9
+[    3.081139] Call trace:
+[    3.081202] Exception stack(0xffff80087a19fbe0 to 0xffff80087a19fd10)
+
+[    3.082269] [<ffff0000083ead24>] gic_raise_softirq+0x12c/0x170
+[    3.082354] [<ffff00000808e614>] smp_send_reschedule+0x34/0x40
+[    3.082433] [<ffff0000080e80a0>] resched_curr+0x50/0x88
+[    3.082512] [<ffff0000080e89d0>] check_preempt_curr+0x60/0xd0
+[    3.082593] [<ffff0000080e8a60>] ttwu_do_wakeup+0x20/0xe8
+[    3.082672] [<ffff0000080e8bb8>] ttwu_do_activate+0x90/0xc0
+[    3.082753] [<ffff0000080ea9a4>] try_to_wake_up+0x224/0x370
+[    3.082836] [<ffff0000080eabc8>] default_wake_function+0x10/0x18
+[    3.082920] [<ffff000008103134>] __wake_up_common+0x5c/0xa0
+[    3.083003] [<ffff0000081031f4>] __wake_up_locked+0x14/0x20
+[    3.083086] [<ffff000008103f80>] complete+0x40/0x60
+[    3.083168] [<ffff00000808df7c>] secondary_start_kernel+0x15c/0x1d0
+[    3.083240] [<00000000808911a4>] 0x808911a4
+[    3.113401] Detected PIPT I-cache on CPU2
+
+Avoid updating the iterator if the next call to cpumask_next() would
+cause the for_each_cpu() loop to exit.
+
+There is no change to gic_raise_softirq()'s behaviour, (cpumask_next()s
+eventual call to _find_next_bit() will return early as start >= nbits),
+this patch just silences the warning.
+
+Signed-off-by: James Morse <james.morse@arm.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/irqchip/irq-gic-v3.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index d93e620adea6..d0b2f6e9517d 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/of_device.h>
- #include <linux/regmap.h>
-+#include <linux/reset.h>
- #include <linux/mfd/syscon.h>
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_crtc.h>
-@@ -1134,6 +1135,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 			of_match_device(dw_mipi_dsi_dt_ids, dev);
- 	const struct dw_mipi_dsi_plat_data *pdata = of_id->data;
- 	struct platform_device *pdev = to_platform_device(dev);
-+	struct reset_control *apb_rst;
- 	struct drm_device *drm = data;
- 	struct dw_mipi_dsi *dsi;
- 	struct resource *res;
-@@ -1172,6 +1174,34 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 		return ret;
- 	}
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index ede5672ab34d..9e37c447cc2c 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -548,6 +548,7 @@ static int gic_starting_cpu(unsigned int cpu)
+ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
+ 				   unsigned long cluster_id)
+ {
++	int next_cpu;
+ 	int cpu = *base_cpu;
+ 	unsigned long mpidr = cpu_logical_map(cpu);
+ 	u16 tlist = 0;
+@@ -562,9 +563,10 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
  
-+	/*
-+	 * Note that the reset was not defined in the initial device tree, so
-+	 * we have to be prepared for it not being found.
-+	 */
-+	apb_rst = devm_reset_control_get(dev, "apb");
-+	if (IS_ERR(apb_rst)) {
-+		if (PTR_ERR(apb_rst) == -ENODEV) {
-+			apb_rst = NULL;
-+		} else {
-+			dev_err(dev, "Unable to get reset control: %d\n", ret);
-+			return PTR_ERR(apb_rst);
-+		}
-+	}
-+
-+	if (apb_rst) {
-+		ret = clk_prepare_enable(dsi->pclk);
-+		if (ret) {
-+			dev_err(dev, "%s: Failed to enable pclk\n", __func__);
-+			return ret;
-+		}
-+
-+		reset_control_assert(apb_rst);
-+		usleep_range(10, 20);
-+		reset_control_deassert(apb_rst);
-+
-+		clk_disable_unprepare(dsi->pclk);
-+	}
-+
- 	ret = clk_prepare_enable(dsi->pllref_clk);
- 	if (ret) {
- 		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
+ 		tlist |= 1 << (mpidr & 0xf);
+ 
+-		cpu = cpumask_next(cpu, mask);
+-		if (cpu >= nr_cpu_ids)
++		next_cpu = cpumask_next(cpu, mask);
++		if (next_cpu >= nr_cpu_ids)
+ 			goto out;
++		cpu = next_cpu;
+ 
+ 		mpidr = cpu_logical_map(cpu);
+ 
 -- 
-2.10.0.278.g4f427b1.dirty
+2.8.0.rc3
