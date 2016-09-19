@@ -1,85 +1,91 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 19 Sep 2016 18:29:15 +0100
-Subject: [PATCH] irqchip/gicv3: silence noisy DEBUG_PER_CPU_MAPS warning
-Message-ID: <1474306155-3303-1-git-send-email-james.morse@arm.com>
+From: john@metanate.com (John Keeping)
+Date: Mon, 19 Sep 2016 18:17:47 +0100
+Subject: [PATCH 26/26] drm/rockchip: dw-mipi-dsi: support read commands
+In-Reply-To: <20160919171747.28512-1-john@metanate.com>
+References: <20160919171747.28512-1-john@metanate.com>
+Message-ID: <20160919171747.28512-38-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gic_raise_softirq() walks the list of cpus using for_each_cpu(), it calls
-gic_compute_target_list() which advances the iterator by the number of
-CPUs in the cluster.
+I haven't found any method for getting the length of a response, so this
+just uses the requested rx_len
 
-If gic_compute_target_list() reaches the last CPU it leaves the iterator
-pointing at the last CPU. This means the next time round the for_each_cpu()
-loop cpumask_next() will be called with an invalid CPU.
-
-This triggers a warning when built with CONFIG_DEBUG_PER_CPU_MAPS:
-[    3.077738] GICv3: CPU1: found redistributor 1 region 0:0x000000002f120000
-[    3.077943] CPU1: Booted secondary processor [410fd0f0]
-[    3.078542] ------------[ cut here ]------------
-[    3.078746] WARNING: CPU: 1 PID: 0 at ../include/linux/cpumask.h:121 gic_raise_softirq+0x12c/0x170
-[    3.078812] Modules linked in:
-[    3.078869]
-[    3.078930] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc5+ #5188
-[    3.078994] Hardware name: Foundation-v8A (DT)
-[    3.079059] task: ffff80087a1a0080 task.stack: ffff80087a19c000
-[    3.079145] PC is at gic_raise_softirq+0x12c/0x170
-[    3.079226] LR is at gic_raise_softirq+0xa4/0x170
-[    3.079296] pc : [<ffff0000083ead24>] lr : [<ffff0000083eac9c>] pstate: 200001c9
-[    3.081139] Call trace:
-[    3.081202] Exception stack(0xffff80087a19fbe0 to 0xffff80087a19fd10)
-
-[    3.082269] [<ffff0000083ead24>] gic_raise_softirq+0x12c/0x170
-[    3.082354] [<ffff00000808e614>] smp_send_reschedule+0x34/0x40
-[    3.082433] [<ffff0000080e80a0>] resched_curr+0x50/0x88
-[    3.082512] [<ffff0000080e89d0>] check_preempt_curr+0x60/0xd0
-[    3.082593] [<ffff0000080e8a60>] ttwu_do_wakeup+0x20/0xe8
-[    3.082672] [<ffff0000080e8bb8>] ttwu_do_activate+0x90/0xc0
-[    3.082753] [<ffff0000080ea9a4>] try_to_wake_up+0x224/0x370
-[    3.082836] [<ffff0000080eabc8>] default_wake_function+0x10/0x18
-[    3.082920] [<ffff000008103134>] __wake_up_common+0x5c/0xa0
-[    3.083003] [<ffff0000081031f4>] __wake_up_locked+0x14/0x20
-[    3.083086] [<ffff000008103f80>] complete+0x40/0x60
-[    3.083168] [<ffff00000808df7c>] secondary_start_kernel+0x15c/0x1d0
-[    3.083240] [<00000000808911a4>] 0x808911a4
-[    3.113401] Detected PIPT I-cache on CPU2
-
-Avoid updating the iterator if the next call to cpumask_next() would
-cause the for_each_cpu() loop to exit.
-
-There is no change to gic_raise_softirq()'s behaviour, (cpumask_next()s
-eventual call to _find_next_bit() will return early as start >= nbits),
-this patch just silences the warning.
-
-Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 54 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index ede5672ab34d..9e37c447cc2c 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -548,6 +548,7 @@ static int gic_starting_cpu(unsigned int cpu)
- static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
- 				   unsigned long cluster_id)
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+index d0b2f6e9517d..6dc43c024bca 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+@@ -676,6 +676,54 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+ 	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
+ }
+ 
++static int dw_mipi_dsi_dcs_read(struct dw_mipi_dsi *dsi,
++				const struct mipi_dsi_msg *msg)
++{
++	const u8 *tx_buf = msg->tx_buf;
++	u8 *rx_buf = msg->rx_buf;
++	size_t i;
++	int ret, val;
++
++	dsi_write(dsi, DSI_PCKHDL_CFG, EN_CRC_RX | EN_ECC_RX | EN_BTA);
++	dsi_write(dsi, DSI_GEN_HDR, GEN_HDATA(tx_buf[0]) | GEN_HTYPE(msg->type));
++
++	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
++				 val, !(val & GEN_RD_CMD_BUSY), 1000,
++				 CMD_PKT_STATUS_TIMEOUT_US);
++	if (ret < 0) {
++		dev_err(dsi->dev, "failed to read command response\n");
++		return ret;
++	}
++
++	for (i = 0; i < msg->rx_len;) {
++		u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
++		while (i < msg->rx_len) {
++			rx_buf[i] = pld & 0xff;
++			pld >>= 8;
++			i++;
++		}
++	}
++
++	return msg->rx_len;
++}
++
++static int dw_mipi_dsi_set_max_return_packet_size(struct dw_mipi_dsi *dsi,
++						  size_t len)
++{
++	u8 val[] = { len & 0xff, (len >> 8) & 0xff };
++	struct mipi_dsi_msg msg = {
++		.channel = dsi->channel,
++		.type = MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE,
++		.tx_buf = val,
++		.tx_len = 2,
++	};
++
++	if (len > 0xffff)
++		return -EINVAL;
++
++	return dw_mipi_dsi_dcs_short_write(dsi, &msg);
++}
++
+ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 					 const struct mipi_dsi_msg *msg)
  {
-+	int next_cpu;
- 	int cpu = *base_cpu;
- 	unsigned long mpidr = cpu_logical_map(cpu);
- 	u16 tlist = 0;
-@@ -562,9 +563,10 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
- 
- 		tlist |= 1 << (mpidr & 0xf);
- 
--		cpu = cpumask_next(cpu, mask);
--		if (cpu >= nr_cpu_ids)
-+		next_cpu = cpumask_next(cpu, mask);
-+		if (next_cpu >= nr_cpu_ids)
- 			goto out;
-+		cpu = next_cpu;
- 
- 		mpidr = cpu_logical_map(cpu);
- 
+@@ -693,6 +741,12 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 	case MIPI_DSI_DCS_LONG_WRITE:
+ 		ret = dw_mipi_dsi_dcs_long_write(dsi, msg);
+ 		break;
++	case MIPI_DSI_DCS_READ:
++		ret = dw_mipi_dsi_set_max_return_packet_size(dsi, msg->rx_len);
++		if (ret < 0)
++			return ret;
++		ret = dw_mipi_dsi_dcs_read(dsi, msg);
++		break;
+ 	default:
+ 		dev_err(dsi->dev, "unsupported message type 0x%02x\n",
+ 			msg->type);
 -- 
-2.8.0.rc3
+2.10.0.278.g4f427b1.dirty
