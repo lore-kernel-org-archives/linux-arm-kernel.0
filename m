@@ -1,105 +1,75 @@
-From: ayaka@soulik.info (Randy Li)
-Date: Tue, 20 Sep 2016 03:02:50 +0800
-Subject: [RFC PATCH v3 1/2] ARM: dts: samsung: add rga-lvds panel in itop elite
-In-Reply-To: <1474311771-23321-1-git-send-email-ayaka@soulik.info>
-References: <1474311771-23321-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1474311771-23321-2-git-send-email-ayaka@soulik.info>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 19 Sep 2016 21:12:15 +0200
+Subject: [PATCH 4/4] ARM: sa11x0/pxa: get rid of get_clock_tick_rate
+In-Reply-To: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
+References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1474312335-20997-5-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is actually a lvds panel connected through a rga-lvds bridge.
-The touchscreen is communicated with i2c bus but the driver is not
-support now.
+The last user of this function is gone, so remove it. The clock API
+should now be used to get clock rates.
 
-Signed-off-by: Randy Li <ayaka@soulik.info>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/boot/dts/exynos4412-itop-elite.dts | 54 +++++++++++++++++++++++++++--
- 1 file changed, 52 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/generic.c                  | 15 ---------------
+ arch/arm/mach-pxa/include/mach/hardware.h    |  2 --
+ arch/arm/mach-sa1100/include/mach/hardware.h |  4 ----
+ 3 files changed, 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos4412-itop-elite.dts b/arch/arm/boot/dts/exynos4412-itop-elite.dts
-index b08705e..5153522 100644
---- a/arch/arm/boot/dts/exynos4412-itop-elite.dts
-+++ b/arch/arm/boot/dts/exynos4412-itop-elite.dts
-@@ -138,6 +138,36 @@
- 		assigned-clocks = <&clock CLK_MOUT_CAM0>;
- 		assigned-clock-parents = <&clock CLK_XUSBXTI>;
- 	};
-+
-+	vcc_sys_lcd: sys-lcd {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_5v";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpl0 4 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	panel: panel at 0 {
-+		compatible = "chunghwa,claa070wp03xg";
-+
-+		power-supply = <&vcc_sys_lcd>;
-+		enable-gpios = <&gpl0 2 GPIO_ACTIVE_HIGH>;
-+		backlight = <&bl>;
-+
-+		port {
-+			lcd_ep: endpoint {
-+				remote-endpoint = <&rga_lvds>;
-+			};
-+		};
-+	};
-+
-+	bl: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 1 5000000 PWM_POLARITY_INVERTED>;
-+		brightness-levels = <0 5 12 16 32 64 128 255>;
-+		default-brightness-level = <5>;
-+		power-supply = <&vcc_sys_lcd>;
-+	};
- };
+diff --git a/arch/arm/mach-pxa/generic.c b/arch/arm/mach-pxa/generic.c
+index 2a9297991d74..cb73a9723d0e 100644
+--- a/arch/arm/mach-pxa/generic.c
++++ b/arch/arm/mach-pxa/generic.c
+@@ -43,21 +43,6 @@ void clear_reset_status(unsigned int mask)
+ 	}
+ }
  
- &adc {
-@@ -171,11 +201,31 @@
- 	assigned-clock-rates = <0>, <176000000>;
- };
+-unsigned long get_clock_tick_rate(void)
+-{
+-	unsigned long clock_tick_rate;
+-
+-	if (cpu_is_pxa25x())
+-		clock_tick_rate = 3686400;
+-	else if (machine_is_mainstone())
+-		clock_tick_rate = 3249600;
+-	else
+-		clock_tick_rate = 3250000;
+-
+-	return clock_tick_rate;
+-}
+-EXPORT_SYMBOL(get_clock_tick_rate);
+-
+ /*
+  * For non device-tree builds, keep legacy timer init
+  */
+diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
+index 8d63c211b22f..55064124ca4e 100644
+--- a/arch/arm/mach-pxa/include/mach/hardware.h
++++ b/arch/arm/mach-pxa/include/mach/hardware.h
+@@ -303,8 +303,6 @@
+  */
+ extern unsigned int get_memclk_frequency_10khz(void);
  
-+&fimd {
-+	pinctrl-0 = <&lcd_clk &lcd_data24>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		port at 3 {
-+			reg = <3>;
-+			rga_lvds: endpoint {
-+				remote-endpoint = <&lcd_ep>;
-+			};
-+		};
-+	};
-+};
-+
- &hsotg {
- 	dr_mode = "peripheral";
- 	status = "okay";
- };
+-/* return the clock tick rate of the OS timer */
+-extern unsigned long get_clock_tick_rate(void);
+ #endif
  
-+&i2c_3 {
-+	status = "okay";
-+};
-+
- &i2c_4 {
- 	samsung,i2c-sda-delay = <100>;
- 	samsung,i2c-slave-addr = <0x10>;
-@@ -215,9 +265,9 @@
+ #endif  /* _ASM_ARCH_HARDWARE_H */
+diff --git a/arch/arm/mach-sa1100/include/mach/hardware.h b/arch/arm/mach-sa1100/include/mach/hardware.h
+index cbedd75a9d65..474844a93e29 100644
+--- a/arch/arm/mach-sa1100/include/mach/hardware.h
++++ b/arch/arm/mach-sa1100/include/mach/hardware.h
+@@ -61,10 +61,6 @@
+ # define __REG(x)	(*((volatile unsigned long __iomem *)io_p2v(x)))
+ # define __PREG(x)	(io_v2p((unsigned long)&(x)))
  
- &pwm {
- 	status = "okay";
--	pinctrl-0 = <&pwm0_out>;
-+	pinctrl-0 = <&pwm0_out &pwm1_out>;
- 	pinctrl-names = "default";
--	samsung,pwm-outputs = <0>;
-+	samsung,pwm-outputs = <0>, <1>;
- };
+-static inline unsigned long get_clock_tick_rate(void)
+-{
+-	return 3686400;
+-}
+ #else
  
- &sdhci_2 {
+ # define __REG(x)	io_p2v(x)
 -- 
-2.7.4
+2.1.4
