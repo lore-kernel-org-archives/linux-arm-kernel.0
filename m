@@ -1,51 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Sep 2016 09:50:00 +0100
-Subject: [PATCH] pinctrl: nomadik: don't default-flag IRQs as falling
-In-Reply-To: <1474273330-15789-1-git-send-email-linus.walleij@linaro.org>
-References: <1474273330-15789-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <57DFA6B8.5070306@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Sep 2016 10:52:01 +0200
+Subject: [GIT PULL 3/4] Broadcom devicetree changes for 4.9
+In-Reply-To: <1473213558-11782-3-git-send-email-f.fainelli@gmail.com>
+References: <1473213558-11782-1-git-send-email-f.fainelli@gmail.com>
+ <1473213558-11782-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <11767334.P2mG8nZVoa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/16 09:22, Linus Walleij wrote:
-> There is no point in adding any default trigger for these
-> GPIO interrupts: the device tree should contain all trigger
-> information and the platforms using the driver boots
-> exclusively from device tree.
+On Tuesday, September 6, 2016 6:59:17 PM CEST Florian Fainelli wrote:
+> This pull request contains Broadcom ARM-based Device Tree changes for v4.9,
+> please pull the following:
 > 
-> Also the boot log is nagging me to fix this:
+> - Jon adds support for the Ethernet MAC DT nodes (AMAC) and provides the
+>   following updates for Broadcom references boards:
+>   * New Northstar Plus reference boards added: BCM958525er, BCM958522er,
+>     BCM988312hr, BCM958623hr and BCM958622hr
+>   * Add SATA nodes to the BCM958625hr and XMC boards
+>   * Add I2C nodes to the XMC board
+>   * Fixes the amount of RAM on BCM958625HR, BCM958625K and BCM958525XMC boards
+>   * Add the GPIO reboot method for BCM958625hr and XMC boards
 > 
-> [    0.771057] ------------[ cut here ]------------
-> [    0.775695] WARNING: CPU: 0 PID: 1 at
->    ../drivers/gpio/gpiolib.c:1622 _gpiochip_irqchip_add+0x138/0x160
-> [    0.785034] /soc/gpio at 8012e000: Ignoring 2 default trigger
-> (...)
-> [    0.942962] gpio 8012e000.gpio: at address e08f8000
-> (etc ad nauseam)
+> - Dhanajay adds PWM nodes for the Northstar Plus SoCs
 > 
-> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/pinctrl/nomadik/pinctrl-nomadik.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> - Rafal adds the USB 2.0 PHY to the BCM5301x Device Tree file include
 > 
-> diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-> index 205fb399268a..d318ca055489 100644
-> --- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-> +++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-> @@ -1177,7 +1177,7 @@ static int nmk_gpio_probe(struct platform_device *dev)
->  				   irqchip,
->  				   0,
->  				   handle_edge_irq,
-> -				   IRQ_TYPE_EDGE_FALLING);
-> +				   IRQ_TYPE_NONE);
->  	if (ret) {
->  		dev_err(&dev->dev, "could not add irqchip\n");
->  		gpiochip_remove(&nmk_chip->chip);
+> - Stefan adds a missing USB clock to the BCM283x DT files, adds a DTSI file for
+>   the USB host mode on BCM283x and finally documents and adds support for the
+>   Raspberry Pi Zero
+> 
+> - Florian adds support for the Northstar Plus Switch Register Access block which
+>   enables the integrated switch on these SoCs and enables the switch ports on the
+>   BCM958625HR reference board
 > 
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+I pulled this into next/dt last Thursday but forgot to send a notification.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Florian already asked me about on Friday, thanks a lot for paying attention!
+
+	Arnd
