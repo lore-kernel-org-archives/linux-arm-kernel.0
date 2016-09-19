@@ -1,34 +1,34 @@
-From: jason.wessel@windriver.com (Jason Wessel)
-Date: Mon, 19 Sep 2016 17:29:36 -0500
-Subject: [RESEND PATCH] arm64: kgdb: fix single stepping
-In-Reply-To: <20160916043218.GA30248@linaro.org>
-References: <1429578793-3971-1-git-send-email-takahiro.akashi@linaro.org>
- <0ea7dfad-e25d-2919-2d03-17b850d7ba91@windriver.com>
- <20160916043218.GA30248@linaro.org>
-Message-ID: <bb9cf2c6-83b4-1c71-d497-67f751de9b35@windriver.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 19 Sep 2016 15:35:39 -0700
+Subject: [GIT PULL 2/2] arm64: X-Gene platforms DTS changes queued for 4.9
+In-Reply-To: <5369836.4ELrYOmq06@wuerfel>
+References: <CADaLNDk7uP8Gv+YB6oJfLqyRgjVVY82jQoPrQMk6y8xXGokyUQ@mail.gmail.com>
+ <5369836.4ELrYOmq06@wuerfel>
+Message-ID: <CADaLNDkVnJo=VWVhs8QvFrYKXFP+GfeynnFU+p7N9He+5pH9Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2016 11:32 PM, AKASHI Takahiro wrote:
-> @@ -176,18 +183,14 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
->>> 		 * over and over again.
->>> 		 */
->>> 		kgdb_arch_update_addr(linux_regs, remcom_in_buffer);
->>> -		atomic_set(&kgdb_cpu_doing_single_step, -1);
->>> -		kgdb_single_step =  0;
->>
->> This is a subtle change, but I assume it is what you intended?  All the CPUs will get released into the run state when exiting the kgdb exception handler.
-> You are talking about "- kgdb_single_step = 0." Right?
+On Mon, Sep 19, 2016 at 1:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Friday, September 16, 2016 12:01:28 AM CEST Duc Dang wrote:
+> > This is the DTS changes for X-Gene platforms targeted for 4.9.
+> >
+> > The changes include:
+> > + X-Gene Soc PMU DTS entry from X-Gene PMU patch set of Tai Nguyen [1]
+> > + Follow up patch to enable DTS entry for SoC PMU on X-Gene v2
+> > + Correct PCIe legacy interrupt mode to level-active high
+> > + DTS entry for X-Gene hwmon (v4 acked by Guenter, DT binding document
+> > and driver is in linux-next now [2])
+> > + DTS entries for X-Gene v2 CPU clock from X-Gene PMD clock patch set
+> > (v3 already accepted by Stephen into clk-next [3])
+> >
+> >
+>
+> Pulled into next/dt64, thanks!
 
-
-Correct.
-
-> Do you think that there is any (negative) side effect of this change?
-
-
-Not at all.   The kernel debugger always skids to a stop, and it is more reliable from a locking perspective if the other CPU threads are released while a single CPU is asked to single step until the next "skid" for all the other CPUs.
-
-When you do not release the other CPUs you can end up single stepping a CPU which dead locks or never exits a lock elsewhere due to what ever it was blocking on never getting freed from another CPU.
-
-Cheers,
-Jason.
+Thanks, Arnd.
+>
+>         Arnd
+>
+Regards,
+Duc Dang.
