@@ -1,41 +1,86 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 19 Sep 2016 15:41:04 -0500
-Subject: [PATCH] cpufreq: ti: Use generic platdev driver
-In-Reply-To: <4712275.44limO7TAi@vostro.rjw.lan>
-References: <20160914204137.20346-1-d-gerlach@ti.com>
- <20160915062507.GA30169@vireshk-i7> <57DC6420.20706@ti.com>
- <4712275.44limO7TAi@vostro.rjw.lan>
-Message-ID: <57E04D60.2040402@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 19 Sep 2016 22:43:52 +0200
+Subject: [PATCH] arm: dts: fix rk3066a based boards vdd_log voltage
+ initialization
+In-Reply-To: <CAD=FV=U_BQez2eCqm7mX9kj0dcEsnBKiFWcLAhXXJD+yTZhACw@mail.gmail.com>
+References: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
+ <1474274696-28090-1-git-send-email-andy.yan@rock-chips.com>
+ <CAD=FV=VawAOWBF_PoXqSj3oiVgfF8SnCBp56p8F==XsaVLmMcg@mail.gmail.com>
+ <2318029.f7g774Bk76@phil>
+ <CAD=FV=UOXcUZyXRj++GkKksyFedGt59vQz8958nhhF9UM7rOuw@mail.gmail.com>
+ <20160919191327.741a2b89@bbrezillon>
+ <CAD=FV=Ufmvg1P8suOPQ53kpOD1pei4N2dOpKUCxZk001XKj_OA@mail.gmail.com>
+ <20160919194844.0db7b307@bbrezillon>
+ <CAD=FV=UyW5cXGGmq5xUzZ1aV5NzbBYGOz1gO9V1itrFU-PigAw@mail.gmail.com>
+ <20160919200627.3ca1aae4@bbrezillon>
+ <CAD=FV=U_BQez2eCqm7mX9kj0dcEsnBKiFWcLAhXXJD+yTZhACw@mail.gmail.com>
+Message-ID: <20160919224352.3b84b6c0@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/16/2016 04:59 PM, Rafael J. Wysocki wrote:
-> On Friday, September 16, 2016 04:29:04 PM Dave Gerlach wrote:
->> Hi,
->> On 09/15/2016 01:25 AM, Viresh Kumar wrote:
->>> On 14-09-16, 15:41, Dave Gerlach wrote:
->>>> Now that the cpufreq-dt-platdev is used to create the cpufreq-dt platform
->>>> device for all OMAP platforms and the platform code that did it
->>>> before has been removed, add ti,am33xx and ti,dra7xx to the machine list
->>>> in cpufreq-dt-platdev which had relied on the removed platform code to do
->>>> this previously.
->>>>
->>>> Fixes: 7694ca6e1d6f ("cpufreq: omap: Use generic platdev driver")
->>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>>
->>> Any stable trees you want this to be added to ?
->>
->> I suppose it'll go for 4.7-stable as the change happened in v4.6.
->
-> The commit in the fixes tag went in during the 4.7 cycle, so the fix should
-> go into 4.7.y, but I'm not going to push it as urgent material for 4.8.
->
+On Mon, 19 Sep 2016 11:12:12 -0700
+Doug Anderson <dianders@chromium.org> wrote:
 
-Yes, that is fine, thanks a lot!
+> Hi,
+> 
+> On Mon, Sep 19, 2016 at 11:06 AM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+> > On Mon, 19 Sep 2016 10:52:51 -0700
+> > Doug Anderson <dianders@chromium.org> wrote:
+> >  
+> >> Hi,
+> >>
+> >> On Mon, Sep 19, 2016 at 10:48 AM, Boris Brezillon
+> >> <boris.brezillon@free-electrons.com> wrote:  
+> >> > The PWM chip has always claimed the pins and muxed them to the PWM IP.
+> >> > So, this means it's broken from the beginning, and my patch is only
+> >> > uncovering the problem (unless the pins stay configured as input until
+> >> > the PWM is enabled, which I'm not sure is the case).  
+> >>
+> >> Such a solution is achievable with the pinctrl APIs pretty easily.
+> >> You might not be able to use the automatic "init" state but you can do
+> >> something similar and switch to an "active" state once the PWM is
+> >> actually turned on the first time.  
+> >
+> > But is it really the case here (I don't see any code requesting a
+> > specific pinmux depending on the PWM state)?  
+> 
+> It is not happening right now as far as I know.  ...but that's a bug.
+> 
+> > Anyway, we really need to handle this case, we should define the
+> > typical voltage when the PWM is disabled. Same as what you suggested
+> > with voltage-when-input, but with a different naming (since the concept
+> > of pinmux is PWM hardware/driver specific).
+> >
+> >         voltage-when-pwm-disabled = <...>;  
+> 
+> Voltage when disabled and voltage when input are two different states.
+> A disabled PWM will typically either drive high or low (depending on
+> where it was when you turned it off).  Not all "disabled" states will
+> mean that the pin is configured as an input.
 
-Regards,
-Dave
+Okay, after reading again your first answer, I think I understand why
+you want to differentiate the when-disabled and when-input cases. You
+want to use the "init" and "default" pinctrl states. The "init" state
+(applied at probe time) would keep the PWM pin in gpio+input mode and
+the "default" state (applied when the PWM device is enabled for the
+first time) would mux the pin to the PWM device.
+Your solution requires that the pwm-regulator device knows in which
+state the pin attached to the PWM is, which IMO is breaking the
+layering we have right now: a PWM-regulator is assigned a PWM device
+which is assigned a pin and a pinmux config.
+Another solution would be to expose an additional information in the
+pwm_state: whether the PWM is in the INIT state (probed, but not yet
+configured by its user) or DEFAULT state (probed and already
+configured by its user). But again, by doing that we also expose
+internal PWM details to its user, which I'm not sure will help keep
+the PWM API simple.
 
-> Thanks,
-> Rafael
->
+Actually, I had something slightly different in mind. I thought about
+having two new pinctrl states ("enabled" and "disabled"). The "enabled"
+state (pin muxed to the PWM device) would be applied each time the PWM
+is enabled, and "disabled" state (gpio+input mode) would be applied each
+time the PWM is disabled.
+This way we can guarantee that even when the PWM is disabled, the
+PWM-driven regulator is configured to output a non-destructive voltage.
+Hence my suggestion to name the property 'voltage-when-pwm-disabled'.
