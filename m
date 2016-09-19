@@ -1,71 +1,99 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 19 Sep 2016 13:52:07 +0200
-Subject: [PATCH] ARM: mvebu: Select corediv clk for all mvebu v7 SoC
-Message-ID: <20160919115207.19334-1-gregory.clement@free-electrons.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 19 Sep 2016 14:13:45 +0200
+Subject: [PATCH v7 00/22] Generic DT bindings for PCI IOMMUs and ARM SMMU
+In-Reply-To: <f16db032-1905-9804-0607-fe007af72b0e@arm.com>
+References: <cover.1473695704.git.robin.murphy@arm.com>
+ <11ebd81e-2ea5-5ff3-35b3-be95f03e05bd@redhat.com>
+ <d03ea5e7-59f1-8b49-4ba2-d05fc2030ebc@arm.com>
+ <04a0a682-4fdc-8d62-57cd-efdf730582c6@redhat.com>
+ <c2645c5e-edd3-2b31-4311-0ca621a915e2@arm.com>
+ <4d87d5f2-0350-b5f8-ffc3-4e9377cf1f87@redhat.com>
+ <fc4ce398-4eeb-f2ca-b964-e9f466be79c4@arm.com>
+ <1838c65d-5944-8946-781c-b420bea1acab@redhat.com>
+ <f16db032-1905-9804-0607-fe007af72b0e@arm.com>
+Message-ID: <48f3bc10-3966-7d50-d070-7ec7f0946c92@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the commit bd3677ff31a3 ("clk: mvebu: Remove corediv clock from
-Armada XP"), the corediv clk is no more selected for Armada XP, however
-this clock is used for Armada XP using the compatible
-armada-370-corediv-clock.
+Hi Robin,
 
-More over even if with the commit 1594d568c6e3 ("clk: mvebu: Move corediv
-config to mvebu config"), it was selected for Armada 38x and Armada 375,
-it was still not selected for Armada 39x.
+On 16/09/2016 18:18, Robin Murphy wrote:
+> Hi Eric,
+> 
+> On 15/09/16 17:46, Auger Eric wrote:
+> [...]
+>> Hum OK; thanks for the explanation. With that implementation however,
+>> don't we face back the issue we encountered in early stage of default
+>> domain implementation:
+>>
+>> With this sample config (AMD overdrive + I350-T2 + 2VFs per PF) I fill
+>> the 8 context banks. Whereas practically we didn't need them before?
+>>
+>> 00:00.0 0600: 1022:1a00
+>> 	Subsystem: 1022:1a00
+>> 00:02.0 0600: 1022:1a01
+>> 00:02.2 0604: 1022:1a02
+>> 	Kernel driver in use: pcieport
+>> 01:00.0 0200: 8086:1521 (rev 01)
+>> 	Subsystem: 8086:0002
+>> 	Kernel driver in use: igb
+>> 01:00.1 0200: 8086:1521 (rev 01)
+>> 	Subsystem: 8086:0002
+>> 	Kernel driver in use: igb
+>> 01:10.0 0200: 8086:1520 (rev 01) -> context 5
+>> 	Subsystem: 8086:0002
+>> 	Kernel driver in use: vfio-pci
+>> 01:10.1 0200: 8086:1520 (rev 01) -> context 7
+>> 	Subsystem: 8086:0002
+>> 	Kernel driver in use: igbvf
+>> 01:10.4 0200: 8086:1520 (rev 01) -> context 6
+>> 	Subsystem: 8086:0002
+>> 	Kernel driver in use: igbvf
+>> 01:10.5 0200: 8086:1520 (rev 01) -> shortage
+>> 	Subsystem: 8086:0002
+>> 	Kernel driver in use: igbvf
+>>
+>> So I can't even do passthrough anymore with that config. Is there
+>> anything wrong in my setup/understanding?
+> 
+> It's kind of hard to avoid, really - people want DMA ops support (try
+> plugging a card which can only do 32-bit DMA into that Seattle, for
+> instance); DMA ops need default domains; default domains are allocated
+> per group; each domain requires a context bank to back it; thus if you
+> have 9 groups and 8 context banks you're in a corner. It would relieve
+> the pressure to have a single default domain per SMMU, but we've no way
+> to do that due to the way the iommu_domain_alloc() API is intended to work.
+> 
+> Ultimately, it's a hardware limitation of that platform - plug in a card
+> with 16 VFs with ACS, and either way you're stuck. There are a number of
+> bodges I can think of that would make your specific situation work, but
+> none of them are really sufficiently general to consider upstreaming.
+> The most logical thing to do right now, if you were happy without DMA
+> ops using the old binding before, is to keep using the old binding (just
+> fixing your DT with #stream-id-cells=0 on the host controller so as not
+> to create the fake aliasing problem). Hopefully future platforms will be
+> in a position to couple their PCI host controllers to an IOMMU which is
+> actually designed to support a PCI host controller.
+> 
+> What I probably will do, though, since we have the functionality in
+> place for the sake of the old binding, and I think there are other folks
+> who want PCI iommu-map support but would prefer not to bother with DMA
+> ops on the host, is add a command-line option to disable DMA domains
+> even for the generic bindings.
 
-Actually all the SoC selecting MVEBU_V7 config need this clock:
-git grep "\-corediv-clock" arch/arm/boot/dts
-arch/arm/boot/dts/armada-370-xp.dtsi: compatible = "marvell,armada-370-corediv-clock";
-arch/arm/boot/dts/armada-375.dtsi:    compatible = "marvell,armada-375-corediv-clock";
-arch/arm/boot/dts/armada-38x.dtsi:    compatible = "marvell,armada-380-corediv-clock";
-arch/arm/boot/dts/armada-39x.dtsi:    compatible = "marvell,armada-390-corediv-clock"
+Yes this would be a good thing I think. This series has an important
+impact on platforms which do not have smmu v3, where contexts are scarce
+HW resources.
 
-This commit now fixes this behavior.
+Thanks
 
-Fixes: bd3677ff31a3 ("clk: mvebu: Remove corediv clock from Armada XP")
-Cc: stable at vger.kernel.org
-Reported-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/Kconfig | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Eric
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index f9b6bd306cfe..541647f57192 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -23,6 +23,7 @@ config MACH_MVEBU_V7
- 	select CACHE_L2X0
- 	select ARM_CPU_SUSPEND
- 	select MACH_MVEBU_ANY
-+	select MVEBU_CLK_COREDIV
- 
- config MACH_ARMADA_370
- 	bool "Marvell Armada 370 boards"
-@@ -32,7 +33,6 @@ config MACH_ARMADA_370
- 	select CPU_PJ4B
- 	select MACH_MVEBU_V7
- 	select PINCTRL_ARMADA_370
--	select MVEBU_CLK_COREDIV
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada 370 SoC with device tree.
-@@ -50,7 +50,6 @@ config MACH_ARMADA_375
- 	select HAVE_SMP
- 	select MACH_MVEBU_V7
- 	select PINCTRL_ARMADA_375
--	select MVEBU_CLK_COREDIV
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada 375 SoC with device tree.
-@@ -68,7 +67,6 @@ config MACH_ARMADA_38X
- 	select HAVE_SMP
- 	select MACH_MVEBU_V7
- 	select PINCTRL_ARMADA_38X
--	select MVEBU_CLK_COREDIV
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada 380/385 SoC with device tree.
--- 
-2.9.3
+> 
+> Robin.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
