@@ -1,72 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Sep 2016 16:08:26 -0700
-Subject: [PATCH] ARM: dts: Add power button support for igepv5
-In-Reply-To: <CAMVEqEkKrw2eH3L6+te5MZLqxBT2jUiRO-KNuS+9nuNYvihCRA@mail.gmail.com>
-References: <20160909210729.20184-1-tony@atomide.com>
- <31409234-3185-5348-2d37-effb7769c92a@osg.samsung.com>
- <CAMVEqEkKrw2eH3L6+te5MZLqxBT2jUiRO-KNuS+9nuNYvihCRA@mail.gmail.com>
-Message-ID: <20160919230826.aubqvj2km4wg6gz7@atomide.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Mon, 19 Sep 2016 16:14:42 -0700
+Subject: [PATCH] clocksource: arm_arch_timer: Don't assume clock runs in
+ suspend
+In-Reply-To: <57DBA81F.2060404@arm.com>
+References: <20160916054917.16930-1-briannorris@chromium.org>
+ <57DBA81F.2060404@arm.com>
+Message-ID: <20160919231441.GA60928@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pau Pajuel <ppajuel@gmail.com> [160919 01:13]:
-> Hello Tony,
+On Fri, Sep 16, 2016 at 09:06:55AM +0100, Marc Zyngier wrote:
+> Hi Brian,
+
+Hi Marc,
+
+Thanks for the quick response.
+
+> On 16/09/16 06:49, Brian Norris wrote:
+> > Since commit 4fbcdc813fb9 ("clocksource: arm_arch_timer: Use clocksource
+> > for suspend timekeeping"), this driver assumes that the ARM architected
+> > timer keeps running in suspend. This is not the case for some ARM SoCs,
+> > depending on the HW state used for system suspend. Let's not assume that
+> > all SoCs support this, and instead only support this if the device tree
+> > explicitly tells us it's "always on". In all other cases, just fall back
+> > to the RTC. This should be relatively harmless.
 > 
-> 2016-09-14 3:26 GMT+02:00 Javier Martinez Canillas <javier@osg.samsung.com>:
-> > Hello Tony,
-> >
-> > On 09/09/2016 05:07 PM, Tony Lindgren wrote:
-> >> Add power button support for igepv5.
-> >>
-> >> Cc: Agust? Fontquerni i Gorchs <afontquerni@iseebcn.com>
-> >> Cc: Enric Balletbo Serra <eballetbo@gmail.com>
-> >> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> >> Cc: Pau Pajuel <ppajuel@gmail.com>
-> >> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> >> ---
-> >
-> > I don't have a schematics for this board, but the patch looks good to me.
-> Patch has an errata. Power button is GPIO_ACTIVE_LOW instead GPIO_ACTIVE_HIGH.
+> I'm afraid you're confusing two things:
+> - the counter, which *must* carry on counting no matter what, as
+> (quoting the ARM ARM) "The system counter must be implemented in an
+> always-on power domain"
+> - the timer, which is allowed to be powered off, and can be tagged with
+> the "always-on" property to indicate that it is guaranteed to stay up
+> (which in practice only exists in virtual machines and never on real HW).
 
-Oops sorry about that, here's an incremental fix.
+Indeed, sorry for that confusion, and thanks for the explanations.
 
-Regards,
+> If your counter does stop counting when suspended, then this is starting
+> to either feel like a HW bug, or someone is killing the clock that feeds
+> this counter when entering suspend.
+> 
+> If this is the former, then we need a separate quirk to indicate the
+> non-standard behaviour. If it is the latter, don't do it! ;-)
 
-Tony
+It's beginning to seem more like a HW quirk which yields nonstandard
+behavior. AIUI, this SoC normally runs the counter off its 24 MHz clock,
+but for low power modes, this "always-on" domain switches over to a 32
+KHz alternative clock. Unfortunately, the counter doesn't actually tick
+when run this way. I'm trying to confirm with the chip designers
+(Rockchip, RK3399) about the nature of the quirk, but I think we'll need
+a separate DT flag for this behavior.
 
-8< -----------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 19 Sep 2016 16:02:12 -0700
-Subject: [PATCH] ARM: dts: Fix igepv5 power button GPIO direction
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-It should be GPIO_ACTIVE_LOW instead of GPIO_ACTIVE_HIGH as
-pointed out by Pau Pajuel <ppajuel@gmail.com>.
-
-Cc: Agust? Fontquerni i Gorchs <afontquerni@iseebcn.com>
-Cc: Enric Balletbo Serra <eballetbo@gmail.com>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: Pau Pajuel <ppajuel@gmail.com>
-Fixes: b118c6a6ffa1 ("ARM: dts: Add power button support for igepv5")
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/omap5-igep0050.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
---- a/arch/arm/boot/dts/omap5-igep0050.dts
-+++ b/arch/arm/boot/dts/omap5-igep0050.dts
-@@ -27,7 +27,7 @@
- 		power-button {
- 			label = "Power Button";
- 			linux,code = <KEY_POWER>;
--			gpios = <&gpio4 22 GPIO_ACTIVE_HIGH>;
-+			gpios = <&gpio4 22 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- 
--- 
-2.9.3
+Brian
