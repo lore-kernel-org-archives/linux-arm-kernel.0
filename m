@@ -1,43 +1,41 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:40 +0100
-Subject: [PATCH 22/27] drm/rockchip: dw-mipi-dsi: defer probe if panel is not
- loaded
+Date: Mon, 19 Sep 2016 18:17:22 +0100
+Subject: [PATCH 12/26] drm/rockchip: dw-mipi-dsi: prepare panel after phy init
 In-Reply-To: <20160919171747.28512-1-john@metanate.com>
 References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-31-john@metanate.com>
+Message-ID: <20160919171747.28512-13-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This ensures that the output resolution is known before fbcon loads.
+Some panels need to be configured with commands sent over the MIPI link,
+which they will do in the prepare hook.  Call this after the PHY has
+been initialized so that we are able to send commands to the panel.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 2b26a54972da..5ecb03c24c2f 100644
+index 4c945cc4d31a..9ff1cac5ef63 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -1186,10 +1186,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+@@ -901,12 +901,14 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+ 	dw_mipi_dsi_dphy_timing_config(dsi);
+ 	dw_mipi_dsi_dphy_interface_config(dsi);
+ 	dw_mipi_dsi_clear_err(dsi);
+-	if (drm_panel_prepare(dsi->panel))
+-		dev_err(dsi->dev, "failed to prepare panel\n");
  
- 	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
- 	dsi->dsi_host.dev = dev;
--	return mipi_dsi_host_register(&dsi->dsi_host);
-+	ret = mipi_dsi_host_register(&dsi->dsi_host);
-+	if (!ret && !dsi->panel) {
-+		mipi_dsi_host_unregister(&dsi->dsi_host);
-+		drm_encoder_cleanup(&dsi->encoder);
-+		drm_connector_cleanup(&dsi->connector);
-+		ret = -EPROBE_DEFER;
-+	}
+ 	dw_mipi_dsi_phy_init(dsi);
+ 	dw_mipi_dsi_wait_for_two_frames(dsi);
  
- err_pllref:
--	clk_disable_unprepare(dsi->pllref_clk);
-+	if (ret)
-+		clk_disable_unprepare(dsi->pllref_clk);
- 	return ret;
- }
++	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
++	if (drm_panel_prepare(dsi->panel))
++		dev_err(dsi->dev, "failed to prepare panel\n");
++
+ 	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_VID_MODE);
+ 	drm_panel_enable(dsi->panel);
  
 -- 
 2.10.0.278.g4f427b1.dirty
