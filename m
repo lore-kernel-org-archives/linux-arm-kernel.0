@@ -1,63 +1,36 @@
-From: ayaka@soulik.info (Randy Li)
-Date: Mon, 19 Sep 2016 23:51:58 +0800
-Subject: [PATCH] ASoC: samsung: make audio interface/controller explicitly
-Message-ID: <1474300318-26767-1-git-send-email-ayaka@soulik.info>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Sep 2016 17:52:58 +0200
+Subject: [GIT PULL] Amlogic driver updates for v4.9, 2nd round
+In-Reply-To: <7hoa3ql2y7.fsf@baylibre.com>
+References: <7hoa3ql2y7.fsf@baylibre.com>
+Message-ID: <3231263.PDDhXyghVb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is simple sound card time, we could assign different codec
-to a interface without making a specific driver for it. The SPDIF
-and I2S interface for Samsung would be possible used by simple-sound-card,
-but not sure about the PCM.
+On Wednesday, September 14, 2016 12:02:40 PM CEST Kevin Hilman wrote:
+> Amlogic driver updates for v4.9, 2nd round
+> - media: update IR support for newer SoCs
+> - firmware: add secure monitor driver
+> - net: new stmmac glue driver
+> - usb: udd DWC2 support for meson-gxbb
+> - clocks: expose more clock IDs for use by DT
+> - DT binding updates
+> 
 
-Signed-off-by: Randy Li <ayaka@soulik.info>
----
- sound/soc/samsung/Kconfig | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+Pulled into next/late. I think in a  case like this, separate
+branches would have been a bit nicer, as this branch mixes some things
+that are not really related.
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 7b722b0..210ce38 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -1,3 +1,7 @@
-+menu "SoC Audio for Samsung CPUs"
-+
-+comment "Common SoC Audio options for Samsung CPUs:"
-+
- config SND_SOC_SAMSUNG
- 	tristate "ASoC support for Samsung"
- 	depends on (PLAT_SAMSUNG || ARCH_EXYNOS)
-@@ -18,18 +22,22 @@ config SND_S3C2412_SOC_I2S
- 	select SND_S3C_I2SV2_SOC
- 
- config SND_SAMSUNG_PCM
--	tristate
-+	tristate "Samsung PCM interface support"
-+	depends on SND_SOC_SAMSUNG
- 
- config SND_SAMSUNG_AC97
- 	tristate
- 	select SND_SOC_AC97_BUS
-+	depends on SND_SOC_SAMSUNG
- 
- config SND_SAMSUNG_SPDIF
--	tristate
-+	tristate "Samsung SPDIF transmitter support"
-+	depends on SND_SOC_SAMSUNG
- 	select SND_SOC_SPDIF
- 
- config SND_SAMSUNG_I2S
--	tristate
-+	tristate "Samsung I2S interface support"
-+	depends on I2C && SND_SOC_SAMSUNG
- 
- config SND_SOC_SAMSUNG_NEO1973_WM8753
- 	tristate "Audio support for Openmoko Neo1973 Smartphones (GTA02)"
-@@ -229,3 +237,5 @@ config SND_SOC_ARNDALE_RT5631_ALC5631
-         depends on SND_SOC_SAMSUNG && I2C
-         select SND_SAMSUNG_I2S
-         select SND_SOC_RT5631
-+
-+endmenu
--- 
-2.7.4
+> ----------------------------------------------------------------
+> Alexander M?ller (6):
+>       clk: meson: Rename meson8b-clkc.c to reflect gxbb naming convention
+>       meson: clk: Move register definitions to meson8b.h
+>       meson: clk: Rename register names according to Amlogic datasheet
+>       clk: meson: Copy meson8b CLKID defines to private header file
+>       gxbb: clk: Adjust MESON_GATE macro to be shared with meson8b
+>       meson: clk: Add support for clock gates
+
+I also note that some of the subject lines are inconsistent regarding
+the "clk: meson:" vs "gxbb: clk:" part.
+
+	Arnd
