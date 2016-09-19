@@ -1,43 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Sep 2016 10:22:10 +0200
-Subject: [PATCH] pinctrl: nomadik: don't default-flag IRQs as falling
-Message-ID: <1474273330-15789-1-git-send-email-linus.walleij@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Sep 2016 10:23:57 +0200
+Subject: [PATCH] dmaengine: sun6i: Add support for Allwinner A83T (sun8i)
+ variant
+In-Reply-To: <20160918080103.ADDBE110E@mail.free-electrons.com>
+References: <20160918080103.ADDBE110E@mail.free-electrons.com>
+Message-ID: <20160919082357.GD8719@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no point in adding any default trigger for these
-GPIO interrupts: the device tree should contain all trigger
-information and the platforms using the driver boots
-exclusively from device tree.
+On Sun, Sep 18, 2016 at 09:59:50AM +0200, Jean-Francois Moine wrote:
+> The A83T SoC has the same dma engine as the A31 (sun6i), with a reduced
+> amount of endpoints and physical channels.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 
-Also the boot log is nagging me to fix this:
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-[    0.771057] ------------[ cut here ]------------
-[    0.775695] WARNING: CPU: 0 PID: 1 at
-   ../drivers/gpio/gpiolib.c:1622 _gpiochip_irqchip_add+0x138/0x160
-[    0.785034] /soc/gpio at 8012e000: Ignoring 2 default trigger
-(...)
-[    0.942962] gpio 8012e000.gpio: at address e08f8000
-(etc ad nauseam)
+Thanks!
+Maxime
 
-Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/nomadik/pinctrl-nomadik.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-index 205fb399268a..d318ca055489 100644
---- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
-@@ -1177,7 +1177,7 @@ static int nmk_gpio_probe(struct platform_device *dev)
- 				   irqchip,
- 				   0,
- 				   handle_edge_irq,
--				   IRQ_TYPE_EDGE_FALLING);
-+				   IRQ_TYPE_NONE);
- 	if (ret) {
- 		dev_err(&dev->dev, "could not add irqchip\n");
- 		gpiochip_remove(&nmk_chip->chip);
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160919/445ea2c3/attachment.sig>
