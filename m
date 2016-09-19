@@ -1,86 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 19 Sep 2016 22:43:52 +0200
-Subject: [PATCH] arm: dts: fix rk3066a based boards vdd_log voltage
- initialization
-In-Reply-To: <CAD=FV=U_BQez2eCqm7mX9kj0dcEsnBKiFWcLAhXXJD+yTZhACw@mail.gmail.com>
-References: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
- <1474274696-28090-1-git-send-email-andy.yan@rock-chips.com>
- <CAD=FV=VawAOWBF_PoXqSj3oiVgfF8SnCBp56p8F==XsaVLmMcg@mail.gmail.com>
- <2318029.f7g774Bk76@phil>
- <CAD=FV=UOXcUZyXRj++GkKksyFedGt59vQz8958nhhF9UM7rOuw@mail.gmail.com>
- <20160919191327.741a2b89@bbrezillon>
- <CAD=FV=Ufmvg1P8suOPQ53kpOD1pei4N2dOpKUCxZk001XKj_OA@mail.gmail.com>
- <20160919194844.0db7b307@bbrezillon>
- <CAD=FV=UyW5cXGGmq5xUzZ1aV5NzbBYGOz1gO9V1itrFU-PigAw@mail.gmail.com>
- <20160919200627.3ca1aae4@bbrezillon>
- <CAD=FV=U_BQez2eCqm7mX9kj0dcEsnBKiFWcLAhXXJD+yTZhACw@mail.gmail.com>
-Message-ID: <20160919224352.3b84b6c0@bbrezillon>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 19 Sep 2016 16:01:09 -0500
+Subject: [PATCH v4 22/22] phy: Add support for Qualcomm's USB HS phy
+In-Reply-To: <147407072439.8245.12292695359399379462@sboyd-linaro>
+References: <20160907213519.27340-1-stephen.boyd@linaro.org>
+ <20160907213519.27340-23-stephen.boyd@linaro.org>
+ <20160916151950.GA31804@rob-hp-laptop>
+ <147407072439.8245.12292695359399379462@sboyd-linaro>
+Message-ID: <CAL_JsqKhmm7k-hA+c9K61AfaRCG332dBdGvdxvTTfBYskZoewQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Sep 2016 11:12:12 -0700
-Doug Anderson <dianders@chromium.org> wrote:
+On Fri, Sep 16, 2016 at 7:05 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> Quoting Rob Herring (2016-09-16 08:19:51)
+>> On Wed, Sep 07, 2016 at 02:35:19PM -0700, Stephen Boyd wrote:
+>> > The high-speed phy on qcom SoCs is controlled via the ULPI
+>> > viewport.
+>> >
 
-> Hi,
-> 
-> On Mon, Sep 19, 2016 at 11:06 AM, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
-> > On Mon, 19 Sep 2016 10:52:51 -0700
-> > Doug Anderson <dianders@chromium.org> wrote:
-> >  
-> >> Hi,
-> >>
-> >> On Mon, Sep 19, 2016 at 10:48 AM, Boris Brezillon
-> >> <boris.brezillon@free-electrons.com> wrote:  
-> >> > The PWM chip has always claimed the pins and muxed them to the PWM IP.
-> >> > So, this means it's broken from the beginning, and my patch is only
-> >> > uncovering the problem (unless the pins stay configured as input until
-> >> > the PWM is enabled, which I'm not sure is the case).  
-> >>
-> >> Such a solution is achievable with the pinctrl APIs pretty easily.
-> >> You might not be able to use the automatic "init" state but you can do
-> >> something similar and switch to an "active" state once the PWM is
-> >> actually turned on the first time.  
-> >
-> > But is it really the case here (I don't see any code requesting a
-> > specific pinmux depending on the PWM state)?  
-> 
-> It is not happening right now as far as I know.  ...but that's a bug.
-> 
-> > Anyway, we really need to handle this case, we should define the
-> > typical voltage when the PWM is disabled. Same as what you suggested
-> > with voltage-when-input, but with a different naming (since the concept
-> > of pinmux is PWM hardware/driver specific).
-> >
-> >         voltage-when-pwm-disabled = <...>;  
-> 
-> Voltage when disabled and voltage when input are two different states.
-> A disabled PWM will typically either drive high or low (depending on
-> where it was when you turned it off).  Not all "disabled" states will
-> mean that the pin is configured as an input.
+[...]
 
-Okay, after reading again your first answer, I think I understand why
-you want to differentiate the when-disabled and when-input cases. You
-want to use the "init" and "default" pinctrl states. The "init" state
-(applied at probe time) would keep the PWM pin in gpio+input mode and
-the "default" state (applied when the PWM device is enabled for the
-first time) would mux the pin to the PWM device.
-Your solution requires that the pwm-regulator device knows in which
-state the pin attached to the PWM is, which IMO is breaking the
-layering we have right now: a PWM-regulator is assigned a PWM device
-which is assigned a pin and a pinmux config.
-Another solution would be to expose an additional information in the
-pwm_state: whether the PWM is in the INIT state (probed, but not yet
-configured by its user) or DEFAULT state (probed and already
-configured by its user). But again, by doing that we also expose
-internal PWM details to its user, which I'm not sure will help keep
-the PWM API simple.
+>> > +- qcom,init-seq:
+>> > +    Usage: optional
+>> > +    Value type: <u8 array>
+>> > +    Definition: Should contain a sequence of ULPI register and address pairs to
+>> > +                program into the ULPI_EXT_VENDOR_SPECIFIC area. This is related
+>> > +                to Device Mode Eye Diagram test.
+>>
+>> We generally nak this type of property. For 1 register I don't care so
+>> much. For 100, that would be another story.
+>>
+>> Is this value per unit, per board, per SoC? Can you limit it to certain
+>> registers?
+>
+> I'm told that this can be per board, depending on how it's wired from
+> the phy pins to the usb port. Typically it's the same though for the
+> boards I have, mostly because those boards are similar designs with
+> respect to how USB is wired. The set of registers is not that many, 4 or
+> 5 at most. My understanding is these are tuning registers. Right now the
+> register part in the binding is the full register offset, and not an
+> offset from ULPI_EXT_VENDOR_SPECIFIC (0x80). I could change this to be
+> an offset from that area if you like so that this can't be abused to
+> write into standard ULPI registers (there really isn't any way to
+> enforce this in software though).
 
-Actually, I had something slightly different in mind. I thought about
-having two new pinctrl states ("enabled" and "disabled"). The "enabled"
-state (pin muxed to the PWM device) would be applied each time the PWM
-is enabled, and "disabled" state (gpio+input mode) would be applied each
-time the PWM is disabled.
-This way we can guarantee that even when the PWM is disabled, the
-PWM-driven regulator is configured to output a non-destructive voltage.
-Hence my suggestion to name the property 'voltage-when-pwm-disabled'.
+Okay, that sounds fine to me.
+
+Rob
