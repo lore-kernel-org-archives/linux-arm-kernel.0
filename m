@@ -1,26 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 19 Sep 2016 12:23:34 -0700
-Subject: [PATCH 1/4] clk: pxa25x: OSTIMER0 clocks from the main oscillator
-In-Reply-To: <1474312335-20997-2-git-send-email-robert.jarzmik@free.fr>
-References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
- <1474312335-20997-2-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20160919192334.GF7243@codeaurora.org>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Mon, 19 Sep 2016 21:34:25 +0200
+Subject: [PATCH 16/19] power: reset: st-poweroff: Remove obsolete
+ platforms.
+In-Reply-To: <1473859677-9231-17-git-send-email-peter.griffin@linaro.org>
+References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
+ <1473859677-9231-17-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160919193423.dhhzk33eu66fbtt6@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19, Robert Jarzmik wrote:
-> From: Russell King - ARM Linux <linux@armlinux.org.uk>
-> 
-> The OSTIMER0 clock ticks at the main oscillator rate, not the 32kHz
-> oscillator rate.  Ensure that it is parented to the main oscillator.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
+Hi,
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+On Wed, Sep 14, 2016 at 02:27:54PM +0100, Peter Griffin wrote:
+> This patch removes support for STiH415/6 SoC's from the
+> st-poweroff driver, as support for these platforms is
+> being removed from the kernel.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I queued this to power-supply's for-next branch. Please
+cc me to full thread next time, so that I can see what
+is goin on.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160919/fa4c20cc/attachment.sig>
