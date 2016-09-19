@@ -1,35 +1,113 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Mon, 19 Sep 2016 09:19:45 +0200
-Subject: [PATCH 07/19] ahci: st: Remove STiH416 dt example
-In-Reply-To: <20160916155449.GB26371@htj.duckdns.org>
-References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
- <1473859677-9231-8-git-send-email-peter.griffin@linaro.org>
- <20160916155449.GB26371@htj.duckdns.org>
-Message-ID: <2d5feb77-49ed-1a2c-5195-82d4a1db38a8@st.com>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Mon, 19 Sep 2016 09:21:21 +0200
+Subject: [PATCH v2 3/6] dt/bindings: Add bindings for Tegra GMI controller
+In-Reply-To: <a3a2371b-5d98-db2d-b7e4-be6d08cb7271@nvidia.com>
+References: <1472045838-22628-1-git-send-email-mirza.krak@gmail.com>
+ <1472045838-22628-4-git-send-email-mirza.krak@gmail.com>
+ <de2fb909-829e-6c04-4f6a-442cbb9171c9@nvidia.com>
+ <CALw8SCVcPymDZ8NyUbeanRF0TCT1TZzL6iRDticYA42FWrEWqw@mail.gmail.com>
+ <20160830170636.GA8741@rob-hp-laptop>
+ <CALw8SCUYQGWXn7=Jpn=uvFvvPRVFQGrtSNot+-tVgP73yAEEOQ@mail.gmail.com>
+ <a3a2371b-5d98-db2d-b7e4-be6d08cb7271@nvidia.com>
+Message-ID: <CALw8SCUK0_kvNR_juAc7N_DMQbV=voizqXE6PApc_B_CQHzzOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/16/2016 05:54 PM, Tejun Heo wrote:
-> On Wed, Sep 14, 2016 at 02:27:45PM +0100, Peter Griffin wrote:
->> This platform is being removed from the kernel so remove
->> the dt example.
+2016-09-06 12:32 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>
+> On 31/08/16 12:22, Mirza Krak wrote:
+>> 2016-08-30 19:06 GMT+02:00 Rob Herring <robh@kernel.org>:
+>
+> ...
+>
+>>>>                  nvidia,snor-cs = <4>;
+>>>
+>>> NAK, no custom CS properties.
+>
+> Ok, so ...
+>
+>> gmi at 70090000 {
+>>         compatible = "nvidia,tegra20-gmi";
+>>         reg = <0x70009000 0x1000>;
+>>         #address-cells = <2>;
+>>         #size-cells = <1>;
+>>         clocks = <&tegra_car TEGRA20_CLK_NOR>;
+>>         clock-names = "gmi";
+>>         resets = <&tegra_car 42>;
+>>         reset-names = "gmi";
+>>         ranges = <4 0 0xd0000000 0xfffffff>;
 >>
->> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->> Cc: <tj@kernel.org>
->> Cc: <robh+dt@kernel.org>
->> Cc: <linux-ide@vger.kernel.org>
-> 
-> This is gonna go through dt tree, right?  If it should go through
-> libata, please let me know.
+>>         status = "okay";
+>>
+>>         bus at 4,0 {
+>>                 compatible = "simple-bus";
+>>                 #address-cells = <1>;
+>>                 #size-cells = <1>;
+>>                 ranges = <0 4 0 0x40000>;
+>>
+>>                 nvidia,snor-mux-mode;
+>>                 nvidia,snor-adv-inv;
+>>
+>>                 can at 0 {
+>>                         reg = <0 0x100>;
+>>                         ...
+>>                 };
+>>
+>>                 can at 40000 {
+>>                         reg = <0x40000 0x100>;
+>>                         ...
+>>                 };
+>>         };
+>> };
+>>
+>> Have I understood you correct?
+>>
+>> Also wanted to verify the example case where you only have on device
+>> connected to one CS#, from what I see in other implementations it
+>> seems OK to put the CS# in the reg property in that case. Is this
+>> correct?
+>>
+>> Example with one SJA1000 CAN controller connected to the GMI bus
+>> on CS4:
+>>
+>> gmi at 70090000 {
+>>         compatible = "nvidia,tegra20-gmi";
+>>         reg = <0x70009000 0x1000>;
+>>         #address-cells = <2>;
+>>         #size-cells = <1>;
+>>         clocks = <&tegra_car TEGRA20_CLK_NOR>;
+>>         clock-names = "gmi";
+>>         resets = <&tegra_car 42>;
+>>         reset-names = "gmi";
+>>         ranges = <4 0 0xd0000000 0xfffffff>;
+>>
+>>         status = "okay";
+>>
+>>         can at 4,0 {
+>>                 reg = <4 0 0x100>;
+>>                 nvidia,snor-mux-mode;
+>>                 nvidia,snor-adv-inv;
+>>                 ...
+>>         };
+>> };
+>>
+>> Jon, to be able to handle both cases in the driver we would first
+>> attempt to decode the CS# from the ranges property, and fallback to
+>> reg property if no ranges are defined. Does that sound reasonable?
+>
+> Given the above examples that may be supported, is there a
+> better/simpler way to extract the CS# than what Mirza is proposing? For
+> example, from the node-name unit-address?
+>
 
-Hi Tejun
+Hi.
 
-I will take care of this patch and include it in the next STi DT pull request.
+I have been on vacation and now I am back and wanted to finalize these
+patch series.
 
-Thanks
+So pinging this thread to see I we can agree on a solution.
 
-> 
-> Thanks.
-> 
+Rob any comments to my proposal and Jon`s comment?
+
+Best Regards
+Mirza Krak
