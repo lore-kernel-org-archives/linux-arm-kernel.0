@@ -1,22 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Sep 2016 17:48:12 +0200
-Subject: [GIT PULL 3/3] ARM: dts: exynos: pinctrl cleanup for v4.9
-In-Reply-To: <1474216788-17282-4-git-send-email-krzk@kernel.org>
-References: <1474216788-17282-1-git-send-email-krzk@kernel.org>
- <1474216788-17282-4-git-send-email-krzk@kernel.org>
-Message-ID: <3076399.mIVbMOx8e1@wuerfel>
+From: ayaka@soulik.info (Randy Li)
+Date: Mon, 19 Sep 2016 23:48:21 +0800
+Subject: [PATCH v8 0/2] Add a new board TOPEET iTOP for Exynos 4412
+Message-ID: <1474300103-26659-1-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, September 18, 2016 6:39:48 PM CEST Krzysztof Kozlowski wrote:
-> Topic branch for Samsung DeviceTree cleanup for 4.9.
-> 
-> Replace in DT sources hard-coded values for pinctrl configuration like pull
-> up/down, drive strength and function. This makes the DTS easier to read,
-> especially that some drive strengths values are quite non-obvious.
-> 
-> 
+Changelog:
+ - v8:
+   - add the missing LDOs for PMIC, the pins for LDOs are not avaiabled in core
+     board.
+   - re-order the header files in core board.
+   - skip the vendor prefix file
+ - v7:
+   - add a missing header file
+   - add a rootdelay to bootargs or it can't mount root filesystem
+   - fix the memory node
+ - v6:
+   - move pwms pinctrl to pwms node
+   - fix the order of the dtb file in Makefile
+ - v5:
+   - correct the mail format
+ - v4:
+   - re-order some nodes in alphabetical order
+   - fix some minor bugs
+   - add a entry in vendor list
+ - v3:
+   - fixing the rtc clock, using clock source from PMIC
+   - enable the tmu
+   - enable the fimc for elite board
+   - suuport the audio codec at elite board, but the audio sound a little 
+     distortion
+   - fixing minor bugs in the last commit
+ - v2:
+   - removing rtc node
+     the clock source driver is not done yet.
+   - adding exynos-bus
+   - fixing the MFC
 
-Pulled into next/dt, thanks!
+Randy Li (2):
+  ARM: dts: Add TOPEET itop core board SCP package version
+  ARM: dts: add TOPEET itop elite based board
 
-	Arnd
+ .../bindings/arm/samsung/samsung-boards.txt        |   3 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/exynos4412-itop-elite.dts        | 240 ++++++++++
+ arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi    | 501 +++++++++++++++++++++
+ 4 files changed, 745 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos4412-itop-elite.dts
+ create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+
+-- 
+2.7.4
