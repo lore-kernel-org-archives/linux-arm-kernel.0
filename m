@@ -1,35 +1,31 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 19 Sep 2016 12:39:25 +0200
-Subject: [PATCH] ARM: dts: sun8i: Add accelerometer to polaroid-mid2407pxe03
-Message-ID: <20160919103925.25149-1-hdegoede@redhat.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 19 Sep 2016 12:44:07 +0200
+Subject: [PATCH] mtd: s3c2410: add device tree support
+In-Reply-To: <1474125760-28168-1-git-send-email-sergio.prado@e-labworks.com>
+References: <CGME20160917152404eucas1p2ca0ebfe59dd762f5cdd611a9dd3cd1a5@eucas1p2.samsung.com>
+ <1474125760-28168-1-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <f8907616-0d6b-37ef-1419-f6aedf3ddbdc@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a dt node describing the mma7660 accelerometer on the
-polaroid-mid2407pxe03 tablet.
+On 09/17/2016 05:22 PM, Sergio Prado wrote:
+> +static int s3c24xx_nand_probe_dt(struct platform_device *pdev)
+> +{
+> +	const struct s3c24XX_nand_devtype_data *devtype_data;
+> +	struct s3c2410_platform_nand *pdata;
+> +	struct s3c2410_nand_info *info = platform_get_drvdata(pdev);
+> +	struct device_node *np = pdev->dev.of_node, *child;
+> +	const struct of_device_id *of_id;
+> +	struct s3c2410_nand_set *sets;
+> +
+> +	of_id = of_match_device(s3c24xx_nand_dt_ids, &pdev->dev);
+> +	if (!of_id)
+> +		return 1;
+> +
+> +	devtype_data = of_id->data;
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+You could make it a bit simpler with of_device_get_match_data().
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
-index 6662127..a86cbed 100644
---- a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
-@@ -62,6 +62,13 @@
- 	};
- };
- 
-+&i2c1 {
-+	mma7660: accelerometer at 4c {
-+		reg = <0x4c>;
-+		compatible = "fsl,mma7660";
-+	};
-+};
-+
- &mmc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc1_pins_a>;
--- 
-2.9.3
+--
+Thanks,
+Sylwester
