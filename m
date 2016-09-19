@@ -1,41 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 19 Sep 2016 17:50:56 +0200
-Subject: [PATCH v2] ARM: mvebu: Select corediv clk for all mvebu v7 SoC
-In-Reply-To: <20160919154824.22919-1-gregory.clement@free-electrons.com>
-References: <20160919154824.22919-1-gregory.clement@free-electrons.com>
-Message-ID: <20160919155056.2toxhbpyr3xjw55m@pengutronix.de>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 19 Sep 2016 16:51:55 +0100
+Subject: [PATCH v3 4/8] scpi: Add support for Legacy match table for
+ Amlogic GXBB SoC
+In-Reply-To: <6698b7b9-6ffc-d120-be9c-851ea0be2bf2@arm.com>
+References: <1473262477-18045-1-git-send-email-narmstrong@baylibre.com>
+ <1473262477-18045-5-git-send-email-narmstrong@baylibre.com>
+ <6698b7b9-6ffc-d120-be9c-851ea0be2bf2@arm.com>
+Message-ID: <e183632f-66e0-d3dc-03f4-10df61374194@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 05:48:24PM +0200, Gregory CLEMENT wrote:
-> Since the commit bd3677ff31a3 ("clk: mvebu: Remove corediv clock from
-> Armada XP"), the corediv clk is no more selected for Armada XP, however
-> this clock is used for Armada XP using the compatible
-> armada-370-corediv-clock.
-> 
-> While since commit 1594d568c6e3 ("clk: mvebu: Move corediv config to
-> mvebu config") Armada 38x and Armada 375 got corediv support again, not
-> only Armada XP was missed but also Armada 39x.
-> 
-> Actually all the SoC selecting MVEBU_V7 config need this clock:
-> git grep "\-corediv-clock" arch/arm/boot/dts
-> arch/arm/boot/dts/armada-370-xp.dtsi: compatible = "marvell,armada-370-corediv-clock";
-> arch/arm/boot/dts/armada-375.dtsi:    compatible = "marvell,armada-375-corediv-clock";
-> arch/arm/boot/dts/armada-38x.dtsi:    compatible = "marvell,armada-380-corediv-clock";
-> arch/arm/boot/dts/armada-39x.dtsi:    compatible = "marvell,armada-390-corediv-clock"
-> 
-> This commit now fixes this behavior by letting MVEBU_V7 select
-> MVEBU_CLK_COREDIV.
-> 
-> Fixes: bd3677ff31a3 ("clk: mvebu: Remove corediv clock from Armada XP")
-> Cc: stable at vger.kernel.org
-> Reported-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Thanks
-Uwe
+
+On 19/09/16 16:50, Sudeep Holla wrote:
+>
+>
+> On 07/09/16 16:34, Neil Armstrong wrote:
+>> Add new DT match table to setup the is_legacy boolean value across
+>> the scpi functions.
+>> Add the Amlogic GXBB SoC compatible for platform and as legacy match
+>> entry.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  drivers/firmware/arm_scpi.c | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
+>>
+>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+>> index 6a16100..60a76e63 100644
+>> --- a/drivers/firmware/arm_scpi.c
+>> +++ b/drivers/firmware/arm_scpi.c
+>> @@ -979,6 +979,11 @@ static int scpi_alloc_xfer_list(struct device
+>> *dev, struct scpi_chan *ch)
+>>      return 0;
+>>  }
+>>
+>> +static const struct of_device_id legacy_scpi_of_match[] = {
+>> +    {.compatible = "amlogic,meson-gxbb-scpi"},
+>> +    {},
+>> +};
+>
+> This needs to be documented.
+>
+
+Ignore that I see you have done that in the later patch.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Sudeep
