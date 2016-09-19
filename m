@@ -1,34 +1,29 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 19 Sep 2016 10:34:18 +0100
-Subject: [PATCH 0/2] Fix recursive Kconfig depedency issue
-Message-ID: <1474277660-5196-1-git-send-email-peter.griffin@linaro.org>
+From: ayaka@soulik.info (Ayaka)
+Date: Mon, 19 Sep 2016 17:41:50 +0800
+Subject: [PATCH] ASoC: samsung: make audio interface/controller explicitly
+In-Reply-To: <20160919083342.GE10189@sirena.org.uk>
+References: <1474207751-9804-1-git-send-email-ayaka@soulik.info>
+ <1474207751-9804-2-git-send-email-ayaka@soulik.info>
+ <20160919083342.GE10189@sirena.org.uk>
+Message-ID: <1BBB8B7D-0C1B-48E0-A516-402515A04568@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-This series fixes a Kconfig recurssive depedency issue and also some
-trivial white space. This was found when developing the fdma dmaegine
-series [1], which has now been applied by Vinod.
 
-These patchs were originally included as part of the fdma series [1],
-but I've now sent it separately as requested by Vinod [2], and also
-privately by Emil. 
+??? iPad ??
 
-FYI not having this patch applied causes kbuild error emails [3].
-
-[1] https://lkml.org/lkml/2016/9/13/191
-
-[2] https://lkml.org/lkml/2016/9/15/562
-
-[3] https://lkml.org/lkml/2016/9/15/850
-
-Peter Griffin (2):
-  drm/virtio: kconfig: Fix recursive dependency issue.
-  drm/virtio: kconfig: Fixup white space.
-
- drivers/gpu/drm/virtio/Kconfig | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
--- 
-1.9.1
+> Mark Brown <broonie@kernel.org> ? 2016?9?19? ??4:33 ???
+> 
+>> On Sun, Sep 18, 2016 at 10:09:11PM +0800, Randy Li wrote:
+>> 
+>> It is simple sound card time, we could assign different codec
+>> to a interface without making a specific driver for it.
+> 
+>> config SND_SAMSUNG_AC97
+>> -    tristate
+>> +    tristate "Samsung AC97 controller support"
+>>    select SND_SOC_AC97_BUS
+> 
+> Are you *sure* simple-card works for AC'97?
+Not sure. I could hardly find a AC97 device in embedded market. If it didn't I could disable it. I have only tested simple sound card for i2s and SPDIF.
