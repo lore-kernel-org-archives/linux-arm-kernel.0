@@ -1,62 +1,118 @@
-From: fabien.lahoudere@collabora.co.uk (Fabien Lahoudere)
-Date: Mon, 19 Sep 2016 09:33:16 +0200
-Subject: [PATCH 1/1] ARM: imx5: Add clocks configuration
-In-Reply-To: <20160918002451.GE15478@tiger>
-References: <1473934403-2726-1-git-send-email-fabien.lahoudere@collabora.co.uk>
- <1473961353.68713919@f429.i.mail.ru> <20160918002159.GD15478@tiger>
- <20160918002451.GE15478@tiger>
-Message-ID: <1b8d9b99-ef47-734e-a232-88fa8860304c@collabora.co.uk>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 19 Sep 2016 13:06:53 +0530
+Subject: [PATCH 5/6] arm/arm64: vgic-new: Implement VGICv3 CPU interface
+ access
+In-Reply-To: <20160917123756.0a05a904@arm.com>
+References: <1474028453-29132-1-git-send-email-vijay.kilari@gmail.com>
+ <1474028453-29132-6-git-send-email-vijay.kilari@gmail.com>
+ <57DC0366.8060304@arm.com>
+ <CALicx6u-uYLY3DtDGMh3n6NbNH3kD9fn9aYHHJC=LVUQfFjTsQ@mail.gmail.com>
+ <57DC26C5.2060800@arm.com>
+ <CALicx6ucEH3w58Rhb8Urk0V5kRcqtUdwDYDtSLXrkas-Jatv=A@mail.gmail.com>
+ <20160917123756.0a05a904@arm.com>
+Message-ID: <CALicx6s=FOVv8t-6s4VJYwqUGaCfqMxrjXuop=JX6UYrYVj7Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marc , Peter
 
-On 18/09/16 02:24, Shawn Guo wrote:
-> On Sun, Sep 18, 2016 at 08:21:59AM +0800, Shawn Guo wrote:
->> On Thu, Sep 15, 2016 at 08:42:33PM +0300, Alexander Shiyan wrote:
->>>> ???????, 15 ???????? 2016, 13:13 +03:00 ?? Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>:
->>>>
->>>> From: Kalle Kankare < kalle.kankare@vincit.fi >
->>>>
->>>> Add clocks configuration for CSI, FIRI and IEEE1588.
->>>>
->>>> Signed-off-by: Fabien Lahoudere < fabien.lahoudere@collabora.co.uk >
->>>> ---
->>>>  drivers/clk/imx/clk-imx51-imx53.c      | 20 ++++++++++++++++++++
->>>>  include/dt-bindings/clock/imx5-clock.h | 15 ++++++++++++++-
->>>>  2 files changed, 34 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/clk/imx/clk-imx51-imx53.c b/drivers/clk/imx/clk-imx51-imx53.c
->>>> index 29d4c44..1e3c9ea 100644
->>>> --- a/drivers/clk/imx/clk-imx51-imx53.c
->>>> +++ b/drivers/clk/imx/clk-imx51-imx53.c
->>>> @@ -126,6 +126,7 @@ static const char *spdif0_com_sel[] = { "spdif0_podf", "ssi1_root_gate", };
->>>>  static const char *mx51_spdif1_com_sel[] = { "spdif1_podf", "ssi2_root_gate", };
->>>>  static const char *step_sels[] = { "lp_apm", };
->>>>  static const char *cpu_podf_sels[] = { "pll1_sw", "step_sel" };
->>>> +static const char *ieee1588_sels[] = { "pll3_sw", "pll4_sw", "dummy" /* usbphy2_clk */, "dummy" /* fec_phy_clk */ };
->>>>
->>>>  static struct clk *clk[IMX5_CLK_END];
->>>>  static struct clk_onecell_data clk_data;
->>>> @@ -543,6 +544,25 @@ static void __init mx53_clocks_init(struct device_node *np)
->>> ...
->>>
->>> 2 Shawn Guo: Since the change affects only on i.MX53 architecture,
->>> I would ask to change the subject to i.MX53 if it possible.
+On Sat, Sep 17, 2016 at 5:07 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Sat, 17 Sep 2016 11:58:48 +0530
+> Vijay Kilari <vijay.kilari@gmail.com> wrote:
+>
+>> On Fri, Sep 16, 2016 at 10:37 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> > On 16/09/16 17:57, Vijay Kilari wrote:
+>> >> On Fri, Sep 16, 2016 at 8:06 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> >>> On 16/09/16 13:20, vijay.kilari at gmail.com wrote:
+>> >>>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>> >>>>
+>> >>>> VGICv3 CPU interface registers are accessed using
+>> >>>> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
+>> >>>> as 64-bit. The cpu MPIDR value is passed along with register id.
+>> >>>> is used to identify the cpu for registers access.
+>> >>>>
+>> >>>> The version of VGIC v3 specification is define here
+>> >>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+>> >>>>
+>> >>>> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+>> >>>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>> >>>> ---
+>> >>>>  arch/arm64/include/uapi/asm/kvm.h   |   3 +
+>> >>>>  arch/arm64/kvm/Makefile             |   1 +
+>> >>>>  include/linux/irqchip/arm-gic-v3.h  |  30 ++++
+>> >>>>  virt/kvm/arm/vgic/vgic-kvm-device.c |  27 ++++
+>> >>>>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |  18 +++
+>> >>>>  virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 296 ++++++++++++++++++++++++++++++++++++
+>> >>>>  virt/kvm/arm/vgic/vgic.h            |  10 ++
+>> >>>>  7 files changed, 385 insertions(+)
+>> >
+>> > [...]
+>> >
+>> >>>> diff --git a/virt/kvm/arm/vgic/vgic-sys-reg-v3.c b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+>> >>>> new file mode 100644
+>> >>>> index 0000000..8e4f403
+>> >>>> --- /dev/null
+>> >>>> +++ b/virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+>> >>>> @@ -0,0 +1,296 @@
+>> >>>> +#include <linux/irqchip/arm-gic-v3.h>
+>> >>>> +#include <linux/kvm.h>
+>> >>>> +#include <linux/kvm_host.h>
+>> >>>> +#include <kvm/iodev.h>
+>> >>>> +#include <kvm/arm_vgic.h>
+>> >>>> +#include <asm/kvm_emulate.h>
+>> >>>> +#include <asm/kvm_arm.h>
+>> >>>> +#include <asm/kvm_mmu.h>
+>> >>>> +
+>> >>>> +#include "vgic.h"
+>> >>>> +#include "vgic-mmio.h"
+>> >>>> +#include "sys_regs.h"
+>> >>>> +
+>> >>>> +static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>> >>>> +                         const struct sys_reg_desc *r)
+>> >>>> +{
+>> >>>> +     struct vgic_vmcr vmcr;
+>> >>>> +     u64 val;
+>> >>>> +     u32 ich_vtr;
+>> >>>> +
+>> >>>> +     vgic_get_vmcr(vcpu, &vmcr);
+>> >>>> +     if (p->is_write) {
+>> >>>> +             val = p->regval;
+>> >>>> +             vmcr.ctlr &= ~(ICH_VMCR_CBPR_MASK | ICH_VMCR_EOIM_MASK);
+>> >>>> +             vmcr.ctlr |= ((val & ICC_CTLR_EL1_CBPR_MASK) >>
+>> >>>> +                           ICC_CTLR_EL1_CBPR_SHIFT) << ICH_VMCR_CBPR_SHIFT;
+>> >>>> +             vmcr.ctlr |= ((val & ICC_CTLR_EL1_EOImode_MASK) >>
+>> >>>> +                          ICC_CTLR_EL1_EOImode_SHIFT) << ICH_VMCR_EOIM_SHIFT;
+>> >>>> +             vgic_set_vmcr(vcpu, &vmcr);
+>> >>>
+>> >>> You've ignored my comments again: "What if userspace writes something
+>> >>> that is incompatible with the current configuration? Wrong number of ID
+>> >>> bits, or number of priorities?"
+>> >>
+>> >> IMO, In case of incompatibility,
+>> >> If ID bits and PRI bits are less than HW supported, it is ok.
+>> >
+>> > Yes. But you also need to track of what the guest has programmed in
+>> > order to be able to migrate it back to its original configuration.
 >>
->> Yes.  Actually, since clock driver is not moved to drivers/clk, we
+>> You mean the vgic has to track/store the ID and PRI bits that guest
+>> has programmed
+>> and return the same when guest reads back instead of
+>> returning HW supported value for ICC_CTLR_EL1 reg access?.
 >
-> s/not/now
+> If you have two hosts (A and B), A having 5 bits of priority and B
+> having 7 bits, you should be able to migrate from A to B, and then from
+> B to A. Which means you have to preserve what the guest knows to be its
+> configuration, even if you run on a more capable system. Otherwise,
+> you're a bit stuck.
 >
->> shouldn't prefix it with "ARM: " any longer.
+> You probably won't be able to hide the discrepancy from inside the
+> guest though (the guest will be able to observe the change), but this
+> is better than nothing.
 
+In order to track the PRI and ID bits written by guest,
+VGIC needs to store these values when ICC_CTRL_EL1 is updated.
+However,  QEMU is reseting VGIC by writing 0's to all the
+registers after VGIC initialization and hence the back up values are
+always reset to 0 and hence when guest read back, VGIC returns wrong value.
 
-Ok is "clk: imx53: Add clocks configuration" ok?
-
->
-> Shawn
->
-
-Thanks
-
-Fabien
+One option is to drop VGIC reset from QEMU which is not doing much.
