@@ -1,87 +1,99 @@
-From: oss@buserror.net (Scott Wood)
-Date: Sun, 18 Sep 2016 23:41:25 -0500
-Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <20160912113615.GA20804@leverpostej>
-References: <1473469413-11019-1-git-send-email-oss@buserror.net>
- <1473469413-11019-3-git-send-email-oss@buserror.net>
- <20160912113615.GA20804@leverpostej>
-Message-ID: <1474260085.15220.17.camel@buserror.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 19 Sep 2016 10:29:27 +0530
+Subject: [PATCH 4/7] phy: meson: add USB2 PHY support for Meson8b and GXBB
+In-Reply-To: <CAFBinCC5fhbtkNdc6MJs7veD+xVGC6Qb-jgX_pwvraP1x2JrhQ@mail.gmail.com>
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160904213152.25837-5-martin.blumenstingl@googlemail.com>
+ <m260q6jibf.fsf@baylibre.com>
+ <CAFBinCA4Yvw5pbOFmJ8SqyOASADavyEPmHywSdOiUazcqe_Zmg@mail.gmail.com>
+ <e3b1f611-d6f6-c98b-a53b-98e94ef5bd96@codethink.co.uk>
+ <m2eg4ui0nl.fsf@baylibre.com>
+ <ffdd0188-72bc-4575-f997-e8547f4c31d2@codethink.co.uk>
+ <CAFBinCC4gkMrJtertYevg_hXDLJEZ0PqfKKLL5UKXo8B=SXsPw@mail.gmail.com>
+ <m2sht9gkau.fsf@baylibre.com>
+ <CAFBinCCDDwydB+RP0CZKoAW5Suxotn224ZFVWvt2OGW3gNJR1g@mail.gmail.com>
+ <57DBAB2F.3040905@ti.com>
+ <CAFBinCC5fhbtkNdc6MJs7veD+xVGC6Qb-jgX_pwvraP1x2JrhQ@mail.gmail.com>
+Message-ID: <57DF70AF.4050002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-09-12 at 12:36 +0100, Mark Rutland wrote:
+Hi,
 
-> On Fri, Sep 09, 2016 at 08:03:31PM -0500, Scott Wood wrote:
-> > +static __always_inline void arch_timer_cval_write_cp15(int access, u64
-> > val)
-> > +{
-> > +	if (access == ARCH_TIMER_PHYS_ACCESS)
-> > +		asm volatile("msr cntp_cval_el0, %0" : : "r" (val));
-> > +	else if (access == ARCH_TIMER_VIRT_ACCESS)
-> > +		asm volatile("msr cntv_cval_el0, %0" : : "r" (val));
-> > +
-> > +	isb();
-> > +}
-> Please add ARCH_TIMER_REG_CVAL to enum arch_timer_reg, and move these
-> accesses into arch_timer_reg_write_cp15().
-
-Adding ARCH_TIMER_REG_CVAL to the enum means we get warnings from bunch of
-switch statements that don't actually need a CVAL implementation -- or else we
-have to add untested CVAL accessors for arm32 and mmio. ?The arm32 part would
-add another dependency on getting an ack from RMK, that can't be postponed as
-easily as the archdata/vdso patch.
-
-Since this is specific to an erratum rather than general cval support, I can
-move the accesses into fsl_a008585_set_next_event (and convert to
-write_sysreg).
-
-> > 
-> > +
-> > +	do {
-> > +		isb();
-> What's the ISB for?
+On Monday 19 September 2016 01:26 AM, Martin Blumenstingl wrote:
+> Hi Kishon,
 > 
-> The core should order accesses to the same counter, and any ISB required
-> for ordering against other counters should already be present. So I
-> don't follow what this is trying to achieve.
+> On Fri, Sep 16, 2016 at 10:19 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi,
+>>
+>> On Friday 09 September 2016 09:44 PM, Martin Blumenstingl wrote:
+>>> On Fri, Sep 9, 2016 at 5:33 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>>>> However, the problem with all of the solutions proposed (runtime PM ones
+>>>> included) is that we're forcing a board-specific design issue (2 devices
+>>>> sharing a reset line) into a driver that should not have any
+>>>> board-specific assumptions in it.
+>>>>
+>>>> For example, if this driver is used on another platform where different
+>>>> PHYs have different reset lines, then one of them (the unlucky one who
+>>>> is not probed first) will never get reset.  So any form of per-device
+>>>> ref-counting is not a portable solution.
+>>> maybe we should also consider Ben's solution: he played with the USB
+>>> PHY on his Meson8b board. His approach was to have only one USB PHY
+>>> driver instance which exposes two PHYs.
+>>> The downside of this: the driver would have to know the offset of the
+>>> PHYs (0x0 for the first PHY, 0x20 for the second), but we could handle
+>>> the reset using runtime PM without any hacks.
+>>
+>> I think the offset information can come from the devicetree too. The phy can be
+>> modeled something like below.
+>>
+>>                 usb-phys at c0000000 {
+>>                         compatible = "amlogic,meson-gxbb-usb2-phy";
+>>                         reg = <0x0 0xc0000000 0x0 0x40>;
+>>                         #address-cells = <2>;
+>>                         #size-cells = <2>;
+>>                         ranges = <0x0 0x0 0x0 0xc0000000 0x0 0x40>;
+>>                         resets = <&reset 34>;
+>>
+>>                         usb0_phy: usb_phy at 0 {
+>>                                 #phy-cells = <0>;
+>>                                 reg = <0x0 0x0 0x0 0x20>;
+>>                                 clocks = <&clkc CLKID_USB &clkc CLKID_USB0>;
+>>                                 clock-names = "usb_general", "usb";
+>>                                 status = "disabled";
+>>                         };
+>>
+>>                         usb1_phy: usb_phy at 20 {
+>>                                 #phy-cells = <0>;
+>>                                 reg = <0x0 0x20 0x0 0x20>;
+>>                                 clocks = <&clkc CLKID_USB &clkc CLKID_USB1>;
+>>                                 clock-names = "usb_general", "usb";
+>>                                 status = "disabled";
+>>                         };
+>>                 };
+>>
+>> This way the driver will be probed only once (the reset can be done during
+>> probe). The phy driver should scan the dt node and for every sub-node it
+>> invokes phy_create?
+> I'll recap what we have discussed so far (so you don't have to re-read
+> the whole thread):
+> The reference driver treats both USB PHYs as separate devices (the
+> datasheet has no information about the PHYs though). The only
+> "special" thing is the shared reset line -> together with Philipp
+> Zabel (the reset framework maintainer) we decided to make
+> reset_control_reset work for shared reset lines.
 > 
-> If this is necessary, please add a comment explaining what it is
-> intended to ensure.
+> That means we can keep the two PHYs as separate devices inside the
+> .dts, while keeping everything else separate (just like the reference
+> driver)
+> Is this fine for you and Arnd?
 
-I think it may have been a leftover from early patch versions when this
-function was entirely replacing arch_counter_get_cntvct(). ?I'm not sure why I
-put it in the loop, though.
+yeah.. I'm fine with that.
 
-> > @@ -271,6 +346,19 @@ static int
-> > arch_timer_set_next_event_phys_mem(unsigned long evt,
-> > ?	return 0;
-> > ?}
-> > ?
-> > +static void fsl_a008585_set_sne(struct clock_event_device *clk)
-> > +{
-> > +#ifdef CONFIG_FSL_ERRATUM_A008585
-> > +	if (!static_branch_unlikely(&arch_timer_read_ool_enabled))
-> > +		return;
-> > +
-> > +	if (arch_timer_uses_ppi == VIRT_PPI)
-> > +		clk->set_next_event = fsl_a008585_set_next_event_virt;
-> > +	else
-> > +		clk->set_next_event = fsl_a008585_set_next_event_phys;
-> > +#endif
-> > +}
-> > +
-> I'm not keen on the magic hook to reset the function pointers, and the
-> additional phys/virt stubs seem pointless. Instead, can we fold this
-> into the existing set_next_event? e.g. have that do:
+Thanks
+Kishon
 > 
-> 	if (needs_fsl_a008585_workaround() {
-> 		fsl_a008585_set_next_event(access, evt, clk);
-> 		return;
-> 	}
-
-OK. ?I had been trying to avoid messing with the standard set_next_event, but
-it doesn't matter as much now that static branches are being used. ?In that
-case we can avoid duplicating the ctrl code, and only replace the tval write.
-
--Scott
+> 
+> Regards,
+> Martin
+> 
