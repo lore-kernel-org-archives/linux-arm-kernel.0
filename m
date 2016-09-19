@@ -1,10 +1,10 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 19 Sep 2016 04:37:25 +0300
-Subject: [PATCH 13/19] ARM: imx legacy: mx35-3ds: move peripheral
+Date: Mon, 19 Sep 2016 04:37:23 +0300
+Subject: [PATCH 11/19] ARM: imx legacy: imx27-visstrim-m10: move peripheral
  initialization to .init_late
 In-Reply-To: <1474248988-10626-1-git-send-email-vz@mleia.com>
 References: <1474248988-10626-1-git-send-email-vz@mleia.com>
-Message-ID: <1474249051-10718-13-git-send-email-vz@mleia.com>
+Message-ID: <1474249051-10718-11-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,54 +15,74 @@ initialization level after init level of i.MX IOMUXC driver.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/mach-imx/mach-mx35_3ds.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index 7e315f0..c8c2e09 100644
---- a/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -555,8 +555,6 @@ static const struct imxi2c_platform_data mx35_3ds_i2c0_data __initconst = {
-  */
- static void __init mx35_3ds_init(void)
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index ede2bdb..dd75a47 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -540,7 +540,6 @@ static void __init visstrim_m10_revision(void)
+ static void __init visstrim_m10_board_init(void)
  {
--	struct platform_device *imx35_fb_pdev;
+ 	int ret;
+-	int mo_version;
+ 
+ 	imx27_soc_init();
+ 	visstrim_m10_revision();
+@@ -550,11 +549,6 @@ static void __init visstrim_m10_board_init(void)
+ 	if (ret)
+ 		pr_err("Failed to setup pins (%d)\n", ret);
+ 
+-	ret = gpio_request_array(visstrim_m10_gpios,
+-				ARRAY_SIZE(visstrim_m10_gpios));
+-	if (ret)
+-		pr_err("Failed to request gpios (%d)\n", ret);
 -
- 	imx35_soc_init();
+ 	imx27_add_imx_ssi(0, &visstrim_m10_ssi_pdata);
+ 	imx27_add_imx_uart0(&uart_pdata);
  
- 	mxc_iomux_v3_setup_multiple_pads(mx35pdk_pads, ARRAY_SIZE(mx35pdk_pads));
-@@ -579,9 +577,6 @@ static void __init mx35_3ds_init(void)
- 	imx35_add_mxc_nand(&mx35pdk_nand_board_info);
- 	imx35_add_sdhci_esdhc_imx(0, NULL);
- 
--	if (mxc_expio_init(MX35_CS5_BASE_ADDR, IMX_GPIO_NR(1, 1)))
--		pr_warn("Init of the debugboard failed, all "
--				"devices on the debugboard are unusable.\n");
- 	imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
- 
- 	i2c_register_board_info(
-@@ -590,6 +585,15 @@ static void __init mx35_3ds_init(void)
- 	imx35_add_ipu_core();
- 	platform_device_register(&mx35_3ds_ov2640);
- 	imx35_3ds_init_camera();
+@@ -566,12 +560,26 @@ static void __init visstrim_m10_board_init(void)
+ 	imx27_add_mxc_mmc(0, &visstrim_m10_sdhc_pdata);
+ 	imx27_add_mxc_ehci_otg(&visstrim_m10_usbotg_pdata);
+ 	imx27_add_fec(NULL);
+-	imx_add_gpio_keys(&visstrim_gpio_keys_platform_data);
++
+ 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 +}
 +
-+static void __init mx35_3ds_late_init(void)
++static void __init visstrim_m10_late_init(void)
 +{
-+	struct platform_device *imx35_fb_pdev;
++	int mo_version, ret;
 +
-+	if (mxc_expio_init(MX35_CS5_BASE_ADDR, IMX_GPIO_NR(1, 1)))
-+		pr_warn("Init of the debugboard failed, all "
-+			"devices on the debugboard are unusable.\n");
++	ret = gpio_request_array(visstrim_m10_gpios,
++				 ARRAY_SIZE(visstrim_m10_gpios));
++	if (ret)
++		pr_err("Failed to request gpios (%d)\n", ret);
++
++	imx_add_gpio_keys(&visstrim_gpio_keys_platform_data);
++
+ 	imx_add_platform_device("mx27vis", 0, NULL, 0, &snd_mx27vis_pdata,
+ 				sizeof(snd_mx27vis_pdata));
+ 	platform_device_register_resndata(NULL, "soc-camera-pdrv", 0, NULL, 0,
+ 				      &iclink_tvp5150, sizeof(iclink_tvp5150));
++
+ 	gpio_led_register_device(0, &visstrim_m10_led_data);
  
- 	imx35_fb_pdev = imx35_add_mx3_sdc_fb(&mx3fb_pdata);
- 	mx35_3ds_lcd.dev.parent = &imx35_fb_pdev->dev;
-@@ -618,6 +622,7 @@ MACHINE_START(MX35_3DS, "Freescale MX35PDK")
- 	.init_irq = mx35_init_irq,
- 	.init_time	= mx35pdk_timer_init,
- 	.init_machine = mx35_3ds_init,
-+	.init_late	= mx35_3ds_late_init,
- 	.reserve = mx35_3ds_reserve,
+ 	/* Use mother board version to decide what video devices we shall use */
+@@ -591,6 +599,7 @@ static void __init visstrim_m10_board_init(void)
+ 		visstrim_deinterlace_init();
+ 		visstrim_analog_camera_init();
+ 	}
++
+ 	visstrim_coda_init();
+ }
+ 
+@@ -607,5 +616,6 @@ MACHINE_START(IMX27_VISSTRIM_M10, "Vista Silicon Visstrim_M10")
+ 	.init_irq = mx27_init_irq,
+ 	.init_time	= visstrim_m10_timer_init,
+ 	.init_machine = visstrim_m10_board_init,
++	.init_late	= visstrim_m10_late_init,
  	.restart	= mxc_restart,
  MACHINE_END
 -- 
