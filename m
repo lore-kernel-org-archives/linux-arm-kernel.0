@@ -1,27 +1,66 @@
 From: andy.yan@rock-chips.com (Andy Yan)
-Date: Mon, 19 Sep 2016 16:43:59 +0800
-Subject: [PATCH 0/1] fix rk3066a based boards boot issue on linux-4.8
-Message-ID: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
+Date: Mon, 19 Sep 2016 16:44:56 +0800
+Subject: [PATCH] arm: dts: fix rk3066a based boards vdd_log voltage
+ initialization
+In-Reply-To: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
+References: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1474274696-28090-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The current rk3066a based boards(Rayeager, Bqcurie2, Marsboard) use
+pwm modulate vdd_logic voltage, but the pwm is default disabled and
+the pwm pin acts as a gpio before pwm regulator probed, so the pwm
+regulator driver will get a zero dutycycle at probe time, so change
+the initial dutycycle to zero to match pwm_regulator_init_state check.
 
-Hi, heiko:
-   I found my Rayeager board couldn't boot up on linux 4.8. After some
-dig, I found the pwm-regulator for vdd_log register failed and found
-some change in Boris's patch: commit 87248991a1de(regulator: pwm: Properly
-initialize the ->state field).
-   I send this patch to make the pwm-regulator can register success on
-this change.
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-
-Andy Yan (1):
-  arm: dts: fix rk3066a based boards vdd_log voltage initialization
+---
 
  arch/arm/boot/dts/rk3066a-bqcurie2.dts  | 2 +-
  arch/arm/boot/dts/rk3066a-marsboard.dts | 2 +-
  arch/arm/boot/dts/rk3066a-rayeager.dts  | 2 +-
  3 files changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/boot/dts/rk3066a-bqcurie2.dts b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+index bc674ee..618450d 100644
+--- a/arch/arm/boot/dts/rk3066a-bqcurie2.dts
++++ b/arch/arm/boot/dts/rk3066a-bqcurie2.dts
+@@ -61,7 +61,7 @@
+ 		regulator-min-microvolt = <1200000>;
+ 		regulator-max-microvolt = <1200000>;
+ 		regulator-always-on;
+-		voltage-table = <1000000 100>,
++		voltage-table = <1000000 0>,
+ 				<1200000 42>;
+ 		status = "okay";
+ 	};
+diff --git a/arch/arm/boot/dts/rk3066a-marsboard.dts b/arch/arm/boot/dts/rk3066a-marsboard.dts
+index a2b763e..ddc680b 100644
+--- a/arch/arm/boot/dts/rk3066a-marsboard.dts
++++ b/arch/arm/boot/dts/rk3066a-marsboard.dts
+@@ -59,7 +59,7 @@
+ 		regulator-min-microvolt = <1200000>;
+ 		regulator-max-microvolt = <1200000>;
+ 		regulator-always-on;
+-		voltage-table = <1000000 100>,
++		voltage-table = <1000000 0>,
+ 				<1200000 42>;
+ 		status = "okay";
+ 	};
+diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts b/arch/arm/boot/dts/rk3066a-rayeager.dts
+index 2536b3a..30aee99 100644
+--- a/arch/arm/boot/dts/rk3066a-rayeager.dts
++++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
+@@ -84,7 +84,7 @@
+ 		regulator-min-microvolt = <1200000>;
+ 		regulator-max-microvolt = <1200000>;
+ 		regulator-always-on;
+-		voltage-table = <1000000 100>,
++		voltage-table = <1000000 0>,
+ 				<1200000 42>;
+ 		status = "okay";
+ 	};
 -- 
 2.7.4
