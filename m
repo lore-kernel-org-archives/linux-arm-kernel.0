@@ -1,45 +1,35 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:12 +0100
-Subject: [PATCH 02/26] drm/rockchip: dw-mipi-dsi: pass new mode into MIPI mode
- set
+Date: Mon, 19 Sep 2016 18:17:34 +0100
+Subject: [PATCH 19/27] drm/rockchip: dw-mipi-dsi: don't enable PHY PLL until
+ it's configured
 In-Reply-To: <20160919171747.28512-1-john@metanate.com>
 References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-3-john@metanate.com>
+Message-ID: <20160919171747.28512-25-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the atomic world the new connector state is not set when mode_set is
-called and we should use the adjusted_mode parameter.
-
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index a87037556f5c..fa90bb615fd0 100644
+index 65c89367d8b2..61cee02e5f72 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -459,9 +459,9 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 	return ret;
- }
+@@ -414,12 +414,12 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
  
--static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
-+static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
-+				    struct drm_display_mode *mode)
- {
--	struct drm_display_mode *mode = &dsi->connector.state->crtc->state->adjusted_mode;
- 	unsigned int i, pre;
- 	unsigned long mpclk, pllref, tmp;
- 	unsigned int m = 1, n = 1, target_mbps = 1000;
-@@ -824,7 +824,7 @@ static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
- 	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
- 	int ret;
+ 	dw_mipi_dsi_phy_write(dsi, 0x44, HSFREQRANGE_SEL(testdin));
  
--	ret = dw_mipi_dsi_get_lane_bps(dsi);
-+	ret = dw_mipi_dsi_get_lane_bps(dsi, adjusted_mode);
- 	if (ret < 0)
- 		return;
+-	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
+ 	dw_mipi_dsi_phy_write(dsi, 0x17, INPUT_DIVIDER(dsi->input_div));
+ 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_LOW_SEL(dsi->feedback_div) |
+ 					 LOW_PROGRAM_EN);
+ 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_HIGH_SEL(dsi->feedback_div) |
+ 					 HIGH_PROGRAM_EN);
++	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
  
+ 	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
+ 					 BIASEXTR_SEL(BIASEXTR_127_7));
 -- 
 2.10.0.278.g4f427b1.dirty
