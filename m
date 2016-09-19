@@ -1,37 +1,34 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 19 Sep 2016 10:34:20 +0100
-Subject: [PATCH 2/2] drm/virtio: kconfig: Fixup white space.
-In-Reply-To: <1474277660-5196-1-git-send-email-peter.griffin@linaro.org>
-References: <1474277660-5196-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1474277660-5196-3-git-send-email-peter.griffin@linaro.org>
+Date: Mon, 19 Sep 2016 10:34:18 +0100
+Subject: [PATCH 0/2] Fix recursive Kconfig depedency issue
+Message-ID: <1474277660-5196-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use tabs instead of spaces.
+Hi,
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/gpu/drm/virtio/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+This series fixes a Kconfig recurssive depedency issue and also some
+trivial white space. This was found when developing the fdma dmaegine
+series [1], which has now been applied by Vinod.
 
-diff --git a/drivers/gpu/drm/virtio/Kconfig b/drivers/gpu/drm/virtio/Kconfig
-index 90357d9..2d83932 100644
---- a/drivers/gpu/drm/virtio/Kconfig
-+++ b/drivers/gpu/drm/virtio/Kconfig
-@@ -2,10 +2,10 @@ config DRM_VIRTIO_GPU
- 	tristate "Virtio GPU driver"
- 	depends on DRM
- 	select VIRTIO
--        select DRM_KMS_HELPER
--        select DRM_TTM
-+	select DRM_KMS_HELPER
-+	select DRM_TTM
- 	help
- 	   This is the virtual GPU driver for virtio.  It can be used with
--           QEMU based VMMs (like KVM or Xen).
-+	   QEMU based VMMs (like KVM or Xen).
- 
- 	   If unsure say M.
+These patchs were originally included as part of the fdma series [1],
+but I've now sent it separately as requested by Vinod [2], and also
+privately by Emil. 
+
+FYI not having this patch applied causes kbuild error emails [3].
+
+[1] https://lkml.org/lkml/2016/9/13/191
+
+[2] https://lkml.org/lkml/2016/9/15/562
+
+[3] https://lkml.org/lkml/2016/9/15/850
+
+Peter Griffin (2):
+  drm/virtio: kconfig: Fix recursive dependency issue.
+  drm/virtio: kconfig: Fixup white space.
+
+ drivers/gpu/drm/virtio/Kconfig | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
 -- 
 1.9.1
