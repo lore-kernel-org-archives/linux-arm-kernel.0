@@ -1,73 +1,64 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 19 Sep 2016 13:47:43 +0530
-Subject: [PATCH v6 0/8] power: add power sequence library
-In-Reply-To: <20160919074637.GA10289@b29397-desktop>
-References: <b1848eb2-9298-9089-ee4d-5356998c6c08@linaro.org>
- <20160824085335.GB27233@shlinux2> <20160829111045.GB3736@b29397-desktop>
- <3a45793f-18d9-0688-d2ab-ef79432c473c@linaro.org>
- <20160831095220.GA11938@b29397-desktop>
- <fd94340b-1c1d-2307-7e57-5b05f1655d2c@linaro.org>
- <20160902011046.GB11262@shlinux2>
- <eb032ff2-dac4-5efe-dda0-96404f290aa8@linaro.org>
- <CAPDyKFp0w0mBGNgu6uk7UevUka_ha6MvaVyOzXjCg3S8kdF7tg@mail.gmail.com>
- <ecbc3c0d-4ce7-758d-7f7d-4b3f3003c1ac@linaro.org>
- <20160919074637.GA10289@b29397-desktop>
-Message-ID: <364c3aa6-024a-1df5-3ae0-cab0535aae73@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Sep 2016 10:18:24 +0200
+Subject: [PATCH v4 1/2] ARM: dts: sun8i: add pinmux for UART1 at PG
+In-Reply-To: <20160916151642.27907-1-icenowy@aosc.xyz>
+References: <20160916151642.27907-1-icenowy@aosc.xyz>
+Message-ID: <20160919081824.GB8719@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Fri, Sep 16, 2016 at 11:16:41PM +0800, Icenowy Zheng wrote:
+> The UART1 at PG (PG6, PG7, PG8, PG9) is, in the Allwinner's reference
+> tablet design of A23/33, used to connect to UART Bluetooth cards.
+> 
+> Add the pinmux for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> This patch is splited in v4.
+> 
+>  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> index 7e05e09..c340885 100644
+> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> @@ -361,6 +361,20 @@
+>  				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>  			};
+>  
+> +			uart1_pins_a: uart1 at 0 {
+> +				allwinner,pins = "PG6", "PG7";
+> +				allwinner,function = "uart1";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			uart1_pins_cts_rts_a: uart1-cts-rts at 0 {
+> +				allwinner,pins = "PG8", "PG9";
+> +				allwinner,function = "uart1";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
 
-On Monday 19 September 2016 01:16 PM, Peter Chen wrote:
-> On Mon, Sep 19, 2016 at 01:09:10PM +0530, Vaibhav Hiremath wrote:
->>
->> On Friday 09 September 2016 02:17 PM, Ulf Hansson wrote:
->>> [...]
->>>
->>>>>>> We had an agreement that keep mmc's pwrseq framework unchanging.
->>>>>>> Unless Ulf and rob both agree to change.
->>>>>> Why 2 separate approach for same problem ?
->>>>>> And I see this as possible duplication of code/functionality :)
->>>>> How the new kernel compatibles old dts? If we do not need to
->>>>> consider this problem, the mmc can try to use power sequence library
->>>>> too in future.
->>>> I think we should attempt to get both MMC and USB power seq
->>>> come on one agreement, so that it can be reused.
->>> That would be nice. Although, to do that you would have to allow some
->>> DT bindings to be deprecated in the new generic power seq bindings, as
->>> otherwise you would break existing DTBs.
->>>
->>> I guess that is what Rob was objecting to!?
->> yeah, thats right.
->>
->> So lets adopt similar implementation for USB as well instead of
->> library, but keeping MMC untouched as of now.
->>
->> What I am trying to propose here is,
->>
->> Lets have power-sequence framework (similar to V1 of this series),
->> with,
->>
->> pwrseq: Core framework for power sequence.
->> pwrseq_generic/simple: for all generic control, like reset and clock
->> pwrseq_emmc: probably duplication of existing code - the idea
->>                            here is, all future code should be using this new
->>                            binding, so that we can deprecate the
->> drivers/mmc/core/pwrseq
->> pwrseq_arche: The usecase which I am dealing with today, which is more
->>                           complex in nature.
->>
->> Then the respective drivers can add their drivers (if needed) based on
->> complexity.
->>
->> comments ??
-> The key point here is DT maintainer (Rob) doesn't agree with adding new node
-> for power sequence at dts.
->
+It turns out the allwinner,drive and allwinner,pull properties are
+optionnal. I removed them, and applied that patch.
 
-Hmmm.
-We haven't heard from Rob lately especially after introduction of complex
-usecases. I hope he would revisit on above proposal.
+Thanks!
+Maxime
 
-Thanks,
-Vaibhav
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160919/38cead74/attachment.sig>
