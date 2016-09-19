@@ -1,84 +1,97 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 19 Sep 2016 15:41:44 +0100
-Subject: [PATCH v3 1/8] scpi: Add cmd indirection table to prepare for
- legacy commands
-In-Reply-To: <1473262477-18045-2-git-send-email-narmstrong@baylibre.com>
-References: <1473262477-18045-1-git-send-email-narmstrong@baylibre.com>
- <1473262477-18045-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <213c023d-bac8-5148-4846-8501501bddf2@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 19 Sep 2016 15:44:30 +0100
+Subject: [PATCH] ASoC: rk3399_gru_sound: fix recording pop at first attempt
+In-Reply-To: <1474295379-16936-1-git-send-email-zhengxing@rock-chips.com>
+References: <1474295379-16936-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <20160919144404.GA18734@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
-
-On 07/09/16 16:34, Neil Armstrong wrote:
-> Add indirection table to permit multiple command values for legacy support.
->
-
-I wrote the most of the patch and you changed the author too ;)
-
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+On Mon, Sep 19, 2016 at 10:29:39PM +0800, Xing Zheng wrote:
+> From: Wonjoon Lee <woojoo.lee@samsung.com>
+> 
+> Pop happens when mclk applied but dmic's own boot-time
+> Specify dmic delay times in dt to make sure
+> clocks are ready earlier than dmic working
+> 
+> Signed-off-by: Wonjoon Lee <woojoo.lee@samsung.com>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 > ---
->  drivers/firmware/arm_scpi.c | 145 ++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 127 insertions(+), 18 deletions(-)
->
-> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-> index 4388937..9a87687 100644
-> --- a/drivers/firmware/arm_scpi.c
-> +++ b/drivers/firmware/arm_scpi.c
+> 
+>  .../bindings/sound/rockchip,rk3399-gru-sound.txt   |    6 ++++++
+>  sound/soc/rockchip/rk3399_gru_sound.c              |   14 ++++++++++++++
+>  2 files changed, 20 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+> index f19b6c8..b7dd3ab 100644
+> --- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+> +++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+> @@ -6,6 +6,12 @@ Required properties:
+>    connected to the codecs
+>  - rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
+>  
+> +Optional properties:
+> +- dmic-delay : specify delay time for DMIC ready.
+> +  If this option is specified, which means it's required dmic need
+> +  delay for DMIC to ready so that rt5514 can avoid recording before
+> +  DMIC send valid data
 
-[..]
+What units is this in? Per the code it looks like ms, so if we follow
+Documentation/devicetree/bindings/property-units.txt, thous should be
+named something like dmic-enable-delay-ms.
 
-> @@ -161,6 +194,7 @@ struct scpi_drvinfo {
->  	u32 protocol_version;
->  	u32 firmware_version;
->  	int num_chans;
-> +	int *scpi_cmds;
->  	atomic_t next_chan;
->  	struct scpi_ops *scpi_ops;
->  	struct scpi_chan *channels;
-> @@ -390,6 +424,19 @@ static u32 scpi_get_version(void)
->  	return scpi_info->protocol_version;
+That said, do we even need a property for this? Does this vary much in
+practice?
+
+If it does, can we not derive this delay from other information (e.g.
+the rates of input clocks and so on)? What exactly determines the
+necessary delay?
+
+Thanks,
+Mark.
+
+>  
+>  sound {
+> diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+> index 164b6da..6ab838b 100644
+> --- a/sound/soc/rockchip/rk3399_gru_sound.c
+> +++ b/sound/soc/rockchip/rk3399_gru_sound.c
+> @@ -37,6 +37,8 @@
+>  
+>  #define SOUND_FS	256
+>  
+> +unsigned int rt5514_dmic_delay;
+> +
+>  static struct snd_soc_jack rockchip_sound_jack;
+>  
+>  static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
+> @@ -122,6 +124,9 @@ static int rockchip_sound_rt5514_hw_params(struct snd_pcm_substream *substream,
+>  		return ret;
+>  	}
+>  
+> +	/* Wait for DMIC stable */
+> +	msleep(rt5514_dmic_delay);
+> +
+>  	return 0;
 >  }
->
-> +static inline int check_cmd(unsigned int offset)
-> +{
-> +	if (offset >= CMD_MAX_COUNT ||
-
-If we call scpi_send_message internally(as it's static) why is this
-check needed ?
-
-
-> +	    !scpi_info ||
-> +	    !scpi_info->scpi_cmds)
-
-Will be even reach to this point if above is true ?
-
-> +		return -EINVAL;
+>  
+> @@ -334,6 +339,15 @@ static int rockchip_sound_probe(struct platform_device *pdev)
+>  		return -ENODEV;
+>  	}
+>  
+> +	/* Set DMIC delay */
+> +	ret = device_property_read_u32(&pdev->dev, "dmic-delay",
+> +					&rt5514_dmic_delay);
+> +	if (ret) {
+> +		rt5514_dmic_delay = 0;
+> +		dev_dbg(&pdev->dev,
+> +			"no optional property 'dmic-delay' found, default: no delay\n");
+> +	}
 > +
-> +	if (scpi_info->scpi_cmds[offset] < 0)
-> +		return -EOPNOTSUPP;
-
-IMO just above couple of lines in the beginning of scpi_send_message
-will suffice. You can just add this to my original patch.
-
->  static int
->  scpi_clk_get_range(u16 clk_id, unsigned long *min, unsigned long *max)
->  {
-> @@ -397,8 +444,13 @@ scpi_clk_get_range(u16 clk_id, unsigned long *min, unsigned long *max)
->  	struct clk_get_info clk;
->  	__le16 le_clk_id = cpu_to_le16(clk_id);
->
-> -	ret = scpi_send_message(SCPI_CMD_GET_CLOCK_INFO, &le_clk_id,
-> -				sizeof(le_clk_id), &clk, sizeof(clk));
-> +	ret = check_cmd(CMD_GET_CLOCK_INFO);
-> +	if (ret)
-> +		return ret;
-> +
-
-It's totally unnecessary to add check in each and every function calling
-scpi_send_message, why not add it to scpi_send_message instead.
-
--- 
-Regards,
-Sudeep
+>  	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+>  	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_dai_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+>  	rockchip_dailinks[DAILINK_RT5514_DSP].platform_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+> -- 
+> 1.7.9.5
+> 
+> 
