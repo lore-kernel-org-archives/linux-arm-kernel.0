@@ -1,36 +1,91 @@
 From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Mon, 19 Sep 2016 17:26:17 +0200
-Subject: [PATCH 3/3] i2c: bcm2835: Use ratelimited logging on transfer errors
-In-Reply-To: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
-References: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
-Message-ID: <1474298777-5858-3-git-send-email-noralf@tronnes.org>
+Date: Mon, 19 Sep 2016 17:26:15 +0200
+Subject: [PATCH 1/3] i2c: bcm2835: Fix hang for writing messages larger than
+ 16 bytes
+Message-ID: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writing to an AT24C32 generates on average 2x i2c transfer errors per
-32-byte page write. Which amounts to a lot for a 4k write. This is due
-to the fact that the chip doesn't respond during it's internal write
-cycle when the at24 driver tries and retries the next write.
-Reduce this flooding of the log by using dev_err_ratelimited().
+Writing messages larger than the FIFO size results in a hang, rendering
+the machine unusable. This is because the RXD status flag is set on the
+first interrupt which results in bcm2835_drain_rxfifo() stealing bytes
+from the buffer. The controller continues to trigger interrupts waiting
+for the missing bytes, but bcm2835_fill_txfifo() has none to give.
+In this situation wait_for_completion_timeout() apparently is unable to
+stop the madness.
+
+The BCM2835 ARM Peripherals datasheet has this to say about the flags:
+  TXD: is set when the FIFO has space for at least one byte of data.
+  RXD: is set when the FIFO contains at least one byte of data.
+  TXW: is set during a write transfer and the FIFO is less than full.
+  RXR: is set during a read transfer and the FIFO is or more full.
+
+Implementing the logic from the downstream i2c-bcm2708 driver solved
+the hang problem.
 
 Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
 ---
- drivers/i2c/busses/i2c-bcm2835.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/i2c/busses/i2c-bcm2835.c | 22 ++++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index b3ce565..dc0a5d5 100644
+index d4f3239..f283b71 100644
 --- a/drivers/i2c/busses/i2c-bcm2835.c
 +++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -274,7 +274,8 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
- 	    (msg->flags & I2C_M_IGNORE_NAK))
- 		return 0;
+@@ -64,6 +64,7 @@ struct bcm2835_i2c_dev {
+ 	int irq;
+ 	struct i2c_adapter adapter;
+ 	struct completion completion;
++	struct i2c_msg *curr_msg;
+ 	u32 msg_err;
+ 	u8 *msg_buf;
+ 	size_t msg_buf_remaining;
+@@ -126,14 +127,13 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
+ 		return IRQ_HANDLED;
+ 	}
  
--	dev_err(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
-+	dev_err_ratelimited(i2c_dev->dev, "i2c transfer failed: %x\n",
-+			    i2c_dev->msg_err);
+-	if (val & BCM2835_I2C_S_RXD) {
+-		bcm2835_drain_rxfifo(i2c_dev);
+-		if (!(val & BCM2835_I2C_S_DONE))
+-			return IRQ_HANDLED;
+-	}
+-
+ 	if (val & BCM2835_I2C_S_DONE) {
+-		if (i2c_dev->msg_buf_remaining)
++		if (i2c_dev->curr_msg->flags & I2C_M_RD) {
++			bcm2835_drain_rxfifo(i2c_dev);
++			val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
++		}
++
++		if ((val & BCM2835_I2C_S_RXD) || i2c_dev->msg_buf_remaining)
+ 			i2c_dev->msg_err = BCM2835_I2C_S_LEN;
+ 		else
+ 			i2c_dev->msg_err = 0;
+@@ -141,11 +141,16 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
+ 		return IRQ_HANDLED;
+ 	}
  
- 	if (i2c_dev->msg_err & BCM2835_I2C_S_ERR)
- 		return -EREMOTEIO;
+-	if (val & BCM2835_I2C_S_TXD) {
++	if (val & BCM2835_I2C_S_TXW) {
+ 		bcm2835_fill_txfifo(i2c_dev);
+ 		return IRQ_HANDLED;
+ 	}
+ 
++	if (val & BCM2835_I2C_S_RXR) {
++		bcm2835_drain_rxfifo(i2c_dev);
++		return IRQ_HANDLED;
++	}
++
+ 	return IRQ_NONE;
+ }
+ 
+@@ -155,6 +160,7 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
+ 	u32 c;
+ 	unsigned long time_left;
+ 
++	i2c_dev->curr_msg = msg;
+ 	i2c_dev->msg_buf = msg->buf;
+ 	i2c_dev->msg_buf_remaining = msg->len;
+ 	reinit_completion(&i2c_dev->completion);
 -- 
 2.8.2
