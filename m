@@ -1,61 +1,107 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 19 Sep 2016 10:22:43 -0700
-Subject: [PATCH] arm: dts: fix rk3066a based boards vdd_log voltage
- initialization
-In-Reply-To: <20160919191327.741a2b89@bbrezillon>
-References: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
- <1474274696-28090-1-git-send-email-andy.yan@rock-chips.com>
- <CAD=FV=VawAOWBF_PoXqSj3oiVgfF8SnCBp56p8F==XsaVLmMcg@mail.gmail.com>
- <2318029.f7g774Bk76@phil>
- <CAD=FV=UOXcUZyXRj++GkKksyFedGt59vQz8958nhhF9UM7rOuw@mail.gmail.com>
- <20160919191327.741a2b89@bbrezillon>
-Message-ID: <CAD=FV=Ufmvg1P8suOPQ53kpOD1pei4N2dOpKUCxZk001XKj_OA@mail.gmail.com>
+From: john@metanate.com (John Keeping)
+Date: Mon, 19 Sep 2016 18:24:30 +0100
+Subject: [PATCH 00/27] drm/rockchip: MIPI fixes & improvements
+In-Reply-To: <20160919171747.28512-1-john@metanate.com>
+References: <20160919171747.28512-1-john@metanate.com>
+Message-ID: <20160919182430.13fb3151.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+D'oh, I got send-email horribly wrong here.  Please ignore the n/27
+patches following this message - the n/26 versions are correct.
 
-On Mon, Sep 19, 2016 at 10:13 AM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> Correct me if I'm wrong, but the main problem here is that, when we try
-> to detect the initial regulator state, we ran into a "missing entry in
-> the duty-cycle <-> voltage table" error, which then triggers an -EINVAL
-> error preventing the PWM regulator probe to succeed.
->
-> Of course, adding an entry for the 0% dutycle case would solve the
-> issue, but I wonder if we should not allow "unknown value" at probe
-> time, and let the regulator user set the voltage output when it claims
-> it.
->
-> Another option would be to fake a valid value in this case (choose the
-> closest entry in the voltage table?).
+I won't spam the list with a cleaned-up v2 immediately, but I'll make
+extra sure to clean out my working directory when I do send the re-roll!
 
-If the goal is to avoid glitching the voltage at bootup, then the
-above doesn't really solve it.
+On Mon, 19 Sep 2016 18:17:10 +0100, John Keeping wrote:
 
-For instance, you could have:
-
-0% - 1.5V
-100% - 0.8V
-When configured as input: 1.1V
-Max useful value: 1.2V
-
-So if firmware doesn't touch the PWM regulator then that means you're
-booting up at 1.1V.
-
-If you read out the PWM itself, it will claim that it's running at 0%.
-While that's true, that doesn't mean that the voltage on the system is
-actually 1.5V because at boot the system had configured the pinmux as
-GPIO input.  ...so it's actually 1.1V because the PWM isn't actually
-controlling the pins.
-
-So if you want to avoid glitching the line then you want to make sure
-that you properly init to 1.1V, _not_ to 1.5V.
-
-In the case above, it's possible that 1.5V isn't really so great for
-the hardware lifespan because 1.2V is the maximum useful value.  You
-could argue that the hardware is badly designed in this case, but I
-have certainly seen boards designed where the maximum achievable value
-is higher than the maximum "safe" value.
-
--Doug
+> This is a bit of a mixed selection of patches to all areas of the
+> Rockchip dw-mipi-dsi driver, which I've been using for a while.
+> 
+> The first few patches fix the driver's use of the atomic API by removing
+> hardware manipulation from the mode_set hook:
+> 
+>   drm/rockchip: dw-mipi-dsi: use mode from display state
+>   drm/rockchip: dw-mipi-dsi: pass new mode into MIPI mode set
+>   drm/rockchip: dw-mipi-dsi: don't configure hardware in mode_set for
+>     MIPI
+>   drm/rockchip: dw-mipi-dsi: rename commit hook to enable
+> 
+> The following several patches fix various aspects of DSI host transfers
+> in order to improve support for displays that need to be set up via DSI
+> commands:
+> 
+>   drm/rockchip: dw-mipi-dsi: fix command header writes
+>   drm/rockchip: dw-mipi-dsi: fix generic packet status check
+>   drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read on tx_buf
+>   drm/rockchip: dw-mipi-dsi: include bad value in error message
+>   drm/rockchip: dw-mipi-dsi: respect message flags
+>   drm/rockchip: dw-mipi-dsi: only request HS clock when required
+>   drm/rockchip: dw-mipi-dsi: don't assume buffer is aligned
+>   drm/rockchip: dw-mipi-dsi: prepare panel after phy init
+>   drm/rockchip: dw-mipi-dsi: allow commands in panel_disable
+> 
+> Then a bunch of patches to improve the PHY PLL and other clock setup:
+> 
+>   drm/rockchip: dw-mipi-dsi: fix escape clock rate
+>   drm/rockchip: dw-mipi-dsi: ensure PHY is reset
+>   drm/rockchip: dw-mipi-dsi: configure bias and bandgap before enable
+>   drm/rockchip: dw-mipi-dsi: don't enable PHY PLL until it's configured
+>   drm/rockchip: dw-mipi-dsi: properly configure PHY timing
+>   drm/rockchip: dw-mipi-dsi: improve PLL configuration
+> 
+> A couple of patches make the VOP and MIPI host consistent when panels do
+> not set explicit hsync/vsync polarities:
+> 
+>   drm/rockchip: dw-mipi-dsi: use positive check for N{H,V}SYNC
+>   drm/rockchip: vop: test for P{H,V}SYNC
+> 
+> The following patch fixes fbcon by making sure that the output
+> resolution is known before it loads:
+> 
+>   drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
+> 
+> Then a patch that should be self-explanatory:
+> 
+>   drm/rockchip: dw-mipi-dsi: support non-burst modes
+> 
+> And the final two patches were useful in development but aren't really
+> needed once everything's working:
+> 
+>   drm/rockchip: dw-mipi-dsi: add reset control
+>   drm/rockchip: dw-mipi-dsi: support read commands
+> 
+> 
+> John Keeping (26):
+>   drm/rockchip: dw-mipi-dsi: use mode from display state
+>   drm/rockchip: dw-mipi-dsi: pass new mode into MIPI mode set
+>   drm/rockchip: dw-mipi-dsi: don't configure hardware in mode_set for
+>     MIPI
+>   drm/rockchip: dw-mipi-dsi: rename commit hook to enable
+>   drm/rockchip: dw-mipi-dsi: fix command header writes
+>   drm/rockchip: dw-mipi-dsi: fix generic packet status check
+>   drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read on tx_buf
+>   drm/rockchip: dw-mipi-dsi: include bad value in error message
+>   drm/rockchip: dw-mipi-dsi: respect message flags
+>   drm/rockchip: dw-mipi-dsi: only request HS clock when required
+>   drm/rockchip: dw-mipi-dsi: don't assume buffer is aligned
+>   drm/rockchip: dw-mipi-dsi: prepare panel after phy init
+>   drm/rockchip: dw-mipi-dsi: allow commands in panel_disable
+>   drm/rockchip: dw-mipi-dsi: fix escape clock rate
+>   drm/rockchip: dw-mipi-dsi: ensure PHY is reset
+>   drm/rockchip: dw-mipi-dsi: configure bias and bandgap before enable
+>   drm/rockchip: dw-mipi-dsi: don't enable PHY PLL until it's configured
+>   drm/rockchip: dw-mipi-dsi: properly configure PHY timing
+>   drm/rockchip: dw-mipi-dsi: improve PLL configuration
+>   drm/rockchip: dw-mipi-dsi: use specific poll helper
+>   drm/rockchip: dw-mipi-dsi: use positive check for N{H,V}SYNC
+>   drm/rockchip: vop: test for P{H,V}SYNC
+>   drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
+>   drm/rockchip: dw-mipi-dsi: support non-burst modes
+>   drm/rockchip: dw-mipi-dsi: add reset control
+>   drm/rockchip: dw-mipi-dsi: support read commands
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c      | 325 ++++++++++++++++++++--------
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   4 +-
+>  2 files changed, 234 insertions(+), 95 deletions(-)
+> 
