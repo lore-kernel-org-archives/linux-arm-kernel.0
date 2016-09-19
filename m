@@ -1,40 +1,84 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 19 Sep 2016 11:11:25 +0100
-Subject: [PATCH 5/6] arm/arm64: vgic-new: Implement VGICv3 CPU interface
- access
-In-Reply-To: <CALicx6s=FOVv8t-6s4VJYwqUGaCfqMxrjXuop=JX6UYrYVj7Fg@mail.gmail.com>
-References: <1474028453-29132-1-git-send-email-vijay.kilari@gmail.com>
- <1474028453-29132-6-git-send-email-vijay.kilari@gmail.com>
- <57DC0366.8060304@arm.com>
- <CALicx6u-uYLY3DtDGMh3n6NbNH3kD9fn9aYHHJC=LVUQfFjTsQ@mail.gmail.com>
- <57DC26C5.2060800@arm.com>
- <CALicx6ucEH3w58Rhb8Urk0V5kRcqtUdwDYDtSLXrkas-Jatv=A@mail.gmail.com>
- <20160917123756.0a05a904@arm.com>
- <CALicx6s=FOVv8t-6s4VJYwqUGaCfqMxrjXuop=JX6UYrYVj7Fg@mail.gmail.com>
-Message-ID: <CAFEAcA9aax2w4yUQ48fWxNCbrAZdyLNVxef5RgvrJ+CaQWF=ZQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Sep 2016 11:12:29 +0100
+Subject: [RFC PATCH v2 11/11] irqchip: mbigen: promote mbigen init
+In-Reply-To: <3f9b5a3e-13f4-75a4-15bc-f55e26740205@linaro.org>
+References: <1473862879-7769-1-git-send-email-guohanjun@huawei.com>
+ <1473862879-7769-12-git-send-email-guohanjun@huawei.com>
+ <57DABD2F.1030606@arm.com> <3f9b5a3e-13f4-75a4-15bc-f55e26740205@linaro.org>
+Message-ID: <57DFBA0D.7040801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 September 2016 at 08:36, Vijay Kilari <vijay.kilari@gmail.com> wrote:
-> In order to track the PRI and ID bits written by guest,
-> VGIC needs to store these values when ICC_CTRL_EL1 is updated.
-> However,  QEMU is reseting VGIC by writing 0's to all the
-> registers after VGIC initialization and hence the back up values are
-> always reset to 0 and hence when guest read back, VGIC returns wrong value.
->
-> One option is to drop VGIC reset from QEMU which is not doing much.
+On 19/09/16 10:49, Hanjun Guo wrote:
+> On 2016/9/15 23:24, Marc Zyngier wrote:
+>> On 14/09/16 15:21, Hanjun Guo wrote:
+>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>
+>>> mbigen is an irqchip and it needs to be probed before
+>>> devices, same logic is used for SMMU and etc., let's
+>>> use arch_initcall instead of platform init for mbigen.
+>>>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> Cc: Ma Jun <majun258@huawei.com>
+>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>> ---
+>>>  drivers/irqchip/irq-mbigen.c | 6 +++++-
+>>>  1 file changed, 5 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+>>> index ca6add1..3a33de6 100644
+>>> --- a/drivers/irqchip/irq-mbigen.c
+>>> +++ b/drivers/irqchip/irq-mbigen.c
+>>> @@ -374,7 +374,11 @@ static struct platform_driver mbigen_platform_driver = {
+>>>  	.probe			= mbigen_device_probe,
+>>>  };
+>>>
+>>> -module_platform_driver(mbigen_platform_driver);
+>>> +static __init int mbigen_init(void)
+>>> +{
+>>> +	return platform_driver_register(&mbigen_platform_driver);
+>>> +}
+>>> +arch_initcall(mbigen_init);
+>>>
+>>>  MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
+>>>  MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
+>>>
+>>
+>> I've already NACKed such a patch in the past, and I will carry on
+>> NACKing it until all the other avenues (like properly tracking device
+>> dependencies) have been explored and have been proven not to be fit for
+>> purpose.
+> 
+> I'd happy to work on this to make progress.
+> 
+>>
+>> Rafael had proposed something around this subject last year, and I've
+> 
+> Sorry, obviously I missed something, could you give me the link about
+> Rafael's patches? I will pull back and test it on our hardware.
 
-No, if QEMU's reset is not resetting registers to the right value
-the correct thing to do is fix the reset code. The way device
-reset is supposed to work is that QEMU knows the right values
-to use and it writes them to the kernel.
+Please see this discussion from almost a year ago:
 
-QEMU doesn't reset ICC_CTLR_EL1 to 0 for TCG:
-    cs->icc_ctlr_el1[GICV3_NS] = ICC_CTLR_EL1_A3V |
-        (1 << ICC_CTLR_EL1_IDBITS_SHIFT) |
-        (7 << ICC_CTLR_EL1_PRIBITS_SHIFT);
+https://patchwork.kernel.org/patch/7407401/
 
-but I don't think that code gets run for the KVM VGIC.
+in which I give the existing pointers and explain why I'm pushing back
+on things like this patch.
 
-thanks
--- PMM
+> 
+>> been repeatedly advising you to work with him and others to make it
+>> happen. You can choose to ignore this advise, but that doesn't make this
+>> patch an acceptable approach.
+> 
+> OK, I will drop this patch in next version, and work on the generic
+> solution instead.
+
+That'd be the ideal thing, and that's what I suggested when we did meet
+in BKK earlier this year. Obviously, I didn't convey my point clearly
+enough.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
