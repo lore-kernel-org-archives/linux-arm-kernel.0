@@ -1,62 +1,47 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 19 Sep 2016 18:22:14 +0300
-Subject: [PATCH 3/8] crypto: omap-sham: rename sgl to sgl_tmp for deprecation
+Date: Mon, 19 Sep 2016 18:22:16 +0300
+Subject: [PATCH 5/8] crypto: omap-sham: change the DMA threshold value to a
+ define
 In-Reply-To: <1474298539-23897-1-git-send-email-t-kristo@ti.com>
 References: <1474298539-23897-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1474298539-23897-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1474298539-23897-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current usage of sgl will be deprecated, and will be replaced by an
-array required by the sg based driver implementation. Rename the existing
-variable as sgl_tmp so that it can be removed from the driver easily later.
+Currently the threshold value was hardcoded in the driver. Having a define
+for it makes it easier to configure.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-sham.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+ drivers/crypto/omap-sham.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index 3f2bf98..33bea52 100644
+index 8558989..5c95bf9 100644
 --- a/drivers/crypto/omap-sham.c
 +++ b/drivers/crypto/omap-sham.c
-@@ -151,7 +151,7 @@ struct omap_sham_reqctx {
+@@ -137,6 +137,7 @@
+ #define OMAP_ALIGNED		__attribute__((aligned(sizeof(u32))))
  
- 	/* walk state */
- 	struct scatterlist	*sg;
--	struct scatterlist	sgl;
-+	struct scatterlist	sgl_tmp;
- 	unsigned int		offset;	/* offset in current sg */
- 	unsigned int		total;	/* total request */
+ #define BUFLEN			PAGE_SIZE
++#define OMAP_SHA_DMA_THRESHOLD	256
  
-@@ -583,18 +583,19 @@ static int omap_sham_xmit_dma(struct omap_sham_dev *dd, dma_addr_t dma_addr,
- 	if (is_sg) {
- 		/*
- 		 * The SG entry passed in may not have the 'length' member
--		 * set correctly so use a local SG entry (sgl) with the
-+		 * set correctly so use a local SG entry (sgl_tmp) with the
- 		 * proper value for 'length' instead.  If this is not done,
- 		 * the dmaengine may try to DMA the incorrect amount of data.
- 		 */
--		sg_init_table(&ctx->sgl, 1);
--		sg_assign_page(&ctx->sgl, sg_page(ctx->sg));
--		ctx->sgl.offset = ctx->sg->offset;
--		sg_dma_len(&ctx->sgl) = len32;
--		sg_dma_address(&ctx->sgl) = sg_dma_address(ctx->sg);
--
--		tx = dmaengine_prep_slave_sg(dd->dma_lch, &ctx->sgl, 1,
--			DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+		sg_init_table(&ctx->sgl_tmp, 1);
-+		sg_assign_page(&ctx->sgl_tmp, sg_page(ctx->sg));
-+		ctx->sgl_tmp.offset = ctx->sg->offset;
-+		sg_dma_len(&ctx->sgl_tmp) = len32;
-+		sg_dma_address(&ctx->sgl_tmp) = sg_dma_address(ctx->sg);
-+
-+		tx = dmaengine_prep_slave_sg(dd->dma_lch, &ctx->sgl_tmp, 1,
-+					     DMA_MEM_TO_DEV,
-+					     DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 	} else {
- 		tx = dmaengine_prep_slave_single(dd->dma_lch, dma_addr, len32,
- 			DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+ struct omap_sham_dev;
+ 
+@@ -1435,10 +1436,11 @@ static int omap_sham_final(struct ahash_request *req)
+ 	/*
+ 	 * OMAP HW accel works only with buffers >= 9.
+ 	 * HMAC is always >= 9 because ipad == block size.
+-	 * If buffersize is less than 240, we use fallback SW encoding,
+-	 * as using DMA + HW in this case doesn't provide any benefit.
++	 * If buffersize is less than DMA_THRESHOLD, we use fallback
++	 * SW encoding, as using DMA + HW in this case doesn't provide
++	 * any benefit.
+ 	 */
+-	if (!ctx->digcnt && ctx->bufcnt < 240)
++	if (!ctx->digcnt && ctx->bufcnt < OMAP_SHA_DMA_THRESHOLD)
+ 		return omap_sham_final_shash(req);
+ 	else if (ctx->bufcnt)
+ 		return omap_sham_enqueue(req, OP_FINAL);
 -- 
 1.9.1
