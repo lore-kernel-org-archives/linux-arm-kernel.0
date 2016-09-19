@@ -1,131 +1,72 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Tue, 20 Sep 2016 07:44:52 +0900
-Subject: [PATCH V5] perf tools: adding support for address filters
-In-Reply-To: <008718a0-13bf-8245-e2ee-562cffeba3c5@intel.com>
-References: <1473702794-8493-1-git-send-email-mathieu.poirier@linaro.org>
- <cd7b9dc9-686c-813e-ff9f-97faba377799@intel.com>
- <CANLsYkz_rQ5uhJQ0x9EDi6vcx4xHrbjjSdwxA=X1ssHq4ucALQ@mail.gmail.com>
- <20160914082535.3304d51a1a6a085234f77529@kernel.org>
- <CANLsYkwRUps0Mtc_yQfNOW+qsmOXT8yaGrDj4566LPPTrLsUxg@mail.gmail.com>
- <20160917223311.19dac50f03da4f40fd5cc844@kernel.org>
- <008718a0-13bf-8245-e2ee-562cffeba3c5@intel.com>
-Message-ID: <20160920074452.3935bf0cf96c2b098ceb8d6f@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 19 Sep 2016 16:08:26 -0700
+Subject: [PATCH] ARM: dts: Add power button support for igepv5
+In-Reply-To: <CAMVEqEkKrw2eH3L6+te5MZLqxBT2jUiRO-KNuS+9nuNYvihCRA@mail.gmail.com>
+References: <20160909210729.20184-1-tony@atomide.com>
+ <31409234-3185-5348-2d37-effb7769c92a@osg.samsung.com>
+ <CAMVEqEkKrw2eH3L6+te5MZLqxBT2jUiRO-KNuS+9nuNYvihCRA@mail.gmail.com>
+Message-ID: <20160919230826.aubqvj2km4wg6gz7@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Sep 2016 09:15:40 +0300
-Adrian Hunter <adrian.hunter@intel.com> wrote:
-
-> On 17/09/16 16:33, Masami Hiramatsu wrote:
-> > On Fri, 16 Sep 2016 09:32:43 -0600
-> > Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> > 
-> >> On 13 September 2016 at 17:25, Masami Hiramatsu <mhiramat@kernel.org> wrote:
-> >>> On Tue, 13 Sep 2016 08:18:10 -0600
-> >>> Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> >>>
-> >>>> On 13 September 2016 at 04:01, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> >>>>> On 12/09/16 20:53, Mathieu Poirier wrote:
-> >>>>>> This patch makes it possible to use the current filter
-> >>>>>> framework with address filters.  That way address filters for
-> >>>>>> HW tracers such as CoreSight and IntelPT can be communicated
-> >>>>>> to the kernel drivers.
-> >>>>>>
-> >>>>>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >>>>>>
-> >>>>>> ---
-> >>>>>> Changes for V5:
-> >>>>>>  - Modified perf_evsel__append_filter() to take a string format
-> >>>>>>    rather than an operation.
-> >>>>>
-> >>>>> Hope I'm not being a pain, but aren't there other places calling
-> >>>>> perf_evsel__append_filter() that need to be changed.  Might make
-> >>>>> sense as a separate patch.
-> >>>>
-> >>>> No no, you're right - I completely overlooked that.
-> >>>>
-> >>>> But shouldn't it be in the same patch?  That way a git bisect would
-> >>>> stay consistent...
-> >>>
-> >>> You're right. Caller and callee should be changed in atomic.
-> >>>
-> >>> BTW, could you add document updates how the perf command line
-> >>> will be changed, and also show the result in the patch description?
+* Pau Pajuel <ppajuel@gmail.com> [160919 01:13]:
+> Hello Tony,
+> 
+> 2016-09-14 3:26 GMT+02:00 Javier Martinez Canillas <javier@osg.samsung.com>:
+> > Hello Tony,
+> >
+> > On 09/09/2016 05:07 PM, Tony Lindgren wrote:
+> >> Add power button support for igepv5.
 > >>
-> >> This patch does not change anything on the perf command line.  It
-> >> simply allows current options to succeed (as they should) rather than
-> >> fail.
-> > 
-> > Yes, and it will make perf acceptable to pass --filter to CoreSight or
-> > Intel PT events, or am I misunderstand?
-> > If it is correct, could you give us an example how to pass it, since
-> > tools/perf/Documentation/perf-record.txt says it is only for tracepoints?
-> 
-> I am adding support for symbols in the address filter.  I will send the
-> patches soon, but the documentation will be:
-> 
-> --filter=<filter>::
->         Event filter. This option should follow a event selector (-e) which
-> 	selects either tracepoint event(s) or a hardware trace PMU
-> 	(e.g. Intel PT or CoreSight).
-> 
-> 	- tracepoint filters
-> 
-> 	In the case of tracepoints, multiple '--filter' options are combined
-> 	using '&&'.
-> 
-> 	- address filters
-> 
-> 	A hardware trace PMU advertises its ability to accept a number of
-> 	address filters	by specifying a non-zero value in
-> 	/sys/bus/event_source/devices/<pmu>/nr_addr_filters.
-> 
-> 	Address filters have the format:
-> 	
-> 	filter|start|stop|tracestop <start> [/ <size>] [@<file name>]
-> 	
-> 	Where:
-> 	- 'filter': defines a region that will be traced.
-> 	- 'start': defines an address at which tracing will begin.
-> 	- 'stop': defines an address at which tracing will stop.
-> 	- 'tracestop': defines a region in which tracing will stop.
-> 
-> 	<file name> is the name of the object file, <start> is the offset to the
-> 	code to trace in that file, and <size> is the size of the region to
-> 	trace. 'start' and 'stop' filters need not specify a <size>.
-> 
-> 	If no object file is specified then the kernel is assumed, in which case
-> 	the start address must be a current kernel memory address.
-> 
-> 	<start> can also be specified by providing the name of a symbol. If the
-> 	symbol name is not unique, it can be disambiguated by inserting #n where
-> 	'n' selects the n'th symbol in address order. Alternately #0, #g or #G
-> 	select only a global symbol. <size> can also be specified by providing
-> 	the name of a symbol, in which case the size is calculated to the end
-> 	of that symbol. For 'filter' and 'tracestop' filters, if <size> is
-> 	omitted and <start> is a symbol, then the size is calculated to the end
-> 	of that symbol.
-> 
-> 	If <size> is omitted and <start> is '*', then the start and size will
-> 	be calculated from the first and last symbols, i.e. to trace the whole
-> 	file.
-> 
-> 	If symbol names (or "*") are provided, they must be surrounded by white
-> 	space.
-> 
-> 	The filter passed to the kernel is not necessarily the same as entered.
-> 	To see the filter that is passed, use the -v option.
-> 
-> 	The kernel may not be able to configure a trace region if it is not
-> 	within a single mapping.  MMAP events (or /proc/<pid>/maps) can be
-> 	examined to determine if that is a possibility.
-> 
-> 	Multiple filters can be separated with space or comma.
+> >> Cc: Agust? Fontquerni i Gorchs <afontquerni@iseebcn.com>
+> >> Cc: Enric Balletbo Serra <eballetbo@gmail.com>
+> >> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> >> Cc: Pau Pajuel <ppajuel@gmail.com>
+> >> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> >> ---
+> >
+> > I don't have a schematics for this board, but the patch looks good to me.
+> Patch has an errata. Power button is GPIO_ACTIVE_LOW instead GPIO_ACTIVE_HIGH.
 
-Perfect! :)
-OK, I'll wait your patch.
+Oops sorry about that, here's an incremental fix.
 
-Thank you,
+Regards,
 
+Tony
+
+8< -----------------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Mon, 19 Sep 2016 16:02:12 -0700
+Subject: [PATCH] ARM: dts: Fix igepv5 power button GPIO direction
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+It should be GPIO_ACTIVE_LOW instead of GPIO_ACTIVE_HIGH as
+pointed out by Pau Pajuel <ppajuel@gmail.com>.
+
+Cc: Agust? Fontquerni i Gorchs <afontquerni@iseebcn.com>
+Cc: Enric Balletbo Serra <eballetbo@gmail.com>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Pau Pajuel <ppajuel@gmail.com>
+Fixes: b118c6a6ffa1 ("ARM: dts: Add power button support for igepv5")
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap5-igep0050.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/omap5-igep0050.dts b/arch/arm/boot/dts/omap5-igep0050.dts
+--- a/arch/arm/boot/dts/omap5-igep0050.dts
++++ b/arch/arm/boot/dts/omap5-igep0050.dts
+@@ -27,7 +27,7 @@
+ 		power-button {
+ 			label = "Power Button";
+ 			linux,code = <KEY_POWER>;
+-			gpios = <&gpio4 22 GPIO_ACTIVE_HIGH>;
++			gpios = <&gpio4 22 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+ 
 -- 
-Masami Hiramatsu <mhiramat@kernel.org>
+2.9.3
