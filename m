@@ -1,41 +1,40 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 19 Sep 2016 05:42:17 +0300
-Subject: [PATCH 0/2] ARM: imx31/of: clk: init clock controller with
- CLK_OF_DECLARE
-Message-ID: <1474252939-12579-1-git-send-email-vz@mleia.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Mon, 19 Sep 2016 10:44:28 +0800
+Subject: [PATCH V2 1/7] dt-bindings: Update QorIQ TMU thermal bindings
+In-Reply-To: <CADRPPNQ+hikr1qNK1wPbLnhudUrU1bN_2iuYyRQnqCN4Zwh83Q@mail.gmail.com>
+References: <1465270054-31512-1-git-send-email-hongtao.jia@nxp.com>
+ <20160608195241.GA6805@rob-hp-laptop>
+ <CADRPPNQ+hikr1qNK1wPbLnhudUrU1bN_2iuYyRQnqCN4Zwh83Q@mail.gmail.com>
+Message-ID: <1474253068.23153.2.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change is based on v4.8.0-rc1 and plus it depends on this fixup:
+On ?, 2016-09-14 at 11:40 -0500, Leo Li wrote:
+> On Wed, Jun 8, 2016 at 2:52 PM, Rob Herring <robh@kernel.org> wrote:
+> > 
+> > On Tue, Jun 07, 2016 at 11:27:34AM +0800, Jia Hongtao wrote:
+> > > 
+> > > For different types of SoC the sensor id and endianness may vary.
+> > > "#thermal-sensor-cells" is used to provide sensor id information.
+> > > "little-endian" property is to tell the endianness of TMU.
+> > > 
+> > > Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
+> > > ---
+> > > Changes for V2:
+> > > * Remove formatting chnages.
+> > > 
+> > > ?Documentation/devicetree/bindings/thermal/qoriq-thermal.txt | 7
+> > > +++++++
+> > > ?1 file changed, 7 insertions(+)
+> > Acked-by: Rob Herring <robh@kernel.org>
+> Hi Zhang Rui,
+> 
+> Since you have applied the driver patch, can you also apply the
+> binding patch???The binding is supposed to go with the driver.
+> 
 
-  ARM: dts: imx31: fix clock control module interrupts description
+Do you mean I should take both patch 1/7 and 7/7? I can not see the
+other patches in this patch set.
 
-The change is tested on qemu kzm target and mx31lite board, while both
-targets don't have DTS in upstream, I had to write simple DTS files for
-them, because the proposed change is for i.MX31 targets with OF support.
-
-The second change in the series compilation time dependent on the first
-one, while the first change apparently should break runtime execution
-of i.MX31 boards with OF support, if both changes are applied everything
-should be fine, regression testing on the same legacy targets does not
-show any problems. Moreover i.MX31/OF/clock initialization seems to be
-broken currently, if the change is not applied I can not get a working
-clock source during early boot stage, jiffies are not incremented, but
-because I didn't check the problem thoroughly (can it be caused by
-missing CLK_OF_DECLARE? Or caused by something fixed by the change
-http://www.spinics.net/lists/linux-clk/msg12235.html ?) and because
-the change was tested against code which is not found in upstream,
-I won't call this change as a fix, however its application is apparently
-wanted to get better OF support for i.MX31 targets.
-
-Vladimir Zapolskiy (2):
-  ARM: imx31: remove mx31_clocks_init_dt() function calls
-  clk: imx31: properly init clocks for machines with DT
-
- arch/arm/mach-imx/common.h   |  1 -
- arch/arm/mach-imx/imx31-dt.c |  6 ------
- drivers/clk/imx/clk-imx31.c  | 49 ++++++++++++++++++++++----------------------
- 3 files changed, 25 insertions(+), 31 deletions(-)
-
--- 
-2.8.1
+thanks,
+rui
