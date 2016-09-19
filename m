@@ -1,29 +1,84 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 19 Sep 2016 11:22:41 +0200
-Subject: [PATCH] ARM: mvebu: let Armada XP also select corediv clk
-Message-ID: <1474276961-4645-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 19 Sep 2016 11:23:16 +0200
+Subject: [PATCH v3 1/4] drm/bridge: Add RGB to VGA bridge support
+In-Reply-To: <1682784.hDdFQltm22@avalon>
+References: <20160908121751.16911-1-maxime.ripard@free-electrons.com>
+ <20160908121751.16911-2-maxime.ripard@free-electrons.com>
+ <2115773.yQojqqIjGI@avalon> <1682784.hDdFQltm22@avalon>
+Message-ID: <20160919092316.GH8719@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An Armada XP there is also a marvell,armada-370-corediv-clock
-compatible device that is needed to make the nand device work.
+On Sun, Sep 18, 2016 at 01:04:17PM +0300, Laurent Pinchart wrote:
+> On Sunday 18 Sep 2016 13:01:16 Laurent Pinchart wrote:
+> > On Thursday 08 Sep 2016 14:17:48 Maxime Ripard wrote:
+> > > Some boards have an entirely passive RGB to VGA bridge, based on either
+> > > DACs or resistor ladders.
+> > > 
+> > > Those might or might not have an i2c bus routed to the VGA connector in
+> > > order to access the screen EDIDs.
+> > > 
+> > > Add a bridge that doesn't do anything but expose the modes available on
+> > > the screen, either based on the EDIDs if available, or based on the XGA
+> > > standards.
+> > > 
+> > > Acked-by: Rob Herring <robh@kernel.org>
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > > 
+> > >  .../bindings/display/bridge/rgb-to-vga-bridge.txt  |  52 +++++
+> > >  drivers/gpu/drm/bridge/Kconfig                     |   6 +
+> > >  drivers/gpu/drm/bridge/Makefile                    |   1 +
+> > >  drivers/gpu/drm/bridge/rgb-to-vga.c                | 232 ++++++++++++++++
+> > >  4 files changed, 291 insertions(+)
+> > >  create mode 100644
+> > > 
+> > > Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
+> > > create mode 100644 drivers/gpu/drm/bridge/rgb-to-vga.c
+> > > 
+> > > diff --git
+> > > a/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
+> > > b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
+> > > new file mode 100644
+> > > index 000000000000..83a053fb51a0
+> > > --- /dev/null
+> > > +++
+> > > b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
+> > > @@ -0,0 +1,52 @@
+> > > +Passive RGB to VGA bridge
+> > > +-------------------------
+> > > +
+> > > +This binding is aimed for entirely passive RGB to VGA bridges that do not
+> > > +require any configuration.
+> > 
+> > Couldn't it also support active RGB to VGA bridges that don't require any
+> > configuration ? It would seem a bit pointless to define a separate DT
+> > binding for them.
+> 
+> I'm thinking in particular about the ADV7123
+> (http://www.analog.com/media/en/technical-documentation/data-sheets/ADV7123.pdf)
+> that already has a DT binding.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-mvebu/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+I guess we don't have the same definition of passive, but I was
+thinking of devices that do not need any configuration in order to
+operate properly. And this one seems to fall in that category.
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index f9b6bd306cfe..2979a9c454f6 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -97,6 +97,7 @@ config MACH_ARMADA_XP
- 	select CPU_PJ4B
- 	select MACH_MVEBU_V7
- 	select PINCTRL_ARMADA_XP
-+	select MVEBU_CLK_COREDIV
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada XP SoC with device tree.
+> Would it be feasible to combine the two, and support both devices
+> with a single driver ?
+
+I don't see why not. But converting the renesas DRM driver seems a bit
+out of scope, and the ADV compatible can definitely be added later.
+
+Maxime
+
 -- 
-2.8.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160919/22fa2cec/attachment.sig>
