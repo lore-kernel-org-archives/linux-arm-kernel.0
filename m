@@ -1,41 +1,35 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:14 +0100
-Subject: [PATCH 04/26] drm/rockchip: dw-mipi-dsi: rename commit hook to enable
+Date: Mon, 19 Sep 2016 18:17:30 +0100
+Subject: [PATCH 17/26] drm/rockchip: dw-mipi-dsi: don't enable PHY PLL until
+ it's configured
 In-Reply-To: <20160919171747.28512-1-john@metanate.com>
 References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-5-john@metanate.com>
+Message-ID: <20160919171747.28512-21-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip DRM is fully atomic and commit is deprecated for atomic
-drivers.  No changed are needed beyond renaming the function.
-
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 5925a185ed76..fac2429b9d6d 100644
+index f824c99b872e..463e469fd1b8 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -852,7 +852,7 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
- 	clk_disable_unprepare(dsi->pclk);
- }
+@@ -414,12 +414,12 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
  
--static void dw_mipi_dsi_encoder_commit(struct drm_encoder *encoder)
-+static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- {
- 	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
- 	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
-@@ -924,7 +924,7 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
+ 	dw_mipi_dsi_phy_write(dsi, 0x44, HSFREQRANGE_SEL(testdin));
  
- static struct drm_encoder_helper_funcs
- dw_mipi_dsi_encoder_helper_funcs = {
--	.commit = dw_mipi_dsi_encoder_commit,
-+	.enable = dw_mipi_dsi_encoder_enable,
- 	.mode_set = dw_mipi_dsi_encoder_mode_set,
- 	.disable = dw_mipi_dsi_encoder_disable,
- 	.atomic_check = dw_mipi_dsi_encoder_atomic_check,
+-	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
+ 	dw_mipi_dsi_phy_write(dsi, 0x17, INPUT_DIVIDER(dsi->input_div));
+ 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_LOW_SEL(dsi->feedback_div) |
+ 					 LOW_PROGRAM_EN);
+ 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_HIGH_SEL(dsi->feedback_div) |
+ 					 HIGH_PROGRAM_EN);
++	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
+ 
+ 	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
+ 					 BIASEXTR_SEL(BIASEXTR_127_7));
 -- 
 2.10.0.278.g4f427b1.dirty
