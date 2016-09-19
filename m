@@ -1,56 +1,182 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 19 Sep 2016 13:41:47 +0100
-Subject: [PATCH v7 00/22] Generic DT bindings for PCI IOMMUs and ARM SMMU
-In-Reply-To: <20160919122435.GD9005@arm.com>
-References: <cover.1473695704.git.robin.murphy@arm.com>
- <11ebd81e-2ea5-5ff3-35b3-be95f03e05bd@redhat.com>
- <d03ea5e7-59f1-8b49-4ba2-d05fc2030ebc@arm.com>
- <04a0a682-4fdc-8d62-57cd-efdf730582c6@redhat.com>
- <c2645c5e-edd3-2b31-4311-0ca621a915e2@arm.com>
- <4d87d5f2-0350-b5f8-ffc3-4e9377cf1f87@redhat.com>
- <fc4ce398-4eeb-f2ca-b964-e9f466be79c4@arm.com>
- <1838c65d-5944-8946-781c-b420bea1acab@redhat.com>
- <f16db032-1905-9804-0607-fe007af72b0e@arm.com>
- <48f3bc10-3966-7d50-d070-7ec7f0946c92@redhat.com>
- <20160919122435.GD9005@arm.com>
-Message-ID: <99ee0946-c7ff-e6e4-08c1-ff686ea1a8a5@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 19 Sep 2016 13:48:42 +0100
+Subject: [PATCH 1/1 v6] ARM: imx: Added perf functionality to mmdc driver
+In-Reply-To: <1473864500-24256-1-git-send-email-Frank.Li@nxp.com>
+References: <1473864500-24256-1-git-send-email-Frank.Li@nxp.com>
+Message-ID: <20160919124641.GB12473@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/16 13:24, Will Deacon wrote:
-> On Mon, Sep 19, 2016 at 02:13:45PM +0200, Auger Eric wrote:
->> On 16/09/2016 18:18, Robin Murphy wrote:
->>> What I probably will do, though, since we have the functionality in
->>> place for the sake of the old binding, and I think there are other folks
->>> who want PCI iommu-map support but would prefer not to bother with DMA
->>> ops on the host, is add a command-line option to disable DMA domains
->>> even for the generic bindings.
->>
->> Yes this would be a good thing I think. This series has an important
->> impact on platforms which do not have smmu v3, where contexts are scarce
->> HW resources.
-> 
-> Rather than disabling DMA domains entirely, we could specify a number
-> of contexts to reserve for other use (e.g. VFIO). It's a pity that these
-> options are global for the system, as opposed to per SMMU instance,
-> but I can't see a good way around that.
+Hi,
 
-The problem with that approach is that due to bus traversal order you'd
-typically end up with the even-more-limited number of non-reserved
-contexts getting consumed by bridges that are unlikely to ever actually
-use their DMA ops, so you end up barely any better off than just not
-doing DMA ops at all, which we already have the code for.
+This is generally looking good now. There are just a few issues
+remaining which I've noted below.
 
-And yeah, if you had, say, "arm-smmu.reserved_s2_contexts=4", for the
-benefit of your PCI SMMU, what do the SMMUs in front of your other
-platform devices with only 2 contexts (and which only want DMA ops) do?
+On Wed, Sep 14, 2016 at 09:48:20AM -0500, Frank Li wrote:
+> From: Zhengyu Shen <zhengyu.shen@nxp.com>
 
-Robin.
+> +static bool mmdc_pmu_group_is_valid(struct perf_event *event)
 
-> 
-> Will
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
-> 
+As a general note, you prefix other functions with mmdc_ rather than
+mmdc_pmu. For consistency, it would be better for all the perf-specific
+functions to be called mmdc_pmu_*. Likewise for attr_groups.
+
+> +{
+> +	struct pmu *pmu = event->pmu;
+> +	struct perf_event *leader = event->group_leader;
+> +	struct perf_event *sibling;
+> +
+> +	int cfg = leader->attr.config;
+> +	int counter_mask = 0;
+> +
+> +	if (cfg < 0 || cfg >= MMDC_NUM_COUNTERS)
+> +		return false;
+
+For any event managed by this PMU, this is checked in event_init, so
+this check is unnecessary.
+
+> +
+> +	if (leader->pmu == pmu)
+> +		counter_mask |= 1 << cfg;
+> +	else if (!is_software_event(leader))
+> +		return false;
+> +
+> +	list_for_each_entry(sibling, &leader->sibling_list, group_entry) {
+> +		if (sibling->pmu == pmu) {
+> +			cfg = sibling->attr.config;
+> +			if (cfg < 0 || cfg >= MMDC_NUM_COUNTERS)
+> +				return false;
+
+Likewise.
+
+> +			counter_mask |= 1 << cfg;
+> +		} else if (!is_software_event(sibling)) {
+> +			return false;
+> +		}
+> +	}
+> +
+> +	if (event == leader)
+> +		return true;
+> +
+> +	cfg = event->attr.config;
+> +	if (cfg < 0 || cfg >= MMDC_NUM_COUNTERS)
+> +		return false;
+> +
+> +	return !(counter_mask & (1 << cfg));
+> +}
+
+I think this would be far clearer if written something like the below:
+
+bool mmdc_pmu_group_event_is_valid(struct perf_event *event,
+				   struct pmu *pmu,
+				   unsigned long *used_counters)
+{
+	int counter = event->attr.config;
+
+	if (is_software_event(event))
+		return true;
+	if (event->pmu != pmu)
+		return false;
+	return !test_and_set_bit(counter, &used_counters);
+}
+
+/*
+ * Each event has a single fixed-purpose counter, so we can only have a
+ * single active event for each at any point in time. Here we just check
+ * for duplicates, and rely on mmdc_pmu_event_init to verify that the HW
+ * event numbers are valid.
+ */
+bool mmdc_pmu_group_is_valid(struct perf_event *event)
+{
+	struct pmu *pmu = event->pmu;
+	struct perf_event *leader = event->group_leader;
+	struct perf_event *sibling;
+	unigned long used_counters = 0;
+
+	set_bit(counter(event), &used_counters);
+
+	if (event != leader) {
+		if (!mmdc_pmu_event_is_valid(event, pmu, &counter_mask))
+			return false;
+	}
+
+	list_for_each_entry(sibling, &leader->sibling_list, group_entry) {
+		if (!mmdc_pmu_group_event_is_valid(event, pmu, &used_counters))
+			return false;
+	}
+
+	return true;
+}
+
+> +static int mmdc_event_add(struct perf_event *event, int flags)
+> +{
+> +	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
+> +	struct hw_perf_event *hwc = &event->hw;
+> +
+> +	int cfg = event->attr.config;
+> +
+> +	if (WARN_ONCE((cfg < 0 || cfg >= MMDC_NUM_COUNTERS),
+> +				"invalid configuration %d for mmdc", cfg))
+> +		return -1;
+
+This should never happen, as you checked this at event_init time.
+
+If you must check this here, please use a real error code mnemonic
+rather than -1 (which happens to be -EPERM).
+
+> +
+> +	if (flags & PERF_EF_START)
+> +		mmdc_event_start(event, flags);
+> +
+> +	pmu_mmdc->mmdc_events[cfg] = event;
+> +	pmu_mmdc->active_events++;
+> +
+> +	local64_set(&hwc->prev_count, mmdc_read_counter(pmu_mmdc, cfg));
+> +
+> +	return 0;
+> +}
+
+You must verify at pmu::add() time that the counter isn't in use
+already, as you can have separate events (i.e. that aren't in the same
+group) trying to reuse the same counter.
+
+If you don't check that, then stopping/starting/resetting the counter
+will not work as expected, and you will get erroneous results.
+
+I think that here all you need to do is to check that check
+pmu_mmdc->mmdc_events[cfg] is NULL before you assign to it. If it has a
+non-NULL value, return -EAGAIN.
+
+> +
+> +static void mmdc_event_stop(struct perf_event *event, int flags)
+> +{
+> +	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
+> +	void __iomem *mmdc_base, *reg;
+> +	int cfg = (int)event->attr.config;
+> +
+> +	mmdc_base = pmu_mmdc->mmdc_base;
+> +	reg = mmdc_base + MMDC_MADPCR0;
+> +
+> +	if (WARN_ONCE((cfg < 0 || cfg >= MMDC_NUM_COUNTERS),
+> +				"invalid configuration %d for mmdc counter", cfg))
+> +		return;
+
+You checked this at event_init time. Is it really necessary to check
+again?
+
+> +static void mmdc_event_del(struct perf_event *event, int flags)
+> +{
+> +	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
+> +	int cfg = event->attr.config;
+> +
+> +	pmu_mmdc->mmdc_events[cfg] = NULL;
+> +	pmu_mmdc->active_events--;
+> +
+> +	if (pmu_mmdc->active_events <= 0)
+> +		hrtimer_cancel(&pmu_mmdc->hrtimer);
+
+You should only have to check that this is equal to zero. If
+active_events is negative, you have a bigger problem.
+
+Thanks,
+Mark.
