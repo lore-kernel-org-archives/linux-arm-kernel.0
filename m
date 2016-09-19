@@ -1,71 +1,84 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 19 Sep 2016 17:28:33 +0800
-Subject: [RFC PATCH v2 10/11] irqchip: mbigen: Add ACPI support
-In-Reply-To: <57DA6097.8060105@arm.com>
-References: <1473862879-7769-1-git-send-email-guohanjun@huawei.com>
- <1473862879-7769-11-git-send-email-guohanjun@huawei.com>
- <57DA6097.8060105@arm.com>
-Message-ID: <e8611dec-ae29-af78-cfb1-7b44670fa11c@linaro.org>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 19 Sep 2016 10:34:19 +0100
+Subject: [PATCH 1/2] drm/virtio: kconfig: Fix recursive dependency issue.
+In-Reply-To: <1474277660-5196-1-git-send-email-peter.griffin@linaro.org>
+References: <1474277660-5196-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1474277660-5196-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
+recursive dependency.
 
-On 2016/9/15 16:49, Marc Zyngier wrote:
-> On 14/09/16 15:21, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> With the preparation of platform msi support and interrupt producer
->> in DSDT, we can add mbigen ACPI support now.
->>
->> We are using _PRS methd to indicate number of irq pins instead
->> of num_pins in DT.
->>
->> For mbi-gen,
->>     Device(MBI0) {
->>           Name(_HID, "HISI0152")
->>           Name(_UID, Zero)
->>           Name(_CRS, ResourceTemplate() {
->>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
->>           })
->>
->>           Name (_PRS, ResourceTemplate() {
->> 		  Interrupt(ResourceProducer,...) {12,14,....}
->>           })
->
-> Since I know next to nothing about all of this, I'm going to play the
-> village idiot. What makes it legal to use _PRS as a way to describe the
-> interrupts that are exposed by MBI0? Looking at the 6.0 spec, I do not
-> see why the interrupts would be put there instead of _CRS, and why you'd
-> have a _PRS at all.
+[..]
+drivers/video/fbdev/Kconfig:5:error: recursive dependency detected!
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:5:	symbol FB is selected by DRM_KMS_FB_HELPER
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/Kconfig:42:	symbol DRM_KMS_FB_HELPER depends on DRM_KMS_HELPER
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/Kconfig:36:	symbol DRM_KMS_HELPER is selected by DRM_VIRTIO_GPU
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/gpu/drm/virtio/Kconfig:1:	symbol DRM_VIRTIO_GPU depends on VIRTIO
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/virtio/Kconfig:1:	symbol VIRTIO is selected by REMOTEPROC
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/remoteproc/Kconfig:4:	symbol REMOTEPROC is selected by ST_SLIM_REMOTEPROC
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/remoteproc/Kconfig:103:	symbol ST_SLIM_REMOTEPROC is selected by ST_FDMA
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/dma/Kconfig:440:	symbol ST_FDMA depends on DMADEVICES
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/dma/Kconfig:5:	symbol DMADEVICES is selected by SND_SOC_SH4_SIU
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+sound/soc/sh/Kconfig:29:	symbol SND_SOC_SH4_SIU is selected by SND_SIU_MIGOR
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+sound/soc/sh/Kconfig:64:	symbol SND_SIU_MIGOR depends on I2C
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/i2c/Kconfig:7:	symbol I2C is selected by FB_DDC
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:63:	symbol FB_DDC is selected by FB_CYBER2000_DDC
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:378:	symbol FB_CYBER2000_DDC depends on FB_CYBER2000
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
+drivers/video/fbdev/Kconfig:366:	symbol FB_CYBER2000 depends on FB
 
-_PRS describes possible resource settings for the device, which returns
-a list of a device's possible resource settings such as memory range,
-interrupt descriptors, and the format of the data in a _PRS object
-follows the same format as _CRS object (ACPI 6.1, section 6.2.12),
-so Interrupts can be put in the _PRS.
+which is due to drivers/gpu/drm/virtio/Kconfig depending on VIRTIO.
 
-And in ACPI 6.1, section 6.2, it describes the _PRS usage:
+Fix by dropping depend and switching to select VIRTIO.
 
-"Some resources, however, may be shared amongst several devices. To
-describe this, devices that share a resource (resource consumers) must
-use the extended resource descriptors (0x7-0xA) described in Section
-6.4.3, ?Large Resource Data Type.? These descriptors point to a single
-device object (resource producer) that claims the shared resource in
-its _PRS."
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ drivers/gpu/drm/virtio/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-As mbigen is a interrupt producer which provide interrupt resoures
-for devices, which matches the usage of _PRS in the spec.
-
->
-> Also, are you going to exhaustively describe all the possible interrupts
-> via this method? Knowing that the mbigen can expose thousands of
-> interrupts, I find it slightly mad. Can't you express a range?
-
-Yes, a little bit mad. I can't express a interrupt range in ACPI at
-least in current version of spec. But that just adding more lines
-of ACPI DSDT code, it's fine to me. or we need to use _DSD to present
-similar property "num_pins" in ACPI which I avoid using.
-
-Thanks
-Hanjun
+diff --git a/drivers/gpu/drm/virtio/Kconfig b/drivers/gpu/drm/virtio/Kconfig
+index e1afc3d..90357d9 100644
+--- a/drivers/gpu/drm/virtio/Kconfig
++++ b/drivers/gpu/drm/virtio/Kconfig
+@@ -1,6 +1,7 @@
+ config DRM_VIRTIO_GPU
+ 	tristate "Virtio GPU driver"
+-	depends on DRM && VIRTIO
++	depends on DRM
++	select VIRTIO
+         select DRM_KMS_HELPER
+         select DRM_TTM
+ 	help
+-- 
+1.9.1
