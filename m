@@ -1,71 +1,37 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 19 Sep 2016 20:31:07 +0200
-Subject: [PATCH] arm: dts: fix rk3066a based boards vdd_log voltage
- initialization
-In-Reply-To: <CAD=FV=U_BQez2eCqm7mX9kj0dcEsnBKiFWcLAhXXJD+yTZhACw@mail.gmail.com>
-References: <1474274639-27768-1-git-send-email-andy.yan@rock-chips.com>
- <1474274696-28090-1-git-send-email-andy.yan@rock-chips.com>
- <CAD=FV=VawAOWBF_PoXqSj3oiVgfF8SnCBp56p8F==XsaVLmMcg@mail.gmail.com>
- <2318029.f7g774Bk76@phil>
- <CAD=FV=UOXcUZyXRj++GkKksyFedGt59vQz8958nhhF9UM7rOuw@mail.gmail.com>
- <20160919191327.741a2b89@bbrezillon>
- <CAD=FV=Ufmvg1P8suOPQ53kpOD1pei4N2dOpKUCxZk001XKj_OA@mail.gmail.com>
- <20160919194844.0db7b307@bbrezillon>
- <CAD=FV=UyW5cXGGmq5xUzZ1aV5NzbBYGOz1gO9V1itrFU-PigAw@mail.gmail.com>
- <20160919200627.3ca1aae4@bbrezillon>
- <CAD=FV=U_BQez2eCqm7mX9kj0dcEsnBKiFWcLAhXXJD+yTZhACw@mail.gmail.com>
-Message-ID: <20160919203107.23b84c1d@bbrezillon>
+From: bdegraaf@codeaurora.org (bdegraaf at codeaurora.org)
+Date: Mon, 19 Sep 2016 14:41:10 -0400
+Subject: [RFC] arm64: Ensure proper addressing for ldnp/stnp
+In-Reply-To: <50fcc549-d785-6332-83bd-292a4f44e8d4@redhat.com>
+References: <1474306586-25118-1-git-send-email-bdegraaf@codeaurora.org>
+ <50fcc549-d785-6332-83bd-292a4f44e8d4@redhat.com>
+Message-ID: <13521f9f5ebe1cd0a85bf31b5ad5cba0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Sep 2016 11:12:12 -0700
-Doug Anderson <dianders@chromium.org> wrote:
-
-> Hi,
+On 2016-09-19 14:28, Laura Abbott wrote:
+> On 09/19/2016 10:36 AM, Brent DeGraaf wrote:
+>> According to section 6.3.8 of the ARM Programmer's Guide, non-temporal
+>> loads and stores do not verify that address dependency is met between 
+>> a
+>> load of an address to a register and a subsequent non-temporal load or
+>> store using that address on the executing PE. Therefore, context 
+>> switch
+>> code and subroutine calls that use non-temporally accessed addresses 
+>> as
+>> parameters that might depend on a load of an address into an argument
+>> register must ensure that ordering requirements are met by introducing
+>> a barrier prior to the successive non-temporal access.  Add 
+>> appropriate
+>> barriers whereever this specific situation comes into play.
+>> 
 > 
-> On Mon, Sep 19, 2016 at 11:06 AM, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
-> > On Mon, 19 Sep 2016 10:52:51 -0700
-> > Doug Anderson <dianders@chromium.org> wrote:
-> >  
-> >> Hi,
-> >>
-> >> On Mon, Sep 19, 2016 at 10:48 AM, Boris Brezillon
-> >> <boris.brezillon@free-electrons.com> wrote:  
-> >> > The PWM chip has always claimed the pins and muxed them to the PWM IP.
-> >> > So, this means it's broken from the beginning, and my patch is only
-> >> > uncovering the problem (unless the pins stay configured as input until
-> >> > the PWM is enabled, which I'm not sure is the case).  
-> >>
-> >> Such a solution is achievable with the pinctrl APIs pretty easily.
-> >> You might not be able to use the automatic "init" state but you can do
-> >> something similar and switch to an "active" state once the PWM is
-> >> actually turned on the first time.  
-> >
-> > But is it really the case here (I don't see any code requesting a
-> > specific pinmux depending on the PWM state)?  
+> Was this found by code inspection or is there a (public) exciting test
+> case to observe this behavior?
 > 
-> It is not happening right now as far as I know.  ...but that's a bug.
-
-Okay.
-
+> Thanks,
+> Laura
 > 
-> > Anyway, we really need to handle this case, we should define the
-> > typical voltage when the PWM is disabled. Same as what you suggested
-> > with voltage-when-input, but with a different naming (since the concept
-> > of pinmux is PWM hardware/driver specific).
-> >
-> >         voltage-when-pwm-disabled = <...>;  
-> 
-> Voltage when disabled and voltage when input are two different states.
-> A disabled PWM will typically either drive high or low (depending on
-> where it was when you turned it off).  Not all "disabled" states will
-> mean that the pin is configured as an input.
 
-Well, my point was that, from the regulator PoV, a PWM is either
-enabled or disabled. The pinmux config when the PWM is disabled
-depends on the PWM driver/hardware, and I don't think it's a good idea
-to expose this information at the regulator level, hence the name
-"voltage-when-pwm-disabled". Anyway, let's stop bikeshedding, no
-matter the name, I think we both agree that a new DT property is needed
-to handle this case :-).
+Code inspection only.
+
+Brent
