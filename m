@@ -1,55 +1,46 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 19 Sep 2016 04:37:29 +0300
-Subject: [PATCH 17/19] ARM: imx legacy: mx21ads: move peripheral
- initialization to .init_late
-In-Reply-To: <1474248988-10626-1-git-send-email-vz@mleia.com>
-References: <1474248988-10626-1-git-send-email-vz@mleia.com>
-Message-ID: <1474249051-10718-17-git-send-email-vz@mleia.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 19 Sep 2016 09:42:25 +0800
+Subject: [PATCH] ASoC: samsung: make audio interface/controller explicitly
+In-Reply-To: <1474207751-9804-2-git-send-email-ayaka@soulik.info>
+Message-ID: <201609190930.MkF7oZVy%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change moves some of peripheral registrations and initializations
-(all peripherals dependent on GPIOs) from .init_machine to .init_late
-level, this allows to safely shift the shared GPIO controller driver
-initialization level after init level of i.MX IOMUXC driver.
+Hi Randy,
 
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+[auto build test ERROR on asoc/for-next]
+[also build test ERROR on v4.8-rc7 next-20160916]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
+
+url:    https://github.com/0day-ci/linux/commits/Randy-Li/ASoC-samsung-make-audio-interface-controller-explicitly/20160918-222618
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
+config: i386-allyesconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   sound/built-in.o: In function `s3c_ac97_probe':
+>> ac97.c:(.text+0x336f9d): undefined reference to `samsung_asoc_dma_platform_register'
+   sound/built-in.o: In function `spdif_probe':
+>> spdif.c:(.text+0x3378de): undefined reference to `samsung_asoc_dma_platform_register'
+   sound/built-in.o: In function `s3c_pcm_dev_probe':
+>> pcm.c:(.text+0x3380e7): undefined reference to `samsung_asoc_dma_platform_register'
+   sound/built-in.o: In function `samsung_i2s_probe':
+>> i2s.c:(.text+0x338c01): undefined reference to `samsung_asoc_dma_platform_register'
+   i2s.c:(.text+0x338ef6): undefined reference to `samsung_asoc_dma_platform_register'
+
 ---
- arch/arm/mach-imx/mach-mx21ads.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
-index 9986f9a..5e36682 100644
---- a/arch/arm/mach-imx/mach-mx21ads.c
-+++ b/arch/arm/mach-imx/mach-mx21ads.c
-@@ -302,12 +302,16 @@ static void __init mx21ads_board_init(void)
- 	imx21_add_imx_uart0(&uart_pdata_rts);
- 	imx21_add_imx_uart2(&uart_pdata_norts);
- 	imx21_add_imx_uart3(&uart_pdata_rts);
--	imx21_add_mxc_mmc(0, &mx21ads_sdhc_pdata);
- 	imx21_add_mxc_nand(&mx21ads_nand_board_info);
- 
--	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
--
- 	imx21_add_imx_fb(&mx21ads_fb_data);
-+}
-+
-+static void __init mx21ads_late_init(void)
-+{
-+	imx21_add_mxc_mmc(0, &mx21ads_sdhc_pdata);
-+
-+	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
- 
- 	mx21ads_cs8900_resources[1].start =
- 			gpio_to_irq(MX21ADS_CS8900A_IRQ_GPIO);
-@@ -328,6 +332,7 @@ MACHINE_START(MX21ADS, "Freescale i.MX21ADS")
- 	.init_early = imx21_init_early,
- 	.init_irq = mx21_init_irq,
- 	.init_time	= mx21ads_timer_init,
--	.init_machine = mx21ads_board_init,
-+	.init_machine	= mx21ads_board_init,
-+	.init_late	= mx21ads_late_init,
- 	.restart	= mxc_restart,
- MACHINE_END
--- 
-2.8.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 55181 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160919/580007ea/attachment-0001.obj>
