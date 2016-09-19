@@ -1,51 +1,43 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Mon, 19 Sep 2016 10:43:17 +0200
-Subject: [PATCH v4 1/7] pinctrl: bcm2835: add pull defines to dt bindings
-In-Reply-To: <1474274603-24215-1-git-send-email-kraxel@redhat.com>
-References: <1474274603-24215-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1474274603-24215-2-git-send-email-kraxel@redhat.com>
+Date: Mon, 19 Sep 2016 10:43:16 +0200
+Subject: [PATCH v4 0/7] ARM: dts: bcm283x: add and use pinctrl groups
+Message-ID: <1474274603-24215-1-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also delete (unused) private enum from driver.
-The pull defines can be used instead if needed.
+  Hi,
 
-Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
----
- drivers/pinctrl/bcm/pinctrl-bcm2835.c | 6 ------
- include/dt-bindings/pinctrl/bcm2835.h | 5 +++++
- 2 files changed, 5 insertions(+), 6 deletions(-)
+New in v4:  Patch #6 has been splitted into two:  Patch 6 just moves
+pinctrl from &gpio to &sdhci.  Removing the empty now alt3 group
+-- including all references as pointed out by Stefan Wahren in review --
+is done by the new patch 7.  Patches 1-5 are unchanged.
 
-diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-index fa77165..4cf612b 100644
---- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-+++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-@@ -76,12 +76,6 @@ enum bcm2835_pinconf_param {
- 	BCM2835_PINCONF_PARAM_PULL,
- };
- 
--enum bcm2835_pinconf_pull {
--	BCM2835_PINCONFIG_PULL_NONE,
--	BCM2835_PINCONFIG_PULL_DOWN,
--	BCM2835_PINCONFIG_PULL_UP,
--};
--
- #define BCM2835_PINCONF_PACK(_param_, _arg_) ((_param_) << 16 | (_arg_))
- #define BCM2835_PINCONF_UNPACK_PARAM(_conf_) ((_conf_) >> 16)
- #define BCM2835_PINCONF_UNPACK_ARG(_conf_) ((_conf_) & 0xffff)
-diff --git a/include/dt-bindings/pinctrl/bcm2835.h b/include/dt-bindings/pinctrl/bcm2835.h
-index 6f0bc37..e4e4fdf 100644
---- a/include/dt-bindings/pinctrl/bcm2835.h
-+++ b/include/dt-bindings/pinctrl/bcm2835.h
-@@ -24,4 +24,9 @@
- #define BCM2835_FSEL_ALT2	6
- #define BCM2835_FSEL_ALT3	7
- 
-+/* brcm,pull property */
-+#define BCM2835_PUD_OFF		0
-+#define BCM2835_PUD_DOWN	1
-+#define BCM2835_PUD_UP		2
-+
- #endif /* __DT_BINDINGS_PINCTRL_BCM2835_H__ */
+cheers,
+  Gerd
+
+Eric Anholt (1):
+  ARM: dts: bcm283x: Define standard pinctrl groups in the gpio node.
+
+Gerd Hoffmann (6):
+  pinctrl: bcm2835: add pull defines to dt bindings
+  ARM: dts: bcm283x: add pinctrl group to &pwm, drop pins from &gpio
+  ARM: dts: bcm283x: add pinctrl group to &i2c0, drop pins from &gpio
+  ARM: dts: bcm283x: add pinctrl group to &i2c1, drop pins from &gpio
+  ARM: dts: bcm283x: add pinctrl group to &sdhci, drop pins from &gpio
+  ARM: dts: bcm283x: drop alt3 from &gpio
+
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |   2 +-
+ arch/arm/boot/dts/bcm2835-rpi-a.dts      |   2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts |   2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts |   2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b.dts      |   2 +-
+ arch/arm/boot/dts/bcm2835-rpi-zero.dts   |   2 +-
+ arch/arm/boot/dts/bcm2835-rpi.dtsi       |  15 ++-
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts    |   2 +-
+ arch/arm/boot/dts/bcm283x.dtsi           | 203 +++++++++++++++++++++++++++++++
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c    |   6 -
+ include/dt-bindings/pinctrl/bcm2835.h    |   5 +
+ 11 files changed, 224 insertions(+), 19 deletions(-)
+
 -- 
 1.8.3.1
