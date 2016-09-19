@@ -1,17 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 19 Sep 2016 17:39:49 +0200
-Subject: [GIT PULL] DaVinci DTS updates for v4.9 (part 2)
-In-Reply-To: <d231c316-a14b-1534-2bcd-29f0898b0b1c@ti.com>
-References: <d231c316-a14b-1534-2bcd-29f0898b0b1c@ti.com>
-Message-ID: <2260703.ZTykBRJEey@wuerfel>
+Date: Mon, 19 Sep 2016 17:45:00 +0200
+Subject: [GIT PULL] omap dts updates for v4.9 merge window, part 2
+In-Reply-To: <20160915172021.6u2zam4yd6vruub4@atomide.com>
+References: <20160915172021.6u2zam4yd6vruub4@atomide.com>
+Message-ID: <2566941.uVvDnvgHof@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 15, 2016 8:14:22 PM CEST Sekhar Nori wrote:
-> This pull request adds NAND support to
-> DA850 based LCDK board.
+On Thursday, September 15, 2016 10:20:22 AM CEST Tony Lindgren wrote:
+> Part two of device tree changes for omaps for v4.9 merge window. This
+> is mostly usability and non-critical fixes except for the addition of
+> beagleboard-x15 rev B1 support:
 > 
+> - Fix omap4 pandaboard SDIO WLAN latencies in idle mode by enabling wakeirq
 > 
+> - Usability fixes for WLAN, USB, LEDs and power button on omap5 boards
+> 
+> - Remove am57xx beagleboard-x15 pinmux configuration as the processor requires
+>   that it's done in IO isolation in bootloader except for MMC and DCAN
+> 
+> - Add support for beagleboard-x15 rev B1 by moving most of the
+>   configuration to am57xx-beagle-x15-common.dtsi
+> 
+> - Enable support for more than 2GB of memory for omap5 with LPAE with
+>   #address-cells
+> 
+> - Fix omap3-gta04 backlight PWM frequency until the PWM driver
+> 
+> - Revert am335x dts changes related to cpufreq as the driver changes
+>   still have not merged and the dts changes broke cpufreq
 
 Pulled into next/dt, thanks!
 
