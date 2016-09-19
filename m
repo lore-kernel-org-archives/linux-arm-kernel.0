@@ -1,52 +1,102 @@
-From: bdegraaf@codeaurora.org (Brent DeGraaf)
-Date: Mon, 19 Sep 2016 13:36:26 -0400
-Subject: [RFC] arm64: Ensure proper addressing for ldnp/stnp
-Message-ID: <1474306586-25118-1-git-send-email-bdegraaf@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Sep 2016 18:38:40 +0100
+Subject: [PATCH] irqchip/gicv3: silence noisy DEBUG_PER_CPU_MAPS warning
+In-Reply-To: <1474306155-3303-1-git-send-email-james.morse@arm.com>
+References: <1474306155-3303-1-git-send-email-james.morse@arm.com>
+Message-ID: <57E022A0.9020501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to section 6.3.8 of the ARM Programmer's Guide, non-temporal
-loads and stores do not verify that address dependency is met between a
-load of an address to a register and a subsequent non-temporal load or
-store using that address on the executing PE. Therefore, context switch
-code and subroutine calls that use non-temporally accessed addresses as
-parameters that might depend on a load of an address into an argument
-register must ensure that ordering requirements are met by introducing
-a barrier prior to the successive non-temporal access.  Add appropriate
-barriers whereever this specific situation comes into play.
+Hi James,
 
-Signed-off-by: Brent DeGraaf <bdegraaf@codeaurora.org>
----
- arch/arm64/kernel/entry.S  | 1 +
- arch/arm64/lib/copy_page.S | 2 ++
- 2 files changed, 3 insertions(+)
+On 19/09/16 18:29, James Morse wrote:
+> gic_raise_softirq() walks the list of cpus using for_each_cpu(), it calls
+> gic_compute_target_list() which advances the iterator by the number of
+> CPUs in the cluster.
+> 
+> If gic_compute_target_list() reaches the last CPU it leaves the iterator
+> pointing at the last CPU. This means the next time round the for_each_cpu()
+> loop cpumask_next() will be called with an invalid CPU.
+> 
+> This triggers a warning when built with CONFIG_DEBUG_PER_CPU_MAPS:
+> [    3.077738] GICv3: CPU1: found redistributor 1 region 0:0x000000002f120000
+> [    3.077943] CPU1: Booted secondary processor [410fd0f0]
+> [    3.078542] ------------[ cut here ]------------
+> [    3.078746] WARNING: CPU: 1 PID: 0 at ../include/linux/cpumask.h:121 gic_raise_softirq+0x12c/0x170
+> [    3.078812] Modules linked in:
+> [    3.078869]
+> [    3.078930] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc5+ #5188
+> [    3.078994] Hardware name: Foundation-v8A (DT)
+> [    3.079059] task: ffff80087a1a0080 task.stack: ffff80087a19c000
+> [    3.079145] PC is at gic_raise_softirq+0x12c/0x170
+> [    3.079226] LR is at gic_raise_softirq+0xa4/0x170
+> [    3.079296] pc : [<ffff0000083ead24>] lr : [<ffff0000083eac9c>] pstate: 200001c9
+> [    3.081139] Call trace:
+> [    3.081202] Exception stack(0xffff80087a19fbe0 to 0xffff80087a19fd10)
+> 
+> [    3.082269] [<ffff0000083ead24>] gic_raise_softirq+0x12c/0x170
+> [    3.082354] [<ffff00000808e614>] smp_send_reschedule+0x34/0x40
+> [    3.082433] [<ffff0000080e80a0>] resched_curr+0x50/0x88
+> [    3.082512] [<ffff0000080e89d0>] check_preempt_curr+0x60/0xd0
+> [    3.082593] [<ffff0000080e8a60>] ttwu_do_wakeup+0x20/0xe8
+> [    3.082672] [<ffff0000080e8bb8>] ttwu_do_activate+0x90/0xc0
+> [    3.082753] [<ffff0000080ea9a4>] try_to_wake_up+0x224/0x370
+> [    3.082836] [<ffff0000080eabc8>] default_wake_function+0x10/0x18
+> [    3.082920] [<ffff000008103134>] __wake_up_common+0x5c/0xa0
+> [    3.083003] [<ffff0000081031f4>] __wake_up_locked+0x14/0x20
+> [    3.083086] [<ffff000008103f80>] complete+0x40/0x60
+> [    3.083168] [<ffff00000808df7c>] secondary_start_kernel+0x15c/0x1d0
+> [    3.083240] [<00000000808911a4>] 0x808911a4
+> [    3.113401] Detected PIPT I-cache on CPU2
+> 
+> Avoid updating the iterator if the next call to cpumask_next() would
+> cause the for_each_cpu() loop to exit.
+> 
+> There is no change to gic_raise_softirq()'s behaviour, (cpumask_next()s
+> eventual call to _find_next_bit() will return early as start >= nbits),
+> this patch just silences the warning.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  drivers/irqchip/irq-gic-v3.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index ede5672ab34d..9e37c447cc2c 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -548,6 +548,7 @@ static int gic_starting_cpu(unsigned int cpu)
+>  static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
+>  				   unsigned long cluster_id)
+>  {
+> +	int next_cpu;
+>  	int cpu = *base_cpu;
+>  	unsigned long mpidr = cpu_logical_map(cpu);
+>  	u16 tlist = 0;
+> @@ -562,9 +563,10 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
+>  
+>  		tlist |= 1 << (mpidr & 0xf);
+>  
+> -		cpu = cpumask_next(cpu, mask);
+> -		if (cpu >= nr_cpu_ids)
+> +		next_cpu = cpumask_next(cpu, mask);
+> +		if (next_cpu >= nr_cpu_ids)
+>  			goto out;
+> +		cpu = next_cpu;
+>  
+>  		mpidr = cpu_logical_map(cpu);
+>  
+> 
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 441420c..982c4d3 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -679,6 +679,7 @@ ENTRY(cpu_switch_to)
- 	ldp	x27, x28, [x8], #16
- 	ldp	x29, x9, [x8], #16
- 	ldr	lr, [x8]
-+	dmb	nshld	// Existence of instructions with loose load-use dependencies (e.g. ldnp/stnp) make this barrier necessary
- 	mov	sp, x9
- 	and	x9, x9, #~(THREAD_SIZE - 1)
- 	msr	sp_el0, x9
-diff --git a/arch/arm64/lib/copy_page.S b/arch/arm64/lib/copy_page.S
-index 4c1e700..21c6892 100644
---- a/arch/arm64/lib/copy_page.S
-+++ b/arch/arm64/lib/copy_page.S
-@@ -47,6 +47,8 @@ alternative_endif
- 	ldp	x14, x15, [x1, #96]
- 	ldp	x16, x17, [x1, #112]
- 
-+	dmb	nshld // In case x0 (for stnp) is dependent on a load
-+
- 	mov	x18, #(PAGE_SIZE - 128)
- 	add	x1, x1, #128
- 1:
+It took me a while to convince myself that the original code was
+correct, and it obviously wasn't... Oh well, paper bag time.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Thomas, any chance you could pick that one for -rc8?
+
+Thanks,
+
+	M.
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
-Forum, a Linux Foundation Collaborative Project.
+Jazz is not dead. It just smells funny...
