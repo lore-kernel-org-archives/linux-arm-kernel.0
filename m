@@ -1,46 +1,36 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:32 +0100
-Subject: [PATCH 18/27] drm/rockchip: dw-mipi-dsi: configure bias and bandgap
- before enable
+Date: Mon, 19 Sep 2016 18:17:26 +0100
+Subject: [PATCH 15/26] drm/rockchip: dw-mipi-dsi: ensure PHY is reset
 In-Reply-To: <20160919171747.28512-1-john@metanate.com>
 References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-23-john@metanate.com>
+Message-ID: <20160919171747.28512-17-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should configure these functions before enabling them.
+Also don't power up the DSI host at this point since this is not
+necessary in order to configure the PHY and we do so later when
+selecting video or command mode.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index e310c3d81bb8..65c89367d8b2 100644
+index 8854b8670d72..73c28e205fc5 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -421,6 +421,11 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_HIGH_SEL(dsi->feedback_div) |
- 					 HIGH_PROGRAM_EN);
+@@ -398,7 +398,10 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+ 		return testdin;
+ 	}
  
-+	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
-+					 BIASEXTR_SEL(BIASEXTR_127_7));
-+	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
-+					 BANDGAP_SEL(BANDGAP_96_10));
-+
- 	dw_mipi_dsi_phy_write(dsi, 0x20, POWER_CONTROL | INTERNAL_REG_CURRENT |
- 					 BIAS_BLOCK_ON | BANDGAP_ON);
+-	dsi_write(dsi, DSI_PWR_UP, POWERUP);
++	/* Start by clearing PHY state */
++	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
++	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLR);
++	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
  
-@@ -430,10 +435,6 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 					 SETRD_MAX | POWER_MANAGE |
- 					 TER_RESISTORS_ON);
- 
--	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
--					 BIASEXTR_SEL(BIASEXTR_127_7));
--	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
--					 BANDGAP_SEL(BANDGAP_96_10));
- 
- 	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
- 	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
+ 	dw_mipi_dsi_phy_write(dsi, 0x10, BYPASS_VCO_RANGE |
+ 					 VCO_RANGE_CON_SEL(vco) |
 -- 
 2.10.0.278.g4f427b1.dirty
