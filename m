@@ -1,33 +1,48 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 19 Sep 2016 09:00:00 +0000
-Subject: [PATCH V6 6/6] ARM64: bcm2835: add thermal driver to default_config
-In-Reply-To: <1474275600-19378-1-git-send-email-kernel@martin.sperl.org>
-References: <1474275600-19378-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1474275600-19378-7-git-send-email-kernel@martin.sperl.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 19 Sep 2016 17:00:41 +0800
+Subject: [PATCH] spi: dw: use relaxed IO accessor
+Message-ID: <20160919090041.4024-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+Using the __raw functions is discouraged.  Update the driver to use the
+relaxed functions.
 
-Add the thermal driver for bcm2837 to list of compiled modules
-in the default config.
-
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/spi/spi-dw.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index eadf485..372f981 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -252,6 +252,7 @@ CONFIG_SENSORS_INA2XX=m
- CONFIG_SENSORS_ARM_SCPI=y
- CONFIG_THERMAL=y
- CONFIG_THERMAL_EMULATION=y
-+CONFIG_BCM2835_THERMAL=y
- CONFIG_EXYNOS_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_RENESAS_WDT=y
+diff --git a/drivers/spi/spi-dw.h b/drivers/spi/spi-dw.h
+index 61bc3cb..2cfdc4d 100644
+--- a/drivers/spi/spi-dw.h
++++ b/drivers/spi/spi-dw.h
+@@ -143,22 +143,22 @@ struct dw_spi {
+ 
+ static inline u32 dw_readl(struct dw_spi *dws, u32 offset)
+ {
+-	return __raw_readl(dws->regs + offset);
++	return readl_relaxed(dws->regs + offset);
+ }
+ 
+ static inline u16 dw_readw(struct dw_spi *dws, u32 offset)
+ {
+-	return __raw_readw(dws->regs + offset);
++	return readw_relaxed(dws->regs + offset);
+ }
+ 
+ static inline void dw_writel(struct dw_spi *dws, u32 offset, u32 val)
+ {
+-	__raw_writel(val, dws->regs + offset);
++	writel_relaxed(val, dws->regs + offset);
+ }
+ 
+ static inline void dw_writew(struct dw_spi *dws, u32 offset, u16 val)
+ {
+-	__raw_writew(val, dws->regs + offset);
++	writew_relaxed(val, dws->regs + offset);
+ }
+ 
+ static inline u32 dw_read_io_reg(struct dw_spi *dws, u32 offset)
 -- 
-2.1.4
+2.9.3
