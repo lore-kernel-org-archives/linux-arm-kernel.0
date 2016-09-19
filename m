@@ -1,68 +1,56 @@
 From: john@metanate.com (John Keeping)
-Date: Mon, 19 Sep 2016 18:17:37 +0100
-Subject: [PATCH 20/26] drm/rockchip: dw-mipi-dsi: use specific poll helper
+Date: Mon, 19 Sep 2016 18:17:23 +0100
+Subject: [PATCH 13/26] drm/rockchip: dw-mipi-dsi: allow commands in
+ panel_disable
 In-Reply-To: <20160919171747.28512-1-john@metanate.com>
 References: <20160919171747.28512-1-john@metanate.com>
-Message-ID: <20160919171747.28512-28-john@metanate.com>
+Message-ID: <20160919171747.28512-14-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the documentation for readx_poll_timeout says, we want to use the
-specialized macro for readl rather than using the generic version
-directly.
+Panel drivers may want to sent commands during the disable function, for
+example MIPI_DCS_SET_DISPLAY_OFF before the video signal ends.  In order
+to send commands we need to write to registers, so pclk must be enabled.
+
+While changing this, remove the unnecessary code after the panel
+unprepare call which seems to be a workaround for a specific panel and
+thus belongs in the panel driver.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 7983b2749518..ae7c330cb7ac 100644
+index 9ff1cac5ef63..5e343b54f0d0 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -472,14 +472,14 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+@@ -857,24 +857,16 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+ {
+ 	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
  
- 
--	ret = readx_poll_timeout(readl, dsi->base + DSI_PHY_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
- 				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
- 		dev_err(dsi->dev, "failed to wait for phy lock state\n");
- 		return ret;
+-	drm_panel_disable(dsi->panel);
+-
+ 	if (clk_prepare_enable(dsi->pclk)) {
+ 		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
+ 		return;
  	}
  
--	ret = readx_poll_timeout(readl, dsi->base + DSI_PHY_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
- 				 val, val & STOP_STATE_CLK_LANE, 1000,
- 				 PHY_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
-@@ -595,7 +595,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- 	int ret;
- 	u32 val, mask;
++	drm_panel_disable(dsi->panel);
++
+ 	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
+ 	drm_panel_unprepare(dsi->panel);
+-	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_VID_MODE);
  
--	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, !(val & GEN_CMD_FULL), 1000,
- 				 CMD_PKT_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
-@@ -606,7 +606,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- 	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
- 
- 	mask = GEN_CMD_EMPTY | GEN_PLD_W_EMPTY;
--	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, (val & mask) == mask,
- 				 1000, CMD_PKT_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
-@@ -665,7 +665,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- 			len -= pld_data_bytes;
- 		}
- 
--		ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-+		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
- 					 val, !(val & GEN_PLD_W_FULL), 1000,
- 					 CMD_PKT_STATUS_TIMEOUT_US);
- 		if (ret < 0) {
+-	/*
+-	 * This is necessary to make sure the peripheral will be driven
+-	 * normally when the display is enabled again later.
+-	 */
+-	msleep(120);
+-
+-	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
+ 	dw_mipi_dsi_disable(dsi);
+ 	clk_disable_unprepare(dsi->pclk);
+ }
 -- 
 2.10.0.278.g4f427b1.dirty
