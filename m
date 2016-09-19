@@ -1,91 +1,17 @@
-From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Mon, 19 Sep 2016 17:26:15 +0200
-Subject: [PATCH 1/3] i2c: bcm2835: Fix hang for writing messages larger than
- 16 bytes
-Message-ID: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 19 Sep 2016 17:29:15 +0200
+Subject: [GIT PULL] ARM: at91: dt for 4.9
+In-Reply-To: <20160914082812.tmlrrqwkeudcybui@piout.net>
+References: <20160914082812.tmlrrqwkeudcybui@piout.net>
+Message-ID: <4092183.rYPCTf7h1o@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writing messages larger than the FIFO size results in a hang, rendering
-the machine unusable. This is because the RXD status flag is set on the
-first interrupt which results in bcm2835_drain_rxfifo() stealing bytes
-from the buffer. The controller continues to trigger interrupts waiting
-for the missing bytes, but bcm2835_fill_txfifo() has none to give.
-In this situation wait_for_completion_timeout() apparently is unable to
-stop the madness.
+On Wednesday, September 14, 2016 10:28:12 AM CEST Alexandre Belloni wrote:
+> DT Changes for 4.9:
+>  - add ETM and ETB nodes on sama5d2
+> 
 
-The BCM2835 ARM Peripherals datasheet has this to say about the flags:
-  TXD: is set when the FIFO has space for at least one byte of data.
-  RXD: is set when the FIFO contains at least one byte of data.
-  TXW: is set during a write transfer and the FIFO is less than full.
-  RXR: is set during a read transfer and the FIFO is or more full.
+Pulled into next/dt, thanks!
 
-Implementing the logic from the downstream i2c-bcm2708 driver solved
-the hang problem.
-
-Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
----
- drivers/i2c/busses/i2c-bcm2835.c | 22 ++++++++++++++--------
- 1 file changed, 14 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index d4f3239..f283b71 100644
---- a/drivers/i2c/busses/i2c-bcm2835.c
-+++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -64,6 +64,7 @@ struct bcm2835_i2c_dev {
- 	int irq;
- 	struct i2c_adapter adapter;
- 	struct completion completion;
-+	struct i2c_msg *curr_msg;
- 	u32 msg_err;
- 	u8 *msg_buf;
- 	size_t msg_buf_remaining;
-@@ -126,14 +127,13 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
- 		return IRQ_HANDLED;
- 	}
- 
--	if (val & BCM2835_I2C_S_RXD) {
--		bcm2835_drain_rxfifo(i2c_dev);
--		if (!(val & BCM2835_I2C_S_DONE))
--			return IRQ_HANDLED;
--	}
--
- 	if (val & BCM2835_I2C_S_DONE) {
--		if (i2c_dev->msg_buf_remaining)
-+		if (i2c_dev->curr_msg->flags & I2C_M_RD) {
-+			bcm2835_drain_rxfifo(i2c_dev);
-+			val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
-+		}
-+
-+		if ((val & BCM2835_I2C_S_RXD) || i2c_dev->msg_buf_remaining)
- 			i2c_dev->msg_err = BCM2835_I2C_S_LEN;
- 		else
- 			i2c_dev->msg_err = 0;
-@@ -141,11 +141,16 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
- 		return IRQ_HANDLED;
- 	}
- 
--	if (val & BCM2835_I2C_S_TXD) {
-+	if (val & BCM2835_I2C_S_TXW) {
- 		bcm2835_fill_txfifo(i2c_dev);
- 		return IRQ_HANDLED;
- 	}
- 
-+	if (val & BCM2835_I2C_S_RXR) {
-+		bcm2835_drain_rxfifo(i2c_dev);
-+		return IRQ_HANDLED;
-+	}
-+
- 	return IRQ_NONE;
- }
- 
-@@ -155,6 +160,7 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
- 	u32 c;
- 	unsigned long time_left;
- 
-+	i2c_dev->curr_msg = msg;
- 	i2c_dev->msg_buf = msg->buf;
- 	i2c_dev->msg_buf_remaining = msg->len;
- 	reinit_completion(&i2c_dev->completion);
--- 
-2.8.2
+	Arnd
