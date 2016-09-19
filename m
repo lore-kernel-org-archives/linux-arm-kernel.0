@@ -1,38 +1,35 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 19 Sep 2016 08:59:58 +0000
-Subject: [PATCH V6 4/6] ARM64: bcm2835: dts: add thermal node to device-tree
- of bcm2837
+Date: Mon, 19 Sep 2016 08:59:59 +0000
+Subject: [PATCH V6 5/6] ARM: bcm2835: add thermal driver to default_config
 In-Reply-To: <1474275600-19378-1-git-send-email-kernel@martin.sperl.org>
 References: <1474275600-19378-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1474275600-19378-5-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1474275600-19378-6-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Add the node for the thermal sensor of the bcm2837-soc
-to the device tree.
+Add the thermal driver to list of compiled modules
+in the default config for bcm2835.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+Reviewed-by: Eric Anholt <eric@anholt.net>
 ---
- arch/arm64/boot/dts/broadcom/bcm2837.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/configs/bcm2835_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Note: untested as I have no 64 bit test system.
-
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837.dtsi b/arch/arm64/boot/dts/broadcom/bcm2837.dtsi
-index f2a31d0..2b0cfc7 100644
---- a/arch/arm64/boot/dts/broadcom/bcm2837.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/bcm2837.dtsi
-@@ -74,3 +74,9 @@
- 	interrupt-parent = <&local_intc>;
- 	interrupts = <8>;
- };
-+
-+/* enable thermal sensor with the correct compatible property set */
-+&thermal {
-+	compatible = "brcm,bcm2837-thermal";
-+	status = "okay";
-+};
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 79de828..4b89f4e 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -73,6 +73,8 @@ CONFIG_SPI_BCM2835=y
+ CONFIG_SPI_BCM2835AUX=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
++CONFIG_THERMAL=y
++CONFIG_BCM2835_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_BCM2835_WDT=y
+ CONFIG_DRM=y
 -- 
 2.1.4
