@@ -1,36 +1,95 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 20 Sep 2016 07:19:19 +0200
-Subject: [PATCH v2 4/6] net: ethernet: bgmac: convert to feature flags
-In-Reply-To: <CACna6rw1j3myPEkbn+YR71W7CF7Of_yahn9eDT7t3hKWGmWUmg@mail.gmail.com>
-References: <1467932938-21819-1-git-send-email-jon.mason@broadcom.com>
- <1467932938-21819-5-git-send-email-jon.mason@broadcom.com>
- <CACna6rw1j3myPEkbn+YR71W7CF7Of_yahn9eDT7t3hKWGmWUmg@mail.gmail.com>
-Message-ID: <CACna6rymVcKV1h_PEvRuCQrtOd4rsqV34bMWzVOof15fdc8KEA@mail.gmail.com>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Tue, 20 Sep 2016 11:42:38 +0530
+Subject: [PATCH v6 0/7] arm/arm64: vgic-new: Implement API for vGICv3 live
+ migration
+Message-ID: <1474351965-11586-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 August 2016 at 13:34, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> On 8 July 2016 at 01:08, Jon Mason <jon.mason@broadcom.com> wrote:
->>         mode = (bgmac_read(bgmac, BGMAC_DEV_STATUS) & BGMAC_DS_MM_MASK) >>
->>                 BGMAC_DS_MM_SHIFT;
->> -       if (ci->id != BCMA_CHIP_ID_BCM47162 || mode != 0)
->> +       if (bgmac->feature_flags & BGMAC_FEAT_CLKCTLST || mode != 0)
->>                 bgmac_set(bgmac, BCMA_CLKCTLST, BCMA_CLKCTLST_FORCEHT);
->> -       if (ci->id == BCMA_CHIP_ID_BCM47162 && mode == 2)
->> +       if (bgmac->feature_flags & BGMAC_FEAT_CLKCTLST && mode == 2)
->>                 bcma_chipco_chipctl_maskset(&bgmac->core->bus->drv_cc, 1, ~0,
->>                                             BGMAC_CHIPCTL_1_RXC_DLL_BYPASS);
->
-> Jon, it looks to me you translated two following conditions:
-> ci->id != BCMA_CHIP_ID_BCM47162
-> and
-> ci->id == BCMA_CHIP_ID_BCM47162
-> into the same flag check:
-> bgmac->feature_flags & BGMAC_FEAT_CLKCTLST
->
-> I don't think it's intentional, is it? Do you have a moment to fix this?
+From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 
-Ping
+This patchset adds API for saving and restoring
+of VGICv3 registers to support live migration with new vgic feature.
+This API definition is as per version of VGICv3 specification
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+
+Compatible live migration QEMU patches will be sent later.
+
+The patch 3 & 4 are picked from the Pavel's previous implementation.
+http://www.spinics.net/lists/kvm/msg122040.html
+
+v5 => v6:
+ - Collated all register definitions to single patch (4)
+ - Introduce macro to convert userspace MPIDR format to MPIDR reg format
+ - Check on ICC_CTLR_EL1.CBPR value is made while accessing ICC_BPR1_EL1
+ - Cached ich_vtr_el2 and guests priority and ID bits
+ - Check on number of priority and ID bits when ICC_CTRL_EL1 write is made
+ - Check is made on SRE bit for ICC_SRE_EL1 write
+
+v4 => v5:
+ - ICC_CTLR_EL1 access is updated to reflect HW values
+ - Updated ICC reg access mask and shift macros
+ - Introduced patch 4 for VMCR changes
+ - Other minor fixes.
+v3 => v4:
+ - Rebased to latest code base
+ - Moved vgic_uaccess() from vgic-mmio-v2.c to vgic-mmio.c
+ - Dropped macro REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED_UACCESS
+ - Dropped LE conversion for userspace access
+ - Introduced vgic_uaccess_write_pending() for ISPENDR write
+ - Change macro KVM_DEV_ARM_VGIC_V3_CPUID_MASK to KVM_DEV_ARM_VGIC_V3_MIDR_MASK
+ - Refactored some code as common code.
+ - Changed handing of ICC_* registers
+ - Allowed ICC_SRE_EL1 read by userspace
+ - Fixed KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_* macros
+
+v2 => v3:
+ - Implemented separate API for ISPENDR and ICPENDR to
+   read soft_pending instead of pending for level triggerred interrupts
+ - Implemented ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO to access line level
+ - Rebased on top of Christoffer's patch set
+   http://www.spinics.net/lists/kvm/msg136840.html
+
+ NOTE: GICD_STATUSR and GICR_STATUSR are implemented as RAZ/WI.
+
+v1 => v2:
+ - The init sequence change patch is no more required.
+   Fixed in patch 2 by using static vgic_io_dev regions structure instead
+   of using dynamic allocation pointer.
+ - Updated commit message of patch 4.
+ - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
+   Used local variable for 32-bit access.
+ - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
+   arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
+
+
+*** BLURB HERE ***
+
+Vijaya Kumar K (7):
+  arm/arm64: vgic-new: Implement support for userspace access
+  arm/arm64: vgic-new: Add distributor and redistributor access
+  arm/arm64: vgic-new: Introduce find_reg_by_id()
+  arm/arm64: vgic-new: Define required GICv3 reg definitions
+  arm/arm64: vgic-new: Introduce VENG0 and VENG1 fields to vmcr struct
+  arm/arm64: vgic-new: Implement VGICv3 CPU interface access
+  arm/arm64: vgic-new: Implement KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+
+ arch/arm64/include/uapi/asm/kvm.h   |  13 ++
+ arch/arm64/kvm/Makefile             |   1 +
+ arch/arm64/kvm/sys_regs.c           |  22 ++-
+ arch/arm64/kvm/sys_regs.h           |   4 +
+ include/kvm/arm_vgic.h              |   9 +
+ include/linux/irqchip/arm-gic-v3.h  |  45 ++++-
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 224 ++++++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio-v2.c    |  57 +------
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    | 200 ++++++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio.c       | 149 +++++++++++++++-
+ virt/kvm/arm/vgic/vgic-mmio.h       |  28 +++
+ virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 327 ++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c         |  17 +-
+ virt/kvm/arm/vgic/vgic.h            |  45 +++++
+ 14 files changed, 1037 insertions(+), 104 deletions(-)
+ create mode 100644 virt/kvm/arm/vgic/vgic-sys-reg-v3.c
 
 -- 
-Rafa?
+1.9.1
