@@ -1,192 +1,241 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 20 Sep 2016 14:17:44 -0500
-Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
- register range for ACPI case
-In-Reply-To: <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
+Date: Tue, 20 Sep 2016 14:26:36 -0500
+Subject: [PATCH V6 0/5] ECAM quirks handling for ARM64 platforms
+In-Reply-To: <1473449047-10499-1-git-send-email-tn@semihalf.com>
 References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <1473449047-10499-4-git-send-email-tn@semihalf.com>
- <20160919180900.GB13775@localhost>
- <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
- <20160920133327.GB13855@localhost>
- <CAKv+Gu-AE7fft_j2cqBCN=xrsf5Yh=mePf5x3dZJuKAmdxF-Gg@mail.gmail.com>
- <20160920140518.GD13855@localhost>
- <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
-Message-ID: <20160920191744.GA4941@localhost>
+Message-ID: <20160920192636.GB4941@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 04:09:25PM +0100, Ard Biesheuvel wrote:
-> On 20 September 2016 at 15:05, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > Hi Ard,
-> >
-> > On Tue, Sep 20, 2016 at 02:40:13PM +0100, Ard Biesheuvel wrote:
-> >> On 20 September 2016 at 14:33, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> >> > [+cc Rafael (maybe already cc'd; I didn't recognize rafael at kernel.org, Duc]
-> >> >
-> >> > On Tue, Sep 20, 2016 at 09:23:21AM +0200, Tomasz Nowicki wrote:
-> >> >> On 19.09.2016 20:09, Bjorn Helgaas wrote:
-> >> >> >On Fri, Sep 09, 2016 at 09:24:05PM +0200, Tomasz Nowicki wrote:
-> >> >> >>thunder-pem driver stands for being ACPI based PCI host controller.
-> >> >> >>However, there is no standard way to describe its PEM-specific register
-> >> >> >>ranges in ACPI tables. Thus we add thunder_pem_init() ACPI extension
-> >> >> >>to obtain hardcoded addresses from static resource array.
-> >> >> >>Although it is not pretty, it prevents from creating standard mechanism to
-> >> >> >>handle similar cases in future.
-> >> >> >>
-> >> >> >>Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> >> >> >>---
-> >> >> >> drivers/pci/host/pci-thunder-pem.c | 61 ++++++++++++++++++++++++++++++--------
-> >> >> >> 1 file changed, 48 insertions(+), 13 deletions(-)
-> >> >> >>
-> >> >> >>diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-> >> >> >>index 6abaf80..b048761 100644
-> >> >> >>--- a/drivers/pci/host/pci-thunder-pem.c
-> >> >> >>+++ b/drivers/pci/host/pci-thunder-pem.c
-> >> >> >>@@ -18,6 +18,7 @@
-> >> >> >> #include <linux/init.h>
-> >> >> >> #include <linux/of_address.h>
-> >> >> >> #include <linux/of_pci.h>
-> >> >> >>+#include <linux/pci-acpi.h>
-> >> >> >> #include <linux/pci-ecam.h>
-> >> >> >> #include <linux/platform_device.h>
-> >> >> >>
-> >> >> >>@@ -284,6 +285,40 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
-> >> >> >>    return pci_generic_config_write(bus, devfn, where, size, val);
-> >> >> >> }
-> >> >> >>
-> >> >> >>+#ifdef CONFIG_ACPI
-> >> >> >>+static struct resource thunder_pem_reg_res[] = {
-> >> >> >>+   [4] = DEFINE_RES_MEM(0x87e0c0000000UL, SZ_16M),
-> >> >> >>+   [5] = DEFINE_RES_MEM(0x87e0c1000000UL, SZ_16M),
-> >> >> >>+   [6] = DEFINE_RES_MEM(0x87e0c2000000UL, SZ_16M),
-> >> >> >>+   [7] = DEFINE_RES_MEM(0x87e0c3000000UL, SZ_16M),
-> >> >> >>+   [8] = DEFINE_RES_MEM(0x87e0c4000000UL, SZ_16M),
-> >> >> >>+   [9] = DEFINE_RES_MEM(0x87e0c5000000UL, SZ_16M),
-> >> >> >>+   [14] = DEFINE_RES_MEM(0x97e0c0000000UL, SZ_16M),
-> >> >> >>+   [15] = DEFINE_RES_MEM(0x97e0c1000000UL, SZ_16M),
-> >> >> >>+   [16] = DEFINE_RES_MEM(0x97e0c2000000UL, SZ_16M),
-> >> >> >>+   [17] = DEFINE_RES_MEM(0x97e0c3000000UL, SZ_16M),
-> >> >> >>+   [18] = DEFINE_RES_MEM(0x97e0c4000000UL, SZ_16M),
-> >> >> >>+   [19] = DEFINE_RES_MEM(0x97e0c5000000UL, SZ_16M),
-> >> >> >
-> >> >> >1) The "correct" way to discover the resources consumed by an ACPI
-> >> >> >   device is to use the _CRS method.  I know there are some issues
-> >> >> >   there for bridges (not the fault of ThunderX!) because there's not
-> >> >> >   a good way to distinguish windows from resources consumed directly
-> >> >> >   by the bridge.
-> >> >> >
-> >> >> >   But we should either do this correctly, or include a comment about
-> >> >> >   why we're doing it wrong, so we don't give the impression that this
-> >> >> >   is the right way to do it.
-> >> >> >
-> >> >> >   I seem to recall some discussion about why we're doing it this way,
-> >> >> >   but I don't remember the details.  It'd be nice to include a
-> >> >> >   summary here.
-> >> >>
-> >> >> OK I will. The reason why we cannot use _CRS for this case is that
-> >> >> CONSUMER flag was not use consistently for the bridge so far.
-> >> >
-> >> > Yes, I'm aware of that problem, but hard-coding resources into drivers
-> >> > is just a disaster.  The PCI and ACPI cores need generic ways to learn
-> >> > what resources are consumed by devices.  For PCI devices, that's done
-> >> > with BARs.  For ACPI devices, it's done with _CRS.  Without generic
-> >> > resource discovery, we can't manage resources reliably at the system
-> >> > level [1].
-> >> >
-> >> > You have a PNP0A03/PNP0A08 device for the PCI host bridge.  Because of
-> >> > the BIOS bugs in CONSUMER flag usage, we assume everything in its _CRS
-> >> > is a window and not consumed by the bridge itself.  What if you added
-> >> > a companion ACPI device with a _CRS that contained the bridge
-> >> > resources?  Then you'd have some driver ugliness to find that device,
-> >> > but at least the ACPI core could tell what resources were in use.
-> >> >
-> >> > Maybe Rafael has a better idea?
-> >>
-> >> In the discussions leading up to this, we tried very hard to make this
-> >> arm64/acpi quirks mechanism just as flexible as we need it to be to
-> >> cover the current crop of incompatible hardware, but not more so.
-> >> Going forward, we intend to require all arm64/acpi hardware to be spec
-> >> compliant, and so any parametrization beyond what is required for the
-> >> currently known broken hardware is only going to make it easier for
-> >> others to ship with tweaked ACPI descriptions so that an existing
-> >> quirk is triggered for hardware that it was not intended for. It also
-> >> implies that we have to deal with the ACPI descriptions as they were
-> >> shipped with the current hardware.
-> >>
-> >> That does not mean, of course, that we should use bare constants
-> >> rather than symbolic ones, but anything beyond that exceeds the
-> >> desired scope of quirks handling.
-> >
-> > Symbolic vs bare constants is the least of my worries.  I'm pretty
-> > happy with the current quirk implementation.  It's pretty simple and
-> > straightforward.
-> >
+On Fri, Sep 09, 2016 at 09:24:02PM +0200, Tomasz Nowicki wrote:
+> Quirk handling relies on an idea of simple static array which contains
+> quirk enties. Each entry consists of identification information (IDs from
+> standard header of MCFG table) along with custom pci_ecam_ops structure and 
+> configuration space resource structure. This way it is possible find
+> corresponding quirk entries and override pci_ecam_ops and PCI configuration
+> space regions.
 > 
-> OK, good to know that we are on the right track here.
+> As an example, the last 3 patches present quirk handling mechanism usage for
+> ThunderX.
 > 
-> > Apparently you shipped broken firmware that doesn't accurately
-> > describe system resource usage.  Presumably that firmware could be
-> > updated, but maybe it's worthwhile to work around it in the kernel,
-> > depending on where it got shipped.
-> >
+> v5 -> v6
+> - rebase against v4.8-rc5
+> - drop patch 1 form previous series
+> - keep pci_acpi_setup_ecam_mapping() in ARM64 arch directory
+> - move quirk code to pci_mcfg.c
+> - restrict quirk to override pci_ecam_ops and CFG resource structure
+>   only, no init call any more
+> - split ThunderX quirks into the smaller chunks
+> - add ThunderX pass1.x silicon revision support
 > 
-> None of these platforms can be fixed entirely in software, and given
-> that we will not be adding quirks for new broken hardware, we should
-> ask ourselves whether having two versions of a quirk, i.e., one for
-> broken hardware + currently shipping firmware, and one for the same
-> broken hardware with fixed firmware is really an improvement over what
-> has been proposed here.
-
-We're talking about two completely different types of quirks:
-
-  1) MCFG quirks to use memory-mapped config space that doesn't quite
-     conform to the ECAM model in the PCIe spec, and
-
-  2) Some yet-to-be-determined method to describe address space
-     consumed by a bridge.
-
-The first two patches of this series are a nice implementation for 1).
-The third patch (ThunderX-specific) is one possibility for 2), but I
-don't like it because there's no way for generic software like the
-ACPI core to discover these resources.
-
-> > I'd like to step back and come up with some understanding of how
-> > non-broken firmware *should* deal with this issue.  Then, if we *do*
-> > work around this particular broken firmware in the kernel, it would be
-> > nice to do it in a way that fits in with that understanding.
-> >
-> > For example, if a companion ACPI device is the preferred solution, an
-> > ACPI quirk could fabricate a device with the required resources.  That
-> > would address the problem closer to the source and make it more likely
-> > that the rest of the system will work correctly: /proc/iomem could
-> > make sense, things that look at _CRS generically would work (e.g,
-> > /sys/, an admittedly hypothetical "lsacpi", etc.)
-> >
-> > Hard-coding stuff in drivers is a point solution that doesn't provide
-> > any guidance for future platforms and makes it likely that the hack
-> > will get copied into even more drivers.
-> >
+> v4 -> v5
+> - rebase against v4.8-rc1
+> - rework to exact MCFG OEM ID, TABLE ID, rev match
+>   - use memcmp instead of strncmp
+>   - no substring match
+> - fix typos and dmesg message
 > 
-> OK, I see. But the guidance for future platforms should be 'do not
-> rely on quirks', and what I am arguing here is that the more we polish
-> up this code and make it clean and reusable, the more likely it is
-> that will end up getting abused by new broken hardware that we set out
-> to reject entirely in the first place.
+> Tomasz Nowicki (5):
+>   PCI/ACPI: Extend pci_mcfg_lookup() responsibilities
+>   PCI/ACPI: Check platform specific ECAM quirks
+>   PCI: thunder-pem: Allow to probe PEM-specific register range for ACPI
+>     case
+>   PCI: thunder: Enable ACPI PCI controller for ThunderX pass2.x silicon
+>     version
+>   PCI: thunder: Enable ACPI PCI controller for ThunderX pass1.x silicon
+>     version
 > 
-> So of course, if the quirk involves claiming resources, let's make
-> sure that this occurs in the cleanest and most compliant way possible.
-> But any factoring/reuse concerns other than for the current crop of
-> broken hardware should be avoided imo.
+>  arch/arm64/kernel/pci.c             |  17 ++--
+>  drivers/acpi/pci_mcfg.c             | 168 +++++++++++++++++++++++++++++++++++-
+>  drivers/pci/host/pci-thunder-ecam.c |   2 +-
+>  drivers/pci/host/pci-thunder-pem.c  |  63 +++++++++++---
+>  include/linux/pci-acpi.h            |   4 +-
+>  include/linux/pci-ecam.h            |   7 ++
+>  6 files changed, 230 insertions(+), 31 deletions(-)
 
-If future hardware is completely ECAM-compliant and we don't need any
-more MCFG quirks, that would be great.
+I'm not quite ready to merge these because we haven't resolved the
+question of how to expose the resources used by the memory-mapped
+config space.  I'm fine with the first two patches (I did make a
+couple trivial changes, see below), but there's no point in merging
+them until we merge a user for them.
 
-But we'll still need to describe that memory-mapped config space
-somewhere.  If that's done with PNP0C02 or similar devices (as is done
-on my x86 laptop), we'd be all set.
-
-If we need to work around firmware in the field that doesn't do that,
-one possibility is a PNP quirk along the lines of
-quirk_amd_mmconfig_area().
+I pushed the series to pci/ecam-v6 for build testing and discussion.
+The diff (the changes I made locally) from v6 as posted by Tomasz is
+below.
 
 Bjorn
+
+
+diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+index eb14f74..bb3b8ad 100644
+--- a/drivers/acpi/pci_mcfg.c
++++ b/drivers/acpi/pci_mcfg.c
+@@ -42,86 +42,59 @@ struct mcfg_fixup {
+ 	struct resource cfgres;
+ };
+ 
+-#define MCFG_DOM_ANY			(-1)
+ #define MCFG_BUS_RANGE(start, end)	DEFINE_RES_NAMED((start),	\
+ 						((end) - (start) + 1),	\
+ 						NULL, IORESOURCE_BUS)
+-#define MCFG_BUS_ANY		MCFG_BUS_RANGE(0x0, 0xff)
+-#define MCFG_RES_EMPTY		DEFINE_RES_NAMED(0, 0, NULL, 0)
++#define MCFG_BUS_ANY			MCFG_BUS_RANGE(0x0, 0xff)
+ 
+ static struct mcfg_fixup mcfg_quirks[] = {
+-/*	{ OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, cfgres, ops }, */
++/*	{ OEM_ID, OEM_TABLE_ID, REV, SEGMENT, BUS_RANGE, cfgres, ops }, */
+ #ifdef CONFIG_PCI_HOST_THUNDER_PEM
++#define THUNDER_PEM_MCFG(rev, seg, addr) 				\
++	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY,			\
++	  &pci_thunder_pem_ops, DEFINE_RES_MEM(addr, 0x39 * SZ_16M) }
++
+ 	/* SoC pass2.x */
+-	{ "CAVIUM", "THUNDERX", 1, 4, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x88001f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 5, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x884057000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 6, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x88808f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 7, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x89001f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 8, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x894057000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 9, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x89808f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 14, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x98001f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 15, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x984057000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 16, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x98808f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 17, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x99001f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 18, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x994057000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 1, 19, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x99808f000000UL, 0x39 * SZ_16M) },
++	THUNDER_PEM_MCFG(1,  4, 0x88001f000000UL),
++	THUNDER_PEM_MCFG(1,  5, 0x884057000000UL),
++	THUNDER_PEM_MCFG(1,  6, 0x88808f000000UL),
++	THUNDER_PEM_MCFG(1,  7, 0x89001f000000UL),
++	THUNDER_PEM_MCFG(1,  8, 0x894057000000UL),
++	THUNDER_PEM_MCFG(1,  9, 0x89808f000000UL),
++	THUNDER_PEM_MCFG(1, 14, 0x98001f000000UL),
++	THUNDER_PEM_MCFG(1, 15, 0x984057000000UL),
++	THUNDER_PEM_MCFG(1, 16, 0x98808f000000UL),
++	THUNDER_PEM_MCFG(1, 17, 0x99001f000000UL),
++	THUNDER_PEM_MCFG(1, 18, 0x994057000000UL),
++	THUNDER_PEM_MCFG(1, 19, 0x99808f000000UL),
+ 
+ 	/* SoC pass1.x */
+-	{ "CAVIUM", "THUNDERX", 2, 4, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x88001f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 5, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x884057000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 6, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x88808f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 7, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x89001f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 8, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x894057000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 9, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x89808f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 14, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x98001f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 15, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x984057000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 16, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x98808f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 17, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x99001f000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 18, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x994057000000UL, 0x39 * SZ_16M) },
+-	{ "CAVIUM", "THUNDERX", 2, 19, MCFG_BUS_ANY, &pci_thunder_pem_ops,
+-	  DEFINE_RES_MEM(0x99808f000000UL, 0x39 * SZ_16M) },
++	THUNDER_PEM_MCFG(2,  4, 0x88001f000000UL),
++	THUNDER_PEM_MCFG(2,  5, 0x884057000000UL),
++	THUNDER_PEM_MCFG(2,  6, 0x88808f000000UL),
++	THUNDER_PEM_MCFG(2,  7, 0x89001f000000UL),
++	THUNDER_PEM_MCFG(2,  8, 0x894057000000UL),
++	THUNDER_PEM_MCFG(2,  9, 0x89808f000000UL),
++	THUNDER_PEM_MCFG(2, 14, 0x98001f000000UL),
++	THUNDER_PEM_MCFG(2, 15, 0x984057000000UL),
++	THUNDER_PEM_MCFG(2, 16, 0x98808f000000UL),
++	THUNDER_PEM_MCFG(2, 17, 0x99001f000000UL),
++	THUNDER_PEM_MCFG(2, 18, 0x994057000000UL),
++	THUNDER_PEM_MCFG(2, 19, 0x99808f000000UL),
+ #endif
+ #ifdef CONFIG_PCI_HOST_THUNDER_ECAM
++#define THUNDER_ECAM_MCFG(rev, seg) 					\
++	{ "CAVIUM", "THUNDERX", rev, seg, MCFG_BUS_ANY, &pci_thunder_ecam_ops }
++
+ 	/* SoC pass1.x */
+-	{ "CAVIUM", "THUNDERX", 2, 0, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
+-	  MCFG_RES_EMPTY},
+-	{ "CAVIUM", "THUNDERX", 2, 1, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
+-	  MCFG_RES_EMPTY},
+-	{ "CAVIUM", "THUNDERX", 2, 2, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
+-	  MCFG_RES_EMPTY},
+-	{ "CAVIUM", "THUNDERX", 2, 3, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
+-	  MCFG_RES_EMPTY},
+-	{ "CAVIUM", "THUNDERX", 2, 10, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
+-	  MCFG_RES_EMPTY},
+-	{ "CAVIUM", "THUNDERX", 2, 11, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
+-	  MCFG_RES_EMPTY},
+-	{ "CAVIUM", "THUNDERX", 2, 12, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
+-	  MCFG_RES_EMPTY},
+-	{ "CAVIUM", "THUNDERX", 2, 13, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
+-	  MCFG_RES_EMPTY},
++	THUNDER_ECAM_MCFG(2,  0),
++	THUNDER_ECAM_MCFG(2,  1),
++	THUNDER_ECAM_MCFG(2,  2),
++	THUNDER_ECAM_MCFG(2,  3),
++	THUNDER_ECAM_MCFG(2, 10),
++	THUNDER_ECAM_MCFG(2, 11),
++	THUNDER_ECAM_MCFG(2, 12),
++	THUNDER_ECAM_MCFG(2, 13),
+ #endif
+ };
+ 
+@@ -141,12 +114,12 @@ static void pci_mcfg_match_quirks(struct acpi_pci_root *root,
+ 	 * table ID, and OEM revision from MCFG table standard header.
+ 	 */
+ 	for (i = 0, f = mcfg_quirks; i < ARRAY_SIZE(mcfg_quirks); i++, f++) {
+-		if (f->seg == root->segment &&
+-		    resource_contains(&f->bus_range, &root->secondary) &&
+-		    !memcmp(f->oem_id, mcfg_oem_id, ACPI_OEM_ID_SIZE) &&
++		if (!memcmp(f->oem_id, mcfg_oem_id, ACPI_OEM_ID_SIZE) &&
+ 		    !memcmp(f->oem_table_id, mcfg_oem_table_id,
+ 		            ACPI_OEM_TABLE_ID_SIZE) &&
+-		    f->oem_revision == mcfg_oem_revision) {
++		    f->oem_revision == mcfg_oem_revision &&
++		    f->seg == root->segment &&
++		    resource_contains(&f->bus_range, &root->secondary)) {
+ 			if (f->cfgres.start)
+ 				*cfgres = f->cfgres;
+ 			if (f->ops)
+@@ -195,10 +168,10 @@ skip_lookup:
+ 	}
+ 
+ 	/*
+-	 * Let to override default ECAM ops and CFG resource range.
+-	 * Also, this might even retrieve CFG resource range in case MCFG
+-	 * does not have it. Invalid CFG start address means MCFG firmware bug
+-	 * or we need another quirk in array.
++	 * Allow quirks to override default ECAM ops and CFG resource
++	 * range.  This may even fabricate a CFG resource range in case
++	 * MCFG does not have it.  Invalid CFG start address means MCFG
++	 * firmware bug or we need another quirk in array.
+ 	 */
+ 	pci_mcfg_match_quirks(root, &res, &ops);
+ 	if (!res.start)
+@@ -239,7 +212,7 @@ static __init int pci_mcfg_parse(struct acpi_table_header *header)
+ 	/* Save MCFG IDs and revision for quirks matching */
+ 	memcpy(mcfg_oem_id, header->oem_id, ACPI_OEM_ID_SIZE);
+ 	memcpy(mcfg_oem_table_id, header->oem_table_id, ACPI_OEM_TABLE_ID_SIZE);
+-	mcfg_oem_revision = header->revision;
++	mcfg_oem_revision = header->oem_revision;
+ 
+ 	pr_info("MCFG table detected, %d entries\n", n);
+ 	return 0;
