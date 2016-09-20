@@ -1,476 +1,127 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 19 Sep 2016 18:07:37 -0700
-Subject: [RFC PATCH] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
- controller
-In-Reply-To: <20160919200614.GB21763@localhost>
-References: <1474122278-32525-1-git-send-email-dhdang@apm.com>
- <20160919200614.GB21763@localhost>
-Message-ID: <CADaLNDmYoYAiufYFrwhWjPBj29XPBSx1FydoM67v0c03D8N7vQ@mail.gmail.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Tue, 20 Sep 2016 09:19:36 +0800
+Subject: [RFC] Arm64 boot fail with numa enable in BIOS
+In-Reply-To: <20160919144542.GK9005@arm.com>
+References: <7618d76d-bfa8-d8aa-59aa-06f9d90c1a98@huawei.com>
+ <20160919140709.GA17464@leverpostej> <20160919144542.GK9005@arm.com>
+Message-ID: <57E08EA8.8000807@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
 
-Thanks for reviewing my RFC patch.
 
-On Mon, Sep 19, 2016 at 1:06 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> Hi Duc,
->
-> On Sat, Sep 17, 2016 at 07:24:38AM -0700, Duc Dang wrote:
->> PCIe controller in X-Gene SoCs is not ECAM compliant: software
->> needs to configure additional concontroller register to address
->> device at bus:dev:function.
+On 2016/9/19 22:45, Will Deacon wrote:
+> On Mon, Sep 19, 2016 at 03:07:19PM +0100, Mark Rutland wrote:
+>> [adding LAKML, arm64 maintainers]
+> 
+> I've also looped in Euler ThunderTown, since (a) he's at Huawei and is
+> assumedly testing this stuff and (b) he has a fairly big NUMA patch
+> series doing the rounds (some of which I've queued).
+In my patch series, only one is used to resolve crashed problem, but it's related to device-tree.
+
+> 
+>> On Mon, Sep 19, 2016 at 09:05:26PM +0800, Yisheng Xie wrote:
+>> In future, please make sure to Cc LAKML along with relevant parties when
+>> sending arm64 patches/queries.
 >>
->> This patch depends on "ECAM quirks handling for ARM64 platforms"
->> series (http://www.spinics.net/lists/arm-kernel/msg530692.html)
->> to address the limitation above for X-Gene PCIe controller.
+>> For everyone newly Cc'd, the original message (with attachments) can be
+>> found at:
 >>
->> The quirk will only be applied for X-Gene PCIe MCFG table with
->> OEM revison 1, 2, 3 or 4 (PCIe controller v1 and v2 on X-Gene SoCs).
+>> http://lkml.kernel.org/r/7618d76d-bfa8-d8aa-59aa-06f9d90c1a98 at huawei.com
 >>
->> Signed-off-by: Duc Dang <dhdang@apm.com>
->> ---
->>  drivers/acpi/pci_mcfg.c           |  32 +++++
->>  drivers/pci/host/Makefile         |   2 +-
->>  drivers/pci/host/pci-xgene-ecam.c | 280 ++++++++++++++++++++++++++++++++++++++
->>  include/linux/pci-ecam.h          |   5 +
->>  4 files changed, 318 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/pci/host/pci-xgene-ecam.c
->
-> This adds a bunch of stuff, but doesn't remove anything.  So I assume
-> it's adding new functionality that didn't exist before.  What is it?
-
-This patch only adds the ability for X-Gene PCIe controller to be
-probable in ACPI boot mode. All the 'quirk' code added is for ECAM to
-work with X-Gene.
-
->
-> I sort of expected this to also remove, for example, the seemingly
-> identical xgene_pcie_config_read32() in drivers/pci/host/pci-xgene.c.
-> Actually, a bunch of this code seems to be duplicated from there.  It
-> doesn't seem like we should end up with all this duplicated code.
->
-> I'd really like it better if all this could get folded into
-> pci-xgene.c so we don't end up with more files.
-
-I am still debating whether to put this X-Gene ECAM quirk code into
-drivers/acpi or keep it here in drivers/pci/host. But given the
-direction of other quirk patches for ThunderX and HiSi, seem like the
-quirk will stay in drivers/pci/host. I can definitely fold the new
-quirk code into pci-xgene.c as you suggested and eliminate the
-identical one.
-
->
->> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->> index ddf338b..adce35f 100644
->> --- a/drivers/acpi/pci_mcfg.c
->> +++ b/drivers/acpi/pci_mcfg.c
->> @@ -123,6 +123,38 @@ static struct mcfg_fixup mcfg_quirks[] = {
->>       { "CAVIUM", "THUNDERX", 2, 13, MCFG_BUS_ANY, &pci_thunder_ecam_ops,
->>         MCFG_RES_EMPTY},
->>  #endif
->> +#ifdef CONFIG_PCI_XGENE
->> +     {"APM   ", "XGENE   ", 1, 0, MCFG_BUS_ANY,
->> +             &xgene_v1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 1, 1, MCFG_BUS_ANY,
->> +             &xgene_v1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 1, 2, MCFG_BUS_ANY,
->> +             &xgene_v1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 1, 3, MCFG_BUS_ANY,
->> +             &xgene_v1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 1, 4, MCFG_BUS_ANY,
->> +             &xgene_v1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 2, 0, MCFG_BUS_ANY,
->> +             &xgene_v1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 2, 1, MCFG_BUS_ANY,
->> +             &xgene_v1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 2, 2, MCFG_BUS_ANY,
->> +             &xgene_v1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 2, 3, MCFG_BUS_ANY,
->> +             &xgene_v1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 2, 4, MCFG_BUS_ANY,
->> +             &xgene_v1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 3, 0, MCFG_BUS_ANY,
->> +             &xgene_v2_1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 3, 1, MCFG_BUS_ANY,
->> +             &xgene_v2_1_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 4, 0, MCFG_BUS_ANY,
->> +             &xgene_v2_2_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 4, 1, MCFG_BUS_ANY,
->> +             &xgene_v2_2_pcie_ecam_ops, MCFG_RES_EMPTY},
->> +     {"APM   ", "XGENE   ", 4, 2, MCFG_BUS_ANY,
->> +             &xgene_v2_2_pcie_ecam_ops, MCFG_RES_EMPTY},
->
-> Most of these are the same.  Let's add a macro that fills in the
-> boilerplate so each entry only contains the variable parts.  I'm going
-> to propose the same for the ThunderX quirks.
-
-I will follow up on this.
-
->
->> +#endif
->>  };
+>>> When I enable NUMA in BIOS for arm64, it failed to boot on v4.8-rc4-162-g071e31e.
 >>
->>  static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
->> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
->> index 8843410..af4f505 100644
->> --- a/drivers/pci/host/Makefile
->> +++ b/drivers/pci/host/Makefile
->> @@ -15,7 +15,7 @@ obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
->>  obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
->>  obj-$(CONFIG_PCIE_XILINX) += pcie-xilinx.o
->>  obj-$(CONFIG_PCIE_XILINX_NWL) += pcie-xilinx-nwl.o
->> -obj-$(CONFIG_PCI_XGENE) += pci-xgene.o
->> +obj-$(CONFIG_PCI_XGENE) += pci-xgene.o pci-xgene-ecam.o
->>  obj-$(CONFIG_PCI_XGENE_MSI) += pci-xgene-msi.o
->>  obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
->>  obj-$(CONFIG_PCI_VERSATILE) += pci-versatile.o
->> diff --git a/drivers/pci/host/pci-xgene-ecam.c b/drivers/pci/host/pci-xgene-ecam.c
->> new file mode 100644
->> index 0000000..b66a04f
->> --- /dev/null
->> +++ b/drivers/pci/host/pci-xgene-ecam.c
->> @@ -0,0 +1,280 @@
->> +/*
->> + * APM X-Gene PCIe ECAM fixup driver
->> + *
->> + * Copyright (c) 2016, Applied Micro Circuits Corporation
->> + * Author:
->> + *   Duc Dang <dhdang@apm.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_pci.h>
->> +#include <linux/pci-acpi.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/pci-ecam.h>
->> +
->> +#ifdef CONFIG_ACPI
->> +#define RTDID                        0x160
->> +#define ROOT_CAP_AND_CTRL    0x5C
->> +
->> +/* PCIe IP version */
->> +#define XGENE_PCIE_IP_VER_UNKN       0
->> +#define XGENE_PCIE_IP_VER_1  1
->> +#define XGENE_PCIE_IP_VER_2  2
->
-> We only use XGENE_PCIE_IP_VER_1, so I think the others should be
-> removed.  I think it would be nicer to have a "crs_broken:1" bit set
-> by the probe path, and get rid of the version field altogether.
-
-We do use XGENE_PCIE_IP_VER_2 for X-Gene v2 PCIe controller, but your
-idea about using crs_broken is much better. I will make change
-following that. This will affect DT booting too.
-
->
->> +#define XGENE_CSR_LENGTH     0x10000
->> +
->> +struct xgene_pcie_acpi_root {
->> +     void __iomem *csr_base;
->> +     u32 version;
->> +};
->
-> I think this should be folded into struct xgene_pcie_port so we don't
-> have to allocate and manage it separately.
-
-I will need to look into this more. When booting with ACPI mode, the
-code in pci-xgene.c is not used (except the cfg read/write functions
-that are shared with ECAM quirk code), so puting these into
-xgene_pcie_port will force ECAM quirk code to allocate this structure
-as well.
-
->
->> +static int xgene_v1_pcie_ecam_init(struct pci_config_window *cfg)
->> +{
->> +     struct xgene_pcie_acpi_root *xgene_root;
->> +     struct device *dev = cfg->parent;
->> +     u32 csr_base;
->> +
->> +     xgene_root = devm_kzalloc(dev, sizeof(*xgene_root), GFP_KERNEL);
->> +     if (!xgene_root)
->> +             return -ENOMEM;
->> +
->> +     switch (cfg->res.start) {
->> +     case 0xE0D0000000ULL:
->> +             csr_base = 0x1F2B0000;
->> +             break;
->> +     case 0xD0D0000000ULL:
->> +             csr_base = 0x1F2C0000;
->> +             break;
->> +     case 0x90D0000000ULL:
->> +             csr_base = 0x1F2D0000;
->> +             break;
->> +     case 0xA0D0000000ULL:
->> +             csr_base = 0x1F500000;
->> +             break;
->> +     case 0xC0D0000000ULL:
->> +             csr_base = 0x1F510000;
->> +             break;
->
-> Ugh.  What in the world is going on here?  Apparently we're testing a
-> host bridge resource against this hard-coded list of random values,
-> and based on that, we know about this *other* list of hard-coded CSR
-> ranges?  This is not the way resource discovery normally works ;)
-
-Yes, this is very ugly :(
-
-But discovering CSR regions by using acpi_walk_resource for each root
-port is not a preferred solution because of the concern that it may
-open a backdoor for continuously abusive usage of the quirk for new
-version of SoCs (https://patchwork.kernel.org/patch/9178791/, last 2
-comments from Lorenzo and Ard)
-
->
->> +     default:
->> +             return -ENODEV;
->> +     }
->> +
->> +     xgene_root->csr_base = ioremap(csr_base, XGENE_CSR_LENGTH);
->
-> There should be a request_region() somewhere, too.  Ideal would be to
-> use devm_ioremap_resource(), but I don't know where this apparent
-> resource is coming from.
-
-Yes, I will use request_region/devm_ioremap_resource here.
-
->
->> +     if (!xgene_root->csr_base) {
->> +             kfree(xgene_root);
->> +             return -ENODEV;
->> +     }
->> +
->> +     xgene_root->version = XGENE_PCIE_IP_VER_1;
->> +
->> +     cfg->priv = xgene_root;
->> +
->> +     return 0;
->> +}
->> +
->> +static int xgene_v2_1_pcie_ecam_init(struct pci_config_window *cfg)
->> +{
->> +     struct xgene_pcie_acpi_root *xgene_root;
->> +     struct device *dev = cfg->parent;
->> +     resource_size_t csr_base;
->> +
->> +     xgene_root = devm_kzalloc(dev, sizeof(*xgene_root), GFP_KERNEL);
->> +     if (!xgene_root)
->> +             return -ENOMEM;
->> +
->> +     switch (cfg->res.start) {
->> +     case 0xC0D0000000ULL:
->> +             csr_base = 0x1F2B0000;
->> +             break;
->> +     case 0xA0D0000000ULL:
->> +             csr_base = 0x1F2C0000;
->> +             break;
->> +     default:
->> +             return -ENODEV;
->> +     }
->> +
->> +     xgene_root->csr_base = ioremap(csr_base, XGENE_CSR_LENGTH);
->> +     if (!xgene_root->csr_base) {
->> +             kfree(xgene_root);
->> +             return -ENODEV;
->> +     }
->> +
->> +     xgene_root->version = XGENE_PCIE_IP_VER_2;
->> +
->> +     cfg->priv = xgene_root;
->> +
->> +     return 0;
->> +}
->> +
->> +static int xgene_v2_2_pcie_ecam_init(struct pci_config_window *cfg)
->> +{
->> +     struct xgene_pcie_acpi_root *xgene_root;
->> +     struct device *dev = cfg->parent;
->> +     resource_size_t csr_base;
->> +
->> +     xgene_root = devm_kzalloc(dev, sizeof(*xgene_root), GFP_KERNEL);
->> +     if (!xgene_root)
->> +             return -ENOMEM;
->> +
->> +     switch (cfg->res.start) {
->> +     case 0xE0D0000000ULL:
->> +             csr_base = 0x1F2B0000;
->> +             break;
->> +     case 0xA0D0000000ULL:
->> +             csr_base = 0x1F500000;
->> +             break;
->> +     case 0x90D0000000ULL:
->> +             csr_base = 0x1F2D0000;
->> +             break;
->> +     default:
->> +             return -ENODEV;
->> +     }
->> +
->> +     xgene_root->csr_base = ioremap(csr_base, XGENE_CSR_LENGTH);
->> +     if (!xgene_root->csr_base) {
->> +             kfree(xgene_root);
->> +             return -ENODEV;
->> +     }
->> +
->> +     xgene_root->version = XGENE_PCIE_IP_VER_2;
->> +
->> +     cfg->priv = xgene_root;
->> +
->> +     return 0;
->> +}
->> +/*
->> + * For Configuration request, RTDID register is used as Bus Number,
->> + * Device Number and Function number of the header fields.
->> + */
->> +static void xgene_pcie_set_rtdid_reg(struct pci_bus *bus, uint devfn)
->> +{
->> +     struct pci_config_window *cfg = bus->sysdata;
->> +     struct xgene_pcie_acpi_root *port = cfg->priv;
->> +     unsigned int b, d, f;
->> +     u32 rtdid_val = 0;
->> +
->> +     b = bus->number;
->> +     d = PCI_SLOT(devfn);
->> +     f = PCI_FUNC(devfn);
->> +
->> +     if (!pci_is_root_bus(bus))
->> +             rtdid_val = (b << 8) | (d << 3) | f;
->> +
->> +     writel(rtdid_val, port->csr_base + RTDID);
->> +     /* read the register back to ensure flush */
->> +     readl(port->csr_base + RTDID);
->> +}
->> +
->> +/*
->> + * X-Gene PCIe port uses BAR0-BAR1 of RC's configuration space as
->> + * the translation from PCI bus to native BUS.  Entire DDR region
->> + * is mapped into PCIe space using these registers, so it can be
->> + * reached by DMA from EP devices.  The BAR0/1 of bridge should be
->> + * hidden during enumeration to avoid the sizing and resource allocation
->> + * by PCIe core.
->> + */
->> +static bool xgene_pcie_hide_rc_bars(struct pci_bus *bus, int offset)
->> +{
->> +     if (pci_is_root_bus(bus) && ((offset == PCI_BASE_ADDRESS_0) ||
->> +                                  (offset == PCI_BASE_ADDRESS_1)))
->> +             return true;
->> +
->> +     return false;
->> +}
->> +
->> +void __iomem *xgene_pcie_ecam_map_bus(struct pci_bus *bus,
->> +                                   unsigned int devfn, int where)
->> +{
->> +     struct pci_config_window *cfg = bus->sysdata;
->> +     unsigned int busn = bus->number;
->> +     void __iomem *base;
->> +
->> +     if (busn < cfg->busr.start || busn > cfg->busr.end)
->> +             return NULL;
->> +
->> +     if ((pci_is_root_bus(bus) && devfn != 0) ||
->> +         xgene_pcie_hide_rc_bars(bus, where))
->> +             return NULL;
->> +
->> +     xgene_pcie_set_rtdid_reg(bus, devfn);
->> +
->> +     if (busn > cfg->busr.start)
->> +             base = cfg->win + (1 << cfg->ops->bus_shift);
->> +     else
->> +             base = cfg->win;
->> +
->> +     return base + where;
->> +}
->> +
->> +static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
->> +                                 int where, int size, u32 *val)
->> +{
->> +     struct pci_config_window *cfg = bus->sysdata;
->> +     struct xgene_pcie_acpi_root *port = cfg->priv;
->> +
->> +     if (pci_generic_config_read32(bus, devfn, where & ~0x3, 4, val) !=
->> +         PCIBIOS_SUCCESSFUL)
->> +             return PCIBIOS_DEVICE_NOT_FOUND;
->> +
->> +     /*
->> +     * The v1 controller has a bug in its Configuration Request
->> +     * Retry Status (CRS) logic: when CRS is enabled and we read the
->> +     * Vendor and Device ID of a non-existent device, the controller
->> +     * fabricates return data of 0xFFFF0001 ("device exists but is not
->> +     * ready") instead of 0xFFFFFFFF ("device does not exist").  This
->> +     * causes the PCI core to retry the read until it times out.
->> +     * Avoid this by not claiming to support CRS.
->> +     */
->> +     if (pci_is_root_bus(bus) && (port->version == XGENE_PCIE_IP_VER_1) &&
->> +         ((where & ~0x3) == ROOT_CAP_AND_CTRL))
->> +             *val &= ~(PCI_EXP_RTCAP_CRSVIS << 16);
->> +
->> +     if (size <= 2)
->> +             *val = (*val >> (8 * (where & 3))) & ((1 << (size * 8)) - 1);
->> +
->> +     return PCIBIOS_SUCCESSFUL;
->> +}
->> +
->> +struct pci_ecam_ops xgene_v1_pcie_ecam_ops = {
->> +     .bus_shift      = 16,
->> +     .init           = xgene_v1_pcie_ecam_init,
->> +     .pci_ops        = {
->> +             .map_bus        = xgene_pcie_ecam_map_bus,
->> +             .read           = xgene_pcie_config_read32,
->> +             .write          = pci_generic_config_write,
->> +     }
->> +};
->> +
->> +struct pci_ecam_ops xgene_v2_1_pcie_ecam_ops = {
->> +     .bus_shift      = 16,
->> +     .init           = xgene_v2_1_pcie_ecam_init,
->> +     .pci_ops        = {
->> +             .map_bus        = xgene_pcie_ecam_map_bus,
->> +             .read           = xgene_pcie_config_read32,
->> +             .write          = pci_generic_config_write,
->> +     }
->> +};
->> +
->> +struct pci_ecam_ops xgene_v2_2_pcie_ecam_ops = {
->> +     .bus_shift      = 16,
->> +     .init           = xgene_v2_2_pcie_ecam_init,
->> +     .pci_ops        = {
->> +             .map_bus        = xgene_pcie_ecam_map_bus,
->> +             .read           = xgene_pcie_config_read32,
->> +             .write          = pci_generic_config_write,
->> +     }
->> +};
->> +#endif
->> diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
->> index 35f0e81..40da3e7 100644
->> --- a/include/linux/pci-ecam.h
->> +++ b/include/linux/pci-ecam.h
->> @@ -65,6 +65,11 @@ extern struct pci_ecam_ops pci_thunder_pem_ops;
->>  #ifdef CONFIG_PCI_HOST_THUNDER_ECAM
->>  extern struct pci_ecam_ops pci_thunder_ecam_ops;
->>  #endif
->> +#ifdef CONFIG_PCI_XGENE
->> +extern struct pci_ecam_ops xgene_v1_pcie_ecam_ops;
->> +extern struct pci_ecam_ops xgene_v2_1_pcie_ecam_ops;
->> +extern struct pci_ecam_ops xgene_v2_2_pcie_ecam_ops;
->> +#endif
+>> That commit ID doesn't seem to be in mainline (I can't find it in my
+>> local tree). Which tree are you using? Do you have local patches
+>> applied?
+> 
+> That commit is in mainline:
+> 
+>   http://git.kernel.org/linus/071e31e
+> 
+> It would be nice to know if the problem also exists on the arm64
+> for-next/core branch.
+> 
+> Will
+> 
+> 
+>> I take it that by "enable NUMA in BIOS", you mean exposing SRAT to the
+>> OS?
 >>
->>  #ifdef CONFIG_PCI_HOST_GENERIC
->>  /* for DT-based PCI controllers that support ECAM */
->> --
->> 1.9.1
+>>> For the crash log, it seems caused by error number of cpumask.
+>>> Any ideas about it?
 >>
-Regards,
-Duc Dang.
+>> Much earlier in your log, there was a (non-fatal) warning, as below. Do
+>> you see this without NUMA/SRAT enabled in your FW? I don't see how the
+>> SRAT should affect the secondaries we try to bring online.
+>>
+>> Given your MPIDRs have Aff2 bits set, I wonder if we've conflated a
+>> logical ID with a physical ID somewhere, and it just so happens that the
+>> NUMA code is more likely to poke something based on that.
+>>
+>> Can you modify the warning in cpumask.h to dump the bad CPU number? That
+>> would make it fairly clear if that's the case.
+>>
+>> Thanks,
+>> Mark.
+>>
+>>> [    0.297337] Detected PIPT I-cache on CPU1
+>>> [    0.297347] GICv3: CPU1: found redistributor 10001 region 1:0x000000004d140000
+>>> [    0.297356] CPU1: Booted secondary processor [410fd082]
+>>> [    0.297375] ------------[ cut here ]------------
+>>> [    0.320390] WARNING: CPU: 1 PID: 0 at ./include/linux/cpumask.h:121 gic_raise_softirq+0x128/0x17c
+>>> [    0.329356] Modules linked in:
+>>> [    0.332434] 
+>>> [    0.333932] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc4-00163-g803ea3a #21
+>>> [    0.341581] Hardware name: Hisilicon Hi1616 Evaluation Board (DT)
+>>> [    0.347735] task: ffff8013e9dd0000 task.stack: ffff8013e9dcc000
+>>> [    0.353714] PC is at gic_raise_softirq+0x128/0x17c
+>>> [    0.358550] LR is at gic_raise_softirq+0xa0/0x17c
+>>> [    0.363298] pc : [<ffff00000838c124>] lr : [<ffff00000838c09c>] pstate: 200001c5
+>>> [    0.370770] sp : ffff8013e9dcfde0
+>>> [    0.374112] x29: ffff8013e9dcfde0 x28: 0000000000000000 
+>>> [    0.379476] x27: 000000000083207c x26: ffff000008ca5d70 
+>>> [    0.384841] x25: 0000000100000001 x24: ffff000008d63ff3 
+>>> [    0.390205] x23: 0000000000000000 x22: ffff000008cb0000 
+>>> [    0.395569] x21: ffff00000884edb0 x20: 0000000000000001 
+>>> [    0.400933] x19: 0000000100000000 x18: 0000000000000000 
+>>> [    0.406298] x17: 0000000000000000 x16: 0000000003010066 
+>>> [    0.411661] x15: ffff000008ca8000 x14: 0000000000000013 
+>>> [    0.417025] x13: 0000000000000000 x12: 0000000000000013 
+>>> [    0.422389] x11: 0000000000000013 x10: 0000000002e92aa7 
+>>> [    0.427754] x9 : 0000000000000000 x8 : ffff8413eb6ca668 
+>>> [    0.433118] x7 : ffff8413eb6ca690 x6 : 0000000000000000 
+>>> [    0.438482] x5 : fffffffffffffffe x4 : 0000000000000000 
+>>> [    0.443845] x3 : 0000000000000040 x2 : 0000000000000041 
+>>> [    0.449209] x1 : 0000000000000000 x0 : 0000000000000001 
+>>> [    0.454573] 
+>>> [    0.456069] ---[ end trace b58e70f3295a8cd7 ]---
+>>> [    0.460730] Call trace:
+>>> [    0.463193] Exception stack(0xffff8013e9dcfc10 to 0xffff8013e9dcfd40)
+>>> [    0.469699] fc00:                                   0000000100000000 0001000000000000
+>>> [    0.477611] fc20: ffff8013e9dcfde0 ffff00000838c124 ffff000008d72228 ffff8013e9dcff70
+>>> [    0.485524] fc40: ffff000008d72608 ffff000008ab02a4 0000000000000000 0000000000000000
+>>> [    0.493436] fc60: 0000000000000000 3464313430303030 0000000000000000 0000000000000000
+>>> [    0.501348] fc80: ffff8013e9dcfc90 ffff00000836e678 ffff8013e9dcfca0 ffff00000836e910
+>>> [    0.509259] fca0: ffff8013e9dcfd30 ffff00000836ec10 0000000000000001 0000000000000000
+>>> [    0.517171] fcc0: 0000000000000041 0000000000000040 0000000000000000 fffffffffffffffe
+>>> [    0.525083] fce0: 0000000000000000 ffff8413eb6ca690 ffff8413eb6ca668 0000000000000000
+>>> [    0.532995] fd00: 0000000002e92aa7 0000000000000013 0000000000000013 0000000000000000
+>>> [    0.540907] fd20: 0000000000000013 ffff000008ca8000 0000000003010066 0000000000000000
+>>> [    0.548819] [<ffff00000838c124>] gic_raise_softirq+0x128/0x17c
+>>> [    0.554713] [<ffff00000808e1f4>] smp_send_reschedule+0x34/0x3c
+>>> [    0.560605] [<ffff0000080ddf18>] resched_curr+0x40/0x5c
+>>> [    0.565881] [<ffff0000080de650>] check_preempt_curr+0x58/0xa0
+>>> [    0.571685] [<ffff0000080de6b0>] ttwu_do_wakeup+0x18/0x80
+>>> [    0.577136] [<ffff0000080de790>] ttwu_do_activate+0x78/0x88
+>>> [    0.582763] [<ffff0000080df5cc>] try_to_wake_up+0x1f8/0x300
+>>> [    0.588390] [<ffff0000080df79c>] default_wake_function+0x10/0x18
+>>> [    0.594458] [<ffff0000080f3210>] __wake_up_common+0x5c/0x9c
+>>> [    0.600085] [<ffff0000080f3264>] __wake_up_locked+0x14/0x1c
+>>> [    0.605712] [<ffff0000080f3e10>] complete+0x40/0x5c
+>>> [    0.610635] [<ffff00000808dba8>] secondary_start_kernel+0x148/0x1a8
+>>> [    0.616965] [<00000000000831a8>] 0x831a8
+>>
+> 
+> .
+> 
