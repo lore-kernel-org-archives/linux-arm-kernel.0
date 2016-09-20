@@ -1,29 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Sep 2016 10:50:46 +0100
-Subject: [PATCH v6 4/7] arm/arm64: vgic-new: Define required GICv3 reg
- definitions
-In-Reply-To: <1474351965-11586-5-git-send-email-vijay.kilari@gmail.com>
-References: <1474351965-11586-1-git-send-email-vijay.kilari@gmail.com>
- <1474351965-11586-5-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <57E10676.9080509@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 20 Sep 2016 11:51:27 +0200 (CEST)
+Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
+ support
+In-Reply-To: <39c4ceee-7e05-ebfd-2ea0-3c4e1c4ea619@st.com>
+References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
+ <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
+ <alpine.DEB.2.20.1609131713490.6233@nanos>
+ <6941f61d-0b33-4108-0135-b11887cd0488@st.com>
+ <alpine.DEB.2.20.1609141103420.6233@nanos>
+ <facd1c7c-d696-eae1-02e4-5a0c9285add0@st.com>
+ <alpine.DEB.2.20.1609141532510.6233@nanos>
+ <f64e4f9d-d811-2c6e-7c5a-d4ab06716e2c@st.com>
+ <39c4ceee-7e05-ebfd-2ea0-3c4e1c4ea619@st.com>
+Message-ID: <alpine.DEB.2.20.1609201150160.6905@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/16 07:12, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> 
-> Define register definitions for ICH_VMCR_EL2, ICC_CTLR_EL1 and
-> ICH_VTR_EL2, ICC_BPR0_EL1, ICC_BPR1_EL1 registers.
-> 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On Tue, 20 Sep 2016, Alexandre Torgue wrote:
+> > On 09/14/2016 03:34 PM, Thomas Gleixner wrote:
+> > > Well, you just used some function in some context which is not
+> > > relevant to
+> > > the normal operation. So adding that mask() is just paranoia for no
+> > > value.
+> > 
+> A gentle reminder ping...
+> If ".free" callback is not relevant then I 'll remove it from exti domain.
 
-$SUBJECT should report "irqchip/gic-v3: Add missing system register
-definitions", or something similar.
-
-Also, please drop this "vgic-new", as there is no vgic-old anymore.
+I was not talking about the .free callback in general. I was talking about
+the masking. But yes, if the thing is otherwise a NOOP, then you can spare
+it completely.
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	tglx
