@@ -1,67 +1,64 @@
-From: minyard@acm.org (Corey Minyard)
-Date: Tue, 20 Sep 2016 09:58:40 -0500
-Subject: [PATCH v3 0/3] ARM: aspeed: add support for the BT IPMI interface
-In-Reply-To: <1474354900-5618-1-git-send-email-clg@kaod.org>
-References: <1474354900-5618-1-git-send-email-clg@kaod.org>
-Message-ID: <40bb95a8-b5a6-563b-11c6-73de2f67130d@acm.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Sep 2016 17:07:06 +0200
+Subject: [PATCH 2/2] arm64: dts: marvell: fix clocksource for CP110 slave
+ SPI0
+In-Reply-To: <1473183672-12028-3-git-send-email-mw@semihalf.com> (Marcin
+ Wojtas's message of "Tue, 6 Sep 2016 19:41:12 +0200")
+References: <1473183672-12028-1-git-send-email-mw@semihalf.com>
+ <1473183672-12028-3-git-send-email-mw@semihalf.com>
+Message-ID: <87pony625h.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2016 02:01 AM, C?dric Le Goater wrote:
-> Hello,
->
-> This serie adds support for the iBT interface on Aspeed SOCs (AST2400
-> and AST2500). The BT (Block Transfer) interface is used to perform
-> in-band IPMI communication between a host and its BMC. This driver
-> implements the BMC side.
+Hi Olof and Arnd,
+ 
+ On mar., sept. 06 2016, Marcin Wojtas <mw@semihalf.com> wrote:
 
-This looks good.  I pulled these into my tree, it's ok for 4.9 or
-whatever is next, since it's a new driver.
+> I2C and SPI interfaces share common clock trees within the CP110 HW block.
+> It occurred that SPI0 interface has wrong clock assignment in the device
+> tree, which is fixed in this commit to a proper value.
+>
+> Fixes: c749b8d9de32 ("arm64: dts: marvell: add description for the ...")
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 
-Do patches 2 and 3 go through Joel?
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
--corey
+Could you take this patch for 4.9? I didn't realized at first view it
+was for 4.9, I though I could put it the PR for fixes for 4.8.
 
-> Changes since v2:
+I can do a new PR for dt64 with this single patch if you prefer.
+
+The last option will be to have it as a fix for v4.9-rc2.
+
+Thanks,
+
+Gregory
+
+
+
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
->   - limit to one opener
->   - protect write/read operations with a mutex.
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index 37bff70..150675c 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -133,7 +133,7 @@
+>  				#address-cells = <0x1>;
+>  				#size-cells = <0x0>;
+>  				cell-index = <1>;
+> -				clocks = <&cps_syscon0 0 3>;
+> +				clocks = <&cps_syscon0 1 21>;
+>  				status = "disabled";
+>  			};
+>  
+> -- 
+> 1.8.3.1
 >
-> Changes since v1:
->
->   - the driver is now called 'bt-bmc' and the device node '/dev/ipmi-bt-host'
->     
->   - the code is now under drivers/char/ipmi/. This required a change of
->     the top Makefile in drivers/ to compile the bt-bmc driver with the
->     ipmi handlers not being selected. That might be an issue.
->     
->   - changed the read/write operations to use a temporary buffer and get
->     rid of the {get,put}_user calls
->
-> Thanks,
->
-> C.
->
-> Alistair Popple (1):
->    ipmi: add an Aspeed BT IPMI BMC driver
->
-> C?dric Le Goater (2):
->    ARM: aspeed: Add defconfigs for CONFIG_ASPEED_BT_IPMI_BMC
->    ARM: dts: aspeed: Enable BT IPMI BMC device
->
->   .../bindings/char/ipmi/aspeed,ast2400-bt-bmc.txt   |  23 +
->   arch/arm/boot/dts/aspeed-g4.dtsi                   |   6 +
->   arch/arm/boot/dts/aspeed-g5.dtsi                   |   6 +
->   arch/arm/configs/aspeed_g4_defconfig               |   1 +
->   arch/arm/configs/aspeed_g5_defconfig               |   1 +
->   drivers/Makefile                                   |   2 +-
->   drivers/char/ipmi/Kconfig                          |   7 +
->   drivers/char/ipmi/Makefile                         |   1 +
->   drivers/char/ipmi/bt-bmc.c                         | 510 +++++++++++++++++++++
->   include/uapi/linux/Kbuild                          |   1 +
->   include/uapi/linux/bt-bmc.h                        |  18 +
->   11 files changed, 575 insertions(+), 1 deletion(-)
->   create mode 100644 Documentation/devicetree/bindings/char/ipmi/aspeed,ast2400-bt-bmc.txt
->   create mode 100644 drivers/char/ipmi/bt-bmc.c
->   create mode 100644 include/uapi/linux/bt-bmc.h
->
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
