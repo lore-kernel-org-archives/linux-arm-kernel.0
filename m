@@ -1,75 +1,35 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Tue, 20 Sep 2016 17:45:13 +0200
-Subject: [PATCH v3 0/3] ARM: aspeed: add support for the BT IPMI interface
-In-Reply-To: <40bb95a8-b5a6-563b-11c6-73de2f67130d@acm.org>
-References: <1474354900-5618-1-git-send-email-clg@kaod.org>
- <40bb95a8-b5a6-563b-11c6-73de2f67130d@acm.org>
-Message-ID: <e0114015-647a-8567-ac10-6dfe76b4069c@kaod.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 20 Sep 2016 09:19:48 +0200
+Subject: [PATCH 4/4] drm/sun4i: dotclock: Round to closest clock rate
+In-Reply-To: <20160915151402.15992-5-wens@csie.org>
+References: <20160915151402.15992-1-wens@csie.org>
+ <20160915151402.15992-5-wens@csie.org>
+Message-ID: <20160920071948.GB8719@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2016 04:58 PM, Corey Minyard wrote:
-> On 09/20/2016 02:01 AM, C?dric Le Goater wrote:
->> Hello,
->>
->> This serie adds support for the iBT interface on Aspeed SOCs (AST2400
->> and AST2500). The BT (Block Transfer) interface is used to perform
->> in-band IPMI communication between a host and its BMC. This driver
->> implements the BMC side.
+On Thu, Sep 15, 2016 at 11:14:02PM +0800, Chen-Yu Tsai wrote:
+> With display pixel clocks we want to have the closest possible clock
+> rate, to minimize timing and refresh rate skews. Whether the actual
+> clock rate is higher or lower than the requested rate is less important.
 > 
-> This looks good.  I pulled these into my tree, it's ok for 4.9 or
-> whatever is next, since it's a new driver.
+> Also check candidates against the requested rate, rather than the
+> ideal parent rate, the varying dividers also influence the difference
+> between the requested rate and the rounded rate.
 > 
-> Do patches 2 and 3 go through Joel?
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Yes. He said he would.
+Applied, thanks!
+Maxime
 
-Thanks,
-
-C. 
-
-> 
-> -corey
-> 
->> Changes since v2:
->>
->>   - limit to one opener
->>   - protect write/read operations with a mutex.
->>
->> Changes since v1:
->>
->>   - the driver is now called 'bt-bmc' and the device node '/dev/ipmi-bt-host'
->>       - the code is now under drivers/char/ipmi/. This required a change of
->>     the top Makefile in drivers/ to compile the bt-bmc driver with the
->>     ipmi handlers not being selected. That might be an issue.
->>       - changed the read/write operations to use a temporary buffer and get
->>     rid of the {get,put}_user calls
->>
->> Thanks,
->>
->> C.
->>
->> Alistair Popple (1):
->>    ipmi: add an Aspeed BT IPMI BMC driver
->>
->> C?dric Le Goater (2):
->>    ARM: aspeed: Add defconfigs for CONFIG_ASPEED_BT_IPMI_BMC
->>    ARM: dts: aspeed: Enable BT IPMI BMC device
->>
->>   .../bindings/char/ipmi/aspeed,ast2400-bt-bmc.txt   |  23 +
->>   arch/arm/boot/dts/aspeed-g4.dtsi                   |   6 +
->>   arch/arm/boot/dts/aspeed-g5.dtsi                   |   6 +
->>   arch/arm/configs/aspeed_g4_defconfig               |   1 +
->>   arch/arm/configs/aspeed_g5_defconfig               |   1 +
->>   drivers/Makefile                                   |   2 +-
->>   drivers/char/ipmi/Kconfig                          |   7 +
->>   drivers/char/ipmi/Makefile                         |   1 +
->>   drivers/char/ipmi/bt-bmc.c                         | 510 +++++++++++++++++++++
->>   include/uapi/linux/Kbuild                          |   1 +
->>   include/uapi/linux/bt-bmc.h                        |  18 +
->>   11 files changed, 575 insertions(+), 1 deletion(-)
->>   create mode 100644 Documentation/devicetree/bindings/char/ipmi/aspeed,ast2400-bt-bmc.txt
->>   create mode 100644 drivers/char/ipmi/bt-bmc.c
->>   create mode 100644 include/uapi/linux/bt-bmc.h
->>
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160920/81bddca7/attachment.sig>
