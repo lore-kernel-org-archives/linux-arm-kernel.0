@@ -1,107 +1,524 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 20 Sep 2016 12:00:20 +0100
-Subject: [RFC] arm64: Ensure proper addressing for ldnp/stnp
-In-Reply-To: <9a3f86d9037a478f0a1a87b2084c7496@codeaurora.org>
-References: <1474306586-25118-1-git-send-email-bdegraaf@codeaurora.org>
- <be5f5bfd-fd41-d202-cec9-0ca3fcad28db@arm.com>
- <9a3f86d9037a478f0a1a87b2084c7496@codeaurora.org>
-Message-ID: <c1911e82-e65a-73e4-f878-8e25f609f58b@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 20 Sep 2016 12:09:51 +0100
+Subject: [PATCH] arm64, numa: Add cpu_to_node() implementation.
+In-Reply-To: <20160920104348.GP25086@rric.localdomain>
+References: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160920104348.GP25086@rric.localdomain>
+Message-ID: <20160920110950.GA3935@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/16 19:25, bdegraaf at codeaurora.org wrote:
-> On 2016-09-19 14:01, Robin Murphy wrote:
->> On 19/09/16 18:36, Brent DeGraaf wrote:
->>> According to section 6.3.8 of the ARM Programmer's Guide, non-temporal
->>> loads and stores do not verify that address dependency is met between a
->>> load of an address to a register and a subsequent non-temporal load or
->>> store using that address on the executing PE. Therefore, context switch
->>> code and subroutine calls that use non-temporally accessed addresses as
->>> parameters that might depend on a load of an address into an argument
->>> register must ensure that ordering requirements are met by introducing
->>> a barrier prior to the successive non-temporal access.  Add appropriate
->>> barriers whereever this specific situation comes into play.
->>>
->>> Signed-off-by: Brent DeGraaf <bdegraaf@codeaurora.org>
->>> ---
->>>  arch/arm64/kernel/entry.S  | 1 +
->>>  arch/arm64/lib/copy_page.S | 2 ++
->>>  2 files changed, 3 insertions(+)
->>>
->>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->>> index 441420c..982c4d3 100644
->>> --- a/arch/arm64/kernel/entry.S
->>> +++ b/arch/arm64/kernel/entry.S
->>> @@ -679,6 +679,7 @@ ENTRY(cpu_switch_to)
->>>      ldp    x27, x28, [x8], #16
->>>      ldp    x29, x9, [x8], #16
->>>      ldr    lr, [x8]
->>> +    dmb    nshld    // Existence of instructions with loose load-use
->>> dependencies (e.g. ldnp/stnp) make this barrier necessary
->>>      mov    sp, x9
->>>      and    x9, x9, #~(THREAD_SIZE - 1)
->>>      msr    sp_el0, x9
->>> diff --git a/arch/arm64/lib/copy_page.S b/arch/arm64/lib/copy_page.S
->>> index 4c1e700..21c6892 100644
->>> --- a/arch/arm64/lib/copy_page.S
->>> +++ b/arch/arm64/lib/copy_page.S
->>> @@ -47,6 +47,8 @@ alternative_endif
->>>      ldp    x14, x15, [x1, #96]
->>>      ldp    x16, x17, [x1, #112]
->>>
->>> +    dmb    nshld // In case x0 (for stnp) is dependent on a load
->>
->> The ARMv8 ARM (B2.7.2 in issue j) says that when an address dependency
->> exists between a load and a subsequent LDNP, *other* observers may
->> observe those accesses in any order. How's that related to an STNP on
->> the same CPU?
->>
->> Robin.
->>
->>> +
->>>      mov    x18, #(PAGE_SIZE - 128)
->>>      add    x1, x1, #128
->>>  1:
->>>
+On Tue, Sep 20, 2016 at 12:43:48PM +0200, Robert Richter wrote:
+> Unfortunately either your nor my code does fix the BUG_ON() I see with
+> the numa kernel:
 > 
-> Yes, I have seen the section in the ARM ARM about this. But the
-> Programmer's Guide goes further, even providing a concrete example:
+>  kernel BUG at mm/page_alloc.c:1848!
 > 
-> "Non-temporal loads and stores relax the memory ordering
-> requirements...the LDNP instruction might
-> be observed before the preceding LDR instruction, which can result in
-> reading from an unpredictable
-> address in X0.
-> 
-> For example:
-> LDR X0, [X3]
-> LDNP X2, X1, [X0]
-> To correct the above, you need an explicit load barrier:
-> LDR X0, [X3]
-> DMB NSHLD
-> LDNP X2, X1, [X0]"
-> 
-> Did the ARM ARM leave this out?  Or is the Programmer's Guide section
-> incorrect?
+> See below for the core dump. It looks like this happens due to moving
+> a mem block where first and last page are mapped to different numa
+> nodes, thus, triggering the BUG_ON().
 
-If the ARM ARM and the Programmer's Guide don't agree, then the
-Programmer's Guide is wrong (I'll raise a bug against it).
+FWIW, I'm seeing a potentially-related BUG in the same function on a
+v4.8-rc7 kernel without CONFIG_NUMA enabled. I have a number of debug
+options set, including CONFIG_PAGE_POISONING and CONFIG_DEBUG_PAGEALLOC.
 
-All the ARM ARM says is that in this situation:
+I've included the full log for that below, including subsequent
+failures.
 
-     P1                        P2
- STP x0, x1, [x2]      1: LDR x0, <ptr>
- DMB ISH                  CBZ x0, 1b
- STR x2, <ptr>            LDNP x1, x2, [x0]
+I'm triggering this by running $(hackbench 100 process 1000).
 
-P2's address dependency still very much exists from the point of view of
-P2's execution, it just may not guarantee order against the DMB on P1,
-so P2's LDNP isn't guaranteed to see the data from P1's STP (as opposed
-to how a regular LDP *is*), and may still load older stale data instead.
+Thanks,
+Mark.
 
-Robin.
-
-> 
-> Thanks for your comments,
-> Brent
-> 
+[  742.923329] ------------[ cut here ]------------
+[  742.927951] kernel BUG at mm/page_alloc.c:1844!
+[  742.932475] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+[  742.937951] Modules linked in:
+[  742.941075] CPU: 4 PID: 3608 Comm: hackbench Not tainted 4.8.0-rc7 #1
+[  742.947506] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  742.955066] task: ffff800341c4af80 task.stack: ffff800341c84000
+[  742.960981] PC is at move_freepages+0x220/0x338
+[  742.965503] LR is at move_freepages_block+0x164/0x1e0
+[  742.970544] pc : [<ffff2000083dfeb8>] lr : [<ffff2000083e0134>] pstate: 200001c5
+[  742.977928] sp : ffff800341c86ce0
+[  742.981233] x29: ffff800341c86ce0 x28: ffff20000c8d9308
+[  742.986541] x27: ffff7e000ffbffc0 x26: 0000000000000100
+[  742.991850] x25: 0000000000000000 x24: 00000000083fefff
+[  742.997157] x23: ffff7e000ffb8000 x22: ffff20000c8d9000
+[  743.002465] x21: ffff20000c8d9000 x20: 0000000000000700
+[  743.007772] x19: ffff7e000ffb8000 x18: 0000000000000000
+[  743.013079] x17: 0000000000000001 x16: ffff200008553d78
+[  743.018387] x15: 0000000000000002 x14: 0000000000000000
+[  743.023694] x13: ffffffffffffffff x12: ffff20000b311000
+[  743.029000] x11: 0000000000000000 x10: ffff20000d540000
+[  743.034307] x9 : dfff200000000000 x8 : ffff20000c8d9318
+[  743.039614] x7 : 0000000000000001 x6 : 1fffe4000149ab66
+[  743.044921] x5 : dfff200000000000 x4 : ffff20000a4d5b30
+[  743.050228] x3 : 0000000000000000 x2 : ffff7e000ffbffc0
+[  743.055535] x1 : 0000000000000000 x0 : 0000000000000000
+[  743.060841]
+[  743.062324] Process hackbench (pid: 3608, stack limit = 0xffff800341c84020)
+[  743.069276] Stack: (0xffff800341c86ce0 to 0xffff800341c88000)
+[  743.075013] 6ce0: ffff800341c86d70 ffff2000083e0134 00000000083fee00 ffff7e000ffb8000
+[  743.082833] 6d00: ffff20000c8d9000 0000000008400000 ffff7e000ffb8000 00000000083fefff
+[  743.090653] 6d20: 0000000000000000 0000000000000100 ffff20000a9873a0 ffff20000c8d9308
+[  743.098472] 6d40: 0000000000000000 0000000000000003 0000000000000005 ffff20000c8d9000
+[  743.106292] 6d60: 0000000000000000 0000000000000100 ffff800341c86dc0 ffff2000083e11bc
+[  743.114111] 6d80: 0000000000000005 0000000000000001 0000000000000000 0000000000000003
+[  743.121930] 6da0: 0000000000000005 ffff20000c8d9000 ffff20000b311000 1ffff000683896e8
+[  743.129750] 6dc0: ffff800341c86f50 ffff2000083e41fc 0000000000000003 ffff800341c873a0
+[  743.137570] 6de0: 00000000002156c0 0000000000000008 dfff200000000000 ffff20000a4d5000
+[  743.145389] 6e00: 0000000000000000 00000000002156c0 dfff200000000000 ffff20000c8d9000
+[  743.153209] 6e20: ffff800341c86ee0 ffff2000081b3758 0000000000000001 ffff800341c84000
+[  743.161028] 6e40: 0000000000000000 ffff7e000ffbb000 1ffff00068390dce ffff800341c86f50
+[  743.168848] 6e60: ffff7e000ffbb020 ffff7e000ffbb000 0000000041b58ab3 ffff20000a2777d8
+[  743.176668] 6e80: ffff2000083e06f8 000000000000b394 ffff800341c86e01 ffff20000823cd10
+[  743.184487] 6ea0: ffff20000b311000 00000000000001c0 ffff20000c8d9598 00000000002156c0
+[  743.192307] 6ec0: dfff200000000000 0000000000000000 ffff800341c86f20 ffff200009c28074
+[  743.200126] 6ee0: ffff20000c8d9580 0000000000000140 ffff2000083e41c8 0000000000000001
+[  743.207946] 6f00: dfff200000000000 ffff20000a4d5000 0000000000000000 0000000000000000
+[  743.215765] 6f20: ffff800341c86f50 ffff2000083e41c8 ffff20000c8d96e8 ffff800341c873a0
+[  743.223585] 6f40: 00000000002156c0 ffff2000083e4884 ffff800341c87160 ffff2000083e74d4
+[  743.231404] 6f60: ffff800341c4af80 ffff800341c873a0 00000000002156c0 0000000000000001
+[  743.239224] 6f80: dfff200000000000 ffff20000a4d5000 0000000000000000 00000000002156c0
+[  743.247043] 6fa0: 1ffff00068390e50 0000000000000001 00000000002156c0 ffff20000a9827c0
+[  743.254863] 6fc0: ffff800341c873b0 0000000000000003 0000000000000268 00000008002156c0
+[  743.262682] 6fe0: 1ffff00068390e18 0000000000000001 ffff8003ffef9000 0000000000000008
+[  743.270501] 7000: ffff8003002156c0 0000000000000002 0000000000000000 ffff200008236b1c
+[  743.278321] 7020: ffff800341c870a0 1ffff00068390e76 0000000000000140 ffff800341c4b740
+[  743.286141] 7040: ffff800300000003 ffff200008236b1c ffff800341c870e0 ffff200008236b1c
+[  743.293960] 7060: ffff800341c870e0 ffff200008236dac 0000000000000040 ffff800341c4b740
+[  743.301780] 7080: ffff800341c87110 ffff20000c8d9e00 ffff20000c8d9580 ffff20000c8d9268
+[  743.309599] 70a0: 0000000000000000 ffff800341c873a0 0000000000000000 ffff20000c8d9000
+[  743.317419] 70c0: 0000000041b58ab3 ffff20000a266f80 ffff2000083e37c8 1ffff00068390e4a
+[  743.325239] 70e0: ffff800341c4af80 0000000000000000 ffff800341c4af80 00000000000001c0
+[  743.333058] 7100: ffff800341c87130 ffff20000823f928 ffff20000b311000 00000000002156c0
+[  743.340878] 7120: 0000000000000140 00000000000001c0 ffff800341c87160 ffff2000083e71dc
+[  743.348698] 7140: ffff8003ffdf4680 00000000025106c0 ffff20000c8d9e00 00000000ffffffff
+[  743.356517] 7160: ffff800341c87400 ffff2000084ef36c ffff8003ffdf4680 00000000025106c0
+[  743.364337] 7180: 00000000002156c0 00000000ffffffff 00000000024146c0 0000000000000003
+[  743.372156] 71a0: 0000000000030020 ffff20000c8d9000 0000000000400000 0000000000000004
+[  743.379976] 71c0: ffff800341c87290 ffff200008093624 ffff800341c87350 ffff800341c87310
+[  743.387796] 71e0: ffff200008092ce0 ffff800341c4af80 ffff80036c0e0f80 ffff200009892b70
+[  743.395615] 7200: ffff20000ab19b70 ffff80036c0e0f80 ffff800341c84000 0000000000000004
+[  743.403435] 7220: 0000000041c4b738 1ffff000683896e7 0000000041b58ab3 ffff200000000040
+[  743.411254] 7240: ffff200000000000 ffff20000c8d9e08 ffff04000191b3c1 0000000000000000
+[  743.419074] 7260: 0000000000000000 ffff800341c87310 0000000300000000 ffff2000084ef36c
+[  743.426894] 7280: 0000000041b58ab3 ffff20000a277828 ffff2000083e70b8 ffff2000080937ac
+[  743.434713] 72a0: ffff800341c873f8 1ffff00068390e5e ffff800341c4af80 ffff800341c84000
+[  743.442533] 72c0: ffff800341c87390 ffff20000809397c ffff800341c84000 ffff800341c873f8
+[  743.450352] 72e0: 00000000025004c0 ffff800357ff2ac0 0000000041b58ab3 ffff20000a2623e8
+[  743.458172] 7300: ffff200008093648 ffff800341c84000 ffff800341c873b0 ffff2000084fade8
+[  743.465991] 7320: ffff800357ff2ce0 ffff800357ff2ba0 00000000025004c0 ffff800357ff2ac0
+[  743.473811] 7340: ffff80036c0e0f80 ffff200009892b70 ffff800341c873b0 ffff200008b58184
+[  743.481631] 7360: ffff20000a499000 000000000000b393 0000000000000000 00000000ffffffff
+[  743.489450] 7380: 00000000024106c0 ffff200009892b94 0000000000030020 ffff20000ab18cf0
+[  743.497270] 73a0: ffff20000c8d9e00 0000000000000000 ffff20000c8d9e00 0000000100000000
+[  743.505089] 73c0: 0000000000000000 ffff200008235e10 ffff8003ffdf4680 00000000025106c0
+[  743.512909] 73e0: 0000000000000000 ffff8003ffefd9b0 ffff800341c87400 ffff2000084ef38c
+[  743.520729] 7400: ffff800341c87490 ffff2000084f3bc0 0000000000000000 ffff8003ffefc5d0
+[  743.528548] 7420: 0000000000000000 ffff8003ffdf4680 00000000025106c0 ffff200009892b94
+[  743.536368] 7440: 0000000000210d00 ffff20000ab18cf0 ffff20000ab19938 0000000000000004
+[  743.544188] 7460: ffff2000098678a0 ffff20000854d770 ffff20000854ff38 025106c008553e20
+[  743.552007] 7480: ffff200008084730 ffffffffffffffff ffff800341c87590 ffff2000084f4130
+[  743.559827] 74a0: ffff20000a4a35d0 ffff20000a4d5e80 0000000000000140 00000000025106c0
+[  743.567646] 74c0: ffff200009892b94 0000000000000004 ffff8003ffdf4680 ffff20000ab1cb30
+[  743.575466] 74e0: ffff800341c84000 0000000000000004 ffff20000a499000 000000000000b392
+[  743.583286] 7500: ffff20000ab19988 ffff8003ffefc5d0 ffff200009892b94 ffff20000a4d5000
+[  743.591105] 7520: ffff800341c87580 ffff200008b5815c ffff20000a4a35d0 ffff8003ffdf4680
+[  743.598925] 7540: 0000000000000140 00000000025106c0 ffff200009892b94 ffff20000a4d5000
+[  743.606744] 7560: ffff8003ffdf4680 ffff20000ab1cb30 ffff800341c84000 ffff20000a278cb8
+[  743.614564] 7580: ffff800341c87590 ffff2000084f40ec ffff800341c875e0 ffff2000084fa028
+[  743.622383] 75a0: 0000000000000000 ffff8003ffdf4680 ffff8003ffdf4680 ffff20000ab1bff0
+[  743.630203] 75c0: 00000000025106c0 ffff20000a4d5000 ffff200009892b94 ffff20000a4d5000
+[  743.638023] 75e0: ffff800341c87660 ffff20000988cf54 ffff800341c87710 1ffff00068390ede
+[  743.645842] 7600: 00000000025004c0 ffff200009892b94 0000000000000000 0000000000000200
+[  743.653662] 7620: ffff80034219e940 dfff200000000000 ffff80034219e940 0000000000000000
+[  743.661481] 7640: 0000000000000064 00000000025004c0 0000000000000000 ffff80036c0e0f80
+[  743.669301] 7660: ffff800341c876a0 ffff200009892b94 ffff800357ff2ac0 1ffff00068390ede
+[  743.677120] 7680: 0000000000000064 00000000025004c0 0000000000000000 ffff80036c0e0f80
+[  743.684939] 76a0: ffff800341c87790 ffff200009893074 0000000000000000 0000000000000064
+[  743.692759] 76c0: ffff80034219eb20 0000000000000000 0000000000000003 0000000000000000
+[  743.700579] 76e0: ffff80034219e940 dfff200000000000 0000000041b58ab3 ffff20000a2cd5a8
+[  743.708398] 7700: ffff200009892ad0 dfff200000000000 ffff80034219f200 ffff20000cb359b0
+[  743.716218] 7720: ffff800342143364 ffff20000a4d5e90 ffff20000a4d5e90 00006003f5a2d000
+[  743.724038] 7740: 1ffff0006842866c 0000000000000004 0000dffff5b2a188 ffff20000a4a0000
+[  743.731857] 7760: ffff800341c877c0 ffff20000823daac ffff800341c84000 0000000000000140
+[  743.739677] 7780: ffff20000a7ac240 000000000000010a ffff800341c87830 ffff20000986ec00
+[  743.747498] 77a0: ffff800341c87920 7fffffffffffffff ffff80034219eb20 0000000000000000
+[  743.755319] 77c0: 0000000000000002 1ffff00068433d65 ffff80034219e940 dfff200000000000
+[  743.763138] 77e0: ffff80034219e940 0000000000000064 ffff800341c87830 ffff2000081b3178
+[  743.770958] 7800: ffff800341c4af80 ffff20000a0f3aa0 000000000000010a 0000000000000000
+[  743.778778] 7820: ffff8003025000c0 ffff800347135840 ffff800341c87980 ffff200009b33a10
+[  743.786597] 7840: 0000000000000064 0000000000000000 0000000000000000 0000000000000000
+[  743.794416] 7860: ffff800342198900 0000000000000064 ffff80034219e940 dfff200000000000
+[  743.802236] 7880: 0000000000000000 0000000000000064 ffff20000a0f3140 1ffff00068390f4a
+[  743.810055] 78a0: 0000000341c87ba0 0000000000000000 0000000000000064 ffff80034219ec50
+[  743.817875] 78c0: 1ffff00068390f20 ffff800341c87a70 ffff200009b3c398 0000000000000064
+[  743.825695] 78e0: ffff80034219eb28 ffff80034219ece2 1ffff00068433d8a ffff100068433d9c
+[  743.833514] 7900: 0000000041b58ab3 ffff20000a2680e0 ffff20000986e710 ffff800341c4b740
+[  743.841334] 7920: 1ffff000683896e8 000000000c8db000 ffff20000987442c 0000000000000140
+[  743.849153] 7940: ffff800341c87980 ffff200009b33b70 ffff800341c87980 ffff200009b337d8
+[  743.856973] 7960: ffff800347135840 ffff800341c87ba0 ffff20000a0f3140 0000000000000000
+[  743.864793] 7980: ffff800341c87af0 ffff2000098675f8 ffff800347135840 ffff800341c87ba0
+[  743.872612] 79a0: ffff20000a0f3140 ffff800341c87d77 ffff800341c87ba0 ffff800342b2a340
+[  743.880432] 79c0: ffff800347135840 1ffff00068390faa 0000000000000002 1ffff0006856546c
+[  743.888251] 79e0: ffff8003372a4780 ffff8003372a4790 1ffff00068390f4a ffff800347135840
+[  743.896071] 7a00: ffff10006843312c ffff800342198960 ffff800341c87a70 ffff80034219eb28
+[  743.903890] 7a20: ffff800341c87ab0 ffff800341c87be8 ffff800341c87ba0 1ffff00068390f7d
+[  743.911710] 7a40: 0000000000000064 0000000000000064 0000000041b58ab3 ffff20000a2d20f8
+[  743.919530] 7a60: ffff200009b33720 ffff20000a743000 00000000ffffff97 1ffff00068390f7e
+[  743.927349] 7a80: ffff800341c4af80 0000000000000000 ffff800341c4af80 ffff8003ffef9000
+[  743.935169] 7aa0: ffff800341c87ab0 ffff2000082383dc 0000000000000000 0000000000000000
+[  743.942988] 7ac0: ffffffff00000000 00000000ffffffff ffff8003ffef9018 0000000000000000
+[  743.950808] 7ae0: 0000000000000000 ffff2000081b205c ffff800341c87b30 ffff2000098678a0
+[  743.958628] 7b00: ffff800341c87d50 ffff800341c87cf0 1ffff00068390f70 00000000000001c0
+[  743.966447] 7b20: ffff8003ffef9018 ffff8003ffef9000 ffff800341c87c20 ffff20000854d770
+[  743.974267] 7b40: 1ffff00068390f92 ffff20000a0c0980 ffff800341c87d50 ffff800341c87e80
+[  743.982086] 7b60: 1ffff0006856546d ffff800342b2a368 1ffff00068390fd0 ffff80036ba1a480
+[  743.989906] 7b80: 0000000041b58ab3 ffff20000a2ccf48 ffff2000098676e0 ffff20000caf9470
+[  743.997725] 7ba0: 0000000000000000 0000000000000000 0000000000000001 0000000000000000
+[  744.005545] 7bc0: 0000000000000064 ffff800341c87cb0 0000000000000001 0000000000000000
+[  744.013364] 7be0: 0000000000000000 0000000000000000 ffff800341c87cf0 0000000000000001
+[  744.021183] 7c00: ffff800341c4b76a ffff800341c4b748 ffff20000d540000 0000000000000001
+[  744.029003] 7c20: ffff800341c87db0 ffff20000854ff38 ffff800342b2a340 0000000000000064
+[  744.036822] 7c40: ffff800347135870 ffff800342b2a3b4 0000000000000004 1ffff00068565476
+[  744.044642] 7c60: 0000ffffe63a1420 ffff800342b2a360 ffff800341c87e80 ffff800347135df0
+[  744.052462] 7c80: 0000000000000064 ffff800342b29fd0 0000000041b58ab3 ffff20000a27c658
+[  744.060281] 7ca0: ffff20000854d520 ffff800342b29fe0 0000ffffe63a1420 0000000000000064
+[  744.068101] 7cc0: 0000dffff5b2a188 0000000000000001 1ffff0007ffdf327 0000000000000001
+[  744.075920] 7ce0: ffff800341c87cf0 1ffff00068390fa2 ffff800342b2a340 0000000000000000
+[  744.083739] 7d00: 0000000000000000 0000000000000000 0000000000000000 ffff20000a27dc50
+[  744.091559] 7d20: ffff800341c87d60 ffff20000854f80c ffff800342b2a340 ffff800347135870
+[  744.099378] 7d40: 0000000000000000 0000000000000001 0000000000000001 0000000000000000
+[  744.107197] 7d60: 0000000000000064 ffff800341c87cb0 0000000000000001 0000000000000064
+[  744.115016] 7d80: ffff800341c84000 ffff800342b2a3b4 0000000000000004 ffff800341c4b300
+[  744.122836] 7da0: 0000000000000000 ffff8003372a4700 ffff800341c87e10 ffff200008553e20
+[  744.130656] 7dc0: 1ffff00068390fcc ffff800342b2a340 ffff800342b2a340 dfff200000000000
+[  744.138475] 7de0: 1ffff00068565487 0000ffffe63a1420 0000000000000064 ffff800342b2a438
+[  744.146295] 7e00: ffff200009c47000 ffff800341c84000 0000000000000000 ffff200008084730
+[  744.154114] 7e20: 0000000000000000 000000003d5e7b00 ffffffffffffffff 0000000000405acc
+[  744.161934] 7e40: 0000000060000000 0000000000000015 0000000000000120 0000000000000040
+[  744.169753] 7e60: 0000000041b58ab3 ffff20000a27c6d0 ffff200008553d78 000000003d5e7b00
+[  744.177572] 7e80: 0000000000000000 0000000000405acc 0000000060000000 ffff200008084630
+[  744.185392] 7ea0: 0000000000000000 ffff200008084624 0000000000000000 000000003d5e7b00
+[  744.193212] 7ec0: 000000000000000c 0000ffffe63a1420 0000000000000064 0000ffffe63a1420
+[  744.201031] 7ee0: 0000000000000000 00000000004a2790 000000000049d020 0000000000000058
+[  744.208850] 7f00: 0000000000000040 1999999999999999 0000000000000000 0000000000000000
+[  744.216669] 7f20: 0000000000000002 ffffffffffffffff 0000000000000000 00000000004a26f8
+[  744.224488] 7f40: 0000000000000000 0000000000000001 0000000000000000 0000000000000000
+[  744.232307] 7f60: 000000003d5e7b00 0000000000000010 0000000000000064 0000000000000004
+[  744.240126] 7f80: 00000000000000f6 000000000049b000 000000000049c010 0000000000401e40
+[  744.247946] 7fa0: 0000000000000022 0000ffffe63a13d0 0000000000401dd4 0000ffffe63a13d0
+[  744.255765] 7fc0: 0000000000405acc 0000000060000000 000000000000000c 0000000000000040
+[  744.263584] 7fe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[  744.271402] Call trace:
+[  744.273840] Exception stack(0xffff800341c86a90 to 0xffff800341c86bc0)
+[  744.280270] 6a80:                                   ffff7e000ffb8000 0001000000000000
+[  744.288090] 6aa0: ffff800341c86ce0 ffff2000083dfeb8 00000000200001c5 000000000000003d
+[  744.295909] 6ac0: 0000000000000000 0000000000000100 ffff7e000ffbffc0 ffff800341c84000
+[  744.303729] 6ae0: ffff800341c4b76a ffff800341c4b748 0000000041b58ab3 ffff20000a261068
+[  744.311549] 6b00: ffff200008081b10 ffff800341c4af80 ffff800341c4b720 dfff200000000000
+[  744.319368] 6b20: ffff20000b311000 0000000000000001 ffff20000b311a60 00000000000080e7
+[  744.327188] 6b40: ffff800341c86ca0 ffff200009c16a78 ffff800341c86c10 ffff200009c28720
+[  744.335007] 6b60: ffff800341c86bc0 ffff200008b58184 ffff20000a499000 000000000000b2f1
+[  744.342826] 6b80: 0000000000000000 ffff20000a4d5000 ffff800336325e80 0000000000000000
+[  744.350645] 6ba0: 0000dffff5b2a188 0000000000000001 0000000000000000 0000000000000000
+[  744.358467] [<ffff2000083dfeb8>] move_freepages+0x220/0x338
+[  744.364030] [<ffff2000083e0134>] move_freepages_block+0x164/0x1e0
+[  744.370113] [<ffff2000083e11bc>] __rmqueue+0xac4/0x16d0
+[  744.375329] [<ffff2000083e41fc>] get_page_from_freelist+0xa34/0x2228
+[  744.381674] [<ffff2000083e74d4>] __alloc_pages_nodemask+0x41c/0x1f60
+[  744.388019] [<ffff2000084ef36c>] new_slab+0x3e4/0x9d8
+[  744.393061] [<ffff2000084f3bc0>] ___slab_alloc.constprop.18+0x3b8/0x8a8
+[  744.399665] [<ffff2000084f4130>] __slab_alloc.isra.15.constprop.17+0x80/0x128
+[  744.406790] [<ffff2000084fa028>] __kmalloc_track_caller+0x318/0x4e0
+[  744.413050] [<ffff20000988cf54>] __kmalloc_reserve.isra.3+0x3c/0xc0
+[  744.419307] [<ffff200009892b94>] __alloc_skb+0xc4/0x508
+[  744.424522] [<ffff200009893074>] alloc_skb_with_frags+0x9c/0x650
+[  744.430519] [<ffff20000986ec00>] sock_alloc_send_pskb+0x4f0/0x7d8
+[  744.436605] [<ffff200009b33a10>] unix_stream_sendmsg+0x2f0/0x858
+[  744.442603] [<ffff2000098675f8>] sock_sendmsg+0x88/0x138
+[  744.447906] [<ffff2000098678a0>] sock_write_iter+0x1c0/0x308
+[  744.453556] [<ffff20000854d770>] __vfs_write+0x250/0x4c8
+[  744.458858] [<ffff20000854ff38>] vfs_write+0x128/0x520
+[  744.463986] [<ffff200008553e20>] SyS_write+0xa8/0x140
+[  744.469029] [<ffff200008084730>] el0_svc_naked+0x24/0x28
+[  744.474333] Code: 913d0000 941ebb67 17ffffed d503201f (d4210000)
+[  744.480482] ---[ end trace a906e1a5ea5e05bb ]---
+[  744.485103] BUG: sleeping function called from invalid context at ./include/linux/sched.h:3049
+[  744.493712] in_atomic(): 1, irqs_disabled(): 0, pid: 3608, name: hackbench
+[  744.500583] INFO: lockdep is turned off.
+[  744.504503] Preemption disabled at:[<ffff2000083e41c8>] get_page_from_freelist+0xa00/0x2228
+[  744.512856]
+[  744.514341] CPU: 4 PID: 3608 Comm: hackbench Tainted: G      D         4.8.0-rc7 #1
+[  744.521986] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  744.529544] Call trace:
+[  744.531983] [<ffff200008093db8>] dump_backtrace+0x0/0x4d8
+[  744.537373] [<ffff2000080942a4>] show_stack+0x14/0x20
+[  744.542417] [<ffff200008afa714>] dump_stack+0xfc/0x150
+[  744.547550] [<ffff2000081b2e24>] ___might_sleep+0x5ec/0x868
+[  744.553114] [<ffff2000081b3178>] __might_sleep+0xd8/0x350
+[  744.558504] [<ffff20000816b740>] exit_signals+0x80/0x428
+[  744.563807] [<ffff200008143f18>] do_exit+0x220/0x1828
+[  744.568849] [<ffff2000080945a4>] die+0x2f4/0x3c8
+[  744.573458] [<ffff2000080946dc>] bug_handler.part.1+0x64/0xf0
+[  744.579194] [<ffff2000080947ac>] bug_handler+0x44/0x70
+[  744.584322] [<ffff200008086c28>] brk_handler+0x168/0x348
+[  744.589624] [<ffff200008081c00>] do_debug_exception+0xf0/0x368
+[  744.595446] Exception stack(0xffff800341c86a90 to 0xffff800341c86bc0)
+[  744.601877] 6a80:                                   ffff7e000ffb8000 0001000000000000
+[  744.609697] 6aa0: ffff800341c86ce0 ffff2000083dfeb8 00000000200001c5 000000000000003d
+[  744.617516] 6ac0: 0000000000000000 0000000000000100 ffff7e000ffbffc0 ffff800341c84000
+[  744.625336] 6ae0: ffff800341c4b76a ffff800341c4b748 0000000041b58ab3 ffff20000a261068
+[  744.633155] 6b00: ffff200008081b10 ffff800341c4af80 ffff800341c4b720 dfff200000000000
+[  744.640975] 6b20: ffff20000b311000 0000000000000001 ffff20000b311a60 00000000000080e7
+[  744.648795] 6b40: ffff800341c86ca0 ffff200009c16a78 ffff800341c86c10 ffff200009c28720
+[  744.656614] 6b60: ffff800341c86bc0 ffff200008b58184 ffff20000a499000 000000000000b2f1
+[  744.664434] 6b80: 0000000000000000 ffff20000a4d5000 ffff800336325e80 0000000000000000
+[  744.672253] 6ba0: 0000dffff5b2a188 0000000000000001 0000000000000000 0000000000000000
+[  744.680072] [<ffff200008083e5c>] el1_dbg+0x18/0x74
+[  744.684854] [<ffff2000083e0134>] move_freepages_block+0x164/0x1e0
+[  744.690937] [<ffff2000083e11bc>] __rmqueue+0xac4/0x16d0
+[  744.696153] [<ffff2000083e41fc>] get_page_from_freelist+0xa34/0x2228
+[  744.702497] [<ffff2000083e74d4>] __alloc_pages_nodemask+0x41c/0x1f60
+[  744.708841] [<ffff2000084ef36c>] new_slab+0x3e4/0x9d8
+[  744.713882] [<ffff2000084f3bc0>] ___slab_alloc.constprop.18+0x3b8/0x8a8
+[  744.720487] [<ffff2000084f4130>] __slab_alloc.isra.15.constprop.17+0x80/0x128
+[  744.727612] [<ffff2000084fa028>] __kmalloc_track_caller+0x318/0x4e0
+[  744.733870] [<ffff20000988cf54>] __kmalloc_reserve.isra.3+0x3c/0xc0
+[  744.740127] [<ffff200009892b94>] __alloc_skb+0xc4/0x508
+[  744.745343] [<ffff200009893074>] alloc_skb_with_frags+0x9c/0x650
+[  744.751339] [<ffff20000986ec00>] sock_alloc_send_pskb+0x4f0/0x7d8
+[  744.757423] [<ffff200009b33a10>] unix_stream_sendmsg+0x2f0/0x858
+[  744.763421] [<ffff2000098675f8>] sock_sendmsg+0x88/0x138
+[  744.768723] [<ffff2000098678a0>] sock_write_iter+0x1c0/0x308
+[  744.774372] [<ffff20000854d770>] __vfs_write+0x250/0x4c8
+[  744.779674] [<ffff20000854ff38>] vfs_write+0x128/0x520
+[  744.784802] [<ffff200008553e20>] SyS_write+0xa8/0x140
+[  744.789843] [<ffff200008084730>] el0_svc_naked+0x24/0x28
+[  744.795159] note: hackbench[3608] exited with preempt_count 1
+[  783.865366] BUG: spinlock lockup suspected on CPU#5, hackbench/3727
+[  783.871631]  lock: contig_page_data+0xc80/0x1900, .magic: dead4ead, .owner: hackbench/3608, .owner_cpu: 4
+[  783.881189] CPU: 5 PID: 3727 Comm: hackbench Tainted: G      D         4.8.0-rc7 #1
+[  783.888835] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  783.896393] Call trace:
+[  783.898832] [<ffff200008093db8>] dump_backtrace+0x0/0x4d8
+[  783.904222] [<ffff2000080942a4>] show_stack+0x14/0x20
+[  783.909265] [<ffff200008afa714>] dump_stack+0xfc/0x150
+[  783.914395] [<ffff20000824a16c>] spin_dump+0x19c/0x2f0
+[  783.919524] [<ffff20000824a770>] do_raw_spin_lock+0x2d8/0x3e8
+[  783.925262] [<ffff200009c28074>] _raw_spin_lock_irqsave+0x54/0x68
+[  783.931346] [<ffff2000083e41c8>] get_page_from_freelist+0xa00/0x2228
+[  783.937691] [<ffff2000083e74d4>] __alloc_pages_nodemask+0x41c/0x1f60
+[  783.944034] [<ffff2000084ef36c>] new_slab+0x3e4/0x9d8
+[  783.949076] [<ffff2000084f3bc0>] ___slab_alloc.constprop.18+0x3b8/0x8a8
+[  783.955680] [<ffff2000084f4130>] __slab_alloc.isra.15.constprop.17+0x80/0x128
+[  783.962805] [<ffff2000084fa028>] __kmalloc_track_caller+0x318/0x4e0
+[  783.969063] [<ffff20000988cf54>] __kmalloc_reserve.isra.3+0x3c/0xc0
+[  783.975320] [<ffff200009892b94>] __alloc_skb+0xc4/0x508
+[  783.980536] [<ffff200009893074>] alloc_skb_with_frags+0x9c/0x650
+[  783.986532] [<ffff20000986ec00>] sock_alloc_send_pskb+0x4f0/0x7d8
+[  783.992616] [<ffff200009b33a10>] unix_stream_sendmsg+0x2f0/0x858
+[  783.998614] [<ffff2000098675f8>] sock_sendmsg+0x88/0x138
+[  784.003916] [<ffff2000098678a0>] sock_write_iter+0x1c0/0x308
+[  784.009565] [<ffff20000854d770>] __vfs_write+0x250/0x4c8
+[  784.014867] [<ffff20000854ff38>] vfs_write+0x128/0x520
+[  784.019995] [<ffff200008553e20>] SyS_write+0xa8/0x140
+[  784.025037] [<ffff200008084730>] el0_svc_naked+0x24/0x28
+[  802.492828] BUG: spinlock lockup suspected on CPU#7, hackbench/3194
+[  802.499097]  lock: contig_page_data+0xc80/0x1900, .magic: dead4ead, .owner: hackbench/3608, .owner_cpu: 4
+[  802.508655] CPU: 7 PID: 3194 Comm: hackbench Tainted: G      D         4.8.0-rc7 #1
+[  802.516301] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  802.523859] Call trace:
+[  802.526300] [<ffff200008093db8>] dump_backtrace+0x0/0x4d8
+[  802.531690] [<ffff2000080942a4>] show_stack+0x14/0x20
+[  802.536733] [<ffff200008afa714>] dump_stack+0xfc/0x150
+[  802.541862] [<ffff20000824a16c>] spin_dump+0x19c/0x2f0
+[  802.546991] [<ffff20000824a770>] do_raw_spin_lock+0x2d8/0x3e8
+[  802.552729] [<ffff200009c28074>] _raw_spin_lock_irqsave+0x54/0x68
+[  802.558813] [<ffff2000083e41c8>] get_page_from_freelist+0xa00/0x2228
+[  802.565158] [<ffff2000083e74d4>] __alloc_pages_nodemask+0x41c/0x1f60
+[  802.571502] [<ffff2000084ef36c>] new_slab+0x3e4/0x9d8
+[  802.576544] [<ffff2000084f3bc0>] ___slab_alloc.constprop.18+0x3b8/0x8a8
+[  802.583148] [<ffff2000084f4130>] __slab_alloc.isra.15.constprop.17+0x80/0x128
+[  802.590273] [<ffff2000084fa028>] __kmalloc_track_caller+0x318/0x4e0
+[  802.596531] [<ffff20000988cf54>] __kmalloc_reserve.isra.3+0x3c/0xc0
+[  802.602789] [<ffff200009892b94>] __alloc_skb+0xc4/0x508
+[  802.608004] [<ffff200009893074>] alloc_skb_with_frags+0x9c/0x650
+[  802.614001] [<ffff20000986ec00>] sock_alloc_send_pskb+0x4f0/0x7d8
+[  802.620086] [<ffff200009b33a10>] unix_stream_sendmsg+0x2f0/0x858
+[  802.626083] [<ffff2000098675f8>] sock_sendmsg+0x88/0x138
+[  802.631386] [<ffff2000098678a0>] sock_write_iter+0x1c0/0x308
+[  802.637035] [<ffff20000854d770>] __vfs_write+0x250/0x4c8
+[  802.642337] [<ffff20000854ff38>] vfs_write+0x128/0x520
+[  802.647465] [<ffff200008553e20>] SyS_write+0xa8/0x140
+[  802.652507] [<ffff200008084730>] el0_svc_naked+0x24/0x28
+[  802.727119] BUG: spinlock lockup suspected on CPU#1, hackbench/5203
+[  802.733384]  lock: contig_page_data+0xc80/0x1900, .magic: dead4ead, .owner: hackbench/3608, .owner_cpu: 4
+[  802.742942] CPU: 1 PID: 5203 Comm: hackbench Tainted: G      D         4.8.0-rc7 #1
+[  802.750587] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  802.758145] Call trace:
+[  802.760584] [<ffff200008093db8>] dump_backtrace+0x0/0x4d8
+[  802.765975] [<ffff2000080942a4>] show_stack+0x14/0x20
+[  802.771017] [<ffff200008afa714>] dump_stack+0xfc/0x150
+[  802.776146] [<ffff20000824a16c>] spin_dump+0x19c/0x2f0
+[  802.781275] [<ffff20000824a770>] do_raw_spin_lock+0x2d8/0x3e8
+[  802.787013] [<ffff200009c28074>] _raw_spin_lock_irqsave+0x54/0x68
+[  802.793097] [<ffff2000083e41c8>] get_page_from_freelist+0xa00/0x2228
+[  802.799441] [<ffff2000083e74d4>] __alloc_pages_nodemask+0x41c/0x1f60
+[  802.805785] [<ffff2000084ef36c>] new_slab+0x3e4/0x9d8
+[  802.810827] [<ffff2000084f3bc0>] ___slab_alloc.constprop.18+0x3b8/0x8a8
+[  802.817432] [<ffff2000084f4130>] __slab_alloc.isra.15.constprop.17+0x80/0x128
+[  802.824557] [<ffff2000084fa028>] __kmalloc_track_caller+0x318/0x4e0
+[  802.830815] [<ffff20000988cf54>] __kmalloc_reserve.isra.3+0x3c/0xc0
+[  802.837073] [<ffff200009892b94>] __alloc_skb+0xc4/0x508
+[  802.842289] [<ffff200009893074>] alloc_skb_with_frags+0x9c/0x650
+[  802.848285] [<ffff20000986ec00>] sock_alloc_send_pskb+0x4f0/0x7d8
+[  802.854370] [<ffff200009b33a10>] unix_stream_sendmsg+0x2f0/0x858
+[  802.860367] [<ffff2000098675f8>] sock_sendmsg+0x88/0x138
+[  802.865670] [<ffff2000098678a0>] sock_write_iter+0x1c0/0x308
+[  802.871319] [<ffff20000854d770>] __vfs_write+0x250/0x4c8
+[  802.876621] [<ffff20000854ff38>] vfs_write+0x128/0x520
+[  802.881750] [<ffff200008553e20>] SyS_write+0xa8/0x140
+[  802.886792] [<ffff200008084730>] el0_svc_naked+0x24/0x28
+[  806.778113] BUG: spinlock lockup suspected on CPU#6, hackbench/3240
+[  806.784376]  lock: contig_page_data+0xc80/0x1900, .magic: dead4ead, .owner: hackbench/3608, .owner_cpu: 4
+[  806.793933] CPU: 6 PID: 3240 Comm: hackbench Tainted: G      D         4.8.0-rc7 #1
+[  806.801578] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  806.809136] Call trace:
+[  806.811575] [<ffff200008093db8>] dump_backtrace+0x0/0x4d8
+[  806.816966] [<ffff2000080942a4>] show_stack+0x14/0x20
+[  806.822008] [<ffff200008afa714>] dump_stack+0xfc/0x150
+[  806.827137] [<ffff20000824a16c>] spin_dump+0x19c/0x2f0
+[  806.832265] [<ffff20000824a770>] do_raw_spin_lock+0x2d8/0x3e8
+[  806.838002] [<ffff200009c28074>] _raw_spin_lock_irqsave+0x54/0x68
+[  806.844086] [<ffff2000083e41c8>] get_page_from_freelist+0xa00/0x2228
+[  806.850430] [<ffff2000083e74d4>] __alloc_pages_nodemask+0x41c/0x1f60
+[  806.856774] [<ffff2000084ef36c>] new_slab+0x3e4/0x9d8
+[  806.861815] [<ffff2000084f3bc0>] ___slab_alloc.constprop.18+0x3b8/0x8a8
+[  806.868420] [<ffff2000084f4130>] __slab_alloc.isra.15.constprop.17+0x80/0x128
+[  806.875545] [<ffff2000084fa028>] __kmalloc_track_caller+0x318/0x4e0
+[  806.881803] [<ffff20000988cf54>] __kmalloc_reserve.isra.3+0x3c/0xc0
+[  806.888060] [<ffff200009892b94>] __alloc_skb+0xc4/0x508
+[  806.893276] [<ffff200009893074>] alloc_skb_with_frags+0x9c/0x650
+[  806.899272] [<ffff20000986ec00>] sock_alloc_send_pskb+0x4f0/0x7d8
+[  806.905356] [<ffff200009b33a10>] unix_stream_sendmsg+0x2f0/0x858
+[  806.911354] [<ffff2000098675f8>] sock_sendmsg+0x88/0x138
+[  806.916656] [<ffff2000098678a0>] sock_write_iter+0x1c0/0x308
+[  806.922306] [<ffff20000854d770>] __vfs_write+0x250/0x4c8
+[  806.927607] [<ffff20000854ff38>] vfs_write+0x128/0x520
+[  806.932736] [<ffff200008553e20>] SyS_write+0xa8/0x140
+[  806.937777] [<ffff200008084730>] el0_svc_naked+0x24/0x28
+[  808.159084] BUG: spinlock lockup suspected on CPU#3, hackbench/4717
+[  808.165350]  lock: contig_page_data+0xc80/0x1900, .magic: dead4ead, .owner: hackbench/3608, .owner_cpu: 4
+[  808.174908] CPU: 3 PID: 4717 Comm: hackbench Tainted: G      D         4.8.0-rc7 #1
+[  808.182554] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  808.190112] Call trace:
+[  808.192552] [<ffff200008093db8>] dump_backtrace+0x0/0x4d8
+[  808.197942] [<ffff2000080942a4>] show_stack+0x14/0x20
+[  808.202985] [<ffff200008afa714>] dump_stack+0xfc/0x150
+[  808.208114] [<ffff20000824a16c>] spin_dump+0x19c/0x2f0
+[  808.213243] [<ffff20000824a770>] do_raw_spin_lock+0x2d8/0x3e8
+[  808.218980] [<ffff200009c28074>] _raw_spin_lock_irqsave+0x54/0x68
+[  808.225064] [<ffff2000083e41c8>] get_page_from_freelist+0xa00/0x2228
+[  808.231408] [<ffff2000083e74d4>] __alloc_pages_nodemask+0x41c/0x1f60
+[  808.237752] [<ffff2000084ef36c>] new_slab+0x3e4/0x9d8
+[  808.242794] [<ffff2000084f3bc0>] ___slab_alloc.constprop.18+0x3b8/0x8a8
+[  808.249399] [<ffff2000084f4130>] __slab_alloc.isra.15.constprop.17+0x80/0x128
+[  808.256524] [<ffff2000084fa028>] __kmalloc_track_caller+0x318/0x4e0
+[  808.262782] [<ffff20000988cf54>] __kmalloc_reserve.isra.3+0x3c/0xc0
+[  808.269039] [<ffff200009892b94>] __alloc_skb+0xc4/0x508
+[  808.274255] [<ffff200009893074>] alloc_skb_with_frags+0x9c/0x650
+[  808.280251] [<ffff20000986ec00>] sock_alloc_send_pskb+0x4f0/0x7d8
+[  808.286335] [<ffff200009b33a10>] unix_stream_sendmsg+0x2f0/0x858
+[  808.292333] [<ffff2000098675f8>] sock_sendmsg+0x88/0x138
+[  808.297635] [<ffff2000098678a0>] sock_write_iter+0x1c0/0x308
+[  808.303285] [<ffff20000854d770>] __vfs_write+0x250/0x4c8
+[  808.308587] [<ffff20000854ff38>] vfs_write+0x128/0x520
+[  808.313715] [<ffff200008553e20>] SyS_write+0xa8/0x140
+[  808.318757] [<ffff200008084730>] el0_svc_naked+0x24/0x28
+[  809.327451] BUG: spinlock lockup suspected on CPU#2, hackbench/3360
+[  809.333714]  lock: contig_page_data+0xc80/0x1900, .magic: dead4ead, .owner: hackbench/3608, .owner_cpu: 4
+[  809.343271] CPU: 2 PID: 3360 Comm: hackbench Tainted: G      D         4.8.0-rc7 #1
+[  809.350916] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  809.358474] Call trace:
+[  809.360913] [<ffff200008093db8>] dump_backtrace+0x0/0x4d8
+[  809.366303] [<ffff2000080942a4>] show_stack+0x14/0x20
+[  809.371345] [<ffff200008afa714>] dump_stack+0xfc/0x150
+[  809.376475] [<ffff20000824a16c>] spin_dump+0x19c/0x2f0
+[  809.381603] [<ffff20000824a770>] do_raw_spin_lock+0x2d8/0x3e8
+[  809.382291] BUG: spinlock lockup suspected on CPU#0, hackbench/5685
+[  809.382297]  lock: contig_page_data+0xc80/0x1900, .magic: dead4ead, .owner: hackbench/3608, .owner_cpu: 4
+[  809.403145] [<ffff200009c28074>] _raw_spin_lock_irqsave+0x54/0x68
+[  809.409229] [<ffff2000083e41c8>] get_page_from_freelist+0xa00/0x2228
+[  809.415574] [<ffff2000083e74d4>] __alloc_pages_nodemask+0x41c/0x1f60
+[  809.421917] [<ffff2000084ef36c>] new_slab+0x3e4/0x9d8
+[  809.426959] [<ffff2000084f3bc0>] ___slab_alloc.constprop.18+0x3b8/0x8a8
+[  809.433564] [<ffff2000084f4130>] __slab_alloc.isra.15.constprop.17+0x80/0x128
+[  809.440689] [<ffff2000084fa028>] __kmalloc_track_caller+0x318/0x4e0
+[  809.446946] [<ffff20000988cf54>] __kmalloc_reserve.isra.3+0x3c/0xc0
+[  809.453204] [<ffff200009892b94>] __alloc_skb+0xc4/0x508
+[  809.458420] [<ffff200009893074>] alloc_skb_with_frags+0x9c/0x650
+[  809.464417] [<ffff20000986ec00>] sock_alloc_send_pskb+0x4f0/0x7d8
+[  809.470501] [<ffff200009b33a10>] unix_stream_sendmsg+0x2f0/0x858
+[  809.476498] [<ffff2000098675f8>] sock_sendmsg+0x88/0x138
+[  809.481801] [<ffff2000098678a0>] sock_write_iter+0x1c0/0x308
+[  809.487450] [<ffff20000854d770>] __vfs_write+0x250/0x4c8
+[  809.492752] [<ffff20000854ff38>] vfs_write+0x128/0x520
+[  809.497880] [<ffff200008553e20>] SyS_write+0xa8/0x140
+[  809.502922] [<ffff200008084730>] el0_svc_naked+0x24/0x28
+[  809.508226] CPU: 0 PID: 5685 Comm: hackbench Tainted: G      D         4.8.0-rc7 #1
+[  809.515873] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  809.523431] Call trace:
+[  809.525871] [<ffff200008093db8>] dump_backtrace+0x0/0x4d8
+[  809.531261] [<ffff2000080942a4>] show_stack+0x14/0x20
+[  809.536304] [<ffff200008afa714>] dump_stack+0xfc/0x150
+[  809.541433] [<ffff20000824a16c>] spin_dump+0x19c/0x2f0
+[  809.546562] [<ffff20000824a770>] do_raw_spin_lock+0x2d8/0x3e8
+[  809.552299] [<ffff200009c28074>] _raw_spin_lock_irqsave+0x54/0x68
+[  809.558383] [<ffff2000083e41c8>] get_page_from_freelist+0xa00/0x2228
+[  809.564728] [<ffff2000083e74d4>] __alloc_pages_nodemask+0x41c/0x1f60
+[  809.571071] [<ffff2000084ef36c>] new_slab+0x3e4/0x9d8
+[  809.576113] [<ffff2000084f3bc0>] ___slab_alloc.constprop.18+0x3b8/0x8a8
+[  809.582717] [<ffff2000084f4130>] __slab_alloc.isra.15.constprop.17+0x80/0x128
+[  809.589842] [<ffff2000084fa028>] __kmalloc_track_caller+0x318/0x4e0
+[  809.596100] [<ffff20000988cf54>] __kmalloc_reserve.isra.3+0x3c/0xc0
+[  809.602357] [<ffff200009892b94>] __alloc_skb+0xc4/0x508
+[  809.607573] [<ffff200009893074>] alloc_skb_with_frags+0x9c/0x650
+[  809.613570] [<ffff20000986ec00>] sock_alloc_send_pskb+0x4f0/0x7d8
+[  809.619654] [<ffff200009b33a10>] unix_stream_sendmsg+0x2f0/0x858
+[  809.625651] [<ffff2000098675f8>] sock_sendmsg+0x88/0x138
+[  809.630953] [<ffff2000098678a0>] sock_write_iter+0x1c0/0x308
+[  809.636602] [<ffff20000854d770>] __vfs_write+0x250/0x4c8
+[  809.641904] [<ffff20000854ff38>] vfs_write+0x128/0x520
+[  809.647032] [<ffff200008553e20>] SyS_write+0xa8/0x140
+[  809.652074] [<ffff200008084730>] el0_svc_naked+0x24/0x28
+[  810.224351] BUG: spinlock lockup suspected on CPU#4, hackbench/5272
+[  810.230613]  lock: contig_page_data+0xc80/0x1900, .magic: dead4ead, .owner: hackbench/3608, .owner_cpu: 4
+[  810.240169] CPU: 4 PID: 5272 Comm: hackbench Tainted: G      D         4.8.0-rc7 #1
+[  810.247814] Hardware name: AMD Seattle (Rev.B0) Development Board (Overdrive) (DT)
+[  810.255371] Call trace:
+[  810.257810] [<ffff200008093db8>] dump_backtrace+0x0/0x4d8
+[  810.263200] [<ffff2000080942a4>] show_stack+0x14/0x20
+[  810.268242] [<ffff200008afa714>] dump_stack+0xfc/0x150
+[  810.273371] [<ffff20000824a16c>] spin_dump+0x19c/0x2f0
+[  810.278499] [<ffff20000824a770>] do_raw_spin_lock+0x2d8/0x3e8
+[  810.284236] [<ffff200009c28074>] _raw_spin_lock_irqsave+0x54/0x68
+[  810.290320] [<ffff2000083e41c8>] get_page_from_freelist+0xa00/0x2228
+[  810.296664] [<ffff2000083e74d4>] __alloc_pages_nodemask+0x41c/0x1f60
+[  810.303008] [<ffff2000084ef36c>] new_slab+0x3e4/0x9d8
+[  810.308049] [<ffff2000084f3bc0>] ___slab_alloc.constprop.18+0x3b8/0x8a8
+[  810.314654] [<ffff2000084f4130>] __slab_alloc.isra.15.constprop.17+0x80/0x128
+[  810.321779] [<ffff2000084fa028>] __kmalloc_track_caller+0x318/0x4e0
+[  810.328037] [<ffff20000988cf54>] __kmalloc_reserve.isra.3+0x3c/0xc0
+[  810.334294] [<ffff200009892b94>] __alloc_skb+0xc4/0x508
+[  810.339509] [<ffff200009893074>] alloc_skb_with_frags+0x9c/0x650
+[  810.345506] [<ffff20000986ec00>] sock_alloc_send_pskb+0x4f0/0x7d8
+[  810.351590] [<ffff200009b33a10>] unix_stream_sendmsg+0x2f0/0x858
+[  810.357587] [<ffff2000098675f8>] sock_sendmsg+0x88/0x138
+[  810.362889] [<ffff2000098678a0>] sock_write_iter+0x1c0/0x308
+[  810.368538] [<ffff20000854d770>] __vfs_write+0x250/0x4c8
+[  810.373840] [<ffff20000854ff38>] vfs_write+0x128/0x520
+[  810.378968] [<ffff200008553e20>] SyS_write+0xa8/0x140
+[  810.384010] [<ffff200008084730>] el0_svc_naked+0x24/0x28
