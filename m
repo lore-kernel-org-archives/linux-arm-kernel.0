@@ -1,67 +1,83 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 20 Sep 2016 10:43:10 +0800
-Subject: [RFC PATCH v2 11/11] irqchip: mbigen: promote mbigen init
-In-Reply-To: <57DFBA0D.7040801@arm.com>
-References: <1473862879-7769-1-git-send-email-guohanjun@huawei.com>
- <1473862879-7769-12-git-send-email-guohanjun@huawei.com>
- <57DABD2F.1030606@arm.com> <3f9b5a3e-13f4-75a4-15bc-f55e26740205@linaro.org>
- <57DFBA0D.7040801@arm.com>
-Message-ID: <57E0A23E.2090609@huawei.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 20 Sep 2016 08:21:04 +0530
+Subject: [PATCH 0/5] ARM64: Uprobe support added
+In-Reply-To: <20160824072622.GB24311@localhost.localdomain>
+References: <cover.1470114993.git.panand@redhat.com>
+ <20160824072622.GB24311@localhost.localdomain>
+Message-ID: <CAHB_GuqgV2bWX_LQnWuTdY2uZ8y6H9Z5CMWMQS6SdpXCh7ghiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/9/19 18:12, Marc Zyngier wrote:
-> On 19/09/16 10:49, Hanjun Guo wrote:
->> On 2016/9/15 23:24, Marc Zyngier wrote:
->>> On 14/09/16 15:21, Hanjun Guo wrote:
->>>> From: Hanjun Guo <hanjun.guo@linaro.org>
->>>>
->>>> mbigen is an irqchip and it needs to be probed before
->>>> devices, same logic is used for SMMU and etc., let's
->>>> use arch_initcall instead of platform init for mbigen.
->>>>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>> Cc: Ma Jun <majun258@huawei.com>
->>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>> ---
->>>>  drivers/irqchip/irq-mbigen.c | 6 +++++-
->>>>  1 file changed, 5 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
->>>> index ca6add1..3a33de6 100644
->>>> --- a/drivers/irqchip/irq-mbigen.c
->>>> +++ b/drivers/irqchip/irq-mbigen.c
->>>> @@ -374,7 +374,11 @@ static struct platform_driver mbigen_platform_driver = {
->>>>  	.probe			= mbigen_device_probe,
->>>>  };
->>>>
->>>> -module_platform_driver(mbigen_platform_driver);
->>>> +static __init int mbigen_init(void)
->>>> +{
->>>> +	return platform_driver_register(&mbigen_platform_driver);
->>>> +}
->>>> +arch_initcall(mbigen_init);
->>>>
->>>>  MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
->>>>  MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
->>>>
->>> I've already NACKed such a patch in the past, and I will carry on
->>> NACKing it until all the other avenues (like properly tracking device
->>> dependencies) have been explored and have been proven not to be fit for
->>> purpose.
->> I'd happy to work on this to make progress.
+Hi Will/Catalin,
+
+So far there is no comment which would require any modification in
+this patch set. However, a rebase would be required, because we have a
+fixup "arm64: Improve kprobes test for atomic sequence" in the next
+now. Also, since we have "arm64: kprobe: Always clear pstate.D in
+breakpoint exception handler" in next, so I can remove __kprobes tag
+from uprobe_breakpoint_handler() and uprobe_single_step_handler().
+
+Do you think that these patches are good to be taken for 4.9? If yes,
+then I will send a quick V2 with above modifications.
+
+~Pratyush
+
+
+On Wed, Aug 24, 2016 at 12:56 PM, Pratyush Anand <panand@redhat.com> wrote:
+> Hi Will/Catalin,
+>
+> Do you have any specific comment for this patch set?
+>
+> ~Pratyush
+>
+> [1] https://lkml.org/lkml/2016/8/22/69
+>
+> On 02/08/2016:11:00:04 AM, Pratyush Anand wrote:
+>> ARM64 kprobe support is lying in torvalds/linux.git:master now. Therefore
+>> sending my uprobe patches which were dependent on decode-insn code of kprobe
+>> patches.
 >>
->>> Rafael had proposed something around this subject last year, and I've
->> Sorry, obviously I missed something, could you give me the link about
->> Rafael's patches? I will pull back and test it on our hardware.
-> Please see this discussion from almost a year ago:
->
-> https://patchwork.kernel.org/patch/7407401/
->
-> in which I give the existing pointers and explain why I'm pushing back
-> on things like this patch.
-
-We (Majun and me ) will look into it, thanks!
-
-Hanjun
+>> Unit tests for following have been done so far and they have been found
+>> working.
+>>      1. Step-able instructions, like sub, ldr, add etc.
+>>      2. Simulation-able like ret, cbnz, cbz etc.
+>>      3. uretprobe
+>>      4. Reject-able instructions like sev, wfe etc.
+>>      5. trapped and abort xol path
+>>      6. probe at unaligned user address.
+>>      7. longjump test cases
+>>
+>> Currently it does not support aarch32 instruction probing.
+>>
+>> RFC patches were sent long back, and all review comments for RFCs have been
+>> incorporated. RFCs were here: https://lwn.net/Articles/648514/
+>>
+>> Pratyush Anand (5):
+>>   arm64: kprobe: protect/rename few definitions to be reused by uprobe
+>>   arm64: kgdb_step_brk_fn: ignore other's exception
+>>   arm64: Handle TRAP_HWBRKPT for user mode as well
+>>   arm64: Handle TRAP_BRKPT for user mode as well
+>>   arm64: Add uprobe support
+>>
+>>  arch/arm64/Kconfig                      |   3 +
+>>  arch/arm64/include/asm/debug-monitors.h |   3 +
+>>  arch/arm64/include/asm/probes.h         |  23 ++--
+>>  arch/arm64/include/asm/ptrace.h         |   8 ++
+>>  arch/arm64/include/asm/thread_info.h    |   5 +-
+>>  arch/arm64/include/asm/uprobes.h        |  37 ++++++
+>>  arch/arm64/kernel/debug-monitors.c      |  40 +++---
+>>  arch/arm64/kernel/entry.S               |   6 +-
+>>  arch/arm64/kernel/kgdb.c                |   3 +
+>>  arch/arm64/kernel/probes/Makefile       |   2 +
+>>  arch/arm64/kernel/probes/decode-insn.c  |  31 ++---
+>>  arch/arm64/kernel/probes/decode-insn.h  |   8 +-
+>>  arch/arm64/kernel/probes/kprobes.c      |  36 ++---
+>>  arch/arm64/kernel/probes/uprobes.c      | 227 ++++++++++++++++++++++++++++++++
+>>  arch/arm64/kernel/signal.c              |   4 +-
+>>  arch/arm64/mm/flush.c                   |   6 +
+>>  16 files changed, 378 insertions(+), 64 deletions(-)
+>>  create mode 100644 arch/arm64/include/asm/uprobes.h
+>>  create mode 100644 arch/arm64/kernel/probes/uprobes.c
+>>
+>> --
+>> 2.5.5
