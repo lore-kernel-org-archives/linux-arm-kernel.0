@@ -1,47 +1,34 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 20 Sep 2016 08:18:02 +0200
-Subject: [PATCH 3/4] watchdog: sa11x0/pxa: get rid of get_clock_tick_rate
-References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
- <1474312335-20997-4-git-send-email-robert.jarzmik@free.fr>
- <20160919200816.GC29242@roeck-us.net>
- <20160919223616.GN1041@n2100.armlinux.org.uk>
- <0909debb-f7df-648b-95d2-23b535e5b299@roeck-us.net>
-Message-ID: <87h99bdrhh.fsf@belgarion.home>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Tue, 20 Sep 2016 08:46:58 +0200
+Subject: [PATCH 1/3] i2c: bcm2835: Fix hang for writing messages larger
+ than 16 bytes
+In-Reply-To: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
+References: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
+Message-ID: <e473206c-7f9c-7b7d-d75d-7879425fc2f9@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guenter Roeck <linux@roeck-us.net> writes:
-
-> On 09/19/2016 03:36 PM, Russell King - ARM Linux wrote:
->> On Mon, Sep 19, 2016 at 01:08:16PM -0700, Guenter Roeck wrote:
->>> On Mon, Sep 19, 2016 at 09:12:14PM +0200, Robert Jarzmik wrote:
->>>> The OS timer rate used for the watchdog can now be fetched from the
->>>> standard clock API. This will remove the last user of
->>>> get_clock_tick_rate() in both pxa and sa11x0 architectures.
->>>>
->>>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->>>
->>> Did you test this ? Potential problem, if built into the kernel, could be that
->>> the clocks might not be ready by the time the driver is instantiated. Unless
->>> this is converted to a platform driver, it won't be able to handle a
->>> -EPROBE_DEFER from the clock subsystem.
->>
->> Really not a problem at all.  The OSTIMER0 is required for the system
->> tick, and if that's not present, the kernel will be without any kind
->> of time keeping, so a missing watchdog driver is the least of the
->> problems.
->>
->> Therefore, both PXA and SA11x0 register their clocks really early to
->> ensure that OSTIMER0 is available by the time_init() stage, which is
->> way before driver probe time.
->>
+On 19.09.2016 17:26, Noralf Tr?nnes wrote:
+> Writing messages larger than the FIFO size results in a hang, rendering
+> the machine unusable. This is because the RXD status flag is set on the
+> first interrupt which results in bcm2835_drain_rxfifo() stealing bytes
+> from the buffer. The controller continues to trigger interrupts waiting
+> for the missing bytes, but bcm2835_fill_txfifo() has none to give.
+I remember having seen similar interrupt issues with the SPI HW-block.
+> In this situation wait_for_completion_timeout() apparently is unable to
+> stop the madness.
+That is because it is a level irq that immediately triggers another 
+interrupt giving
+no CPU no time to do other (threaded) OS activity - this might be slightly
+different for multi-core machines...
+> The BCM2835 ARM Peripherals datasheet has this to say about the flags:
+>    TXD: is set when the FIFO has space for at least one byte of data.
+>    RXD: is set when the FIFO contains at least one byte of data.
+>    TXW: is set during a write transfer and the FIFO is less than full.
+>    RXR: is set during a read transfer and the FIFO is or more full.
 >
-> You are right. And, at least in qemu, it actually works.
-Hi Guenter,
-
-Yes, it was tested on pxa25x (lubbock) and pxa27x (mainstone).
-
-Cheers.
-
--- 
-Robert
+> Implementing the logic from the downstream i2c-bcm2708 driver solved
+> the hang problem.
+>
+> Signed-off-by: Noralf Tr?nnes<noralf@tronnes.org>
+Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
