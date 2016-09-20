@@ -1,113 +1,152 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Sep 2016 18:26:35 +0200
-Subject: [PATCH] pinctrl: mvebu: orion5x: Generalise mv88f5181l support for
- 88f5181
-Message-ID: <20160920162635.4195-1-gregory.clement@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Sep 2016 17:42:33 +0100
+Subject: [PATCH v4 2/2] KVM: arm/arm64: Route vtimer events to user space
+In-Reply-To: <57E14829.3060406@suse.de>
+References: <1474283695-212421-1-git-send-email-agraf@suse.de>
+ <1474283695-212421-3-git-send-email-agraf@suse.de> <57DFFAD3.3080009@arm.com>
+ <0960d2a7-6100-3212-c544-d5377df34d57@suse.de> <57E0FF95.7040305@arm.com>
+ <580a8a26-ca8f-a08a-a9da-d19d1a595cb6@suse.de> <57E103E8.7040506@arm.com>
+ <57E109CF.8030705@suse.de> <57E10F37.3030002@arm.com>
+ <57E12A02.7020907@suse.de> <57E12D98.6080008@arm.com>
+ <57E14829.3060406@suse.de>
+Message-ID: <57E166F9.8080109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jamie Lentin <jm@lentin.co.uk>
+On 20/09/16 15:31, Alexander Graf wrote:
+> On 09/20/2016 02:37 PM, Marc Zyngier wrote:
 
-As far as I'm aware the mv88f5181-b1 and mv88f5181l are the same at the
-pinctrl level, so re-use the definitions for both.
+[...]
 
-[gregory.clement at free-electrons.com: fix commit title]
-Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- .../bindings/pinctrl/marvell,orion-pinctrl.txt     |  4 +++-
- drivers/pinctrl/mvebu/pinctrl-orion.c              | 23 +++++++++++-----------
- 2 files changed, 15 insertions(+), 12 deletions(-)
+>>>>> We also need to know "timer line low + timer line masked", as otherwise
+>>>>> we might get spurious interrupts in the guest, no?
+>>>> Yes. Though you can't really know about this one, and you'll have to
+>>>> wait until the next natural exit to find out. As long as the spurious is
+>>> We can provoke a special exit for it, no?
+>> How? The guest decides to disable its timer. That doesn't trigger any
+>> exit whatsoever. You'll have to wait until the next exit from the guest
+>> to notice it.
+> 
+> Before we inject a timer interrupt, we can check whether the pending 
+> semantics of user space / kernel space match. If they don't match, we 
+> can exit before we inject the interrupt and allow user space to disable 
+> the pending state again.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt
-index 27570a3a1741..ec8aa3c6936b 100644
---- a/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt
-@@ -4,7 +4,9 @@ Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
- part and usage.
- 
- Required properties:
--- compatible: "marvell,88f5181l-pinctrl", "marvell,88f5182-pinctrl",
-+- compatible: "marvell,88f5181-pinctrl",
-+              "marvell,88f5181l-pinctrl",
-+              "marvell,88f5182-pinctrl",
-               "marvell,88f5281-pinctrl"
- 
- - reg: two register areas, the first one describing the first two
-diff --git a/drivers/pinctrl/mvebu/pinctrl-orion.c b/drivers/pinctrl/mvebu/pinctrl-orion.c
-index 345c3df669a0..84e144167b44 100644
---- a/drivers/pinctrl/mvebu/pinctrl-orion.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-orion.c
-@@ -64,11 +64,11 @@ static int orion_mpp_ctrl_set(unsigned pid, unsigned long config)
- 	return 0;
- }
- 
--#define V(f5181l, f5182, f5281) \
--	((f5181l << 0) | (f5182 << 1) | (f5281 << 2))
-+#define V(f5181, f5182, f5281) \
-+	((f5181 << 0) | (f5182 << 1) | (f5281 << 2))
- 
- enum orion_variant {
--	V_5181L = V(1, 0, 0),
-+	V_5181  = V(1, 0, 0),
- 	V_5182  = V(0, 1, 0),
- 	V_5281  = V(0, 0, 1),
- 	V_ALL   = V(1, 1, 1),
-@@ -103,13 +103,13 @@ static struct mvebu_mpp_mode orion_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
- 		 MPP_VAR_FUNCTION(0x2, "pci", "req5",       V_ALL),
- 		 MPP_VAR_FUNCTION(0x4, "nand", "re0",       V_5182 | V_5281),
--		 MPP_VAR_FUNCTION(0x5, "pci-1", "clk",      V_5181L),
-+		 MPP_VAR_FUNCTION(0x5, "pci-1", "clk",      V_5181),
- 		 MPP_VAR_FUNCTION(0x5, "sata0", "act",      V_5182)),
- 	MPP_MODE(7,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
- 		 MPP_VAR_FUNCTION(0x2, "pci", "gnt5",       V_ALL),
- 		 MPP_VAR_FUNCTION(0x4, "nand", "we0",       V_5182 | V_5281),
--		 MPP_VAR_FUNCTION(0x5, "pci-1", "clk",      V_5181L),
-+		 MPP_VAR_FUNCTION(0x5, "pci-1", "clk",      V_5181),
- 		 MPP_VAR_FUNCTION(0x5, "sata1", "act",      V_5182)),
- 	MPP_MODE(8,
- 		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,        V_ALL),
-@@ -165,7 +165,7 @@ static struct mvebu_mpp_ctrl orion_mpp_controls[] = {
- 	MPP_FUNC_CTRL(0, 19, NULL, orion_mpp_ctrl),
- };
- 
--static struct pinctrl_gpio_range mv88f5181l_gpio_ranges[] = {
-+static struct pinctrl_gpio_range mv88f5181_gpio_ranges[] = {
- 	MPP_GPIO_RANGE(0, 0, 0, 16),
- };
- 
-@@ -177,14 +177,14 @@ static struct pinctrl_gpio_range mv88f5281_gpio_ranges[] = {
- 	MPP_GPIO_RANGE(0, 0, 0, 16),
- };
- 
--static struct mvebu_pinctrl_soc_info mv88f5181l_info = {
--	.variant = V_5181L,
-+static struct mvebu_pinctrl_soc_info mv88f5181_info = {
-+	.variant = V_5181,
- 	.controls = orion_mpp_controls,
- 	.ncontrols = ARRAY_SIZE(orion_mpp_controls),
- 	.modes = orion_mpp_modes,
- 	.nmodes = ARRAY_SIZE(orion_mpp_modes),
--	.gpioranges = mv88f5181l_gpio_ranges,
--	.ngpioranges = ARRAY_SIZE(mv88f5181l_gpio_ranges),
-+	.gpioranges = mv88f5181_gpio_ranges,
-+	.ngpioranges = ARRAY_SIZE(mv88f5181_gpio_ranges),
- };
- 
- static struct mvebu_pinctrl_soc_info mv88f5182_info = {
-@@ -212,7 +212,8 @@ static struct mvebu_pinctrl_soc_info mv88f5281_info = {
-  * muxing, they are identical.
-  */
- static const struct of_device_id orion_pinctrl_of_match[] = {
--	{ .compatible = "marvell,88f5181l-pinctrl", .data = &mv88f5181l_info },
-+	{ .compatible = "marvell,88f5181-pinctrl", .data = &mv88f5181_info },
-+	{ .compatible = "marvell,88f5181l-pinctrl", .data = &mv88f5181_info },
- 	{ .compatible = "marvell,88f5182-pinctrl", .data = &mv88f5182_info },
- 	{ .compatible = "marvell,88f5281-pinctrl", .data = &mv88f5281_info },
- 	{ }
+Let's rewind a bit, because I've long lost track of what you're trying
+to do to handle what.
+
+You need two signals:
+
+(1) TIMER_LEVEL: the output of the timer line, having accounted for the
+IMASK bit. This is conveniently the value of timer->irq.level.
+
+(2) TIMER_IRQ_MASK: an indication from userspace that a timer interrupt
+is pending, and that the physical line should be masked.
+
+You need a number of rules:
+
+(a) On exit to userspace, the kernel always exposes the value of
+TIMER_LEVEL.
+
+(b) On kernel entry, userspace always exposes the required
+TIMER_IRQ_MASK, depending on what has been exposed to it by TIMER_LEVEL.
+
+(c) If on guest exit, TIMER_LEVEL==1 and TIMER_IRQ_MASK==0, perform a
+userspace exit, because the emulated GIC needs to make the interrupt
+pending.
+
+(d) If on guest exit, TIMER_LEVEL==0 and TIMER_IRQ_MASK==1, perform a
+userspace exit, because the guest has disabled its timer before taking
+the interrupt, and the emulated GIC needs to retire the pending state.
+
+and that's it. Nothing else. The kernel tells userspace the state of the
+timer, and userspace drives the masking of the physical interrupt.
+Conveniently, this matches what the current code does.
+
+> 
+>>
+>>>> "spurious in the GIC sense" (hence returning 0x3ff) and not a spurious
+>>>> timer interrupt being presented, you're fine.
+>>> Imagine
+>>>
+>>>     * guest configures timer to fire
+>>>     * kvm exits to user space because lines mismatch now
+>> I suppose you mean timer fired + physical interrupt for the virtual enabled?
+> 
+> In this scheme, I would simply say "user space thinks it's pending" == 
+> "host vtimer irq is masked". So because user space thinks that no timer 
+> is pending and the guest managed to trigger a vtimer irq on the host, 
+> the guest exited on a physical vtimer irq. Kvm then checks whether the 
+> timer expired and sets the vcpu timer pending status to 1. User space 
+> status is still 0, so kvm exits to user space to update the status.
+> 
+>>
+>>>     * user space sets gic line up, setting vcpu irq line high
+>>>     * guest runs, handles IRQ, calls EOI with IRQs disabled on the core
+>> Same thing: you mean physical interrupt for the virtual timer disabled?
+>> or something else?
+> 
+> I mean the guest sets pstate.I = 0.
+
+The I bit is a mask, just like any other exception bit in PSTATE. So
+you're *enabling* interrupts here. But let's assume the interrupts are
+disabled, as they are in an interrupt handler.
+
+> 
+>>
+>>>     * user space handles EOI, but still leaves the vcpu line high
+>> If there is another pending interrupt, sure. Otherwise, that's a bug.
+> 
+> Why is that a bug? The line really is still pending at this point.
+
+So what is this "vcpu line"? HCR_EL2.VI? The timer interrupt through the
+GIC? The timer output line?
+
+> 
+>>
+>>>     * guest runs, sets cval, enables IRQs on the core
+>> What is that interrupt? Please name things, because that's very confusing.
+> 
+> The guest sets pstate.I=1.
+
+And?
+
+> 
+>>
+>>>     * kvm injects a timer interrupt into the guest
+>> Why? Has the timer fired?
+> 
+> cntv.ctl.imask = 0 here, but user space doesn't know that yet. So the 
+> "pending" state is still active.
+
+Rule (a) should apply, always. Whether it is pending or not depends on
+what userspace decides to do. If userspace doesn't play ball, the guest
+will keep exiting.
+
+> 
+>>
+>>> At this point, the pending state from user space is bogus, as the line
+>>> really isn't pending anymore. However, when the guest asks the GIC at
+>>> that point what interrupt is pending, the line down state will have
+>>> populated into user space before the mmio request gets processed. So you
+>>> will see a 0x3ff return I guess.
+>>>
+>>> Is that reasonable?
+>> I'm sorry, but you need to put names on things and precisely describe
+>> the various events. because from the above script, I can derive twenty
+>> different scenarios...
+> 
+> I'm sure one of them has to be racy? :)
+> 
+> (in fact, there are probably more than what I came up with that really 
+> are...)
+
+At this stage, I don't have any understanding of what you're trying to
+do. I've given you what I think needs to be implemented, please let me
+know if that matches your understanding.
+
+Thanks,
+
+	M.
 -- 
-2.9.3
+Jazz is not dead. It just smells funny...
