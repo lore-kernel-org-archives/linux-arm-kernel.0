@@ -1,58 +1,49 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 20 Sep 2016 22:12:42 +0800
-Subject: [PATCH] arm64, numa: Add cpu_to_node() implementation.
-In-Reply-To: <20160920133813.GR25086@rric.localdomain>
-References: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
- <20160920104348.GP25086@rric.localdomain> <57E11E52.8060303@linaro.org>
- <20160920133813.GR25086@rric.localdomain>
-Message-ID: <57E143DA.5030602@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Sep 2016 15:13:53 +0100
+Subject: [PATCH 2/2] arm-cci: Do not probe the CCI ports if booted from HYP
+In-Reply-To: <1474380833-30121-1-git-send-email-marc.zyngier@arm.com>
+References: <1474380833-30121-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1474380833-30121-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2016 09:38 PM, Robert Richter wrote:
-> On 20.09.16 19:32:34, Hanjun Guo wrote:
->> On 09/20/2016 06:43 PM, Robert Richter wrote:
->
->>> Instead we need to make sure the set_*numa_node() functions are called
->>> earlier before secondary cpus are booted. My suggested change for that
->>> is this:
->>>
->>>
->>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->>> index d93d43352504..952365c2f100 100644
->>> --- a/arch/arm64/kernel/smp.c
->>> +++ b/arch/arm64/kernel/smp.c
->>> @@ -204,7 +204,6 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
->>>   static void smp_store_cpu_info(unsigned int cpuid)
->>>   {
->>>   	store_cpu_topology(cpuid);
->>> -	numa_store_cpu_info(cpuid);
->>>   }
->>>
->>>   /*
->>> @@ -719,6 +718,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->>>   			continue;
->>>
->>>   		set_cpu_present(cpu, true);
->>> +		numa_store_cpu_info(cpu);
->>>   	}
->>>   }
->>
->> We tried a similar approach which add numa_store_cpu_info() in
->> early_map_cpu_to_node(), and remove it from smp_store_cpu_info,
->> but didn't work for us, we will try your approach to see if works.
+Poking the CCI ports from non-secure is likely to end up in fireworks,
+so let's not try our luck here, and skip the driver initialization
+if booted from HYP (which is always non-secure).
 
-And it works :)
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/bus/arm-cci.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
->
-> Calling it in early_map_cpu_to_node() is probably too early since
-> setup_node_to_cpumask_map() is called in numa_init() afterwards
-> overwriting it again.
->
-> Actually, early_map_cpu_to_node() is used to temporarily store the
-> mapping until it can be setup in numa_store_cpu_info().
-
-Thanks for the clarify, let's wait for David's reply on this one.
-
-Thanks
-Hanjun
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index ffa7c9d..70f51a9 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -28,6 +28,7 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
++#include <asm/virt.h>
+ 
+ static void __iomem *cci_ctrl_base;
+ static unsigned long cci_ctrl_phys;
+@@ -2184,6 +2185,16 @@ static int cci_probe_ports(struct device_node *np)
+ 	const char *match_str;
+ 	bool is_ace;
+ 
++	/*
++	 * If we booted in HYP mode, then we're running non-secure,
++	 * and there is zero chance that we'll be able to configure
++	 * anything on the CCI. Gracefully leave the room...
++	 */
++	if (is_hyp_mode_available()) {
++		pr_info("%s: skipping probe (running non-secure)\n",
++			np->full_name);
++		return -ENODEV;
++	}
+ 
+ 	cci_config = of_match_node(arm_cci_matches, np)->data;
+ 	if (!cci_config)
+-- 
+2.1.4
