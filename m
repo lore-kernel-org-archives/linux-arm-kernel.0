@@ -1,43 +1,23 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Tue, 20 Sep 2016 17:09:10 -0500
-Subject: [GIT PULL] Qualcomm EBI2 bindings and bus driver
-In-Reply-To: <CACRpkdZdoK4+YRrZC=Kd8TFzJXOQxh=Gi0BWLp4PzV6H5_wEtg@mail.gmail.com>
-References: <CACRpkdYvowN2htUuN46JNVdfaKNw3AEbBfzAeScHQcLU5o3ZUg@mail.gmail.com>
- <4360974.U0qvolVKdi@wuerfel>
- <20160919223616.GD5431@hector.attlocal.net>
- <CACRpkdZdoK4+YRrZC=Kd8TFzJXOQxh=Gi0BWLp4PzV6H5_wEtg@mail.gmail.com>
-Message-ID: <20160920220910.GE5431@hector.attlocal.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 20 Sep 2016 16:52:12 -0700
+Subject: [PATCH v2 1/1] clk: imx53: Add clocks configuration
+In-Reply-To: <1474281002-18868-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+References: <20160918002451.GE15478@tiger>
+ <1474281002-18868-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+Message-ID: <20160920235212.GE8319@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 11:50:14PM +0200, Linus Walleij wrote:
-> On Tue, Sep 20, 2016 at 12:36 AM, Andy Gross <andy.gross@linaro.org> wrote:
-> > On Tue, Sep 20, 2016 at 12:12:33AM +0200, Arnd Bergmann wrote:
-> >> On Thursday, September 8, 2016 3:34:42 PM CEST Linus Walleij wrote:
-> >> > please pull this new EBI2 bus driver and its bindings into an
-> >> > apropriate branch in the ARM SoC tree. The binding now has
-> >> > Rob Herrings ACK and we have hopefully finally figured out how
-> >> > this should be done.
-> >> >
-> >>
-> >> I just noticed that you sent the pull request directly to arm at kernel.org
-> >> rather than the Qualcomm maintainers (which are only on Cc).
-> >>
-> >> Usually, I'd expect to see this forwarded from Andy, is there a
-> >> reason to do it differently here? If so, can I have an Ack
-> >> from him?
-> >
-> > When I looked at this last, I thought there were comments.  Sorry I missed it.
-> > If you want to pick it up Arnd, please do, otherwise I can send it along in the
-> > next pull request.
-> >
-> > Acked-by: Andy Gross <andy.gross@linaro.org>
+On 09/19, Fabien Lahoudere wrote:
+> From: Kalle Kankare <kalle.kankare@vincit.fi>
 > 
-> Thanks, I hope Arnd can pull this as-is.
+> Add clocks configuration for CSI, FIRI and IEEE1588.
 > 
-> Will you apply the DTS changes Andy?
+> Signed-off-by: Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>
+> ---
 
-Sure I'll put it in a supplemental pull.
+Applied to clk-next
 
-
-Andy
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
