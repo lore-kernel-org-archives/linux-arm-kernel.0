@@ -1,56 +1,36 @@
-From: clg@kaod.org (=?UTF-8?q?C=C3=A9dric=20Le=20Goater?=)
-Date: Tue, 20 Sep 2016 09:01:40 +0200
-Subject: [PATCH v3 3/3] ARM: dts: aspeed: Enable BT IPMI BMC device
-In-Reply-To: <1474354900-5618-1-git-send-email-clg@kaod.org>
-References: <1474354900-5618-1-git-send-email-clg@kaod.org>
-Message-ID: <1474354900-5618-4-git-send-email-clg@kaod.org>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 20 Sep 2016 09:06:23 +0200
+Subject: [PATCH V6 4/5] PCI: thunder: Enable ACPI PCI controller for
+ ThunderX pass2.x silicon version
+In-Reply-To: <20160919154550.GA13775@localhost>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <1473449047-10499-5-git-send-email-tn@semihalf.com>
+ <20160919154550.GA13775@localhost>
+Message-ID: <d06879a2-d6e9-5d62-77c5-47eff33d9584@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: C?dric Le Goater <clg@kaod.org>
----
+On 19.09.2016 17:45, Bjorn Helgaas wrote:
+> On Fri, Sep 09, 2016 at 09:24:06PM +0200, Tomasz Nowicki wrote:
+>> ThunderX PCIe controller to off-chip devices (so-called PEM) is not fully
+>> compliant with ECAM standard. It uses non-standard configuration space
+>> accessors (see pci_thunder_pem_ops) and custom configuration space granulation
+>> (see bus_shift = 24). In order to access configuration space and
+>> probe PEM as ACPI based PCI host controller we need to add MCFG quirk
+>> infrastructure. This involves:
+>> 1. Export PEM pci_thunder_pem_ops structure so it is visible to MCFG quirk
+>>    code.
+>> 2. New quirk entries for each PEM segment. Each contains platform IDs,
+>>    mentioned pci_thunder_pem_ops and CFG resources.
+>>
+>> Quirk is considered for ThunderX silicon pass2.x only which is identified
+>> via MCFG revision 1.
+>
+> Is it really the case that silicon pass2.x has MCFG revision 1, and
+> silicon pass1.x has MCFG revision 2?  That just seems backwards.
 
- Changes since v1:
+It is weird but silicon pass2.x is more common and it had MCFG revision 
+1 from the beginning. Unless it is allowed to use MCFG revision 0 ? Then 
+we could use MCFG revision 0 for pass1.x
 
- - added the soc name ast2400 in the compatible cell 
-
- arch/arm/boot/dts/aspeed-g4.dtsi | 6 ++++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 6 ++++++
- 2 files changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 22dee5937d5c..7bb00b6f13d8 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -82,6 +82,12 @@
- 				clocks = <&clk_apb>;
- 			};
- 
-+			ibt: ibt at 1e789140 {
-+				compatible = "aspeed,ast2400-bt-bmc";
-+				reg = <0x1e789140 0x18>;
-+				interrupts = <8>;
-+			};
-+
- 			wdt1: wdt at 1e785000 {
- 				compatible = "aspeed,wdt";
- 				reg = <0x1e785000 0x1c>;
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index dd94d9361fda..1d8f81b548b3 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -86,6 +86,12 @@
- 				clocks = <&clk_apb>;
- 			};
- 
-+			ibt: ibt at 1e789140 {
-+				compatible = "aspeed,ast2400-bt-bmc";
-+				reg = <0x1e789140 0x18>;
-+				interrupts = <8>;
-+			};
-+
- 			wdt1: wdt at 1e785000 {
- 				compatible = "aspeed,wdt";
- 				reg = <0x1e785000 0x1c>;
--- 
-2.7.4
+Tomasz
