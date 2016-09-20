@@ -1,228 +1,76 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Sep 2016 11:28:07 +0100
-Subject: [PATCH v4 2/2] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <57E109CF.8030705@suse.de>
-References: <1474283695-212421-1-git-send-email-agraf@suse.de>
- <1474283695-212421-3-git-send-email-agraf@suse.de> <57DFFAD3.3080009@arm.com>
- <0960d2a7-6100-3212-c544-d5377df34d57@suse.de> <57E0FF95.7040305@arm.com>
- <580a8a26-ca8f-a08a-a9da-d19d1a595cb6@suse.de> <57E103E8.7040506@arm.com>
- <57E109CF.8030705@suse.de>
-Message-ID: <57E10F37.3030002@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 20 Sep 2016 11:33:34 +0100
+Subject: [PATCH] arm64: kgdb: handle read-only text / modules
+In-Reply-To: <20160920100321.17846-1-takahiro.akashi@linaro.org>
+References: <20160920100321.17846-1-takahiro.akashi@linaro.org>
+Message-ID: <20160920103333.GB1045@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/16 11:05, Alexander Graf wrote:
-> On 09/20/2016 11:39 AM, Marc Zyngier wrote:
->> On 20/09/16 10:26, Alexander Graf wrote:
->>>
->>> On 20.09.16 11:21, Marc Zyngier wrote:
->>>> On 19/09/16 18:39, Alexander Graf wrote:
->>>>>
->>>>> On 19.09.16 16:48, Marc Zyngier wrote:
->>>>>> On 19/09/16 12:14, Alexander Graf wrote:
->>>>>>> We have 2 modes for dealing with interrupts in the ARM world. We can either
->>>>>>> handle them all using hardware acceleration through the vgic or we can emulate
->>>>>>> a gic in user space and only drive CPU IRQ pins from there.
->>>>>>>
->>>>>>> Unfortunately, when driving IRQs from user space, we never tell user space
->>>>>>> about timer events that may result in interrupt line state changes, so we
->>>>>>> lose out on timer events if we run with user space gic emulation.
->>>>>>>
->>>>>>> This patch fixes that by routing vtimer expiration events to user space.
->>>>>>> With this patch I can successfully run edk2 and Linux with user space gic
->>>>>>> emulation.
->>>>>>>
->>>>>>> Signed-off-by: Alexander Graf <agraf@suse.de>
->>>>>>>
->>>>>>> ---
->>>>>>>
->>>>>>> v1 -> v2:
->>>>>>>
->>>>>>>    - Add back curly brace that got lost
->>>>>>>
->>>>>>> v2 -> v3:
->>>>>>>
->>>>>>>    - Split into patch set
->>>>>>>
->>>>>>> v3 -> v4:
->>>>>>>
->>>>>>>    - Improve documentation
->>>>>>> ---
->>>>>>>   Documentation/virtual/kvm/api.txt |  30 ++++++++-
->>>>>>>   arch/arm/include/asm/kvm_host.h   |   3 +
->>>>>>>   arch/arm/kvm/arm.c                |  22 ++++---
->>>>>>>   arch/arm64/include/asm/kvm_host.h |   3 +
->>>>>>>   include/uapi/linux/kvm.h          |  14 +++++
->>>>>>>   virt/kvm/arm/arch_timer.c         | 125 +++++++++++++++++++++++++++-----------
->>>>>>>   6 files changed, 155 insertions(+), 42 deletions(-)
->>>>>>>
->>>>>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->>>>>>> index 23937e0..1c0bd86 100644
->>>>>>> --- a/Documentation/virtual/kvm/api.txt
->>>>>>> +++ b/Documentation/virtual/kvm/api.txt
->>>>>>> @@ -3202,9 +3202,14 @@ struct kvm_run {
->>>>>>>   	/* in */
->>>>>>>   	__u8 request_interrupt_window;
->>>>>>>   
->>>>>>> -Request that KVM_RUN return when it becomes possible to inject external
->>>>>>> +[x86] Request that KVM_RUN return when it becomes possible to inject external
->>>>>>>   interrupts into the guest.  Useful in conjunction with KVM_INTERRUPT.
->>>>>>>   
->>>>>>> +[arm*] Bits set to 1 in here mask IRQ lines that would otherwise potentially
->>>>>>> +trigger forever. These lines are available:
->>>>>>> +
->>>>>>> +    KVM_IRQWINDOW_VTIMER  -  Masks hw virtual timer irq while in guest
->>>>>>> +
->>>>>>>   	__u8 padding1[7];
->>>>>>>   
->>>>>>>   	/* out */
->>>>>>> @@ -3519,6 +3524,18 @@ Hyper-V SynIC state change. Notification is used to remap SynIC
->>>>>>>   event/message pages and to enable/disable SynIC messages/events processing
->>>>>>>   in userspace.
->>>>>>>   
->>>>>>> +		/* KVM_EXIT_ARM_TIMER */
->>>>>>> +		struct {
->>>>>>> +			__u8 timesource;
->>>>>>> +		} arm_timer;
->>>>>>> +
->>>>>>> +Indicates that a timer triggered that user space needs to handle and
->>>>>>> +potentially mask with vcpu->run->request_interrupt_window to allow the
->>>>>>> +guest to proceed. This only happens for timers that got enabled through
->>>>>>> +KVM_CAP_ARM_TIMER. The following time sources are available:
->>>>>>> +
->>>>>>> +    KVM_ARM_TIMER_VTIMER  - virtual cpu timer
->>>>>>> +
->>>>>>>   		/* Fix the size of the union. */
->>>>>>>   		char padding[256];
->>>>>>>   	};
->>>>>>> @@ -3739,6 +3756,17 @@ Once this is done the KVM_REG_MIPS_VEC_* and KVM_REG_MIPS_MSA_* registers can be
->>>>>>>   accessed, and the Config5.MSAEn bit is accessible via the KVM API and also from
->>>>>>>   the guest.
->>>>>>>   
->>>>>>> +6.11 KVM_CAP_ARM_TIMER
->>>>>>> +
->>>>>>> +Architectures: arm, arm64
->>>>>>> +Target: vcpu
->>>>>>> +Parameters: args[0] contains a bitmap of timers to select (see 5.)
->>>>>>> +
->>>>>>> +This capability allows to route per-core timers into user space. When it's
->>>>>>> +enabled and no in-kernel interrupt controller is in use, the timers selected
->>>>>>> +by args[0] trigger KVM_EXIT_ARM_TIMER guest exits when they are pending,
->>>>>>> +unless masked by vcpu->run->request_interrupt_window (see 5.).
->>>>>>> +
->>>>>>>   7. Capabilities that can be enabled on VMs
->>>>>>>   ------------------------------------------
->>>>>>>   
->>>>>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>>>>>> index de338d9..77d1f73 100644
->>>>>>> --- a/arch/arm/include/asm/kvm_host.h
->>>>>>> +++ b/arch/arm/include/asm/kvm_host.h
->>>>>>> @@ -180,6 +180,9 @@ struct kvm_vcpu_arch {
->>>>>>>   
->>>>>>>   	/* Detect first run of a vcpu */
->>>>>>>   	bool has_run_once;
->>>>>>> +
->>>>>>> +	/* User space wants timer notifications */
->>>>>>> +	bool user_space_arm_timers;
->>>>>> Please move this to the timer structure.
->>>>> Sure.
->>>>>
->>>>>>>   };
->>>>>>>   
->>>>>>>   struct kvm_vm_stat {
->>>>>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->>>>>>> index c84b6ad..57bdb71 100644
->>>>>>> --- a/arch/arm/kvm/arm.c
->>>>>>> +++ b/arch/arm/kvm/arm.c
->>>>>>> @@ -187,6 +187,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->>>>>>>   	case KVM_CAP_ARM_PSCI_0_2:
->>>>>>>   	case KVM_CAP_READONLY_MEM:
->>>>>>>   	case KVM_CAP_MP_STATE:
->>>>>>> +	case KVM_CAP_ARM_TIMER:
->>>>>>>   		r = 1;
->>>>>>>   		break;
->>>>>>>   	case KVM_CAP_COALESCED_MMIO:
->>>>>>> @@ -474,13 +475,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
->>>>>>>   			return ret;
->>>>>>>   	}
->>>>>>>   
->>>>>>> -	/*
->>>>>>> -	 * Enable the arch timers only if we have an in-kernel VGIC
->>>>>>> -	 * and it has been properly initialized, since we cannot handle
->>>>>>> -	 * interrupts from the virtual timer with a userspace gic.
->>>>>>> -	 */
->>>>>>> -	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
->>>>>>> -		ret = kvm_timer_enable(vcpu);
->>>>>>> +	ret = kvm_timer_enable(vcpu);
->>>>>>>   
->>>>>>>   	return ret;
->>>>>>>   }
->>>>>>> @@ -601,6 +596,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>>>>   			run->exit_reason = KVM_EXIT_INTR;
->>>>>>>   		}
->>>>>>>   
->>>>>>> +		if (kvm_check_request(KVM_REQ_PENDING_TIMER, vcpu)) {
->>>>>> Since this is a very unlikely event (in the grand scheme of things), how
->>>>>> about making this unlikely()?
->>>>>>
->>>>>>> +			/* Tell user space about the pending vtimer */
->>>>>>> +			ret = 0;
->>>>>>> +			run->exit_reason = KVM_EXIT_ARM_TIMER;
->>>>>>> +			run->arm_timer.timesource = KVM_ARM_TIMER_VTIMER;
->>>>>>> +		}
->>>>>> More importantly: why does it have to be indirected by a
->>>>>> make_request/check_request, and not be handled as part of the
->>>>>> kvm_timer_sync() call? We do update the state there, and you could
->>>>>> directly find out whether an exit is required.
->>>>> I can try - it seemed like it could easily become quite racy because we
->>>>> call kvm_timer_sync_hwstate() at multiple places.
->>>> It shouldn't. We only do it at exactly two locations (depending whether
->>>> we've entered the guest or not).
->>>>
->>>> Also, take the following scenario:
->>>> (1) guest programs the timer to expire at time T
->>>> (2) guest performs an MMIO access which traps
->>>> (3) during the world switch, the timer expires and we mark the timer
->>>> interrupt as pending
->>>> (4) we exit to handle the MMIO, no sign of the timer being pending
->>>>
->>>> Is the timer event lost? Or simply delayed? I think this indicates that
->>>> the timer state should always be signalled to userspace, no matter what
->>>> the exit reason is.
->>> That's basically what I'm trying to get running right now, yes. I pushed
->>> the interrupt pending status field into the kvm_sync_regs struct and
->>> check it on every exit in user space - to make sure we catch pending
->>> state changes before mmio reads.
->>>
->>> On top of that we also need a force exit event when the state changes,
->>> in case there's no other event pending. Furthermore we probably want to
->>> indicate the user space status of the pending bit into the kernel to not
->>> exit too often.
->> All you need is to do is to stash the line state in the run structure.
+On Tue, Sep 20, 2016 at 07:03:21PM +0900, AKASHI Takahiro wrote:
+> Handle read-only cases (CONFIG_DEBUG_RODATA/CONFIG_DEBUG_SET_MODULE_RONX)
+> by using aarch64_insn_write() instead of probe_kernel_write().
+> See how this works:
+>     commit 2f896d586610 ("arm64: use fixmap for text patching")
 > 
-> That's what I do now, yes. The sync_regs struct is basically an arch 
-> specific add-on to the run structure, so we don't modify padding / 
-> alignment with the change.
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Jason Wessel <jason.wessel@windriver.com>
+> Cc: <stable@vger.kernel.org> # 4.0-
+
+We had SET_MODULE_RONX in v3.17, and we had KGDB before that, so we need
+something for v3.17+.
+
+> ---
+>  arch/arm64/kernel/kgdb.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 > 
->> You shouldn't need any other information. And you trigger the exit on
->> "timer line high + timer line unmasked" in order to inject the
->> interrupt. Which is basically what the vgic does. It would greatly help
->> if you adopted a similar behaviour.
-> 
-> We also need to know "timer line low + timer line masked", as otherwise 
-> we might get spurious interrupts in the guest, no?
+> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+> index 6732a27..133cfe3 100644
+> --- a/arch/arm64/kernel/kgdb.c
+> +++ b/arch/arm64/kernel/kgdb.c
+> @@ -382,3 +382,23 @@ struct kgdb_arch arch_kgdb_ops = {
+>  		KGDB_DYN_BRK_INS_BYTE(3),
+>  	}
+>  };
+> +int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
+> +{
+> +	int err;
+> +
+> +	BUILD_BUG_ON(AARCH64_INSN_SIZE != BREAK_INSTR_SIZE);
+> +
+> +	err = aarch64_insn_read((void *)bpt->bpt_addr, (u32 *)bpt->saved_instr);
+> +	if (err)
+> +		return err;
+> +
+> +	return aarch64_insn_write((void *)bpt->bpt_addr,
+> +			(u32)AARCH64_BREAK_KGDB_DYN_DBG);
+> +}
 
-Yes. Though you can't really know about this one, and you'll have to
-wait until the next natural exit to find out. As long as the spurious is
-"spurious in the GIC sense" (hence returning 0x3ff) and not a spurious
-timer interrupt being presented, you're fine.
+This changes the endianness of saved_instr (on BE), but it looks like
+that's handed as an opaque token by the core code anyway, so that should
+be fine.
 
-> Either way, I agree that this approach in general is saner. I don't 
-> think it's easier to implement though, but we'll get to that when I send 
-> a new version :)
+This also renders arch_kgdb_ops.gdb_bpt_instr unused. Can/should we get
+rid of that?
 
-OK.
+> +int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
+> +{
+> +	return aarch64_insn_write((void *)bpt->bpt_addr,
+> +			*(u32 *)bpt->saved_instr);
+> +}
 
-	M
--- 
-Jazz is not dead. It just smells funny...
+We also need a few additional includes:
+
+<asm/debug-monitors.h> # for BREAK_INSTR_SIZE, AARCH64_BREAK_KGDB_DYN_DBG
+<asm/insn.h> # for AARCH64_INSN_SIZE, insn_{read,write}
+<linux/bug.h> # for BUILD_BUG_ON()
+
+I take it that we're protected against nesting within
+aarch64_insn_write(), so that we can't deadlock on patch_lock?
+
+Other than that, this looks good to me.
+
+Thanks,
+Mark.
