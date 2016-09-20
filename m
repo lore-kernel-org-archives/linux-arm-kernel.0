@@ -1,55 +1,28 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 20 Sep 2016 18:15:02 +0100
-Subject: [PATCH 1/4] ARM: tegra: nyan: Use proper IRQ type definitions
-In-Reply-To: <20160828173246.32621-1-contact@paulk.fr>
-References: <20160828173246.32621-1-contact@paulk.fr>
-Message-ID: <ef69b6d2-ce6b-ff76-5c04-ab2176eb6ecc@nvidia.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 20 Sep 2016 19:26:31 +0200
+Subject: [PATCH v3] ASoC: exynos: organize the asoc audio into a menu
+In-Reply-To: <1474311470-23175-1-git-send-email-ayaka@soulik.info>
+References: <1474311470-23175-1-git-send-email-ayaka@soulik.info>
+Message-ID: <20160920172631.GA17304@kozik-book>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 28/08/16 18:32, Paul Kocialkowski wrote:
-> This switches a few interrupt definitions that were using
-> GPIO_ACTIVE_HIGH as IRQ type, which is invalid.
-
-May be you are right, but this does not describe why this is invalid.
-Can you elaborate?
-
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+On Tue, Sep 20, 2016 at 02:57:50AM +0800, Randy Li wrote:
+> It is simple sound card time, we could assign different codec
+> to a interface without making a specific driver for it. The SPDIF
+> and I2S interface for Samsung would be possible used by
+> simple-sound-card, but not sure about the PCM.
+> 
+> Those S3C time entries are left alone as I don't think any new board
+> would need them.
+> 
+> Signed-off-by: Randy Li <ayaka@soulik.info>
 > ---
->  arch/arm/boot/dts/tegra124-nyan.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-> index 271505e..30a77ec 100644
-> --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
-> +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-> @@ -59,7 +59,7 @@
->  			compatible = "maxim,max98090";
->  			reg = <0x10>;
->  			interrupt-parent = <&gpio>;
-> -			interrupts = <TEGRA_GPIO(H, 4) GPIO_ACTIVE_HIGH>;
-> +			interrupts = <TEGRA_GPIO(H, 4) IRQ_TYPE_EDGE_FALLING>;
-
-If this in invalid then the DT binding doc for the max98090 should be
-updated as well.
-
->  		};
->  
->  		temperature-sensor at 4c {
-> @@ -325,7 +325,7 @@
->  					reg = <0x9>;
->  					interrupt-parent = <&gpio>;
->  					interrupts = <TEGRA_GPIO(J, 0)
-> -							GPIO_ACTIVE_HIGH>;
-> +							IRQ_TYPE_EDGE_BOTH>;
->  					ti,ac-detect-gpios = <&gpio
->  							TEGRA_GPIO(J, 0)
->  							GPIO_ACTIVE_HIGH>;
+>  sound/soc/samsung/Kconfig | 57 ++++++++++++++++++++++++-----------------------
+>  1 file changed, 29 insertions(+), 28 deletions(-)
 > 
 
-Cheers
-Jon
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
--- 
-nvpublic
+Best regards,
+Krzysztof
