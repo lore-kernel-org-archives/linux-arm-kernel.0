@@ -1,141 +1,40 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 20 Sep 2016 09:05:18 -0500
-Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
- register range for ACPI case
-In-Reply-To: <CAKv+Gu-AE7fft_j2cqBCN=xrsf5Yh=mePf5x3dZJuKAmdxF-Gg@mail.gmail.com>
-References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <1473449047-10499-4-git-send-email-tn@semihalf.com>
- <20160919180900.GB13775@localhost>
- <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
- <20160920133327.GB13855@localhost>
- <CAKv+Gu-AE7fft_j2cqBCN=xrsf5Yh=mePf5x3dZJuKAmdxF-Gg@mail.gmail.com>
-Message-ID: <20160920140518.GD13855@localhost>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 20 Sep 2016 07:06:33 -0700
+Subject: [PATCH] gpio: Added zynq specific check for special pins on bank
+ zero
+In-Reply-To: <1474360324-8168-1-git-send-email-navam@xilinx.com>
+References: <1474360324-8168-1-git-send-email-navam@xilinx.com>
+Message-ID: <20160920140633.GD16583@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-On Tue, Sep 20, 2016 at 02:40:13PM +0100, Ard Biesheuvel wrote:
-> On 20 September 2016 at 14:33, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > [+cc Rafael (maybe already cc'd; I didn't recognize rafael at kernel.org, Duc]
-> >
-> > On Tue, Sep 20, 2016 at 09:23:21AM +0200, Tomasz Nowicki wrote:
-> >> On 19.09.2016 20:09, Bjorn Helgaas wrote:
-> >> >On Fri, Sep 09, 2016 at 09:24:05PM +0200, Tomasz Nowicki wrote:
-> >> >>thunder-pem driver stands for being ACPI based PCI host controller.
-> >> >>However, there is no standard way to describe its PEM-specific register
-> >> >>ranges in ACPI tables. Thus we add thunder_pem_init() ACPI extension
-> >> >>to obtain hardcoded addresses from static resource array.
-> >> >>Although it is not pretty, it prevents from creating standard mechanism to
-> >> >>handle similar cases in future.
-> >> >>
-> >> >>Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> >> >>---
-> >> >> drivers/pci/host/pci-thunder-pem.c | 61 ++++++++++++++++++++++++++++++--------
-> >> >> 1 file changed, 48 insertions(+), 13 deletions(-)
-> >> >>
-> >> >>diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-> >> >>index 6abaf80..b048761 100644
-> >> >>--- a/drivers/pci/host/pci-thunder-pem.c
-> >> >>+++ b/drivers/pci/host/pci-thunder-pem.c
-> >> >>@@ -18,6 +18,7 @@
-> >> >> #include <linux/init.h>
-> >> >> #include <linux/of_address.h>
-> >> >> #include <linux/of_pci.h>
-> >> >>+#include <linux/pci-acpi.h>
-> >> >> #include <linux/pci-ecam.h>
-> >> >> #include <linux/platform_device.h>
-> >> >>
-> >> >>@@ -284,6 +285,40 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
-> >> >>    return pci_generic_config_write(bus, devfn, where, size, val);
-> >> >> }
-> >> >>
-> >> >>+#ifdef CONFIG_ACPI
-> >> >>+static struct resource thunder_pem_reg_res[] = {
-> >> >>+   [4] = DEFINE_RES_MEM(0x87e0c0000000UL, SZ_16M),
-> >> >>+   [5] = DEFINE_RES_MEM(0x87e0c1000000UL, SZ_16M),
-> >> >>+   [6] = DEFINE_RES_MEM(0x87e0c2000000UL, SZ_16M),
-> >> >>+   [7] = DEFINE_RES_MEM(0x87e0c3000000UL, SZ_16M),
-> >> >>+   [8] = DEFINE_RES_MEM(0x87e0c4000000UL, SZ_16M),
-> >> >>+   [9] = DEFINE_RES_MEM(0x87e0c5000000UL, SZ_16M),
-> >> >>+   [14] = DEFINE_RES_MEM(0x97e0c0000000UL, SZ_16M),
-> >> >>+   [15] = DEFINE_RES_MEM(0x97e0c1000000UL, SZ_16M),
-> >> >>+   [16] = DEFINE_RES_MEM(0x97e0c2000000UL, SZ_16M),
-> >> >>+   [17] = DEFINE_RES_MEM(0x97e0c3000000UL, SZ_16M),
-> >> >>+   [18] = DEFINE_RES_MEM(0x97e0c4000000UL, SZ_16M),
-> >> >>+   [19] = DEFINE_RES_MEM(0x97e0c5000000UL, SZ_16M),
-> >> >
-> >> >1) The "correct" way to discover the resources consumed by an ACPI
-> >> >   device is to use the _CRS method.  I know there are some issues
-> >> >   there for bridges (not the fault of ThunderX!) because there's not
-> >> >   a good way to distinguish windows from resources consumed directly
-> >> >   by the bridge.
-> >> >
-> >> >   But we should either do this correctly, or include a comment about
-> >> >   why we're doing it wrong, so we don't give the impression that this
-> >> >   is the right way to do it.
-> >> >
-> >> >   I seem to recall some discussion about why we're doing it this way,
-> >> >   but I don't remember the details.  It'd be nice to include a
-> >> >   summary here.
-> >>
-> >> OK I will. The reason why we cannot use _CRS for this case is that
-> >> CONSUMER flag was not use consistently for the bridge so far.
-> >
-> > Yes, I'm aware of that problem, but hard-coding resources into drivers
-> > is just a disaster.  The PCI and ACPI cores need generic ways to learn
-> > what resources are consumed by devices.  For PCI devices, that's done
-> > with BARs.  For ACPI devices, it's done with _CRS.  Without generic
-> > resource discovery, we can't manage resources reliably at the system
-> > level [1].
-> >
-> > You have a PNP0A03/PNP0A08 device for the PCI host bridge.  Because of
-> > the BIOS bugs in CONSUMER flag usage, we assume everything in its _CRS
-> > is a window and not consumed by the bridge itself.  What if you added
-> > a companion ACPI device with a _CRS that contained the bridge
-> > resources?  Then you'd have some driver ugliness to find that device,
-> > but at least the ACPI core could tell what resources were in use.
-> >
-> > Maybe Rafael has a better idea?
+On Tue, 2016-09-20 at 14:02:04 +0530, Nava kishore Manne wrote:
+> From: Nava kishore Manne <nava.manne@xilinx.com>
 > 
-> In the discussions leading up to this, we tried very hard to make this
-> arm64/acpi quirks mechanism just as flexible as we need it to be to
-> cover the current crop of incompatible hardware, but not more so.
-> Going forward, we intend to require all arm64/acpi hardware to be spec
-> compliant, and so any parametrization beyond what is required for the
-> currently known broken hardware is only going to make it easier for
-> others to ship with tweaked ACPI descriptions so that an existing
-> quirk is triggered for hardware that it was not intended for. It also
-> implies that we have to deal with the ACPI descriptions as they were
-> shipped with the current hardware.
+> This patch adds zynq specific check for bank 0 pins 7 and 8
+> are special and cannot be used as inputs
 > 
-> That does not mean, of course, that we should use bare constants
-> rather than symbolic ones, but anything beyond that exceeds the
-> desired scope of quirks handling.
+> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> ---
+>  drivers/gpio/gpio-zynq.c | 17 +++++++++++++++--
+>  1 file changed, 15 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+> index e72794e..eae9d24 100644
+> --- a/drivers/gpio/gpio-zynq.c
+> +++ b/drivers/gpio/gpio-zynq.c
+> @@ -96,6 +96,10 @@
+>  /* GPIO upper 16 bit mask */
+>  #define ZYNQ_GPIO_UPPER_MASK 0xFFFF0000
+>  
+> +/* For GPIO quirks */
+> +#define ZYNQ_GPIO	BIT(0)
+> +#define ZYNQMP_GPIO	BIT(1)
 
-Symbolic vs bare constants is the least of my worries.  I'm pretty
-happy with the current quirk implementation.  It's pretty simple and
-straightforward.
+I'd make sure all quirks are easily identifiable and call them something
+like 'ZYNQ_GPIO_QUIRK_FOO'
 
-Apparently you shipped broken firmware that doesn't accurately
-describe system resource usage.  Presumably that firmware could be
-updated, but maybe it's worthwhile to work around it in the kernel,
-depending on where it got shipped.
+Apart from that:
+Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-I'd like to step back and come up with some understanding of how
-non-broken firmware *should* deal with this issue.  Then, if we *do*
-work around this particular broken firmware in the kernel, it would be
-nice to do it in a way that fits in with that understanding.
-
-For example, if a companion ACPI device is the preferred solution, an
-ACPI quirk could fabricate a device with the required resources.  That
-would address the problem closer to the source and make it more likely
-that the rest of the system will work correctly: /proc/iomem could
-make sense, things that look at _CRS generically would work (e.g,
-/sys/, an admittedly hypothetical "lsacpi", etc.)
-
-Hard-coding stuff in drivers is a point solution that doesn't provide
-any guidance for future platforms and makes it likely that the hack
-will get copied into even more drivers.
-
-Bjorn
+	S?ren
