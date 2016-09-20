@@ -1,35 +1,75 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 20 Sep 2016 17:36:02 +0200 (CEST)
-Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
- support
-In-Reply-To: <2095bf33-2940-3294-afd6-a28a48762569@st.com>
-References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
- <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
- <alpine.DEB.2.20.1609131713490.6233@nanos>
- <6941f61d-0b33-4108-0135-b11887cd0488@st.com>
- <alpine.DEB.2.20.1609141103420.6233@nanos>
- <facd1c7c-d696-eae1-02e4-5a0c9285add0@st.com>
- <alpine.DEB.2.20.1609141532510.6233@nanos>
- <f64e4f9d-d811-2c6e-7c5a-d4ab06716e2c@st.com>
- <39c4ceee-7e05-ebfd-2ea0-3c4e1c4ea619@st.com>
- <alpine.DEB.2.20.1609201150160.6905@nanos>
- <053a37f4-aa10-46ea-f477-8ae55bb5773f@st.com>
- <alpine.DEB.2.20.1609201439440.6905@nanos>
- <c2c8ad5f-e679-8522-808f-e940b8c6954d@st.com>
- <alpine.DEB.2.20.1609201600490.6905@nanos>
- <2095bf33-2940-3294-afd6-a28a48762569@st.com>
-Message-ID: <alpine.DEB.2.20.1609201735370.6905@nanos>
+From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
+Date: Tue, 20 Sep 2016 17:45:13 +0200
+Subject: [PATCH v3 0/3] ARM: aspeed: add support for the BT IPMI interface
+In-Reply-To: <40bb95a8-b5a6-563b-11c6-73de2f67130d@acm.org>
+References: <1474354900-5618-1-git-send-email-clg@kaod.org>
+ <40bb95a8-b5a6-563b-11c6-73de2f67130d@acm.org>
+Message-ID: <e0114015-647a-8567-ac10-6dfe76b4069c@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Sep 2016, Alexandre Torgue wrote:
-> so if you agree I will resend only patches concerning stm32 exti driver
-> [1],[2],[3],[4]
+On 09/20/2016 04:58 PM, Corey Minyard wrote:
+> On 09/20/2016 02:01 AM, C?dric Le Goater wrote:
+>> Hello,
+>>
+>> This serie adds support for the iBT interface on Aspeed SOCs (AST2400
+>> and AST2500). The BT (Block Transfer) interface is used to perform
+>> in-band IPMI communication between a host and its BMC. This driver
+>> implements the BMC side.
+> 
+> This looks good.  I pulled these into my tree, it's ok for 4.9 or
+> whatever is next, since it's a new driver.
+> 
+> Do patches 2 and 3 go through Joel?
 
-Ok.
- 
-> Thanks for your time.
+Yes. He said he would.
 
-Welcome,
+Thanks,
 
-	tglx
+C. 
+
+> 
+> -corey
+> 
+>> Changes since v2:
+>>
+>>   - limit to one opener
+>>   - protect write/read operations with a mutex.
+>>
+>> Changes since v1:
+>>
+>>   - the driver is now called 'bt-bmc' and the device node '/dev/ipmi-bt-host'
+>>       - the code is now under drivers/char/ipmi/. This required a change of
+>>     the top Makefile in drivers/ to compile the bt-bmc driver with the
+>>     ipmi handlers not being selected. That might be an issue.
+>>       - changed the read/write operations to use a temporary buffer and get
+>>     rid of the {get,put}_user calls
+>>
+>> Thanks,
+>>
+>> C.
+>>
+>> Alistair Popple (1):
+>>    ipmi: add an Aspeed BT IPMI BMC driver
+>>
+>> C?dric Le Goater (2):
+>>    ARM: aspeed: Add defconfigs for CONFIG_ASPEED_BT_IPMI_BMC
+>>    ARM: dts: aspeed: Enable BT IPMI BMC device
+>>
+>>   .../bindings/char/ipmi/aspeed,ast2400-bt-bmc.txt   |  23 +
+>>   arch/arm/boot/dts/aspeed-g4.dtsi                   |   6 +
+>>   arch/arm/boot/dts/aspeed-g5.dtsi                   |   6 +
+>>   arch/arm/configs/aspeed_g4_defconfig               |   1 +
+>>   arch/arm/configs/aspeed_g5_defconfig               |   1 +
+>>   drivers/Makefile                                   |   2 +-
+>>   drivers/char/ipmi/Kconfig                          |   7 +
+>>   drivers/char/ipmi/Makefile                         |   1 +
+>>   drivers/char/ipmi/bt-bmc.c                         | 510 +++++++++++++++++++++
+>>   include/uapi/linux/Kbuild                          |   1 +
+>>   include/uapi/linux/bt-bmc.h                        |  18 +
+>>   11 files changed, 575 insertions(+), 1 deletion(-)
+>>   create mode 100644 Documentation/devicetree/bindings/char/ipmi/aspeed,ast2400-bt-bmc.txt
+>>   create mode 100644 drivers/char/ipmi/bt-bmc.c
+>>   create mode 100644 include/uapi/linux/bt-bmc.h
+>>
+> 
