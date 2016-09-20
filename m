@@ -1,57 +1,65 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 20 Sep 2016 20:02:24 +0200
-Subject: [PATCH 3/4] ARM: tegra: nyan-big: Include compatible revisions
- for proper detection
-In-Reply-To: <d05b8e5a-adf7-9057-b42a-0da1fde84953@nvidia.com>
+Date: Tue, 20 Sep 2016 20:02:47 +0200
+Subject: [PATCH 2/4] ARM: tegra: nyan: Use external control for bq24735
+ charger
+In-Reply-To: <00697eef-0b36-1ff5-9c7a-43c1b53b52bc@nvidia.com>
 References: <20160828173246.32621-1-contact@paulk.fr>
- <20160828173246.32621-3-contact@paulk.fr>
- <a9485a88-55a5-9dd1-1a1b-a6c0a78ff476@nvidia.com>
- <1474394004.1215.2.camel@paulk.fr>
- <d05b8e5a-adf7-9057-b42a-0da1fde84953@nvidia.com>
-Message-ID: <1474394544.1215.13.camel@paulk.fr>
+ <20160828173246.32621-2-contact@paulk.fr>
+ <00697eef-0b36-1ff5-9c7a-43c1b53b52bc@nvidia.com>
+Message-ID: <1474394567.1215.14.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi 20 septembre 2016 ? 18:56 +0100, Jon Hunter a ?crit?:
-> On 20/09/16 18:53, Paul Kocialkowski wrote:
-> > 
-> > * PGP Signed by an unknown key
-> > 
-> > Le mardi 20 septembre 2016 ? 18:41 +0100, Jon Hunter a ?crit :
-> > > 
-> > > On 28/08/16 18:32, Paul Kocialkowski wrote:
-> > > > 
-> > > > 
-> > > > Depthcharge (the payload used with cros devices) will attempt to detect
-> > > > boards using their revision. This includes all the known revisions for
-> > > > the nyan-big board so that the dtb can be selected preferably.
-> > > 
-> > > May be I am missing something here, but for the mainline there is only
-> > > one dtb available and so why is this needed for the mainline?
-> > 
-> > There is indeed a single dts in mainline, but depthcharge will use the
-> > revision
-> > to match the compatible string (e.g. it will look for google,nyan-big-rev5,
-> > not
-> > google,nyan-big), so we need to list them all in that single dts. Otherwise,
-> > depthcharge will fall back to the default config, which may or may not be
-> > suitable for nyan.
-> 
-> Is tegra124-nyan-big.dtb not the default?
+Le mardi 20 septembre 2016 ? 18:40 +0100, Jon Hunter a ?crit :
+> On 28/08/16 18:32, Paul Kocialkowski wrote:
+> >?
+> > Nyan boards come with an embedded controller that controls when to
+> > enable and disable the charge. Thus, it should not be left up to the
+> > kernel to handle that.
+> >?
+> > Using the ti,external-control property allows specifying this use-case.
+>?
+> So the bq24735 is populated under the EC's 'i2c-tunnel' property which
+> is there to specifically interface it's child devices to the host. So I
+> am a bit confused why this is expose to the host if it should not be used?
 
-You can't expect that to always be the case. The image format allows many
-different dts to be provided, so I could easily build with multi_v7_defconfig
-and have various dts for various devices in the same image, and just select a
-random one as default.
+Well, it needs to access the information in the read-only registers provided by
+the chip, which is allowed by the setup in place that you described.
 
-Here, default is really a fallback, the right one is expected to be detected by
-this mechanism. And it really doesn't hurt to provide that information for
-proper detection.
+However, the EC has its internal state machine that decides when to start
+charging, etc and so should be the only one to write registers, to avoid
+conflicts.
 
-Note that this is done with many other cros devices in mainline (such as rk3288
-veyrons).
+> Again you may right and I did find the original series [0] for this
+> which specifically references the Acer Chromebook that needs this.
+> However, I am not sure why this was never populated? Is there any other
+> history here?
 
--- 
+I am also confused about why it wasn't applied earlier. However, the cros kernel
+is using the very same scheme.
+
+> What is the actual problem you see without making this change?
+
+There is a risk of conflict (even though it's probably not that significant),
+given the low variety of possible cases here. The idea is simply to say that the
+EC is in charge and to let it do its job without interfering.
+
+> The original series states ...
+>?
+> "On Acer Chromebook 13 (CB5-311) this module fails to load if the
+> charger is not inserted, and will error when it is removed."
+
+I'm confused about that comment. At this point (and with this patch), it works
+normally.
+
+> Cheers
+> Jon
+>?
+> [0] http://marc.info/?l=linux-pm&m=145447948705686&w=2
+
+Cheers,
+
+--?
 Paul Kocialkowski, developer of low-level free software for embedded devices
 
 Website: https://www.paulk.fr/
@@ -63,4 +71,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160920/82f5dcd1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160920/19d6ecea/attachment.sig>
