@@ -1,48 +1,54 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 20 Sep 2016 20:39:26 +0800
-Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <VI1PR0401MB1709F91B0C1EB6C80D741E4492F50@VI1PR0401MB1709.eurprd04.prod.outlook.com>
-References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
- <1473741659-17618-1-git-send-email-po.liu@nxp.com>
- <1473741659-17618-3-git-send-email-po.liu@nxp.com>
- <20160918005212.GF15478@tiger>
- <VI1PR0401MB1709F91B0C1EB6C80D741E4492F50@VI1PR0401MB1709.eurprd04.prod.outlook.com>
-Message-ID: <20160920123926.GA3744@tiger>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 20 Sep 2016 14:40:17 +0200
+Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
+ support
+In-Reply-To: <alpine.DEB.2.20.1609201150160.6905@nanos>
+References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
+ <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
+ <alpine.DEB.2.20.1609131713490.6233@nanos>
+ <6941f61d-0b33-4108-0135-b11887cd0488@st.com>
+ <alpine.DEB.2.20.1609141103420.6233@nanos>
+ <facd1c7c-d696-eae1-02e4-5a0c9285add0@st.com>
+ <alpine.DEB.2.20.1609141532510.6233@nanos>
+ <f64e4f9d-d811-2c6e-7c5a-d4ab06716e2c@st.com>
+ <39c4ceee-7e05-ebfd-2ea0-3c4e1c4ea619@st.com>
+ <alpine.DEB.2.20.1609201150160.6905@nanos>
+Message-ID: <053a37f4-aa10-46ea-f477-8ae55bb5773f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 18, 2016 at 03:37:27AM +0000, Po Liu wrote:
-> Hi Shawn,
-> 
-> 
-> >  -----Original Message-----
-> >  From: Shawn Guo [mailto:shawnguo at kernel.org]
-> >  Sent: Sunday, September 18, 2016 8:52 AM
-> >  To: Po Liu
-> >  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang; Arnd
-> >  Bergmann; Marc Zyngier; Stuart Yoder; Leo Li; M.H. Lian; Murali
-> >  Karicheri; Bjorn Helgaas; Mingkai Hu
-> >  Subject: Re: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
-> >  MSI/MSI-X/INTx mode
-> >  
-> >  On Tue, Sep 13, 2016 at 12:40:59PM +0800, Po Liu wrote:
-> >  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-> >  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-> >  > maybe there is interrupt line for aer pme etc. Search the interrupt
-> >  > number in the fdt file. Then fixup the dev->irq with it.
-> >  >
-> >  > Signed-off-by: Po Liu <po.liu@nxp.com>
-> >  
-> >  Will the new kernel work with existing/old DTB?  I'm trying to
-> >  understand the dependency between driver and DTS changes.
-> 
-> Yes, We've never use name 'intr' before. So we remove it is ok. 
-> 'aer' is a dts name for researching it's true interrupt number by kernel. This patch is first time to use name 'aer'. So it must be compatible with existing/old DTB.
+Thomas,
 
-Does that mean driver and DTS changes can go through separate trees,
-i.e. PCI and arm-soc, without introducing regressions on either tree?
-Or does the patch series needs to go in as a whole?
+On 09/20/2016 11:51 AM, Thomas Gleixner wrote:
+> On Tue, 20 Sep 2016, Alexandre Torgue wrote:
+>>> On 09/14/2016 03:34 PM, Thomas Gleixner wrote:
+>>>> Well, you just used some function in some context which is not
+>>>> relevant to
+>>>> the normal operation. So adding that mask() is just paranoia for no
+>>>> value.
+>>>
+>> A gentle reminder ping...
+>> If ".free" callback is not relevant then I 'll remove it from exti domain.
 
-Shawn
+Sorry for discussing about the same thing again (and again) but I just 
+want to be sure before sending a new version. As you know I have 2 
+domains: EXTI domain (parent) and stm32-pinctrl-bank domain (child one).
+
+There does it make sens to have ".free" callbacks defined in both domain 
+(actually if I define one for the child domain I have to define also 
+".free" callback for parent domain (EXTI) as it is hierarchical) ?
+If ".free" have no chance to be called then I will send a new version by 
+removing .free callbacks (in both domain).
+
+Regards
+Alex
+
+>
+> I was not talking about the .free callback in general. I was talking about
+> the masking. But yes, if the thing is otherwise a NOOP, then you can spare
+> it completely.
+>
+> Thanks,
+>
+> 	tglx
+>
