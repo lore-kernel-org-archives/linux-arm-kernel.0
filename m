@@ -1,53 +1,45 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 20 Sep 2016 14:44:16 +0200 (CEST)
-Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
- support
-In-Reply-To: <053a37f4-aa10-46ea-f477-8ae55bb5773f@st.com>
-References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
- <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
- <alpine.DEB.2.20.1609131713490.6233@nanos>
- <6941f61d-0b33-4108-0135-b11887cd0488@st.com>
- <alpine.DEB.2.20.1609141103420.6233@nanos>
- <facd1c7c-d696-eae1-02e4-5a0c9285add0@st.com>
- <alpine.DEB.2.20.1609141532510.6233@nanos>
- <f64e4f9d-d811-2c6e-7c5a-d4ab06716e2c@st.com>
- <39c4ceee-7e05-ebfd-2ea0-3c4e1c4ea619@st.com>
- <alpine.DEB.2.20.1609201150160.6905@nanos>
- <053a37f4-aa10-46ea-f477-8ae55bb5773f@st.com>
-Message-ID: <alpine.DEB.2.20.1609201439440.6905@nanos>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 20 Sep 2016 20:52:05 +0800
+Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <1474259324.15220.5.camel@buserror.net>
+References: <1473469413-11019-1-git-send-email-oss@buserror.net>
+ <1473469413-11019-3-git-send-email-oss@buserror.net>
+ <20160912113615.GA20804@leverpostej>
+ <20160912114406.GG23211@arm.com>
+ <20160912123027.GA13741@leverpostej>
+ <1474259324.15220.5.camel@buserror.net>
+Message-ID: <20160920125205.GB3744@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Sep 2016, Alexandre Torgue wrote:
-
-> Thomas,
-> 
-> On 09/20/2016 11:51 AM, Thomas Gleixner wrote:
-> > On Tue, 20 Sep 2016, Alexandre Torgue wrote:
-> > > > On 09/14/2016 03:34 PM, Thomas Gleixner wrote:
-> > > > > Well, you just used some function in some context which is not
-> > > > > relevant to
-> > > > > the normal operation. So adding that mask() is just paranoia for no
-> > > > > value.
+On Sun, Sep 18, 2016 at 11:28:44PM -0500, Scott Wood wrote:
+> On Mon, 2016-09-12 at 13:30 +0100, Mark Rutland wrote:
+> > On Mon, Sep 12, 2016 at 12:44:07PM +0100, Will Deacon wrote:
+> > > 
+> > > On Mon, Sep 12, 2016 at 12:36:15PM +0100, Mark Rutland wrote:
 > > > > 
-> > > A gentle reminder ping...
-> > > If ".free" callback is not relevant then I 'll remove it from exti domain.
+> > > > The changes in arm64's <asm/arch_timer.h> are going to conflict with
+> > > > some cleanup [1,2] that just landed in the arm64 for-next/core branch.
+> > > > 
+> > > > Could you please rebase atop of that?
+> > > Well, we should figure out what tree this is going through first. There
+> > > are a mixture of arm, arm64, driver and dts changes here and not all
+> > > of it is carrying the appropriate acks for me to queue it.
+> > Given that mix, I had assumed that this would all go through the arm64
+> > tree -- I see that Rob has already acked the binding, and I'm happy to
+> > give my ack for the driver once that's in shape.
+> > 
+> > The dts change could go through arm-soc in parallel, I guess. It doesn't
+> > look like arm-soc have been Cc'd for that, though.
 > 
-> Sorry for discussing about the same thing again (and again) but I just want to
-> be sure before sending a new version. As you know I have 2 domains: EXTI
-> domain (parent) and stm32-pinctrl-bank domain (child one).
-> 
-> There does it make sens to have ".free" callbacks defined in both domain
-> (actually if I define one for the child domain I have to define also ".free"
-> callback for parent domain (EXTI) as it is hierarchical) ?
-> If ".free" have no chance to be called then I will send a new version by
-> removing .free callbacks (in both domain).
+> The arm-soc section of MAINTAINERS says to e-mail linux-arm-kernel, which I
+> did. ?There doesn't appear to be a separate arm-soc mailing list, nor is there
+> a request to CC Olof/Arnd. ?I did CC Shawn Guo who has been handling the
+> device tree patches for these chips.
 
-Free will be called when a interrupt in the child domain is torn down,
-i.e. when irq_domain_free_irqs() is called. And it will be called for both
-domains like the alloc callback is invoked on both domains via
-irq_domain_alloc_irqs().
+This is kind of new feature development, and there is no hard dependency
+between driver and DTS changes.  In this case, we normally pick up the
+DTS patch only after driver part get accepted.
 
-Thanks,
-
-	tglx
+Shawn
