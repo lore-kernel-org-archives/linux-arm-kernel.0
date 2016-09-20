@@ -1,25 +1,45 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 20 Sep 2016 22:00:37 +0200
-Subject: [PATCH 3/4] ARM: dts: socfpga: Add new MCVEVK manufacturer compat
-In-Reply-To: <57E190B6.2060202@opensource.altera.com>
-References: <20160919214044.9615-1-marex@denx.de>
- <20160919214044.9615-3-marex@denx.de>
- <57E190B6.2060202@opensource.altera.com>
-Message-ID: <b414c494-2c9e-cd76-ed33-8581943663cd@denx.de>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 20 Sep 2016 13:02:24 -0700
+Subject: iomux-mx3.h: possible macro precedence issue
+Message-ID: <1474401744.1954.55.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2016 09:40 PM, Dinh Nguyen wrote:
-> On 09/19/2016 04:40 PM, Marek Vasut wrote:
->> The board is now manufactured by Aries Embedded GmbH, update compat string.
->>
-> 
-> Applied. But I think its too late for v4.9.
-> 
-> Dinh
-> 
-4.10 it is then, thanks!
+Julia Lawall wrote a script
 
--- 
-Best regards,
-Marek Vasut
+Link:?http://lkml.kernel.org/r/alpine.DEB.2.10.1609201503260.2914 at hadrien
+
+that found a possible issue with macro argument precedence.
+
+
+diff -u -p a/arch/arm/mach-imx/iomux-mx3.h b/arch/arm/mach-imx/iomux-mx3.h
+--- a/arch/arm/mach-imx/iomux-mx3.h
++++ b/arch/arm/mach-imx/iomux-mx3.h
+@@ -529,7 +529,7 @@ enum iomux_pins {
+ #define MX31_PIN_DCD_DTE1__DCD_DTE2	IOMUX_MODE(MX31_PIN_DCD_DTE1, IOMUX_CONFIG_ALT1)
+ #define MX31_PIN_RI_DTE1__RI_DTE2	IOMUX_MODE(MX31_PIN_RI_DTE1, IOMUX_CONFIG_ALT1)
+ #define MX31_PIN_DSR_DTE1__DSR_DTE2	IOMUX_MODE(MX31_PIN_DSR_DTE1, IOMUX_CONFIG_ALT1)
+-#define MX31_PIN_DTR_DTE1__DTR_DTE2	IOMUX_MODE(MX31_PIN_DTR_DTE1, IOMUX_OCONFIG_ALT3 | IOMUX_ICONFIG_NONE)
++#define MX31_PIN_DTR_DTE1__DTR_DTE2	IOMUX_MODE(MX31_PIN_DTR_DTE1, (IOMUX_OCONFIG_ALT3 | IOMUX_ICONFIG_NONE))
+ #define MX31_PIN_PC_RST__CTS5		IOMUX_MODE(MX31_PIN_PC_RST, IOMUX_CONFIG_ALT2)
+ #define MX31_PIN_PC_VS2__RTS5		IOMUX_MODE(MX31_PIN_PC_VS2, IOMUX_CONFIG_ALT2)
+ #define MX31_PIN_PC_BVD2__TXD5		IOMUX_MODE(MX31_PIN_PC_BVD2, IOMUX_CONFIG_ALT2)
+
+this may be intentional, but perhaps a solution
+would be to use parentheses in the #define IOMUX_MODE 
+
+---
+
+diff --git a/arch/arm/mach-imx/iomux-mx3.h b/arch/arm/mach-imx/iomux-mx3.h
+index 368667b..3f9ede2 100644
+--- a/arch/arm/mach-imx/iomux-mx3.h
++++ b/arch/arm/mach-imx/iomux-mx3.h
+@@ -156,7 +156,7 @@ void mxc_iomux_mode(unsigned int pin_mode);
+ 	(((gpionum << IOMUX_GPIONUM_SHIFT) & IOMUX_GPIONUM_MASK) | \
+ 	 (padnum & IOMUX_PADNUM_MASK))
+ 
+-#define IOMUX_MODE(pin, mode) (pin | mode << IOMUX_MODE_SHIFT)
++#define IOMUX_MODE(pin, mode) ((pin) | ((mode) << IOMUX_MODE_SHIFT))
+ 
+ #define IOMUX_TO_GPIO(iomux_pin) \
+ 	((iomux_pin & IOMUX_GPIONUM_MASK) >> IOMUX_GPIONUM_SHIFT)
