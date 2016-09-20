@@ -1,21 +1,22 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 20 Sep 2016 16:58:42 -0700
-Subject: [PATCH 2/2] clk: imx6: initialize GPU clocks
-In-Reply-To: <1474017371-28966-2-git-send-email-l.stach@pengutronix.de>
+Date: Tue, 20 Sep 2016 16:58:40 -0700
+Subject: [PATCH 1/2] clk: imx6: fix i.MX6DL clock tree to reflect reality
+In-Reply-To: <1474017371-28966-1-git-send-email-l.stach@pengutronix.de>
 References: <1474017371-28966-1-git-send-email-l.stach@pengutronix.de>
- <1474017371-28966-2-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20160920235842.GG8319@codeaurora.org>
+Message-ID: <20160920235840.GF8319@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/16, Lucas Stach wrote:
-> Initialize the GPU clock muxes to sane inputs. Until now they have
-> not been changed from their default values, which means that both
-> GPU3D shader and GPU2D core were fed by clock inputs whose rates
-> exceed the maximium allowed frequency of the cores by as much as
-> 200MHz.
+> The current clock tree only implements the minimal set of differences
+> between the i.MX6Q and the i.MX6DL, but that doesn't really reflect
+> reality.
 > 
-> This fixes a severe GPU stability issue on i.MX6DL.
+> Apply the following fixes to match the RM:
+> - DL has no GPU3D_SHADER_SEL/PODF, the shader domain is clocked by
+>   GPU3D_CORE
+> - GPU3D_SHADER_SEL/PODF has been repurposed as GPU2D_CORE_SEL/PODF
+> - GPU2D_CORE_SEL/PODF has been repurposed as MLB_SEL/PODF
 > 
 > Cc: stable at vger.kernel.org
 > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
