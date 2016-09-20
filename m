@@ -1,35 +1,26 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 20 Sep 2016 10:32:50 -0700
-Subject: [PATCH 0/2] ARM: imx31/of: clk: init clock controller with
- CLK_OF_DECLARE
-In-Reply-To: <20160919055802.dkf2rxcou44kbya5@pengutronix.de>
+Date: Tue, 20 Sep 2016 10:36:46 -0700
+Subject: [PATCH 2/2] clk: imx31: properly init clocks for machines with DT
+In-Reply-To: <1474252939-12579-3-git-send-email-vz@mleia.com>
 References: <1474252939-12579-1-git-send-email-vz@mleia.com>
- <20160919055802.dkf2rxcou44kbya5@pengutronix.de>
-Message-ID: <20160920173250.GB8319@codeaurora.org>
+ <1474252939-12579-3-git-send-email-vz@mleia.com>
+Message-ID: <20160920173646.GC8319@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Mon, Sep 19, 2016 at 05:42:17AM +0300, Vladimir Zapolskiy wrote:
-> > The change is based on v4.8.0-rc1 and plus it depends on this fixup:
-> > 
-> >   ARM: dts: imx31: fix clock control module interrupts description
-> > 
-> > The change is tested on qemu kzm target and mx31lite board, while both
-> > targets don't have DTS in upstream, I had to write simple DTS files for
-> > them, because the proposed change is for i.MX31 targets with OF support.
-> > 
-> > The second change in the series compilation time dependent on the first
-> > one, while the first change apparently should break runtime execution
-> > of i.MX31 boards with OF support, if both changes are applied everything
-> > should be fine, regression testing on the same legacy targets does not
-> 
-> that means this should be done in a single patch.
+On 09/19, Vladimir Zapolskiy wrote:
+> @@ -222,22 +215,31 @@ int __init mx31_clocks_init(unsigned long fref)
+>  	return 0;
+>  }
+>  
+> -int __init mx31_clocks_init_dt(void)
+> +static void __init mx31_clocks_init_dt(struct device_node *np)
 
-Yes, please combine the patches. I can ack it then so it can be
-routed through arm-soc.
+Alternatively we can leave mx31_clocks_init_dt() around as an
+exported API, but make it return 0 immediately in the same patch
+to the clk driver here. Then after rc1 we can delete the "unused"
+function in the clk tree assuming the last caller has been
+deleted through arm-soc.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
