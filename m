@@ -1,40 +1,40 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 19 Sep 2016 21:37:06 -0700
-Subject: [PATCH 3/4] watchdog: sa11x0/pxa: get rid of get_clock_tick_rate
-In-Reply-To: <20160919223616.GN1041@n2100.armlinux.org.uk>
-References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
- <1474312335-20997-4-git-send-email-robert.jarzmik@free.fr>
- <20160919200816.GC29242@roeck-us.net>
- <20160919223616.GN1041@n2100.armlinux.org.uk>
-Message-ID: <0909debb-f7df-648b-95d2-23b535e5b299@roeck-us.net>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 20 Sep 2016 13:43:19 +0900
+Subject: [PATCH] ARM: uniphier: select ARCH_HAS_RESET_CONTROLLER
+Message-ID: <1474346599-29925-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2016 03:36 PM, Russell King - ARM Linux wrote:
-> On Mon, Sep 19, 2016 at 01:08:16PM -0700, Guenter Roeck wrote:
->> On Mon, Sep 19, 2016 at 09:12:14PM +0200, Robert Jarzmik wrote:
->>> The OS timer rate used for the watchdog can now be fetched from the
->>> standard clock API. This will remove the last user of
->>> get_clock_tick_rate() in both pxa and sa11x0 architectures.
->>>
->>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->>
->> Did you test this ? Potential problem, if built into the kernel, could be that
->> the clocks might not be ready by the time the driver is instantiated. Unless
->> this is converted to a platform driver, it won't be able to handle a
->> -EPROBE_DEFER from the clock subsystem.
->
-> Really not a problem at all.  The OSTIMER0 is required for the system
-> tick, and if that's not present, the kernel will be without any kind
-> of time keeping, so a missing watchdog driver is the least of the
-> problems.
->
-> Therefore, both PXA and SA11x0 register their clocks really early to
-> ensure that OSTIMER0 is available by the time_init() stage, which is
-> way before driver probe time.
->
+The UniPhier reset driver (drivers/reset/reset-uniphier.c) has been
+merged.  Select ARCH_HAS_RESET_CONTROLLER from the SoC Kconfig.
 
-You are right. And, at least in qemu, it actually works.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Thanks,
-Guenter
+Philipp,
+
+IIRC, you mentioned that you were planning to consolidate the double
+gurad by CONFIG_RESET_CONTROLLER and CONFIG_ARCH_HAS_RESET_CONTROLLER.
+
+I have not seen it in the ML, so I am sending this.
+
+Please let me know if you have some updates.
+
+
+ arch/arm/mach-uniphier/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/mach-uniphier/Kconfig
+index 82dddee..3930fbb 100644
+--- a/arch/arm/mach-uniphier/Kconfig
++++ b/arch/arm/mach-uniphier/Kconfig
+@@ -1,6 +1,7 @@
+ config ARCH_UNIPHIER
+ 	bool "Socionext UniPhier SoCs"
+ 	depends on ARCH_MULTI_V7
++	select ARCH_HAS_RESET_CONTROLLER
+ 	select ARM_AMBA
+ 	select ARM_GLOBAL_TIMER
+ 	select ARM_GIC
+-- 
+1.9.1
