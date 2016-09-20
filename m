@@ -1,97 +1,177 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 20 Sep 2016 09:23:21 +0200
-Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
- register range for ACPI case
-In-Reply-To: <20160919180900.GB13775@localhost>
-References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <1473449047-10499-4-git-send-email-tn@semihalf.com>
- <20160919180900.GB13775@localhost>
-Message-ID: <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
+From: minghuan.lian@nxp.com (M.H. Lian)
+Date: Tue, 20 Sep 2016 07:25:08 +0000
+Subject: [PATCH 1/2] pci/layercape: disable all iATUs before initialization
+In-Reply-To: <20160914211053.GD13189@localhost>
+References: <1473315950-6396-1-git-send-email-Minghuan.Lian@nxp.com>
+ <20160914211053.GD13189@localhost>
+Message-ID: <VI1PR04MB161515A0B98570FA6CF6C620E8F70@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.09.2016 20:09, Bjorn Helgaas wrote:
-> On Fri, Sep 09, 2016 at 09:24:05PM +0200, Tomasz Nowicki wrote:
->> thunder-pem driver stands for being ACPI based PCI host controller.
->> However, there is no standard way to describe its PEM-specific register
->> ranges in ACPI tables. Thus we add thunder_pem_init() ACPI extension
->> to obtain hardcoded addresses from static resource array.
->> Although it is not pretty, it prevents from creating standard mechanism to
->> handle similar cases in future.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> ---
->>  drivers/pci/host/pci-thunder-pem.c | 61 ++++++++++++++++++++++++++++++--------
->>  1 file changed, 48 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
->> index 6abaf80..b048761 100644
->> --- a/drivers/pci/host/pci-thunder-pem.c
->> +++ b/drivers/pci/host/pci-thunder-pem.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/init.h>
->>  #include <linux/of_address.h>
->>  #include <linux/of_pci.h>
->> +#include <linux/pci-acpi.h>
->>  #include <linux/pci-ecam.h>
->>  #include <linux/platform_device.h>
->>
->> @@ -284,6 +285,40 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
->>  	return pci_generic_config_write(bus, devfn, where, size, val);
->>  }
->>
->> +#ifdef CONFIG_ACPI
->> +static struct resource thunder_pem_reg_res[] = {
->> +	[4] = DEFINE_RES_MEM(0x87e0c0000000UL, SZ_16M),
->> +	[5] = DEFINE_RES_MEM(0x87e0c1000000UL, SZ_16M),
->> +	[6] = DEFINE_RES_MEM(0x87e0c2000000UL, SZ_16M),
->> +	[7] = DEFINE_RES_MEM(0x87e0c3000000UL, SZ_16M),
->> +	[8] = DEFINE_RES_MEM(0x87e0c4000000UL, SZ_16M),
->> +	[9] = DEFINE_RES_MEM(0x87e0c5000000UL, SZ_16M),
->> +	[14] = DEFINE_RES_MEM(0x97e0c0000000UL, SZ_16M),
->> +	[15] = DEFINE_RES_MEM(0x97e0c1000000UL, SZ_16M),
->> +	[16] = DEFINE_RES_MEM(0x97e0c2000000UL, SZ_16M),
->> +	[17] = DEFINE_RES_MEM(0x97e0c3000000UL, SZ_16M),
->> +	[18] = DEFINE_RES_MEM(0x97e0c4000000UL, SZ_16M),
->> +	[19] = DEFINE_RES_MEM(0x97e0c5000000UL, SZ_16M),
->
-> 1) The "correct" way to discover the resources consumed by an ACPI
->    device is to use the _CRS method.  I know there are some issues
->    there for bridges (not the fault of ThunderX!) because there's not
->    a good way to distinguish windows from resources consumed directly
->    by the bridge.
->
->    But we should either do this correctly, or include a comment about
->    why we're doing it wrong, so we don't give the impression that this
->    is the right way to do it.
->
->    I seem to recall some discussion about why we're doing it this way,
->    but I don't remember the details.  It'd be nice to include a
->    summary here.
+Hi Bjorn,
 
-OK I will. The reason why we cannot use _CRS for this case is that 
-CONSUMER flag was not use consistently for the bridge so far.
+Thanks for your reply.
+Please see my comments inline.
 
->
-> 2) This is a little weird because here we define the resource size as
->    16MB, in the OF case we get the resource size from OF, in either
->    case we ioremap 64K of it, and then as far as I can tell, we only
->    ever access PEM_CFG_WR and PEM_CFG_RD, at offsets 0x28 and 0x30
->    into the space.
->
->    If the hardware actually decodes the entire 16MB, we should ioremap
->    the whole 16MB.  (Strictly speaking, drivers only need to ioremap
->    the parts they're using, but in this case nobody claims the entire
->    resource because of deficiencies in the ACPI and OF cores, so the
->    driver should ioremap the entire thing to help prevent conflicts
->    with other devices.)
->
->    It'd be nice if we didn't have the 64KB magic number.  I think
->    using devm_ioremap_resource() would be nice.
+Best Regards,
+Minghuan
 
-I agree.
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: Thursday, September 15, 2016 5:11 AM
+> To: M.H. Lian <minghuan.lian@nxp.com>
+> Cc: linux-pci at vger.kernel.org; Roy Zang <roy.zang@nxp.com>; Arnd
+> Bergmann <arnd@arndb.de>; Jingoo Han <jg1.han@samsung.com>; Stuart
+> Yoder <stuart.yoder@nxp.com>; Leo Li <leoyang.li@nxp.com>; linux-arm-
+> kernel at lists.infradead.org; Bjorn Helgaas <bhelgaas@google.com>; Mingkai
+> Hu <mingkai.hu@nxp.com>
+> Subject: Re: [PATCH 1/2] pci/layercape: disable all iATUs before initialization
+> 
+> On Thu, Sep 08, 2016 at 02:25:49PM +0800, Minghuan Lian wrote:
+> > Layerscape PCIe has 6 outbound iATUs. The bootloader such as u-boot
+> > uses 4 iATUs for CFG0 CFG1 IO and MEM separately. But Designware
+> > driver only uses two outbound iATUs. To avoid conflict between enabled
+> > but unused iATUs with used iATUs under Linux and unexpected behavior,
+> > the patch disables all iATUs before initialization.
+> 
+> Do we need similar changes in other DesignWare-based drivers?
+[Minghuan Lian]  Yes. I think so.  
+I could provide a patch for all the Designware-based drivers. 
+Could you give me suggestion  how to get ATU number of all kinds of PCIe controller?
+1. Add optional "num-atu" property to designware-based PCIe dts node?
+2. The specific driver assign a variable "num-atu" before  calling dw_pcie_host_init()
 
-David, is there anything which prevents us from using 
-devm_ioremap_resource() here with SZ_16M size?
+We could achieve  benefits if   the ATU number is bigger than two (current default value)
+1. A dedicated ATU is for IO map. It will avoid conflict IO and config access simultaneously.
+2. Supports multiple ATUs for prefetchable and non-prefetchable memory and the memory size can be greater than 4G.
 
-Tomasz
+> 
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> > ---
+> >  drivers/pci/host/pci-layerscape.c  | 17 +++++++++++++++--
+> > drivers/pci/host/pcie-designware.c |  7 +++++++
+> > drivers/pci/host/pcie-designware.h |  1 +
+> >  3 files changed, 23 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/pci/host/pci-layerscape.c
+> > b/drivers/pci/host/pci-layerscape.c
+> > index 114ba81..cf783ad 100644
+> > --- a/drivers/pci/host/pci-layerscape.c
+> > +++ b/drivers/pci/host/pci-layerscape.c
+> > @@ -38,6 +38,8 @@
+> >  /* PEX LUT registers */
+> >  #define PCIE_LUT_DBG		0x7FC /* PEX LUT Debug Register */
+> >
+> > +#define PCIE_IATU_NUM		6
+> > +
+> >  struct ls_pcie_drvdata {
+> >  	u32 lut_offset;
+> >  	u32 ltssm_shift;
+> > @@ -55,6 +57,8 @@ struct ls_pcie {
+> >
+> >  #define to_ls_pcie(x)	container_of(x, struct ls_pcie, pp)
+> >
+> > +static void ls_pcie_host_init(struct pcie_port *pp);
+> 
+> I would prefer to reorder the function definitions so the forward declaration
+> is not necessary.  This would be two patches:
+> 
+>   1) Reorder functions (no functional change)
+>   2) Disable iATUs
+[Minghuan Lian] ok. I will change it.
+> 
+> >  static bool ls_pcie_is_bridge(struct ls_pcie *pcie)  {
+> >  	u32 header_type;
+> > @@ -87,6 +91,14 @@ static void ls_pcie_drop_msg_tlp(struct ls_pcie *pcie)
+> >  	iowrite32(val, pcie->dbi + PCIE_STRFMR1);  }
+> >
+> > +static void ls_pcie_disable_outbound_atus(struct ls_pcie *pcie) {
+> > +	int i;
+> > +
+> > +	for (i = 0; i < PCIE_IATU_NUM; i++)
+> > +		dw_pcie_disable_outbound_atu(&pcie->pp, i);
+> 
+> It looks like maybe the DesignWare ATUs are generic enough that we could
+> move the loop into the generic code, e.g.,
+> 
+>   void dw_pcie_disable_outbound_atu(struct pcie_port *pp, int count)
+>   {
+>     int i;
+> 
+>     for (i = 0; i < count; i++) {
+>       dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | i,
+> PCIE_ATU_VIEWPORT);
+>       dw_pcie_writel_rc(pp, 0, PCIE_ATU_CR2);
+>     }
+>   }
+> 
+[Minghuan Lian] Yes.  And,  If we add "num-atu" property to dts node. 
+Designware driver can directly clear ATUs and the specific driver needs to do nothing.
+
+> > +
+> >  static int ls1021_pcie_link_up(struct pcie_port *pp)  {
+> >  	u32 state;
+> > @@ -124,9 +136,8 @@ static void ls1021_pcie_host_init(struct pcie_port
+> *pp)
+> >  	}
+> >  	pcie->index = index[1];
+> >
+> > +	ls_pcie_host_init(pp);
+> >  	dw_pcie_setup_rc(pp);
+> > -
+> > -	ls_pcie_drop_msg_tlp(pcie);
+> 
+> Can you split this to a separate patch?  This hunk changes
+> ls1021_pcie_host_init() so it does several things in addition to
+> ls_pcie_drop_msg_tlp(), and it is unrelated to the "disable iATU" change.
+[Minghuan Lian] OK. I will change it.
+> 
+> >  }
+> >
+> >  static int ls_pcie_link_up(struct pcie_port *pp) @@ -153,6 +164,8 @@
+> > static void ls_pcie_host_init(struct pcie_port *pp)
+> >  	ls_pcie_clear_multifunction(pcie);
+> >  	ls_pcie_drop_msg_tlp(pcie);
+> >  	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);
+> > +
+> > +	ls_pcie_disable_outbound_atus(pcie);
+> >  }
+> >
+> >  static int ls_pcie_msi_host_init(struct pcie_port *pp, diff --git
+> > a/drivers/pci/host/pcie-designware.c
+> > b/drivers/pci/host/pcie-designware.c
+> > index 12afce1..e4d1203 100644
+> > --- a/drivers/pci/host/pcie-designware.c
+> > +++ b/drivers/pci/host/pcie-designware.c
+> > @@ -172,6 +172,13 @@ static void dw_pcie_prog_outbound_atu(struct
+> pcie_port *pp, int index,
+> >  	dw_pcie_readl_rc(pp, PCIE_ATU_CR2, &val);  }
+> >
+> > +void dw_pcie_disable_outbound_atu(struct pcie_port *pp, int index) {
+> > +	dw_pcie_writel_rc(pp, PCIE_ATU_REGION_OUTBOUND | index,
+> > +			  PCIE_ATU_VIEWPORT);
+> > +	dw_pcie_writel_rc(pp, 0, PCIE_ATU_CR2); }
+> > +
+> >  static struct irq_chip dw_msi_irq_chip = {
+> >  	.name = "PCI-MSI",
+> >  	.irq_enable = pci_msi_unmask_irq,
+> > diff --git a/drivers/pci/host/pcie-designware.h
+> > b/drivers/pci/host/pcie-designware.h
+> > index f437f9b..e998bfc 100644
+> > --- a/drivers/pci/host/pcie-designware.h
+> > +++ b/drivers/pci/host/pcie-designware.h
+> > @@ -85,5 +85,6 @@ int dw_pcie_wait_for_link(struct pcie_port *pp);
+> > int dw_pcie_link_up(struct pcie_port *pp);  void
+> > dw_pcie_setup_rc(struct pcie_port *pp);  int dw_pcie_host_init(struct
+> > pcie_port *pp);
+> > +void dw_pcie_disable_outbound_atu(struct pcie_port *pp, int index);
+> >
+> >  #endif /* _PCIE_DESIGNWARE_H */
+> > --
+> > 1.9.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
