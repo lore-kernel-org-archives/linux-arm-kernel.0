@@ -1,31 +1,43 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 20 Sep 2016 21:05:04 +0800
-Subject: [PATCH] tty: amba-pl011: uart_amba_port is not available with
- earlycon function
-In-Reply-To: <1474092878-30034-1-git-send-email-shawn.guo@linaro.org>
-References: <1474092878-30034-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20160920130504.GF3744@tiger>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 20 Sep 2016 08:08:39 -0500
+Subject: [PATCH V6 4/5] PCI: thunder: Enable ACPI PCI controller for
+ ThunderX pass2.x silicon version
+In-Reply-To: <d06879a2-d6e9-5d62-77c5-47eff33d9584@semihalf.com>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <1473449047-10499-5-git-send-email-tn@semihalf.com>
+ <20160919154550.GA13775@localhost>
+ <d06879a2-d6e9-5d62-77c5-47eff33d9584@semihalf.com>
+Message-ID: <20160920130839.GA13855@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 17, 2016 at 02:14:38PM +0800, Shawn Guo wrote:
-> Commit 0e125a5facf8 ("tty: amba-pl011: define flag register bits for ZTE
-> device") changes earlycon function pl011_putc() to use a pointer to
-> uart_amba_port.  This causes a regression when earlycon is enabled,
-> because uart_amba_port is not available yet at earlycon time.  Let's
-> revert the change on pl011_putc() to fix the regression.
+On Tue, Sep 20, 2016 at 09:06:23AM +0200, Tomasz Nowicki wrote:
+> On 19.09.2016 17:45, Bjorn Helgaas wrote:
+> >On Fri, Sep 09, 2016 at 09:24:06PM +0200, Tomasz Nowicki wrote:
+> >>ThunderX PCIe controller to off-chip devices (so-called PEM) is not fully
+> >>compliant with ECAM standard. It uses non-standard configuration space
+> >>accessors (see pci_thunder_pem_ops) and custom configuration space granulation
+> >>(see bus_shift = 24). In order to access configuration space and
+> >>probe PEM as ACPI based PCI host controller we need to add MCFG quirk
+> >>infrastructure. This involves:
+> >>1. Export PEM pci_thunder_pem_ops structure so it is visible to MCFG quirk
+> >>   code.
+> >>2. New quirk entries for each PEM segment. Each contains platform IDs,
+> >>   mentioned pci_thunder_pem_ops and CFG resources.
+> >>
+> >>Quirk is considered for ThunderX silicon pass2.x only which is identified
+> >>via MCFG revision 1.
+> >
+> >Is it really the case that silicon pass2.x has MCFG revision 1, and
+> >silicon pass1.x has MCFG revision 2?  That just seems backwards.
 > 
-> The earlycon support for ZTE device can probably be added later by
-> declaring a new earlycon setup function with a vendor specific
-> compatible.
-> 
-> Reported-by: Sudeep Holla <sudeep.holla@arm.com>
-> Fixes: 0e125a5facf8 ("tty: amba-pl011: define flag register bits for ZTE device")
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> It is weird but silicon pass2.x is more common and it had MCFG
+> revision 1 from the beginning. Unless it is allowed to use MCFG
+> revision 0 ? Then we could use MCFG revision 0 for pass1.x
 
-Hi Sudeep,
+There's no reason to avoid revision 0.  The question is really what
+firmware is already in the field.  We need to accommodate that.  We don't
+want a situation where kernel version X only works with firmware version Y,
+but kernel version X+1 only works with firmware version Y+1.
 
-Can you please confirm if the patch fixes your problem, so that Greg
-knows whether it should be applied?  Thanks.
-
-Shawn
+Bjorn
