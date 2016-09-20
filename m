@@ -1,79 +1,84 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 20 Sep 2016 11:36:47 +0800
-Subject: [PATCH v7 8/8] ARM: dts: imx6q-evi: Fix onboard hub reset line
-In-Reply-To: <1474342607-27512-1-git-send-email-peter.chen@nxp.com>
-References: <1474342607-27512-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1474342607-27512-9-git-send-email-peter.chen@nxp.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 19 Sep 2016 21:35:46 -0700
+Subject: [PATCH 3/4] watchdog: sa11x0/pxa: get rid of get_clock_tick_rate
+In-Reply-To: <1474312335-20997-4-git-send-email-robert.jarzmik@free.fr>
+References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
+ <1474312335-20997-4-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <c87359e7-7d0c-6889-af9d-c2136cb46074@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joshua Clayton <stillcompiling@gmail.com>
+On 09/19/2016 12:12 PM, Robert Jarzmik wrote:
+> The OS timer rate used for the watchdog can now be fetched from the
+> standard clock API. This will remove the last user of
+> get_clock_tick_rate() in both pxa and sa11x0 architectures.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Previously the onboard hub was made to work by treating its
-reset gpio as a regulator enable.
-Get rid of that kludge now that pwseq has added reset gpio support
-Move pin muxing the hub reset pin into the usbh1 group
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Tested-by: Guenter Roeck <linux@roeck-us.net>
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
- 1 file changed, 7 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index 4fa5601..49c6f61 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -54,18 +54,6 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
- 
--	reg_usbh1_vbus: regulator-usbhubreset {
--		compatible = "regulator-fixed";
--		regulator-name = "usbh1_vbus";
--		regulator-min-microvolt = <5000000>;
--		regulator-max-microvolt = <5000000>;
--		enable-active-high;
--		startup-delay-us = <2>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
--		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
--	};
--
- 	reg_usb_otg_vbus: regulator-usbotgvbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb_otg_vbus";
-@@ -204,12 +192,18 @@
- };
- 
- &usbh1 {
--	vbus-supply = <&reg_usbh1_vbus>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh1>;
- 	dr_mode = "host";
- 	disable-over-current;
- 	status = "okay";
-+
-+	usb2415host: hub at 1 {
-+		compatible = "usb424,2513";
-+		reg = <1>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usbotg {
-@@ -467,11 +461,6 @@
- 			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
- 			/* usbh1_b OC */
- 			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
--		>;
--	};
--
--	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
--		fsl,pins = <
- 			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
- 		>;
- 	};
--- 
-2.7.4
+> ---
+>  drivers/watchdog/sa1100_wdt.c | 24 +++++++++++++++++++++++-
+>  1 file changed, 23 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/watchdog/sa1100_wdt.c b/drivers/watchdog/sa1100_wdt.c
+> index e1d39a1e9628..8965e3f536c3 100644
+> --- a/drivers/watchdog/sa1100_wdt.c
+> +++ b/drivers/watchdog/sa1100_wdt.c
+> @@ -22,6 +22,7 @@
+>
+>  #include <linux/module.h>
+>  #include <linux/moduleparam.h>
+> +#include <linux/clk.h>
+>  #include <linux/types.h>
+>  #include <linux/kernel.h>
+>  #include <linux/fs.h>
+> @@ -155,12 +156,27 @@ static struct miscdevice sa1100dog_miscdev = {
+>  };
+>
+>  static int margin __initdata = 60;		/* (secs) Default is 1 minute */
+> +static struct clk *clk;
+>
+>  static int __init sa1100dog_init(void)
+>  {
+>  	int ret;
+>
+> -	oscr_freq = get_clock_tick_rate();
+> +	clk = clk_get(NULL, "OSTIMER0");
+> +	if (IS_ERR(clk)) {
+> +		pr_err("SA1100/PXA2xx Watchdog Timer: clock not found: %d\n",
+> +		       (int) PTR_ERR(clk));
+> +		return PTR_ERR(clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret) {
+> +		pr_err("SA1100/PXA2xx Watchdog Timer: clock failed to prepare+enable: %d\n",
+> +		       ret);
+> +		goto err;
+> +	}
+> +
+> +	oscr_freq = clk_get_rate(clk);
+>
+>  	/*
+>  	 * Read the reset status, and save it for later.  If
+> @@ -176,11 +192,17 @@ static int __init sa1100dog_init(void)
+>  		pr_info("SA1100/PXA2xx Watchdog Timer: timer margin %d sec\n",
+>  			margin);
+>  	return ret;
+> +err:
+> +	clk_disable_unprepare(clk);
+> +	clk_put(clk);
+> +	return ret;
+>  }
+>
+>  static void __exit sa1100dog_exit(void)
+>  {
+>  	misc_deregister(&sa1100dog_miscdev);
+> +	clk_disable_unprepare(clk);
+> +	clk_put(clk);
+>  }
+>
+>  module_init(sa1100dog_init);
+>
