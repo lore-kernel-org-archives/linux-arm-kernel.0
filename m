@@ -1,46 +1,36 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 20 Sep 2016 10:31:08 +0530
-Subject: [PATCH v2 3/6] phy: meson: add USB2 PHY support for Meson8b and
- GXBB
-In-Reply-To: <m2wpi7hmdt.fsf@baylibre.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20160911134111.31141-1-martin.blumenstingl@googlemail.com>
- <20160911134111.31141-4-martin.blumenstingl@googlemail.com>
- <m2a8faxy72.fsf@baylibre.com> <57DCC3CF.9090409@ti.com>
- <m2wpi7hmdt.fsf@baylibre.com>
-Message-ID: <57E0C294.50502@ti.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 20 Sep 2016 07:19:19 +0200
+Subject: [PATCH v2 4/6] net: ethernet: bgmac: convert to feature flags
+In-Reply-To: <CACna6rw1j3myPEkbn+YR71W7CF7Of_yahn9eDT7t3hKWGmWUmg@mail.gmail.com>
+References: <1467932938-21819-1-git-send-email-jon.mason@broadcom.com>
+ <1467932938-21819-5-git-send-email-jon.mason@broadcom.com>
+ <CACna6rw1j3myPEkbn+YR71W7CF7Of_yahn9eDT7t3hKWGmWUmg@mail.gmail.com>
+Message-ID: <CACna6rymVcKV1h_PEvRuCQrtOd4rsqV34bMWzVOof15fdc8KEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 17 August 2016 at 13:34, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> On 8 July 2016 at 01:08, Jon Mason <jon.mason@broadcom.com> wrote:
+>>         mode = (bgmac_read(bgmac, BGMAC_DEV_STATUS) & BGMAC_DS_MM_MASK) >>
+>>                 BGMAC_DS_MM_SHIFT;
+>> -       if (ci->id != BCMA_CHIP_ID_BCM47162 || mode != 0)
+>> +       if (bgmac->feature_flags & BGMAC_FEAT_CLKCTLST || mode != 0)
+>>                 bgmac_set(bgmac, BCMA_CLKCTLST, BCMA_CLKCTLST_FORCEHT);
+>> -       if (ci->id == BCMA_CHIP_ID_BCM47162 && mode == 2)
+>> +       if (bgmac->feature_flags & BGMAC_FEAT_CLKCTLST && mode == 2)
+>>                 bcma_chipco_chipctl_maskset(&bgmac->core->bus->drv_cc, 1, ~0,
+>>                                             BGMAC_CHIPCTL_1_RXC_DLL_BYPASS);
+>
+> Jon, it looks to me you translated two following conditions:
+> ci->id != BCMA_CHIP_ID_BCM47162
+> and
+> ci->id == BCMA_CHIP_ID_BCM47162
+> into the same flag check:
+> bgmac->feature_flags & BGMAC_FEAT_CLKCTLST
+>
+> I don't think it's intentional, is it? Do you have a moment to fix this?
 
+Ping
 
-On Monday 19 September 2016 10:12 PM, Kevin Hilman wrote:
-> Kishon Vijay Abraham I <kishon@ti.com> writes:
-> 
->> Hi Kevin,
->>
->> On Wednesday 14 September 2016 09:36 PM, Kevin Hilman wrote:
->>> Kishon,
->>>
->>> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
->>>
->>>> This is a new driver for the USB PHY found in Meson8b and GXBB SoCs.
->>>>
->>>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>>> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
->>>> Tested-by: Kevin Hilman <khilman@baylibre.com>
->>>
->>> Will you be picking this up for v4.9?
->>
->> It's already late for 4.9. Generally send pull request to Greg around -rc6.
->> This can go only in 4.10.
-> 
-> That's fine.
-> 
-> Does that mean you have it queued someplace?  I don't see it in any of
-> your branches.
-
-I haven't queued so far. I'll create a testing branch to queue pending patches.
-
-Thanks
-Kishon
+-- 
+Rafa?
