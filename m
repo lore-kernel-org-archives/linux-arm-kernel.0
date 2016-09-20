@@ -1,36 +1,27 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 20 Sep 2016 22:43:51 +0800
-Subject: [PATCH 00/19] ARM: imx legacy: move peripheral initializations
- to .init_late
-In-Reply-To: <1474248988-10626-1-git-send-email-vz@mleia.com>
-References: <1474248988-10626-1-git-send-email-vz@mleia.com>
-Message-ID: <20160920144351.GH3744@tiger>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 20 Sep 2016 09:46:45 -0500
+Subject: [PATCH v7 05/22] Docs: dt: document ARM SMMUv3 generic binding
+ usage
+In-Reply-To: <2273645f1fa5c76b6b98b5fd03804ab8b55a7691.1473695704.git.robin.murphy@arm.com>
+References: <cover.1473695704.git.robin.murphy@arm.com>
+ <2273645f1fa5c76b6b98b5fd03804ab8b55a7691.1473695704.git.robin.murphy@arm.com>
+Message-ID: <20160920144645.GA27580@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 04:36:28AM +0300, Vladimir Zapolskiy wrote:
-> Vladimir Zapolskiy (19):
->   ARM: imx legacy: kzm: move peripheral initialization to .init_late
->   ARM: imx legacy: mx31lite: move peripheral initialization to .init_late
->   ARM: imx legacy: mx31ads: move peripheral initialization to .init_late
->   ARM: imx legacy: mx31lilly: move peripheral initialization to .init_late
->   ARM: imx legacy: pcm037: move peripheral initialization to .init_late
->   ARM: imx legacy: mx31-3ds: move peripheral initialization to .init_late
->   ARM: imx legacy: qong: move peripheral initialization to .init_late
->   ARM: imx legacy: armadillo5x0: move peripheral initialization to .init_late
->   ARM: imx legacy: mx31moboard: move peripheral initialization to .init_late
->   ARM: imx legacy: vpr200: move peripheral initialization to .init_late
->   ARM: imx legacy: imx27-visstrim-m10: move peripheral initialization to .init_late
->   ARM: imx legacy: mx27-3ds: move peripheral initialization to .init_late
->   ARM: imx legacy: mx35-3ds: move peripheral initialization to .init_late
->   ARM: imx legacy: apf9328: move peripheral initialization to .init_late
->   ARM: imx legacy: scb9328: move peripheral initialization to .init_late
->   ARM: imx legacy: pcm043: move peripheral initialization to .init_late
->   ARM: imx legacy: mx21ads: move peripheral initialization to .init_late
->   ARM: imx legacy: mx27ads: move peripheral initialization to .init_late
->   ARM: imx legacy: pca100: move peripheral initialization to .init_late
+On Mon, Sep 12, 2016 at 05:13:43PM +0100, Robin Murphy wrote:
+> We're about to ratify our use of the generic binding, so document it.
+> 
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> ---
+> 
+> - Reference PCI "iommu-map" binding instead, as that's our main concern
+> - Fix "IDs" typo
+> ---
+>  Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
 
-Applied all, except patch #14 (apf9328) and #15 (scb9328), which are
-removed during this development cycle.
-
-Shawn
+Acked-by: Rob Herring <robh@kernel.org>
