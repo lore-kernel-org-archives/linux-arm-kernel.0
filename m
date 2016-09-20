@@ -1,64 +1,167 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 20 Sep 2016 17:07:06 +0200
-Subject: [PATCH 2/2] arm64: dts: marvell: fix clocksource for CP110 slave
- SPI0
-In-Reply-To: <1473183672-12028-3-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Tue, 6 Sep 2016 19:41:12 +0200")
-References: <1473183672-12028-1-git-send-email-mw@semihalf.com>
- <1473183672-12028-3-git-send-email-mw@semihalf.com>
-Message-ID: <87pony625h.fsf@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 20 Sep 2016 16:09:25 +0100
+Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
+ register range for ACPI case
+In-Reply-To: <20160920140518.GD13855@localhost>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <1473449047-10499-4-git-send-email-tn@semihalf.com>
+ <20160919180900.GB13775@localhost>
+ <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
+ <20160920133327.GB13855@localhost>
+ <CAKv+Gu-AE7fft_j2cqBCN=xrsf5Yh=mePf5x3dZJuKAmdxF-Gg@mail.gmail.com>
+ <20160920140518.GD13855@localhost>
+Message-ID: <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof and Arnd,
- 
- On mar., sept. 06 2016, Marcin Wojtas <mw@semihalf.com> wrote:
-
-> I2C and SPI interfaces share common clock trees within the CP110 HW block.
-> It occurred that SPI0 interface has wrong clock assignment in the device
-> tree, which is fixed in this commit to a proper value.
+On 20 September 2016 at 15:05, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> Hi Ard,
 >
-> Fixes: c749b8d9de32 ("arm64: dts: marvell: add description for the ...")
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Could you take this patch for 4.9? I didn't realized at first view it
-was for 4.9, I though I could put it the PR for fixes for 4.8.
-
-I can do a new PR for dt64 with this single patch if you prefer.
-
-The last option will be to have it as a fix for v4.9-rc2.
-
-Thanks,
-
-Gregory
-
-
-
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> On Tue, Sep 20, 2016 at 02:40:13PM +0100, Ard Biesheuvel wrote:
+>> On 20 September 2016 at 14:33, Bjorn Helgaas <helgaas@kernel.org> wrote:
+>> > [+cc Rafael (maybe already cc'd; I didn't recognize rafael at kernel.org, Duc]
+>> >
+>> > On Tue, Sep 20, 2016 at 09:23:21AM +0200, Tomasz Nowicki wrote:
+>> >> On 19.09.2016 20:09, Bjorn Helgaas wrote:
+>> >> >On Fri, Sep 09, 2016 at 09:24:05PM +0200, Tomasz Nowicki wrote:
+>> >> >>thunder-pem driver stands for being ACPI based PCI host controller.
+>> >> >>However, there is no standard way to describe its PEM-specific register
+>> >> >>ranges in ACPI tables. Thus we add thunder_pem_init() ACPI extension
+>> >> >>to obtain hardcoded addresses from static resource array.
+>> >> >>Although it is not pretty, it prevents from creating standard mechanism to
+>> >> >>handle similar cases in future.
+>> >> >>
+>> >> >>Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> >> >>---
+>> >> >> drivers/pci/host/pci-thunder-pem.c | 61 ++++++++++++++++++++++++++++++--------
+>> >> >> 1 file changed, 48 insertions(+), 13 deletions(-)
+>> >> >>
+>> >> >>diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+>> >> >>index 6abaf80..b048761 100644
+>> >> >>--- a/drivers/pci/host/pci-thunder-pem.c
+>> >> >>+++ b/drivers/pci/host/pci-thunder-pem.c
+>> >> >>@@ -18,6 +18,7 @@
+>> >> >> #include <linux/init.h>
+>> >> >> #include <linux/of_address.h>
+>> >> >> #include <linux/of_pci.h>
+>> >> >>+#include <linux/pci-acpi.h>
+>> >> >> #include <linux/pci-ecam.h>
+>> >> >> #include <linux/platform_device.h>
+>> >> >>
+>> >> >>@@ -284,6 +285,40 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
+>> >> >>    return pci_generic_config_write(bus, devfn, where, size, val);
+>> >> >> }
+>> >> >>
+>> >> >>+#ifdef CONFIG_ACPI
+>> >> >>+static struct resource thunder_pem_reg_res[] = {
+>> >> >>+   [4] = DEFINE_RES_MEM(0x87e0c0000000UL, SZ_16M),
+>> >> >>+   [5] = DEFINE_RES_MEM(0x87e0c1000000UL, SZ_16M),
+>> >> >>+   [6] = DEFINE_RES_MEM(0x87e0c2000000UL, SZ_16M),
+>> >> >>+   [7] = DEFINE_RES_MEM(0x87e0c3000000UL, SZ_16M),
+>> >> >>+   [8] = DEFINE_RES_MEM(0x87e0c4000000UL, SZ_16M),
+>> >> >>+   [9] = DEFINE_RES_MEM(0x87e0c5000000UL, SZ_16M),
+>> >> >>+   [14] = DEFINE_RES_MEM(0x97e0c0000000UL, SZ_16M),
+>> >> >>+   [15] = DEFINE_RES_MEM(0x97e0c1000000UL, SZ_16M),
+>> >> >>+   [16] = DEFINE_RES_MEM(0x97e0c2000000UL, SZ_16M),
+>> >> >>+   [17] = DEFINE_RES_MEM(0x97e0c3000000UL, SZ_16M),
+>> >> >>+   [18] = DEFINE_RES_MEM(0x97e0c4000000UL, SZ_16M),
+>> >> >>+   [19] = DEFINE_RES_MEM(0x97e0c5000000UL, SZ_16M),
+>> >> >
+>> >> >1) The "correct" way to discover the resources consumed by an ACPI
+>> >> >   device is to use the _CRS method.  I know there are some issues
+>> >> >   there for bridges (not the fault of ThunderX!) because there's not
+>> >> >   a good way to distinguish windows from resources consumed directly
+>> >> >   by the bridge.
+>> >> >
+>> >> >   But we should either do this correctly, or include a comment about
+>> >> >   why we're doing it wrong, so we don't give the impression that this
+>> >> >   is the right way to do it.
+>> >> >
+>> >> >   I seem to recall some discussion about why we're doing it this way,
+>> >> >   but I don't remember the details.  It'd be nice to include a
+>> >> >   summary here.
+>> >>
+>> >> OK I will. The reason why we cannot use _CRS for this case is that
+>> >> CONSUMER flag was not use consistently for the bridge so far.
+>> >
+>> > Yes, I'm aware of that problem, but hard-coding resources into drivers
+>> > is just a disaster.  The PCI and ACPI cores need generic ways to learn
+>> > what resources are consumed by devices.  For PCI devices, that's done
+>> > with BARs.  For ACPI devices, it's done with _CRS.  Without generic
+>> > resource discovery, we can't manage resources reliably at the system
+>> > level [1].
+>> >
+>> > You have a PNP0A03/PNP0A08 device for the PCI host bridge.  Because of
+>> > the BIOS bugs in CONSUMER flag usage, we assume everything in its _CRS
+>> > is a window and not consumed by the bridge itself.  What if you added
+>> > a companion ACPI device with a _CRS that contained the bridge
+>> > resources?  Then you'd have some driver ugliness to find that device,
+>> > but at least the ACPI core could tell what resources were in use.
+>> >
+>> > Maybe Rafael has a better idea?
+>>
+>> In the discussions leading up to this, we tried very hard to make this
+>> arm64/acpi quirks mechanism just as flexible as we need it to be to
+>> cover the current crop of incompatible hardware, but not more so.
+>> Going forward, we intend to require all arm64/acpi hardware to be spec
+>> compliant, and so any parametrization beyond what is required for the
+>> currently known broken hardware is only going to make it easier for
+>> others to ship with tweaked ACPI descriptions so that an existing
+>> quirk is triggered for hardware that it was not intended for. It also
+>> implies that we have to deal with the ACPI descriptions as they were
+>> shipped with the current hardware.
+>>
+>> That does not mean, of course, that we should use bare constants
+>> rather than symbolic ones, but anything beyond that exceeds the
+>> desired scope of quirks handling.
 >
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index 37bff70..150675c 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -133,7 +133,7 @@
->  				#address-cells = <0x1>;
->  				#size-cells = <0x0>;
->  				cell-index = <1>;
-> -				clocks = <&cps_syscon0 0 3>;
-> +				clocks = <&cps_syscon0 1 21>;
->  				status = "disabled";
->  			};
->  
-> -- 
-> 1.8.3.1
+> Symbolic vs bare constants is the least of my worries.  I'm pretty
+> happy with the current quirk implementation.  It's pretty simple and
+> straightforward.
 >
+
+OK, good to know that we are on the right track here.
+
+> Apparently you shipped broken firmware that doesn't accurately
+> describe system resource usage.  Presumably that firmware could be
+> updated, but maybe it's worthwhile to work around it in the kernel,
+> depending on where it got shipped.
+>
+
+None of these platforms can be fixed entirely in software, and given
+that we will not be adding quirks for new broken hardware, we should
+ask ourselves whether having two versions of a quirk, i.e., one for
+broken hardware + currently shipping firmware, and one for the same
+broken hardware with fixed firmware is really an improvement over what
+has been proposed here.
+
+> I'd like to step back and come up with some understanding of how
+> non-broken firmware *should* deal with this issue.  Then, if we *do*
+> work around this particular broken firmware in the kernel, it would be
+> nice to do it in a way that fits in with that understanding.
+>
+> For example, if a companion ACPI device is the preferred solution, an
+> ACPI quirk could fabricate a device with the required resources.  That
+> would address the problem closer to the source and make it more likely
+> that the rest of the system will work correctly: /proc/iomem could
+> make sense, things that look at _CRS generically would work (e.g,
+> /sys/, an admittedly hypothetical "lsacpi", etc.)
+>
+> Hard-coding stuff in drivers is a point solution that doesn't provide
+> any guidance for future platforms and makes it likely that the hack
+> will get copied into even more drivers.
+>
+
+OK, I see. But the guidance for future platforms should be 'do not
+rely on quirks', and what I am arguing here is that the more we polish
+up this code and make it clean and reusable, the more likely it is
+that will end up getting abused by new broken hardware that we set out
+to reject entirely in the first place.
+
+So of course, if the quirk involves claiming resources, let's make
+sure that this occurs in the cleanest and most compliant way possible.
+But any factoring/reuse concerns other than for the current crop of
+broken hardware should be avoided imo.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ard.
