@@ -1,42 +1,67 @@
-From: sergio.prado@e-labworks.com (Sergio Prado)
-Date: Mon, 19 Sep 2016 23:31:49 -0300
-Subject: [PATCH] mtd: s3c2410: add device tree support
-In-Reply-To: <f8907616-0d6b-37ef-1419-f6aedf3ddbdc@samsung.com>
-References: <CGME20160917152404eucas1p2ca0ebfe59dd762f5cdd611a9dd3cd1a5@eucas1p2.samsung.com>
- <1474125760-28168-1-git-send-email-sergio.prado@e-labworks.com>
- <f8907616-0d6b-37ef-1419-f6aedf3ddbdc@samsung.com>
-Message-ID: <20160920023149.GC11294@n1>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 20 Sep 2016 10:43:10 +0800
+Subject: [RFC PATCH v2 11/11] irqchip: mbigen: promote mbigen init
+In-Reply-To: <57DFBA0D.7040801@arm.com>
+References: <1473862879-7769-1-git-send-email-guohanjun@huawei.com>
+ <1473862879-7769-12-git-send-email-guohanjun@huawei.com>
+ <57DABD2F.1030606@arm.com> <3f9b5a3e-13f4-75a4-15bc-f55e26740205@linaro.org>
+ <57DFBA0D.7040801@arm.com>
+Message-ID: <57E0A23E.2090609@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 12:44:07PM +0200, Sylwester Nawrocki wrote:
-> On 09/17/2016 05:22 PM, Sergio Prado wrote:
-> > +static int s3c24xx_nand_probe_dt(struct platform_device *pdev)
-> > +{
-> > +	const struct s3c24XX_nand_devtype_data *devtype_data;
-> > +	struct s3c2410_platform_nand *pdata;
-> > +	struct s3c2410_nand_info *info = platform_get_drvdata(pdev);
-> > +	struct device_node *np = pdev->dev.of_node, *child;
-> > +	const struct of_device_id *of_id;
-> > +	struct s3c2410_nand_set *sets;
-> > +
-> > +	of_id = of_match_device(s3c24xx_nand_dt_ids, &pdev->dev);
-> > +	if (!of_id)
-> > +		return 1;
-> > +
-> > +	devtype_data = of_id->data;
-> 
-> You could make it a bit simpler with of_device_get_match_data().
+On 2016/9/19 18:12, Marc Zyngier wrote:
+> On 19/09/16 10:49, Hanjun Guo wrote:
+>> On 2016/9/15 23:24, Marc Zyngier wrote:
+>>> On 14/09/16 15:21, Hanjun Guo wrote:
+>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>
+>>>> mbigen is an irqchip and it needs to be probed before
+>>>> devices, same logic is used for SMMU and etc., let's
+>>>> use arch_initcall instead of platform init for mbigen.
+>>>>
+>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>>> Cc: Ma Jun <majun258@huawei.com>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> ---
+>>>>  drivers/irqchip/irq-mbigen.c | 6 +++++-
+>>>>  1 file changed, 5 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+>>>> index ca6add1..3a33de6 100644
+>>>> --- a/drivers/irqchip/irq-mbigen.c
+>>>> +++ b/drivers/irqchip/irq-mbigen.c
+>>>> @@ -374,7 +374,11 @@ static struct platform_driver mbigen_platform_driver = {
+>>>>  	.probe			= mbigen_device_probe,
+>>>>  };
+>>>>
+>>>> -module_platform_driver(mbigen_platform_driver);
+>>>> +static __init int mbigen_init(void)
+>>>> +{
+>>>> +	return platform_driver_register(&mbigen_platform_driver);
+>>>> +}
+>>>> +arch_initcall(mbigen_init);
+>>>>
+>>>>  MODULE_AUTHOR("Jun Ma <majun258@huawei.com>");
+>>>>  MODULE_AUTHOR("Yun Wu <wuyun.wu@huawei.com>");
+>>>>
+>>> I've already NACKed such a patch in the past, and I will carry on
+>>> NACKing it until all the other avenues (like properly tracking device
+>>> dependencies) have been explored and have been proven not to be fit for
+>>> purpose.
+>> I'd happy to work on this to make progress.
+>>
+>>> Rafael had proposed something around this subject last year, and I've
+>> Sorry, obviously I missed something, could you give me the link about
+>> Rafael's patches? I will pull back and test it on our hardware.
+> Please see this discussion from almost a year ago:
+>
+> https://patchwork.kernel.org/patch/7407401/
+>
+> in which I give the existing pointers and explain why I'm pushing back
+> on things like this patch.
 
-I wasn't aware of this interface. I'll use it. Thanks!
+We (Majun and me ) will look into it, thanks!
 
-> 
-> --
-> Thanks,
-> Sylwester
-
--- 
-Sergio Prado
-Embedded Labworks
-Office: +55 11 2628-3461
-Mobile: +55 11 97123-3420
+Hanjun
