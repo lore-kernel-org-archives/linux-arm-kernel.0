@@ -1,11 +1,10 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Tue, 20 Sep 2016 16:52:03 +0930
-Subject: [PATCH v3 2/3] ARM: aspeed: Add defconfigs for
- CONFIG_ASPEED_BT_IPMI_BMC
-In-Reply-To: <1474354900-5618-3-git-send-email-clg@kaod.org>
+Date: Tue, 20 Sep 2016 16:52:36 +0930
+Subject: [PATCH v3 3/3] ARM: dts: aspeed: Enable BT IPMI BMC device
+In-Reply-To: <1474354900-5618-4-git-send-email-clg@kaod.org>
 References: <1474354900-5618-1-git-send-email-clg@kaod.org>
- <1474354900-5618-3-git-send-email-clg@kaod.org>
-Message-ID: <CACPK8XdtaoMqVc-x3cc6Tp9hfWfXiGFJk2aPYjYMinE=EqFH2Q@mail.gmail.com>
+ <1474354900-5618-4-git-send-email-clg@kaod.org>
+Message-ID: <CACPK8XdTTuFSTEn7TkNfOBSMgNK-OYxXuS5Mc+CSN749Hb2GXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,45 +13,56 @@ On Tue, Sep 20, 2016 at 4:31 PM, C?dric Le Goater <clg@kaod.org> wrote:
 
 Acked-by: Joel Stanley <joel@jms.id.au>
 
-I'll this in my tree to send to Arnd.
+I'll put this in my tree to send to Arnd.
 
 Cheers,
 
 Joel
+
 > ---
 >
 >  Changes since v1:
 >
->  - renamed config option
+>  - added the soc name ast2400 in the compatible cell
 >
->  arch/arm/configs/aspeed_g4_defconfig | 1 +
->  arch/arm/configs/aspeed_g5_defconfig | 1 +
->  2 files changed, 2 insertions(+)
+>  arch/arm/boot/dts/aspeed-g4.dtsi | 6 ++++++
+>  arch/arm/boot/dts/aspeed-g5.dtsi | 6 ++++++
+>  2 files changed, 12 insertions(+)
 >
-> diff --git a/arch/arm/configs/aspeed_g4_defconfig b/arch/arm/configs/aspeed_g4_defconfig
-> index ca39c04fec6b..af3847db00f8 100644
-> --- a/arch/arm/configs/aspeed_g4_defconfig
-> +++ b/arch/arm/configs/aspeed_g4_defconfig
-> @@ -53,6 +53,7 @@ CONFIG_SERIAL_8250_RUNTIME_UARTS=6
->  CONFIG_SERIAL_8250_EXTENDED=y
->  CONFIG_SERIAL_8250_SHARE_IRQ=y
->  CONFIG_SERIAL_OF_PLATFORM=y
-> +CONFIG_ASPEED_BT_IPMI_BMC=y
->  # CONFIG_HW_RANDOM is not set
->  # CONFIG_USB_SUPPORT is not set
->  # CONFIG_IOMMU_SUPPORT is not set
-> diff --git a/arch/arm/configs/aspeed_g5_defconfig b/arch/arm/configs/aspeed_g5_defconfig
-> index 4f366b0370e9..5d46290736fb 100644
-> --- a/arch/arm/configs/aspeed_g5_defconfig
-> +++ b/arch/arm/configs/aspeed_g5_defconfig
-> @@ -54,6 +54,7 @@ CONFIG_SERIAL_8250_RUNTIME_UARTS=6
->  CONFIG_SERIAL_8250_EXTENDED=y
->  CONFIG_SERIAL_8250_SHARE_IRQ=y
->  CONFIG_SERIAL_OF_PLATFORM=y
-> +CONFIG_ASPEED_BT_IPMI_BMC=y
->  # CONFIG_HW_RANDOM is not set
->  # CONFIG_USB_SUPPORT is not set
->  # CONFIG_IOMMU_SUPPORT is not set
+> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+> index 22dee5937d5c..7bb00b6f13d8 100644
+> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+> @@ -82,6 +82,12 @@
+>                                 clocks = <&clk_apb>;
+>                         };
+>
+> +                       ibt: ibt at 1e789140 {
+> +                               compatible = "aspeed,ast2400-bt-bmc";
+> +                               reg = <0x1e789140 0x18>;
+> +                               interrupts = <8>;
+> +                       };
+> +
+>                         wdt1: wdt at 1e785000 {
+>                                 compatible = "aspeed,wdt";
+>                                 reg = <0x1e785000 0x1c>;
+> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+> index dd94d9361fda..1d8f81b548b3 100644
+> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+> @@ -86,6 +86,12 @@
+>                                 clocks = <&clk_apb>;
+>                         };
+>
+> +                       ibt: ibt at 1e789140 {
+> +                               compatible = "aspeed,ast2400-bt-bmc";
+> +                               reg = <0x1e789140 0x18>;
+> +                               interrupts = <8>;
+> +                       };
+> +
+>                         wdt1: wdt at 1e785000 {
+>                                 compatible = "aspeed,wdt";
+>                                 reg = <0x1e785000 0x1c>;
 > --
 > 2.7.4
 >
