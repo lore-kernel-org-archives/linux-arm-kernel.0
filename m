@@ -1,36 +1,28 @@
-From: rric@kernel.org (Robert Richter)
-Date: Tue, 20 Sep 2016 15:21:20 +0200
-Subject: [PATCH] arm64, numa: Add cpu_to_node() implementation.
-In-Reply-To: <57E11E52.8060303@linaro.org>
-References: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
- <20160920104348.GP25086@rric.localdomain>
- <57E11E52.8060303@linaro.org>
-Message-ID: <20160920132120.GQ25086@rric.localdomain>
+From: michael@amarulasolutions.com (Michael Trimarchi)
+Date: Tue, 20 Sep 2016 15:23:02 +0200
+Subject: [PATCH v4 2/5] ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
+ initial support
+In-Reply-To: <CAOMZO5B_ahBJr_Tgz_HShmG9heUwCj4K0N3FHhxja1yg0gCUGA@mail.gmail.com>
+References: <1473618641-10159-1-git-send-email-jagan@amarulasolutions.com>
+ <1473618641-10159-3-git-send-email-jagan@amarulasolutions.com>
+ <CAOMZO5CsrrqqUPaVbU-ya79VSXgxyspa_fbr8HY1voJgpy2LLg@mail.gmail.com>
+ <CAMty3ZDKrXxmwDFxSBvL_anJQPdXEfnJ40uNv5B6KssQyJJKhA@mail.gmail.com>
+ <CAOMZO5B_ahBJr_Tgz_HShmG9heUwCj4K0N3FHhxja1yg0gCUGA@mail.gmail.com>
+Message-ID: <CAOf5uw=bMMa98RP=kvA=NfS89TWOEqU3Q2HjpEmzUTVrdg2=sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.09.16 19:32:34, Hanjun Guo wrote:
-> On 09/20/2016 06:43 PM, Robert Richter wrote:
+Hi Fabio
 
-> >Unfortunately either your nor my code does fix the BUG_ON() I see with
-> >the numa kernel:
-> >
-> >  kernel BUG at mm/page_alloc.c:1848!
-> >
-> >See below for the core dump. It looks like this happens due to moving
-> >a mem block where first and last page are mapped to different numa
-> >nodes, thus, triggering the BUG_ON().
-> 
-> Didn't triggered it on our NUMA hardware, could you provide your
-> config then we can have a try?
+On Wed, Sep 14, 2016 at 8:00 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Wed, Sep 14, 2016 at 2:43 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+>> OK, but where it showed on the processor manual? I only find LDO_2P5
+>
+> It is not a SoC regulator. It is the regulator that powers the CAN transceiver.
 
-Config attached. Other configs with an initrd fail too.
+Engicam use fixed regulator always on and on on boot. Their board does
+not have any
+external pmu. Is this answer to your comment?
 
--Robert
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: config-4.8.0-rc5.vanilla5.xz
-Type: application/x-xz
-Size: 35316 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160920/8f9a3512/attachment-0001.xz>
+Michael
