@@ -1,40 +1,77 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 20 Sep 2016 13:43:19 +0900
-Subject: [PATCH] ARM: uniphier: select ARCH_HAS_RESET_CONTROLLER
-Message-ID: <1474346599-29925-1-git-send-email-yamada.masahiro@socionext.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 20 Sep 2016 10:15:19 +0530
+Subject: [PATCH 1/2] phy-sun4i-usb: Add sun4i_usb_phy_force_session_end()
+ function
+In-Reply-To: <20160918165018.24547-1-hdegoede@redhat.com>
+References: <20160918165018.24547-1-hdegoede@redhat.com>
+Message-ID: <57E0BEDF.2020603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UniPhier reset driver (drivers/reset/reset-uniphier.c) has been
-merged.  Select ARCH_HAS_RESET_CONTROLLER from the SoC Kconfig.
+Hi,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+On Sunday 18 September 2016 10:20 PM, Hans de Goede wrote:
+> The sunxi musb has a bug where sometimes it will generate a babble
+> error on device disconnect instead of a disconnect irq. When this
+> happens the musb-controller switches from host mode to device mode
+> (it clears MUSB_DEVCTL_SESSION and sets MUSB_DEVCTL_BDEVICE) and
+> gets stuck in this state.
+> 
+> Clearing this requires reporting Vbus low for 200 or more ms, but
+> on some devices Vbus is simply always high (host-only mode, no Vbus
+> control). The phy-sun4i-usb code already has code to force a session
+> end for devices without Vbus control.
+> 
+> This commit adds a sun4i_usb_phy_force_session_end() function exporting
+> this functionality to the sunxi-musb glue, so that it can force a session
+> end to fixup the stuck state after a babble error.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/phy/phy-sun4i-usb.c       | 11 +++++++++++
+>  include/linux/phy/phy-sun4i-usb.h |  7 +++++++
+>  2 files changed, 18 insertions(+)
+> 
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index 43c0d98..06f4e11a 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -470,6 +470,17 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
+>  }
+>  EXPORT_SYMBOL_GPL(sun4i_usb_phy_set_squelch_detect);
+>  
+> +void sun4i_usb_phy_force_session_end(struct phy *_phy)
+> +{
+> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+> +
+> +	data->id_det = -1;
+> +	data->force_session_end = true;
+> +	queue_delayed_work(system_wq, &data->detect, 0);
+> +}
+> +EXPORT_SYMBOL_GPL(sun4i_usb_phy_force_session_end);
 
-Philipp,
+Er.. one more export symbol :-(
+> +
+>  static const struct phy_ops sun4i_usb_phy_ops = {
+>  	.init		= sun4i_usb_phy_init,
+>  	.exit		= sun4i_usb_phy_exit,
+> diff --git a/include/linux/phy/phy-sun4i-usb.h b/include/linux/phy/phy-sun4i-usb.h
+> index 50aed92..3bb773f 100644
+> --- a/include/linux/phy/phy-sun4i-usb.h
+> +++ b/include/linux/phy/phy-sun4i-usb.h
+> @@ -23,4 +23,11 @@
+>   */
+>  void sun4i_usb_phy_set_squelch_detect(struct phy *phy, bool enabled);
+>  
+> +/**
+> + * sun4i_usb_force_session_end() - Force the current session to end
+> + *				   by reporting VBus low for 200+ ms
+> + * @phy: reference to a sun4i usb phy
+> + */
+> +void sun4i_usb_phy_force_session_end(struct phy *phy);
 
-IIRC, you mentioned that you were planning to consolidate the double
-gurad by CONFIG_RESET_CONTROLLER and CONFIG_ARCH_HAS_RESET_CONTROLLER.
+Should we include a static inline function if sun4i phy is not defined?
 
-I have not seen it in the ML, so I am sending this.
-
-Please let me know if you have some updates.
-
-
- arch/arm/mach-uniphier/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/mach-uniphier/Kconfig
-index 82dddee..3930fbb 100644
---- a/arch/arm/mach-uniphier/Kconfig
-+++ b/arch/arm/mach-uniphier/Kconfig
-@@ -1,6 +1,7 @@
- config ARCH_UNIPHIER
- 	bool "Socionext UniPhier SoCs"
- 	depends on ARCH_MULTI_V7
-+	select ARCH_HAS_RESET_CONTROLLER
- 	select ARM_AMBA
- 	select ARM_GLOBAL_TIMER
- 	select ARM_GIC
--- 
-1.9.1
+Thanks
+Kishon
