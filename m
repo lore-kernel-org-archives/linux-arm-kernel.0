@@ -1,92 +1,58 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 20 Sep 2016 10:07:16 -0400
-Subject: ftrace function_graph causes system crash
-In-Reply-To: <7d0e88fff8e64591ac31be3adbbf763c@SIWEX5A.sing.micron.com>
-References: <7d0e88fff8e64591ac31be3adbbf763c@SIWEX5A.sing.micron.com>
-Message-ID: <20160920100716.131d3647@gandalf.local.home>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 20 Sep 2016 22:12:42 +0800
+Subject: [PATCH] arm64, numa: Add cpu_to_node() implementation.
+In-Reply-To: <20160920133813.GR25086@rric.localdomain>
+References: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160920104348.GP25086@rric.localdomain> <57E11E52.8060303@linaro.org>
+ <20160920133813.GR25086@rric.localdomain>
+Message-ID: <57E143DA.5030602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Sep 2016 13:10:39 +0000
-"Bean Huo (beanhuo)" <beanhuo@micron.com> wrote:
+On 09/20/2016 09:38 PM, Robert Richter wrote:
+> On 20.09.16 19:32:34, Hanjun Guo wrote:
+>> On 09/20/2016 06:43 PM, Robert Richter wrote:
+>
+>>> Instead we need to make sure the set_*numa_node() functions are called
+>>> earlier before secondary cpus are booted. My suggested change for that
+>>> is this:
+>>>
+>>>
+>>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>>> index d93d43352504..952365c2f100 100644
+>>> --- a/arch/arm64/kernel/smp.c
+>>> +++ b/arch/arm64/kernel/smp.c
+>>> @@ -204,7 +204,6 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+>>>   static void smp_store_cpu_info(unsigned int cpuid)
+>>>   {
+>>>   	store_cpu_topology(cpuid);
+>>> -	numa_store_cpu_info(cpuid);
+>>>   }
+>>>
+>>>   /*
+>>> @@ -719,6 +718,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>>>   			continue;
+>>>
+>>>   		set_cpu_present(cpu, true);
+>>> +		numa_store_cpu_info(cpu);
+>>>   	}
+>>>   }
+>>
+>> We tried a similar approach which add numa_store_cpu_info() in
+>> early_map_cpu_to_node(), and remove it from smp_store_cpu_info,
+>> but didn't work for us, we will try your approach to see if works.
 
-> Hi, all 
-> I just use ftrace to do some latency study, found that function_graph can not
-> Work, as long as enable it, will cause kernel panic. I searched this online.
-> Found that there are also some cause the same as mine. I am a newer of ftrace. 
-> I want to know who know what root cause? Here is some partial log:
-> 
-> 
+And it works :)
 
-Can you do a function bisect to find what function this is.
+>
+> Calling it in early_map_cpu_to_node() is probably too early since
+> setup_node_to_cpumask_map() is called in numa_init() afterwards
+> overwriting it again.
+>
+> Actually, early_map_cpu_to_node() is used to temporarily store the
+> mapping until it can be setup in numa_store_cpu_info().
 
-This script is used to help find functions that are being traced by
-function tracer or function graph tracing that causes the machine to
-reboot, hang, or crash. Here's the steps to take.
+Thanks for the clarify, let's wait for David's reply on this one.
 
-First, determine if function graph is working with a single function:
-
-# cd /sys/kernel/debug/tracing
-# echo schedule > set_ftrace_filter
-# echo function_graph > current_tracer
-
-If this works, then we know that something is being traced that
-shouldn't be.
-
-# echo nop > current_tracer
-
-# cat available_filter_functions > ~/full-file
-# ftrace-bisect ~/full-file ~/test-file ~/non-test-file
-# cat ~/test-file > set_ftrace_filter
-
-*** Note *** this will take several minutes. Setting multiple functions
-is an O(n^2) operation, and we are dealing with thousands of functions.
-So go have  coffee, talk with your coworkers, read facebook. And
-eventually, this operation will end.
-
-# echo function_graph > current_tracer
-
-If it crashes, we know that ~/test-file has a bad function.
-
-   Reboot back to test kernel.
-
-   # cd /sys/kernel/debug/tracing
-   # mv ~/test-file ~/full-file
-
-If it didn't crash.
-
-   # echo nop > current_tracer
-   # mv ~/non-test-file ~/full-file
-
-Get rid of the other test file from previous run (or save them off
-somewhere.
-# rm -f ~/test-file ~/non-test-file
-
-And start again:
-
-# ftrace-bisect ~/full-file ~/test-file ~/non-test-file
-
-The good thing is, because this cuts the number of functions in
-~/test-file by half, the cat of it into set_ftrace_filter takes half as
-long each iteration, so don't talk so much at the water cooler the
-second time.
-
-Eventually, if you did this correctly, you will get down to the problem
-function, and all we need to do is to notrace it.
-
-The way to figure out if the problem function is bad, just do:
-
-# echo <problem-function> > set_ftrace_notrace
-# echo > set_ftrace_filter
-# echo function_graph > current_tracer
-
-And if it doesn't crash, we are done.
-
--- Steve
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: ftrace-bisect
-Type: application/octet-stream
-Size: 1487 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160920/de1e152c/attachment.obj>
+Thanks
+Hanjun
