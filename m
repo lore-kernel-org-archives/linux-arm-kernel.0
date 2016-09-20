@@ -1,158 +1,107 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Tue, 20 Sep 2016 12:56:52 +0200
-Subject: [PATCH 2/3] i2c: bcm2835: Add support for combined write-read
- transfer
-In-Reply-To: <4990930f-6d69-89c6-4b23-deae3d6713ed@martin.sperl.org>
-References: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
- <1474298777-5858-2-git-send-email-noralf@tronnes.org>
- <c47a0a10-4e0b-9025-8d38-af299d5f55da@martin.sperl.org>
- <fb5e8e93-c6af-0050-1e7d-a69b722feadb@tronnes.org>
- <4990930f-6d69-89c6-4b23-deae3d6713ed@martin.sperl.org>
-Message-ID: <8053bf5c-7ddc-b4f7-1961-93f161731b16@tronnes.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 20 Sep 2016 12:00:20 +0100
+Subject: [RFC] arm64: Ensure proper addressing for ldnp/stnp
+In-Reply-To: <9a3f86d9037a478f0a1a87b2084c7496@codeaurora.org>
+References: <1474306586-25118-1-git-send-email-bdegraaf@codeaurora.org>
+ <be5f5bfd-fd41-d202-cec9-0ca3fcad28db@arm.com>
+ <9a3f86d9037a478f0a1a87b2084c7496@codeaurora.org>
+Message-ID: <c1911e82-e65a-73e4-f878-8e25f609f58b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Den 20.09.2016 12:15, skrev Martin Sperl:
->
->
-> On 20.09.2016 10:41, Noralf Tr?nnes wrote:
->>
->> Den 20.09.2016 09:19, skrev Martin Sperl:
->>> Hi Noralf!
+On 19/09/16 19:25, bdegraaf at codeaurora.org wrote:
+> On 2016-09-19 14:01, Robin Murphy wrote:
+>> On 19/09/16 18:36, Brent DeGraaf wrote:
+>>> According to section 6.3.8 of the ARM Programmer's Guide, non-temporal
+>>> loads and stores do not verify that address dependency is met between a
+>>> load of an address to a register and a subsequent non-temporal load or
+>>> store using that address on the executing PE. Therefore, context switch
+>>> code and subroutine calls that use non-temporally accessed addresses as
+>>> parameters that might depend on a load of an address into an argument
+>>> register must ensure that ordering requirements are met by introducing
+>>> a barrier prior to the successive non-temporal access.  Add appropriate
+>>> barriers whereever this specific situation comes into play.
 >>>
->>> On 19.09.2016 17:26, Noralf Tr?nnes wrote:
->>>> Some SMBus protocols use Repeated Start Condition to switch from write
->>>> mode to read mode. Devices like MMA8451 won't work without it.
->>>>
->>>> When downstream implemented support for this in i2c-bcm2708, it broke
->>>> support for some devices, so a module parameter was added and combined
->>>> transfer was disabled by default.
->>>> See https://github.com/raspberrypi/linux/issues/599
->>>> It doesn't seem to have been any investigation into what the problem
->>>> really was. Later there was added a timeout on the polling loop.
->>>>
->>>> One of the devices mentioned to partially stop working was DS1307.
->>>>
->>>> I have run thousands of transfers to a DS1307 (rtc), MMA8451 (accel)
->>>> and AT24C32 (eeprom) in parallel without problems.
->>>>
->>>> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
->>>> ---
->>>>   drivers/i2c/busses/i2c-bcm2835.c | 107
->>>> +++++++++++++++++++++++++++++++++++----
->>>>   1 file changed, 98 insertions(+), 9 deletions(-)
->>> ...
->>>> @@ -209,8 +289,17 @@ static int bcm2835_i2c_xfer(struct i2c_adapter
->>>> *adap, struct i2c_msg msgs[],
->>>>       int i;
->>>>       int ret = 0;
->>>>   +    /* Combined write-read to the same address (smbus) */
->>>> +    if (num == 2 && (msgs[0].addr == msgs[1].addr) &&
->>>> +        !(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
->>>> +        (msgs[0].len <= 16)) {
->>>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[0], &msgs[1]);
->>>> +
->>>> +    return ret ? ret : 2;
->>>> +    }
->>>> +
->>>>       for (i = 0; i < num; i++) {
->>>> -        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i]);
->>>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i], NULL);
->>>>           if (ret)
->>>>               break;
->>>>       }
->>> This does not seem to implement the i2c_msg api correctly.
+>>> Signed-off-by: Brent DeGraaf <bdegraaf@codeaurora.org>
+>>> ---
+>>>  arch/arm64/kernel/entry.S  | 1 +
+>>>  arch/arm64/lib/copy_page.S | 2 ++
+>>>  2 files changed, 3 insertions(+)
 >>>
->>> As per comments in include/uapi/linux/i2c.h on line 58 only the last
->>> message
->>> in a group should - by default - send a STOP.
+>>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>>> index 441420c..982c4d3 100644
+>>> --- a/arch/arm64/kernel/entry.S
+>>> +++ b/arch/arm64/kernel/entry.S
+>>> @@ -679,6 +679,7 @@ ENTRY(cpu_switch_to)
+>>>      ldp    x27, x28, [x8], #16
+>>>      ldp    x29, x9, [x8], #16
+>>>      ldr    lr, [x8]
+>>> +    dmb    nshld    // Existence of instructions with loose load-use
+>>> dependencies (e.g. ldnp/stnp) make this barrier necessary
+>>>      mov    sp, x9
+>>>      and    x9, x9, #~(THREAD_SIZE - 1)
+>>>      msr    sp_el0, x9
+>>> diff --git a/arch/arm64/lib/copy_page.S b/arch/arm64/lib/copy_page.S
+>>> index 4c1e700..21c6892 100644
+>>> --- a/arch/arm64/lib/copy_page.S
+>>> +++ b/arch/arm64/lib/copy_page.S
+>>> @@ -47,6 +47,8 @@ alternative_endif
+>>>      ldp    x14, x15, [x1, #96]
+>>>      ldp    x16, x17, [x1, #112]
 >>>
+>>> +    dmb    nshld // In case x0 (for stnp) is dependent on a load
 >>
->> Apparently it's a known problem that the i2c controller doesn't support
->> Repeated Start. It will always issue a Stop when it has transferred DLEN
->> bytes.
->> Refs:
->> http://www.circuitwizard.de/raspi-i2c-fix/raspi-i2c-fix.html
->> http://raspberrypi.stackexchange.com/questions/31728/has-anyone-successfully-used-i2c-repeated-starts-on-the-pi2-my-scope-says-they 
+>> The ARMv8 ARM (B2.7.2 in issue j) says that when an address dependency
+>> exists between a load and a subsequent LDNP, *other* observers may
+>> observe those accesses in any order. How's that related to an STNP on
+>> the same CPU?
 >>
+>> Robin.
 >>
->>
->> UNLESS: a Start Transfer (ST) is issued after Transfer Active (TA) is 
->> set
->> and before DONE is set (or the last byte is shifted, I don't know 
->> excatly).
->> Refs:
->> https://github.com/raspberrypi/linux/issues/254#issuecomment-15254134
->> https://www.raspberrypi.org/forums/viewtopic.php?p=807834&sid=2b612c7209f2175bf1a266359c72ae6c#p807834 
->>
->>
->>
->> I found this answer/report by joan that the downstream combined support
->> isn't reliable:
->> http://raspberrypi.stackexchange.com/questions/31728/has-anyone-successfully-used-i2c-repeated-starts-on-the-pi2-my-scope-says-they 
->>
->>
->>
->> My implementation differs from downstream in that I use local_irq_save()
->> to protect the polling loop. But that only protects from missing the TA
->> (downstream can miss the TA and issue a Stop).
->>
->> So currently in mainline we have a driver that says it support the 
->> standard
->> (I2C_FUNC_I2C), but it really only supports one message transfers 
->> since it
->> can't do ReStart.
->>
->> What I have done in this patch is to support ReStart for transfers with
->> 2 messages: first write, then read. But maybe a better solution is to 
->> just
->> leave this alone if it is flaky and use bitbanging instead. I don't 
->> know.
-> I have not said that the approach you have taken is wrong or bad.
->
+>>> +
+>>>      mov    x18, #(PAGE_SIZE - 128)
+>>>      add    x1, x1, #128
+>>>  1:
+>>>
+> 
+> Yes, I have seen the section in the ARM ARM about this. But the
+> Programmer's Guide goes further, even providing a concrete example:
+> 
+> "Non-temporal loads and stores relax the memory ordering
+> requirements...the LDNP instruction might
+> be observed before the preceding LDR instruction, which can result in
+> reading from an unpredictable
+> address in X0.
+> 
+> For example:
+> LDR X0, [X3]
+> LDNP X2, X1, [X0]
+> To correct the above, you need an explicit load barrier:
+> LDR X0, [X3]
+> DMB NSHLD
+> LDNP X2, X1, [X0]"
+> 
+> Did the ARM ARM leave this out?  Or is the Programmer's Guide section
+> incorrect?
 
-I didn't take it as such, I'm just not sure what's the best approach here,
-so I added and looked up some more information
+If the ARM ARM and the Programmer's Guide don't agree, then the
+Programmer's Guide is wrong (I'll raise a bug against it).
 
-> I was only telling you that the portion inside the bcm2835_i2c_xfer:
-> +    /* Combined write-read to the same address (smbus) */
-> +    if (num == 2 && (msgs[0].addr == msgs[1].addr) &&
-> +        !(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
-> +        (msgs[0].len <= 16)) {
-> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[0], &msgs[1]);
-> +
-> +        return ret ? ret : 2;
-> +    }
-> is very specific and maybe could be done in a "generic" manner
-> supporting more cases.
->
+All the ARM ARM says is that in this situation:
 
-It has to be specific when it comes to number of messages. We can only
-support ReStart after the first message unless we use polling for the
-whole transfer. And in that case we can't disable interrupts for such
-a long period and we will end up sometimes loosing Transfer Active,
-resulting in Stop Condition between the messages.
-So we can only do transfers with 2 messages if we want Restart.
+     P1                        P2
+ STP x0, x1, [x2]      1: LDR x0, <ptr>
+ DMB ISH                  CBZ x0, 1b
+ STR x2, <ptr>            LDNP x1, x2, [x0]
 
-It is possible to support more than 16 bytes for the first message,
-filling the FIFO after polling TA, but I'm not sure that is common.
-Mostly it's 1 or 2 bytes to set a register.
-The write-read restriction isn't absolutely necessary either, but it's the
-most common case I think. So it was about reusing bcm2835_i2c_xfer_msg().
-A less restrictive approach would require a dedicated function I think.
+P2's address dependency still very much exists from the point of view of
+P2's execution, it just may not guarantee order against the DMB on P1,
+so P2's LDNP isn't guaranteed to see the data from P1's STP (as opposed
+to how a regular LDP *is*), and may still load older stale data instead.
 
-> At least add a dev_warn_once for all num > 1 cases not handled by the
-> code above.
->
-> This gives people an opportunity to detect such a situation if they
-> find something is not working as expected.
->
+Robin.
 
-I agree.
-
-After reading joan's report I wonder if it would be best to add a module
-parameter like downstream has, so it can be disabled. What do you think?
-
-
-Noralf.
+> 
+> Thanks for your comments,
+> Brent
+> 
