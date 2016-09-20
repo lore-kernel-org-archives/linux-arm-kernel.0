@@ -1,69 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Sep 2016 08:47:07 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: Don't assume clock runs in
- suspend
-In-Reply-To: <20160919231441.GA60928@google.com>
-References: <20160916054917.16930-1-briannorris@chromium.org>
- <57DBA81F.2060404@arm.com> <20160919231441.GA60928@google.com>
-Message-ID: <57E0E97B.5000106@arm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 20 Sep 2016 17:27:37 +0900
+Subject: [PATCH v26 6/7] arm64: kdump: update a kernel doc
+In-Reply-To: <57DC18FC.9000807@arm.com>
+References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
+ <20160907042908.6232-7-takahiro.akashi@linaro.org>
+ <57DC18FC.9000807@arm.com>
+Message-ID: <20160920082736.GE30248@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/16 00:14, Brian Norris wrote:
-> On Fri, Sep 16, 2016 at 09:06:55AM +0100, Marc Zyngier wrote:
->> Hi Brian,
+On Fri, Sep 16, 2016 at 05:08:28PM +0100, James Morse wrote:
+> Hi Akashi,
 > 
-> Hi Marc,
+> On 07/09/16 05:29, AKASHI Takahiro wrote:
+> > This patch adds arch specific descriptions about kdump usage on arm64
+> > to kdump.txt.
 > 
-> Thanks for the quick response.
+> > diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
 > 
->> On 16/09/16 06:49, Brian Norris wrote:
->>> Since commit 4fbcdc813fb9 ("clocksource: arm_arch_timer: Use clocksource
->>> for suspend timekeeping"), this driver assumes that the ARM architected
->>> timer keeps running in suspend. This is not the case for some ARM SoCs,
->>> depending on the HW state used for system suspend. Let's not assume that
->>> all SoCs support this, and instead only support this if the device tree
->>> explicitly tells us it's "always on". In all other cases, just fall back
->>> to the RTC. This should be relatively harmless.
->>
->> I'm afraid you're confusing two things:
->> - the counter, which *must* carry on counting no matter what, as
->> (quoting the ARM ARM) "The system counter must be implemented in an
->> always-on power domain"
->> - the timer, which is allowed to be powered off, and can be tagged with
->> the "always-on" property to indicate that it is guaranteed to stay up
->> (which in practice only exists in virtual machines and never on real HW).
+> > @@ -249,6 +249,13 @@ Dump-capture kernel config options (Arch Dependent, arm)
+> >  
+> >      AUTO_ZRELADDR=y
+> >  
+> > +Dump-capture kernel config options (Arch Dependent, arm64)
+> > +----------------------------------------------------------
+> > +
+> > +- Please note that kvm of the dump-capture kernel will not be enabled
+> > +  on non-VHE systems even if it is configured. This is because the CPU
+> > +  cannot be reset to EL2 on panic.
 > 
-> Indeed, sorry for that confusion, and thanks for the explanations.
-> 
->> If your counter does stop counting when suspended, then this is starting
->> to either feel like a HW bug, or someone is killing the clock that feeds
->> this counter when entering suspend.
->>
->> If this is the former, then we need a separate quirk to indicate the
->> non-standard behaviour. If it is the latter, don't do it! ;-)
-> 
-> It's beginning to seem more like a HW quirk which yields nonstandard
-> behavior. AIUI, this SoC normally runs the counter off its 24 MHz clock,
-> but for low power modes, this "always-on" domain switches over to a 32
-> KHz alternative clock. Unfortunately, the counter doesn't actually tick
-> when run this way. I'm trying to confirm with the chip designers
-> (Rockchip, RK3399) about the nature of the quirk, but I think we'll need
-> a separate DT flag for this behavior.
+> Nit:
+> cannot be -> will not be
 
-The counter is allowed to be clocked at a different rate, as long as it
-is incremented by the frequency ratio on each tick of the new frequency.
-In your case, the counter should increment by 750 on each tick of the
-32kHz clock. If the rk3399 implementation doesn't do this, then this is
-a bug, and we need a quirk to work around it.
+OK.
 
-Note that such a quirk will have some other impacts, such as the
-gettimeofday implementation in the VDSO (which relies on the counter
-making forward progress). There could be other issues in the timer
-subsystem as well... This doesn't look like a pleasant thing to fix.
+> We could try to do this, but its more code that could prevent us reaching the
+> kdump kernel, so we choose not to.
+> 
+> 
+> > @@ -370,6 +381,9 @@ For s390x:
+> >  For arm:
+> >  	"1 maxcpus=1 reset_devices"
+> >  
+> > +For arm64:
+> > +	"1 maxcpus=1 reset_devices"
+> > +
+> 
+> 'maxcpus=1' is a bit fragile. Since 44dbcc93ab67145 ("arm64: Fix behavior of
+> maxcpus=N") udev on ubuntu vivid (running on Juno) has taken it upon itself to
+> bring the secondary cores online, even when booted with 'maxcpus=1'.
+> 
+> Can we change the recomendation to "1 nosmp reset_devices"?
+
+Well, I have no strong opinion here, but I'm not quite sure whether
+this change does make any difference in practice.
+Looking at kernel/smp.c, the only difference is setup_max_cpus. But
+given that arch_disable_smp_support() is null and smp_cpus_done()
+ignores "max_cpus" on arm64, I don't think that the change is very
+meaningful.
+
+I might miss something.
 
 Thanks,
+-Takahiro AKASHI
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> Thanks,
+> 
+> James
+> 
