@@ -1,42 +1,28 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 20 Sep 2016 12:51:58 +0100
-Subject: [PATCH] ARM: tegra: nyan: Mark all USB ports as host
-In-Reply-To: <20160918102852.6593-1-contact@paulk.fr>
-References: <20160918102852.6593-1-contact@paulk.fr>
-Message-ID: <31a2d04c-91d5-807d-3a2d-76cc3e607f4a@nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Sep 2016 12:58:13 +0100
+Subject: [PATCH] irqchip, gicv3: Fix out-of-range cpumask access reported
+ by cpumask_check()
+In-Reply-To: <20160920113858.GA5140@leverpostej>
+References: <1474371259-18783-1-git-send-email-rrichter@cavium.com>
+ <20160920113858.GA5140@leverpostej>
+Message-ID: <57E12455.8000507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 18/09/16 11:28, Paul Kocialkowski wrote:
-> Nyan boards only have host USB ports (2 external, 1 internal), there is
-> no OTG-enabled connector.
+On 20/09/16 12:39, Mark Rutland wrote:
+> On Tue, Sep 20, 2016 at 01:34:19PM +0200, Robert Richter wrote:
+>> Booting a kernel with DEBUG_PER_CPU_MAPS enabled triggers the follwing
+>> warning:
+>>
+>>  WARNING: CPU: 1 PID: 0 at ./include/linux/cpumask.h:121 gic_raise_softirq+0x298/0x308
 > 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> ---
->  arch/arm/boot/dts/tegra124-nyan.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-> index 18db797..254b2ee 100644
-> --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
-> +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-> @@ -435,7 +435,7 @@
->  			usb2-0 {
->  				vbus-supply = <&vdd_usb1_vbus>;
->  				status = "okay";
-> -				mode = "otg";
-> +				mode = "host";
->  			};
->  
->  			usb2-1 {
+> James posted a patch for this [1], which we were hoping Thomas would
+> pick up [2].
 
-Sounds correct to me, so ...
+It is already in tip/irq/urgent (727653d).
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
+Thanks,
 
-Cheers
-Jon
-
+	M.
 -- 
-nvpublic
+Jazz is not dead. It just smells funny...
