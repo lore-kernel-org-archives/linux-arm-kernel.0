@@ -1,211 +1,98 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 20 Sep 2016 11:26:57 +0200
-Subject: [PATCH v4 2/2] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <57E0FF95.7040305@arm.com>
-References: <1474283695-212421-1-git-send-email-agraf@suse.de>
- <1474283695-212421-3-git-send-email-agraf@suse.de> <57DFFAD3.3080009@arm.com>
- <0960d2a7-6100-3212-c544-d5377df34d57@suse.de> <57E0FF95.7040305@arm.com>
-Message-ID: <580a8a26-ca8f-a08a-a9da-d19d1a595cb6@suse.de>
+From: jani.nikula@linux.intel.com (Jani Nikula)
+Date: Tue, 20 Sep 2016 12:33:45 +0300
+Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
+ issue.
+In-Reply-To: <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
+ <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
+ <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
+ <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <8760pqncee.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 20 Sep 2016, Peter Griffin <peter.griffin@linaro.org> wrote:
+> Hi Emil,
+>
+> On Tue, 20 Sep 2016, Emil Velikov wrote:
+>
+>> On 5 September 2016 at 14:16, Peter Griffin <peter.griffin@linaro.org> wrote:
+>> > ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
+>> > recursive dependency.
+>
+>
+>> >
+>> From a humble skim through remoteproc, drm and a few other subsystems
+>> I think the above is wrong. All the drivers (outside of remoteproc),
+>> that I've seen, depend on the core component, they don't select it.
+>
+> I will let Bjorn comment on the remoteproc subsystem Kconfig design, and
+> why it is like it is.
+>
+> For this particular SLIM_RPROC I have added it to Kconfig in keeping with all
+> the other drivers in the remoteproc subsystem which has exposed this recursive
+> dependency issue.
+>
+> For this particular kconfig symbol a quick grep reveals more drivers in
+> the kernel using 'select', than 'depend on'
+>
+> git grep "select VIRTIO" | wc -l
+> 14
+>
+> git grep "depends on VIRTIO" | wc -l
+> 10
+>
+>
+>> Furthermore most places explicitly hide the drivers from the menu if
+>> the core component isn't enabled.
+>
+> Remoteproc subsystem takes a different approach, the core code is only enabled
+> if a driver which relies on it is enabled. This IMHO makes sense, as
+> remoteproc is not widely used (only a few particular ARM SoC's).
+>
+> It is true that for subsystems which rely on the core component being
+> explicitly enabled, they often tend to hide drivers which depend on it
+> from the menu unless it is. This also makes sense.
+>
+>> 
+>> Is there something that requires such a different/unusual behaviour in
+>> remoteproc ?
+>> 
+>
+> I'm not sure it is that unusual...looking at config USB, it selects USB_COMMON in
+> mfd subsystem, client drivers select MFD_CORE.
+>
+> I've added Arnd to this thread, as I've seen lots of Kconfig patches from him
+> recently, maybe he has some thoughts on whether this is the correct fix or not?
 
 
-On 20.09.16 11:21, Marc Zyngier wrote:
-> On 19/09/16 18:39, Alexander Graf wrote:
->>
->>
->> On 19.09.16 16:48, Marc Zyngier wrote:
->>> On 19/09/16 12:14, Alexander Graf wrote:
->>>> We have 2 modes for dealing with interrupts in the ARM world. We can either
->>>> handle them all using hardware acceleration through the vgic or we can emulate
->>>> a gic in user space and only drive CPU IRQ pins from there.
->>>>
->>>> Unfortunately, when driving IRQs from user space, we never tell user space
->>>> about timer events that may result in interrupt line state changes, so we
->>>> lose out on timer events if we run with user space gic emulation.
->>>>
->>>> This patch fixes that by routing vtimer expiration events to user space.
->>>> With this patch I can successfully run edk2 and Linux with user space gic
->>>> emulation.
->>>>
->>>> Signed-off-by: Alexander Graf <agraf@suse.de>
->>>>
->>>> ---
->>>>
->>>> v1 -> v2:
->>>>
->>>>   - Add back curly brace that got lost
->>>>
->>>> v2 -> v3:
->>>>
->>>>   - Split into patch set
->>>>
->>>> v3 -> v4:
->>>>
->>>>   - Improve documentation
->>>> ---
->>>>  Documentation/virtual/kvm/api.txt |  30 ++++++++-
->>>>  arch/arm/include/asm/kvm_host.h   |   3 +
->>>>  arch/arm/kvm/arm.c                |  22 ++++---
->>>>  arch/arm64/include/asm/kvm_host.h |   3 +
->>>>  include/uapi/linux/kvm.h          |  14 +++++
->>>>  virt/kvm/arm/arch_timer.c         | 125 +++++++++++++++++++++++++++-----------
->>>>  6 files changed, 155 insertions(+), 42 deletions(-)
->>>>
->>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->>>> index 23937e0..1c0bd86 100644
->>>> --- a/Documentation/virtual/kvm/api.txt
->>>> +++ b/Documentation/virtual/kvm/api.txt
->>>> @@ -3202,9 +3202,14 @@ struct kvm_run {
->>>>  	/* in */
->>>>  	__u8 request_interrupt_window;
->>>>  
->>>> -Request that KVM_RUN return when it becomes possible to inject external
->>>> +[x86] Request that KVM_RUN return when it becomes possible to inject external
->>>>  interrupts into the guest.  Useful in conjunction with KVM_INTERRUPT.
->>>>  
->>>> +[arm*] Bits set to 1 in here mask IRQ lines that would otherwise potentially
->>>> +trigger forever. These lines are available:
->>>> +
->>>> +    KVM_IRQWINDOW_VTIMER  -  Masks hw virtual timer irq while in guest
->>>> +
->>>>  	__u8 padding1[7];
->>>>  
->>>>  	/* out */
->>>> @@ -3519,6 +3524,18 @@ Hyper-V SynIC state change. Notification is used to remap SynIC
->>>>  event/message pages and to enable/disable SynIC messages/events processing
->>>>  in userspace.
->>>>  
->>>> +		/* KVM_EXIT_ARM_TIMER */
->>>> +		struct {
->>>> +			__u8 timesource;
->>>> +		} arm_timer;
->>>> +
->>>> +Indicates that a timer triggered that user space needs to handle and
->>>> +potentially mask with vcpu->run->request_interrupt_window to allow the
->>>> +guest to proceed. This only happens for timers that got enabled through
->>>> +KVM_CAP_ARM_TIMER. The following time sources are available:
->>>> +
->>>> +    KVM_ARM_TIMER_VTIMER  - virtual cpu timer
->>>> +
->>>>  		/* Fix the size of the union. */
->>>>  		char padding[256];
->>>>  	};
->>>> @@ -3739,6 +3756,17 @@ Once this is done the KVM_REG_MIPS_VEC_* and KVM_REG_MIPS_MSA_* registers can be
->>>>  accessed, and the Config5.MSAEn bit is accessible via the KVM API and also from
->>>>  the guest.
->>>>  
->>>> +6.11 KVM_CAP_ARM_TIMER
->>>> +
->>>> +Architectures: arm, arm64
->>>> +Target: vcpu
->>>> +Parameters: args[0] contains a bitmap of timers to select (see 5.)
->>>> +
->>>> +This capability allows to route per-core timers into user space. When it's
->>>> +enabled and no in-kernel interrupt controller is in use, the timers selected
->>>> +by args[0] trigger KVM_EXIT_ARM_TIMER guest exits when they are pending,
->>>> +unless masked by vcpu->run->request_interrupt_window (see 5.).
->>>> +
->>>>  7. Capabilities that can be enabled on VMs
->>>>  ------------------------------------------
->>>>  
->>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>>> index de338d9..77d1f73 100644
->>>> --- a/arch/arm/include/asm/kvm_host.h
->>>> +++ b/arch/arm/include/asm/kvm_host.h
->>>> @@ -180,6 +180,9 @@ struct kvm_vcpu_arch {
->>>>  
->>>>  	/* Detect first run of a vcpu */
->>>>  	bool has_run_once;
->>>> +
->>>> +	/* User space wants timer notifications */
->>>> +	bool user_space_arm_timers;
->>>
->>> Please move this to the timer structure.
->>
->> Sure.
->>
->>>
->>>>  };
->>>>  
->>>>  struct kvm_vm_stat {
->>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->>>> index c84b6ad..57bdb71 100644
->>>> --- a/arch/arm/kvm/arm.c
->>>> +++ b/arch/arm/kvm/arm.c
->>>> @@ -187,6 +187,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->>>>  	case KVM_CAP_ARM_PSCI_0_2:
->>>>  	case KVM_CAP_READONLY_MEM:
->>>>  	case KVM_CAP_MP_STATE:
->>>> +	case KVM_CAP_ARM_TIMER:
->>>>  		r = 1;
->>>>  		break;
->>>>  	case KVM_CAP_COALESCED_MMIO:
->>>> @@ -474,13 +475,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
->>>>  			return ret;
->>>>  	}
->>>>  
->>>> -	/*
->>>> -	 * Enable the arch timers only if we have an in-kernel VGIC
->>>> -	 * and it has been properly initialized, since we cannot handle
->>>> -	 * interrupts from the virtual timer with a userspace gic.
->>>> -	 */
->>>> -	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
->>>> -		ret = kvm_timer_enable(vcpu);
->>>> +	ret = kvm_timer_enable(vcpu);
->>>>  
->>>>  	return ret;
->>>>  }
->>>> @@ -601,6 +596,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>  			run->exit_reason = KVM_EXIT_INTR;
->>>>  		}
->>>>  
->>>> +		if (kvm_check_request(KVM_REQ_PENDING_TIMER, vcpu)) {
->>>
->>> Since this is a very unlikely event (in the grand scheme of things), how
->>> about making this unlikely()?
->>>
->>>> +			/* Tell user space about the pending vtimer */
->>>> +			ret = 0;
->>>> +			run->exit_reason = KVM_EXIT_ARM_TIMER;
->>>> +			run->arm_timer.timesource = KVM_ARM_TIMER_VTIMER;
->>>> +		}
->>>
->>> More importantly: why does it have to be indirected by a
->>> make_request/check_request, and not be handled as part of the
->>> kvm_timer_sync() call? We do update the state there, and you could
->>> directly find out whether an exit is required.
->>
->> I can try - it seemed like it could easily become quite racy because we
->> call kvm_timer_sync_hwstate() at multiple places.
-> 
-> It shouldn't. We only do it at exactly two locations (depending whether
-> we've entered the guest or not).
-> 
-> Also, take the following scenario:
-> (1) guest programs the timer to expire at time T
-> (2) guest performs an MMIO access which traps
-> (3) during the world switch, the timer expires and we mark the timer
-> interrupt as pending
-> (4) we exit to handle the MMIO, no sign of the timer being pending
-> 
-> Is the timer event lost? Or simply delayed? I think this indicates that
-> the timer state should always be signalled to userspace, no matter what
-> the exit reason is.
+Documentation/kbuild/kconfig-language.txt:
 
-That's basically what I'm trying to get running right now, yes. I pushed
-the interrupt pending status field into the kvm_sync_regs struct and
-check it on every exit in user space - to make sure we catch pending
-state changes before mmio reads.
+  Note:
+	select should be used with care. select will force
+	a symbol to a value without visiting the dependencies.
+	By abusing select you are able to select a symbol FOO even
+	if FOO depends on BAR that is not set.
+	In general use select only for non-visible symbols
+	(no prompts anywhere) and for symbols with no dependencies.
+	That will limit the usefulness but on the other hand avoid
+	the illegal configurations all over.
 
-On top of that we also need a force exit event when the state changes,
-in case there's no other event pending. Furthermore we probably want to
-indicate the user space status of the pending bit into the kernel to not
-exit too often.
+People tend to abuse select because it's "convenient". If you depend,
+but some of your dependencies aren't met, you're in for some digging
+through Kconfig to find the missing deps. Just to make the option you
+want visible in menuconfig. If you instead select something with
+dependencies, it'll be right most of the time, and it's "convenient",
+until it breaks. (And hey, it usually breaks for someone else with some
+other config, so it's still convenient for you.)
 
-Something doesn't quite work with that approach yet though - I can't get
-edk2 to roll yet.
+Perhaps kconfig should complain about selecting visible symbols and
+symbols with dependencies.
 
 
-Alex
+BR,
+Jani.
+
+
+-- 
+Jani Nikula, Intel Open Source Technology Center
