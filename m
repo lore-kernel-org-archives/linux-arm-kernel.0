@@ -1,40 +1,92 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 20 Sep 2016 07:06:33 -0700
-Subject: [PATCH] gpio: Added zynq specific check for special pins on bank
- zero
-In-Reply-To: <1474360324-8168-1-git-send-email-navam@xilinx.com>
-References: <1474360324-8168-1-git-send-email-navam@xilinx.com>
-Message-ID: <20160920140633.GD16583@xsjsorenbubuntu>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 20 Sep 2016 10:07:16 -0400
+Subject: ftrace function_graph causes system crash
+In-Reply-To: <7d0e88fff8e64591ac31be3adbbf763c@SIWEX5A.sing.micron.com>
+References: <7d0e88fff8e64591ac31be3adbbf763c@SIWEX5A.sing.micron.com>
+Message-ID: <20160920100716.131d3647@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-09-20 at 14:02:04 +0530, Nava kishore Manne wrote:
-> From: Nava kishore Manne <nava.manne@xilinx.com>
-> 
-> This patch adds zynq specific check for bank 0 pins 7 and 8
-> are special and cannot be used as inputs
-> 
-> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> ---
->  drivers/gpio/gpio-zynq.c | 17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-> index e72794e..eae9d24 100644
-> --- a/drivers/gpio/gpio-zynq.c
-> +++ b/drivers/gpio/gpio-zynq.c
-> @@ -96,6 +96,10 @@
->  /* GPIO upper 16 bit mask */
->  #define ZYNQ_GPIO_UPPER_MASK 0xFFFF0000
->  
-> +/* For GPIO quirks */
-> +#define ZYNQ_GPIO	BIT(0)
-> +#define ZYNQMP_GPIO	BIT(1)
+On Tue, 20 Sep 2016 13:10:39 +0000
+"Bean Huo (beanhuo)" <beanhuo@micron.com> wrote:
 
-I'd make sure all quirks are easily identifiable and call them something
-like 'ZYNQ_GPIO_QUIRK_FOO'
+> Hi, all 
+> I just use ftrace to do some latency study, found that function_graph can not
+> Work, as long as enable it, will cause kernel panic. I searched this online.
+> Found that there are also some cause the same as mine. I am a newer of ftrace. 
+> I want to know who know what root cause? Here is some partial log:
+> 
+> 
 
-Apart from that:
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Can you do a function bisect to find what function this is.
 
-	S?ren
+This script is used to help find functions that are being traced by
+function tracer or function graph tracing that causes the machine to
+reboot, hang, or crash. Here's the steps to take.
+
+First, determine if function graph is working with a single function:
+
+# cd /sys/kernel/debug/tracing
+# echo schedule > set_ftrace_filter
+# echo function_graph > current_tracer
+
+If this works, then we know that something is being traced that
+shouldn't be.
+
+# echo nop > current_tracer
+
+# cat available_filter_functions > ~/full-file
+# ftrace-bisect ~/full-file ~/test-file ~/non-test-file
+# cat ~/test-file > set_ftrace_filter
+
+*** Note *** this will take several minutes. Setting multiple functions
+is an O(n^2) operation, and we are dealing with thousands of functions.
+So go have  coffee, talk with your coworkers, read facebook. And
+eventually, this operation will end.
+
+# echo function_graph > current_tracer
+
+If it crashes, we know that ~/test-file has a bad function.
+
+   Reboot back to test kernel.
+
+   # cd /sys/kernel/debug/tracing
+   # mv ~/test-file ~/full-file
+
+If it didn't crash.
+
+   # echo nop > current_tracer
+   # mv ~/non-test-file ~/full-file
+
+Get rid of the other test file from previous run (or save them off
+somewhere.
+# rm -f ~/test-file ~/non-test-file
+
+And start again:
+
+# ftrace-bisect ~/full-file ~/test-file ~/non-test-file
+
+The good thing is, because this cuts the number of functions in
+~/test-file by half, the cat of it into set_ftrace_filter takes half as
+long each iteration, so don't talk so much at the water cooler the
+second time.
+
+Eventually, if you did this correctly, you will get down to the problem
+function, and all we need to do is to notrace it.
+
+The way to figure out if the problem function is bad, just do:
+
+# echo <problem-function> > set_ftrace_notrace
+# echo > set_ftrace_filter
+# echo function_graph > current_tracer
+
+And if it doesn't crash, we are done.
+
+-- Steve
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ftrace-bisect
+Type: application/octet-stream
+Size: 1487 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160920/de1e152c/attachment.obj>
