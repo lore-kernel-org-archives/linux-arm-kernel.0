@@ -1,120 +1,101 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Tue, 20 Sep 2016 12:15:33 +0200
-Subject: [PATCH 2/3] i2c: bcm2835: Add support for combined write-read
- transfer
-In-Reply-To: <fb5e8e93-c6af-0050-1e7d-a69b722feadb@tronnes.org>
-References: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
- <1474298777-5858-2-git-send-email-noralf@tronnes.org>
- <c47a0a10-4e0b-9025-8d38-af299d5f55da@martin.sperl.org>
- <fb5e8e93-c6af-0050-1e7d-a69b722feadb@tronnes.org>
-Message-ID: <4990930f-6d69-89c6-4b23-deae3d6713ed@martin.sperl.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Sep 2016 11:25:34 +0100
+Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.9
+Message-ID: <20160920102534.GC17978@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Joerg,
 
+Please pull these significant arm-smmu updates for 4.9. The vast majority
+of the code here is Robin's series to move the drivers over to the
+generic DT bindings, which finally hooks up the DMA API and MSI mapping
+for host machines. This has been stewing for a while and is now at the
+point where I feel it's much better in mainline than languishing outside.
 
-On 20.09.2016 10:41, Noralf Tr?nnes wrote:
->
-> Den 20.09.2016 09:19, skrev Martin Sperl:
->> Hi Noralf!
->>
->> On 19.09.2016 17:26, Noralf Tr?nnes wrote:
->>> Some SMBus protocols use Repeated Start Condition to switch from write
->>> mode to read mode. Devices like MMA8451 won't work without it.
->>>
->>> When downstream implemented support for this in i2c-bcm2708, it broke
->>> support for some devices, so a module parameter was added and combined
->>> transfer was disabled by default.
->>> See https://github.com/raspberrypi/linux/issues/599
->>> It doesn't seem to have been any investigation into what the problem
->>> really was. Later there was added a timeout on the polling loop.
->>>
->>> One of the devices mentioned to partially stop working was DS1307.
->>>
->>> I have run thousands of transfers to a DS1307 (rtc), MMA8451 (accel)
->>> and AT24C32 (eeprom) in parallel without problems.
->>>
->>> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
->>> ---
->>>   drivers/i2c/busses/i2c-bcm2835.c | 107
->>> +++++++++++++++++++++++++++++++++++----
->>>   1 file changed, 98 insertions(+), 9 deletions(-)
->> ...
->>> @@ -209,8 +289,17 @@ static int bcm2835_i2c_xfer(struct i2c_adapter
->>> *adap, struct i2c_msg msgs[],
->>>       int i;
->>>       int ret = 0;
->>>   +    /* Combined write-read to the same address (smbus) */
->>> +    if (num == 2 && (msgs[0].addr == msgs[1].addr) &&
->>> +        !(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
->>> +        (msgs[0].len <= 16)) {
->>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[0], &msgs[1]);
->>> +
->>> +    return ret ? ret : 2;
->>> +    }
->>> +
->>>       for (i = 0; i < num; i++) {
->>> -        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i]);
->>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i], NULL);
->>>           if (ret)
->>>               break;
->>>       }
->> This does not seem to implement the i2c_msg api correctly.
->>
->> As per comments in include/uapi/linux/i2c.h on line 58 only the last
->> message
->> in a group should - by default - send a STOP.
->>
->
-> Apparently it's a known problem that the i2c controller doesn't support
-> Repeated Start. It will always issue a Stop when it has transferred DLEN
-> bytes.
-> Refs:
-> http://www.circuitwizard.de/raspi-i2c-fix/raspi-i2c-fix.html
-> http://raspberrypi.stackexchange.com/questions/31728/has-anyone-successfully-used-i2c-repeated-starts-on-the-pi2-my-scope-says-they
->
->
-> UNLESS: a Start Transfer (ST) is issued after Transfer Active (TA) is set
-> and before DONE is set (or the last byte is shifted, I don't know excatly).
-> Refs:
-> https://github.com/raspberrypi/linux/issues/254#issuecomment-15254134
-> https://www.raspberrypi.org/forums/viewtopic.php?p=807834&sid=2b612c7209f2175bf1a266359c72ae6c#p807834
->
->
-> I found this answer/report by joan that the downstream combined support
-> isn't reliable:
-> http://raspberrypi.stackexchange.com/questions/31728/has-anyone-successfully-used-i2c-repeated-starts-on-the-pi2-my-scope-says-they
->
->
-> My implementation differs from downstream in that I use local_irq_save()
-> to protect the polling loop. But that only protects from missing the TA
-> (downstream can miss the TA and issue a Stop).
->
-> So currently in mainline we have a driver that says it support the standard
-> (I2C_FUNC_I2C), but it really only supports one message transfers since it
-> can't do ReStart.
->
-> What I have done in this patch is to support ReStart for transfers with
-> 2 messages: first write, then read. But maybe a better solution is to just
-> leave this alone if it is flaky and use bitbanging instead. I don't know.
-I have not said that the approach you have taken is wrong or bad.
+A consequence of that is that there are some non-trivial changes outside
+of the drivers, but these are all acked by the relevant subsystem
+maintainers.
 
-I was only telling you that the portion inside the bcm2835_i2c_xfer:
-+	/* Combined write-read to the same address (smbus) */
-+	if (num == 2 && (msgs[0].addr == msgs[1].addr) &&
-+	    !(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
-+	    (msgs[0].len <= 16)) {
-+		ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[0], &msgs[1]);
-+
-+		return ret ? ret : 2;
-+	}
-is very specific and maybe could be done in a "generic" manner
-supporting more cases.
+Other stuff here includes some non-critical fixes to the queue handling
+on SMMUv3 and a small devm cleanup that missed the boat last time around.
 
-At least add a dev_warn_once for all num > 1 cases not handled by the
-code above.
+Cheers,
 
-This gives people an opportunity to detect such a situation if they
-find something is not working as expected.
+Will
 
-Martin
+--->8
+
+The following changes since commit 3eab887a55424fc2c27553b7bfe32330df83f7b8:
+
+  Linux 4.8-rc4 (2016-08-28 15:04:33 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+
+for you to fetch changes up to 82db33dc5e49fb625262d81125625d07a0d6184e:
+
+  iommu/io-pgtable-arm: Check for v7s-incapable systems (2016-09-16 09:34:23 +0100)
+
+----------------------------------------------------------------
+Jean-Philippe Brucker (2):
+      iommu/arm-smmu: Fix event queues synchronization
+      iommu/arm-smmu: Fix polling of command queue
+
+Mark Rutland (1):
+      Docs: dt: add PCI IOMMU map bindings
+
+Peng Fan (1):
+      iommu/arm-smmu: Drop devm_free_irq when driver detach
+
+Robin Murphy (23):
+      iommu/arm-smmu: Support v7s context format
+      of/irq: Break out msi-map lookup (again)
+      iommu/of: Handle iommu-map property for PCI
+      iommu: Introduce iommu_fwspec
+      Docs: dt: document ARM SMMUv3 generic binding usage
+      iommu/arm-smmu: Fall back to global bypass
+      iommu/arm-smmu: Implement of_xlate() for SMMUv3
+      iommu/arm-smmu: Support non-PCI devices with SMMUv3
+      iommu/arm-smmu: Set PRIVCFG in stage 1 STEs
+      iommu/arm-smmu: Handle stream IDs more dynamically
+      iommu/arm-smmu: Consolidate stream map entry state
+      iommu/arm-smmu: Keep track of S2CR state
+      iommu/arm-smmu: Refactor mmu-masters handling
+      iommu/arm-smmu: Streamline SMMU data lookups
+      iommu/arm-smmu: Add a stream map entry iterator
+      iommu/arm-smmu: Intelligent SMR allocation
+      iommu/arm-smmu: Convert to iommu_fwspec
+      Docs: dt: document ARM SMMU generic binding usage
+      iommu/arm-smmu: Wire up generic configuration support
+      iommu/arm-smmu: Set domain geometry
+      iommu/dma: Add support for mapping MSIs
+      iommu/dma: Avoid PCI host bridge windows
+      iommu/io-pgtable-arm: Check for v7s-incapable systems
+
+Will Deacon (1):
+      iommu/arm-smmu: Disable interrupts whilst holding the cmdq lock
+
+ .../devicetree/bindings/iommu/arm,smmu-v3.txt      |   8 +-
+ .../devicetree/bindings/iommu/arm,smmu.txt         |  61 +-
+ .../devicetree/bindings/pci/pci-iommu.txt          | 171 ++++
+ arch/arm64/mm/dma-mapping.c                        |   2 +-
+ drivers/gpu/drm/exynos/exynos_drm_iommu.h          |   2 +-
+ drivers/iommu/Kconfig                              |   2 +-
+ drivers/iommu/arm-smmu-v3.c                        | 561 ++++++------
+ drivers/iommu/arm-smmu.c                           | 995 ++++++++++-----------
+ drivers/iommu/dma-iommu.c                          | 161 +++-
+ drivers/iommu/io-pgtable-arm-v7s.c                 |   4 +
+ drivers/iommu/iommu.c                              |  58 ++
+ drivers/iommu/of_iommu.c                           |  52 +-
+ drivers/irqchip/irq-gic-v2m.c                      |   3 +
+ drivers/irqchip/irq-gic-v3-its.c                   |   3 +
+ drivers/of/irq.c                                   |  78 +-
+ drivers/of/of_pci.c                                | 102 +++
+ include/linux/device.h                             |   3 +
+ include/linux/dma-iommu.h                          |  12 +-
+ include/linux/iommu.h                              |  39 +
+ include/linux/of_pci.h                             |  10 +
+ 20 files changed, 1430 insertions(+), 897 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-iommu.txt
