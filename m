@@ -1,80 +1,68 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Tue, 20 Sep 2016 14:02:04 +0530
-Subject: [PATCH] gpio: Added zynq specific check for special pins on bank zero
-Message-ID: <1474360324-8168-1-git-send-email-navam@xilinx.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 20 Sep 2016 09:32:51 +0100
+Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
+ issue.
+In-Reply-To: <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
+References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
+ <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
+ <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
+Message-ID: <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nava kishore Manne <nava.manne@xilinx.com>
+Hi Emil,
 
-This patch adds zynq specific check for bank 0 pins 7 and 8
-are special and cannot be used as inputs
+On Tue, 20 Sep 2016, Emil Velikov wrote:
 
-Signed-off-by: Nava kishore Manne <navam@xilinx.com>
----
- drivers/gpio/gpio-zynq.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+> On 5 September 2016 at 14:16, Peter Griffin <peter.griffin@linaro.org> wrote:
+> > ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
+> > recursive dependency.
 
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index e72794e..eae9d24 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -96,6 +96,10 @@
- /* GPIO upper 16 bit mask */
- #define ZYNQ_GPIO_UPPER_MASK 0xFFFF0000
- 
-+/* For GPIO quirks */
-+#define ZYNQ_GPIO	BIT(0)
-+#define ZYNQMP_GPIO	BIT(1)
-+
- /**
-  * struct zynq_gpio - gpio device private data structure
-  * @chip:	instance of the gpio_chip
-@@ -122,6 +126,7 @@ struct zynq_gpio {
- */
- struct zynq_platform_data {
- 	const char *label;
-+	u32 quirks;
- 	u16 ngpio;
- 	int max_bank;
- 	int bank_min[ZYNQMP_GPIO_MAX_BANK];
-@@ -238,13 +243,19 @@ static void zynq_gpio_set_value(struct gpio_chip *chip, unsigned int pin,
- static int zynq_gpio_dir_in(struct gpio_chip *chip, unsigned int pin)
- {
- 	u32 reg;
-+	bool is_zynq_gpio;
- 	unsigned int bank_num, bank_pin_num;
- 	struct zynq_gpio *gpio = gpiochip_get_data(chip);
- 
-+	is_zynq_gpio = gpio->p_data->quirks & ZYNQ_GPIO;
- 	zynq_gpio_get_bank_pin(pin, &bank_num, &bank_pin_num, gpio);
- 
--	/* bank 0 pins 7 and 8 are special and cannot be used as inputs */
--	if (bank_num == 0 && (bank_pin_num == 7 || bank_pin_num == 8))
-+	/*
-+	 * On zynq bank 0 pins 7 and 8 are special and cannot be used
-+	 * as inputs.
-+	 */
-+	if (is_zynq_gpio && bank_num == 0 &&
-+		(bank_pin_num == 7 || bank_pin_num == 8))
- 		return -EINVAL;
- 
- 	/* clear the bit in direction mode reg to set the pin as input */
-@@ -609,6 +620,7 @@ static const struct dev_pm_ops zynq_gpio_dev_pm_ops = {
- 
- static const struct zynq_platform_data zynqmp_gpio_def = {
- 	.label = "zynqmp_gpio",
-+	.quirks = ZYNQMP_GPIO,
- 	.ngpio = ZYNQMP_GPIO_NR_GPIOS,
- 	.max_bank = ZYNQMP_GPIO_MAX_BANK,
- 	.bank_min[0] = ZYNQ_GPIO_BANK0_PIN_MIN(MP),
-@@ -627,6 +639,7 @@ static const struct zynq_platform_data zynqmp_gpio_def = {
- 
- static const struct zynq_platform_data zynq_gpio_def = {
- 	.label = "zynq_gpio",
-+	.quirks = ZYNQ_GPIO,
- 	.ngpio = ZYNQ_GPIO_NR_GPIOS,
- 	.max_bank = ZYNQ_GPIO_MAX_BANK,
- 	.bank_min[0] = ZYNQ_GPIO_BANK0_PIN_MIN(),
--- 
-2.1.2
+
+> >
+> From a humble skim through remoteproc, drm and a few other subsystems
+> I think the above is wrong. All the drivers (outside of remoteproc),
+> that I've seen, depend on the core component, they don't select it.
+
+I will let Bjorn comment on the remoteproc subsystem Kconfig design, and
+why it is like it is.
+
+For this particular SLIM_RPROC I have added it to Kconfig in keeping with all
+the other drivers in the remoteproc subsystem which has exposed this recursive
+dependency issue.
+
+For this particular kconfig symbol a quick grep reveals more drivers in
+the kernel using 'select', than 'depend on'
+
+git grep "select VIRTIO" | wc -l
+14
+
+git grep "depends on VIRTIO" | wc -l
+10
+
+
+> Furthermore most places explicitly hide the drivers from the menu if
+> the core component isn't enabled.
+
+Remoteproc subsystem takes a different approach, the core code is only enabled
+if a driver which relies on it is enabled. This IMHO makes sense, as
+remoteproc is not widely used (only a few particular ARM SoC's).
+
+It is true that for subsystems which rely on the core component being
+explicitly enabled, they often tend to hide drivers which depend on it
+from the menu unless it is. This also makes sense.
+
+> 
+> Is there something that requires such a different/unusual behaviour in
+> remoteproc ?
+> 
+
+I'm not sure it is that unusual...looking at config USB, it selects USB_COMMON in
+mfd subsystem, client drivers select MFD_CORE.
+
+I've added Arnd to this thread, as I've seen lots of Kconfig patches from him
+recently, maybe he has some thoughts on whether this is the correct fix or not?
+
+regards,
+
+Peter.
