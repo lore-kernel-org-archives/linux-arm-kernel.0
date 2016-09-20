@@ -1,147 +1,120 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 20 Sep 2016 18:05:40 +0800
-Subject: [PATCH] arm64, numa: Add cpu_to_node() implementation.
-In-Reply-To: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <57E109F4.1060902@linaro.org>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Tue, 20 Sep 2016 12:15:33 +0200
+Subject: [PATCH 2/3] i2c: bcm2835: Add support for combined write-read
+ transfer
+In-Reply-To: <fb5e8e93-c6af-0050-1e7d-a69b722feadb@tronnes.org>
+References: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
+ <1474298777-5858-2-git-send-email-noralf@tronnes.org>
+ <c47a0a10-4e0b-9025-8d38-af299d5f55da@martin.sperl.org>
+ <fb5e8e93-c6af-0050-1e7d-a69b722feadb@tronnes.org>
+Message-ID: <4990930f-6d69-89c6-4b23-deae3d6713ed@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2016 02:49 AM, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
->
-> The wq_numa_init() function makes a private CPU to node map by calling
-> cpu_to_node() early in the boot process, before the non-boot CPUs are
-> brought online.  Since the default implementation of cpu_to_node()
-> returns zero for CPUs that have never been brought online, the
-> workqueue system's view is that *all* CPUs are on node zero.
->
-> When the unbound workqueue for a non-zero node is created, the
-> tsk_cpus_allowed() for the worker threads is the empty set because
-> there are, in the view of the workqueue system, no CPUs on non-zero
-> nodes.  The code in try_to_wake_up() using this empty cpumask ends up
-> using the cpumask empty set value of NR_CPUS as an index into the
-> per-CPU area pointer array, and gets garbage as it is one past the end
-> of the array.  This results in:
->
-> [    0.881970] Unable to handle kernel paging request at virtual address fffffb1008b926a4
-> [    1.970095] pgd = fffffc00094b0000
-> [    1.973530] [fffffb1008b926a4] *pgd=0000000000000000, *pud=0000000000000000, *pmd=0000000000000000
-> [    1.982610] Internal error: Oops: 96000004 [#1] SMP
-> [    1.987541] Modules linked in:
-> [    1.990631] CPU: 48 PID: 295 Comm: cpuhp/48 Tainted: G        W       4.8.0-rc6-preempt-vol+ #9
-> [    1.999435] Hardware name: Cavium ThunderX CN88XX board (DT)
-> [    2.005159] task: fffffe0fe89cc300 task.stack: fffffe0fe8b8c000
-> [    2.011158] PC is at try_to_wake_up+0x194/0x34c
-> [    2.015737] LR is at try_to_wake_up+0x150/0x34c
-> [    2.020318] pc : [<fffffc00080e7468>] lr : [<fffffc00080e7424>] pstate: 600000c5
-> [    2.027803] sp : fffffe0fe8b8fb10
-> [    2.031149] x29: fffffe0fe8b8fb10 x28: 0000000000000000
-> [    2.036522] x27: fffffc0008c63bc8 x26: 0000000000001000
-> [    2.041896] x25: fffffc0008c63c80 x24: fffffc0008bfb200
-> [    2.047270] x23: 00000000000000c0 x22: 0000000000000004
-> [    2.052642] x21: fffffe0fe89d25bc x20: 0000000000001000
-> [    2.058014] x19: fffffe0fe89d1d00 x18: 0000000000000000
-> [    2.063386] x17: 0000000000000000 x16: 0000000000000000
-> [    2.068760] x15: 0000000000000018 x14: 0000000000000000
-> [    2.074133] x13: 0000000000000000 x12: 0000000000000000
-> [    2.079505] x11: 0000000000000000 x10: 0000000000000000
-> [    2.084879] x9 : 0000000000000000 x8 : 0000000000000000
-> [    2.090251] x7 : 0000000000000040 x6 : 0000000000000000
-> [    2.095621] x5 : ffffffffffffffff x4 : 0000000000000000
-> [    2.100991] x3 : 0000000000000000 x2 : 0000000000000000
-> [    2.106364] x1 : fffffc0008be4c24 x0 : ffffff0ffffada80
-> [    2.111737]
-> [    2.113236] Process cpuhp/48 (pid: 295, stack limit = 0xfffffe0fe8b8c020)
-> [    2.120102] Stack: (0xfffffe0fe8b8fb10 to 0xfffffe0fe8b90000)
-> [    2.125914] fb00:                                   fffffe0fe8b8fb80 fffffc00080e7648
-> .
-> .
-> .
-> [    2.442859] Call trace:
-> [    2.445327] Exception stack(0xfffffe0fe8b8f940 to 0xfffffe0fe8b8fa70)
-> [    2.451843] f940: fffffe0fe89d1d00 0000040000000000 fffffe0fe8b8fb10 fffffc00080e7468
-> [    2.459767] f960: fffffe0fe8b8f980 fffffc00080e4958 ffffff0ff91ab200 fffffc00080e4b64
-> [    2.467690] f980: fffffe0fe8b8f9d0 fffffc00080e515c fffffe0fe8b8fa80 0000000000000000
-> [    2.475614] f9a0: fffffe0fe8b8f9d0 fffffc00080e58e4 fffffe0fe8b8fa80 0000000000000000
-> [    2.483540] f9c0: fffffe0fe8d10000 0000000000000040 fffffe0fe8b8fa50 fffffc00080e5ac4
-> [    2.491465] f9e0: ffffff0ffffada80 fffffc0008be4c24 0000000000000000 0000000000000000
-> [    2.499387] fa00: 0000000000000000 ffffffffffffffff 0000000000000000 0000000000000040
-> [    2.507309] fa20: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-> [    2.515233] fa40: 0000000000000000 0000000000000000 0000000000000000 0000000000000018
-> [    2.523156] fa60: 0000000000000000 0000000000000000
-> [    2.528089] [<fffffc00080e7468>] try_to_wake_up+0x194/0x34c
-> [    2.533723] [<fffffc00080e7648>] wake_up_process+0x28/0x34
-> [    2.539275] [<fffffc00080d3764>] create_worker+0x110/0x19c
-> [    2.544824] [<fffffc00080d69dc>] alloc_unbound_pwq+0x3cc/0x4b0
-> [    2.550724] [<fffffc00080d6bcc>] wq_update_unbound_numa+0x10c/0x1e4
-> [    2.557066] [<fffffc00080d7d78>] workqueue_online_cpu+0x220/0x28c
-> [    2.563234] [<fffffc00080bd288>] cpuhp_invoke_callback+0x6c/0x168
-> [    2.569398] [<fffffc00080bdf74>] cpuhp_up_callbacks+0x44/0xe4
-> [    2.575210] [<fffffc00080be194>] cpuhp_thread_fun+0x13c/0x148
-> [    2.581027] [<fffffc00080dfbac>] smpboot_thread_fn+0x19c/0x1a8
-> [    2.586929] [<fffffc00080dbd64>] kthread+0xdc/0xf0
-> [    2.591776] [<fffffc0008083380>] ret_from_fork+0x10/0x50
-> [    2.597147] Code: b00057e1 91304021 91005021 b8626822 (b8606821)
-> [    2.603464] ---[ end trace 58c0cd36b88802bc ]---
-> [    2.608138] Kernel panic - not syncing: Fatal exception
->
-> Fix by supplying a cpu_to_node() implementation that returns correct
-> node mappings.
->
-> Cc: <stable@vger.kernel.org> # 4.7.x-
-> Signed-off-by: David Daney <david.daney@cavium.com>
->
-> ---
->   arch/arm64/include/asm/topology.h |  3 +++
->   arch/arm64/mm/numa.c              | 18 ++++++++++++++++++
->   2 files changed, 21 insertions(+)
->
-> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-> index 8b57339..8d935447 100644
-> --- a/arch/arm64/include/asm/topology.h
-> +++ b/arch/arm64/include/asm/topology.h
-> @@ -30,6 +30,9 @@ int pcibus_to_node(struct pci_bus *bus);
->   				 cpu_all_mask :				\
->   				 cpumask_of_node(pcibus_to_node(bus)))
->
-> +int cpu_to_node(int cpu);
-> +#define cpu_to_node cpu_to_node
-> +
->   #endif /* CONFIG_NUMA */
->
->   #include <asm-generic/topology.h>
-> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-> index 5bb15ea..e76281b 100644
-> --- a/arch/arm64/mm/numa.c
-> +++ b/arch/arm64/mm/numa.c
-> @@ -130,6 +130,24 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
->   	cpu_to_node_map[cpu] = nid;
->   }
->
-> +int cpu_to_node(int cpu)
-> +{
-> +	int nid;
-> +
-> +	/*
-> +	 * Return 0 for unknown mapping so that we report something
-> +	 * sensible if firmware doesn't supply a proper mapping.
-> +	 */
-> +	if (cpu < 0 || cpu >= NR_CPUS)
-> +		return 0;
-> +
-> +	nid = cpu_to_node_map[cpu];
-> +	if (nid == NUMA_NO_NODE)
-> +		nid = 0;
-> +	return nid;
-> +}
-> +EXPORT_SYMBOL(cpu_to_node);
-> +
->   /**
->    * numa_add_memblk - Set node id to memblk
->    * @nid: NUMA node ID of the new memblk
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Thanks for the fix!
-Hanjun
+On 20.09.2016 10:41, Noralf Tr?nnes wrote:
+>
+> Den 20.09.2016 09:19, skrev Martin Sperl:
+>> Hi Noralf!
+>>
+>> On 19.09.2016 17:26, Noralf Tr?nnes wrote:
+>>> Some SMBus protocols use Repeated Start Condition to switch from write
+>>> mode to read mode. Devices like MMA8451 won't work without it.
+>>>
+>>> When downstream implemented support for this in i2c-bcm2708, it broke
+>>> support for some devices, so a module parameter was added and combined
+>>> transfer was disabled by default.
+>>> See https://github.com/raspberrypi/linux/issues/599
+>>> It doesn't seem to have been any investigation into what the problem
+>>> really was. Later there was added a timeout on the polling loop.
+>>>
+>>> One of the devices mentioned to partially stop working was DS1307.
+>>>
+>>> I have run thousands of transfers to a DS1307 (rtc), MMA8451 (accel)
+>>> and AT24C32 (eeprom) in parallel without problems.
+>>>
+>>> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
+>>> ---
+>>>   drivers/i2c/busses/i2c-bcm2835.c | 107
+>>> +++++++++++++++++++++++++++++++++++----
+>>>   1 file changed, 98 insertions(+), 9 deletions(-)
+>> ...
+>>> @@ -209,8 +289,17 @@ static int bcm2835_i2c_xfer(struct i2c_adapter
+>>> *adap, struct i2c_msg msgs[],
+>>>       int i;
+>>>       int ret = 0;
+>>>   +    /* Combined write-read to the same address (smbus) */
+>>> +    if (num == 2 && (msgs[0].addr == msgs[1].addr) &&
+>>> +        !(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
+>>> +        (msgs[0].len <= 16)) {
+>>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[0], &msgs[1]);
+>>> +
+>>> +    return ret ? ret : 2;
+>>> +    }
+>>> +
+>>>       for (i = 0; i < num; i++) {
+>>> -        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i]);
+>>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i], NULL);
+>>>           if (ret)
+>>>               break;
+>>>       }
+>> This does not seem to implement the i2c_msg api correctly.
+>>
+>> As per comments in include/uapi/linux/i2c.h on line 58 only the last
+>> message
+>> in a group should - by default - send a STOP.
+>>
+>
+> Apparently it's a known problem that the i2c controller doesn't support
+> Repeated Start. It will always issue a Stop when it has transferred DLEN
+> bytes.
+> Refs:
+> http://www.circuitwizard.de/raspi-i2c-fix/raspi-i2c-fix.html
+> http://raspberrypi.stackexchange.com/questions/31728/has-anyone-successfully-used-i2c-repeated-starts-on-the-pi2-my-scope-says-they
+>
+>
+> UNLESS: a Start Transfer (ST) is issued after Transfer Active (TA) is set
+> and before DONE is set (or the last byte is shifted, I don't know excatly).
+> Refs:
+> https://github.com/raspberrypi/linux/issues/254#issuecomment-15254134
+> https://www.raspberrypi.org/forums/viewtopic.php?p=807834&sid=2b612c7209f2175bf1a266359c72ae6c#p807834
+>
+>
+> I found this answer/report by joan that the downstream combined support
+> isn't reliable:
+> http://raspberrypi.stackexchange.com/questions/31728/has-anyone-successfully-used-i2c-repeated-starts-on-the-pi2-my-scope-says-they
+>
+>
+> My implementation differs from downstream in that I use local_irq_save()
+> to protect the polling loop. But that only protects from missing the TA
+> (downstream can miss the TA and issue a Stop).
+>
+> So currently in mainline we have a driver that says it support the standard
+> (I2C_FUNC_I2C), but it really only supports one message transfers since it
+> can't do ReStart.
+>
+> What I have done in this patch is to support ReStart for transfers with
+> 2 messages: first write, then read. But maybe a better solution is to just
+> leave this alone if it is flaky and use bitbanging instead. I don't know.
+I have not said that the approach you have taken is wrong or bad.
+
+I was only telling you that the portion inside the bcm2835_i2c_xfer:
++	/* Combined write-read to the same address (smbus) */
++	if (num == 2 && (msgs[0].addr == msgs[1].addr) &&
++	    !(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
++	    (msgs[0].len <= 16)) {
++		ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[0], &msgs[1]);
++
++		return ret ? ret : 2;
++	}
+is very specific and maybe could be done in a "generic" manner
+supporting more cases.
+
+At least add a dev_warn_once for all num > 1 cases not handled by the
+code above.
+
+This gives people an opportunity to detect such a situation if they
+find something is not working as expected.
+
+Martin
