@@ -1,68 +1,37 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 20 Sep 2016 09:32:51 +0100
-Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
- issue.
-In-Reply-To: <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
-References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
- <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
-Message-ID: <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Sep 2016 09:33:52 +0100
+Subject: [RFC] Arm64 boot fail with numa enable in BIOS
+In-Reply-To: <cd53a1ae-e4ff-933c-4d1c-1ddaaa999a43@huawei.com>
+References: <7618d76d-bfa8-d8aa-59aa-06f9d90c1a98@huawei.com>
+ <20160919140709.GA17464@leverpostej>
+ <cd53a1ae-e4ff-933c-4d1c-1ddaaa999a43@huawei.com>
+Message-ID: <20160920083352.GA25614@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emil,
+Hi Yisheng,
 
-On Tue, 20 Sep 2016, Emil Velikov wrote:
-
-> On 5 September 2016 at 14:16, Peter Griffin <peter.griffin@linaro.org> wrote:
-> > ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
-> > recursive dependency.
-
-
-> >
-> From a humble skim through remoteproc, drm and a few other subsystems
-> I think the above is wrong. All the drivers (outside of remoteproc),
-> that I've seen, depend on the core component, they don't select it.
-
-I will let Bjorn comment on the remoteproc subsystem Kconfig design, and
-why it is like it is.
-
-For this particular SLIM_RPROC I have added it to Kconfig in keeping with all
-the other drivers in the remoteproc subsystem which has exposed this recursive
-dependency issue.
-
-For this particular kconfig symbol a quick grep reveals more drivers in
-the kernel using 'select', than 'depend on'
-
-git grep "select VIRTIO" | wc -l
-14
-
-git grep "depends on VIRTIO" | wc -l
-10
-
-
-> Furthermore most places explicitly hide the drivers from the menu if
-> the core component isn't enabled.
-
-Remoteproc subsystem takes a different approach, the core code is only enabled
-if a driver which relies on it is enabled. This IMHO makes sense, as
-remoteproc is not widely used (only a few particular ARM SoC's).
-
-It is true that for subsystems which rely on the core component being
-explicitly enabled, they often tend to hide drivers which depend on it
-from the menu unless it is. This also makes sense.
-
+On Tue, Sep 20, 2016 at 11:29:24AM +0800, Yisheng Xie wrote:
+> On 2016/9/19 22:07, Mark Rutland wrote:
+> > On Mon, Sep 19, 2016 at 09:05:26PM +0800, Yisheng Xie wrote:
+> > Can you modify the warning in cpumask.h to dump the bad CPU number? That
+> > would make it fairly clear if that's the case.
+> > 
+> hi Mark,
+> I dump the bad CPU number, it is 64,
+> And the cpumask get from task is 00000000,00000000.
 > 
-> Is there something that requires such a different/unusual behaviour in
-> remoteproc ?
-> 
+> [    3.873044] select_task_rq: allowed 0, allow_cpumask 00000000,00000000
+> [    3.879727] cpumask_check: cpu 64, nr_cpumask_bits:64, nr_cpu_ids= 64
+> [    3.895989] ------------[ cut here ]------------
+> [    3.900652] WARNING: CPU: 16 PID: 103 at ./include/linux/cpumask.h:122 try_to_wake_up+0x410/0x4ac
 
-I'm not sure it is that unusual...looking at config USB, it selects USB_COMMON in
-mfd subsystem, client drivers select MFD_CORE.
+Can you look at this patch from David, please:
 
-I've added Arnd to this thread, as I've seen lots of Kconfig patches from him
-recently, maybe he has some thoughts on whether this is the correct fix or not?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/458110.html
 
-regards,
+and offer a Tested-by if it fixes your problem?
 
-Peter.
+Thanks,
+
+Will
