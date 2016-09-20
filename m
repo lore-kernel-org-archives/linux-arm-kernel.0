@@ -1,40 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 20 Sep 2016 09:40:23 -0500
-Subject: [PATCH resend 2/5] input: touchscreen: Add LED trigger support
- to the softbutton code
-In-Reply-To: <20160911184408.11657-3-hdegoede@redhat.com>
-References: <20160911184408.11657-1-hdegoede@redhat.com>
- <20160911184408.11657-3-hdegoede@redhat.com>
-Message-ID: <20160920144023.GA31922@rob-hp-laptop>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 20 Sep 2016 22:43:51 +0800
+Subject: [PATCH 00/19] ARM: imx legacy: move peripheral initializations
+ to .init_late
+In-Reply-To: <1474248988-10626-1-git-send-email-vz@mleia.com>
+References: <1474248988-10626-1-git-send-email-vz@mleia.com>
+Message-ID: <20160920144351.GH3744@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 11, 2016 at 08:44:05PM +0200, Hans de Goede wrote:
-> In some hardware there are 1 or more LEDs behind the touchscreen
-> softbuttons, which are intended to provide visual feedback to the
-> user that the softbutton has been pressed, this commit adds support
-> for this.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  .../bindings/input/touchscreen/softbuttons.txt     |  4 ++
->  drivers/input/touchscreen/softbuttons.c            | 49 +++++++++++++++++++++-
->  2 files changed, 52 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
-> index 3eb6f4c..b425b95 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
-> @@ -17,6 +17,10 @@ Required subnode-properties:
->   - softbutton-min-y		: Y start of the area the softbutton area covers
->   - softbutton-max-y		: Y end of the area the softbutton area covers
->  
-> +Optional subnode-properties:
-> +- linux,led-trigger		: String for a LED trigger for providing visual
-> +				  feedback that the softbutton has been pressed
+On Mon, Sep 19, 2016 at 04:36:28AM +0300, Vladimir Zapolskiy wrote:
+> Vladimir Zapolskiy (19):
+>   ARM: imx legacy: kzm: move peripheral initialization to .init_late
+>   ARM: imx legacy: mx31lite: move peripheral initialization to .init_late
+>   ARM: imx legacy: mx31ads: move peripheral initialization to .init_late
+>   ARM: imx legacy: mx31lilly: move peripheral initialization to .init_late
+>   ARM: imx legacy: pcm037: move peripheral initialization to .init_late
+>   ARM: imx legacy: mx31-3ds: move peripheral initialization to .init_late
+>   ARM: imx legacy: qong: move peripheral initialization to .init_late
+>   ARM: imx legacy: armadillo5x0: move peripheral initialization to .init_late
+>   ARM: imx legacy: mx31moboard: move peripheral initialization to .init_late
+>   ARM: imx legacy: vpr200: move peripheral initialization to .init_late
+>   ARM: imx legacy: imx27-visstrim-m10: move peripheral initialization to .init_late
+>   ARM: imx legacy: mx27-3ds: move peripheral initialization to .init_late
+>   ARM: imx legacy: mx35-3ds: move peripheral initialization to .init_late
+>   ARM: imx legacy: apf9328: move peripheral initialization to .init_late
+>   ARM: imx legacy: scb9328: move peripheral initialization to .init_late
+>   ARM: imx legacy: pcm043: move peripheral initialization to .init_late
+>   ARM: imx legacy: mx21ads: move peripheral initialization to .init_late
+>   ARM: imx legacy: mx27ads: move peripheral initialization to .init_late
+>   ARM: imx legacy: pca100: move peripheral initialization to .init_late
 
-This should just be a phandle to the LED if you want to describe the 
-link. Or standardize the trigger naming (in the kernel) for buttons and 
-just use the existing 'linux,default-trigger' in the LED node.
+Applied all, except patch #14 (apf9328) and #15 (scb9328), which are
+removed during this development cycle.
 
-Rob
+Shawn
