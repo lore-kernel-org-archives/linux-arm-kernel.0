@@ -1,46 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2016 11:45:50 +0200
-Subject: [GIT PULL] ARM: mvebu: soc for v4.9 (#1)
-In-Reply-To: <87shsv6ni8.fsf@free-electrons.com>
-References: <87bmzqbilu.fsf@free-electrons.com> <4288010.vBvIiUCvY8@wuerfel>
- <87shsv6ni8.fsf@free-electrons.com>
-Message-ID: <5238448.m4YaC7vVme@wuerfel>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 20 Sep 2016 11:48:20 +0200
+Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
+ support
+In-Reply-To: <f64e4f9d-d811-2c6e-7c5a-d4ab06716e2c@st.com>
+References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
+ <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
+ <alpine.DEB.2.20.1609131713490.6233@nanos>
+ <6941f61d-0b33-4108-0135-b11887cd0488@st.com>
+ <alpine.DEB.2.20.1609141103420.6233@nanos>
+ <facd1c7c-d696-eae1-02e4-5a0c9285add0@st.com>
+ <alpine.DEB.2.20.1609141532510.6233@nanos>
+ <f64e4f9d-d811-2c6e-7c5a-d4ab06716e2c@st.com>
+Message-ID: <39c4ceee-7e05-ebfd-2ea0-3c4e1c4ea619@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 20, 2016 9:25:51 AM CEST Gregory CLEMENT wrote:
-> Hi Arnd,
->  
->  On lun., sept. 19 2016, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > On Monday, September 19, 2016 11:46:22 PM CEST Arnd Bergmann wrote:
-> >> On Wednesday, September 14, 2016 5:34:37 PM CEST Gregory CLEMENT wrote:
-> >> > mvebu soc for 4.9 (part 1)
-> >> > 
-> >> > - irq cleanup for old mvebu SoC
-> >> > - Convert orion5x based SoC Netgear WNR854T to devicetree
-> >> > 
-> >> 
-> >> Pulled into next/soc, thanks!
-> >
-> > Sorry, backed out again after seeing the PCI stuff on the WNR854T in
-> > there. I thought the plan was to leave out PCI support from the DT
-> > based machine file, and leave the old board in place, or am I
-> > missing something?
-> 
-> I might have overlooked the thread, I thouhgt the state of the patch was
-> OK as is, and further changes can be done later.
-> 
-> So it seems that it will be 4.10 material.
-> 
+Hi Thomas,
 
-We have gained a little more time since Linus delayed the merge window
-by another week, so I think there is still a chance to respin this.
+On 09/14/2016 03:44 PM, Alexandre Torgue wrote:
+>
+>
+> On 09/14/2016 03:34 PM, Thomas Gleixner wrote:
+>> On Wed, 14 Sep 2016, Alexandre Torgue wrote:
+>>> On 09/14/2016 11:19 AM, Thomas Gleixner wrote:
+>>>>
+>>>> Now what really bugs me is that you do that at all. An interrupt
+>>>> which is
+>>>> freed must be masked already. Why is it unmasked in the first place?
+>>>
+>>> Honestly I don't know. When "devm_free_irq" is called to release
+>>> virq, there
+>>> is no issue and interrupt is well masked. But, when I tried to use
+>>> "irq_dispose_mapping(virq)" I observed that .free is called (child
+>>> and parent
+>>> domain) but interrupt is not masked.
+>>
+>> Well, you just used some function in some context which is not
+>> relevant to
+>> the normal operation. So adding that mask() is just paranoia for no
+>> value.
+>
+A gentle reminder ping...
+If ".free" callback is not relevant then I 'll remove it from exti domain.
 
-I also really want the NO_IRQ changes to get merged ;-)
+> I agree. I just wanted to "force" a test for .free callback. If it not
+> relevant I'll remove ".free" callback of exti domain.
+> As a part of this series has already been taken by Linus (pinctrl part),
+> I will send a new series only for irqchip part (patches [1] and [2]). Do
+> you agree ?
+>
 
-Just drop the patch removing wnr854t-setup.c, and add another patch
-on top to remove the PCI initialization from wrt350n-v2-setup.c,
-and I'll take it.
+Thanks in advance
+Alex
 
-	Arnd
+> Thanks
+> Alex
+>
+>
+>>
+>> Thanks,
+>>
+>>     tglx
+>>
+>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
