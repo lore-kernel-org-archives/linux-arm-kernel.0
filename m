@@ -1,225 +1,47 @@
-From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Tue, 20 Sep 2016 11:42:45 +0530
-Subject: [PATCH v6 7/7] arm/arm64: vgic-new: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <1474351965-11586-1-git-send-email-vijay.kilari@gmail.com>
-References: <1474351965-11586-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1474351965-11586-8-git-send-email-vijay.kilari@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 20 Sep 2016 08:18:02 +0200
+Subject: [PATCH 3/4] watchdog: sa11x0/pxa: get rid of get_clock_tick_rate
+References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
+ <1474312335-20997-4-git-send-email-robert.jarzmik@free.fr>
+ <20160919200816.GC29242@roeck-us.net>
+ <20160919223616.GN1041@n2100.armlinux.org.uk>
+ <0909debb-f7df-648b-95d2-23b535e5b299@roeck-us.net>
+Message-ID: <87h99bdrhh.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+Guenter Roeck <linux@roeck-us.net> writes:
 
-Userspace requires to store and restore of line_level for
-level triggered interrupts using ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO.
+> On 09/19/2016 03:36 PM, Russell King - ARM Linux wrote:
+>> On Mon, Sep 19, 2016 at 01:08:16PM -0700, Guenter Roeck wrote:
+>>> On Mon, Sep 19, 2016 at 09:12:14PM +0200, Robert Jarzmik wrote:
+>>>> The OS timer rate used for the watchdog can now be fetched from the
+>>>> standard clock API. This will remove the last user of
+>>>> get_clock_tick_rate() in both pxa and sa11x0 architectures.
+>>>>
+>>>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>>>
+>>> Did you test this ? Potential problem, if built into the kernel, could be that
+>>> the clocks might not be ready by the time the driver is instantiated. Unless
+>>> this is converted to a platform driver, it won't be able to handle a
+>>> -EPROBE_DEFER from the clock subsystem.
+>>
+>> Really not a problem at all.  The OSTIMER0 is required for the system
+>> tick, and if that's not present, the kernel will be without any kind
+>> of time keeping, so a missing watchdog driver is the least of the
+>> problems.
+>>
+>> Therefore, both PXA and SA11x0 register their clocks really early to
+>> ensure that OSTIMER0 is available by the time_init() stage, which is
+>> way before driver probe time.
+>>
+>
+> You are right. And, at least in qemu, it actually works.
+Hi Guenter,
 
-Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
----
- arch/arm64/include/uapi/asm/kvm.h   |  6 +++++
- virt/kvm/arm/vgic/vgic-kvm-device.c | 50 ++++++++++++++++++++++++++++++++++++-
- virt/kvm/arm/vgic/vgic-mmio-v3.c    | 11 ++++++++
- virt/kvm/arm/vgic/vgic-mmio.c       | 33 ++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h       |  5 ++++
- virt/kvm/arm/vgic/vgic.h            |  3 +++
- 6 files changed, 107 insertions(+), 1 deletion(-)
+Yes, it was tested on pxa25x (lubbock) and pxa27x (mainstone).
 
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 91c7137..4100f8c 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -211,6 +211,12 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
- #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
- #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
-+#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
-+			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
-+#define VGIC_LEVEL_INFO_LINE_LEVEL	0
- 
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
- 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index da532d1..0f82a91 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -512,6 +512,25 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
- 						  regid, reg);
- 		break;
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		unsigned int info, intid;
-+
-+		info = (attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-+			KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT;
-+		if (info == VGIC_LEVEL_INFO_LINE_LEVEL) {
-+			if (is_write)
-+				tmp32 = *reg;
-+			intid = attr->attr &
-+				KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK;
-+			ret = vgic_v3_line_level_info_uaccess(vcpu, is_write,
-+							      intid, &tmp32);
-+			if (!is_write)
-+				*reg = tmp32;
-+		} else {
-+			ret = -EINVAL;
-+		}
-+		break;
-+	}
- 	default:
- 		ret = -EINVAL;
- 		break;
-@@ -554,6 +573,17 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
- 
- 		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u64 reg;
-+		u32 tmp32;
-+
-+		if (get_user(tmp32, uaddr))
-+			return -EFAULT;
-+
-+		reg = tmp32;
-+		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
-+	}
- 	}
- 	return -ENXIO;
- }
-@@ -589,8 +619,18 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
- 			return ret;
- 		return put_user(reg, uaddr);
- 	}
--	}
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u64 reg;
-+		u32 tmp32;
- 
-+		ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
-+		if (ret)
-+			return ret;
-+		tmp32 = reg;
-+		return put_user(tmp32, uaddr);
-+	}
-+	}
- 	return -ENXIO;
- }
- 
-@@ -611,11 +651,19 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
- 		return vgic_v3_has_attr_regs(dev, attr);
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
- 		return 0;
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		if (((attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-+		      KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT) ==
-+		      VGIC_LEVEL_INFO_LINE_LEVEL)
-+			return 0;
-+		break;
-+	}
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
- 		switch (attr->attr) {
- 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
- 			return 0;
- 		}
-+		break;
- 	}
- 	return -ENXIO;
- }
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 8f46e61..648f588 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -807,3 +807,14 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 		return vgic_uaccess(vcpu, &rd_dev, is_write,
- 				    offset, val);
- }
-+
-+int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+				    u32 intid, u32 *val)
-+{
-+	if (is_write)
-+		vgic_write_irq_line_level_info(vcpu, intid, *val);
-+	else
-+		*val = vgic_read_irq_line_level_info(vcpu, intid);
-+
-+	return 0;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 173d6f0..fb018eb 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -371,6 +371,39 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
- 	}
- }
- 
-+unsigned long vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid)
-+{
-+	int i;
-+	unsigned long val = 0;
-+
-+	for (i = 0; i < 32; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		if (irq->line_level)
-+			val |= (1U << i);
-+
-+		vgic_put_irq(vcpu->kvm, irq);
-+	}
-+
-+	return val;
-+}
-+
-+void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-+				    const unsigned long val)
-+{
-+	int i;
-+
-+	for_each_set_bit(i, &val, 32) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+		irq->line_level = true;
-+		spin_unlock(&irq->irq_lock);
-+
-+		vgic_put_irq(vcpu->kvm, irq);
-+	}
-+}
-+
- static int match_region(const void *key, const void *elt)
- {
- 	const unsigned int offset = (unsigned long)key;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index acbf99e..938702c 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -181,6 +181,11 @@ int vgic_validate_mmio_region_addr(struct kvm_device *dev,
- 				   const struct vgic_register_region *regions,
- 				   int nr_regions, gpa_t addr);
- 
-+unsigned long vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid);
-+
-+void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-+				    const unsigned long val);
-+
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
- 
- unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 0e632d0..77d3d84 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -130,6 +130,9 @@ int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 			 u64 id, u64 *val);
- int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
- 				u64 *reg);
-+int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+				    u32 intid, u32 *val);
-+
- #else
- static inline int vgic_register_its_iodevs(struct kvm *kvm)
- {
+Cheers.
+
 -- 
-1.9.1
+Robert
