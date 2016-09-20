@@ -1,139 +1,135 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 20 Sep 2016 10:17:48 -0600
-Subject: [PATCH v5 02/16] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <874m5cx6y8.fsf@arm.com>
-References: <20160902201605.GA1705@linaro.org> <87sht59mcw.fsf@arm.com>
- <20160912161600.GA21885@linaro.org>
- <a4fc71ae-6fa5-4142-6dd4-7bc96eb20186@arm.com>
- <87intz665i.fsf@arm.com> <20160913193844.GB28944@linaro.org>
- <87h99i6b5d.fsf@arm.com> <7hpoo3ix80.fsf@baylibre.com>
- <7af4c2d7-70a3-1881-2980-8ea49e594e5b@arm.com>
- <874m5cx6y8.fsf@arm.com>
-Message-ID: <20160920161748.GB46914@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 20 Sep 2016 18:24:50 +0200
+Subject: [PATCH] clk: mvebu: Add clk support for the orion5x SoC mv88f5181
+Message-ID: <20160920162450.4046-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19 2016 at 09:09 -0600, Brendan Jackman wrote:
->
->On Fri, Sep 16 2016 at 18:39, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Kevin,
->>
->> Thanks for looking at this and simplifying various discussions we had so
->> far. I was thinking of summarizing something very similar. I couldn't
->> due to lack of time.
->>
->> On 16/09/16 18:13, Kevin Hilman wrote:
->>
->> [...]
->>
->>> I think we're having some terminology issues...
->>>
->>> FWIW, the kernel terminolgy is actually "PM domain", not power domain.
->>> This was intentional because the goal of the PM domain was to group
->>> devices that some PM features.  To be very specific to the kernel, they
->>> us the same set of PM callbacks.  Today, this is most commonly used to
->>> model power domains, where a group of devices share a power rail, but it
->>> does not need to be limited to that.
->>>
->>
->> Agreed/Understood.
->>
->>> That being said, I'm having a hard time understanding the root of the
->>> disagreement.
->>>
->>
->> Yes. I tried to convey the same earlier, but have failed. The only
->> disagreement is about a small part of this DT bindings. We would like to
->> make it completely hierarchical up to CPU nodes. More comments on that
->> below.
->>
->>> It seems that you and Sudeep would like to use domain-idle-states to
->>> replace/superceed cpu-idle-states with the primary goal (and benefit)
->>> being that it simplifies the DT bindings.  Is that correct?
->>>
->>
->> Correct, we want to deprecate cpu-idle-states with the introduction of
->> this hierarchical PM bindings. Yes IMO, it simplifies things and avoids
->> any ABI break we might trigger if we miss to consider some use-case now.
->>
->>> The objections have come in because that means that implies that CPUs
->>> become their own domains, which may not be the case in hardware in the
->>> sense that they share a power rail.
->>>
->>
->> Agreed.
->>
->>> However, IMO, thinking of a CPU as it's own "PM domain" may make some
->>> sense based on the terminology above.
->>>
->>
->> Thanks for that, we do understand that it may not be 100% correct when
->> we strictly considers hardware terminologies instead of above ones.
->> As along as we see no issues with the above terminologies it should be fine.
->>
->>> I think the other objection may be that using a genpd to model domain
->>> with only a single device in it may be overkill, and I agree with that.
->>
->> I too agree with that. Just because we represent that in DT in that way
->> doesn't mean we need to create a genpd to model domain. We can always
->> skip that if not required. That's pure implementation specifics and I
->> have tried to convey the same in my previous emails. I must say you have
->> summarized it very clearly in this email. Thanks again for that.
->>
->>> But, I'm not sure if making CPUs use domain-idle-states implies that
->>> they necessarily have to use genpd is what you are proposing.  Maybe
->>> someone could clarify that?
->>>
->>
->> No, I have not proposing anything around implementation in the whole
->> discussion so far. I have constrained myself just to DT bindings so far.
->> That's the main reason why I was opposed to mentions of OS vs platform
->> co-ordinated modes of CPU suspend in this discussion. IMO that's
->> completely out of scope of this DT binding we are defining here.
->>
-Fair. But understand the PM Domain bindings do not impose any
-requirements of hierarchy. Domain idle states are defined by the
-property domain-idle-states in the domain node. How the DT bindings are
-organized is immaterial to the PM Domain core.
+From: Jamie Lentin <jm@lentin.co.uk>
 
-It is a different exercise all together to look at CPU PSCI modes and
-have a unified way of representing them in DT. The current set of
-patches does not dictate where the domain idle states be located (pardon
-my example in the patch, which was not updated to reflect that). That
-said, I do require that domains that are controlled by the PSCI f/w be
-defined under the 'psci' node in DT, which is fair. All the domain needs
-are phandles to the idle state definitions; how the nodes are arranged
-in DT is not of consequence to the driver.
+Referring to the u-boot sources for the Netgear WNR854T, add support
+for the mv88f5181.
 
-In my mind providing a structure to CPU PM domains that can be used for
-both OSI and PC is a separate effort. It may also club what Brendan
-mentions below as part of the effort. The hierarchy that is presented in
-[1] is inherent in the PM domain hierarchy and idle states don't have to
-duplicate that information.
+[gregory.clement at free-electrons.com: fix commit title]
+Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
 
->> Hope that helps/clarifies the misunderstanding/disagreement.
->
->Indeed. My intention was that the proposal would result in the exact
->same kernel behaviour as Lina's current patchset, i.e. there is one
->genpd per cluster, and CPU-level idle states are still handled by
->cpuidle.
->
->The only change from the current patchset would be in initialisation
->code: some coordination would need to be done to determine which idle
->states go into cpuidle and which go into the genpds (whereas with the
->current bindings, states from cpu-idle-states go into cpuidle and states
->from domain-idle-states go into genpd). So you could say that this would
->be a trade-off between binding simplicity and implementation simplicity.
->
-I would not oppose the idea of virtual domains around CPUs (I admit I am
-not comfortable with the idea though), if that is the right thing to do.
-But the scope of that work is extensive and should not be clubbed as
-part of this proposal. It is an extensive code rework spanning cpuidle
-drivers and PSCI and there are hooks in this code to help you achieve
-that.
+Hi Stephen and Mike,
+
+do you agree to give your acked-by on this patch. It is part of a
+convertion of old orion5x Socv to the device tree. If you acked-by
+this one, then I will be able to take it in my tree and avoiding
+breaking the git bisect.
+
+This patch is really about adding a new variant, teh logic remains the
+same and also it won't produce any conflict.
+
+Sorry to not have asked this before.
 
 Thanks,
-Lina
 
-[1]. https://patchwork.kernel.org/patch/9264507/
+Gregory
+
+
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |  1 +
+ drivers/clk/mvebu/orion.c                          | 70 ++++++++++++++++++++++
+ 2 files changed, 71 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+index 670c2af3e931..eb985a633d59 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+@@ -52,6 +52,7 @@ Required properties:
+ 	"marvell,dove-core-clock" - for Dove SoC core clocks
+ 	"marvell,kirkwood-core-clock" - for Kirkwood SoC (except mv88f6180)
+ 	"marvell,mv88f6180-core-clock" - for Kirkwood MV88f6180 SoC
++	"marvell,mv88f5181-core-clock" - for Orion MV88F5181 SoC
+ 	"marvell,mv88f5182-core-clock" - for Orion MV88F5182 SoC
+ 	"marvell,mv88f5281-core-clock" - for Orion MV88F5281 SoC
+ 	"marvell,mv88f6183-core-clock" - for Orion MV88F6183 SoC
+diff --git a/drivers/clk/mvebu/orion.c b/drivers/clk/mvebu/orion.c
+index fd129566c1ce..a6e5bee23385 100644
+--- a/drivers/clk/mvebu/orion.c
++++ b/drivers/clk/mvebu/orion.c
+@@ -21,6 +21,76 @@ static const struct coreclk_ratio orion_coreclk_ratios[] __initconst = {
+ };
+ 
+ /*
++ * Orion 5181
++ */
++
++#define SAR_MV88F5181_TCLK_FREQ      8
++#define SAR_MV88F5181_TCLK_FREQ_MASK 0x3
++
++static u32 __init mv88f5181_get_tclk_freq(void __iomem *sar)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F5181_TCLK_FREQ) &
++		SAR_MV88F5181_TCLK_FREQ_MASK;
++	if (opt == 0)
++		return 133333333;
++	else if (opt == 1)
++		return 150000000;
++	else if (opt == 2)
++		return 166666667;
++	else
++		return 0;
++}
++
++#define SAR_MV88F5181_CPU_FREQ       4
++#define SAR_MV88F5181_CPU_FREQ_MASK  0xf
++
++static u32 __init mv88f5181_get_cpu_freq(void __iomem *sar)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F5181_CPU_FREQ) &
++		SAR_MV88F5181_CPU_FREQ_MASK;
++	if (opt == 0)
++		return 333333333;
++	else if (opt == 1 || opt == 2)
++		return 400000000;
++	else if (opt == 3)
++		return 500000000;
++	else
++		return 0;
++}
++
++static void __init mv88f5181_get_clk_ratio(void __iomem *sar, int id,
++					   int *mult, int *div)
++{
++	u32 opt = (readl(sar) >> SAR_MV88F5181_CPU_FREQ) &
++		SAR_MV88F5181_CPU_FREQ_MASK;
++	if (opt == 0 || opt == 1) {
++		*mult = 1;
++		*div  = 2;
++	} else if (opt == 2 || opt == 3) {
++		*mult = 1;
++		*div  = 3;
++	} else {
++		*mult = 0;
++		*div  = 1;
++	}
++}
++
++static const struct coreclk_soc_desc mv88f5181_coreclks = {
++	.get_tclk_freq = mv88f5181_get_tclk_freq,
++	.get_cpu_freq = mv88f5181_get_cpu_freq,
++	.get_clk_ratio = mv88f5181_get_clk_ratio,
++	.ratios = orion_coreclk_ratios,
++	.num_ratios = ARRAY_SIZE(orion_coreclk_ratios),
++};
++
++static void __init mv88f5181_clk_init(struct device_node *np)
++{
++	return mvebu_coreclk_setup(np, &mv88f5181_coreclks);
++}
++
++CLK_OF_DECLARE(mv88f5181_clk, "marvell,mv88f5181-core-clock", mv88f5181_clk_init);
++
++/*
+  * Orion 5182
+  */
+ 
+-- 
+2.9.3
