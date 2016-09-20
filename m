@@ -1,149 +1,192 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 20 Sep 2016 11:46:35 -0700
-Subject: [PATCH] arm64: Call numa_store_cpu_info() earlier.
-Message-ID: <1474397195-16520-1-git-send-email-ddaney.cavm@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 20 Sep 2016 14:17:44 -0500
+Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
+ register range for ACPI case
+In-Reply-To: <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <1473449047-10499-4-git-send-email-tn@semihalf.com>
+ <20160919180900.GB13775@localhost>
+ <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
+ <20160920133327.GB13855@localhost>
+ <CAKv+Gu-AE7fft_j2cqBCN=xrsf5Yh=mePf5x3dZJuKAmdxF-Gg@mail.gmail.com>
+ <20160920140518.GD13855@localhost>
+ <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
+Message-ID: <20160920191744.GA4941@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+On Tue, Sep 20, 2016 at 04:09:25PM +0100, Ard Biesheuvel wrote:
+> On 20 September 2016 at 15:05, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> > Hi Ard,
+> >
+> > On Tue, Sep 20, 2016 at 02:40:13PM +0100, Ard Biesheuvel wrote:
+> >> On 20 September 2016 at 14:33, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> >> > [+cc Rafael (maybe already cc'd; I didn't recognize rafael at kernel.org, Duc]
+> >> >
+> >> > On Tue, Sep 20, 2016 at 09:23:21AM +0200, Tomasz Nowicki wrote:
+> >> >> On 19.09.2016 20:09, Bjorn Helgaas wrote:
+> >> >> >On Fri, Sep 09, 2016 at 09:24:05PM +0200, Tomasz Nowicki wrote:
+> >> >> >>thunder-pem driver stands for being ACPI based PCI host controller.
+> >> >> >>However, there is no standard way to describe its PEM-specific register
+> >> >> >>ranges in ACPI tables. Thus we add thunder_pem_init() ACPI extension
+> >> >> >>to obtain hardcoded addresses from static resource array.
+> >> >> >>Although it is not pretty, it prevents from creating standard mechanism to
+> >> >> >>handle similar cases in future.
+> >> >> >>
+> >> >> >>Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> >> >> >>---
+> >> >> >> drivers/pci/host/pci-thunder-pem.c | 61 ++++++++++++++++++++++++++++++--------
+> >> >> >> 1 file changed, 48 insertions(+), 13 deletions(-)
+> >> >> >>
+> >> >> >>diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> >> >> >>index 6abaf80..b048761 100644
+> >> >> >>--- a/drivers/pci/host/pci-thunder-pem.c
+> >> >> >>+++ b/drivers/pci/host/pci-thunder-pem.c
+> >> >> >>@@ -18,6 +18,7 @@
+> >> >> >> #include <linux/init.h>
+> >> >> >> #include <linux/of_address.h>
+> >> >> >> #include <linux/of_pci.h>
+> >> >> >>+#include <linux/pci-acpi.h>
+> >> >> >> #include <linux/pci-ecam.h>
+> >> >> >> #include <linux/platform_device.h>
+> >> >> >>
+> >> >> >>@@ -284,6 +285,40 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
+> >> >> >>    return pci_generic_config_write(bus, devfn, where, size, val);
+> >> >> >> }
+> >> >> >>
+> >> >> >>+#ifdef CONFIG_ACPI
+> >> >> >>+static struct resource thunder_pem_reg_res[] = {
+> >> >> >>+   [4] = DEFINE_RES_MEM(0x87e0c0000000UL, SZ_16M),
+> >> >> >>+   [5] = DEFINE_RES_MEM(0x87e0c1000000UL, SZ_16M),
+> >> >> >>+   [6] = DEFINE_RES_MEM(0x87e0c2000000UL, SZ_16M),
+> >> >> >>+   [7] = DEFINE_RES_MEM(0x87e0c3000000UL, SZ_16M),
+> >> >> >>+   [8] = DEFINE_RES_MEM(0x87e0c4000000UL, SZ_16M),
+> >> >> >>+   [9] = DEFINE_RES_MEM(0x87e0c5000000UL, SZ_16M),
+> >> >> >>+   [14] = DEFINE_RES_MEM(0x97e0c0000000UL, SZ_16M),
+> >> >> >>+   [15] = DEFINE_RES_MEM(0x97e0c1000000UL, SZ_16M),
+> >> >> >>+   [16] = DEFINE_RES_MEM(0x97e0c2000000UL, SZ_16M),
+> >> >> >>+   [17] = DEFINE_RES_MEM(0x97e0c3000000UL, SZ_16M),
+> >> >> >>+   [18] = DEFINE_RES_MEM(0x97e0c4000000UL, SZ_16M),
+> >> >> >>+   [19] = DEFINE_RES_MEM(0x97e0c5000000UL, SZ_16M),
+> >> >> >
+> >> >> >1) The "correct" way to discover the resources consumed by an ACPI
+> >> >> >   device is to use the _CRS method.  I know there are some issues
+> >> >> >   there for bridges (not the fault of ThunderX!) because there's not
+> >> >> >   a good way to distinguish windows from resources consumed directly
+> >> >> >   by the bridge.
+> >> >> >
+> >> >> >   But we should either do this correctly, or include a comment about
+> >> >> >   why we're doing it wrong, so we don't give the impression that this
+> >> >> >   is the right way to do it.
+> >> >> >
+> >> >> >   I seem to recall some discussion about why we're doing it this way,
+> >> >> >   but I don't remember the details.  It'd be nice to include a
+> >> >> >   summary here.
+> >> >>
+> >> >> OK I will. The reason why we cannot use _CRS for this case is that
+> >> >> CONSUMER flag was not use consistently for the bridge so far.
+> >> >
+> >> > Yes, I'm aware of that problem, but hard-coding resources into drivers
+> >> > is just a disaster.  The PCI and ACPI cores need generic ways to learn
+> >> > what resources are consumed by devices.  For PCI devices, that's done
+> >> > with BARs.  For ACPI devices, it's done with _CRS.  Without generic
+> >> > resource discovery, we can't manage resources reliably at the system
+> >> > level [1].
+> >> >
+> >> > You have a PNP0A03/PNP0A08 device for the PCI host bridge.  Because of
+> >> > the BIOS bugs in CONSUMER flag usage, we assume everything in its _CRS
+> >> > is a window and not consumed by the bridge itself.  What if you added
+> >> > a companion ACPI device with a _CRS that contained the bridge
+> >> > resources?  Then you'd have some driver ugliness to find that device,
+> >> > but at least the ACPI core could tell what resources were in use.
+> >> >
+> >> > Maybe Rafael has a better idea?
+> >>
+> >> In the discussions leading up to this, we tried very hard to make this
+> >> arm64/acpi quirks mechanism just as flexible as we need it to be to
+> >> cover the current crop of incompatible hardware, but not more so.
+> >> Going forward, we intend to require all arm64/acpi hardware to be spec
+> >> compliant, and so any parametrization beyond what is required for the
+> >> currently known broken hardware is only going to make it easier for
+> >> others to ship with tweaked ACPI descriptions so that an existing
+> >> quirk is triggered for hardware that it was not intended for. It also
+> >> implies that we have to deal with the ACPI descriptions as they were
+> >> shipped with the current hardware.
+> >>
+> >> That does not mean, of course, that we should use bare constants
+> >> rather than symbolic ones, but anything beyond that exceeds the
+> >> desired scope of quirks handling.
+> >
+> > Symbolic vs bare constants is the least of my worries.  I'm pretty
+> > happy with the current quirk implementation.  It's pretty simple and
+> > straightforward.
+> >
+> 
+> OK, good to know that we are on the right track here.
+> 
+> > Apparently you shipped broken firmware that doesn't accurately
+> > describe system resource usage.  Presumably that firmware could be
+> > updated, but maybe it's worthwhile to work around it in the kernel,
+> > depending on where it got shipped.
+> >
+> 
+> None of these platforms can be fixed entirely in software, and given
+> that we will not be adding quirks for new broken hardware, we should
+> ask ourselves whether having two versions of a quirk, i.e., one for
+> broken hardware + currently shipping firmware, and one for the same
+> broken hardware with fixed firmware is really an improvement over what
+> has been proposed here.
 
-The wq_numa_init() function makes a private CPU to node map by calling
-cpu_to_node() early in the boot process, before the non-boot CPUs are
-brought online.  Since the default implementation of cpu_to_node()
-returns zero for CPUs that have never been brought online, the
-workqueue system's view is that *all* CPUs are on node zero.
+We're talking about two completely different types of quirks:
 
-When the unbound workqueue for a non-zero node is created, the
-tsk_cpus_allowed() for the worker threads is the empty set because
-there are, in the view of the workqueue system, no CPUs on non-zero
-nodes.  The code in try_to_wake_up() using this empty cpumask ends up
-using the cpumask empty set value of NR_CPUS as an index into the
-per-CPU area pointer array, and gets garbage as it is one past the end
-of the array.  This results in:
+  1) MCFG quirks to use memory-mapped config space that doesn't quite
+     conform to the ECAM model in the PCIe spec, and
 
-[    0.881970] Unable to handle kernel paging request at virtual address fffffb1008b926a4
-[    1.970095] pgd = fffffc00094b0000
-[    1.973530] [fffffb1008b926a4] *pgd=0000000000000000, *pud=0000000000000000, *pmd=0000000000000000
-[    1.982610] Internal error: Oops: 96000004 [#1] SMP
-[    1.987541] Modules linked in:
-[    1.990631] CPU: 48 PID: 295 Comm: cpuhp/48 Tainted: G        W       4.8.0-rc6-preempt-vol+ #9
-[    1.999435] Hardware name: Cavium ThunderX CN88XX board (DT)
-[    2.005159] task: fffffe0fe89cc300 task.stack: fffffe0fe8b8c000
-[    2.011158] PC is at try_to_wake_up+0x194/0x34c
-[    2.015737] LR is at try_to_wake_up+0x150/0x34c
-[    2.020318] pc : [<fffffc00080e7468>] lr : [<fffffc00080e7424>] pstate: 600000c5
-[    2.027803] sp : fffffe0fe8b8fb10
-[    2.031149] x29: fffffe0fe8b8fb10 x28: 0000000000000000
-[    2.036522] x27: fffffc0008c63bc8 x26: 0000000000001000
-[    2.041896] x25: fffffc0008c63c80 x24: fffffc0008bfb200
-[    2.047270] x23: 00000000000000c0 x22: 0000000000000004
-[    2.052642] x21: fffffe0fe89d25bc x20: 0000000000001000
-[    2.058014] x19: fffffe0fe89d1d00 x18: 0000000000000000
-[    2.063386] x17: 0000000000000000 x16: 0000000000000000
-[    2.068760] x15: 0000000000000018 x14: 0000000000000000
-[    2.074133] x13: 0000000000000000 x12: 0000000000000000
-[    2.079505] x11: 0000000000000000 x10: 0000000000000000
-[    2.084879] x9 : 0000000000000000 x8 : 0000000000000000
-[    2.090251] x7 : 0000000000000040 x6 : 0000000000000000
-[    2.095621] x5 : ffffffffffffffff x4 : 0000000000000000
-[    2.100991] x3 : 0000000000000000 x2 : 0000000000000000
-[    2.106364] x1 : fffffc0008be4c24 x0 : ffffff0ffffada80
-[    2.111737]
-[    2.113236] Process cpuhp/48 (pid: 295, stack limit = 0xfffffe0fe8b8c020)
-[    2.120102] Stack: (0xfffffe0fe8b8fb10 to 0xfffffe0fe8b90000)
-[    2.125914] fb00:                                   fffffe0fe8b8fb80 fffffc00080e7648
-.
-.
-.
-[    2.442859] Call trace:
-[    2.445327] Exception stack(0xfffffe0fe8b8f940 to 0xfffffe0fe8b8fa70)
-[    2.451843] f940: fffffe0fe89d1d00 0000040000000000 fffffe0fe8b8fb10 fffffc00080e7468
-[    2.459767] f960: fffffe0fe8b8f980 fffffc00080e4958 ffffff0ff91ab200 fffffc00080e4b64
-[    2.467690] f980: fffffe0fe8b8f9d0 fffffc00080e515c fffffe0fe8b8fa80 0000000000000000
-[    2.475614] f9a0: fffffe0fe8b8f9d0 fffffc00080e58e4 fffffe0fe8b8fa80 0000000000000000
-[    2.483540] f9c0: fffffe0fe8d10000 0000000000000040 fffffe0fe8b8fa50 fffffc00080e5ac4
-[    2.491465] f9e0: ffffff0ffffada80 fffffc0008be4c24 0000000000000000 0000000000000000
-[    2.499387] fa00: 0000000000000000 ffffffffffffffff 0000000000000000 0000000000000040
-[    2.507309] fa20: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-[    2.515233] fa40: 0000000000000000 0000000000000000 0000000000000000 0000000000000018
-[    2.523156] fa60: 0000000000000000 0000000000000000
-[    2.528089] [<fffffc00080e7468>] try_to_wake_up+0x194/0x34c
-[    2.533723] [<fffffc00080e7648>] wake_up_process+0x28/0x34
-[    2.539275] [<fffffc00080d3764>] create_worker+0x110/0x19c
-[    2.544824] [<fffffc00080d69dc>] alloc_unbound_pwq+0x3cc/0x4b0
-[    2.550724] [<fffffc00080d6bcc>] wq_update_unbound_numa+0x10c/0x1e4
-[    2.557066] [<fffffc00080d7d78>] workqueue_online_cpu+0x220/0x28c
-[    2.563234] [<fffffc00080bd288>] cpuhp_invoke_callback+0x6c/0x168
-[    2.569398] [<fffffc00080bdf74>] cpuhp_up_callbacks+0x44/0xe4
-[    2.575210] [<fffffc00080be194>] cpuhp_thread_fun+0x13c/0x148
-[    2.581027] [<fffffc00080dfbac>] smpboot_thread_fn+0x19c/0x1a8
-[    2.586929] [<fffffc00080dbd64>] kthread+0xdc/0xf0
-[    2.591776] [<fffffc0008083380>] ret_from_fork+0x10/0x50
-[    2.597147] Code: b00057e1 91304021 91005021 b8626822 (b8606821)
-[    2.603464] ---[ end trace 58c0cd36b88802bc ]---
-[    2.608138] Kernel panic - not syncing: Fatal exception
+  2) Some yet-to-be-determined method to describe address space
+     consumed by a bridge.
 
-Fix by moving call to numa_store_cpu_info() for all CPUs into
-smp_prepare_cpus(), which happens before wq_numa_init().  Since
-smp_store_cpu_info() now contains only a single function call,
-simplify by removing the function and out-lining its contents.
+The first two patches of this series are a nice implementation for 1).
+The third patch (ThunderX-specific) is one possibility for 2), but I
+don't like it because there's no way for generic software like the
+ACPI core to discover these resources.
 
-Suggested-by: Robert Richter <rric@kernel.org>
-fixes: 1a2db300348b ("arm64, numa: Add NUMA support for arm64 platforms.")
-Cc: <stable@vger.kernel.org> # 4.7.x-
-Signed-off-by: David Daney <david.daney@cavium.com>
----
- arch/arm64/kernel/smp.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+> > I'd like to step back and come up with some understanding of how
+> > non-broken firmware *should* deal with this issue.  Then, if we *do*
+> > work around this particular broken firmware in the kernel, it would be
+> > nice to do it in a way that fits in with that understanding.
+> >
+> > For example, if a companion ACPI device is the preferred solution, an
+> > ACPI quirk could fabricate a device with the required resources.  That
+> > would address the problem closer to the source and make it more likely
+> > that the rest of the system will work correctly: /proc/iomem could
+> > make sense, things that look at _CRS generically would work (e.g,
+> > /sys/, an admittedly hypothetical "lsacpi", etc.)
+> >
+> > Hard-coding stuff in drivers is a point solution that doesn't provide
+> > any guidance for future platforms and makes it likely that the hack
+> > will get copied into even more drivers.
+> >
+> 
+> OK, I see. But the guidance for future platforms should be 'do not
+> rely on quirks', and what I am arguing here is that the more we polish
+> up this code and make it clean and reusable, the more likely it is
+> that will end up getting abused by new broken hardware that we set out
+> to reject entirely in the first place.
+> 
+> So of course, if the quirk involves claiming resources, let's make
+> sure that this occurs in the cleanest and most compliant way possible.
+> But any factoring/reuse concerns other than for the current crop of
+> broken hardware should be avoided imo.
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index d93d433..3ff173e 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -201,12 +201,6 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	return ret;
- }
- 
--static void smp_store_cpu_info(unsigned int cpuid)
--{
--	store_cpu_topology(cpuid);
--	numa_store_cpu_info(cpuid);
--}
--
- /*
-  * This is the secondary CPU boot entry.  We're using this CPUs
-  * idle thread stack, but a set of temporary page tables.
-@@ -254,7 +248,7 @@ asmlinkage void secondary_start_kernel(void)
- 	 */
- 	notify_cpu_starting(cpu);
- 
--	smp_store_cpu_info(cpu);
-+	store_cpu_topology(cpu);
- 
- 	/*
- 	 * OK, now it's safe to let the boot CPU continue.  Wait for
-@@ -689,10 +683,13 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int err;
- 	unsigned int cpu;
-+	unsigned int this_cpu;
- 
- 	init_cpu_topology();
- 
--	smp_store_cpu_info(smp_processor_id());
-+	this_cpu = smp_processor_id();
-+	store_cpu_topology(this_cpu);
-+	numa_store_cpu_info(this_cpu);
- 
- 	/*
- 	 * If UP is mandated by "nosmp" (which implies "maxcpus=0"), don't set
-@@ -719,6 +716,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 			continue;
- 
- 		set_cpu_present(cpu, true);
-+		numa_store_cpu_info(cpu);
- 	}
- }
- 
--- 
-1.8.3.1
+If future hardware is completely ECAM-compliant and we don't need any
+more MCFG quirks, that would be great.
+
+But we'll still need to describe that memory-mapped config space
+somewhere.  If that's done with PNP0C02 or similar devices (as is done
+on my x86 laptop), we'd be all set.
+
+If we need to work around firmware in the field that doesn't do that,
+one possibility is a PNP quirk along the lines of
+quirk_amd_mmconfig_area().
+
+Bjorn
