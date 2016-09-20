@@ -1,45 +1,45 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 20 Sep 2016 09:59:24 -0400
-Subject: [PATCH v2 4/6] net: ethernet: bgmac: convert to feature flags
-In-Reply-To: <CACna6rymVcKV1h_PEvRuCQrtOd4rsqV34bMWzVOof15fdc8KEA@mail.gmail.com>
-References: <1467932938-21819-1-git-send-email-jon.mason@broadcom.com>
- <1467932938-21819-5-git-send-email-jon.mason@broadcom.com>
- <CACna6rw1j3myPEkbn+YR71W7CF7Of_yahn9eDT7t3hKWGmWUmg@mail.gmail.com>
- <CACna6rymVcKV1h_PEvRuCQrtOd4rsqV34bMWzVOof15fdc8KEA@mail.gmail.com>
-Message-ID: <CAC3K-4rZGOeH8nw5jBFaJXKh3SDfv7qPicS7fby0u-f=Q7DigQ@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 20 Sep 2016 16:02:03 +0200 (CEST)
+Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
+ support
+In-Reply-To: <c2c8ad5f-e679-8522-808f-e940b8c6954d@st.com>
+References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
+ <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
+ <alpine.DEB.2.20.1609131713490.6233@nanos>
+ <6941f61d-0b33-4108-0135-b11887cd0488@st.com>
+ <alpine.DEB.2.20.1609141103420.6233@nanos>
+ <facd1c7c-d696-eae1-02e4-5a0c9285add0@st.com>
+ <alpine.DEB.2.20.1609141532510.6233@nanos>
+ <f64e4f9d-d811-2c6e-7c5a-d4ab06716e2c@st.com>
+ <39c4ceee-7e05-ebfd-2ea0-3c4e1c4ea619@st.com>
+ <alpine.DEB.2.20.1609201150160.6905@nanos>
+ <053a37f4-aa10-46ea-f477-8ae55bb5773f@st.com>
+ <alpine.DEB.2.20.1609201439440.6905@nanos>
+ <c2c8ad5f-e679-8522-808f-e940b8c6954d@st.com>
+Message-ID: <alpine.DEB.2.20.1609201600490.6905@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 1:19 AM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> On 17 August 2016 at 13:34, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->> On 8 July 2016 at 01:08, Jon Mason <jon.mason@broadcom.com> wrote:
->>>         mode = (bgmac_read(bgmac, BGMAC_DEV_STATUS) & BGMAC_DS_MM_MASK) >>
->>>                 BGMAC_DS_MM_SHIFT;
->>> -       if (ci->id != BCMA_CHIP_ID_BCM47162 || mode != 0)
->>> +       if (bgmac->feature_flags & BGMAC_FEAT_CLKCTLST || mode != 0)
->>>                 bgmac_set(bgmac, BCMA_CLKCTLST, BCMA_CLKCTLST_FORCEHT);
->>> -       if (ci->id == BCMA_CHIP_ID_BCM47162 && mode == 2)
->>> +       if (bgmac->feature_flags & BGMAC_FEAT_CLKCTLST && mode == 2)
->>>                 bcma_chipco_chipctl_maskset(&bgmac->core->bus->drv_cc, 1, ~0,
->>>                                             BGMAC_CHIPCTL_1_RXC_DLL_BYPASS);
->>
->> Jon, it looks to me you translated two following conditions:
->> ci->id != BCMA_CHIP_ID_BCM47162
->> and
->> ci->id == BCMA_CHIP_ID_BCM47162
->> into the same flag check:
->> bgmac->feature_flags & BGMAC_FEAT_CLKCTLST
->>
->> I don't think it's intentional, is it? Do you have a moment to fix this?
->
-> Ping
+On Tue, 20 Sep 2016, Alexandre Torgue wrote:
+> On 09/20/2016 02:44 PM, Thomas Gleixner wrote:
+> > Free will be called when a interrupt in the child domain is torn down,
+> > i.e. when irq_domain_free_irqs() is called. And it will be called for both
+> > domains like the alloc callback is invoked on both domains via
+> > irq_domain_alloc_irqs().
+> 
+> Thanks Thomas for this clarification (I'm sure now that we need .free
+> callbacks).
+> irq_domain_free_irqs() is called in 2 scenario:
+> 1- when issue occurs in irq_create_fwspec_mapping()
+> 2- when irq_dispose_mapping() is called
+> 
+> Case 2 is the one I tested some times ago. In this case, I need to mask
+> interrupts in .free callback of EXTI (parent) domain to avoid spurious
+> interrupts.
 
-Sorry, just seeing this now.  I'll double check the original code and
-verify it (or fix it).
+And why would irq_dispose_mapping() be called on an unmasked, i.e. active,
+interrupt? The masking is just papering over that.
 
 Thanks,
-Jon
 
->
-> --
-> Rafa?
+	tglx
