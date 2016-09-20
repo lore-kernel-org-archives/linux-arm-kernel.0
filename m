@@ -1,218 +1,147 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 20 Sep 2016 12:05:03 +0200
-Subject: [PATCH v4 2/2] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <57E103E8.7040506@arm.com>
-References: <1474283695-212421-1-git-send-email-agraf@suse.de>
- <1474283695-212421-3-git-send-email-agraf@suse.de> <57DFFAD3.3080009@arm.com>
- <0960d2a7-6100-3212-c544-d5377df34d57@suse.de> <57E0FF95.7040305@arm.com>
- <580a8a26-ca8f-a08a-a9da-d19d1a595cb6@suse.de> <57E103E8.7040506@arm.com>
-Message-ID: <57E109CF.8030705@suse.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 20 Sep 2016 18:05:40 +0800
+Subject: [PATCH] arm64, numa: Add cpu_to_node() implementation.
+In-Reply-To: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <57E109F4.1060902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2016 11:39 AM, Marc Zyngier wrote:
-> On 20/09/16 10:26, Alexander Graf wrote:
->>
->> On 20.09.16 11:21, Marc Zyngier wrote:
->>> On 19/09/16 18:39, Alexander Graf wrote:
->>>>
->>>> On 19.09.16 16:48, Marc Zyngier wrote:
->>>>> On 19/09/16 12:14, Alexander Graf wrote:
->>>>>> We have 2 modes for dealing with interrupts in the ARM world. We can either
->>>>>> handle them all using hardware acceleration through the vgic or we can emulate
->>>>>> a gic in user space and only drive CPU IRQ pins from there.
->>>>>>
->>>>>> Unfortunately, when driving IRQs from user space, we never tell user space
->>>>>> about timer events that may result in interrupt line state changes, so we
->>>>>> lose out on timer events if we run with user space gic emulation.
->>>>>>
->>>>>> This patch fixes that by routing vtimer expiration events to user space.
->>>>>> With this patch I can successfully run edk2 and Linux with user space gic
->>>>>> emulation.
->>>>>>
->>>>>> Signed-off-by: Alexander Graf <agraf@suse.de>
->>>>>>
->>>>>> ---
->>>>>>
->>>>>> v1 -> v2:
->>>>>>
->>>>>>    - Add back curly brace that got lost
->>>>>>
->>>>>> v2 -> v3:
->>>>>>
->>>>>>    - Split into patch set
->>>>>>
->>>>>> v3 -> v4:
->>>>>>
->>>>>>    - Improve documentation
->>>>>> ---
->>>>>>   Documentation/virtual/kvm/api.txt |  30 ++++++++-
->>>>>>   arch/arm/include/asm/kvm_host.h   |   3 +
->>>>>>   arch/arm/kvm/arm.c                |  22 ++++---
->>>>>>   arch/arm64/include/asm/kvm_host.h |   3 +
->>>>>>   include/uapi/linux/kvm.h          |  14 +++++
->>>>>>   virt/kvm/arm/arch_timer.c         | 125 +++++++++++++++++++++++++++-----------
->>>>>>   6 files changed, 155 insertions(+), 42 deletions(-)
->>>>>>
->>>>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->>>>>> index 23937e0..1c0bd86 100644
->>>>>> --- a/Documentation/virtual/kvm/api.txt
->>>>>> +++ b/Documentation/virtual/kvm/api.txt
->>>>>> @@ -3202,9 +3202,14 @@ struct kvm_run {
->>>>>>   	/* in */
->>>>>>   	__u8 request_interrupt_window;
->>>>>>   
->>>>>> -Request that KVM_RUN return when it becomes possible to inject external
->>>>>> +[x86] Request that KVM_RUN return when it becomes possible to inject external
->>>>>>   interrupts into the guest.  Useful in conjunction with KVM_INTERRUPT.
->>>>>>   
->>>>>> +[arm*] Bits set to 1 in here mask IRQ lines that would otherwise potentially
->>>>>> +trigger forever. These lines are available:
->>>>>> +
->>>>>> +    KVM_IRQWINDOW_VTIMER  -  Masks hw virtual timer irq while in guest
->>>>>> +
->>>>>>   	__u8 padding1[7];
->>>>>>   
->>>>>>   	/* out */
->>>>>> @@ -3519,6 +3524,18 @@ Hyper-V SynIC state change. Notification is used to remap SynIC
->>>>>>   event/message pages and to enable/disable SynIC messages/events processing
->>>>>>   in userspace.
->>>>>>   
->>>>>> +		/* KVM_EXIT_ARM_TIMER */
->>>>>> +		struct {
->>>>>> +			__u8 timesource;
->>>>>> +		} arm_timer;
->>>>>> +
->>>>>> +Indicates that a timer triggered that user space needs to handle and
->>>>>> +potentially mask with vcpu->run->request_interrupt_window to allow the
->>>>>> +guest to proceed. This only happens for timers that got enabled through
->>>>>> +KVM_CAP_ARM_TIMER. The following time sources are available:
->>>>>> +
->>>>>> +    KVM_ARM_TIMER_VTIMER  - virtual cpu timer
->>>>>> +
->>>>>>   		/* Fix the size of the union. */
->>>>>>   		char padding[256];
->>>>>>   	};
->>>>>> @@ -3739,6 +3756,17 @@ Once this is done the KVM_REG_MIPS_VEC_* and KVM_REG_MIPS_MSA_* registers can be
->>>>>>   accessed, and the Config5.MSAEn bit is accessible via the KVM API and also from
->>>>>>   the guest.
->>>>>>   
->>>>>> +6.11 KVM_CAP_ARM_TIMER
->>>>>> +
->>>>>> +Architectures: arm, arm64
->>>>>> +Target: vcpu
->>>>>> +Parameters: args[0] contains a bitmap of timers to select (see 5.)
->>>>>> +
->>>>>> +This capability allows to route per-core timers into user space. When it's
->>>>>> +enabled and no in-kernel interrupt controller is in use, the timers selected
->>>>>> +by args[0] trigger KVM_EXIT_ARM_TIMER guest exits when they are pending,
->>>>>> +unless masked by vcpu->run->request_interrupt_window (see 5.).
->>>>>> +
->>>>>>   7. Capabilities that can be enabled on VMs
->>>>>>   ------------------------------------------
->>>>>>   
->>>>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>>>>> index de338d9..77d1f73 100644
->>>>>> --- a/arch/arm/include/asm/kvm_host.h
->>>>>> +++ b/arch/arm/include/asm/kvm_host.h
->>>>>> @@ -180,6 +180,9 @@ struct kvm_vcpu_arch {
->>>>>>   
->>>>>>   	/* Detect first run of a vcpu */
->>>>>>   	bool has_run_once;
->>>>>> +
->>>>>> +	/* User space wants timer notifications */
->>>>>> +	bool user_space_arm_timers;
->>>>> Please move this to the timer structure.
->>>> Sure.
->>>>
->>>>>>   };
->>>>>>   
->>>>>>   struct kvm_vm_stat {
->>>>>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->>>>>> index c84b6ad..57bdb71 100644
->>>>>> --- a/arch/arm/kvm/arm.c
->>>>>> +++ b/arch/arm/kvm/arm.c
->>>>>> @@ -187,6 +187,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->>>>>>   	case KVM_CAP_ARM_PSCI_0_2:
->>>>>>   	case KVM_CAP_READONLY_MEM:
->>>>>>   	case KVM_CAP_MP_STATE:
->>>>>> +	case KVM_CAP_ARM_TIMER:
->>>>>>   		r = 1;
->>>>>>   		break;
->>>>>>   	case KVM_CAP_COALESCED_MMIO:
->>>>>> @@ -474,13 +475,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
->>>>>>   			return ret;
->>>>>>   	}
->>>>>>   
->>>>>> -	/*
->>>>>> -	 * Enable the arch timers only if we have an in-kernel VGIC
->>>>>> -	 * and it has been properly initialized, since we cannot handle
->>>>>> -	 * interrupts from the virtual timer with a userspace gic.
->>>>>> -	 */
->>>>>> -	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
->>>>>> -		ret = kvm_timer_enable(vcpu);
->>>>>> +	ret = kvm_timer_enable(vcpu);
->>>>>>   
->>>>>>   	return ret;
->>>>>>   }
->>>>>> @@ -601,6 +596,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>>>>   			run->exit_reason = KVM_EXIT_INTR;
->>>>>>   		}
->>>>>>   
->>>>>> +		if (kvm_check_request(KVM_REQ_PENDING_TIMER, vcpu)) {
->>>>> Since this is a very unlikely event (in the grand scheme of things), how
->>>>> about making this unlikely()?
->>>>>
->>>>>> +			/* Tell user space about the pending vtimer */
->>>>>> +			ret = 0;
->>>>>> +			run->exit_reason = KVM_EXIT_ARM_TIMER;
->>>>>> +			run->arm_timer.timesource = KVM_ARM_TIMER_VTIMER;
->>>>>> +		}
->>>>> More importantly: why does it have to be indirected by a
->>>>> make_request/check_request, and not be handled as part of the
->>>>> kvm_timer_sync() call? We do update the state there, and you could
->>>>> directly find out whether an exit is required.
->>>> I can try - it seemed like it could easily become quite racy because we
->>>> call kvm_timer_sync_hwstate() at multiple places.
->>> It shouldn't. We only do it at exactly two locations (depending whether
->>> we've entered the guest or not).
->>>
->>> Also, take the following scenario:
->>> (1) guest programs the timer to expire at time T
->>> (2) guest performs an MMIO access which traps
->>> (3) during the world switch, the timer expires and we mark the timer
->>> interrupt as pending
->>> (4) we exit to handle the MMIO, no sign of the timer being pending
->>>
->>> Is the timer event lost? Or simply delayed? I think this indicates that
->>> the timer state should always be signalled to userspace, no matter what
->>> the exit reason is.
->> That's basically what I'm trying to get running right now, yes. I pushed
->> the interrupt pending status field into the kvm_sync_regs struct and
->> check it on every exit in user space - to make sure we catch pending
->> state changes before mmio reads.
->>
->> On top of that we also need a force exit event when the state changes,
->> in case there's no other event pending. Furthermore we probably want to
->> indicate the user space status of the pending bit into the kernel to not
->> exit too often.
-> All you need is to do is to stash the line state in the run structure.
+On 09/20/2016 02:49 AM, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> The wq_numa_init() function makes a private CPU to node map by calling
+> cpu_to_node() early in the boot process, before the non-boot CPUs are
+> brought online.  Since the default implementation of cpu_to_node()
+> returns zero for CPUs that have never been brought online, the
+> workqueue system's view is that *all* CPUs are on node zero.
+>
+> When the unbound workqueue for a non-zero node is created, the
+> tsk_cpus_allowed() for the worker threads is the empty set because
+> there are, in the view of the workqueue system, no CPUs on non-zero
+> nodes.  The code in try_to_wake_up() using this empty cpumask ends up
+> using the cpumask empty set value of NR_CPUS as an index into the
+> per-CPU area pointer array, and gets garbage as it is one past the end
+> of the array.  This results in:
+>
+> [    0.881970] Unable to handle kernel paging request at virtual address fffffb1008b926a4
+> [    1.970095] pgd = fffffc00094b0000
+> [    1.973530] [fffffb1008b926a4] *pgd=0000000000000000, *pud=0000000000000000, *pmd=0000000000000000
+> [    1.982610] Internal error: Oops: 96000004 [#1] SMP
+> [    1.987541] Modules linked in:
+> [    1.990631] CPU: 48 PID: 295 Comm: cpuhp/48 Tainted: G        W       4.8.0-rc6-preempt-vol+ #9
+> [    1.999435] Hardware name: Cavium ThunderX CN88XX board (DT)
+> [    2.005159] task: fffffe0fe89cc300 task.stack: fffffe0fe8b8c000
+> [    2.011158] PC is at try_to_wake_up+0x194/0x34c
+> [    2.015737] LR is at try_to_wake_up+0x150/0x34c
+> [    2.020318] pc : [<fffffc00080e7468>] lr : [<fffffc00080e7424>] pstate: 600000c5
+> [    2.027803] sp : fffffe0fe8b8fb10
+> [    2.031149] x29: fffffe0fe8b8fb10 x28: 0000000000000000
+> [    2.036522] x27: fffffc0008c63bc8 x26: 0000000000001000
+> [    2.041896] x25: fffffc0008c63c80 x24: fffffc0008bfb200
+> [    2.047270] x23: 00000000000000c0 x22: 0000000000000004
+> [    2.052642] x21: fffffe0fe89d25bc x20: 0000000000001000
+> [    2.058014] x19: fffffe0fe89d1d00 x18: 0000000000000000
+> [    2.063386] x17: 0000000000000000 x16: 0000000000000000
+> [    2.068760] x15: 0000000000000018 x14: 0000000000000000
+> [    2.074133] x13: 0000000000000000 x12: 0000000000000000
+> [    2.079505] x11: 0000000000000000 x10: 0000000000000000
+> [    2.084879] x9 : 0000000000000000 x8 : 0000000000000000
+> [    2.090251] x7 : 0000000000000040 x6 : 0000000000000000
+> [    2.095621] x5 : ffffffffffffffff x4 : 0000000000000000
+> [    2.100991] x3 : 0000000000000000 x2 : 0000000000000000
+> [    2.106364] x1 : fffffc0008be4c24 x0 : ffffff0ffffada80
+> [    2.111737]
+> [    2.113236] Process cpuhp/48 (pid: 295, stack limit = 0xfffffe0fe8b8c020)
+> [    2.120102] Stack: (0xfffffe0fe8b8fb10 to 0xfffffe0fe8b90000)
+> [    2.125914] fb00:                                   fffffe0fe8b8fb80 fffffc00080e7648
+> .
+> .
+> .
+> [    2.442859] Call trace:
+> [    2.445327] Exception stack(0xfffffe0fe8b8f940 to 0xfffffe0fe8b8fa70)
+> [    2.451843] f940: fffffe0fe89d1d00 0000040000000000 fffffe0fe8b8fb10 fffffc00080e7468
+> [    2.459767] f960: fffffe0fe8b8f980 fffffc00080e4958 ffffff0ff91ab200 fffffc00080e4b64
+> [    2.467690] f980: fffffe0fe8b8f9d0 fffffc00080e515c fffffe0fe8b8fa80 0000000000000000
+> [    2.475614] f9a0: fffffe0fe8b8f9d0 fffffc00080e58e4 fffffe0fe8b8fa80 0000000000000000
+> [    2.483540] f9c0: fffffe0fe8d10000 0000000000000040 fffffe0fe8b8fa50 fffffc00080e5ac4
+> [    2.491465] f9e0: ffffff0ffffada80 fffffc0008be4c24 0000000000000000 0000000000000000
+> [    2.499387] fa00: 0000000000000000 ffffffffffffffff 0000000000000000 0000000000000040
+> [    2.507309] fa20: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+> [    2.515233] fa40: 0000000000000000 0000000000000000 0000000000000000 0000000000000018
+> [    2.523156] fa60: 0000000000000000 0000000000000000
+> [    2.528089] [<fffffc00080e7468>] try_to_wake_up+0x194/0x34c
+> [    2.533723] [<fffffc00080e7648>] wake_up_process+0x28/0x34
+> [    2.539275] [<fffffc00080d3764>] create_worker+0x110/0x19c
+> [    2.544824] [<fffffc00080d69dc>] alloc_unbound_pwq+0x3cc/0x4b0
+> [    2.550724] [<fffffc00080d6bcc>] wq_update_unbound_numa+0x10c/0x1e4
+> [    2.557066] [<fffffc00080d7d78>] workqueue_online_cpu+0x220/0x28c
+> [    2.563234] [<fffffc00080bd288>] cpuhp_invoke_callback+0x6c/0x168
+> [    2.569398] [<fffffc00080bdf74>] cpuhp_up_callbacks+0x44/0xe4
+> [    2.575210] [<fffffc00080be194>] cpuhp_thread_fun+0x13c/0x148
+> [    2.581027] [<fffffc00080dfbac>] smpboot_thread_fn+0x19c/0x1a8
+> [    2.586929] [<fffffc00080dbd64>] kthread+0xdc/0xf0
+> [    2.591776] [<fffffc0008083380>] ret_from_fork+0x10/0x50
+> [    2.597147] Code: b00057e1 91304021 91005021 b8626822 (b8606821)
+> [    2.603464] ---[ end trace 58c0cd36b88802bc ]---
+> [    2.608138] Kernel panic - not syncing: Fatal exception
+>
+> Fix by supplying a cpu_to_node() implementation that returns correct
+> node mappings.
+>
+> Cc: <stable@vger.kernel.org> # 4.7.x-
+> Signed-off-by: David Daney <david.daney@cavium.com>
+>
+> ---
+>   arch/arm64/include/asm/topology.h |  3 +++
+>   arch/arm64/mm/numa.c              | 18 ++++++++++++++++++
+>   2 files changed, 21 insertions(+)
+>
+> diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
+> index 8b57339..8d935447 100644
+> --- a/arch/arm64/include/asm/topology.h
+> +++ b/arch/arm64/include/asm/topology.h
+> @@ -30,6 +30,9 @@ int pcibus_to_node(struct pci_bus *bus);
+>   				 cpu_all_mask :				\
+>   				 cpumask_of_node(pcibus_to_node(bus)))
+>
+> +int cpu_to_node(int cpu);
+> +#define cpu_to_node cpu_to_node
+> +
+>   #endif /* CONFIG_NUMA */
+>
+>   #include <asm-generic/topology.h>
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index 5bb15ea..e76281b 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -130,6 +130,24 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+>   	cpu_to_node_map[cpu] = nid;
+>   }
+>
+> +int cpu_to_node(int cpu)
+> +{
+> +	int nid;
+> +
+> +	/*
+> +	 * Return 0 for unknown mapping so that we report something
+> +	 * sensible if firmware doesn't supply a proper mapping.
+> +	 */
+> +	if (cpu < 0 || cpu >= NR_CPUS)
+> +		return 0;
+> +
+> +	nid = cpu_to_node_map[cpu];
+> +	if (nid == NUMA_NO_NODE)
+> +		nid = 0;
+> +	return nid;
+> +}
+> +EXPORT_SYMBOL(cpu_to_node);
+> +
+>   /**
+>    * numa_add_memblk - Set node id to memblk
+>    * @nid: NUMA node ID of the new memblk
 
-That's what I do now, yes. The sync_regs struct is basically an arch 
-specific add-on to the run structure, so we don't modify padding / 
-alignment with the change.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-> You shouldn't need any other information. And you trigger the exit on
-> "timer line high + timer line unmasked" in order to inject the
-> interrupt. Which is basically what the vgic does. It would greatly help
-> if you adopted a similar behaviour.
-
-We also need to know "timer line low + timer line masked", as otherwise 
-we might get spurious interrupts in the guest, no?
-
-Either way, I agree that this approach in general is saner. I don't 
-think it's easier to implement though, but we'll get to that when I send 
-a new version :)
-
-
-Alex
+Thanks for the fix!
+Hanjun
