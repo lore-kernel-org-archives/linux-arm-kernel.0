@@ -1,19 +1,24 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 20 Sep 2016 16:52:12 -0700
-Subject: [PATCH v2 1/1] clk: imx53: Add clocks configuration
-In-Reply-To: <1474281002-18868-1-git-send-email-fabien.lahoudere@collabora.co.uk>
-References: <20160918002451.GE15478@tiger>
- <1474281002-18868-1-git-send-email-fabien.lahoudere@collabora.co.uk>
-Message-ID: <20160920235212.GE8319@codeaurora.org>
+Date: Tue, 20 Sep 2016 16:58:42 -0700
+Subject: [PATCH 2/2] clk: imx6: initialize GPU clocks
+In-Reply-To: <1474017371-28966-2-git-send-email-l.stach@pengutronix.de>
+References: <1474017371-28966-1-git-send-email-l.stach@pengutronix.de>
+ <1474017371-28966-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20160920235842.GG8319@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19, Fabien Lahoudere wrote:
-> From: Kalle Kankare <kalle.kankare@vincit.fi>
+On 09/16, Lucas Stach wrote:
+> Initialize the GPU clock muxes to sane inputs. Until now they have
+> not been changed from their default values, which means that both
+> GPU3D shader and GPU2D core were fed by clock inputs whose rates
+> exceed the maximium allowed frequency of the cores by as much as
+> 200MHz.
 > 
-> Add clocks configuration for CSI, FIRI and IEEE1588.
+> This fixes a severe GPU stability issue on i.MX6DL.
 > 
-> Signed-off-by: Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 > ---
 
 Applied to clk-next
