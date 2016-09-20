@@ -1,32 +1,42 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Tue, 20 Sep 2016 19:39:53 +0800
-Subject: [PATCH -next v2] arm*/efi: efi_init error handling fix
-Message-ID: <1474371593-10250-1-git-send-email-xieyisheng1@huawei.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 20 Sep 2016 12:51:58 +0100
+Subject: [PATCH] ARM: tegra: nyan: Mark all USB ports as host
+In-Reply-To: <20160918102852.6593-1-contact@paulk.fr>
+References: <20160918102852.6593-1-contact@paulk.fr>
+Message-ID: <31a2d04c-91d5-807d-3a2d-76cc3e607f4a@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's an early memmap leak in efi_init error path, fix it.
 
-Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
----
- drivers/firmware/efi/arm-init.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+On 18/09/16 11:28, Paul Kocialkowski wrote:
+> Nyan boards only have host USB ports (2 external, 1 internal), there is
+> no OTG-enabled connector.
+> 
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> ---
+>  arch/arm/boot/dts/tegra124-nyan.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
+> index 18db797..254b2ee 100644
+> --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
+> +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
+> @@ -435,7 +435,7 @@
+>  			usb2-0 {
+>  				vbus-supply = <&vdd_usb1_vbus>;
+>  				status = "okay";
+> -				mode = "otg";
+> +				mode = "host";
+>  			};
+>  
+>  			usb2-1 {
 
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index 9f8d996..7c2fe57 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -245,8 +245,10 @@ void __init efi_init(void)
- 	     "Unexpected EFI_MEMORY_DESCRIPTOR version %ld",
- 	      efi.memmap.desc_version);
- 
--	if (uefi_init() < 0)
-+	if (uefi_init() < 0) {
-+		efi_memmap_unmap();
- 		return;
-+	}
- 
- 	reserve_regions();
- 	efi_memattr_init();
+Sounds correct to me, so ...
+
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+
+Cheers
+Jon
+
 -- 
-1.7.12.4
+nvpublic
