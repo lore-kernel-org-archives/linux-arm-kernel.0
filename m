@@ -1,70 +1,39 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 20 Sep 2016 10:51:07 +0800
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Tue, 20 Sep 2016 11:29:24 +0800
 Subject: [RFC] Arm64 boot fail with numa enable in BIOS
 In-Reply-To: <20160919140709.GA17464@leverpostej>
 References: <7618d76d-bfa8-d8aa-59aa-06f9d90c1a98@huawei.com>
  <20160919140709.GA17464@leverpostej>
-Message-ID: <57E0A41B.8020008@huawei.com>
+Message-ID: <cd53a1ae-e4ff-933c-4d1c-1ddaaa999a43@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
+
 On 2016/9/19 22:07, Mark Rutland wrote:
 > [adding LAKML, arm64 maintainers]
->
+> 
 > On Mon, Sep 19, 2016 at 09:05:26PM +0800, Yisheng Xie wrote:
 >> hi all,
-> Hi,
->
-> In future, please make sure to Cc LAKML along with relevant parties when
-> sending arm64 patches/queries.
->
-> For everyone newly Cc'd, the original message (with attachments) can be
-> found at:
->
-> http://lkml.kernel.org/r/7618d76d-bfa8-d8aa-59aa-06f9d90c1a98 at huawei.com
->
->> When I enable NUMA in BIOS for arm64, it failed to boot on v4.8-rc4-162-g071e31e.
-> That commit ID doesn't seem to be in mainline (I can't find it in my
-> local tree). Which tree are you using? Do you have local patches
-> applied?
-
-Yes, we have GICv3 ITS and mbigen patches on top which trying to enable PCI msi
-and native SAS on the board.
-
->
-> I take it that by "enable NUMA in BIOS", you mean exposing SRAT to the
-> OS?
-
-Yes, SRAT and SLIT.
-
->
->> For the crash log, it seems caused by error number of cpumask.
->> Any ideas about it?
-> Much earlier in your log, there was a (non-fatal) warning, as below. Do
-> you see this without NUMA/SRAT enabled in your FW? 
-
-Works ok without NUMA/SRAT enabled, we will check the SRAT table.
-
-> I don't see how the
->
-> SRAT should affect the secondaries we try to bring online.
-
-Yes, CPU masks and secondaries boot up is related MADT not SRAT.
-
-Thanks
-Hanjun
-
->
-> Given your MPIDRs have Aff2 bits set, I wonder if we've conflated a
-> logical ID with a physical ID somewhere, and it just so happens that the
-> NUMA code is more likely to poke something based on that.
->
+> 
 > Can you modify the warning in cpumask.h to dump the bad CPU number? That
 > would make it fairly clear if that's the case.
->
+> 
+hi Mark,
+I dump the bad CPU number, it is 64,
+And the cpumask get from task is 00000000,00000000.
+
+[    3.873044] select_task_rq: allowed 0, allow_cpumask 00000000,00000000
+[    3.879727] cpumask_check: cpu 64, nr_cpumask_bits:64, nr_cpu_ids= 64
+[    3.895989] ------------[ cut here ]------------
+[    3.900652] WARNING: CPU: 16 PID: 103 at ./include/linux/cpumask.h:122 try_to_wake_up+0x410/0x4ac
+
+Thanks.
+Yisheng Xie
+
 > Thanks,
 > Mark.
->
+> 
 >> [    0.297337] Detected PIPT I-cache on CPU1
 >> [    0.297347] GICv3: CPU1: found redistributor 10001 region 1:0x000000004d140000
 >> [    0.297356] CPU1: Booted secondary processor [410fd082]
@@ -121,5 +90,6 @@ Hanjun
 >> [    0.605712] [<ffff0000080f3e10>] complete+0x40/0x5c
 >> [    0.610635] [<ffff00000808dba8>] secondary_start_kernel+0x148/0x1a8
 >> [    0.616965] [<00000000000831a8>] 0x831a8
+> 
 > .
->
+> 
