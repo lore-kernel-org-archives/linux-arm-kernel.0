@@ -1,49 +1,30 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Sep 2016 15:13:53 +0100
-Subject: [PATCH 2/2] arm-cci: Do not probe the CCI ports if booted from HYP
-In-Reply-To: <1474380833-30121-1-git-send-email-marc.zyngier@arm.com>
-References: <1474380833-30121-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1474380833-30121-3-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 20 Sep 2016 15:13:51 +0100
+Subject: [PATCH 0/2] ARM: Do not mess with CCI if booted from HYP
+Message-ID: <1474380833-30121-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Poking the CCI ports from non-secure is likely to end up in fireworks,
-so let's not try our luck here, and skip the driver initialization
-if booted from HYP (which is always non-secure).
+Some systems (such as the VExpress TC2) are built around a CCI-400,
+which is only accessible from secure mode. This obviously breaks if
+the system is booted in non-secure mode. Detecting non-secure is
+pretty hard to do, unless the system is booted from HYP.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/bus/arm-cci.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+This small patch series makes sure that:
+- The CCI ports are not accessed when the kernel is booted from HYP
+- MCPM (which depends on CCI) is not enabled on VExpress if booted
+from HYP.
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index ffa7c9d..70f51a9 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -28,6 +28,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
-+#include <asm/virt.h>
- 
- static void __iomem *cci_ctrl_base;
- static unsigned long cci_ctrl_phys;
-@@ -2184,6 +2185,16 @@ static int cci_probe_ports(struct device_node *np)
- 	const char *match_str;
- 	bool is_ace;
- 
-+	/*
-+	 * If we booted in HYP mode, then we're running non-secure,
-+	 * and there is zero chance that we'll be able to configure
-+	 * anything on the CCI. Gracefully leave the room...
-+	 */
-+	if (is_hyp_mode_available()) {
-+		pr_info("%s: skipping probe (running non-secure)\n",
-+			np->full_name);
-+		return -ENODEV;
-+	}
- 
- 	cci_config = of_match_node(arm_cci_matches, np)->data;
- 	if (!cci_config)
+This allows a multi_v7_defconfig kernel to be booted on a TC2 booting
+from HYP, instead of miserably dying very early on.
+
+Marc Zyngier (2):
+  ARM: vexpress: Do not enable MCPM if booted from HYP
+  arm-cci: Do not probe the CCI ports if booted from HYP
+
+ arch/arm/mach-vexpress/platsmp.c |  8 ++++++--
+ drivers/bus/arm-cci.c            | 11 +++++++++++
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+
 -- 
 2.1.4
