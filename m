@@ -1,45 +1,71 @@
-From: rrichter@cavium.com (Robert Richter)
-Date: Tue, 20 Sep 2016 13:34:19 +0200
-Subject: [PATCH] irqchip,
- gicv3: Fix out-of-range cpumask access reported by cpumask_check()
-Message-ID: <1474371259-18783-1-git-send-email-rrichter@cavium.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 20 Sep 2016 12:37:06 +0100
+Subject: Tegra baseline test results for v4.8-rc7
+Message-ID: <d35343a5-b6ae-4f0a-9220-344e23685332@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Booting a kernel with DEBUG_PER_CPU_MAPS enabled triggers the follwing
-warning:
+Here are some basic Tegra test results for Linux v4.8-rc7.
+Logs and other details at:
 
- WARNING: CPU: 1 PID: 0 at ./include/linux/cpumask.h:121 gic_raise_softirq+0x298/0x308
+    https://nvtb.github.io//linux/test_v4.8-rc7/20160919073102/
 
-Reason for this is the code in for_each_cpu() that modifies cpu in
-gic_compute_target_list() which may cause cpu set to nr_cpumask_bits
-and cpumask_check() (cpumask_next() of for_each_cpu()) throwing the
-warning.
 
-Change the code to avoid out-of-range access that stops the warning.
+Test summary
+------------
 
-Note: Though cpumask_check() fails, current for_each_cpu()
-implementation is save to use cpu out of range. Also, code in
-gic_raise_softirq() might be reworked at all in a way that a single
-each-cpu loop is used by squashing it with gic_compute_target_list().
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- drivers/irqchip/irq-gic-v3.c | 2 ++
- 1 file changed, 2 insertions(+)
+Build: Image:
+    Pass: ( 1/ 1): defconfig
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index ede5672ab34d..ed46b906cf0a 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -615,6 +615,8 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 
- 		tlist = gic_compute_target_list(&cpu, mask, cluster_id);
- 		gic_send_sgi(cluster_id, tlist, irq);
-+		if (cpu >= nr_cpu_ids)
-+			break;
- 	}
- 
- 	/* Force the above writes to ICC_SGI1R_EL1 to be executed */
--- 
-2.7.0.rc3
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.8-rc6 (9395452b4aab7bc2475ef8935b4a4fb99d778d70)):
+   text     data      bss    total  kernel
+   +564        0        0     +564  defconfig
+ +12679    +4288        0   +16967  multi_v7_defconfig
+   +208        0        0     +208  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.8-rc6 (9395452b4aab7bc2475ef8935b4a4fb99d778d70))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
