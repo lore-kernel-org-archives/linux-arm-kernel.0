@@ -1,79 +1,158 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 20 Sep 2016 12:44:35 +0200
-Subject: [PATCH] ARM: uniphier: select ARCH_HAS_RESET_CONTROLLER
-In-Reply-To: <CAK7LNASDYjUjUoUEstFygA1GOboVgDTNKak8Zkpcj_B3XbK-1w@mail.gmail.com>
-References: <1474346599-29925-1-git-send-email-yamada.masahiro@socionext.com>
- <1474356608.4030.7.camel@pengutronix.de>
- <CAK7LNASDYjUjUoUEstFygA1GOboVgDTNKak8Zkpcj_B3XbK-1w@mail.gmail.com>
-Message-ID: <1474368275.4030.45.camel@pengutronix.de>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Tue, 20 Sep 2016 12:56:52 +0200
+Subject: [PATCH 2/3] i2c: bcm2835: Add support for combined write-read
+ transfer
+In-Reply-To: <4990930f-6d69-89c6-4b23-deae3d6713ed@martin.sperl.org>
+References: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
+ <1474298777-5858-2-git-send-email-noralf@tronnes.org>
+ <c47a0a10-4e0b-9025-8d38-af299d5f55da@martin.sperl.org>
+ <fb5e8e93-c6af-0050-1e7d-a69b722feadb@tronnes.org>
+ <4990930f-6d69-89c6-4b23-deae3d6713ed@martin.sperl.org>
+Message-ID: <8053bf5c-7ddc-b4f7-1961-93f161731b16@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 20.09.2016, 17:47 +0900 schrieb Masahiro Yamada:
-> Hi Philipp,
-> 
-> 
-> 2016-09-20 16:30 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> > Hi Masahiro,
-> >
-> > Am Dienstag, den 20.09.2016, 13:43 +0900 schrieb Masahiro Yamada:
-> >> The UniPhier reset driver (drivers/reset/reset-uniphier.c) has been
-> >> merged.  Select ARCH_HAS_RESET_CONTROLLER from the SoC Kconfig.
-> >>
-> >> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> >> ---
-> >>
-> >> Philipp,
-> >>
-> >> IIRC, you mentioned that you were planning to consolidate the double
-> >> gurad by CONFIG_RESET_CONTROLLER and CONFIG_ARCH_HAS_RESET_CONTROLLER.
-> >>
-> >> I have not seen it in the ML, so I am sending this.
-> >>
-> >> Please let me know if you have some updates.
-> >
-> > I had started to doodle a bit, see
-> >
-> >     git fetch git://git.pengutronix.de/git/pza/linux.git refs/heads/reset/kconfig
-> >
-> > but I haven't found time for cleanup and testing.
-> 
-> 
-> OK, I will merge this patch for now.
-> 
-> 
-> 
-> BTW, I did not understand some of your commits under way.
-> 
-> 
-> commit 7fe911f9c83737449565db03bebf953d3d94bbbf
-> Author: Philipp Zabel <p.zabel@pengutronix.de>
-> Date:   Tue Aug 9 11:18:51 2016 +0200
-> 
->     dmaengine: sunx6i: do not depend on reset controller framework
-> 
->     The reset controller framework provides inline function stubs if
->     disabled.
-> 
->     Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> 
-> 
-> 
-> 
-> As far as I see from drivers/dma/sun6i-dma.c,
-> the reset control is mandatory for this driver.
-> 
-> Why are you removing the dependency?
-> 
-> 
-> Don't you care if it works on run-time
-> as long as it can build?
 
-I have not thought about this too hard, it's just there because the
-reset framework is not a build dependency (anymore). Some patches were
-necessary to remove dependency loops, but I think this one could just be
-dropped.
+Den 20.09.2016 12:15, skrev Martin Sperl:
+>
+>
+> On 20.09.2016 10:41, Noralf Tr?nnes wrote:
+>>
+>> Den 20.09.2016 09:19, skrev Martin Sperl:
+>>> Hi Noralf!
+>>>
+>>> On 19.09.2016 17:26, Noralf Tr?nnes wrote:
+>>>> Some SMBus protocols use Repeated Start Condition to switch from write
+>>>> mode to read mode. Devices like MMA8451 won't work without it.
+>>>>
+>>>> When downstream implemented support for this in i2c-bcm2708, it broke
+>>>> support for some devices, so a module parameter was added and combined
+>>>> transfer was disabled by default.
+>>>> See https://github.com/raspberrypi/linux/issues/599
+>>>> It doesn't seem to have been any investigation into what the problem
+>>>> really was. Later there was added a timeout on the polling loop.
+>>>>
+>>>> One of the devices mentioned to partially stop working was DS1307.
+>>>>
+>>>> I have run thousands of transfers to a DS1307 (rtc), MMA8451 (accel)
+>>>> and AT24C32 (eeprom) in parallel without problems.
+>>>>
+>>>> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
+>>>> ---
+>>>>   drivers/i2c/busses/i2c-bcm2835.c | 107
+>>>> +++++++++++++++++++++++++++++++++++----
+>>>>   1 file changed, 98 insertions(+), 9 deletions(-)
+>>> ...
+>>>> @@ -209,8 +289,17 @@ static int bcm2835_i2c_xfer(struct i2c_adapter
+>>>> *adap, struct i2c_msg msgs[],
+>>>>       int i;
+>>>>       int ret = 0;
+>>>>   +    /* Combined write-read to the same address (smbus) */
+>>>> +    if (num == 2 && (msgs[0].addr == msgs[1].addr) &&
+>>>> +        !(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
+>>>> +        (msgs[0].len <= 16)) {
+>>>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[0], &msgs[1]);
+>>>> +
+>>>> +    return ret ? ret : 2;
+>>>> +    }
+>>>> +
+>>>>       for (i = 0; i < num; i++) {
+>>>> -        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i]);
+>>>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i], NULL);
+>>>>           if (ret)
+>>>>               break;
+>>>>       }
+>>> This does not seem to implement the i2c_msg api correctly.
+>>>
+>>> As per comments in include/uapi/linux/i2c.h on line 58 only the last
+>>> message
+>>> in a group should - by default - send a STOP.
+>>>
+>>
+>> Apparently it's a known problem that the i2c controller doesn't support
+>> Repeated Start. It will always issue a Stop when it has transferred DLEN
+>> bytes.
+>> Refs:
+>> http://www.circuitwizard.de/raspi-i2c-fix/raspi-i2c-fix.html
+>> http://raspberrypi.stackexchange.com/questions/31728/has-anyone-successfully-used-i2c-repeated-starts-on-the-pi2-my-scope-says-they 
+>>
+>>
+>>
+>> UNLESS: a Start Transfer (ST) is issued after Transfer Active (TA) is 
+>> set
+>> and before DONE is set (or the last byte is shifted, I don't know 
+>> excatly).
+>> Refs:
+>> https://github.com/raspberrypi/linux/issues/254#issuecomment-15254134
+>> https://www.raspberrypi.org/forums/viewtopic.php?p=807834&sid=2b612c7209f2175bf1a266359c72ae6c#p807834 
+>>
+>>
+>>
+>> I found this answer/report by joan that the downstream combined support
+>> isn't reliable:
+>> http://raspberrypi.stackexchange.com/questions/31728/has-anyone-successfully-used-i2c-repeated-starts-on-the-pi2-my-scope-says-they 
+>>
+>>
+>>
+>> My implementation differs from downstream in that I use local_irq_save()
+>> to protect the polling loop. But that only protects from missing the TA
+>> (downstream can miss the TA and issue a Stop).
+>>
+>> So currently in mainline we have a driver that says it support the 
+>> standard
+>> (I2C_FUNC_I2C), but it really only supports one message transfers 
+>> since it
+>> can't do ReStart.
+>>
+>> What I have done in this patch is to support ReStart for transfers with
+>> 2 messages: first write, then read. But maybe a better solution is to 
+>> just
+>> leave this alone if it is flaky and use bitbanging instead. I don't 
+>> know.
+> I have not said that the approach you have taken is wrong or bad.
+>
 
-regards
-Philipp
+I didn't take it as such, I'm just not sure what's the best approach here,
+so I added and looked up some more information
+
+> I was only telling you that the portion inside the bcm2835_i2c_xfer:
+> +    /* Combined write-read to the same address (smbus) */
+> +    if (num == 2 && (msgs[0].addr == msgs[1].addr) &&
+> +        !(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
+> +        (msgs[0].len <= 16)) {
+> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[0], &msgs[1]);
+> +
+> +        return ret ? ret : 2;
+> +    }
+> is very specific and maybe could be done in a "generic" manner
+> supporting more cases.
+>
+
+It has to be specific when it comes to number of messages. We can only
+support ReStart after the first message unless we use polling for the
+whole transfer. And in that case we can't disable interrupts for such
+a long period and we will end up sometimes loosing Transfer Active,
+resulting in Stop Condition between the messages.
+So we can only do transfers with 2 messages if we want Restart.
+
+It is possible to support more than 16 bytes for the first message,
+filling the FIFO after polling TA, but I'm not sure that is common.
+Mostly it's 1 or 2 bytes to set a register.
+The write-read restriction isn't absolutely necessary either, but it's the
+most common case I think. So it was about reusing bcm2835_i2c_xfer_msg().
+A less restrictive approach would require a dedicated function I think.
+
+> At least add a dev_warn_once for all num > 1 cases not handled by the
+> code above.
+>
+> This gives people an opportunity to detect such a situation if they
+> find something is not working as expected.
+>
+
+I agree.
+
+After reading joan's report I wonder if it would be best to add a module
+parameter like downstream has, so it can be disabled. What do you think?
+
+
+Noralf.
