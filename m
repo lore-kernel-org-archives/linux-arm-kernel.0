@@ -1,99 +1,77 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 20 Sep 2016 08:33:27 -0500
-Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
- register range for ACPI case
-In-Reply-To: <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
-References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <1473449047-10499-4-git-send-email-tn@semihalf.com>
- <20160919180900.GB13775@localhost>
- <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
-Message-ID: <20160920133327.GB13855@localhost>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 20 Sep 2016 15:33:49 +0200
+Subject: [PATCH v5 2/9] drivers: irqchip: Add STM32 external interrupts
+ support
+In-Reply-To: <alpine.DEB.2.20.1609201439440.6905@nanos>
+References: <1473432124-6784-1-git-send-email-alexandre.torgue@st.com>
+ <1473432124-6784-3-git-send-email-alexandre.torgue@st.com>
+ <alpine.DEB.2.20.1609131713490.6233@nanos>
+ <6941f61d-0b33-4108-0135-b11887cd0488@st.com>
+ <alpine.DEB.2.20.1609141103420.6233@nanos>
+ <facd1c7c-d696-eae1-02e4-5a0c9285add0@st.com>
+ <alpine.DEB.2.20.1609141532510.6233@nanos>
+ <f64e4f9d-d811-2c6e-7c5a-d4ab06716e2c@st.com>
+ <39c4ceee-7e05-ebfd-2ea0-3c4e1c4ea619@st.com>
+ <alpine.DEB.2.20.1609201150160.6905@nanos>
+ <053a37f4-aa10-46ea-f477-8ae55bb5773f@st.com>
+ <alpine.DEB.2.20.1609201439440.6905@nanos>
+Message-ID: <c2c8ad5f-e679-8522-808f-e940b8c6954d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Rafael (maybe already cc'd; I didn't recognize rafael at kernel.org, Duc]
+Thomas,
 
-On Tue, Sep 20, 2016 at 09:23:21AM +0200, Tomasz Nowicki wrote:
-> On 19.09.2016 20:09, Bjorn Helgaas wrote:
-> >On Fri, Sep 09, 2016 at 09:24:05PM +0200, Tomasz Nowicki wrote:
-> >>thunder-pem driver stands for being ACPI based PCI host controller.
-> >>However, there is no standard way to describe its PEM-specific register
-> >>ranges in ACPI tables. Thus we add thunder_pem_init() ACPI extension
-> >>to obtain hardcoded addresses from static resource array.
-> >>Although it is not pretty, it prevents from creating standard mechanism to
-> >>handle similar cases in future.
-> >>
-> >>Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> >>---
-> >> drivers/pci/host/pci-thunder-pem.c | 61 ++++++++++++++++++++++++++++++--------
-> >> 1 file changed, 48 insertions(+), 13 deletions(-)
-> >>
-> >>diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-> >>index 6abaf80..b048761 100644
-> >>--- a/drivers/pci/host/pci-thunder-pem.c
-> >>+++ b/drivers/pci/host/pci-thunder-pem.c
-> >>@@ -18,6 +18,7 @@
-> >> #include <linux/init.h>
-> >> #include <linux/of_address.h>
-> >> #include <linux/of_pci.h>
-> >>+#include <linux/pci-acpi.h>
-> >> #include <linux/pci-ecam.h>
-> >> #include <linux/platform_device.h>
-> >>
-> >>@@ -284,6 +285,40 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
-> >> 	return pci_generic_config_write(bus, devfn, where, size, val);
-> >> }
-> >>
-> >>+#ifdef CONFIG_ACPI
-> >>+static struct resource thunder_pem_reg_res[] = {
-> >>+	[4] = DEFINE_RES_MEM(0x87e0c0000000UL, SZ_16M),
-> >>+	[5] = DEFINE_RES_MEM(0x87e0c1000000UL, SZ_16M),
-> >>+	[6] = DEFINE_RES_MEM(0x87e0c2000000UL, SZ_16M),
-> >>+	[7] = DEFINE_RES_MEM(0x87e0c3000000UL, SZ_16M),
-> >>+	[8] = DEFINE_RES_MEM(0x87e0c4000000UL, SZ_16M),
-> >>+	[9] = DEFINE_RES_MEM(0x87e0c5000000UL, SZ_16M),
-> >>+	[14] = DEFINE_RES_MEM(0x97e0c0000000UL, SZ_16M),
-> >>+	[15] = DEFINE_RES_MEM(0x97e0c1000000UL, SZ_16M),
-> >>+	[16] = DEFINE_RES_MEM(0x97e0c2000000UL, SZ_16M),
-> >>+	[17] = DEFINE_RES_MEM(0x97e0c3000000UL, SZ_16M),
-> >>+	[18] = DEFINE_RES_MEM(0x97e0c4000000UL, SZ_16M),
-> >>+	[19] = DEFINE_RES_MEM(0x97e0c5000000UL, SZ_16M),
-> >
-> >1) The "correct" way to discover the resources consumed by an ACPI
-> >   device is to use the _CRS method.  I know there are some issues
-> >   there for bridges (not the fault of ThunderX!) because there's not
-> >   a good way to distinguish windows from resources consumed directly
-> >   by the bridge.
-> >
-> >   But we should either do this correctly, or include a comment about
-> >   why we're doing it wrong, so we don't give the impression that this
-> >   is the right way to do it.
-> >
-> >   I seem to recall some discussion about why we're doing it this way,
-> >   but I don't remember the details.  It'd be nice to include a
-> >   summary here.
-> 
-> OK I will. The reason why we cannot use _CRS for this case is that
-> CONSUMER flag was not use consistently for the bridge so far.
+On 09/20/2016 02:44 PM, Thomas Gleixner wrote:
+> On Tue, 20 Sep 2016, Alexandre Torgue wrote:
+>
+>> Thomas,
+>>
+>> On 09/20/2016 11:51 AM, Thomas Gleixner wrote:
+>>> On Tue, 20 Sep 2016, Alexandre Torgue wrote:
+>>>>> On 09/14/2016 03:34 PM, Thomas Gleixner wrote:
+>>>>>> Well, you just used some function in some context which is not
+>>>>>> relevant to
+>>>>>> the normal operation. So adding that mask() is just paranoia for no
+>>>>>> value.
+>>>>>
+>>>> A gentle reminder ping...
+>>>> If ".free" callback is not relevant then I 'll remove it from exti domain.
+>>
+>> Sorry for discussing about the same thing again (and again) but I just want to
+>> be sure before sending a new version. As you know I have 2 domains: EXTI
+>> domain (parent) and stm32-pinctrl-bank domain (child one).
+>>
+>> There does it make sens to have ".free" callbacks defined in both domain
+>> (actually if I define one for the child domain I have to define also ".free"
+>> callback for parent domain (EXTI) as it is hierarchical) ?
+>> If ".free" have no chance to be called then I will send a new version by
+>> removing .free callbacks (in both domain).
+>
+> Free will be called when a interrupt in the child domain is torn down,
+> i.e. when irq_domain_free_irqs() is called. And it will be called for both
+> domains like the alloc callback is invoked on both domains via
+> irq_domain_alloc_irqs().
 
-Yes, I'm aware of that problem, but hard-coding resources into drivers
-is just a disaster.  The PCI and ACPI cores need generic ways to learn
-what resources are consumed by devices.  For PCI devices, that's done
-with BARs.  For ACPI devices, it's done with _CRS.  Without generic
-resource discovery, we can't manage resources reliably at the system
-level [1].
+Thanks Thomas for this clarification (I'm sure now that we need .free 
+callbacks).
+irq_domain_free_irqs() is called in 2 scenario:
+1- when issue occurs in irq_create_fwspec_mapping()
+2- when irq_dispose_mapping() is called
 
-You have a PNP0A03/PNP0A08 device for the PCI host bridge.  Because of
-the BIOS bugs in CONSUMER flag usage, we assume everything in its _CRS
-is a window and not consumed by the bridge itself.  What if you added
-a companion ACPI device with a _CRS that contained the bridge
-resources?  Then you'd have some driver ugliness to find that device,
-but at least the ACPI core could tell what resources were in use.
+Case 2 is the one I tested some times ago. In this case, I need to mask 
+interrupts in .free callback of EXTI (parent) domain to avoid spurious 
+interrupts.
 
-Maybe Rafael has a better idea?
+Regards
 
-Bjorn
+Alex
 
-[1] I know the ACPI core currently doesn't actually *do* anything with
-_CRS.  But I think it *should*, and someday it might, so I want to
-preserve the principle of using _CRS to document all the resources.
+
+>
+> Thanks,
+>
+> 	tglx
+>
+>
+>
+>
