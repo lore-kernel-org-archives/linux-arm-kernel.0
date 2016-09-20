@@ -1,41 +1,28 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 20 Sep 2016 18:40:06 +0100
-Subject: [PATCH 2/4] ARM: tegra: nyan: Use external control for bq24735
- charger
-In-Reply-To: <20160828173246.32621-2-contact@paulk.fr>
+Date: Tue, 20 Sep 2016 18:41:53 +0100
+Subject: [PATCH 3/4] ARM: tegra: nyan-big: Include compatible revisions
+ for proper detection
+In-Reply-To: <20160828173246.32621-3-contact@paulk.fr>
 References: <20160828173246.32621-1-contact@paulk.fr>
- <20160828173246.32621-2-contact@paulk.fr>
-Message-ID: <00697eef-0b36-1ff5-9c7a-43c1b53b52bc@nvidia.com>
+ <20160828173246.32621-3-contact@paulk.fr>
+Message-ID: <a9485a88-55a5-9dd1-1a1b-a6c0a78ff476@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 On 28/08/16 18:32, Paul Kocialkowski wrote:
-> Nyan boards come with an embedded controller that controls when to
-> enable and disable the charge. Thus, it should not be left up to the
-> kernel to handle that.
-> 
-> Using the ti,external-control property allows specifying this use-case.
+> Depthcharge (the payload used with cros devices) will attempt to detect
+> boards using their revision. This includes all the known revisions for
+> the nyan-big board so that the dtb can be selected preferably.
 
-So the bq24735 is populated under the EC's 'i2c-tunnel' property which
-is there to specifically interface it's child devices to the host. So I
-am a bit confused why this is expose to the host if it should not be used?
+May be I am missing something here, but for the mainline there is only
+one dtb available and so why is this needed for the mainline?
 
-Again you may right and I did find the original series [0] for this
-which specifically references the Acer Chromebook that needs this.
-However, I am not sure why this was never populated? Is there any other
-history here?
-
-What is the actual problem you see without making this change? The
-original series states ...
-
-"On Acer Chromebook 13 (CB5-311) this module fails to load if the
-charger is not inserted, and will error when it is removed."
+I understand for the downstream kernels that the chromebooks ship with
+they may include multiple dtbs, but for the mainline we only have one.
 
 Cheers
 Jon
-
-[0] http://marc.info/?l=linux-pm&m=145447948705686&w=2
 
 -- 
 nvpublic
