@@ -1,31 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Sep 2016 23:54:48 +0200
-Subject: [PATCH] pinctrl: mvebu: orion5x: Generalise mv88f5181l support
- for 88f5181
-In-Reply-To: <20160920162635.4195-1-gregory.clement@free-electrons.com>
-References: <20160920162635.4195-1-gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdbo6JmR=K58KQ_J0Gd5_gLqub65watU-iEabQ0rWdeVpQ@mail.gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Tue, 20 Sep 2016 17:09:10 -0500
+Subject: [GIT PULL] Qualcomm EBI2 bindings and bus driver
+In-Reply-To: <CACRpkdZdoK4+YRrZC=Kd8TFzJXOQxh=Gi0BWLp4PzV6H5_wEtg@mail.gmail.com>
+References: <CACRpkdYvowN2htUuN46JNVdfaKNw3AEbBfzAeScHQcLU5o3ZUg@mail.gmail.com>
+ <4360974.U0qvolVKdi@wuerfel>
+ <20160919223616.GD5431@hector.attlocal.net>
+ <CACRpkdZdoK4+YRrZC=Kd8TFzJXOQxh=Gi0BWLp4PzV6H5_wEtg@mail.gmail.com>
+Message-ID: <20160920220910.GE5431@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 6:26 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
+On Tue, Sep 20, 2016 at 11:50:14PM +0200, Linus Walleij wrote:
+> On Tue, Sep 20, 2016 at 12:36 AM, Andy Gross <andy.gross@linaro.org> wrote:
+> > On Tue, Sep 20, 2016 at 12:12:33AM +0200, Arnd Bergmann wrote:
+> >> On Thursday, September 8, 2016 3:34:42 PM CEST Linus Walleij wrote:
+> >> > please pull this new EBI2 bus driver and its bindings into an
+> >> > apropriate branch in the ARM SoC tree. The binding now has
+> >> > Rob Herrings ACK and we have hopefully finally figured out how
+> >> > this should be done.
+> >> >
+> >>
+> >> I just noticed that you sent the pull request directly to arm at kernel.org
+> >> rather than the Qualcomm maintainers (which are only on Cc).
+> >>
+> >> Usually, I'd expect to see this forwarded from Andy, is there a
+> >> reason to do it differently here? If so, can I have an Ack
+> >> from him?
+> >
+> > When I looked at this last, I thought there were comments.  Sorry I missed it.
+> > If you want to pick it up Arnd, please do, otherwise I can send it along in the
+> > next pull request.
+> >
+> > Acked-by: Andy Gross <andy.gross@linaro.org>
+> 
+> Thanks, I hope Arnd can pull this as-is.
+> 
+> Will you apply the DTS changes Andy?
 
-> From: Jamie Lentin <jm@lentin.co.uk>
->
-> As far as I'm aware the mv88f5181-b1 and mv88f5181l are the same at the
-> pinctrl level, so re-use the definitions for both.
->
-> [gregory.clement at free-electrons.com: fix commit title]
-> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Sure I'll put it in a supplemental pull.
 
-Is this the patch from your pull request?
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Or do you prefer that I take it into the pinctrl tree?
-
-Yours,
-Linus Walleij
+Andy
