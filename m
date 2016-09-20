@@ -1,98 +1,43 @@
-From: jani.nikula@linux.intel.com (Jani Nikula)
-Date: Tue, 20 Sep 2016 12:33:45 +0300
-Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
- issue.
-In-Reply-To: <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
- <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
- <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <8760pqncee.fsf@intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 20 Sep 2016 10:35:03 +0100
+Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <1474312560.4283.10.camel@buserror.net>
+References: <1473469413-11019-1-git-send-email-oss@buserror.net>
+ <1473469413-11019-3-git-send-email-oss@buserror.net>
+ <20160912113615.GA20804@leverpostej>
+ <1474260085.15220.17.camel@buserror.net>
+ <20160919165258.GA30584@leverpostej>
+ <1474304489.4283.6.camel@buserror.net>
+ <20160919170707.GC30584@leverpostej>
+ <1474312560.4283.10.camel@buserror.net>
+Message-ID: <20160920093503.GA1045@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Sep 2016, Peter Griffin <peter.griffin@linaro.org> wrote:
-> Hi Emil,
->
-> On Tue, 20 Sep 2016, Emil Velikov wrote:
->
->> On 5 September 2016 at 14:16, Peter Griffin <peter.griffin@linaro.org> wrote:
->> > ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
->> > recursive dependency.
->
->
->> >
->> From a humble skim through remoteproc, drm and a few other subsystems
->> I think the above is wrong. All the drivers (outside of remoteproc),
->> that I've seen, depend on the core component, they don't select it.
->
-> I will let Bjorn comment on the remoteproc subsystem Kconfig design, and
-> why it is like it is.
->
-> For this particular SLIM_RPROC I have added it to Kconfig in keeping with all
-> the other drivers in the remoteproc subsystem which has exposed this recursive
-> dependency issue.
->
-> For this particular kconfig symbol a quick grep reveals more drivers in
-> the kernel using 'select', than 'depend on'
->
-> git grep "select VIRTIO" | wc -l
-> 14
->
-> git grep "depends on VIRTIO" | wc -l
-> 10
->
->
->> Furthermore most places explicitly hide the drivers from the menu if
->> the core component isn't enabled.
->
-> Remoteproc subsystem takes a different approach, the core code is only enabled
-> if a driver which relies on it is enabled. This IMHO makes sense, as
-> remoteproc is not widely used (only a few particular ARM SoC's).
->
-> It is true that for subsystems which rely on the core component being
-> explicitly enabled, they often tend to hide drivers which depend on it
-> from the menu unless it is. This also makes sense.
->
->> 
->> Is there something that requires such a different/unusual behaviour in
->> remoteproc ?
->> 
->
-> I'm not sure it is that unusual...looking at config USB, it selects USB_COMMON in
-> mfd subsystem, client drivers select MFD_CORE.
->
-> I've added Arnd to this thread, as I've seen lots of Kconfig patches from him
-> recently, maybe he has some thoughts on whether this is the correct fix or not?
+On Mon, Sep 19, 2016 at 02:16:00PM -0500, Scott Wood wrote:
+> On Mon, 2016-09-19 at 18:07 +0100, Mark Rutland wrote:
+> > > > Reconsidering my suggestion, I realise this will also affect the MMIO
+> > > > timers, so that doesn't work.
+> > > > 
+> > > > So for the moment, I guess we have to keep fsl_a008585_set_next_event().
+> > > What is the problem with MMIO timers? ?needs_fsl_a008585_workaround()
+> > > should
+> > > always be false for them.
+> > As suggested, needs_fsl_a008585_workaround() takes no parameter, and
+> > set_next_event is called for both cp15/sysreg and MMIO timers. So it
+> > would either be true for all, or false for all.
+> > 
+> > If it's true for all, we'd end up calling fsl_a008585_set_next_event()
+> > for the MMIO timers too.
+> 
+> There should not be any MMIO timers on a system where
+> fsl_a008585_set_next_event() returns true.
 
+I'm generally not keen on relying on that.
 
-Documentation/kbuild/kconfig-language.txt:
+For reference, are no MMIO timers implemented at all, or are they simply
+not listed in the DT today?
 
-  Note:
-	select should be used with care. select will force
-	a symbol to a value without visiting the dependencies.
-	By abusing select you are able to select a symbol FOO even
-	if FOO depends on BAR that is not set.
-	In general use select only for non-visible symbols
-	(no prompts anywhere) and for symbols with no dependencies.
-	That will limit the usefulness but on the other hand avoid
-	the illegal configurations all over.
-
-People tend to abuse select because it's "convenient". If you depend,
-but some of your dependencies aren't met, you're in for some digging
-through Kconfig to find the missing deps. Just to make the option you
-want visible in menuconfig. If you instead select something with
-dependencies, it'll be right most of the time, and it's "convenient",
-until it breaks. (And hey, it usually breaks for someone else with some
-other config, so it's still convenient for you.)
-
-Perhaps kconfig should complain about selecting visible symbols and
-symbols with dependencies.
-
-
-BR,
-Jani.
-
-
--- 
-Jani Nikula, Intel Open Source Technology Center
+Thanks,
+Mark.
