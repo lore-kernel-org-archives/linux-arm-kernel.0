@@ -1,44 +1,46 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Thu, 22 Sep 2016 08:06:29 +1000
-Subject: [PATCH] drm/sun4i: rgb: Enable panel after controller
-In-Reply-To: <20160921210340.GI8719@lukather>
-References: <20160921130304.3486-1-net147@gmail.com>
- <20160921210340.GI8719@lukather>
-Message-ID: <CANwerB2tO_1kpcW-n+mUNr4syHg7vqrFwn5nU+LJhhf+1cn9Lw@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 22 Sep 2016 00:09:35 +0200
+Subject: [PATCH v2 2/6] ARM: at91: add secumod register definitions
+In-Reply-To: <20160921220939.27924-1-alexandre.belloni@free-electrons.com>
+References: <20160921220939.27924-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20160921220939.27924-3-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Add registers and bits definitions for the security module found on
+sama5d2.
 
-On 22 September 2016 at 07:03, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Sep 21, 2016 at 11:03:04PM +1000, Jonathan Liu wrote:
->> The panel should be enabled after the controller so that the panel
->> prepare/enable delays are properly taken into account. Similarly, the
->> panel should be disabled before the controller so that the panel
->> unprepare/disable delays are properly taken into account.
->>
->> This is useful for avoiding visual glitches.
->
-> This is not really taking any delays into account, especially since
-> drm_panel_enable and prepare are suppose to block until their
-> operation is complete.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ include/soc/at91/atmel-secumod.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 include/soc/at91/atmel-secumod.h
 
-drm_panel_prepare turns on power to the LCD using enable-gpios
-property of the panel and then blocks for prepare delay. The prepare
-delay for panel can be set to how long it takes between the time the
-panel is powered to when it is ready to receive images. If backlight
-property is specified the backlight will be off while the panel is
-powered on.
-
-drm_panel_enable blocks for enable delay and then turns on the
-backlight. The enable delay can be set to how long it takes for panel
-to start making the image visible after receiving the first valid
-frame. For example if the panel starts off as white and the TFT takes
-some time to initialize to black before it shows the image being
-received.
-
-Refer to drivers/gpu/drm/panel-panel.simple.c for details.
-
-Regards,
-Jonathan
+diff --git a/include/soc/at91/atmel-secumod.h b/include/soc/at91/atmel-secumod.h
+new file mode 100644
+index 000000000000..7139e8eb1aca
+--- /dev/null
++++ b/include/soc/at91/atmel-secumod.h
+@@ -0,0 +1,20 @@
++/*
++ * Atmel Security Module register offsets and bit definitions.
++ *
++ * Copyright (C) 2016 Atmel
++ *
++ * Author: Alexandre Belloni <alexandre.belloni@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef _LINUX_SOC_AT91_ATMEL_SECUMOD_H
++#define _LINUX_SOC_AT91_ATMEL_SECUMOD_H
++
++#define AT91_SECUMOD_RAMRDY	0x14
++#define AT91_SECUMOD_RAMRDY_READY	BIT(0)
++
++#endif /* _LINUX_SOC_AT91_ATMEL_SECUMOD_H */
++
+-- 
+2.9.3
