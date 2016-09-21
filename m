@@ -1,151 +1,90 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 21 Sep 2016 13:54:37 +0800
-Subject: [RESEND PATCH v6, 5/5] arm64: dts: mediatek: add USB3 DRD driver
-In-Reply-To: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1474437277-27201-6-git-send-email-chunfeng.yun@mediatek.com>
+Date: Wed, 21 Sep 2016 13:54:32 +0800
+Subject: [RESEND PATCH v6, 0/5] Add MediaTek USB3 DRD Driver 
+Message-ID: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB3 DRD driver is added for MT8173-EVB, and xHCI driver
-becomes its subnode
+>From 99e428a1808c8ca91ff473d487b52ca5d355d875 Mon Sep 17 00:00:00 2001
+From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Date: Mon, 5 Sep 2016 10:27:07 +0800
+Subject: [PATCH v6, 0/5] Add MediaTek USB3 DRD Driver
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   46 +++++++++++++++++++++++++--
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    |   29 +++++++++++++----
- 2 files changed, 66 insertions(+), 9 deletions(-)
+These patches introduce the MediaTek USB3 dual-role controller
+driver.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index 7453a47..682dfd7 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -34,6 +34,11 @@
- 
- 	chosen { };
- 
-+	extcon_usb: extcon_iddig {
-+		compatible = "linux,extcon-usb-gpio";
-+		id-gpio = <&pio 16 GPIO_ACTIVE_HIGH>;
-+	};
-+
- 	usb_p1_vbus: regulator at 0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb_vbus";
-@@ -42,6 +47,16 @@
- 		gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
- 		enable-active-high;
- 	};
-+
-+	usb_p0_vbus: regulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&pio 9 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
- };
- 
- &i2c1 {
-@@ -205,6 +220,20 @@
- 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
- 		};
- 	};
-+
-+	usb_id_pins_float: usb_iddig_pull_up {
-+		pins_iddig {
-+			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
-+			bias-pull-up;
-+		};
-+	};
-+
-+	usb_id_pins_ground: usb_iddig_pull_down {
-+		pins_iddig {
-+			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
-+			bias-pull-down;
-+		};
-+	};
- };
- 
- &pwm0 {
-@@ -431,12 +460,25 @@
- 	status = "okay";
- };
- 
-+&ssusb {
-+	vusb33-supply = <&mt6397_vusb_reg>;
-+	vbus-supply = <&usb_p0_vbus>;
-+	extcon = <&extcon_usb>;
-+	dr_mode = "otg";
-+	mediatek,enable-wakeup;
-+	pinctrl-names = "default", "id_float", "id_ground";
-+	pinctrl-0 = <&usb_id_pins_float>;
-+	pinctrl-1 = <&usb_id_pins_float>;
-+	pinctrl-2 = <&usb_id_pins_ground>;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	status = "okay";
- };
- 
--&usb30 {
-+&usb_host {
- 	vusb33-supply = <&mt6397_vusb_reg>;
- 	vbus-supply = <&usb_p1_vbus>;
--	mediatek,wakeup-src = <1>;
-+	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 10f638f..925948a 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -668,11 +668,14 @@
- 			status = "disabled";
- 		};
- 
--		usb30: usb at 11270000 {
--			compatible = "mediatek,mt8173-xhci";
--			reg = <0 0x11270000 0 0x1000>,
-+		ssusb: usb at 11271000 {
-+			compatible = "mediatek,mt8173-mtu3";
-+			reg = <0 0x11271000 0 0x3000>,
- 			      <0 0x11280700 0 0x0100>;
--			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+			reg-names = "mac", "ippc";
-+			interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>;
-+			phys = <&phy_port0 PHY_TYPE_USB3>,
-+			       <&phy_port1 PHY_TYPE_USB2>;
- 			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
- 			clocks = <&topckgen CLK_TOP_USB30_SEL>,
- 				 <&pericfg CLK_PERI_USB0>,
-@@ -680,10 +683,22 @@
- 			clock-names = "sys_ck",
- 				      "wakeup_deb_p0",
- 				      "wakeup_deb_p1";
--			phys = <&phy_port0 PHY_TYPE_USB3>,
--			       <&phy_port1 PHY_TYPE_USB2>;
- 			mediatek,syscon-wakeup = <&pericfg>;
--			status = "okay";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+			status = "disabled";
-+
-+			usb_host: xhci at 11270000 {
-+				compatible = "mediatek,mt8173-xhci";
-+				reg = <0 0x11270000 0 0x1000>;
-+				reg-names = "mac";
-+				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+				clocks = <&topckgen CLK_TOP_USB30_SEL>;
-+				clock-names = "sys_ck";
-+				status = "disabled";
-+			};
- 		};
- 
- 		u3phy: usb-phy at 11290000 {
--- 
+The driver can be configured as Dual-Role Device (DRD),
+Peripheral Only and Host Only (xHCI) modes. It works well
+with Mass Storage, RNDIS and g_zero on FS/HS and SS. And it is
+tested on MT8173 platform which only contains USB2.0 device IP,
+and on MT6290 platform which contains USB3.0 device IP.
+
+Change in v6:
+1. handle endianness of GPD and SETUP data
+2. remove dummy error log and return suitable error number
+3. cancel delay work when deregiseter driver
+
+Change in v5:
+1. modify some comments
+2. rename some unsuitable variables
+3. add reg-names property for host node
+4. add USB_MTU3_DEBUG to control debug messages
+
+Change in v4:
+1. fix build errors on non-mediatek platforms
+2. provide manual dual-role switch via debugfs instead of sysfs
+
+Change in v3:
+1. fix some typo error
+2. rename mtu3.txt to mt8173-mtu3.txt
+
+Change in v2:
+1. modify binding docs according to suggestions
+2. modify some comments and remove some dummy blank lines
+3. fix memory leakage
+
+Chunfeng Yun (5):
+  dt-bindings: mt8173-xhci: support host side of dual-role mode
+  dt-bindings: mt8173-mtu3: add devicetree bindings
+  usb: xhci-mtk: make IPPC register optional
+  usb: Add MediaTek USB3 DRD Driver
+  arm64: dts: mediatek: add USB3 DRD driver
+
+ .../devicetree/bindings/usb/mt8173-mtu3.txt        |   87 ++
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |   54 +-
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   46 +-
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   29 +-
+ drivers/usb/Kconfig                                |    2 +
+ drivers/usb/Makefile                               |    1 +
+ drivers/usb/host/xhci-mtk.c                        |   36 +-
+ drivers/usb/mtu3/Kconfig                           |   54 ++
+ drivers/usb/mtu3/Makefile                          |   19 +
+ drivers/usb/mtu3/mtu3.h                            |  422 ++++++++++
+ drivers/usb/mtu3/mtu3_core.c                       |  871 +++++++++++++++++++
+ drivers/usb/mtu3/mtu3_dr.c                         |  379 +++++++++
+ drivers/usb/mtu3/mtu3_dr.h                         |  108 +++
+ drivers/usb/mtu3/mtu3_gadget.c                     |  731 ++++++++++++++++
+ drivers/usb/mtu3/mtu3_gadget_ep0.c                 |  883 ++++++++++++++++++++
+ drivers/usb/mtu3/mtu3_host.c                       |  294 +++++++
+ drivers/usb/mtu3/mtu3_hw_regs.h                    |  473 +++++++++++
+ drivers/usb/mtu3/mtu3_plat.c                       |  490 +++++++++++
+ drivers/usb/mtu3/mtu3_qmu.c                        |  599 +++++++++++++
+ drivers/usb/mtu3/mtu3_qmu.h                        |   43 +
+ 20 files changed, 5603 insertions(+), 18 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+ create mode 100644 drivers/usb/mtu3/Kconfig
+ create mode 100644 drivers/usb/mtu3/Makefile
+ create mode 100644 drivers/usb/mtu3/mtu3.h
+ create mode 100644 drivers/usb/mtu3/mtu3_core.c
+ create mode 100644 drivers/usb/mtu3/mtu3_dr.c
+ create mode 100644 drivers/usb/mtu3/mtu3_dr.h
+ create mode 100644 drivers/usb/mtu3/mtu3_gadget.c
+ create mode 100644 drivers/usb/mtu3/mtu3_gadget_ep0.c
+ create mode 100644 drivers/usb/mtu3/mtu3_host.c
+ create mode 100644 drivers/usb/mtu3/mtu3_hw_regs.h
+ create mode 100644 drivers/usb/mtu3/mtu3_plat.c
+ create mode 100644 drivers/usb/mtu3/mtu3_qmu.c
+ create mode 100644 drivers/usb/mtu3/mtu3_qmu.h
+
+--
 1.7.9.5
