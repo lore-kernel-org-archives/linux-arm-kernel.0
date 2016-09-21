@@ -1,32 +1,34 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Wed, 21 Sep 2016 15:08:31 +0000
-Subject: [PATCH -next] soc: mediatek: PMIC wrap: fix missing
- clk_disable_unprepare() on error in pwrap_probe()
-Message-ID: <1474470511-2458-1-git-send-email-weiyj.lk@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 21 Sep 2016 16:35:13 +0100
+Subject: [PATCH 1/2] MAINTAINERS: add myself as EFI maintainer
+Message-ID: <1474472114-12973-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+At the request of Matt, I am taking up co-maintainership of the EFI
+subsystem. So add my name to the EFI section in MAINTAINERS, and
+change the SCM tree reference to point to the new shared Git repo.
 
-Fix the missing clk_disable_unprepare() before return
-from pwrap_probe() in the error handling case.
-
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/soc/mediatek/mtk-pmic-wrap.c | 3 ++-
+ MAINTAINERS | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index a5f1093..4da3bb2 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -1200,7 +1200,8 @@ static int pwrap_probe(struct platform_device *pdev)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 007d05acbb5f..224518556a84 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4557,8 +4557,9 @@ F:	sound/usb/misc/ua101.c
  
- 	if (!(pwrap_readl(wrp, PWRAP_WACS2_RDATA) & PWRAP_STATE_INIT_DONE0)) {
- 		dev_dbg(wrp->dev, "initialization isn't finished\n");
--		return -ENODEV;
-+		ret = -ENODEV;
-+		goto err_out2;
- 	}
- 
- 	/* Initialize watchdog, may not be done by the bootloader */
+ EXTENSIBLE FIRMWARE INTERFACE (EFI)
+ M:	Matt Fleming <matt@codeblueprint.co.uk>
++M:	Ard Biesheuvel <ard.biesheuvel@linaro.org>
+ L:	linux-efi at vger.kernel.org
+-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/efi.git
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/efi/efi.git
+ S:	Maintained
+ F:	Documentation/efi-stub.txt
+ F:	arch/ia64/kernel/efi.c
+-- 
+2.7.4
