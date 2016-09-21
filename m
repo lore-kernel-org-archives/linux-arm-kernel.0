@@ -1,68 +1,40 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 21 Sep 2016 11:35:50 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Using for_each_set_bit to simplify
- the code
-In-Reply-To: <1474436491-26220-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1474436491-26220-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <3dd248de-5ef6-6255-fa7f-4f2c6a6de417@arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 21 Sep 2016 12:37:49 +0200
+Subject: [PATCH v10 0/4] ACPI: parse the SPCR table
+In-Reply-To: <25d32778-e708-6763-7cb2-4ddbeebc844b@linaro.org>
+References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
+ <25d32778-e708-6763-7cb2-4ddbeebc844b@linaro.org>
+Message-ID: <20160921103749.GA7993@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/09/16 06:41, Kefeng Wang wrote:
-> Using for_each_set_bit() to simplify the code.
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
->  drivers/iommu/io-pgtable-arm-v7s.c | 5 +----
->  drivers/iommu/io-pgtable-arm.c     | 5 +----
->  2 files changed, 2 insertions(+), 8 deletions(-)
+On Wed, Sep 21, 2016 at 01:27:30PM +0300, Aleksey Makarov wrote:
 > 
-> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-> index def8ca1..f23821b 100644
-> --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> @@ -789,8 +789,7 @@ static int __init arm_v7s_do_selftests(void)
->  	 * Distinct mappings of different granule sizes.
->  	 */
->  	iova = 0;
-> -	i = find_first_bit(&cfg.pgsize_bitmap, BITS_PER_LONG);
-> -	while (i != BITS_PER_LONG) {
-> +	for_each_set_bit(i, &cfg.pgsize_bitmap, BITS_PER_LONG) {
->  		size = 1UL << i;
->  		if (ops->map(ops, iova, iova, size, IOMMU_READ |
->  						    IOMMU_WRITE |
-> @@ -807,8 +806,6 @@ static int __init arm_v7s_do_selftests(void)
->  			return __FAIL(ops);
->  
->  		iova += SZ_16M;
-> -		i++;
-> -		i = find_next_bit(&cfg.pgsize_bitmap, BITS_PER_LONG, i);
->  		loopnr++;
->  	}
->  
-> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-> index f5c90e1..8c3dfb7 100644
-> --- a/drivers/iommu/io-pgtable-arm.c
-> +++ b/drivers/iommu/io-pgtable-arm.c
-> @@ -980,8 +980,7 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
->  		 * Distinct mappings of different granule sizes.
->  		 */
->  		iova = 0;
-> -		j = find_first_bit(&cfg->pgsize_bitmap, BITS_PER_LONG);
-> -		while (j != BITS_PER_LONG) {
-> +		for_each_set_bit(j, &cfg->pgsize_bitmap, BITS_PER_LONG) {
->  			size = 1UL << j;
->  
->  			if (ops->map(ops, iova, iova, size, IOMMU_READ |
-> @@ -999,8 +998,6 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
->  				return __FAIL(ops, i);
->  
->  			iova += SZ_1G;
-> -			j++;
-> -			j = find_next_bit(&cfg->pgsize_bitmap, BITS_PER_LONG, j);
->  		}
->  
->  		/* Partial unmap */
 > 
+> On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
+> > 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port Console
+> > Redirection Table) [2] as a mandatory ACPI table that specifies the
+> > configuration of serial console.
+> > 
+> > Move "earlycon" early_param handling to earlycon.c to parse this option once
+> > 
+> > Parse SPCR table, setup earlycon and register specified console.
+> > 
+> > Enable parsing this table on ARM64.  Earlycon should be set up as early as
+> > possible.  ACPI boot tables are mapped in
+> > arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch() and
+> > that's where we parse spcr.  So it has to be opted-in per-arch. When
+> > ACPI_SPCR_TABLE is defined initialization of DT earlycon is deferred until the
+> > DT/ACPI decision is done.
+> > 
+> > Implement console_match() for pl011.
+> 
+> Hi Greg,
+> 
+> Can you consider picking this series for 4.9 please?
+
+I thought you asked Rafael to take them, they are not in my queue
+anymore because of that.  Don't try to shop-around for maintainers
+please, that's kind of rude...
+
+greg k-h
