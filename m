@@ -1,120 +1,158 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 21 Sep 2016 17:13:07 +0800
-Subject: ftrace function_graph causes system crash
-In-Reply-To: <0e38f79fdc1f4671943da74764c15050@SIWEX5A.sing.micron.com>
-References: <7d0e88fff8e64591ac31be3adbbf763c@SIWEX5A.sing.micron.com>
- <20160920100716.131d3647@gandalf.local.home>
- <0e38f79fdc1f4671943da74764c15050@SIWEX5A.sing.micron.com>
-Message-ID: <20160921171307.3fb84c87@xhacker>
+From: zhichang.yuan02@gmail.com (zhichang)
+Date: Wed, 21 Sep 2016 17:26:06 +0800
+Subject: [PATCH V3 1/4] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <5264074.nuyDhEuOR4@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <8337589.pzGt0MZ9xn@wuerfel> <57D95BBC.9030405@hisilicon.com>
+ <5264074.nuyDhEuOR4@wuerfel>
+Message-ID: <c6fe6d43-5e8b-ee88-a328-83d998b51c5a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bean,
+Hi, Arnd,
 
-On Wed, 21 Sep 2016 07:50:58 +0000 "Bean Huo (beanhuo)"  wrote:
 
-> > From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
-> > On Behalf Of Steven Rostedt
-> > Sent: Dienstag, 20. September 2016 16:07
-> > To: Bean Huo (beanhuo) <beanhuo@micron.com>
-> > Cc: Zoltan Szubbocsev (zszubbocsev) <zszubbocsev@micron.com>;
-> > catalin.marinas at arm.com; will.deacon at arm.com; rfi at lists.rocketboards.org;
-> > linux-kernel at vger.kernel.org; mingo at redhat.com; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: ftrace function_graph causes system crash
-> > 
-> > On Tue, 20 Sep 2016 13:10:39 +0000
-> > "Bean Huo (beanhuo)" <beanhuo@micron.com> wrote:
-> >   
-> > > Hi, all
-> > > I just use ftrace to do some latency study, found that function_graph
-> > > can not Work, as long as enable it, will cause kernel panic. I searched this  
-> > online.  
-> > > Found that there are also some cause the same as mine. I am a newer of  
-> > ftrace.  
-> > > I want to know who know what root cause? Here is some partial log:
-> > >
-> > >  
-> > 
-> > Can you do a function bisect to find what function this is.
-> > 
-> > This script is used to help find functions that are being traced by function tracer
-> > or function graph tracing that causes the machine to reboot, hang, or crash.
-> > Here's the steps to take.
-> > 
-> > First, determine if function graph is working with a single function:
-> > 
-> > # cd /sys/kernel/debug/tracing
-> > # echo schedule > set_ftrace_filter
-> > # echo function_graph > current_tracer
-> > 
-> > If this works, then we know that something is being traced that shouldn't be.
-> > 
-> > # echo nop > current_tracer
-> > 
-> > # cat available_filter_functions > ~/full-file # ftrace-bisect ~/full-file ~/test-file
-> > ~/non-test-file # cat ~/test-file > set_ftrace_filter
-> > 
-> > *** Note *** this will take several minutes. Setting multiple functions is an
-> > O(n^2) operation, and we are dealing with thousands of functions.
-> > So go have  coffee, talk with your coworkers, read facebook. And eventually,
-> > this operation will end.
-> > 
-> > # echo function_graph > current_tracer
-> > 
-> > If it crashes, we know that ~/test-file has a bad function.
-> > 
-> >    Reboot back to test kernel.
-> > 
-> >    # cd /sys/kernel/debug/tracing
-> >    # mv ~/test-file ~/full-file
-> > 
-> > If it didn't crash.
-> > 
-> >    # echo nop > current_tracer
-> >    # mv ~/non-test-file ~/full-file
-> > 
-> > Get rid of the other test file from previous run (or save them off somewhere.
-> > # rm -f ~/test-file ~/non-test-file
-> > 
-> > And start again:
-> > 
-> > # ftrace-bisect ~/full-file ~/test-file ~/non-test-file
-> > 
-> > The good thing is, because this cuts the number of functions in ~/test-file by half,
-> > the cat of it into set_ftrace_filter takes half as long each iteration, so don't talk
-> > so much at the water cooler the second time.
-> > 
-> > Eventually, if you did this correctly, you will get down to the problem function,
-> > and all we need to do is to notrace it.
-> > 
-> > The way to figure out if the problem function is bad, just do:
-> > 
-> > # echo <problem-function> > set_ftrace_notrace # echo > set_ftrace_filter #
-> > echo function_graph > current_tracer
-> > 
-> > And if it doesn't crash, we are done.
-> > 
-> > -- Steve  
+On 2016?09?14? 22:23, Arnd Bergmann wrote:
+> On Wednesday, September 14, 2016 10:16:28 PM CEST zhichang.yuan wrote:
+>>>
+>>> No need to guard includes with an #ifdef.
+>> If remove #ifdef here, extio.h should not contain any function external declarations whose definitions are in
+>> extio.c compiled only when CONFIG_ARM64_INDIRECT_PIO is yes.
+>  
+> There is no problem with making declarations visible for functions that
+> are not part of the kernel, we do that all the time.
 > 
+>>>> +#define BUILDS_RW(bwl, type)                                                \
+>>>> +static inline void reads##bwl(const volatile void __iomem *addr,    \
+>>>> +                            void *buffer, unsigned int count)       \
+>>>> +{                                                                   \
+>>>> +    if (count) {                                                    \
+>>>> +            type *buf = buffer;                                     \
+>>>> +                                                                    \
+>>>> +            do {                                                    \
+>>>> +                    type x = __raw_read##bwl(addr);                 \
+>>>> +                    *buf++ = x;                                     \
+>>>> +            } while (--count);                                      \
+>>>> +    }                                                               \
+>>>> +}                                                                   \
+>>>> +                                                                    \
+>>>> +static inline void writes##bwl(volatile void __iomem *addr,         \
+>>>> +                            const void *buffer, unsigned int count) \
+>>>> +{                                                                   \
+>>>> +    if (count) {                                                    \
+>>>> +            const type *buf = buffer;                               \
+>>>> +                                                                    \
+>>>> +            do {                                                    \
+>>>> +                    __raw_write##bwl(*buf++, addr);                 \
+>>>> +            } while (--count);                                      \
+>>>> +    }                                                               \
+>>>> +}
+>>>> +
+>>>> +BUILDS_RW(b, u8)
+>>>
+>>> Why is this in here?
+>> the readsb/writesb are defined in asm-generic/io.h which is included later, but the redefined insb/outsb need
+>> to call them. Without these readsb/writesb definition before insb/outsb redefined, compile error occur.
+>>
+>> It seems that copy all the definitions of "asm-generic/io.h" is not a good idea, so I move the definitions of
+>> those function needed here....
+>>
+>> Ok. I think your idea below defining in(s)/out(s) in a c file can solve this issue.
+>>
+>> #ifdef CONFIG_ARM64_INDIRECT_PIO
+>> #define inb inb
+>> extern u8 inb(unsigned long addr);
+>>
+>> #define outb outb
+>> extern void outb(u8 value, unsigned long addr);
+>>
+>> #define insb insb
+>> extern void insb(unsigned long addr, void *buffer, unsigned int count);
+>>
+>> #define outsb outsb
+>> extern void outsb(unsigned long addr, const void *buffer, unsigned int count);
+>> #endif
+>>
+>> and definitions of all these functions are in extio.c :
+>>
+>> u8 inb(unsigned long addr)
+>> {
+>>         if (!arm64_extio_ops || arm64_extio_ops->start > addr ||
+>>                         arm64_extio_ops->end < addr)
+>>                 return readb(PCI_IOBASE + addr);
+>>         else
+>>                 return arm64_extio_ops->pfin ?
+>>                         arm64_extio_ops->pfin(arm64_extio_ops->devpara,
+>>                                 addr + arm64_extio_ops->ptoffset, NULL,
+>>                                 sizeof(u8), 1) : -1;
+>> }
+>> .....
 > 
-> Hi, Steve
-> Thanks very much! This is a very useful trace tool, I now know the problem function,
-> It is gt_counter_read, if not trace this function, ftrace function_graph work well.
-
-I'm not sure whether the commit d6df3576e6b4 ("clocksource/drivers/arm_global_timer
-: Prevent ftrace recursion") can fix this issue.
-
-this commit is merged since v4.3, I noticed your kernel version is v4.0
-
-Thanks,
-Jisheng
-
-> Do you know now how to deeply debug and trace which line is wrong through Ftrace?
+> Yes, sounds good.
 > 
-> --Bean
+>>>> @@ -149,6 +185,60 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+>>>>  #define IO_SPACE_LIMIT              (PCI_IO_SIZE - 1)
+>>>>  #define PCI_IOBASE          ((void __iomem *)PCI_IO_START)
+>>>>  
+>>>> +
+>>>> +/*
+>>>> + * redefine the in(s)b/out(s)b for indirect-IO.
+>>>> + */
+>>>> +#define inb inb
+>>>> +static inline u8 inb(unsigned long addr)
+>>>> +{
+>>>> +#ifdef CONFIG_ARM64_INDIRECT_PIO
+>>>> +    if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
+>>>> +                    addr <= arm64_extio_ops->end)
+>>>> +            return extio_inb(addr);
+>>>> +#endif
+>>>> +    return readb(PCI_IOBASE + addr);
+>>>> +}
+>>>> +
+>>>
+>>> Looks ok, but you only seem to do this for the 8-bit
+>>> accessors, when it should be done for 16-bit and 32-bit
+>>> ones as well for consistency.
+>> Hip06 LPC only support 8-bit I/O operations on the designated port.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> That is an interesting limitation. Maybe still call the extio operations
+> and have them do WARN_ON_ONCE() instead?
+> 
+> If you get a driver that calls inw/outw on the range that is owned
+> by the LPC bus, you otherwise get an unhandled page fault in kernel
+> space, which is not as nice.
+
+As for this issue, I provided a wrong reply in the last email.
+After double-checking with SoC guys, the inw(l)/outw(l) are OK with multiple 8-bit transfers to consecutive
+I/O addresses.
+
+Sorry for the wrong information!
+Will support inw(l)/outw(l) in V4.
+
+Best,
+Zhichang
+
+
+> 
+>>>> diff --git a/drivers/bus/extio.c b/drivers/bus/extio.c
+>>>> new file mode 100644
+>>>> index 0000000..1e7a9c5
+>>>> --- /dev/null
+>>>> +++ b/drivers/bus/extio.c
+>>>> @@ -0,0 +1,66 @@
+>>>
+>>> This is in a globally visible directory
+>>>
+>>>> +
+>>>> +struct extio_ops *arm64_extio_ops;
+>>>
+>>> But the identifier uses an architecture specific prefix. Either
+>>> move the whole file into arch/arm64, or make the naming so that
+>>> it can be used for everything.
+>>
+>> I perfer to move the whole file into arch/arm64, extio.h will be moved to arch/arm64/include/asm;
+> 
+> Ok, that simplifies it a lot, you can just do everything in asm/io.h then.
+> 
+> 	Arnd
+> 
