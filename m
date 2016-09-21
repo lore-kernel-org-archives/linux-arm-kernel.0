@@ -1,59 +1,39 @@
-From: jiangyanpin77@gmail.com (jiangyanpin77)
-Date: Wed, 21 Sep 2016 10:39:21 +0800
-Subject: s3c2416 use two usb host?
-Message-ID: <403DECCF315248C7AF7660C24FFBE43C@jyp>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 21 Sep 2016 11:29:48 +0800
+Subject: [PATCH] clk: mediatek: clk-mt8173: Unmap region obtained by
+ of_iomap
+In-Reply-To: <1474360242-15126-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1474360242-15126-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1474428588.10249.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 2016-09-20 at 14:00 +0530, Arvind Yadav wrote:
+> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> 
+> Free memory mapping, if init is not successful.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-I am working on samsung s3c2416 ARM based Soc on
- linux 3.1.18 kernel. By default, the Soc has one
- USB host and one USB device/host. My USB host is
- working fine. Since I need to use two USB host on my system,
-  I need to enable the USB device/host as a USB host.
- I am using ARM9 based s3c2416 processor. The SoC has one USB host
-controller and one USB host/device controller. What are the
-register settings that should be done to enable both USB
-interfaces as USB host controller. ? There is a register PHYCTRL
-with address 0x4C00_0080. Its bit[0] says something on USB host
-mode and USB device mode. Is it this register which I should
-work on or any more register configurations are required ?
+Reviewed-by: James Liao <jamesjj.liao@mediatek.com>
 
-
-
-
-
- The following are the changes I have made for the same:
-
- Register  Address        value
-  -----------------------------
-  PHYPWR    0x4C00_0084    0x0
-  PWRCFG    0x4C00_0060    (1<<4)
-  URSTCON   0x4C00_0088    (0<<2)|(1<<1)|(1<<0)
-  URSTCON   0x4C00_0088    (0<<2)|(0<<1)|(0<<0)
-  PHYCTRL   0x4C00_0080    (0<<3)|(0<<2)|(1<<1)|(1<<0)
-  UCLKCON   0x4C00_008C    0<<31)|(0<<2)|(1<<1)|(1<<0)
- 
-  Once I try to plug in a  USB mass storage device (whose driver is present in
-  kernel), I get the following error:
- 
-  usb 1-2: new full speed USB device using s3c2410-ohci and address 10
-  usb 1-2: device descriptor read/64, error -62
-  usb 1-2: device descriptor read/64, error -62
-  usb 1-2: new full speed USB device using s3c2410-ohci and address 11
-  usb 1-2: device descriptor read/64, error -62
-  usb 1-2: device descriptor read/64, error -62
-  usb 1-2: new full speed USB device using s3c2410-ohci and address 12
-  usb 1-2: device not accepting address 12, error -62
-  usb 1-2: new full speed USB device using s3c2410-ohci and address 13
-  usb 1-2: device not accepting address 13, error -62
- 
- 
-  Why is it throwing this error ? Is there any driver for USB hub missing in
-  2.6.21 kernel, or do I need to modify more on register settings.
- 
-  Please help.
- 
-  Thank You
-  YanpinJiang
+> ---
+>  drivers/clk/mediatek/clk-mt8173.c |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+> index 10c9860..0ac3aee 100644
+> --- a/drivers/clk/mediatek/clk-mt8173.c
+> +++ b/drivers/clk/mediatek/clk-mt8173.c
+> @@ -1074,8 +1074,10 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
+>  	}
+>  
+>  	mt8173_pll_clk_data = clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
+> -	if (!clk_data)
+> +	if (!clk_data) {
+> +		iounmap(base);
+>  		return;
+> +	}
+>  
+>  	mtk_clk_register_plls(node, plls, ARRAY_SIZE(plls), clk_data);
+>  
