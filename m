@@ -1,126 +1,59 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 22 Sep 2016 00:13:40 +0200
-Subject: [PATCH v2 5/6] misc: sram: add Atmel securam support
-In-Reply-To: <20160921220939.27924-6-alexandre.belloni@free-electrons.com>
-References: <20160921220939.27924-1-alexandre.belloni@free-electrons.com>
- <20160921220939.27924-6-alexandre.belloni@free-electrons.com>
-Message-ID: <20160921221340.yivgcadbnflz4ij7@piout.net>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 21 Sep 2016 15:25:04 -0700
+Subject: [PATCHv2] arm64: Correctly bounds check virt_addr_valid
+Message-ID: <1474496704-30541-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
 
-As a reminder, I think we agreed that this one could go through the at91
-tree because of the dependency on patch 2/6.
+virt_addr_valid is supposed to return true if and only if virt_to_page
+returns a valid page structure. The current macro does math on whatever
+address is given and passes that to pfn_valid to verify. vmalloc and
+module addresses can happen to generate a pfn that 'happens' to be
+valid. Fix this by only performing the pfn_valid check on addresses that
+have the potential to be valid.
 
-I'd like to get your ack though.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+v2: Properly parenthesize macro arguments. Re-factor to common macro.
 
-On 22/09/2016 at 00:09:38 +0200, Alexandre Belloni wrote :
-> The Atmel secure SRAM is connected to a security module and may be erased
-> automatically under certain conditions. For that reason, it is necessary to
-> wait for the security module to flag that SRAM accesses are allowed before
-> accessing it.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> 
->  drivers/misc/sram.c | 42 +++++++++++++++++++++++++++++++++++-------
->  1 file changed, 35 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
-> index f84b53d6ce50..b0d4dd9b0586 100644
-> --- a/drivers/misc/sram.c
-> +++ b/drivers/misc/sram.c
-> @@ -19,12 +19,17 @@
->   */
->  
->  #include <linux/clk.h>
-> +#include <linux/delay.h>
->  #include <linux/genalloc.h>
->  #include <linux/io.h>
->  #include <linux/list_sort.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
-> +#include <linux/regmap.h>
->  #include <linux/slab.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <soc/at91/atmel-secumod.h>
->  
->  #define SRAM_GRANULARITY	32
->  
-> @@ -334,12 +339,35 @@ static int sram_reserve_regions(struct sram_dev *sram, struct resource *res)
->  	return ret;
->  }
->  
-> +static int atmel_securam_wait(void)
-> +{
-> +	struct regmap *regmap;
-> +	u32 val;
-> +
-> +	regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-secumod");
-> +	if (IS_ERR(regmap))
-> +		return -ENODEV;
-> +
-> +	return regmap_read_poll_timeout(regmap, AT91_SECUMOD_RAMRDY, val,
-> +					val & AT91_SECUMOD_RAMRDY_READY,
-> +					10000, 500000);
-> +}
-> +
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id sram_dt_ids[] = {
-> +	{ .compatible = "mmio-sram" },
-> +	{ .compatible = "atmel,sama5d2-securam", .data = atmel_securam_wait },
-> +	{}
-> +};
-> +#endif
-> +
->  static int sram_probe(struct platform_device *pdev)
->  {
->  	struct sram_dev *sram;
->  	struct resource *res;
->  	size_t size;
->  	int ret;
-> +	int (*init_func)(void);
->  
->  	sram = devm_kzalloc(&pdev->dev, sizeof(*sram), GFP_KERNEL);
->  	if (!sram)
-> @@ -384,6 +412,13 @@ static int sram_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, sram);
->  
-> +	init_func = of_device_get_match_data(&pdev->dev);
-> +	if (init_func) {
-> +		ret = init_func();
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	dev_dbg(sram->dev, "SRAM pool: %zu KiB @ 0x%p\n",
->  		gen_pool_size(sram->pool) / 1024, sram->virt_base);
->  
-> @@ -405,13 +440,6 @@ static int sram_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_OF
-> -static const struct of_device_id sram_dt_ids[] = {
-> -	{ .compatible = "mmio-sram" },
-> -	{}
-> -};
-> -#endif
-> -
->  static struct platform_driver sram_driver = {
->  	.driver = {
->  		.name = "sram",
-> -- 
-> 2.9.3
-> 
+Also in case it wasn't clear, there's no need to try and squeeze this
+into 4.8. Hardened usercopy should have all the checks, this is just for
+full correctness.
+---
+ arch/arm64/include/asm/memory.h | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 31b7322..ba62df8 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -214,7 +214,7 @@ static inline void *phys_to_virt(phys_addr_t x)
+ 
+ #ifndef CONFIG_SPARSEMEM_VMEMMAP
+ #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+-#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
++#define _virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+ #else
+ #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
+ #define __page_to_voff(kaddr)	(((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+@@ -222,11 +222,15 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
+ #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
+ 
+-#define virt_addr_valid(kaddr)	pfn_valid((((u64)(kaddr) & ~PAGE_OFFSET) \
++#define _virt_addr_valid(kaddr)	pfn_valid((((u64)(kaddr) & ~PAGE_OFFSET) \
+ 					   + PHYS_OFFSET) >> PAGE_SHIFT)
+ #endif
+ #endif
+ 
++#define _virt_addr_is_linear(kaddr)	(((u64)(kaddr)) >= PAGE_OFFSET)
++#define virt_addr_valid(kaddr)		(_virt_addr_is_linear(kaddr) && \
++					 _virt_addr_valid(kaddr))
++
+ #include <asm-generic/memory_model.h>
+ 
+ #endif
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.7.4
