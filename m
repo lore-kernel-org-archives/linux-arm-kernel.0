@@ -1,45 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Sep 2016 21:29:22 +0200
-Subject: [PATCH V3 3/4] ARM64 LPC: support serial based on low-pin-count
-In-Reply-To: <815bebc1-96c9-2131-930d-bccdd4bf1c55@gmail.com>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <5525856.MfDSSsiP5d@wuerfel> <815bebc1-96c9-2131-930d-bccdd4bf1c55@gmail.com>
-Message-ID: <4518414.hTLWuvFlBl@wuerfel>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 21 Sep 2016 14:34:22 -0500
+Subject: [PATCH v2 2/2] cpufreq: ti: Add cpufreq driver to determine
+ available OPPs at runtime
+In-Reply-To: <20160908033909.GR27345@vireshk-i7>
+References: <20160901025328.376-1-d-gerlach@ti.com>
+ <20160901025328.376-3-d-gerlach@ti.com> <20160907052053.GO27345@vireshk-i7>
+ <57D02C85.7020300@ti.com> <20160908033909.GR27345@vireshk-i7>
+Message-ID: <57E2E0BE.3070206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 21, 2016 6:12:28 PM CEST zhichang wrote:
-> On 2016?09?15? 05:33, Arnd Bergmann wrote:
-> > On Wednesday, September 14, 2016 11:04:33 PM CEST zhichang.yuan wrote:
-> >> The 8250_hisi_lpc.c support both ACPI and dts similar to 8250_dw :
-> >>
-> >> +static struct platform_driver hs_lpc8250_driver = {
-> >> +       .driver = {
-> >> +               .name           = "hisi-lpc-uart",
-> >> +               .of_match_table = hs8250_of_match,
-> >> +               .acpi_match_table = ACPI_PTR(hs8250_acpi_match),
-> >>
-> >> So, I am a little confused why we need to support dts in 8250_of.c and support ACPI in another
-> >> driver file.
-> >>
-> > 
-> > After looking again, I'm pretty sure that drivers/tty/serial/8250/8250_pnp.c
-> > will handle the ACPI case without modifications, you just need to adapt
-> > the 8250_of driver to handle IORESOURCE_IO ports. This will be required
-> > anyway with the next version once the LPC bridge is on the PCI bus.
-> > 
-> 
-> Yes. You are right.
-> 
-> When the indirectIO patch is accepted, no much changes needed in these two file to support LPC UART.
-> 
-> BTW, what is your target to change these two files to support LPC uart?
-> Do you think we don't need to add many new c files??
+Viresh,
+On 09/07/2016 10:39 PM, Viresh Kumar wrote:
+> On 07-09-16, 10:04, Dave Gerlach wrote:
+>>>> +static const struct of_device_id ti_cpufreq_of_match[] = {
+>>>> +	{ .compatible = "operating-points-v2-ti-am3352-cpu",
+>>>> +	  .data = &am3x_soc_data, },
+>>>> +	{ .compatible = "operating-points-v2-ti-am4372-cpu",
+>>>> +	  .data = &am4x_soc_data, },
+>>>> +	{ .compatible = "operating-points-v2-ti-dra7-cpu",
+>>>> +	  .data = &dra7_soc_data },
+>>>
+>>> You should be using your SoC compatible strings here. OPP compatible
+>>> property isn't supposed to be (mis)used for this purpose.
+>>>
+>>
+>> Referring to my comments in patch 1, what if we end up changing the bindings
+>> based on DT maintainer comments? We will have these compatible strings, and
+>> at that point is it acceptable to match against them? Or is it still better
+>> to match to SoC compatibles? I think it makes sense to just probe against
+>> these.
+>
+> But even then I think these are not correct. You should have added a
+> single compatible string: operating-points-v2-ti-cpu.
+>
+> As the properties will stay the same across machines. And then you
+> need to use SoC strings here.
+>
 
-I think by modifying 8250_of.c, you should be able to make any UART on
-some LPC bus work, regardless of what controller is used.
+Are you opposed to moving _of_get_opp_desc_node from 
+drivers/base/power/opp/opp.h to include/linux/pm_opp.h and renaming it 
+appropriately?
 
-The ACPI version (8250_pnp.c) shouldn't need any changes at all if I
-read that correctly.
+If I move the ti properties out of the cpu node, as discussed in patch 1 
+of this series, and into the operating-points-v2 table, I need a way to 
+get the operating-points-v2 device node and I think it makes sense to 
+reuse this as it is what the opp framework uses internally to parse the 
+phandle to the opp table.
 
-	Arnd
+Regards,
+Dave
