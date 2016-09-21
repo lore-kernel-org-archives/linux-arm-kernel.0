@@ -1,74 +1,85 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Wed, 21 Sep 2016 11:31:22 +0200
-Subject: [PATCH 1/4] ARM: tegra: nyan: Use proper IRQ type definitions
-In-Reply-To: <eb7540c0-4abd-86c0-7777-78fe1f12bc59@nvidia.com>
+Date: Wed, 21 Sep 2016 11:31:47 +0200
+Subject: [PATCH 3/4] ARM: tegra: nyan-big: Include compatible revisions
+ for proper detection
+In-Reply-To: <5461eb20-9372-7fa1-0e48-3d0143393b8c@nvidia.com>
 References: <20160828173246.32621-1-contact@paulk.fr>
- <ef69b6d2-ce6b-ff76-5c04-ab2176eb6ecc@nvidia.com>
- <1474395289.1215.20.camel@paulk.fr>
- <0ca614bf-4d27-9948-03e3-472d059f2153@nvidia.com>
- <1474446366.1239.17.camel@paulk.fr>
- <eb7540c0-4abd-86c0-7777-78fe1f12bc59@nvidia.com>
-Message-ID: <1474450282.1239.21.camel@paulk.fr>
+ <20160828173246.32621-3-contact@paulk.fr>
+ <a9485a88-55a5-9dd1-1a1b-a6c0a78ff476@nvidia.com>
+ <1474394004.1215.2.camel@paulk.fr>
+ <d05b8e5a-adf7-9057-b42a-0da1fde84953@nvidia.com>
+ <1474394544.1215.13.camel@paulk.fr>
+ <6501341f-e14c-4876-dcb7-60a33b7621c4@nvidia.com>
+ <1474443809.1239.4.camel@paulk.fr>
+ <5461eb20-9372-7fa1-0e48-3d0143393b8c@nvidia.com>
+Message-ID: <1474450307.1239.23.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Resending with the right CC chain.
 
-Le mercredi 21 septembre 2016 ? 10:06 +0100, Jon Hunter a ?crit?:
-> On 21/09/16 09:26, Paul Kocialkowski wrote:
-> > 
-> > 
-> > * PGP Signed by an unknown key
-> > 
-> > Le mercredi 21 septembre 2016 ? 08:52 +0100, Jon Hunter a ?crit :
-> > > 
-> > > 
-> > > On 20/09/16 19:14, Paul Kocialkowski wrote:
-> > > > 
-> > > > 
-> > > > 
-> > > > > 
-> > > > > 
-> > > > > Old Signed by an unknown key
-> > > > 
-> > > > Le mardi 20 septembre 2016 ? 18:15 +0100, Jon Hunter a ?crit :
-> > > > > 
-> > > > > 
-> > > > > 
-> > > > > On 28/08/16 18:32, Paul Kocialkowski wrote:
-> > > > > > 
-> > > > > > 
-> > > > > > 
-> > > > > > 
-> > > > > > This switches a few interrupt definitions that were using
-> > > > > > GPIO_ACTIVE_HIGH as IRQ type, which is invalid.
-> > > > > 
-> > > > > May be you are right, but this does not describe why this is invalid.
-> > > > > Can you elaborate?
-> > > > 
-> > > > GPIO_ACTIVE_HIGH is simply not the right kind of define to use in the
-> > > > "interrupts" devicetree property. Values provided there are understood
-> > > > as
-> > > > IRQ_TYPE_ defines.
-> > > 
-> > > Right, but you are changing the type as GPIO_ACTIVE_HIGH = 0 and
-> > > IRQ_TYPE_EDGE_FALLING = 2 and there is no comment about why this has
-> > > been changed. It might be correct, but you need to explain it.
-> > 
-> > This actually makes the IRQ trigger values consistent with the drivers, that
-> > define them regardless of devicetree anyway. The max98090 driver
-> > has IRQF_TRIGGER_FALLING and bq24735 has IRQF_TRIGGER_RISING |
-> > IRQF_TRIGGER_FALLING.
-> > 
-> > This is really more of a cosmetic change, it doesn't impact actual use.
+Le mercredi 21 septembre 2016 ? 10:15 +0100, Jon Hunter a ?crit?:
 > 
-> So you are saying that the drivers don't actually use the DT types?
+> On 21/09/16 08:43, Paul Kocialkowski wrote:
+> 
+> ...
+> 
+> > > > > > > > Depthcharge (the payload used with cros devices) will attempt to
+> > > > > > > > detect
+> > > > > > > > boards using their revision. This includes all the known
+> > > > > > > > revisions
+> > > > > > > > for
+> > > > > > > > the nyan-big board so that the dtb can be selected preferably.
+> > > > > > > 
+> > > > > > > May be I am missing something here, but for the mainline there is
+> > > > > > > only
+> > > > > > > one dtb available and so why is this needed for the mainline?
+> > > > > > 
+> > > > > > There is indeed a single dts in mainline, but depthcharge will use
+> > > > > > the
+> > > > > > revision
+> > > > > > to match the compatible string (e.g. it will look for google,nyan-
+> > > > > > big-
+> > > > > > rev5,
+> > > > > > not
+> > > > > > google,nyan-big), so we need to list them all in that single dts.
+> > > > > > Otherwise,
+> > > > > > depthcharge will fall back to the default config, which may or may
+> > > > > > not
+> > > > > > be
+> > > > > > suitable for nyan.
+> > > > > 
+> > > > > Is tegra124-nyan-big.dtb not the default?
+> > > > 
+> > > > You can't expect that to always be the case. The image format allows
+> > > > many
+> > > > different dts to be provided, so I could easily build with
+> > > > multi_v7_defconfig
+> > > > and have various dts for various devices in the same image, and just
+> > > > select
+> > > > a
+> > > > random one as default.
+> > > 
+> > > Really? Sounds odd. I was hoping that tegra124-nyan-big.dtb would be a
+> > > catch all.
+> 
+> I meant I was hoping that compatible = "google,nyan-big" would be the
+> catchall not the dtb file name ;-)
 
-It appears so. At least they are hardcoded in the kernel driver.
+Yeah, I figured :)
 
 > 
-> ?May be that is ok, and yes this is cosmetic, but this should be stated in
-> the changelog as it is not clear what is going on here.
+> > 
+> > Yes, the image format (FIT) allows specifying multiple dtb and zImage
+> > combinations in the same image[0].
+> 
+> Yes I am aware of that. Typically, I have been testing using a FIT image
+> with single zImage and dtb. Hence no problems.
+> 
+> So are you wanting to create a FIT image to support multiple boards and
+> use the single FIT image for all? If so then I can see why you want
+> this. Again please describe the motivation for the changes in the
+> changelog so it is clear why we are adding this.
 
 Fair enough, will do in v2.
 
@@ -84,4 +95,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160921/c34cbaae/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160921/3e5c3e2d/attachment.sig>
