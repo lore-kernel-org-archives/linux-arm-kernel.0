@@ -1,51 +1,48 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Wed, 21 Sep 2016 09:54:52 +0200
-Subject: [PATCH v6 2/4] drivers: irqchip: Add STM32 external interrupts
- support
-In-Reply-To: <alpine.DEB.2.20.1609210949150.5573@nanos>
-References: <1474387259-18926-1-git-send-email-alexandre.torgue@st.com>
- <1474387259-18926-3-git-send-email-alexandre.torgue@st.com>
- <alpine.DEB.2.20.1609202214460.5476@nanos>
- <f7875786-9b5e-075a-59c8-cd32fb1c4583@st.com>
- <alpine.DEB.2.20.1609210949150.5573@nanos>
-Message-ID: <CALszF6Bp2p=fJ+qQE5q_MJC3R5td_YQzrUFH+wgsNjZMuxdrpw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Sep 2016 09:55:28 +0200
+Subject: [PATCH] spi: atmel: use managed resource for gpio chip select
+Message-ID: <20160921075528.14452-1-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-09-21 9:50 GMT+02:00 Thomas Gleixner <tglx@linutronix.de>:
-> On Wed, 21 Sep 2016, Alexandre Torgue wrote:
->
->> Hi Thomas,
->>
->> On 09/20/2016 10:16 PM, Thomas Gleixner wrote:
->> > Alexandre,
->> >
->> > On Tue, 20 Sep 2016, Alexandre TORGUE wrote:
->> >
->> > > The STM32 external interrupt controller consists of edge detectors that
->> > > generate interrupts requests or wake-up events.
->> > >
->> > > Each line can be independently configured as interrupt or wake-up source,
->> > > and triggers either on rising, falling or both edges. Each line can also
->> > > be masked independently.
->> > >
->> > > Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> > > Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->> >
->> > That all looks very reasonable now. The only remaining question is your SOB
->> > chain. Who is the author of these patches? You or Maxime? If it's Maxime,
->> > then the changelog misses a From: tag. If it's you then Maximes SOB is
->> > bogus.
->>
->> Actually Maxime wrote the main part of this driver and sent version 1 and 2 of
->> the series. After Linus W. reviews, rework was required to use hierarchical
->> domain. According to Maxime, I coded the rework (adaptation to hierarchical
->> domain) and sent other version of the series.
->
-> So I replace Maximes SOB with Originally-by: Does that apply to all four
-> patches?
-Yes, that's fine.
-Alex did a lot of rework on this series, he deserves the SoB.
+Use the managed gpio CS pin request so that we avoid having trouble
+in the cleanup code.
+In fact, if module was configured with DT, cleanup code released
+invalid pin.  Since resource wasn't freed, module cannot be reinserted.
 
-Thanks,
-Maxime
+Reported-by: Alexander Morozov <linux@meltdown.ru>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/spi/spi-atmel.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 8feac599e9ab..4e3f2345844a 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -1248,7 +1248,8 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 			return -ENOMEM;
+ 
+ 		if (as->use_cs_gpios) {
+-			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
++			ret = devm_gpio_request(&spi->dev,
++						npcs_pin, dev_name(&spi->dev));
+ 			if (ret) {
+ 				kfree(asd);
+ 				return ret;
+@@ -1471,13 +1472,11 @@ static int atmel_spi_transfer_one_message(struct spi_master *master,
+ static void atmel_spi_cleanup(struct spi_device *spi)
+ {
+ 	struct atmel_spi_device	*asd = spi->controller_state;
+-	unsigned		gpio = (unsigned long) spi->controller_data;
+ 
+ 	if (!asd)
+ 		return;
+ 
+ 	spi->controller_state = NULL;
+-	gpio_free(gpio);
+ 	kfree(asd);
+ }
+ 
+-- 
+2.9.0
