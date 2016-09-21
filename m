@@ -1,81 +1,38 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Wed, 21 Sep 2016 13:09:33 +0100
-Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
- issue.
-In-Reply-To: <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
- <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
- <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <CACvgo53fuoPVjBAkZbWFPVxosObjvxoDgFdR_BkSTgevqyGg9g@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 21 Sep 2016 15:41:27 +0300
+Subject: [PATCH v3 1/9] dmaengine: edma: Add missing MODULE_DEVICE_TABLE() for
+ of_device_id structs
+In-Reply-To: <20160921124135.11849-1-peter.ujfalusi@ti.com>
+References: <20160921124135.11849-1-peter.ujfalusi@ti.com>
+Message-ID: <20160921124135.11849-2-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 September 2016 at 09:32, Peter Griffin <peter.griffin@linaro.org> wrote:
-> Hi Emil,
->
-> On Tue, 20 Sep 2016, Emil Velikov wrote:
->
->> On 5 September 2016 at 14:16, Peter Griffin <peter.griffin@linaro.org> wrote:
->> > ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
->> > recursive dependency.
->
->
->> >
->> From a humble skim through remoteproc, drm and a few other subsystems
->> I think the above is wrong. All the drivers (outside of remoteproc),
->> that I've seen, depend on the core component, they don't select it.
->
-> I will let Bjorn comment on the remoteproc subsystem Kconfig design, and
-> why it is like it is.
->
-> For this particular SLIM_RPROC I have added it to Kconfig in keeping with all
-> the other drivers in the remoteproc subsystem which has exposed this recursive
-> dependency issue.
->
-> For this particular kconfig symbol a quick grep reveals more drivers in
-> the kernel using 'select', than 'depend on'
->
-> git grep "select VIRTIO" | wc -l
-> 14
->
-> git grep "depends on VIRTIO" | wc -l
-> 10
->
-Might be worth taking a closer look into these at some point.
+The MODULE_DEVICE_TABLE() were missing from the driver for the of_device_id
+structures.
 
->
->> Furthermore most places explicitly hide the drivers from the menu if
->> the core component isn't enabled.
->
-> Remoteproc subsystem takes a different approach, the core code is only enabled
-> if a driver which relies on it is enabled. This IMHO makes sense, as
-> remoteproc is not widely used (only a few particular ARM SoC's).
->
-> It is true that for subsystems which rely on the core component being
-> explicitly enabled, they often tend to hide drivers which depend on it
-> from the menu unless it is. This also makes sense.
->
->>
->> Is there something that requires such a different/unusual behaviour in
->> remoteproc ?
->>
->
-> I'm not sure it is that unusual...looking at config USB, it selects USB_COMMON in
-> mfd subsystem, client drivers select MFD_CORE.
->
-On the USB case I'm not sure what the reasoning behind the USB vs
-USB_COMMON split. In seems that one could just fold them, but that's
-another topic. On the MFD side... it follows the select {,mis,ab}use.
-With one (the only one?) MFD driver not using/selecting MFD_CORE doing
-it's own version of mfd_add_devices... which could be reworked,
-possibly.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ drivers/dma/edma.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> I've added Arnd to this thread, as I've seen lots of Kconfig patches from him
-> recently, maybe he has some thoughts on whether this is the correct fix or not?
->
-Ack. Fwiw, I believe that the reasoning put by Jani is perfeclty
-reasonable, but it'll be great to hear others as well.
-
-Thanks
-Emil
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 3d277fa76c1a..c2098a4b4dcf 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -274,11 +274,13 @@ static const struct of_device_id edma_of_ids[] = {
+ 	},
+ 	{}
+ };
++MODULE_DEVICE_TABLE(of, edma_of_ids);
+ 
+ static const struct of_device_id edma_tptc_of_ids[] = {
+ 	{ .compatible = "ti,edma3-tptc", },
+ 	{}
+ };
++MODULE_DEVICE_TABLE(of, edma_tptc_of_ids);
+ 
+ static inline unsigned int edma_read(struct edma_cc *ecc, int offset)
+ {
+-- 
+2.10.0
