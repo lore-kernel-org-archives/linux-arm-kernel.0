@@ -1,137 +1,118 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 22 Sep 2016 04:17:01 +0800
-Subject: [PATCH v5] soc: qcom: add l2 cache perf events driver
-In-Reply-To: <1474470350-25818-1-git-send-email-nleeder@codeaurora.org>
-Message-ID: <201609220417.E9RcTnj9%fengguang.wu@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Sep 2016 22:18:16 +0200
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F87D223@lhreml507-mbx>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <e246c886-e0eb-b635-01ae-f00bbfcfb56b@gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F87D223@lhreml507-mbx>
+Message-ID: <3538381.vOsx75UXVU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+On Wednesday, September 21, 2016 4:20:55 PM CEST Gabriele Paoloni wrote:
+> > -----Original Message-----
+> > From: zhichang [mailto:zhichang.yuan02 at gmail.com]
+> > On 2016?09?15? 20:24, Arnd Bergmann wrote:
+> > > On Thursday, September 15, 2016 12:05:51 PM CEST Gabriele Paoloni
+> > wrote:
+> > >>> -----Original Message-----
+> > >>> On Thursday, September 15, 2016 8:02:27 AM CEST Gabriele Paoloni
+> > wrote:
+> > >> I think that maybe having the 1:1 range mapping doesn't
+> > >> reflect well the reality but it is the less painful
+> > >> solution...
+> > >>
+> > >> What's your view?
+> > >
+> > > We can check the 'i' bit for I/O space in of_bus_isa_get_flags,
+> > > and that should be enough to translate the I/O port number.
+> > >
+> > > The only part we need to change here is to not go through
+> > > the crazy conversion all the way from PCI I/O space to a
+> > > physical address and back to a (logical) port number
+> > > that we do today with of_translate_address/pci_address_to_pio.
+> > >
+> > Sorry for the late response! Several days' leave....
+> > Do you want to bypass of_translate_address and pci_address_to_pio for
+> > the registered specific PIO?
+> > I think the bypass for of_translate_address is ok, but worry some new
+> > issues will emerge without the
+> > conversion between physical address and logical/linux port number.
 
-[auto build test ERROR on next-20160921]
-[cannot apply to linus/master linux/master v4.8-rc7 v4.8-rc6 v4.8-rc5 v4.8-rc7]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+The same function that handles the non-translated region would
+do that conversion.
 
-url:    https://github.com/0day-ci/linux/commits/Neil-Leeder/soc-qcom-add-l2-cache-perf-events-driver/20160922-000500
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+> > When PCI host bridge which support IO operations is configured and
+> > enabled, the pci_address_to_pio will
+> > populate the logical IO range from ZERO for the first host bridge. Our
+> > LPC will also use part of the IO range
+> > started from ZERO. It will make in/out enter the wrong branch possibly.
+> > 
+> > In V2, the 0 - 0x1000 logical IO range is reserved for LPC use only.
+> > But it seems not so good. In this way,
+> > PCI has no chance to use low 4K IO range(logical).
+> > 
+> > So, in V3, applying the conversion from physical/cpu address to
+> > logical/linux IO port for any IO ranges,
+> > including the LPC, but recorded the logical IO range for LPC. When
+> > calling in/out with a logical port address,
+> > we can check this port fall into LPC logical IO range and get back the
+> > real IO.
 
-All error/warnings (new ones prefixed by >>):
+Right, and the same translation can be used in __of_address_to_resource()
+going the opposite way.
 
-   drivers/soc/qcom/perf_event_l2.c: In function 'set_l2_indirect_reg':
->> drivers/soc/qcom/perf_event_l2.c:92:2: error: implicit declaration of function 'write_sysreg' [-Werror=implicit-function-declaration]
-     write_sysreg(reg, L2CPUSRSELR_EL1);
-     ^~~~~~~~~~~~
->> drivers/soc/qcom/perf_event_l2.c:74:33: error: 'S3_3_c15_c0_6' undeclared (first use in this function)
-    #define L2CPUSRSELR_EL1         S3_3_c15_c0_6
-                                    ^
->> drivers/soc/qcom/perf_event_l2.c:92:20: note: in expansion of macro 'L2CPUSRSELR_EL1'
-     write_sysreg(reg, L2CPUSRSELR_EL1);
-                       ^~~~~~~~~~~~~~~
-   drivers/soc/qcom/perf_event_l2.c:74:33: note: each undeclared identifier is reported only once for each function it appears in
-    #define L2CPUSRSELR_EL1         S3_3_c15_c0_6
-                                    ^
->> drivers/soc/qcom/perf_event_l2.c:92:20: note: in expansion of macro 'L2CPUSRSELR_EL1'
-     write_sysreg(reg, L2CPUSRSELR_EL1);
-                       ^~~~~~~~~~~~~~~
->> drivers/soc/qcom/perf_event_l2.c:75:33: error: 'S3_3_c15_c0_7' undeclared (first use in this function)
-    #define L2CPUSRDR_EL1           S3_3_c15_c0_7
-                                    ^
->> drivers/soc/qcom/perf_event_l2.c:94:20: note: in expansion of macro 'L2CPUSRDR_EL1'
-     write_sysreg(val, L2CPUSRDR_EL1);
-                       ^~~~~~~~~~~~~
-   drivers/soc/qcom/perf_event_l2.c: In function 'get_l2_indirect_reg':
->> drivers/soc/qcom/perf_event_l2.c:74:33: error: 'S3_3_c15_c0_6' undeclared (first use in this function)
-    #define L2CPUSRSELR_EL1         S3_3_c15_c0_6
-                                    ^
-   drivers/soc/qcom/perf_event_l2.c:112:20: note: in expansion of macro 'L2CPUSRSELR_EL1'
-     write_sysreg(reg, L2CPUSRSELR_EL1);
-                       ^~~~~~~~~~~~~~~
->> drivers/soc/qcom/perf_event_l2.c:114:8: error: implicit declaration of function 'read_sysreg' [-Werror=implicit-function-declaration]
-     val = read_sysreg(L2CPUSRDR_EL1);
-           ^~~~~~~~~~~
->> drivers/soc/qcom/perf_event_l2.c:75:33: error: 'S3_3_c15_c0_7' undeclared (first use in this function)
-    #define L2CPUSRDR_EL1           S3_3_c15_c0_7
-                                    ^
-   drivers/soc/qcom/perf_event_l2.c:114:20: note: in expansion of macro 'L2CPUSRDR_EL1'
-     val = read_sysreg(L2CPUSRDR_EL1);
-                       ^~~~~~~~~~~~~
-   drivers/soc/qcom/perf_event_l2.c: In function 'l2_cache_pmu_probe_cluster':
->> drivers/soc/qcom/perf_event_l2.c:787:6: error: implicit declaration of function 'acpi_bus_get_device' [-Werror=implicit-function-declaration]
-     if (acpi_bus_get_device(ACPI_HANDLE(dev), &device))
-         ^~~~~~~~~~~~~~~~~~~
->> drivers/soc/qcom/perf_event_l2.c:790:20: error: dereferencing pointer to incomplete type 'struct acpi_device'
-     if (kstrtol(device->pnp.unique_id, 10, &fw_cluster_id) < 0) {
-                       ^~
-   cc1: some warnings being treated as errors
+> > Do you have further comments about this??
+> 
+> I think there are two separate issues to be discussed:
+> 
+> The first issue is about having of_translate_address failing due to
+> "range" missing. About this Arnd suggested that it is not appropriate
+> to have a range describing a bridge 1:1 mapping and this was discussed
+> before in this thread. Arnd had a suggestion about this (see below) 
+> however (looking twice at the code) it seems to me that such solution 
+> would lead to quite some duplication from __of_translate_address()
+> in order to retrieve the actual addr from dt...
 
-vim +/write_sysreg +92 drivers/soc/qcom/perf_event_l2.c
+I don't think we need to duplicate much, we can probably safely
+assume that there are no nontrivial ranges in devices below the LPC
+node, so we just walk up the bus to see if the node is a child
+(or possibly grandchild etc) of the LPC bus, and treat any IO port
+number under there as a physical port number, which has a known
+offset from the Linux I/O port number.
 
-    68	
-    69	#define L2_EVT_GROUP_MAX        7
-    70	
-    71	#define L2_MAX_PERIOD           U32_MAX
-    72	#define L2_CNT_PERIOD           (U32_MAX - GENMASK(26, 0))
-    73	
-  > 74	#define L2CPUSRSELR_EL1         S3_3_c15_c0_6
-  > 75	#define L2CPUSRDR_EL1           S3_3_c15_c0_7
-    76	
-    77	static DEFINE_RAW_SPINLOCK(l2_access_lock);
-    78	
-    79	/**
-    80	 * set_l2_indirect_reg: write value to an L2 register
-    81	 * @reg: Address of L2 register.
-    82	 * @value: Value to be written to register.
-    83	 *
-    84	 * Use architecturally required barriers for ordering between system register
-    85	 * accesses
-    86	 */
-    87	static void set_l2_indirect_reg(u64 reg, u64 val)
-    88	{
-    89		unsigned long flags;
-    90	
-    91		raw_spin_lock_irqsave(&l2_access_lock, flags);
-  > 92		write_sysreg(reg, L2CPUSRSELR_EL1);
-    93		isb();
-  > 94		write_sysreg(val, L2CPUSRDR_EL1);
-    95		isb();
-    96		raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-    97	}
-    98	
-    99	/**
-   100	 * get_l2_indirect_reg: read an L2 register value
-   101	 * @reg: Address of L2 register.
-   102	 *
-   103	 * Use architecturally required barriers for ordering between system register
-   104	 * accesses
-   105	 */
-   106	static u64 get_l2_indirect_reg(u64 reg)
-   107	{
-   108		u64 val;
-   109		unsigned long flags;
-   110	
-   111		raw_spin_lock_irqsave(&l2_access_lock, flags);
-   112		write_sysreg(reg, L2CPUSRSELR_EL1);
-   113		isb();
- > 114		val = read_sysreg(L2CPUSRDR_EL1);
-   115		raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-   116	
-   117		return val;
+> I think extending of_empty_ranges_quirk() may be a reasonable solution.
+> What do you think Arnd?
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 59315 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160922/bf497f00/attachment-0001.gz>
+I don't really like that idea, that quirk is meant to work around
+broken DTs, but we can just make the DT valid and implement the
+code properly.
+
+> The second issue is a conflict between cpu addresses used by the LPC
+> controller and i/o tokens from pci endpoints.
+> 
+> About this what if we modify armn64_extio_ops to have a list of ranges
+> rather than only one range (now we have just start/end); then in the
+> LPC driver we can scan the LPC child devices and 
+> 1) populate such list of ranges
+> 2) call pci_register_io_range for such ranges
+
+Scanning the child devices sounds really wrong, please register just
+one range that covers the bus to keep the workaround as simple
+as possible.
+
+> Then when calling __of_address_to_resource we retrieve I/O tokens 
+> for the devices on top of the LPC driver and in the I/O accessors
+> we call pci_pio_to_address to figure out the cpu address and compare
+> it to the list of ranges in armn64_extio_ops.
+>   
+> What about this?
+
+That seems really complex for something that can be quite simple.
+The only thing we need to worry about is that the io_range_list
+contains an entry for the LPC bus so we don't conflict with the
+PCI buses.
+
+	Arnd
+
+	Arnd
