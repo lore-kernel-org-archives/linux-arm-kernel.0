@@ -1,170 +1,120 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Wed, 21 Sep 2016 15:45:32 +0200
-Subject: [PATCH 2/3] i2c: bcm2835: Add support for combined write-read
- transfer
-In-Reply-To: <DF457EB8-D1B8-4BA4-B79C-AF01AF7CAA3B@martin.sperl.org>
-References: <1474298777-5858-1-git-send-email-noralf@tronnes.org>
- <1474298777-5858-2-git-send-email-noralf@tronnes.org>
- <c47a0a10-4e0b-9025-8d38-af299d5f55da@martin.sperl.org>
- <fb5e8e93-c6af-0050-1e7d-a69b722feadb@tronnes.org>
- <4990930f-6d69-89c6-4b23-deae3d6713ed@martin.sperl.org>
- <8053bf5c-7ddc-b4f7-1961-93f161731b16@tronnes.org>
- <DF457EB8-D1B8-4BA4-B79C-AF01AF7CAA3B@martin.sperl.org>
-Message-ID: <e141d8bb-e313-a8a5-1d3e-e2b46bd797c9@tronnes.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 21 Sep 2016 15:05:49 +0100
+Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
+ register range for ACPI case
+In-Reply-To: <20160920191744.GA4941@localhost>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <1473449047-10499-4-git-send-email-tn@semihalf.com>
+ <20160919180900.GB13775@localhost>
+ <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
+ <20160920133327.GB13855@localhost>
+ <CAKv+Gu-AE7fft_j2cqBCN=xrsf5Yh=mePf5x3dZJuKAmdxF-Gg@mail.gmail.com>
+ <20160920140518.GD13855@localhost>
+ <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
+ <20160920191744.GA4941@localhost>
+Message-ID: <20160921140549.GA11968@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 20, 2016 at 02:17:44PM -0500, Bjorn Helgaas wrote:
+> On Tue, Sep 20, 2016 at 04:09:25PM +0100, Ard Biesheuvel wrote:
 
-Den 20.09.2016 13:29, skrev kernel at martin.sperl.org:
->> On 20.09.2016, at 12:56, Noralf Tr?nnes <noralf@tronnes.org> wrote:
->>
->>
->> Den 20.09.2016 12:15, skrev Martin Sperl:
->>>
->>> On 20.09.2016 10:41, Noralf Tr?nnes wrote:
->>>> Den 20.09.2016 09:19, skrev Martin Sperl:
->>>>> Hi Noralf!
->>>>>
->>>>> On 19.09.2016 17:26, Noralf Tr?nnes wrote:
->>>>>> Some SMBus protocols use Repeated Start Condition to switch from write
->>>>>> mode to read mode. Devices like MMA8451 won't work without it.
->>>>>>
->>>>>> When downstream implemented support for this in i2c-bcm2708, it broke
->>>>>> support for some devices, so a module parameter was added and combined
->>>>>> transfer was disabled by default.
->>>>>> See https://github.com/raspberrypi/linux/issues/599
->>>>>> It doesn't seem to have been any investigation into what the problem
->>>>>> really was. Later there was added a timeout on the polling loop.
->>>>>>
->>>>>> One of the devices mentioned to partially stop working was DS1307.
->>>>>>
->>>>>> I have run thousands of transfers to a DS1307 (rtc), MMA8451 (accel)
->>>>>> and AT24C32 (eeprom) in parallel without problems.
->>>>>>
->>>>>> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
->>>>>> ---
->>>>>>   drivers/i2c/busses/i2c-bcm2835.c | 107
->>>>>> +++++++++++++++++++++++++++++++++++----
->>>>>>   1 file changed, 98 insertions(+), 9 deletions(-)
->>>>> ...
->>>>>> @@ -209,8 +289,17 @@ static int bcm2835_i2c_xfer(struct i2c_adapter
->>>>>> *adap, struct i2c_msg msgs[],
->>>>>>       int i;
->>>>>>       int ret = 0;
->>>>>>   +    /* Combined write-read to the same address (smbus) */
->>>>>> +    if (num == 2 && (msgs[0].addr == msgs[1].addr) &&
->>>>>> +        !(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
->>>>>> +        (msgs[0].len <= 16)) {
->>>>>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[0], &msgs[1]);
->>>>>> +
->>>>>> +    return ret ? ret : 2;
->>>>>> +    }
->>>>>> +
->>>>>>       for (i = 0; i < num; i++) {
->>>>>> -        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i]);
->>>>>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i], NULL);
->>>>>>           if (ret)
->>>>>>               break;
->>>>>>       }
->>>>> This does not seem to implement the i2c_msg api correctly.
->>>>>
->>>>> As per comments in include/uapi/linux/i2c.h on line 58 only the last
->>>>> message
->>>>> in a group should - by default - send a STOP.
->>>>>
->>>> Apparently it's a known problem that the i2c controller doesn't support
->>>> Repeated Start. It will always issue a Stop when it has transferred DLEN
->>>> bytes.
->>>> Refs:
->>>> http://www.circuitwizard.de/raspi-i2c-fix/raspi-i2c-fix.html
->>>> http://raspberrypi.stackexchange.com/questions/31728/has-anyone-successfully-used-i2c-repeated-starts-on-the-pi2-my-scope-says-they
->>>>
->>>>
->>>> UNLESS: a Start Transfer (ST) is issued after Transfer Active (TA) is set
->>>> and before DONE is set (or the last byte is shifted, I don't know excatly).
->>>> Refs:
->>>> https://github.com/raspberrypi/linux/issues/254#issuecomment-15254134
->>>> https://www.raspberrypi.org/forums/viewtopic.php?p=807834&sid=2b612c7209f2175bf1a266359c72ae6c#p807834
->>>>
->>>>
->>>> I found this answer/report by joan that the downstream combined support
->>>> isn't reliable:
->>>> http://raspberrypi.stackexchange.com/questions/31728/has-anyone-successfully-used-i2c-repeated-starts-on-the-pi2-my-scope-says-they
->>>>
->>>>
->>>> My implementation differs from downstream in that I use local_irq_save()
->>>> to protect the polling loop. But that only protects from missing the TA
->>>> (downstream can miss the TA and issue a Stop).
->>>>
->>>> So currently in mainline we have a driver that says it support the standard
->>>> (I2C_FUNC_I2C), but it really only supports one message transfers since it
->>>> can't do ReStart.
->>>>
->>>> What I have done in this patch is to support ReStart for transfers with
->>>> 2 messages: first write, then read. But maybe a better solution is to just
->>>> leave this alone if it is flaky and use bitbanging instead. I don't know.
->>> I have not said that the approach you have taken is wrong or bad.
->>>
->> I didn't take it as such, I'm just not sure what's the best approach here,
->> so I added and looked up some more information
->>
->>> I was only telling you that the portion inside the bcm2835_i2c_xfer:
->>> +    /* Combined write-read to the same address (smbus) */
->>> +    if (num == 2 && (msgs[0].addr == msgs[1].addr) &&
->>> +        !(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
->>> +        (msgs[0].len <= 16)) {
->>> +        ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[0], &msgs[1]);
->>> +
->>> +        return ret ? ret : 2;
->>> +    }
->>> is very specific and maybe could be done in a "generic" manner
->>> supporting more cases.
->>>
->> It has to be specific when it comes to number of messages. We can only
->> support ReStart after the first message unless we use polling for the
->> whole transfer. And in that case we can't disable interrupts for such
->> a long period and we will end up sometimes loosing Transfer Active,
->> resulting in Stop Condition between the messages.
->> So we can only do transfers with 2 messages if we want Restart.
->>
->> It is possible to support more than 16 bytes for the first message,
->> filling the FIFO after polling TA, but I'm not sure that is common.
->> Mostly it's 1 or 2 bytes to set a register.
->> The write-read restriction isn't absolutely necessary either, but it's the
->> most common case I think. So it was about reusing bcm2835_i2c_xfer_msg().
->> A less restrictive approach would require a dedicated function I think.
->>
->>> At least add a dev_warn_once for all num > 1 cases not handled by the
->>> code above.
->>>
->>> This gives people an opportunity to detect such a situation if they
->>> find something is not working as expected.
->>>
->> I agree.
->>
->> After reading joan's report I wonder if it would be best to add a module
->> parameter like downstream has, so it can be disabled. What do you think?
->>
-> I guess let us start simple:
-> * get warning in place about always issuing a stop for num > 1
->    - instead we may just want to set max_num_msgs = 1 in quirks.
-> * apply your patch for the write (<=16) then read case.
->    - maybe by setting quirks I2C_AQ_COMB_WRITE_THEN_READ
->      plus max_comb_1st_msg_len = 16 and max_num_msgs = 2
->
-> If this becomes too restrictive for some specific HW, then someone
-> may want to add the missing features.
->
-> As for the module parameters: no idea if this is acceptable
-> or sensible.
->
-> But that?s just my 2c...
+[...]
 
-It suddenly struct me that I had seen the TA bit set when I debugged the
-interrupt function. And it turns out that if I don't prefill the FIFO,
-then I can use the TXW interrupt to know when the transfer is active,
-no need for polling. It looks promising so far, need to run my testcases
-to be sure.
+> > None of these platforms can be fixed entirely in software, and given
+> > that we will not be adding quirks for new broken hardware, we should
+> > ask ourselves whether having two versions of a quirk, i.e., one for
+> > broken hardware + currently shipping firmware, and one for the same
+> > broken hardware with fixed firmware is really an improvement over what
+> > has been proposed here.
+> 
+> We're talking about two completely different types of quirks:
+> 
+>   1) MCFG quirks to use memory-mapped config space that doesn't quite
+>      conform to the ECAM model in the PCIe spec, and
+> 
+>   2) Some yet-to-be-determined method to describe address space
+>      consumed by a bridge.
+> 
+> The first two patches of this series are a nice implementation for 1).
+> The third patch (ThunderX-specific) is one possibility for 2), but I
+> don't like it because there's no way for generic software like the
+> ACPI core to discover these resources.
+
+Ok, so basically this means that to implement (2) we need to assign
+some sort of _HID to these quirky PCI bridges (so that we know what
+device they represent and we can retrieve their _CRS). I take from
+this discussion that the goal is to make sure that all non-config
+resources have to be declared through _CRS device objects, which is
+fine but that requires a FW update (unless we can fabricate ACPI
+devices and corresponding _CRS in the kernel whenever we match a
+given MCFG table signature).
+
+We discussed this already and I think we should make a decision:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/414722.html
+
+> > > I'd like to step back and come up with some understanding of how
+> > > non-broken firmware *should* deal with this issue.  Then, if we *do*
+> > > work around this particular broken firmware in the kernel, it would be
+> > > nice to do it in a way that fits in with that understanding.
+> > >
+> > > For example, if a companion ACPI device is the preferred solution, an
+> > > ACPI quirk could fabricate a device with the required resources.  That
+> > > would address the problem closer to the source and make it more likely
+> > > that the rest of the system will work correctly: /proc/iomem could
+> > > make sense, things that look at _CRS generically would work (e.g,
+> > > /sys/, an admittedly hypothetical "lsacpi", etc.)
+> > >
+> > > Hard-coding stuff in drivers is a point solution that doesn't provide
+> > > any guidance for future platforms and makes it likely that the hack
+> > > will get copied into even more drivers.
+> > >
+> > 
+> > OK, I see. But the guidance for future platforms should be 'do not
+> > rely on quirks', and what I am arguing here is that the more we polish
+> > up this code and make it clean and reusable, the more likely it is
+> > that will end up getting abused by new broken hardware that we set out
+> > to reject entirely in the first place.
+> > 
+> > So of course, if the quirk involves claiming resources, let's make
+> > sure that this occurs in the cleanest and most compliant way possible.
+> > But any factoring/reuse concerns other than for the current crop of
+> > broken hardware should be avoided imo.
+> 
+> If future hardware is completely ECAM-compliant and we don't need any
+> more MCFG quirks, that would be great.
+
+Yes.
+
+> But we'll still need to describe that memory-mapped config space
+> somewhere.  If that's done with PNP0C02 or similar devices (as is done
+> on my x86 laptop), we'd be all set.
+
+I am not sure I understand what you mean here. Are you referring
+to MCFG regions reported as PNP0c02 resources through its _CRS ?
+
+IIUC PNP0C02 is a reservation mechanism, but it does not help us
+associate its _CRS to a specific PCI host bridge instance, right ?
+
+> If we need to work around firmware in the field that doesn't do that,
+> one possibility is a PNP quirk along the lines of
+> quirk_amd_mmconfig_area().
+
+You mean matching PNP0C01/PNP0c02 and create a resource (that has to
+hardcoded in a static array in the kernel anyway, there is no way to
+retrieve it otherwise) in the corresponding PNP quirk handler ?
+
+And it is not a given we can match against PNP0c01/PNP0c02.
+
+So it looks like the only solution is allocating an _HID for each
+host bridge that is not ECAM compliant to add resources to its _CRS
+(unless the MCFG quirk does not need any additional data/resource,
+eg "use different set of PCI accessorsi 32-bit vs byte-access").
+
+For FW that is immutable I really do not see what we can do apart
+from hardcoding the non-config resources (consumed by a bridge),
+somehow.
 
 Thanks,
-Noralf.
+Lorenzo
