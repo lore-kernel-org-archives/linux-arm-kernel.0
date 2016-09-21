@@ -1,120 +1,34 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 21 Sep 2016 15:05:49 +0100
-Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
- register range for ACPI case
-In-Reply-To: <20160920191744.GA4941@localhost>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 21 Sep 2016 10:07:36 -0400
+Subject: [PATCH V6 0/5] ECAM quirks handling for ARM64 platforms
+In-Reply-To: <20160921131107.GB10804@localhost>
 References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <1473449047-10499-4-git-send-email-tn@semihalf.com>
- <20160919180900.GB13775@localhost>
- <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
- <20160920133327.GB13855@localhost>
- <CAKv+Gu-AE7fft_j2cqBCN=xrsf5Yh=mePf5x3dZJuKAmdxF-Gg@mail.gmail.com>
- <20160920140518.GD13855@localhost>
- <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
- <20160920191744.GA4941@localhost>
-Message-ID: <20160921140549.GA11968@red-moon>
+ <20160920192636.GB4941@localhost>
+ <0429663d51ed8e93fb0c96261dd2ecc7@codeaurora.org>
+ <20160921131107.GB10804@localhost>
+Message-ID: <25529f96-3e80-0524-82d8-6eeb517df5b5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 02:17:44PM -0500, Bjorn Helgaas wrote:
-> On Tue, Sep 20, 2016 at 04:09:25PM +0100, Ard Biesheuvel wrote:
+On 9/21/2016 9:11 AM, Bjorn Helgaas wrote:
+> On Tue, Sep 20, 2016 at 09:15:14PM -0400, cov at codeaurora.org wrote:
+>> Hi Bjorn, Thomasz,
+>>
 
-[...]
-
-> > None of these platforms can be fixed entirely in software, and given
-> > that we will not be adding quirks for new broken hardware, we should
-> > ask ourselves whether having two versions of a quirk, i.e., one for
-> > broken hardware + currently shipping firmware, and one for the same
-> > broken hardware with fixed firmware is really an improvement over what
-> > has been proposed here.
+>>
+>> Did you delete this because there were no current users, because you'd
+>> prefer users just use "-1", or for some other reason?
 > 
-> We're talking about two completely different types of quirks:
-> 
->   1) MCFG quirks to use memory-mapped config space that doesn't quite
->      conform to the ECAM model in the PCIe spec, and
-> 
->   2) Some yet-to-be-determined method to describe address space
->      consumed by a bridge.
-> 
-> The first two patches of this series are a nice implementation for 1).
-> The third patch (ThunderX-specific) is one possibility for 2), but I
-> don't like it because there's no way for generic software like the
-> ACPI core to discover these resources.
+> I removed it because there were no users of it and, more importantly,
+> the code doesn't implement support for it.
 
-Ok, so basically this means that to implement (2) we need to assign
-some sort of _HID to these quirky PCI bridges (so that we know what
-device they represent and we can retrieve their _CRS). I take from
-this discussion that the goal is to make sure that all non-config
-resources have to be declared through _CRS device objects, which is
-fine but that requires a FW update (unless we can fabricate ACPI
-devices and corresponding _CRS in the kernel whenever we match a
-given MCFG table signature).
+Is it possible to queue up Cov's patch as part of this effort once he 
+rebases and sends an updated version? Cov will have to implement something
+else now.
 
-We discussed this already and I think we should make a decision:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/414722.html
 
-> > > I'd like to step back and come up with some understanding of how
-> > > non-broken firmware *should* deal with this issue.  Then, if we *do*
-> > > work around this particular broken firmware in the kernel, it would be
-> > > nice to do it in a way that fits in with that understanding.
-> > >
-> > > For example, if a companion ACPI device is the preferred solution, an
-> > > ACPI quirk could fabricate a device with the required resources.  That
-> > > would address the problem closer to the source and make it more likely
-> > > that the rest of the system will work correctly: /proc/iomem could
-> > > make sense, things that look at _CRS generically would work (e.g,
-> > > /sys/, an admittedly hypothetical "lsacpi", etc.)
-> > >
-> > > Hard-coding stuff in drivers is a point solution that doesn't provide
-> > > any guidance for future platforms and makes it likely that the hack
-> > > will get copied into even more drivers.
-> > >
-> > 
-> > OK, I see. But the guidance for future platforms should be 'do not
-> > rely on quirks', and what I am arguing here is that the more we polish
-> > up this code and make it clean and reusable, the more likely it is
-> > that will end up getting abused by new broken hardware that we set out
-> > to reject entirely in the first place.
-> > 
-> > So of course, if the quirk involves claiming resources, let's make
-> > sure that this occurs in the cleanest and most compliant way possible.
-> > But any factoring/reuse concerns other than for the current crop of
-> > broken hardware should be avoided imo.
-> 
-> If future hardware is completely ECAM-compliant and we don't need any
-> more MCFG quirks, that would be great.
-
-Yes.
-
-> But we'll still need to describe that memory-mapped config space
-> somewhere.  If that's done with PNP0C02 or similar devices (as is done
-> on my x86 laptop), we'd be all set.
-
-I am not sure I understand what you mean here. Are you referring
-to MCFG regions reported as PNP0c02 resources through its _CRS ?
-
-IIUC PNP0C02 is a reservation mechanism, but it does not help us
-associate its _CRS to a specific PCI host bridge instance, right ?
-
-> If we need to work around firmware in the field that doesn't do that,
-> one possibility is a PNP quirk along the lines of
-> quirk_amd_mmconfig_area().
-
-You mean matching PNP0C01/PNP0c02 and create a resource (that has to
-hardcoded in a static array in the kernel anyway, there is no way to
-retrieve it otherwise) in the corresponding PNP quirk handler ?
-
-And it is not a given we can match against PNP0c01/PNP0c02.
-
-So it looks like the only solution is allocating an _HID for each
-host bridge that is not ECAM compliant to add resources to its _CRS
-(unless the MCFG quirk does not need any additional data/resource,
-eg "use different set of PCI accessorsi 32-bit vs byte-access").
-
-For FW that is immutable I really do not see what we can do apart
-from hardcoding the non-config resources (consumed by a bridge),
-somehow.
-
-Thanks,
-Lorenzo
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
