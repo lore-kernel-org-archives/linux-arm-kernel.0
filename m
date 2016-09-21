@@ -1,46 +1,57 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux (gmail))
-Date: Wed, 21 Sep 2016 13:41:07 -0400
-Subject: [PATCH] clk: nxp: clk-lpc32xx: Unmap region obtained by of_iomap
-In-Reply-To: <162fe71f-e190-3511-6b06-35efdbc8573f@mleia.com>
-References: <1474368846-15916-1-git-send-email-arvind.yadav.cs@gmail.com>
- <162fe71f-e190-3511-6b06-35efdbc8573f@mleia.com>
-Message-ID: <1474479667.13453.0.camel@localhost>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 21 Sep 2016 10:43:23 -0700
+Subject: [PATCH] arm64: Correctly bounds check virt_addr_valid
+In-Reply-To: <1474478928-25022-1-git-send-email-labbott@redhat.com>
+References: <1474478928-25022-1-git-send-email-labbott@redhat.com>
+Message-ID: <2d9d63c9-ce12-d9b8-205a-19fcb72d846b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-09-21 at 13:17 +0300, Vladimir Zapolskiy wrote:
-> On 20.09.2016 13:54, Arvind Yadav wrote:
-> > From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> > 
-> > Free memory mapping, if lpc32xx_clk_init is not successful.
-> > 
-> > Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> > ---
-> >  drivers/clk/nxp/clk-lpc32xx.c |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
-> > index 90d740a..34c9735 100644
-> > --- a/drivers/clk/nxp/clk-lpc32xx.c
-> > +++ b/drivers/clk/nxp/clk-lpc32xx.c
-> > @@ -1513,6 +1513,7 @@ static void __init lpc32xx_clk_init(struct device_node *np)
-> >  	if (IS_ERR(clk_regmap)) {
-> >  		pr_err("failed to regmap system control block: %ld\n",
-> >  			PTR_ERR(clk_regmap));
-> > +		iounmap(base);
-> >  		return;
-> >  	}
-> >  
-> > 
-> 
-> Acked-by: Vladimir Zapolskiy <vz@mleia.com>
-> 
-> Thank you for the patch.
-> 
-Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+On 09/21/2016 10:28 AM, Laura Abbott wrote:
+> virt_addr_valid is supposed to return true if and only if virt_to_page
+> returns a valid page structure. The current macro does math on whatever
+> address is given and passes that to pfn_valid to verify. vmalloc and
+> module addresses can happen to generate a pfn that 'happens' to be
+> valid. Fix this by only performing the pfn_valid check on addresses that
+> have the potential to be valid.
+>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> This caused a bug at least twice in hardened usercopy so it is an
+> actual problem. A further TODO is full DEBUG_VIRTUAL support to
+> catch these types of mistakes.
+> ---
+>  arch/arm64/include/asm/memory.h | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 31b7322..f741e19 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -214,7 +214,7 @@ static inline void *phys_to_virt(phys_addr_t x)
+>
+>  #ifndef CONFIG_SPARSEMEM_VMEMMAP
+>  #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+> -#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+> +#define virt_addr_valid(kaddr)	(((u64)kaddr) >= PAGE_OFFSET && pfn_valid(__pa(kaddr) >> PAGE_SHIFT))
+>  #else
+>  #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
+>  #define __page_to_voff(kaddr)	(((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+> @@ -222,8 +222,8 @@ static inline void *phys_to_virt(phys_addr_t x)
+>  #define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
+>  #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
+>
+> -#define virt_addr_valid(kaddr)	pfn_valid((((u64)(kaddr) & ~PAGE_OFFSET) \
+> -					   + PHYS_OFFSET) >> PAGE_SHIFT)
+> +#define virt_addr_valid(kaddr)	(((u64)kaddr) >= PAGE_OFFSET && pfn_valid((((u64)(kaddr) & ~PAGE_OFFSET) \
+> +					   + PHYS_OFFSET) >> PAGE_SHIFT))
+>  #endif
+>  #endif
+>
+>
 
-> --
-> With best wishes,
-> Vladimir
-> 
-> 
+Bah, I realized I butchered the macro parenthesization. I'll fix that
+in a v2. I'll wait for comments on this first.
+
+Thanks,
+Laura
