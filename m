@@ -1,95 +1,51 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 21 Sep 2016 11:05:33 +0300
-Subject: [PATCH 1/2] phy-sun4i-usb: Add sun4i_usb_phy_force_session_end()
- function
-In-Reply-To: <57E0BEDF.2020603@ti.com>
-References: <20160918165018.24547-1-hdegoede@redhat.com>
- <57E0BEDF.2020603@ti.com>
-Message-ID: <54119844-ce99-bf8c-fc6e-09bcc7523e4d@redhat.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 21 Sep 2016 10:05:49 +0200
+Subject: [PATCH V6 4/5] PCI: thunder: Enable ACPI PCI controller for
+ ThunderX pass2.x silicon version
+In-Reply-To: <20160920130839.GA13855@localhost>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <1473449047-10499-5-git-send-email-tn@semihalf.com>
+ <20160919154550.GA13775@localhost>
+ <d06879a2-d6e9-5d62-77c5-47eff33d9584@semihalf.com>
+ <20160920130839.GA13855@localhost>
+Message-ID: <c7636112-b080-9101-e504-8a4acd19c96a@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 09/20/2016 07:45 AM, Kishon Vijay Abraham I wrote:
-> Hi,
+On 20.09.2016 15:08, Bjorn Helgaas wrote:
+> On Tue, Sep 20, 2016 at 09:06:23AM +0200, Tomasz Nowicki wrote:
+>> On 19.09.2016 17:45, Bjorn Helgaas wrote:
+>>> On Fri, Sep 09, 2016 at 09:24:06PM +0200, Tomasz Nowicki wrote:
+>>>> ThunderX PCIe controller to off-chip devices (so-called PEM) is not fully
+>>>> compliant with ECAM standard. It uses non-standard configuration space
+>>>> accessors (see pci_thunder_pem_ops) and custom configuration space granulation
+>>>> (see bus_shift = 24). In order to access configuration space and
+>>>> probe PEM as ACPI based PCI host controller we need to add MCFG quirk
+>>>> infrastructure. This involves:
+>>>> 1. Export PEM pci_thunder_pem_ops structure so it is visible to MCFG quirk
+>>>>   code.
+>>>> 2. New quirk entries for each PEM segment. Each contains platform IDs,
+>>>>   mentioned pci_thunder_pem_ops and CFG resources.
+>>>>
+>>>> Quirk is considered for ThunderX silicon pass2.x only which is identified
+>>>> via MCFG revision 1.
+>>>
+>>> Is it really the case that silicon pass2.x has MCFG revision 1, and
+>>> silicon pass1.x has MCFG revision 2?  That just seems backwards.
+>>
+>> It is weird but silicon pass2.x is more common and it had MCFG
+>> revision 1 from the beginning. Unless it is allowed to use MCFG
+>> revision 0 ? Then we could use MCFG revision 0 for pass1.x
 >
-> On Sunday 18 September 2016 10:20 PM, Hans de Goede wrote:
->> The sunxi musb has a bug where sometimes it will generate a babble
->> error on device disconnect instead of a disconnect irq. When this
->> happens the musb-controller switches from host mode to device mode
->> (it clears MUSB_DEVCTL_SESSION and sets MUSB_DEVCTL_BDEVICE) and
->> gets stuck in this state.
->>
->> Clearing this requires reporting Vbus low for 200 or more ms, but
->> on some devices Vbus is simply always high (host-only mode, no Vbus
->> control). The phy-sun4i-usb code already has code to force a session
->> end for devices without Vbus control.
->>
->> This commit adds a sun4i_usb_phy_force_session_end() function exporting
->> this functionality to the sunxi-musb glue, so that it can force a session
->> end to fixup the stuck state after a babble error.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  drivers/phy/phy-sun4i-usb.c       | 11 +++++++++++
->>  include/linux/phy/phy-sun4i-usb.h |  7 +++++++
->>  2 files changed, 18 insertions(+)
->>
->> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
->> index 43c0d98..06f4e11a 100644
->> --- a/drivers/phy/phy-sun4i-usb.c
->> +++ b/drivers/phy/phy-sun4i-usb.c
->> @@ -470,6 +470,17 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
->>  }
->>  EXPORT_SYMBOL_GPL(sun4i_usb_phy_set_squelch_detect);
->>
->> +void sun4i_usb_phy_force_session_end(struct phy *_phy)
->> +{
->> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
->> +
->> +	data->id_det = -1;
->> +	data->force_session_end = true;
->> +	queue_delayed_work(system_wq, &data->detect, 0);
->> +}
->> +EXPORT_SYMBOL_GPL(sun4i_usb_phy_force_session_end);
->
-> Er.. one more export symbol :-(
+> There's no reason to avoid revision 0.  The question is really what
+> firmware is already in the field.  We need to accommodate that.  We don't
+> want a situation where kernel version X only works with firmware version Y,
+> but kernel version X+1 only works with firmware version Y+1.
 
-Yes unfortunately we need one more to work around sunxi musb / phy bugs.
+Yes I agree. We have already deployed the firmware where:
+pass2.x has MCFG revision 1
+pass1.x has MCFG revision 2
+so we need to stick to this.
 
->> +
->>  static const struct phy_ops sun4i_usb_phy_ops = {
->>  	.init		= sun4i_usb_phy_init,
->>  	.exit		= sun4i_usb_phy_exit,
->> diff --git a/include/linux/phy/phy-sun4i-usb.h b/include/linux/phy/phy-sun4i-usb.h
->> index 50aed92..3bb773f 100644
->> --- a/include/linux/phy/phy-sun4i-usb.h
->> +++ b/include/linux/phy/phy-sun4i-usb.h
->> @@ -23,4 +23,11 @@
->>   */
->>  void sun4i_usb_phy_set_squelch_detect(struct phy *phy, bool enabled);
->>
->> +/**
->> + * sun4i_usb_force_session_end() - Force the current session to end
->> + *				   by reporting VBus low for 200+ ms
->> + * @phy: reference to a sun4i usb phy
->> + */
->> +void sun4i_usb_phy_force_session_end(struct phy *phy);
->
-> Should we include a static inline function if sun4i phy is not defined?
-
-No, we're also not doing that for the already exported
-sun4i_usb_phy_set_squelch_detect()
-
-And it is not necessary since the only caller is drivers/usb/musb/sunxi.c,
-and drivers/usb/musb/Kconfig has:
-
-config USB_MUSB_SUNXI
-         tristate "Allwinner (sunxi)"
-         depends on PHY_SUN4I_USB
-
-Regards,
-
-Hans
+Thanks,
+Tomasz
