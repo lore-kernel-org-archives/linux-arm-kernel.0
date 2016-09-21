@@ -1,34 +1,57 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 21 Sep 2016 18:38:23 +0200
-Subject: [PATCH v10 0/4] ACPI: parse the SPCR table
-In-Reply-To: <CAOZdJXV2KyZAbrRxQ_zmFNd3Gn4vyuqSsUfJMTU8wpiOtjyE=g@mail.gmail.com>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
- <25d32778-e708-6763-7cb2-4ddbeebc844b@linaro.org>
- <20160921103749.GA7993@kroah.com>
- <CAOZdJXV2KyZAbrRxQ_zmFNd3Gn4vyuqSsUfJMTU8wpiOtjyE=g@mail.gmail.com>
-Message-ID: <20160921163823.GB9373@kroah.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Wed, 21 Sep 2016 12:42:04 -0400
+Subject: [PATCH] arm64, numa: Add cpu_to_node() implementation.
+In-Reply-To: <57E143DA.5030602@linaro.org>
+References: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160920104348.GP25086@rric.localdomain> <57E11E52.8060303@linaro.org>
+ <20160920133813.GR25086@rric.localdomain> <57E143DA.5030602@linaro.org>
+Message-ID: <9f9097ec-6097-4ef7-a710-e7ad89470814@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2016 at 11:19:35AM -0500, Timur Tabi wrote:
-> On Wed, Sep 21, 2016 at 5:37 AM, Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org> wrote:
-> >
-> > I thought you asked Rafael to take them, they are not in my queue
-> > anymore because of that.  Don't try to shop-around for maintainers
-> > please, that's kind of rude...
+On 09/20/2016 10:12 AM, Hanjun Guo wrote:
+> On 09/20/2016 09:38 PM, Robert Richter wrote:
+>> On 20.09.16 19:32:34, Hanjun Guo wrote:
+>>> On 09/20/2016 06:43 PM, Robert Richter wrote:
+>>
+>>>> Instead we need to make sure the set_*numa_node() functions are called
+>>>> earlier before secondary cpus are booted. My suggested change for that
+>>>> is this:
+>>>>
+>>>>
+>>>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>>>> index d93d43352504..952365c2f100 100644
+>>>> --- a/arch/arm64/kernel/smp.c
+>>>> +++ b/arch/arm64/kernel/smp.c
+>>>> @@ -204,7 +204,6 @@ int __cpu_up(unsigned int cpu, struct
+>>>> task_struct *idle)
+>>>>   static void smp_store_cpu_info(unsigned int cpuid)
+>>>>   {
+>>>>       store_cpu_topology(cpuid);
+>>>> -    numa_store_cpu_info(cpuid);
+>>>>   }
+>>>>
+>>>>   /*
+>>>> @@ -719,6 +718,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>>>>               continue;
+>>>>
+>>>>           set_cpu_present(cpu, true);
+>>>> +        numa_store_cpu_info(cpu);
+>>>>       }
+>>>>   }
+>>>
+>>> We tried a similar approach which add numa_store_cpu_info() in
+>>> early_map_cpu_to_node(), and remove it from smp_store_cpu_info,
+>>> but didn't work for us, we will try your approach to see if works.
 > 
-> In Aleksey's defense, these patches have been floating around for far
-> too long, so I can understand his frustration.
+> And it works :)
 
-I understand the frustration as well, cross-maintainer messy patches
-like this are hard to get merged at times at they fall between the
-cracks a lot.
+Great. I'm curious for further (immediate) feedback on David's updated
+patch in the other thread due to some time sensitive needs on our end.
 
-> But as you said, I really hope Rafael picks these up for 4.9.  We need
-> these patches for ARM server.
+Jon.
 
-I thought I saw an email saying he would do so, but it might have been
-for some other patchset, sorry...
 
-greg k-h
+
+-- 
+Computer Architect | Sent from my Fedora powered laptop
