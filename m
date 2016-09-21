@@ -1,73 +1,43 @@
 From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 21 Sep 2016 18:38:05 -0400
-Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
-In-Reply-To: <20160921173129.GA20006@localhost>
-References: <20160921173129.GA20006@localhost>
-Message-ID: <20160921223805.21652-1-cov@codeaurora.org>
+Date: Wed, 21 Sep 2016 18:40:47 -0400
+Subject: [PATCH V6 0/5] ECAM quirks handling for ARM64 platforms
+In-Reply-To: <20160921131107.GB10804@localhost>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <20160920192636.GB4941@localhost>
+ <0429663d51ed8e93fb0c96261dd2ecc7@codeaurora.org>
+ <20160921131107.GB10804@localhost>
+Message-ID: <304377c6-554d-60ea-30df-006e557c7279@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Qualcomm Technologies QDF2432 SoC does not support accesses smaller
-than 32 bits to the PCI configuration space. Register the appropriate
-quirk.
+Hi Bjorn,
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- drivers/acpi/pci_mcfg.c  |  8 ++++++++
- drivers/pci/ecam.c       | 10 ++++++++++
- include/linux/pci-ecam.h |  1 +
- 3 files changed, 19 insertions(+)
+On 09/21/2016 09:11 AM, Bjorn Helgaas wrote:
+> On Tue, Sep 20, 2016 at 09:15:14PM -0400, cov at codeaurora.org wrote:
 
-diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-index 245b79f..212334f 100644
---- a/drivers/acpi/pci_mcfg.c
-+++ b/drivers/acpi/pci_mcfg.c
-@@ -96,6 +96,14 @@ static struct mcfg_fixup mcfg_quirks[] = {
- 	THUNDER_ECAM_MCFG(2, 12),
- 	THUNDER_ECAM_MCFG(2, 13),
- #endif
-+	{ "QCOM  ", "QDF2432 ", 1, 0, MCFG_BUS_ANY, &pci_32b_ops },
-+	{ "QCOM  ", "QDF2432 ", 1, 1, MCFG_BUS_ANY, &pci_32b_ops },
-+	{ "QCOM  ", "QDF2432 ", 1, 2, MCFG_BUS_ANY, &pci_32b_ops },
-+	{ "QCOM  ", "QDF2432 ", 1, 3, MCFG_BUS_ANY, &pci_32b_ops },
-+	{ "QCOM  ", "QDF2432 ", 1, 4, MCFG_BUS_ANY, &pci_32b_ops },
-+	{ "QCOM  ", "QDF2432 ", 1, 5, MCFG_BUS_ANY, &pci_32b_ops },
-+	{ "QCOM  ", "QDF2432 ", 1, 6, MCFG_BUS_ANY, &pci_32b_ops },
-+	{ "QCOM  ", "QDF2432 ", 1, 7, MCFG_BUS_ANY, &pci_32b_ops },
- };
- 
- static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
-diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
-index 43ed08d..c3b3063 100644
---- a/drivers/pci/ecam.c
-+++ b/drivers/pci/ecam.c
-@@ -162,3 +162,13 @@ struct pci_ecam_ops pci_generic_ecam_ops = {
- 		.write		= pci_generic_config_write,
- 	}
- };
-+
-+/* ops for 32 bit config space access quirk */
-+struct pci_ecam_ops pci_32b_ops = {
-+	.bus_shift	= 20,
-+	.pci_ops	= {
-+		.map_bus	= pci_ecam_map_bus,
-+		.read		= pci_generic_config_read32,
-+		.write		= pci_generic_config_write32,
-+	}
-+};
-diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
-index 35f0e81..a6cffb8 100644
---- a/include/linux/pci-ecam.h
-+++ b/include/linux/pci-ecam.h
-@@ -65,6 +65,7 @@ extern struct pci_ecam_ops pci_thunder_pem_ops;
- #ifdef CONFIG_PCI_HOST_THUNDER_ECAM
- extern struct pci_ecam_ops pci_thunder_ecam_ops;
- #endif
-+extern struct pci_ecam_ops pci_32b_ops;
- 
- #ifdef CONFIG_PCI_HOST_GENERIC
- /* for DT-based PCI controllers that support ECAM */
+>>> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+>>> index eb14f74..bb3b8ad 100644
+>>> --- a/drivers/acpi/pci_mcfg.c
+>>> +++ b/drivers/acpi/pci_mcfg.c
+>>> @@ -42,86 +42,59 @@ struct mcfg_fixup {
+>>> 	struct resource cfgres;
+>>> };
+>>>
+>>> -#define MCFG_DOM_ANY			(-1)
+>>
+>> Did you delete this because there were no current users, because you'd
+>> prefer users just use "-1", or for some other reason?
+> 
+> I removed it because there were no users of it and, more importantly,
+> the code doesn't implement support for it.
+
+It looks like a stale "First match against PCI topology <domain:bus>..."
+comment remains.
+
+Thanks,
+Cov
+
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
-Forum, a Linux Foundation Collaborative Project.
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
