@@ -1,202 +1,68 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 21 Sep 2016 16:53:34 -0500
-Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
-In-Reply-To: <VI1PR0401MB170983489310BF383C8C7E5B92F60@VI1PR0401MB1709.eurprd04.prod.outlook.com>
-References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-2-git-send-email-po.liu@nxp.com>
- <20160729224154.GC13632@localhost>
- <VI1PR0401MB170958461E597D1BC7D280FF92E80@VI1PR0401MB1709.eurprd04.prod.outlook.com>
- <20160920204725.GA10804@localhost>
- <VI1PR0401MB170983489310BF383C8C7E5B92F60@VI1PR0401MB1709.eurprd04.prod.outlook.com>
-Message-ID: <20160921215334.GF20006@localhost>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Wed, 21 Sep 2016 21:57:14 +0000
+Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.9
+In-Reply-To: <CALRxmdDLRPLr3yD_wGW+3=thr8eZwX4DVGzMad0Gh7n-ERi+og@mail.gmail.com>
+References: <1473670948-4265-1-git-send-email-shawnguo@kernel.org>
+ <2241121.MvRjeYAnGC@wuerfel> <20160916014703.GC7398@tiger>
+ <6140062.uQFBQdfrcg@wuerfel>
+ <CALRxmdDLRPLr3yD_wGW+3=thr8eZwX4DVGzMad0Gh7n-ERi+og@mail.gmail.com>
+Message-ID: <VI1PR0401MB26380A4FF1141C69C4F364A58DF60@VI1PR0401MB2638.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2016 at 06:51:55AM +0000, Po Liu wrote:
-> Hi Bjorn,
-> 
-> >  -----Original Message-----
-> >  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> >  Sent: Wednesday, September 21, 2016 4:47 AM
-> >  To: Po Liu
-> >  Cc: Roy Zang; Arnd Bergmann; devicetree at vger.kernel.org; Marc Zyngier;
-> >  linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; Stuart Yoder;
-> >  M.H. Lian; Murali Karicheri; Mingkai Hu; Bjorn Helgaas; Leo Li; Shawn
-> >  Guo; linux-arm-kernel at lists.infradead.org
-> >  Subject: Re: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
-> >  
-> >  On Mon, Aug 22, 2016 at 10:09:18AM +0000, Po Liu wrote:
-> >  > Hi Bjorn,
-> >  >
-> >  > Sorry for late reply.
-> >  >
-> >  > I checked the updated kernel with Dongdong mentioned ACPI patch which
-> >  was truly affected my quirk patch uploaded. So I suppose the quirk patch
-> >  is not qualify to fix the bug.
-> >  
-> >  I don't understand what you're saying here.
-> >  
-> >  The quirk worked on your machine.  It apparently didn't work on
-> >  Dongdong's machine because of_irq_parse_and_map_pci() is run after the
-> >  quirk in this path:
-> >  
-> >    pci_device_probe
-> >      pcibios_alloc_irq                 # arm64
-> >        dev->irq = of_irq_parse_and_map_pci
-> >  
-> >  and of_irq_parse_and_map_pci() returned zero, probably because
-> >  of_irq_parse_pci() failed.  My guess is that the reason it works on your
-> >  machine but not Dongdong's is that your DTs are different such that
-> >  of_irq_parse_pci() works for you but not for Dongdong.
-> >  
-> >  I think the idea of of_irq_parse_and_map_pci() is to set up a device's
-> >  INTx line.  But that doesn't quite apply here because your device
-> >  doesn't actually *use* INTx.  So I don't know why of_irq_parse_pci()
-> >  works for you.  Maybe that's a symptom of a problem in your DT.
-> >  
-> >  Or maybe you're saying that the quirk *didn't* work on your machine when
-> >  you tested it in a kernel that included d8ed75d59332 ("ARM64:
-> >  PCI: ACPI support for legacy IRQs parsing and consolidation with DT
-> >  code"). 
-> 
-> Yes, this point is what I mean. After this patch my quirk patch would not work. 
-> Since I discussed with Dongdong, the patches d8ed75d59332 ACPI related were not be merged yet.
+> -----Original Message-----
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Fri, Sep 16, 2016 at 8:42 AM
+> Subject: Re: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.9
+> To: Shawn Guo <shawnguo@kernel.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>, arm at kernel.org,
+> kernel at pengutronix.de, linux-arm-kernel at lists.infradead.org
 > 
 > 
-> >  But that doesn't make sense either, because prior to
-> >  d8ed75d59332, we *always* set
-> >  
-> >    dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> >  
-> >  and after the patch we only do it if "acpi_disabled".  I guess I just
-> >  don't understand what you're saying.
+> On Friday, September 16, 2016 9:47:03 AM CEST Shawn Guo wrote:
+> > On Wed, Sep 14, 2016 at 05:30:49PM +0200, Arnd Bergmann wrote:
+> > > On Monday, September 12, 2016 5:02:27 PM CEST Shawn Guo wrote:
+> > > > i.MX arm64 device tree changes for 4.9:
+> > > >  - Add property dma-coherent for ls2080a PCI device to save software
+> > > >    cache maintenance.
+> > > >  - Update serial aliases and use stdout-path to sepecify console for
+> > > >    ls2080a and ls1043a boards.
+> > > >  - Add DDR memory controller device node for ls2080a and ls1043a SoCs.
+> > > >
+> > >
+> > > Pulled into next/dt64, thanks!
+> > >
+> > > The "dma-coherent" change sounds like a bugfix, should that be backported
+> > > to stable kernels? Usually if you lack that property on a device that
+> > > is actually coherent, you can get silent data corruption by treating it as
+> > > non-coherent.
+> >
+> > My impression is that those cache maintenance enforced for non-coherent
+> > device will hurt performance on coherent device.  I don't know it will
+> > cause data corruption.
 > 
-> Before the patch merged. pcibios_add_device()(which run the ->irq =
-> of_irq_parse_and_map_pci(dev, 0, 0);) was loaded before the
-> pci_fixup_device(pci_fixup_final).  But after the patch
-> d8ed75d59332("ARM64: PCI: ACPI support for legacy IRQs parsing and
-> consolidation with DT code") merged, the
-> pci_fixup_device(pci_fixup_final) run BEFORE the
-> pcibios_alloc_irq()(which run the ->irq =
-> of_irq_parse_and_map_pci(dev, 0, 0);). So the dev->irq were
-> overwhelm by the pcibios_alloc_irq().
-
-OK.  Prior to d8ed75d59332, arm64 overrode the default empty
-pcibios_add_device() implementation, and called
-of_irq_parse_and_map_pci() there.  d8ed75d59332 changed that function
-to pcibios_alloc_irq(), which is called later, in the driver probe
-path.
-
-> When I test, the acpi_disabled is '1' although my kernel config
-> default is CONFIG_ACPI=y. And no setting in the uboot with apci=xxx.
-> But this is another issue, I didn't deep to check it. 
-
-Likely your platform just doesn't have ACPI or something's wrong in
-the initial ACPI setup.
-
-> >  > I were keep thinking what your "explicitly checking for a root port
-> >  device" meaning. Do you mean I should upload again the first version
-> >  patch which fix it in the portdrv_core.c ? I would upload again if yes.
-> >  
-> >  No, I did not mean you should go back to the first version of the patch.
-> >  If we *can* do this in a quirk, I think that would be much better than
-> >  doing it in the PCIe port driver.  I meant that Dongdong's suggestion of
-> >  adding this:
-> >  
-> >    if (pci_pcie_type(dev) != PCI_EXP_TYPE_ROOT_PORT)
-> >      return;
-> >  
-> >  to your quirk made sense to me.
+> The problem is that the device in this case is accessing data from
+> the cache, while the CPU bypasses the cache for coherent mappings.
+> The cache might have a stale cache line as the device reads data, or
+> it could be in a writeback configuration, where the data written
+> from the device to the cache has not made it into RAM at the time it
+> is accessed by the CPU.
 > 
-> If the quirk patch could make workaround. It should be the better way.
+> For streaming mappings, the CPU will invalidate cache lines
+> before reading the data, so again if the device has written data
+> into the cache but not yet into memory, we will see stale data
+> after dma_unmap_single().
 
-It doesn't sound like a quirk is going to work because all the quirks
-run too early.  I'll respond to the patch itself with more ideas.
+I'm not following the potential data corruption issue.  In this case 
+at least, DMA cohrerent devices are not directly reading or writing
+any L1/L2 cache. If the device is writing a physical address, the write goes to
+memory, and snoops invalidate any corresponding cache lines in L1/L2 caches.
+If the device is reading a physical address, snoop transactions ensure that
+dirty L1/L2 cache lines are written to memory and the device gets the right data.
 
-> >  > >  -----Original Message-----
-> >  > >  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> >  > >  Sent: Saturday, July 30, 2016 6:42 AM
-> >  > >  To: Po Liu
-> >  > >  Cc: linux-pci at vger.kernel.org;
-> >  > > linux-arm-kernel at lists.infradead.org;
-> >  > >  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang;
-> >  > > Arnd  Bergmann; Marc Zyngier; Stuart Yoder; Yang-Leo Li; Minghuan
-> >  > > Lian; Murali  Karicheri; Bjorn Helgaas; Shawn Guo; Mingkai Hu
-> >  > >  Subject: Re: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
-> >  > >
-> >  > >  On Tue, Jun 14, 2016 at 04:24:05PM +0800, Po Liu wrote:
-> >  > >  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC
-> >  mode.
-> >  > >  > When chip support the aer interrupt with none MSI/MSI-X/INTx
-> >  > > mode,  > maybe there is interrupt line for aer pme etc. Search the
-> >  > > interrupt  > number in the fdt file. Then fixup the dev->irq with it.
-> >  > >  >
-> >  > >  > Signed-off-by: Po Liu <po.liu@nxp.com>
-> >  > >
-> >  > >  I'm not sure where we're at with this.  Dongdong had some issue
-> >  > > (possibly with a version of the quirk on a different platform?), and
-> >  > > I  think the suggestion of explicitly checking for a root port
-> >  > > device was a  good one.
-> >  > >
-> >  > >  So please update and repost this for next cycle.
-> >  > >
-> >  > >  > ---
-> >  > >  > changes for V3:
-> >  > >  > 	- Move to quirk;
-> >  > >  > 	- Only correct the irq in RC mode;
-> >  > >  >
-> >  > >  >  drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++  >  1
-> >  > > file changed, 29 insertions(+)  >  > diff --git
-> >  > > a/drivers/pci/quirks.c b/drivers/pci/quirks.c index  >
-> >  > > ee72ebe..8b39cce 100644  > --- a/drivers/pci/quirks.c  > +++
-> >  > > b/drivers/pci/quirks.c  > @@ -25,6 +25,7 @@  >  #include
-> >  > > <linux/sched.h>  >  #include <linux/ktime.h>  >  #include
-> >  > > <linux/mm.h>  > +#include <linux/of_irq.h>
-> >  > >  >  #include <asm/dma.h>	/* isa_dma_bridge_buggy */
-> >  > >  >  #include "pci.h"
-> >  > >  >
-> >  > >  > @@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct
-> >  > > pci_dev *pdev)
-> >  > >  >  	}
-> >  > >  >  }
-> >  > >  >  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443,  >
-> >  > > quirk_intel_qat_vf_cap);  > +  > +/* If root port doesn't support
-> >  > > MSI/MSI-X/INTx in RC mode,  > + * but use standalone irq. Read the
-> >  > > device tree for the aer  > + * interrupt number.
-> >  > >  > + */
-> >  > >  > +static void quirk_aer_interrupt(struct pci_dev *dev) {
-> >  > >  > +	int ret;
-> >  > >  > +	u8 header_type;
-> >  > >  > +	struct device_node *np = NULL;
-> >  > >  > +
-> >  > >  > +	/* Only for the RC mode device */
-> >  > >  > +	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
-> >  > >  > +	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
-> >  > >  > +		return;
-> >  > >  > +
-> >  > >  > +	if (dev->bus->dev.of_node)
-> >  > >  > +		np = dev->bus->dev.of_node;
-> >  > >  > +
-> >  > >  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
-> >  > >  > +		ret = of_irq_get_byname(np, "aer");
-> >  > >  > +		if (ret > 0) {
-> >  > >  > +			dev->no_msi = 1;
-> >  > >  > +			dev->irq = ret;
-> >  > >  > +		}
-> >  > >  > +	}
-> >  > >  > +}
-> >  > >  > +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID,  >
-> >  > > +quirk_aer_interrupt);  > --  > 2.1.0.27.g96db324  >  >  >
-> >  > > _______________________________________________
-> >  > >  > linux-arm-kernel mailing list
-> >  > >  > linux-arm-kernel at lists.infradead.org
-> >  > >  > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >  > _______________________________________________
-> >  > linux-arm-kernel mailing list
-> >  > linux-arm-kernel at lists.infradead.org
-> >  > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The device is already sending the needed snoop transactions.  The problem
+is that because of the missing dma-coherent property the kernel doesn't know it
+and unnecessarily does invalidates/flushes.
+
+Thanks,
+Stuart
