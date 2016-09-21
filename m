@@ -1,98 +1,109 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Wed, 21 Sep 2016 18:14:25 +0000
-Subject: [PATCH v6 3/3] arm64: Add support for binary image files
-In-Reply-To: <cover.1474481332.git.geoff@infradead.org>
-References: <cover.1474481332.git.geoff@infradead.org>
-Message-ID: <a9f1fafd7c248d33768177438742b90bc4338202.1474481332.git.geoff@infradead.org>
+Subject: [PATCH v6 0/3] arm64 kexec-tools patches
+Message-ID: <cover.1474481332.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <panand@redhat.com>
+This series adds the core support for kexec re-boot on ARM64.
 
-Signed-off-by: Pratyush Anand <panand@redhat.com>
-[Reworked and cleaned up]
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- kexec/arch/arm64/kexec-image-arm64.c | 49 ++++++++++++++++++++++++++++++++----
- 1 file changed, 44 insertions(+), 5 deletions(-)
+Linux kernel support for ARM64 kexec reboot has been merged in v4.8-rc1 with the
+expectation that it will be included in the v4.8 stable kernel release.
 
-diff --git a/kexec/arch/arm64/kexec-image-arm64.c b/kexec/arch/arm64/kexec-image-arm64.c
-index 42d2ea7..960ed96 100644
---- a/kexec/arch/arm64/kexec-image-arm64.c
-+++ b/kexec/arch/arm64/kexec-image-arm64.c
-@@ -3,7 +3,9 @@
-  */
- 
- #define _GNU_SOURCE
-+
- #include "kexec-arm64.h"
-+#include <limits.h>
- 
- int image_arm64_probe(const char *kernel_buf, off_t kernel_size)
- {
-@@ -21,14 +23,53 @@ int image_arm64_probe(const char *kernel_buf, off_t kernel_size)
- 		return -1;
- 	}
- 
--	fprintf(stderr, "kexec: ARM64 binary image files are currently NOT SUPPORTED.\n");
--	return -1;
-+	return 0;
- }
- 
- int image_arm64_load(int argc, char **argv, const char *kernel_buf,
- 	off_t kernel_size, struct kexec_info *info)
- {
--	return -1;
-+	const struct arm64_image_header *header;
-+	unsigned long kernel_segment;
-+	int result;
-+
-+	header = (const struct arm64_image_header *)(kernel_buf);
-+
-+	if (arm64_process_image_header(header))
-+		return -1;
-+
-+        kernel_segment = arm64_locate_kernel_segment(info);
-+
-+        if (kernel_segment == ULONG_MAX) {
-+                dbgprintf("%s: Kernel segment is not allocated\n", __func__);
-+                result = -EFAILED;
-+                goto exit;
-+        }
-+
-+	dbgprintf("%s: kernel_segment: %016lx\n", __func__, kernel_segment);
-+	dbgprintf("%s: text_offset:    %016lx\n", __func__,
-+		arm64_mem.text_offset);
-+	dbgprintf("%s: image_size:     %016lx\n", __func__,
-+		arm64_mem.image_size);
-+	dbgprintf("%s: phys_offset:    %016lx\n", __func__,
-+		arm64_mem.phys_offset);
-+	dbgprintf("%s: vp_offset:      %016lx\n", __func__,
-+		arm64_mem.vp_offset);
-+	dbgprintf("%s: PE format:      %s\n", __func__,
-+		(arm64_header_check_pe_sig(header) ? "yes" : "no"));
-+
-+	/* load the kernel */
-+	add_segment_phys_virt(info, kernel_buf, kernel_size,
-+			kernel_segment + arm64_mem.text_offset,
-+			arm64_mem.image_size, 0);
-+
-+	result = arm64_load_other_segments(info, kernel_segment
-+		+ arm64_mem.text_offset);
-+
-+exit:
-+        if (result)
-+                fprintf(stderr, "kexec: load failed.\n");
-+        return result;
- }
- 
- void image_arm64_usage(void)
-@@ -36,6 +77,4 @@ void image_arm64_usage(void)
- 	printf(
- "     An ARM64 binary image, compressed or not, big or little endian.\n"
- "     Typically an Image, Image.gz or Image.lzma file.\n\n");
--	printf(
--"     ARM64 binary image files are currently NOT SUPPORTED.\n\n");
- }
+For ARM64 kdump support see Takahiro's latest kdump patches [1].
+
+[1] http://lists.infradead.org/pipermail/kexec
+
+Changes for v6 (Sep , 2016, 2m):
+
+  o Remove the get_memory_ranges_dt() routine.
+  o Rename dtb_[12] to dtb_{proc,sys,user}.
+
+Changes for v5 (Sep 1, 2016, 2m):
+
+  o Add common routine arm64_locate_kernel_segment().
+
+Changes for v4 (Aug 18, 2016, 1m):
+
+  o Fix some error return values and error messages.
+  o Add enum arm64_header_page_size.
+  o Rename page_offset to vp_offset.
+
+Changes for v3 (Aug 10, 2016, 1m):
+
+  o Rebase to 2.0.13.
+  o Add support for flag bits 1-3 to arm64 image-header.h.
+  o Fix OPT_ARCH_MAX value.
+  o Use fdt_pack() in dtb_set_property().
+  o Remove patch ("kexec: (bugfix) calc correct end address of memory ranges in device tree").
+
+Changes for v2 (July 26, 2016, 0m):
+
+  o Inline some small routines.
+  o Reformat some dbgprintf messages.
+  o Remove debug_brk from entry.S
+  o Change arm64_image_header.flags to uint64_t.
+  o Look in iomem then dt for mem info.
+  o Remove check_cpu_nodes.
+  o Remove purgatory printing.
+
+First submission v1 (July 20, 2016).
+
+-Geoff
+
+The following changes since commit 67488beb0a6ee8ad2c0b05f721a9e00041fab93a:
+
+  kexec-tools 2.0.13 (2016-08-08 12:26:44 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git for-merge-arm64-v6
+
+for you to fetch changes up to a9f1fafd7c248d33768177438742b90bc4338202:
+
+  arm64: Add support for binary image files (2016-09-21 11:04:03 -0700)
+
+----------------------------------------------------------------
+Geoff Levand (2):
+      kexec: Add common device tree routines
+      arm64: Add arm64 kexec support
+
+Pratyush Anand (1):
+      arm64: Add support for binary image files
+
+ configure.ac                            |   3 +
+ kexec/Makefile                          |   5 +
+ kexec/arch/arm64/Makefile               |  40 +++
+ kexec/arch/arm64/crashdump-arm64.c      |  21 ++
+ kexec/arch/arm64/crashdump-arm64.h      |  12 +
+ kexec/arch/arm64/image-header.h         | 146 ++++++++
+ kexec/arch/arm64/include/arch/options.h |  39 ++
+ kexec/arch/arm64/kexec-arm64.c          | 615 ++++++++++++++++++++++++++++++++
+ kexec/arch/arm64/kexec-arm64.h          |  71 ++++
+ kexec/arch/arm64/kexec-elf-arm64.c      | 146 ++++++++
+ kexec/arch/arm64/kexec-image-arm64.c    |  80 +++++
+ kexec/dt-ops.c                          | 145 ++++++++
+ kexec/dt-ops.h                          |  13 +
+ kexec/kexec-syscall.h                   |   8 +-
+ purgatory/Makefile                      |   1 +
+ purgatory/arch/arm64/Makefile           |  18 +
+ purgatory/arch/arm64/entry.S            |  51 +++
+ purgatory/arch/arm64/purgatory-arm64.c  |  19 +
+ 18 files changed, 1431 insertions(+), 2 deletions(-)
+ create mode 100644 kexec/arch/arm64/Makefile
+ create mode 100644 kexec/arch/arm64/crashdump-arm64.c
+ create mode 100644 kexec/arch/arm64/crashdump-arm64.h
+ create mode 100644 kexec/arch/arm64/image-header.h
+ create mode 100644 kexec/arch/arm64/include/arch/options.h
+ create mode 100644 kexec/arch/arm64/kexec-arm64.c
+ create mode 100644 kexec/arch/arm64/kexec-arm64.h
+ create mode 100644 kexec/arch/arm64/kexec-elf-arm64.c
+ create mode 100644 kexec/arch/arm64/kexec-image-arm64.c
+ create mode 100644 kexec/dt-ops.c
+ create mode 100644 kexec/dt-ops.h
+ create mode 100644 purgatory/arch/arm64/Makefile
+ create mode 100644 purgatory/arch/arm64/entry.S
+ create mode 100644 purgatory/arch/arm64/purgatory-arm64.c
+
 -- 
 2.7.4
