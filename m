@@ -1,89 +1,65 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 21 Sep 2016 16:14:07 +0900
-Subject: [PATCH] arm64: kgdb: handle read-only text / modules
-In-Reply-To: <20160920103333.GB1045@leverpostej>
-References: <20160920100321.17846-1-takahiro.akashi@linaro.org>
- <20160920103333.GB1045@leverpostej>
-Message-ID: <20160921071406.GG30248@linaro.org>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Wed, 21 Sep 2016 14:57:12 +0800
+Subject: [v12, 0/8] Fix eSDHC host version register bug
+Message-ID: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 11:33:34AM +0100, Mark Rutland wrote:
-> On Tue, Sep 20, 2016 at 07:03:21PM +0900, AKASHI Takahiro wrote:
-> > Handle read-only cases (CONFIG_DEBUG_RODATA/CONFIG_DEBUG_SET_MODULE_RONX)
-> > by using aarch64_insn_write() instead of probe_kernel_write().
-> > See how this works:
-> >     commit 2f896d586610 ("arm64: use fixmap for text patching")
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Jason Wessel <jason.wessel@windriver.com>
-> > Cc: <stable@vger.kernel.org> # 4.0-
-> 
-> We had SET_MODULE_RONX in v3.17, and we had KGDB before that, so we need
-> something for v3.17+.
+This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
+eSDHC controller. To match the SoC version and revision, 10 previous version
+patchsets had tried many methods but all of them were rejected by reviewers.
+Such as
+	- dts compatible method
+	- syscon method
+	- ifdef PPC method
+	- GUTS driver getting SVR method
+Anrd suggested a soc_device_match method in v10, and this is the only available
+method left now. This v11 patchset introduces the soc_device_match interface in
+soc driver.
 
-Right, but 3.18+ :)
-Unfortunately, the patch ("arm64: use fixmap for text patching")
-is merged only in v4.0 or later. So it is also a pre-requisite.
+The first six patches of Yangbo are to add the GUTS driver. This is used to
+register a soc device which contain soc version and revision information.
+The other two patches introduce the soc_device_match method in soc driver
+and apply it on esdhc driver to fix this bug.
 
-> > ---
-> >  arch/arm64/kernel/kgdb.c | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
-> > 
-> > diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> > index 6732a27..133cfe3 100644
-> > --- a/arch/arm64/kernel/kgdb.c
-> > +++ b/arch/arm64/kernel/kgdb.c
-> > @@ -382,3 +382,23 @@ struct kgdb_arch arch_kgdb_ops = {
-> >  		KGDB_DYN_BRK_INS_BYTE(3),
-> >  	}
-> >  };
-> > +int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
-> > +{
-> > +	int err;
-> > +
-> > +	BUILD_BUG_ON(AARCH64_INSN_SIZE != BREAK_INSTR_SIZE);
-> > +
-> > +	err = aarch64_insn_read((void *)bpt->bpt_addr, (u32 *)bpt->saved_instr);
-> > +	if (err)
-> > +		return err;
-> > +
-> > +	return aarch64_insn_write((void *)bpt->bpt_addr,
-> > +			(u32)AARCH64_BREAK_KGDB_DYN_DBG);
-> > +}
-> 
-> This changes the endianness of saved_instr (on BE), but it looks like
-> that's handed as an opaque token by the core code anyway, so that should
-> be fine.
-> 
-> This also renders arch_kgdb_ops.gdb_bpt_instr unused. Can/should we get
-> rid of that?
+Arnd Bergmann (1):
+  base: soc: introduce soc_device_match() interface
 
-Yes, we can. But arch_kgdb_ops is still needed for compiling anyway.
+Yangbo Lu (7):
+  dt: bindings: update Freescale DCFG compatible
+  ARM64: dts: ls2080a: add device configuration node
+  dt: bindings: move guts devicetree doc out of powerpc directory
+  powerpc/fsl: move mpc85xx.h to include/linux/fsl
+  soc: fsl: add GUTS driver for QorIQ platforms
+  MAINTAINERS: add entry for Freescale SoC drivers
+  mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
 
-> > +int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
-> > +{
-> > +	return aarch64_insn_write((void *)bpt->bpt_addr,
-> > +			*(u32 *)bpt->saved_instr);
-> > +}
-> 
-> We also need a few additional includes:
-> 
-> <asm/debug-monitors.h> # for BREAK_INSTR_SIZE, AARCH64_BREAK_KGDB_DYN_DBG
-> <asm/insn.h> # for AARCH64_INSN_SIZE, insn_{read,write}
-> <linux/bug.h> # for BUILD_BUG_ON()
+ Documentation/devicetree/bindings/arm/fsl.txt      |   6 +-
+ .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
+ MAINTAINERS                                        |  11 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 +
+ arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
+ arch/powerpc/sysdev/fsl_pci.c                      |   2 +-
+ drivers/base/Kconfig                               |   1 +
+ drivers/base/soc.c                                 |  66 ++++++
+ drivers/clk/clk-qoriq.c                            |   3 +-
+ drivers/i2c/busses/i2c-mpc.c                       |   2 +-
+ drivers/iommu/fsl_pamu.c                           |   3 +-
+ drivers/mmc/host/Kconfig                           |   1 +
+ drivers/mmc/host/sdhci-of-esdhc.c                  |  20 ++
+ drivers/net/ethernet/freescale/gianfar.c           |   2 +-
+ drivers/soc/Kconfig                                |   2 +-
+ drivers/soc/fsl/Kconfig                            |  19 ++
+ drivers/soc/fsl/Makefile                           |   1 +
+ drivers/soc/fsl/guts.c                             | 257 +++++++++++++++++++++
+ include/linux/fsl/guts.h                           | 125 ++++++----
+ .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
+ include/linux/sys_soc.h                            |   3 +
+ 21 files changed, 478 insertions(+), 61 deletions(-)
+ rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+ create mode 100644 drivers/soc/fsl/Kconfig
+ create mode 100644 drivers/soc/fsl/guts.c
+ rename arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h (97%)
 
-Added.
-
-> I take it that we're protected against nesting within
-> aarch64_insn_write(), so that we can't deadlock on patch_lock?
-> 
-> Other than that, this looks good to me.
-
-Thanks,
--Takahiro AKASHI
-
-> Thanks,
-> Mark.
+-- 
+2.1.0.27.g96db324
