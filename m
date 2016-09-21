@@ -1,112 +1,91 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 21 Sep 2016 09:57:21 +0100
-Subject: [PATCH v2] arm64: kgdb: handle read-only text / modules
-In-Reply-To: <20160921071955.21792-1-takahiro.akashi@linaro.org>
-References: <20160921071955.21792-1-takahiro.akashi@linaro.org>
-Message-ID: <20160921085721.GA18176@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 21 Sep 2016 11:58:14 +0300
+Subject: [GIT PULL] Allwinner late DT changes for 4.9
+Message-ID: <20160921085814.GA25513@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2016 at 04:19:55PM +0900, AKASHI Takahiro wrote:
-> Handle read-only cases (CONFIG_DEBUG_RODATA/CONFIG_DEBUG_SET_MODULE_RONX)
-> by using aarch64_insn_write() instead of probe_kernel_write().
-> See how this works:
->     commit 2f896d586610 ("arm64: use fixmap for text patching")
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Jason Wessel <jason.wessel@windriver.com>
-> Cc: <stable@vger.kernel.org> # 3.18-3.19: 2f896d5: arm64: use fixmap
-> Cc: <stable@vger.kernel.org> # 4.0-
+Hi Arnd, Olof, Kevin,
 
-For v3.18-v3.19, we also need commit f6242cac10427c54 ("arm64: Fix text
-patching logic when using fixmap"), so as to not break the
-!CONFIG_DEBUG_SET_MODULE_RONX case.
+This is a late (and last) PR for the Allwinner device trees.
 
-With that:
+It comes on top of the previous one (so it still has the dependency in
+the clock changes).
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Let me know if you have any questions,
+Maxime
 
-Thanks,
-Mark.
+The following changes since commit 7a988a4dd29a8cfcf405a12441533d765d25a6b8:
 
-> ---
->  arch/arm64/include/asm/debug-monitors.h |  2 --
->  arch/arm64/kernel/kgdb.c                | 36 ++++++++++++++++++++++-----------
->  2 files changed, 24 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-> index 4b6b3f7..b71420a 100644
-> --- a/arch/arm64/include/asm/debug-monitors.h
-> +++ b/arch/arm64/include/asm/debug-monitors.h
-> @@ -61,8 +61,6 @@
->  
->  #define AARCH64_BREAK_KGDB_DYN_DBG	\
->  	(AARCH64_BREAK_MON | (KGDB_DYN_DBG_BRK_IMM << 5))
-> -#define KGDB_DYN_BRK_INS_BYTE(x)	\
-> -	((AARCH64_BREAK_KGDB_DYN_DBG >> (8 * (x))) & 0xff)
->  
->  #define CACHE_FLUSH_IS_SAFE		1
->  
-> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> index 6732a27..b06a7a2 100644
-> --- a/arch/arm64/kernel/kgdb.c
-> +++ b/arch/arm64/kernel/kgdb.c
-> @@ -19,6 +19,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/bug.h>
->  #include <linux/cpumask.h>
->  #include <linux/irq.h>
->  #include <linux/irq_work.h>
-> @@ -26,6 +27,8 @@
->  #include <linux/kgdb.h>
->  #include <linux/kprobes.h>
->  #include <linux/percpu.h>
-> +#include <asm/debug-monitors.h>
-> +#include <asm/insn.h>
->  #include <asm/ptrace.h>
->  #include <asm/traps.h>
->  
-> @@ -370,15 +373,24 @@ void kgdb_arch_exit(void)
->  	unregister_die_notifier(&kgdb_notifier);
->  }
->  
-> -/*
-> - * ARM instructions are always in LE.
-> - * Break instruction is encoded in LE format
-> - */
-> -struct kgdb_arch arch_kgdb_ops = {
-> -	.gdb_bpt_instr = {
-> -		KGDB_DYN_BRK_INS_BYTE(0),
-> -		KGDB_DYN_BRK_INS_BYTE(1),
-> -		KGDB_DYN_BRK_INS_BYTE(2),
-> -		KGDB_DYN_BRK_INS_BYTE(3),
-> -	}
-> -};
-> +struct kgdb_arch arch_kgdb_ops;
-> +
-> +int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
-> +{
-> +	int err;
-> +
-> +	BUILD_BUG_ON(AARCH64_INSN_SIZE != BREAK_INSTR_SIZE);
-> +
-> +	err = aarch64_insn_read((void *)bpt->bpt_addr, (u32 *)bpt->saved_instr);
-> +	if (err)
-> +		return err;
-> +
-> +	return aarch64_insn_write((void *)bpt->bpt_addr,
-> +			(u32)AARCH64_BREAK_KGDB_DYN_DBG);
-> +}
-> +
-> +int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
-> +{
-> +	return aarch64_insn_write((void *)bpt->bpt_addr,
-> +			*(u32 *)bpt->saved_instr);
-> +}
-> -- 
-> 2.10.0
-> 
+  ARM: dts: gr8: Add support for the GR8 evaluation board (2016-09-11 22:23:17 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.9-3
+
+for you to fetch changes up to 90cb4b8c7e3af989c78227954e01455fc7c1e767:
+
+  ARM: dts: sun8i: Add accelerometer to polaroid-mid2407pxe03 (2016-09-21 11:48:09 +0300)
+
+----------------------------------------------------------------
+Allwinner DT changes for 4.9, late edition
+
+Here is a bunch of late changes for the 4.9 merge window, mostly:
+  - Added a bunch of touchscreens nodes to tablets
+  - Added support for the AXP806 PMIC found in the A80 boards
+  - Enabled a few pinmux options for the H3
+
+----------------------------------------------------------------
+Chen-Yu Tsai (5):
+      ARM: dts: sun9i: a80-optimus: Declare AXP809 SW regulator as unused
+      ARM: dts: sun9i: cubieboard4: Declare AXP809 SW regulator as unused
+      ARM: dts: sun9i: a80-optimus: Add AXP806 PMIC device node and regulators
+      ARM: dts: sun9i: cubieboard4: Add AXP806 PMIC device node and regulators
+      ARM: dts: sun9i: a80-optimus: Disable EHCI1
+
+Hans de Goede (6):
+      ARM: dts: sun8i: Add touchscreen node for sun8i-a23-gt90h
+      ARM: dts: sun8i: Add touchscreen node for sun8i-a23-inet86dz
+      ARM: dts: sun8i: Add touchscreen node for sun8i-a23-polaroid-mid2407pxe03
+      ARM: dts: sun8i: Add touchscreen node for sun8i-a23-polaroid-mid2809pxe04
+      ARM: dts: sun8i: Add touchscreen node for sun8i-a33-ga10h
+      ARM: dts: sun8i: Add accelerometer to polaroid-mid2407pxe03
+
+Icenowy Zheng (2):
+      ARM: dts: sun8i: add pinmux for UART1 at PG
+      ARM: dts: sun8i: enable UART1 for iNet D978 Rev2 board
+
+Jorik Jonker (5):
+      dts: sun8i-h3: add pinmux definitions for UART2-3
+      dts: sun8i-h3: split off RTS/CTS for UART1 in seperate pinmux
+      dts: sun8i-h3: associate exposed UARTs on Orange Pi Boards
+      dts: sun8i-h3: add pinmux definitions for I2C0-2
+      dts: sun8i-h3: add I2C0-2 peripherals to H3 SOC
+
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               |  10 ++
+ arch/arm/boot/dts/sun8i-a23-gt90h-v4.dts           |   9 ++
+ arch/arm/boot/dts/sun8i-a23-inet86dz.dts           |   9 ++
+ .../boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts   |  26 +++++
+ .../boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts   |   9 ++
+ arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts         |  10 ++
+ arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts     |  20 ++++
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |   2 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  18 +++
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  18 +++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  18 +++
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |  85 +++++++++++++-
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 116 +++++++++++++++++++
+ arch/arm/boot/dts/sun9i-a80-optimus.dts            | 123 ++++++++++++++++++++-
+ 14 files changed, 468 insertions(+), 5 deletions(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160921/3be903f5/attachment.sig>
