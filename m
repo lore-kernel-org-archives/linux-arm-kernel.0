@@ -1,34 +1,31 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 21 Sep 2016 15:41:31 +0300
-Subject: [PATCH v3 5/9] dmaengine: ti-dma-crossbar: Correct type for
- of_find_property() third parameter
+Date: Wed, 21 Sep 2016 15:41:33 +0300
+Subject: [PATCH v3 7/9] dmaengine: edma: enable COMPILE_TEST
 In-Reply-To: <20160921124135.11849-1-peter.ujfalusi@ti.com>
 References: <20160921124135.11849-1-peter.ujfalusi@ti.com>
-Message-ID: <20160921124135.11849-6-peter.ujfalusi@ti.com>
+Message-ID: <20160921124135.11849-8-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The correct type is int and not for the third parameter of
-of_find_property().
-Fixes compilation for 64bit architectures (x86_64, aarch64).
+To get more coverage, enable COMPILE_TEST for this driver.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/ti-dma-crossbar.c | 2 +-
+ drivers/dma/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti-dma-crossbar.c
-index 5ae294b256a7..e4f3bd1ae264 100644
---- a/drivers/dma/ti-dma-crossbar.c
-+++ b/drivers/dma/ti-dma-crossbar.c
-@@ -311,7 +311,7 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
- 	struct property *prop;
- 	struct resource *res;
- 	u32 safe_val;
--	size_t sz;
-+	int sz;
- 	void __iomem *iomem;
- 	int i, ret;
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index fe2dbb811e19..4348249b943a 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -515,7 +515,7 @@ config TI_DMA_CROSSBAR
  
+ config TI_EDMA
+ 	bool "TI EDMA support"
+-	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE
++	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE || COMPILE_TEST
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+ 	select TI_DMA_CROSSBAR if ARCH_OMAP
 -- 
 2.10.0
