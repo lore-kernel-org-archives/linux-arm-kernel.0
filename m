@@ -1,47 +1,45 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 21 Sep 2016 14:18:45 -0500
-Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
- register range for ACPI case
-In-Reply-To: <CADaLNDn4CeoB+sELQ5yQDQUS158raEu5QohPH2PsVtuGpfGKHg@mail.gmail.com>
-References: <20160919180900.GB13775@localhost>
- <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
- <20160920133327.GB13855@localhost>
- <CAKv+Gu-AE7fft_j2cqBCN=xrsf5Yh=mePf5x3dZJuKAmdxF-Gg@mail.gmail.com>
- <20160920140518.GD13855@localhost>
- <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
- <20160920191744.GA4941@localhost> <20160921140549.GA11968@red-moon>
- <20160921180457.GB20006@localhost>
- <CADaLNDn4CeoB+sELQ5yQDQUS158raEu5QohPH2PsVtuGpfGKHg@mail.gmail.com>
-Message-ID: <20160921191845.GD20006@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Sep 2016 21:29:22 +0200
+Subject: [PATCH V3 3/4] ARM64 LPC: support serial based on low-pin-count
+In-Reply-To: <815bebc1-96c9-2131-930d-bccdd4bf1c55@gmail.com>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <5525856.MfDSSsiP5d@wuerfel> <815bebc1-96c9-2131-930d-bccdd4bf1c55@gmail.com>
+Message-ID: <4518414.hTLWuvFlBl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2016 at 11:58:22AM -0700, Duc Dang wrote:
-> On Wed, Sep 21, 2016 at 11:04 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Wed, Sep 21, 2016 at 03:05:49PM +0100, Lorenzo Pieralisi wrote:
-
-> > The existing x86 practice is to use PNP0C02 devices for this purpose,
-> > and I think we should just follow that practice.
-> >
-> > ...
-> >
-> > My point is that the hard-coding should not be buried in a driver
-> > where it's invisible to the rest of the kernel.  If we hard-code it in
-> > a quirk that adds _CRS entries, then the kernel will work just like it
-> > would if the firmware had been correct in the first place.  The
-> > resource will appear in /sys/devices/pnp*/*/resources and /proc/iomem,
-> > and if we ever used _SRS to assign or move ACPI devices, we would know
-> > to avoid the bridge resource.
+On Wednesday, September 21, 2016 6:12:28 PM CEST zhichang wrote:
+> On 2016?09?15? 05:33, Arnd Bergmann wrote:
+> > On Wednesday, September 14, 2016 11:04:33 PM CEST zhichang.yuan wrote:
+> >> The 8250_hisi_lpc.c support both ACPI and dts similar to 8250_dw :
+> >>
+> >> +static struct platform_driver hs_lpc8250_driver = {
+> >> +       .driver = {
+> >> +               .name           = "hisi-lpc-uart",
+> >> +               .of_match_table = hs8250_of_match,
+> >> +               .acpi_match_table = ACPI_PTR(hs8250_acpi_match),
+> >>
+> >> So, I am a little confused why we need to support dts in 8250_of.c and support ACPI in another
+> >> driver file.
+> >>
+> > 
+> > After looking again, I'm pretty sure that drivers/tty/serial/8250/8250_pnp.c
+> > will handle the ACPI case without modifications, you just need to adapt
+> > the 8250_of driver to handle IORESOURCE_IO ports. This will be required
+> > anyway with the next version once the LPC bridge is on the PCI bus.
+> > 
 > 
-> Are you suggesting to add code similar to functions in
-> linux/drivers/pnp/quirks.c to declare/attach the additional resource
-> that the host need to have when the resource is not in MCFG table?
+> Yes. You are right.
+> 
+> When the indirectIO patch is accepted, no much changes needed in these two file to support LPC UART.
+> 
+> BTW, what is your target to change these two files to support LPC uart?
+> Do you think we don't need to add many new c files??
 
-Yes, but what I'm suggesting is actually a little stronger.  This has
-nothing to do with whether a resource is in the MCFG table or not.
+I think by modifying 8250_of.c, you should be able to make any UART on
+some LPC bus work, regardless of what controller is used.
 
-I'm suggesting ACPI firmware should always describe the resource.  If the
-firmware is defective and doesn't describe it, we should add a quirk in
-pnp/quirks.c to add a resource for it.
+The ACPI version (8250_pnp.c) shouldn't need any changes at all if I
+read that correctly.
 
-Bjorn
+	Arnd
