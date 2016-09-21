@@ -1,50 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Sep 2016 12:31:52 +0200
-Subject: [PATCH v2 2/9] dmaengine: edma: Use enum for eDMA binding type
- (legacy vs TPCC)
-In-Reply-To: <20160921102637.24845-3-peter.ujfalusi@ti.com>
-References: <20160921102637.24845-1-peter.ujfalusi@ti.com>
- <20160921102637.24845-3-peter.ujfalusi@ti.com>
-Message-ID: <7753810.Z3F41qkFaI@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 21 Sep 2016 11:35:50 +0100
+Subject: [PATCH] iommu/io-pgtable-arm: Using for_each_set_bit to simplify
+ the code
+In-Reply-To: <1474436491-26220-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1474436491-26220-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <3dd248de-5ef6-6255-fa7f-4f2c6a6de417@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 21, 2016 1:26:30 PM CEST Peter Ujfalusi wrote:
-> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> index c2098a4b4dcf..4c8818278fcc 100644
-> --- a/drivers/dma/edma.c
-> +++ b/drivers/dma/edma.c
-> @@ -261,8 +261,11 @@ static const struct edmacc_param dummy_paramset = {
->         .ccnt = 1,
->  };
->  
-> -#define EDMA_BINDING_LEGACY    0
-> -#define EDMA_BINDING_TPCC      1
-> +enum edma_binding_type {
-> +       EDMA_BINDING_LEGACY = 0,
-> +       EDMA_BINDING_TPCC,
-> +};
-> +
->  static const struct of_device_id edma_of_ids[] = {
->         {
->                 .compatible = "ti,edma3",
-> @@ -2184,7 +2187,8 @@ static int edma_probe(struct platform_device *pdev)
->                 const struct of_device_id *match;
->  
->                 match = of_match_node(edma_of_ids, node);
-> -               if (match && (u32)match->data == EDMA_BINDING_TPCC)
-> +               if (match &&
-> +                   (enum edma_binding_type)match->data == EDMA_BINDING_TPCC)
->                         legacy_mode = false;
->  
->                 info = edma_setup_info_from_dt(dev, legacy_mode);
-> -- 
-> 2.10.0
+On 21/09/16 06:41, Kefeng Wang wrote:
+> Using for_each_set_bit() to simplify the code.
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  drivers/iommu/io-pgtable-arm-v7s.c | 5 +----
+>  drivers/iommu/io-pgtable-arm.c     | 5 +----
+>  2 files changed, 2 insertions(+), 8 deletions(-)
 > 
-
-Are you sure this works on all architectures? IIRC the size of an enum
-is implementation defined, so this could still fail sometimes.
-
-I tend to use 'uintptr_t' for the cast instead.
-
-	Arnd
+> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+> index def8ca1..f23821b 100644
+> --- a/drivers/iommu/io-pgtable-arm-v7s.c
+> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
+> @@ -789,8 +789,7 @@ static int __init arm_v7s_do_selftests(void)
+>  	 * Distinct mappings of different granule sizes.
+>  	 */
+>  	iova = 0;
+> -	i = find_first_bit(&cfg.pgsize_bitmap, BITS_PER_LONG);
+> -	while (i != BITS_PER_LONG) {
+> +	for_each_set_bit(i, &cfg.pgsize_bitmap, BITS_PER_LONG) {
+>  		size = 1UL << i;
+>  		if (ops->map(ops, iova, iova, size, IOMMU_READ |
+>  						    IOMMU_WRITE |
+> @@ -807,8 +806,6 @@ static int __init arm_v7s_do_selftests(void)
+>  			return __FAIL(ops);
+>  
+>  		iova += SZ_16M;
+> -		i++;
+> -		i = find_next_bit(&cfg.pgsize_bitmap, BITS_PER_LONG, i);
+>  		loopnr++;
+>  	}
+>  
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index f5c90e1..8c3dfb7 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -980,8 +980,7 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
+>  		 * Distinct mappings of different granule sizes.
+>  		 */
+>  		iova = 0;
+> -		j = find_first_bit(&cfg->pgsize_bitmap, BITS_PER_LONG);
+> -		while (j != BITS_PER_LONG) {
+> +		for_each_set_bit(j, &cfg->pgsize_bitmap, BITS_PER_LONG) {
+>  			size = 1UL << j;
+>  
+>  			if (ops->map(ops, iova, iova, size, IOMMU_READ |
+> @@ -999,8 +998,6 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
+>  				return __FAIL(ops, i);
+>  
+>  			iova += SZ_1G;
+> -			j++;
+> -			j = find_next_bit(&cfg->pgsize_bitmap, BITS_PER_LONG, j);
+>  		}
+>  
+>  		/* Partial unmap */
+> 
