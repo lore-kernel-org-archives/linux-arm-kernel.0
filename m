@@ -1,70 +1,108 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 21 Sep 2016 08:57:26 +0100
-Subject: [PATCH] ARM: tegra: nyan: Enable GPU node and related supply
-In-Reply-To: <1474395433.1215.23.camel@paulk.fr>
-References: <20160918141311.17140-1-contact@paulk.fr>
- <f2489bf5-bb08-11f5-1b53-7a1568f20b6b@nvidia.com>
- <1474395433.1215.23.camel@paulk.fr>
-Message-ID: <e95335ae-ad19-b8cd-634b-63c6a0b88e01@nvidia.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Wed, 21 Sep 2016 09:56:59 +0200
+Subject: [PATCH 2/4] ARM: tegra: nyan: Use external control for bq24735
+ charger
+In-Reply-To: <90828c8d-e46d-0956-d6b3-e88fc90f3049@nvidia.com>
+References: <20160828173246.32621-1-contact@paulk.fr>
+ <20160828173246.32621-2-contact@paulk.fr>
+ <00697eef-0b36-1ff5-9c7a-43c1b53b52bc@nvidia.com>
+ <1474394567.1215.14.camel@paulk.fr>
+ <90828c8d-e46d-0956-d6b3-e88fc90f3049@nvidia.com>
+Message-ID: <1474444619.1239.13.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 20/09/16 19:17, Paul Kocialkowski wrote:
-> * PGP Signed by an unknown key
+Le mercredi 21 septembre 2016 ? 08:30 +0100, Jon Hunter a ?crit?:
+> On 20/09/16 19:02, Paul Kocialkowski wrote:
+> > 
+> > * PGP Signed by an unknown key
+> > 
+> > Le mardi 20 septembre 2016 ? 18:40 +0100, Jon Hunter a ?crit :
+> > > 
+> > > On 28/08/16 18:32, Paul Kocialkowski wrote:
+> > > > 
+> > > > ?
+> > > > Nyan boards come with an embedded controller that controls when to
+> > > > enable and disable the charge. Thus, it should not be left up to the
+> > > > kernel to handle that.
+> > > > ?
+> > > > Using the ti,external-control property allows specifying this use-case.
+> > > ?
+> > > So the bq24735 is populated under the EC's 'i2c-tunnel' property which
+> > > is there to specifically interface it's child devices to the host. So I
+> > > am a bit confused why this is expose to the host if it should not be used?
+> > 
+> > Well, it needs to access the information in the read-only registers provided
+> > by
+> > the chip, which is allowed by the setup in place that you described.
 > 
-> Le mardi 20 septembre 2016 ? 13:24 +0100, Jon Hunter a ?crit :
->> On 18/09/16 15:13, Paul Kocialkowski wrote:
->>>
->>> This enables the GPU node for tegra124 nyan boards, which is required to
->>> get graphics acceleration with nouveau on these devices.
->>>
->>> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
->>> ---
->>>  arch/arm/boot/dts/tegra124-nyan.dtsi | 8 +++++++-
->>>  1 file changed, 7 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi
->>> b/arch/arm/boot/dts/tegra124-nyan.dtsi
->>> index dab9509..225ca77 100644
->>> --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
->>> +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
->>> @@ -42,6 +42,12 @@
->>>  		};
->>>  	};
->>>  
->>> +	gpu at 0,57000000 {
->>> +		status = "okay";
->>> +
->>> +		vdd-supply = <&vdd_gpu>;
->>> +	};
->>> +
->>>  	serial at 70006000 {
->>>  		/* Debug connector on the bottom of the board near SD card.
->>> */
->>>  		status = "okay";
->>> @@ -214,7 +220,7 @@
->>>  					regulator-always-on;
->>>  				};
->>>  
->>> -				sd6 {
->>> +				vdd_gpu: sd6 {
->>>  					regulator-name = "+VDD_GPU_AP";
->>>  					regulator-min-microvolt = <650000>;
->>>  					regulator-max-microvolt =
->>> <1200000>;
->>>
->>
->> Looks good to me. I see the following error when booting but looking at the
->> code appears to be benign. Thierry, Alex, is this normal/okay?
+> Is this to expose the current state to the kernel so we can monitor the
+> battery state?
+
+Yes, that is correct.
+
+> > However, the EC has its internal state machine that decides when to start
+> > charging, etc and so should be the only one to write registers, to avoid
+> > conflicts.
+> > 
+> > > 
+> > > Again you may right and I did find the original series [0] for this
+> > > which specifically references the Acer Chromebook that needs this.
+> > > However, I am not sure why this was never populated? Is there any other
+> > > history here?
+> > 
+> > I am also confused about why it wasn't applied earlier. However, the cros
+> > kernel
+> > is using the very same scheme.
 > 
-> I have the same messages and asked Alexandre about them the other day. He told
-> me that it looks normal.
+> Do you have a reference?
 
-Ok great. Hopefully, Alex can ACK then.
+Sure thing, there's a similar commit for the dts[0] and one for the driver[1]
+(which was already merged in mainline).
 
-Cheers
-Jon
+> > > What is the actual problem you see without making this change?
+> > 
+> > There is a risk of conflict (even though it's probably not that
+> > significant),
+> > given the low variety of possible cases here. The idea is simply to say that
+> > the
+> > EC is in charge and to let it do its job without interfering.
+> > 
+> > > 
+> > > The original series states ...
+> > > ?
+> > > "On Acer Chromebook 13 (CB5-311) this module fails to load if the
+> > > charger is not inserted, and will error when it is removed."
+> > 
+> > I'm confused about that comment. At this point (and with this patch), it
+> > works
+> > normally.
+> 
+> Ok, I think Thierry prefers to only apply fixes for problems that can be
+> reproduced. Is there a simple way to check the battery status and
+> charging status via say the sysfs? If I can test that this has no
+> negative impact may be it is ok.
+
+Sure, this is exported at: /sys/class/power_supply/bq24735 at 5-0009
+Also, note that the power-supply next branch[2] has some more fixes for the
+bq24735 driver.
+
+Cheers,
+
+[0]:?https://chromium.googlesource.com/chromiumos/third_party/kernel/+/e25a91f87af41e29012a4e2dd7a9ab725efd308e
+[1]: https://chromium.googlesource.com/chromiumos/third_party/kernel/+/6b34e53d506b44f911d0fd246ccdc8b4e942e4ae
+[2]: https://git.kernel.org/cgit/linux/kernel/git/sre/linux-power-supply.git/log/?h=for-next
 
 -- 
-nvpublic
+Paul Kocialkowski, developer of low-level free software for embedded devices
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160921/be9788f1/attachment.sig>
