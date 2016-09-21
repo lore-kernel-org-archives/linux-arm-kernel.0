@@ -1,74 +1,135 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 20 Sep 2016 18:26:54 -0700
-Subject: [RFC PATCH 0/8] arm64: move thread_info off of the task stack
-In-Reply-To: <1473947349-14521-1-git-send-email-mark.rutland@arm.com>
-References: <1473947349-14521-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <f954c330-fb58-5f8f-1d66-5bbcd0d9dadb@redhat.com>
+From: yromanenko@carrietech.com (Yuriy Romanenko)
+Date: Tue, 20 Sep 2016 19:00:28 -0700
+Subject: [PATCH] ARM: *: mm: Implement get_user_pages_fast()
+Message-ID: <CACOPJM6AC5TwSEPUA7Df8F-FuChrjVP1TWVNeSrHt6ZaSyFiGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2016 06:49 AM, Mark Rutland wrote:
-> Building atop of Andy's work on x86 and generic code, these patches move
-> arm64's thread_info off of the stack and into task_struct. This protects
-> thread_info from corruption in the face of stack overflow, and serves as
-> a step towards fully robust stack overflow handling will be addressed by
-> subsequent patches.
->
-> In contrast to x86, we can't place some critical data such as
-> preempt_count in percpu variables, and we must store these in some
-> per-task location. This, compounded with the way headers are organised
-> conspires to require us to still define our own thread_info. I
-> understand that the longer term plan is to kill off thread_info
-> entirely, hence I'm sending this as an RFC so we can figure out if/how
-> we can achieve that.
->
-> These patches are based on Andy's x86/vmap_stack branch [1,2], and I've
-> pushed a copy to me arm64/ti-stack-split branch [3,4]. The result of
-> these patches boots happily on platforms within reach of my desk, but
-> has not seen much stressing so far.
->
+>From 6be781314e78ad43d797915189145a0aae41f639 Mon Sep 17 00:00:00 2001
+From: Yuriy Romanenko <yromanenko@carrietech.com>
+Date: Tue, 20 Sep 2016 18:50:16 -0700
+Subject: [PATCH] ARM: *: mm: Implement get_user_pages_fast()
 
-FWIW, I used your ti-stack-split branch while running some kernel builds
-and it seems to work well enough. You can take that as a Tested-by or I
-can re-test with a non-RFC version.
+Will do an unlocked walk of the page table, if that provides everything
+necessary, it will succeed and return, otherwise it will call the old
+slow path on the remainder
 
-> Thanks,
-> Mark.
->
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/luto/linux.git x86/vmap_stack
-> [2] https://git.kernel.org/cgit/linux/kernel/git/luto/linux.git/log/?h=x86/vmap_stack
-> [3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/ti-stack-split
-> [4] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/ti-stack-split
->
-> Mark Rutland (8):
->   thread_info: include <current.h> for THREAD_INFO_IN_TASK
->   thread_info: allow custom in-task thread_info
->   arm64: thread_info remove stale items
->   arm64: asm-offsets: remove unused definitions
->   arm64: assembler: introduce ldr_this_cpu
->   arm64: traps: use task_struct instead of thread_info
->   arm64: move sp_el0 and tpidr_el1 into cpu_suspend_ctx
->   arm64: split thread_info from task stack
->
->  arch/arm64/Kconfig                   |  2 ++
->  arch/arm64/include/asm/Kbuild        |  1 -
->  arch/arm64/include/asm/assembler.h   | 19 +++++++++++++++----
->  arch/arm64/include/asm/current.h     | 22 ++++++++++++++++++++++
->  arch/arm64/include/asm/smp.h         |  1 +
->  arch/arm64/include/asm/suspend.h     |  2 +-
->  arch/arm64/include/asm/thread_info.h | 21 ---------------------
->  arch/arm64/kernel/asm-offsets.c      |  3 +--
->  arch/arm64/kernel/entry.S            |  6 +++---
->  arch/arm64/kernel/head.S             | 11 +++++------
->  arch/arm64/kernel/process.c          | 31 ++++++++++++++++++++++++++-----
->  arch/arm64/kernel/sleep.S            |  3 ---
->  arch/arm64/kernel/smp.c              |  2 ++
->  arch/arm64/kernel/stacktrace.c       |  5 +++++
->  arch/arm64/kernel/suspend.c          |  6 ------
->  arch/arm64/kernel/traps.c            | 12 ++++++------
->  arch/arm64/mm/proc.S                 |  6 ++++++
->  include/linux/thread_info.h          |  4 +++-
->  init/Kconfig                         |  3 +++
->  19 files changed, 101 insertions(+), 59 deletions(-)
->  create mode 100644 arch/arm64/include/asm/current.h
->
+Signed-off-by: Yuriy Romanenko <yromanenko@carrietech.com>
+---
+ arch/arm/mm/Makefile |  2 +-
+ arch/arm/mm/gup.c    | 90 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 91 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mm/gup.c
+
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 7f76d96..096cfcb 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -6,7 +6,7 @@ obj-y := dma-mapping.o extable.o fault.o init.o \
+    iomap.o
+
+ obj-$(CONFIG_MMU) += fault-armv.o flush.o idmap.o ioremap.o \
+-   mmap.o pgd.o mmu.o pageattr.o
++   mmap.o pgd.o mmu.o pageattr.o gup.o
+
+ ifneq ($(CONFIG_MMU),y)
+ obj-y += nommu.o
+diff --git a/arch/arm/mm/gup.c b/arch/arm/mm/gup.c
+new file mode 100644
+index 0000000..6e57bc9
+--- /dev/null
++++ b/arch/arm/mm/gup.c
+@@ -0,0 +1,90 @@
++/*
++ * Lockless get_user_pages_fast for ARM
++ *
++ * Copyright (C) 2014 Lytro, Inc.
++ */
++
++#include <linux/sched.h>
++#include <linux/mm.h>
++#include <linux/vmstat.h>
++#include <linux/highmem.h>
++#include <linux/swap.h>
++
++#include <asm/pgtable.h>
++
++struct gup_private_data {
++ int nr;
++ struct page **pages;
++ int write;
++};
++
++static int gup_pte_entry(pte_t *ptep, unsigned long start,
++ unsigned long end, struct mm_walk *walk)
++{
++ struct gup_private_data *private_data =
++ (struct gup_private_data *)walk->private;
++ struct page * page;
++ pte_t pte = *ptep;
++ if (!pte_present(pte) ||
++ pte_special(pte) ||
++ (private_data->write && !pte_write(pte)))
++ {
++ return private_data->nr;
++ }
++ page = pte_page(pte);
++ get_page(page);
++ private_data->pages[private_data->nr++] = page;
++ return 0;
++}
++
++static int gup_pte_hole_entry(unsigned long start, unsigned long end,
++ struct mm_walk *walk)
++{
++ struct gup_private_data *private_data =
++ (struct gup_private_data *)walk->private;
++ return private_data->nr;
++}
++
++
++int get_user_pages_fast(unsigned long start, int nr_pages, int write,
++ struct page **pages)
++{
++ struct mm_struct *mm = current->mm;
++ int ret;
++ unsigned long page_addr = (start & PAGE_MASK);
++ int nr = 0;
++
++ struct gup_private_data private_data = {
++ .nr = 0,
++ .pages = pages,
++ .write = write
++ };
++
++ struct mm_walk gup_walk = {
++ .pte_entry = gup_pte_entry,
++ .pte_hole = gup_pte_hole_entry,
++ .mm = mm,
++ .private = (void *)&private_data
++ };
++
++ ret = walk_page_range(page_addr,
++ page_addr + nr_pages * PAGE_SIZE,
++ &gup_walk);
++ nr = ret ? ret : nr_pages;
++
++ if (nr == nr_pages)
++ {
++ return nr;
++ }
++ else
++ {
++ page_addr += (nr << PAGE_SHIFT);
++ }
++
++ down_read(&mm->mmap_sem);
++ ret = get_user_pages(current, mm, page_addr,
++ nr_pages - nr, write, 0, pages + nr, NULL);
++ up_read(&mm->mmap_sem);
++
++ return (ret < 0) ? nr : (ret + nr);
++}
+\ No newline@end of file
+-- 
+2.7.4
