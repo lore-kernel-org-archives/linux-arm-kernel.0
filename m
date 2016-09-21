@@ -1,83 +1,57 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 21 Sep 2016 14:16:13 +0800
-Subject: [GIT PULL] i.MX legacy board changes for 4.9
-Message-ID: <20160921061613.GI3744@tiger>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 21 Sep 2016 08:39:52 +0200
+Subject: iomux-mx3.h: possible macro precedence issue
+In-Reply-To: <1474438379.15981.1.camel@perches.com>
+References: <1474401744.1954.55.camel@perches.com>
+ <20160921060609.5efuaa2sdsti2j5g@pengutronix.de>
+ <1474438379.15981.1.camel@perches.com>
+Message-ID: <20160921063952.gloauhp76uuuibx6@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hello Joe,
 
-I know this is late for 4.9 merge window, but the patch series fixes a
-regression for i.MX legacy board support on linux-next [1].  So please
-pull it for 4.9 merge window.  Otherwise, we will need to get them in
-during 4.9-rc cycles.
+On Tue, Sep 20, 2016 at 11:12:59PM -0700, Joe Perches wrote:
+> > > -#define MX31_PIN_DTR_DTE1__DTR_DTE2	IOMUX_MODE(MX31_PIN_DTR_DTE1, IOMUX_OCONFIG_ALT3 | IOMUX_ICONFIG_NONE)
+> > > +#define MX31_PIN_DTR_DTE1__DTR_DTE2	IOMUX_MODE(MX31_PIN_DTR_DTE1, (IOMUX_OCONFIG_ALT3 | IOMUX_ICONFIG_NONE))
+> > > [...]
+> > > -#define IOMUX_MODE(pin, mode) (pin | mode << IOMUX_MODE_SHIFT)
+> > > +#define IOMUX_MODE(pin, mode) ((pin) | ((mode) << IOMUX_MODE_SHIFT))
+> >
+> > Joe, do you create a proper patch?
+> 
+> I just don't have the hardware and don't know what was intended
+> by the existing code.  It does appear to be a defect though.
 
-Thanks,
-Shawn
+I don't have that hardware either, but fixing this with just checking
+the hardware manual is good enough.
 
-[1] http://www.gossamer-threads.com/lists/linux/kernel/2529845
+The current definition makes MX31_PIN_DTR_DTE1__DTR_DTE2:
 
+	  MX31_PIN_DTR_DTE1__DTR_DTE2
+	= IOMUX_MODE(MX31_PIN_DTR_DTE1, IOMUX_OCONFIG_ALT3 | IOMUX_ICONFIG_NONE)
+	= (MX31_PIN_DTR_DTE1 | IOMUX_OCONFIG_ALT3 | IOMUX_ICONFIG_NONE << IOMUX_MODE_SHIFT)
+	= (IOMUX_PIN(44, 109) | (4 << 4) | 0 << 17)
+	= (0x586d | 0x40)
+	= 0x586d
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+while the expected value is
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+	  (MX31_PIN_DTR_DTE1 | (IOMUX_OCONFIG_ALT3 | IOMUX_ICONFIG_NONE) << IOMUX_MODE_SHIFT)
+	= (IOMUX_PIN(44, 109) | ((4 << 4) | 0) << 17)
+	= (0x586d | 0x800000)
+	= 0x80586d
 
-are available in the git repository at:
+The effect is that the input is routed nowhere (which is the case also
+with the issue fixed) and output is controlled by the GPIO module
+instead of the UART and so the pin doesn't operate as handshaking
+signal. (Assuming I interpreted everything correctly which I'm not sure
+given that I didn't touch i.MX31 for long and it's different that the
+other i.MX SoCs.)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-legacy-4.9
+Best regards
+Uwe
 
-for you to fetch changes up to 23fe1fd01c1e065907fdcd5cbfd35c02e5a418a2:
-
-  ARM: imx legacy: pca100: move peripheral initialization to .init_late (2016-09-20 22:39:07 +0800)
-
-----------------------------------------------------------------
-i.MX legacy board file changes for 4.9:
-
-It includes a patch series that moves registrations and initializations
-of all peripherals which are GPIO line consumers for all legacy boards
-from .init_machine to .init_late init level. This is needed to
-proactively prevent boot time issues on the legacy boards due to the
-deprioritized init level of the GPIO controller driver (set lower than
-IOMUX controller driver init level), which is shared among all i.MX
-SoCs.
-
-----------------------------------------------------------------
-Vladimir Zapolskiy (17):
-      ARM: imx legacy: kzm: move peripheral initialization to .init_late
-      ARM: imx legacy: mx31lite: move peripheral initialization to .init_late
-      ARM: imx legacy: mx31ads: move peripheral initialization to .init_late
-      ARM: imx legacy: mx31lilly: move peripheral initialization to .init_late
-      ARM: imx legacy: pcm037: move peripheral initialization to .init_late
-      ARM: imx legacy: mx31-3ds: move peripheral initialization to .init_late
-      ARM: imx legacy: qong: move peripheral initialization to .init_late
-      ARM: imx legacy: armadillo5x0: move peripheral initialization to .init_late
-      ARM: imx legacy: mx31moboard: move peripheral initialization to .init_late
-      ARM: imx legacy: vpr200: move peripheral initialization to .init_late
-      ARM: imx legacy: imx27-visstrim-m10: move peripheral initialization to .init_late
-      ARM: imx legacy: mx27-3ds: move peripheral initialization to .init_late
-      ARM: imx legacy: mx35-3ds: move peripheral initialization to .init_late
-      ARM: imx legacy: pcm043: move peripheral initialization to .init_late
-      ARM: imx legacy: mx21ads: move peripheral initialization to .init_late
-      ARM: imx legacy: mx27ads: move peripheral initialization to .init_late
-      ARM: imx legacy: pca100: move peripheral initialization to .init_late
-
- arch/arm/mach-imx/mach-armadillo5x0.c       | 39 ++++++++++-------
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c | 24 +++++++---
- arch/arm/mach-imx/mach-kzm_arm11_01.c       |  9 +++-
- arch/arm/mach-imx/mach-mx21ads.c            | 13 ++++--
- arch/arm/mach-imx/mach-mx27_3ds.c           | 30 ++++++++-----
- arch/arm/mach-imx/mach-mx27ads.c            | 13 ++++--
- arch/arm/mach-imx/mach-mx31_3ds.c           | 39 ++++++++++-------
- arch/arm/mach-imx/mach-mx31ads.c            | 18 ++++----
- arch/arm/mach-imx/mach-mx31lilly.c          | 50 +++++++++++++++------
- arch/arm/mach-imx/mach-mx31lite.c           | 68 ++++++++++++++++++++---------
- arch/arm/mach-imx/mach-mx31moboard.c        | 23 ++++++----
- arch/arm/mach-imx/mach-mx35_3ds.c           | 15 ++++---
- arch/arm/mach-imx/mach-pca100.c             | 26 ++++++-----
- arch/arm/mach-imx/mach-pcm037.c             | 67 ++++++++++++++--------------
- arch/arm/mach-imx/mach-pcm043.c             | 10 ++++-
- arch/arm/mach-imx/mach-qong.c               |  2 +-
- arch/arm/mach-imx/mach-vpr200.c             | 29 +++++++-----
- arch/arm/mach-imx/mx31lilly-db.c            | 20 ---------
- arch/arm/mach-imx/mx31lite-db.c             | 33 --------------
- 19 files changed, 301 insertions(+), 227 deletions(-)
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
