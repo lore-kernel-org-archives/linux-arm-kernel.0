@@ -1,9 +1,9 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 21 Sep 2016 15:41:33 +0300
-Subject: [PATCH v3 7/9] dmaengine: edma: enable COMPILE_TEST
+Date: Wed, 21 Sep 2016 15:41:34 +0300
+Subject: [PATCH v3 8/9] dmaengine: omap-dma: enable COMPILE_TEST
 In-Reply-To: <20160921124135.11849-1-peter.ujfalusi@ti.com>
 References: <20160921124135.11849-1-peter.ujfalusi@ti.com>
-Message-ID: <20160921124135.11849-8-peter.ujfalusi@ti.com>
+Message-ID: <20160921124135.11849-9-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,17 +15,17 @@ Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index fe2dbb811e19..4348249b943a 100644
+index 4348249b943a..84647d6cb2f4 100644
 --- a/drivers/dma/Kconfig
 +++ b/drivers/dma/Kconfig
-@@ -515,7 +515,7 @@ config TI_DMA_CROSSBAR
+@@ -130,7 +130,7 @@ config DMA_JZ4780
  
- config TI_EDMA
- 	bool "TI EDMA support"
--	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE
-+	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE || COMPILE_TEST
+ config DMA_OMAP
+ 	tristate "OMAP DMA support"
+-	depends on ARCH_OMAP
++	depends on ARCH_OMAP || COMPILE_TEST
  	select DMA_ENGINE
  	select DMA_VIRTUAL_CHANNELS
- 	select TI_DMA_CROSSBAR if ARCH_OMAP
+ 	select TI_DMA_CROSSBAR if SOC_DRA7XX
 -- 
 2.10.0
