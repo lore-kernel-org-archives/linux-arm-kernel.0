@@ -1,48 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 21 Sep 2016 09:55:28 +0200
-Subject: [PATCH] spi: atmel: use managed resource for gpio chip select
-Message-ID: <20160921075528.14452-1-nicolas.ferre@atmel.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 21 Sep 2016 10:56:14 +0300
+Subject: =?UTF-8?B?UmU6IFt2MTIsIDcvOF0gYmFzZTogc29jOiBpbnRyb2R1Y2Ugc29jX2Rldmlj?=
+ =?UTF-8?B?ZV9tYXRjaCgpIGludGVyZmFjZQ==?=
+In-Reply-To: <1474441040-11946-8-git-send-email-yangbo.lu@nxp.com>
+References: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
+ <1474441040-11946-8-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1474444574.270880035@f136.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the managed gpio CS pin request so that we avoid having trouble
-in the cleanup code.
-In fact, if module was configured with DT, cleanup code released
-invalid pin.  Since resource wasn't freed, module cannot be reinserted.
+>?????, 21 ???????? 2016, 9:57 +03:00 ?? Yangbo Lu <yangbo.lu@nxp.com>:
+>
+>From: Arnd Bergmann < arnd@arndb.de >
+>
+>We keep running into cases where device drivers want to know the exact
+>version of the a SoC they are currently running on. In the past, this has
+>usually been done through a vendor specific API that can be called by a
+>driver, or by directly accessing some kind of version register that is
+>not part of the device itself but that belongs to a global register area
+>of the chip.
+...
+>+const struct soc_device_attribute *soc_device_match(
+>+const struct soc_device_attribute *matches)
+>+{
+>+int ret = 0;
+>+
+>+if (!matches)
+>+return NULL;
+>+
+>+while (!ret) {
+>+if (!(matches->machine || matches->family ||
+>+      matches->revision || matches->soc_id))
+>+break;
+>+ret = bus_for_each_dev(&soc_bus_type, NULL, (void *)matches,
+>+       soc_device_match_one);
+>+if (!ret)
+>+matches++;
 
-Reported-by: Alexander Morozov <linux@meltdown.ru>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+So, what happen if next "matches" (after increment) will be NULL?
+
+I think you should use while(matches) at the start of this procedure.
+
 ---
- drivers/spi/spi-atmel.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 8feac599e9ab..4e3f2345844a 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -1248,7 +1248,8 @@ static int atmel_spi_setup(struct spi_device *spi)
- 			return -ENOMEM;
- 
- 		if (as->use_cs_gpios) {
--			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
-+			ret = devm_gpio_request(&spi->dev,
-+						npcs_pin, dev_name(&spi->dev));
- 			if (ret) {
- 				kfree(asd);
- 				return ret;
-@@ -1471,13 +1472,11 @@ static int atmel_spi_transfer_one_message(struct spi_master *master,
- static void atmel_spi_cleanup(struct spi_device *spi)
- {
- 	struct atmel_spi_device	*asd = spi->controller_state;
--	unsigned		gpio = (unsigned long) spi->controller_data;
- 
- 	if (!asd)
- 		return;
- 
- 	spi->controller_state = NULL;
--	gpio_free(gpio);
- 	kfree(asd);
- }
- 
--- 
-2.9.0
