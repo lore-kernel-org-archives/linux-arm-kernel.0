@@ -1,54 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 21 Sep 2016 12:10:48 +0200
-Subject: [PATCH] pinctrl: mvebu: orion5x: Generalise mv88f5181l support
- for 88f5181
-In-Reply-To: <CACRpkdbo6JmR=K58KQ_J0Gd5_gLqub65watU-iEabQ0rWdeVpQ@mail.gmail.com>
- (Linus Walleij's message of "Tue, 20 Sep 2016 23:54:48 +0200")
-References: <20160920162635.4195-1-gregory.clement@free-electrons.com>
- <CACRpkdbo6JmR=K58KQ_J0Gd5_gLqub65watU-iEabQ0rWdeVpQ@mail.gmail.com>
-Message-ID: <87a8f15zrr.fsf@free-electrons.com>
+From: zhichang.yuan02@gmail.com (zhichang)
+Date: Wed, 21 Sep 2016 18:12:28 +0800
+Subject: [PATCH V3 3/4] ARM64 LPC: support serial based on low-pin-count
+In-Reply-To: <5525856.MfDSSsiP5d@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <4340181.AghlmQIy28@wuerfel> <57D96701.4050700@hisilicon.com>
+ <5525856.MfDSSsiP5d@wuerfel>
+Message-ID: <815bebc1-96c9-2131-930d-bccdd4bf1c55@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
- 
- On mar., sept. 20 2016, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> On Tue, Sep 20, 2016 at 6:26 PM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->
->> From: Jamie Lentin <jm@lentin.co.uk>
+
+On 2016?09?15? 05:33, Arnd Bergmann wrote:
+> On Wednesday, September 14, 2016 11:04:33 PM CEST zhichang.yuan wrote:
+>> The 8250_hisi_lpc.c support both ACPI and dts similar to 8250_dw :
 >>
->> As far as I'm aware the mv88f5181-b1 and mv88f5181l are the same at the
->> pinctrl level, so re-use the definitions for both.
+>> +static struct platform_driver hs_lpc8250_driver = {
+>> +       .driver = {
+>> +               .name           = "hisi-lpc-uart",
+>> +               .of_match_table = hs8250_of_match,
+>> +               .acpi_match_table = ACPI_PTR(hs8250_acpi_match),
 >>
->> [gregory.clement at free-electrons.com: fix commit title]
->> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
->> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
->> Acked-by: Rob Herring <robh@kernel.org>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->
-> Is this the patch from your pull request?
+>> So, I am a little confused why we need to support dts in 8250_of.c and support ACPI in another
+>> driver file.
+>>
+> 
+> After looking again, I'm pretty sure that drivers/tty/serial/8250/8250_pnp.c
+> will handle the ACPI case without modifications, you just need to adapt
+> the 8250_of driver to handle IORESOURCE_IO ports. This will be required
+> anyway with the next version once the LPC bridge is on the PCI bus.
+> 
 
-yes this one.
+Yes. You are right.
 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Or do you prefer that I take it into the pinctrl tree?
+When the indirectIO patch is accepted, no much changes needed in these two file to support LPC UART.
 
-No it is ok, it will be in the second tentaive of my pull request.
+BTW, what is your target to change these two files to support LPC uart?
+Do you think we don't need to add many new c files??
 
-Thanks,
-
-Gregory
+Best,
+Zhichang
 
 
->
-> Yours,
-> Linus Walleij
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 	Arnd
+> 
