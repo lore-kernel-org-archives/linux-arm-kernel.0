@@ -1,127 +1,96 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Wed, 21 Sep 2016 14:57:20 +0800
-Subject: [v12, 8/8] mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-In-Reply-To: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
-References: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1474441040-11946-9-git-send-email-yangbo.lu@nxp.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 21 Sep 2016 16:19:55 +0900
+Subject: [PATCH v2] arm64: kgdb: handle read-only text / modules
+Message-ID: <20160921071955.21792-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eSDHC of T4240-R1.0-R2.0 has incorrect vender version and spec version.
-Acturally the right version numbers should be VVN=0x13 and SVN = 0x1.
-This patch adds the GUTS driver support for eSDHC driver to match SoC.
-And fix host version to avoid that incorrect version numbers break down
-the ADMA data transfer.
+Handle read-only cases (CONFIG_DEBUG_RODATA/CONFIG_DEBUG_SET_MODULE_RONX)
+by using aarch64_insn_write() instead of probe_kernel_write().
+See how this works:
+    commit 2f896d586610 ("arm64: use fixmap for text patching")
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Scott Wood <oss@buserror.net>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Jason Wessel <jason.wessel@windriver.com>
+Cc: <stable@vger.kernel.org> # 3.18-3.19: 2f896d5: arm64: use fixmap
+Cc: <stable@vger.kernel.org> # 4.0-
 ---
-Changes for v2:
-	- Got SVR through iomap instead of dts
-Changes for v3:
-	- Managed GUTS through syscon instead of iomap in eSDHC driver
-Changes for v4:
-	- Got SVR by GUTS driver instead of SYSCON
-Changes for v5:
-	- Changed to get SVR through API fsl_guts_get_svr()
-	- Combined patch 4, patch 5 and patch 6 into one
-Changes for v6:
-	- Added 'Acked-by: Ulf Hansson'
-Changes for v7:
-	- None
-Changes for v8:
-	- Added 'Acked-by: Scott Wood'
-Changes for v9:
-	- None
-Changes for v10:
-	- None
-Changes for v11:
-	- Changed to use soc_device_match
-Changes for v12:
-	- Matched soc through .family field instead of .soc_id
----
- drivers/mmc/host/Kconfig          |  1 +
- drivers/mmc/host/sdhci-of-esdhc.c | 20 ++++++++++++++++++++
- 2 files changed, 21 insertions(+)
+ arch/arm64/include/asm/debug-monitors.h |  2 --
+ arch/arm64/kernel/kgdb.c                | 36 ++++++++++++++++++++++-----------
+ 2 files changed, 24 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 5274f50..a1135a9 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -144,6 +144,7 @@ config MMC_SDHCI_OF_ESDHC
- 	depends on MMC_SDHCI_PLTFM
- 	depends on PPC || ARCH_MXC || ARCH_LAYERSCAPE
- 	select MMC_SDHCI_IO_ACCESSORS
-+	select FSL_GUTS
- 	help
- 	  This selects the Freescale eSDHC controller support.
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index 4b6b3f7..b71420a 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -61,8 +61,6 @@
  
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index fb71c86..57bdb9e 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -18,6 +18,7 @@
- #include <linux/of.h>
- #include <linux/delay.h>
- #include <linux/module.h>
-+#include <linux/sys_soc.h>
- #include <linux/mmc/host.h>
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
-@@ -28,6 +29,7 @@
- struct sdhci_esdhc {
- 	u8 vendor_ver;
- 	u8 spec_ver;
-+	bool quirk_incorrect_hostver;
- };
+ #define AARCH64_BREAK_KGDB_DYN_DBG	\
+ 	(AARCH64_BREAK_MON | (KGDB_DYN_DBG_BRK_IMM << 5))
+-#define KGDB_DYN_BRK_INS_BYTE(x)	\
+-	((AARCH64_BREAK_KGDB_DYN_DBG >> (8 * (x))) & 0xff)
  
- /**
-@@ -73,6 +75,8 @@ static u32 esdhc_readl_fixup(struct sdhci_host *host,
- static u16 esdhc_readw_fixup(struct sdhci_host *host,
- 				     int spec_reg, u32 value)
- {
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
- 	u16 ret;
- 	int shift = (spec_reg & 0x2) * 8;
+ #define CACHE_FLUSH_IS_SAFE		1
  
-@@ -80,6 +84,12 @@ static u16 esdhc_readw_fixup(struct sdhci_host *host,
- 		ret = value & 0xffff;
- 	else
- 		ret = (value >> shift) & 0xffff;
-+	/* Workaround for T4240-R1.0-R2.0 eSDHC which has incorrect
-+	 * vendor version and spec version information.
-+	 */
-+	if ((spec_reg == SDHCI_HOST_VERSION) &&
-+	    (esdhc->quirk_incorrect_hostver))
-+		ret = (VENDOR_V_23 << SDHCI_VENDOR_VER_SHIFT) | SDHCI_SPEC_200;
- 	return ret;
+diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+index 6732a27..b06a7a2 100644
+--- a/arch/arm64/kernel/kgdb.c
++++ b/arch/arm64/kernel/kgdb.c
+@@ -19,6 +19,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/bug.h>
+ #include <linux/cpumask.h>
+ #include <linux/irq.h>
+ #include <linux/irq_work.h>
+@@ -26,6 +27,8 @@
+ #include <linux/kgdb.h>
+ #include <linux/kprobes.h>
+ #include <linux/percpu.h>
++#include <asm/debug-monitors.h>
++#include <asm/insn.h>
+ #include <asm/ptrace.h>
+ #include <asm/traps.h>
+ 
+@@ -370,15 +373,24 @@ void kgdb_arch_exit(void)
+ 	unregister_die_notifier(&kgdb_notifier);
  }
  
-@@ -558,6 +568,12 @@ static const struct sdhci_pltfm_data sdhci_esdhc_le_pdata = {
- 	.ops = &sdhci_esdhc_le_ops,
- };
- 
-+static struct soc_device_attribute soc_incorrect_hostver[] = {
-+	{ .family = "QorIQ T4240", .revision = "1.0", },
-+	{ .family = "QorIQ T4240", .revision = "2.0", },
-+	{ },
-+};
+-/*
+- * ARM instructions are always in LE.
+- * Break instruction is encoded in LE format
+- */
+-struct kgdb_arch arch_kgdb_ops = {
+-	.gdb_bpt_instr = {
+-		KGDB_DYN_BRK_INS_BYTE(0),
+-		KGDB_DYN_BRK_INS_BYTE(1),
+-		KGDB_DYN_BRK_INS_BYTE(2),
+-		KGDB_DYN_BRK_INS_BYTE(3),
+-	}
+-};
++struct kgdb_arch arch_kgdb_ops;
 +
- static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- {
- 	struct sdhci_pltfm_host *pltfm_host;
-@@ -571,6 +587,10 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- 	esdhc->vendor_ver = (host_ver & SDHCI_VENDOR_VER_MASK) >>
- 			     SDHCI_VENDOR_VER_SHIFT;
- 	esdhc->spec_ver = host_ver & SDHCI_SPEC_VER_MASK;
-+	if (soc_device_match(soc_incorrect_hostver))
-+		esdhc->quirk_incorrect_hostver = true;
-+	else
-+		esdhc->quirk_incorrect_hostver = false;
- }
- 
- static int sdhci_esdhc_probe(struct platform_device *pdev)
++int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
++{
++	int err;
++
++	BUILD_BUG_ON(AARCH64_INSN_SIZE != BREAK_INSTR_SIZE);
++
++	err = aarch64_insn_read((void *)bpt->bpt_addr, (u32 *)bpt->saved_instr);
++	if (err)
++		return err;
++
++	return aarch64_insn_write((void *)bpt->bpt_addr,
++			(u32)AARCH64_BREAK_KGDB_DYN_DBG);
++}
++
++int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
++{
++	return aarch64_insn_write((void *)bpt->bpt_addr,
++			*(u32 *)bpt->saved_instr);
++}
 -- 
-2.1.0.27.g96db324
+2.10.0
