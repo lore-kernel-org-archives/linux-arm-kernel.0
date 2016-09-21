@@ -1,32 +1,26 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Wed, 21 Sep 2016 14:57:15 +0800
-Subject: [v12,
- 3/8] dt: bindings: move guts devicetree doc out of powerpc directory
+Date: Wed, 21 Sep 2016 14:57:14 +0800
+Subject: [v12, 2/8] ARM64: dts: ls2080a: add device configuration node
 In-Reply-To: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
 References: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1474441040-11946-4-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1474441040-11946-3-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move guts devicetree doc to Documentation/devicetree/bindings/soc/fsl/
-since it's used by not only PowerPC but also ARM. And add a specification
-for 'little-endian' property.
+Add the dts node for device configuration unit that provides
+general purpose configuration and status for the device.
 
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Acked-by: Scott Wood <oss@buserror.net>
 ---
-Changes for v4:
-	- Added this patch
 Changes for v5:
-	- Modified the description for little-endian property
+	- Added this patch
 Changes for v6:
 	- None
 Changes for v7:
 	- None
 Changes for v8:
 	- Added 'Acked-by: Scott Wood'
-	- Added 'Acked-by: Rob Herring'
 Changes for v9:
 	- None
 Changes for v10:
@@ -36,26 +30,25 @@ Changes for v11:
 Changes for v12:
 	- None
 ---
- Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt | 3 +++
- 1 file changed, 3 insertions(+)
- rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt b/Documentation/devicetree/bindings/soc/fsl/guts.txt
-similarity index 91%
-rename from Documentation/devicetree/bindings/powerpc/fsl/guts.txt
-rename to Documentation/devicetree/bindings/soc/fsl/guts.txt
-index b71b203..07adca9 100644
---- a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt
-+++ b/Documentation/devicetree/bindings/soc/fsl/guts.txt
-@@ -25,6 +25,9 @@ Recommended properties:
-  - fsl,liodn-bits : Indicates the number of defined bits in the LIODN
-    registers, for those SOCs that have a PAMU device.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index e3b6034..f231a14 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -215,6 +215,12 @@
+ 			clocks = <&sysclk>;
+ 		};
  
-+ - little-endian : Indicates that the global utilities block is little
-+   endian. The default is big endian.
++		dcfg: dcfg at 1e00000 {
++			compatible = "fsl,ls2080a-dcfg", "syscon";
++			reg = <0x0 0x1e00000 0x0 0x10000>;
++			little-endian;
++		};
 +
- Examples:
- 	global-utilities at e0000 {	/* global utilities block */
- 		compatible = "fsl,mpc8548-guts";
+ 		serial0: serial at 21c0500 {
+ 			compatible = "fsl,ns16550", "ns16550a";
+ 			reg = <0x0 0x21c0500 0x0 0x100>;
 -- 
 2.1.0.27.g96db324
