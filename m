@@ -1,65 +1,51 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Wed, 21 Sep 2016 14:57:12 +0800
-Subject: [v12, 0/8] Fix eSDHC host version register bug
-Message-ID: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
+Date: Wed, 21 Sep 2016 14:57:13 +0800
+Subject: [v12, 1/8] dt: bindings: update Freescale DCFG compatible
+In-Reply-To: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
+References: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1474441040-11946-2-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
-eSDHC controller. To match the SoC version and revision, 10 previous version
-patchsets had tried many methods but all of them were rejected by reviewers.
-Such as
-	- dts compatible method
-	- syscon method
-	- ifdef PPC method
-	- GUTS driver getting SVR method
-Anrd suggested a soc_device_match method in v10, and this is the only available
-method left now. This v11 patchset introduces the soc_device_match interface in
-soc driver.
+Update Freescale DCFG compatible with 'fsl,<chip>-dcfg' instead
+of 'fsl,ls1021a-dcfg' to include more chips such as ls1021a,
+ls1043a, and ls2080a.
 
-The first six patches of Yangbo are to add the GUTS driver. This is used to
-register a soc device which contain soc version and revision information.
-The other two patches introduce the soc_device_match method in soc driver
-and apply it on esdhc driver to fix this bug.
+Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Scott Wood <oss@buserror.net>
+---
+Changes for v8:
+	- Added this patch
+Changes for v9:
+	- Added a list for the possible compatibles
+Changes for v10:
+	- None
+Changes for v11:
+	- Added 'Acked-by: Rob Herring'
+	- Updated commit message by Scott
+Changes for v12:
+	- None
+---
+ Documentation/devicetree/bindings/arm/fsl.txt | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Arnd Bergmann (1):
-  base: soc: introduce soc_device_match() interface
-
-Yangbo Lu (7):
-  dt: bindings: update Freescale DCFG compatible
-  ARM64: dts: ls2080a: add device configuration node
-  dt: bindings: move guts devicetree doc out of powerpc directory
-  powerpc/fsl: move mpc85xx.h to include/linux/fsl
-  soc: fsl: add GUTS driver for QorIQ platforms
-  MAINTAINERS: add entry for Freescale SoC drivers
-  mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-
- Documentation/devicetree/bindings/arm/fsl.txt      |   6 +-
- .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
- MAINTAINERS                                        |  11 +-
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 +
- arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
- arch/powerpc/sysdev/fsl_pci.c                      |   2 +-
- drivers/base/Kconfig                               |   1 +
- drivers/base/soc.c                                 |  66 ++++++
- drivers/clk/clk-qoriq.c                            |   3 +-
- drivers/i2c/busses/i2c-mpc.c                       |   2 +-
- drivers/iommu/fsl_pamu.c                           |   3 +-
- drivers/mmc/host/Kconfig                           |   1 +
- drivers/mmc/host/sdhci-of-esdhc.c                  |  20 ++
- drivers/net/ethernet/freescale/gianfar.c           |   2 +-
- drivers/soc/Kconfig                                |   2 +-
- drivers/soc/fsl/Kconfig                            |  19 ++
- drivers/soc/fsl/Makefile                           |   1 +
- drivers/soc/fsl/guts.c                             | 257 +++++++++++++++++++++
- include/linux/fsl/guts.h                           | 125 ++++++----
- .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
- include/linux/sys_soc.h                            |   3 +
- 21 files changed, 478 insertions(+), 61 deletions(-)
- rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
- create mode 100644 drivers/soc/fsl/Kconfig
- create mode 100644 drivers/soc/fsl/guts.c
- rename arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h (97%)
-
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index dbbc095..713c1ae 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -119,7 +119,11 @@ Freescale DCFG
+ configuration and status for the device. Such as setting the secondary
+ core start address and release the secondary core from holdoff and startup.
+   Required properties:
+-  - compatible: should be "fsl,ls1021a-dcfg"
++  - compatible: should be "fsl,<chip>-dcfg"
++    Possible compatibles:
++	"fsl,ls1021a-dcfg"
++	"fsl,ls1043a-dcfg"
++	"fsl,ls2080a-dcfg"
+   - reg : should contain base address and length of DCFG memory-mapped registers
+ 
+ Example:
 -- 
 2.1.0.27.g96db324
