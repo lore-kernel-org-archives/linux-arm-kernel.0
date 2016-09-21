@@ -1,67 +1,46 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Wed, 21 Sep 2016 23:03:57 +0530
-Subject: [PATCH] clocksource: bcm2835_timer: Unmap region obtained by of_iomap
-Message-ID: <1474479237-10356-1-git-send-email-arvind.yadav.cs@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 21 Sep 2016 13:34:44 -0400
+Subject: [PATCH V6 0/5] ECAM quirks handling for ARM64 platforms
+In-Reply-To: <20160921173129.GA20006@localhost>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <20160920192636.GB4941@localhost>
+ <0429663d51ed8e93fb0c96261dd2ecc7@codeaurora.org>
+ <20160921131107.GB10804@localhost>
+ <25529f96-3e80-0524-82d8-6eeb517df5b5@codeaurora.org>
+ <20160921173129.GA20006@localhost>
+Message-ID: <3137f181-1c23-ca56-fbca-b2cdbabd784b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Free memory mapping, if bcm2835_timer_init is not successful.
+On 9/21/2016 1:31 PM, Bjorn Helgaas wrote:
+> On Wed, Sep 21, 2016 at 10:07:36AM -0400, Sinan Kaya wrote:
+>> On 9/21/2016 9:11 AM, Bjorn Helgaas wrote:
+>>> On Tue, Sep 20, 2016 at 09:15:14PM -0400, cov at codeaurora.org wrote:
+>>>> Hi Bjorn, Thomasz,
+>>>>
+>>
+>>>>
+>>>> Did you delete this because there were no current users, because you'd
+>>>> prefer users just use "-1", or for some other reason?
+>>>
+>>> I removed it because there were no users of it and, more importantly,
+>>> the code doesn't implement support for it.
+>>
+>> Is it possible to queue up Cov's patch as part of this effort once he 
+>> rebases and sends an updated version? Cov will have to implement something
+>> else now.
+> 
+> I haven't see Cov's patch (patchwork doesn't follow URLs to git trees,
+> and I normally don't either).  If they show up on the mailing list,
+> I'll take a look, of course.
+> 
+> Bjorn
+> 
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/clocksource/bcm2835_timer.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+Thanks, I talked to Cov today. He's getting ready to post the rebased patch
+once he completes testing.
 
-diff --git a/drivers/clocksource/bcm2835_timer.c b/drivers/clocksource/bcm2835_timer.c
-index e71acf2..f2f29d2 100644
---- a/drivers/clocksource/bcm2835_timer.c
-+++ b/drivers/clocksource/bcm2835_timer.c
-@@ -96,7 +96,7 @@ static int __init bcm2835_timer_init(struct device_node *node)
- 	ret = of_property_read_u32(node, "clock-frequency", &freq);
- 	if (ret) {
- 		pr_err("Can't read clock-frequency");
--		return ret;
-+		goto err_iounmap;
- 	}
- 
- 	system_clock = base + REG_COUNTER_LO;
-@@ -108,13 +108,15 @@ static int __init bcm2835_timer_init(struct device_node *node)
- 	irq = irq_of_parse_and_map(node, DEFAULT_TIMER);
- 	if (irq <= 0) {
- 		pr_err("Can't parse IRQ");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto err_iounmap;
- 	}
- 
- 	timer = kzalloc(sizeof(*timer), GFP_KERNEL);
- 	if (!timer) {
- 		pr_err("Can't allocate timer struct\n");
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto err_iounmap;
- 	}
- 
- 	timer->control = base + REG_CONTROL;
-@@ -133,7 +135,7 @@ static int __init bcm2835_timer_init(struct device_node *node)
- 	ret = setup_irq(irq, &timer->act);
- 	if (ret) {
- 		pr_err("Can't set up timer IRQ\n");
--		return ret;
-+		goto err_iounmap;
- 	}
- 
- 	clockevents_config_and_register(&timer->evt, freq, 0xf, 0xffffffff);
-@@ -141,6 +143,10 @@ static int __init bcm2835_timer_init(struct device_node *node)
- 	pr_info("bcm2835: system timer (irq = %d)\n", irq);
- 
- 	return 0;
-+
-+err_iounmap:
-+	iounmap(base);
-+	return ret;
- }
- CLOCKSOURCE_OF_DECLARE(bcm2835, "brcm,bcm2835-system-timer",
- 			bcm2835_timer_init);
 -- 
-2.7.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
