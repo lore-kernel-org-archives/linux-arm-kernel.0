@@ -1,36 +1,66 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 21 Sep 2016 11:37:24 -0700
-Subject: [PATCH v2] drivers: psci: PSCI checker module
-In-Reply-To: <20160921143905.36197-1-kevin.brodsky@arm.com> (Kevin Brodsky's
- message of "Wed, 21 Sep 2016 15:39:05 +0100")
-References: <20160921143905.36197-1-kevin.brodsky@arm.com>
-Message-ID: <7hfuothzff.fsf@baylibre.com>
+Date: Wed, 21 Sep 2016 11:38:55 -0700
+Subject: [PATCH v2 2/6] Documentation: dt-bindings: Add documentation for
+ the Meson USB2 PHYs
+In-Reply-To: <20160920142944.GA16016@rob-hp-laptop> (Rob Herring's message of
+ "Tue, 20 Sep 2016 09:29:45 -0500")
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20160911134111.31141-1-martin.blumenstingl@googlemail.com>
+ <20160911134111.31141-3-martin.blumenstingl@googlemail.com>
+ <20160920142944.GA16016@rob-hp-laptop>
+Message-ID: <7ha8f1hzcw.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Brodsky <kevin.brodsky@arm.com> writes:
+Rob Herring <robh@kernel.org> writes:
 
-> On arm and arm64, PSCI is one of the possible firmware interfaces
-> used for power management. This includes both turning CPUs on and off,
-> and suspending them (entering idle states).
+> On Sun, Sep 11, 2016 at 03:41:07PM +0200, Martin Blumenstingl wrote:
+>> Add the documentation for the bindings for the Meson8b and GXBB USB2
+>> PHYs.
+>> 
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> ---
+>>  .../devicetree/bindings/phy/meson-usb2-phy.txt     | 27 ++++++++++++++++++++++
+>>  1 file changed, 27 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
+>> 
+>> diff --git a/Documentation/devicetree/bindings/phy/meson-usb2-phy.txt b/Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
+>> new file mode 100644
+>> index 0000000..9da5ea2
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
+>> @@ -0,0 +1,27 @@
+>> +* Amlogic USB2 PHY
+>> +
+>> +Required properties:
+>> +- compatible:	Depending on the platform this should be one of:
+>> +	"amlogic,meson8b-usb2-phy"
+>> +	"amlogic,meson-gxbb-usb2-phy"
+>> +- reg:		The base address and length of the registers
+>> +- #phys-cells:	should be 0 (see phy-bindings.txt in this directory)
+>> +- clocks:	phandle and clock identifier for the phy clocks
+>> +- clock-names:	"usb_general" and "usb"
+>> +
+>> +Optional properties:
+>> +- resets:	reference to the reset controller
+>> +- phy-supply:	see phy-bindings.txt in this directory
+>> +
+>> +
+>> +Example:
+>> +
+>> +usb0_phy: usb_phy at 0 {
 >
-> This patch adds a PSCI checker module that enables basic testing of
-> PSCI operations during startup. There are two main tests: CPU
-> hotplugging and suspending.
+> usb-phy at 0
 >
-> In the hotplug tests, the hotplug API is used to turn off and on again
-> all CPUs in the system, and then all CPUs in each cluster, checking
-> the consistency of the return codes.
+> With that,
 >
-> In the suspend tests, a high-priority thread is created on each core
-> and uses low-level cpuidle functionalities to enter suspend, in all
-> the possible states and multiple times. This should allow a maximum
-> number of CPUs to enter the same sleep state at the same or slightly
-> different time.
+> Acked-by: Rob Herring <robh@kernel.org>
+>
 
-Since you're doing it multiple times, it might be useful to track the
-actual time it takes to suspend and wakeup, and possibly even warn
-if the time is longer than the target_residency.  This could catch
-poorly configured idle states.
+Oops, I had already merged this one.
+
+Martin, can you send a fixup patch for the underscores?
+
+Thanks,
 
 Kevin
