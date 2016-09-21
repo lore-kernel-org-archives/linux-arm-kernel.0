@@ -1,30 +1,36 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 21 Sep 2016 14:17:05 -0400
-Subject: ftrace function_graph causes system crash
-In-Reply-To: <20160921171307.3fb84c87@xhacker>
-References: <7d0e88fff8e64591ac31be3adbbf763c@SIWEX5A.sing.micron.com>
- <20160920100716.131d3647@gandalf.local.home>
- <0e38f79fdc1f4671943da74764c15050@SIWEX5A.sing.micron.com>
- <20160921171307.3fb84c87@xhacker>
-Message-ID: <20160921141705.6ab0be03@gandalf.local.home>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 21 Sep 2016 11:37:24 -0700
+Subject: [PATCH v2] drivers: psci: PSCI checker module
+In-Reply-To: <20160921143905.36197-1-kevin.brodsky@arm.com> (Kevin Brodsky's
+ message of "Wed, 21 Sep 2016 15:39:05 +0100")
+References: <20160921143905.36197-1-kevin.brodsky@arm.com>
+Message-ID: <7hfuothzff.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Sep 2016 17:13:07 +0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
+Kevin Brodsky <kevin.brodsky@arm.com> writes:
 
-> I'm not sure whether the commit d6df3576e6b4 ("clocksource/drivers/arm_global_timer
-> : Prevent ftrace recursion") can fix this issue.
-> 
-> this commit is merged since v4.3, I noticed your kernel version is v4.0
+> On arm and arm64, PSCI is one of the possible firmware interfaces
+> used for power management. This includes both turning CPUs on and off,
+> and suspending them (entering idle states).
+>
+> This patch adds a PSCI checker module that enables basic testing of
+> PSCI operations during startup. There are two main tests: CPU
+> hotplugging and suspending.
+>
+> In the hotplug tests, the hotplug API is used to turn off and on again
+> all CPUs in the system, and then all CPUs in each cluster, checking
+> the consistency of the return codes.
+>
+> In the suspend tests, a high-priority thread is created on each core
+> and uses low-level cpuidle functionalities to enter suspend, in all
+> the possible states and multiple times. This should allow a maximum
+> number of CPUs to enter the same sleep state at the same or slightly
+> different time.
 
-BTW, yes, that would be the fix.
+Since you're doing it multiple times, it might be useful to track the
+actual time it takes to suspend and wakeup, and possibly even warn
+if the time is longer than the target_residency.  This could catch
+poorly configured idle states.
 
--- Steve
-
-> 
-> Thanks,
-> Jisheng
-> 
-> > Do you know now how to deeply debug and trace which line is wrong through Ftrace?
-> > 
+Kevin
