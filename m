@@ -1,96 +1,62 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 21 Sep 2016 16:19:55 +0900
-Subject: [PATCH v2] arm64: kgdb: handle read-only text / modules
-Message-ID: <20160921071955.21792-1-takahiro.akashi@linaro.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed, 21 Sep 2016 15:19:56 +0800
+Subject: [PATCH 1/2] dt: bindings: add allwinner,
+ otg-routed property for phy-sun4i-usb
+In-Reply-To: <4a1ab62a-4091-fd75-d753-fb30585dffa5@redhat.com>
+References: <20160921070406.27445-1-icenowy@aosc.xyz>
+ <4a1ab62a-4091-fd75-d753-fb30585dffa5@redhat.com>
+Message-ID: <6718551474442396@web16h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle read-only cases (CONFIG_DEBUG_RODATA/CONFIG_DEBUG_SET_MODULE_RONX)
-by using aarch64_insn_write() instead of probe_kernel_write().
-See how this works:
-    commit 2f896d586610 ("arm64: use fixmap for text patching")
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Jason Wessel <jason.wessel@windriver.com>
-Cc: <stable@vger.kernel.org> # 3.18-3.19: 2f896d5: arm64: use fixmap
-Cc: <stable@vger.kernel.org> # 4.0-
----
- arch/arm64/include/asm/debug-monitors.h |  2 --
- arch/arm64/kernel/kgdb.c                | 36 ++++++++++++++++++++++-----------
- 2 files changed, 24 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index 4b6b3f7..b71420a 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -61,8 +61,6 @@
- 
- #define AARCH64_BREAK_KGDB_DYN_DBG	\
- 	(AARCH64_BREAK_MON | (KGDB_DYN_DBG_BRK_IMM << 5))
--#define KGDB_DYN_BRK_INS_BYTE(x)	\
--	((AARCH64_BREAK_KGDB_DYN_DBG >> (8 * (x))) & 0xff)
- 
- #define CACHE_FLUSH_IS_SAFE		1
- 
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index 6732a27..b06a7a2 100644
---- a/arch/arm64/kernel/kgdb.c
-+++ b/arch/arm64/kernel/kgdb.c
-@@ -19,6 +19,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/bug.h>
- #include <linux/cpumask.h>
- #include <linux/irq.h>
- #include <linux/irq_work.h>
-@@ -26,6 +27,8 @@
- #include <linux/kgdb.h>
- #include <linux/kprobes.h>
- #include <linux/percpu.h>
-+#include <asm/debug-monitors.h>
-+#include <asm/insn.h>
- #include <asm/ptrace.h>
- #include <asm/traps.h>
- 
-@@ -370,15 +373,24 @@ void kgdb_arch_exit(void)
- 	unregister_die_notifier(&kgdb_notifier);
- }
- 
--/*
-- * ARM instructions are always in LE.
-- * Break instruction is encoded in LE format
-- */
--struct kgdb_arch arch_kgdb_ops = {
--	.gdb_bpt_instr = {
--		KGDB_DYN_BRK_INS_BYTE(0),
--		KGDB_DYN_BRK_INS_BYTE(1),
--		KGDB_DYN_BRK_INS_BYTE(2),
--		KGDB_DYN_BRK_INS_BYTE(3),
--	}
--};
-+struct kgdb_arch arch_kgdb_ops;
-+
-+int kgdb_arch_set_breakpoint(struct kgdb_bkpt *bpt)
-+{
-+	int err;
-+
-+	BUILD_BUG_ON(AARCH64_INSN_SIZE != BREAK_INSTR_SIZE);
-+
-+	err = aarch64_insn_read((void *)bpt->bpt_addr, (u32 *)bpt->saved_instr);
-+	if (err)
-+		return err;
-+
-+	return aarch64_insn_write((void *)bpt->bpt_addr,
-+			(u32)AARCH64_BREAK_KGDB_DYN_DBG);
-+}
-+
-+int kgdb_arch_remove_breakpoint(struct kgdb_bkpt *bpt)
-+{
-+	return aarch64_insn_write((void *)bpt->bpt_addr,
-+			*(u32 *)bpt->saved_instr);
-+}
--- 
-2.10.0
+21.09.2016, 15:10, "Hans de Goede" <hdegoede@redhat.com>:
+> Hi,
+>
+> On 09/21/2016 10:04 AM, Icenowy Zheng wrote:
+>> ?On some newer Allwinner SoCs (H3 or A64), the PHY0 can be either routed to
+>> ?the MUSB controller (which is an OTG controller) or the OHCI/EHCI pair
+>> ?(which is a Host-only controller, but more stable and easy to implement).
+>>
+>> ?This property marks whether on a certain board which controller should be
+>> ?attached to the PHY.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>
+> Erm, I think that the idea here is to dynamically switch the routing
+> based on the id-pin of the otg connector. IOW use the musb controller
+> for device mode, and the ehci/ohci proper for proper host support
+> when in host mode.
+
+At least on some boards this implementation works...
+
+(I mean Pine64, which has two USB-A connectors)
+
+>
+> Regards,
+>
+> Hans
+>
+>> ?---
+>> ??Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 7 +++++++
+>> ??1 file changed, 7 insertions(+)
+>>
+>> ?diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> ?index 287150d..5c11d57 100644
+>> ?--- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> ?+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> ?@@ -36,6 +36,13 @@ Optional properties:
+>> ??- usb1_vbus-supply : regulator phandle for controller usb1 vbus
+>> ??- usb2_vbus-supply : regulator phandle for controller usb2 vbus
+>>
+>> ?+Optional properties for H3 or A64 SoCs:
+>> ?+- allwinner,otg-routed : USB0 (OTG) PHY is routed to OHCI/EHCI pair rather than
+>> ?+ MUSB. (boolean, if this property is set, the OHCI/EHCI
+>> ?+ controllers at PHY0 should be enabled and the MUSB
+>> ?+ controller must *NOT* be enabled, and thus the PHY can
+>> ?+ only work in host mode)
+>> ?+
+>> ??Example:
+>> ??????????usbphy: phy at 0x01c13400 {
+>> ??????????????????#phy-cells = <1>;
