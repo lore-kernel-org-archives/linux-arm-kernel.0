@@ -1,65 +1,87 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 21 Sep 2016 10:20:27 +0200
-Subject: [PATCH] spi: atmel: use managed resource for gpio chip select
-In-Reply-To: <20160921075528.14452-1-nicolas.ferre@atmel.com>
-References: <20160921075528.14452-1-nicolas.ferre@atmel.com>
-Message-ID: <CAMuHMdUQLkHn4=3U6TNjgTN--RUHZHsbwNu9dLdFrBJA0sx4aw@mail.gmail.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Wed, 21 Sep 2016 08:23:41 +0000
+Subject: [PATCH V7 0/6] thermal: bcm2835: add thermal driver
+Message-ID: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+From: Martin Sperl <kernel@martin.sperl.org>
 
-On Wed, Sep 21, 2016 at 9:55 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Use the managed gpio CS pin request so that we avoid having trouble
-> in the cleanup code.
-> In fact, if module was configured with DT, cleanup code released
-> invalid pin.  Since resource wasn't freed, module cannot be reinserted.
->
-> Reported-by: Alexander Morozov <linux@meltdown.ru>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  drivers/spi/spi-atmel.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 8feac599e9ab..4e3f2345844a 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -1248,7 +1248,8 @@ static int atmel_spi_setup(struct spi_device *spi)
->                         return -ENOMEM;
->
->                 if (as->use_cs_gpios) {
-> -                       ret = gpio_request(npcs_pin, dev_name(&spi->dev));
-> +                       ret = devm_gpio_request(&spi->dev,
-> +                                               npcs_pin, dev_name(&spi->dev));
+Add a thermal driver for the TSENSE device of the bcm2835/6/7 SOC.
 
-Note that spi_master.setup() can be called multiple times during the lifetime
-of the spi_device.
+If the firmware enables the HW, then the configuration is not touched.
+In case the firmware has not enabled the device, then we try to set
+it up correctly (which unfortunately can not get tested).
 
->                         if (ret) {
->                                 kfree(asd);
->                                 return ret;
-> @@ -1471,13 +1472,11 @@ static int atmel_spi_transfer_one_message(struct spi_master *master,
->  static void atmel_spi_cleanup(struct spi_device *spi)
->  {
->         struct atmel_spi_device *asd = spi->controller_state;
-> -       unsigned                gpio = (unsigned long) spi->controller_data;
->
->         if (!asd)
->                 return;
->
->         spi->controller_state = NULL;
-> -       gpio_free(gpio);
->         kfree(asd);
->  }
+It exposes temperature and a critical trip point
+(using a hardcoded default of 80C or the temperature configured
+in the control register by the firmware, which reads as
+407C currently)
 
-Gr{oetje,eeting}s,
+The calibrations are (potentially) different for bcm2835, bcm2836
+and bcm2837 and can get selected by the compatible property
+in the device tree.
 
-                        Geert
+The driver also exposes the registers via debugfs.
+
+Possible future enhancements:
+* the device has the ability to trigger interrupts on reaching
+  the programmed critical temperature.
+  I have no knowledge which interrupt could be responsible
+  for this on the ARM side, so if we get to know which irq
+  it is we can implement that.
+  Instead the driver right now implements polling in 1 second intervals
+* the device can also reset the HW after the trip point
+  has been reached (also with some delay, so that corrective
+  actions can get taken) - this is currently not enabled by the
+  firmware, but could.
+* we could define more trip points for THERMAL_TRIP_HOT
+* make the trip point limits modifiable (ops.set_trip_temp)
+
+Note:
+  No support for 32-bit arm bcm2837, as there is no
+  arch/arm/boot/dts/bcm2836.dtsi upstream as of now.
+  64-bit arm support is not tested
+
+Changelog:
+ V1 -> V2: renamed dt-binding documentation file
+       	   added specific settings depending on compatible
+	   added trip point based on register
+	   setting up ctrl-register if HW is not enabled by firmware
+	     as per recommendation of Eric (untested)
+	   check that clock frequency is in range
+	     (1.9 - 5MHz - as per comment in clk-bcm2835.c)
+ 	   added driver to multi_v7_defconfig
+ V2 -> V3: made a module in multi_v7_defconfig
+           fixed typo in dt-binding document
+ V3 -> V4: moved driver back to thermal (not using bcm sub-directory)
+       	   set polling interval to 1second (was 0ms, so interrupt driven)
+ V4 -> V5: use correct compatiblity for different soc versions in dt
+       	   support ARM64 for bcm2837 in devicetree and defconfig
+ V5 -> V6: incorporated changes recommended by Stefan Wahren
+ V6 -> V7: removed depends on ARCH_BCM2836 || ARCH_BCM2837 in Kconfig
+
+Martin Sperl (6):
+  dt: bindings: add thermal device driver for bcm2835
+  thermal: bcm2835: add thermal driver for bcm2835 soc
+  ARM: bcm2835: dts: add thermal node to device-tree of bcm283x
+  ARM64: bcm2835: dts: add thermal node to device-tree of bcm2837
+  ARM: bcm2835: add thermal driver to default_config
+  ARM64: bcm2835: add thermal driver to default_config
+
+ .../bindings/thermal/brcm,bcm2835-thermal.txt      |  17 ++
+ arch/arm/boot/dts/bcm2835.dtsi                     |   6 +
+ arch/arm/boot/dts/bcm2836.dtsi                     |   6 +
+ arch/arm/boot/dts/bcm283x.dtsi                     |   7 +
+ arch/arm/configs/bcm2835_defconfig                 |   2 +
+ arch/arm64/boot/dts/broadcom/bcm2837.dtsi          |   6 +
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/thermal/Kconfig                            |   8 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/bcm2835_thermal.c                  | 340 +++++++++++++++++++++
+ 10 files changed, 394 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/brcm,bcm2835-thermal.txt
+ create mode 100644 drivers/thermal/bcm2835_thermal.c
 
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.1.4
