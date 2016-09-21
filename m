@@ -1,40 +1,57 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 21 Sep 2016 11:05:57 +0200
-Subject: [PATCH v3 1/3] clk: mvebu: fix setting unwanted flags in CP110 gate
- clock
-In-Reply-To: <1474448759-24482-1-git-send-email-mw@semihalf.com>
-References: <1474448759-24482-1-git-send-email-mw@semihalf.com>
-Message-ID: <1474448759-24482-2-git-send-email-mw@semihalf.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 21 Sep 2016 10:06:19 +0100
+Subject: [PATCH 1/4] ARM: tegra: nyan: Use proper IRQ type definitions
+In-Reply-To: <1474446366.1239.17.camel@paulk.fr>
+References: <20160828173246.32621-1-contact@paulk.fr>
+ <ef69b6d2-ce6b-ff76-5c04-ab2176eb6ecc@nvidia.com>
+ <1474395289.1215.20.camel@paulk.fr>
+ <0ca614bf-4d27-9948-03e3-472d059f2153@nvidia.com>
+ <1474446366.1239.17.camel@paulk.fr>
+Message-ID: <eb7540c0-4abd-86c0-7777-78fe1f12bc59@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada CP110 system controller comprises its own routine responsble
-for registering gate clocks. Among others 'flags' field in
-struct clk_init_data was not set, using a random values, which
-may cause an unpredicted behavior.
 
-This patch fixes the problem by resetting all fields of clk_init_data
-before assigning values for all gated clocks of Armada 7k/8k SoCs family.
+On 21/09/16 09:26, Paul Kocialkowski wrote:
+> * PGP Signed by an unknown key
+> 
+> Le mercredi 21 septembre 2016 ? 08:52 +0100, Jon Hunter a ?crit :
+>> On 20/09/16 19:14, Paul Kocialkowski wrote:
+>>>
+>>>> Old Signed by an unknown key
+>>>
+>>> Le mardi 20 septembre 2016 ? 18:15 +0100, Jon Hunter a ?crit :
+>>>>
+>>>> On 28/08/16 18:32, Paul Kocialkowski wrote:
+>>>>>
+>>>>>
+>>>>> This switches a few interrupt definitions that were using
+>>>>> GPIO_ACTIVE_HIGH as IRQ type, which is invalid.
+>>>>
+>>>> May be you are right, but this does not describe why this is invalid.
+>>>> Can you elaborate?
+>>>
+>>> GPIO_ACTIVE_HIGH is simply not the right kind of define to use in the
+>>> "interrupts" devicetree property. Values provided there are understood as
+>>> IRQ_TYPE_ defines.
+>>
+>> Right, but you are changing the type as GPIO_ACTIVE_HIGH = 0 and
+>> IRQ_TYPE_EDGE_FALLING = 2 and there is no comment about why this has
+>> been changed. It might be correct, but you need to explain it.
+> 
+> This actually makes the IRQ trigger values consistent with the drivers, that
+> define them regardless of devicetree anyway. The max98090 driver
+> has IRQF_TRIGGER_FALLING and bq24735 has IRQF_TRIGGER_RISING |
+> IRQF_TRIGGER_FALLING.
+> 
+> This is really more of a cosmetic change, it doesn't impact actual use.
 
-Fixes: d3da3eaef7f4 ("clk: mvebu: new driver for Armada CP110 system ...")
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-CC: <stable@vger.kernel.org>
----
- drivers/clk/mvebu/cp110-system-controller.c | 2 ++
- 1 file changed, 2 insertions(+)
+So you are saying that the drivers don't actually use the DT types? May
+be that is ok, and yes this is cosmetic, but this should be stated in
+the changelog as it is not clear what is going on here.
 
-diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
-index 7fa42d6..59fe76e 100644
---- a/drivers/clk/mvebu/cp110-system-controller.c
-+++ b/drivers/clk/mvebu/cp110-system-controller.c
-@@ -142,6 +142,8 @@ static struct clk *cp110_register_gate(const char *name,
- 	if (!gate)
- 		return ERR_PTR(-ENOMEM);
- 
-+	memset(&init, 0, sizeof(init));
-+
- 	init.name = name;
- 	init.ops = &cp110_gate_ops;
- 	init.parent_names = &parent_name;
+Cheers
+Jon
+
 -- 
-1.8.3.1
+nvpublic
