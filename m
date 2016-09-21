@@ -1,138 +1,46 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 21 Sep 2016 12:39:16 -0700
-Subject: [PATCH] arm64: Add BCM2835 (Raspberry Pi 3) support to the
- defconfig
-In-Reply-To: <20160919133150.9371-1-eric@anholt.net>
-References: <20160919133150.9371-1-eric@anholt.net>
-Message-ID: <7b4066c1-d850-3440-e221-53bd131e9480@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 21 Sep 2016 21:06:01 +0100
+Subject: [PATCH] arm64: Correctly bounds check virt_addr_valid
+In-Reply-To: <b8f34fc7-76ac-5681-085a-8c007cd40e98@redhat.com>
+References: <1474478928-25022-1-git-send-email-labbott@redhat.com>
+ <20160921175855.GG18176@leverpostej>
+ <b8f34fc7-76ac-5681-085a-8c007cd40e98@redhat.com>
+Message-ID: <20160921200601.GA24734@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2016 06:31 AM, Eric Anholt wrote:
-> Most of the drivers are included as modules, except for serial (needed
-> for early console), WDT (required for reboot), and the dependency
-> chain of RASPBERRYPI_POWER (which is currently not buildable as a
-> module, but should be changed).
+On Wed, Sep 21, 2016 at 12:34:46PM -0700, Laura Abbott wrote:
+> On 09/21/2016 10:58 AM, Mark Rutland wrote:
+> >Are there other potentially-broken users of virt_addr_valid? It's not
+> >clear to me what some drivers are doing with this, and therefore whether
+> >we need to cc stable.
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+> The number of users is pretty limited. Some of them use it as a debugging
+> check, others are using it more like hardened usercopy. The number of
+> users that would actually affect arm64 seems so small I don't think it's
+> worth trying to backport to stable.
 
-LGTM, can you queue this for the next ARM/ARM64 SoC pull request in a
-separate branch for me to pull from?
+Ok.
 
-Thanks!
+> Hardened usercopy was getting hit particularly hard because usercopy was
+> happening on all types of memory whereas the drivers tend to be more limited
+> in scope.
 
-> ---
->  arch/arm64/configs/defconfig | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+Sure.
+
+> >Given the common sub-expression, perhaps it would be better to leave
+> >these as-is, but prefix them with '_', and after the #endif, have
+> >something like:
+> >
+> >#define _virt_addr_is_linear(kaddr)	(((u64)(kaddr)) >= PAGE_OFFSET)
+> >#define virt_addr_valid(kaddr)		(_virt_addr_is_linear(kaddr) && _virt_addr_valid(kaddr))
+> >
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index fb8d84516e92..9748c4735a60 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -34,6 +34,7 @@ CONFIG_MODULE_UNLOAD=y
->  # CONFIG_IOSCHED_DEADLINE is not set
->  CONFIG_ARCH_SUNXI=y
->  CONFIG_ARCH_ALPINE=y
-> +CONFIG_ARCH_BCM2835=y
->  CONFIG_ARCH_BCM_IPROC=y
->  CONFIG_ARCH_BERLIN=y
->  CONFIG_ARCH_EXYNOS=y
-> @@ -193,6 +194,7 @@ CONFIG_USB_NET_SMSC75XX=m
->  CONFIG_USB_NET_SMSC95XX=m
->  CONFIG_USB_NET_PLUSB=m
->  CONFIG_USB_NET_MCS7830=m
-> +CONFIG_BRCMFMAC=m
->  CONFIG_WL18XX=m
->  CONFIG_WLCORE_SDIO=m
->  CONFIG_INPUT_EVDEV=y
-> @@ -205,6 +207,9 @@ CONFIG_SERIO_AMBAKMI=y
->  CONFIG_LEGACY_PTY_COUNT=16
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
-> +CONFIG_SERIAL_8250_EXTENDED=y
-> +CONFIG_SERIAL_8250_SHARE_IRQ=y
-> +CONFIG_SERIAL_8250_BCM2835AUX=y
->  CONFIG_SERIAL_8250_DW=y
->  CONFIG_SERIAL_8250_MT6577=y
->  CONFIG_SERIAL_8250_UNIPHIER=y
-> @@ -228,6 +233,7 @@ CONFIG_VIRTIO_CONSOLE=y
->  CONFIG_I2C_CHARDEV=y
->  CONFIG_I2C_MUX=y
->  CONFIG_I2C_MUX_PCA954x=y
-> +CONFIG_I2C_BCM2835=m
->  CONFIG_I2C_DESIGNWARE_PLATFORM=y
->  CONFIG_I2C_IMX=y
->  CONFIG_I2C_MESON=y
-> @@ -238,6 +244,8 @@ CONFIG_I2C_UNIPHIER_F=y
->  CONFIG_I2C_RCAR=y
->  CONFIG_I2C_CROS_EC_TUNNEL=y
->  CONFIG_SPI=y
-> +CONFIG_SPI_BCM2835=m
-> +CONFIG_SPI_BCM2835AUX=m
->  CONFIG_SPI_MESON_SPIFC=m
->  CONFIG_SPI_ORION=y
->  CONFIG_SPI_PL022=y
-> @@ -272,6 +280,7 @@ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
->  CONFIG_CPU_THERMAL=y
->  CONFIG_EXYNOS_THERMAL=y
->  CONFIG_WATCHDOG=y
-> +CONFIG_BCM2835_WDT=y
->  CONFIG_RENESAS_WDT=y
->  CONFIG_S3C2410_WATCHDOG=y
->  CONFIG_MESON_GXBB_WATCHDOG=m
-> @@ -294,6 +303,7 @@ CONFIG_REGULATOR_S2MPS11=y
->  CONFIG_DRM=m
->  CONFIG_DRM_NOUVEAU=m
->  CONFIG_DRM_TEGRA=m
-> +CONFIG_DRM_VC4=m
->  CONFIG_DRM_PANEL_SIMPLE=m
->  CONFIG_DRM_I2C_ADV7511=m
->  CONFIG_DRM_HISI_KIRIN=m
-> @@ -308,6 +318,7 @@ CONFIG_LOGO=y
->  CONFIG_SOUND=y
->  CONFIG_SND=y
->  CONFIG_SND_SOC=y
-> +CONFIG_SND_BCM2835_SOC_I2S=m
->  CONFIG_SND_SOC_RCAR=y
->  CONFIG_SND_SOC_SAMSUNG=y
->  CONFIG_SND_SOC_AK4613=y
-> @@ -372,6 +383,7 @@ CONFIG_RTC_DRV_XGENE=y
->  CONFIG_RTC_DRV_S3C=y
->  CONFIG_DMADEVICES=y
->  CONFIG_PL330_DMA=y
-> +CONFIG_DMA_BCM2835=m
->  CONFIG_TEGRA20_APB_DMA=y
->  CONFIG_QCOM_BAM_DMA=y
->  CONFIG_QCOM_HIDMA_MGMT=y
-> @@ -394,8 +406,10 @@ CONFIG_MSM_MMCC_8996=y
->  CONFIG_HWSPINLOCK_QCOM=y
->  CONFIG_MAILBOX=y
->  CONFIG_ARM_MHU=y
-> +CONFIG_BCM2835_MBOX=y
->  CONFIG_HI6220_MBOX=y
->  CONFIG_ARM_SMMU=y
-> +CONFIG_RASPBERRYPI_POWER=y
->  CONFIG_QCOM_SMEM=y
->  CONFIG_QCOM_SMD=y
->  CONFIG_QCOM_SMD_RPM=y
-> @@ -403,6 +417,7 @@ CONFIG_ARCH_TEGRA_132_SOC=y
->  CONFIG_ARCH_TEGRA_210_SOC=y
->  CONFIG_EXTCON_USB_GPIO=y
->  CONFIG_PWM=y
-> +CONFIG_PWM_BCM2835=m
->  CONFIG_PWM_TEGRA=m
->  CONFIG_COMMON_RESET_HI6220=y
->  CONFIG_PHY_RCAR_GEN3_USB2=y
-> @@ -414,6 +429,7 @@ CONFIG_ACPI=y
->  CONFIG_IIO=y
->  CONFIG_EXYNOS_ADC=y
->  CONFIG_PWM_SAMSUNG=y
-> +CONFIG_RASPBERRYPI_FIRMWARE=y
->  CONFIG_EXT2_FS=y
->  CONFIG_EXT3_FS=y
->  CONFIG_EXT4_FS_POSIX_ACL=y
-> 
+> Good suggestion.
 
+FWIW, with that, feel free to add:
 
--- 
-Florian
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
