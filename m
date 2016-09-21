@@ -1,52 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Sep 2016 15:49:08 -0700
-Subject: [GIT PULL] few minor fixes for omap dts files for v4.9 merge window
-Message-ID: <20160921224907.l2nxg5ynw3rxztlm@atomide.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 21 Sep 2016 16:49:29 -0700
+Subject: [PATCHv2] arm64: Correctly bounds check virt_addr_valid
+In-Reply-To: <1474496704-30541-1-git-send-email-labbott@redhat.com>
+References: <1474496704-30541-1-git-send-email-labbott@redhat.com>
+Message-ID: <CAGXu5jKrHyJ4mgcoXxbhns4kFP4sWn-9dAOn9bP3pzXLhs9kuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a2a2b8215621536a7620e31f36bede81bb86680b:
+On Wed, Sep 21, 2016 at 3:25 PM, Laura Abbott <labbott@redhat.com> wrote:
+>
+> virt_addr_valid is supposed to return true if and only if virt_to_page
+> returns a valid page structure. The current macro does math on whatever
+> address is given and passes that to pfn_valid to verify. vmalloc and
+> module addresses can happen to generate a pfn that 'happens' to be
+> valid. Fix this by only performing the pfn_valid check on addresses that
+> have the potential to be valid.
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> v2: Properly parenthesize macro arguments. Re-factor to common macro.
+>
+> Also in case it wasn't clear, there's no need to try and squeeze this
+> into 4.8. Hardened usercopy should have all the checks, this is just for
+> full correctness.
 
-  Merge branch 'am335x-cpufreq-regression' into omap-for-v4.9/dt-v2 (2016-09-14 16:27:28 -0700)
+After this lands for 4.9, I should likely drop the checks that are in
+hardened usercopy? That'll speed things up ever so slightly, and will
+let us catch other architectures that have a weird
+virt_addr_valid()...
 
-are available in the git repository at:
+-Kees
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.9/dt-pt3-signed
-
-for you to fetch changes up to ce385a5e7a85c023af2e013101d4fe2240beec21:
-
-  ARM: dts: omap5-igep0050.dts: Use tabs for indentation (2016-09-20 11:37:50 -0700)
-
-----------------------------------------------------------------
-Few fixes for omap dts files for v4.9 merge window. Let's also add
-the tilcdc quirks:
-
-- Fix typo with recent beagleboard-x15 changes for mmc2_pins_default
-
-- Add am335x blue-and-red-wiring quirk as specified in the binding in
-  Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt. Also
-  fix up the whitespace formatting for am335x-evmsk.
-
-- Fix for recent igepv5 power button for GPIO_ACTIVE_LOW. Also fix
-  up the whitespace formatting for the button
-
-----------------------------------------------------------------
-Jyri Sarha (3):
-      ARM: dts: am335x-evm: Add blue-and-red-wiring -property to lcdc node
-      ARM: dts: am335x-evmsk: Whitespace cleanup of lcdc related nodes
-      ARM: dts: am335x-evmsk: Add blue-and-red-wiring -property to lcdc node
-
-Ladislav Michl (1):
-      ARM: dts: omap5-igep0050.dts: Use tabs for indentation
-
-Nishanth Menon (1):
-      ARM: dts: am57xx-beagle-x15-common: Fix wrong pinctrl selection for mmc2
-
-Tony Lindgren (1):
-      ARM: dts: Fix igepv5 power button GPIO direction
-
- arch/arm/boot/dts/am335x-evm.dts                |  2 ++
- arch/arm/boot/dts/am335x-evmsk.dts              | 42 +++++++++++++------------
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi |  2 +-
- arch/arm/boot/dts/omap5-igep0050.dts            |  4 +--
- 4 files changed, 27 insertions(+), 23 deletions(-)
+-- 
+Kees Cook
+Nexus Security
