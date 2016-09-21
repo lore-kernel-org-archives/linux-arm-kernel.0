@@ -1,151 +1,61 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 22 Sep 2016 01:14:32 +0800
-Subject: [PATCH] usb: xhci: Fix the patch inherit dma configuration from
-In-Reply-To: <DB5PR0401MB1925CDF6CBD45ACBEE95D152F5F60@DB5PR0401MB1925.eurprd04.prod.outlook.com>
-Message-ID: <201609220122.CBgu9ja6%fengguang.wu@intel.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Wed, 21 Sep 2016 20:22:54 +0300
+Subject: [PATCH v10 0/4] ACPI: parse the SPCR table
+In-Reply-To: <20160921163823.GB9373@kroah.com>
+References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
+ <25d32778-e708-6763-7cb2-4ddbeebc844b@linaro.org>
+ <20160921103749.GA7993@kroah.com>
+ <CAOZdJXV2KyZAbrRxQ_zmFNd3Gn4vyuqSsUfJMTU8wpiOtjyE=g@mail.gmail.com>
+ <20160921163823.GB9373@kroah.com>
+Message-ID: <98ed1e6b-0994-4429-c085-2293b4a89edf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sriram,
 
-[auto build test ERROR on usb/usb-testing]
-[also build test ERROR on v4.8-rc7 next-20160921]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
 
-url:    https://github.com/0day-ci/linux/commits/Sriram-Dash/usb-xhci-Fix-the-patch-inherit-dma-configuration-from/20160922-004329
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-testing
-config: x86_64-randconfig-x012-201638 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+On 09/21/2016 07:38 PM, Greg Kroah-Hartman wrote:
+> On Wed, Sep 21, 2016 at 11:19:35AM -0500, Timur Tabi wrote:
+>> On Wed, Sep 21, 2016 at 5:37 AM, Greg Kroah-Hartman
+>> <gregkh@linuxfoundation.org> wrote:
+>>>
+>>> I thought you asked Rafael to take them, they are not in my queue
+>>> anymore because of that.  Don't try to shop-around for maintainers
+>>> please, that's kind of rude...
+>>
+>> In Aleksey's defense, these patches have been floating around for far
+>> too long, so I can understand his frustration.
+> 
+> I understand the frustration as well, cross-maintainer messy patches
+> like this are hard to get merged at times at they fall between the
+> cracks a lot.
+> 
+>> But as you said, I really hope Rafael picks these up for 4.9.  We need
+>> these patches for ARM server.
+> 
+> I thought I saw an email saying he would do so, but it might have been
+> for some other patchset, sorry...
 
-All error/warnings (new ones prefixed by >>):
+This can be for "ACPI: ARM64: support for ACPI_TABLE_UPGRADE":
 
-   In file included from include/linux/list.h:8:0,
-                    from include/linux/pci.h:25,
-                    from drivers/usb/host/xhci.c:23:
-   drivers/usb/host/xhci.c: In function 'xhci_setup_msi':
->> drivers/usb/host/xhci.c:234:60: error: 'struct usb_bus' has no member named 'sysdev'
-     struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
-                                                               ^
-   include/linux/kernel.h:831:49: note: in definition of macro 'container_of'
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                    ^~~
->> drivers/usb/host/xhci.c:234:26: note: in expansion of macro 'to_pci_dev'
-     struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
-                             ^~~~~~~~~~
-   drivers/usb/host/xhci.c: In function 'xhci_free_irq':
-   drivers/usb/host/xhci.c:260:59: error: 'struct usb_bus' has no member named 'sysdev'
-     struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
-                                                              ^
-   include/linux/kernel.h:831:49: note: in definition of macro 'container_of'
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                    ^~~
-   drivers/usb/host/xhci.c:260:25: note: in expansion of macro 'to_pci_dev'
-     struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
-                            ^~~~~~~~~~
-   drivers/usb/host/xhci.c: In function 'xhci_setup_msix':
-   drivers/usb/host/xhci.c:283:45: error: 'struct usb_bus' has no member named 'sysdev'
-     struct pci_dev *pdev = to_pci_dev(hcd->self.sysdev);
-                                                ^
-   include/linux/kernel.h:831:49: note: in definition of macro 'container_of'
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                    ^~~
-   drivers/usb/host/xhci.c:283:25: note: in expansion of macro 'to_pci_dev'
-     struct pci_dev *pdev = to_pci_dev(hcd->self.sysdev);
-                            ^~~~~~~~~~
-   drivers/usb/host/xhci.c: In function 'xhci_cleanup_msix':
-   drivers/usb/host/xhci.c:338:45: error: 'struct usb_bus' has no member named 'sysdev'
-     struct pci_dev *pdev = to_pci_dev(hcd->self.sysdev);
-                                                ^
-   include/linux/kernel.h:831:49: note: in definition of macro 'container_of'
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                    ^~~
-   drivers/usb/host/xhci.c:338:25: note: in expansion of macro 'to_pci_dev'
-     struct pci_dev *pdev = to_pci_dev(hcd->self.sysdev);
-                            ^~~~~~~~~~
-   drivers/usb/host/xhci.c: In function 'xhci_try_enable_msi':
-   drivers/usb/host/xhci.c:377:43: error: 'struct usb_bus' has no member named 'sysdev'
-     pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
-                                              ^
-   include/linux/kernel.h:831:49: note: in definition of macro 'container_of'
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                    ^~~
-   drivers/usb/host/xhci.c:377:9: note: in expansion of macro 'to_pci_dev'
-     pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
-            ^~~~~~~~~~
-   drivers/usb/host/xhci.c: In function 'xhci_shutdown':
-   drivers/usb/host/xhci.c:746:46: error: 'struct usb_bus' has no member named 'sysdev'
-      usb_disable_xhci_ports(to_pci_dev(hcd->self.sysdev));
-                                                 ^
-   include/linux/kernel.h:831:49: note: in definition of macro 'container_of'
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                    ^~~
-   drivers/usb/host/xhci.c:746:26: note: in expansion of macro 'to_pci_dev'
-      usb_disable_xhci_ports(to_pci_dev(hcd->self.sysdev));
-                             ^~~~~~~~~~
-   drivers/usb/host/xhci.c:763:43: error: 'struct usb_bus' has no member named 'sysdev'
-      pci_set_power_state(to_pci_dev(hcd->self.sysdev), PCI_D3hot);
-                                              ^
-   include/linux/kernel.h:831:49: note: in definition of macro 'container_of'
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                    ^~~
-   drivers/usb/host/xhci.c:763:23: note: in expansion of macro 'to_pci_dev'
-      pci_set_power_state(to_pci_dev(hcd->self.sysdev), PCI_D3hot);
-                          ^~~~~~~~~~
-   drivers/usb/host/xhci.c: In function 'xhci_gen_setup':
-   drivers/usb/host/xhci.c:4835:33: error: 'struct usb_bus' has no member named 'sysdev'
-     struct device  *dev = hcd->self.sysdev;
-                                    ^
---
-   drivers/usb/host/xhci-mem.c: In function 'xhci_free_stream_ctx':
->> drivers/usb/host/xhci-mem.c:589:46: error: 'struct usb_bus' has no member named 'sysdev'
-     struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
-                                                 ^
-   drivers/usb/host/xhci-mem.c: In function 'xhci_alloc_stream_ctx':
-   drivers/usb/host/xhci-mem.c:617:46: error: 'struct usb_bus' has no member named 'sysdev'
-     struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
-                                                 ^
-   drivers/usb/host/xhci-mem.c: In function 'scratchpad_alloc':
-   drivers/usb/host/xhci-mem.c:1647:46: error: 'struct usb_bus' has no member named 'sysdev'
-     struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
-                                                 ^
-   drivers/usb/host/xhci-mem.c: In function 'scratchpad_free':
-   drivers/usb/host/xhci-mem.c:1719:46: error: 'struct usb_bus' has no member named 'sysdev'
-     struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
-                                                 ^
-   drivers/usb/host/xhci-mem.c: In function 'xhci_mem_cleanup':
-   drivers/usb/host/xhci-mem.c:1795:46: error: 'struct usb_bus' has no member named 'sysdev'
-     struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
-                                                 ^
-   drivers/usb/host/xhci-mem.c: In function 'xhci_mem_init':
-   drivers/usb/host/xhci-mem.c:2337:46: error: 'struct usb_bus' has no member named 'sysdev'
-     struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
-                                                 ^
+	https://lkml.kernel.org/r/CAJZ5v0goXsQ2umcDXU0six+QtxcKGZq7mxhgxuvXTH2iZt6YNA at mail.gmail.com
 
-vim +234 drivers/usb/host/xhci.c
+As for this patchset, Rafael ACKed the ACPI part:
 
-   228	/*
-   229	 * Set up MSI
-   230	 */
-   231	static int xhci_setup_msi(struct xhci_hcd *xhci)
-   232	{
-   233		int ret;
- > 234		struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
-   235	
-   236		ret = pci_enable_msi(pdev);
-   237		if (ret) {
+	https://lkml.kernel.org/r/CAJZ5v0hdoLTfjrD8+WxSoxM48dqbZK2KwY_h+63kHKHKgO=JFA at mail.gmail.com
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 21706 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160922/df321917/attachment-0001.gz>
+but I can not find any acknowledge from him that he is ready to merge the series.
+On the contrary, he expressed his doubt that he is "the right maintainer to send this to":
+
+	https://lkml.kernel.org/r/CAJZ5v0gzjtFzig7nEumr83+J2dGb+OA8GNR2i45ZqznfV_hA-A at mail.gmail.com
+
+I asked the ARM64 people, they said they prefer Rafael to do that:
+
+	https://lkml.kernel.org/r/20160909151758.GA11418 at arm.com
+
+I interpreted the silence from Rafael as unwillingness to pull the series 
+and thought it's OK to ask you.
+
+I am sorry if this looks rude for Rafael, I did not mean that.
+
+Thank you
+Aleksey Makarov
