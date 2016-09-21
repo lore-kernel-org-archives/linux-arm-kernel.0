@@ -1,40 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Sep 2016 22:42:42 +0200
-Subject: [GIT PULL] Qualcomm EBI2 bindings and bus driver
-In-Reply-To: <CACRpkdZdoK4+YRrZC=Kd8TFzJXOQxh=Gi0BWLp4PzV6H5_wEtg@mail.gmail.com>
-References: <CACRpkdYvowN2htUuN46JNVdfaKNw3AEbBfzAeScHQcLU5o3ZUg@mail.gmail.com>
- <20160919223616.GD5431@hector.attlocal.net>
- <CACRpkdZdoK4+YRrZC=Kd8TFzJXOQxh=Gi0BWLp4PzV6H5_wEtg@mail.gmail.com>
-Message-ID: <75785466.JAjuGRDEOe@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 21 Sep 2016 13:45:54 -0700
+Subject: [PATCH] clk: mvebu: Add clk support for the orion5x SoC mv88f5181
+In-Reply-To: <8760pp5zhp.fsf@free-electrons.com>
+References: <20160920162450.4046-1-gregory.clement@free-electrons.com>
+ <20160920195919.GD8319@codeaurora.org>
+ <8760pp5zhp.fsf@free-electrons.com>
+Message-ID: <20160921204554.GM8319@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 20, 2016 11:50:14 PM CEST Linus Walleij wrote:
-> On Tue, Sep 20, 2016 at 12:36 AM, Andy Gross <andy.gross@linaro.org> wrote:
-> > On Tue, Sep 20, 2016 at 12:12:33AM +0200, Arnd Bergmann wrote:
-> >> On Thursday, September 8, 2016 3:34:42 PM CEST Linus Walleij wrote:
-> >> > please pull this new EBI2 bus driver and its bindings into an
-> >> > apropriate branch in the ARM SoC tree. The binding now has
-> >> > Rob Herrings ACK and we have hopefully finally figured out how
-> >> > this should be done.
-> >> >
-> >>
-> >> I just noticed that you sent the pull request directly to arm at kernel.org
-> >> rather than the Qualcomm maintainers (which are only on Cc).
-> >>
-> >> Usually, I'd expect to see this forwarded from Andy, is there a
-> >> reason to do it differently here? If so, can I have an Ack
-> >> from him?
-> >
-> > When I looked at this last, I thought there were comments.  Sorry I missed it.
-> > If you want to pick it up Arnd, please do, otherwise I can send it along in the
-> > next pull request.
-> >
-> > Acked-by: Andy Gross <andy.gross@linaro.org>
+On 09/21, Gregory CLEMENT wrote:
+> Hi Stephen,
+>  
+>  On mar., sept. 20 2016, Stephen Boyd <sboyd@codeaurora.org> wrote:
 > 
-> Thanks, I hope Arnd can pull this as-is.
+> > On 09/20, Gregory CLEMENT wrote:
+> >> From: Jamie Lentin <jm@lentin.co.uk>
+> >> 
+> >> Referring to the u-boot sources for the Netgear WNR854T, add support
+> >> for the mv88f5181.
+> >> 
+> >> [gregory.clement at free-electrons.com: fix commit title]
+> >> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> >> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> >> Acked-by: Rob Herring <robh@kernel.org>
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> ---
+> >> 
+> >> Hi Stephen and Mike,
+> >> 
+> >> do you agree to give your acked-by on this patch. It is part of a
+> >> convertion of old orion5x Socv to the device tree. If you acked-by
+> >> this one, then I will be able to take it in my tree and avoiding
+> >> breaking the git bisect.
+> >
+> > Is the problem that we're changing some dts files somewhere and
+> > those platforms would stop booting if this change wasn't present?
+> > Given that we're adding a new compatible it seems like we're
+> > adding new SoC support, so having the clk patch and the dts patch
+> > come together in -next via a merge instead of basing the dts
+> > patch on top of the clk patch would be how things are normally
+> > done.
 > 
+> The problem appear if the dts for the board using the clock driver is
+> merged in Linus tree before the support in the driver. At this point the
+> board won't be able to boot.
+> 
+> It introduces a hole in the git bisect between the merge of the clock
+> subsystem and the arm-soc subsystem.
 
-Pulled into next/drivers, with Andy's Ack added to the merge commit, thanks!
+Ok so that sounds like the typical case where a new SoC/board is
+supported and the dts files don't do anything useful until the
+driver support lands. We don't usually care about bisection
+problems here because the board doesn't transition from 'working'
+to 'not working'. It only transitions from 'not working' to
+'working' once the clk driver and the dts files are both present
+in the tree.
 
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
