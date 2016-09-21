@@ -1,73 +1,29 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Wed, 21 Sep 2016 06:54:59 +0000
-Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <20160920123926.GA3744@tiger>
-References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
- <1473741659-17618-1-git-send-email-po.liu@nxp.com>
- <1473741659-17618-3-git-send-email-po.liu@nxp.com>
- <20160918005212.GF15478@tiger>
- <VI1PR0401MB1709F91B0C1EB6C80D741E4492F50@VI1PR0401MB1709.eurprd04.prod.outlook.com>
- <20160920123926.GA3744@tiger>
-Message-ID: <VI1PR0401MB17090ED60A826FDCBFB8B33D92F60@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: rric@kernel.org (Robert Richter)
+Date: Wed, 21 Sep 2016 08:55:08 +0200
+Subject: [PATCH] arm64: Call numa_store_cpu_info() earlier.
+In-Reply-To: <1474397195-16520-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1474397195-16520-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160921065508.GS25086@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 20.09.16 11:46:35, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+...
+> Fix by moving call to numa_store_cpu_info() for all CPUs into
+> smp_prepare_cpus(), which happens before wq_numa_init().  Since
+> smp_store_cpu_info() now contains only a single function call,
+> simplify by removing the function and out-lining its contents.
+> 
+> Suggested-by: Robert Richter <rric@kernel.org>
+> fixes: 1a2db300348b ("arm64, numa: Add NUMA support for arm64 platforms.")
+> Cc: <stable@vger.kernel.org> # 4.7.x-
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  arch/arm64/kernel/smp.c | 14 ++++++--------
+>  1 file changed, 6 insertions(+), 8 deletions(-)
 
+Looks good, your version properly initializes the boot cpu that was
+missing in my version.
 
->  -----Original Message-----
->  From: Shawn Guo [mailto:shawnguo at kernel.org]
->  Sent: Tuesday, September 20, 2016 8:39 PM
->  To: Po Liu
->  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang; Arnd
->  Bergmann; Marc Zyngier; Stuart Yoder; Leo Li; M.H. Lian; Murali
->  Karicheri; Bjorn Helgaas; Mingkai Hu
->  Subject: Re: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
->  MSI/MSI-X/INTx mode
->  
->  On Sun, Sep 18, 2016 at 03:37:27AM +0000, Po Liu wrote:
->  > Hi Shawn,
->  >
->  >
->  > >  -----Original Message-----
->  > >  From: Shawn Guo [mailto:shawnguo at kernel.org]
->  > >  Sent: Sunday, September 18, 2016 8:52 AM
->  > >  To: Po Liu
->  > >  Cc: linux-pci at vger.kernel.org;
->  > > linux-arm-kernel at lists.infradead.org;
->  > >  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang;
->  > > Arnd  Bergmann; Marc Zyngier; Stuart Yoder; Leo Li; M.H. Lian;
->  > > Murali  Karicheri; Bjorn Helgaas; Mingkai Hu
->  > >  Subject: Re: [PATCH v5 3/3] pci:aer: add support aer interrupt with
->  > > none  MSI/MSI-X/INTx mode
->  > >
->  > >  On Tue, Sep 13, 2016 at 12:40:59PM +0800, Po Liu wrote:
->  > >  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC
->  mode.
->  > >  > When chip support the aer interrupt with none MSI/MSI-X/INTx
->  > > mode,  > maybe there is interrupt line for aer pme etc. Search the
->  > > interrupt  > number in the fdt file. Then fixup the dev->irq with it.
->  > >  >
->  > >  > Signed-off-by: Po Liu <po.liu@nxp.com>
->  > >
->  > >  Will the new kernel work with existing/old DTB?  I'm trying to
->  > > understand the dependency between driver and DTS changes.
->  >
->  > Yes, We've never use name 'intr' before. So we remove it is ok.
->  > 'aer' is a dts name for researching it's true interrupt number by
->  kernel. This patch is first time to use name 'aer'. So it must be
->  compatible with existing/old DTB.
->  
->  Does that mean driver and DTS changes can go through separate trees, i.e.
->  PCI and arm-soc, without introducing regressions on either tree?
->  Or does the patch series needs to go in as a whole?
-
-Should be as a whole. The driver base on the dts. Or else, the driver would not found the 'aer' point.
-Thanks!
-
-Po
-
->  
->  Shawn
+Reviewed-by: Robert Richter <rrichter@cavium.com>
