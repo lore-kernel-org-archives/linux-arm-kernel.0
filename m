@@ -1,59 +1,107 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 21 Sep 2016 22:58:34 +0200
-Subject: [PATCH 3/3] ARM: BCM5301X: Specify USB 3.0 PHY in DT
+Date: Wed, 21 Sep 2016 22:58:33 +0200
+Subject: [PATCH 2/3] ARM: BCM5301X: Enable UART on Netgear R8000
 In-Reply-To: <20160921205838.15627-1-zajec5@gmail.com>
 References: <20160921205838.15627-1-zajec5@gmail.com>
-Message-ID: <20160921205838.15627-3-zajec5@gmail.com>
+Message-ID: <20160921205838.15627-2-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Driver for Northstar USB 3.0 PHY has been recently added under the name
-phy-bcm-ns-usb3. Add binding for it into the DT files.
-The only slightly tricky part is BCM47094 which uses different PHY
-version and requires different compatible value.
+It was tested by LEDE users, all we need is to adjust clock frequency.
+While we're at it create a separated DTS include file to share code with
+other BCM4709 devices easier.
 
 Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
- arch/arm/boot/dts/bcm47094.dtsi | 6 ++++++
- arch/arm/boot/dts/bcm5301x.dtsi | 7 +++++++
- 2 files changed, 13 insertions(+)
+ arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts       |  2 +-
+ arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts |  2 +-
+ arch/arm/boot/dts/bcm4709-netgear-r7000.dts       |  2 +-
+ arch/arm/boot/dts/bcm4709-netgear-r8000.dts       |  6 +++++-
+ arch/arm/boot/dts/bcm4709.dtsi                    | 11 +++++++++++
+ 5 files changed, 19 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm4709.dtsi
 
-diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
-index f039765..4f09aa0 100644
---- a/arch/arm/boot/dts/bcm47094.dtsi
-+++ b/arch/arm/boot/dts/bcm47094.dtsi
-@@ -6,6 +6,12 @@
+diff --git a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
+index 8ade7de..eac0f52 100644
+--- a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
++++ b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
+@@ -9,7 +9,7 @@
  
- #include "bcm4708.dtsi"
+ /dts-v1/;
  
-+/ {
-+	usb3_phy: usb3-phy {
-+		compatible = "brcm,ns-bx-usb3-phy";
-+	};
+-#include "bcm4708.dtsi"
++#include "bcm4709.dtsi"
+ #include "bcm5301x-nand-cs0-bch8.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
+index 0653e7e..aab39c9 100644
+--- a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
++++ b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
+@@ -9,7 +9,7 @@
+ 
+ /dts-v1/;
+ 
+-#include "bcm4708.dtsi"
++#include "bcm4709.dtsi"
+ #include "bcm5301x-nand-cs0-bch8.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+index a22ed14..fd38d2a 100644
+--- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
++++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+@@ -9,7 +9,7 @@
+ 
+ /dts-v1/;
+ 
+-#include "bcm4708.dtsi"
++#include "bcm4709.dtsi"
+ #include "bcm5301x-nand-cs0-bch8.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+index ca18151..92f8a72 100644
+--- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
++++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+@@ -9,7 +9,7 @@
+ 
+ /dts-v1/;
+ 
+-#include "bcm4708.dtsi"
++#include "bcm4709.dtsi"
+ #include "bcm5301x-nand-cs0-bch8.dtsi"
+ 
+ / {
+@@ -107,6 +107,10 @@
+ 	};
+ };
+ 
++&uart0 {
++	status = "okay";
 +};
 +
- &uart0 {
- 	clock-frequency = <125000000>;
+ &usb2 {
+ 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
  };
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index ae4b388..f09a2bb 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -149,6 +149,13 @@
- 		clock-names = "phy-ref-clk";
- 	};
- 
-+	usb3_phy: usb3-phy {
-+		compatible = "brcm,ns-ax-usb3-phy";
-+		reg = <0x18105000 0x1000>, <0x18003000 0x1000>;
-+		reg-names = "dmp", "ccb-mii";
-+		#phy-cells = <0>;
-+	};
+diff --git a/arch/arm/boot/dts/bcm4709.dtsi b/arch/arm/boot/dts/bcm4709.dtsi
+new file mode 100644
+index 0000000..f039765
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4709.dtsi
+@@ -0,0 +1,11 @@
++/*
++ * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
++ *
++ * Licensed under the ISC license.
++ */
 +
- 	axi at 18000000 {
- 		compatible = "brcm,bus-axi";
- 		reg = <0x18000000 0x1000>;
++#include "bcm4708.dtsi"
++
++&uart0 {
++	clock-frequency = <125000000>;
++};
 -- 
 2.9.3
