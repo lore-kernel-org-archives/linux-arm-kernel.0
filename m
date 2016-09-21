@@ -1,40 +1,58 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 21 Sep 2016 12:37:49 +0200
-Subject: [PATCH v10 0/4] ACPI: parse the SPCR table
-In-Reply-To: <25d32778-e708-6763-7cb2-4ddbeebc844b@linaro.org>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
- <25d32778-e708-6763-7cb2-4ddbeebc844b@linaro.org>
-Message-ID: <20160921103749.GA7993@kroah.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Sep 2016 12:44:14 +0200
+Subject: [PATCH] tty/serial: atmel: fix fractional baud rate computation
+Message-ID: <20160921104414.16241-1-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2016 at 01:27:30PM +0300, Aleksey Makarov wrote:
-> 
-> 
-> On 09/05/2016 03:36 PM, Aleksey Makarov wrote:
-> > 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port Console
-> > Redirection Table) [2] as a mandatory ACPI table that specifies the
-> > configuration of serial console.
-> > 
-> > Move "earlycon" early_param handling to earlycon.c to parse this option once
-> > 
-> > Parse SPCR table, setup earlycon and register specified console.
-> > 
-> > Enable parsing this table on ARM64.  Earlycon should be set up as early as
-> > possible.  ACPI boot tables are mapped in
-> > arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch() and
-> > that's where we parse spcr.  So it has to be opted-in per-arch. When
-> > ACPI_SPCR_TABLE is defined initialization of DT earlycon is deferred until the
-> > DT/ACPI decision is done.
-> > 
-> > Implement console_match() for pl011.
-> 
-> Hi Greg,
-> 
-> Can you consider picking this series for 4.9 please?
+From: Alexey Starikovskiy <aystarik@gmail.com>
 
-I thought you asked Rafael to take them, they are not in my queue
-anymore because of that.  Don't try to shop-around for maintainers
-please, that's kind of rude...
+The problem with previous code was it rounded values in wrong
+place and produced wrong baud rate in some cases.
 
-greg k-h
+Signed-off-by: Alexey Starikovskiy <aystarik@gmail.com>
+[nicolas.ferre at atmel.com: port to newer kernel and add commit log]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/tty/serial/atmel_serial.c | 10 ++++++----
+ include/linux/atmel_serial.h      |  1 +
+ 2 files changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 5f550d9feed9..fd8aa1f4ba78 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -2170,13 +2170,15 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	 * accurately. This feature is enabled only when using normal mode.
+ 	 * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
+ 	 * Currently, OVER is always set to 0 so we get
+-	 * baudrate = selected clock (16 * (CD + FP / 8))
++	 * baudrate = selected clock / (16 * (CD + FP / 8))
++	 * then
++	 * 8 CD + FP = selected clock / (2 * baudrate)
+ 	 */
+ 	if (atmel_port->has_frac_baudrate &&
+ 	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
+-		div = DIV_ROUND_CLOSEST(port->uartclk, baud);
+-		cd = div / 16;
+-		fp = DIV_ROUND_CLOSEST(div % 16, 2);
++		div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
++		cd = div >> 3;
++		fp = div & ATMEL_US_FP_MASK;
+ 	} else {
+ 		cd = uart_get_divisor(port, baud);
+ 	}
+diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
+index f8e452aa48d7..bd2560502f3c 100644
+--- a/include/linux/atmel_serial.h
++++ b/include/linux/atmel_serial.h
+@@ -119,6 +119,7 @@
+ #define ATMEL_US_BRGR		0x20	/* Baud Rate Generator Register */
+ #define	ATMEL_US_CD		GENMASK(15, 0)	/* Clock Divider */
+ #define ATMEL_US_FP_OFFSET	16	/* Fractional Part */
++#define ATMEL_US_FP_MASK	0x7
+ 
+ #define ATMEL_US_RTOR		0x24	/* Receiver Time-out Register for USART */
+ #define ATMEL_UA_RTOR		0x28	/* Receiver Time-out Register for UART */
+-- 
+2.9.0
