@@ -1,114 +1,42 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 21 Sep 2016 15:41:32 +0300
-Subject: [PATCH v3 6/9] dmaengine: ti-dma-crossbar: Fix of_device_id data
- parameter usage
+Date: Wed, 21 Sep 2016 15:41:35 +0300
+Subject: [PATCH v3 9/9] dmaengine: ti-dma-crossbar: enable COMPILE_TEST
 In-Reply-To: <20160921124135.11849-1-peter.ujfalusi@ti.com>
 References: <20160921124135.11849-1-peter.ujfalusi@ti.com>
-Message-ID: <20160921124135.11849-7-peter.ujfalusi@ti.com>
+Message-ID: <20160921124135.11849-10-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pointers to static constant variables for crossbar type and for DMA
-offset configuration.
-
-Fixes compiler warnings on 64bit architectures:
-
-drivers/dma/ti-dma-crossbar.c: In function ?ti_dra7_xbar_probe?:
-drivers/dma/ti-dma-crossbar.c:398:21: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-  xbar->dma_offset = (u32)match->data;
-                     ^
-drivers/dma/ti-dma-crossbar.c: In function ?ti_dma_xbar_probe?:
-drivers/dma/ti-dma-crossbar.c:431:10: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-  switch ((u32)match->data) {
-          ^
+To get more coverage, enable COMPILE_TEST for this driver.
+When compile testing eDMA or omap-dma, select also the ti-dma-crossbar so
+it is also covered by the compile testing.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/ti-dma-crossbar.c | 28 ++++++++++++++++++----------
- 1 file changed, 18 insertions(+), 10 deletions(-)
+ drivers/dma/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti-dma-crossbar.c
-index e4f3bd1ae264..9103b1260797 100644
---- a/drivers/dma/ti-dma-crossbar.c
-+++ b/drivers/dma/ti-dma-crossbar.c
-@@ -18,15 +18,19 @@
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 84647d6cb2f4..1c11628062ad 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -133,7 +133,7 @@ config DMA_OMAP
+ 	depends on ARCH_OMAP || COMPILE_TEST
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+-	select TI_DMA_CROSSBAR if SOC_DRA7XX
++	select TI_DMA_CROSSBAR if (SOC_DRA7XX || COMPILE_TEST)
  
- #define TI_XBAR_DRA7		0
- #define TI_XBAR_AM335X		1
-+static const u32 ti_xbar_type[] = {
-+	[TI_XBAR_DRA7] = TI_XBAR_DRA7,
-+	[TI_XBAR_AM335X] = TI_XBAR_AM335X,
-+};
- 
- static const struct of_device_id ti_dma_xbar_match[] = {
- 	{
- 		.compatible = "ti,dra7-dma-crossbar",
--		.data = (void *)TI_XBAR_DRA7,
-+		.data = &ti_xbar_type[TI_XBAR_DRA7],
- 	},
- 	{
- 		.compatible = "ti,am335x-edma-crossbar",
--		.data = (void *)TI_XBAR_AM335X,
-+		.data = &ti_xbar_type[TI_XBAR_AM335X],
- 	},
- 	{},
- };
-@@ -190,9 +194,6 @@ static int ti_am335x_xbar_probe(struct platform_device *pdev)
- #define TI_DRA7_XBAR_OUTPUTS	127
- #define TI_DRA7_XBAR_INPUTS	256
- 
--#define TI_XBAR_EDMA_OFFSET	0
--#define TI_XBAR_SDMA_OFFSET	1
--
- struct ti_dra7_xbar_data {
- 	void __iomem *iomem;
- 
-@@ -280,18 +281,25 @@ static void *ti_dra7_xbar_route_allocate(struct of_phandle_args *dma_spec,
- 	return map;
- }
- 
-+#define TI_XBAR_EDMA_OFFSET	0
-+#define TI_XBAR_SDMA_OFFSET	1
-+static const u32 ti_dma_offset[] = {
-+	[TI_XBAR_EDMA_OFFSET] = 0,
-+	[TI_XBAR_SDMA_OFFSET] = 1,
-+};
-+
- static const struct of_device_id ti_dra7_master_match[] = {
- 	{
- 		.compatible = "ti,omap4430-sdma",
--		.data = (void *)TI_XBAR_SDMA_OFFSET,
-+		.data = &ti_dma_offset[TI_XBAR_SDMA_OFFSET],
- 	},
- 	{
- 		.compatible = "ti,edma3",
--		.data = (void *)TI_XBAR_EDMA_OFFSET,
-+		.data = &ti_dma_offset[TI_XBAR_EDMA_OFFSET],
- 	},
- 	{
- 		.compatible = "ti,edma3-tpcc",
--		.data = (void *)TI_XBAR_EDMA_OFFSET,
-+		.data = &ti_dma_offset[TI_XBAR_EDMA_OFFSET],
- 	},
- 	{},
- };
-@@ -395,7 +403,7 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
- 
- 	xbar->dmarouter.dev = &pdev->dev;
- 	xbar->dmarouter.route_free = ti_dra7_xbar_free;
--	xbar->dma_offset = (u32)match->data;
-+	xbar->dma_offset = *(u32*)match->data;
- 
- 	mutex_init(&xbar->mutex);
- 	platform_set_drvdata(pdev, xbar);
-@@ -428,7 +436,7 @@ static int ti_dma_xbar_probe(struct platform_device *pdev)
- 	if (unlikely(!match))
- 		return -EINVAL;
- 
--	switch ((u32)match->data) {
-+	switch (*(u32*)match->data) {
- 	case TI_XBAR_DRA7:
- 		ret = ti_dra7_xbar_probe(pdev);
- 		break;
+ config DMA_SA11X0
+ 	tristate "SA-11x0 DMA support"
+@@ -518,7 +518,7 @@ config TI_EDMA
+ 	depends on ARCH_DAVINCI || ARCH_OMAP || ARCH_KEYSTONE || COMPILE_TEST
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+-	select TI_DMA_CROSSBAR if ARCH_OMAP
++	select TI_DMA_CROSSBAR if (ARCH_OMAP || COMPILE_TEST)
+ 	default n
+ 	help
+ 	  Enable support for the TI EDMA controller. This DMA
 -- 
 2.10.0
