@@ -1,82 +1,95 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 21 Sep 2016 10:03:10 +0200
-Subject: [PATCH v3 1/5] clk: at91: move slow clock controller clocks to
- sckc.c
-In-Reply-To: <20160921000211.GH8319@codeaurora.org>
-References: <20160920205833.19638-1-alexandre.belloni@free-electrons.com>
- <20160920205833.19638-2-alexandre.belloni@free-electrons.com>
- <20160921000211.GH8319@codeaurora.org>
-Message-ID: <20160921080310.szxig3mzebq2oseo@piout.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 21 Sep 2016 11:05:33 +0300
+Subject: [PATCH 1/2] phy-sun4i-usb: Add sun4i_usb_phy_force_session_end()
+ function
+In-Reply-To: <57E0BEDF.2020603@ti.com>
+References: <20160918165018.24547-1-hdegoede@redhat.com>
+ <57E0BEDF.2020603@ti.com>
+Message-ID: <54119844-ce99-bf8c-fc6e-09bcc7523e4d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/2016 at 17:02:11 -0700, Stephen Boyd wrote :
-> On 09/20, Alexandre Belloni wrote:
-> > Move all clocks related to the slow clock controller to sckc.c. This avoids
-> > extern definitions and allows to remove sckc.h
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> 
-> Applied to clk-next
-> 
+Hi,
 
-Thanks for the fix!
+On 09/20/2016 07:45 AM, Kishon Vijay Abraham I wrote:
+> Hi,
+>
+> On Sunday 18 September 2016 10:20 PM, Hans de Goede wrote:
+>> The sunxi musb has a bug where sometimes it will generate a babble
+>> error on device disconnect instead of a disconnect irq. When this
+>> happens the musb-controller switches from host mode to device mode
+>> (it clears MUSB_DEVCTL_SESSION and sets MUSB_DEVCTL_BDEVICE) and
+>> gets stuck in this state.
+>>
+>> Clearing this requires reporting Vbus low for 200 or more ms, but
+>> on some devices Vbus is simply always high (host-only mode, no Vbus
+>> control). The phy-sun4i-usb code already has code to force a session
+>> end for devices without Vbus control.
+>>
+>> This commit adds a sun4i_usb_phy_force_session_end() function exporting
+>> this functionality to the sunxi-musb glue, so that it can force a session
+>> end to fixup the stuck state after a babble error.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  drivers/phy/phy-sun4i-usb.c       | 11 +++++++++++
+>>  include/linux/phy/phy-sun4i-usb.h |  7 +++++++
+>>  2 files changed, 18 insertions(+)
+>>
+>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+>> index 43c0d98..06f4e11a 100644
+>> --- a/drivers/phy/phy-sun4i-usb.c
+>> +++ b/drivers/phy/phy-sun4i-usb.c
+>> @@ -470,6 +470,17 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
+>>  }
+>>  EXPORT_SYMBOL_GPL(sun4i_usb_phy_set_squelch_detect);
+>>
+>> +void sun4i_usb_phy_force_session_end(struct phy *_phy)
+>> +{
+>> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>> +
+>> +	data->id_det = -1;
+>> +	data->force_session_end = true;
+>> +	queue_delayed_work(system_wq, &data->detect, 0);
+>> +}
+>> +EXPORT_SYMBOL_GPL(sun4i_usb_phy_force_session_end);
+>
+> Er.. one more export symbol :-(
 
-> drivers/clk/at91/sckc.c:146:13:
-> warning: symbol 'of_at91sam9x5_clk_slow_osc_setup' was not
-> declared. Should it be static?
-> drivers/clk/at91/sckc.c:260:13:
-> warning: symbol 'of_at91sam9x5_clk_slow_rc_osc_setup' was not
-> declared. Should it be static?
-> drivers/clk/at91/sckc.c:359:13:
-> warning: symbol 'of_at91sam9x5_clk_slow_setup' was not declared.
-> Should it be static?
-> 
-> ----8<----
-> diff --git a/drivers/clk/at91/sckc.c b/drivers/clk/at91/sckc.c
-> index f6ed711af738..311956abf4aa 100644
-> --- a/drivers/clk/at91/sckc.c
-> +++ b/drivers/clk/at91/sckc.c
-> @@ -143,8 +143,8 @@ at91_clk_register_slow_osc(void __iomem *sckcr,
->  	return hw;
->  }
->  
-> -void __init of_at91sam9x5_clk_slow_osc_setup(struct device_node *np,
-> -					     void __iomem *sckcr)
-> +static void __init
-> +of_at91sam9x5_clk_slow_osc_setup(struct device_node *np, void __iomem *sckcr)
->  {
->  	struct clk_hw *hw;
->  	const char *parent_name;
-> @@ -257,8 +257,8 @@ at91_clk_register_slow_rc_osc(void __iomem *sckcr,
->  	return hw;
->  }
->  
-> -void __init of_at91sam9x5_clk_slow_rc_osc_setup(struct device_node *np,
-> -						void __iomem *sckcr)
-> +static void __init
-> +of_at91sam9x5_clk_slow_rc_osc_setup(struct device_node *np, void __iomem *sckcr)
->  {
->  	struct clk_hw *hw;
->  	u32 frequency = 0;
-> @@ -356,8 +356,8 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
->  	return hw;
->  }
->  
-> -void __init of_at91sam9x5_clk_slow_setup(struct device_node *np,
-> -					 void __iomem *sckcr)
-> +static void __init
-> +of_at91sam9x5_clk_slow_setup(struct device_node *np, void __iomem *sckcr)
->  {
->  	struct clk_hw *hw;
->  	const char *parent_names[2];
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+Yes unfortunately we need one more to work around sunxi musb / phy bugs.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>> +
+>>  static const struct phy_ops sun4i_usb_phy_ops = {
+>>  	.init		= sun4i_usb_phy_init,
+>>  	.exit		= sun4i_usb_phy_exit,
+>> diff --git a/include/linux/phy/phy-sun4i-usb.h b/include/linux/phy/phy-sun4i-usb.h
+>> index 50aed92..3bb773f 100644
+>> --- a/include/linux/phy/phy-sun4i-usb.h
+>> +++ b/include/linux/phy/phy-sun4i-usb.h
+>> @@ -23,4 +23,11 @@
+>>   */
+>>  void sun4i_usb_phy_set_squelch_detect(struct phy *phy, bool enabled);
+>>
+>> +/**
+>> + * sun4i_usb_force_session_end() - Force the current session to end
+>> + *				   by reporting VBus low for 200+ ms
+>> + * @phy: reference to a sun4i usb phy
+>> + */
+>> +void sun4i_usb_phy_force_session_end(struct phy *phy);
+>
+> Should we include a static inline function if sun4i phy is not defined?
+
+No, we're also not doing that for the already exported
+sun4i_usb_phy_set_squelch_detect()
+
+And it is not necessary since the only caller is drivers/usb/musb/sunxi.c,
+and drivers/usb/musb/Kconfig has:
+
+config USB_MUSB_SUNXI
+         tristate "Allwinner (sunxi)"
+         depends on PHY_SUN4I_USB
+
+Regards,
+
+Hans
