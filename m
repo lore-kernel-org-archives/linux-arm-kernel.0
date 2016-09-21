@@ -1,113 +1,110 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 21 Sep 2016 13:54:35 +0800
-Subject: [RESEND PATCH v6, 3/5] usb: xhci-mtk: make IPPC register optional
+Date: Wed, 21 Sep 2016 13:54:33 +0800
+Subject: [RESEND PATCH v6,
+ 1/5] dt-bindings: mt8173-xhci: support host side of dual-role mode
 In-Reply-To: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1474437277-27201-4-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1474437277-27201-2-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make IPPC register optional to support host side of dual-role mode,
-due to it is moved into common glue layer for simplification.
+Some resources, such as IPPC register etc, shared with device
+driver are moved into common glue layer when xHCI driver is the
+host side of dual-role mode and they should be changed as optional
+properties if they are required ones before. For clarity, add
+a new part of binding to support host side of dual-role mode.
+
+Additionally add optional properties of pinctrl for host only mode
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/usb/host/xhci-mtk.c |   36 +++++++++++++++++++++++++++++-------
- 1 file changed, 29 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |   54 +++++++++++++++++++-
+ 1 file changed, 52 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 79959f1..4bf99b9 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -94,6 +94,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
- 	int ret;
- 	int i;
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+index b3a7ffa..2a930bd 100644
+--- a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+@@ -2,10 +2,18 @@ MT8173 xHCI
  
-+	if (ippc == NULL)
-+		return 0;
+ The device node for Mediatek SOC USB3.0 host controller
+ 
++There are two scenarios: the first one only supports xHCI driver;
++the second one supports dual-role mode, and the host is based on xHCI
++driver. Take account of backward compatibility, we divide bindings
++into two parts.
 +
- 	/* power on host ip */
- 	value = readl(&ippc->ip_pw_ctr1);
- 	value &= ~CTRL1_IP_HOST_PDN;
-@@ -139,6 +142,9 @@ static int xhci_mtk_host_disable(struct xhci_hcd_mtk *mtk)
- 	int ret;
- 	int i;
- 
-+	if (ippc == NULL)
-+		return 0;
++1st: only supports xHCI driver
++------------------------------------------------------------------------
 +
- 	/* power down all u3 ports */
- 	for (i = 0; i < mtk->num_u3_ports; i++) {
- 		value = readl(&ippc->u3_ctrl_p[i]);
-@@ -173,6 +179,9 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
- 	struct mu3c_ippc_regs __iomem *ippc = mtk->ippc_regs;
- 	u32 value;
+ Required properties:
+  - compatible : should contain "mediatek,mt8173-xhci"
+- - reg : specifies physical base address and size of the registers,
+-	the first one for MAC, the second for IPPC
++ - reg : specifies physical base address and size of the registers
++ - reg-names: should be "mac" for xHCI MAC and "ippc" for IP port control
+  - interrupts : interrupt used by the controller
+  - power-domains : a phandle to USB power domain node to control USB's
+ 	mtcmos
+@@ -27,12 +35,16 @@ Optional properties:
+ 	control register, it depends on "mediatek,wakeup-src".
+  - vbus-supply : reference to the VBUS regulator;
+  - usb3-lpm-capable : supports USB3.0 LPM
++ - pinctrl-names : a pinctrl state named "default" must be defined
++ - pinctrl-0 : pin control group
++	See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
  
-+	if (ippc == NULL)
-+		return 0;
+ Example:
+ usb30: usb at 11270000 {
+ 	compatible = "mediatek,mt8173-xhci";
+ 	reg = <0 0x11270000 0 0x1000>,
+ 	      <0 0x11280700 0 0x0100>;
++	reg-names = "mac", "ippc";
+ 	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+ 	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+ 	clocks = <&topckgen CLK_TOP_USB30_SEL>,
+@@ -49,3 +61,41 @@ usb30: usb at 11270000 {
+ 	mediatek,syscon-wakeup = <&pericfg>;
+ 	mediatek,wakeup-src = <1>;
+ };
 +
- 	/* reset whole ip */
- 	value = readl(&ippc->ip_pw_ctr0);
- 	value |= CTRL0_IP_SW_RST;
-@@ -475,6 +484,7 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
- /* called during probe() after chip reset completes */
- static int xhci_mtk_setup(struct usb_hcd *hcd)
- {
-+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
- 	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
- 	int ret;
- 
-@@ -482,12 +492,21 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
- 		ret = xhci_mtk_ssusb_config(mtk);
- 		if (ret)
- 			return ret;
-+	}
++2nd: dual-role mode with xHCI driver
++------------------------------------------------------------------------
 +
-+	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
-+	if (ret)
-+		return ret;
++In the case, xhci is added as subnode to mtu3. An example and the DT binding
++details of mtu3 can be found in:
++Documentation/devicetree/bindings/usb/mtu3.txt
 +
-+	if (usb_hcd_is_primary_hcd(hcd)) {
-+		mtk->num_u3_ports = xhci->num_usb3_ports;
-+		mtk->num_u2_ports = xhci->num_usb2_ports;
- 		ret = xhci_mtk_sch_init(mtk);
- 		if (ret)
- 			return ret;
- 	}
- 
--	return xhci_gen_setup(hcd, xhci_mtk_quirks);
-+	return ret;
- }
- 
- static int xhci_mtk_probe(struct platform_device *pdev)
-@@ -586,7 +605,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 	mtk->hcd = platform_get_drvdata(pdev);
- 	platform_set_drvdata(pdev, mtk);
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac");
- 	hcd->regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(hcd->regs)) {
- 		ret = PTR_ERR(hcd->regs);
-@@ -595,11 +614,14 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 	hcd->rsrc_start = res->start;
- 	hcd->rsrc_len = resource_size(res);
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
--	mtk->ippc_regs = devm_ioremap_resource(dev, res);
--	if (IS_ERR(mtk->ippc_regs)) {
--		ret = PTR_ERR(mtk->ippc_regs);
--		goto put_usb2_hcd;
-+	mtk->ippc_regs = NULL;
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ippc");
-+	if (res) {	/* ippc register is optional */
-+		mtk->ippc_regs = devm_ioremap_resource(dev, res);
-+		if (IS_ERR(mtk->ippc_regs)) {
-+			ret = PTR_ERR(mtk->ippc_regs);
-+			goto put_usb2_hcd;
-+		}
- 	}
- 
- 	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
++Required properties:
++ - compatible : should contain "mediatek,mt8173-xhci"
++ - reg : specifies physical base address and size of the registers
++ - reg-names: should be "mac" for xHCI MAC
++ - interrupts : interrupt used by the host controller
++ - power-domains : a phandle to USB power domain node to control USB's
++	mtcmos
++ - vusb33-supply : regulator of USB avdd3.3v
++
++ - clocks : a list of phandle + clock-specifier pairs, one for each
++	entry in clock-names
++ - clock-names : must be
++	"sys_ck": for clock of xHCI MAC
++
++Optional properties:
++ - vbus-supply : reference to the VBUS regulator;
++ - usb3-lpm-capable : supports USB3.0 LPM
++
++Example:
++usb30: usb at 11270000 {
++	compatible = "mediatek,mt8173-xhci";
++	reg = <0 0x11270000 0 0x1000>;
++	reg-names = "mac";
++	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++	clocks = <&topckgen CLK_TOP_USB30_SEL>;
++	clock-names = "sys_ck";
++	vusb33-supply = <&mt6397_vusb_reg>;
++	usb3-lpm-capable;
++};
 -- 
 1.7.9.5
