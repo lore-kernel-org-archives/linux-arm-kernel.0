@@ -1,50 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Sep 2016 16:44:00 +0100
-Subject: [PATCH 2/2] MAINTAINERS: add ARM and arm64 EFI specific files to
- EFI subsystem
-In-Reply-To: <1474472114-12973-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1474472114-12973-1-git-send-email-ard.biesheuvel@linaro.org>
- <1474472114-12973-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160921154400.GJ29042@arm.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Wed, 21 Sep 2016 21:41:31 +0530
+Subject: [PATCH 1/4] mfd: ti_am335x_tscadc: store physical address
+In-Reply-To: <20160921161134.6951-1-mugunthanvnm@ti.com>
+References: <20160921161134.6951-1-mugunthanvnm@ti.com>
+Message-ID: <20160921161134.6951-2-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2016 at 04:35:14PM +0100, Ard Biesheuvel wrote:
-> Since I will be co-maintaining the EFI subsystem, it makes sense to
-> mention the ARM and arm64 EFI bits in the EFI section in MAINTAINERS
-> so that Matt, the list and I get cc'ed on proposed changes.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <rmk+kernel@armlinux.org.uk>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  MAINTAINERS | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 224518556a84..cc8b36699f94 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4562,12 +4562,14 @@ L:	linux-efi at vger.kernel.org
->  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/efi/efi.git
->  S:	Maintained
->  F:	Documentation/efi-stub.txt
-> -F:	arch/ia64/kernel/efi.c
-> +F:	arch/*/kernel/efi.c
->  F:	arch/x86/boot/compressed/eboot.[ch]
-> -F:	arch/x86/include/asm/efi.h
-> +F:	arch/*/include/asm/efi.h
->  F:	arch/x86/platform/efi/
->  F:	drivers/firmware/efi/
->  F:	include/linux/efi*.h
-> +F:	arch/arm/boot/compressed/efi-header.S
-> +F:	arch/arm64/kernel/efi-entry.S
+store the physical address of the device in its priv to use it
+for DMA addressing in the client drivers.
 
-For the arm64 bit,
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+---
+ drivers/mfd/ti_am335x_tscadc.c       | 1 +
+ include/linux/mfd/ti_am335x_tscadc.h | 1 +
+ 2 files changed, 2 insertions(+)
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Thanks,
-
-Will
+diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+index c8f027b..0f3fab4 100644
+--- a/drivers/mfd/ti_am335x_tscadc.c
++++ b/drivers/mfd/ti_am335x_tscadc.c
+@@ -183,6 +183,7 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
+ 		tscadc->irq = err;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	tscadc->tscadc_phys_base = res->start;
+ 	tscadc->tscadc_base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(tscadc->tscadc_base))
+ 		return PTR_ERR(tscadc->tscadc_base);
+diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+index 7f55b8b..e45a208 100644
+--- a/include/linux/mfd/ti_am335x_tscadc.h
++++ b/include/linux/mfd/ti_am335x_tscadc.h
+@@ -155,6 +155,7 @@ struct ti_tscadc_dev {
+ 	struct device *dev;
+ 	struct regmap *regmap;
+ 	void __iomem *tscadc_base;
++	phys_addr_t tscadc_phys_base;
+ 	int irq;
+ 	int used_cells;	/* 1-2 */
+ 	int tsc_wires;
+-- 
+2.10.0.129.g35f6318
