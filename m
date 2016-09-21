@@ -1,140 +1,73 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 21 Sep 2016 17:37:41 -0500
-Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <1473741659-17618-3-git-send-email-po.liu@nxp.com>
-References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
- <1473741659-17618-1-git-send-email-po.liu@nxp.com>
- <1473741659-17618-3-git-send-email-po.liu@nxp.com>
-Message-ID: <20160921223741.GG20006@localhost>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 21 Sep 2016 18:38:05 -0400
+Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
+In-Reply-To: <20160921173129.GA20006@localhost>
+References: <20160921173129.GA20006@localhost>
+Message-ID: <20160921223805.21652-1-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 12:40:59PM +0800, Po Liu wrote:
-> On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-> When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-> maybe there is interrupt line for aer pme etc. Search the interrupt
-> number in the fdt file. Then fixup the dev->irq with it.
-> 
-> Signed-off-by: Po Liu <po.liu@nxp.com>
-> ---
-> changes for v5:
-> 	- Add clear 'aer' interrup-names description
-> 
->  .../devicetree/bindings/pci/layerscape-pci.txt     | 11 +++++---
->  drivers/pci/pcie/portdrv_core.c                    | 31 +++++++++++++++++++---
->  2 files changed, 35 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index 41e9f55..101d0a7 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -18,8 +18,10 @@ Required properties:
->  - reg: base addresses and lengths of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must contain an
->    entry for each entry in the interrupt-names property.
-> -- interrupt-names: Must include the following entries:
-> -  "intr": The interrupt that is asserted for controller interrupts
-> +- interrupt-names: It may be include the following entries:
-> +  "aer": The interrupt that is asserted for aer interrupt
-> +  "pme": The interrupt that is asserted for pme interrupt
-> +  ......
->  - fsl,pcie-scfg: Must include two entries.
->    The first entry must be a link to the SCFG device node
->    The second entry must be '0' or '1' based on physical PCIe controller index.
-> @@ -35,8 +37,9 @@ Example:
->  		reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers */
->  		       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
->  		reg-names = "regs", "config";
-> -		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
-> -		interrupt-names = "intr";
-> +		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>, /* aer interrupt */
-> +			<GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* pme interrupt */
-> +		interrupt-names = "aer", "pme";
->  		fsl,pcie-scfg = <&scfg 0>;
->  		#address-cells = <3>;
->  		#size-cells = <2>;
-> diff --git a/drivers/pci/pcie/portdrv_core.c b/drivers/pci/pcie/portdrv_core.c
-> index e9270b4..7c4943d 100644
-> --- a/drivers/pci/pcie/portdrv_core.c
-> +++ b/drivers/pci/pcie/portdrv_core.c
-> @@ -16,6 +16,7 @@
->  #include <linux/slab.h>
->  #include <linux/pcieport_if.h>
->  #include <linux/aer.h>
-> +#include <linux/of_irq.h>
->  
->  #include "../pci.h"
->  #include "portdrv.h"
-> @@ -200,6 +201,28 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *vectors, int mask)
->  static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
->  {
->  	int i, irq = -1;
-> +	int ret;
-> +	struct device_node *np = NULL;
-> +
-> +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
-> +		irqs[i] = 0;
-> +
-> +	if (dev->bus->dev.of_node)
-> +		np = dev->bus->dev.of_node;
-> +
-> +	/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
-> +	 * request irq for aer
-> +	 */
-> +	if (IS_ENABLED(CONFIG_OF_IRQ) && np &&
-> +			(mask & PCIE_PORT_SERVICE_PME)) {
-> +		ret = of_irq_get_byname(np, "aer");
-> +		if (ret > 0) {
-> +			irqs[PCIE_PORT_SERVICE_AER_SHIFT] = ret;
-> +			if (dev->irq)
-> +				irq = dev->irq;
-> +			goto no_msi;
-> +		}
-> +	}
+The Qualcomm Technologies QDF2432 SoC does not support accesses smaller
+than 32 bits to the PCI configuration space. Register the appropriate
+quirk.
 
-We definitely need to solve this somehow.  But this approach doesn't
-feel quite right because it's hard to map this code back to anything
-in the spec, and it uses a completely platform-dependent name
-("interrupt-names aer") in code that is supposedly generic.
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+---
+ drivers/acpi/pci_mcfg.c  |  8 ++++++++
+ drivers/pci/ecam.c       | 10 ++++++++++
+ include/linux/pci-ecam.h |  1 +
+ 3 files changed, 19 insertions(+)
 
-What if we added some sort of hook that would return the IRQ?  Maybe a
-pcibios_*() hook right now, with the idea of making it a
-pci_host_bridge function pointer someday?
-
-I know the body of the hook would look a lot like what you have here,
-but at least it would be more obvious that it's platform-specific
-code.
-
-I think your platform supports PME interrupts as well as AER, and
-they're different IRQs.  So you'd probably have to do something
-similar to the pcie_port_enable_msix() interface, so you can fill in
-both IRQs.
-
->  	/*
->  	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
-> @@ -225,11 +248,13 @@ static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
->  		irq = dev->irq;
->  
->   no_msi:
-> -	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
-> -		irqs[i] = irq;
-> +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
-> +		if (!irqs[i])
-> +			irqs[i] = irq;
-> +	}
->  	irqs[PCIE_PORT_SERVICE_VC_SHIFT] = -1;
->  
-> -	if (irq < 0)
-> +	if (irq < 0 && irqs[PCIE_PORT_SERVICE_AER_SHIFT] < 0)
->  		return -ENODEV;
->  	return 0;
->  }
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+index 245b79f..212334f 100644
+--- a/drivers/acpi/pci_mcfg.c
++++ b/drivers/acpi/pci_mcfg.c
+@@ -96,6 +96,14 @@ static struct mcfg_fixup mcfg_quirks[] = {
+ 	THUNDER_ECAM_MCFG(2, 12),
+ 	THUNDER_ECAM_MCFG(2, 13),
+ #endif
++	{ "QCOM  ", "QDF2432 ", 1, 0, MCFG_BUS_ANY, &pci_32b_ops },
++	{ "QCOM  ", "QDF2432 ", 1, 1, MCFG_BUS_ANY, &pci_32b_ops },
++	{ "QCOM  ", "QDF2432 ", 1, 2, MCFG_BUS_ANY, &pci_32b_ops },
++	{ "QCOM  ", "QDF2432 ", 1, 3, MCFG_BUS_ANY, &pci_32b_ops },
++	{ "QCOM  ", "QDF2432 ", 1, 4, MCFG_BUS_ANY, &pci_32b_ops },
++	{ "QCOM  ", "QDF2432 ", 1, 5, MCFG_BUS_ANY, &pci_32b_ops },
++	{ "QCOM  ", "QDF2432 ", 1, 6, MCFG_BUS_ANY, &pci_32b_ops },
++	{ "QCOM  ", "QDF2432 ", 1, 7, MCFG_BUS_ANY, &pci_32b_ops },
+ };
+ 
+ static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
+diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+index 43ed08d..c3b3063 100644
+--- a/drivers/pci/ecam.c
++++ b/drivers/pci/ecam.c
+@@ -162,3 +162,13 @@ struct pci_ecam_ops pci_generic_ecam_ops = {
+ 		.write		= pci_generic_config_write,
+ 	}
+ };
++
++/* ops for 32 bit config space access quirk */
++struct pci_ecam_ops pci_32b_ops = {
++	.bus_shift	= 20,
++	.pci_ops	= {
++		.map_bus	= pci_ecam_map_bus,
++		.read		= pci_generic_config_read32,
++		.write		= pci_generic_config_write32,
++	}
++};
+diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+index 35f0e81..a6cffb8 100644
+--- a/include/linux/pci-ecam.h
++++ b/include/linux/pci-ecam.h
+@@ -65,6 +65,7 @@ extern struct pci_ecam_ops pci_thunder_pem_ops;
+ #ifdef CONFIG_PCI_HOST_THUNDER_ECAM
+ extern struct pci_ecam_ops pci_thunder_ecam_ops;
+ #endif
++extern struct pci_ecam_ops pci_32b_ops;
+ 
+ #ifdef CONFIG_PCI_HOST_GENERIC
+ /* for DT-based PCI controllers that support ECAM */
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
+Forum, a Linux Foundation Collaborative Project.
