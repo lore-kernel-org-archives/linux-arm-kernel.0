@@ -1,71 +1,69 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 21 Sep 2016 10:31:13 +0300
-Subject: [PATCH 8/9] dmaengine: ti-dma-crossbar: Use enum for crossbar type
-In-Reply-To: <20160921035226.GE2609@localhost>
-References: <20160916083324.29133-1-peter.ujfalusi@ti.com>
- <20160916083324.29133-9-peter.ujfalusi@ti.com>
- <20160921035226.GE2609@localhost>
-Message-ID: <512e93da-9a25-01d5-4a71-07a48e28702d@ti.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 21 Sep 2016 08:34:18 +0100
+Subject: [PATCH 3/4] ARM: tegra: nyan-big: Include compatible revisions
+ for proper detection
+In-Reply-To: <1474394544.1215.13.camel@paulk.fr>
+References: <20160828173246.32621-1-contact@paulk.fr>
+ <20160828173246.32621-3-contact@paulk.fr>
+ <a9485a88-55a5-9dd1-1a1b-a6c0a78ff476@nvidia.com>
+ <1474394004.1215.2.camel@paulk.fr>
+ <d05b8e5a-adf7-9057-b42a-0da1fde84953@nvidia.com>
+ <1474394544.1215.13.camel@paulk.fr>
+Message-ID: <6501341f-e14c-4876-dcb7-60a33b7621c4@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/16 06:52, Vinod Koul wrote:
-> On Fri, Sep 16, 2016 at 11:33:23AM +0300, Peter Ujfalusi wrote:
->> Fixes compiler warning on 64bit architectures.
+
+On 20/09/16 19:02, Paul Kocialkowski wrote:
+> * PGP Signed by an unknown key
 > 
-> Would be good to give the warning message here
-
-Let me revert this patch and patch #2 for the eDMA to get the warnings.
-
-I will repost v2 with the updated commit messages.
-
+> Le mardi 20 septembre 2016 ? 18:56 +0100, Jon Hunter a ?crit :
+>> On 20/09/16 18:53, Paul Kocialkowski wrote:
+>>>
+>>>> Old Signed by an unknown key
+>>>
+>>> Le mardi 20 septembre 2016 ? 18:41 +0100, Jon Hunter a ?crit :
+>>>>
+>>>> On 28/08/16 18:32, Paul Kocialkowski wrote:
+>>>>>
+>>>>>
+>>>>> Depthcharge (the payload used with cros devices) will attempt to detect
+>>>>> boards using their revision. This includes all the known revisions for
+>>>>> the nyan-big board so that the dtb can be selected preferably.
+>>>>
+>>>> May be I am missing something here, but for the mainline there is only
+>>>> one dtb available and so why is this needed for the mainline?
+>>>
+>>> There is indeed a single dts in mainline, but depthcharge will use the
+>>> revision
+>>> to match the compatible string (e.g. it will look for google,nyan-big-rev5,
+>>> not
+>>> google,nyan-big), so we need to list them all in that single dts. Otherwise,
+>>> depthcharge will fall back to the default config, which may or may not be
+>>> suitable for nyan.
+>>
+>> Is tegra124-nyan-big.dtb not the default?
 > 
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->>  drivers/dma/ti-dma-crossbar.c | 10 ++++++----
->>  1 file changed, 6 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti-dma-crossbar.c
->> index e4f3bd1ae264..876e4ccaf033 100644
->> --- a/drivers/dma/ti-dma-crossbar.c
->> +++ b/drivers/dma/ti-dma-crossbar.c
->> @@ -16,8 +16,10 @@
->>  #include <linux/of_device.h>
->>  #include <linux/of_dma.h>
->>  
->> -#define TI_XBAR_DRA7		0
->> -#define TI_XBAR_AM335X		1
->> +enum ti_xbar_type {
->> +	TI_XBAR_DRA7 = 0,
->> +	TI_XBAR_AM335X,
->> +};
->>  
->>  static const struct of_device_id ti_dma_xbar_match[] = {
->>  	{
->> @@ -395,7 +397,7 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
->>  
->>  	xbar->dmarouter.dev = &pdev->dev;
->>  	xbar->dmarouter.route_free = ti_dra7_xbar_free;
->> -	xbar->dma_offset = (u32)match->data;
->> +	xbar->dma_offset = (enum ti_xbar_type)match->data;
->>  
->>  	mutex_init(&xbar->mutex);
->>  	platform_set_drvdata(pdev, xbar);
->> @@ -428,7 +430,7 @@ static int ti_dma_xbar_probe(struct platform_device *pdev)
->>  	if (unlikely(!match))
->>  		return -EINVAL;
->>  
->> -	switch ((u32)match->data) {
->> +	switch ((enum ti_xbar_type)match->data) {
->>  	case TI_XBAR_DRA7:
->>  		ret = ti_dra7_xbar_probe(pdev);
->>  		break;
->> -- 
->> 2.10.0
->>
-> 
+> You can't expect that to always be the case. The image format allows many
+> different dts to be provided, so I could easily build with multi_v7_defconfig
+> and have various dts for various devices in the same image, and just select a
+> random one as default.
 
+Really? Sounds odd. I was hoping that tegra124-nyan-big.dtb would be a
+catch all.
+
+> Here, default is really a fallback, the right one is expected to be detected by
+> this mechanism. And it really doesn't hurt to provide that information for
+> proper detection.
+> 
+> Note that this is done with many other cros devices in mainline (such as rk3288
+> veyrons).
+
+Yes, I guess the same is true for the tegra210-smaug and we do define
+all the revs for that one. May be extend the changelog comment to say
+what may happen without this change and the problem that this is fixing.
+
+Jon	
 
 -- 
-P?ter
+nvpublic
