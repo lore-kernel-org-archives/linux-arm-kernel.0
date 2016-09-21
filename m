@@ -1,44 +1,39 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Wed, 21 Sep 2016 21:41:31 +0530
-Subject: [PATCH 1/4] mfd: ti_am335x_tscadc: store physical address
-In-Reply-To: <20160921161134.6951-1-mugunthanvnm@ti.com>
-References: <20160921161134.6951-1-mugunthanvnm@ti.com>
-Message-ID: <20160921161134.6951-2-mugunthanvnm@ti.com>
+Date: Wed, 21 Sep 2016 21:41:30 +0530
+Subject: [PATCH 0/4] Add DMA support for ti_am335x_adc driver
+Message-ID: <20160921161134.6951-1-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-store the physical address of the device in its priv to use it
-for DMA addressing in the client drivers.
+The ADC has a 64 work depth fifo length which holds the ADC data
+till the CPU reads. So when a user program needs a large ADC data
+to operate on, then it has to do multiple reads to get its
+buffer. Currently if the application asks for 4 samples per
+channel with all 8 channels are enabled, kernel can provide only
+3 samples per channel when all 8 channels are enabled (logs at
+[1]). So with DMA support user can request for large number of
+samples at a time (logs at [2]).
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- drivers/mfd/ti_am335x_tscadc.c       | 1 +
- include/linux/mfd/ti_am335x_tscadc.h | 1 +
- 2 files changed, 2 insertions(+)
+Tested the patch on AM437x-gp-evm and AM335x Boneblack with the
+patch [3] to enable ADC and pushed a branch for testing [4]
 
-diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
-index c8f027b..0f3fab4 100644
---- a/drivers/mfd/ti_am335x_tscadc.c
-+++ b/drivers/mfd/ti_am335x_tscadc.c
-@@ -183,6 +183,7 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
- 		tscadc->irq = err;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	tscadc->tscadc_phys_base = res->start;
- 	tscadc->tscadc_base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(tscadc->tscadc_base))
- 		return PTR_ERR(tscadc->tscadc_base);
-diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
-index 7f55b8b..e45a208 100644
---- a/include/linux/mfd/ti_am335x_tscadc.h
-+++ b/include/linux/mfd/ti_am335x_tscadc.h
-@@ -155,6 +155,7 @@ struct ti_tscadc_dev {
- 	struct device *dev;
- 	struct regmap *regmap;
- 	void __iomem *tscadc_base;
-+	phys_addr_t tscadc_phys_base;
- 	int irq;
- 	int used_cells;	/* 1-2 */
- 	int tsc_wires;
+[1] - http://pastebin.ubuntu.com/23211490/
+[2] - http://pastebin.ubuntu.com/23211492/
+[3] - http://pastebin.ubuntu.com/23211494/
+[4] - git://git.ti.com/~mugunthanvnm/ti-linux-kernel/linux.git iio-dma
+
+Mugunthan V N (4):
+  mfd: ti_am335x_tscadc: store physical address
+  drivers: iio: ti_am335x_adc: add dma support
+  ARM: dts: am33xx: add DMA properties for tscadc
+  ARM: dts: am4372: add DMA properties for tscadc
+
+ arch/arm/boot/dts/am33xx.dtsi        |   2 +
+ arch/arm/boot/dts/am4372.dtsi        |   2 +
+ drivers/iio/adc/ti_am335x_adc.c      | 160 ++++++++++++++++++++++++++++++++++-
+ drivers/mfd/ti_am335x_tscadc.c       |   1 +
+ include/linux/mfd/ti_am335x_tscadc.h |   8 ++
+ 5 files changed, 170 insertions(+), 3 deletions(-)
+
 -- 
 2.10.0.129.g35f6318
