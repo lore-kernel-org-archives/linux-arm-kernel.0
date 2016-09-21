@@ -1,56 +1,171 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 21 Sep 2016 10:10:14 +0300
-Subject: [PATCH 1/2] dt: bindings: add allwinner,otg-routed property for
- phy-sun4i-usb
-In-Reply-To: <20160921070406.27445-1-icenowy@aosc.xyz>
-References: <20160921070406.27445-1-icenowy@aosc.xyz>
-Message-ID: <4a1ab62a-4091-fd75-d753-fb30585dffa5@redhat.com>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Wed, 21 Sep 2016 14:57:19 +0800
+Subject: [v12, 7/8] base: soc: introduce soc_device_match() interface
+In-Reply-To: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
+References: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1474441040-11946-8-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Arnd Bergmann <arnd@arndb.de>
 
-On 09/21/2016 10:04 AM, Icenowy Zheng wrote:
-> On some newer Allwinner SoCs (H3 or A64), the PHY0 can be either routed to
-> the MUSB controller (which is an OTG controller) or the OHCI/EHCI pair
-> (which is a Host-only controller, but more stable and easy to implement).
->
-> This property marks whether on a certain board which controller should be
-> attached to the PHY.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+We keep running into cases where device drivers want to know the exact
+version of the a SoC they are currently running on. In the past, this has
+usually been done through a vendor specific API that can be called by a
+driver, or by directly accessing some kind of version register that is
+not part of the device itself but that belongs to a global register area
+of the chip.
 
-Erm, I think that the idea here is to dynamically switch the routing
-based on the id-pin of the otg connector. IOW use the musb controller
-for device mode, and the ehci/ohci proper for proper host support
-when in host mode.
+Common reasons for doing this include:
 
-Regards,
+- A machine is not using devicetree or similar for passing data about
+  on-chip devices, but just announces their presence using boot-time
+  platform devices, and the machine code itself does not care about the
+  revision.
 
-Hans
+- There is existing firmware or boot loaders with existing DT binaries
+  with generic compatible strings that do not identify the particular
+  revision of each device, but the driver knows which SoC revisions
+  include which part.
 
+- A prerelease version of a chip has some quirks and we are using the same
+  version of the bootloader and the DT blob on both the prerelease and the
+  final version. An update of the DT binding seems inappropriate because
+  that would involve maintaining multiple copies of the dts and/or
+  bootloader.
 
+This patch introduces the soc_device_match() interface that is meant to
+work like of_match_node() but instead of identifying the version of a
+device, it identifies the SoC itself using a vendor-agnostic interface.
 
-> ---
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index 287150d..5c11d57 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -36,6 +36,13 @@ Optional properties:
->  - usb1_vbus-supply : regulator phandle for controller usb1 vbus
->  - usb2_vbus-supply : regulator phandle for controller usb2 vbus
->
-> +Optional properties for H3 or A64 SoCs:
-> +- allwinner,otg-routed : USB0 (OTG) PHY is routed to OHCI/EHCI pair rather than
-> +			 MUSB. (boolean, if this property is set, the OHCI/EHCI
-> +			 controllers at PHY0 should be enabled and the MUSB
-> +			 controller must *NOT* be enabled, and thus the PHY can
-> +			 only work in host mode)
-> +
->  Example:
->  	usbphy: phy at 0x01c13400 {
->  		#phy-cells = <1>;
->
+Unlike of_match_node(), we do not do an exact string compare but instead
+use glob_match() to allow wildcards in strings.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+---
+Changes for v11:
+	- Added this patch for soc match
+Changes for v12:
+	- Corrected the author
+	- Rewrited soc_device_match with while loop
+---
+ drivers/base/Kconfig    |  1 +
+ drivers/base/soc.c      | 66 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/sys_soc.h |  3 +++
+ 3 files changed, 70 insertions(+)
+
+diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+index 98504ec..f1591ad2 100644
+--- a/drivers/base/Kconfig
++++ b/drivers/base/Kconfig
+@@ -225,6 +225,7 @@ config GENERIC_CPU_AUTOPROBE
+ 
+ config SOC_BUS
+ 	bool
++	select GLOB
+ 
+ source "drivers/base/regmap/Kconfig"
+ 
+diff --git a/drivers/base/soc.c b/drivers/base/soc.c
+index 75b98aa..d2fd1ad 100644
+--- a/drivers/base/soc.c
++++ b/drivers/base/soc.c
+@@ -14,6 +14,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/sys_soc.h>
+ #include <linux/err.h>
++#include <linux/glob.h>
+ 
+ static DEFINE_IDA(soc_ida);
+ 
+@@ -168,3 +169,68 @@ static void __exit soc_bus_unregister(void)
+ 	bus_unregister(&soc_bus_type);
+ }
+ module_exit(soc_bus_unregister);
++
++static int soc_device_match_one(struct device *dev, void *arg)
++{
++	struct soc_device *soc_dev = container_of(dev, struct soc_device, dev);
++	const struct soc_device_attribute *match = arg;
++
++	if (match->machine &&
++	    !glob_match(match->machine, soc_dev->attr->machine))
++		return 0;
++
++	if (match->family &&
++	    !glob_match(match->family, soc_dev->attr->family))
++		return 0;
++
++	if (match->revision &&
++	    !glob_match(match->revision, soc_dev->attr->revision))
++		return 0;
++
++	if (match->soc_id &&
++	    !glob_match(match->soc_id, soc_dev->attr->soc_id))
++		return 0;
++
++	return 1;
++}
++
++/*
++ * soc_device_match - identify the SoC in the machine
++ * @matches: zero-terminated array of possible matches
++ *
++ * returns the first matching entry of the argument array, or NULL
++ * if none of them match.
++ *
++ * This function is meant as a helper in place of of_match_node()
++ * in cases where either no device tree is available or the information
++ * in a device node is insufficient to identify a particular variant
++ * by its compatible strings or other properties. For new devices,
++ * the DT binding should always provide unique compatible strings
++ * that allow the use of of_match_node() instead.
++ *
++ * The calling function can use the .data entry of the
++ * soc_device_attribute to pass a structure or function pointer for
++ * each entry.
++ */
++const struct soc_device_attribute *soc_device_match(
++	const struct soc_device_attribute *matches)
++{
++	int ret = 0;
++
++	if (!matches)
++		return NULL;
++
++	while (!ret) {
++		if (!(matches->machine || matches->family ||
++		      matches->revision || matches->soc_id))
++			break;
++		ret = bus_for_each_dev(&soc_bus_type, NULL, (void *)matches,
++				       soc_device_match_one);
++		if (!ret)
++			matches++;
++		else
++			return matches;
++	}
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(soc_device_match);
+diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
+index 2739ccb..9f5eb06 100644
+--- a/include/linux/sys_soc.h
++++ b/include/linux/sys_soc.h
+@@ -13,6 +13,7 @@ struct soc_device_attribute {
+ 	const char *family;
+ 	const char *revision;
+ 	const char *soc_id;
++	const void *data;
+ };
+ 
+ /**
+@@ -34,4 +35,6 @@ void soc_device_unregister(struct soc_device *soc_dev);
+  */
+ struct device *soc_device_to_device(struct soc_device *soc);
+ 
++const struct soc_device_attribute *soc_device_match(
++	const struct soc_device_attribute *matches);
+ #endif /* __SOC_BUS_H */
+-- 
+2.1.0.27.g96db324
