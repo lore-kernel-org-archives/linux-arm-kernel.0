@@ -1,107 +1,36 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 21 Sep 2016 22:58:33 +0200
-Subject: [PATCH 2/3] ARM: BCM5301X: Enable UART on Netgear R8000
-In-Reply-To: <20160921205838.15627-1-zajec5@gmail.com>
-References: <20160921205838.15627-1-zajec5@gmail.com>
-Message-ID: <20160921205838.15627-2-zajec5@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 Sep 2016 00:03:40 +0300
+Subject: [PATCH] drm/sun4i: rgb: Enable panel after controller
+In-Reply-To: <20160921130304.3486-1-net147@gmail.com>
+References: <20160921130304.3486-1-net147@gmail.com>
+Message-ID: <20160921210340.GI8719@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+Hi,
 
-It was tested by LEDE users, all we need is to adjust clock frequency.
-While we're at it create a separated DTS include file to share code with
-other BCM4709 devices easier.
+On Wed, Sep 21, 2016 at 11:03:04PM +1000, Jonathan Liu wrote:
+> The panel should be enabled after the controller so that the panel
+> prepare/enable delays are properly taken into account. Similarly, the
+> panel should be disabled before the controller so that the panel
+> unprepare/disable delays are properly taken into account.
+>
+> This is useful for avoiding visual glitches.
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
- arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts       |  2 +-
- arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts |  2 +-
- arch/arm/boot/dts/bcm4709-netgear-r7000.dts       |  2 +-
- arch/arm/boot/dts/bcm4709-netgear-r8000.dts       |  6 +++++-
- arch/arm/boot/dts/bcm4709.dtsi                    | 11 +++++++++++
- 5 files changed, 19 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/bcm4709.dtsi
+This is not really taking any delays into account, especially since
+drm_panel_enable and prepare are suppose to block until their
+operation is complete.
 
-diff --git a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-index 8ade7de..eac0f52 100644
---- a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-+++ b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-@@ -9,7 +9,7 @@
- 
- /dts-v1/;
- 
--#include "bcm4708.dtsi"
-+#include "bcm4709.dtsi"
- #include "bcm5301x-nand-cs0-bch8.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-index 0653e7e..aab39c9 100644
---- a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-+++ b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-@@ -9,7 +9,7 @@
- 
- /dts-v1/;
- 
--#include "bcm4708.dtsi"
-+#include "bcm4709.dtsi"
- #include "bcm5301x-nand-cs0-bch8.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-index a22ed14..fd38d2a 100644
---- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-+++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-@@ -9,7 +9,7 @@
- 
- /dts-v1/;
- 
--#include "bcm4708.dtsi"
-+#include "bcm4709.dtsi"
- #include "bcm5301x-nand-cs0-bch8.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-index ca18151..92f8a72 100644
---- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-+++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-@@ -9,7 +9,7 @@
- 
- /dts-v1/;
- 
--#include "bcm4708.dtsi"
-+#include "bcm4709.dtsi"
- #include "bcm5301x-nand-cs0-bch8.dtsi"
- 
- / {
-@@ -107,6 +107,10 @@
- 	};
- };
- 
-+&uart0 {
-+	status = "okay";
-+};
-+
- &usb2 {
- 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
- };
-diff --git a/arch/arm/boot/dts/bcm4709.dtsi b/arch/arm/boot/dts/bcm4709.dtsi
-new file mode 100644
-index 0000000..f039765
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm4709.dtsi
-@@ -0,0 +1,11 @@
-+/*
-+ * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
-+ *
-+ * Licensed under the ISC license.
-+ */
-+
-+#include "bcm4708.dtsi"
-+
-+&uart0 {
-+	clock-frequency = <125000000>;
-+};
+Maxime
+
 -- 
-2.9.3
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160922/2c9d582c/attachment.sig>
