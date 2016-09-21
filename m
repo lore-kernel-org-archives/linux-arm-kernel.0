@@ -1,39 +1,69 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 21 Sep 2016 11:29:48 +0800
-Subject: [PATCH] clk: mediatek: clk-mt8173: Unmap region obtained by
- of_iomap
-In-Reply-To: <1474360242-15126-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1474360242-15126-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1474428588.10249.0.camel@mtksdaap41>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 21 Sep 2016 09:21:32 +0530
+Subject: [PATCH 5/9] dmaengine/ARM: omap-dma: Fix the DMAengine compile
+ test on non OMAP configs
+In-Reply-To: <20160916083324.29133-6-peter.ujfalusi@ti.com>
+References: <20160916083324.29133-1-peter.ujfalusi@ti.com>
+ <20160916083324.29133-6-peter.ujfalusi@ti.com>
+Message-ID: <20160921035131.GD2609@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-09-20 at 14:00 +0530, Arvind Yadav wrote:
-> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> 
-> Free memory mapping, if init is not successful.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+On Fri, Sep 16, 2016 at 11:33:20AM +0300, Peter Ujfalusi wrote:
+> The DMAengine driver for omap-dma use three function calls from the
+> plat-omap legacy driver. When the DMAengine driver is built when ARCH_OMAP
+> is not set, the compilation will fail due to missing symbols.
+> Add empty inline functions to allow the DMAengine driver to be compiled
+> with COMPILE_TEST.
 
-Reviewed-by: James Liao <jamesjj.liao@mediatek.com>
+Peter,
 
+This should be before you enable COMPILE_TEST otherwise build will break!
+
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > ---
->  drivers/clk/mediatek/clk-mt8173.c |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+>  include/linux/omap-dma.h | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
-> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-> index 10c9860..0ac3aee 100644
-> --- a/drivers/clk/mediatek/clk-mt8173.c
-> +++ b/drivers/clk/mediatek/clk-mt8173.c
-> @@ -1074,8 +1074,10 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
->  	}
+> diff --git a/include/linux/omap-dma.h b/include/linux/omap-dma.h
+> index 1d99b61adc65..290081620b3e 100644
+> --- a/include/linux/omap-dma.h
+> +++ b/include/linux/omap-dma.h
+> @@ -297,6 +297,7 @@ struct omap_system_dma_plat_info {
+>  #define dma_omap15xx()	__dma_omap15xx(d)
+>  #define dma_omap16xx()	__dma_omap16xx(d)
 >  
->  	mt8173_pll_clk_data = clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
-> -	if (!clk_data)
-> +	if (!clk_data) {
-> +		iounmap(base);
->  		return;
-> +	}
+> +#if defined(CONFIG_ARCH_OMAP)
+>  extern struct omap_system_dma_plat_info *omap_get_plat_info(void);
 >  
->  	mtk_clk_register_plls(node, plls, ARRAY_SIZE(plls), clk_data);
+>  extern void omap_set_dma_priority(int lch, int dst_port, int priority);
+> @@ -355,4 +356,22 @@ static inline int omap_lcd_dma_running(void)
+>  }
+>  #endif
 >  
+> +#else /* CONFIG_ARCH_OMAP */
+> +
+> +static inline struct omap_system_dma_plat_info *omap_get_plat_info(void)
+> +{
+> +	return NULL;
+> +}
+> +
+> +static inline int omap_request_dma(int dev_id, const char *dev_name,
+> +			void (*callback)(int lch, u16 ch_status, void *data),
+> +			void *data, int *dma_ch)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +static inline void omap_free_dma(int ch) { }
+> +
+> +#endif /* CONFIG_ARCH_OMAP */
+> +
+>  #endif /* __LINUX_OMAP_DMA_H */
+> -- 
+> 2.10.0
+> 
+
+-- 
+~Vinod
