@@ -1,44 +1,70 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 21 Sep 2016 10:56:14 +0300
-Subject: =?UTF-8?B?UmU6IFt2MTIsIDcvOF0gYmFzZTogc29jOiBpbnRyb2R1Y2Ugc29jX2Rldmlj?=
- =?UTF-8?B?ZV9tYXRjaCgpIGludGVyZmFjZQ==?=
-In-Reply-To: <1474441040-11946-8-git-send-email-yangbo.lu@nxp.com>
-References: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
- <1474441040-11946-8-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1474444574.270880035@f136.i.mail.ru>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 21 Sep 2016 08:57:26 +0100
+Subject: [PATCH] ARM: tegra: nyan: Enable GPU node and related supply
+In-Reply-To: <1474395433.1215.23.camel@paulk.fr>
+References: <20160918141311.17140-1-contact@paulk.fr>
+ <f2489bf5-bb08-11f5-1b53-7a1568f20b6b@nvidia.com>
+ <1474395433.1215.23.camel@paulk.fr>
+Message-ID: <e95335ae-ad19-b8cd-634b-63c6a0b88e01@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->?????, 21 ???????? 2016, 9:57 +03:00 ?? Yangbo Lu <yangbo.lu@nxp.com>:
->
->From: Arnd Bergmann < arnd@arndb.de >
->
->We keep running into cases where device drivers want to know the exact
->version of the a SoC they are currently running on. In the past, this has
->usually been done through a vendor specific API that can be called by a
->driver, or by directly accessing some kind of version register that is
->not part of the device itself but that belongs to a global register area
->of the chip.
-...
->+const struct soc_device_attribute *soc_device_match(
->+const struct soc_device_attribute *matches)
->+{
->+int ret = 0;
->+
->+if (!matches)
->+return NULL;
->+
->+while (!ret) {
->+if (!(matches->machine || matches->family ||
->+      matches->revision || matches->soc_id))
->+break;
->+ret = bus_for_each_dev(&soc_bus_type, NULL, (void *)matches,
->+       soc_device_match_one);
->+if (!ret)
->+matches++;
 
-So, what happen if next "matches" (after increment) will be NULL?
+On 20/09/16 19:17, Paul Kocialkowski wrote:
+> * PGP Signed by an unknown key
+> 
+> Le mardi 20 septembre 2016 ? 13:24 +0100, Jon Hunter a ?crit :
+>> On 18/09/16 15:13, Paul Kocialkowski wrote:
+>>>
+>>> This enables the GPU node for tegra124 nyan boards, which is required to
+>>> get graphics acceleration with nouveau on these devices.
+>>>
+>>> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+>>> ---
+>>>  arch/arm/boot/dts/tegra124-nyan.dtsi | 8 +++++++-
+>>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi
+>>> b/arch/arm/boot/dts/tegra124-nyan.dtsi
+>>> index dab9509..225ca77 100644
+>>> --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
+>>> +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
+>>> @@ -42,6 +42,12 @@
+>>>  		};
+>>>  	};
+>>>  
+>>> +	gpu at 0,57000000 {
+>>> +		status = "okay";
+>>> +
+>>> +		vdd-supply = <&vdd_gpu>;
+>>> +	};
+>>> +
+>>>  	serial at 70006000 {
+>>>  		/* Debug connector on the bottom of the board near SD card.
+>>> */
+>>>  		status = "okay";
+>>> @@ -214,7 +220,7 @@
+>>>  					regulator-always-on;
+>>>  				};
+>>>  
+>>> -				sd6 {
+>>> +				vdd_gpu: sd6 {
+>>>  					regulator-name = "+VDD_GPU_AP";
+>>>  					regulator-min-microvolt = <650000>;
+>>>  					regulator-max-microvolt =
+>>> <1200000>;
+>>>
+>>
+>> Looks good to me. I see the following error when booting but looking at the
+>> code appears to be benign. Thierry, Alex, is this normal/okay?
+> 
+> I have the same messages and asked Alexandre about them the other day. He told
+> me that it looks normal.
 
-I think you should use while(matches) at the start of this procedure.
+Ok great. Hopefully, Alex can ACK then.
 
----
+Cheers
+Jon
+
+-- 
+nvpublic
