@@ -1,62 +1,66 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 21 Sep 2016 15:19:56 +0800
-Subject: [PATCH 1/2] dt: bindings: add allwinner,
- otg-routed property for phy-sun4i-usb
-In-Reply-To: <4a1ab62a-4091-fd75-d753-fb30585dffa5@redhat.com>
-References: <20160921070406.27445-1-icenowy@aosc.xyz>
- <4a1ab62a-4091-fd75-d753-fb30585dffa5@redhat.com>
-Message-ID: <6718551474442396@web16h.yandex.ru>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 21 Sep 2016 09:22:09 +0200
+Subject: [PATCH] gpio: Added zynq specific check for special pins on bank
+ zero
+In-Reply-To: <20160920140633.GD16583@xsjsorenbubuntu>
+References: <1474360324-8168-1-git-send-email-navam@xilinx.com>
+ <20160920140633.GD16583@xsjsorenbubuntu>
+Message-ID: <d4d36022-aa3a-d49c-e008-626e20e35b9e@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-21.09.2016, 15:10, "Hans de Goede" <hdegoede@redhat.com>:
-> Hi,
->
-> On 09/21/2016 10:04 AM, Icenowy Zheng wrote:
->> ?On some newer Allwinner SoCs (H3 or A64), the PHY0 can be either routed to
->> ?the MUSB controller (which is an OTG controller) or the OHCI/EHCI pair
->> ?(which is a Host-only controller, but more stable and easy to implement).
+On 20.9.2016 16:06, S?ren Brinkmann wrote:
+> On Tue, 2016-09-20 at 14:02:04 +0530, Nava kishore Manne wrote:
+>> From: Nava kishore Manne <nava.manne@xilinx.com>
 >>
->> ?This property marks whether on a certain board which controller should be
->> ?attached to the PHY.
+>> This patch adds zynq specific check for bank 0 pins 7 and 8
+>> are special and cannot be used as inputs
 >>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->
-> Erm, I think that the idea here is to dynamically switch the routing
-> based on the id-pin of the otg connector. IOW use the musb controller
-> for device mode, and the ehci/ohci proper for proper host support
-> when in host mode.
-
-At least on some boards this implementation works...
-
-(I mean Pine64, which has two USB-A connectors)
-
->
-> Regards,
->
-> Hans
->
->> ?---
->> ??Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 7 +++++++
->> ??1 file changed, 7 insertions(+)
+>> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+>> ---
+>>  drivers/gpio/gpio-zynq.c | 17 +++++++++++++++--
+>>  1 file changed, 15 insertions(+), 2 deletions(-)
 >>
->> ?diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
->> ?index 287150d..5c11d57 100644
->> ?--- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
->> ?+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
->> ?@@ -36,6 +36,13 @@ Optional properties:
->> ??- usb1_vbus-supply : regulator phandle for controller usb1 vbus
->> ??- usb2_vbus-supply : regulator phandle for controller usb2 vbus
->>
->> ?+Optional properties for H3 or A64 SoCs:
->> ?+- allwinner,otg-routed : USB0 (OTG) PHY is routed to OHCI/EHCI pair rather than
->> ?+ MUSB. (boolean, if this property is set, the OHCI/EHCI
->> ?+ controllers at PHY0 should be enabled and the MUSB
->> ?+ controller must *NOT* be enabled, and thus the PHY can
->> ?+ only work in host mode)
->> ?+
->> ??Example:
->> ??????????usbphy: phy at 0x01c13400 {
->> ??????????????????#phy-cells = <1>;
+>> diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+>> index e72794e..eae9d24 100644
+>> --- a/drivers/gpio/gpio-zynq.c
+>> +++ b/drivers/gpio/gpio-zynq.c
+>> @@ -96,6 +96,10 @@
+>>  /* GPIO upper 16 bit mask */
+>>  #define ZYNQ_GPIO_UPPER_MASK 0xFFFF0000
+>>  
+>> +/* For GPIO quirks */
+>> +#define ZYNQ_GPIO	BIT(0)
+>> +#define ZYNQMP_GPIO	BIT(1)
+> 
+> I'd make sure all quirks are easily identifiable and call them something
+> like 'ZYNQ_GPIO_QUIRK_FOO'
+> 
+> Apart from that:
+> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> 
+
+This issue was:
+Reported-by: Jonas Karlsson <Jonas.d.karlsson@gmail.com>
+
+And here is also my:
+Acked-by: Michal Simek <michal.simek@xilinx.com>
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160921/7059a368/attachment.sig>
