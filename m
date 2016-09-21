@@ -1,57 +1,106 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 21 Sep 2016 16:42:50 +0900
-Subject: [PATCH v26 0/7] arm64: add kdump support
-In-Reply-To: <57E00CDC.70403@arm.com>
-References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
- <57DC1812.6040906@arm.com>
- <CAKv+Gu_UvFnPtFHggaO6Z_ePuArdchEK1qYWPkkwpcgLus3Epw@mail.gmail.com>
- <57E00CDC.70403@arm.com>
-Message-ID: <20160921074249.GI30248@linaro.org>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Wed, 21 Sep 2016 09:43:29 +0200
+Subject: [PATCH 3/4] ARM: tegra: nyan-big: Include compatible revisions
+ for proper detection
+In-Reply-To: <6501341f-e14c-4876-dcb7-60a33b7621c4@nvidia.com>
+References: <20160828173246.32621-1-contact@paulk.fr>
+ <20160828173246.32621-3-contact@paulk.fr>
+ <a9485a88-55a5-9dd1-1a1b-a6c0a78ff476@nvidia.com>
+ <1474394004.1215.2.camel@paulk.fr>
+ <d05b8e5a-adf7-9057-b42a-0da1fde84953@nvidia.com>
+ <1474394544.1215.13.camel@paulk.fr>
+ <6501341f-e14c-4876-dcb7-60a33b7621c4@nvidia.com>
+Message-ID: <1474443809.1239.4.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 05:05:48PM +0100, James Morse wrote:
-> On 16/09/16 21:17, Ard Biesheuvel wrote:
-> > On 16 September 2016 at 17:04, James Morse <james.morse@arm.com> wrote:
-> >> Mark, Ard, how does/will reserved-memory work on an APCI only system?
+Le mercredi 21 septembre 2016 ? 08:34 +0100, Jon Hunter a ?crit?:
+> On 20/09/16 19:02, Paul Kocialkowski wrote:
 > > 
-> > It works by accident, at the moment. We used to ignore both
-> > /memreserve/s and the /reserved-memory node, but due to some unrelated
-> > refactoring, we ended up honouring the reserved-memory node when
-> > booting via UEFI
+> > * PGP Signed by an unknown key
+> > 
+> > Le mardi 20 septembre 2016 ? 18:56 +0100, Jon Hunter a ?crit :
+> > > 
+> > > On 20/09/16 18:53, Paul Kocialkowski wrote:
+> > > > 
+> > > > 
+> > > > > 
+> > > > > Old Signed by an unknown key
+> > > > 
+> > > > Le mardi 20 septembre 2016 ? 18:41 +0100, Jon Hunter a ?crit :
+> > > > > 
+> > > > > 
+> > > > > On 28/08/16 18:32, Paul Kocialkowski wrote:
+> > > > > > 
+> > > > > > 
+> > > > > > 
+> > > > > > Depthcharge (the payload used with cros devices) will attempt to
+> > > > > > detect
+> > > > > > boards using their revision. This includes all the known revisions
+> > > > > > for
+> > > > > > the nyan-big board so that the dtb can be selected preferably.
+> > > > > 
+> > > > > May be I am missing something here, but for the mainline there is only
+> > > > > one dtb available and so why is this needed for the mainline?
+> > > > 
+> > > > There is indeed a single dts in mainline, but depthcharge will use the
+> > > > revision
+> > > > to match the compatible string (e.g. it will look for google,nyan-big-
+> > > > rev5,
+> > > > not
+> > > > google,nyan-big), so we need to list them all in that single dts.
+> > > > Otherwise,
+> > > > depthcharge will fall back to the default config, which may or may not
+> > > > be
+> > > > suitable for nyan.
+> > > 
+> > > Is tegra124-nyan-big.dtb not the default?
+> > 
+> > You can't expect that to always be the case. The image format allows many
+> > different dts to be provided, so I could easily build with
+> > multi_v7_defconfig
+> > and have various dts for various devices in the same image, and just select
+> > a
+> > random one as default.
 > 
-> Okay, so kdump probably shouldn't rely on this behaviour...
-> 
-> For an acpi-only system, we could get reserve_crashkernel() to copy the uefi
-> memory map into the reserved region, changing the region types for existing
-> kernel memory to EfiReservedMemoryType (for example) and fixing up the reserved
-> region boundaries.
-> 
-> This second memory map could then be added alongside the real one in the
-> DT/chosen, and used in preference the second time we go through uefi_init() in
-> the crash kernel.
+> Really? Sounds odd. I was hoping that tegra124-nyan-big.dtb would be a
+> catch all.
 
-Do we need add this map as the second one?
-Why not replace "linux,uefi-mmap-start" in a new blob?
+Yes, the image format (FIT) allows specifying multiple dtb and zImage
+combinations in the same image[0].
 
-> kexec-tools would still need to keep the '/reserved-memory' node for non-uefi
-> systems.
+See depthcharge[|1] for how the "compatible" property is being matched against.
 
-Yeah, but if we go in our own way on UEFI/ACPI systems, we may want to
-go in a DT-specific way, like PPC does, on DT systems.
-(That is, "linux,usable-memory" in memory nodes.)
+> > Here, default is really a fallback, the right one is expected to be detected
+> > by
+> > this mechanism. And it really doesn't hurt to provide that information for
+> > proper detection.
+> > 
+> > Note that this is done with many other cros devices in mainline (such as
+> > rk3288
+> > veyrons).
+> 
+> Yes, I guess the same is true for the tegra210-smaug and we do define
+> all the revs for that one. May be extend the changelog comment to say
+> what may happen without this change and the problem that this is fixing.
 
-Thanks,
--Takahiro AKASHI
+Allright, will do!
 
-> Doing this doesn't depend on userspace, and means the uefi memory map is still
-> the one and only true source of memory layout information. If fixing it like
-> this is valid I don't think it should block kdump.
-> 
-> ... I will think about this some more before trying to put it together.
-> 
-> 
-> 
-> Thanks,
-> 
-> James
+Thanks
+
+[0]:?http://www.denx.de/wiki/pub/U-Boot/Documentation/multi_image_booting_scenarios.pdf
+[1]:?https://chromium.googlesource.com/chromiumos/platform/depthcharge/+/master/src/boot/fit.c#39
+
+-- 
+Paul Kocialkowski, developer of low-level free software for embedded devices
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160921/d16c5577/attachment.sig>
