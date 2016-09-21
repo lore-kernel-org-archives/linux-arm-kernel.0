@@ -1,29 +1,64 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 21 Sep 2016 09:23:26 +0530
-Subject: [PATCH 5/9] dmaengine/ARM: omap-dma: Fix the DMAengine compile
- test on non OMAP configs
-In-Reply-To: <20160921035131.GD2609@localhost>
-References: <20160916083324.29133-1-peter.ujfalusi@ti.com>
- <20160916083324.29133-6-peter.ujfalusi@ti.com>
- <20160921035131.GD2609@localhost>
-Message-ID: <20160921035326.GF2609@localhost>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Wed, 21 Sep 2016 13:41:31 +0800
+Subject: [PATCH] iommu/io-pgtable-arm: Using for_each_set_bit to simplify the
+ code
+Message-ID: <1474436491-26220-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2016 at 09:21:32AM +0530, Vinod Koul wrote:
-> On Fri, Sep 16, 2016 at 11:33:20AM +0300, Peter Ujfalusi wrote:
-> > The DMAengine driver for omap-dma use three function calls from the
-> > plat-omap legacy driver. When the DMAengine driver is built when ARCH_OMAP
-> > is not set, the compilation will fail due to missing symbols.
-> > Add empty inline functions to allow the DMAengine driver to be compiled
-> > with COMPILE_TEST.
-> 
-> Peter,
-> 
-> This should be before you enable COMPILE_TEST otherwise build will break!
+Using for_each_set_bit() to simplify the code.
 
-Ah never mind, you have three drivers in this series so I think this is fine
-before the omap one :)
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ drivers/iommu/io-pgtable-arm-v7s.c | 5 +----
+ drivers/iommu/io-pgtable-arm.c     | 5 +----
+ 2 files changed, 2 insertions(+), 8 deletions(-)
 
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index def8ca1..f23821b 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -789,8 +789,7 @@ static int __init arm_v7s_do_selftests(void)
+ 	 * Distinct mappings of different granule sizes.
+ 	 */
+ 	iova = 0;
+-	i = find_first_bit(&cfg.pgsize_bitmap, BITS_PER_LONG);
+-	while (i != BITS_PER_LONG) {
++	for_each_set_bit(i, &cfg.pgsize_bitmap, BITS_PER_LONG) {
+ 		size = 1UL << i;
+ 		if (ops->map(ops, iova, iova, size, IOMMU_READ |
+ 						    IOMMU_WRITE |
+@@ -807,8 +806,6 @@ static int __init arm_v7s_do_selftests(void)
+ 			return __FAIL(ops);
+ 
+ 		iova += SZ_16M;
+-		i++;
+-		i = find_next_bit(&cfg.pgsize_bitmap, BITS_PER_LONG, i);
+ 		loopnr++;
+ 	}
+ 
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index f5c90e1..8c3dfb7 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -980,8 +980,7 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
+ 		 * Distinct mappings of different granule sizes.
+ 		 */
+ 		iova = 0;
+-		j = find_first_bit(&cfg->pgsize_bitmap, BITS_PER_LONG);
+-		while (j != BITS_PER_LONG) {
++		for_each_set_bit(j, &cfg->pgsize_bitmap, BITS_PER_LONG) {
+ 			size = 1UL << j;
+ 
+ 			if (ops->map(ops, iova, iova, size, IOMMU_READ |
+@@ -999,8 +998,6 @@ static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
+ 				return __FAIL(ops, i);
+ 
+ 			iova += SZ_1G;
+-			j++;
+-			j = find_next_bit(&cfg->pgsize_bitmap, BITS_PER_LONG, j);
+ 		}
+ 
+ 		/* Partial unmap */
 -- 
-~Vinod
+1.7.12.4
