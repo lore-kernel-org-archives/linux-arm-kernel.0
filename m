@@ -1,47 +1,70 @@
-From: zhichang.yuan02@gmail.com (zhichang)
-Date: Wed, 21 Sep 2016 18:12:28 +0800
-Subject: [PATCH V3 3/4] ARM64 LPC: support serial based on low-pin-count
-In-Reply-To: <5525856.MfDSSsiP5d@wuerfel>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <4340181.AghlmQIy28@wuerfel> <57D96701.4050700@hisilicon.com>
- <5525856.MfDSSsiP5d@wuerfel>
-Message-ID: <815bebc1-96c9-2131-930d-bccdd4bf1c55@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 21 Sep 2016 12:16:50 +0200
+Subject: [PATCH] clk: mvebu: Add clk support for the orion5x SoC mv88f5181
+In-Reply-To: <20160920195919.GD8319@codeaurora.org> (Stephen Boyd's message of
+ "Tue, 20 Sep 2016 12:59:19 -0700")
+References: <20160920162450.4046-1-gregory.clement@free-electrons.com>
+ <20160920195919.GD8319@codeaurora.org>
+Message-ID: <8760pp5zhp.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stephen,
+ 
+ On mar., sept. 20 2016, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
+> On 09/20, Gregory CLEMENT wrote:
+>> From: Jamie Lentin <jm@lentin.co.uk>
+>> 
+>> Referring to the u-boot sources for the Netgear WNR854T, add support
+>> for the mv88f5181.
+>> 
+>> [gregory.clement at free-electrons.com: fix commit title]
+>> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+>> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>> 
+>> Hi Stephen and Mike,
+>> 
+>> do you agree to give your acked-by on this patch. It is part of a
+>> convertion of old orion5x Socv to the device tree. If you acked-by
+>> this one, then I will be able to take it in my tree and avoiding
+>> breaking the git bisect.
+>
+> Is the problem that we're changing some dts files somewhere and
+> those platforms would stop booting if this change wasn't present?
+> Given that we're adding a new compatible it seems like we're
+> adding new SoC support, so having the clk patch and the dts patch
+> come together in -next via a merge instead of basing the dts
+> patch on top of the clk patch would be how things are normally
+> done.
 
-On 2016?09?15? 05:33, Arnd Bergmann wrote:
-> On Wednesday, September 14, 2016 11:04:33 PM CEST zhichang.yuan wrote:
->> The 8250_hisi_lpc.c support both ACPI and dts similar to 8250_dw :
->>
->> +static struct platform_driver hs_lpc8250_driver = {
->> +       .driver = {
->> +               .name           = "hisi-lpc-uart",
->> +               .of_match_table = hs8250_of_match,
->> +               .acpi_match_table = ACPI_PTR(hs8250_acpi_match),
->>
->> So, I am a little confused why we need to support dts in 8250_of.c and support ACPI in another
->> driver file.
->>
-> 
-> After looking again, I'm pretty sure that drivers/tty/serial/8250/8250_pnp.c
-> will handle the ACPI case without modifications, you just need to adapt
-> the 8250_of driver to handle IORESOURCE_IO ports. This will be required
-> anyway with the next version once the LPC bridge is on the PCI bus.
-> 
+The problem appear if the dts for the board using the clock driver is
+merged in Linus tree before the support in the driver. At this point the
+board won't be able to boot.
 
-Yes. You are right.
+It introduces a hole in the git bisect between the merge of the clock
+subsystem and the arm-soc subsystem.
 
-When the indirectIO patch is accepted, no much changes needed in these two file to support LPC UART.
+>
+> If we're really changing some dts to be backwards incompatible,
+> then I understand the bisect problem and you can have my ack.
+>
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org.
 
-BTW, what is your target to change these two files to support LPC uart?
-Do you think we don't need to add many new c files??
+Thanks,
 
-Best,
-Zhichang
+Gregory
 
+>
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
 
-
-> 	Arnd
-> 
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
