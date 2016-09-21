@@ -1,56 +1,173 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Wed, 21 Sep 2016 10:26:06 +0200
-Subject: [PATCH 1/4] ARM: tegra: nyan: Use proper IRQ type definitions
-In-Reply-To: <0ca614bf-4d27-9948-03e3-472d059f2153@nvidia.com>
-References: <20160828173246.32621-1-contact@paulk.fr>
- <ef69b6d2-ce6b-ff76-5c04-ab2176eb6ecc@nvidia.com>
- <1474395289.1215.20.camel@paulk.fr>
- <0ca614bf-4d27-9948-03e3-472d059f2153@nvidia.com>
-Message-ID: <1474446366.1239.17.camel@paulk.fr>
+From: clingutla@codeaurora.org (Lingutla Chandrasekhar)
+Date: Wed, 21 Sep 2016 14:12:39 +0530
+Subject: [RFC] irqchip/gic-v3: Implement suspend and resume callbacks
+Message-ID: <1474447359-29551-1-git-send-email-clingutla@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi 21 septembre 2016 ? 08:52 +0100, Jon Hunter a ?crit?:
-> On 20/09/16 19:14, Paul Kocialkowski wrote:
-> > 
-> > * PGP Signed by an unknown key
-> > 
-> > Le mardi 20 septembre 2016 ? 18:15 +0100, Jon Hunter a ?crit :
-> > > 
-> > > On 28/08/16 18:32, Paul Kocialkowski wrote:
-> > > > 
-> > > > 
-> > > > This switches a few interrupt definitions that were using
-> > > > GPIO_ACTIVE_HIGH as IRQ type, which is invalid.
-> > > 
-> > > May be you are right, but this does not describe why this is invalid.
-> > > Can you elaborate?
-> > 
-> > GPIO_ACTIVE_HIGH is simply not the right kind of define to use in the
-> > "interrupts" devicetree property. Values provided there are understood as
-> > IRQ_TYPE_ defines.
-> 
-> Right, but you are changing the type as GPIO_ACTIVE_HIGH = 0 and
-> IRQ_TYPE_EDGE_FALLING = 2 and there is no comment about why this has
-> been changed. It might be correct, but you need to explain it.
+Implement suspend and resume syscore_ops to disable and
+enable non wake up capable interrupts.
 
-This actually makes the IRQ trigger values consistent with the drivers, that
-define them regardless of devicetree anyway. The max98090 driver
-has?IRQF_TRIGGER_FALLING and bq24735 has IRQF_TRIGGER_RISING |
-IRQF_TRIGGER_FALLING.
+When system enters suspend, enable only wakeup capable
+interrupts. While resuming, enable previously enabled interrupts
+and show triggered/pending interrupts.
 
-This is really more of a cosmetic change, it doesn't impact actual use.
+Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
 
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index ede5672..511a5a1 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -33,6 +33,7 @@
+ #include <linux/irqchip/arm-gic-common.h>
+ #include <linux/irqchip/arm-gic-v3.h>
+ #include <linux/irqchip/irq-partition-percpu.h>
++#include <linux/syscore_ops.h>
+ 
+ #include <asm/cputype.h>
+ #include <asm/exception.h>
+@@ -57,6 +58,10 @@ struct gic_chip_data {
+ 	u32			nr_redist_regions;
+ 	unsigned int		irq_nr;
+ 	struct partition_desc	*ppi_descs[16];
++#ifdef CONFIG_PM
++	unsigned int wakeup_irqs[32];
++	unsigned int enabled_irqs[32];
++#endif
+ };
+ 
+ static struct gic_chip_data gic_data __read_mostly;
+@@ -330,6 +335,81 @@ static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int gic_suspend(void)
++{
++	unsigned int i;
++	void __iomem *base = gic_data.dist_base;
++
++	for (i = 0; i * 32 < gic->irq_nr; i++) {
++		gic->enabled_irqs[i]
++			= readl_relaxed(base + GICD_ISENABLER + i * 4);
++		/* disable all of them */
++		writel_relaxed(0xffffffff, base + GICD_ICENABLER + i * 4);
++		/* enable the wakeup set */
++		writel_relaxed(gic->wakeup_irqs[i],
++			base + GICD_ISENABLER + i * 4);
++	}
++	return 0;
++}
++
++static void gic_show_pending(void)
++{
++	unsigned int i;
++	u32 enabled;
++	u32 pending[32];
++	void __iomem *base = gic_data.dist_base;
++
++	for (i = 0; i * 32 < gic->irq_nr; i++) {
++		enabled = readl_relaxed(base + GICD_ICENABLER + i * 4);
++		pending[i] = readl_relaxed(base + GICD_ISPENDR + i * 4);
++		pending[i] &= enabled;
++	}
++
++	for_each_set_bit(i, (unsigned long *)pending, gic->irq_nr) {
++		unsigned int irq = irq_find_mapping(gic->domain, i);
++		struct irq_desc *desc = irq_to_desc(irq);
++		const char *name = "null";
++
++		if (desc == NULL)
++			name = "stray irq";
++		else if (desc->action && desc->action->name)
++			name = desc->action->name;
++
++		pr_debug("Pending IRQ: %d [%s]\n", __func__, irq, name);
++	}
++}
++
++static void gic_resume(void)
++{
++	unsigned int i;
++	void __iomem *base = gic_data.dist_base;
++
++	gic_show_pending();
++
++	for (i = 0; i * 32 < gic->irq_nr; i++) {
++		/* disable all of them */
++		writel_relaxed(0xffffffff, base + GICD_ICENABLER + i * 4);
++		/* enable the enabled set */
++		writel_relaxed(gic->enabled_irqs[i],
++			base + GICD_ISENABLER + i * 4);
++	}
++}
++
++static struct syscore_ops gic_syscore_ops = {
++	.suspend = gic_suspend,
++	.resume = gic_resume,
++};
++
++static int __init gic_init_sys(void)
++{
++	register_syscore_ops(&gic_syscore_ops);
++	return 0;
++}
++device_initcall(gic_init_sys);
++
++#endif
++
+ static u64 gic_mpidr_to_affinity(unsigned long mpidr)
+ {
+ 	u64 aff;
+@@ -666,6 +746,32 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ #define gic_smp_init()		do { } while(0)
+ #endif
+ 
++#ifdef CONFIG_PM
++int gic_set_wake(struct irq_data *d, unsigned int on)
++{
++	int ret = -ENXIO;
++	unsigned int reg_offset, bit_offset;
++	unsigned int gicirq = gic_irq(d);
++	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
++
++	/* per-cpu interrupts cannot be wakeup interrupts */
++	WARN_ON(gicirq < 32);
++
++	reg_offset = gicirq / 32;
++	bit_offset = gicirq % 32;
++
++	if (on)
++		gic_data->wakeup_irqs[reg_offset] |=  1 << bit_offset;
++	else
++		gic_data->wakeup_irqs[reg_offset] &=  ~(1 << bit_offset);
++
++	return ret;
++}
++
++#else
++#define gic_set_wake	NULL
++#endif
++
+ #ifdef CONFIG_CPU_PM
+ /* Check whether it's single security state view */
+ static bool gic_dist_security_disabled(void)
+@@ -707,6 +813,7 @@ static struct irq_chip gic_chip = {
+ 	.irq_eoi		= gic_eoi_irq,
+ 	.irq_set_type		= gic_set_type,
+ 	.irq_set_affinity	= gic_set_affinity,
++	.irq_set_wake           = gic_set_wake,
+ 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
+ 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
+ 	.flags			= IRQCHIP_SET_TYPE_MASKED,
+@@ -723,6 +830,7 @@ static struct irq_chip gic_eoimode1_chip = {
+ 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
+ 	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
+ 	.flags			= IRQCHIP_SET_TYPE_MASKED,
++	.irq_set_wake		= gic_set_wake,
+ };
+ 
+ #define GIC_ID_NR		(1U << gic_data.rdists.id_bits)
 -- 
-Paul Kocialkowski, developer of low-level free software for embedded devices
-
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160921/989111ff/attachment.sig>
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+ a Linux Foundation Collaborative Project.
