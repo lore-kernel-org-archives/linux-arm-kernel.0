@@ -1,86 +1,143 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 22 Sep 2016 15:20:45 +0200
-Subject: [PATCHv2 2/3] tty/serial: at91: fix hardware handshake with GPIOs
-In-Reply-To: <20160912094733.21501-3-richard.genoud@gmail.com>
-References: <20160912094733.21501-1-richard.genoud@gmail.com>
- <20160912094733.21501-3-richard.genoud@gmail.com>
-Message-ID: <20160922132045.tbrd5u56qasaf7gn@pengutronix.de>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Thu, 22 Sep 2016 18:51:29 +0530
+Subject: [PATCH v2] arm: dts: zynq: Add MicroZed board support
+Message-ID: <1474550489-7005-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2016 at 11:47:32AM +0200, Richard Genoud wrote:
-> Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
-> hardware handshake is enabled") broke the hardware handshake when GPIOs
-> where used.
+From: Jagan Teki <jteki@openedev.com>
 
-s/where/were/
+Added basic dts support for MicroZed board.
 
-> Hardware handshake with GPIOs used to work before this commit because
-> the CRTSCTS flag (termios->c_cflag) was set, but not the
-> ATMEL_US_USMODE_HWHS flag (controller register) ; so hardware handshake
-> enabled, but not handled by the controller.
-> 
-> This commit restores this behaviour.
-> 
-> NB: -stable is not Cced because it doesn't cleanly apply on 4.1+
-> and it will also need previous commit:
-> "serial: mctrl_gpio: implement mctrl_gpio_use_rtscts"
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when hardware handshake is enabled")
-> ---
->  drivers/tty/serial/atmel_serial.c | 11 ++++++++---
->  1 file changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 2eaa18ddef61..e9b4fbf88c2d 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -2025,6 +2025,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
->  static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  			      struct ktermios *old)
->  {
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->  	unsigned long flags;
->  	unsigned int old_mode, mode, imr, quot, baud;
->  
-> @@ -2126,8 +2127,12 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  		atmel_uart_writel(port, ATMEL_US_TTGR,
->  				  port->rs485.delay_rts_after_send);
->  		mode |= ATMEL_US_USMODE_RS485;
-> -	} else if (termios->c_cflag & CRTSCTS) {
-> -		/* RS232 with hardware handshake (RTS/CTS) */
-> +	} else if ((termios->c_cflag & CRTSCTS) &&
-> +		   !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
+- UART
+- SDHCI
+- Ethernet
 
-IMHO the behaviour of the hw controlled pins shouldn't change when
-mctrl_gpio is in use (if possible). But I don't understand the issue so
-I guess you need a better changelog.
+Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Jagan Teki <jteki@openedev.com>
+---
+Changes for v2:
+	- Add SDHCI
+	- Add Ethernet
 
+ arch/arm/boot/dts/Makefile          |  1 +
+ arch/arm/boot/dts/zynq-microzed.dts | 95 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 96 insertions(+)
+ create mode 100644 arch/arm/boot/dts/zynq-microzed.dts
 
-> +		/*
-> +		 * RS232 with hardware handshake (RTS/CTS)
-> +		 * handled by the controller.
-> +		 */
->  		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
->  			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
->  			termios->c_cflag &= ~CRTSCTS;
-> @@ -2135,7 +2140,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  			mode |= ATMEL_US_USMODE_HWHS;
->  		}
->  	} else {
-> -		/* RS232 without hadware handshake */
-> +		/* RS232 without hadware handshake or controlled by GPIOs */
-
-When touching this line, please also do s/hadware/hardware/.
-
->  		mode |= ATMEL_US_USMODE_NORMAL;
->  	}
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index faacd52..4d7b858 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -862,6 +862,7 @@ dtb-$(CONFIG_ARCH_VT8500) += \
+ 	wm8750-apc8750.dtb \
+ 	wm8850-w70v2.dtb
+ dtb-$(CONFIG_ARCH_ZYNQ) += \
++	zynq-microzed.dtb \
+ 	zynq-parallella.dtb \
+ 	zynq-zc702.dtb \
+ 	zynq-zc706.dtb \
+diff --git a/arch/arm/boot/dts/zynq-microzed.dts b/arch/arm/boot/dts/zynq-microzed.dts
+new file mode 100644
+index 0000000..9e64496
+--- /dev/null
++++ b/arch/arm/boot/dts/zynq-microzed.dts
+@@ -0,0 +1,95 @@
++/*
++ * Copyright (C) 2015 Jagan Teki <jteki@openedev.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++/dts-v1/;
++/include/ "zynq-7000.dtsi"
++
++/ {
++	model = "Zynq MicroZED Development Board";
++	compatible = "xlnx,zynq-microzed", "xlnx,zynq-7000";
++
++	aliases {
++		ethernet0 = &gem0;
++		serial0 = &uart1;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x40000000>;
++	};
++
++	chosen {
++		bootargs = "earlycon";
++		stdout-path = "serial0:115200n8";
++	};
++
++	usb_phy0: phy0 {
++		compatible = "usb-nop-xceiv";
++		#phy-cells = <0>;
++	};
++};
++
++&clkc {
++	ps-clk-frequency = <33333333>;
++};
++
++&gem0 {
++	status = "okay";
++	phy-mode = "rgmii-id";
++	phy-handle = <&ethernet_phy>;
++
++	ethernet_phy: ethernet-phy at 0 {
++		reg = <0>;
++	};
++};
++
++&sdhci0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&usb0 {
++	status = "okay";
++	dr_mode = "host";
++	usb-phy = <&usb_phy0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb0_default>;
++};
++
++&pinctrl0 {
++	pinctrl_usb0_default: usb0-default {
++		mux {
++			groups = "usb0_0_grp";
++			function = "usb0";
++		};
++
++		conf {
++			groups = "usb0_0_grp";
++			slew-rate = <0>;
++			io-standard = <1>;
++		};
++
++		conf-rx {
++			pins = "MIO29", "MIO31", "MIO36";
++			bias-high-impedance;
++		};
++
++		conf-tx {
++			pins = "MIO28", "MIO30", "MIO32", "MIO33", "MIO34",
++			       "MIO35", "MIO37", "MIO38", "MIO39";
++			bias-disable;
++		};
++	};
++};
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.7.4
