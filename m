@@ -1,93 +1,135 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu, 22 Sep 2016 11:39:35 -0700
-Subject: [RFC 1/4] arm64: dts: msm8992 SoC and LG Bullhead (Nexus 5X)
- support
-In-Reply-To: <6cf4c215-e8a3-a9db-fcf1-8b56b5c1fab9@redhat.com>
-References: <1467938467-21607-1-git-send-email-jmcnicol@redhat.com>
- <1467938467-21607-2-git-send-email-jmcnicol@redhat.com>
- <20160708174125.GC7896@hector.attlocal.net>
- <6cf4c215-e8a3-a9db-fcf1-8b56b5c1fab9@redhat.com>
-Message-ID: <147456957514.9057.12155171248212777735@sboyd-linaro>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 22 Sep 2016 20:40:36 +0200
+Subject: [PATCH v2] ARM: dts: exynos: Add entries for sound support on
+ Odroid-XU board
+In-Reply-To: <5fef2bec-adcf-0230-cd00-7fc29cbbcd32@samsung.com>
+References: <CGME20160916112217eucas1p1694395dda2a1e8cdf562007ed8141542@eucas1p1.samsung.com>
+ <1474024920-32744-1-git-send-email-s.nawrocki@samsung.com>
+ <f4d204d8-b6b8-5173-c530-bfea1ec9ed7d@samsung.com>
+ <71286ef8-4b7f-cfde-7bb9-9f3bd2289527@samsung.com>
+ <20160917200017.GA13666@kozik-lap>
+ <5fef2bec-adcf-0230-cd00-7fc29cbbcd32@samsung.com>
+Message-ID: <20160922184036.GA10000@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jeremy McNicoll (2016-09-20 17:42:02)
-> On 2016-07-08 10:41 AM, Andy Gross wrote:
-> > On Thu, Jul 07, 2016 at 05:41:04PM -0700, Jeremy McNicoll wrote:
-> >> +
-> >> +#include "../qcom/msm8992.dtsi"
-> >> +
-> >> +/ {
-> >> +    model = "LGE MSM8992 BULLHEAD rev-1.01";
-> >> +    compatible = "qcom,msm8992";
-> >> +    qcom,board-id = <0xb64 0>;
+On Mon, Sep 19, 2016 at 10:47:46AM +0200, Sylwester Nawrocki wrote:
+> On 09/17/2016 10:00 PM, Krzysztof Kozlowski wrote:
+> > On Fri, Sep 16, 2016 at 01:58:32PM +0200, Krzysztof Kozlowski wrote:
+> >> > On 09/16/2016 01:25 PM, Sylwester Nawrocki wrote:
+> >>> > > On 09/16/2016 01:22 PM, Sylwester Nawrocki wrote:
+> >>>> > >> This patch adds device nodes for the AUDSS clock controller,
+> >>>> > >> peripheral DMA 0/1 controllers and the Audio Subsystem I2S controller.
+> >>>> > >> These entries are required for sound support on Odroid-XU board.
+> >>>> > >>
+> >>>> > >> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> >>>> > >> ---
+> >>>> > >> This patch depends on a patch adding clock ID macro definitions.
+> >>>> > >> I'm going to provide a topic branch containing required changes.
+> >>>> > >>
+> >>>> > >> Changes since v1:
+> >>>> > >>  - GIC_SPI, IRQ_TYPE_NONE used in the PDMA and max98080 interrupt
+> >>>> > >>    specifiers,
+> >>>> > >>  - assigned-clock-* properties moved to respective controller
+> >>>> > >>    nodes.
+> >>> > > 
+> >>> > > And here is a pull request containing clk dependency patches:
+> >>> > > 
+> >>> > > The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+> >>> > > 
+> >>> > >   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+> >>> > > 
+> >>> > > are available in the git repository at:
+> >>> > > 
+> >>> > >   git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.9-exynos54x0-dt
+> >>> > > 
+> >>> > > for you to fetch changes up to 58d6506f327e3d192998ba03632f546da221b8d8:
+> >>> > > 
+> >>> > >   clk: samsung: exynos5410: Add clock IDs for PDMA and EPLL clocks (2016-09-09
+> >>> > > 10:13:02 +0200)
+> >>> > > 
+> >> > 
+> >> > Pulled and applied, thanks!
 > >
-> > Please work with sboyd to add the board-id to the dtbTool.  We don't put
-> > board-ids in the dts file.  We post-process the dtb file and add them then.
-> >
+> > This does not boot...
+> > http://www.krzk.eu/builders/boot-odroid-xu-exynos/builds/216
+> > http://www.krzk.eu/builders/boot-odroid-xu-multi_v7/builds/195
+> > 
+> > I am going to send pull request this weekend (or Monday) so probably this
+> > won't be included. If by any chance you prepare a fix soon, then it
+> > will save me from rebasing the branch.
 > 
-> sboyd has all the info he needs for this, I believe its just with legal 
-> now.  Will remove for V2.
+> Oops, indeed, I didn't test with just that part of clk changes applied.
+> The only resolution here I can see is to pull my whole clk branch,
+> it has already been pulled to the upstream clk tree.
 
-I've pushed out an update for dtbtool to have these msm ids.
+Hmmmm, why the clock implementation is needed? Usually it should work
+without it. The driver will just handle ENODEV or DEFER... Maybe there
+is similar issue to the serial: e51e4d8a185d ("serial: samsung: Fix ERR
+pointer dereference on deferred probe")?
+
+Anyway, the patch will wait till next window opens. I hope it will work
+then. :)
+
+Best regards,
+Krzysztof
+
 
 > 
-> >> +
-> >> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> >> +#include <dt-bindings/clock/qcom,gcc-msm8994.h>
-> >> +
-> >> +/ {
-> >> +    model = "Qualcomm Technologies, Inc. MSM 8992";
-> >> +    compatible = "qcom,msm8992";
-> >> +    qcom,msm-id = <251 0>, <252 0>;
+> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 > 
-> This is needed or else the LK provides the following error
+>   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 > 
-> [5380] qcom,msm-id entry not found
+> are available in the git repository at:
 > 
-> and refuses to boot.
+>   git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.9-samsung
 > 
+> for you to fetch changes up to be95d2c7d918b2b7b973378a1e92bdc6559c21f9:
 > 
-> >> +    qcom,pmic-id = <0x10009 0x1000A 0x0 0x0>;
-> >
-> > See above comment on ids.
+>   clk: samsung: Add support for EPLL on exynos5410 (2016-09-09 17:35:13 +0200)
 > 
-> removal of this (pmic-id) seems to be ok.
+> ----------------------------------------------------------------
+> In addition to a few clean up and code consolidation patches this
+> includes:
+> - addition of sound subsystem related clocks for Exynos5410 SoC
+>   (EPLL, PDMA) and support for "samsung,exynos5410-audss-clock"
+>   compatible in the clk-exynos-audss driver,
+> - addition of DRAM controller related clocks for exynos5420,
+> - MAINTAINERS update adding Chanwoo Choi as the Samsung SoC
+>   clock drivers co-maintainer.
 > 
-
-Having the msm ids (and the pmic ids) in dtbtool isn't going to help
-here though. I believe the bootloader on these devices uses a design of
-appended dtbs where each dtb has the qcom,{msm-id,board-id,pmic-id}
-properties in them. The QCDT "header" that dtbtool generates is not
-used.
-
-To fix that problem we'll need to update dtbtool to inject these
-properties into the dtbs based on the compatible strings. Or get
-maintainers to accept that these ids are now necessary for proper
-functionality.
-
-Furthermore, the value of board-id (0xb64) is concerning. qcom only
-supports a certain set of values there for their boards, but vendors are
-free to do whatever they want with that value. This means they can reuse
-existing values that would map to qcom's concept of the "mtp" or "cdp"
-boards, or they can numbers that would alias with other vendors.
-Thankfully, msm-id and pmic-id are values that are under qcom's control,
-so those are always going to be unique and sane. Really all that could
-alias is board-id.
-
-What does this all mean? We can't support non-qcom boards in the same
-boot.img because of the possibility for the board-id property to alias
-between different dtbs. Or at least dtbtool will have to do some alias
-analysis and eject one aliasing dtbs from the blob. It also means that
-we have a lot of work to do in dtbtool to inject these properties based
-on strings, and to have custom parsers for different vendor prefixes so
-that we know what values to inject (the nightmare is growing).
-
-I've asked the bootloader folks to fix this in future platforms so that
-we match based on the compatible string, instead of having to do any
-post processing. Basically, put dtbtool logic into the bootloader. The
-discussion is still on-going, but I'm hopeful that we don't need to keep
-doing things here with post-processing and the headache will be reduced.
-That could totally backfire though if vendors decide to leave the
-bootloader unchanged and boot the "qcom,msm8992-mtp" dtb that's been
-slightly tweaked for their design. Let's hope that doesn't happen.
+> ----------------------------------------------------------------
+> Chanwoo Choi (5):
+>       clk: samsung: Add clock IDs for the CMU_CDREX (DRAM Express Controller)
+>       MAINTAINERS: Add myself as Samsung SoC clock drivers co-maintainer
+>       clk: samsung: exynos5260: Move struct samsung_cmu_info to init section
+>       clk: samsung: exynos5410: Use samsung_cmu_register_one() to simplify code
+>       clk: samsung: exynos5420: Add clocks for CMU_CDREX domain
+> 
+> Sylwester Nawrocki (7):
+>       clk: samsung: exynos5410: Add clock IDs for PDMA and EPLL clocks
+>       clk: samsung: exynos5410: Expose the peripheral DMA gate clocks
+>       clk: samsung: Use common registration function for pll2550x
+>       clk: samsung: clk-exynos-audss: controller variant handling rework
+>       clk: samsung: clk-exynos-audss: Add exynos5410 compatible
+>       clk: samsung: clk-exynos-audss: Whitespace and debug trace cleanup
+>       clk: samsung: Add support for EPLL on exynos5410
+> 
+>  .../devicetree/bindings/clock/clk-exynos-audss.txt  |   4 +-
+>  .../devicetree/bindings/clock/exynos5410-clock.txt  |  21 +-
+>  MAINTAINERS                                         |   3 +
+>  drivers/clk/samsung/clk-exynos-audss.c              |  84 +++--
+>  drivers/clk/samsung/clk-exynos5260.c                | 350 ++++++++++-----------
+>  drivers/clk/samsung/clk-exynos5410.c                |  61 ++--
+>  drivers/clk/samsung/clk-exynos5420.c                |  37 +++
+>  drivers/clk/samsung/clk-exynos5440.c                |   9 +-
+>  drivers/clk/samsung/clk-pll.c                       | 154 ++++++---
+>  drivers/clk/samsung/clk-pll.h                       |   2 +
+>  include/dt-bindings/clock/exynos5410.h              |   3 +
+>  include/dt-bindings/clock/exynos5420.h              |  11 +-
+>  include/dt-bindings/clock/exynos5440.h              |   2 +
+>  13 files changed, 453 insertions(+), 288 deletions(-)
+> 
+> --
+> Thanks,
+> Sylwester
