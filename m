@@ -1,175 +1,81 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Thu, 22 Sep 2016 02:53:37 +0000
-Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <20160921223741.GG20006@localhost>
-References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
- <1473741659-17618-1-git-send-email-po.liu@nxp.com>
- <1473741659-17618-3-git-send-email-po.liu@nxp.com>
- <20160921223741.GG20006@localhost>
-Message-ID: <VI1PR0401MB1709C4C29C35E8991052364992C90@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Thu, 22 Sep 2016 11:04:04 +0800
+Subject: [PATCH] arm64: Call numa_store_cpu_info() earlier.
+In-Reply-To: <1474397195-16520-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1474397195-16520-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20bc1c5f-7e8f-a18c-0061-24d97b3a62fe@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
 
->  -----Original Message-----
->  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
->  Sent: Thursday, September 22, 2016 6:38 AM
->  To: Po Liu
->  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang; Arnd
->  Bergmann; Marc Zyngier; Stuart Yoder; Leo Li; M.H. Lian; Murali
->  Karicheri; Bjorn Helgaas; Shawn Guo; Mingkai Hu
->  Subject: Re: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
->  MSI/MSI-X/INTx mode
->  
->  On Tue, Sep 13, 2016 at 12:40:59PM +0800, Po Liu wrote:
->  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
->  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
->  > maybe there is interrupt line for aer pme etc. Search the interrupt
->  > number in the fdt file. Then fixup the dev->irq with it.
->  >
->  > Signed-off-by: Po Liu <po.liu@nxp.com>
->  > ---
->  > changes for v5:
->  > 	- Add clear 'aer' interrup-names description
->  >
->  >  .../devicetree/bindings/pci/layerscape-pci.txt     | 11 +++++---
->  >  drivers/pci/pcie/portdrv_core.c                    | 31
->  +++++++++++++++++++---
->  >  2 files changed, 35 insertions(+), 7 deletions(-)
->  >
->  > diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > index 41e9f55..101d0a7 100644
->  > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > @@ -18,8 +18,10 @@ Required properties:
->  >  - reg: base addresses and lengths of the PCIe controller
->  >  - interrupts: A list of interrupt outputs of the controller. Must
->  contain an
->  >    entry for each entry in the interrupt-names property.
->  > -- interrupt-names: Must include the following entries:
->  > -  "intr": The interrupt that is asserted for controller interrupts
->  > +- interrupt-names: It may be include the following entries:
->  > +  "aer": The interrupt that is asserted for aer interrupt
->  > +  "pme": The interrupt that is asserted for pme interrupt
->  > +  ......
->  >  - fsl,pcie-scfg: Must include two entries.
->  >    The first entry must be a link to the SCFG device node
->  >    The second entry must be '0' or '1' based on physical PCIe
->  controller index.
->  > @@ -35,8 +37,9 @@ Example:
->  >  		reg = <0x00 0x03400000 0x0 0x00010000   /* controller
->  registers */
->  >  		       0x40 0x00000000 0x0 0x00002000>; /* configuration
->  space */
->  >  		reg-names = "regs", "config";
->  > -		interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /*
->  controller interrupt */
->  > -		interrupt-names = "intr";
->  > +		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>, /* aer
->  interrupt */
->  > +			<GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>; /* pme interrupt */
->  > +		interrupt-names = "aer", "pme";
->  >  		fsl,pcie-scfg = <&scfg 0>;
->  >  		#address-cells = <3>;
->  >  		#size-cells = <2>;
->  > diff --git a/drivers/pci/pcie/portdrv_core.c
->  > b/drivers/pci/pcie/portdrv_core.c index e9270b4..7c4943d 100644
->  > --- a/drivers/pci/pcie/portdrv_core.c
->  > +++ b/drivers/pci/pcie/portdrv_core.c
->  > @@ -16,6 +16,7 @@
->  >  #include <linux/slab.h>
->  >  #include <linux/pcieport_if.h>
->  >  #include <linux/aer.h>
->  > +#include <linux/of_irq.h>
->  >
->  >  #include "../pci.h"
->  >  #include "portdrv.h"
->  > @@ -200,6 +201,28 @@ static int pcie_port_enable_msix(struct pci_dev
->  > *dev, int *vectors, int mask)  static int init_service_irqs(struct
->  > pci_dev *dev, int *irqs, int mask)  {
->  >  	int i, irq = -1;
->  > +	int ret;
->  > +	struct device_node *np = NULL;
->  > +
->  > +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
->  > +		irqs[i] = 0;
->  > +
->  > +	if (dev->bus->dev.of_node)
->  > +		np = dev->bus->dev.of_node;
->  > +
->  > +	/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
->  > +	 * request irq for aer
->  > +	 */
->  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np &&
->  > +			(mask & PCIE_PORT_SERVICE_PME)) {
->  > +		ret = of_irq_get_byname(np, "aer");
->  > +		if (ret > 0) {
->  > +			irqs[PCIE_PORT_SERVICE_AER_SHIFT] = ret;
->  > +			if (dev->irq)
->  > +				irq = dev->irq;
->  > +			goto no_msi;
->  > +		}
->  > +	}
->  
->  We definitely need to solve this somehow.  But this approach doesn't
->  feel quite right because it's hard to map this code back to anything in
->  the spec, and it uses a completely platform-dependent name ("interrupt-
->  names aer") in code that is supposedly generic.
 
-Very agree.
-
->  
->  What if we added some sort of hook that would return the IRQ?  Maybe a
->  pcibios_*() hook right now, with the idea of making it a pci_host_bridge
->  function pointer someday?
-
-Good idea. I'll try one version patch soon.
-
->  
->  I know the body of the hook would look a lot like what you have here,
->  but at least it would be more obvious that it's platform-specific code.
->  
-Not agree more.
-
->  I think your platform supports PME interrupts as well as AER, and
->  they're different IRQs.  So you'd probably have to do something similar
->  to the pcie_port_enable_msix() interface, so you can fill in both IRQs.
+On 2016/9/21 2:46, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
 > 
+> Fix by moving call to numa_store_cpu_info() for all CPUs into
+> smp_prepare_cpus(), which happens before wq_numa_init().  Since
+> smp_store_cpu_info() now contains only a single function call,
+> simplify by removing the function and out-lining its contents.
+> 
+> Suggested-by: Robert Richter <rric@kernel.org>
+> fixes: 1a2db300348b ("arm64, numa: Add NUMA support for arm64 platforms.")
+> Cc: <stable@vger.kernel.org> # 4.7.x-
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+Tested-by: Yisheng Xie <xieyisheng1@huawei.com>
 
-Ok, understand.
+Thanks.
 
-Po
- 
->  >  	/*
->  >  	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
->  @@
->  > -225,11 +248,13 @@ static int init_service_irqs(struct pci_dev *dev,
->  int *irqs, int mask)
->  >  		irq = dev->irq;
->  >
->  >   no_msi:
->  > -	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
->  > -		irqs[i] = irq;
->  > +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
->  > +		if (!irqs[i])
->  > +			irqs[i] = irq;
->  > +	}
->  >  	irqs[PCIE_PORT_SERVICE_VC_SHIFT] = -1;
->  >
->  > -	if (irq < 0)
->  > +	if (irq < 0 && irqs[PCIE_PORT_SERVICE_AER_SHIFT] < 0)
->  >  		return -ENODEV;
->  >  	return 0;
->  >  }
->  > --
->  > 2.1.0.27.g96db324
->  >
->  >
->  > _______________________________________________
->  > linux-arm-kernel mailing list
->  > linux-arm-kernel at lists.infradead.org
->  > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  arch/arm64/kernel/smp.c | 14 ++++++--------
+>  1 file changed, 6 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index d93d433..3ff173e 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -201,12 +201,6 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+>  	return ret;
+>  }
+>  
+> -static void smp_store_cpu_info(unsigned int cpuid)
+> -{
+> -	store_cpu_topology(cpuid);
+> -	numa_store_cpu_info(cpuid);
+> -}
+> -
+>  /*
+>   * This is the secondary CPU boot entry.  We're using this CPUs
+>   * idle thread stack, but a set of temporary page tables.
+> @@ -254,7 +248,7 @@ asmlinkage void secondary_start_kernel(void)
+>  	 */
+>  	notify_cpu_starting(cpu);
+>  
+> -	smp_store_cpu_info(cpu);
+> +	store_cpu_topology(cpu);
+>  
+>  	/*
+>  	 * OK, now it's safe to let the boot CPU continue.  Wait for
+> @@ -689,10 +683,13 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>  {
+>  	int err;
+>  	unsigned int cpu;
+> +	unsigned int this_cpu;
+>  
+>  	init_cpu_topology();
+>  
+> -	smp_store_cpu_info(smp_processor_id());
+> +	this_cpu = smp_processor_id();
+> +	store_cpu_topology(this_cpu);
+> +	numa_store_cpu_info(this_cpu);
+>  
+>  	/*
+>  	 * If UP is mandated by "nosmp" (which implies "maxcpus=0"), don't set
+> @@ -719,6 +716,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>  			continue;
+>  
+>  		set_cpu_present(cpu, true);
+> +		numa_store_cpu_info(cpu);
+>  	}
+>  }
+>  
+> 
