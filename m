@@ -1,24 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 22 Sep 2016 19:52:25 +0200
-Subject: [PATCH 0/2] Fix warnings for i2c-rk3x.c
-In-Reply-To: <1474543764-51135-1-git-send-email-david.wu@rock-chips.com>
-References: <1474543764-51135-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20160922175224.GD1861@katana>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Sep 2016 11:07:18 -0700
+Subject: Regression in next with "mfd: twl6040: The chip does not support
+ bulk access"
+Message-ID: <20160922180718.kmttyt26t56fa3kp@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2016 at 07:29:22PM +0800, David Wu wrote:
-> David Wu (2):
->   i2c: rk3x: Fix sparse warning
->   i2c: rk3x: fix variable 'min_total_ns' unused warning
-> 
+Hi,
 
-Applied to for-next, thanks!
+Looks like commit 7a17e47f6403 ("mfd: twl6040: The chip does not
+support bulk access") breaks at least omap4-duovero. I now get
+tons of errors:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160922/95673b3a/attachment.sig>
+Skipping twl internal clock init and using bootloader value (unknown osc rate)
+twl 0-0048: PIH (irq 332) nested IRQs
+of_get_named_gpiod_flags: parsed 'ti,audpwron-gpio' property of node '/ocp/i2c at 48070000/t
+wl at 4b[0]' - status (0)
+omap_i2c 48070000.i2c: bus 0 rev0.10 at 400 kHz
+twl6040 0-004b: Failed to read IRQ status: -16
+twl6040 0-004b: Failed to read IRQ status: -16
+twl6040 0-004b: Failed to read IRQ status: -16
+twl6040 0-004b: Failed to read IRQ status: -16
+twl6040 0-004b: Failed to read IRQ status: -16
+twl6040 0-004b: Failed to read IRQ status: -16
+twl6040 0-004b: Failed to read IRQ status: -16
+twl6040 0-004b: Failed to read IRQ status: -16
+twl6040 0-004b: Failed to read IRQ status: -16
+
+It seems the regmap irqs don't work with use_single_rw?
+
+Also seems that twl6040 does support bulk access as things have been
+working earlier?
+
+Anyways, can you please revert?
+
+Regards,
+
+Tony
