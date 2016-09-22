@@ -1,116 +1,107 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 22 Sep 2016 10:31:37 +0300
-Subject: [PATCH 1/2] phy-sun4i-usb: Add sun4i_usb_phy_force_session_end()
- function
-In-Reply-To: <20160922022854.GD3981@uda0271908>
-References: <20160918165018.24547-1-hdegoede@redhat.com>
- <57E0BEDF.2020603@ti.com> <54119844-ce99-bf8c-fc6e-09bcc7523e4d@redhat.com>
- <20160922022854.GD3981@uda0271908>
-Message-ID: <5d5eb2c6-46ae-2c58-1a31-8c5618abf365@redhat.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 22 Sep 2016 09:39:04 +0200
+Subject: [PATCH] tty/serial: atmel: fix fractional baud rate computation
+In-Reply-To: <20160922070746.65nzezj3fwunu55s@pengutronix.de>
+References: <20160921104414.16241-1-nicolas.ferre@atmel.com>
+ <20160922070746.65nzezj3fwunu55s@pengutronix.de>
+Message-ID: <20160922093904.5b738ad6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 22 Sep 2016 09:07:46 +0200
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
-On 09/22/2016 05:28 AM, Bin Liu wrote:
-> Hi,
->
-> On Wed, Sep 21, 2016 at 11:05:33AM +0300, Hans de Goede wrote:
->> Hi,
->>
->> On 09/20/2016 07:45 AM, Kishon Vijay Abraham I wrote:
->>> Hi,
->>>
->>> On Sunday 18 September 2016 10:20 PM, Hans de Goede wrote:
->>>> The sunxi musb has a bug where sometimes it will generate a babble
->>>> error on device disconnect instead of a disconnect irq. When this
->>>> happens the musb-controller switches from host mode to device mode
->>>> (it clears MUSB_DEVCTL_SESSION and sets MUSB_DEVCTL_BDEVICE) and
->>>> gets stuck in this state.
->>>>
->>>> Clearing this requires reporting Vbus low for 200 or more ms, but
->>>> on some devices Vbus is simply always high (host-only mode, no Vbus
->>>> control). The phy-sun4i-usb code already has code to force a session
->>>> end for devices without Vbus control.
->>>>
->>>> This commit adds a sun4i_usb_phy_force_session_end() function exporting
->>>> this functionality to the sunxi-musb glue, so that it can force a session
->>>> end to fixup the stuck state after a babble error.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> ---
->>>> drivers/phy/phy-sun4i-usb.c       | 11 +++++++++++
->>>> include/linux/phy/phy-sun4i-usb.h |  7 +++++++
->>>> 2 files changed, 18 insertions(+)
->>>>
->>>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
->>>> index 43c0d98..06f4e11a 100644
->>>> --- a/drivers/phy/phy-sun4i-usb.c
->>>> +++ b/drivers/phy/phy-sun4i-usb.c
->>>> @@ -470,6 +470,17 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
->>>> }
->>>> EXPORT_SYMBOL_GPL(sun4i_usb_phy_set_squelch_detect);
->>>>
->>>> +void sun4i_usb_phy_force_session_end(struct phy *_phy)
->>>> +{
->>>> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->>>> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
->>>> +
->>>> +	data->id_det = -1;
->>>> +	data->force_session_end = true;
->>>> +	queue_delayed_work(system_wq, &data->detect, 0);
->>>> +}
->>>> +EXPORT_SYMBOL_GPL(sun4i_usb_phy_force_session_end);
->>>
->>> Er.. one more export symbol :-(
->>
->> Yes unfortunately we need one more to work around sunxi musb / phy bugs.
->
-> Instead, can you somehow reuse sun4i_usb_phy_set_mode()?
+> On Wed, Sep 21, 2016 at 12:44:14PM +0200, Nicolas Ferre wrote:
+> > From: Alexey Starikovskiy <aystarik@gmail.com>
+> > 
+> > The problem with previous code was it rounded values in wrong
+> > place and produced wrong baud rate in some cases.
+> > 
+> > Signed-off-by: Alexey Starikovskiy <aystarik@gmail.com>
+> > [nicolas.ferre at atmel.com: port to newer kernel and add commit log]
+> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > ---
+> >  drivers/tty/serial/atmel_serial.c | 10 ++++++----
+> >  include/linux/atmel_serial.h      |  1 +
+> >  2 files changed, 7 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> > index 5f550d9feed9..fd8aa1f4ba78 100644
+> > --- a/drivers/tty/serial/atmel_serial.c
+> > +++ b/drivers/tty/serial/atmel_serial.c
+> > @@ -2170,13 +2170,15 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+> >  	 * accurately. This feature is enabled only when using normal mode.
+> >  	 * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
+> >  	 * Currently, OVER is always set to 0 so we get
+> > -	 * baudrate = selected clock (16 * (CD + FP / 8))
+> > +	 * baudrate = selected clock / (16 * (CD + FP / 8))
+> > +	 * then
+> > +	 * 8 CD + FP = selected clock / (2 * baudrate)
+> >  	 */
+> >  	if (atmel_port->has_frac_baudrate &&
+> >  	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
+> > -		div = DIV_ROUND_CLOSEST(port->uartclk, baud);
+> > -		cd = div / 16;
+> > -		fp = DIV_ROUND_CLOSEST(div % 16, 2);
+> > +		div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
+> > +		cd = div >> 3;
+> > +		fp = div & ATMEL_US_FP_MASK;  
+> 
+> given baud = 115200 and uartclk = 5414300 this results in:
+> 
+> 	div = DIV_ROUND_CLOSEST(5414300, 115200 * 2) = 23
+> 	cd = 2
+> 	fp = 7
 
-That was my first thought too, and I looked into this, but it did not
-work out.
+How about:
 
-Regards,
+	div = DIV_ROUND_CLOSEST(port->uartclk, baud);
+	cd = div / 16;
+	fp = (div % 16) / 2;
 
-Hans
+	best_baud = port->uartclk / ((16 * cd) +  (8 * fp));
 
->
-> Regards,
-> -Bin.
->
->>
->>>> +
->>>> static const struct phy_ops sun4i_usb_phy_ops = {
->>>> 	.init		= sun4i_usb_phy_init,
->>>> 	.exit		= sun4i_usb_phy_exit,
->>>> diff --git a/include/linux/phy/phy-sun4i-usb.h b/include/linux/phy/phy-sun4i-usb.h
->>>> index 50aed92..3bb773f 100644
->>>> --- a/include/linux/phy/phy-sun4i-usb.h
->>>> +++ b/include/linux/phy/phy-sun4i-usb.h
->>>> @@ -23,4 +23,11 @@
->>>>  */
->>>> void sun4i_usb_phy_set_squelch_detect(struct phy *phy, bool enabled);
->>>>
->>>> +/**
->>>> + * sun4i_usb_force_session_end() - Force the current session to end
->>>> + *				   by reporting VBus low for 200+ ms
->>>> + * @phy: reference to a sun4i usb phy
->>>> + */
->>>> +void sun4i_usb_phy_force_session_end(struct phy *phy);
->>>
->>> Should we include a static inline function if sun4i phy is not defined?
->>
->> No, we're also not doing that for the already exported
->> sun4i_usb_phy_set_squelch_detect()
->>
->> And it is not necessary since the only caller is drivers/usb/musb/sunxi.c,
->> and drivers/usb/musb/Kconfig has:
->>
->> config USB_MUSB_SUNXI
->>         tristate "Allwinner (sunxi)"
->>         depends on PHY_SUN4I_USB
->>
->> Regards,
->>
->> Hans
+	/* Check if we can get a better approximation by rounding up. */
+	if (div % 2) {
+		int alt_baud, alt_fp, alt_cd;
+
+		alt_fp = fp++;
+		alt_cd = cd;
+		if (alt_fp > 7) {
+			alt_cd++;
+			alt_fp = 0;
+		}
+
+		alt_baud = port->uartclk / ((16 * alt_cd) +  (8 *alt_fp));
+		if (abs(best_baud - baud) > abs(alt_baud - baud)) {
+			best_baud = alt_baud;
+			fp = alt_fp;
+			cd = alt_cd;
+		}
+	}
+
+> 
+> which yields a rate of 5414300 / 46 = 117702.17. With cd = 3 and fp = 0
+> however the resulting rate is 5414300 / 48 = 112797.92.
+> 
+> Which one is better?
+> 
+> >  	} else {
+> >  		cd = uart_get_divisor(port, baud);
+> >  	}
+> > diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
+> > index f8e452aa48d7..bd2560502f3c 100644
+> > --- a/include/linux/atmel_serial.h
+> > +++ b/include/linux/atmel_serial.h
+> > @@ -119,6 +119,7 @@
+> >  #define ATMEL_US_BRGR		0x20	/* Baud Rate Generator Register */
+> >  #define	ATMEL_US_CD		GENMASK(15, 0)	/* Clock Divider */
+> >  #define ATMEL_US_FP_OFFSET	16	/* Fractional Part */
+> > +#define ATMEL_US_FP_MASK	0x7  
+> 
+> Is there another user of this header? If not, this can be folded into
+> the driver.
+> 
+> Best regards
+> Uwe
+> 
