@@ -1,17 +1,19 @@
 From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Thu, 22 Sep 2016 16:50:35 +0530
-Subject: [PATCH v3] devicetree: bindings: uart: Add new compatible string for
+Date: Thu, 22 Sep 2016 16:56:19 +0530
+Subject: [PATCH v4] devicetree: bindings: uart: Add new compatible string for
  ZynqMP
-Message-ID: <1474543235-38151-1-git-send-email-navam@xilinx.com>
+Message-ID: <1474543579-40312-1-git-send-email-navam@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nava kishore Manne <nava.manne@xilinx.com>
 
-This patch Adds the new compatiable string for ZynqMP.
+This patch Adds the new compatible string for ZynqMP.
 
 Signed-off-by: Nava kishore Manne <navam@xilinx.com>
 ---
+Changes for v4:
+		-Modified the ChangeLog comment.
 Changes for v3:
 		-Added changeLog comment.
 Changes for v2:
