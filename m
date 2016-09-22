@@ -1,30 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 22 Sep 2016 18:06:51 +0100
-Subject: [PATCH] arm64: Call numa_store_cpu_info() earlier.
-In-Reply-To: <1474397195-16520-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1474397195-16520-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160922170651.GB27704@e104818-lin.cambridge.arm.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 22 Sep 2016 10:15:11 -0700
+Subject: [PATCH] PCI: rockchip: fix uninitialized variable use
+In-Reply-To: <20160922094018.2138640-1-arnd@arndb.de>
+References: <20160922094018.2138640-1-arnd@arndb.de>
+Message-ID: <20160922171510.GA113955@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 11:46:35AM -0700, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
+On Thu, Sep 22, 2016 at 11:39:59AM +0200, Arnd Bergmann wrote:
+> The newly added pcie-rockchip driver fails to initialize the
+> io_size variable if the DT doesn't provide ranges for the PCI
+> I/O space, as found by building it with -Wmaybe-uninitialized:
 > 
-> The wq_numa_init() function makes a private CPU to node map by calling
-> cpu_to_node() early in the boot process, before the non-boot CPUs are
-> brought online.  Since the default implementation of cpu_to_node()
-> returns zero for CPUs that have never been brought online, the
-> workqueue system's view is that *all* CPUs are on node zero.
+> drivers/pci/host/pcie-rockchip.c: In function 'rockchip_pcie_probe':
+> drivers/pci/host/pcie-rockchip.c:1007:6: warning: 'io_size' may be used uninitialized in this function [-Wmaybe-uninitialized]
 > 
-> When the unbound workqueue for a non-zero node is created, the
-> tsk_cpus_allowed() for the worker threads is the empty set because
-> there are, in the view of the workqueue system, no CPUs on non-zero
-> nodes.  The code in try_to_wake_up() using this empty cpumask ends up
-> using the cpumask empty set value of NR_CPUS as an index into the
-> per-CPU area pointer array, and gets garbage as it is one past the end
-> of the array.  This results in:
+> This adds an appropriate initialization immediately in front of
+> the loop, so the io_size is zero as expected afterwards for that
+> case.
+> 
+> Fixes: abe17181b16f ("PCI: rockchip: Add Rockchip PCIe controller support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/pci/host/pcie-rockchip.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> index c3593e633ccd..8bedc1e1ef80 100644
+> --- a/drivers/pci/host/pcie-rockchip.c
+> +++ b/drivers/pci/host/pcie-rockchip.c
+> @@ -1078,6 +1078,7 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
+>  		goto err_vpcie;
+>  
+>  	/* Get the I/O and memory ranges from DT */
+> +	io_size = 0;
+>  	resource_list_for_each_entry(win, &res) {
+>  		switch (resource_type(win->res)) {
+>  		case IORESOURCE_IO:
 
-Queued for 4.8. Thanks.
+I feel like we've fixed this one before, but then it's been refactored
+many times along the way...
 
--- 
-Catalin
+Reviewed-by: Brian Norris <briannorris@chromium.org>
