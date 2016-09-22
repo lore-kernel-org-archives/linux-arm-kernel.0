@@ -1,56 +1,23 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Thu, 22 Sep 2016 08:54:15 -0500
-Subject: [PATCH v2 2/3] musb: sunxi: Remove custom babble handling
-In-Reply-To: <20160922111901.15337-2-hdegoede@redhat.com>
-References: <20160922111901.15337-1-hdegoede@redhat.com>
- <20160922111901.15337-2-hdegoede@redhat.com>
-Message-ID: <20160922135415.GB31827@uda0271908>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 22 Sep 2016 15:58:03 +0200 (CEST)
+Subject: [PATCH] clocksource/drivers/ti-32k: Prevent ftrace recursion
+In-Reply-To: <20160922075621.3725-1-jszhang@marvell.com>
+References: <20160922075621.3725-1-jszhang@marvell.com>
+Message-ID: <alpine.DEB.2.20.1609221555590.5599@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 22 Sep 2016, Jisheng Zhang wrote:
 
-On Thu, Sep 22, 2016 at 02:19:00PM +0300, Hans de Goede wrote:
-> The musb-core now a days always treats babble errors in host mode
-
-I don't think this statement is accurate. You might want to change it to
-"The musb core already handles babble interrupt" or something else.
-
-Regards,
--Bin.
-
-> as disconnects, so there is no need for the sunxi specific handling
-> of this anymore.
+> Currently ti-32k can be used as a scheduler clock. We properly marked
+> omap_32k_read_sched_clock() as notrace but we then call another
+> function ti_32k_read_cycles() that _wasn't_ notrace.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -This is a new patch in v2 of this patch series
-> ---
->  drivers/usb/musb/sunxi.c | 10 ----------
->  1 file changed, 10 deletions(-)
-> 
-> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> index 1408245..82eba92 100644
-> --- a/drivers/usb/musb/sunxi.c
-> +++ b/drivers/usb/musb/sunxi.c
-> @@ -186,16 +186,6 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
->  	if (musb->int_usb)
->  		writeb(musb->int_usb, musb->mregs + SUNXI_MUSB_INTRUSB);
->  
-> -	/*
-> -	 * sunxi musb often signals babble on low / full speed device
-> -	 * disconnect, without ever raising MUSB_INTR_DISCONNECT, since
-> -	 * normally babble never happens treat it as disconnect.
-> -	 */
-> -	if ((musb->int_usb & MUSB_INTR_BABBLE) && is_host_active(musb)) {
-> -		musb->int_usb &= ~MUSB_INTR_BABBLE;
-> -		musb->int_usb |= MUSB_INTR_DISCONNECT;
-> -	}
-> -
->  	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
->  		/* ep0 FADDR must be 0 when (re)entering peripheral mode */
->  		musb_ep_select(musb->mregs, 0);
-> -- 
-> 2.9.3
-> 
+> Having a traceable function in the sched_clock() path leads to a
+> recursion within ftrace and a kernel crash.
+
+Kernel crash? Doesn't ftrace core prevent recursion?
+ 
+Thanks,
+
+	tglx
