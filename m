@@ -1,290 +1,382 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 22 Sep 2016 13:44:46 +0100
-Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
- register range for ACPI case
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F8815A9@lhreml507-mbx>
-References: <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
- <20160920133327.GB13855@localhost>
- <CAKv+Gu-AE7fft_j2cqBCN=xrsf5Yh=mePf5x3dZJuKAmdxF-Gg@mail.gmail.com>
- <20160920140518.GD13855@localhost>
- <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
- <20160920191744.GA4941@localhost> <20160921140549.GA11968@red-moon>
- <20160921180457.GB20006@localhost>
- <20160922094955.GB18637@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F8815A9@lhreml507-mbx>
-Message-ID: <20160922124446.GA21681@red-moon>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 22 Sep 2016 14:52:49 +0200
+Subject: [PATCH v5] KVM: arm/arm64: Route vtimer events to user space
+Message-ID: <1474548769-195643-1-git-send-email-agraf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2016 at 11:10:13AM +0000, Gabriele Paoloni wrote:
-> Hi Lorenzo, Bjorn
-> 
-> > -----Original Message-----
-> > From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> > Sent: 22 September 2016 10:50
-> > To: Bjorn Helgaas
-> > Cc: Ard Biesheuvel; Tomasz Nowicki; David Daney; Will Deacon; Catalin
-> > Marinas; Rafael Wysocki; Arnd Bergmann; Hanjun Guo; Sinan Kaya;
-> > Jayachandran C; Christopher Covington; Duc Dang; Robert Richter; Marcin
-> > Wojtas; Liviu Dudau; Wangyijing; Mark Salter; linux-
-> > pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Linaro ACPI
-> > Mailman List; Jon Masters; Andrea Gallo; Jeremy Linton; liudongdong
-> > (C); Gabriele Paoloni; Jeff Hugo; linux-acpi at vger.kernel.org; linux-
-> > kernel at vger.kernel.org; Rafael J. Wysocki
-> > Subject: Re: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-
-> > specific register range for ACPI case
-> > 
-> > On Wed, Sep 21, 2016 at 01:04:57PM -0500, Bjorn Helgaas wrote:
-> > > On Wed, Sep 21, 2016 at 03:05:49PM +0100, Lorenzo Pieralisi wrote:
-> > > > On Tue, Sep 20, 2016 at 02:17:44PM -0500, Bjorn Helgaas wrote:
-> > > > > On Tue, Sep 20, 2016 at 04:09:25PM +0100, Ard Biesheuvel wrote:
-> > > >
-> > > > [...]
-> > > >
-> > > > > > None of these platforms can be fixed entirely in software, and
-> > given
-> > > > > > that we will not be adding quirks for new broken hardware, we
-> > should
-> > > > > > ask ourselves whether having two versions of a quirk, i.e., one
-> > for
-> > > > > > broken hardware + currently shipping firmware, and one for the
-> > same
-> > > > > > broken hardware with fixed firmware is really an improvement
-> > over what
-> > > > > > has been proposed here.
-> > > > >
-> > > > > We're talking about two completely different types of quirks:
-> > > > >
-> > > > >   1) MCFG quirks to use memory-mapped config space that doesn't
-> > quite
-> > > > >      conform to the ECAM model in the PCIe spec, and
-> > > > >
-> > > > >   2) Some yet-to-be-determined method to describe address space
-> > > > >      consumed by a bridge.
-> > > > >
-> > > > > The first two patches of this series are a nice implementation
-> > for 1).
-> > > > > The third patch (ThunderX-specific) is one possibility for 2),
-> > but I
-> > > > > don't like it because there's no way for generic software like
-> > the
-> > > > > ACPI core to discover these resources.
-> > > >
-> > > > Ok, so basically this means that to implement (2) we need to assign
-> > > > some sort of _HID to these quirky PCI bridges (so that we know what
-> > > > device they represent and we can retrieve their _CRS). I take from
-> > > > this discussion that the goal is to make sure that all non-config
-> > > > resources have to be declared through _CRS device objects, which is
-> > > > fine but that requires a FW update (unless we can fabricate ACPI
-> > > > devices and corresponding _CRS in the kernel whenever we match a
-> > > > given MCFG table signature).
-> > >
-> > > All resources consumed by ACPI devices should be declared through
-> > > _CRS.  If you want to fabricate ACPI devices or _CRS via kernel
-> > > quirks, that's fine with me.  This could be triggered via MCFG
-> > > signature, DMI info, host bridge _HID, etc.
-> > 
-> > I think the PNP quirk approach + PNP0c02 resource put forward by Gab
-> > is enough.
-> 
-> Great thanks as we take a final decision I will ask Dogndgong to submit
-> another RFC based on this approach
-> 
-> > 
-> > > > We discussed this already and I think we should make a decision:
-> > > >
-> > > > http://lists.infradead.org/pipermail/linux-arm-kernel/2016-
-> > March/414722.html
-> > > >
-> > > > > > > I'd like to step back and come up with some understanding of
-> > how
-> > > > > > > non-broken firmware *should* deal with this issue.  Then, if
-> > we *do*
-> > > > > > > work around this particular broken firmware in the kernel, it
-> > would be
-> > > > > > > nice to do it in a way that fits in with that understanding.
-> > > > > > >
-> > > > > > > For example, if a companion ACPI device is the preferred
-> > solution, an
-> > > > > > > ACPI quirk could fabricate a device with the required
-> > resources.  That
-> > > > > > > would address the problem closer to the source and make it
-> > more likely
-> > > > > > > that the rest of the system will work correctly: /proc/iomem
-> > could
-> > > > > > > make sense, things that look at _CRS generically would work
-> > (e.g,
-> > > > > > > /sys/, an admittedly hypothetical "lsacpi", etc.)
-> > > > > > >
-> > > > > > > Hard-coding stuff in drivers is a point solution that doesn't
-> > provide
-> > > > > > > any guidance for future platforms and makes it likely that
-> > the hack
-> > > > > > > will get copied into even more drivers.
-> > > > > > >
-> > > > > >
-> > > > > > OK, I see. But the guidance for future platforms should be 'do
-> > not
-> > > > > > rely on quirks', and what I am arguing here is that the more we
-> > polish
-> > > > > > up this code and make it clean and reusable, the more likely it
-> > is
-> > > > > > that will end up getting abused by new broken hardware that we
-> > set out
-> > > > > > to reject entirely in the first place.
-> > > > > >
-> > > > > > So of course, if the quirk involves claiming resources, let's
-> > make
-> > > > > > sure that this occurs in the cleanest and most compliant way
-> > possible.
-> > > > > > But any factoring/reuse concerns other than for the current
-> > crop of
-> > > > > > broken hardware should be avoided imo.
-> > > > >
-> > > > > If future hardware is completely ECAM-compliant and we don't need
-> > any
-> > > > > more MCFG quirks, that would be great.
-> > > >
-> > > > Yes.
-> > > >
-> > > > > But we'll still need to describe that memory-mapped config space
-> > > > > somewhere.  If that's done with PNP0C02 or similar devices (as is
-> > done
-> > > > > on my x86 laptop), we'd be all set.
-> > > >
-> > > > I am not sure I understand what you mean here. Are you referring
-> > > > to MCFG regions reported as PNP0c02 resources through its _CRS ?
-> > >
-> > > Yes.  PCI Firmware Spec r3.0, Table 4-2, note 2 says address ranges
-> > > reported via MCFG or _CBA should be reserved by _CRS of a PNP0C02
-> > > device.
-> > 
-> > Ok, that's agreed. It goes without saying that since you are quoting
-> > the PCI spec, if FW fails to report MCFG regions in a PNP0c02 device
-> > _CRS I will consider that a FW bug.
-> > 
-> > > > IIUC PNP0C02 is a reservation mechanism, but it does not help us
-> > > > associate its _CRS to a specific PCI host bridge instance, right ?
-> > >
-> > > Gab proposed a hierarchy that *would* associate a PNP0C02 device with
-> > > a PCI bridge:
-> > >
-> > >   Device (PCI1) {
-> > >     Name (_HID, "HISI0080") // PCI Express Root Bridge
-> > >     Name (_CID, "PNP0A03") // Compatible PCI Root Bridge
-> > >     Method (_CRS, 0, Serialized) { // Root complex resources
-> > (windows) }
-> > >     Device (RES0) {
-> > >       Name (_HID, "HISI0081") // HiSi PCIe RC config base address
-> > >       Name (_CID, "PNP0C02")  // Motherboard reserved resource
-> > >       Name (_CRS, ResourceTemplate () { ... }
-> > >     }
-> > >   }
-> > >
-> > > That's a possibility.  The PCI Firmware Spec suggests putting RES0 at
-> > > the root (under \_SB), but I don't know why.
-> > >
-> > > Putting it at the root means we couldn't generically associate it
-> > with
-> > > a bridge, although I could imagine something like this:
-> > >
-> > >   Device (RES1) {
-> > >     Name (_HID, "HISI0081") // HiSi PCIe RC config base address
-> > >     Name (_CID, "PNP0C02")  // Motherboard reserved resource
-> > >     Name (_CRS, ResourceTemplate () { ... }
-> > >     Method (BRDG) { "PCI1" }  // hand-wavy ASL
-> > >   }
-> > >   Device (PCI1) {
-> > >     Name (_HID, "HISI0080") // PCI Express Root Bridge
-> > >     Name (_CID, "PNP0A03") // Compatible PCI Root Bridge
-> > >     Method (_CRS, 0, Serialized) { // Root complex resources
-> > (windows) }
-> > >   }
-> > >
-> > > Where you could search PNP0C02 devices for a cookie that matched the
-> > > host bridge.o
-> > 
-> > Ok, I am fine with both and I think we are converging, but the way
-> > to solve this problem has to be uniform for all ARM partners (and
-> > not only ARM). Two points here:
-> > 
-> > 1) Adding a device/subdevice allows people to add a _CRS reporting the
-> >    non-window bridge resources. Fine. It also allows people to chuck in
-> >    there all sorts of _DSD properties to describe their PCI host bridge
-> >    as it is done with DT properties (those _DSD can contain eg clocks
-> >    etc.), this may be tempting (so that they can reuse the same DT
-> >    driver and do not have to update their firmware) but I want to be
-> >    clear here: that must not happen. So, a subdevice with a _CRS to
-> >    report resources, yes, but it will stop there.
-> > 2) It is unclear to me how to formalize the above. People should not
-> >    write FW by reading the PCI mailing list, so these guidelines have
-> > to
-> >    be written, somehow. I do not want to standardize quirks, I want
-> >    to prevent random ACPI table content, which is different.
-> >    Should I report this to the ACPI spec working group ? If we do
-> >    not do that everyone will go solve this problem as they deem fit.
-> > 
-> 
-> Do we really need to formalize this?
-> 
-> As we discussed in the Linaro call at the moment we have few vendors
-> that need quirks and we want to avoid promoting/accepting quirks for
-> the future.
-> 
-> At the time of the call I think we decided to informally accept a set
-> of quirks for the current platforms and reject any other quirk coming
-> after a certain date/kernel version (this to be decided).
-> 
-> I am not sure if there is a way to document/formalize a temporary
-> exception from the rule...
+We have 2 modes for dealing with interrupts in the ARM world. We can either
+handle them all using hardware acceleration through the vgic or we can emulate
+a gic in user space and only drive CPU IRQ pins from there.
 
-- (1) will be enforced.
-- We do not know whether PNP0c02 can be used in non-root devices _CRS
-- Are we sure (given that we are implementing this to make sure we are
-  able to validate resources) that it is valid to have a subdevice with
-  a _CRS whose resources are not contained in its parent _CRS address
-  space (because that's exactly the case for these quirks) ?
+Unfortunately, when driving IRQs from user space, we never tell user space
+about timer events that may result in interrupt line state changes, so we
+lose out on timer events if we run with user space gic emulation.
 
-That's what I mean by formalizing, I want to know how PNP0c02 should
-be used. We all want platforms with quirks to be enabled asap but only
-if we stick to the ACPI specifications. On top of that, with the
-bindings above, the kernel would end up creating a platform device for
-the "fake" device with a _CRS approach, which is questionable.
+This patch fixes that by syncing user space's view of the vtimer irq line
+with the kvm view of that same line.
 
-Lorenzo
+With this patch I can successfully run edk2 and Linux with user space gic
+emulation.
 
-> 
-> Thanks
-> 
-> Gab 
-> 
-> 
-> > [...]
-> > 
-> > > > For FW that is immutable I really do not see what we can do apart
-> > > > from hardcoding the non-config resources (consumed by a bridge),
-> > > > somehow.
-> > >
-> > > Right.  Well, I assume you mean we should hard-code "non-window
-> > > resources consumed directly by a bridge".  If firmware in the field
-> > is
-> > > broken, we should work around it, and that may mean hard-coding some
-> > > resources.
-> > >
-> > > My point is that the hard-coding should not be buried in a driver
-> > > where it's invisible to the rest of the kernel.  If we hard-code it
-> > in
-> > > a quirk that adds _CRS entries, then the kernel will work just like
-> > it
-> > > would if the firmware had been correct in the first place.  The
-> > > resource will appear in /sys/devices/pnp*/*/resources and
-> > /proc/iomem,
-> > > and if we ever used _SRS to assign or move ACPI devices, we would
-> > know
-> > > to avoid the bridge resource.
-> > 
-> > We are in complete agreement here.
-> > 
-> > Thanks,
-> > Lorenzo
-> 
+Signed-off-by: Alexander Graf <agraf@suse.de>
+
+---
+
+v1 -> v2:
+
+  - Add back curly brace that got lost
+
+v2 -> v3:
+
+  - Split into patch set
+
+v3 -> v4:
+
+  - Improve documentation
+
+v4 -> v5:
+
+  - Rewrite to use pending state sync in sregs (marc)
+  - Remove redundant checks of vgic_initialized()
+  - qemu tree to try this out: https://github.com/agraf/u-boot.git no-kvm-irqchip-for-v5
+---
+ Documentation/virtual/kvm/api.txt |  26 ++++++++
+ arch/arm/include/uapi/asm/kvm.h   |   3 +
+ arch/arm/kvm/arm.c                |  14 ++---
+ arch/arm64/include/uapi/asm/kvm.h |   3 +
+ include/kvm/arm_arch_timer.h      |   2 +-
+ include/uapi/linux/kvm.h          |   6 ++
+ virt/kvm/arm/arch_timer.c         | 129 ++++++++++++++++++++++++++------------
+ 7 files changed, 134 insertions(+), 49 deletions(-)
+
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 739db9a..8049327 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -3928,3 +3928,29 @@ In order to use SynIC, it has to be activated by setting this
+ capability via KVM_ENABLE_CAP ioctl on the vcpu fd. Note that this
+ will disable the use of APIC hardware virtualization even if supported
+ by the CPU, as it's incompatible with SynIC auto-EOI behavior.
++
++8.3 KVM_CAP_ARM_TIMER
++
++Architectures: arm, arm64
++This capability, if KVM_CHECK_EXTENSION indicates that it is available and no
++in-kernel interrupt controller is in use, means that that the kernel populates
++the vcpu's run->s.regs.kernel_timer_pending field with timers that are currently
++considered pending by kvm.
++
++If active, it also allows user space to propagate its own pending state of timer
++interrupt lines using run->s.regs.user_timer_pending. If those two fields
++mismatch during CPU execution, kvm will exit to user space to give it a chance
++to update its own interrupt pending status. This usually involves triggering
++an interrupt line on a user space emulated interrupt controller.
++
++The fields run->s.regs.kernel_timer_pending and run->s.regs.user_timer_pending
++are available independent of run->kvm_valid_regs or run->kvm_dirty_regs bits.
++If no in-kernel interrupt controller is used and the capability exists, they
++will always be available and used.
++
++Currently the following bits are defined for both bitmaps:
++
++    KVM_ARM_TIMER_VTIMER  -  virtual timer
++
++Future versions of kvm may implement additional timer events. These will get
++indicated by additional KVM_CAP extensions.
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index a2b3eb3..caad81d 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -105,6 +105,9 @@ struct kvm_debug_exit_arch {
+ };
+ 
+ struct kvm_sync_regs {
++	/* Used with KVM_CAP_ARM_TIMER */
++	u8 kernel_timer_pending;
++	u8 user_timer_pending;
+ };
+ 
+ struct kvm_arch_memory_slot {
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 75f130e..dc19221 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -187,6 +187,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PSCI_0_2:
+ 	case KVM_CAP_READONLY_MEM:
+ 	case KVM_CAP_MP_STATE:
++	case KVM_CAP_ARM_TIMER:
+ 		r = 1;
+ 		break;
+ 	case KVM_CAP_COALESCED_MMIO:
+@@ -474,13 +475,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 			return ret;
+ 	}
+ 
+-	/*
+-	 * Enable the arch timers only if we have an in-kernel VGIC
+-	 * and it has been properly initialized, since we cannot handle
+-	 * interrupts from the virtual timer with a userspace gic.
+-	 */
+-	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
+-		ret = kvm_timer_enable(vcpu);
++	ret = kvm_timer_enable(vcpu);
+ 
+ 	return ret;
+ }
+@@ -588,7 +583,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		preempt_disable();
+ 		kvm_pmu_flush_hwstate(vcpu);
+-		kvm_timer_flush_hwstate(vcpu);
++		if (kvm_timer_flush_hwstate(vcpu)) {
++			ret = -EINTR;
++			run->exit_reason = KVM_EXIT_INTR;
++		}
+ 		kvm_vgic_flush_hwstate(vcpu);
+ 
+ 		local_irq_disable();
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 3051f86..9aac860 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -143,6 +143,9 @@ struct kvm_debug_exit_arch {
+ #define KVM_GUESTDBG_USE_HW		(1 << 17)
+ 
+ struct kvm_sync_regs {
++	/* Used with KVM_CAP_ARM_TIMER */
++	u8 kernel_timer_pending;
++	u8 user_timer_pending;
+ };
+ 
+ struct kvm_arch_memory_slot {
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index dda39d8..8cd7240 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -63,7 +63,7 @@ void kvm_timer_init(struct kvm *kvm);
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 			 const struct kvm_irq_level *irq);
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+-void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
++int kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
+ 
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 300ef25..1fc02d7 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -870,6 +870,7 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_S390_USER_INSTR0 130
+ #define KVM_CAP_MSI_DEVID 131
+ #define KVM_CAP_PPC_HTM 132
++#define KVM_CAP_ARM_TIMER 133
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
+@@ -1327,4 +1328,9 @@ struct kvm_assigned_msix_entry {
+ #define KVM_X2APIC_API_USE_32BIT_IDS            (1ULL << 0)
+ #define KVM_X2APIC_API_DISABLE_BROADCAST_QUIRK  (1ULL << 1)
+ 
++/* Available with KVM_CAP_ARM_TIMER */
++
++/* Bits for run->s.regs.{user,kernel}_timer_pending */
++#define KVM_ARM_TIMER_VTIMER		(1 << 0)
++
+ #endif /* __LINUX_KVM_H */
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 4309b60..0c6fc38 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -166,21 +166,36 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+ 	return cval <= now;
+ }
+ 
++/*
++ * Synchronize the timer IRQ state with the interrupt controller.
++ */
+ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+ {
+ 	int ret;
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 
+-	BUG_ON(!vgic_initialized(vcpu->kvm));
+-
+ 	timer->active_cleared_last = false;
+ 	timer->irq.level = new_level;
+-	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
++	trace_kvm_timer_update_irq(vcpu->vcpu_id, host_vtimer_irq,
+ 				   timer->irq.level);
+-	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+-					 timer->irq.irq,
+-					 timer->irq.level);
+-	WARN_ON(ret);
++
++	if (irqchip_in_kernel(vcpu->kvm)) {
++		BUG_ON(!vgic_initialized(vcpu->kvm));
++
++		/* Fire the timer in the VGIC */
++		ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
++						 timer->irq.irq,
++						 timer->irq.level);
++
++		WARN_ON(ret);
++	} else {
++		struct kvm_sync_regs *regs = &vcpu->run->s.regs;
++
++		/* Populate the timer bitmap for user space */
++		regs->kernel_timer_pending &= ~KVM_ARM_TIMER_VTIMER;
++		if (new_level)
++			regs->kernel_timer_pending |= KVM_ARM_TIMER_VTIMER;
++	}
+ }
+ 
+ /*
+@@ -197,7 +212,8 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	 * because the guest would never see the interrupt.  Instead wait
+ 	 * until we call this function from kvm_timer_flush_hwstate.
+ 	 */
+-	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
++	if ((irqchip_in_kernel(vcpu->kvm) && !vgic_initialized(vcpu->kvm)) ||
++	    !timer->enabled)
+ 		return -ENODEV;
+ 
+ 	if (kvm_timer_should_fire(vcpu) != timer->irq.level)
+@@ -248,15 +264,20 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+  *
+  * Check if the virtual timer has expired while we were running in the host,
+  * and inject an interrupt if that was the case.
++ *
++ * Returns:
++ *
++ *    0  - success
++ *    1  - need exit to user space
+  */
+-void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
++int kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	bool phys_active;
+ 	int ret;
+ 
+ 	if (kvm_timer_update_state(vcpu))
+-		return;
++		return 0;
+ 
+ 	/*
+ 	* If we enter the guest with the virtual input level to the VGIC
+@@ -275,38 +296,61 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	* to ensure that hardware interrupts from the timer triggers a guest
+ 	* exit.
+ 	*/
+-	phys_active = timer->irq.level ||
+-			kvm_vgic_map_is_active(vcpu, timer->irq.irq);
+-
+-	/*
+-	 * We want to avoid hitting the (re)distributor as much as
+-	 * possible, as this is a potentially expensive MMIO access
+-	 * (not to mention locks in the irq layer), and a solution for
+-	 * this is to cache the "active" state in memory.
+-	 *
+-	 * Things to consider: we cannot cache an "active set" state,
+-	 * because the HW can change this behind our back (it becomes
+-	 * "clear" in the HW). We must then restrict the caching to
+-	 * the "clear" state.
+-	 *
+-	 * The cache is invalidated on:
+-	 * - vcpu put, indicating that the HW cannot be trusted to be
+-	 *   in a sane state on the next vcpu load,
+-	 * - any change in the interrupt state
+-	 *
+-	 * Usage conditions:
+-	 * - cached value is "active clear"
+-	 * - value to be programmed is "active clear"
+-	 */
+-	if (timer->active_cleared_last && !phys_active)
+-		return;
+-
+-	ret = irq_set_irqchip_state(host_vtimer_irq,
+-				    IRQCHIP_STATE_ACTIVE,
+-				    phys_active);
+-	WARN_ON(ret);
++	if (irqchip_in_kernel(vcpu->kvm)) {
++		phys_active = timer->irq.level ||
++				kvm_vgic_map_is_active(vcpu, timer->irq.irq);
++
++		/*
++		 * We want to avoid hitting the (re)distributor as much as
++		 * possible, as this is a potentially expensive MMIO access
++		 * (not to mention locks in the irq layer), and a solution for
++		 * this is to cache the "active" state in memory.
++		 *
++		 * Things to consider: we cannot cache an "active set" state,
++		 * because the HW can change this behind our back (it becomes
++		 * "clear" in the HW). We must then restrict the caching to
++		 * the "clear" state.
++		 *
++		 * The cache is invalidated on:
++		 * - vcpu put, indicating that the HW cannot be trusted to be
++		 *   in a sane state on the next vcpu load,
++		 * - any change in the interrupt state
++		 *
++		 * Usage conditions:
++		 * - cached value is "active clear"
++		 * - value to be programmed is "active clear"
++		 */
++		if (timer->active_cleared_last && !phys_active)
++			return 0;
++
++		ret = irq_set_irqchip_state(host_vtimer_irq,
++					    IRQCHIP_STATE_ACTIVE,
++					    phys_active);
++		WARN_ON(ret);
++	} else {
++		struct kvm_sync_regs *regs = &vcpu->run->s.regs;
++
++		/*
++		 * User space handles timer events, so we need to check whether
++		 * its view of the world is in sync with ours.
++		 */
++		if (regs->kernel_timer_pending != regs->user_timer_pending) {
++			/* Return to user space */
++			return 1;
++		}
++
++		/*
++		 * As long as user space is aware that the timer is pending,
++		 * we do not need to get new host timer events.
++		 */
++		if (timer->irq.level)
++			disable_percpu_irq(host_vtimer_irq);
++		else
++			enable_percpu_irq(host_vtimer_irq, 0);
++	}
+ 
+ 	timer->active_cleared_last = !phys_active;
++	return 0;
+ }
+ 
+ /**
+@@ -479,6 +523,10 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 	if (timer->enabled)
+ 		return 0;
+ 
++	/* No need to route physical IRQs when we don't use the vgic */
++	if (!irqchip_in_kernel(vcpu->kvm))
++		goto no_vgic;
++
+ 	/*
+ 	 * Find the physical IRQ number corresponding to the host_vtimer_irq
+ 	 */
+@@ -502,6 +550,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 	if (ret)
+ 		return ret;
+ 
++no_vgic:
+ 
+ 	/*
+ 	 * There is a potential race here between VCPUs starting for the first
+-- 
+1.8.5.6
