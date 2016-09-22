@@ -1,26 +1,40 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 22 Sep 2016 08:25:40 -0400 (EDT)
-Subject: [PATCH 0/2] BQL support and fix for a regression issue
-In-Reply-To: <1474535121-13958-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1474535121-13958-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <20160922.082540.992436214283504080.davem@davemloft.net>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 22 Sep 2016 14:32:26 +0200
+Subject: [PATCH v4 2/2] KVM: arm/arm64: Route vtimer events to user space
+In-Reply-To: <57E0FF95.7040305@arm.com>
+References: <1474283695-212421-1-git-send-email-agraf@suse.de>
+ <1474283695-212421-3-git-send-email-agraf@suse.de> <57DFFAD3.3080009@arm.com>
+ <0960d2a7-6100-3212-c544-d5377df34d57@suse.de> <57E0FF95.7040305@arm.com>
+Message-ID: <57E3CF5A.3050608@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: sunil.kovvuri@gmail.com
-Date: Thu, 22 Sep 2016 14:35:19 +0530
+On 09/20/2016 11:21 AM, Marc Zyngier wrote:
+> On 19/09/16 18:39, Alexander Graf wrote:
+>>
+>> On 19.09.16 16:48, Marc Zyngier wrote:
+>>
+>>>> +
+>>>> +		/*
+>>>> +		 * So we can just explicitly mask or unmask the IRQ, gaining
+>>>> +		 * more compatibility with oddball irq controllers.
+>>>> +		 */
+>>>> +		if (phys_active)
+>>>> +			disable_percpu_irq(host_vtimer_irq);
+>>>> +		else
+>>>> +			enable_percpu_irq(host_vtimer_irq, 0);
+>>> Since you are now targeting random irqchips (as opposed to a GIC
+>>> specifically), what guarantees that the timer is a per-cpu IRQ?
+>> This is the host interrupt controller - and we're already using percpu
+>> irqs on it :). Also as it happens the RPi has them percpu (anything else
+>> wouldn't make sense...).
+> Not really. The RPi is faking percpu interrupts just to have some level
+> of compatibility with the host arch timer driver. But nonetheless, if
+> you're opening the code to something else than a GIC, then you should
+> check that the interrupt you're getting is percpu.
 
-> From: Sunil Goutham <sgoutham@cavium.com>
-> 
-> These patches add byte queue limit support and also fixes a regression
-> issue introduced by commit
-> 'net: thunderx: Use netdev's name for naming VF's interrupts'
+This should already be covered by request_percpu_irq() in 
+kvm_timer_hyp_init(), no?
 
-The correct way to refer to commits when you fix a bug is
-to use the "Fixes: " tag right before the signoffs and ACKs.
 
-The correct form is:
-
-Fixes: $SHA1_ID ("Commit header line.")
-
-You'll see this in many other netdev commits.
+Alex
