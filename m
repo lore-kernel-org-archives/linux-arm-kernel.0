@@ -1,37 +1,105 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 21 Sep 2016 16:49:29 -0700
-Subject: [PATCHv2] arm64: Correctly bounds check virt_addr_valid
-In-Reply-To: <1474496704-30541-1-git-send-email-labbott@redhat.com>
-References: <1474496704-30541-1-git-send-email-labbott@redhat.com>
-Message-ID: <CAGXu5jKrHyJ4mgcoXxbhns4kFP4sWn-9dAOn9bP3pzXLhs9kuw@mail.gmail.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Wed, 21 Sep 2016 21:28:54 -0500
+Subject: [PATCH 1/2] phy-sun4i-usb: Add sun4i_usb_phy_force_session_end()
+ function
+In-Reply-To: <54119844-ce99-bf8c-fc6e-09bcc7523e4d@redhat.com>
+References: <20160918165018.24547-1-hdegoede@redhat.com>
+ <57E0BEDF.2020603@ti.com>
+ <54119844-ce99-bf8c-fc6e-09bcc7523e4d@redhat.com>
+Message-ID: <20160922022854.GD3981@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2016 at 3:25 PM, Laura Abbott <labbott@redhat.com> wrote:
->
-> virt_addr_valid is supposed to return true if and only if virt_to_page
-> returns a valid page structure. The current macro does math on whatever
-> address is given and passes that to pfn_valid to verify. vmalloc and
-> module addresses can happen to generate a pfn that 'happens' to be
-> valid. Fix this by only performing the pfn_valid check on addresses that
-> have the potential to be valid.
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v2: Properly parenthesize macro arguments. Re-factor to common macro.
->
-> Also in case it wasn't clear, there's no need to try and squeeze this
-> into 4.8. Hardened usercopy should have all the checks, this is just for
-> full correctness.
+Hi,
 
-After this lands for 4.9, I should likely drop the checks that are in
-hardened usercopy? That'll speed things up ever so slightly, and will
-let us catch other architectures that have a weird
-virt_addr_valid()...
+On Wed, Sep 21, 2016 at 11:05:33AM +0300, Hans de Goede wrote:
+> Hi,
+> 
+> On 09/20/2016 07:45 AM, Kishon Vijay Abraham I wrote:
+> >Hi,
+> >
+> >On Sunday 18 September 2016 10:20 PM, Hans de Goede wrote:
+> >>The sunxi musb has a bug where sometimes it will generate a babble
+> >>error on device disconnect instead of a disconnect irq. When this
+> >>happens the musb-controller switches from host mode to device mode
+> >>(it clears MUSB_DEVCTL_SESSION and sets MUSB_DEVCTL_BDEVICE) and
+> >>gets stuck in this state.
+> >>
+> >>Clearing this requires reporting Vbus low for 200 or more ms, but
+> >>on some devices Vbus is simply always high (host-only mode, no Vbus
+> >>control). The phy-sun4i-usb code already has code to force a session
+> >>end for devices without Vbus control.
+> >>
+> >>This commit adds a sun4i_usb_phy_force_session_end() function exporting
+> >>this functionality to the sunxi-musb glue, so that it can force a session
+> >>end to fixup the stuck state after a babble error.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >> drivers/phy/phy-sun4i-usb.c       | 11 +++++++++++
+> >> include/linux/phy/phy-sun4i-usb.h |  7 +++++++
+> >> 2 files changed, 18 insertions(+)
+> >>
+> >>diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> >>index 43c0d98..06f4e11a 100644
+> >>--- a/drivers/phy/phy-sun4i-usb.c
+> >>+++ b/drivers/phy/phy-sun4i-usb.c
+> >>@@ -470,6 +470,17 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
+> >> }
+> >> EXPORT_SYMBOL_GPL(sun4i_usb_phy_set_squelch_detect);
+> >>
+> >>+void sun4i_usb_phy_force_session_end(struct phy *_phy)
+> >>+{
+> >>+	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> >>+	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+> >>+
+> >>+	data->id_det = -1;
+> >>+	data->force_session_end = true;
+> >>+	queue_delayed_work(system_wq, &data->detect, 0);
+> >>+}
+> >>+EXPORT_SYMBOL_GPL(sun4i_usb_phy_force_session_end);
+> >
+> >Er.. one more export symbol :-(
+> 
+> Yes unfortunately we need one more to work around sunxi musb / phy bugs.
 
--Kees
+Instead, can you somehow reuse sun4i_usb_phy_set_mode()?
 
--- 
-Kees Cook
-Nexus Security
+Regards,
+-Bin.
+
+> 
+> >>+
+> >> static const struct phy_ops sun4i_usb_phy_ops = {
+> >> 	.init		= sun4i_usb_phy_init,
+> >> 	.exit		= sun4i_usb_phy_exit,
+> >>diff --git a/include/linux/phy/phy-sun4i-usb.h b/include/linux/phy/phy-sun4i-usb.h
+> >>index 50aed92..3bb773f 100644
+> >>--- a/include/linux/phy/phy-sun4i-usb.h
+> >>+++ b/include/linux/phy/phy-sun4i-usb.h
+> >>@@ -23,4 +23,11 @@
+> >>  */
+> >> void sun4i_usb_phy_set_squelch_detect(struct phy *phy, bool enabled);
+> >>
+> >>+/**
+> >>+ * sun4i_usb_force_session_end() - Force the current session to end
+> >>+ *				   by reporting VBus low for 200+ ms
+> >>+ * @phy: reference to a sun4i usb phy
+> >>+ */
+> >>+void sun4i_usb_phy_force_session_end(struct phy *phy);
+> >
+> >Should we include a static inline function if sun4i phy is not defined?
+> 
+> No, we're also not doing that for the already exported
+> sun4i_usb_phy_set_squelch_detect()
+> 
+> And it is not necessary since the only caller is drivers/usb/musb/sunxi.c,
+> and drivers/usb/musb/Kconfig has:
+> 
+> config USB_MUSB_SUNXI
+>         tristate "Allwinner (sunxi)"
+>         depends on PHY_SUN4I_USB
+> 
+> Regards,
+> 
+> Hans
