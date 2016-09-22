@@ -1,24 +1,36 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Thu, 22 Sep 2016 14:35:19 +0530
-Subject: [PATCH 0/2] BQL support and fix for a regression issue
-Message-ID: <1474535121-13958-1-git-send-email-sunil.kovvuri@gmail.com>
+Date: Thu, 22 Sep 2016 14:35:20 +0530
+Subject: [PATCH 1/2] net: thunderx: Fix issue with IRQ namimg
+In-Reply-To: <1474535121-13958-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1474535121-13958-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1474535121-13958-2-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-These patches add byte queue limit support and also fixes a regression
-issue introduced by commit
-'net: thunderx: Use netdev's name for naming VF's interrupts'
+This patch fixes a regression caused by previous commit
+'Use netdev's name for naming VF's interrupts' where
+irq name exceeds 20 byte array if interface's name size
+is large.
 
-Sunil Goutham (2):
-  net: thunderx: Fix issue with IRQ namimg
-  net: thunderx: Support for byte queue limits
+Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/nic.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/net/ethernet/cavium/thunder/nic.h          |  2 +-
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 11 ++++++--
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 30 ++++++++++++++--------
- 3 files changed, 30 insertions(+), 13 deletions(-)
-
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 18d12d3..3042610 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -305,7 +305,7 @@ struct nicvf {
+ 	bool			msix_enabled;
+ 	u8			num_vec;
+ 	struct msix_entry	msix_entries[NIC_VF_MSIX_VECTORS];
+-	char			irq_name[NIC_VF_MSIX_VECTORS][20];
++	char			irq_name[NIC_VF_MSIX_VECTORS][IFNAMSIZ + 15];
+ 	bool			irq_allocated[NIC_VF_MSIX_VECTORS];
+ 	cpumask_var_t		affinity_mask[NIC_VF_MSIX_VECTORS];
+ 
 -- 
 2.7.4
