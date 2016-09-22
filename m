@@ -1,15 +1,14 @@
 From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Thu, 22 Sep 2016 09:13:11 +0200
-Subject: [PATCH v5 1/3] ASoC: sun4i-codec: Rename sun4i_codec_widgets for
- consistency
+Date: Thu, 22 Sep 2016 09:13:12 +0200
+Subject: [PATCH v5 2/3] ASoC: sun4i-codec: Rename some sun7i-only registers
 In-Reply-To: <20160922071313.12891-1-dannym@scratchpost.org>
 References: <20160922071313.12891-1-dannym@scratchpost.org>
-Message-ID: <20160922071313.12891-2-dannym@scratchpost.org>
+Message-ID: <20160922071313.12891-3-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ASoC: sun4i-codec: Rename "sun4i_codec_widgets" to "sun4i_codec_controls" for
-consistency with the struct field name.
+Some of the registers defined in the driver are only usable on the
+A20. Rename these registers.
 
 Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
 ---
@@ -17,26 +16,26 @@ Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 0e19c50..c2c0583 100644
+index c2c0583..3b53b78 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -509,7 +509,7 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
+@@ -96,8 +96,8 @@
+ /* Other various ADC registers */
+ #define SUN4I_CODEC_DAC_TXCNT			(0x30)
+ #define SUN4I_CODEC_ADC_RXCNT			(0x34)
+-#define SUN4I_CODEC_AC_SYS_VERI			(0x38)
+-#define SUN4I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
++#define SUN7I_CODEC_AC_DAC_CAL			(0x38)
++#define SUN7I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
  
- static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
+ struct sun4i_codec {
+ 	struct device	*dev;
+@@ -682,7 +682,7 @@ static const struct regmap_config sun4i_codec_regmap_config = {
+ 	.reg_bits	= 32,
+ 	.reg_stride	= 4,
+ 	.val_bits	= 32,
+-	.max_register	= SUN4I_CODEC_AC_MIC_PHONE_CAL,
++	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
+ };
  
--static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
-+static const struct snd_kcontrol_new sun4i_codec_controls[] = {
- 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
- 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
- 		       sun4i_codec_pa_volume_scale),
-@@ -629,8 +629,8 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 
- static struct snd_soc_codec_driver sun4i_codec_codec = {
- 	.component_driver = {
--		.controls		= sun4i_codec_widgets,
--		.num_controls		= ARRAY_SIZE(sun4i_codec_widgets),
-+		.controls		= sun4i_codec_controls,
-+		.num_controls		= ARRAY_SIZE(sun4i_codec_controls),
- 		.dapm_widgets		= sun4i_codec_codec_dapm_widgets,
- 		.num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
- 		.dapm_routes		= sun4i_codec_codec_dapm_routes,
+ static const struct of_device_id sun4i_codec_of_match[] = {
