@@ -1,61 +1,84 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 Sep 2016 17:47:52 +0100
-Subject: [PATCH] arm: dts: fix rk3066a based boards vdd_log voltage
- initialization
-In-Reply-To: <20160922171217.09a6d13f@bbrezillon>
-References: <CAD=FV=UOXcUZyXRj++GkKksyFedGt59vQz8958nhhF9UM7rOuw@mail.gmail.com>
- <20160919191327.741a2b89@bbrezillon>
- <CAD=FV=Ufmvg1P8suOPQ53kpOD1pei4N2dOpKUCxZk001XKj_OA@mail.gmail.com>
- <20160919194844.0db7b307@bbrezillon>
- <CAD=FV=UyW5cXGGmq5xUzZ1aV5NzbBYGOz1gO9V1itrFU-PigAw@mail.gmail.com>
- <20160919200627.3ca1aae4@bbrezillon>
- <CAD=FV=U_BQez2eCqm7mX9kj0dcEsnBKiFWcLAhXXJD+yTZhACw@mail.gmail.com>
- <20160919224352.3b84b6c0@bbrezillon>
- <CAD=FV=W=ZiaLu1=zcnDyUqvK6f=E-0AWH9URHE3cgAKWWa+aJA@mail.gmail.com>
- <20160922171217.09a6d13f@bbrezillon>
-Message-ID: <20160922164752.GP7994@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Sep 2016 17:50:30 +0100
+Subject: [PATCH 5/5] arm64: Add uprobe support
+In-Reply-To: <20160922032328.GB29470@localhost.localdomain>
+References: <cover.1470114993.git.panand@redhat.com>
+ <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
+ <20160920165946.GA19353@e104818-lin.cambridge.arm.com>
+ <20160921110047.GA29470@localhost.localdomain>
+ <20160921170403.GE12180@e104818-lin.cambridge.arm.com>
+ <20160922032328.GB29470@localhost.localdomain>
+Message-ID: <20160922165030.GA27704@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2016 at 05:12:17PM +0200, Boris Brezillon wrote:
-> +Mark
+On Thu, Sep 22, 2016 at 08:53:28AM +0530, Pratyush Anand wrote:
+> On 21/09/2016:06:04:04 PM, Catalin Marinas wrote:
+> > On Wed, Sep 21, 2016 at 04:30:47PM +0530, Pratyush Anand wrote:
+> > > On 20/09/2016:05:59:46 PM, Catalin Marinas wrote:
+> > > > > +int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
+> > > > > +		unsigned long addr)
+> > > > > +{
+> > > > > +	probe_opcode_t insn;
+> > > > > +
+> > > > > +	/* TODO: Currently we do not support AARCH32 instruction probing */
+> > > > 
+> > > > Is there a way to check (not necessarily in this file) that we don't
+> > > > probe 32-bit tasks?
+> > > 
+> > > - Well, I do not have complete idea about it that, how it can be done. I think
+> > >   we can not check that just by looking a single bit in an instruction.
+> > >   My understanding is that, we can only know about it when we are executing the
+> > >   instruction, by reading pstate, but that would not be useful for uprobe
+> > >   instruction analysis.
+> > >   
+> > >   I hope, instruction encoding for aarch32 and aarch64 are different, and by
+> > >   analyzing for all types of aarch32 instructions, we will be able to decide
+> > >   that whether instruction is 32 bit trace-able or not.  Accordingly, we can use
+> > >   either BRK or BKPT instruction for breakpoint generation.
+> > 
+> > We may have some unrelated instruction encoding overlapping but I
+> > haven't checked. I was more thinking about whether we know which task is
+> > being probed and check is_compat_task() or maybe using
+> > compat_user_mode(regs).
+> 
+> I had thought of this, but problem is that we might not have task in existence
+> when we enable uprobes.  For example: Lets say we are inserting a trace probe at
+> offset 0x690 in a executable binary.
+> 
+> echo "p test:0x690" > /sys/kernel/debug/tracing/uprobe_events
+> echo 1 > /sys/kernel/debug/tracing/events/uprobes/enable
+> 
+> In the 'enable' step, it is decided that whether instruction is traceable or
+> not. 
+> 
+> (1) But at this point 'test' executable might not be running.
+> (2) Even if it is running, is_compat_task() or compat_user_mode() might not be
+> usable, as they work with 'current' task.
 
-> I realize Mark has been out of the discussion, and what started as a DT
-> problem actually turned into a PWM regulator discussion.
-> Maybe we should start a new thread.
+What I find strange is that uprobes allows you to insert a breakpoint
+instruction that's not even compatible with the task (so it would
+SIGILL rather than generate a debug exception).
 
-Probably, you're lucky I even looked at this - the number of irrelevant
-patches I get CCed on is such that I'll often delete things that look
-irrelevant unread.  I'm unsure what the relevance is, it looks like it's
-mainly a discussion about pinctrl?
+> What I was thinking that, let it go with 'TODO' as of now. 
 
-> As I said, the problem you're describing (pins muxed to the PWM device
-> when it should actually stay in gpio+input mode) is not new, and the old
-> pwm-regulator and pwm-rockchip implementation (before my atomic PWM
-> changes) were behaving the same way.
+Only that I don't have any guarantee that someone is going to fix it ;).
 
-Why would this make any kind of sense?
+As a quick workaround you could check mm->task_size > TASK_SIZE_32 in
+the arch_uprobe_analyze_insn() function.
 
-> What is new though, is the pwm_regulator_init_state() function [1], and
-> it seems it's now preventing the probe of a pwm-regulator device if the
-> initial PWM state is not described in the voltage-table.
+> Later on, we propose some changes in core layer, so that we can read the elf
+> headers of executable binary. ELFCLASS will be able to tell us, whether its a 32
+> bit or 64 bit executable. I think, moving "struct uprobe" from
+> kernel/events/uprobes.c to a include/linux header file will do the job.  "struct
+> arch_uprobe" is part of "struct uprobe". "struct arch_uprobe" is passed in
+> arch_uprobe_analyze_insn(). So, we can access struct uprobe's "inode" element
+> with this change. 
 
-> The question is, what should we do?
+You can get access to struct linux_binfmt via mm_struct but it doesn't
+currently help much since all the members of this structure point to
+static functions. Maybe an enum in struct linux_binfmt with format types
+exposed to the rest of the kernel?
 
-> 1/ Force users to put an entry matching this state (which means
->    breaking DT compat)
-> 2/ Put a valid value in drvdata->state even if it's not reflecting the
->    real state
-> 3/ Patch regulator core to support an "unknown-selector" return code.
-
-Could someone say what the actual problem was please?  That was a very
-long e-mail so I might be missing something but the obvious thing seems
-to be to force a state since we'll be doing that when we enable anyway.
-Or just not have the voltage table and use it as a continuous regulator.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160922/bd12da6f/attachment.sig>
+-- 
+Catalin
