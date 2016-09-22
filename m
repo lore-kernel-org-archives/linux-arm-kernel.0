@@ -1,199 +1,393 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 22 Sep 2016 11:55:45 +0000
-Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <3538381.vOsx75UXVU@wuerfel>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <e246c886-e0eb-b635-01ae-f00bbfcfb56b@gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F87D223@lhreml507-mbx>
- <3538381.vOsx75UXVU@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F881744@lhreml507-mbx>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 22 Sep 2016 13:08:56 +0100
+Subject: [PATCH v6 1/7] arm/arm64: vgic-new: Implement support for
+ userspace access
+In-Reply-To: <1474351965-11586-2-git-send-email-vijay.kilari@gmail.com>
+References: <1474351965-11586-1-git-send-email-vijay.kilari@gmail.com>
+ <1474351965-11586-2-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <57E3C9D8.7070906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+On 20/09/16 07:12, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> 
+> Read and write of some registers like ISPENDR and ICPENDR
+> from userspace requires special handling when compared to
+> guest access for these registers.
+> 
+> Refer to Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+> for handling of ISPENDR, ICPENDR registers handling.
+> 
+> Add infrastructure to support guest and userspace read
+> and write for the required registers
+> Also moved vgic_uaccess from vgic-mmio-v2.c to vgic-mmio.c
+> 
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 25 ----------
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 98 ++++++++++++++++++++++++++++++++--------
+>  virt/kvm/arm/vgic/vgic-mmio.c    | 78 ++++++++++++++++++++++++++++----
+>  virt/kvm/arm/vgic/vgic-mmio.h    | 19 ++++++++
+>  4 files changed, 169 insertions(+), 51 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index b44b359..0b32f40 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -406,31 +406,6 @@ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+>  	return -ENXIO;
+>  }
+>  
+> -/*
+> - * When userland tries to access the VGIC register handlers, we need to
+> - * create a usable struct vgic_io_device to be passed to the handlers and we
+> - * have to set up a buffer similar to what would have happened if a guest MMIO
+> - * access occurred, including doing endian conversions on BE systems.
+> - */
+> -static int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
+> -			bool is_write, int offset, u32 *val)
+> -{
+> -	unsigned int len = 4;
+> -	u8 buf[4];
+> -	int ret;
+> -
+> -	if (is_write) {
+> -		vgic_data_host_to_mmio_bus(buf, len, *val);
+> -		ret = kvm_io_gic_ops.write(vcpu, &dev->dev, offset, len, buf);
+> -	} else {
+> -		ret = kvm_io_gic_ops.read(vcpu, &dev->dev, offset, len, buf);
+> -		if (!ret)
+> -			*val = vgic_data_mmio_bus_to_host(buf, len);
+> -	}
+> -
+> -	return ret;
+> -}
+> -
+>  int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>  			  int offset, u32 *val)
+>  {
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 0d3c76a..ce2708d 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -209,6 +209,62 @@ static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
+>  	return 0;
+>  }
+>  
+> +static unsigned long vgic_v3_uaccess_read_pending(struct kvm_vcpu *vcpu,
+> +						  gpa_t addr, unsigned int len)
+> +{
+> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> +	u32 value = 0;
+> +	int i;
+> +
+> +	/*
+> +	 * A level triggerred interrupt pending state is latched in both
+> +	 * "soft_pending" and "line_level" variables. Userspace will save
+> +	 * and restore soft_pending and line_level separately.
+> +	 * Refer to Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+> +	 * handling of ISPENDR and ICPENDR.
+> +	 */
+> +	for (i = 0; i < len * 8; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (irq->config == VGIC_CONFIG_LEVEL && irq->soft_pending)
+> +			value |= (1U << i);
+> +		if (irq->config == VGIC_CONFIG_EDGE && irq->pending)
+> +			value |= (1U << i);
+> +
+> +		vgic_put_irq(vcpu->kvm, irq);
+> +	}
+> +
+> +	return value;
+> +}
+> +
+> +static void vgic_v3_uaccess_write_pending(struct kvm_vcpu *vcpu,
+> +					  gpa_t addr, unsigned int len,
+> +					  unsigned long val)
+> +{
+> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> +	int i;
+> +
+> +	for (i = 0; i < len * 8; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +		if (test_bit(i, &val)) {
+> +			irq->pending = true;
+> +			irq->soft_pending = true;
+> +			vgic_queue_irq_unlock(vcpu->kvm, irq);
+> +		} else {
+> +			irq->soft_pending = false;
+> +			if (irq->config == VGIC_CONFIG_EDGE ||
+> +			    (irq->config == VGIC_CONFIG_LEVEL &&
+> +			    !irq->line_level))
+> +				irq->pending = false;
+> +			spin_unlock(&irq->irq_lock);
+> +		}
+> +
+> +		vgic_put_irq(vcpu->kvm, irq);
+> +	}
+> +}
+> +
+>  /* We want to avoid outer shareable. */
+>  u64 vgic_sanitise_shareability(u64 field)
+>  {
+> @@ -358,7 +414,7 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
+>   * We take some special care here to fix the calculation of the register
+>   * offset.
+>   */
+> -#define REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(off, rd, wr, bpi, acc)	\
+> +#define REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(off, rd, wr, ur, uw, bpi, acc) \
+>  	{								\
+>  		.reg_offset = off,					\
+>  		.bits_per_irq = bpi,					\
+> @@ -373,6 +429,8 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
+>  		.access_flags = acc,					\
+>  		.read = rd,						\
+>  		.write = wr,						\
+> +		.uaccess_read = ur,					\
+> +		.uaccess_write = uw,					\
+>  	}
+>  
+>  static const struct vgic_register_region vgic_v3_dist_registers[] = {
+> @@ -380,40 +438,42 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+>  		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+> -		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
+> +		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
+> -		vgic_mmio_read_enable, vgic_mmio_write_senable, 1,
+> +		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICENABLER,
+> -		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1,
+> +		vgic_mmio_read_enable, vgic_mmio_write_cenable, NULL, NULL, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISPENDR,
+> -		vgic_mmio_read_pending, vgic_mmio_write_spending, 1,
+> +		vgic_mmio_read_pending, vgic_mmio_write_spending,
+> +		vgic_v3_uaccess_read_pending, vgic_v3_uaccess_write_pending, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICPENDR,
+> -		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1,
+> +		vgic_mmio_read_pending, vgic_mmio_write_cpending,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISACTIVER,
+> -		vgic_mmio_read_active, vgic_mmio_write_sactive, 1,
+> +		vgic_mmio_read_active, vgic_mmio_write_sactive, NULL, NULL, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICACTIVER,
+> -		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
+> +		vgic_mmio_read_active, vgic_mmio_write_cactive, NULL, NULL, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IPRIORITYR,
+> -		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
+> -		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+> +		vgic_mmio_read_priority, vgic_mmio_write_priority, NULL, NULL,
+> +		8, VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ITARGETSR,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 8,
+>  		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICFGR,
+> -		vgic_mmio_read_config, vgic_mmio_write_config, 2,
+> +		vgic_mmio_read_config, vgic_mmio_write_config, NULL, NULL, 2,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGRPMODR,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IROUTER,
+> -		vgic_mmio_read_irouter, vgic_mmio_write_irouter, 64,
+> +		vgic_mmio_read_irouter, vgic_mmio_write_irouter, NULL, NULL, 64,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
+>  		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
+> @@ -451,11 +511,13 @@ static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GICR_ICENABLER0,
+>  		vgic_mmio_read_enable, vgic_mmio_write_cenable, 4,
+>  		VGIC_ACCESS_32bit),
+> -	REGISTER_DESC_WITH_LENGTH(GICR_ISPENDR0,
+> -		vgic_mmio_read_pending, vgic_mmio_write_spending, 4,
+> +	REGISTER_DESC_WITH_LENGTH_UACCESS(GICR_ISPENDR0,
+> +		vgic_mmio_read_pending, vgic_mmio_write_spending,
+> +		vgic_v3_uaccess_read_pending, vgic_v3_uaccess_write_pending, 4,
+>  		VGIC_ACCESS_32bit),
+> -	REGISTER_DESC_WITH_LENGTH(GICR_ICPENDR0,
+> -		vgic_mmio_read_pending, vgic_mmio_write_cpending, 4,
+> +	REGISTER_DESC_WITH_LENGTH_UACCESS(GICR_ICPENDR0,
+> +		vgic_mmio_read_pending, vgic_mmio_write_cpending,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_ISACTIVER0,
+>  		vgic_mmio_read_active, vgic_mmio_write_sactive, 4,
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index e18b30d..31f85df 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -468,6 +468,73 @@ static bool check_region(const struct vgic_register_region *region,
+>  	return false;
+>  }
+>  
+> +static const struct vgic_register_region *
+> +vgic_get_mmio_region(struct vgic_io_device *iodev, gpa_t addr, int len)
+> +{
+> +	const struct vgic_register_region *region;
+> +
+> +	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+> +				       addr - iodev->base_addr);
+> +	if (!region || !check_region(region, addr, len))
+> +		return NULL;
+> +
+> +	return region;
+> +}
+> +
+> +static int vgic_uaccess_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+> +			     gpa_t addr, u32 *val)
+> +{
+> +	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
+> +	const struct vgic_register_region *region;
+> +	struct kvm_vcpu *r_vcpu;
+> +
+> +	region = vgic_get_mmio_region(iodev, addr, sizeof(u32));
+> +	if (!region) {
+> +		*val = 0;
+> +		return 0;
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 21 September 2016 21:18
-> To: Gabriele Paoloni
-> Cc: zhichang; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com; minyard at acm.org;
-> linux-pci at vger.kernel.org; gregkh at linuxfoundation.org; John Garry;
-> will.deacon at arm.com; linux-kernel at vger.kernel.org; Yuanzhichang;
-> Linuxarm; xuwei (O); linux-serial at vger.kernel.org;
-> benh at kernel.crashing.org; zourongrong at gmail.com; liviu.dudau at arm.com;
-> kantyzc at 163.com
-> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
-> Hip06
-> 
-> On Wednesday, September 21, 2016 4:20:55 PM CEST Gabriele Paoloni
-> wrote:
-> > > -----Original Message-----
-> > > From: zhichang [mailto:zhichang.yuan02 at gmail.com]
-> > > On 2016?09?15? 20:24, Arnd Bergmann wrote:
-> > > > On Thursday, September 15, 2016 12:05:51 PM CEST Gabriele Paoloni
-> > > wrote:
-> > > >>> -----Original Message-----
-> > > >>> On Thursday, September 15, 2016 8:02:27 AM CEST Gabriele
-> Paoloni
-> > > wrote:
-> > > >> I think that maybe having the 1:1 range mapping doesn't
-> > > >> reflect well the reality but it is the less painful
-> > > >> solution...
-> > > >>
-> > > >> What's your view?
-> > > >
-> > > > We can check the 'i' bit for I/O space in of_bus_isa_get_flags,
-> > > > and that should be enough to translate the I/O port number.
-> > > >
-> > > > The only part we need to change here is to not go through
-> > > > the crazy conversion all the way from PCI I/O space to a
-> > > > physical address and back to a (logical) port number
-> > > > that we do today with of_translate_address/pci_address_to_pio.
-> > > >
-> > > Sorry for the late response! Several days' leave....
-> > > Do you want to bypass of_translate_address and pci_address_to_pio
-> for
-> > > the registered specific PIO?
-> > > I think the bypass for of_translate_address is ok, but worry some
-> new
-> > > issues will emerge without the
-> > > conversion between physical address and logical/linux port number.
-> 
-> The same function that handles the non-translated region would
-> do that conversion.
-> 
-> > > When PCI host bridge which support IO operations is configured and
-> > > enabled, the pci_address_to_pio will
-> > > populate the logical IO range from ZERO for the first host bridge.
-> Our
-> > > LPC will also use part of the IO range
-> > > started from ZERO. It will make in/out enter the wrong branch
-> possibly.
-> > >
-> > > In V2, the 0 - 0x1000 logical IO range is reserved for LPC use
-> only.
-> > > But it seems not so good. In this way,
-> > > PCI has no chance to use low 4K IO range(logical).
-> > >
-> > > So, in V3, applying the conversion from physical/cpu address to
-> > > logical/linux IO port for any IO ranges,
-> > > including the LPC, but recorded the logical IO range for LPC. When
-> > > calling in/out with a logical port address,
-> > > we can check this port fall into LPC logical IO range and get back
-> the
-> > > real IO.
-> 
-> Right, and the same translation can be used in
-> __of_address_to_resource()
-> going the opposite way.
-> 
-> > > Do you have further comments about this??
-> >
-> > I think there are two separate issues to be discussed:
-> >
-> > The first issue is about having of_translate_address failing due to
-> > "range" missing. About this Arnd suggested that it is not appropriate
-> > to have a range describing a bridge 1:1 mapping and this was
-> discussed
-> > before in this thread. Arnd had a suggestion about this (see below)
-> > however (looking twice at the code) it seems to me that such solution
-> > would lead to quite some duplication from __of_translate_address()
-> > in order to retrieve the actual addr from dt...
-> 
-> I don't think we need to duplicate much, we can probably safely
-> assume that there are no nontrivial ranges in devices below the LPC
-> node, so we just walk up the bus to see if the node is a child
-> (or possibly grandchild etc) of the LPC bus, and treat any IO port
-> number under there as a physical port number, which has a known
-> offset from the Linux I/O port number.
-> 
-> > I think extending of_empty_ranges_quirk() may be a reasonable
-> solution.
-> > What do you think Arnd?
-> 
-> I don't really like that idea, that quirk is meant to work around
-> broken DTs, but we can just make the DT valid and implement the
-> code properly.
+This is not the previous semantic of vgic_uaccess, and I cannot see why
+blindly ignoring an access to an undefined region would be acceptable.
+What am I missing?
 
-Ok  I understand your point where it is not right to use of_empty_ranges_quirk()
-As a quirk is used to work around broken HW or broken FW (as in this case)
-rather than to fix code
+> +	}
+> +
+> +	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
+> +	if (region->uaccess_read)
+> +		*val = region->uaccess_read(r_vcpu, addr, sizeof(u32));
+> +	else
+> +		*val = region->read(r_vcpu, addr, sizeof(u32));
+> +
+> +	return 0;
+> +}
+> +
+> +static int vgic_uaccess_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+> +			      gpa_t addr, const u32 *val)
+> +{
+> +	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
+> +	const struct vgic_register_region *region;
+> +	struct kvm_vcpu *r_vcpu;
+> +
+> +	region = vgic_get_mmio_region(iodev, addr, sizeof(u32));
+> +	if (!region)
+> +		return 0;
 
-What about the following? I think adding the check you suggested next to
-of_empty_ranges_quirk() is adding the case we need in the right point (thus
-avoiding any duplication)
- 
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -457,6 +457,15 @@ static struct of_bus *of_match_bus(struct device_node *np)
-        return NULL;
- }
- 
-+static inline int of_isa_indirect_io(struct device_node *np)
-+{
-+       /*
-+        * check if the current node is an isa bus and if indirectio operation
-+        * are registered
-+        */
-+       return (of_bus_isa_match(np) && arm64_extio_ops);
-+}
-+
- static int of_empty_ranges_quirk(struct device_node *np)
- {
-        if (IS_ENABLED(CONFIG_PPC)) {
-@@ -503,7 +512,7 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
-         * This code is only enabled on powerpc. --gcl
-         */
-        ranges = of_get_property(parent, rprop, &rlen);
--       if (ranges == NULL && !of_empty_ranges_quirk(parent)) {
-+       if (ranges == NULL && !of_empty_ranges_quirk(parent) && !of_isa_indirect_io(parent)) {
-                pr_debug("OF: no ranges; cannot translate\n");
-                return 1;
-        }
+Same here.
 
-
+> +
+> +	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
+> +	if (region->uaccess_write)
+> +		region->uaccess_write(r_vcpu, addr, sizeof(u32), *val);
+> +	else
+> +		region->write(r_vcpu, addr, sizeof(u32), *val);
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * Userland access to VGIC registers.
+> + */
+> +int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
+> +		 bool is_write, int offset, u32 *val)
+> +{
+> +	if (is_write)
+> +		return vgic_uaccess_write(vcpu, &dev->dev, offset, val);
+> +	else
+> +		return vgic_uaccess_read(vcpu, &dev->dev, offset, val);
+> +}
+> +
+>  static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  			      gpa_t addr, int len, void *val)
+>  {
+> @@ -475,9 +542,8 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  	const struct vgic_register_region *region;
+>  	unsigned long data = 0;
+>  
+> -	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+> -				       addr - iodev->base_addr);
+> -	if (!region || !check_region(region, addr, len)) {
+> +	region = vgic_get_mmio_region(iodev, addr, len);
+> +	if (!region) {
+>  		memset(val, 0, len);
+>  		return 0;
+>  	}
+> @@ -508,14 +574,10 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  	const struct vgic_register_region *region;
+>  	unsigned long data = vgic_data_mmio_bus_to_host(val, len);
+>  
+> -	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+> -				       addr - iodev->base_addr);
+> +	region = vgic_get_mmio_region(iodev, addr, len);
+>  	if (!region)
+>  		return 0;
+>  
+> -	if (!check_region(region, addr, len))
+> -		return 0;
+> -
+>  	switch (iodev->iodev_type) {
+>  	case IODEV_CPUIF:
+>  		region->write(vcpu, addr, len, data);
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 4c34d39..97e6df7 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -34,6 +34,10 @@ struct vgic_register_region {
+>  				  gpa_t addr, unsigned int len,
+>  				  unsigned long val);
+>  	};
+> +	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+> +				      unsigned int len);
+> +	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+> +			      unsigned int len, unsigned long val);
+>  };
+>  
+>  extern struct kvm_io_device_ops kvm_io_gic_ops;
+> @@ -86,6 +90,18 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
+>  		.write = wr,						\
+>  	}
+>  
+> +#define REGISTER_DESC_WITH_LENGTH_UACCESS(off, rd, wr, urd, uwr, length, acc) \
+> +	{								\
+> +		.reg_offset = off,					\
+> +		.bits_per_irq = 0,					\
+> +		.len = length,						\
+> +		.access_flags = acc,					\
+> +		.read = rd,						\
+> +		.write = wr,						\
+> +		.uaccess_read = urd,					\
+> +		.uaccess_write = uwr,					\
+> +	}
+> +
+>  int kvm_vgic_register_mmio_region(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>  				  struct vgic_register_region *reg_desc,
+>  				  struct vgic_io_device *region,
+> @@ -158,6 +174,9 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+>  			    gpa_t addr, unsigned int len,
+>  			    unsigned long val);
+>  
+> +int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
+> +		 bool is_write, int offset, u32 *val);
+> +
+>  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+>  
+>  unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
 > 
-> > The second issue is a conflict between cpu addresses used by the LPC
-> > controller and i/o tokens from pci endpoints.
-> >
-> > About this what if we modify armn64_extio_ops to have a list of
-> ranges
-> > rather than only one range (now we have just start/end); then in the
-> > LPC driver we can scan the LPC child devices and
-> > 1) populate such list of ranges
-> > 2) call pci_register_io_range for such ranges
-> 
-> Scanning the child devices sounds really wrong, please register just
-> one range that covers the bus to keep the workaround as simple
-> as possible.
-> 
-> > Then when calling __of_address_to_resource we retrieve I/O tokens
-> > for the devices on top of the LPC driver and in the I/O accessors
-> > we call pci_pio_to_address to figure out the cpu address and compare
-> > it to the list of ranges in armn64_extio_ops.
-> >
-> > What about this?
-> 
-> That seems really complex for something that can be quite simple.
-> The only thing we need to worry about is that the io_range_list
-> contains an entry for the LPC bus so we don't conflict with the
-> PCI buses.
 
-Thanks
+Thanks,
 
-I discussed with Zhichang and we agreed to use only one LPC range
-to be registered with pci_register_io_range.
-
-We'll rework the accessors to check if the retrieved I/O tokens
-belong to LPC or PCI IO range...
-
-Cheers
-
-Gab
-
-
-> 
-> 	Arnd
-> 
-> 	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
