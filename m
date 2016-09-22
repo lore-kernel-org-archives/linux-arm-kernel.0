@@ -1,38 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Sep 2016 11:39:59 +0200
-Subject: [PATCH] PCI: rockchip: fix uninitialized variable use
-Message-ID: <20160922094018.2138640-1-arnd@arndb.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 22 Sep 2016 11:40:42 +0200
+Subject: [RESEND PATCH v7 1/2] sdhci-of-arasan: Add device tree parameter
+ xlnx,fails-without-test-cd bit
+In-Reply-To: <1474038102-20937-1-git-send-email-zach.brown@ni.com>
+References: <1474038102-20937-1-git-send-email-zach.brown@ni.com>
+Message-ID: <CAPDyKFoOskfUZ6nPtC1bf5dhqekb9fQYB-qj8dh8sF6NKdH1xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added pcie-rockchip driver fails to initialize the
-io_size variable if the DT doesn't provide ranges for the PCI
-I/O space, as found by building it with -Wmaybe-uninitialized:
+On 16 September 2016 at 17:01, Zach Brown <zach.brown@ni.com> wrote:
+> The sdhci controller on xilinx zynq devices will not function unless
+> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
+> In cases where it is impossible to provide the CD bit in hardware,
+> setting the controller to test mode and then setting inserted to true
+> will get the controller to function without the CD bit.
+>
+> The device property "xlnx,fails-without-test-cd" will let the arasan
+> driver know the controller does not have the CD line wired and that the
+> controller does not function without it.
+>
+> Signed-off-by: Zach Brown <zach.brown@ni.com>
 
-drivers/pci/host/pcie-rockchip.c: In function 'rockchip_pcie_probe':
-drivers/pci/host/pcie-rockchip.c:1007:6: warning: 'io_size' may be used uninitialized in this function [-Wmaybe-uninitialized]
+Thanks, applied for next! I took the liberty to shrink the commit msg
+header bit and to add "dt: " prefix.
 
-This adds an appropriate initialization immediately in front of
-the loop, so the io_size is zero as expected afterwards for that
-case.
+Kind regards
+Uffe
 
-Fixes: abe17181b16f ("PCI: rockchip: Add Rockchip PCIe controller support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/pci/host/pcie-rockchip.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-index c3593e633ccd..8bedc1e1ef80 100644
---- a/drivers/pci/host/pcie-rockchip.c
-+++ b/drivers/pci/host/pcie-rockchip.c
-@@ -1078,6 +1078,7 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
- 		goto err_vpcie;
- 
- 	/* Get the I/O and memory ranges from DT */
-+	io_size = 0;
- 	resource_list_for_each_entry(win, &res) {
- 		switch (resource_type(win->res)) {
- 		case IORESOURCE_IO:
--- 
-2.9.0
+> ---
+> v2:
+>  * improved commit messages
+>  * removed fake-cd device property
+>  * removed fake-cd quirk
+>  * use broken-cd device property
+>  * documented new usage of broken-cd
+> v3:
+>  * removed new usage of broken-cd
+>  * created fails-without-test-cd device property
+>  * created arasan controller specific quirk
+> v4:
+>  * changed fails-without-test-cd to xlnx-fails-without-test-cd
+>  * removed extra blank line
+> v5:
+>  * Fixed style mistake
+>  * Changed (1 << 0 ) to BIT(0)
+> v6:
+>  * Fixed style mistakes
+>  * Condensed unnecessarily long variable names
+>  * Removed line wraps that were no longer necessary.
+>  * Rebased changes off Ulf's mmc tree's next branch.
+> v7:
+>  * Removed erroneous re-creation of Optional Properties section
+>  * Changed xlnx-fails-without-test-cd to xlnx,fails-without-test-cd
+>  * Changed of_get_property to of_property_read_bool
+>
+>
+>  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> index 3404afa..49df630 100644
+> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+> @@ -36,6 +36,9 @@ Optional Properties:
+>    - #clock-cells: If specified this should be the value <0>.  With this property
+>      in place we will export a clock representing the Card Clock.  This clock
+>      is expected to be consumed by our PHY.  You must also specify
+> +  - xlnx,fails-without-test-cd: when present, the controller doesn't work when
+> +    the CD line is not connected properly, and the line is not connected
+> +    properly. Test mode can be used to force the controller to function.
+>
+>  Example:
+>         sdhci at e0100000 {
+> --
+> 2.7.4
+>
