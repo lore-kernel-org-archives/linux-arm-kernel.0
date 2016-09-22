@@ -1,33 +1,44 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 22 Sep 2016 14:16:42 +0300
-Subject: [PATCH 2/4] drivers: iio: ti_am335x_adc: add dma support
-In-Reply-To: <0cd3dfcc-2525-c2fb-35ab-1b260c5973a8@ti.com>
-References: <20160921161134.6951-1-mugunthanvnm@ti.com>
- <20160921161134.6951-3-mugunthanvnm@ti.com>
- <1dbd7bbd-36ac-4433-79bf-8975a06dd07e@ti.com>
- <0cd3dfcc-2525-c2fb-35ab-1b260c5973a8@ti.com>
-Message-ID: <30294b90-af44-d8cf-d70b-92a9461f1e5f@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 22 Sep 2016 14:19:00 +0300
+Subject: [PATCH v2 2/3] musb: sunxi: Remove custom babble handling
+In-Reply-To: <20160922111901.15337-1-hdegoede@redhat.com>
+References: <20160922111901.15337-1-hdegoede@redhat.com>
+Message-ID: <20160922111901.15337-2-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/16 13:45, Mugunthan V N wrote:
->>> +	if (!dma->chan)
->>> +		return -ENODEV;
->>> +
->>> +	/* RX buffer */
->>> +	dma->buf = dma_alloc_coherent(dma->chan->device->dev, DMA_BUFFER_SIZE,
->>> +				      &dma->addr, GFP_KERNEL);
->>> +	if (!dma->buf)
->>> +		goto err;
->>> +
->>> +	dev_dbg_ratelimited(adc_dev->mfd_tscadc->dev, "got dma channel\n");
->>
->> Do we need _ratelimited? AFAICS, this print is called only once.
-> 
-> True, will change to dev_dbg.
+The musb-core now a days always treats babble errors in host mode
+as disconnects, so there is no need for the sunxi specific handling
+of this anymore.
 
-It would be better to remove it. It gives no useful debuggin information apart
-from the fact that the driver did not failed to probe.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-This is a new patch in v2 of this patch series
+---
+ drivers/usb/musb/sunxi.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index 1408245..82eba92 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -186,16 +186,6 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
+ 	if (musb->int_usb)
+ 		writeb(musb->int_usb, musb->mregs + SUNXI_MUSB_INTRUSB);
+ 
+-	/*
+-	 * sunxi musb often signals babble on low / full speed device
+-	 * disconnect, without ever raising MUSB_INTR_DISCONNECT, since
+-	 * normally babble never happens treat it as disconnect.
+-	 */
+-	if ((musb->int_usb & MUSB_INTR_BABBLE) && is_host_active(musb)) {
+-		musb->int_usb &= ~MUSB_INTR_BABBLE;
+-		musb->int_usb |= MUSB_INTR_DISCONNECT;
+-	}
+-
+ 	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
+ 		/* ep0 FADDR must be 0 when (re)entering peripheral mode */
+ 		musb_ep_select(musb->mregs, 0);
 -- 
-P?ter
+2.9.3
