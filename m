@@ -1,85 +1,68 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Thu, 22 Sep 2016 09:13:13 +0200
-Subject: [PATCH v5 3/3] ASoC: sun4i-codec: Add custom regmap configs
-In-Reply-To: <20160922071313.12891-1-dannym@scratchpost.org>
-References: <20160922071313.12891-1-dannym@scratchpost.org>
-Message-ID: <20160922071313.12891-4-dannym@scratchpost.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 Sep 2016 10:18:07 +0300
+Subject: [GIT PULL] Allwinner sun4i DRM fixes for 4.9
+Message-ID: <20160922071807.GA13920@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A20 has a few extra registers that the A10 doesn't have.
-Therefore, use different regmaps for A10 as compared to A20.
+Hi David,
 
-Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
----
- sound/soc/sunxi/sun4i-codec.c | 38 +++++++++++++++++++++++++++++++++++---
- 1 file changed, 35 insertions(+), 3 deletions(-)
+Here is a bunch of fixes for the previous pull request I sent.
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 3b53b78..e047ec0 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -682,12 +682,37 @@ static const struct regmap_config sun4i_codec_regmap_config = {
- 	.reg_bits	= 32,
- 	.reg_stride	= 4,
- 	.val_bits	= 32,
-+	.max_register	= SUN4I_CODEC_ADC_RXCNT,
-+};
-+
-+static const struct regmap_config sun7i_codec_regmap_config = {
-+	.reg_bits	= 32,
-+	.reg_stride	= 4,
-+	.val_bits	= 32,
- 	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
- };
- 
-+struct sun4i_codec_quirks {
-+	const struct regmap_config *regmap_config;
-+};
-+
-+static const struct sun4i_codec_quirks sun4i_codec_quirks = {
-+	.regmap_config = &sun4i_codec_regmap_config,
-+};
-+
-+static const struct sun4i_codec_quirks sun7i_codec_quirks = {
-+	.regmap_config = &sun7i_codec_regmap_config,
-+};
-+
- static const struct of_device_id sun4i_codec_of_match[] = {
--	{ .compatible = "allwinner,sun4i-a10-codec" },
--	{ .compatible = "allwinner,sun7i-a20-codec" },
-+	{
-+		.compatible = "allwinner,sun4i-a10-codec",
-+		.data = &sun4i_codec_quirks,
-+	},
-+	{
-+		.compatible = "allwinner,sun7i-a20-codec",
-+		.data = &sun7i_codec_quirks,
-+	},
- 	{}
- };
- MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
-@@ -760,6 +785,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card;
- 	struct sun4i_codec *scodec;
-+	const struct sun4i_codec_quirks *quirks;
- 	struct resource *res;
- 	void __iomem *base;
- 	int ret;
-@@ -777,8 +803,14 @@ static int sun4i_codec_probe(struct platform_device *pdev)
- 		return PTR_ERR(base);
- 	}
- 
-+	quirks = of_device_get_match_data(&pdev->dev);
-+	if (quirks == NULL) {
-+		dev_err(&pdev->dev, "Failed to determine the quirks to use\n");
-+		return -ENODEV;
-+	}
-+
- 	scodec->regmap = devm_regmap_init_mmio(&pdev->dev, base,
--					     &sun4i_codec_regmap_config);
-+					       quirks->regmap_config);
- 	if (IS_ERR(scodec->regmap)) {
- 		dev_err(&pdev->dev, "Failed to create our regmap\n");
- 		return PTR_ERR(scodec->regmap);
+Thanks!
+Maxime
+
+The following changes since commit 0c3ff44cc23cbede56aa1ca5916b126e681ca69b:
+
+  drm/sun4i: add missing header dependencies (2016-09-08 14:55:48 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drm-fixes-for-4.9
+
+for you to fetch changes up to f0188ef8301ccbb128bbfd10751a9aeca8c9172e:
+
+  drm/sun4i: Fix the high buffer address mask (2016-09-22 10:13:22 +0300)
+
+----------------------------------------------------------------
+Allwinner sun4i DRM fixes for 4.9
+
+A few fixes for the sun4i drm driver that range, including some fixes that
+might prevent multiple planes from working depending on the sequence where
+they are enabled.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (3):
+      drm/sun4i: dotclock: Fix clock rate read back calcation
+      drm/sun4i: dotclock: Allow divider = 127
+      drm/sun4i: dotclock: Round to closest clock rate
+
+Maxime Ripard (3):
+      drm/sun4i: Fix formats usable by the primary plane
+      drm/sun4i: tv: Check mode pointer
+      drm/sun4i: Fix the high buffer address mask
+
+Ville Syrj?l? (1):
+      drm/sun4i: Fix sparse warnings
+
+Wei Yongjun (1):
+      drm/sun4i: backend: remove redundant dev_err call in sun4i_backend_bind()
+
+ drivers/gpu/drm/sun4i/sun4i_backend.c  | 13 +++++---
+ drivers/gpu/drm/sun4i/sun4i_backend.h  |  4 +--
+ drivers/gpu/drm/sun4i/sun4i_dotclock.c |  7 +++--
+ drivers/gpu/drm/sun4i/sun4i_layer.c    | 56 +++++++++++++++++++++++-----------
+ drivers/gpu/drm/sun4i/sun4i_tv.c       | 46 ++++++++++++++++------------
+ 5 files changed, 79 insertions(+), 47 deletions(-)
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160922/42771ce4/attachment.sig>
