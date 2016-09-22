@@ -1,66 +1,85 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 22 Sep 2016 12:30:04 +0100
-Subject: [RFC PATCH 1/3] efi/arm64: add SIMD stash/unstash operations
-In-Reply-To: <1474543806-19210-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1474543806-19210-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1474543806-19210-2-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu, 22 Sep 2016 12:30:03 +0100
+Subject: [RFC PATCH 0/3] efi: MMC proxy support for the UEFI varstore
+Message-ID: <1474543806-19210-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the SIMD stash/unstash operations that we need to allow UEFI
-runtime services calls to call back into the kernel.
+================================================================================
+NOTE: this is a work in progress, and not fully functional yet. In particular,
+the actual MMC host protocol methods are stubbed out at the moment, and need to
+be wired up to the Linux device drivers.
+================================================================================
 
-The UEFI bindings for arm64 stipulate that the ordinary AAPCS rules apply,
-which means that code may use FP/NEON registers, and may also expect that
-the values of the callee saved registers q8 - q15 are preserved across
-function calls.
+On mobile and embedded systems, there is usually only a single MMC device for
+non-volatile storage, which sits behind a controller that is owned by the OS at
+runtime. This makes it difficult to host the UEFI variable store on MMC as well,
+since the UEFI runtime services routines expect ownership of the underlying
+device as well.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/efi.h | 33 ++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+This series proposes an approach to work around this. It implements the UEFI
+MMC host protocol in the kernel, in a way that makes it possible to expose it
+to the firmware. At the same time, the firmware needs be set up for this, i.e.,
+it needs to expose its MMC host protocol pointer via a UEFI configuration table,
+so that the kernel can override it if it decides to expose this functionality
+to the firmware.
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index a9e54aad15ef..d6bbbcba9820 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -81,4 +81,37 @@ static inline void efi_set_pgd(struct mm_struct *mm)
- void efi_virtmap_load(void);
- void efi_virtmap_unload(void);
- 
-+struct efi_simd_reg_stash {
-+	u8	q8[16];
-+	u8	q9[16];
-+	u8	q10[16];
-+	u8	q11[16];
-+	u8	q12[16];
-+	u8	q13[16];
-+	u8	q14[16];
-+	u8	q15[16];
-+};
-+
-+static inline void arch_efi_stash_simd_regs(struct efi_simd_reg_stash *stash)
-+{
-+	asm(	"stp	q8,  q9,  [%1];"
-+		"stp	q10, q11, [%1, #32];"
-+		"stp	q12, q13, [%1, #64];"
-+		"stp	q14, q15, [%1, #96];"
-+
-+		: "=m"(*stash)
-+		: "r"(stash));
-+}
-+
-+static inline void arch_efi_unstash_simd_regs(struct efi_simd_reg_stash *stash)
-+{
-+	asm(	"ldp	q8,  q9,  [%1];"
-+		"ldp	q10, q11, [%1, #32];"
-+		"ldp	q12, q13, [%1, #64];"
-+		"ldp	q14, q15, [%1, #96];"
-+
-+		:
-+		: "m"(*stash), "r"(stash));
-+}
-+
- #endif /* _ASM_EFI_H */
+Note that these patches are based on patches in the EFI tree that are queued
+for v4.9, which replace the runtime wrappers spinlock with a semaphore. This
+allows us to sleep in the firmware callbacks.
+
+Prerequisites for using these patches:
+
+* qemu-system-aarch64 built from this branch:
+  https://git.linaro.org/people/ard.biesheuvel/qemu.git/shortlog/refs/heads/mach-virt-pl181
+  which adds a PL181 SD/MMC controller to the mach-virt model, and exposes it
+  via the device tree. It also sets the 'linux,uefi-varstore' property on this
+  node.
+
+* UEFI firmware built from this branch:
+  https://git.linaro.org/people/ard.biesheuvel/uefi-next.git/shortlog/refs/heads/mmc-proxy
+  
+  Build using the following command
+  build -a AARCH64 -t GCC5 -p ArmVirtPkg/ArmVirtQemuMmcVars.dsc
+
+  Run using 
+  qemu-system-aarch64 \
+    -M virt -cpu cortex-a57 -m 2048 \
+    -device virtio-blk-device,drive=boot \
+    -drive if=none,id=boot,file=fat:<path-of-Image>,format=raw \
+    -kernel <edk2-dir>/Build/ArmVirtQemuMmcVars-AARCH64/DEBUG_GCC5/FV/QEMU_EFI.fd \
+    -sd <edk2-dir>/build/edk2/Build/ArmVirtQemuMmcVars-AARCH64/DEBUG_GCC5/FV/QEMU_VARS.fd \
+    -nographic $@
+
+  This will give you an UEFI environment which keeps its UEFI variables in the
+  emulated MMC volume, and exposes its MMC host protocol in a way that allows
+  these patches to hook into it.
+
+Patches #1 and #2 implement the arch specific hooks to preserve/restore the NEON
+registers that the firmware may expect to be preserved across function calls.
+
+Patch #3 implements the plumbing to call back into the kernel from the firmware.
+
+Please comment on whether this approach seems feasible, and in particular, how
+on earth I should wire this up to the actual MMC code.
+
+Thanks,
+Ard.
+
+Ard Biesheuvel (3):
+  efi/arm64: add SIMD stash/unstash operations
+  efi/arm: add SIMD stash/unstash operations
+  efi: implement MMC proxy support for the UEFI variable store
+
+ arch/arm/include/asm/efi.h       |  11 +
+ arch/arm64/include/asm/efi.h     |  33 +++
+ drivers/firmware/efi/Kconfig     |   9 +
+ drivers/firmware/efi/Makefile    |   1 +
+ drivers/firmware/efi/arm-init.c  |   2 +
+ drivers/firmware/efi/mmc-proxy.c | 222 ++++++++++++++++++++
+ include/linux/efi.h              |   1 +
+ 7 files changed, 279 insertions(+)
+ create mode 100644 drivers/firmware/efi/mmc-proxy.c
+
 -- 
 2.7.4
