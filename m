@@ -1,36 +1,52 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Thu, 22 Sep 2016 06:12:16 -0700
-Subject: [PATCH 0/2] BQL support and fix for a regression issue
-In-Reply-To: <20160922.082540.992436214283504080.davem@davemloft.net>
-References: <1474535121-13958-1-git-send-email-sunil.kovvuri@gmail.com>
- <20160922.082540.992436214283504080.davem@davemloft.net>
-Message-ID: <1474549936.23058.98.camel@edumazet-glaptop3.roam.corp.google.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 22 Sep 2016 15:14:05 +0200
+Subject: [PATCHv2 1/3] serial: mctrl_gpio: implement mctrl_gpio_use_rtscts
+In-Reply-To: <20160912094733.21501-2-richard.genoud@gmail.com>
+References: <20160912094733.21501-1-richard.genoud@gmail.com>
+ <20160912094733.21501-2-richard.genoud@gmail.com>
+Message-ID: <20160922131405.y4wvgd3n534jbdv5@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-09-22 at 08:25 -0400, David Miller wrote:
-> From: sunil.kovvuri at gmail.com
-> Date: Thu, 22 Sep 2016 14:35:19 +0530
+On Mon, Sep 12, 2016 at 11:47:31AM +0200, Richard Genoud wrote:
+> This function returns true if CTS and RTS are used as GPIOs.
+> Some drivers (like atmel_serial) needs to know if the flow control is
+> handled by the controller or by GPIOs.
 > 
-> > From: Sunil Goutham <sgoutham@cavium.com>
-> > 
-> > These patches add byte queue limit support and also fixes a regression
-> > issue introduced by commit
-> > 'net: thunderx: Use netdev's name for naming VF's interrupts'
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  drivers/tty/serial/serial_mctrl_gpio.c |  8 ++++++++
+>  drivers/tty/serial/serial_mctrl_gpio.h | 10 ++++++++++
+>  2 files changed, 18 insertions(+)
 > 
-> The correct way to refer to commits when you fix a bug is
-> to use the "Fixes: " tag right before the signoffs and ACKs.
-> 
-> The correct form is:
-> 
-> Fixes: $SHA1_ID ("Commit header line.")
-> 
-> You'll see this in many other netdev commits.
+> diff --git a/drivers/tty/serial/serial_mctrl_gpio.c b/drivers/tty/serial/serial_mctrl_gpio.c
+> index d2da6aa7f27d..93bed8c99796 100644
+> --- a/drivers/tty/serial/serial_mctrl_gpio.c
+> +++ b/drivers/tty/serial/serial_mctrl_gpio.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/err.h>
+>  #include <linux/device.h>
+>  #include <linux/irq.h>
+> +#include <linux/err.h>
+>  #include <linux/gpio/consumer.h>
+>  #include <linux/termios.h>
+>  #include <linux/serial_core.h>
+> @@ -72,6 +73,13 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+>  }
+>  EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
+>  
+> +bool mctrl_gpio_use_rtscts(struct mctrl_gpios *gpios)
+> +{
+> +	return !IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(gpios, UART_GPIO_CTS)) &&
+> +		!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(gpios, UART_GPIO_RTS));
 
-Thanks a lot David for this enforcement, it really helps bug tracking
-and backports
+mctrl_gpio_to_gpiod cannot return an error pointer. So this is
+(surprise!) a wrong usage of IS_ERR_OR_NULL.
 
-Note that the $SHA1_ID should be truncated to 12 first chars.
+Best regards
+Uwe
 
-Refer to Documentation/SubmittingPatches around line 191 for more
-details.
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
