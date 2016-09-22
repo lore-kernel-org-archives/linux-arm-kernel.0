@@ -1,63 +1,148 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu, 22 Sep 2016 11:51:02 -0700
-Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
-In-Reply-To: <20160917011605.GB10392@b29397-desktop>
-References: <20160914014246.31847-1-stephen.boyd@linaro.org>
- <147384330268.13546.17843140335600627152@sboyd-linaro>
- <20160917011605.GB10392@b29397-desktop>
-Message-ID: <147457026249.9057.8712383708019243942@sboyd-linaro>
+From: sam.van.den.berge@telenet.be (Sam Van Den Berge)
+Date: Thu, 22 Sep 2016 20:51:15 +0200
+Subject: [PATCH v3] dmaengine: s3c24xx: Add dma_slave_map for s3c2440 devices
+Message-ID: <1474570275-7238-1-git-send-email-sam.van.den.berge@telenet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-09-16 18:16:05)
-> On Wed, Sep 14, 2016 at 01:55:02AM -0700, Stephen Boyd wrote:
-> > Quoting Stephen Boyd (2016-09-13 18:42:46)
-> > > On the db410c 96boards platform we have a TC7USB40MU[1] on the
-> > > board to mux the D+/D- lines from the SoC between a micro usb
-> > > "device" port and a USB hub for "host" roles. Upon a role switch,
-> > > we need to change this mux to forward the D+/D- lines to either
-> > > the port or the hub. Therefore, introduce a driver for this
-> > > device that intercepts extcon USB_HOST events and logically
-> > > asserts a gpio to mux the "host" D+/D- lines when a host cable is
-> > > attached. When the cable goes away, it will logically deassert
-> > > the gpio and mux the "device" lines.
-> > > 
-> > > [1] https://toshiba.semicon-storage.com/ap-en/product/logic/bus-switch/detail.TC7USB40MU.html
-> > > 
-> > > Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-> > > Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> > > Cc: <devicetree@vger.kernel.org>
-> > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> > > ---
-> > > 
-> > > Should I make the extcon part optional? I could see a case where there are two
-> > > "OTG" ports connected to the mux (or two hubs), and for some reason the
-> > > software may want to mux between them at runtime. If we mandate an extcon,
-> > > that won't be possible to support. Perhaps it would be better to have
-> > > the node, but connect it to the usb controller with a phandle (maybe of_graph
-> > > endpoints would be useful too) so that when the controller wants to mux over
-> > > a port it can do so.
-> > 
-> > Here's some dts mock-up on top of the db410c for the of_graph stuff. I
-> > haven't written any code around it, but the idea is to allow the binding
-> > to specify how the mux is connected to upstream and downstream D+/D-
-> > lines. This way, we can do some dt parsing of the endpoints and their
-> > parent nodes to figure out if the mux needs to be set high or low to use
-> > a device connector or a usb hub based on if the id cable is present.
-> > Maybe I'm over thinking things though and we could just have a DT
-> > property for that.
-> > 
-> >       soc {
-> >               usb at 78d9000 {
-> >                       extcon = <&usb_id>, <&usb_id>;
-> 
-> Why you have two same extcon phandler? From my mind, one should id,
-> another should is vbus. Besides, I find extcon-usb-gpio.c is lack of
-> vbus support, how you support vbus detection for
-> connection/disconnection with PC for your chipidea msm patch set?
+This patch updates the s3c24xx dma driver to be able to pass a
+dma_slave_map array via the platform data. This is needed to
+be able to use the new, simpler dmaengine API [1].
+I used the virtual DMA channels as a parameter for the dma_filter
+function. By doing that, I could reuse the existing filter function in
+drivers/dma/s3c24xx-dma.c.
 
-This was already in the dts files for db410c. In the chipidea binding
-one is for EXTCON_USB (vbus) and one is for EXTCON_USB_HOST (id). My
-understanding is that extcon-usb-gpio.c sends events for both EXTCON_USB
-and EXTCON_USB_HOST when the gpio changes state. vbus detection is not
-that great on this board because we only have on gpio for this.
+I have tested this on my mini2440 board with the audio driver.
+According to my observations, dma_request_slave_channel in the
+function dmaengine_pcm_new in the file
+sound/soc/soc-generic-dmaengine-pcm.c now returns a valid DMA channel
+whereas before no DMA channel was returned at that point.
+
+Entries for DMACH_XD0, DMACH_XD1 and DMACH_TIMER are missing because I
+don't realy know which driver to use for these.
+
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/393635.html
+
+Signed-off-by: Sam Van Den Berge <sam.van.den.berge@telenet.be>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+This patch depends on the audio fixes from Sylwester Nawrocki
+(http://www.spinics.net/lists/arm-kernel/msg521918.html)
+
+Changes since v2:
+- s/3c2440-sdi/s3c2440-sdi/
+- Removed reference to the audio fixes of Sylwester from the commit message
+  because I don't think it belongs in the commit message itself.
+
+Changes since v1:
+- rename arm into dmaengine in title
+- one channel for s3c2440-sdi named "rx-tx"
+
+ arch/arm/mach-s3c24xx/common.c            | 35 +++++++++++++++++++++++++++++++
+ drivers/dma/s3c24xx-dma.c                 |  3 +++
+ include/linux/platform_data/dma-s3c24xx.h |  6 ++++++
+ 3 files changed, 44 insertions(+)
+
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index fe7485d..f6c3f15 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -33,6 +33,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/platform_data/dma-s3c24xx.h>
++#include <linux/dmaengine.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/regs-clock.h>
+@@ -445,10 +446,44 @@ static struct s3c24xx_dma_channel s3c2440_dma_channels[DMACH_MAX] = {
+ 	[DMACH_USB_EP4] = { S3C24XX_DMA_APB, true, S3C24XX_DMA_CHANREQ(4, 3), },
+ };
+ 
++static const struct dma_slave_map s3c2440_dma_slave_map[] = {
++	/* TODO: DMACH_XD0 */
++	/* TODO: DMACH_XD1 */
++	{ "s3c2440-sdi", "rx-tx", (void *)DMACH_SDI },
++	{ "s3c2410-spi.0", "rx", (void *)DMACH_SPI0 },
++	{ "s3c2410-spi.0", "tx", (void *)DMACH_SPI0 },
++	{ "s3c2410-spi.1", "rx", (void *)DMACH_SPI1 },
++	{ "s3c2410-spi.1", "tx", (void *)DMACH_SPI1 },
++	{ "s3c2440-uart.0", "rx", (void *)DMACH_UART0 },
++	{ "s3c2440-uart.0", "tx", (void *)DMACH_UART0 },
++	{ "s3c2440-uart.1", "rx", (void *)DMACH_UART1 },
++	{ "s3c2440-uart.1", "tx", (void *)DMACH_UART1 },
++	{ "s3c2440-uart.2", "rx", (void *)DMACH_UART2 },
++	{ "s3c2440-uart.2", "tx", (void *)DMACH_UART2 },
++	{ "s3c2440-uart.3", "rx", (void *)DMACH_UART3 },
++	{ "s3c2440-uart.3", "tx", (void *)DMACH_UART3 },
++	/* TODO: DMACH_TIMER */
++	{ "s3c24xx-iis", "rx", (void *)DMACH_I2S_IN },
++	{ "s3c24xx-iis", "tx", (void *)DMACH_I2S_OUT },
++	{ "samsung-ac97", "rx", (void *)DMACH_PCM_IN },
++	{ "samsung-ac97", "tx", (void *)DMACH_PCM_OUT },
++	{ "samsung-ac97", "rx", (void *)DMACH_MIC_IN },
++	{ "s3c-hsudc", "rx0", (void *)DMACH_USB_EP1 },
++	{ "s3c-hsudc", "rx1", (void *)DMACH_USB_EP2 },
++	{ "s3c-hsudc", "rx2", (void *)DMACH_USB_EP3 },
++	{ "s3c-hsudc", "rx3", (void *)DMACH_USB_EP4 },
++	{ "s3c-hsudc", "tx0", (void *)DMACH_USB_EP1 },
++	{ "s3c-hsudc", "tx1", (void *)DMACH_USB_EP2 },
++	{ "s3c-hsudc", "tx2", (void *)DMACH_USB_EP3 },
++	{ "s3c-hsudc", "tx3", (void *)DMACH_USB_EP4 }
++};
++
+ static struct s3c24xx_dma_platdata s3c2440_dma_platdata = {
+ 	.num_phy_channels = 4,
+ 	.channels = s3c2440_dma_channels,
+ 	.num_channels = DMACH_MAX,
++	.slave_map = s3c2440_dma_slave_map,
++	.slavecnt = ARRAY_SIZE(s3c2440_dma_slave_map),
+ };
+ 
+ struct platform_device s3c2440_device_dma = {
+diff --git a/drivers/dma/s3c24xx-dma.c b/drivers/dma/s3c24xx-dma.c
+index ce67075..d5c85e7 100644
+--- a/drivers/dma/s3c24xx-dma.c
++++ b/drivers/dma/s3c24xx-dma.c
+@@ -1301,6 +1301,9 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
+ 	s3cdma->slave.device_prep_dma_cyclic = s3c24xx_dma_prep_dma_cyclic;
+ 	s3cdma->slave.device_config = s3c24xx_dma_set_runtime_config;
+ 	s3cdma->slave.device_terminate_all = s3c24xx_dma_terminate_all;
++	s3cdma->slave.filter.map = pdata->slave_map;
++	s3cdma->slave.filter.mapcnt = pdata->slavecnt;
++	s3cdma->slave.filter.fn = s3c24xx_dma_filter;
+ 
+ 	/* Register as many memcpy channels as there are physical channels */
+ 	ret = s3c24xx_dma_init_virtual_channels(s3cdma, &s3cdma->memcpy,
+diff --git a/include/linux/platform_data/dma-s3c24xx.h b/include/linux/platform_data/dma-s3c24xx.h
+index 89ba1b0..4f9aba4 100644
+--- a/include/linux/platform_data/dma-s3c24xx.h
++++ b/include/linux/platform_data/dma-s3c24xx.h
+@@ -30,16 +30,22 @@ struct s3c24xx_dma_channel {
+ 	u16 chansel;
+ };
+ 
++struct dma_slave_map;
++
+ /**
+  * struct s3c24xx_dma_platdata - platform specific settings
+  * @num_phy_channels: number of physical channels
+  * @channels: array of virtual channel descriptions
+  * @num_channels: number of virtual channels
++ * @slave_map: dma slave map matching table
++ * @slavecnt: number of elements in slave_map
+  */
+ struct s3c24xx_dma_platdata {
+ 	int num_phy_channels;
+ 	struct s3c24xx_dma_channel *channels;
+ 	int num_channels;
++	const struct dma_slave_map *slave_map;
++	int slavecnt;
+ };
+ 
+ struct dma_chan;
+-- 
+1.9.1
