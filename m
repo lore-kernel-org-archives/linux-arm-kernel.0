@@ -1,24 +1,78 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 22 Sep 2016 09:42:57 +0300
-Subject: [PATCH] clocksource: bcm2835_timer: Unmap region obtained by
- of_iomap
-In-Reply-To: <1474479237-10356-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1474479237-10356-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <87vaxoa0zy.fsf@eliezer.anholt.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 22 Sep 2016 09:07:46 +0200
+Subject: [PATCH] tty/serial: atmel: fix fractional baud rate computation
+In-Reply-To: <20160921104414.16241-1-nicolas.ferre@atmel.com>
+References: <20160921104414.16241-1-nicolas.ferre@atmel.com>
+Message-ID: <20160922070746.65nzezj3fwunu55s@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arvind Yadav <arvind.yadav.cs@gmail.com> writes:
+On Wed, Sep 21, 2016 at 12:44:14PM +0200, Nicolas Ferre wrote:
+> From: Alexey Starikovskiy <aystarik@gmail.com>
+> 
+> The problem with previous code was it rounded values in wrong
+> place and produced wrong baud rate in some cases.
+> 
+> Signed-off-by: Alexey Starikovskiy <aystarik@gmail.com>
+> [nicolas.ferre at atmel.com: port to newer kernel and add commit log]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/tty/serial/atmel_serial.c | 10 ++++++----
+>  include/linux/atmel_serial.h      |  1 +
+>  2 files changed, 7 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 5f550d9feed9..fd8aa1f4ba78 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -2170,13 +2170,15 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  	 * accurately. This feature is enabled only when using normal mode.
+>  	 * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
+>  	 * Currently, OVER is always set to 0 so we get
+> -	 * baudrate = selected clock (16 * (CD + FP / 8))
+> +	 * baudrate = selected clock / (16 * (CD + FP / 8))
+> +	 * then
+> +	 * 8 CD + FP = selected clock / (2 * baudrate)
+>  	 */
+>  	if (atmel_port->has_frac_baudrate &&
+>  	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
+> -		div = DIV_ROUND_CLOSEST(port->uartclk, baud);
+> -		cd = div / 16;
+> -		fp = DIV_ROUND_CLOSEST(div % 16, 2);
+> +		div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
+> +		cd = div >> 3;
+> +		fp = div & ATMEL_US_FP_MASK;
 
-> Free memory mapping, if bcm2835_timer_init is not successful.
->
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+given baud = 115200 and uartclk = 5414300 this results in:
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160922/72ec6b9b/attachment.sig>
+	div = DIV_ROUND_CLOSEST(5414300, 115200 * 2) = 23
+	cd = 2
+	fp = 7
+
+which yields a rate of 5414300 / 46 = 117702.17. With cd = 3 and fp = 0
+however the resulting rate is 5414300 / 48 = 112797.92.
+
+Which one is better?
+
+>  	} else {
+>  		cd = uart_get_divisor(port, baud);
+>  	}
+> diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
+> index f8e452aa48d7..bd2560502f3c 100644
+> --- a/include/linux/atmel_serial.h
+> +++ b/include/linux/atmel_serial.h
+> @@ -119,6 +119,7 @@
+>  #define ATMEL_US_BRGR		0x20	/* Baud Rate Generator Register */
+>  #define	ATMEL_US_CD		GENMASK(15, 0)	/* Clock Divider */
+>  #define ATMEL_US_FP_OFFSET	16	/* Fractional Part */
+> +#define ATMEL_US_FP_MASK	0x7
+
+Is there another user of this header? If not, this can be folded into
+the driver.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
