@@ -1,138 +1,86 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 22 Sep 2016 10:41:00 -0700
-Subject: [PATCH 2/2] net: thunderx: Support for byte queue limits
-In-Reply-To: <1474535121-13958-3-git-send-email-sunil.kovvuri@gmail.com>
-References: <1474535121-13958-1-git-send-email-sunil.kovvuri@gmail.com>
- <1474535121-13958-3-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <9704f631-dad4-3291-8731-bef9a07e1b07@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 22 Sep 2016 19:46:06 +0200
+Subject: [PATCH] ARM: dts: exynos: Add reboot reason support for Trats2
+In-Reply-To: <1474562915-4319-1-git-send-email-wolfgit@wiedmeyer.de>
+References: <1474562915-4319-1-git-send-email-wolfgit@wiedmeyer.de>
+Message-ID: <20160922174606.GA4988@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2016 02:05 AM, sunil.kovvuri at gmail.com wrote:
-> From: Sunil Goutham <sgoutham@cavium.com>
-> 
-> This patch adds support for byte queue limits
-> 
-> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+Hi,
 
-Where is the code that calls netdev_tx_reset_queue()? This is needed in
-the function that brings down the interface, did your test survive a
-up/down/up sequence?
+Thanks for the patch, it is nice that someone did this! When I saw the
+syscon reboot mode driver, I though about such feature but never had
+time or will to implement it. Great job!
 
+Few comments below.
+
+On Thu, Sep 22, 2016 at 06:48:35PM +0200, Wolfgang Wiedmeyer wrote:
+> This allows to reboot the device into recovery mode and into the download
+> mode of the bootloader.
+
+Which bootloader? Probably UBoot... or Samsung stock one? Could you put
+that information here?
+
+> 
+> Signed-off-by: Wolfgang Wiedmeyer <wolfgit@wiedmeyer.de>
 > ---
->  drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 11 ++++++--
->  drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 30 ++++++++++++++--------
->  2 files changed, 29 insertions(+), 12 deletions(-)
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 14 ++++++++++++++
+>  arch/arm/boot/dts/exynos4x12.dtsi       |  2 +-
+>  2 files changed, 15 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-> index 7d00162..453e3a0 100644
-> --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-> @@ -516,7 +516,8 @@ static int nicvf_init_resources(struct nicvf *nic)
->  static void nicvf_snd_pkt_handler(struct net_device *netdev,
->  				  struct cmp_queue *cq,
->  				  struct cqe_send_t *cqe_tx,
-> -				  int cqe_type, int budget)
-> +				  int cqe_type, int budget,
-> +				  unsigned int *tx_pkts, unsigned int *tx_bytes)
->  {
->  	struct sk_buff *skb = NULL;
->  	struct nicvf *nic = netdev_priv(netdev);
-> @@ -547,6 +548,8 @@ static void nicvf_snd_pkt_handler(struct net_device *netdev,
->  		}
->  		nicvf_put_sq_desc(sq, hdr->subdesc_cnt + 1);
->  		prefetch(skb);
-> +		(*tx_pkts)++;
-> +		*tx_bytes += skb->len;
->  		napi_consume_skb(skb, budget);
->  		sq->skbuff[cqe_tx->sqe_ptr] = (u64)NULL;
->  	} else {
-> @@ -662,6 +665,7 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
->  	struct cmp_queue *cq = &qs->cq[cq_idx];
->  	struct cqe_rx_t *cq_desc;
->  	struct netdev_queue *txq;
-> +	unsigned int tx_pkts = 0, tx_bytes = 0;
->  
->  	spin_lock_bh(&cq->lock);
->  loop:
-> @@ -701,7 +705,7 @@ loop:
->  		case CQE_TYPE_SEND:
->  			nicvf_snd_pkt_handler(netdev, cq,
->  					      (void *)cq_desc, CQE_TYPE_SEND,
-> -					      budget);
-> +					      budget, &tx_pkts, &tx_bytes);
->  			tx_done++;
->  		break;
->  		case CQE_TYPE_INVALID:
-> @@ -730,6 +734,9 @@ done:
->  		netdev = nic->pnicvf->netdev;
->  		txq = netdev_get_tx_queue(netdev,
->  					  nicvf_netdev_qidx(nic, cq_idx));
-> +		if (tx_pkts)
-> +			netdev_tx_completed_queue(txq, tx_pkts, tx_bytes);
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 129e973..a38d1e3 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -1294,3 +1294,17 @@
+>  	vtmu-supply = <&ldo10_reg>;
+>  	status = "okay";
+>  };
 > +
->  		nic = nic->pnicvf;
->  		if (netif_tx_queue_stopped(txq) && netif_carrier_ok(netdev)) {
->  			netif_tx_start_queue(txq);
-> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> index 178c5c7..a4fc501 100644
-> --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> @@ -1082,6 +1082,24 @@ static inline void nicvf_sq_add_cqe_subdesc(struct snd_queue *sq, int qentry,
->  	imm->len = 1;
->  }
->  
-> +static inline void nicvf_sq_doorbell(struct nicvf *nic, struct sk_buff *skb,
-> +				     int sq_num, int desc_cnt)
-> +{
-> +	struct netdev_queue *txq;
+> +&pmu {
+> +	compatible = "syscon", "simple-mfd";
 > +
-> +	txq = netdev_get_tx_queue(nic->pnicvf->netdev,
-> +				  skb_get_queue_mapping(skb));
+> +	reboot-mode {
+> +		compatible = "syscon-reboot-mode";
+> +		offset = <0x80c>;
 > +
-> +	netdev_tx_sent_queue(txq, skb->len);
-> +
-> +	/* make sure all memory stores are done before ringing doorbell */
-> +	smp_wmb();
-> +
-> +	/* Inform HW to xmit all TSO segments */
-> +	nicvf_queue_reg_write(nic, NIC_QSET_SQ_0_7_DOOR,
-> +			      sq_num, desc_cnt);
-> +}
-> +
->  /* Segment a TSO packet into 'gso_size' segments and append
->   * them to SQ for transfer
->   */
-> @@ -1141,12 +1159,8 @@ static int nicvf_sq_append_tso(struct nicvf *nic, struct snd_queue *sq,
->  	/* Save SKB in the last segment for freeing */
->  	sq->skbuff[hdr_qentry] = (u64)skb;
->  
-> -	/* make sure all memory stores are done before ringing doorbell */
-> -	smp_wmb();
-> +	nicvf_sq_doorbell(nic, skb, sq_num, desc_cnt);
->  
-> -	/* Inform HW to xmit all TSO segments */
-> -	nicvf_queue_reg_write(nic, NIC_QSET_SQ_0_7_DOOR,
-> -			      sq_num, desc_cnt);
->  	nic->drv_stats.tx_tso++;
->  	return 1;
->  }
-> @@ -1219,12 +1233,8 @@ doorbell:
->  		nicvf_sq_add_cqe_subdesc(sq, qentry, tso_sqe, skb);
->  	}
->  
-> -	/* make sure all memory stores are done before ringing doorbell */
-> -	smp_wmb();
-> +	nicvf_sq_doorbell(nic, skb, sq_num, subdesc_cnt);
->  
-> -	/* Inform HW to xmit new packet */
-> -	nicvf_queue_reg_write(nic, NIC_QSET_SQ_0_7_DOOR,
-> -			      sq_num, subdesc_cnt);
->  	return 1;
->  
->  append_fail:
-> 
+> +		mode-normal	= <0x12345670>;
+> +		mode-bootloader	= <0x12345671>;
+> +		mode-download	= <0x12345671>;
+> +		mode-recovery	= <0x12345674>;
+
+Hmmm, how did you get these values? Are they already supported?
+
+It would be nice to document them:
+1. In Documentation/arm/Samsung/Bootloader-interface.txt
+2. In header. I hate such magic numbers... you could add new header next
+   to existing rockchip one:
+   include/dt-bindings/soc/samsung,boot-mode.h
+   (and update maintainers entry :) )
 
 
--- 
-Florian
+Best regards,
+Krzysztof
+
+
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+> index c452499..b58c14e 100644
+> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> @@ -179,7 +179,7 @@
+>  			ranges;
+>  			status = "disabled";
+>  
+> -			pmu at 10020000 {
+> +			pmu: pmu at 10020000 {
+>  				reg = <0x10020000 0x3000>;
+>  			};
+>  
+> -- 
+> Website: https://fossencdi.org
+> OpenPGP: 0F30 D1A0 2F73 F70A 6FEE  048E 5816 A24C 1075 7FC4
+> Key download: https://wiedmeyer.de/keys/ww.asc
+> 
