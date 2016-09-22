@@ -1,95 +1,127 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 22 Sep 2016 12:50:35 +0800
-Subject: [PATCH v3 7/9] dmaengine: edma: enable COMPILE_TEST
-In-Reply-To: <20160921124135.11849-8-peter.ujfalusi@ti.com>
-Message-ID: <201609221213.4CCUmdcE%fengguang.wu@intel.com>
+From: sriram.dash@nxp.com (Sriram Dash)
+Date: Thu, 22 Sep 2016 05:02:17 +0000
+Subject: [PATCH] usb: dwc3: host: inherit dma configuration from parent dev
+In-Reply-To: <20042182.GcPMJken6Z@wuerfel>
+References: <Pine.LNX.4.44L0.1604271357190.1912-100000@iolanthe.rowland.org>
+ <3596831.dckG5peiyF@wuerfel>
+ <DB5PR0401MB1925CDF6CBD45ACBEE95D152F5F60@DB5PR0401MB1925.eurprd04.prod.outlook.com>
+ <20042182.GcPMJken6Z@wuerfel>
+Message-ID: <DB5PR0401MB1925E5980009DD23FA9C7D50F5C90@DB5PR0401MB1925.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+>From: Arnd Bergmann [mailto:arnd at arndb.de]
+>On Wednesday, September 21, 2016 11:43:59 AM CEST Sriram Dash wrote:
+>> >From: Arnd Bergmann [mailto:arnd at arndb.de] On Wednesday, September
+>> >21, 2016 11:06:47 AM CEST Sriram Dash wrote:
+>>
+>> ==============================================================
+>> From 8b0dea1513e9e73a11dcfa802ddc71cca11d66f8 Mon Sep 17 00:00:00 2001
+>> From: Sriram Dash <sriram.dash@nxp.com>
+>> Date: Wed, 21 Sep 2016 11:39:30 +0530
+>> Subject: [PATCH] usb: xhci: Fix the patch inherit dma configuration
+>> from  parent dev
+>>
+>> Fixes the patch https://patchwork.kernel.org/patch/9319527/
+>> ("usb: dwc3: host: inherit dma configuration from parent dev").
+>>
+>> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+>> ---
+>>  drivers/usb/host/xhci-mem.c | 12 ++++++------
+>>  drivers/usb/host/xhci.c     | 20 ++++++++++----------
+>>  2 files changed, 16 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/drivers/usb/host/xhci-mem.c b/drivers/usb/host/xhci-mem.c
+>> index 6afe323..79608df 100644
+>> --- a/drivers/usb/host/xhci-mem.c
+>> +++ b/drivers/usb/host/xhci-mem.c
+>
+>All the changes you did to this file seem fine, I completely missed that part.
+>
+>> diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c index
+>> 01d96c9..9a1ff09 100644
+>> --- a/drivers/usb/host/xhci.c
+>> +++ b/drivers/usb/host/xhci.c
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.8-rc7 next-20160921]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+Yes. Some sanity is required over this patch.
 
-url:    https://github.com/0day-ci/linux/commits/Peter-Ujfalusi/dmaengine-ti-drivers-enable-COMPILE_TESTing/20160921-212008
-config: powerpc-allyesconfig (attached as .config)
-compiler: powerpc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=powerpc 
-
-All errors (new ones prefixed by >>):
-
->> drivers/dma/edma.c:415:20: error: conflicting types for 'set_bits'
-    static inline void set_bits(int offset, int len, unsigned long *p)
-                       ^~~~~~~~
-   In file included from include/linux/bitops.h:36:0,
-                    from include/linux/kernel.h:10,
-                    from include/linux/list.h:8,
-                    from include/linux/kobject.h:20,
-                    from include/linux/device.h:17,
-                    from include/linux/dmaengine.h:20,
-                    from drivers/dma/edma.c:16:
-   arch/powerpc/include/asm/bitops.h:75:14: note: previous definition of 'set_bits' was here
-    DEFINE_BITOP(set_bits, or, "")
-                 ^
-   arch/powerpc/include/asm/bitops.h:58:24: note: in definition of macro 'DEFINE_BITOP'
-    static __inline__ void fn(unsigned long mask, \
-                           ^~
->> drivers/dma/edma.c:421:20: error: conflicting types for 'clear_bits'
-    static inline void clear_bits(int offset, int len, unsigned long *p)
-                       ^~~~~~~~~~
-   In file included from include/linux/bitops.h:36:0,
-                    from include/linux/kernel.h:10,
-                    from include/linux/list.h:8,
-                    from include/linux/kobject.h:20,
-                    from include/linux/device.h:17,
-                    from include/linux/dmaengine.h:20,
-                    from drivers/dma/edma.c:16:
-   arch/powerpc/include/asm/bitops.h:76:14: note: previous definition of 'clear_bits' was here
-    DEFINE_BITOP(clear_bits, andc, "")
-                 ^
-   arch/powerpc/include/asm/bitops.h:58:24: note: in definition of macro 'DEFINE_BITOP'
-    static __inline__ void fn(unsigned long mask, \
-                           ^~
-
-vim +/set_bits +415 drivers/dma/edma.c
-
-d9c345d1 Peter Ujfalusi 2015-10-16  409  static inline void edma_param_or(struct edma_cc *ecc, int offset, int param_no,
-2b6b3b74 Peter Ujfalusi 2015-10-14  410  				 unsigned or)
-2b6b3b74 Peter Ujfalusi 2015-10-14  411  {
-2b6b3b74 Peter Ujfalusi 2015-10-14  412  	edma_or(ecc, EDMA_PARM + offset + (param_no << 5), or);
-2b6b3b74 Peter Ujfalusi 2015-10-14  413  }
-2b6b3b74 Peter Ujfalusi 2015-10-14  414  
-2b6b3b74 Peter Ujfalusi 2015-10-14 @415  static inline void set_bits(int offset, int len, unsigned long *p)
-2b6b3b74 Peter Ujfalusi 2015-10-14  416  {
-2b6b3b74 Peter Ujfalusi 2015-10-14  417  	for (; len > 0; len--)
-2b6b3b74 Peter Ujfalusi 2015-10-14  418  		set_bit(offset + (len - 1), p);
-2b6b3b74 Peter Ujfalusi 2015-10-14  419  }
-2b6b3b74 Peter Ujfalusi 2015-10-14  420  
-2b6b3b74 Peter Ujfalusi 2015-10-14 @421  static inline void clear_bits(int offset, int len, unsigned long *p)
-2b6b3b74 Peter Ujfalusi 2015-10-14  422  {
-2b6b3b74 Peter Ujfalusi 2015-10-14  423  	for (; len > 0; len--)
-2b6b3b74 Peter Ujfalusi 2015-10-14  424  		clear_bit(offset + (len - 1), p);
-
-:::::: The code at line 415 was first introduced by commit
-:::::: 2b6b3b7420190888793c49e97276e1e73bd7eaed ARM/dmaengine: edma: Merge the two drivers under drivers/dma/
-
-:::::: TO: Peter Ujfalusi <peter.ujfalusi@ti.com>
-:::::: CC: Vinod Koul <vinod.koul@intel.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 49928 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160922/316e4457/attachment-0001.gz>
+>> @@ -231,7 +231,7 @@ static int xhci_free_msi(struct xhci_hcd *xhci)
+>> static int xhci_setup_msi(struct xhci_hcd *xhci)  {
+>>  	int ret;
+>> -	struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
+>> +	struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
+>>
+>>  	ret = pci_enable_msi(pdev);
+>>  	if (ret) {
+>
+>This one is interesting as I stumbled over some code comment mentioning that for
+>dwc3-pci, we don't support MSI. I think with this change, we /can/ actually support
+>MSI, but this could be a separate patch and we'd have to test it on dwc3-pci
+>hardware. Same for most of this file.
+>
+>> @@ -745,7 +745,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
+>>  	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+>>
+>>  	if (xhci->quirks & XHCI_SPURIOUS_REBOOT)
+>> -		usb_disable_xhci_ports(to_pci_dev(hcd->self.controller));
+>> +		usb_disable_xhci_ports(to_pci_dev(hcd->self.sysdev));
+>>
+>>  	spin_lock_irq(&xhci->lock);
+>>  	xhci_halt(xhci);
+>
+>This seems obviously correct, but I don't yet see why it currently works. We
+>probably don't call this function on dwc3.
+>
+>>  #ifdef CONFIG_PM
+>> @@ -3605,7 +3605,7 @@ void xhci_free_dev(struct usb_hcd *hcd, struct
+>usb_device *udev)
+>>  	 * if no devices remain.
+>>  	 */
+>>  	if (xhci->quirks & XHCI_RESET_ON_RESUME)
+>> -		pm_runtime_put_noidle(hcd->self.controller);
+>> +		pm_runtime_put_noidle(hcd->self.sysdev);
+>>  #endif
+>>
+>>  	ret = xhci_check_args(hcd, udev, NULL, 0, true, __func__);
+>
+>I suspect this one is wrong, based on what Felipe explained earlier:
+>the power management should propagate down from the child to the parent
+>device.
+>
+>Someone who understands this better than I do should look at it.
+>
+>> @@ -3745,7 +3745,7 @@ int xhci_alloc_dev(struct usb_hcd *hcd, struct
+>usb_device *udev)
+>>  	 * suspend if there is a device attached.
+>>  	 */
+>>  	if (xhci->quirks & XHCI_RESET_ON_RESUME)
+>> -		pm_runtime_get_noresume(hcd->self.controller);
+>> +		pm_runtime_get_noresume(hcd->self.sysdev);
+>>  #endif
+>>
+>>
+>
+>Same here.
+>
+>> @@ -4834,7 +4834,7 @@ int xhci_get_frame(struct usb_hcd *hcd)  int
+>> xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)  {
+>>  	struct xhci_hcd		*xhci;
+>> -	struct device		*dev = hcd->self.controller;
+>> +	struct device		*dev = hcd->self.sysdev;
+>>  	int			retval;
+>
+>
+>This one calls
+>
+>        get_quirks(dev, xhci);
+>
+>not sure whether this should be called with self.controller or self.sysdev, we should
+>audit every one of the callers here to be sure:
+>
+>drivers/usb/host/xhci-mtk.c:    return xhci_gen_setup(hcd, xhci_mtk_quirks);
+>drivers/usb/host/xhci-pci.c:    retval = xhci_gen_setup(hcd, xhci_pci_quirks);
+>drivers/usb/host/xhci-plat.c:   return xhci_gen_setup(hcd, xhci_plat_quirks);
+>drivers/usb/host/xhci-rcar.c:    * xhci_gen_setup().
+>drivers/usb/host/xhci-tegra.c:  return xhci_gen_setup(hcd, tegra_xhci_quirks);
+>
+>	Arnd
