@@ -1,52 +1,42 @@
 From: oss@buserror.net (Scott Wood)
-Date: Thu, 22 Sep 2016 03:34:39 -0500
-Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <20160920093503.GA1045@leverpostej>
-References: <1473469413-11019-1-git-send-email-oss@buserror.net>
- <1473469413-11019-3-git-send-email-oss@buserror.net>
- <20160912113615.GA20804@leverpostej>
- <1474260085.15220.17.camel@buserror.net>
- <20160919165258.GA30584@leverpostej> <1474304489.4283.6.camel@buserror.net>
- <20160919170707.GC30584@leverpostej>
- <1474312560.4283.10.camel@buserror.net> <20160920093503.GA1045@leverpostej>
-Message-ID: <1474533279.4283.32.camel@buserror.net>
+Date: Thu, 22 Sep 2016 03:35:16 -0500
+Subject: [PATCH v6 2/4] arm64: dts: Add timer erratum property for LS2080A and
+ LS1043A
+In-Reply-To: <1474533318-7796-1-git-send-email-oss@buserror.net>
+References: <1474533318-7796-1-git-send-email-oss@buserror.net>
+Message-ID: <1474533318-7796-2-git-send-email-oss@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-09-20 at 10:35 +0100, Mark Rutland wrote:
-> On Mon, Sep 19, 2016 at 02:16:00PM -0500, Scott Wood wrote:
-> > 
-> > On Mon, 2016-09-19 at 18:07 +0100, Mark Rutland wrote:
-> > > 
-> > > > 
-> > > > > 
-> > > > > Reconsidering my suggestion, I realise this will also affect the
-> > > > > MMIO
-> > > > > timers, so that doesn't work.
-> > > > > 
-> > > > > So for the moment, I guess we have to keep
-> > > > > fsl_a008585_set_next_event().
-> > > > What is the problem with MMIO timers? ?needs_fsl_a008585_workaround()
-> > > > should
-> > > > always be false for them.
-> > > As suggested, needs_fsl_a008585_workaround() takes no parameter, and
-> > > set_next_event is called for both cp15/sysreg and MMIO timers. So it
-> > > would either be true for all, or false for all.
-> > > 
-> > > If it's true for all, we'd end up calling fsl_a008585_set_next_event()
-> > > for the MMIO timers too.
-> > There should not be any MMIO timers on a system where
-> > fsl_a008585_set_next_event() returns true.
-> I'm generally not keen on relying on that.
-> 
-> For reference, are no MMIO timers implemented at all, or are they simply
-> not listed in the DT today?
+Signed-off-by: Scott Wood <oss@buserror.net>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 1 +
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
 
-As far as I can tell they're not implemented, but it's possible I'm just not
-looking at the right documentation. ?
-
-I agree though that depending on that isn't particularly pretty. ?I'll stick
-with the current approach for set_next_event().
-
--Scott
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index e669fbd..952531d 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -123,6 +123,7 @@
+ 			     <1 14 0x1>, /* Physical Non-Secure PPI */
+ 			     <1 11 0x1>, /* Virtual PPI */
+ 			     <1 10 0x1>; /* Hypervisor PPI */
++		fsl,erratum-a008585;
+ 	};
+ 
+ 	pmu {
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 21023a3..9d3ac19 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -195,6 +195,7 @@
+ 			     <1 14 0x8>, /* Physical Non-Secure PPI, active-low */
+ 			     <1 11 0x8>, /* Virtual PPI, active-low */
+ 			     <1 10 0x8>; /* Hypervisor PPI, active-low */
++		fsl,erratum-a008585;
+ 	};
+ 
+ 	pmu {
+-- 
+2.7.4
