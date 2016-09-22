@@ -1,205 +1,121 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 22 Sep 2016 17:50:57 +0200
-Subject: [PATCH v26 3/7] arm64: kdump: add kdump support
-In-Reply-To: <20160907042908.6232-4-takahiro.akashi@linaro.org>
-References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
- <20160907042908.6232-4-takahiro.akashi@linaro.org>
-Message-ID: <c7a17afe-a5b4-4cd6-0199-49df68430887@gmail.com>
+From: zhichang.yuan02@gmail.com (zhichang.yuan)
+Date: Fri, 23 Sep 2016 00:27:17 +0800
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <9178320.n4yHmfyPA3@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <3538381.vOsx75UXVU@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F881744@lhreml507-mbx>
+ <9178320.n4yHmfyPA3@wuerfel>
+Message-ID: <57E40665.8080005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+On 09/22/2016 08:14 PM, Arnd Bergmann wrote:
+> On Thursday, September 22, 2016 11:55:45 AM CEST Gabriele Paoloni wrote:
+>>>> I think extending of_empty_ranges_quirk() may be a reasonable
+>>> solution.
+>>>> What do you think Arnd?
+>>> I don't really like that idea, that quirk is meant to work around
+>>> broken DTs, but we can just make the DT valid and implement the
+>>> code properly.
+>> Ok  I understand your point where it is not right to use of_empty_ranges_quirk()
+>> As a quirk is used to work around broken HW or broken FW (as in this case)
+>> rather than to fix code
+>>
+>> What about the following? I think adding the check you suggested next to
+>> of_empty_ranges_quirk() is adding the case we need in the right point (thus
+>> avoiding any duplication)
+>>   
+>> --- a/drivers/of/address.c
+>> +++ b/drivers/of/address.c
+>> @@ -457,6 +457,15 @@ static struct of_bus *of_match_bus(struct device_node *np)
+>>          return NULL;
+>>   }
+>>   
+>> +static inline int of_isa_indirect_io(struct device_node *np)
+>> +{
+>> +       /*
+>> +        * check if the current node is an isa bus and if indirectio operation
+>> +        * are registered
+>> +        */
+>> +       return (of_bus_isa_match(np) && arm64_extio_ops);
+>> +}
+>> +
+>>   static int of_empty_ranges_quirk(struct device_node *np)
+>>   {
+>>          if (IS_ENABLED(CONFIG_PPC)) {
+>> @@ -503,7 +512,7 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
+>>           * This code is only enabled on powerpc. --gcl
+>>           */
+>>          ranges = of_get_property(parent, rprop, &rlen);
+>> -       if (ranges == NULL && !of_empty_ranges_quirk(parent)) {
+>> +       if (ranges == NULL && !of_empty_ranges_quirk(parent) && !of_isa_indirect_io(parent)) {
+>>                  pr_debug("OF: no ranges; cannot translate\n");
+>>                  return 1;
+>>          }
+> I don't see what effect that would have. What do you want to
+> achieve with this?
+>
+> I think all we need from this function is to return '1' if
+> we hit an ISA I/O window, and that should happen for the two
+> interesting cases, either no 'ranges' at all, or no translation
+> for the range in question, so that __of_translate_address can
+> return OF_BAD_ADDR, and we can enter the special case
+> handling in the caller, that handles it like
+>
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 02b2903fe9d2..a18d96843fae 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -685,17 +685,24 @@ static int __of_address_to_resource(struct device_node *dev,
+>   	if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
+>   		return -EINVAL;
+>   	taddr = of_translate_address(dev, addrp);
+> -	if (taddr == OF_BAD_ADDR)
+> -		return -EINVAL;
+>   	memset(r, 0, sizeof(struct resource));
+> +
+>   	if (flags & IORESOURCE_IO) {
+>   		unsigned long port;
+> -		port = pci_address_to_pio(taddr);
+> +
+> +		if (taddr == OF_BAD_ADDR)
+> +			port = arch_of_address_to_pio(dev, addrp)
+> +		else
+> +			port = pci_address_to_pio(taddr);
+> +
+>   		if (port == (unsigned long)-1)
+>   			return -EINVAL;
+>   		r->start = port;
+>   		r->end = port + size - 1;
+>   	} else {
+> +		if (taddr == OF_BAD_ADDR)
+> +			return -EINVAL;
+> +
+>   		r->start = taddr;
+>   		r->end = taddr + size - 1;
+>   	}
+>
+For this patch sketch, I have a question.
+Do we call pci_address_to_pio in arch_of_address_to_pio to get the 
+corresponding logical IO port
+for LPC??
 
-On 09/07/2016 06:29 AM, AKASHI Takahiro wrote:
-> On crash dump kernel, all the information about primary kernel's system
-> memory (core image) is available in elf core header.
-> The primary kernel will set aside this header with reserve_elfcorehdr()
-> at boot time and inform crash dump kernel of its location via a new
-> device-tree property, "linux,elfcorehdr".
->
-> Please note that all other architectures use traditional "elfcorehdr="
-> kernel parameter for this purpose.
->
-> Then crash dump kernel will access the primary kernel's memory with
-> copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-> not reside in linear mapping on crash dump kernel.
->
-> We also need our own elfcorehdr_read() here since the header is placed
-> within crash dump kernel's usable memory.
->
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/Kconfig             | 11 +++++++
->  arch/arm64/kernel/Makefile     |  1 +
->  arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm64/mm/init.c           | 54 ++++++++++++++++++++++++++++++++
->  4 files changed, 137 insertions(+)
->  create mode 100644 arch/arm64/kernel/crash_dump.c
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index bc3f00f..9c15c66 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -683,6 +683,17 @@ config KEXEC
->  	  but it is independent of the system firmware.   And like a reboot
->  	  you can start any kernel with it, not just Linux.
->
-> +config CRASH_DUMP
-> +	bool "Build kdump crash kernel"
-> +	help
-> +	  Generate crash dump after being started by kexec. This should
-> +	  be normally only set in special crash dump kernels which are
-> +	  loaded in the main kernel with kexec-tools into a specially
-> +	  reserved region and then later executed after a crash by
-> +	  kdump/kexec.
-> +
-> +	  For more details see Documentation/kdump/kdump.txt
-> +
->  config XEN_DOM0
->  	def_bool y
->  	depends on XEN
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 14f7b65..f1cbfc8 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -48,6 +48,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
->  arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
->  arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
->  					   cpu-reset.o
-> +arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
->
->  obj-y					+= $(arm64-obj-y) vdso/ probes/
->  obj-m					+= $(arm64-obj-m)
-> diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-> new file mode 100644
-> index 0000000..bc5b932
-> --- /dev/null
-> +++ b/arch/arm64/kernel/crash_dump.c
-> @@ -0,0 +1,71 @@
-> +/*
-> + * Routines for doing kexec-based kdump
-> + *
-> + * Copyright (C) 2014 Linaro Limited
-> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/crash_dump.h>
-> +#include <linux/errno.h>
-> +#include <linux/io.h>
-> +#include <linux/memblock.h>
-> +#include <linux/uaccess.h>
-> +#include <asm/memory.h>
-> +
-> +/**
-> + * copy_oldmem_page() - copy one page from old kernel memory
-> + * @pfn: page frame number to be copied
-> + * @buf: buffer where the copied page is placed
-> + * @csize: number of bytes to copy
-> + * @offset: offset in bytes into the page
-> + * @userbuf: if set, @buf is in a user address space
-> + *
-> + * This function copies one page from old kernel memory into buffer pointed by
-> + * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-> + * copied or negative error in case of failure.
-> + */
-> +ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-> +			 size_t csize, unsigned long offset,
-> +			 int userbuf)
-> +{
-> +	void *vaddr;
-> +
-> +	if (!csize)
-> +		return 0;
-> +
-> +	vaddr = memremap(__pfn_to_phys(pfn), PAGE_SIZE, MEMREMAP_WB);
-> +	if (!vaddr)
-> +		return -ENOMEM;
-> +
-> +	if (userbuf) {
-> +		if (copy_to_user(buf, vaddr + offset, csize)) {
-> +			memunmap(vaddr);
-> +			return -EFAULT;
-> +		}
-> +	} else {
-> +		memcpy(buf, vaddr + offset, csize);
-> +	}
-> +
-> +	memunmap(vaddr);
-> +
-> +	return csize;
-> +}
-> +
-> +/**
-> + * elfcorehdr_read - read from ELF core header
-> + * @buf: buffer where the data is placed
-> + * @csize: number of bytes to read
-> + * @ppos: address in the memory
-> + *
-> + * This function reads @count bytes from elf core header which exists
-> + * on crash dump kernel's memory.
-> + */
-> +ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
-> +{
-> +	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
-> +	return count;
-> +}
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index dd273ec..e4d9c38 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -36,6 +36,7 @@
->  #include <linux/efi.h>
->  #include <linux/swiotlb.h>
->  #include <linux/kexec.h>
-> +#include <linux/crash_dump.h>
->
->  #include <asm/boot.h>
->  #include <asm/fixmap.h>
-> @@ -186,6 +187,57 @@ static void __init reserve_crashkernel(void)
->  }
->  #endif /* CONFIG_KEXEC_CORE */
->
-> +#ifdef CONFIG_CRASH_DUMP
-> +static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
-> +		const char *uname, int depth, void *data)
-> +{
-> +	const __be32 *reg;
-> +	int len;
-> +
-> +	if (depth != 1 || strcmp(uname, "chosen") != 0)
-> +		return 0;
-> +
-> +	reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
-> +	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-> +		return 1;
-> +
-> +	elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
-> +	elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
-> +
-> +	return 1;
-> +}
-> +
-> +/*
-> + * reserve_elfcorehdr() - reserves memory for elf core header
-> + *
-> + * This function reserves elf core header given in "elfcorehdr=" kernel
-> + * command line parameter. This region contains all the information about
-> + * primary kernel's core image and is used by a dump capture kernel to
-> + * access the system memory on primary kernel.
-> + */
-> +static void __init reserve_elfcorehdr(void)
-> +{
-> +	of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
-> +
+If we don't, it seems the LPC specific IO address will conflict with PCI 
+host bridges' logical IO.
+Supposed our LPC populated the IO range from 0x100 to 0x3FF( this is 
+normal for ISA similar
+devices), after arch_of_address_to_pio(), the r->start will be set as 
+0x100, r->end will be set as
+0x3FF.  And if there is one PCI host bridge who request a IO window size 
+over 0x400 at the same
+time, the  corresponding r->start and r->end will be set as 0x0, 0x3FF 
+after of_address_to_resource
+for this host bridge.  Then the IO conflict happens.
 
-Do I get that right that we can pass crashkernel address/size through 
-the kernel boot parameter, but elfcorehdr can only be provided via 
-device tree?
-Why? If there is a reason for doing so, we should fix the documentation.
+cheers,
+Zhichang
 
-Regards,
-Matthias
+>
+> 	Arnd
