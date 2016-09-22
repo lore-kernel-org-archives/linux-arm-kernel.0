@@ -1,40 +1,121 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 22 Sep 2016 17:34:54 +0200
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.9
-In-Reply-To: <20160920102534.GC17978@arm.com>
-References: <20160920102534.GC17978@arm.com>
-Message-ID: <20160922153454.GM3541@8bytes.org>
+From: zhichang.yuan02@gmail.com (zhichang.yuan)
+Date: Thu, 22 Sep 2016 23:46:12 +0800
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F882BB3@lhreml507-mbx>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <9178320.n4yHmfyPA3@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F882AD3@lhreml507-mbx>
+ <1669038.JevuM4F83e@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F882BB3@lhreml507-mbx>
+Message-ID: <57E3FCC4.1000804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 11:25:34AM +0100, Will Deacon wrote:
-> Hi Joerg,
-> 
-> Please pull these significant arm-smmu updates for 4.9. The vast majority
-> of the code here is Robin's series to move the drivers over to the
-> generic DT bindings, which finally hooks up the DMA API and MSI mapping
-> for host machines. This has been stewing for a while and is now at the
-> point where I feel it's much better in mainline than languishing outside.
-> 
-> A consequence of that is that there are some non-trivial changes outside
-> of the drivers, but these are all acked by the relevant subsystem
-> maintainers.
-> 
-> Other stuff here includes some non-critical fixes to the queue handling
-> on SMMUv3 and a small devm cleanup that missed the boat last time around.
-> 
-> Cheers,
-> 
-> Will
-> 
-> --->8
-> 
-> The following changes since commit 3eab887a55424fc2c27553b7bfe32330df83f7b8:
-> 
->   Linux 4.8-rc4 (2016-08-28 15:04:33 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
 
-Pulled, thanks Will.
+On 09/22/2016 11:20 PM, Gabriele Paoloni wrote:
+>
+>> -----Original Message-----
+>> From: Arnd Bergmann [mailto:arnd at arndb.de]
+>> Sent: 22 September 2016 15:59
+>> To: Gabriele Paoloni
+>> Cc: zhichang; linux-arm-kernel at lists.infradead.org;
+>> devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com; minyard at acm.org;
+>> linux-pci at vger.kernel.org; gregkh at linuxfoundation.org; John Garry;
+>> will.deacon at arm.com; linux-kernel at vger.kernel.org; Yuanzhichang;
+>> Linuxarm; xuwei (O); linux-serial at vger.kernel.org;
+>> benh at kernel.crashing.org; zourongrong at gmail.com; liviu.dudau at arm.com;
+>> kantyzc at 163.com
+>> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
+>> Hip06
+>>
+>> On Thursday, September 22, 2016 2:47:14 PM CEST Gabriele Paoloni wrote:
+>>>>>   static int of_empty_ranges_quirk(struct device_node *np)
+>>>>>   {
+>>>>>          if (IS_ENABLED(CONFIG_PPC)) {
+>>>>> @@ -503,7 +512,7 @@ static int of_translate_one(struct
+>> device_node
+>>>> *parent, struct of_bus *bus,
+>>>>>           * This code is only enabled on powerpc. --gcl
+>>>>>           */
+>>>>>          ranges = of_get_property(parent, rprop, &rlen);
+>>>>> -       if (ranges == NULL && !of_empty_ranges_quirk(parent)) {
+>>>>> +       if (ranges == NULL && !of_empty_ranges_quirk(parent) &&
+>>>> !of_isa_indirect_io(parent)) {
+>>>>>                  pr_debug("OF: no ranges; cannot translate\n");
+>>>>>                  return 1;
+>>>>>          }
+>>>> I don't see what effect that would have. What do you want to
+>>>> achieve with this?
+>>> If I read the code correctly adding the function above would end
+>>> up in a 1:1 mapping:
+>>> http://lxr.free-electrons.com/source/drivers/of/address.c#L513
+>>>
+>>> so taddr will be assigned with the cpu address space specified
+>>> in the children nodes of LPC and we are not using a quirk function
+>>> (we are just checking that we have the indirect io assigned and
+>>> that we are on a ISA bus). Now probably there is a nit in my
+>>> code sketch where of_isa_indirect_io should be probably an
+>> architecture
+>>> specific function...
+>> But the point is that it would then return an incorrect address,
+>> which in the worst case could be the same as another I/O space
+>> if that happens to be at CPU address zero.
+> If we do not touch __of_address_to_resource after taddr is returned
+> by of_translate_address we will check for (flags & IORESOURCE_IO),
+> then we call pci_address_to_pio to retrieve the unique token (remember
+> that LPC driver will register the LPC io range to pci io_range_list).
+>
+> I do not think that we can have any conflict with any other I/O space
+> as pci_register_io_range will guarantee that the LPC range does not
+> overlap with any other I/O range...
+If we don't bypass the calling of pci_address_to_pio after 
+of_translate_address,
+there should no conflict between LPC logical IO range and other logical 
+IO ranges
+of other devices.
+I guess Arnd want to skip all the translation for our LPC IO address. 
+But if we do it
+like that, it seems we can't avoid the possible conflict with the 
+logical IO ranges of
+PCI host bridges without any changes on the pci_register_io_range and 
+pci_address_to_pio.
+Because two completely separate I/O spaces are created without 
+synchronization.
+
+Best,
+Zhichang
+>>>> I think all we need from this function is to return '1' if
+>>>> we hit an ISA I/O window, and that should happen for the two
+>>>> interesting cases, either no 'ranges' at all, or no translation
+>>>> for the range in question, so that __of_translate_address can
+>>>> return OF_BAD_ADDR, and we can enter the special case
+>>>> handling in the caller, that handles it like
+>>>>
+>>> I don't think this is very right as you may fail for different
+>>> reasons other than a missing range property, e.g:
+>>> http://lxr.free-electrons.com/source/drivers/of/address.c#L575
+>>>
+>>> And even if the only failure case was a missing range if in the
+>>> future __of_translate_address had to be reworked we would again
+>>> make a wrong assumption...you get my point?
+>> The newly introduced function would clearly have to make
+>> some sanity checks. The idea is that treat the case of
+>> not being able to translate a bus specific I/O address
+>> into a CPU address literally and fall back to another method
+>> of translating that address.
+>>
+>> This matches my mental model of how we find the resource:
+>>
+>> - start with the bus address
+>> - try to translate that into a CPU address
+>> - if we arrive at a CPU physical address for IORESOURCE_MEM, use that
+>> - if we arrive at a CPU physical address for IORESOURCE_IO, translate
+>>    that into a Linux IORESOURCE_IO token
+>> - if there is no valid CPU physical address, try to translate
+>>    the address into an IORESOURCE_IO using the ISA accessor
+>> - if that fails too, give up.
+>>
+>> If you try to fake a CPU physical address inbetween, it just
+>> gets more confusing.
+>>
+>> 	Arnd
