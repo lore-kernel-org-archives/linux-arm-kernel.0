@@ -1,41 +1,41 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Thu, 22 Sep 2016 19:29:24 +0800
-Subject: [PATCH 2/2] i2c: rk3x: Fix variable 'min_total_ns' unused warning
-In-Reply-To: <1474543764-51135-1-git-send-email-david.wu@rock-chips.com>
-References: <1474543764-51135-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1474543764-51135-3-git-send-email-david.wu@rock-chips.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 22 Sep 2016 12:30:05 +0100
+Subject: [RFC PATCH 2/3] efi/arm: add SIMD stash/unstash operations
+In-Reply-To: <1474543806-19210-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1474543806-19210-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1474543806-19210-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixs the following warning:
-drivers/i2c/busses/i2c-rk3x.c: In function 'rk3x_i2c_v1_calc_timings':
-drivers/i2c/busses/i2c-rk3x.c:745:41: warning: variable 'min_total_ns' set but not used [-Wunused-but-set-variable]
+This adds the SIMD stash/unstash operations that we need to allow UEFI
+runtime services calls to call back into the kernel. In the ARM case,
+these are actually NOPs, since UEFI on ARM is not allowed to use the
+FP/NEON register file.
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/i2c/busses/i2c-rk3x.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/include/asm/efi.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index 965477e..50702c7 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -742,7 +742,7 @@ static int rk3x_i2c_v1_calc_timings(unsigned long clk_rate,
- 				    struct i2c_timings *t,
- 				    struct rk3x_i2c_calced_timings *t_calc)
- {
--	unsigned long min_low_ns, min_high_ns, min_total_ns;
-+	unsigned long min_low_ns, min_high_ns;
- 	unsigned long min_setup_start_ns, min_setup_data_ns;
- 	unsigned long min_setup_stop_ns, max_hold_data_ns;
+diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+index 766bf9b78160..c71ea8c21d0d 100644
+--- a/arch/arm/include/asm/efi.h
++++ b/arch/arm/include/asm/efi.h
+@@ -83,4 +83,15 @@ static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
+ #define MIN_ZIMAGE_OFFSET	MAX_UNCOMP_KERNEL_SIZE
+ #define MAX_FDT_OFFSET		ZIMAGE_OFFSET_LIMIT
  
-@@ -793,7 +793,6 @@ static int rk3x_i2c_v1_calc_timings(unsigned long clk_rate,
- 
- 	/* These are the min dividers needed for min hold times. */
- 	min_div_for_hold = (min_low_div + min_high_div);
--	min_total_ns = min_low_ns + min_high_ns;
- 
- 	/*
- 	 * This is the maximum divider so we don't go over the maximum.
++struct efi_simd_reg_stash {
++};
++
++static inline void arch_efi_stash_simd_regs(struct efi_simd_reg_stash *stash)
++{
++}
++
++static inline void arch_efi_unstash_simd_regs(struct efi_simd_reg_stash *stash)
++{
++}
++
+ #endif /* _ASM_ARM_EFI_H */
 -- 
-1.9.1
+2.7.4
