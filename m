@@ -1,35 +1,23 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 22 Sep 2016 18:46:03 +0800
-Subject: [PATCH 0/8] crypto: omap-sham: convert to sg based data engine
-In-Reply-To: <1474298539-23897-1-git-send-email-t-kristo@ti.com>
-References: <1474298539-23897-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20160922104603.GJ5884@gondor.apana.org.au>
+Date: Thu, 22 Sep 2016 18:46:24 +0800
+Subject: [PATCH] hwrng: omap - Only fail if pm_runtime_get_sync returns < 0
+In-Reply-To: <20160920152540.3004-1-d-gerlach@ti.com>
+References: <20160920152540.3004-1-d-gerlach@ti.com>
+Message-ID: <20160922104624.GK5884@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 06:22:11PM +0300, Tero Kristo wrote:
-> Hi,
+On Tue, Sep 20, 2016 at 10:25:40AM -0500, Dave Gerlach wrote:
+> Currently omap-rng checks the return value of pm_runtime_get_sync and
+> reports failure if anything is returned, however it should be checking
+> if ret < 0 as pm_runtime_get_sync return 0 on success but also can return
+> 1 if the device was already active which is not a failure case. Only
+> values < 0 are actual failures.
 > 
-> This series converts the omap-sham buffer handling towards a scatterlist
-> approach. This avoids the need to have a huge internal buffer within the
-> driver, and also allows us to properly implement export/import for the
-> driver. I tried splitting up the changes to some sane patches, but this
-> was rather difficult due to the fact that this is largely a complete
-> rewrite of portions of the driver. Patch #6 is a prime example of this
-> being pretty large, but splitting this up would break bisectability.
-> Hopefully the patch is still understandable though.
-> 
-> Crypto manager tests work fine at least on omap3/am3/am4/dra7 SoC:s.
-> (Something is broken with test farm again and could not try omap2/omap4.)
-> 
-> Also tested tcrypt SHA performance on DRA7 and it seems to be working
-> fine with different buffer sizes.
-> 
-> My test branch is also available here for interested parties:
-> tree: https://github.com/t-kristo/linux-pm.git
-> breanch: 4.8-rc1-crypto
+> Fixes: 61dc0a446e5d ("hwrng: omap - Fix assumption that runtime_get_sync will always succeed")
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 
-All applied.  Thanks.
+Patch applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
