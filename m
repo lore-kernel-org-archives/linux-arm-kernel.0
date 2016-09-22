@@ -1,24 +1,18 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Thu, 22 Sep 2016 22:44:51 +0200
-Subject: [PATCH 3/3] arm64: Add the Raspberry Pi firmware's interface to
- the FXL6408.
-In-Reply-To: <20160919161314.25858-3-eric@anholt.net>
-References: <20160919161314.25858-1-eric@anholt.net>
- <20160919161314.25858-3-eric@anholt.net>
-Message-ID: <1474577091.12009.10.camel@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Sep 2016 13:51:22 -0700
+Subject: Regression in next with "softirq: fix tasklet_kill() and its users"
+Message-ID: <20160922205122.ezsxjint2l6lytyi@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mo, 2016-09-19 at 17:13 +0100, Eric Anholt wrote:
-> This gets us hotplug detection of HDMI, so that graphics now works at
-> boot.  Tested with watching the output of xrandr while plugging and
-> unplugging the HDMI cable.
+Hi Santosh,
 
-Very nice.  Whole patch series:
+Looks like commit 1f5e9c3bc47f ("softirq: fix tasklet_kill() and
+its users") causes pandaboard es to not get any IP address on the
+smsc95xx USB Ethernet.
 
-Tested-by: Gerd Hoffmann <kraxel@redhat.com>
+Reverting the commits fixes the issue. Any ideas?
 
-/me hopes this lands in the 4.9 merge window.
+Regards,
 
-cheers,
-  Gerd
+Tony
