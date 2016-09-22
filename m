@@ -1,106 +1,62 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Thu, 22 Sep 2016 09:30:50 -0500
-Subject: [PATCH v2 2/3] musb: sunxi: Remove custom babble handling
-In-Reply-To: <39199bd7-a372-0312-6177-5b0fc2d683ac@redhat.com>
-References: <20160922111901.15337-1-hdegoede@redhat.com>
- <20160922111901.15337-2-hdegoede@redhat.com>
- <20160922135415.GB31827@uda0271908>
- <39199bd7-a372-0312-6177-5b0fc2d683ac@redhat.com>
-Message-ID: <20160922143050.GC31827@uda0271908>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 22 Sep 2016 17:39:53 +0300
+Subject: [PATCH] clocksource: timer-digicolor: Unmap region obtained by
+ of_iomap
+In-Reply-To: <1474554073-8658-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1474554073-8658-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <20160922143953.3pd7yicmwosuk3xk@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arvind Yadav,
 
-On Thu, Sep 22, 2016 at 05:03:39PM +0300, Hans de Goede wrote:
-> Hi,
-> 
-> On 09/22/2016 04:54 PM, Bin Liu wrote:
-> >Hi,
-> >
-> >On Thu, Sep 22, 2016 at 02:19:00PM +0300, Hans de Goede wrote:
-> >>The musb-core now a days always treats babble errors in host mode
-> >
-> >I don't think this statement is accurate. You might want to change it to
-> >"The musb core already handles babble interrupt" or something else.
-> 
-> It is accurate if you look in the history at drivers/usb/musb
-> commits around 15-03-10 you will see 2 relevant commits:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/usb/musb?id=b4dc38fd45b63e3da2bc98db5d283a15a637a2fa
-> 
-> "usb: musb: core: simplify musb_recover_work()"
-> 
-> This commits introduces calling musb_root_disconnect(musb)
-> on babble errors, that was not happening before which is why
+On Thu, Sep 22, 2016 at 07:51:13PM +0530, Arvind Yadav wrote:
+> Free memory mapping, if digicolor_timer_init is not successful.
 
-That is true, but calling musb_root_disconnect() is just one step of the
-recovery in musb core, not all.
+Thanks for looking into that.
 
-The statement of "treats babble errors in host mode as disconnects"
-implies all the babble handling is just disconnect, which is not
-accurate.
+Why not add a devm_of_iomap() variant of of_iomap() that calls devm_ioremap() 
+instead of ioremap()?
 
-BTY, "babble errors in host mode" is also redundant. babble implies
-host mode.
+I'm not sure that cleaning up after a clocksource driver init failure makes 
+much sense. Something is clearly fundamentally wrong in your device tree, and 
+your system will most likely not boot anyway.
 
-Regards,
--Bin.
-> I added the custom babble error handling. to the sunxi glue.
+baruch
+
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+>  drivers/clocksource/timer-digicolor.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> And:
-> 
-> "usb: musb: core: always try to recover from babble"
-> 
-> Where the title says it all.
-> 
-> Take these together and I believe that my commit msg:
-> 
-> "The musb-core now a days always treats babble errors in host mode
-> as disconnects, so there is no need for the sunxi specific handling
-> of this anymore."
-> 
-> Is quite accurate.
-> 
-> Regards,
-> 
-> Hans
-> 
-> 
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>---
-> >>Changes in v2:
-> >>-This is a new patch in v2 of this patch series
-> >>---
-> >> drivers/usb/musb/sunxi.c | 10 ----------
-> >> 1 file changed, 10 deletions(-)
-> >>
-> >>diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-> >>index 1408245..82eba92 100644
-> >>--- a/drivers/usb/musb/sunxi.c
-> >>+++ b/drivers/usb/musb/sunxi.c
-> >>@@ -186,16 +186,6 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
-> >> 	if (musb->int_usb)
-> >> 		writeb(musb->int_usb, musb->mregs + SUNXI_MUSB_INTRUSB);
-> >>
-> >>-	/*
-> >>-	 * sunxi musb often signals babble on low / full speed device
-> >>-	 * disconnect, without ever raising MUSB_INTR_DISCONNECT, since
-> >>-	 * normally babble never happens treat it as disconnect.
-> >>-	 */
-> >>-	if ((musb->int_usb & MUSB_INTR_BABBLE) && is_host_active(musb)) {
-> >>-		musb->int_usb &= ~MUSB_INTR_BABBLE;
-> >>-		musb->int_usb |= MUSB_INTR_DISCONNECT;
-> >>-	}
-> >>-
-> >> 	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
-> >> 		/* ep0 FADDR must be 0 when (re)entering peripheral mode */
-> >> 		musb_ep_select(musb->mregs, 0);
-> >>--
-> >>2.9.3
-> >>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
+> index 10318cc..e6e5e6a 100644
+> --- a/drivers/clocksource/timer-digicolor.c
+> +++ b/drivers/clocksource/timer-digicolor.c
+> @@ -167,12 +167,14 @@ static int __init digicolor_timer_init(struct device_node *node)
+>  	irq = irq_of_parse_and_map(node, dc_timer_dev.timer_id);
+>  	if (irq <= 0) {
+>  		pr_err("Can't parse IRQ");
+> +		iounmap(dc_timer_dev.base);
+>  		return -EINVAL;
+>  	}
+>  
+>  	clk = of_clk_get(node, 0);
+>  	if (IS_ERR(clk)) {
+>  		pr_err("Can't get timer clock");
+> +		iounmap(dc_timer_dev.base);
+>  		return PTR_ERR(clk);
+>  	}
+>  	clk_prepare_enable(clk);
+> @@ -192,6 +194,7 @@ static int __init digicolor_timer_init(struct device_node *node)
+>  			  &dc_timer_dev.ce);
+>  	if (ret) {
+>  		pr_warn("request of timer irq %d failed (%d)\n", irq, ret);
+> +		iounmap(dc_timer_dev.base);
+>  		return ret;
+>  	}
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
