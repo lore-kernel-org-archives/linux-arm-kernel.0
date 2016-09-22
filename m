@@ -1,90 +1,49 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 23 Sep 2016 00:22:06 +0200
-Subject: [PATCH 2/4] ARM: at91: handle CONFIG_PM for armv7m configurations
+Date: Fri, 23 Sep 2016 00:22:08 +0200
+Subject: [PATCH 4/4] ARM: at91: debug: add samx7 support
 In-Reply-To: <20160922222208.23798-1-alexandre.belloni@free-electrons.com>
 References: <20160922222208.23798-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20160922222208.23798-3-alexandre.belloni@free-electrons.com>
+Message-ID: <20160922222208.23798-5-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is currently no PM support for samx7 but the symbol can still be
-selected. This avoids compilation issues.
+From: Szemz? Andr?s <sza@esh.hu>
 
+Add support for low level debugging on Atmel samx7.
+
+Signed-off-by: Szemz? Andr?s <sza@esh.hu>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/Kconfig  |  6 ++++++
- arch/arm/mach-at91/Makefile |  3 +--
- arch/arm/mach-at91/samx7.c  | 10 ++++++++++
- 3 files changed, 17 insertions(+), 2 deletions(-)
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 3ca2724a6ca6..df3b6efa888d 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -59,6 +59,7 @@ config SOC_AT91RM9200
- 	bool "AT91RM9200"
- 	depends on ARCH_MULTI_V4T
- 	select ATMEL_AIC_IRQ
-+	select ATMEL_PM if PM
- 	select ATMEL_ST
- 	select CPU_ARM920T
- 	select HAVE_AT91_USB_CLK
-@@ -73,6 +74,7 @@ config SOC_AT91SAM9
- 	bool "AT91SAM9"
- 	depends on ARCH_MULTI_V5
- 	select ATMEL_AIC_IRQ
-+	select ATMEL_PM if PM
- 	select ATMEL_SDRAMC
- 	select CPU_ARM926T
- 	select HAVE_AT91_SMD
-@@ -131,9 +133,13 @@ config SOC_SAM_V7
- config SOC_SAMA5
- 	bool
- 	select ATMEL_AIC5_IRQ
-+	select ATMEL_PM if PM
- 	select ATMEL_SDRAMC
- 	select MEMORY
- 	select SOC_SAM_V7
- 	select SRAM if PM
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index a9693b6987a6..d209d0d78820 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -145,6 +145,15 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on the USART3 port of sama5d4.
  
-+config ATMEL_PM
-+	bool
++	config DEBUG_AT91_SAMX7_USART1
++		bool "Kernel low-level debugging via SAMX7 USART1"
++		select DEBUG_AT91_UART
++		depends on SOC_SAMX7
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the USART1 port on SAMX7 based
++		  machines.
 +
- endif
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 84956a18d604..116691714bb8 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -10,8 +10,7 @@ obj-$(CONFIG_SOC_SAMA5)		+= sama5.o
- obj-$(CONFIG_SOC_SAMX7)		+= samx7.o
- 
- # Power Management
--obj-$(CONFIG_PM)		+= pm.o
--obj-$(CONFIG_PM)		+= pm_suspend.o
-+obj-$(CONFIG_ATMEL_PM)		+= pm.o pm_suspend.o
- 
- ifeq ($(CONFIG_CPU_V7),y)
- AFLAGS_pm_suspend.o := -march=armv7-a
-diff --git a/arch/arm/mach-at91/samx7.c b/arch/arm/mach-at91/samx7.c
-index bd33bc56278e..240f8cda79ee 100644
---- a/arch/arm/mach-at91/samx7.c
-+++ b/arch/arm/mach-at91/samx7.c
-@@ -16,6 +16,16 @@
- #include "generic.h"
- #include "soc.h"
- 
-+
-+#ifdef CONFIG_PM
-+/* This function has to be defined for various drivers that are using it */
-+int at91_suspend_entering_slow_clock(void)
-+{
-+	return 0;
-+}
-+EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
-+#endif
-+
- static const struct at91_soc samx7_socs[] = {
- 	AT91_SOC(SAME70Q21_CIDR_MATCH, SAME70Q21_EXID_MATCH,
- 		 "same70q21", "samx7"),
+ 	config DEBUG_BCM2835
+ 		bool "Kernel low-level debugging on BCM2835 PL011 UART"
+ 		depends on ARCH_BCM2835 && ARCH_MULTI_V6
+@@ -1479,6 +1488,7 @@ config DEBUG_UART_PHYS
+ 	default 0x3f201000 if DEBUG_BCM2836
+ 	default 0x3e000000 if DEBUG_BCM_KONA_UART
+ 	default 0x4000e400 if DEBUG_LL_UART_EFM32
++	default 0x40028000 if DEBUG_AT91_SAMX7_USART1
+ 	default 0x40081000 if DEBUG_LPC18XX_UART0
+ 	default 0x40090000 if DEBUG_LPC32XX
+ 	default 0x40100000 if DEBUG_PXA_UART1
 -- 
 2.9.3
