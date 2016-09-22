@@ -1,42 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 22 Sep 2016 11:31:23 +0300
-Subject: [PATCH v5 0/3] ASoC: sun4i-codec: Distinguish sun4i from sun7i
-In-Reply-To: <20160922071313.12891-1-dannym@scratchpost.org>
-References: <20160922071313.12891-1-dannym@scratchpost.org>
-Message-ID: <20160922083123.GN8719@lukather>
+From: oss@buserror.net (Scott Wood)
+Date: Thu, 22 Sep 2016 03:34:39 -0500
+Subject: [PATCH v5 3/5] arm64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <20160920093503.GA1045@leverpostej>
+References: <1473469413-11019-1-git-send-email-oss@buserror.net>
+ <1473469413-11019-3-git-send-email-oss@buserror.net>
+ <20160912113615.GA20804@leverpostej>
+ <1474260085.15220.17.camel@buserror.net>
+ <20160919165258.GA30584@leverpostej> <1474304489.4283.6.camel@buserror.net>
+ <20160919170707.GC30584@leverpostej>
+ <1474312560.4283.10.camel@buserror.net> <20160920093503.GA1045@leverpostej>
+Message-ID: <1474533279.4283.32.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Sep 22, 2016 at 09:13:10AM +0200, Danny Milosavljevic wrote:
-> ASoC: sun4i-codec: Introduce mechanism to detect sun7i and provide a
-> different regmap different compared to sun4i Allwinner A10.
->  
-> The controls will be extended in a forthcoming patch - it is necessary
-> to distinguish between sun4i and sun7i controls because they have different
-> registers.
->  
-> Renamed SUN4I_CODEC_AC_SYS_VERI to SUN7I_CODEC_AC_DAC_CAL and renamed
-> SUN4I_CODEC_AC_MIC_PHONE_CAL to SUN7I_CODEC_AC_MIC_PHONE_CAL because these
-> are actually not present on Allwinner A10.
+On Tue, 2016-09-20 at 10:35 +0100, Mark Rutland wrote:
+> On Mon, Sep 19, 2016 at 02:16:00PM -0500, Scott Wood wrote:
+> > 
+> > On Mon, 2016-09-19 at 18:07 +0100, Mark Rutland wrote:
+> > > 
+> > > > 
+> > > > > 
+> > > > > Reconsidering my suggestion, I realise this will also affect the
+> > > > > MMIO
+> > > > > timers, so that doesn't work.
+> > > > > 
+> > > > > So for the moment, I guess we have to keep
+> > > > > fsl_a008585_set_next_event().
+> > > > What is the problem with MMIO timers? ?needs_fsl_a008585_workaround()
+> > > > should
+> > > > always be false for them.
+> > > As suggested, needs_fsl_a008585_workaround() takes no parameter, and
+> > > set_next_event is called for both cp15/sysreg and MMIO timers. So it
+> > > would either be true for all, or false for all.
+> > > 
+> > > If it's true for all, we'd end up calling fsl_a008585_set_next_event()
+> > > for the MMIO timers too.
+> > There should not be any MMIO timers on a system where
+> > fsl_a008585_set_next_event() returns true.
+> I'm generally not keen on relying on that.
 > 
-> Handle quirks by regmap config and codec and select the correct quirks
-> automatically.  
+> For reference, are no MMIO timers implemented at all, or are they simply
+> not listed in the DT today?
 
-Usually, you would set the history of changes from one version to the
-other here.
+As far as I can tell they're not implemented, but it's possible I'm just not
+looking at the right documentation. ?
 
-Maxime
+I agree though that depending on that isn't particularly pretty. ?I'll stick
+with the current approach for set_next_event().
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160922/2b5924b5/attachment.sig>
+-Scott
