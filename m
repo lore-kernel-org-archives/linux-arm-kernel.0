@@ -1,103 +1,180 @@
 From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Thu, 22 Sep 2016 18:12:48 -0300
-Subject: [PATCH 04/15] perf tools: Make coresight PMU listable
+Date: Thu, 22 Sep 2016 18:12:50 -0300
+Subject: [PATCH 06/15] perf pmu: Push configuration down to PMU driver
 In-Reply-To: <1474578779-14095-1-git-send-email-acme@kernel.org>
 References: <1474578779-14095-1-git-send-email-acme@kernel.org>
-Message-ID: <1474578779-14095-5-git-send-email-acme@kernel.org>
+Message-ID: <1474578779-14095-7-git-send-email-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Adding the required mechanic allowing 'perf list pmu' to discover
-coresight ETM/PTM tracers.
+This patch adds a PMU callback and the required mechanic so that drivers
+can process the command line configuration elements found in
+evsel::config_terms.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 Acked-by: Jiri Olsa <jolsa@kernel.org>
 Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1474041004-13956-3-git-send-email-mathieu.poirier at linaro.org
+Link: http://lkml.kernel.org/r/1474041004-13956-6-git-send-email-mathieu.poirier at linaro.org
 Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 ---
- MAINTAINERS                      |  1 +
- tools/perf/arch/arm/util/Build   |  2 ++
- tools/perf/arch/arm/util/pmu.c   | 34 ++++++++++++++++++++++++++++++++++
- tools/perf/arch/arm64/util/Build |  2 ++
- 4 files changed, 39 insertions(+)
- create mode 100644 tools/perf/arch/arm/util/pmu.c
+ tools/perf/util/Build         |  1 +
+ tools/perf/util/drv_configs.c | 77 +++++++++++++++++++++++++++++++++++++++++++
+ tools/perf/util/drv_configs.h | 26 +++++++++++++++
+ tools/perf/util/pmu.h         |  2 ++
+ 4 files changed, 106 insertions(+)
+ create mode 100644 tools/perf/util/drv_configs.c
+ create mode 100644 tools/perf/util/drv_configs.h
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index db814a89599c..7407fe779053 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1123,6 +1123,7 @@ F:	drivers/hwtracing/coresight/*
- F:	Documentation/trace/coresight.txt
- F:	Documentation/devicetree/bindings/arm/coresight.txt
- F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
-+F:	tools/perf/arch/arm/util/pmu.c
+diff --git a/tools/perf/util/Build b/tools/perf/util/Build
+index 96f99d608d00..eb60e613d795 100644
+--- a/tools/perf/util/Build
++++ b/tools/perf/util/Build
+@@ -86,6 +86,7 @@ libperf-y += term.o
+ libperf-y += help-unknown-cmd.o
+ libperf-y += mem-events.o
+ libperf-y += vsprintf.o
++libperf-y += drv_configs.o
  
- ARM/CORGI MACHINE SUPPORT
- M:	Richard Purdie <rpurdie@rpsys.net>
-diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
-index f98da17357c0..4093fd146f46 100644
---- a/tools/perf/arch/arm/util/Build
-+++ b/tools/perf/arch/arm/util/Build
-@@ -2,3 +2,5 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
- 
- libperf-$(CONFIG_LOCAL_LIBUNWIND)    += unwind-libunwind.o
- libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
-+
-+libperf-$(CONFIG_AUXTRACE) += pmu.o
-diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
+ libperf-$(CONFIG_LIBBPF) += bpf-loader.o
+ libperf-$(CONFIG_BPF_PROLOGUE) += bpf-prologue.o
+diff --git a/tools/perf/util/drv_configs.c b/tools/perf/util/drv_configs.c
 new file mode 100644
-index 000000000000..af9fb666b44f
+index 000000000000..1647f285c629
 --- /dev/null
-+++ b/tools/perf/arch/arm/util/pmu.c
-@@ -0,0 +1,34 @@
++++ b/tools/perf/util/drv_configs.c
+@@ -0,0 +1,77 @@
 +/*
-+ * Copyright(C) 2015 Linaro Limited. All rights reserved.
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ * drv_configs.h: Interface to apply PMU specific configuration
++ * Copyright (c) 2016-2018, Linaro Ltd.
 + *
 + * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
 + *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * This program is distributed in the hope it will be useful, but WITHOUT
 + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
 + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
 + * more details.
 + *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <string.h>
-+#include <linux/coresight-pmu.h>
-+#include <linux/perf_event.h>
++#include "drv_configs.h"
++#include "evlist.h"
++#include "evsel.h"
++#include "pmu.h"
 +
-+#include "../../util/pmu.h"
-+
-+struct perf_event_attr
-+*perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
++static int
++perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
++			      struct perf_evsel_config_term **err_term)
 +{
-+#ifdef HAVE_AUXTRACE_SUPPORT
-+	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
-+		/* add ETM default config here */
-+		pmu->selectable = true;
-+	}
-+#endif
-+	return NULL;
-+}
-diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
-index 02f41dba4f4f..3876dd05bb8b 100644
---- a/tools/perf/arch/arm64/util/Build
-+++ b/tools/perf/arch/arm64/util/Build
-@@ -1,2 +1,4 @@
- libperf-$(CONFIG_DWARF)     += dwarf-regs.o
- libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
++	bool found = false;
++	int err = 0;
++	struct perf_evsel_config_term *term;
++	struct perf_pmu *pmu = NULL;
 +
-+libperf-$(CONFIG_AUXTRACE) += ../../arm/util/pmu.o
++	while ((pmu = perf_pmu__scan(pmu)) != NULL)
++		if (pmu->type == evsel->attr.type) {
++			found = true;
++			break;
++		}
++
++	list_for_each_entry(term, &evsel->config_terms, list) {
++		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
++			continue;
++
++		/*
++		 * We have a configuration term, report an error if we
++		 * can't find the PMU or if the PMU driver doesn't support
++		 * cmd line driver configuration.
++		 */
++		if (!found || !pmu->set_drv_config) {
++			err = -EINVAL;
++			*err_term = term;
++			break;
++		}
++
++		err = pmu->set_drv_config(term);
++		if (err) {
++			*err_term = term;
++			break;
++		}
++	}
++
++	return err;
++}
++
++int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
++				   struct perf_evsel **err_evsel,
++				   struct perf_evsel_config_term **err_term)
++{
++	struct perf_evsel *evsel;
++	int err = 0;
++
++	evlist__for_each_entry(evlist, evsel) {
++		err = perf_evsel__apply_drv_configs(evsel, err_term);
++		if (err) {
++			*err_evsel = evsel;
++			break;
++		}
++	}
++
++	return err;
++}
+diff --git a/tools/perf/util/drv_configs.h b/tools/perf/util/drv_configs.h
+new file mode 100644
+index 000000000000..32bc9babc2e0
+--- /dev/null
++++ b/tools/perf/util/drv_configs.h
+@@ -0,0 +1,26 @@
++/*
++ * drv_configs.h: Interface to apply PMU specific configuration
++ * Copyright (c) 2016-2018, Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
++
++#ifndef __PERF_DRV_CONFIGS_H
++#define __PERF_DRV_CONFIGS_H
++
++#include "drv_configs.h"
++#include "evlist.h"
++#include "evsel.h"
++
++int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
++				   struct perf_evsel **err_evsel,
++				   struct perf_evsel_config_term **term);
++#endif
+diff --git a/tools/perf/util/pmu.h b/tools/perf/util/pmu.h
+index 5d7e84466bee..743422ad900b 100644
+--- a/tools/perf/util/pmu.h
++++ b/tools/perf/util/pmu.h
+@@ -4,6 +4,7 @@
+ #include <linux/bitmap.h>
+ #include <linux/perf_event.h>
+ #include <stdbool.h>
++#include "evsel.h"
+ #include "parse-events.h"
+ 
+ enum {
+@@ -25,6 +26,7 @@ struct perf_pmu {
+ 	struct list_head format;  /* HEAD struct perf_pmu_format -> list */
+ 	struct list_head aliases; /* HEAD struct perf_pmu_alias -> list */
+ 	struct list_head list;    /* ELEM */
++	int (*set_drv_config)	(struct perf_evsel_config_term *term);
+ };
+ 
+ struct perf_pmu_info {
 -- 
 2.7.4
