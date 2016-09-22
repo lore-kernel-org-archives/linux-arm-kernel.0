@@ -1,54 +1,45 @@
-From: beanhuo@micron.com (Bean Huo (beanhuo))
-Date: Thu, 22 Sep 2016 08:36:41 +0000
-Subject: ftrace function_graph causes system crash
-In-Reply-To: <20160921141705.6ab0be03@gandalf.local.home>
-References: <7d0e88fff8e64591ac31be3adbbf763c@SIWEX5A.sing.micron.com>
- <20160920100716.131d3647@gandalf.local.home>
- <0e38f79fdc1f4671943da74764c15050@SIWEX5A.sing.micron.com>
- <20160921171307.3fb84c87@xhacker>
- <20160921141705.6ab0be03@gandalf.local.home>
-Message-ID: <baf9aa64cc5e479ca21e30c176062f20@SIWEX5A.sing.micron.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 22 Sep 2016 09:58:52 +0100
+Subject: [PATCH v2] drivers: psci: PSCI checker module
+In-Reply-To: <7hfuothzff.fsf@baylibre.com>
+References: <20160921143905.36197-1-kevin.brodsky@arm.com>
+ <7hfuothzff.fsf@baylibre.com>
+Message-ID: <20160922085852.GA18637@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Steven Rostedt [mailto:rostedt at goodmis.org]
-> Sent: Mittwoch, 21. September 2016 20:17
-> To: Jisheng Zhang <jszhang@marvell.com>
-> Cc: Bean Huo (beanhuo) <beanhuo@micron.com>; Zoltan Szubbocsev
-> (zszubbocsev) <zszubbocsev@micron.com>; catalin.marinas at arm.com;
-> will.deacon at arm.com; rfi at lists.rocketboards.org; linux-
-> kernel at vger.kernel.org; mingo at redhat.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: ftrace function_graph causes system crash
+On Wed, Sep 21, 2016 at 11:37:24AM -0700, Kevin Hilman wrote:
+> Kevin Brodsky <kevin.brodsky@arm.com> writes:
 > 
-> On Wed, 21 Sep 2016 17:13:07 +0800
-> Jisheng Zhang <jszhang@marvell.com> wrote:
-> 
-> > I'm not sure whether the commit d6df3576e6b4
-> ("clocksource/drivers/arm_global_timer
-> > : Prevent ftrace recursion") can fix this issue.
+> > On arm and arm64, PSCI is one of the possible firmware interfaces
+> > used for power management. This includes both turning CPUs on and off,
+> > and suspending them (entering idle states).
 > >
-> > this commit is merged since v4.3, I noticed your kernel version is v4.0
-> 
-> BTW, yes, that would be the fix.
-> 
-> -- Steve
-> 
+> > This patch adds a PSCI checker module that enables basic testing of
+> > PSCI operations during startup. There are two main tests: CPU
+> > hotplugging and suspending.
 > >
-> > Thanks,
-> > Jisheng
+> > In the hotplug tests, the hotplug API is used to turn off and on again
+> > all CPUs in the system, and then all CPUs in each cluster, checking
+> > the consistency of the return codes.
 > >
-> > > Do you know now how to deeply debug and trace which line is wrong
-> through Ftrace?
-> > >
+> > In the suspend tests, a high-priority thread is created on each core
+> > and uses low-level cpuidle functionalities to enter suspend, in all
+> > the possible states and multiple times. This should allow a maximum
+> > number of CPUs to enter the same sleep state at the same or slightly
+> > different time.
+> 
+> Since you're doing it multiple times, it might be useful to track the
+> actual time it takes to suspend and wakeup, and possibly even warn
+> if the time is longer than the target_residency.  This could catch
+> poorly configured idle states.
 
-Hi, Steven and Jisheng
-Thanks to both warm-hearted guys. I merged  d6df3576e6b4 patch into my kernel 4.0.
-Then it is true, no cash appears again.
+That's a good point, we can add a couple of checks for latencies on top
+of the existing code, we will definitely do, at the moment we are
+concerned with the overall design in particular in relation to usage of
+high priority threads and tick broadcast to test the PSCI suspend
+interface.
 
-I have one more question that current ftrace can trace DMA latency, include mapping and unmapping?
-Means I want to know when one BIO request be completed. Just like blktrace.
-But blktrace can not tell me the function calling sequence.
+Thank you for having a look !
 
---Bean 
+Lorenzo
