@@ -1,122 +1,138 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 22 Sep 2016 11:40:48 +0200
-Subject: [RESEND PATCH v7 2/2] sdhci-of-arasan: Set controller to test
- mode when xlnx,fails-without-test-cd is present
-In-Reply-To: <1474038102-20937-2-git-send-email-zach.brown@ni.com>
-References: <1474038102-20937-1-git-send-email-zach.brown@ni.com>
- <1474038102-20937-2-git-send-email-zach.brown@ni.com>
-Message-ID: <CAPDyKFridH90QK-MYhdB+nqaHTBAw9USP7CXNSTiNFW3ruDwWQ@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 22 Sep 2016 11:43:08 +0200
+Subject: [PATCH] tty/serial: atmel: fix fractional baud rate computation
+In-Reply-To: <20160922093904.5b738ad6@bbrezillon>
+References: <20160921104414.16241-1-nicolas.ferre@atmel.com>
+ <20160922070746.65nzezj3fwunu55s@pengutronix.de>
+ <20160922093904.5b738ad6@bbrezillon>
+Message-ID: <20160922114308.0913c60e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 September 2016 at 17:01, Zach Brown <zach.brown@ni.com> wrote:
-> The sdhci controller on xilinx zynq devices will not function unless
-> the CD bit is provided. http://www.xilinx.com/support/answers/61064.html
-> In cases where it is impossible to provide the CD bit in hardware,
-> setting the controller to test mode and then setting inserted to true
-> will get the controller to function without the CD bit.
->
-> When the device has the property xlnx,fails-without-test-cd the driver
-> changes the controller to test mode and sets test inserted to true to
-> make the controller function.
->
-> Signed-off-by: Zach Brown <zach.brown@ni.com>
+On Thu, 22 Sep 2016 09:39:04 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-Thanks, applied for next! I took the liberty to shrink the commit msg
-header bit and to add "mmc: " prefix.
+> On Thu, 22 Sep 2016 09:07:46 +0200
+> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+> 
+> > On Wed, Sep 21, 2016 at 12:44:14PM +0200, Nicolas Ferre wrote:  
+> > > From: Alexey Starikovskiy <aystarik@gmail.com>
+> > > 
+> > > The problem with previous code was it rounded values in wrong
+> > > place and produced wrong baud rate in some cases.
+> > > 
+> > > Signed-off-by: Alexey Starikovskiy <aystarik@gmail.com>
+> > > [nicolas.ferre at atmel.com: port to newer kernel and add commit log]
+> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > ---
+> > >  drivers/tty/serial/atmel_serial.c | 10 ++++++----
+> > >  include/linux/atmel_serial.h      |  1 +
+> > >  2 files changed, 7 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> > > index 5f550d9feed9..fd8aa1f4ba78 100644
+> > > --- a/drivers/tty/serial/atmel_serial.c
+> > > +++ b/drivers/tty/serial/atmel_serial.c
+> > > @@ -2170,13 +2170,15 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+> > >  	 * accurately. This feature is enabled only when using normal mode.
+> > >  	 * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
+> > >  	 * Currently, OVER is always set to 0 so we get
+> > > -	 * baudrate = selected clock (16 * (CD + FP / 8))
+> > > +	 * baudrate = selected clock / (16 * (CD + FP / 8))
+> > > +	 * then
+> > > +	 * 8 CD + FP = selected clock / (2 * baudrate)
+> > >  	 */
+> > >  	if (atmel_port->has_frac_baudrate &&
+> > >  	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
+> > > -		div = DIV_ROUND_CLOSEST(port->uartclk, baud);
+> > > -		cd = div / 16;
+> > > -		fp = DIV_ROUND_CLOSEST(div % 16, 2);
+> > > +		div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
+> > > +		cd = div >> 3;
+> > > +		fp = div & ATMEL_US_FP_MASK;    
+> > 
+> > given baud = 115200 and uartclk = 5414300 this results in:
+> > 
+> > 	div = DIV_ROUND_CLOSEST(5414300, 115200 * 2) = 23
+> > 	cd = 2
+> > 	fp = 7  
+> 
+> How about:
+> 
+> 	div = DIV_ROUND_CLOSEST(port->uartclk, baud);
+> 	cd = div / 16;
+> 	fp = (div % 16) / 2;
+> 
+> 	best_baud = port->uartclk / ((16 * cd) +  (8 * fp));
+> 
+> 	/* Check if we can get a better approximation by rounding up. */
+> 	if (div % 2) {
+> 		int alt_baud, alt_fp, alt_cd;
+> 
+> 		alt_fp = fp++;
+> 		alt_cd = cd;
+> 		if (alt_fp > 7) {
+> 			alt_cd++;
+> 			alt_fp = 0;
+> 		}
+> 
+> 		alt_baud = port->uartclk / ((16 * alt_cd) +  (8 *alt_fp));
+> 		if (abs(best_baud - baud) > abs(alt_baud - baud)) {
 
-Kind regards
-Uffe
+After a lengthy discussion that happened on IRC (#armlinux), Uwe
+proved me wrong. This should actually be
 
-> ---
->  drivers/mmc/host/sdhci-of-arasan.c | 27 ++++++++++++++++++++++++++-
->  drivers/mmc/host/sdhci.h           |  2 ++
->  2 files changed, 28 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index 33601a8..da8e40a 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -26,6 +26,7 @@
->  #include <linux/phy/phy.h>
->  #include <linux/regmap.h>
->  #include "sdhci-pltfm.h"
-> +#include <linux/of.h>
->
->  #define SDHCI_ARASAN_CLK_CTRL_OFFSET   0x2c
->  #define SDHCI_ARASAN_VENDOR_REGISTER   0x78
-> @@ -98,6 +99,10 @@ struct sdhci_arasan_data {
->
->         struct regmap   *soc_ctl_base;
->         const struct sdhci_arasan_soc_ctl_map *soc_ctl_map;
-> +       unsigned int    quirks; /* Arasan deviations from spec */
-> +
-> +/* Controller does not have CD wired and will not function normally without */
-> +#define SDHCI_ARASAN_QUIRK_FORCE_CDTEST        BIT(0)
->  };
->
->  static const struct sdhci_arasan_soc_ctl_map rk3399_soc_ctl_map = {
-> @@ -245,12 +250,27 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
->         writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
->  }
->
-> +void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
-> +{
-> +       u8 ctrl;
-> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
-> +
-> +       sdhci_reset(host, mask);
-> +
-> +       if (sdhci_arasan->quirks & SDHCI_ARASAN_QUIRK_FORCE_CDTEST) {
-> +               ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
-> +               ctrl |= SDHCI_CTRL_CDTEST_INS | SDHCI_CTRL_CDTEST_EN;
-> +               sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
-> +       }
-> +}
-> +
->  static struct sdhci_ops sdhci_arasan_ops = {
->         .set_clock = sdhci_arasan_set_clock,
->         .get_max_clock = sdhci_pltfm_clk_get_max_clock,
->         .get_timeout_clock = sdhci_arasan_get_timeout_clock,
->         .set_bus_width = sdhci_set_bus_width,
-> -       .reset = sdhci_reset,
-> +       .reset = sdhci_arasan_reset,
->         .set_uhs_signaling = sdhci_set_uhs_signaling,
->  };
->
-> @@ -545,6 +565,7 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->         struct sdhci_host *host;
->         struct sdhci_pltfm_host *pltfm_host;
->         struct sdhci_arasan_data *sdhci_arasan;
-> +       struct device_node *np = pdev->dev.of_node;
->
->         host = sdhci_pltfm_init(pdev, &sdhci_arasan_pdata,
->                                 sizeof(*sdhci_arasan));
-> @@ -599,6 +620,10 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->         }
->
->         sdhci_get_of_property(pdev);
-> +
-> +       if (of_property_read_bool(np, "xlnx,fails-without-test-cd"))
-> +               sdhci_arasan->quirks |= SDHCI_ARASAN_QUIRK_FORCE_CDTEST;
-> +
->         pltfm_host->clk = clk_xin;
->
->         if (of_device_is_compatible(pdev->dev.of_node,
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index a2bc9e1..c722cd2 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -84,6 +84,8 @@
->  #define   SDHCI_CTRL_ADMA32    0x10
->  #define   SDHCI_CTRL_ADMA64    0x18
->  #define   SDHCI_CTRL_8BITBUS   0x20
-> +#define  SDHCI_CTRL_CDTEST_INS 0x40
-> +#define  SDHCI_CTRL_CDTEST_EN  0x80
->
->  #define SDHCI_POWER_CONTROL    0x29
->  #define  SDHCI_POWER_ON                0x01
-> --
-> 2.7.4
->
+
+		/*
+		 * Calculate the Error in the time domain:
+		 * Error = (RealBaudPeriod - ExpectedBaudPeriod) /
+		 *	   ExpectedBaudPeriod;
+		 *
+		 * which after conversion to the frequency domain gives:
+		 * Error = 1 - (ExpectedBaudRate/RealBaudRate);
+		 *
+		 * and since we want to compare 2 errors and avoid
+		 * approximation, we have:
+		 *
+		 * if (RealBaudRate2 * (RealBaudRate1 - ExpectedBaudRate) <
+		 *     RealBaudRate1 * (RealBaudRate2 - ExpectedBaudRate))
+		 *	...
+		 * 
+		 */
+		if (alt_baud * abs(best_baud - baud) >
+		    best_baud * abs(alt_baud - baud))
+
+Thanks for your patience ;-).
+
+> 			best_baud = alt_baud;
+> 			fp = alt_fp;
+> 			cd = alt_cd;
+> 		}
+> 	}
+> 
+> > 
+> > which yields a rate of 5414300 / 46 = 117702.17. With cd = 3 and fp = 0
+> > however the resulting rate is 5414300 / 48 = 112797.92.
+> > 
+> > Which one is better?
+> >   
+> > >  	} else {
+> > >  		cd = uart_get_divisor(port, baud);
+> > >  	}
+> > > diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
+> > > index f8e452aa48d7..bd2560502f3c 100644
+> > > --- a/include/linux/atmel_serial.h
+> > > +++ b/include/linux/atmel_serial.h
+> > > @@ -119,6 +119,7 @@
+> > >  #define ATMEL_US_BRGR		0x20	/* Baud Rate Generator Register */
+> > >  #define	ATMEL_US_CD		GENMASK(15, 0)	/* Clock Divider */
+> > >  #define ATMEL_US_FP_OFFSET	16	/* Fractional Part */
+> > > +#define ATMEL_US_FP_MASK	0x7    
+> > 
+> > Is there another user of this header? If not, this can be folded into
+> > the driver.
+> > 
+> > Best regards
+> > Uwe
+> >   
+> 
