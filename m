@@ -1,62 +1,154 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 22 Sep 2016 17:39:53 +0300
-Subject: [PATCH] clocksource: timer-digicolor: Unmap region obtained by
- of_iomap
-In-Reply-To: <1474554073-8658-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1474554073-8658-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <20160922143953.3pd7yicmwosuk3xk@tarshish>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 22 Sep 2016 14:47:14 +0000
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <9178320.n4yHmfyPA3@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <3538381.vOsx75UXVU@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F881744@lhreml507-mbx>
+ <9178320.n4yHmfyPA3@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F882AD3@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arvind Yadav,
+Hi Arnd
 
-On Thu, Sep 22, 2016 at 07:51:13PM +0530, Arvind Yadav wrote:
-> Free memory mapping, if digicolor_timer_init is not successful.
-
-Thanks for looking into that.
-
-Why not add a devm_of_iomap() variant of of_iomap() that calls devm_ioremap() 
-instead of ioremap()?
-
-I'm not sure that cleaning up after a clocksource driver init failure makes 
-much sense. Something is clearly fundamentally wrong in your device tree, and 
-your system will most likely not boot anyway.
-
-baruch
-
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/clocksource/timer-digicolor.c | 3 +++
->  1 file changed, 3 insertions(+)
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 22 September 2016 13:15
+> To: Gabriele Paoloni
+> Cc: zhichang; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com; minyard at acm.org;
+> linux-pci at vger.kernel.org; gregkh at linuxfoundation.org; John Garry;
+> will.deacon at arm.com; linux-kernel at vger.kernel.org; Yuanzhichang;
+> Linuxarm; xuwei (O); linux-serial at vger.kernel.org;
+> benh at kernel.crashing.org; zourongrong at gmail.com; liviu.dudau at arm.com;
+> kantyzc at 163.com
+> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
+> Hip06
 > 
-> diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
-> index 10318cc..e6e5e6a 100644
-> --- a/drivers/clocksource/timer-digicolor.c
-> +++ b/drivers/clocksource/timer-digicolor.c
-> @@ -167,12 +167,14 @@ static int __init digicolor_timer_init(struct device_node *node)
->  	irq = irq_of_parse_and_map(node, dc_timer_dev.timer_id);
->  	if (irq <= 0) {
->  		pr_err("Can't parse IRQ");
-> +		iounmap(dc_timer_dev.base);
->  		return -EINVAL;
->  	}
->  
->  	clk = of_clk_get(node, 0);
->  	if (IS_ERR(clk)) {
->  		pr_err("Can't get timer clock");
-> +		iounmap(dc_timer_dev.base);
->  		return PTR_ERR(clk);
->  	}
->  	clk_prepare_enable(clk);
-> @@ -192,6 +194,7 @@ static int __init digicolor_timer_init(struct device_node *node)
->  			  &dc_timer_dev.ce);
->  	if (ret) {
->  		pr_warn("request of timer irq %d failed (%d)\n", irq, ret);
-> +		iounmap(dc_timer_dev.base);
->  		return ret;
->  	}
+> On Thursday, September 22, 2016 11:55:45 AM CEST Gabriele Paoloni
+> wrote:
+> > > > I think extending of_empty_ranges_quirk() may be a reasonable
+> > > solution.
+> > > > What do you think Arnd?
+> > >
+> > > I don't really like that idea, that quirk is meant to work around
+> > > broken DTs, but we can just make the DT valid and implement the
+> > > code properly.
+> >
+> > Ok  I understand your point where it is not right to use
+> of_empty_ranges_quirk()
+> > As a quirk is used to work around broken HW or broken FW (as in this
+> case)
+> > rather than to fix code
+> >
+> > What about the following? I think adding the check you suggested next
+> to
+> > of_empty_ranges_quirk() is adding the case we need in the right point
+> (thus
+> > avoiding any duplication)
+> >
+> > --- a/drivers/of/address.c
+> > +++ b/drivers/of/address.c
+> > @@ -457,6 +457,15 @@ static struct of_bus *of_match_bus(struct
+> device_node *np)
+> >         return NULL;
+> >  }
+> >
+> > +static inline int of_isa_indirect_io(struct device_node *np)
+> > +{
+> > +       /*
+> > +        * check if the current node is an isa bus and if indirectio
+> operation
+> > +        * are registered
+> > +        */
+> > +       return (of_bus_isa_match(np) && arm64_extio_ops);
+> > +}
+> > +
+> >  static int of_empty_ranges_quirk(struct device_node *np)
+> >  {
+> >         if (IS_ENABLED(CONFIG_PPC)) {
+> > @@ -503,7 +512,7 @@ static int of_translate_one(struct device_node
+> *parent, struct of_bus *bus,
+> >          * This code is only enabled on powerpc. --gcl
+> >          */
+> >         ranges = of_get_property(parent, rprop, &rlen);
+> > -       if (ranges == NULL && !of_empty_ranges_quirk(parent)) {
+> > +       if (ranges == NULL && !of_empty_ranges_quirk(parent) &&
+> !of_isa_indirect_io(parent)) {
+> >                 pr_debug("OF: no ranges; cannot translate\n");
+> >                 return 1;
+> >         }
+> 
+> I don't see what effect that would have. What do you want to
+> achieve with this?
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+If I read the code correctly adding the function above would end
+up in a 1:1 mapping:
+http://lxr.free-electrons.com/source/drivers/of/address.c#L513
+
+so taddr will be assigned with the cpu address space specified
+in the children nodes of LPC and we are not using a quirk function
+(we are just checking that we have the indirect io assigned and
+that we are on a ISA bus). Now probably there is a nit in my 
+code sketch where of_isa_indirect_io should be probably an architecture
+specific function...
+
+> 
+> I think all we need from this function is to return '1' if
+> we hit an ISA I/O window, and that should happen for the two
+> interesting cases, either no 'ranges' at all, or no translation
+> for the range in question, so that __of_translate_address can
+> return OF_BAD_ADDR, and we can enter the special case
+> handling in the caller, that handles it like
+> 
+
+I don't think this is very right as you may fail for different
+reasons other than a missing range property, e.g:
+http://lxr.free-electrons.com/source/drivers/of/address.c#L575
+
+And even if the only failure case was a missing range if in the
+future __of_translate_address had to be reworked we would again
+make a wrong assumption...you get my point?
+
+Thanks
+
+Gab
+
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 02b2903fe9d2..a18d96843fae 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -685,17 +685,24 @@ static int __of_address_to_resource(struct
+> device_node *dev,
+>  	if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
+>  		return -EINVAL;
+>  	taddr = of_translate_address(dev, addrp);
+> -	if (taddr == OF_BAD_ADDR)
+> -		return -EINVAL;
+>  	memset(r, 0, sizeof(struct resource));
+> +
+>  	if (flags & IORESOURCE_IO) {
+>  		unsigned long port;
+> -		port = pci_address_to_pio(taddr);
+> +
+> +		if (taddr == OF_BAD_ADDR)
+> +			port = arch_of_address_to_pio(dev, addrp)
+> +		else
+> +			port = pci_address_to_pio(taddr);
+> +
+>  		if (port == (unsigned long)-1)
+>  			return -EINVAL;
+>  		r->start = port;
+>  		r->end = port + size - 1;
+>  	} else {
+> +		if (taddr == OF_BAD_ADDR)
+> +			return -EINVAL;
+> +
+>  		r->start = taddr;
+>  		r->end = taddr + size - 1;
+>  	}
+> 
+> 
+> 
+> 	Arnd
