@@ -1,54 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 22 Sep 2016 20:26:02 +0100
-Subject: [PATCH] arm: dts: fix rk3066a based boards vdd_log voltage
- initialization
-In-Reply-To: <20160922201301.0157a292@bbrezillon>
-References: <CAD=FV=Ufmvg1P8suOPQ53kpOD1pei4N2dOpKUCxZk001XKj_OA@mail.gmail.com>
- <20160919194844.0db7b307@bbrezillon>
- <CAD=FV=UyW5cXGGmq5xUzZ1aV5NzbBYGOz1gO9V1itrFU-PigAw@mail.gmail.com>
- <20160919200627.3ca1aae4@bbrezillon>
- <CAD=FV=U_BQez2eCqm7mX9kj0dcEsnBKiFWcLAhXXJD+yTZhACw@mail.gmail.com>
- <20160919224352.3b84b6c0@bbrezillon>
- <CAD=FV=W=ZiaLu1=zcnDyUqvK6f=E-0AWH9URHE3cgAKWWa+aJA@mail.gmail.com>
- <20160922171217.09a6d13f@bbrezillon>
- <20160922164752.GP7994@sirena.org.uk>
- <20160922201301.0157a292@bbrezillon>
-Message-ID: <20160922192602.GV7994@sirena.org.uk>
+From: atull@opensource.altera.com (atull)
+Date: Thu, 22 Sep 2016 14:53:34 -0500
+Subject: [PATCH v18 6/6] ARM: socfpga: fpga bridge driver support
+In-Reply-To: <20160809160039.GX29630@windriver.com>
+References: <20160712193645.9098-1-atull@opensource.altera.com>
+ <20160712193645.9098-7-atull@opensource.altera.com>
+ <CAP=VYLo2jtp57kQe5671xM=4o_ZAU6XG_W1MXU8aPv4Ws7kkDA@mail.gmail.com>
+ <alpine.DEB.2.02.1608081416110.11063@linuxheads99>
+ <CAAtXAHev2Dytadp-_Hs0agcSXUTyrFhJQxHcsFd7faOReHzr9Q@mail.gmail.com>
+ <20160809160039.GX29630@windriver.com>
+Message-ID: <alpine.DEB.2.02.1609221451140.4126@linuxheads99>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2016 at 08:13:01PM +0200, Boris Brezillon wrote:
+On Tue, 9 Aug 2016, Paul Gortmaker wrote:
 
-> So, there are 2 different problems here:
-> 1/ the board no longer boots because of commit 87248991a1de and a
->    missing entry in the voltage table
-> 2/ claiming the PWM pins at probe time can cause glitches
+> [Re: [PATCH v18 6/6] ARM: socfpga: fpga bridge driver support] On 08/08/2016 (Mon 13:44) Moritz Fischer wrote:
+> 
+> > Hi Alan,
+> > 
+> > On Mon, Aug 8, 2016 at 12:18 PM, atull <atull@opensource.altera.com> wrote:
+> > 
+> > >> Please don't use module.h in drivers controlled by a bool
+> > >> Kconfig setting.
+> > >>
+> > >> THanks,
+> > >> Paul.
+> > >>
+> > >
+> > > Thanks for the feedback.  Can you provide an example of what you
+> > > would consider to be proper usage in the kernel?
+> > 
+> > 
+> > I think Paul is suggesting to use
+> > 
+> > static int __init alt_fpga_bridge_init(void)
+> > {
+> >         platform_driver_register(&alt_fpga_bridge_driver);
+> > }
+> > 
+> > device_initcall(alt_fpga_bridge_init);
+> > 
+> > or better:
+> > 
+> > builtin_platform_driver(&alt_fpga_bridge_driver);
+> > 
+> > Like for example in: drivers/cpuidle/cpuidle-mvebu-v7.c
+> 
+> Yes, pretty much that -- if you have a bool Kconfig, you should be using
+> builtin registration functions, and have no need for module.h or
+> anything MODULE_<xyz> or any module_init/module_exit calls.
+> 
+> An empty file containing nothing but #include <linux/module.h> will
+> cause cpp to emit about 750k of goop, so we really should only be using
+> it for drivers that are genuinely modular; i.e. tristate Kconfig.
+> 
+> Thanks,
+> Paul.
+> --
+> 
+> > 
+> > Cheers,
+> > 
+> > Moritz
+> 
 
-> I'm currently trying to solve #1, but most of the discussion in this
-> thread was about addressing #2.
+Thanks for the feedback and explanations!
 
-Well, if you actually want the entry in the voltage table then adding it
-does seem the most sensible fix.
+I've retested my stuff with it all built as modules (mgr, bridged,
+and fpga-region) and it all works that way as well as built in.
+So I'll fix up the Kconfig as tristates for everybody.  Also
+I'll add some dependencies as FPGA_REGION should be dependent
+on FPGA_BRIDGE.
 
-> > That was a very
-> > long e-mail so I might be missing something but the obvious thing seems
-> > to be to force a state since we'll be doing that when we enable anyway.
-
-> Hm, okay, but which state should we choose? The first entry in the
-> voltage-table?
-
-That's why we don't do this currently.  Probably the closest one if we
-can work out what it was trying to achieve.
-
-> > Or just not have the voltage table and use it as a continuous regulator.
-
-> Yes, but that means patching the DT, which means breaking the DT compat.
-
-It sounds like you want to fix the DT anyway though?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160922/adb328ef/attachment.sig>
+Alan
