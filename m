@@ -1,55 +1,30 @@
-From: wolfgit@wiedmeyer.de (Wolfgang Wiedmeyer)
-Date: Thu, 22 Sep 2016 18:48:35 +0200
-Subject: [PATCH] ARM: dts: exynos: Add reboot reason support for Trats2
-Message-ID: <1474562915-4319-1-git-send-email-wolfgit@wiedmeyer.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Sep 2016 18:06:51 +0100
+Subject: [PATCH] arm64: Call numa_store_cpu_info() earlier.
+In-Reply-To: <1474397195-16520-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1474397195-16520-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20160922170651.GB27704@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows to reboot the device into recovery mode and into the download
-mode of the bootloader.
+On Tue, Sep 20, 2016 at 11:46:35AM -0700, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> The wq_numa_init() function makes a private CPU to node map by calling
+> cpu_to_node() early in the boot process, before the non-boot CPUs are
+> brought online.  Since the default implementation of cpu_to_node()
+> returns zero for CPUs that have never been brought online, the
+> workqueue system's view is that *all* CPUs are on node zero.
+> 
+> When the unbound workqueue for a non-zero node is created, the
+> tsk_cpus_allowed() for the worker threads is the empty set because
+> there are, in the view of the workqueue system, no CPUs on non-zero
+> nodes.  The code in try_to_wake_up() using this empty cpumask ends up
+> using the cpumask empty set value of NR_CPUS as an index into the
+> per-CPU area pointer array, and gets garbage as it is one past the end
+> of the array.  This results in:
 
-Signed-off-by: Wolfgang Wiedmeyer <wolfgit@wiedmeyer.de>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 14 ++++++++++++++
- arch/arm/boot/dts/exynos4x12.dtsi       |  2 +-
- 2 files changed, 15 insertions(+), 1 deletion(-)
+Queued for 4.8. Thanks.
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 129e973..a38d1e3 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -1294,3 +1294,17 @@
- 	vtmu-supply = <&ldo10_reg>;
- 	status = "okay";
- };
-+
-+&pmu {
-+	compatible = "syscon", "simple-mfd";
-+
-+	reboot-mode {
-+		compatible = "syscon-reboot-mode";
-+		offset = <0x80c>;
-+
-+		mode-normal	= <0x12345670>;
-+		mode-bootloader	= <0x12345671>;
-+		mode-download	= <0x12345671>;
-+		mode-recovery	= <0x12345674>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index c452499..b58c14e 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -179,7 +179,7 @@
- 			ranges;
- 			status = "disabled";
- 
--			pmu at 10020000 {
-+			pmu: pmu at 10020000 {
- 				reg = <0x10020000 0x3000>;
- 			};
- 
 -- 
-Website: https://fossencdi.org
-OpenPGP: 0F30 D1A0 2F73 F70A 6FEE  048E 5816 A24C 1075 7FC4
-Key download: https://wiedmeyer.de/keys/ww.asc
+Catalin
