@@ -1,366 +1,272 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 22 Sep 2016 16:26:15 +0530
-Subject: [PATCH 2/4] drivers: iio: ti_am335x_adc: add dma support
-In-Reply-To: <94b46406-577e-9cec-8e79-1134581932c5@ti.com>
-References: <20160921161134.6951-1-mugunthanvnm@ti.com>
- <20160921161134.6951-3-mugunthanvnm@ti.com>
- <94b46406-577e-9cec-8e79-1134581932c5@ti.com>
-Message-ID: <e763c4a5-2cc3-eb1d-d0ce-b90747f5011a@ti.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 22 Sep 2016 11:10:13 +0000
+Subject: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-specific
+ register range for ACPI case
+In-Reply-To: <20160922094955.GB18637@red-moon>
+References: <1473449047-10499-4-git-send-email-tn@semihalf.com>
+ <20160919180900.GB13775@localhost>
+ <49f53bfc-4421-a8b0-694c-bce7e61e1c9e@semihalf.com>
+ <20160920133327.GB13855@localhost>
+ <CAKv+Gu-AE7fft_j2cqBCN=xrsf5Yh=mePf5x3dZJuKAmdxF-Gg@mail.gmail.com>
+ <20160920140518.GD13855@localhost>
+ <CAKv+Gu-j-gKiNMx-TvSxezJth1619FN8W1rAy7DKpkmfX9ii6A@mail.gmail.com>
+ <20160920191744.GA4941@localhost> <20160921140549.GA11968@red-moon>
+ <20160921180457.GB20006@localhost> <20160922094955.GB18637@red-moon>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F8815A9@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 September 2016 12:50 PM, Peter Ujfalusi wrote:
-> On 09/21/16 19:11, Mugunthan V N wrote:
->> This patch adds the required pieces to ti_am335x_adc driver for
->> DMA support
->>
->> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
->> ---
->>  drivers/iio/adc/ti_am335x_adc.c      | 160 ++++++++++++++++++++++++++++++++++-
->>  include/linux/mfd/ti_am335x_tscadc.h |   7 ++
->>  2 files changed, 164 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/iio/adc/ti_am335x_adc.c b/drivers/iio/adc/ti_am335x_adc.c
->> index c3cfacca..89d0b07 100644
->> --- a/drivers/iio/adc/ti_am335x_adc.c
->> +++ b/drivers/iio/adc/ti_am335x_adc.c
->> @@ -30,10 +30,32 @@
->>  #include <linux/iio/buffer.h>
->>  #include <linux/iio/kfifo_buf.h>
->>  
->> +#include <linux/dmaengine.h>
->> +#include <linux/dma-mapping.h>
->> +
->> +#define DMA_BUFFER_SIZE		SZ_2K
->> +
->> +struct tiadc_dma {
->> +	/* Filter function */
->> +	dma_filter_fn		fn;
->> +	/* Parameter to the filter function */
->> +	void			*param;
->> +	struct dma_slave_config	conf;
->> +	struct dma_chan		*chan;
->> +	dma_addr_t		addr;
->> +	dma_cookie_t		cookie;
->> +	u8			*buf;
->> +	bool			valid_buf_seg;
->> +	int			buf_offset;
->> +	u8			fifo_thresh;
->> +};
->> +
->>  struct tiadc_device {
->>  	struct ti_tscadc_dev *mfd_tscadc;
->> +	struct tiadc_dma dma;
->>  	struct mutex fifo1_lock; /* to protect fifo access */
->>  	int channels;
->> +	int total_ch_enabled;
->>  	u8 channel_line[8];
->>  	u8 channel_step[8];
->>  	int buffer_en_ch_steps;
->> @@ -184,6 +206,7 @@ static irqreturn_t tiadc_worker_h(int irq, void *private)
->>  	u16 *data = adc_dev->data;
->>  
->>  	fifo1count = tiadc_readl(adc_dev, REG_FIFO1CNT);
->> +
->>  	for (k = 0; k < fifo1count; k = k + i) {
->>  		for (i = 0; i < (indio_dev->scan_bytes)/2; i++) {
->>  			read = tiadc_readl(adc_dev, REG_FIFO1);
->> @@ -198,6 +221,68 @@ static irqreturn_t tiadc_worker_h(int irq, void *private)
->>  	return IRQ_HANDLED;
->>  }
->>  
->> +static void tiadc_dma_rx_complete(void *param)
->> +{
->> +	struct iio_dev *indio_dev = param;
->> +	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->> +	struct tiadc_dma *dma = &adc_dev->dma;
->> +	u8 *data;
->> +	int i;
->> +
->> +	data = dma->valid_buf_seg ? dma->buf + dma->buf_offset : dma->buf;
-> 
-> bool valid_buf_seg ? The buffer segment is valid or not valid? Which buffer
-> segment is valid when valid_buf_seg is true?
-> 
-> I know what this is doing, but it is logically not correct.
-> 
-> Instead you could have:
-> 
-> int current_period; /* The period the DMA is working on */
-> 
-> When you start the DMA:
-> dma->current_period = 0; /* We start to fill period 0 */
-> 
-> In here:
-> 
-> u8 *data = dma->buf + (dma->current_period * dma_period_size);
-> 
->> +	dma->valid_buf_seg = !dma->valid_buf_seg;
-> 
-> /* Currently we have only two periods, so we can just */
-> dma->current_period = !dma->current_period;
-> /* or */
-> dma->current_period = 1 - dma->current_period; /* swap the buffer ID */
-> 
-> I think this would make it better to follow and if later you figure that you
-> want three or more periods instead of the two, it is going to be easier to add
-> that.
+Hi Lorenzo, Bjorn
 
-Okay, will change this in next version patch.
+> -----Original Message-----
+> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> Sent: 22 September 2016 10:50
+> To: Bjorn Helgaas
+> Cc: Ard Biesheuvel; Tomasz Nowicki; David Daney; Will Deacon; Catalin
+> Marinas; Rafael Wysocki; Arnd Bergmann; Hanjun Guo; Sinan Kaya;
+> Jayachandran C; Christopher Covington; Duc Dang; Robert Richter; Marcin
+> Wojtas; Liviu Dudau; Wangyijing; Mark Salter; linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Linaro ACPI
+> Mailman List; Jon Masters; Andrea Gallo; Jeremy Linton; liudongdong
+> (C); Gabriele Paoloni; Jeff Hugo; linux-acpi at vger.kernel.org; linux-
+> kernel at vger.kernel.org; Rafael J. Wysocki
+> Subject: Re: [PATCH V6 3/5] PCI: thunder-pem: Allow to probe PEM-
+> specific register range for ACPI case
+> 
+> On Wed, Sep 21, 2016 at 01:04:57PM -0500, Bjorn Helgaas wrote:
+> > On Wed, Sep 21, 2016 at 03:05:49PM +0100, Lorenzo Pieralisi wrote:
+> > > On Tue, Sep 20, 2016 at 02:17:44PM -0500, Bjorn Helgaas wrote:
+> > > > On Tue, Sep 20, 2016 at 04:09:25PM +0100, Ard Biesheuvel wrote:
+> > >
+> > > [...]
+> > >
+> > > > > None of these platforms can be fixed entirely in software, and
+> given
+> > > > > that we will not be adding quirks for new broken hardware, we
+> should
+> > > > > ask ourselves whether having two versions of a quirk, i.e., one
+> for
+> > > > > broken hardware + currently shipping firmware, and one for the
+> same
+> > > > > broken hardware with fixed firmware is really an improvement
+> over what
+> > > > > has been proposed here.
+> > > >
+> > > > We're talking about two completely different types of quirks:
+> > > >
+> > > >   1) MCFG quirks to use memory-mapped config space that doesn't
+> quite
+> > > >      conform to the ECAM model in the PCIe spec, and
+> > > >
+> > > >   2) Some yet-to-be-determined method to describe address space
+> > > >      consumed by a bridge.
+> > > >
+> > > > The first two patches of this series are a nice implementation
+> for 1).
+> > > > The third patch (ThunderX-specific) is one possibility for 2),
+> but I
+> > > > don't like it because there's no way for generic software like
+> the
+> > > > ACPI core to discover these resources.
+> > >
+> > > Ok, so basically this means that to implement (2) we need to assign
+> > > some sort of _HID to these quirky PCI bridges (so that we know what
+> > > device they represent and we can retrieve their _CRS). I take from
+> > > this discussion that the goal is to make sure that all non-config
+> > > resources have to be declared through _CRS device objects, which is
+> > > fine but that requires a FW update (unless we can fabricate ACPI
+> > > devices and corresponding _CRS in the kernel whenever we match a
+> > > given MCFG table signature).
+> >
+> > All resources consumed by ACPI devices should be declared through
+> > _CRS.  If you want to fabricate ACPI devices or _CRS via kernel
+> > quirks, that's fine with me.  This could be triggered via MCFG
+> > signature, DMI info, host bridge _HID, etc.
+> 
+> I think the PNP quirk approach + PNP0c02 resource put forward by Gab
+> is enough.
+
+Great thanks as we take a final decision I will ask Dogndgong to submit
+another RFC based on this approach
 
 > 
->> +
->> +	for (i = 0; i < dma->buf_offset; i += indio_dev->scan_bytes) {
->> +		iio_push_to_buffers(indio_dev, data);
->> +		data += indio_dev->scan_bytes;
->> +	}
->> +}
->> +
->> +static int tiadc_start_dma(struct iio_dev *indio_dev)
->> +{
->> +	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->> +	struct tiadc_dma *dma = &adc_dev->dma;
->> +	struct dma_async_tx_descriptor *desc;
->> +
->> +	dma->valid_buf_seg = false;
->> +	dma->fifo_thresh = FIFO1_THRESHOLD;
+> > > We discussed this already and I think we should make a decision:
+> > >
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2016-
+> March/414722.html
+> > >
+> > > > > > I'd like to step back and come up with some understanding of
+> how
+> > > > > > non-broken firmware *should* deal with this issue.  Then, if
+> we *do*
+> > > > > > work around this particular broken firmware in the kernel, it
+> would be
+> > > > > > nice to do it in a way that fits in with that understanding.
+> > > > > >
+> > > > > > For example, if a companion ACPI device is the preferred
+> solution, an
+> > > > > > ACPI quirk could fabricate a device with the required
+> resources.  That
+> > > > > > would address the problem closer to the source and make it
+> more likely
+> > > > > > that the rest of the system will work correctly: /proc/iomem
+> could
+> > > > > > make sense, things that look at _CRS generically would work
+> (e.g,
+> > > > > > /sys/, an admittedly hypothetical "lsacpi", etc.)
+> > > > > >
+> > > > > > Hard-coding stuff in drivers is a point solution that doesn't
+> provide
+> > > > > > any guidance for future platforms and makes it likely that
+> the hack
+> > > > > > will get copied into even more drivers.
+> > > > > >
+> > > > >
+> > > > > OK, I see. But the guidance for future platforms should be 'do
+> not
+> > > > > rely on quirks', and what I am arguing here is that the more we
+> polish
+> > > > > up this code and make it clean and reusable, the more likely it
+> is
+> > > > > that will end up getting abused by new broken hardware that we
+> set out
+> > > > > to reject entirely in the first place.
+> > > > >
+> > > > > So of course, if the quirk involves claiming resources, let's
+> make
+> > > > > sure that this occurs in the cleanest and most compliant way
+> possible.
+> > > > > But any factoring/reuse concerns other than for the current
+> crop of
+> > > > > broken hardware should be avoided imo.
+> > > >
+> > > > If future hardware is completely ECAM-compliant and we don't need
+> any
+> > > > more MCFG quirks, that would be great.
+> > >
+> > > Yes.
+> > >
+> > > > But we'll still need to describe that memory-mapped config space
+> > > > somewhere.  If that's done with PNP0C02 or similar devices (as is
+> done
+> > > > on my x86 laptop), we'd be all set.
+> > >
+> > > I am not sure I understand what you mean here. Are you referring
+> > > to MCFG regions reported as PNP0c02 resources through its _CRS ?
+> >
+> > Yes.  PCI Firmware Spec r3.0, Table 4-2, note 2 says address ranges
+> > reported via MCFG or _CBA should be reserved by _CRS of a PNP0C02
+> > device.
 > 
-> FIFO1_THRESHOLD is defined as 19 in the global header file, so
-> if you have 2 channels enabled the trigger comes when the FIFO have 10
-> samples/ch, in case of all 8 channels enabled you will round it down the
-> trigger comes when you have 2 samples/ch.
+> Ok, that's agreed. It goes without saying that since you are quoting
+> the PCI spec, if FW fails to report MCFG regions in a PNP0c02 device
+> _CRS I will consider that a FW bug.
 > 
-> Would not be better to try to use high threshold for the FIFO to reduce the
-> number of DMA requests needed runtime?
+> > > IIUC PNP0C02 is a reservation mechanism, but it does not help us
+> > > associate its _CRS to a specific PCI host bridge instance, right ?
+> >
+> > Gab proposed a hierarchy that *would* associate a PNP0C02 device with
+> > a PCI bridge:
+> >
+> >   Device (PCI1) {
+> >     Name (_HID, "HISI0080") // PCI Express Root Bridge
+> >     Name (_CID, "PNP0A03") // Compatible PCI Root Bridge
+> >     Method (_CRS, 0, Serialized) { // Root complex resources
+> (windows) }
+> >     Device (RES0) {
+> >       Name (_HID, "HISI0081") // HiSi PCIe RC config base address
+> >       Name (_CID, "PNP0C02")  // Motherboard reserved resource
+> >       Name (_CRS, ResourceTemplate () { ... }
+> >     }
+> >   }
+> >
+> > That's a possibility.  The PCI Firmware Spec suggests putting RES0 at
+> > the root (under \_SB), but I don't know why.
+> >
+> > Putting it at the root means we couldn't generically associate it
+> with
+> > a bridge, although I could imagine something like this:
+> >
+> >   Device (RES1) {
+> >     Name (_HID, "HISI0081") // HiSi PCIe RC config base address
+> >     Name (_CID, "PNP0C02")  // Motherboard reserved resource
+> >     Name (_CRS, ResourceTemplate () { ... }
+> >     Method (BRDG) { "PCI1" }  // hand-wavy ASL
+> >   }
+> >   Device (PCI1) {
+> >     Name (_HID, "HISI0080") // PCI Express Root Bridge
+> >     Name (_CID, "PNP0A03") // Compatible PCI Root Bridge
+> >     Method (_CRS, 0, Serialized) { // Root complex resources
+> (windows) }
+> >   }
+> >
+> > Where you could search PNP0C02 devices for a cookie that matched the
+> > host bridge.o
 > 
-> It is OK as it is at the moment, but I think it would make sense to try to
-> maximize the FIFO usage.
-
-I had already tried with higher values, It works fine. Just don't want
-to change the non-DMA implementation as I am not aware of any
-limitations why at the first place they have used fifo threshold as 19.
-
+> Ok, I am fine with both and I think we are converging, but the way
+> to solve this problem has to be uniform for all ARM partners (and
+> not only ARM). Two points here:
 > 
->> +	/*
->> +	 * Make the fifo thresh as the multiple of total number of
->> +	 * channels enabled, so make sure that that cyclic DMA period
->> +	 * length is also a multiple of total number of channels
->> +	 * enabled. This ensures that no invalid data is reported
->> +	 * to the stack via iio_push_to_buffers().
->> +	 */
->> +	dma->fifo_thresh -= (dma->fifo_thresh + 1) % adc_dev->total_ch_enabled;
->> +	dma->buf_offset = DMA_BUFFER_SIZE / 2;
->> +	/* Make sure that period length is multiple of fifo thresh level */
->> +	dma->buf_offset -= dma->buf_offset % ((dma->fifo_thresh + 1) *
->> +					      sizeof(u16));
->> +
->> +	dma->conf.src_maxburst = dma->fifo_thresh + 1;
->> +	dmaengine_slave_config(dma->chan, &dma->conf);
->> +
->> +	desc = dmaengine_prep_dma_cyclic(dma->chan, dma->addr,
->> +					 dma->buf_offset * 2,
->> +					 dma->buf_offset, DMA_DEV_TO_MEM,
-> 
-> I find the buf_offset name and it's use really confusing. It should be called
-> period_size, really.
-
-Yes, will fix this.
-
-> 
->> +					 DMA_PREP_INTERRUPT);
->> +	if (!desc)
->> +		return -EBUSY;
->> +
->> +	desc->callback = tiadc_dma_rx_complete;
->> +	desc->callback_param = indio_dev;
->> +
->> +	dma->cookie = dmaengine_submit(desc);
->> +
->> +	dma_async_issue_pending(dma->chan);
->> +
->> +	tiadc_writel(adc_dev, REG_FIFO1THR, dma->fifo_thresh);
->> +	tiadc_writel(adc_dev, REG_DMA1REQ, dma->fifo_thresh);
->> +	tiadc_writel(adc_dev, REG_DMAENABLE_SET, DMA_FIFO1);
->> +
->> +	return 0;
->> +}
->> +
->>  static int tiadc_buffer_preenable(struct iio_dev *indio_dev)
->>  {
->>  	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->> @@ -218,20 +303,30 @@ static int tiadc_buffer_preenable(struct iio_dev *indio_dev)
->>  static int tiadc_buffer_postenable(struct iio_dev *indio_dev)
->>  {
->>  	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->> +	struct tiadc_dma *dma = &adc_dev->dma;
->>  	unsigned int enb = 0;
->>  	u8 bit;
->> +	u32 irq_enable;
->>  
->>  	tiadc_step_config(indio_dev);
->> -	for_each_set_bit(bit, indio_dev->active_scan_mask, adc_dev->channels)
->> +	for_each_set_bit(bit, indio_dev->active_scan_mask, adc_dev->channels) {
->>  		enb |= (get_adc_step_bit(adc_dev, bit) << 1);
->> +		adc_dev->total_ch_enabled++;
->> +	}
->>  	adc_dev->buffer_en_ch_steps = enb;
->>  
->> +	if (dma->chan)
->> +		tiadc_start_dma(indio_dev);
->> +
->>  	am335x_tsc_se_set_cache(adc_dev->mfd_tscadc, enb);
->>  
->>  	tiadc_writel(adc_dev,  REG_IRQSTATUS, IRQENB_FIFO1THRES
->>  				| IRQENB_FIFO1OVRRUN | IRQENB_FIFO1UNDRFLW);
->> -	tiadc_writel(adc_dev,  REG_IRQENABLE, IRQENB_FIFO1THRES
->> -				| IRQENB_FIFO1OVRRUN);
->> +
->> +	irq_enable = IRQENB_FIFO1OVRRUN;
->> +	if (!dma->chan)
->> +		irq_enable |= IRQENB_FIFO1THRES;
->> +	tiadc_writel(adc_dev,  REG_IRQENABLE, irq_enable);
->>  
->>  	return 0;
->>  }
->> @@ -239,12 +334,18 @@ static int tiadc_buffer_postenable(struct iio_dev *indio_dev)
->>  static int tiadc_buffer_predisable(struct iio_dev *indio_dev)
->>  {
->>  	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->> +	struct tiadc_dma *dma = &adc_dev->dma;
->>  	int fifo1count, i, read;
->>  
->>  	tiadc_writel(adc_dev, REG_IRQCLR, (IRQENB_FIFO1THRES |
->>  				IRQENB_FIFO1OVRRUN | IRQENB_FIFO1UNDRFLW));
->>  	am335x_tsc_se_clr(adc_dev->mfd_tscadc, adc_dev->buffer_en_ch_steps);
->>  	adc_dev->buffer_en_ch_steps = 0;
->> +	adc_dev->total_ch_enabled = 0;
->> +	if (dma->chan) {
->> +		tiadc_writel(adc_dev, REG_DMAENABLE_CLEAR, 0x2);
->> +		dmaengine_terminate_async(dma->chan);
->> +	}
->>  
->>  	/* Flush FIFO of leftover data in the time it takes to disable adc */
->>  	fifo1count = tiadc_readl(adc_dev, REG_FIFO1CNT);
->> @@ -430,6 +531,50 @@ static const struct iio_info tiadc_info = {
->>  	.driver_module = THIS_MODULE,
->>  };
->>  
->> +static bool the_no_dma_filter_fn(struct dma_chan *chan, void *param)
->> +{
->> +	return false;
->> +}
->> +
->> +static int tiadc_request_dma(struct platform_device *pdev,
->> +			     struct tiadc_device *adc_dev)
->> +{
->> +	struct tiadc_dma	*dma = &adc_dev->dma;
->> +	dma_cap_mask_t		mask;
->> +
->> +	dma->fn = the_no_dma_filter_fn;
->> +
->> +	/* Default slave configuration parameters */
->> +	dma->conf.direction = DMA_DEV_TO_MEM;
->> +	dma->conf.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
->> +	dma->conf.src_addr = adc_dev->mfd_tscadc->tscadc_phys_base + REG_FIFO1;
->> +
->> +	dma_cap_zero(mask);
->> +	dma_cap_set(DMA_CYCLIC, mask);
->> +
->> +	/* Get a channel for RX */
->> +	dma->chan = dma_request_slave_channel_compat(mask,
->> +						     dma->fn, dma->param,
->> +						     adc_dev->mfd_tscadc->dev,
->> +						     "fifo1");
-> 
-> dma_request_chan()
-
-Will fix this.
-
-> 
->> +	if (!dma->chan)
->> +		return -ENODEV;
->> +
->> +	/* RX buffer */
->> +	dma->buf = dma_alloc_coherent(dma->chan->device->dev, DMA_BUFFER_SIZE,
->> +				      &dma->addr, GFP_KERNEL);
->> +	if (!dma->buf)
->> +		goto err;
->> +
->> +	dev_dbg_ratelimited(adc_dev->mfd_tscadc->dev, "got dma channel\n");
->> +
->> +	return 0;
->> +err:
->> +	dma_release_channel(dma->chan);
->> +
->> +	return -ENOMEM;
->> +}
->> +
->>  static int tiadc_parse_dt(struct platform_device *pdev,
->>  			  struct tiadc_device *adc_dev)
->>  {
->> @@ -512,8 +657,14 @@ static int tiadc_probe(struct platform_device *pdev)
->>  
->>  	platform_set_drvdata(pdev, indio_dev);
->>  
->> +	err = tiadc_request_dma(pdev, adc_dev);
->> +	if (err && err != -ENODEV)
->> +		goto err_dma;
->> +
->>  	return 0;
->>  
->> +err_dma:
->> +	iio_device_unregister(indio_dev);
->>  err_buffer_unregister:
->>  	tiadc_iio_buffered_hardware_remove(indio_dev);
->>  err_free_channels:
->> @@ -525,8 +676,11 @@ static int tiadc_remove(struct platform_device *pdev)
->>  {
->>  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->>  	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->> +	struct tiadc_dma *dma = &adc_dev->dma;
->>  	u32 step_en;
->>  
->> +	if (dma->chan)
->> +		dma_release_channel(dma->chan);
->>  	iio_device_unregister(indio_dev);
->>  	tiadc_iio_buffered_hardware_remove(indio_dev);
->>  	tiadc_channels_remove(indio_dev);
->> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
->> index e45a208..fb9dc99 100644
->> --- a/include/linux/mfd/ti_am335x_tscadc.h
->> +++ b/include/linux/mfd/ti_am335x_tscadc.h
->> @@ -23,6 +23,8 @@
->>  #define REG_IRQENABLE		0x02C
->>  #define REG_IRQCLR		0x030
->>  #define REG_IRQWAKEUP		0x034
->> +#define REG_DMAENABLE_SET	0x038
->> +#define REG_DMAENABLE_CLEAR	0x038
->>  #define REG_CTRL		0x040
->>  #define REG_ADCFSM		0x044
->>  #define REG_CLKDIV		0x04C
->> @@ -36,6 +38,7 @@
->>  #define REG_FIFO0THR		0xE8
->>  #define REG_FIFO1CNT		0xF0
->>  #define REG_FIFO1THR		0xF4
->> +#define REG_DMA1REQ		0xF8
->>  #define REG_FIFO0		0x100
->>  #define REG_FIFO1		0x200
->>  
->> @@ -126,6 +129,10 @@
->>  #define FIFOREAD_DATA_MASK (0xfff << 0)
->>  #define FIFOREAD_CHNLID_MASK (0xf << 16)
->>  
->> +/* DMA ENABLE/CLEAR Register */
->> +#define DMA_FIFO0		BIT(0)
->> +#define DMA_FIFO1		BIT(1)
->> +
->>  /* Sequencer Status */
->>  #define SEQ_STATUS BIT(5)
->>  #define CHARGE_STEP		0x11
->>
-> 
+> 1) Adding a device/subdevice allows people to add a _CRS reporting the
+>    non-window bridge resources. Fine. It also allows people to chuck in
+>    there all sorts of _DSD properties to describe their PCI host bridge
+>    as it is done with DT properties (those _DSD can contain eg clocks
+>    etc.), this may be tempting (so that they can reuse the same DT
+>    driver and do not have to update their firmware) but I want to be
+>    clear here: that must not happen. So, a subdevice with a _CRS to
+>    report resources, yes, but it will stop there.
+> 2) It is unclear to me how to formalize the above. People should not
+>    write FW by reading the PCI mailing list, so these guidelines have
+> to
+>    be written, somehow. I do not want to standardize quirks, I want
+>    to prevent random ACPI table content, which is different.
+>    Should I report this to the ACPI spec working group ? If we do
+>    not do that everyone will go solve this problem as they deem fit.
 > 
 
---
-Regards
-Mugunthan V N
+Do we really need to formalize this?
+
+As we discussed in the Linaro call at the moment we have few vendors
+that need quirks and we want to avoid promoting/accepting quirks for
+the future.
+
+At the time of the call I think we decided to informally accept a set
+of quirks for the current platforms and reject any other quirk coming
+after a certain date/kernel version (this to be decided).
+
+I am not sure if there is a way to document/formalize a temporary
+exception from the rule...
+
+Thanks
+
+Gab 
+
+
+> [...]
+> 
+> > > For FW that is immutable I really do not see what we can do apart
+> > > from hardcoding the non-config resources (consumed by a bridge),
+> > > somehow.
+> >
+> > Right.  Well, I assume you mean we should hard-code "non-window
+> > resources consumed directly by a bridge".  If firmware in the field
+> is
+> > broken, we should work around it, and that may mean hard-coding some
+> > resources.
+> >
+> > My point is that the hard-coding should not be buried in a driver
+> > where it's invisible to the rest of the kernel.  If we hard-code it
+> in
+> > a quirk that adds _CRS entries, then the kernel will work just like
+> it
+> > would if the firmware had been correct in the first place.  The
+> > resource will appear in /sys/devices/pnp*/*/resources and
+> /proc/iomem,
+> > and if we ever used _SRS to assign or move ACPI devices, we would
+> know
+> > to avoid the bridge resource.
+> 
+> We are in complete agreement here.
+> 
+> Thanks,
+> Lorenzo
