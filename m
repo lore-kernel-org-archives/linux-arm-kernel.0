@@ -1,23 +1,35 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 22 Sep 2016 18:45:42 +0800
-Subject: [PATCH] crypto: sun4i-ss: mark sun4i_hash() static
-In-Reply-To: <1474203164-14884-1-git-send-email-baoyou.xie@linaro.org>
-References: <1474203164-14884-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20160922104542.GI5884@gondor.apana.org.au>
+Date: Thu, 22 Sep 2016 18:46:03 +0800
+Subject: [PATCH 0/8] crypto: omap-sham: convert to sg based data engine
+In-Reply-To: <1474298539-23897-1-git-send-email-t-kristo@ti.com>
+References: <1474298539-23897-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20160922104603.GJ5884@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 18, 2016 at 08:52:44PM +0800, Baoyou Xie wrote:
-> We get 1 warning when building kernel with W=1:
-> drivers/crypto/sunxi-ss/sun4i-ss-hash.c:168:5: warning: no previous prototype for 'sun4i_hash' [-Wmissing-prototypes]
+On Mon, Sep 19, 2016 at 06:22:11PM +0300, Tero Kristo wrote:
+> Hi,
 > 
-> In fact, this function is only used in the file in which it is
-> declared and don't need a declaration, but can be made static.
-> So this patch marks it 'static'.
+> This series converts the omap-sham buffer handling towards a scatterlist
+> approach. This avoids the need to have a huge internal buffer within the
+> driver, and also allows us to properly implement export/import for the
+> driver. I tried splitting up the changes to some sane patches, but this
+> was rather difficult due to the fact that this is largely a complete
+> rewrite of portions of the driver. Patch #6 is a prime example of this
+> being pretty large, but splitting this up would break bisectability.
+> Hopefully the patch is still understandable though.
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> Crypto manager tests work fine at least on omap3/am3/am4/dra7 SoC:s.
+> (Something is broken with test farm again and could not try omap2/omap4.)
+> 
+> Also tested tcrypt SHA performance on DRA7 and it seems to be working
+> fine with different buffer sizes.
+> 
+> My test branch is also available here for interested parties:
+> tree: https://github.com/t-kristo/linux-pm.git
+> breanch: 4.8-rc1-crypto
 
-Patch applied.  Thanks.
+All applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
