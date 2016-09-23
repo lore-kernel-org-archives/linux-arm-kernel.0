@@ -1,125 +1,666 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 23 Sep 2016 14:28:40 +0530
-Subject: [PATCH v6 0/3] arm64 kexec-tools patches
-In-Reply-To: <cover.1474481332.git.geoff@infradead.org>
-References: <cover.1474481332.git.geoff@infradead.org>
-Message-ID: <20160923085840.GA22928@localhost.localdomain>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 23 Sep 2016 11:08:12 +0200
+Subject: [PATCH v5] KVM: arm/arm64: Route vtimer events to user space
+In-Reply-To: <d90f04d4-b29f-f08e-df39-ec307af44225@suse.de>
+References: <1474548769-195643-1-git-send-email-agraf@suse.de>
+ <20160922212831.GD9101@cbox>
+ <d90f04d4-b29f-f08e-df39-ec307af44225@suse.de>
+Message-ID: <20160923090812.GE9101@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+On Fri, Sep 23, 2016 at 09:14:13AM +0200, Alexander Graf wrote:
+> 
+> 
+> On 22.09.16 23:28, Christoffer Dall wrote:
+> > On Thu, Sep 22, 2016 at 02:52:49PM +0200, Alexander Graf wrote:
+> >> We have 2 modes for dealing with interrupts in the ARM world. We can either
+> >> handle them all using hardware acceleration through the vgic or we can emulate
+> >> a gic in user space and only drive CPU IRQ pins from there.
+> >>
+> >> Unfortunately, when driving IRQs from user space, we never tell user space
+> >> about timer events that may result in interrupt line state changes, so we
+> >> lose out on timer events if we run with user space gic emulation.
+> >>
+> >> This patch fixes that by syncing user space's view of the vtimer irq line
+> >> with the kvm view of that same line.
+> >>
+> >> With this patch I can successfully run edk2 and Linux with user space gic
+> >> emulation.
+> >>
+> >> Signed-off-by: Alexander Graf <agraf@suse.de>
+> >>
+> >> ---
+> >>
+> >> v1 -> v2:
+> >>
+> >>   - Add back curly brace that got lost
+> >>
+> >> v2 -> v3:
+> >>
+> >>   - Split into patch set
+> >>
+> >> v3 -> v4:
+> >>
+> >>   - Improve documentation
+> >>
+> >> v4 -> v5:
+> >>
+> >>   - Rewrite to use pending state sync in sregs (marc)
+> >>   - Remove redundant checks of vgic_initialized()
+> >>   - qemu tree to try this out: https://github.com/agraf/u-boot.git no-kvm-irqchip-for-v5
+> > 
+> > huh, qemu=u-boot?
+> 
+> Bleks, qemu.git of course.
+> 
+> > 
+> >> ---
+> >>  Documentation/virtual/kvm/api.txt |  26 ++++++++
+> >>  arch/arm/include/uapi/asm/kvm.h   |   3 +
+> >>  arch/arm/kvm/arm.c                |  14 ++---
+> >>  arch/arm64/include/uapi/asm/kvm.h |   3 +
+> >>  include/kvm/arm_arch_timer.h      |   2 +-
+> >>  include/uapi/linux/kvm.h          |   6 ++
+> >>  virt/kvm/arm/arch_timer.c         | 129 ++++++++++++++++++++++++++------------
+> >>  7 files changed, 134 insertions(+), 49 deletions(-)
+> >>
+> >> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> >> index 739db9a..8049327 100644
+> >> --- a/Documentation/virtual/kvm/api.txt
+> >> +++ b/Documentation/virtual/kvm/api.txt
+> >> @@ -3928,3 +3928,29 @@ In order to use SynIC, it has to be activated by setting this
+> >>  capability via KVM_ENABLE_CAP ioctl on the vcpu fd. Note that this
+> >>  will disable the use of APIC hardware virtualization even if supported
+> >>  by the CPU, as it's incompatible with SynIC auto-EOI behavior.
+> >> +
+> >> +8.3 KVM_CAP_ARM_TIMER
+> >> +
+> >> +Architectures: arm, arm64
+> >> +This capability, if KVM_CHECK_EXTENSION indicates that it is available and no
+> >> +in-kernel interrupt controller is in use, means that that the kernel populates
+> >> +the vcpu's run->s.regs.kernel_timer_pending field with timers that are currently
+> >> +considered pending by kvm.
+> > 
+> > Be careful with the word 'pending' here.  I think this could be
+> > misleading, because pending is a state in the GIC, but not really
+> > something I can find specific to the timer.  It would be more
+> > descriptive to say that the kernel maintained generic timer's output
+> > signal is asserted.
+> 
+> Sure, asserted works for me. Or maybe istatus?
+> 
 
-On 21/09/2016:06:14:25 PM, Geoff Levand wrote:
-> This series adds the core support for kexec re-boot on ARM64.
+I think the concept that most closely describes the generic timer
+architecture talks about 'asserting the timer output signal', so I'd
+rather we stick to something as close to that as possible.
 
-I tested this series with mustang and seattle and they work.
+> > 
+> >> +
+> >> +If active, it also allows user space to propagate its own pending state of timer
+> >> +interrupt lines using run->s.regs.user_timer_pending. If those two fields
+> >> +mismatch during CPU execution, kvm will exit to user space to give it a chance
+> > 
+> > I don't quite understand the semantics here.  The only entity that knows
+> > what the level state of the output of the timer is, is the kernel, which
+> > emulates the timer.  Userspace knows interrupt controller state, but if
+> > it has a different view of the timer state than the kernel, it's because
+> > the kernel failed to notify userspace of a change or userspace failed to
+> > listen?
+> 
+> Right, and the reason we have 2 fields is to get us exit-less (and
+> easier) updates whenever we can. In most cases, taking the assertion
+> down will coincide with an MMIO exit to user space for an EOI for example.
 
-So you can use my "Tested-By: Pratyush Anand <panand@redhat.com>".
-
-Just one Nitpick: In patch 2/3 arm64_header_check_msb(),
-arm64_header_page_size() and arm64_header_placement() have been defined but they
-have not been used anywhere. So, may be they can be removed.
-
-~Pratyush
+The assertion of the timer output signal is a completely separate
+concept from an EOI.  Most often, the signal will be deasserted *before*
+the EOI, but only noticed when you trap for the EOI.  Just to make that
+distinction clear.
 
 > 
-> Linux kernel support for ARM64 kexec reboot has been merged in v4.8-rc1 with the
-> expectation that it will be included in the v4.8 stable kernel release.
+> Somewhere in between in the development I had a version that explicitly
+> triggered a KVM_EXIT for every state change of the timer. But that gets
+> messy very quickly. You need to update the state change before an MMIO
+> for example, otherwise a sequence like
 > 
-> For ARM64 kdump support see Takahiro's latest kdump patches [1].
+>   * set cval to future (which in turns sets istatus=0)
+>   * read gic pending state
 > 
-> [1] http://lists.infradead.org/pipermail/kexec
+> will give you bogus results, as the mmio read to user space did not yet
+> have the timer status updated. And I really didn't want to wrap my head
+> around restarting MMIO exits ;).
 > 
-> Changes for v6 (Sep , 2016, 2m):
+> So having this side channel where user space potentially expects a timer
+> status change on every exit is much cleaner.
 > 
->   o Remove the get_memory_ranges_dt() routine.
->   o Rename dtb_[12] to dtb_{proc,sys,user}.
+
+Eh, I'm confused.  I'm not arguing against the side channel, I
+completely agree that this is a reasonable approach: Always just tell
+userspace what the timer output level is, no matter why you exit.
+
+What I don't understand is why userspace have to tell the kernel
+anything back.  The kernel already knows what the state is, and if
+userspace forgot what it was told, it did something wrong.
+
+> > 
+> >> +to update its own interrupt pending status. This usually involves triggering
+> >> +an interrupt line on a user space emulated interrupt controller.
+> > 
+> > To me it feels like the semantics should be that userspace can always
+> > derive the status of the timer and the level of the output signal from
+> > the timer by simply looking at kvm_run structure.
 > 
-> Changes for v5 (Sep 1, 2016, 2m):
+> Yes, it can, and it does. That's what the "kernel_timer_pending" field is.
 > 
->   o Add common routine arm64_locate_kernel_segment().
+> The kernel however also needs to know whether user space's view is in
+> sync, because we don't know whether there was an exit between our
+> internal state change and the guest entry. 
+
+Yes we do, whenever we notice that the computed state is changing (this
+is exactly when we call kvm_timer_update_irq), then we will update
+timer->irq.level and we will notice that there's now a deviation between
+what we last told userspace (kernel_timer_pending) and the current
+state, so we update kernel_timer_pending and force an exit to userspace.
+
+Why should we care if userspace has derived something in the mean time
+(which I don't even see how it can)?
+
+
+>  That's what the
+> "user_timer_pending" field is for.
 > 
-> Changes for v4 (Aug 18, 2016, 1m):
+
+I don't understand the semantics of this field.
+
+Perhaps you can explain me which hardware state (line etc.) this field
+represents?
+
+> > 
+> > The remaining two problems are:
+> > 
+> > (1) when should the kernel trigger exits to userspace?  Presumably on
+> > any change in the timer's output level, because this change has to be
+> > propagated to the userspace interrupt controller.
 > 
->   o Fix some error return values and error messages.
->   o Add enum arm64_header_page_size.
->   o Rename page_offset to vp_offset.
+> Yes, but if we can we want to piggy-back on an existing exit.
 > 
-> Changes for v3 (Aug 10, 2016, 1m):
+
+never argued against that.
+
+> > (2) the kernel needs to somehow mask the underlying hardware timer
+> > interrupt signal when it's active, because otherwise the guest won't
+> > proceed.  If we simply mask the hardware signal after telling userspace
+> > the output signal is asserted and until the output signal ever becomes
+> > deasserted, why do we need to listen to anything userspace has to say?
 > 
->   o Rebase to 2.0.13.
->   o Add support for flag bits 1-3 to arm64 image-header.h.
->   o Fix OPT_ARCH_MAX value.
->   o Use fdt_pack() in dtb_set_property().
->   o Remove patch ("kexec: (bugfix) calc correct end address of memory ranges in device tree").
+> Because we need to make sure that the cpu IRQ line is updated before we
+> enter the guest. Otherwise we might get spurious interrupts.
 > 
-> Changes for v2 (July 26, 2016, 0m):
+
+This doesn't mean we need to listen to what userspace says, we just have
+to exit to userspace with the updated value before re-entering the
+guest.
+
+You shoudl have the exact same semantics between the arch timer and the
+gic and between the arch timer and the userspace irqchip: Before
+entering the guest, the kernel arch timer code needs to notify the
+irqchip (whereever that lives) of a state change.
+
+We've had all sorts of other schemes in the past and they just kept on
+breaking for weirdo corner cases.  The only thing that works here is to
+maintain the semantics of the architecture.
+
+> >> +
+> >> +The fields run->s.regs.kernel_timer_pending and run->s.regs.user_timer_pending
+> >> +are available independent of run->kvm_valid_regs or run->kvm_dirty_regs bits.
+> >> +If no in-kernel interrupt controller is used and the capability exists, they
+> >> +will always be available and used.
+> >> +
+> >> +Currently the following bits are defined for both bitmaps:
+> >> +
+> >> +    KVM_ARM_TIMER_VTIMER  -  virtual timer
+> >> +
+> >> +Future versions of kvm may implement additional timer events. These will get
+> >> +indicated by additional KVM_CAP extensions.
+> >> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> >> index a2b3eb3..caad81d 100644
+> >> --- a/arch/arm/include/uapi/asm/kvm.h
+> >> +++ b/arch/arm/include/uapi/asm/kvm.h
+> >> @@ -105,6 +105,9 @@ struct kvm_debug_exit_arch {
+> >>  };
+> >>  
+> >>  struct kvm_sync_regs {
+> >> +	/* Used with KVM_CAP_ARM_TIMER */
+> >> +	u8 kernel_timer_pending;
+> >> +	u8 user_timer_pending;
+> >>  };
+> >>  
+> >>  struct kvm_arch_memory_slot {
+> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> >> index 75f130e..dc19221 100644
+> >> --- a/arch/arm/kvm/arm.c
+> >> +++ b/arch/arm/kvm/arm.c
+> >> @@ -187,6 +187,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+> >>  	case KVM_CAP_ARM_PSCI_0_2:
+> >>  	case KVM_CAP_READONLY_MEM:
+> >>  	case KVM_CAP_MP_STATE:
+> >> +	case KVM_CAP_ARM_TIMER:
+> >>  		r = 1;
+> >>  		break;
+> >>  	case KVM_CAP_COALESCED_MMIO:
+> >> @@ -474,13 +475,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+> >>  			return ret;
+> >>  	}
+> >>  
+> >> -	/*
+> >> -	 * Enable the arch timers only if we have an in-kernel VGIC
+> >> -	 * and it has been properly initialized, since we cannot handle
+> >> -	 * interrupts from the virtual timer with a userspace gic.
+> >> -	 */
+> >> -	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
+> >> -		ret = kvm_timer_enable(vcpu);
+> >> +	ret = kvm_timer_enable(vcpu);
+> >>  
+> >>  	return ret;
+> >>  }
+> >> @@ -588,7 +583,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >>  		 */
+> >>  		preempt_disable();
+> >>  		kvm_pmu_flush_hwstate(vcpu);
+> >> -		kvm_timer_flush_hwstate(vcpu);
+> >> +		if (kvm_timer_flush_hwstate(vcpu)) {
+> >> +			ret = -EINTR;
+> >> +			run->exit_reason = KVM_EXIT_INTR;
+> >> +		}
+> >>  		kvm_vgic_flush_hwstate(vcpu);
+> >>  
+> >>  		local_irq_disable();
+> >> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> >> index 3051f86..9aac860 100644
+> >> --- a/arch/arm64/include/uapi/asm/kvm.h
+> >> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> >> @@ -143,6 +143,9 @@ struct kvm_debug_exit_arch {
+> >>  #define KVM_GUESTDBG_USE_HW		(1 << 17)
+> >>  
+> >>  struct kvm_sync_regs {
+> >> +	/* Used with KVM_CAP_ARM_TIMER */
+> >> +	u8 kernel_timer_pending;
+> >> +	u8 user_timer_pending;
+> >>  };
+> >>  
+> >>  struct kvm_arch_memory_slot {
+> >> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> >> index dda39d8..8cd7240 100644
+> >> --- a/include/kvm/arm_arch_timer.h
+> >> +++ b/include/kvm/arm_arch_timer.h
+> >> @@ -63,7 +63,7 @@ void kvm_timer_init(struct kvm *kvm);
+> >>  int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+> >>  			 const struct kvm_irq_level *irq);
+> >>  void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+> >> -void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+> >> +int kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+> >>  void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
+> >>  void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
+> >>  
+> >> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> >> index 300ef25..1fc02d7 100644
+> >> --- a/include/uapi/linux/kvm.h
+> >> +++ b/include/uapi/linux/kvm.h
+> >> @@ -870,6 +870,7 @@ struct kvm_ppc_smmu_info {
+> >>  #define KVM_CAP_S390_USER_INSTR0 130
+> >>  #define KVM_CAP_MSI_DEVID 131
+> >>  #define KVM_CAP_PPC_HTM 132
+> >> +#define KVM_CAP_ARM_TIMER 133
+> >>  
+> >>  #ifdef KVM_CAP_IRQ_ROUTING
+> >>  
+> >> @@ -1327,4 +1328,9 @@ struct kvm_assigned_msix_entry {
+> >>  #define KVM_X2APIC_API_USE_32BIT_IDS            (1ULL << 0)
+> >>  #define KVM_X2APIC_API_DISABLE_BROADCAST_QUIRK  (1ULL << 1)
+> >>  
+> >> +/* Available with KVM_CAP_ARM_TIMER */
+> >> +
+> >> +/* Bits for run->s.regs.{user,kernel}_timer_pending */
+> >> +#define KVM_ARM_TIMER_VTIMER		(1 << 0)
+> >> +
+> >>  #endif /* __LINUX_KVM_H */
+> >> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> >> index 4309b60..0c6fc38 100644
+> >> --- a/virt/kvm/arm/arch_timer.c
+> >> +++ b/virt/kvm/arm/arch_timer.c
+> >> @@ -166,21 +166,36 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+> >>  	return cval <= now;
+> >>  }
+> >>  
+> >> +/*
+> >> + * Synchronize the timer IRQ state with the interrupt controller.
+> >> + */
+> >>  static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+> >>  {
+> >>  	int ret;
+> >>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> >>  
+> >> -	BUG_ON(!vgic_initialized(vcpu->kvm));
+> >> -
+> >>  	timer->active_cleared_last = false;
+> >>  	timer->irq.level = new_level;
+> >> -	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
+> >> +	trace_kvm_timer_update_irq(vcpu->vcpu_id, host_vtimer_irq,
+> >>  				   timer->irq.level);
+> >> -	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+> >> -					 timer->irq.irq,
+> >> -					 timer->irq.level);
+> >> -	WARN_ON(ret);
+> >> +
+> >> +	if (irqchip_in_kernel(vcpu->kvm)) {
+> >> +		BUG_ON(!vgic_initialized(vcpu->kvm));
+> >> +
+> >> +		/* Fire the timer in the VGIC */
+> >> +		ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+> >> +						 timer->irq.irq,
+> >> +						 timer->irq.level);
+> >> +
+> >> +		WARN_ON(ret);
+> >> +	} else {
+> >> +		struct kvm_sync_regs *regs = &vcpu->run->s.regs;
+> >> +
+> >> +		/* Populate the timer bitmap for user space */
+> >> +		regs->kernel_timer_pending &= ~KVM_ARM_TIMER_VTIMER;
+> >> +		if (new_level)
+> >> +			regs->kernel_timer_pending |= KVM_ARM_TIMER_VTIMER;
+> > 
+> > I think if you got here, it means you have to exit to userspace to
+> > update it of the new state.  If you don't want to propagate a return
 > 
->   o Inline some small routines.
->   o Reformat some dbgprintf messages.
->   o Remove debug_brk from entry.S
->   o Change arm64_image_header.flags to uint64_t.
->   o Look in iomem then dt for mem info.
->   o Remove check_cpu_nodes.
->   o Remove purgatory printing.
+> Yes, but we can't exit straight away with our own exit reason because we
+> might be inside an MMIO exit path here which already occupies the
+> exit_reason.
 > 
-> First submission v1 (July 20, 2016).
+> > value from here, I think you should just not do anything an then later
+> > compare timer->irq.level with whatever was last written to
+> > run->kernel_timer_pending (which should be named something else than
+> > pending).
 > 
-> -Geoff
+> Hm, so you're saying we should just update kernel_timer_pending in
+> flush_hwstate()? That way we miss out on the piggy backing, no?
 > 
-> The following changes since commit 67488beb0a6ee8ad2c0b05f721a9e00041fab93a:
+
+I don't see why.  What I had in mind was something like this (untested,
+incomplete, pseudo-code'ish):
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 85a3f90..a78ce7d 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -549,7 +549,7 @@ static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+  */
+ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+-	int ret;
++	int ret, timer_ret;
+ 	sigset_t sigsaved;
+ 
+ 	if (unlikely(!kvm_vcpu_initialized(vcpu)))
+@@ -588,7 +588,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		preempt_disable();
+ 		kvm_pmu_flush_hwstate(vcpu);
+-		kvm_timer_flush_hwstate(vcpu);
++		timer_ret = kvm_timer_flush_hwstate(vcpu);
+ 		kvm_vgic_flush_hwstate(vcpu);
+ 
+ 		local_irq_disable();
+@@ -596,7 +596,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		/*
+ 		 * Re-check atomic conditions
+ 		 */
+-		if (signal_pending(current)) {
++		if (timer_ret || signal_pending(current)) {
+ 			ret = -EINTR;
+ 			run->exit_reason = KVM_EXIT_INTR;
+ 		}
+@@ -659,13 +659,17 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * interrupt line.
+ 		 */
+ 		kvm_pmu_sync_hwstate(vcpu);
+-		kvm_timer_sync_hwstate(vcpu);
++		timer_ret = kvm_timer_sync_hwstate(vcpu);
+ 
+ 		kvm_vgic_sync_hwstate(vcpu);
+ 
+ 		preempt_enable();
+ 
+ 		ret = handle_exit(vcpu, run, ret);
++		if (!ret & timer_ret) {
++			ret = -EINTR;
++			run->exit_reason = KVM_EXIT_INTR;
++		}
+ 	}
+ 
+ 	if (vcpu->sigset_active)
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 27a1f63..0f7c23d 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -242,6 +242,19 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+ 	timer_disarm(timer);
+ }
+ 
++static int kvm_timer_update_user_irqchip(struct kvm_vcpu *vcpu)
++{
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	struct kvm_sync_regs *regs = &vcpu->run->s.regs;
++
++	if (irqchip_in_kernel(vcpu->kvm))
++		return 0;
++
++	if (timer->irq.level != (regs->kernel_timer_pending & KVM_ARM_TIMER_VTIMER))
++		return 1;
++	return 0;
++}
++
+ /**
+  * kvm_timer_flush_hwstate - prepare to move the virt timer to the cpu
+  * @vcpu: The vcpu pointer
+@@ -258,6 +271,11 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	if (kvm_timer_update_state(vcpu))
+ 		return;
+ 
++	if (!irqchip_in_kernel(vcpu->kvm)) {
++		/* do your masking here */
++		return kvm_timer_update_user_irqchip(vcpu);
++	}
++
+ 	/*
+ 	* If we enter the guest with the virtual input level to the VGIC
+ 	* asserted, then we have already told the VGIC what we need to, and
+@@ -315,8 +333,10 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+  *
+  * Check if the virtual timer has expired while we were running in the guest,
+  * and inject an interrupt if that was the case.
++ *
++ * Return 1 to force exit to userspace, 0 otherwise.
+  */
+-void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
++int kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 
+@@ -327,6 +347,8 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	 * could have expired, update the timer state.
+ 	 */
+ 	kvm_timer_update_state(vcpu);
++
++	return kvm_timer_update_user_irqchip(vcpu);
+ }
+ 
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+
+> > 
+> >> +	}
+> >>  }
+> >>  
+> >>  /*
+> >> @@ -197,7 +212,8 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+> >>  	 * because the guest would never see the interrupt.  Instead wait
+> >>  	 * until we call this function from kvm_timer_flush_hwstate.
+> >>  	 */
+> >> -	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
+> >> +	if ((irqchip_in_kernel(vcpu->kvm) && !vgic_initialized(vcpu->kvm)) ||
+> >> +	    !timer->enabled)
+> >>  		return -ENODEV;
+> >>  
+> >>  	if (kvm_timer_should_fire(vcpu) != timer->irq.level)
+> >> @@ -248,15 +264,20 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+> >>   *
+> >>   * Check if the virtual timer has expired while we were running in the host,
+> >>   * and inject an interrupt if that was the case.
+> >> + *
+> >> + * Returns:
+> >> + *
+> >> + *    0  - success
+> >> + *    1  - need exit to user space
+> > 
+> > this is opposite to all other exit-related APIs we have.  Why not just
+> > return -EINTR?
 > 
->   kexec-tools 2.0.13 (2016-08-08 12:26:44 +0200)
+> All functions in the arch timer file are in normal C API notion
+> (0=success). I actually had it all in exit-related API notion at first
+> and it became very awkward and hard to read to convert exit codes in
+> between. Doing it just once in kvm.c felt much cleaner.
 > 
-> are available in the git repository at:
+
+ok, that's fair.
+
+> > 
+> >>   */
+> >> -void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+> >> +int kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+> >>  {
+> >>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> >>  	bool phys_active;
+> >>  	int ret;
+> >>  
+> >>  	if (kvm_timer_update_state(vcpu))
+> >> -		return;
+> >> +		return 0;
+> >>  
+> >>  	/*
+> >>  	* If we enter the guest with the virtual input level to the VGIC
+> >> @@ -275,38 +296,61 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+> >>  	* to ensure that hardware interrupts from the timer triggers a guest
+> >>  	* exit.
+> >>  	*/
+> >> -	phys_active = timer->irq.level ||
+> >> -			kvm_vgic_map_is_active(vcpu, timer->irq.irq);
+> >> -
+> >> -	/*
+> >> -	 * We want to avoid hitting the (re)distributor as much as
+> >> -	 * possible, as this is a potentially expensive MMIO access
+> >> -	 * (not to mention locks in the irq layer), and a solution for
+> >> -	 * this is to cache the "active" state in memory.
+> >> -	 *
+> >> -	 * Things to consider: we cannot cache an "active set" state,
+> >> -	 * because the HW can change this behind our back (it becomes
+> >> -	 * "clear" in the HW). We must then restrict the caching to
+> >> -	 * the "clear" state.
+> >> -	 *
+> >> -	 * The cache is invalidated on:
+> >> -	 * - vcpu put, indicating that the HW cannot be trusted to be
+> >> -	 *   in a sane state on the next vcpu load,
+> >> -	 * - any change in the interrupt state
+> >> -	 *
+> >> -	 * Usage conditions:
+> >> -	 * - cached value is "active clear"
+> >> -	 * - value to be programmed is "active clear"
+> >> -	 */
+> >> -	if (timer->active_cleared_last && !phys_active)
+> >> -		return;
+> >> -
+> >> -	ret = irq_set_irqchip_state(host_vtimer_irq,
+> >> -				    IRQCHIP_STATE_ACTIVE,
+> >> -				    phys_active);
+> >> -	WARN_ON(ret);
+> >> +	if (irqchip_in_kernel(vcpu->kvm)) {
+> >> +		phys_active = timer->irq.level ||
+> >> +				kvm_vgic_map_is_active(vcpu, timer->irq.irq);
+> >> +
+> >> +		/*
+> >> +		 * We want to avoid hitting the (re)distributor as much as
+> >> +		 * possible, as this is a potentially expensive MMIO access
+> >> +		 * (not to mention locks in the irq layer), and a solution for
+> >> +		 * this is to cache the "active" state in memory.
+> >> +		 *
+> >> +		 * Things to consider: we cannot cache an "active set" state,
+> >> +		 * because the HW can change this behind our back (it becomes
+> >> +		 * "clear" in the HW). We must then restrict the caching to
+> >> +		 * the "clear" state.
+> >> +		 *
+> >> +		 * The cache is invalidated on:
+> >> +		 * - vcpu put, indicating that the HW cannot be trusted to be
+> >> +		 *   in a sane state on the next vcpu load,
+> >> +		 * - any change in the interrupt state
+> >> +		 *
+> >> +		 * Usage conditions:
+> >> +		 * - cached value is "active clear"
+> >> +		 * - value to be programmed is "active clear"
+> >> +		 */
+> >> +		if (timer->active_cleared_last && !phys_active)
+> >> +			return 0;
+> >> +
+> >> +		ret = irq_set_irqchip_state(host_vtimer_irq,
+> >> +					    IRQCHIP_STATE_ACTIVE,
+> >> +					    phys_active);
+> >> +		WARN_ON(ret);
+> >> +	} else {
+> >> +		struct kvm_sync_regs *regs = &vcpu->run->s.regs;
+> >> +
+> >> +		/*
+> >> +		 * User space handles timer events, so we need to check whether
+> >> +		 * its view of the world is in sync with ours.
+> >> +		 */
+> >> +		if (regs->kernel_timer_pending != regs->user_timer_pending) {
+> >> +			/* Return to user space */
+> >> +			return 1;
+> >> +		}
+> > 
+> > Maybe I'm misunderstanding and user_timer_pending is just a cached
+> > verison of what you said last, but as I said above, I think you can just
+> > compare timer->irq.level with the last value the kvm_run struct, and if
+> > something changed, you have to exit.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git for-merge-arm64-v6
+> So how would user space know whether the line went up or down? Or didn't
+> change at all (if we coalesce with an MMIO exit)?
 > 
-> for you to fetch changes up to a9f1fafd7c248d33768177438742b90bc4338202:
+
+It just samples the line on every exit?  It is free to cache the old
+value if it wants to detect changes as opposed to recomputing the line
+on every exit, but I don't understand why it has to feed it back to the
+kernel.  Surely userspace has its own per-VCPU state?
+
+> > 
+> >> +
+> >> +		/*
+> >> +		 * As long as user space is aware that the timer is pending,
+> >> +		 * we do not need to get new host timer events.
+> >> +		 */
+> > 
+> > yes, correct, but I don't think this concept was clearly reflected in
+> > your API text above.
+> > 
+> >> +		if (timer->irq.level)
+> >> +			disable_percpu_irq(host_vtimer_irq);
+> >> +		else
+> >> +			enable_percpu_irq(host_vtimer_irq, 0);
+> >> +	}
+> > 
+> > could we move these two blocks into their own functions instead?  That
+> > would also give nice names to the huge chunk of complicated
+> > functionality, e.g. flush_timer_state_to_user() and
+> > flush_timer_state_to_vgic().
 > 
->   arm64: Add support for binary image files (2016-09-21 11:04:03 -0700)
+> That's probably a very useful cleanup, yes :).
 > 
-> ----------------------------------------------------------------
-> Geoff Levand (2):
->       kexec: Add common device tree routines
->       arm64: Add arm64 kexec support
 > 
-> Pratyush Anand (1):
->       arm64: Add support for binary image files
-> 
->  configure.ac                            |   3 +
->  kexec/Makefile                          |   5 +
->  kexec/arch/arm64/Makefile               |  40 +++
->  kexec/arch/arm64/crashdump-arm64.c      |  21 ++
->  kexec/arch/arm64/crashdump-arm64.h      |  12 +
->  kexec/arch/arm64/image-header.h         | 146 ++++++++
->  kexec/arch/arm64/include/arch/options.h |  39 ++
->  kexec/arch/arm64/kexec-arm64.c          | 615 ++++++++++++++++++++++++++++++++
->  kexec/arch/arm64/kexec-arm64.h          |  71 ++++
->  kexec/arch/arm64/kexec-elf-arm64.c      | 146 ++++++++
->  kexec/arch/arm64/kexec-image-arm64.c    |  80 +++++
->  kexec/dt-ops.c                          | 145 ++++++++
->  kexec/dt-ops.h                          |  13 +
->  kexec/kexec-syscall.h                   |   8 +-
->  purgatory/Makefile                      |   1 +
->  purgatory/arch/arm64/Makefile           |  18 +
->  purgatory/arch/arm64/entry.S            |  51 +++
->  purgatory/arch/arm64/purgatory-arm64.c  |  19 +
->  18 files changed, 1431 insertions(+), 2 deletions(-)
->  create mode 100644 kexec/arch/arm64/Makefile
->  create mode 100644 kexec/arch/arm64/crashdump-arm64.c
->  create mode 100644 kexec/arch/arm64/crashdump-arm64.h
->  create mode 100644 kexec/arch/arm64/image-header.h
->  create mode 100644 kexec/arch/arm64/include/arch/options.h
->  create mode 100644 kexec/arch/arm64/kexec-arm64.c
->  create mode 100644 kexec/arch/arm64/kexec-arm64.h
->  create mode 100644 kexec/arch/arm64/kexec-elf-arm64.c
->  create mode 100644 kexec/arch/arm64/kexec-image-arm64.c
->  create mode 100644 kexec/dt-ops.c
->  create mode 100644 kexec/dt-ops.h
->  create mode 100644 purgatory/arch/arm64/Makefile
->  create mode 100644 purgatory/arch/arm64/entry.S
->  create mode 100644 purgatory/arch/arm64/purgatory-arm64.c
-> 
-> -- 
-> 2.7.4
+Thanks,
+-Christoffer
