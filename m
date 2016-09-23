@@ -1,100 +1,57 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 23 Sep 2016 16:01:50 +0100
-Subject: [PATCH 1/2] ARM: vexpress: refine MCPM smp operations override
- criteria
-In-Reply-To: <20160923150004.GV8917@e106497-lin.cambridge.arm.com>
-References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
- <20160923150004.GV8917@e106497-lin.cambridge.arm.com>
-Message-ID: <51dbcf07-65dd-cf57-c807-882991d6d5e4@arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 23 Sep 2016 17:03:23 +0200
+Subject: [PATCH] usb: gadget: udc: atmel: fix endpoint name
+In-Reply-To: <331f5819-1f65-980d-486d-732342877f2c@atmel.com>
+References: <20160915150722.13103-1-alexandre.belloni@free-electrons.com>
+ <c90099af-2537-cc41-2775-dd2ca41dc070@atmel.com>
+ <331f5819-1f65-980d-486d-732342877f2c@atmel.com>
+Message-ID: <20160923150323.GB13744@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 23, 2016 at 04:20:45PM +0200, Nicolas Ferre wrote:
+> Le 16/09/2016 ? 10:36, Nicolas Ferre a ?crit :
+> > Le 15/09/2016 ? 17:07, Alexandre Belloni a ?crit :
+> >> Since commit c32b5bcfa3c4 ("ARM: dts: at91: Fix USB endpoint nodes"),
+> >> atmel_usba_udc fails with:
+> >>
+> >> ------------[ cut here ]------------
+> >> WARNING: CPU: 0 PID: 0 at include/linux/usb/gadget.h:405
+> >> ecm_do_notify+0x188/0x1a0
+> >> Modules linked in:
+> >> CPU: 0 PID: 0 Comm: swapper Not tainted 4.7.0+ #15
+> >> Hardware name: Atmel SAMA5
+> >> [<c010ccfc>] (unwind_backtrace) from [<c010a7ec>] (show_stack+0x10/0x14)
+> >> [<c010a7ec>] (show_stack) from [<c0115c10>] (__warn+0xe4/0xfc)
+> >> [<c0115c10>] (__warn) from [<c0115cd8>] (warn_slowpath_null+0x20/0x28)
+> >> [<c0115cd8>] (warn_slowpath_null) from [<c04377ac>] (ecm_do_notify+0x188/0x1a0)
+> >> [<c04377ac>] (ecm_do_notify) from [<c04379a4>] (ecm_set_alt+0x74/0x1ac)
+> >> [<c04379a4>] (ecm_set_alt) from [<c042f74c>] (composite_setup+0xfc0/0x19f8)
+> >> [<c042f74c>] (composite_setup) from [<c04356e8>] (usba_udc_irq+0x8f4/0xd9c)
+> >> [<c04356e8>] (usba_udc_irq) from [<c013ec9c>] (handle_irq_event_percpu+0x9c/0x158)
+> >> [<c013ec9c>] (handle_irq_event_percpu) from [<c013ed80>] (handle_irq_event+0x28/0x3c)
+> >> [<c013ed80>] (handle_irq_event) from [<c01416d4>] (handle_fasteoi_irq+0xa0/0x168)
+> >> [<c01416d4>] (handle_fasteoi_irq) from [<c013e3f8>] (generic_handle_irq+0x24/0x34)
+> >> [<c013e3f8>] (generic_handle_irq) from [<c013e640>] (__handle_domain_irq+0x54/0xa8)
+> >> [<c013e640>] (__handle_domain_irq) from [<c010b214>] (__irq_svc+0x54/0x70)
+> >> [<c010b214>] (__irq_svc) from [<c0107eb0>] (arch_cpu_idle+0x38/0x3c)
+> >> [<c0107eb0>] (arch_cpu_idle) from [<c0137300>] (cpu_startup_entry+0x9c/0xdc)
+> >> [<c0137300>] (cpu_startup_entry) from [<c0900c40>] (start_kernel+0x354/0x360)
+> >> [<c0900c40>] (start_kernel) from [<20008078>] (0x20008078)
+> >> ---[ end trace e7cf9dcebf4815a6 ]---
+> >>
+> >> Fixes: c32b5bcfa3c4 ("ARM: dts: at91: Fix USB endpoint nodes")
+> >> Reported-by: Richard Genoud <richard.genoud@gmail.com>
+> >> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > 
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > 
+> > Felipe, Greg,
+> > It is clearly a regression and material for 4.8-fixes. But I do know
+> > that we are very late in the process :-(
+> > Please do what you can to make it progress before 4.8-final but I'm
+> > truly aware of the challenge.
+> 
+> Any chance that we can have it (aka ping)?
 
-
-On 23/09/16 16:00, Liviu Dudau wrote:
-> On Fri, Sep 23, 2016 at 02:09:06PM +0100, Lorenzo Pieralisi wrote:
->> Current vexpress smp init code detects whether to override the
->> default smp ops with MCPM smp ops by matching the "cci-400"
->> compatible string, in that MCPM requires control over CCI ports
->> to manage low-power states entry/exit.
->>
->> The "cci-400" compatible string check is a necessary but not
->> sufficient condition for MCPM to work, because the cci-400
->> can be made visible to the kernel, but firmware can nonetheless
->> disable non-secure CCI ports control, while still allowing PMU
->> access; if booted in non-secure world, the kernel would still
->> blindly override smp operations with MCPM operations, resulting
->> in kernel faults when the CCI ports programming interface is
->> accessed from non-secure world.
->>
->> This means that the "cci-400" compatible string check would
->> result in a false positive in systems that eg boot in HYP mode,
->> where CCI ports non-secure access is explicitly not allowed,
->> and it is reported in the respective device tree nodes with
->> CCI ports marked as disabled.
->
-> I remember seeing a patch from Marc this week exactly on this
-> subject, but I can't find it again today. However, I remember that
-> his patch was explicitly testing for the HYP presence.
->
->>
->> Refactor the smp operations initialization to make sure that
->> the kernel is actually allowed to take control over CCI ports
->> (by enabling MCPM smp operations) before overriding default
->> vexpress smp operations.
->>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Liviu Dudau <liviu.dudau@arm.com>
->> Cc: Sudeep Holla <sudeep.holla@arm.com>
->> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/mach-vexpress/platsmp.c | 31 ++++++++++++++++++++++++-------
->>  1 file changed, 24 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
->> index 8b8d072..6cfd782 100644
->> --- a/arch/arm/mach-vexpress/platsmp.c
->> +++ b/arch/arm/mach-vexpress/platsmp.c
->> @@ -26,17 +26,34 @@
->>  bool __init vexpress_smp_init_ops(void)
->>  {
->>  #ifdef CONFIG_MCPM
->> +	int cpu;
->> +	struct device_node *cpu_node, *cci_node;
->> +
->>  	/*
->> -	 * The best way to detect a multi-cluster configuration at the moment
->> -	 * is to look for the presence of a CCI in the system.
->> +	 * The best way to detect a multi-cluster configuration
->> +	 * is to detect if the kernel can take over CCI ports
->> +	 * control. Loop over possible CPUs and check if CCI
->> +	 * port control is available.
->>  	 * Override the default vexpress_smp_ops if so.
->>  	 */
->> -	struct device_node *node;
->> -	node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
->> -	if (node && of_device_is_available(node)) {
->> -		mcpm_smp_set_ops();
->> -		return true;
->> +	for_each_possible_cpu(cpu) {
->> +		bool available;
->> +
->> +		cpu_node = of_get_cpu_node(cpu, NULL);
->> +		if (WARN(!cpu_node, "Missing cpu device node!"))
->> +			return false;
->> +
->> +		cci_node = of_parse_phandle(cpu_node, "cci-control-port", 0);
->> +		available = cci_node && of_device_is_available(cci_node);
->
-> of_device_is_available() only checks the DT node for status = "enabled";
->
-> Does the HYP modify the DT to disable the cci-control-port? If not, then I guess
-> this patch is not enough?
->
-
-Correct, I will send out the u-boot patch to disable the cci ports soon.
-
--- 
-Regards,
-Sudeep
+It's Felipe's area, not mine :)
