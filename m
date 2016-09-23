@@ -1,73 +1,25 @@
-From: eric@nelint.com (Eric Nelson)
-Date: Fri, 23 Sep 2016 10:33:29 -0700
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Sep 2016 18:37:52 +0100
 Subject: Alignment issues with freescale FEC driver
 In-Reply-To: <5ee28ee0-cf0c-bdab-1271-f17755365c13@nelint.com>
 References: <troy.kisky@boundarydevices.com>
  <02afb707-65de-5101-a79b-355929c4e00b@nelint.com>
  <CANn89iLb+QJu+MYh859oAAjcLCsKRpBbzVf43yOdq+HJVtZDpQ@mail.gmail.com>
  <5ee28ee0-cf0c-bdab-1271-f17755365c13@nelint.com>
-Message-ID: <0fe7a310-2d2f-4fca-d698-85d66122d91c@nelint.com>
+Message-ID: <20160923173751.GA1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On 09/23/2016 10:19 AM, Eric Nelson wrote:
-> Thanks Eric,
-> 
-> On 09/23/2016 09:54 AM, Eric Dumazet wrote:
->> On Fri, Sep 23, 2016 at 9:43 AM, Eric Nelson <eric@nelint.com> wrote:
->>>
->>> Hello all,
->>>
->>> We're seeing alignment issues from the ethernet stack on an i.MX6UL board:
->>>
->>>
-> 
-> <snip>
-> 
->>>
->>> - id = ntohl(*(__be32 *)&iph->id);
->>> - flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (id & ~IP_DF));
->>> - id >>= 16;
->>> + id = ntohs(*(__be16 *)&iph->id);
->>> + frag = ntohs(*(__be16 *)&iph->frag_off);
->>> + flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (frag &
->>> ~IP_DF));
->>>
->>> for (p = *head; p; p = p->next) {
->>> struct iphdr *iph2;
->>>
->>
->> This solves nothing, because a few lines after you'll have yet another
->> unaligned access :
->>
-> 
+On Fri, Sep 23, 2016 at 10:19:50AM -0700, Eric Nelson wrote:
 > Oddly, it does prevent the vast majority (90%+) of the alignment errors.
 > 
 > I believe this is because the compiler is generating an ldm instruction
 > when the ntohl() call is used, but I'm stumped about why these aren't
 > generating faults:
-> 
->> ((__force u32)iph->saddr ^ (__force u32)iph2->saddr) |
->> ((__force u32)iph->daddr ^ (__force u32)iph2->daddr)) {
->>
->> So you might have one less problematic access, out of hundreds of them
->> all over the places.
->>
->> Really the problem is that whole stack depends on the assumption that
->> IP headers are aligned on arches that care
->> (ie where NET_IP_ALIGN == 2)
->>
->> If your build does have NET_IP_ALIGN = 2 and you get a fault here, it
->> might be because of a buggy driver.
->>
-> 
-> NET_IP_ALIGN is set to 2.
-> 
->> The other known case is some GRE encapsulations that break the
->> assumption, and this is discussed somewhere else.
->>
+
+ldm generates alignment faults when the address is not aligned to a
+32-bit boundary.  ldr on ARMv6+ does not.
+
 > I don't think that's the case.
 > 
 > # CONFIG_IPV6_GRE is not set
@@ -75,29 +27,70 @@ On 09/23/2016 10:19 AM, Eric Nelson wrote:
 > Hmm... Instrumenting the kernel, it seems that iphdr **is** aligned on
 > a 4-byte boundary.
 > 
+> Does the ldm instruction require 8-byte alignment?
+> 
+> There's definitely a compiler-version dependency involved here,
+> since using gcc 4.9 also reduced the number of faults dramatically.
 
-No. That was wrong.
+Well, I don't think it's that gcc related:
 
-The iphdr is aligned at offsets of 14 from the ethernet frame, which itself
-is longword aligned.
+User:           0
+System:         312855 (ip6_route_input+0x6c/0x1e0)
+Skipped:        0
+Half:           0
+Word:           0
+DWord:          2
+Multi:          312853
 
-I mistakenly tested before the call to skb_gro_header_slow(), when
-iph was NULL.
+c06d8998 <ip6_route_input>:
+c06d89ac:       e1a04000        mov     r4, r0
+c06d89b0:       e1d489b4        ldrh    r8, [r4, #148]  ; 0x94
+c06d89b8:       e594a0a0        ldr     sl, [r4, #160]  ; 0xa0
+c06d89cc:       e08ac008        add     ip, sl, r8
+c06d89d4:       e28c3018        add     r3, ip, #24
+c06d89dc:       e28c7008        add     r7, ip, #8
+c06d89e4:       e893000f        ldm     r3, {r0, r1, r2, r3}
+c06d89ec:       e24be044        sub     lr, fp, #68     ; 0x44
+c06d89f4:       e24b5054        sub     r5, fp, #84     ; 0x54
+c06d89fc:       e885000f        stm     r5, {r0, r1, r2, r3}
+c06d8a04:       e897000f        ldm     r7, {r0, r1, r2, r3}
+c06d8a10:       e88e000f        stm     lr, {r0, r1, r2, r3}
 
-After putting a test in the right place, I'm seeing an address of
-888a364e for the first un-aligned packet.
+This is from:
 
-Since the hardware requires longword alignment for its' DMA transfers,
-aligning the IP header will require a memcpy, right?
+        struct flowi6 fl6 = {
+                .flowi6_iif = l3mdev_fib_oif(skb->dev),
+                .daddr = iph->daddr,
+                .saddr = iph->saddr,
+                .flowlabel = ip6_flowinfo(iph),
+                .flowi6_mark = skb->mark,
+                .flowi6_proto = iph->nexthdr,
+        };
 
-You hinted at a solution in this post:
+specifically, I suspect, the saddr and daddr initialisations.
 
-http://www.spinics.net/lists/netdev/msg213166.html
+There's not much to get away from this - the FEC on iMX requires a
+16-byte alignment for DMA addresses, which violates the network
+stack's requirement for the ethernet packet to be received with a
+two byte offset.  So the IP header (and IPv6 headers) will always
+be mis-aligned in memory, which leads to a huge number of alignment
+faults.
 
-Are you aware of another driver doing this that could be used as
-a reference?
+There's not much getting away from this - the problem is not in the
+networking stack, but the FEC hardware/network driver.  See:
 
-Please advise,
+        struct  fec_enet_private *fep = netdev_priv(ndev);
+        int off;
 
+        off = ((unsigned long)skb->data) & fep->rx_align;
+        if (off)
+                skb_reserve(skb, fep->rx_align + 1 - off);
 
-Eric
+        bdp->cbd_bufaddr = cpu_to_fec32(dma_map_single(&fep->pdev->dev, skb->data, FEC_ENET_RX_FRSIZE - fep->rx_align, DMA_FROM_DEVICE));
+
+in fec_enet_new_rxbdp().
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
