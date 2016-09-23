@@ -1,57 +1,28 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 23 Sep 2016 17:03:23 +0200
-Subject: [PATCH] usb: gadget: udc: atmel: fix endpoint name
-In-Reply-To: <331f5819-1f65-980d-486d-732342877f2c@atmel.com>
-References: <20160915150722.13103-1-alexandre.belloni@free-electrons.com>
- <c90099af-2537-cc41-2775-dd2ca41dc070@atmel.com>
- <331f5819-1f65-980d-486d-732342877f2c@atmel.com>
-Message-ID: <20160923150323.GB13744@kroah.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Sep 2016 10:06:36 -0500
+Subject: [PATCH 01/19] phy: phy-miphy365x: Remove miphy365 driver and dt
+ binding documentation.
+In-Reply-To: <1473859677-9231-2-git-send-email-peter.griffin@linaro.org>
+References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
+ <1473859677-9231-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160923150636.GA9176@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 04:20:45PM +0200, Nicolas Ferre wrote:
-> Le 16/09/2016 ? 10:36, Nicolas Ferre a ?crit :
-> > Le 15/09/2016 ? 17:07, Alexandre Belloni a ?crit :
-> >> Since commit c32b5bcfa3c4 ("ARM: dts: at91: Fix USB endpoint nodes"),
-> >> atmel_usba_udc fails with:
-> >>
-> >> ------------[ cut here ]------------
-> >> WARNING: CPU: 0 PID: 0 at include/linux/usb/gadget.h:405
-> >> ecm_do_notify+0x188/0x1a0
-> >> Modules linked in:
-> >> CPU: 0 PID: 0 Comm: swapper Not tainted 4.7.0+ #15
-> >> Hardware name: Atmel SAMA5
-> >> [<c010ccfc>] (unwind_backtrace) from [<c010a7ec>] (show_stack+0x10/0x14)
-> >> [<c010a7ec>] (show_stack) from [<c0115c10>] (__warn+0xe4/0xfc)
-> >> [<c0115c10>] (__warn) from [<c0115cd8>] (warn_slowpath_null+0x20/0x28)
-> >> [<c0115cd8>] (warn_slowpath_null) from [<c04377ac>] (ecm_do_notify+0x188/0x1a0)
-> >> [<c04377ac>] (ecm_do_notify) from [<c04379a4>] (ecm_set_alt+0x74/0x1ac)
-> >> [<c04379a4>] (ecm_set_alt) from [<c042f74c>] (composite_setup+0xfc0/0x19f8)
-> >> [<c042f74c>] (composite_setup) from [<c04356e8>] (usba_udc_irq+0x8f4/0xd9c)
-> >> [<c04356e8>] (usba_udc_irq) from [<c013ec9c>] (handle_irq_event_percpu+0x9c/0x158)
-> >> [<c013ec9c>] (handle_irq_event_percpu) from [<c013ed80>] (handle_irq_event+0x28/0x3c)
-> >> [<c013ed80>] (handle_irq_event) from [<c01416d4>] (handle_fasteoi_irq+0xa0/0x168)
-> >> [<c01416d4>] (handle_fasteoi_irq) from [<c013e3f8>] (generic_handle_irq+0x24/0x34)
-> >> [<c013e3f8>] (generic_handle_irq) from [<c013e640>] (__handle_domain_irq+0x54/0xa8)
-> >> [<c013e640>] (__handle_domain_irq) from [<c010b214>] (__irq_svc+0x54/0x70)
-> >> [<c010b214>] (__irq_svc) from [<c0107eb0>] (arch_cpu_idle+0x38/0x3c)
-> >> [<c0107eb0>] (arch_cpu_idle) from [<c0137300>] (cpu_startup_entry+0x9c/0xdc)
-> >> [<c0137300>] (cpu_startup_entry) from [<c0900c40>] (start_kernel+0x354/0x360)
-> >> [<c0900c40>] (start_kernel) from [<20008078>] (0x20008078)
-> >> ---[ end trace e7cf9dcebf4815a6 ]---
-> >>
-> >> Fixes: c32b5bcfa3c4 ("ARM: dts: at91: Fix USB endpoint nodes")
-> >> Reported-by: Richard Genoud <richard.genoud@gmail.com>
-> >> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > 
-> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > 
-> > Felipe, Greg,
-> > It is clearly a regression and material for 4.8-fixes. But I do know
-> > that we are very late in the process :-(
-> > Please do what you can to make it progress before 4.8-final but I'm
-> > truly aware of the challenge.
+On Wed, Sep 14, 2016 at 02:27:39PM +0100, Peter Griffin wrote:
+> This phy is only used on STiH415/6 based silicon, and support for
+> these SoC's is being removed from the kernel.
 > 
-> Any chance that we can have it (aka ping)?
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Cc: <kishon@ti.com>
+> ---
+>  .../devicetree/bindings/phy/phy-miphy365x.txt      |  77 ---
 
-It's Felipe's area, not mine :)
+Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/phy/Kconfig                                |  10 -
+>  drivers/phy/Makefile                               |   1 -
+>  drivers/phy/phy-miphy365x.c                        | 625 ---------------------
+>  4 files changed, 713 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+>  delete mode 100644 drivers/phy/phy-miphy365x.c
