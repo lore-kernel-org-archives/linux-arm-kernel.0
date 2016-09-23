@@ -1,56 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Sep 2016 20:22:58 +0200
-Subject: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape
- platforms
-In-Reply-To: <VI1PR0401MB263894265429130B91E7880C8DC80@VI1PR0401MB2638.eurprd04.prod.outlook.com>
-References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
- <2519047.ijr708V79a@wuerfel>
- <VI1PR0401MB263894265429130B91E7880C8DC80@VI1PR0401MB2638.eurprd04.prod.outlook.com>
-Message-ID: <4642389.nHAzKPNi96@wuerfel>
+From: eric@nelint.com (Eric Nelson)
+Date: Fri, 23 Sep 2016 11:26:18 -0700
+Subject: Alignment issues with freescale FEC driver
+In-Reply-To: <20160923173751.GA1041@n2100.armlinux.org.uk>
+References: <troy.kisky@boundarydevices.com>
+ <02afb707-65de-5101-a79b-355929c4e00b@nelint.com>
+ <CANn89iLb+QJu+MYh859oAAjcLCsKRpBbzVf43yOdq+HJVtZDpQ@mail.gmail.com>
+ <5ee28ee0-cf0c-bdab-1271-f17755365c13@nelint.com>
+ <20160923173751.GA1041@n2100.armlinux.org.uk>
+Message-ID: <d0d6f333-c6fc-6572-0633-d7c2c29b8b3f@nelint.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 23, 2016 4:09:29 PM CEST Stuart Yoder wrote:
-> > -----Original Message-----
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Friday, September 23, 2016 10:58 AM
+Thanks Russell,
 
-> > > Really, though, the firmware call thing is an incredibly niche use-case.
-> > > Beyond development, the only real benefit of starting an AArch32 kernel
-> > > in Hyp is that you can run AArch32 KVM guests, which you can do equally
-> > > well (if not better) under an AArch64 kernel.
-> > 
-> > This was my question earlier in the thread, apparently Alison has
-> > another use case in mind, but I don't yet know what that is. If
-> > that use case is important enough, we could do it this way.
-> > 
-> > The only use case I can think of at the moment is boot testing
-> > on kernelci.org, which could be used to check whether all the drivers
-> > work in 32-bit environments.
+On 09/23/2016 10:37 AM, Russell King - ARM Linux wrote:
+> On Fri, Sep 23, 2016 at 10:19:50AM -0700, Eric Nelson wrote:
+>> Oddly, it does prevent the vast majority (90%+) of the alignment errors.
+>>
+>> I believe this is because the compiler is generating an ldm instruction
+>> when the ntohl() call is used, but I'm stumped about why these aren't
+>> generating faults:
+
+After looking at it, I have to think that the code that reads iph->id
+is just hit more frequently than the other code in this routine.
+
 > 
-> The reason we want aarch32 kernel support is for specific customers that
-> have requirements for legacy 32-bit kernel drivers that function on ARMv7
-> but for some reason are very problematic to port to a 64-bit kernel.  So,
-> the way to ease the 64-bit transition is allow them to run an aarch32 kernel
-> and their driver on an ARMv8 SoC.   I don't think we specifically care
-> whether the kernel starts at EL2 or EL1.
+> ldm generates alignment faults when the address is not aligned to a
+> 32-bit boundary.  ldr on ARMv6+ does not.
+> 
+>> I don't think that's the case.
+>>
+>> # CONFIG_IPV6_GRE is not set
+>>
+>> Hmm... Instrumenting the kernel, it seems that iphdr **is** aligned on
+>> a 4-byte boundary.
+>>
+>> Does the ldm instruction require 8-byte alignment?
+>>
+>> There's definitely a compiler-version dependency involved here,
+>> since using gcc 4.9 also reduced the number of faults dramatically.
+> 
+> Well, I don't think it's that gcc related:
+> 
 
-Thanks for the explanation. Unfortunately I don't think that helps
-get this approach upstream, in particular I wouldn't want to add
-a platform specific hack just to help a third party not have to fix
-their out-of-tree drivers to be 64-bit clean.
+I can only say that I noticed a dramatic drop in the number of faults, and
+didn't see the inet_gro_receive reported in /proc/cpu/alignment with gcc 4.9
+when trying to identify the issue.
 
-If your customer already has a chunk of downstream patches large
-enough to be problematic to rebuild for 64-bit, they should be able
-to also pick up these two patches, but of course what we really
-want is to get drivers upstream and fixed (presumably this would
-be an even larger task than just fixing them, so I don't set my
-hopes too high here).
+> User:           0
+> System:         312855 (ip6_route_input+0x6c/0x1e0)
+> Skipped:        0
+> Half:           0
+> Word:           0
+> DWord:          2
+> Multi:          312853
+> 
+> c06d8998 <ip6_route_input>:
+> c06d89ac:       e1a04000        mov     r4, r0
+> c06d89b0:       e1d489b4        ldrh    r8, [r4, #148]  ; 0x94
+> c06d89b8:       e594a0a0        ldr     sl, [r4, #160]  ; 0xa0
+> c06d89cc:       e08ac008        add     ip, sl, r8
+> c06d89d4:       e28c3018        add     r3, ip, #24
+> c06d89dc:       e28c7008        add     r7, ip, #8
+> c06d89e4:       e893000f        ldm     r3, {r0, r1, r2, r3}
+> c06d89ec:       e24be044        sub     lr, fp, #68     ; 0x44
+> c06d89f4:       e24b5054        sub     r5, fp, #84     ; 0x54
+> c06d89fc:       e885000f        stm     r5, {r0, r1, r2, r3}
+> c06d8a04:       e897000f        ldm     r7, {r0, r1, r2, r3}
+> c06d8a10:       e88e000f        stm     lr, {r0, r1, r2, r3}
+> 
+> This is from:
+> 
+>         struct flowi6 fl6 = {
+>                 .flowi6_iif = l3mdev_fib_oif(skb->dev),
+>                 .daddr = iph->daddr,
+>                 .saddr = iph->saddr,
+>                 .flowlabel = ip6_flowinfo(iph),
+>                 .flowi6_mark = skb->mark,
+>                 .flowi6_proto = iph->nexthdr,
+>         };
+> 
+> specifically, I suspect, the saddr and daddr initialisations.
+> 
+> There's not much to get away from this - the FEC on iMX requires a
+> 16-byte alignment for DMA addresses, which violates the network
+> stack's requirement for the ethernet packet to be received with a
+> two byte offset.  So the IP header (and IPv6 headers) will always
+> be mis-aligned in memory, which leads to a huge number of alignment
+> faults.
+> 
+> There's not much getting away from this - the problem is not in the
+> networking stack, but the FEC hardware/network driver.  See:
+> 
+>         struct  fec_enet_private *fep = netdev_priv(ndev);
+>         int off;
+> 
+>         off = ((unsigned long)skb->data) & fep->rx_align;
+>         if (off)
+>                 skb_reserve(skb, fep->rx_align + 1 - off);
+> 
+>         bdp->cbd_bufaddr = cpu_to_fec32(dma_map_single(&fep->pdev->dev, skb->data, FEC_ENET_RX_FRSIZE - fep->rx_align, DMA_FROM_DEVICE));
+> 
+> in fec_enet_new_rxbdp().
+> 
 
-I'm still not opposed to making *all* 64-bit platforms available
-to 32-bit kernels for testing purposes though, and that would solve
-the customer problem too, as would the approach of encapsulating
-the kernel in hypervisor stub that implements the PSCI calls
-and using MACH_VIRT with the respective layerscape drivers enabled.
+So the question is: should we just live with this and acknowledge a
+performance penalty of bad alignment or do something about it?
 
-	Arnd
+I'm not sure the cost (or the details) of Eric's proposed fix of allocating
+and copying the header to another skb.
+
+The original report was of bad network performance, but I haven't
+been able to see an impact doing some simple tests using wget
+and SSH.
