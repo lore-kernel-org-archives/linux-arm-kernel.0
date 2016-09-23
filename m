@@ -1,84 +1,71 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 23 Sep 2016 11:17:13 +0200
-Subject: [PATCH v5] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <e4c08096-03bd-3ec3-998d-41643992ab1a@redhat.com>
-References: <1474548769-195643-1-git-send-email-agraf@suse.de>
- <20160922212831.GD9101@cbox> <d90f04d4-b29f-f08e-df39-ec307af44225@suse.de>
- <63a1e3a2-f551-017f-b6be-593b53a0b407@redhat.com>
- <7afbc08e-0ba2-d6fd-c1ed-e5822e05c00b@suse.de>
- <e4c08096-03bd-3ec3-998d-41643992ab1a@redhat.com>
-Message-ID: <70fc788d-f99e-4ba5-67a2-da9c1a857dfe@suse.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Sep 2016 10:19:08 +0100
+Subject: [RFC PATCH 0/3] efi: MMC proxy support for the UEFI varstore
+In-Reply-To: <CAKv+Gu-H=JkXFSm2bO4tFcUEVPs2ueT3za2X+aUjrnGZZSdUvQ@mail.gmail.com>
+References: <1474543806-19210-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160922125854.GC26596@leverpostej>
+ <CAKv+Gu-H=JkXFSm2bO4tFcUEVPs2ueT3za2X+aUjrnGZZSdUvQ@mail.gmail.com>
+Message-ID: <20160923091907.GA10042@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 22, 2016 at 02:37:00PM +0100, Ard Biesheuvel wrote:
+> On 22 September 2016 at 13:58, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Thu, Sep 22, 2016 at 12:30:03PM +0100, Ard Biesheuvel wrote:
 
+> > I also think that this needs to go via the USWG (and to the UEFI spec),
+> > before we can consider using it.
 
-On 23.09.16 11:15, Paolo Bonzini wrote:
+> The primary issue there is that the variable protocols are
+> architectural DXE protocols defined in the PI spec, not the UEFI spec
+> (and the MMC host protocol I am using here is not in any spec afaik),
+> and so implementing this in a UEFI compliant way is not currently
+> possible. Exposing a UEFI protocol like block I/O is not sufficient,
+> since the variable protocols are depended upon earlier in the boot
+> sequence (in UEFI implementations based on PI).
 > 
-> 
-> On 23/09/2016 11:10, Alexander Graf wrote:
->>>>> Maybe I'm misunderstanding and user_timer_pending is just a cached
->>>>> verison of what you said last, but as I said above, I think you can just
->>>>> compare timer->irq.level with the last value the kvm_run struct, and if
->>>>> something changed, you have to exit.
->>>>
->>>> So how would user space know whether the line went up or down? Or didn't
->>>> change at all (if we coalesce with an MMIO exit)?
->>>
->>> It would save the status of the line somewhere in its own variable,
->>> without introducing a relatively delicate API between kernel and user.
->>>
->>> I agree that you cannot update kernel_timer_pending only in
->>> flush_hwstate; otherwise you miss on case (2) when there is a vmexit.
->>> That has to stay in kvm_timer_sync_hwstate (or it could become a new
->>> function called at the very end of kvm_arch_vcpu_ioctl_run).
->>
->> The beauty of having it in the timer update function is that it gets
->> called from flush_hwstate() as well. That way we catch the update also
->> in cases where we need it before we enter the vcpu.
-> 
-> Yeah, the timer update function is ideal because it is called from both
-> flush_hwstate and sync_hwstate.
-> 
->>> However, I'm not sure why user_timer_pending is necessary.  If it is
->>> just the value you assigned to regs->kernel_timer_pending at the time of
->>> the previous vmexit, can kvm_timer_flush_hwstate just do
->>>
->>>    if (timer->prev_kernel_timer_pending != regs->kernel_timer_pending) {
->>>        timer->prev_kernel_timer_pending = regs->kernel_timer_pending;
->>>        return 1;
->>>    }
->>>
->>> ?  Or even
->>>
->>>    if (timer->prev_irq_level != timer->irq.level) {
->>>        timer->prev_irq_level = regs->irq.level;
->>>        return 1;
->>>    }
->>>
->>> so that regs->kernel_timer_pending remains exclusively
->>> kvm_timer_sync_hwstate's business?
->>
->> We could do that too, yes. But it puts more burden on user space - it
->> would have to ensure that it *always* checks for the pending timer
->> status. With this approach, user space may opt to only check for timer
->> state changes on -EINTR and things would still work.
-> 
-> That would be overloading EINTR a bit though.  But that's a digression,
-> I don't think it matters much.
-> 
-> On the other hand, what happens if you run new QEMU with old userspace?
-> With user_timer_pending you'd get an infinite stream of vmexits the
-> first time the timer fires, wouldn't you?  Whereas if you keep it in the
-> kernel, userspace would simply not get the interrupt (because it doesn't
-> know about kernel_timer_pending) and think it got a spurious vmexit.
-> The kernel's IRQ would stay masked and everything would just (not) work
-> like before your patch?
+> So yes, this needs to be discussed (and it will be, but not out in the
+> open, unfortunately.) However, it is unclear whether it is feasible to
+> address this at the UEFI level, or whether we will need to go beyond
+> and define something based on the PI spec directly. (/me looks at
+> Charles)
 
-Yes, we'd definitely stay more compatible by tracking it only in the
-kernel. I'm not fully convinced that it's the better interface, but
-since both Christoffer and you seem to choke on that part, I'll give it
-a stab ;).
+That is... less than optimal. :(
 
+> > I have a few other general concerns:
 
-Alex
+> > * Lifetime guarantees
+> >
+> >   When is it valid for EFI to call the MMC proxy? Can other services
+> >   (e.g. ACPI) call this?
+> >
+> >   How do we handle kexec/kdump? e.g. how do we teardown the interface
+> >   before branching to a new kernel, how do we safely tear down a crashed
+> >   kernel's interface, what can we call before doing so?
+> >
+> >   How do we handle suspend/resume? e.g. is it necessary to re-register
+> >   upon resume?
+> 
+> All good questions, and exactly the kind of feedback I am seeking.
+> 
+> Tearing down the interface could be as simple as clearing the pointer,
+> but some synchronization is probably in order to make sure that no
+> calls are in progress.
+> 
+> But to clarify the purpose of this series: are there any concerns
+> regarding exposing callbacks to the firmware in general, and for MMC
+> access in particular, from the Linux side?
+
+I have a general uneasiness about having UEFI call kernel function
+pointers, inverting the usual relationship, but I'll need to think about
+that a little further -- the lifetime stuff was the most obvious problem
+in that area, but I'm sure there are more. ;)
+
+It would really help to know *when* UEFI is expected/allowed to call
+this. For synchronous calls, the FW could return a new
+requires-os-support error code, and the OS could then call some API,
+figure out what to do, and later send any acknowledgement required back
+to UEFI. That might not cover all cases, though.
+
+Thanks,
+Mark.
