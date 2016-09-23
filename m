@@ -1,28 +1,30 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 23 Sep 2016 13:22:39 -0400
-Subject: [PATCH V3 01/10] Documentation: DT: qcom_hidma: update binding
- for MSI
-In-Reply-To: <20160923153910.GA23150@rob-hp-laptop>
-References: <1473960166-30155-1-git-send-email-okaya@codeaurora.org>
- <1473960166-30155-2-git-send-email-okaya@codeaurora.org>
- <20160923153910.GA23150@rob-hp-laptop>
-Message-ID: <92feb6b5-b9b9-394d-3cb6-d095df339ebc@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Sep 2016 18:31:44 +0100
+Subject: [RFC PATCH 2/8] thread_info: allow custom in-task thread_info
+In-Reply-To: <CALCETrV6G2DU1d7qr=ADas7nk5a77=J6X7ezKxw2_kzdmJGDXg@mail.gmail.com>
+References: <1473947349-14521-1-git-send-email-mark.rutland@arm.com>
+ <1473947349-14521-3-git-send-email-mark.rutland@arm.com>
+ <CALCETrWni0aZ71r-R6oYG98kZvZA8a184UR0YURk_=tXu8HXMw@mail.gmail.com>
+ <20160916103101.GA21702@leverpostej>
+ <CALCETrUDWiDmLbMqw9sQYEzvDuSVfmT_UscxQXfmf8YYyTOC=Q@mail.gmail.com>
+ <20160921102827.GC18176@leverpostej>
+ <CALCETrV6G2DU1d7qr=ADas7nk5a77=J6X7ezKxw2_kzdmJGDXg@mail.gmail.com>
+Message-ID: <20160923173143.GA29830@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/23/2016 11:39 AM, Rob Herring wrote:
->> Required properties:
->> > -- compatible: must contain "qcom,hidma-1.0"
->> > +- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
->> > +for MSI capable HW.
-> Do you have an SoC part number yet? If so, please use that instead.
+On Thu, Sep 22, 2016 at 03:23:59PM -0700, Andy Lutomirski wrote:
+> On Sep 21, 2016 12:28 AM, "Mark Rutland" <mark.rutland@arm.com> wrote:
+
+> > Given all that, can we make the generic thread_info::flags an unsigned
+> > long, matching what the thread flag helpers implicitly assume?
 > 
+> Yes.  Want to send the patch or should I?
 
-Unfortunately, I have the same problem like "qcom, hidma-1.0". The SoC name is not settled
-yet and same IP gets used in multiple SoCs. Each IP reports its own version number. This is
-one of the reasons why I sticked to versioning instead of SoC name.
+I've sent a patch out to LKML [1], though if that doesn't look right I'm
+more than happy for you to send a correct one. ;)
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks,
+Mark.
+
+[1] http://lkml.kernel.org/r/1474651447-30447-1-git-send-email-mark.rutland at arm.com
