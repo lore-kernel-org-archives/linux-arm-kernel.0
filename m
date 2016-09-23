@@ -1,40 +1,80 @@
 From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Fri, 23 Sep 2016 16:55:48 +0530
-Subject: [PATCH v4] devicetree: bindings: uart: Add new compatible string for
- ZynqMP
-Message-ID: <1474629948-9780-1-git-send-email-navam@xilinx.com>
+Date: Fri, 23 Sep 2016 16:56:58 +0530
+Subject: [PATCH v3] gpio: Added zynq specific check for special pins on bank
+ zero
+Message-ID: <1474630018-9986-1-git-send-email-navam@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nava kishore Manne <nava.manne@xilinx.com>
 
-This patch Adds the new compatible string for ZynqMP.
+This patch adds zynq specific check for bank 0 pins 7 and 8
+are special and cannot be used as inputs
 
 Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+Reported-by: Jonas Karlsson <Jonas.d.karlsson@gmail.com>
+Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Acked-by: Michal Simek <michal.simek@xilinx.com>
 ---
-Changes for v4:
-		-Modified the ChangeLog comment.
 Changes for v3:
-		-Added changeLog comment.
+		-Fixed some minor comments.
 Changes for v2:
-                -None
+                -Removed un-used quirks for zynqmp.
 
- Documentation/devicetree/bindings/serial/cdns,uart.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/gpio/gpio-zynq.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/serial/cdns,uart.txt b/Documentation/devicetree/bindings/serial/cdns,uart.txt
-index a3eb154..4fe7aae 100644
---- a/Documentation/devicetree/bindings/serial/cdns,uart.txt
-+++ b/Documentation/devicetree/bindings/serial/cdns,uart.txt
-@@ -1,7 +1,8 @@
- Binding for Cadence UART Controller
+diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+index e72794e..6b4d10d 100644
+--- a/drivers/gpio/gpio-zynq.c
++++ b/drivers/gpio/gpio-zynq.c
+@@ -96,6 +96,9 @@
+ /* GPIO upper 16 bit mask */
+ #define ZYNQ_GPIO_UPPER_MASK 0xFFFF0000
  
- Required properties:
--- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps"
-+- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps" for Zynq and
-+               "cdns,uart-r1p12" for Zynq Ultrascale+ MPSoC uart controller.
- - reg: Should contain UART controller registers location and length.
- - interrupts: Should contain UART controller interrupts.
- - clocks: Must contain phandles to the UART clocks
++/* For GPIO quirks */
++#define ZYNQ_GPIO_QUIRK_FOO	BIT(0)
++
+ /**
+  * struct zynq_gpio - gpio device private data structure
+  * @chip:	instance of the gpio_chip
+@@ -122,6 +125,7 @@ struct zynq_gpio {
+ */
+ struct zynq_platform_data {
+ 	const char *label;
++	u32 quirks;
+ 	u16 ngpio;
+ 	int max_bank;
+ 	int bank_min[ZYNQMP_GPIO_MAX_BANK];
+@@ -238,13 +242,19 @@ static void zynq_gpio_set_value(struct gpio_chip *chip, unsigned int pin,
+ static int zynq_gpio_dir_in(struct gpio_chip *chip, unsigned int pin)
+ {
+ 	u32 reg;
++	bool is_zynq_gpio;
+ 	unsigned int bank_num, bank_pin_num;
+ 	struct zynq_gpio *gpio = gpiochip_get_data(chip);
+ 
++	is_zynq_gpio = gpio->p_data->quirks & ZYNQ_GPIO_QUIRK_FOO;
+ 	zynq_gpio_get_bank_pin(pin, &bank_num, &bank_pin_num, gpio);
+ 
+-	/* bank 0 pins 7 and 8 are special and cannot be used as inputs */
+-	if (bank_num == 0 && (bank_pin_num == 7 || bank_pin_num == 8))
++	/*
++	 * On zynq bank 0 pins 7 and 8 are special and cannot be used
++	 * as inputs.
++	 */
++	if (is_zynq_gpio && bank_num == 0 &&
++		(bank_pin_num == 7 || bank_pin_num == 8))
+ 		return -EINVAL;
+ 
+ 	/* clear the bit in direction mode reg to set the pin as input */
+@@ -627,6 +637,7 @@ static const struct zynq_platform_data zynqmp_gpio_def = {
+ 
+ static const struct zynq_platform_data zynq_gpio_def = {
+ 	.label = "zynq_gpio",
++	.quirks = ZYNQ_GPIO_QUIRK_FOO,
+ 	.ngpio = ZYNQ_GPIO_NR_GPIOS,
+ 	.max_bank = ZYNQ_GPIO_MAX_BANK,
+ 	.bank_min[0] = ZYNQ_GPIO_BANK0_PIN_MIN(),
 -- 
 2.1.2
