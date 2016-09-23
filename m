@@ -1,41 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Sep 2016 17:10:03 +0100
-Subject: [PATCH] arm64: fix dump_backtrace with NULL tsk
-In-Reply-To: <57E55117.8080907@arm.com>
-References: <1474642587-22416-1-git-send-email-mark.rutland@arm.com>
- <57E55117.8080907@arm.com>
-Message-ID: <20160923161003.GC22454@leverpostej>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Sep 2016 11:13:38 -0500
+Subject: [PATCH v5 1/6] of: Add vendor prefix for Engicam s.r.l company
+In-Reply-To: <1473967015-8523-2-git-send-email-jagan@amarulasolutions.com>
+References: <1473967015-8523-1-git-send-email-jagan@amarulasolutions.com>
+ <1473967015-8523-2-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <20160923161338.GA13871@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 04:58:15PM +0100, James Morse wrote:
-> Hi Mark,
+On Fri, Sep 16, 2016 at 12:46:50AM +0530, Jagan Teki wrote:
+> Engicam providing design services of electronic systems with
+> high content of technology, relying on a long experience in
+> electronic design.
 > 
-> On 23/09/16 15:56, Mark Rutland wrote:
-> > In some places, dump_backtrace() is called with a NULL tsk parameter,
-> > e.g. in bug_handler() in arch/arm64, or indirectly via show_stack() in
-> > core code. The expectation is that this is treated as if current were
-> > passed instead of NULL.
-> > 
-> > Commit a80a0eb70c358f8c ("arm64: make irq_stack_ptr more robust") didn't
-> > take this into account, and compares tsk against current *before* we
-> > check if tsk is NULL.
-> > 
-> > Due to this, we won't initialise irq_stack_ptr, and when we try to dump
-> > the exception regs we may call dump_mem() for memory immediately above
-> > the IRQ stack range, rather than for the relevant range on the task
-> > stack.
+> For more info visit
+> http://www.engicam.com/en/
 > 
-> Bother, I should have spotted that.
-
-FWIW, it certainly wasn't obvious!
-
-I only noticed because I had to vet all the callers for
-try_get_task_stack() ... put_task_stack() correctness with
-THREAD_INFO_IN_TASK.
-
-> Thanks for catching this!
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v5:
+> 	- none
+> Changes for v4:
+> 	- new patch
 > 
-> Acked-by: James Morse <james.morse@arm.com>
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Cheers!
+Acked-by: Rob Herring <robh@kernel.org>
