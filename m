@@ -1,36 +1,52 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 23 Sep 2016 22:33:47 +0900
-Subject: [PATCH] i2c: uniphier-f: fix misdetection of incomplete STOP
- condition
-In-Reply-To: <20160923121245.GA1580@katana>
-References: <1474632241-10440-1-git-send-email-yamada.masahiro@socionext.com>
- <20160923121245.GA1580@katana>
-Message-ID: <CAK7LNAT_Kqm3t_pXuqKxG_p=N504NRKWKoVAFRiv0Fq1LHJQBQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Sep 2016 08:35:29 -0500
+Subject: [PATCH 2/3] nvmem: dt: document lpc1850 OTP binding
+In-Reply-To: <20160913161241.22492-3-manabian@gmail.com>
+References: <20160913161241.22492-1-manabian@gmail.com>
+ <20160913161241.22492-3-manabian@gmail.com>
+Message-ID: <20160923133529.GA23548@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Tue, Sep 13, 2016 at 06:12:40PM +0200, Joachim Eastwood wrote:
+> Documenation for the LPC18xx/43xx OTP memory bindings.
+> 
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  .../devicetree/bindings/nvmem/lpc1850-otp.txt        | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt b/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
+> new file mode 100644
+> index 0000000..853b6a7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
+> @@ -0,0 +1,20 @@
+> +* NXP LPC18xx OTP memory
+> +
+> +Internal OTP (One Time Programmable) memory for NXP LPC18xx/43xx devices.
+> +
+> +Required properties:
+> +  - compatible: Should be "nxp,lpc1850-otp"
+> +  - reg: Must contain an entry with the physical base address and length
+> +    for each entry in reg-names.
 
+> +  - address-cells: must be set to 1.
+> +  - size-cells: must be set to 1.
 
-2016-09-23 21:12 GMT+09:00 Wolfram Sang <wsa@the-dreams.de>:
-> On Fri, Sep 23, 2016 at 09:04:01PM +0900, Masahiro Yamada wrote:
->> Currently, the status register FI2C_SR is checked immediately after
->> a STOP condition is issued in case of the deferred STOP condition.
->> It takes typically 5-10 usec until the corresponding bits in the
->> register are set, so the error check for "stop condition was not
->> completed" is very likely to be false positive.
->>
->> Add wait code to relax the status register check.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->
-> Use readl_poll_timeout?
->
+Not needed unless you have child nodes.
 
-Yes, thanks for your advice!
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> +
+> +See nvmem.txt for more information.
+> +
+> +Example:
+> +  otp: otp at 40045000 {
+> +    compatible = "nxp,lpc1850-otp";
+> +    reg = <0x40045000 0x1000>;
+> +    #address-cells = <1>;
+> +    #size-cells = <1>;
+> +  };
+> -- 
+> 2.9.3
+> 
