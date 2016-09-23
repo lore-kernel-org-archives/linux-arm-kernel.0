@@ -1,32 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Sep 2016 10:49:53 +0100
-Subject: [PATCH v2.1] arm64: kgdb: handle read-only text / modules
-In-Reply-To: <20160923074208.9899-1-takahiro.akashi@linaro.org>
-References: <20160923074208.9899-1-takahiro.akashi@linaro.org>
-Message-ID: <20160923094953.GC27704@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 23 Sep 2016 10:50:38 +0100
+Subject: [PATCH v6 1/7] arm/arm64: vgic-new: Implement support for
+ userspace access
+In-Reply-To: <CALicx6uuL9xX3VxLCy+EZi0AqXrNM_O+F3MN+W4gbiriUyb7Ug@mail.gmail.com>
+References: <1474351965-11586-1-git-send-email-vijay.kilari@gmail.com>
+ <1474351965-11586-2-git-send-email-vijay.kilari@gmail.com>
+ <57E3C9D8.7070906@arm.com>
+ <CALicx6uuL9xX3VxLCy+EZi0AqXrNM_O+F3MN+W4gbiriUyb7Ug@mail.gmail.com>
+Message-ID: <57E4FAEE.3070003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 04:42:08PM +0900, AKASHI Takahiro wrote:
-> Handle read-only cases (CONFIG_DEBUG_RODATA/CONFIG_DEBUG_SET_MODULE_RONX)
-> by using aarch64_insn_write() instead of probe_kernel_write().
-> See how this works:
->     commit 2f896d586610 ("arm64: use fixmap for text patching")
+On 22/09/16 15:01, Vijay Kilari wrote:
+> On Thu, Sep 22, 2016 at 5:38 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 20/09/16 07:12, vijay.kilari at gmail.com wrote:
+>>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>>> +static int vgic_uaccess_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>>> +                          gpa_t addr, u32 *val)
+>>> +{
+>>> +     struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
+>>> +     const struct vgic_register_region *region;
+>>> +     struct kvm_vcpu *r_vcpu;
+>>> +
+>>> +     region = vgic_get_mmio_region(iodev, addr, sizeof(u32));
+>>> +     if (!region) {
+>>> +             *val = 0;
+>>> +             return 0;
+>>
+>> This is not the previous semantic of vgic_uaccess, and I cannot see why
+>> blindly ignoring an access to an undefined region would be acceptable.
+>> What am I missing?
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Jason Wessel <jason.wessel@windriver.com>
-> Cc: <stable@vger.kernel.org> # 3.18-3.19: 2f896d5: arm64: use fixmap
-> Cc: <stable@vger.kernel.org> # 3.18-3.19: f6242ca: arm64: Fix text
-> Cc: <stable@vger.kernel.org> # 4.0-
+> AFAIK, the vgic_uaccess is not making any check on undefined region/register.
+> However, dispatch_mmio_read/write are returning 0 if check of region is failed
 
-Queued for 4.8 with a slight change in the last Cc: tag above:
+Hmmm. Fair enough. I don't really like it, but that's something for
+another day.
 
-Cc: <stable@vger.kernel.org> # 3.18.x-
-
-Thanks.
-
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
