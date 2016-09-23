@@ -1,66 +1,29 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 23 Sep 2016 14:55:28 +0300
-Subject: [PATCH V3 RFT 3/5] ARM64: dts: bcm283x: Use dtsi for USB host mode
-In-Reply-To: <4cda98b0-03a6-f43d-0eee-29b7702eac8c@i2se.com>
-References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
- <1471792204-21908-4-git-send-email-stefan.wahren@i2se.com>
- <bb073ea3-2f89-4fc5-e3af-2e27c54f221e@i2se.com>
- <1473245956.28663.50.camel@redhat.com>
- <18641a83-ddd7-1689-535a-c5a15b8a54f9@i2se.com>
- <1473257837.28663.80.camel@redhat.com>
- <aeba1434-3903-3ec4-1a94-e5c8229f4e5f@i2se.com>
- <87zimz821m.fsf@eliezer.anholt.net>
- <4cda98b0-03a6-f43d-0eee-29b7702eac8c@i2se.com>
-Message-ID: <87vaxm96fj.fsf@eliezer.anholt.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Sep 2016 13:58:43 +0200
+Subject: [PATCH 2/2] armv8: aarch32: Add SMP support for 32-bit Linux
+ kernel
+In-Reply-To: <1474597146-33312-2-git-send-email-b18965@freescale.com>
+References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
+ <1474597146-33312-2-git-send-email-b18965@freescale.com>
+Message-ID: <1728374.uyXUDC3UK8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On Friday, September 23, 2016 10:19:06 AM CEST Alison Wang wrote:
+> The patch adds SMP support for running 32-bit Linux kernel for
+> Layerscape platforms. Spin-table method is used for SMP support.
+> 
+> Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
+> ---
+>  arch/arm/mach-imx/common.h          |  1 +
+>  arch/arm/mach-imx/mach-layerscape.c |  1 +
+>  arch/arm/mach-imx/platsmp.c         | 49 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 51 insertions(+)
+> 
 
-> Am 23.09.2016 um 10:15 schrieb Eric Anholt:
->> Stefan Wahren <stefan.wahren@i2se.com> writes:
->>
->>> Am 07.09.2016 um 16:17 schrieb Gerd Hoffmann:
->>>>   Hi,
->>>>
->>>>> ARM: dts: Remove use of skeleton.dtsi from bcm283x.dtsi
->>>>> ARM64: dts: bcm: Use a symlink to R-Pi dtsi files from arch=arm
->>>> Picked them up.
->>>>
->>>>> In case of a multiplatform config with following settings the driver
->>>>> isn't able to "detect" the role:
->>>>>
->>>>> CONFIG_USB=y
->>>>> CONFIG_USB_OTG=y
->>>>> CONFIG_USB_DWC2=y
->>>>> CONFIG_USB_DWC2_DUAL_ROLE=y
->>>>> CONFIG_USB_PHY=y
->>>>> CONFIG_NOP_USB_XCEIV=y
->>>>> CONFIG_USB_GADGET=y
->>>>> CONFIG_USB_ZERO=y
->>>> Configured my kernel that way so the test actually tests something ;)
->>>>
->>>> And ... everything looks fine.  usb ethernet works, and so does the usb
->>>> keyboard.  /proc/device-tree/soc/usb at 7e980000/dr_mode exists and
->>>> contains "host".
->>>>
->>>> Tested-by: Gerd Hoffmann <kraxel@redhat.com>
->>>>
->>> This patch hasn't been merged yet. Is there something wrong?
->> I hadn't bumped it back to todo from RFT.  Also, is this a priority
->> patch, since submitting merges is a pain? 
-> No
->> Does USB break in some way
->> without it?
->
-> No. I only want know if this is still in queue and does someone care
-> about this patch.
+This really shouldn't be needed: if it works on a 64-bit kernel
+without platform specific SMP operations, why do you need it on 32-bit
+kernels?
 
-It's in my queue now.  Sorry for missing it!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160923/03281913/attachment.sig>
+	Arnd
