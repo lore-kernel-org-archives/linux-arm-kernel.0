@@ -1,59 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Sep 2016 21:38:51 +0200
-Subject: [PATCH] serial: stm32: use mapbase instead of membase for DMA
-Message-ID: <20160923193935.3726427-1-arnd@arndb.de>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 23 Sep 2016 22:01:47 +0200
+Subject: [PATCH 2/3] firmware: dt: document lpc1850 boot ROM bindings
+In-Reply-To: <20160923133949.GA24505@rob-hp-laptop>
+References: <20160913195117.2887-1-manabian@gmail.com>
+ <20160913195117.2887-3-manabian@gmail.com>
+ <20160923133949.GA24505@rob-hp-laptop>
+Message-ID: <CAGhQ9VwLHiONa5pfpAhKuu78uDwYRjfwJu3i1fhjVz+zaDFojw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building this driver with a 64-bit dma_addr_t type results in
-a compiler warning:
+On 23 September 2016 at 15:39, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Sep 13, 2016 at 09:51:16PM +0200, Joachim Eastwood wrote:
+>> Binding documentation for the NXP LPC boot ROM.
+>>
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> ---
+>>  .../devicetree/bindings/firmware/nxp,boot-rom.txt   | 21 +++++++++++++++++++++
+>>  1 file changed, 21 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt b/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
+>> new file mode 100644
+>> index 0000000..5f3a044
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
+>> @@ -0,0 +1,21 @@
+>> +* NXP LPC boot ROM
+>> +
+>> +NXP LPC microcontrollers contains a boot ROM used to retrieve part information
+>> +and access internal Flash memory and OTP memory. Note that the Flash API is
+>> +not available on Flashless devices.
+>
+> Is this determined at run-time? If not flashless devices should have a
+> different compatible string to determine this then.
 
-drivers/tty/serial/stm32-usart.c: In function 'stm32_of_dma_rx_probe':
-drivers/tty/serial/stm32-usart.c:746:20: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
-drivers/tty/serial/stm32-usart.c: In function 'stm32_of_dma_tx_probe':
-drivers/tty/serial/stm32-usart.c:818:20: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+It is determined at run time by reading a 'CHIP ID' register in CREG
+(syscon) that is present on both Flash and Flashless devices.
 
-While the type conversion here is harmless, this hints at a different
-problem: we pass an __iomem pointer into a DMA engine, which expects
-a phys_addr_t. This happens to work because stm32 has no MMU and
-ioremap() is an identity mapping here, but it's still an incorrect
-API use. Using dma_addr_t is doubly wrong here, because that would
-be the result of dma_map_single() rather than the physical address.
 
-Using the mapbase instead fixes multiple issues:
-
-- the warning is gone
-- we don't go through ioremap in error
-- the cast is gone, making it use the correct resource_size_t/phys_addr_t
-  type in the process.
-
-Fixes: 3489187204eb ("serial: stm32: adding dma support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/tty/serial/stm32-usart.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
-index 4d3001b77e7e..2adb678a863b 100644
---- a/drivers/tty/serial/stm32-usart.c
-+++ b/drivers/tty/serial/stm32-usart.c
-@@ -743,7 +743,7 @@ static int stm32_of_dma_rx_probe(struct stm32_port *stm32port,
- 
- 	/* Configure DMA channel */
- 	memset(&config, 0, sizeof(config));
--	config.src_addr = (dma_addr_t)port->membase + ofs->rdr;
-+	config.src_addr = port->mapbase + ofs->rdr;
- 	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
- 
- 	ret = dmaengine_slave_config(stm32port->rx_ch, &config);
-@@ -815,7 +815,7 @@ static int stm32_of_dma_tx_probe(struct stm32_port *stm32port,
- 
- 	/* Configure DMA channel */
- 	memset(&config, 0, sizeof(config));
--	config.dst_addr = (dma_addr_t)port->membase + ofs->tdr;
-+	config.dst_addr = port->mapbase + ofs->tdr;
- 	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
- 
- 	ret = dmaengine_slave_config(stm32port->tx_ch, &config);
--- 
-2.9.0
+regards,
+Joachim Eastwood
