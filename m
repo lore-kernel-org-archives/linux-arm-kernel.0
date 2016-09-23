@@ -1,95 +1,72 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 20 Sep 2016 18:38:31 +0200
-Subject: [PATCH 2/3] regulator: axp20x: simplify the treatment of linked
- regulators
-In-Reply-To: <cover.1474616699.git.moinejf@free.fr>
-References: <cover.1474616699.git.moinejf@free.fr>
-Message-ID: <7496199d0a35463dc66346eb0985d059cbdcfc11.1474616699.git.moinejf@free.fr>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 23 Sep 2016 11:04:33 +0300
+Subject: [PATCHv2 1/3] Documentation: dt: Add TI SCI clock driver
+In-Reply-To: <20160912131038.GA13103@rob-hp-laptop>
+References: <1472733635-22661-1-git-send-email-t-kristo@ti.com>
+ <1472733635-22661-2-git-send-email-t-kristo@ti.com>
+ <20160912131038.GA13103@rob-hp-laptop>
+Message-ID: <45d8054d-21cb-c90d-7226-387b97040d83@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using ancillary variables for handling the linked regulators simplifies
-the loop of regulator creation and makes easier the addition of new
-regulator types.
+On 12/09/16 16:10, Rob Herring wrote:
+> On Thu, Sep 01, 2016 at 03:40:33PM +0300, Tero Kristo wrote:
+>> Add a clock implementation, TI SCI clock, that will hook to the common
+>> clock framework, and allow each clock to be controlled via TI SCI
+>> protocol.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>> Tested-by: Dave Gerlach <d-gerlach@ti.com>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>  .../devicetree/bindings/clock/ti,sci-clk.txt       | 51 ++++++++++++++++++++++
+>>  MAINTAINERS                                        |  1 +
+>>  2 files changed, 52 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/ti,sci-clk.txt b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>> new file mode 100644
+>> index 0000000..231cb80
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>> @@ -0,0 +1,51 @@
+>> +Texas Instruments TI-SCI Clocks
+>> +===============================
+>> +
+>> +All clocks on Texas Instruments' SoCs that contain a System Controller,
+>> +are only controlled by this entity. Communication between a host processor
+>> +running an OS and the System Controller happens through a protocol known
+>> +as TI-SCI[1]. This clock implementation plugs into the common clock
+>> +framework and makes use of the TI-SCI protocol on clock API requests.
+>> +
+>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+>> +
+>> +Required properties:
+>> +-------------------
+>> +- compatible: Must be "ti,sci-clk"
+>> +- #clock-cells: Shall be 2.
+>> +  In clock consumers, this cell represents the device ID and clock ID
+>> +  exposed by the PM firmware. The assignments can be found in the header
+>> +  files <dt-bindings/genpd/<soc>.h> (which covers the device IDs) and
+>> +  <dt-bindings/clock/<soc>.h> (which covers the clock IDs), where <soc>
+>> +  is the SoC involved, for example 'k2g'.
+>> +- ti,sci: Phandle to the TI SCI device to use for managing the clocks
+>> +
+>> +Optional properties:
+>> +-------------------
+>> +- ti,ssc-clocks: Array of phandle clocks that shall enable spread spectrum
+>> +		 clocking while enabled
+>> +- ti,allow-freq-change-clocks: Array of phandle clocks that shall allow
+>> +			       dynamic clock frequency changes by firmware
+>> +- ti,input-term-clocks: Array of phandle clocks that shall enable input
+>> +			termination
+>
+> These seem like a random set of features to control. What determines the
+> clocks for these? If it is based on the SoC, then make your compatible
+> string SoC specific and don't put this into DT.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- drivers/regulator/axp20x-regulator.c | 24 ++++++++++++++++--------
- 1 file changed, 16 insertions(+), 8 deletions(-)
+Currently nobody seems to be using these flags, so I will just drop the 
+support for these from the next rev. If anybody will need them at some 
+point, I will figure out how to support these.
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 4e5e7c8..7405f5b 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -511,6 +511,10 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 	u32 workmode;
- 	const char *dcdc1_name = axp22x_regulators[AXP22X_DCDC1].name;
- 	const char *dcdc5_name = axp22x_regulators[AXP22X_DCDC5].name;
-+	s8 dcdc1_ix = -1;
-+	s8 dcdc5_ix = -1;
-+	s8 dc1sw_ix = -1;
-+	s8 dc5ldo_ix = -1;
- 	bool drivevbus = false;
- 	u32 skip_bitmap = 0;
- 
-@@ -524,6 +528,10 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 	case AXP223_ID:
- 		regulators = axp22x_regulators;
- 		nregulators = AXP22X_REG_ID_MAX;
-+		dcdc1_ix = AXP22X_DCDC1;
-+		dcdc5_ix = AXP22X_DCDC5;
-+		dc1sw_ix = AXP22X_DC1SW;
-+		dc5ldo_ix = AXP22X_DC5LDO;
- 		drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
- 						  "x-powers,drive-vbus-en");
- 		break;
-@@ -541,6 +549,10 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 	case AXP809_ID:
- 		regulators = axp809_regulators;
- 		nregulators = AXP809_REG_ID_MAX;
-+		dcdc1_ix = AXP809_DCDC1;
-+		dcdc5_ix = AXP809_DCDC5;
-+		dc1sw_ix = AXP809_DC1SW;
-+		dc5ldo_ix = AXP809_DC5LDO;
- 		break;
- 	default:
- 		dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
-@@ -567,8 +579,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 		 * part of this loop to see where we save the DT defined
- 		 * name.
- 		 */
--		if ((regulators == axp22x_regulators && i == AXP22X_DC1SW) ||
--		    (regulators == axp809_regulators && i == AXP809_DC1SW)) {
-+		if (i == dc1sw_ix && dcdc1_name) {
- 			new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
- 						GFP_KERNEL);
- 			*new_desc = regulators[i];
-@@ -576,8 +587,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 			desc = new_desc;
- 		}
- 
--		if ((regulators == axp22x_regulators && i == AXP22X_DC5LDO) ||
--		    (regulators == axp809_regulators && i == AXP809_DC5LDO)) {
-+		if (i == dc5ldo_ix && dcdc5_name) {
- 			new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
- 						GFP_KERNEL);
- 			*new_desc = regulators[i];
-@@ -605,14 +615,12 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 		/*
- 		 * Save AXP22X DCDC1 / DCDC5 regulator names for later.
- 		 */
--		if ((regulators == axp22x_regulators && i == AXP22X_DCDC1) ||
--		    (regulators == axp809_regulators && i == AXP809_DCDC1))
-+		if (i == dcdc1_ix)
- 			of_property_read_string(rdev->dev.of_node,
- 						"regulator-name",
- 						&dcdc1_name);
- 
--		if ((regulators == axp22x_regulators && i == AXP22X_DCDC5) ||
--		    (regulators == axp809_regulators && i == AXP809_DCDC5))
-+		if (i == dcdc5_ix)
- 			of_property_read_string(rdev->dev.of_node,
- 						"regulator-name",
- 						&dcdc5_name);
--- 
-2.10.0
+-Tero
