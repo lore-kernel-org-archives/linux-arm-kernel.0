@@ -1,93 +1,107 @@
-From: edumazet@google.com (Eric Dumazet)
-Date: Fri, 23 Sep 2016 09:54:38 -0700
-Subject: Alignment issues with freescale FEC driver
-In-Reply-To: <02afb707-65de-5101-a79b-355929c4e00b@nelint.com>
-References: <troy.kisky@boundarydevices.com>
- <02afb707-65de-5101-a79b-355929c4e00b@nelint.com>
-Message-ID: <CANn89iLb+QJu+MYh859oAAjcLCsKRpBbzVf43yOdq+HJVtZDpQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Sep 2016 17:55:05 +0100
+Subject: [PATCHv2] arm64: fix dump_backtrace/unwind_frame with NULL tsk
+Message-ID: <1474649705-29040-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 9:43 AM, Eric Nelson <eric@nelint.com> wrote:
->
-> Hello all,
->
-> We're seeing alignment issues from the ethernet stack on an i.MX6UL board:
->
-> root at mx6ul:~# cat /proc/cpu/alignment
-> User: 0
-> System: 470010 (inet_gro_receive+0x104/0x278)
->
-> This seems to be related to the ip header alignment, and there
-> was much discussion in mailing list threads [1] and [2].
->
-> In particular, Russell referred to a patch here, but I haven't been
-> able to find it:
-> https://lists.linaro.org/pipermail/linaro-toolchain/2012-October/002844.html
->
-> Eric Dumazet also suggested a path toward fixing it, but I don't quite
-> understand the suggestion:
-> http://www.spinics.net/lists/netdev/msg213166.htm
->
-> The immediate problem is addressed by just reading the id and frag_offs
-> fields in the iphdr structure as shown in this patch:
->
-> commit 98810abc911b1286a7e4a2ebdfbad66f12fae19d
-> Author: Eric Nelson <eric@nelint.com>
-> Date: Fri Sep 23 08:26:03 2016 -0700
->
-> net: ipv4: af_inet: don't read multiple 16-bit iphdr fields as a 32-bit
-> value
->
-> Change-Id: Idc7122c22c13ca078be31907d30ab1c3148ba807
-> Signed-off-by: Eric Nelson <eric@nelint.com>
->
-> diff --git a/net/ipv4/af_inet.c b/net/ipv4/af_inet.c
-> index 0cc98b1..c17ef6e 100644
-> --- a/net/ipv4/af_inet.c
-> +++ b/net/ipv4/af_inet.c
-> @@ -1301,6 +1301,7 @@ static struct sk_buff **inet_gro_receive(struct
-> sk_buff **head,
-> unsigned int hlen;
-> unsigned int off;
-> unsigned int id;
-> + unsigned int frag;
-> int flush = 1;
-> int proto;
->
-> @@ -1326,9 +1327,9 @@ static struct sk_buff **inet_gro_receive(struct
-> sk_buff **head,
-> if (unlikely(ip_fast_csum((u8 *)iph, 5)))
-> goto out_unlock;
->
-> - id = ntohl(*(__be32 *)&iph->id);
-> - flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (id & ~IP_DF));
-> - id >>= 16;
-> + id = ntohs(*(__be16 *)&iph->id);
-> + frag = ntohs(*(__be16 *)&iph->frag_off);
-> + flush = (u16)((ntohl(*(__be32 *)iph) ^ skb_gro_len(skb)) | (frag &
-> ~IP_DF));
->
-> for (p = *head; p; p = p->next) {
-> struct iphdr *iph2;
->
+In some places, dump_backtrace() is called with a NULL tsk parameter,
+e.g. in bug_handler() in arch/arm64, or indirectly via show_stack() in
+core code. The expectation is that this is treated as if current were
+passed instead of NULL. Similar is true of unwind_frame().
 
-This solves nothing, because a few lines after you'll have yet another
-unaligned access :
+Commit a80a0eb70c358f8c ("arm64: make irq_stack_ptr more robust") didn't
+take this into account. In dump_backtrace() it compares tsk against
+current *before* we check if tsk is NULL, and in unwind_frame() we never
+set tsk if it is NULL.
 
+Due to this, we won't initialise irq_stack_ptr in either function. In
+dump_backtrace() this results in calling dump_mem() for memory
+immediately above the IRQ stack range, rather than for the relevant
+range on the task stack. In unwind_frame we'll reject unwinding frames
+on the IRQ stack.
 
-((__force u32)iph->saddr ^ (__force u32)iph2->saddr) |
-((__force u32)iph->daddr ^ (__force u32)iph2->daddr)) {
+In either case this results in incomplete or misleading backtrace
+information, but is not otherwise problematic. The initial percpu areas
+(including the IRQ stacks) are allocated in the linear map, and dump_mem
+uses __get_user(), so we shouldn't access anything with side-effects,
+and will handle holes safely.
 
-So you might have one less problematic access, out of hundreds of them
-all over the places.
+This patch fixes the issue by having both functions handle the NULL tsk
+case before doing anything else with tsk.
 
-Really the problem is that whole stack depends on the assumption that
-IP headers are aligned on arches that care
-(ie where NET_IP_ALIGN == 2)
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Fixes: a80a0eb70c358f8c ("arm64: make irq_stack_ptr more robust")
+Acked-by: James Morse <james.morse@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Yang Shi <yang.shi@linaro.org>
+---
+ arch/arm64/kernel/stacktrace.c |  5 ++++-
+ arch/arm64/kernel/traps.c      | 10 +++++-----
+ 2 files changed, 9 insertions(+), 6 deletions(-)
 
-If your build does have NET_IP_ALIGN = 2 and you get a fault here, it
-might be because of a buggy driver.
+Since v1 [1]:
+* Fix up unwind_frame(), too.
 
-The other known case is some GRE encapsulations that break the
-assumption, and this is discussed somewhere else.
+James, I've assumed that your ack still applies. Please shout if that is not
+the case!
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/458913.html
+
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index d9751a4..d34fd72 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -43,6 +43,9 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+ 	unsigned long fp = frame->fp;
+ 	unsigned long irq_stack_ptr;
+ 
++	if (!tsk)
++		tsk = current;
++
+ 	/*
+ 	 * Switching between stacks is valid when tracing current and in
+ 	 * non-preemptible context.
+@@ -67,7 +70,7 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+ 	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
+ 
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	if (tsk && tsk->ret_stack &&
++	if (tsk->ret_stack &&
+ 			(frame->pc == (unsigned long)return_to_handler)) {
+ 		/*
+ 		 * This is a case where function graph tracer has
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 1584e8a..8b7e596 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -142,6 +142,11 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 	unsigned long irq_stack_ptr;
+ 	int skip;
+ 
++	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
++
++	if (!tsk)
++		tsk = current;
++
+ 	/*
+ 	 * Switching between stacks is valid when tracing current and in
+ 	 * non-preemptible context.
+@@ -151,11 +156,6 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 	else
+ 		irq_stack_ptr = 0;
+ 
+-	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+-
+-	if (!tsk)
+-		tsk = current;
+-
+ 	if (tsk == current) {
+ 		frame.fp = (unsigned long)__builtin_frame_address(0);
+ 		frame.sp = current_stack_pointer;
+-- 
+1.9.1
