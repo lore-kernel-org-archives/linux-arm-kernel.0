@@ -1,77 +1,76 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 23 Sep 2016 14:58:32 -0400
-Subject: [PATCH V3 01/10] Documentation: DT: qcom_hidma: update binding
- for MSI
-In-Reply-To: <20160923180239.GC29830@leverpostej>
-References: <1473960166-30155-1-git-send-email-okaya@codeaurora.org>
- <1473960166-30155-2-git-send-email-okaya@codeaurora.org>
- <20160923180239.GC29830@leverpostej>
-Message-ID: <0ec888b5-65cf-37eb-1cbf-9e462a4a5592@codeaurora.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 23 Sep 2016 21:00:21 +0200 (CEST)
+Subject: [PATCH 2/3] gpio: Add a driver for the Raspberry Pi's firmware
+ GPIO calls.
+In-Reply-To: <20160919161314.25858-2-eric@anholt.net>
+References: <20160919161314.25858-1-eric@anholt.net>
+ <20160919161314.25858-2-eric@anholt.net>
+Message-ID: <420040015.81512.e9d48a65-997b-4986-a9d0-10632895df40.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/23/2016 2:02 PM, Mark Rutland wrote:
-> On Thu, Sep 15, 2016 at 01:22:37PM -0400, Sinan Kaya wrote:
->> Adding a new binding for qcom,hidma-1.1 to distinguish HW supporting
->> MSI interrupts from the older revision.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 13 ++++++++++++-
->>  1 file changed, 12 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
->> index fd5618b..47bfb5a 100644
->> --- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
->> +++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
->> @@ -47,12 +47,23 @@ When the OS is not in control of the management interface (i.e. it's a guest),
->>  the channel nodes appear on their own, not under a management node.
->>  
->>  Required properties:
->> -- compatible: must contain "qcom,hidma-1.0"
->> +- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
->> +for MSI capable HW.
->>  - reg: Addresses for the transfer and event channel
->>  - interrupts: Should contain the event interrupt
->>  - desc-count: Number of asynchronous requests this channel can handle
->>  - iommus: required a iommu node
->>  
->> +Optional properties for MSI:
->> +- msi-parent: pointer to the MSI controller object with the DeviceID in use.
-> 
-> The format of msi-cells depends on the particular msi-controller, so no
-> need to mention DeviceID here.
-> 
-> Please refer to
-> Documentation/devicetree/bindings/interrupt-controller/msi.txt
+Hi Eric,
 
-Thanks, let me do some more research.
-
+> Eric Anholt <eric@anholt.net> hat am 19. September 2016 um 18:13 geschrieben:
 > 
->> +Example:
->> + msi_parent: <&msi0 0x80024>
 > 
-> This doesn't match (s/_/-/).
-
-ok
-
+> This driver will be used for accessing the FXL6408 GPIO exander on the
+> Pi3.  We can't drive it directly from Linux because the firmware is
+> continuously polling one of the expander's lines to do its
+> undervoltage detection.
 > 
->> +msi0 is the MSI controller in the system. Bits 0-5 is the channel ID. 4
->> +is the channel ID. Bits 5-8 is the instance number. This is for the HIDMA
->> +instance 1.
-> 
-> I don't think you need any of this text, so long as you refer to the
-> generic MSI binding document, as above.
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+> ...
+> +
+> +static int rpi_gpio_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	struct device_node *fw_node;
+> +	struct rpi_gpio *rpi;
+> +	u32 ngpio;
+> +	int ret;
+> +
+> +	rpi = devm_kzalloc(dev, sizeof *rpi, GFP_KERNEL);
+> +	if (!rpi)
+> +		return -ENOMEM;
+> +	rpi->dev = dev;
+> +
+> +	fw_node = of_parse_phandle(np, "firmware", 0);
 
-ok
+AFAIK fw_node must be freed with of_node_put() after usage
 
-> 
-> Thanks,
-> Mark.
-> 
+> +	if (!fw_node) {
+> +		dev_err(dev, "Missing firmware node\n");
+> +		return -ENOENT;
+> +	}
+> +
+> +	rpi->firmware = rpi_firmware_get(fw_node);
+> +	if (!rpi->firmware)
+> +		return -EPROBE_DEFER;
+> +
+> +	if (of_property_read_u32(pdev->dev.of_node, "ngpios", &ngpio)) {
+> +		dev_err(dev, "Missing ngpios");
+> +		return -ENOENT;
+> +	}
+> +	if (of_property_read_u32(pdev->dev.of_node,
+> +				 "raspberrypi,firmware-gpio-offset",
+> +				 &rpi->offset)) {
+> +		dev_err(dev, "Missing raspberrypi,firmware-gpio-offset");
+> +		return -ENOENT;
+> +	}
+> +
+> +	rpi->gc.label = np->full_name;
+> +	rpi->gc.owner = THIS_MODULE;
+> +	rpi->gc.of_node = np;
+> +	rpi->gc.ngpio = ngpio;
+> +	rpi->gc.direction_input = rpi_gpio_dir_in;
+> +	rpi->gc.direction_output = rpi_gpio_dir_out;
+> +	rpi->gc.get = rpi_gpio_get;
+> +	rpi->gc.set = rpi_gpio_set;
+> +	rpi->gc.can_sleep = true;
 
+i think it's better to assign rpi->gc.base explicit.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Stefan
