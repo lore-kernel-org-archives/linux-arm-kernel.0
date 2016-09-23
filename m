@@ -1,30 +1,100 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 23 Sep 2016 10:01:13 -0500
-Subject: [PATCH 0/2] i2c: meson: add gxbb compatible string
-In-Reply-To: <20160915194146.GB7863@katana>
-References: <1473846557-18123-1-git-send-email-jbrunet@baylibre.com>
- <20160915194146.GB7863@katana>
-Message-ID: <CAL_JsqKNFzo6RWJO5WOvsyO3e4UTo5Zn48aaDac=+uL_CQWerQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 23 Sep 2016 16:01:50 +0100
+Subject: [PATCH 1/2] ARM: vexpress: refine MCPM smp operations override
+ criteria
+In-Reply-To: <20160923150004.GV8917@e106497-lin.cambridge.arm.com>
+References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+ <20160923150004.GV8917@e106497-lin.cambridge.arm.com>
+Message-ID: <51dbcf07-65dd-cf57-c807-882991d6d5e4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 2:41 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Wed, Sep 14, 2016 at 11:49:15AM +0200, Jerome Brunet wrote:
->> This patchset adds a specific compatible string in the Meson I2C driver
->> for the Amlogic Meson gxbb SoC.
+
+
+On 23/09/16 16:00, Liviu Dudau wrote:
+> On Fri, Sep 23, 2016 at 02:09:06PM +0100, Lorenzo Pieralisi wrote:
+>> Current vexpress smp init code detects whether to override the
+>> default smp ops with MCPM smp ops by matching the "cci-400"
+>> compatible string, in that MCPM requires control over CCI ports
+>> to manage low-power states entry/exit.
 >>
->> Other patch series (pinctrl and device tree) are being sent to complete
->> the i2c support on meson gxbb
+>> The "cci-400" compatible string check is a necessary but not
+>> sufficient condition for MCPM to work, because the cci-400
+>> can be made visible to the kernel, but firmware can nonetheless
+>> disable non-secure CCI ports control, while still allowing PMU
+>> access; if booted in non-secure world, the kernel would still
+>> blindly override smp operations with MCPM operations, resulting
+>> in kernel faults when the CCI ports programming interface is
+>> accessed from non-secure world.
 >>
->> Neil Armstrong (2):
->>   i2c: meson: add gxbb compatible string
->>   dt-bindings: i2c-meson: add gxbb compatible string
+>> This means that the "cci-400" compatible string check would
+>> result in a false positive in systems that eg boot in HYP mode,
+>> where CCI ports non-secure access is explicitly not allowed,
+>> and it is reported in the respective device tree nodes with
+>> CCI ports marked as disabled.
 >
-> Squashed both patches and applied to for-next, thanks!
+> I remember seeing a patch from Marc this week exactly on this
+> subject, but I can't find it again today. However, I remember that
+> his patch was explicitly testing for the HYP presence.
+>
+>>
+>> Refactor the smp operations initialization to make sure that
+>> the kernel is actually allowed to take control over CCI ports
+>> (by enabling MCPM smp operations) before overriding default
+>> vexpress smp operations.
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/mach-vexpress/platsmp.c | 31 ++++++++++++++++++++++++-------
+>>  1 file changed, 24 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+>> index 8b8d072..6cfd782 100644
+>> --- a/arch/arm/mach-vexpress/platsmp.c
+>> +++ b/arch/arm/mach-vexpress/platsmp.c
+>> @@ -26,17 +26,34 @@
+>>  bool __init vexpress_smp_init_ops(void)
+>>  {
+>>  #ifdef CONFIG_MCPM
+>> +	int cpu;
+>> +	struct device_node *cpu_node, *cci_node;
+>> +
+>>  	/*
+>> -	 * The best way to detect a multi-cluster configuration at the moment
+>> -	 * is to look for the presence of a CCI in the system.
+>> +	 * The best way to detect a multi-cluster configuration
+>> +	 * is to detect if the kernel can take over CCI ports
+>> +	 * control. Loop over possible CPUs and check if CCI
+>> +	 * port control is available.
+>>  	 * Override the default vexpress_smp_ops if so.
+>>  	 */
+>> -	struct device_node *node;
+>> -	node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
+>> -	if (node && of_device_is_available(node)) {
+>> -		mcpm_smp_set_ops();
+>> -		return true;
+>> +	for_each_possible_cpu(cpu) {
+>> +		bool available;
+>> +
+>> +		cpu_node = of_get_cpu_node(cpu, NULL);
+>> +		if (WARN(!cpu_node, "Missing cpu device node!"))
+>> +			return false;
+>> +
+>> +		cci_node = of_parse_phandle(cpu_node, "cci-control-port", 0);
+>> +		available = cci_node && of_device_is_available(cci_node);
+>
+> of_device_is_available() only checks the DT node for status = "enabled";
+>
+> Does the HYP modify the DT to disable the cci-control-port? If not, then I guess
+> this patch is not enough?
+>
 
-Please don't squash. We ask people to split DT bindings for a reason
-being reviews and bindings may not go thru subsystem maintainers in
-the future. It also makes it harder to find things in the archives or
-patchwork (as does maintainer fixups of subject lines).
+Correct, I will send out the u-boot patch to disable the cci ports soon.
 
-Rob
+-- 
+Regards,
+Sudeep
