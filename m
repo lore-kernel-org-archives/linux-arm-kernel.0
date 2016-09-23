@@ -1,136 +1,338 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Fri, 23 Sep 2016 23:43:55 +1000
-Subject: [PATCH] drm/sun4i: rgb: Enable panel after controller
-In-Reply-To: <20160923131626.GX8719@lukather>
-References: <20160921130304.3486-1-net147@gmail.com>
- <20160921210340.GI8719@lukather>
- <CANwerB2pmO7AMqmE9SMR1vFFsY5jMUALGSvtd=AvpU1=_jSHUw@mail.gmail.com>
- <20160923131626.GX8719@lukather>
-Message-ID: <CANwerB1PgaACukEj1jzUY-dQzbf50Em3h47KEsQu3rC3Jej=6Q@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Sep 2016 08:45:00 -0500
+Subject: [PATCH v3 2/2] ARM64: dts: meson-gxbb: add MMC support
+In-Reply-To: <20160914004314.682-3-khilman@baylibre.com>
+References: <20160914004314.682-1-khilman@baylibre.com>
+ <20160914004314.682-3-khilman@baylibre.com>
+Message-ID: <20160923134500.GA27686@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Tue, Sep 13, 2016 at 05:43:14PM -0700, Kevin Hilman wrote:
+> Add binding and basic support for the SD/eMMC controller on Amlogic
+> S905/GXBB devices.
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+>  .../devicetree/bindings/mmc/amlogic,meson-gxbb.txt | 29 ++++++++
+>  .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 87 ++++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   | 78 +++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 37 ++++++++-
+>  4 files changed, 230 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt
 
-On 23 September 2016 at 23:16, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Sep 22, 2016 at 08:03:31AM +1000, Jonathan Liu wrote:
->> Hi Maxime,
->>
->> On Thursday, 22 September 2016, Maxime Ripard <maxime.ripard@free-electrons.
->> com> wrote:
->>
->> > On Wed, Sep 21, 2016 at 11:03:04PM +1000, Jonathan Liu wrote:
->> > > The panel should be enabled after the controller so that the panel
->> > > prepare/enable delays are properly taken into account. Similarly, the
->> > > panel should be disabled before the controller so that the panel
->> > > unprepare/disable delays are properly taken into account.
->> > >
->> > > This is useful for avoiding visual glitches.
->> >
->> > This is not really taking any delays into account, especially since
->> > drm_panel_enable and prepare are suppose to block until their
->> > operation is complete.
->>
->>
->> drm_panel_prepare turns on power to the LCD using enable-gpios property of
->> the panel and then blocks for prepare delay. The prepare delay for panel
->> can be set to how long it takes between the time the panel is powered to
->> when it is ready to receive images. If backlight property is specified the
->> backlight will be off while the panel is powered on.
->>
->> drm_panel_enable blocks for enable delay and then turns on the backlight.
->> The enable delay can be set to how long it takes for panel to start making
->> the image visible after receiving the first valid frame. For example if the
->> panel starts off as white and the TFT takes some time to initialize to
->> black before it shows the image being received.
->>
->> Refer to drivers/gpu/drm/panel-panel.simple.c for details.
->
-> From drm_panel.h:
->
-> """
-> * drm_panel_enable - enable a panel
-> * @panel: DRM panel
-> *
-> * Calling this function will cause the panel display drivers to be turned on
-> * and the backlight to be enabled. Content will be visible on screen after
-> * this call completes.
-> """
->
-> """
-> * drm_panel_prepare - power on a panel
-> * @panel: DRM panel
-> *
-> * Calling this function will enable power and deassert any reset signals to
-> * the panel. After this has completed it is possible to communicate with any
-> * integrated circuitry via a command bus.
-> """
->
-> Those comments clearly says that the caller should not have to deal
-> with the delays, even more so by just moving calls around and hoping
-> that the code running in between is adding enough delay for the panel
-> to behave properly.
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Some nits below, otherwise:
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/include/drm/drm_panel.h#n34
+Acked-by: Rob Herring <robh@kernel.org>
 
-In comment for struct drm_panel_funcs:
-/**
- * struct drm_panel_funcs - perform operations on a given panel
- * @disable: disable panel (turn off back light, etc.)
- * @unprepare: turn off panel
- * @prepare: turn on panel and perform set up
- * @enable: enable panel (turn on back light, etc.)
- * @get_modes: add modes to the connector that the panel is attached to and
- * return the number of modes added
- * @get_timings: copy display timings into the provided array and return
- * the number of display timings available
- *
- * The .prepare() function is typically called before the display controller
- * starts to transmit video data. Panel drivers can use this to turn the panel
- * on and wait for it to become ready. If additional configuration is required
- * (via a control bus such as I2C, SPI or DSI for example) this is a good time
- * to do that.
- *
- * After the display controller has started transmitting video data, it's safe
- * to call the .enable() function. This will typically enable the backlight to
- * make the image on screen visible. Some panels require a certain amount of
- * time or frames before the image is displayed. This function is responsible
- * for taking this into account before enabling the backlight to avoid visual
- * glitches.
- *
- * Before stopping video transmission from the display controller it can be
- * necessary to turn off the panel to avoid visual glitches. This is done in
- * the .disable() function. Analogously to .enable() this typically involves
- * turning off the backlight and waiting for some time to make sure no image
- * is visible on the panel. It is then safe for the display controller to
- * cease transmission of video data.
- *
- * To save power when no video data is transmitted, a driver can power down
- * the panel. This is the job of the .unprepare() function.
- */
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt b/Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt
+> new file mode 100644
+> index 000000000000..39cbe528b7de
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt
+> @@ -0,0 +1,29 @@
+> +Amlogic SD / eMMC controller for S905/GXBB family SoCs
+> +
+> +The MMC 5.1 compliant host controller on Amlogic provides the
+> +interface for SD, eMMC and SDIO devices.
+> +
+> +This file documents the properties in addition to those available in
+> +the MMC core bindings, documented by mmc.txt.
+> +
+> +Required properties:
+> +- compatible : contains "amlogic,meson-gxbb-mmc"
+> +- clocks     : A list of phandle + clock-specifier pairs for the clocks listed in clock-names.
+> +- clock-names: Should contain the following:
+> +	"core" - Main peripheral bus clock
+> +	"clkin0" - Parent clock of internal mux
+> +	"clkin1" - Other parent clock of internal mux
+> +  The driver has an interal mux clock which switches between clkin0 and clkin1 depending on the
+> +  clock rate requested by the MMC core.
+> +
+> +Example:
+> +
+> +	sd_emmc_a: mmc at 70000 {
+> +        	compatible = "amlogic,meson-gxbb-mmc";
+> +		reg = <0x0 0x70000 0x0 0x2000>;
+> +                interrupts = < GIC_SPI 216 IRQ_TYPE_EDGE_RISING>;
+> +		clocks = <&clkc CLKID_SD_EMMC_A>, <&xtal>, <&clkc CLKID_FCLK_DIV2>;
+> +		clock-names = "core", "clkin0", "clkin1";
+> +		pinctrl-0 = <&emmc_pins>;
+> +	};
+> +
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> index 90a84c514d3d..2a9303e7fab8 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> @@ -73,6 +73,56 @@
+>  			default-state = "off";
+>  		};
+>  	};
+> +
+> +	tflash_vdd: regulator-tflash_vdd {
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/gpu/drm/panel/panel-simple.c?id=refs/tags/v4.8-rc7#n39
+Use '-' not '_' in node names.
 
-In struct panel_desc:
-/**
- * @prepare: the time (in milliseconds) that it takes for the panel to
- *           become ready and start receiving video data
- * @enable: the time (in milliseconds) that it takes for the panel to
- *          display the first valid frame after starting to receive
- *          video data
- * @disable: the time (in milliseconds) that it takes for the panel to
- *           turn the display off (no content is visible)
- * @unprepare: the time (in milliseconds) that it takes for the panel
- *             to power itself down completely
- */
+> +		/*
+> +		 * signal name from schematics: TFLASH_VDD_EN
+> +		 */
+> +		compatible = "regulator-fixed";
+> +
+> +		regulator-name = "TFLASH_VDD";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +
+> +		gpio = <&gpio_ao GPIOAO_12 GPIO_ACTIVE_HIGH>;
+> +		enable-active-high;
+> +	};
+> +
+> +	tf_io: gpio-regulator-tf_io {
 
-Regards,
-Jonathan
+ditto
+
+> +		compatible = "regulator-gpio";
+> +
+> +		regulator-name = "TF_IO";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <3300000>;
+> +
+> +		/*
+> +		 * signal name from schematics: TF_3V3N_1V8_EN
+> +		 */
+> +		gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_HIGH>;
+> +		gpios-states = <0>;
+> +
+> +		states = <3300000 0
+> +			  1800000 1>;
+> +	};
+> +
+> +	vcc1v8: regulator-vcc1v8 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VCC1V8";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +	};
+> +
+> +	vcc3v3: regulator-vcc3v3 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VCC3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +
+> +	emmc_pwrseq: emmc-pwrseq {
+> +		compatible = "mmc-pwrseq-emmc";
+> +		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
+> +	};
+>  };
+>  
+>  &uart_AO {
+> @@ -87,3 +137,40 @@
+>  	pinctrl-names = "default";
+>  };
+>  
+> +/* SD */
+> +&sd_emmc_b {
+> +	status = "okay";
+> +	pinctrl-0 = <&sdcard_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	bus-width = <4>;
+> +	cap-sd-highspeed;
+> +	max-frequency = <100000000>;
+> +	disable-wp;
+> +
+> +	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+> +	cd-inverted;
+> +
+> +	vmmc-supply = <&tflash_vdd>;
+> +	vqmmc-supply = <&tf_io>;
+> +};
+> +
+> +/* eMMC */
+> +&sd_emmc_c {
+> +	status = "okay";
+> +	pinctrl-0 = <&emmc_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	bus-width = <8>;
+> +	cap-sd-highspeed;
+> +	max-frequency = <200000000>;
+> +	non-removable;
+> +	disable-wp;
+> +	cap-mmc-highspeed;
+> +	mmc-ddr-1_8v;
+> +	mmc-hs200-1_8v;
+> +
+> +	mmc-pwrseq = <&emmc_pwrseq>;
+> +	vmmc-supply = <&vcc3v3>;
+> +	vqmmc-supply = <&vcc1v8>;
+> +};
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> index f4f30f674b4c..77c4d5eb48a2 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> @@ -57,6 +57,47 @@
+>  		device_type = "memory";
+>  		reg = <0x0 0x0 0x0 0x40000000>;
+>  	};
+> +
+> +	vddio_card: gpio-regulator {
+> +		compatible = "regulator-gpio";
+> +
+> +		regulator-name = "VDDIO_CARD";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <3300000>;
+> +
+> +		gpios = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+> +		gpios-states = <1>;
+> +
+> +		/* Based on P200 schematics, signal CARD_1.8V/3.3V_CTR */
+> +		states = <1800000 0
+> +			  3300000 1>;
+> +	};
+> +
+> +	vddio_boot: regulator-vddio_boot {
+
+ditto
+
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VDDIO_BOOT";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +	};
+> +
+> +	vddao_3v3: regulator-vddao_3v3 {
+
+ditto
+
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VDDAO_3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +
+> +	vcc_3v3: regulator-vcc_3v3 {
+
+ditto
+
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VCC_3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +
+> +	emmc_pwrseq: emmc-pwrseq {
+> +		compatible = "mmc-pwrseq-emmc";
+> +		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
+> +	};
+>  };
+>  
+>  /* This UART is brought out to the DB9 connector */
+> @@ -72,3 +113,40 @@
+>  	pinctrl-names = "default";
+>  };
+>  
+> +/* SD card */
+> +&sd_emmc_b {
+> +	status = "okay";
+> +	pinctrl-0 = <&sdcard_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	bus-width = <4>;
+> +	cap-sd-highspeed;
+> +	max-frequency = <100000000>;
+> +	disable-wp;
+> +
+> +	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+> +	cd-inverted;
+> +
+> +	vmmc-supply = <&vddao_3v3>;
+> +	vqmmc-supply = <&vddio_card>;
+> +};
+> +
+> +/* eMMC */
+> +&sd_emmc_c {
+> +	status = "okay";
+> +	pinctrl-0 = <&emmc_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	bus-width = <8>;
+> +	cap-sd-highspeed;
+> +	cap-mmc-highspeed;
+> +	max-frequency = <200000000>;
+> +	non-removable;
+> +	disable-wp;
+> +	mmc-ddr-1_8v;
+> +	mmc-hs200-1_8v;
+> +
+> +	mmc-pwrseq = <&emmc_pwrseq>;
+> +	vmmc-supply = <&vcc_3v3>;
+> +	vqmmc-supply = <&vddio_boot>;
+> +};
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> index e502c24b0ac7..3723007146ac 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> @@ -45,6 +45,7 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/gpio/meson-gxbb-gpio.h>
+>  #include <dt-bindings/reset/amlogic,meson-gxbb-reset.h>
+> +#include <dt-bindings/clock/gxbb-clkc.h>
+>  
+>  / {
+>  	compatible = "amlogic,meson-gxbb";
+> @@ -246,7 +247,8 @@
+>  					mux {
+>  						groups = "emmc_nand_d07",
+>  						       "emmc_cmd",
+> -						       "emmc_clk";
+> +						       "emmc_clk",
+> +						       "emmc_ds";
+>  						function = "emmc";
+>  					};
+>  				};
+> @@ -329,6 +331,39 @@
+>  			#address-cells = <2>;
+>  			#size-cells = <2>;
+>  			ranges = <0x0 0x0 0x0 0xd0000000 0x0 0x200000>;
+> +
+> +			sd_emmc_a: mmc at 70000 {
+> +				compatible = "amlogic,meson-gxbb-mmc";
+> +				reg = <0x0 0x70000 0x0 0x2000>;
+> +				interrupts = <GIC_SPI 216 IRQ_TYPE_EDGE_RISING>;
+> +				clocks = <&clkc CLKID_SD_EMMC_A>,
+> +					 <&xtal>,
+> +					 <&clkc CLKID_FCLK_DIV2>;
+> +				clock-names = "core", "clkin0", "clkin1";
+> +				status = "disabled";
+> +			};
+> +
+> +			sd_emmc_b: mmc at 72000 {
+> +				compatible = "amlogic,meson-gxbb-mmc";
+> +				reg = <0x0 0x72000 0x0 0x2000>;
+> +				interrupts = <GIC_SPI 217 IRQ_TYPE_EDGE_RISING>;
+> +				clocks = <&clkc CLKID_SD_EMMC_B>,
+> +					 <&xtal>,
+> +					 <&clkc CLKID_FCLK_DIV2>;
+> +				clock-names = "core", "clkin0", "clkin1";
+> +				status = "disabled";
+> +			};
+> +
+> +			sd_emmc_c: mmc at 74000 {
+> +				compatible = "amlogic,meson-gxbb-mmc";
+> +				reg = <0x0 0x74000 0x0 0x2000>;
+> +				interrupts = <GIC_SPI 218 IRQ_TYPE_EDGE_RISING>;
+> +				clocks = <&clkc CLKID_SD_EMMC_C>,
+> +					 <&xtal>,
+> +					 <&clkc CLKID_FCLK_DIV2>;
+> +				clock-names = "core", "clkin0", "clkin1";
+> +				status = "disabled";
+> +			};
+>  		};
+>  
+>  		ethmac: ethernet at c9410000 {
+> -- 
+> 2.9.3
+> 
