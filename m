@@ -1,73 +1,44 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Fri, 23 Sep 2016 16:03:53 +0200
-Subject: [1/2] pwm: sunxi: allow the pwm to finish its pulse before disable
-In-Reply-To: <CANwerB2LwWShNEUmNNbuH_4GY90gSpVmrxbC+oLK4p51cxUe2g@mail.gmail.com>
-References: <1472147411-30424-2-git-send-email-oliver@schinagl.nl>
- <CANwerB2LwWShNEUmNNbuH_4GY90gSpVmrxbC+oLK4p51cxUe2g@mail.gmail.com>
-Message-ID: <d68427df-a3ec-0a74-9bb5-c86ca60a1c2e@schinagl.nl>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Fri, 23 Sep 2016 16:06:40 +0200
+Subject: [PATCH 2/2] drm/rockchip: analogix_dp: Refuse to enable PSR if panel
+ doesn't support it
+In-Reply-To: <1474639600-30090-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1474639600-30090-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1474639600-30090-2-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Jonathan,
+There's no point in enabling PSR when the panel doesn't support it.
 
+This also avoids a problem when PSR gets enabled when a CRTC is being
+disabled, because sometimes in that situation the DSP_HOLD_VALID_INTR
+interrupt on which we wait will never arrive. This was observed on
+RK3288 with a panel without PSR (veyron-jaq Chromebook).
 
-On 23-09-16 16:02, Jonathan Liu wrote:
-> On 26 August 2016 at 03:50,  <oliver@schinagl.nl> wrote:
->> When we inform the PWM block to stop toggeling the output, we may end up
->> in a state where the output is not what we would expect (e.g. not the
->> low-pulse) but whatever the output was at when the clock got disabled.
->>
->> To counter this we have to wait for maximally the time of one whole
->> period to ensure the pwm hardware was able to finish. Since we already
->> told the PWM hardware to disable it self, it will not continue toggling
->> but merly finish its current pulse.
->>
->> If a whole period is considered to much, it may be contemplated to use a
->> half period + a little bit to ensure we get passed the transition.
->>
->> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
->> ---
->>   drivers/pwm/pwm-sun4i.c | 11 +++++++++++
->>   1 file changed, 11 insertions(+)
->>
->> diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
->> index 03a99a5..5e97c8a 100644
->> --- a/drivers/pwm/pwm-sun4i.c
->> +++ b/drivers/pwm/pwm-sun4i.c
->> @@ -8,6 +8,7 @@
->>
->>   #include <linux/bitops.h>
->>   #include <linux/clk.h>
->> +#include <linux/delay.h>
->>   #include <linux/err.h>
->>   #include <linux/io.h>
->>   #include <linux/module.h>
->> @@ -245,6 +246,16 @@ static void sun4i_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->>          spin_lock(&sun4i_pwm->ctrl_lock);
->>          val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
->>          val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
->> +       sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
->> +       spin_unlock(&sun4i_pwm->ctrl_lock);
->> +
->> +       /* Allow for the PWM hardware to finish its last toggle. The pulse
->> +        * may have just started and thus we should wait a full period.
->> +        */
->> +       ndelay(pwm_get_period(pwm));
->> +
->> +       spin_lock(&sun4i_pwm->ctrl_lock);
->> +       val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
->>          val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
->>          sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
->>          spin_unlock(&sun4i_pwm->ctrl_lock);
-> I had some issues where setting the brightness for pwm-backlight to 0
-> was not turning off the backlight sometimes.
-> This patch fixes the issue for me. Thanks.
-You are welcome, but there's some work still being done in this regard, 
-or rather, i have to find time to grab a scope and properly check the 
-output. So expect the proper fix to be coming to a kernel near you soon :)
+It's very easy to reproduce by running the kms_rmfb test in IGT a few
+times.
 
-Meanwhile, it seems to still confirm that this is needed. Thanks on that.
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Cc: Sean Paul <seanpaul@chromium.org>
+Cc: Yakir Yang <ykk@rock-chips.com>
+Cc: Archit Taneja <architt@codeaurora.org>
+---
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Olliver
->
-> Tested-by: Jonathan Liu <net147@gmail.com>
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index e83be157cc2a..8548e8271639 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -85,6 +85,9 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
+ 	struct rockchip_dp_device *dp = to_dp(encoder);
+ 	unsigned long flags;
+ 
++	if (!analogix_dp_psr_supported(dp->dev))
++		return;
++
+ 	dev_dbg(dp->dev, "%s PSR...\n", enabled ? "Entry" : "Exit");
+ 
+ 	spin_lock_irqsave(&dp->psr_lock, flags);
+-- 
+2.7.4
