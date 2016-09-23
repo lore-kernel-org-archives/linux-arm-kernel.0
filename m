@@ -1,89 +1,88 @@
 From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Fri, 23 Sep 2016 21:14:38 +0530
-Subject: [PATCH v7 3/7] arm/arm64: vgic: Introduce find_reg_by_id()
+Date: Fri, 23 Sep 2016 21:14:39 +0530
+Subject: [PATCH v7 4/7] irqchip/gic-v3: Add missing system register definitions
 In-Reply-To: <1474645482-28131-1-git-send-email-vijay.kilari@gmail.com>
 References: <1474645482-28131-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1474645482-28131-4-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <1474645482-28131-5-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 
-In order to implement vGICv3 CPU interface access, we will need to perform
-table lookup of system registers. We would need both index_to_params() and
-find_reg() exported for that purpose, but instead we export a single
-function which combines them both.
+Define register definitions for ICH_VMCR_EL2, ICC_CTLR_EL1 and
+ICH_VTR_EL2, ICC_BPR0_EL1, ICC_BPR1_EL1 registers.
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
 Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 22 +++++++++++++++-------
- arch/arm64/kvm/sys_regs.h |  4 ++++
- 2 files changed, 19 insertions(+), 7 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h | 43 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 41 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index e51367d..87ebe35 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1794,6 +1794,17 @@ static bool index_to_params(u64 id, struct sys_reg_params *params)
- 	}
- }
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 99ac022..36402d4 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -352,8 +352,30 @@
+ /*
+  * CPU interface registers
+  */
+-#define ICC_CTLR_EL1_EOImode_drop_dir	(0U << 1)
+-#define ICC_CTLR_EL1_EOImode_drop	(1U << 1)
++#define ICC_CTLR_EL1_EOImode_SHIFT	(1)
++#define ICC_CTLR_EL1_EOImode_drop_dir	(0U << ICC_CTLR_EL1_EOImode_SHIFT)
++#define ICC_CTLR_EL1_EOImode_drop	(1U << ICC_CTLR_EL1_EOImode_SHIFT)
++#define ICC_CTLR_EL1_EOImode_MASK	(1 << ICC_CTLR_EL1_EOImode_SHIFT)
++#define ICC_CTLR_EL1_CBPR_SHIFT		0
++#define ICC_CTLR_EL1_CBPR_MASK		(1 << ICC_CTLR_EL1_CBPR_SHIFT)
++#define ICC_CTLR_EL1_PRI_BITS_SHIFT	8
++#define ICC_CTLR_EL1_PRI_BITS_MASK	(0x7 << ICC_CTLR_EL1_PRI_BITS_SHIFT)
++#define ICC_CTLR_EL1_ID_BITS_SHIFT	11
++#define ICC_CTLR_EL1_ID_BITS_MASK	(0x7 << ICC_CTLR_EL1_ID_BITS_SHIFT)
++#define ICC_CTLR_EL1_SEIS_SHIFT		14
++#define ICC_CTLR_EL1_SEIS_MASK		(0x1 << ICC_CTLR_EL1_SEIS_SHIFT)
++#define ICC_CTLR_EL1_A3V_SHIFT		15
++#define ICC_CTLR_EL1_A3V_MASK		(0x1 << ICC_CTLR_EL1_A3V_SHIFT)
++#define ICC_PMR_EL1_SHIFT		0
++#define ICC_PMR_EL1_MASK		(0xff << ICC_PMR_EL1_SHIFT)
++#define ICC_BPR0_EL1_SHIFT		0
++#define ICC_BPR0_EL1_MASK		(0x7 << ICC_BPR0_EL1_SHIFT)
++#define ICC_BPR1_EL1_SHIFT		0
++#define ICC_BPR1_EL1_MASK		(0x7 << ICC_BPR1_EL1_SHIFT)
++#define ICC_IGRPEN0_EL1_SHIFT		0
++#define ICC_IGRPEN0_EL1_MASK		(1 << ICC_IGRPEN0_EL1_SHIFT)
++#define ICC_IGRPEN1_EL1_SHIFT		0
++#define ICC_IGRPEN1_EL1_MASK		(1 << ICC_IGRPEN1_EL1_SHIFT)
+ #define ICC_SRE_EL1_SRE			(1U << 0)
  
-+const struct sys_reg_desc *find_reg_by_id(u64 id,
-+					  struct sys_reg_params *params,
-+					  const struct sys_reg_desc table[],
-+					  unsigned int num)
-+{
-+	if (!index_to_params(id, params))
-+		return NULL;
+ /*
+@@ -384,12 +406,29 @@
+ 
+ #define ICH_VMCR_CTLR_SHIFT		0
+ #define ICH_VMCR_CTLR_MASK		(0x21f << ICH_VMCR_CTLR_SHIFT)
++#define ICH_VMCR_CBPR_SHIFT		4
++#define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
++#define ICH_VMCR_EOIM_SHIFT		9
++#define ICH_VMCR_EOIM_MASK		(1 << ICH_VMCR_EOIM_SHIFT)
+ #define ICH_VMCR_BPR1_SHIFT		18
+ #define ICH_VMCR_BPR1_MASK		(7 << ICH_VMCR_BPR1_SHIFT)
+ #define ICH_VMCR_BPR0_SHIFT		21
+ #define ICH_VMCR_BPR0_MASK		(7 << ICH_VMCR_BPR0_SHIFT)
+ #define ICH_VMCR_PMR_SHIFT		24
+ #define ICH_VMCR_PMR_MASK		(0xffUL << ICH_VMCR_PMR_SHIFT)
++#define ICH_VMCR_ENG0_SHIFT		0
++#define ICH_VMCR_ENG0_MASK		(1 << ICH_VMCR_ENG0_SHIFT)
++#define ICH_VMCR_ENG1_SHIFT		1
++#define ICH_VMCR_ENG1_MASK		(1 << ICH_VMCR_ENG1_SHIFT)
 +
-+	return find_reg(params, table, num);
-+}
-+
- /* Decode an index value, and find the sys_reg_desc entry. */
- static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
- 						    u64 id)
-@@ -1921,10 +1932,8 @@ static int get_invariant_sys_reg(u64 id, void __user *uaddr)
- 	struct sys_reg_params params;
- 	const struct sys_reg_desc *r;
++#define ICH_VTR_PRI_BITS_SHIFT		29
++#define ICH_VTR_PRI_BITS_MASK		(7 << ICH_VTR_PRI_BITS_SHIFT)
++#define ICH_VTR_ID_BITS_SHIFT		23
++#define ICH_VTR_ID_BITS_MASK		(7 << ICH_VTR_ID_BITS_SHIFT)
++#define ICH_VTR_SEIS_SHIFT		22
++#define ICH_VTR_SEIS_MASK		(1 << ICH_VTR_SEIS_SHIFT)
++#define ICH_VTR_A3V_SHIFT		21
++#define ICH_VTR_A3V_MASK		(1 << ICH_VTR_A3V_SHIFT)
  
--	if (!index_to_params(id, &params))
--		return -ENOENT;
--
--	r = find_reg(&params, invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs));
-+	r = find_reg_by_id(id, &params, invariant_sys_regs,
-+			   ARRAY_SIZE(invariant_sys_regs));
- 	if (!r)
- 		return -ENOENT;
+ #define ICC_IAR1_EL1_SPURIOUS		0x3ff
  
-@@ -1938,9 +1947,8 @@ static int set_invariant_sys_reg(u64 id, void __user *uaddr)
- 	int err;
- 	u64 val = 0; /* Make sure high bits are 0 for 32-bit regs */
- 
--	if (!index_to_params(id, &params))
--		return -ENOENT;
--	r = find_reg(&params, invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs));
-+	r = find_reg_by_id(id, &params, invariant_sys_regs,
-+			   ARRAY_SIZE(invariant_sys_regs));
- 	if (!r)
- 		return -ENOENT;
- 
-diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-index dbbb01c..9c6ffd0 100644
---- a/arch/arm64/kvm/sys_regs.h
-+++ b/arch/arm64/kvm/sys_regs.h
-@@ -136,6 +136,10 @@ static inline int cmp_sys_reg(const struct sys_reg_desc *i1,
- 	return i1->Op2 - i2->Op2;
- }
- 
-+const struct sys_reg_desc *find_reg_by_id(u64 id,
-+					  struct sys_reg_params *params,
-+					  const struct sys_reg_desc table[],
-+					  unsigned int num);
- 
- #define Op0(_x) 	.Op0 = _x
- #define Op1(_x) 	.Op1 = _x
 -- 
 1.9.1
