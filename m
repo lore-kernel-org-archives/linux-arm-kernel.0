@@ -1,72 +1,53 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 23 Sep 2016 11:49:23 -0400 (EDT)
-Subject: [PATCH 2/2] drivers: cci: add missing CCI port availability
- firmware check
-In-Reply-To: <20160923130907.4187-2-lorenzo.pieralisi@arm.com>
-References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
- <20160923130907.4187-2-lorenzo.pieralisi@arm.com>
-Message-ID: <alpine.LFD.2.20.1609231148100.9311@knanqh.ubzr>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 23 Sep 2016 16:51:48 +0100
+Subject: [PATCH] ARM/dt: Respect #address-cells when parsing CPUs
+Message-ID: <31c4684aa8ef7ef210cc74da5f1b02ff2882a099.1474645829.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Sep 2016, Lorenzo Pieralisi wrote:
+Whilst MPIDR values themselves are only 32 bits, it is still perfectly
+valid for a DT to have #address-cells > 1 in the CPUs node, resulting in
+the "reg" property having leading zero cell(s). In that situation, the
+big-endian nature of the data conspires with the current behaviour of
+just parsing the first cell to cause the kernel to think all CPUs have
+ID 0, and become resoundingly unhappy as a consequence.
 
-> The CCI ports programming interface is available to the kernel
-> only when booted in secure mode (or when firmware enables
-> non-secure access to override CCI ports control). In both cases,
-> firmware reports the CCI ports availability through the device
-> tree CCI ports nodes, which must be parsed and their status checked
-> by the kernel probing path.
-> 
-> This check is currently missing and may cause the kernel to
-> erroneously believe it is free to take control of CCI ports
-> where in practice CCI ports control is forbidden.
-> 
-> Add the missing CCI port availability check to the CCI driver
-> in order to guarantee sane CCI usage.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+Take #address-cells into account when parsing CPUs so as to be correct
+under any circumstances.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+CC: Russell King <linux@armlinux.org.uk>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm/kernel/devtree.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-> ---
->  drivers/bus/arm-cci.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index 5755907f..3c7a1c7 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -2199,6 +2199,9 @@ static int cci_probe_ports(struct device_node *np)
->  		if (!of_match_node(arm_cci_ctrl_if_matches, cp))
->  			continue;
->  
-> +		if (!of_device_is_available(cp))
-> +			continue;
-> +
->  		i = nb_ace + nb_ace_lite;
->  
->  		if (i >= nb_cci_ports)
-> @@ -2241,6 +2244,13 @@ static int cci_probe_ports(struct device_node *np)
->  		ports[i].dn = cp;
->  	}
->  
-> +	/*
-> +	 * If there is no CCI port that is under kernel control
-> +	 * return early and report probe status.
-> +	 */
-> +	if (!nb_ace && !nb_ace_lite)
-> +		return -ENODEV;
-> +
->  	 /* initialize a stashed array of ACE ports to speed-up look-up */
->  	cci_ace_init_ports();
->  
-> -- 
-> 2.10.0
-> 
-> 
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 40ecd5f514a2..7ab113c5c818 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -88,6 +88,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 		return;
+ 
+ 	for_each_child_of_node(cpus, cpu) {
++		const u32 *cell;
+ 		u32 hwid;
+ 
+ 		if (of_node_cmp(cpu->type, "cpu"))
+@@ -99,12 +100,14 @@ void __init arm_dt_init_cpu_maps(void)
+ 		 * properties is considered invalid to build the
+ 		 * cpu_logical_map.
+ 		 */
+-		if (of_property_read_u32(cpu, "reg", &hwid)) {
++		cell = of_get_property(cpu, "reg", NULL);
++		if (!cell) {
+ 			pr_debug(" * %s missing reg property\n",
+ 				     cpu->full_name);
+ 			of_node_put(cpu);
+ 			return;
+ 		}
++		hwid = of_read_number(cell, of_n_addr_cells(cpu));
+ 
+ 		/*
+ 		 * 8 MSBs must be set to 0 in the DT since the reg property
+-- 
+2.8.1.dirty
