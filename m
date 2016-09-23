@@ -1,59 +1,22 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Sep 2016 19:02:39 +0100
-Subject: [PATCH V3 01/10] Documentation: DT: qcom_hidma: update binding
- for MSI
-In-Reply-To: <1473960166-30155-2-git-send-email-okaya@codeaurora.org>
-References: <1473960166-30155-1-git-send-email-okaya@codeaurora.org>
- <1473960166-30155-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <20160923180239.GC29830@leverpostej>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 23 Sep 2016 20:13:01 +0200
+Subject: Alignment issues with freescale FEC driver
+In-Reply-To: <0fe7a310-2d2f-4fca-d698-85d66122d91c@nelint.com>
+References: <troy.kisky@boundarydevices.com>
+ <02afb707-65de-5101-a79b-355929c4e00b@nelint.com>
+ <CANn89iLb+QJu+MYh859oAAjcLCsKRpBbzVf43yOdq+HJVtZDpQ@mail.gmail.com>
+ <5ee28ee0-cf0c-bdab-1271-f17755365c13@nelint.com>
+ <0fe7a310-2d2f-4fca-d698-85d66122d91c@nelint.com>
+Message-ID: <20160923181301.GD22965@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 01:22:37PM -0400, Sinan Kaya wrote:
-> Adding a new binding for qcom,hidma-1.1 to distinguish HW supporting
-> MSI interrupts from the older revision.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-> index fd5618b..47bfb5a 100644
-> --- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-> +++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-> @@ -47,12 +47,23 @@ When the OS is not in control of the management interface (i.e. it's a guest),
->  the channel nodes appear on their own, not under a management node.
->  
->  Required properties:
-> -- compatible: must contain "qcom,hidma-1.0"
-> +- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
-> +for MSI capable HW.
->  - reg: Addresses for the transfer and event channel
->  - interrupts: Should contain the event interrupt
->  - desc-count: Number of asynchronous requests this channel can handle
->  - iommus: required a iommu node
->  
-> +Optional properties for MSI:
-> +- msi-parent: pointer to the MSI controller object with the DeviceID in use.
+> Since the hardware requires longword alignment for its' DMA transfers,
+> aligning the IP header will require a memcpy, right?
 
-The format of msi-cells depends on the particular msi-controller, so no
-need to mention DeviceID here.
+The vf610 FEC has an SHIFT16 bit in register ENETx_TACC, which inserts
+two padding bits on transmit. ENETx_RACC has the same.
 
-Please refer to
-Documentation/devicetree/bindings/interrupt-controller/msi.txt
+What about your hardware?
 
-> +Example:
-> + msi_parent: <&msi0 0x80024>
-
-This doesn't match (s/_/-/).
-
-> +msi0 is the MSI controller in the system. Bits 0-5 is the channel ID. 4
-> +is the channel ID. Bits 5-8 is the instance number. This is for the HIDMA
-> +instance 1.
-
-I don't think you need any of this text, so long as you refer to the
-generic MSI binding document, as above.
-
-Thanks,
-Mark.
+     Andrew
