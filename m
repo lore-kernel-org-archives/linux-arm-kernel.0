@@ -1,31 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Sep 2016 10:53:34 +0200
-Subject: [PATCH v4 1/7] pinctrl: bcm2835: add pull defines to dt bindings
-In-Reply-To: <87zin49p9m.fsf@eliezer.anholt.net>
-References: <1474274603-24215-1-git-send-email-kraxel@redhat.com>
- <1474274603-24215-2-git-send-email-kraxel@redhat.com>
- <87zin49p9m.fsf@eliezer.anholt.net>
-Message-ID: <CACRpkdZ9NmFGtGcT_KfoLLUqoLic7i9_ao7cw8JgSnq2o0VvnQ@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 23 Sep 2016 10:54:25 +0200
+Subject: [PATCH v2] arm: dts: zynq: Add MicroZed board support
+In-Reply-To: <CAD6G_RRn0pAF=TsgONQ4yah2VhZXQeBQmeBQ5p46u6R5F8pSqw@mail.gmail.com>
+References: <1474550489-7005-1-git-send-email-jagan@amarulasolutions.com>
+ <20160922205917.GS16583@xsjsorenbubuntu>
+ <4a586da6-8d94-bfbe-ea0c-58b6f8573e7b@xilinx.com>
+ <CAD6G_RR6JSzd-QCUj3wDC30pXabNqaNR1d1jQm9bUq6z0CP=3g@mail.gmail.com>
+ <aa469a8b-7968-1934-1b8e-6978fd0e6922@xilinx.com>
+ <CAD6G_RRn0pAF=TsgONQ4yah2VhZXQeBQmeBQ5p46u6R5F8pSqw@mail.gmail.com>
+Message-ID: <c0cd61f3-28c2-f8c7-f5b6-faf197f39986@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 12:07 PM, Eric Anholt <eric@anholt.net> wrote:
-> Gerd Hoffmann <kraxel@redhat.com> writes:
->
->> Also delete (unused) private enum from driver.
->> The pull defines can be used instead if needed.
+On 23.9.2016 10:42, Jagan Teki wrote:
+> On Fri, Sep 23, 2016 at 2:07 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> On 23.9.2016 09:39, Jagan Teki wrote:
+>>> On Fri, Sep 23, 2016 at 11:33 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>>> On 22.9.2016 22:59, S?ren Brinkmann wrote:
+>>>>> On Thu, 2016-09-22 at 18:51:29 +0530, Jagan Teki wrote:
+>>>>>> From: Jagan Teki <jteki@openedev.com>
+>>>>>>
+>>>>>> Added basic dts support for MicroZed board.
+>>>>>>
+>>>>>> - UART
+>>>>>> - SDHCI
+>>>>>> - Ethernet
+>>>>>>
+>>>>>> Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>>>>> Cc: Michal Simek <michal.simek@xilinx.com>
+>>>>>> Signed-off-by: Jagan Teki <jteki@openedev.com>
+>>>>>> ---
+>>>>>> Changes for v2:
+>>>>>>      - Add SDHCI
+>>>>>>      - Add Ethernet
+>>>>>>
+>>>>>>  arch/arm/boot/dts/Makefile          |  1 +
+>>>>>>  arch/arm/boot/dts/zynq-microzed.dts | 95 +++++++++++++++++++++++++++++++++++++
+>>>>>>  2 files changed, 96 insertions(+)
+>>>>>>  create mode 100644 arch/arm/boot/dts/zynq-microzed.dts
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>>>>> index faacd52..4d7b858 100644
+>>>>>> --- a/arch/arm/boot/dts/Makefile
+>>>>>> +++ b/arch/arm/boot/dts/Makefile
+>>>>>> @@ -862,6 +862,7 @@ dtb-$(CONFIG_ARCH_VT8500) += \
+>>>>>>      wm8750-apc8750.dtb \
+>>>>>>      wm8850-w70v2.dtb
+>>>>>>  dtb-$(CONFIG_ARCH_ZYNQ) += \
+>>>>>> +    zynq-microzed.dtb \
+>>>>>>      zynq-parallella.dtb \
+>>>>>>      zynq-zc702.dtb \
+>>>>>>      zynq-zc706.dtb \
+>>>>>> diff --git a/arch/arm/boot/dts/zynq-microzed.dts b/arch/arm/boot/dts/zynq-microzed.dts
+>>>>>> new file mode 100644
+>>>>>> index 0000000..9e64496
+>>>>>> --- /dev/null
+>>>>>> +++ b/arch/arm/boot/dts/zynq-microzed.dts
+>>>>>> @@ -0,0 +1,95 @@
+>>>>>> +/*
+>>>>>> + * Copyright (C) 2015 Jagan Teki <jteki@openedev.com>
+>>>>
+>>>>
+>>>> Did you created only yourself without copying part of this from others?
+>>>> There is dts in u-boot which I believe you are aware of.
+>>>
+>>> I sent the initial one few months back so at that time, I was created
+>>> and now I just added USB and Ethernet with the reference of zc702
+>>> board.
 >>
->> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
->
-> Acked-by: Eric Anholt <eric@anholt.net>
->
-> gpio maintainers, could I pull this through my dt tree?  Or does this
-> need to be split in two?
+>> Can you send me a link to that post? I didn't find it.
+> 
+> Here is the link [1]
+> 
+>> Anyway you should keep Xilinx copyright there.
+> 
+> OK then will append Xilinx as well.
+> 
+> [1] http://lkml.iu.edu/hypermail/linux/kernel/1601.1/03236.html
 
-You can take it. The bcm2835 driver is not seeing any conflicting
-changes in this merge window.
+ok. It was lkml and devicetree not arm mailing list that's why I didn't
+find it.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Thanks,
+Michal
