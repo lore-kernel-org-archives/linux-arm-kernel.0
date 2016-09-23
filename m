@@ -1,138 +1,84 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Fri, 23 Sep 2016 14:42:28 +0530
-Subject: [PATCH v2 2/2] net: thunderx: Support for byte queue limits
-In-Reply-To: <1474621948-9172-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1474621948-9172-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1474621948-9172-3-git-send-email-sunil.kovvuri@gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Fri, 23 Sep 2016 11:17:13 +0200
+Subject: [PATCH v5] KVM: arm/arm64: Route vtimer events to user space
+In-Reply-To: <e4c08096-03bd-3ec3-998d-41643992ab1a@redhat.com>
+References: <1474548769-195643-1-git-send-email-agraf@suse.de>
+ <20160922212831.GD9101@cbox> <d90f04d4-b29f-f08e-df39-ec307af44225@suse.de>
+ <63a1e3a2-f551-017f-b6be-593b53a0b407@redhat.com>
+ <7afbc08e-0ba2-d6fd-c1ed-e5822e05c00b@suse.de>
+ <e4c08096-03bd-3ec3-998d-41643992ab1a@redhat.com>
+Message-ID: <70fc788d-f99e-4ba5-67a2-da9c1a857dfe@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
 
-This patch adds support for byte queue limits
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 14 ++++++++--
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 30 ++++++++++++++--------
- 2 files changed, 32 insertions(+), 12 deletions(-)
+On 23.09.16 11:15, Paolo Bonzini wrote:
+> 
+> 
+> On 23/09/2016 11:10, Alexander Graf wrote:
+>>>>> Maybe I'm misunderstanding and user_timer_pending is just a cached
+>>>>> verison of what you said last, but as I said above, I think you can just
+>>>>> compare timer->irq.level with the last value the kvm_run struct, and if
+>>>>> something changed, you have to exit.
+>>>>
+>>>> So how would user space know whether the line went up or down? Or didn't
+>>>> change at all (if we coalesce with an MMIO exit)?
+>>>
+>>> It would save the status of the line somewhere in its own variable,
+>>> without introducing a relatively delicate API between kernel and user.
+>>>
+>>> I agree that you cannot update kernel_timer_pending only in
+>>> flush_hwstate; otherwise you miss on case (2) when there is a vmexit.
+>>> That has to stay in kvm_timer_sync_hwstate (or it could become a new
+>>> function called at the very end of kvm_arch_vcpu_ioctl_run).
+>>
+>> The beauty of having it in the timer update function is that it gets
+>> called from flush_hwstate() as well. That way we catch the update also
+>> in cases where we need it before we enter the vcpu.
+> 
+> Yeah, the timer update function is ideal because it is called from both
+> flush_hwstate and sync_hwstate.
+> 
+>>> However, I'm not sure why user_timer_pending is necessary.  If it is
+>>> just the value you assigned to regs->kernel_timer_pending at the time of
+>>> the previous vmexit, can kvm_timer_flush_hwstate just do
+>>>
+>>>    if (timer->prev_kernel_timer_pending != regs->kernel_timer_pending) {
+>>>        timer->prev_kernel_timer_pending = regs->kernel_timer_pending;
+>>>        return 1;
+>>>    }
+>>>
+>>> ?  Or even
+>>>
+>>>    if (timer->prev_irq_level != timer->irq.level) {
+>>>        timer->prev_irq_level = regs->irq.level;
+>>>        return 1;
+>>>    }
+>>>
+>>> so that regs->kernel_timer_pending remains exclusively
+>>> kvm_timer_sync_hwstate's business?
+>>
+>> We could do that too, yes. But it puts more burden on user space - it
+>> would have to ensure that it *always* checks for the pending timer
+>> status. With this approach, user space may opt to only check for timer
+>> state changes on -EINTR and things would still work.
+> 
+> That would be overloading EINTR a bit though.  But that's a digression,
+> I don't think it matters much.
+> 
+> On the other hand, what happens if you run new QEMU with old userspace?
+> With user_timer_pending you'd get an infinite stream of vmexits the
+> first time the timer fires, wouldn't you?  Whereas if you keep it in the
+> kernel, userspace would simply not get the interrupt (because it doesn't
+> know about kernel_timer_pending) and think it got a spurious vmexit.
+> The kernel's IRQ would stay masked and everything would just (not) work
+> like before your patch?
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 7d00162..45a13f7 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -516,7 +516,8 @@ static int nicvf_init_resources(struct nicvf *nic)
- static void nicvf_snd_pkt_handler(struct net_device *netdev,
- 				  struct cmp_queue *cq,
- 				  struct cqe_send_t *cqe_tx,
--				  int cqe_type, int budget)
-+				  int cqe_type, int budget,
-+				  unsigned int *tx_pkts, unsigned int *tx_bytes)
- {
- 	struct sk_buff *skb = NULL;
- 	struct nicvf *nic = netdev_priv(netdev);
-@@ -547,6 +548,8 @@ static void nicvf_snd_pkt_handler(struct net_device *netdev,
- 		}
- 		nicvf_put_sq_desc(sq, hdr->subdesc_cnt + 1);
- 		prefetch(skb);
-+		(*tx_pkts)++;
-+		*tx_bytes += skb->len;
- 		napi_consume_skb(skb, budget);
- 		sq->skbuff[cqe_tx->sqe_ptr] = (u64)NULL;
- 	} else {
-@@ -662,6 +665,7 @@ static int nicvf_cq_intr_handler(struct net_device *netdev, u8 cq_idx,
- 	struct cmp_queue *cq = &qs->cq[cq_idx];
- 	struct cqe_rx_t *cq_desc;
- 	struct netdev_queue *txq;
-+	unsigned int tx_pkts = 0, tx_bytes = 0;
- 
- 	spin_lock_bh(&cq->lock);
- loop:
-@@ -701,7 +705,7 @@ loop:
- 		case CQE_TYPE_SEND:
- 			nicvf_snd_pkt_handler(netdev, cq,
- 					      (void *)cq_desc, CQE_TYPE_SEND,
--					      budget);
-+					      budget, &tx_pkts, &tx_bytes);
- 			tx_done++;
- 		break;
- 		case CQE_TYPE_INVALID:
-@@ -730,6 +734,9 @@ done:
- 		netdev = nic->pnicvf->netdev;
- 		txq = netdev_get_tx_queue(netdev,
- 					  nicvf_netdev_qidx(nic, cq_idx));
-+		if (tx_pkts)
-+			netdev_tx_completed_queue(txq, tx_pkts, tx_bytes);
-+
- 		nic = nic->pnicvf;
- 		if (netif_tx_queue_stopped(txq) && netif_carrier_ok(netdev)) {
- 			netif_tx_start_queue(txq);
-@@ -1160,6 +1167,9 @@ int nicvf_stop(struct net_device *netdev)
- 
- 	netif_tx_disable(netdev);
- 
-+	for (qidx = 0; qidx < netdev->num_tx_queues; qidx++)
-+		netdev_tx_reset_queue(netdev_get_tx_queue(netdev, qidx));
-+
- 	/* Free resources */
- 	nicvf_config_data_transfer(nic, false);
- 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index 178c5c7..a4fc501 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -1082,6 +1082,24 @@ static inline void nicvf_sq_add_cqe_subdesc(struct snd_queue *sq, int qentry,
- 	imm->len = 1;
- }
- 
-+static inline void nicvf_sq_doorbell(struct nicvf *nic, struct sk_buff *skb,
-+				     int sq_num, int desc_cnt)
-+{
-+	struct netdev_queue *txq;
-+
-+	txq = netdev_get_tx_queue(nic->pnicvf->netdev,
-+				  skb_get_queue_mapping(skb));
-+
-+	netdev_tx_sent_queue(txq, skb->len);
-+
-+	/* make sure all memory stores are done before ringing doorbell */
-+	smp_wmb();
-+
-+	/* Inform HW to xmit all TSO segments */
-+	nicvf_queue_reg_write(nic, NIC_QSET_SQ_0_7_DOOR,
-+			      sq_num, desc_cnt);
-+}
-+
- /* Segment a TSO packet into 'gso_size' segments and append
-  * them to SQ for transfer
-  */
-@@ -1141,12 +1159,8 @@ static int nicvf_sq_append_tso(struct nicvf *nic, struct snd_queue *sq,
- 	/* Save SKB in the last segment for freeing */
- 	sq->skbuff[hdr_qentry] = (u64)skb;
- 
--	/* make sure all memory stores are done before ringing doorbell */
--	smp_wmb();
-+	nicvf_sq_doorbell(nic, skb, sq_num, desc_cnt);
- 
--	/* Inform HW to xmit all TSO segments */
--	nicvf_queue_reg_write(nic, NIC_QSET_SQ_0_7_DOOR,
--			      sq_num, desc_cnt);
- 	nic->drv_stats.tx_tso++;
- 	return 1;
- }
-@@ -1219,12 +1233,8 @@ doorbell:
- 		nicvf_sq_add_cqe_subdesc(sq, qentry, tso_sqe, skb);
- 	}
- 
--	/* make sure all memory stores are done before ringing doorbell */
--	smp_wmb();
-+	nicvf_sq_doorbell(nic, skb, sq_num, subdesc_cnt);
- 
--	/* Inform HW to xmit new packet */
--	nicvf_queue_reg_write(nic, NIC_QSET_SQ_0_7_DOOR,
--			      sq_num, subdesc_cnt);
- 	return 1;
- 
- append_fail:
--- 
-2.7.4
+Yes, we'd definitely stay more compatible by tracking it only in the
+kernel. I'm not fully convinced that it's the better interface, but
+since both Christoffer and you seem to choke on that part, I'll give it
+a stab ;).
+
+
+Alex
