@@ -1,43 +1,102 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Sep 2016 11:23:40 +0100
-Subject: [PATCH v2.1] arm64: kgdb: handle read-only text / modules
-In-Reply-To: <20160923094953.GC27704@e104818-lin.cambridge.arm.com>
-References: <20160923074208.9899-1-takahiro.akashi@linaro.org>
- <20160923094953.GC27704@e104818-lin.cambridge.arm.com>
-Message-ID: <20160923102340.GA2161@e104818-lin.cambridge.arm.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 23 Sep 2016 10:23:30 +0000
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <1760643.vMTR5o5E9g@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <9178320.n4yHmfyPA3@wuerfel> <57E40665.8080005@gmail.com>
+ <1760643.vMTR5o5E9g@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F8842B6@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 10:49:53AM +0100, Catalin Marinas wrote:
-> On Fri, Sep 23, 2016 at 04:42:08PM +0900, AKASHI Takahiro wrote:
-> > Handle read-only cases (CONFIG_DEBUG_RODATA/CONFIG_DEBUG_SET_MODULE_RONX)
-> > by using aarch64_insn_write() instead of probe_kernel_write().
-> > See how this works:
-> >     commit 2f896d586610 ("arm64: use fixmap for text patching")
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Jason Wessel <jason.wessel@windriver.com>
-> > Cc: <stable@vger.kernel.org> # 3.18-3.19: 2f896d5: arm64: use fixmap
-> > Cc: <stable@vger.kernel.org> # 3.18-3.19: f6242ca: arm64: Fix text
-> > Cc: <stable@vger.kernel.org> # 4.0-
+Hi Arnd
+
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 23 September 2016 10:52
+> To: zhichang.yuan
+> Cc: Gabriele Paoloni; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com; minyard at acm.org;
+> linux-pci at vger.kernel.org; gregkh at linuxfoundation.org; John Garry;
+> will.deacon at arm.com; linux-kernel at vger.kernel.org; Yuanzhichang;
+> Linuxarm; xuwei (O); linux-serial at vger.kernel.org;
+> benh at kernel.crashing.org; zourongrong at gmail.com; liviu.dudau at arm.com;
+> kantyzc at 163.com
+> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
+> Hip06
 > 
-> Queued for 4.8 with a slight change in the last Cc: tag above:
+> On Friday, September 23, 2016 12:27:17 AM CEST zhichang.yuan wrote:
+> > For this patch sketch, I have a question.
+> > Do we call pci_address_to_pio in arch_of_address_to_pio to get the
+> > corresponding logical IO port
+> > for LPC??
 > 
-> Cc: <stable@vger.kernel.org> # 3.18.x-
+> 
+> No, of course not, that would be silly:
+> 
+> The argument to pci_address_to_pio() is a phys_addr_t, and we we don't
+> have one because there is no address associated with your PIO, that
+> is the entire point of your driver!
+> 
+> Also, we already know the mapping because this is what the inb/outb
+> workaround is looking at, so there is absolutely no reason to call it
+> either.
 
-I tried to apply this patch to 3.18, 4.1, 4.4, 4.7. It fails on all of
-them with smaller or slightly larger conflicts.
+Ok assume that we do not call pci_address_to_pio() for the ISA bus...
+The LPC driver will register its phys address range in io_range_list,
+then the IPMI driver probe will retrieve its physical address calling
+of_address_to_resource and will use the indirect io to access this
+address.
 
-So, I'll merge it in 4.8 without any "Cc: stable" tags, just a "Fixes:"
-one for the commit introducing CONFIG_DEBUG_SET_MODULE_RONX (3.18). Once
-the patch reaches mainline, could you please back-port and test it on
-the stable kernel versions and send separate patches to
-stable at vger.kernel.org?
+>From the perspective of the indirect IO function the input parameter
+is an unsigned long addr that (now) can be either:
+1) an IO token coming from a legacy pci device
+2) a phys address that lives on the LPC bus
 
-Thanks.
+These are conceptually two separate address spaces (and actually they 
+both start from 0).
 
--- 
-Catalin
+If the input parameter can live on different address spaces that are
+overlapped, even if I save the used LPC range in arm64_extio_ops->start/end
+there is no way for the indirect IO to tell if the input parameter is
+an I/O token or a phys address that belongs to LPC...  
+
+Am I missing something?
+
+Thanks
+
+Gab
+
+> 
+> > If we don't, it seems the LPC specific IO address will conflict with
+> PCI
+> > host bridges' logical IO.
+> >
+> > Supposed our LPC populated the IO range from 0x100 to 0x3FF( this is
+> > normal for ISA similar
+> > devices), after arch_of_address_to_pio(), the r->start will be set as
+> > 0x100, r->end will be set as
+> > 0x3FF.  And if there is one PCI host bridge who request a IO window
+> size
+> > over 0x400 at the same
+> > time, the  corresponding r->start and r->end will be set as 0x0,
+> 0x3FF
+> > after of_address_to_resource
+> > for this host bridge.  Then the IO conflict happens.
+> 
+> You would still need to reserve some space in the io_range_list
+> to avoid possible conflicts, which is a bit ugly with the current
+> definition of pci_register_io_range, but I'm sure can be done.
+> 
+> One way I can think of would be to change pci_register_io_range()
+> to just return the logical port number directly (it already
+> knows it!), and pass an invalid physical address (e.g.
+> #define ISA_WORKAROUND_IO_PORT_WINDOW -0x10000) into it for
+> invalid translations.
+> 
+> Another alternative that just occurred to me would be to move
+> the pci_address_to_pio() call from __of_address_to_resource()
+> into of_bus_pci_translate() and then do the special handling
+> for the ISA/LPC bus in of_bus_isa_translate().
+> 
+> 	Arnd
