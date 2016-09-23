@@ -1,53 +1,33 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 23 Sep 2016 14:40:48 +0200
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 23 Sep 2016 14:46:48 +0200
 Subject: [PATCH v6] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <dd9267b6-2323-2d74-0553-71a89d05a654@redhat.com>
+In-Reply-To: <D82BA95A-A89E-46EB-93D2-197DF44433EC@suse.de>
 References: <1474628854-69945-1-git-send-email-agraf@suse.de>
  <dd9267b6-2323-2d74-0553-71a89d05a654@redhat.com>
-Message-ID: <20160923124048.GI9101@cbox>
+ <D82BA95A-A89E-46EB-93D2-197DF44433EC@suse.de>
+Message-ID: <55ac71d8-7e92-aa57-9856-5fc48a7f8357@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 02:11:41PM +0200, Paolo Bonzini wrote:
+
+
+On 23/09/2016 14:36, Alexander Graf wrote:
+>>>
+>>> +        if ((ret == 1) && timer_ret) {
+>>> +            /*
+>>> +             * We have to exit straight away to ensure that we only
+>>> +             * ever notify user space once about a level change
+>>> +             */
+>>
+>> Is this really a requirement?  It complicates the logic noticeably.
 > 
-> 
-> On 23/09/2016 13:07, Alexander Graf wrote:
-> > +		timer_ret = kvm_timer_sync_hwstate(vcpu);
-> >  
-> >  		kvm_vgic_sync_hwstate(vcpu);
-> >  
-> >  		preempt_enable();
-> >  
-> >  		ret = handle_exit(vcpu, run, ret);
-> > +
-> > +		if ((ret == 1) && timer_ret) {
-> > +			/*
-> > +			 * We have to exit straight away to ensure that we only
-> > +			 * ever notify user space once about a level change
-> > +			 */
-> 
-> Is this really a requirement?  It complicates the logic noticeably.
-> 
+> The alternative would be to track the state on ioctl entry, which
+> Christoffer disliked :).
 
-If we skip this, then we have to somehow remember that the sync may have
-updated the line level when we reach the flush state (and didn't exit),
-and I would like maintaining that state even less than doing this check.
+Ok, I see.  Maybe he's convinced by the ugly code. :)
 
-What we could do is to compare the timer->irq.level with the kvm_run
-state outside of the run loop (on the way to userspace) and update the
-kvm_run state if there's a discrepancy.  That way, we can maintain the
-'timer->irq.level != kvm_run' means, we have to exit, and whenever we
-are exiting, we are reporting the most recent state to user space
-anyway.
+It's not an architectural concept, it's a KVM API concept.  Tracking the
+state on entry just the equivalent of making this vmexit edge-triggered
+(both rising and falling edge).
 
-Would that work?
-
-(By the way, the check should be via a call into the arch timer code,
-kvm_timer_update_user_state() or something like that).
-
-Also, the comment above is confusing, because that's not why this check
-is here, the check is here so that we don't loose track of the timer
-output level change if there's no exit to userspace.
-
-Thanks,
--Christoffer
+Paolo
