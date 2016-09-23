@@ -1,68 +1,54 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 23 Sep 2016 16:42:44 +0200
-Subject: [PATCH v6] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <20160923124048.GI9101@cbox>
-References: <1474628854-69945-1-git-send-email-agraf@suse.de>
- <dd9267b6-2323-2d74-0553-71a89d05a654@redhat.com>
- <20160923124048.GI9101@cbox>
-Message-ID: <3f14f9f4-a408-4e16-9fcf-608c2809401d@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 23 Sep 2016 15:44:11 +0100
+Subject: [PATCH v6 2/4] arm64: dts: Add timer erratum property for LS2080A
+ and LS1043A
+In-Reply-To: <1474533318-7796-2-git-send-email-oss@buserror.net>
+References: <1474533318-7796-1-git-send-email-oss@buserror.net>
+ <1474533318-7796-2-git-send-email-oss@buserror.net>
+Message-ID: <57E53FBB.9090208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+With a commit message along the lines of:
 
+Both the LS1043A and LS2080A platforms are affected by the Freescale
+A008585 erratum. Advertise it in their respective device trees.
 
-On 23/09/2016 14:40, Christoffer Dall wrote:
-> On Fri, Sep 23, 2016 at 02:11:41PM +0200, Paolo Bonzini wrote:
->>
->>
->> On 23/09/2016 13:07, Alexander Graf wrote:
->>> +		timer_ret = kvm_timer_sync_hwstate(vcpu);
->>>  
->>>  		kvm_vgic_sync_hwstate(vcpu);
->>>  
->>>  		preempt_enable();
->>>  
->>>  		ret = handle_exit(vcpu, run, ret);
->>> +
->>> +		if ((ret == 1) && timer_ret) {
->>> +			/*
->>> +			 * We have to exit straight away to ensure that we only
->>> +			 * ever notify user space once about a level change
->>> +			 */
->>
->> Is this really a requirement?  It complicates the logic noticeably.
->>
+On 22/09/16 09:35, Scott Wood wrote:
+> Signed-off-by: Scott Wood <oss@buserror.net>
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 1 +
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> If we skip this, then we have to somehow remember that the sync may have
-> updated the line level when we reach the flush state (and didn't exit),
-> and I would like maintaining that state even less than doing this check.
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> index e669fbd..952531d 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> @@ -123,6 +123,7 @@
+>  			     <1 14 0x1>, /* Physical Non-Secure PPI */
+>  			     <1 11 0x1>, /* Virtual PPI */
+>  			     <1 10 0x1>; /* Hypervisor PPI */
+> +		fsl,erratum-a008585;
+>  	};
+>  
+>  	pmu {
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> index 21023a3..9d3ac19 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -195,6 +195,7 @@
+>  			     <1 14 0x8>, /* Physical Non-Secure PPI, active-low */
+>  			     <1 11 0x8>, /* Virtual PPI, active-low */
+>  			     <1 10 0x8>; /* Hypervisor PPI, active-low */
+> +		fsl,erratum-a008585;
+>  	};
+>  
+>  	pmu {
 > 
-> What we could do is to compare the timer->irq.level with the kvm_run
-> state outside of the run loop (on the way to userspace) and update the
-> kvm_run state if there's a discrepancy.  That way, we can maintain the
-> 'timer->irq.level != kvm_run' means, we have to exit, and whenever we
-> are exiting, we are reporting the most recent state to user space
-> anyway.
-> 
-> Would that work?
 
-It seems clearer at least.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> (By the way, the check should be via a call into the arch timer code,
-> kvm_timer_update_user_state() or something like that).
-
-Makes sense.
-
-Paolo
-
-> Also, the comment above is confusing, because that's not why this check
-> is here, the check is here so that we don't loose track of the timer
-> output level change if there's no exit to userspace.
-> 
-> Thanks,
-> -Christoffer
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
