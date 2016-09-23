@@ -1,25 +1,120 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Sep 2016 13:29:21 +0100
-Subject: [PATCH 2/2] armv8: aarch32: Add SMP support for 32-bit Linux
- kernel
-In-Reply-To: <1474597146-33312-2-git-send-email-b18965@freescale.com>
-References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
- <1474597146-33312-2-git-send-email-b18965@freescale.com>
-Message-ID: <20160923122921.GD10042@leverpostej>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 23 Sep 2016 14:30:59 +0200
+Subject: [PATCH V11 0/8] Introduce ACPI world to ITS irqchip
+In-Reply-To: <1473705147-6588-1-git-send-email-tn@semihalf.com>
+References: <1473705147-6588-1-git-send-email-tn@semihalf.com>
+Message-ID: <d49bfc6c-c776-73b9-8444-bb5052a9af35@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 10:19:06AM +0800, Alison Wang wrote:
-> The patch adds SMP support for running 32-bit Linux kernel for
-> Layerscape platforms. Spin-table method is used for SMP support.
+Hi,
 
-So far, spin-table has not been defined for 32-bit, and the code below,
-while mostly a copy of the 64-bit code, is somewhat different.
+On 12/09/2016 20:32, Tomasz Nowicki wrote:
+> The series builds the PCI/MSI domain stack based on initial IORT driver
+> which is added in first place. As a reference please see IORT spec:
+> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+> 
+> Tested on Cavium ThunderX server and Qualcomm Technologies server platform QDF2XXX.
+> The patches can be found here:
+> https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v11)
 
-If you want a common enable method, I would strongly advise that you use
-PSCI, which is well-defined for both 32-bit and 64-bit. There are a
-number of problems with spin-table, and I would not recommend extending
-it to 32-bit ARM.
+Tested-by: Eric Auger <eric.auger@redhat.com>
+on a Cavium QEMU guest with mach-virt.
 
-Thanks,
-Mark.
+Thanks
+
+Eric
+
+> 
+> v10 -> v11
+> - rebased against v4.8-rc6
+> - bug fix for iort_match_node_callback() error handling
+> - patch 1-2 changelog updates
+> 
+> v9 -> v10
+> - error handling improvements for iort_match_node_callback() but no functional changes
+> - iort.h -> acpi_iort.h header name change
+> - style improvements
+> 
+> v8 -> v9
+> - rebased against v4.8-rc4
+> - move root IORT pointer validation to one place iort_scan_node()
+> - function names & Kconfig option name improvements
+> - remove annoying dev_err() appearances for non-IORT users
+> - for debug purpose print full ITS resource range
+> 
+> v7 -> v8
+> - rebased against v4.8-rc1
+> - move IORT support under new drivers/acpi/arm64 directory
+> - memory leak fix for iort_match_node_callback()
+> - iort_node_map_rid() algorithm improvements
+> - fix RID match check in iort_id_map()
+> - fix typos and white spaces
+> 
+> v6 -> v7
+> - rebased against irq/irqchip-4.8
+> - improvements for IORT ID mapping
+> - call IORT init call from acpi_init() instead of arch_initcall()
+> - split IORT driver in to two parts: core and ITS/MSI
+> 
+> v5 -> v6
+> - added locking mechanism for IORT list with domain token
+> - IORT function name improvements
+> - extended IORT RID mapping helper
+> - reworked IORT to be more SMMU friendly
+> - IORT functions which map RID and find corresponding domain are not
+>   PCI specific any more (struct pci_dev -> struct device)
+> - bug fixes
+> 
+> v4 -> v5
+> - rebased against v4.7-rc1
+> - drop generic layer and call IORT functions directly
+> - improve resource abstraction and string formatting
+> 
+> v3 -> v4
+> - rebased against v4.5
+> - add ACPI support for IRQ domain handling on a per-device basis
+> - reorder domain setup step
+> - improve error handling
+> - code style improvements
+> 
+> v2 -> v3
+> - rebased on top of 4.4
+> - fixes and improvements for redistributor init via GICC structures
+> - fixes as per kbuild reports
+> 
+> v1 -> v2
+> - rebased on top of 4.4-rc4
+> - use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+> 
+> Tomasz Nowicki (8):
+>   ACPI: I/O Remapping Table (IORT) initial support
+>   ACPI: Add new IORT functions to support MSI domain handling
+>   PCI/MSI: Setup MSI domain on a per-device basis using IORT ACPI table
+>   irqchip/gicv3-its: Cleanup for ITS domain initialization
+>   irqchip/gicv3-its: Refactor ITS DT init code to prepare for ACPI
+>   irqchip/gicv3-its: Probe ITS in the ACPI way
+>   irqchip/gicv3-its: Factor out PCI-MSI part that might be reused for
+>     ACPI
+>   irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain
+>     initialization
+> 
+>  drivers/acpi/Kconfig                     |   4 +
+>  drivers/acpi/Makefile                    |   2 +
+>  drivers/acpi/arm64/Kconfig               |   6 +
+>  drivers/acpi/arm64/Makefile              |   1 +
+>  drivers/acpi/arm64/iort.c                | 366 +++++++++++++++++++++++++++++++
+>  drivers/acpi/bus.c                       |   2 +
+>  drivers/irqchip/Kconfig                  |   1 +
+>  drivers/irqchip/irq-gic-v3-its-pci-msi.c |  88 ++++++--
+>  drivers/irqchip/irq-gic-v3-its.c         | 171 +++++++++++----
+>  drivers/irqchip/irq-gic-v3.c             |   7 +-
+>  drivers/pci/msi.c                        |  11 +-
+>  include/linux/acpi_iort.h                |  42 ++++
+>  include/linux/irqchip/arm-gic-v3.h       |   4 +-
+>  13 files changed, 635 insertions(+), 70 deletions(-)
+>  create mode 100644 drivers/acpi/arm64/Kconfig
+>  create mode 100644 drivers/acpi/arm64/Makefile
+>  create mode 100644 drivers/acpi/arm64/iort.c
+>  create mode 100644 include/linux/acpi_iort.h
+> 
