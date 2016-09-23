@@ -1,111 +1,43 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 23 Sep 2016 11:10:46 +0200
-Subject: [PATCH v5] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <63a1e3a2-f551-017f-b6be-593b53a0b407@redhat.com>
-References: <1474548769-195643-1-git-send-email-agraf@suse.de>
- <20160922212831.GD9101@cbox> <d90f04d4-b29f-f08e-df39-ec307af44225@suse.de>
- <63a1e3a2-f551-017f-b6be-593b53a0b407@redhat.com>
-Message-ID: <7afbc08e-0ba2-d6fd-c1ed-e5822e05c00b@suse.de>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 23 Sep 2016 10:58:27 +0200
+Subject: [PATCH v3 0/4] regulator: axp20x: support AXP803/AXP813 variants
+Message-ID: <cover.1474621107.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series adds support for the X-Powers AXP803 and AXP813 PMICs.
+It is based on the previous patch series
+	regulator: axp20x: Simplify various code
 
+v3:
+- put the code of the new devices in new files instead of in the common
+  axp20x file.
+- fix errors about the regulators and interrupts
+v2:
+- fix lack of support of dcdc frequency
+- notice that the AXP803 is also handled
+- send the patch to the DT maintainers
 
-On 23.09.16 10:57, Paolo Bonzini wrote:
-> 
-> 
-> On 23/09/2016 09:14, Alexander Graf wrote:
->>>> +/*
->>>> + * Synchronize the timer IRQ state with the interrupt controller.
->>>> + */
->>>>  static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
->>>>  {
->>>>  	int ret;
->>>>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->>>>  
->>>>  	timer->active_cleared_last = false;
->>>>  	timer->irq.level = new_level;
->>>> -	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
->>>> +	trace_kvm_timer_update_irq(vcpu->vcpu_id, host_vtimer_irq,
->>>>  				   timer->irq.level);
->>>> +	[...]
->>>> +		struct kvm_sync_regs *regs = &vcpu->run->s.regs;
->>>> +
->>>> +		/* Populate the timer bitmap for user space */
->>>> +		regs->kernel_timer_pending &= ~KVM_ARM_TIMER_VTIMER;
->>>> +		if (new_level)
->>>> +			regs->kernel_timer_pending |= KVM_ARM_TIMER_VTIMER;
->>>
->>> I think if you got here, it means you have to exit to userspace to
->>> update it of the new state.  If you don't want to propagate a return
->>
->> Yes, but we can't exit straight away with our own exit reason because we
->> might be inside an MMIO exit path here which already occupies the
->> exit_reason.
-> 
-> So the idea is that whenever you're here you have one of the following
-> cases:
-> 
-> - are coming from kvm_timer_flush_hwstate, and then you exit immediately
-> with KVM_EXIT_INTR if needed
-> 
-> - you are coming from the kvm_timer_sync_hwstate just before
-> handle_exit.  Then if there's a vmexit you have already set
-> regs->kernel_timer_pending, if not you'll do a kvm_timer_flush_hwstate soon.
-> 
-> - you are coming from the kvm_timer_sync_hwstate in the middle of
-> kvm_arch_vcpu_ioctl_run, and then "continue" will either exit the loop
-> immediately (if ret <= 0) or go to kvm_timer_flush_hwstate as in the
-> previous case
-> 
-> Right?
+Jean-Francois Moine (4):
+  regulator: axp20x: move device independant parts to new files
+  regulator: axp20x: duplicate the MFD axp20x-rsb code
+  regulator: axp20x: add the AXP803
+  regulator: axp20x: add the AXP813
 
-Yup :)
+ Documentation/devicetree/bindings/mfd/axp20x.txt |  29 ++-
+ drivers/mfd/axp20x.c                             |  15 +
+ drivers/regulator/Makefile                       |   3 +-
+ drivers/regulator/axp-regulator.c                | 347 +++++++++++++++++++
+ drivers/regulator/axp-regulator.h                | 133 ++++++++
+ drivers/regulator/axp20x-regulator.c             | 415 ++---------------------
+ drivers/regulator/axp803.c                       | 225 ++++++++++++
+ drivers/regulator/axp813.c                       | 229 +++++++++++++
+ include/linux/mfd/axp20x.h                       |   2 +
+ 9 files changed, 1012 insertions(+), 388 deletions(-)
+ create mode 100644 drivers/regulator/axp-regulator.c
+ create mode 100644 drivers/regulator/axp-regulator.h
+ create mode 100644 drivers/regulator/axp803.c
+ create mode 100644 drivers/regulator/axp813.c
 
-> 
->>> Maybe I'm misunderstanding and user_timer_pending is just a cached
->>> verison of what you said last, but as I said above, I think you can just
->>> compare timer->irq.level with the last value the kvm_run struct, and if
->>> something changed, you have to exit.
->>
->> So how would user space know whether the line went up or down? Or didn't
->> change at all (if we coalesce with an MMIO exit)?
-> 
-> It would save the status of the line somewhere in its own variable,
-> without introducing a relatively delicate API between kernel and user.
-> 
-> I agree that you cannot update kernel_timer_pending only in
-> flush_hwstate; otherwise you miss on case (2) when there is a vmexit.
-> That has to stay in kvm_timer_sync_hwstate (or it could become a new
-> function called at the very end of kvm_arch_vcpu_ioctl_run).
-
-The beauty of having it in the timer update function is that it gets
-called from flush_hwstate() as well. That way we catch the update also
-in cases where we need it before we enter the vcpu.
-
-> However, I'm not sure why user_timer_pending is necessary.  If it is
-> just the value you assigned to regs->kernel_timer_pending at the time of
-> the previous vmexit, can kvm_timer_flush_hwstate just do
-> 
->    if (timer->prev_kernel_timer_pending != regs->kernel_timer_pending) {
->        timer->prev_kernel_timer_pending = regs->kernel_timer_pending;
->        return 1;
->    }
-> 
-> ?  Or even
-> 
->    if (timer->prev_irq_level != timer->irq.level) {
->        timer->prev_irq_level = regs->irq.level;
->        return 1;
->    }
-> 
-> so that regs->kernel_timer_pending remains exclusively
-> kvm_timer_sync_hwstate's business?
-
-We could do that too, yes. But it puts more burden on user space - it
-would have to ensure that it *always* checks for the pending timer
-status. With this approach, user space may opt to only check for timer
-state changes on -EINTR and things would still work.
-
-
-Alex
+-- 
+2.10.0
