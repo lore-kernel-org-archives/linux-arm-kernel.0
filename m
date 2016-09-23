@@ -1,36 +1,75 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 23 Sep 2016 16:58:15 +0100
-Subject: [PATCH] arm64: fix dump_backtrace with NULL tsk
-In-Reply-To: <1474642587-22416-1-git-send-email-mark.rutland@arm.com>
-References: <1474642587-22416-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <57E55117.8080907@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Sep 2016 17:01:51 +0100
+Subject: [PATCH] ARM/dt: Respect #address-cells when parsing CPUs
+In-Reply-To: <31c4684aa8ef7ef210cc74da5f1b02ff2882a099.1474645829.git.robin.murphy@arm.com>
+References: <31c4684aa8ef7ef210cc74da5f1b02ff2882a099.1474645829.git.robin.murphy@arm.com>
+Message-ID: <20160923160151.GB22454@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Robin,
 
-On 23/09/16 15:56, Mark Rutland wrote:
-> In some places, dump_backtrace() is called with a NULL tsk parameter,
-> e.g. in bug_handler() in arch/arm64, or indirectly via show_stack() in
-> core code. The expectation is that this is treated as if current were
-> passed instead of NULL.
+On Fri, Sep 23, 2016 at 04:51:48PM +0100, Robin Murphy wrote:
+> Whilst MPIDR values themselves are only 32 bits, it is still perfectly
+> valid for a DT to have #address-cells > 1 in the CPUs node, resulting in
+> the "reg" property having leading zero cell(s). In that situation, the
+> big-endian nature of the data conspires with the current behaviour of
+> just parsing the first cell to cause the kernel to think all CPUs have
+> ID 0, and become resoundingly unhappy as a consequence.
 > 
-> Commit a80a0eb70c358f8c ("arm64: make irq_stack_ptr more robust") didn't
-> take this into account, and compares tsk against current *before* we
-> check if tsk is NULL.
-> 
-> Due to this, we won't initialise irq_stack_ptr, and when we try to dump
-> the exception regs we may call dump_mem() for memory immediately above
-> the IRQ stack range, rather than for the relevant range on the task
-> stack.
+> Take #address-cells into account when parsing CPUs so as to be correct
+> under any circumstances.
 
-Bother, I should have spotted that.
-Thanks for catching this!
+To be correct under any circumstances you'll also need to verify that
+the upper bits (e.g. Aff3) are zero, and handle the non-zero case
+somewhow.
 
-Acked-by: James Morse <james.morse@arm.com>
-
-
+As it stands, this can have the kernel think that MPIDR.Aff* values
+exist which were never in the DT.
 
 Thanks,
+Mark.
 
-James
+> CC: Russell King <linux@armlinux.org.uk>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  arch/arm/kernel/devtree.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index 40ecd5f514a2..7ab113c5c818 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -88,6 +88,7 @@ void __init arm_dt_init_cpu_maps(void)
+>  		return;
+>  
+>  	for_each_child_of_node(cpus, cpu) {
+> +		const u32 *cell;
+>  		u32 hwid;
+>  
+>  		if (of_node_cmp(cpu->type, "cpu"))
+> @@ -99,12 +100,14 @@ void __init arm_dt_init_cpu_maps(void)
+>  		 * properties is considered invalid to build the
+>  		 * cpu_logical_map.
+>  		 */
+> -		if (of_property_read_u32(cpu, "reg", &hwid)) {
+> +		cell = of_get_property(cpu, "reg", NULL);
+> +		if (!cell) {
+>  			pr_debug(" * %s missing reg property\n",
+>  				     cpu->full_name);
+>  			of_node_put(cpu);
+>  			return;
+>  		}
+> +		hwid = of_read_number(cell, of_n_addr_cells(cpu));
+>  
+>  		/*
+>  		 * 8 MSBs must be set to 0 in the DT since the reg property
+> -- 
+> 2.8.1.dirty
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
