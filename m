@@ -1,48 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 23 Sep 2016 11:25:50 +0200
-Subject: [PATCH] arm/arm64: KVM: Add support for ARMv8 AArch32 execution
- state
-In-Reply-To: <1474614805-18629-1-git-send-email-b18965@freescale.com>
-References: <1474614805-18629-1-git-send-email-b18965@freescale.com>
-Message-ID: <20160923092550.GG9101@cbox>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Fri, 23 Sep 2016 17:28:05 +0800
+Subject: [PATCH v14 4/4] CMDQ: save more energy in idle
+In-Reply-To: <CABb+yY1YqyReK5bii6n5a_rJ6fgpPi=aC3sfKJdomvM5+NG9FA@mail.gmail.com>
+References: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
+ <1473039885-24009-5-git-send-email-hs.liao@mediatek.com>
+ <CABb+yY1YqyReK5bii6n5a_rJ6fgpPi=aC3sfKJdomvM5+NG9FA@mail.gmail.com>
+Message-ID: <1474622885.21723.25.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 03:13:25PM +0800, Alison Wang wrote:
-> The ARMv8 architecture supports two execution state, AArch64 and
-> AArch32. To support KVM in AArch32 execution state for ARMv8, Cortex-A53
-> and Cortex-A72 need to be added for target-specific checks.
+On Thu, 2016-09-22 at 13:22 +0530, Jassi Brar wrote:
+> On Mon, Sep 5, 2016 at 7:14 AM, HS Liao <hs.liao@mediatek.com> wrote:
+> > Use clk_disable_unprepare instead of clk_disable to save more energy
+> > when CMDQ is idle.
+> >
+> > Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> > ---
+> >  drivers/mailbox/mtk-cmdq.c | 54 +++++++++++++++++++++++++++++++++++++++-------
 > 
-> Signed-off-by: Alison Wang <alison.wang@nxp.com>
-> ---
->  arch/arm/include/asm/cputype.h | 2 ++
->  arch/arm/kvm/guest.c           | 2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index 754f86f..4f8c632 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -75,6 +75,8 @@
->  #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
->  #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
->  #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
-> +#define ARM_CPU_PART_CORTEX_A53_AARCH32	0x4100d030
-> +#define ARM_CPU_PART_CORTEX_A72_AARCH32	0x4100d080
->  #define ARM_CPU_PART_MASK		0xff00fff0
->  
->  /* DEC implemented cores */
-> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-> index 9aca920..462a099 100644
-> --- a/arch/arm/kvm/guest.c
-> +++ b/arch/arm/kvm/guest.c
-> @@ -252,6 +252,8 @@ int __attribute_const__ kvm_target_cpu(void)
->  {
->  	switch (read_cpuid_part()) {
->  	case ARM_CPU_PART_CORTEX_A7:
-> +	case ARM_CPU_PART_CORTEX_A53_AARCH32:
-> +	case ARM_CPU_PART_CORTEX_A72_AARCH32:
+> The driver is introduced by second patch of the set, so it makes sense
+> to merge this patch into patch 2/4.
 
-huh?  why are we mapping A53 and A72 cores to an A7 core?
+Hi Jassi,
 
--Christoffer
+Could you take a look at previous discussion between Matthias and me?
+http://lkml.iu.edu/hypermail/linux/kernel/1606.2/05239.html
+His basic idea is to simplify first working version.
+Therefore, I move some code to this patch.
+
+Thanks,
+HS
