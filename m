@@ -1,74 +1,136 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Sep 2016 15:42:39 +0200
-Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F8842B6@lhreml507-mbx>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <1760643.vMTR5o5E9g@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F8842B6@lhreml507-mbx>
-Message-ID: <10705430.q2aqv5uYO3@wuerfel>
+From: net147@gmail.com (Jonathan Liu)
+Date: Fri, 23 Sep 2016 23:43:55 +1000
+Subject: [PATCH] drm/sun4i: rgb: Enable panel after controller
+In-Reply-To: <20160923131626.GX8719@lukather>
+References: <20160921130304.3486-1-net147@gmail.com>
+ <20160921210340.GI8719@lukather>
+ <CANwerB2pmO7AMqmE9SMR1vFFsY5jMUALGSvtd=AvpU1=_jSHUw@mail.gmail.com>
+ <20160923131626.GX8719@lukather>
+Message-ID: <CANwerB1PgaACukEj1jzUY-dQzbf50Em3h47KEsQu3rC3Jej=6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 23, 2016 10:23:30 AM CEST Gabriele Paoloni wrote:
-> Hi Arnd
-> 
-> > -----Original Message-----
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: 23 September 2016 10:52
-> > To: zhichang.yuan
-> > Cc: Gabriele Paoloni; linux-arm-kernel at lists.infradead.org;
-> > devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com; minyard at acm.org;
-> > linux-pci at vger.kernel.org; gregkh at linuxfoundation.org; John Garry;
-> > will.deacon at arm.com; linux-kernel at vger.kernel.org; Yuanzhichang;
-> > Linuxarm; xuwei (O); linux-serial at vger.kernel.org;
-> > benh at kernel.crashing.org; zourongrong at gmail.com; liviu.dudau at arm.com;
-> > kantyzc at 163.com
-> > Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
-> > Hip06
-> > 
-> > On Friday, September 23, 2016 12:27:17 AM CEST zhichang.yuan wrote:
-> > > For this patch sketch, I have a question.
-> > > Do we call pci_address_to_pio in arch_of_address_to_pio to get the
-> > > corresponding logical IO port
-> > > for LPC??
-> > 
-> > 
-> > No, of course not, that would be silly:
-> > 
-> > The argument to pci_address_to_pio() is a phys_addr_t, and we we don't
-> > have one because there is no address associated with your PIO, that
-> > is the entire point of your driver!
-> > 
-> > Also, we already know the mapping because this is what the inb/outb
-> > workaround is looking at, so there is absolutely no reason to call it
-> > either.
-> 
-> Ok assume that we do not call pci_address_to_pio() for the ISA bus...
-> The LPC driver will register its phys address range in io_range_list,
-> then the IPMI driver probe will retrieve its physical address calling
-> of_address_to_resource and will use the indirect io to access this
-> address.
-> 
-> From the perspective of the indirect IO function the input parameter
-> is an unsigned long addr that (now) can be either:
-> 1) an IO token coming from a legacy pci device
-> 2) a phys address that lives on the LPC bus
-> 
-> These are conceptually two separate address spaces (and actually they 
-> both start from 0).
+Hi Maxime,
 
-Why? Any IORESOURCE_IO address always refers to the logical I/O port
-range in Linux, not the physical address that is used on a bus.
+On 23 September 2016 at 23:16, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Sep 22, 2016 at 08:03:31AM +1000, Jonathan Liu wrote:
+>> Hi Maxime,
+>>
+>> On Thursday, 22 September 2016, Maxime Ripard <maxime.ripard@free-electrons.
+>> com> wrote:
+>>
+>> > On Wed, Sep 21, 2016 at 11:03:04PM +1000, Jonathan Liu wrote:
+>> > > The panel should be enabled after the controller so that the panel
+>> > > prepare/enable delays are properly taken into account. Similarly, the
+>> > > panel should be disabled before the controller so that the panel
+>> > > unprepare/disable delays are properly taken into account.
+>> > >
+>> > > This is useful for avoiding visual glitches.
+>> >
+>> > This is not really taking any delays into account, especially since
+>> > drm_panel_enable and prepare are suppose to block until their
+>> > operation is complete.
+>>
+>>
+>> drm_panel_prepare turns on power to the LCD using enable-gpios property of
+>> the panel and then blocks for prepare delay. The prepare delay for panel
+>> can be set to how long it takes between the time the panel is powered to
+>> when it is ready to receive images. If backlight property is specified the
+>> backlight will be off while the panel is powered on.
+>>
+>> drm_panel_enable blocks for enable delay and then turns on the backlight.
+>> The enable delay can be set to how long it takes for panel to start making
+>> the image visible after receiving the first valid frame. For example if the
+>> panel starts off as white and the TFT takes some time to initialize to
+>> black before it shows the image being received.
+>>
+>> Refer to drivers/gpu/drm/panel-panel.simple.c for details.
+>
+> From drm_panel.h:
+>
+> """
+> * drm_panel_enable - enable a panel
+> * @panel: DRM panel
+> *
+> * Calling this function will cause the panel display drivers to be turned on
+> * and the backlight to be enabled. Content will be visible on screen after
+> * this call completes.
+> """
+>
+> """
+> * drm_panel_prepare - power on a panel
+> * @panel: DRM panel
+> *
+> * Calling this function will enable power and deassert any reset signals to
+> * the panel. After this has completed it is possible to communicate with any
+> * integrated circuitry via a command bus.
+> """
+>
+> Those comments clearly says that the caller should not have to deal
+> with the delays, even more so by just moving calls around and hoping
+> that the code running in between is adding enough delay for the panel
+> to behave properly.
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-> If the input parameter can live on different address spaces that are
-> overlapped, even if I save the used LPC range in arm64_extio_ops->start/end
-> there is no way for the indirect IO to tell if the input parameter is
-> an I/O token or a phys address that belongs to LPC...  
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/include/drm/drm_panel.h#n34
 
-The start address is the offset: if you get an address between 'start'
-and 'end', you subtract the 'start' from it, and use that to call
-the registered driver function. That works because we can safely
-assume that the bus address range that the LPC driver registers starts
-zero.
+In comment for struct drm_panel_funcs:
+/**
+ * struct drm_panel_funcs - perform operations on a given panel
+ * @disable: disable panel (turn off back light, etc.)
+ * @unprepare: turn off panel
+ * @prepare: turn on panel and perform set up
+ * @enable: enable panel (turn on back light, etc.)
+ * @get_modes: add modes to the connector that the panel is attached to and
+ * return the number of modes added
+ * @get_timings: copy display timings into the provided array and return
+ * the number of display timings available
+ *
+ * The .prepare() function is typically called before the display controller
+ * starts to transmit video data. Panel drivers can use this to turn the panel
+ * on and wait for it to become ready. If additional configuration is required
+ * (via a control bus such as I2C, SPI or DSI for example) this is a good time
+ * to do that.
+ *
+ * After the display controller has started transmitting video data, it's safe
+ * to call the .enable() function. This will typically enable the backlight to
+ * make the image on screen visible. Some panels require a certain amount of
+ * time or frames before the image is displayed. This function is responsible
+ * for taking this into account before enabling the backlight to avoid visual
+ * glitches.
+ *
+ * Before stopping video transmission from the display controller it can be
+ * necessary to turn off the panel to avoid visual glitches. This is done in
+ * the .disable() function. Analogously to .enable() this typically involves
+ * turning off the backlight and waiting for some time to make sure no image
+ * is visible on the panel. It is then safe for the display controller to
+ * cease transmission of video data.
+ *
+ * To save power when no video data is transmitted, a driver can power down
+ * the panel. This is the job of the .unprepare() function.
+ */
 
-	Arnd
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/gpu/drm/panel/panel-simple.c?id=refs/tags/v4.8-rc7#n39
+
+In struct panel_desc:
+/**
+ * @prepare: the time (in milliseconds) that it takes for the panel to
+ *           become ready and start receiving video data
+ * @enable: the time (in milliseconds) that it takes for the panel to
+ *          display the first valid frame after starting to receive
+ *          video data
+ * @disable: the time (in milliseconds) that it takes for the panel to
+ *           turn the display off (no content is visible)
+ * @unprepare: the time (in milliseconds) that it takes for the panel
+ *             to power itself down completely
+ */
+
+Regards,
+Jonathan
