@@ -1,76 +1,83 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 23 Sep 2016 21:00:21 +0200 (CEST)
-Subject: [PATCH 2/3] gpio: Add a driver for the Raspberry Pi's firmware
- GPIO calls.
-In-Reply-To: <20160919161314.25858-2-eric@anholt.net>
-References: <20160919161314.25858-1-eric@anholt.net>
- <20160919161314.25858-2-eric@anholt.net>
-Message-ID: <420040015.81512.e9d48a65-997b-4986-a9d0-10632895df40.open-xchange@email.1und1.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 23 Sep 2016 22:05:57 +0300
+Subject: Regression in next with "mfd: twl6040: The chip does not support
+ bulk access"
+In-Reply-To: <06e0406c-3ff0-a069-a48a-0b1b82872f98@oracle.com>
+References: <20160922180718.kmttyt26t56fa3kp@atomide.com>
+ <139a8c7b-8cfe-fa21-634a-4551511f0cea@ti.com>
+ <20160923142634.zkaqxmiif22kws2e@atomide.com>
+ <06e0406c-3ff0-a069-a48a-0b1b82872f98@oracle.com>
+Message-ID: <663a8a97-f01f-ce10-b0c6-c1a5ca0f11d2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-> Eric Anholt <eric@anholt.net> hat am 19. September 2016 um 18:13 geschrieben:
+On 09/23/2016 06:24 PM, Santosh Shilimkar wrote:
+> On 9/23/2016 7:26 AM, Tony Lindgren wrote:
+>> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160923 00:21]:
+>>> On 09/22/16 21:07, Tony Lindgren wrote:
 > 
+> [...]
 > 
-> This driver will be used for accessing the FXL6408 GPIO exander on the
-> Pi3.  We can't drive it directly from Linux because the firmware is
-> continuously polling one of the expander's lines to do its
-> undervoltage detection.
+>>> On which linux-next version you are seeing this?
+>>
+>> This was with next-20160922. But testing it again this is just another
+>> regression caused by "softirq: fix tasklet_kill() and its users", so adding
+>> Santosh to Cc.
+>>
+>> So no need to revert $subject patch.
+>>
+> So your driver also looks like fiddling with tasklet core structures if
+> you got impacted because of the core change.
+
+How is that? None of the drivers in the twl6040 stack uses tasklets
+explicitly. The core uses regmap_irq and the drivers use threaded irq when
+they need interrupt handling, but no tasklet, no fiddling with internals.
+
+-- 
+P?ter
+
+> After the merge window
+> am going to take stab at bad users of tasklet but below is
+> quick snap shot conversation I had with Thomas and Andrew...
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
-> ...
-> +
-> +static int rpi_gpio_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *np = dev->of_node;
-> +	struct device_node *fw_node;
-> +	struct rpi_gpio *rpi;
-> +	u32 ngpio;
-> +	int ret;
-> +
-> +	rpi = devm_kzalloc(dev, sizeof *rpi, GFP_KERNEL);
-> +	if (!rpi)
-> +		return -ENOMEM;
-> +	rpi->dev = dev;
-> +
-> +	fw_node = of_parse_phandle(np, "firmware", 0);
-
-AFAIK fw_node must be freed with of_node_put() after usage
-
-> +	if (!fw_node) {
-> +		dev_err(dev, "Missing firmware node\n");
-> +		return -ENOENT;
-> +	}
-> +
-> +	rpi->firmware = rpi_firmware_get(fw_node);
-> +	if (!rpi->firmware)
-> +		return -EPROBE_DEFER;
-> +
-> +	if (of_property_read_u32(pdev->dev.of_node, "ngpios", &ngpio)) {
-> +		dev_err(dev, "Missing ngpios");
-> +		return -ENOENT;
-> +	}
-> +	if (of_property_read_u32(pdev->dev.of_node,
-> +				 "raspberrypi,firmware-gpio-offset",
-> +				 &rpi->offset)) {
-> +		dev_err(dev, "Missing raspberrypi,firmware-gpio-offset");
-> +		return -ENOENT;
-> +	}
-> +
-> +	rpi->gc.label = np->full_name;
-> +	rpi->gc.owner = THIS_MODULE;
-> +	rpi->gc.of_node = np;
-> +	rpi->gc.ngpio = ngpio;
-> +	rpi->gc.direction_input = rpi_gpio_dir_in;
-> +	rpi->gc.direction_output = rpi_gpio_dir_out;
-> +	rpi->gc.get = rpi_gpio_get;
-> +	rpi->gc.set = rpi_gpio_set;
-> +	rpi->gc.can_sleep = true;
-
-i think it's better to assign rpi->gc.base explicit.
-
-Stefan
+> ------------------------------------------------------------------
+> B1;2802;0cOn Wed, 21 Sep 2016, Santosh Shilimkar wrote:
+>> I requested you to include this patch but now am not sure anymore.
+>> Looks like there are almost 30 more users which are directly
+>> tweaking 'tasklet_struct' fields and calling other APIs. Hunting them
+>> and fixing them probably would be an exercise and also those changes
+>> needs those changed drivers to be tested.
+>>
+>> What do you suggest ? At least this patch needs to be dropped as of now
+>> till we can have complete coverage for those bad users.
+> 
+> Yes, it needs to be dropped. Stephen, can you please revert it from next?
+> 
+> How to fix this: The only way is to review all tasklet usage sites for
+> creative abuse and then fix them one by one. This needs to be done anyway
+> because those are ticking timebombs even without changes in the core
+> code. I looked at one of the offenders and it's broken today, it's just
+> protected by the extremly low probablity to hit the wreckage case.
+> 
+> What you can do to coerce the developers/maintainers of offending code into
+> looking at the mess they created/merged is to implement accessors for the
+> tasklet struct fields and replace the open coded fiddling with them.
+> 
+> Once that is done, rename the struct fields to something which is absurd
+> enough to type.  But don't worry, you will find people doing that. I
+> catched a few brainwrecks who actually used:
+> 
+>  irqdesc->core_internal_state__do_not_mess_with_it
+> 
+> in their code.
+> 
+> Now after having everything converted to accessors, you can add sanity
+> checks into the accessors and emit WARN_ONCE() when they are used in the
+> wrong context. That'll make them look and explain why they think that
+> fiddling in the internals is a good idea.
+> 
+> Thanks,
+> 
+>     tglx
+> ------------------------------------------------------------------
+> 
