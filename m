@@ -1,53 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 23 Sep 2016 08:39:49 -0500
-Subject: [PATCH 2/3] firmware: dt: document lpc1850 boot ROM bindings
-In-Reply-To: <20160913195117.2887-3-manabian@gmail.com>
-References: <20160913195117.2887-1-manabian@gmail.com>
- <20160913195117.2887-3-manabian@gmail.com>
-Message-ID: <20160923133949.GA24505@rob-hp-laptop>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 23 Sep 2016 16:40:57 +0300
+Subject: [PATCH v3 2/3] musb: sunxi: Remove custom babble handling
+In-Reply-To: <20160923134058.26828-1-hdegoede@redhat.com>
+References: <20160923134058.26828-1-hdegoede@redhat.com>
+Message-ID: <20160923134058.26828-2-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 09:51:16PM +0200, Joachim Eastwood wrote:
-> Binding documentation for the NXP LPC boot ROM.
-> 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  .../devicetree/bindings/firmware/nxp,boot-rom.txt   | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt b/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
-> new file mode 100644
-> index 0000000..5f3a044
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
-> @@ -0,0 +1,21 @@
-> +* NXP LPC boot ROM
-> +
-> +NXP LPC microcontrollers contains a boot ROM used to retrieve part information
-> +and access internal Flash memory and OTP memory. Note that the Flash API is
-> +not available on Flashless devices.
+The musb core already handles babble interrupts, so the sunxi glue
+having its own custom handling is redundant.
 
-Is this determined at run-time? If not flashless devices should have a 
-different compatible string to determine this then.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-This is a new patch in v2 of this patch series
+Changes in v3:
+-Improve commit msg
+---
+ drivers/usb/musb/sunxi.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-> +
-> +Required properties:
-> +- compatible: must contain the following: "nxp,lpc1850-boot-rom".
-> +- reg: physical base address of the ROM and length of memory mapped region.
-> +- syscon: handle to NXP CREG (Configuration Registers) syscon block.
-> +- nvmem-cells: = handle to OTP memory cell which contain the part ID.
-> +- nvmem-cell-names: must contain "PartID".
-> +
-> +Example:
-> +boot_rom: firmware at 10400000 {
-> +	compatible = "nxp,lpc1850-boot-rom";
-> +	reg = <0x10400000 0x10000>;
-> +	syscon = <&creg>;
-> +	nvmem-cells = <&part_id>;
-> +	nvmem-cell-names = "PartID";
-> +};
-> -- 
-> 2.9.3
-> 
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index 1408245..82eba92 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -186,16 +186,6 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
+ 	if (musb->int_usb)
+ 		writeb(musb->int_usb, musb->mregs + SUNXI_MUSB_INTRUSB);
+ 
+-	/*
+-	 * sunxi musb often signals babble on low / full speed device
+-	 * disconnect, without ever raising MUSB_INTR_DISCONNECT, since
+-	 * normally babble never happens treat it as disconnect.
+-	 */
+-	if ((musb->int_usb & MUSB_INTR_BABBLE) && is_host_active(musb)) {
+-		musb->int_usb &= ~MUSB_INTR_BABBLE;
+-		musb->int_usb |= MUSB_INTR_DISCONNECT;
+-	}
+-
+ 	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
+ 		/* ep0 FADDR must be 0 when (re)entering peripheral mode */
+ 		musb_ep_select(musb->mregs, 0);
+-- 
+2.9.3
