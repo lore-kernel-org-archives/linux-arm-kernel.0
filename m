@@ -1,58 +1,33 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Fri, 23 Sep 2016 08:47:56 -0500
-Subject: [PATCH v2 2/3] musb: sunxi: Remove custom babble handling
-In-Reply-To: <db52a0d4-74f1-4f47-eb67-bcfbd66f174f@redhat.com>
-References: <20160922111901.15337-1-hdegoede@redhat.com>
- <20160922111901.15337-2-hdegoede@redhat.com>
- <20160922135415.GB31827@uda0271908>
- <39199bd7-a372-0312-6177-5b0fc2d683ac@redhat.com>
- <20160922143050.GC31827@uda0271908>
- <db52a0d4-74f1-4f47-eb67-bcfbd66f174f@redhat.com>
-Message-ID: <20160923134756.GE31827@uda0271908>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 Sep 2016 15:53:38 +0200
+Subject: [PATCH 1/3] dt-bindings: Add a binding for the RPi firmware GPIO
+ driver.
+In-Reply-To: <87ponu931e.fsf@eliezer.anholt.net>
+References: <20160919161314.25858-1-eric@anholt.net>
+ <CACRpkdb-hRjD+FmyZ4SKurp94V=HR3L90OLNc-6eUKuy9AK_Rg@mail.gmail.com>
+ <87ponu931e.fsf@eliezer.anholt.net>
+Message-ID: <CACRpkdYqPXo4xzNQzjQemCpM_dWYn+ZmSBPopRScyR9K1R3cfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 04:42:26PM +0300, Hans de Goede wrote:
-> Hi,
-> 
-> On 09/22/2016 05:30 PM, Bin Liu wrote:
-> >Hi,
-> >
-> >On Thu, Sep 22, 2016 at 05:03:39PM +0300, Hans de Goede wrote:
-> >>Hi,
-> >>
-> >>On 09/22/2016 04:54 PM, Bin Liu wrote:
-> >>>Hi,
-> >>>
-> >>>On Thu, Sep 22, 2016 at 02:19:00PM +0300, Hans de Goede wrote:
-> >>>>The musb-core now a days always treats babble errors in host mode
-> >>>
-> >>>I don't think this statement is accurate. You might want to change it to
-> >>>"The musb core already handles babble interrupt" or something else.
-> >>
-> >>It is accurate if you look in the history at drivers/usb/musb
-> >>commits around 15-03-10 you will see 2 relevant commits:
-> >>
-> >>https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/usb/musb?id=b4dc38fd45b63e3da2bc98db5d283a15a637a2fa
-> >>
-> >>"usb: musb: core: simplify musb_recover_work()"
-> >>
-> >>This commits introduces calling musb_root_disconnect(musb)
-> >>on babble errors, that was not happening before which is why
-> >
-> >That is true, but calling musb_root_disconnect() is just one step of the
-> >recovery in musb core, not all.
-> >
-> >The statement of "treats babble errors in host mode as disconnects"
-> >implies all the babble handling is just disconnect, which is not
-> >accurate.
-> 
-> Ok, I'll send out a v3 with an improved commit msg.
+On Fri, Sep 23, 2016 at 3:08 PM, Eric Anholt <eric@anholt.net> wrote:
 
-Thanks.
+> Sort of related: I also worry that we have races with the firmware for
+> the platform GPIO bits, since both ARM and firmware are doing RMWs (or,
+> even worse, maybe just Ws?) of the registers controlled by the pinctrl
+> driver.  Hopefully I can get the firmware to pass control of devices
+> like this over to Linux, with firmware making requests to us, but I
+> don't know if that will happen and we may need to access other GPIOs
+> using this interface :(
 
-If Kishon gives his Acked-by, I will take all the 3 patches. Or
-I can just take the 2 musb patches into my tree.
+For the race with firmware I have no good solutions, it's just one of
+those things I guess :(
 
-Regards,
--Bin.
+When two kernel drivers compete about registers, say for example
+one driver needs to RMW bits 0-5 and another driver needs to
+RMW bits 7-11, the right solution is usually to use syscon
+and then regmap-mmio will deal with the concurrency as part
+of regmap_update_bits() etc.
+
+Yours,
+Linus Walleij
