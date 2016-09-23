@@ -1,147 +1,78 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Sep 2016 16:08:23 +0200
-Subject: [PATCH 2/3] gpio: Add a driver for the Raspberry Pi's firmware
- GPIO calls.
-In-Reply-To: <87mviy92qw.fsf@eliezer.anholt.net>
-References: <20160919161314.25858-1-eric@anholt.net>
- <20160919161314.25858-2-eric@anholt.net>
- <CACRpkda6HpJp97FUAh6yvo-BhiDbAXxzQS9U6uT+jvg6hiB8ag@mail.gmail.com>
- <87mviy92qw.fsf@eliezer.anholt.net>
-Message-ID: <CACRpkdbJoM-RbcuoC=7xJyrT3v7p2n9HiidRp1GUw=o43_Fkwg@mail.gmail.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Fri, 23 Sep 2016 16:13:19 +0200
+Subject: [PATCH v18 6/6] ARM: socfpga: fpga bridge driver support
+In-Reply-To: <20160712193645.9098-7-atull@opensource.altera.com>
+References: <20160712193645.9098-1-atull@opensource.altera.com>
+ <20160712193645.9098-7-atull@opensource.altera.com>
+Message-ID: <73ponug19k.fsf@unicorn.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 3:15 PM, Eric Anholt <eric@anholt.net> wrote:
-> Linus Walleij <linus.walleij@linaro.org> writes:
 
->> Maybe it should be named GPIO_RPI_FXL6408 ?
->>
->> (No strong opinion.)
+Hi!
+
+Alan Tull writes:
+
+> Supports Altera SOCFPGA bridges:
+>  * fpga2sdram
+>  * fpga2hps
+>  * hps2fpga
+>  * lwhps2fpga
 >
-> See DT binding comment -- I think since this driver has no dependency on
-> being to the 6408 on the pi3, we shouldn't needlessly bind it to the
-> FXL6408.  (the help comment was just context for why you would want the
-> driver today).
-
-OK
-
->>> +static int rpi_gpio_dir_in(struct gpio_chip *gc, unsigned off)
->>> +{
->>> +       /* We don't have direction control. */
->>> +       return -EINVAL;
->>> +}
->>> +
->>> +static int rpi_gpio_dir_out(struct gpio_chip *gc, unsigned off, int val)
->>> +{
->>> +       /* We don't have direction control. */
->>> +       return -EINVAL;
->>> +}
->>
->> IMO this should return OK if you try to set it to the direction
->> that the line is hardwired for in that case, not just fail everything.
->>
->> If you return errors here, any generic driver that tries to
->> set the line as input or output will fail and then require a
->> second workaround in that driver if it is used on rpi etc etc.
->>
->> Try to return zero if the consumer asks for the direction that
->> the line is set to.
->>
->> Also implement .get_direction(). Doing so will show how to
->> do the above two calls in the right way.
+> Allows enabling/disabling the bridges through the FPGA
+> Bridge Framework API functions.
 >
-> I was worried about the lack of direction support.  The firmware
-> interface doesn't give me anything for direction, and a get or set
-> of the value doesn't try to set direction.
+> The fpga2sdram driver only supports enabling and disabling
+> of the ports that been configured early on.  This is due to
+> a hardware limitation where the read, write, and command
+> ports on the fpga2sdram bridge can only be reconfigured
+> while there are no transactions to the sdram, i.e. when
+> running out of OCRAM before the kernel boots.
 >
-> I can try to bother them to give me support for that, but if they
-> cooperate on that it means that users will only get HDMI detection once
-> they update firmware.
+> Device tree property 'init-val' configures the driver to
+> enable or disable the bridge during probe.  If the property
+> does not exist, the driver will leave the bridge in its
+> current state.
 >
-> The alternative to new firmware interface would be to provide a bunch of
-> DT saying which of these should be in/out at boot time and refuse to
-> change them after that.  That seems like a mess, though.
+> Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> Signed-off-by: Matthew Gerlach <mgerlach@altera.com>
+> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-It has to be resolved one way or another I'm afraid.
+(...)
 
-Do you have an API in place to ask for the firmware version?
-RPI_FIRMWARE_GET_FIRMWARE_REVISION seems to
-exist at least?
+> +static inline int _alt_fpga2sdram_enable_set(struct alt_fpga2sdram_data *priv,
+> +					     bool enable)
+> +{
+> +	return regmap_update_bits(priv->sdrctl, ALT_SDR_CTL_FPGAPORTRST_OFST,
+> +				  priv->mask, enable ? priv->mask : 0);
+> +}
 
-In that case try to make some compromise, e.g. if lines 0 and 1
-are output and the rest input in a certain firmware version:
+(...)
 
-struct rpi_gpio {
-    (...)
-    u8 dirs;
-};
+> +	/* Get f2s bridge configuration saved in handoff register */
+> +	regmap_read(sysmgr, SYSMGR_ISWGRP_HANDOFF3, &priv->mask);
+> +
 
-if (fw_version <= a)
-     rpi->dirs = 0x03;
-else if (fw_version > a && fw_version <= b)
-    rpi->dirs = 0x07;
-else
-     /* Ask firmware */
+Could you maybe add some documentation about this implicit information
+shared between a bootloader and this driver?
+I understand why you do this, but there must be a better way than
+depending on something some bootloader wrote in some undocumented
+register, no?
+The documentation just says:
 
-Then in e.g.
+"These registers are used to store handoff infomation between the
+preloader and the OS. These 8 registers can be used to store any
+information. The contents of these registers have no impact on the
+state of the HPS hardware"
 
-static int rpi_gpio_dir_in(struct gpio_chip *gc, unsigned off)
-{
-     struct rpi_gpio *rpi = gpiochip_get_data(gc);
+If it is already agreed upon, that a bridge-enable property is okay,
+why not add a port-enable property, too?
 
-     if (!(rpi->dirs & BIT(off)))
-            return 0;
-     return -EINVAL;
-}
+Regards,
+Steffen Trumtrar
 
-I think this should be managed by code in the driver like this
-and not by any DT properties. I suspect also the ngpio number
-is better to determine from looking at the fw version number.
-
->> Use devm_gpiochip_add_data() and pass NULL as data
->> so you can still use the devm* function.
->
-> Oh, nice.
-
-I forgot this: with devm_gpiochip_add_data() pass struct rpi_gpio *
-as data then you can just:
-
-static void rpi_gpio_set(struct gpio_chip *gc, unsigned off, int val)
-{
--       struct rpi_gpio *rpi = container_of(gc, struct rpi_gpio, gc);
-+      struct rpi_gpio *rpi = gpiochip_get_data(gc);
-
-Applies everywhere.
-
->>> diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
->>> index 3fb357193f09..671ccd00aea2 100644
->>> --- a/include/soc/bcm2835/raspberrypi-firmware.h
->>> +++ b/include/soc/bcm2835/raspberrypi-firmware.h
->>> @@ -73,11 +73,13 @@ enum rpi_firmware_property_tag {
->>>         RPI_FIRMWARE_GET_DISPMANX_RESOURCE_MEM_HANDLE =       0x00030014,
->>>         RPI_FIRMWARE_GET_EDID_BLOCK =                         0x00030020,
->>>         RPI_FIRMWARE_GET_DOMAIN_STATE =                       0x00030030,
->>> +       RPI_FIRMWARE_GET_GPIO_STATE =                         0x00030041,
->>>         RPI_FIRMWARE_SET_CLOCK_STATE =                        0x00038001,
->>>         RPI_FIRMWARE_SET_CLOCK_RATE =                         0x00038002,
->>>         RPI_FIRMWARE_SET_VOLTAGE =                            0x00038003,
->>>         RPI_FIRMWARE_SET_TURBO =                              0x00038009,
->>>         RPI_FIRMWARE_SET_DOMAIN_STATE =                       0x00038030,
->>> +       RPI_FIRMWARE_SET_GPIO_STATE =                         0x00038041,
->>
->> Can you please merge this orthogonally into the rpi tree to ARM SoC?
->
-> This driver would appear in the rpi downstream tree once we settle the
-> driver here.  Or are you asking me to delay this series until I can get
-> them to pull just a patch extending the set of packets?
-
-Sorry I am not familiar with your development model. I don't know
-about any RPI downstream tree... What I mean is that the patch to
-include/soc/bcm2835/raspberrypi-firmware.h should be merged by
-whoever is maintaining that file, it is not a GPIO file.
-
-If I get an ACK from the maintainer I can take it into the GPIO
-tree.
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Steffen Trumtrar            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
