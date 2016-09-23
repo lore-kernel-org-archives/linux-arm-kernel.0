@@ -1,41 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Sep 2016 16:52:51 +0100
-Subject: [PATCH] arm64: fix dump_backtrace with NULL tsk
-In-Reply-To: <1474642587-22416-1-git-send-email-mark.rutland@arm.com>
-References: <1474642587-22416-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160923155250.GA22454@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Sep 2016 17:55:10 +0200
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F8850F2@lhreml507-mbx>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <10705430.q2aqv5uYO3@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F8850F2@lhreml507-mbx>
+Message-ID: <1849232.KJrfRPHGN6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 03:56:27PM +0100, Mark Rutland wrote:
-> In some places, dump_backtrace() is called with a NULL tsk parameter,
-> e.g. in bug_handler() in arch/arm64, or indirectly via show_stack() in
-> core code. The expectation is that this is treated as if current were
-> passed instead of NULL.
+On Friday, September 23, 2016 2:59:55 PM CEST Gabriele Paoloni wrote:
 > 
-> Commit a80a0eb70c358f8c ("arm64: make irq_stack_ptr more robust") didn't
-> take this into account, and compares tsk against current *before* we
-> check if tsk is NULL.
+> > > From the perspective of the indirect IO function the input parameter
+> > > is an unsigned long addr that (now) can be either:
+> > > 1) an IO token coming from a legacy pci device
+> > > 2) a phys address that lives on the LPC bus
+> > >
+> > > These are conceptually two separate address spaces (and actually they
+> > > both start from 0).
+> > 
+> > Why? Any IORESOURCE_IO address always refers to the logical I/O port
+> > range in Linux, not the physical address that is used on a bus.
 > 
-> Due to this, we won't initialise irq_stack_ptr, and when we try to dump
-> the exception regs we may call dump_mem() for memory immediately above
-> the IRQ stack range, rather than for the relevant range on the task
-> stack.
+> If I read the code correctly when you get an I/O token you just add it
+> to PCI_IOBASE.
+> This is enough since pci_remap_iospace set the virtual address to 
+> PCI_IOBASE + the I/O token offset; so we can read/write to
+> vaddr = PCI_IOBASE + token as pci_remap_iospace has mapped it correctly
+> to the respective PCI cpu address (that is set in the I/O range property
+> of the host controller)
 > 
-> This will result in misleading, though should not be otherwise
-> problematic. The initial percpu areas (including the IRQ stacks) are
-> allocated in the linear map, and dump_mem uses __get_user(), so we
-> shouldn't access anything with side-effects, and will handle holes
-> safely.
+> In the patchset accessors LPC operates directly on the cpu addresses
+> and the input parameter of the accessors can be either an IO token or
+> a cpu address
 > 
-> This patch fixes the issue by handling the NULL tsk case before we do
-> anything else with tsk.
+> +static inline void outb(u8 value, unsigned long addr)
+> +{
+> +#ifdef CONFIG_ARM64_INDIRECT_PIO
+> +       if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
+> +                       addr <= arm64_extio_ops->end)
+> 
+> Here below we operate on cpu address
+> 
+> +               extio_outb(value, addr);
+> +       else
+> +#endif
 
-Looking again, it seems we have a similar issue in unwind_frame(), at
-least when called by profile_pc(). In that case, we'll needlessly bail
-out early with -EINVAL.
+I missed this bug earlier, this obviously needs to be
 
-I'll spin a fix for that in v2...
+		arm64_extio_ops->outb(value, addr - arm64_extio_ops->start);
 
-Thanks,
-Mark.
+or possibly
+
+		arm64_extio_ops->outb(arm64_extio_ops, value, addr);
+
+as the outb function won't know what the offset is, but
+that needed to be fixed regardless.
+
+	Arnd
