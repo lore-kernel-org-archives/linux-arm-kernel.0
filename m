@@ -1,85 +1,53 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 23 Sep 2016 10:54:25 +0200
-Subject: [PATCH v2] arm: dts: zynq: Add MicroZed board support
-In-Reply-To: <CAD6G_RRn0pAF=TsgONQ4yah2VhZXQeBQmeBQ5p46u6R5F8pSqw@mail.gmail.com>
-References: <1474550489-7005-1-git-send-email-jagan@amarulasolutions.com>
- <20160922205917.GS16583@xsjsorenbubuntu>
- <4a586da6-8d94-bfbe-ea0c-58b6f8573e7b@xilinx.com>
- <CAD6G_RR6JSzd-QCUj3wDC30pXabNqaNR1d1jQm9bUq6z0CP=3g@mail.gmail.com>
- <aa469a8b-7968-1934-1b8e-6978fd0e6922@xilinx.com>
- <CAD6G_RRn0pAF=TsgONQ4yah2VhZXQeBQmeBQ5p46u6R5F8pSqw@mail.gmail.com>
-Message-ID: <c0cd61f3-28c2-f8c7-f5b6-faf197f39986@xilinx.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 Sep 2016 10:57:27 +0200
+Subject: [PATCH 1/3] dt-bindings: Add a binding for the RPi firmware GPIO
+ driver.
+In-Reply-To: <20160919161314.25858-1-eric@anholt.net>
+References: <20160919161314.25858-1-eric@anholt.net>
+Message-ID: <CACRpkdb-hRjD+FmyZ4SKurp94V=HR3L90OLNc-6eUKuy9AK_Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.9.2016 10:42, Jagan Teki wrote:
-> On Fri, Sep 23, 2016 at 2:07 PM, Michal Simek <michal.simek@xilinx.com> wrote:
->> On 23.9.2016 09:39, Jagan Teki wrote:
->>> On Fri, Sep 23, 2016 at 11:33 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->>>> On 22.9.2016 22:59, S?ren Brinkmann wrote:
->>>>> On Thu, 2016-09-22 at 18:51:29 +0530, Jagan Teki wrote:
->>>>>> From: Jagan Teki <jteki@openedev.com>
->>>>>>
->>>>>> Added basic dts support for MicroZed board.
->>>>>>
->>>>>> - UART
->>>>>> - SDHCI
->>>>>> - Ethernet
->>>>>>
->>>>>> Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>
->>>>>> Cc: Michal Simek <michal.simek@xilinx.com>
->>>>>> Signed-off-by: Jagan Teki <jteki@openedev.com>
->>>>>> ---
->>>>>> Changes for v2:
->>>>>>      - Add SDHCI
->>>>>>      - Add Ethernet
->>>>>>
->>>>>>  arch/arm/boot/dts/Makefile          |  1 +
->>>>>>  arch/arm/boot/dts/zynq-microzed.dts | 95 +++++++++++++++++++++++++++++++++++++
->>>>>>  2 files changed, 96 insertions(+)
->>>>>>  create mode 100644 arch/arm/boot/dts/zynq-microzed.dts
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>>>>> index faacd52..4d7b858 100644
->>>>>> --- a/arch/arm/boot/dts/Makefile
->>>>>> +++ b/arch/arm/boot/dts/Makefile
->>>>>> @@ -862,6 +862,7 @@ dtb-$(CONFIG_ARCH_VT8500) += \
->>>>>>      wm8750-apc8750.dtb \
->>>>>>      wm8850-w70v2.dtb
->>>>>>  dtb-$(CONFIG_ARCH_ZYNQ) += \
->>>>>> +    zynq-microzed.dtb \
->>>>>>      zynq-parallella.dtb \
->>>>>>      zynq-zc702.dtb \
->>>>>>      zynq-zc706.dtb \
->>>>>> diff --git a/arch/arm/boot/dts/zynq-microzed.dts b/arch/arm/boot/dts/zynq-microzed.dts
->>>>>> new file mode 100644
->>>>>> index 0000000..9e64496
->>>>>> --- /dev/null
->>>>>> +++ b/arch/arm/boot/dts/zynq-microzed.dts
->>>>>> @@ -0,0 +1,95 @@
->>>>>> +/*
->>>>>> + * Copyright (C) 2015 Jagan Teki <jteki@openedev.com>
->>>>
->>>>
->>>> Did you created only yourself without copying part of this from others?
->>>> There is dts in u-boot which I believe you are aware of.
->>>
->>> I sent the initial one few months back so at that time, I was created
->>> and now I just added USB and Ethernet with the reference of zc702
->>> board.
->>
->> Can you send me a link to that post? I didn't find it.
-> 
-> Here is the link [1]
-> 
->> Anyway you should keep Xilinx copyright there.
-> 
-> OK then will append Xilinx as well.
-> 
-> [1] http://lkml.iu.edu/hypermail/linux/kernel/1601.1/03236.html
+On Mon, Sep 19, 2016 at 6:13 PM, Eric Anholt <eric@anholt.net> wrote:
 
-ok. It was lkml and devicetree not arm mailing list that's why I didn't
-find it.
+> The RPi firmware exposes all of the board's GPIO lines through
+> property calls.  Linux chooses to control most lines directly through
+> the pinctrl driver, but for the FXL6408 GPIO expander on the Pi3, we
+> need to access them through the firmware.
+>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-Thanks,
-Michal
+Aha
+
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
+> @@ -0,0 +1,22 @@
+> +Raspberry Pi power domain driver
+
+Really? :)
+
+> +Required properties:
+> +
+> +- compatible:          Should be "raspberrypi,firmware-gpio"
+
+Usually this is vendor,compat, is the vendors name "raspberrypi"?
+
+> +- gpio-controller:     Marks the device node as a gpio controller
+> +- #gpio-cells:         Should be <2> for GPIO number and flags
+> +- ngpios:              Number of GPIO lines to control.  See gpio.txt
+
+Is this ever anything else than 8? Else omit it and hardcode
+8 in the driver instead.
+
+> +- firmware:            Reference to the RPi firmware device node
+
+Reference the DT binding for this.
+
+> +- raspberrypi,firmware-gpio-offset:
+> +                       Number the firmware uses for the first GPIO line
+> +                         controlled by this driver
+
+Does this differ between different instances of this hardware or
+can it just be open coded in the driver instead?
+
+Yours,
+Linus Walleij
