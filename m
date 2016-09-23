@@ -1,83 +1,61 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 23 Sep 2016 09:42:30 +0530
-Subject: [PATCH 5/5] arm64: Add uprobe support
-In-Reply-To: <20160922165030.GA27704@e104818-lin.cambridge.arm.com>
-References: <cover.1470114993.git.panand@redhat.com>
- <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
- <20160920165946.GA19353@e104818-lin.cambridge.arm.com>
- <20160921110047.GA29470@localhost.localdomain>
- <20160921170403.GE12180@e104818-lin.cambridge.arm.com>
- <20160922032328.GB29470@localhost.localdomain>
- <20160922165030.GA27704@e104818-lin.cambridge.arm.com>
-Message-ID: <20160923041230.GC29470@localhost.localdomain>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 23 Sep 2016 10:49:47 +0530
+Subject: [PATCH v2 2/2] cpufreq: ti: Add cpufreq driver to determine
+ available OPPs at runtime
+In-Reply-To: <57E2E0BE.3070206@ti.com>
+References: <20160901025328.376-1-d-gerlach@ti.com>
+ <20160901025328.376-3-d-gerlach@ti.com>
+ <20160907052053.GO27345@vireshk-i7> <57D02C85.7020300@ti.com>
+ <20160908033909.GR27345@vireshk-i7> <57E2E0BE.3070206@ti.com>
+Message-ID: <20160923051947.GC17336@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/2016:05:50:30 PM, Catalin Marinas wrote:
-> On Thu, Sep 22, 2016 at 08:53:28AM +0530, Pratyush Anand wrote:
-> > On 21/09/2016:06:04:04 PM, Catalin Marinas wrote:
-> > > On Wed, Sep 21, 2016 at 04:30:47PM +0530, Pratyush Anand wrote:
-> > > > On 20/09/2016:05:59:46 PM, Catalin Marinas wrote:
-> > > > > > +int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
-> > > > > > +		unsigned long addr)
-> > > > > > +{
-> > > > > > +	probe_opcode_t insn;
-> > > > > > +
-> > > > > > +	/* TODO: Currently we do not support AARCH32 instruction probing */
-> > > > > 
-> > > > > Is there a way to check (not necessarily in this file) that we don't
-> > > > > probe 32-bit tasks?
-> > > > 
-> > > > - Well, I do not have complete idea about it that, how it can be done. I think
-> > > >   we can not check that just by looking a single bit in an instruction.
-> > > >   My understanding is that, we can only know about it when we are executing the
-> > > >   instruction, by reading pstate, but that would not be useful for uprobe
-> > > >   instruction analysis.
-> > > >   
-> > > >   I hope, instruction encoding for aarch32 and aarch64 are different, and by
-> > > >   analyzing for all types of aarch32 instructions, we will be able to decide
-> > > >   that whether instruction is 32 bit trace-able or not.  Accordingly, we can use
-> > > >   either BRK or BKPT instruction for breakpoint generation.
-> > > 
-> > > We may have some unrelated instruction encoding overlapping but I
-> > > haven't checked. I was more thinking about whether we know which task is
-> > > being probed and check is_compat_task() or maybe using
-> > > compat_user_mode(regs).
-> > 
-> > I had thought of this, but problem is that we might not have task in existence
-> > when we enable uprobes.  For example: Lets say we are inserting a trace probe at
-> > offset 0x690 in a executable binary.
-> > 
-> > echo "p test:0x690" > /sys/kernel/debug/tracing/uprobe_events
-> > echo 1 > /sys/kernel/debug/tracing/events/uprobes/enable
-> > 
-> > In the 'enable' step, it is decided that whether instruction is traceable or
-> > not. 
-> > 
-> > (1) But at this point 'test' executable might not be running.
-
-Let me correct myself first here. When executable is not running, then,
-arch_uprobe_analyze_insn() is not called while uprobes enabling (ie writing '1'
-to 'enable'). In that case, it is called when binary is executed and task is
-created.
-
-> > (2) Even if it is running, is_compat_task() or compat_user_mode() might not be
-> > usable, as they work with 'current' task.
+On 21-09-16, 14:34, Dave Gerlach wrote:
+> Viresh,
+> On 09/07/2016 10:39 PM, Viresh Kumar wrote:
+> >On 07-09-16, 10:04, Dave Gerlach wrote:
+> >>>>+static const struct of_device_id ti_cpufreq_of_match[] = {
+> >>>>+	{ .compatible = "operating-points-v2-ti-am3352-cpu",
+> >>>>+	  .data = &am3x_soc_data, },
+> >>>>+	{ .compatible = "operating-points-v2-ti-am4372-cpu",
+> >>>>+	  .data = &am4x_soc_data, },
+> >>>>+	{ .compatible = "operating-points-v2-ti-dra7-cpu",
+> >>>>+	  .data = &dra7_soc_data },
+> >>>
+> >>>You should be using your SoC compatible strings here. OPP compatible
+> >>>property isn't supposed to be (mis)used for this purpose.
+> >>>
+> >>
+> >>Referring to my comments in patch 1, what if we end up changing the bindings
+> >>based on DT maintainer comments? We will have these compatible strings, and
+> >>at that point is it acceptable to match against them? Or is it still better
+> >>to match to SoC compatibles? I think it makes sense to just probe against
+> >>these.
+> >
+> >But even then I think these are not correct. You should have added a
+> >single compatible string: operating-points-v2-ti-cpu.
+> >
+> >As the properties will stay the same across machines. And then you
+> >need to use SoC strings here.
+> >
 > 
-> What I find strange is that uprobes allows you to insert a breakpoint
-> instruction that's not even compatible with the task (so it would
-> SIGILL rather than generate a debug exception).
-> 
-> > What I was thinking that, let it go with 'TODO' as of now. 
-> 
-> Only that I don't have any guarantee that someone is going to fix it ;).
-> 
-> As a quick workaround you could check mm->task_size > TASK_SIZE_32 in
-> the arch_uprobe_analyze_insn() function.
+> Are you opposed to moving _of_get_opp_desc_node from
+> drivers/base/power/opp/opp.h to include/linux/pm_opp.h and renaming it
+> appropriately?
 
-It would be doable. TASK_SIZE_32 is defined only for COMPAT. So, may be I can
-return -EINVAL when mm->task_size < TASK_SIZE_64.
+I am not opposed to that, but ...
 
-Thanks for your input. 
+> If I move the ti properties out of the cpu node, as discussed in patch 1 of
+> this series, and into the operating-points-v2 table, I need a way to get the
+> operating-points-v2 device node and I think it makes sense to reuse this as
+> it is what the opp framework uses internally to parse the phandle to the opp
+> table.
 
-~Pratyush
+I am not sure if those registers belong to the OPP bindings. What are those
+registers really? What all can be read from them? Why shouldn't they be present
+as a separate node in DT on the respective bus? Look at how it is done for
+sti-cpufreq driver.
+
+-- 
+viresh
