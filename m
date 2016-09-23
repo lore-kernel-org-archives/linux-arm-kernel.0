@@ -1,122 +1,70 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 23 Sep 2016 09:52:59 -0500
-Subject: [RFC PATCH 08/11] pci: controller: dra7xx: Add EP mode support
-In-Reply-To: <1473829927-20466-9-git-send-email-kishon@ti.com>
-References: <1473829927-20466-1-git-send-email-kishon@ti.com>
- <1473829927-20466-9-git-send-email-kishon@ti.com>
-Message-ID: <20160923145259.GA28285@rob-hp-laptop>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Sep 2016 15:56:27 +0100
+Subject: [PATCH] arm64: fix dump_backtrace with NULL tsk
+Message-ID: <1474642587-22416-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 10:42:04AM +0530, Kishon Vijay Abraham I wrote:
-> The PCIe controller integrated in dra7xx SoCs is capable of operating
-> in endpoint mode. Add support for dra7xx SoCs to operate in endpoint
-> mode.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  Documentation/devicetree/bindings/pci/ti-pci.txt |   30 ++-
->  drivers/pci/controller/Kconfig                   |   21 +++
->  drivers/pci/controller/pci-dra7xx.c              |  211 +++++++++++++++++++---
->  3 files changed, 225 insertions(+), 37 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
-> index 60e2516..b0e76f6 100644
-> --- a/Documentation/devicetree/bindings/pci/ti-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
-> @@ -1,17 +1,22 @@
->  TI PCI Controllers
->  
->  PCIe Designware Controller
-> - - compatible: Should be "ti,dra7-pcie""
-> - - reg : Two register ranges as listed in the reg-names property
-> - - reg-names : The first entry must be "ti-conf" for the TI specific registers
-> -	       The second entry must be "rc-dbics" for the designware pcie
-> -	       registers
-> -	       The third entry must be "config" for the PCIe configuration space
-> + - compatible: Should be "ti,dra7-pcie" for RC
-> +	       Should be "ti,dra7-pcie-ep" for EP
->   - phys : list of PHY specifiers (used by generic PHY framework)
->   - phy-names : must be "pcie-phy0", "pcie-phy1", "pcie-phyN".. based on the
->  	       number of PHYs as specified in *phys* property.
->   - ti,hwmods : Name of the hwmod associated to the pcie, "pcie<X>",
->  	       where <X> is the instance number of the pcie from the HW spec.
-> + - num-lanes as specified in ../designware-pcie.txt
-> +
-> +HOST MODE
-> +=========
-> + - reg : Two register ranges as listed in the reg-names property
-> + - reg-names : The first entry must be "ti-conf" for the TI specific registers
-> +	       The second entry must be "rc-dbics" for the designware pcie
-> +	       registers
-> +	       The third entry must be "config" for the PCIe configuration space
->   - interrupts : Two interrupt entries must be specified. The first one is for
->  		main interrupt line and the second for MSI interrupt line.
->   - #address-cells,
-> @@ -19,13 +24,24 @@ PCIe Designware Controller
->     #interrupt-cells,
->     device_type,
->     ranges,
-> -   num-lanes,
->     interrupt-map-mask,
->     interrupt-map : as specified in ../designware-pcie.txt
->  
->  Optional Property:
->   - gpios : Should be added if a gpio line is required to drive PERST# line
+In some places, dump_backtrace() is called with a NULL tsk parameter,
+e.g. in bug_handler() in arch/arm64, or indirectly via show_stack() in
+core code. The expectation is that this is treated as if current were
+passed instead of NULL.
 
-Don't you need gpios as the input side of GPIO outputs in RC mode? Or 
-for EP mode they are all handled by h/w?
+Commit a80a0eb70c358f8c ("arm64: make irq_stack_ptr more robust") didn't
+take this into account, and compares tsk against current *before* we
+check if tsk is NULL.
 
->  
-> +DEVICE MODE
-> +===========
-> + - reg : Two register ranges as listed in the reg-names property
-> + - reg-names : "ti-conf" for the TI specific registers
-> +	       "ep_dbics" for the standard configuration registers as
-> +		they are locally accessed within the DIF CS space
-> +	       "ep_dbics2" for the standard configuration registers as
-> +		they are locally accessed within the DIF CS2 space
-> + - interrupts : one interrupt entries must be specified for main interrupt.
-> + - num-ib-windows : number of inbound address translation windows
-> + - num-ob-windows : number of outbound address translation windows
-> +
->  Example:
->  axi {
->  	compatible = "simple-bus";
-> diff --git a/drivers/pci/controller/Kconfig b/drivers/pci/controller/Kconfig
-> index 8574828..4d70981 100644
-> --- a/drivers/pci/controller/Kconfig
-> +++ b/drivers/pci/controller/Kconfig
-> @@ -23,6 +23,27 @@ config PCI_DRA7XX_HOST
->  	 Enables support for the PCIe controller in the DRA7xx SoC to work in
->  	 host mode.
->  
-> +config PCI_DRA7XX_EP
-> +	bool "Endpoint Only Mode"
-> +	depends on PCI_ENDPOINT
-> +	select PCIE_DW_EP
-> +	help
-> +	 Enables support for the PCIe controller in the DRA7xx SoC to work in
-> +	 endpoint mode.
-> +
-> +config PCI_DRA7XX_HOST_EP
+Due to this, we won't initialise irq_stack_ptr, and when we try to dump
+the exception regs we may call dump_mem() for memory immediately above
+the IRQ stack range, rather than for the relevant range on the task
+stack.
 
-I'd make these 2 options just RC and EP depending on PCI_DRA7XX_HOST 
-with RC option being default yes.
+This will result in misleading, though should not be otherwise
+problematic. The initial percpu areas (including the IRQ stacks) are
+allocated in the linear map, and dump_mem uses __get_user(), so we
+shouldn't access anything with side-effects, and will handle holes
+safely.
 
+This patch fixes the issue by handling the NULL tsk case before we do
+anything else with tsk.
 
-> +	bool "Both Host and Endpoint Mode"
-> +	depends on PCI_MSI_IRQ_DOMAIN
-> +	depends on PCI
-> +	depends on PCI_ENDPOINT
-> +	select PCIE_DW_HOST
-> +	select PCIE_DW_EP
-> +	help
-> +	 Enables support for the PCIe controller in the DRA7xx SoC to work in
-> +	 both endpoint mode and host mode. If the board has 2 PCIe ports and
-> +	 one of them has to work in host mode and the other has to work in
-> +	 EP mode then this option has to be enabled.
-> +
->  endchoice
->  
->  endif
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Fixes: a80a0eb70c358f8c ("arm64: make irq_stack_ptr more robust")
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Yang Shi <yang.shi@linaro.org>
+---
+ arch/arm64/kernel/traps.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index e04f838..df06750 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -142,6 +142,11 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 	unsigned long irq_stack_ptr;
+ 	int skip;
+ 
++	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
++
++	if (!tsk)
++		tsk = current;
++
+ 	/*
+ 	 * Switching between stacks is valid when tracing current and in
+ 	 * non-preemptible context.
+@@ -151,11 +156,6 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 	else
+ 		irq_stack_ptr = 0;
+ 
+-	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+-
+-	if (!tsk)
+-		tsk = current;
+-
+ 	if (tsk == current) {
+ 		frame.fp = (unsigned long)__builtin_frame_address(0);
+ 		frame.sp = current_stack_pointer;
+-- 
+1.9.1
