@@ -1,61 +1,40 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 23 Sep 2016 20:39:01 +0200 (CEST)
-Subject: [PATCH 1/3] dt-bindings: Add a binding for the RPi firmware
- GPIO driver.
-In-Reply-To: <20160919161314.25858-1-eric@anholt.net>
-References: <20160919161314.25858-1-eric@anholt.net>
-Message-ID: <1903581972.81288.e9d48a65-997b-4986-a9d0-10632895df40.open-xchange@email.1und1.de>
+From: eric@nelint.com (Eric Nelson)
+Date: Fri, 23 Sep 2016 11:39:41 -0700
+Subject: Alignment issues with freescale FEC driver
+In-Reply-To: <20160923183010.GB1041@n2100.armlinux.org.uk>
+References: <troy.kisky@boundarydevices.com>
+ <02afb707-65de-5101-a79b-355929c4e00b@nelint.com>
+ <CANn89iLb+QJu+MYh859oAAjcLCsKRpBbzVf43yOdq+HJVtZDpQ@mail.gmail.com>
+ <5ee28ee0-cf0c-bdab-1271-f17755365c13@nelint.com>
+ <0fe7a310-2d2f-4fca-d698-85d66122d91c@nelint.com>
+ <20160923181301.GD22965@lunn.ch>
+ <20160923183010.GB1041@n2100.armlinux.org.uk>
+Message-ID: <e1db8ef7-a61a-e4a7-b551-51d42df6d065@nelint.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Thanks Russell,
 
-> Eric Anholt <eric@anholt.net> hat am 19. September 2016 um 18:13 geschrieben:
+On 09/23/2016 11:30 AM, Russell King - ARM Linux wrote:
+> On Fri, Sep 23, 2016 at 08:13:01PM +0200, Andrew Lunn wrote:
+>>> Since the hardware requires longword alignment for its' DMA transfers,
+>>> aligning the IP header will require a memcpy, right?
+>>
+>> The vf610 FEC has an SHIFT16 bit in register ENETx_TACC, which inserts
+>> two padding bits on transmit. ENETx_RACC has the same.
+>>
+>> What about your hardware?
 > 
+> The iMX6 FEC also has that ability - as part of my FEC patch stack from
+> ages ago, I implemented support for it.
 > 
-> The RPi firmware exposes all of the board's GPIO lines through
-> property calls.  Linux chooses to control most lines directly through
-> the pinctrl driver, but for the FXL6408 GPIO expander on the Pi3, we
-> need to access them through the firmware.
+>   "net:fec: implement almost zero-copy receive path"
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  .../bindings/gpio/gpio-raspberrypi-firmware.txt    | 22
-> ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
+> in my public fec-testing branch.
 > 
-> diff --git
-> a/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
-> b/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
-> new file mode 100644
-> index 000000000000..2b635c23a6f8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
-> @@ -0,0 +1,22 @@
-> +Raspberry Pi power domain driver
-> +
-> +Required properties:
-> +
-> +- compatible:		Should be "raspberrypi,firmware-gpio"
+> That patch stack is sadly now totally dead and I've no interest in
+> reviving it myself.  There was some interest from others in taking my
+> patch stack over, but that went quiet.
+> 
 
-i think the compatible should be more specific like
-
-raspberrypi,rpi3-firmware-gpio
-
-and all information which aren't requestable from the firmware should be stored
-in a info structure. This makes the driver easier to extend in the future by
-adding new compatibles and their info structures.
-
-> +- gpio-controller:	Marks the device node as a gpio controller
-> +- #gpio-cells:		Should be <2> for GPIO number and flags
-> +- ngpios:		Number of GPIO lines to control.  See gpio.txt
-> +- firmware:		Reference to the RPi firmware device node
-> +- raspberrypi,firmware-gpio-offset:
-> +			Number the firmware uses for the first GPIO line
-> +			  controlled by this driver
-
-We should avoid such properties because they don't really describe the hardware.
-
-Stefan
+I'll take a look and hopefully revive at least part of the patch set.
