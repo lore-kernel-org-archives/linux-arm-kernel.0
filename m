@@ -1,41 +1,52 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 23 Sep 2016 22:01:47 +0200
-Subject: [PATCH 2/3] firmware: dt: document lpc1850 boot ROM bindings
-In-Reply-To: <20160923133949.GA24505@rob-hp-laptop>
-References: <20160913195117.2887-1-manabian@gmail.com>
- <20160913195117.2887-3-manabian@gmail.com>
- <20160923133949.GA24505@rob-hp-laptop>
-Message-ID: <CAGhQ9VwLHiONa5pfpAhKuu78uDwYRjfwJu3i1fhjVz+zaDFojw@mail.gmail.com>
+Date: Fri, 23 Sep 2016 22:05:54 +0200
+Subject: [PATCH 2/3] nvmem: dt: document lpc1850 OTP binding
+In-Reply-To: <20160923133529.GA23548@rob-hp-laptop>
+References: <20160913161241.22492-1-manabian@gmail.com>
+ <20160913161241.22492-3-manabian@gmail.com>
+ <20160923133529.GA23548@rob-hp-laptop>
+Message-ID: <CAGhQ9VzwPY9_Wn_-=UoLKE6oyQPvTMpiWSj6q6PGFQvB8P=vuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 September 2016 at 15:39, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Sep 13, 2016 at 09:51:16PM +0200, Joachim Eastwood wrote:
->> Binding documentation for the NXP LPC boot ROM.
+On 23 September 2016 at 15:35, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Sep 13, 2016 at 06:12:40PM +0200, Joachim Eastwood wrote:
+>> Documenation for the LPC18xx/43xx OTP memory bindings.
 >>
 >> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 >> ---
->>  .../devicetree/bindings/firmware/nxp,boot-rom.txt   | 21 +++++++++++++++++++++
->>  1 file changed, 21 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
+>>  .../devicetree/bindings/nvmem/lpc1850-otp.txt        | 20 ++++++++++++++++++++
+>>  1 file changed, 20 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
 >>
->> diff --git a/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt b/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
+>> diff --git a/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt b/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
 >> new file mode 100644
->> index 0000000..5f3a044
+>> index 0000000..853b6a7
 >> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/firmware/nxp,boot-rom.txt
->> @@ -0,0 +1,21 @@
->> +* NXP LPC boot ROM
+>> +++ b/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
+>> @@ -0,0 +1,20 @@
+>> +* NXP LPC18xx OTP memory
 >> +
->> +NXP LPC microcontrollers contains a boot ROM used to retrieve part information
->> +and access internal Flash memory and OTP memory. Note that the Flash API is
->> +not available on Flashless devices.
+>> +Internal OTP (One Time Programmable) memory for NXP LPC18xx/43xx devices.
+>> +
+>> +Required properties:
+>> +  - compatible: Should be "nxp,lpc1850-otp"
+>> +  - reg: Must contain an entry with the physical base address and length
+>> +    for each entry in reg-names.
 >
-> Is this determined at run-time? If not flashless devices should have a
-> different compatible string to determine this then.
+>> +  - address-cells: must be set to 1.
+>> +  - size-cells: must be set to 1.
+>
+> Not needed unless you have child nodes.
 
-It is determined at run time by reading a 'CHIP ID' register in CREG
-(syscon) that is present on both Flash and Flashless devices.
+They will have "nvmem" cell children. See patch 3/3
+
++                       /* Flashless devices has part ID in OTP bank 0 */
++                       part_id: identification at 0 {
++                               reg = <0x0 0x10>;
++                       };
+
+These cells are documented in nvmem.txt.
 
 
 regards,
