@@ -1,38 +1,94 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Sep 2016 19:30:11 +0100
-Subject: Alignment issues with freescale FEC driver
-In-Reply-To: <20160923181301.GD22965@lunn.ch>
-References: <troy.kisky@boundarydevices.com>
- <02afb707-65de-5101-a79b-355929c4e00b@nelint.com>
- <CANn89iLb+QJu+MYh859oAAjcLCsKRpBbzVf43yOdq+HJVtZDpQ@mail.gmail.com>
- <5ee28ee0-cf0c-bdab-1271-f17755365c13@nelint.com>
- <0fe7a310-2d2f-4fca-d698-85d66122d91c@nelint.com>
- <20160923181301.GD22965@lunn.ch>
-Message-ID: <20160923183010.GB1041@n2100.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Sep 2016 13:34:21 -0500
+Subject: [PATCH v3 1/3] ipmi: add an Aspeed BT IPMI BMC driver
+In-Reply-To: <1474354900-5618-2-git-send-email-clg@kaod.org>
+References: <1474354900-5618-1-git-send-email-clg@kaod.org>
+ <1474354900-5618-2-git-send-email-clg@kaod.org>
+Message-ID: <20160923183421.GA14864@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 08:13:01PM +0200, Andrew Lunn wrote:
-> > Since the hardware requires longword alignment for its' DMA transfers,
-> > aligning the IP header will require a memcpy, right?
+On Tue, Sep 20, 2016 at 09:01:38AM +0200, C?dric Le Goater wrote:
+> From: Alistair Popple <alistair@popple.id.au>
 > 
-> The vf610 FEC has an SHIFT16 bit in register ENETx_TACC, which inserts
-> two padding bits on transmit. ENETx_RACC has the same.
+> This patch adds a simple device driver to expose the iBT interface on
+> Aspeed SOCs (AST2400 and AST2500) as a character device. Such SOCs are
+> commonly used as BMCs (BaseBoard Management Controllers) and this
+> driver implements the BMC side of the BT interface.
 > 
-> What about your hardware?
+> The BT (Block Transfer) interface is used to perform in-band IPMI
+> communication between a host and its BMC. Entire messages are buffered
+> before sending a notification to the other end, host or BMC, that
+> there is data to be read. Usually, the host emits requests and the BMC
+> responses but the specification provides a mean for the BMC to send
+> SMS Attention (BMC-to-Host attention or System Management Software
+> attention) messages.
+> 
+> For this purpose, the driver introduces a specific ioctl on the
+> device: 'BT_BMC_IOCTL_SMS_ATN' that can be used by the system running
+> on the BMC to signal the host of such an event.
+> 
+> The device name defaults to '/dev/ipmi-bt-host'
+> 
+> Signed-off-by: Alistair Popple <alistair@popple.id.au>
+> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> [clg: - checkpatch fixes
+>       - added a devicetree binding documentation
+>       - replace 'bt_host' by 'bt_bmc' to reflect that the driver is
+>         the BMC side of the IPMI BT interface
+>       - renamed the device to 'ipmi-bt-host'
+>       - introduced a temporary buffer to copy_{to,from}_user
+>       - used platform_get_irq()
+>       - moved the driver under drivers/char/ipmi/ but kept it as a misc
+>         device
+>       - changed the compatible cell to "aspeed,ast2400-bt-bmc"
+> ]
+> Signed-off-by: C?dric Le Goater <clg@kaod.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> [clg: - checkpatch --strict fixes
+>       - removed the use of devm_iounmap, devm_kfree in cleanup paths
+>       - introduced an atomic-t to limit opens to 1
+>       - introduced a mutex to protect write/read operations]
+> Signed-off-by: C?dric Le Goater <clg@kaod.org>
+> 
+> ---
+> 
+>  Changes since v2:
+> 
+>  - fixed checkpatch --strict issues
+>  - cleanup'ed includes
+>  - limit to one opener
+>  - protect write/read operations with a mutex.
+>  - removed the use of devm_iounmap, devm_kfree in cleanup paths
+> 
+>  Changes since v1:
+> 
+>  - replace 'bt_host' by 'bt_bmc' to reflect that the driver is
+>    the BMC side of the IPMI BT interface
+>  - renamed the device to 'ipmi-bt-host'
+>  - introduced a temporary buffer to copy_{to,from}_user
+>  - used platform_get_irq()
+>  - moved the driver under drivers/char/ipmi/ but kept it as a misc
+>    device
+>  - changed the compatible cell to "aspeed,ast2400-bt-bmc"
+> 
+>  .../bindings/char/ipmi/aspeed,ast2400-bt-bmc.txt   |  23 +
 
-The iMX6 FEC also has that ability - as part of my FEC patch stack from
-ages ago, I implemented support for it.
+While similar, this is not the kernel directory structure. Just make 
+this bindings/ipmi/
 
-  "net:fec: implement almost zero-copy receive path"
+With that,
 
-in my public fec-testing branch.
+Acked-by: Rob Herring <robh@kernel.org>
 
-That patch stack is sadly now totally dead and I've no interest in
-reviving it myself.  There was some interest from others in taking my
-patch stack over, but that went quiet.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>  drivers/Makefile                                   |   2 +-
+>  drivers/char/ipmi/Kconfig                          |   7 +
+>  drivers/char/ipmi/Makefile                         |   1 +
+>  drivers/char/ipmi/bt-bmc.c                         | 510 +++++++++++++++++++++
+>  include/uapi/linux/Kbuild                          |   1 +
+>  include/uapi/linux/bt-bmc.h                        |  18 +
+>  7 files changed, 561 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/char/ipmi/aspeed,ast2400-bt-bmc.txt
+>  create mode 100644 drivers/char/ipmi/bt-bmc.c
+>  create mode 100644 include/uapi/linux/bt-bmc.h
