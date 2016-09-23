@@ -1,115 +1,40 @@
-From: b18965@freescale.com (Alison Wang)
-Date: Fri, 23 Sep 2016 10:19:06 +0800
-Subject: [PATCH 2/2] armv8: aarch32: Add SMP support for 32-bit Linux kernel
-In-Reply-To: <1474597146-33312-1-git-send-email-b18965@freescale.com>
-References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
-Message-ID: <1474597146-33312-2-git-send-email-b18965@freescale.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 22 Sep 2016 22:45:14 -0400
+Subject: [PATCH] clocksource/drivers/ti-32k: Prevent ftrace recursion
+In-Reply-To: <20160923100431.6cf2c88f@xhacker>
+References: <20160922075621.3725-1-jszhang@marvell.com>
+ <alpine.DEB.2.20.1609221555590.5599@nanos>
+ <20160923100431.6cf2c88f@xhacker>
+Message-ID: <20160922224514.696ae61b@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds SMP support for running 32-bit Linux kernel for
-Layerscape platforms. Spin-table method is used for SMP support.
+On Fri, 23 Sep 2016 10:04:31 +0800
+Jisheng Zhang <jszhang@marvell.com> wrote:
 
-Signed-off-by: Alison Wang <alison.wang@nxp.com>
-Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
----
- arch/arm/mach-imx/common.h          |  1 +
- arch/arm/mach-imx/mach-layerscape.c |  1 +
- arch/arm/mach-imx/platsmp.c         | 49 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 51 insertions(+)
+> Hi Thomas,
+> 
+> On Thu, 22 Sep 2016 15:58:03 +0200 Thomas Gleixner wrote:
+> 
+> > On Thu, 22 Sep 2016, Jisheng Zhang wrote:
+> >   
+> > > Currently ti-32k can be used as a scheduler clock. We properly marked
+> > > omap_32k_read_sched_clock() as notrace but we then call another
+> > > function ti_32k_read_cycles() that _wasn't_ notrace.
+> > > 
+> > > Having a traceable function in the sched_clock() path leads to a
+> > > recursion within ftrace and a kernel crash.    
+> > 
+> > Kernel crash? Doesn't ftrace core prevent recursion?  
+> 
+> a recent similar issue:
+> 
+> http://www.spinics.net/lists/arm-kernel/msg533480.html
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index c4436d9..6362790 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -152,5 +152,6 @@ static inline void imx_init_l2cache(void) {}
- 
- extern const struct smp_operations imx_smp_ops;
- extern const struct smp_operations ls1021a_smp_ops;
-+extern const struct smp_operations layerscape_smp_ops;
- 
- #endif
-diff --git a/arch/arm/mach-imx/mach-layerscape.c b/arch/arm/mach-imx/mach-layerscape.c
-index acfb2a2..109d488 100644
---- a/arch/arm/mach-imx/mach-layerscape.c
-+++ b/arch/arm/mach-imx/mach-layerscape.c
-@@ -19,5 +19,6 @@ static const char * const layerscape_dt_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(LAYERSCAPE_AARCH32, "Freescale LAYERSCAPE")
-+	.smp		= smp_ops(layerscape_smp_ops),
- 	.dt_compat	= layerscape_dt_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-index 711dbbd..e2fc7a2 100644
---- a/arch/arm/mach-imx/platsmp.c
-+++ b/arch/arm/mach-imx/platsmp.c
-@@ -14,6 +14,7 @@
- #include <linux/of_address.h>
- #include <linux/of.h>
- #include <linux/smp.h>
-+#include <linux/types.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/page.h>
-@@ -26,6 +27,8 @@
- u32 g_diag_reg;
- static void __iomem *scu_base;
- 
-+static u64 cpu_release_addr[NR_CPUS];
-+
- static struct map_desc scu_io_desc __initdata = {
- 	/* .virtual and .pfn are run-time assigned */
- 	.length		= SZ_4K,
-@@ -127,3 +130,49 @@ const struct smp_operations ls1021a_smp_ops __initconst = {
- 	.smp_prepare_cpus	= ls1021a_smp_prepare_cpus,
- 	.smp_boot_secondary	= ls1021a_boot_secondary,
- };
-+
-+static int layerscape_smp_boot_secondary(unsigned int cpu,
-+					 struct task_struct *idle)
-+{
-+	u32 secondary_startup_phys;
-+	__le32 __iomem *release_addr;
-+
-+	secondary_startup_phys = virt_to_phys(secondary_startup);
-+
-+	release_addr = memremap((u32)cpu_release_addr[cpu], sizeof(u64),
-+				MEMREMAP_WB);
-+	if (!release_addr)
-+		return -ENOMEM;
-+
-+	writel_relaxed(secondary_startup_phys, release_addr);
-+	writel_relaxed(0, release_addr + 1);
-+	__cpuc_flush_dcache_area((__force void *)release_addr,
-+				 sizeof(u64));
-+
-+	sev();
-+
-+	iounmap(release_addr);
-+
-+	return 0;
-+}
-+
-+static void layerscape_smp_init_cpus(void)
-+{
-+	struct device_node *dnt = NULL;
-+	unsigned int cpu = 0;
-+
-+	while ((dnt = of_find_node_by_type(dnt, "cpu"))) {
-+		if (of_property_read_u64(dnt, "cpu-release-addr",
-+		    &cpu_release_addr[cpu])) {
-+			pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
-+			cpu);
-+		}
-+
-+		cpu++;
-+	}
-+}
-+
-+const struct smp_operations layerscape_smp_ops __initconst = {
-+	.smp_init_cpus		= layerscape_smp_init_cpus,
-+	.smp_boot_secondary	= layerscape_smp_boot_secondary,
-+};
--- 
-2.1.0.27.g96db324
+Right. But Thomas brought up recursion detection. And I said that would
+be the fix, but now thinking about it, I've updated the recursion
+protection so that timer issues should not cause a crash.
+
+I'd like to know more, as this appears to be mostly arm related.
+
+-- Steve
