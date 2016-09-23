@@ -1,225 +1,100 @@
-From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Fri, 23 Sep 2016 21:14:42 +0530
-Subject: [PATCH v7 7/7] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <1474645482-28131-1-git-send-email-vijay.kilari@gmail.com>
-References: <1474645482-28131-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1474645482-28131-8-git-send-email-vijay.kilari@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 23 Sep 2016 11:46:46 -0400 (EDT)
+Subject: [PATCH 1/2] ARM: vexpress: refine MCPM smp operations override
+ criteria
+In-Reply-To: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.20.1609231144440.9311@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On Fri, 23 Sep 2016, Lorenzo Pieralisi wrote:
 
-Userspace requires to store and restore of line_level for
-level triggered interrupts using ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO.
+> Current vexpress smp init code detects whether to override the
+> default smp ops with MCPM smp ops by matching the "cci-400"
+> compatible string, in that MCPM requires control over CCI ports
+> to manage low-power states entry/exit.
+> 
+> The "cci-400" compatible string check is a necessary but not
+> sufficient condition for MCPM to work, because the cci-400
+> can be made visible to the kernel, but firmware can nonetheless
+> disable non-secure CCI ports control, while still allowing PMU
+> access; if booted in non-secure world, the kernel would still
+> blindly override smp operations with MCPM operations, resulting
+> in kernel faults when the CCI ports programming interface is
+> accessed from non-secure world.
+> 
+> This means that the "cci-400" compatible string check would
+> result in a false positive in systems that eg boot in HYP mode,
+> where CCI ports non-secure access is explicitly not allowed,
+> and it is reported in the respective device tree nodes with
+> CCI ports marked as disabled.
+> 
+> Refactor the smp operations initialization to make sure that
+> the kernel is actually allowed to take control over CCI ports
+> (by enabling MCPM smp operations) before overriding default
+> vexpress smp operations.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
----
- arch/arm64/include/uapi/asm/kvm.h   |  6 +++++
- virt/kvm/arm/vgic/vgic-kvm-device.c | 50 ++++++++++++++++++++++++++++++++++++-
- virt/kvm/arm/vgic/vgic-mmio-v3.c    | 11 ++++++++
- virt/kvm/arm/vgic/vgic-mmio.c       | 33 ++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h       |  5 ++++
- virt/kvm/arm/vgic/vgic.h            |  3 +++
- 6 files changed, 107 insertions(+), 1 deletion(-)
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 91c7137..4100f8c 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -211,6 +211,12 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
- #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
- #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
-+#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
-+			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
-+#define VGIC_LEVEL_INFO_LINE_LEVEL	0
- 
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
- 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index da532d1..0f82a91 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -512,6 +512,25 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
- 						  regid, reg);
- 		break;
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		unsigned int info, intid;
-+
-+		info = (attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-+			KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT;
-+		if (info == VGIC_LEVEL_INFO_LINE_LEVEL) {
-+			if (is_write)
-+				tmp32 = *reg;
-+			intid = attr->attr &
-+				KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK;
-+			ret = vgic_v3_line_level_info_uaccess(vcpu, is_write,
-+							      intid, &tmp32);
-+			if (!is_write)
-+				*reg = tmp32;
-+		} else {
-+			ret = -EINVAL;
-+		}
-+		break;
-+	}
- 	default:
- 		ret = -EINVAL;
- 		break;
-@@ -554,6 +573,17 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
- 
- 		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u64 reg;
-+		u32 tmp32;
-+
-+		if (get_user(tmp32, uaddr))
-+			return -EFAULT;
-+
-+		reg = tmp32;
-+		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
-+	}
- 	}
- 	return -ENXIO;
- }
-@@ -589,8 +619,18 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
- 			return ret;
- 		return put_user(reg, uaddr);
- 	}
--	}
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u64 reg;
-+		u32 tmp32;
- 
-+		ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
-+		if (ret)
-+			return ret;
-+		tmp32 = reg;
-+		return put_user(tmp32, uaddr);
-+	}
-+	}
- 	return -ENXIO;
- }
- 
-@@ -611,11 +651,19 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
- 		return vgic_v3_has_attr_regs(dev, attr);
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
- 		return 0;
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		if (((attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-+		      KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT) ==
-+		      VGIC_LEVEL_INFO_LINE_LEVEL)
-+			return 0;
-+		break;
-+	}
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
- 		switch (attr->attr) {
- 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
- 			return 0;
- 		}
-+		break;
- 	}
- 	return -ENXIO;
- }
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 8f46e61..648f588 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -807,3 +807,14 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 		return vgic_uaccess(vcpu, &rd_dev, is_write,
- 				    offset, val);
- }
-+
-+int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+				    u32 intid, u32 *val)
-+{
-+	if (is_write)
-+		vgic_write_irq_line_level_info(vcpu, intid, *val);
-+	else
-+		*val = vgic_read_irq_line_level_info(vcpu, intid);
-+
-+	return 0;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 173d6f0..fb018eb 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -371,6 +371,39 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
- 	}
- }
- 
-+unsigned long vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid)
-+{
-+	int i;
-+	unsigned long val = 0;
-+
-+	for (i = 0; i < 32; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		if (irq->line_level)
-+			val |= (1U << i);
-+
-+		vgic_put_irq(vcpu->kvm, irq);
-+	}
-+
-+	return val;
-+}
-+
-+void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-+				    const unsigned long val)
-+{
-+	int i;
-+
-+	for_each_set_bit(i, &val, 32) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+		irq->line_level = true;
-+		spin_unlock(&irq->irq_lock);
-+
-+		vgic_put_irq(vcpu->kvm, irq);
-+	}
-+}
-+
- static int match_region(const void *key, const void *elt)
- {
- 	const unsigned int offset = (unsigned long)key;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index acbf99e..938702c 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -181,6 +181,11 @@ int vgic_validate_mmio_region_addr(struct kvm_device *dev,
- 				   const struct vgic_register_region *regions,
- 				   int nr_regions, gpa_t addr);
- 
-+unsigned long vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid);
-+
-+void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-+				    const unsigned long val);
-+
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
- 
- unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 0e632d0..77d3d84 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -130,6 +130,9 @@ int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 			 u64 id, u64 *val);
- int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
- 				u64 *reg);
-+int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+				    u32 intid, u32 *val);
-+
- #else
- static inline int vgic_register_its_iodevs(struct kvm *kvm)
- {
--- 
-1.9.1
+
+> ---
+>  arch/arm/mach-vexpress/platsmp.c | 31 ++++++++++++++++++++++++-------
+>  1 file changed, 24 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index 8b8d072..6cfd782 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -26,17 +26,34 @@
+>  bool __init vexpress_smp_init_ops(void)
+>  {
+>  #ifdef CONFIG_MCPM
+> +	int cpu;
+> +	struct device_node *cpu_node, *cci_node;
+> +
+>  	/*
+> -	 * The best way to detect a multi-cluster configuration at the moment
+> -	 * is to look for the presence of a CCI in the system.
+> +	 * The best way to detect a multi-cluster configuration
+> +	 * is to detect if the kernel can take over CCI ports
+> +	 * control. Loop over possible CPUs and check if CCI
+> +	 * port control is available.
+>  	 * Override the default vexpress_smp_ops if so.
+>  	 */
+> -	struct device_node *node;
+> -	node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
+> -	if (node && of_device_is_available(node)) {
+> -		mcpm_smp_set_ops();
+> -		return true;
+> +	for_each_possible_cpu(cpu) {
+> +		bool available;
+> +
+> +		cpu_node = of_get_cpu_node(cpu, NULL);
+> +		if (WARN(!cpu_node, "Missing cpu device node!"))
+> +			return false;
+> +
+> +		cci_node = of_parse_phandle(cpu_node, "cci-control-port", 0);
+> +		available = cci_node && of_device_is_available(cci_node);
+> +		of_node_put(cci_node);
+> +		of_node_put(cpu_node);
+> +
+> +		if (!available)
+> +			return false;
+>  	}
+> +
+> +	mcpm_smp_set_ops();
+> +	return true;
+>  #endif
+>  	return false;
+>  }
+> -- 
+> 2.10.0
+> 
+> 
