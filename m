@@ -1,127 +1,125 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 23 Sep 2016 10:57:46 +0200
-Subject: [PATCH v5] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <d90f04d4-b29f-f08e-df39-ec307af44225@suse.de>
-References: <1474548769-195643-1-git-send-email-agraf@suse.de>
- <20160922212831.GD9101@cbox> <d90f04d4-b29f-f08e-df39-ec307af44225@suse.de>
-Message-ID: <63a1e3a2-f551-017f-b6be-593b53a0b407@redhat.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 23 Sep 2016 14:28:40 +0530
+Subject: [PATCH v6 0/3] arm64 kexec-tools patches
+In-Reply-To: <cover.1474481332.git.geoff@infradead.org>
+References: <cover.1474481332.git.geoff@infradead.org>
+Message-ID: <20160923085840.GA22928@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Geoff,
 
+On 21/09/2016:06:14:25 PM, Geoff Levand wrote:
+> This series adds the core support for kexec re-boot on ARM64.
 
-On 23/09/2016 09:14, Alexander Graf wrote:
->>> +/*
->>> + * Synchronize the timer IRQ state with the interrupt controller.
->>> + */
->>>  static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
->>>  {
->>>  	int ret;
->>>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->>>  
->>>  	timer->active_cleared_last = false;
->>>  	timer->irq.level = new_level;
->>> -	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
->>> +	trace_kvm_timer_update_irq(vcpu->vcpu_id, host_vtimer_irq,
->>>  				   timer->irq.level);
->>> +	[...]
->>> +		struct kvm_sync_regs *regs = &vcpu->run->s.regs;
->>> +
->>> +		/* Populate the timer bitmap for user space */
->>> +		regs->kernel_timer_pending &= ~KVM_ARM_TIMER_VTIMER;
->>> +		if (new_level)
->>> +			regs->kernel_timer_pending |= KVM_ARM_TIMER_VTIMER;
->>
->> I think if you got here, it means you have to exit to userspace to
->> update it of the new state.  If you don't want to propagate a return
+I tested this series with mustang and seattle and they work.
+
+So you can use my "Tested-By: Pratyush Anand <panand@redhat.com>".
+
+Just one Nitpick: In patch 2/3 arm64_header_check_msb(),
+arm64_header_page_size() and arm64_header_placement() have been defined but they
+have not been used anywhere. So, may be they can be removed.
+
+~Pratyush
+
 > 
-> Yes, but we can't exit straight away with our own exit reason because we
-> might be inside an MMIO exit path here which already occupies the
-> exit_reason.
-
-So the idea is that whenever you're here you have one of the following
-cases:
-
-- are coming from kvm_timer_flush_hwstate, and then you exit immediately
-with KVM_EXIT_INTR if needed
-
-- you are coming from the kvm_timer_sync_hwstate just before
-handle_exit.  Then if there's a vmexit you have already set
-regs->kernel_timer_pending, if not you'll do a kvm_timer_flush_hwstate soon.
-
-- you are coming from the kvm_timer_sync_hwstate in the middle of
-kvm_arch_vcpu_ioctl_run, and then "continue" will either exit the loop
-immediately (if ret <= 0) or go to kvm_timer_flush_hwstate as in the
-previous case
-
-Right?
-
->> Maybe I'm misunderstanding and user_timer_pending is just a cached
->> verison of what you said last, but as I said above, I think you can just
->> compare timer->irq.level with the last value the kvm_run struct, and if
->> something changed, you have to exit.
+> Linux kernel support for ARM64 kexec reboot has been merged in v4.8-rc1 with the
+> expectation that it will be included in the v4.8 stable kernel release.
 > 
-> So how would user space know whether the line went up or down? Or didn't
-> change at all (if we coalesce with an MMIO exit)?
-
-It would save the status of the line somewhere in its own variable,
-without introducing a relatively delicate API between kernel and user.
-
-I agree that you cannot update kernel_timer_pending only in
-flush_hwstate; otherwise you miss on case (2) when there is a vmexit.
-That has to stay in kvm_timer_sync_hwstate (or it could become a new
-function called at the very end of kvm_arch_vcpu_ioctl_run).
-
-However, I'm not sure why user_timer_pending is necessary.  If it is
-just the value you assigned to regs->kernel_timer_pending at the time of
-the previous vmexit, can kvm_timer_flush_hwstate just do
-
-   if (timer->prev_kernel_timer_pending != regs->kernel_timer_pending) {
-       timer->prev_kernel_timer_pending = regs->kernel_timer_pending;
-       return 1;
-   }
-
-?  Or even
-
-   if (timer->prev_irq_level != timer->irq.level) {
-       timer->prev_irq_level = regs->irq.level;
-       return 1;
-   }
-
-so that regs->kernel_timer_pending remains exclusively
-kvm_timer_sync_hwstate's business?
-
-Thanks,
-
-Paolo
-
->>
->>> +
->>> +		/*
->>> +		 * As long as user space is aware that the timer is pending,
->>> +		 * we do not need to get new host timer events.
->>> +		 */
->>
->> yes, correct, but I don't think this concept was clearly reflected in
->> your API text above.
->>
->>> +		if (timer->irq.level)
->>> +			disable_percpu_irq(host_vtimer_irq);
->>> +		else
->>> +			enable_percpu_irq(host_vtimer_irq, 0);
->>> +	}
->>
->> could we move these two blocks into their own functions instead?  That
->> would also give nice names to the huge chunk of complicated
->> functionality, e.g. flush_timer_state_to_user() and
->> flush_timer_state_to_vgic().
+> For ARM64 kdump support see Takahiro's latest kdump patches [1].
 > 
-> That's probably a very useful cleanup, yes :).
+> [1] http://lists.infradead.org/pipermail/kexec
 > 
+> Changes for v6 (Sep , 2016, 2m):
 > 
-> Alex
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>   o Remove the get_memory_ranges_dt() routine.
+>   o Rename dtb_[12] to dtb_{proc,sys,user}.
 > 
+> Changes for v5 (Sep 1, 2016, 2m):
+> 
+>   o Add common routine arm64_locate_kernel_segment().
+> 
+> Changes for v4 (Aug 18, 2016, 1m):
+> 
+>   o Fix some error return values and error messages.
+>   o Add enum arm64_header_page_size.
+>   o Rename page_offset to vp_offset.
+> 
+> Changes for v3 (Aug 10, 2016, 1m):
+> 
+>   o Rebase to 2.0.13.
+>   o Add support for flag bits 1-3 to arm64 image-header.h.
+>   o Fix OPT_ARCH_MAX value.
+>   o Use fdt_pack() in dtb_set_property().
+>   o Remove patch ("kexec: (bugfix) calc correct end address of memory ranges in device tree").
+> 
+> Changes for v2 (July 26, 2016, 0m):
+> 
+>   o Inline some small routines.
+>   o Reformat some dbgprintf messages.
+>   o Remove debug_brk from entry.S
+>   o Change arm64_image_header.flags to uint64_t.
+>   o Look in iomem then dt for mem info.
+>   o Remove check_cpu_nodes.
+>   o Remove purgatory printing.
+> 
+> First submission v1 (July 20, 2016).
+> 
+> -Geoff
+> 
+> The following changes since commit 67488beb0a6ee8ad2c0b05f721a9e00041fab93a:
+> 
+>   kexec-tools 2.0.13 (2016-08-08 12:26:44 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git for-merge-arm64-v6
+> 
+> for you to fetch changes up to a9f1fafd7c248d33768177438742b90bc4338202:
+> 
+>   arm64: Add support for binary image files (2016-09-21 11:04:03 -0700)
+> 
+> ----------------------------------------------------------------
+> Geoff Levand (2):
+>       kexec: Add common device tree routines
+>       arm64: Add arm64 kexec support
+> 
+> Pratyush Anand (1):
+>       arm64: Add support for binary image files
+> 
+>  configure.ac                            |   3 +
+>  kexec/Makefile                          |   5 +
+>  kexec/arch/arm64/Makefile               |  40 +++
+>  kexec/arch/arm64/crashdump-arm64.c      |  21 ++
+>  kexec/arch/arm64/crashdump-arm64.h      |  12 +
+>  kexec/arch/arm64/image-header.h         | 146 ++++++++
+>  kexec/arch/arm64/include/arch/options.h |  39 ++
+>  kexec/arch/arm64/kexec-arm64.c          | 615 ++++++++++++++++++++++++++++++++
+>  kexec/arch/arm64/kexec-arm64.h          |  71 ++++
+>  kexec/arch/arm64/kexec-elf-arm64.c      | 146 ++++++++
+>  kexec/arch/arm64/kexec-image-arm64.c    |  80 +++++
+>  kexec/dt-ops.c                          | 145 ++++++++
+>  kexec/dt-ops.h                          |  13 +
+>  kexec/kexec-syscall.h                   |   8 +-
+>  purgatory/Makefile                      |   1 +
+>  purgatory/arch/arm64/Makefile           |  18 +
+>  purgatory/arch/arm64/entry.S            |  51 +++
+>  purgatory/arch/arm64/purgatory-arm64.c  |  19 +
+>  18 files changed, 1431 insertions(+), 2 deletions(-)
+>  create mode 100644 kexec/arch/arm64/Makefile
+>  create mode 100644 kexec/arch/arm64/crashdump-arm64.c
+>  create mode 100644 kexec/arch/arm64/crashdump-arm64.h
+>  create mode 100644 kexec/arch/arm64/image-header.h
+>  create mode 100644 kexec/arch/arm64/include/arch/options.h
+>  create mode 100644 kexec/arch/arm64/kexec-arm64.c
+>  create mode 100644 kexec/arch/arm64/kexec-arm64.h
+>  create mode 100644 kexec/arch/arm64/kexec-elf-arm64.c
+>  create mode 100644 kexec/arch/arm64/kexec-image-arm64.c
+>  create mode 100644 kexec/dt-ops.c
+>  create mode 100644 kexec/dt-ops.h
+>  create mode 100644 purgatory/arch/arm64/Makefile
+>  create mode 100644 purgatory/arch/arm64/entry.S
+>  create mode 100644 purgatory/arch/arm64/purgatory-arm64.c
+> 
+> -- 
+> 2.7.4
