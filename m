@@ -1,38 +1,39 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 23 Sep 2016 17:32:58 +0900
-Subject: [PATCH v2 0/3] arm64: kgdb: fix single stepping
-In-Reply-To: <20160923081618.GH18056@kroah.com>
-References: <20160923073327.9657-1-takahiro.akashi@linaro.org>
- <20160923081618.GH18056@kroah.com>
-Message-ID: <20160923083257.GL30248@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 23 Sep 2016 10:28:40 +0200
+Subject: [PATCH] ARM: shmobile: Sort Kconfig selections
+Message-ID: <1474619320-28888-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 10:16:18AM +0200, Greg KH wrote:
-> On Fri, Sep 23, 2016 at 04:33:24PM +0900, AKASHI Takahiro wrote:
-> > Kgdb support on arm64 was merged in v3.15, but from its first appearance,
-> > "signle step" has never worked well.
-> > 
-> > This patch fixes all the error cases I found so far.
-> > The original patch[1] was splitted into three pieces, ones for each case.
-> > patch#1, #2 should be applied to all the version, v3.15 and later.
-> > pathc#3 only for v3.16 and later.
-> 
-> As this is not a regression (i.e. it has never worked), why is this
-> something for stable releases?
+Sort alphabetically all symbols selected by ARCH_RENESAS
 
-Because, I think, that is a bug.
-The author seems to have believed that it worked.
-Please see:
-  commit 44679a4f
-  Author: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-  Date:   Tue Jan 28 11:20:19 2014 +0000
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/mach-shmobile/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-      arm64: KGDB: Add step debugging support
-
-Thanks,
--Takahiro AKASHI
-
-> thanks,
-> 
-> greg k-h
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 4a48c9f5f72537cd..b5a3cbe81dd1d1f0 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -33,15 +33,15 @@ config ARCH_RMOBILE
+ menuconfig ARCH_RENESAS
+ 	bool "Renesas ARM SoCs"
+ 	depends on ARCH_MULTI_V7 && MMU
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select ARCH_SHMOBILE
+ 	select ARCH_SHMOBILE_MULTI
++	select ARM_GIC
++	select GPIOLIB
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+-	select ARM_GIC
+-	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select NO_IOPORT_MAP
+ 	select PINCTRL
+-	select GPIOLIB
+ 	select ZONE_DMA if ARM_LPAE
+ 
+ if ARCH_RENESAS
+-- 
+1.9.1
