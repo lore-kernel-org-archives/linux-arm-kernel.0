@@ -1,124 +1,115 @@
 From: b18965@freescale.com (Alison Wang)
-Date: Fri, 23 Sep 2016 10:19:05 +0800
-Subject: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape
- platforms
-Message-ID: <1474597146-33312-1-git-send-email-b18965@freescale.com>
+Date: Fri, 23 Sep 2016 10:19:06 +0800
+Subject: [PATCH 2/2] armv8: aarch32: Add SMP support for 32-bit Linux kernel
+In-Reply-To: <1474597146-33312-1-git-send-email-b18965@freescale.com>
+References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
+Message-ID: <1474597146-33312-2-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv8 architecture supports:
-1. 64-bit execution state, AArch64.
-2. 32-bit execution state, AArch32, that is compatible with previous
-versions of the ARM architecture.
+The patch adds SMP support for running 32-bit Linux kernel for
+Layerscape platforms. Spin-table method is used for SMP support.
 
-LayerScape platforms are compliant with ARMv8 architecture. This patch
-is to support running 32-bit Linux kernel for LayerScape platforms.
-
-Verified on LayerScape LS1043ARDB, LS1012ARDB, LS1046ARDB boards.
-
-Signed-off-by: Ebony Zhu <ebony.zhu@nxp.com>
 Signed-off-by: Alison Wang <alison.wang@nxp.com>
+Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
 ---
- arch/arm/Kconfig                    |  9 +++++++++
- arch/arm/mach-imx/Kconfig           | 14 ++++++++++++++
- arch/arm/mach-imx/Makefile          |  4 +++-
- arch/arm/mach-imx/mach-layerscape.c | 23 +++++++++++++++++++++++
- 4 files changed, 49 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-imx/mach-layerscape.c
+ arch/arm/mach-imx/common.h          |  1 +
+ arch/arm/mach-imx/mach-layerscape.c |  1 +
+ arch/arm/mach-imx/platsmp.c         | 49 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 51 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f0c8068..e8d470e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -294,6 +294,15 @@ config PGTABLE_LEVELS
- 	default 3 if ARM_LPAE
- 	default 2
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index c4436d9..6362790 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -152,5 +152,6 @@ static inline void imx_init_l2cache(void) {}
  
-+config ARCH_AARCH32_ES_SUPPORT
-+	def_bool n
-+	help
-+	 The ARMv8 architecture supports 64-bit execution state, AArch64
-+	 and 32-bit execution state, AArch32, that is compatible with
-+	 previous versions of the ARM architecture.
-+
-+	 Enable AArch32 execution state support for ARMv8 architecture.
-+
- source "init/Kconfig"
+ extern const struct smp_operations imx_smp_ops;
+ extern const struct smp_operations ls1021a_smp_ops;
++extern const struct smp_operations layerscape_smp_ops;
  
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0ac05a0..fda4f5f 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -549,6 +549,20 @@ config SOC_LS1021A
- 	help
- 	  This enables support for Freescale LS1021A processor.
- 
-+config ARCH_LAYERSCAPE_AARCH32
-+	bool "Freescale Layerscape SoC AArch32 ES support"
-+	select ARCH_AARCH32_ES_SUPPORT
-+	select ARM_AMBA
-+	select ARM_GIC
-+	select ARM_ARCH_TIMER
-+	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
-+	select PCI_LAYERSCAPE if PCI
-+	select PCI_DOMAINS if PCI
-+
-+	help
-+	  This enables support for Freescale Layerscape SoC family in
-+	  in AArch32 execution state.
-+
- endif
- 
- comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 737450f..7ded4fa 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -69,7 +69,7 @@ obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
- obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
- obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
- obj-$(CONFIG_HAVE_IMX_SRC) += src.o
--ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A),)
-+ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A)$(CONFIG_ARCH_LAYERSCAPE_AARCH32),)
- AFLAGS_headsmp.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-@@ -96,4 +96,6 @@ obj-$(CONFIG_SOC_VF610) += mach-vf610.o
- 
- obj-$(CONFIG_SOC_LS1021A) += mach-ls1021a.o
- 
-+obj-$(CONFIG_ARCH_LAYERSCAPE_AARCH32) += mach-layerscape.o
-+
- obj-y += devices/
+ #endif
 diff --git a/arch/arm/mach-imx/mach-layerscape.c b/arch/arm/mach-imx/mach-layerscape.c
-new file mode 100644
-index 0000000..acfb2a2
---- /dev/null
+index acfb2a2..109d488 100644
+--- a/arch/arm/mach-imx/mach-layerscape.c
 +++ b/arch/arm/mach-imx/mach-layerscape.c
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright 2015-2016 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
+@@ -19,5 +19,6 @@ static const char * const layerscape_dt_compat[] __initconst = {
+ };
+ 
+ DT_MACHINE_START(LAYERSCAPE_AARCH32, "Freescale LAYERSCAPE")
++	.smp		= smp_ops(layerscape_smp_ops),
+ 	.dt_compat	= layerscape_dt_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
+index 711dbbd..e2fc7a2 100644
+--- a/arch/arm/mach-imx/platsmp.c
++++ b/arch/arm/mach-imx/platsmp.c
+@@ -14,6 +14,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of.h>
+ #include <linux/smp.h>
++#include <linux/types.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/page.h>
+@@ -26,6 +27,8 @@
+ u32 g_diag_reg;
+ static void __iomem *scu_base;
+ 
++static u64 cpu_release_addr[NR_CPUS];
 +
-+#include <asm/mach/arch.h>
+ static struct map_desc scu_io_desc __initdata = {
+ 	/* .virtual and .pfn are run-time assigned */
+ 	.length		= SZ_4K,
+@@ -127,3 +130,49 @@ const struct smp_operations ls1021a_smp_ops __initconst = {
+ 	.smp_prepare_cpus	= ls1021a_smp_prepare_cpus,
+ 	.smp_boot_secondary	= ls1021a_boot_secondary,
+ };
 +
-+#include "common.h"
++static int layerscape_smp_boot_secondary(unsigned int cpu,
++					 struct task_struct *idle)
++{
++	u32 secondary_startup_phys;
++	__le32 __iomem *release_addr;
 +
-+static const char * const layerscape_dt_compat[] __initconst = {
-+	"fsl,ls1012a",
-+	"fsl,ls1043a",
-+	"fsl,ls1046a",
-+	NULL,
++	secondary_startup_phys = virt_to_phys(secondary_startup);
++
++	release_addr = memremap((u32)cpu_release_addr[cpu], sizeof(u64),
++				MEMREMAP_WB);
++	if (!release_addr)
++		return -ENOMEM;
++
++	writel_relaxed(secondary_startup_phys, release_addr);
++	writel_relaxed(0, release_addr + 1);
++	__cpuc_flush_dcache_area((__force void *)release_addr,
++				 sizeof(u64));
++
++	sev();
++
++	iounmap(release_addr);
++
++	return 0;
++}
++
++static void layerscape_smp_init_cpus(void)
++{
++	struct device_node *dnt = NULL;
++	unsigned int cpu = 0;
++
++	while ((dnt = of_find_node_by_type(dnt, "cpu"))) {
++		if (of_property_read_u64(dnt, "cpu-release-addr",
++		    &cpu_release_addr[cpu])) {
++			pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
++			cpu);
++		}
++
++		cpu++;
++	}
++}
++
++const struct smp_operations layerscape_smp_ops __initconst = {
++	.smp_init_cpus		= layerscape_smp_init_cpus,
++	.smp_boot_secondary	= layerscape_smp_boot_secondary,
 +};
-+
-+DT_MACHINE_START(LAYERSCAPE_AARCH32, "Freescale LAYERSCAPE")
-+	.dt_compat	= layerscape_dt_compat,
-+MACHINE_END
 -- 
 2.1.0.27.g96db324
