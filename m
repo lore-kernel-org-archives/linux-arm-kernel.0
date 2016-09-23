@@ -1,70 +1,118 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Sep 2016 15:56:27 +0100
-Subject: [PATCH] arm64: fix dump_backtrace with NULL tsk
-Message-ID: <1474642587-22416-1-git-send-email-mark.rutland@arm.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Fri, 23 Sep 2016 16:00:04 +0100
+Subject: [PATCH 1/2] ARM: vexpress: refine MCPM smp operations override
+ criteria
+In-Reply-To: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20160923150004.GV8917@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some places, dump_backtrace() is called with a NULL tsk parameter,
-e.g. in bug_handler() in arch/arm64, or indirectly via show_stack() in
-core code. The expectation is that this is treated as if current were
-passed instead of NULL.
+On Fri, Sep 23, 2016 at 02:09:06PM +0100, Lorenzo Pieralisi wrote:
+> Current vexpress smp init code detects whether to override the
+> default smp ops with MCPM smp ops by matching the "cci-400"
+> compatible string, in that MCPM requires control over CCI ports
+> to manage low-power states entry/exit.
+> 
+> The "cci-400" compatible string check is a necessary but not
+> sufficient condition for MCPM to work, because the cci-400
+> can be made visible to the kernel, but firmware can nonetheless
+> disable non-secure CCI ports control, while still allowing PMU
+> access; if booted in non-secure world, the kernel would still
+> blindly override smp operations with MCPM operations, resulting
+> in kernel faults when the CCI ports programming interface is
+> accessed from non-secure world.
+> 
+> This means that the "cci-400" compatible string check would
+> result in a false positive in systems that eg boot in HYP mode,
+> where CCI ports non-secure access is explicitly not allowed,
+> and it is reported in the respective device tree nodes with
+> CCI ports marked as disabled.
 
-Commit a80a0eb70c358f8c ("arm64: make irq_stack_ptr more robust") didn't
-take this into account, and compares tsk against current *before* we
-check if tsk is NULL.
+I remember seeing a patch from Marc this week exactly on this
+subject, but I can't find it again today. However, I remember that
+his patch was explicitly testing for the HYP presence.
 
-Due to this, we won't initialise irq_stack_ptr, and when we try to dump
-the exception regs we may call dump_mem() for memory immediately above
-the IRQ stack range, rather than for the relevant range on the task
-stack.
+> 
+> Refactor the smp operations initialization to make sure that
+> the kernel is actually allowed to take control over CCI ports
+> (by enabling MCPM smp operations) before overriding default
+> vexpress smp operations.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/mach-vexpress/platsmp.c | 31 ++++++++++++++++++++++++-------
+>  1 file changed, 24 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index 8b8d072..6cfd782 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -26,17 +26,34 @@
+>  bool __init vexpress_smp_init_ops(void)
+>  {
+>  #ifdef CONFIG_MCPM
+> +	int cpu;
+> +	struct device_node *cpu_node, *cci_node;
+> +
+>  	/*
+> -	 * The best way to detect a multi-cluster configuration at the moment
+> -	 * is to look for the presence of a CCI in the system.
+> +	 * The best way to detect a multi-cluster configuration
+> +	 * is to detect if the kernel can take over CCI ports
+> +	 * control. Loop over possible CPUs and check if CCI
+> +	 * port control is available.
+>  	 * Override the default vexpress_smp_ops if so.
+>  	 */
+> -	struct device_node *node;
+> -	node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
+> -	if (node && of_device_is_available(node)) {
+> -		mcpm_smp_set_ops();
+> -		return true;
+> +	for_each_possible_cpu(cpu) {
+> +		bool available;
+> +
+> +		cpu_node = of_get_cpu_node(cpu, NULL);
+> +		if (WARN(!cpu_node, "Missing cpu device node!"))
+> +			return false;
+> +
+> +		cci_node = of_parse_phandle(cpu_node, "cci-control-port", 0);
+> +		available = cci_node && of_device_is_available(cci_node);
 
-This will result in misleading, though should not be otherwise
-problematic. The initial percpu areas (including the IRQ stacks) are
-allocated in the linear map, and dump_mem uses __get_user(), so we
-shouldn't access anything with side-effects, and will handle holes
-safely.
+of_device_is_available() only checks the DT node for status = "enabled";
 
-This patch fixes the issue by handling the NULL tsk case before we do
-anything else with tsk.
+Does the HYP modify the DT to disable the cci-control-port? If not, then I guess
+this patch is not enough?
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Fixes: a80a0eb70c358f8c ("arm64: make irq_stack_ptr more robust")
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/kernel/traps.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Best regards,
+Liviu
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index e04f838..df06750 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -142,6 +142,11 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 	unsigned long irq_stack_ptr;
- 	int skip;
- 
-+	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
-+
-+	if (!tsk)
-+		tsk = current;
-+
- 	/*
- 	 * Switching between stacks is valid when tracing current and in
- 	 * non-preemptible context.
-@@ -151,11 +156,6 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 	else
- 		irq_stack_ptr = 0;
- 
--	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
--
--	if (!tsk)
--		tsk = current;
--
- 	if (tsk == current) {
- 		frame.fp = (unsigned long)__builtin_frame_address(0);
- 		frame.sp = current_stack_pointer;
+> +		of_node_put(cci_node);
+> +		of_node_put(cpu_node);
+> +
+> +		if (!available)
+> +			return false;
+>  	}
+> +
+> +	mcpm_smp_set_ops();
+> +	return true;
+>  #endif
+>  	return false;
+>  }
+> -- 
+> 2.10.0
+> 
+
 -- 
-1.9.1
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
