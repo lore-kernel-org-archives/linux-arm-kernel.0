@@ -1,53 +1,41 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 23 Sep 2016 16:51:48 +0100
-Subject: [PATCH] ARM/dt: Respect #address-cells when parsing CPUs
-Message-ID: <31c4684aa8ef7ef210cc74da5f1b02ff2882a099.1474645829.git.robin.murphy@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Sep 2016 16:52:51 +0100
+Subject: [PATCH] arm64: fix dump_backtrace with NULL tsk
+In-Reply-To: <1474642587-22416-1-git-send-email-mark.rutland@arm.com>
+References: <1474642587-22416-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160923155250.GA22454@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whilst MPIDR values themselves are only 32 bits, it is still perfectly
-valid for a DT to have #address-cells > 1 in the CPUs node, resulting in
-the "reg" property having leading zero cell(s). In that situation, the
-big-endian nature of the data conspires with the current behaviour of
-just parsing the first cell to cause the kernel to think all CPUs have
-ID 0, and become resoundingly unhappy as a consequence.
+On Fri, Sep 23, 2016 at 03:56:27PM +0100, Mark Rutland wrote:
+> In some places, dump_backtrace() is called with a NULL tsk parameter,
+> e.g. in bug_handler() in arch/arm64, or indirectly via show_stack() in
+> core code. The expectation is that this is treated as if current were
+> passed instead of NULL.
+> 
+> Commit a80a0eb70c358f8c ("arm64: make irq_stack_ptr more robust") didn't
+> take this into account, and compares tsk against current *before* we
+> check if tsk is NULL.
+> 
+> Due to this, we won't initialise irq_stack_ptr, and when we try to dump
+> the exception regs we may call dump_mem() for memory immediately above
+> the IRQ stack range, rather than for the relevant range on the task
+> stack.
+> 
+> This will result in misleading, though should not be otherwise
+> problematic. The initial percpu areas (including the IRQ stacks) are
+> allocated in the linear map, and dump_mem uses __get_user(), so we
+> shouldn't access anything with side-effects, and will handle holes
+> safely.
+> 
+> This patch fixes the issue by handling the NULL tsk case before we do
+> anything else with tsk.
 
-Take #address-cells into account when parsing CPUs so as to be correct
-under any circumstances.
+Looking again, it seems we have a similar issue in unwind_frame(), at
+least when called by profile_pc(). In that case, we'll needlessly bail
+out early with -EINVAL.
 
-CC: Russell King <linux@armlinux.org.uk>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm/kernel/devtree.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+I'll spin a fix for that in v2...
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 40ecd5f514a2..7ab113c5c818 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -88,6 +88,7 @@ void __init arm_dt_init_cpu_maps(void)
- 		return;
- 
- 	for_each_child_of_node(cpus, cpu) {
-+		const u32 *cell;
- 		u32 hwid;
- 
- 		if (of_node_cmp(cpu->type, "cpu"))
-@@ -99,12 +100,14 @@ void __init arm_dt_init_cpu_maps(void)
- 		 * properties is considered invalid to build the
- 		 * cpu_logical_map.
- 		 */
--		if (of_property_read_u32(cpu, "reg", &hwid)) {
-+		cell = of_get_property(cpu, "reg", NULL);
-+		if (!cell) {
- 			pr_debug(" * %s missing reg property\n",
- 				     cpu->full_name);
- 			of_node_put(cpu);
- 			return;
- 		}
-+		hwid = of_read_number(cell, of_n_addr_cells(cpu));
- 
- 		/*
- 		 * 8 MSBs must be set to 0 in the DT since the reg property
--- 
-2.8.1.dirty
+Thanks,
+Mark.
