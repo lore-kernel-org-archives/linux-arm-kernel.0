@@ -1,59 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 23 Sep 2016 10:30:46 +0100
-Subject: [PATCH] arm/arm64: KVM: Add support for ARMv8 AArch32 execution
- state
-In-Reply-To: <20160923092550.GG9101@cbox>
-References: <1474614805-18629-1-git-send-email-b18965@freescale.com>
- <20160923092550.GG9101@cbox>
-Message-ID: <57E4F646.1000204@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 Sep 2016 11:41:43 +0200
+Subject: [PATCH 00/24] ste_dma40: Fine-tuning for several function
+ implementations
+In-Reply-To: <92810066-69b6-94e7-dcec-a28594b1328f@users.sourceforge.net>
+References: <566ABCD9.1060404@users.sourceforge.net>
+ <92810066-69b6-94e7-dcec-a28594b1328f@users.sourceforge.net>
+Message-ID: <CACRpkdY0QnbZxQ=LT7eTW1sWJ6Vdd+9d9jfUwGKBACp+ZmGZ9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/16 10:25, Christoffer Dall wrote:
-> On Fri, Sep 23, 2016 at 03:13:25PM +0800, Alison Wang wrote:
->> The ARMv8 architecture supports two execution state, AArch64 and
->> AArch32. To support KVM in AArch32 execution state for ARMv8, Cortex-A53
->> and Cortex-A72 need to be added for target-specific checks.
->>
->> Signed-off-by: Alison Wang <alison.wang@nxp.com>
->> ---
->>  arch/arm/include/asm/cputype.h | 2 ++
->>  arch/arm/kvm/guest.c           | 2 ++
->>  2 files changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
->> index 754f86f..4f8c632 100644
->> --- a/arch/arm/include/asm/cputype.h
->> +++ b/arch/arm/include/asm/cputype.h
->> @@ -75,6 +75,8 @@
->>  #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
->>  #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
->>  #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
->> +#define ARM_CPU_PART_CORTEX_A53_AARCH32	0x4100d030
->> +#define ARM_CPU_PART_CORTEX_A72_AARCH32	0x4100d080
->>  #define ARM_CPU_PART_MASK		0xff00fff0
->>  
->>  /* DEC implemented cores */
->> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
->> index 9aca920..462a099 100644
->> --- a/arch/arm/kvm/guest.c
->> +++ b/arch/arm/kvm/guest.c
->> @@ -252,6 +252,8 @@ int __attribute_const__ kvm_target_cpu(void)
->>  {
->>  	switch (read_cpuid_part()) {
->>  	case ARM_CPU_PART_CORTEX_A7:
->> +	case ARM_CPU_PART_CORTEX_A53_AARCH32:
->> +	case ARM_CPU_PART_CORTEX_A72_AARCH32:
-> 
-> huh?  why are we mapping A53 and A72 cores to an A7 core?
+On Sat, Sep 17, 2016 at 5:05 PM, SF Markus Elfring
+<elfring@users.sourceforge.net> wrote:
 
-Yeah, that's absolutely disgusting. The only sensible thing to do would
-be to implement something "generic", just like we have on the 64bit side.
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sat, 17 Sep 2016 16:56:56 +0200
+>
+> Several update suggestions were taken into account
+> from static source code analysis.
 
-As it stands, this patch falls into the "No way" bucket.
+All look very nice!
 
-Thanks,
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Vinod, please apply them all!
+
+Yours,
+Linus Walleij
