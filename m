@@ -1,120 +1,53 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 23 Sep 2016 14:30:59 +0200
-Subject: [PATCH V11 0/8] Introduce ACPI world to ITS irqchip
-In-Reply-To: <1473705147-6588-1-git-send-email-tn@semihalf.com>
-References: <1473705147-6588-1-git-send-email-tn@semihalf.com>
-Message-ID: <d49bfc6c-c776-73b9-8444-bb5052a9af35@redhat.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 23 Sep 2016 14:40:48 +0200
+Subject: [PATCH v6] KVM: arm/arm64: Route vtimer events to user space
+In-Reply-To: <dd9267b6-2323-2d74-0553-71a89d05a654@redhat.com>
+References: <1474628854-69945-1-git-send-email-agraf@suse.de>
+ <dd9267b6-2323-2d74-0553-71a89d05a654@redhat.com>
+Message-ID: <20160923124048.GI9101@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Sep 23, 2016 at 02:11:41PM +0200, Paolo Bonzini wrote:
+> 
+> 
+> On 23/09/2016 13:07, Alexander Graf wrote:
+> > +		timer_ret = kvm_timer_sync_hwstate(vcpu);
+> >  
+> >  		kvm_vgic_sync_hwstate(vcpu);
+> >  
+> >  		preempt_enable();
+> >  
+> >  		ret = handle_exit(vcpu, run, ret);
+> > +
+> > +		if ((ret == 1) && timer_ret) {
+> > +			/*
+> > +			 * We have to exit straight away to ensure that we only
+> > +			 * ever notify user space once about a level change
+> > +			 */
+> 
+> Is this really a requirement?  It complicates the logic noticeably.
+> 
 
-On 12/09/2016 20:32, Tomasz Nowicki wrote:
-> The series builds the PCI/MSI domain stack based on initial IORT driver
-> which is added in first place. As a reference please see IORT spec:
-> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
-> 
-> Tested on Cavium ThunderX server and Qualcomm Technologies server platform QDF2XXX.
-> The patches can be found here:
-> https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v11)
+If we skip this, then we have to somehow remember that the sync may have
+updated the line level when we reach the flush state (and didn't exit),
+and I would like maintaining that state even less than doing this check.
 
-Tested-by: Eric Auger <eric.auger@redhat.com>
-on a Cavium QEMU guest with mach-virt.
+What we could do is to compare the timer->irq.level with the kvm_run
+state outside of the run loop (on the way to userspace) and update the
+kvm_run state if there's a discrepancy.  That way, we can maintain the
+'timer->irq.level != kvm_run' means, we have to exit, and whenever we
+are exiting, we are reporting the most recent state to user space
+anyway.
 
-Thanks
+Would that work?
 
-Eric
+(By the way, the check should be via a call into the arch timer code,
+kvm_timer_update_user_state() or something like that).
 
-> 
-> v10 -> v11
-> - rebased against v4.8-rc6
-> - bug fix for iort_match_node_callback() error handling
-> - patch 1-2 changelog updates
-> 
-> v9 -> v10
-> - error handling improvements for iort_match_node_callback() but no functional changes
-> - iort.h -> acpi_iort.h header name change
-> - style improvements
-> 
-> v8 -> v9
-> - rebased against v4.8-rc4
-> - move root IORT pointer validation to one place iort_scan_node()
-> - function names & Kconfig option name improvements
-> - remove annoying dev_err() appearances for non-IORT users
-> - for debug purpose print full ITS resource range
-> 
-> v7 -> v8
-> - rebased against v4.8-rc1
-> - move IORT support under new drivers/acpi/arm64 directory
-> - memory leak fix for iort_match_node_callback()
-> - iort_node_map_rid() algorithm improvements
-> - fix RID match check in iort_id_map()
-> - fix typos and white spaces
-> 
-> v6 -> v7
-> - rebased against irq/irqchip-4.8
-> - improvements for IORT ID mapping
-> - call IORT init call from acpi_init() instead of arch_initcall()
-> - split IORT driver in to two parts: core and ITS/MSI
-> 
-> v5 -> v6
-> - added locking mechanism for IORT list with domain token
-> - IORT function name improvements
-> - extended IORT RID mapping helper
-> - reworked IORT to be more SMMU friendly
-> - IORT functions which map RID and find corresponding domain are not
->   PCI specific any more (struct pci_dev -> struct device)
-> - bug fixes
-> 
-> v4 -> v5
-> - rebased against v4.7-rc1
-> - drop generic layer and call IORT functions directly
-> - improve resource abstraction and string formatting
-> 
-> v3 -> v4
-> - rebased against v4.5
-> - add ACPI support for IRQ domain handling on a per-device basis
-> - reorder domain setup step
-> - improve error handling
-> - code style improvements
-> 
-> v2 -> v3
-> - rebased on top of 4.4
-> - fixes and improvements for redistributor init via GICC structures
-> - fixes as per kbuild reports
-> 
-> v1 -> v2
-> - rebased on top of 4.4-rc4
-> - use pci_msi_domain_get_msi_rid for requester ID to device ID translation
-> 
-> Tomasz Nowicki (8):
->   ACPI: I/O Remapping Table (IORT) initial support
->   ACPI: Add new IORT functions to support MSI domain handling
->   PCI/MSI: Setup MSI domain on a per-device basis using IORT ACPI table
->   irqchip/gicv3-its: Cleanup for ITS domain initialization
->   irqchip/gicv3-its: Refactor ITS DT init code to prepare for ACPI
->   irqchip/gicv3-its: Probe ITS in the ACPI way
->   irqchip/gicv3-its: Factor out PCI-MSI part that might be reused for
->     ACPI
->   irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain
->     initialization
-> 
->  drivers/acpi/Kconfig                     |   4 +
->  drivers/acpi/Makefile                    |   2 +
->  drivers/acpi/arm64/Kconfig               |   6 +
->  drivers/acpi/arm64/Makefile              |   1 +
->  drivers/acpi/arm64/iort.c                | 366 +++++++++++++++++++++++++++++++
->  drivers/acpi/bus.c                       |   2 +
->  drivers/irqchip/Kconfig                  |   1 +
->  drivers/irqchip/irq-gic-v3-its-pci-msi.c |  88 ++++++--
->  drivers/irqchip/irq-gic-v3-its.c         | 171 +++++++++++----
->  drivers/irqchip/irq-gic-v3.c             |   7 +-
->  drivers/pci/msi.c                        |  11 +-
->  include/linux/acpi_iort.h                |  42 ++++
->  include/linux/irqchip/arm-gic-v3.h       |   4 +-
->  13 files changed, 635 insertions(+), 70 deletions(-)
->  create mode 100644 drivers/acpi/arm64/Kconfig
->  create mode 100644 drivers/acpi/arm64/Makefile
->  create mode 100644 drivers/acpi/arm64/iort.c
->  create mode 100644 include/linux/acpi_iort.h
-> 
+Also, the comment above is confusing, because that's not why this check
+is here, the check is here so that we don't loose track of the timer
+output level change if there's no exit to userspace.
+
+Thanks,
+-Christoffer
