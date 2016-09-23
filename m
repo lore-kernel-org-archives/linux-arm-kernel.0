@@ -1,50 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Sep 2016 14:11:43 +0200
-Subject: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape
- platforms
-In-Reply-To: <1474597146-33312-1-git-send-email-b18965@freescale.com>
-References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
-Message-ID: <12411518.Vrka20sV4r@wuerfel>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 23 Sep 2016 14:12:45 +0200
+Subject: [PATCH] i2c: uniphier-f: fix misdetection of incomplete STOP
+ condition
+In-Reply-To: <1474632241-10440-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1474632241-10440-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160923121245.GA1580@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 23, 2016 10:19:05 AM CEST Alison Wang wrote:
-> The ARMv8 architecture supports:
-> 1. 64-bit execution state, AArch64.
-> 2. 32-bit execution state, AArch32, that is compatible with previous
-> versions of the ARM architecture.
+On Fri, Sep 23, 2016 at 09:04:01PM +0900, Masahiro Yamada wrote:
+> Currently, the status register FI2C_SR is checked immediately after
+> a STOP condition is issued in case of the deferred STOP condition.
+> It takes typically 5-10 usec until the corresponding bits in the
+> register are set, so the error check for "stop condition was not
+> completed" is very likely to be false positive.
 > 
-> LayerScape platforms are compliant with ARMv8 architecture. This patch
-> is to support running 32-bit Linux kernel for LayerScape platforms.
+> Add wait code to relax the status register check.
 > 
-> Verified on LayerScape LS1043ARDB, LS1012ARDB, LS1046ARDB boards.
-> 
-> Signed-off-by: Ebony Zhu <ebony.zhu@nxp.com>
-> Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-I'm not too happy about adding random 64-bit platforms in arch/arm/.
-We have done this twice already (ARCH_VIRT and ARCH_BCM2835), which
-are both platforms that can come with ARMv6, ARMv7 or ARMv8 cores
-and are otherwise almost identical. However, there are two problem
-I see with the general approach:
+Use readl_poll_timeout?
 
-a) We don't actually support ARMv8 as a target architecture, in fact
-   we don't even support ARMv7VE (Cortex-A7/A12/A15/A17, Krait-400,
-   PJ4B-MP and Brahma-B15) properly. For an ARMv8-only kernel
-   we should pass the correct compiler flags. We should also have
-   this for any upcoming Cortex-A32 and Cortex-R52 platforms.
-
-b) Generally speaking it's a bad idea to run an platform that
-   supports aarch64 in aarch32 mode, you should use a native kernel
-   with syscall emulation for 32-bit user space unless you have a
-   very strong reason not to do that. If you have a strong reason
-   why your platform is different from all the others, please at
-   least explain it in the changelog.
-   On the other hand, any platform support both aarch64 and aarch32
-   mode should in theory run with a 32-bit kernel, and it might be
-   nice to allow that for *all* platforms that we support on a 64-bit
-   kernel. If we decide to do this, we should come up with a way to
-   include the platform configuration from arch/arm64 in the arm
-   Kconfig file.
-
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160923/fdca9ba0/attachment.sig>
