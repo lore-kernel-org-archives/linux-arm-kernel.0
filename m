@@ -1,53 +1,42 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 23 Sep 2016 08:15:05 +0800
-Subject: [PATCH] PCI: rockchip: fix uninitialized variable use
-In-Reply-To: <20160922094018.2138640-1-arnd@arndb.de>
-References: <20160922094018.2138640-1-arnd@arndb.de>
-Message-ID: <440300d4-1d96-4f38-870b-c026b8fb5b2c@rock-chips.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 23 Sep 2016 09:45:08 +0800
+Subject: [PATCH] clk: zx296718: register driver earlier with core_initcall
+Message-ID: <1474595108-15790-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Clock driver should be registered with an earlier initcall than
+module_init which is used by most of client device drivers.  Otherwise,
+probing of these client drivers will likely be deferred due to that
+calls into clk API will return -EPROBE_DEFER.
 
-? 2016/9/22 17:39, Arnd Bergmann ??:
-> The newly added pcie-rockchip driver fails to initialize the
-> io_size variable if the DT doesn't provide ranges for the PCI
-> I/O space, as found by building it with -Wmaybe-uninitialized:
->
-> drivers/pci/host/pcie-rockchip.c: In function 'rockchip_pcie_probe':
-> drivers/pci/host/pcie-rockchip.c:1007:6: warning: 'io_size' may be used uninitialized in this function [-Wmaybe-uninitialized]
->
+Deferred probing is not a problem for most subsystems, but could bring
+some side effect for particular subsystem, like display.  On ZX296718
+platform, we get Linux logo and boot log lost from display device, just
+because the DRM/KMS driver gets -EPROBE_DEFER from devm_clk_get() call.
 
-Seems like we miss this when refactoring the code a bit.
-Thanks for fixing it.
+Let's use core_initcall (qcom and a few other clk drivers use that) for
+driver registration to avoid those unnecessary -EPROBE_DEFER and get rid
+of the side effect with ZX296718 display system.
 
-Acked-by: Shawn Lin <shawn.lin@rock-chips.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/clk/zte/clk-zx296718.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-> This adds an appropriate initialization immediately in front of
-> the loop, so the io_size is zero as expected afterwards for that
-> case.
->
-> Fixes: abe17181b16f ("PCI: rockchip: Add Rockchip PCIe controller support")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/pci/host/pcie-rockchip.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> index c3593e633ccd..8bedc1e1ef80 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -1078,6 +1078,7 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
->  		goto err_vpcie;
->
->  	/* Get the I/O and memory ranges from DT */
-> +	io_size = 0;
->  	resource_list_for_each_entry(win, &res) {
->  		switch (resource_type(win->res)) {
->  		case IORESOURCE_IO:
->
-
-
+diff --git a/drivers/clk/zte/clk-zx296718.c b/drivers/clk/zte/clk-zx296718.c
+index c7716c17f302..707d62956e9b 100644
+--- a/drivers/clk/zte/clk-zx296718.c
++++ b/drivers/clk/zte/clk-zx296718.c
+@@ -917,4 +917,8 @@ static int zx_clkc_probe(struct platform_device *pdev)
+ 	},
+ };
+ 
+-builtin_platform_driver(zx_clk_driver);
++static int __init zx_clk_init(void)
++{
++	return platform_driver_register(&zx_clk_driver);
++}
++core_initcall(zx_clk_init);
 -- 
-Best Regards
-Shawn Lin
+1.9.1
