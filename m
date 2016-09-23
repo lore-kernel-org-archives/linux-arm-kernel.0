@@ -1,49 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 23 Sep 2016 15:06:59 -0700
-Subject: [PATCH v3 3/3] clk: mvebu: migrate CP110 system controller to
- clk_hw API and registration
-In-Reply-To: <CAPv3WKfDrtDDMPi4oBmpNN_+b4mvG6cVnZT7pNTo8tcNUyzwyA@mail.gmail.com>
-References: <1474448759-24482-1-git-send-email-mw@semihalf.com>
- <1474448759-24482-4-git-send-email-mw@semihalf.com>
- <20160923214730.GF21232@codeaurora.org>
- <CAPv3WKfDrtDDMPi4oBmpNN_+b4mvG6cVnZT7pNTo8tcNUyzwyA@mail.gmail.com>
-Message-ID: <20160923220659.GL21232@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 23 Sep 2016 19:12:15 -0300
+Subject: [PATCH 3/3] clk: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <1474036587-13819-3-git-send-email-fabio.estevam@nxp.com>
+References: <1474036587-13819-1-git-send-email-fabio.estevam@nxp.com>
+ <1474036587-13819-3-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <CAOMZO5D7=A=ms_iq1D+Fgg4wKpRx-aScm5V=avxRPu62rFymzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24, Marcin Wojtas wrote:
-> Hi Stephen,
-> 
-> 2016-09-23 23:47 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
-> > On 09/21, Marcin Wojtas wrote:
-> >> @@ -203,80 +202,75 @@ static int cp110_syscon_clk_probe(struct platform_device *pdev)
-> >>       if (ret)
-> >>               return ret;
-> >>
-> >> -     cp110_clks = devm_kcalloc(&pdev->dev, sizeof(struct clk *),
-> >> -                               CP110_CLK_NUM, GFP_KERNEL);
-> >> -     if (!cp110_clks)
-> >> -             return -ENOMEM;
-> >> -
-> >> -     cp110_clk_data = devm_kzalloc(&pdev->dev,
-> >> -                                   sizeof(*cp110_clk_data),
-> >> +     cp110_clk_data = devm_kcalloc(&pdev->dev, sizeof(*cp110_clk_data),
-> >> +                                   sizeof(struct clk_hw *) * CP110_CLK_NUM,
-> >>                                     GFP_KERNEL);
-> >
-> > This doesn't look right. Why are calloc()ing clk_hw_onecell_data this
-> > way?
-> 
-> After some time, at a first sight it seems I should've used following:
-> cp110_clk_data = devm_kzalloc(&pdev->dev, sizeof(*cp110_clk_data) +
->                                                     sizeof(struct
-> clk_hw *) * CP110_CLK_NUM,
->                                                     GFP_KERNEL);
-> 
-> I'll re-check, but is that what you meant?
+Hi Stephen,
 
-Yes that looks better.
+On Fri, Sep 16, 2016 at 11:36 AM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
+> Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk
+> tree, the glitchy parent mux of ldb_di[x]_clk can cause a glitch to
+> enter the ldb_di_ipu_div divider. If the divider gets locked up, no
+> ldb_di[x]_clk is generated, and the LVDS display will hang when the
+> ipu_di_clk is sourced from ldb_di_clk.
+>
+> To fix the problem, both the new and current parent of the ldb_di_clk
+> should be disabled before the switch. This patch ensures that correct
+> steps are followed when ldb_di_clk parent is switched in the beginning
+> of boot. The glitchy muxes are then registered as read-only. The clock
+> parent can be selected using the assigned-clocks and
+> assigned-clock-parents properties of the ccm device tree node:
+>
+>         &clks {
+>                 assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
+>                                   <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
+>                 assigned-clock-parents = <&clks IMX6QDL_CLK_MMDC_CH1_AXI>,
+>                                          <&clks IMX6QDL_CLK_PLL5_VIDEO_DIV>;
+>         };
+>
+> The issue is explained in detail in EB821 ("LDB Clock Switch Procedure &
+> i.MX6 Asynchronous Clock Switching Guidelines") [1].
+>
+> [1] http://www.nxp.com/files/32bit/doc/eng_bulletin/EB821.pdf
+>
+> Signed-off-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@nxp.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Reviewed-by: Akshay Bhat <akshay.bhat@timesys.com>
+> Tested-by Joshua Clayton <stillcompiling@gmail.com>
+> Tested-by: Charles Kang <Charles.Kang@advantech.com.tw>
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Do you think this one could be applied to clk-next? It fixes an
+important LVDS bug.
+
+Thanks
