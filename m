@@ -1,78 +1,84 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri, 23 Sep 2016 16:13:19 +0200
-Subject: [PATCH v18 6/6] ARM: socfpga: fpga bridge driver support
-In-Reply-To: <20160712193645.9098-7-atull@opensource.altera.com>
-References: <20160712193645.9098-1-atull@opensource.altera.com>
- <20160712193645.9098-7-atull@opensource.altera.com>
-Message-ID: <73ponug19k.fsf@unicorn.hi.pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 23 Sep 2016 16:20:45 +0200
+Subject: [PATCH] usb: gadget: udc: atmel: fix endpoint name
+In-Reply-To: <c90099af-2537-cc41-2775-dd2ca41dc070@atmel.com>
+References: <20160915150722.13103-1-alexandre.belloni@free-electrons.com>
+ <c90099af-2537-cc41-2775-dd2ca41dc070@atmel.com>
+Message-ID: <331f5819-1f65-980d-486d-732342877f2c@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Le 16/09/2016 ? 10:36, Nicolas Ferre a ?crit :
+> Le 15/09/2016 ? 17:07, Alexandre Belloni a ?crit :
+>> Since commit c32b5bcfa3c4 ("ARM: dts: at91: Fix USB endpoint nodes"),
+>> atmel_usba_udc fails with:
+>>
+>> ------------[ cut here ]------------
+>> WARNING: CPU: 0 PID: 0 at include/linux/usb/gadget.h:405
+>> ecm_do_notify+0x188/0x1a0
+>> Modules linked in:
+>> CPU: 0 PID: 0 Comm: swapper Not tainted 4.7.0+ #15
+>> Hardware name: Atmel SAMA5
+>> [<c010ccfc>] (unwind_backtrace) from [<c010a7ec>] (show_stack+0x10/0x14)
+>> [<c010a7ec>] (show_stack) from [<c0115c10>] (__warn+0xe4/0xfc)
+>> [<c0115c10>] (__warn) from [<c0115cd8>] (warn_slowpath_null+0x20/0x28)
+>> [<c0115cd8>] (warn_slowpath_null) from [<c04377ac>] (ecm_do_notify+0x188/0x1a0)
+>> [<c04377ac>] (ecm_do_notify) from [<c04379a4>] (ecm_set_alt+0x74/0x1ac)
+>> [<c04379a4>] (ecm_set_alt) from [<c042f74c>] (composite_setup+0xfc0/0x19f8)
+>> [<c042f74c>] (composite_setup) from [<c04356e8>] (usba_udc_irq+0x8f4/0xd9c)
+>> [<c04356e8>] (usba_udc_irq) from [<c013ec9c>] (handle_irq_event_percpu+0x9c/0x158)
+>> [<c013ec9c>] (handle_irq_event_percpu) from [<c013ed80>] (handle_irq_event+0x28/0x3c)
+>> [<c013ed80>] (handle_irq_event) from [<c01416d4>] (handle_fasteoi_irq+0xa0/0x168)
+>> [<c01416d4>] (handle_fasteoi_irq) from [<c013e3f8>] (generic_handle_irq+0x24/0x34)
+>> [<c013e3f8>] (generic_handle_irq) from [<c013e640>] (__handle_domain_irq+0x54/0xa8)
+>> [<c013e640>] (__handle_domain_irq) from [<c010b214>] (__irq_svc+0x54/0x70)
+>> [<c010b214>] (__irq_svc) from [<c0107eb0>] (arch_cpu_idle+0x38/0x3c)
+>> [<c0107eb0>] (arch_cpu_idle) from [<c0137300>] (cpu_startup_entry+0x9c/0xdc)
+>> [<c0137300>] (cpu_startup_entry) from [<c0900c40>] (start_kernel+0x354/0x360)
+>> [<c0900c40>] (start_kernel) from [<20008078>] (0x20008078)
+>> ---[ end trace e7cf9dcebf4815a6 ]---
+>>
+>> Fixes: c32b5bcfa3c4 ("ARM: dts: at91: Fix USB endpoint nodes")
+>> Reported-by: Richard Genoud <richard.genoud@gmail.com>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Felipe, Greg,
+> It is clearly a regression and material for 4.8-fixes. But I do know
+> that we are very late in the process :-(
+> Please do what you can to make it progress before 4.8-final but I'm
+> truly aware of the challenge.
 
-Hi!
+Any chance that we can have it (aka ping)?
 
-Alan Tull writes:
+Bye,
 
-> Supports Altera SOCFPGA bridges:
->  * fpga2sdram
->  * fpga2hps
->  * hps2fpga
->  * lwhps2fpga
->
-> Allows enabling/disabling the bridges through the FPGA
-> Bridge Framework API functions.
->
-> The fpga2sdram driver only supports enabling and disabling
-> of the ports that been configured early on.  This is due to
-> a hardware limitation where the read, write, and command
-> ports on the fpga2sdram bridge can only be reconfigured
-> while there are no transactions to the sdram, i.e. when
-> running out of OCRAM before the kernel boots.
->
-> Device tree property 'init-val' configures the driver to
-> enable or disable the bridge during probe.  If the property
-> does not exist, the driver will leave the bridge in its
-> current state.
->
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> Signed-off-by: Matthew Gerlach <mgerlach@altera.com>
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+> Thanks to Richard for finding this and Alexandre for the quick correction.
+> 
+> Bye,
+> 
+>> ---
+>>  drivers/usb/gadget/udc/atmel_usba_udc.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> index bb1f6c8f0f01..45bc997d0711 100644
+>> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> @@ -1978,7 +1978,7 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>>  			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
+>>  			goto err;
+>>  		}
+>> -		ep->ep.name = name;
+>> +		ep->ep.name = kasprintf(GFP_KERNEL, "ep%d", ep->index);
+>>  
+>>  		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
+>>  		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
+>>
+> 
+> 
 
-(...)
-
-> +static inline int _alt_fpga2sdram_enable_set(struct alt_fpga2sdram_data *priv,
-> +					     bool enable)
-> +{
-> +	return regmap_update_bits(priv->sdrctl, ALT_SDR_CTL_FPGAPORTRST_OFST,
-> +				  priv->mask, enable ? priv->mask : 0);
-> +}
-
-(...)
-
-> +	/* Get f2s bridge configuration saved in handoff register */
-> +	regmap_read(sysmgr, SYSMGR_ISWGRP_HANDOFF3, &priv->mask);
-> +
-
-Could you maybe add some documentation about this implicit information
-shared between a bootloader and this driver?
-I understand why you do this, but there must be a better way than
-depending on something some bootloader wrote in some undocumented
-register, no?
-The documentation just says:
-
-"These registers are used to store handoff infomation between the
-preloader and the OS. These 8 registers can be used to store any
-information. The contents of these registers have no impact on the
-state of the HPS hardware"
-
-If it is already agreed upon, that a bridge-enable property is okay,
-why not add a port-enable property, too?
-
-Regards,
-Steffen Trumtrar
 
 -- 
-Pengutronix e.K.                           | Steffen Trumtrar            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas Ferre
