@@ -1,40 +1,122 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Sep 2016 16:44:25 +0200
-Subject: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape
- platforms
-In-Reply-To: <15d69a29-6997-6af8-f121-ff253388626c@arm.com>
-References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
- <VI1PR0401MB26384246128D6043B93E6E9F8DC80@VI1PR0401MB2638.eurprd04.prod.outlook.com>
- <15d69a29-6997-6af8-f121-ff253388626c@arm.com>
-Message-ID: <2017806.nj5EEu7nrO@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Sep 2016 09:52:59 -0500
+Subject: [RFC PATCH 08/11] pci: controller: dra7xx: Add EP mode support
+In-Reply-To: <1473829927-20466-9-git-send-email-kishon@ti.com>
+References: <1473829927-20466-1-git-send-email-kishon@ti.com>
+ <1473829927-20466-9-git-send-email-kishon@ti.com>
+Message-ID: <20160923145259.GA28285@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 23, 2016 3:24:12 PM CEST Robin Murphy wrote:
-> On 23/09/16 15:01, Stuart Yoder wrote:
-> Otherwise you can
-> always simply run your own shim at EL2 to drive an AArch32 EL1 (it'll
-> need to trap and translate subsequent SMC calls for e.g. PSCI).
+On Wed, Sep 14, 2016 at 10:42:04AM +0530, Kishon Vijay Abraham I wrote:
+> The PCIe controller integrated in dra7xx SoCs is capable of operating
+> in endpoint mode. Add support for dra7xx SoCs to operate in endpoint
+> mode.
 > 
-> > If there is such a requirement, it's something begging for standardization.
-> > Doesn't make sense for multiple divergent approaches for switching from
-> > aarch64/EL2 to aarch32/EL2.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  Documentation/devicetree/bindings/pci/ti-pci.txt |   30 ++-
+>  drivers/pci/controller/Kconfig                   |   21 +++
+>  drivers/pci/controller/pci-dra7xx.c              |  211 +++++++++++++++++++---
+>  3 files changed, 225 insertions(+), 37 deletions(-)
 > 
-> Perhaps - I did briefly look into how hard it would be to write a proper
-> SMC service handler to do this (since ATF does have a framework for such
-> things), but concluded it would be more than 10 minutes' work and just
-> cheated instead. It's certainly something which could be raised with the
-> firmware folks.
+> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+> index 60e2516..b0e76f6 100644
+> --- a/Documentation/devicetree/bindings/pci/ti-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+> @@ -1,17 +1,22 @@
+>  TI PCI Controllers
+>  
+>  PCIe Designware Controller
+> - - compatible: Should be "ti,dra7-pcie""
+> - - reg : Two register ranges as listed in the reg-names property
+> - - reg-names : The first entry must be "ti-conf" for the TI specific registers
+> -	       The second entry must be "rc-dbics" for the designware pcie
+> -	       registers
+> -	       The third entry must be "config" for the PCIe configuration space
+> + - compatible: Should be "ti,dra7-pcie" for RC
+> +	       Should be "ti,dra7-pcie-ep" for EP
+>   - phys : list of PHY specifiers (used by generic PHY framework)
+>   - phy-names : must be "pcie-phy0", "pcie-phy1", "pcie-phyN".. based on the
+>  	       number of PHYs as specified in *phys* property.
+>   - ti,hwmods : Name of the hwmod associated to the pcie, "pcie<X>",
+>  	       where <X> is the instance number of the pcie from the HW spec.
+> + - num-lanes as specified in ../designware-pcie.txt
+> +
+> +HOST MODE
+> +=========
+> + - reg : Two register ranges as listed in the reg-names property
+> + - reg-names : The first entry must be "ti-conf" for the TI specific registers
+> +	       The second entry must be "rc-dbics" for the designware pcie
+> +	       registers
+> +	       The third entry must be "config" for the PCIe configuration space
+>   - interrupts : Two interrupt entries must be specified. The first one is for
+>  		main interrupt line and the second for MSI interrupt line.
+>   - #address-cells,
+> @@ -19,13 +24,24 @@ PCIe Designware Controller
+>     #interrupt-cells,
+>     device_type,
+>     ranges,
+> -   num-lanes,
+>     interrupt-map-mask,
+>     interrupt-map : as specified in ../designware-pcie.txt
+>  
+>  Optional Property:
+>   - gpios : Should be added if a gpio line is required to drive PERST# line
 
-If we end up allowing all arm64 platforms to be enabled in arch/arm,
-we could perhaps create a generic implementation that does both of
-those things, i.e.
+Don't you need gpios as the input side of GPIO outputs in RC mode? Or 
+for EP mode they are all handled by h/w?
 
-- Take the arm32 kernel Image or zImage file, wrap it inside of a binary
-  that implements the arm64 boot protocol.
-- When that starts up, try to use the new PSCI call to jump into
-  the arm32 kernel
-- If PSCI failed and we are running in EL2, implement the shim
-  and start the arm32 kernel in EL1 mode
+>  
+> +DEVICE MODE
+> +===========
+> + - reg : Two register ranges as listed in the reg-names property
+> + - reg-names : "ti-conf" for the TI specific registers
+> +	       "ep_dbics" for the standard configuration registers as
+> +		they are locally accessed within the DIF CS space
+> +	       "ep_dbics2" for the standard configuration registers as
+> +		they are locally accessed within the DIF CS2 space
+> + - interrupts : one interrupt entries must be specified for main interrupt.
+> + - num-ib-windows : number of inbound address translation windows
+> + - num-ob-windows : number of outbound address translation windows
+> +
+>  Example:
+>  axi {
+>  	compatible = "simple-bus";
+> diff --git a/drivers/pci/controller/Kconfig b/drivers/pci/controller/Kconfig
+> index 8574828..4d70981 100644
+> --- a/drivers/pci/controller/Kconfig
+> +++ b/drivers/pci/controller/Kconfig
+> @@ -23,6 +23,27 @@ config PCI_DRA7XX_HOST
+>  	 Enables support for the PCIe controller in the DRA7xx SoC to work in
+>  	 host mode.
+>  
+> +config PCI_DRA7XX_EP
+> +	bool "Endpoint Only Mode"
+> +	depends on PCI_ENDPOINT
+> +	select PCIE_DW_EP
+> +	help
+> +	 Enables support for the PCIe controller in the DRA7xx SoC to work in
+> +	 endpoint mode.
+> +
+> +config PCI_DRA7XX_HOST_EP
 
-	Arnd
+I'd make these 2 options just RC and EP depending on PCI_DRA7XX_HOST 
+with RC option being default yes.
+
+
+> +	bool "Both Host and Endpoint Mode"
+> +	depends on PCI_MSI_IRQ_DOMAIN
+> +	depends on PCI
+> +	depends on PCI_ENDPOINT
+> +	select PCIE_DW_HOST
+> +	select PCIE_DW_EP
+> +	help
+> +	 Enables support for the PCIe controller in the DRA7xx SoC to work in
+> +	 both endpoint mode and host mode. If the board has 2 PCIe ports and
+> +	 one of them has to work in host mode and the other has to work in
+> +	 EP mode then this option has to be enabled.
+> +
+>  endchoice
+>  
+>  endif
