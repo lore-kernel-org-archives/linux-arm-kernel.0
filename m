@@ -1,44 +1,31 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 23 Sep 2016 10:43:41 +0200
-Subject: [PATCH v2 0/3] arm64: kgdb: fix single stepping
-In-Reply-To: <20160923083257.GL30248@linaro.org>
-References: <20160923073327.9657-1-takahiro.akashi@linaro.org>
- <20160923081618.GH18056@kroah.com>
- <20160923083257.GL30248@linaro.org>
-Message-ID: <20160923084341.GA32342@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 Sep 2016 10:53:34 +0200
+Subject: [PATCH v4 1/7] pinctrl: bcm2835: add pull defines to dt bindings
+In-Reply-To: <87zin49p9m.fsf@eliezer.anholt.net>
+References: <1474274603-24215-1-git-send-email-kraxel@redhat.com>
+ <1474274603-24215-2-git-send-email-kraxel@redhat.com>
+ <87zin49p9m.fsf@eliezer.anholt.net>
+Message-ID: <CACRpkdZ9NmFGtGcT_KfoLLUqoLic7i9_ao7cw8JgSnq2o0VvnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 05:32:58PM +0900, AKASHI Takahiro wrote:
-> On Fri, Sep 23, 2016 at 10:16:18AM +0200, Greg KH wrote:
-> > On Fri, Sep 23, 2016 at 04:33:24PM +0900, AKASHI Takahiro wrote:
-> > > Kgdb support on arm64 was merged in v3.15, but from its first appearance,
-> > > "signle step" has never worked well.
-> > > 
-> > > This patch fixes all the error cases I found so far.
-> > > The original patch[1] was splitted into three pieces, ones for each case.
-> > > patch#1, #2 should be applied to all the version, v3.15 and later.
-> > > pathc#3 only for v3.16 and later.
-> > 
-> > As this is not a regression (i.e. it has never worked), why is this
-> > something for stable releases?
-> 
-> Because, I think, that is a bug.
-> The author seems to have believed that it worked.
-> Please see:
->   commit 44679a4f
->   Author: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
->   Date:   Tue Jan 28 11:20:19 2014 +0000
-> 
->       arm64: KGDB: Add step debugging support
+On Mon, Sep 19, 2016 at 12:07 PM, Eric Anholt <eric@anholt.net> wrote:
+> Gerd Hoffmann <kraxel@redhat.com> writes:
+>
+>> Also delete (unused) private enum from driver.
+>> The pull defines can be used instead if needed.
+>>
+>> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+>
+> Acked-by: Eric Anholt <eric@anholt.net>
+>
+> gpio maintainers, could I pull this through my dt tree?  Or does this
+> need to be split in two?
 
-Yes, but again, it didn't work, so this would be a new feature.  One
-that obviously people aren't using in the stable kernels, otherwise they
-would have noticed in the past 2 years about it being broken :)
+You can take it. The bcm2835 driver is not seeing any conflicting
+changes in this merge window.
 
-Please read Documentation/stable_kernel_rules.txt for the requirements
-of a stable kernel patch.  I don't think this series meets those rules.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-thanks,
-
-greg k-h
+Yours,
+Linus Walleij
