@@ -1,31 +1,124 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 23 Sep 2016 10:04:31 +0800
-Subject: [PATCH] clocksource/drivers/ti-32k: Prevent ftrace recursion
-In-Reply-To: <alpine.DEB.2.20.1609221555590.5599@nanos>
-References: <20160922075621.3725-1-jszhang@marvell.com>
- <alpine.DEB.2.20.1609221555590.5599@nanos>
-Message-ID: <20160923100431.6cf2c88f@xhacker>
+From: b18965@freescale.com (Alison Wang)
+Date: Fri, 23 Sep 2016 10:19:05 +0800
+Subject: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape
+ platforms
+Message-ID: <1474597146-33312-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+The ARMv8 architecture supports:
+1. 64-bit execution state, AArch64.
+2. 32-bit execution state, AArch32, that is compatible with previous
+versions of the ARM architecture.
 
-On Thu, 22 Sep 2016 15:58:03 +0200 Thomas Gleixner wrote:
+LayerScape platforms are compliant with ARMv8 architecture. This patch
+is to support running 32-bit Linux kernel for LayerScape platforms.
 
-> On Thu, 22 Sep 2016, Jisheng Zhang wrote:
-> 
-> > Currently ti-32k can be used as a scheduler clock. We properly marked
-> > omap_32k_read_sched_clock() as notrace but we then call another
-> > function ti_32k_read_cycles() that _wasn't_ notrace.
-> > 
-> > Having a traceable function in the sched_clock() path leads to a
-> > recursion within ftrace and a kernel crash.  
-> 
-> Kernel crash? Doesn't ftrace core prevent recursion?
+Verified on LayerScape LS1043ARDB, LS1012ARDB, LS1046ARDB boards.
 
-a recent similar issue:
+Signed-off-by: Ebony Zhu <ebony.zhu@nxp.com>
+Signed-off-by: Alison Wang <alison.wang@nxp.com>
+---
+ arch/arm/Kconfig                    |  9 +++++++++
+ arch/arm/mach-imx/Kconfig           | 14 ++++++++++++++
+ arch/arm/mach-imx/Makefile          |  4 +++-
+ arch/arm/mach-imx/mach-layerscape.c | 23 +++++++++++++++++++++++
+ 4 files changed, 49 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-imx/mach-layerscape.c
 
-http://www.spinics.net/lists/arm-kernel/msg533480.html
-
-Thanks,
-Jisheng
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f0c8068..e8d470e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -294,6 +294,15 @@ config PGTABLE_LEVELS
+ 	default 3 if ARM_LPAE
+ 	default 2
+ 
++config ARCH_AARCH32_ES_SUPPORT
++	def_bool n
++	help
++	 The ARMv8 architecture supports 64-bit execution state, AArch64
++	 and 32-bit execution state, AArch32, that is compatible with
++	 previous versions of the ARM architecture.
++
++	 Enable AArch32 execution state support for ARMv8 architecture.
++
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 0ac05a0..fda4f5f 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -549,6 +549,20 @@ config SOC_LS1021A
+ 	help
+ 	  This enables support for Freescale LS1021A processor.
+ 
++config ARCH_LAYERSCAPE_AARCH32
++	bool "Freescale Layerscape SoC AArch32 ES support"
++	select ARCH_AARCH32_ES_SUPPORT
++	select ARM_AMBA
++	select ARM_GIC
++	select ARM_ARCH_TIMER
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
++	select PCI_LAYERSCAPE if PCI
++	select PCI_DOMAINS if PCI
++
++	help
++	  This enables support for Freescale Layerscape SoC family in
++	  in AArch32 execution state.
++
+ endif
+ 
+ comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 737450f..7ded4fa 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -69,7 +69,7 @@ obj-$(CONFIG_HAVE_IMX_ANATOP) += anatop.o
+ obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
+ obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
+ obj-$(CONFIG_HAVE_IMX_SRC) += src.o
+-ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A),)
++ifneq ($(CONFIG_SOC_IMX6)$(CONFIG_SOC_LS1021A)$(CONFIG_ARCH_LAYERSCAPE_AARCH32),)
+ AFLAGS_headsmp.o :=-Wa,-march=armv7-a
+ obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+@@ -96,4 +96,6 @@ obj-$(CONFIG_SOC_VF610) += mach-vf610.o
+ 
+ obj-$(CONFIG_SOC_LS1021A) += mach-ls1021a.o
+ 
++obj-$(CONFIG_ARCH_LAYERSCAPE_AARCH32) += mach-layerscape.o
++
+ obj-y += devices/
+diff --git a/arch/arm/mach-imx/mach-layerscape.c b/arch/arm/mach-imx/mach-layerscape.c
+new file mode 100644
+index 0000000..acfb2a2
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-layerscape.c
+@@ -0,0 +1,23 @@
++/*
++ * Copyright 2015-2016 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <asm/mach/arch.h>
++
++#include "common.h"
++
++static const char * const layerscape_dt_compat[] __initconst = {
++	"fsl,ls1012a",
++	"fsl,ls1043a",
++	"fsl,ls1046a",
++	NULL,
++};
++
++DT_MACHINE_START(LAYERSCAPE_AARCH32, "Freescale LAYERSCAPE")
++	.dt_compat	= layerscape_dt_compat,
++MACHINE_END
+-- 
+2.1.0.27.g96db324
