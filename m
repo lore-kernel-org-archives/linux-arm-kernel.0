@@ -1,122 +1,78 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 23 Sep 2016 15:24:12 +0100
-Subject: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape
- platforms
-In-Reply-To: <VI1PR0401MB26384246128D6043B93E6E9F8DC80@VI1PR0401MB2638.eurprd04.prod.outlook.com>
-References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
- <f4195baa-907d-2c00-eb62-d4452ed749c8@arm.com>
- <VI1PR0401MB2638049F479731B3CC903B248DC80@VI1PR0401MB2638.eurprd04.prod.outlook.com>
- <c6697a9c-013b-9880-e52f-8de2f0a5b7ae@arm.com>
- <VI1PR0401MB26384246128D6043B93E6E9F8DC80@VI1PR0401MB2638.eurprd04.prod.outlook.com>
-Message-ID: <15d69a29-6997-6af8-f121-ff253388626c@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 Sep 2016 07:26:34 -0700
+Subject: Regression in next with "mfd: twl6040: The chip does not support
+ bulk access"
+In-Reply-To: <139a8c7b-8cfe-fa21-634a-4551511f0cea@ti.com>
+References: <20160922180718.kmttyt26t56fa3kp@atomide.com>
+ <139a8c7b-8cfe-fa21-634a-4551511f0cea@ti.com>
+Message-ID: <20160923142634.zkaqxmiif22kws2e@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/09/16 15:01, Stuart Yoder wrote:
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160923 00:21]:
+> On 09/22/16 21:07, Tony Lindgren wrote:
+> > Hi,
+> > 
+> > Looks like commit 7a17e47f6403 ("mfd: twl6040: The chip does not
+> > support bulk access") breaks at least omap4-duovero.
 > 
-> 
->> -----Original Message-----
->> From: Robin Murphy [mailto:robin.murphy at arm.com]
->> Sent: Friday, September 23, 2016 8:19 AM
->> To: Stuart Yoder <stuart.yoder@nxp.com>; Alison Wang <b18965@freescale.com>; shawnguo at kernel.org;
->> kernel at pengutronix.de; Fabio Estevam Estevam <fabio.estevam@nxp.com>; linux at armlinux.org.uk; linux-arm-
->> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Scott Wood <scott.wood@nxp.com>; Leo Li
->> <leoyang.li@nxp.com>
->> Cc: Jason Jin <jason.jin@nxp.com>
->> Subject: Re: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape platforms
->>
->> On 23/09/16 14:13, Stuart Yoder wrote:
->>>
->>>
->>>> -----Original Message-----
->>>> From: Robin Murphy [mailto:robin.murphy at arm.com]
->>>> Sent: Friday, September 23, 2016 7:17 AM
->>>> To: Alison Wang <b18965@freescale.com>; shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
->>>> Estevam <fabio.estevam@nxp.com>; linux at armlinux.org.uk; linux-arm-kernel at lists.infradead.org; linux-
->>>> kernel at vger.kernel.org; Scott Wood <scott.wood@nxp.com>; Stuart Yoder <stuart.yoder@nxp.com>; Leo Li
->>>> <leoyang.li@nxp.com>
->>>> Cc: Jason Jin <jason.jin@nxp.com>
->>>> Subject: Re: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape platforms
->>>>
->>>> Hi Alison,
->>>>
->>>> On 23/09/16 03:19, Alison Wang wrote:
->>>>> The ARMv8 architecture supports:
->>>>> 1. 64-bit execution state, AArch64.
->>>>> 2. 32-bit execution state, AArch32, that is compatible with previous
->>>>> versions of the ARM architecture.
->>>>>
->>>>> LayerScape platforms are compliant with ARMv8 architecture. This patch
->>>>> is to support running 32-bit Linux kernel for LayerScape platforms.
->>>>>
->>>>> Verified on LayerScape LS1043ARDB, LS1012ARDB, LS1046ARDB boards.
->>>>>
->>>>> Signed-off-by: Ebony Zhu <ebony.zhu@nxp.com>
->>>>> Signed-off-by: Alison Wang <alison.wang@nxp.com>
->>>>> ---
->>>>>  arch/arm/Kconfig                    |  9 +++++++++
->>>>>  arch/arm/mach-imx/Kconfig           | 14 ++++++++++++++
->>>>>  arch/arm/mach-imx/Makefile          |  4 +++-
->>>>>  arch/arm/mach-imx/mach-layerscape.c | 23 +++++++++++++++++++++++
->>>>>  4 files changed, 49 insertions(+), 1 deletion(-)
->>>>>  create mode 100644 arch/arm/mach-imx/mach-layerscape.c
->>>>>
->>>>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>>>> index f0c8068..e8d470e 100644
->>>>> --- a/arch/arm/Kconfig
->>>>> +++ b/arch/arm/Kconfig
->>>>> @@ -294,6 +294,15 @@ config PGTABLE_LEVELS
->>>>>  	default 3 if ARM_LPAE
->>>>>  	default 2
->>>>>
->>>>> +config ARCH_AARCH32_ES_SUPPORT
->>>>> +	def_bool n
->>>>> +	help
->>>>> +	 The ARMv8 architecture supports 64-bit execution state, AArch64
->>>>> +	 and 32-bit execution state, AArch32, that is compatible with
->>>>> +	 previous versions of the ARM architecture.
->>>>> +
->>>>> +	 Enable AArch32 execution state support for ARMv8 architecture.
->>>>
->>>> What's this supposed to do, exactly? I've been running 32-bit kernels on
->>>> my Juno with very little issue (beyond a couple of DT tweaks, and some
->>>> firmware hacks with a corresponding bit of A64 assembly tacked on the
->>>> front of the zImage to switch into AArch32 state).
->>>
->>> Which arch/arm/mach-* platform are you using for Juno?
->>
->> I don't even know! :) I just start with a multi_v7_defconfig plus a few
->> extra bits (LPAE, KVM, sil24, sky2, etc.) and it works. I guess it's the
->> combination of mach-vexpress and mach-virt.
-> 
-> Thanks.  A question about the switch into aarch32 state... our assumption
-> was that the kernel starts at EL2.  In this proof of concept we're doing the
-> switch to aarch32/EL2 in firmware.  And what I'm being told is that the
-> firmware aarch64 EL2 code cannot switch to aarch32 EL2 without some 
-> assistance from EL3 firmware.  This is leading us to invent a new
-> SMC call to do this.
-> 
-> Did you face this?
+> That's odd. I see no such errors on omap4 PandaBoard-ES nor on omap5 uEVM.
+> The IRQ status is one register so even in bulk access it is one read. So the
+> use_single_rw should have no effect on the access.
 
-Yes, the only way to enter in Hyp is to have the firmware twiddle
-SCR_EL3.RW (I simply stuck a disgusting hack directly in ATF's exception
-handler, which my dodgy 64-bit header then calls). Otherwise you can
-always simply run your own shim at EL2 to drive an AArch32 EL1 (it'll
-need to trap and translate subsequent SMC calls for e.g. PSCI).
+Oh it's just one register.
 
-> If there is such a requirement, it's something begging for standardization.
-> Doesn't make sense for multiple divergent approaches for switching from
-> aarch64/EL2 to aarch32/EL2.
-
-Perhaps - I did briefly look into how hard it would be to write a proper
-SMC service handler to do this (since ATF does have a framework for such
-things), but concluded it would be more than 10 minutes' work and just
-cheated instead. It's certainly something which could be raised with the
-firmware folks.
-
-Robin.
-
+> The only time when regmap would try to use bulk access to twl6040 is when we
+> execute regcache_sync() on it after resuming the chip and this would fail at
+> the first time when it tries to restore more than one consecutive registers.
 > 
-> Thanks,
-> Stuart
+> I just tested things on next-20160915 and I see no errors at all.
+
+OK interesting.
+
+> > I now get tons of errors:
+> > 
+> > Skipping twl internal clock init and using bootloader value (unknown osc rate)
+> > twl 0-0048: PIH (irq 332) nested IRQs
+> > of_get_named_gpiod_flags: parsed 'ti,audpwron-gpio' property of node '/ocp/i2c at 48070000/t
+> > wl at 4b[0]' - status (0)
+> > omap_i2c 48070000.i2c: bus 0 rev0.10 at 400 kHz
+> > twl6040 0-004b: Failed to read IRQ status: -16
+> > twl6040 0-004b: Failed to read IRQ status: -16
+> > twl6040 0-004b: Failed to read IRQ status: -16
+> > twl6040 0-004b: Failed to read IRQ status: -16
+> > twl6040 0-004b: Failed to read IRQ status: -16
+> > twl6040 0-004b: Failed to read IRQ status: -16
+> > twl6040 0-004b: Failed to read IRQ status: -16
+> > twl6040 0-004b: Failed to read IRQ status: -16
+> > twl6040 0-004b: Failed to read IRQ status: -16
+> > 
+> > It seems the regmap irqs don't work with use_single_rw?
+
+So obviously that's a wrong conclusion then.
+
+> > Also seems that twl6040 does support bulk access as things have been
+> > working earlier?
 > 
+> Things kind of worked as we had single register reads and writes, but when I
+> tried to power down/up the twl6040 the regcache_sync() would fail to restore
+> the registers at the first place when we had two or more registers to update
+> in bulk mode. In that case regmap gives an error, but I have not been checking
+> the return of the regcache_sync() so the chip comes up, but not all settings
+> were restored.
+> 
+> > Anyways, can you please revert?
+> 
+> Please don't.
+> 
+> On which linux-next version you are seeing this?
+
+This was with next-20160922. But testing it again this is just another
+regression caused by "softirq: fix tasklet_kill() and its users", so adding
+Santosh to Cc.
+
+So no need to revert $subject patch.
+
+Regards,
+
+Tony
