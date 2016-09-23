@@ -1,83 +1,153 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 23 Sep 2016 16:33:27 +0900
-Subject: [PATCH v2 3/3] arm64: kgdb: disable interrupts while a software step
- is enabled
+Date: Fri, 23 Sep 2016 16:33:26 +0900
+Subject: [PATCH v2 2/3] arm64: kgdb: prevent kgdb from being invoked
+ recursively
 In-Reply-To: <20160923073327.9657-1-takahiro.akashi@linaro.org>
 References: <20160923073327.9657-1-takahiro.akashi@linaro.org>
-Message-ID: <20160923073327.9657-4-takahiro.akashi@linaro.org>
+Message-ID: <20160923073327.9657-3-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After entering kgdb mode, 'stepi' may unexpectedly breaks the execution
-somewhere in el1_irq.
+If a breakpoint is set in an interrupt-sensitive place,
+like gic_handle_irq(), a debug exception can be triggerred recursively.
+We will see the following message:
 
-This happens because a debug exception is always enabled in el1_irq
-due to the following commit merged in v3.16:
-  commit 2a2830703a23 ("arm64: debug: avoid accessing mdscr_el1 on fault
-			paths where possible")
-A pending interrupt can be taken after kgdb has enabled a software step,
-but before a debug exception is actually taken.
+    KGDB: re-enter error: breakpoint removed ffffffc000081258
+    ------------[ cut here ]------------
+    WARNING: CPU: 0 PID: 650 at kernel/debug/debug_core.c:435
+                                        kgdb_handle_exception+0x1dc/0x1f4()
+    Modules linked in:
+    CPU: 0 PID: 650 Comm: sh Not tainted 3.17.0-rc2+ #177
+    Call trace:
+    [<ffffffc000087fac>] dump_backtrace+0x0/0x130
+    [<ffffffc0000880ec>] show_stack+0x10/0x1c
+    [<ffffffc0004d683c>] dump_stack+0x74/0xb8
+    [<ffffffc0000ab824>] warn_slowpath_common+0x8c/0xb4
+    [<ffffffc0000ab90c>] warn_slowpath_null+0x14/0x20
+    [<ffffffc000121bfc>] kgdb_handle_exception+0x1d8/0x1f4
+    [<ffffffc000092ffc>] kgdb_brk_fn+0x18/0x28
+    [<ffffffc0000821c8>] brk_handler+0x9c/0xe8
+    [<ffffffc0000811e8>] do_debug_exception+0x3c/0xac
+    Exception stack(0xffffffc07e027650 to 0xffffffc07e027770)
+    ...
+    [<ffffffc000083cac>] el1_dbg+0x14/0x68
+    [<ffffffc00012178c>] kgdb_cpu_enter+0x464/0x5c0
+    [<ffffffc000121bb4>] kgdb_handle_exception+0x190/0x1f4
+    [<ffffffc000092ffc>] kgdb_brk_fn+0x18/0x28
+    [<ffffffc0000821c8>] brk_handler+0x9c/0xe8
+    [<ffffffc0000811e8>] do_debug_exception+0x3c/0xac
+    Exception stack(0xffffffc07e027ac0 to 0xffffffc07e027be0)
+    ...
+    [<ffffffc000083cac>] el1_dbg+0x14/0x68
+    [<ffffffc00032e4b4>] __handle_sysrq+0x11c/0x190
+    [<ffffffc00032e93c>] write_sysrq_trigger+0x4c/0x60
+    [<ffffffc0001e7d58>] proc_reg_write+0x54/0x84
+    [<ffffffc000192fa4>] vfs_write+0x98/0x1c8
+    [<ffffffc0001939b0>] SyS_write+0x40/0xa0
 
-This patch enforces interrupts to be masked while single stepping.
+When some interrupt occurs, a breakpoint at gic_handle_irq() invokes kgdb.
+Kgdb then calls kgdb_roundup_cpus() to sync with other cpus. Current
+kgdb_roundup_cpus() unmasks interrupts temporarily to use
+smp_call_function(). This eventually allows another interrupt to occur and
+likely results in hitting a breakpoint at gic_handle_irq() again since
+a debug exception is always enabled in el1_irq.
+
+We can avoid this issue by specifying "nokgdbroundup" in a kernel command
+line, but this will also leave other cpus be in unknown state in terms of
+kgdb, and may result in interfering with kgdb.
+
+This patch re-implements kgdb_roundup_cpus() so that we won't have to
+enable interrupts there by using irq_work.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Jason Wessel <jason.wessel@windriver.com>
-Cc: <stable@vger.kernel.org> # 3.16-
+Cc: <stable@vger.kernel.org> # 3.15-
 ---
- arch/arm64/kernel/kgdb.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/kernel/kgdb.c | 32 ++++++++++++++++++++++++++++----
+ 1 file changed, 28 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index 59c4aec..6732a27 100644
+index afe5f90..59c4aec 100644
 --- a/arch/arm64/kernel/kgdb.c
 +++ b/arch/arm64/kernel/kgdb.c
-@@ -26,6 +26,7 @@
+@@ -19,10 +19,13 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/cpumask.h>
+ #include <linux/irq.h>
++#include <linux/irq_work.h>
+ #include <linux/kdebug.h>
  #include <linux/kgdb.h>
  #include <linux/kprobes.h>
- #include <linux/percpu.h>
-+#include <asm/ptrace.h>
++#include <linux/percpu.h>
  #include <asm/traps.h>
  
  struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
-@@ -109,6 +110,7 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
+@@ -106,6 +109,8 @@ struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
  	{ "fpcr", 4, -1 },
  };
  
-+static DEFINE_PER_CPU(unsigned int, kgdb_pstate);
- static DEFINE_PER_CPU(struct irq_work, kgdb_irq_work);
- 
++static DEFINE_PER_CPU(struct irq_work, kgdb_irq_work);
++
  char *dbg_get_reg(int regno, void *mem, struct pt_regs *regs)
-@@ -198,6 +200,10 @@ int kgdb_arch_handle_exception(int exception_vector, int signo,
- 		err = 0;
- 		break;
- 	case 's':
-+		/* mask interrupts while single stepping */
-+		__this_cpu_write(kgdb_pstate, linux_regs->pstate);
-+		linux_regs->pstate |= PSR_I_BIT;
-+
- 		/*
- 		 * Update step address value with address passed
- 		 * with step packet.
-@@ -239,9 +245,18 @@ NOKPROBE_SYMBOL(kgdb_compiled_brk_fn);
- 
- static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
  {
-+	unsigned int pstate;
-+
- 	kernel_disable_single_step();
- 	atomic_set(&kgdb_cpu_doing_single_step, -1);
+ 	if (regno >= DBG_MAX_REG_NUM || regno < 0)
+@@ -258,16 +263,27 @@ static struct step_hook kgdb_step_hook = {
+ 	.fn		= kgdb_step_brk_fn
+ };
  
-+	/* restore interrupt mask status */
-+	pstate = __this_cpu_read(kgdb_pstate);
-+	if (pstate & PSR_I_BIT)
-+		regs->pstate |= PSR_I_BIT;
-+	else
-+		regs->pstate &= ~PSR_I_BIT;
+-static void kgdb_call_nmi_hook(void *ignored)
++static void kgdb_roundup_hook(struct irq_work *work)
+ {
+ 	kgdb_nmicallback(raw_smp_processor_id(), get_irq_regs());
+ }
+ 
+ void kgdb_roundup_cpus(unsigned long flags)
+ {
+-	local_irq_enable();
+-	smp_call_function(kgdb_call_nmi_hook, NULL, 0);
+-	local_irq_disable();
++	int cpu;
++	struct cpumask mask;
++	struct irq_work *work;
 +
- 	kgdb_handle_exception(1, SIGTRAP, 0, regs);
++	mask = *cpu_online_mask;
++	cpumask_clear_cpu(smp_processor_id(), &mask);
++	cpu = cpumask_first(&mask);
++	if (cpu >= nr_cpu_ids)
++		return;
++
++	for_each_cpu(cpu, &mask) {
++		work = per_cpu_ptr(&kgdb_irq_work, cpu);
++		irq_work_queue_on(work, cpu);
++	}
+ }
+ 
+ static int __kgdb_notify(struct die_args *args, unsigned long cmd)
+@@ -308,6 +324,8 @@ static struct notifier_block kgdb_notifier = {
+ int kgdb_arch_init(void)
+ {
+ 	int ret = register_die_notifier(&kgdb_notifier);
++	int cpu;
++	struct irq_work *work;
+ 
+ 	if (ret != 0)
+ 		return ret;
+@@ -315,6 +333,12 @@ int kgdb_arch_init(void)
+ 	register_break_hook(&kgdb_brkpt_hook);
+ 	register_break_hook(&kgdb_compiled_brkpt_hook);
+ 	register_step_hook(&kgdb_step_hook);
++
++	for_each_possible_cpu(cpu) {
++		work = per_cpu_ptr(&kgdb_irq_work, cpu);
++		init_irq_work(work, kgdb_roundup_hook);
++	}
++
  	return 0;
  }
+ 
 -- 
 2.10.0
