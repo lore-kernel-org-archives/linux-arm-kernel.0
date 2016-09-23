@@ -1,102 +1,47 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 23 Sep 2016 10:23:30 +0000
-Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <1760643.vMTR5o5E9g@wuerfel>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <9178320.n4yHmfyPA3@wuerfel> <57E40665.8080005@gmail.com>
- <1760643.vMTR5o5E9g@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F8842B6@lhreml507-mbx>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 23 Sep 2016 11:29:07 +0100
+Subject: [PATCH 0/2] ARM: Do not mess with CCI if booted from HYP
+In-Reply-To: <1474380833-30121-1-git-send-email-marc.zyngier@arm.com>
+References: <1474380833-30121-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160923102907.GB31120@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Hi Marc,
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 23 September 2016 10:52
-> To: zhichang.yuan
-> Cc: Gabriele Paoloni; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com; minyard at acm.org;
-> linux-pci at vger.kernel.org; gregkh at linuxfoundation.org; John Garry;
-> will.deacon at arm.com; linux-kernel at vger.kernel.org; Yuanzhichang;
-> Linuxarm; xuwei (O); linux-serial at vger.kernel.org;
-> benh at kernel.crashing.org; zourongrong at gmail.com; liviu.dudau at arm.com;
-> kantyzc at 163.com
-> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
-> Hip06
+On Tue, Sep 20, 2016 at 03:13:51PM +0100, Marc Zyngier wrote:
+> Some systems (such as the VExpress TC2) are built around a CCI-400,
+> which is only accessible from secure mode. This obviously breaks if
+> the system is booted in non-secure mode. Detecting non-secure is
+> pretty hard to do, unless the system is booted from HYP.
 > 
-> On Friday, September 23, 2016 12:27:17 AM CEST zhichang.yuan wrote:
-> > For this patch sketch, I have a question.
-> > Do we call pci_address_to_pio in arch_of_address_to_pio to get the
-> > corresponding logical IO port
-> > for LPC??
+> This small patch series makes sure that:
+> - The CCI ports are not accessed when the kernel is booted from HYP
+> - MCPM (which depends on CCI) is not enabled on VExpress if booted
+> from HYP.
 > 
-> 
-> No, of course not, that would be silly:
-> 
-> The argument to pci_address_to_pio() is a phys_addr_t, and we we don't
-> have one because there is no address associated with your PIO, that
-> is the entire point of your driver!
-> 
-> Also, we already know the mapping because this is what the inb/outb
-> workaround is looking at, so there is absolutely no reason to call it
-> either.
+> This allows a multi_v7_defconfig kernel to be booted on a TC2 booting
+> from HYP, instead of miserably dying very early on.
 
-Ok assume that we do not call pci_address_to_pio() for the ISA bus...
-The LPC driver will register its phys address range in io_range_list,
-then the IPMI driver probe will retrieve its physical address calling
-of_address_to_resource and will use the indirect io to access this
-address.
+As discussed I came up with a different set of patches that
+detect CCI ports status as reported by DT and prevent enabling
+MCPM if the CCI ports are not under kernel control (eg they are
+reported as "disabled" by DT since we booted in HYP).
 
->From the perspective of the indirect IO function the input parameter
-is an unsigned long addr that (now) can be either:
-1) an IO token coming from a legacy pci device
-2) a phys address that lives on the LPC bus
+I will post patches for review and test shortly.
 
-These are conceptually two separate address spaces (and actually they 
-both start from 0).
-
-If the input parameter can live on different address spaces that are
-overlapped, even if I save the used LPC range in arm64_extio_ops->start/end
-there is no way for the indirect IO to tell if the input parameter is
-an I/O token or a phys address that belongs to LPC...  
-
-Am I missing something?
-
-Thanks
-
-Gab
+Thanks for fixing it anyway,
+Lorenzo
 
 > 
-> > If we don't, it seems the LPC specific IO address will conflict with
-> PCI
-> > host bridges' logical IO.
-> >
-> > Supposed our LPC populated the IO range from 0x100 to 0x3FF( this is
-> > normal for ISA similar
-> > devices), after arch_of_address_to_pio(), the r->start will be set as
-> > 0x100, r->end will be set as
-> > 0x3FF.  And if there is one PCI host bridge who request a IO window
-> size
-> > over 0x400 at the same
-> > time, the  corresponding r->start and r->end will be set as 0x0,
-> 0x3FF
-> > after of_address_to_resource
-> > for this host bridge.  Then the IO conflict happens.
+> Marc Zyngier (2):
+>   ARM: vexpress: Do not enable MCPM if booted from HYP
+>   arm-cci: Do not probe the CCI ports if booted from HYP
 > 
-> You would still need to reserve some space in the io_range_list
-> to avoid possible conflicts, which is a bit ugly with the current
-> definition of pci_register_io_range, but I'm sure can be done.
+>  arch/arm/mach-vexpress/platsmp.c |  8 ++++++--
+>  drivers/bus/arm-cci.c            | 11 +++++++++++
+>  2 files changed, 17 insertions(+), 2 deletions(-)
 > 
-> One way I can think of would be to change pci_register_io_range()
-> to just return the logical port number directly (it already
-> knows it!), and pass an invalid physical address (e.g.
-> #define ISA_WORKAROUND_IO_PORT_WINDOW -0x10000) into it for
-> invalid translations.
+> -- 
+> 2.1.4
 > 
-> Another alternative that just occurred to me would be to move
-> the pci_address_to_pio() call from __of_address_to_resource()
-> into of_bus_pci_translate() and then do the special handling
-> for the ISA/LPC bus in of_bus_isa_translate().
-> 
-> 	Arnd
