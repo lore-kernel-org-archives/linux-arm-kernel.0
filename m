@@ -1,62 +1,97 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Sat, 24 Sep 2016 00:02:13 +1000
-Subject: [1/2] pwm: sunxi: allow the pwm to finish its pulse before disable
-In-Reply-To: <1472147411-30424-2-git-send-email-oliver@schinagl.nl>
-References: <1472147411-30424-2-git-send-email-oliver@schinagl.nl>
-Message-ID: <CANwerB2LwWShNEUmNNbuH_4GY90gSpVmrxbC+oLK4p51cxUe2g@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 23 Sep 2016 15:03:03 +0100
+Subject: [PATCH 1/2] ARM: vexpress: refine MCPM smp operations override
+ criteria
+In-Reply-To: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20160923140303.GA26672@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 August 2016 at 03:50,  <oliver@schinagl.nl> wrote:
-> When we inform the PWM block to stop toggeling the output, we may end up
-> in a state where the output is not what we would expect (e.g. not the
-> low-pulse) but whatever the output was at when the clock got disabled.
->
-> To counter this we have to wait for maximally the time of one whole
-> period to ensure the pwm hardware was able to finish. Since we already
-> told the PWM hardware to disable it self, it will not continue toggling
-> but merly finish its current pulse.
->
-> If a whole period is considered to much, it may be contemplated to use a
-> half period + a little bit to ensure we get passed the transition.
->
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+On Fri, Sep 23, 2016 at 02:09:06PM +0100, Lorenzo Pieralisi wrote:
+> Current vexpress smp init code detects whether to override the
+> default smp ops with MCPM smp ops by matching the "cci-400"
+> compatible string, in that MCPM requires control over CCI ports
+> to manage low-power states entry/exit.
+> 
+> The "cci-400" compatible string check is a necessary but not
+> sufficient condition for MCPM to work, because the cci-400
+> can be made visible to the kernel, but firmware can nonetheless
+> disable non-secure CCI ports control, while still allowing PMU
+> access; if booted in non-secure world, the kernel would still
+> blindly override smp operations with MCPM operations, resulting
+> in kernel faults when the CCI ports programming interface is
+> accessed from non-secure world.
+> 
+> This means that the "cci-400" compatible string check would
+> result in a false positive in systems that eg boot in HYP mode,
+> where CCI ports non-secure access is explicitly not allowed,
+> and it is reported in the respective device tree nodes with
+> CCI ports marked as disabled.
+> 
+> Refactor the smp operations initialization to make sure that
+> the kernel is actually allowed to take control over CCI ports
+> (by enabling MCPM smp operations) before overriding default
+> vexpress smp operations.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/pwm/pwm-sun4i.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-> index 03a99a5..5e97c8a 100644
-> --- a/drivers/pwm/pwm-sun4i.c
-> +++ b/drivers/pwm/pwm-sun4i.c
-> @@ -8,6 +8,7 @@
->
->  #include <linux/bitops.h>
->  #include <linux/clk.h>
-> +#include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/module.h>
-> @@ -245,6 +246,16 @@ static void sun4i_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->         spin_lock(&sun4i_pwm->ctrl_lock);
->         val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
->         val &= ~BIT_CH(PWM_EN, pwm->hwpwm);
-> +       sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
-> +       spin_unlock(&sun4i_pwm->ctrl_lock);
+>  arch/arm/mach-vexpress/platsmp.c | 31 ++++++++++++++++++++++++-------
+>  1 file changed, 24 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index 8b8d072..6cfd782 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -26,17 +26,34 @@
+>  bool __init vexpress_smp_init_ops(void)
+>  {
+>  #ifdef CONFIG_MCPM
+> +	int cpu;
+> +	struct device_node *cpu_node, *cci_node;
 > +
-> +       /* Allow for the PWM hardware to finish its last toggle. The pulse
-> +        * may have just started and thus we should wait a full period.
-> +        */
-> +       ndelay(pwm_get_period(pwm));
+>  	/*
+> -	 * The best way to detect a multi-cluster configuration at the moment
+> -	 * is to look for the presence of a CCI in the system.
+> +	 * The best way to detect a multi-cluster configuration
+> +	 * is to detect if the kernel can take over CCI ports
+> +	 * control. Loop over possible CPUs and check if CCI
+> +	 * port control is available.
+>  	 * Override the default vexpress_smp_ops if so.
+>  	 */
+> -	struct device_node *node;
+> -	node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
+> -	if (node && of_device_is_available(node)) {
+> -		mcpm_smp_set_ops();
+> -		return true;
+> +	for_each_possible_cpu(cpu) {
+> +		bool available;
 > +
-> +       spin_lock(&sun4i_pwm->ctrl_lock);
-> +       val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
->         val &= ~BIT_CH(PWM_CLK_GATING, pwm->hwpwm);
->         sun4i_pwm_writel(sun4i_pwm, val, PWM_CTRL_REG);
->         spin_unlock(&sun4i_pwm->ctrl_lock);
+> +		cpu_node = of_get_cpu_node(cpu, NULL);
+> +		if (WARN(!cpu_node, "Missing cpu device node!"))
+> +			return false;
+> +
+> +		cci_node = of_parse_phandle(cpu_node, "cci-control-port", 0);
+> +		available = cci_node && of_device_is_available(cci_node);
+> +		of_node_put(cci_node);
+> +		of_node_put(cpu_node);
+> +
+> +		if (!available)
+> +			return false;
+>  	}
+> +
+> +	mcpm_smp_set_ops();
+> +	return true;
+>  #endif
+>  	return false;
 
-I had some issues where setting the brightness for pwm-backlight to 0
-was not turning off the backlight sometimes.
-This patch fixes the issue for me. Thanks.
+For the records, while moving the code around I missed I was ending
+up with this idiotic double return, I have already reworked the patch
+and will squash changes in the final version if we agree on the bulk of
+the code.
 
-Tested-by: Jonathan Liu <net147@gmail.com>
+Lorenzo
