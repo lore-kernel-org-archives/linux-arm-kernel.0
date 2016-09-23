@@ -1,87 +1,59 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 23 Sep 2016 15:22:19 -0400
-Subject: [PATCH V6 0/5] ECAM quirks handling for ARM64 platforms
-In-Reply-To: <20160923191710.GB16019@localhost>
-References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
- <20160920192636.GB4941@localhost>
- <0429663d51ed8e93fb0c96261dd2ecc7@codeaurora.org>
- <20160921131107.GB10804@localhost>
- <304377c6-554d-60ea-30df-006e557c7279@codeaurora.org>
- <20160922230806.GB1514@localhost>
- <e1b1c38f-0779-82a5-5d3c-b164215a4ed3@codeaurora.org>
- <20160923191710.GB16019@localhost>
-Message-ID: <462d5ee7-5e21-b375-09ed-3c5cfd798ae5@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Sep 2016 21:38:51 +0200
+Subject: [PATCH] serial: stm32: use mapbase instead of membase for DMA
+Message-ID: <20160923193935.3726427-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2016 03:17 PM, Bjorn Helgaas wrote:
-> On Fri, Sep 23, 2016 at 02:41:39PM -0400, Christopher Covington wrote:
->> On 09/22/2016 07:08 PM, Bjorn Helgaas wrote:
->>> On Wed, Sep 21, 2016 at 06:40:47PM -0400, Christopher Covington wrote:
->>>> Hi Bjorn,
->>>>
->>>> On 09/21/2016 09:11 AM, Bjorn Helgaas wrote:
->>>>> On Tue, Sep 20, 2016 at 09:15:14PM -0400, cov at codeaurora.org wrote:
->>>>
->>>>>>> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->>>>>>> index eb14f74..bb3b8ad 100644
->>>>>>> --- a/drivers/acpi/pci_mcfg.c
->>>>>>> +++ b/drivers/acpi/pci_mcfg.c
->>>>>>> @@ -42,86 +42,59 @@ struct mcfg_fixup {
->>>>>>> 	struct resource cfgres;
->>>>>>> };
->>>>>>>
->>>>>>> -#define MCFG_DOM_ANY			(-1)
->>>>>>
->>>>>> Did you delete this because there were no current users, because you'd
->>>>>> prefer users just use "-1", or for some other reason?
->>>>>
->>>>> I removed it because there were no users of it and, more importantly,
->>>>> the code doesn't implement support for it.
->>>>
->>>> It looks like a stale "First match against PCI topology <domain:bus>..."
->>>> comment remains.
->>>
->>> Yep.  I removed the comment since it's sort of obvious from the code.
->>> I also renamed a few things and pulled the match out into a helper
->>> function.
->>>
->>> I also changed the dmesg note: I think the actual resource and the
->>> name of the pci_ecam_ops is more interesting than the table IDs (which
->>> I think are already elsewhere in the dmesg log).
->>
->> It looks like the resource is already being printed from
->> drivers/pci/ecam.c:102.
-> 
-> Yes, but I want a hint that a quirk has overridden it because that's a
-> clue that there's something wonky about the platform or the firmware.
-> 
-> But I guess it'd be nice to mirror the format of the existing info
-> (mem first, then bus range).
-> 
->>> Here's the incremental diff, which I can't really test:
->>
->> Here's what it looks like for me:
->>
->> ACPI: PCI Root Bridge [PCI2] (domain 0002 [bus 00-1f])
->> acpi PNP0A08:02: _OSC: OS supports [ExtendedConfig ASPM ClockPM Segments MSI]
->> acpi PNP0A08:02: _OSC: platform does not support [PCIeHotplug]
->> acpi PNP0A08:02: _OSC: OS now controls [PME AER PCIeCapability]
->> acpi PNP0A08:02: MCFG quirk: ECAM space for [bus 00-1f] at [mem 0xa0000000000-0xa0001ffffff] with pci_3
-> 
-> Is "pci_3" really the entire name?  If not, what happened to the rest?
-> I was hoping for a symbol we could grep for.
+Building this driver with a 64-bit dma_addr_t type results in
+a compiler warning:
 
-The full name is pci_32b_ops. The print overflowed my tmux pane.
+drivers/tty/serial/stm32-usart.c: In function 'stm32_of_dma_rx_probe':
+drivers/tty/serial/stm32-usart.c:746:20: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+drivers/tty/serial/stm32-usart.c: In function 'stm32_of_dma_tx_probe':
+drivers/tty/serial/stm32-usart.c:818:20: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
 
->> acpi PNP0A08:02: ECAM at [mem 0xa0000000000-0xa0001ffffff] for [bus 00-1f]
->> Remapped I/O 0x00000affffff0000 to [io  0x10000-0x1ffff window]
->> PCI host bridge to bus 0002:00
+While the type conversion here is harmless, this hints at a different
+problem: we pass an __iomem pointer into a DMA engine, which expects
+a phys_addr_t. This happens to work because stm32 has no MMU and
+ioremap() is an identity mapping here, but it's still an incorrect
+API use. Using dma_addr_t is doubly wrong here, because that would
+be the result of dma_map_single() rather than the physical address.
 
-Thanks,
-Cov
+Using the mapbase instead fixes multiple issues:
 
+- the warning is gone
+- we don't go through ioremap in error
+- the cast is gone, making it use the correct resource_size_t/phys_addr_t
+  type in the process.
+
+Fixes: 3489187204eb ("serial: stm32: adding dma support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/tty/serial/stm32-usart.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
+index 4d3001b77e7e..2adb678a863b 100644
+--- a/drivers/tty/serial/stm32-usart.c
++++ b/drivers/tty/serial/stm32-usart.c
+@@ -743,7 +743,7 @@ static int stm32_of_dma_rx_probe(struct stm32_port *stm32port,
+ 
+ 	/* Configure DMA channel */
+ 	memset(&config, 0, sizeof(config));
+-	config.src_addr = (dma_addr_t)port->membase + ofs->rdr;
++	config.src_addr = port->mapbase + ofs->rdr;
+ 	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+ 
+ 	ret = dmaengine_slave_config(stm32port->rx_ch, &config);
+@@ -815,7 +815,7 @@ static int stm32_of_dma_tx_probe(struct stm32_port *stm32port,
+ 
+ 	/* Configure DMA channel */
+ 	memset(&config, 0, sizeof(config));
+-	config.dst_addr = (dma_addr_t)port->membase + ofs->tdr;
++	config.dst_addr = port->mapbase + ofs->tdr;
+ 	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+ 
+ 	ret = dmaengine_slave_config(stm32port->tx_ch, &config);
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+2.9.0
