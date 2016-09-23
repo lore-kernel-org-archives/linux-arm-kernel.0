@@ -1,82 +1,177 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 23 Sep 2016 16:16:26 +0300
-Subject: [PATCH] drm/sun4i: rgb: Enable panel after controller
-In-Reply-To: <CANwerB2pmO7AMqmE9SMR1vFFsY5jMUALGSvtd=AvpU1=_jSHUw@mail.gmail.com>
-References: <20160921130304.3486-1-net147@gmail.com>
- <20160921210340.GI8719@lukather>
- <CANwerB2pmO7AMqmE9SMR1vFFsY5jMUALGSvtd=AvpU1=_jSHUw@mail.gmail.com>
-Message-ID: <20160923131626.GX8719@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 23 Sep 2016 14:17:30 +0100
+Subject: [PATCH v6 3/4] arm64: arch_timer: Work around QorIQ Erratum
+ A-008585
+In-Reply-To: <1474533318-7796-3-git-send-email-oss@buserror.net>
+References: <1474533318-7796-1-git-send-email-oss@buserror.net>
+ <1474533318-7796-3-git-send-email-oss@buserror.net>
+Message-ID: <57E52B6A.5070909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2016 at 08:03:31AM +1000, Jonathan Liu wrote:
-> Hi Maxime,
+On 22/09/16 09:35, Scott Wood wrote:
+> Erratum A-008585 says that the ARM generic timer counter "has the
+> potential to contain an erroneous value for a small number of core
+> clock cycles every time the timer value changes".  Accesses to TVAL
+> (both read and write) are also affected due to the implicit counter
+> read.  Accesses to CVAL are not affected.
 > 
-> On Thursday, 22 September 2016, Maxime Ripard <maxime.ripard@free-electrons.
-> com> wrote:
+> The workaround is to reread TVAL and count registers until successive
+> reads return the same value.  Writes to TVAL are replaced with an
+> equivalent write to CVAL.
 > 
-> > On Wed, Sep 21, 2016 at 11:03:04PM +1000, Jonathan Liu wrote:
-> > > The panel should be enabled after the controller so that the panel
-> > > prepare/enable delays are properly taken into account. Similarly, the
-> > > panel should be disabled before the controller so that the panel
-> > > unprepare/disable delays are properly taken into account.
-> > >
-> > > This is useful for avoiding visual glitches.
-> >
-> > This is not really taking any delays into account, especially since
-> > drm_panel_enable and prepare are suppose to block until their
-> > operation is complete.
+> The workaround is to reread TVAL and count registers until successive reads
+> return the same value, and when writing TVAL to retry until counter
+> reads before and after the write return the same value.
 > 
+> The workaround is enabled if the fsl,erratum-a008585 property is found in
+> the timer node in the device tree.  This can be overridden with the
+> clocksource.arm_arch_timer.fsl-a008585 boot parameter, which allows KVM
+> users to enable the workaround until a mechanism is implemented to
+> automatically communicate this information.
 > 
-> drm_panel_prepare turns on power to the LCD using enable-gpios property of
-> the panel and then blocks for prepare delay. The prepare delay for panel
-> can be set to how long it takes between the time the panel is powered to
-> when it is ready to receive images. If backlight property is specified the
-> backlight will be off while the panel is powered on.
+> This erratum can be found on LS1043A and LS2080A.
 > 
-> drm_panel_enable blocks for enable delay and then turns on the backlight.
-> The enable delay can be set to how long it takes for panel to start making
-> the image visible after receiving the first valid frame. For example if the
-> panel starts off as white and the TFT takes some time to initialize to
-> black before it shows the image being received.
+> Signed-off-by: Scott Wood <oss@buserror.net>
+> ---
+> v6:
+> - Addressed feedback from Mark Rutland
 > 
-> Refer to drivers/gpu/drm/panel-panel.simple.c for details.
+> v5:
+> - Export arch_timer_read_ool_enabled so that get_cycles() can be called
+>   from modules.
+> 
+> v4:
+> - Undef ARCH_TIMER_REG_READ after use
+> 
+> v3:
+> - Used cval rather than a loop for the write side of the erratum
+> - Added a Kconfig control
+> - Moved the device tree binding into its own patch
+> - Added erratum to silicon-errata.txt
+> - Changed function names to contain the erratum name
+> - Factored out the setting of erratum versions of set_next_event
+>   to improve readability
+> - Added a comment clarifying that the timeout is arbitrary
+> 
+> v2:
+> Significant rework based on feedback, including using static_key,
+> disabling VDSO counter access rather than adding the workaround to the
+> VDSO, and uninlining the loops.
+> 
+> Dropped the separate property for indicating that writes to TVAL are
+> affected, as I believe that's just a side effect of the implicit
+> counter read being corrupted, and thus a chip that is affected by one
+> will always be affected by the other.
+> 
+> Dropped the arm32 portion as it seems there was confusion about whether
+> LS1021A is affected.  Currently I am being told that it is not
+> affected.
+> 
+> I considered writing to CVAL rather than looping on TVAL writes, but
+> that would still have required separate set_next_event() code for the
+> erratum, and adding CVAL to the enum would have required a bunch of
+> extra handlers in switch statements (even where unused, due to compiler
+> warnings about unhandled enum values) including in an arm32 header.  It
+> seemed better to avoid the arm32 interaction and new untested
+> accessors.
+> 
+> Signed-off-by: Scott Wood <oss@buserror.net>
+> ---
+>  Documentation/arm64/silicon-errata.txt |   2 +
+>  Documentation/kernel-parameters.txt    |   9 +++
+>  arch/arm64/include/asm/arch_timer.h    |  47 ++++++++++++++-
+>  drivers/clocksource/Kconfig            |  10 ++++
+>  drivers/clocksource/arm_arch_timer.c   | 104 +++++++++++++++++++++++++++++++++
+>  5 files changed, 169 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> index 4da60b4..041e3a9 100644
+> --- a/Documentation/arm64/silicon-errata.txt
+> +++ b/Documentation/arm64/silicon-errata.txt
+> @@ -60,3 +60,5 @@ stable kernels.
+>  | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
+>  | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
+>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
+> +|                |                 |                 |                         |
+> +| Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
+> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> index 46c030a..fb4de4d 100644
+> --- a/Documentation/kernel-parameters.txt
+> +++ b/Documentation/kernel-parameters.txt
+> @@ -698,6 +698,15 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>  			loops can be debugged more effectively on production
+>  			systems.
+>  
+> +	clocksource.arm_arch_timer.fsl-a008585=
+> +			[ARM64]
+> +			Format: <bool>
+> +			Enable/disable the workaround of Freescale/NXP
+> +			erratum A-008585.  This can be useful for KVM
+> +			guests, if the guest device tree doesn't show the
+> +			erratum.  If unspecified, the workaround is
+> +			enabled based on the device tree.
+> +
+>  	clearcpuid=BITNUM [X86]
+>  			Disable CPUID feature X for the kernel. See
+>  			arch/x86/include/asm/cpufeatures.h for the valid bit
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index 7ff386c..cddd5b7 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -24,10 +24,51 @@
+>  
+>  #include <linux/bug.h>
+>  #include <linux/init.h>
+> +#include <linux/jump_label.h>
+>  #include <linux/types.h>
+>  
+>  #include <clocksource/arm_arch_timer.h>
+>  
+> +#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585)
+> +extern struct static_key_false arch_timer_read_ool_enabled;
+> +#define needs_fsl_a008585_workaround() \
+> +	static_branch_unlikely(&arch_timer_read_ool_enabled)
+> +#else
+> +#define needs_fsl_a008585_workaround()  false
+> +#endif
+> +
+> +u32 __fsl_a008585_read_cntp_tval_el0(void);
+> +u32 __fsl_a008585_read_cntv_tval_el0(void);
+> +u64 __fsl_a008585_read_cntvct_el0(void);
+> +
+> +/*
+> + * The number of retries is an arbitrary value well beyond the highest number
+> + * of iterations the loop has been observed to take.
+> + */
+> +#define __fsl_a008585_read_reg(reg) ({			\
+> +	u64 _old, _new;					\
+> +	int _retries = 200;				\
+> +							\
+> +	do {						\
+> +		_old = read_sysreg(reg);		\
+> +		_new = read_sysreg(reg);		\
+> +		_retries--;				\
+> +	} while (unlikely(_old != _new) && _retries);	\
+> +							\
+> +	WARN_ON_ONCE(!_retries);			\
+> +	_new;						\
+> +})
+> +
+> +#define arch_timer_unstable_reg_read(reg) 		\
 
->From drm_panel.h:
+I think this name is the only thing I don't like about this patch,
+because it is only unstable if the workaround is on. This is a minor
+thing and it can be addressed when/after merging it. No need to respin
+it on this account.
 
-"""
-* drm_panel_enable - enable a panel
-* @panel: DRM panel
-*
-* Calling this function will cause the panel display drivers to be turned on
-* and the backlight to be enabled. Content will be visible on screen after
-* this call completes.
-"""
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-"""
-* drm_panel_prepare - power on a panel
-* @panel: DRM panel
-*
-* Calling this function will enable power and deassert any reset signals to
-* the panel. After this has completed it is possible to communicate with any
-* integrated circuitry via a command bus.
-"""
+The usual question is "Who takes it?". I'm quite keen on it, as my
+LS2085 is otherwise completely unusable.
 
-Those comments clearly says that the caller should not have to deal
-with the delays, even more so by just moving calls around and hoping
-that the code running in between is adding enough delay for the panel
-to behave properly.
+Thanks,
 
-Maxime
-
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160923/1be13bd7/attachment.sig>
+Jazz is not dead. It just smells funny...
