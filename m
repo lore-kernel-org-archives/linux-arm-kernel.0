@@ -1,44 +1,109 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Sep 2016 07:27:28 -0700
-Subject: Regression in next with "mfd: twl6040: The chip does not support
- bulk access"
-In-Reply-To: <8b8a49cd-ca7b-4580-58ba-3e05d933853e@ti.com>
-References: <20160922180718.kmttyt26t56fa3kp@atomide.com>
- <139a8c7b-8cfe-fa21-634a-4551511f0cea@ti.com>
- <8b8a49cd-ca7b-4580-58ba-3e05d933853e@ti.com>
-Message-ID: <20160923142727.ysj3or2ltlhk5r72@atomide.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 23 Sep 2016 09:27:33 -0500
+Subject: [PATCH 1/2] net: qcom/emac: do not use devm on internal phy pdev
+Message-ID: <1474640854-1698-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [160923 03:20]:
-> On 09/23/16 10:20, Peter Ujfalusi wrote:
-> > On 09/22/16 21:07, Tony Lindgren wrote:
-> >> Hi,
-> >>
-> >> Looks like commit 7a17e47f6403 ("mfd: twl6040: The chip does not
-> >> support bulk access") breaks at least omap4-duovero.
-> > 
-> > That's odd. I see no such errors on omap4 PandaBoard-ES nor on omap5 uEVM.
-> > The IRQ status is one register so even in bulk access it is one read. So the
-> > use_single_rw should have no effect on the access.
-> > 
-> > The only time when regmap would try to use bulk access to twl6040 is when we
-> > execute regcache_sync() on it after resuming the chip and this would fail at
-> > the first time when it tries to restore more than one consecutive registers.
-> > 
-> > I just tested things on next-20160915 and I see no errors at all.
-> 
-> Retested on next-20160923 and I see no issue on Panda-ES or omap5-uevm.
-> 
-> My guess is that you receive an interrupt from twl6040 while the chip is
-> powered down, the regmap is set to cache only. But this has nothing to do with
-> the bulk or non bulk access... Looking at the commit logs and git blame I see
-> no recent change in the driver(s) for twl6040 which changed the way it loads
-> and/or powers up/down.
+The platform_device returned by of_find_device_by_node() is not
+automatically released when the driver unprobes.  Therefore,
+managed calls like devm_ioremap_resource() should not be used.
+Instead, we manually allocate the resources and then free them
+on driver release.
 
-OK yeah this is another one caused by "softirq: fix tasklet_kill() and
-its users".
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/net/ethernet/qualcomm/emac/emac-sgmii.c | 42 +++++++++++++++++++------
+ drivers/net/ethernet/qualcomm/emac/emac.c       |  4 +++
+ 2 files changed, 37 insertions(+), 9 deletions(-)
 
-Thanks,
-
-Tony
+diff --git a/drivers/net/ethernet/qualcomm/emac/emac-sgmii.c b/drivers/net/ethernet/qualcomm/emac/emac-sgmii.c
+index 9a9a963..2a095fb 100644
+--- a/drivers/net/ethernet/qualcomm/emac/emac-sgmii.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac-sgmii.c
+@@ -681,6 +681,7 @@ int emac_sgmii_config(struct platform_device *pdev, struct emac_adapter *adpt)
+ 	struct resource *res;
+ 	const struct of_device_id *match;
+ 	struct device_node *np;
++	int ret;
+ 
+ 	np = of_parse_phandle(pdev->dev.of_node, "internal-phy", 0);
+ 	if (!np) {
+@@ -697,26 +698,49 @@ int emac_sgmii_config(struct platform_device *pdev, struct emac_adapter *adpt)
+ 	match = of_match_device(emac_sgmii_dt_match, &sgmii_pdev->dev);
+ 	if (!match) {
+ 		dev_err(&pdev->dev, "unrecognized internal phy node\n");
+-		return -ENODEV;
++		ret = -ENODEV;
++		goto error_put_device;
+ 	}
+ 
+ 	phy->initialize = (emac_sgmii_initialize)match->data;
+ 
+ 	/* Base address is the first address */
+ 	res = platform_get_resource(sgmii_pdev, IORESOURCE_MEM, 0);
+-	phy->base = devm_ioremap_resource(&sgmii_pdev->dev, res);
+-	if (IS_ERR(phy->base))
+-		return PTR_ERR(phy->base);
++	phy->base = ioremap(res->start, resource_size(res));
++	if (IS_ERR(phy->base)) {
++		ret = PTR_ERR(phy->base);
++		goto error_put_device;
++	}
+ 
+ 	/* v2 SGMII has a per-lane digital digital, so parse it if it exists */
+ 	res = platform_get_resource(sgmii_pdev, IORESOURCE_MEM, 1);
+ 	if (res) {
+-		phy->digital = devm_ioremap_resource(&sgmii_pdev->dev, res);
+-		if (IS_ERR(phy->base))
+-			return PTR_ERR(phy->base);
+-
++		phy->digital = ioremap(res->start, resource_size(res));
++		if (IS_ERR(phy->digital)) {
++			ret = PTR_ERR(phy->digital);
++			goto error_unmap_base;
++		}
+ 	}
+ 
+-	return phy->initialize(adpt);
++	ret = phy->initialize(adpt);
++	if (ret)
++		goto error;
++
++	/* We've remapped the addresses, so we don't need the device any
++	 * more.  of_find_device_by_node() says we should release it.
++	 */
++	put_device(&sgmii_pdev->dev);
++
++	return 0;
++
++error:
++	if (phy->digital)
++		iounmap(phy->digital);
++error_unmap_base:
++	iounmap(phy->base);
++error_put_device:
++	put_device(&sgmii_pdev->dev);
++
++	return ret;
+ }
+ 
+diff --git a/drivers/net/ethernet/qualcomm/emac/emac.c b/drivers/net/ethernet/qualcomm/emac/emac.c
+index e47d387..429b4cb 100644
+--- a/drivers/net/ethernet/qualcomm/emac/emac.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac.c
+@@ -723,6 +723,10 @@ static int emac_remove(struct platform_device *pdev)
+ 	mdiobus_unregister(adpt->mii_bus);
+ 	free_netdev(netdev);
+ 
++	if (adpt->phy.digital)
++		iounmap(adpt->phy.digital);
++	iounmap(adpt->phy.base);
++
+ 	return 0;
+ }
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
