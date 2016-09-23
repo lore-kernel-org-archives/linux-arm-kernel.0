@@ -1,58 +1,92 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Fri, 23 Sep 2016 09:25:00 +0200
-Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <20160915162650.GZ13920@localhost>
-References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
- <20160810173710.GK9681@localhost>
- <20160915162650.GZ13920@localhost>
-Message-ID: <20160923072459.GJ19172@bigcity.dyn.berto.se>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 23 Sep 2016 15:24:08 +0800
+Subject: [PATCH 1/2] dt-bindings: add bindings doc for ZTE VOU display
+ controller
+Message-ID: <1474615449-16893-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+It adds initial bindings doc for ZTE VOU display controller.  HDMI is
+the only supported output device right now.
 
-On 2016-09-15 21:56:51 +0530, Vinod Koul wrote:
-> On Wed, Aug 10, 2016 at 11:07:10PM +0530, Vinod Koul wrote:
-> > On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
-> > > Hi,
-> > > 
-> > > This series tries to solve the problem with DMA with device registers
-> > > (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
-> > > recent patch '9575632 (dmaengine: make slave address physical)'
-> > > clarifies that DMA slave address provided by clients is the physical
-> > > address. This puts the task of mapping the DMA slave address from a
-> > > phys_addr_t to a dma_addr_t on the DMA engine.
-> > > 
-> > > Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
-> > > the same and no special care is needed. However if you have a IOMMU you
-> > > need to map the DMA slave phys_addr_t to a dma_addr_t using something
-> > > like this.
-> > > 
-> > > This series is based on top of v4.8-rc1. And I'm hoping to be able to collect a
-> > > Ack from Russell King on patch 4/6 that adds the ARM specific part and then be
-> > > able to take the whole series through the dmaengine tree. If this is not the
-> > > best route I'm more then happy to do it another way.
-> > > 
-> > > It's tested on a Koelsch with CONFIG_IPMMU_VMSA and by enabling the
-> > > ipmmu_ds node in r8a7791.dtsi. I verified operation by interacting with
-> > > /dev/mmcblk1, i2c and the serial console which are devices behind the
-> > > iommu.
-> > 
-> > As I said in last one, the dmaengine parts look fine to me. But to go thru
-> > dmaengine tree I would need ACK on non dmaengine patches.
-> 
-> I havent heard back from this one and I am inclined to merge this one now.
-> If anyone has any objects, please speak up now...
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ .../devicetree/bindings/display/zte,vou.txt        | 67 ++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/zte,vou.txt
 
-I'm just curios, do you plan to merge this series with Arnds Ack? If not 
-is there anything I can do to help move the series in the right 
-direction?
-
-> 
-> Also ACKs welcome...
-> 
-
+diff --git a/Documentation/devicetree/bindings/display/zte,vou.txt b/Documentation/devicetree/bindings/display/zte,vou.txt
+new file mode 100644
+index 000000000000..b7407219cfa1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/zte,vou.txt
+@@ -0,0 +1,67 @@
++ZTE VOU Display Controller
++
++This is a display controller found on ZTE ZX296718 SoC.  It includes multiple
++Graphic Layer (GL) and Video Layer (VL), two Mixers/Channels, and a few blocks
++handling scaling, color space conversion etc.  VOU also integrates the support
++for typical output devices, like HDMI, TV Encoder, VGA, and RGB LCD.
++
++* Master display-subsystem node
++
++It must be the parent node of all the sub-device nodes.
++
++Required properties:
++ - compatible: should be "zte,zx-display-subsystem"
++ - #address-cells: should be <1>
++ - #size-cells: should be <1>
++ - ranges: to allow probing of sub-devices
++
++* VOU controller device
++
++Required properties:
++ - compatible: should be "zte,zx296718-vou"
++ - reg: Physical base address and length of the whole VOU IO region
++ - interrupts: VOU interrupt number to the CPU
++ - clocks: A list of phandle + clock-specifier pairs, one for each entry
++   in 'clock-names'
++ - clock-names: A list of clock names.  It should contain: "aclk", "ppu_wclk",
++   "main_wclk" and "aux_wclk".
++
++* HDMI output device
++
++Required properties:
++ - compatible: should be "zte,zx296718-hdmi"
++ - reg: Physical base address and length of the HDMI device IO region
++ - interrupts : HDMI interrupt number to the CPU
++ - clocks: A list of phandle + clock-specifier pairs, one for each entry
++   in 'clock-names'
++ - clock-names: A list of clock names.  It should contain: "osc_cec", "osc_clk"
++   and "xclk".
++
++Example:
++
++display-subsystem {
++	compatible = "zte,zx-display-subsystem";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges;
++
++	vou: vou at 1440000 {
++		compatible = "zte,zx296718-vou";
++		reg = <0x1440000 0x10000>;
++		interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&topcrm VOU_ACLK>, <&topcrm VOU_PPU_WCLK>,
++			 <&topcrm VOU_MAIN_WCLK>, <&topcrm VOU_AUX_WCLK>;
++		clock-names = "aclk", "ppu_wclk",
++			      "main_wclk", "aux_wclk";
++	};
++
++	hdmi: hdmi at 144c000 {
++		compatible = "zte,zx296718-hdmi";
++		reg = <0x144c000 0x4000>;
++		interrupts = <GIC_SPI 82 IRQ_TYPE_EDGE_RISING>;
++		clocks = <&topcrm HDMI_OSC_CEC>,
++			 <&topcrm HDMI_OSC_CLK>,
++			 <&topcrm HDMI_XCLK>;
++		clock-names = "osc_cec", "osc_clk", "xclk";
++	};
++};
 -- 
-Regards,
-Niklas S?derlund
+1.9.1
