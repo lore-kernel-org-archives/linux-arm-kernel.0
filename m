@@ -1,38 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 23 Sep 2016 13:00:42 -0500
-Subject: [RFC PATCH v3 2/2] drm/panel: Add support for Chunghwa
- CLAA070WP03XG panel
-In-Reply-To: <1474311771-23321-3-git-send-email-ayaka@soulik.info>
-References: <1474311771-23321-1-git-send-email-ayaka@soulik.info>
- <1474311771-23321-3-git-send-email-ayaka@soulik.info>
-Message-ID: <20160923180042.GA7132@rob-hp-laptop>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Sep 2016 19:02:39 +0100
+Subject: [PATCH V3 01/10] Documentation: DT: qcom_hidma: update binding
+ for MSI
+In-Reply-To: <1473960166-30155-2-git-send-email-okaya@codeaurora.org>
+References: <1473960166-30155-1-git-send-email-okaya@codeaurora.org>
+ <1473960166-30155-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160923180239.GC29830@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 03:02:51AM +0800, Randy Li wrote:
-> The Chunghwa CLAA070WP03XG is a 7" 1280x800 panel, which can be
-> supported by the simple panel driver.
+On Thu, Sep 15, 2016 at 01:22:37PM -0400, Sinan Kaya wrote:
+> Adding a new binding for qcom,hidma-1.1 to distinguish HW supporting
+> MSI interrupts from the older revision.
 > 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  .../display/panel/chunghwa,claa070wp03xg.txt       |  7 ++++++
->  drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
->  2 files changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt
+>  Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt b/Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt
-> new file mode 100644
-> index 0000000..dd22685
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt
-> @@ -0,0 +1,7 @@
-> +Chunghwa Picture Tubes Ltd. 7" WXGA TFT LCD panel
-> +
-> +Required properties:
-> +- compatible: should be "chunghwa,claa070wp03xg"
+> diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+> index fd5618b..47bfb5a 100644
+> --- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+> +++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+> @@ -47,12 +47,23 @@ When the OS is not in control of the management interface (i.e. it's a guest),
+>  the channel nodes appear on their own, not under a management node.
+>  
+>  Required properties:
+> -- compatible: must contain "qcom,hidma-1.0"
+> +- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
+> +for MSI capable HW.
+>  - reg: Addresses for the transfer and event channel
+>  - interrupts: Should contain the event interrupt
+>  - desc-count: Number of asynchronous requests this channel can handle
+>  - iommus: required a iommu node
+>  
+> +Optional properties for MSI:
+> +- msi-parent: pointer to the MSI controller object with the DeviceID in use.
 
-What about VCC, VLED, LED_EN (PWM), LVBIT, LVFMT, DITHER signals?
+The format of msi-cells depends on the particular msi-controller, so no
+need to mention DeviceID here.
 
-> +
-> +This binding is compatible with the simple-panel binding, which is specified
-> +in simple-panel.txt in this directory.
+Please refer to
+Documentation/devicetree/bindings/interrupt-controller/msi.txt
+
+> +Example:
+> + msi_parent: <&msi0 0x80024>
+
+This doesn't match (s/_/-/).
+
+> +msi0 is the MSI controller in the system. Bits 0-5 is the channel ID. 4
+> +is the channel ID. Bits 5-8 is the instance number. This is for the HIDMA
+> +instance 1.
+
+I don't think you need any of this text, so long as you refer to the
+generic MSI binding document, as above.
+
+Thanks,
+Mark.
