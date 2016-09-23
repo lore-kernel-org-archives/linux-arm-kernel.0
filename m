@@ -1,47 +1,72 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 23 Sep 2016 14:11:00 +0100
-Subject: [PATCH] iommu/arm-smmu: Work around ARM DMA configuration
-Message-ID: <f52377644766e4fd5920b8981d9b77872defb436.1474635876.git.robin.murphy@arm.com>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Fri, 23 Sep 2016 13:13:17 +0000
+Subject: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape
+ platforms
+In-Reply-To: <f4195baa-907d-2c00-eb62-d4452ed749c8@arm.com>
+References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
+ <f4195baa-907d-2c00-eb62-d4452ed749c8@arm.com>
+Message-ID: <VI1PR0401MB2638049F479731B3CC903B248DC80@VI1PR0401MB2638.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 32-bit ARM DMA configuration code predates the IOMMU core's default
-domain functionality, and instead relies on allocating its own domains
-and attaching any devices using the generic IOMMU binding to them.
-Unfortunately, it does this relatively early on in the creation of the
-device, before we've seen our add_device callback, which leads us to
-attempt to operate on a half-configured master.
 
-To avoid a crash, check for this situation on attach, but refuse to
-play, as there's nothing we can do. This at least allows VFIO to keep
-working for people who update their 32-bit DTs to the generic binding,
-albeit with a few (innocuous) warnings from the DMA layer on boot.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Friday, September 23, 2016 7:17 AM
+> To: Alison Wang <b18965@freescale.com>; shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
+> Estevam <fabio.estevam@nxp.com>; linux at armlinux.org.uk; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Scott Wood <scott.wood@nxp.com>; Stuart Yoder <stuart.yoder@nxp.com>; Leo Li
+> <leoyang.li@nxp.com>
+> Cc: Jason Jin <jason.jin@nxp.com>
+> Subject: Re: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape platforms
+> 
+> Hi Alison,
+> 
+> On 23/09/16 03:19, Alison Wang wrote:
+> > The ARMv8 architecture supports:
+> > 1. 64-bit execution state, AArch64.
+> > 2. 32-bit execution state, AArch32, that is compatible with previous
+> > versions of the ARM architecture.
+> >
+> > LayerScape platforms are compliant with ARMv8 architecture. This patch
+> > is to support running 32-bit Linux kernel for LayerScape platforms.
+> >
+> > Verified on LayerScape LS1043ARDB, LS1012ARDB, LS1046ARDB boards.
+> >
+> > Signed-off-by: Ebony Zhu <ebony.zhu@nxp.com>
+> > Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> > ---
+> >  arch/arm/Kconfig                    |  9 +++++++++
+> >  arch/arm/mach-imx/Kconfig           | 14 ++++++++++++++
+> >  arch/arm/mach-imx/Makefile          |  4 +++-
+> >  arch/arm/mach-imx/mach-layerscape.c | 23 +++++++++++++++++++++++
+> >  4 files changed, 49 insertions(+), 1 deletion(-)
+> >  create mode 100644 arch/arm/mach-imx/mach-layerscape.c
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index f0c8068..e8d470e 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -294,6 +294,15 @@ config PGTABLE_LEVELS
+> >  	default 3 if ARM_LPAE
+> >  	default 2
+> >
+> > +config ARCH_AARCH32_ES_SUPPORT
+> > +	def_bool n
+> > +	help
+> > +	 The ARMv8 architecture supports 64-bit execution state, AArch64
+> > +	 and 32-bit execution state, AArch32, that is compatible with
+> > +	 previous versions of the ARM architecture.
+> > +
+> > +	 Enable AArch32 execution state support for ARMv8 architecture.
+> 
+> What's this supposed to do, exactly? I've been running 32-bit kernels on
+> my Juno with very little issue (beyond a couple of DT tweaks, and some
+> firmware hacks with a corresponding bit of A64 assembly tacked on the
+> front of the zImage to switch into AArch32 state).
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index c841eb7a1a74..3af7f8f62d0a 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1228,6 +1228,16 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
- 		return -ENXIO;
- 	}
- 
-+	/*
-+	 * FIXME: The arch/arm DMA API code tries to attach devices to its own
-+	 * domains between of_xlate() and add_device() - we have no way to cope
-+	 * with that, so until ARM gets converted to rely on groups and default
-+	 * domains, just say no (but more politely than by dereferencing NULL).
-+	 * This should be at least a WARN_ON once that's sorted.
-+	 */
-+	if (!fwspec->iommu_priv)
-+		return -ENODEV;
-+
- 	smmu = fwspec_smmu(fwspec);
- 	/* Ensure that the domain is finalised */
- 	ret = arm_smmu_init_domain_context(domain, smmu);
--- 
-2.8.1.dirty
+Which arch/arm/mach-* platform are you using for Juno?
+
+Thanks,
+Stuart
