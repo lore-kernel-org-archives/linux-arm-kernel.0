@@ -1,63 +1,58 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 23 Sep 2016 10:20:45 +0300
-Subject: Regression in next with "mfd: twl6040: The chip does not support
- bulk access"
-In-Reply-To: <20160922180718.kmttyt26t56fa3kp@atomide.com>
-References: <20160922180718.kmttyt26t56fa3kp@atomide.com>
-Message-ID: <139a8c7b-8cfe-fa21-634a-4551511f0cea@ti.com>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Fri, 23 Sep 2016 09:25:00 +0200
+Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <20160915162650.GZ13920@localhost>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+ <20160810173710.GK9681@localhost>
+ <20160915162650.GZ13920@localhost>
+Message-ID: <20160923072459.GJ19172@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/16 21:07, Tony Lindgren wrote:
-> Hi,
+Hi Vinod,
+
+On 2016-09-15 21:56:51 +0530, Vinod Koul wrote:
+> On Wed, Aug 10, 2016 at 11:07:10PM +0530, Vinod Koul wrote:
+> > On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
+> > > Hi,
+> > > 
+> > > This series tries to solve the problem with DMA with device registers
+> > > (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
+> > > recent patch '9575632 (dmaengine: make slave address physical)'
+> > > clarifies that DMA slave address provided by clients is the physical
+> > > address. This puts the task of mapping the DMA slave address from a
+> > > phys_addr_t to a dma_addr_t on the DMA engine.
+> > > 
+> > > Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
+> > > the same and no special care is needed. However if you have a IOMMU you
+> > > need to map the DMA slave phys_addr_t to a dma_addr_t using something
+> > > like this.
+> > > 
+> > > This series is based on top of v4.8-rc1. And I'm hoping to be able to collect a
+> > > Ack from Russell King on patch 4/6 that adds the ARM specific part and then be
+> > > able to take the whole series through the dmaengine tree. If this is not the
+> > > best route I'm more then happy to do it another way.
+> > > 
+> > > It's tested on a Koelsch with CONFIG_IPMMU_VMSA and by enabling the
+> > > ipmmu_ds node in r8a7791.dtsi. I verified operation by interacting with
+> > > /dev/mmcblk1, i2c and the serial console which are devices behind the
+> > > iommu.
+> > 
+> > As I said in last one, the dmaengine parts look fine to me. But to go thru
+> > dmaengine tree I would need ACK on non dmaengine patches.
 > 
-> Looks like commit 7a17e47f6403 ("mfd: twl6040: The chip does not
-> support bulk access") breaks at least omap4-duovero.
+> I havent heard back from this one and I am inclined to merge this one now.
+> If anyone has any objects, please speak up now...
 
-That's odd. I see no such errors on omap4 PandaBoard-ES nor on omap5 uEVM.
-The IRQ status is one register so even in bulk access it is one read. So the
-use_single_rw should have no effect on the access.
+I'm just curios, do you plan to merge this series with Arnds Ack? If not 
+is there anything I can do to help move the series in the right 
+direction?
 
-The only time when regmap would try to use bulk access to twl6040 is when we
-execute regcache_sync() on it after resuming the chip and this would fail at
-the first time when it tries to restore more than one consecutive registers.
-
-I just tested things on next-20160915 and I see no errors at all.
-
-> I now get tons of errors:
 > 
-> Skipping twl internal clock init and using bootloader value (unknown osc rate)
-> twl 0-0048: PIH (irq 332) nested IRQs
-> of_get_named_gpiod_flags: parsed 'ti,audpwron-gpio' property of node '/ocp/i2c at 48070000/t
-> wl at 4b[0]' - status (0)
-> omap_i2c 48070000.i2c: bus 0 rev0.10 at 400 kHz
-> twl6040 0-004b: Failed to read IRQ status: -16
-> twl6040 0-004b: Failed to read IRQ status: -16
-> twl6040 0-004b: Failed to read IRQ status: -16
-> twl6040 0-004b: Failed to read IRQ status: -16
-> twl6040 0-004b: Failed to read IRQ status: -16
-> twl6040 0-004b: Failed to read IRQ status: -16
-> twl6040 0-004b: Failed to read IRQ status: -16
-> twl6040 0-004b: Failed to read IRQ status: -16
-> twl6040 0-004b: Failed to read IRQ status: -16
+> Also ACKs welcome...
 > 
-> It seems the regmap irqs don't work with use_single_rw?
-> 
-> Also seems that twl6040 does support bulk access as things have been
-> working earlier?
-
-Things kind of worked as we had single register reads and writes, but when I
-tried to power down/up the twl6040 the regcache_sync() would fail to restore
-the registers at the first place when we had two or more registers to update
-in bulk mode. In that case regmap gives an error, but I have not been checking
-the return of the regcache_sync() so the chip comes up, but not all settings
-were restored.
-
-> Anyways, can you please revert?
-
-Please don't.
-
-On which linux-next version you are seeing this?
 
 -- 
-P?ter
+Regards,
+Niklas S?derlund
