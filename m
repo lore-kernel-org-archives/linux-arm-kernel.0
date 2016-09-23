@@ -1,45 +1,81 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 23 Sep 2016 16:40:57 +0300
-Subject: [PATCH v3 2/3] musb: sunxi: Remove custom babble handling
-In-Reply-To: <20160923134058.26828-1-hdegoede@redhat.com>
-References: <20160923134058.26828-1-hdegoede@redhat.com>
-Message-ID: <20160923134058.26828-2-hdegoede@redhat.com>
+Date: Fri, 23 Sep 2016 16:40:56 +0300
+Subject: [PATCH v3 1/3] phy_sun4i_usb: set_mode: Allow using set_mode to force
+ end the current session
+Message-ID: <20160923134058.26828-1-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The musb core already handles babble interrupts, so the sunxi glue
-having its own custom handling is redundant.
+The sunxi musb has a bug where sometimes it will generate a babble
+error on device disconnect instead of a disconnect irq. When this
+happens the musb-controller switches from host mode to device mode
+(it clears MUSB_DEVCTL_SESSION and sets MUSB_DEVCTL_BDEVICE) and
+gets stuck in this state.
+
+Clearing this requires reporting Vbus low for 200 or more ms, but
+on some devices Vbus is simply always high (host-only mode, no Vbus
+control).
+
+This commit modifies sun4i_usb_phy_set_mode so that it will force
+end the current session when called with the current mode, before this
+commit calling set_mode with the current mode was a nop since id_det
+would stay the same resulting in the detect_work not doing anything.
+
+This allows the sunxi-musb glue to use sun4i_usb_phy_set_mode to force
+end the current session without changing the mode, to fixup the stuck
+state after a babble error.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
 Changes in v2:
--This is a new patch in v2 of this patch series
+-New patch in v2 of this series replacing the
+ "phy-sun4i-usb: Add sun4i_usb_phy_force_session_end() function"
+ from v1
 Changes in v3:
--Improve commit msg
+-Fix dev_info so that it prints the new-mode instead of the old one
 ---
- drivers/usb/musb/sunxi.c | 10 ----------
- 1 file changed, 10 deletions(-)
+ drivers/phy/phy-sun4i-usb.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index 1408245..82eba92 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -186,16 +186,6 @@ static irqreturn_t sunxi_musb_interrupt(int irq, void *__hci)
- 	if (musb->int_usb)
- 		writeb(musb->int_usb, musb->mregs + SUNXI_MUSB_INTRUSB);
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index 43c0d98..cbd338d 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -437,25 +437,31 @@ static int sun4i_usb_phy_set_mode(struct phy *_phy, enum phy_mode mode)
+ {
+ 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+ 	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
++	int new_mode;
  
--	/*
--	 * sunxi musb often signals babble on low / full speed device
--	 * disconnect, without ever raising MUSB_INTR_DISCONNECT, since
--	 * normally babble never happens treat it as disconnect.
--	 */
--	if ((musb->int_usb & MUSB_INTR_BABBLE) && is_host_active(musb)) {
--		musb->int_usb &= ~MUSB_INTR_BABBLE;
--		musb->int_usb |= MUSB_INTR_DISCONNECT;
--	}
--
- 	if ((musb->int_usb & MUSB_INTR_RESET) && !is_host_active(musb)) {
- 		/* ep0 FADDR must be 0 when (re)entering peripheral mode */
- 		musb_ep_select(musb->mregs, 0);
+ 	if (phy->index != 0)
+ 		return -EINVAL;
+ 
+ 	switch (mode) {
+ 	case PHY_MODE_USB_HOST:
+-		data->dr_mode = USB_DR_MODE_HOST;
++		new_mode = USB_DR_MODE_HOST;
+ 		break;
+ 	case PHY_MODE_USB_DEVICE:
+-		data->dr_mode = USB_DR_MODE_PERIPHERAL;
++		new_mode = USB_DR_MODE_PERIPHERAL;
+ 		break;
+ 	case PHY_MODE_USB_OTG:
+-		data->dr_mode = USB_DR_MODE_OTG;
++		new_mode = USB_DR_MODE_OTG;
+ 		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+ 
+-	dev_info(&_phy->dev, "Changing dr_mode to %d\n", (int)data->dr_mode);
++	if (new_mode != data->dr_mode) {
++		dev_info(&_phy->dev, "Changing dr_mode to %d\n", new_mode);
++		data->dr_mode = new_mode;
++	}
++
++	data->id_det = -1; /* Force reprocessing of id */
+ 	data->force_session_end = true;
+ 	queue_delayed_work(system_wq, &data->detect, 0);
+ 
 -- 
 2.9.3
