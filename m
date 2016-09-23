@@ -1,163 +1,82 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 23 Sep 2016 16:15:03 +0300
-Subject: [PATCH 2/3] gpio: Add a driver for the Raspberry Pi's firmware
- GPIO calls.
-In-Reply-To: <CACRpkda6HpJp97FUAh6yvo-BhiDbAXxzQS9U6uT+jvg6hiB8ag@mail.gmail.com>
-References: <20160919161314.25858-1-eric@anholt.net>
- <20160919161314.25858-2-eric@anholt.net>
- <CACRpkda6HpJp97FUAh6yvo-BhiDbAXxzQS9U6uT+jvg6hiB8ag@mail.gmail.com>
-Message-ID: <87mviy92qw.fsf@eliezer.anholt.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 23 Sep 2016 16:16:26 +0300
+Subject: [PATCH] drm/sun4i: rgb: Enable panel after controller
+In-Reply-To: <CANwerB2pmO7AMqmE9SMR1vFFsY5jMUALGSvtd=AvpU1=_jSHUw@mail.gmail.com>
+References: <20160921130304.3486-1-net147@gmail.com>
+ <20160921210340.GI8719@lukather>
+ <CANwerB2pmO7AMqmE9SMR1vFFsY5jMUALGSvtd=AvpU1=_jSHUw@mail.gmail.com>
+Message-ID: <20160923131626.GX8719@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On Thu, Sep 22, 2016 at 08:03:31AM +1000, Jonathan Liu wrote:
+> Hi Maxime,
+> 
+> On Thursday, 22 September 2016, Maxime Ripard <maxime.ripard@free-electrons.
+> com> wrote:
+> 
+> > On Wed, Sep 21, 2016 at 11:03:04PM +1000, Jonathan Liu wrote:
+> > > The panel should be enabled after the controller so that the panel
+> > > prepare/enable delays are properly taken into account. Similarly, the
+> > > panel should be disabled before the controller so that the panel
+> > > unprepare/disable delays are properly taken into account.
+> > >
+> > > This is useful for avoiding visual glitches.
+> >
+> > This is not really taking any delays into account, especially since
+> > drm_panel_enable and prepare are suppose to block until their
+> > operation is complete.
+> 
+> 
+> drm_panel_prepare turns on power to the LCD using enable-gpios property of
+> the panel and then blocks for prepare delay. The prepare delay for panel
+> can be set to how long it takes between the time the panel is powered to
+> when it is ready to receive images. If backlight property is specified the
+> backlight will be off while the panel is powered on.
+> 
+> drm_panel_enable blocks for enable delay and then turns on the backlight.
+> The enable delay can be set to how long it takes for panel to start making
+> the image visible after receiving the first valid frame. For example if the
+> panel starts off as white and the TFT takes some time to initialize to
+> black before it shows the image being received.
+> 
+> Refer to drivers/gpu/drm/panel-panel.simple.c for details.
 
-> On Mon, Sep 19, 2016 at 6:13 PM, Eric Anholt <eric@anholt.net> wrote:
->
->> This driver will be used for accessing the FXL6408 GPIO exander on the
->> Pi3.  We can't drive it directly from Linux because the firmware is
->> continuously polling one of the expander's lines to do its
->> undervoltage detection.
->>
->> Signed-off-by: Eric Anholt <eric@anholt.net>
-> (...)
->
->> +config GPIO_RASPBERRYPI
->> +       tristate "Raspberry Pi firmware-based GPIO access"
->> +       depends on OF_GPIO && RASPBERRYPI_FIRMWARE && (ARCH_BCM2835 || COMPILE_TEST)
->> +       help
->> +         Turns on support for using the Raspberry Pi firmware to
->> +         control GPIO pins.  Used for access to the FXL6408 GPIO
->> +         expander on the Pi 3.
->
-> Maybe it should be named GPIO_RPI_FXL6408 ?
->
-> (No strong opinion.)
+>From drm_panel.h:
 
-See DT binding comment -- I think since this driver has no dependency on
-being to the 6408 on the pi3, we shouldn't needlessly bind it to the
-FXL6408.  (the help comment was just context for why you would want the
-driver today).
+"""
+* drm_panel_enable - enable a panel
+* @panel: DRM panel
+*
+* Calling this function will cause the panel display drivers to be turned on
+* and the backlight to be enabled. Content will be visible on screen after
+* this call completes.
+"""
 
->> +static int rpi_gpio_dir_in(struct gpio_chip *gc, unsigned off)
->> +{
->> +       /* We don't have direction control. */
->> +       return -EINVAL;
->> +}
->> +
->> +static int rpi_gpio_dir_out(struct gpio_chip *gc, unsigned off, int val)
->> +{
->> +       /* We don't have direction control. */
->> +       return -EINVAL;
->> +}
->
-> IMO this should return OK if you try to set it to the direction
-> that the line is hardwired for in that case, not just fail everything.
->
-> If you return errors here, any generic driver that tries to
-> set the line as input or output will fail and then require a
-> second workaround in that driver if it is used on rpi etc etc.
->
-> Try to return zero if the consumer asks for the direction that
-> the line is set to.
->
-> Also implement .get_direction(). Doing so will show how to
-> do the above two calls in the right way.
+"""
+* drm_panel_prepare - power on a panel
+* @panel: DRM panel
+*
+* Calling this function will enable power and deassert any reset signals to
+* the panel. After this has completed it is possible to communicate with any
+* integrated circuitry via a command bus.
+"""
 
-I was worried about the lack of direction support.  The firmware
-interface doesn't give me anything for direction, and a get or set
-of the value doesn't try to set direction.
+Those comments clearly says that the caller should not have to deal
+with the delays, even more so by just moving calls around and hoping
+that the code running in between is adding enough delay for the panel
+to behave properly.
 
-I can try to bother them to give me support for that, but if they
-cooperate on that it means that users will only get HDMI detection once
-they update firmware.
+Maxime
 
-The alternative to new firmware interface would be to provide a bunch of
-DT saying which of these should be in/out at boot time and refuse to
-change them after that.  That seems like a mess, though.
-
->> +static void rpi_gpio_set(struct gpio_chip *gc, unsigned off, int val)
->> +{
->> +       struct rpi_gpio *rpi = container_of(gc, struct rpi_gpio, gc);
->> +       u32 packet[2] = { rpi->offset + off, val };
->> +       int ret;
->> +
->> +       ret = rpi_firmware_property(rpi->firmware,
->> +                                   RPI_FIRMWARE_SET_GPIO_STATE,
->> +                                   &packet, sizeof(packet));
->> +       if (ret)
->> +               dev_err(rpi->dev, "Error setting GPIO %d state: %d\n", off, ret);
->> +}
->> +
->> +static int rpi_gpio_get(struct gpio_chip *gc, unsigned off)
->> +{
->> +       struct rpi_gpio *rpi = container_of(gc, struct rpi_gpio, gc);
->> +       u32 packet[2] = { rpi->offset + off, 0 };
->> +       int ret;
->> +
->> +       ret = rpi_firmware_property(rpi->firmware,
->> +                                   RPI_FIRMWARE_GET_GPIO_STATE,
->> +                                   &packet, sizeof(packet));
->> +       if (ret) {
->> +               dev_err(rpi->dev, "Error getting GPIO state: %d\n", ret);
->> +               return ret;
->> +       } else if (packet[0]) {
->> +               dev_err(rpi->dev, "Firmware error getting GPIO state: %d\n",
->> +                       packet[0]);
->> +               return -EINVAL;
->> +       } else {
->> +               return packet[1];
->> +       }
->
-> You can just remove the last } else { } clause and return on a
-> single line.
->
-> Please do it like this though:
->
-> return !!packet[1];
->
-> So you clamp the returned value to a boolean.
-
-Will do.
-
->> +       rpi->gc.get = rpi_gpio_get;
->> +       rpi->gc.set = rpi_gpio_set;
->> +       rpi->gc.can_sleep = true;
->> +
->> +       ret = gpiochip_add(&rpi->gc);
->> +       if (ret)
->> +               return ret;
->
-> Use devm_gpiochip_add_data() and pass NULL as data
-> so you can still use the devm* function.
-
-Oh, nice.
-
->> diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
->> index 3fb357193f09..671ccd00aea2 100644
->> --- a/include/soc/bcm2835/raspberrypi-firmware.h
->> +++ b/include/soc/bcm2835/raspberrypi-firmware.h
->> @@ -73,11 +73,13 @@ enum rpi_firmware_property_tag {
->>         RPI_FIRMWARE_GET_DISPMANX_RESOURCE_MEM_HANDLE =       0x00030014,
->>         RPI_FIRMWARE_GET_EDID_BLOCK =                         0x00030020,
->>         RPI_FIRMWARE_GET_DOMAIN_STATE =                       0x00030030,
->> +       RPI_FIRMWARE_GET_GPIO_STATE =                         0x00030041,
->>         RPI_FIRMWARE_SET_CLOCK_STATE =                        0x00038001,
->>         RPI_FIRMWARE_SET_CLOCK_RATE =                         0x00038002,
->>         RPI_FIRMWARE_SET_VOLTAGE =                            0x00038003,
->>         RPI_FIRMWARE_SET_TURBO =                              0x00038009,
->>         RPI_FIRMWARE_SET_DOMAIN_STATE =                       0x00038030,
->> +       RPI_FIRMWARE_SET_GPIO_STATE =                         0x00038041,
->
-> Can you please merge this orthogonally into the rpi tree to ARM SoC?
-
-This driver would appear in the rpi downstream tree once we settle the
-driver here.  Or are you asking me to delay this series until I can get
-them to pull just a patch extending the set of packets?
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 800 bytes
+Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160923/83848ae6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160923/1be13bd7/attachment.sig>
