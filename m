@@ -1,26 +1,25 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 23 Sep 2016 14:44:50 -0700
-Subject: [PATCH v3 2/3] clk: mvebu: dynamically allocate resources in
- Armada CP110 system controller
-In-Reply-To: <1474448759-24482-3-git-send-email-mw@semihalf.com>
+Date: Fri, 23 Sep 2016 14:44:48 -0700
+Subject: [PATCH v3 1/3] clk: mvebu: fix setting unwanted flags in CP110
+ gate clock
+In-Reply-To: <1474448759-24482-2-git-send-email-mw@semihalf.com>
 References: <1474448759-24482-1-git-send-email-mw@semihalf.com>
- <1474448759-24482-3-git-send-email-mw@semihalf.com>
-Message-ID: <20160923214450.GE21232@codeaurora.org>
+ <1474448759-24482-2-git-send-email-mw@semihalf.com>
+Message-ID: <20160923214448.GD21232@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/21, Marcin Wojtas wrote:
-> Original commit, which added support for Armada CP110 system controller
-> used global variables for storing all clock information. It worked
-> fine for Armada 7k SoC, with single CP110 block. After dual-CP110 Armada 8k
-> was introduced, the data got overwritten and corrupted.
+> Armada CP110 system controller comprises its own routine responsble
+> for registering gate clocks. Among others 'flags' field in
+> struct clk_init_data was not set, using a random values, which
+> may cause an unpredicted behavior.
 > 
-> This patch fixes the issue by allocating resources dynamically in the
-> driver probe and storing it as platform drvdata.
+> This patch fixes the problem by resetting all fields of clk_init_data
+> before assigning values for all gated clocks of Armada 7k/8k SoCs family.
 > 
 > Fixes: d3da3eaef7f4 ("clk: mvebu: new driver for Armada CP110 system ...")
 > Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > CC: <stable@vger.kernel.org>
 > ---
 
