@@ -1,34 +1,72 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 23 Sep 2016 11:13:38 -0500
-Subject: [PATCH v5 1/6] of: Add vendor prefix for Engicam s.r.l company
-In-Reply-To: <1473967015-8523-2-git-send-email-jagan@amarulasolutions.com>
-References: <1473967015-8523-1-git-send-email-jagan@amarulasolutions.com>
- <1473967015-8523-2-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <20160923161338.GA13871@rob-hp-laptop>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 23 Sep 2016 11:17:55 -0500
+Subject: [PATCH v2 2/2] cpufreq: ti: Add cpufreq driver to determine
+ available OPPs at runtime
+In-Reply-To: <20160923051947.GC17336@vireshk-i7>
+References: <20160901025328.376-1-d-gerlach@ti.com>
+ <20160901025328.376-3-d-gerlach@ti.com> <20160907052053.GO27345@vireshk-i7>
+ <57D02C85.7020300@ti.com> <20160908033909.GR27345@vireshk-i7>
+ <57E2E0BE.3070206@ti.com> <20160923051947.GC17336@vireshk-i7>
+Message-ID: <57E555B3.2010304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 12:46:50AM +0530, Jagan Teki wrote:
-> Engicam providing design services of electronic systems with
-> high content of technology, relying on a long experience in
-> electronic design.
-> 
-> For more info visit
-> http://www.engicam.com/en/
-> 
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v5:
-> 	- none
-> Changes for v4:
-> 	- new patch
-> 
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+On 09/23/2016 12:19 AM, Viresh Kumar wrote:
+> On 21-09-16, 14:34, Dave Gerlach wrote:
+>> Viresh,
+>> On 09/07/2016 10:39 PM, Viresh Kumar wrote:
+>>> On 07-09-16, 10:04, Dave Gerlach wrote:
+>>>>>> +static const struct of_device_id ti_cpufreq_of_match[] = {
+>>>>>> +	{ .compatible = "operating-points-v2-ti-am3352-cpu",
+>>>>>> +	  .data = &am3x_soc_data, },
+>>>>>> +	{ .compatible = "operating-points-v2-ti-am4372-cpu",
+>>>>>> +	  .data = &am4x_soc_data, },
+>>>>>> +	{ .compatible = "operating-points-v2-ti-dra7-cpu",
+>>>>>> +	  .data = &dra7_soc_data },
+>>>>>
+>>>>> You should be using your SoC compatible strings here. OPP compatible
+>>>>> property isn't supposed to be (mis)used for this purpose.
+>>>>>
+>>>>
+>>>> Referring to my comments in patch 1, what if we end up changing the bindings
+>>>> based on DT maintainer comments? We will have these compatible strings, and
+>>>> at that point is it acceptable to match against them? Or is it still better
+>>>> to match to SoC compatibles? I think it makes sense to just probe against
+>>>> these.
+>>>
+>>> But even then I think these are not correct. You should have added a
+>>> single compatible string: operating-points-v2-ti-cpu.
+>>>
+>>> As the properties will stay the same across machines. And then you
+>>> need to use SoC strings here.
+>>>
+>>
+>> Are you opposed to moving _of_get_opp_desc_node from
+>> drivers/base/power/opp/opp.h to include/linux/pm_opp.h and renaming it
+>> appropriately?
+>
+> I am not opposed to that, but ...
+>
+>> If I move the ti properties out of the cpu node, as discussed in patch 1 of
+>> this series, and into the operating-points-v2 table, I need a way to get the
+>> operating-points-v2 device node and I think it makes sense to reuse this as
+>> it is what the opp framework uses internally to parse the phandle to the opp
+>> table.
+>
+> I am not sure if those registers belong to the OPP bindings. What are those
+> registers really? What all can be read from them? Why shouldn't they be present
+> as a separate node in DT on the respective bus? Look at how it is done for
+> sti-cpufreq driver.
+>
 
-Acked-by: Rob Herring <robh@kernel.org>
+The sti-cpufreq driver in v4.8-rc7 appears to do what I am already doing 
+in this revision of the patch, reading from a syscon phandle that is 
+part of the cpu node in the DT which is what I was told not to do.
+
+The register I am referencing in the syscon is a bit-field describing 
+which OPPs are valid for the system, so it is very relevant to the OPP 
+binding. They really are already present in a separate node, I'm just 
+indexing into a syscon, same as the sti-cpufreq driver appears to be doing.
+
+Regards,
+Dave
