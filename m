@@ -1,33 +1,33 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 23 Sep 2016 14:46:48 +0200
-Subject: [PATCH v6] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <D82BA95A-A89E-46EB-93D2-197DF44433EC@suse.de>
-References: <1474628854-69945-1-git-send-email-agraf@suse.de>
- <dd9267b6-2323-2d74-0553-71a89d05a654@redhat.com>
- <D82BA95A-A89E-46EB-93D2-197DF44433EC@suse.de>
-Message-ID: <55ac71d8-7e92-aa57-9856-5fc48a7f8357@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 23 Sep 2016 16:02:20 +0300
+Subject: [PATCH v5 1/3] ASoC: sun4i-codec: Rename sun4i_codec_widgets for
+ consistency
+In-Reply-To: <20160922071313.12891-2-dannym@scratchpost.org>
+References: <20160922071313.12891-1-dannym@scratchpost.org>
+ <20160922071313.12891-2-dannym@scratchpost.org>
+Message-ID: <20160923130220.GW8719@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Thu, Sep 22, 2016 at 09:13:11AM +0200, Danny Milosavljevic wrote:
+> ASoC: sun4i-codec: Rename "sun4i_codec_widgets" to "sun4i_codec_controls" for
+> consistency with the struct field name.
 
-On 23/09/2016 14:36, Alexander Graf wrote:
->>>
->>> +        if ((ret == 1) && timer_ret) {
->>> +            /*
->>> +             * We have to exit straight away to ensure that we only
->>> +             * ever notify user space once about a level change
->>> +             */
->>
->> Is this really a requirement?  It complicates the logic noticeably.
-> 
-> The alternative would be to track the state on ioctl entry, which
-> Christoffer disliked :).
+Your commit log still has the flaws your other patches had in the
+previous version.
 
-Ok, I see.  Maybe he's convinced by the ugly code. :)
+Maxime
 
-It's not an architectural concept, it's a KVM API concept.  Tracking the
-state on entry just the equivalent of making this vmexit edge-triggered
-(both rising and falling edge).
-
-Paolo
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160923/3e8272c4/attachment.sig>
