@@ -1,34 +1,61 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 23 Sep 2016 11:19:40 +0200
-Subject: [PATCH v5] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <70fc788d-f99e-4ba5-67a2-da9c1a857dfe@suse.de>
-References: <1474548769-195643-1-git-send-email-agraf@suse.de>
- <20160922212831.GD9101@cbox> <d90f04d4-b29f-f08e-df39-ec307af44225@suse.de>
- <63a1e3a2-f551-017f-b6be-593b53a0b407@redhat.com>
- <7afbc08e-0ba2-d6fd-c1ed-e5822e05c00b@suse.de>
- <e4c08096-03bd-3ec3-998d-41643992ab1a@redhat.com>
- <70fc788d-f99e-4ba5-67a2-da9c1a857dfe@suse.de>
-Message-ID: <71706c4a-3182-2308-8273-12aba35fccc6@redhat.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 23 Sep 2016 18:27:07 +0900
+Subject: [PATCH v2 0/3] arm64: kgdb: fix single stepping
+In-Reply-To: <20160923084341.GA32342@kroah.com>
+References: <20160923073327.9657-1-takahiro.akashi@linaro.org>
+ <20160923081618.GH18056@kroah.com>
+ <20160923083257.GL30248@linaro.org>
+ <20160923084341.GA32342@kroah.com>
+Message-ID: <20160923092706.GN30248@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 23, 2016 at 10:43:41AM +0200, Greg KH wrote:
+> On Fri, Sep 23, 2016 at 05:32:58PM +0900, AKASHI Takahiro wrote:
+> > On Fri, Sep 23, 2016 at 10:16:18AM +0200, Greg KH wrote:
+> > > On Fri, Sep 23, 2016 at 04:33:24PM +0900, AKASHI Takahiro wrote:
+> > > > Kgdb support on arm64 was merged in v3.15, but from its first appearance,
+> > > > "signle step" has never worked well.
+> > > > 
+> > > > This patch fixes all the error cases I found so far.
+> > > > The original patch[1] was splitted into three pieces, ones for each case.
+> > > > patch#1, #2 should be applied to all the version, v3.15 and later.
+> > > > pathc#3 only for v3.16 and later.
+> > > 
+> > > As this is not a regression (i.e. it has never worked), why is this
+> > > something for stable releases?
+> > 
+> > Because, I think, that is a bug.
+> > The author seems to have believed that it worked.
+> > Please see:
+> >   commit 44679a4f
+> >   Author: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+> >   Date:   Tue Jan 28 11:20:19 2014 +0000
+> > 
+> >       arm64: KGDB: Add step debugging support
+> 
+> Yes, but again, it didn't work, so this would be a new feature.
 
+Yes, but again, it's a bug of kgdb on arm64 which is supposed
+to have been available since v3.15.
 
-On 23/09/2016 11:17, Alexander Graf wrote:
->> > 
->> > On the other hand, what happens if you run new QEMU with old userspace?
->> > With user_timer_pending you'd get an infinite stream of vmexits the
->> > first time the timer fires, wouldn't you?  Whereas if you keep it in the
->> > kernel, userspace would simply not get the interrupt (because it doesn't
->> > know about kernel_timer_pending) and think it got a spurious vmexit.
->> > The kernel's IRQ would stay masked and everything would just (not) work
->> > like before your patch?
-> Yes, we'd definitely stay more compatible by tracking it only in the
-> kernel. I'm not fully convinced that it's the better interface, but
-> since both Christoffer and you seem to choke on that part, I'll give it
-> a stab ;).
+> One
+> that obviously people aren't using in the stable kernels, otherwise they
+> would have noticed in the past 2 years about it being broken :)
 
-Cool!  FWIW my suggestion for kernel_timer_pending's name would be
-timer_irq_level (nicely matching timer->irq.level in the kernel).
+Totally agree. That is also why I've left this patch untouched
+for a long time. But recently a guy asked me about kgdb, saying that
+single step didn't work on his platform. He re-discovered this bug.
+He doesn't use stable kernels, but Linaro's LSK (v4.4), though :)
 
-Paolo
+> Please read Documentation/stable_kernel_rules.txt for the requirements
+> of a stable kernel patch.  I don't think this series meets those rules.
+
+Please re-think about merging this patch.
+
+Thanks,
+-Takahiro AKASHI
+
+> thanks,
+> 
+> greg k-h
