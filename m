@@ -1,124 +1,56 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 23 Sep 2016 11:22:48 +0200
-Subject: [PATCH v5] KVM: arm/arm64: Route vtimer events to user space
-In-Reply-To: <7afbc08e-0ba2-d6fd-c1ed-e5822e05c00b@suse.de>
-References: <1474548769-195643-1-git-send-email-agraf@suse.de>
- <20160922212831.GD9101@cbox>
- <d90f04d4-b29f-f08e-df39-ec307af44225@suse.de>
- <63a1e3a2-f551-017f-b6be-593b53a0b407@redhat.com>
- <7afbc08e-0ba2-d6fd-c1ed-e5822e05c00b@suse.de>
-Message-ID: <20160923092248.GF9101@cbox>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 23 Sep 2016 11:23:33 +0200
+Subject: [PATCH v2 0/3] arm64: kgdb: fix single stepping
+In-Reply-To: <20160923092706.GN30248@linaro.org>
+References: <20160923073327.9657-1-takahiro.akashi@linaro.org>
+ <20160923081618.GH18056@kroah.com>
+ <20160923083257.GL30248@linaro.org>
+ <20160923084341.GA32342@kroah.com>
+ <20160923092706.GN30248@linaro.org>
+Message-ID: <20160923092333.GB1071@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 11:10:46AM +0200, Alexander Graf wrote:
+On Fri, Sep 23, 2016 at 06:27:07PM +0900, AKASHI Takahiro wrote:
+> On Fri, Sep 23, 2016 at 10:43:41AM +0200, Greg KH wrote:
+> > On Fri, Sep 23, 2016 at 05:32:58PM +0900, AKASHI Takahiro wrote:
+> > > On Fri, Sep 23, 2016 at 10:16:18AM +0200, Greg KH wrote:
+> > > > On Fri, Sep 23, 2016 at 04:33:24PM +0900, AKASHI Takahiro wrote:
+> > > > > Kgdb support on arm64 was merged in v3.15, but from its first appearance,
+> > > > > "signle step" has never worked well.
+> > > > > 
+> > > > > This patch fixes all the error cases I found so far.
+> > > > > The original patch[1] was splitted into three pieces, ones for each case.
+> > > > > patch#1, #2 should be applied to all the version, v3.15 and later.
+> > > > > pathc#3 only for v3.16 and later.
+> > > > 
+> > > > As this is not a regression (i.e. it has never worked), why is this
+> > > > something for stable releases?
+> > > 
+> > > Because, I think, that is a bug.
+> > > The author seems to have believed that it worked.
+> > > Please see:
+> > >   commit 44679a4f
+> > >   Author: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+> > >   Date:   Tue Jan 28 11:20:19 2014 +0000
+> > > 
+> > >       arm64: KGDB: Add step debugging support
+> > 
+> > Yes, but again, it didn't work, so this would be a new feature.
 > 
-> 
-> On 23.09.16 10:57, Paolo Bonzini wrote:
-> > 
-> > 
-> > On 23/09/2016 09:14, Alexander Graf wrote:
-> >>>> +/*
-> >>>> + * Synchronize the timer IRQ state with the interrupt controller.
-> >>>> + */
-> >>>>  static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
-> >>>>  {
-> >>>>  	int ret;
-> >>>>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> >>>>  
-> >>>>  	timer->active_cleared_last = false;
-> >>>>  	timer->irq.level = new_level;
-> >>>> -	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
-> >>>> +	trace_kvm_timer_update_irq(vcpu->vcpu_id, host_vtimer_irq,
-> >>>>  				   timer->irq.level);
-> >>>> +	[...]
-> >>>> +		struct kvm_sync_regs *regs = &vcpu->run->s.regs;
-> >>>> +
-> >>>> +		/* Populate the timer bitmap for user space */
-> >>>> +		regs->kernel_timer_pending &= ~KVM_ARM_TIMER_VTIMER;
-> >>>> +		if (new_level)
-> >>>> +			regs->kernel_timer_pending |= KVM_ARM_TIMER_VTIMER;
-> >>>
-> >>> I think if you got here, it means you have to exit to userspace to
-> >>> update it of the new state.  If you don't want to propagate a return
-> >>
-> >> Yes, but we can't exit straight away with our own exit reason because we
-> >> might be inside an MMIO exit path here which already occupies the
-> >> exit_reason.
-> > 
-> > So the idea is that whenever you're here you have one of the following
-> > cases:
-> > 
-> > - are coming from kvm_timer_flush_hwstate, and then you exit immediately
-> > with KVM_EXIT_INTR if needed
-> > 
-> > - you are coming from the kvm_timer_sync_hwstate just before
-> > handle_exit.  Then if there's a vmexit you have already set
-> > regs->kernel_timer_pending, if not you'll do a kvm_timer_flush_hwstate soon.
-> > 
-> > - you are coming from the kvm_timer_sync_hwstate in the middle of
-> > kvm_arch_vcpu_ioctl_run, and then "continue" will either exit the loop
-> > immediately (if ret <= 0) or go to kvm_timer_flush_hwstate as in the
-> > previous case
-> > 
-> > Right?
-> 
-> Yup :)
-> 
-> > 
-> >>> Maybe I'm misunderstanding and user_timer_pending is just a cached
-> >>> verison of what you said last, but as I said above, I think you can just
-> >>> compare timer->irq.level with the last value the kvm_run struct, and if
-> >>> something changed, you have to exit.
-> >>
-> >> So how would user space know whether the line went up or down? Or didn't
-> >> change at all (if we coalesce with an MMIO exit)?
-> > 
-> > It would save the status of the line somewhere in its own variable,
-> > without introducing a relatively delicate API between kernel and user.
-> > 
-> > I agree that you cannot update kernel_timer_pending only in
-> > flush_hwstate; otherwise you miss on case (2) when there is a vmexit.
-> > That has to stay in kvm_timer_sync_hwstate (or it could become a new
-> > function called at the very end of kvm_arch_vcpu_ioctl_run).
-> 
-> The beauty of having it in the timer update function is that it gets
-> called from flush_hwstate() as well. That way we catch the update also
-> in cases where we need it before we enter the vcpu.
-> 
-> > However, I'm not sure why user_timer_pending is necessary.  If it is
-> > just the value you assigned to regs->kernel_timer_pending at the time of
-> > the previous vmexit, can kvm_timer_flush_hwstate just do
-> > 
-> >    if (timer->prev_kernel_timer_pending != regs->kernel_timer_pending) {
-> >        timer->prev_kernel_timer_pending = regs->kernel_timer_pending;
-> >        return 1;
-> >    }
-> > 
-> > ?  Or even
-> > 
-> >    if (timer->prev_irq_level != timer->irq.level) {
-> >        timer->prev_irq_level = regs->irq.level;
-> >        return 1;
-> >    }
-> > 
-> > so that regs->kernel_timer_pending remains exclusively
-> > kvm_timer_sync_hwstate's business?
-> 
-> We could do that too, yes. But it puts more burden on user space - it
-> would have to ensure that it *always* checks for the pending timer
-> status. With this approach, user space may opt to only check for timer
-> state changes on -EINTR and things would still work.
-> 
-Huh?  I thought the whole point was that you could piggy back on an MMIO
-exit with a change in the line state, for example.  So I don't
-understand this.
+> Yes, but again, it's a bug of kgdb on arm64 which is supposed
+> to have been available since v3.15.
 
-In any case, exposing internal historical state only used by the kernel
-to figure out whether or not it should force an exit if there's not
-already one happening, to user space, just feels weird to me, and my
-emphasis is on having a clean timer emulation component in the kernel
-where the semantics are clear.  Have a look at my proposal in the other
-mail on this thread.
+But it wasn't ever working, so it's not a regression or a bugfix, sorry.
 
--Christoffer
+> > Please read Documentation/stable_kernel_rules.txt for the requirements
+> > of a stable kernel patch.  I don't think this series meets those rules.
+> 
+> Please re-think about merging this patch.
+
+It's not even in Linus's tree yet, so there's nothing for me to merge
+anywhere.
+
+thanks,
+
+greg k-h
