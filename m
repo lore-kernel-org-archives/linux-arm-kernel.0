@@ -1,83 +1,156 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 23 Sep 2016 22:05:57 +0300
-Subject: Regression in next with "mfd: twl6040: The chip does not support
- bulk access"
-In-Reply-To: <06e0406c-3ff0-a069-a48a-0b1b82872f98@oracle.com>
-References: <20160922180718.kmttyt26t56fa3kp@atomide.com>
- <139a8c7b-8cfe-fa21-634a-4551511f0cea@ti.com>
- <20160923142634.zkaqxmiif22kws2e@atomide.com>
- <06e0406c-3ff0-a069-a48a-0b1b82872f98@oracle.com>
-Message-ID: <663a8a97-f01f-ce10-b0c6-c1a5ca0f11d2@ti.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 23 Sep 2016 14:17:10 -0500
+Subject: [PATCH V6 0/5] ECAM quirks handling for ARM64 platforms
+In-Reply-To: <e1b1c38f-0779-82a5-5d3c-b164215a4ed3@codeaurora.org>
+References: <1473449047-10499-1-git-send-email-tn@semihalf.com>
+ <20160920192636.GB4941@localhost>
+ <0429663d51ed8e93fb0c96261dd2ecc7@codeaurora.org>
+ <20160921131107.GB10804@localhost>
+ <304377c6-554d-60ea-30df-006e557c7279@codeaurora.org>
+ <20160922230806.GB1514@localhost>
+ <e1b1c38f-0779-82a5-5d3c-b164215a4ed3@codeaurora.org>
+Message-ID: <20160923191710.GB16019@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2016 06:24 PM, Santosh Shilimkar wrote:
-> On 9/23/2016 7:26 AM, Tony Lindgren wrote:
->> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160923 00:21]:
->>> On 09/22/16 21:07, Tony Lindgren wrote:
+On Fri, Sep 23, 2016 at 02:41:39PM -0400, Christopher Covington wrote:
+> On 09/22/2016 07:08 PM, Bjorn Helgaas wrote:
+> > On Wed, Sep 21, 2016 at 06:40:47PM -0400, Christopher Covington wrote:
+> >> Hi Bjorn,
+> >>
+> >> On 09/21/2016 09:11 AM, Bjorn Helgaas wrote:
+> >>> On Tue, Sep 20, 2016 at 09:15:14PM -0400, cov at codeaurora.org wrote:
+> >>
+> >>>>> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> >>>>> index eb14f74..bb3b8ad 100644
+> >>>>> --- a/drivers/acpi/pci_mcfg.c
+> >>>>> +++ b/drivers/acpi/pci_mcfg.c
+> >>>>> @@ -42,86 +42,59 @@ struct mcfg_fixup {
+> >>>>> 	struct resource cfgres;
+> >>>>> };
+> >>>>>
+> >>>>> -#define MCFG_DOM_ANY			(-1)
+> >>>>
+> >>>> Did you delete this because there were no current users, because you'd
+> >>>> prefer users just use "-1", or for some other reason?
+> >>>
+> >>> I removed it because there were no users of it and, more importantly,
+> >>> the code doesn't implement support for it.
+> >>
+> >> It looks like a stale "First match against PCI topology <domain:bus>..."
+> >> comment remains.
+> > 
+> > Yep.  I removed the comment since it's sort of obvious from the code.
+> > I also renamed a few things and pulled the match out into a helper
+> > function.
+> > 
+> > I also changed the dmesg note: I think the actual resource and the
+> > name of the pci_ecam_ops is more interesting than the table IDs (which
+> > I think are already elsewhere in the dmesg log).
 > 
-> [...]
-> 
->>> On which linux-next version you are seeing this?
->>
->> This was with next-20160922. But testing it again this is just another
->> regression caused by "softirq: fix tasklet_kill() and its users", so adding
->> Santosh to Cc.
->>
->> So no need to revert $subject patch.
->>
-> So your driver also looks like fiddling with tasklet core structures if
-> you got impacted because of the core change.
+> It looks like the resource is already being printed from
+> drivers/pci/ecam.c:102.
 
-How is that? None of the drivers in the twl6040 stack uses tasklets
-explicitly. The core uses regmap_irq and the drivers use threaded irq when
-they need interrupt handling, but no tasklet, no fiddling with internals.
+Yes, but I want a hint that a quirk has overridden it because that's a
+clue that there's something wonky about the platform or the firmware.
 
--- 
-P?ter
+But I guess it'd be nice to mirror the format of the existing info
+(mem first, then bus range).
 
-> After the merge window
-> am going to take stab at bad users of tasklet but below is
-> quick snap shot conversation I had with Thomas and Andrew...
+> > Here's the incremental diff, which I can't really test:
 > 
-> ------------------------------------------------------------------
-> B1;2802;0cOn Wed, 21 Sep 2016, Santosh Shilimkar wrote:
->> I requested you to include this patch but now am not sure anymore.
->> Looks like there are almost 30 more users which are directly
->> tweaking 'tasklet_struct' fields and calling other APIs. Hunting them
->> and fixing them probably would be an exercise and also those changes
->> needs those changed drivers to be tested.
->>
->> What do you suggest ? At least this patch needs to be dropped as of now
->> till we can have complete coverage for those bad users.
+> Here's what it looks like for me:
 > 
-> Yes, it needs to be dropped. Stephen, can you please revert it from next?
+> ACPI: PCI Root Bridge [PCI2] (domain 0002 [bus 00-1f])
+> acpi PNP0A08:02: _OSC: OS supports [ExtendedConfig ASPM ClockPM Segments MSI]
+> acpi PNP0A08:02: _OSC: platform does not support [PCIeHotplug]
+> acpi PNP0A08:02: _OSC: OS now controls [PME AER PCIeCapability]
+> acpi PNP0A08:02: MCFG quirk: ECAM space for [bus 00-1f] at [mem 0xa0000000000-0xa0001ffffff] with pci_3
+
+Is "pci_3" really the entire name?  If not, what happened to the rest?
+I was hoping for a symbol we could grep for.
+
+> acpi PNP0A08:02: ECAM at [mem 0xa0000000000-0xa0001ffffff] for [bus 00-1f]
+> Remapped I/O 0x00000affffff0000 to [io  0x10000-0x1ffff window]
+> PCI host bridge to bus 0002:00
 > 
-> How to fix this: The only way is to review all tasklet usage sites for
-> creative abuse and then fix them one by one. This needs to be done anyway
-> because those are ticking timebombs even without changes in the core
-> code. I looked at one of the offenders and it's broken today, it's just
-> protected by the extremly low probablity to hit the wreckage case.
+> > diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> > index 245b79f..0b36bc5 100644
+> > --- a/drivers/acpi/pci_mcfg.c
+> > +++ b/drivers/acpi/pci_mcfg.c
+> > @@ -36,7 +36,7 @@ struct mcfg_fixup {
+> >  	char oem_id[ACPI_OEM_ID_SIZE + 1];
+> >  	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
+> >  	u32 oem_revision;
+> > -	u16 seg;
+> > +	u16 segment;
+> >  	struct resource bus_range;
+> >  	struct pci_ecam_ops *ops;
+> >  	struct resource cfgres;
+> > @@ -102,30 +102,37 @@ static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
+> >  static char mcfg_oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
+> >  static u32 mcfg_oem_revision;
+> >  
+> > -static void pci_mcfg_match_quirks(struct acpi_pci_root *root,
+> > +static int pci_mcfg_quirk_matches(struct mcfg_fixup *f, u16 segment,
+> > +				  struct resource *bus_range)
+> > +{
+> > +	if (!memcmp(f->oem_id, mcfg_oem_id, ACPI_OEM_ID_SIZE) &&
+> > +	    !memcmp(f->oem_table_id, mcfg_oem_table_id,
+> > +	            ACPI_OEM_TABLE_ID_SIZE) &&
+> > +	    f->oem_revision == mcfg_oem_revision &&
+> > +	    f->segment == segment &&
+> > +	    resource_contains(&f->bus_range, bus_range))
+> > +		return 1;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void pci_mcfg_apply_quirks(struct acpi_pci_root *root,
+> >  				  struct resource *cfgres,
+> >  				  struct pci_ecam_ops **ecam_ops)
+> >  {
+> > +	u16 segment = root->segment;
+> > +	struct resource *bus_range = &root->secondary;
+> >  	struct mcfg_fixup *f;
+> >  	int i;
+> >  
+> > -	/*
+> > -	 * First match against PCI topology <domain:bus> then use OEM ID, OEM
+> > -	 * table ID, and OEM revision from MCFG table standard header.
+> > -	 */
+> >  	for (i = 0, f = mcfg_quirks; i < ARRAY_SIZE(mcfg_quirks); i++, f++) {
+> > -		if (!memcmp(f->oem_id, mcfg_oem_id, ACPI_OEM_ID_SIZE) &&
+> > -		    !memcmp(f->oem_table_id, mcfg_oem_table_id,
+> > -		            ACPI_OEM_TABLE_ID_SIZE) &&
+> > -		    f->oem_revision == mcfg_oem_revision &&
+> > -		    f->seg == root->segment &&
+> > -		    resource_contains(&f->bus_range, &root->secondary)) {
+> > +		if (pci_mcfg_quirk_matches(f, segment, bus_range)) {
+> >  			if (f->cfgres.start)
+> >  				*cfgres = f->cfgres;
+> >  			if (f->ops)
+> >  				*ecam_ops =  f->ops;
+> > -			dev_info(&root->device->dev, "Applying PCI MCFG quirks for %s %s rev: %d\n",
+> > -				 f->oem_id, f->oem_table_id, f->oem_revision);
+> > +			dev_info(&root->device->dev, "MCFG quirk: ECAM space for %pR at %pR with %ps\n",
+> > +				 bus_range, cfgres, *ecam_ops);
+> >  			return;
+> >  		}
+> >  	}
+> > @@ -173,7 +180,7 @@ skip_lookup:
+> >  	 * MCFG does not have it.  Invalid CFG start address means MCFG
+> >  	 * firmware bug or we need another quirk in array.
+> >  	 */
+> > -	pci_mcfg_match_quirks(root, &res, &ops);
+> > +	pci_mcfg_apply_quirks(root, &res, &ops);
+> >  	if (!res.start)
+> >  		return -ENXIO;
+> >  
+> > 
 > 
-> What you can do to coerce the developers/maintainers of offending code into
-> looking at the mess they created/merged is to implement accessors for the
-> tasklet struct fields and replace the open coded fiddling with them.
 > 
-> Once that is done, rename the struct fields to something which is absurd
-> enough to type.  But don't worry, you will find people doing that. I
-> catched a few brainwrecks who actually used:
-> 
->  irqdesc->core_internal_state__do_not_mess_with_it
-> 
-> in their code.
-> 
-> Now after having everything converted to accessors, you can add sanity
-> checks into the accessors and emit WARN_ONCE() when they are used in the
-> wrong context. That'll make them look and explain why they think that
-> fiddling in the internals is a good idea.
-> 
-> Thanks,
-> 
->     tglx
-> ------------------------------------------------------------------
-> 
+> -- 
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+> Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+> Aurora Forum, a Linux Foundation Collaborative Project.
