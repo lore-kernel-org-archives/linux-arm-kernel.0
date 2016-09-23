@@ -1,38 +1,43 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 23 Sep 2016 13:19:43 +0300
-Subject: Regression in next with "mfd: twl6040: The chip does not support
- bulk access"
-In-Reply-To: <139a8c7b-8cfe-fa21-634a-4551511f0cea@ti.com>
-References: <20160922180718.kmttyt26t56fa3kp@atomide.com>
- <139a8c7b-8cfe-fa21-634a-4551511f0cea@ti.com>
-Message-ID: <8b8a49cd-ca7b-4580-58ba-3e05d933853e@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Sep 2016 11:23:40 +0100
+Subject: [PATCH v2.1] arm64: kgdb: handle read-only text / modules
+In-Reply-To: <20160923094953.GC27704@e104818-lin.cambridge.arm.com>
+References: <20160923074208.9899-1-takahiro.akashi@linaro.org>
+ <20160923094953.GC27704@e104818-lin.cambridge.arm.com>
+Message-ID: <20160923102340.GA2161@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/16 10:20, Peter Ujfalusi wrote:
-> On 09/22/16 21:07, Tony Lindgren wrote:
->> Hi,
->>
->> Looks like commit 7a17e47f6403 ("mfd: twl6040: The chip does not
->> support bulk access") breaks at least omap4-duovero.
+On Fri, Sep 23, 2016 at 10:49:53AM +0100, Catalin Marinas wrote:
+> On Fri, Sep 23, 2016 at 04:42:08PM +0900, AKASHI Takahiro wrote:
+> > Handle read-only cases (CONFIG_DEBUG_RODATA/CONFIG_DEBUG_SET_MODULE_RONX)
+> > by using aarch64_insn_write() instead of probe_kernel_write().
+> > See how this works:
+> >     commit 2f896d586610 ("arm64: use fixmap for text patching")
+> > 
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Jason Wessel <jason.wessel@windriver.com>
+> > Cc: <stable@vger.kernel.org> # 3.18-3.19: 2f896d5: arm64: use fixmap
+> > Cc: <stable@vger.kernel.org> # 3.18-3.19: f6242ca: arm64: Fix text
+> > Cc: <stable@vger.kernel.org> # 4.0-
 > 
-> That's odd. I see no such errors on omap4 PandaBoard-ES nor on omap5 uEVM.
-> The IRQ status is one register so even in bulk access it is one read. So the
-> use_single_rw should have no effect on the access.
+> Queued for 4.8 with a slight change in the last Cc: tag above:
 > 
-> The only time when regmap would try to use bulk access to twl6040 is when we
-> execute regcache_sync() on it after resuming the chip and this would fail at
-> the first time when it tries to restore more than one consecutive registers.
-> 
-> I just tested things on next-20160915 and I see no errors at all.
+> Cc: <stable@vger.kernel.org> # 3.18.x-
 
-Retested on next-20160923 and I see no issue on Panda-ES or omap5-uevm.
+I tried to apply this patch to 3.18, 4.1, 4.4, 4.7. It fails on all of
+them with smaller or slightly larger conflicts.
 
-My guess is that you receive an interrupt from twl6040 while the chip is
-powered down, the regmap is set to cache only. But this has nothing to do with
-the bulk or non bulk access... Looking at the commit logs and git blame I see
-no recent change in the driver(s) for twl6040 which changed the way it loads
-and/or powers up/down.
+So, I'll merge it in 4.8 without any "Cc: stable" tags, just a "Fixes:"
+one for the commit introducing CONFIG_DEBUG_SET_MODULE_RONX (3.18). Once
+the patch reaches mainline, could you please back-port and test it on
+the stable kernel versions and send separate patches to
+stable at vger.kernel.org?
+
+Thanks.
 
 -- 
-P?ter
+Catalin
