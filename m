@@ -1,118 +1,136 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Fri, 23 Sep 2016 16:00:04 +0100
-Subject: [PATCH 1/2] ARM: vexpress: refine MCPM smp operations override
- criteria
-In-Reply-To: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
-References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20160923150004.GV8917@e106497-lin.cambridge.arm.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 23 Sep 2016 14:59:55 +0000
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <10705430.q2aqv5uYO3@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1760643.vMTR5o5E9g@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F8842B6@lhreml507-mbx>
+ <10705430.q2aqv5uYO3@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F8850F2@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 02:09:06PM +0100, Lorenzo Pieralisi wrote:
-> Current vexpress smp init code detects whether to override the
-> default smp ops with MCPM smp ops by matching the "cci-400"
-> compatible string, in that MCPM requires control over CCI ports
-> to manage low-power states entry/exit.
+Hi Arnd
+
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 23 September 2016 14:43
+> To: Gabriele Paoloni
+> Cc: zhichang.yuan; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com; minyard at acm.org;
+> linux-pci at vger.kernel.org; gregkh at linuxfoundation.org; John Garry;
+> will.deacon at arm.com; linux-kernel at vger.kernel.org; Yuanzhichang;
+> Linuxarm; xuwei (O); linux-serial at vger.kernel.org;
+> benh at kernel.crashing.org; zourongrong at gmail.com; liviu.dudau at arm.com;
+> kantyzc at 163.com
+> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
+> Hip06
 > 
-> The "cci-400" compatible string check is a necessary but not
-> sufficient condition for MCPM to work, because the cci-400
-> can be made visible to the kernel, but firmware can nonetheless
-> disable non-secure CCI ports control, while still allowing PMU
-> access; if booted in non-secure world, the kernel would still
-> blindly override smp operations with MCPM operations, resulting
-> in kernel faults when the CCI ports programming interface is
-> accessed from non-secure world.
+> On Friday, September 23, 2016 10:23:30 AM CEST Gabriele Paoloni wrote:
+> > Hi Arnd
+> >
+> > > -----Original Message-----
+> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > > Sent: 23 September 2016 10:52
+> > > To: zhichang.yuan
+> > > Cc: Gabriele Paoloni; linux-arm-kernel at lists.infradead.org;
+> > > devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com;
+> minyard at acm.org;
+> > > linux-pci at vger.kernel.org; gregkh at linuxfoundation.org; John Garry;
+> > > will.deacon at arm.com; linux-kernel at vger.kernel.org; Yuanzhichang;
+> > > Linuxarm; xuwei (O); linux-serial at vger.kernel.org;
+> > > benh at kernel.crashing.org; zourongrong at gmail.com;
+> liviu.dudau at arm.com;
+> > > kantyzc at 163.com
+> > > Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
+> > > Hip06
+> > >
+> > > On Friday, September 23, 2016 12:27:17 AM CEST zhichang.yuan wrote:
+> > > > For this patch sketch, I have a question.
+> > > > Do we call pci_address_to_pio in arch_of_address_to_pio to get
+> the
+> > > > corresponding logical IO port
+> > > > for LPC??
+> > >
+> > >
+> > > No, of course not, that would be silly:
+> > >
+> > > The argument to pci_address_to_pio() is a phys_addr_t, and we we
+> don't
+> > > have one because there is no address associated with your PIO, that
+> > > is the entire point of your driver!
+> > >
+> > > Also, we already know the mapping because this is what the inb/outb
+> > > workaround is looking at, so there is absolutely no reason to call
+> it
+> > > either.
+> >
+> > Ok assume that we do not call pci_address_to_pio() for the ISA bus...
+> > The LPC driver will register its phys address range in io_range_list,
+> > then the IPMI driver probe will retrieve its physical address calling
+> > of_address_to_resource and will use the indirect io to access this
+> > address.
+> >
+> > From the perspective of the indirect IO function the input parameter
+> > is an unsigned long addr that (now) can be either:
+> > 1) an IO token coming from a legacy pci device
+> > 2) a phys address that lives on the LPC bus
+> >
+> > These are conceptually two separate address spaces (and actually they
+> > both start from 0).
 > 
-> This means that the "cci-400" compatible string check would
-> result in a false positive in systems that eg boot in HYP mode,
-> where CCI ports non-secure access is explicitly not allowed,
-> and it is reported in the respective device tree nodes with
-> CCI ports marked as disabled.
+> Why? Any IORESOURCE_IO address always refers to the logical I/O port
+> range in Linux, not the physical address that is used on a bus.
 
-I remember seeing a patch from Marc this week exactly on this
-subject, but I can't find it again today. However, I remember that
-his patch was explicitly testing for the HYP presence.
+If I read the code correctly when you get an I/O token you just add it
+to PCI_IOBASE.
+This is enough since pci_remap_iospace set the virtual address to 
+PCI_IOBASE + the I/O token offset; so we can read/write to
+vaddr = PCI_IOBASE + token as pci_remap_iospace has mapped it correctly
+to the respective PCI cpu address (that is set in the I/O range property
+of the host controller)
+
+In the patchset accessors LPC operates directly on the cpu addresses
+and the input parameter of the accessors can be either an IO token or
+a cpu address
+
++static inline void outb(u8 value, unsigned long addr)
++{
++#ifdef CONFIG_ARM64_INDIRECT_PIO
++	if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
++			addr <= arm64_extio_ops->end)
+
+Here below we operate on cpu address
+
++		extio_outb(value, addr);
++	else
++#endif
+
+In the case below we have an I/O token added to PCI_IOBASE
+to calculate the virtual address 
+
++		writeb(value, PCI_IOBASE + addr);
++}
+
+My point is that if do not call pci_address_to_pio() in 
+__of_address_to_resource for the ISA LPC exception then the accessors
+are called either by passing an IO token or a cpu address...and from
+the accessors perspective we do not know...
+
+Thanks
+Gab 
 
 > 
-> Refactor the smp operations initialization to make sure that
-> the kernel is actually allowed to take control over CCI ports
-> (by enabling MCPM smp operations) before overriding default
-> vexpress smp operations.
+> > If the input parameter can live on different address spaces that are
+> > overlapped, even if I save the used LPC range in arm64_extio_ops-
+> >start/end
+> > there is no way for the indirect IO to tell if the input parameter is
+> > an I/O token or a phys address that belongs to LPC...
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mach-vexpress/platsmp.c | 31 ++++++++++++++++++++++++-------
->  1 file changed, 24 insertions(+), 7 deletions(-)
+> The start address is the offset: if you get an address between 'start'
+> and 'end', you subtract the 'start' from it, and use that to call
+> the registered driver function. That works because we can safely
+> assume that the bus address range that the LPC driver registers starts
+> zero.
 > 
-> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-> index 8b8d072..6cfd782 100644
-> --- a/arch/arm/mach-vexpress/platsmp.c
-> +++ b/arch/arm/mach-vexpress/platsmp.c
-> @@ -26,17 +26,34 @@
->  bool __init vexpress_smp_init_ops(void)
->  {
->  #ifdef CONFIG_MCPM
-> +	int cpu;
-> +	struct device_node *cpu_node, *cci_node;
-> +
->  	/*
-> -	 * The best way to detect a multi-cluster configuration at the moment
-> -	 * is to look for the presence of a CCI in the system.
-> +	 * The best way to detect a multi-cluster configuration
-> +	 * is to detect if the kernel can take over CCI ports
-> +	 * control. Loop over possible CPUs and check if CCI
-> +	 * port control is available.
->  	 * Override the default vexpress_smp_ops if so.
->  	 */
-> -	struct device_node *node;
-> -	node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
-> -	if (node && of_device_is_available(node)) {
-> -		mcpm_smp_set_ops();
-> -		return true;
-> +	for_each_possible_cpu(cpu) {
-> +		bool available;
-> +
-> +		cpu_node = of_get_cpu_node(cpu, NULL);
-> +		if (WARN(!cpu_node, "Missing cpu device node!"))
-> +			return false;
-> +
-> +		cci_node = of_parse_phandle(cpu_node, "cci-control-port", 0);
-> +		available = cci_node && of_device_is_available(cci_node);
-
-of_device_is_available() only checks the DT node for status = "enabled";
-
-Does the HYP modify the DT to disable the cci-control-port? If not, then I guess
-this patch is not enough?
-
-Best regards,
-Liviu
-
-> +		of_node_put(cci_node);
-> +		of_node_put(cpu_node);
-> +
-> +		if (!available)
-> +			return false;
->  	}
-> +
-> +	mcpm_smp_set_ops();
-> +	return true;
->  #endif
->  	return false;
->  }
-> -- 
-> 2.10.0
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> 	Arnd
