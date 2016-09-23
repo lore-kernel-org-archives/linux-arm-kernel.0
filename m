@@ -1,90 +1,81 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 23 Sep 2016 14:09:06 +0100
-Subject: [PATCH 1/2] ARM: vexpress: refine MCPM smp operations override
- criteria
-Message-ID: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 23 Sep 2016 16:08:45 +0300
+Subject: [PATCH 1/3] dt-bindings: Add a binding for the RPi firmware GPIO
+ driver.
+In-Reply-To: <CACRpkdb-hRjD+FmyZ4SKurp94V=HR3L90OLNc-6eUKuy9AK_Rg@mail.gmail.com>
+References: <20160919161314.25858-1-eric@anholt.net>
+ <CACRpkdb-hRjD+FmyZ4SKurp94V=HR3L90OLNc-6eUKuy9AK_Rg@mail.gmail.com>
+Message-ID: <87ponu931e.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current vexpress smp init code detects whether to override the
-default smp ops with MCPM smp ops by matching the "cci-400"
-compatible string, in that MCPM requires control over CCI ports
-to manage low-power states entry/exit.
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-The "cci-400" compatible string check is a necessary but not
-sufficient condition for MCPM to work, because the cci-400
-can be made visible to the kernel, but firmware can nonetheless
-disable non-secure CCI ports control, while still allowing PMU
-access; if booted in non-secure world, the kernel would still
-blindly override smp operations with MCPM operations, resulting
-in kernel faults when the CCI ports programming interface is
-accessed from non-secure world.
+> On Mon, Sep 19, 2016 at 6:13 PM, Eric Anholt <eric@anholt.net> wrote:
+>
+>> The RPi firmware exposes all of the board's GPIO lines through
+>> property calls.  Linux chooses to control most lines directly through
+>> the pinctrl driver, but for the FXL6408 GPIO expander on the Pi3, we
+>> need to access them through the firmware.
+>>
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>
+> Aha
+>
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
+>> @@ -0,0 +1,22 @@
+>> +Raspberry Pi power domain driver
+>
+> Really? :)
 
-This means that the "cci-400" compatible string check would
-result in a false positive in systems that eg boot in HYP mode,
-where CCI ports non-secure access is explicitly not allowed,
-and it is reported in the respective device tree nodes with
-CCI ports marked as disabled.
+Thanks.
 
-Refactor the smp operations initialization to make sure that
-the kernel is actually allowed to take control over CCI ports
-(by enabling MCPM smp operations) before overriding default
-vexpress smp operations.
+>> +Required properties:
+>> +
+>> +- compatible:          Should be "raspberrypi,firmware-gpio"
+>
+> Usually this is vendor,compat, is the vendors name "raspberrypi"?
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-vexpress/platsmp.c | 31 ++++++++++++++++++++++++-------
- 1 file changed, 24 insertions(+), 7 deletions(-)
+Yes, this driver is for part of the Raspberry Pi Foundation's firmware
+code (you can find the same pattern in the firmware and firmware power
+domain drivers).
 
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 8b8d072..6cfd782 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -26,17 +26,34 @@
- bool __init vexpress_smp_init_ops(void)
- {
- #ifdef CONFIG_MCPM
-+	int cpu;
-+	struct device_node *cpu_node, *cci_node;
-+
- 	/*
--	 * The best way to detect a multi-cluster configuration at the moment
--	 * is to look for the presence of a CCI in the system.
-+	 * The best way to detect a multi-cluster configuration
-+	 * is to detect if the kernel can take over CCI ports
-+	 * control. Loop over possible CPUs and check if CCI
-+	 * port control is available.
- 	 * Override the default vexpress_smp_ops if so.
- 	 */
--	struct device_node *node;
--	node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
--	if (node && of_device_is_available(node)) {
--		mcpm_smp_set_ops();
--		return true;
-+	for_each_possible_cpu(cpu) {
-+		bool available;
-+
-+		cpu_node = of_get_cpu_node(cpu, NULL);
-+		if (WARN(!cpu_node, "Missing cpu device node!"))
-+			return false;
-+
-+		cci_node = of_parse_phandle(cpu_node, "cci-control-port", 0);
-+		available = cci_node && of_device_is_available(cci_node);
-+		of_node_put(cci_node);
-+		of_node_put(cpu_node);
-+
-+		if (!available)
-+			return false;
- 	}
-+
-+	mcpm_smp_set_ops();
-+	return true;
- #endif
- 	return false;
- }
--- 
-2.10.0
+>> +- gpio-controller:     Marks the device node as a gpio controller
+>> +- #gpio-cells:         Should be <2> for GPIO number and flags
+>> +- ngpios:              Number of GPIO lines to control.  See gpio.txt
+>
+> Is this ever anything else than 8? Else omit it and hardcode
+> 8 in the driver instead.
+
+(see below)
+
+>> +- firmware:            Reference to the RPi firmware device node
+>
+> Reference the DT binding for this.
+>
+>> +- raspberrypi,firmware-gpio-offset:
+>> +                       Number the firmware uses for the first GPIO line
+>> +                         controlled by this driver
+>
+> Does this differ between different instances of this hardware or
+> can it just be open coded in the driver instead?
+
+This is which range (128-135) of the firmware's GPIOs we're controlling.
+If another GPIO expander appears later (quite believable, I think
+they're down to 1 spare line on this expander), then we would just make
+another node with a new offset and ngpios for that expander.
+
+Sort of related: I also worry that we have races with the firmware for
+the platform GPIO bits, since both ARM and firmware are doing RMWs (or,
+even worse, maybe just Ws?) of the registers controlled by the pinctrl
+driver.  Hopefully I can get the firmware to pass control of devices
+like this over to Linux, with firmware making requests to us, but I
+don't know if that will happen and we may need to access other GPIOs
+using this interface :(
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160923/2ef4c585/attachment.sig>
