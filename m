@@ -1,56 +1,48 @@
-From: greg@kroah.com (Greg KH)
-Date: Fri, 23 Sep 2016 11:23:33 +0200
-Subject: [PATCH v2 0/3] arm64: kgdb: fix single stepping
-In-Reply-To: <20160923092706.GN30248@linaro.org>
-References: <20160923073327.9657-1-takahiro.akashi@linaro.org>
- <20160923081618.GH18056@kroah.com>
- <20160923083257.GL30248@linaro.org>
- <20160923084341.GA32342@kroah.com>
- <20160923092706.GN30248@linaro.org>
-Message-ID: <20160923092333.GB1071@kroah.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 23 Sep 2016 11:25:50 +0200
+Subject: [PATCH] arm/arm64: KVM: Add support for ARMv8 AArch32 execution
+ state
+In-Reply-To: <1474614805-18629-1-git-send-email-b18965@freescale.com>
+References: <1474614805-18629-1-git-send-email-b18965@freescale.com>
+Message-ID: <20160923092550.GG9101@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 06:27:07PM +0900, AKASHI Takahiro wrote:
-> On Fri, Sep 23, 2016 at 10:43:41AM +0200, Greg KH wrote:
-> > On Fri, Sep 23, 2016 at 05:32:58PM +0900, AKASHI Takahiro wrote:
-> > > On Fri, Sep 23, 2016 at 10:16:18AM +0200, Greg KH wrote:
-> > > > On Fri, Sep 23, 2016 at 04:33:24PM +0900, AKASHI Takahiro wrote:
-> > > > > Kgdb support on arm64 was merged in v3.15, but from its first appearance,
-> > > > > "signle step" has never worked well.
-> > > > > 
-> > > > > This patch fixes all the error cases I found so far.
-> > > > > The original patch[1] was splitted into three pieces, ones for each case.
-> > > > > patch#1, #2 should be applied to all the version, v3.15 and later.
-> > > > > pathc#3 only for v3.16 and later.
-> > > > 
-> > > > As this is not a regression (i.e. it has never worked), why is this
-> > > > something for stable releases?
-> > > 
-> > > Because, I think, that is a bug.
-> > > The author seems to have believed that it worked.
-> > > Please see:
-> > >   commit 44679a4f
-> > >   Author: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-> > >   Date:   Tue Jan 28 11:20:19 2014 +0000
-> > > 
-> > >       arm64: KGDB: Add step debugging support
-> > 
-> > Yes, but again, it didn't work, so this would be a new feature.
+On Fri, Sep 23, 2016 at 03:13:25PM +0800, Alison Wang wrote:
+> The ARMv8 architecture supports two execution state, AArch64 and
+> AArch32. To support KVM in AArch32 execution state for ARMv8, Cortex-A53
+> and Cortex-A72 need to be added for target-specific checks.
 > 
-> Yes, but again, it's a bug of kgdb on arm64 which is supposed
-> to have been available since v3.15.
-
-But it wasn't ever working, so it's not a regression or a bugfix, sorry.
-
-> > Please read Documentation/stable_kernel_rules.txt for the requirements
-> > of a stable kernel patch.  I don't think this series meets those rules.
+> Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> ---
+>  arch/arm/include/asm/cputype.h | 2 ++
+>  arch/arm/kvm/guest.c           | 2 ++
+>  2 files changed, 4 insertions(+)
 > 
-> Please re-think about merging this patch.
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index 754f86f..4f8c632 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -75,6 +75,8 @@
+>  #define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
+>  #define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
+>  #define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
+> +#define ARM_CPU_PART_CORTEX_A53_AARCH32	0x4100d030
+> +#define ARM_CPU_PART_CORTEX_A72_AARCH32	0x4100d080
+>  #define ARM_CPU_PART_MASK		0xff00fff0
+>  
+>  /* DEC implemented cores */
+> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+> index 9aca920..462a099 100644
+> --- a/arch/arm/kvm/guest.c
+> +++ b/arch/arm/kvm/guest.c
+> @@ -252,6 +252,8 @@ int __attribute_const__ kvm_target_cpu(void)
+>  {
+>  	switch (read_cpuid_part()) {
+>  	case ARM_CPU_PART_CORTEX_A7:
+> +	case ARM_CPU_PART_CORTEX_A53_AARCH32:
+> +	case ARM_CPU_PART_CORTEX_A72_AARCH32:
 
-It's not even in Linus's tree yet, so there's nothing for me to merge
-anywhere.
+huh?  why are we mapping A53 and A72 cores to an A7 core?
 
-thanks,
-
-greg k-h
+-Christoffer
