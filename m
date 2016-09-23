@@ -1,47 +1,28 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 23 Sep 2016 11:29:07 +0100
-Subject: [PATCH 0/2] ARM: Do not mess with CCI if booted from HYP
-In-Reply-To: <1474380833-30121-1-git-send-email-marc.zyngier@arm.com>
-References: <1474380833-30121-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160923102907.GB31120@red-moon>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 23 Sep 2016 12:50:12 +0200
+Subject: [PATCH v2] gpio: Added zynq specific check for special pins on
+ bank zero
+In-Reply-To: <1474625137-9022-1-git-send-email-navam@xilinx.com>
+References: <1474625137-9022-1-git-send-email-navam@xilinx.com>
+Message-ID: <c6806094-9809-f488-34d3-d5294e9abe9b@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 23.9.2016 12:05, Nava kishore Manne wrote:
+> From: Nava kishore Manne <nava.manne@xilinx.com>
+> 
+> This patch adds zynq specific check for bank 0 pins 7 and 8
+> are special and cannot be used as inputs
+> 
+> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> Acked-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> Changes for v2:
+>                 -Removed un-used quirks for zynqmp.
 
-On Tue, Sep 20, 2016 at 03:13:51PM +0100, Marc Zyngier wrote:
-> Some systems (such as the VExpress TC2) are built around a CCI-400,
-> which is only accessible from secure mode. This obviously breaks if
-> the system is booted in non-secure mode. Detecting non-secure is
-> pretty hard to do, unless the system is booted from HYP.
-> 
-> This small patch series makes sure that:
-> - The CCI ports are not accessed when the kernel is booted from HYP
-> - MCPM (which depends on CCI) is not enabled on VExpress if booted
-> from HYP.
-> 
-> This allows a multi_v7_defconfig kernel to be booted on a TC2 booting
-> from HYP, instead of miserably dying very early on.
 
-As discussed I came up with a different set of patches that
-detect CCI ports status as reported by DT and prevent enabling
-MCPM if the CCI ports are not under kernel control (eg they are
-reported as "disabled" by DT since we booted in HYP).
+You missed Soren's ACK and also Jonas reported by line.
+Please add it to v3.
 
-I will post patches for review and test shortly.
-
-Thanks for fixing it anyway,
-Lorenzo
-
-> 
-> Marc Zyngier (2):
->   ARM: vexpress: Do not enable MCPM if booted from HYP
->   arm-cci: Do not probe the CCI ports if booted from HYP
-> 
->  arch/arm/mach-vexpress/platsmp.c |  8 ++++++--
->  drivers/bus/arm-cci.c            | 11 +++++++++++
->  2 files changed, 17 insertions(+), 2 deletions(-)
-> 
-> -- 
-> 2.1.4
-> 
+Thakns,
+Michal
