@@ -1,53 +1,44 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 23 Sep 2016 22:05:54 +0200
-Subject: [PATCH 2/3] nvmem: dt: document lpc1850 OTP binding
-In-Reply-To: <20160923133529.GA23548@rob-hp-laptop>
-References: <20160913161241.22492-1-manabian@gmail.com>
- <20160913161241.22492-3-manabian@gmail.com>
- <20160923133529.GA23548@rob-hp-laptop>
-Message-ID: <CAGhQ9VzwPY9_Wn_-=UoLKE6oyQPvTMpiWSj6q6PGFQvB8P=vuA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 23 Sep 2016 22:22:14 +0200
+Subject: Alignment issues with freescale FEC driver
+In-Reply-To: <20160923183725.GC1041@n2100.armlinux.org.uk>
+References: <troy.kisky@boundarydevices.com>
+ <02afb707-65de-5101-a79b-355929c4e00b@nelint.com>
+ <CANn89iLb+QJu+MYh859oAAjcLCsKRpBbzVf43yOdq+HJVtZDpQ@mail.gmail.com>
+ <5ee28ee0-cf0c-bdab-1271-f17755365c13@nelint.com>
+ <20160923173751.GA1041@n2100.armlinux.org.uk>
+ <d0d6f333-c6fc-6572-0633-d7c2c29b8b3f@nelint.com>
+ <20160923183725.GC1041@n2100.armlinux.org.uk>
+Message-ID: <20160923202214.kvnmvkc7abi5oj23@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 September 2016 at 15:35, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Sep 13, 2016 at 06:12:40PM +0200, Joachim Eastwood wrote:
->> Documenation for the LPC18xx/43xx OTP memory bindings.
->>
->> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
->> ---
->>  .../devicetree/bindings/nvmem/lpc1850-otp.txt        | 20 ++++++++++++++++++++
->>  1 file changed, 20 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
->>
->> diff --git a/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt b/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
->> new file mode 100644
->> index 0000000..853b6a7
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/nvmem/lpc1850-otp.txt
->> @@ -0,0 +1,20 @@
->> +* NXP LPC18xx OTP memory
->> +
->> +Internal OTP (One Time Programmable) memory for NXP LPC18xx/43xx devices.
->> +
->> +Required properties:
->> +  - compatible: Should be "nxp,lpc1850-otp"
->> +  - reg: Must contain an entry with the physical base address and length
->> +    for each entry in reg-names.
->
->> +  - address-cells: must be set to 1.
->> +  - size-cells: must be set to 1.
->
-> Not needed unless you have child nodes.
+Hello Russell,
 
-They will have "nvmem" cell children. See patch 3/3
+On Fri, Sep 23, 2016 at 07:37:25PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 23, 2016 at 11:26:18AM -0700, Eric Nelson wrote:
+> > So the question is: should we just live with this and acknowledge a
+> > performance penalty of bad alignment or do something about it?
+> 
+> Well, I've no interest in trying to do anything with the FEC driver
+> anymore, as I'll just generate another big patch stack which won't
+> make it into the kernel in a timely fashion - my last attempt at
+> improving the FEC driver was dogged with conflicting changes and I
+> gave up with it in the end.  I ended up spending a full cycle
+> rebasing, re-testing, and re-evaluating their performance only to find
+> that I'd missed the merge window again, and other conflicting changes
+> got merged which meant that I had to start from the beginning again.
 
-+                       /* Flashless devices has part ID in OTP bank 0 */
-+                       part_id: identification at 0 {
-+                               reg = <0x0 0x10>;
-+                       };
+I'm not included in the set of people who are responsible to review and
+merge fec patches, but I'd be surprised if you couldn't get an exclusive
+lock for that driver. Something like: After 4.X-rc1 the fec isn't
+touched any more until you got your series ready for the 4.X+1 merge
+window. Of course some fixes might have to go in, but these hopefully
+won't disturb much.
 
-These cells are documented in nvmem.txt.
+Best regards
+Uwe
 
-
-regards,
-Joachim Eastwood
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
