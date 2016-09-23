@@ -1,31 +1,28 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 23 Sep 2016 14:43:51 -0700
-Subject: [PATCH] clk: zx296718: register driver earlier with core_initcall
-In-Reply-To: <1474595108-15790-1-git-send-email-shawn.guo@linaro.org>
-References: <1474595108-15790-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20160923214351.GB21232@codeaurora.org>
+Date: Fri, 23 Sep 2016 14:44:50 -0700
+Subject: [PATCH v3 2/3] clk: mvebu: dynamically allocate resources in
+ Armada CP110 system controller
+In-Reply-To: <1474448759-24482-3-git-send-email-mw@semihalf.com>
+References: <1474448759-24482-1-git-send-email-mw@semihalf.com>
+ <1474448759-24482-3-git-send-email-mw@semihalf.com>
+Message-ID: <20160923214450.GE21232@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23, Shawn Guo wrote:
-> Clock driver should be registered with an earlier initcall than
-> module_init which is used by most of client device drivers.  Otherwise,
-> probing of these client drivers will likely be deferred due to that
-> calls into clk API will return -EPROBE_DEFER.
+On 09/21, Marcin Wojtas wrote:
+> Original commit, which added support for Armada CP110 system controller
+> used global variables for storing all clock information. It worked
+> fine for Armada 7k SoC, with single CP110 block. After dual-CP110 Armada 8k
+> was introduced, the data got overwritten and corrupted.
 > 
-> Deferred probing is not a problem for most subsystems, but could bring
-> some side effect for particular subsystem, like display.  On ZX296718
-> platform, we get Linux logo and boot log lost from display device, just
-> because the DRM/KMS driver gets -EPROBE_DEFER from devm_clk_get() call.
+> This patch fixes the issue by allocating resources dynamically in the
+> driver probe and storing it as platform drvdata.
 > 
-> Let's use core_initcall (qcom and a few other clk drivers use that) for
-> driver registration to avoid those unnecessary -EPROBE_DEFER and get rid
-> of the side effect with ZX296718 display system.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Fixes: d3da3eaef7f4 ("clk: mvebu: new driver for Armada CP110 system ...")
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> CC: <stable@vger.kernel.org>
 > ---
-
-Not the ideal solution but it'll do for now.
 
 Applied to clk-next
 
