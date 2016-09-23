@@ -1,72 +1,163 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Fri, 23 Sep 2016 13:13:17 +0000
-Subject: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape
- platforms
-In-Reply-To: <f4195baa-907d-2c00-eb62-d4452ed749c8@arm.com>
-References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
- <f4195baa-907d-2c00-eb62-d4452ed749c8@arm.com>
-Message-ID: <VI1PR0401MB2638049F479731B3CC903B248DC80@VI1PR0401MB2638.eurprd04.prod.outlook.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 23 Sep 2016 16:15:03 +0300
+Subject: [PATCH 2/3] gpio: Add a driver for the Raspberry Pi's firmware
+ GPIO calls.
+In-Reply-To: <CACRpkda6HpJp97FUAh6yvo-BhiDbAXxzQS9U6uT+jvg6hiB8ag@mail.gmail.com>
+References: <20160919161314.25858-1-eric@anholt.net>
+ <20160919161314.25858-2-eric@anholt.net>
+ <CACRpkda6HpJp97FUAh6yvo-BhiDbAXxzQS9U6uT+jvg6hiB8ag@mail.gmail.com>
+Message-ID: <87mviy92qw.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Linus Walleij <linus.walleij@linaro.org> writes:
 
+> On Mon, Sep 19, 2016 at 6:13 PM, Eric Anholt <eric@anholt.net> wrote:
+>
+>> This driver will be used for accessing the FXL6408 GPIO exander on the
+>> Pi3.  We can't drive it directly from Linux because the firmware is
+>> continuously polling one of the expander's lines to do its
+>> undervoltage detection.
+>>
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+> (...)
+>
+>> +config GPIO_RASPBERRYPI
+>> +       tristate "Raspberry Pi firmware-based GPIO access"
+>> +       depends on OF_GPIO && RASPBERRYPI_FIRMWARE && (ARCH_BCM2835 || COMPILE_TEST)
+>> +       help
+>> +         Turns on support for using the Raspberry Pi firmware to
+>> +         control GPIO pins.  Used for access to the FXL6408 GPIO
+>> +         expander on the Pi 3.
+>
+> Maybe it should be named GPIO_RPI_FXL6408 ?
+>
+> (No strong opinion.)
 
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Friday, September 23, 2016 7:17 AM
-> To: Alison Wang <b18965@freescale.com>; shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
-> Estevam <fabio.estevam@nxp.com>; linux at armlinux.org.uk; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Scott Wood <scott.wood@nxp.com>; Stuart Yoder <stuart.yoder@nxp.com>; Leo Li
-> <leoyang.li@nxp.com>
-> Cc: Jason Jin <jason.jin@nxp.com>
-> Subject: Re: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape platforms
-> 
-> Hi Alison,
-> 
-> On 23/09/16 03:19, Alison Wang wrote:
-> > The ARMv8 architecture supports:
-> > 1. 64-bit execution state, AArch64.
-> > 2. 32-bit execution state, AArch32, that is compatible with previous
-> > versions of the ARM architecture.
-> >
-> > LayerScape platforms are compliant with ARMv8 architecture. This patch
-> > is to support running 32-bit Linux kernel for LayerScape platforms.
-> >
-> > Verified on LayerScape LS1043ARDB, LS1012ARDB, LS1046ARDB boards.
-> >
-> > Signed-off-by: Ebony Zhu <ebony.zhu@nxp.com>
-> > Signed-off-by: Alison Wang <alison.wang@nxp.com>
-> > ---
-> >  arch/arm/Kconfig                    |  9 +++++++++
-> >  arch/arm/mach-imx/Kconfig           | 14 ++++++++++++++
-> >  arch/arm/mach-imx/Makefile          |  4 +++-
-> >  arch/arm/mach-imx/mach-layerscape.c | 23 +++++++++++++++++++++++
-> >  4 files changed, 49 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/mach-imx/mach-layerscape.c
-> >
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index f0c8068..e8d470e 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -294,6 +294,15 @@ config PGTABLE_LEVELS
-> >  	default 3 if ARM_LPAE
-> >  	default 2
-> >
-> > +config ARCH_AARCH32_ES_SUPPORT
-> > +	def_bool n
-> > +	help
-> > +	 The ARMv8 architecture supports 64-bit execution state, AArch64
-> > +	 and 32-bit execution state, AArch32, that is compatible with
-> > +	 previous versions of the ARM architecture.
-> > +
-> > +	 Enable AArch32 execution state support for ARMv8 architecture.
-> 
-> What's this supposed to do, exactly? I've been running 32-bit kernels on
-> my Juno with very little issue (beyond a couple of DT tweaks, and some
-> firmware hacks with a corresponding bit of A64 assembly tacked on the
-> front of the zImage to switch into AArch32 state).
+See DT binding comment -- I think since this driver has no dependency on
+being to the 6408 on the pi3, we shouldn't needlessly bind it to the
+FXL6408.  (the help comment was just context for why you would want the
+driver today).
 
-Which arch/arm/mach-* platform are you using for Juno?
+>> +static int rpi_gpio_dir_in(struct gpio_chip *gc, unsigned off)
+>> +{
+>> +       /* We don't have direction control. */
+>> +       return -EINVAL;
+>> +}
+>> +
+>> +static int rpi_gpio_dir_out(struct gpio_chip *gc, unsigned off, int val)
+>> +{
+>> +       /* We don't have direction control. */
+>> +       return -EINVAL;
+>> +}
+>
+> IMO this should return OK if you try to set it to the direction
+> that the line is hardwired for in that case, not just fail everything.
+>
+> If you return errors here, any generic driver that tries to
+> set the line as input or output will fail and then require a
+> second workaround in that driver if it is used on rpi etc etc.
+>
+> Try to return zero if the consumer asks for the direction that
+> the line is set to.
+>
+> Also implement .get_direction(). Doing so will show how to
+> do the above two calls in the right way.
 
-Thanks,
-Stuart
+I was worried about the lack of direction support.  The firmware
+interface doesn't give me anything for direction, and a get or set
+of the value doesn't try to set direction.
+
+I can try to bother them to give me support for that, but if they
+cooperate on that it means that users will only get HDMI detection once
+they update firmware.
+
+The alternative to new firmware interface would be to provide a bunch of
+DT saying which of these should be in/out at boot time and refuse to
+change them after that.  That seems like a mess, though.
+
+>> +static void rpi_gpio_set(struct gpio_chip *gc, unsigned off, int val)
+>> +{
+>> +       struct rpi_gpio *rpi = container_of(gc, struct rpi_gpio, gc);
+>> +       u32 packet[2] = { rpi->offset + off, val };
+>> +       int ret;
+>> +
+>> +       ret = rpi_firmware_property(rpi->firmware,
+>> +                                   RPI_FIRMWARE_SET_GPIO_STATE,
+>> +                                   &packet, sizeof(packet));
+>> +       if (ret)
+>> +               dev_err(rpi->dev, "Error setting GPIO %d state: %d\n", off, ret);
+>> +}
+>> +
+>> +static int rpi_gpio_get(struct gpio_chip *gc, unsigned off)
+>> +{
+>> +       struct rpi_gpio *rpi = container_of(gc, struct rpi_gpio, gc);
+>> +       u32 packet[2] = { rpi->offset + off, 0 };
+>> +       int ret;
+>> +
+>> +       ret = rpi_firmware_property(rpi->firmware,
+>> +                                   RPI_FIRMWARE_GET_GPIO_STATE,
+>> +                                   &packet, sizeof(packet));
+>> +       if (ret) {
+>> +               dev_err(rpi->dev, "Error getting GPIO state: %d\n", ret);
+>> +               return ret;
+>> +       } else if (packet[0]) {
+>> +               dev_err(rpi->dev, "Firmware error getting GPIO state: %d\n",
+>> +                       packet[0]);
+>> +               return -EINVAL;
+>> +       } else {
+>> +               return packet[1];
+>> +       }
+>
+> You can just remove the last } else { } clause and return on a
+> single line.
+>
+> Please do it like this though:
+>
+> return !!packet[1];
+>
+> So you clamp the returned value to a boolean.
+
+Will do.
+
+>> +       rpi->gc.get = rpi_gpio_get;
+>> +       rpi->gc.set = rpi_gpio_set;
+>> +       rpi->gc.can_sleep = true;
+>> +
+>> +       ret = gpiochip_add(&rpi->gc);
+>> +       if (ret)
+>> +               return ret;
+>
+> Use devm_gpiochip_add_data() and pass NULL as data
+> so you can still use the devm* function.
+
+Oh, nice.
+
+>> diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
+>> index 3fb357193f09..671ccd00aea2 100644
+>> --- a/include/soc/bcm2835/raspberrypi-firmware.h
+>> +++ b/include/soc/bcm2835/raspberrypi-firmware.h
+>> @@ -73,11 +73,13 @@ enum rpi_firmware_property_tag {
+>>         RPI_FIRMWARE_GET_DISPMANX_RESOURCE_MEM_HANDLE =       0x00030014,
+>>         RPI_FIRMWARE_GET_EDID_BLOCK =                         0x00030020,
+>>         RPI_FIRMWARE_GET_DOMAIN_STATE =                       0x00030030,
+>> +       RPI_FIRMWARE_GET_GPIO_STATE =                         0x00030041,
+>>         RPI_FIRMWARE_SET_CLOCK_STATE =                        0x00038001,
+>>         RPI_FIRMWARE_SET_CLOCK_RATE =                         0x00038002,
+>>         RPI_FIRMWARE_SET_VOLTAGE =                            0x00038003,
+>>         RPI_FIRMWARE_SET_TURBO =                              0x00038009,
+>>         RPI_FIRMWARE_SET_DOMAIN_STATE =                       0x00038030,
+>> +       RPI_FIRMWARE_SET_GPIO_STATE =                         0x00038041,
+>
+> Can you please merge this orthogonally into the rpi tree to ARM SoC?
+
+This driver would appear in the rpi downstream tree once we settle the
+driver here.  Or are you asking me to delay this series until I can get
+them to pull just a patch extending the set of packets?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160923/83848ae6/attachment.sig>
