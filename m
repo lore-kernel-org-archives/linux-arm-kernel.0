@@ -1,26 +1,22 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 23 Sep 2016 09:39:52 +0200
-Subject: [PATCH 0/2] Add R8A7792 MSIOF support
-In-Reply-To: <19842984-5776-0740-7552-f63ce30d4bdd@cogentembedded.com>
-References: <2481458.x1iQg26kO7@wasted.cogentembedded.com>
- <19842984-5776-0740-7552-f63ce30d4bdd@cogentembedded.com>
-Message-ID: <20160923073952.GC20129@verge.net.au>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 23 Sep 2016 09:44:59 +0200
+Subject: [PATCH 0/3] regulator: axp20x: Simplify various code
+Message-ID: <cover.1474616699.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 12:18:52AM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 09/05/2016 11:54 PM, Sergei Shtylyov wrote:
-> 
-> >   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-> >'renesas-devel-20160905-v4.8-rc5' tag. We're adding the R8A7792 MSIOF clocks
-> >and device nodes. I'm not posting the board patches because the MSIOF driver
-> >seems erratic ATM...
-> >
-> >[1/2] ARM: dts: r8a7792: add MSIOF clock
-> >[2/2] ARM: dts: r8a7792: add MSIOF support
-> 
->    These seem stuck for no apparent reason. Simon?
+This patch series just simplifies a bit the code of the AXP20x driver.
+It does not contain any fonctional changes.
+It will be used as a base for adding new AXP devices (patches to come).
+It applies on linux-next.
 
-Thanks, I have queued these up.
+Jean-Francois Moine (3):
+  regulator: axp20x: simplify poly-phase handling
+  regulator: axp20x: simplify the treatment of linked regulators
+  regulator: axp20x: simplify device access
+
+ drivers/regulator/axp20x-regulator.c | 114 ++++++++++++++++++-----------------
+ 1 file changed, 60 insertions(+), 54 deletions(-)
+
+-- 
+2.10.0
