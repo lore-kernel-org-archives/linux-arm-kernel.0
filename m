@@ -1,42 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 23 Sep 2016 10:50:38 +0100
-Subject: [PATCH v6 1/7] arm/arm64: vgic-new: Implement support for
- userspace access
-In-Reply-To: <CALicx6uuL9xX3VxLCy+EZi0AqXrNM_O+F3MN+W4gbiriUyb7Ug@mail.gmail.com>
-References: <1474351965-11586-1-git-send-email-vijay.kilari@gmail.com>
- <1474351965-11586-2-git-send-email-vijay.kilari@gmail.com>
- <57E3C9D8.7070906@arm.com>
- <CALicx6uuL9xX3VxLCy+EZi0AqXrNM_O+F3MN+W4gbiriUyb7Ug@mail.gmail.com>
-Message-ID: <57E4FAEE.3070003@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Sep 2016 11:51:49 +0200
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <57E40665.8080005@gmail.com>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <9178320.n4yHmfyPA3@wuerfel> <57E40665.8080005@gmail.com>
+Message-ID: <1760643.vMTR5o5E9g@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/09/16 15:01, Vijay Kilari wrote:
-> On Thu, Sep 22, 2016 at 5:38 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 20/09/16 07:12, vijay.kilari at gmail.com wrote:
->>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>> +static int vgic_uaccess_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->>> +                          gpa_t addr, u32 *val)
->>> +{
->>> +     struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
->>> +     const struct vgic_register_region *region;
->>> +     struct kvm_vcpu *r_vcpu;
->>> +
->>> +     region = vgic_get_mmio_region(iodev, addr, sizeof(u32));
->>> +     if (!region) {
->>> +             *val = 0;
->>> +             return 0;
->>
->> This is not the previous semantic of vgic_uaccess, and I cannot see why
->> blindly ignoring an access to an undefined region would be acceptable.
->> What am I missing?
-> 
-> AFAIK, the vgic_uaccess is not making any check on undefined region/register.
-> However, dispatch_mmio_read/write are returning 0 if check of region is failed
+On Friday, September 23, 2016 12:27:17 AM CEST zhichang.yuan wrote:
+> For this patch sketch, I have a question.
+> Do we call pci_address_to_pio in arch_of_address_to_pio to get the 
+> corresponding logical IO port
+> for LPC??
 
-Hmmm. Fair enough. I don't really like it, but that's something for
-another day.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+No, of course not, that would be silly:
+
+The argument to pci_address_to_pio() is a phys_addr_t, and we we don't
+have one because there is no address associated with your PIO, that
+is the entire point of your driver!
+
+Also, we already know the mapping because this is what the inb/outb
+workaround is looking at, so there is absolutely no reason to call it
+either.
+
+> If we don't, it seems the LPC specific IO address will conflict with PCI 
+> host bridges' logical IO.
+>
+> Supposed our LPC populated the IO range from 0x100 to 0x3FF( this is 
+> normal for ISA similar
+> devices), after arch_of_address_to_pio(), the r->start will be set as 
+> 0x100, r->end will be set as
+> 0x3FF.  And if there is one PCI host bridge who request a IO window size 
+> over 0x400 at the same
+> time, the  corresponding r->start and r->end will be set as 0x0, 0x3FF 
+> after of_address_to_resource
+> for this host bridge.  Then the IO conflict happens.
+
+You would still need to reserve some space in the io_range_list
+to avoid possible conflicts, which is a bit ugly with the current
+definition of pci_register_io_range, but I'm sure can be done.
+
+One way I can think of would be to change pci_register_io_range()
+to just return the logical port number directly (it already
+knows it!), and pass an invalid physical address (e.g. 
+#define ISA_WORKAROUND_IO_PORT_WINDOW -0x10000) into it for
+invalid translations.
+
+Another alternative that just occurred to me would be to move
+the pci_address_to_pio() call from __of_address_to_resource()
+into of_bus_pci_translate() and then do the special handling
+for the ISA/LPC bus in of_bus_isa_translate().
+
+	Arnd
