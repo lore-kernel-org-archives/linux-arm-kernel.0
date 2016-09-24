@@ -1,43 +1,48 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 24 Sep 2016 11:11:27 +0200
-Subject: [PATCH v3 0/4] regulator: axp20x: support AXP803/AXP813 variants
-In-Reply-To: <CAGb2v65LjjB_vM46yurKOcw6mMaxW3pXTHwbxQO6L1BTOnTUmw@mail.gmail.com>
-References: <cover.1474621107.git.moinejf@free.fr>
- <CAGb2v65LjjB_vM46yurKOcw6mMaxW3pXTHwbxQO6L1BTOnTUmw@mail.gmail.com>
-Message-ID: <20160924111127.942fa9c65db71fa58cf07f18@free.fr>
+From: eric@nelint.com (Eric Nelson)
+Date: Sat, 24 Sep 2016 05:27:15 -0700
+Subject: Alignment issues with freescale FEC driver
+In-Reply-To: <20160923.224305.942077200829435690.davem@davemloft.net>
+References: <CANn89iLb+QJu+MYh859oAAjcLCsKRpBbzVf43yOdq+HJVtZDpQ@mail.gmail.com>
+ <5ee28ee0-cf0c-bdab-1271-f17755365c13@nelint.com>
+ <0fe7a310-2d2f-4fca-d698-85d66122d91c@nelint.com>
+ <20160923.224305.942077200829435690.davem@davemloft.net>
+Message-ID: <78d1e5e1-30dd-e434-9656-2d2bab32956f@nelint.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 24 Sep 2016 16:35:05 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
+Hi David,
 
-> On Fri, Sep 23, 2016 at 4:58 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> > This patch series adds support for the X-Powers AXP803 and AXP813 PMICs.
-> > It is based on the previous patch series
-> >         regulator: axp20x: Simplify various code
-> >
-> > v3:
-> > - put the code of the new devices in new files instead of in the common
-> >   axp20x file.
-> > - fix errors about the regulators and interrupts
-> > v2:
-> > - fix lack of support of dcdc frequency
-> > - notice that the AXP803 is also handled
-> > - send the patch to the DT maintainers
-> >
-> > Jean-Francois Moine (4):
-> >   regulator: axp20x: move device independant parts to new files
-> >   regulator: axp20x: duplicate the MFD axp20x-rsb code
-> >   regulator: axp20x: add the AXP803
-> >   regulator: axp20x: add the AXP813
+On 09/23/2016 07:43 PM, David Miller wrote:
+> From: Eric Nelson <eric@nelint.com>
+> Date: Fri, 23 Sep 2016 10:33:29 -0700
 > 
-> NAK. Please follow the axp20x mfd and sub-device driver design we
-> already have.
+>> Since the hardware requires longword alignment for its' DMA transfers,
+>> aligning the IP header will require a memcpy, right?
+> 
+> I wish hardware designers didn't do this.
+> 
+> There is no conflict between DMA alignment and properly offseting
+> the packet data by two bytes.
+> 
+> All hardware designers have to do is allow 2 padding bytes to be
+> emitted by the chip before the actual packet data.
+> 
 
-Sorry, I will not: installing a lot of useless code and tables in
-permanent system memory for just one regulator is not the way I think
-about a good kernel.
+Andrew Lunn pointed out that the hardware does support this,
+and I just pushed a patch for the vendor kernel to the meta-freescale
+mailing list:
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+https://lists.yoctoproject.org/pipermail/meta-freescale/2016-September/019228.html
+
+> Then the longword or whatever DMA transfer alignment is met
+> whilst still giving the necessary flexibility for where the
+> packet data lands.
+> 
+
+Right. A relatively small change fixes things right up.
+
+Many thanks to Andrew for pointing this out and Russell for providing
+the basis for my patch.
+
+I'll re-work this for the up-stream kernel when I get out from
+under a couple of unrelated things.
