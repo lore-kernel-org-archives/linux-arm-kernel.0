@@ -1,116 +1,85 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sat, 24 Sep 2016 11:39:54 -0700
-Subject: [PATCH 4/5] input: touchscreen: support Allwinner SoCs'
- touchscreen
-In-Reply-To: <ca39a2e7-6116-6f6e-3f61-78abfdefcbb7@free-electrons.com>
-References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
- <1469003351-15263-5-git-send-email-quentin.schulz@free-electrons.com>
- <20160720172532.GE25655@dtor-ws>
- <ca39a2e7-6116-6f6e-3f61-78abfdefcbb7@free-electrons.com>
-Message-ID: <20160924183954.GE40187@dtor-ws>
+From: dannym@scratchpost.org (Danny Milosavljevic)
+Date: Sat, 24 Sep 2016 22:05:03 +0200
+Subject: [PATCH v6 3/3] ASoC: sun4i-codec: Add custom regmap configs
+In-Reply-To: <20160924200503.10728-1-dannym@scratchpost.org>
+References: <20160924200503.10728-1-dannym@scratchpost.org>
+Message-ID: <20160924200503.10728-4-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Quentin,
+The A20 has a few extra registers that the A10 doesn't have.
+Therefore, use different regmaps for A10 as compared to A20.
 
-On Sat, Sep 24, 2016 at 08:26:08PM +0200, Quentin Schulz wrote:
-> Hi Dimitry,
-> 
-> Sorry for the (long) delay, I did not have time to work on it. I'll
-> mainly work in my free time now.
-> 
-> On 20/07/2016 19:25, Dmitry Torokhov wrote:
-> > Hi Quentin,
-> > 
-> > On Wed, Jul 20, 2016 at 10:29:10AM +0200, Quentin Schulz wrote:
-> >> This adds support for Allwinner SoCs' (A10, A13 and A31) resistive
-> >> touchscreen. This driver is probed by the MFD sunxi-gpadc-mfd.
-> >>
-> >> This driver uses ADC channels exposed through the IIO framework by
-> >> sunxi-gpadc-iio to get its data. When opening this input device, it will
-> >> start buffering in the ADC driver and enable a TP_UP_PENDING irq. The ADC
-> >> driver will fill in a buffer with all data and call the callback the input
-> >> device associated with this buffer. The input device will then read the
-> >> buffer two by two and send X and Y coordinates to the input framework based
-> >> on what it received from the ADC's buffer. When closing this input device,
-> >> the buffering is stopped.
-> >>
-> >> Note that locations in the first received buffer after an TP_UP_PENDING irq
-> >> occurred are unreliable, thus dropped.
-> >>
-> >> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> >> ---
-> [...]
-> >> +	info->buffer = iio_channel_get_all_cb(&pdev->dev,
-> >> +					      &sunxi_gpadc_ts_callback,
-> >> +					      (void *)info);
-> > 
-> > Any chance we could introduce devm-variant here? If you do not want to
-> > wait for IIO to add it you can temporarily add call
-> > devm_add_action_or_reset() after getting channels and remove it when IIO
-> > API catches up.
-> > 
-> 
-> Something like:
-> 
-> release_iio_channels(void* data)
-> {
-> 	struct sunxi_gpadc_ts *info = data;
-> 	iio_channel_release_all_cb(info->buffer);
-> }
-> 
-> [...]
-> 	info->buffer = iio_channel_get_all_cb(&pdev->dev,
-> 					      &sunxi_gpadc_ts_callback,
-> 					      (void *)info);
-> 	ret = devm_add_action_or_reset(&pdev->dev,
-> 				       release_iio_channels,
-> 				       (void *)info);
-> 	if (ret)
-> 		return ret;
-> 
-> ?
-> 
-> May I know why you prefer that way instead of explicit removing in
-> remove function of the platform device? I understand for devm-variant
-> already in the framework but I am curious for this one.
+Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
+---
+ sound/soc/sunxi/sun4i-codec.c | 38 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 35 insertions(+), 3 deletions(-)
 
-So that you release all resources in the same order they were allocated.
-When mixing devm and non-devm allocation/release order is often
-incorrect.
-
-> 
-> [...]
-> >> +static int sunxi_gpadc_ts_remove(struct platform_device *pdev)
-> >> +{
-> >> +	struct sunxi_gpadc_ts *info = platform_get_drvdata(pdev);
-> >> +
-> >> +	iio_channel_stop_all_cb(info->buffer);
-> >> +	iio_channel_release_all_cb(info->buffer);
-> >> +
-> >> +	disable_irq(info->tp_up_irq);
-> > 
-> > You are mixing devm and non-devm so your unwind order is completely out
-> > of wack. If input device is opened while you are unloading (or
-> > unbinding) the dirver, then you'll release channels, then input device's
-> > close() will be called, which will try to stop the IIO channels again
-> > and disable IRQ yet again.
-> > 
-> 
-> Do you mean that I should be using exclusively devm or non-devm functions?
-
-Yes. Sometimes you can get away with mixing style (you have all devm
-resources allocated first, then non-devm), but it is much clearer and
-safer if you use one style or another exclusively.
-
-> Do you mean input device's close will always be called when
-> unloading/unbinding the driver?
-
-If ->open() has been called() then input core will ensure that ->close()
-is called as part of input_unregister_device(). If ->open() has not been
-called, then ->close() will not be called either.
-
-Thanks.
-
--- 
-Dmitry
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 3b53b78..e047ec0 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -682,12 +682,37 @@ static const struct regmap_config sun4i_codec_regmap_config = {
+ 	.reg_bits	= 32,
+ 	.reg_stride	= 4,
+ 	.val_bits	= 32,
++	.max_register	= SUN4I_CODEC_ADC_RXCNT,
++};
++
++static const struct regmap_config sun7i_codec_regmap_config = {
++	.reg_bits	= 32,
++	.reg_stride	= 4,
++	.val_bits	= 32,
+ 	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
+ };
+ 
++struct sun4i_codec_quirks {
++	const struct regmap_config *regmap_config;
++};
++
++static const struct sun4i_codec_quirks sun4i_codec_quirks = {
++	.regmap_config = &sun4i_codec_regmap_config,
++};
++
++static const struct sun4i_codec_quirks sun7i_codec_quirks = {
++	.regmap_config = &sun7i_codec_regmap_config,
++};
++
+ static const struct of_device_id sun4i_codec_of_match[] = {
+-	{ .compatible = "allwinner,sun4i-a10-codec" },
+-	{ .compatible = "allwinner,sun7i-a20-codec" },
++	{
++		.compatible = "allwinner,sun4i-a10-codec",
++		.data = &sun4i_codec_quirks,
++	},
++	{
++		.compatible = "allwinner,sun7i-a20-codec",
++		.data = &sun7i_codec_quirks,
++	},
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
+@@ -760,6 +785,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card;
+ 	struct sun4i_codec *scodec;
++	const struct sun4i_codec_quirks *quirks;
+ 	struct resource *res;
+ 	void __iomem *base;
+ 	int ret;
+@@ -777,8 +803,14 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+ 		return PTR_ERR(base);
+ 	}
+ 
++	quirks = of_device_get_match_data(&pdev->dev);
++	if (quirks == NULL) {
++		dev_err(&pdev->dev, "Failed to determine the quirks to use\n");
++		return -ENODEV;
++	}
++
+ 	scodec->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+-					     &sun4i_codec_regmap_config);
++					       quirks->regmap_config);
+ 	if (IS_ERR(scodec->regmap)) {
+ 		dev_err(&pdev->dev, "Failed to create our regmap\n");
+ 		return PTR_ERR(scodec->regmap);
