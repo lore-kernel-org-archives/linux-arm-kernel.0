@@ -1,111 +1,51 @@
-From: jmcnicol@redhat.com (Jeremy McNicoll)
-Date: Fri, 23 Sep 2016 16:27:35 -0700
-Subject: [RFC 1/4] arm64: dts: msm8992 SoC and LG Bullhead (Nexus 5X)
- support
-In-Reply-To: <147456957514.9057.12155171248212777735@sboyd-linaro>
-References: <1467938467-21607-1-git-send-email-jmcnicol@redhat.com>
- <1467938467-21607-2-git-send-email-jmcnicol@redhat.com>
- <20160708174125.GC7896@hector.attlocal.net>
- <6cf4c215-e8a3-a9db-fcf1-8b56b5c1fab9@redhat.com>
- <147456957514.9057.12155171248212777735@sboyd-linaro>
-Message-ID: <a18e8abb-3c5b-6278-a0f4-36c9c0e6fb8a@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 23 Sep 2016 20:02:46 -0500
+Subject: [PATCH 0/2] i2c: meson: add gxbb compatible string
+In-Reply-To: <20160923232641.GB5683@katana>
+References: <1473846557-18123-1-git-send-email-jbrunet@baylibre.com>
+ <20160915194146.GB7863@katana>
+ <CAL_JsqKNFzo6RWJO5WOvsyO3e4UTo5Zn48aaDac=+uL_CQWerQ@mail.gmail.com>
+ <20160923221312.GA5683@katana>
+ <CAL_JsqKi9Dk5-nF9xFD-89TTUinaGjMv5s1=N2b-Xyu98b+S3w@mail.gmail.com>
+ <20160923232641.GB5683@katana>
+Message-ID: <CAL_JsqJGQ2az=eO0PbfcTrAPxUsym=UaDOOy1Rsw0-AbzMjnXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-09-22 11:39 AM, Stephen Boyd wrote:
-> Quoting Jeremy McNicoll (2016-09-20 17:42:02)
->> On 2016-07-08 10:41 AM, Andy Gross wrote:
->>> On Thu, Jul 07, 2016 at 05:41:04PM -0700, Jeremy McNicoll wrote:
->>>> +
->>>> +#include "../qcom/msm8992.dtsi"
->>>> +
->>>> +/ {
->>>> +    model = "LGE MSM8992 BULLHEAD rev-1.01";
->>>> +    compatible = "qcom,msm8992";
->>>> +    qcom,board-id = <0xb64 0>;
->>>
->>> Please work with sboyd to add the board-id to the dtbTool.  We don't put
->>> board-ids in the dts file.  We post-process the dtb file and add them then.
->>>
->>
->> sboyd has all the info he needs for this, I believe its just with legal
->> now.  Will remove for V2.
+On Fri, Sep 23, 2016 at 6:26 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
 >
-> I've pushed out an update for dtbtool to have these msm ids.
+>> > I intentionally don't ask people to send me the patches squashed. So,
+>> > you will have them seperate in patchwork et al. I only squash them just
+>> > before commiting to my tree. That's because I found that when digging
+>> > through git history, it is much more convenient to have all the
+>> > information in one commit.
+>>
+>> If git history was the only thing that mattered, then that would be
+>> fine. But it is not. Maintainers should apply what's on the list.
+>> Period.
 >
->>
->>>> +
->>>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->>>> +#include <dt-bindings/clock/qcom,gcc-msm8994.h>
->>>> +
->>>> +/ {
->>>> +    model = "Qualcomm Technologies, Inc. MSM 8992";
->>>> +    compatible = "qcom,msm8992";
->>>> +    qcom,msm-id = <251 0>, <252 0>;
->>
->> This is needed or else the LK provides the following error
->>
->> [5380] qcom,msm-id entry not found
->>
->> and refuses to boot.
->>
->>
->>>> +    qcom,pmic-id = <0x10009 0x1000A 0x0 0x0>;
->>>
->>> See above comment on ids.
->>
->> removal of this (pmic-id) seems to be ok.
->>
->
-> Having the msm ids (and the pmic ids) in dtbtool isn't going to help
-> here though. I believe the bootloader on these devices uses a design of
-> appended dtbs where each dtb has the qcom,{msm-id,board-id,pmic-id}
-> properties in them. The QCDT "header" that dtbtool generates is not
-> used.
->
-> To fix that problem we'll need to update dtbtool to inject these
-> properties into the dtbs based on the compatible strings. Or get
-> maintainers to accept that these ids are now necessary for proper
-> functionality.
+> Huh? If you would *ask* me to stop squashing, I am listening to reasons.
 
+I did state some reasons previously. Consistent rules for submitters
+of DT bindings and being able to trace history beyond git. Now, I
+guess you aren't changing the rules, but you probably aren't
+requesting people to split DT bindings either? You might not be aware,
+but we also generate a DT only tree with git-filter-branch[1] for
+non-kernel projects to use bindings and dts files. For that, sure they
+will only get the DT binding part of it, but what commit text do they
+get? Finally, DT maintainer acks (which from me is a review really)
+apply to the bindings only. Sometimes I review the drivers, but not
+often. So I would like the git history of my reviews to be accurate in
+terms of what I actually reviewed.
 
-I will try modifying the tool to inject these values to understand
-how easy and/or complicated it will be.  This topic will be raised
-during plumbers as most people will be there.
+> If you want to force arbitrary rules on me, I am not. There are reasons
+> where squashing/modifying patches makes more sense compared to forcing
+> the author to resend. DTS bindings may not be one, we can discuss that.
+> But that rule without allowing exceptions seems impractical to me.
 
->
-> Furthermore, the value of board-id (0xb64) is concerning. qcom only
-> supports a certain set of values there for their boards, but vendors are
-> free to do whatever they want with that value. This means they can reuse
-> existing values that would map to qcom's concept of the "mtp" or "cdp"
-> boards, or they can numbers that would alias with other vendors.
-> Thankfully, msm-id and pmic-id are values that are under qcom's control,
-> so those are always going to be unique and sane. Really all that could
-> alias is board-id.
->
-> What does this all mean? We can't support non-qcom boards in the same
-> boot.img because of the possibility for the board-id property to alias
-> between different dtbs. Or at least dtbtool will have to do some alias
-> analysis and eject one aliasing dtbs from the blob. It also means that
-> we have a lot of work to do in dtbtool to inject these properties based
-> on strings, and to have custom parsers for different vendor prefixes so
-> that we know what values to inject (the nightmare is growing).
->
+Okay, "period" was a bit much. Exceptions are perfectly fine, we all
+do some minor fixups time to time. It just shouldn't be the norm IMO.
 
-This provides a reasonably compelling argument that can be discussed 
-with the device tree maintainers during Plumbers.
+Rob
 
-> I've asked the bootloader folks to fix this in future platforms so that
-> we match based on the compatible string, instead of having to do any
-> post processing. Basically, put dtbtool logic into the bootloader. The
-> discussion is still on-going, but I'm hopeful that we don't need to keep
-> doing things here with post-processing and the headache will be reduced.
-> That could totally backfire though if vendors decide to leave the
-> bootloader unchanged and boot the "qcom,msm8992-mtp" dtb that's been
-> slightly tweaked for their design. Let's hope that doesn't happen.
->
-
-Thank you for pushing this internally as it will definitely aid in the
-mainline support going forward.
-
--jeremy
+[1] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
