@@ -1,85 +1,58 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Sat, 24 Sep 2016 13:36:53 +0800
-Subject: [PATCH 2/2] mfd: ab8500-debugfs: remove unused function
-Message-ID: <1474695413-30460-1-git-send-email-baoyou.xie@linaro.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Sat, 24 Sep 2016 10:01:26 +0300
+Subject: [PATCH 2/3] gpio: Add a driver for the Raspberry Pi's firmware
+ GPIO calls.
+In-Reply-To: <CACRpkdbJoM-RbcuoC=7xJyrT3v7p2n9HiidRp1GUw=o43_Fkwg@mail.gmail.com>
+References: <20160919161314.25858-1-eric@anholt.net>
+ <20160919161314.25858-2-eric@anholt.net>
+ <CACRpkda6HpJp97FUAh6yvo-BhiDbAXxzQS9U6uT+jvg6hiB8ag@mail.gmail.com>
+ <87mviy92qw.fsf@eliezer.anholt.net>
+ <CACRpkdbJoM-RbcuoC=7xJyrT3v7p2n9HiidRp1GUw=o43_Fkwg@mail.gmail.com>
+Message-ID: <87lgyh6at5.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get 1 warning when building kernel with W=1:
-drivers/mfd/ab8500-debugfs.c:1395:6: warning: no previous prototype for 'ab8500_dump_all_banks_to_mem' [-Wmissing-prototypes]
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-In fact, this function is called by no one and not exported,
-so this patch removes it.
+> On Fri, Sep 23, 2016 at 3:15 PM, Eric Anholt <eric@anholt.net> wrote:
+>> Linus Walleij <linus.walleij@linaro.org> writes:
+>>>> diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
+>>>> index 3fb357193f09..671ccd00aea2 100644
+>>>> --- a/include/soc/bcm2835/raspberrypi-firmware.h
+>>>> +++ b/include/soc/bcm2835/raspberrypi-firmware.h
+>>>> @@ -73,11 +73,13 @@ enum rpi_firmware_property_tag {
+>>>>         RPI_FIRMWARE_GET_DISPMANX_RESOURCE_MEM_HANDLE =       0x00030014,
+>>>>         RPI_FIRMWARE_GET_EDID_BLOCK =                         0x00030020,
+>>>>         RPI_FIRMWARE_GET_DOMAIN_STATE =                       0x00030030,
+>>>> +       RPI_FIRMWARE_GET_GPIO_STATE =                         0x00030041,
+>>>>         RPI_FIRMWARE_SET_CLOCK_STATE =                        0x00038001,
+>>>>         RPI_FIRMWARE_SET_CLOCK_RATE =                         0x00038002,
+>>>>         RPI_FIRMWARE_SET_VOLTAGE =                            0x00038003,
+>>>>         RPI_FIRMWARE_SET_TURBO =                              0x00038009,
+>>>>         RPI_FIRMWARE_SET_DOMAIN_STATE =                       0x00038030,
+>>>> +       RPI_FIRMWARE_SET_GPIO_STATE =                         0x00038041,
+>>>
+>>> Can you please merge this orthogonally into the rpi tree to ARM SoC?
+>>
+>> This driver would appear in the rpi downstream tree once we settle the
+>> driver here.  Or are you asking me to delay this series until I can get
+>> them to pull just a patch extending the set of packets?
+>
+> Sorry I am not familiar with your development model. I don't know
+> about any RPI downstream tree... What I mean is that the patch to
+> include/soc/bcm2835/raspberrypi-firmware.h should be merged by
+> whoever is maintaining that file, it is not a GPIO file.
+>
+> If I get an ACK from the maintainer I can take it into the GPIO
+> tree.
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- drivers/mfd/ab8500-debugfs.c | 54 --------------------------------------------
- 1 file changed, 54 deletions(-)
-
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 0aecd7b..9f04a25 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -1382,60 +1382,6 @@ void ab8500_dump_all_banks(struct device *dev)
- 	}
- }
- 
--/* Space for 500 registers. */
--#define DUMP_MAX_REGS 700
--static struct ab8500_register_dump
--{
--	u8 bank;
--	u8 reg;
--	u8 value;
--} ab8500_complete_register_dump[DUMP_MAX_REGS];
--
--/* This shall only be called upon kernel panic! */
--void ab8500_dump_all_banks_to_mem(void)
--{
--	int i, r = 0;
--	u8 bank;
--	int err = 0;
--
--	pr_info("Saving all ABB registers for crash analysis.\n");
--
--	for (bank = 0; bank < AB8500_NUM_BANKS; bank++) {
--		for (i = 0; i < debug_ranges[bank].num_ranges; i++) {
--			u8 reg;
--
--			for (reg = debug_ranges[bank].range[i].first;
--			     reg <= debug_ranges[bank].range[i].last;
--			     reg++) {
--				u8 value;
--
--				err = prcmu_abb_read(bank, reg, &value, 1);
--
--				if (err < 0)
--					goto out;
--
--				ab8500_complete_register_dump[r].bank = bank;
--				ab8500_complete_register_dump[r].reg = reg;
--				ab8500_complete_register_dump[r].value = value;
--
--				r++;
--
--				if (r >= DUMP_MAX_REGS) {
--					pr_err("%s: too many register to dump!\n",
--						__func__);
--					err = -EINVAL;
--					goto out;
--				}
--			}
--		}
--	}
--out:
--	if (err >= 0)
--		pr_info("Saved all ABB registers.\n");
--	else
--		pr_info("Failed to save all ABB registers.\n");
--}
--
- static int ab8500_all_banks_open(struct inode *inode, struct file *file)
- {
- 	struct seq_file *s;
--- 
-2.7.4
+Oh, people often say "the rpi tree" to mean downstream (currently 4.4).
+The maintainer of that file upstream is me, and I was hoping you could
+merge through your tree.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160924/7d45838e/attachment.sig>
