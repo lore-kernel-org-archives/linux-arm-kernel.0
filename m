@@ -1,33 +1,43 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Sat, 24 Sep 2016 17:14:25 +0800
-Subject: [PATCH 5/5] tty: amba-pl011: Add earlycon support for SBSA UART
-In-Reply-To: <1474708465-38958-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1474708465-38958-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1474708465-38958-6-git-send-email-wangkefeng.wang@huawei.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sat, 24 Sep 2016 11:11:27 +0200
+Subject: [PATCH v3 0/4] regulator: axp20x: support AXP803/AXP813 variants
+In-Reply-To: <CAGb2v65LjjB_vM46yurKOcw6mMaxW3pXTHwbxQO6L1BTOnTUmw@mail.gmail.com>
+References: <cover.1474621107.git.moinejf@free.fr>
+ <CAGb2v65LjjB_vM46yurKOcw6mMaxW3pXTHwbxQO6L1BTOnTUmw@mail.gmail.com>
+Message-ID: <20160924111127.942fa9c65db71fa58cf07f18@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare an OF early console for SBSA UART so that the early console device
-can be specified via the "stdout-path" property in device-tree.
+On Sat, 24 Sep 2016 16:35:05 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- drivers/tty/serial/amba-pl011.c | 1 +
- 1 file changed, 1 insertion(+)
+> On Fri, Sep 23, 2016 at 4:58 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> > This patch series adds support for the X-Powers AXP803 and AXP813 PMICs.
+> > It is based on the previous patch series
+> >         regulator: axp20x: Simplify various code
+> >
+> > v3:
+> > - put the code of the new devices in new files instead of in the common
+> >   axp20x file.
+> > - fix errors about the regulators and interrupts
+> > v2:
+> > - fix lack of support of dcdc frequency
+> > - notice that the AXP803 is also handled
+> > - send the patch to the DT maintainers
+> >
+> > Jean-Francois Moine (4):
+> >   regulator: axp20x: move device independant parts to new files
+> >   regulator: axp20x: duplicate the MFD axp20x-rsb code
+> >   regulator: axp20x: add the AXP803
+> >   regulator: axp20x: add the AXP813
+> 
+> NAK. Please follow the axp20x mfd and sub-device driver design we
+> already have.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 7d9b291..3688d3b 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2330,6 +2330,7 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
- 	return 0;
- }
- OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
-+OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
- 
- #else
- #define AMBA_CONSOLE	NULL
+Sorry, I will not: installing a lot of useless code and tables in
+permanent system memory for just one regulator is not the way I think
+about a good kernel.
+
 -- 
-1.7.12.4
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
