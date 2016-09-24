@@ -1,125 +1,172 @@
-From: wolfgang@wiedmeyer.de (Wolfgang Wiedmeyer)
-Date: Sat, 24 Sep 2016 23:04:49 +0200
-Subject: [PATCH] ARM: dts: exynos: Add reboot reason support for Trats2
-In-Reply-To: <20160922205522.GA15917@kozik-lap>
-Message-ID: <87fuopvwjy.fsf@machinist.wiedmeyer.de>
+From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
+Date: Sun, 25 Sep 2016 08:59:45 +0900
+Subject: [PATCH v2] ARM: dts: socfpga: Add Macnica sodia board
+Message-ID: <20160924235945.32128-1-iwamatsu@nigauri.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add support for board based on the Altera Cyclone V SoC.
+This board has the following functions:
+    - 1 GiB of DRAM
+    - 1 Gigabit ethernet
+    - 1 SD card slot
+    - 1 USB gadget port
+    - QSPI NOR Flash
+    - I2C EEPROMs and I2C RTC
+    - DVI output
+    - Audio port
 
-Krzysztof Kozlowski writes:
+This commit supports without QSPI, DVI and Audio.
 
-> On Thu, Sep 22, 2016 at 08:59:03PM +0200, Wolfgang Wiedmeyer wrote:
->> 
->> Krzysztof Kozlowski writes:
->> 
->> > On Thu, Sep 22, 2016 at 06:48:35PM +0200, Wolfgang Wiedmeyer wrote:
->> >> This allows to reboot the device into recovery mode and into the download
->> >> mode of the bootloader.
->> >
->> > Which bootloader? Probably UBoot... or Samsung stock one? Could you put
->> > that information here?
->> 
->> I'm only working with the stock one. I was under the impression that the
->> stock bootloader cannot be replaced on a i9300 because there's a
->> signature check. Is UBoot loaded after the stock one on Trats2 or how
->> does this work? I didn't find information on that.
->
-> +CC Marek,
->
-> Trats2 is working with U-Boot. Just U-Boot. However I never converted S3
-> into Trats2 on my own. I always used targets prepared to be "Trats2"
-> type. 
+Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+---
+ V2: move the PHY of setting to the Ethetnet PHY node level.
 
-It would be awesome to be able to run U-Boot on i9300. Is there a way to
-test this by not risking to brick the device, e.g. by booting from the
-SD card? Then I could send an updated version of the patch that is
-compatible with U-Boot :) 
+ arch/arm/boot/dts/Makefile                   |   1 +
+ arch/arm/boot/dts/socfpga_cyclone5_sodia.dts | 123 +++++++++++++++++++++++++++
+ 2 files changed, 124 insertions(+)
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
 
-> Of course kernel is independent to bootloader but in that case you want
-> to use a specific interface between kernel and specific bootloader
-> type/version. In that case - this should be U-Boot, I think.
-
-I absolutely understand that. Having the patch in mainline doesn't make
-much sense if it's not compatible with U-Boot.
-
-Best regards,
-Wolfgang
-
->> >> Signed-off-by: Wolfgang Wiedmeyer <wolfgit@wiedmeyer.de>
->> >> ---
->> >>  arch/arm/boot/dts/exynos4412-trats2.dts | 14 ++++++++++++++
->> >>  arch/arm/boot/dts/exynos4x12.dtsi       |  2 +-
->> >>  2 files changed, 15 insertions(+), 1 deletion(-)
->> >> 
->> >> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
->> >> index 129e973..a38d1e3 100644
->> >> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
->> >> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
->> >> @@ -1294,3 +1294,17 @@
->> >>  	vtmu-supply = <&ldo10_reg>;
->> >>  	status = "okay";
->> >>  };
->> >> +
->> >> +&pmu {
->> >> +	compatible = "syscon", "simple-mfd";
->> >> +
->> >> +	reboot-mode {
->> >> +		compatible = "syscon-reboot-mode";
->> >> +		offset = <0x80c>;
->> >> +
->> >> +		mode-normal	= <0x12345670>;
->> >> +		mode-bootloader	= <0x12345671>;
->> >> +		mode-download	= <0x12345671>;
->> >> +		mode-recovery	= <0x12345674>;
->> >
->> > Hmmm, how did you get these values? Are they already supported?
->> 
->> I only have the vendor source drop as documentation. The magic mode
->> values [1] and the offset [2] can be found there.
->
-> It would be useful to mention that in commit msg (just the source)...
-> however as I wrote above, these values should be for U-Boot, not the
-> stock one.
->
-> Best regards,
-> Krzysztof
->
->> 
->> > It would be nice to document them:
->> > 1. In Documentation/arm/Samsung/Bootloader-interface.txt
->> > 2. In header. I hate such magic numbers... you could add new header next
->> >    to existing rockchip one:
->> >    include/dt-bindings/soc/samsung,boot-mode.h
->> >    (and update maintainers entry :) )
->> 
->> Thanks for the review! I will do the documentation and update the commit
->> message.
->> 
->> Best regards,
->> Wolfgang
->> 
->> [1] https://code.fossencdi.org/kernel_samsung_smdk4412.git/tree/arch/arm/mach-exynos/sec-reboot.c#n65
->> 
->> [2] https://code.fossencdi.org/kernel_samsung_smdk4412.git/tree/arch/arm/mach-exynos/include/mach/regs-pmu.h#n79
->> 
->> 
->> -- 
->> Website: https://fossencdi.org
->> Jabber: wolfgang at wiedmeyer.de
->> OpenPGP: 0F30 D1A0 2F73 F70A 6FEE  048E 5816 A24C 1075 7FC4
->> Key download: https://wiedmeyer.de/keys/ww.asc
-
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index befcd26..7c5f0c3 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -696,6 +696,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
+ 	socfpga_cyclone5_de0_sockit.dtb \
+ 	socfpga_cyclone5_sockit.dtb \
+ 	socfpga_cyclone5_socrates.dtb \
++	socfpga_cyclone5_sodia.dtb \
+ 	socfpga_cyclone5_vining_fpga.dtb \
+ 	socfpga_vt.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += \
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
+new file mode 100644
+index 0000000..9aaf413
+--- /dev/null
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
+@@ -0,0 +1,123 @@
++/*
++ *  Copyright (C) 2016 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include "socfpga_cyclone5.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++
++/ {
++	model = "Altera SOCFPGA Cyclone V SoC Macnica Sodia board";
++	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
++
++	chosen {
++		bootargs = "earlyprintk";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		name = "memory";
++		device_type = "memory";
++		reg = <0x0 0x40000000>;
++	};
++
++	aliases {
++		ethernet0 = &gmac1;
++	};
++
++	regulator_3_3v: 3-3-v-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	leds: gpio-leds {
++		compatible = "gpio-leds";
++
++		hps_led0 {
++			label = "hps:green:led0";
++			gpios = <&portb 12 GPIO_ACTIVE_LOW>;
++		};
++
++		hps_led1 {
++			label = "hps:green:led1";
++			gpios = <&portb 13 GPIO_ACTIVE_LOW>;
++		};
++
++		hps_led2 {
++			label = "hps:green:led2";
++			gpios = <&portb 14 GPIO_ACTIVE_LOW>;
++		};
++
++		hps_led3 {
++			label = "hps:green:led3";
++			gpios = <&portb 15 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&gmac1 {
++	status = "okay";
++	phy-mode = "rgmii";
++	phy = <&phy0>;
++
++	mdio0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		phy0: ethernet-phy at 0 {
++			reg = <0>;
++			rxd0-skew-ps = <0>;
++			rxd1-skew-ps = <0>;
++			rxd2-skew-ps = <0>;
++			rxd3-skew-ps = <0>;
++			rxdv-skew-ps = <0>;
++			rxc-skew-ps = <3000>;
++			txen-skew-ps = <0>;
++			txc-skew-ps = <3000>;
++		};
++	};
++};
++
++&gpio1 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++
++	eeprom at 51 {
++		compatible = "atmel,24c32";
++		reg = <0x51>;
++		pagesize = <32>;
++	};
++
++	rtc at 68 {
++		compatible = "dallas,ds1339";
++		reg = <0x68>;
++	};
++};
++
++&mmc0 {
++	cd-gpios = <&portb 18 0>;
++	vmmc-supply = <&regulator_3_3v>;
++	vqmmc-supply = <&regulator_3_3v>;
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
 -- 
-Website: https://fossencdi.org
-Jabber: wolfgang at wiedmeyer.de
-OpenPGP: 0F30 D1A0 2F73 F70A 6FEE  048E 5816 A24C 1075 7FC4
-Key download: https://wiedmeyer.de/keys/ww.asc
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160924/58a07749/attachment.sig>
+2.9.3
