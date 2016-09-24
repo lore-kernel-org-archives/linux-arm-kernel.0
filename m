@@ -1,58 +1,186 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Sat, 24 Sep 2016 10:01:26 +0300
-Subject: [PATCH 2/3] gpio: Add a driver for the Raspberry Pi's firmware
- GPIO calls.
-In-Reply-To: <CACRpkdbJoM-RbcuoC=7xJyrT3v7p2n9HiidRp1GUw=o43_Fkwg@mail.gmail.com>
-References: <20160919161314.25858-1-eric@anholt.net>
- <20160919161314.25858-2-eric@anholt.net>
- <CACRpkda6HpJp97FUAh6yvo-BhiDbAXxzQS9U6uT+jvg6hiB8ag@mail.gmail.com>
- <87mviy92qw.fsf@eliezer.anholt.net>
- <CACRpkdbJoM-RbcuoC=7xJyrT3v7p2n9HiidRp1GUw=o43_Fkwg@mail.gmail.com>
-Message-ID: <87lgyh6at5.fsf@eliezer.anholt.net>
+From: zhichang.yuan02@gmail.com (zhichang)
+Date: Sat, 24 Sep 2016 16:00:37 +0800
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <1760643.vMTR5o5E9g@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <9178320.n4yHmfyPA3@wuerfel> <57E40665.8080005@gmail.com>
+ <1760643.vMTR5o5E9g@wuerfel>
+Message-ID: <378cda2d-e8fb-af10-01ff-c555def3d639@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Hi, Arnd,
 
-> On Fri, Sep 23, 2016 at 3:15 PM, Eric Anholt <eric@anholt.net> wrote:
->> Linus Walleij <linus.walleij@linaro.org> writes:
->>>> diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
->>>> index 3fb357193f09..671ccd00aea2 100644
->>>> --- a/include/soc/bcm2835/raspberrypi-firmware.h
->>>> +++ b/include/soc/bcm2835/raspberrypi-firmware.h
->>>> @@ -73,11 +73,13 @@ enum rpi_firmware_property_tag {
->>>>         RPI_FIRMWARE_GET_DISPMANX_RESOURCE_MEM_HANDLE =       0x00030014,
->>>>         RPI_FIRMWARE_GET_EDID_BLOCK =                         0x00030020,
->>>>         RPI_FIRMWARE_GET_DOMAIN_STATE =                       0x00030030,
->>>> +       RPI_FIRMWARE_GET_GPIO_STATE =                         0x00030041,
->>>>         RPI_FIRMWARE_SET_CLOCK_STATE =                        0x00038001,
->>>>         RPI_FIRMWARE_SET_CLOCK_RATE =                         0x00038002,
->>>>         RPI_FIRMWARE_SET_VOLTAGE =                            0x00038003,
->>>>         RPI_FIRMWARE_SET_TURBO =                              0x00038009,
->>>>         RPI_FIRMWARE_SET_DOMAIN_STATE =                       0x00038030,
->>>> +       RPI_FIRMWARE_SET_GPIO_STATE =                         0x00038041,
->>>
->>> Can you please merge this orthogonally into the rpi tree to ARM SoC?
+
+On 2016?09?23? 17:51, Arnd Bergmann wrote:
+> On Friday, September 23, 2016 12:27:17 AM CEST zhichang.yuan wrote:
+>> For this patch sketch, I have a question.
+>> Do we call pci_address_to_pio in arch_of_address_to_pio to get the 
+>> corresponding logical IO port
+>> for LPC??
+> 
+> 
+> No, of course not, that would be silly:
+> 
+> The argument to pci_address_to_pio() is a phys_addr_t, and we we don't
+> have one because there is no address associated with your PIO, that
+> is the entire point of your driver!
+> 
+ok. I think I know you points. The physical addresses of LPC are only the LPC
+domain addresses, not the really CPU physical addresses. That is just why you
+don't support the ranges property usage in patch V3. Consequently, It is not so
+reasonable to call pci_address_to_pio() with LPC address because that function
+is only suitable for cpu physical address.
+
+But just as you said in the next email reply to Gabriele, "Any IORESOURCE_IO
+address always refers to the logical I/O port range in Linux, not the physical
+address that is used on a bus.", Any devices which support IO accesses should
+have their own unique logical IO range to drive the corresponding hardware. It
+means that the drivers should know the mapping between physical port/memory
+address and logical IO depend on the device specific I/O mode. At this moment,
+only PCI host bridge setup a logical IO range allocation mechanism to manipulate
+this logical IO range, and this way applies cpu physical address(memory) as the
+input. Now, our LPC also need subrange from this common logical IO range, but
+with legacy I/O port rather than CPU memory address. Ok, it break the
+precondition of pci_register_io_range/pci_pio_to_address, we should not use them
+directly for LPC although the calling of pci_pio_to_address is simple and less
+change on the relevant code. We had done like that in V3...
+
+So, the key issue is how to get a logical IO subrange which is not conflicted
+with others, such as pci host bridges??
+
+I list several ideas for discussion:
+
+1. reserve a specific logical IO subrange for LPC
+
+I describe this in "Note 1" below. Please check it.
+This way seems simple without much changes, but it is not generic.
+
+2. setup a separate logical IO subrange allocation mechanism specific for LPC/ISA
+
+Just as your suggestion before, add the arch_of_address_to_pio() for the devices
+which operate I/O with legacy I/O port address rather than memory address in
+MMIO mode. That arch_of_address_to_pio() will return non-conflict logical IO
+with PCI host bridge at last. But the logical IO range is global, those
+functions for LPC/ISA specific logical IO subrange allocation must be
+synchronized with pci_register_io_range/pci_pio_to_address to know what logical
+ranges had been populated. It is not good for the implement dispersion on same
+issue.
+
+3. setup a new underlying method to control the logical IO range management
+
+Based on the existing resource management, add a simplified logical IO range
+management support which only request the logical IO ranges according the IO
+range size ( similar to IORESOURCE_SIZEALIGN mode ), no matter what type the
+physical address is. Then revise the current pci_register_io_range to adopt this
+new method. Of-course, LPC/ISA request the logical IO with this new method too.
+
+This is just a proposition. It is more workload compared with other solutions.
+
+What do you think about these? Any more ideas?
+
+
+> Also, we already know the mapping because this is what the inb/outb
+> workaround is looking at, so there is absolutely no reason to call it
+> either.
+> 
+>> If we don't, it seems the LPC specific IO address will conflict with PCI 
+>> host bridges' logical IO.
 >>
->> This driver would appear in the rpi downstream tree once we settle the
->> driver here.  Or are you asking me to delay this series until I can get
->> them to pull just a patch extending the set of packets?
->
-> Sorry I am not familiar with your development model. I don't know
-> about any RPI downstream tree... What I mean is that the patch to
-> include/soc/bcm2835/raspberrypi-firmware.h should be merged by
-> whoever is maintaining that file, it is not a GPIO file.
->
-> If I get an ACK from the maintainer I can take it into the GPIO
-> tree.
+>> Supposed our LPC populated the IO range from 0x100 to 0x3FF( this is 
+>> normal for ISA similar
+>> devices), after arch_of_address_to_pio(), the r->start will be set as 
+>> 0x100, r->end will be set as
+>> 0x3FF.  And if there is one PCI host bridge who request a IO window size 
+>> over 0x400 at the same
+>> time, the  corresponding r->start and r->end will be set as 0x0, 0x3FF 
+>> after of_address_to_resource
+>> for this host bridge.  Then the IO conflict happens.
+> 
+> You would still need to reserve some space in the io_range_list
+> to avoid possible conflicts, which is a bit ugly with the current
+> definition of pci_register_io_range, but I'm sure can be done.
+> 
 
-Oh, people often say "the rpi tree" to mean downstream (currently 4.4).
-The maintainer of that file upstream is me, and I was hoping you could
-merge through your tree.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160924/7d45838e/attachment.sig>
+Note 1) Do you remember patch V2? There, I modified the pci.c like that to
+reserve 0 - PCIBIOS_MIN_IO (it is 0x1000) :
+
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index aab9d51..ac2e569 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3221,7 +3221,7 @@ int __weak pci_register_io_range(phys_addr_t addr, resourc
+
+ #ifdef PCI_IOBASE
+        struct io_range *range;
+-       resource_size_t allocated_size = 0;
++       resource_size_t allocated_size = PCIBIOS_MIN_IO;
+
+        /* check if the range hasn't been previously recorded */
+        spin_lock(&io_range_lock);
+@@ -3270,7 +3270,7 @@ phys_addr_t pci_pio_to_address(unsigned long pio)
+
+ #ifdef PCI_IOBASE
+        struct io_range *range;
+-       resource_size_t allocated_size = 0;
++       resource_size_t allocated_size = PCIBIOS_MIN_IO;
+
+        if (pio > IO_SPACE_LIMIT)
+                return address;
+@@ -3293,7 +3293,7 @@ unsigned long __weak pci_address_to_pio(phys_addr_t addres
+ {
+ #ifdef PCI_IOBASE
+        struct io_range *res;
+-       resource_size_t offset = 0;
++       resource_size_t offset = PCIBIOS_MIN_IO;
+        unsigned long addr = -1;
+
+        spin_lock(&io_range_lock);
+
+Based on this, a exclusive logical IO subrange is for LPC now. Then we certainly
+can add some special handling in __of_address_to_resource or
+__of_translate_address --> of_translate_one to return the untranslated LPC/ISA
+IO address. But to be honest, I think we don't need this special handling in
+address.c anymore. We had known the LPC/ISA IO is 1:1 to logical IO, just think
+any logical IO port among 0 - 0x1000 should call the LPC registered I/O hooks in
+the new in/out().
+
+Furthermore, we can make the reservation is not fixed as PCIBIOS_MIN_IO. If the
+LPC/ISA probing is run before PCI host bridge probing, we can reserve a
+non-fixed logcial IO subrange what LPC/ISA ask for.
+
+This solution is based on an assumption that no any other devices have to
+request the specific logical IO subrange for LPC/ISA. Probably this assumption
+is ok on arm64, you known, there is no real IO space as X86. But anyway, this
+reservation is not so generic, depended on some special handling.
+
+Does this idea match your comments??
+
+
+> One way I can think of would be to change pci_register_io_range()
+> to just return the logical port number directly (it already
+> knows it!), and pass an invalid physical address (e.g. 
+> #define ISA_WORKAROUND_IO_PORT_WINDOW -0x10000) into it for
+> invalid translations.
+> 
+
+I am not so clear know your idea here.  Do you want to select an unpopulated CPU
+address as the parent address in range property?? or anything else???
+
+
+> Another alternative that just occurred to me would be to move
+> the pci_address_to_pio() call from __of_address_to_resource()
+> into of_bus_pci_translate() and then do the special handling
+> for the ISA/LPC bus in of_bus_isa_translate().
+
+As for this idea, do you mean that of_translate_address will directly return the
+final logical IO start address?? It seems to extend the definition of
+of_translate_address.
+
+
+Thanks,
+Zhichang
+
+> 
+> 	Arnd
+> 
