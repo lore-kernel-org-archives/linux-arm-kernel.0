@@ -1,48 +1,39 @@
-From: eric@nelint.com (Eric Nelson)
-Date: Sat, 24 Sep 2016 05:27:15 -0700
-Subject: Alignment issues with freescale FEC driver
-In-Reply-To: <20160923.224305.942077200829435690.davem@davemloft.net>
-References: <CANn89iLb+QJu+MYh859oAAjcLCsKRpBbzVf43yOdq+HJVtZDpQ@mail.gmail.com>
- <5ee28ee0-cf0c-bdab-1271-f17755365c13@nelint.com>
- <0fe7a310-2d2f-4fca-d698-85d66122d91c@nelint.com>
- <20160923.224305.942077200829435690.davem@davemloft.net>
-Message-ID: <78d1e5e1-30dd-e434-9656-2d2bab32956f@nelint.com>
+From: nicolas.iooss_linux@m4x.org (Nicolas Iooss)
+Date: Sat, 24 Sep 2016 14:31:46 +0200
+Subject: [PATCH 1/1] ARM: add printf format attribute to early_print()
+In-Reply-To: <20160828165815.25647-1-nicolas.iooss_linux@m4x.org>
+References: <20160828165815.25647-1-nicolas.iooss_linux@m4x.org>
+Message-ID: <57873573-dd8f-d2f6-ef1c-4c6b76e70308@m4x.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-On 09/23/2016 07:43 PM, David Miller wrote:
-> From: Eric Nelson <eric@nelint.com>
-> Date: Fri, 23 Sep 2016 10:33:29 -0700
+On 28/08/16 18:58, Nicolas Iooss wrote:
+> Adding such an attribute is helpful to detect errors related to printf
+> formats at compile-time.
 > 
->> Since the hardware requires longword alignment for its' DMA transfers,
->> aligning the IP header will require a memcpy, right?
+> Signed-off-by: Nicolas Iooss <nicolas.iooss_linux@m4x.org>
+> ---
+>  arch/arm/include/asm/setup.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I wish hardware designers didn't do this.
-> 
-> There is no conflict between DMA alignment and properly offseting
-> the packet data by two bytes.
-> 
-> All hardware designers have to do is allow 2 padding bytes to be
-> emitted by the chip before the actual packet data.
-> 
+> diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+> index 3613d7e9fc40..797b8505b49a 100644
+> --- a/arch/arm/include/asm/setup.h
+> +++ b/arch/arm/include/asm/setup.h
+> @@ -22,7 +22,7 @@
+>  static const struct tagtable __tagtable_##fn __tag = { tag, fn }
+>  
+>  extern int arm_add_memory(u64 start, u64 size);
+> -extern void early_print(const char *str, ...);
+> +extern __printf(1, 2) void early_print(const char *str, ...);
+>  extern void dump_machine_table(void);
+>  
+>  #ifdef CONFIG_ATAGS_PROC
 
-Andrew Lunn pointed out that the hardware does support this,
-and I just pushed a patch for the vendor kernel to the meta-freescale
-mailing list:
+Hello,
+I sent this patch a few weeks ago and got no reply (and nothing showed
+up on https://patchwork.kernel.org/patch/9302825/). Could you please
+consider it for 4.9?
 
-https://lists.yoctoproject.org/pipermail/meta-freescale/2016-September/019228.html
-
-> Then the longword or whatever DMA transfer alignment is met
-> whilst still giving the necessary flexibility for where the
-> packet data lands.
-> 
-
-Right. A relatively small change fixes things right up.
-
-Many thanks to Andrew for pointing this out and Russell for providing
-the basis for my patch.
-
-I'll re-work this for the up-stream kernel when I get out from
-under a couple of unrelated things.
+Thanks,
+Nicolas
