@@ -1,39 +1,25 @@
-From: nicolas.iooss_linux@m4x.org (Nicolas Iooss)
-Date: Sat, 24 Sep 2016 14:31:46 +0200
-Subject: [PATCH 1/1] ARM: add printf format attribute to early_print()
-In-Reply-To: <20160828165815.25647-1-nicolas.iooss_linux@m4x.org>
-References: <20160828165815.25647-1-nicolas.iooss_linux@m4x.org>
-Message-ID: <57873573-dd8f-d2f6-ef1c-4c6b76e70308@m4x.org>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 24 Sep 2016 08:47:40 -0400 (EDT)
+Subject: [PATCH v2 0/2] BQL support and fix for a regression issue
+In-Reply-To: <1474621948-9172-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1474621948-9172-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <20160924.084740.220729213459690389.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/16 18:58, Nicolas Iooss wrote:
-> Adding such an attribute is helpful to detect errors related to printf
-> formats at compile-time.
-> 
-> Signed-off-by: Nicolas Iooss <nicolas.iooss_linux@m4x.org>
-> ---
->  arch/arm/include/asm/setup.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-> index 3613d7e9fc40..797b8505b49a 100644
-> --- a/arch/arm/include/asm/setup.h
-> +++ b/arch/arm/include/asm/setup.h
-> @@ -22,7 +22,7 @@
->  static const struct tagtable __tagtable_##fn __tag = { tag, fn }
->  
->  extern int arm_add_memory(u64 start, u64 size);
-> -extern void early_print(const char *str, ...);
-> +extern __printf(1, 2) void early_print(const char *str, ...);
->  extern void dump_machine_table(void);
->  
->  #ifdef CONFIG_ATAGS_PROC
+From: sunil.kovvuri@gmail.com
+Date: Fri, 23 Sep 2016 14:42:26 +0530
 
-Hello,
-I sent this patch a few weeks ago and got no reply (and nothing showed
-up on https://patchwork.kernel.org/patch/9302825/). Could you please
-consider it for 4.9?
+> From: Sunil Goutham <sgoutham@cavium.com>
+> 
+> These patches add byte queue limit support and also fixes a regression
+> issue introduced by commit
+> 'net: thunderx: Use netdev's name for naming VF's interrupts'
+> 
+> Changes from v1:
+> - As suggested added 'Fixes' tag with commit id of previous commit 
+>   which cuased issue.
+> - Also fixed the missing netdev_tx_reset_queue() function call in 
+>   byte queue limits support patch.
 
-Thanks,
-Nicolas
+Series applied to net-next, thanks.
