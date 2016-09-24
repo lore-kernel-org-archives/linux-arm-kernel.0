@@ -1,28 +1,42 @@
 From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Sat, 24 Sep 2016 22:05:00 +0200
-Subject: [PATCH v6 0/3] ASoC: sun4i-codec: Distinguish sun4i from sun7i
-Message-ID: <20160924200503.10728-1-dannym@scratchpost.org>
+Date: Sat, 24 Sep 2016 22:05:01 +0200
+Subject: [PATCH v6 1/3] ASoC: sun4i-codec: Rename sun4i_codec_widgets for
+ consistency
+In-Reply-To: <20160924200503.10728-1-dannym@scratchpost.org>
+References: <20160924200503.10728-1-dannym@scratchpost.org>
+Message-ID: <20160924200503.10728-2-dannym@scratchpost.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce mechanism to detect sun7i and provide a different regmap
-(different compared to sun4i Allwinner A10).
+Rename "sun4i_codec_widgets" to "sun4i_codec_controls" for
+consistency with the struct field name.
 
-The controls will be extended in a forthcoming patch - it is necessary
-to distinguish between sun4i and sun7i controls because they have different
-registers.
+Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
+---
+ sound/soc/sunxi/sun4i-codec.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Rename SUN4I_CODEC_AC_SYS_VERI to SUN7I_CODEC_AC_DAC_CAL and rename
-SUN4I_CODEC_AC_MIC_PHONE_CAL to SUN7I_CODEC_AC_MIC_PHONE_CAL because these
-are actually not present on Allwinner A10.
-
-Handle quirks by regmap config and codec and select the correct quirks
-automatically.  
-
-Danny Milosavljevic (3):
-  ASoC: sun4i-codec: Rename sun4i_codec_widgets for consistency
-  ASoC: sun4i-codec: Rename some sun7i-only registers
-  ASoC: sun4i-codec: Add custom regmap configs
-
- sound/soc/sunxi/sun4i-codec.c | 50 +++++++++++++++++++++++++++++++++++--------
- 1 file changed, 41 insertions(+), 9 deletions(-)
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 0e19c50..c2c0583 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -509,7 +509,7 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
+ 
+ static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
+ 
+-static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
++static const struct snd_kcontrol_new sun4i_codec_controls[] = {
+ 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
+ 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
+ 		       sun4i_codec_pa_volume_scale),
+@@ -629,8 +629,8 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
+ 
+ static struct snd_soc_codec_driver sun4i_codec_codec = {
+ 	.component_driver = {
+-		.controls		= sun4i_codec_widgets,
+-		.num_controls		= ARRAY_SIZE(sun4i_codec_widgets),
++		.controls		= sun4i_codec_controls,
++		.num_controls		= ARRAY_SIZE(sun4i_codec_controls),
+ 		.dapm_widgets		= sun4i_codec_codec_dapm_widgets,
+ 		.num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
+ 		.dapm_routes		= sun4i_codec_codec_dapm_routes,
