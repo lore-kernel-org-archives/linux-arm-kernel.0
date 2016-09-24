@@ -1,30 +1,217 @@
-From: peter.senna@collabora.co.uk (Peter Senna Tschudin)
-Date: Mon, 26 Sep 2016 09:58:26 +0100
-Subject: =?utf-8?q?Re=3A?==?utf-8?q?_=5BPATCH?= V5 =?utf-8?q?3=2F4=5D?=
- =?utf-8?q?_drm=2Fbridge=3A?= Add driver for GE B850v3
- =?utf-8?q?LVDS=2FDP++?= Bridge
-In-Reply-To: <c157d4a6-2d63-07d6-4274-883d79c8ab9e@codeaurora.org>
-Message-ID: <3a56-57e8e300-3-10c8a340@87357206>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 24 Sep 2016 16:29:11 +0800
+Subject: [PATCH 3/3] regulator: axp20x: simplify device access
+In-Reply-To: <d3078ed4eefd4de48e4b5666a64f6123f8d72483.1474616699.git.moinejf@free.fr>
+References: <cover.1474616699.git.moinejf@free.fr>
+ <d3078ed4eefd4de48e4b5666a64f6123f8d72483.1474616699.git.moinejf@free.fr>
+Message-ID: <CAGb2v64ZpQ=9KUH39cFoRxU6n03cgDoUbHegjFfDWaTLQAZ2wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi Archit,
+Hi,
 
-On Monday, September 26, 2016 10:31 CEST, Archit Taneja <architt@codeaurora.org> wrote: 
- 
-> Hi Peter,
-> 
-> On 09/26/2016 01:57 PM, Peter Senna Tschudin wrote:
-> > Patch 1/4 is already on linux-next, but what about this one? Ping?
+On Thu, Sep 22, 2016 at 2:20 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> Use the pointer to the main regulator device instead of the pointer
+> to the child platform device.
+>
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  drivers/regulator/axp20x-regulator.c | 45 ++++++++++++++++++------------------
+>  1 file changed, 23 insertions(+), 22 deletions(-)
+>
+> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+> index 7405f5b..244ddc3 100644
+> --- a/drivers/regulator/axp20x-regulator.c
+> +++ b/drivers/regulator/axp20x-regulator.c
+> @@ -347,9 +347,9 @@ static const struct regulator_desc axp809_regulators[] = {
+>         AXP_DESC_SW(AXP809, SW, "sw", "swin", AXP22X_PWR_OUT_CTRL2, BIT(6)),
+>  };
+>
+> -static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+> +static int axp20x_set_dcdc_freq(struct device *dev, u32 dcdcfreq)
+>  {
+> -       struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+> +       struct axp20x_dev *axp20x = dev_get_drvdata(dev);
+>         unsigned int reg = AXP20X_DCDC_FREQ;
+>         u32 min, max, def, step;
+>
+> @@ -378,7 +378,7 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+>                 step = 150;
+>                 break;
+>         default:
+> -               dev_err(&pdev->dev,
+> +               dev_err(dev,
+>                         "Setting DCDC frequency for unsupported AXP variant\n");
+>                 return -EINVAL;
+>         }
+> @@ -388,13 +388,13 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+>
+>         if (dcdcfreq < min) {
+>                 dcdcfreq = min;
+> -               dev_warn(&pdev->dev, "DCDC frequency too low. Set to %ukHz\n",
+> +               dev_warn(dev, "DCDC frequency too low. Set to %ukHz\n",
+>                          min);
+>         }
+>
+>         if (dcdcfreq > max) {
+>                 dcdcfreq = max;
+> -               dev_warn(&pdev->dev, "DCDC frequency too high. Set to %ukHz\n",
+> +               dev_warn(dev, "DCDC frequency too high. Set to %ukHz\n",
+>                          max);
+>         }
+>
+> @@ -404,24 +404,24 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+>                                   AXP20X_FREQ_DCDC_MASK, dcdcfreq);
+>  }
+>
+> -static int axp20x_regulator_parse_dt(struct platform_device *pdev)
+> +static int axp20x_regulator_parse_dt(struct device *dev)
+>  {
+>         struct device_node *np, *regulators;
+>         int ret;
+>         u32 dcdcfreq = 0;
+>
+> -       np = of_node_get(pdev->dev.parent->of_node);
+> +       np = of_node_get(dev->of_node);
+>         if (!np)
+>                 return 0;
+>
+>         regulators = of_get_child_by_name(np, "regulators");
+>         if (!regulators) {
+> -               dev_warn(&pdev->dev, "regulators node not found\n");
+> +               dev_warn(dev, "regulators node not found\n");
+>         } else {
+>                 of_property_read_u32(regulators, "x-powers,dcdc-freq", &dcdcfreq);
+> -               ret = axp20x_set_dcdc_freq(pdev, dcdcfreq);
+> +               ret = axp20x_set_dcdc_freq(dev, dcdcfreq);
+>                 if (ret < 0) {
+> -                       dev_err(&pdev->dev, "Error setting dcdc frequency: %d\n", ret);
+> +                       dev_err(dev, "Error setting dcdc frequency: %d\n", ret);
+>                         return ret;
+>                 }
+>
+> @@ -499,11 +499,12 @@ static u32 axp20x_polyphase_slave(struct axp20x_dev *axp20x)
+>
+>  static int axp20x_regulator_probe(struct platform_device *pdev)
+>  {
+> +       struct device *dev = pdev->dev.parent;
 
-> 
-> I'd posted some queries a couple of times which you didn't answer to.
-> Could you please respond to them before we try to get this merged?
+There are 2 struct device's in play in this function, 1 from the parent,
+and 1 for the platform device for this regulator sub-device.
 
-Your queries were already answered by similar questions. The commit messages and cover letter also addresses the design decisions of the code. But basically the driver usefulness to other scenarios is severely limited by the firmware used by both chips. And when using the firmware that goes with this specific hardware, then yes, the two chips are always expected to work together. But the main point is that with the custom firmware each chip do not behave as independent bridges anymore.
+>         struct regulator_dev *rdev;
+> -       struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+> +       struct axp20x_dev *axp20x = dev_get_drvdata(dev);
+>         const struct regulator_desc *regulators;
+>         struct regulator_config config = {
+> -               .dev = pdev->dev.parent,
+> +               .dev = dev,
+>                 .regmap = axp20x->regmap,
+>                 .driver_data = axp20x,
+>         };
+> @@ -532,7 +533,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+>                 dcdc5_ix = AXP22X_DCDC5;
+>                 dc1sw_ix = AXP22X_DC1SW;
+>                 dc5ldo_ix = AXP22X_DC5LDO;
+> -               drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
+> +               drivevbus = of_property_read_bool(dev->of_node,
+>                                                   "x-powers,drive-vbus-en");
+>                 break;
+>         case AXP806_ID:
+> @@ -555,13 +556,13 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+>                 dc5ldo_ix = AXP809_DC5LDO;
+>                 break;
+>         default:
+> -               dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
+> +               dev_err(dev, "Unsupported AXP variant: %ld\n",
 
-On the other side, I was careful to use meaningful names for the registers, so a future implementation based on same chips can take the basics from this work, at least as a starting point.
+So this one is incorrect. You should use this device's struct,
+not the parent. It's possible the mfd driver supports a PMIC,
+but the regulator driver is still missing.
 
-Thanks,
+>                         axp20x->variant);
+>                 return -EINVAL;
+>         }
+>
+>         /* This only sets the dcdc freq. Ignore any errors */
+> -       axp20x_regulator_parse_dt(pdev);
+> +       axp20x_regulator_parse_dt(dev);
+>
+>         for (i = 0; i < nregulators; i++) {
+>                 const struct regulator_desc *desc = &regulators[i];
+> @@ -580,7 +581,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+>                  * name.
+>                  */
+>                 if (i == dc1sw_ix && dcdc1_name) {
+> -                       new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
+> +                       new_desc = devm_kzalloc(dev, sizeof(*desc),
+>                                                 GFP_KERNEL);
+>                         *new_desc = regulators[i];
+>                         new_desc->supply_name = dcdc1_name;
+> @@ -588,16 +589,16 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+>                 }
+>
+>                 if (i == dc5ldo_ix && dcdc5_name) {
+> -                       new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
+> +                       new_desc = devm_kzalloc(dev, sizeof(*desc),
+>                                                 GFP_KERNEL);
 
-Peter
+Same here. The devres lifetime should be bound to this driver, not the parent.
+
+>                         *new_desc = regulators[i];
+>                         new_desc->supply_name = dcdc5_name;
+>                         desc = new_desc;
+>                 }
+>
+> -               rdev = devm_regulator_register(&pdev->dev, desc, &config);
+> +               rdev = devm_regulator_register(dev, desc, &config);
+
+Same here.
+
+>                 if (IS_ERR(rdev)) {
+> -                       dev_err(&pdev->dev, "Failed to register %s\n",
+> +                       dev_err(dev, "Failed to register %s\n",
+
+Same here.
+
+>                                 regulators[i].name);
+>
+>                         return PTR_ERR(rdev);
+> @@ -608,7 +609,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+>                                            &workmode);
+>                 if (!ret) {
+>                         if (axp20x_set_dcdc_workmode(rdev, i, workmode))
+> -                               dev_err(&pdev->dev, "Failed to set workmode on %s\n",
+> +                               dev_err(dev, "Failed to set workmode on %s\n",
+
+Same here.
+
+>                                         rdev->desc->name);
+>                 }
+>
+> @@ -630,11 +631,11 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+>                 /* Change N_VBUSEN sense pin to DRIVEVBUS output pin */
+>                 regmap_update_bits(axp20x->regmap, AXP20X_OVER_TMP,
+>                                    AXP22X_MISC_N_VBUSEN_FUNC, 0);
+> -               rdev = devm_regulator_register(&pdev->dev,
+> +               rdev = devm_regulator_register(dev,
+
+Same here.
+
+>                                                &axp22x_drivevbus_regulator,
+>                                                &config);
+>                 if (IS_ERR(rdev)) {
+> -                       dev_err(&pdev->dev, "Failed to register drivevbus\n");
+> +                       dev_err(dev, "Failed to register drivevbus\n");
+
+Same here.
+
+Regards
+ChenYu
+
+>                         return PTR_ERR(rdev);
+>                 }
+>         }
+> --
+> 2.10.0
+>
