@@ -1,42 +1,40 @@
-From: dannym@scratchpost.org (Danny Milosavljevic)
-Date: Sat, 24 Sep 2016 22:05:01 +0200
-Subject: [PATCH v6 1/3] ASoC: sun4i-codec: Rename sun4i_codec_widgets for
- consistency
-In-Reply-To: <20160924200503.10728-1-dannym@scratchpost.org>
-References: <20160924200503.10728-1-dannym@scratchpost.org>
-Message-ID: <20160924200503.10728-2-dannym@scratchpost.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 24 Sep 2016 23:00:40 +0200
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <05a573de-e963-6590-6ed3-55af97067d7a@gmail.com>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1849232.KJrfRPHGN6@wuerfel> <05a573de-e963-6590-6ed3-55af97067d7a@gmail.com>
+Message-ID: <2866656.cISrGNv8pP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename "sun4i_codec_widgets" to "sun4i_codec_controls" for
-consistency with the struct field name.
+On Saturday, September 24, 2016 4:14:15 PM CEST zhichang wrote:
+> 
+> In V3, the outb is :
+> 
+> void outb(u8 value, unsigned long addr)
+> {
+>         if (!arm64_extio_ops || arm64_extio_ops->start > addr ||
+>                         arm64_extio_ops->end < addr)
+>                 writeb(value, PCI_IOBASE + addr);
+>         else
+>                 if (arm64_extio_ops->pfout)
+>                         arm64_extio_ops->pfout(arm64_extio_ops->devpara,
+>                                 addr + arm64_extio_ops->ptoffset, &value,
+>                                 sizeof(u8), 1);
+> }
+> 
+> here, arm64_extio_ops->ptoffset is the offset between the real legacy IO address
+> and the logical IO address, similar to the offset of primary address and
+> secondary address in PCI bridge.
 
-Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
----
- sound/soc/sunxi/sun4i-codec.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Ok, though we can probably simplify this by making the assumption that
+'ptoffset' is the negative of 'start', as the bus we register should
+always start at port zero.
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 0e19c50..c2c0583 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -509,7 +509,7 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
- 
- static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
- 
--static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
-+static const struct snd_kcontrol_new sun4i_codec_controls[] = {
- 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
- 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
- 		       sun4i_codec_pa_volume_scale),
-@@ -629,8 +629,8 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 
- static struct snd_soc_codec_driver sun4i_codec_codec = {
- 	.component_driver = {
--		.controls		= sun4i_codec_widgets,
--		.num_controls		= ARRAY_SIZE(sun4i_codec_widgets),
-+		.controls		= sun4i_codec_controls,
-+		.num_controls		= ARRAY_SIZE(sun4i_codec_controls),
- 		.dapm_widgets		= sun4i_codec_codec_dapm_widgets,
- 		.num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
- 		.dapm_routes		= sun4i_codec_codec_dapm_routes,
+> But in V3, LPC driver call pci_address_to_pio to request the logical IO as PCI
+> host bridge during its probing.
+
+Right, so this still needs to be fixed.
+
+	Arnd
