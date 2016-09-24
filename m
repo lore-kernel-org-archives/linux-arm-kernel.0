@@ -1,28 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 23 Sep 2016 22:45:53 -0400 (EDT)
-Subject: Alignment issues with freescale FEC driver
-In-Reply-To: <bc19d934-f50b-50d6-0f4f-ecfcb8a2a1c9@nelint.com>
-References: <0fe7a310-2d2f-4fca-d698-85d66122d91c@nelint.com>
- <20160923181301.GD22965@lunn.ch>
- <bc19d934-f50b-50d6-0f4f-ecfcb8a2a1c9@nelint.com>
-Message-ID: <20160923.224553.1824171056324385383.davem@davemloft.net>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Sat, 24 Sep 2016 12:28:46 +0800
+Subject: [PATCH] crypto: sunxi-ss: mark sun4i_hash() static
+Message-ID: <1474691326-15541-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Nelson <eric@nelint.com>
-Date: Fri, 23 Sep 2016 11:35:17 -0700
+We get 1 warning when building kernel with W=1:
+drivers/crypto/sunxi-ss/sun4i-ss-hash.c:168:5: warning: no previous prototype for 'sun4i_hash' [-Wmissing-prototypes]
 
-> From the i.MX6DQ reference manual, bit 7 of ENET_RACC says this:
-> 
-> "RX FIFO Shift-16
-> 
-> When this field is set, the actual frame data starts at bit 16 of the first
-> word read from the RX FIFO aligning the Ethernet payload on a
-> 32-bit boundary."
-> 
-> Same for the i.MX6UL.
-> 
-> I'm not sure what it will take to use this, but it seems to be exactly
-> what we're looking for.
+In fact, this function is only used in the file in which it is
+declared and don't need a declaration, but can be made static.
+So this patch marks it 'static'.
 
-+1
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ drivers/crypto/sunxi-ss/sun4i-ss-hash.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+index 1afeb8e..0de2f62 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-hash.c
+@@ -165,7 +165,7 @@ int sun4i_hash_import_sha1(struct ahash_request *areq, const void *in)
+  * write remaining data in op->buf
+  * final state op->len=56
+  */
+-int sun4i_hash(struct ahash_request *areq)
++static int sun4i_hash(struct ahash_request *areq)
+ {
+ 	u32 v, ivmode = 0;
+ 	unsigned int i = 0;
+-- 
+2.7.4
