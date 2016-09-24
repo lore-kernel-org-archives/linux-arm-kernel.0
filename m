@@ -1,93 +1,41 @@
-From: zhichang.yuan02@gmail.com (zhichang)
-Date: Sat, 24 Sep 2016 16:14:15 +0800
-Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <1849232.KJrfRPHGN6@wuerfel>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <10705430.q2aqv5uYO3@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F8850F2@lhreml507-mbx>
- <1849232.KJrfRPHGN6@wuerfel>
-Message-ID: <05a573de-e963-6590-6ed3-55af97067d7a@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 24 Sep 2016 10:41:54 +0200
+Subject: [PATCH 0/2] i2c: meson: add gxbb compatible string
+In-Reply-To: <CAL_JsqJGQ2az=eO0PbfcTrAPxUsym=UaDOOy1Rsw0-AbzMjnXg@mail.gmail.com>
+References: <1473846557-18123-1-git-send-email-jbrunet@baylibre.com>
+ <20160915194146.GB7863@katana>
+ <CAL_JsqKNFzo6RWJO5WOvsyO3e4UTo5Zn48aaDac=+uL_CQWerQ@mail.gmail.com>
+ <20160923221312.GA5683@katana>
+ <CAL_JsqKi9Dk5-nF9xFD-89TTUinaGjMv5s1=N2b-Xyu98b+S3w@mail.gmail.com>
+ <20160923232641.GB5683@katana>
+ <CAL_JsqJGQ2az=eO0PbfcTrAPxUsym=UaDOOy1Rsw0-AbzMjnXg@mail.gmail.com>
+Message-ID: <20160924084154.GA1434@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd,
 
-On 2016?09?23? 23:55, Arnd Bergmann wrote:
-> On Friday, September 23, 2016 2:59:55 PM CEST Gabriele Paoloni wrote:
->>
->>>> From the perspective of the indirect IO function the input parameter
->>>> is an unsigned long addr that (now) can be either:
->>>> 1) an IO token coming from a legacy pci device
->>>> 2) a phys address that lives on the LPC bus
->>>>
->>>> These are conceptually two separate address spaces (and actually they
->>>> both start from 0).
->>>
->>> Why? Any IORESOURCE_IO address always refers to the logical I/O port
->>> range in Linux, not the physical address that is used on a bus.
->>
->> If I read the code correctly when you get an I/O token you just add it
->> to PCI_IOBASE.
->> This is enough since pci_remap_iospace set the virtual address to 
->> PCI_IOBASE + the I/O token offset; so we can read/write to
->> vaddr = PCI_IOBASE + token as pci_remap_iospace has mapped it correctly
->> to the respective PCI cpu address (that is set in the I/O range property
->> of the host controller)
->>
->> In the patchset accessors LPC operates directly on the cpu addresses
->> and the input parameter of the accessors can be either an IO token or
->> a cpu address
->>
->> +static inline void outb(u8 value, unsigned long addr)
->> +{
->> +#ifdef CONFIG_ARM64_INDIRECT_PIO
->> +       if (arm64_extio_ops && arm64_extio_ops->start <= addr &&
->> +                       addr <= arm64_extio_ops->end)
->>
->> Here below we operate on cpu address
->>
->> +               extio_outb(value, addr);
->> +       else
->> +#endif
-> 
-> I missed this bug earlier, this obviously needs to be
-> 
-> 		arm64_extio_ops->outb(value, addr - arm64_extio_ops->start);
-> 
-> or possibly
-> 
-> 		arm64_extio_ops->outb(arm64_extio_ops, value, addr);
-> 
-> as the outb function won't know what the offset is, but
-> that needed to be fixed regardless.
+> I did state some reasons previously. Consistent rules for submitters
+> of DT bindings and being able to trace history beyond git. Now, I
+> guess you aren't changing the rules, but you probably aren't
+> requesting people to split DT bindings either? You might not be aware,
+> but we also generate a DT only tree with git-filter-branch[1] for
+> non-kernel projects to use bindings and dts files. For that, sure they
+> will only get the DT binding part of it, but what commit text do they
+> get? Finally, DT maintainer acks (which from me is a review really)
+> apply to the bindings only. Sometimes I review the drivers, but not
+> often. So I would like the git history of my reviews to be accurate in
+> terms of what I actually reviewed.
 
-In V3, the outb is :
+Points taken. Will keep them seperate from now on.
 
-void outb(u8 value, unsigned long addr)
-{
-	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||
-			arm64_extio_ops->end < addr)
-		writeb(value, PCI_IOBASE + addr);
-	else
-		if (arm64_extio_ops->pfout)
-			arm64_extio_ops->pfout(arm64_extio_ops->devpara,
-				addr + arm64_extio_ops->ptoffset, &value,
-				sizeof(u8), 1);
-}
+Thanks,
 
-here, arm64_extio_ops->ptoffset is the offset between the real legacy IO address
-and the logical IO address, similar to the offset of primary address and
-secondary address in PCI bridge.
+   Wolfram
 
-But in V3, LPC driver call pci_address_to_pio to request the logical IO as PCI
-host bridge during its probing.
-
-
-cheers,
-Zhichang
-
-
-
-> 
-> 	Arnd
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160924/b82a4946/attachment-0001.sig>
