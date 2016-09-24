@@ -1,34 +1,37 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Sat, 24 Sep 2016 17:14:22 +0800
-Subject: [PATCH 2/5] Documentation: arm64: Add Hisilicon Hip07 D05 dts binding
-In-Reply-To: <1474708465-38958-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1474708465-38958-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1474708465-38958-3-git-send-email-wangkefeng.wang@huawei.com>
+Date: Sat, 24 Sep 2016 17:14:20 +0800
+Subject: [PATCH 0/5] arm64: dts: hisilicon: Hip06 fix and support Hip07 D05
+ board
+Message-ID: <1474708465-38958-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the devicetree bindings used by
-the DT files of Hisilicon Hip07 D05 board.
+1) DTs
+- Fix Hip06 ehci/ohci interrupt pin number.
+- Add initial support for Hip07 D05 board.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+2) PL011
+- The sbsa uart is used on Hip07 SoC, the interrupt is connected to mbigen,
+  but the uart probe(arch_init) is earlier than mbigen(module_init), so
+  don't complain on -EPROBE_DEFER when no irq.
+- Add earlycon support for SBSA UART.
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 3f81575..7df79a7 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -28,6 +28,10 @@ HiP06 D03 Board
- Required root node properties:
- 	- compatible = "hisilicon,hip06-d03";
- 
-+HiP07 D05 Board
-+Required root node properties:
-+	- compatible = "hisilicon,hip07-d05";
-+
- Hisilicon system controller
- 
- Required properties:
+Kefeng Wang (5):
+  arm64: dts: hip06: Correct hardware pin number of usb node
+  Documentation: arm64: Add Hisilicon Hip07 D05 dts binding
+  arm64: dts: hisilicon: Add initial dts for Hip07 D05 board
+  tty: amba-pl011: Don't complain on -EPROBE_DEFER when no irq
+  tty: amba-pl011: Add earlycon support for SBSA UART
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |    4 +
+ arch/arm64/boot/dts/hisilicon/Makefile             |    1 +
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi           |    4 +-
+ arch/arm64/boot/dts/hisilicon/hip07-d05.dts        |   66 ++
+ arch/arm64/boot/dts/hisilicon/hip07.dtsi           | 1059 ++++++++++++++++++++
+ drivers/tty/serial/amba-pl011.c                    |    4 +-
+ 6 files changed, 1135 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hip07-d05.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hip07.dtsi
+
 -- 
 1.7.12.4
