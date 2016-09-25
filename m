@@ -1,34 +1,63 @@
 From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Sun, 25 Sep 2016 15:38:28 +0800
-Subject: [PATCH 1/2] drm/rockchip: add missing header dependencies
-Message-ID: <1474789109-22010-1-git-send-email-baoyou.xie@linaro.org>
+Date: Sun, 25 Sep 2016 15:38:29 +0800
+Subject: [PATCH] drm/mediatek: mark symbols static where possible
+In-Reply-To: <1474789109-22010-1-git-send-email-baoyou.xie@linaro.org>
+References: <1474789109-22010-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <1474789109-22010-2-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get 2 warnings when building kernel with W=1:
-drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c:130:5: warning: no previous prototype for 'rockchip_drm_fbdev_init' [-Wmissing-prototypes]
-drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c:173:6: warning: no previous prototype for 'rockchip_drm_fbdev_fini' [-Wmissing-prototypes]
+We get 4 warnings when building kernel with W=1:
+drivers/gpu/drm/mediatek/mtk_hdmi.c:1089:6: warning: no previous prototype for 'mtk_hdmi_audio_enable' [-Wmissing-prototypes]
+drivers/gpu/drm/mediatek/mtk_hdmi.c:1095:6: warning: no previous prototype for 'mtk_hdmi_audio_disable' [-Wmissing-prototypes]
+drivers/gpu/drm/mediatek/mtk_hdmi.c:1101:5: warning: no previous prototype for 'mtk_hdmi_audio_set_param' [-Wmissing-prototypes]
+drivers/gpu/drm/mediatek/mtk_hdmi.c:1627:5: warning: no previous prototype for 'mtk_hdmi_audio_digital_mute' [-Wmissing-prototypes]
 
-In fact, these functions are declared
-in drivers/gpu/drm/rockchip/rockchip_drm_fbdev.h,
-so this patch adds missing header dependencies.
+In fact, both functions are only used in the file in which they are
+declared and don't need a declaration, but can be made static.
+So this patch marks both functions with 'static'.
 
 Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/mediatek/mtk_hdmi.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-index 207e01d..a16c69f 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-@@ -20,6 +20,7 @@
- #include "rockchip_drm_drv.h"
- #include "rockchip_drm_gem.h"
- #include "rockchip_drm_fb.h"
-+#include "rockchip_drm_fbdev.h"
+diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+index 334562d..be4e19c 100644
+--- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
++++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+@@ -1086,19 +1086,19 @@ static int mtk_hdmi_output_init(struct mtk_hdmi *hdmi)
+ 	return 0;
+ }
  
- #define PREFERRED_BPP		32
- #define to_drm_private(x) \
+-void mtk_hdmi_audio_enable(struct mtk_hdmi *hdmi)
++static void mtk_hdmi_audio_enable(struct mtk_hdmi *hdmi)
+ {
+ 	mtk_hdmi_aud_enable_packet(hdmi, true);
+ 	hdmi->audio_enable = true;
+ }
+ 
+-void mtk_hdmi_audio_disable(struct mtk_hdmi *hdmi)
++static void mtk_hdmi_audio_disable(struct mtk_hdmi *hdmi)
+ {
+ 	mtk_hdmi_aud_enable_packet(hdmi, false);
+ 	hdmi->audio_enable = false;
+ }
+ 
+-int mtk_hdmi_audio_set_param(struct mtk_hdmi *hdmi,
++static int mtk_hdmi_audio_set_param(struct mtk_hdmi *hdmi,
+ 			     struct hdmi_audio_param *param)
+ {
+ 	if (!hdmi->audio_enable) {
+@@ -1624,7 +1624,8 @@ static void mtk_hdmi_audio_shutdown(struct device *dev, void *data)
+ 	mtk_hdmi_audio_disable(hdmi);
+ }
+ 
+-int mtk_hdmi_audio_digital_mute(struct device *dev, void *data, bool enable)
++static int
++mtk_hdmi_audio_digital_mute(struct device *dev, void *data, bool enable)
+ {
+ 	struct mtk_hdmi *hdmi = dev_get_drvdata(dev);
+ 
 -- 
 2.7.4
