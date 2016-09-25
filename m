@@ -1,172 +1,56 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Sun, 25 Sep 2016 08:59:45 +0900
-Subject: [PATCH v2] ARM: dts: socfpga: Add Macnica sodia board
-Message-ID: <20160924235945.32128-1-iwamatsu@nigauri.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Sun, 25 Sep 2016 09:29:19 +0900
+Subject: [PATCH v2.1] arm64: kgdb: handle read-only text / modules
+In-Reply-To: <20160923102340.GA2161@e104818-lin.cambridge.arm.com>
+References: <20160923074208.9899-1-takahiro.akashi@linaro.org>
+ <20160923094953.GC27704@e104818-lin.cambridge.arm.com>
+ <20160923102340.GA2161@e104818-lin.cambridge.arm.com>
+Message-ID: <20160925002917.GB4855@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for board based on the Altera Cyclone V SoC.
-This board has the following functions:
-    - 1 GiB of DRAM
-    - 1 Gigabit ethernet
-    - 1 SD card slot
-    - 1 USB gadget port
-    - QSPI NOR Flash
-    - I2C EEPROMs and I2C RTC
-    - DVI output
-    - Audio port
+Hi Catalin,
 
-This commit supports without QSPI, DVI and Audio.
+On Fri, Sep 23, 2016 at 11:23:40AM +0100, Catalin Marinas wrote:
+> On Fri, Sep 23, 2016 at 10:49:53AM +0100, Catalin Marinas wrote:
+> > On Fri, Sep 23, 2016 at 04:42:08PM +0900, AKASHI Takahiro wrote:
+> > > Handle read-only cases (CONFIG_DEBUG_RODATA/CONFIG_DEBUG_SET_MODULE_RONX)
+> > > by using aarch64_insn_write() instead of probe_kernel_write().
+> > > See how this works:
+> > >     commit 2f896d586610 ("arm64: use fixmap for text patching")
+> > > 
+> > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: Jason Wessel <jason.wessel@windriver.com>
+> > > Cc: <stable@vger.kernel.org> # 3.18-3.19: 2f896d5: arm64: use fixmap
+> > > Cc: <stable@vger.kernel.org> # 3.18-3.19: f6242ca: arm64: Fix text
+> > > Cc: <stable@vger.kernel.org> # 4.0-
+> > 
+> > Queued for 4.8 with a slight change in the last Cc: tag above:
+> > 
+> > Cc: <stable@vger.kernel.org> # 3.18.x-
+> 
+> I tried to apply this patch to 3.18, 4.1, 4.4, 4.7. It fails on all of
+> them with smaller or slightly larger conflicts.
 
-Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
----
- V2: move the PHY of setting to the Ethetnet PHY node level.
+Oh, too bad.
+I guest we'd better revert the following patches as well:
+    c696b93 arm64/debug: Simplify BRK insn opcode declarations
+    c172d99 arm64/debug: More consistent naming for the BRK ESR template macro
+but I will check anyway.
 
- arch/arm/boot/dts/Makefile                   |   1 +
- arch/arm/boot/dts/socfpga_cyclone5_sodia.dts | 123 +++++++++++++++++++++++++++
- 2 files changed, 124 insertions(+)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
+> So, I'll merge it in 4.8 without any "Cc: stable" tags, just a "Fixes:"
+> one for the commit introducing CONFIG_DEBUG_SET_MODULE_RONX (3.18). Once
+> the patch reaches mainline, could you please back-port and test it on
+> the stable kernel versions and send separate patches to
+> stable at vger.kernel.org?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index befcd26..7c5f0c3 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -696,6 +696,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
- 	socfpga_cyclone5_de0_sockit.dtb \
- 	socfpga_cyclone5_sockit.dtb \
- 	socfpga_cyclone5_socrates.dtb \
-+	socfpga_cyclone5_sodia.dtb \
- 	socfpga_cyclone5_vining_fpga.dtb \
- 	socfpga_vt.dtb
- dtb-$(CONFIG_ARCH_SPEAR13XX) += \
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-new file mode 100644
-index 0000000..9aaf413
---- /dev/null
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-@@ -0,0 +1,123 @@
-+/*
-+ *  Copyright (C) 2016 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include "socfpga_cyclone5.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "Altera SOCFPGA Cyclone V SoC Macnica Sodia board";
-+	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+
-+	chosen {
-+		bootargs = "earlyprintk";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>;
-+	};
-+
-+	aliases {
-+		ethernet0 = &gmac1;
-+	};
-+
-+	regulator_3_3v: 3-3-v-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	leds: gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		hps_led0 {
-+			label = "hps:green:led0";
-+			gpios = <&portb 12 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		hps_led1 {
-+			label = "hps:green:led1";
-+			gpios = <&portb 13 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		hps_led2 {
-+			label = "hps:green:led2";
-+			gpios = <&portb 14 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		hps_led3 {
-+			label = "hps:green:led3";
-+			gpios = <&portb 15 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&gmac1 {
-+	status = "okay";
-+	phy-mode = "rgmii";
-+	phy = <&phy0>;
-+
-+	mdio0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		phy0: ethernet-phy at 0 {
-+			reg = <0>;
-+			rxd0-skew-ps = <0>;
-+			rxd1-skew-ps = <0>;
-+			rxd2-skew-ps = <0>;
-+			rxd3-skew-ps = <0>;
-+			rxdv-skew-ps = <0>;
-+			rxc-skew-ps = <3000>;
-+			txen-skew-ps = <0>;
-+			txc-skew-ps = <3000>;
-+		};
-+	};
-+};
-+
-+&gpio1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	eeprom at 51 {
-+		compatible = "atmel,24c32";
-+		reg = <0x51>;
-+		pagesize = <32>;
-+	};
-+
-+	rtc at 68 {
-+		compatible = "dallas,ds1339";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&mmc0 {
-+	cd-gpios = <&portb 18 0>;
-+	vmmc-supply = <&regulator_3_3v>;
-+	vqmmc-supply = <&regulator_3_3v>;
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
--- 
-2.9.3
+Thanks,
+-Takahiro AKASHI
+
+> Thanks.
+> 
+> -- 
+> Catalin
