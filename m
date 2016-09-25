@@ -1,44 +1,41 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Sun, 25 Sep 2016 15:43:08 +0800
-Subject: [PATCH 2/2] drm/rockchip: mark symbols static where possible
-Message-ID: <1474789388-3284-1-git-send-email-baoyou.xie@linaro.org>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Sun, 25 Sep 2016 09:47:52 +0200
+Subject: [PATCH v4 0/1] Armada 7k/8k CP110 system controller fixes
+Message-ID: <1474789673-3837-1-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get 2 warnings when building kernel with W=1:
-drivers/gpu/drm/rockchip/rockchip_drm_drv.c:309:6: warning: no previous prototype for 'rockchip_drm_fb_suspend' [-Wmissing-prototypes]
-drivers/gpu/drm/rockchip/rockchip_drm_drv.c:318:6: warning: no previous prototype for 'rockchip_drm_fb_resume' [-Wmissing-prototypes]
+Hi,
 
-In fact, these functions are only used in the file in which they are
-declared and don't need a declaration, but can be made static.
-So this patch marks these functions with 'static'.
+Two patches from the third version of the patchset have already been
+applied, so I re-send the last one with corrected allocation of
+clock data, which was pointed in the review.
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Any feedback would be very welcome.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index 76eaf1d..38c3be5 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -309,7 +309,7 @@ static struct drm_driver rockchip_drm_driver = {
- };
- 
- #ifdef CONFIG_PM_SLEEP
--void rockchip_drm_fb_suspend(struct drm_device *drm)
-+static void rockchip_drm_fb_suspend(struct drm_device *drm)
- {
- 	struct rockchip_drm_private *priv = drm->dev_private;
- 
-@@ -318,7 +318,7 @@ void rockchip_drm_fb_suspend(struct drm_device *drm)
- 	console_unlock();
- }
- 
--void rockchip_drm_fb_resume(struct drm_device *drm)
-+static void rockchip_drm_fb_resume(struct drm_device *drm)
- {
- 	struct rockchip_drm_private *priv = drm->dev_private;
- 
+Best regards,
+Marcin
+
+Changelog:
+v4 <- v3
+* fix allocation of clock data
+
+v3 <- v2
+* return -ENOMEM on alloc failures
+
+v1 <- v2
+* replace setting CLK_IS_BASIC flag with clearing init structure fields
+  with memset
+* minor improvements of allocation and error checking
+* add migration to clk_hw
+
+
+Marcin Wojtas (1):
+  clk: mvebu: migrate CP110 system controller to clk_hw API and
+    registration
+
+ drivers/clk/mvebu/cp110-system-controller.c | 150 +++++++++++++---------------
+ 1 file changed, 72 insertions(+), 78 deletions(-)
+
 -- 
-2.7.4
+1.8.3.1
