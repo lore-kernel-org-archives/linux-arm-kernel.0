@@ -1,66 +1,53 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 25 Sep 2016 18:07:30 +0200
-Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
-References: <20160905105803.13ed27ff@canb.auug.org.au>
- <20160905182603.GS1041@n2100.armlinux.org.uk>
-Message-ID: <871t08c69p.fsf@belgarion.home>
+From: panand@redhat.com (Pratyush Anand)
+Date: Sun, 25 Sep 2016 22:32:28 +0530
+Subject: [PATCH 5/5] arm64: Add uprobe support
+In-Reply-To: <20160923130528.GE2161@e104818-lin.cambridge.arm.com>
+References: <cover.1470114993.git.panand@redhat.com>
+ <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
+ <20160920165946.GA19353@e104818-lin.cambridge.arm.com>
+ <20160921110047.GA29470@localhost.localdomain>
+ <20160921170403.GE12180@e104818-lin.cambridge.arm.com>
+ <20160922032328.GB29470@localhost.localdomain>
+ <20160922165030.GA27704@e104818-lin.cambridge.arm.com>
+ <20160923041230.GC29470@localhost.localdomain>
+ <20160923130528.GE2161@e104818-lin.cambridge.arm.com>
+Message-ID: <CAHB_GupuUYPNFoYQeX8EhAcesvqKVVuphuxneudZ5kL2cxm-7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+On Fri, Sep 23, 2016 at 6:35 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Sep 23, 2016 at 09:42:30AM +0530, Pratyush Anand wrote:
+>> On 22/09/2016:05:50:30 PM, Catalin Marinas wrote:
+>> > On Thu, Sep 22, 2016 at 08:53:28AM +0530, Pratyush Anand wrote:
+>> > > On 21/09/2016:06:04:04 PM, Catalin Marinas wrote:
 
-> On Mon, Sep 05, 2016 at 10:58:03AM +1000, Stephen Rothwell wrote:
->> I fixed it up (I deleted the file) and can carry the fix as
->> necessary. This is now fixed as far as linux-next is concerned, but any
->> non trivial conflicts should be mentioned to your upstream maintainer
->> when your tree is submitted for merging.  You may also want to consider
->> cooperating with the maintainer of the conflicting tree to minimise any
->> particularly complex conflicts.
-
-...zip...
-> Since the patch in my tree is fixing a regression caused by the broken
-> conversions, I'm not mindful to drop it from the merge window - I
-> actually want to push it into -rc kernels.  We _do_ need to fix the
-> DT regressions, and quickly though, and push those with this patch.
+>> > As a quick workaround you could check mm->task_size > TASK_SIZE_32 in
+>> > the arch_uprobe_analyze_insn() function.
+>>
+>> It would be doable. TASK_SIZE_32 is defined only for COMPAT. So, may be I can
+>> return -EINVAL when mm->task_size < TASK_SIZE_64.
 >
-> Since I don't use the SMC91x with DT, that's outside of what I can
-> test, so consider this a call for help on that subject.
-Then consider you have one more tester, for a 16-bits access.
+> That's just a temporary workaround. If we ever merge ILP32, this test
+> would no longer be enough (as the ISA is AArch64 but with TASK_SIZE_32).
 
-My lubbock is now DT aware, with a smc91x ethernet card actually working,
-provided the small patch in [2].
+OK.. So what about doing something similar what x86 is doing.
+We can have a flag for task Type in arch specific mm_context_t. We
+also set this flag in COMPAT_SET_PERSONALITY() along with setting
+thread_info flag, and we clear them in SET_PERSONALITY().
 
-Cheers.
+>
+> Looking at prepare_uprobe(), we have a weak is_trap_insn() function.
+> This check is meaningless without knowing which instruction set we
+> target. A false positive here, however, is not that bad as we wouldn't
+> end up inserting the wrong breakpoint in the executable. But it looks to
+> me like the core uprobe code needs to pass some additional information
+> like the type of task or ELF format to the arch code to make a useful
+> choice of breakpoint type.
 
--- 
-Robert
+It seems that 'strtle r0, [r0], #160' would have the closest matching
+aarch32 instruction wrt BRK64_OPCODE_UPROBES(0xd42000A0). But that too
+seems a bad instruction. So, may be we can use still weak
+is_trap_insn().
 
-[1] DT extract
-	ethernet at extbus {
-		compatible = "smsc,lan91c94";
-		reg = <0x0c000c00 0x100000 0x0e00000 0x100000>;
-		reg-names = "smc91x-regs", "smc91x-attrib";
-		interrupts-extended = <&pxa_cplds_irqs 3 IRQ_TYPE_EDGE_RISING>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_eth_default>;
-		reg-io-width = <2>;
-		reg-io-shift = <2>;
-	};
-
-
-[2] Patch for lubbock
----8>---
-diff --git a/drivers/net/ethernet/smsc/smc91x.c b/drivers/net/ethernet/smsc/smc91x.c
-index 726b80f45906..6d4fdac6c0e0 100644
---- a/drivers/net/ethernet/smsc/smc91x.c
-+++ b/drivers/net/ethernet/smsc/smc91x.c
-@@ -2316,6 +2316,9 @@ static int smc_drv_probe(struct platform_device *pdev)
- 		} else {
- 			lp->cfg.flags |= SMC91X_USE_16BIT;
- 		}
-+		if (!device_property_read_u32(&pdev->dev, "reg-io-shift",
-+					      &val))
-+			lp->io_shift = val;
- 	}
- #endif
- 
+~Pratyush
