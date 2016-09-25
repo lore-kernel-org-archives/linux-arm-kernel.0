@@ -1,9 +1,7 @@
 From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Sun, 25 Sep 2016 15:38:29 +0800
+Date: Sun, 25 Sep 2016 15:41:05 +0800
 Subject: [PATCH] drm/mediatek: mark symbols static where possible
-In-Reply-To: <1474789109-22010-1-git-send-email-baoyou.xie@linaro.org>
-References: <1474789109-22010-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1474789109-22010-2-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <1474789265-30142-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
