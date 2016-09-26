@@ -1,38 +1,46 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 26 Sep 2016 21:29:26 +0200
-Subject: [PATCH 0/4] kill get_clock_tick_rate()
-In-Reply-To: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Mon, 19 Sep 2016 21:12:11 +0200")
-References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <87twd2bgtl.fsf@belgarion.home>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Mon, 26 Sep 2016 14:34:59 -0500
+Subject: [PATCH] ARM: dts: socfpga: enable arm,shared-override in the pl310
+Message-ID: <1474918499-9811-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-> Hi,
->
-> This serie aims at killing get_clock_tick_rate() from pxa and sa1100 and replace
-> it by clock API calls.
->
-> I'd like to have this reviewed and acked afterwards at least by :
->  - Russell for the mach-sa1100 and sa1100_wdt.c
->  - Stephen or Michael for the clk-pxa25x.c
->  - Thomas or Daniel for the clocksource part
->  - Wim for sa1100_wdt.c
->
-> If the review converges, I'd also like to take it through the pxa/for-next tree,
-> or alternatively Russell's tree if there is a dependency I'm not seeing, for
-> v4.10 cycle.
+Enable the bit(22) shared-override bit for the SoCFPGA family. While at it,
+enable the prefetch-data and prefetch-instr settings for the Arria10.
 
-Hi Russell,
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/boot/dts/socfpga.dtsi         |    1 +
+ arch/arm/boot/dts/socfpga_arria10.dtsi |    3 +++
+ 2 files changed, 4 insertions(+)
 
-Would you have time within the next 2 weeks to give this serie a review and
-maybe an Ack from the sa1100 impacted parts (that would be patches 2, 3 and 4) ?
-
-I can also resend the serie if it's easier in your workflow.
-
-Cheers.
-
---
-Robert
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 9f48141..28ff6e4 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -686,6 +686,7 @@
+ 			arm,data-latency = <2 1 1>;
+ 			prefetch-data = <1>;
+ 			prefetch-instr = <1>;
++			arm,shared-override;
+ 		};
+ 
+ 		mmc: dwmmc0 at ff704000 {
+diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+index 94000cb..16fcb9f 100644
+--- a/arch/arm/boot/dts/socfpga_arria10.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+@@ -573,6 +573,9 @@
+ 			interrupts = <0 18 IRQ_TYPE_LEVEL_HIGH>;
+ 			cache-unified;
+ 			cache-level = <2>;
++			prefetch-data = <1>;
++			prefetch-instr = <1>;
++			arm,shared-override;
+ 		};
+ 
+ 		mmc: dwmmc0 at ff808000 {
+-- 
+1.7.9.5
