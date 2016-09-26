@@ -1,153 +1,34 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 26 Sep 2016 08:22:18 +0200
-Subject: [PATCH v3] arm: dts: zynq: Add MicroZed board support
-In-Reply-To: <1474624113-22825-1-git-send-email-jagan@amarulasolutions.com>
-References: <1474624113-22825-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <f0c33080-0811-a515-f897-e7f851b13b5e@xilinx.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 26 Sep 2016 08:23:18 +0200
+Subject: [PATCH v2 3/4] clk: imx31: fix rewritten input argument of
+ mx31_clocks_init()
+In-Reply-To: <1474848223-19728-4-git-send-email-vz@mleia.com>
+References: <1474848223-19728-1-git-send-email-vz@mleia.com>
+ <1474848223-19728-4-git-send-email-vz@mleia.com>
+Message-ID: <20160926062318.c6tipjjktvmxpwed@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.9.2016 11:48, Jagan Teki wrote:
-> From: Jagan Teki <jteki@openedev.com>
-> 
-> Added basic dts support for MicroZed board.
-> 
-> - UART
-> - SDHCI
-> - Ethernet
-> 
-> Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Signed-off-by: Jagan Teki <jteki@openedev.com>
-> ---
-> Changes for v3:
-> 	- Add Xilinx copyright
-> Changes for v2:
-> 	- Add SDHCI
-> 	- Add Ethernet
-> 
->  arch/arm/boot/dts/Makefile          |  1 +
->  arch/arm/boot/dts/zynq-microzed.dts | 96 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 97 insertions(+)
->  create mode 100644 arch/arm/boot/dts/zynq-microzed.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index faacd52..4d7b858 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -862,6 +862,7 @@ dtb-$(CONFIG_ARCH_VT8500) += \
->  	wm8750-apc8750.dtb \
->  	wm8850-w70v2.dtb
->  dtb-$(CONFIG_ARCH_ZYNQ) += \
-> +	zynq-microzed.dtb \
->  	zynq-parallella.dtb \
->  	zynq-zc702.dtb \
->  	zynq-zc706.dtb \
-> diff --git a/arch/arm/boot/dts/zynq-microzed.dts b/arch/arm/boot/dts/zynq-microzed.dts
-> new file mode 100644
-> index 0000000..b9376a4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/zynq-microzed.dts
-> @@ -0,0 +1,96 @@
-> +/*
-> + * Copyright (C) 2011 - 2014 Xilinx
-> + * Copyright (C) 2016 Jagan Teki <jteki@openedev.com>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +/dts-v1/;
-> +/include/ "zynq-7000.dtsi"
-> +
-> +/ {
-> +	model = "Zynq MicroZED Development Board";
-> +	compatible = "xlnx,zynq-microzed", "xlnx,zynq-7000";
-> +
-> +	aliases {
-> +		ethernet0 = &gem0;
-> +		serial0 = &uart1;
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x0 0x40000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "earlycon";
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	usb_phy0: phy0 {
-> +		compatible = "usb-nop-xceiv";
-> +		#phy-cells = <0>;
-> +	};
-> +};
-> +
-> +&clkc {
-> +	ps-clk-frequency = <33333333>;
-> +};
-> +
-> +&gem0 {
-> +	status = "okay";
-> +	phy-mode = "rgmii-id";
-> +	phy-handle = <&ethernet_phy>;
-> +
-> +	ethernet_phy: ethernet-phy at 0 {
-> +		reg = <0>;
-> +	};
-> +};
-> +
-> +&sdhci0 {
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> +
-> +&usb0 {
-> +	status = "okay";
-> +	dr_mode = "host";
-> +	usb-phy = <&usb_phy0>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usb0_default>;
-> +};
-> +
-> +&pinctrl0 {
-> +	pinctrl_usb0_default: usb0-default {
-> +		mux {
-> +			groups = "usb0_0_grp";
-> +			function = "usb0";
-> +		};
-> +
-> +		conf {
-> +			groups = "usb0_0_grp";
-> +			slew-rate = <0>;
-> +			io-standard = <1>;
-> +		};
-> +
-> +		conf-rx {
-> +			pins = "MIO29", "MIO31", "MIO36";
-> +			bias-high-impedance;
-> +		};
-> +
-> +		conf-tx {
-> +			pins = "MIO28", "MIO30", "MIO32", "MIO33", "MIO34",
-> +			       "MIO35", "MIO37", "MIO38", "MIO39";
-> +			bias-disable;
-> +		};
-> +	};
-> +};
-> 
+Hello,
 
-Applied.
+On Mon, Sep 26, 2016 at 03:03:42AM +0300, Vladimir Zapolskiy wrote:
+> Function mx31_clocks_init() is called during clock intialization on
+> legacy boards with reference clock frequency passed as its input
+> argument, this can be verified by examination of the function
+> declaration found in arch/arm/mach-imx/common.h and actual function
+> users which include that header file.
+> 
+> Inside CCF driver the function ignores its input argument, by chance
+> the used value in the function body is the same as input arguments on
+> side of all callers.
+> 
+> Fixes: d9388c843237 ("clk: imx31: Do not call mxc_timer_init twice when booting with DT")
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Reviewed-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Thanks,
-Michal
+Thanks
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
