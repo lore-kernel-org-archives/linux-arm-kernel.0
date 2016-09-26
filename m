@@ -1,56 +1,47 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 26 Sep 2016 03:03:41 +0300
-Subject: [PATCH v2 2/4] ARM: dts: imx31: move CCM device node to AIPS2 bus
- devices
+Date: Mon, 26 Sep 2016 03:03:42 +0300
+Subject: [PATCH v2 3/4] clk: imx31: fix rewritten input argument of
+ mx31_clocks_init()
 In-Reply-To: <1474848223-19728-1-git-send-email-vz@mleia.com>
 References: <1474848223-19728-1-git-send-email-vz@mleia.com>
-Message-ID: <1474848223-19728-3-git-send-email-vz@mleia.com>
+Message-ID: <1474848223-19728-4-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX31 Clock Control Module controller is found on AIPS2 bus, move it
-there from SPBA bus to avoid a conflict of device IO space mismatch.
+Function mx31_clocks_init() is called during clock intialization on
+legacy boards with reference clock frequency passed as its input
+argument, this can be verified by examination of the function
+declaration found in arch/arm/mach-imx/common.h and actual function
+users which include that header file.
 
-Fixes: ef0e4a606fb6 ("ARM: mx31: Replace clk_register_clkdev with clock DT lookup")
+Inside CCF driver the function ignores its input argument, by chance
+the used value in the function body is the same as input arguments on
+side of all callers.
+
+Fixes: d9388c843237 ("clk: imx31: Do not call mxc_timer_init twice when booting with DT")
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
 Changes from v1 to v2:
-* new change in the series
+* reworded commit message, thanks to Uwe for review
 
- arch/arm/boot/dts/imx31.dtsi | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/clk/imx/clk-imx31.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx31.dtsi b/arch/arm/boot/dts/imx31.dtsi
-index 3e0893e..8d4c0e3 100644
---- a/arch/arm/boot/dts/imx31.dtsi
-+++ b/arch/arm/boot/dts/imx31.dtsi
-@@ -118,13 +118,6 @@
- 				interrupts = <19>;
- 				clocks = <&clks 25>;
- 			};
+diff --git a/drivers/clk/imx/clk-imx31.c b/drivers/clk/imx/clk-imx31.c
+index 6a96414..6a49ba2 100644
+--- a/drivers/clk/imx/clk-imx31.c
++++ b/drivers/clk/imx/clk-imx31.c
+@@ -157,10 +157,8 @@ static void __init _mx31_clocks_init(unsigned long fref)
+ 	}
+ }
+ 
+-int __init mx31_clocks_init(void)
++int __init mx31_clocks_init(unsigned long fref)
+ {
+-	u32 fref = 26000000; /* default */
 -
--			clks: ccm at 53f80000{
--				compatible = "fsl,imx31-ccm";
--				reg = <0x53f80000 0x4000>;
--				interrupts = <31>, <53>;
--				#clock-cells = <1>;
--			};
- 		};
+ 	_mx31_clocks_init(fref);
  
- 		aips at 53f00000 { /* AIPS2 */
-@@ -134,6 +127,13 @@
- 			reg = <0x53f00000 0x100000>;
- 			ranges;
- 
-+			clks: ccm at 53f80000{
-+				compatible = "fsl,imx31-ccm";
-+				reg = <0x53f80000 0x4000>;
-+				interrupts = <31>, <53>;
-+				#clock-cells = <1>;
-+			};
-+
- 			gpt: timer at 53f90000 {
- 				compatible = "fsl,imx31-gpt";
- 				reg = <0x53f90000 0x4000>;
+ 	clk_register_clkdev(clk[gpt_gate], "per", "imx-gpt.0");
 -- 
 2.8.1
