@@ -1,217 +1,117 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 24 Sep 2016 16:29:11 +0800
-Subject: [PATCH 3/3] regulator: axp20x: simplify device access
-In-Reply-To: <d3078ed4eefd4de48e4b5666a64f6123f8d72483.1474616699.git.moinejf@free.fr>
-References: <cover.1474616699.git.moinejf@free.fr>
- <d3078ed4eefd4de48e4b5666a64f6123f8d72483.1474616699.git.moinejf@free.fr>
-Message-ID: <CAGb2v64ZpQ=9KUH39cFoRxU6n03cgDoUbHegjFfDWaTLQAZ2wg@mail.gmail.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Mon, 26 Sep 2016 17:26:27 +0800
+Subject: [PATCH v13 0/4] Add clock support for Mediatek MT2701
+Message-ID: <1474881991-17429-1-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series is based on clk-next, add clock and reset controller support
+for Mediatek MT2701.
 
-On Thu, Sep 22, 2016 at 2:20 AM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> Use the pointer to the main regulator device instead of the pointer
-> to the child platform device.
->
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
->  drivers/regulator/axp20x-regulator.c | 45 ++++++++++++++++++------------------
->  1 file changed, 23 insertions(+), 22 deletions(-)
->
-> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-> index 7405f5b..244ddc3 100644
-> --- a/drivers/regulator/axp20x-regulator.c
-> +++ b/drivers/regulator/axp20x-regulator.c
-> @@ -347,9 +347,9 @@ static const struct regulator_desc axp809_regulators[] = {
->         AXP_DESC_SW(AXP809, SW, "sw", "swin", AXP22X_PWR_OUT_CTRL2, BIT(6)),
->  };
->
-> -static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
-> +static int axp20x_set_dcdc_freq(struct device *dev, u32 dcdcfreq)
->  {
-> -       struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
-> +       struct axp20x_dev *axp20x = dev_get_drvdata(dev);
->         unsigned int reg = AXP20X_DCDC_FREQ;
->         u32 min, max, def, step;
->
-> @@ -378,7 +378,7 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
->                 step = 150;
->                 break;
->         default:
-> -               dev_err(&pdev->dev,
-> +               dev_err(dev,
->                         "Setting DCDC frequency for unsupported AXP variant\n");
->                 return -EINVAL;
->         }
-> @@ -388,13 +388,13 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
->
->         if (dcdcfreq < min) {
->                 dcdcfreq = min;
-> -               dev_warn(&pdev->dev, "DCDC frequency too low. Set to %ukHz\n",
-> +               dev_warn(dev, "DCDC frequency too low. Set to %ukHz\n",
->                          min);
->         }
->
->         if (dcdcfreq > max) {
->                 dcdcfreq = max;
-> -               dev_warn(&pdev->dev, "DCDC frequency too high. Set to %ukHz\n",
-> +               dev_warn(dev, "DCDC frequency too high. Set to %ukHz\n",
->                          max);
->         }
->
-> @@ -404,24 +404,24 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
->                                   AXP20X_FREQ_DCDC_MASK, dcdcfreq);
->  }
->
-> -static int axp20x_regulator_parse_dt(struct platform_device *pdev)
-> +static int axp20x_regulator_parse_dt(struct device *dev)
->  {
->         struct device_node *np, *regulators;
->         int ret;
->         u32 dcdcfreq = 0;
->
-> -       np = of_node_get(pdev->dev.parent->of_node);
-> +       np = of_node_get(dev->of_node);
->         if (!np)
->                 return 0;
->
->         regulators = of_get_child_by_name(np, "regulators");
->         if (!regulators) {
-> -               dev_warn(&pdev->dev, "regulators node not found\n");
-> +               dev_warn(dev, "regulators node not found\n");
->         } else {
->                 of_property_read_u32(regulators, "x-powers,dcdc-freq", &dcdcfreq);
-> -               ret = axp20x_set_dcdc_freq(pdev, dcdcfreq);
-> +               ret = axp20x_set_dcdc_freq(dev, dcdcfreq);
->                 if (ret < 0) {
-> -                       dev_err(&pdev->dev, "Error setting dcdc frequency: %d\n", ret);
-> +                       dev_err(dev, "Error setting dcdc frequency: %d\n", ret);
->                         return ret;
->                 }
->
-> @@ -499,11 +499,12 @@ static u32 axp20x_polyphase_slave(struct axp20x_dev *axp20x)
->
->  static int axp20x_regulator_probe(struct platform_device *pdev)
->  {
-> +       struct device *dev = pdev->dev.parent;
+Since some patches in v11 had been applied into clk-next, they were not
+included in v13 series.
 
-There are 2 struct device's in play in this function, 1 from the parent,
-and 1 for the platform device for this regulator sub-device.
+changes since v12:
+- Rebase to clk-next.
+- Use CLK_OF_DECLARE_DRIVER() instead of CLK_OF_DECLARE().
+- Use dev_* and devm_* APIs instead of pr_* and ioremap().
+- Refine init functions. Share error messages in common probe().
+- Fix null pointer checking for clk_data.
 
->         struct regulator_dev *rdev;
-> -       struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
-> +       struct axp20x_dev *axp20x = dev_get_drvdata(dev);
->         const struct regulator_desc *regulators;
->         struct regulator_config config = {
-> -               .dev = pdev->dev.parent,
-> +               .dev = dev,
->                 .regmap = axp20x->regmap,
->                 .driver_data = axp20x,
->         };
-> @@ -532,7 +533,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
->                 dcdc5_ix = AXP22X_DCDC5;
->                 dc1sw_ix = AXP22X_DC1SW;
->                 dc5ldo_ix = AXP22X_DC5LDO;
-> -               drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
-> +               drivevbus = of_property_read_bool(dev->of_node,
->                                                   "x-powers,drive-vbus-en");
->                 break;
->         case AXP806_ID:
-> @@ -555,13 +556,13 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
->                 dc5ldo_ix = AXP809_DC5LDO;
->                 break;
->         default:
-> -               dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
-> +               dev_err(dev, "Unsupported AXP variant: %ld\n",
+changes since v11:
+- Rebase to clk-next.
+- Return error code from probe() if clock registration fail.
 
-So this one is incorrect. You should use this device's struct,
-not the parent. It's possible the mfd driver supports a PMIC,
-but the regulator driver is still missing.
+changes since v10:
+- Remove COMMON_CLK dependency from clk/mediatek/Kconfig.
 
->                         axp20x->variant);
->                 return -EINVAL;
->         }
->
->         /* This only sets the dcdc freq. Ignore any errors */
-> -       axp20x_regulator_parse_dt(pdev);
-> +       axp20x_regulator_parse_dt(dev);
->
->         for (i = 0; i < nregulators; i++) {
->                 const struct regulator_desc *desc = &regulators[i];
-> @@ -580,7 +581,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
->                  * name.
->                  */
->                 if (i == dc1sw_ix && dcdc1_name) {
-> -                       new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
-> +                       new_desc = devm_kzalloc(dev, sizeof(*desc),
->                                                 GFP_KERNEL);
->                         *new_desc = regulators[i];
->                         new_desc->supply_name = dcdc1_name;
-> @@ -588,16 +589,16 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
->                 }
->
->                 if (i == dc5ldo_ix && dcdc5_name) {
-> -                       new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
-> +                       new_desc = devm_kzalloc(dev, sizeof(*desc),
->                                                 GFP_KERNEL);
+changes since v9:
+- Rebase to v4.8-rc1.
+- Drop a fix patch of parent clock initial state. It will be replaced by a new
+  patch from Mike/Stephen.
+- Replace clk.h with clk-provider.h.
+- Correct register settings of clocks.
 
-Same here. The devres lifetime should be bound to this driver, not the parent.
+changes since v8:
+- Rebase to v4.7-rc1.
+- Include mt2701-resets.h in mt2701.dtsi.
+- Remove an unused property from apmixedsys DT node.
 
->                         *new_desc = regulators[i];
->                         new_desc->supply_name = dcdc5_name;
->                         desc = new_desc;
->                 }
->
-> -               rdev = devm_regulator_register(&pdev->dev, desc, &config);
-> +               rdev = devm_regulator_register(dev, desc, &config);
+changes since v7:
+- Rebase to clk-next.
+- Implement subsystem clocks in seperated files.
+- Replace critical clock enabling with CLK_IS_CRITICAL flag.
+- Reduce most clock registrations in CLK_OF_DECLARE().
+- Remove __init and __initconst from most init fucntions and data,
+  and replace driver registration with platform_driver_register().
+- Replace some common function or variable names with unique names.
+- Use real clock for UARTs.
 
-Same here.
+changes since v6:
+- Rebase to v4.6-rc1.
+- Register subsystem clocks in probe() instead of CLK_OF_DECLARE().
+- Add clocks that referred by subsystem clocks.
+- Fix clk_data size of apmixedsys.
+- Add config options for each subsystem clock provider.
 
->                 if (IS_ERR(rdev)) {
-> -                       dev_err(&pdev->dev, "Failed to register %s\n",
-> +                       dev_err(dev, "Failed to register %s\n",
+changes since v5:
+- Rebase to v4.5-rc1 and [1].
+- Enable critical clocks for MT2701
+- Refine dt-binding documents, add reset controller support for hifsys.
 
-Same here.
+changes since v4:
+- Rebase to v4.5-rc1.
+- Remove CLK_SET_RATE_PARENT from divider flags.
+- Add img_jpgdec_smi clock.
+- Move clk/mediatek/Kconfig into menu section in clk/Kconfig.
 
->                                 regulators[i].name);
->
->                         return PTR_ERR(rdev);
-> @@ -608,7 +609,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
->                                            &workmode);
->                 if (!ret) {
->                         if (axp20x_set_dcdc_workmode(rdev, i, workmode))
-> -                               dev_err(&pdev->dev, "Failed to set workmode on %s\n",
-> +                               dev_err(dev, "Failed to set workmode on %s\n",
+changes since v3:
+- Change the parent of mm_mdp_bls_26m from clk26m to pwm_sel.
 
-Same here.
+changes since v2:
+- Fix ethsys definition.
+- Replace read-modify-write with regmap_update_bits() in clock operations.
+- Move mt2701-resets.h to include/dt-bindings/reset/.
+- Add hifsys reset patch from John Crispin.
 
->                                         rdev->desc->name);
->                 }
->
-> @@ -630,11 +631,11 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
->                 /* Change N_VBUSEN sense pin to DRIVEVBUS output pin */
->                 regmap_update_bits(axp20x->regmap, AXP20X_OVER_TMP,
->                                    AXP22X_MISC_N_VBUSEN_FUNC, 0);
-> -               rdev = devm_regulator_register(&pdev->dev,
-> +               rdev = devm_regulator_register(dev,
+changes since v1:
+- Document MT2701 compatible strings.
 
-Same here.
+[1] https://patchwork.kernel.org/patch/8147901/
 
->                                                &axp22x_drivevbus_regulator,
->                                                &config);
->                 if (IS_ERR(rdev)) {
-> -                       dev_err(&pdev->dev, "Failed to register drivevbus\n");
-> +                       dev_err(dev, "Failed to register drivevbus\n");
+Erin Lo (1):
+  arm: dts: mt2701: Use real clock for UARTs
 
-Same here.
+James Liao (1):
+  arm: dts: mt2701: Add clock controller device nodes
 
-Regards
-ChenYu
+Shunli Wang (2):
+  clk: mediatek: Add MT2701 clock support
+  reset: mediatek: Add MT2701 reset driver
 
->                         return PTR_ERR(rdev);
->                 }
->         }
-> --
-> 2.10.0
->
+ arch/arm/boot/dts/mt2701.dtsi          |   50 +-
+ drivers/clk/mediatek/Kconfig           |   43 ++
+ drivers/clk/mediatek/Makefile          |    7 +
+ drivers/clk/mediatek/clk-gate.c        |   52 ++
+ drivers/clk/mediatek/clk-gate.h        |    2 +
+ drivers/clk/mediatek/clk-mt2701-bdp.c  |  148 +++++
+ drivers/clk/mediatek/clk-mt2701-eth.c  |   90 +++
+ drivers/clk/mediatek/clk-mt2701-hif.c  |   91 +++
+ drivers/clk/mediatek/clk-mt2701-img.c  |   90 +++
+ drivers/clk/mediatek/clk-mt2701-mm.c   |  133 ++++
+ drivers/clk/mediatek/clk-mt2701-vdec.c |  101 +++
+ drivers/clk/mediatek/clk-mt2701.c      | 1054 ++++++++++++++++++++++++++++++++
+ drivers/clk/mediatek/clk-mtk.c         |   40 ++
+ drivers/clk/mediatek/clk-mtk.h         |   41 +-
+ drivers/clk/mediatek/clk-pll.c         |    1 +
+ 15 files changed, 1933 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-bdp.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-eth.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-hif.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-img.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-mm.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-vdec.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701.c
+
+--
+1.9.1
