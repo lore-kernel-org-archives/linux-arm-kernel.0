@@ -1,65 +1,465 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 26 Sep 2016 12:01:59 +0100
-Subject: [PATCH 5/5] arm64: Add uprobe support
-In-Reply-To: <CAHB_GupuUYPNFoYQeX8EhAcesvqKVVuphuxneudZ5kL2cxm-7g@mail.gmail.com>
-References: <cover.1470114993.git.panand@redhat.com>
- <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
- <20160920165946.GA19353@e104818-lin.cambridge.arm.com>
- <20160921110047.GA29470@localhost.localdomain>
- <20160921170403.GE12180@e104818-lin.cambridge.arm.com>
- <20160922032328.GB29470@localhost.localdomain>
- <20160922165030.GA27704@e104818-lin.cambridge.arm.com>
- <20160923041230.GC29470@localhost.localdomain>
- <20160923130528.GE2161@e104818-lin.cambridge.arm.com>
- <CAHB_GupuUYPNFoYQeX8EhAcesvqKVVuphuxneudZ5kL2cxm-7g@mail.gmail.com>
-Message-ID: <20160926110159.GB27498@e104818-lin.cambridge.arm.com>
+From: peter.senna@collabora.co.uk (Peter Senna Tschudin)
+Date: Mon, 26 Sep 2016 12:54:54 +0100
+Subject: =?utf-8?q?Re=3A?==?utf-8?q?_=5BPATCH?= V5 =?utf-8?q?3=2F4=5D?=
+ =?utf-8?q?_drm=2Fbridge=3A?= Add driver for GE B850v3
+ =?utf-8?q?LVDS=2FDP++?= Bridge
+In-Reply-To: <180ae266-a4fb-4432-83dc-e39f2ccb0ad1@codeaurora.org>
+Message-ID: <5734-57e90c80-11-398829c0@7164733>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 25, 2016 at 10:32:28PM +0530, Pratyush Anand wrote:
-> On Fri, Sep 23, 2016 at 6:35 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Fri, Sep 23, 2016 at 09:42:30AM +0530, Pratyush Anand wrote:
-> >> On 22/09/2016:05:50:30 PM, Catalin Marinas wrote:
-> >> > On Thu, Sep 22, 2016 at 08:53:28AM +0530, Pratyush Anand wrote:
-> >> > > On 21/09/2016:06:04:04 PM, Catalin Marinas wrote:
+ 
+On Monday, September 26, 2016 12:29 CEST, Archit Taneja <architt@codeaurora.org> wrote: 
+ 
+> Hi,
 > 
-> >> > As a quick workaround you could check mm->task_size > TASK_SIZE_32 in
-> >> > the arch_uprobe_analyze_insn() function.
-> >>
-> >> It would be doable. TASK_SIZE_32 is defined only for COMPAT. So, may be I can
-> >> return -EINVAL when mm->task_size < TASK_SIZE_64.
+> Some comments.
+
+Thank you for the review!
+
+> 
+> On 08/09/2016 10:11 PM, Peter Senna Tschudin wrote:
+> > Add a driver that create a drm_bridge and a drm_connector for the LVDS
+> > to DP++ display bridge of the GE B850v3.
 > >
-> > That's just a temporary workaround. If we ever merge ILP32, this test
-> > would no longer be enough (as the ISA is AArch64 but with TASK_SIZE_32).
+> > There are two physical bridges on the video signal pipeline: a
+> > STDP4028(LVDS to DP) and a STDP2690(DP to DP++).  The hardware and
+
+> > firmware made it complicated for this binding to comprise two device
+> > tree nodes, as the design goal is to configure both bridges based on
+> > the LVDS signal, which leave the driver powerless to control the video
+> > processing pipeline. The two bridges behaves as a single bridge, and
+> > the driver is only needed for telling the host about EDID / HPD, and
+> > for giving the host powers to ack interrupts. The video signal pipeline
+> > is as follows:
+> >
+> >   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
+> >
+> > Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+> > Cc: Martin Donnelly <martin.donnelly@ge.com>
+> > Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
+> > Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> > Cc: Rob Herring <robh@kernel.org>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > CC: David Airlie <airlied@linux.ie>
+> > CC: Thierry Reding <treding@nvidia.com>
+> > CC: Thierry Reding <thierry.reding@gmail.com>
+> > Reviewed-by: Enric Balletbo <enric.balletbo@collabora.com>
+> > Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> > ---
+> > Changes from V4:
+> >  - Check the output of the first call to i2c_smbus_write_word_data() and return
+> >    it's error code for failing gracefully on i2c issues
+> >  - Renamed the i2c_driver.name from "ge,b850v3-lvds-dp" to "b850v3-lvds-dp" to
+> >    remove the comma from the driver name
+> >
+> > Changes from V3:
+> >  - 3/4 instead of 4/5
+> >  - Tested on next-20160804
+> >
+> > Changes from V2:
+> >  - Made it atomic to be applied on next-20160729 on top of Liu Ying changes
+> >    that made imx-ldb atomic
+> >
+> > Changes from V1:
+> >  - New commit message
+> >  - Removed 3 empty entry points
+> >  - Removed memory leak from ge_b850v3_lvds_dp_get_modes()
+> >  - Added a lock for mode setting
+> >  - Removed a few blank lines
+> >  - Changed the order at Makefile and Kconfig
+> >
+> >  MAINTAINERS                                |   8 +
+> >  drivers/gpu/drm/bridge/Kconfig             |  11 +
+> >  drivers/gpu/drm/bridge/Makefile            |   1 +
+> >  drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c | 405 +++++++++++++++++++++++++++++
+> >  4 files changed, 425 insertions(+)
+> >  create mode 100644 drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c
+> >
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index a306795..e8d106a 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -5142,6 +5142,14 @@ W:	https://linuxtv.org
+> >  S:	Maintained
+> >  F:	drivers/media/radio/radio-gemtek*
+> >
+> > +GENERAL ELECTRIC B850V3 LVDS/DP++ BRIDGE
+> > +M:	Peter Senna Tschudin <peter.senna@collabora.com>
+> > +M:	Martin Donnelly <martin.donnelly@ge.com>
+> > +M:	Martyn Welch <martyn.welch@collabora.co.uk>
+> > +S:	Maintained
+> > +F:	drivers/gpu/drm/bridge/ge_b850v3_dp2.c
+> > +F:	Documentation/devicetree/bindings/ge/b850v3_dp2_bridge.txt
+
+> > +
+> >  GENERIC GPIO I2C DRIVER
+> >  M:	Haavard Skinnemoen <hskinnemoen@gmail.com>
+> >  S:	Supported
 > 
-> OK.. So what about doing something similar what x86 is doing.
-> We can have a flag for task Type in arch specific mm_context_t. We
-> also set this flag in COMPAT_SET_PERSONALITY() along with setting
-> thread_info flag, and we clear them in SET_PERSONALITY().
+> Could you move the MAINTAINERS change to a different patch? It would 
+> make it easier to integrate separately.
 
-This looks like a better approach.
+If needed, yes sure.
 
-> > Looking at prepare_uprobe(), we have a weak is_trap_insn() function.
-> > This check is meaningless without knowing which instruction set we
-> > target. A false positive here, however, is not that bad as we wouldn't
-> > end up inserting the wrong breakpoint in the executable. But it looks to
-> > me like the core uprobe code needs to pass some additional information
-> > like the type of task or ELF format to the arch code to make a useful
-> > choice of breakpoint type.
 > 
-> It seems that 'strtle r0, [r0], #160' would have the closest matching
-> aarch32 instruction wrt BRK64_OPCODE_UPROBES(0xd42000A0). But that too
-> seems a bad instruction. So, may be we can use still weak
-> is_trap_insn().
+> > diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> > index b590e67..b4b70fb 100644
+> > --- a/drivers/gpu/drm/bridge/Kconfig
+> > +++ b/drivers/gpu/drm/bridge/Kconfig
+> > @@ -32,6 +32,17 @@ config DRM_DW_HDMI_AHB_AUDIO
+> >  	  Designware HDMI block.  This is used in conjunction with
+> >  	  the i.MX6 HDMI driver.
+> >
+> > +config DRM_GE_B850V3_LVDS_DP
+> > +	tristate "GE B850v3 LVDS to DP++ display bridge"
+> > +	depends on OF
+> > +	select DRM_KMS_HELPER
+> > +	select DRM_PANEL
+> > +	---help---
+> > +          This is a driver for the display bridge of
+> > +          GE B850v3 that convert dual channel LVDS
+> > +          to DP++. This is used with the i.MX6 imx-ldb
+> > +          driver.
+> > +
+> >  config DRM_NXP_PTN3460
+> >  	tristate "NXP PTN3460 DP/LVDS bridge"
+> >  	depends on OF
+> > diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+> > index efdb07e..b9606f3 100644
+> > --- a/drivers/gpu/drm/bridge/Makefile
+> > +++ b/drivers/gpu/drm/bridge/Makefile
+> > @@ -3,6 +3,7 @@ ccflags-y := -Iinclude/drm
+> >  obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
+> >  obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
+> >  obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
+> > +obj-$(CONFIG_DRM_GE_B850V3_LVDS_DP) += ge_b850v3_lvds_dp.o
+> >  obj-$(CONFIG_DRM_NXP_PTN3460) += nxp-ptn3460.o
+> >  obj-$(CONFIG_DRM_PARADE_PS8622) += parade-ps8622.o
+> >  obj-$(CONFIG_DRM_SII902X) += sii902x.o
+> > diff --git a/drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c b/drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c
+> > new file mode 100644
+> > index 0000000..81e9279
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c
+> > @@ -0,0 +1,405 @@
+> > +/*
+> > + * Driver for GE B850v3 DP display bridge
+> > +
+> > + * Copyright (c) 2016, Collabora Ltd.
+> > + * Copyright (c) 2016, General Electric Company
+> > +
+> > + * This program is free software; you can redistribute it and/or modify it
+> > + * under the terms and conditions of the GNU General Public License,
+> > + * version 2, as published by the Free Software Foundation.
+> > +
+> > + * This program is distributed in the hope it will be useful, but WITHOUT
+> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> > + * more details.
+> > +
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> > +
+> > + * This driver creates a drm_bridge and a drm_connector for the LVDS to DP++
+> > + * display bridge of the GE B850v3. There are two physical bridges on the video
+> > + * signal pipeline: a STDP4028(LVDS to DP) and a STDP2690(DP to DP++). However
+> > + * the physical bridges are automatically configured by the input video signal,
+> > + * and the driver has no access to the video processing pipeline. The driver is
+> > + * only needed to read EDID from the STDP2690 and to handle HPD events from the
+> > + * STDP4028. The driver communicates with both bridges over i2c. The video
+> > + * signal pipeline is as follows:
+> > + *
+> > + *   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
+> > + *
+> > + */
+> > +
+> > +#include <linux/gpio.h>
+> > +#include <linux/i2c.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <drm/drm_atomic.h>
+> > +#include <drm/drm_atomic_helper.h>
+> > +#include <drm/drm_crtc_helper.h>
+> > +#include <drm/drm_edid.h>
+> > +#include <drm/drmP.h>
+> > +
+> > +/*
+> > + * 220Mhz is a limitation of the host, as the bridge is capable of up to
+> > + * 330Mhz. See section 9.2.1.2.4 of the i.MX 6Dual/6Quad Applications
+> > + * Processor Reference Manual for more information about the 220Mhz limit.
+> > + * The imx-ldb driver will warn about clocks over 170Mhz, but it seem to work
+> > + * fine.
+> > + */
+> > +#define MAX_PIXEL_CLOCK 220000
+> > +
+> > +#define EDID_EXT_BLOCK_CNT 0x7E
+> > +
+> > +#define STDP4028_IRQ_OUT_CONF_REG 0x02
+> > +#define STDP4028_DPTX_IRQ_EN_REG 0x3C
+> > +#define STDP4028_DPTX_IRQ_STS_REG 0x3D
+> > +#define STDP4028_DPTX_STS_REG 0x3E
+> > +
+> > +#define STDP4028_DPTX_DP_IRQ_EN 0x1000
+> > +
+> > +#define STDP4028_DPTX_HOTPLUG_IRQ_EN 0x0400
+> > +#define STDP4028_DPTX_LINK_CH_IRQ_EN 0x2000
+> > +#define STDP4028_DPTX_IRQ_CONFIG \
+> > +		(STDP4028_DPTX_LINK_CH_IRQ_EN | STDP4028_DPTX_HOTPLUG_IRQ_EN)
+> > +
+> > +#define STDP4028_DPTX_HOTPLUG_STS 0x0200
+> > +#define STDP4028_DPTX_LINK_STS 0x1000
+> > +#define STDP4028_CON_STATE_CONNECTED \
+> > +		(STDP4028_DPTX_HOTPLUG_STS | STDP4028_DPTX_LINK_STS)
+> > +
+> > +#define STDP4028_DPTX_HOTPLUG_CH_STS 0x0400
+> > +#define STDP4028_DPTX_LINK_CH_STS 0x2000
+> > +#define STDP4028_DPTX_IRQ_CLEAR \
+> > +		(STDP4028_DPTX_LINK_CH_STS | STDP4028_DPTX_HOTPLUG_CH_STS)
+> > +
+> > +struct ge_b850v3_lvds_dp {
+> > +	struct drm_connector connector;
+> > +	struct drm_bridge bridge;
+> > +	struct i2c_client *ge_b850v3_lvds_dp_i2c;
+> > +	struct i2c_client *edid_i2c;
+> > +	struct edid *edid;
+> > +	struct mutex lock;
+> > +};
+> > +
+> > +static inline struct ge_b850v3_lvds_dp *
+> > +		bridge_to_ge_b850v3_lvds_dp(struct drm_bridge *bridge)
+> > +{
+> > +	return container_of(bridge, struct ge_b850v3_lvds_dp, bridge);
+> > +}
+> > +
+> > +static inline struct ge_b850v3_lvds_dp *
+> > +		connector_to_ge_b850v3_lvds_dp(struct drm_connector *connector)
+> > +{
+> > +	return container_of(connector, struct ge_b850v3_lvds_dp, connector);
+> > +}
+> > +
+> > +u8 *stdp2690_get_edid(struct i2c_client *client)
+> > +{
+> > +	struct i2c_adapter *adapter = client->adapter;
+> > +	unsigned char start = 0x00;
+> > +	unsigned int total_size;
+> > +	u8 *block = kmalloc(EDID_LENGTH, GFP_KERNEL);
+> > +
+> > +	struct i2c_msg msgs[] = {
+> > +		{
+> > +			.addr	= client->addr,
+> > +			.flags	= 0,
+> > +			.len	= 1,
+> > +			.buf	= &start,
+> > +		}, {
+> > +			.addr	= client->addr,
+> > +			.flags	= I2C_M_RD,
+> > +			.len	= EDID_LENGTH,
+> > +			.buf	= block,
+> > +		}
+> > +	};
+> > +
+> > +	if (!block)
+> > +		return NULL;
+> > +
+> > +	if (i2c_transfer(adapter, msgs, 2) != 2) {
+> > +		DRM_ERROR("Unable to read EDID.\n");
+> > +		goto err;
+> > +	}
+> > +
+> > +	if (!drm_edid_block_valid(block, 0, false, NULL)) {
+> > +		DRM_ERROR("Invalid EDID block\n");
+> > +		goto err;
+> > +	}
+> > +
+> > +	total_size = (block[EDID_EXT_BLOCK_CNT] + 1) * EDID_LENGTH;
+> > +	if (total_size > EDID_LENGTH) {
+> > +		kfree(block);
+> > +		block = kmalloc(total_size, GFP_KERNEL);
+> > +		if (!block)
+> > +			return NULL;
+> > +
+> > +		/* Yes, read the entire buffer, and do not skip the first
+> > +		 * EDID_LENGTH bytes.
+> > +		 */
+> > +		start = 0x00;
+> > +		msgs[1].len = total_size;
+> > +		msgs[1].buf = block;
+> > +
+> > +		if (i2c_transfer(adapter, msgs, 2) != 2) {
+> > +			DRM_ERROR("Unable to read EDID extension blocks.\n");
+> > +			goto err;
+> > +		}
+> > +	}
+> > +
+> > +	return block;
+> > +
+> > +err:
+> > +	kfree(block);
+> > +	return NULL;
+> > +}
+> > +
+> > +static int ge_b850v3_lvds_dp_get_modes(struct drm_connector *connector)
+> > +{
+> > +	struct ge_b850v3_lvds_dp *ptn_bridge;
+> > +	struct i2c_client *client;
+> > +	int num_modes = 0;
+> > +
+> > +	ptn_bridge = connector_to_ge_b850v3_lvds_dp(connector);
+> > +	client = ptn_bridge->edid_i2c;
+> > +
+> > +	mutex_lock(&ptn_bridge->lock);
+> > +
+> > +	kfree(ptn_bridge->edid);
+> > +	ptn_bridge->edid = (struct edid *) stdp2690_get_edid(client);
+> > +
+> > +	if (ptn_bridge->edid) {
+> > +		drm_mode_connector_update_edid_property(connector,
+> > +				ptn_bridge->edid);
+> > +		num_modes = drm_add_edid_modes(connector, ptn_bridge->edid);
+> > +	}
+> > +
+> > +	mutex_unlock(&ptn_bridge->lock);
+> > +
+> > +	return num_modes;
+> > +}
+> > +
+> > +
+> > +static enum drm_mode_status ge_b850v3_lvds_dp_mode_valid(
+> > +		struct drm_connector *connector, struct drm_display_mode *mode)
+> > +{
+> > +	if (mode->clock > MAX_PIXEL_CLOCK) {
+> > +		DRM_INFO("The pixel clock for the mode %s is too high, and not supported.",
+> > +				mode->name);
+> > +		return MODE_CLOCK_HIGH;
+> > +	}
+> > +
+> > +	return MODE_OK;
+> > +}
+> > +
+> > +static const struct
+> > +drm_connector_helper_funcs ge_b850v3_lvds_dp_connector_helper_funcs = {
+> > +	.get_modes = ge_b850v3_lvds_dp_get_modes,
+> > +	.mode_valid = ge_b850v3_lvds_dp_mode_valid,
+> > +};
+> > +
+> > +static enum drm_connector_status ge_b850v3_lvds_dp_detect(
+> > +		struct drm_connector *connector, bool force)
+> > +{
+> > +	struct ge_b850v3_lvds_dp *ptn_bridge =
+> > +			connector_to_ge_b850v3_lvds_dp(connector);
+> > +	struct i2c_client *ge_b850v3_lvds_dp_i2c =
+> > +			ptn_bridge->ge_b850v3_lvds_dp_i2c;
+> > +	s32 link_state;
+> > +
+> > +	link_state = i2c_smbus_read_word_data(ge_b850v3_lvds_dp_i2c,
+> > +			STDP4028_DPTX_STS_REG);
+> > +
+> > +	if (link_state == STDP4028_CON_STATE_CONNECTED)
+> > +		return connector_status_connected;
+> > +
+> > +	if (link_state == 0)
+> > +		return connector_status_disconnected;
+> > +
+> > +	return connector_status_unknown;
+> > +}
+> > +
+> > +static const struct drm_connector_funcs ge_b850v3_lvds_dp_connector_funcs = {
+> > +	.dpms = drm_atomic_helper_connector_dpms,
+> > +	.fill_modes = drm_helper_probe_single_connector_modes,
+> > +	.detect = ge_b850v3_lvds_dp_detect,
+> > +	.destroy = drm_connector_cleanup,
+> > +	.reset = drm_atomic_helper_connector_reset,
+> > +	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+> > +	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+> > +};
+> > +
+> > +static irqreturn_t ge_b850v3_lvds_dp_irq_handler(int irq, void *dev_id)
+> > +{
+> > +	struct ge_b850v3_lvds_dp *ptn_bridge = dev_id;
+> > +	struct i2c_client *ge_b850v3_lvds_dp_i2c
+> > +			= ptn_bridge->ge_b850v3_lvds_dp_i2c;
+> > +
+> > +	mutex_lock(&ptn_bridge->lock);
+> > +
+> > +	i2c_smbus_write_word_data(ge_b850v3_lvds_dp_i2c,
 
-Even if the is_trap_insn() check passes, we would reject the probe in
-arch_uprobe_analyze_insn() immediately after based on the mm type check,
-so not too bad.
+> > +			STDP4028_DPTX_IRQ_STS_REG, STDP4028_DPTX_IRQ_CLEAR);
+> > +
+> > +	mutex_unlock(&ptn_bridge->lock);
+> > +
+> > +	if (ptn_bridge->connector.dev)
+> > +		drm_kms_helper_hotplug_event(ptn_bridge->connector.dev);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static int ge_b850v3_lvds_dp_attach(struct drm_bridge *bridge)
+> > +{
+> > +	struct ge_b850v3_lvds_dp *ptn_bridge
+> > +			= bridge_to_ge_b850v3_lvds_dp(bridge);
+> > +	struct drm_connector *connector = &ptn_bridge->connector;
+> > +	struct i2c_client *ge_b850v3_lvds_dp_i2c
+> > +			= ptn_bridge->ge_b850v3_lvds_dp_i2c;
+> > +	int ret;
+> > +
+> > +	if (!bridge->encoder) {
+> > +		DRM_ERROR("Parent encoder object not found");
+> > +		return -ENODEV;
+> > +	}
+> > +
+> > +	connector->polled = DRM_CONNECTOR_POLL_HPD;
+> > +
+> > +	drm_connector_helper_add(connector,
+> > +			&ge_b850v3_lvds_dp_connector_helper_funcs);
+> > +
+> > +	ret = drm_connector_init(bridge->dev, connector,
+> > +			&ge_b850v3_lvds_dp_connector_funcs,
+> > +			DRM_MODE_CONNECTOR_DisplayPort);
+> > +	if (ret) {
+> > +		DRM_ERROR("Failed to initialize connector with drm\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	drm_connector_register(connector);
+> 
+> Connectors shouldn't be registered in the bridge driver, they should
 
-If we add support for probing 32-bit tasks, I would rather have
-is_trap_insn() take the mm_struct as argument so that a non-weak
-implementation can check for the correct encoding.
+> be registered by the kms driver after drm_dev_register is called.
+> The drm_connector_register_all() API is used for that.
 
--- 
-Catalin
+Hmm, I got this from:
+
+drivers/gpu/drm/bridge/nxp-ptn3460.c:	drm_connector_register(&ptn_bridge->connector);
+drivers/gpu/drm/bridge/parade-ps8622.c:	drm_connector_register(&ps8622->connector);
+drivers/gpu/drm/bridge/analogix-anx78xx.c:	err = drm_connector_register(&anx78xx->connector);
+
+
+> 
+> > +	ret = drm_mode_connector_attach_encoder(connector, bridge->encoder);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	drm_bridge_enable(bridge);
+> 
+> This drm_bridge_enable() doesn't seem to serve any purpose here. It also
+> doesn't seem to make much sense to call drm_bridge_() funcs within a
+> bridge op itself.
+
+Yes, removing this line has no effect. I'll send V6. Thank you!
+
+> 
+> > +	if (ge_b850v3_lvds_dp_i2c->irq) {
+> > +		drm_helper_hpd_irq_event(connector->dev);
+> > +
+> > +		ret = devm_request_threaded_irq(&ge_b850v3_lvds_dp_i2c->dev,
+> > +				ge_b850v3_lvds_dp_i2c->irq, NULL,
+> > +				ge_b850v3_lvds_dp_irq_handler,
+> > +				IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+> > +				"ge-b850v3-lvds-dp", ptn_bridge);
+> 
+> Is there a reason why we register the interrupt handler here and not in
+> probe?
+
+Yes, drm_bridge_funcs.attach() is called when drm decides it is time to initialize the bridge, which means the drm is already running. i2c_driver.probe() is likely to be called way before drm initializes, and if for some reason the bridge is not attached, there is no need for the interrupt handler. In this case the interrupt handler is mostly used for events related to display plugging/unplugging.
