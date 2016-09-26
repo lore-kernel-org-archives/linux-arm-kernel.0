@@ -1,77 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 26 Sep 2016 09:43:55 -0700
-Subject: Applied "ASoC: sun4i-codec: Rename sun4i_codec_widgets for
- consistency" to the asoc tree
-In-Reply-To: <20160915143922.4890-2-dannym@scratchpost.org>
-Message-ID: <E1boZ0V-0007DI-BU@finisterre>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 26 Sep 2016 10:46:38 -0600
+Subject: [PATCH 2/3] gpio: Add a driver for the Raspberry Pi's firmware
+ GPIO calls.
+In-Reply-To: <87mviy92qw.fsf@eliezer.anholt.net>
+References: <20160919161314.25858-1-eric@anholt.net>
+ <20160919161314.25858-2-eric@anholt.net>
+ <CACRpkda6HpJp97FUAh6yvo-BhiDbAXxzQS9U6uT+jvg6hiB8ag@mail.gmail.com>
+ <87mviy92qw.fsf@eliezer.anholt.net>
+Message-ID: <25fc865c-ef95-75c7-cf9d-7034572e98b6@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 09/23/2016 07:15 AM, Eric Anholt wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
+>
+>> On Mon, Sep 19, 2016 at 6:13 PM, Eric Anholt <eric@anholt.net> wrote:
+>>
+>>> This driver will be used for accessing the FXL6408 GPIO exander on the
+>>> Pi3.  We can't drive it directly from Linux because the firmware is
+>>> continuously polling one of the expander's lines to do its
+>>> undervoltage detection.
+>>>
+>>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> (...)
+>>
+>>> +config GPIO_RASPBERRYPI
+>>> +       tristate "Raspberry Pi firmware-based GPIO access"
+>>> +       depends on OF_GPIO && RASPBERRYPI_FIRMWARE && (ARCH_BCM2835 || COMPILE_TEST)
+>>> +       help
+>>> +         Turns on support for using the Raspberry Pi firmware to
+>>> +         control GPIO pins.  Used for access to the FXL6408 GPIO
+>>> +         expander on the Pi 3.
+>>
+>> Maybe it should be named GPIO_RPI_FXL6408 ?
+>>
+>> (No strong opinion.)
+>
+> See DT binding comment -- I think since this driver has no dependency on
+> being to the 6408 on the pi3, we shouldn't needlessly bind it to the
+> FXL6408.  (the help comment was just context for why you would want the
+> driver today).
 
-   ASoC: sun4i-codec: Rename sun4i_codec_widgets for consistency
-
-has been applied to the asoc tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From c9e902f4b37a3c108eb5dc51f1340c09becd7232 Mon Sep 17 00:00:00 2001
-From: Danny Milosavljevic <dannym@scratchpost.org>
-Date: Sat, 24 Sep 2016 22:05:01 +0200
-Subject: [PATCH] ASoC: sun4i-codec: Rename sun4i_codec_widgets for consistency
-
-Rename "sun4i_codec_widgets" to "sun4i_codec_controls" for
-consistency with the struct field name.
-
-Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/sunxi/sun4i-codec.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index e51f363ff786..e047ec06d538 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -509,7 +509,7 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
- 
- static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
- 
--static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
-+static const struct snd_kcontrol_new sun4i_codec_controls[] = {
- 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
- 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
- 		       sun4i_codec_pa_volume_scale),
-@@ -629,8 +629,8 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 
- static struct snd_soc_codec_driver sun4i_codec_codec = {
- 	.component_driver = {
--		.controls		= sun4i_codec_widgets,
--		.num_controls		= ARRAY_SIZE(sun4i_codec_widgets),
-+		.controls		= sun4i_codec_controls,
-+		.num_controls		= ARRAY_SIZE(sun4i_codec_controls),
- 		.dapm_widgets		= sun4i_codec_codec_dapm_widgets,
- 		.num_dapm_widgets	= ARRAY_SIZE(sun4i_codec_codec_dapm_widgets),
- 		.dapm_routes		= sun4i_codec_codec_dapm_routes,
--- 
-2.9.3
+I'd suggest including "FW" or "FIRMWARE" in the Kconfig option too; the 
+Raspberry Pi has multiple GPIO drivers; one accessing the BCM283x HW 
+directly and the other going through the FW. It'd be good if each 
+Kconfig name was pretty explicit re: which one it represented.
