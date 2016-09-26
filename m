@@ -1,76 +1,56 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 25 Sep 2016 23:50:29 +0200
-Subject: [PATCH 1/2] clk: rockchip: add I2S internal clock IDs for rk3288
-In-Reply-To: <20160907191823.7f955ae2.john@metanate.com>
-References: <20160907165330.14607-1-john@metanate.com>
- <2003903.QOgKKA6m1b@phil> <20160907191823.7f955ae2.john@metanate.com>
-Message-ID: <21692410.II2VYnELL8@phil>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 26 Sep 2016 03:03:41 +0300
+Subject: [PATCH v2 2/4] ARM: dts: imx31: move CCM device node to AIPS2 bus
+ devices
+In-Reply-To: <1474848223-19728-1-git-send-email-vz@mleia.com>
+References: <1474848223-19728-1-git-send-email-vz@mleia.com>
+Message-ID: <1474848223-19728-3-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+i.MX31 Clock Control Module controller is found on AIPS2 bus, move it
+there from SPBA bus to avoid a conflict of device IO space mismatch.
 
-sorry this took so long,
+Fixes: ef0e4a606fb6 ("ARM: mx31: Replace clk_register_clkdev with clock DT lookup")
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+Changes from v1 to v2:
+* new change in the series
 
-Am Mittwoch, 7. September 2016, 19:18:23 CEST schrieb John Keeping:
-> On Wed, 07 Sep 2016 19:58:31 +0200, Heiko Stuebner wrote:
-> > Am Mittwoch, 7. September 2016, 17:53:29 CEST schrieb John Keeping:
-> > > To minimize jitter on the I2S clocks, it is important that the
-> > > denominator in the fractional divider is much greater than the
-> > > numerator.  Add identifiers for these internal clocks so that the
-> > > specific clock topology and rates can be specified in the device tree.
-> > 
-> > The TRM states that the denominator must be bigger than 20. Is this the
-> > one
-> > you found or did you find further constraints?
-> 
-> Is it not that the denominator must be bigger than 20 times the
-> numerator?  That's what we found, although it seems that the greater the
-> divisor the better, so our aim is dividing down from 594MHz from GPLL to
-> the target rate in i2s_frac.
+ arch/arm/boot/dts/imx31.dtsi | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-That is good to know ... the TRM probably lost the real information during 
-translation or so and only states that hard value. Looking at the rk3368 TRM 
-just now, the value really is 20 times greater than the numerator.
-
-
-> > Did you try teaching the fractional divider to handle these constraints
-> > before going this way?
-> 
-> No, I hadn't looked at doing that.  I'm not sure how that would work,
-> we'd need to add support for fractional divider changing the parent rate
-> wouldn't we?
-
-Doug had a somewhat similar problem, mentioning the lack of a "bestdiv" 
-equivalent that the standard divider provides. I'm not sure if there isn't a 
-way to provide something like this and/or make the fractional clock honor 
-specific requirments concerning numerator/denominator - any mathematicians 
-around? :-)
-
-One could also replace the generic fraction divider use with a rockchip-
-specific implementation that somehow handles that.
-
-
-> > Exporting the internal clocks really would be sort of plan d or e, after
-> > handling this in the clock framework failed. Especially as i2s rates are
-> > probably dependant on the media being handled (frequencies and such), so
-> > setting fractional rates statically in the dts won't help you much in the
-> > general case, as any new playback could trigger a clk_set_rate call
-> > anyway?
-> 
-> We're not setting the fractional rate specifically, instead we're
-> setting the i2s_pre rate and parent explicitly and banning the i2s_src
-> mux setting to i2s_pre, which means that clk_set_rate on sclk_i2s0 will
-> always change i2s_frac but leave i2s_pre alone.
-
-But then you are again in the situation where some requested rate can ignore 
-those fractional-divider constraints? In general I really don't like encoding 
-such board-specific behaviour into the generic clock tree, like needing to 
-disable parent relationships.
-
-It works for your board now but does not necessarily for all other boards, 
-which might require other "hacks" and also doesn't solve the general problem 
-for all other fractional dividers we have.
-
-
-Heiko
+diff --git a/arch/arm/boot/dts/imx31.dtsi b/arch/arm/boot/dts/imx31.dtsi
+index 3e0893e..8d4c0e3 100644
+--- a/arch/arm/boot/dts/imx31.dtsi
++++ b/arch/arm/boot/dts/imx31.dtsi
+@@ -118,13 +118,6 @@
+ 				interrupts = <19>;
+ 				clocks = <&clks 25>;
+ 			};
+-
+-			clks: ccm at 53f80000{
+-				compatible = "fsl,imx31-ccm";
+-				reg = <0x53f80000 0x4000>;
+-				interrupts = <31>, <53>;
+-				#clock-cells = <1>;
+-			};
+ 		};
+ 
+ 		aips at 53f00000 { /* AIPS2 */
+@@ -134,6 +127,13 @@
+ 			reg = <0x53f00000 0x100000>;
+ 			ranges;
+ 
++			clks: ccm at 53f80000{
++				compatible = "fsl,imx31-ccm";
++				reg = <0x53f80000 0x4000>;
++				interrupts = <31>, <53>;
++				#clock-cells = <1>;
++			};
++
+ 			gpt: timer at 53f90000 {
+ 				compatible = "fsl,imx31-gpt";
+ 				reg = <0x53f90000 0x4000>;
+-- 
+2.8.1
