@@ -1,43 +1,90 @@
 From: gerg@uclinux.org (Greg Ungerer)
-Date: Mon, 26 Sep 2016 10:52:28 +1000
-Subject: [PATCH 2/4] arm/versatile: define empty debug_ll_io_init() for no-MMU
+Date: Mon, 26 Sep 2016 10:52:30 +1000
+Subject: [PATCH 4/4] arm/versatile: support configuring versatile machine for
+ no-MMU
 In-Reply-To: <1474851150-12532-1-git-send-email-gerg@uclinux.org>
 References: <1474851150-12532-1-git-send-email-gerg@uclinux.org>
-Message-ID: <1474851150-12532-3-git-send-email-gerg@uclinux.org>
+Message-ID: <1474851150-12532-5-git-send-email-gerg@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No-MMU configured targets have no definition for debug_ll_io_init().
-Not all machines use this and it will only be required if CONFIG_DEBUG_LL
-is enabled.
+Allow the arm versatile machine to be configured for no-MMU operation.
+The approach taken is similar to the support for no-MMU arm v7 machines.
 
-But when compiling for a target that uses it and it is configured for
-no-MMU (!CONFIG_MMU), for example the versatile machine, you will get:
+A new define, CONFIG_ARM_SINGLE_ARMV5, is used to enable a class of v5
+core based machines that are supported for building with !CONFIG_MMU.
+Currently only the versatile machine is configured to support this.
 
-  CC      arch/arm/mach-versatile/versatile_dt.o
-arch/arm/mach-versatile/versatile_dt.c: In function ?versatile_map_io?:
-arch/arm/mach-versatile/versatile_dt.c:283:2: error: implicit declaration of function ?debug_ll_io_init? [-Werror=implicit-function-declaration]
-  debug_ll_io_init();
-  ^
+Older kernels had the ability to build the versatile machine with the MMU
+disabled (!CONFIG_MMU). Recent changes to convert the versatile machine
+to device tree lost this ability. (Although older kernels could be built
+they did not run due to a bug in the IO_ADDRESS() mapping on this machine).
 
-Fix by adding a macro for it to the !CONFIG_MMU path in map.h.
+The motivation for this is that the versatile machine is well supported
+in qemu. And this provides an excellent platform for development and
+testing no-MMU support on ARM in general.
 
 Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 ---
- arch/arm/include/asm/mach/map.h | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/Kconfig                | 10 ++++++++++
+ arch/arm/Kconfig.debug          |  3 ++-
+ arch/arm/mach-versatile/Kconfig |  3 ++-
+ 3 files changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-index 9b7c328..b1fe9c8 100644
---- a/arch/arm/include/asm/mach/map.h
-+++ b/arch/arm/include/asm/mach/map.h
-@@ -62,6 +62,7 @@ extern int ioremap_page(unsigned long virt, unsigned long phys,
- #else
- #define iotable_init(map,num)	do { } while (0)
- #define vm_reserve_area_early(a,s,c)	do { } while (0)
-+#define debug_ll_io_init()	do { } while (0)
- #endif
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a9c4e48..f44fe7b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -353,6 +353,16 @@ config ARM_SINGLE_ARMV7M
+ 	select SPARSE_IRQ
+ 	select USE_OF
  
- #endif
++config ARM_SINGLE_ARMV5
++	bool "ARMv5 based platforms (ARM926T)"
++	depends on !MMU
++	select AUTO_ZRELADDR
++	select CLKSRC_OF
++	select COMMON_CLK
++	select GENERIC_CLOCKEVENTS
++	select SPARSE_IRQ
++	select USE_OF
++
+ config ARCH_GEMINI
+ 	bool "Cortina Systems Gemini"
+ 	select CLKSRC_MMIO
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index a9693b6..9897348 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1712,7 +1712,8 @@ config DEBUG_UNCOMPRESS
+ config UNCOMPRESS_INCLUDE
+ 	string
+ 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
+-					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
++					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
++					ARM_SINGLE_ARMV5
+ 	default "mach/uncompress.h"
+ 
+ config EARLY_PRINTK
+diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
+index b0cc262..904a012 100644
+--- a/arch/arm/mach-versatile/Kconfig
++++ b/arch/arm/mach-versatile/Kconfig
+@@ -1,6 +1,6 @@
+ config ARCH_VERSATILE
+ 	bool "ARM Ltd. Versatile family"
+-	depends on ARCH_MULTI_V5
++	depends on ARCH_MULTI_V5 || ARM_SINGLE_ARMV5
+ 	select ARM_AMBA
+ 	select ARM_TIMER_SP804
+ 	select ARM_VIC
+@@ -14,6 +14,7 @@ config ARCH_VERSATILE
+ 	select POWER_RESET
+ 	select POWER_RESET_VERSATILE
+ 	select VERSATILE_FPGA_IRQ
++	select GPIOLIB
+ 	help
+ 	  This enables support for ARM Ltd Versatile board.
+ 
 -- 
 1.9.1
