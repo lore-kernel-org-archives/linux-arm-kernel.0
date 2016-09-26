@@ -1,15 +1,18 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 26 Sep 2016 16:48:53 +0200
-Subject: [PATCH] ARM: shmobile: Sort Kconfig selections
-In-Reply-To: <1474619320-28888-1-git-send-email-geert+renesas@glider.be>
-References: <1474619320-28888-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20160926144852.GC5792@verge.net.au>
+Date: Mon, 26 Sep 2016 16:55:09 +0200
+Subject: [PATCH] ARM: dts: gose: use generic pinctrl properties in SDHI
+ nodes
+In-Reply-To: <1474020294-1544-1-git-send-email-horms+renesas@verge.net.au>
+References: <1474020294-1544-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20160926145509.GF5792@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 10:28:40AM +0200, Geert Uytterhoeven wrote:
-> Sort alphabetically all symbols selected by ARCH_RENESAS
+On Fri, Sep 16, 2016 at 12:04:54PM +0200, Simon Horman wrote:
+> Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
+> groups properties") renesas pfc drivers accept generic "function", "pins"
+> and "groups" properties.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thanks, I have queued this up.
+I have queued this up.
