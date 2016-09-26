@@ -1,34 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 26 Sep 2016 10:55:21 -0300
-Subject: [PATCH v4 2/5] ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
- initial support
-In-Reply-To: <CAOf5uw=HwErWWqvQ30ZJpb3CupqdvGZ9FnGAxh4+JVTrT6wTjw@mail.gmail.com>
-References: <1473618641-10159-1-git-send-email-jagan@amarulasolutions.com>
- <1473618641-10159-3-git-send-email-jagan@amarulasolutions.com>
- <CAOMZO5CsrrqqUPaVbU-ya79VSXgxyspa_fbr8HY1voJgpy2LLg@mail.gmail.com>
- <CAMty3ZDKrXxmwDFxSBvL_anJQPdXEfnJ40uNv5B6KssQyJJKhA@mail.gmail.com>
- <CAOMZO5B_ahBJr_Tgz_HShmG9heUwCj4K0N3FHhxja1yg0gCUGA@mail.gmail.com>
- <CAOf5uw=bMMa98RP=kvA=NfS89TWOEqU3Q2HjpEmzUTVrdg2=sQ@mail.gmail.com>
- <CAOMZO5CnP3=CNnQcOzra7eQ-cAwProgH+Kws0FHVOw7Q6nCDow@mail.gmail.com>
- <119ad2fc-8e74-1193-8ee2-417cf1e6fd49@engicam.com>
- <CAOMZO5BWgqxfbOepJZwqdZceSWKBnSfd38Ab2TV-LN0oDttc-Q@mail.gmail.com>
- <CAOf5uw=HwErWWqvQ30ZJpb3CupqdvGZ9FnGAxh4+JVTrT6wTjw@mail.gmail.com>
-Message-ID: <CAOMZO5BHhA8rd0URLNGGLZKN00zFz9d5vsq4CuRWsKyT6yq-oA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 26 Sep 2016 15:55:31 +0200
+Subject: [PATCH] serial: imx: Fix DCD reading
+Message-ID: <20160926135531.31888-1-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2016 at 10:54 AM, Michael Trimarchi
-<michael@amarulasolutions.com> wrote:
+The USR2_DCDIN bit is tested for in register usr1. As the name
+suggests the usr2 register should be used instead. This fixes
+reading the Carrier detect status.
 
->> Why don't you simply do like this?
->>
->>        reg_3p3v: regulator-3p3v {
->>                compatible = "regulator-fixed";
->>                regulator-name = "3P3V";
->>                regulator-min-microvolt = <3300000>;
->>                regulator-max-microvolt = <3300000>;
->>        };
->
-> Should dts rispect the schematic connection?
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/tty/serial/imx.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Yes
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 0df2b1c..615c027 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -740,12 +740,13 @@ static unsigned int imx_get_hwmctrl(struct imx_port *sport)
+ {
+ 	unsigned int tmp = TIOCM_DSR;
+ 	unsigned usr1 = readl(sport->port.membase + USR1);
++	unsigned usr2 = readl(sport->port.membase + USR2);
+ 
+ 	if (usr1 & USR1_RTSS)
+ 		tmp |= TIOCM_CTS;
+ 
+ 	/* in DCE mode DCDIN is always 0 */
+-	if (!(usr1 & USR2_DCDIN))
++	if (!(usr2 & USR2_DCDIN))
+ 		tmp |= TIOCM_CAR;
+ 
+ 	if (sport->dte_mode)
+-- 
+2.9.3
