@@ -1,21 +1,37 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Sun, 25 Sep 2016 20:46:33 -0700
-Subject: [PATCH -next] mmc: sdhci-of-arasan: Fix non static symbol warning
-In-Reply-To: <1474818243-19207-1-git-send-email-weiyj.lk@gmail.com>
-References: <1474818243-19207-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <20160926034633.GY16583@xsjsorenbubuntu>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 26 Sep 2016 09:23:38 +0530
+Subject: [PATCH] cpufreq: st: add missing \n to end of dev_err message
+In-Reply-To: <20160925214013.12430-1-colin.king@canonical.com>
+References: <20160925214013.12430-1-colin.king@canonical.com>
+Message-ID: <20160926035338.GF17336@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2016-09-25 at 15:44:03 +0000, Wei Yongjun wrote:
-> From: Wei Yongjun <weiyongjun1@huawei.com>
+On 25-09-16, 14:40, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> Fixes the following sparse warning:
+> Trival fix, dev_err message is missing a \n, so add it.
 > 
-> drivers/mmc/host/sdhci-of-arasan.c:253:6: warning:
->  symbol 'sdhci_arasan_reset' was not declared. Should it be static?
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  drivers/cpufreq/sti-cpufreq.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> diff --git a/drivers/cpufreq/sti-cpufreq.c b/drivers/cpufreq/sti-cpufreq.c
+> index 0404203..b366e6d 100644
+> --- a/drivers/cpufreq/sti-cpufreq.c
+> +++ b/drivers/cpufreq/sti-cpufreq.c
+> @@ -163,7 +163,7 @@ static int sti_cpufreq_set_opp_info(void)
+>  
+>  	reg_fields = sti_cpufreq_match();
+>  	if (!reg_fields) {
+> -		dev_err(dev, "This SoC doesn't support voltage scaling");
+> +		dev_err(dev, "This SoC doesn't support voltage scaling\n");
+>  		return -ENODEV;
+>  	}
+>  
 
-	S?ren
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
