@@ -1,31 +1,38 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Mon, 26 Sep 2016 14:19:59 -0500
-Subject: [PATCH v2] ARM: dts: socfpga: Add Macnica sodia board
-In-Reply-To: <20160924235945.32128-1-iwamatsu@nigauri.org>
-References: <20160924235945.32128-1-iwamatsu@nigauri.org>
-Message-ID: <57E974DF.4060402@opensource.altera.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 26 Sep 2016 21:29:26 +0200
+Subject: [PATCH 0/4] kill get_clock_tick_rate()
+In-Reply-To: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
+ (Robert Jarzmik's message of "Mon, 19 Sep 2016 21:12:11 +0200")
+References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87twd2bgtl.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2016 06:59 PM, Nobuhiro Iwamatsu wrote:
-> Add support for board based on the Altera Cyclone V SoC.
-> This board has the following functions:
->     - 1 GiB of DRAM
->     - 1 Gigabit ethernet
->     - 1 SD card slot
->     - 1 USB gadget port
->     - QSPI NOR Flash
->     - I2C EEPROMs and I2C RTC
->     - DVI output
->     - Audio port
-> 
-> This commit supports without QSPI, DVI and Audio.
-> 
-> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> ---
->  V2: move the PHY of setting to the Ethetnet PHY node level.
-> 
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Applied. Thanks!
+> Hi,
+>
+> This serie aims at killing get_clock_tick_rate() from pxa and sa1100 and replace
+> it by clock API calls.
+>
+> I'd like to have this reviewed and acked afterwards at least by :
+>  - Russell for the mach-sa1100 and sa1100_wdt.c
+>  - Stephen or Michael for the clk-pxa25x.c
+>  - Thomas or Daniel for the clocksource part
+>  - Wim for sa1100_wdt.c
+>
+> If the review converges, I'd also like to take it through the pxa/for-next tree,
+> or alternatively Russell's tree if there is a dependency I'm not seeing, for
+> v4.10 cycle.
 
-Dinh
+Hi Russell,
+
+Would you have time within the next 2 weeks to give this serie a review and
+maybe an Ack from the sa1100 impacted parts (that would be patches 2, 3 and 4) ?
+
+I can also resend the serie if it's easier in your workflow.
+
+Cheers.
+
+--
+Robert
