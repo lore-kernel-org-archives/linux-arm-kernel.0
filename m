@@ -1,140 +1,73 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 26 Sep 2016 06:02:29 -0700
-Subject: [RFC PATCH 1/2] watchdog: imx2: fix hang-up on boot for i.MX21,
- i.MX27 and i.MX31 SoCs
-In-Reply-To: <1474850361-20884-2-git-send-email-vz@mleia.com>
-References: <1474850361-20884-1-git-send-email-vz@mleia.com>
- <1474850361-20884-2-git-send-email-vz@mleia.com>
-Message-ID: <ebece25b-7a3b-3fdf-d117-dd0a3a2975b7@roeck-us.net>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 26 Sep 2016 18:33:59 +0530
+Subject: [PATCH 5/5] arm64: Add uprobe support
+In-Reply-To: <20160926110159.GB27498@e104818-lin.cambridge.arm.com>
+References: <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
+ <20160920165946.GA19353@e104818-lin.cambridge.arm.com>
+ <20160921110047.GA29470@localhost.localdomain>
+ <20160921170403.GE12180@e104818-lin.cambridge.arm.com>
+ <20160922032328.GB29470@localhost.localdomain>
+ <20160922165030.GA27704@e104818-lin.cambridge.arm.com>
+ <20160923041230.GC29470@localhost.localdomain>
+ <20160923130528.GE2161@e104818-lin.cambridge.arm.com>
+ <CAHB_GupuUYPNFoYQeX8EhAcesvqKVVuphuxneudZ5kL2cxm-7g@mail.gmail.com>
+ <20160926110159.GB27498@e104818-lin.cambridge.arm.com>
+Message-ID: <20160926130359.GA9370@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2016 05:39 PM, Vladimir Zapolskiy wrote:
-> Power down counter enable/disable bit switch is located in WMCR
-> register, but watchdog controllers found on legacy i.MX21, i.MX27 and
-> i.MX31 SoCs don't have this register. As a result of writing data to
-> the non-existing register on driver probe the SoC hangs up, to fix the
-> problem add more OF compatible strings and on this basis get
-> information about availability of the WMCR register.
->
-> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
->  drivers/watchdog/imx2_wdt.c | 47 +++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 45 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-> index 62f346b..b6763e0 100644
-> --- a/drivers/watchdog/imx2_wdt.c
-> +++ b/drivers/watchdog/imx2_wdt.c
-> @@ -29,6 +29,7 @@
->  #include <linux/module.h>
->  #include <linux/moduleparam.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/regmap.h>
->  #include <linux/watchdog.h>
-> @@ -57,6 +58,10 @@
->
->  #define WDOG_SEC_TO_COUNT(s)	((s * 2 - 1) << 8)
->
-> +struct imx2_wdt_data {
-> +	bool has_pdc;
-> +};
-> +
->  struct imx2_wdt_device {
->  	struct clk *clk;
->  	struct regmap *regmap;
-> @@ -64,6 +69,8 @@ struct imx2_wdt_device {
->  	bool ext_reset;
->  };
->
-> +static const struct of_device_id imx2_wdt_dt_ids[];
-> +
->  static bool nowayout = WATCHDOG_NOWAYOUT;
->  module_param(nowayout, bool, 0);
->  MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
-> @@ -200,10 +207,13 @@ static const struct regmap_config imx2_wdt_regmap_config = {
->
->  static int __init imx2_wdt_probe(struct platform_device *pdev)
->  {
-> +	const struct of_device_id *of_id;
-> +	const struct imx2_wdt_data *data;
->  	struct imx2_wdt_device *wdev;
->  	struct watchdog_device *wdog;
->  	struct resource *res;
->  	void __iomem *base;
-> +	bool has_pdc;
->  	int ret;
->  	u32 val;
->
-> @@ -261,12 +271,24 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
->  		set_bit(WDOG_HW_RUNNING, &wdog->status);
->  	}
->
-> +	if (pdev->dev.of_node) {
-> +		of_id = of_match_device(imx2_wdt_dt_ids, &pdev->dev);
-> +		if (!of_id)
-> +			return -ENODEV;
-> +
-> +		data = of_id->data;
-> +		has_pdc = data->has_pdc;
-> +	} else {
-> +		has_pdc = false;
-> +	}
-> +
->  	/*
->  	 * Disable the watchdog power down counter at boot. Otherwise the power
->  	 * down counter will pull down the #WDOG interrupt line for one clock
->  	 * cycle.
->  	 */
-> -	regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
-> +	if (has_pdc)
-> +		regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
->
->  	ret = watchdog_register_device(wdog);
->  	if (ret) {
-> @@ -363,8 +385,29 @@ static int imx2_wdt_resume(struct device *dev)
->  static SIMPLE_DEV_PM_OPS(imx2_wdt_pm_ops, imx2_wdt_suspend,
->  			 imx2_wdt_resume);
->
-> +static const struct imx2_wdt_data imx21_wdt_data = {
-> +	.has_pdc = false,
-> +};
-> +
-> +static const struct imx2_wdt_data imx25_wdt_data = {
-> +	.has_pdc = true,
-> +};
-> +
->  static const struct of_device_id imx2_wdt_dt_ids[] = {
-> -	{ .compatible = "fsl,imx21-wdt", },
-> +	{ .compatible = "fsl,imx21-wdt",  .data = &imx21_wdt_data },
+On 26/09/2016:12:01:59 PM, Catalin Marinas wrote:
+> On Sun, Sep 25, 2016 at 10:32:28PM +0530, Pratyush Anand wrote:
+> > On Fri, Sep 23, 2016 at 6:35 PM, Catalin Marinas
+> > <catalin.marinas@arm.com> wrote:
+> > > On Fri, Sep 23, 2016 at 09:42:30AM +0530, Pratyush Anand wrote:
+> > >> On 22/09/2016:05:50:30 PM, Catalin Marinas wrote:
+> > >> > On Thu, Sep 22, 2016 at 08:53:28AM +0530, Pratyush Anand wrote:
+> > >> > > On 21/09/2016:06:04:04 PM, Catalin Marinas wrote:
+> > 
+> > >> > As a quick workaround you could check mm->task_size > TASK_SIZE_32 in
+> > >> > the arch_uprobe_analyze_insn() function.
+> > >>
+> > >> It would be doable. TASK_SIZE_32 is defined only for COMPAT. So, may be I can
+> > >> return -EINVAL when mm->task_size < TASK_SIZE_64.
+> > >
+> > > That's just a temporary workaround. If we ever merge ILP32, this test
+> > > would no longer be enough (as the ISA is AArch64 but with TASK_SIZE_32).
+> > 
+> > OK.. So what about doing something similar what x86 is doing.
+> > We can have a flag for task Type in arch specific mm_context_t. We
+> > also set this flag in COMPAT_SET_PERSONALITY() along with setting
+> > thread_info flag, and we clear them in SET_PERSONALITY().
+> 
+> This looks like a better approach.
+> 
+> > > Looking at prepare_uprobe(), we have a weak is_trap_insn() function.
+> > > This check is meaningless without knowing which instruction set we
+> > > target. A false positive here, however, is not that bad as we wouldn't
+> > > end up inserting the wrong breakpoint in the executable. But it looks to
+> > > me like the core uprobe code needs to pass some additional information
+> > > like the type of task or ELF format to the arch code to make a useful
+> > > choice of breakpoint type.
+> > 
+> > It seems that 'strtle r0, [r0], #160' would have the closest matching
+> > aarch32 instruction wrt BRK64_OPCODE_UPROBES(0xd42000A0). But that too
+> > seems a bad instruction. So, may be we can use still weak
+> > is_trap_insn().
+> 
+> Even if the is_trap_insn() check passes, we would reject the probe in
+> arch_uprobe_analyze_insn() immediately after based on the mm type check,
+> so not too bad.
 
-Please just specify the flag directly, as in
-					.data = (void *) true
-or, if you prefer, use defines.
-					.data = (void *) IMX_SUPPORTS_PDC
+OK..I will have an always returning false from arm64 is_trap_insn() in v2.
 
-Then, in above code:
-		has_pdc = (bool) of_id->data;
+> 
+> If we add support for probing 32-bit tasks, I would rather have
+> is_trap_insn() take the mm_struct as argument so that a non-weak
+> implementation can check for the correct encoding.
 
-Guenter
+Yes, for 32 bit task we would need mm_struct as arg in is_trap_insn() as well as
+in is_swbp_insn(). We would also need to have arm64 specific set_swbp().
 
-> +	{ .compatible = "fsl,imx25-wdt",  .data = &imx25_wdt_data },
-> +	{ .compatible = "fsl,imx27-wdt",  .data = &imx21_wdt_data },
-> +	{ .compatible = "fsl,imx31-wdt",  .data = &imx21_wdt_data },
-> +	{ .compatible = "fsl,imx35-wdt",  .data = &imx25_wdt_data },
-> +	{ .compatible = "fsl,imx50-wdt",  .data = &imx25_wdt_data },
-> +	{ .compatible = "fsl,imx51-wdt",  .data = &imx25_wdt_data },
-> +	{ .compatible = "fsl,imx53-wdt",  .data = &imx25_wdt_data },
-> +	{ .compatible = "fsl,imx6q-wdt",  .data = &imx25_wdt_data },
-> +	{ .compatible = "fsl,imx6sl-wdt", .data = &imx25_wdt_data },
-> +	{ .compatible = "fsl,imx6sx-wdt", .data = &imx25_wdt_data },
-> +	{ .compatible = "fsl,imx6ul-wdt", .data = &imx25_wdt_data },
-> +	{ .compatible = "fsl,imx7d-wdt",  .data = &imx25_wdt_data },
-> +	{ .compatible = "fsl,vf610-wdt",  .data = &imx25_wdt_data },
->  	{ /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(of, imx2_wdt_dt_ids);
->
+Thanks for all your input. It was helpful. I will send V2 soon.
+
+~Pratyush
