@@ -1,118 +1,77 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Mon, 26 Sep 2016 14:44:27 -0400
-Subject: [PATCH] clk: lpc32xx: fix pwm clock divider computation
-Message-ID: <1474915467-11101-1-git-send-email-slemieux.tyco@gmail.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Mon, 26 Sep 2016 11:44:50 -0700
+Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
+In-Reply-To: <20160926032927.GA25395@b29397-desktop>
+References: <20160914014246.31847-1-stephen.boyd@linaro.org>
+ <147384330268.13546.17843140335600627152@sboyd-linaro>
+ <20160917011605.GB10392@b29397-desktop>
+ <147457026249.9057.8712383708019243942@sboyd-linaro>
+ <20160926032927.GA25395@b29397-desktop>
+Message-ID: <147491549050.5206.9497559526723777799@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+Quoting Peter Chen (2016-09-25 20:29:27)
+> On Thu, Sep 22, 2016 at 11:51:02AM -0700, Stephen Boyd wrote:
+> > Quoting Peter Chen (2016-09-16 18:16:05)
+> > > On Wed, Sep 14, 2016 at 01:55:02AM -0700, Stephen Boyd wrote:
+> > > > Quoting Stephen Boyd (2016-09-13 18:42:46)
+> > > > > On the db410c 96boards platform we have a TC7USB40MU[1] on the
+> > > > > board to mux the D+/D- lines from the SoC between a micro usb
+> > > > > "device" port and a USB hub for "host" roles. Upon a role switch,
+> > > > > we need to change this mux to forward the D+/D- lines to either
+> > > > > the port or the hub. Therefore, introduce a driver for this
+> > > > > device that intercepts extcon USB_HOST events and logically
+> > > > > asserts a gpio to mux the "host" D+/D- lines when a host cable is
+> > > > > attached. When the cable goes away, it will logically deassert
+> > > > > the gpio and mux the "device" lines.
+> > > > > 
+> > > > > [1] https://toshiba.semicon-storage.com/ap-en/product/logic/bus-switch/detail.TC7USB40MU.html
+> > > > > 
+> > > > > Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+> > > > > Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> > > > > Cc: <devicetree@vger.kernel.org>
+> > > > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > > > > ---
+> > > > > 
+> > > > > Should I make the extcon part optional? I could see a case where there are two
+> > > > > "OTG" ports connected to the mux (or two hubs), and for some reason the
+> > > > > software may want to mux between them at runtime. If we mandate an extcon,
+> > > > > that won't be possible to support. Perhaps it would be better to have
+> > > > > the node, but connect it to the usb controller with a phandle (maybe of_graph
+> > > > > endpoints would be useful too) so that when the controller wants to mux over
+> > > > > a port it can do so.
+> > > > 
+> > > > Here's some dts mock-up on top of the db410c for the of_graph stuff. I
+> > > > haven't written any code around it, but the idea is to allow the binding
+> > > > to specify how the mux is connected to upstream and downstream D+/D-
+> > > > lines. This way, we can do some dt parsing of the endpoints and their
+> > > > parent nodes to figure out if the mux needs to be set high or low to use
+> > > > a device connector or a usb hub based on if the id cable is present.
+> > > > Maybe I'm over thinking things though and we could just have a DT
+> > > > property for that.
+> > > > 
+> > > >       soc {
+> > > >               usb at 78d9000 {
+> > > >                       extcon = <&usb_id>, <&usb_id>;
+> > > 
+> > > Why you have two same extcon phandler? From my mind, one should id,
+> > > another should is vbus. Besides, I find extcon-usb-gpio.c is lack of
+> > > vbus support, how you support vbus detection for
+> > > connection/disconnection with PC for your chipidea msm patch set?
+> > 
+> > This was already in the dts files for db410c. In the chipidea binding
+> > one is for EXTCON_USB (vbus) and one is for EXTCON_USB_HOST (id). My
+> > understanding is that extcon-usb-gpio.c sends events for both EXTCON_USB
+> > and EXTCON_USB_HOST when the gpio changes state. vbus detection is not
+> > that great on this board because we only have on gpio for this.
+> 
+> I think extcon-usb-gpio.c needs to extend for supporting vbus event,
+> otherwise, the micro-b cable's connect/disconnect will introduce
+> EXTCON_USB_HOST event, if you use two <&usb_idx> for both id and
+> vbus event.
+> 
 
-A zero value in the PWM clock divider register
-(PWM1_FREQ/PWM2_FREQ) turn off the PWM clock.
-
-The "CLK_DIVIDER_ALLOW_ZERO" option is used for hardware that handle
-the zero divider by not modifying their clock input (i.e. bypass).
-See "/include/linux/clk-provider.h" for details.
-
-Remove the CLK_DIVIDER_ALLOW_ZERO option and add support to handle
-the clock rate computation of the PWM clock divider 0 value.
-
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
-Note:
-* Should we include a new CLK_DIVIDER option for this case
-  (i.e. clock off when zero ) in "clk-provider.h"?
-
- drivers/clk/nxp/clk-lpc32xx.c | 52 +++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 48 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
-index 34c9735..3ca3a14 100644
---- a/drivers/clk/nxp/clk-lpc32xx.c
-+++ b/drivers/clk/nxp/clk-lpc32xx.c
-@@ -959,6 +959,25 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
- 				   divider->flags);
- }
- 
-+static unsigned long clk_divider_pwm_recalc_rate(struct clk_hw *hw,
-+		unsigned long parent_rate)
-+{
-+	struct lpc32xx_clk_div *divider = to_lpc32xx_div(hw);
-+	unsigned int val;
-+
-+	regmap_read(clk_regmap, divider->reg, &val);
-+
-+	val >>= divider->shift;
-+	val &= div_mask(divider->width);
-+
-+	/* Handle 0 divider -> PWM clock is off. */
-+	if(val == 0)
-+		return 0;
-+
-+	return divider_recalc_rate(hw, parent_rate, val, divider->table,
-+				   divider->flags);
-+}
-+
- static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
- 				unsigned long *prate)
- {
-@@ -999,6 +1018,12 @@ static const struct clk_ops lpc32xx_clk_divider_ops = {
- 	.set_rate = clk_divider_set_rate,
- };
- 
-+static const struct clk_ops lpc32xx_clk_pwm_divider_ops = {
-+	.recalc_rate = clk_divider_pwm_recalc_rate,
-+	.round_rate = clk_divider_round_rate,
-+	.set_rate = clk_divider_set_rate,
-+};
-+
- static u8 clk_mux_get_parent(struct clk_hw *hw)
- {
- 	struct lpc32xx_clk_mux *mux = to_lpc32xx_mux(hw);
-@@ -1151,6 +1176,25 @@ struct clk_hw_proto {
- 	},								\
- }
- 
-+#define LPC32XX_DEFINE_PWM_DIV(_idx, _reg, _shift, _width, _tab, _fl)	\
-+[CLK_PREFIX(_idx)] = {							\
-+	.type = CLK_DIV,						\
-+	{								\
-+		.hw0 = {						\
-+			.ops = &lpc32xx_clk_pwm_divider_ops,		\
-+			{						\
-+				.div = {				\
-+					.reg = LPC32XX_CLKPWR_ ## _reg,	\
-+					.shift = (_shift),		\
-+					.width = (_width),		\
-+					.table = (_tab),		\
-+					.flags = (_fl),			\
-+				 },					\
-+			},						\
-+		 },							\
-+	},								\
-+}
-+
- #define LPC32XX_DEFINE_GATE(_idx, _reg, _bit, _flags)			\
- [CLK_PREFIX(_idx)] = {							\
- 	.type = CLK_GATE,						\
-@@ -1281,14 +1325,14 @@ static struct clk_hw_proto clk_hw_proto[LPC32XX_CLK_HW_MAX] = {
- 	LPC32XX_DEFINE_GATE(MCPWM, TIMCLK_CTRL1, 6, 0),
- 
- 	LPC32XX_DEFINE_MUX(PWM1_MUX, PWMCLK_CTRL, 1, 0x1, NULL, 0),
--	LPC32XX_DEFINE_DIV(PWM1_DIV, PWMCLK_CTRL, 4, 4, NULL,
--			   CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO),
-+	LPC32XX_DEFINE_PWM_DIV(PWM1_DIV, PWMCLK_CTRL, 4, 4, NULL,
-+			       CLK_DIVIDER_ONE_BASED),
- 	LPC32XX_DEFINE_GATE(PWM1_GATE, PWMCLK_CTRL, 0, 0),
- 	LPC32XX_DEFINE_COMPOSITE(PWM1, PWM1_MUX, PWM1_DIV, PWM1_GATE),
- 
- 	LPC32XX_DEFINE_MUX(PWM2_MUX, PWMCLK_CTRL, 3, 0x1, NULL, 0),
--	LPC32XX_DEFINE_DIV(PWM2_DIV, PWMCLK_CTRL, 8, 4, NULL,
--			   CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO),
-+	LPC32XX_DEFINE_PWM_DIV(PWM2_DIV, PWMCLK_CTRL, 8, 4, NULL,
-+			       CLK_DIVIDER_ONE_BASED),
- 	LPC32XX_DEFINE_GATE(PWM2_GATE, PWMCLK_CTRL, 2, 0),
- 	LPC32XX_DEFINE_COMPOSITE(PWM2, PWM2_MUX, PWM2_DIV, PWM2_GATE),
- 
--- 
-1.8.3.1
+Sorry, I'm lost now. extcon-usb-gpio.c already supports EXTCON_USB as an
+event. Is the problem that we're using two of the same phandles in the
+binding?
