@@ -1,67 +1,69 @@
-From: gerald.baeza@st.com (Gerald Baeza)
-Date: Mon, 26 Sep 2016 15:21:30 +0200
-Subject: [PATCH] serial: stm32: use mapbase instead of membase for DMA
-In-Reply-To: <20160923193935.3726427-1-arnd@arndb.de>
-References: <20160923193935.3726427-1-arnd@arndb.de>
-Message-ID: <61d40e5f-a096-e401-50d4-941fd86d2e0c@st.com>
+From: matteo.lisi@engicam.com (Matteo Lisi)
+Date: Mon, 26 Sep 2016 15:44:05 +0200
+Subject: [PATCH v4 2/5] ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
+ initial support
+In-Reply-To: <CAOMZO5CnP3=CNnQcOzra7eQ-cAwProgH+Kws0FHVOw7Q6nCDow@mail.gmail.com>
+References: <1473618641-10159-1-git-send-email-jagan@amarulasolutions.com>
+ <1473618641-10159-3-git-send-email-jagan@amarulasolutions.com>
+ <CAOMZO5CsrrqqUPaVbU-ya79VSXgxyspa_fbr8HY1voJgpy2LLg@mail.gmail.com>
+ <CAMty3ZDKrXxmwDFxSBvL_anJQPdXEfnJ40uNv5B6KssQyJJKhA@mail.gmail.com>
+ <CAOMZO5B_ahBJr_Tgz_HShmG9heUwCj4K0N3FHhxja1yg0gCUGA@mail.gmail.com>
+ <CAOf5uw=bMMa98RP=kvA=NfS89TWOEqU3Q2HjpEmzUTVrdg2=sQ@mail.gmail.com>
+ <CAOMZO5CnP3=CNnQcOzra7eQ-cAwProgH+Kws0FHVOw7Q6nCDow@mail.gmail.com>
+Message-ID: <119ad2fc-8e74-1193-8ee2-417cf1e6fd49@engicam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Hi Fabio,
 
-On 09/23/2016 09:38 PM, Arnd Bergmann wrote:
-> Building this driver with a 64-bit dma_addr_t type results in
-> a compiler warning:
+Our SOM doesn't use external PMIC.
+
+We powered all devices with a fix voltage regulators that cannot be 
+drive directly from SoC so
+any external power rail can be driven by drivers.
+
+Regards
+
+Matteo
+
+
+
+Il 21/09/2016 18:46, Fabio Estevam ha scritto:
+> Hi Michael,
 >
-> drivers/tty/serial/stm32-usart.c: In function 'stm32_of_dma_rx_probe':
-> drivers/tty/serial/stm32-usart.c:746:20: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
-> drivers/tty/serial/stm32-usart.c: In function 'stm32_of_dma_tx_probe':
-> drivers/tty/serial/stm32-usart.c:818:20: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+> On Tue, Sep 20, 2016 at 10:23 AM, Michael Trimarchi
+> <michael@amarulasolutions.com> wrote:
 >
-> While the type conversion here is harmless, this hints at a different
-> problem: we pass an __iomem pointer into a DMA engine, which expects
-> a phys_addr_t. This happens to work because stm32 has no MMU and
-> ioremap() is an identity mapping here, but it's still an incorrect
-> API use. Using dma_addr_t is doubly wrong here, because that would
-> be the result of dma_map_single() rather than the physical address.
+>> Engicam use fixed regulator always on and on on boot. Their board does
+>> not have any
+>> external pmu. Is this answer to your comment?
+> All I am saying is that  "regulator-boot-on" and "regulator-always-on"
+> properties should be removed.
 >
-> Using the mapbase instead fixes multiple issues:
->
-> - the warning is gone
-> - we don't go through ioremap in error
-> - the cast is gone, making it use the correct resource_size_t/phys_addr_t
->   type in the process.
->
-> Fixes: 3489187204eb ("serial: stm32: adding dma support")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/tty/serial/stm32-usart.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
-> index 4d3001b77e7e..2adb678a863b 100644
-> --- a/drivers/tty/serial/stm32-usart.c
-> +++ b/drivers/tty/serial/stm32-usart.c
-> @@ -743,7 +743,7 @@ static int stm32_of_dma_rx_probe(struct stm32_port *stm32port,
->
->  	/* Configure DMA channel */
->  	memset(&config, 0, sizeof(config));
-> -	config.src_addr = (dma_addr_t)port->membase + ofs->rdr;
-> +	config.src_addr = port->mapbase + ofs->rdr;
->  	config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->
->  	ret = dmaengine_slave_config(stm32port->rx_ch, &config);
-> @@ -815,7 +815,7 @@ static int stm32_of_dma_tx_probe(struct stm32_port *stm32port,
->
->  	/* Configure DMA channel */
->  	memset(&config, 0, sizeof(config));
-> -	config.dst_addr = (dma_addr_t)port->membase + ofs->tdr;
-> +	config.dst_addr = port->mapbase + ofs->tdr;
->  	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->
->  	ret = dmaengine_slave_config(stm32port->tx_ch, &config);
+> The "reg_3p3v" regulator will be turned on and off by the flexcan driver.
 >
 
-Indeed, thanks for this finding.
 
-Reviewed-by: Gerald Baeza <gerald.baeza@st.com>
+-- 
+
+------------------------------------------------------------------------
+http://www.engicam.com <http://www.engicam.com>
+
+*/ENGICAM /*s.r.l.
+50018 Scandicci - FIRENZE
+Via dei Pratoni, 16
+Tel. +39 055 7311387
+Fax. +39 055 720608
+Web www.engicam.com <http://www.engicam.com>
+
+C.F./P.I. 05389070482
+Registro Imprese di FIRENZE 542918
+Capitale sociale i.v. 50.000,00?
+------------------------------------------------------------------------
+NOTICE: This message and attachments are intended only for the use of 
+their addresses and may contain confidential information belonging to 
+Engicam. If you are not the intended recipient, you are hereby notified 
+that any reading, dissemination, distribution, or copying of this 
+message, or any attachment, is strictly prohibited. If you have received 
+this message in error, please notify the original sender immediately and 
+delete this message, along with any attachments.
