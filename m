@@ -1,104 +1,93 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Mon, 26 Sep 2016 08:25:10 +0000
-Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <20160923130620.GA1486@rob-hp-laptop>
-References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
- <1473741659-17618-1-git-send-email-po.liu@nxp.com>
- <1473741659-17618-3-git-send-email-po.liu@nxp.com>
- <20160918005212.GF15478@tiger>
- <VI1PR0401MB1709F91B0C1EB6C80D741E4492F50@VI1PR0401MB1709.eurprd04.prod.outlook.com>
- <20160923130620.GA1486@rob-hp-laptop>
-Message-ID: <VI1PR0401MB17097C1AE342ADF6F691019092CD0@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: peter.senna@collabora.co.uk (Peter Senna Tschudin)
+Date: Mon, 26 Sep 2016 09:26:53 +0100
+Subject: =?utf-8?q?Re=3A?==?utf-8?q?_=5BPATCH?= V5 =?utf-8?q?2=2F4=5D?=
+ =?utf-8?q?_Documentation=2Fdevicetree=2Fbindings=3A?=
+ =?utf-8?q?_b850v3=5Flvds=5Fdp?=
+In-Reply-To: <2add7cb9193b96211f5e5938cbfc6181c76e2591.1470739193.git.peter.senna@collabora.com>
+Message-ID: <33e8-57e8dc00-1-799eaa00@98390718>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Patch 1/4 is already on linux-next, but what about this one? Ping?
 
->  -----Original Message-----
->  From: Rob Herring [mailto:robh at kernel.org]
->  Sent: Friday, September 23, 2016 9:06 PM
->  To: Po Liu
->  Cc: Shawn Guo; linux-pci at vger.kernel.org; linux-arm-
->  kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
->  devicetree at vger.kernel.org; Roy Zang; Arnd Bergmann; Marc Zyngier;
->  Stuart Yoder; Leo Li; M.H. Lian; Murali Karicheri; Bjorn Helgaas;
->  Mingkai Hu
->  Subject: Re: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
->  MSI/MSI-X/INTx mode
->  
->  On Sun, Sep 18, 2016 at 03:37:27AM +0000, Po Liu wrote:
->  > Hi Shawn,
->  >
->  >
->  > >  -----Original Message-----
->  > >  From: Shawn Guo [mailto:shawnguo at kernel.org]
->  > >  Sent: Sunday, September 18, 2016 8:52 AM
->  > >  To: Po Liu
->  > >  Cc: linux-pci at vger.kernel.org;
->  > > linux-arm-kernel at lists.infradead.org;
->  > >  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang;
->  > > Arnd  Bergmann; Marc Zyngier; Stuart Yoder; Leo Li; M.H. Lian;
->  > > Murali  Karicheri; Bjorn Helgaas; Mingkai Hu
->  > >  Subject: Re: [PATCH v5 3/3] pci:aer: add support aer interrupt with
->  > > none  MSI/MSI-X/INTx mode
->  > >
->  > >  On Tue, Sep 13, 2016 at 12:40:59PM +0800, Po Liu wrote:
->  > >  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC
->  mode.
->  > >  > When chip support the aer interrupt with none MSI/MSI-X/INTx
->  > > mode,  > maybe there is interrupt line for aer pme etc. Search the
->  > > interrupt  > number in the fdt file. Then fixup the dev->irq with it.
->  > >  >
->  > >  > Signed-off-by: Po Liu <po.liu@nxp.com>
->  > >
->  > >  Will the new kernel work with existing/old DTB?  I'm trying to
->  > > understand the dependency between driver and DTS changes.
->  >
->  > Yes, We've never use name 'intr' before. So we remove it is ok.
->  > 'aer' is a dts name for researching it's true interrupt number by
->  > kernel. This patch is first time to use name 'aer'. So it must be
->  > compatible with existing/old DTB.
->  
->  Please explain why you are not breaking compatibility in the commit
->  message. I asked for this on v2.
-
-Sorry, I didn't really catch what your means. Do you mean I should add why I remove the 'intr'?
-
->  
->  > >  > ---
->  > >  > changes for v5:
->  > >  > 	- Add clear 'aer' interrup-names description
->  > >  >
->  > >  >  .../devicetree/bindings/pci/layerscape-pci.txt     | 11 +++++---
->  > >  >  drivers/pci/pcie/portdrv_core.c                    | 31
->  > >  +++++++++++++++++++---
->  > >  >  2 files changed, 35 insertions(+), 7 deletions(-)  >  > diff
->  > > --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > >  > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > >  > index 41e9f55..101d0a7 100644
->  > >  > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > >  > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > >  > @@ -18,8 +18,10 @@ Required properties:
->  > >  >  - reg: base addresses and lengths of the PCIe controller  >  -
->  > > interrupts: A list of interrupt outputs of the controller. Must
->  > > contain an
->  > >  >    entry for each entry in the interrupt-names property.
->  > >  > -- interrupt-names: Must include the following entries:
->  > >  > -  "intr": The interrupt that is asserted for controller
->  > > interrupts  > +- interrupt-names: It may be include the following
->  entries:
->  
->  "may be" is not okay. It should be "must" or explain when an interrupt
->  would not be present. Really, differences in interrupts means you need
->  different compatible strings.
-
-How about changing "must" to "should" or "could" and also add when to add after "aer": to explain when to add it?
-
-Thanks!
-
->  
->  Rob
->  
->  > >  > +  "aer": The interrupt that is asserted for aer interrupt  > +
->  > > "pme": The interrupt that is asserted for pme interrupt  > +  ......
+On Tuesday, August 9, 2016 18:41 CEST, Peter Senna Tschudin <peter.senna@collabora.com> wrote: 
+ 
+> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+> display bridge.
+> 
+> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+> Cc: Martin Donnelly <martin.donnelly@ge.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> ---
+> Unchanged from V4
+> 
+> Changes from V3:
+>  - 2/4 instead of 3/5
+> 
+> Unchanged from V2
+> 
+> Changes from V1:
+>  - Replaced '_' by '-' in node names or compatible strings
+>  - Added missing @73 to the example
+> 
+> 
+>  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 37 ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> new file mode 100644
+> index 0000000..f05c3e9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> @@ -0,0 +1,37 @@
+> +Driver for GE B850v3 LVDS/DP++ display bridge
+> +
+> +Required properties:
+> +  - compatible : should be "ge,b850v3-lvds-dp".
+> +  - reg : should contain the address used to ack the interrupts.
+> +  - interrupt-parent : phandle of the interrupt controller that services
+> +    interrupts to the device
+> +  - interrupts : one interrupt should be described here, as in
+> +    <0 IRQ_TYPE_LEVEL_HIGH>.
+> +  - edid-reg : should contain the address used to read edid information
+> +  - port : should describe the video signal connection between the host
+> +    and the bridge.
+> +
+> +Example:
+> +
+> +&mux2_i2c2 {
+> +	status = "okay";
+> +	clock-frequency = <100000>;
+> +
+> +	b850v3-lvds-dp-bridge at 73  {
+> +		compatible = "ge,b850v3-lvds-dp";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		reg = <0x73>;
+> +		interrupt-parent = <&gpio2>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +		edid-reg = <0x72>;
+> +
+> +		port {
+> +			b850v3_dp_bridge_in: endpoint {
+> +				remote-endpoint = <&lvds0_out>;
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 2.5.5
+> 
+ 
+ 
+ 
+ 
