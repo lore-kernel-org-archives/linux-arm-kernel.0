@@ -1,50 +1,28 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 26 Sep 2016 22:18:42 +0200
-Subject: [PATCH] soc: rockchip: power-domain: Don't (incorrectly) set
- rk3399 up/down counts
-In-Reply-To: <1471546561-4459-1-git-send-email-dianders@chromium.org>
-References: <1471546561-4459-1-git-send-email-dianders@chromium.org>
-Message-ID: <3409868.mFCNHRg95O@phil>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 Sep 2016 22:57:41 +0100
+Subject: [PATCH 2/4] ARM: sa11x0/pxa: acquire timer rate from the clock
+ rate
+In-Reply-To: <1474312335-20997-3-git-send-email-robert.jarzmik@free.fr>
+References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
+ <1474312335-20997-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20160926215741.GH1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 18. August 2016, 11:56:01 CEST schrieb Douglas Anderson:
-> On rk3288 it was important that powerdown and powerup counts for the
-> CPU/GPU in the kernel because:
-> * The power on default was crazy long.
-> * We couldn't rely on the firmware to set this up because really this
->   wasn't the firmware's job--the kernel was the only one that really
->   cared about bringing up / down CPUs and the GPU and doing suspend /
->   resume (which involves bringing up / down CPUs).
+On Mon, Sep 19, 2016 at 09:12:13PM +0200, Robert Jarzmik wrote:
+> As both pxa and sa1100 provide a clock to the timer, the rate can be
+> inferred from the clock rather than hard encoded in a functional call.
 > 
-> On newer ARM systems (like rk3399) ARM Trusted Firmware is in charge of
-> bringing up and down the CPUs and it really should be in charge of
-> setting all these counts right.  After all ATF is in charge of suspend /
-> resume and CPU up / down.  Let's get out of the way and let ATF do its
-> job.
+> This patch changes the pxa timer to have a mandatory clock which is used
+> as the timer rate.
 > 
-> A few other motivations for doing this:
-> * Depending on another configuration (PMU_24M_EN_CFG) these counts can
->   be either in 24M or 32k cycles.  Thus, though ATF isn't really so
->   involved in bringing up the GPU, ATF should probably manage the counts
->   for everything so it can also manage the 24M / 32k choice.
-> * It turns out that (right now) 24M mode is broken on rk3399 and not
->   being used.  That means that the count the kernel was programming
->   in (24) was not 1 us (which it seems was intended) but was actually
->   .75 ms
-> * On rk3399 there are actually 2 separate registers for setting CPU
->   up/down time plus 1 register for GPU up/down time.  The curent kernel
->   code actually was putting the register for the "little" cores in the
->   "CPU" slot and the register for the "big" cores in the "GPU" slot.  It
->   was never initting the GPU counts.
-> 
-> Note: this change assumes that ATF will actually set these values at
-> boot, as I'm proposing in <http://crosreview.com/372381>.
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-applied to my drivers branch for 4.10
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
+Thanks.
 
-Thanks
-Heiko
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
