@@ -1,38 +1,43 @@
 From: gerg@uclinux.org (Greg Ungerer)
-Date: Mon, 26 Sep 2016 10:52:29 +1000
-Subject: [PATCH 3/4] arm/versatile: empty Makefile.boot needed for no-MMU
- compile
+Date: Mon, 26 Sep 2016 10:52:28 +1000
+Subject: [PATCH 2/4] arm/versatile: define empty debug_ll_io_init() for no-MMU
 In-Reply-To: <1474851150-12532-1-git-send-email-gerg@uclinux.org>
 References: <1474851150-12532-1-git-send-email-gerg@uclinux.org>
-Message-ID: <1474851150-12532-4-git-send-email-gerg@uclinux.org>
+Message-ID: <1474851150-12532-3-git-send-email-gerg@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To compile the arm versatile board with the MMU disabled (!CONFIG_MMU)
-a Makefile.boot is required. Without it you get:
+No-MMU configured targets have no definition for debug_ll_io_init().
+Not all machines use this and it will only be required if CONFIG_DEBUG_LL
+is enabled.
 
-  SYSMAP  System.map
-arch/arm/boot/Makefile:15: arch/arm/mach-versatile//Makefile.boot: No such file or directory
-make[2]: *** No rule to make target `arch/arm/mach-versatile//Makefile.boot'.  Stop.
+But when compiling for a target that uses it and it is configured for
+no-MMU (!CONFIG_MMU), for example the versatile machine, you will get:
 
-Create an empty Makefile.boot for the versatile machine. This is a
-copy of the other empty machine Makefile.boot files. (A few have this
-same commented empty file: stm32, ep93xx, lpc18xx, efm32 and vexpress).
+  CC      arch/arm/mach-versatile/versatile_dt.o
+arch/arm/mach-versatile/versatile_dt.c: In function ?versatile_map_io?:
+arch/arm/mach-versatile/versatile_dt.c:283:2: error: implicit declaration of function ?debug_ll_io_init? [-Werror=implicit-function-declaration]
+  debug_ll_io_init();
+  ^
+
+Fix by adding a macro for it to the !CONFIG_MMU path in map.h.
 
 Signed-off-by: Greg Ungerer <gerg@uclinux.org>
 ---
- arch/arm/mach-versatile/Makefile.boot | 3 +++
- 1 file changed, 3 insertions(+)
- create mode 100644 arch/arm/mach-versatile/Makefile.boot
+ arch/arm/include/asm/mach/map.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-versatile/Makefile.boot b/arch/arm/mach-versatile/Makefile.boot
-new file mode 100644
-index 0000000..eacfc3f
---- /dev/null
-+++ b/arch/arm/mach-versatile/Makefile.boot
-@@ -0,0 +1,3 @@
-+# Empty file waiting for deletion once Makefile.boot isn't needed any more.
-+# Patch waits for application at
-+# http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1 .
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index 9b7c328..b1fe9c8 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -62,6 +62,7 @@ extern int ioremap_page(unsigned long virt, unsigned long phys,
+ #else
+ #define iotable_init(map,num)	do { } while (0)
+ #define vm_reserve_area_early(a,s,c)	do { } while (0)
++#define debug_ll_io_init()	do { } while (0)
+ #endif
+ 
+ #endif
 -- 
 1.9.1
