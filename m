@@ -1,67 +1,69 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 26 Sep 2016 13:30:34 +0100
-Subject: [PATCH 2/2] drivers: cci: add missing CCI port availability
- firmware check
-In-Reply-To: <20160923130907.4187-2-lorenzo.pieralisi@arm.com>
-References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
- <20160923130907.4187-2-lorenzo.pieralisi@arm.com>
-Message-ID: <1474893034.2898.19.camel@linaro.org>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Mon, 26 Sep 2016 12:49:49 +0000
+Subject: [PATCH v4] devicetree: bindings: uart: Add new compatible
+ string for ZynqMP
+In-Reply-To: <20160923223747.GA1163@rob-hp-laptop>
+References: <1474629948-9780-1-git-send-email-navam@xilinx.com>
+ <20160923223747.GA1163@rob-hp-laptop>
+Message-ID: <C89496FEAE474D468F30D558A9468D9F26D192EF@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-09-23 at 14:09 +0100, Lorenzo Pieralisi wrote:
-> The CCI ports programming interface is available to the kernel
-> only when booted in secure mode (or when firmware enables
-> non-secure access to override CCI ports control). In both cases,
-> firmware reports the CCI ports availability through the device
-> tree CCI ports nodes, which must be parsed and their status checked
-> by the kernel probing path.
-> 
-> This check is currently missing and may cause the kernel to
-> erroneously believe it is free to take control of CCI ports
-> where in practice CCI ports control is forbidden.
-> 
-> Add the missing CCI port availability check to the CCI driver
-> in order to guarantee sane CCI usage.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
 
-Tested-by: Jon Medhurst <tixy@linaro.org>
 
->  drivers/bus/arm-cci.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index 5755907f..3c7a1c7 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -2199,6 +2199,9 @@ static int cci_probe_ports(struct device_node *np)
->  		if (!of_match_node(arm_cci_ctrl_if_matches, cp))
->  			continue;
->  
-> +		if (!of_device_is_available(cp))
-> +			continue;
-> +
->  		i = nb_ace + nb_ace_lite;
->  
->  		if (i >= nb_cci_ports)
-> @@ -2241,6 +2244,13 @@ static int cci_probe_ports(struct device_node *np)
->  		ports[i].dn = cp;
->  	}
->  
-> +	/*
-> +	 * If there is no CCI port that is under kernel control
-> +	 * return early and report probe status.
-> +	 */
-> +	if (!nb_ace && !nb_ace_lite)
-> +		return -ENODEV;
-> +
->  	 /* initialize a stashed array of ACE ports to speed-up look-up */
->  	cci_ace_init_ports();
->  
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Saturday, September 24, 2016 4:08 AM
+> To: Nava kishore Manne <navam@xilinx.com>
+> Cc: gregkh at linuxfoundation.org; mark.rutland at arm.com; jslaby at suse.com;
+> michal.simek at xilinx.com; Soren Brinkmann <sorenb@xilinx.com>; linux-
+> serial at vger.kernel.org; devicetree at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Punnaiah
+> Choudary Kalluri <punnaia@xilinx.com>; Nava kishore Manne
+> <navam@xilinx.com>
+> Subject: Re: [PATCH v4] devicetree: bindings: uart: Add new compatible
+> string for ZynqMP
+>
+> On Fri, Sep 23, 2016 at 04:55:48PM +0530, Nava kishore Manne wrote:
+> > From: Nava kishore Manne <nava.manne@xilinx.com>
+> >
+> > This patch Adds the new compatible string for ZynqMP.
+> >
+> > Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> > ---
+> > Changes for v4:
+> >             -Modified the ChangeLog comment.
+> > Changes for v3:
+> >             -Added changeLog comment.
+> > Changes for v2:
+> >                 -None
+> >
+> >  Documentation/devicetree/bindings/serial/cdns,uart.txt | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/serial/cdns,uart.txt
+> b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+> > index a3eb154..4fe7aae 100644
+> > --- a/Documentation/devicetree/bindings/serial/cdns,uart.txt
+> > +++ b/Documentation/devicetree/bindings/serial/cdns,uart.txt
+> > @@ -1,7 +1,8 @@
+> >  Binding for Cadence UART Controller
+> >
+> >  Required properties:
+> > -- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps"
+> > +- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps" for Zynq and
+> > +               "cdns,uart-r1p12" for Zynq Ultrascale+ MPSoC uart controller.
+>
+> Please format this as one valid combination per line.
+>
+> xuartps is not very specific. It needs some abbreviation of "Zynq
+> Ultrascale+ MPSoC" in it.
+>
+
+Will fix the above comments in the next version.
+
+Regards,
+Navakishore.
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
