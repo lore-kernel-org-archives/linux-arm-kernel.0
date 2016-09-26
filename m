@@ -1,297 +1,83 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 26 Sep 2016 17:33:48 +0800
-Subject: [PATCH v8 1/4] soc: mediatek: Refine scpsys to support multiple
- platform
-In-Reply-To: <92a5bc68-0c4c-b9e1-17d7-34c83020aa37@gmail.com>
-References: <1468911883-41882-1-git-send-email-jamesjj.liao@mediatek.com>
- <1468911883-41882-2-git-send-email-jamesjj.liao@mediatek.com>
- <92a5bc68-0c4c-b9e1-17d7-34c83020aa37@gmail.com>
-Message-ID: <1474882428.20251.3.camel@mtksdaap41>
+From: jason.jin@nxp.com (Jason Jin)
+Date: Mon, 26 Sep 2016 09:58:35 +0000
+Subject: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape
+ platforms
+In-Reply-To: <4642389.nHAzKPNi96@wuerfel>
+References: <1474597146-33312-1-git-send-email-b18965@freescale.com>
+ <2519047.ijr708V79a@wuerfel>
+ <VI1PR0401MB263894265429130B91E7880C8DC80@VI1PR0401MB2638.eurprd04.prod.outlook.com>
+ <4642389.nHAzKPNi96@wuerfel>
+Message-ID: <DB4PR04MB26568C0647A1C01F0CA98B9E9CD0@DB4PR04MB265.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-09-21 at 12:25 +0200, Matthias Brugger wrote:
+> Subject: Re: [PATCH 1/2] armv8: aarch32: Execute 32-bit Linux for LayerScape
+> platforms
 > 
-> On 19/07/16 09:04, James Liao wrote:
-> > Refine scpsys driver common code to support multiple SoC / platform.
-> >
-> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> > ---
-> >  drivers/soc/mediatek/mtk-scpsys.c | 363 +++++++++++++++++++++++---------------
-> >  1 file changed, 220 insertions(+), 143 deletions(-)
-> >
-> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> > index 837effe..1f3555a 100644
-> > --- a/drivers/soc/mediatek/mtk-scpsys.c
-> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> > @@ -11,17 +11,15 @@
-> >   * GNU General Public License for more details.
-> >   */
-> >  #include <linux/clk.h>
-> > -#include <linux/delay.h>
-> > +#include <linux/init.h>
-> >  #include <linux/io.h>
-> > -#include <linux/kernel.h>
-> >  #include <linux/mfd/syscon.h>
-> > -#include <linux/init.h>
-> >  #include <linux/of_device.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/pm_domain.h>
-> > -#include <linux/regmap.h>
-> > -#include <linux/soc/mediatek/infracfg.h>
-> >  #include <linux/regulator/consumer.h>
-> > +#include <linux/soc/mediatek/infracfg.h>
-> > +
-> >  #include <dt-bindings/power/mt8173-power.h>
-> >
-> >  #define SPM_VDE_PWR_CON			0x0210
-> > @@ -34,6 +32,7 @@
-> >  #define SPM_MFG_2D_PWR_CON		0x02c0
-> >  #define SPM_MFG_ASYNC_PWR_CON		0x02c4
-> >  #define SPM_USB_PWR_CON			0x02cc
-> > +
-> >  #define SPM_PWR_STATUS			0x060c
-> >  #define SPM_PWR_STATUS_2ND		0x0610
-> >
-> > @@ -55,12 +54,12 @@
-> >  #define PWR_STATUS_USB			BIT(25)
-> >
-> >  enum clk_id {
-> > -	MT8173_CLK_NONE,
-> > -	MT8173_CLK_MM,
-> > -	MT8173_CLK_MFG,
-> > -	MT8173_CLK_VENC,
-> > -	MT8173_CLK_VENC_LT,
-> > -	MT8173_CLK_MAX,
-> > +	CLK_NONE,
-> > +	CLK_MM,
-> > +	CLK_MFG,
-> > +	CLK_VENC,
-> > +	CLK_VENC_LT,
-> > +	CLK_MAX,
-> >  };
-> >
-> >  #define MAX_CLKS	2
-> > @@ -76,98 +75,6 @@ struct scp_domain_data {
-> >  	bool active_wakeup;
-> >  };
-> >
-> > -static const struct scp_domain_data scp_domain_data[] = {
-> > -	[MT8173_POWER_DOMAIN_VDEC] = {
-> > -		.name = "vdec",
-> > -		.sta_mask = PWR_STATUS_VDEC,
-> > -		.ctl_offs = SPM_VDE_PWR_CON,
-> > -		.sram_pdn_bits = GENMASK(11, 8),
-> > -		.sram_pdn_ack_bits = GENMASK(12, 12),
-> > -		.clk_id = {MT8173_CLK_MM},
-> > -	},
-> > -	[MT8173_POWER_DOMAIN_VENC] = {
-> > -		.name = "venc",
-> > -		.sta_mask = PWR_STATUS_VENC,
-> > -		.ctl_offs = SPM_VEN_PWR_CON,
-> > -		.sram_pdn_bits = GENMASK(11, 8),
-> > -		.sram_pdn_ack_bits = GENMASK(15, 12),
-> > -		.clk_id = {MT8173_CLK_MM, MT8173_CLK_VENC},
-> > -	},
-> > -	[MT8173_POWER_DOMAIN_ISP] = {
-> > -		.name = "isp",
-> > -		.sta_mask = PWR_STATUS_ISP,
-> > -		.ctl_offs = SPM_ISP_PWR_CON,
-> > -		.sram_pdn_bits = GENMASK(11, 8),
-> > -		.sram_pdn_ack_bits = GENMASK(13, 12),
-> > -		.clk_id = {MT8173_CLK_MM},
-> > -	},
-> > -	[MT8173_POWER_DOMAIN_MM] = {
-> > -		.name = "mm",
-> > -		.sta_mask = PWR_STATUS_DISP,
-> > -		.ctl_offs = SPM_DIS_PWR_CON,
-> > -		.sram_pdn_bits = GENMASK(11, 8),
-> > -		.sram_pdn_ack_bits = GENMASK(12, 12),
-> > -		.clk_id = {MT8173_CLK_MM},
-> > -		.bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MM_M0 |
-> > -			MT8173_TOP_AXI_PROT_EN_MM_M1,
-> > -	},
-> > -	[MT8173_POWER_DOMAIN_VENC_LT] = {
-> > -		.name = "venc_lt",
-> > -		.sta_mask = PWR_STATUS_VENC_LT,
-> > -		.ctl_offs = SPM_VEN2_PWR_CON,
-> > -		.sram_pdn_bits = GENMASK(11, 8),
-> > -		.sram_pdn_ack_bits = GENMASK(15, 12),
-> > -		.clk_id = {MT8173_CLK_MM, MT8173_CLK_VENC_LT},
-> > -	},
-> > -	[MT8173_POWER_DOMAIN_AUDIO] = {
-> > -		.name = "audio",
-> > -		.sta_mask = PWR_STATUS_AUDIO,
-> > -		.ctl_offs = SPM_AUDIO_PWR_CON,
-> > -		.sram_pdn_bits = GENMASK(11, 8),
-> > -		.sram_pdn_ack_bits = GENMASK(15, 12),
-> > -		.clk_id = {MT8173_CLK_NONE},
-> > -	},
-> > -	[MT8173_POWER_DOMAIN_USB] = {
-> > -		.name = "usb",
-> > -		.sta_mask = PWR_STATUS_USB,
-> > -		.ctl_offs = SPM_USB_PWR_CON,
-> > -		.sram_pdn_bits = GENMASK(11, 8),
-> > -		.sram_pdn_ack_bits = GENMASK(15, 12),
-> > -		.clk_id = {MT8173_CLK_NONE},
-> > -		.active_wakeup = true,
-> > -	},
-> > -	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
-> > -		.name = "mfg_async",
-> > -		.sta_mask = PWR_STATUS_MFG_ASYNC,
-> > -		.ctl_offs = SPM_MFG_ASYNC_PWR_CON,
-> > -		.sram_pdn_bits = GENMASK(11, 8),
-> > -		.sram_pdn_ack_bits = 0,
-> > -		.clk_id = {MT8173_CLK_MFG},
-> > -	},
-> > -	[MT8173_POWER_DOMAIN_MFG_2D] = {
-> > -		.name = "mfg_2d",
-> > -		.sta_mask = PWR_STATUS_MFG_2D,
-> > -		.ctl_offs = SPM_MFG_2D_PWR_CON,
-> > -		.sram_pdn_bits = GENMASK(11, 8),
-> > -		.sram_pdn_ack_bits = GENMASK(13, 12),
-> > -		.clk_id = {MT8173_CLK_NONE},
-> > -	},
-> > -	[MT8173_POWER_DOMAIN_MFG] = {
-> > -		.name = "mfg",
-> > -		.sta_mask = PWR_STATUS_MFG,
-> > -		.ctl_offs = SPM_MFG_PWR_CON,
-> > -		.sram_pdn_bits = GENMASK(13, 8),
-> > -		.sram_pdn_ack_bits = GENMASK(21, 16),
-> > -		.clk_id = {MT8173_CLK_NONE},
-> > -		.bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MFG_S |
-> > -			MT8173_TOP_AXI_PROT_EN_MFG_M0 |
-> > -			MT8173_TOP_AXI_PROT_EN_MFG_M1 |
-> > -			MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT,
-> > -	},
-> > -};
-> > -
-> > -#define NUM_DOMAINS	ARRAY_SIZE(scp_domain_data)
-> > -
-> >  struct scp;
-> >
-> >  struct scp_domain {
-> > @@ -179,7 +86,7 @@ struct scp_domain {
-> >  };
-> >
-> >  struct scp {
-> > -	struct scp_domain domains[NUM_DOMAINS];
-> > +	struct scp_domain *domains;
-> >  	struct genpd_onecell_data pd_data;
-> >  	struct device *dev;
-> >  	void __iomem *base;
-> > @@ -408,57 +315,69 @@ static bool scpsys_active_wakeup(struct device *dev)
-> >  	return scpd->data->active_wakeup;
-> >  }
-> >
-> > -static int scpsys_probe(struct platform_device *pdev)
-> > +static void init_clks(struct platform_device *pdev, struct clk *clk[CLK_MAX])
-> > +{
-> > +	enum clk_id clk_ids[] = {
-> > +		CLK_MM,
-> > +		CLK_MFG,
-> > +		CLK_VENC,
-> > +		CLK_VENC_LT
-> > +	};
-> > +
-> > +	static const char * const clk_names[] = {
-> > +		"mm",
-> > +		"mfg",
-> > +		"venc",
-> > +		"venc_lt",
-> > +	};
-> > +
-> > +	int i;
-> > +
-> > +	for (i = 0; i < ARRAY_SIZE(clk_ids); i++)
-> > +		clk[clk_ids[i]] = devm_clk_get(&pdev->dev, clk_names[i]);
+> On Friday, September 23, 2016 4:09:29 PM CEST Stuart Yoder wrote:
+> > > -----Original Message-----
+> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > > Sent: Friday, September 23, 2016 10:58 AM
 > 
-> Should be:
-> for (i = CLK_NONE + 1; i < CLK_MAX; i++)
+> > > > Really, though, the firmware call thing is an incredibly niche use-case.
+> > > > Beyond development, the only real benefit of starting an AArch32
+> > > > kernel in Hyp is that you can run AArch32 KVM guests, which you
+> > > > can do equally well (if not better) under an AArch64 kernel.
+> > >
+> > > This was my question earlier in the thread, apparently Alison has
+> > > another use case in mind, but I don't yet know what that is. If that
+> > > use case is important enough, we could do it this way.
+> > >
+> > > The only use case I can think of at the moment is boot testing on
+> > > kernelci.org, which could be used to check whether all the drivers
+> > > work in 32-bit environments.
+> >
+> > The reason we want aarch32 kernel support is for specific customers
+> > that have requirements for legacy 32-bit kernel drivers that function
+> > on ARMv7 but for some reason are very problematic to port to a 64-bit
+> > kernel.  So, the way to ease the 64-bit transition is allow them to run an
+> aarch32 kernel
+> > and their driver on an ARMv8 SoC.   I don't think we specifically care
+> > whether the kernel starts at EL2 or EL1.
 > 
-> then we can get rid of clk_ids[].
-
-I'll change it in next patch.
-
-> > +}
-> > +
-> > +static struct scp *init_scp(struct platform_device *pdev,
-> > +			const struct scp_domain_data *scp_domain_data, int num)
-> >  {
-> >  	struct genpd_onecell_data *pd_data;
-> >  	struct resource *res;
-> > -	int i, j, ret;
-> > +	int i, j;
-> >  	struct scp *scp;
-> > -	struct clk *clk[MT8173_CLK_MAX];
-> > +	struct clk *clk[CLK_MAX];
-> >
-> >  	scp = devm_kzalloc(&pdev->dev, sizeof(*scp), GFP_KERNEL);
-> >  	if (!scp)
-> > -		return -ENOMEM;
-> > +		return ERR_PTR(-ENOMEM);
-> >
-> >  	scp->dev = &pdev->dev;
-> >
-> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >  	scp->base = devm_ioremap_resource(&pdev->dev, res);
-> >  	if (IS_ERR(scp->base))
-> > -		return PTR_ERR(scp->base);
-> > -
-> > -	pd_data = &scp->pd_data;
-> > -
-> > -	pd_data->domains = devm_kzalloc(&pdev->dev,
-> > -			sizeof(*pd_data->domains) * NUM_DOMAINS, GFP_KERNEL);
-> > -	if (!pd_data->domains)
-> > -		return -ENOMEM;
-> > -
-> > -	clk[MT8173_CLK_MM] = devm_clk_get(&pdev->dev, "mm");
-> > -	if (IS_ERR(clk[MT8173_CLK_MM]))
-> > -		return PTR_ERR(clk[MT8173_CLK_MM]);
-> > -
-> > -	clk[MT8173_CLK_MFG] = devm_clk_get(&pdev->dev, "mfg");
-> > -	if (IS_ERR(clk[MT8173_CLK_MFG]))
-> > -		return PTR_ERR(clk[MT8173_CLK_MFG]);
-> > -
-> > -	clk[MT8173_CLK_VENC] = devm_clk_get(&pdev->dev, "venc");
-> > -	if (IS_ERR(clk[MT8173_CLK_VENC]))
-> > -		return PTR_ERR(clk[MT8173_CLK_VENC]);
-> > -
-> > -	clk[MT8173_CLK_VENC_LT] = devm_clk_get(&pdev->dev, "venc_lt");
-> > -	if (IS_ERR(clk[MT8173_CLK_VENC_LT]))
-> > -		return PTR_ERR(clk[MT8173_CLK_VENC_LT]);
-> > +		return ERR_CAST(scp->base);
-> >
-> >  	scp->infracfg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-> >  			"infracfg");
-> >  	if (IS_ERR(scp->infracfg)) {
-> >  		dev_err(&pdev->dev, "Cannot find infracfg controller: %ld\n",
-> >  				PTR_ERR(scp->infracfg));
-> > -		return PTR_ERR(scp->infracfg);
-> > +		return ERR_CAST(scp->infracfg);
-> >  	}
-> >
-> > -	for (i = 0; i < NUM_DOMAINS; i++) {
-> > +	scp->domains = devm_kzalloc(&pdev->dev,
-> > +				sizeof(*scp->domains) * num, GFP_KERNEL);
-> > +	if (!scp->domains)
-> > +		return ERR_PTR(-ENOMEM);
-> > +
-> > +	pd_data = &scp->pd_data;
-> > +
-> > +	pd_data->domains = devm_kzalloc(&pdev->dev,
-> > +			sizeof(*pd_data->domains) * num, GFP_KERNEL);
-> > +	if (!pd_data->domains)
-> > +		return ERR_PTR(-ENOMEM);
-> > +
+> Thanks for the explanation. Unfortunately I don't think that helps get this
+> approach upstream, in particular I wouldn't want to add a platform specific
+> hack just to help a third party not have to fix their out-of-tree drivers to be 64-
+> bit clean.
 > 
-> While at it, please leave this block of code between
-> devm_ioremap_resource(...) and syscon_regmap_lookup_by_phandle(...)
+> If your customer already has a chunk of downstream patches large enough to
+> be problematic to rebuild for 64-bit, they should be able to also pick up these
+> two patches, but of course what we really want is to get drivers upstream and
+> fixed (presumably this would be an even larger task than just fixing them, so I
+> don't set my hopes too high here).
+> 
+> I'm still not opposed to making *all* 64-bit platforms available to 32-bit kernels
+> for testing purposes though, and that would solve the customer problem too,
+> as would the approach of encapsulating the kernel in hypervisor stub that
+> implements the PSCI calls and using MACH_VIRT with the respective layerscape
+> drivers enabled.
+> 
+[Jason] Thanks for all the comments regarding to the ARMv8 32bit kernel patches.
+ I'd like to provide some comment from this thread.
 
-OK, I'll change it in next patch.
+To run the 32bit kernel on ARMv8, we also provided some patches to u-boot. The
+same U-boot image will be used to boot up the 64bit and 32bit kernel. With u-boot
+patches, bootm will automatically identify the kernel image, if it's 32bit kernel image,
+u-boot will change the ES to AArch32 EL2 and boot up the 32bit kernel. So we do
+not need to wrap the 32bit image with 64bit bootup protocol.
 
+Our FW set the u-boot to EL2 and did not have the 'NEW' SMC call to switch the 
+AArch64(EL2) to AArch32(EL2) at this moment, so this patch set did not rely on
+the FW and did not  implement the PSCI for secondary core bootup.
 
-Best regards,
+I agree with Robin that maybe it's not necessary to support the Hyp for ARMv8 AArch32,
+so we can boot up the 32bit kernel with EL1 directly. With this assumption, I think we
+can switch to FW and PSCI for SMP easily and drop the spin table patches.
 
-James
+Thanks all for the suggestion. We'll try the "Generic DT based system" instead of
+introducing a new platform to support the 32bit kernel. And rely on the dtb built
+from ARM64 to bootup the system. Not sure at this moment if some minor update
+patches still needed for ARMv8.
+
+Jason
+> 	Arnd
