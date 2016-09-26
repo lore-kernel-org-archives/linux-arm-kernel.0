@@ -1,51 +1,98 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Mon, 26 Sep 2016 15:56:39 +0200
-Subject: [PATCH v4 2/5] ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
- initial support
-In-Reply-To: <CAOMZO5BHhA8rd0URLNGGLZKN00zFz9d5vsq4CuRWsKyT6yq-oA@mail.gmail.com>
-References: <1473618641-10159-1-git-send-email-jagan@amarulasolutions.com>
- <1473618641-10159-3-git-send-email-jagan@amarulasolutions.com>
- <CAOMZO5CsrrqqUPaVbU-ya79VSXgxyspa_fbr8HY1voJgpy2LLg@mail.gmail.com>
- <CAMty3ZDKrXxmwDFxSBvL_anJQPdXEfnJ40uNv5B6KssQyJJKhA@mail.gmail.com>
- <CAOMZO5B_ahBJr_Tgz_HShmG9heUwCj4K0N3FHhxja1yg0gCUGA@mail.gmail.com>
- <CAOf5uw=bMMa98RP=kvA=NfS89TWOEqU3Q2HjpEmzUTVrdg2=sQ@mail.gmail.com>
- <CAOMZO5CnP3=CNnQcOzra7eQ-cAwProgH+Kws0FHVOw7Q6nCDow@mail.gmail.com>
- <119ad2fc-8e74-1193-8ee2-417cf1e6fd49@engicam.com>
- <CAOMZO5BWgqxfbOepJZwqdZceSWKBnSfd38Ab2TV-LN0oDttc-Q@mail.gmail.com>
- <CAOf5uw=HwErWWqvQ30ZJpb3CupqdvGZ9FnGAxh4+JVTrT6wTjw@mail.gmail.com>
- <CAOMZO5BHhA8rd0URLNGGLZKN00zFz9d5vsq4CuRWsKyT6yq-oA@mail.gmail.com>
-Message-ID: <CAOf5uwk3FJ4K4gL8xNNAp-z_AesjwTwSz986gfveVJsOU+N8Ow@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Sep 2016 15:06:42 +0100
+Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
+ addresses
+In-Reply-To: <1474643941-109020-2-git-send-email-labath@google.com>
+References: <1474643941-109020-1-git-send-email-labath@google.com>
+ <1474643941-109020-2-git-send-email-labath@google.com>
+Message-ID: <20160926140642.GL5317@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Pavel,
 
-On Mon, Sep 26, 2016 at 3:55 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Mon, Sep 26, 2016 at 10:54 AM, Michael Trimarchi
-> <michael@amarulasolutions.com> wrote:
->
->>> Why don't you simply do like this?
->>>
->>>        reg_3p3v: regulator-3p3v {
->>>                compatible = "regulator-fixed";
->>>                regulator-name = "3P3V";
->>>                regulator-min-microvolt = <3300000>;
->>>                regulator-max-microvolt = <3300000>;
->>>        };
->>
->> Should dts rispect the schematic connection?
->
-> Yes
+On Fri, Sep 23, 2016 at 04:19:00PM +0100, Pavel Labath wrote:
+> Arm64 hardware does not always report a watchpoint hit address that
+> matches one of the watchpoints set. It can also report an address
+> "near" the watchpoint if a single instruction access both watched and
+> unwatched addresses. There is no straight-forward way, short of
+> disassembling the offending instruction, to map that address back to
+> the watchpoint.
+> 
+> Previously, when the hardware reported a watchpoint hit on an address
+> that did not match our watchpoint (this happens in case of instructions
+> which access large chunks of memory such as "stp") the process would
+> enter a loop where we would be continually resuming it (because we did
+> not recognise that watchpoint hit) and it would keep hitting the
+> watchpoint again and again. The tracing process would never get
+> notified of the watchpoint hit.
+> 
+> This commit fixes the problem by looking at the watchpoints near the
+> address reported by the hardware. If the address does not exactly match
+> one of the watchpoints we have set, it attributes the hit to the
+> nearest watchpoint we have.  This heuristic is a bit dodgy, but I don't
+> think we can do much more, given the hardware limitations.
+> 
+> Signed-off-by: Pavel Labath <labath@google.com>
+> ---
+>  arch/arm64/kernel/hw_breakpoint.c | 98 +++++++++++++++++++++++++--------------
+>  1 file changed, 64 insertions(+), 34 deletions(-)
 
-So boot on and always on are used to declare their status and their
-behavionr. I don't
-see the point to not specify them in this way
+If the first patch in the series is no longer required (as you stated in
+your follow-up reply), then you can just drop it.
 
-Michael
+> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+> index 14562ae..3ce27ea 100644
+> --- a/arch/arm64/kernel/hw_breakpoint.c
+> +++ b/arch/arm64/kernel/hw_breakpoint.c
+> @@ -664,49 +664,63 @@ unlock:
+>  }
+>  NOKPROBE_SYMBOL(breakpoint_handler);
+>  
+> +/*
+> + * Arm64 hardware does not always report a watchpoint hit address that matches
+> + * one of the watchpoints set. It can also report an address "near" the
+> + * watchpoint if a single instruction access both watched and unwatched
+> + * addresses. There is no straight-forward way, short of disassembling the
+> + * offending instruction, to map that address back to the watchpoint. This
+> + * function computes the distance of the memory access from the watchpoint as a
+> + * heuristic for the likelyhood that a given access triggered the watchpoint.
+> + *
+> + * See Section D2.10.5 "Determining the memory location that caused a Watchpoint
+> + * exception" of ARMv8 Architecture Reference Manual for details.
+> + *
+> + * The function returns the distance of the address from the bytes watched by
+> + * the watchpoint. In case of an exact match, it returns 0.
+> + */
+> +static u64 get_distance_from_watchpoint(unsigned long addr, int i,
+> +					struct arch_hw_breakpoint *info)
+> +{
+> +	u64 wp_low, wp_high;
+> +	int first_bit;
+> +
+> +	first_bit = ffs(info->ctrl.len);
+> +	if (first_bit == 0)
+> +		return -1;
+> +
+> +	wp_low = info->address + first_bit - 1;
+> +	wp_high = info->address + fls(info->ctrl.len) - 1;
 
+This would all be cleaner if you just called get_hbp_len(info->ctrl.len)
+to get the size of the watchpoint. We don't do anything sophisticated
+with the BAS, so you can assume everything is base + len.
 
--- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+> @@ -723,10 +748,15 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>  		/* Do we need to handle the stepping? */
+>  		if (is_default_overflow_handler(wp))
+>  			step = 1;
+> -
+> -unlock:
+> -		rcu_read_unlock();
+>  	}
+> +	if (min_dist > 0 && min_dist != -1) {
+
+min_dist is unsigned, so this could be:
+
+	if (min_dist + 1 > 1)
+
+Will
