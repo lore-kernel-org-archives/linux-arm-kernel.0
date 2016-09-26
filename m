@@ -1,100 +1,80 @@
-From: john@metanate.com (John Keeping)
-Date: Mon, 26 Sep 2016 18:04:39 +0100
-Subject: [PATCH 1/2] clk: rockchip: add I2S internal clock IDs for rk3288
-In-Reply-To: <21692410.II2VYnELL8@phil>
-References: <20160907165330.14607-1-john@metanate.com>
- <2003903.QOgKKA6m1b@phil>
- <20160907191823.7f955ae2.john@metanate.com>
- <21692410.II2VYnELL8@phil>
-Message-ID: <20160926180439.64a16cf1.john@metanate.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 26 Sep 2016 19:07:44 +0200
+Subject: [PATCH] ARM: dts: exynos: Add reboot reason support for Trats2
+In-Reply-To: <20160925073445.GA2469@kozik-lap>
+References: <20160922205522.GA15917@kozik-lap>
+ <87fuopvwjy.fsf@machinist.wiedmeyer.de>
+ <20160925073445.GA2469@kozik-lap>
+Message-ID: <20160926170744.GA5625@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 25 Sep 2016 23:50:29 +0200, Heiko Stuebner wrote:
-
-> Am Mittwoch, 7. September 2016, 19:18:23 CEST schrieb John Keeping:
-> > On Wed, 07 Sep 2016 19:58:31 +0200, Heiko Stuebner wrote:  
-> > > Am Mittwoch, 7. September 2016, 17:53:29 CEST schrieb John Keeping:  
-> > > > To minimize jitter on the I2S clocks, it is important that the
-> > > > denominator in the fractional divider is much greater than the
-> > > > numerator.  Add identifiers for these internal clocks so that the
-> > > > specific clock topology and rates can be specified in the device tree.  
-> > > 
-> > > The TRM states that the denominator must be bigger than 20. Is this the
-> > > one
-> > > you found or did you find further constraints?  
+On Sun, Sep 25, 2016 at 09:34:45AM +0200, Krzysztof Kozlowski wrote:
+> On Sat, Sep 24, 2016 at 11:04:49PM +0200, Wolfgang Wiedmeyer wrote:
 > > 
-> > Is it not that the denominator must be bigger than 20 times the
-> > numerator?  That's what we found, although it seems that the greater the
-> > divisor the better, so our aim is dividing down from 594MHz from GPLL to
-> > the target rate in i2s_frac.  
-> 
-> That is good to know ... the TRM probably lost the real information during 
-> translation or so and only states that hard value. Looking at the rk3368 TRM 
-> just now, the value really is 20 times greater than the numerator.
-> 
-> 
-> > > Did you try teaching the fractional divider to handle these constraints
-> > > before going this way?  
+> > Krzysztof Kozlowski writes:
 > > 
-> > No, I hadn't looked at doing that.  I'm not sure how that would work,
-> > we'd need to add support for fractional divider changing the parent rate
-> > wouldn't we?  
-> 
-> Doug had a somewhat similar problem, mentioning the lack of a "bestdiv" 
-> equivalent that the standard divider provides. I'm not sure if there isn't a 
-> way to provide something like this and/or make the fractional clock honor 
-> specific requirments concerning numerator/denominator - any mathematicians 
-> around? :-)
-
-Yes, this is difficult, although I expect a simple approach of setting
-the input as fast as possible would work reasonably well in practice.
-But even when the input is a mux with a fixed set of possible rates it
-is difficult to extract its maximum frequency within the clock
-framework.
-
-> One could also replace the generic fraction divider use with a rockchip-
-> specific implementation that somehow handles that.
-
-I hadn't considered that, I assumed there would be a strong preference
-for enhancing the generic code rather than writing a special case
-implementation.
-
-> > > Exporting the internal clocks really would be sort of plan d or e, after
-> > > handling this in the clock framework failed. Especially as i2s rates are
-> > > probably dependant on the media being handled (frequencies and such), so
-> > > setting fractional rates statically in the dts won't help you much in the
-> > > general case, as any new playback could trigger a clk_set_rate call
-> > > anyway?  
+> > > On Thu, Sep 22, 2016 at 08:59:03PM +0200, Wolfgang Wiedmeyer wrote:
+> > >> 
+> > >> Krzysztof Kozlowski writes:
+> > >> 
+> > >> > On Thu, Sep 22, 2016 at 06:48:35PM +0200, Wolfgang Wiedmeyer wrote:
+> > >> >> This allows to reboot the device into recovery mode and into the download
+> > >> >> mode of the bootloader.
+> > >> >
+> > >> > Which bootloader? Probably UBoot... or Samsung stock one? Could you put
+> > >> > that information here?
+> > >> 
+> > >> I'm only working with the stock one. I was under the impression that the
+> > >> stock bootloader cannot be replaced on a i9300 because there's a
+> > >> signature check. Is UBoot loaded after the stock one on Trats2 or how
+> > >> does this work? I didn't find information on that.
+> > >
+> > > +CC Marek,
+> > >
+> > > Trats2 is working with U-Boot. Just U-Boot. However I never converted S3
+> > > into Trats2 on my own. I always used targets prepared to be "Trats2"
+> > > type. 
 > > 
-> > We're not setting the fractional rate specifically, instead we're
-> > setting the i2s_pre rate and parent explicitly and banning the i2s_src
-> > mux setting to i2s_pre, which means that clk_set_rate on sclk_i2s0 will
-> > always change i2s_frac but leave i2s_pre alone.  
+> > It would be awesome to be able to run U-Boot on i9300. Is there a way to
+> > test this by not risking to brick the device, e.g. by booting from the
+> > SD card? Then I could send an updated version of the patch that is
+> > compatible with U-Boot :)
 > 
-> But then you are again in the situation where some requested rate can ignore 
-> those fractional-divider constraints? In general I really don't like encoding 
-> such board-specific behaviour into the generic clock tree, like needing to 
-> disable parent relationships.
+> I don't think the stock bootloader supports chaining another bootloader
+> from SD card. There is a way of booting from SD card by shortening a
+> resistor but it is an emergency rescue procedure to overwrite existing
+> bootloader with data from SD card (to restore device). This thread might
+> be interesting:
+> http://forum.xda-developers.com/showpost.php?p=47234165&postcount=220
+> https://smyl.es/samsung-galaxy-iii-s3-gt-i9300-jtag-leaked-document-how-to-repair-soft-bricked-galaxy-s3/
+> 
+> On xda-developers you might find more data about this (including the
+> procedure for emergency restore from SD card). Somehow people flash and
+> unbrick their devices when playing with CyanogenMod...
 
-Yes, I wouldn't suggest changing the clock mux in the upstream kernel.
-I was hoping specifying an assigned parent in DT would be enough to keep
-the parent set correctly, but it doesn't seem to be.
+Hi Wolfgang,
 
-> It works for your board now but does not necessarily for all other boards, 
-> which might require other "hacks" and also doesn't solve the general problem 
-> for all other fractional dividers we have.
+Few more info from my side. It is (rather) not possible to just flash
+GT-I9300 with U-Boot. It still requires S-Boot as a primary bootloader
+(probably different than the stock one). I think such binary S-Boot was
+published along with Tizen images for Trats2 (called RD-PQ). These
+images however started to disappear from download.tizen.org. You can
+still find some, e.g.:
+http://download.tizen.org/releases/system/Tizen_RD-PQ_System_20130716_1.tar
 
-The sensible heuristic is to minimize the length of the clock path when
-there are two equally good routes, which would handle the case where the
-I2S clock can be generated without the need for a fractional divider.
-But I don't think the clock framework has any way to take into account
-that a mux may end up bypassing another clock.
+(better download it soon :) ) This 'tar' should be uploaded through
+Lthor (also from tizen.org) however it might require appropriate
+Partition Information Table (PIT).
+On Tizen Wiki you might find some guides for flashing/upgrading-PIT on Trats2.
 
-It seems that even without the fractional divider we can't get low
-enough jitter to meet our requirements, so we've decided to use an
-external clock for I2S.  As a result of that, we're no longer using this
-part of the clock tree at all, so I'm happy to drop these patches.
+However, please be careful, as all of these steps (and linked binary) are
+targeted to existing RD-PQ/Trats2 boards. They are not intended as a
+way of converting GT-I9300 into Trats2. The conversion might work but...
+it might not.
 
+Before playing with it, I think it would be wise to have the emergency
+recovery procedure (with SD card) ready.
 
-John
+Best regards,
+Krzysztof
