@@ -1,415 +1,94 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Mon, 26 Sep 2016 14:06:12 +0200
-Subject: [PATCH v7] KVM: arm/arm64: Route vtimer events to user space
-Message-ID: <1474891572-177751-1-git-send-email-agraf@suse.de>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 26 Sep 2016 13:29:46 +0100
+Subject: [PATCH 1/2] ARM: vexpress: refine MCPM smp operations override
+ criteria
+In-Reply-To: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+Message-ID: <1474892986.2898.17.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have 2 modes for dealing with interrupts in the ARM world. We can either
-handle them all using hardware acceleration through the vgic or we can emulate
-a gic in user space and only drive CPU IRQ pins from there.
+On Fri, 2016-09-23 at 14:09 +0100, Lorenzo Pieralisi wrote:
+> Current vexpress smp init code detects whether to override the
+> default smp ops with MCPM smp ops by matching the "cci-400"
+> compatible string, in that MCPM requires control over CCI ports
+> to manage low-power states entry/exit.
+> 
+> The "cci-400" compatible string check is a necessary but not
+> sufficient condition for MCPM to work, because the cci-400
+> can be made visible to the kernel, but firmware can nonetheless
+> disable non-secure CCI ports control, while still allowing PMU
+> access; if booted in non-secure world, the kernel would still
+> blindly override smp operations with MCPM operations, resulting
+> in kernel faults when the CCI ports programming interface is
+> accessed from non-secure world.
+> 
+> This means that the "cci-400" compatible string check would
+> result in a false positive in systems that eg boot in HYP mode,
+> where CCI ports non-secure access is explicitly not allowed,
+> and it is reported in the respective device tree nodes with
+> CCI ports marked as disabled.
+> 
+> Refactor the smp operations initialization to make sure that
+> the kernel is actually allowed to take control over CCI ports
+> (by enabling MCPM smp operations) before overriding default
+> vexpress smp operations.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
 
-Unfortunately, when driving IRQs from user space, we never tell user space
-about timer events that may result in interrupt line state changes, so we
-lose out on timer events if we run with user space gic emulation.
+Tested-by: Jon Medhurst <tixy@linaro.org>
 
-This patch fixes that by exposing kvm's view of the vtimer irq line to user
-space and giving it a chance to sync that when it changes.
-
-With this patch I can successfully run edk2 and Linux with user space gic
-emulation.
-
-Signed-off-by: Alexander Graf <agraf@suse.de>
-
----
-
-v1 -> v2:
-
-  - Add back curly brace that got lost
-
-v2 -> v3:
-
-  - Split into patch set
-
-v3 -> v4:
-
-  - Improve documentation
-
-v4 -> v5:
-
-  - Rewrite to use pending state sync in sregs (marc)
-  - Remove redundant checks of vgic_initialized()
-
-v5 -> v6:
-
-  - s/pending/asserted/
-  - split kvm_timer_flush_hwstate function
-  - remove user_timer_asserted
-  - rename kernel_timer_asserted to timer_irq_level
-  - exit only once per level change
-
-v6 -> v7:
-
-  - Move run struct sync out of the run loop
-  - Only check for run sync in kvm_timer_flush_hwstate()
-  - qemu tree to try this out: https://github.com/agraf/qemu.git no-kvm-irqchip-for-v6
----
- Documentation/virtual/kvm/api.txt |  27 +++++++++
- arch/arm/include/uapi/asm/kvm.h   |   2 +
- arch/arm/kvm/arm.c                |  18 +++---
- arch/arm64/include/uapi/asm/kvm.h |   2 +
- include/kvm/arm_arch_timer.h      |   3 +-
- include/uapi/linux/kvm.h          |   6 ++
- virt/kvm/arm/arch_timer.c         | 122 ++++++++++++++++++++++++++++++++------
- 7 files changed, 150 insertions(+), 30 deletions(-)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 739db9a..20ab558 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -3928,3 +3928,30 @@ In order to use SynIC, it has to be activated by setting this
- capability via KVM_ENABLE_CAP ioctl on the vcpu fd. Note that this
- will disable the use of APIC hardware virtualization even if supported
- by the CPU, as it's incompatible with SynIC auto-EOI behavior.
-+
-+8.3 KVM_CAP_ARM_TIMER
-+
-+Architectures: arm, arm64
-+This capability, if KVM_CHECK_EXTENSION indicates that it is available and no
-+in-kernel interrupt controller is in use, means that that the kernel populates
-+the vcpu's run->s.regs.timer_irq_level field with timers that are currently
-+considered asserted by kvm.
-+
-+If active, kvm guarantees at least one exit happens after it detects an
-+assertion change. This exit could either be a KVM_EXIT_INTR or any other exit
-+event, like KVM_EXIT_MMIO. This way kvm gives user space a chance to update its
-+own interrupt asserted status. This usually involves triggering an interrupt
-+line on a user space emulated interrupt controller, so user space should always
-+check the state of run->s.regs.timer_irq_level on every kvm exit.
-+
-+The field run->s.regs.timer_irq_level is available independent of
-+run->kvm_valid_regs or run->kvm_dirty_regs bits. If no in-kernel interrupt
-+controller is used and the capability exists, it will always be available and
-+populated.
-+
-+Currently the following bits are defined for the timer_irq_level bitmap:
-+
-+    KVM_ARM_TIMER_VTIMER  -  virtual timer
-+
-+Future versions of kvm may implement additional timer events. These will get
-+indicated by additional KVM_CAP extensions.
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index a2b3eb3..ad61b4f 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -105,6 +105,8 @@ struct kvm_debug_exit_arch {
- };
- 
- struct kvm_sync_regs {
-+	/* Used with KVM_CAP_ARM_TIMER */
-+	u8 timer_irq_level;
- };
- 
- struct kvm_arch_memory_slot {
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 75f130e..c4c1734 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -187,6 +187,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_ARM_PSCI_0_2:
- 	case KVM_CAP_READONLY_MEM:
- 	case KVM_CAP_MP_STATE:
-+	case KVM_CAP_ARM_TIMER:
- 		r = 1;
- 		break;
- 	case KVM_CAP_COALESCED_MMIO:
-@@ -474,13 +475,7 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 			return ret;
- 	}
- 
--	/*
--	 * Enable the arch timers only if we have an in-kernel VGIC
--	 * and it has been properly initialized, since we cannot handle
--	 * interrupts from the virtual timer with a userspace gic.
--	 */
--	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
--		ret = kvm_timer_enable(vcpu);
-+	ret = kvm_timer_enable(vcpu);
- 
- 	return ret;
- }
-@@ -549,7 +544,7 @@ static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
-  */
- int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	int ret;
-+	int ret, timer_ret;
- 	sigset_t sigsaved;
- 
- 	if (unlikely(!kvm_vcpu_initialized(vcpu)))
-@@ -588,7 +583,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 */
- 		preempt_disable();
- 		kvm_pmu_flush_hwstate(vcpu);
--		kvm_timer_flush_hwstate(vcpu);
-+		timer_ret = kvm_timer_flush_hwstate(vcpu);
- 		kvm_vgic_flush_hwstate(vcpu);
- 
- 		local_irq_disable();
-@@ -596,7 +591,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		/*
- 		 * Re-check atomic conditions
- 		 */
--		if (signal_pending(current)) {
-+		if (timer_ret || signal_pending(current)) {
- 			ret = -EINTR;
- 			run->exit_reason = KVM_EXIT_INTR;
- 		}
-@@ -668,6 +663,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		ret = handle_exit(vcpu, run, ret);
- 	}
- 
-+	/* Resynchronize the internal timer and vcpu run irq level bits */
-+	kvm_timer_sync_run(vcpu);
-+
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &sigsaved, NULL);
- 	return ret;
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 3051f86..411d62a 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -143,6 +143,8 @@ struct kvm_debug_exit_arch {
- #define KVM_GUESTDBG_USE_HW		(1 << 17)
- 
- struct kvm_sync_regs {
-+	/* Used with KVM_CAP_ARM_TIMER */
-+	u8 timer_irq_level;
- };
- 
- struct kvm_arch_memory_slot {
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index dda39d8..cc49bcd 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -63,8 +63,9 @@ void kvm_timer_init(struct kvm *kvm);
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 			 const struct kvm_irq_level *irq);
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
--void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
-+int kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
-+void kvm_timer_sync_run(struct kvm_vcpu *vcpu);
- void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
- 
- u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 300ef25..10d63c5 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -870,6 +870,7 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_S390_USER_INSTR0 130
- #define KVM_CAP_MSI_DEVID 131
- #define KVM_CAP_PPC_HTM 132
-+#define KVM_CAP_ARM_TIMER 133
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
-@@ -1327,4 +1328,9 @@ struct kvm_assigned_msix_entry {
- #define KVM_X2APIC_API_USE_32BIT_IDS            (1ULL << 0)
- #define KVM_X2APIC_API_DISABLE_BROADCAST_QUIRK  (1ULL << 1)
- 
-+/* Available with KVM_CAP_ARM_TIMER */
-+
-+/* Bits for run->s.regs.{user,kernel}_timer_asserted */
-+#define KVM_ARM_TIMER_VTIMER		(1 << 0)
-+
- #endif /* __LINUX_KVM_H */
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 4309b60..62f1daa 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -166,26 +166,69 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
- 	return cval <= now;
- }
- 
-+static bool kvm_timer_in_sync_with_run(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_sync_regs *regs = &vcpu->run->s.regs;
-+	bool timer_high = vcpu->arch.timer_cpu.irq.level;
-+	bool run_high = regs->timer_irq_level & KVM_ARM_TIMER_VTIMER;
-+
-+	/* Only need to sync with user space irqchip */
-+	if (irqchip_in_kernel(vcpu->kvm))
-+		return true;
-+
-+	return timer_high == run_high;
-+}
-+
-+/*
-+ * Synchronize the vcpu run irq level bits with the timer
-+ */
-+void kvm_timer_sync_run(struct kvm_vcpu *vcpu)
-+{
-+	struct kvm_sync_regs *regs = &vcpu->run->s.regs;
-+
-+	/* Only synchronize if we're out of sync */
-+	if (kvm_timer_in_sync_with_run(vcpu))
-+		return;
-+
-+	/* Populate the timer bitmap for user space */
-+	regs->timer_irq_level &= ~KVM_ARM_TIMER_VTIMER;
-+	if (vcpu->arch.timer_cpu.irq.level)
-+		regs->timer_irq_level |= KVM_ARM_TIMER_VTIMER;
-+}
-+
-+/*
-+ * Synchronize the timer IRQ state with the interrupt controller.
-+ */
- static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
- {
- 	int ret;
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 
--	BUG_ON(!vgic_initialized(vcpu->kvm));
--
- 	timer->active_cleared_last = false;
- 	timer->irq.level = new_level;
--	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
-+	trace_kvm_timer_update_irq(vcpu->vcpu_id, host_vtimer_irq,
- 				   timer->irq.level);
--	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
--					 timer->irq.irq,
--					 timer->irq.level);
--	WARN_ON(ret);
-+
-+	if (irqchip_in_kernel(vcpu->kvm)) {
-+		BUG_ON(!vgic_initialized(vcpu->kvm));
-+
-+		/* Fire the timer in the VGIC */
-+		ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
-+						 timer->irq.irq,
-+						 timer->irq.level);
-+
-+		WARN_ON(ret);
-+	}
- }
- 
- /*
-  * Check if there was a change in the timer state (should we raise or lower
-  * the line level to the GIC).
-+ *
-+ * Returns:
-+ *
-+ *   <0  - error
-+ *    0  - success
-  */
- static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
- {
-@@ -197,7 +240,8 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	 * because the guest would never see the interrupt.  Instead wait
- 	 * until we call this function from kvm_timer_flush_hwstate.
- 	 */
--	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
-+	if ((irqchip_in_kernel(vcpu->kvm) && !vgic_initialized(vcpu->kvm)) ||
-+	    !timer->enabled)
- 		return -ENODEV;
- 
- 	if (kvm_timer_should_fire(vcpu) != timer->irq.level)
-@@ -242,22 +286,12 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
- 	timer_disarm(timer);
- }
- 
--/**
-- * kvm_timer_flush_hwstate - prepare to move the virt timer to the cpu
-- * @vcpu: The vcpu pointer
-- *
-- * Check if the virtual timer has expired while we were running in the host,
-- * and inject an interrupt if that was the case.
-- */
--void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
-+static void kvm_timer_flush_hwstate_vgic(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	bool phys_active;
- 	int ret;
- 
--	if (kvm_timer_update_state(vcpu))
--		return;
--
- 	/*
- 	* If we enter the guest with the virtual input level to the VGIC
- 	* asserted, then we have already told the VGIC what we need to, and
-@@ -309,6 +343,51 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 	timer->active_cleared_last = !phys_active;
- }
- 
-+static void kvm_timer_flush_hwstate_user(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+
-+	/*
-+	 * As long as the timer is asserted, we do not need to get new host
-+	 * timer events to know whether the line is still up. Since the GIC
-+	 * is handled in user space, we will get an exit on EOI, so we can
-+	 * resynchronize the status there.
-+	 */
-+	if (timer->irq.level)
-+		disable_percpu_irq(host_vtimer_irq);
-+	else
-+		enable_percpu_irq(host_vtimer_irq, 0);
-+}
-+
-+/**
-+ * kvm_timer_flush_hwstate - prepare to move the virt timer to the cpu
-+ * @vcpu: The vcpu pointer
-+ *
-+ * Check if the virtual timer has expired while we were running in the host,
-+ * and inject an interrupt if that was the case.
-+ *
-+ * Returns:
-+ *
-+ *    0  - success
-+ *    1  - need exit to user space
-+ */
-+int kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
-+{
-+	if (kvm_timer_update_state(vcpu))
-+		return 0;
-+
-+	/* Do we need to return to user space to resynchronize? */
-+	if (!kvm_timer_in_sync_with_run(vcpu))
-+		return 1;
-+
-+	if (irqchip_in_kernel(vcpu->kvm))
-+		kvm_timer_flush_hwstate_vgic(vcpu);
-+	else
-+		kvm_timer_flush_hwstate_user(vcpu);
-+
-+	return 0;
-+}
-+
- /**
-  * kvm_timer_sync_hwstate - sync timer state from cpu
-  * @vcpu: The vcpu pointer
-@@ -479,6 +558,10 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	if (timer->enabled)
- 		return 0;
- 
-+	/* No need to route physical IRQs when we don't use the vgic */
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		goto no_vgic;
-+
- 	/*
- 	 * Find the physical IRQ number corresponding to the host_vtimer_irq
- 	 */
-@@ -502,6 +585,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	if (ret)
- 		return ret;
- 
-+no_vgic:
- 
- 	/*
- 	 * There is a potential race here between VCPUs starting for the first
--- 
-1.8.5.6
+>  arch/arm/mach-vexpress/platsmp.c | 31 ++++++++++++++++++++++++-------
+>  1 file changed, 24 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
+> index 8b8d072..6cfd782 100644
+> --- a/arch/arm/mach-vexpress/platsmp.c
+> +++ b/arch/arm/mach-vexpress/platsmp.c
+> @@ -26,17 +26,34 @@
+>  bool __init vexpress_smp_init_ops(void)
+>  {
+>  #ifdef CONFIG_MCPM
+> +	int cpu;
+> +	struct device_node *cpu_node, *cci_node;
+> +
+>  	/*
+> -	 * The best way to detect a multi-cluster configuration at the moment
+> -	 * is to look for the presence of a CCI in the system.
+> +	 * The best way to detect a multi-cluster configuration
+> +	 * is to detect if the kernel can take over CCI ports
+> +	 * control. Loop over possible CPUs and check if CCI
+> +	 * port control is available.
+>  	 * Override the default vexpress_smp_ops if so.
+>  	 */
+> -	struct device_node *node;
+> -	node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
+> -	if (node && of_device_is_available(node)) {
+> -		mcpm_smp_set_ops();
+> -		return true;
+> +	for_each_possible_cpu(cpu) {
+> +		bool available;
+> +
+> +		cpu_node = of_get_cpu_node(cpu, NULL);
+> +		if (WARN(!cpu_node, "Missing cpu device node!"))
+> +			return false;
+> +
+> +		cci_node = of_parse_phandle(cpu_node, "cci-control-port", 0);
+> +		available = cci_node && of_device_is_available(cci_node);
+> +		of_node_put(cci_node);
+> +		of_node_put(cpu_node);
+> +
+> +		if (!available)
+> +			return false;
+>  	}
+> +
+> +	mcpm_smp_set_ops();
+> +	return true;
+>  #endif
+>  	return false;
+>  }
