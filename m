@@ -1,99 +1,50 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Mon, 26 Sep 2016 12:48:47 -0700
-Subject: [PATCH v10 0/4] ACPI: parse the SPCR table
-In-Reply-To: <98ed1e6b-0994-4429-c085-2293b4a89edf@linaro.org>
-References: <20160905123617.18775-1-aleksey.makarov@linaro.org>
- <25d32778-e708-6763-7cb2-4ddbeebc844b@linaro.org>
- <20160921103749.GA7993@kroah.com>
- <CAOZdJXV2KyZAbrRxQ_zmFNd3Gn4vyuqSsUfJMTU8wpiOtjyE=g@mail.gmail.com>
- <20160921163823.GB9373@kroah.com>
- <98ed1e6b-0994-4429-c085-2293b4a89edf@linaro.org>
-Message-ID: <3529130a-d44d-3160-4fbc-9827f8d94196@linaro.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 26 Sep 2016 22:18:42 +0200
+Subject: [PATCH] soc: rockchip: power-domain: Don't (incorrectly) set
+ rk3399 up/down counts
+In-Reply-To: <1471546561-4459-1-git-send-email-dianders@chromium.org>
+References: <1471546561-4459-1-git-send-email-dianders@chromium.org>
+Message-ID: <3409868.mFCNHRg95O@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Donnerstag, 18. August 2016, 11:56:01 CEST schrieb Douglas Anderson:
+> On rk3288 it was important that powerdown and powerup counts for the
+> CPU/GPU in the kernel because:
+> * The power on default was crazy long.
+> * We couldn't rely on the firmware to set this up because really this
+>   wasn't the firmware's job--the kernel was the only one that really
+>   cared about bringing up / down CPUs and the GPU and doing suspend /
+>   resume (which involves bringing up / down CPUs).
+> 
+> On newer ARM systems (like rk3399) ARM Trusted Firmware is in charge of
+> bringing up and down the CPUs and it really should be in charge of
+> setting all these counts right.  After all ATF is in charge of suspend /
+> resume and CPU up / down.  Let's get out of the way and let ATF do its
+> job.
+> 
+> A few other motivations for doing this:
+> * Depending on another configuration (PMU_24M_EN_CFG) these counts can
+>   be either in 24M or 32k cycles.  Thus, though ATF isn't really so
+>   involved in bringing up the GPU, ATF should probably manage the counts
+>   for everything so it can also manage the 24M / 32k choice.
+> * It turns out that (right now) 24M mode is broken on rk3399 and not
+>   being used.  That means that the count the kernel was programming
+>   in (24) was not 1 us (which it seems was intended) but was actually
+>   .75 ms
+> * On rk3399 there are actually 2 separate registers for setting CPU
+>   up/down time plus 1 register for GPU up/down time.  The curent kernel
+>   code actually was putting the register for the "little" cores in the
+>   "CPU" slot and the register for the "big" cores in the "GPU" slot.  It
+>   was never initting the GPU counts.
+> 
+> Note: this change assumes that ATF will actually set these values at
+> boot, as I'm proposing in <http://crosreview.com/372381>.
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+
+applied to my drivers branch for 4.10
 
 
-On 09/21/2016 10:22 AM, Aleksey Makarov wrote:
->
->
-> On 09/21/2016 07:38 PM, Greg Kroah-Hartman wrote:
->> On Wed, Sep 21, 2016 at 11:19:35AM -0500, Timur Tabi wrote:
->>> On Wed, Sep 21, 2016 at 5:37 AM, Greg Kroah-Hartman
->>> <gregkh@linuxfoundation.org> wrote:
->>>>
->>>> I thought you asked Rafael to take them, they are not in my queue
->>>> anymore because of that.  Don't try to shop-around for maintainers
->>>> please, that's kind of rude...
->>>
->>> In Aleksey's defense, these patches have been floating around for far
->>> too long, so I can understand his frustration.
->>
->> I understand the frustration as well, cross-maintainer messy patches
->> like this are hard to get merged at times at they fall between the
->> cracks a lot.
->>
->>> But as you said, I really hope Rafael picks these up for 4.9.  We need
->>> these patches for ARM server.
->>
->> I thought I saw an email saying he would do so, but it might have been
->> for some other patchset, sorry...
->
-> This can be for "ACPI: ARM64: support for ACPI_TABLE_UPGRADE":
->
-> 	https://lkml.kernel.org/r/CAJZ5v0goXsQ2umcDXU0six+QtxcKGZq7mxhgxuvXTH2iZt6YNA at mail.gmail.com
->
-> As for this patchset, Rafael ACKed the ACPI part:
->
-> 	https://lkml.kernel.org/r/CAJZ5v0hdoLTfjrD8+WxSoxM48dqbZK2KwY_h+63kHKHKgO=JFA at mail.gmail.com
->
-> but I can not find any acknowledge from him that he is ready to merge the series.
-> On the contrary, he expressed his doubt that he is "the right maintainer to send this to":
->
-> 	https://lkml.kernel.org/r/CAJZ5v0gzjtFzig7nEumr83+J2dGb+OA8GNR2i45ZqznfV_hA-A at mail.gmail.com
->
-> I asked the ARM64 people, they said they prefer Rafael to do that:
->
-> 	https://lkml.kernel.org/r/20160909151758.GA11418 at arm.com
->
-> I interpreted the silence from Rafael as unwillingness to pull the series
-> and thought it's OK to ask you.
->
-> I am sorry if this looks rude for Rafael, I did not mean that.
-
-Hi Greg,
-
-Can you give advise on how to deal with this situation please?
-
-It looks like Rafael does not want to pull the patches.  Some time ago he wrote:
-
-"Honestly, I'm not sure why I'm regarded as the right maintainer to send this to.
-
-The only patch here touching generic ACPI code is [3/5] (the [2/5] is
-going in through ACPICA) and the rest is all about ARM64 AFAICS.  Why
-don't you send it to the ARM64 maintainers instead?"
-
-(https://lkml.kernel.org/r/CAJZ5v0gzjtFzig7nEumr83+J2dGb+OA8GNR2i45ZqznfV_hA-A at mail.gmail.com)
-
-ARM64 maintainer said
-
-"The series should go via Rafael, since the bulk of the changes are
-outside of arch/arm64."
-
-(https://lkml.kernel.org/r/20160909151758.GA11418 at arm.com)
-
-So should I continue to try to reach Rafael or ask another maintainer?
-Can you pull it for 4.9?
-
-Thank you
-Aleksey Makarov
-
->
-> Thank you
-> Aleksey Makarov
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Thanks
+Heiko
