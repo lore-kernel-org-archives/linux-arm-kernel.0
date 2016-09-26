@@ -1,89 +1,75 @@
-From: yangbo.lu@nxp.com (Y.B. Lu)
-Date: Mon, 26 Sep 2016 03:14:32 +0000
-Subject: [v12, 0/8] Fix eSDHC host version register bug
-In-Reply-To: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
-References: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <HE1PR04MB08893C8EE38DB311648C1109F8CD0@HE1PR04MB0889.eurprd04.prod.outlook.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 26 Sep 2016 11:29:27 +0800
+Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
+In-Reply-To: <147457026249.9057.8712383708019243942@sboyd-linaro>
+References: <20160914014246.31847-1-stephen.boyd@linaro.org>
+ <147384330268.13546.17843140335600627152@sboyd-linaro>
+ <20160917011605.GB10392@b29397-desktop>
+ <147457026249.9057.8712383708019243942@sboyd-linaro>
+Message-ID: <20160926032927.GA25395@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments about this version patchset ?
+On Thu, Sep 22, 2016 at 11:51:02AM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-09-16 18:16:05)
+> > On Wed, Sep 14, 2016 at 01:55:02AM -0700, Stephen Boyd wrote:
+> > > Quoting Stephen Boyd (2016-09-13 18:42:46)
+> > > > On the db410c 96boards platform we have a TC7USB40MU[1] on the
+> > > > board to mux the D+/D- lines from the SoC between a micro usb
+> > > > "device" port and a USB hub for "host" roles. Upon a role switch,
+> > > > we need to change this mux to forward the D+/D- lines to either
+> > > > the port or the hub. Therefore, introduce a driver for this
+> > > > device that intercepts extcon USB_HOST events and logically
+> > > > asserts a gpio to mux the "host" D+/D- lines when a host cable is
+> > > > attached. When the cable goes away, it will logically deassert
+> > > > the gpio and mux the "device" lines.
+> > > > 
+> > > > [1] https://toshiba.semicon-storage.com/ap-en/product/logic/bus-switch/detail.TC7USB40MU.html
+> > > > 
+> > > > Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+> > > > Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> > > > Cc: <devicetree@vger.kernel.org>
+> > > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > > > ---
+> > > > 
+> > > > Should I make the extcon part optional? I could see a case where there are two
+> > > > "OTG" ports connected to the mux (or two hubs), and for some reason the
+> > > > software may want to mux between them at runtime. If we mandate an extcon,
+> > > > that won't be possible to support. Perhaps it would be better to have
+> > > > the node, but connect it to the usb controller with a phandle (maybe of_graph
+> > > > endpoints would be useful too) so that when the controller wants to mux over
+> > > > a port it can do so.
+> > > 
+> > > Here's some dts mock-up on top of the db410c for the of_graph stuff. I
+> > > haven't written any code around it, but the idea is to allow the binding
+> > > to specify how the mux is connected to upstream and downstream D+/D-
+> > > lines. This way, we can do some dt parsing of the endpoints and their
+> > > parent nodes to figure out if the mux needs to be set high or low to use
+> > > a device connector or a usb hub based on if the id cable is present.
+> > > Maybe I'm over thinking things though and we could just have a DT
+> > > property for that.
+> > > 
+> > >       soc {
+> > >               usb at 78d9000 {
+> > >                       extcon = <&usb_id>, <&usb_id>;
+> > 
+> > Why you have two same extcon phandler? From my mind, one should id,
+> > another should is vbus. Besides, I find extcon-usb-gpio.c is lack of
+> > vbus support, how you support vbus detection for
+> > connection/disconnection with PC for your chipidea msm patch set?
+> 
+> This was already in the dts files for db410c. In the chipidea binding
+> one is for EXTCON_USB (vbus) and one is for EXTCON_USB_HOST (id). My
+> understanding is that extcon-usb-gpio.c sends events for both EXTCON_USB
+> and EXTCON_USB_HOST when the gpio changes state. vbus detection is not
+> that great on this board because we only have on gpio for this.
 
-:)
+I think extcon-usb-gpio.c needs to extend for supporting vbus event,
+otherwise, the micro-b cable's connect/disconnect will introduce
+EXTCON_USB_HOST event, if you use two <&usb_idx> for both id and
+vbus event.
 
+-- 
 
-> -----Original Message-----
-> From: Yangbo Lu [mailto:yangbo.lu at nxp.com]
-> Sent: Wednesday, September 21, 2016 2:57 PM
-> To: linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Scott Wood; Arnd
-> Bergmann
-> Cc: linuxppc-dev at lists.ozlabs.org; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
-> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
-> foundation.org; netdev at vger.kernel.org; Mark Rutland; Rob Herring;
-> Russell King; Jochen Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh
-> Sharma; Qiang Zhao; Kumar Gala; Santosh Shilimkar; Leo Li; X.B. Xie; M.H.
-> Lian; Y.B. Lu
-> Subject: [v12, 0/8] Fix eSDHC host version register bug
-> 
-> This patchset is used to fix a host version register bug in the T4240-
-> R1.0-R2.0 eSDHC controller. To match the SoC version and revision, 10
-> previous version patchsets had tried many methods but all of them were
-> rejected by reviewers.
-> Such as
-> 	- dts compatible method
-> 	- syscon method
-> 	- ifdef PPC method
-> 	- GUTS driver getting SVR method
-> Anrd suggested a soc_device_match method in v10, and this is the only
-> available method left now. This v11 patchset introduces the
-> soc_device_match interface in soc driver.
-> 
-> The first six patches of Yangbo are to add the GUTS driver. This is used
-> to register a soc device which contain soc version and revision
-> information.
-> The other two patches introduce the soc_device_match method in soc driver
-> and apply it on esdhc driver to fix this bug.
-> 
-> Arnd Bergmann (1):
->   base: soc: introduce soc_device_match() interface
-> 
-> Yangbo Lu (7):
->   dt: bindings: update Freescale DCFG compatible
->   ARM64: dts: ls2080a: add device configuration node
->   dt: bindings: move guts devicetree doc out of powerpc directory
->   powerpc/fsl: move mpc85xx.h to include/linux/fsl
->   soc: fsl: add GUTS driver for QorIQ platforms
->   MAINTAINERS: add entry for Freescale SoC drivers
->   mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-> 
->  Documentation/devicetree/bindings/arm/fsl.txt      |   6 +-
->  .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
->  MAINTAINERS                                        |  11 +-
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 +
->  arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
->  arch/powerpc/sysdev/fsl_pci.c                      |   2 +-
->  drivers/base/Kconfig                               |   1 +
->  drivers/base/soc.c                                 |  66 ++++++
->  drivers/clk/clk-qoriq.c                            |   3 +-
->  drivers/i2c/busses/i2c-mpc.c                       |   2 +-
->  drivers/iommu/fsl_pamu.c                           |   3 +-
->  drivers/mmc/host/Kconfig                           |   1 +
->  drivers/mmc/host/sdhci-of-esdhc.c                  |  20 ++
->  drivers/net/ethernet/freescale/gianfar.c           |   2 +-
->  drivers/soc/Kconfig                                |   2 +-
->  drivers/soc/fsl/Kconfig                            |  19 ++
->  drivers/soc/fsl/Makefile                           |   1 +
->  drivers/soc/fsl/guts.c                             | 257
-> +++++++++++++++++++++
->  include/linux/fsl/guts.h                           | 125 ++++++----
->  .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
->  include/linux/sys_soc.h                            |   3 +
->  21 files changed, 478 insertions(+), 61 deletions(-)  rename
-> Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
-> create mode 100644 drivers/soc/fsl/Kconfig  create mode 100644
-> drivers/soc/fsl/guts.c  rename arch/powerpc/include/asm/mpc85xx.h =>
-> include/linux/fsl/svr.h (97%)
-> 
-> --
-> 2.1.0.27.g96db324
+Best Regards,
+Peter Chen
