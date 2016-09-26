@@ -1,74 +1,104 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 26 Sep 2016 10:05:13 +0200
-Subject: [PATCH v2 4/4] PM / AVS: rockchip-cpu-avs: add driver handling
- Rockchip cpu avs
-In-Reply-To: <20160926035511.GG17336@vireshk-i7>
-References: <1471510341-63926-1-git-send-email-finley.xiao@rock-chips.com>
- <20160912215515.GF7243@codeaurora.org> <20160926035511.GG17336@vireshk-i7>
-Message-ID: <20776501.pZ2NDOzLK3@phil>
+From: po.liu@nxp.com (Po Liu)
+Date: Mon, 26 Sep 2016 08:25:10 +0000
+Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
+ MSI/MSI-X/INTx mode
+In-Reply-To: <20160923130620.GA1486@rob-hp-laptop>
+References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
+ <1473741659-17618-1-git-send-email-po.liu@nxp.com>
+ <1473741659-17618-3-git-send-email-po.liu@nxp.com>
+ <20160918005212.GF15478@tiger>
+ <VI1PR0401MB1709F91B0C1EB6C80D741E4492F50@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+ <20160923130620.GA1486@rob-hp-laptop>
+Message-ID: <VI1PR0401MB17097C1AE342ADF6F691019092CD0@VI1PR0401MB1709.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 26. September 2016, 09:25:11 CEST schrieb Viresh Kumar:
-> On 12-09-16, 14:55, Stephen Boyd wrote:
-> > On 08/29, Viresh Kumar wrote:
-> > > On 18-08-16, 16:52, Finlye Xiao wrote:
-> > > > +static int rockchip_adjust_opp_table(struct device *cpu_dev,
-> > > > +				     struct cpufreq_frequency_table *table,
-> > > > +				     int volt)
-> > > > +{
-> > > > +	struct opp_table *opp_table;
-> > > > +	struct cpufreq_frequency_table *pos;
-> > > > +	struct dev_pm_opp *opp;
-> > > > +
-> > > > +	if (!volt)
-> > > > +		return 0;
-> > > > +
-> > > > +	rcu_read_lock();
-> > > > +
-> > > > +	opp_table = _find_opp_table(cpu_dev);
-> > > > +	if (IS_ERR(opp_table)) {
-> > > > +		rcu_read_unlock();
-> > > > +		return PTR_ERR(opp_table);
-> > > > +	}
-> > > > +
-> > > > +	cpufreq_for_each_valid_entry(pos, table) {
-> > > > +		opp = dev_pm_opp_find_freq_exact(cpu_dev, pos->frequency * 1000,
-> > > > +						 true);
-> > > > +		if (IS_ERR(opp))
-> > > > +			continue;
-> > > > +
-> > > > +		opp->u_volt += volt;
-> > > > +		opp->u_volt_min += volt;
-> > > > +		opp->u_volt_max += volt;
-> > > > +	}
-> > > > +
-> > > > +	rcu_read_unlock();
-> > > > +
-> > > > +	return 0;
-> > > > +}
-> > > 
-> > > I wouldn't prefer altering the opp tables from individual drivers at
-> > > all. At the least, it should be done via some helpers exposed by the
-> > > core.
-> > > 
-> > > But before that I would like to hear from Stephen a bit as I recall he
-> > > was also working on something similar.
-> > 
-> > I had a patch to modify the voltage at runtime for the "current"
-> > OPP. Now that we have regulator and clk control inside OPP that
-> > became a little easier to do without having to do some notifier
-> > from the OPP layer to the consumers. I haven't had time to revive
-> > those patches though. Should we do that?
-> 
-> Perhaps yes, we should have a common place for doing all that.
-> 
-> > Does this need to modify
-> > anything besides the OPP the device is currently running at?
-> 
-> Finlye, can you please answer this ?
+Hi Rob,
 
-If I understand it correctly, depending on the leakage value stored in an 
-efuse, all opp voltages are reduced by a certain value. Right now the driver 
-does it in one go for the full opp table, but of course could also do it for 
-each new opp individually before it gets set.
+>  -----Original Message-----
+>  From: Rob Herring [mailto:robh at kernel.org]
+>  Sent: Friday, September 23, 2016 9:06 PM
+>  To: Po Liu
+>  Cc: Shawn Guo; linux-pci at vger.kernel.org; linux-arm-
+>  kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+>  devicetree at vger.kernel.org; Roy Zang; Arnd Bergmann; Marc Zyngier;
+>  Stuart Yoder; Leo Li; M.H. Lian; Murali Karicheri; Bjorn Helgaas;
+>  Mingkai Hu
+>  Subject: Re: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
+>  MSI/MSI-X/INTx mode
+>  
+>  On Sun, Sep 18, 2016 at 03:37:27AM +0000, Po Liu wrote:
+>  > Hi Shawn,
+>  >
+>  >
+>  > >  -----Original Message-----
+>  > >  From: Shawn Guo [mailto:shawnguo at kernel.org]
+>  > >  Sent: Sunday, September 18, 2016 8:52 AM
+>  > >  To: Po Liu
+>  > >  Cc: linux-pci at vger.kernel.org;
+>  > > linux-arm-kernel at lists.infradead.org;
+>  > >  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Roy Zang;
+>  > > Arnd  Bergmann; Marc Zyngier; Stuart Yoder; Leo Li; M.H. Lian;
+>  > > Murali  Karicheri; Bjorn Helgaas; Mingkai Hu
+>  > >  Subject: Re: [PATCH v5 3/3] pci:aer: add support aer interrupt with
+>  > > none  MSI/MSI-X/INTx mode
+>  > >
+>  > >  On Tue, Sep 13, 2016 at 12:40:59PM +0800, Po Liu wrote:
+>  > >  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC
+>  mode.
+>  > >  > When chip support the aer interrupt with none MSI/MSI-X/INTx
+>  > > mode,  > maybe there is interrupt line for aer pme etc. Search the
+>  > > interrupt  > number in the fdt file. Then fixup the dev->irq with it.
+>  > >  >
+>  > >  > Signed-off-by: Po Liu <po.liu@nxp.com>
+>  > >
+>  > >  Will the new kernel work with existing/old DTB?  I'm trying to
+>  > > understand the dependency between driver and DTS changes.
+>  >
+>  > Yes, We've never use name 'intr' before. So we remove it is ok.
+>  > 'aer' is a dts name for researching it's true interrupt number by
+>  > kernel. This patch is first time to use name 'aer'. So it must be
+>  > compatible with existing/old DTB.
+>  
+>  Please explain why you are not breaking compatibility in the commit
+>  message. I asked for this on v2.
+
+Sorry, I didn't really catch what your means. Do you mean I should add why I remove the 'intr'?
+
+>  
+>  > >  > ---
+>  > >  > changes for v5:
+>  > >  > 	- Add clear 'aer' interrup-names description
+>  > >  >
+>  > >  >  .../devicetree/bindings/pci/layerscape-pci.txt     | 11 +++++---
+>  > >  >  drivers/pci/pcie/portdrv_core.c                    | 31
+>  > >  +++++++++++++++++++---
+>  > >  >  2 files changed, 35 insertions(+), 7 deletions(-)  >  > diff
+>  > > --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+>  > >  > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+>  > >  > index 41e9f55..101d0a7 100644
+>  > >  > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+>  > >  > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+>  > >  > @@ -18,8 +18,10 @@ Required properties:
+>  > >  >  - reg: base addresses and lengths of the PCIe controller  >  -
+>  > > interrupts: A list of interrupt outputs of the controller. Must
+>  > > contain an
+>  > >  >    entry for each entry in the interrupt-names property.
+>  > >  > -- interrupt-names: Must include the following entries:
+>  > >  > -  "intr": The interrupt that is asserted for controller
+>  > > interrupts  > +- interrupt-names: It may be include the following
+>  entries:
+>  
+>  "may be" is not okay. It should be "must" or explain when an interrupt
+>  would not be present. Really, differences in interrupts means you need
+>  different compatible strings.
+
+How about changing "must" to "should" or "could" and also add when to add after "aer": to explain when to add it?
+
+Thanks!
+
+>  
+>  Rob
+>  
+>  > >  > +  "aer": The interrupt that is asserted for aer interrupt  > +
+>  > > "pme": The interrupt that is asserted for pme interrupt  > +  ......
