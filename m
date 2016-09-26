@@ -1,53 +1,34 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 26 Sep 2016 09:21:28 +0200
-Subject: [PATCH] ARM: pxa: pxa_cplds: honor probe deferral
-Message-ID: <1474874488-26533-1-git-send-email-robert.jarzmik@free.fr>
+Date: Mon, 26 Sep 2016 09:21:51 +0200
+Subject: [PATCH] ARM: pxa: fix pxa25x interrupt init
+Message-ID: <1474874511-26617-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The method to acquire the input interrupt was working in a platform data
-based board, but was failing in a device-tree one when the gpio
-controller was probed after pxa_cplds.
+In the device-tree case, the root interrupt controller cannot be
+accessed through the 6th coprocessor, contrary to pxa27x and pxa3xx
+architectures.
 
-Use platform_get_irq() to benefit from the probe deferral
-mechanism. Moreover, as seen in dm9000.c development, platform_get_irq()
-doesn't honor the irq type IO resource (ie. edge rising for example),
-and it must be passed again at irq request in a not device-tree build,
-hence the irq_get_trigger_type() call.
+Fix it to behave as in non-devicetree builds.
 
+Fixes: 32f17997c130 ("ARM: pxa: remove irq init from dt machines")
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/mach-pxa/pxa_cplds_irqs.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+ arch/arm/mach-pxa/pxa25x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/pxa_cplds_irqs.c b/arch/arm/mach-pxa/pxa_cplds_irqs.c
-index e362f865fcd2..941508585e34 100644
---- a/arch/arm/mach-pxa/pxa_cplds_irqs.c
-+++ b/arch/arm/mach-pxa/pxa_cplds_irqs.c
-@@ -120,13 +120,9 @@ static int cplds_probe(struct platform_device *pdev)
- 	if (!fpga)
- 		return -ENOMEM;
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index 12b94357fbc1..c725baf119e1 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -156,7 +156,7 @@ static int __init __init
+ pxa25x_dt_init_irq(struct device_node *node, struct device_node *parent)
+ {
+ 	pxa_dt_irq_init(pxa25x_set_wake);
+-	set_handle_irq(ichp_handle_irq);
++	set_handle_irq(icip_handle_irq);
  
--	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
--	if (res) {
--		fpga->irq = (unsigned int)res->start;
--		irqflags = res->flags;
--	}
--	if (!fpga->irq)
--		return -ENODEV;
-+	fpga->irq = platform_get_irq(pdev, 0);
-+	if (fpga->irq <= 0)
-+		return fpga->irq;
- 
- 	base_irq = platform_get_irq(pdev, 1);
- 	if (base_irq < 0)
-@@ -142,6 +138,7 @@ static int cplds_probe(struct platform_device *pdev)
- 	writel(fpga->irq_mask, fpga->base + FPGA_IRQ_MASK_EN);
- 	writel(0, fpga->base + FPGA_IRQ_SET_CLR);
- 
-+	irqflags = irq_get_trigger_type(fpga->irq);
- 	ret = devm_request_irq(&pdev->dev, fpga->irq, cplds_irq_handler,
- 			       irqflags, dev_name(&pdev->dev), fpga);
- 	if (ret == -ENOSYS)
+ 	return 0;
+ }
 -- 
 2.1.4
