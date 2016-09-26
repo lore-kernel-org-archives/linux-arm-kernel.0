@@ -1,30 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 26 Sep 2016 08:36:50 +0200
-Subject: [PATCH v2 2/4] ARM: dts: imx31: move CCM device node to AIPS2
- bus devices
-In-Reply-To: <1474848223-19728-3-git-send-email-vz@mleia.com>
-References: <1474848223-19728-1-git-send-email-vz@mleia.com>
- <1474848223-19728-3-git-send-email-vz@mleia.com>
-Message-ID: <20160926063650.syqjgg445dny5kxw@pengutronix.de>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 26 Sep 2016 09:45:40 +0300
+Subject: [PATCH -next] mmc: sdhci-of-arasan: Fix non static symbol warning
+In-Reply-To: <1474818243-19207-1-git-send-email-weiyj.lk@gmail.com>
+References: <1474818243-19207-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <c916cd6a-2929-91fc-2433-78f8638ff071@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vladimir,
-
-On Mon, Sep 26, 2016 at 03:03:41AM +0300, Vladimir Zapolskiy wrote:
-> i.MX31 Clock Control Module controller is found on AIPS2 bus, move it
-> there from SPBA bus to avoid a conflict of device IO space mismatch.
+On 25/09/16 18:44, Wei Yongjun wrote:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
 > 
-> Fixes: ef0e4a606fb6 ("ARM: mx31: Replace clk_register_clkdev with clock DT lookup")
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Fixes the following sparse warning:
+> 
+> drivers/mmc/host/sdhci-of-arasan.c:253:6: warning:
+>  symbol 'sdhci_arasan_reset' was not declared. Should it be static?
+> 
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-out of interest: Which kind of machine do you work with? I assume this
-isn't just a finger exercise with qemu?
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index da8e40a..e263671 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -250,7 +250,7 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
+>  	writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
+>  }
+>  
+> -void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
+> +static void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
+>  {
+>  	u8 ctrl;
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> 
+> 
+> 
+> 
