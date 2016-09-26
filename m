@@ -1,33 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 26 Sep 2016 09:33:22 -0700
-Subject: [linux-sunxi] [PATCH v6 0/3] ASoC: sun4i-codec: Distinguish
- sun4i from sun7i
-In-Reply-To: <20160925100827.5dc3240d@scratchpost.org>
-References: <20160924200503.10728-1-dannym@scratchpost.org>
- <20160925100827.5dc3240d@scratchpost.org>
-Message-ID: <20160926163322.bwnmgwkq4v45epa3@sirena.org.uk>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 26 Sep 2016 22:17:22 +0530
+Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <20160926164722.GB2467@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 25, 2016 at 10:08:27AM +0200, Danny Milosavljevic wrote:
+On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
+> Hi,
+> 
+> This series tries to solve the problem with DMA with device registers
+> (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
+> recent patch '9575632 (dmaengine: make slave address physical)'
+> clarifies that DMA slave address provided by clients is the physical
+> address. This puts the task of mapping the DMA slave address from a
+> phys_addr_t to a dma_addr_t on the DMA engine.
+> 
+> Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
+> the same and no special care is needed. However if you have a IOMMU you
+> need to map the DMA slave phys_addr_t to a dma_addr_t using something
+> like this.
+> 
+> This series is based on top of v4.8-rc1. And I'm hoping to be able to collect a
+> Ack from Russell King on patch 4/6 that adds the ARM specific part and then be
+> able to take the whole series through the dmaengine tree. If this is not the
+> best route I'm more then happy to do it another way.
+> 
+> It's tested on a Koelsch with CONFIG_IPMMU_VMSA and by enabling the
+> ipmmu_ds node in r8a7791.dtsi. I verified operation by interacting with
+> /dev/mmcblk1, i2c and the serial console which are devices behind the
+> iommu.
+> 
+> Furthermore I have audited to the best of my ability all call paths
+> involved to make sure that the dma_addr_t obtained from
+> dma_map_resource() to is not used in a way where it would be expected
+> for the mapping to be RAM (have a struct page). Many thanks to Christoph
+> Hellwig and Laurent Pinchart for there input in this effort.
 
-Please fix your mail client to word wrap within paragraphs at something
-substantially less than 80 columns.  Doing this makes your messages much
-easier to read and reply to.
+Applied, thanks
 
-> I see that the v5 patches 2 and 3 have already been applied in the mean time  - and the functional content in v6 is identical.
-
-> Therefore, the only thing that needs to be looked at is patch 1 - where I modified the commit message only compared to v5.
-
-Please do not submit new versions of already applied patches, please
-submit incremental updates to the existing code.  Modifying existing
-commits creates problems for other users building on top of those
-commits so it's best practice to only change pubished git commits if
-absolutely essential.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160926/98dad3ce/attachment-0001.sig>
+-- 
+~Vinod
