@@ -1,73 +1,133 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 26 Sep 2016 18:33:59 +0530
-Subject: [PATCH 5/5] arm64: Add uprobe support
-In-Reply-To: <20160926110159.GB27498@e104818-lin.cambridge.arm.com>
-References: <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
- <20160920165946.GA19353@e104818-lin.cambridge.arm.com>
- <20160921110047.GA29470@localhost.localdomain>
- <20160921170403.GE12180@e104818-lin.cambridge.arm.com>
- <20160922032328.GB29470@localhost.localdomain>
- <20160922165030.GA27704@e104818-lin.cambridge.arm.com>
- <20160923041230.GC29470@localhost.localdomain>
- <20160923130528.GE2161@e104818-lin.cambridge.arm.com>
- <CAHB_GupuUYPNFoYQeX8EhAcesvqKVVuphuxneudZ5kL2cxm-7g@mail.gmail.com>
- <20160926110159.GB27498@e104818-lin.cambridge.arm.com>
-Message-ID: <20160926130359.GA9370@localhost.localdomain>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 26 Sep 2016 13:21:13 +0000
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <10705430.q2aqv5uYO3@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1760643.vMTR5o5E9g@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F8842B6@lhreml507-mbx>
+ <10705430.q2aqv5uYO3@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F8889E1@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/09/2016:12:01:59 PM, Catalin Marinas wrote:
-> On Sun, Sep 25, 2016 at 10:32:28PM +0530, Pratyush Anand wrote:
-> > On Fri, Sep 23, 2016 at 6:35 PM, Catalin Marinas
-> > <catalin.marinas@arm.com> wrote:
-> > > On Fri, Sep 23, 2016 at 09:42:30AM +0530, Pratyush Anand wrote:
-> > >> On 22/09/2016:05:50:30 PM, Catalin Marinas wrote:
-> > >> > On Thu, Sep 22, 2016 at 08:53:28AM +0530, Pratyush Anand wrote:
-> > >> > > On 21/09/2016:06:04:04 PM, Catalin Marinas wrote:
-> > 
-> > >> > As a quick workaround you could check mm->task_size > TASK_SIZE_32 in
-> > >> > the arch_uprobe_analyze_insn() function.
-> > >>
-> > >> It would be doable. TASK_SIZE_32 is defined only for COMPAT. So, may be I can
-> > >> return -EINVAL when mm->task_size < TASK_SIZE_64.
+Hi Arnd
+
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: 23 September 2016 14:43
+> To: Gabriele Paoloni
+> Cc: zhichang.yuan; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com; minyard at acm.org;
+> linux-pci at vger.kernel.org; gregkh at linuxfoundation.org; John Garry;
+> will.deacon at arm.com; linux-kernel at vger.kernel.org; Yuanzhichang;
+> Linuxarm; xuwei (O); linux-serial at vger.kernel.org;
+> benh at kernel.crashing.org; zourongrong at gmail.com; liviu.dudau at arm.com;
+> kantyzc at 163.com
+> Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
+> Hip06
+> 
+> On Friday, September 23, 2016 10:23:30 AM CEST Gabriele Paoloni wrote:
+> > Hi Arnd
+> >
+> > > -----Original Message-----
+> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > > Sent: 23 September 2016 10:52
+> > > To: zhichang.yuan
+> > > Cc: Gabriele Paoloni; linux-arm-kernel at lists.infradead.org;
+> > > devicetree at vger.kernel.org; lorenzo.pieralisi at arm.com;
+> minyard at acm.org;
+> > > linux-pci at vger.kernel.org; gregkh at linuxfoundation.org; John Garry;
+> > > will.deacon at arm.com; linux-kernel at vger.kernel.org; Yuanzhichang;
+> > > Linuxarm; xuwei (O); linux-serial at vger.kernel.org;
+> > > benh at kernel.crashing.org; zourongrong at gmail.com;
+> liviu.dudau at arm.com;
+> > > kantyzc at 163.com
+> > > Subject: Re: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on
+> > > Hip06
 > > >
-> > > That's just a temporary workaround. If we ever merge ILP32, this test
-> > > would no longer be enough (as the ISA is AArch64 but with TASK_SIZE_32).
-> > 
-> > OK.. So what about doing something similar what x86 is doing.
-> > We can have a flag for task Type in arch specific mm_context_t. We
-> > also set this flag in COMPAT_SET_PERSONALITY() along with setting
-> > thread_info flag, and we clear them in SET_PERSONALITY().
+> > > On Friday, September 23, 2016 12:27:17 AM CEST zhichang.yuan wrote:
+> > > > For this patch sketch, I have a question.
+> > > > Do we call pci_address_to_pio in arch_of_address_to_pio to get
+> the
+> > > > corresponding logical IO port
+> > > > for LPC??
+> > >
+> > >
+> > > No, of course not, that would be silly:
+> > >
+> > > The argument to pci_address_to_pio() is a phys_addr_t, and we we
+> don't
+> > > have one because there is no address associated with your PIO, that
+> > > is the entire point of your driver!
+> > >
+> > > Also, we already know the mapping because this is what the inb/outb
+> > > workaround is looking at, so there is absolutely no reason to call
+> it
+> > > either.
+> >
+> > Ok assume that we do not call pci_address_to_pio() for the ISA bus...
+> > The LPC driver will register its phys address range in io_range_list,
+> > then the IPMI driver probe will retrieve its physical address calling
+> > of_address_to_resource and will use the indirect io to access this
+> > address.
+> >
+> > From the perspective of the indirect IO function the input parameter
+> > is an unsigned long addr that (now) can be either:
+> > 1) an IO token coming from a legacy pci device
+> > 2) a phys address that lives on the LPC bus
+> >
+> > These are conceptually two separate address spaces (and actually they
+> > both start from 0).
 > 
-> This looks like a better approach.
+> Why? Any IORESOURCE_IO address always refers to the logical I/O port
+> range in Linux, not the physical address that is used on a bus.
 > 
-> > > Looking at prepare_uprobe(), we have a weak is_trap_insn() function.
-> > > This check is meaningless without knowing which instruction set we
-> > > target. A false positive here, however, is not that bad as we wouldn't
-> > > end up inserting the wrong breakpoint in the executable. But it looks to
-> > > me like the core uprobe code needs to pass some additional information
-> > > like the type of task or ELF format to the arch code to make a useful
-> > > choice of breakpoint type.
-> > 
-> > It seems that 'strtle r0, [r0], #160' would have the closest matching
-> > aarch32 instruction wrt BRK64_OPCODE_UPROBES(0xd42000A0). But that too
-> > seems a bad instruction. So, may be we can use still weak
-> > is_trap_insn().
+> > If the input parameter can live on different address spaces that are
+> > overlapped, even if I save the used LPC range in arm64_extio_ops-
+> >start/end
+> > there is no way for the indirect IO to tell if the input parameter is
+> > an I/O token or a phys address that belongs to LPC...
+>
+
+Assume that in the probe function the LPC drivers calls pci_register_io_range
+for the LPC cpu address range (0 to PCIBIOS_MIN_I0) and does not scan
+the children DT nodes.
+
+Consider for example the ipmi driver:
+When the reg property is read to retrieve the ipmi <<i/o port>> in
+http://lxr.free-electrons.com/source/drivers/char/ipmi/ipmi_si_intf.c#L2622
+if we do not call pci_address_to_pio in __of_address_to_resource the input
+parameter of inb/outb will be the cpu address of the ipmi (not translated
+to a unique token id).
+
+So inb/outb at this stage can be called passing either a cpu address or a
+token io port.
+
+If we set arm64_extio_ops->start/end to 0 and PCIBIOS_MIN_I0 respectively
+we still cannot tell inside inb/outb if the passed address is a token or
+an LPC cpu address as the ipmi cpu address can overlap with another device
+I/O token...
+
+My suggestion is to call pci_address_to_pio even for devices living on
+the LPC bus; then in the LPC probe we set arm64_extio_ops->start/end to
+the I/O tokens that correspond to the LPC cpu address range (in the LPC probe
+function we call pci_address_to_pio after we have called pci_register_io_range);
+finally in inb/outb we know that we can get only an I/O token as input
+parameter and we check it against arm64_extio_ops->start/end to decide
+whether to call the LPC accessors or readb/writeb...
+
+> The start address is the offset: if you get an address between 'start'
+> and 'end', you subtract the 'start' from it, and use that to call
+> the registered driver function. That works because we can safely
+> assume that the bus address range that the LPC driver registers starts
+> zero.
+
+Sorry I cannot follow what you said here above: <<if you get an address 
+between 'start' and 'end'>>...in which function?
+
+Thanks
+
+Gab
+
 > 
-> Even if the is_trap_insn() check passes, we would reject the probe in
-> arch_uprobe_analyze_insn() immediately after based on the mm type check,
-> so not too bad.
-
-OK..I will have an always returning false from arm64 is_trap_insn() in v2.
-
-> 
-> If we add support for probing 32-bit tasks, I would rather have
-> is_trap_insn() take the mm_struct as argument so that a non-weak
-> implementation can check for the correct encoding.
-
-Yes, for 32 bit task we would need mm_struct as arg in is_trap_insn() as well as
-in is_swbp_insn(). We would also need to have arm64 specific set_swbp().
-
-Thanks for all your input. It was helpful. I will send V2 soon.
-
-~Pratyush
+> 	Arnd
