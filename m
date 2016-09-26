@@ -1,52 +1,116 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Sep 2016 16:53:53 +0100
-Subject: [RFC PATCH 0/3] efi: MMC proxy support for the UEFI varstore
-In-Reply-To: <20160922125854.GC26596@leverpostej>
-References: <1474543806-19210-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160922125854.GC26596@leverpostej>
-Message-ID: <20160926155352.GA16830@remoulade>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 26 Sep 2016 09:15:42 -0700
+Subject: Applied "ASoC: rk3399_gru_sound: fix recording pop at first attempt"
+ to the asoc tree
+In-Reply-To: <1474552206-31742-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <E1boYZC-0005RL-8m@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2016 at 01:58:54PM +0100, Mark Rutland wrote:
-> On Thu, Sep 22, 2016 at 12:30:03PM +0100, Ard Biesheuvel wrote:
+The patch
 
-> > This series proposes an approach to work around this. It implements the UEFI
-> > MMC host protocol in the kernel, in a way that makes it possible to expose it
-> > to the firmware. At the same time, the firmware needs be set up for this, i.e.,
-> > it needs to expose its MMC host protocol pointer via a UEFI configuration table,
-> > so that the kernel can override it if it decides to expose this functionality
-> > to the firmware.
-> 
-> At a high level, and assuming a number of details from previous
-> discussions, I think the general approach of having the kernel mediate
-> access to the MMC makes sense.
+   ASoC: rk3399_gru_sound: fix recording pop at first attempt
 
-> I have a few other general concerns:
+has been applied to the asoc tree at
 
-Another few thoughts I had:
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-* The UEFI spec mandates that a certain amount of stack space is available to
-  runtime services which we call. If UEFI can call back into the kernel, it's
-  not clear how much of the stack is available to either UEFI or the kernel.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-  This is a rather fragile area -- kernel stack usage can vary wildly depending
-  on configuration options.
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-* CPU state management. Runtime services can temporarily mask interrupts, and
-  may require interrupts to remain masked over calls back into the kernel. That
-  and other concerns mean that deadlock is going to be very difficult to avoid.
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-* It gets in the way of (though doesn't strictly prevent) sandboxing. One thing
-  I'd like to do is run UEFI services in a more restricted environment (e.g. a
-  VM if we have EL2 available), to aid robustness and debugging. Having a single
-  entry/exit point, and not having to proxy calls would make this far simpler.
-
-Overall, I'd far prefer that we have a strict one-way call policy (as is the
-case today with UEFI), even if that means we have to make a number of calls to
-achieve some functionality. In addition to the above, that also sidesteps the
-lifetime issues I mentioned previously (modulo some FW-side state retained
-across kexec and so on).
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Mark.
+Mark
+
+>From 3a6f9dce6116cc54e31dc10d176ceecb1a7e4e7f Mon Sep 17 00:00:00 2001
+From: Wonjoon Lee <woojoo.lee@samsung.com>
+Date: Thu, 22 Sep 2016 21:50:06 +0800
+Subject: [PATCH] ASoC: rk3399_gru_sound: fix recording pop at first attempt
+
+Pop happens when mclk applied but dmic's own boot-time
+Specify dmic delay times in dt to make sure
+clocks are ready earlier than dmic working
+
+Signed-off-by: Wonjoon Lee <woojoo.lee@samsung.com>
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ .../bindings/sound/rockchip,rk3399-gru-sound.txt           |  7 +++++++
+ sound/soc/rockchip/rk3399_gru_sound.c                      | 14 ++++++++++++++
+ 2 files changed, 21 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+index f19b6c830a34..eac91db07178 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+@@ -6,10 +6,17 @@ Required properties:
+   connected to the codecs
+ - rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
+ 
++Optional properties:
++- dmic-wakeup-delay-ms : specify delay time (ms) for DMIC ready.
++  If this option is specified, which means it's required dmic need
++  delay for DMIC to ready so that rt5514 can avoid recording before
++  DMIC send valid data
++
+ Example:
+ 
+ sound {
+ 	compatible = "rockchip,rk3399-gru-sound";
+ 	rockchip,cpu = <&i2s0>;
+ 	rockchip,codec = <&max98357a &rt5514 &da7219>;
++	dmic-wakeup-delay-ms = <20>;
+ };
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index ee0648927afc..9ed735a6cf49 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -38,6 +38,8 @@
+ 
+ #define SOUND_FS	256
+ 
++unsigned int rt5514_dmic_delay;
++
+ static struct snd_soc_jack rockchip_sound_jack;
+ 
+ static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
+@@ -123,6 +125,9 @@ static int rockchip_sound_rt5514_hw_params(struct snd_pcm_substream *substream,
+ 		return ret;
+ 	}
+ 
++	/* Wait for DMIC stable */
++	msleep(rt5514_dmic_delay);
++
+ 	return 0;
+ }
+ 
+@@ -343,6 +348,15 @@ static int rockchip_sound_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	/* Set DMIC delay */
++	ret = device_property_read_u32(&pdev->dev, "dmic-delay",
++					&rt5514_dmic_delay);
++	if (ret) {
++		rt5514_dmic_delay = 0;
++		dev_dbg(&pdev->dev,
++			"no optional property 'dmic-delay' found, default: no delay\n");
++	}
++
+ 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+ 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_dai_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+ 	rockchip_dailinks[DAILINK_RT5514_DSP].platform_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+-- 
+2.9.3
