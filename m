@@ -1,38 +1,38 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 26 Sep 2016 09:22:11 +0200
-Subject: [PATCH] ARM: dts: pxa: fix gpio0 and gpio1 interrupts
-Message-ID: <1474874531-26703-1-git-send-email-robert.jarzmik@free.fr>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 26 Sep 2016 15:36:50 +0800
+Subject: [PATCH -next] arm64: Kconfig: select OF/ACPI_NUMA under NUMA config
+Message-ID: <1474875410-23016-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since gpio-pxa was redesigned to differenciate gpio0, gpio1 and the
-gpio-mux interrupt as in the hardware IP, the device-tree description
-should be amended so that interrupts from gpio0 and gpio1 can be mapped
-to consumers.
+Move OF_NUMA select under NUMA config, and select ACPI_NUMA
+when ACPI enabled.
 
-This is especially true on lubbock and mainstone devices where gpio0 is
-multiplexed on pxa_cplds for ethernet, sa1111, usb udc, and other
-devices.
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/arm/boot/dts/pxa2xx.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
-index 3ff077ca4400..e4ebcde17837 100644
---- a/arch/arm/boot/dts/pxa2xx.dtsi
-+++ b/arch/arm/boot/dts/pxa2xx.dtsi
-@@ -54,8 +54,8 @@
- 			reg = <0x40e00000 0x10000>;
- 			gpio-controller;
- 			#gpio-cells = <0x2>;
--			interrupts = <10>;
--			interrupt-names = "gpio_mux";
-+			interrupts = <8>, <9>, <10>;
-+			interrupt-names = "gpio0", "gpio1", "gpio_mux";
- 			interrupt-controller;
- 			#interrupt-cells = <0x2>;
- 			ranges;
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 3b4afbc..6ee8ceb 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -100,7 +100,6 @@ config ARM64
+ 	select NO_BOOTMEM
+ 	select OF
+ 	select OF_EARLY_FLATTREE
+-	select OF_NUMA if NUMA && OF
+ 	select OF_RESERVED_MEM
+ 	select PCI_ECAM if ACPI
+ 	select POWER_RESET
+@@ -578,6 +577,8 @@ config HOTPLUG_CPU
+ config NUMA
+ 	bool "Numa Memory Allocation and Scheduler Support"
+ 	depends on SMP
++	select ACPI_NUMA if ACPI
++	select OF_NUMA
+ 	help
+ 	  Enable NUMA (Non Uniform Memory Access) support.
+ 
 -- 
-2.1.4
+1.7.12.4
