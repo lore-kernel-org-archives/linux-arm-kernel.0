@@ -1,94 +1,67 @@
 From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 26 Sep 2016 13:29:46 +0100
-Subject: [PATCH 1/2] ARM: vexpress: refine MCPM smp operations override
- criteria
-In-Reply-To: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
+Date: Mon, 26 Sep 2016 13:30:34 +0100
+Subject: [PATCH 2/2] drivers: cci: add missing CCI port availability
+ firmware check
+In-Reply-To: <20160923130907.4187-2-lorenzo.pieralisi@arm.com>
 References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
-Message-ID: <1474892986.2898.17.camel@linaro.org>
+ <20160923130907.4187-2-lorenzo.pieralisi@arm.com>
+Message-ID: <1474893034.2898.19.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 2016-09-23 at 14:09 +0100, Lorenzo Pieralisi wrote:
-> Current vexpress smp init code detects whether to override the
-> default smp ops with MCPM smp ops by matching the "cci-400"
-> compatible string, in that MCPM requires control over CCI ports
-> to manage low-power states entry/exit.
+> The CCI ports programming interface is available to the kernel
+> only when booted in secure mode (or when firmware enables
+> non-secure access to override CCI ports control). In both cases,
+> firmware reports the CCI ports availability through the device
+> tree CCI ports nodes, which must be parsed and their status checked
+> by the kernel probing path.
 > 
-> The "cci-400" compatible string check is a necessary but not
-> sufficient condition for MCPM to work, because the cci-400
-> can be made visible to the kernel, but firmware can nonetheless
-> disable non-secure CCI ports control, while still allowing PMU
-> access; if booted in non-secure world, the kernel would still
-> blindly override smp operations with MCPM operations, resulting
-> in kernel faults when the CCI ports programming interface is
-> accessed from non-secure world.
+> This check is currently missing and may cause the kernel to
+> erroneously believe it is free to take control of CCI ports
+> where in practice CCI ports control is forbidden.
 > 
-> This means that the "cci-400" compatible string check would
-> result in a false positive in systems that eg boot in HYP mode,
-> where CCI ports non-secure access is explicitly not allowed,
-> and it is reported in the respective device tree nodes with
-> CCI ports marked as disabled.
-> 
-> Refactor the smp operations initialization to make sure that
-> the kernel is actually allowed to take control over CCI ports
-> (by enabling MCPM smp operations) before overriding default
-> vexpress smp operations.
+> Add the missing CCI port availability check to the CCI driver
+> in order to guarantee sane CCI usage.
 > 
 > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > Cc: Liviu Dudau <liviu.dudau@arm.com>
 > Cc: Sudeep Holla <sudeep.holla@arm.com>
 > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
 > ---
 
 Tested-by: Jon Medhurst <tixy@linaro.org>
 
->  arch/arm/mach-vexpress/platsmp.c | 31 ++++++++++++++++++++++++-------
->  1 file changed, 24 insertions(+), 7 deletions(-)
+>  drivers/bus/arm-cci.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-> index 8b8d072..6cfd782 100644
-> --- a/arch/arm/mach-vexpress/platsmp.c
-> +++ b/arch/arm/mach-vexpress/platsmp.c
-> @@ -26,17 +26,34 @@
->  bool __init vexpress_smp_init_ops(void)
->  {
->  #ifdef CONFIG_MCPM
-> +	int cpu;
-> +	struct device_node *cpu_node, *cci_node;
+> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> index 5755907f..3c7a1c7 100644
+> --- a/drivers/bus/arm-cci.c
+> +++ b/drivers/bus/arm-cci.c
+> @@ -2199,6 +2199,9 @@ static int cci_probe_ports(struct device_node *np)
+>  		if (!of_match_node(arm_cci_ctrl_if_matches, cp))
+>  			continue;
+>  
+> +		if (!of_device_is_available(cp))
+> +			continue;
 > +
->  	/*
-> -	 * The best way to detect a multi-cluster configuration at the moment
-> -	 * is to look for the presence of a CCI in the system.
-> +	 * The best way to detect a multi-cluster configuration
-> +	 * is to detect if the kernel can take over CCI ports
-> +	 * control. Loop over possible CPUs and check if CCI
-> +	 * port control is available.
->  	 * Override the default vexpress_smp_ops if so.
->  	 */
-> -	struct device_node *node;
-> -	node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
-> -	if (node && of_device_is_available(node)) {
-> -		mcpm_smp_set_ops();
-> -		return true;
-> +	for_each_possible_cpu(cpu) {
-> +		bool available;
-> +
-> +		cpu_node = of_get_cpu_node(cpu, NULL);
-> +		if (WARN(!cpu_node, "Missing cpu device node!"))
-> +			return false;
-> +
-> +		cci_node = of_parse_phandle(cpu_node, "cci-control-port", 0);
-> +		available = cci_node && of_device_is_available(cci_node);
-> +		of_node_put(cci_node);
-> +		of_node_put(cpu_node);
-> +
-> +		if (!available)
-> +			return false;
+>  		i = nb_ace + nb_ace_lite;
+>  
+>  		if (i >= nb_cci_ports)
+> @@ -2241,6 +2244,13 @@ static int cci_probe_ports(struct device_node *np)
+>  		ports[i].dn = cp;
 >  	}
+>  
+> +	/*
+> +	 * If there is no CCI port that is under kernel control
+> +	 * return early and report probe status.
+> +	 */
+> +	if (!nb_ace && !nb_ace_lite)
+> +		return -ENODEV;
 > +
-> +	mcpm_smp_set_ops();
-> +	return true;
->  #endif
->  	return false;
->  }
+>  	 /* initialize a stashed array of ACE ports to speed-up look-up */
+>  	cci_ace_init_ports();
+>  
