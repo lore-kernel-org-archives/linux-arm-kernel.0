@@ -1,42 +1,62 @@
-From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
-Date: Wed, 28 Sep 2016 01:30:17 +0200
-Subject: [PATCH v7 0/8] power: add power sequence library
-In-Reply-To: <1474342607-27512-1-git-send-email-peter.chen@nxp.com>
-References: <1474342607-27512-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <57EB0109.4070000@maciej.szmigiero.name>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 28 Sep 2016 00:39:15 +0100
+Subject: [PATCH v24 9/9] Documentation: dt: chosen properties for arm64
+ kdump
+In-Reply-To: <20160819132641.GA12709@rob-hp-laptop>
+References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
+ <20160809015747.28591-1-takahiro.akashi@linaro.org>
+ <20160819132641.GA12709@rob-hp-laptop>
+Message-ID: <20160927233915.GB3437@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.09.2016 05:36, Peter Chen wrote:
-> Hi all,
-> 
-> This is a follow-up for my last power sequence framework patch set [1].
-> According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
-> power sequence instances will be added at postcore_initcall, the match
-> criteria is compatible string first, if the compatible string is not
-> matched between dts and library, it will try to use generic power sequence.
-> 	 
-> The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> if only one power sequence instance is needed, for more power sequences
-> are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
-> 
-> In future, if there are special power sequence requirements, the special
-> power sequence library can be created.
-> 
-> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
-> two hot-plug devices to simulate this use case, the related binding
-> change is updated at patch [1/6], The udoo board changes were tested
-> using my last power sequence patch set.[3]
-> 
-> Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
-> need to power on itself before it can be found by ULPI bus.
-> 
-> [1] http://www.spinics.net/lists/linux-usb/msg142755.html
-> [2] http://www.spinics.net/lists/linux-usb/msg143106.html
-> [3] http://www.spinics.net/lists/linux-usb/msg142815.html
+Hi Rob,
 
-Just tested this patch set on UDOO board again to make sure that it still
-works after all changes done since it was last tested there and can confirm
-that it does work correctly.
+Reviving an old thread -- "rock" and "hard place" come to mind.
 
-Maciej
+On Fri, Aug 19, 2016 at 08:26:41AM -0500, Rob Herring wrote:
+> On Tue, Aug 09, 2016 at 10:57:47AM +0900, AKASHI Takahiro wrote:
+> > From: James Morse <james.morse@arm.com>
+
+> > +linux,usable-memory-range
+> > +-------------------------
+> > +
+> > +This property (currently used only on arm64) holds the memory range,
+> > +the base address and the size, which can be used as system ram on
+> > +the *current* kernel. Note that, if this property is present, any memory
+> > +regions under "memory" nodes in DT blob or ones marked as "conventional
+> > +memory" in EFI memory map should be ignored.
+> > +e.g.
+> > +
+> > +/ {
+> > +	chosen {
+> > +		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
+> > +	};
+> > +};
+> 
+> I've read the discussion on this. I think you should use the existing 
+> linux,usable-memory property in the memory nodes. If UEFI systems don't 
+> have memory nodes, then you can find an UEFI way to describe this. DT is 
+> not the dumping ground for what doesn't fit in UEFI. How do x86 systems 
+> work?
+
+Having looked at the proposals, I'm personally much keener on the approach
+above (modulo naming and wording) than trying to bolt memory nodes onto a UEFI
+system, or using reserved-memory to describe the inverse of the allowable
+range.
+
+I completely agree that we want one solution for DT-only and DT+UEFI.
+
+While those approaches reuse existing infrastructure, they end up creating more
+work, and I believe that they create more scope for painful problems. As kdump
+is already a constrained case, I think that it's reasonable to have a
+linux-specific property as above.
+
+I also think we need to figure out how we expect this to work for the
+kexec_file_load case, as that has a criticial impact on the above (e.g. what's
+preferable out of cmdline options vs dt properties).
+
+Can we try to sync at connect to discuss this?
+
+Thanks,
+Mark.
