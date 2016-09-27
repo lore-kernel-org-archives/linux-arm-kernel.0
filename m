@@ -1,61 +1,84 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 27 Sep 2016 14:25:44 -0700
-Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
-In-Reply-To: <20160927045357.GB27697@b29397-desktop>
-References: <20160914014246.31847-1-stephen.boyd@linaro.org>
- <147384330268.13546.17843140335600627152@sboyd-linaro>
- <20160917011605.GB10392@b29397-desktop>
- <147457026249.9057.8712383708019243942@sboyd-linaro>
- <20160926032927.GA25395@b29397-desktop>
- <147491549050.5206.9497559526723777799@sboyd-linaro>
- <20160927045357.GB27697@b29397-desktop>
-Message-ID: <147501154421.20482.11679706034780655409@sboyd-linaro>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 27 Sep 2016 15:14:01 -0700
+Subject: [PATCH v2 4/4] PM / AVS: rockchip-cpu-avs: add driver handling
+ Rockchip cpu avs
+In-Reply-To: <20776501.pZ2NDOzLK3@phil>
+References: <1471510341-63926-1-git-send-email-finley.xiao@rock-chips.com>
+ <20160912215515.GF7243@codeaurora.org>
+ <20160926035511.GG17336@vireshk-i7> <20776501.pZ2NDOzLK3@phil>
+Message-ID: <20160927221401.GA940@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-09-26 21:53:58)
-> On Mon, Sep 26, 2016 at 11:44:50AM -0700, Stephen Boyd wrote:
-> > Quoting Peter Chen (2016-09-25 20:29:27)
-> > > On Thu, Sep 22, 2016 at 11:51:02AM -0700, Stephen Boyd wrote:
-> > > > Quoting Peter Chen (2016-09-16 18:16:05)
-> > > > > On Wed, Sep 14, 2016 at 01:55:02AM -0700, Stephen Boyd wrote:
-> > > > > > Quoting Stephen Boyd (2016-09-13 18:42:46)
-> > > > > > 
-> > > > > >       soc {
-> > > > > >               usb at 78d9000 {
-> > > > > >                       extcon = <&usb_id>, <&usb_id>;
-> > > > > 
-> > > > > Why you have two same extcon phandler? From my mind, one should id,
-> > > > > another should is vbus. Besides, I find extcon-usb-gpio.c is lack of
-> > > > > vbus support, how you support vbus detection for
-> > > > > connection/disconnection with PC for your chipidea msm patch set?
+On 09/26, Heiko Stuebner wrote:
+> Am Montag, 26. September 2016, 09:25:11 CEST schrieb Viresh Kumar:
+> > On 12-09-16, 14:55, Stephen Boyd wrote:
+> > > On 08/29, Viresh Kumar wrote:
+> > > > On 18-08-16, 16:52, Finlye Xiao wrote:
+> > > > > +static int rockchip_adjust_opp_table(struct device *cpu_dev,
+> > > > > +				     struct cpufreq_frequency_table *table,
+> > > > > +				     int volt)
+> > > > > +{
+> > > > > +	struct opp_table *opp_table;
+> > > > > +	struct cpufreq_frequency_table *pos;
+> > > > > +	struct dev_pm_opp *opp;
+> > > > > +
+> > > > > +	if (!volt)
+> > > > > +		return 0;
+> > > > > +
+> > > > > +	rcu_read_lock();
+> > > > > +
+> > > > > +	opp_table = _find_opp_table(cpu_dev);
+> > > > > +	if (IS_ERR(opp_table)) {
+> > > > > +		rcu_read_unlock();
+> > > > > +		return PTR_ERR(opp_table);
+> > > > > +	}
+> > > > > +
+> > > > > +	cpufreq_for_each_valid_entry(pos, table) {
+> > > > > +		opp = dev_pm_opp_find_freq_exact(cpu_dev, pos->frequency * 1000,
+> > > > > +						 true);
+> > > > > +		if (IS_ERR(opp))
+> > > > > +			continue;
+> > > > > +
+> > > > > +		opp->u_volt += volt;
+> > > > > +		opp->u_volt_min += volt;
+> > > > > +		opp->u_volt_max += volt;
+> > > > > +	}
+> > > > > +
+> > > > > +	rcu_read_unlock();
+> > > > > +
+> > > > > +	return 0;
+> > > > > +}
 > > > > 
-> > > > This was already in the dts files for db410c. In the chipidea binding
-> > > > one is for EXTCON_USB (vbus) and one is for EXTCON_USB_HOST (id). My
-> > > > understanding is that extcon-usb-gpio.c sends events for both EXTCON_USB
-> > > > and EXTCON_USB_HOST when the gpio changes state. vbus detection is not
-> > > > that great on this board because we only have on gpio for this.
+> > > > I wouldn't prefer altering the opp tables from individual drivers at
+> > > > all. At the least, it should be done via some helpers exposed by the
+> > > > core.
+> > > > 
+> > > > But before that I would like to hear from Stephen a bit as I recall he
+> > > > was also working on something similar.
 > > > 
-> > > I think extcon-usb-gpio.c needs to extend for supporting vbus event,
-> > > otherwise, the micro-b cable's connect/disconnect will introduce
-> > > EXTCON_USB_HOST event, if you use two <&usb_idx> for both id and
-> > > vbus event.
-> > > 
+> > > I had a patch to modify the voltage at runtime for the "current"
+> > > OPP. Now that we have regulator and clk control inside OPP that
+> > > became a little easier to do without having to do some notifier
+> > > from the OPP layer to the consumers. I haven't had time to revive
+> > > those patches though. Should we do that?
 > > 
-> > Sorry, I'm lost now. extcon-usb-gpio.c already supports EXTCON_USB as an
-> > event. Is the problem that we're using two of the same phandles in the
-> > binding?
+> > Perhaps yes, we should have a common place for doing all that.
+> > 
+> > > Does this need to modify
+> > > anything besides the OPP the device is currently running at?
+> > 
+> > Finlye, can you please answer this ?
 > 
-> No, ID and VBUS are different events.
-> 
-> http://www.spinics.net/lists/linux-usb/msg147004.html
-> 
+> If I understand it correctly, depending on the leakage value stored in an 
+> efuse, all opp voltages are reduced by a certain value. Right now the driver 
+> does it in one go for the full opp table, but of course could also do it for 
+> each new opp individually before it gets set.
 
-Agreed. But we only register for EXTCON_USB or EXTCON_USB_HOST for each
-phandle in the list respectively based on the index of the phandle. So
-with or without the patch you mention I don't see how it matters.
+Ok. Well either way that sounds fine. We could expose an API to
+change each voltage and an API to change the current voltage and
+update the table.
 
-We do it this way to trigger the role switch when the cable is
-disconnected. I think the problem with just having the id phandle is
-that we'll never see the vbus event, and so the role switch doesn't
-work.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
