@@ -1,79 +1,111 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:19 +0200
-Subject: [PULL 11/50] arm64: KVM: Move the AArch32 conditional execution to
- common code
+Date: Tue, 27 Sep 2016 20:05:48 +0200
+Subject: [PULL 40/50] KVM: arm64: vgic-its: Introduce config option to guard
+ ITS specific code
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-12-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-41-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Vladimir Murzin <vladimir.murzin@arm.com>
 
-It would make some sense to share the conditional execution code
-between 32 and 64bit. In order to achieve this, let's move that
-code to virt/kvm/arm/aarch32.c. While we're at it, drop a
-superfluous BUG_ON() that wasn't that useful.
+By now ITS code guarded with KVM_ARM_VGIC_V3 config option which was
+introduced to hide everything specific to vgic-v3 from 32-bit world.
+We are going to support vgic-v3 in 32-bit world and KVM_ARM_VGIC_V3
+will gone, but we don't have support for ITS there yet and we need to
+continue keeping ITS away.
+Introduce the new config option to prevent ITS code being build in
+32-bit mode when support for vgic-v3 is done.
 
-Following patches will migrate the 32bit port to that code base.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/emulate.c                             | 4 +---
- arch/arm64/kvm/Makefile                            | 3 ++-
- arch/arm64/kvm/emulate.c => virt/kvm/arm/aarch32.c | 4 +---
- 3 files changed, 4 insertions(+), 7 deletions(-)
- rename arch/arm64/kvm/emulate.c => virt/kvm/arm/aarch32.c (97%)
+ arch/arm64/kvm/Kconfig              | 4 ++++
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 3 +++
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    | 2 ++
+ virt/kvm/arm/vgic/vgic.h            | 4 ++++
+ 4 files changed, 13 insertions(+)
 
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index af93e3f..eda9ddd 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -221,9 +221,7 @@ static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
- 	bool is_arm = !(cpsr & PSR_T_BIT);
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 9c9edc9..7ba9164 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -16,6 +16,9 @@ menuconfig VIRTUALIZATION
  
--	BUG_ON(is_arm && (cpsr & PSR_IT_MASK));
--
--	if (!(cpsr & PSR_IT_MASK))
-+	if (is_arm || !(cpsr & PSR_IT_MASK))
- 		return;
+ if VIRTUALIZATION
  
- 	cond = (cpsr & 0xe000) >> 13;
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 695eb3c..d50a82a 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -16,9 +16,10 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/e
- kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
++config KVM_ARM_VGIC_V3_ITS
++	bool
++
+ config KVM_ARM_VGIC_V3
+ 	bool
  
--kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/aarch32.o
+@@ -35,6 +38,7 @@ config KVM
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
+ 	select KVM_ARM_VGIC_V3
++	select KVM_ARM_VGIC_V3_ITS
+ 	select KVM_ARM_PMU if HW_PERF_EVENTS
+ 	select HAVE_KVM_MSI
+ 	select HAVE_KVM_IRQCHIP
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 163b057..89ef9bc 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -223,9 +223,12 @@ int kvm_register_vgic_device(unsigned long type)
+ 	case KVM_DEV_TYPE_ARM_VGIC_V3:
+ 		ret = kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
+ 					      KVM_DEV_TYPE_ARM_VGIC_V3);
++
++#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+ 		if (ret)
+ 			break;
+ 		ret = kvm_vgic_register_its_device();
++#endif
+ 		break;
+ #endif
+ 	}
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 90d8181..acbe691 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -42,6 +42,7 @@ u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+ 	return reg | ((u64)val << lower);
+ }
  
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-init.o
-diff --git a/arch/arm64/kvm/emulate.c b/virt/kvm/arm/aarch32.c
-similarity index 97%
-rename from arch/arm64/kvm/emulate.c
-rename to virt/kvm/arm/aarch32.c
-index 40098ad..cb02e56 100644
---- a/arch/arm64/kvm/emulate.c
-+++ b/virt/kvm/arm/aarch32.c
-@@ -109,9 +109,7 @@ static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
- 	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
++#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+ bool vgic_has_its(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+@@ -51,6 +52,7 @@ bool vgic_has_its(struct kvm *kvm)
  
--	BUG_ON(is_arm && (cpsr & COMPAT_PSR_IT_MASK));
--
--	if (!(cpsr & COMPAT_PSR_IT_MASK))
-+	if (is_arm || !(cpsr & COMPAT_PSR_IT_MASK))
- 		return;
+ 	return dist->has_its;
+ }
++#endif
  
- 	cond = (cpsr & 0xe000) >> 13;
+ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+ 					    gpa_t addr, unsigned int len)
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 6c4625c..100045f 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -84,11 +84,15 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
+ int vgic_v3_probe(const struct gic_kvm_info *info);
+ int vgic_v3_map_resources(struct kvm *kvm);
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
++
++#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+ int vgic_register_its_iodevs(struct kvm *kvm);
+ bool vgic_has_its(struct kvm *kvm);
+ int kvm_vgic_register_its_device(void);
+ void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
++#endif
++
+ #else
+ static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+ {
 -- 
 2.9.0
