@@ -1,45 +1,77 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Tue, 27 Sep 2016 15:01:54 +0200
-Subject: [PATCH v2 3/8] i2c: bcm2835: Use ratelimited logging on transfer
- errors
-In-Reply-To: <1474977426-3272-4-git-send-email-noralf@tronnes.org>
-References: <1474977426-3272-1-git-send-email-noralf@tronnes.org>
- <1474977426-3272-4-git-send-email-noralf@tronnes.org>
-Message-ID: <74D9ED33-1B99-4ED6-88B5-879950D160C8@martin.sperl.org>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Tue, 27 Sep 2016 21:15:12 +0800
+Subject: [PATCH 5/5] tty: amba-pl011: Add earlycon support for SBSA UART
+In-Reply-To: <20160927105748.GA3847@kroah.com>
+References: <1474708465-38958-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1474708465-38958-6-git-send-email-wangkefeng.wang@huawei.com>
+ <20160927105748.GA3847@kroah.com>
+Message-ID: <281fb262-d9b8-9543-e35e-5db41fcea5d1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 27 Sep 2016, at 13:57, Noralf Tr?nnes <noralf@tronnes.org> wrote:
-> 
-> Writing to an AT24C32 generates on average 2x i2c transfer errors per
-> 32-byte page write. Which amounts to a lot for a 4k write. This is due
-> to the fact that the chip doesn't respond during it's internal write
-> cycle when the at24 driver tries and retries the next write.
-> Reduce this flooding of the log by using dev_err_ratelimited().
-> 
-> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
-> Reviewed-by: Eric Anholt <eric@anholt.net>
-> ---
-> drivers/i2c/busses/i2c-bcm2835.c | 3 ++-
-> 1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-> index df036ed..370a322 100644
-> --- a/drivers/i2c/busses/i2c-bcm2835.c
-> +++ b/drivers/i2c/busses/i2c-bcm2835.c
-> @@ -207,7 +207,8 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
->        (msg->flags & I2C_M_IGNORE_NAK))
->        return 0;
-> 
-> -    dev_err(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
-> +    dev_err_ratelimited(i2c_dev->dev, "i2c transfer failed: %x\n",
-> +                i2c_dev->msg_err);
-Do we really need this error message at all?
 
-Maybe just remove it instead, because error messages during 
-"normal"/successfull operations of at24 seems  strange.
+On 2016/9/27 18:57, Greg Kroah-Hartman wrote:
+> On Sat, Sep 24, 2016 at 05:14:25PM +0800, Kefeng Wang wrote:
+>> Declare an OF early console for SBSA UART so that the early console device
+>> can be specified via the "stdout-path" property in device-tree.
+>>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>> ---
+>>  drivers/tty/serial/amba-pl011.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+>> index 7d9b291..3688d3b 100644
+>> --- a/drivers/tty/serial/amba-pl011.c
+>> +++ b/drivers/tty/serial/amba-pl011.c
+>> @@ -2330,6 +2330,7 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
+>>  	return 0;
+>>  }
+>>  OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
+>> +OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
+> 
+> Why do you need another option for the same thing?
 
-Or make it a debug message instead.
 
-Martin
+It is used to support earlycon(without option) for sbsa-uart in bootargs.
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs = "earlycon"
+	};
+
+	uart0: uart at 602b0000 {
+		compatible = "arm,sbsa-uart";
+		reg = <0x0 0x602b0000 0x0 0x1000>;
+		...
+	};
+
+We setup a unique struct with compatible name by OF_EARLYCON_DECLARE,
+#define OF_EARLYCON_DECLARE(_name, compat, fn)				\
+	static const struct earlycon_id __UNIQUE_ID(__earlycon_##_name)	\
+	     __used __section(__earlycon_table)				\
+		= { .name = __stringify(_name),				\
+		    .compatible = compat,				\
+		    .setup = fn  }
+
+if without this patch(see drivers/of/fdt.c),
+
+early_init_dt_scan_chosen_serial()
+ - for (match = __earlycon_table; match < __earlycon_table_end; match++)
+  -- if (fdt_node_check_compatible(fdt, offset, match->compatible))
+	countinue;
+  -- of_setup_earlycon(match, offset, options); // will never touch here.
+
+Thanks,
+Kefeng
+
+> 
+> confused,
+> 
+> greg k-h
+> 
+> .
+> 
