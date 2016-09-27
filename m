@@ -1,77 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 27 Sep 2016 14:51:34 +0100
-Subject: [PATCH 5/5] arm64: Add uprobe support
-In-Reply-To: <20160926130359.GA9370@localhost.localdomain>
-References: <20160920165946.GA19353@e104818-lin.cambridge.arm.com>
- <20160921110047.GA29470@localhost.localdomain>
- <20160921170403.GE12180@e104818-lin.cambridge.arm.com>
- <20160922032328.GB29470@localhost.localdomain>
- <20160922165030.GA27704@e104818-lin.cambridge.arm.com>
- <20160923041230.GC29470@localhost.localdomain>
- <20160923130528.GE2161@e104818-lin.cambridge.arm.com>
- <CAHB_GupuUYPNFoYQeX8EhAcesvqKVVuphuxneudZ5kL2cxm-7g@mail.gmail.com>
- <20160926110159.GB27498@e104818-lin.cambridge.arm.com>
- <20160926130359.GA9370@localhost.localdomain>
-Message-ID: <20160927135133.GF17336@e104818-lin.cambridge.arm.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 27 Sep 2016 16:13:11 +0200
+Subject: [PATCHv3 1/3] serial: mctrl_gpio: implement mctrl_gpio_use_rtscts
+In-Reply-To: <20160927141313.27668-1-richard.genoud@gmail.com>
+References: <20160927141313.27668-1-richard.genoud@gmail.com>
+Message-ID: <20160927141313.27668-2-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2016 at 06:33:59PM +0530, Pratyush Anand wrote:
-> On 26/09/2016:12:01:59 PM, Catalin Marinas wrote:
-> > On Sun, Sep 25, 2016 at 10:32:28PM +0530, Pratyush Anand wrote:
-> > > On Fri, Sep 23, 2016 at 6:35 PM, Catalin Marinas
-> > > <catalin.marinas@arm.com> wrote:
-> > > > On Fri, Sep 23, 2016 at 09:42:30AM +0530, Pratyush Anand wrote:
-> > > >> On 22/09/2016:05:50:30 PM, Catalin Marinas wrote:
-> > > >> > On Thu, Sep 22, 2016 at 08:53:28AM +0530, Pratyush Anand wrote:
-> > > >> > > On 21/09/2016:06:04:04 PM, Catalin Marinas wrote:
-> > > 
-> > > >> > As a quick workaround you could check mm->task_size > TASK_SIZE_32 in
-> > > >> > the arch_uprobe_analyze_insn() function.
-> > > >>
-> > > >> It would be doable. TASK_SIZE_32 is defined only for COMPAT. So, may be I can
-> > > >> return -EINVAL when mm->task_size < TASK_SIZE_64.
-> > > >
-> > > > That's just a temporary workaround. If we ever merge ILP32, this test
-> > > > would no longer be enough (as the ISA is AArch64 but with TASK_SIZE_32).
-> > > 
-> > > OK.. So what about doing something similar what x86 is doing.
-> > > We can have a flag for task Type in arch specific mm_context_t. We
-> > > also set this flag in COMPAT_SET_PERSONALITY() along with setting
-> > > thread_info flag, and we clear them in SET_PERSONALITY().
-> > 
-> > This looks like a better approach.
-> > 
-> > > > Looking at prepare_uprobe(), we have a weak is_trap_insn() function.
-> > > > This check is meaningless without knowing which instruction set we
-> > > > target. A false positive here, however, is not that bad as we wouldn't
-> > > > end up inserting the wrong breakpoint in the executable. But it looks to
-> > > > me like the core uprobe code needs to pass some additional information
-> > > > like the type of task or ELF format to the arch code to make a useful
-> > > > choice of breakpoint type.
-> > > 
-> > > It seems that 'strtle r0, [r0], #160' would have the closest matching
-> > > aarch32 instruction wrt BRK64_OPCODE_UPROBES(0xd42000A0). But that too
-> > > seems a bad instruction. So, may be we can use still weak
-> > > is_trap_insn().
-> > 
-> > Even if the is_trap_insn() check passes, we would reject the probe in
-> > arch_uprobe_analyze_insn() immediately after based on the mm type check,
-> > so not too bad.
-> 
-> OK..I will have an always returning false from arm64 is_trap_insn() in v2.
+This function returns true if CTS and RTS are used as GPIOs.
+Some drivers (like atmel_serial) needs to know if the flow control is
+handled by the controller or by GPIOs.
 
-For the time being, I think the default is_trap_insn() check is still
-useful on arm64. The problem gets trickier when we add AArch32 support
-as it may return 'true' on an AArch32 instruction that matches the
-AArch64 BRK (or vice-versa). That's when we need to either pass the mm
-to is_trap_insn() or simply return false and always perform the check in
-the arch_uprobe_analyze_insn() (which should, in addition, check for the
-trap instruction).
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ drivers/tty/serial/serial_mctrl_gpio.c |  8 ++++++++
+ drivers/tty/serial/serial_mctrl_gpio.h | 10 ++++++++++
+ 2 files changed, 18 insertions(+)
 
-There is also the is_trap_at_addr() function which uses is_trap_insn().
-I haven't checked the call paths here, are there any implications if
-is_trap_insn() always returns false?
-
--- 
-Catalin
+diff --git a/drivers/tty/serial/serial_mctrl_gpio.c b/drivers/tty/serial/serial_mctrl_gpio.c
+index d2da6aa7f27d..0e5525a64c2a 100644
+--- a/drivers/tty/serial/serial_mctrl_gpio.c
++++ b/drivers/tty/serial/serial_mctrl_gpio.c
+@@ -17,6 +17,7 @@
+ #include <linux/err.h>
+ #include <linux/device.h>
+ #include <linux/irq.h>
++#include <linux/err.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/termios.h>
+ #include <linux/serial_core.h>
+@@ -72,6 +73,13 @@ struct gpio_desc *mctrl_gpio_to_gpiod(struct mctrl_gpios *gpios,
+ }
+ EXPORT_SYMBOL_GPL(mctrl_gpio_to_gpiod);
+ 
++bool mctrl_gpio_use_rtscts(struct mctrl_gpios *gpios)
++{
++	return mctrl_gpio_to_gpiod(gpios, UART_GPIO_CTS) &&
++		mctrl_gpio_to_gpiod(gpios, UART_GPIO_RTS);
++}
++EXPORT_SYMBOL_GPL(mctrl_gpio_use_rtscts);
++
+ unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
+ {
+ 	enum mctrl_gpio_idx i;
+diff --git a/drivers/tty/serial/serial_mctrl_gpio.h b/drivers/tty/serial/serial_mctrl_gpio.h
+index fa000bcff217..c34269733c62 100644
+--- a/drivers/tty/serial/serial_mctrl_gpio.h
++++ b/drivers/tty/serial/serial_mctrl_gpio.h
+@@ -101,6 +101,11 @@ void mctrl_gpio_enable_ms(struct mctrl_gpios *gpios);
+  */
+ void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios);
+ 
++/*
++ * Return true if both CTS and RTS are used with GPIOs
++ */
++bool mctrl_gpio_use_rtscts(struct mctrl_gpios *gpios);
++
+ #else /* GPIOLIB */
+ 
+ static inline
+@@ -152,6 +157,11 @@ static inline void mctrl_gpio_disable_ms(struct mctrl_gpios *gpios)
+ {
+ }
+ 
++static inline bool mctrl_gpio_use_rtscts(struct mctrl_gpios *gpios)
++{
++	return false;
++}
++
+ #endif /* GPIOLIB */
+ 
+ #endif
