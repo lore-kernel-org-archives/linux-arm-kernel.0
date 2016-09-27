@@ -1,160 +1,162 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:08 +0200
-Subject: [PULL 00/50] KVM/ARM Changes for v4.9
-Message-ID: <20160927180558.14699-1-christoffer.dall@linaro.org>
+Date: Tue, 27 Sep 2016 20:05:10 +0200
+Subject: [PULL 02/50] KVM: arm/arm64: Factor out vgic_attr_regs_access
+ functionality
+In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
+References: <20160927180558.14699-1-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-3-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo and Radim,
+As we are about to deal with multiple data types and situations where
+the vgic should not be initialized when doing userspace accesses on the
+register attributes, factor out the functionality of
+vgic_attr_regs_access into smaller bits which can be reused by a new
+function later.
 
-Here are the KVM/ARM Changes for v4.9. They include:
-
- - Various cleanups and removal of redundant code
- - Two important fixes for not using an in-kernel irqchip
- - A bit of optimizations
- - Handle SError exceptions and present them to guests if appropriate
- - Proxying of GICV access at EL2 if guest mappings are unsafe
- - GICv3 on AArch32 on ARMv8
- - Preparations for GICv3 save/restore, including ABI docs
-
-
-The following changes since commit 9ac7e3e815060efdc86b6d12448200e3c3597e01:
-
-  KVM: nVMX: expose INS/OUTS information support (2016-09-07 19:34:30 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.9
-
-for you to fetch changes up to 0099b7701f5296a758d9e6b945ec96f96847cc2f:
-
-  KVM: arm/arm64: vgic: Don't flush/sync without a working vgic (2016-09-27 18:57:35 +0200)
-
-Thanks,
--Christoffer
-
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 100 ++++++++++++++++++++++++++----------
+ 1 file changed, 73 insertions(+), 27 deletions(-)
 
-Christoffer Dall (6):
-      KVM: arm/arm64: Add VGICv3 save/restore API documentation
-      KVM: arm/arm64: Factor out vgic_attr_regs_access functionality
-      KVM: arm/arm64: Rename vgic_attr_regs_access to vgic_attr_regs_access_v2
-      KVM: arm/arm64: Get rid of exported aliases to static functions
-      KVM: arm64: Require in-kernel irqchip for PMU support
-      KVM: arm/arm64: vgic: Don't flush/sync without a working vgic
-
-Marc Zyngier (28):
-      KVM: arm: vgic: Drop build compatibility hack for older kernel versions
-      arm64: KVM: Move kvm_vcpu_get_condition out of emulate.c
-      arm64: KVM: Move the AArch32 conditional execution to common code
-      arm: KVM: Use common AArch32 conditional execution code
-      arm64: KVM: Make kvm_skip_instr32 available to HYP
-      arm64: KVM: vgic-v2: Add the GICV emulation infrastructure
-      arm64: KVM: vgic-v2: Add GICV access from HYP
-      arm64: KVM: vgic-v2: Enable GICV access from HYP if access from guest is unsafe
-      arm64: KVM: Rename HCR_VA to HCR_VSE
-      arm64: KVM: Preserve pending vSError in world switch
-      arm64: KVM: Add Virtual Abort injection helper
-      arm64: KVM: Add exception code to report EL1 asynchronous aborts
-      arm64: KVM: Add EL1 async abort handler
-      arm64: KVM: Route asynchronous aborts
-      arm64: KVM: Allow an exit code to be tagged with an SError
-      arm64: KVM: Inject a Virtual SError if it was pending
-      arm64: KVM: Handle async aborts delivered while at EL2
-      arm: KVM: Preserve pending Virtual Abort in world switch
-      arm: KVM: Add Virtual Abort injection helper
-      arm: KVM: Add HYP async abort handler
-      arm: KVM: Allow an exit code to be tagged with a Virtual Abort
-      arm: KVM: Handle async aborts delivered while at HYP
-      arm: KVM: Inject a Virtual Abort if it was pending
-      arm: KVM: Drop unreachable HYP abort handlers
-      arm/arm64: KVM: Inject virtual abort when guest exits on external abort
-      arm/arm64: KVM: Remove external abort test from MMIO handling
-      arm64: KVM: Inject a vSerror if detecting a bad GICV access at EL2
-      ARM: gic-v3: Work around definition of gic_write_bpr1
-
-Mark Rutland (2):
-      arm/kvm: excise redundant cache maintenance
-      arm64/kvm: remove unused stub functions
-
-Paolo Bonzini (1):
-      KVM: ARM: cleanup kvm_timer_hyp_init
-
-Shanker Donthineni (1):
-      arm64: KVM: Optimize __guest_enter/exit() to save a few instructions
-
-Vladimir Murzin (12):
-      arm64: KVM: VHE: reset PSTATE.PAN on entry to EL2
-      arm64: KVM: Use static keys for selecting the GIC backend
-      arm64: KVM: Move GIC accessors to arch_gicv3.h
-      arm64: KVM: Move vgic-v3 save/restore to virt/kvm/arm/hyp
-      KVM: arm64: vgic-its: Introduce config option to guard ITS specific code
-      KVM: arm: vgic: Fix compiler warnings when built for 32-bit
-      KVM: arm: vgic: Support 64-bit data manipulation on 32-bit host systems
-      ARM: Introduce MPIDR_LEVEL_SHIFT macro
-      ARM: Move system register accessors to asm/cp15.h
-      ARM: gic-v3: Introduce 32-to-64-bit mappings for GICv3 cpu registers
-      ARM: KVM: Support vgic-v3
-      arm64: KVM: Remove duplicating init code for setting VMID
-
- Documentation/virtual/kvm/devices/arm-vgic-its.txt |  38 ++++
- Documentation/virtual/kvm/devices/arm-vgic-v3.txt  | 206 +++++++++++++++++++++
- Documentation/virtual/kvm/devices/arm-vgic.txt     |  52 ++----
- Documentation/virtual/kvm/devices/vcpu.txt         |   4 +-
- arch/arm/include/asm/arch_gicv3.h                  | 100 ++++++++--
- arch/arm/include/asm/cp15.h                        |  15 ++
- arch/arm/include/asm/cputype.h                     |   1 +
- arch/arm/include/asm/kvm_asm.h                     |   7 +
- arch/arm/include/asm/kvm_emulate.h                 |  35 +++-
- arch/arm/include/asm/kvm_host.h                    |   5 +
- arch/arm/include/asm/kvm_hyp.h                     |  18 +-
- arch/arm/include/asm/kvm_mmu.h                     |  28 +--
- arch/arm/include/uapi/asm/kvm.h                    |   7 +
- arch/arm/kvm/Makefile                              |   3 +
- arch/arm/kvm/arm.c                                 |  12 +-
- arch/arm/kvm/coproc.c                              |  35 ++++
- arch/arm/kvm/emulate.c                             | 111 ++---------
- arch/arm/kvm/handle_exit.c                         |  49 +++--
- arch/arm/kvm/hyp/Makefile                          |   1 +
- arch/arm/kvm/hyp/entry.S                           |  31 ++++
- arch/arm/kvm/hyp/hyp-entry.S                       |  16 +-
- arch/arm/kvm/hyp/switch.c                          |  25 ++-
- arch/arm/kvm/hyp/tlb.c                             |  15 +-
- arch/arm/kvm/mmio.c                                |   6 -
- arch/arm/kvm/mmu.c                                 |   7 +-
- arch/arm64/include/asm/arch_gicv3.h                |  13 ++
- arch/arm64/include/asm/kvm_arm.h                   |   4 +-
- arch/arm64/include/asm/kvm_asm.h                   |   9 +-
- arch/arm64/include/asm/kvm_emulate.h               |  11 ++
- arch/arm64/include/asm/kvm_hyp.h                   |   1 +
- arch/arm64/include/asm/kvm_mmu.h                   |   6 -
- arch/arm64/kvm/Kconfig                             |   4 +-
- arch/arm64/kvm/Makefile                            |   3 +-
- arch/arm64/kvm/handle_exit.c                       |  23 +++
- arch/arm64/kvm/hyp/Makefile                        |   2 +-
- arch/arm64/kvm/hyp/debug-sr.c                      |   4 +-
- arch/arm64/kvm/hyp/entry.S                         | 128 ++++++++-----
- arch/arm64/kvm/hyp/hyp-entry.S                     |  73 +++++---
- arch/arm64/kvm/hyp/switch.c                        |  84 +++++++--
- arch/arm64/kvm/hyp/tlb.c                           |  13 +-
- arch/arm64/kvm/inject_fault.c                      |  12 ++
- include/kvm/arm_vgic.h                             |  18 +-
- arch/arm64/kvm/emulate.c => virt/kvm/arm/aarch32.c |  25 +--
- virt/kvm/arm/arch_timer.c                          |   6 +-
- virt/kvm/arm/hyp/vgic-v2-sr.c                      |  57 ++++++
- {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v3-sr.c  |  17 +-
- virt/kvm/arm/pmu.c                                 |   8 +
- virt/kvm/arm/vgic/vgic-init.c                      |   4 +
- virt/kvm/arm/vgic/vgic-irqfd.c                     |   6 -
- virt/kvm/arm/vgic/vgic-kvm-device.c                | 133 ++++++++-----
- virt/kvm/arm/vgic/vgic-mmio-v3.c                   |   8 +-
- virt/kvm/arm/vgic/vgic-mmio.c                      |   2 -
- virt/kvm/arm/vgic/vgic-mmio.h                      |   4 +-
- virt/kvm/arm/vgic/vgic-v2.c                        |  71 ++++---
- virt/kvm/arm/vgic/vgic.c                           |   8 +-
- virt/kvm/arm/vgic/vgic.h                           |  54 +-----
- 56 files changed, 1076 insertions(+), 562 deletions(-)
- create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-its.txt
- create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-v3.txt
- rename arch/arm64/kvm/emulate.c => virt/kvm/arm/aarch32.c (90%)
- rename {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v3-sr.c (94%)
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 1813f93..19fa331 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -233,6 +233,67 @@ int kvm_register_vgic_device(unsigned long type)
+ 	return ret;
+ }
+ 
++struct vgic_reg_attr {
++	struct kvm_vcpu *vcpu;
++	gpa_t addr;
++};
++
++static int parse_vgic_v2_attr(struct kvm_device *dev,
++			      struct kvm_device_attr *attr,
++			      struct vgic_reg_attr *reg_attr)
++{
++	int cpuid;
++
++	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
++		 KVM_DEV_ARM_VGIC_CPUID_SHIFT;
++
++	if (cpuid >= atomic_read(&dev->kvm->online_vcpus))
++		return -EINVAL;
++
++	reg_attr->vcpu = kvm_get_vcpu(dev->kvm, cpuid);
++	reg_attr->addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
++
++	return 0;
++}
++
++/* unlocks vcpus from @vcpu_lock_idx and smaller */
++static void unlock_vcpus(struct kvm *kvm, int vcpu_lock_idx)
++{
++	struct kvm_vcpu *tmp_vcpu;
++
++	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
++		tmp_vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
++		mutex_unlock(&tmp_vcpu->mutex);
++	}
++}
++
++static void unlock_all_vcpus(struct kvm *kvm)
++{
++	unlock_vcpus(kvm, atomic_read(&kvm->online_vcpus) - 1);
++}
++
++/* Returns true if all vcpus were locked, false otherwise */
++static bool lock_all_vcpus(struct kvm *kvm)
++{
++	struct kvm_vcpu *tmp_vcpu;
++	int c;
++
++	/*
++	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
++	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
++	 * that no other VCPUs are run and fiddle with the vgic state while we
++	 * access it.
++	 */
++	kvm_for_each_vcpu(c, tmp_vcpu, kvm) {
++		if (!mutex_trylock(&tmp_vcpu->mutex)) {
++			unlock_vcpus(kvm, c - 1);
++			return false;
++		}
++	}
++
++	return true;
++}
++
+ /** vgic_attr_regs_access: allows user space to read/write VGIC registers
+  *
+  * @dev: kvm device handle
+@@ -245,15 +306,17 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+ 				 struct kvm_device_attr *attr,
+ 				 u32 *reg, bool is_write)
+ {
++	struct vgic_reg_attr reg_attr;
+ 	gpa_t addr;
+-	int cpuid, ret, c;
+-	struct kvm_vcpu *vcpu, *tmp_vcpu;
+-	int vcpu_lock_idx = -1;
++	struct kvm_vcpu *vcpu;
++	int ret;
+ 
+-	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
+-		 KVM_DEV_ARM_VGIC_CPUID_SHIFT;
+-	vcpu = kvm_get_vcpu(dev->kvm, cpuid);
+-	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
++	ret = parse_vgic_v2_attr(dev, attr, &reg_attr);
++	if (ret)
++		return ret;
++
++	vcpu = reg_attr.vcpu;
++	addr = reg_attr.addr;
+ 
+ 	mutex_lock(&dev->kvm->lock);
+ 
+@@ -261,24 +324,11 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+ 	if (ret)
+ 		goto out;
+ 
+-	if (cpuid >= atomic_read(&dev->kvm->online_vcpus)) {
+-		ret = -EINVAL;
++	if (!lock_all_vcpus(dev->kvm)) {
++		ret = -EBUSY;
+ 		goto out;
+ 	}
+ 
+-	/*
+-	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
+-	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
+-	 * that no other VCPUs are run and fiddle with the vgic state while we
+-	 * access it.
+-	 */
+-	ret = -EBUSY;
+-	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm) {
+-		if (!mutex_trylock(&tmp_vcpu->mutex))
+-			goto out;
+-		vcpu_lock_idx = c;
+-	}
+-
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+ 		ret = vgic_v2_cpuif_uaccess(vcpu, is_write, addr, reg);
+@@ -291,12 +341,8 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+ 		break;
+ 	}
+ 
++	unlock_all_vcpus(dev->kvm);
+ out:
+-	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+-		tmp_vcpu = kvm_get_vcpu(dev->kvm, vcpu_lock_idx);
+-		mutex_unlock(&tmp_vcpu->mutex);
+-	}
+-
+ 	mutex_unlock(&dev->kvm->lock);
+ 	return ret;
+ }
+-- 
+2.9.0
