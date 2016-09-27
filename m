@@ -1,73 +1,79 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:46 +0200
-Subject: [PULL 38/50] arm64: KVM: Move GIC accessors to arch_gicv3.h
+Date: Tue, 27 Sep 2016 20:05:19 +0200
+Subject: [PULL 11/50] arm64: KVM: Move the AArch32 conditional execution to
+ common code
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-39-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-12-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Murzin <vladimir.murzin@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Since we are going to share vgic-v3 save/restore code with ARM keep
-arch specific accessors separately.
+It would make some sense to share the conditional execution code
+between 32 and 64bit. In order to achieve this, let's move that
+code to virt/kvm/arm/aarch32.c. While we're at it, drop a
+superfluous BUG_ON() that wasn't that useful.
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Following patches will migrate the 32bit port to that code base.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/arch_gicv3.h | 13 +++++++++++++
- arch/arm64/kvm/hyp/vgic-v3-sr.c     | 13 -------------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/kvm/emulate.c                             | 4 +---
+ arch/arm64/kvm/Makefile                            | 3 ++-
+ arch/arm64/kvm/emulate.c => virt/kvm/arm/aarch32.c | 4 +---
+ 3 files changed, 4 insertions(+), 7 deletions(-)
+ rename arch/arm64/kvm/emulate.c => virt/kvm/arm/aarch32.c (97%)
 
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 8ec88e5..ae7dbd7 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -79,6 +79,19 @@
- #include <linux/stringify.h>
- #include <asm/barrier.h>
+diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+index af93e3f..eda9ddd 100644
+--- a/arch/arm/kvm/emulate.c
++++ b/arch/arm/kvm/emulate.c
+@@ -221,9 +221,7 @@ static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
+ 	unsigned long cpsr = *vcpu_cpsr(vcpu);
+ 	bool is_arm = !(cpsr & PSR_T_BIT);
  
-+#define read_gicreg(r)							\
-+	({								\
-+		u64 reg;						\
-+		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
-+		reg;							\
-+	})
-+
-+#define write_gicreg(v,r)						\
-+	do {								\
-+		u64 __val = (v);					\
-+		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
-+	} while (0)
-+
- /*
-  * Low-level accessors
-  *
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-index ee1ea63..3947095 100644
---- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-+++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-@@ -24,19 +24,6 @@
- #define vtr_to_max_lr_idx(v)		((v) & 0xf)
- #define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
+-	BUG_ON(is_arm && (cpsr & PSR_IT_MASK));
+-
+-	if (!(cpsr & PSR_IT_MASK))
++	if (is_arm || !(cpsr & PSR_IT_MASK))
+ 		return;
  
--#define read_gicreg(r)							\
--	({								\
--		u64 reg;						\
--		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
--		reg;							\
--	})
+ 	cond = (cpsr & 0xe000) >> 13;
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index 695eb3c..d50a82a 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -16,9 +16,10 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/e
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/arm.o $(ARM)/mmu.o $(ARM)/mmio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+ 
+-kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
++kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/aarch32.o
+ 
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-init.o
+diff --git a/arch/arm64/kvm/emulate.c b/virt/kvm/arm/aarch32.c
+similarity index 97%
+rename from arch/arm64/kvm/emulate.c
+rename to virt/kvm/arm/aarch32.c
+index 40098ad..cb02e56 100644
+--- a/arch/arm64/kvm/emulate.c
++++ b/virt/kvm/arm/aarch32.c
+@@ -109,9 +109,7 @@ static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
+ 	unsigned long cpsr = *vcpu_cpsr(vcpu);
+ 	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
+ 
+-	BUG_ON(is_arm && (cpsr & COMPAT_PSR_IT_MASK));
 -
--#define write_gicreg(v,r)						\
--	do {								\
--		u64 __val = (v);					\
--		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
--	} while (0)
--
- static u64 __hyp_text __gic_v3_get_lr(unsigned int lr)
- {
- 	switch (lr & 0xf) {
+-	if (!(cpsr & COMPAT_PSR_IT_MASK))
++	if (is_arm || !(cpsr & COMPAT_PSR_IT_MASK))
+ 		return;
+ 
+ 	cond = (cpsr & 0xe000) >> 13;
 -- 
 2.9.0
