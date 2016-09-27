@@ -1,103 +1,235 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux (gmail))
-Date: Tue, 27 Sep 2016 08:34:18 -0400
-Subject: [PATCH] ARM: dts: lpc32xx: add pwm-cells to base dts file
-In-Reply-To: <aaf0fc9c-ea2f-0081-cf58-b5024e450030@mleia.com>
-References: <1474915641-11209-1-git-send-email-slemieux.tyco@gmail.com>
- <aaf0fc9c-ea2f-0081-cf58-b5024e450030@mleia.com>
-Message-ID: <1474979658.10588.18.camel@localhost>
+From: clingutla@codeaurora.org (Chandra Sekhar Lingutla)
+Date: Tue, 27 Sep 2016 18:05:00 +0530
+Subject: [RFC] irqchip/gic-v3: Implement suspend and resume callbacks
+In-Reply-To: <57E25C8E.7080502@arm.com>
+References: <1474447359-29551-1-git-send-email-clingutla@codeaurora.org>
+ <57E25C8E.7080502@arm.com>
+Message-ID: <57EA6774.2060807@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On 09/21/2016 03:40 PM, Marc Zyngier wrote:
+> +Sudeep, Lorenzo,
+>
+> On 21/09/16 09:42, Lingutla Chandrasekhar wrote:
+>> Implement suspend and resume syscore_ops to disable and
+>> enable non wake up capable interrupts.
+>>
+>> When system enters suspend, enable only wakeup capable
+>> interrupts. While resuming, enable previously enabled interrupts
+>> and show triggered/pending interrupts.
+>
+> The fundamental problem (which you're not mentioning at all) is that the
+> GICv3 architecture doesn't mention wake-up interrupts at all, so this
+> has to be entirely handled in firmware. Is that what is happening?
+>
+>>
+>> Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index ede5672..511a5a1 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -33,6 +33,7 @@
+>>   #include <linux/irqchip/arm-gic-common.h>
+>>   #include <linux/irqchip/arm-gic-v3.h>
+>>   #include <linux/irqchip/irq-partition-percpu.h>
+>> +#include <linux/syscore_ops.h>
+>>
+>>   #include <asm/cputype.h>
+>>   #include <asm/exception.h>
+>> @@ -57,6 +58,10 @@ struct gic_chip_data {
+>>   	u32			nr_redist_regions;
+>>   	unsigned int		irq_nr;
+>>   	struct partition_desc	*ppi_descs[16];
+>> +#ifdef CONFIG_PM
+>> +	unsigned int wakeup_irqs[32];
+>> +	unsigned int enabled_irqs[32];
+>
+> Do not use ambiguous types for something that comes from the HW. Where
+> does this '32' comes from?
+Expecting wakeup capable irq can be any of maximum 1024 interrupt lines, so
+used array of size 32 (32 * 32 bits).
 
-On Tue, 2016-09-27 at 01:07 +0300, Vladimir Zapolskiy wrote:
-> Hi Sylvain,
-> 
-> On 26.09.2016 21:47, Sylvain Lemieux wrote:
-> > From: Sylvain Lemieux <slemieux@tycoint.com>
-> > 
-> > There is no need to define the "pwm-cells" in the board
-> > specific dts file; move the entry to the base dts file.
-> > 
-> > Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
-> > ---
-> > Note:
-> > * This patch should be apply after
-> >   "ARM: dts: lpc32xx: set default parent clock for pwm1 & pwm2"
-> >   http://www.spinics.net/lists/arm-kernel/msg530277.html
-> >   - There is no dependency between the patches.
-> > 
-> >  arch/arm/boot/dts/lpc32xx.dtsi | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-[...] 
-> 
-> that's something I have done locally and in a different manner, but I haven't
-> published it yet, please find below a draft.
-> 
-> First of all from multiple places in the User's Manual you can find that there
-> are "two single output PWM blocks" or "the LPC32x0 provides two 8-bit PWMs" etc.
-> 
-> In this case it does not make sense to set PWM cells to 2 (there is only one
-> channel), and 1 cell for frequency is good enough, and that's the proposed
-> change to support it:
-> 
-> diff --git a/drivers/pwm/pwm-lpc32xx.c b/drivers/pwm/pwm-lpc32xx.c
-> index a9b3cff..447ae44 100644
-> --- a/drivers/pwm/pwm-lpc32xx.c
-> +++ b/drivers/pwm/pwm-lpc32xx.c
-> @@ -99,6 +99,22 @@ static const struct pwm_ops lpc32xx_pwm_ops = {
->  	.owner = THIS_MODULE,
->  };
->  
-> +static struct pwm_device *lpc32xx_pwm_of_xlate(struct pwm_chip *pc,
-> +				       const struct of_phandle_args *args)
-> +{
-> +	struct pwm_device *pwm;
-> +
-> +	pwm = pwm_request_from_chip(pc, 0, NULL);
-> +	if (IS_ERR(pwm))
-> +		return pwm;
-> +
-> +	pwm->args.period = args->args[0];
-> +
-> +	return pwm;
-> +}
-> +
->  static int lpc32xx_pwm_probe(struct platform_device *pdev)
->  {
->  	struct lpc32xx_pwm_chip *lpc32xx;
-> @@ -123,6 +139,8 @@ static int lpc32xx_pwm_probe(struct platform_device *pdev)
->  	lpc32xx->chip.ops = &lpc32xx_pwm_ops;
->  	lpc32xx->chip.npwm = 1;
->  	lpc32xx->chip.base = -1;
-> +	lpc32xx->chip.of_xlate = lpc32xx_pwm_of_xlate;
-> +	lpc32xx->chip.of_pwm_n_cells = 1;
->  
->  	ret = pwmchip_add(&lpc32xx->chip);
->  	if (ret < 0) {
-> 
-> 
-> What is your opinion about this proposal?
-> 
-I agree with you, this clean-up make sense; the PWM cell should be 1.
+>
+>> +#endif
+>>   };
+>>
+>>   static struct gic_chip_data gic_data __read_mostly;
+>> @@ -330,6 +335,81 @@ static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
+>>   	return 0;
+>>   }
+>>
+>> +#ifdef CONFIG_PM
+>> +static int gic_suspend(void)
+>> +{
+>> +	unsigned int i;
+>> +	void __iomem *base = gic_data.dist_base;
+>> +
+>> +	for (i = 0; i * 32 < gic->irq_nr; i++) {
+>> +		gic->enabled_irqs[i]
+>> +			= readl_relaxed(base + GICD_ISENABLER + i * 4);
+>
+> Do you realize that GICD_ISENABLER0 is always zero? What do you do for
+> PPIs? Please keep the assignment on a single line.
+Agreed, will update.
 
-> If this change is applied, then lpc32xx.dtsi should contain #pwm-cells = <1>.
-> 
-Can you submit your change on the mailing list?
-I will send a version 2 of this patch after.
+>
+>> +		/* disable all of them */
+>> +		writel_relaxed(0xffffffff, base + GICD_ICENABLER + i * 4);
+>> +		/* enable the wakeup set */
+>> +		writel_relaxed(gic->wakeup_irqs[i],
+>> +			base + GICD_ISENABLER + i * 4);
+>
+> On a single line as well.
+>
+>> +	}
+>> +	return 0;
+>> +}
+>> +
+>> +static void gic_show_pending(void)
+>> +{
+>> +	unsigned int i;
+>> +	u32 enabled;
+>> +	u32 pending[32];
+>> +	void __iomem *base = gic_data.dist_base;
+>> +
+>> +	for (i = 0; i * 32 < gic->irq_nr; i++) {
+>> +		enabled = readl_relaxed(base + GICD_ICENABLER + i * 4);
+>> +		pending[i] = readl_relaxed(base + GICD_ISPENDR + i * 4);
+>> +		pending[i] &= enabled;
+>> +	}
+>> +
+>> +	for_each_set_bit(i, (unsigned long *)pending, gic->irq_nr) {
+>> +		unsigned int irq = irq_find_mapping(gic->domain, i);
+>> +		struct irq_desc *desc = irq_to_desc(irq);
+>> +		const char *name = "null";
+>> +
+>> +		if (desc == NULL)
+>> +			name = "stray irq";
+>> +		else if (desc->action && desc->action->name)
+>> +			name = desc->action->name;
+>> +
+>> +		pr_debug("Pending IRQ: %d [%s]\n", __func__, irq, name);
+>> +	}
+>> +}
+>
+> Please drop this function from this patch, it doesn't serve any purpose
+> other than your own debugging.
+>
+I think, this function is useful for debugging to know wakeup reason.
+Can we move this function under PM_DEBUG flag or debugfs entry ?
 
-If it is helping, I can take care of submitting a patch
-to update the documentation (lpc32xx-pwm.txt).
+>> +
+>> +static void gic_resume(void)
+>> +{
+>> +	unsigned int i;
+>> +	void __iomem *base = gic_data.dist_base;
+>> +
+>> +	gic_show_pending();
+>> +
+>> +	for (i = 0; i * 32 < gic->irq_nr; i++) {
+>> +		/* disable all of them */
+>> +		writel_relaxed(0xffffffff, base + GICD_ICENABLER + i * 4);
+>> +		/* enable the enabled set */
+>> +		writel_relaxed(gic->enabled_irqs[i],
+>> +			base + GICD_ISENABLER + i * 4);
+>
+> Same remarks as the suspend side.
+>
+>> +	}
+>> +}
+>> +
+>> +static struct syscore_ops gic_syscore_ops = {
+>> +	.suspend = gic_suspend,
+>> +	.resume = gic_resume,
+>> +};
+>> +
+>> +static int __init gic_init_sys(void)
+>> +{
+>> +	register_syscore_ops(&gic_syscore_ops);
+>> +	return 0;
+>> +}
+>> +device_initcall(gic_init_sys);
+>> +
+>> +#endif
+>> +
+>>   static u64 gic_mpidr_to_affinity(unsigned long mpidr)
+>>   {
+>>   	u64 aff;
+>> @@ -666,6 +746,32 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>>   #define gic_smp_init()		do { } while(0)
+>>   #endif
+>>
+>> +#ifdef CONFIG_PM
+>> +int gic_set_wake(struct irq_data *d, unsigned int on)
+>> +{
+>> +	int ret = -ENXIO;
+>> +	unsigned int reg_offset, bit_offset;
+>> +	unsigned int gicirq = gic_irq(d);
+>> +	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
+>> +
+>> +	/* per-cpu interrupts cannot be wakeup interrupts */
+>> +	WARN_ON(gicirq < 32);
+>
+> How did you decide that? There is no such specification anywhere.
+>
+I am basically looking at system suspend, where cores would be in power collapse.
 
-Did you have a change to look at the 2 others PWM related change:
-* clk: lpc32xx: fix pwm clock divider computation
-  http://www.spinics.net/lists/arm-kernel/msg534048.html
-* ARM: dts: lpc32xx: set pwm1 & pwm2 default clock rate
-  http://www.spinics.net/lists/arm-kernel/msg534051.html
- 
-> --
-> With best wishes,
-> Vladimir
+>> +
+>> +	reg_offset = gicirq / 32;
+>> +	bit_offset = gicirq % 32;
+>> +
+>> +	if (on)
+>> +		gic_data->wakeup_irqs[reg_offset] |=  1 << bit_offset;
+>> +	else
+>> +		gic_data->wakeup_irqs[reg_offset] &=  ~(1 << bit_offset);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +#else
+>> +#define gic_set_wake	NULL
+>> +#endif
+>> +
+>>   #ifdef CONFIG_CPU_PM
+>>   /* Check whether it's single security state view */
+>>   static bool gic_dist_security_disabled(void)
+>> @@ -707,6 +813,7 @@ static struct irq_chip gic_chip = {
+>>   	.irq_eoi		= gic_eoi_irq,
+>>   	.irq_set_type		= gic_set_type,
+>>   	.irq_set_affinity	= gic_set_affinity,
+>> +	.irq_set_wake           = gic_set_wake,
+>>   	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
+>>   	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
+>>   	.flags			= IRQCHIP_SET_TYPE_MASKED,
+>> @@ -723,6 +830,7 @@ static struct irq_chip gic_eoimode1_chip = {
+>>   	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
+>>   	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
+>>   	.flags			= IRQCHIP_SET_TYPE_MASKED,
+>> +	.irq_set_wake		= gic_set_wake,
+>
+> Keep the fields in the same order.
+>
+>>   };
+>>
+>>   #define GIC_ID_NR		(1U << gic_data.rdists.id_bits)
+>>
+>
+> But here's my fundamental objection: None of that should be required and
+> setting (IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND) as part of the
+> irqchip flags should be enough.
+>
+> Can you explain why this doesn't work for you?
+>
+These flags work for me, I will remove suspend/resume functions, but i think
+it is very useful to know the wakeup source for debugging purposes.
+Please let me know, if you have any better way to achieve this.
 
-Sylvain
+> Thanks,
+>
+> 	M.
+>
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,\na Linux Foundation Collaborative Project
