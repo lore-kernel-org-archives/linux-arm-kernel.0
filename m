@@ -1,86 +1,71 @@
-From: jjj@gmx.de (Jan Kandziora)
-Date: Tue, 27 Sep 2016 20:53:21 +0200
-Subject: [PATCH v2 8/8] ARM: bcm2835: Disable i2c2 in the Device Tree
-In-Reply-To: <256118042.194076.147d5d83-f402-4ba4-b7de-4ab57a0e29ad.open-xchange@email.1und1.de>
-References: <1474977426-3272-1-git-send-email-noralf@tronnes.org>
- <1474977426-3272-9-git-send-email-noralf@tronnes.org>
- <256118042.194076.147d5d83-f402-4ba4-b7de-4ab57a0e29ad.open-xchange@email.1und1.de>
-Message-ID: <21d33b61-d1a6-feb9-c9e7-ad3f565b6e41@gmx.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 27 Sep 2016 21:08:03 +0200
+Subject: [PATCH 0/3] Support userspace irqchip with arch timers
+Message-ID: <20160927190806.22988-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.09.2016 um 19:25 schrieb Stefan Wahren:
-> 
->> Noralf Tr?nnes <noralf@tronnes.org> hat am 27. September 2016 um 13:57
->> geschrieben:
->>
->>
->> i2c2 is connected to the HDMI connector and is controlled by the
->> firmware. Disable it to stay out of harms way.
-> 
-> Until this point the commit message is okay, the rest is more confusing.
-> 
-> Btw this should avoid a warning about missing clock frequency.
-> 
->>
->> From the downstream commit:
->> i2c-bcm2708/BCM270X_DT: Add support for I2C2
->>
->> The third I2C bus (I2C2) is normally reserved for HDMI use. Careless
->> use of this bus can break an attached display - use with caution.
->>
->> It is recommended to disable accesses by VideoCore by setting
->> hdmi_ignore_edid=1 or hdmi_edid_file=1 in config.txt.
->>
->> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
->> ---
->>  arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 ----
->>  1 file changed, 4 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi
->> b/arch/arm/boot/dts/bcm2835-rpi.dtsi
->> index e9b47b2..8bffbee 100644
->> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
->> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
->> @@ -59,10 +59,6 @@
->>  	clock-frequency = <100000>;
->>  };
->>  
->> -&i2c2 {
->> -	status = "okay";
->> -};
->> -
-> 
-> I'm not sure if this the right fix. According to bcm283x.dtsi the 3 i2c busses
-> have the same compatible string "brcm,bcm2835-i2c", but the changelog suggests
-> that this bus is "special".
-> 
-> Shouldn't we use a different compatible string? Our intention isn't to disable
-> i2c2 but avoid any claims of the usual i2c driver.
-> 
-i2c2 should not be generally disabled.
+Hi Alex,
 
-There's dtparam=i2c2_iknowwhatimdoing which enables CPU access to this
-bus. It's useful for reading out the monitor EDID by the CPU, and for
-accessing controls (backlight, volume) on certain monitors.
+Marc and I have been looking at this during Linaro connect and have
+slightly reworked your patch into this small series.
 
-And I have a I2C touchscreen controller on HDMI DDC.
+It would be good if you could have a look at it and test it out.
 
+I've tested it with your QEMU, and it works for UP, but secondary CPUs
+fail to come up, and it looks like the kernel never gets an IPI for
+those CPUs from userspace.  Any chance you're willing to take a look at
+that?
 
+Also, let me know if the split of your patch with preserving your
+authorship is ok with you.
 
->>  &sdhci {
->>  	status = "okay";
->>  	bus-width = <4>;
->> -- 
->> 2.8.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Thanks,
+-Christoffer
+
+---
+
+This series slightly reworks the patches to support architected timers
+with a userspace irqchip sent by Alexander Graf [1].
+
+We first cleanup some of the timer code to make it easier to understand
+what is being done in the later patches, and then split up the
+implementation into two separate patches (maintaining original
+authorship).
+
+Several changes have been made compared to v7 of the original single
+patch, including:
+ - Rewording ABI documentation to be more in line with the ARM
+   architecture
+ - Add an explicit check for needing to notify userspace of a level
+   change instead of propagating the value
+ - Changes to commenting throughout to more accurately describe the
+   architecture concepts we try to maintain
+ - Reword of functions, for example from sync to update when the date
+   only flows one direction
+
+These patches are based on two fixes necessary to test them which deal
+with running kernel code without an in-kernl irqchip, and they are both
+in kvmarm/next[2].
+
+[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2016-September/021867.html
+[2]: git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git next
+
+Alexander Graf (2):
+  KVM: arm/arm64: Add ARM arch timer interrupts ABI
+  KVM: arm/arm64: Support arch timers with a userspace gic
+
+Christoffer Dall (1):
+  KVM: arm/arm64: Cleanup the arch timer code's irqchip checking
+
+ Documentation/virtual/kvm/api.txt |  29 ++++++++++
+ arch/arm/include/uapi/asm/kvm.h   |   2 +
+ arch/arm/kvm/arm.c                |  19 +++----
+ arch/arm64/include/uapi/asm/kvm.h |   2 +
+ include/kvm/arm_arch_timer.h      |   2 +
+ include/uapi/linux/kvm.h          |   6 +++
+ virt/kvm/arm/arch_timer.c         | 111 ++++++++++++++++++++++++++++++--------
+ 7 files changed, 139 insertions(+), 32 deletions(-)
+
+-- 
+2.9.0
