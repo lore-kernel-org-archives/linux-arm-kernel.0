@@ -1,184 +1,53 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:16 +0200
-Subject: [PULL 08/50] KVM: arm/arm64: Get rid of exported aliases to static
- functions
+Date: Tue, 27 Sep 2016 20:05:21 +0200
+Subject: [PULL 13/50] arm64: KVM: Make kvm_skip_instr32 available to HYP
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-9-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-14-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When rewriting the assembly code to C code, it was useful to have
-exported aliases or static functions so that we could keep the existing
-common C code unmodified and at the same time rewrite arm64 from
-assembly to C code, and later do the arm part.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Now when both are done, we really don't need this level of indirection
-anymore, and it's time to save a few lines and brain cells.
+As we plan to do some emulation at HYP, let's make kvm_skip_instr32
+as part of the hyp_text section. This doesn't preclude the kernel
+from using it.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/hyp/switch.c       |  4 +---
- arch/arm/kvm/hyp/tlb.c          | 15 ++++-----------
- arch/arm64/kvm/hyp/debug-sr.c   |  4 +---
- arch/arm64/kvm/hyp/switch.c     |  4 +---
- arch/arm64/kvm/hyp/tlb.c        | 13 +++----------
- arch/arm64/kvm/hyp/vgic-v3-sr.c |  4 +---
- 6 files changed, 11 insertions(+), 33 deletions(-)
+ virt/kvm/arm/aarch32.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
-index b13caa9..37b3365 100644
---- a/arch/arm/kvm/hyp/switch.c
-+++ b/arch/arm/kvm/hyp/switch.c
-@@ -134,7 +134,7 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
- 	return true;
- }
+diff --git a/virt/kvm/arm/aarch32.c b/virt/kvm/arm/aarch32.c
+index ba4417b..528af4b 100644
+--- a/virt/kvm/arm/aarch32.c
++++ b/virt/kvm/arm/aarch32.c
+@@ -23,6 +23,7 @@
  
--static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
-+int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_cpu_context *host_ctxt;
- 	struct kvm_cpu_context *guest_ctxt;
-@@ -191,8 +191,6 @@ again:
- 	return exit_code;
- }
+ #include <linux/kvm_host.h>
+ #include <asm/kvm_emulate.h>
++#include <asm/kvm_hyp.h>
  
--__alias(__guest_run) int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
--
- static const char * const __hyp_panic_string[] = {
- 	[ARM_EXCEPTION_RESET]      = "\nHYP panic: RST   PC:%08x CPSR:%08x",
- 	[ARM_EXCEPTION_UNDEFINED]  = "\nHYP panic: UNDEF PC:%08x CPSR:%08x",
-diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
-index a263600..7296528 100644
---- a/arch/arm/kvm/hyp/tlb.c
-+++ b/arch/arm/kvm/hyp/tlb.c
-@@ -34,7 +34,7 @@
-  * As v7 does not support flushing per IPA, just nuke the whole TLB
-  * instead, ignoring the ipa value.
+ #ifndef CONFIG_ARM64
+ #define COMPAT_PSR_T_BIT	PSR_T_BIT
+@@ -108,7 +109,7 @@ bool kvm_condition_valid32(const struct kvm_vcpu *vcpu)
+  *
+  * IT[7:0] -> CPSR[26:25],CPSR[15:10]
   */
--static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
-+void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
+-static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
++static void __hyp_text kvm_adjust_itstate(struct kvm_vcpu *vcpu)
  {
- 	dsb(ishst);
- 
-@@ -50,21 +50,14 @@ static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
- 	write_sysreg(0, VTTBR);
- }
- 
--__alias(__tlb_flush_vmid) void __kvm_tlb_flush_vmid(struct kvm *kvm);
--
--static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-+void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 	unsigned long itbits, cond;
+ 	unsigned long cpsr = *vcpu_cpsr(vcpu);
+@@ -138,7 +139,7 @@ static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
+  * kvm_skip_instr - skip a trapped instruction and proceed to the next
+  * @vcpu: The vcpu pointer
+  */
+-void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr)
++void __hyp_text kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr)
  {
--	__tlb_flush_vmid(kvm);
-+	__kvm_tlb_flush_vmid(kvm);
- }
+ 	bool is_thumb;
  
--__alias(__tlb_flush_vmid_ipa) void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
--							    phys_addr_t ipa);
--
--static void __hyp_text __tlb_flush_vm_context(void)
-+void __hyp_text __kvm_flush_vm_context(void)
- {
- 	write_sysreg(0, TLBIALLNSNHIS);
- 	write_sysreg(0, ICIALLUIS);
- 	dsb(ish);
- }
--
--__alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
-diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-index 33342a7..4ba5c90 100644
---- a/arch/arm64/kvm/hyp/debug-sr.c
-+++ b/arch/arm64/kvm/hyp/debug-sr.c
-@@ -131,9 +131,7 @@ void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
- 		vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
- }
- 
--static u32 __hyp_text __debug_read_mdcr_el2(void)
-+u32 __hyp_text __kvm_get_mdcr_el2(void)
- {
- 	return read_sysreg(mdcr_el2);
- }
--
--__alias(__debug_read_mdcr_el2) u32 __kvm_get_mdcr_el2(void);
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 5a84b45..35d2e09 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -232,7 +232,7 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
- 	return true;
- }
- 
--static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
-+int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_cpu_context *host_ctxt;
- 	struct kvm_cpu_context *guest_ctxt;
-@@ -293,8 +293,6 @@ again:
- 	return exit_code;
- }
- 
--__alias(__guest_run) int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
--
- static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
- 
- static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-index be8177c..9cc0ea7 100644
---- a/arch/arm64/kvm/hyp/tlb.c
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -17,7 +17,7 @@
- 
- #include <asm/kvm_hyp.h>
- 
--static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-+void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
- 	dsb(ishst);
- 
-@@ -48,10 +48,7 @@ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 	write_sysreg(0, vttbr_el2);
- }
- 
--__alias(__tlb_flush_vmid_ipa) void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
--							    phys_addr_t ipa);
--
--static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
-+void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
- {
- 	dsb(ishst);
- 
-@@ -67,14 +64,10 @@ static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
- 	write_sysreg(0, vttbr_el2);
- }
- 
--__alias(__tlb_flush_vmid) void __kvm_tlb_flush_vmid(struct kvm *kvm);
--
--static void __hyp_text __tlb_flush_vm_context(void)
-+void __hyp_text __kvm_flush_vm_context(void)
- {
- 	dsb(ishst);
- 	asm volatile("tlbi alle1is	\n"
- 		     "ic ialluis	  ": : );
- 	dsb(ish);
- }
--
--__alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-index 5f8f80b..ee1ea63 100644
---- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-+++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-@@ -335,9 +335,7 @@ void __hyp_text __vgic_v3_init_lrs(void)
- 		__gic_v3_set_lr(0, i);
- }
- 
--static u64 __hyp_text __vgic_v3_read_ich_vtr_el2(void)
-+u64 __hyp_text __vgic_v3_get_ich_vtr_el2(void)
- {
- 	return read_gicreg(ICH_VTR_EL2);
- }
--
--__alias(__vgic_v3_read_ich_vtr_el2) u64 __vgic_v3_get_ich_vtr_el2(void);
 -- 
 2.9.0
