@@ -1,48 +1,161 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:26 +0200
-Subject: [PULL 18/50] arm64: KVM: Preserve pending vSError in world switch
+Date: Tue, 27 Sep 2016 20:05:22 +0200
+Subject: [PULL 14/50] arm64: KVM: vgic-v2: Add the GICV emulation
+ infrastructure
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-19-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-15-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-The HCR_EL2.VSE bit is used to signal an SError to a guest, and has
-the peculiar feature of getting cleared when the guest has taken
-the abort (this is the only bit that behaves as such in this register).
+In order to efficiently perform the GICV access on behalf of the
+guest, we need to be able to avoid going back all the way to
+the host kernel.
 
-This means that if we signal such an abort, we must leave it
-in the guest context until it disappears from HCR_EL2, and at which
-point it must be cleared from the context. This is achieved by
-reading back from HCR_EL2 until the guest takes the fault.
+For this, we introduce a new hook in the world switch code,
+conveniently placed just after populating the fault info.
+At that point, we only have saved/restored the GP registers,
+and we can quickly perform all the required checks (data abort,
+translation fault, valid faulting syndrome, not an external
+abort, not a PTW).
+
+Coming back from the emulation code, we need to skip the emulated
+instruction. This involves an additional bit of save/restore in
+order to be able to access the guest's PC (and possibly CPSR if
+this is a 32bit guest).
+
+At this stage, no emulation code is provided.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/switch.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/include/asm/kvm_hyp.h |  1 +
+ arch/arm64/kvm/hyp/switch.c      | 32 ++++++++++++++++++++++++++++++++
+ include/kvm/arm_vgic.h           |  3 +++
+ virt/kvm/arm/hyp/vgic-v2-sr.c    |  7 +++++++
+ virt/kvm/arm/vgic/vgic-v2.c      |  2 ++
+ 5 files changed, 45 insertions(+)
 
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index cff5105..88ec3ac 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -123,6 +123,7 @@ typeof(orig) * __hyp_text fname(void)					\
+ 
+ void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
++bool __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
+ 
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
 diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index b3a66c5..8246de2 100644
+index 35d2e09..b3a66c5 100644
 --- a/arch/arm64/kvm/hyp/switch.c
 +++ b/arch/arm64/kvm/hyp/switch.c
-@@ -110,6 +110,15 @@ static hyp_alternate_select(__deactivate_traps_arch,
+@@ -17,6 +17,7 @@
  
- static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
- {
-+	/*
-+	 * If we pended a virtual abort, preserve it until it gets
-+	 * cleared. See D1.14.3 (Virtual Interrupts) for details, but
-+	 * the crucial bit is "On taking a vSError interrupt,
-+	 * HCR_EL2.VSE is cleared to 0."
-+	 */
-+	if (vcpu->arch.hcr_el2 & HCR_VSE)
-+		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
+ #include <linux/types.h>
+ #include <asm/kvm_asm.h>
++#include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
+ 
+ static bool __hyp_text __fpsimd_enabled_nvhe(void)
+@@ -232,6 +233,21 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+ 	return true;
+ }
+ 
++static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
++{
++	*vcpu_pc(vcpu) = read_sysreg_el2(elr);
 +
- 	__deactivate_traps_arch()();
- 	write_sysreg(0, hstr_el2);
- 	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
++	if (vcpu_mode_is_32bit(vcpu)) {
++		vcpu->arch.ctxt.gp_regs.regs.pstate = read_sysreg_el2(spsr);
++		kvm_skip_instr32(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
++		write_sysreg_el2(vcpu->arch.ctxt.gp_regs.regs.pstate, spsr);
++	} else {
++		*vcpu_pc(vcpu) += 4;
++	}
++
++	write_sysreg_el2(*vcpu_pc(vcpu), elr);
++}
++
+ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *host_ctxt;
+@@ -270,6 +286,22 @@ again:
+ 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
+ 		goto again;
+ 
++	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
++	    exit_code == ARM_EXCEPTION_TRAP) {
++		bool valid;
++
++		valid = kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_DABT_LOW &&
++			kvm_vcpu_trap_get_fault_type(vcpu) == FSC_FAULT &&
++			kvm_vcpu_dabt_isvalid(vcpu) &&
++			!kvm_vcpu_dabt_isextabt(vcpu) &&
++			!kvm_vcpu_dabt_iss1tw(vcpu);
++
++		if (valid && __vgic_v2_perform_cpuif_access(vcpu)) {
++			__skip_instr(vcpu);
++			goto again;
++		}
++	}
++
+ 	fp_enabled = __fpsimd_enabled();
+ 
+ 	__sysreg_save_guest_state(guest_ctxt);
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 19b698e..8eb1501 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -20,6 +20,7 @@
+ #include <linux/kvm.h>
+ #include <linux/irqreturn.h>
+ #include <linux/spinlock.h>
++#include <linux/static_key.h>
+ #include <linux/types.h>
+ #include <kvm/iodev.h>
+ #include <linux/list.h>
+@@ -265,6 +266,8 @@ struct vgic_cpu {
+ 	bool lpis_enabled;
+ };
+ 
++extern struct static_key_false vgic_v2_cpuif_trap;
++
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+ void kvm_vgic_early_init(struct kvm *kvm);
+ int kvm_vgic_create(struct kvm *kvm, u32 type);
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index 7cffd93..3e2a62e 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -167,3 +167,10 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+ 	writel_relaxed(cpu_if->vgic_vmcr, base + GICH_VMCR);
+ 	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
+ }
++
++#ifdef CONFIG_ARM64
++bool __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
++{
++		return false;
++}
++#endif
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 0bf6709..b8da901 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -294,6 +294,8 @@ out:
+ 	return ret;
+ }
+ 
++DEFINE_STATIC_KEY_FALSE(vgic_v2_cpuif_trap);
++
+ /**
+  * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
+  * @node:	pointer to the DT node
 -- 
 2.9.0
