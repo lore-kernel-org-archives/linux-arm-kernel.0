@@ -1,42 +1,33 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Tue, 27 Sep 2016 08:53:47 -0700
-Subject: [PATCH] arm64: set path to Image.gz in the mkspec to avoid rpm build
- issue
-Message-ID: <1474991627-1743-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 27 Sep 2016 09:00:36 -0700
+Subject: next-20160927 build: 2 failures 4 warnings (next-20160927)
+In-Reply-To: <E1bop0x-0001YK-4h@optimist>
+References: <E1bop0x-0001YK-4h@optimist>
+Message-ID: <20160927160036.y3ti3gzt4ebg2vyz@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In addition to http://www.spinics.net/lists/arm-kernel/msg527466.html
+On Tue, Sep 27, 2016 at 10:49:27AM +0100, Build bot for Mark Brown wrote:
 
-While building rpm-pkg target it fails to copy kernel image
-from default location to rpm buildroot directory.
+-next is still failing to build an arm and arm64 allmodconfig due to:
 
-Since we have arch variable set to aarch64 while Image.gz
-is located at arch/arm64/boot it's necessary to specify
-correct path to cp command as it implemeted for ppc64 build.
+> 	arm64-allmodconfig
+> ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
 
-Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
----
- scripts/package/mkspec | 4 ++++
- 1 file changed, 4 insertions(+)
+> 	arm-allmodconfig
+> ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
 
-diff --git a/scripts/package/mkspec b/scripts/package/mkspec
-index 57673ba..2f2bc7e 100755
---- a/scripts/package/mkspec
-+++ b/scripts/package/mkspec
-@@ -101,9 +101,13 @@ echo "%ifarch ppc64"
- echo "cp vmlinux arch/powerpc/boot"
- echo "cp arch/powerpc/boot/"'$KBUILD_IMAGE $RPM_BUILD_ROOT'"/boot/vmlinuz-$KERNELRELEASE"
- echo "%else"
-+echo "%ifarch aarch64"
-+echo "cp arch/arm64/boot/"'$KBUILD_IMAGE $RPM_BUILD_ROOT'"/boot/vmlinuz-$KERNELRELEASE"
-+echo "%else"
- echo 'cp $KBUILD_IMAGE $RPM_BUILD_ROOT'"/boot/vmlinuz-$KERNELRELEASE"
- echo "%endif"
- echo "%endif"
-+echo "%endif"
- 
- echo 'make %{?_smp_mflags} INSTALL_HDR_PATH=$RPM_BUILD_ROOT/usr KBUILD_SRC= headers_install'
- echo 'cp System.map $RPM_BUILD_ROOT'"/boot/System.map-$KERNELRELEASE"
--- 
-1.8.3.1
+due to 262d5cc6ceb293 (mfd: tps65217: Add support for IRQs) since
+irq_set_parent() isn't exported.  There was a fix posted adding the
+export to the IRQ subsystem but it's still not been applied, the
+function is being used in order to enable lazy IRQ disabling for
+threaded interrupts:
+
+   https://www.spinics.net/lists/arm-kernel/msg532864.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160927/0a361488/attachment.sig>
