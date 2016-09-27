@@ -1,432 +1,355 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 27 Sep 2016 13:18:00 +0530
-Subject: [PATCH V2 6/6] arm64: Add uprobe support
-In-Reply-To: <cover.1474960629.git.panand@redhat.com>
-References: <cover.1474960629.git.panand@redhat.com>
-Message-ID: <41cc70043792e65cbc3b4cc4ad7fbf6379afa550.1474960629.git.panand@redhat.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 27 Sep 2016 10:02:27 +0200
+Subject: [PATCH 15/19] reset: sti: Remove STiH415/6 reset support
+In-Reply-To: <1473859677-9231-16-git-send-email-peter.griffin@linaro.org>
+References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
+ <1473859677-9231-16-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1474963347.2494.8.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for uprobe on ARM64 architecture.
+Hi Peter,
 
-Unit tests for following have been done so far and they have been found
-working
-    1. Step-able instructions, like sub, ldr, add etc.
-    2. Simulation-able like ret, cbnz, cbz etc.
-    3. uretprobe
-    4. Reject-able instructions like sev, wfe etc.
-    5. trapped and abort xol path
-    6. probe at unaligned user address.
-    7. longjump test cases
+Am Mittwoch, den 14.09.2016, 14:27 +0100 schrieb Peter Griffin:
+> Support for STiH415/6 SoCs is being removed from the
+> kernel because the platforms are obsolete. This patch removes
+> the reset drivers for these SoC's.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Cc: <p.zabel@pengutronix.de>
+> ---
+>  arch/arm/mach-sti/Kconfig         |   2 -
+>  drivers/reset/sti/Kconfig         |   8 ---
+>  drivers/reset/sti/Makefile        |   2 -
+>  drivers/reset/sti/reset-stih415.c | 112 -----------------------------
+>  drivers/reset/sti/reset-stih416.c | 143 --------------------------------------
+>  5 files changed, 267 deletions(-)
+>  delete mode 100644 drivers/reset/sti/reset-stih415.c
+>  delete mode 100644 drivers/reset/sti/reset-stih416.c
+> 
+> diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
+> index 119e110..f8eeeff 100644
+> --- a/arch/arm/mach-sti/Kconfig
+> +++ b/arch/arm/mach-sti/Kconfig
+> @@ -28,7 +28,6 @@ if ARCH_STI
+>  config SOC_STIH415
+>  	bool "STiH415 STMicroelectronics Consumer Electronics family"
+>  	default y
+> -	select STIH415_RESET
+>  	help
+>  	  This enables support for STMicroelectronics Digital Consumer
+>  	  Electronics family StiH415 parts, primarily targeted at set-top-box
+> @@ -38,7 +37,6 @@ config SOC_STIH415
+>  config SOC_STIH416
+>  	bool "STiH416 STMicroelectronics Consumer Electronics family"
+>  	default y
+> -	select STIH416_RESET
+>  	help
+>  	  This enables support for STMicroelectronics Digital Consumer
+>  	  Electronics family StiH416 parts, primarily targeted at set-top-box
+> diff --git a/drivers/reset/sti/Kconfig b/drivers/reset/sti/Kconfig
+> index 6131785..71592b5 100644
+> --- a/drivers/reset/sti/Kconfig
+> +++ b/drivers/reset/sti/Kconfig
+> @@ -3,14 +3,6 @@ if ARCH_STI
+>  config STI_RESET_SYSCFG
+>  	bool
+>  
+> -config STIH415_RESET
+> -	bool
+> -	select STI_RESET_SYSCFG
+> -
+> -config STIH416_RESET
+> -	bool
+> -	select STI_RESET_SYSCFG
+> -
+>  config STIH407_RESET
+>  	bool
+>  	select STI_RESET_SYSCFG
+> diff --git a/drivers/reset/sti/Makefile b/drivers/reset/sti/Makefile
+> index dc85dfb..f9d8241 100644
+> --- a/drivers/reset/sti/Makefile
+> +++ b/drivers/reset/sti/Makefile
+> @@ -1,5 +1,3 @@
+>  obj-$(CONFIG_STI_RESET_SYSCFG) += reset-syscfg.o
+>  
+> -obj-$(CONFIG_STIH415_RESET) += reset-stih415.o
+> -obj-$(CONFIG_STIH416_RESET) += reset-stih416.o
+>  obj-$(CONFIG_STIH407_RESET) += reset-stih407.o
+> diff --git a/drivers/reset/sti/reset-stih415.c b/drivers/reset/sti/reset-stih415.c
+> deleted file mode 100644
+> index 6f220cd..0000000
+> --- a/drivers/reset/sti/reset-stih415.c
+> +++ /dev/null
+> @@ -1,112 +0,0 @@
+> -/*
+> - * Copyright (C) 2013 STMicroelectronics (R&D) Limited
+> - * Author: Stephen Gallimore <stephen.gallimore@st.com>
+> - * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - */
+> -#include <linux/module.h>
+> -#include <linux/of.h>
+> -#include <linux/of_platform.h>
+> -#include <linux/platform_device.h>
+> -
+> -#include <dt-bindings/reset/stih415-resets.h>
+> -
+> -#include "reset-syscfg.h"
+> -
+> -/*
+> - * STiH415 Peripheral powerdown definitions.
+> - */
+> -static const char stih415_front[] = "st,stih415-front-syscfg";
+> -static const char stih415_rear[] = "st,stih415-rear-syscfg";
+> -static const char stih415_sbc[] = "st,stih415-sbc-syscfg";
+> -static const char stih415_lpm[] = "st,stih415-lpm-syscfg";
+> -
+> -#define STIH415_PDN_FRONT(_bit) \
+> -	_SYSCFG_RST_CH(stih415_front, SYSCFG_114, _bit, SYSSTAT_187, _bit)
+> -
+> -#define STIH415_PDN_REAR(_cntl, _stat) \
+> -	_SYSCFG_RST_CH(stih415_rear, SYSCFG_336, _cntl, SYSSTAT_384, _stat)
+> -
+> -#define STIH415_SRST_REAR(_reg, _bit) \
+> -	_SYSCFG_RST_CH_NO_ACK(stih415_rear, _reg, _bit)
+> -
+> -#define STIH415_SRST_SBC(_reg, _bit) \
+> -	_SYSCFG_RST_CH_NO_ACK(stih415_sbc, _reg, _bit)
+> -
+> -#define STIH415_SRST_FRONT(_reg, _bit) \
+> -	_SYSCFG_RST_CH_NO_ACK(stih415_front, _reg, _bit)
+> -
+> -#define STIH415_SRST_LPM(_reg, _bit) \
+> -	_SYSCFG_RST_CH_NO_ACK(stih415_lpm, _reg, _bit)
+> -
+> -#define SYSCFG_114	0x38 /* Powerdown request EMI/NAND/Keyscan */
+> -#define SYSSTAT_187	0x15c /* Powerdown status EMI/NAND/Keyscan */
+> -
+> -#define SYSCFG_336	0x90 /* Powerdown request USB/SATA/PCIe */
+> -#define SYSSTAT_384	0x150 /* Powerdown status USB/SATA/PCIe */
+> -
+> -#define SYSCFG_376	0x130 /* Reset generator 0 control 0 */
+> -#define SYSCFG_166	0x108 /* Softreset Ethernet 0 */
+> -#define SYSCFG_31	0x7c /* Softreset Ethernet 1 */
+> -#define LPM_SYSCFG_1	0x4 /* Softreset IRB */
+> -
+> -static const struct syscfg_reset_channel_data stih415_powerdowns[] = {
+> -	[STIH415_EMISS_POWERDOWN]	= STIH415_PDN_FRONT(0),
+> -	[STIH415_NAND_POWERDOWN]	= STIH415_PDN_FRONT(1),
+> -	[STIH415_KEYSCAN_POWERDOWN]	= STIH415_PDN_FRONT(2),
+> -	[STIH415_USB0_POWERDOWN]	= STIH415_PDN_REAR(0, 0),
+> -	[STIH415_USB1_POWERDOWN]	= STIH415_PDN_REAR(1, 1),
+> -	[STIH415_USB2_POWERDOWN]	= STIH415_PDN_REAR(2, 2),
+> -	[STIH415_SATA0_POWERDOWN]	= STIH415_PDN_REAR(3, 3),
+> -	[STIH415_SATA1_POWERDOWN]	= STIH415_PDN_REAR(4, 4),
+> -	[STIH415_PCIE_POWERDOWN]	= STIH415_PDN_REAR(5, 8),
+> -};
+> -
+> -static const struct syscfg_reset_channel_data stih415_softresets[] = {
+> -	[STIH415_ETH0_SOFTRESET] = STIH415_SRST_FRONT(SYSCFG_166, 0),
+> -	[STIH415_ETH1_SOFTRESET] = STIH415_SRST_SBC(SYSCFG_31, 0),
+> -	[STIH415_IRB_SOFTRESET]	 = STIH415_SRST_LPM(LPM_SYSCFG_1, 6),
+> -	[STIH415_USB0_SOFTRESET] = STIH415_SRST_REAR(SYSCFG_376, 9),
+> -	[STIH415_USB1_SOFTRESET] = STIH415_SRST_REAR(SYSCFG_376, 10),
+> -	[STIH415_USB2_SOFTRESET] = STIH415_SRST_REAR(SYSCFG_376, 11),
+> -	[STIH415_KEYSCAN_SOFTRESET] = STIH415_SRST_LPM(LPM_SYSCFG_1, 8),
+> -};
+> -
+> -static struct syscfg_reset_controller_data stih415_powerdown_controller = {
+> -	.wait_for_ack = true,
+> -	.nr_channels = ARRAY_SIZE(stih415_powerdowns),
+> -	.channels = stih415_powerdowns,
+> -};
+> -
+> -static struct syscfg_reset_controller_data stih415_softreset_controller = {
+> -	.wait_for_ack = false,
+> -	.active_low = true,
+> -	.nr_channels = ARRAY_SIZE(stih415_softresets),
+> -	.channels = stih415_softresets,
+> -};
+> -
+> -static const struct of_device_id stih415_reset_match[] = {
+> -	{ .compatible = "st,stih415-powerdown",
+> -	  .data = &stih415_powerdown_controller, },
+> -	{ .compatible = "st,stih415-softreset",
+> -	  .data = &stih415_softreset_controller, },
+> -	{},
+> -};
+> -
+> -static struct platform_driver stih415_reset_driver = {
+> -	.probe = syscfg_reset_probe,
+> -	.driver = {
+> -		.name = "reset-stih415",
+> -		.of_match_table = stih415_reset_match,
+> -	},
+> -};
+> -
+> -static int __init stih415_reset_init(void)
+> -{
+> -	return platform_driver_register(&stih415_reset_driver);
+> -}
+> -arch_initcall(stih415_reset_init);
+> diff --git a/drivers/reset/sti/reset-stih416.c b/drivers/reset/sti/reset-stih416.c
+> deleted file mode 100644
+> index c581d606e..0000000
+> --- a/drivers/reset/sti/reset-stih416.c
+> +++ /dev/null
+> @@ -1,143 +0,0 @@
+> -/*
+> - * Copyright (C) 2013 STMicroelectronics (R&D) Limited
+> - * Author: Stephen Gallimore <stephen.gallimore@st.com>
+> - * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - */
+> -#include <linux/module.h>
+> -#include <linux/of.h>
+> -#include <linux/of_platform.h>
+> -#include <linux/platform_device.h>
+> -
+> -#include <dt-bindings/reset/stih416-resets.h>
+> -
+> -#include "reset-syscfg.h"
+> -
+> -/*
+> - * STiH416 Peripheral powerdown definitions.
+> - */
+> -static const char stih416_front[] = "st,stih416-front-syscfg";
+> -static const char stih416_rear[] = "st,stih416-rear-syscfg";
+> -static const char stih416_sbc[] = "st,stih416-sbc-syscfg";
+> -static const char stih416_lpm[] = "st,stih416-lpm-syscfg";
+> -static const char stih416_cpu[] = "st,stih416-cpu-syscfg";
+> -
+> -#define STIH416_PDN_FRONT(_bit) \
+> -	_SYSCFG_RST_CH(stih416_front, SYSCFG_1500, _bit, SYSSTAT_1578, _bit)
+> -
+> -#define STIH416_PDN_REAR(_cntl, _stat) \
+> -	_SYSCFG_RST_CH(stih416_rear, SYSCFG_2525, _cntl, SYSSTAT_2583, _stat)
+> -
+> -#define SYSCFG_1500	0x7d0 /* Powerdown request EMI/NAND/Keyscan */
+> -#define SYSSTAT_1578	0x908 /* Powerdown status EMI/NAND/Keyscan */
+> -
+> -#define SYSCFG_2525	0x834 /* Powerdown request USB/SATA/PCIe */
+> -#define SYSSTAT_2583	0x91c /* Powerdown status USB/SATA/PCIe */
+> -
+> -#define SYSCFG_2552	0x8A0 /* Reset Generator control 0 */
+> -#define SYSCFG_1539	0x86c /* Softreset Ethernet 0 */
+> -#define SYSCFG_510	0x7f8 /* Softreset Ethernet 1 */
+> -#define LPM_SYSCFG_1	0x4 /* Softreset IRB */
+> -#define SYSCFG_2553	0x8a4 /* Softreset SATA0/1, PCIE0/1 */
+> -#define SYSCFG_7563	0x8cc /* MPE softresets 0 */
+> -#define SYSCFG_7564	0x8d0 /* MPE softresets 1 */
+> -
+> -#define STIH416_SRST_CPU(_reg, _bit) \
+> -	 _SYSCFG_RST_CH_NO_ACK(stih416_cpu, _reg, _bit)
+> -
+> -#define STIH416_SRST_FRONT(_reg, _bit) \
+> -	 _SYSCFG_RST_CH_NO_ACK(stih416_front, _reg, _bit)
+> -
+> -#define STIH416_SRST_REAR(_reg, _bit) \
+> -	 _SYSCFG_RST_CH_NO_ACK(stih416_rear, _reg, _bit)
+> -
+> -#define STIH416_SRST_LPM(_reg, _bit) \
+> -	 _SYSCFG_RST_CH_NO_ACK(stih416_lpm, _reg, _bit)
+> -
+> -#define STIH416_SRST_SBC(_reg, _bit) \
+> -	 _SYSCFG_RST_CH_NO_ACK(stih416_sbc, _reg, _bit)
+> -
+> -static const struct syscfg_reset_channel_data stih416_powerdowns[] = {
+> -	[STIH416_EMISS_POWERDOWN]	= STIH416_PDN_FRONT(0),
+> -	[STIH416_NAND_POWERDOWN]	= STIH416_PDN_FRONT(1),
+> -	[STIH416_KEYSCAN_POWERDOWN]	= STIH416_PDN_FRONT(2),
+> -	[STIH416_USB0_POWERDOWN]	= STIH416_PDN_REAR(0, 0),
+> -	[STIH416_USB1_POWERDOWN]	= STIH416_PDN_REAR(1, 1),
+> -	[STIH416_USB2_POWERDOWN]	= STIH416_PDN_REAR(2, 2),
+> -	[STIH416_USB3_POWERDOWN]	= STIH416_PDN_REAR(6, 5),
+> -	[STIH416_SATA0_POWERDOWN]	= STIH416_PDN_REAR(3, 3),
+> -	[STIH416_SATA1_POWERDOWN]	= STIH416_PDN_REAR(4, 4),
+> -	[STIH416_PCIE0_POWERDOWN]	= STIH416_PDN_REAR(7, 9),
+> -	[STIH416_PCIE1_POWERDOWN]	= STIH416_PDN_REAR(5, 8),
+> -};
+> -
+> -static const struct syscfg_reset_channel_data stih416_softresets[] = {
+> -	[STIH416_ETH0_SOFTRESET] = STIH416_SRST_FRONT(SYSCFG_1539, 0),
+> -	[STIH416_ETH1_SOFTRESET] = STIH416_SRST_SBC(SYSCFG_510, 0),
+> -	[STIH416_IRB_SOFTRESET]	 = STIH416_SRST_LPM(LPM_SYSCFG_1, 6),
+> -	[STIH416_USB0_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2552, 9),
+> -	[STIH416_USB1_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2552, 10),
+> -	[STIH416_USB2_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2552, 11),
+> -	[STIH416_USB3_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2552, 28),
+> -	[STIH416_SATA0_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2553, 7),
+> -	[STIH416_SATA1_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2553, 3),
+> -	[STIH416_PCIE0_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2553, 15),
+> -	[STIH416_PCIE1_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2553, 2),
+> -	[STIH416_AUD_DAC_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2553, 14),
+> -	[STIH416_HDTVOUT_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2552, 5),
+> -	[STIH416_VTAC_M_RX_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2552, 25),
+> -	[STIH416_VTAC_A_RX_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2552, 26),
+> -	[STIH416_SYNC_HD_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2553, 5),
+> -	[STIH416_SYNC_SD_SOFTRESET] = STIH416_SRST_REAR(SYSCFG_2553, 6),
+> -	[STIH416_BLITTER_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7563, 10),
+> -	[STIH416_GPU_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7563, 11),
+> -	[STIH416_VTAC_M_TX_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7563, 18),
+> -	[STIH416_VTAC_A_TX_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7563, 19),
+> -	[STIH416_VTG_AUX_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7563, 21),
+> -	[STIH416_JPEG_DEC_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7563, 23),
+> -	[STIH416_HVA_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 2),
+> -	[STIH416_COMPO_M_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 3),
+> -	[STIH416_COMPO_A_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 4),
+> -	[STIH416_VP8_DEC_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 10),
+> -	[STIH416_VTG_MAIN_SOFTRESET] = STIH416_SRST_CPU(SYSCFG_7564, 16),
+> -	[STIH416_KEYSCAN_SOFTRESET] = STIH416_SRST_LPM(LPM_SYSCFG_1, 8),
+> -};
+> -
+> -static struct syscfg_reset_controller_data stih416_powerdown_controller = {
+> -	.wait_for_ack	= true,
+> -	.nr_channels	= ARRAY_SIZE(stih416_powerdowns),
+> -	.channels	= stih416_powerdowns,
+> -};
+> -
+> -static struct syscfg_reset_controller_data stih416_softreset_controller = {
+> -	.wait_for_ack = false,
+> -	.active_low = true,
+> -	.nr_channels = ARRAY_SIZE(stih416_softresets),
+> -	.channels = stih416_softresets,
+> -};
+> -
+> -static const struct of_device_id stih416_reset_match[] = {
+> -	{ .compatible = "st,stih416-powerdown",
+> -	  .data = &stih416_powerdown_controller, },
+> -	{ .compatible = "st,stih416-softreset",
+> -	  .data = &stih416_softreset_controller, },
+> -	{},
+> -};
+> -
+> -static struct platform_driver stih416_reset_driver = {
+> -	.probe = syscfg_reset_probe,
+> -	.driver = {
+> -		.name = "reset-stih416",
+> -		.of_match_table = stih416_reset_match,
+> -	},
+> -};
+> -
+> -static int __init stih416_reset_init(void)
+> -{
+> -	return platform_driver_register(&stih416_reset_driver);
+> -}
+> -arch_initcall(stih416_reset_init);
 
-Currently it does not support aarch32 instruction probing.
+Can I pick up patches 15 and 19, or are there dependencies in the
+series?
+In the latter case,
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+to merge both together with the other patches. Currently there is no
+conflict with changes queued from the reset tree.
 
-Signed-off-by: Pratyush Anand <panand@redhat.com>
----
- arch/arm64/Kconfig                      |   3 +
- arch/arm64/include/asm/cacheflush.h     |   1 +
- arch/arm64/include/asm/debug-monitors.h |   3 +
- arch/arm64/include/asm/ptrace.h         |   8 ++
- arch/arm64/include/asm/thread_info.h    |   5 +-
- arch/arm64/include/asm/uprobes.h        |  36 ++++++
- arch/arm64/kernel/probes/Makefile       |   2 +
- arch/arm64/kernel/probes/uprobes.c      | 221 ++++++++++++++++++++++++++++++++
- arch/arm64/kernel/signal.c              |   3 +
- arch/arm64/mm/flush.c                   |   2 +-
- 10 files changed, 282 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/include/asm/uprobes.h
- create mode 100644 arch/arm64/kernel/probes/uprobes.c
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 113326e637f0..2bee1b0b99af 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -236,6 +236,9 @@ config PGTABLE_LEVELS
- 	default 3 if ARM64_16K_PAGES && ARM64_VA_BITS_47
- 	default 4 if !ARM64_64K_PAGES && ARM64_VA_BITS_48
- 
-+config ARCH_SUPPORTS_UPROBES
-+	def_bool y
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index 2e5fb976a572..e9f64ecb75ce 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -71,6 +71,7 @@ extern void __flush_dcache_area(void *addr, size_t len);
- extern void __clean_dcache_area_poc(void *addr, size_t len);
- extern void __clean_dcache_area_pou(void *addr, size_t len);
- extern long __flush_cache_user_range(unsigned long start, unsigned long end);
-+extern void sync_icache_aliases(void *kaddr, unsigned long len);
- 
- static inline void flush_cache_mm(struct mm_struct *mm)
- {
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index b71420a12f26..a44cf5225429 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -68,6 +68,9 @@
- #define BRK64_ESR_MASK		0xFFFF
- #define BRK64_ESR_KPROBES	0x0004
- #define BRK64_OPCODE_KPROBES	(AARCH64_BREAK_MON | (BRK64_ESR_KPROBES << 5))
-+/* uprobes BRK opcodes with ESR encoding  */
-+#define BRK64_ESR_UPROBES	0x0005
-+#define BRK64_OPCODE_UPROBES	(AARCH64_BREAK_MON | (BRK64_ESR_UPROBES << 5))
- 
- /* AArch32 */
- #define DBG_ESR_EVT_BKPT	0x4
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index ada08b5b036d..513daf050e84 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -217,6 +217,14 @@ int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task);
- 
- #include <asm-generic/ptrace.h>
- 
-+#define procedure_link_pointer(regs)	((regs)->regs[30])
-+
-+static inline void procedure_link_pointer_set(struct pt_regs *regs,
-+					   unsigned long val)
-+{
-+	procedure_link_pointer(regs) = val;
-+}
-+
- #undef profile_pc
- extern unsigned long profile_pc(struct pt_regs *regs);
- 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index e9ea5a6bd449..f6859831462e 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -112,6 +112,7 @@ static inline struct thread_info *current_thread_info(void)
- #define TIF_NEED_RESCHED	1
- #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
- #define TIF_FOREIGN_FPSTATE	3	/* CPU's FP state is not current's */
-+#define TIF_UPROBE		4	/* uprobe breakpoint or singlestep */
- #define TIF_NOHZ		7
- #define TIF_SYSCALL_TRACE	8
- #define TIF_SYSCALL_AUDIT	9
-@@ -132,10 +133,12 @@ static inline struct thread_info *current_thread_info(void)
- #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
- #define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
- #define _TIF_SECCOMP		(1 << TIF_SECCOMP)
-+#define _TIF_UPROBE		(1 << TIF_UPROBE)
- #define _TIF_32BIT		(1 << TIF_32BIT)
- 
- #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
--				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE)
-+				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE | \
-+				 _TIF_UPROBE)
- 
- #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
- 				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
-diff --git a/arch/arm64/include/asm/uprobes.h b/arch/arm64/include/asm/uprobes.h
-new file mode 100644
-index 000000000000..8d004073d0e8
---- /dev/null
-+++ b/arch/arm64/include/asm/uprobes.h
-@@ -0,0 +1,36 @@
-+/*
-+ * Copyright (C) 2014-2016 Pratyush Anand <panand@redhat.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _ASM_UPROBES_H
-+#define _ASM_UPROBES_H
-+
-+#include <asm/debug-monitors.h>
-+#include <asm/insn.h>
-+#include <asm/probes.h>
-+
-+#define MAX_UINSN_BYTES		AARCH64_INSN_SIZE
-+
-+#define UPROBE_SWBP_INSN	BRK64_OPCODE_UPROBES
-+#define UPROBE_SWBP_INSN_SIZE	AARCH64_INSN_SIZE
-+#define UPROBE_XOL_SLOT_BYTES	MAX_UINSN_BYTES
-+
-+typedef u32 uprobe_opcode_t;
-+
-+struct arch_uprobe_task {
-+};
-+
-+struct arch_uprobe {
-+	union {
-+		u8 insn[MAX_UINSN_BYTES];
-+		u8 ixol[MAX_UINSN_BYTES];
-+	};
-+	struct arch_probe_insn api;
-+	bool simulate;
-+};
-+
-+#endif
-diff --git a/arch/arm64/kernel/probes/Makefile b/arch/arm64/kernel/probes/Makefile
-index ce06312e3d34..89b6df613dde 100644
---- a/arch/arm64/kernel/probes/Makefile
-+++ b/arch/arm64/kernel/probes/Makefile
-@@ -1,3 +1,5 @@
- obj-$(CONFIG_KPROBES)		+= kprobes.o decode-insn.o	\
- 				   kprobes_trampoline.o		\
- 				   simulate-insn.o
-+obj-$(CONFIG_UPROBES)		+= uprobes.o decode-insn.o	\
-+				   simulate-insn.o
-diff --git a/arch/arm64/kernel/probes/uprobes.c b/arch/arm64/kernel/probes/uprobes.c
-new file mode 100644
-index 000000000000..d30d13040346
---- /dev/null
-+++ b/arch/arm64/kernel/probes/uprobes.c
-@@ -0,0 +1,221 @@
-+/*
-+ * Copyright (C) 2014-2016 Pratyush Anand <panand@redhat.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/highmem.h>
-+#include <linux/ptrace.h>
-+#include <linux/uprobes.h>
-+#include <asm/cacheflush.h>
-+
-+#include "decode-insn.h"
-+
-+#define UPROBE_INV_FAULT_CODE	UINT_MAX
-+
-+bool is_trap_insn(uprobe_opcode_t *insn)
-+{
-+	return false;
-+}
-+
-+void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-+		void *src, unsigned long len)
-+{
-+	void *xol_page_kaddr = kmap_atomic(page);
-+	void *dst = xol_page_kaddr + (vaddr & ~PAGE_MASK);
-+
-+	/* Initialize the slot */
-+	memcpy(dst, src, len);
-+
-+	/* flush caches (dcache/icache) */
-+	sync_icache_aliases(dst, len);
-+
-+	kunmap_atomic(xol_page_kaddr);
-+}
-+
-+unsigned long uprobe_get_swbp_addr(struct pt_regs *regs)
-+{
-+	return instruction_pointer(regs);
-+}
-+
-+int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
-+		unsigned long addr)
-+{
-+	probe_opcode_t insn;
-+
-+	/* TODO: Currently we do not support AARCH32 instruction probing */
-+	if (test_bit(TIF_32BIT, &mm->context.flags))
-+		return -EINVAL;
-+	else if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
-+		return -EINVAL;
-+
-+	insn = *(probe_opcode_t *)(&auprobe->insn[0]);
-+
-+	switch (arm_probe_decode_insn(insn, &auprobe->api)) {
-+	case INSN_REJECTED:
-+		return -EINVAL;
-+
-+	case INSN_GOOD_NO_SLOT:
-+		auprobe->simulate = true;
-+		break;
-+
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
-+{
-+	struct uprobe_task *utask = current->utask;
-+
-+	/* Initialize with an invalid fault code to detect if ol insn trapped */
-+	current->thread.fault_code = UPROBE_INV_FAULT_CODE;
-+
-+	/* Instruction points to execute ol */
-+	instruction_pointer_set(regs, utask->xol_vaddr);
-+
-+	user_enable_single_step(current);
-+
-+	return 0;
-+}
-+
-+int arch_uprobe_post_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
-+{
-+	struct uprobe_task *utask = current->utask;
-+
-+	WARN_ON_ONCE(current->thread.fault_code != UPROBE_INV_FAULT_CODE);
-+
-+	/* Instruction points to execute next to breakpoint address */
-+	instruction_pointer_set(regs, utask->vaddr + 4);
-+
-+	user_disable_single_step(current);
-+
-+	return 0;
-+}
-+bool arch_uprobe_xol_was_trapped(struct task_struct *t)
-+{
-+	/*
-+	 * Between arch_uprobe_pre_xol and arch_uprobe_post_xol, if an xol
-+	 * insn itself is trapped, then detect the case with the help of
-+	 * invalid fault code which is being set in arch_uprobe_pre_xol
-+	 */
-+	if (t->thread.fault_code != UPROBE_INV_FAULT_CODE)
-+		return true;
-+
-+	return false;
-+}
-+
-+bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
-+{
-+	probe_opcode_t insn;
-+	unsigned long addr;
-+
-+	if (!auprobe->simulate)
-+		return false;
-+
-+	insn = *(probe_opcode_t *)(&auprobe->insn[0]);
-+	addr = instruction_pointer(regs);
-+
-+	if (auprobe->api.handler)
-+		auprobe->api.handler(insn, addr, regs);
-+
-+	return true;
-+}
-+
-+void arch_uprobe_abort_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
-+{
-+	struct uprobe_task *utask = current->utask;
-+
-+	/*
-+	 * Task has received a fatal signal, so reset back to probbed
-+	 * address.
-+	 */
-+	instruction_pointer_set(regs, utask->vaddr);
-+
-+	user_disable_single_step(current);
-+}
-+
-+bool arch_uretprobe_is_alive(struct return_instance *ret, enum rp_check ctx,
-+		struct pt_regs *regs)
-+{
-+	/*
-+	 * If a simple branch instruction (B) was called for retprobed
-+	 * assembly label then return true even when regs->sp and ret->stack
-+	 * are same. It will ensure that cleanup and reporting of return
-+	 * instances corresponding to callee label is done when
-+	 * handle_trampoline for called function is executed.
-+	 */
-+	if (ctx == RP_CHECK_CHAIN_CALL)
-+		return regs->sp <= ret->stack;
-+	else
-+		return regs->sp < ret->stack;
-+}
-+
-+unsigned long
-+arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr,
-+				  struct pt_regs *regs)
-+{
-+	unsigned long orig_ret_vaddr;
-+
-+	orig_ret_vaddr = procedure_link_pointer(regs);
-+	/* Replace the return addr with trampoline addr */
-+	procedure_link_pointer_set(regs, trampoline_vaddr);
-+
-+	return orig_ret_vaddr;
-+}
-+
-+int arch_uprobe_exception_notify(struct notifier_block *self,
-+				 unsigned long val, void *data)
-+{
-+	return NOTIFY_DONE;
-+}
-+
-+static int uprobe_breakpoint_handler(struct pt_regs *regs,
-+		unsigned int esr)
-+{
-+	if (user_mode(regs) && uprobe_pre_sstep_notifier(regs))
-+		return DBG_HOOK_HANDLED;
-+
-+	return DBG_HOOK_ERROR;
-+}
-+
-+static int uprobe_single_step_handler(struct pt_regs *regs,
-+		unsigned int esr)
-+{
-+	struct uprobe_task *utask = current->utask;
-+
-+	if (user_mode(regs)) {
-+		WARN_ON(utask &&
-+			(instruction_pointer(regs) != utask->xol_vaddr + 4));
-+
-+		if (uprobe_post_sstep_notifier(regs))
-+			return DBG_HOOK_HANDLED;
-+	}
-+
-+	return DBG_HOOK_ERROR;
-+}
-+
-+/* uprobe breakpoint handler hook */
-+static struct break_hook uprobes_break_hook = {
-+	.esr_mask = BRK64_ESR_MASK,
-+	.esr_val = BRK64_ESR_UPROBES,
-+	.fn = uprobe_breakpoint_handler,
-+};
-+
-+/* uprobe single step handler hook */
-+static struct step_hook uprobes_step_hook = {
-+	.fn = uprobe_single_step_handler,
-+};
-+
-+static int __init arch_init_uprobes(void)
-+{
-+	register_break_hook(&uprobes_break_hook);
-+	register_step_hook(&uprobes_step_hook);
-+
-+	return 0;
-+}
-+
-+device_initcall(arch_init_uprobes);
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 404dd67080b9..c7b6de62f9d3 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -414,6 +414,9 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
- 		} else {
- 			local_irq_enable();
- 
-+			if (thread_flags & _TIF_UPROBE)
-+				uprobe_notify_resume(regs);
-+
- 			if (thread_flags & _TIF_SIGPENDING)
- 				do_signal(regs);
- 
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index 8377329d8c97..2d78d5a9b89f 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -32,7 +32,7 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
- 		__flush_icache_all();
- }
- 
--static void sync_icache_aliases(void *kaddr, unsigned long len)
-+void sync_icache_aliases(void *kaddr, unsigned long len)
- {
- 	unsigned long addr = (unsigned long)kaddr;
- 
--- 
-2.7.4
+regards
+Philipp
