@@ -1,136 +1,184 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:24 +0200
-Subject: [PULL 16/50] arm64: KVM: vgic-v2: Enable GICV access from HYP if
- access from guest is unsafe
+Date: Tue, 27 Sep 2016 20:05:16 +0200
+Subject: [PULL 08/50] KVM: arm/arm64: Get rid of exported aliases to static
+ functions
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-17-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-9-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+When rewriting the assembly code to C code, it was useful to have
+exported aliases or static functions so that we could keep the existing
+common C code unmodified and at the same time rewrite arm64 from
+assembly to C code, and later do the arm part.
 
-So far, we've been disabling KVM on systems where the GICV region couldn't
-be safely given to a guest. Now that we're able to handle this access
-safely by emulating it in HYP, we can enable this feature when we detect
-an unsafe configuration.
+Now when both are done, we really don't need this level of indirection
+anymore, and it's time to save a few lines and brain cells.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-v2.c | 69 +++++++++++++++++++++++++++------------------
- 1 file changed, 42 insertions(+), 27 deletions(-)
+ arch/arm/kvm/hyp/switch.c       |  4 +---
+ arch/arm/kvm/hyp/tlb.c          | 15 ++++-----------
+ arch/arm64/kvm/hyp/debug-sr.c   |  4 +---
+ arch/arm64/kvm/hyp/switch.c     |  4 +---
+ arch/arm64/kvm/hyp/tlb.c        | 13 +++----------
+ arch/arm64/kvm/hyp/vgic-v3-sr.c |  4 +---
+ 6 files changed, 11 insertions(+), 33 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index b8da901..0a063af 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -278,12 +278,14 @@ int vgic_v2_map_resources(struct kvm *kvm)
- 		goto out;
- 	}
- 
--	ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
--				    kvm_vgic_global_state.vcpu_base,
--				    KVM_VGIC_V2_CPU_SIZE, true);
--	if (ret) {
--		kvm_err("Unable to remap VGIC CPU to VCPU\n");
--		goto out;
-+	if (!static_branch_unlikely(&vgic_v2_cpuif_trap)) {
-+		ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
-+					    kvm_vgic_global_state.vcpu_base,
-+					    KVM_VGIC_V2_CPU_SIZE, true);
-+		if (ret) {
-+			kvm_err("Unable to remap VGIC CPU to VCPU\n");
-+			goto out;
-+		}
- 	}
- 
- 	dist->ready = true;
-@@ -312,45 +314,51 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- 		return -ENXIO;
- 	}
- 
--	if (!PAGE_ALIGNED(info->vcpu.start)) {
--		kvm_err("GICV physical address 0x%llx not page aligned\n",
--			(unsigned long long)info->vcpu.start);
--		return -ENXIO;
--	}
-+	if (!PAGE_ALIGNED(info->vcpu.start) ||
-+	    !PAGE_ALIGNED(resource_size(&info->vcpu))) {
-+		kvm_info("GICV region size/alignment is unsafe, using trapping (reduced performance)\n");
-+		kvm_vgic_global_state.vcpu_base_va = ioremap(info->vcpu.start,
-+							     resource_size(&info->vcpu));
-+		if (!kvm_vgic_global_state.vcpu_base_va) {
-+			kvm_err("Cannot ioremap GICV\n");
-+			return -ENOMEM;
-+		}
- 
--	if (!PAGE_ALIGNED(resource_size(&info->vcpu))) {
--		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
--			(unsigned long long)resource_size(&info->vcpu),
--			PAGE_SIZE);
--		return -ENXIO;
-+		ret = create_hyp_io_mappings(kvm_vgic_global_state.vcpu_base_va,
-+					     kvm_vgic_global_state.vcpu_base_va + resource_size(&info->vcpu),
-+					     info->vcpu.start);
-+		if (ret) {
-+			kvm_err("Cannot map GICV into hyp\n");
-+			goto out;
-+		}
-+
-+		static_branch_enable(&vgic_v2_cpuif_trap);
- 	}
- 
- 	kvm_vgic_global_state.vctrl_base = ioremap(info->vctrl.start,
- 						   resource_size(&info->vctrl));
- 	if (!kvm_vgic_global_state.vctrl_base) {
- 		kvm_err("Cannot ioremap GICH\n");
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto out;
- 	}
- 
- 	vtr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VTR);
- 	kvm_vgic_global_state.nr_lr = (vtr & 0x3f) + 1;
- 
--	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
--	if (ret) {
--		kvm_err("Cannot register GICv2 KVM device\n");
--		iounmap(kvm_vgic_global_state.vctrl_base);
--		return ret;
--	}
--
- 	ret = create_hyp_io_mappings(kvm_vgic_global_state.vctrl_base,
- 				     kvm_vgic_global_state.vctrl_base +
- 					 resource_size(&info->vctrl),
- 				     info->vctrl.start);
- 	if (ret) {
- 		kvm_err("Cannot map VCTRL into hyp\n");
--		kvm_unregister_device_ops(KVM_DEV_TYPE_ARM_VGIC_V2);
--		iounmap(kvm_vgic_global_state.vctrl_base);
--		return ret;
-+		goto out;
-+	}
-+
-+	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
-+	if (ret) {
-+		kvm_err("Cannot register GICv2 KVM device\n");
-+		goto out;
- 	}
- 
- 	kvm_vgic_global_state.can_emulate_gicv2 = true;
-@@ -361,4 +369,11 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- 	kvm_info("vgic-v2@%llx\n", info->vctrl.start);
- 
- 	return 0;
-+out:
-+	if (kvm_vgic_global_state.vctrl_base)
-+		iounmap(kvm_vgic_global_state.vctrl_base);
-+	if (kvm_vgic_global_state.vcpu_base_va)
-+		iounmap(kvm_vgic_global_state.vcpu_base_va);
-+
-+	return ret;
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index b13caa9..37b3365 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -134,7 +134,7 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+ 	return true;
  }
+ 
+-static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
++int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *host_ctxt;
+ 	struct kvm_cpu_context *guest_ctxt;
+@@ -191,8 +191,6 @@ again:
+ 	return exit_code;
+ }
+ 
+-__alias(__guest_run) int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+-
+ static const char * const __hyp_panic_string[] = {
+ 	[ARM_EXCEPTION_RESET]      = "\nHYP panic: RST   PC:%08x CPSR:%08x",
+ 	[ARM_EXCEPTION_UNDEFINED]  = "\nHYP panic: UNDEF PC:%08x CPSR:%08x",
+diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
+index a263600..7296528 100644
+--- a/arch/arm/kvm/hyp/tlb.c
++++ b/arch/arm/kvm/hyp/tlb.c
+@@ -34,7 +34,7 @@
+  * As v7 does not support flushing per IPA, just nuke the whole TLB
+  * instead, ignoring the ipa value.
+  */
+-static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
++void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
+ {
+ 	dsb(ishst);
+ 
+@@ -50,21 +50,14 @@ static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
+ 	write_sysreg(0, VTTBR);
+ }
+ 
+-__alias(__tlb_flush_vmid) void __kvm_tlb_flush_vmid(struct kvm *kvm);
+-
+-static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
++void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+-	__tlb_flush_vmid(kvm);
++	__kvm_tlb_flush_vmid(kvm);
+ }
+ 
+-__alias(__tlb_flush_vmid_ipa) void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
+-							    phys_addr_t ipa);
+-
+-static void __hyp_text __tlb_flush_vm_context(void)
++void __hyp_text __kvm_flush_vm_context(void)
+ {
+ 	write_sysreg(0, TLBIALLNSNHIS);
+ 	write_sysreg(0, ICIALLUIS);
+ 	dsb(ish);
+ }
+-
+-__alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index 33342a7..4ba5c90 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -131,9 +131,7 @@ void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
+ 		vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
+ }
+ 
+-static u32 __hyp_text __debug_read_mdcr_el2(void)
++u32 __hyp_text __kvm_get_mdcr_el2(void)
+ {
+ 	return read_sysreg(mdcr_el2);
+ }
+-
+-__alias(__debug_read_mdcr_el2) u32 __kvm_get_mdcr_el2(void);
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 5a84b45..35d2e09 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -232,7 +232,7 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+ 	return true;
+ }
+ 
+-static int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
++int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *host_ctxt;
+ 	struct kvm_cpu_context *guest_ctxt;
+@@ -293,8 +293,6 @@ again:
+ 	return exit_code;
+ }
+ 
+-__alias(__guest_run) int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+-
+ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
+ 
+ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
+diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+index be8177c..9cc0ea7 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
++++ b/arch/arm64/kvm/hyp/tlb.c
+@@ -17,7 +17,7 @@
+ 
+ #include <asm/kvm_hyp.h>
+ 
+-static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
++void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+ 	dsb(ishst);
+ 
+@@ -48,10 +48,7 @@ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 	write_sysreg(0, vttbr_el2);
+ }
+ 
+-__alias(__tlb_flush_vmid_ipa) void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm,
+-							    phys_addr_t ipa);
+-
+-static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
++void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
+ {
+ 	dsb(ishst);
+ 
+@@ -67,14 +64,10 @@ static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
+ 	write_sysreg(0, vttbr_el2);
+ }
+ 
+-__alias(__tlb_flush_vmid) void __kvm_tlb_flush_vmid(struct kvm *kvm);
+-
+-static void __hyp_text __tlb_flush_vm_context(void)
++void __hyp_text __kvm_flush_vm_context(void)
+ {
+ 	dsb(ishst);
+ 	asm volatile("tlbi alle1is	\n"
+ 		     "ic ialluis	  ": : );
+ 	dsb(ish);
+ }
+-
+-__alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 5f8f80b..ee1ea63 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -335,9 +335,7 @@ void __hyp_text __vgic_v3_init_lrs(void)
+ 		__gic_v3_set_lr(0, i);
+ }
+ 
+-static u64 __hyp_text __vgic_v3_read_ich_vtr_el2(void)
++u64 __hyp_text __vgic_v3_get_ich_vtr_el2(void)
+ {
+ 	return read_gicreg(ICH_VTR_EL2);
+ }
+-
+-__alias(__vgic_v3_read_ich_vtr_el2) u64 __vgic_v3_get_ich_vtr_el2(void);
 -- 
 2.9.0
