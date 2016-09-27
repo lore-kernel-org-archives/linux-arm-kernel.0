@@ -1,96 +1,293 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 27 Sep 2016 09:45:28 +0200
-Subject: [PATCHv2 2/3] tty/serial: at91: fix hardware handshake with GPIOs
-In-Reply-To: <20160922132045.tbrd5u56qasaf7gn@pengutronix.de>
-References: <20160912094733.21501-1-richard.genoud@gmail.com>
- <20160912094733.21501-3-richard.genoud@gmail.com>
- <20160922132045.tbrd5u56qasaf7gn@pengutronix.de>
-Message-ID: <CACQ1gAjPfM9pN5Y88rum=0a8nfp7VL=FoJCz3bhHxkJj7JdHpw@mail.gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 27 Sep 2016 13:17:55 +0530
+Subject: [PATCH V2 1/6] arm64: kprobe: protect/rename few definitions to be
+ reused by uprobe
+In-Reply-To: <cover.1474960629.git.panand@redhat.com>
+References: <cover.1474960629.git.panand@redhat.com>
+Message-ID: <6ef7e86af6926b95d75561e5593e1f275ac584f1.1474960629.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-09-22 15:20 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Mon, Sep 12, 2016 at 11:47:32AM +0200, Richard Genoud wrote:
->> Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
->> hardware handshake is enabled") broke the hardware handshake when GPIOs
->> where used.
->
-> s/where/were/
-ok.
+decode-insn code has to be reused by arm64 uprobe implementation as well.
+Therefore, this patch protects some portion of kprobe code and renames few
+other, so that decode-insn functionality can be reused by uprobe even when
+CONFIG_KPROBES is not defined.
 
->> Hardware handshake with GPIOs used to work before this commit because
->> the CRTSCTS flag (termios->c_cflag) was set, but not the
->> ATMEL_US_USMODE_HWHS flag (controller register) ; so hardware handshake
->> enabled, but not handled by the controller.
->>
->> This commit restores this behaviour.
->>
->> NB: -stable is not Cced because it doesn't cleanly apply on 4.1+
->> and it will also need previous commit:
->> "serial: mctrl_gpio: implement mctrl_gpio_use_rtscts"
->>
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when hardware handshake is enabled")
->> ---
->>  drivers/tty/serial/atmel_serial.c | 11 ++++++++---
->>  1 file changed, 8 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> index 2eaa18ddef61..e9b4fbf88c2d 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -2025,6 +2025,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
->>  static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->>                             struct ktermios *old)
->>  {
->> +     struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->>       unsigned long flags;
->>       unsigned int old_mode, mode, imr, quot, baud;
->>
->> @@ -2126,8 +2127,12 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->>               atmel_uart_writel(port, ATMEL_US_TTGR,
->>                                 port->rs485.delay_rts_after_send);
->>               mode |= ATMEL_US_USMODE_RS485;
->> -     } else if (termios->c_cflag & CRTSCTS) {
->> -             /* RS232 with hardware handshake (RTS/CTS) */
->> +     } else if ((termios->c_cflag & CRTSCTS) &&
->> +                !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
->
-> IMHO the behaviour of the hw controlled pins shouldn't change when
-> mctrl_gpio is in use (if possible). But I don't understand the issue so
-> I guess you need a better changelog.
-Yes, the behavior of the CTS/RTS pins should the same whenever they
-are GPIOs or not.
-That was the case before commit 1cf6e8fc8341 ("tty/serial: at91: fix
-RTS line management when
-hardware handshake is enabled")
-BUT, this commit (1cf6e8fc834) introduced the actual use of the
-ATMEL_US_USMODE_HWHS flag.
-This flags changes the way RTS/CTS pins are driven, and that's the
-discussion we are having in patch 3/3.
+kprobe_opcode_t and struct arch_specific_insn are also defined by
+linux/kprobes.h, when CONFIG_KPROBES is not defined. So, protect these
+definitions in asm/probes.h.
 
->> +             /*
->> +              * RS232 with hardware handshake (RTS/CTS)
->> +              * handled by the controller.
->> +              */
->>               if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
->>                       dev_info(port->dev, "not enabling hardware flow control because DMA is used");
->>                       termios->c_cflag &= ~CRTSCTS;
->> @@ -2135,7 +2140,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->>                       mode |= ATMEL_US_USMODE_HWHS;
->>               }
->>       } else {
->> -             /* RS232 without hadware handshake */
->> +             /* RS232 without hadware handshake or controlled by GPIOs */
->
-> When touching this line, please also do s/hadware/hardware/.
-ok.
->
->>               mode |= ATMEL_US_USMODE_NORMAL;
->>       }
->
-> Best regards
-> Uwe
+linux/kprobes.h already includes asm/kprobes.h. Therefore, remove inclusion
+of asm/kprobes.h from decode-insn.c.
 
-Thanks.
+There are some definitions like kprobe_insn and kprobes_handler_t etc can
+be re-used by uprobe. So, it would be better to remove 'k' from their
+names.
+
+struct arch_specific_insn is specific to kprobe. Therefore, introduce a new
+struct arch_probe_insn which will be common for both kprobe and uprobe, so
+that decode-insn code can be shared. Modify kprobe code accordingly.
+
+Function arm_probe_decode_insn() will be needed by uprobe as well. So make
+it global.
+
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+---
+ arch/arm64/include/asm/probes.h        | 19 ++++++++++--------
+ arch/arm64/kernel/probes/decode-insn.c | 32 ++++++++++++++++--------------
+ arch/arm64/kernel/probes/decode-insn.h |  8 ++++++--
+ arch/arm64/kernel/probes/kprobes.c     | 36 +++++++++++++++++-----------------
+ 4 files changed, 52 insertions(+), 43 deletions(-)
+
+diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
+index 5af574d632fa..e175a825b187 100644
+--- a/arch/arm64/include/asm/probes.h
++++ b/arch/arm64/include/asm/probes.h
+@@ -17,19 +17,22 @@
+ 
+ #include <asm/opcodes.h>
+ 
+-struct kprobe;
+-struct arch_specific_insn;
+-
+-typedef u32 kprobe_opcode_t;
+-typedef void (kprobes_handler_t) (u32 opcode, long addr, struct pt_regs *);
++typedef u32 probe_opcode_t;
++typedef void (probes_handler_t) (u32 opcode, long addr, struct pt_regs *);
+ 
+ /* architecture specific copy of original instruction */
+-struct arch_specific_insn {
+-	kprobe_opcode_t *insn;
++struct arch_probe_insn {
++	probe_opcode_t *insn;
+ 	pstate_check_t *pstate_cc;
+-	kprobes_handler_t *handler;
++	probes_handler_t *handler;
+ 	/* restore address after step xol */
+ 	unsigned long restore;
+ };
++#ifdef CONFIG_KPROBES
++typedef u32 kprobe_opcode_t;
++struct arch_specific_insn {
++	struct arch_probe_insn api;
++};
++#endif
+ 
+ #endif
+diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
+index d1731bf977ef..8a29d2982eec 100644
+--- a/arch/arm64/kernel/probes/decode-insn.c
++++ b/arch/arm64/kernel/probes/decode-insn.c
+@@ -78,8 +78,8 @@ static bool __kprobes aarch64_insn_is_steppable(u32 insn)
+  *   INSN_GOOD         If instruction is supported and uses instruction slot,
+  *   INSN_GOOD_NO_SLOT If instruction is supported but doesn't use its slot.
+  */
+-static enum kprobe_insn __kprobes
+-arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
++enum probe_insn __kprobes
++arm_probe_decode_insn(probe_opcode_t insn, struct arch_probe_insn *api)
+ {
+ 	/*
+ 	 * Instructions reading or modifying the PC won't work from the XOL
+@@ -89,26 +89,26 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 		return INSN_GOOD;
+ 
+ 	if (aarch64_insn_is_bcond(insn)) {
+-		asi->handler = simulate_b_cond;
++		api->handler = simulate_b_cond;
+ 	} else if (aarch64_insn_is_cbz(insn) ||
+ 	    aarch64_insn_is_cbnz(insn)) {
+-		asi->handler = simulate_cbz_cbnz;
++		api->handler = simulate_cbz_cbnz;
+ 	} else if (aarch64_insn_is_tbz(insn) ||
+ 	    aarch64_insn_is_tbnz(insn)) {
+-		asi->handler = simulate_tbz_tbnz;
++		api->handler = simulate_tbz_tbnz;
+ 	} else if (aarch64_insn_is_adr_adrp(insn)) {
+-		asi->handler = simulate_adr_adrp;
++		api->handler = simulate_adr_adrp;
+ 	} else if (aarch64_insn_is_b(insn) ||
+ 	    aarch64_insn_is_bl(insn)) {
+-		asi->handler = simulate_b_bl;
++		api->handler = simulate_b_bl;
+ 	} else if (aarch64_insn_is_br(insn) ||
+ 	    aarch64_insn_is_blr(insn) ||
+ 	    aarch64_insn_is_ret(insn)) {
+-		asi->handler = simulate_br_blr_ret;
++		api->handler = simulate_br_blr_ret;
+ 	} else if (aarch64_insn_is_ldr_lit(insn)) {
+-		asi->handler = simulate_ldr_literal;
++		api->handler = simulate_ldr_literal;
+ 	} else if (aarch64_insn_is_ldrsw_lit(insn)) {
+-		asi->handler = simulate_ldrsw_literal;
++		api->handler = simulate_ldrsw_literal;
+ 	} else {
+ 		/*
+ 		 * Instruction cannot be stepped out-of-line and we don't
+@@ -120,6 +120,7 @@ arm_probe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi)
+ 	return INSN_GOOD_NO_SLOT;
+ }
+ 
++#ifdef CONFIG_KPROBES
+ static bool __kprobes
+ is_probed_address_atomic(kprobe_opcode_t *scan_start, kprobe_opcode_t *scan_end)
+ {
+@@ -138,12 +139,12 @@ is_probed_address_atomic(kprobe_opcode_t *scan_start, kprobe_opcode_t *scan_end)
+ 	return false;
+ }
+ 
+-enum kprobe_insn __kprobes
++enum probe_insn __kprobes
+ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
+ {
+-	enum kprobe_insn decoded;
+-	kprobe_opcode_t insn = le32_to_cpu(*addr);
+-	kprobe_opcode_t *scan_end = NULL;
++	enum probe_insn decoded;
++	probe_opcode_t insn = le32_to_cpu(*addr);
++	probe_opcode_t *scan_end = NULL;
+ 	unsigned long size = 0, offset = 0;
+ 
+ 	/*
+@@ -162,7 +163,7 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
+ 		else
+ 			scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
+ 	}
+-	decoded = arm_probe_decode_insn(insn, asi);
++	decoded = arm_probe_decode_insn(insn, &asi->api);
+ 
+ 	if (decoded != INSN_REJECTED && scan_end)
+ 		if (is_probed_address_atomic(addr - 1, scan_end))
+@@ -170,3 +171,4 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
+ 
+ 	return decoded;
+ }
++#endif
+diff --git a/arch/arm64/kernel/probes/decode-insn.h b/arch/arm64/kernel/probes/decode-insn.h
+index d438289646a6..76d3f315407f 100644
+--- a/arch/arm64/kernel/probes/decode-insn.h
++++ b/arch/arm64/kernel/probes/decode-insn.h
+@@ -23,13 +23,17 @@
+  */
+ #define MAX_ATOMIC_CONTEXT_SIZE	(128 / sizeof(kprobe_opcode_t))
+ 
+-enum kprobe_insn {
++enum probe_insn {
+ 	INSN_REJECTED,
+ 	INSN_GOOD_NO_SLOT,
+ 	INSN_GOOD,
+ };
+ 
+-enum kprobe_insn __kprobes
++#ifdef CONFIG_KPROBES
++enum probe_insn __kprobes
+ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi);
++#endif
++enum probe_insn __kprobes
++arm_probe_decode_insn(probe_opcode_t insn, struct arch_probe_insn *asi);
+ 
+ #endif /* _ARM_KERNEL_KPROBES_ARM64_H */
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index f5077ea7af6d..1decd2b2c730 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -44,31 +44,31 @@ post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
+ static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
+ {
+ 	/* prepare insn slot */
+-	p->ainsn.insn[0] = cpu_to_le32(p->opcode);
++	p->ainsn.api.insn[0] = cpu_to_le32(p->opcode);
+ 
+-	flush_icache_range((uintptr_t) (p->ainsn.insn),
+-			   (uintptr_t) (p->ainsn.insn) +
++	flush_icache_range((uintptr_t) (p->ainsn.api.insn),
++			   (uintptr_t) (p->ainsn.api.insn) +
+ 			   MAX_INSN_SIZE * sizeof(kprobe_opcode_t));
+ 
+ 	/*
+ 	 * Needs restoring of return address after stepping xol.
+ 	 */
+-	p->ainsn.restore = (unsigned long) p->addr +
++	p->ainsn.api.restore = (unsigned long) p->addr +
+ 	  sizeof(kprobe_opcode_t);
+ }
+ 
+ static void __kprobes arch_prepare_simulate(struct kprobe *p)
+ {
+ 	/* This instructions is not executed xol. No need to adjust the PC */
+-	p->ainsn.restore = 0;
++	p->ainsn.api.restore = 0;
+ }
+ 
+ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
+ {
+ 	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+ 
+-	if (p->ainsn.handler)
+-		p->ainsn.handler((u32)p->opcode, (long)p->addr, regs);
++	if (p->ainsn.api.handler)
++		p->ainsn.api.handler((u32)p->opcode, (long)p->addr, regs);
+ 
+ 	/* single step simulated, now go for post processing */
+ 	post_kprobe_handler(kcb, regs);
+@@ -98,18 +98,18 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+ 		return -EINVAL;
+ 
+ 	case INSN_GOOD_NO_SLOT:	/* insn need simulation */
+-		p->ainsn.insn = NULL;
++		p->ainsn.api.insn = NULL;
+ 		break;
+ 
+ 	case INSN_GOOD:	/* instruction uses slot */
+-		p->ainsn.insn = get_insn_slot();
+-		if (!p->ainsn.insn)
++		p->ainsn.api.insn = get_insn_slot();
++		if (!p->ainsn.api.insn)
+ 			return -ENOMEM;
+ 		break;
+ 	};
+ 
+ 	/* prepare the instruction */
+-	if (p->ainsn.insn)
++	if (p->ainsn.api.insn)
+ 		arch_prepare_ss_slot(p);
+ 	else
+ 		arch_prepare_simulate(p);
+@@ -142,9 +142,9 @@ void __kprobes arch_disarm_kprobe(struct kprobe *p)
+ 
+ void __kprobes arch_remove_kprobe(struct kprobe *p)
+ {
+-	if (p->ainsn.insn) {
+-		free_insn_slot(p->ainsn.insn, 0);
+-		p->ainsn.insn = NULL;
++	if (p->ainsn.api.insn) {
++		free_insn_slot(p->ainsn.api.insn, 0);
++		p->ainsn.api.insn = NULL;
+ 	}
+ }
+ 
+@@ -244,9 +244,9 @@ static void __kprobes setup_singlestep(struct kprobe *p,
+ 	}
+ 
+ 
+-	if (p->ainsn.insn) {
++	if (p->ainsn.api.insn) {
+ 		/* prepare for single stepping */
+-		slot = (unsigned long)p->ainsn.insn;
++		slot = (unsigned long)p->ainsn.api.insn;
+ 
+ 		set_ss_context(kcb, slot);	/* mark pending ss */
+ 
+@@ -295,8 +295,8 @@ post_kprobe_handler(struct kprobe_ctlblk *kcb, struct pt_regs *regs)
+ 		return;
+ 
+ 	/* return addr restore if non-branching insn */
+-	if (cur->ainsn.restore != 0)
+-		instruction_pointer_set(regs, cur->ainsn.restore);
++	if (cur->ainsn.api.restore != 0)
++		instruction_pointer_set(regs, cur->ainsn.api.restore);
+ 
+ 	/* restore back original saved kprobe variables and continue */
+ 	if (kcb->kprobe_status == KPROBE_REENTER) {
+-- 
+2.7.4
