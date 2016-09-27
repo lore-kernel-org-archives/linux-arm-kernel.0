@@ -1,197 +1,185 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Wed, 28 Sep 2016 00:20:16 +0930
-Subject: [PATCH 4/8] pinctrl: aspeed-g5: Fix pin association of SPI1 function
+Date: Wed, 28 Sep 2016 00:20:17 +0930
+Subject: [PATCH 5/8] pinctrl: aspeed: Enable capture of off-SCU pinmux state
 In-Reply-To: <cover.115463f791b69859c5ce9dafd61a5755ea039f4b.1474986045.git-series.andrew@aj.id.au>
 References: <cover.115463f791b69859c5ce9dafd61a5755ea039f4b.1474986045.git-series.andrew@aj.id.au>
-Message-ID: <bdd34f8c4bfabbc1d3cd05a66ac8734da514b1e5.1474986045.git-series.andrew@aj.id.au>
+Message-ID: <a266046d34009e6e92c4c76699c550c2ba44bd5c.1474986045.git-series.andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPI1 function was associated with the wrong pins: The functions that
-those pins provide is either an SPI debug or passthrough function
-coupled to SPI1. Make the SPI1 mux function configure the relevant pins
-and associate new SPI1DEBUG and SPI1PASSTHRU functions with the pins
-that were already defined.
+The System Control Unit IP in the Aspeed SoCs is typically where the
+pinmux configuration is found.
 
-The notation used in the datasheet's multi-function pin table for the SoC is
-often creative: in this case the SYS* signals are enabled by a single bit,
-which is nothing unusual on its own, but in this case the bit was also
-participating in a multi-bit bitfield and therefore represented multiple
-functions. This fact was overlooked in the original patch.
+But not always.
 
-Fixes: 56e57cb6c07f (pinctrl: Add pinctrl-aspeed-g5 driver)
+On the AST2400 and AST2500 a number of pins depend on state in one of
+the SIO, LPC or GFX IP blocks, so add support to at least capture what
+that state is. The pinctrl engine for the Aspeed SoCs doesn't try to
+inspect or modify the state of the off-SCU IP blocks. Instead, it logs
+the state requirement with the expectation that the platform
+designer/maintainer arranges for the appropriate configuration to be
+applied through the associated drivers.
+
+The IP block of interest is encoded in the reg member of struct
+aspeed_sig_desc. For compatibility with the existing code, the SCU is
+defined to have an IP value of 0.
+
 Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 ---
- Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt |  4 +-
- drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c                   | 86 ++++++-
- 2 files changed, 81 insertions(+), 9 deletions(-)
+ drivers/pinctrl/aspeed/pinctrl-aspeed.c | 53 +++++++++++++++++++++++---
+ drivers/pinctrl/aspeed/pinctrl-aspeed.h | 16 +++++++-
+ 2 files changed, 61 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
-index 5e60ad18f147..2ad18c4ea55c 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
-@@ -43,7 +43,9 @@ aspeed,ast2500-pinctrl, aspeed,g5-pinctrl:
+diff --git a/drivers/pinctrl/aspeed/pinctrl-aspeed.c b/drivers/pinctrl/aspeed/pinctrl-aspeed.c
+index 49aeba912531..21ef195d586f 100644
+--- a/drivers/pinctrl/aspeed/pinctrl-aspeed.c
++++ b/drivers/pinctrl/aspeed/pinctrl-aspeed.c
+@@ -14,6 +14,8 @@
+ #include "../core.h"
+ #include "pinctrl-aspeed.h"
  
- GPID0 GPID2 GPIE0 I2C10 I2C11 I2C12 I2C13 I2C14 I2C3 I2C4 I2C5 I2C6 I2C7 I2C8
- I2C9 MAC1LINK MDIO1 MDIO2 OSCCLK PEWAKE PWM0 PWM1 PWM2 PWM3 PWM4 PWM5 PWM6 PWM7
--RGMII1 RGMII2 RMII1 RMII2 SD1 SPI1 TIMER4 TIMER5 TIMER6 TIMER7 TIMER8
-+RGMII1 RGMII2 RMII1 RMII2 SD1 SPI1 SPI1DEBUG SPI1PASSTHRU TIMER4 TIMER5 TIMER6
-+TIMER7 TIMER8 VGABIOSROM
++const char *const aspeed_pinmux_ips[] = { "SCU", "SIO", "GFX", "LPC" };
 +
+ int aspeed_pinctrl_get_groups_count(struct pinctrl_dev *pctldev)
+ {
+ 	struct aspeed_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
+@@ -78,7 +80,9 @@ int aspeed_pinmux_get_fn_groups(struct pinctrl_dev *pctldev,
+ static inline void aspeed_sig_desc_print_val(
+ 		const struct aspeed_sig_desc *desc, bool enable, u32 rv)
+ {
+-	pr_debug("SCU%x[0x%08x]=0x%x, got 0x%x from 0x%08x\n", desc->reg,
++	pr_debug("Want %s%lX[0x%08X]=0x%X, got 0x%X from 0x%08X\n",
++			aspeed_pinmux_ips[SIG_DESC_IP_FROM_REG(desc->reg)],
++			SIG_DESC_OFFSET_FROM_REG(desc->reg),
+ 			desc->mask, enable ? desc->enable : desc->disable,
+ 			(rv & desc->mask) >> __ffs(desc->mask), rv);
+ }
+@@ -105,6 +109,8 @@ static bool aspeed_sig_desc_eval(const struct aspeed_sig_desc *desc,
+ 	unsigned int raw;
+ 	u32 want;
  
- Examples:
- 
-diff --git a/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c b/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c
-index 235d929e74fd..c8c72e8259d3 100644
---- a/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c
-+++ b/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c
-@@ -186,24 +186,84 @@ MS_PIN_DECL(C20, GPIOE1, NDCD3, GPIE0OUT);
- 
- FUNC_GROUP_DECL(GPIE0, B20, C20);
- 
--#define SPI1_DESC	SIG_DESC_SET(HW_STRAP1, 13)
-+#define SPI1_DESC		{ HW_STRAP1, GENMASK(13, 12), 1, 0 }
-+#define SPI1DEBUG_DESC		{ HW_STRAP1, GENMASK(13, 12), 2, 0 }
-+#define SPI1PASSTHRU_DESC	{ HW_STRAP1, GENMASK(13, 12), 3, 0 }
++	WARN_ON(SIG_DESC_IP_FROM_REG(desc->reg) != ASPEED_IP_SCU);
 +
- #define C18 64
--SIG_EXPR_LIST_DECL_SINGLE(SYSCS, SPI1, COND1, SPI1_DESC);
-+SIG_EXPR_DECL(SYSCS, SPI1DEBUG, COND1, SPI1DEBUG_DESC);
-+SIG_EXPR_DECL(SYSCS, SPI1PASSTHRU, COND1, SPI1PASSTHRU_DESC);
-+SIG_EXPR_LIST_DECL_DUAL(SYSCS, SPI1DEBUG, SPI1PASSTHRU);
- SS_PIN_DECL(C18, GPIOI0, SYSCS);
+ 	if (regmap_read(map, desc->reg, &raw) < 0)
+ 		return false;
  
- #define E15 65
--SIG_EXPR_LIST_DECL_SINGLE(SYSCK, SPI1, COND1, SPI1_DESC);
-+SIG_EXPR_DECL(SYSCK, SPI1DEBUG, COND1, SPI1DEBUG_DESC);
-+SIG_EXPR_DECL(SYSCK, SPI1PASSTHRU, COND1, SPI1PASSTHRU_DESC);
-+SIG_EXPR_LIST_DECL_DUAL(SYSCK, SPI1DEBUG, SPI1PASSTHRU);
- SS_PIN_DECL(E15, GPIOI1, SYSCK);
+@@ -142,9 +148,19 @@ static bool aspeed_sig_expr_eval(const struct aspeed_sig_expr *expr,
  
--#define A14 66
--SIG_EXPR_LIST_DECL_SINGLE(SYSMOSI, SPI1, COND1, SPI1_DESC);
--SS_PIN_DECL(A14, GPIOI2, SYSMOSI);
-+#define B16 66
-+SIG_EXPR_DECL(SYSMOSI, SPI1DEBUG, COND1, SPI1DEBUG_DESC);
-+SIG_EXPR_DECL(SYSMOSI, SPI1PASSTHRU, COND1, SPI1PASSTHRU_DESC);
-+SIG_EXPR_LIST_DECL_DUAL(SYSMOSI, SPI1DEBUG, SPI1PASSTHRU);
-+SS_PIN_DECL(B16, GPIOI2, SYSMOSI);
- 
- #define C16 67
--SIG_EXPR_LIST_DECL_SINGLE(SYSMISO, SPI1, COND1, SPI1_DESC);
-+SIG_EXPR_DECL(SYSMISO, SPI1DEBUG, COND1, SPI1DEBUG_DESC);
-+SIG_EXPR_DECL(SYSMISO, SPI1PASSTHRU, COND1, SPI1PASSTHRU_DESC);
-+SIG_EXPR_LIST_DECL_DUAL(SYSMISO, SPI1DEBUG, SPI1PASSTHRU);
- SS_PIN_DECL(C16, GPIOI3, SYSMISO);
- 
--FUNC_GROUP_DECL(SPI1, C18, E15, A14, C16);
-+#define VB_DESC	SIG_DESC_SET(HW_STRAP1, 5)
+ 	for (i = 0; i < expr->ndescs; i++) {
+ 		const struct aspeed_sig_desc *desc = &expr->descs[i];
++		size_t ip = SIG_DESC_IP_FROM_REG(desc->reg);
 +
-+#define B15 68
-+SIG_EXPR_DECL(SPI1CS0, SPI1, COND1, SPI1_DESC);
-+SIG_EXPR_DECL(SPI1CS0, SPI1DEBUG, COND1, SPI1DEBUG_DESC);
-+SIG_EXPR_DECL(SPI1CS0, SPI1PASSTHRU, COND1, SPI1PASSTHRU_DESC);
-+SIG_EXPR_LIST_DECL(SPI1CS0, SIG_EXPR_PTR(SPI1CS0, SPI1),
-+			    SIG_EXPR_PTR(SPI1CS0, SPI1DEBUG),
-+			    SIG_EXPR_PTR(SPI1CS0, SPI1PASSTHRU));
-+SIG_EXPR_LIST_DECL_SINGLE(VBCS, VGABIOSROM, COND1, VB_DESC);
-+MS_PIN_DECL(B15, GPIOI4, SPI1CS0, VBCS);
++		if (ip == ASPEED_IP_SCU) {
++			if (!aspeed_sig_desc_eval(desc, enabled, map))
++				return false;
++		} else {
++			size_t offset = SIG_DESC_OFFSET_FROM_REG(desc->reg);
++			const char *ip_name = aspeed_pinmux_ips[ip];
 +
-+#define C15 69
-+SIG_EXPR_DECL(SPI1CK, SPI1, COND1, SPI1_DESC);
-+SIG_EXPR_DECL(SPI1CK, SPI1DEBUG, COND1, SPI1DEBUG_DESC);
-+SIG_EXPR_DECL(SPI1CK, SPI1PASSTHRU, COND1, SPI1PASSTHRU_DESC);
-+SIG_EXPR_LIST_DECL(SPI1CK, SIG_EXPR_PTR(SPI1CK, SPI1),
-+			    SIG_EXPR_PTR(SPI1CK, SPI1DEBUG),
-+			    SIG_EXPR_PTR(SPI1CK, SPI1PASSTHRU));
-+SIG_EXPR_LIST_DECL_SINGLE(VBCK, VGABIOSROM, COND1, VB_DESC);
-+MS_PIN_DECL(C15, GPIOI5, SPI1CK, VBCK);
-+
-+#define A14 70
-+SIG_EXPR_DECL(SPI1MOSI, SPI1, COND1, SPI1_DESC);
-+SIG_EXPR_DECL(SPI1MOSI, SPI1DEBUG, COND1, SPI1DEBUG_DESC);
-+SIG_EXPR_DECL(SPI1MOSI, SPI1PASSTHRU, COND1, SPI1PASSTHRU_DESC);
-+SIG_EXPR_LIST_DECL(SPI1MOSI, SIG_EXPR_PTR(SPI1MOSI, SPI1),
-+			    SIG_EXPR_PTR(SPI1MOSI, SPI1DEBUG),
-+			    SIG_EXPR_PTR(SPI1MOSI, SPI1PASSTHRU));
-+SIG_EXPR_LIST_DECL_SINGLE(VBMOSI, VGABIOSROM, COND1, VB_DESC);
-+MS_PIN_DECL(A14, GPIOI6, SPI1MOSI, VBMOSI);
-+
-+#define A15 71
-+SIG_EXPR_DECL(SPI1MISO, SPI1, COND1, SPI1_DESC);
-+SIG_EXPR_DECL(SPI1MISO, SPI1DEBUG, COND1, SPI1DEBUG_DESC);
-+SIG_EXPR_DECL(SPI1MISO, SPI1PASSTHRU, COND1, SPI1PASSTHRU_DESC);
-+SIG_EXPR_LIST_DECL(SPI1MISO, SIG_EXPR_PTR(SPI1MISO, SPI1),
-+			    SIG_EXPR_PTR(SPI1MISO, SPI1DEBUG),
-+			    SIG_EXPR_PTR(SPI1MISO, SPI1PASSTHRU));
-+SIG_EXPR_LIST_DECL_SINGLE(VBMISO, VGABIOSROM, COND1, VB_DESC);
-+MS_PIN_DECL(A15, GPIOI7, SPI1MISO, VBMISO);
-+
-+FUNC_GROUP_DECL(SPI1, B15, C15, A14, A15);
-+FUNC_GROUP_DECL(SPI1DEBUG, C18, E15, B16, C16, B15, C15, A14, A15);
-+FUNC_GROUP_DECL(SPI1PASSTHRU, C18, E15, B16, C16, B15, C15, A14, A15);
-+FUNC_GROUP_DECL(VGABIOSROM, B15, C15, A14, A15);
-+
-+#define R2 72
-+SIG_EXPR_LIST_DECL_SINGLE(SGPMCK, SGPM, SIG_DESC_SET(SCU84, 8));
-+SS_PIN_DECL(R2, GPIOJ0, SGPMCK);
++			pr_debug("Ignoring configuration of field %s%X[0x%08X]\n",
++				 ip_name, offset, desc->mask);
++		}
  
- #define L2 73
- SIG_EXPR_LIST_DECL_SINGLE(SGPMLD, SGPM, SIG_DESC_SET(SCU84, 9));
-@@ -580,6 +640,7 @@ static struct pinctrl_pin_desc aspeed_g5_pins[ASPEED_G5_NR_PINS] = {
- 	ASPEED_PINCTRL_PIN(A12),
- 	ASPEED_PINCTRL_PIN(A13),
- 	ASPEED_PINCTRL_PIN(A14),
-+	ASPEED_PINCTRL_PIN(A15),
- 	ASPEED_PINCTRL_PIN(A2),
- 	ASPEED_PINCTRL_PIN(A3),
- 	ASPEED_PINCTRL_PIN(A4),
-@@ -592,6 +653,8 @@ static struct pinctrl_pin_desc aspeed_g5_pins[ASPEED_G5_NR_PINS] = {
- 	ASPEED_PINCTRL_PIN(B12),
- 	ASPEED_PINCTRL_PIN(B13),
- 	ASPEED_PINCTRL_PIN(B14),
-+	ASPEED_PINCTRL_PIN(B15),
-+	ASPEED_PINCTRL_PIN(B16),
- 	ASPEED_PINCTRL_PIN(B2),
- 	ASPEED_PINCTRL_PIN(B20),
- 	ASPEED_PINCTRL_PIN(B3),
-@@ -603,6 +666,7 @@ static struct pinctrl_pin_desc aspeed_g5_pins[ASPEED_G5_NR_PINS] = {
- 	ASPEED_PINCTRL_PIN(C12),
- 	ASPEED_PINCTRL_PIN(C13),
- 	ASPEED_PINCTRL_PIN(C14),
-+	ASPEED_PINCTRL_PIN(C15),
- 	ASPEED_PINCTRL_PIN(C16),
- 	ASPEED_PINCTRL_PIN(C18),
- 	ASPEED_PINCTRL_PIN(C2),
-@@ -691,11 +755,14 @@ static const struct aspeed_pin_group aspeed_g5_groups[] = {
- 	ASPEED_PINCTRL_GROUP(RMII2),
- 	ASPEED_PINCTRL_GROUP(SD1),
- 	ASPEED_PINCTRL_GROUP(SPI1),
-+	ASPEED_PINCTRL_GROUP(SPI1DEBUG),
-+	ASPEED_PINCTRL_GROUP(SPI1PASSTHRU),
- 	ASPEED_PINCTRL_GROUP(TIMER4),
- 	ASPEED_PINCTRL_GROUP(TIMER5),
- 	ASPEED_PINCTRL_GROUP(TIMER6),
- 	ASPEED_PINCTRL_GROUP(TIMER7),
- 	ASPEED_PINCTRL_GROUP(TIMER8),
-+	ASPEED_PINCTRL_GROUP(VGABIOSROM),
- };
+-		if (!aspeed_sig_desc_eval(desc, enabled, map))
+-			return false;
+ 	}
  
- static const struct aspeed_pin_function aspeed_g5_functions[] = {
-@@ -733,11 +800,14 @@ static const struct aspeed_pin_function aspeed_g5_functions[] = {
- 	ASPEED_PINCTRL_FUNC(RMII2),
- 	ASPEED_PINCTRL_FUNC(SD1),
- 	ASPEED_PINCTRL_FUNC(SPI1),
-+	ASPEED_PINCTRL_FUNC(SPI1DEBUG),
-+	ASPEED_PINCTRL_FUNC(SPI1PASSTHRU),
- 	ASPEED_PINCTRL_FUNC(TIMER4),
- 	ASPEED_PINCTRL_FUNC(TIMER5),
- 	ASPEED_PINCTRL_FUNC(TIMER6),
- 	ASPEED_PINCTRL_FUNC(TIMER7),
- 	ASPEED_PINCTRL_FUNC(TIMER8),
-+	ASPEED_PINCTRL_FUNC(VGABIOSROM),
- };
+ 	return true;
+@@ -170,7 +186,14 @@ static bool aspeed_sig_expr_set(const struct aspeed_sig_expr *expr,
+ 	for (i = 0; i < expr->ndescs; i++) {
+ 		bool ret;
+ 		const struct aspeed_sig_desc *desc = &expr->descs[i];
++
++		size_t offset = SIG_DESC_OFFSET_FROM_REG(desc->reg);
++		size_t ip = SIG_DESC_IP_FROM_REG(desc->reg);
++		bool is_scu = (ip == ASPEED_IP_SCU);
++		const char *ip_name = aspeed_pinmux_ips[ip];
++
+ 		u32 pattern = enable ? desc->enable : desc->disable;
++		u32 val = (pattern << __ffs(desc->mask));
  
- static struct aspeed_pinctrl_data aspeed_g5_pinctrl_data = {
+ 		/*
+ 		 * Strap registers are configured in hardware or by early-boot
+@@ -179,11 +202,27 @@ static bool aspeed_sig_expr_set(const struct aspeed_sig_expr *expr,
+ 		 * deconfigured and is the reason we re-evaluate after writing
+ 		 * all descriptor bits.
+ 		 */
+-		if (desc->reg == HW_STRAP1 || desc->reg == HW_STRAP2)
++		if (is_scu && (offset == HW_STRAP1 || offset == HW_STRAP2))
+ 			continue;
+ 
+-		ret = regmap_update_bits(map, desc->reg, desc->mask,
+-				pattern << __ffs(desc->mask)) == 0;
++		/*
++		 * Sometimes we need help from IP outside the SCU to activate a
++		 * mux request. Report that we need its cooperation.
++		 */
++		if (enable && !is_scu) {
++			pr_debug("Pinmux request for %s requires cooperation of %s IP: Need (%s%X[0x%08X] = 0x%08X\n",
++				expr->function, ip_name, ip_name, offset,
++				desc->mask, val);
++		}
++
++		/* And only read/write SCU registers */
++		if (!is_scu) {
++			pr_debug("Skipping configuration of field %s%X[0x%08X]\n",
++					ip_name, offset, desc->mask);
++			continue;
++		}
++
++		ret = regmap_update_bits(map, desc->reg, desc->mask, val) == 0;
+ 
+ 		if (!ret)
+ 			return ret;
+@@ -343,6 +382,8 @@ int aspeed_pinmux_set_mux(struct pinctrl_dev *pctldev, unsigned int function,
+ 		const struct aspeed_sig_expr **funcs;
+ 		const struct aspeed_sig_expr ***prios;
+ 
++		pr_debug("Muxing pin %d for %s\n", pin, pfunc->name);
++
+ 		if (!pdesc)
+ 			return -EINVAL;
+ 
+diff --git a/drivers/pinctrl/aspeed/pinctrl-aspeed.h b/drivers/pinctrl/aspeed/pinctrl-aspeed.h
+index 3e72ef8c54bf..4384407d77fb 100644
+--- a/drivers/pinctrl/aspeed/pinctrl-aspeed.h
++++ b/drivers/pinctrl/aspeed/pinctrl-aspeed.h
+@@ -232,6 +232,15 @@
+  * group.
+  */
+ 
++#define ASPEED_IP_SCU	0
++#define ASPEED_IP_SIO	1
++#define ASPEED_IP_GFX	2
++#define ASPEED_IP_LPC	3
++
++#define SIG_DESC_TO_REG(ip, offset)	(((ip) << 24) | (offset))
++#define SIG_DESC_IP_FROM_REG(reg)	(((reg) >> 24) & GENMASK(7, 0))
++#define SIG_DESC_OFFSET_FROM_REG(reg)	((reg) & GENMASK(11, 0))
++
+ /*
+  * The "Multi-function Pins Mapping and Control" table in the SoC datasheet
+  * references registers by the device/offset mnemonic. The register macros
+@@ -261,7 +270,10 @@
+   * A signal descriptor, which describes the register, bits and the
+   * enable/disable values that should be compared or written.
+   *
+-  * @reg: The register offset from base in bytes
++  * @reg: Split into three fields:
++  *       31:24: IP selector
++  *       23:12: Reserved
++  *       11:0: Register offset
+   * @mask: The mask to apply to the register. The lowest set bit of the mask is
+   *        used to derive the shift value.
+   * @enable: The value that enables the function. Value should be in the LSBs,
+@@ -270,7 +282,7 @@
+   *           LSBs, not at the position of the mask.
+   */
+ struct aspeed_sig_desc {
+-	unsigned int reg;
++	u32 reg;
+ 	u32 mask;
+ 	u32 enable;
+ 	u32 disable;
 -- 
 git-series 0.8.10
