@@ -1,42 +1,48 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:15 +0200
-Subject: [PULL 07/50] arm64/kvm: remove unused stub functions
+Date: Tue, 27 Sep 2016 20:05:26 +0200
+Subject: [PULL 18/50] arm64: KVM: Preserve pending vSError in world switch
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-8-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-19-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Now that 32-bit KVM no longer performs cache maintenance for page table
-updates, we no longer need empty stubs for arm64. Remove them.
+The HCR_EL2.VSE bit is used to signal an SError to a guest, and has
+the peculiar feature of getting cleared when the guest has taken
+the abort (this is the only bit that behaves as such in this register).
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
+This means that if we signal such an abort, we must leave it
+in the guest context until it disappears from HCR_EL2, and at which
+point it must be cleared from the context. This is achieved by
+reading back from HCR_EL2 until the guest takes the fault.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm64/kvm/hyp/switch.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index b6bb834..8f99ab6 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -166,12 +166,6 @@ void kvm_clear_hyp_idmap(void);
- #define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
- #define	kvm_set_pmd(pmdp, pmd)		set_pmd(pmdp, pmd)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index b3a66c5..8246de2 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -110,6 +110,15 @@ static hyp_alternate_select(__deactivate_traps_arch,
  
--static inline void kvm_clean_pgd(pgd_t *pgd) {}
--static inline void kvm_clean_pmd(pmd_t *pmd) {}
--static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
--static inline void kvm_clean_pte(pte_t *pte) {}
--static inline void kvm_clean_pte_entry(pte_t *pte) {}
--
- static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
  {
- 	pte_val(pte) |= PTE_S2_RDWR;
++	/*
++	 * If we pended a virtual abort, preserve it until it gets
++	 * cleared. See D1.14.3 (Virtual Interrupts) for details, but
++	 * the crucial bit is "On taking a vSError interrupt,
++	 * HCR_EL2.VSE is cleared to 0."
++	 */
++	if (vcpu->arch.hcr_el2 & HCR_VSE)
++		vcpu->arch.hcr_el2 = read_sysreg(hcr_el2);
++
+ 	__deactivate_traps_arch()();
+ 	write_sysreg(0, hstr_el2);
+ 	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
 -- 
 2.9.0
