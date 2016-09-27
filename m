@@ -1,123 +1,103 @@
-From: sramana@codeaurora.org (Srinivas Ramana)
-Date: Tue, 27 Sep 2016 17:46:44 +0530
-Subject: [PATCH] ARM: decompressor: reset ttbcr fields to use TTBR0 on
- ARMv7
-In-Reply-To: <57D812A7.6040905@codeaurora.org>
-References: <57D3C06D.4030908@codeaurora.org>
- <1473663420-18629-1-git-send-email-sramana@codeaurora.org>
- <7608c508-0537-267c-0cdf-6995445b811e@arm.com>
- <57D812A7.6040905@codeaurora.org>
-Message-ID: <57EA632C.3000208@codeaurora.org>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux (gmail))
+Date: Tue, 27 Sep 2016 08:34:18 -0400
+Subject: [PATCH] ARM: dts: lpc32xx: add pwm-cells to base dts file
+In-Reply-To: <aaf0fc9c-ea2f-0081-cf58-b5024e450030@mleia.com>
+References: <1474915641-11209-1-git-send-email-slemieux.tyco@gmail.com>
+ <aaf0fc9c-ea2f-0081-cf58-b5024e450030@mleia.com>
+Message-ID: <1474979658.10588.18.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Vladimir,
 
-On 09/13/2016 08:22 PM, Srinivas Ramana wrote:
-> On 09/12/2016 11:21 PM, Robin Murphy wrote:
->> On 12/09/16 07:57, Srinivas Ramana wrote:
->>> If the bootloader uses the long descriptor format and jumps to
->>> kernel decompressor code, TTBCR may not be in a right state.
->>> Before enabling the MMU, it is required to clear the TTBCR.PD0
->>> field to use TTBR0 for translation table walks.
->>>
->>> The 'commit dbece45894d3a ("ARM: 7501/1: decompressor:
->>> reset ttbcr for VMSA ARMv7 cores")' does the reset of TTBCR.N, but
->>> doesn't consider all the bits for the size of TTBCR.N.
->>>
->>> Clear TTBCR.PD0 field and reset all the three bits of TTBCR.N to
->>> indicate the use of TTBR0 and the correct base address width.
->>>
->>> Signed-off-by: Srinivas Ramana <sramana@codeaurora.org>
->>> ---
->>>   arch/arm/boot/compressed/head.S | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/compressed/head.S
->>> b/arch/arm/boot/compressed/head.S
->>> index af11c2f8f3b7..fc6d541549a2 100644
->>> --- a/arch/arm/boot/compressed/head.S
->>> +++ b/arch/arm/boot/compressed/head.S
->>> @@ -779,7 +779,7 @@ __armv7_mmu_cache_on:
->>>           orrne    r0, r0, #1        @ MMU enabled
->>>           movne    r1, #0xfffffffd        @ domain 0 = client
->>>           bic     r6, r6, #1 << 31        @ 32-bit translation system
->>
->> Hmm, if TTBCR.EAE _was_ actually set...
->>
->>> -        bic     r6, r6, #3 << 0         @ use only ttbr0
->>> +        bic     r6, r6, #(7 << 0) | (1 << 4)    @ use only ttbr0
->>>           mcrne    p15, 0, r3, c2, c0, 0    @ load page table pointer
->>>           mcrne    p15, 0, r1, c3, c0, 0    @ load domain access control
->>>           mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
->>
->> ...then strictly the TLBIALL needs to happen after the ISB following
->> this update. Otherwise per B3.10.2 of DDI406C.c I think we might be into
->> unpredictable territory - i.e. if the TLB happens to treat long- and
->> short-descriptor entries differently then the TLBI beforehand (with EAE
->> set) may be at liberty to only discard long-descriptor entries and leave
->> bogus short-descriptor entries sitting around.
-> Yes, it seems this has to be taken care of, along with resetting
-> TTBCR.PD0 and TTBCR.N. Do you say that this needs to be done in the same
-> patch or a different one?
->>
->> In other words, something like (completely untested):
->>
->> ---8<---
->> diff --git a/arch/arm/boot/compressed/head.S
->> b/arch/arm/boot/compressed/head.S
->> index af11c2f8f3b7..536b7781024a 100644
->> --- a/arch/arm/boot/compressed/head.S
->> +++ b/arch/arm/boot/compressed/head.S
->> @@ -764,7 +764,6 @@ __armv7_mmu_cache_on:
->>                  mov     r0, #0
->>                  mcr     p15, 0, r0, c7, c10, 4  @ drain write buffer
->>                  tst     r11, #0xf               @ VMSA
->> -               mcrne   p15, 0, r0, c8, c7, 0   @ flush I,D TLBs
->
-> Shouldn't this be still there for the same reason you explained above? I
-> mean to discard the long descriptor entries when EAE was 1 (before we
-> reset it).
->>   #endif
->>                  mrc     p15, 0, r0, c1, c0, 0   @ read control reg
->>                  bic     r0, r0, #1 << 28        @ clear SCTLR.TRE
->> @@ -783,8 +782,11 @@ __armv7_mmu_cache_on:
->>                  mcrne   p15, 0, r3, c2, c0, 0   @ load page table
->> pointer
->>                  mcrne   p15, 0, r1, c3, c0, 0   @ load domain access
->> control
->>                  mcrne   p15, 0, r6, c2, c0, 2   @ load ttb control
->> -#endif
->>                  mcr     p15, 0, r0, c7, c5, 4   @ ISB
->> +               mcrne   p15, 0, r0, c8, c7, 0   @ flush I,D TLBs
->> +#else
->> +               mcr     p15, 0, r0, c7, c5, 4   @ ISB
->> +#endif
->>                  mcr     p15, 0, r0, c1, c0, 0   @ load control register
->>                  mrc     p15, 0, r0, c1, c0, 0   @ and read it back
->> ---8<---
->>
->> Robin.
->>
-> i have tested this change (flush I, D, TLBs after TTB control is
-> written) and don't see any issue. But on my setup decompression is
-> successful even without this (probably not hitting the case in discussion).
->
->
-> Thanks,
-> -- Srinivas R
->
+On Tue, 2016-09-27 at 01:07 +0300, Vladimir Zapolskiy wrote:
+> Hi Sylvain,
+> 
+> On 26.09.2016 21:47, Sylvain Lemieux wrote:
+> > From: Sylvain Lemieux <slemieux@tycoint.com>
+> > 
+> > There is no need to define the "pwm-cells" in the board
+> > specific dts file; move the entry to the base dts file.
+> > 
+> > Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> > ---
+> > Note:
+> > * This patch should be apply after
+> >   "ARM: dts: lpc32xx: set default parent clock for pwm1 & pwm2"
+> >   http://www.spinics.net/lists/arm-kernel/msg530277.html
+> >   - There is no dependency between the patches.
+> > 
+> >  arch/arm/boot/dts/lpc32xx.dtsi | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+[...] 
+> 
+> that's something I have done locally and in a different manner, but I haven't
+> published it yet, please find below a draft.
+> 
+> First of all from multiple places in the User's Manual you can find that there
+> are "two single output PWM blocks" or "the LPC32x0 provides two 8-bit PWMs" etc.
+> 
+> In this case it does not make sense to set PWM cells to 2 (there is only one
+> channel), and 1 cell for frequency is good enough, and that's the proposed
+> change to support it:
+> 
+> diff --git a/drivers/pwm/pwm-lpc32xx.c b/drivers/pwm/pwm-lpc32xx.c
+> index a9b3cff..447ae44 100644
+> --- a/drivers/pwm/pwm-lpc32xx.c
+> +++ b/drivers/pwm/pwm-lpc32xx.c
+> @@ -99,6 +99,22 @@ static const struct pwm_ops lpc32xx_pwm_ops = {
+>  	.owner = THIS_MODULE,
+>  };
+>  
+> +static struct pwm_device *lpc32xx_pwm_of_xlate(struct pwm_chip *pc,
+> +				       const struct of_phandle_args *args)
+> +{
+> +	struct pwm_device *pwm;
+> +
+> +	pwm = pwm_request_from_chip(pc, 0, NULL);
+> +	if (IS_ERR(pwm))
+> +		return pwm;
+> +
+> +	pwm->args.period = args->args[0];
+> +
+> +	return pwm;
+> +}
+> +
+>  static int lpc32xx_pwm_probe(struct platform_device *pdev)
+>  {
+>  	struct lpc32xx_pwm_chip *lpc32xx;
+> @@ -123,6 +139,8 @@ static int lpc32xx_pwm_probe(struct platform_device *pdev)
+>  	lpc32xx->chip.ops = &lpc32xx_pwm_ops;
+>  	lpc32xx->chip.npwm = 1;
+>  	lpc32xx->chip.base = -1;
+> +	lpc32xx->chip.of_xlate = lpc32xx_pwm_of_xlate;
+> +	lpc32xx->chip.of_pwm_n_cells = 1;
+>  
+>  	ret = pwmchip_add(&lpc32xx->chip);
+>  	if (ret < 0) {
+> 
+> 
+> What is your opinion about this proposal?
+> 
+I agree with you, this clean-up make sense; the PWM cell should be 1.
 
-Would like your feedback on the above. Can we get the TTBCR fix merged 
-first?(will send final patch with Russell Kings comments fixed)
+> If this change is applied, then lpc32xx.dtsi should contain #pwm-cells = <1>.
+> 
+Can you submit your change on the mailing list?
+I will send a version 2 of this patch after.
 
-For testing the TLB flush change we may have to check if we can create a 
-failure case.
+If it is helping, I can take care of submitting a patch
+to update the documentation (lpc32xx-pwm.txt).
 
-Thanks,
--- Srinivas R
+Did you have a change to look at the 2 others PWM related change:
+* clk: lpc32xx: fix pwm clock divider computation
+  http://www.spinics.net/lists/arm-kernel/msg534048.html
+* ARM: dts: lpc32xx: set pwm1 & pwm2 default clock rate
+  http://www.spinics.net/lists/arm-kernel/msg534051.html
+ 
+> --
+> With best wishes,
+> Vladimir
 
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, 
-Inc., is a member of Code Aurora Forum, a Linux Foundation Collaborative 
-Project.
+Sylvain
