@@ -1,119 +1,136 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:43 +0200
-Subject: [PULL 35/50] arm64: KVM: Inject a vSerror if detecting a bad GICV
- access at EL2
+Date: Tue, 27 Sep 2016 20:05:24 +0200
+Subject: [PULL 16/50] arm64: KVM: vgic-v2: Enable GICV access from HYP if
+ access from guest is unsafe
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-36-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-17-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-If, when proxying a GICV access at EL2, we detect that the guest is
-doing something silly, report an EL1 SError instead ofgnoring the
-access.
+So far, we've been disabling KVM on systems where the GICV region couldn't
+be safely given to a guest. Now that we're able to handle this access
+safely by emulating it in HYP, we can enable this feature when we detect
+an unsafe configuration.
 
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_hyp.h |  2 +-
- arch/arm64/kvm/hyp/switch.c      | 18 +++++++++++++++---
- virt/kvm/arm/hyp/vgic-v2-sr.c    | 21 ++++++++++++++++-----
- 3 files changed, 32 insertions(+), 9 deletions(-)
+ virt/kvm/arm/vgic/vgic-v2.c | 69 +++++++++++++++++++++++++++------------------
+ 1 file changed, 42 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index 88ec3ac..b18e852 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -123,7 +123,7 @@ typeof(orig) * __hyp_text fname(void)					\
- 
- void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
- void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
--bool __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
-+int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
- 
- void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
- void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 8b81cc6..731519c 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -311,9 +311,21 @@ again:
- 			!kvm_vcpu_dabt_isextabt(vcpu) &&
- 			!kvm_vcpu_dabt_iss1tw(vcpu);
- 
--		if (valid && __vgic_v2_perform_cpuif_access(vcpu)) {
--			__skip_instr(vcpu);
--			goto again;
-+		if (valid) {
-+			int ret = __vgic_v2_perform_cpuif_access(vcpu);
-+
-+			if (ret == 1) {
-+				__skip_instr(vcpu);
-+				goto again;
-+			}
-+
-+			if (ret == -1) {
-+				/* Promote an illegal access to an SError */
-+				__skip_instr(vcpu);
-+				exit_code = ARM_EXCEPTION_EL1_SERROR;
-+			}
-+
-+			/* 0 falls through to be handler out of EL2 */
- 		}
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index b8da901..0a063af 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -278,12 +278,14 @@ int vgic_v2_map_resources(struct kvm *kvm)
+ 		goto out;
  	}
  
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index a052f20..c8aeb7b 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -170,7 +170,18 @@ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
- }
- 
- #ifdef CONFIG_ARM64
--bool __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
-+/*
-+ * __vgic_v2_perform_cpuif_access -- perform a GICV access on behalf of the
-+ *				     guest.
-+ *
-+ * @vcpu: the offending vcpu
-+ *
-+ * Returns:
-+ *  1: GICV access successfully performed
-+ *  0: Not a GICV access
-+ * -1: Illegal GICV access
-+ */
-+int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
-@@ -185,15 +196,15 @@ bool __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 	/* If not for GICV, move on */
- 	if (fault_ipa <  vgic->vgic_cpu_base ||
- 	    fault_ipa >= (vgic->vgic_cpu_base + KVM_VGIC_V2_CPU_SIZE))
--		return false;
-+		return 0;
- 
- 	/* Reject anything but a 32bit access */
- 	if (kvm_vcpu_dabt_get_as(vcpu) != sizeof(u32))
--		return false;
-+		return -1;
- 
- 	/* Not aligned? Don't bother */
- 	if (fault_ipa & 3)
--		return false;
-+		return -1;
- 
- 	rd = kvm_vcpu_dabt_get_rd(vcpu);
- 	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
-@@ -210,6 +221,6 @@ bool __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 							       sizeof(u32)));
+-	ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
+-				    kvm_vgic_global_state.vcpu_base,
+-				    KVM_VGIC_V2_CPU_SIZE, true);
+-	if (ret) {
+-		kvm_err("Unable to remap VGIC CPU to VCPU\n");
+-		goto out;
++	if (!static_branch_unlikely(&vgic_v2_cpuif_trap)) {
++		ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
++					    kvm_vgic_global_state.vcpu_base,
++					    KVM_VGIC_V2_CPU_SIZE, true);
++		if (ret) {
++			kvm_err("Unable to remap VGIC CPU to VCPU\n");
++			goto out;
++		}
  	}
  
--	return true;
-+	return 1;
+ 	dist->ready = true;
+@@ -312,45 +314,51 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 		return -ENXIO;
+ 	}
+ 
+-	if (!PAGE_ALIGNED(info->vcpu.start)) {
+-		kvm_err("GICV physical address 0x%llx not page aligned\n",
+-			(unsigned long long)info->vcpu.start);
+-		return -ENXIO;
+-	}
++	if (!PAGE_ALIGNED(info->vcpu.start) ||
++	    !PAGE_ALIGNED(resource_size(&info->vcpu))) {
++		kvm_info("GICV region size/alignment is unsafe, using trapping (reduced performance)\n");
++		kvm_vgic_global_state.vcpu_base_va = ioremap(info->vcpu.start,
++							     resource_size(&info->vcpu));
++		if (!kvm_vgic_global_state.vcpu_base_va) {
++			kvm_err("Cannot ioremap GICV\n");
++			return -ENOMEM;
++		}
+ 
+-	if (!PAGE_ALIGNED(resource_size(&info->vcpu))) {
+-		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+-			(unsigned long long)resource_size(&info->vcpu),
+-			PAGE_SIZE);
+-		return -ENXIO;
++		ret = create_hyp_io_mappings(kvm_vgic_global_state.vcpu_base_va,
++					     kvm_vgic_global_state.vcpu_base_va + resource_size(&info->vcpu),
++					     info->vcpu.start);
++		if (ret) {
++			kvm_err("Cannot map GICV into hyp\n");
++			goto out;
++		}
++
++		static_branch_enable(&vgic_v2_cpuif_trap);
+ 	}
+ 
+ 	kvm_vgic_global_state.vctrl_base = ioremap(info->vctrl.start,
+ 						   resource_size(&info->vctrl));
+ 	if (!kvm_vgic_global_state.vctrl_base) {
+ 		kvm_err("Cannot ioremap GICH\n");
+-		return -ENOMEM;
++		ret = -ENOMEM;
++		goto out;
+ 	}
+ 
+ 	vtr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VTR);
+ 	kvm_vgic_global_state.nr_lr = (vtr & 0x3f) + 1;
+ 
+-	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
+-	if (ret) {
+-		kvm_err("Cannot register GICv2 KVM device\n");
+-		iounmap(kvm_vgic_global_state.vctrl_base);
+-		return ret;
+-	}
+-
+ 	ret = create_hyp_io_mappings(kvm_vgic_global_state.vctrl_base,
+ 				     kvm_vgic_global_state.vctrl_base +
+ 					 resource_size(&info->vctrl),
+ 				     info->vctrl.start);
+ 	if (ret) {
+ 		kvm_err("Cannot map VCTRL into hyp\n");
+-		kvm_unregister_device_ops(KVM_DEV_TYPE_ARM_VGIC_V2);
+-		iounmap(kvm_vgic_global_state.vctrl_base);
+-		return ret;
++		goto out;
++	}
++
++	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++	if (ret) {
++		kvm_err("Cannot register GICv2 KVM device\n");
++		goto out;
+ 	}
+ 
+ 	kvm_vgic_global_state.can_emulate_gicv2 = true;
+@@ -361,4 +369,11 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 	kvm_info("vgic-v2@%llx\n", info->vctrl.start);
+ 
+ 	return 0;
++out:
++	if (kvm_vgic_global_state.vctrl_base)
++		iounmap(kvm_vgic_global_state.vctrl_base);
++	if (kvm_vgic_global_state.vcpu_base_va)
++		iounmap(kvm_vgic_global_state.vcpu_base_va);
++
++	return ret;
  }
- #endif
 -- 
 2.9.0
