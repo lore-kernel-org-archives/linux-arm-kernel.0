@@ -1,73 +1,48 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:18 +0200
-Subject: [PULL 10/50] arm64: KVM: Move kvm_vcpu_get_condition out of emulate.c
+Date: Tue, 27 Sep 2016 20:05:13 +0200
+Subject: [PULL 05/50] KVM: arm: vgic: Drop build compatibility hack for older
+ kernel versions
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-11-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-6-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-In order to make emulate.c more generic, move the arch-specific
-manupulation bits out of emulate.c.
+As kvm_set_routing_entry() was changing prototype between 4.7 and 4.8,
+an ugly hack was put in place in order to survive both building in
+-next and the merge window.
+
+Now that everything has been merged, let's dump the compatibility
+hack for good.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_emulate.h | 10 ++++++++++
- arch/arm64/kvm/emulate.c             | 11 -----------
- 2 files changed, 10 insertions(+), 11 deletions(-)
+ virt/kvm/arm/vgic/vgic-irqfd.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 4cdeae3..b336434d 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -147,6 +147,16 @@ static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
- 	return vcpu->arch.fault.esr_el2;
- }
- 
-+static inline int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
-+{
-+	u32 esr = kvm_vcpu_get_hsr(vcpu);
-+
-+	if (esr & ESR_ELx_CV)
-+		return (esr & ESR_ELx_COND_MASK) >> ESR_ELx_COND_SHIFT;
-+
-+	return -1;
-+}
-+
- static inline unsigned long kvm_vcpu_get_hfar(const struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
+index b31a51a..d918dcf 100644
+--- a/virt/kvm/arm/vgic/vgic-irqfd.c
++++ b/virt/kvm/arm/vgic/vgic-irqfd.c
+@@ -46,15 +46,9 @@ static int vgic_irqfd_set_irq(struct kvm_kernel_irq_routing_entry *e,
+  * @ue: user api routing entry handle
+  * return 0 on success, -EINVAL on errors.
+  */
+-#ifdef KVM_CAP_X2APIC_API
+ int kvm_set_routing_entry(struct kvm *kvm,
+ 			  struct kvm_kernel_irq_routing_entry *e,
+ 			  const struct kvm_irq_routing_entry *ue)
+-#else
+-/* Remove this version and the ifdefery once merged into 4.8 */
+-int kvm_set_routing_entry(struct kvm_kernel_irq_routing_entry *e,
+-			  const struct kvm_irq_routing_entry *ue)
+-#endif
  {
- 	return vcpu->arch.fault.far_el2;
-diff --git a/arch/arm64/kvm/emulate.c b/arch/arm64/kvm/emulate.c
-index f87d8fb..40098ad 100644
---- a/arch/arm64/kvm/emulate.c
-+++ b/arch/arm64/kvm/emulate.c
-@@ -22,7 +22,6 @@
-  */
+ 	int r = -EINVAL;
  
- #include <linux/kvm_host.h>
--#include <asm/esr.h>
- #include <asm/kvm_emulate.h>
- 
- /*
-@@ -52,16 +51,6 @@ static const unsigned short cc_map[16] = {
- 	0			/* NV                     */
- };
- 
--static int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
--{
--	u32 esr = kvm_vcpu_get_hsr(vcpu);
--
--	if (esr & ESR_ELx_CV)
--		return (esr & ESR_ELx_COND_MASK) >> ESR_ELx_COND_SHIFT;
--
--	return -1;
--}
--
- /*
-  * Check if a trapped instruction should have been executed or not.
-  */
 -- 
 2.9.0
