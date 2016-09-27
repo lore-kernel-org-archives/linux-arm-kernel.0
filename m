@@ -1,67 +1,96 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 27 Sep 2016 13:13:34 +0530
-Subject: [PATCH V2 0/6] ARM64: Uprobe support added
-Message-ID: <cover.1474960629.git.panand@redhat.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 27 Sep 2016 09:45:28 +0200
+Subject: [PATCHv2 2/3] tty/serial: at91: fix hardware handshake with GPIOs
+In-Reply-To: <20160922132045.tbrd5u56qasaf7gn@pengutronix.de>
+References: <20160912094733.21501-1-richard.genoud@gmail.com>
+ <20160912094733.21501-3-richard.genoud@gmail.com>
+ <20160922132045.tbrd5u56qasaf7gn@pengutronix.de>
+Message-ID: <CACQ1gAjPfM9pN5Y88rum=0a8nfp7VL=FoJCz3bhHxkJj7JdHpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
-* Exposed sync_icache_aliases() and used that in stead of flush_uprobe_xol_access()
-* Assigned 0x0005 to BRK64_ESR_UPROBES in stead of 0x0008
-* moved uprobe_opcode_t from probes.h to uprobes.h
-* Assigned 4 to TIF_UPROBE instead of 5
-* Assigned AARCH64_INSN_SIZE to UPROBE_SWBP_INSN_SIZE instead of hard code 4.
-* Removed saved_fault_code from struct arch_uprobe_task
-* Removed preempt_dis(en)able() from arch_uprobe_copy_ixol()
-* Removed case INSN_GOOD from arch_uprobe_analyze_insn()
-* Now we do check that probe point is not for a 32 bit task.
-* Return a false positive from is_tarp_insn()
-* Changes for rebase conflict resolution
+2016-09-22 15:20 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Mon, Sep 12, 2016 at 11:47:32AM +0200, Richard Genoud wrote:
+>> Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
+>> hardware handshake is enabled") broke the hardware handshake when GPIOs
+>> where used.
+>
+> s/where/were/
+ok.
 
-V1 was here: https://lkml.org/lkml/2016/8/2/29
-Patches have been rebased on next-20160927, so that there would be no
-conflicts with other arm64/for-next/core patches.
+>> Hardware handshake with GPIOs used to work before this commit because
+>> the CRTSCTS flag (termios->c_cflag) was set, but not the
+>> ATMEL_US_USMODE_HWHS flag (controller register) ; so hardware handshake
+>> enabled, but not handled by the controller.
+>>
+>> This commit restores this behaviour.
+>>
+>> NB: -stable is not Cced because it doesn't cleanly apply on 4.1+
+>> and it will also need previous commit:
+>> "serial: mctrl_gpio: implement mctrl_gpio_use_rtscts"
+>>
+>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when hardware handshake is enabled")
+>> ---
+>>  drivers/tty/serial/atmel_serial.c | 11 ++++++++---
+>>  1 file changed, 8 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index 2eaa18ddef61..e9b4fbf88c2d 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -2025,6 +2025,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
+>>  static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>>                             struct ktermios *old)
+>>  {
+>> +     struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>>       unsigned long flags;
+>>       unsigned int old_mode, mode, imr, quot, baud;
+>>
+>> @@ -2126,8 +2127,12 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>>               atmel_uart_writel(port, ATMEL_US_TTGR,
+>>                                 port->rs485.delay_rts_after_send);
+>>               mode |= ATMEL_US_USMODE_RS485;
+>> -     } else if (termios->c_cflag & CRTSCTS) {
+>> -             /* RS232 with hardware handshake (RTS/CTS) */
+>> +     } else if ((termios->c_cflag & CRTSCTS) &&
+>> +                !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
+>
+> IMHO the behaviour of the hw controlled pins shouldn't change when
+> mctrl_gpio is in use (if possible). But I don't understand the issue so
+> I guess you need a better changelog.
+Yes, the behavior of the CTS/RTS pins should the same whenever they
+are GPIOs or not.
+That was the case before commit 1cf6e8fc8341 ("tty/serial: at91: fix
+RTS line management when
+hardware handshake is enabled")
+BUT, this commit (1cf6e8fc834) introduced the actual use of the
+ATMEL_US_USMODE_HWHS flag.
+This flags changes the way RTS/CTS pins are driven, and that's the
+discussion we are having in patch 3/3.
 
-Patches have been tested for following:
-1. Step-able instructions, like sub, ldr, add etc.
-2. Simulation-able like ret, cbnz, cbz etc.
-3. uretprobe
-4. Reject-able instructions like sev, wfe etc.
-5. trapped and abort xol path
-6. probe at unaligned user address.
-7. longjump test cases
+>> +             /*
+>> +              * RS232 with hardware handshake (RTS/CTS)
+>> +              * handled by the controller.
+>> +              */
+>>               if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
+>>                       dev_info(port->dev, "not enabling hardware flow control because DMA is used");
+>>                       termios->c_cflag &= ~CRTSCTS;
+>> @@ -2135,7 +2140,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>>                       mode |= ATMEL_US_USMODE_HWHS;
+>>               }
+>>       } else {
+>> -             /* RS232 without hadware handshake */
+>> +             /* RS232 without hadware handshake or controlled by GPIOs */
+>
+> When touching this line, please also do s/hadware/hardware/.
+ok.
+>
+>>               mode |= ATMEL_US_USMODE_NORMAL;
+>>       }
+>
+> Best regards
+> Uwe
 
-aarch32 task probing is not yet supported.
-
-Pratyush Anand (6):
-  arm64: kprobe: protect/rename few definitions to be reused by uprobe
-  arm64: kgdb_step_brk_fn: ignore other's exception
-  arm64: Handle TRAP_TRACE for user mode as well
-  arm64: Handle TRAP_BRKPT for user mode as well
-  arm64: introduce mm context flag to keep 32 bit task information
-  arm64: Add uprobe support
-
- arch/arm64/Kconfig                      |   3 +
- arch/arm64/include/asm/cacheflush.h     |   1 +
- arch/arm64/include/asm/debug-monitors.h |   3 +
- arch/arm64/include/asm/elf.h            |  12 +-
- arch/arm64/include/asm/mmu.h            |   1 +
- arch/arm64/include/asm/probes.h         |  19 +--
- arch/arm64/include/asm/ptrace.h         |   8 ++
- arch/arm64/include/asm/thread_info.h    |   5 +-
- arch/arm64/include/asm/uprobes.h        |  36 ++++++
- arch/arm64/kernel/debug-monitors.c      |  40 +++---
- arch/arm64/kernel/kgdb.c                |   3 +
- arch/arm64/kernel/probes/Makefile       |   2 +
- arch/arm64/kernel/probes/decode-insn.c  |  32 ++---
- arch/arm64/kernel/probes/decode-insn.h  |   8 +-
- arch/arm64/kernel/probes/kprobes.c      |  36 +++---
- arch/arm64/kernel/probes/uprobes.c      | 221 ++++++++++++++++++++++++++++++++
- arch/arm64/kernel/signal.c              |   3 +
- arch/arm64/mm/flush.c                   |   2 +-
- 18 files changed, 371 insertions(+), 64 deletions(-)
- create mode 100644 arch/arm64/include/asm/uprobes.h
- create mode 100644 arch/arm64/kernel/probes/uprobes.c
-
--- 
-2.7.4
+Thanks.
