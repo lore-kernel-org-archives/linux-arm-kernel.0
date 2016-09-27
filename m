@@ -1,55 +1,34 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 27 Sep 2016 09:28:58 -0400
-Subject: [PATCH 2/2] drm/rockchip: analogix_dp: Refuse to enable PSR if
- panel doesn't support it
-In-Reply-To: <1474639600-30090-2-git-send-email-tomeu.vizoso@collabora.com>
-References: <1474639600-30090-1-git-send-email-tomeu.vizoso@collabora.com>
- <1474639600-30090-2-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAOw6vbL1fDpPbFeePEFqYZ+i0sbbsB+vu7fCC8U88HAj-1D2Ag@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 27 Sep 2016 14:44:25 +0100
+Subject: [PATCH 3/3] coresight: tmc: Remove duplicate memset
+In-Reply-To: <1474983865-11816-1-git-send-email-suzuki.poulose@arm.com>
+References: <1474983865-11816-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1474983865-11816-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 10:06 AM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> There's no point in enabling PSR when the panel doesn't support it.
->
-> This also avoids a problem when PSR gets enabled when a CRTC is being
-> disabled, because sometimes in that situation the DSP_HOLD_VALID_INTR
-> interrupt on which we wait will never arrive. This was observed on
-> RK3288 with a panel without PSR (veyron-jaq Chromebook).
->
-> It's very easy to reproduce by running the kms_rmfb test in IGT a few
-> times.
->
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+The tmc_etr_enable_hw() fills the buffer with 0's before enabling
+the hardware. So, we don't need an explicit memset() in
+tmc_enable_etr_sink_sysfs() before calling the tmc_etr_enable_hw().
+This patch removes the explicit memset from tmc_enable_etr_sink_sysfs.
 
-Thanks for digging into this.
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
-
-
-
-> Cc: Sean Paul <seanpaul@chromium.org>
-> Cc: Yakir Yang <ykk@rock-chips.com>
-> Cc: Archit Taneja <architt@codeaurora.org>
-> ---
->  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> index e83be157cc2a..8548e8271639 100644
-> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> @@ -85,6 +85,9 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
->         struct rockchip_dp_device *dp = to_dp(encoder);
->         unsigned long flags;
->
-> +       if (!analogix_dp_psr_supported(dp->dev))
-> +               return;
-> +
->         dev_dbg(dp->dev, "%s PSR...\n", enabled ? "Entry" : "Exit");
->
->         spin_lock_irqsave(&dp->psr_lock, flags);
-> --
-> 2.7.4
->
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 3b84d0d..5d31269 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -150,8 +150,6 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
+ 		drvdata->buf = drvdata->vaddr;
+ 	}
+ 
+-	memset(drvdata->vaddr, 0, drvdata->size);
+-
+ 	drvdata->mode = CS_MODE_SYSFS;
+ 	tmc_etr_enable_hw(drvdata);
+ out:
+-- 
+2.7.4
