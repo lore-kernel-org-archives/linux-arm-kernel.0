@@ -1,29 +1,86 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 27 Sep 2016 20:46:12 +0200
-Subject: [PATCH 0/4] kill get_clock_tick_rate()
-In-Reply-To: <87twd2bgtl.fsf@belgarion.home> (Robert Jarzmik's message of
- "Mon, 26 Sep 2016 21:29:26 +0200")
-References: <1474312335-20997-1-git-send-email-robert.jarzmik@free.fr>
- <87twd2bgtl.fsf@belgarion.home>
-Message-ID: <87wphx9o5n.fsf@belgarion.home>
+From: jjj@gmx.de (Jan Kandziora)
+Date: Tue, 27 Sep 2016 20:53:21 +0200
+Subject: [PATCH v2 8/8] ARM: bcm2835: Disable i2c2 in the Device Tree
+In-Reply-To: <256118042.194076.147d5d83-f402-4ba4-b7de-4ab57a0e29ad.open-xchange@email.1und1.de>
+References: <1474977426-3272-1-git-send-email-noralf@tronnes.org>
+ <1474977426-3272-9-git-send-email-noralf@tronnes.org>
+ <256118042.194076.147d5d83-f402-4ba4-b7de-4ab57a0e29ad.open-xchange@email.1und1.de>
+Message-ID: <21d33b61-d1a6-feb9-c9e7-ad3f565b6e41@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
->> Hi,
+Am 27.09.2016 um 19:25 schrieb Stefan Wahren:
+> 
+>> Noralf Tr?nnes <noralf@tronnes.org> hat am 27. September 2016 um 13:57
+>> geschrieben:
 >>
->> This serie aims at killing get_clock_tick_rate() from pxa and sa1100 and replace
->> it by clock API calls.
 >>
->> I'd like to have this reviewed and acked afterwards at least by :
->>  - Russell for the mach-sa1100 and sa1100_wdt.c
->>  - Stephen or Michael for the clk-pxa25x.c
->>  - Thomas or Daniel for the clocksource part
->>  - Wim for sa1100_wdt.c
+>> i2c2 is connected to the HDMI connector and is controlled by the
+>> firmware. Disable it to stay out of harms way.
+> 
+> Until this point the commit message is okay, the rest is more confusing.
+> 
+> Btw this should avoid a warning about missing clock frequency.
+> 
+>>
+>> From the downstream commit:
+>> i2c-bcm2708/BCM270X_DT: Add support for I2C2
+>>
+>> The third I2C bus (I2C2) is normally reserved for HDMI use. Careless
+>> use of this bus can break an attached display - use with caution.
+>>
+>> It is recommended to disable accesses by VideoCore by setting
+>> hdmi_ignore_edid=1 or hdmi_edid_file=1 in config.txt.
+>>
+>> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
+>> ---
+>>  arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 ----
+>>  1 file changed, 4 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi
+>> b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+>> index e9b47b2..8bffbee 100644
+>> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
+>> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+>> @@ -59,10 +59,6 @@
+>>  	clock-frequency = <100000>;
+>>  };
+>>  
+>> -&i2c2 {
+>> -	status = "okay";
+>> -};
+>> -
+> 
+> I'm not sure if this the right fix. According to bcm283x.dtsi the 3 i2c busses
+> have the same compatible string "brcm,bcm2835-i2c", but the changelog suggests
+> that this bus is "special".
+> 
+> Shouldn't we use a different compatible string? Our intention isn't to disable
+> i2c2 but avoid any claims of the usual i2c driver.
+> 
+i2c2 should not be generally disabled.
 
-Thanks to all for tests and acks, queued to pxa/for-next.
+There's dtparam=i2c2_iknowwhatimdoing which enables CPU access to this
+bus. It's useful for reading out the monitor EDID by the CPU, and for
+accessing controls (backlight, volume) on certain monitors.
 
-Cheers.
+And I have a I2C touchscreen controller on HDMI DDC.
 
---
-Robert
+
+
+>>  &sdhci {
+>>  	status = "okay";
+>>  	bus-width = <4>;
+>> -- 
+>> 2.8.2
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
