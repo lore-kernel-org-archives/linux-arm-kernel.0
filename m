@@ -1,270 +1,98 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 27 Sep 2016 09:16:59 -0700
-Subject: [PATCH] usb: Convert pr_warning to pr_warn
-Message-ID: <f86b512272987e0faeaccbe6466665175eaefe9a.1474992979.git.joe@perches.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 27 Sep 2016 17:23:29 +0100
+Subject: ARM juno R2 board USB Issue (EHCI probe failed)
+In-Reply-To: <57EA9AAA.5090504@linaro.org>
+References: <AT5PR84MB005284C92DEA45ADF67A4F55D9CC0@AT5PR84MB0052.NAMPRD84.PROD.OUTLOOK.COM>
+ <CAGm_ybhc4DKYkDtE8dVzhC3-kJk138Lbm-zAhepQiyUnuqZQHg@mail.gmail.com>
+ <22e151c5-fc83-a48c-b130-f633fac8674f@arm.com>
+ <AT5PR84MB00524ACD87B9FF61AAB55223D9CC0@AT5PR84MB0052.NAMPRD84.PROD.OUTLOOK.COM>
+ <37a463cb-86d5-e0d7-7e8f-50cec3d65c95@arm.com> <57EA9AAA.5090504@linaro.org>
+Message-ID: <9b231601-2c6a-a5d7-471f-4fc0d8190d83@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the more common logging mechanism.
+On 27/09/16 17:13, Hanjun Guo wrote:
+> On 09/27/2016 05:07 PM, Sudeep Holla wrote:
+>>
+>>
+>> On 27/09/16 09:55, Sajjan, Vikas C wrote:
+>>> Hi Sudeep,
+>>>
+>>> -----Original Message-----
+>>> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
+>>> Sent: Tuesday, September 27, 2016 2:21 PM
+>>> To: Vikas Sajjan <sajjan.linux@gmail.com>; linux-usb at vger.kernel.org;
+>>> linux-arm-kernel at lists.infradead.org; linux-acpi at vger.kernel.org
+>>> Cc: Sudeep Holla <sudeep.holla@arm.com>; mark.rutland at arm.com;
+>>> lorenzo.pieralisi at arm.com; Sajjan, Vikas C <vikas.cha.sajjan@hpe.com>
+>>> Subject: Re: ARM juno R2 board USB Issue (EHCI probe failed)
+>>>
+>>> Hi Vikas,
+>>>
+>>> On 27/09/16 09:14, Vikas Sajjan wrote:
+>>>> Adding USB mailing list.
+>>>>
+>>>>
+>>>> On Tue, Sep 27, 2016 at 12:33 PM, Sajjan, Vikas C
+>>>> <vikas.cha.sajjan@hpe.com> wrote:
+>>>>> Hi All,
+>>>>>
+>>>>> I working on ARM juno R2 board, with latest kernel 4.8.rc7 and I get
+>>>>> below USB EHCI probe error while booting with acpi=force.
+>>>>>
+>>>
+>>> Are you using the latest UEFI EDK2 ?
+>>> No, I am still using the UEFI binary which came as part of the Juno
+>>> board.
+>>>
+>>>
+>>>>> [    1.223662] VFIO - User Level meta-driver version: 0.3
+>>>>> [    1.229335] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI)
+>>>>> Driver
+>>>>> [    1.235882] ehci-pci: EHCI PCI platform driver
+>>>>> [    1.240359] ehci-platform: EHCI generic platform driver
+>>>>> [    1.245619] ehci-platform ARMH0D20:00: Error: DMA mask
+>>>>> configuration failed
+>>>>> [    1.272491] ehci-platform: probe of ARMH0D20:00 failed with
+>>>>> error -5
+>>>>> [    1.278876] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+>>>>> [    1.285071] ohci-pci: OHCI PCI platform driver
+>>>>> [    1.289548] ohci-platform: OHCI generic platform driver
+>>>>> [    1.294884] usbcore: registered new interface driver usb-storage
+>>>>> [    1.301231] mousedev: PS/2 mouse device common for all mice
+>>>>> [    1.307197] rtc-efi rtc-efi: rtc core: registered rtc-efi as rtc0
+>>>>>
+>>>>> But this error goes off, if I don't force ACPI booting, i.e., if I
+>>>>> remove acpi=force from kernel command line , USB is detected  and my
+>>>>> RFS which is in the usb drive, gets mounted successfully.
+>>>>>
+>>>
+>>> As I mentioned in private, I do get the same error if I drop _CCA in
+>>> USB object of ACPI DSDT. Can you give it a spin with latest UEFI ?
+>>>
+>>> Sure, will try with latest UEFI.
+>>>
+>>
+>> I bet that's 8-12 months old. It puts the banner during boot with the
+>> build date. You can try to follow [1] or access it from [2]
+> 
+> Agree.
+> 
+> D03 is using the same IP (EHCI) and the USB works fine with _CCA
+> in the device node.
 
-Miscellanea:
+_CCA is mandatory on arm64 (see CONFIG_ACPI_CCA_REQUIRED). Any devices
+without it are going to end up with the dummy DMA ops which
+intentionally fail if a driver tries to use them - i.e. the error seen
+above is by design.
 
-o Realign multiline statements
-o Coalesce format
+Robin.
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- drivers/usb/gadget/function/rndis.c     |  9 ++++-----
- drivers/usb/gadget/function/u_serial.c  |  4 ++--
- drivers/usb/gadget/udc/at91_udc.h       |  2 +-
- drivers/usb/gadget/udc/atmel_usba_udc.c |  4 ++--
- drivers/usb/gadget/udc/fsl_usb2_udc.h   |  2 +-
- drivers/usb/gadget/udc/m66592-udc.c     |  4 ++--
- drivers/usb/gadget/udc/omap_udc.h       |  2 +-
- drivers/usb/gadget/udc/pxa25x_udc.h     |  2 +-
- drivers/usb/host/isp1362-hcd.c          | 27 ++++++++++++++-------------
- drivers/usb/isp1760/isp1760-if.c        |  2 +-
- 10 files changed, 29 insertions(+), 29 deletions(-)
-
-diff --git a/drivers/usb/gadget/function/rndis.c b/drivers/usb/gadget/function/rndis.c
-index ab6ac1b74ac0..766c328c15c0 100644
---- a/drivers/usb/gadget/function/rndis.c
-+++ b/drivers/usb/gadget/function/rndis.c
-@@ -474,8 +474,7 @@ static int gen_ndis_query_resp(struct rndis_params *params, u32 OID, u8 *buf,
- 		break;
- 
- 	default:
--		pr_warning("%s: query unknown OID 0x%08X\n",
--			 __func__, OID);
-+		pr_warn("%s: query unknown OID 0x%08X\n", __func__, OID);
- 	}
- 	if (retval < 0)
- 		length = 0;
-@@ -546,8 +545,8 @@ static int gen_ndis_set_resp(struct rndis_params *params, u32 OID,
- 		break;
- 
- 	default:
--		pr_warning("%s: set unknown OID 0x%08X, size %d\n",
--			 __func__, OID, buf_len);
-+		pr_warn("%s: set unknown OID 0x%08X, size %d\n",
-+			__func__, OID, buf_len);
- 	}
- 
- 	return retval;
-@@ -854,7 +853,7 @@ int rndis_msg_parser(struct rndis_params *params, u8 *buf)
- 		 * In one case those messages seemed to relate to the host
- 		 * suspending itself.
- 		 */
--		pr_warning("%s: unknown RNDIS message 0x%08X len %d\n",
-+		pr_warn("%s: unknown RNDIS message 0x%08X len %d\n",
- 			__func__, MsgType, MsgLength);
- 		print_hex_dump_bytes(__func__, DUMP_PREFIX_OFFSET,
- 				     buf, MsgLength);
-diff --git a/drivers/usb/gadget/function/u_serial.c b/drivers/usb/gadget/function/u_serial.c
-index e0cd1e4c8892..62ec842874aa 100644
---- a/drivers/usb/gadget/function/u_serial.c
-+++ b/drivers/usb/gadget/function/u_serial.c
-@@ -622,8 +622,8 @@ static void gs_write_complete(struct usb_ep *ep, struct usb_request *req)
- 	switch (req->status) {
- 	default:
- 		/* presumably a transient fault */
--		pr_warning("%s: unexpected %s status %d\n",
--				__func__, ep->name, req->status);
-+		pr_warn("%s: unexpected %s status %d\n",
-+			__func__, ep->name, req->status);
- 		/* FALL THROUGH */
- 	case 0:
- 		/* normal completion */
-diff --git a/drivers/usb/gadget/udc/at91_udc.h b/drivers/usb/gadget/udc/at91_udc.h
-index 0a433e6b346b..9bbe72764f31 100644
---- a/drivers/usb/gadget/udc/at91_udc.h
-+++ b/drivers/usb/gadget/udc/at91_udc.h
-@@ -175,7 +175,7 @@ struct at91_request {
- #endif
- 
- #define ERR(stuff...)		pr_err("udc: " stuff)
--#define WARNING(stuff...)	pr_warning("udc: " stuff)
-+#define WARNING(stuff...)	pr_warn("udc: " stuff)
- #define INFO(stuff...)		pr_info("udc: " stuff)
- #define DBG(stuff...)		pr_debug("udc: " stuff)
- 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 45bc997d0711..1ef7a9a9d7f5 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -1464,8 +1464,8 @@ static void usba_control_irq(struct usba_udc *udc, struct usba_ep *ep)
- 		pkt_len = USBA_BFEXT(BYTE_COUNT, usba_ep_readl(ep, STA));
- 		DBG(DBG_HW, "Packet length: %u\n", pkt_len);
- 		if (pkt_len != sizeof(crq)) {
--			pr_warning("udc: Invalid packet length %u "
--				"(expected %zu)\n", pkt_len, sizeof(crq));
-+			pr_warn("udc: Invalid packet length %u (expected %zu)\n",
-+				pkt_len, sizeof(crq));
- 			set_protocol_stall(udc, ep);
- 			return;
- 		}
-diff --git a/drivers/usb/gadget/udc/fsl_usb2_udc.h b/drivers/usb/gadget/udc/fsl_usb2_udc.h
-index 84715625b2b3..e92b8408b6f6 100644
---- a/drivers/usb/gadget/udc/fsl_usb2_udc.h
-+++ b/drivers/usb/gadget/udc/fsl_usb2_udc.h
-@@ -554,7 +554,7 @@ static void dump_msg(const char *label, const u8 * buf, unsigned int length)
- #endif
- 
- #define ERR(stuff...)		pr_err("udc: " stuff)
--#define WARNING(stuff...)		pr_warning("udc: " stuff)
-+#define WARNING(stuff...)	pr_warn("udc: " stuff)
- #define INFO(stuff...)		pr_info("udc: " stuff)
- 
- /*-------------------------------------------------------------------------*/
-diff --git a/drivers/usb/gadget/udc/m66592-udc.c b/drivers/usb/gadget/udc/m66592-udc.c
-index 6e977dc22570..de3e03483659 100644
---- a/drivers/usb/gadget/udc/m66592-udc.c
-+++ b/drivers/usb/gadget/udc/m66592-udc.c
-@@ -637,7 +637,7 @@ static void init_controller(struct m66592 *m66592)
- 			clock = M66592_XTAL48;
- 			break;
- 		default:
--			pr_warning("m66592-udc: xtal configuration error\n");
-+			pr_warn("m66592-udc: xtal configuration error\n");
- 			clock = 0;
- 		}
- 
-@@ -649,7 +649,7 @@ static void init_controller(struct m66592 *m66592)
- 			irq_sense = 0;
- 			break;
- 		default:
--			pr_warning("m66592-udc: irq trigger config error\n");
-+			pr_warn("m66592-udc: irq trigger config error\n");
- 			irq_sense = 0;
- 		}
- 
-diff --git a/drivers/usb/gadget/udc/omap_udc.h b/drivers/usb/gadget/udc/omap_udc.h
-index cfadeb5fc5de..26974196cf44 100644
---- a/drivers/usb/gadget/udc/omap_udc.h
-+++ b/drivers/usb/gadget/udc/omap_udc.h
-@@ -187,7 +187,7 @@ struct omap_udc {
- #endif
- 
- #define ERR(stuff...)		pr_err("udc: " stuff)
--#define WARNING(stuff...)	pr_warning("udc: " stuff)
-+#define WARNING(stuff...)	pr_warn("udc: " stuff)
- #define INFO(stuff...)		pr_info("udc: " stuff)
- #define DBG(stuff...)		pr_debug("udc: " stuff)
- 
-diff --git a/drivers/usb/gadget/udc/pxa25x_udc.h b/drivers/usb/gadget/udc/pxa25x_udc.h
-index 4b8b72d7ab37..a458bec2536d 100644
---- a/drivers/usb/gadget/udc/pxa25x_udc.h
-+++ b/drivers/usb/gadget/udc/pxa25x_udc.h
-@@ -248,7 +248,7 @@ dump_state(struct pxa25x_udc *dev)
- #define DBG(lvl, stuff...) do{if ((lvl) <= UDC_DEBUG) DMSG(stuff);}while(0)
- 
- #define ERR(stuff...)		pr_err("udc: " stuff)
--#define WARNING(stuff...)	pr_warning("udc: " stuff)
-+#define WARNING(stuff...)	pr_warn("udc: " stuff)
- #define INFO(stuff...)		pr_info("udc: " stuff)
- 
- 
-diff --git a/drivers/usb/host/isp1362-hcd.c b/drivers/usb/host/isp1362-hcd.c
-index 6cf82ee460a6..0f2b4b358e1a 100644
---- a/drivers/usb/host/isp1362-hcd.c
-+++ b/drivers/usb/host/isp1362-hcd.c
-@@ -147,7 +147,7 @@ static inline struct isp1362_ep_queue *get_ptd_queue(struct isp1362_hcd *isp1362
- 	if (epq)
- 		DBG(1, "%s: PTD $%04x is on %s queue\n", __func__, offset, epq->name);
- 	else
--		pr_warning("%s: invalid PTD $%04x\n", __func__, offset);
-+		pr_warn("%s: invalid PTD $%04x\n", __func__, offset);
- 
- 	return epq;
- }
-@@ -157,8 +157,9 @@ static inline int get_ptd_offset(struct isp1362_ep_queue *epq, u8 index)
- 	int offset;
- 
- 	if (index * epq->blk_size > epq->buf_size) {
--		pr_warning("%s: Bad %s index %d(%d)\n", __func__, epq->name, index,
--		     epq->buf_size / epq->blk_size);
-+		pr_warn("%s: Bad %s index %d(%d)\n",
-+			__func__, epq->name, index,
-+			epq->buf_size / epq->blk_size);
- 		return -EINVAL;
- 	}
- 	offset = epq->buf_start + index * epq->blk_size;
-@@ -902,8 +903,8 @@ static void start_iso_transfers(struct isp1362_hcd *isp1362_hcd)
- 
- 			ptd_offset = next_ptd(epq, ep);
- 			if (ptd_offset < 0) {
--				pr_warning("%s: req %d No more %s PTD buffers available\n", __func__,
--				     ep->num_req, epq->name);
-+				pr_warn("%s: req %d No more %s PTD buffers available\n",
-+					__func__, ep->num_req, epq->name);
- 				break;
- 			}
- 		}
-@@ -973,8 +974,8 @@ static void finish_transfers(struct isp1362_hcd *isp1362_hcd, unsigned long done
- 			break;
- 	}
- 	if (done_map)
--		pr_warning("%s: done_map not clear: %08lx:%08lx\n", __func__, done_map,
--		     epq->skip_map);
-+		pr_warn("%s: done_map not clear: %08lx:%08lx\n",
-+			__func__, done_map, epq->skip_map);
- 	atomic_dec(&epq->finishing);
- }
- 
-@@ -1433,7 +1434,7 @@ static int isp1362_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
- 		} else
- 			DBG(1, "%s: urb %p active; wait4irq\n", __func__, urb);
- 	} else {
--		pr_warning("%s: No EP in URB %p\n", __func__, urb);
-+		pr_warn("%s: No EP in URB %p\n", __func__, urb);
- 		retval = -EINVAL;
- 	}
- done:
-@@ -1748,10 +1749,10 @@ static int isp1362_bus_suspend(struct usb_hcd *hcd)
- 		/* FALL THROUGH */
- 	case OHCI_USB_RESET:
- 		status = -EBUSY;
--		pr_warning("%s: needs reinit!\n", __func__);
-+		pr_warn("%s: needs reinit!\n", __func__);
- 		goto done;
- 	case OHCI_USB_SUSPEND:
--		pr_warning("%s: already suspended?\n", __func__);
-+		pr_warn("%s: already suspended?\n", __func__);
- 		goto done;
- 	}
- 	DBG(0, "%s: suspend root hub\n", __func__);
-@@ -1839,7 +1840,7 @@ static int isp1362_bus_resume(struct usb_hcd *hcd)
- 	isp1362_hcd->hc_control = isp1362_read_reg32(isp1362_hcd, HCCONTROL);
- 	pr_info("%s: HCCONTROL: %08x\n", __func__, isp1362_hcd->hc_control);
- 	if (hcd->state == HC_STATE_RESUMING) {
--		pr_warning("%s: duplicate resume\n", __func__);
-+		pr_warn("%s: duplicate resume\n", __func__);
- 		status = 0;
- 	} else
- 		switch (isp1362_hcd->hc_control & OHCI_CTRL_HCFS) {
-@@ -2474,8 +2475,8 @@ static int isp1362_chip_test(struct isp1362_hcd *isp1362_hcd)
- 					    __func__, offset);
- 					break;
- 				}
--				pr_warning("%s: memory check with offset %02x ok after second read\n",
--				     __func__, offset);
-+				pr_warn("%s: memory check with offset %02x ok after second read\n",
-+					__func__, offset);
- 			}
- 		}
- 		kfree(ref);
-diff --git a/drivers/usb/isp1760/isp1760-if.c b/drivers/usb/isp1760/isp1760-if.c
-index 9535b2872183..79205b31e4a9 100644
---- a/drivers/usb/isp1760/isp1760-if.c
-+++ b/drivers/usb/isp1760/isp1760-if.c
-@@ -197,7 +197,7 @@ static int isp1760_plat_probe(struct platform_device *pdev)
- 
- 	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 	if (!irq_res) {
--		pr_warning("isp1760: IRQ resource not available\n");
-+		pr_warn("isp1760: IRQ resource not available\n");
- 		return -ENODEV;
- 	}
- 	irqflags = irq_res->flags & IRQF_TRIGGER_MASK;
--- 
-2.10.0.rc2.1.g053435c
+> 
+> Thanks
+> Hanjun
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
