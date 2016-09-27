@@ -1,40 +1,66 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 27 Sep 2016 13:17:56 +0530
-Subject: [PATCH V2 2/6] arm64: kgdb_step_brk_fn: ignore other's exception
+Date: Tue, 27 Sep 2016 13:17:57 +0530
+Subject: [PATCH V2 3/6] arm64: Handle TRAP_TRACE for user mode as well
 In-Reply-To: <cover.1474960629.git.panand@redhat.com>
 References: <cover.1474960629.git.panand@redhat.com>
-Message-ID: <60aa43dad279e0f35b91def7fb7a60562f3ebb50.1474960629.git.panand@redhat.com>
+Message-ID: <fa1ba7b617633efe53a16cc0e438e03472784061.1474960629.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 step exception does not have any syndrome information. So, it is
-responsibility of exception handler to take care that they handle it
-only if exception was raised for them.
-
-Since kgdb_step_brk_fn() always returns 0, therefore we might have problem
-when we will have other step handler registered as well.
-
-This patch fixes kgdb_step_brk_fn() to return error in case of step handler
-was not meant for kgdb.
+uprobe registers a handler at step_hook. So, single_step_handler now
+checks for user mode as well if there is a valid hook.
 
 Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- arch/arm64/kernel/kgdb.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/kernel/debug-monitors.c | 22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index e017a9493b92..d217c9e95b06 100644
---- a/arch/arm64/kernel/kgdb.c
-+++ b/arch/arm64/kernel/kgdb.c
-@@ -247,6 +247,9 @@ NOKPROBE_SYMBOL(kgdb_compiled_brk_fn);
- 
- static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 73ae90ef434c..a8f8de012250 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -226,6 +226,8 @@ static void send_user_sigtrap(int si_code)
+ static int single_step_handler(unsigned long addr, unsigned int esr,
+ 			       struct pt_regs *regs)
  {
-+	if (!kgdb_single_step)
-+		return DBG_HOOK_ERROR;
++	bool handler_found = false;
 +
- 	kgdb_handle_exception(1, SIGTRAP, 0, regs);
- 	return 0;
- }
+ 	/*
+ 	 * If we are stepping a pending breakpoint, call the hw_breakpoint
+ 	 * handler first.
+@@ -233,7 +235,14 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+ 	if (!reinstall_suspended_bps(regs))
+ 		return 0;
+ 
+-	if (user_mode(regs)) {
++#ifdef	CONFIG_KPROBES
++	if (kprobe_single_step_handler(regs, esr) == DBG_HOOK_HANDLED)
++		handler_found = true;
++#endif
++	if (!handler_found && call_step_hook(regs, esr) == DBG_HOOK_HANDLED)
++		handler_found = true;
++
++	if (!handler_found && user_mode(regs)) {
+ 		send_user_sigtrap(TRAP_TRACE);
+ 
+ 		/*
+@@ -243,15 +252,8 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
+ 		 * to the active-not-pending state).
+ 		 */
+ 		user_rewind_single_step(current);
+-	} else {
+-#ifdef	CONFIG_KPROBES
+-		if (kprobe_single_step_handler(regs, esr) == DBG_HOOK_HANDLED)
+-			return 0;
+-#endif
+-		if (call_step_hook(regs, esr) == DBG_HOOK_HANDLED)
+-			return 0;
+-
+-		pr_warning("Unexpected kernel single-step exception at EL1\n");
++	} else if (!handler_found) {
++		pr_warn("Unexpected kernel single-step exception at EL1\n");
+ 		/*
+ 		 * Re-enable stepping since we know that we will be
+ 		 * returning to regs.
 -- 
 2.7.4
