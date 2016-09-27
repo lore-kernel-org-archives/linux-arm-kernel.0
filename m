@@ -1,95 +1,43 @@
 From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Tue, 27 Sep 2016 13:56:59 +0200
-Subject: [PATCH v2 1/8] i2c: bcm2835: Fix hang for writing messages larger
- than 16 bytes
+Date: Tue, 27 Sep 2016 13:57:06 +0200
+Subject: [PATCH v2 8/8] ARM: bcm2835: Disable i2c2 in the Device Tree
 In-Reply-To: <1474977426-3272-1-git-send-email-noralf@tronnes.org>
 References: <1474977426-3272-1-git-send-email-noralf@tronnes.org>
-Message-ID: <1474977426-3272-2-git-send-email-noralf@tronnes.org>
+Message-ID: <1474977426-3272-9-git-send-email-noralf@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writing messages larger than the FIFO size results in a hang, rendering
-the machine unusable. This is because the RXD status flag is set on the
-first interrupt which results in bcm2835_drain_rxfifo() stealing bytes
-from the buffer. The controller continues to trigger interrupts waiting
-for the missing bytes, but bcm2835_fill_txfifo() has none to give.
-In this situation wait_for_completion_timeout() apparently is unable to
-stop the madness.
+i2c2 is connected to the HDMI connector and is controlled by the
+firmware. Disable it to stay out of harms way.
 
-The BCM2835 ARM Peripherals datasheet has this to say about the flags:
-  TXD: is set when the FIFO has space for at least one byte of data.
-  RXD: is set when the FIFO contains at least one byte of data.
-  TXW: is set during a write transfer and the FIFO is less than full.
-  RXR: is set during a read transfer and the FIFO is or more full.
+>From the downstream commit:
+i2c-bcm2708/BCM270X_DT: Add support for I2C2
 
-Implementing the logic from the downstream i2c-bcm2708 driver solved
-the hang problem.
+The third I2C bus (I2C2) is normally reserved for HDMI use. Careless
+use of this bus can break an attached display - use with caution.
+
+It is recommended to disable accesses by VideoCore by setting
+hdmi_ignore_edid=1 or hdmi_edid_file=1 in config.txt.
 
 Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
-Reviewed-by: Eric Anholt <eric@anholt.net>
-Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/i2c/busses/i2c-bcm2835.c | 22 ++++++++++++++--------
- 1 file changed, 14 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index d4f3239..f283b71 100644
---- a/drivers/i2c/busses/i2c-bcm2835.c
-+++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -64,6 +64,7 @@ struct bcm2835_i2c_dev {
- 	int irq;
- 	struct i2c_adapter adapter;
- 	struct completion completion;
-+	struct i2c_msg *curr_msg;
- 	u32 msg_err;
- 	u8 *msg_buf;
- 	size_t msg_buf_remaining;
-@@ -126,14 +127,13 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
- 		return IRQ_HANDLED;
- 	}
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index e9b47b2..8bffbee 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -59,10 +59,6 @@
+ 	clock-frequency = <100000>;
+ };
  
--	if (val & BCM2835_I2C_S_RXD) {
--		bcm2835_drain_rxfifo(i2c_dev);
--		if (!(val & BCM2835_I2C_S_DONE))
--			return IRQ_HANDLED;
--	}
+-&i2c2 {
+-	status = "okay";
+-};
 -
- 	if (val & BCM2835_I2C_S_DONE) {
--		if (i2c_dev->msg_buf_remaining)
-+		if (i2c_dev->curr_msg->flags & I2C_M_RD) {
-+			bcm2835_drain_rxfifo(i2c_dev);
-+			val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
-+		}
-+
-+		if ((val & BCM2835_I2C_S_RXD) || i2c_dev->msg_buf_remaining)
- 			i2c_dev->msg_err = BCM2835_I2C_S_LEN;
- 		else
- 			i2c_dev->msg_err = 0;
-@@ -141,11 +141,16 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
- 		return IRQ_HANDLED;
- 	}
- 
--	if (val & BCM2835_I2C_S_TXD) {
-+	if (val & BCM2835_I2C_S_TXW) {
- 		bcm2835_fill_txfifo(i2c_dev);
- 		return IRQ_HANDLED;
- 	}
- 
-+	if (val & BCM2835_I2C_S_RXR) {
-+		bcm2835_drain_rxfifo(i2c_dev);
-+		return IRQ_HANDLED;
-+	}
-+
- 	return IRQ_NONE;
- }
- 
-@@ -155,6 +160,7 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
- 	u32 c;
- 	unsigned long time_left;
- 
-+	i2c_dev->curr_msg = msg;
- 	i2c_dev->msg_buf = msg->buf;
- 	i2c_dev->msg_buf_remaining = msg->len;
- 	reinit_completion(&i2c_dev->completion);
+ &sdhci {
+ 	status = "okay";
+ 	bus-width = <4>;
 -- 
 2.8.2
