@@ -1,115 +1,61 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Tue, 27 Sep 2016 06:28:43 +0000
-Subject: [PATCH v2 1/3] ARM: dts: imx6qdl-apalis: Do not rely on DDC I2C
- bus bitbang for HDMI
-In-Reply-To: <2263d508999ada9476268138b2922702eb50131f.1474260360.git.maitysanchayan@gmail.com>
-References: <2263d508999ada9476268138b2922702eb50131f.1474260360.git.maitysanchayan@gmail.com>
-Message-ID: <1474957723.3739.3.camel@toradex.com>
+From: vikas.cha.sajjan@hpe.com (Sajjan, Vikas C)
+Date: Tue, 27 Sep 2016 07:03:17 +0000
+Subject: ARM juno R2 board USB Issue (EHCI probe failed)
+Message-ID: <AT5PR84MB005284C92DEA45ADF67A4F55D9CC0@AT5PR84MB0052.NAMPRD84.PROD.OUTLOOK.COM>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-09-19 at 10:41 +0530, Sanchayan Maity wrote:
-> Remove the use of DDC I2C bus bitbang to support reading of EDID
-> and rely on support from internal HDMI I2C master controller instead.
-> As a result remove the device tree property ddc-i2c-bus.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+Hi All,
 
-Acked-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+I working on ARM juno R2 board, with latest kernel 4.8.rc7 and I get below USB EHCI probe error while booting with acpi=force. 
 
-> ---
-> Changes since v1:
-> 
-> Change the ranking in i2c aliases
-> 
-> v1: https://lkml.org/lkml/2016/9/14/55
-> ---
-> ?arch/arm/boot/dts/imx6q-apalis-ixora.dts | 12 +++---------
-> ?arch/arm/boot/dts/imx6qdl-apalis.dtsi????| 25 +++++++++-------------
-> ---
-> ?2 files changed, 12 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> index 207b85b..82b81e0 100644
-> --- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> +++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-> @@ -55,10 +55,9 @@
-> ?		?????"fsl,imx6q";
-> ?
-> ?	aliases {
-> -		i2c0 = &i2cddc;
-> -		i2c1 = &i2c1;
-> -		i2c2 = &i2c2;
-> -		i2c3 = &i2c3;
-> +		i2c0 = &i2c1;
-> +		i2c1 = &i2c2;
-> +		i2c2 = &i2c3;
-> ?	};
-> ?
-> ?	aliases {
-> @@ -186,11 +185,6 @@
-> ?};
-> ?
-> ?&hdmi {
-> -	ddc-i2c-bus = <&i2cddc>;
-> -	status = "okay";
-> -};
-> -
-> -&i2cddc {
-> ?	status = "okay";
-> ?};
-> ?
-> diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> index 99e323b..8c67dd8 100644
-> --- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> @@ -53,18 +53,6 @@
-> ?		status = "disabled";
-> ?	};
-> ?
-> -	/* DDC_I2C: I2C2_SDA/SCL on MXM3 205/207 */
-> -	i2cddc: i2c at 0 {
-> -		compatible = "i2c-gpio";
-> -		pinctrl-names = "default";
-> -		pinctrl-0 = <&pinctrl_i2c_ddc>;
-> -		gpios = <&gpio3 16 GPIO_ACTIVE_HIGH /* sda */
-> -			?&gpio2 30 GPIO_ACTIVE_HIGH /* scl */
-> -			>;
-> -		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> -		status = "disabled";
-> -	};
-> -
-> ?	reg_1p8v: regulator-1p8v {
-> ?		compatible = "regulator-fixed";
-> ?		regulator-name = "1P8V";
-> @@ -209,6 +197,12 @@
-> ?	};
-> ?};
-> ?
-> +&hdmi {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hdmi_ddc>;
-> +	status = "disabled";
-> +};
-> +
-> ?/*
-> ? * GEN1_I2C: I2C1_SDA/SCL on MXM3 209/211 (e.g. RTC on carrier
-> ? * board)
-> @@ -633,11 +627,10 @@
-> ?		>;
-> ?	};
-> ?
-> -	pinctrl_i2c_ddc: gpioi2cddcgrp {
-> +	pinctrl_hdmi_ddc: hdmiddcgrp {
-> ?		fsl,pins = <
-> -			/* DDC bitbang */
-> -			MX6QDL_PAD_EIM_EB2__GPIO2_IO30 0x1b0b0
-> -			MX6QDL_PAD_EIM_D16__GPIO3_IO16 0x1b0b0
-> +			MX6QDL_PAD_EIM_EB2__HDMI_TX_DDC_SCL
-> 0x4001b8b1
-> +			MX6QDL_PAD_EIM_D16__HDMI_TX_DDC_SDA
-> 0x4001b8b1
-> ?		>;
-> ?	};
+EFI stub: Booting Linux Kernel...
+ConvertPages: Incompatible memory types
+EFI stub: Using DTB from command line
+EFI stub: Exiting boot services and installing virtual address map...
+[    0.000000] Booting Linux on physical CPU 0x100
+[    0.000000] Linux version 4.8.0-rc7-00142-gb1f2beb (vikas at dctxvm241) (gcc version 4.8.3 20140401 (prerelease) (crosstool-NG linaro-1.13.1-4.8-2014.04 - Linaro GCC 4.8-2014.04) ) #48 SMP PREEMPT Mon Sep 26 15:31:48 IST 2016
+[    0.000000] Boot CPU: AArch64 Processor [410fd033]
+[    0.000000] efi: Getting EFI parameters from FDT:
+[    0.000000] efi: EFI v2.50 by ARM Juno EFI Oct 15 2015 14:16:39
+[    0.000000] efi:  ACPI=0xfe750000  ACPI 2.0=0xfe750014  PROP=0xfe794370 
+[    0.000000] cma: Reserved 16 MiB at 0x00000000fd400000
+[    0.000000] ACPI: Early table checksum verification disabled
+[    0.000000] ACPI: RSDP 0x00000000FE750014 000024 (v02 ARMLTD)
+[    0.000000] ACPI: XSDT 0x00000000FE7400E8 00003C (v01 ARMLTD ARM-JUNO 20140727      01000013)
+[    0.000000] ACPI: FACP 0x00000000FE720000 00010C (v05 ARMLTD ARM-JUNO 20140727 ARM  00000099)
+[    0.000000] ACPI: DSDT 0x00000000FE6F0000 000317 (v01 ARMLTD ARM-JUNO 20140727 INTL 20140214)
+[    0.000000] ACPI: GTDT 0x00000000FE710000 000060 (v02 ARMLTD ARM-JUNO 20140727 ARM  00000099)
+[    0.000000] ACPI: APIC 0x00000000FE700000 000224 (v01 ARMLTD ARM-JUNO 20140727 ARM  00000099)
+[    0.000000] psci: probing for conduit method from ACPI.
+[    0.000000] psci: PSCIv1.0 detected in firmware.
+[    0.000000] psci: Using standard PSCI v0.2 function IDs
+[    0.000000] psci: MIGRATE_INFO_TYPE not supported.
+[    0.000000] percpu: Embedded 21 pages/cpu @ffff80097feb8000 s47488 r8192 d30336 u86016
+[    0.000000] Detected VIPT I-cache on CPU0
+[    0.000000] CPU features: enabling workaround for ARM erratum 845719
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 2060048
+[    0.000000] Kernel command line: dtb=board.dtb initrd=ramdisk.img console=ttyAMA0,115200 acpi=force root=/dev/sda1
+[    0.000000] log_buf_len individual max cpu contribution: 4096 bytes
+[    0.000000] log_buf_len total cpu_extra contributions: 20480 bytes
+. .  . . . .  . .
+. .  . . . .  . .
+. .  . . . .  . .
+. .  . . . .  . .
+[    1.223662] VFIO - User Level meta-driver version: 0.3
+[    1.229335] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+[    1.235882] ehci-pci: EHCI PCI platform driver
+[    1.240359] ehci-platform: EHCI generic platform driver
+[    1.245619] ehci-platform ARMH0D20:00: Error: DMA mask configuration failed
+[    1.272491] ehci-platform: probe of ARMH0D20:00 failed with error -5
+[    1.278876] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+[    1.285071] ohci-pci: OHCI PCI platform driver
+[    1.289548] ohci-platform: OHCI generic platform driver
+[    1.294884] usbcore: registered new interface driver usb-storage
+[    1.301231] mousedev: PS/2 mouse device common for all mice
+[    1.307197] rtc-efi rtc-efi: rtc core: registered rtc-efi as rtc0
+ 
+But this error goes off, if I don't force ACPI booting, i.e., if I remove acpi=force from kernel command line , USB is detected  and my RFS which is in the usb drive, gets mounted successfully. 
+
+Thanks and Regards
+Vikas Sajjan
