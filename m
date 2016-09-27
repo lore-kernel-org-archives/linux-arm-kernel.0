@@ -1,114 +1,50 @@
-From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Tue, 27 Sep 2016 13:57:00 +0200
-Subject: [PATCH v2 2/8] i2c: bcm2835: Protect against unexpected TXW/RXR
- interrupts
-In-Reply-To: <1474977426-3272-1-git-send-email-noralf@tronnes.org>
-References: <1474977426-3272-1-git-send-email-noralf@tronnes.org>
-Message-ID: <1474977426-3272-3-git-send-email-noralf@tronnes.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 27 Sep 2016 13:58:10 +0200
+Subject: [PATCH] ARM: at91: pm: remove useless extern definition
+In-Reply-To: <20160927103715.26785-1-alexandre.belloni@free-electrons.com>
+References: <20160927103715.26785-1-alexandre.belloni@free-electrons.com>
+Message-ID: <cfbb320a-4fc1-4e00-5ceb-632bf0a3da67@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If an unexpected TXW or RXR interrupt occurs (msg_buf_remaining == 0),
-the driver has no way to fill/drain the FIFO to stop the interrupts.
-In this case the controller has to be disabled and the transfer
-completed to avoid hang.
+Le 27/09/2016 ? 12:37, Alexandre Belloni a ?crit :
+> at91_ramc_base is local to pm.c, remove its definition in pm.h
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/mach-at91/pm.c | 2 +-
+>  arch/arm/mach-at91/pm.h | 2 --
+>  2 files changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index b4332b727e9c..3d89b7905bd9 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -55,7 +55,7 @@ static struct {
+>  	int memctrl;
+>  } at91_pm_data;
+>  
+> -void __iomem *at91_ramc_base[2];
+> +static void __iomem *at91_ramc_base[2];
+>  
+>  static int at91_pm_valid_state(suspend_state_t state)
+>  {
+> diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+> index 3fcf8810f14e..bf980c6ef294 100644
+> --- a/arch/arm/mach-at91/pm.h
+> +++ b/arch/arm/mach-at91/pm.h
+> @@ -18,8 +18,6 @@
+>  #include <soc/at91/at91sam9_sdramc.h>
+>  
+>  #ifndef __ASSEMBLY__
+> -extern void __iomem *at91_ramc_base[];
+> -
+>  #define at91_ramc_read(id, field) \
+>  	__raw_readl(at91_ramc_base[id] + field)
+>  
+> 
 
-(CLKT | ERR) and DONE interrupts are completed in their own paths, and
-the controller is disabled in the transfer function after completion.
-Unite the code paths and do disabling inside the interrupt routine.
 
-Clear interrupt status bits in the united completion path instead of
-trying to do it on every interrupt which isn't necessary.
-Only CLKT, ERR and DONE can be cleared that way.
-
-Add the status value to the error value in case of TXW/RXR errors to
-distinguish them from the other S_LEN error.
-
-Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
----
- drivers/i2c/busses/i2c-bcm2835.c | 31 ++++++++++++++++++++++---------
- 1 file changed, 22 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index f283b71..df036ed 100644
---- a/drivers/i2c/busses/i2c-bcm2835.c
-+++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -50,8 +50,6 @@
- #define BCM2835_I2C_S_CLKT	BIT(9)
- #define BCM2835_I2C_S_LEN	BIT(10) /* Fake bit for SW error reporting */
- 
--#define BCM2835_I2C_BITMSK_S	0x03FF
--
- #define BCM2835_I2C_CDIV_MIN	0x0002
- #define BCM2835_I2C_CDIV_MAX	0xFFFE
- 
-@@ -117,14 +115,11 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
- 	u32 val, err;
- 
- 	val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
--	val &= BCM2835_I2C_BITMSK_S;
--	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, val);
- 
- 	err = val & (BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR);
- 	if (err) {
- 		i2c_dev->msg_err = err;
--		complete(&i2c_dev->completion);
--		return IRQ_HANDLED;
-+		goto complete;
- 	}
- 
- 	if (val & BCM2835_I2C_S_DONE) {
-@@ -137,21 +132,38 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
- 			i2c_dev->msg_err = BCM2835_I2C_S_LEN;
- 		else
- 			i2c_dev->msg_err = 0;
--		complete(&i2c_dev->completion);
--		return IRQ_HANDLED;
-+		goto complete;
- 	}
- 
- 	if (val & BCM2835_I2C_S_TXW) {
-+		if (!i2c_dev->msg_buf_remaining) {
-+			i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
-+			goto complete;
-+		}
-+
- 		bcm2835_fill_txfifo(i2c_dev);
- 		return IRQ_HANDLED;
- 	}
- 
- 	if (val & BCM2835_I2C_S_RXR) {
-+		if (!i2c_dev->msg_buf_remaining) {
-+			i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
-+			goto complete;
-+		}
-+
- 		bcm2835_drain_rxfifo(i2c_dev);
- 		return IRQ_HANDLED;
- 	}
- 
- 	return IRQ_NONE;
-+
-+complete:
-+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
-+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, BCM2835_I2C_S_CLKT |
-+			   BCM2835_I2C_S_ERR | BCM2835_I2C_S_DONE);
-+	complete(&i2c_dev->completion);
-+
-+	return IRQ_HANDLED;
- }
- 
- static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
-@@ -181,8 +193,9 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
- 
- 	time_left = wait_for_completion_timeout(&i2c_dev->completion,
- 						BCM2835_I2C_TIMEOUT);
--	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
- 	if (!time_left) {
-+		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C,
-+				   BCM2835_I2C_C_CLEAR);
- 		dev_err(i2c_dev->dev, "i2c transfer timed out\n");
- 		return -ETIMEDOUT;
- 	}
 -- 
-2.8.2
+Nicolas Ferre
