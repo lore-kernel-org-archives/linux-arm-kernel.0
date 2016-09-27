@@ -1,69 +1,101 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 27 Sep 2016 19:25:48 +0200 (CEST)
-Subject: [PATCH v2 8/8] ARM: bcm2835: Disable i2c2 in the Device Tree
-In-Reply-To: <1474977426-3272-9-git-send-email-noralf@tronnes.org>
-References: <1474977426-3272-1-git-send-email-noralf@tronnes.org>
- <1474977426-3272-9-git-send-email-noralf@tronnes.org>
-Message-ID: <256118042.194076.147d5d83-f402-4ba4-b7de-4ab57a0e29ad.open-xchange@email.1und1.de>
+From: dhaab@luxul.com (Dan Haab)
+Date: Tue, 27 Sep 2016 11:27:10 -0600
+Subject: [PATCH 1/2] ARM: BCM5301X: Add DT for Luxul XAP-1510
+Message-ID: <1474997231-27700-1-git-send-email-dhaab@luxul.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Luxul XAP-1510 is an AP device based on BCM4708 SoC with 2 x BCM4360
+chipsets on PCB connected using PCIe.
 
-> Noralf Tr?nnes <noralf@tronnes.org> hat am 27. September 2016 um 13:57
-> geschrieben:
-> 
-> 
-> i2c2 is connected to the HDMI connector and is controlled by the
-> firmware. Disable it to stay out of harms way.
+Signed-off-by: Dan Haab <dhaab@luxul.com>
+---
+ arch/arm/boot/dts/Makefile                   |    1 +
+ arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts |   64 ++++++++++++++++++++++++++
+ 2 files changed, 65 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
 
-Until this point the commit message is okay, the rest is more confusing.
-
-Btw this should avoid a warning about missing clock frequency.
-
-> 
-> From the downstream commit:
-> i2c-bcm2708/BCM270X_DT: Add support for I2C2
-> 
-> The third I2C bus (I2C2) is normally reserved for HDMI use. Careless
-> use of this bus can break an attached display - use with caution.
-> 
-> It is recommended to disable accesses by VideoCore by setting
-> hdmi_ignore_edid=1 or hdmi_edid_file=1 in config.txt.
-> 
-> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
-> ---
->  arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 ----
->  1 file changed, 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> index e9b47b2..8bffbee 100644
-> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> @@ -59,10 +59,6 @@
->  	clock-frequency = <100000>;
->  };
->  
-> -&i2c2 {
-> -	status = "okay";
-> -};
-> -
-
-I'm not sure if this the right fix. According to bcm283x.dtsi the 3 i2c busses
-have the same compatible string "brcm,bcm2835-i2c", but the changelog suggests
-that this bus is "special".
-
-Shouldn't we use a different compatible string? Our intention isn't to disable
-i2c2 but avoid any claims of the usual i2c driver.
-
->  &sdhci {
->  	status = "okay";
->  	bus-width = <4>;
-> -- 
-> 2.8.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9bfd1ef..b7fbc1b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -75,6 +75,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-asus-rt-ac56u.dtb \
+ 	bcm4708-asus-rt-ac68u.dtb \
+ 	bcm4708-buffalo-wzr-1750dhp.dtb \
++	bcm4708-luxul-xap-1510.dtb \
+ 	bcm4708-luxul-xwc-1000.dtb \
+ 	bcm4708-netgear-r6250.dtb \
+ 	bcm4708-netgear-r6300-v2.dtb \
+diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+new file mode 100644
+index 0000000..35e6ed6
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+@@ -0,0 +1,64 @@
++/*
++ * Copyright 2016 Luxul Inc.
++ *
++ * Licensed under the ISC license.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++
++/ {
++	compatible = "luxul,xap-1510v1", "brcm,bcm4708";
++	model = "Luxul XAP-1510 V1";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlycon";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		5ghz {
++			label = "bcm53xx:blue:5ghz";
++			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "none";
++		};
++
++		2ghz {
++			label = "bcm53xx:blue:2ghz";
++			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "none";
++		};
++
++		status {
++			label = "bcm53xx:green:status";
++			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "timer";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&spi_nor {
++	status = "okay";
++};
+-- 
+1.7.9.5
