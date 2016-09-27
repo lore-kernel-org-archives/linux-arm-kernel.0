@@ -1,33 +1,34 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 27 Sep 2016 15:05:42 +1000
-Subject: linux-next: manual merge of the gpio tree with the arm-soc tree
-Message-ID: <20160927150542.7e81e7ee@canb.auug.org.au>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 27 Sep 2016 14:26:08 +0800
+Subject: [PATCH] arm64, numa: Add cpu_to_node() implementation.
+In-Reply-To: <20160920132120.GQ25086@rric.localdomain>
+References: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160920104348.GP25086@rric.localdomain> <57E11E52.8060303@linaro.org>
+ <20160920132120.GQ25086@rric.localdomain>
+Message-ID: <57EA1100.2080900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 09/20/2016 09:21 PM, Robert Richter wrote:
+> On 20.09.16 19:32:34, Hanjun Guo wrote:
+>> On 09/20/2016 06:43 PM, Robert Richter wrote:
+>
+>>> Unfortunately either your nor my code does fix the BUG_ON() I see with
+>>> the numa kernel:
+>>>
+>>>   kernel BUG at mm/page_alloc.c:1848!
+>>>
+>>> See below for the core dump. It looks like this happens due to moving
+>>> a mem block where first and last page are mapped to different numa
+>>> nodes, thus, triggering the BUG_ON().
+>>
+>> Didn't triggered it on our NUMA hardware, could you provide your
+>> config then we can have a try?
+>
+> Config attached. Other configs with an initrd fail too.
 
-Today's linux-next merge of the gpio tree got a conflict in:
+hmm, we can't reproduce it on our hardware, do we need
+to run some specific stress test on it?
 
-  arch/arm/mach-omap2/board-rx51-peripherals.c
-
-between commit:
-
-  9b7141d01a76 ("ARM: OMAP2+: Drop legacy board file for n900")
-
-from the arm-soc tree and commit:
-
-  9132ce450bd1 ("ARM: omap2: fix missing include")
-
-from the gpio tree.
-
-I fixed it up (the former removed the file, so I did that) and can
-carry the fix as necessary. This is now fixed as far as linux-next is
-concerned, but any non trivial conflicts should be mentioned to your
-upstream maintainer when your tree is submitted for merging.  You may
-also want to consider cooperating with the maintainer of the conflicting
-tree to minimise any particularly complex conflicts.
-
--- 
-Cheers,
-Stephen Rothwell
+Thanks
+Hanjun
