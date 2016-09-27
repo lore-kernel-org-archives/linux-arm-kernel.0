@@ -1,55 +1,41 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:35 +0200
-Subject: [PULL 27/50] arm: KVM: Add Virtual Abort injection helper
+Date: Tue, 27 Sep 2016 20:05:31 +0200
+Subject: [PULL 23/50] arm64: KVM: Allow an exit code to be tagged with an
+ SError
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-28-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-24-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Now that we're able to context switch the HCR.VA bit, let's
-introduce a helper that injects an Abort into a vcpu.
+Similarily to EL1, an asynchronous abort can be triggered whilst
+running at EL2. But instead of making that a new error code,
+we need to communicate it to the rest of KVM together with
+the exit reason. So let's hijack a single bit that allows the
+exception code to be tagged with a "pending SError" information.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_emulate.h |  1 +
- arch/arm/kvm/emulate.c             | 12 ++++++++++++
- 2 files changed, 13 insertions(+)
+ arch/arm64/include/asm/kvm_asm.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 448d63c..9a8a45a 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -43,6 +43,7 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
- bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
- void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
- void kvm_inject_undefined(struct kvm_vcpu *vcpu);
-+void kvm_inject_vabt(struct kvm_vcpu *vcpu);
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index d177e7e..18f7465 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -20,6 +20,10 @@
  
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index ff9acd1..0064b86 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -303,3 +303,15 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
- {
- 	inject_abt(vcpu, true, addr);
- }
+ #include <asm/virt.h>
+ 
++#define ARM_EXIT_WITH_SERROR_BIT  31
++#define ARM_EXCEPTION_CODE(x)	  ((x) & ~(1U << ARM_EXIT_WITH_SERROR_BIT))
++#define ARM_SERROR_PENDING(x)	  !!((x) & (1U << ARM_EXIT_WITH_SERROR_BIT))
 +
-+/**
-+ * kvm_inject_vabt - inject an async abort / SError into the guest
-+ * @vcpu: The VCPU to receive the exception
-+ *
-+ * It is assumed that this code is called from the VCPU thread and that the
-+ * VCPU therefore is not currently executing guest code.
-+ */
-+void kvm_inject_vabt(struct kvm_vcpu *vcpu)
-+{
-+	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VA);
-+}
+ #define ARM_EXCEPTION_IRQ	  0
+ #define ARM_EXCEPTION_EL1_SERROR  1
+ #define ARM_EXCEPTION_TRAP	  2
 -- 
 2.9.0
