@@ -1,55 +1,47 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:27 +0200
-Subject: [PULL 19/50] arm64: KVM: Add Virtual Abort injection helper
+Date: Tue, 27 Sep 2016 20:05:34 +0200
+Subject: [PULL 26/50] arm: KVM: Preserve pending Virtual Abort in world switch
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-20-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-27-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Now that we're able to context switch the HCR_EL2.VA bit, let's
-introduce a helper that injects an Abort into a vcpu.
+The HCR.VA bit is used to signal an Abort to a guest, and has
+the peculiar feature of getting cleared when the guest has taken
+the abort (this is the only bit that behaves as such in this register).
+
+This means that if we signal such an abort, we must leave it in
+the guest context until it disappears from HCR, and at which point
+it must be cleared from the context.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_emulate.h |  1 +
- arch/arm64/kvm/inject_fault.c        | 12 ++++++++++++
- 2 files changed, 13 insertions(+)
+ arch/arm/kvm/hyp/switch.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index b336434d..fd9d5fd 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -38,6 +38,7 @@ bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
- void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index 37b3365..9da16fd 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -54,6 +54,15 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ {
+ 	u32 val;
  
- void kvm_inject_undefined(struct kvm_vcpu *vcpu);
-+void kvm_inject_vabt(struct kvm_vcpu *vcpu);
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
- 
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index 898c0e6..da6a8cf 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -231,3 +231,15 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
- 	else
- 		inject_undef64(vcpu);
- }
++	/*
++	 * If we pended a virtual abort, preserve it until it gets
++	 * cleared. See B1.9.9 (Virtual Abort exception) for details,
++	 * but the crucial bit is the zeroing of HCR.VA in the
++	 * pseudocode.
++	 */
++	if (vcpu->arch.hcr & HCR_VA)
++		vcpu->arch.hcr = read_sysreg(HCR);
 +
-+/**
-+ * kvm_inject_vabt - inject an async abort / SError into the guest
-+ * @vcpu: The VCPU to receive the exception
-+ *
-+ * It is assumed that this code is called from the VCPU thread and that the
-+ * VCPU therefore is not currently executing guest code.
-+ */
-+void kvm_inject_vabt(struct kvm_vcpu *vcpu)
-+{
-+	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
-+}
+ 	write_sysreg(0, HCR);
+ 	write_sysreg(0, HSTR);
+ 	val = read_sysreg(HDCR);
 -- 
 2.9.0
