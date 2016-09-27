@@ -1,79 +1,50 @@
-From: finley.xiao@rock-chips.com (Finley Xiao)
-Date: Tue, 27 Sep 2016 16:40:22 +0800
-Subject: [PATCH v2 4/4] PM / AVS: rockchip-cpu-avs: add driver handling
- Rockchip cpu avs
-In-Reply-To: <20776501.pZ2NDOzLK3@phil>
-References: <1471510341-63926-1-git-send-email-finley.xiao@rock-chips.com>
- <20160912215515.GF7243@codeaurora.org> <20160926035511.GG17336@vireshk-i7>
- <20776501.pZ2NDOzLK3@phil>
-Message-ID: <c58a6eb3-7db0-4327-20a3-35c892ae1b93@rock-chips.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 27 Sep 2016 09:50:31 +0100
+Subject: ARM juno R2 board USB Issue (EHCI probe failed)
+In-Reply-To: <CAGm_ybhc4DKYkDtE8dVzhC3-kJk138Lbm-zAhepQiyUnuqZQHg@mail.gmail.com>
+References: <AT5PR84MB005284C92DEA45ADF67A4F55D9CC0@AT5PR84MB0052.NAMPRD84.PROD.OUTLOOK.COM>
+ <CAGm_ybhc4DKYkDtE8dVzhC3-kJk138Lbm-zAhepQiyUnuqZQHg@mail.gmail.com>
+Message-ID: <22e151c5-fc83-a48c-b130-f633fac8674f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Vikas,
 
-
-? 2016/9/26 16:05, Heiko Stuebner ??:
-> Am Montag, 26. September 2016, 09:25:11 CEST schrieb Viresh Kumar:
->> On 12-09-16, 14:55, Stephen Boyd wrote:
->>> On 08/29, Viresh Kumar wrote:
->>>> On 18-08-16, 16:52, Finlye Xiao wrote:
->>>>> +static int rockchip_adjust_opp_table(struct device *cpu_dev,
->>>>> +				     struct cpufreq_frequency_table *table,
->>>>> +				     int volt)
->>>>> +{
->>>>> +	struct opp_table *opp_table;
->>>>> +	struct cpufreq_frequency_table *pos;
->>>>> +	struct dev_pm_opp *opp;
->>>>> +
->>>>> +	if (!volt)
->>>>> +		return 0;
->>>>> +
->>>>> +	rcu_read_lock();
->>>>> +
->>>>> +	opp_table = _find_opp_table(cpu_dev);
->>>>> +	if (IS_ERR(opp_table)) {
->>>>> +		rcu_read_unlock();
->>>>> +		return PTR_ERR(opp_table);
->>>>> +	}
->>>>> +
->>>>> +	cpufreq_for_each_valid_entry(pos, table) {
->>>>> +		opp = dev_pm_opp_find_freq_exact(cpu_dev, pos->frequency * 1000,
->>>>> +						 true);
->>>>> +		if (IS_ERR(opp))
->>>>> +			continue;
->>>>> +
->>>>> +		opp->u_volt += volt;
->>>>> +		opp->u_volt_min += volt;
->>>>> +		opp->u_volt_max += volt;
->>>>> +	}
->>>>> +
->>>>> +	rcu_read_unlock();
->>>>> +
->>>>> +	return 0;
->>>>> +}
->>>> I wouldn't prefer altering the opp tables from individual drivers at
->>>> all. At the least, it should be done via some helpers exposed by the
->>>> core.
->>>>
->>>> But before that I would like to hear from Stephen a bit as I recall he
->>>> was also working on something similar.
->>> I had a patch to modify the voltage at runtime for the "current"
->>> OPP. Now that we have regulator and clk control inside OPP that
->>> became a little easier to do without having to do some notifier
->>> from the OPP layer to the consumers. I haven't had time to revive
->>> those patches though. Should we do that?
->> Perhaps yes, we should have a common place for doing all that.
+On 27/09/16 09:14, Vikas Sajjan wrote:
+> Adding USB mailing list.
+>
+>
+> On Tue, Sep 27, 2016 at 12:33 PM, Sajjan, Vikas C
+> <vikas.cha.sajjan@hpe.com> wrote:
+>> Hi All,
 >>
->>> Does this need to modify
->>> anything besides the OPP the device is currently running at?
->> Finlye, can you please answer this ?
-> If I understand it correctly, depending on the leakage value stored in an
-> efuse, all opp voltages are reduced by a certain value. Right now the driver
-> does it in one go for the full opp table, but of course could also do it for
-> each new opp individually before it gets set.
->
-Yes? it is necessary to modify all opp voltages and  I agreed with Heiko.
->
+>> I working on ARM juno R2 board, with latest kernel 4.8.rc7 and I get below
+>> USB EHCI probe error while booting with acpi=force.
+>>
+
+Are you using the latest UEFI EDK2 ?
+
+>> [    1.223662] VFIO - User Level meta-driver version: 0.3
+>> [    1.229335] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+>> [    1.235882] ehci-pci: EHCI PCI platform driver
+>> [    1.240359] ehci-platform: EHCI generic platform driver
+>> [    1.245619] ehci-platform ARMH0D20:00: Error: DMA mask configuration failed
+>> [    1.272491] ehci-platform: probe of ARMH0D20:00 failed with error -5
+>> [    1.278876] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+>> [    1.285071] ohci-pci: OHCI PCI platform driver
+>> [    1.289548] ohci-platform: OHCI generic platform driver
+>> [    1.294884] usbcore: registered new interface driver usb-storage
+>> [    1.301231] mousedev: PS/2 mouse device common for all mice
+>> [    1.307197] rtc-efi rtc-efi: rtc core: registered rtc-efi as rtc0
+>>
+>> But this error goes off, if I don't force ACPI booting, i.e., if I remove
+>> acpi=force from kernel command line , USB is detected  and my RFS which is
+>> in the usb drive, gets mounted successfully.
+>>
+
+As I mentioned in private, I do get the same error if I drop _CCA in
+USB object of ACPI DSDT. Can you give it a spin with latest UEFI ?
 
 -- 
-Finley
+Regards,
+Sudeep
