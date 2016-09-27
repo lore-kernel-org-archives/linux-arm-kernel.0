@@ -1,81 +1,61 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Tue, 27 Sep 2016 23:54:14 +0300
-Subject: [PATCH v11 3/4] ARM64: ACPI: enable ACPI_SPCR_TABLE
-In-Reply-To: <20160927205418.31529-1-aleksey.makarov@linaro.org>
-References: <20160927151953.GB4371@kroah.com>
- <20160927205418.31529-1-aleksey.makarov@linaro.org>
-Message-ID: <20160927205418.31529-3-aleksey.makarov@linaro.org>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 27 Sep 2016 14:25:44 -0700
+Subject: [RFC/PATCH] usb: misc: Add a driver for TC7USB40MU
+In-Reply-To: <20160927045357.GB27697@b29397-desktop>
+References: <20160914014246.31847-1-stephen.boyd@linaro.org>
+ <147384330268.13546.17843140335600627152@sboyd-linaro>
+ <20160917011605.GB10392@b29397-desktop>
+ <147457026249.9057.8712383708019243942@sboyd-linaro>
+ <20160926032927.GA25395@b29397-desktop>
+ <147491549050.5206.9497559526723777799@sboyd-linaro>
+ <20160927045357.GB27697@b29397-desktop>
+Message-ID: <147501154421.20482.11679706034780655409@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SBBR mentions SPCR as a mandatory ACPI table.  So enable it for ARM64
+Quoting Peter Chen (2016-09-26 21:53:58)
+> On Mon, Sep 26, 2016 at 11:44:50AM -0700, Stephen Boyd wrote:
+> > Quoting Peter Chen (2016-09-25 20:29:27)
+> > > On Thu, Sep 22, 2016 at 11:51:02AM -0700, Stephen Boyd wrote:
+> > > > Quoting Peter Chen (2016-09-16 18:16:05)
+> > > > > On Wed, Sep 14, 2016 at 01:55:02AM -0700, Stephen Boyd wrote:
+> > > > > > Quoting Stephen Boyd (2016-09-13 18:42:46)
+> > > > > > 
+> > > > > >       soc {
+> > > > > >               usb at 78d9000 {
+> > > > > >                       extcon = <&usb_id>, <&usb_id>;
+> > > > > 
+> > > > > Why you have two same extcon phandler? From my mind, one should id,
+> > > > > another should is vbus. Besides, I find extcon-usb-gpio.c is lack of
+> > > > > vbus support, how you support vbus detection for
+> > > > > connection/disconnection with PC for your chipidea msm patch set?
+> > > > 
+> > > > This was already in the dts files for db410c. In the chipidea binding
+> > > > one is for EXTCON_USB (vbus) and one is for EXTCON_USB_HOST (id). My
+> > > > understanding is that extcon-usb-gpio.c sends events for both EXTCON_USB
+> > > > and EXTCON_USB_HOST when the gpio changes state. vbus detection is not
+> > > > that great on this board because we only have on gpio for this.
+> > > 
+> > > I think extcon-usb-gpio.c needs to extend for supporting vbus event,
+> > > otherwise, the micro-b cable's connect/disconnect will introduce
+> > > EXTCON_USB_HOST event, if you use two <&usb_idx> for both id and
+> > > vbus event.
+> > > 
+> > 
+> > Sorry, I'm lost now. extcon-usb-gpio.c already supports EXTCON_USB as an
+> > event. Is the problem that we're using two of the same phandles in the
+> > binding?
+> 
+> No, ID and VBUS are different events.
+> 
+> http://www.spinics.net/lists/linux-usb/msg147004.html
+> 
 
-Earlycon should be set up as early as possible.  ACPI boot tables are
-mapped in arch/arm64/kernel/acpi.c:acpi_boot_table_init() that
-is called from setup_arch() and that's where we parse SPCR.
-So it has to be opted-in per-arch.
+Agreed. But we only register for EXTCON_USB or EXTCON_USB_HOST for each
+phandle in the list respectively based on the index of the phandle. So
+with or without the patch you mention I don't see how it matters.
 
-When ACPI_SPCR_TABLE is defined initialization of DT earlycon is
-deferred until the DT/ACPI decision is done.  Initialize DT earlycon
-if ACPI is disabled.
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-Tested-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-Tested-by: Christopher Covington <cov@codeaurora.org>
----
- arch/arm64/Kconfig       |  1 +
- arch/arm64/kernel/acpi.c | 11 ++++++++++-
- 2 files changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index bc3f00f..11a2d36 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -4,6 +4,7 @@ config ARM64
- 	select ACPI_GENERIC_GSI if ACPI
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
- 	select ACPI_MCFG if ACPI
-+	select ACPI_SPCR_TABLE if ACPI
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 3e4f1a4..252a6d9 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -24,6 +24,7 @@
- #include <linux/memblock.h>
- #include <linux/of_fdt.h>
- #include <linux/smp.h>
-+#include <linux/serial_core.h>
- 
- #include <asm/cputype.h>
- #include <asm/cpu_ops.h>
-@@ -206,7 +207,7 @@ void __init acpi_boot_table_init(void)
- 	if (param_acpi_off ||
- 	    (!param_acpi_on && !param_acpi_force &&
- 	     of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
--		return;
-+		goto done;
- 
- 	/*
- 	 * ACPI is disabled at this point. Enable it in order to parse
-@@ -226,6 +227,14 @@ void __init acpi_boot_table_init(void)
- 		if (!param_acpi_force)
- 			disable_acpi();
- 	}
-+
-+done:
-+	if (acpi_disabled) {
-+		if (earlycon_init_is_deferred)
-+			early_init_dt_scan_chosen_stdout();
-+	} else {
-+		parse_spcr(earlycon_init_is_deferred);
-+	}
- }
- 
- #ifdef CONFIG_ACPI_APEI
--- 
-2.10.0
+We do it this way to trigger the role switch when the cable is
+disconnected. I think the problem with just having the id phandle is
+that we'll never see the vbus event, and so the role switch doesn't
+work.
