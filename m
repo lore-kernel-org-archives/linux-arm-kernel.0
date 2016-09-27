@@ -1,40 +1,55 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 27 Sep 2016 14:25:43 +0100
-Subject: [RFC] irqchip/gic-v3: Implement suspend and resume callbacks
-In-Reply-To: <57EA6774.2060807@codeaurora.org>
-References: <1474447359-29551-1-git-send-email-clingutla@codeaurora.org>
- <57E25C8E.7080502@arm.com> <57EA6774.2060807@codeaurora.org>
-Message-ID: <bfaa6b63-4187-198a-5d0a-f2ba3c1ffa20@arm.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Tue, 27 Sep 2016 09:28:58 -0400
+Subject: [PATCH 2/2] drm/rockchip: analogix_dp: Refuse to enable PSR if
+ panel doesn't support it
+In-Reply-To: <1474639600-30090-2-git-send-email-tomeu.vizoso@collabora.com>
+References: <1474639600-30090-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1474639600-30090-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAOw6vbL1fDpPbFeePEFqYZ+i0sbbsB+vu7fCC8U88HAj-1D2Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 27/09/16 13:35, Chandra Sekhar Lingutla wrote:
-> On 09/21/2016 03:40 PM, Marc Zyngier wrote:
->> +Sudeep, Lorenzo,
-
-[...]
-
->>
->> But here's my fundamental objection: None of that should be required and
->> setting (IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND) as part of the
->> irqchip flags should be enough.
->>
->> Can you explain why this doesn't work for you?
->>
-> These flags work for me, I will remove suspend/resume functions, but i
-> think it is very useful to know the wakeup source for debugging purposes.
-> Please let me know, if you have any better way to achieve this.
+On Fri, Sep 23, 2016 at 10:06 AM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> There's no point in enabling PSR when the panel doesn't support it.
 >
+> This also avoids a problem when PSR gets enabled when a CRTC is being
+> disabled, because sometimes in that situation the DSP_HOLD_VALID_INTR
+> interrupt on which we wait will never arrive. This was observed on
+> RK3288 with a panel without PSR (veyron-jaq Chromebook).
+>
+> It's very easy to reproduce by running the kms_rmfb test in IGT a few
+> times.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-I don't understand what's missing ? As the user you can set the wakeup
-source if it's wakeup capable. You will find the sysfs entries which can
-say if it's enabled or not. You can use the same to enable it.
+Thanks for digging into this.
 
-I am not sure what you mean by "it is very useful to know the wakeup
-source for debugging purposes".
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
--- 
-Regards,
-Sudeep
+
+
+> Cc: Sean Paul <seanpaul@chromium.org>
+> Cc: Yakir Yang <ykk@rock-chips.com>
+> Cc: Archit Taneja <architt@codeaurora.org>
+> ---
+>  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> index e83be157cc2a..8548e8271639 100644
+> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> @@ -85,6 +85,9 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
+>         struct rockchip_dp_device *dp = to_dp(encoder);
+>         unsigned long flags;
+>
+> +       if (!analogix_dp_psr_supported(dp->dev))
+> +               return;
+> +
+>         dev_dbg(dp->dev, "%s PSR...\n", enabled ? "Entry" : "Exit");
+>
+>         spin_lock_irqsave(&dp->psr_lock, flags);
+> --
+> 2.7.4
+>
