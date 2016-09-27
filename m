@@ -1,245 +1,241 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:12 +0200
-Subject: [PULL 04/50] arm64: KVM: Optimize __guest_enter/exit() to save a few
- instructions
+Date: Tue, 27 Sep 2016 20:05:20 +0200
+Subject: [PULL 12/50] arm: KVM: Use common AArch32 conditional execution code
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-5-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-13-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shanker Donthineni <shankerd@codeaurora.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-We are doing an unnecessary stack push/pop operation when restoring
-the guest registers x0-x18 in __guest_enter(). This patch saves the
-two instructions by using x18 as a base register. No need to store
-the vcpu context pointer in stack because it is redundant, the same
-information is available in tpidr_el2. The function __guest_exit()
-calling convention is slightly modified, caller only pushes the regs
-x0-x1 to stack instead of regs x0-x3.
+Add the bit of glue and const-ification that is required to use
+the code inherited from the arm64 port, and move over to it.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/entry.S     | 101 ++++++++++++++++++++---------------------
- arch/arm64/kvm/hyp/hyp-entry.S |  37 ++++++---------
- 2 files changed, 63 insertions(+), 75 deletions(-)
+ arch/arm/include/asm/kvm_emulate.h | 34 ++++++++++---
+ arch/arm/kvm/Makefile              |  1 +
+ arch/arm/kvm/emulate.c             | 97 --------------------------------------
+ virt/kvm/arm/aarch32.c             |  5 ++
+ 4 files changed, 33 insertions(+), 104 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index ce9e5e5..3967c231 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -55,79 +55,78 @@
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index ee5328f..448d63c 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -40,18 +40,28 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
+ 	*vcpu_reg(vcpu, reg_num) = val;
+ }
+ 
+-bool kvm_condition_valid(struct kvm_vcpu *vcpu);
+-void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr);
++bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
++void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
+ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
+ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+ 
++static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
++{
++	return kvm_condition_valid32(vcpu);
++}
++
++static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
++{
++	kvm_skip_instr32(vcpu, is_wide_instr);
++}
++
+ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ {
+ 	vcpu->arch.hcr = HCR_GUEST_MASK;
+ }
+ 
+-static inline unsigned long vcpu_get_hcr(struct kvm_vcpu *vcpu)
++static inline unsigned long vcpu_get_hcr(const struct kvm_vcpu *vcpu)
+ {
+ 	return vcpu->arch.hcr;
+ }
+@@ -61,7 +71,7 @@ static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
+ 	vcpu->arch.hcr = hcr;
+ }
+ 
+-static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
++static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+ {
+ 	return 1;
+ }
+@@ -71,9 +81,9 @@ static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
+ 	return &vcpu->arch.ctxt.gp_regs.usr_regs.ARM_pc;
+ }
+ 
+-static inline unsigned long *vcpu_cpsr(struct kvm_vcpu *vcpu)
++static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
+ {
+-	return &vcpu->arch.ctxt.gp_regs.usr_regs.ARM_cpsr;
++	return (unsigned long *)&vcpu->arch.ctxt.gp_regs.usr_regs.ARM_cpsr;
+ }
+ 
+ static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
+@@ -93,11 +103,21 @@ static inline bool vcpu_mode_priv(struct kvm_vcpu *vcpu)
+ 	return cpsr_mode > USR_MODE;;
+ }
+ 
+-static inline u32 kvm_vcpu_get_hsr(struct kvm_vcpu *vcpu)
++static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
+ {
+ 	return vcpu->arch.fault.hsr;
+ }
+ 
++static inline int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
++{
++	u32 hsr = kvm_vcpu_get_hsr(vcpu);
++
++	if (hsr & HSR_CV)
++		return (hsr & HSR_COND) >> HSR_COND_SHIFT;
++
++	return -1;
++}
++
+ static inline unsigned long kvm_vcpu_get_hfar(struct kvm_vcpu *vcpu)
+ {
+ 	return vcpu->arch.fault.hxfar;
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index 10d77a6..339ec88 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -21,6 +21,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += hyp/
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+ obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
++obj-y += $(KVM)/arm/aarch32.o
+ 
+ obj-y += $(KVM)/arm/vgic/vgic.o
+ obj-y += $(KVM)/arm/vgic/vgic-init.o
+diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+index eda9ddd..ff9acd1 100644
+--- a/arch/arm/kvm/emulate.c
++++ b/arch/arm/kvm/emulate.c
+@@ -161,103 +161,6 @@ unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu)
+ 	}
+ }
+ 
+-/*
+- * A conditional instruction is allowed to trap, even though it
+- * wouldn't be executed.  So let's re-implement the hardware, in
+- * software!
+- */
+-bool kvm_condition_valid(struct kvm_vcpu *vcpu)
+-{
+-	unsigned long cpsr, cond, insn;
+-
+-	/*
+-	 * Exception Code 0 can only happen if we set HCR.TGE to 1, to
+-	 * catch undefined instructions, and then we won't get past
+-	 * the arm_exit_handlers test anyway.
+-	 */
+-	BUG_ON(!kvm_vcpu_trap_get_class(vcpu));
+-
+-	/* Top two bits non-zero?  Unconditional. */
+-	if (kvm_vcpu_get_hsr(vcpu) >> 30)
+-		return true;
+-
+-	cpsr = *vcpu_cpsr(vcpu);
+-
+-	/* Is condition field valid? */
+-	if ((kvm_vcpu_get_hsr(vcpu) & HSR_CV) >> HSR_CV_SHIFT)
+-		cond = (kvm_vcpu_get_hsr(vcpu) & HSR_COND) >> HSR_COND_SHIFT;
+-	else {
+-		/* This can happen in Thumb mode: examine IT state. */
+-		unsigned long it;
+-
+-		it = ((cpsr >> 8) & 0xFC) | ((cpsr >> 25) & 0x3);
+-
+-		/* it == 0 => unconditional. */
+-		if (it == 0)
+-			return true;
+-
+-		/* The cond for this insn works out as the top 4 bits. */
+-		cond = (it >> 4);
+-	}
+-
+-	/* Shift makes it look like an ARM-mode instruction */
+-	insn = cond << 28;
+-	return arm_check_condition(insn, cpsr) != ARM_OPCODE_CONDTEST_FAIL;
+-}
+-
+-/**
+- * adjust_itstate - adjust ITSTATE when emulating instructions in IT-block
+- * @vcpu:	The VCPU pointer
+- *
+- * When exceptions occur while instructions are executed in Thumb IF-THEN
+- * blocks, the ITSTATE field of the CPSR is not advanced (updated), so we have
+- * to do this little bit of work manually. The fields map like this:
+- *
+- * IT[7:0] -> CPSR[26:25],CPSR[15:10]
+- */
+-static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
+-{
+-	unsigned long itbits, cond;
+-	unsigned long cpsr = *vcpu_cpsr(vcpu);
+-	bool is_arm = !(cpsr & PSR_T_BIT);
+-
+-	if (is_arm || !(cpsr & PSR_IT_MASK))
+-		return;
+-
+-	cond = (cpsr & 0xe000) >> 13;
+-	itbits = (cpsr & 0x1c00) >> (10 - 2);
+-	itbits |= (cpsr & (0x3 << 25)) >> 25;
+-
+-	/* Perform ITAdvance (see page A-52 in ARM DDI 0406C) */
+-	if ((itbits & 0x7) == 0)
+-		itbits = cond = 0;
+-	else
+-		itbits = (itbits << 1) & 0x1f;
+-
+-	cpsr &= ~PSR_IT_MASK;
+-	cpsr |= cond << 13;
+-	cpsr |= (itbits & 0x1c) << (10 - 2);
+-	cpsr |= (itbits & 0x3) << 25;
+-	*vcpu_cpsr(vcpu) = cpsr;
+-}
+-
+-/**
+- * kvm_skip_instr - skip a trapped instruction and proceed to the next
+- * @vcpu: The vcpu pointer
+- */
+-void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
+-{
+-	bool is_thumb;
+-
+-	is_thumb = !!(*vcpu_cpsr(vcpu) & PSR_T_BIT);
+-	if (is_thumb && !is_wide_instr)
+-		*vcpu_pc(vcpu) += 2;
+-	else
+-		*vcpu_pc(vcpu) += 4;
+-	kvm_adjust_itstate(vcpu);
+-}
+-
+-
+ /******************************************************************************
+  * Inject exceptions into the guest
   */
- ENTRY(__guest_enter)
- 	// x0: vcpu
--	// x1: host/guest context
--	// x2-x18: clobbered by macros
-+	// x1: host context
-+	// x2-x17: clobbered by macros
-+	// x18: guest context
+diff --git a/virt/kvm/arm/aarch32.c b/virt/kvm/arm/aarch32.c
+index cb02e56..ba4417b 100644
+--- a/virt/kvm/arm/aarch32.c
++++ b/virt/kvm/arm/aarch32.c
+@@ -24,6 +24,11 @@
+ #include <linux/kvm_host.h>
+ #include <asm/kvm_emulate.h>
  
- 	// Store the host regs
- 	save_callee_saved_regs x1
- 
--	// Preserve vcpu & host_ctxt for use at exit time
--	stp	x0, x1, [sp, #-16]!
-+	// Store the host_ctxt for use at exit time
-+	str	x1, [sp, #-16]!
- 
--	add	x1, x0, #VCPU_CONTEXT
-+	add	x18, x0, #VCPU_CONTEXT
- 
--	// Prepare x0-x1 for later restore by pushing them onto the stack
--	ldp	x2, x3, [x1, #CPU_XREG_OFFSET(0)]
--	stp	x2, x3, [sp, #-16]!
-+	// Restore guest regs x0-x17
-+	ldp	x0, x1,   [x18, #CPU_XREG_OFFSET(0)]
-+	ldp	x2, x3,   [x18, #CPU_XREG_OFFSET(2)]
-+	ldp	x4, x5,   [x18, #CPU_XREG_OFFSET(4)]
-+	ldp	x6, x7,   [x18, #CPU_XREG_OFFSET(6)]
-+	ldp	x8, x9,   [x18, #CPU_XREG_OFFSET(8)]
-+	ldp	x10, x11, [x18, #CPU_XREG_OFFSET(10)]
-+	ldp	x12, x13, [x18, #CPU_XREG_OFFSET(12)]
-+	ldp	x14, x15, [x18, #CPU_XREG_OFFSET(14)]
-+	ldp	x16, x17, [x18, #CPU_XREG_OFFSET(16)]
- 
--	// x2-x18
--	ldp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
--	ldp	x4, x5,   [x1, #CPU_XREG_OFFSET(4)]
--	ldp	x6, x7,   [x1, #CPU_XREG_OFFSET(6)]
--	ldp	x8, x9,   [x1, #CPU_XREG_OFFSET(8)]
--	ldp	x10, x11, [x1, #CPU_XREG_OFFSET(10)]
--	ldp	x12, x13, [x1, #CPU_XREG_OFFSET(12)]
--	ldp	x14, x15, [x1, #CPU_XREG_OFFSET(14)]
--	ldp	x16, x17, [x1, #CPU_XREG_OFFSET(16)]
--	ldr	x18,      [x1, #CPU_XREG_OFFSET(18)]
--
--	// x19-x29, lr
--	restore_callee_saved_regs x1
--
--	// Last bits of the 64bit state
--	ldp	x0, x1, [sp], #16
-+	// Restore guest regs x19-x29, lr
-+	restore_callee_saved_regs x18
++#ifndef CONFIG_ARM64
++#define COMPAT_PSR_T_BIT	PSR_T_BIT
++#define COMPAT_PSR_IT_MASK	PSR_IT_MASK
++#endif
 +
-+	// Restore guest reg x18
-+	ldr	x18,      [x18, #CPU_XREG_OFFSET(18)]
- 
- 	// Do not touch any register after this!
- 	eret
- ENDPROC(__guest_enter)
- 
- ENTRY(__guest_exit)
--	// x0: vcpu
--	// x1: return code
--	// x2-x3: free
--	// x4-x29,lr: vcpu regs
--	// vcpu x0-x3 on the stack
--
--	add	x2, x0, #VCPU_CONTEXT
--
--	stp	x4, x5,   [x2, #CPU_XREG_OFFSET(4)]
--	stp	x6, x7,   [x2, #CPU_XREG_OFFSET(6)]
--	stp	x8, x9,   [x2, #CPU_XREG_OFFSET(8)]
--	stp	x10, x11, [x2, #CPU_XREG_OFFSET(10)]
--	stp	x12, x13, [x2, #CPU_XREG_OFFSET(12)]
--	stp	x14, x15, [x2, #CPU_XREG_OFFSET(14)]
--	stp	x16, x17, [x2, #CPU_XREG_OFFSET(16)]
--	str	x18,      [x2, #CPU_XREG_OFFSET(18)]
--
--	ldp	x6, x7, [sp], #16	// x2, x3
--	ldp	x4, x5, [sp], #16	// x0, x1
--
--	stp	x4, x5, [x2, #CPU_XREG_OFFSET(0)]
--	stp	x6, x7, [x2, #CPU_XREG_OFFSET(2)]
-+	// x0: return code
-+	// x1: vcpu
-+	// x2-x29,lr: vcpu regs
-+	// vcpu x0-x1 on the stack
-+
-+	add	x1, x1, #VCPU_CONTEXT
-+
-+	// Store the guest regs x2 and x3
-+	stp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
-+
-+	// Retrieve the guest regs x0-x1 from the stack
-+	ldp	x2, x3, [sp], #16	// x0, x1
-+
-+	// Store the guest regs x0-x1 and x4-x18
-+	stp	x2, x3,   [x1, #CPU_XREG_OFFSET(0)]
-+	stp	x4, x5,   [x1, #CPU_XREG_OFFSET(4)]
-+	stp	x6, x7,   [x1, #CPU_XREG_OFFSET(6)]
-+	stp	x8, x9,   [x1, #CPU_XREG_OFFSET(8)]
-+	stp	x10, x11, [x1, #CPU_XREG_OFFSET(10)]
-+	stp	x12, x13, [x1, #CPU_XREG_OFFSET(12)]
-+	stp	x14, x15, [x1, #CPU_XREG_OFFSET(14)]
-+	stp	x16, x17, [x1, #CPU_XREG_OFFSET(16)]
-+	str	x18,      [x1, #CPU_XREG_OFFSET(18)]
-+
-+	// Store the guest regs x19-x29, lr
-+	save_callee_saved_regs x1
- 
--	save_callee_saved_regs x2
-+	// Restore the host_ctxt from the stack
-+	ldr	x2, [sp], #16
- 
--	// Restore vcpu & host_ctxt from the stack
--	// (preserving return code in x1)
--	ldp	x0, x2, [sp], #16
- 	// Now restore the host regs
- 	restore_callee_saved_regs x2
- 
--	mov	x0, x1
- 	ret
- ENDPROC(__guest_exit)
- 
- ENTRY(__fpsimd_guest_restore)
-+	stp	x2, x3, [sp, #-16]!
- 	stp	x4, lr, [sp, #-16]!
- 
- alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index f6d9694..d6cae54 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -27,16 +27,6 @@
- 	.text
- 	.pushsection	.hyp.text, "ax"
- 
--.macro	save_x0_to_x3
--	stp	x0, x1, [sp, #-16]!
--	stp	x2, x3, [sp, #-16]!
--.endm
--
--.macro	restore_x0_to_x3
--	ldp	x2, x3, [sp], #16
--	ldp	x0, x1, [sp], #16
--.endm
--
- .macro do_el2_call
- 	/*
- 	 * Shuffle the parameters before calling the function
-@@ -79,23 +69,23 @@ ENTRY(__kvm_hyp_teardown)
- ENDPROC(__kvm_hyp_teardown)
- 	
- el1_sync:				// Guest trapped into EL2
--	save_x0_to_x3
-+	stp	x0, x1, [sp, #-16]!
- 
- alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	mrs	x1, esr_el2
- alternative_else
- 	mrs	x1, esr_el1
- alternative_endif
--	lsr	x2, x1, #ESR_ELx_EC_SHIFT
-+	lsr	x0, x1, #ESR_ELx_EC_SHIFT
- 
--	cmp	x2, #ESR_ELx_EC_HVC64
-+	cmp	x0, #ESR_ELx_EC_HVC64
- 	b.ne	el1_trap
- 
--	mrs	x3, vttbr_el2		// If vttbr is valid, the 64bit guest
--	cbnz	x3, el1_trap		// called HVC
-+	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
-+	cbnz	x1, el1_trap		// called HVC
- 
- 	/* Here, we're pretty sure the host called HVC. */
--	restore_x0_to_x3
-+	ldp	x0, x1, [sp], #16
- 
- 	cmp	x0, #HVC_GET_VECTORS
- 	b.ne	1f
-@@ -113,22 +103,21 @@ alternative_endif
- 
- el1_trap:
- 	/*
--	 * x1: ESR
--	 * x2: ESR_EC
-+	 * x0: ESR_EC
- 	 */
- 
- 	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
--	cmp	x2, #ESR_ELx_EC_FP_ASIMD
-+	cmp	x0, #ESR_ELx_EC_FP_ASIMD
- 	b.eq	__fpsimd_guest_restore
- 
--	mrs	x0, tpidr_el2
--	mov	x1, #ARM_EXCEPTION_TRAP
-+	mrs	x1, tpidr_el2
-+	mov	x0, #ARM_EXCEPTION_TRAP
- 	b	__guest_exit
- 
- el1_irq:
--	save_x0_to_x3
--	mrs	x0, tpidr_el2
--	mov	x1, #ARM_EXCEPTION_IRQ
-+	stp     x0, x1, [sp, #-16]!
-+	mrs	x1, tpidr_el2
-+	mov	x0, #ARM_EXCEPTION_IRQ
- 	b	__guest_exit
- 
- ENTRY(__hyp_do_panic)
+ /*
+  * stolen from arch/arm/kernel/opcodes.c
+  *
 -- 
 2.9.0
