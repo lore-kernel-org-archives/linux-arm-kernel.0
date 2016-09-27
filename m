@@ -1,235 +1,63 @@
-From: clingutla@codeaurora.org (Chandra Sekhar Lingutla)
-Date: Tue, 27 Sep 2016 18:05:00 +0530
-Subject: [RFC] irqchip/gic-v3: Implement suspend and resume callbacks
-In-Reply-To: <57E25C8E.7080502@arm.com>
-References: <1474447359-29551-1-git-send-email-clingutla@codeaurora.org>
- <57E25C8E.7080502@arm.com>
-Message-ID: <57EA6774.2060807@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 27 Sep 2016 14:37:39 +0200
+Subject: [PATCH/RFT 0/4] ARM: shmobile: R-Car Gen2: Allow booting
+ secondary CPU cores in debug mode
+In-Reply-To: <1471877069-4157-1-git-send-email-geert+renesas@glider.be>
+References: <1471877069-4157-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdUfV46Y_L2yformTPcnGKpbfFawNOrutyeMk5L4rL5BfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2016 03:40 PM, Marc Zyngier wrote:
-> +Sudeep, Lorenzo,
->
-> On 21/09/16 09:42, Lingutla Chandrasekhar wrote:
->> Implement suspend and resume syscore_ops to disable and
->> enable non wake up capable interrupts.
->>
->> When system enters suspend, enable only wakeup capable
->> interrupts. While resuming, enable previously enabled interrupts
->> and show triggered/pending interrupts.
->
-> The fundamental problem (which you're not mentioning at all) is that the
-> GICv3 architecture doesn't mention wake-up interrupts at all, so this
-> has to be entirely handled in firmware. Is that what is happening?
->
->>
->> Signed-off-by: Lingutla Chandrasekhar <clingutla@codeaurora.org>
->>
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index ede5672..511a5a1 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -33,6 +33,7 @@
->>   #include <linux/irqchip/arm-gic-common.h>
->>   #include <linux/irqchip/arm-gic-v3.h>
->>   #include <linux/irqchip/irq-partition-percpu.h>
->> +#include <linux/syscore_ops.h>
->>
->>   #include <asm/cputype.h>
->>   #include <asm/exception.h>
->> @@ -57,6 +58,10 @@ struct gic_chip_data {
->>   	u32			nr_redist_regions;
->>   	unsigned int		irq_nr;
->>   	struct partition_desc	*ppi_descs[16];
->> +#ifdef CONFIG_PM
->> +	unsigned int wakeup_irqs[32];
->> +	unsigned int enabled_irqs[32];
->
-> Do not use ambiguous types for something that comes from the HW. Where
-> does this '32' comes from?
-Expecting wakeup capable irq can be any of maximum 1024 interrupt lines, so
-used array of size 32 (32 * 32 bits).
+Hi Simon, Magnus,
 
+On Mon, Aug 22, 2016 at 4:44 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> This patch series is an attempt to allow booting secondary CPU cores on
+> R-Car Gen2 when hardware debug mode is enabled. In this mode, reset
+> requests derived from power-shutoff to the AP-system CPU cores must be
+> enabled before the AP-system cores first resume from power-shutoff. Else
+> resume may fail, causing the system to hang during boot. Currently we
+> avoid the hang by prohibiting booting secondary CPU cores when hardware
+> debug mode is enabled.
 >
->> +#endif
->>   };
->>
->>   static struct gic_chip_data gic_data __read_mostly;
->> @@ -330,6 +335,81 @@ static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
->>   	return 0;
->>   }
->>
->> +#ifdef CONFIG_PM
->> +static int gic_suspend(void)
->> +{
->> +	unsigned int i;
->> +	void __iomem *base = gic_data.dist_base;
->> +
->> +	for (i = 0; i * 32 < gic->irq_nr; i++) {
->> +		gic->enabled_irqs[i]
->> +			= readl_relaxed(base + GICD_ISENABLER + i * 4);
+> On all R-Car Gen2 SoCs, hardware debug mode is enabled by setting
+> MD21=1.  On both Koelsch and Lager, this is done by setting mode switch
+> SW8-4 to OFF.
 >
-> Do you realize that GICD_ISENABLER0 is always zero? What do you do for
-> PPIs? Please keep the assignment on a single line.
-Agreed, will update.
+> Unfortunately the hang is not easy to reproduce: I only saw it (on
+> Koelsch) during real cold boot (power off during the night), and even
+> then it's not guaranteed to trigger. Pressing the reset button
+> afterwards recovers the system, and a subsequent boot will succeed
+> (incl. secondary CPU core boot).
+>
+> This series configures the reset requests as documented in the R-Car
+> Gen2 datasheet, and removes the check for MD21 during secondary CPU
+> bringup.  It was inspired by CPU-specific patches in the BSP by
+> Nakamura-san.
+>
+> This series has been boot-tested on r8a7791/koelsch (both debug mode and
+> normal mode), on r8a7790/lager and r8a7793/gose (normal mode only), and
+> on r8a7794/alt (normal mode UP only).
 
->
->> +		/* disable all of them */
->> +		writel_relaxed(0xffffffff, base + GICD_ICENABLER + i * 4);
->> +		/* enable the wakeup set */
->> +		writel_relaxed(gic->wakeup_irqs[i],
->> +			base + GICD_ISENABLER + i * 4);
->
-> On a single line as well.
->
->> +	}
->> +	return 0;
->> +}
->> +
->> +static void gic_show_pending(void)
->> +{
->> +	unsigned int i;
->> +	u32 enabled;
->> +	u32 pending[32];
->> +	void __iomem *base = gic_data.dist_base;
->> +
->> +	for (i = 0; i * 32 < gic->irq_nr; i++) {
->> +		enabled = readl_relaxed(base + GICD_ICENABLER + i * 4);
->> +		pending[i] = readl_relaxed(base + GICD_ISPENDR + i * 4);
->> +		pending[i] &= enabled;
->> +	}
->> +
->> +	for_each_set_bit(i, (unsigned long *)pending, gic->irq_nr) {
->> +		unsigned int irq = irq_find_mapping(gic->domain, i);
->> +		struct irq_desc *desc = irq_to_desc(irq);
->> +		const char *name = "null";
->> +
->> +		if (desc == NULL)
->> +			name = "stray irq";
->> +		else if (desc->action && desc->action->name)
->> +			name = desc->action->name;
->> +
->> +		pr_debug("Pending IRQ: %d [%s]\n", __func__, irq, name);
->> +	}
->> +}
->
-> Please drop this function from this patch, it doesn't serve any purpose
-> other than your own debugging.
->
-I think, this function is useful for debugging to know wakeup reason.
-Can we move this function under PM_DEBUG flag or debugfs entry ?
+Any comments?
+Any objection to applying this series?
 
->> +
->> +static void gic_resume(void)
->> +{
->> +	unsigned int i;
->> +	void __iomem *base = gic_data.dist_base;
->> +
->> +	gic_show_pending();
->> +
->> +	for (i = 0; i * 32 < gic->irq_nr; i++) {
->> +		/* disable all of them */
->> +		writel_relaxed(0xffffffff, base + GICD_ICENABLER + i * 4);
->> +		/* enable the enabled set */
->> +		writel_relaxed(gic->enabled_irqs[i],
->> +			base + GICD_ISENABLER + i * 4);
->
-> Same remarks as the suspend side.
->
->> +	}
->> +}
->> +
->> +static struct syscore_ops gic_syscore_ops = {
->> +	.suspend = gic_suspend,
->> +	.resume = gic_resume,
->> +};
->> +
->> +static int __init gic_init_sys(void)
->> +{
->> +	register_syscore_ops(&gic_syscore_ops);
->> +	return 0;
->> +}
->> +device_initcall(gic_init_sys);
->> +
->> +#endif
->> +
->>   static u64 gic_mpidr_to_affinity(unsigned long mpidr)
->>   {
->>   	u64 aff;
->> @@ -666,6 +746,32 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>   #define gic_smp_init()		do { } while(0)
->>   #endif
->>
->> +#ifdef CONFIG_PM
->> +int gic_set_wake(struct irq_data *d, unsigned int on)
->> +{
->> +	int ret = -ENXIO;
->> +	unsigned int reg_offset, bit_offset;
->> +	unsigned int gicirq = gic_irq(d);
->> +	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
->> +
->> +	/* per-cpu interrupts cannot be wakeup interrupts */
->> +	WARN_ON(gicirq < 32);
->
-> How did you decide that? There is no such specification anywhere.
->
-I am basically looking at system suspend, where cores would be in power collapse.
+I've been running my Koelsch with MD21=1 since I posted this series,
+and it has been included in renesas-drivers since the beginning of September.
 
->> +
->> +	reg_offset = gicirq / 32;
->> +	bit_offset = gicirq % 32;
->> +
->> +	if (on)
->> +		gic_data->wakeup_irqs[reg_offset] |=  1 << bit_offset;
->> +	else
->> +		gic_data->wakeup_irqs[reg_offset] &=  ~(1 << bit_offset);
->> +
->> +	return ret;
->> +}
->> +
->> +#else
->> +#define gic_set_wake	NULL
->> +#endif
->> +
->>   #ifdef CONFIG_CPU_PM
->>   /* Check whether it's single security state view */
->>   static bool gic_dist_security_disabled(void)
->> @@ -707,6 +813,7 @@ static struct irq_chip gic_chip = {
->>   	.irq_eoi		= gic_eoi_irq,
->>   	.irq_set_type		= gic_set_type,
->>   	.irq_set_affinity	= gic_set_affinity,
->> +	.irq_set_wake           = gic_set_wake,
->>   	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
->>   	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
->>   	.flags			= IRQCHIP_SET_TYPE_MASKED,
->> @@ -723,6 +830,7 @@ static struct irq_chip gic_eoimode1_chip = {
->>   	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
->>   	.irq_set_vcpu_affinity	= gic_irq_set_vcpu_affinity,
->>   	.flags			= IRQCHIP_SET_TYPE_MASKED,
->> +	.irq_set_wake		= gic_set_wake,
->
-> Keep the fields in the same order.
->
->>   };
->>
->>   #define GIC_ID_NR		(1U << gic_data.rdists.id_bits)
->>
->
-> But here's my fundamental objection: None of that should be required and
-> setting (IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND) as part of the
-> irqchip flags should be enough.
->
-> Can you explain why this doesn't work for you?
->
-These flags work for me, I will remove suspend/resume functions, but i think
-it is very useful to know the wakeup source for debugging purposes.
-Please let me know, if you have any better way to achieve this.
+My main motivation to push this is that it removes two more users of
+rcar_gen2_read_mode_pins(). After this, the only remaining user is the
+clock driver, invoked from rcar_gen2_timer_init().
 
-> Thanks,
->
-> 	M.
->
+Thanks!
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,\na Linux Foundation Collaborative Project
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
