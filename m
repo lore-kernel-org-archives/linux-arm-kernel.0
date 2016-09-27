@@ -1,52 +1,37 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Tue, 27 Sep 2016 21:27:54 +0200
-Subject: [PATCH v2 3/8] i2c: bcm2835: Use ratelimited logging on transfer
- errors
-In-Reply-To: <74D9ED33-1B99-4ED6-88B5-879950D160C8@martin.sperl.org>
-References: <1474977426-3272-1-git-send-email-noralf@tronnes.org>
- <1474977426-3272-4-git-send-email-noralf@tronnes.org>
- <74D9ED33-1B99-4ED6-88B5-879950D160C8@martin.sperl.org>
-Message-ID: <66be95f1-3ed7-7abc-3def-b10582d609ea@tronnes.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 27 Sep 2016 20:36:45 +0100
+Subject: next-20160927 build: 2 failures 4 warnings (next-20160927)
+In-Reply-To: <20160927160036.y3ti3gzt4ebg2vyz@sirena.org.uk>
+References: <E1bop0x-0001YK-4h@optimist>
+ <20160927160036.y3ti3gzt4ebg2vyz@sirena.org.uk>
+Message-ID: <20160927193645.GI21388@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 27 Sep 2016, Mark Brown wrote:
 
-Den 27.09.2016 15:01, skrev Martin Sperl:
->> On 27 Sep 2016, at 13:57, Noralf Tr?nnes <noralf@tronnes.org> wrote:
->>
->> Writing to an AT24C32 generates on average 2x i2c transfer errors per
->> 32-byte page write. Which amounts to a lot for a 4k write. This is due
->> to the fact that the chip doesn't respond during it's internal write
->> cycle when the at24 driver tries and retries the next write.
->> Reduce this flooding of the log by using dev_err_ratelimited().
->>
->> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
->> Reviewed-by: Eric Anholt <eric@anholt.net>
->> ---
->> drivers/i2c/busses/i2c-bcm2835.c | 3 ++-
->> 1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
->> index df036ed..370a322 100644
->> --- a/drivers/i2c/busses/i2c-bcm2835.c
->> +++ b/drivers/i2c/busses/i2c-bcm2835.c
->> @@ -207,7 +207,8 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
->>         (msg->flags & I2C_M_IGNORE_NAK))
->>         return 0;
->>
->> -    dev_err(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
->> +    dev_err_ratelimited(i2c_dev->dev, "i2c transfer failed: %x\n",
->> +                i2c_dev->msg_err);
-> Do we really need this error message at all?
->
-> Maybe just remove it instead, because error messages during
-> "normal"/successfull operations of at24 seems  strange.
->
-> Or make it a debug message instead.
+> On Tue, Sep 27, 2016 at 10:49:27AM +0100, Build bot for Mark Brown wrote:
+> 
+> -next is still failing to build an arm and arm64 allmodconfig due to:
+> 
+> > 	arm64-allmodconfig
+> > ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+> 
+> > 	arm-allmodconfig
+> > ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+> 
+> due to 262d5cc6ceb293 (mfd: tps65217: Add support for IRQs) since
+> irq_set_parent() isn't exported.  There was a fix posted adding the
+> export to the IRQ subsystem but it's still not been applied, the
+> function is being used in order to enable lazy IRQ disabling for
+> threaded interrupts:
+> 
+>    https://www.spinics.net/lists/arm-kernel/msg532864.html
 
-I have looked through 64 i2c bus drivers, 8 use dev_err and 2 use dev_warn
-on transfer errors (not timeouts). Several use dev_dbg.
+Right H-hour is fast approaching.  How are we going to resolve this?
 
-I'll change it to dev_dbg instead. Thanks.
-
-Noralf.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
