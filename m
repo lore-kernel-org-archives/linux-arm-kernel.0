@@ -1,47 +1,104 @@
-From: vagrantc@aikidev.net (Vagrant Cascadian)
-Date: Tue, 27 Sep 2016 13:53:46 -0700
-Subject: [PATCH v2] ARM: dts: rockchip: temporarily remove emmc hs200 speed
- from rk3288-veyron-speedy.
-Message-ID: <87twd1vzc5.fsf@aikidev.net>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Tue, 27 Sep 2016 23:54:12 +0300
+Subject: [PATCH v11 1/4] of/serial: move earlycon early_param handling to
+ serial
+In-Reply-To: <20160927151953.GB4371@kroah.com>
+References: <20160927151953.GB4371@kroah.com>
+Message-ID: <20160927205418.31529-1-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This essentially mimics what was done with rk3288-veyron-minnie in
-commit 984926781122f034d5bc9962815d135b6c4a8e1d.
+From: Leif Lindholm <leif.lindholm@linaro.org>
 
-The eMMC of the speedy Chromebook also appears to need the same tuning
-workaround, as it frequently fails to recognize the eMMC without it.
+We have multiple "earlycon" early_param handlers - merge the DT one into
+the main earlycon one.  It's a cleanup that also will be useful
+to defer setting up DT console until ACPI/DT decision is made.
 
-Signed-off-by: Vagrant Cascadian <vagrantc@aikidev.net>
+Rename the exported function to avoid clashing with the function from
+arch/microblaze/kernel/prom.c
+
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+Tested-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Tested-by: Christopher Covington <cov@codeaurora.org>
 ---
-Changes in v2:
- - Added Signed-off-by.
+ drivers/of/fdt.c              | 11 +----------
+ drivers/tty/serial/earlycon.c |  2 +-
+ include/linux/of_fdt.h        |  3 +++
+ 3 files changed, 5 insertions(+), 11 deletions(-)
 
- arch/arm/boot/dts/rk3288-veyron-speedy.dts | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-veyron-speedy.dts b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-index a0d033f..500fd18 100644
---- a/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-+++ b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-@@ -124,6 +124,11 @@
-            &sdmmc_bus4>;
- };
-
-+
-+&emmc {
-+       /delete-property/mmc-hs200-1_8v;
-+};
-+
- &vcc_5v {
-    enable-active-high;
-    gpio = <&gpio7 21 GPIO_ACTIVE_HIGH>;
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 085c638..c89d5d2 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -924,7 +924,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
+ 
+ #ifdef CONFIG_SERIAL_EARLYCON
+ 
+-static int __init early_init_dt_scan_chosen_serial(void)
++int __init early_init_dt_scan_chosen_stdout(void)
+ {
+ 	int offset;
+ 	const char *p, *q, *options = NULL;
+@@ -968,15 +968,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
+ 	}
+ 	return -ENODEV;
+ }
+-
+-static int __init setup_of_earlycon(char *buf)
+-{
+-	if (buf)
+-		return 0;
+-
+-	return early_init_dt_scan_chosen_serial();
+-}
+-early_param("earlycon", setup_of_earlycon);
+ #endif
+ 
+ /**
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+index 067783f..7aae655 100644
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -209,7 +209,7 @@ static int __init param_setup_earlycon(char *buf)
+ 	 * don't generate a warning from parse_early_params() in that case
+ 	 */
+ 	if (!buf || !buf[0])
+-		return 0;
++		return early_init_dt_scan_chosen_stdout();
+ 
+ 	err = setup_earlycon(buf);
+ 	if (err == -ENOENT || err == -EALREADY)
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index 26c3302..4341f32 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -14,6 +14,7 @@
+ 
+ #include <linux/types.h>
+ #include <linux/init.h>
++#include <linux/errno.h>
+ 
+ /* Definitions used by the flattened device tree */
+ #define OF_DT_HEADER		0xd00dfeed	/* marker */
+@@ -66,6 +67,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+ 				     int depth, void *data);
+ extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+ 				     int depth, void *data);
++extern int early_init_dt_scan_chosen_stdout(void);
+ extern void early_init_fdt_scan_reserved_mem(void);
+ extern void early_init_fdt_reserve_self(void);
+ extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+@@ -94,6 +96,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
+ extern u64 of_flat_dt_translate_address(unsigned long node);
+ extern void of_fdt_limit_memory(int limit);
+ #else /* CONFIG_OF_FLATTREE */
++static inline int early_init_dt_scan_chosen_stdout(void) { return -ENODEV; }
+ static inline void early_init_fdt_scan_reserved_mem(void) {}
+ static inline void early_init_fdt_reserve_self(void) {}
+ static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
 -- 
-2.9.3
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160927/2c08807f/attachment.sig>
+2.10.0
