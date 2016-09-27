@@ -1,37 +1,55 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:51 +0200
-Subject: [PULL 43/50] ARM: Introduce MPIDR_LEVEL_SHIFT macro
+Date: Tue, 27 Sep 2016 20:05:58 +0200
+Subject: [PULL 50/50] KVM: arm/arm64: vgic: Don't flush/sync without a working
+ vgic
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-44-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-51-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Murzin <vladimir.murzin@arm.com>
+If the vgic hasn't been created and initialized, we shouldn't attempt to
+look at its data structures or flush/sync anything to the GIC hardware.
 
-vgic-v3 driver uses architecture specific MPIDR_LEVEL_SHIFT macro to
-encode the affinity in a form compatible with ICC_SGI* registers.
-Unfortunately, that macro is missing on ARM, so let's add it.
+This fixes an issue reported by Alexander Graf when using a userspace
+irqchip.
 
-Cc: Russell King <rmk+kernel@armlinux.org.uk>
+Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
+Cc: stable at vger.kernel.org
+Reported-by: Alexander Graf <agraf@suse.de>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/cputype.h | 1 +
- 1 file changed, 1 insertion(+)
+Note that this is rework of a patch submitted by Alexander Graf, but
+slightly reworked to use vgic_initialized instead of vgic_enabled, as
+discussed on the list.
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 1ee94c7..e2d94c1 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -55,6 +55,7 @@
- 
- #define MPIDR_LEVEL_BITS 8
- #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
-+#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
- 
- #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
- 	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
+ virt/kvm/arm/vgic/vgic.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 8a529a7..2893d5b 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -645,6 +645,9 @@ next:
+ /* Sync back the hardware VGIC state into our emulation after a guest's run. */
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ {
++	if (unlikely(!vgic_initialized(vcpu->kvm)))
++		return;
++
+ 	vgic_process_maintenance_interrupt(vcpu);
+ 	vgic_fold_lr_state(vcpu);
+ 	vgic_prune_ap_list(vcpu);
+@@ -653,6 +656,9 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ /* Flush our emulation state into the GIC hardware before entering the guest. */
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ {
++	if (unlikely(!vgic_initialized(vcpu->kvm)))
++		return;
++
+ 	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ 	vgic_flush_lr_state(vcpu);
+ 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
 -- 
 2.9.0
