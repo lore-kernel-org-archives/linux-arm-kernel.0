@@ -1,55 +1,60 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 27 Sep 2016 20:05:58 +0200
-Subject: [PULL 50/50] KVM: arm/arm64: vgic: Don't flush/sync without a working
- vgic
+Date: Tue, 27 Sep 2016 20:05:57 +0200
+Subject: [PULL 49/50] KVM: arm64: Require in-kernel irqchip for PMU support
 In-Reply-To: <20160927180558.14699-1-christoffer.dall@linaro.org>
 References: <20160927180558.14699-1-christoffer.dall@linaro.org>
-Message-ID: <20160927180558.14699-51-christoffer.dall@linaro.org>
+Message-ID: <20160927180558.14699-50-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the vgic hasn't been created and initialized, we shouldn't attempt to
-look at its data structures or flush/sync anything to the GIC hardware.
+If userspace creates a PMU for the VCPU, but doesn't create an in-kernel
+irqchip, then we end up in a nasty path where we try to take an
+uninitialized spinlock, which can lead to all sorts of breakages.
 
-This fixes an issue reported by Alexander Graf when using a userspace
-irqchip.
+Luckily, QEMU always creates the VGIC before the PMU, so we can
+establish this as ABI and check for the VGIC in the PMU init stage.
+This can be relaxed at a later time if we want to support PMU with a
+userspace irqchip.
 
-Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
 Cc: stable at vger.kernel.org
-Reported-by: Alexander Graf <agraf@suse.de>
+Cc: Shannon Zhao <shannon.zhao@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-Note that this is rework of a patch submitted by Alexander Graf, but
-slightly reworked to use vgic_initialized instead of vgic_enabled, as
-discussed on the list.
+ Documentation/virtual/kvm/devices/vcpu.txt | 4 +++-
+ virt/kvm/arm/pmu.c                         | 8 ++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
- virt/kvm/arm/vgic/vgic.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 8a529a7..2893d5b 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -645,6 +645,9 @@ next:
- /* Sync back the hardware VGIC state into our emulation after a guest's run. */
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
-+	if (unlikely(!vgic_initialized(vcpu->kvm)))
-+		return;
+diff --git a/Documentation/virtual/kvm/devices/vcpu.txt b/Documentation/virtual/kvm/devices/vcpu.txt
+index c041658..02f5068 100644
+--- a/Documentation/virtual/kvm/devices/vcpu.txt
++++ b/Documentation/virtual/kvm/devices/vcpu.txt
+@@ -30,4 +30,6 @@ Returns: -ENODEV: PMUv3 not supported
+                  attribute
+          -EBUSY: PMUv3 already initialized
+ 
+-Request the initialization of the PMUv3.
++Request the initialization of the PMUv3.  This must be done after creating the
++in-kernel irqchip.  Creating a PMU with a userspace irqchip is currently not
++supported.
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index a027569..6e9c40e 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -423,6 +423,14 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+ 	if (!kvm_arm_support_pmu_v3())
+ 		return -ENODEV;
+ 
++	/*
++	 * We currently require an in-kernel VGIC to use the PMU emulation,
++	 * because we do not support forwarding PMU overflow interrupts to
++	 * userspace yet.
++	 */
++	if (!irqchip_in_kernel(vcpu->kvm) || !vgic_initialized(vcpu->kvm))
++		return -ENODEV;
 +
- 	vgic_process_maintenance_interrupt(vcpu);
- 	vgic_fold_lr_state(vcpu);
- 	vgic_prune_ap_list(vcpu);
-@@ -653,6 +656,9 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- /* Flush our emulation state into the GIC hardware before entering the guest. */
- void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- {
-+	if (unlikely(!vgic_initialized(vcpu->kvm)))
-+		return;
-+
- 	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
- 	vgic_flush_lr_state(vcpu);
- 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ 	if (!test_bit(KVM_ARM_VCPU_PMU_V3, vcpu->arch.features) ||
+ 	    !kvm_arm_pmu_irq_initialized(vcpu))
+ 		return -ENXIO;
 -- 
 2.9.0
