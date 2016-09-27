@@ -1,172 +1,160 @@
-From: dhaab@luxul.com (Dan Haab)
-Date: Tue, 27 Sep 2016 11:27:11 -0600
-Subject: [PATCH 2/2] ARM: BCM5301X: Add DT for Luxul XWR-3100
-In-Reply-To: <1474997231-27700-1-git-send-email-dhaab@luxul.com>
-References: <1474997231-27700-1-git-send-email-dhaab@luxul.com>
-Message-ID: <1474997231-27700-2-git-send-email-dhaab@luxul.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 27 Sep 2016 20:05:08 +0200
+Subject: [PULL 00/50] KVM/ARM Changes for v4.9
+Message-ID: <20160927180558.14699-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Luxul XWR-3100 is a wireless router based on BCM47094 SoC with two
-4366c0 FullMAC PCIe cards on the PCB. It uses NAND with BCH-4 ECC
-algorithm.
+Hi Paolo and Radim,
 
-Signed-off-by: Dan Haab <dhaab@luxul.com>
+Here are the KVM/ARM Changes for v4.9. They include:
+
+ - Various cleanups and removal of redundant code
+ - Two important fixes for not using an in-kernel irqchip
+ - A bit of optimizations
+ - Handle SError exceptions and present them to guests if appropriate
+ - Proxying of GICV access at EL2 if guest mappings are unsafe
+ - GICv3 on AArch32 on ARMv8
+ - Preparations for GICv3 save/restore, including ABI docs
+
+
+The following changes since commit 9ac7e3e815060efdc86b6d12448200e3c3597e01:
+
+  KVM: nVMX: expose INS/OUTS information support (2016-09-07 19:34:30 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.9
+
+for you to fetch changes up to 0099b7701f5296a758d9e6b945ec96f96847cc2f:
+
+  KVM: arm/arm64: vgic: Don't flush/sync without a working vgic (2016-09-27 18:57:35 +0200)
+
+Thanks,
+-Christoffer
+
 ---
- arch/arm/boot/dts/Makefile                    |    1 +
- arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts |  111 +++++++++++++++++++++++++
- arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi |   13 +++
- 3 files changed, 125 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
- create mode 100644 arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b7fbc1b..e46e2d85 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -88,6 +88,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4709-netgear-r7000.dtb \
- 	bcm4709-netgear-r8000.dtb \
- 	bcm47094-dlink-dir-885l.dtb \
-+	bcm47094-luxul-xwr-3100.dtb \
- 	bcm47094-netgear-r8500.dtb \
- 	bcm94708.dtb \
- 	bcm94709.dtb \
-diff --git a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-new file mode 100644
-index 0000000..169b35f
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-@@ -0,0 +1,111 @@
-+/*
-+ * Copyright 2016 Luxul Inc.
-+ *
-+ * Licensed under the ISC license.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm47094.dtsi"
-+#include "bcm5301x-nand-cs0-bch4.dtsi"
-+
-+/ {
-+	compatible = "luxul,xwr-3100v1", "brcm,bcm47094", "brcm,bcm4708";
-+	model = "Luxul XWR-3100 V1";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlycon";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		power	{
-+			label = "bcm53xx:green:power";
-+			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		lan3	{
-+			label = "bcm53xx:green:lan1";
-+			gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		lan4	{
-+			label = "bcm53xx:green:lan0";
-+			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wan	{
-+			label = "bcm53xx:green:wan";
-+			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		lan1	{
-+			label = "bcm53xx:green:lan3";
-+			gpios = <&chipcommon 4 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		lan2	{
-+			label = "bcm53xx:green:lan2";
-+			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		usb3	{
-+			label = "bcm53xx:green:usb3";
-+			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		status	{
-+			label = "bcm53xx:green:status";
-+			gpios = <&chipcommon 10 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "timer";
-+		};
-+
-+		2ghz {
-+			label = "bcm53xx:green:2ghz";
-+			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		5ghz {
-+			label = "bcm53xx:green:5ghz";
-+			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&usb3 {
-+	vcc-gpio = <&chipcommon 18 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&spi_nor {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi
-new file mode 100644
-index 0000000..b4e875d
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi
-@@ -0,0 +1,13 @@
-+/*
-+ * Copyright 2016 Luxul Inc.
-+ *
-+ * Licensed under the ISC license.
-+ */
-+
-+#include "bcm5301x-nand-cs0.dtsi"
-+
-+&nandcs {
-+	nand-ecc-algo = "bch";
-+	nand-ecc-strength = <4>;
-+	nand-ecc-step-size = <512>;
-+};
--- 
-1.7.9.5
+Christoffer Dall (6):
+      KVM: arm/arm64: Add VGICv3 save/restore API documentation
+      KVM: arm/arm64: Factor out vgic_attr_regs_access functionality
+      KVM: arm/arm64: Rename vgic_attr_regs_access to vgic_attr_regs_access_v2
+      KVM: arm/arm64: Get rid of exported aliases to static functions
+      KVM: arm64: Require in-kernel irqchip for PMU support
+      KVM: arm/arm64: vgic: Don't flush/sync without a working vgic
+
+Marc Zyngier (28):
+      KVM: arm: vgic: Drop build compatibility hack for older kernel versions
+      arm64: KVM: Move kvm_vcpu_get_condition out of emulate.c
+      arm64: KVM: Move the AArch32 conditional execution to common code
+      arm: KVM: Use common AArch32 conditional execution code
+      arm64: KVM: Make kvm_skip_instr32 available to HYP
+      arm64: KVM: vgic-v2: Add the GICV emulation infrastructure
+      arm64: KVM: vgic-v2: Add GICV access from HYP
+      arm64: KVM: vgic-v2: Enable GICV access from HYP if access from guest is unsafe
+      arm64: KVM: Rename HCR_VA to HCR_VSE
+      arm64: KVM: Preserve pending vSError in world switch
+      arm64: KVM: Add Virtual Abort injection helper
+      arm64: KVM: Add exception code to report EL1 asynchronous aborts
+      arm64: KVM: Add EL1 async abort handler
+      arm64: KVM: Route asynchronous aborts
+      arm64: KVM: Allow an exit code to be tagged with an SError
+      arm64: KVM: Inject a Virtual SError if it was pending
+      arm64: KVM: Handle async aborts delivered while at EL2
+      arm: KVM: Preserve pending Virtual Abort in world switch
+      arm: KVM: Add Virtual Abort injection helper
+      arm: KVM: Add HYP async abort handler
+      arm: KVM: Allow an exit code to be tagged with a Virtual Abort
+      arm: KVM: Handle async aborts delivered while at HYP
+      arm: KVM: Inject a Virtual Abort if it was pending
+      arm: KVM: Drop unreachable HYP abort handlers
+      arm/arm64: KVM: Inject virtual abort when guest exits on external abort
+      arm/arm64: KVM: Remove external abort test from MMIO handling
+      arm64: KVM: Inject a vSerror if detecting a bad GICV access at EL2
+      ARM: gic-v3: Work around definition of gic_write_bpr1
+
+Mark Rutland (2):
+      arm/kvm: excise redundant cache maintenance
+      arm64/kvm: remove unused stub functions
+
+Paolo Bonzini (1):
+      KVM: ARM: cleanup kvm_timer_hyp_init
+
+Shanker Donthineni (1):
+      arm64: KVM: Optimize __guest_enter/exit() to save a few instructions
+
+Vladimir Murzin (12):
+      arm64: KVM: VHE: reset PSTATE.PAN on entry to EL2
+      arm64: KVM: Use static keys for selecting the GIC backend
+      arm64: KVM: Move GIC accessors to arch_gicv3.h
+      arm64: KVM: Move vgic-v3 save/restore to virt/kvm/arm/hyp
+      KVM: arm64: vgic-its: Introduce config option to guard ITS specific code
+      KVM: arm: vgic: Fix compiler warnings when built for 32-bit
+      KVM: arm: vgic: Support 64-bit data manipulation on 32-bit host systems
+      ARM: Introduce MPIDR_LEVEL_SHIFT macro
+      ARM: Move system register accessors to asm/cp15.h
+      ARM: gic-v3: Introduce 32-to-64-bit mappings for GICv3 cpu registers
+      ARM: KVM: Support vgic-v3
+      arm64: KVM: Remove duplicating init code for setting VMID
+
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt |  38 ++++
+ Documentation/virtual/kvm/devices/arm-vgic-v3.txt  | 206 +++++++++++++++++++++
+ Documentation/virtual/kvm/devices/arm-vgic.txt     |  52 ++----
+ Documentation/virtual/kvm/devices/vcpu.txt         |   4 +-
+ arch/arm/include/asm/arch_gicv3.h                  | 100 ++++++++--
+ arch/arm/include/asm/cp15.h                        |  15 ++
+ arch/arm/include/asm/cputype.h                     |   1 +
+ arch/arm/include/asm/kvm_asm.h                     |   7 +
+ arch/arm/include/asm/kvm_emulate.h                 |  35 +++-
+ arch/arm/include/asm/kvm_host.h                    |   5 +
+ arch/arm/include/asm/kvm_hyp.h                     |  18 +-
+ arch/arm/include/asm/kvm_mmu.h                     |  28 +--
+ arch/arm/include/uapi/asm/kvm.h                    |   7 +
+ arch/arm/kvm/Makefile                              |   3 +
+ arch/arm/kvm/arm.c                                 |  12 +-
+ arch/arm/kvm/coproc.c                              |  35 ++++
+ arch/arm/kvm/emulate.c                             | 111 ++---------
+ arch/arm/kvm/handle_exit.c                         |  49 +++--
+ arch/arm/kvm/hyp/Makefile                          |   1 +
+ arch/arm/kvm/hyp/entry.S                           |  31 ++++
+ arch/arm/kvm/hyp/hyp-entry.S                       |  16 +-
+ arch/arm/kvm/hyp/switch.c                          |  25 ++-
+ arch/arm/kvm/hyp/tlb.c                             |  15 +-
+ arch/arm/kvm/mmio.c                                |   6 -
+ arch/arm/kvm/mmu.c                                 |   7 +-
+ arch/arm64/include/asm/arch_gicv3.h                |  13 ++
+ arch/arm64/include/asm/kvm_arm.h                   |   4 +-
+ arch/arm64/include/asm/kvm_asm.h                   |   9 +-
+ arch/arm64/include/asm/kvm_emulate.h               |  11 ++
+ arch/arm64/include/asm/kvm_hyp.h                   |   1 +
+ arch/arm64/include/asm/kvm_mmu.h                   |   6 -
+ arch/arm64/kvm/Kconfig                             |   4 +-
+ arch/arm64/kvm/Makefile                            |   3 +-
+ arch/arm64/kvm/handle_exit.c                       |  23 +++
+ arch/arm64/kvm/hyp/Makefile                        |   2 +-
+ arch/arm64/kvm/hyp/debug-sr.c                      |   4 +-
+ arch/arm64/kvm/hyp/entry.S                         | 128 ++++++++-----
+ arch/arm64/kvm/hyp/hyp-entry.S                     |  73 +++++---
+ arch/arm64/kvm/hyp/switch.c                        |  84 +++++++--
+ arch/arm64/kvm/hyp/tlb.c                           |  13 +-
+ arch/arm64/kvm/inject_fault.c                      |  12 ++
+ include/kvm/arm_vgic.h                             |  18 +-
+ arch/arm64/kvm/emulate.c => virt/kvm/arm/aarch32.c |  25 +--
+ virt/kvm/arm/arch_timer.c                          |   6 +-
+ virt/kvm/arm/hyp/vgic-v2-sr.c                      |  57 ++++++
+ {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v3-sr.c  |  17 +-
+ virt/kvm/arm/pmu.c                                 |   8 +
+ virt/kvm/arm/vgic/vgic-init.c                      |   4 +
+ virt/kvm/arm/vgic/vgic-irqfd.c                     |   6 -
+ virt/kvm/arm/vgic/vgic-kvm-device.c                | 133 ++++++++-----
+ virt/kvm/arm/vgic/vgic-mmio-v3.c                   |   8 +-
+ virt/kvm/arm/vgic/vgic-mmio.c                      |   2 -
+ virt/kvm/arm/vgic/vgic-mmio.h                      |   4 +-
+ virt/kvm/arm/vgic/vgic-v2.c                        |  71 ++++---
+ virt/kvm/arm/vgic/vgic.c                           |   8 +-
+ virt/kvm/arm/vgic/vgic.h                           |  54 +-----
+ 56 files changed, 1076 insertions(+), 562 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-its.txt
+ create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+ rename arch/arm64/kvm/emulate.c => virt/kvm/arm/aarch32.c (90%)
+ rename {arch/arm64/kvm => virt/kvm/arm}/hyp/vgic-v3-sr.c (94%)
