@@ -1,34 +1,33 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Sep 2016 23:00:32 +0100
-Subject: [PATCH v1] ARM: decompressor: reset ttbcr fields to use TTBR0 on
- ARMv7
-In-Reply-To: <1475066728-27290-1-git-send-email-sramana@codeaurora.org>
-References: <3441d0c3-c4b6-a795-a841-b61a8866ce17@arm.com>
- <1475066728-27290-1-git-send-email-sramana@codeaurora.org>
-Message-ID: <20160928220032.GN1041@n2100.armlinux.org.uk>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Thu, 29 Sep 2016 00:10:37 +0200
+Subject: [PATCH v3 7/7] i2c: bcm2835: Add support for dynamic clock
+In-Reply-To: <87r383g1kb.fsf@eliezer.anholt.net>
+References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+ <1475085056-5205-8-git-send-email-noralf@tronnes.org>
+ <87r383g1kb.fsf@eliezer.anholt.net>
+Message-ID: <05d1c9d8-644e-a2b1-2853-67b7b77f8509@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2016 at 06:15:28PM +0530, Srinivas Ramana wrote:
-> If the bootloader uses the long descriptor format and jumps to
-> kernel decompressor code, TTBCR may not be in a right state.
-> Before enabling the MMU, it is required to clear the TTBCR.PD0
-> field to use TTBR0 for translation table walks.
-> 
-> The commit dbece45894d3a ("ARM: 7501/1: decompressor:
-> reset ttbcr for VMSA ARMv7 cores") does the reset of TTBCR.N, but
-> doesn't consider all the bits for the size of TTBCR.N.
-> 
-> Clear TTBCR.PD0 field and reset all the three bits of TTBCR.N to
-> indicate the use of TTBR0 and the correct base address width.
-> 
-> Fixes: dbece45894d3 ("ARM: 7501/1: decompressor: reset ttbcr for VMSA ARMv7 cores")
-> Acked-by: Robin Murphy <robin.murphy@arm.com>
-> Signed-off-by: Srinivas Ramana <sramana@codeaurora.org>
 
-Please submit to the patch system, thanks.
+Den 28.09.2016 23:24, skrev Eric Anholt:
+> Noralf Tr?nnes <noralf@tronnes.org> writes:
+>
+>> Support a dynamic clock by reading the frequency and setting the
+>> divisor in the transfer function instead of during probe.
+> Is this fixing some particular case you could note in the commit
+> message?  As is, it makes me think that we should be using a notifier
+> for when the parent clock (that's the one I assume you're talking about
+> being dynamic) changes.  But maybe you're working around a variable VPU
+> clock being set by the firmware, because we don't have a notifier for
+> it?
+>
+> I'm a bit worried because I think this is going to be pretty expensive
+> to be doing per transfer.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Actually I thought that this was a known problem, but trying to track
+it down now, I can't find anything definitive. I don't have any tool
+to look at the bus signals, so I couldn't actually test it.
+Sorry about this, we can just drop this patch.
+
+Noralf.
