@@ -1,7 +1,7 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 28 Sep 2016 15:41:48 +0800
+Date: Wed, 28 Sep 2016 15:43:38 +0800
 Subject: [PATCH v1] usb: ohci-at91: Use descriptor-based gpio APIs
-Message-ID: <1475048509-3042-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1475048618-3155-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
