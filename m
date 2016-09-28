@@ -1,51 +1,36 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 28 Sep 2016 11:59:58 -0500
-Subject: [PATCH] PCI: rockchip: fix uninitialized variable use
-In-Reply-To: <20160922094018.2138640-1-arnd@arndb.de>
-References: <20160922094018.2138640-1-arnd@arndb.de>
-Message-ID: <20160928165957.GC5658@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Sep 2016 18:12:10 +0100
+Subject: [PATCH 5/5] arm64: Add uprobe support
+In-Reply-To: <c7675b74-982d-d8b6-935f-a74139820174@redhat.com>
+References: <20160921170403.GE12180@e104818-lin.cambridge.arm.com>
+ <20160922032328.GB29470@localhost.localdomain>
+ <20160922165030.GA27704@e104818-lin.cambridge.arm.com>
+ <20160923041230.GC29470@localhost.localdomain>
+ <20160923130528.GE2161@e104818-lin.cambridge.arm.com>
+ <CAHB_GupuUYPNFoYQeX8EhAcesvqKVVuphuxneudZ5kL2cxm-7g@mail.gmail.com>
+ <20160926110159.GB27498@e104818-lin.cambridge.arm.com>
+ <20160926130359.GA9370@localhost.localdomain>
+ <20160927135133.GF17336@e104818-lin.cambridge.arm.com>
+ <c7675b74-982d-d8b6-935f-a74139820174@redhat.com>
+Message-ID: <20160928171210.GC29934@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2016 at 11:39:59AM +0200, Arnd Bergmann wrote:
-> The newly added pcie-rockchip driver fails to initialize the
-> io_size variable if the DT doesn't provide ranges for the PCI
-> I/O space, as found by building it with -Wmaybe-uninitialized:
+On Tue, Sep 27, 2016 at 08:33:25PM +0530, Pratyush Anand wrote:
+> On Tuesday 27 September 2016 07:21 PM, Catalin Marinas wrote:
+> >There is also the is_trap_at_addr() function which uses is_trap_insn().
+> >I haven't checked the call paths here, are there any implications if
+> >is_trap_insn() always returns false?
 > 
-> drivers/pci/host/pcie-rockchip.c: In function 'rockchip_pcie_probe':
-> drivers/pci/host/pcie-rockchip.c:1007:6: warning: 'io_size' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> 
-> This adds an appropriate initialization immediately in front of
-> the loop, so the io_size is zero as expected afterwards for that
-> case.
-> 
-> Fixes: abe17181b16f ("PCI: rockchip: Add Rockchip PCIe controller support")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> I had looked into it and also tested that a tracepoint at an application
+> having a same instruction as that of "uprobe break instruction" ie "BRK
+> #0x5" is rejected. So, I think a false positive return from is_tarp_insn()
+> is still OK.
 
-Thanks, I folded this into the original commit and added a note that it's
-from you.
+Looking at handle_swbp(), if we hit a breakpoint for which we don't have
+a valid uprobe, this function currently sends a SIGTRAP. But if
+is_trap_insn() returns false always, is_trap_at_addr() would return 0 in
+this case so the SIGTRAP is never issued.
 
-> ---
->  drivers/pci/host/pcie-rockchip.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> index c3593e633ccd..8bedc1e1ef80 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -1078,6 +1078,7 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
->  		goto err_vpcie;
->  
->  	/* Get the I/O and memory ranges from DT */
-> +	io_size = 0;
->  	resource_list_for_each_entry(win, &res) {
->  		switch (resource_type(win->res)) {
->  		case IORESOURCE_IO:
-> -- 
-> 2.9.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Catalin
