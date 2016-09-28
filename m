@@ -1,40 +1,34 @@
 From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Wed, 28 Sep 2016 19:50:52 +0200
-Subject: [PATCH v3 3/7] i2c: bcm2835: Use dev_dbg logging on transfer errors
-In-Reply-To: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
-References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
-Message-ID: <1475085056-5205-4-git-send-email-noralf@tronnes.org>
+Date: Wed, 28 Sep 2016 19:50:49 +0200
+Subject: [PATCH v3 0/7] i2c: bcm2835: Bring in changes from downstream
+Message-ID: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writing to an AT24C32 generates on average 2x i2c transfer errors per
-32-byte page write. Which amounts to a lot for a 4k write. This is due
-to the fact that the chip doesn't respond during it's internal write
-cycle when the at24 driver tries and retries the next write.
-Only a handful drivers use dev_err() on transfer error, so switch to
-dev_dbg() instead.
+This patchset tries to bring in the lessons learned in the downstream
+driver i2c-bcm2708. The downstream clock stretcing timeout patch has
+been left out since clock stretching is broken/unreliable on this
+controller, so no point in setting it.
 
-Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
----
+Changes since version 2:
+- use dev_dbg instead for transfer errors
+- drop i2c2 disabling patch, vc4 uses it.
 
-Changes:
-- use dev_dbg instead of dev_err_ratelimited
 
- drivers/i2c/busses/i2c-bcm2835.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Noralf.
 
-diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index df036ed..8cdb139 100644
---- a/drivers/i2c/busses/i2c-bcm2835.c
-+++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -207,7 +207,7 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
- 	    (msg->flags & I2C_M_IGNORE_NAK))
- 		return 0;
 
--	dev_err(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
-+	dev_dbg(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
+Noralf Tr?nnes (7):
+  i2c: bcm2835: Fix hang for writing messages larger than 16 bytes
+  i2c: bcm2835: Protect against unexpected TXW/RXR interrupts
+  i2c: bcm2835: Use dev_dbg logging on transfer errors
+  i2c: bcm2835: Can't support I2C_M_IGNORE_NAK
+  i2c: bcm2835: Add support for Repeated Start Condition
+  i2c: bcm2835: Support i2c-dev ioctl I2C_TIMEOUT
+  i2c: bcm2835: Add support for dynamic clock
 
- 	if (i2c_dev->msg_err & BCM2835_I2C_S_ERR)
- 		return -EREMOTEIO;
+ drivers/i2c/busses/i2c-bcm2835.c | 209 ++++++++++++++++++++++++---------------
+ 1 file changed, 130 insertions(+), 79 deletions(-)
+
 --
 2.8.2
