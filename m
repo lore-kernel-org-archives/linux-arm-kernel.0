@@ -1,39 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 28 Sep 2016 23:17:50 +0200
-Subject: [PATCH] drm/sun4i: rgb: Enable panel after controller
-In-Reply-To: <CAOw6vbKxJeSZYsCwVWYbVosZUK+FfBq1ytrpRUNpbH+kM6Ow6Q@mail.gmail.com>
-References: <20160921130304.3486-1-net147@gmail.com>
- <20160921210340.GI8719@lukather>
- <CANwerB2pmO7AMqmE9SMR1vFFsY5jMUALGSvtd=AvpU1=_jSHUw@mail.gmail.com>
- <20160923131626.GX8719@lukather>
- <CANwerB1PgaACukEj1jzUY-dQzbf50Em3h47KEsQu3rC3Jej=6Q@mail.gmail.com>
- <20160924201813.GE16901@lukather>
- <CAOw6vbKxJeSZYsCwVWYbVosZUK+FfBq1ytrpRUNpbH+kM6Ow6Q@mail.gmail.com>
-Message-ID: <20160928211750.GP4189@lukather>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 28 Sep 2016 14:24:36 -0700
+Subject: [PATCH v3 7/7] i2c: bcm2835: Add support for dynamic clock
+In-Reply-To: <1475085056-5205-8-git-send-email-noralf@tronnes.org>
+References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+ <1475085056-5205-8-git-send-email-noralf@tronnes.org>
+Message-ID: <87r383g1kb.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Noralf Tr?nnes <noralf@tronnes.org> writes:
 
-On Tue, Sep 27, 2016 at 10:42:09AM -0400, Sean Paul wrote:
-> As an aside, it seems like (from the diff, I haven't looked at the
-> code) the bridge_pre_enable and bridge_post_disable calls are missing,
-> and the enable/disable calls are in the wrong place.
+> Support a dynamic clock by reading the frequency and setting the
+> divisor in the transfer function instead of during probe.
 
-You're right. I have to push more bridges support patches in the
-upcoming weeks, I'll take care of that.
+Is this fixing some particular case you could note in the commit
+message?  As is, it makes me think that we should be using a notifier
+for when the parent clock (that's the one I assume you're talking about
+being dynamic) changes.  But maybe you're working around a variable VPU
+clock being set by the firmware, because we don't have a notifier for
+it?
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+I'm a bit worried because I think this is going to be pretty expensive
+to be doing per transfer.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 800 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160928/416b0a37/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160928/074f1585/attachment.sig>
