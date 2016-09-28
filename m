@@ -1,56 +1,54 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Sep 2016 09:46:18 +0100
-Subject: [PATCH 1/1] ARM: dma: fix dma_max_pfn()
-In-Reply-To: <135ccf6f-ef3b-98a5-9d3d-4cd7f0967ceb@ti.com>
-References: <1471435517-7840-1-git-send-email-rogerq@ti.com>
- <1471435517-7840-2-git-send-email-rogerq@ti.com>
- <20160818142459.GX1041@n2100.armlinux.org.uk>
- <8003b6ed-6071-9384-1b88-0b84604bdce8@oracle.com>
- <20160818230754.GE1041@n2100.armlinux.org.uk>
- <f8a05c02-df36-a0cf-6433-c67eb4a0f5b6@oracle.com>
- <9c38663b-1867-213d-21ba-f1dec7edfb6a@ti.com>
- <81dedbcc-14f6-f02f-2ce9-114d57c8d9d4@oracle.com>
- <c29290ee-9d74-73f9-7405-112357359f55@ti.com>
- <135ccf6f-ef3b-98a5-9d3d-4cd7f0967ceb@ti.com>
-Message-ID: <20160928084618.GK1041@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 Sep 2016 10:49:13 +0100
+Subject: [PATCH] arm64: set path to Image.gz in the mkspec to avoid rpm
+ build issue
+In-Reply-To: <1474991627-1743-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+References: <1474991627-1743-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20160928094913.GD24658@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2016 at 10:53:49AM +0300, Roger Quadros wrote:
-> Hi,
-> 
-> On 12/09/16 14:38, Roger Quadros wrote:
-> > Hi Santosh & Russell,
-> > 
-> > On 19/08/16 19:38, Santosh Shilimkar wrote:
-> >>
-> >> On 8/19/2016 12:30 AM, Roger Quadros wrote:
-> >>> Hi Santosh,
-> >>>
-> >>
-> >>>>> So I'm 99.9% convinced that the proposed change is correct.
-> >>>>>
-> >>>> I will got with that then :-) and take my objection back. Just
-> >>>> saying that if there other breakages which I can't recollect now,
-> >>>> those drivers needs to be patched as well.
-> >>>>
-> >>> I was able to boot the Keystone2 Edison EVM over NFS with the $subject patch.
-> >>> Boot log is below. Do you see anything suspicious?
-> >>>
-> >> Logs looks ok to me. Probably do some tests where DMA and bounce buffers etc gets tested. Running it through your internal regression
-> >> suit will be good idea as well if thats possible.
-> >>
-> > 
-> > This has been running in our internal test suite for a week on various TI
-> > platforms. There haven't been any surprises.
-> > 
-> > Is it a good idea to at least put this in -next for a wider test audience?
-> 
-> Gentle reminder.
+[Adding Michal Marek]
 
-Please put it in the patch system, thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+On Tue, Sep 27, 2016 at 08:53:47AM -0700, Vadim Lomovtsev wrote:
+> In addition to http://www.spinics.net/lists/arm-kernel/msg527466.html
+> 
+> While building rpm-pkg target it fails to copy kernel image
+> from default location to rpm buildroot directory.
+> 
+> Since we have arch variable set to aarch64 while Image.gz
+> is located at arch/arm64/boot it's necessary to specify
+> correct path to cp command as it implemeted for ppc64 build.
+> 
+> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+> ---
+>  scripts/package/mkspec | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/scripts/package/mkspec b/scripts/package/mkspec
+> index 57673ba..2f2bc7e 100755
+> --- a/scripts/package/mkspec
+> +++ b/scripts/package/mkspec
+> @@ -101,9 +101,13 @@ echo "%ifarch ppc64"
+>  echo "cp vmlinux arch/powerpc/boot"
+>  echo "cp arch/powerpc/boot/"'$KBUILD_IMAGE $RPM_BUILD_ROOT'"/boot/vmlinuz-$KERNELRELEASE"
+>  echo "%else"
+> +echo "%ifarch aarch64"
+> +echo "cp arch/arm64/boot/"'$KBUILD_IMAGE $RPM_BUILD_ROOT'"/boot/vmlinuz-$KERNELRELEASE"
+> +echo "%else"
+>  echo 'cp $KBUILD_IMAGE $RPM_BUILD_ROOT'"/boot/vmlinuz-$KERNELRELEASE"
+>  echo "%endif"
+>  echo "%endif"
+> +echo "%endif"
+>  
+>  echo 'make %{?_smp_mflags} INSTALL_HDR_PATH=$RPM_BUILD_ROOT/usr KBUILD_SRC= headers_install'
+>  echo 'cp System.map $RPM_BUILD_ROOT'"/boot/System.map-$KERNELRELEASE"
+> -- 
+> 1.8.3.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
