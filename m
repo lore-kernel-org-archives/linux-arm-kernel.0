@@ -1,48 +1,37 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 28 Sep 2016 11:58:43 -0500
-Subject: [PATCH 2/3] [v2] net: qcom/emac: use device_get_mac_address
-In-Reply-To: <1475081924-12362-1-git-send-email-timur@codeaurora.org>
-References: <1475081924-12362-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1475081924-12362-3-git-send-email-timur@codeaurora.org>
+Date: Wed, 28 Sep 2016 11:58:41 -0500
+Subject: [PATCH 0/3] [v2] Add basic ACPI support to the Qualcomm Technologies
+ EMAC driver
+Message-ID: <1475081924-12362-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the DT-specific of_get_mac_address() function with
-device_get_mac_address, which works on both DT and ACPI platforms.  This
-change makes it easier to add ACPI support.
+This patch series adds support to the EMAC driver for extracting addresses,
+interrupts, and some _DSDs (properties) from ACPI.  The first two patches
+clean up the code, and the third patch adds ACPI-specific functionality.
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/net/ethernet/qualcomm/emac/emac.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+The first patch fixes a bug with handling the platform_device for the
+internal PHY.  This phy is treated as a separate device in both DT and
+ACPI, but since the platform is not released automatically when the 
+driver unloads, managed functions like devm_ioremap_resource cannot be
+used. 
 
-diff --git a/drivers/net/ethernet/qualcomm/emac/emac.c b/drivers/net/ethernet/qualcomm/emac/emac.c
-index 429b4cb..551df1c 100644
---- a/drivers/net/ethernet/qualcomm/emac/emac.c
-+++ b/drivers/net/ethernet/qualcomm/emac/emac.c
-@@ -531,18 +531,16 @@ static void emac_clks_teardown(struct emac_adapter *adpt)
- static int emac_probe_resources(struct platform_device *pdev,
- 				struct emac_adapter *adpt)
- {
--	struct device_node *node = pdev->dev.of_node;
- 	struct net_device *netdev = adpt->netdev;
- 	struct resource *res;
--	const void *maddr;
-+	char maddr[ETH_ALEN];
- 	int ret = 0;
- 
- 	/* get mac address */
--	maddr = of_get_mac_address(node);
--	if (!maddr)
--		eth_hw_addr_random(netdev);
--	else
-+	if (device_get_mac_address(&pdev->dev, maddr, ETH_ALEN))
- 		ether_addr_copy(netdev->dev_addr, maddr);
-+	else
-+		eth_hw_addr_random(netdev);
- 
- 	/* Core 0 interrupt */
- 	ret = platform_get_irq(pdev, 0);
+The second patch replaces of_get_mac_address with its platform-independent
+equivalent device_get_mac_address.  
+
+The third patch parses the ACPI tables to obtain the platform_device for
+the primary EMAC node ("QCOM8070") and the internal phy node ("QCOM8071").
+
+Timur Tabi (3):
+  [v2] net: qcom/emac: do not use devm on internal phy pdev
+  [v2] net: qcom/emac: use device_get_mac_address
+  [v2] net: qcom/emac: initial ACPI support
+
+ drivers/net/ethernet/qualcomm/emac/emac-phy.c   |  37 ++++++--
+ drivers/net/ethernet/qualcomm/emac/emac-sgmii.c | 110 ++++++++++++++++++------
+ drivers/net/ethernet/qualcomm/emac/emac.c       |  26 ++++--
+ 3 files changed, 134 insertions(+), 39 deletions(-)
+
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
