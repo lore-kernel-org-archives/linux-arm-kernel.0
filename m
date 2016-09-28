@@ -1,44 +1,282 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 28 Sep 2016 08:58:16 +0300
-Subject: [PATCH v3 0/9] dmaengine: ti drivers: enable COMPILE_TESTing
-In-Reply-To: <20160928032605.GK2467@localhost>
-References: <20160921124135.11849-1-peter.ujfalusi@ti.com>
- <20160928032605.GK2467@localhost>
-Message-ID: <e138bd1b-8705-11b8-c4c2-a50db5292fcc@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 28 Sep 2016 09:10:46 +0200
+Subject: [PATCH] usb: Convert pr_warning to pr_warn
+In-Reply-To: <f86b512272987e0faeaccbe6466665175eaefe9a.1474992979.git.joe@perches.com>
+References: <f86b512272987e0faeaccbe6466665175eaefe9a.1474992979.git.joe@perches.com>
+Message-ID: <8ae6acf4-36a8-6223-4e79-8bbf217f2626@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod,
+Le 27/09/2016 ? 18:16, Joe Perches a ?crit :
+> Use the more common logging mechanism.
+> 
+> Miscellanea:
+> 
+> o Realign multiline statements
+> o Coalesce format
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
+>  drivers/usb/gadget/function/rndis.c     |  9 ++++-----
+>  drivers/usb/gadget/function/u_serial.c  |  4 ++--
+>  drivers/usb/gadget/udc/at91_udc.h       |  2 +-
+>  drivers/usb/gadget/udc/atmel_usba_udc.c |  4 ++--
 
-On 09/28/16 06:26, Vinod Koul wrote:
-> On Wed, Sep 21, 2016 at 03:41:26PM +0300, Peter Ujfalusi wrote:
->> Hi,
->>
->> Changes since v2:
->> - Instead of converting to use enum for the of_device_id data parameter the two
->>   patch for edma and ti-dma-crossbar is using pointers to u32 variables to make
->>   sure that the code compile (and in theory work) on all architectures.
->> - fixed issue in the ti-dma-crossbar driver I have made with the enum change to
->>   not handle the DMA offset parameters correctly.
->>
->> Changes since v1:
->> - added the compiler warning message to ti-dma-crossbar enum type patch
->> - moved the Kconfig patches at the end of the seris
->>
->> The following series will enable unconditional COMPILE_TEST coverage for the
->> following drivers: omap-dma, edma and ti-dma-crossbar
->>
->> The series includes fixes noticed when compiling the drivers for x86_64 and
->> aarch64.
-> 
-> I have applied the series after fixing code style nit-picks.
-> 
-> Also applied the edma patch and reordered the series to have that come
-> before compile test enable patch
-> 
-> Please verify.
+For AT91 and Atmel parts:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Looks good, thank you!
+Thanks
+
+>  drivers/usb/gadget/udc/fsl_usb2_udc.h   |  2 +-
+>  drivers/usb/gadget/udc/m66592-udc.c     |  4 ++--
+>  drivers/usb/gadget/udc/omap_udc.h       |  2 +-
+>  drivers/usb/gadget/udc/pxa25x_udc.h     |  2 +-
+>  drivers/usb/host/isp1362-hcd.c          | 27 ++++++++++++++-------------
+>  drivers/usb/isp1760/isp1760-if.c        |  2 +-
+>  10 files changed, 29 insertions(+), 29 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/function/rndis.c b/drivers/usb/gadget/function/rndis.c
+> index ab6ac1b74ac0..766c328c15c0 100644
+> --- a/drivers/usb/gadget/function/rndis.c
+> +++ b/drivers/usb/gadget/function/rndis.c
+> @@ -474,8 +474,7 @@ static int gen_ndis_query_resp(struct rndis_params *params, u32 OID, u8 *buf,
+>  		break;
+>  
+>  	default:
+> -		pr_warning("%s: query unknown OID 0x%08X\n",
+> -			 __func__, OID);
+> +		pr_warn("%s: query unknown OID 0x%08X\n", __func__, OID);
+>  	}
+>  	if (retval < 0)
+>  		length = 0;
+> @@ -546,8 +545,8 @@ static int gen_ndis_set_resp(struct rndis_params *params, u32 OID,
+>  		break;
+>  
+>  	default:
+> -		pr_warning("%s: set unknown OID 0x%08X, size %d\n",
+> -			 __func__, OID, buf_len);
+> +		pr_warn("%s: set unknown OID 0x%08X, size %d\n",
+> +			__func__, OID, buf_len);
+>  	}
+>  
+>  	return retval;
+> @@ -854,7 +853,7 @@ int rndis_msg_parser(struct rndis_params *params, u8 *buf)
+>  		 * In one case those messages seemed to relate to the host
+>  		 * suspending itself.
+>  		 */
+> -		pr_warning("%s: unknown RNDIS message 0x%08X len %d\n",
+> +		pr_warn("%s: unknown RNDIS message 0x%08X len %d\n",
+>  			__func__, MsgType, MsgLength);
+>  		print_hex_dump_bytes(__func__, DUMP_PREFIX_OFFSET,
+>  				     buf, MsgLength);
+> diff --git a/drivers/usb/gadget/function/u_serial.c b/drivers/usb/gadget/function/u_serial.c
+> index e0cd1e4c8892..62ec842874aa 100644
+> --- a/drivers/usb/gadget/function/u_serial.c
+> +++ b/drivers/usb/gadget/function/u_serial.c
+> @@ -622,8 +622,8 @@ static void gs_write_complete(struct usb_ep *ep, struct usb_request *req)
+>  	switch (req->status) {
+>  	default:
+>  		/* presumably a transient fault */
+> -		pr_warning("%s: unexpected %s status %d\n",
+> -				__func__, ep->name, req->status);
+> +		pr_warn("%s: unexpected %s status %d\n",
+> +			__func__, ep->name, req->status);
+>  		/* FALL THROUGH */
+>  	case 0:
+>  		/* normal completion */
+> diff --git a/drivers/usb/gadget/udc/at91_udc.h b/drivers/usb/gadget/udc/at91_udc.h
+> index 0a433e6b346b..9bbe72764f31 100644
+> --- a/drivers/usb/gadget/udc/at91_udc.h
+> +++ b/drivers/usb/gadget/udc/at91_udc.h
+> @@ -175,7 +175,7 @@ struct at91_request {
+>  #endif
+>  
+>  #define ERR(stuff...)		pr_err("udc: " stuff)
+> -#define WARNING(stuff...)	pr_warning("udc: " stuff)
+> +#define WARNING(stuff...)	pr_warn("udc: " stuff)
+>  #define INFO(stuff...)		pr_info("udc: " stuff)
+>  #define DBG(stuff...)		pr_debug("udc: " stuff)
+>  
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> index 45bc997d0711..1ef7a9a9d7f5 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> @@ -1464,8 +1464,8 @@ static void usba_control_irq(struct usba_udc *udc, struct usba_ep *ep)
+>  		pkt_len = USBA_BFEXT(BYTE_COUNT, usba_ep_readl(ep, STA));
+>  		DBG(DBG_HW, "Packet length: %u\n", pkt_len);
+>  		if (pkt_len != sizeof(crq)) {
+> -			pr_warning("udc: Invalid packet length %u "
+> -				"(expected %zu)\n", pkt_len, sizeof(crq));
+> +			pr_warn("udc: Invalid packet length %u (expected %zu)\n",
+> +				pkt_len, sizeof(crq));
+>  			set_protocol_stall(udc, ep);
+>  			return;
+>  		}
+> diff --git a/drivers/usb/gadget/udc/fsl_usb2_udc.h b/drivers/usb/gadget/udc/fsl_usb2_udc.h
+> index 84715625b2b3..e92b8408b6f6 100644
+> --- a/drivers/usb/gadget/udc/fsl_usb2_udc.h
+> +++ b/drivers/usb/gadget/udc/fsl_usb2_udc.h
+> @@ -554,7 +554,7 @@ static void dump_msg(const char *label, const u8 * buf, unsigned int length)
+>  #endif
+>  
+>  #define ERR(stuff...)		pr_err("udc: " stuff)
+> -#define WARNING(stuff...)		pr_warning("udc: " stuff)
+> +#define WARNING(stuff...)	pr_warn("udc: " stuff)
+>  #define INFO(stuff...)		pr_info("udc: " stuff)
+>  
+>  /*-------------------------------------------------------------------------*/
+> diff --git a/drivers/usb/gadget/udc/m66592-udc.c b/drivers/usb/gadget/udc/m66592-udc.c
+> index 6e977dc22570..de3e03483659 100644
+> --- a/drivers/usb/gadget/udc/m66592-udc.c
+> +++ b/drivers/usb/gadget/udc/m66592-udc.c
+> @@ -637,7 +637,7 @@ static void init_controller(struct m66592 *m66592)
+>  			clock = M66592_XTAL48;
+>  			break;
+>  		default:
+> -			pr_warning("m66592-udc: xtal configuration error\n");
+> +			pr_warn("m66592-udc: xtal configuration error\n");
+>  			clock = 0;
+>  		}
+>  
+> @@ -649,7 +649,7 @@ static void init_controller(struct m66592 *m66592)
+>  			irq_sense = 0;
+>  			break;
+>  		default:
+> -			pr_warning("m66592-udc: irq trigger config error\n");
+> +			pr_warn("m66592-udc: irq trigger config error\n");
+>  			irq_sense = 0;
+>  		}
+>  
+> diff --git a/drivers/usb/gadget/udc/omap_udc.h b/drivers/usb/gadget/udc/omap_udc.h
+> index cfadeb5fc5de..26974196cf44 100644
+> --- a/drivers/usb/gadget/udc/omap_udc.h
+> +++ b/drivers/usb/gadget/udc/omap_udc.h
+> @@ -187,7 +187,7 @@ struct omap_udc {
+>  #endif
+>  
+>  #define ERR(stuff...)		pr_err("udc: " stuff)
+> -#define WARNING(stuff...)	pr_warning("udc: " stuff)
+> +#define WARNING(stuff...)	pr_warn("udc: " stuff)
+>  #define INFO(stuff...)		pr_info("udc: " stuff)
+>  #define DBG(stuff...)		pr_debug("udc: " stuff)
+>  
+> diff --git a/drivers/usb/gadget/udc/pxa25x_udc.h b/drivers/usb/gadget/udc/pxa25x_udc.h
+> index 4b8b72d7ab37..a458bec2536d 100644
+> --- a/drivers/usb/gadget/udc/pxa25x_udc.h
+> +++ b/drivers/usb/gadget/udc/pxa25x_udc.h
+> @@ -248,7 +248,7 @@ dump_state(struct pxa25x_udc *dev)
+>  #define DBG(lvl, stuff...) do{if ((lvl) <= UDC_DEBUG) DMSG(stuff);}while(0)
+>  
+>  #define ERR(stuff...)		pr_err("udc: " stuff)
+> -#define WARNING(stuff...)	pr_warning("udc: " stuff)
+> +#define WARNING(stuff...)	pr_warn("udc: " stuff)
+>  #define INFO(stuff...)		pr_info("udc: " stuff)
+>  
+>  
+> diff --git a/drivers/usb/host/isp1362-hcd.c b/drivers/usb/host/isp1362-hcd.c
+> index 6cf82ee460a6..0f2b4b358e1a 100644
+> --- a/drivers/usb/host/isp1362-hcd.c
+> +++ b/drivers/usb/host/isp1362-hcd.c
+> @@ -147,7 +147,7 @@ static inline struct isp1362_ep_queue *get_ptd_queue(struct isp1362_hcd *isp1362
+>  	if (epq)
+>  		DBG(1, "%s: PTD $%04x is on %s queue\n", __func__, offset, epq->name);
+>  	else
+> -		pr_warning("%s: invalid PTD $%04x\n", __func__, offset);
+> +		pr_warn("%s: invalid PTD $%04x\n", __func__, offset);
+>  
+>  	return epq;
+>  }
+> @@ -157,8 +157,9 @@ static inline int get_ptd_offset(struct isp1362_ep_queue *epq, u8 index)
+>  	int offset;
+>  
+>  	if (index * epq->blk_size > epq->buf_size) {
+> -		pr_warning("%s: Bad %s index %d(%d)\n", __func__, epq->name, index,
+> -		     epq->buf_size / epq->blk_size);
+> +		pr_warn("%s: Bad %s index %d(%d)\n",
+> +			__func__, epq->name, index,
+> +			epq->buf_size / epq->blk_size);
+>  		return -EINVAL;
+>  	}
+>  	offset = epq->buf_start + index * epq->blk_size;
+> @@ -902,8 +903,8 @@ static void start_iso_transfers(struct isp1362_hcd *isp1362_hcd)
+>  
+>  			ptd_offset = next_ptd(epq, ep);
+>  			if (ptd_offset < 0) {
+> -				pr_warning("%s: req %d No more %s PTD buffers available\n", __func__,
+> -				     ep->num_req, epq->name);
+> +				pr_warn("%s: req %d No more %s PTD buffers available\n",
+> +					__func__, ep->num_req, epq->name);
+>  				break;
+>  			}
+>  		}
+> @@ -973,8 +974,8 @@ static void finish_transfers(struct isp1362_hcd *isp1362_hcd, unsigned long done
+>  			break;
+>  	}
+>  	if (done_map)
+> -		pr_warning("%s: done_map not clear: %08lx:%08lx\n", __func__, done_map,
+> -		     epq->skip_map);
+> +		pr_warn("%s: done_map not clear: %08lx:%08lx\n",
+> +			__func__, done_map, epq->skip_map);
+>  	atomic_dec(&epq->finishing);
+>  }
+>  
+> @@ -1433,7 +1434,7 @@ static int isp1362_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
+>  		} else
+>  			DBG(1, "%s: urb %p active; wait4irq\n", __func__, urb);
+>  	} else {
+> -		pr_warning("%s: No EP in URB %p\n", __func__, urb);
+> +		pr_warn("%s: No EP in URB %p\n", __func__, urb);
+>  		retval = -EINVAL;
+>  	}
+>  done:
+> @@ -1748,10 +1749,10 @@ static int isp1362_bus_suspend(struct usb_hcd *hcd)
+>  		/* FALL THROUGH */
+>  	case OHCI_USB_RESET:
+>  		status = -EBUSY;
+> -		pr_warning("%s: needs reinit!\n", __func__);
+> +		pr_warn("%s: needs reinit!\n", __func__);
+>  		goto done;
+>  	case OHCI_USB_SUSPEND:
+> -		pr_warning("%s: already suspended?\n", __func__);
+> +		pr_warn("%s: already suspended?\n", __func__);
+>  		goto done;
+>  	}
+>  	DBG(0, "%s: suspend root hub\n", __func__);
+> @@ -1839,7 +1840,7 @@ static int isp1362_bus_resume(struct usb_hcd *hcd)
+>  	isp1362_hcd->hc_control = isp1362_read_reg32(isp1362_hcd, HCCONTROL);
+>  	pr_info("%s: HCCONTROL: %08x\n", __func__, isp1362_hcd->hc_control);
+>  	if (hcd->state == HC_STATE_RESUMING) {
+> -		pr_warning("%s: duplicate resume\n", __func__);
+> +		pr_warn("%s: duplicate resume\n", __func__);
+>  		status = 0;
+>  	} else
+>  		switch (isp1362_hcd->hc_control & OHCI_CTRL_HCFS) {
+> @@ -2474,8 +2475,8 @@ static int isp1362_chip_test(struct isp1362_hcd *isp1362_hcd)
+>  					    __func__, offset);
+>  					break;
+>  				}
+> -				pr_warning("%s: memory check with offset %02x ok after second read\n",
+> -				     __func__, offset);
+> +				pr_warn("%s: memory check with offset %02x ok after second read\n",
+> +					__func__, offset);
+>  			}
+>  		}
+>  		kfree(ref);
+> diff --git a/drivers/usb/isp1760/isp1760-if.c b/drivers/usb/isp1760/isp1760-if.c
+> index 9535b2872183..79205b31e4a9 100644
+> --- a/drivers/usb/isp1760/isp1760-if.c
+> +++ b/drivers/usb/isp1760/isp1760-if.c
+> @@ -197,7 +197,7 @@ static int isp1760_plat_probe(struct platform_device *pdev)
+>  
+>  	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>  	if (!irq_res) {
+> -		pr_warning("isp1760: IRQ resource not available\n");
+> +		pr_warn("isp1760: IRQ resource not available\n");
+>  		return -ENODEV;
+>  	}
+>  	irqflags = irq_res->flags & IRQF_TRIGGER_MASK;
+> 
+
 
 -- 
-P?ter
+Nicolas Ferre
