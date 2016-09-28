@@ -1,67 +1,70 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Wed, 28 Sep 2016 13:22:00 -0500
-Subject: [PATCH v19 12/12] fpga-manager: Add Socfpga Arria10 support
+Date: Wed, 28 Sep 2016 13:21:59 -0500
+Subject: [PATCH v19 11/12] fpga: add altera freeze bridge support
 In-Reply-To: <20160928182200.15800-1-atull@opensource.altera.com>
 References: <20160928182200.15800-1-atull@opensource.altera.com>
-Message-ID: <20160928182200.15800-13-atull@opensource.altera.com>
+Message-ID: <20160928182200.15800-12-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add low level driver to support reprogramming FPGAs for Altera
-SoCFPGA Arria10.
+Add a low level driver for Altera Freeze Bridges to the FPGA Bridge
+framework.  A freeze bridge is a bridge that exists in the FPGA
+fabric to isolate one region of the FPGA from the busses while that
+one region is being reprogrammed.
 
 Signed-off-by: Alan Tull <atull@opensource.altera.com>
+Signed-off-by: Matthew Gerlach <mgerlach@opensource.altera.com>
 ---
-v19: Added to this patchset as has been changed to use
-       fpga image information struct
-     a checkpatch fix of a block comment
-     do not use clk_put because we are using devm_clk_get
+v19: added in v19 of patchset as it needs for fpga info struct
 ---
- drivers/fpga/Kconfig       |   6 +
- drivers/fpga/Makefile      |   1 +
- drivers/fpga/socfpga-a10.c | 572 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 579 insertions(+)
- create mode 100644 drivers/fpga/socfpga-a10.c
+ drivers/fpga/Kconfig                |   9 ++
+ drivers/fpga/Makefile               |   1 +
+ drivers/fpga/altera-freeze-bridge.c | 273 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 283 insertions(+)
+ create mode 100644 drivers/fpga/altera-freeze-bridge.c
 
 diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-index 0d1887f..bc56c4c 100644
+index 55d97d2..0d1887f 100644
 --- a/drivers/fpga/Kconfig
 +++ b/drivers/fpga/Kconfig
-@@ -26,6 +26,12 @@ config FPGA_MGR_SOCFPGA
- 	help
- 	  FPGA manager driver support for Altera SOCFPGA.
+@@ -46,6 +46,15 @@ config SOCFPGA_FPGA_BRIDGE
+ 	  Say Y to enable drivers for FPGA bridges for Altera SOCFPGA
+ 	  devices.
  
-+config FPGA_MGR_SOCFPGA_A10
-+	tristate "Altera SoCFPGA Arria10"
-+	depends on ARCH_SOCFPGA
++config ALTERA_FREEZE_BRIDGE
++	tristate "Altera FPGA Freeze Bridge"
++	depends on ARCH_SOCFPGA && FPGA_BRIDGE
 +	help
-+	  FPGA manager driver support for Altera Arria10 SoCFPGA.
++	  Say Y to enable drivers for Altera FPGA Freeze bridges.  A
++	  freeze bridge is a bridge that exists in the FPGA fabric to
++	  isolate one region of the FPGA from the busses while that
++	  region is being reprogrammed.
 +
- config FPGA_MGR_ZYNQ_FPGA
- 	tristate "Xilinx Zynq FPGA"
- 	depends on HAS_DMA
+ endif # FPGA
+ 
+ endmenu
 diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-index a6f874d..8df07bc 100644
+index e658436..a6f874d 100644
 --- a/drivers/fpga/Makefile
 +++ b/drivers/fpga/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_FPGA)			+= fpga-mgr.o
- 
- # FPGA Manager Drivers
- obj-$(CONFIG_FPGA_MGR_SOCFPGA)		+= socfpga.o
-+obj-$(CONFIG_FPGA_MGR_SOCFPGA_A10)	+= socfpga-a10.o
- obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
- 
+@@ -12,6 +12,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
  # FPGA Bridge Drivers
-diff --git a/drivers/fpga/socfpga-a10.c b/drivers/fpga/socfpga-a10.c
+ obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
+ obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)	+= altera-hps2fpga.o altera-fpga2sdram.o
++obj-$(CONFIG_ALTERA_FREEZE_BRIDGE)	+= altera-freeze-bridge.o
+ 
+ # High Level Interfaces
+ obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
+diff --git a/drivers/fpga/altera-freeze-bridge.c b/drivers/fpga/altera-freeze-bridge.c
 new file mode 100644
-index 0000000..01ca5f0
+index 0000000..8dcd9fb
 --- /dev/null
-+++ b/drivers/fpga/socfpga-a10.c
-@@ -0,0 +1,572 @@
++++ b/drivers/fpga/altera-freeze-bridge.c
+@@ -0,0 +1,273 @@
 +/*
-+ * FPGA Manager Driver for Altera Arria10 SoCFPGA
++ * FPGA Freeze Bridge Controller
 + *
-+ * Copyright (C) 2015-2016 Altera Corporation
++ *  Copyright (C) 2016 Altera Corporation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms and conditions of the GNU General Public License,
@@ -75,560 +78,261 @@ index 0000000..01ca5f0
 + * You should have received a copy of the GNU General Public License along with
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+
-+#include <linux/clk.h>
-+#include <linux/device.h>
 +#include <linux/delay.h>
-+#include <linux/fpga/fpga-mgr.h>
 +#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/of_device.h>
 +#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/regmap.h>
++#include <linux/fpga/fpga-bridge.h>
 +
-+#define A10_FPGAMGR_DCLKCNT_OFST				0x08
-+#define A10_FPGAMGR_DCLKSTAT_OFST				0x0c
-+#define A10_FPGAMGR_IMGCFG_CTL_00_OFST				0x70
-+#define A10_FPGAMGR_IMGCFG_CTL_01_OFST				0x74
-+#define A10_FPGAMGR_IMGCFG_CTL_02_OFST				0x78
-+#define A10_FPGAMGR_IMGCFG_STAT_OFST				0x80
++#define FREEZE_CSR_STATUS_OFFSET		0
++#define FREEZE_CSR_CTRL_OFFSET			4
++#define FREEZE_CSR_ILLEGAL_REQ_OFFSET		8
++#define FREEZE_CSR_REG_VERSION			12
 +
-+#define A10_FPGAMGR_DCLKSTAT_DCLKDONE				BIT(0)
++#define FREEZE_CSR_SUPPORTED_VERSION		2
 +
-+#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NCONFIG		BIT(0)
-+#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NSTATUS		BIT(1)
-+#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_CONDONE		BIT(2)
-+#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NCONFIG			BIT(8)
-+#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NSTATUS_OE		BIT(16)
-+#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_CONDONE_OE		BIT(24)
++#define FREEZE_CSR_STATUS_FREEZE_REQ_DONE	BIT(0)
++#define FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE	BIT(1)
 +
-+#define A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG		BIT(0)
-+#define A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST		BIT(16)
-+#define A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE			BIT(24)
++#define FREEZE_CSR_CTRL_FREEZE_REQ		BIT(0)
++#define FREEZE_CSR_CTRL_RESET_REQ		BIT(1)
++#define FREEZE_CSR_CTRL_UNFREEZE_REQ		BIT(2)
 +
-+#define A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL			BIT(0)
-+#define A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_MASK		(BIT(16) | BIT(17))
-+#define A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_SHIFT			16
-+#define A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH			BIT(24)
-+#define A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH_SHIFT		24
++#define FREEZE_BRIDGE_NAME			"freeze"
 +
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_CRC_ERROR			BIT(0)
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_EARLY_USERMODE		BIT(1)
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE			BIT(2)
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN			BIT(4)
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_CONDONE_PIN			BIT(6)
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_PR_READY			BIT(9)
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_PR_DONE			BIT(10)
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_PR_ERROR			BIT(11)
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_NCONFIG_PIN			BIT(12)
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_MASK	(BIT(16) | BIT(17) | BIT(18))
-+#define A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_SHIFT		        16
-+
-+/* FPGA CD Ratio Value */
-+#define CDRATIO_x1						0x0
-+#define CDRATIO_x2						0x1
-+#define CDRATIO_x4						0x2
-+#define CDRATIO_x8						0x3
-+
-+/* Configuration width 16/32 bit */
-+#define CFGWDTH_32						1
-+#define CFGWDTH_16						0
-+
-+/*
-+ * struct a10_fpga_priv - private data for fpga manager
-+ * @regmap: regmap for register access
-+ * @fpga_data_addr: iomap for single address data register to FPGA
-+ * @clk: clock
-+ */
-+struct a10_fpga_priv {
-+	struct regmap *regmap;
-+	void __iomem *fpga_data_addr;
-+	struct clk *clk;
-+};
-+
-+static bool socfpga_a10_fpga_writeable_reg(struct device *dev, unsigned int reg)
-+{
-+	switch (reg) {
-+	case A10_FPGAMGR_DCLKCNT_OFST:
-+	case A10_FPGAMGR_DCLKSTAT_OFST:
-+	case A10_FPGAMGR_IMGCFG_CTL_00_OFST:
-+	case A10_FPGAMGR_IMGCFG_CTL_01_OFST:
-+	case A10_FPGAMGR_IMGCFG_CTL_02_OFST:
-+		return true;
-+	}
-+	return false;
-+}
-+
-+static bool socfpga_a10_fpga_readable_reg(struct device *dev, unsigned int reg)
-+{
-+	switch (reg) {
-+	case A10_FPGAMGR_DCLKCNT_OFST:
-+	case A10_FPGAMGR_DCLKSTAT_OFST:
-+	case A10_FPGAMGR_IMGCFG_CTL_00_OFST:
-+	case A10_FPGAMGR_IMGCFG_CTL_01_OFST:
-+	case A10_FPGAMGR_IMGCFG_CTL_02_OFST:
-+	case A10_FPGAMGR_IMGCFG_STAT_OFST:
-+		return true;
-+	}
-+	return false;
-+}
-+
-+static const struct regmap_config socfpga_a10_fpga_regmap_config = {
-+	.reg_bits = 32,
-+	.reg_stride = 4,
-+	.val_bits = 32,
-+	.writeable_reg = socfpga_a10_fpga_writeable_reg,
-+	.readable_reg = socfpga_a10_fpga_readable_reg,
-+	.max_register = A10_FPGAMGR_IMGCFG_STAT_OFST,
-+	.cache_type = REGCACHE_NONE,
++struct altera_freeze_br_data {
++	struct device *dev;
++	void __iomem *base_addr;
++	bool enable;
 +};
 +
 +/*
-+ * from the register map description of cdratio in imgcfg_ctrl_02:
-+ *  Normal Configuration    : 32bit Passive Parallel
-+ *  Partial Reconfiguration : 16bit Passive Parallel
++ * Poll status until status bit is set or we have a timeout.
 + */
-+static void socfpga_a10_fpga_set_cfg_width(struct a10_fpga_priv *priv,
-+					   int width)
++static int altera_freeze_br_req_ack(struct altera_freeze_br_data *priv,
++				    u32 timeout, u32 req_ack)
 +{
-+	width <<= A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH_SHIFT;
++	struct device *dev = priv->dev;
++	void __iomem *csr_illegal_req_addr = priv->base_addr +
++					     FREEZE_CSR_ILLEGAL_REQ_OFFSET;
++	u32 status, illegal, ctrl;
++	int ret = -ETIMEDOUT;
 +
-+	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
-+			   A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH, width);
-+}
++	do {
++		illegal = readl(csr_illegal_req_addr);
++		if (illegal) {
++			dev_err(dev, "illegal request detected 0x%x", illegal);
 +
-+static void socfpga_a10_fpga_generate_dclks(struct a10_fpga_priv *priv,
-+					    u32 count)
-+{
-+	u32 val;
-+	unsigned int i;
++			writel(1, csr_illegal_req_addr);
 +
-+	/* Clear any existing DONE status. */
-+	regmap_write(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST,
-+		     A10_FPGAMGR_DCLKSTAT_DCLKDONE);
++			illegal = readl(csr_illegal_req_addr);
++			if (illegal)
++				dev_err(dev, "illegal request not cleared 0x%x",
++					illegal);
 +
-+	/* Issue the DCLK regmap. */
-+	regmap_write(priv->regmap, A10_FPGAMGR_DCLKCNT_OFST, count);
-+
-+	/* wait till the dclkcnt done */
-+	for (i = 0; i < 100; i++) {
-+		regmap_read(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST, &val);
-+		if (val)
++			ret = -EINVAL;
 +			break;
++		}
++
++		status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++		dev_dbg(dev, "%s %x %x\n", __func__, status, req_ack);
++		status &= req_ack;
++		if (status) {
++			ctrl = readl(priv->base_addr + FREEZE_CSR_CTRL_OFFSET);
++			dev_dbg(dev, "%s request %x acknowledged %x %x\n",
++				__func__, req_ack, status, ctrl);
++			ret = 0;
++			break;
++		}
++
 +		udelay(1);
-+	}
++	} while (timeout--);
 +
-+	/* Clear DONE status. */
-+	regmap_write(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST,
-+		     A10_FPGAMGR_DCLKSTAT_DCLKDONE);
++	if (ret == -ETIMEDOUT)
++		dev_err(dev, "%s timeout waiting for 0x%x\n",
++			__func__, req_ack);
++
++	return ret;
 +}
 +
-+static int socfpga_a10_fpga_encrypted(struct fpga_manager *mgr,
-+				      u32 *buf32, size_t buf32_size)
++static int altera_freeze_br_do_freeze(struct altera_freeze_br_data *priv,
++				      u32 timeout)
 +{
-+	int encrypt;
-+
-+	if (buf32_size < 70)
-+		return -EINVAL;
-+
-+	encrypt = ((buf32[69] >> 2) & 3) != 0;
-+
-+	dev_dbg(&mgr->dev, "header word %d = %08x encrypt=%d\n",
-+		69, buf32[69], encrypt);
-+
-+	return encrypt;
-+}
-+
-+static int socfpga_a10_fpga_compressed(struct fpga_manager *mgr,
-+				       u32 *buf32, size_t buf32_size)
-+{
-+	int compress;
-+
-+	if (buf32_size < 230)
-+		return -EINVAL;
-+
-+	compress = !((buf32[229] >> 1) & 1);
-+
-+	dev_dbg(&mgr->dev, "header word %d = %08x compress=%d\n",
-+		229, buf32[229], compress);
-+
-+	return compress;
-+}
-+
-+static unsigned int socfpga_a10_fpga_get_cd_ratio(unsigned int cfg_width,
-+						  bool encrypt, bool compress)
-+{
-+	unsigned int cd_ratio;
-+
-+	/*
-+	 * cd ratio is dependent on cfg width and whether the bitstream
-+	 * is encrypted and/or compressed.
-+	 *
-+	 * | width | encr. | compr. | cd ratio |
-+	 * |  16   |   0   |   0    |     1    |
-+	 * |  16   |   0   |   1    |     4    |
-+	 * |  16   |   1   |   0    |     2    |
-+	 * |  16   |   1   |   1    |     4    |
-+	 * |  32   |   0   |   0    |     1    |
-+	 * |  32   |   0   |   1    |     8    |
-+	 * |  32   |   1   |   0    |     4    |
-+	 * |  32   |   1   |   1    |     8    |
-+	 */
-+	if (!compress && !encrypt)
-+		return CDRATIO_x1;
-+
-+	if (compress)
-+		cd_ratio = CDRATIO_x4;
-+	else
-+		cd_ratio = CDRATIO_x2;
-+
-+	/* If 32 bit, double the cd ratio by incrementing the field  */
-+	if (cfg_width == CFGWDTH_32)
-+		cd_ratio += 1;
-+
-+	return cd_ratio;
-+}
-+
-+static int socfpga_a10_fpga_set_cdratio(struct fpga_manager *mgr,
-+					unsigned int cfg_width,
-+					const char *buf, size_t count)
-+{
-+	struct a10_fpga_priv *priv = mgr->priv;
-+	unsigned int cd_ratio;
-+	int encrypt, compress;
-+
-+	encrypt = socfpga_a10_fpga_encrypted(mgr, (u32 *)buf, count / 4);
-+	if (encrypt < 0)
-+		return -EINVAL;
-+
-+	compress = socfpga_a10_fpga_compressed(mgr, (u32 *)buf, count / 4);
-+	if (compress < 0)
-+		return -EINVAL;
-+
-+	cd_ratio = socfpga_a10_fpga_get_cd_ratio(cfg_width, encrypt, compress);
-+
-+	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
-+			   A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_MASK,
-+			   cd_ratio << A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_SHIFT);
-+
-+	return 0;
-+}
-+
-+static u32 socfpga_a10_fpga_read_stat(struct a10_fpga_priv *priv)
-+{
-+	u32 val;
-+
-+	regmap_read(priv->regmap, A10_FPGAMGR_IMGCFG_STAT_OFST, &val);
-+
-+	return val;
-+}
-+
-+static int socfpga_a10_fpga_wait_for_pr_ready(struct a10_fpga_priv *priv)
-+{
-+	u32 reg, i;
-+
-+	for (i = 0; i < 10 ; i++) {
-+		reg = socfpga_a10_fpga_read_stat(priv);
-+
-+		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_ERROR)
-+			return -EINVAL;
-+
-+		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_READY)
-+			return 0;
-+	}
-+
-+	return -ETIMEDOUT;
-+}
-+
-+static int socfpga_a10_fpga_wait_for_pr_done(struct a10_fpga_priv *priv)
-+{
-+	u32 reg, i;
-+
-+	for (i = 0; i < 10 ; i++) {
-+		reg = socfpga_a10_fpga_read_stat(priv);
-+
-+		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_ERROR)
-+			return -EINVAL;
-+
-+		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_DONE)
-+			return 0;
-+	}
-+
-+	return -ETIMEDOUT;
-+}
-+
-+/* Start the FPGA programming by initialize the FPGA Manager */
-+static int socfpga_a10_fpga_write_init(struct fpga_manager *mgr,
-+				       struct fpga_image_info *info,
-+				       const char *buf, size_t count)
-+{
-+	struct a10_fpga_priv *priv = mgr->priv;
-+	unsigned int cfg_width;
-+	u32 msel, stat, mask;
++	struct device *dev = priv->dev;
++	void __iomem *csr_ctrl_addr = priv->base_addr +
++				      FREEZE_CSR_CTRL_OFFSET;
++	u32 status;
 +	int ret;
 +
-+	if (info->flags & FPGA_MGR_PARTIAL_RECONFIG)
-+		cfg_width = CFGWDTH_16;
-+	else
-+		return -EINVAL;
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
 +
-+	/* Check for passive parallel (msel == 000 or 001) */
-+	msel = socfpga_a10_fpga_read_stat(priv);
-+	msel &= A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_MASK;
-+	msel >>= A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_SHIFT;
-+	if ((msel != 0) && (msel != 1)) {
-+		dev_dbg(&mgr->dev, "Fail: invalid msel=%d\n", msel);
++	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
++
++	if (status & FREEZE_CSR_STATUS_FREEZE_REQ_DONE) {
++		dev_dbg(dev, "%s bridge already disabled %d\n",
++			__func__, status);
++		return 0;
++	} else if (!(status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE)) {
++		dev_err(dev, "%s bridge not enabled %d\n", __func__, status);
 +		return -EINVAL;
 +	}
 +
-+	/* Make sure no external devices are interfering */
-+	stat = socfpga_a10_fpga_read_stat(priv);
-+	mask = A10_FPGAMGR_IMGCFG_STAT_F2S_NCONFIG_PIN |
-+	       A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN;
-+	if ((stat & mask) != mask)
-+		return -EINVAL;
++	writel(FREEZE_CSR_CTRL_FREEZE_REQ, csr_ctrl_addr);
 +
-+	/* Set cfg width */
-+	socfpga_a10_fpga_set_cfg_width(priv, cfg_width);
++	ret = altera_freeze_br_req_ack(priv, timeout,
++				       FREEZE_CSR_STATUS_FREEZE_REQ_DONE);
 +
-+	/* Determine cd ratio from bitstream header and set cd ratio */
-+	ret = socfpga_a10_fpga_set_cdratio(mgr, cfg_width, buf, count);
 +	if (ret)
-+		return ret;
++		writel(0, csr_ctrl_addr);
++	else
++		writel(FREEZE_CSR_CTRL_RESET_REQ, csr_ctrl_addr);
 +
-+	/*
-+	 * Clear s2f_nce to enable chip select.  Leave pr_request
-+	 * unasserted and override disabled.
-+	 */
-+	regmap_write(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
-+		     A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG);
++	return ret;
++}
 +
-+	/* Set cfg_ctrl to enable s2f dclk and data */
-+	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
-+			   A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL,
-+			   A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL);
++static int altera_freeze_br_do_unfreeze(struct altera_freeze_br_data *priv,
++					u32 timeout)
++{
++	struct device *dev = priv->dev;
++	void __iomem *csr_ctrl_addr = priv->base_addr +
++				      FREEZE_CSR_CTRL_OFFSET;
++	u32 status;
++	int ret;
 +
-+	/*
-+	 * Disable overrides not needed for pr.
-+	 * s2f_config==1 leaves reset deasseted.
-+	 */
-+	regmap_write(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_00_OFST,
-+		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NCONFIG |
-+		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NSTATUS |
-+		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_CONDONE |
-+		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NCONFIG);
++	writel(0, csr_ctrl_addr);
 +
-+	/* Enable override for data, dclk, nce, and pr_request to CSS */
-+	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
-+			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG, 0);
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
 +
-+	/* Send some clocks to clear out any errors */
-+	socfpga_a10_fpga_generate_dclks(priv, 256);
++	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
 +
-+	/* Assert pr_request */
-+	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
-+			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST,
-+			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST);
++	if (status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE) {
++		dev_dbg(dev, "%s bridge already enabled %d\n",
++			__func__, status);
++		return 0;
++	} else if (!(status & FREEZE_CSR_STATUS_FREEZE_REQ_DONE)) {
++		dev_err(dev, "%s bridge not frozen %d\n", __func__, status);
++		return -EINVAL;
++	}
 +
-+	/* Do some dclks, wait for pr_ready */
-+	socfpga_a10_fpga_generate_dclks(priv, 0x7ff);
++	writel(FREEZE_CSR_CTRL_UNFREEZE_REQ, csr_ctrl_addr);
 +
-+	/* Wait for pr_ready */
-+	return socfpga_a10_fpga_wait_for_pr_ready(priv);
++	ret = altera_freeze_br_req_ack(priv, timeout,
++				       FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE);
++
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++
++	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
++
++	writel(0, csr_ctrl_addr);
++
++	return ret;
 +}
 +
 +/*
-+ * write data to the FPGA data register
++ * enable = 1 : allow traffic through the bridge
++ * enable = 0 : disable traffic through the bridge
 + */
-+static int socfpga_a10_fpga_write(struct fpga_manager *mgr, const char *buf,
-+				  size_t count)
++static int altera_freeze_br_enable_set(struct fpga_bridge *bridge,
++				       bool enable)
 +{
-+	struct a10_fpga_priv *priv = mgr->priv;
-+	u32 *buffer_32 = (u32 *)buf;
-+	size_t i = 0;
-+
-+	if (count <= 0)
-+		return -EINVAL;
-+
-+	/* Write out the complete 32-bit chunks */
-+	while (count >= sizeof(u32)) {
-+		writel(buffer_32[i++], priv->fpga_data_addr);
-+		count -= sizeof(u32);
-+	}
-+
-+	/* Write out remaining non 32-bit chunks */
-+	switch (count) {
-+	case 3:
-+		writel(buffer_32[i++] & 0x00ffffff, priv->fpga_data_addr);
-+		break;
-+	case 2:
-+		writel(buffer_32[i++] & 0x0000ffff, priv->fpga_data_addr);
-+		break;
-+	case 1:
-+		writel(buffer_32[i++] & 0x000000ff, priv->fpga_data_addr);
-+		break;
-+	case 0:
-+		break;
-+	default:
-+		/* This will never happen */
-+		return -EFAULT;
-+	}
-+
-+	return 0;
-+}
-+
-+static int socfpga_a10_fpga_write_complete(struct fpga_manager *mgr,
-+					   struct fpga_image_info *info)
-+{
-+	struct a10_fpga_priv *priv = mgr->priv;
-+	u32 reg;
++	struct altera_freeze_br_data *priv = bridge->priv;
++	struct fpga_image_info *info = bridge->info;
++	u32 timeout = 0;
 +	int ret;
 +
-+	/* Wait for pr_done */
-+	ret = socfpga_a10_fpga_wait_for_pr_done(priv);
++	if (enable) {
++		if (info)
++			timeout = info->enable_timeout_us;
 +
-+	/* Clear pr_request */
-+	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
-+			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST, 0);
++		ret = altera_freeze_br_do_unfreeze(bridge->priv, timeout);
++	} else {
++		if (info)
++			timeout = info->disable_timeout_us;
 +
-+	/* Send some clocks to clear out any errors */
-+	socfpga_a10_fpga_generate_dclks(priv, 256);
-+
-+	/* Disable s2f dclk and data */
-+	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
-+			   A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL, 0);
-+
-+	/* Deassert chip select */
-+	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
-+			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE,
-+			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE);
-+
-+	/* Disable data, dclk, nce, and pr_request override to CSS */
-+	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
-+			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG,
-+			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG);
-+
-+	/* Return any errors regarding pr_done or pr_error */
-+	if (ret)
-+		return ret;
-+
-+	/* Final check */
-+	reg = socfpga_a10_fpga_read_stat(priv);
-+
-+	if (((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE) == 0) ||
-+	    ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_CONDONE_PIN) == 0) ||
-+	    ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN) == 0)) {
-+		dev_dbg(&mgr->dev,
-+			"Timeout in final check. Status=%08xf\n", reg);
-+		return -ETIMEDOUT;
++		ret = altera_freeze_br_do_freeze(bridge->priv, timeout);
 +	}
 +
-+	return 0;
++	if (!ret)
++		priv->enable = enable;
++
++	return ret;
 +}
 +
-+static enum fpga_mgr_states socfpga_a10_fpga_state(struct fpga_manager *mgr)
++static int altera_freeze_br_enable_show(struct fpga_bridge *bridge)
 +{
-+	struct a10_fpga_priv *priv = mgr->priv;
-+	u32 reg = socfpga_a10_fpga_read_stat(priv);
++	struct altera_freeze_br_data *priv = bridge->priv;
 +
-+	if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE)
-+		return FPGA_MGR_STATE_OPERATING;
-+
-+	if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_READY)
-+		return FPGA_MGR_STATE_WRITE;
-+
-+	if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_CRC_ERROR)
-+		return FPGA_MGR_STATE_WRITE_COMPLETE_ERR;
-+
-+	if ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN) == 0)
-+		return FPGA_MGR_STATE_RESET;
-+
-+	return FPGA_MGR_STATE_UNKNOWN;
++	return priv->enable;
 +}
 +
-+static const struct fpga_manager_ops socfpga_a10_fpga_mgr_ops = {
-+	.state = socfpga_a10_fpga_state,
-+	.write_init = socfpga_a10_fpga_write_init,
-+	.write = socfpga_a10_fpga_write,
-+	.write_complete = socfpga_a10_fpga_write_complete,
++static struct fpga_bridge_ops altera_freeze_br_br_ops = {
++	.enable_set = altera_freeze_br_enable_set,
++	.enable_show = altera_freeze_br_enable_show,
 +};
 +
-+static int socfpga_a10_fpga_probe(struct platform_device *pdev)
++static const struct of_device_id altera_freeze_br_of_match[] = {
++	{ .compatible = "altr,freeze-bridge-controller", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, altera_freeze_br_of_match);
++
++static int altera_freeze_br_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
-+	struct a10_fpga_priv *priv;
-+	void __iomem *reg_base;
++	struct device_node *np = pdev->dev.of_node;
++	struct altera_freeze_br_data *priv;
 +	struct resource *res;
-+	int ret;
++	u32 status, revision;
++
++	if (!np)
++		return -ENODEV;
 +
 +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 +	if (!priv)
 +		return -ENOMEM;
 +
-+	/* First mmio base is for register access */
++	priv->dev = dev;
++
 +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	reg_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(reg_base))
-+		return PTR_ERR(reg_base);
++	priv->base_addr = devm_ioremap_resource(dev, res);
++	if (IS_ERR(priv->base_addr))
++		return PTR_ERR(priv->base_addr);
 +
-+	/* Second mmio base is for writing FPGA image data */
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	priv->fpga_data_addr = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(priv->fpga_data_addr))
-+		return PTR_ERR(priv->fpga_data_addr);
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++	if (status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE)
++		priv->enable = 1;
 +
-+	/* regmap for register access */
-+	priv->regmap = devm_regmap_init_mmio(dev, reg_base,
-+					     &socfpga_a10_fpga_regmap_config);
-+	if (IS_ERR(priv->regmap))
-+		return -ENODEV;
++	revision = readl(priv->base_addr + FREEZE_CSR_REG_VERSION);
++	if (revision != FREEZE_CSR_SUPPORTED_VERSION)
++		dev_warn(dev,
++			 "%s Freeze Controller unexpected revision %d != %d\n",
++			 __func__, revision, FREEZE_CSR_SUPPORTED_VERSION);
 +
-+	priv->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(dev, "no clock specified\n");
-+		return PTR_ERR(priv->clk);
-+	}
-+
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret) {
-+		dev_err(dev, "could not enable clock\n");
-+		return -EBUSY;
-+	}
-+
-+	return fpga_mgr_register(dev, "SoCFPGA Arria10 FPGA Manager",
-+				 &socfpga_a10_fpga_mgr_ops, priv);
++	return fpga_bridge_register(dev, FREEZE_BRIDGE_NAME,
++				    &altera_freeze_br_br_ops, priv);
 +}
 +
-+static int socfpga_a10_fpga_remove(struct platform_device *pdev)
++static int altera_freeze_br_remove(struct platform_device *pdev)
 +{
-+	struct fpga_manager *mgr = platform_get_drvdata(pdev);
-+	struct a10_fpga_priv *priv = mgr->priv;
-+
-+	fpga_mgr_unregister(&pdev->dev);
-+	clk_disable_unprepare(priv->clk);
++	fpga_bridge_unregister(&pdev->dev);
 +
 +	return 0;
 +}
 +
-+static const struct of_device_id socfpga_a10_fpga_of_match[] = {
-+	{ .compatible = "altr,socfpga-a10-fpga-mgr", },
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, socfpga_a10_fpga_of_match);
-+
-+static struct platform_driver socfpga_a10_fpga_driver = {
-+	.probe = socfpga_a10_fpga_probe,
-+	.remove = socfpga_a10_fpga_remove,
++static struct platform_driver altera_freeze_br_driver = {
++	.probe = altera_freeze_br_probe,
++	.remove = altera_freeze_br_remove,
 +	.driver = {
-+		.name	= "socfpga_a10_fpga_manager",
-+		.of_match_table = socfpga_a10_fpga_of_match,
++		.name	= "altera_freeze_br",
++		.of_match_table = of_match_ptr(altera_freeze_br_of_match),
 +	},
 +};
 +
-+module_platform_driver(socfpga_a10_fpga_driver);
++module_platform_driver(altera_freeze_br_driver);
 +
++MODULE_DESCRIPTION("Altera Freeze Bridge");
 +MODULE_AUTHOR("Alan Tull <atull@opensource.altera.com>");
-+MODULE_DESCRIPTION("SoCFPGA Arria10 FPGA Manager");
 +MODULE_LICENSE("GPL v2");
 -- 
 2.9.3
