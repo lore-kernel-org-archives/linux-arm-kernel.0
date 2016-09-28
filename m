@@ -1,37 +1,44 @@
-From: songjun.wu@microchip.com (Songjun Wu)
-Date: Wed, 28 Sep 2016 13:28:57 +0800
-Subject: [PATCH] [media] atmel-isc: start dma in some scenario
-Message-ID: <1475040538-32591-1-git-send-email-songjun.wu@microchip.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 28 Sep 2016 08:58:16 +0300
+Subject: [PATCH v3 0/9] dmaengine: ti drivers: enable COMPILE_TESTing
+In-Reply-To: <20160928032605.GK2467@localhost>
+References: <20160921124135.11849-1-peter.ujfalusi@ti.com>
+ <20160928032605.GK2467@localhost>
+Message-ID: <e138bd1b-8705-11b8-c4c2-a50db5292fcc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a new vb buf is added to vb queue, the queue is
-empty and steaming, dma should be started.
+Vinod,
 
-Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
----
+On 09/28/16 06:26, Vinod Koul wrote:
+> On Wed, Sep 21, 2016 at 03:41:26PM +0300, Peter Ujfalusi wrote:
+>> Hi,
+>>
+>> Changes since v2:
+>> - Instead of converting to use enum for the of_device_id data parameter the two
+>>   patch for edma and ti-dma-crossbar is using pointers to u32 variables to make
+>>   sure that the code compile (and in theory work) on all architectures.
+>> - fixed issue in the ti-dma-crossbar driver I have made with the enum change to
+>>   not handle the DMA offset parameters correctly.
+>>
+>> Changes since v1:
+>> - added the compiler warning message to ti-dma-crossbar enum type patch
+>> - moved the Kconfig patches at the end of the seris
+>>
+>> The following series will enable unconditional COMPILE_TEST coverage for the
+>> following drivers: omap-dma, edma and ti-dma-crossbar
+>>
+>> The series includes fixes noticed when compiling the drivers for x86_64 and
+>> aarch64.
+> 
+> I have applied the series after fixing code style nit-picks.
+> 
+> Also applied the edma patch and reordered the series to have that come
+> before compile test enable patch
+> 
+> Please verify.
 
- drivers/media/platform/atmel/atmel-isc.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Looks good, thank you!
 
-diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-index ccfe13b..8e25d3f 100644
---- a/drivers/media/platform/atmel/atmel-isc.c
-+++ b/drivers/media/platform/atmel/atmel-isc.c
-@@ -617,7 +617,13 @@ static void isc_buffer_queue(struct vb2_buffer *vb)
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&isc->dma_queue_lock, flags);
--	list_add_tail(&buf->list, &isc->dma_queue);
-+	if (!isc->cur_frm && list_empty(&isc->dma_queue) &&
-+		vb2_is_streaming(vb->vb2_queue)) {
-+		isc->cur_frm = buf;
-+		isc_start_dma(isc->regmap, isc->cur_frm,
-+			isc->current_fmt->reg_dctrl_dview);
-+	} else
-+		list_add_tail(&buf->list, &isc->dma_queue);
- 	spin_unlock_irqrestore(&isc->dma_queue_lock, flags);
- }
- 
 -- 
-2.7.4
+P?ter
