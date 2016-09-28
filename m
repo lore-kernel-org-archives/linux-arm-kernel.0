@@ -1,558 +1,711 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Wed, 28 Sep 2016 13:21:49 -0500
-Subject: [PATCH v19 01/12] fpga: add bindings document for fpga region
+Date: Wed, 28 Sep 2016 13:21:57 -0500
+Subject: [PATCH v19 09/12] fpga: fpga-region: device tree control for FPGA
 In-Reply-To: <20160928182200.15800-1-atull@opensource.altera.com>
 References: <20160928182200.15800-1-atull@opensource.altera.com>
-Message-ID: <20160928182200.15800-2-atull@opensource.altera.com>
+Message-ID: <20160928182200.15800-10-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New bindings document for FPGA Region to support programming
-FPGA's under Device Tree control
+FPGA Regions support programming FPGA under control of the Device
+Tree.
 
 Signed-off-by: Alan Tull <atull@opensource.altera.com>
-Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
 ---
-v9:  initial version added to this patchset
-v10: s/fpga/FPGA/g
-     replace DT overlay example with slightly more complicated example
-     move to staging/simple-fpga-bus
+v9:  initial version (this patch added during rest of patchset's v9)
+v10: request deferral if fpga mgr or bridges not available yet
+     cleanup as fpga manager core goes into the real kernel
+     Don't assume bridges are disabled before programming FPGA
+     Don't hang onto reference for fpga manager
+     Move to staging/simple-fpga-bus
 v11: No change in this patch for v11 of the patch set
 v12: Moved out of staging.
-     Changed to use FPGA bridges framework instead of resets
-     for bridges.
-v13: bridge at 0xff20000 -> bridge at ff200000, etc
-     Leave out directly talking about overlays
-     Remove regs and clocks directly under simple-fpga-bus in example
-     Use common "firmware-name" binding instead of "fpga-firmware"
-v14: Use firmware-name in bindings description
-     Call it FPGA Area
-     Remove bindings that specify FPGA Manager and FPGA Bridges
-v15: Cleanup as per Rob's comments
-     Combine usage doc with bindings document
-     Document as being Altera specific
-     Additions and changes to add FPGA Bus
-v16: Reworked to document FPGA Regions
-     rename altera-fpga-bus-fpga-area.txt -> fpga-region.txt
-     Remove references that made it sound exclusive to Altera
-     Remove altr, prefix from fpga-bus and fpga-area compatible strings
-     Added Moritz' usage example with Xilinx
-     Cleaned up unit addresses
-v17: Lots of rewrites to try to make things clearer
-     Clarify that overlay can be rejected if FPGA isn't programmed
-     Add external-fpga-config binding already used in u-boot
-     Change partial-reconfig binding to partial-fpga-config to align
-       with existing u-boot binding format *-fpga-config
-     Add a document from Xilinx' website
-v18: Fix node names underscores to be hyphens
-     Fix copy/pasted duplicate nodes in diagram
-v19: Fix more underscores
-     Make FPGA regions to be children of bridges
-     General cleanup and clarification
+     Use fpga bridges framework.
+v13: If no bridges are specified, assume we don't need any.
+     Clean up debug messages
+     Some dev_info -> dev_dbg
+     Remove unneeded #include
+     Fix size of array of pointers
+     Don't need to specify .owner
+     Use common binding: firmware-name
+v14: OK it's not a simple bus.  Call it "FPGA Area"
+     Remove bindings that specify FPGA manager and FPGA bridges
+     Use parent FPGA bridge and bridges that are its peers
+     Use ancestor FPGA Manager
+v15: Add altr,fpga-bus implementation
+     Change compatible string "fpga-area" -> "altr,fpga-area"
+v16: Much changes as FPGA Areas and Busses become FPGA Regions
+     Add reconfig notifier, don't rely on simple-bus
+v17: Use new overlay notifier instead of reconfig notifier
+     Add external_fpga_config property used in u-boot
+     Change partial-reconfig binding to partial-fpga-config to be
+       similar to *-fpga-config bindings used in u-boot
+v18: No change to this patch in v18 of patch set
+v19: add fpga image information struct
+     support region as child of fpga bridge
+     remove message about not finding region
+     Make a tristate in the Kconfig
+     Add dependency on bridges in Kconfig
 ---
- .../devicetree/bindings/fpga/fpga-region.txt       | 494 +++++++++++++++++++++
- 1 file changed, 494 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/fpga-region.txt
+ drivers/fpga/Kconfig          |   7 +
+ drivers/fpga/Makefile         |   3 +
+ drivers/fpga/fpga-region.c    | 603 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/fpga/fpga-mgr.h |   2 +
+ 4 files changed, 615 insertions(+)
+ create mode 100644 drivers/fpga/fpga-region.c
 
-diff --git a/Documentation/devicetree/bindings/fpga/fpga-region.txt b/Documentation/devicetree/bindings/fpga/fpga-region.txt
+diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
+index fe87d44..1a3a38a 100644
+--- a/drivers/fpga/Kconfig
++++ b/drivers/fpga/Kconfig
+@@ -13,6 +13,13 @@ config FPGA
+ 
+ if FPGA
+ 
++config FPGA_REGION
++	tristate "FPGA Region"
++	depends on OF && FPGA_BRIDGE
++	help
++	  FPGA Regions allow loading FPGA images under control of
++	  the Device Tree.
++
+ config FPGA_MGR_SOCFPGA
+ 	tristate "Altera SOCFPGA FPGA Manager"
+ 	depends on ARCH_SOCFPGA
+diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
+index 4baef00..8d746c3 100644
+--- a/drivers/fpga/Makefile
++++ b/drivers/fpga/Makefile
+@@ -11,3 +11,6 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
+ 
+ # FPGA Bridge Drivers
+ obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
++
++# High Level Interfaces
++obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
+diff --git a/drivers/fpga/fpga-region.c b/drivers/fpga/fpga-region.c
 new file mode 100644
-index 0000000..3b32ba1
+index 0000000..3222fdb
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/fpga/fpga-region.txt
-@@ -0,0 +1,494 @@
-+FPGA Region Device Tree Binding
++++ b/drivers/fpga/fpga-region.c
+@@ -0,0 +1,603 @@
++/*
++ * FPGA Region - Device Tree support for FPGA programming under Linux
++ *
++ *  Copyright (C) 2013-2016 Altera Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+Alan Tull 2016
++#include <linux/fpga/fpga-bridge.h>
++#include <linux/fpga/fpga-mgr.h>
++#include <linux/idr.h>
++#include <linux/kernel.h>
++#include <linux/list.h>
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
 +
-+ CONTENTS
-+ - Introduction
-+ - Terminology
-+ - Sequence
-+ - FPGA Region
-+ - Supported Use Models
-+ - Device Tree Examples
-+ - Constraints
-+
-+
-+Introduction
-+============
-+
-+FPGA Regions represent FPGA's and partial reconfiguration regions of FPGA's in
-+the Device Tree.  FPGA Regions provide a way to program FPGAs under device tree
-+control.
-+
-+This device tree binding document hits some of the high points of FPGA usage and
-+attempts to include terminology used by both major FPGA manufacturers.  This
-+document isn't a replacement for any manufacturers specifications for FPGA
-+usage.
-+
-+
-+Terminology
-+===========
-+
-+Full Reconfiguration
-+ * The entire FPGA is programmed.
-+
-+Partial Reconfiguration (PR)
-+ * A section of an FPGA is reprogrammed while the rest of the FPGA is not
-+   affected.
-+ * Not all FPGA's support PR.
-+
-+Partial Reconfiguration Region (PRR)
-+ * Also called a "reconfigurable partition"
-+ * A PRR is a specific section of a FPGA reserved for reconfiguration.
-+ * A base (or static) FPGA image may create a set of PRR's that later may
-+   be independently reprogrammed many times.
-+ * The size and specific location of each PRR is fixed.
-+ * The connections at the edge of each PRR are fixed.  The image that is loaded
-+   into a PRR must fit and must use a subset of the region's connections.
-+ * The busses within the FPGA are split such that each region gets its own
-+   branch that may be gated independently.
-+
-+Persona
-+ * Also called a "partial bit stream"
-+ * An FPGA image that is designed to be loaded into a PRR.  There may be
-+   any number of personas designed to fit into a PRR, but only one at at time
-+   may be loaded.
-+ * A persona may create more regions.
-+
-+FPGA Bridge
-+ * FPGA Bridges gate bus signals between a host and FPGA.
-+ * FPGA Bridges should be disabled while the FPGA is being programmed to
-+   prevent spurious signals on the cpu bus and to the soft logic.
-+ * FPGA bridges may be actual hardware or soft logic on an FPGA.
-+ * During Full Reconfiguration, hardware bridges between the host and FPGA
-+   will be disabled.
-+ * During Partial Reconfiguration of a specific region, that region's bridge
-+   will be used to gate the busses.  Traffic to other regions is not affected.
-+ * In some implementations, the FPGA Manager transparantly handles gating the
-+   buses, eliminating the need to show the hardware FPGA bridges in the
-+   device tree.
-+ * An FPGA image may create a set of reprogrammable regions, each having its
-+   own bridge and its own split of the busses in the FPGA.
-+
-+FPGA Manager
-+ * An FPGA Manager is a hardware block that programs an FPGA under the control
-+   of a host processor.
-+
-+Base Image
-+ * Also called the "static image"
-+ * An FPGA image that is designed to do full reconfiguration of the FPGA.
-+ * A base image may set up a set of partial reconfiguration regions that may
-+   later be reprogrammed.
-+
-+    ----------------       ----------------------------------
-+    |  Host CPU    |       |             FPGA               |
-+    |              |       |                                |
-+    |          ----|       |       -----------    --------  |
-+    |          | H |       |   |==>| Bridge0 |<==>| PRR0 |  |
-+    |          | W |       |   |   -----------    --------  |
-+    |          |   |       |   |                            |
-+    |          | B |<=====>|<==|   -----------    --------  |
-+    |          | R |       |   |==>| Bridge1 |<==>| PRR1 |  |
-+    |          | I |       |   |   -----------    --------  |
-+    |          | D |       |   |                            |
-+    |          | G |       |   |   -----------    --------  |
-+    |          | E |       |   |==>| Bridge2 |<==>| PRR2 |  |
-+    |          ----|       |       -----------    --------  |
-+    |              |       |                                |
-+    ----------------       ----------------------------------
-+
-+Figure 1: An FPGA set up with a base image that created three regions.  Each
-+region (PRR0-2) gets its own split of the busses that is independently gated by
-+a soft logic bridge (Bridge0-2) in the FPGA.  The contents of each PRR can be
-+reprogrammed independently while the rest of the system continues to function.
-+
-+
-+Sequence
-+========
-+
-+When a DT overlay that targets a FPGA Region is applied, the FPGA Region will
-+do the following:
-+
-+ 1. Disable appropriate FPGA bridges.
-+ 2. Program the FPGA using the FPGA manager.
-+ 3. Enable the FPGA bridges.
-+ 4. The Device Tree overlay is accepted into the live tree.
-+ 5. Child devices are populated.
-+
-+When the overlay is removed, the child nodes will be removed and the FPGA Region
-+will disable the bridges.
-+
-+
-+FPGA Region
-+===========
-+
-+FPGA Regions represent FPGA's and FPGA PR regions in the device tree.  An FPGA
-+Region brings together the elements needed to program on a running system and
-+add the child devices:
-+
-+ * FPGA Manager
-+ * FPGA Bridges
-+ * image-specific information needed to to the programming.
-+ * child nodes
-+
-+The intended use is that a Device Tree overlay (DTO) can be used to reprogram an
-+FPGA while an operating system is running.
-+
-+An FPGA Region that exists in the live Device Tree reflects the current state.
-+If the live tree shows a "firmware-name" property or child nodes under a FPGA
-+Region, the FPGA already has been programmed.  A DTO that targets a FPGA Region
-+and adds the "firmware-name" property is taken as a request to reprogram the
-+FPGA.  After reprogramming is successful, the overlay is accepted into the live
-+tree.
-+
-+The base FPGA Region in the device tree represents the FPGA and supports full
-+reconfiguration.  It must include a phandle to an FPGA Manager.  The base
-+FPGA region will be the child of one of the hardware bridges (the bridge that
-+allows register access) between the cpu and the FPGA.  If there are more than
-+one bridge to control during FPGA programming, the region will also contain a
-+list of phandles to the additional hardware FPGA Bridges.
-+
-+For partial reconfiguration (PR), each PR region will have an FPGA Region.
-+These FPGA regions are children of FPGA bridges which are then children of the
-+base FPGA region.  The "Full Reconfiguration to add PRR's" example below shows
-+this.
-+
-+If an FPGA Region does not specify a FPGA Manager, it will inherit the FPGA
-+Manager specified by its ancestor FPGA Region.  This supports both the case
-+where the same FPGA Manager is used for all of a FPGA as well the case where
-+a different FPGA Manager is used for each region.
-+
-+FPGA Regions do not inherit their ancestor FPGA regions' bridges.  This prevents
-+shutting down bridges that are upstream from the other active regions while one
-+region is getting reconfigured (see Figure 1 above).  During PR, the FPGA's
-+hardware bridges remain enabled.  The PR regions' bridges will be FPGA bridges
-+within the static image of the FPGA.
-+
-+Required properties:
-+- compatible : should contain "fpga-region"
-+- fpga-mgr : should contain a phandle to an FPGA Manager.  Child FPGA Regions
-+	inherit this property from their ancestor regions.  A fpga-mgr property
-+	in a region will override any inherited FPGA manager.
-+- #address-cells, #size-cells, ranges : must be present to handle address space
-+	mapping for child nodes.
-+
-+Optional properties:
-+- firmware-name : should contain the name of an FPGA image file located on the
-+	firmware search path.  If this property shows up in a live device tree
-+	it indicates that the FPGA has already been programmed with this image.
-+	If this property is in an overlay targeting a FPGA region, it is a
-+	request to program the FPGA with that image.
-+- fpga-bridges : should contain a list of phandles to FPGA Bridges that must be
-+	controlled during FPGA programming along with the parent FPGA bridge.
-+	This property is optional if the FPGA Manager handles the bridges.
-+        If the fpga-region is  the child of a fpga-bridge, the list should not
-+        contain the parent bridge.
-+- partial-fpga-config : boolean, set if partial reconfiguration is to be done,
-+	otherwise full reconfiguration is done.
-+- external-fpga-config : boolean, set if the FPGA has already been configured
-+	prior to OS boot up.
-+- region-unfreeze-timeout-us : The maximum time in microseconds to wait for
-+	bridges to successfully become enabled after the region has been
-+	programmed.
-+- region-freeze-timeout-us : The maximum time in microseconds to wait for
-+	bridges to successfully become disabled before the region has been
-+	programmed.
-+- child nodes : devices in the FPGA after programming.
-+
-+In the example below, when an overlay is applied targeting fpga-region0,
-+fpga_mgr is used to program the FPGA.  Two bridges are controlled during
-+programming: the parent fpga_bridge0 and fpga_bridge1.  Because the region is
-+the child of fpga_bridge0, only fpga_bridge1 needs to be specified in the
-+fpga-bridges property.  During programming, these bridges are disabled, the
-+firmware specified in the overlay is loaded to the FPGA using the FPGA manager
-+specified in the region.  If FPGA programming succeeds, the bridges are
-+reenabled and the overlay makes it into the live device tree.  The child devices
-+are then populated.  If FPGA programming fails, the bridges are left disabled
-+and the overlay is rejected.  The overlay's ranges property maps the lwhps
-+bridge's region (0xff200000) and the hps bridge's region (0xc0000000) for use by
-+the two child devices.
-+
-+Example:
-+Base tree contains:
-+
-+	fpga_mgr: fpga-mgr at ff706000 {
-+		compatible = "altr,socfpga-fpga-mgr";
-+		reg = <0xff706000 0x1000
-+		       0xffb90000 0x20>;
-+		interrupts = <0 175 4>;
-+	};
-+
-+	fpga_bridge0: fpga-bridge at ff400000 {
-+		compatible = "altr,socfpga-lwhps2fpga-bridge";
-+		reg = <0xff400000 0x100000>;
-+		resets = <&rst LWHPS2FPGA_RESET>;
-+		clocks = <&l4_main_clk>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		fpga_region0: fpga-region0 {
-+			compatible = "fpga-region";
-+			fpga-mgr = <&fpga_mgr>;
-+		};
-+	};
-+
-+	fpga_bridge1: fpga-bridge at ff500000 {
-+		compatible = "altr,socfpga-hps2fpga-bridge";
-+		reg = <0xff500000 0x10000>;
-+		resets = <&rst HPS2FPGA_RESET>;
-+		clocks = <&l4_main_clk>;
-+	};
-+
-+Overlay contains:
-+
-+/dts-v1/ /plugin/;
-+/ {
-+	fragment at 0 {
-+		target = <&fpga_region0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		__overlay__ {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			firmware-name = "soc_system.rbf";
-+			fpga-bridges = <&fpga_bridge1>;
-+			ranges = <0x20000 0xff200000 0x100000>,
-+				 <0x0 0xc0000000 0x20000000>;
-+
-+			gpio at 10040 {
-+				compatible = "altr,pio-1.0";
-+				reg = <0x10040 0x20>;
-+				altr,gpio-bank-width = <4>;
-+				#gpio-cells = <2>;
-+				clocks = <2>;
-+				gpio-controller;
-+			};
-+
-+			onchip-memory {
-+				device_type = "memory";
-+				compatible = "altr,onchipmem-15.1";
-+				reg = <0x0 0x10000>;
-+			};
-+		};
-+	};
++/**
++ * struct fpga_region - FPGA Region structure
++ * @dev: FPGA Region device
++ * @mutex: enforces exclusive reference to region
++ * @bridge_list: list of FPGA bridges specified in region
++ * @info: fpga image specific information
++ */
++struct fpga_region {
++	struct device dev;
++	struct mutex mutex; /* for exclusive reference to region */
++	struct list_head bridge_list;
++	struct fpga_image_info *info;
 +};
 +
++#define to_fpga_region(d) container_of(d, struct fpga_region, dev)
 +
-+Supported Use Models
-+====================
++static DEFINE_IDA(fpga_region_ida);
++static struct class *fpga_region_class;
 +
-+In all cases the live DT must have the FPGA Manager, FPGA Bridges (if any), and
-+a FPGA Region.  The target of the Device Tree Overlay is the FPGA Region.  Some
-+uses are specific to a FPGA device.
++static const struct of_device_id fpga_region_of_match[] = {
++	{ .compatible = "fpga-region", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, fpga_region_of_match);
 +
-+ * No FPGA Bridges
-+   In this case, the FPGA Manager which programs the FPGA also handles the
-+   bridges behind the scenes.  No FPGA Bridge devices are needed for full
-+   reconfiguration.
++static int fpga_region_of_node_match(struct device *dev, const void *data)
++{
++	return dev->of_node == data;
++}
 +
-+ * Full reconfiguration with hardware bridges
-+   In this case, there are hardware bridges between the processor and FPGA that
-+   need to be controlled during full reconfiguration.  Before the overlay is
-+   applied, the live DT must include the FPGA Manager, FPGA Bridges, and a
-+   FPGA Region.  The FPGA Region is the child of the bridge that allows
-+   register access to the FPGA.  Additional bridges may be listed in a
-+   fpga-bridges property in the FPGA region or in the device tree overlay.
++/**
++ * fpga_region_find - find FPGA region
++ * @np: device node of FPGA Region
++ * Caller will need to put_device(&region->dev) when done.
++ * Returns FPGA Region struct or NULL
++ */
++static struct fpga_region *fpga_region_find(struct device_node *np)
++{
++	struct device *dev;
 +
-+ * Partial reconfiguration with bridges in the FPGA
-+   In this case, the FPGA will have one or more PRR's that may be programmed
-+   separately while the rest of the FPGA can remain active.  To manage this,
-+   bridges need to exist in the FPGA that can gate the buses going to each FPGA
-+   region while the buses are enabled for other sections.  Before any partial
-+   reconfiguration can be done, a base FPGA image must be loaded which includes
-+   PRR's with FPGA bridges.  The device tree should have a FPGA region for each
-+   PRR.
++	dev = class_find_device(fpga_region_class, NULL, np,
++				fpga_region_of_node_match);
++	if (!dev)
++		return NULL;
 +
-+Device Tree Examples
-+====================
++	return to_fpga_region(dev);
++}
 +
-+The intention of this section is to give some simple examples, focusing on
-+the placement of the elements detailed above, especially:
-+ * FPGA Manager
-+ * FPGA Bridges
-+ * FPGA Region
-+ * ranges
-+ * target-path or target
++/**
++ * fpga_region_get - get an exclusive reference to a fpga region
++ * @region: FPGA Region struct
++ *
++ * Caller should call fpga_region_put() when done with region.
++ *
++ * Return fpga_region struct if successful.
++ * Return -EBUSY if someone already has a reference to the region.
++ * Return -ENODEV if @np is not a FPGA Region.
++ */
++static struct fpga_region *fpga_region_get(struct fpga_region *region)
++{
++	struct device *dev = &region->dev;
 +
-+For the purposes of this section, I'm dividing the Device Tree into two parts,
-+each with its own requirements.  The two parts are:
-+ * The live DT prior to the overlay being added
-+ * The DT overlay
++	if (!mutex_trylock(&region->mutex)) {
++		dev_dbg(dev, "%s: FPGA Region already in use\n", __func__);
++		return ERR_PTR(-EBUSY);
++	}
 +
-+The live Device Tree must contain an FPGA Region, an FPGA Manager, and any FPGA
-+Bridges.  The FPGA Region's "fpga-mgr" property specifies the manager by phandle
-+to handle programming the FPGA.  If the FPGA Region is the child of another FPGA
-+Region, the parent's FPGA Manager is used.  If FPGA Bridges need to be involved,
-+they are specified in the FPGA Region by the "fpga-bridges" property.  During
-+FPGA programming, the FPGA Region will disable the bridges that are in its
-+"fpga-bridges" list and will re-enable them after FPGA programming has
-+succeeded.
++	get_device(dev);
++	of_node_get(dev->of_node);
++	if (!try_module_get(dev->parent->driver->owner)) {
++		of_node_put(dev->of_node);
++		put_device(dev);
++		mutex_unlock(&region->mutex);
++		return ERR_PTR(-ENODEV);
++	}
 +
-+The Device Tree Overlay will contain:
-+ * "target-path" or "target"
-+   The insertion point where the the contents of the overlay will go into the
-+   live tree.  target-path is a full path, while target is a phandle.
-+ * "ranges"
-+    The address space mapping from processor to FPGA bus(ses).
-+ * "firmware-name"
-+   Specifies the name of the FPGA image file on the firmware search
-+   path.  The search path is described in the firmware class documentation.
-+ * "partial-fpga-config"
-+   This binding is a boolean and should be present if partial reconfiguration
-+   is to be done.
-+ * child nodes corresponding to hardware that will be loaded in this region of
-+   the FPGA.
++	dev_dbg(&region->dev, "get\n");
 +
-+Device Tree Example: Full Reconfiguration without Bridges
-+=========================================================
++	return region;
++}
 +
-+Live Device Tree contains:
-+	fpga_mgr0: fpga-mgr at f8007000 {
-+		compatible = "xlnx,zynq-devcfg-1.0";
-+		reg = <0xf8007000 0x100>;
-+		interrupt-parent = <&intc>;
-+		interrupts = <0 8 4>;
-+		clocks = <&clkc 12>;
-+		clock-names = "ref_clk";
-+		syscon = <&slcr>;
-+	};
++/**
++ * fpga_region_put - release a reference to a region
++ *
++ * @region: FPGA region
++ */
++static void fpga_region_put(struct fpga_region *region)
++{
++	struct device *dev = &region->dev;
 +
-+	fpga_region0: fpga-region0 {
-+		compatible = "fpga-region";
-+		fpga-mgr = <&fpga_mgr0>;
-+		#address-cells = <0x1>;
-+		#size-cells = <0x1>;
-+		ranges;
-+	};
++	dev_dbg(&region->dev, "put\n");
 +
-+DT Overlay contains:
-+/dts-v1/ /plugin/;
-+/ {
-+fragment at 0 {
-+	target = <&fpga_region0>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	__overlay__ {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
++	module_put(dev->parent->driver->owner);
++	of_node_put(dev->of_node);
++	put_device(dev);
++	mutex_unlock(&region->mutex);
++}
 +
-+		firmware-name = "zynq-gpio.bin";
++/**
++ * fpga_region_get_manager - get exclusive reference for FPGA manager
++ * @region: FPGA region
++ *
++ * Get FPGA Manager from "fpga-mgr" property or from ancestor region.
++ *
++ * Caller should call fpga_mgr_put() when done with manager.
++ *
++ * Return: fpga manager struct or IS_ERR() condition containing error code.
++ */
++static struct fpga_manager *fpga_region_get_manager(struct fpga_region *region)
++{
++	struct device *dev = &region->dev;
++	struct device_node *np = dev->of_node;
++	struct device_node  *mgr_node;
++	struct fpga_manager *mgr;
 +
-+		gpio1: gpio at 40000000 {
-+			compatible = "xlnx,xps-gpio-1.00.a";
-+			reg = <0x40000000 0x10000>;
-+			gpio-controller;
-+			#gpio-cells = <0x2>;
-+			xlnx,gpio-width= <0x6>;
-+		};
-+	};
++	of_node_get(np);
++	while (np) {
++		if (of_device_is_compatible(np, "fpga-region")) {
++			mgr_node = of_parse_phandle(np, "fpga-mgr", 0);
++			if (mgr_node) {
++				mgr = of_fpga_mgr_get(mgr_node);
++				of_node_put(np);
++				return mgr;
++			}
++		}
++		np = of_get_next_parent(np);
++	}
++	of_node_put(np);
++
++	return ERR_PTR(-EINVAL);
++}
++
++/**
++ * fpga_region_get_bridges - create a list of bridges
++ * @region: FPGA region
++ * @overlay: device node of the overlay
++ *
++ * Create a list of bridges including the parent bridge and the bridges
++ * specified by "fpga-bridges" property.  Note that the
++ * fpga_bridges_enable/disable/put functions are all fine with an empty list
++ * if that happens.
++ *
++ * Caller should call fpga_bridges_put(&region->bridge_list) when
++ * done with the bridges.
++ *
++ * Return 0 for success (even if there are no bridges specified)
++ * or -EBUSY if any of the bridges are in use.
++ */
++static int fpga_region_get_bridges(struct fpga_region *region,
++				   struct device_node *overlay)
++{
++	struct device *dev = &region->dev;
++	struct device_node *region_np = dev->of_node;
++	struct device_node *br, *np, *parent_br = NULL;
++	int i, ret;
++
++	/* If parent is a bridge, add to list */
++	ret = fpga_bridge_get_to_list(region_np->parent, region->info,
++				      &region->bridge_list);
++	if (ret == -EBUSY)
++		return ret;
++
++	if (!ret)
++		parent_br = region_np->parent;
++
++	/* If overlay has a list of bridges, use it. */
++	if (of_parse_phandle(overlay, "fpga-bridges", 0))
++		np = overlay;
++	else
++		np = region_np;
++
++	for (i = 0; ; i++) {
++		br = of_parse_phandle(np, "fpga-bridges", i);
++		if (!br)
++			break;
++
++		/* If parent bridge is in list, skip it. */
++		if (br == parent_br)
++			continue;
++
++		/* If node is a bridge, get it and add to list */
++		ret = fpga_bridge_get_to_list(br, region->info,
++					      &region->bridge_list);
++
++		/* If any of the bridges are in use, give up */
++		if (ret == -EBUSY) {
++			fpga_bridges_put(&region->bridge_list);
++			return -EBUSY;
++		}
++	}
++
++	return 0;
++}
++
++/**
++ * fpga_region_program_fpga - program FPGA
++ * @region: FPGA region
++ * @firmware_name: name of FPGA image firmware file
++ * @overlay: device node of the overlay
++ * Program an FPGA using information in the device tree.
++ * Function assumes that there is a firmware-name property.
++ * Return 0 for success or negative error code.
++ */
++static int fpga_region_program_fpga(struct fpga_region *region,
++				    const char *firmware_name,
++				    struct device_node *overlay)
++{
++	struct fpga_manager *mgr;
++	int ret;
++
++	region = fpga_region_get(region);
++	if (IS_ERR(region)) {
++		pr_err("failed to get fpga region\n");
++		return PTR_ERR(region);
++	}
++
++	mgr = fpga_region_get_manager(region);
++	if (IS_ERR(mgr)) {
++		pr_err("failed to get fpga region manager\n");
++		return PTR_ERR(mgr);
++	}
++
++	ret = fpga_region_get_bridges(region, overlay);
++	if (ret) {
++		pr_err("failed to get fpga region bridges\n");
++		goto err_put_mgr;
++	}
++
++	ret = fpga_bridges_disable(&region->bridge_list);
++	if (ret) {
++		pr_err("failed to disable region bridges\n");
++		goto err_put_br;
++	}
++
++	ret = fpga_mgr_firmware_load(mgr, region->info, firmware_name);
++	if (ret) {
++		pr_err("failed to load fpga image\n");
++		goto err_put_br;
++	}
++
++	ret = fpga_bridges_enable(&region->bridge_list);
++	if (ret) {
++		pr_err("failed to enable region bridges\n");
++		goto err_put_br;
++	}
++
++	fpga_mgr_put(mgr);
++	fpga_region_put(region);
++
++	return 0;
++
++err_put_br:
++	fpga_bridges_put(&region->bridge_list);
++err_put_mgr:
++	fpga_mgr_put(mgr);
++	fpga_region_put(region);
++
++	return ret;
++}
++
++/**
++ * child_regions_with_firmware
++ * @overlay: device node of the overlay
++ *
++ * If the overlay adds child FPGA regions, they are not allowed to have
++ * firmware-name property.
++ *
++ * Return 0 for OK or -EINVAL if child FPGA region adds firmware-name.
++ */
++static int child_regions_with_firmware(struct device_node *overlay)
++{
++	struct device_node *child_region;
++	const char *child_firmware_name;
++	int ret = 0;
++
++	of_node_get(overlay);
++
++	child_region = of_find_matching_node(overlay, fpga_region_of_match);
++	while (child_region) {
++		if (!of_property_read_string(child_region, "firmware-name",
++					     &child_firmware_name)) {
++			ret = -EINVAL;
++			break;
++		}
++		child_region = of_find_matching_node(child_region,
++						     fpga_region_of_match);
++	}
++
++	of_node_put(child_region);
++
++	if (ret)
++		pr_err("firmware-name not allowed in child FPGA region: %s",
++		       child_region->full_name);
++
++	return ret;
++}
++
++/**
++ * fpga_region_notify_pre_apply - pre-apply overlay notification
++ *
++ * @region: FPGA region that the overlay was applied to
++ * @nd: overlay notification data
++ *
++ * Called after when an overlay targeted to a FPGA Region is about to be
++ * applied.  Function will check the properties that will be added to the FPGA
++ * region.  If the checks pass, it will program the FPGA.
++ *
++ * The checks are:
++ * The overlay must add either firmware-name or external-fpga-config property
++ * to the FPGA Region.
++ *
++ *   firmware-name        : program the FPGA
++ *   external-fpga-config : FPGA is already programmed
++ *
++ * The overlay can add other FPGA regions, but child FPGA regions cannot have a
++ * firmware-name property since those regions don't exist yet.
++ *
++ * If the overlay that breaks the rules, notifier returns an error and the
++ * overlay is rejected before it goes into the main tree.
++ *
++ * Returns 0 for success or negative error code for failure.
++ */
++static int fpga_region_notify_pre_apply(struct fpga_region *region,
++					struct of_overlay_notify_data *nd)
++{
++	const char *firmware_name = NULL;
++	struct fpga_image_info *info;
++	int ret;
++
++	info = devm_kzalloc(&region->dev, sizeof(*info), GFP_KERNEL);
++	if (!info)
++		return -ENOMEM;
++
++	region->info = info;
++
++	/* Reject overlay if child FPGA Regions have firmware-name property */
++	ret = child_regions_with_firmware(nd->overlay);
++	if (ret)
++		return ret;
++
++	/* Read FPGA region properties from the overlay */
++	if (of_property_read_bool(nd->overlay, "partial-fpga-config"))
++		info->flags |= FPGA_MGR_PARTIAL_RECONFIG;
++
++	if (of_property_read_bool(nd->overlay, "external-fpga-config"))
++		info->flags |= FPGA_MGR_EXTERNAL_CONFIG;
++
++	of_property_read_string(nd->overlay, "firmware-name", &firmware_name);
++
++	of_property_read_u32(nd->overlay, "region-unfreeze-timeout-us",
++			     &info->enable_timeout_us);
++
++	of_property_read_u32(nd->overlay, "region-freeze-timeout-us",
++			     &info->disable_timeout_us);
++
++	/* If FPGA was externally programmed, don't specify firmware */
++	if ((info->flags & FPGA_MGR_EXTERNAL_CONFIG) && firmware_name) {
++		pr_err("error: specified firmware and external-fpga-config");
++		return -EINVAL;
++	}
++
++	/* FPGA is already configured externally.  We're done. */
++	if (info->flags & FPGA_MGR_EXTERNAL_CONFIG)
++		return 0;
++
++	/* If we got this far, we should be programming the FPGA */
++	if (!firmware_name) {
++		pr_err("should specify firmware-name or external-fpga-config\n");
++		return -EINVAL;
++	}
++
++	return fpga_region_program_fpga(region, firmware_name, nd->overlay);
++}
++
++/**
++ * fpga_region_notify_post_remove - post-remove overlay notification
++ *
++ * @region: FPGA region that was targeted by the overlay that was removed
++ * @nd: overlay notification data
++ *
++ * Called after an overlay has been removed if the overlay's target was a
++ * FPGA region.
++ */
++static void fpga_region_notify_post_remove(struct fpga_region *region,
++					   struct of_overlay_notify_data *nd)
++{
++	fpga_bridges_disable(&region->bridge_list);
++	fpga_bridges_put(&region->bridge_list);
++	devm_kfree(&region->dev, region->info);
++	region->info = NULL;
++}
++
++/**
++ * of_fpga_region_notify - reconfig notifier for dynamic DT changes
++ * @nb:		notifier block
++ * @action:	notifier action
++ * @arg:	reconfig data
++ *
++ * This notifier handles programming a FPGA when a "firmware-name" property is
++ * added to a fpga-region.
++ *
++ * Returns NOTIFY_OK or error if FPGA programming fails.
++ */
++static int of_fpga_region_notify(struct notifier_block *nb,
++				 unsigned long action, void *arg)
++{
++	struct of_overlay_notify_data *nd = arg;
++	struct fpga_region *region;
++	int ret;
++
++	switch (action) {
++	case OF_OVERLAY_PRE_APPLY:
++		pr_debug("%s OF_OVERLAY_PRE_APPLY\n", __func__);
++		break;
++	case OF_OVERLAY_POST_APPLY:
++		pr_debug("%s OF_OVERLAY_POST_APPLY\n", __func__);
++		return NOTIFY_OK;       /* not for us */
++	case OF_OVERLAY_PRE_REMOVE:
++		pr_debug("%s OF_OVERLAY_PRE_REMOVE\n", __func__);
++		return NOTIFY_OK;       /* not for us */
++	case OF_OVERLAY_POST_REMOVE:
++		pr_debug("%s OF_OVERLAY_POST_REMOVE\n", __func__);
++		break;
++	default:			/* should not happen */
++		return NOTIFY_OK;
++	}
++
++	region = fpga_region_find(nd->target);
++	if (!region)
++		return NOTIFY_OK;
++
++	ret = 0;
++	switch (action) {
++	case OF_OVERLAY_PRE_APPLY:
++		ret = fpga_region_notify_pre_apply(region, nd);
++		break;
++
++	case OF_OVERLAY_POST_REMOVE:
++		fpga_region_notify_post_remove(region, nd);
++		break;
++	}
++
++	put_device(&region->dev);
++
++	if (ret)
++		return notifier_from_errno(ret);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block fpga_region_of_nb = {
++	.notifier_call = of_fpga_region_notify,
 +};
 +
-+Device Tree Example: Full Reconfiguration to add PRR's
-+======================================================
++static int fpga_region_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct fpga_region *region;
++	int id, ret = 0;
 +
-+The base FPGA Region is specified similar to the first example above.
++	region = kzalloc(sizeof(*region), GFP_KERNEL);
++	if (!region)
++		return -ENOMEM;
 +
-+This example programs the FPGA to have two regions that can later be partially
-+configured.  Each region has its own bridge in the FPGA fabric.
++	id = ida_simple_get(&fpga_region_ida, 0, 0, GFP_KERNEL);
++	if (id < 0) {
++		ret = id;
++		goto err_kfree;
++	}
 +
-+DT Overlay contains:
-+/dts-v1/ /plugin/;
-+/ {
-+	fragment at 0 {
-+		target = <&fpga_region0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		__overlay__ {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
++	mutex_init(&region->mutex);
++	INIT_LIST_HEAD(&region->bridge_list);
 +
-+			firmware-name = "base.rbf";
++	device_initialize(&region->dev);
++	region->dev.class = fpga_region_class;
++	region->dev.parent = dev;
++	region->dev.of_node = np;
++	region->dev.id = id;
++	dev_set_drvdata(dev, region);
 +
-+			fpga-bridge at 4400 {
-+				compatible = "altr,freeze-bridge";
-+				reg = <0x4400 0x10>;
++	ret = dev_set_name(&region->dev, "region%d", id);
++	if (ret)
++		goto err_remove;
 +
-+				fpga_region1: fpga-region1 {
-+					compatible = "fpga-region";
-+					#address-cells = <0x1>;
-+					#size-cells = <0x1>;
-+					ranges;
-+				};
-+			};
++	ret = device_add(&region->dev);
++	if (ret)
++		goto err_remove;
 +
-+			fpga-bridge at 4420 {
-+				compatible = "altr,freeze-bridge";
-+				reg = <0x4420 0x10>;
++	of_platform_populate(np, fpga_region_of_match, NULL, &region->dev);
 +
-+				fpga_region2: fpga-region2 {
-+					compatible = "fpga-region";
-+					#address-cells = <0x1>;
-+					#size-cells = <0x1>;
-+					ranges;
-+				};
-+			};
-+		};
-+	};
++	dev_info(dev, "FPGA Region probed\n");
++
++	return 0;
++
++err_remove:
++	ida_simple_remove(&fpga_region_ida, id);
++err_kfree:
++	kfree(region);
++
++	return ret;
++}
++
++static int fpga_region_remove(struct platform_device *pdev)
++{
++	struct fpga_region *region = platform_get_drvdata(pdev);
++
++	device_unregister(&region->dev);
++
++	return 0;
++}
++
++static struct platform_driver fpga_region_driver = {
++	.probe = fpga_region_probe,
++	.remove = fpga_region_remove,
++	.driver = {
++		.name	= "fpga-region",
++		.of_match_table = of_match_ptr(fpga_region_of_match),
++	},
 +};
 +
-+Device Tree Example: Partial Reconfiguration
-+============================================
++static void fpga_region_dev_release(struct device *dev)
++{
++	struct fpga_region *region = to_fpga_region(dev);
 +
-+This example reprograms one of the PRR's set up in the previous example.
++	ida_simple_remove(&fpga_region_ida, region->dev.id);
++	kfree(region);
++}
 +
-+The sequence that occurs when this overlay is similar to the above, the only
-+differences are that the FPGA is partially reconfigured due to the
-+"partial-fpga-config" boolean and the only bridge that is controlled during
-+programming is the FPGA based bridge of fpga_region1.
++/**
++ * fpga_region_init - init function for fpga_region class
++ * Creates the fpga_region class and registers a reconfig notifier.
++ */
++static int __init fpga_region_init(void)
++{
++	int ret;
 +
-+/dts-v1/ /plugin/;
-+/ {
-+	fragment at 0 {
-+		target = <&fpga_region1>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		__overlay__ {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
++	fpga_region_class = class_create(THIS_MODULE, "fpga_region");
++	if (IS_ERR(fpga_region_class))
++		return PTR_ERR(fpga_region_class);
 +
-+			firmware-name = "soc_image2.rbf";
-+			partial-fpga-config;
++	fpga_region_class->dev_release = fpga_region_dev_release;
 +
-+			gpio at 10040 {
-+				compatible = "altr,pio-1.0";
-+				reg = <0x10040 0x20>;
-+				clocks = <0x2>;
-+				altr,gpio-bank-width = <0x4>;
-+				resetvalue = <0x0>;
-+				#gpio-cells = <0x2>;
-+				gpio-controller;
-+			};
-+		};
-+	};
-+};
++	ret = of_overlay_notifier_register(&fpga_region_of_nb);
++	if (ret)
++		goto err_class;
 +
-+Constraints
-+===========
++	ret = platform_driver_register(&fpga_region_driver);
++	if (ret)
++		goto err_plat;
 +
-+It is beyond the scope of this document to fully describe all the FPGA design
-+constraints required to make partial reconfiguration work[1] [2] [3], but a few
-+deserve quick mention.
++	return 0;
 +
-+A persona must have boundary connections that line up with those of the partion
-+or region it is designed to go into.
++err_plat:
++	of_overlay_notifier_unregister(&fpga_region_of_nb);
++err_class:
++	class_destroy(fpga_region_class);
++	ida_destroy(&fpga_region_ida);
++	return ret;
++}
 +
-+During programming, transactions through those connections must be stopped and
-+the connections must be held at a fixed logic level.  This can be achieved by
-+FPGA Bridges that exist on the FPGA fabric prior to the partial reconfiguration.
++static void __exit fpga_region_exit(void)
++{
++	platform_driver_unregister(&fpga_region_driver);
++	of_overlay_notifier_unregister(&fpga_region_of_nb);
++	class_destroy(fpga_region_class);
++	ida_destroy(&fpga_region_ida);
++}
 +
-+--
-+[1] www.altera.com/content/dam/altera-www/global/en_US/pdfs/literature/ug/ug_partrecon.pdf
-+[2] tspace.library.utoronto.ca/bitstream/1807/67932/1/Byma_Stuart_A_201411_MAS_thesis.pdf
-+[3] http://www.xilinx.com/support/documentation/sw_manuals/xilinx14_1/ug702.pdf
++subsys_initcall(fpga_region_init);
++module_exit(fpga_region_exit);
++
++MODULE_DESCRIPTION("FPGA Region");
++MODULE_AUTHOR("Alan Tull <atull@opensource.altera.com>");
++MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
+index 040b86d..12f6207 100644
+--- a/include/linux/fpga/fpga-mgr.h
++++ b/include/linux/fpga/fpga-mgr.h
+@@ -65,8 +65,10 @@ enum fpga_mgr_states {
+ /*
+  * FPGA Manager flags
+  * FPGA_MGR_PARTIAL_RECONFIG: do partial reconfiguration if supported
++ * FPGA_MGR_EXTERNAL_CONFIG: FPGA has been configured prior to Linux booting
+  */
+ #define FPGA_MGR_PARTIAL_RECONFIG	BIT(0)
++#define FPGA_MGR_EXTERNAL_CONFIG	BIT(1)
+ 
+ /**
+  * struct fpga_image_info - information specific to a FPGA image
 -- 
 2.9.3
