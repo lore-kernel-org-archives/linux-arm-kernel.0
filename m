@@ -1,48 +1,43 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 28 Sep 2016 21:40:21 +0200
-Subject: [PATCH 00/10] ARM: dts: berlin: fix dtc warnings
-In-Reply-To: <20160906084013.2887-1-jszhang@marvell.com>
-References: <20160906084013.2887-1-jszhang@marvell.com>
-Message-ID: <57EC1CA5.2030102@gmail.com>
+From: ayaka@soulik.info (ayaka)
+Date: Thu, 29 Sep 2016 03:51:44 +0800
+Subject: [RFC PATCH v3 2/2] drm/panel: Add support for Chunghwa
+ CLAA070WP03XG panel
+In-Reply-To: <20160923180042.GA7132@rob-hp-laptop>
+References: <1474311771-23321-1-git-send-email-ayaka@soulik.info>
+ <1474311771-23321-3-git-send-email-ayaka@soulik.info>
+ <20160923180042.GA7132@rob-hp-laptop>
+Message-ID: <91b2efcc-4a74-c965-2163-a26a7f11fcd0@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.09.2016 10:40, Jisheng Zhang wrote:
-> This is a clean up series to fix berlin arm platforms dtc warnings.
-> Firstly we remove skeleton.dtsi inclusion. Then add missing unit name
-> of /soc node and /memory node. Lastly, we fix regulators' name
+
+
+On 09/24/2016 02:00 AM, Rob Herring wrote:
+> On Tue, Sep 20, 2016 at 03:02:51AM +0800, Randy Li wrote:
+>> The Chunghwa CLAA070WP03XG is a 7" 1280x800 panel, which can be
+>> supported by the simple panel driver.
+>>
+>> Signed-off-by: Randy Li <ayaka@soulik.info>
+>> ---
+>>   .../display/panel/chunghwa,claa070wp03xg.txt       |  7 ++++++
+>>   drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
+>>   2 files changed, 34 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt b/Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt
+>> new file mode 100644
+>> index 0000000..dd22685
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/panel/chunghwa,claa070wp03xg.txt
+>> @@ -0,0 +1,7 @@
+>> +Chunghwa Picture Tubes Ltd. 7" WXGA TFT LCD panel
+>> +
+>> +Required properties:
+>> +- compatible: should be "chunghwa,claa070wp03xg"
+> What about VCC, VLED, LED_EN (PWM), LVBIT, LVFMT, DITHER signals?
+I didn't see the other simple-panel has that, so I didn't neither.
+And I think it would only have VCC and LED_EN(PWM).
 >
-> Jisheng Zhang (10):
->    ARM: dts: berlin2q: Remove skeleton.dtsi inclusion
->    ARM: dts: berlin2cd: Remove skeleton.dtsi inclusion
->    ARM: dts: berlin2: Remove skeleton.dtsi inclusion
->    ARM: dts: berlin2q: Add missing unit name to /soc node
->    ARM: dts: berlin2cd: Add missing unit name to /soc node
->    ARM: dts: berlin2: Add missing unit name to /soc node
->    ARM: dts: berlin2q-marvell-dmp: add missing unit name to /memory node
->    ARM: dts: chromecast: add missing unit name to /memory node
-
-Jisheng,
-
-Applied the 8 patches above.
-
->    ARM: dts: sony-nsz-gs7: add missing unit name to /memory node
-
-I didn't receive this one and could not find it online.
-I recreated the patch by using the chromecast patch above, so
-applied.
-
->    ARM: dts: berlin2q-marvell-dmp: fix regulators' name
-
-I have no clue what it should be fixed to.
-
-Sebastian
-
->   arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts        |  2 +-
->   arch/arm/boot/dts/berlin2.dtsi                    |  5 +++--
->   arch/arm/boot/dts/berlin2cd-google-chromecast.dts |  2 +-
->   arch/arm/boot/dts/berlin2cd.dtsi                  |  5 +++--
->   arch/arm/boot/dts/berlin2q-marvell-dmp.dts        | 12 ++++++------
->   arch/arm/boot/dts/berlin2q.dtsi                   |  6 +++---
->   6 files changed, 17 insertions(+), 15 deletions(-)
->
+>> +
+>> +This binding is compatible with the simple-panel binding, which is specified
+>> +in simple-panel.txt in this directory.
