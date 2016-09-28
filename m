@@ -1,31 +1,32 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 28 Sep 2016 13:35:26 +0300
-Subject: [PATCH 0/4] ARM: davinci: Remove DMA resources for MMC/SPI
-Message-ID: <20160928103530.15291-1-peter.ujfalusi@ti.com>
+Date: Wed, 28 Sep 2016 13:35:28 +0300
+Subject: [PATCH 2/4] ARM: davinci: devices: Remove DMA resources for MMC
+In-Reply-To: <20160928103530.15291-1-peter.ujfalusi@ti.com>
+References: <20160928103530.15291-1-peter.ujfalusi@ti.com>
+Message-ID: <20160928103530.15291-3-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The driver is converted to not use the DMA resource.
 
-The drivers for davinci MMC and SPI have been converted to the new DMAengine API
-and no longer rely on the IORESOURCE_DMA.
-This is the case for at least one release cycle so now we can remove the
-IORESOURCE_DMA for these devices.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (4):
-  ARM: davinci: devices-da8xx: Remove DMA resources for MMC and SPI
-  ARM: davinci: devices: Remove DMA resources for MMC
-  ARM: davinci: dm355: Remove DMA resources for SPI
-  ARM: davinci: dm365: Remove DMA resources for SPI
+ arch/arm/mach-davinci/devices.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
- arch/arm/mach-davinci/devices-da8xx.c | 29 -----------------------------
- arch/arm/mach-davinci/devices.c       |  3 ---
- arch/arm/mach-davinci/dm355.c         |  8 --------
- arch/arm/mach-davinci/dm365.c         |  8 --------
- 4 files changed, 48 deletions(-)
-
---
+diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+index 67d26c5bda0b..3ae70f2909b0 100644
+--- a/arch/arm/mach-davinci/devices.c
++++ b/arch/arm/mach-davinci/devices.c
+@@ -36,9 +36,6 @@
+ #define DM365_MMCSD0_BASE	     0x01D11000
+ #define DM365_MMCSD1_BASE	     0x01D00000
+ 
+-#define DAVINCI_DMA_MMCRXEVT	26
+-#define DAVINCI_DMA_MMCTXEVT	27
+-
+ void __iomem  *davinci_sysmod_base;
+ 
+ void davinci_map_sysmod(void)
+-- 
 2.10.0
