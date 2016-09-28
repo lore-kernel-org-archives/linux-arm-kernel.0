@@ -1,67 +1,49 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Wed, 28 Sep 2016 16:08:01 +0200
-Subject: [PATCH v3 1/3] ipmi: add an Aspeed BT IPMI BMC driver
-In-Reply-To: <85dc3a75-46e0-87ec-91d5-31e686103ee0@acm.org>
-References: <1474354900-5618-1-git-send-email-clg@kaod.org>
- <1474354900-5618-2-git-send-email-clg@kaod.org>
- <20160923183421.GA14864@rob-hp-laptop>
- <c3f084ab-9f77-86ab-7875-cbfe654ea18e@kaod.org>
- <85dc3a75-46e0-87ec-91d5-31e686103ee0@acm.org>
-Message-ID: <51788cf6-5d7d-dd74-1083-bdc5ecbd9756@kaod.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 28 Sep 2016 17:47:35 +0200
+Subject: [PATCH] MAINTAINERS: update entry for atmel_serial driver
+Message-ID: <20160928154735.25265-1-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2016 03:53 PM, Corey Minyard wrote:
-> On 09/26/2016 01:50 AM, C?dric Le Goater wrote:
->>
->>>>   Changes since v1:
->>>>
->>>>   - replace 'bt_host' by 'bt_bmc' to reflect that the driver is
->>>>     the BMC side of the IPMI BT interface
->>>>   - renamed the device to 'ipmi-bt-host'
->>>>   - introduced a temporary buffer to copy_{to,from}_user
->>>>   - used platform_get_irq()
->>>>   - moved the driver under drivers/char/ipmi/ but kept it as a misc
->>>>     device
->>>>   - changed the compatible cell to "aspeed,ast2400-bt-bmc"
->>>>
->>>>   .../bindings/char/ipmi/aspeed,ast2400-bt-bmc.txt   |  23 +
->>> While similar, this is not the kernel directory structure. Just make
->>> this bindings/ipmi/
->>>
->>> With that,
->>>
->>> Acked-by: Rob Herring <robh@kernel.org>
->> OK. So I suppose we should be moving all IPMI documentation under
->> the same directory.
->>
->>
->> Corey,
->>
->> If the move is okay for you, I can send the patch below.
->>
->> Thanks,
->>
->> C.
-> 
-> Sorry this took so long, I'm at a conference.  That change is fine, it does
-> seem to match the structure better.
+Change maintainer for the serial driver found on most of the
+Microchip / Atmel MPUs and take advantage of the move to rename
+and reorder the entry.
+I'm happy that Richard is taking over the maintenance of this
+driver.
 
-It's ok. 
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ MAINTAINERS | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-Checkpatch really does not like that patch and I don't know what we can
-do about it. You've been warned :) 
-
-Thanks, 
-
-C. 
-
-
-./scripts/checkpatch.pl --strict  0001-dt-bindings-ipmi-move-all-documentation-under-bindin.patch
-WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
-#12: 
- .../devicetree/bindings/{char => }/ipmi/aspeed,ast2400-bt-bmc.txt         | 0
-
-ERROR: Does not appear to be a unified-diff format patch
-
-total: 1 errors, 1 warnings, 0 checks, 0 lines checked
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e39dacd77c0e..06c17717a004 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2140,11 +2140,6 @@ M:	Ludovic Desroches <ludovic.desroches@atmel.com>
+ S:	Maintained
+ F:	drivers/mmc/host/atmel-mci.c
+ 
+-ATMEL AT91 / AT32 SERIAL DRIVER
+-M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+-S:	Supported
+-F:	drivers/tty/serial/atmel_serial.c
+-
+ ATMEL AT91 SAMA5D2-Compatible Shutdown Controller
+ M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ S:	Supported
+@@ -7930,6 +7925,12 @@ T:	git git://git.monstr.eu/linux-2.6-microblaze.git
+ S:	Supported
+ F:	arch/microblaze/
+ 
++MICROCHIP / ATMEL AT91 / AT32 SERIAL DRIVER
++M:	Richard Genoud <richard.genoud@gmail.com>
++S:	Maintained
++F:	drivers/tty/serial/atmel_serial.c
++F:	include/linux/atmel_serial.h
++
+ MICROCHIP / ATMEL ISC DRIVER
+ M:	Songjun Wu <songjun.wu@microchip.com>
+ L:	linux-media at vger.kernel.org
+-- 
+2.9.0
