@@ -1,121 +1,67 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Wed, 28 Sep 2016 13:21:56 -0500
-Subject: [PATCH v19 08/12] fpga: add fpga bridge framework
+Date: Wed, 28 Sep 2016 13:22:00 -0500
+Subject: [PATCH v19 12/12] fpga-manager: Add Socfpga Arria10 support
 In-Reply-To: <20160928182200.15800-1-atull@opensource.altera.com>
 References: <20160928182200.15800-1-atull@opensource.altera.com>
-Message-ID: <20160928182200.15800-9-atull@opensource.altera.com>
+Message-ID: <20160928182200.15800-13-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This framework adds API functions for enabling/
-disabling FPGA bridges under kernel control.
-
-This allows the Linux kernel to disable FPGA bridges
-during FPGA reprogramming and to enable FPGA bridges
-when FPGA reprogramming is done.  This framework is
-be manufacturer-agnostic, allowing it to be used in
-interfaces that use the FPGA Manager Framework to
-reprogram FPGA's.
-
-The functions are:
-* of_fpga_bridge_get
-* fpga_bridge_put
-   Get/put an exclusive reference to a FPGA bridge.
-
-* fpga_bridge_enable
-* fpga_bridge_disable
-   Enable/Disable traffic through a bridge.
-
-* fpga_bridge_register
-* fpga_bridge_unregister
-   Register/unregister a device-specific low level FPGA
-   Bridge driver.
-
-Get an exclusive reference to a bridge and add it to a list:
-* fpga_bridge_get_to_list
-
-To enable/disable/put a set of bridges that are on a list:
-* fpga_bridges_enable
-* fpga_bridges_disable
-* fpga_bridges_put
+Add low level driver to support reprogramming FPGAs for Altera
+SoCFPGA Arria10.
 
 Signed-off-by: Alan Tull <atull@opensource.altera.com>
 ---
-v2:  Minor cleanup
-v12: Bump version to line up with simple fpga bus
-     Remove sysfs
-     Improve get/put functions, get the low level driver too.
-     Clean up class implementation
-     Add kernel doc documentation
-     Rename (un)register_fpga_bridge -> fpga_bridge_(un)register
-v13: Add inlined empty functions for if not CONFIG_FPGA_BRIDGE
-     Clean up debugging
-     Remove unneeded #include in .h
-     Remove unnecessary prints
-     Remove 'label' DT binding.
-     Document the mutex
-v14: Allow bridges with no ops
-     *const* struct fpga_bridge_ops
-     Add functions to git/put/enable/disable list of bridges
-     Add list node to struct fpga_bridge
-     Do of_node_get/put in of_fpga_bridge_get()
-     Add r/o attributes: name and state
-v15: No change in this patch for v15 of this patch set
-v16: Remove of_get_fpga_bus function
-v17: No change to this patch in v17 of patch set
-v18: No change to this patch in v18 of patch set
-v19: Use fpga image info struct
-     Support fpga image specific timeouts
-     Support child fpga-regions by doing of_platform_populate
-     make a tristate in Kconfig
+v19: Added to this patchset as has been changed to use
+       fpga image information struct
+     a checkpatch fix of a block comment
+     do not use clk_put because we are using devm_clk_get
 ---
- drivers/fpga/Kconfig             |   7 +
- drivers/fpga/Makefile            |   3 +
- drivers/fpga/fpga-bridge.c       | 398 +++++++++++++++++++++++++++++++++++++++
- include/linux/fpga/fpga-bridge.h |  60 ++++++
- 4 files changed, 468 insertions(+)
- create mode 100644 drivers/fpga/fpga-bridge.c
- create mode 100644 include/linux/fpga/fpga-bridge.h
+ drivers/fpga/Kconfig       |   6 +
+ drivers/fpga/Makefile      |   1 +
+ drivers/fpga/socfpga-a10.c | 572 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 579 insertions(+)
+ create mode 100644 drivers/fpga/socfpga-a10.c
 
 diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-index d614102..fe87d44 100644
+index 0d1887f..bc56c4c 100644
 --- a/drivers/fpga/Kconfig
 +++ b/drivers/fpga/Kconfig
-@@ -25,6 +25,13 @@ config FPGA_MGR_ZYNQ_FPGA
+@@ -26,6 +26,12 @@ config FPGA_MGR_SOCFPGA
  	help
- 	  FPGA manager driver support for Xilinx Zynq FPGAs.
+ 	  FPGA manager driver support for Altera SOCFPGA.
  
-+config FPGA_BRIDGE
-+	tristate "FPGA Bridge Framework"
-+	depends on OF
++config FPGA_MGR_SOCFPGA_A10
++	tristate "Altera SoCFPGA Arria10"
++	depends on ARCH_SOCFPGA
 +	help
-+	  Say Y here if you want to support bridges connected between host
-+	  processors and FPGAs or between FPGAs.
++	  FPGA manager driver support for Altera Arria10 SoCFPGA.
 +
- endif # FPGA
- 
- endmenu
+ config FPGA_MGR_ZYNQ_FPGA
+ 	tristate "Xilinx Zynq FPGA"
+ 	depends on HAS_DMA
 diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-index 8d83fc6..4baef00 100644
+index a6f874d..8df07bc 100644
 --- a/drivers/fpga/Makefile
 +++ b/drivers/fpga/Makefile
-@@ -8,3 +8,6 @@ obj-$(CONFIG_FPGA)			+= fpga-mgr.o
+@@ -7,6 +7,7 @@ obj-$(CONFIG_FPGA)			+= fpga-mgr.o
+ 
  # FPGA Manager Drivers
  obj-$(CONFIG_FPGA_MGR_SOCFPGA)		+= socfpga.o
++obj-$(CONFIG_FPGA_MGR_SOCFPGA_A10)	+= socfpga-a10.o
  obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
-+
-+# FPGA Bridge Drivers
-+obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
-diff --git a/drivers/fpga/fpga-bridge.c b/drivers/fpga/fpga-bridge.c
+ 
+ # FPGA Bridge Drivers
+diff --git a/drivers/fpga/socfpga-a10.c b/drivers/fpga/socfpga-a10.c
 new file mode 100644
-index 0000000..5a733c8
+index 0000000..01ca5f0
 --- /dev/null
-+++ b/drivers/fpga/fpga-bridge.c
-@@ -0,0 +1,398 @@
++++ b/drivers/fpga/socfpga-a10.c
+@@ -0,0 +1,572 @@
 +/*
-+ * FPGA Bridge Framework Driver
++ * FPGA Manager Driver for Altera Arria10 SoCFPGA
 + *
-+ *  Copyright (C) 2013-2016 Altera Corporation, All Rights Reserved.
++ * Copyright (C) 2015-2016 Altera Corporation
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms and conditions of the GNU General Public License,
@@ -129,452 +75,560 @@ index 0000000..5a733c8
 + * You should have received a copy of the GNU General Public License along with
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#include <linux/fpga/fpga-bridge.h>
-+#include <linux/idr.h>
-+#include <linux/kernel.h>
++
++#include <linux/clk.h>
++#include <linux/device.h>
++#include <linux/delay.h>
++#include <linux/fpga/fpga-mgr.h>
++#include <linux/io.h>
 +#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
++#include <linux/of_address.h>
++#include <linux/regmap.h>
 +
-+static DEFINE_IDA(fpga_bridge_ida);
-+static struct class *fpga_bridge_class;
++#define A10_FPGAMGR_DCLKCNT_OFST				0x08
++#define A10_FPGAMGR_DCLKSTAT_OFST				0x0c
++#define A10_FPGAMGR_IMGCFG_CTL_00_OFST				0x70
++#define A10_FPGAMGR_IMGCFG_CTL_01_OFST				0x74
++#define A10_FPGAMGR_IMGCFG_CTL_02_OFST				0x78
++#define A10_FPGAMGR_IMGCFG_STAT_OFST				0x80
 +
-+/* Lock for adding/removing bridges to linked lists*/
-+spinlock_t bridge_list_lock;
++#define A10_FPGAMGR_DCLKSTAT_DCLKDONE				BIT(0)
 +
-+static int fpga_bridge_of_node_match(struct device *dev, const void *data)
-+{
-+	return dev->of_node == data;
-+}
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NCONFIG		BIT(0)
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NSTATUS		BIT(1)
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_CONDONE		BIT(2)
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NCONFIG			BIT(8)
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NSTATUS_OE		BIT(16)
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_CONDONE_OE		BIT(24)
 +
-+/**
-+ * fpga_bridge_enable - Enable transactions on the bridge
-+ *
-+ * @bridge: FPGA bridge
-+ *
-+ * Return: 0 for success, error code otherwise.
++#define A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG		BIT(0)
++#define A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST		BIT(16)
++#define A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE			BIT(24)
++
++#define A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL			BIT(0)
++#define A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_MASK		(BIT(16) | BIT(17))
++#define A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_SHIFT			16
++#define A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH			BIT(24)
++#define A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH_SHIFT		24
++
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_CRC_ERROR			BIT(0)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_EARLY_USERMODE		BIT(1)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE			BIT(2)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN			BIT(4)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_CONDONE_PIN			BIT(6)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_PR_READY			BIT(9)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_PR_DONE			BIT(10)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_PR_ERROR			BIT(11)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_NCONFIG_PIN			BIT(12)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_MASK	(BIT(16) | BIT(17) | BIT(18))
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_SHIFT		        16
++
++/* FPGA CD Ratio Value */
++#define CDRATIO_x1						0x0
++#define CDRATIO_x2						0x1
++#define CDRATIO_x4						0x2
++#define CDRATIO_x8						0x3
++
++/* Configuration width 16/32 bit */
++#define CFGWDTH_32						1
++#define CFGWDTH_16						0
++
++/*
++ * struct a10_fpga_priv - private data for fpga manager
++ * @regmap: regmap for register access
++ * @fpga_data_addr: iomap for single address data register to FPGA
++ * @clk: clock
 + */
-+int fpga_bridge_enable(struct fpga_bridge *bridge)
-+{
-+	dev_dbg(&bridge->dev, "enable\n");
-+
-+	if (bridge->br_ops && bridge->br_ops->enable_set)
-+		return bridge->br_ops->enable_set(bridge, 1);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_enable);
-+
-+/**
-+ * fpga_bridge_disable - Disable transactions on the bridge
-+ *
-+ * @bridge: FPGA bridge
-+ *
-+ * Return: 0 for success, error code otherwise.
-+ */
-+int fpga_bridge_disable(struct fpga_bridge *bridge)
-+{
-+	dev_dbg(&bridge->dev, "disable\n");
-+
-+	if (bridge->br_ops && bridge->br_ops->enable_set)
-+		return bridge->br_ops->enable_set(bridge, 0);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_disable);
-+
-+/**
-+ * of_fpga_bridge_get - get an exclusive reference to a fpga bridge
-+ *
-+ * @np: node pointer of a FPGA bridge
-+ * @info: fpga image specific information
-+ *
-+ * Return fpga_bridge struct if successful.
-+ * Return -EBUSY if someone already has a reference to the bridge.
-+ * Return -ENODEV if @np is not a FPGA Bridge.
-+ */
-+struct fpga_bridge *of_fpga_bridge_get(struct device_node *np,
-+				       struct fpga_image_info *info)
-+
-+{
-+	struct device *dev;
-+	struct fpga_bridge *bridge;
-+	int ret = -ENODEV;
-+
-+	of_node_get(np);
-+
-+	dev = class_find_device(fpga_bridge_class, NULL, np,
-+				fpga_bridge_of_node_match);
-+	if (!dev)
-+		goto err_dev;
-+
-+	bridge = to_fpga_bridge(dev);
-+	if (!bridge)
-+		goto err_dev;
-+
-+	bridge->info = info;
-+
-+	if (!mutex_trylock(&bridge->mutex)) {
-+		ret = -EBUSY;
-+		goto err_dev;
-+	}
-+
-+	if (!try_module_get(dev->parent->driver->owner))
-+		goto err_ll_mod;
-+
-+	dev_dbg(&bridge->dev, "get\n");
-+
-+	return bridge;
-+
-+err_ll_mod:
-+	mutex_unlock(&bridge->mutex);
-+err_dev:
-+	put_device(dev);
-+	of_node_put(np);
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL_GPL(of_fpga_bridge_get);
-+
-+/**
-+ * fpga_bridge_put - release a reference to a bridge
-+ *
-+ * @bridge: FPGA bridge
-+ */
-+void fpga_bridge_put(struct fpga_bridge *bridge)
-+{
-+	dev_dbg(&bridge->dev, "put\n");
-+
-+	bridge->info = NULL;
-+	module_put(bridge->dev.parent->driver->owner);
-+	mutex_unlock(&bridge->mutex);
-+	put_device(&bridge->dev);
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_put);
-+
-+/**
-+ * fpga_bridges_enable - enable bridges in a list
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * Enable each bridge in the list.  If list is empty, do nothing.
-+ *
-+ * Return 0 for success or empty bridge list; return error code otherwise.
-+ */
-+int fpga_bridges_enable(struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	struct list_head *node;
-+	int ret;
-+
-+	list_for_each(node, bridge_list) {
-+		bridge = list_entry(node, struct fpga_bridge, node);
-+		ret = fpga_bridge_enable(bridge);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridges_enable);
-+
-+/**
-+ * fpga_bridges_disable - disable bridges in a list
-+ *
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * Disable each bridge in the list.  If list is empty, do nothing.
-+ *
-+ * Return 0 for success or empty bridge list; return error code otherwise.
-+ */
-+int fpga_bridges_disable(struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	struct list_head *node;
-+	int ret;
-+
-+	list_for_each(node, bridge_list) {
-+		bridge = list_entry(node, struct fpga_bridge, node);
-+		ret = fpga_bridge_disable(bridge);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridges_disable);
-+
-+/**
-+ * fpga_bridges_put - put bridges
-+ *
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * For each bridge in the list, put the bridge and remove it from the list.
-+ * If list is empty, do nothing.
-+ */
-+void fpga_bridges_put(struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	struct list_head *node, *next;
-+	unsigned long flags;
-+
-+	list_for_each_safe(node, next, bridge_list) {
-+		bridge = list_entry(node, struct fpga_bridge, node);
-+
-+		fpga_bridge_put(bridge);
-+
-+		spin_lock_irqsave(&bridge_list_lock, flags);
-+		list_del(&bridge->node);
-+		spin_unlock_irqrestore(&bridge_list_lock, flags);
-+	}
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridges_put);
-+
-+/**
-+ * fpga_bridges_get_to_list - get a bridge, add it to a list
-+ *
-+ * @np: node pointer of a FPGA bridge
-+ * @info: fpga image specific information
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * Get an exclusive reference to the bridge and and it to the list.
-+ *
-+ * Return 0 for success, error code from of_fpga_bridge_get() othewise.
-+ */
-+int fpga_bridge_get_to_list(struct device_node *np,
-+			    struct fpga_image_info *info,
-+			    struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	unsigned long flags;
-+
-+	bridge = of_fpga_bridge_get(np, info);
-+	if (IS_ERR(bridge))
-+		return PTR_ERR(bridge);
-+
-+	spin_lock_irqsave(&bridge_list_lock, flags);
-+	list_add(&bridge->node, bridge_list);
-+	spin_unlock_irqrestore(&bridge_list_lock, flags);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_get_to_list);
-+
-+static ssize_t name_show(struct device *dev,
-+			 struct device_attribute *attr, char *buf)
-+{
-+	struct fpga_bridge *bridge = to_fpga_bridge(dev);
-+
-+	return sprintf(buf, "%s\n", bridge->name);
-+}
-+
-+static ssize_t state_show(struct device *dev,
-+			  struct device_attribute *attr, char *buf)
-+{
-+	struct fpga_bridge *bridge = to_fpga_bridge(dev);
-+	int enable = 1;
-+
-+	if (bridge->br_ops && bridge->br_ops->enable_show)
-+		enable = bridge->br_ops->enable_show(bridge);
-+
-+	return sprintf(buf, "%s\n", enable ? "enabled" : "disabled");
-+}
-+
-+static DEVICE_ATTR_RO(name);
-+static DEVICE_ATTR_RO(state);
-+
-+static struct attribute *fpga_bridge_attrs[] = {
-+	&dev_attr_name.attr,
-+	&dev_attr_state.attr,
-+	NULL,
++struct a10_fpga_priv {
++	struct regmap *regmap;
++	void __iomem *fpga_data_addr;
++	struct clk *clk;
 +};
-+ATTRIBUTE_GROUPS(fpga_bridge);
 +
-+/**
-+ * fpga_bridge_register - register a fpga bridge driver
-+ * @dev:	FPGA bridge device from pdev
-+ * @name:	FPGA bridge name
-+ * @br_ops:	pointer to structure of fpga bridge ops
-+ * @priv:	FPGA bridge private data
-+ *
-+ * Return: 0 for success, error code otherwise.
-+ */
-+int fpga_bridge_register(struct device *dev, const char *name,
-+			 const struct fpga_bridge_ops *br_ops, void *priv)
++static bool socfpga_a10_fpga_writeable_reg(struct device *dev, unsigned int reg)
 +{
-+	struct fpga_bridge *bridge;
-+	int id, ret = 0;
++	switch (reg) {
++	case A10_FPGAMGR_DCLKCNT_OFST:
++	case A10_FPGAMGR_DCLKSTAT_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_00_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_01_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_02_OFST:
++		return true;
++	}
++	return false;
++}
 +
-+	if (!name || !strlen(name)) {
-+		dev_err(dev, "Attempt to register with no name!\n");
++static bool socfpga_a10_fpga_readable_reg(struct device *dev, unsigned int reg)
++{
++	switch (reg) {
++	case A10_FPGAMGR_DCLKCNT_OFST:
++	case A10_FPGAMGR_DCLKSTAT_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_00_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_01_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_02_OFST:
++	case A10_FPGAMGR_IMGCFG_STAT_OFST:
++		return true;
++	}
++	return false;
++}
++
++static const struct regmap_config socfpga_a10_fpga_regmap_config = {
++	.reg_bits = 32,
++	.reg_stride = 4,
++	.val_bits = 32,
++	.writeable_reg = socfpga_a10_fpga_writeable_reg,
++	.readable_reg = socfpga_a10_fpga_readable_reg,
++	.max_register = A10_FPGAMGR_IMGCFG_STAT_OFST,
++	.cache_type = REGCACHE_NONE,
++};
++
++/*
++ * from the register map description of cdratio in imgcfg_ctrl_02:
++ *  Normal Configuration    : 32bit Passive Parallel
++ *  Partial Reconfiguration : 16bit Passive Parallel
++ */
++static void socfpga_a10_fpga_set_cfg_width(struct a10_fpga_priv *priv,
++					   int width)
++{
++	width <<= A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH_SHIFT;
++
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH, width);
++}
++
++static void socfpga_a10_fpga_generate_dclks(struct a10_fpga_priv *priv,
++					    u32 count)
++{
++	u32 val;
++	unsigned int i;
++
++	/* Clear any existing DONE status. */
++	regmap_write(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST,
++		     A10_FPGAMGR_DCLKSTAT_DCLKDONE);
++
++	/* Issue the DCLK regmap. */
++	regmap_write(priv->regmap, A10_FPGAMGR_DCLKCNT_OFST, count);
++
++	/* wait till the dclkcnt done */
++	for (i = 0; i < 100; i++) {
++		regmap_read(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST, &val);
++		if (val)
++			break;
++		udelay(1);
++	}
++
++	/* Clear DONE status. */
++	regmap_write(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST,
++		     A10_FPGAMGR_DCLKSTAT_DCLKDONE);
++}
++
++static int socfpga_a10_fpga_encrypted(struct fpga_manager *mgr,
++				      u32 *buf32, size_t buf32_size)
++{
++	int encrypt;
++
++	if (buf32_size < 70)
++		return -EINVAL;
++
++	encrypt = ((buf32[69] >> 2) & 3) != 0;
++
++	dev_dbg(&mgr->dev, "header word %d = %08x encrypt=%d\n",
++		69, buf32[69], encrypt);
++
++	return encrypt;
++}
++
++static int socfpga_a10_fpga_compressed(struct fpga_manager *mgr,
++				       u32 *buf32, size_t buf32_size)
++{
++	int compress;
++
++	if (buf32_size < 230)
++		return -EINVAL;
++
++	compress = !((buf32[229] >> 1) & 1);
++
++	dev_dbg(&mgr->dev, "header word %d = %08x compress=%d\n",
++		229, buf32[229], compress);
++
++	return compress;
++}
++
++static unsigned int socfpga_a10_fpga_get_cd_ratio(unsigned int cfg_width,
++						  bool encrypt, bool compress)
++{
++	unsigned int cd_ratio;
++
++	/*
++	 * cd ratio is dependent on cfg width and whether the bitstream
++	 * is encrypted and/or compressed.
++	 *
++	 * | width | encr. | compr. | cd ratio |
++	 * |  16   |   0   |   0    |     1    |
++	 * |  16   |   0   |   1    |     4    |
++	 * |  16   |   1   |   0    |     2    |
++	 * |  16   |   1   |   1    |     4    |
++	 * |  32   |   0   |   0    |     1    |
++	 * |  32   |   0   |   1    |     8    |
++	 * |  32   |   1   |   0    |     4    |
++	 * |  32   |   1   |   1    |     8    |
++	 */
++	if (!compress && !encrypt)
++		return CDRATIO_x1;
++
++	if (compress)
++		cd_ratio = CDRATIO_x4;
++	else
++		cd_ratio = CDRATIO_x2;
++
++	/* If 32 bit, double the cd ratio by incrementing the field  */
++	if (cfg_width == CFGWDTH_32)
++		cd_ratio += 1;
++
++	return cd_ratio;
++}
++
++static int socfpga_a10_fpga_set_cdratio(struct fpga_manager *mgr,
++					unsigned int cfg_width,
++					const char *buf, size_t count)
++{
++	struct a10_fpga_priv *priv = mgr->priv;
++	unsigned int cd_ratio;
++	int encrypt, compress;
++
++	encrypt = socfpga_a10_fpga_encrypted(mgr, (u32 *)buf, count / 4);
++	if (encrypt < 0)
++		return -EINVAL;
++
++	compress = socfpga_a10_fpga_compressed(mgr, (u32 *)buf, count / 4);
++	if (compress < 0)
++		return -EINVAL;
++
++	cd_ratio = socfpga_a10_fpga_get_cd_ratio(cfg_width, encrypt, compress);
++
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_MASK,
++			   cd_ratio << A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_SHIFT);
++
++	return 0;
++}
++
++static u32 socfpga_a10_fpga_read_stat(struct a10_fpga_priv *priv)
++{
++	u32 val;
++
++	regmap_read(priv->regmap, A10_FPGAMGR_IMGCFG_STAT_OFST, &val);
++
++	return val;
++}
++
++static int socfpga_a10_fpga_wait_for_pr_ready(struct a10_fpga_priv *priv)
++{
++	u32 reg, i;
++
++	for (i = 0; i < 10 ; i++) {
++		reg = socfpga_a10_fpga_read_stat(priv);
++
++		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_ERROR)
++			return -EINVAL;
++
++		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_READY)
++			return 0;
++	}
++
++	return -ETIMEDOUT;
++}
++
++static int socfpga_a10_fpga_wait_for_pr_done(struct a10_fpga_priv *priv)
++{
++	u32 reg, i;
++
++	for (i = 0; i < 10 ; i++) {
++		reg = socfpga_a10_fpga_read_stat(priv);
++
++		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_ERROR)
++			return -EINVAL;
++
++		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_DONE)
++			return 0;
++	}
++
++	return -ETIMEDOUT;
++}
++
++/* Start the FPGA programming by initialize the FPGA Manager */
++static int socfpga_a10_fpga_write_init(struct fpga_manager *mgr,
++				       struct fpga_image_info *info,
++				       const char *buf, size_t count)
++{
++	struct a10_fpga_priv *priv = mgr->priv;
++	unsigned int cfg_width;
++	u32 msel, stat, mask;
++	int ret;
++
++	if (info->flags & FPGA_MGR_PARTIAL_RECONFIG)
++		cfg_width = CFGWDTH_16;
++	else
++		return -EINVAL;
++
++	/* Check for passive parallel (msel == 000 or 001) */
++	msel = socfpga_a10_fpga_read_stat(priv);
++	msel &= A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_MASK;
++	msel >>= A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_SHIFT;
++	if ((msel != 0) && (msel != 1)) {
++		dev_dbg(&mgr->dev, "Fail: invalid msel=%d\n", msel);
 +		return -EINVAL;
 +	}
 +
-+	bridge = kzalloc(sizeof(*bridge), GFP_KERNEL);
-+	if (!bridge)
-+		return -ENOMEM;
++	/* Make sure no external devices are interfering */
++	stat = socfpga_a10_fpga_read_stat(priv);
++	mask = A10_FPGAMGR_IMGCFG_STAT_F2S_NCONFIG_PIN |
++	       A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN;
++	if ((stat & mask) != mask)
++		return -EINVAL;
 +
-+	id = ida_simple_get(&fpga_bridge_ida, 0, 0, GFP_KERNEL);
-+	if (id < 0) {
-+		ret = id;
-+		goto error_kfree;
-+	}
++	/* Set cfg width */
++	socfpga_a10_fpga_set_cfg_width(priv, cfg_width);
 +
-+	mutex_init(&bridge->mutex);
-+	INIT_LIST_HEAD(&bridge->node);
-+
-+	bridge->name = name;
-+	bridge->br_ops = br_ops;
-+	bridge->priv = priv;
-+
-+	device_initialize(&bridge->dev);
-+	bridge->dev.class = fpga_bridge_class;
-+	bridge->dev.parent = dev;
-+	bridge->dev.of_node = dev->of_node;
-+	bridge->dev.id = id;
-+	dev_set_drvdata(dev, bridge);
-+
-+	ret = dev_set_name(&bridge->dev, "br%d", id);
++	/* Determine cd ratio from bitstream header and set cd ratio */
++	ret = socfpga_a10_fpga_set_cdratio(mgr, cfg_width, buf, count);
 +	if (ret)
-+		goto error_device;
-+
-+	ret = device_add(&bridge->dev);
-+	if (ret)
-+		goto error_device;
-+
-+	of_platform_populate(dev->of_node, NULL, NULL, dev);
-+
-+	dev_info(bridge->dev.parent, "fpga bridge [%s] registered\n",
-+		 bridge->name);
-+
-+	return 0;
-+
-+error_device:
-+	ida_simple_remove(&fpga_bridge_ida, id);
-+error_kfree:
-+	kfree(bridge);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_register);
-+
-+/**
-+ * fpga_bridge_unregister - unregister a fpga bridge driver
-+ * @dev: FPGA bridge device from pdev
-+ */
-+void fpga_bridge_unregister(struct device *dev)
-+{
-+	struct fpga_bridge *bridge = dev_get_drvdata(dev);
++		return ret;
 +
 +	/*
-+	 * If the low level driver provides a method for putting bridge into
-+	 * a desired state upon unregister, do it.
++	 * Clear s2f_nce to enable chip select.  Leave pr_request
++	 * unasserted and override disabled.
 +	 */
-+	if (bridge->br_ops && bridge->br_ops->fpga_bridge_remove)
-+		bridge->br_ops->fpga_bridge_remove(bridge);
++	regmap_write(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++		     A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG);
 +
-+	device_unregister(&bridge->dev);
++	/* Set cfg_ctrl to enable s2f dclk and data */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL,
++			   A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL);
++
++	/*
++	 * Disable overrides not needed for pr.
++	 * s2f_config==1 leaves reset deasseted.
++	 */
++	regmap_write(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_00_OFST,
++		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NCONFIG |
++		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NSTATUS |
++		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_CONDONE |
++		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NCONFIG);
++
++	/* Enable override for data, dclk, nce, and pr_request to CSS */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG, 0);
++
++	/* Send some clocks to clear out any errors */
++	socfpga_a10_fpga_generate_dclks(priv, 256);
++
++	/* Assert pr_request */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST);
++
++	/* Do some dclks, wait for pr_ready */
++	socfpga_a10_fpga_generate_dclks(priv, 0x7ff);
++
++	/* Wait for pr_ready */
++	return socfpga_a10_fpga_wait_for_pr_ready(priv);
 +}
-+EXPORT_SYMBOL_GPL(fpga_bridge_unregister);
 +
-+static void fpga_bridge_dev_release(struct device *dev)
++/*
++ * write data to the FPGA data register
++ */
++static int socfpga_a10_fpga_write(struct fpga_manager *mgr, const char *buf,
++				  size_t count)
 +{
-+	struct fpga_bridge *bridge = to_fpga_bridge(dev);
++	struct a10_fpga_priv *priv = mgr->priv;
++	u32 *buffer_32 = (u32 *)buf;
++	size_t i = 0;
 +
-+	ida_simple_remove(&fpga_bridge_ida, bridge->dev.id);
-+	kfree(bridge);
-+}
++	if (count <= 0)
++		return -EINVAL;
 +
-+static int __init fpga_bridge_dev_init(void)
-+{
-+	spin_lock_init(&bridge_list_lock);
++	/* Write out the complete 32-bit chunks */
++	while (count >= sizeof(u32)) {
++		writel(buffer_32[i++], priv->fpga_data_addr);
++		count -= sizeof(u32);
++	}
 +
-+	fpga_bridge_class = class_create(THIS_MODULE, "fpga_bridge");
-+	if (IS_ERR(fpga_bridge_class))
-+		return PTR_ERR(fpga_bridge_class);
-+
-+	fpga_bridge_class->dev_groups = fpga_bridge_groups;
-+	fpga_bridge_class->dev_release = fpga_bridge_dev_release;
++	/* Write out remaining non 32-bit chunks */
++	switch (count) {
++	case 3:
++		writel(buffer_32[i++] & 0x00ffffff, priv->fpga_data_addr);
++		break;
++	case 2:
++		writel(buffer_32[i++] & 0x0000ffff, priv->fpga_data_addr);
++		break;
++	case 1:
++		writel(buffer_32[i++] & 0x000000ff, priv->fpga_data_addr);
++		break;
++	case 0:
++		break;
++	default:
++		/* This will never happen */
++		return -EFAULT;
++	}
 +
 +	return 0;
 +}
 +
-+static void __exit fpga_bridge_dev_exit(void)
++static int socfpga_a10_fpga_write_complete(struct fpga_manager *mgr,
++					   struct fpga_image_info *info)
 +{
-+	class_destroy(fpga_bridge_class);
-+	ida_destroy(&fpga_bridge_ida);
++	struct a10_fpga_priv *priv = mgr->priv;
++	u32 reg;
++	int ret;
++
++	/* Wait for pr_done */
++	ret = socfpga_a10_fpga_wait_for_pr_done(priv);
++
++	/* Clear pr_request */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST, 0);
++
++	/* Send some clocks to clear out any errors */
++	socfpga_a10_fpga_generate_dclks(priv, 256);
++
++	/* Disable s2f dclk and data */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL, 0);
++
++	/* Deassert chip select */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE);
++
++	/* Disable data, dclk, nce, and pr_request override to CSS */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG);
++
++	/* Return any errors regarding pr_done or pr_error */
++	if (ret)
++		return ret;
++
++	/* Final check */
++	reg = socfpga_a10_fpga_read_stat(priv);
++
++	if (((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE) == 0) ||
++	    ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_CONDONE_PIN) == 0) ||
++	    ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN) == 0)) {
++		dev_dbg(&mgr->dev,
++			"Timeout in final check. Status=%08xf\n", reg);
++		return -ETIMEDOUT;
++	}
++
++	return 0;
 +}
 +
-+MODULE_DESCRIPTION("FPGA Bridge Driver");
++static enum fpga_mgr_states socfpga_a10_fpga_state(struct fpga_manager *mgr)
++{
++	struct a10_fpga_priv *priv = mgr->priv;
++	u32 reg = socfpga_a10_fpga_read_stat(priv);
++
++	if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE)
++		return FPGA_MGR_STATE_OPERATING;
++
++	if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_READY)
++		return FPGA_MGR_STATE_WRITE;
++
++	if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_CRC_ERROR)
++		return FPGA_MGR_STATE_WRITE_COMPLETE_ERR;
++
++	if ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN) == 0)
++		return FPGA_MGR_STATE_RESET;
++
++	return FPGA_MGR_STATE_UNKNOWN;
++}
++
++static const struct fpga_manager_ops socfpga_a10_fpga_mgr_ops = {
++	.state = socfpga_a10_fpga_state,
++	.write_init = socfpga_a10_fpga_write_init,
++	.write = socfpga_a10_fpga_write,
++	.write_complete = socfpga_a10_fpga_write_complete,
++};
++
++static int socfpga_a10_fpga_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct a10_fpga_priv *priv;
++	void __iomem *reg_base;
++	struct resource *res;
++	int ret;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	/* First mmio base is for register access */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	reg_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(reg_base))
++		return PTR_ERR(reg_base);
++
++	/* Second mmio base is for writing FPGA image data */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	priv->fpga_data_addr = devm_ioremap_resource(dev, res);
++	if (IS_ERR(priv->fpga_data_addr))
++		return PTR_ERR(priv->fpga_data_addr);
++
++	/* regmap for register access */
++	priv->regmap = devm_regmap_init_mmio(dev, reg_base,
++					     &socfpga_a10_fpga_regmap_config);
++	if (IS_ERR(priv->regmap))
++		return -ENODEV;
++
++	priv->clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(priv->clk)) {
++		dev_err(dev, "no clock specified\n");
++		return PTR_ERR(priv->clk);
++	}
++
++	ret = clk_prepare_enable(priv->clk);
++	if (ret) {
++		dev_err(dev, "could not enable clock\n");
++		return -EBUSY;
++	}
++
++	return fpga_mgr_register(dev, "SoCFPGA Arria10 FPGA Manager",
++				 &socfpga_a10_fpga_mgr_ops, priv);
++}
++
++static int socfpga_a10_fpga_remove(struct platform_device *pdev)
++{
++	struct fpga_manager *mgr = platform_get_drvdata(pdev);
++	struct a10_fpga_priv *priv = mgr->priv;
++
++	fpga_mgr_unregister(&pdev->dev);
++	clk_disable_unprepare(priv->clk);
++
++	return 0;
++}
++
++static const struct of_device_id socfpga_a10_fpga_of_match[] = {
++	{ .compatible = "altr,socfpga-a10-fpga-mgr", },
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, socfpga_a10_fpga_of_match);
++
++static struct platform_driver socfpga_a10_fpga_driver = {
++	.probe = socfpga_a10_fpga_probe,
++	.remove = socfpga_a10_fpga_remove,
++	.driver = {
++		.name	= "socfpga_a10_fpga_manager",
++		.of_match_table = socfpga_a10_fpga_of_match,
++	},
++};
++
++module_platform_driver(socfpga_a10_fpga_driver);
++
 +MODULE_AUTHOR("Alan Tull <atull@opensource.altera.com>");
++MODULE_DESCRIPTION("SoCFPGA Arria10 FPGA Manager");
 +MODULE_LICENSE("GPL v2");
-+
-+subsys_initcall(fpga_bridge_dev_init);
-+module_exit(fpga_bridge_dev_exit);
-diff --git a/include/linux/fpga/fpga-bridge.h b/include/linux/fpga/fpga-bridge.h
-new file mode 100644
-index 0000000..dba6e3c
---- /dev/null
-+++ b/include/linux/fpga/fpga-bridge.h
-@@ -0,0 +1,60 @@
-+#include <linux/device.h>
-+#include <linux/fpga/fpga-mgr.h>
-+
-+#ifndef _LINUX_FPGA_BRIDGE_H
-+#define _LINUX_FPGA_BRIDGE_H
-+
-+struct fpga_bridge;
-+
-+/**
-+ * struct fpga_bridge_ops - ops for low level FPGA bridge drivers
-+ * @enable_show: returns the FPGA bridge's status
-+ * @enable_set: set a FPGA bridge as enabled or disabled
-+ * @fpga_bridge_remove: set FPGA into a specific state during driver remove
-+ */
-+struct fpga_bridge_ops {
-+	int (*enable_show)(struct fpga_bridge *bridge);
-+	int (*enable_set)(struct fpga_bridge *bridge, bool enable);
-+	void (*fpga_bridge_remove)(struct fpga_bridge *bridge);
-+};
-+
-+/**
-+ * struct fpga_bridge - FPGA bridge structure
-+ * @name: name of low level FPGA bridge
-+ * @dev: FPGA bridge device
-+ * @mutex: enforces exclusive reference to bridge
-+ * @br_ops: pointer to struct of FPGA bridge ops
-+ * @info: fpga image specific information
-+ * @node: FPGA bridge list node
-+ * @priv: low level driver private date
-+ */
-+struct fpga_bridge {
-+	const char *name;
-+	struct device dev;
-+	struct mutex mutex; /* for exclusive reference to bridge */
-+	const struct fpga_bridge_ops *br_ops;
-+	struct fpga_image_info *info;
-+	struct list_head node;
-+	void *priv;
-+};
-+
-+#define to_fpga_bridge(d) container_of(d, struct fpga_bridge, dev)
-+
-+struct fpga_bridge *of_fpga_bridge_get(struct device_node *node,
-+				       struct fpga_image_info *info);
-+void fpga_bridge_put(struct fpga_bridge *bridge);
-+int fpga_bridge_enable(struct fpga_bridge *bridge);
-+int fpga_bridge_disable(struct fpga_bridge *bridge);
-+
-+int fpga_bridges_enable(struct list_head *bridge_list);
-+int fpga_bridges_disable(struct list_head *bridge_list);
-+void fpga_bridges_put(struct list_head *bridge_list);
-+int fpga_bridge_get_to_list(struct device_node *np,
-+			    struct fpga_image_info *info,
-+			    struct list_head *bridge_list);
-+
-+int fpga_bridge_register(struct device *dev, const char *name,
-+			 const struct fpga_bridge_ops *br_ops, void *priv);
-+void fpga_bridge_unregister(struct device *dev);
-+
-+#endif /* _LINUX_FPGA_BRIDGE_H */
 -- 
 2.9.3
