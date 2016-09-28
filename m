@@ -1,177 +1,227 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Wed, 28 Sep 2016 12:48:49 +0530
-Subject: [PATCH v7 6/7] arm/arm64: vgic: Implement VGICv3 CPU interface
- access
-In-Reply-To: <1474645482-28131-7-git-send-email-vijay.kilari@gmail.com>
-References: <1474645482-28131-1-git-send-email-vijay.kilari@gmail.com>
- <1474645482-28131-7-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <CALicx6tuaNAaXoD8_dwwBkw1D8iHsufKSdM6ki4iq=5+RzevMg@mail.gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 28 Sep 2016 15:41:48 +0800
+Subject: [PATCH v1] usb: ohci-at91: Use descriptor-based gpio APIs
+Message-ID: <1475048509-3042-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2016 at 9:14 PM,  <vijay.kilari@gmail.com> wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->
-> VGICv3 CPU interface registers are accessed using
-> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
-> as 64-bit. The cpu MPIDR value is passed along with register id.
-> is used to identify the cpu for registers access.
->
-> The version of VGIC v3 specification is define here
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
->
-> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> ---
->  arch/arm64/include/uapi/asm/kvm.h   |   3 +
->  arch/arm64/kvm/Makefile             |   1 +
->  include/kvm/arm_vgic.h              |   9 +
->  virt/kvm/arm/vgic/vgic-kvm-device.c |  27 +++
->  virt/kvm/arm/vgic/vgic-mmio-v3.c    |  19 +++
->  virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 324 ++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-v3.c         |   8 +
->  virt/kvm/arm/vgic/vgic.h            |   4 +
->  8 files changed, 395 insertions(+)
->
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 56dc08d..91c7137 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -206,9 +206,12 @@ struct kvm_arch_memory_slot {
->                         (0xffffffffULL << KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT)
->  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT        0
->  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK (0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-> +#define   KVM_DEV_ARM_VGIC_SYSREG_INSTR_MASK (0xffff)
->  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS   3
->  #define KVM_DEV_ARM_VGIC_GRP_CTRL      4
->  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
-> +#define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
-> +
->  #define   KVM_DEV_ARM_VGIC_CTRL_INIT   0
->
->  /* Device Control API on vcpu fd */
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index d50a82a..1a14e29 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -32,5 +32,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
-> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-sys-reg-v3.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
->  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 002f092..730a18a 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -71,6 +71,9 @@ struct vgic_global {
->
->         /* GIC system register CPU interface */
->         struct static_key_false gicv3_cpuif;
-> +
-> +       /* Cache ICH_VTR_EL2 reg value */
-> +       u32                     ich_vtr_el2;
->  };
->
->  extern struct vgic_global kvm_vgic_global_state;
-> @@ -269,6 +272,12 @@ struct vgic_cpu {
->         u64 pendbaser;
->
->         bool lpis_enabled;
-> +
-> +       /* Cache guest priority bits */
-> +       u32 num_pri_bits;
-> +
-> +       /* Cache guest interrupt ID bits */
-> +       u32 num_id_bits;
->  };
->
->  extern struct static_key_false vgic_v2_cpuif_trap;
-> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> index 6c7d30c..da532d1 100644
-> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> @@ -504,6 +504,14 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
->                 if (!is_write)
->                         *reg = tmp32;
->                 break;
-> +       case KVM_DEV_ARM_VGIC_CPU_SYSREGS: {
-> +               u64 regid;
-> +
-> +               regid = (attr->attr & KVM_DEV_ARM_VGIC_SYSREG_INSTR_MASK);
-> +               ret = vgic_v3_cpu_sysregs_uaccess(vcpu, is_write,
-> +                                                 regid, reg);
-> +               break;
-> +       }
->         default:
->                 ret = -EINVAL;
->                 break;
-> @@ -537,6 +545,15 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
->                 reg = tmp32;
->                 return vgic_v3_attr_regs_access(dev, attr, &reg, true);
->         }
-> +       case KVM_DEV_ARM_VGIC_CPU_SYSREGS: {
-> +               u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-> +               u64 reg;
-> +
-> +               if (get_user(reg, uaddr))
-> +                       return -EFAULT;
-> +
-> +               return vgic_v3_attr_regs_access(dev, attr, &reg, true);
-> +       }
->         }
->         return -ENXIO;
->  }
-> @@ -563,6 +580,15 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
->                 tmp32 = reg;
->                 return put_user(tmp32, uaddr);
->         }
-> +       case KVM_DEV_ARM_VGIC_CPU_SYSREGS: {
-> +               u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-> +               u64 reg;
-> +
-> +               ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
-> +               if (ret)
-> +                       return ret;
-> +               return put_user(reg, uaddr);
-> +       }
->         }
->
->         return -ENXIO;
-> @@ -581,6 +607,7 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
->                 break;
->         case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
->         case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
-> +       case KVM_DEV_ARM_VGIC_CPU_SYSREGS:
->                 return vgic_v3_has_attr_regs(dev, attr);
->         case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
->                 return 0;
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index b35fb83..8f46e61 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -23,6 +23,7 @@
->
->  #include "vgic.h"
->  #include "vgic-mmio.h"
-> +#include "sys_regs.h"
->
->  /* extract @num bytes at @offset bytes offset in data */
->  unsigned long extract_bytes(u64 data, unsigned int offset,
-> @@ -639,6 +640,24 @@ int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
->                 nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
->                 break;
->         }
-> +       case KVM_DEV_ARM_VGIC_CPU_SYSREGS: {
-> +               u64 reg, id;
-> +               unsigned long vgic_mpidr, mpidr_reg;
-> +               struct kvm_vcpu *vcpu;
-> +
-> +               vgic_mpidr = (attr->attr & KVM_DEV_ARM_VGIC_V3_MPIDR_MASK) >>
-> +                             KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT;
-> +
-> +               /* Convert plain mpidr value to MPIDR reg format */
-> +               mpidr_reg = VGIC_TO_MPIDR(mpidr_reg);
+Use the descriptor-based interface to manipulate GPIOs, instead of
+the legacy integer-based interface.
 
-My bad, Wrong parameter. I will fix it.
+In the meanwhile, remove unneeded vbus_pin_active_low[...] member.
+
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+
+ drivers/usb/host/ohci-at91.c | 120 ++++++++++---------------------------------
+ 1 file changed, 28 insertions(+), 92 deletions(-)
+
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index d177372..b0c7827 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -14,8 +14,8 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/dma-mapping.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/of_platform.h>
+-#include <linux/of_gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/atmel.h>
+ #include <linux/io.h>
+@@ -36,11 +36,10 @@
+ 
+ #define AT91_MAX_USBH_PORTS	3
+ struct at91_usbh_data {
+-	int vbus_pin[AT91_MAX_USBH_PORTS];	/* port power-control pin */
+-	int overcurrent_pin[AT91_MAX_USBH_PORTS];
++	struct gpio_desc *vbus_pin[AT91_MAX_USBH_PORTS];
++	struct gpio_desc *overcurrent_pin[AT91_MAX_USBH_PORTS];
+ 	u8 ports;				/* number of ports on root hub */
+ 	u8 overcurrent_supported;
+-	u8 vbus_pin_active_low[AT91_MAX_USBH_PORTS];
+ 	u8 overcurrent_status[AT91_MAX_USBH_PORTS];
+ 	u8 overcurrent_changed[AT91_MAX_USBH_PORTS];
+ };
+@@ -243,11 +242,7 @@ static void ohci_at91_usb_set_power(struct at91_usbh_data *pdata, int port, int
+ 	if (!valid_port(port))
+ 		return;
+ 
+-	if (!gpio_is_valid(pdata->vbus_pin[port]))
+-		return;
+-
+-	gpio_set_value(pdata->vbus_pin[port],
+-		       pdata->vbus_pin_active_low[port] ^ enable);
++	gpiod_set_value(pdata->vbus_pin[port], enable);
+ }
+ 
+ static int ohci_at91_usb_get_power(struct at91_usbh_data *pdata, int port)
+@@ -255,11 +250,7 @@ static int ohci_at91_usb_get_power(struct at91_usbh_data *pdata, int port)
+ 	if (!valid_port(port))
+ 		return -EINVAL;
+ 
+-	if (!gpio_is_valid(pdata->vbus_pin[port]))
+-		return -EINVAL;
+-
+-	return gpio_get_value(pdata->vbus_pin[port]) ^
+-		pdata->vbus_pin_active_low[port];
++	return gpiod_get_value(pdata->vbus_pin[port]);
+ }
+ 
+ /*
+@@ -406,16 +397,13 @@ static irqreturn_t ohci_hcd_at91_overcurrent_irq(int irq, void *data)
+ {
+ 	struct platform_device *pdev = data;
+ 	struct at91_usbh_data *pdata = dev_get_platdata(&pdev->dev);
+-	int val, gpio, port;
++	int val, port;
+ 
+ 	/* From the GPIO notifying the over-current situation, find
+ 	 * out the corresponding port */
+ 	at91_for_each_port(port) {
+-		if (gpio_is_valid(pdata->overcurrent_pin[port]) &&
+-				gpio_to_irq(pdata->overcurrent_pin[port]) == irq) {
+-			gpio = pdata->overcurrent_pin[port];
++		if (gpiod_to_irq(pdata->overcurrent_pin[port]) == irq)
+ 			break;
+-		}
+ 	}
+ 
+ 	if (port == AT91_MAX_USBH_PORTS) {
+@@ -423,7 +411,7 @@ static irqreturn_t ohci_hcd_at91_overcurrent_irq(int irq, void *data)
+ 		return IRQ_HANDLED;
+ 	}
+ 
+-	val = gpio_get_value(gpio);
++	val = gpiod_get_value(pdata->overcurrent_pin[port]);
+ 
+ 	/* When notified of an over-current situation, disable power
+ 	   on the corresponding port, and mark this port in
+@@ -454,9 +442,8 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct at91_usbh_data	*pdata;
+ 	int			i;
+-	int			gpio;
+ 	int			ret;
+-	enum of_gpio_flags	flags;
++	int			err;
+ 	u32			ports;
+ 
+ 	/* Right now device-tree probed devices don't get dma_mask set.
+@@ -477,36 +464,12 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 		pdata->ports = ports;
+ 
+ 	at91_for_each_port(i) {
+-		/*
+-		 * do not configure PIO if not in relation with
+-		 * real USB port on board
+-		 */
+-		if (i >= pdata->ports) {
+-			pdata->vbus_pin[i] = -EINVAL;
+-			pdata->overcurrent_pin[i] = -EINVAL;
+-			continue;
+-		}
+-
+-		gpio = of_get_named_gpio_flags(np, "atmel,vbus-gpio", i,
+-					       &flags);
+-		pdata->vbus_pin[i] = gpio;
+-		if (!gpio_is_valid(gpio))
+-			continue;
+-		pdata->vbus_pin_active_low[i] = flags & OF_GPIO_ACTIVE_LOW;
+-
+-		ret = gpio_request(gpio, "ohci_vbus");
+-		if (ret) {
+-			dev_err(&pdev->dev,
+-				"can't request vbus gpio %d\n", gpio);
+-			continue;
+-		}
+-		ret = gpio_direction_output(gpio,
+-					!pdata->vbus_pin_active_low[i]);
+-		if (ret) {
+-			dev_err(&pdev->dev,
+-				"can't put vbus gpio %d as output %d\n",
+-				gpio, !pdata->vbus_pin_active_low[i]);
+-			gpio_free(gpio);
++		pdata->vbus_pin[i] = devm_gpiod_get_optional(&pdev->dev,
++							     "atmel,vbus-gpio",
++							     GPIOD_IN);
++		if (IS_ERR(pdata->vbus_pin[i])) {
++			err = PTR_ERR(pdata->vbus_pin[i]);
++			dev_err(&pdev->dev, "unable to claim gpio \"vbus\": %d\n", err);
+ 			continue;
+ 		}
+ 
+@@ -518,37 +481,21 @@ static int ohci_hcd_at91_drv_probe(struct platform_device *pdev)
+ 			break;
+ 
+ 		pdata->overcurrent_pin[i] =
+-			of_get_named_gpio_flags(np, "atmel,oc-gpio", i, &flags);
+-
+-		if (!gpio_is_valid(pdata->overcurrent_pin[i]))
+-			continue;
+-		gpio = pdata->overcurrent_pin[i];
+-
+-		ret = gpio_request(gpio, "ohci_overcurrent");
+-		if (ret) {
+-			dev_err(&pdev->dev,
+-				"can't request overcurrent gpio %d\n",
+-				gpio);
++			devm_gpiod_get_optional(&pdev->dev,
++						"atmel,oc-gpio", GPIOD_IN);
++		if (IS_ERR(pdata->overcurrent_pin[i])) {
++			err = PTR_ERR(pdata->overcurrent_pin[i]);
++			dev_err(&pdev->dev, "unable to claim gpio \"overcurrent\": %d\n", err);
+ 			continue;
+ 		}
+ 
+-		ret = gpio_direction_input(gpio);
+-		if (ret) {
+-			dev_err(&pdev->dev,
+-				"can't configure overcurrent gpio %d as input\n",
+-				gpio);
+-			gpio_free(gpio);
+-			continue;
+-		}
+-
+-		ret = request_irq(gpio_to_irq(gpio),
+-				  ohci_hcd_at91_overcurrent_irq,
+-				  IRQF_SHARED, "ohci_overcurrent", pdev);
+-		if (ret) {
+-			gpio_free(gpio);
+-			dev_err(&pdev->dev,
+-				"can't get gpio IRQ for overcurrent\n");
+-		}
++		ret = devm_request_irq(&pdev->dev,
++				       gpiod_to_irq(pdata->overcurrent_pin[i]),
++				       ohci_hcd_at91_overcurrent_irq,
++				       IRQF_SHARED,
++				       "ohci_overcurrent", pdev);
++		if (ret)
++			dev_info(&pdev->dev, "failed to request gpio \"overcurrent\" IRQ\n");
+ 	}
+ 
+ 	device_init_wakeup(&pdev->dev, 1);
+@@ -561,19 +508,8 @@ static int ohci_hcd_at91_drv_remove(struct platform_device *pdev)
+ 	int			i;
+ 
+ 	if (pdata) {
+-		at91_for_each_port(i) {
+-			if (!gpio_is_valid(pdata->vbus_pin[i]))
+-				continue;
++		at91_for_each_port(i)
+ 			ohci_at91_usb_set_power(pdata, i, 0);
+-			gpio_free(pdata->vbus_pin[i]);
+-		}
+-
+-		at91_for_each_port(i) {
+-			if (!gpio_is_valid(pdata->overcurrent_pin[i]))
+-				continue;
+-			free_irq(gpio_to_irq(pdata->overcurrent_pin[i]), pdev);
+-			gpio_free(pdata->overcurrent_pin[i]);
+-		}
+ 	}
+ 
+ 	device_init_wakeup(&pdev->dev, 0);
+-- 
+2.7.4
