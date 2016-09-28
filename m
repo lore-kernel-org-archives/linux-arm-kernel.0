@@ -1,56 +1,27 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Thu, 29 Sep 2016 00:22:25 +0200
-Subject: [PATCH v3 2/7] i2c: bcm2835: Protect against unexpected TXW/RXR
- interrupts
-In-Reply-To: <87oa37fzx6.fsf@eliezer.anholt.net>
-References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
- <1475085056-5205-3-git-send-email-noralf@tronnes.org>
- <87oa37fzx6.fsf@eliezer.anholt.net>
-Message-ID: <d93a0590-1783-b913-9362-007628cb17d6@tronnes.org>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Wed, 28 Sep 2016 16:41:57 -0700
+Subject: [PATCH v19 05/12] fpga-mgr: add fpga image information struct
+In-Reply-To: <20160928182200.15800-6-atull@opensource.altera.com>
+References: <20160928182200.15800-1-atull@opensource.altera.com>
+ <20160928182200.15800-6-atull@opensource.altera.com>
+Message-ID: <CAAtXAHcdSsVUE4hQ6isCp7_35ZKb60EAKAgtGwBR41apwPpe=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Alan,
 
-Den 29.09.2016 00:00, skrev Eric Anholt:
-> Noralf Tr?nnes <noralf@tronnes.org> writes:
->
->> If an unexpected TXW or RXR interrupt occurs (msg_buf_remaining == 0),
->> the driver has no way to fill/drain the FIFO to stop the interrupts.
->> In this case the controller has to be disabled and the transfer
->> completed to avoid hang.
->>
->> (CLKT | ERR) and DONE interrupts are completed in their own paths, and
->> the controller is disabled in the transfer function after completion.
->> Unite the code paths and do disabling inside the interrupt routine.
->>
->> Clear interrupt status bits in the united completion path instead of
->> trying to do it on every interrupt which isn't necessary.
->> Only CLKT, ERR and DONE can be cleared that way.
->>
->> Add the status value to the error value in case of TXW/RXR errors to
->> distinguish them from the other S_LEN error.
-> I was surprised that not writing the TXW/RXR bits on handling their
-> interrupts was OK, given that we were doing so before, but it's a level
-> interrupt and those bits are basically ignored on write.
->
-> This patch and 3, 4, and 6 are:
->
-> Reviewed-by: Eric Anholt <eric@anholt.net>
->
-> Patch 5 is:
->
-> Acked-by: Eric Anholt <eric@anholt.net>
->
-> Note for future debug: The I2C_C_CLEAR on errors will take some time to
-> resolve -- if you were in non-idle state and I2C_C_READ, it sets an
-> abort_rx flag and runs through the state machine to send a NACK and a
-> STOP, I think.  Since we're setting CLEAR without I2CEN, that NACK will
-> be hanging around queued up for next time we start the engine.
+generally ok with the change.
 
-Maybe you're able to explain the issues I had with reset:
-https://github.com/raspberrypi/linux/issues/1653
+On Wed, Sep 28, 2016 at 11:21 AM, Alan Tull <atull@opensource.altera.com> wrote:
 
-Should we put your note into the commit message?
-It will most likely be lost if it just stays in this email.
+> -int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
+> -                     size_t count)
+> +int fpga_mgr_buf_load(struct fpga_manager *mgr, struct fpga_image_info *info,
+> +                     const char *buf, size_t count)
 
-Noralf.
+Doesn't this break the both socfpga and zynq if [6/12] and [7/12] are
+not part of this commit?
+i.e shouldn't 5,6 and 7 be a single commit?
+
+Cheers,
+Moritz
