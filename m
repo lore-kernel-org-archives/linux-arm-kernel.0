@@ -1,50 +1,63 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 28 Sep 2016 07:53:42 +0800
-Subject: [PATCH v7 0/8] power: add power sequence library
-In-Reply-To: <57EB0109.4070000@maciej.szmigiero.name>
-References: <1474342607-27512-1-git-send-email-peter.chen@nxp.com>
- <57EB0109.4070000@maciej.szmigiero.name>
-Message-ID: <20160927235342.GA6165@b29397-desktop>
+From: briannorris@chromium.org (Brian Norris)
+Date: Tue, 27 Sep 2016 18:23:11 -0700
+Subject: [PATCH] clocksource: arm_arch_timer: Don't assume clock runs in
+ suspend
+In-Reply-To: <57E0E97B.5000106@arm.com>
+References: <20160916054917.16930-1-briannorris@chromium.org>
+ <57DBA81F.2060404@arm.com> <20160919231441.GA60928@google.com>
+ <57E0E97B.5000106@arm.com>
+Message-ID: <20160928012309.GA29518@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2016 at 01:30:17AM +0200, Maciej S. Szmigiero wrote:
-> On 20.09.2016 05:36, Peter Chen wrote:
-> > Hi all,
-> > 
-> > This is a follow-up for my last power sequence framework patch set [1].
-> > According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
-> > power sequence instances will be added at postcore_initcall, the match
-> > criteria is compatible string first, if the compatible string is not
-> > matched between dts and library, it will try to use generic power sequence.
-> > 	 
-> > The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> > if only one power sequence instance is needed, for more power sequences
-> > are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
-> > 
-> > In future, if there are special power sequence requirements, the special
-> > power sequence library can be created.
-> > 
-> > This patch set is tested on i.mx6 sabresx evk using a dts change, I use
-> > two hot-plug devices to simulate this use case, the related binding
-> > change is updated at patch [1/6], The udoo board changes were tested
-> > using my last power sequence patch set.[3]
-> > 
-> > Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
-> > need to power on itself before it can be found by ULPI bus.
-> > 
-> > [1] http://www.spinics.net/lists/linux-usb/msg142755.html
-> > [2] http://www.spinics.net/lists/linux-usb/msg143106.html
-> > [3] http://www.spinics.net/lists/linux-usb/msg142815.html
-> 
-> Just tested this patch set on UDOO board again to make sure that it still
-> works after all changes done since it was last tested there and can confirm
-> that it does work correctly.
-> 
+Hi Marc,
 
-Thanks, Maciej.
+Thanks again for the help. I was checking with Rockchip on the details.
 
--- 
+On Tue, Sep 20, 2016 at 08:47:07AM +0100, Marc Zyngier wrote:
+> The counter is allowed to be clocked at a different rate, as long as it
+> is incremented by the frequency ratio on each tick of the new frequency.
+> In your case, the counter should increment by 750 on each tick of the
+> 32kHz clock. If the rk3399 implementation doesn't do this, then this is
+> a bug, and we need a quirk to work around it.
 
-Best Regards,
-Peter Chen
+I had hope that we could find a switch that would do the above for
+rk3399, since other parts of the system (e.g., the PMU itself) support
+switching from the 24MHz to 32KHz clock, but Rockchip confirmed that it
+is indeed a HW quirk that the arch timer's counter does not support
+clocking out ticks based on the 32KHz clock. So I'm planning to send a
+v2 that adds a "arm,no-tick-in-suspend" property.
+
+<Begin side note>
+rk3288 (ARMv7 system widely used for our Chromebooks) has the same
+issue, except the kernel we're using for production (based on v3.14)
+doesn't have the following commit, which stopped utilizing the RTC:
+
+commit 0fa88cb4b82b5cf7429bc1cef9db006ca035754e
+Author: Xunlei Pang <pang.xunlei@linaro.org>
+Date:   Wed Apr 1 20:34:38 2015 -0700
+
+    time, drivers/rtc: Don't bother with rtc_resume() for the nonstop clocksource
+
+And any mainline testing on rk3288 doesn't see the problem, because
+mainline doesn't support its lowest-power sleep modes well enough (see
+ROCKCHIP_ARM_OFF_LOGIC_DEEP in arch/arm/mach-rockchip/pm.c).
+<End side note>
+
+> Note that such a quirk will have some other impacts, such as the
+> gettimeofday implementation in the VDSO (which relies on the counter
+> making forward progress). There could be other issues in the timer
+> subsystem as well... This doesn't look like a pleasant thing to fix.
+
+How sure are you of these problems? I'm a bit new to the kernel
+timekeeping subsystem, but doesn't this kind of code already have to
+handle time adjustments like this when reprogramming the system time
+(settimeofday())? And might we be covered for the suspend/resume case
+when we allow the kernel to fall back to the RTC instead, which adjusts
+the sleep delta with timekeeping_inject_sleeptime64()? And (weaker
+evidence here) we haven't seen problems on rk3288 so far, at least
+without the above referenced rtc commit 0fa88cb4b82. But admittedly
+there are some differences between arch/{arm,arm64}/.
+
+Regards,
+Brian
