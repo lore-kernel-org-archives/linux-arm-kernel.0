@@ -1,143 +1,117 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Thu, 29 Sep 2016 02:17:17 +0800
-Subject: [PATCH v14 9/9] acpi/arm64: Add SBSA Generic Watchdog support in GTDT
- driver
-In-Reply-To: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1475086637-1914-10-git-send-email-fu.wei@linaro.org>
+From: atull@opensource.altera.com (Alan Tull)
+Date: Wed, 28 Sep 2016 13:21:50 -0500
+Subject: [PATCH v19 02/12] doc: fpga-mgr: add fpga image info to api
+In-Reply-To: <20160928182200.15800-1-atull@opensource.altera.com>
+References: <20160928182200.15800-1-atull@opensource.altera.com>
+Message-ID: <20160928182200.15800-3-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+This patch adds a minor change in the FPGA Mangager API
+to hold information that is specific to an FPGA image
+file.  This change is expected to bring little, if any,
+pain.
 
-This driver adds support for parsing SBSA Generic Watchdog timer
-in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
-and creating a platform device with that information.
+An FPGA image file will have particulars that affect how the
+image is programmed to the FPGA.  One example is that
+current 'flags' currently has one bit which shows whether the
+FPGA image was built for full reconfiguration or partial
+reconfiguration.  Another example is timeout values for
+enabling or disabling the bridges in the FPGA.  As the
+complexity of the FPGA design increases, the bridges in the
+FPGA may take longer times to enable or disable.
 
-This allows the operating system to obtain device data from the
-resource of platform device. The platform device named "sbsa-gwdt"
-can be used by the ARM SBSA Generic Watchdog driver.
+This patch documents the change in the FPGA Manager API
+functions, replacing the 'u32 flag' parameter with a pointer
+to struct fpga_image_info.
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Alan Tull <atull@opensource.altera.com>
 ---
- drivers/acpi/arm64/gtdt.c | 87 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/watchdog/Kconfig  |  1 +
- 2 files changed, 88 insertions(+)
+v19: Added in v19 of this patchset
+---
+ Documentation/fpga/fpga-mgr.txt | 32 +++++++++++++++++++++-----------
+ 1 file changed, 21 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
-index b6021db..6d9fdd3 100644
---- a/drivers/acpi/arm64/gtdt.c
-+++ b/drivers/acpi/arm64/gtdt.c
-@@ -14,6 +14,7 @@
- #include <linux/acpi.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
+diff --git a/Documentation/fpga/fpga-mgr.txt b/Documentation/fpga/fpga-mgr.txt
+index ce3e84f..9227e3f 100644
+--- a/Documentation/fpga/fpga-mgr.txt
++++ b/Documentation/fpga/fpga-mgr.txt
+@@ -18,21 +18,25 @@ API Functions:
+ To program the FPGA from a file or from a buffer:
+ -------------------------------------------------
  
- #include <clocksource/arm_arch_timer.h>
+-	int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags,
++	int fpga_mgr_buf_load(struct fpga_manager *mgr,
++			      struct fpga_image_info *info,
+ 		              const char *buf, size_t count);
  
-@@ -220,3 +221,89 @@ int __init gtdt_arch_timer_mem_init(struct gt_block_data *data)
+ Load the FPGA from an image which exists as a buffer in memory.
  
- 	return index;
- }
+-	int fpga_mgr_firmware_load(struct fpga_manager *mgr, u32 flags,
++	int fpga_mgr_firmware_load(struct fpga_manager *mgr,
++				   struct fpga_image_info *info,
+ 		                   const char *image_name);
+ 
+ Load the FPGA from an image which exists as a file.  The image file must be on
+-the firmware search path (see the firmware class documentation).
+-
+-For both these functions, flags == 0 for normal full reconfiguration or
+-FPGA_MGR_PARTIAL_RECONFIG for partial reconfiguration.  If successful, the FPGA
+-ends up in operating mode.  Return 0 on success or a negative error code.
++the firmware search path (see the firmware class documentation).  If successful,
++the FPGA ends up in operating mode.  Return 0 on success or a negative error
++code.
+ 
++A FPGA design contained in a FPGA image file will likely have particulars that
++affect how the image is programmed to the FPGA.  These are contained in struct
++fpga_image_info.  Currently the only such particular is a single flag bit
++indicating whether the image is for full or partial reconfiguration.
+ 
+ To get/put a reference to a FPGA manager:
+ -----------------------------------------
+@@ -70,8 +74,11 @@ struct device_node *mgr_node = ...
+ char *buf = ...
+ int count = ...
+ 
++/* struct with information about the FPGA image to program. */
++struct fpga_image_info info;
 +
-+/*
-+ * Initialize a SBSA generic Watchdog platform device info from GTDT
-+ */
-+static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
-+					int index)
-+{
-+	struct platform_device *pdev;
-+	int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
-+	int no_irq = 1;
+ /* flags indicates whether to do full or partial reconfiguration */
+-int flags = 0;
++info.flags = 0;
+ 
+ int ret;
+ 
+@@ -79,7 +86,7 @@ int ret;
+ struct fpga_manager *mgr = of_fpga_mgr_get(mgr_node);
+ 
+ /* Load the buffer to the FPGA */
+-ret = fpga_mgr_buf_load(mgr, flags, buf, count);
++ret = fpga_mgr_buf_load(mgr, &info, buf, count);
+ 
+ /* Release the FPGA manager */
+ fpga_mgr_put(mgr);
+@@ -96,8 +103,11 @@ struct device_node *mgr_node = ...
+ /* FPGA image is in this file which is in the firmware search path */
+ const char *path = "fpga-image-9.rbf"
+ 
++/* struct with information about the FPGA image to program. */
++struct fpga_image_info info;
 +
-+	/*
-+	 * According to SBSA specification the size of refresh and control
-+	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
-+	 */
-+	struct resource res[] = {
-+		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
-+		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
-+		DEFINE_RES_IRQ(irq),
-+	};
-+
-+	pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
-+		 wd->refresh_frame_address, wd->control_frame_address,
-+		 wd->timer_interrupt, wd->timer_flags);
-+
-+	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
-+		pr_err(FW_BUG "failed to get the Watchdog base address.\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!wd->timer_interrupt)
-+		pr_warn(FW_BUG "failed to get the Watchdog interrupt.\n");
-+	else if (irq <= 0)
-+		pr_warn("failed to map the Watchdog interrupt.\n");
-+	else
-+		no_irq = 0;
-+
-+	/*
-+	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
-+	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
-+	 * The platform driver (like drivers/watchdog/sbsa_gwdt.c)can get device
-+	 * info below by matching this name.
-+	 */
-+	pdev = platform_device_register_simple("sbsa-gwdt", index, res,
-+					       ARRAY_SIZE(res) - no_irq);
-+	if (IS_ERR(pdev)) {
-+		acpi_unregister_gsi(wd->timer_interrupt);
-+		return PTR_ERR(pdev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init gtdt_sbsa_gwdt_init(void)
-+{
-+	struct acpi_table_header *table;
-+	void *platform_timer;
-+	int index = 0;
-+	int ret;
-+
-+	if (acpi_disabled)
-+		return 0;
-+
-+	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
-+		return -EINVAL;
-+
-+	ret = acpi_gtdt_init(table);
-+	if (ret <= 0)
-+		return ret;
-+
-+	for_each_platform_timer(platform_timer) {
-+		if (!is_watchdog(platform_timer))
-+			continue;
-+		ret = gtdt_import_sbsa_gwdt(platform_timer, index);
-+		if (ret)
-+			break;
-+		index++;
-+	}
-+
-+	if (index)
-+		pr_info("found %d SBSA generic Watchdog(s).\n", index);
-+
-+	return ret;
-+}
-+
-+device_initcall(gtdt_sbsa_gwdt_init);
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 1bffe00..341964a 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -205,6 +205,7 @@ config ARM_SBSA_WATCHDOG
- 	tristate "ARM SBSA Generic Watchdog"
- 	depends on ARM64
- 	depends on ARM_ARCH_TIMER
-+	depends on ACPI_GTDT || !ACPI
- 	select WATCHDOG_CORE
- 	help
- 	  ARM SBSA Generic Watchdog has two stage timeouts:
+ /* flags indicates whether to do full or partial reconfiguration */
+-int flags = 0;
++info.flags = 0;
+ 
+ int ret;
+ 
+@@ -105,7 +115,7 @@ int ret;
+ struct fpga_manager *mgr = of_fpga_mgr_get(mgr_node);
+ 
+ /* Get the firmware image (path) and load it to the FPGA */
+-ret = fpga_mgr_firmware_load(mgr, flags, path);
++ret = fpga_mgr_firmware_load(mgr, &info, path);
+ 
+ /* Release the FPGA manager */
+ fpga_mgr_put(mgr);
 -- 
-2.7.4
+2.9.3
