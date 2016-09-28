@@ -1,32 +1,33 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 28 Sep 2016 23:09:40 +0300
-Subject: [PATCH RFC 6/8] ARM: dts: r8a7743: add SYS-DMAC support
-In-Reply-To: <CAMuHMdXz5K66AU7d-+NsPrAyc8V53mDxzggiUk-TrFRAwBFXOg@mail.gmail.com>
-References: <3533019.Wim1Kuh1ic@wasted.cogentembedded.com>
- <1815255.1arMxK7TDL@wasted.cogentembedded.com>
- <CAMuHMdXz5K66AU7d-+NsPrAyc8V53mDxzggiUk-TrFRAwBFXOg@mail.gmail.com>
-Message-ID: <be7575a5-e9a0-05a6-5b2d-803632c7edac@cogentembedded.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 28 Sep 2016 14:10:26 -0700
+Subject: [PATCH V7 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
+References: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
+ <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87twczg27x.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2016 11:19 AM, Geert Uytterhoeven wrote:
+kernel at martin.sperl.org writes:
 
->> --- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
->> +++ renesas/arch/arm/boot/dts/r8a7743.dtsi
->> @@ -90,6 +90,70 @@
->>                         #power-domain-cells = <1>;
->>                 };
->>
->> +               dmac0: dma-controller at e6700000 {
->> +                       compatible = "renesas,dmac-r8a7743",
+> From: Martin Sperl <kernel@martin.sperl.org>
 >
-> To be documented.
-
-    The R-Car DMAC binding has "renesas,dmac-<soctype>" documented.
-I can add the mention of RZ/G and new examples though...
-
-> Gr{oetje,eeting}s,
+> Add basic thermal driver for bcm2835 SOC.
 >
->                         Geert
+> This driver currently relies on the firmware setting up the
+> tsense HW block and does not set it up itself.
+>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> Acked-by: Eric Anholt <eric@anholt.net>
+> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-MBR, Sergei
+What's the status of merging this one?  I'd like to merge the other
+patches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160928/23e2792a/attachment.sig>
