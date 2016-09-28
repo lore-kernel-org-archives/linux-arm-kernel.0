@@ -1,70 +1,107 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Wed, 28 Sep 2016 13:21:59 -0500
-Subject: [PATCH v19 11/12] fpga: add altera freeze bridge support
+Date: Wed, 28 Sep 2016 13:21:58 -0500
+Subject: [PATCH v19 10/12] ARM: socfpga: fpga bridge driver support
 In-Reply-To: <20160928182200.15800-1-atull@opensource.altera.com>
 References: <20160928182200.15800-1-atull@opensource.altera.com>
-Message-ID: <20160928182200.15800-12-atull@opensource.altera.com>
+Message-ID: <20160928182200.15800-11-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a low level driver for Altera Freeze Bridges to the FPGA Bridge
-framework.  A freeze bridge is a bridge that exists in the FPGA
-fabric to isolate one region of the FPGA from the busses while that
-one region is being reprogrammed.
+Supports Altera SOCFPGA bridges:
+ * fpga2sdram
+ * fpga2hps
+ * hps2fpga
+ * lwhps2fpga
+
+Allows enabling/disabling the bridges through the FPGA
+Bridge Framework API functions.
+
+The fpga2sdram driver only supports enabling and disabling
+of the ports that been configured early on.  This is due to
+a hardware limitation where the read, write, and command
+ports on the fpga2sdram bridge can only be reconfigured
+while there are no transactions to the sdram, i.e. when
+running out of OCRAM before the kernel boots.
+
+Device tree property 'init-val' configures the driver to
+enable or disable the bridge during probe.  If the property
+does not exist, the driver will leave the bridge in its
+current state.
 
 Signed-off-by: Alan Tull <atull@opensource.altera.com>
-Signed-off-by: Matthew Gerlach <mgerlach@opensource.altera.com>
+Signed-off-by: Matthew Gerlach <mgerlach@altera.com>
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
-v19: added in v19 of patchset as it needs for fpga info struct
+v2:  Use resets instead of directly writing reset registers
+v12: Bump version to align with simple-fpga-bus version
+     Get rid of the sysfs interface
+     fpga2sdram: get configuration stored in handoff register
+v13: Remove unneeded WARN_ON
+     Change property from init-val to bridge-enable
+     Checkpatch cleanup
+     Fix email address
+v14: use module_platform_driver
+     remove unused struct field and some #defines
+     don't really need exclamation points on error msgs
+     *const* struct fpga_bridge_ops
+v15: No change in this patch for v15 of this patch set
+v16: No change in this patch for v16 of this patch set
+v17: No change to this patch for v17 of this patch set
+v18: Eliminate need to specify reset names since only one reset
+v19: Set bridge state before registering driver with framework
+     Include fix for drivers sharing the l3_remap_value reg
+     use devm_clk_get
+     make tristate in Kconfig
+     documentation of handoff registers
 ---
- drivers/fpga/Kconfig                |   9 ++
- drivers/fpga/Makefile               |   1 +
- drivers/fpga/altera-freeze-bridge.c | 273 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 283 insertions(+)
- create mode 100644 drivers/fpga/altera-freeze-bridge.c
+ drivers/fpga/Kconfig             |   7 ++
+ drivers/fpga/Makefile            |   1 +
+ drivers/fpga/altera-fpga2sdram.c | 180 +++++++++++++++++++++++++++++++
+ drivers/fpga/altera-hps2fpga.c   | 221 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 409 insertions(+)
+ create mode 100644 drivers/fpga/altera-fpga2sdram.c
+ create mode 100644 drivers/fpga/altera-hps2fpga.c
 
 diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-index 55d97d2..0d1887f 100644
+index 1a3a38a..55d97d2 100644
 --- a/drivers/fpga/Kconfig
 +++ b/drivers/fpga/Kconfig
-@@ -46,6 +46,15 @@ config SOCFPGA_FPGA_BRIDGE
- 	  Say Y to enable drivers for FPGA bridges for Altera SOCFPGA
- 	  devices.
+@@ -39,6 +39,13 @@ config FPGA_BRIDGE
+ 	  Say Y here if you want to support bridges connected between host
+ 	  processors and FPGAs or between FPGAs.
  
-+config ALTERA_FREEZE_BRIDGE
-+	tristate "Altera FPGA Freeze Bridge"
++config SOCFPGA_FPGA_BRIDGE
++	tristate "Altera SoCFPGA FPGA Bridges"
 +	depends on ARCH_SOCFPGA && FPGA_BRIDGE
 +	help
-+	  Say Y to enable drivers for Altera FPGA Freeze bridges.  A
-+	  freeze bridge is a bridge that exists in the FPGA fabric to
-+	  isolate one region of the FPGA from the busses while that
-+	  region is being reprogrammed.
++	  Say Y to enable drivers for FPGA bridges for Altera SOCFPGA
++	  devices.
 +
  endif # FPGA
  
  endmenu
 diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-index e658436..a6f874d 100644
+index 8d746c3..e658436 100644
 --- a/drivers/fpga/Makefile
 +++ b/drivers/fpga/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
+@@ -11,6 +11,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
+ 
  # FPGA Bridge Drivers
  obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
- obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)	+= altera-hps2fpga.o altera-fpga2sdram.o
-+obj-$(CONFIG_ALTERA_FREEZE_BRIDGE)	+= altera-freeze-bridge.o
++obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)	+= altera-hps2fpga.o altera-fpga2sdram.o
  
  # High Level Interfaces
  obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
-diff --git a/drivers/fpga/altera-freeze-bridge.c b/drivers/fpga/altera-freeze-bridge.c
+diff --git a/drivers/fpga/altera-fpga2sdram.c b/drivers/fpga/altera-fpga2sdram.c
 new file mode 100644
-index 0000000..8dcd9fb
+index 0000000..7ab358e
 --- /dev/null
-+++ b/drivers/fpga/altera-freeze-bridge.c
-@@ -0,0 +1,273 @@
++++ b/drivers/fpga/altera-fpga2sdram.c
+@@ -0,0 +1,180 @@
 +/*
-+ * FPGA Freeze Bridge Controller
++ * FPGA to SDRAM Bridge Driver for Altera SoCFPGA Devices
 + *
-+ *  Copyright (C) 2016 Altera Corporation. All rights reserved.
++ *  Copyright (C) 2013-2016 Altera Corporation, All Rights Reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms and conditions of the GNU General Public License,
@@ -78,215 +115,100 @@ index 0000000..8dcd9fb
 + * You should have received a copy of the GNU General Public License along with
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/of_device.h>
-+#include <linux/module.h>
++
++/*
++ * This driver manages a bridge between an FPGA and the SDRAM used by the ARM
++ * host processor system (HPS).
++ *
++ * The bridge contains 4 read ports, 4 write ports, and 6 command ports.
++ * Reconfiguring these ports requires that no SDRAM transactions occur during
++ * reconfiguration.  The code reconfiguring the ports cannot run out of SDRAM
++ * nor can the FPGA access the SDRAM during reconfiguration.  This driver does
++ * not support reconfiguring the ports.  The ports are configured by code
++ * running out of on chip ram before Linux is started and the configuration
++ * is passed in a handoff register in the system manager.
++ *
++ * This driver supports enabling and disabling of the configured ports, which
++ * allows for safe reprogramming of the FPGA, assuming that the new FPGA image
++ * uses the same port configuration.  Bridges must be disabled before
++ * reprogramming the FPGA and re-enabled after the FPGA has been programmed.
++ */
++
 +#include <linux/fpga/fpga-bridge.h>
++#include <linux/kernel.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/regmap.h>
 +
-+#define FREEZE_CSR_STATUS_OFFSET		0
-+#define FREEZE_CSR_CTRL_OFFSET			4
-+#define FREEZE_CSR_ILLEGAL_REQ_OFFSET		8
-+#define FREEZE_CSR_REG_VERSION			12
++#define ALT_SDR_CTL_FPGAPORTRST_OFST		0x80
++#define ALT_SDR_CTL_FPGAPORTRST_PORTRSTN_MSK	0x00003fff
++#define ALT_SDR_CTL_FPGAPORTRST_RD_SHIFT	0
++#define ALT_SDR_CTL_FPGAPORTRST_WR_SHIFT	4
++#define ALT_SDR_CTL_FPGAPORTRST_CTRL_SHIFT	8
 +
-+#define FREEZE_CSR_SUPPORTED_VERSION		2
++/*
++ * From the Cyclone V HPS Memory Map document:
++ *   These registers are used to store handoff information between the
++ *   preloader and the OS. These 8 registers can be used to store any
++ *   information. The contents of these registers have no impact on
++ *   the state of the HPS hardware.
++ */
++#define SYSMGR_ISWGRP_HANDOFF3          (0x8C)
 +
-+#define FREEZE_CSR_STATUS_FREEZE_REQ_DONE	BIT(0)
-+#define FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE	BIT(1)
++#define F2S_BRIDGE_NAME "fpga2sdram"
 +
-+#define FREEZE_CSR_CTRL_FREEZE_REQ		BIT(0)
-+#define FREEZE_CSR_CTRL_RESET_REQ		BIT(1)
-+#define FREEZE_CSR_CTRL_UNFREEZE_REQ		BIT(2)
-+
-+#define FREEZE_BRIDGE_NAME			"freeze"
-+
-+struct altera_freeze_br_data {
++struct alt_fpga2sdram_data {
 +	struct device *dev;
-+	void __iomem *base_addr;
-+	bool enable;
++	struct regmap *sdrctl;
++	int mask;
 +};
 +
-+/*
-+ * Poll status until status bit is set or we have a timeout.
-+ */
-+static int altera_freeze_br_req_ack(struct altera_freeze_br_data *priv,
-+				    u32 timeout, u32 req_ack)
++static int alt_fpga2sdram_enable_show(struct fpga_bridge *bridge)
 +{
-+	struct device *dev = priv->dev;
-+	void __iomem *csr_illegal_req_addr = priv->base_addr +
-+					     FREEZE_CSR_ILLEGAL_REQ_OFFSET;
-+	u32 status, illegal, ctrl;
-+	int ret = -ETIMEDOUT;
++	struct alt_fpga2sdram_data *priv = bridge->priv;
++	int value;
 +
-+	do {
-+		illegal = readl(csr_illegal_req_addr);
-+		if (illegal) {
-+			dev_err(dev, "illegal request detected 0x%x", illegal);
++	regmap_read(priv->sdrctl, ALT_SDR_CTL_FPGAPORTRST_OFST, &value);
 +
-+			writel(1, csr_illegal_req_addr);
-+
-+			illegal = readl(csr_illegal_req_addr);
-+			if (illegal)
-+				dev_err(dev, "illegal request not cleared 0x%x",
-+					illegal);
-+
-+			ret = -EINVAL;
-+			break;
-+		}
-+
-+		status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
-+		dev_dbg(dev, "%s %x %x\n", __func__, status, req_ack);
-+		status &= req_ack;
-+		if (status) {
-+			ctrl = readl(priv->base_addr + FREEZE_CSR_CTRL_OFFSET);
-+			dev_dbg(dev, "%s request %x acknowledged %x %x\n",
-+				__func__, req_ack, status, ctrl);
-+			ret = 0;
-+			break;
-+		}
-+
-+		udelay(1);
-+	} while (timeout--);
-+
-+	if (ret == -ETIMEDOUT)
-+		dev_err(dev, "%s timeout waiting for 0x%x\n",
-+			__func__, req_ack);
-+
-+	return ret;
++	return (value & priv->mask) == priv->mask;
 +}
 +
-+static int altera_freeze_br_do_freeze(struct altera_freeze_br_data *priv,
-+				      u32 timeout)
++static inline int _alt_fpga2sdram_enable_set(struct alt_fpga2sdram_data *priv,
++					     bool enable)
 +{
-+	struct device *dev = priv->dev;
-+	void __iomem *csr_ctrl_addr = priv->base_addr +
-+				      FREEZE_CSR_CTRL_OFFSET;
-+	u32 status;
-+	int ret;
-+
-+	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
-+
-+	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
-+
-+	if (status & FREEZE_CSR_STATUS_FREEZE_REQ_DONE) {
-+		dev_dbg(dev, "%s bridge already disabled %d\n",
-+			__func__, status);
-+		return 0;
-+	} else if (!(status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE)) {
-+		dev_err(dev, "%s bridge not enabled %d\n", __func__, status);
-+		return -EINVAL;
-+	}
-+
-+	writel(FREEZE_CSR_CTRL_FREEZE_REQ, csr_ctrl_addr);
-+
-+	ret = altera_freeze_br_req_ack(priv, timeout,
-+				       FREEZE_CSR_STATUS_FREEZE_REQ_DONE);
-+
-+	if (ret)
-+		writel(0, csr_ctrl_addr);
-+	else
-+		writel(FREEZE_CSR_CTRL_RESET_REQ, csr_ctrl_addr);
-+
-+	return ret;
++	return regmap_update_bits(priv->sdrctl, ALT_SDR_CTL_FPGAPORTRST_OFST,
++				  priv->mask, enable ? priv->mask : 0);
 +}
 +
-+static int altera_freeze_br_do_unfreeze(struct altera_freeze_br_data *priv,
-+					u32 timeout)
++static int alt_fpga2sdram_enable_set(struct fpga_bridge *bridge, bool enable)
 +{
-+	struct device *dev = priv->dev;
-+	void __iomem *csr_ctrl_addr = priv->base_addr +
-+				      FREEZE_CSR_CTRL_OFFSET;
-+	u32 status;
-+	int ret;
-+
-+	writel(0, csr_ctrl_addr);
-+
-+	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
-+
-+	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
-+
-+	if (status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE) {
-+		dev_dbg(dev, "%s bridge already enabled %d\n",
-+			__func__, status);
-+		return 0;
-+	} else if (!(status & FREEZE_CSR_STATUS_FREEZE_REQ_DONE)) {
-+		dev_err(dev, "%s bridge not frozen %d\n", __func__, status);
-+		return -EINVAL;
-+	}
-+
-+	writel(FREEZE_CSR_CTRL_UNFREEZE_REQ, csr_ctrl_addr);
-+
-+	ret = altera_freeze_br_req_ack(priv, timeout,
-+				       FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE);
-+
-+	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
-+
-+	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
-+
-+	writel(0, csr_ctrl_addr);
-+
-+	return ret;
++	return _alt_fpga2sdram_enable_set(bridge->priv, enable);
 +}
 +
-+/*
-+ * enable = 1 : allow traffic through the bridge
-+ * enable = 0 : disable traffic through the bridge
-+ */
-+static int altera_freeze_br_enable_set(struct fpga_bridge *bridge,
-+				       bool enable)
-+{
-+	struct altera_freeze_br_data *priv = bridge->priv;
-+	struct fpga_image_info *info = bridge->info;
-+	u32 timeout = 0;
-+	int ret;
-+
-+	if (enable) {
-+		if (info)
-+			timeout = info->enable_timeout_us;
-+
-+		ret = altera_freeze_br_do_unfreeze(bridge->priv, timeout);
-+	} else {
-+		if (info)
-+			timeout = info->disable_timeout_us;
-+
-+		ret = altera_freeze_br_do_freeze(bridge->priv, timeout);
-+	}
-+
-+	if (!ret)
-+		priv->enable = enable;
-+
-+	return ret;
-+}
-+
-+static int altera_freeze_br_enable_show(struct fpga_bridge *bridge)
-+{
-+	struct altera_freeze_br_data *priv = bridge->priv;
-+
-+	return priv->enable;
-+}
-+
-+static struct fpga_bridge_ops altera_freeze_br_br_ops = {
-+	.enable_set = altera_freeze_br_enable_set,
-+	.enable_show = altera_freeze_br_enable_show,
++struct prop_map {
++	char *prop_name;
++	u32 *prop_value;
++	u32 prop_max;
 +};
 +
-+static const struct of_device_id altera_freeze_br_of_match[] = {
-+	{ .compatible = "altr,freeze-bridge-controller", },
++static const struct fpga_bridge_ops altera_fpga2sdram_br_ops = {
++	.enable_set = alt_fpga2sdram_enable_set,
++	.enable_show = alt_fpga2sdram_enable_show,
++};
++
++static const struct of_device_id altera_fpga_of_match[] = {
++	{ .compatible = "altr,socfpga-fpga2sdram-bridge" },
 +	{},
 +};
-+MODULE_DEVICE_TABLE(of, altera_freeze_br_of_match);
 +
-+static int altera_freeze_br_probe(struct platform_device *pdev)
++static int alt_fpga_bridge_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct altera_freeze_br_data *priv;
-+	struct resource *res;
-+	u32 status, revision;
-+
-+	if (!np)
-+		return -ENODEV;
++	struct alt_fpga2sdram_data *priv;
++	u32 enable;
++	struct regmap *sysmgr;
++	int ret = 0;
 +
 +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 +	if (!priv)
@@ -294,44 +216,293 @@ index 0000000..8dcd9fb
 +
 +	priv->dev = dev;
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->base_addr = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(priv->base_addr))
-+		return PTR_ERR(priv->base_addr);
++	priv->sdrctl = syscon_regmap_lookup_by_compatible("altr,sdr-ctl");
++	if (IS_ERR(priv->sdrctl)) {
++		dev_err(dev, "regmap for altr,sdr-ctl lookup failed.\n");
++		return PTR_ERR(priv->sdrctl);
++	}
 +
-+	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
-+	if (status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE)
-+		priv->enable = 1;
++	sysmgr = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
++	if (IS_ERR(priv->sdrctl)) {
++		dev_err(dev, "regmap for altr,sys-mgr lookup failed.\n");
++		return PTR_ERR(sysmgr);
++	}
 +
-+	revision = readl(priv->base_addr + FREEZE_CSR_REG_VERSION);
-+	if (revision != FREEZE_CSR_SUPPORTED_VERSION)
-+		dev_warn(dev,
-+			 "%s Freeze Controller unexpected revision %d != %d\n",
-+			 __func__, revision, FREEZE_CSR_SUPPORTED_VERSION);
++	/* Get f2s bridge configuration saved in handoff register */
++	regmap_read(sysmgr, SYSMGR_ISWGRP_HANDOFF3, &priv->mask);
 +
-+	return fpga_bridge_register(dev, FREEZE_BRIDGE_NAME,
-+				    &altera_freeze_br_br_ops, priv);
++	ret = fpga_bridge_register(dev, F2S_BRIDGE_NAME,
++				   &altera_fpga2sdram_br_ops, priv);
++	if (ret)
++		return ret;
++
++	dev_info(dev, "driver initialized with handoff %08x\n", priv->mask);
++
++	if (!of_property_read_u32(dev->of_node, "bridge-enable", &enable)) {
++		if (enable > 1) {
++			dev_warn(dev, "invalid bridge-enable %u > 1\n", enable);
++		} else {
++			dev_info(dev, "%s bridge\n",
++				 (enable ? "enabling" : "disabling"));
++			ret = _alt_fpga2sdram_enable_set(priv, enable);
++			if (ret) {
++				fpga_bridge_unregister(&pdev->dev);
++				return ret;
++			}
++		}
++	}
++
++	return ret;
 +}
 +
-+static int altera_freeze_br_remove(struct platform_device *pdev)
++static int alt_fpga_bridge_remove(struct platform_device *pdev)
 +{
 +	fpga_bridge_unregister(&pdev->dev);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver altera_freeze_br_driver = {
-+	.probe = altera_freeze_br_probe,
-+	.remove = altera_freeze_br_remove,
++MODULE_DEVICE_TABLE(of, altera_fpga_of_match);
++
++static struct platform_driver altera_fpga_driver = {
++	.probe = alt_fpga_bridge_probe,
++	.remove = alt_fpga_bridge_remove,
 +	.driver = {
-+		.name	= "altera_freeze_br",
-+		.of_match_table = of_match_ptr(altera_freeze_br_of_match),
++		.name	= "altera_fpga2sdram_bridge",
++		.of_match_table = of_match_ptr(altera_fpga_of_match),
 +	},
 +};
 +
-+module_platform_driver(altera_freeze_br_driver);
++module_platform_driver(altera_fpga_driver);
 +
-+MODULE_DESCRIPTION("Altera Freeze Bridge");
++MODULE_DESCRIPTION("Altera SoCFPGA FPGA to SDRAM Bridge");
++MODULE_AUTHOR("Alan Tull <atull@opensource.altera.com>");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/fpga/altera-hps2fpga.c b/drivers/fpga/altera-hps2fpga.c
+new file mode 100644
+index 0000000..63ff0e3
+--- /dev/null
++++ b/drivers/fpga/altera-hps2fpga.c
+@@ -0,0 +1,221 @@
++/*
++ * FPGA to/from HPS Bridge Driver for Altera SoCFPGA Devices
++ *
++ *  Copyright (C) 2013-2016 Altera Corporation, All Rights Reserved.
++ *
++ * Includes this patch from the mailing list:
++ *   fpga: altera-hps2fpga: fix HPS2FPGA bridge visibility to L3 masters
++ *   Signed-off-by: Anatolij Gustschin <agust@denx.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * This driver manages bridges on a Altera SOCFPGA between the ARM host
++ * processor system (HPS) and the embedded FPGA.
++ *
++ * This driver supports enabling and disabling of the configured ports, which
++ * allows for safe reprogramming of the FPGA, assuming that the new FPGA image
++ * uses the same port configuration.  Bridges must be disabled before
++ * reprogramming the FPGA and re-enabled after the FPGA has been programmed.
++ */
++
++#include <linux/clk.h>
++#include <linux/fpga/fpga-bridge.h>
++#include <linux/kernel.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/regmap.h>
++#include <linux/reset.h>
++#include <linux/spinlock.h>
++
++#define ALT_L3_REMAP_OFST			0x0
++#define ALT_L3_REMAP_MPUZERO_MSK		0x00000001
++#define ALT_L3_REMAP_H2F_MSK			0x00000008
++#define ALT_L3_REMAP_LWH2F_MSK			0x00000010
++
++#define HPS2FPGA_BRIDGE_NAME			"hps2fpga"
++#define LWHPS2FPGA_BRIDGE_NAME			"lwhps2fpga"
++#define FPGA2HPS_BRIDGE_NAME			"fpga2hps"
++
++struct altera_hps2fpga_data {
++	const char *name;
++	struct reset_control *bridge_reset;
++	struct regmap *l3reg;
++	unsigned int remap_mask;
++	struct clk *clk;
++};
++
++static int alt_hps2fpga_enable_show(struct fpga_bridge *bridge)
++{
++	struct altera_hps2fpga_data *priv = bridge->priv;
++
++	return reset_control_status(priv->bridge_reset);
++}
++
++/* The L3 REMAP register is write only, so keep a cached value. */
++static unsigned int l3_remap_shadow;
++static spinlock_t l3_remap_lock;
++
++static int _alt_hps2fpga_enable_set(struct altera_hps2fpga_data *priv,
++				    bool enable)
++{
++	unsigned long flags;
++	int ret;
++
++	/* bring bridge out of reset */
++	if (enable)
++		ret = reset_control_deassert(priv->bridge_reset);
++	else
++		ret = reset_control_assert(priv->bridge_reset);
++	if (ret)
++		return ret;
++
++	/* Allow bridge to be visible to L3 masters or not */
++	if (priv->remap_mask) {
++		spin_lock_irqsave(&l3_remap_lock, flags);
++		l3_remap_shadow |= ALT_L3_REMAP_MPUZERO_MSK;
++
++		if (enable)
++			l3_remap_shadow |= priv->remap_mask;
++		else
++			l3_remap_shadow &= ~priv->remap_mask;
++
++		ret = regmap_write(priv->l3reg, ALT_L3_REMAP_OFST,
++				   l3_remap_shadow);
++		spin_unlock_irqrestore(&l3_remap_lock, flags);
++	}
++
++	return ret;
++}
++
++static int alt_hps2fpga_enable_set(struct fpga_bridge *bridge, bool enable)
++{
++	return _alt_hps2fpga_enable_set(bridge->priv, enable);
++}
++
++static const struct fpga_bridge_ops altera_hps2fpga_br_ops = {
++	.enable_set = alt_hps2fpga_enable_set,
++	.enable_show = alt_hps2fpga_enable_show,
++};
++
++static struct altera_hps2fpga_data hps2fpga_data  = {
++	.name = HPS2FPGA_BRIDGE_NAME,
++	.remap_mask = ALT_L3_REMAP_H2F_MSK,
++};
++
++static struct altera_hps2fpga_data lwhps2fpga_data  = {
++	.name = LWHPS2FPGA_BRIDGE_NAME,
++	.remap_mask = ALT_L3_REMAP_LWH2F_MSK,
++};
++
++static struct altera_hps2fpga_data fpga2hps_data  = {
++	.name = FPGA2HPS_BRIDGE_NAME,
++};
++
++static const struct of_device_id altera_fpga_of_match[] = {
++	{ .compatible = "altr,socfpga-hps2fpga-bridge",
++	  .data = &hps2fpga_data },
++	{ .compatible = "altr,socfpga-lwhps2fpga-bridge",
++	  .data = &lwhps2fpga_data },
++	{ .compatible = "altr,socfpga-fpga2hps-bridge",
++	  .data = &fpga2hps_data },
++	{},
++};
++
++static int alt_fpga_bridge_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct altera_hps2fpga_data *priv;
++	const struct of_device_id *of_id;
++	u32 enable;
++	int ret;
++
++	of_id = of_match_device(altera_fpga_of_match, dev);
++	priv = (struct altera_hps2fpga_data *)of_id->data;
++
++	priv->bridge_reset = of_reset_control_get_by_index(dev->of_node, 0);
++	if (IS_ERR(priv->bridge_reset)) {
++		dev_err(dev, "Could not get %s reset control\n", priv->name);
++		return PTR_ERR(priv->bridge_reset);
++	}
++
++	priv->l3reg = syscon_regmap_lookup_by_compatible("altr,l3regs");
++	if (IS_ERR(priv->l3reg)) {
++		dev_err(dev, "regmap for altr,l3regs lookup failed\n");
++		return PTR_ERR(priv->l3reg);
++	}
++
++	priv->clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(priv->clk)) {
++		dev_err(dev, "no clock specified\n");
++		return PTR_ERR(priv->clk);
++	}
++
++	ret = clk_prepare_enable(priv->clk);
++	if (ret) {
++		dev_err(dev, "could not enable clock\n");
++		return -EBUSY;
++	}
++
++	spin_lock_init(&l3_remap_lock);
++
++	if (!of_property_read_u32(dev->of_node, "bridge-enable", &enable)) {
++		if (enable > 1) {
++			dev_warn(dev, "invalid bridge-enable %u > 1\n", enable);
++		} else {
++			dev_info(dev, "%s bridge\n",
++				 (enable ? "enabling" : "disabling"));
++
++			ret = _alt_hps2fpga_enable_set(priv, enable);
++			if (ret) {
++				fpga_bridge_unregister(&pdev->dev);
++				return ret;
++			}
++		}
++	}
++
++	return fpga_bridge_register(dev, priv->name, &altera_hps2fpga_br_ops,
++				    priv);
++}
++
++static int alt_fpga_bridge_remove(struct platform_device *pdev)
++{
++	struct fpga_bridge *bridge = platform_get_drvdata(pdev);
++	struct altera_hps2fpga_data *priv = bridge->priv;
++
++	fpga_bridge_unregister(&pdev->dev);
++
++	clk_disable_unprepare(priv->clk);
++	clk_put(priv->clk);
++
++	return 0;
++}
++
++MODULE_DEVICE_TABLE(of, altera_fpga_of_match);
++
++static struct platform_driver alt_fpga_bridge_driver = {
++	.probe = alt_fpga_bridge_probe,
++	.remove = alt_fpga_bridge_remove,
++	.driver = {
++		.name	= "altera_hps2fpga_bridge",
++		.of_match_table = of_match_ptr(altera_fpga_of_match),
++	},
++};
++
++module_platform_driver(alt_fpga_bridge_driver);
++
++MODULE_DESCRIPTION("Altera SoCFPGA HPS to FPGA Bridge");
 +MODULE_AUTHOR("Alan Tull <atull@opensource.altera.com>");
 +MODULE_LICENSE("GPL v2");
 -- 
