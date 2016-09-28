@@ -1,49 +1,23 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 28 Sep 2016 17:47:35 +0200
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 28 Sep 2016 17:52:25 +0200
 Subject: [PATCH] MAINTAINERS: update entry for atmel_serial driver
-Message-ID: <20160928154735.25265-1-nicolas.ferre@atmel.com>
+In-Reply-To: <20160928154735.25265-1-nicolas.ferre@atmel.com>
+References: <20160928154735.25265-1-nicolas.ferre@atmel.com>
+Message-ID: <20160928155225.GA18790@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change maintainer for the serial driver found on most of the
-Microchip / Atmel MPUs and take advantage of the move to rename
-and reorder the entry.
-I'm happy that Richard is taking over the maintenance of this
-driver.
+On Wed, Sep 28, 2016 at 05:47:35PM +0200, Nicolas Ferre wrote:
+> Change maintainer for the serial driver found on most of the
+> Microchip / Atmel MPUs and take advantage of the move to rename
+> and reorder the entry.
+> I'm happy that Richard is taking over the maintenance of this
+> driver.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- MAINTAINERS | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+Can I get an ack from Richard that he agrees with this?
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e39dacd77c0e..06c17717a004 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2140,11 +2140,6 @@ M:	Ludovic Desroches <ludovic.desroches@atmel.com>
- S:	Maintained
- F:	drivers/mmc/host/atmel-mci.c
- 
--ATMEL AT91 / AT32 SERIAL DRIVER
--M:	Nicolas Ferre <nicolas.ferre@atmel.com>
--S:	Supported
--F:	drivers/tty/serial/atmel_serial.c
--
- ATMEL AT91 SAMA5D2-Compatible Shutdown Controller
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- S:	Supported
-@@ -7930,6 +7925,12 @@ T:	git git://git.monstr.eu/linux-2.6-microblaze.git
- S:	Supported
- F:	arch/microblaze/
- 
-+MICROCHIP / ATMEL AT91 / AT32 SERIAL DRIVER
-+M:	Richard Genoud <richard.genoud@gmail.com>
-+S:	Maintained
-+F:	drivers/tty/serial/atmel_serial.c
-+F:	include/linux/atmel_serial.h
-+
- MICROCHIP / ATMEL ISC DRIVER
- M:	Songjun Wu <songjun.wu@microchip.com>
- L:	linux-media at vger.kernel.org
--- 
-2.9.0
+thanks,
+
+greg k-h
