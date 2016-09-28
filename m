@@ -1,112 +1,119 @@
-From: vikas.cha.sajjan@hpe.com (Sajjan, Vikas C)
-Date: Wed, 28 Sep 2016 03:33:32 +0000
-Subject: ARM juno R2 board USB Issue (EHCI probe failed)
-In-Reply-To: <9b231601-2c6a-a5d7-471f-4fc0d8190d83@arm.com>
-References: <AT5PR84MB005284C92DEA45ADF67A4F55D9CC0@AT5PR84MB0052.NAMPRD84.PROD.OUTLOOK.COM>
- <CAGm_ybhc4DKYkDtE8dVzhC3-kJk138Lbm-zAhepQiyUnuqZQHg@mail.gmail.com>
- <22e151c5-fc83-a48c-b130-f633fac8674f@arm.com>
- <AT5PR84MB00524ACD87B9FF61AAB55223D9CC0@AT5PR84MB0052.NAMPRD84.PROD.OUTLOOK.COM>
- <37a463cb-86d5-e0d7-7e8f-50cec3d65c95@arm.com> <57EA9AAA.5090504@linaro.org>
- <9b231601-2c6a-a5d7-471f-4fc0d8190d83@arm.com>
-Message-ID: <AT5PR84MB0052DB498EA586C6943044F3D9CF0@AT5PR84MB0052.NAMPRD84.PROD.OUTLOOK.COM>
+From: qiang.zhao@nxp.com (Zhao Qiang)
+Date: Wed, 28 Sep 2016 11:40:36 +0800
+Subject: [PATCH 1/3] ls1043ardb: add qe node to ls1043ardb
+Message-ID: <1475034038-7217-1-git-send-email-qiang.zhao@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Signed-off-by: Zhao Qiang <qiang.zhao@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 16 ++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi    | 66 +++++++++++++++++++++++
+ 2 files changed, 82 insertions(+)
 
------Original Message-----
-From: Robin Murphy [mailto:robin.murphy at arm.com] 
-Sent: Tuesday, September 27, 2016 9:53 PM
-To: Hanjun Guo <hanjun.guo@linaro.org>; Sudeep Holla <sudeep.holla@arm.com>; Sajjan, Vikas C <vikas.cha.sajjan@hpe.com>; Vikas Sajjan <sajjan.linux@gmail.com>; linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-acpi at vger.kernel.org
-Cc: mark.rutland at arm.com; lorenzo.pieralisi at arm.com
-Subject: Re: ARM juno R2 board USB Issue (EHCI probe failed)
-
-On 27/09/16 17:13, Hanjun Guo wrote:
-> On 09/27/2016 05:07 PM, Sudeep Holla wrote:
->>
->>
->> On 27/09/16 09:55, Sajjan, Vikas C wrote:
->>> Hi Sudeep,
->>>
->>> -----Original Message-----
->>> From: Sudeep Holla [mailto:sudeep.holla at arm.com]
->>> Sent: Tuesday, September 27, 2016 2:21 PM
->>> To: Vikas Sajjan <sajjan.linux@gmail.com>; 
->>> linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org; 
->>> linux-acpi at vger.kernel.org
->>> Cc: Sudeep Holla <sudeep.holla@arm.com>; mark.rutland at arm.com; 
->>> lorenzo.pieralisi at arm.com; Sajjan, Vikas C 
->>> <vikas.cha.sajjan@hpe.com>
->>> Subject: Re: ARM juno R2 board USB Issue (EHCI probe failed)
->>>
->>> Hi Vikas,
->>>
->>> On 27/09/16 09:14, Vikas Sajjan wrote:
->>>> Adding USB mailing list.
->>>>
->>>>
->>>> On Tue, Sep 27, 2016 at 12:33 PM, Sajjan, Vikas C 
->>>> <vikas.cha.sajjan@hpe.com> wrote:
->>>>> Hi All,
->>>>>
->>>>> I working on ARM juno R2 board, with latest kernel 4.8.rc7 and I 
->>>>> get below USB EHCI probe error while booting with acpi=force.
->>>>>
->>>
->>> Are you using the latest UEFI EDK2 ?
->>> No, I am still using the UEFI binary which came as part of the Juno 
->>> board.
->>>
->>>
->>>>> [    1.223662] VFIO - User Level meta-driver version: 0.3
->>>>> [    1.229335] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI)
->>>>> Driver
->>>>> [    1.235882] ehci-pci: EHCI PCI platform driver
->>>>> [    1.240359] ehci-platform: EHCI generic platform driver
->>>>> [    1.245619] ehci-platform ARMH0D20:00: Error: DMA mask
->>>>> configuration failed
->>>>> [    1.272491] ehci-platform: probe of ARMH0D20:00 failed with
->>>>> error -5
->>>>> [    1.278876] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
->>>>> [    1.285071] ohci-pci: OHCI PCI platform driver
->>>>> [    1.289548] ohci-platform: OHCI generic platform driver
->>>>> [    1.294884] usbcore: registered new interface driver usb-storage
->>>>> [    1.301231] mousedev: PS/2 mouse device common for all mice
->>>>> [    1.307197] rtc-efi rtc-efi: rtc core: registered rtc-efi as rtc0
->>>>>
->>>>> But this error goes off, if I don't force ACPI booting, i.e., if I 
->>>>> remove acpi=force from kernel command line , USB is detected  and 
->>>>> my RFS which is in the usb drive, gets mounted successfully.
->>>>>
->>>
->>> As I mentioned in private, I do get the same error if I drop _CCA in 
->>> USB object of ACPI DSDT. Can you give it a spin with latest UEFI ?
->>>
->>> Sure, will try with latest UEFI.
->>>
->>
->> I bet that's 8-12 months old. It puts the banner during boot with the 
->> build date. You can try to follow [1] or access it from [2]
-> 
-> Agree.
-> 
-> D03 is using the same IP (EHCI) and the USB works fine with _CCA in 
-> the device node.
-
-_CCA is mandatory on arm64 (see CONFIG_ACPI_CCA_REQUIRED). Any devices without it are going to end up with the dummy DMA ops which intentionally fail if a driver tries to use them - i.e. the error seen above is by design.
-
-Thank you for the clarification.
-
-Thanks and Regards
-Vikas Sajjan
-
-Robin.
-
-> 
-> Thanks
-> Hanjun
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+index 4084631..4fc60e7 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+@@ -124,6 +124,22 @@
+ 	};
+ };
+ 
++&uqe {
++	ucc_hdlc: ucc at 2000 {
++		compatible = "fsl,ls1043-ucc-hdlc", "fsl,ucc-hdlc";
++		rx-clock-name = "clk8";
++		tx-clock-name = "clk9";
++		fsl,rx-sync-clock = "rsync_pin";
++		fsl,tx-sync-clock = "tsync_pin";
++		fsl,tx-timeslot-mask = <0xfffffffe>;
++		fsl,rx-timeslot-mask = <0xfffffffe>;
++		fsl,tdm-framer-type = "e1";
++		fsl,tdm-id = <0>;
++		fsl,siram-entry-id = <0>;
++		fsl,tdm-interface;
++	};
++};
++
+ &duart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index e669fbd..f6b6775 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -388,6 +388,72 @@
+ 			#interrupt-cells = <2>;
+ 		};
+ 
++		uqe: uqe at 2400000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			device_type = "qe";
++			compatible = "fsl,qe", "simple-bus";
++			ranges = <0x0 0x0 0x2400000 0x40000>;
++			reg = <0x0 0x2400000 0x0 0x480>;
++			brg-frequency = <100000000>;
++			bus-frequency = <200000000>;
++
++			fsl,qe-num-riscs = <1>;
++			fsl,qe-num-snums = <28>;
++
++			qeic: qeic at 80 {
++				compatible = "fsl,qe-ic";
++				reg = <0x80 0x80>;
++				#address-cells = <0>;
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				interrupts = <0 77 0x04 0 77 0x04>;
++			};
++
++			si1: si at 700 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,ls1043-qe-si",
++						"fsl,t1040-qe-si";
++				reg = <0x700 0x80>;
++			};
++
++			siram1: siram at 1000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "fsl,ls1043-qe-siram",
++						"fsl,t1040-qe-siram";
++				reg = <0x1000 0x800>;
++			};
++
++			ucc at 2000 {
++				cell-index = <1>;
++				reg = <0x2000 0x200>;
++				interrupts = <32>;
++				interrupt-parent = <&qeic>;
++			};
++
++			ucc at 2200 {
++				cell-index = <3>;
++				reg = <0x2200 0x200>;
++				interrupts = <34>;
++				interrupt-parent = <&qeic>;
++			};
++
++			muram at 10000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "fsl,qe-muram", "fsl,cpm-muram";
++				ranges = <0x0 0x10000 0x6000>;
++
++				data-only at 0 {
++					compatible = "fsl,qe-muram-data",
++					"fsl,cpm-muram-data";
++					reg = <0x0 0x6000>;
++				};
++			};
++		};
++
+ 		lpuart0: serial at 2950000 {
+ 			compatible = "fsl,ls1021a-lpuart";
+ 			reg = <0x0 0x2950000 0x0 0x1000>;
+-- 
+2.1.0.27.g96db324
