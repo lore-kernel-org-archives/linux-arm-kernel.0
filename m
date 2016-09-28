@@ -1,114 +1,108 @@
-From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Wed, 28 Sep 2016 19:50:51 +0200
-Subject: [PATCH v3 2/7] i2c: bcm2835: Protect against unexpected TXW/RXR
- interrupts
-In-Reply-To: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
-References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
-Message-ID: <1475085056-5205-3-git-send-email-noralf@tronnes.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 28 Sep 2016 11:54:46 -0600
+Subject: [PATCH 1/3] dt-bindings: Add a binding for the RPi firmware GPIO
+ driver.
+In-Reply-To: <1748463691.140438.2f32d916-fa80-4bce-8581-e02e1b204bda.open-xchange@email.1und1.de>
+References: <20160919161314.25858-1-eric@anholt.net>
+ <1903581972.81288.e9d48a65-997b-4986-a9d0-10632895df40.open-xchange@email.1und1.de>
+ <fa11c543-2ad3-b2ae-f816-62a1acd42911@wwwdotorg.org>
+ <1748463691.140438.2f32d916-fa80-4bce-8581-e02e1b204bda.open-xchange@email.1und1.de>
+Message-ID: <00930ed5-52ca-1635-e09b-fdc836edccac@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If an unexpected TXW or RXR interrupt occurs (msg_buf_remaining == 0),
-the driver has no way to fill/drain the FIFO to stop the interrupts.
-In this case the controller has to be disabled and the transfer
-completed to avoid hang.
+On 09/26/2016 12:42 PM, Stefan Wahren wrote:
+>
+>> Stephen Warren <swarren@wwwdotorg.org> hat am 26. September 2016 um 18:38
+>> geschrieben:
+>>
+>>
+>> On 09/23/2016 12:39 PM, Stefan Wahren wrote:
+>>> Hi Eric,
+>>>
+>>>> Eric Anholt <eric@anholt.net> hat am 19. September 2016 um 18:13
+>>>> geschrieben:
+>>>>
+>>>>
+>>>> The RPi firmware exposes all of the board's GPIO lines through
+>>>> property calls.  Linux chooses to control most lines directly through
+>>>> the pinctrl driver, but for the FXL6408 GPIO expander on the Pi3, we
+>>>> need to access them through the firmware.
+>>>>
+>>>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>>>> ---
+>>>>  .../bindings/gpio/gpio-raspberrypi-firmware.txt    | 22
+>>>> ++++++++++++++++++++++
+>>>>  1 file changed, 22 insertions(+)
+>>>>  create mode 100644
+>>>> Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
+>>>>
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
+>>>> b/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
+>>>> new file mode 100644
+>>>> index 000000000000..2b635c23a6f8
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-raspberrypi-firmware.txt
+>>>> @@ -0,0 +1,22 @@
+>>>> +Raspberry Pi power domain driver
+>>>> +
+>>>> +Required properties:
+>>>> +
+>>>> +- compatible:		Should be "raspberrypi,firmware-gpio"
+>>>
+>>> i think the compatible should be more specific like
+>>>
+>>> raspberrypi,rpi3-firmware-gpio
+>>>
+>>> and all information which aren't requestable from the firmware should be
+>>> stored
+>>> in a info structure. This makes the driver easier to extend in the future by
+>>> adding new compatibles and their info structures.
+>>
+>> Is this actually specific to the Pi3 at all?
+>
+> AFAIK only the Raspberry Pi 3 has a GPIO expander which is accessible via the
+> common FW. My suggestion tries to follow the basic guideline "A precise
+> compatible string is better than a vague one" from Device Tree for Dummies [1].
+> So in case the next Raspberry Pi would have a different GPIO expander with
+> different parameters we could add a new compatible.
+>
+> But you are right the word order in "rpi3-firmware-gpio" suggests that there are
+> different FW which is wrong. At the end it's only a compatible string. So no
+> strong opinion about the naming.
+>
+> [1] -
+> https://events.linuxfoundation.org/sites/events/files/slides/petazzoni-device-tree-dummies.pdf
 
-(CLKT | ERR) and DONE interrupts are completed in their own paths, and
-the controller is disabled in the transfer function after completion.
-Unite the code paths and do disabling inside the interrupt routine.
+To deal with that requirement, what you'd want is the following:
 
-Clear interrupt status bits in the united completion path instead of
-trying to do it on every interrupt which isn't necessary.
-Only CLKT, ERR and DONE can be cleared that way.
+RPi 1:
+"raspberrypi,firmware-gpio"
 
-Add the status value to the error value in case of TXW/RXR errors to
-distinguish them from the other S_LEN error.
+RPi 2:
+"raspberrypi,rpi2-firmware-gpio", "raspberrypi,firmware-gpio"
 
-Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
----
- drivers/i2c/busses/i2c-bcm2835.c | 31 ++++++++++++++++++++++---------
- 1 file changed, 22 insertions(+), 9 deletions(-)
+RPi 3:
+"raspberrypi,rpi3-firmware-gpio", "raspberrypi,firmware-gpio"
 
-diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index f283b71..df036ed 100644
---- a/drivers/i2c/busses/i2c-bcm2835.c
-+++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -50,8 +50,6 @@
- #define BCM2835_I2C_S_CLKT	BIT(9)
- #define BCM2835_I2C_S_LEN	BIT(10) /* Fake bit for SW error reporting */
- 
--#define BCM2835_I2C_BITMSK_S	0x03FF
--
- #define BCM2835_I2C_CDIV_MIN	0x0002
- #define BCM2835_I2C_CDIV_MAX	0xFFFE
- 
-@@ -117,14 +115,11 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
- 	u32 val, err;
- 
- 	val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
--	val &= BCM2835_I2C_BITMSK_S;
--	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, val);
- 
- 	err = val & (BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR);
- 	if (err) {
- 		i2c_dev->msg_err = err;
--		complete(&i2c_dev->completion);
--		return IRQ_HANDLED;
-+		goto complete;
- 	}
- 
- 	if (val & BCM2835_I2C_S_DONE) {
-@@ -137,21 +132,38 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
- 			i2c_dev->msg_err = BCM2835_I2C_S_LEN;
- 		else
- 			i2c_dev->msg_err = 0;
--		complete(&i2c_dev->completion);
--		return IRQ_HANDLED;
-+		goto complete;
- 	}
- 
- 	if (val & BCM2835_I2C_S_TXW) {
-+		if (!i2c_dev->msg_buf_remaining) {
-+			i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
-+			goto complete;
-+		}
-+
- 		bcm2835_fill_txfifo(i2c_dev);
- 		return IRQ_HANDLED;
- 	}
- 
- 	if (val & BCM2835_I2C_S_RXR) {
-+		if (!i2c_dev->msg_buf_remaining) {
-+			i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
-+			goto complete;
-+		}
-+
- 		bcm2835_drain_rxfifo(i2c_dev);
- 		return IRQ_HANDLED;
- 	}
- 
- 	return IRQ_NONE;
-+
-+complete:
-+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
-+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, BCM2835_I2C_S_CLKT |
-+			   BCM2835_I2C_S_ERR | BCM2835_I2C_S_DONE);
-+	complete(&i2c_dev->completion);
-+
-+	return IRQ_HANDLED;
- }
- 
- static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
-@@ -181,8 +193,9 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
- 
- 	time_left = wait_for_completion_timeout(&i2c_dev->completion,
- 						BCM2835_I2C_TIMEOUT);
--	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
- 	if (!time_left) {
-+		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C,
-+				   BCM2835_I2C_C_CLEAR);
- 		dev_err(i2c_dev->dev, "i2c transfer timed out\n");
- 		return -ETIMEDOUT;
- 	}
--- 
-2.8.2
+Compatible values should always list both the most specific value and 
+the baseline value that it's 100% backwards compatible with.
+
+However, I don't think this argument applies in this case. It isn't the 
+case that there's a separate Pi1 FW, Pi2 FW, Pi3 FW. Rather, there is a 
+single FW image that runs on all (currently existing) Pis. As such, I 
+believe that using solely "raspberrypi,firmware-gpio" is appropriate 
+everywhere, since the thing being described is always the exact same 
+thing with no variance.
+
+This contrasts with HW modules in the SoC, since the different Pis 
+really do have a different SoC, and hence potentially different HW 
+modules, so e.g. compatible = "brcm,bcm2837-i2c", "brcm,bcm2835-i2c" 
+could actually be useful.
+
+>> Isn't the FW the same
+>> across all Pis; the part that's specific to the Pi3 is whether it's
+>> useful to use that API?
+>>
+>> As such, I'd suggest just raspberrypi,firmware-gpio as the compatible value.
