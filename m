@@ -1,34 +1,48 @@
 From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Wed, 28 Sep 2016 19:50:49 +0200
-Subject: [PATCH v3 0/7] i2c: bcm2835: Bring in changes from downstream
-Message-ID: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+Date: Wed, 28 Sep 2016 19:50:53 +0200
+Subject: [PATCH v3 4/7] i2c: bcm2835: Can't support I2C_M_IGNORE_NAK
+In-Reply-To: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+Message-ID: <1475085056-5205-5-git-send-email-noralf@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset tries to bring in the lessons learned in the downstream
-driver i2c-bcm2708. The downstream clock stretcing timeout patch has
-been left out since clock stretching is broken/unreliable on this
-controller, so no point in setting it.
+The controller can't support this flag, so remove it.
 
-Changes since version 2:
-- use dev_dbg instead for transfer errors
-- drop i2c2 disabling patch, vc4 uses it.
+Documentation/i2c/i2c-protocol states that all of the message is sent:
 
+I2C_M_IGNORE_NAK:
+    Normally message is interrupted immediately if there is [NA] from the
+    client. Setting this flag treats any [NA] as [A], and all of
+    message is sent.
 
-Noralf.
+>From the BCM2835 ARM Peripherals datasheet:
 
+    The ERR field is set when the slave fails to acknowledge either
+    its address or a data byte written to it.
 
-Noralf Tr?nnes (7):
-  i2c: bcm2835: Fix hang for writing messages larger than 16 bytes
-  i2c: bcm2835: Protect against unexpected TXW/RXR interrupts
-  i2c: bcm2835: Use dev_dbg logging on transfer errors
-  i2c: bcm2835: Can't support I2C_M_IGNORE_NAK
-  i2c: bcm2835: Add support for Repeated Start Condition
-  i2c: bcm2835: Support i2c-dev ioctl I2C_TIMEOUT
-  i2c: bcm2835: Add support for dynamic clock
+So when the controller doesn't receive an ack, it sets ERR and raises
+an interrupt. In other words, the whole message is not sent.
 
- drivers/i2c/busses/i2c-bcm2835.c | 209 ++++++++++++++++++++++++---------------
- 1 file changed, 130 insertions(+), 79 deletions(-)
+Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
+---
+ drivers/i2c/busses/i2c-bcm2835.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
---
+diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
+index 8cdb139..99857f8 100644
+--- a/drivers/i2c/busses/i2c-bcm2835.c
++++ b/drivers/i2c/busses/i2c-bcm2835.c
+@@ -203,10 +203,6 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
+ 	if (likely(!i2c_dev->msg_err))
+ 		return 0;
+ 
+-	if ((i2c_dev->msg_err & BCM2835_I2C_S_ERR) &&
+-	    (msg->flags & I2C_M_IGNORE_NAK))
+-		return 0;
+-
+ 	dev_dbg(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
+ 
+ 	if (i2c_dev->msg_err & BCM2835_I2C_S_ERR)
+-- 
 2.8.2
