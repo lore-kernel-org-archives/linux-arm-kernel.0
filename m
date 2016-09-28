@@ -1,76 +1,95 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 28 Sep 2016 11:41:41 -0600
-Subject: Crash seen on ARM Juno r1 with 4.8-rc8 when Coresight is enabled
-In-Reply-To: <CAGhh56EPK0BYbjV_v7cehT+yuB=L3O-AkFR2mLQMDAS66zDgDg@mail.gmail.com>
-References: <CAGhh56EPK0BYbjV_v7cehT+yuB=L3O-AkFR2mLQMDAS66zDgDg@mail.gmail.com>
-Message-ID: <CANLsYkypz383Smuqv3B5K3i9mzGxMdc1OJdc_tWQZ5qHWQCeJw@mail.gmail.com>
+From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
+Date: Wed, 28 Sep 2016 19:50:50 +0200
+Subject: [PATCH v3 1/7] i2c: bcm2835: Fix hang for writing messages larger
+ than 16 bytes
+In-Reply-To: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+Message-ID: <1475085056-5205-2-git-send-email-noralf@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 September 2016 at 10:35, Venkatesh Vivekanandan
-<venkatesh.vivekanandan@broadcom.com> wrote:
-> Hi All,
->
-> I am trying to boot 4.8-rc8 in ARM Juno r1 board with coresight
-> enabled and could see crash. When coresight is disabled at kernel
-> config, then it boots to the linux prompt with rootfs in USB.
->
-> I am using UEFI binary that came along with Juno-r1 board.
->
-> Used following Image and dtb,
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
-> <------ git repo
-> arch/arm64/boot/Image   <------ Kernel image
-> arch/arm64/boot/dts/arm/juno-r1.dtb   <-------- dtb
->
-> Attached both kernel config and complete crash log.
->
-> Seen the same issue with arm64 repo also,
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git
->
-> [    4.513529] atkbd serio1: keyboard reset failed on 1c070000.kmi
-> [    5.479353] Unable to handle kernel NULL pointer dereference at
-> virtual address 00000000
-> [    5.487372] pgd = ffff000008db1000
-> [    5.490739] [00000000] *pgd=00000009ffffe003,
-> *pud=00000009ffffd003, *pmd=0000000000000000
-> [    5.498940] Internal error: Oops: 96000004 [#1] PREEMPT SMP
-> [    5.504451] Modules linked in:
-> [    5.507474] CPU: 0 PID: 449 Comm: kworker/0:1 Not tainted 4.8.0-rc8-dirty #1
-> [    5.514447] Hardware name: ARM Juno development board (r1) (DT)
-> [    5.520310] Workqueue: events amba_deferred_retry_func
-> [    5.525394] task: ffff800976bfd780 task.stack: ffff8009760bc000
-> [    5.531253] PC is at strcmp+0x1c/0x160
-> [    5.534962] LR is at coresight_orphan_match+0x78/0xc8
-> [    5.539957] pc : [<ffff00000835f14c>] lr : [<ffff00000870231c>]
-> pstate: 40000145
-> [    5.547272] sp : ffff8009760bfa00
-> [    5.550547] x29: ffff8009760bfa00 x28: ffff8009762c7f00
-> [    5.555807] x27: ffff000008d66e46 x26: 0000000000000000
-> [    5.561066] x25: 0000000000000001 x24: ffff000008702048
-> [    5.566325] x23: 0000000000000000 x22: ffff800973ce5000
-> [    5.571584] x21: ffff800973ce0800 x20: 0000000000000000
-> [    5.576843] x19: ffff800976b08600 x18: 0000000000000000
-> [    5.582101] x17: 0000000000000000 x16: ffff000008e52fff
-> [    5.587360] x15: ffff000008e52fff x14: ffffffffffffffff
-> [    5.592619] x13: ffff000008ca5000 x12: 0000000000000008
-> [    5.597878] x11: 0000000000000020 x10: 0101010101010101
-> [    5.603137] x9 : 0000000000000000 x8 : 7fff7f7f7f7f7f7f
-> [    5.608396] x7 : 0000000000000000 x6 : 000000008008cb22
-> [    5.613655] x5 : 22cb080000000000 x4 : ffff800973ce0828
-> [    5.618914] x3 : 0000000000000000 x2 : 3030303031303032
-> [    5.624173] x1 : 0000000000000000 x0 : ffff8009760f1d08
-> [    5.629432]
+Writing messages larger than the FIFO size results in a hang, rendering
+the machine unusable. This is because the RXD status flag is set on the
+first interrupt which results in bcm2835_drain_rxfifo() stealing bytes
+from the buffer. The controller continues to trigger interrupts waiting
+for the missing bytes, but bcm2835_fill_txfifo() has none to give.
+In this situation wait_for_completion_timeout() apparently is unable to
+stop the madness.
 
-Thanks you for reporting this Vankatesh,
+The BCM2835 ARM Peripherals datasheet has this to say about the flags:
+  TXD: is set when the FIFO has space for at least one byte of data.
+  RXD: is set when the FIFO contains at least one byte of data.
+  TXW: is set during a write transfer and the FIFO is less than full.
+  RXR: is set during a read transfer and the FIFO is or more full.
 
-Sudeep and Suzuki, can you guys help me with this - I don't have an R1
-to test with.
+Implementing the logic from the downstream i2c-bcm2708 driver solved
+the hang problem.
 
-Mathieu
+Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
+---
+ drivers/i2c/busses/i2c-bcm2835.c | 22 ++++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
 
->
->
-> Thanks,
-> Venkatesh.
+diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
+index d4f3239..f283b71 100644
+--- a/drivers/i2c/busses/i2c-bcm2835.c
++++ b/drivers/i2c/busses/i2c-bcm2835.c
+@@ -64,6 +64,7 @@ struct bcm2835_i2c_dev {
+ 	int irq;
+ 	struct i2c_adapter adapter;
+ 	struct completion completion;
++	struct i2c_msg *curr_msg;
+ 	u32 msg_err;
+ 	u8 *msg_buf;
+ 	size_t msg_buf_remaining;
+@@ -126,14 +127,13 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
+ 		return IRQ_HANDLED;
+ 	}
+ 
+-	if (val & BCM2835_I2C_S_RXD) {
+-		bcm2835_drain_rxfifo(i2c_dev);
+-		if (!(val & BCM2835_I2C_S_DONE))
+-			return IRQ_HANDLED;
+-	}
+-
+ 	if (val & BCM2835_I2C_S_DONE) {
+-		if (i2c_dev->msg_buf_remaining)
++		if (i2c_dev->curr_msg->flags & I2C_M_RD) {
++			bcm2835_drain_rxfifo(i2c_dev);
++			val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
++		}
++
++		if ((val & BCM2835_I2C_S_RXD) || i2c_dev->msg_buf_remaining)
+ 			i2c_dev->msg_err = BCM2835_I2C_S_LEN;
+ 		else
+ 			i2c_dev->msg_err = 0;
+@@ -141,11 +141,16 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
+ 		return IRQ_HANDLED;
+ 	}
+ 
+-	if (val & BCM2835_I2C_S_TXD) {
++	if (val & BCM2835_I2C_S_TXW) {
+ 		bcm2835_fill_txfifo(i2c_dev);
+ 		return IRQ_HANDLED;
+ 	}
+ 
++	if (val & BCM2835_I2C_S_RXR) {
++		bcm2835_drain_rxfifo(i2c_dev);
++		return IRQ_HANDLED;
++	}
++
+ 	return IRQ_NONE;
+ }
+ 
+@@ -155,6 +160,7 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
+ 	u32 c;
+ 	unsigned long time_left;
+ 
++	i2c_dev->curr_msg = msg;
+ 	i2c_dev->msg_buf = msg->buf;
+ 	i2c_dev->msg_buf_remaining = msg->len;
+ 	reinit_completion(&i2c_dev->completion);
+-- 
+2.8.2
