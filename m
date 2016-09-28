@@ -1,42 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Sep 2016 09:36:10 -0700
-Subject: [GIT PULL] immutable branch to move HTC EGPIO from MFD to GPIO
-Message-ID: <CACRpkdZBiQDpUuv9gsN2dhv0BBjPxpLC7Jz1R_zF7UjpHAXzeQ@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 28 Sep 2016 11:58:43 -0500
+Subject: [PATCH 2/3] [v2] net: qcom/emac: use device_get_mac_address
+In-Reply-To: <1475081924-12362-1-git-send-email-timur@codeaurora.org>
+References: <1475081924-12362-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1475081924-12362-3-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is an immutable branch for you Lee - may be of interest to ARM SoC
-or others touching arch/arm/mach-sa1100 or mach-pxa etc as well:
+Replace the DT-specific of_get_mac_address() function with
+device_get_mac_address, which works on both DT and ACPI platforms.  This
+change makes it easier to add ACPI support.
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/net/ethernet/qualcomm/emac/emac.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
-tags/ib-move-htc-egpio-mfd
-
-for you to fetch changes up to 3c6e8d05d60d8106b5cdc730cf220b2a4b521b66:
-
-  mfd/gpio: Move HTC GPIO driver to GPIO subsystem (2016-09-28 09:28:34 -0700)
-
-----------------------------------------------------------------
-Immutable branch to move the HTC EGPIO expande from MFD to GPIO
-
-----------------------------------------------------------------
-Linus Walleij (1):
-      mfd/gpio: Move HTC GPIO driver to GPIO subsystem
-
- arch/arm/mach-pxa/hx4700.c                                        | 2 +-
- arch/arm/mach-pxa/magician.c                                      | 2 +-
- arch/arm/mach-sa1100/h3xxx.c                                      | 2 +-
- drivers/gpio/Kconfig                                              | 8 ++++++++
- drivers/gpio/Makefile                                             | 1 +
- drivers/{mfd/htc-egpio.c => gpio/gpio-htc-egpio.c}                | 2 +-
- drivers/mfd/Kconfig                                               | 8 --------
- drivers/mfd/Makefile                                              | 1 -
- include/linux/{mfd/htc-egpio.h => platform_data/gpio-htc-egpio.h} | 0
- 9 files changed, 13 insertions(+), 13 deletions(-)
- rename drivers/{mfd/htc-egpio.c => gpio/gpio-htc-egpio.c} (99%)
- rename include/linux/{mfd/htc-egpio.h => platform_data/gpio-htc-egpio.h} (100%)
+diff --git a/drivers/net/ethernet/qualcomm/emac/emac.c b/drivers/net/ethernet/qualcomm/emac/emac.c
+index 429b4cb..551df1c 100644
+--- a/drivers/net/ethernet/qualcomm/emac/emac.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac.c
+@@ -531,18 +531,16 @@ static void emac_clks_teardown(struct emac_adapter *adpt)
+ static int emac_probe_resources(struct platform_device *pdev,
+ 				struct emac_adapter *adpt)
+ {
+-	struct device_node *node = pdev->dev.of_node;
+ 	struct net_device *netdev = adpt->netdev;
+ 	struct resource *res;
+-	const void *maddr;
++	char maddr[ETH_ALEN];
+ 	int ret = 0;
+ 
+ 	/* get mac address */
+-	maddr = of_get_mac_address(node);
+-	if (!maddr)
+-		eth_hw_addr_random(netdev);
+-	else
++	if (device_get_mac_address(&pdev->dev, maddr, ETH_ALEN))
+ 		ether_addr_copy(netdev->dev_addr, maddr);
++	else
++		eth_hw_addr_random(netdev);
+ 
+ 	/* Core 0 interrupt */
+ 	ret = platform_get_irq(pdev, 0);
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
