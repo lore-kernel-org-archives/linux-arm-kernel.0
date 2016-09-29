@@ -1,32 +1,41 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 29 Sep 2016 12:01:22 +0800
-Subject: [PATCH] drm/mediatek: fix a typo
-In-Reply-To: <1475119322-58657-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1475119322-58657-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1475121682.18843.2.camel@mtksdaap41>
+From: delicious.quinoa@gmail.com (Alan Tull)
+Date: Wed, 28 Sep 2016 23:34:51 -0500
+Subject: [PATCH v19 05/12] fpga-mgr: add fpga image information struct
+In-Reply-To: <CAAtXAHcdSsVUE4hQ6isCp7_35ZKb60EAKAgtGwBR41apwPpe=g@mail.gmail.com>
+References: <20160928182200.15800-1-atull@opensource.altera.com>
+ <20160928182200.15800-6-atull@opensource.altera.com>
+ <CAAtXAHcdSsVUE4hQ6isCp7_35ZKb60EAKAgtGwBR41apwPpe=g@mail.gmail.com>
+Message-ID: <CANk1AXTbKhiSu3XN4HgTM_rBBQ315qseH06RzojOOZrV74M7yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: CK Hu <ck.hu@mediatek.com>
+On Wed, Sep 28, 2016 at 6:41 PM, Moritz Fischer
+<moritz.fischer@ettus.com> wrote:
+Hi Moritz,
 
-On Thu, 2016-09-29 at 11:22 +0800, Bibby Hsieh wrote:
-> Fix the typo: OD_RELAYMODE->OD_CFG
-> 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> index df33b3c..aa5f20f 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> @@ -123,7 +123,7 @@ static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
->  			  unsigned int bpc)
->  {
->  	writel(w << 16 | h, comp->regs + DISP_OD_SIZE);
-> -	writel(OD_RELAYMODE, comp->regs + OD_RELAYMODE);
-> +	writel(OD_RELAYMODE, comp->regs + OD_CFG);
->  	mtk_dither_set(comp, bpc, DISP_OD_CFG);
->  }
->  
+> Hi Alan,
+>
+> generally ok with the change.
+
+Cool!
+
+>
+> On Wed, Sep 28, 2016 at 11:21 AM, Alan Tull <atull@opensource.altera.com> wrote:
+>
+>> -int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
+>> -                     size_t count)
+>> +int fpga_mgr_buf_load(struct fpga_manager *mgr, struct fpga_image_info *info,
+>> +                     const char *buf, size_t count)
+>
+> Doesn't this break the both socfpga and zynq if [6/12] and [7/12] are
+> not part of this commit?
+> i.e shouldn't 5,6 and 7 be a single commit?
+
+Yeah, squashing those would improve bisectability.
+
+Alan
+aka atull
+
+>
+> Cheers,
+> Moritz
