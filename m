@@ -1,194 +1,110 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 29 Sep 2016 14:32:57 -0700
-Subject: [PATCH 3/3] arm64: dump: Add checking for writable and exectuable
- pages
-In-Reply-To: <20160929213257.30505-1-labbott@redhat.com>
-References: <20160929213257.30505-1-labbott@redhat.com>
-Message-ID: <20160929213257.30505-4-labbott@redhat.com>
+From: atull@opensource.altera.com (atull)
+Date: Thu, 29 Sep 2016 16:35:39 -0500
+Subject: [PATCH v19 12/12] fpga-manager: Add Socfpga Arria10 support
+In-Reply-To: <CAAtXAHe927JSxaCs0LK8bm57mPRKvZ7ZaAvus_XDnzcQMmdAWw@mail.gmail.com>
+References: <20160928182200.15800-1-atull@opensource.altera.com>
+ <20160928182200.15800-13-atull@opensource.altera.com>
+ <CAAtXAHe927JSxaCs0LK8bm57mPRKvZ7ZaAvus_XDnzcQMmdAWw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1609291615050.30756@linuxheads99>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Page mappings with full RWX permissions are a security risk. x86
-has an option to walk the page tables and dump any bad pages.
-(See e1a58320a38d ("x86/mm: Warn on W^X mappings")). Add a similar
-implementation for arm64.
+On Thu, 29 Sep 2016, Moritz Fischer wrote:
 
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
- arch/arm64/Kconfig.debug        | 28 ++++++++++++++++++++++++++++
- arch/arm64/include/asm/ptdump.h | 10 ++++++++++
- arch/arm64/mm/dump.c            | 36 ++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/mmu.c             |  2 ++
- 4 files changed, 76 insertions(+)
+> Hi Alan,
+> 
+> On Wed, Sep 28, 2016 at 11:22 AM, Alan Tull <atull@opensource.altera.com> wrote:
+> 
+> > +static void socfpga_a10_fpga_generate_dclks(struct a10_fpga_priv *priv,
+> > +                                           u32 count)
+> > +{
+> > +       u32 val;
+> > +       unsigned int i;
+> > +
+> > +       /* Clear any existing DONE status. */
+> > +       regmap_write(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST,
+> > +                    A10_FPGAMGR_DCLKSTAT_DCLKDONE);
+> > +
+> > +       /* Issue the DCLK regmap. */
+> > +       regmap_write(priv->regmap, A10_FPGAMGR_DCLKCNT_OFST, count);
+> > +
+> > +       /* wait till the dclkcnt done */
+> > +       for (i = 0; i < 100; i++) {
+> > +               regmap_read(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST, &val);
+> > +               if (val)
+> > +                       break;
+> > +               udelay(1);
+> > +       }
+> 
+> It's quite new, but regmap_read_poll_timeout() might be a good fit here?
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 9015f02..037dba4 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -42,6 +42,34 @@ config ARM64_RANDOMIZE_TEXT_OFFSET
- 	  of TEXT_OFFSET and platforms must not require a specific
- 	  value.
- 
-+config DEBUG_WX
-+	bool "Warn on W+X mappings at boot"
-+	select ARM64_PTDUMP_CORE
-+	---help---
-+	  Generate a warning if any W+X mappings are found at boot.
-+
-+	  This is useful for discovering cases where the kernel is leaving
-+	  W+X mappings after applying NX, as such mappings are a security risk.
-+
-+	  Look for a message in dmesg output like this:
-+
-+	    arm64/mm: Checked W+X mappings: passed, no W+X pages found.
-+
-+	  or like this, if the check failed:
-+
-+	    arm64/mm: Checked W+X mappings: FAILED, <N> W+X pages found.
-+
-+	  Note that even if the check fails, your kernel is possibly
-+	  still fine, as W+X mappings are not a security hole in
-+	  themselves, what they do is that they make the exploitation
-+	  of other unfixed kernel bugs easier.
-+
-+	  There is no runtime or memory usage effect of this option
-+	  once the kernel has booted up - it's a one time check.
-+
-+	  If in doubt, say "Y".
-+
-+
- config DEBUG_SET_MODULE_RONX
- 	bool "Set loadable kernel module data as NX and text as RO"
- 	depends on MODULES
-diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
-index b18a62c..e3c6bc0 100644
---- a/arch/arm64/include/asm/ptdump.h
-+++ b/arch/arm64/include/asm/ptdump.h
-@@ -20,6 +20,7 @@
- 
- #include <linux/seq_file.h>
- #include <linux/mm_types.h>
-+#include <linux/list.h>
- 
- struct addr_marker {
- 	unsigned long start_address;
-@@ -31,6 +32,8 @@ struct ptdump_info {
- 	const struct addr_marker	*markers;
- 	unsigned long			base_addr;
- 	unsigned long			max_addr;
-+	/* Internal, do not touch */
-+	struct list_head		node;
- };
- 
- int ptdump_register(struct ptdump_info *info, const char *name);
-@@ -44,6 +47,13 @@ static inline int ptdump_debugfs_create(struct ptdump_info *info,
- 	return 0;
- }
- #endif
-+void ptdump_check_wx(void);
-+
-+#ifdef CONFIG_DEBUG_WX
-+#define debug_checkwx()	ptdump_check_wx()
-+#else
-+#define debug_checkwx()	do { } while (0)
-+#endif
- 
- #else
- static inline int ptdump_register(struct ptdump_info *info, const char *name)
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index e318f3d..b0b1dd6 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -29,6 +29,8 @@
- #include <asm/pgtable-hwdef.h>
- #include <asm/ptdump.h>
- 
-+static LIST_HEAD(dump_info);
-+
- static const struct addr_marker address_markers[] = {
- #ifdef CONFIG_KASAN
- 	{ KASAN_SHADOW_START,		"Kasan shadow start" },
-@@ -74,6 +76,8 @@ struct pg_state {
- 	unsigned long start_address;
- 	unsigned level;
- 	u64 current_prot;
-+	bool check_wx;
-+	unsigned long wx_pages;
- };
- 
- struct prot_bits {
-@@ -219,6 +223,15 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
- 		unsigned long delta;
- 
- 		if (st->current_prot) {
-+			if (st->check_wx &&
-+			((st->current_prot & PTE_RDONLY) != PTE_RDONLY) &&
-+			((st->current_prot & PTE_PXN) != PTE_PXN)) {
-+				WARN_ONCE(1, "arm64/mm: Found insecure W+X mapping at address %p/%pS\n",
-+					 (void *)st->start_address,
-+					 (void *)st->start_address);
-+				st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
-+			}
-+
- 			pt_dump_seq_printf(st->seq, "0x%016lx-0x%016lx   ",
- 				   st->start_address, addr);
- 
-@@ -341,6 +354,7 @@ static void ptdump_initialize(struct ptdump_info *info)
- int ptdump_register(struct ptdump_info *info, const char *name)
- {
- 	ptdump_initialize(info);
-+	list_add(&info->node, &dump_info);
- 	return ptdump_debugfs_create(info, name);
- }
- 
-@@ -350,6 +364,28 @@ static struct ptdump_info kernel_ptdump_info = {
- 	.base_addr	= VA_START,
- };
- 
-+void ptdump_check_wx(void)
-+{
-+	struct ptdump_info *info;
-+
-+	list_for_each_entry(info, &dump_info, node) {
-+		struct pg_state st = {
-+			.seq = NULL,
-+			.marker = info->markers,
-+			.check_wx = true,
-+		};
-+
-+		__walk_pgd(&st, info->mm, info->base_addr);
-+		note_page(&st, 0, 0, 0);
-+		if (st.wx_pages)
-+			pr_info("Checked W+X mappings (%p): FAILED, %lu W+X pages found\n",
-+				info->mm,
-+				st.wx_pages);
-+		else
-+			pr_info("Checked W+X mappings (%p): passed, no W+X pages found\n", info->mm);
-+	}
-+}
-+
- static int ptdump_init(void)
- {
- 	return ptdump_register(&kernel_ptdump_info, "kernel_page_tables");
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 4989948..1f036d2 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -41,6 +41,7 @@
- #include <asm/tlb.h>
- #include <asm/memblock.h>
- #include <asm/mmu_context.h>
-+#include <asm/ptdump.h>
- 
- #include "mm.h"
- 
-@@ -397,6 +398,7 @@ void mark_rodata_ro(void)
- 	section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
- 	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
- 			    section_size, PAGE_KERNEL_RO);
-+	debug_checkwx();
- }
- 
- void fixup_init(void)
--- 
-2.10.0
+Yes
+
+> 
+> > +static int socfpga_a10_fpga_encrypted(struct fpga_manager *mgr,
+> > +                                     u32 *buf32, size_t buf32_size)
+> > +{
+> > +       int encrypt;
+> > +
+> > +       if (buf32_size < 70)
+> > +               return -EINVAL;
+> > +
+> > +       encrypt = ((buf32[69] >> 2) & 3) != 0;
+> > +
+> > +       dev_dbg(&mgr->dev, "header word %d = %08x encrypt=%d\n",
+> > +               69, buf32[69], encrypt);
+> Maybe a named constants for magic 69 / 70 value :)
+
+Sure
+
+> 
+> > +static int socfpga_a10_fpga_compressed(struct fpga_manager *mgr,
+> > +                                      u32 *buf32, size_t buf32_size)
+> > +{
+> > +       int compress;
+> > +
+> > +       if (buf32_size < 230)
+> > +               return -EINVAL;
+> > +
+> > +       compress = !((buf32[229] >> 1) & 1);
+> > +
+> > +       dev_dbg(&mgr->dev, "header word %d = %08x compress=%d\n",
+> > +               229, buf32[229], compress);
+> > +
+> > +       return compress;
+> > +}
+> Same here, a comment on 229/230 would work too I guess.
+> 
+> > +/* Start the FPGA programming by initialize the FPGA Manager */
+> > +static int socfpga_a10_fpga_write_init(struct fpga_manager *mgr,
+> > +                                      struct fpga_image_info *info,
+> > +                                      const char *buf, size_t count)
+> > +{
+> > +       struct a10_fpga_priv *priv = mgr->priv;
+> > +       unsigned int cfg_width;
+> > +       u32 msel, stat, mask;
+> > +       int ret;
+> > +
+> > +       if (info->flags & FPGA_MGR_PARTIAL_RECONFIG)
+> > +               cfg_width = CFGWDTH_16;
+> > +       else
+> > +               return -EINVAL;
+> 
+> So we can *only* do partial reconfig? Am I missing something here?
+
+Correct, only PR for now.
+
+> 
+> > +       /* Do some dclks, wait for pr_ready */
+> > +       socfpga_a10_fpga_generate_dclks(priv, 0x7ff);
+> 
+> Maybe a named constant?
+
+OK.  Thanks for the review!
+
+Alan
+
+> 
+> Cheers,
+> Moritz
+> 
