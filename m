@@ -1,38 +1,40 @@
-From: songjun.wu@microchip.com (Songjun Wu)
-Date: Thu, 29 Sep 2016 09:21:31 +0800
-Subject: [RESEND][PATCH] [media] atmel-isc: start dma in some scenario
-Message-ID: <1475112091-28120-1-git-send-email-songjun.wu@microchip.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 28 Sep 2016 22:12:39 -0400
+Subject: [PATCH V4 02/10] Documentation: DT: qcom_hidma: correct spelling
+ mistakes
+In-Reply-To: <1475115167-5898-1-git-send-email-okaya@codeaurora.org>
+References: <1475115167-5898-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1475115167-5898-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a new vb buf is added to vb queue, the queue is
-empty and steaming, dma should be started.
+Fix the spelling mistakes and extra and statements in the sentences.
 
-Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
+ Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- drivers/media/platform/atmel/atmel-isc.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-index ccfe13b..ff403d5 100644
---- a/drivers/media/platform/atmel/atmel-isc.c
-+++ b/drivers/media/platform/atmel/atmel-isc.c
-@@ -617,7 +617,14 @@ static void isc_buffer_queue(struct vb2_buffer *vb)
- 	unsigned long flags;
+diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+index 2c5e4b8..55492c2 100644
+--- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
++++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+@@ -5,13 +5,13 @@ memcpy and memset capabilities. It has been designed for virtualized
+ environments.
  
- 	spin_lock_irqsave(&isc->dma_queue_lock, flags);
--	list_add_tail(&buf->list, &isc->dma_queue);
-+	if (!isc->cur_frm && list_empty(&isc->dma_queue) &&
-+		vb2_is_streaming(vb->vb2_queue)) {
-+		isc->cur_frm = buf;
-+		isc_start_dma(isc->regmap, isc->cur_frm,
-+			isc->current_fmt->reg_dctrl_dview);
-+	} else {
-+		list_add_tail(&buf->list, &isc->dma_queue);
-+	}
- 	spin_unlock_irqrestore(&isc->dma_queue_lock, flags);
- }
+ Each HIDMA HW instance consists of multiple DMA channels. These channels
+-share the same bandwidth. The bandwidth utilization can be parititioned
++share the same bandwidth. The bandwidth utilization can be partitioned
+ among channels based on the priority and weight assignments.
  
+ There are only two priority levels and 15 weigh assignments possible.
+ 
+ Other parameters here determine how much of the system bus this HIDMA
+-instance can use like maximum read/write request and and number of bytes to
++instance can use like maximum read/write request and number of bytes to
+ read/write in a single burst.
+ 
+ Main node required properties:
 -- 
-2.7.4
+1.9.1
