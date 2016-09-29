@@ -1,67 +1,66 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Thu, 29 Sep 2016 17:24:59 +0930
-Subject: [PATCH 5/8] pinctrl: aspeed: Enable capture of off-SCU pinmux
- state
-In-Reply-To: <CACPK8Xc7y3GtcJCVYYs-JKTqBZvqVeZaz5MUk=UX151SX1xEFw@mail.gmail.com>
-References: <cover.115463f791b69859c5ce9dafd61a5755ea039f4b.1474986045.git-series.andrew@aj.id.au>
- <a266046d34009e6e92c4c76699c550c2ba44bd5c.1474986045.git-series.andrew@aj.id.au>
- <CACPK8Xc7y3GtcJCVYYs-JKTqBZvqVeZaz5MUk=UX151SX1xEFw@mail.gmail.com>
-Message-ID: <1475135699.24463.21.camel@aj.id.au>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Thu, 29 Sep 2016 10:02:44 +0200
+Subject: [PATCH v3 7/7] i2c: bcm2835: Add support for dynamic clock
+In-Reply-To: <87r383g1kb.fsf@eliezer.anholt.net>
+References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+ <1475085056-5205-8-git-send-email-noralf@tronnes.org>
+ <87r383g1kb.fsf@eliezer.anholt.net>
+Message-ID: <109bda50-455e-f91b-a3a1-bf00cb5745db@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-09-29 at 16:15 +0930, Joel Stanley wrote:
-> On Wed, Sep 28, 2016 at 12:20 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> > 
-> > The System Control Unit IP in the Aspeed SoCs is typically where the
-> > pinmux configuration is found.
-> > 
-> > But not always.
-> > 
-> > On the AST2400 and AST2500 a number of pins depend on state in one of
-> > the SIO, LPC or GFX IP blocks, so add support to at least capture what
-> > that state is. The pinctrl engine for the Aspeed SoCs doesn't try to
-> > inspect or modify the state of the off-SCU IP blocks. Instead, it logs
-> > the state requirement with the expectation that the platform
-> > designer/maintainer arranges for the appropriate configuration to be
-> > applied through the associated drivers.
-> This is unfortunate.
-> 
-> This patch kicks the can down the road, but doesn't solve the problem
-> for a user who wants to configure some functionality that depends on
-> the non-SCU bits. Because of this I'm not sure if we want to put it in
-> the tree.
+On 28.09.2016 23:24, Eric Anholt wrote:
+> Noralf Tr?nnes <noralf@tronnes.org> writes:
+>
+>> Support a dynamic clock by reading the frequency and setting the
+>> divisor in the transfer function instead of during probe.
+> Is this fixing some particular case you could note in the commit
+> message?  As is, it makes me think that we should be using a notifier
+> for when the parent clock (that's the one I assume you're talking about
+> being dynamic) changes.  But maybe you're working around a variable VPU
+> clock being set by the firmware, because we don't have a notifier for
+> it?
+>
+> I'm a bit worried because I think this is going to be pretty expensive
+> to be doing per transfer.
 
-I agree that there's not much functionality from a user's perspective,
-but the "kicking the can down the road" assessment might be a little
-harsh. Given the lack of user functionality it becomes more difficult
-to argue for the patch's inclusion given the additional complexity, but
-it does mean that the g4/g5 drivers can completely specify their
-dependencies and not have the aspeed pinctrl core do the wrong thing
-when it encounters the non-SCU IP offsets. It gets us half-way to
-having the pinctrl driver actually configure the state (knowing what it
-needs to configure), which I feel is more than a kick-the-can-down-the-
-road boondoggle.
+Well, the clocks are all configured without CLK_GET_RATE_NOCACHE et. al.,
+so the value is read from cache, which is not (very) expensive
+(see clk_core_get_rate).
 
-> 
-> However, I'm not sure what a proper solution would look like.
+This also means that any clock change of the VPU done by the firmware
+does not propagate to the linux kernel anyway and the unchanged
+cached value is returned.
 
-So if we accept that a proper solution includes specifying the off-SCU
-dependencies, the remaining question is how do we tastefully apply the
-desired state on register-spaces the pinctrl driver doesn't own.
+To make this work it would require a notification mechanism from the
+firmware to trigger a re-validation of all the caches. (or some sort of 
+watchdog
+process).
 
->  Perhaps
-> Linus can point out another SoC that has a similar problem?
+Adding a notifier to each driver (I2C, SPI) instead is - imo - a lot of 
+unnecessary
+code complexity, as any currently running transfer would still be impacted,
+because changing the clock-divider in flight is a asking for trouble.
+But then changing the vpu-clock speed while a I2s/SPI/... transfer is 
+running is
+also asking for trouble....
 
-Or failing that, an approach that is acceptable...
+The only place where - IMO - a notifier would make sense is with the 
+auxiliar
+UART driver(8250_bcm2835aux.c), as there we only read the clock rates
+when setting/changing the baud rate. But - again -  this would require some
+notification by the firmware in the first place and any reception in the
+window of change would go wrong because of unexpected effective baud
+rate changes.
 
-Cheers,
+So as far as I can tell the change to read the current clock rate in the
+transfer function is a reasonable approach and the clock framework should
+handle the communication with the firmware about such changes.
+(And I remember having had some discussions around this subject
+with Phil Elwell or popcornmix some time ago on github where it boiled
+down to: what is the "right" interface? - I can not find the reference
+right now)
 
-Andrew
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160929/31192dfd/attachment-0001.sig>
+Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
+
+Thanks, Martin
