@@ -1,27 +1,35 @@
-From: mmarek@suse.com (Michal Marek)
-Date: Thu, 29 Sep 2016 09:23:51 +0200
-Subject: [PATCH] arm64: set path to Image.gz in the mkspec to avoid rpm
- build issue
-In-Reply-To: <20160928094913.GD24658@arm.com>
-References: <1474991627-1743-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
- <20160928094913.GD24658@arm.com>
-Message-ID: <9900a5d1-d133-12dc-0ff1-9370e6dab7a7@suse.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 29 Sep 2016 09:37:46 +0200
+Subject: [PATCH] MAINTAINERS: update entry for atmel_serial driver
+In-Reply-To: <20160929063148.GA418@kroah.com>
+References: <20160928154735.25265-1-nicolas.ferre@atmel.com>
+ <20160929063148.GA418@kroah.com>
+Message-ID: <3dc3a39b-5cae-1ad1-df44-bed4703121c3@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-09-28 11:49, Will Deacon wrote:
-> [Adding Michal Marek]
+Le 29/09/2016 ? 08:31, Greg Kroah-Hartman a ?crit :
+> On Wed, Sep 28, 2016 at 05:47:35PM +0200, Nicolas Ferre wrote:
+>> Change maintainer for the serial driver found on most of the
+>> Microchip / Atmel MPUs and take advantage of the move to rename
+>> and reorder the entry.
+>> I'm happy that Richard is taking over the maintenance of this
+>> driver.
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Acked-by: Richard Genoud <richard.genoud@gmail.com>
+>> ---
+>>  MAINTAINERS | 11 ++++++-----
+>>  1 file changed, 6 insertions(+), 5 deletions(-)
 > 
-> On Tue, Sep 27, 2016 at 08:53:47AM -0700, Vadim Lomovtsev wrote:
->> In addition to http://www.spinics.net/lists/arm-kernel/msg527466.html
->>
->> While building rpm-pkg target it fails to copy kernel image
->> from default location to rpm buildroot directory.
->>
->> Since we have arch variable set to aarch64 while Image.gz
->> is located at arch/arm64/boot it's necessary to specify
->> correct path to cp command as it implemeted for ppc64 build.
+> This doesn't apply to my tty-next tree at all, what did you make it
+> against?
 
-The variable should point to the actual file. ppc64 should be fixed as well.
+Yesterdays' linux-next (next-20160928 tag). I thought it would be the
+best for easy pick-up by anybody, particularly on a highly shared file
+like MAINTAINERS.
 
-Michal
+Tell me if you want me to collect all tags, rebase on tty-next and re-send.
+
+-- 
+Nicolas Ferre
