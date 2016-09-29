@@ -1,66 +1,39 @@
-From: kernel@martin.sperl.org (Martin Sperl)
-Date: Thu, 29 Sep 2016 10:02:44 +0200
-Subject: [PATCH v3 7/7] i2c: bcm2835: Add support for dynamic clock
-In-Reply-To: <87r383g1kb.fsf@eliezer.anholt.net>
-References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
- <1475085056-5205-8-git-send-email-noralf@tronnes.org>
- <87r383g1kb.fsf@eliezer.anholt.net>
-Message-ID: <109bda50-455e-f91b-a3a1-bf00cb5745db@martin.sperl.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 29 Sep 2016 10:05:58 +0200
+Subject: [PATCH] MAINTAINERS: update entry for atmel_serial driver
+In-Reply-To: <3dc3a39b-5cae-1ad1-df44-bed4703121c3@atmel.com>
+References: <20160928154735.25265-1-nicolas.ferre@atmel.com>
+ <20160929063148.GA418@kroah.com>
+ <3dc3a39b-5cae-1ad1-df44-bed4703121c3@atmel.com>
+Message-ID: <20160929080557.GA3406@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.09.2016 23:24, Eric Anholt wrote:
-> Noralf Tr?nnes <noralf@tronnes.org> writes:
->
->> Support a dynamic clock by reading the frequency and setting the
->> divisor in the transfer function instead of during probe.
-> Is this fixing some particular case you could note in the commit
-> message?  As is, it makes me think that we should be using a notifier
-> for when the parent clock (that's the one I assume you're talking about
-> being dynamic) changes.  But maybe you're working around a variable VPU
-> clock being set by the firmware, because we don't have a notifier for
-> it?
->
-> I'm a bit worried because I think this is going to be pretty expensive
-> to be doing per transfer.
+On Thu, Sep 29, 2016 at 09:37:46AM +0200, Nicolas Ferre wrote:
+> Le 29/09/2016 ? 08:31, Greg Kroah-Hartman a ?crit :
+> > On Wed, Sep 28, 2016 at 05:47:35PM +0200, Nicolas Ferre wrote:
+> >> Change maintainer for the serial driver found on most of the
+> >> Microchip / Atmel MPUs and take advantage of the move to rename
+> >> and reorder the entry.
+> >> I'm happy that Richard is taking over the maintenance of this
+> >> driver.
+> >>
+> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >> Acked-by: Richard Genoud <richard.genoud@gmail.com>
+> >> ---
+> >>  MAINTAINERS | 11 ++++++-----
+> >>  1 file changed, 6 insertions(+), 5 deletions(-)
+> > 
+> > This doesn't apply to my tty-next tree at all, what did you make it
+> > against?
+> 
+> Yesterdays' linux-next (next-20160928 tag). I thought it would be the
+> best for easy pick-up by anybody, particularly on a highly shared file
+> like MAINTAINERS.
+> 
+> Tell me if you want me to collect all tags, rebase on tty-next and re-send.
 
-Well, the clocks are all configured without CLK_GET_RATE_NOCACHE et. al.,
-so the value is read from cache, which is not (very) expensive
-(see clk_core_get_rate).
+It's ok, I've fixed it up by hand, it's a tough file to handle at times
+with lots of different trees touching it like you mention.
 
-This also means that any clock change of the VPU done by the firmware
-does not propagate to the linux kernel anyway and the unchanged
-cached value is returned.
-
-To make this work it would require a notification mechanism from the
-firmware to trigger a re-validation of all the caches. (or some sort of 
-watchdog
-process).
-
-Adding a notifier to each driver (I2C, SPI) instead is - imo - a lot of 
-unnecessary
-code complexity, as any currently running transfer would still be impacted,
-because changing the clock-divider in flight is a asking for trouble.
-But then changing the vpu-clock speed while a I2s/SPI/... transfer is 
-running is
-also asking for trouble....
-
-The only place where - IMO - a notifier would make sense is with the 
-auxiliar
-UART driver(8250_bcm2835aux.c), as there we only read the clock rates
-when setting/changing the baud rate. But - again -  this would require some
-notification by the firmware in the first place and any reception in the
-window of change would go wrong because of unexpected effective baud
-rate changes.
-
-So as far as I can tell the change to read the current clock rate in the
-transfer function is a reasonable approach and the clock framework should
-handle the communication with the firmware about such changes.
-(And I remember having had some discussions around this subject
-with Phil Elwell or popcornmix some time ago on github where it boiled
-down to: what is the "right" interface? - I can not find the reference
-right now)
-
-Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
-
-Thanks, Martin
+greg k-h
