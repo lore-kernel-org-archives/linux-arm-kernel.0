@@ -1,115 +1,112 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 29 Sep 2016 18:31:55 +0200
-Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
+Date: Thu, 29 Sep 2016 18:31:52 +0200
+Subject: [PATCH 3/6] ARM: dts: da850-lcdk: enable the LCD controller
 In-Reply-To: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1475166715-7857-4-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Default memory settings of da850 do not meet the throughput/latency
-requirements of tilcdc. This results in the image displayed being
-incorrect and the following warning being displayed by the LCDC
-drm driver:
+From: Karl Beldan <kbeldan@baylibre.com>
 
-  tilcdc da8xx_lcdc.0: tilcdc_crtc_irq(0x00000020): FIFO underfow
+This adds the pins used by the LCD controller, and uses 'tilcdc,panel'
+with some default timings for 800x600.
 
-Reconfigure the LCDC priority to the highest. This is a workaround
-for the da850-lcdk board which has the LCD controller enabled in
-the device tree, but a long-term, system-wide fix is needed for
-all davinci boards.
+Tested on an LCDK connected on the VGA port (the LCDC is connected to
+this port via a THS8135).
 
-This patch has been modified for mainline linux. It comes from a
-downstream TI release for da850[1].
-
-Original author: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
-
-[1] http://arago-project.org/git/projects/linux-davinci.git?p=projects/linux-davinci.git;a=commitdiff;h=b9bd39a34cc02c3ba2fc15539a2f0bc2b68d25da;hp=6f6c795faa6366a4ebc1037a0235edba6018a991
-
+Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+[Bartosz:
+  - fixed whitespace errors
+  - tweaked the description
+  - fixed the incorrect hback-porch value
+  - other minor tweaks]
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/da8xx-dt.c           | 43 ++++++++++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/da8xx.h |  4 +++
- 2 files changed, 47 insertions(+)
+ arch/arm/boot/dts/da850-lcdk.dts | 60 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index f8ecc02..9d29670 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -44,9 +44,52 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index 7b8ab21..6ca5d48 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -50,6 +50,40 @@
+ 			system-clock-frequency = <24576000>;
+ 		};
+ 	};
++
++	panel {
++		compatible = "ti,tilcdc,panel";
++		pinctrl-names = "default";
++		pinctrl-0 = <&lcd_pins>;
++		status = "okay";
++
++		panel-info {
++			ac-bias           = <0>;
++			ac-bias-intrpt    = <0>;
++			dma-burst-sz      = <16>;
++			bpp               = <16>;
++			fdd               = <255>;
++			sync-edge         = <0>;
++			sync-ctrl         = <0>;
++			raster-order      = <0>;
++			fifo-th           = <5>;
++		};
++
++		display-timings {
++			native-mode = <&svga_timings>;
++			svga_timings: 800x600 {
++				clock-frequency = <37500000>;
++				hactive = <800>;
++				hback-porch = <140>;
++				hfront-porch = <40>;
++				hsync-len = <128>;
++				vactive = <600>;
++				vback-porch = <23>;
++				vfront-porch = <1>;
++				vsync-len = <4>;
++			};
++		};
++	};
+ };
  
- #ifdef CONFIG_ARCH_DAVINCI_DA850
+ &pmx_core {
+@@ -84,6 +118,28 @@
+ 			0x30 0x01100000  0x0ff00000
+ 		>;
+ 	};
++
++	lcd_pins: pinmux_lcd_pins {
++		pinctrl-single,bits = <
++			/*
++			 * LCD_D[2], LCD_D[3], LCD_D[4], LCD_D[5],
++			 * LCD_D[6], LCD_D[7]
++			 */
++			0x40 0x22222200 0xffffff00
++			/*
++			 * LCD_D[10], LCD_D[11], LCD_D[12], LCD_D[13],
++			 * LCD_D[14], LCD_D[15], LCD_D[0], LCD_D[1]
++			 */
++			0x44 0x22222222 0xffffffff
++			/* LCD_D[8], LCD_D[9] */
++			0x48 0x00000022 0x000000ff
++
++			/* LCD_PCLK */
++			0x48 0x02000000 0x0f000000
++			/* LCD_AC_ENB_CS, LCD_VSYNC, LCD_HSYNC */
++			0x4c 0x02000022 0x0f0000ff
++		>;
++	};
+ };
  
-+/*
-+ * Adjust the default memory settings to cope with the LCDC
-+ *
-+ * REVISIT: This issue occurs on other davinci boards as well. Find
-+ * a proper system-wide fix.
-+ */
-+static void da850_lcdc_adjust_memory_bandwidth(void)
-+{
-+	void __iomem *cfg_mstpri1_base;
-+	void __iomem *cfg_mstpri2_base;
-+	void __iomem *emifb;
-+	u32 val;
+ &serial2 {
+@@ -219,3 +275,7 @@
+ 		};
+ 	};
+ };
 +
-+	/*
-+	 * Default master priorities in reg 0 are all lower by default than LCD
-+	 * which is set below to 0. Hence don't need to change here.
-+	 */
-+
-+	/* set EDMA30TC0 and TC1 to lower than LCDC (4 < 0) */
-+	cfg_mstpri1_base = DA8XX_SYSCFG0_VIRT(DA8XX_MSTPRI1_REG);
-+	val = __raw_readl(cfg_mstpri1_base);
-+	val &= 0xFFFF00FF;
-+	val |= 4 << 8;             /* 0-high, 7-low priority*/
-+	val |= 4 << 12;            /* 0-high, 7-low priority*/
-+	__raw_writel(val, cfg_mstpri1_base);
-+
-+	/*
-+	 * Reconfigure the LCDC priority to the highest to ensure that
-+	 * the throughput/latency requirements for the LCDC are met.
-+	 */
-+	cfg_mstpri2_base = DA8XX_SYSCFG0_VIRT(DA8XX_MSTPRI2_REG);
-+
-+	val = __raw_readl(cfg_mstpri2_base);
-+	val &= 0x0fffffff;
-+	__raw_writel(val, cfg_mstpri2_base);
-+
-+	/* set BPRIO */
-+	emifb = ioremap(DA8XX_DDR_CTL_BASE, SZ_4K);
-+	__raw_writel(0x20, emifb + DA8XX_PBBPR_REG);
-+	iounmap(emifb);
-+}
-+
- static void __init da850_init_machine(void)
- {
- 	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
-+	da850_lcdc_adjust_memory_bandwidth();
- }
- 
- static const char *const da850_boards_compat[] __initconst = {
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index f9f9713..5549eff 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -56,6 +56,8 @@ extern unsigned int da850_max_speed;
- #define DA8XX_SYSCFG0_VIRT(x)	(da8xx_syscfg0_base + (x))
- #define DA8XX_JTAG_ID_REG	0x18
- #define DA8XX_HOST1CFG_REG	0x44
-+#define DA8XX_MSTPRI1_REG	0x114
-+#define DA8XX_MSTPRI2_REG	0x118
- #define DA8XX_CHIPSIG_REG	0x174
- #define DA8XX_CFGCHIP0_REG	0x17c
- #define DA8XX_CFGCHIP1_REG	0x180
-@@ -79,6 +81,8 @@ extern unsigned int da850_max_speed;
- #define DA8XX_AEMIF_CTL_BASE	0x68000000
- #define DA8XX_SHARED_RAM_BASE	0x80000000
- #define DA8XX_ARM_RAM_BASE	0xffff0000
-+#define DA8XX_DDR_CTL_BASE	0xB0000000
-+#define DA8XX_PBBPR_REG		0x00000020
- 
- void da830_init(void);
- void da850_init(void);
++&lcdc {
++	status = "okay";
++};
 -- 
 2.7.4
