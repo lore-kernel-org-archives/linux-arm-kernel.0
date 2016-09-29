@@ -1,146 +1,310 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Fri, 30 Sep 2016 00:53:40 +0800
-Subject: [PATCH v12 0/8] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <6a1af526-3500-e603-351f-2b2da5726140@huawei.com>
-References: <1473763144-5653-1-git-send-email-fu.wei@linaro.org>
- <6a1af526-3500-e603-351f-2b2da5726140@huawei.com>
-Message-ID: <CADyBb7shk=sUNi1O1EcqMZSWYLRGiAcN6ZczXANfjyxc-_VWaw@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 29 Sep 2016 19:11:40 +0200
+Subject: [GIT PULL 00/27] perf/core improvements and fixes
+In-Reply-To: <1475159756-21326-1-git-send-email-acme@kernel.org>
+References: <1475159756-21326-1-git-send-email-acme@kernel.org>
+Message-ID: <20160929171139.GA24937@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wang Xiongfeng
 
-On 29 September 2016 at 16:33, wangxiongfeng (C)
-<wangxiongfeng2@huawei.com> wrote:
-> for sbsa watchdog part,  Tested-by:  wangxiongfeng2 at huawei.com on D05 board.
+* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
 
-Great thanks for your testing. :-)
+> Hi Ingo,
+> 
+> 	Please consider pulling, more to come soon,
+> 
+> - Arnaldo
+> 
+> Build and test results at the end of this message.
+> 
+> The following changes since commit 6b652de2b27c0a4020ce0e8f277e782b6af76096:
+> 
+>   Merge tag 'perf-core-for-mingo-20160922' of git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux into perf/core (2016-09-23 07:21:38 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-core-for-mingo-20160929
+> 
+> for you to fetch changes up to d18019a53a07e009899ff6b8dc5ec30f249360d9:
+> 
+>   perf tests: Add dwarf unwind test for powerpc (2016-09-29 11:18:21 -0300)
+> 
+> ----------------------------------------------------------------
+> perf/core improvements and fixes:
+> 
+> User visible:
+> -------------
+> 
+> New features:
+> 
+> - Add support for using symbols in address filters with Intel PT and ARM
+>   CoreSight (hardware assisted tracing facilities) (Adrian Hunter, Mathieu Poirier)
+> 
+> Fixes:
+> 
+> - Fix MMAP event synthesis for pre-existing threads when no hugetlbfs
+>   mount is in place (Adrian Hunter)
+> 
+> - Don't ignore kernel idle symbols in 'perf script' (Adrian Hunter)
+> 
+> - Assorted Intel PT fixes (Adrian Hunter)
+> 
+> Improvements:
+> 
+> - Fix handling of C++ symbols in 'perf probe' (Masami Hiramatsu)
+> 
+> - Beautify sched_[gs]et_attr return value in 'perf trace' (Arnaldo Carvalho de Melo)
+> 
+> Infrastructure:
+> ---------------
+> 
+> New features:
+> 
+> - Add dwarf unwind 'perf test' for powerpc (Ravi Bangoria)
+> 
+> Fixes:
+> 
+> - Fix error paths in 'perf record' (Adrian Hunter)
+> 
+> Documentation:
+> 
+> - Update documentation info about quipper, a C++ parser for converting
+>   to/from perf.data/chromium profiling format (Simon Que)
+> 
+> Build Fixes:
+> 
+>   Fix building in 32 bit platform with libbabeltrace (Wang Nan)
+> 
+> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+> 
+> ----------------------------------------------------------------
+> Adrian Hunter (16):
+>       perf record: Fix documentation 'event_sources' -> 'event_source'
+>       perf tools: Fix MMAP event synthesis broken by MAP_HUGETLB change
+>       perf script: Fix vanished idle symbols
+>       perf record: Rename label 'out_symbol_exit'
+>       perf record: Fix error paths
+>       perf symbols: Add dso__last_symbol()
+>       perf record: Add support for using symbols in address filters
+>       perf probe: Increase debug level of SDT debug messages
+>       perf intel-pt: Fix snapshot overlap detection decoder errors
+>       perf intel-pt: Add support for recording the max non-turbo ratio
+>       perf intel-pt: Fix missing error codes processing auxtrace_info
+>       perf intel-pt: Add a helper function for processing AUXTRACE_INFO
+>       perf intel-pt: Record address filter in AUXTRACE_INFO event
+>       perf intel-pt: Read address filter from AUXTRACE_INFO event
+>       perf intel-pt: Enable decoder to handle TIP.PGD with missing IP
+>       perf intel-pt: Fix decoding when there are address filters
+> 
+> Arnaldo Carvalho de Melo (1):
+>       perf trace: Beautify sched_[gs]et_attr return value
+> 
+> Masami Hiramatsu (4):
+>       perf probe: Ignore the error of finding inline instance
+>       perf probe: Skip if the function address is 0
+>       perf probe: Fix to cut off incompatible chars from group name
+>       perf probe: Match linkage name with mangled name
+> 
+> Mathieu Poirier (3):
+>       perf tools: Make perf_evsel__append_filter() generic
+>       perf evsel: New tracepoint specific function
+>       perf evsel: Add support for address filters
+> 
+> Ravi Bangoria (1):
+>       perf tests: Add dwarf unwind test for powerpc
+> 
+> Simon Que (1):
+>       perf tools: Update documentation info about quipper
+> 
+> Wang Nan (1):
+>       perf data: Fix building in 32 bit platform with libbabeltrace
+> 
+>  tools/perf/Documentation/perf-record.txt           |  61 +-
+>  tools/perf/Documentation/perf.data-file-format.txt |   6 +-
+>  tools/perf/arch/powerpc/Build                      |   1 +
+>  tools/perf/arch/powerpc/include/arch-tests.h       |  13 +
+>  tools/perf/arch/powerpc/include/perf_regs.h        |   2 +
+>  tools/perf/arch/powerpc/tests/Build                |   4 +
+>  tools/perf/arch/powerpc/tests/arch-tests.c         |  15 +
+>  tools/perf/arch/powerpc/tests/dwarf-unwind.c       |  62 ++
+>  tools/perf/arch/powerpc/tests/regs_load.S          |  94 +++
+>  tools/perf/arch/x86/util/intel-pt.c                |  57 +-
+>  tools/perf/builtin-record.c                        |  32 +-
+>  tools/perf/builtin-trace.c                         |  10 +-
+>  tools/perf/tests/Build                             |   2 +-
+>  tools/perf/tests/dwarf-unwind.c                    |   2 +-
+>  tools/perf/util/auxtrace.c                         | 737 +++++++++++++++++++++
+>  tools/perf/util/auxtrace.h                         |  54 ++
+>  tools/perf/util/build-id.c                         |   4 +-
+>  tools/perf/util/data-convert-bt.c                  |   2 +-
+>  tools/perf/util/dwarf-aux.c                        |  28 +-
+>  tools/perf/util/dwarf-aux.h                        |   3 +
+>  tools/perf/util/event.c                            |   3 +-
+>  tools/perf/util/evsel.c                            |  16 +-
+>  tools/perf/util/evsel.h                            |   5 +-
+>  tools/perf/util/evsel_fprintf.c                    |   7 +-
+>  .../perf/util/intel-pt-decoder/intel-pt-decoder.c  |  30 +
+>  .../perf/util/intel-pt-decoder/intel-pt-decoder.h  |   1 +
+>  tools/perf/util/intel-pt.c                         | 172 ++++-
+>  tools/perf/util/intel-pt.h                         |   4 +-
+>  tools/perf/util/parse-events.c                     |  41 +-
+>  tools/perf/util/probe-event.c                      |  10 +-
+>  tools/perf/util/probe-file.c                       |   2 +-
+>  tools/perf/util/probe-finder.c                     |  17 +-
+>  tools/perf/util/symbol.c                           |  15 +
+>  tools/perf/util/symbol.h                           |   1 +
+>  34 files changed, 1451 insertions(+), 62 deletions(-)
+>  create mode 100644 tools/perf/arch/powerpc/include/arch-tests.h
+>  create mode 100644 tools/perf/arch/powerpc/tests/Build
+>  create mode 100644 tools/perf/arch/powerpc/tests/arch-tests.c
+>  create mode 100644 tools/perf/arch/powerpc/tests/dwarf-unwind.c
+>  create mode 100644 tools/perf/arch/powerpc/tests/regs_load.S
+> 
+>   # time dm
+>    1  alpine:3.4: Ok
+>    2 android-ndk:r12b-arm: Ok
+>    3 archlinux:latest: Ok
+>    4 centos:5: Ok
+>    5 centos:6: Ok
+>    6 centos:7: Ok
+>    7 debian:7: Ok
+>    8 debian:8: Ok
+>    9 debian:experimental: Ok
+>   10 fedora:20: Ok
+>   11 fedora:21: Ok
+>   12 fedora:22: Ok
+>   13 fedora:23: Ok
+>   14 fedora:24: Ok
+>   15 fedora:24-x-ARC-uClibc: Ok
+>   16 fedora:rawhide: Ok
+>   17 mageia:5: Ok
+>   18 opensuse:13.2: Ok
+>   19 opensuse:42.1: Ok
+>   20 opensuse:tumbleweed: Ok
+>   21 ubuntu:12.04.5: Ok
+>   22 ubuntu:14.04: Ok
+>   23 ubuntu:14.04.4: Ok
+>   24 ubuntu:15.10: Ok
+>   25 ubuntu:16.04: Ok
+>   26 ubuntu:16.04-x-arm: Ok
+>   27 ubuntu:16.04-x-arm64: Ok
+>   28 ubuntu:16.04-x-powerpc: Ok
+>   29 ubuntu:16.04-x-powerpc64: Ok
+>   30 ubuntu:16.04-x-powerpc64el: Ok
+>   31 ubuntu:16.04-x-s390: Ok
+>   32 ubuntu:16.10: Ok
+>   33 2246.21
+> 
+>   real	37m26.862s
+>   user	0m2.148s
+>   sys	0m2.256s
+>   # 
+> 
+>   # perf test
+>    1: vmlinux symtab matches kallsyms                          : Ok
+>    2: detect openat syscall event                              : Ok
+>    3: detect openat syscall event on all cpus                  : Ok
+>    4: read samples using the mmap interface                    : Ok
+>    5: parse events tests                                       : Ok
+>    6: Validate PERF_RECORD_* events & perf_sample fields       : Ok
+>    7: Test perf pmu format parsing                             : Ok
+>    8: Test dso data read                                       : Ok
+>    9: Test dso data cache                                      : Ok
+>   10: Test dso data reopen                                     : Ok
+>   11: roundtrip evsel->name check                              : Ok
+>   12: Check parsing of sched tracepoints fields                : Ok
+>   13: Generate and check syscalls:sys_enter_openat event fields: Ok
+>   14: struct perf_event_attr setup                             : Ok
+>   15: Test matching and linking multiple hists                 : Ok
+>   16: Try 'import perf' in python, checking link problems      : Ok
+>   17: Test breakpoint overflow signal handler                  : Ok
+>   18: Test breakpoint overflow sampling                        : Ok
+>   19: Test number of exit event of a simple workload           : Ok
+>   20: Test software clock events have valid period values      : Ok
+>   21: Test object code reading                                 : Ok
+>   22: Test sample parsing                                      : Ok
+>   23: Test using a dummy software event to keep tracking       : Ok
+>   24: Test parsing with no sample_id_all bit set               : Ok
+>   25: Test filtering hist entries                              : Ok
+>   26: Test mmap thread lookup                                  : Ok
+>   27: Test thread mg sharing                                   : Ok
+>   28: Test output sorting of hist entries                      : Ok
+>   29: Test cumulation of child hist entries                    : Ok
+>   30: Test tracking with sched_switch                          : Ok
+>   31: Filter fds with revents mask in a fdarray                : Ok
+>   32: Add fd to a fdarray, making it autogrow                  : Ok
+>   33: Test kmod_path__parse function                           : Ok
+>   34: Test thread map                                          : Ok
+>   35: Test LLVM searching and compiling                        :
+>   35.1: Basic BPF llvm compiling test                          : Ok
+>   35.2: Test kbuild searching                                  : Ok
+>   35.3: Compile source for BPF prologue generation test        : Ok
+>   35.4: Compile source for BPF relocation test                 : Ok
+>   36: Test topology in session                                 : Ok
+>   37: Test BPF filter                                          :
+>   37.1: Test basic BPF filtering                               : Ok
+>   37.2: Test BPF prologue generation                           : Ok
+>   37.3: Test BPF relocation checker                            : Ok
+>   38: Test thread map synthesize                               : Ok
+>   39: Test cpu map synthesize                                  : Ok
+>   40: Test stat config synthesize                              : Ok
+>   41: Test stat synthesize                                     : Ok
+>   42: Test stat round synthesize                               : Ok
+>   43: Test attr update synthesize                              : Ok
+>   44: Test events times                                        : Ok
+>   45: Test backward reading from ring buffer                   : Ok
+>   46: Test cpu map print                                       : Ok
+>   47: Test SDT event probing                                   : Ok
+>   48: Test is_printable_array function                         : Ok
+>   49: Test bitmap print                                        : Ok
+>   50: x86 rdpmc test                                           : Ok
+>   51: Test converting perf time to TSC                         : Ok
+>   52: Test dwarf unwind                                        : Ok
+>   53: Test x86 instruction decoder - new instructions          : Ok
+>   54: Test intel cqm nmi context read                          : Skip
+>   #
+> 
+>   $ make -C tools/perf build-test
+>   make: Entering directory '/home/acme/git/linux/tools/perf'
+>                         tarpkg: ./tests/perf-targz-src-pkg .
+>                   make_debug_O: make DEBUG=1
+>              make_no_libnuma_O: make NO_LIBNUMA=1
+>                make_no_slang_O: make NO_SLANG=1
+>             make_no_libaudit_O: make NO_LIBAUDIT=1
+>               make_no_libbpf_O: make NO_LIBBPF=1
+>    make_install_prefix_slash_O: make install prefix=/tmp/krava/
+>                    make_tags_O: make tags
+>                     make_doc_O: make doc
+>            make_no_libunwind_O: make NO_LIBUNWIND=1
+>             make_install_bin_O: make install-bin
+>            make_no_libbionic_O: make NO_LIBBIONIC=1
+>         make_with_babeltrace_O: make LIBBABELTRACE=1
+>             make_no_demangle_O: make NO_DEMANGLE=1
+>                  make_perf_o_O: make perf.o
+>             make_no_auxtrace_O: make NO_AUXTRACE=1
+>              make_no_scripts_O: make NO_LIBPYTHON=1 NO_LIBPERL=1
+>                    make_pure_O: make
+>              make_util_map_o_O: make util/map.o
+>   make_no_libdw_dwarf_unwind_O: make NO_LIBDW_DWARF_UNWIND=1
+>                 make_no_newt_O: make NO_NEWT=1
+>            make_no_libpython_O: make NO_LIBPYTHON=1
+>        make_util_pmu_bison_o_O: make util/pmu-bison.o
+>                    make_help_O: make help
+>          make_install_prefix_O: make install prefix=/tmp/krava
+>                  make_static_O: make LDFLAGS=-static
+>                   make_no_ui_O: make NO_NEWT=1 NO_SLANG=1 NO_GTK2=1
+>            make_no_backtrace_O: make NO_BACKTRACE=1
+>               make_clean_all_O: make clean all
+>                 make_install_O: make install
+>               make_no_libelf_O: make NO_LIBELF=1
+>              make_no_libperl_O: make NO_LIBPERL=1
+>                 make_no_gtk2_O: make NO_GTK2=1
+>                 make_minimal_O: make NO_LIBPERL=1 NO_LIBPYTHON=1 NO_NEWT=1 NO_GTK2=1 NO_DEMANGLE=1 NO_LIBELF=1 NO_LIBUNWIND=1 NO_BACKTRACE=1 NO_LIBNUMA=1 NO_LIBAUDIT=1 NO_LIBBIONIC=1 NO_LIBDW_DWARF_UNWIND=1 NO_AUXTRACE=1 NO_LIBBPF=1 NO_LIBCRYPTO=1 NO_SDT=1
+>   OK
+>   make: Leaving directory '/home/acme/git/linux/tools/perf'
+>   $
 
+Pulled, thanks a lot Arnaldo!
 
->
-> On 2016/9/13 18:38, fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> This patchset:
->>     (1)Preparation for adding GTDT support in arm_arch_timer:
->>         1. Move some enums and marcos to header file;
->>         2. Add a new enum for spi type;
->>         3. Improve printk relevant code.
->>
->>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
->>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
->>     memory-mapped timer and SBSA Generic Watchdog timer.
->>     This driver can help to simplify all the relevant timer drivers,
->>     and separate all the ACPI GTDT knowledge from them.
->>
->>     (3)Simplify ACPI code for arm_arch_timer
->>
->>     (4)Add GTDT support for ARM memory-mapped timer
->>
->> This patchset depends on the following patchset:
->> [UPDATE PATCH V11 1/8] ACPI: I/O Remapping Table (IORT) initial support
->> https://lkml.org/lkml/2016/9/12/949
->>
->> This patchset has been tested on the following platforms:
->>     (1)ARM Foundation v8 model
->>
->> Changelog:
->> v12: https://lkml.org/lkml/2016/9/13/
->>      Rebase to latest Linux 4.8-rc6
->>      Delete the confusing "skipping" in the error message.
->>
->> V11: https://lkml.org/lkml/2016/9/6/354
->>      Rebase to latest Linux 4.8-rc5
->>      Delete typedef (suggested by checkpatch.pl)
->>
->> V10: https://lkml.org/lkml/2016/7/26/215
->>      Drop the "readq" patch.
->>      Rebase to latest Linux 4.7.
->>
->> V9: https://lkml.org/lkml/2016/7/25/345
->>     Improve pr_err message in acpi gtdt driver.
->>     Update Commit message for 7/9
->>     shorten the irq mapping function name
->>     Improve GTDT driver for memory-mapped timer
->>
->> v8: https://lkml.org/lkml/2016/7/19/660
->>     Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
->>     and also improve printk message.
->>     Simplify is_timer_block and is_watchdog.
->>     Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
->>     Delete __init in include/linux/acpi.h for GTDT API
->>     Make ARM64 select GTDT.
->>     Delete "#include <linux/module.h>" from acpi_gtdt.c
->>     Simplify GT block parse code.
->>
->> v7: https://lkml.org/lkml/2016/7/13/769
->>     Move the GTDT driver to drivers/acpi/arm64
->>     Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
->>     Merge 3 patches of GTDT parser driver.
->>     Fix the for_each_platform_timer bug.
->>
->> v6: https://lkml.org/lkml/2016/6/29/580
->>     split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
->>     and SBSA Generic Watchdog timer
->>     Improve driver by suggestions and example code from Daniel Lezcano
->>
->> v5: https://lkml.org/lkml/2016/5/24/356
->>     Sorting out all patches, simplify the API of GTDT driver:
->>     GTDT driver just fills the data struct for arm_arch_timer driver.
->>
->> v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
->>     Delete the kvm relevant patches
->>     Separate two patches for sorting out the code for arm_arch_timer.
->>     Improve irq info export code to allow missing irq info in GTDT table.
->>
->> v3: https://lkml.org/lkml/2016/2/1/658
->>     Improve GTDT driver code:
->>       (1)improve pr_* by defining pr_fmt(fmt)
->>       (2)simplify gtdt_sbsa_gwdt_init
->>       (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
->>       to get GTDT table.
->>     Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
->>     Add arm_arch_timer get ppi from DT and GTDT support for kvm.
->>
->> v2: https://lkml.org/lkml/2015/12/2/10
->>     Rebase to latest kernel version(4.4-rc3).
->>     Fix the bug about the config problem,
->>     use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
->>
->> v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
->>
->> Fu Wei (8):
->>   clocksource/drivers/arm_arch_timer: Move enums and defines to header
->>     file
->>   clocksource/drivers/arm_arch_timer: Add a new enum for spi type
->>   clocksource/drivers/arm_arch_timer: Improve printk relevant code
->>   acpi/arm64: Add GTDT table parse driver
->>   clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
->>   acpi/arm64: Add memory-mapped timer support in GTDT driver
->>   clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
->>     timer
->>   acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
->>
->>  arch/arm64/Kconfig                   |   1 +
->>  drivers/acpi/arm64/Kconfig           |   3 +
->>  drivers/acpi/arm64/Makefile          |   1 +
->>  drivers/acpi/arm64/gtdt.c            | 309 +++++++++++++++++++++++++++++++++++
->>  drivers/clocksource/Kconfig          |   2 +-
->>  drivers/clocksource/arm_arch_timer.c | 225 +++++++++++++++++--------
->>  drivers/watchdog/Kconfig             |   1 +
->>  include/clocksource/arm_arch_timer.h |  32 ++++
->>  include/linux/acpi.h                 |   7 +
->>  9 files changed, 510 insertions(+), 71 deletions(-)
->>  create mode 100644 drivers/acpi/arm64/gtdt.c
->>
->
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+	Ingo
