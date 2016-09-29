@@ -1,34 +1,42 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 29 Sep 2016 18:31:50 +0200
-Subject: [PATCH 1/6] ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for lcdc
+Date: Thu, 29 Sep 2016 18:31:51 +0200
+Subject: [PATCH 2/6] ARM: dts: da850: add a node for the LCD controller
 In-Reply-To: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1475166715-7857-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1475166715-7857-3-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Karl Beldan <kbeldan@baylibre.com>
 
-This is required for tilcdc to be able to acquire a functional clock.
+Add a disabled LCDC node to be reused in device trees including
+da850.dtsi for boards equipped with tilcdc enabled.
 
 Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
 [Bartosz: added the commit description]
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/da8xx-dt.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/da850.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index c9f7e92..f8ecc02 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -38,6 +38,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 		       NULL),
- 	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
- 	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", NULL),
-+	OF_DEV_AUXDATA("ti,am33xx-tilcdc", 0x01e13000, "da8xx_lcdc.0", NULL),
- 	{}
- };
- 
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index f79e1b9..9f39296 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -399,6 +399,14 @@
+ 				<&edma0 0 1>;
+ 			dma-names = "tx", "rx";
+ 		};
++
++		lcdc: lcdc at 213000 {
++			compatible = "ti,am33xx-tilcdc";
++			reg = <0x213000 0x1000>;
++			interrupt-parent = <&intc>;
++			interrupts = <52>;
++			status = "disabled";
++		};
+ 	};
+ 	aemif: aemif at 68000000 {
+ 		compatible = "ti,da850-aemif";
 -- 
 2.7.4
