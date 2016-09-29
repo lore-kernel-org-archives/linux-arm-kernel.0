@@ -1,52 +1,32 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 29 Sep 2016 18:31:53 +0200
-Subject: [PATCH 4/6] ARM: dts: da850-lcdk: add support for 1024x768 resolution
+Date: Thu, 29 Sep 2016 18:31:54 +0200
+Subject: [PATCH 5/6] ARM: davinci: enable the LCDC DRM driver in defconfig
 In-Reply-To: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1475166715-7857-5-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1475166715-7857-6-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add svga timings for 1024x768 resolution to the da850-lcdk
-device tree.
+With the device tree changes for tilcdc in place, we can now enable
+the driver by default in the davinci_all defconfig file.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/da850-lcdk.dts | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ arch/arm/configs/davinci_all_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 6ca5d48..6e4288c 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -70,8 +70,8 @@
- 		};
- 
- 		display-timings {
--			native-mode = <&svga_timings>;
--			svga_timings: 800x600 {
-+			native-mode = <&svga_timing0>;
-+			svga_timing0: 800x600 {
- 				clock-frequency = <37500000>;
- 				hactive = <800>;
- 				hback-porch = <140>;
-@@ -82,6 +82,17 @@
- 				vfront-porch = <1>;
- 				vsync-len = <4>;
- 			};
-+			svga_timing1: 1024x768 {
-+				clock-frequency = <72000000>;
-+				hactive = <1024>;
-+				hback-porch = <140>;
-+				hfront-porch = <40>;
-+				hsync-len = <128>;
-+				vactive = <768>;
-+				vback-porch = <23>;
-+				vfront-porch = <1>;
-+				vsync-len = <4>;
-+			};
- 		};
- 	};
- };
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index 5e5dd6b..58d04f1 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -123,6 +123,8 @@ CONFIG_TPS6507X=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_TPS6507X=y
++CONFIG_DRM=m
++CONFIG_DRM_TILCDC=m
+ CONFIG_FB=y
+ CONFIG_FIRMWARE_EDID=y
+ CONFIG_FB_DA8XX=y
 -- 
 2.7.4
