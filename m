@@ -1,55 +1,51 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Thu, 29 Sep 2016 11:02:12 +0800
-Subject: [PATCH v5 0/3] MT8173 HDMI 4K support
-Message-ID: <1475118135-56780-1-git-send-email-bibby.hsieh@mediatek.com>
+Date: Thu, 29 Sep 2016 11:02:15 +0800
+Subject: [PATCH v5 3/3] drm/mediatek: modify the factor to make the pll_rate
+ set in the 1G-2G range
+In-Reply-To: <1475118135-56780-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1475118135-56780-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1475118135-56780-4-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is MT8173 HDMI 4K support PATCH v5, based on 4.8-rc1.
+From: Junzhi Zhao <junzhi.zhao@mediatek.com>
 
-In order to support HDMI 4K on MT8173,
-we have to make some modifications.
-1) Make sure that mtk_hdmi_send_infoframe is sent successfully.
-2) Enhance the HDMI driving current to improve performance.
-3) Make sure that pixel clock is 297MHz when resolution is 4K.
+Currently, the code sets the "pll" to the desired multiple
+of the pixel clock manully(4*3m 8*3,etc).  The valid range
+of the pll is 1G-2G, however, when the pixel clock is bigger
+than 167MHz,  the "pll" will be set to a invalid value( > 2G),
+then the "pll" will be 2GHz, thus the pixel clock will be in
+correct. Change the factor to make the "pll" be set in the
+(1G, 2G) range.
 
-Changes since v4:
- - Update commit message and patch title.
+Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_dpi.c |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-Changes since v3:
- - Rebase to 4.8-rc1.
- - The valid range of tvdpll is 1G to 2G Hz, so, we Change the
-   if statement of mode->clock to fit that and add a comment.
-
-Changes since v2:
- - Remove the change about preparation for MT2701 support.
-
-Changes since v1:
- - According to the suggestion from philipp, We use the new
-   dpi0_sel rate set method.
- - calls clk_set_rate to set the dpi0_sel according to the
-   pixel clock.
- - Remove the direct access to all the intermediate clock part.
- - Remove the intermediate tvdpll_d* clocks in dts.
- - According to suggestion from CK, we rename the clock parse
-   function and remove it from mtk_dpi_conf struct.
- - Merges the hdmi Pll set rate for pixel clock greater than
-   165MHz and smaller parts.
-
-The PATCH depends on the following patch:
-https://patchwork.kernel.org/patch/9262575/
-(arm64: dts: mt8173: add mmsel clocks for 4K support)
-
-Junzhi Zhao (3):
-  drm/mediatek: do mtk_hdmi_send_infoframe after HDMI clock enable
-  drm/mediatek: enhance the HDMI driving current
-  drm/mediatek: modify the factor to make the pll_rate set in the 1G-2G
-    range
-
- drivers/gpu/drm/mediatek/mtk_dpi.c             |    9 +++--
- drivers/gpu/drm/mediatek/mtk_hdmi.c            |   17 ++++++----
- drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c |   42 +++++++++++++++++-------
- 3 files changed, 48 insertions(+), 20 deletions(-)
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+index 0186e50..90fb831 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+@@ -432,11 +432,16 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
+ 	unsigned long pll_rate;
+ 	unsigned int factor;
+ 
++	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
+ 	pix_rate = 1000UL * mode->clock;
+-	if (mode->clock <= 74000)
++	if (mode->clock <= 27000)
++		factor = 16 * 3;
++	else if (mode->clock <= 84000)
+ 		factor = 8 * 3;
+-	else
++	else if (mode->clock <= 167000)
+ 		factor = 4 * 3;
++	else
++		factor = 2 * 3;
+ 	pll_rate = pix_rate * factor;
+ 
+ 	dev_dbg(dpi->dev, "Want PLL %lu Hz, pixel clock %lu Hz\n",
 -- 
 1.7.9.5
