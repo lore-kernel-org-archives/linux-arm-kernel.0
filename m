@@ -1,35 +1,28 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 29 Sep 2016 08:17:31 +0200
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 29 Sep 2016 08:31:48 +0200
 Subject: [PATCH] MAINTAINERS: update entry for atmel_serial driver
-In-Reply-To: <1475078653.2685.1.camel@perches.com>
+In-Reply-To: <20160928154735.25265-1-nicolas.ferre@atmel.com>
 References: <20160928154735.25265-1-nicolas.ferre@atmel.com>
- <1475078653.2685.1.camel@perches.com>
-Message-ID: <CACQ1gAiNNWqLmit-G4ch3eVJbBcB-QYa8eupRVqR8aVq6cjf7A@mail.gmail.com>
+Message-ID: <20160929063148.GA418@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-09-28 18:04 GMT+02:00 Joe Perches <joe@perches.com>:
-> On Wed, 2016-09-28 at 17:47 +0200, Nicolas Ferre wrote:
->> Change maintainer for the serial driver found on most of the
->> Microchip / Atmel MPUs and take advantage of the move to rename
->> and reorder the entry.
-> []
->> diff --git a/MAINTAINERS b/MAINTAINERS
-> []
->> +MICROCHIP / ATMEL AT91 / AT32 SERIAL DRIVER
->> +M:   Richard Genoud <richard.genoud@gmail.com>
->> +S:   Maintained
->> +F:   drivers/tty/serial/atmel_serial.c
->> +F:   include/linux/atmel_serial.h
->
-> Thanks Richard.
->
-> include/linux is pretty cluttered with random files.
->
-> atmel_serial.h is #include exactly once.
->
-> Please move it out of include/linux and into
-> drivers/tty/serial/ one day.
-No problem, I'll add that to my TBD list !
+On Wed, Sep 28, 2016 at 05:47:35PM +0200, Nicolas Ferre wrote:
+> Change maintainer for the serial driver found on most of the
+> Microchip / Atmel MPUs and take advantage of the move to rename
+> and reorder the entry.
+> I'm happy that Richard is taking over the maintenance of this
+> driver.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  MAINTAINERS | 11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
 
-Richard.
+This doesn't apply to my tty-next tree at all, what did you make it
+against?
+
+thanks,
+
+greg k-h
