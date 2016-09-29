@@ -1,50 +1,55 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 28 Sep 2016 19:23:34 -0700
-Subject: [PATCH] clk: bcm2835: Clamp the PLL's requested rate to the hardware
- limits.
-Message-ID: <20160929022334.25537-1-eric@anholt.net>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Thu, 29 Sep 2016 11:02:12 +0800
+Subject: [PATCH v5 0/3] MT8173 HDMI 4K support
+Message-ID: <1475118135-56780-1-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes setting low-resolution video modes on HDMI.  Now the PLLH_PIX
-divider adjusts itself until the PLLH is within bounds.
+This is MT8173 HDMI 4K support PATCH v5, based on 4.8-rc1.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- drivers/clk/bcm/clk-bcm2835.c | 12 +++++-------
- 1 file changed, 5 insertions(+), 7 deletions(-)
+In order to support HDMI 4K on MT8173,
+we have to make some modifications.
+1) Make sure that mtk_hdmi_send_infoframe is sent successfully.
+2) Enhance the HDMI driving current to improve performance.
+3) Make sure that pixel clock is 297MHz when resolution is 4K.
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 7a7970865c2d..fedc88908e61 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -499,8 +499,13 @@ static long bcm2835_pll_rate_from_divisors(unsigned long parent_rate,
- static long bcm2835_pll_round_rate(struct clk_hw *hw, unsigned long rate,
- 				   unsigned long *parent_rate)
- {
-+	struct bcm2835_pll *pll = container_of(hw, struct bcm2835_pll, hw);
-+	const struct bcm2835_pll_data *data = pll->data;
- 	u32 ndiv, fdiv;
- 
-+	rate = max(data->min_rate, rate);
-+	rate = min(data->max_rate, rate);
-+
- 	bcm2835_pll_choose_ndiv_and_fdiv(rate, *parent_rate, &ndiv, &fdiv);
- 
- 	return bcm2835_pll_rate_from_divisors(*parent_rate, ndiv, fdiv, 1);
-@@ -605,13 +610,6 @@ static int bcm2835_pll_set_rate(struct clk_hw *hw,
- 	u32 ana[4];
- 	int i;
- 
--	if (rate < data->min_rate || rate > data->max_rate) {
--		dev_err(cprman->dev, "%s: rate out of spec: %lu vs (%lu, %lu)\n",
--			clk_hw_get_name(hw), rate,
--			data->min_rate, data->max_rate);
--		return -EINVAL;
--	}
--
- 	if (rate > data->max_fb_rate) {
- 		use_fb_prediv = true;
- 		rate /= 2;
+Changes since v4:
+ - Update commit message and patch title.
+
+Changes since v3:
+ - Rebase to 4.8-rc1.
+ - The valid range of tvdpll is 1G to 2G Hz, so, we Change the
+   if statement of mode->clock to fit that and add a comment.
+
+Changes since v2:
+ - Remove the change about preparation for MT2701 support.
+
+Changes since v1:
+ - According to the suggestion from philipp, We use the new
+   dpi0_sel rate set method.
+ - calls clk_set_rate to set the dpi0_sel according to the
+   pixel clock.
+ - Remove the direct access to all the intermediate clock part.
+ - Remove the intermediate tvdpll_d* clocks in dts.
+ - According to suggestion from CK, we rename the clock parse
+   function and remove it from mtk_dpi_conf struct.
+ - Merges the hdmi Pll set rate for pixel clock greater than
+   165MHz and smaller parts.
+
+The PATCH depends on the following patch:
+https://patchwork.kernel.org/patch/9262575/
+(arm64: dts: mt8173: add mmsel clocks for 4K support)
+
+Junzhi Zhao (3):
+  drm/mediatek: do mtk_hdmi_send_infoframe after HDMI clock enable
+  drm/mediatek: enhance the HDMI driving current
+  drm/mediatek: modify the factor to make the pll_rate set in the 1G-2G
+    range
+
+ drivers/gpu/drm/mediatek/mtk_dpi.c             |    9 +++--
+ drivers/gpu/drm/mediatek/mtk_hdmi.c            |   17 ++++++----
+ drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c |   42 +++++++++++++++++-------
+ 3 files changed, 48 insertions(+), 20 deletions(-)
+
 -- 
-2.9.3
+1.7.9.5
