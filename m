@@ -1,118 +1,60 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 29 Sep 2016 15:15:20 +0100
-Subject: [PATCH v5 01/14] drivers: iommu: add FWNODE_IOMMU fwnode type
-In-Reply-To: <20160909142343.13314-2-lorenzo.pieralisi@arm.com>
-References: <20160909142343.13314-1-lorenzo.pieralisi@arm.com>
- <20160909142343.13314-2-lorenzo.pieralisi@arm.com>
-Message-ID: <20160929141520.GA29244@red-moon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 29 Sep 2016 16:28:55 +0200
+Subject: [PATCH] clk: mvebu: armada-37xx-periph: Fix the clock provider
+ registration
+Message-ID: <20160929142855.30408-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+While trying using a peripheral clock on a driver, I saw that the clock
+pointer returned by the provider was NULL.
 
-On Fri, Sep 09, 2016 at 03:23:30PM +0100, Lorenzo Pieralisi wrote:
-> On systems booting with a device tree, every struct device is
-> associated with a struct device_node, that represents its DT
-> representation. The device node can be used in generic kernel
-> contexts (eg IRQ translation, IOMMU streamid mapping), to
-> retrieve the properties associated with the device and carry
-> out kernel operation accordingly. Owing to the 1:1 relationship
-> between the device and its device_node, the device_node can also
-> be used as a look-up token for the device (eg looking up a device
-> through its device_node), to retrieve the device in kernel paths
-> where the device_node is available.
-> 
-> On systems booting with ACPI, the same abstraction provided by
-> the device_node is required to provide look-up functionality.
-> 
-> Therefore, mirroring the approach implemented in the IRQ domain
-> kernel layer, this patch adds an additional fwnode type FWNODE_IOMMU.
-> 
-> This patch also implements a glue kernel layer that allows to
-> allocate/free FWNODE_IOMMU fwnode_handle structures and associate
-> them with IOMMU devices.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> ---
->  include/linux/fwnode.h |  1 +
->  include/linux/iommu.h  | 25 +++++++++++++++++++++++++
->  2 files changed, 26 insertions(+)
-> 
-> diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
-> index 8516717..6e10050 100644
-> --- a/include/linux/fwnode.h
-> +++ b/include/linux/fwnode.h
-> @@ -19,6 +19,7 @@ enum fwnode_type {
->  	FWNODE_ACPI_DATA,
->  	FWNODE_PDATA,
->  	FWNODE_IRQCHIP,
-> +	FWNODE_IOMMU,
+The problem was a missing indirection. It was the pointer stored in the
+hws array which needed to be updated not the value it contains.
 
-This patch provides groundwork for this series and it is key for
-the rest of it, basically the point here is that we need a fwnode
-to differentiate platform devices created out of static ACPI tables
-entries (ie IORT), that represent IOMMU components.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/clk/mvebu/armada-37xx-periph.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-The corresponding device is not an ACPI device (I could fabricate one as
-it is done for other static tables entries eg FADT power button, but I
-do not necessarily see the reason for doing that given that all we need
-the fwnode for is a token identifier), so FWNODE_ACPI does not apply
-here.
-
-Please let me know if it is reasonable how I sorted this out (it
-is basically identical to IRQCHIP, just another enum entry), the
-remainder of the code depends on this.
-
-Thanks !
-Lorenzo
-
->  };
->  
->  struct fwnode_handle {
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index a35fb8b..6456528 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -38,6 +38,7 @@ struct bus_type;
->  struct device;
->  struct iommu_domain;
->  struct notifier_block;
-> +struct fwnode_handle;
->  
->  /* iommu fault flags */
->  #define IOMMU_FAULT_READ	0x0
-> @@ -543,4 +544,28 @@ static inline void iommu_device_unlink(struct device *dev, struct device *link)
->  
->  #endif /* CONFIG_IOMMU_API */
->  
-> +/* IOMMU fwnode handling */
-> +static inline bool is_fwnode_iommu(struct fwnode_handle *fwnode)
-> +{
-> +	return fwnode && fwnode->type == FWNODE_IOMMU;
-> +}
-> +
-> +static inline struct fwnode_handle *iommu_alloc_fwnode(void)
-> +{
-> +	struct fwnode_handle *fwnode;
-> +
-> +	fwnode = kzalloc(sizeof(struct fwnode_handle), GFP_KERNEL);
-> +	fwnode->type = FWNODE_IOMMU;
-> +
-> +	return fwnode;
-> +}
-> +
-> +static inline void iommu_free_fwnode(struct fwnode_handle *fwnode)
-> +{
-> +	if (WARN_ON(!is_fwnode_iommu(fwnode)))
-> +		return;
-> +
-> +	kfree(fwnode);
-> +}
-> +
->  #endif /* __LINUX_IOMMU_H */
-> -- 
-> 2.10.0
-> 
+diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
+index 45905fc0d75b..d5dfbad4ceab 100644
+--- a/drivers/clk/mvebu/armada-37xx-periph.c
++++ b/drivers/clk/mvebu/armada-37xx-periph.c
+@@ -305,7 +305,7 @@ static const struct of_device_id armada_3700_periph_clock_of_match[] = {
+ };
+ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
+ 					 void __iomem *reg, spinlock_t *lock,
+-					 struct device *dev, struct clk_hw *hw)
++					 struct device *dev, struct clk_hw **hw)
+ {
+ 	const struct clk_ops *mux_ops = NULL, *gate_ops = NULL,
+ 		*rate_ops = NULL;
+@@ -353,13 +353,13 @@ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
+ 		}
+ 	}
+ 
+-	hw = clk_hw_register_composite(dev, data->name, data->parent_names,
++	*hw = clk_hw_register_composite(dev, data->name, data->parent_names,
+ 				       data->num_parents, mux_hw,
+ 				       mux_ops, rate_hw, rate_ops,
+ 				       gate_hw, gate_ops, CLK_IGNORE_UNUSED);
+ 
+-	if (IS_ERR(hw))
+-		return PTR_ERR(hw);
++	if (IS_ERR(*hw))
++		return PTR_ERR(*hw);
+ 
+ 	return 0;
+ }
+@@ -400,7 +400,7 @@ static int armada_3700_periph_clock_probe(struct platform_device *pdev)
+ 	spin_lock_init(&driver_data->lock);
+ 
+ 	for (i = 0; i < num_periph; i++) {
+-		struct clk_hw *hw = driver_data->hw_data->hws[i];
++		struct clk_hw **hw = &driver_data->hw_data->hws[i];
+ 
+ 		if (armada_3700_add_composite_clk(&data[i], reg,
+ 						  &driver_data->lock, dev, hw))
+-- 
+2.9.3
