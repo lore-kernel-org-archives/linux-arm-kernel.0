@@ -1,66 +1,57 @@
-From: chris@chris-wilson.co.uk (Chris Wilson)
-Date: Thu, 29 Sep 2016 09:18:18 +0100
-Subject: [PATCH] mm/vmalloc: reduce the number of lazy_max_pages to
- reduce latency
-In-Reply-To: <20160929073411.3154-1-jszhang@marvell.com>
-References: <20160929073411.3154-1-jszhang@marvell.com>
-Message-ID: <20160929081818.GE28107@nuc-i3427.alporthouse.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 29 Sep 2016 10:46:38 +0200
+Subject: [PATCH] drm/mediatek: fix a typo
+In-Reply-To: <1475121682.18843.2.camel@mtksdaap41>
+References: <1475119322-58657-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1475121682.18843.2.camel@mtksdaap41>
+Message-ID: <1f324471-bebb-c8bf-75c1-391355c50a99@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2016 at 03:34:11PM +0800, Jisheng Zhang wrote:
-> On Marvell berlin arm64 platforms, I see the preemptoff tracer report
-> a max 26543 us latency at __purge_vmap_area_lazy, this latency is an
-> awfully bad for STB. And the ftrace log also shows __free_vmap_area
-> contributes most latency now. I noticed that Joel mentioned the same
-> issue[1] on x86 platform and gave two solutions, but it seems no patch
-> is sent out for this purpose.
-> 
-> This patch adopts Joel's first solution, but I use 16MB per core
-> rather than 8MB per core for the number of lazy_max_pages. After this
-> patch, the preemptoff tracer reports a max 6455us latency, reduced to
-> 1/4 of original result.
-
-My understanding is that
-
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 91f44e78c516..3f7c6d6969ac 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -626,7 +626,6 @@ void set_iounmap_nonlazy(void)
- static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
-                                        int sync, int force_flush)
- {
--       static DEFINE_SPINLOCK(purge_lock);
-        struct llist_node *valist;
-        struct vmap_area *va;
-        struct vmap_area *n_va;
-@@ -637,12 +636,6 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
-         * should not expect such behaviour. This just simplifies locking for
-         * the case that isn't actually used at the moment anyway.
-         */
--       if (!sync && !force_flush) {
--               if (!spin_trylock(&purge_lock))
--                       return;
--       } else
--               spin_lock(&purge_lock);
--
-        if (sync)
-                purge_fragmented_blocks_allcpus();
- 
-@@ -667,7 +660,6 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
-                        __free_vmap_area(va);
-                spin_unlock(&vmap_area_lock);
-        }
--       spin_unlock(&purge_lock);
- }
- 
- /*
 
 
-should now be safe. That should significantly reduce the preempt-disabled
-section, I think.
--Chris
+On 29/09/16 06:01, CK Hu wrote:
+> Acked-by: CK Hu <ck.hu@mediatek.com>
+>
+> On Thu, 2016-09-29 at 11:22 +0800, Bibby Hsieh wrote:
+>> Fix the typo: OD_RELAYMODE->OD_CFG
+>>
 
--- 
-Chris Wilson, Intel Open Source Technology Centre
+Although it is quite clear what the patch does, could you write one 
+sentence to explain what it does. Maybe explain even which effect it 
+has, which error get fixed etc.
+
+As we are getting public available boards now, we should take more care 
+about fixes. If you have a fix for a commit introduced in an earlier 
+version of linux and it should be fixed for this version as well (e.g. 
+v4.6 does have the feature but it does not work correctly) then please 
+add these two lines before your Signed-off-by:
+
+Fixes: <commit-hash> ("<commit subject line>")
+Cc: stable at vger.kernel.org # v4.6+
+
+Where v4.6+ stands for the oldest version where this should get fixed.
+
+Thanks a lot,
+Matthias
+
+>> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+>> ---
+>>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+>> index df33b3c..aa5f20f 100644
+>> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+>> @@ -123,7 +123,7 @@ static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
+>>  			  unsigned int bpc)
+>>  {
+>>  	writel(w << 16 | h, comp->regs + DISP_OD_SIZE);
+>> -	writel(OD_RELAYMODE, comp->regs + OD_RELAYMODE);
+>> +	writel(OD_RELAYMODE, comp->regs + OD_CFG);
+>>  	mtk_dither_set(comp, bpc, DISP_OD_CFG);
+>>  }
+>>
+>
+>
