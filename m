@@ -1,32 +1,32 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Thu, 29 Sep 2016 11:29:49 +0800
-Subject: [PATCH 2/2] drm/mediatek: clear IRQ status before enable OVL interrupt
-In-Reply-To: <1475119789-64619-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1475119789-64619-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1475119789-64619-3-git-send-email-bibby.hsieh@mediatek.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Thu, 29 Sep 2016 12:01:22 +0800
+Subject: [PATCH] drm/mediatek: fix a typo
+In-Reply-To: <1475119322-58657-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1475119322-58657-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1475121682.18843.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make sure that the first vblank IRQ after enabling
-vblank isn't too short or immediate, we have to clear
-the IRQ status before enable OVL interrupt.
+Acked-by: CK Hu <ck.hu@mediatek.com>
 
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_disp_ovl.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-index 019b7ca..f75c5b5 100644
---- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-+++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-@@ -80,6 +80,7 @@ static void mtk_ovl_enable_vblank(struct mtk_ddp_comp *comp,
- 						 ddp_comp);
- 
- 	priv->crtc = crtc;
-+	writel(0x0, comp->regs + DISP_REG_OVL_INTSTA);
- 	writel_relaxed(OVL_FME_CPL_INT, comp->regs + DISP_REG_OVL_INTEN);
- }
- 
--- 
-1.7.9.5
+On Thu, 2016-09-29 at 11:22 +0800, Bibby Hsieh wrote:
+> Fix the typo: OD_RELAYMODE->OD_CFG
+> 
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> index df33b3c..aa5f20f 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> @@ -123,7 +123,7 @@ static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
+>  			  unsigned int bpc)
+>  {
+>  	writel(w << 16 | h, comp->regs + DISP_OD_SIZE);
+> -	writel(OD_RELAYMODE, comp->regs + OD_RELAYMODE);
+> +	writel(OD_RELAYMODE, comp->regs + OD_CFG);
+>  	mtk_dither_set(comp, bpc, DISP_OD_CFG);
+>  }
+>  
