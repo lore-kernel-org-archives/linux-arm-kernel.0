@@ -1,51 +1,53 @@
-From: venkatesh.vivekanandan@broadcom.com (Venkatesh Vivekanandan)
-Date: Thu, 29 Sep 2016 17:50:10 +0530
-Subject: Crash seen on ARM Juno r1 with 4.8-rc8 when Coresight is enabled
-In-Reply-To: <5dc4d096-d580-900c-5750-38e0db1ccbce@arm.com>
-References: <CAGhh56EPK0BYbjV_v7cehT+yuB=L3O-AkFR2mLQMDAS66zDgDg@mail.gmail.com>
- <CANLsYkypz383Smuqv3B5K3i9mzGxMdc1OJdc_tWQZ5qHWQCeJw@mail.gmail.com>
- <20160929084953.GA24154@lnxartpec.se.axis.com>
- <5dc4d096-d580-900c-5750-38e0db1ccbce@arm.com>
-Message-ID: <CAGhh56Embbr=N=XLGozKjUvRozonF8wkW9SkSE+PRpXHvgL=2g@mail.gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Thu, 29 Sep 2016 18:31:30 +0530
+Subject: [PATCH 0/4] Add DMA support for ti_am335x_adc driver
+In-Reply-To: <22588f2d-d0de-7911-35ed-92094f7dd28d@kernel.org>
+References: <20160921161134.6951-1-mugunthanvnm@ti.com>
+ <22588f2d-d0de-7911-35ed-92094f7dd28d@kernel.org>
+Message-ID: <ff19f584-e4e5-61ff-046d-68ec37ab51c2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2016 at 2:47 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 29/09/16 09:49, Rabin Vincent wrote:
->>
->> On Wed, Sep 28, 2016 at 11:41:41AM -0600, Mathieu Poirier wrote:
->
-> [...]
->
->>> Thanks you for reporting this Vankatesh,
->>>
->>> Sudeep and Suzuki, can you guys help me with this - I don't have an R1
->>> to test with.
->>
->>
->> I've seen this too, on other platforms.  This should fix it:
->>
->> 8<-----------
->> From a9da7d7b47e67dd6ffcafddadb50e6f97503f296 Mon Sep 17 00:00:00 2001
->> From: Rabin Vincent <rabinv@axis.com>
->> Date: Tue, 30 Aug 2016 08:54:21 +0200
->> Subject: [PATCH] coresight: check for NULL child_name
->>
->> Connection child names associated to ports can sometimes be NULL, which
->> is the case when booting a system on QEMU or when the Coresight power
->> domain isn't switched on.  fadf3a44e974 ("coresight: checking for NULL
->> string in coresight_name_match()") fixed one place to handle this but
->> the same check is needed in coresight_orphan_match() to prevent a crash
->> there.
->>
->
-> Thanks Rabin, we have exact same fix in linux-next already.
+On Sunday 25 September 2016 03:11 PM, Jonathan Cameron wrote:
+> On 21/09/16 17:11, Mugunthan V N wrote:
+>> > The ADC has a 64 work depth fifo length which holds the ADC data
+>> > till the CPU reads. So when a user program needs a large ADC data
+>> > to operate on, then it has to do multiple reads to get its
+>> > buffer. Currently if the application asks for 4 samples per
+>> > channel with all 8 channels are enabled, kernel can provide only
+>> > 3 samples per channel when all 8 channels are enabled (logs at
+>> > [1]). So with DMA support user can request for large number of
+>> > samples at a time (logs at [2]).
+>> > 
+>> > Tested the patch on AM437x-gp-evm and AM335x Boneblack with the
+>> > patch [3] to enable ADC and pushed a branch for testing [4]
+>> > 
+>> > [1] - http://pastebin.ubuntu.com/23211490/
+>> > [2] - http://pastebin.ubuntu.com/23211492/
+>> > [3] - http://pastebin.ubuntu.com/23211494/
+>> > [4] - git://git.ti.com/~mugunthanvnm/ti-linux-kernel/linux.git iio-dma
+> Just curious.  How fast is the ADC sampling at in these?  Never that
+> obvious for this driver!
+> 
+> I'm also curious as to whether you started to hit the limits of the
+> kfifo based interface.  Might be worth considering adding alternative
+> support for the dma buffers interface which is obviously much lower
+> overhead.
+> 
+> Good to have this work prior to that as the kfifo stuff is somewhat
+> easier to use.
 
-Thanks Rabin/Sudeep for pointing out the patch. It is booting now with
-coresight enabled.
->
-> --
-> Regards,
-> Sudeep
+Currently ADC clock is 3MHz, which can produce a data rate of 225KBps
+per channel with no open delay and no averaging of samples. So when all
+8 Channels are enables the data rate will be 1.75MBps
+
+ADC can be operated at 24MHz, which can generate a data rate of 28MBps
+with all 8 channels enabled and no open delay and averaging, but our
+target is to get 800K samples per second per channel which has a data
+rate of 12.5MBps
+
+I think with this data rate, DMA will be the best option to implement
+without any data loss and less cpu overload to read the ADC samples.
+
+Regards
+Mugunthan V N
