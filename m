@@ -1,54 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 30 Sep 2016 01:35:57 +0300
-Subject: [PATCH RFC v2 12/12] ARM: dts: sk-rzg1m: add Ether support
-In-Reply-To: <1987532.PE2ex6PrJ5@wasted.cogentembedded.com>
-References: <1987532.PE2ex6PrJ5@wasted.cogentembedded.com>
-Message-ID: <2289242.teybpFdFcf@wasted.cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Sep 2016 00:44:05 +0200
+Subject: next-20160929 build: 2 failures 4 warnings (next-20160929)
+In-Reply-To: <57ED66CA.3090903@akamai.com>
+References: <E1bpZhb-0002Oz-OQ@optimist>
+ <20160929184737.ragquwy2tmhxo5bn@sirena.org.uk> <57ED66CA.3090903@akamai.com>
+Message-ID: <201609300044.05324.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the SK-RZG1M board dependent part of the Ether device node.
-Enable DHCP and NFS root  for the kernel booting.
+On Thursday 29 September 2016, Vishwanath Pai wrote:
+> I have sent a patch for this a couple of days ago to netdev, it hasn't
+> made it to net-next yet. Here's the latest one:
+> 
+> [PATCH net-next v3] netfilter: xt_hashlimit: Fix link error in 32bit
+> arch because of 64bit division
+> 
+> This should fix the link error.
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+I also did a patch (not submitted yet), but my solution used 32-bit
+math for the version 1 case. I think that would be better so we
+don't slow down 32-bit architectures too much (div_u64_u64
+is very slow).
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-Changes in version 2:
-- new patch.
-
- arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-+++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-@@ -20,7 +20,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -42,3 +42,16 @@
- &scif0 {
- 	status = "okay";
- };
-+
-+&ether {
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		micrel,led-mode = <1>;
-+	};
-+};
+	Arnd
