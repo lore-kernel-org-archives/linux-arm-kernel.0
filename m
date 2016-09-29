@@ -1,154 +1,54 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 29 Sep 2016 16:42:47 -0700
-Subject: [PATCH v2 2/2] drm: zte: add initial vou drm driver
-In-Reply-To: <20160925205809.GR20761@phenom.ffwll.local>
-References: <1474727185-24180-1-git-send-email-shawn.guo@linaro.org>
- <1474727185-24180-3-git-send-email-shawn.guo@linaro.org>
- <20160925205809.GR20761@phenom.ffwll.local>
-Message-ID: <20160929234246.GA18734@x250>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 29 Sep 2016 19:50:11 -0400
+Subject: [PATCH V2 3/5] PCI: save and restore bus on parent bus reset
+In-Reply-To: <20160929214942.GD20897@localhost>
+References: <1474056395-21843-1-git-send-email-okaya@codeaurora.org>
+ <1474056395-21843-4-git-send-email-okaya@codeaurora.org>
+ <20160929214942.GD20897@localhost>
+Message-ID: <8dbad89c-2646-773a-e114-42d21ce14cc7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 25, 2016 at 10:58:09PM +0200, Daniel Vetter wrote:
-> On Sat, Sep 24, 2016 at 10:26:25PM +0800, Shawn Guo wrote:
-> > It adds the initial ZTE VOU display controller DRM driver.  There are
-> > still some features to be added, like overlay plane, scaling, and more
-> > output devices support.  But it's already useful with dual CRTCs and
-> > HDMI monitor working.
-> > 
-> > It's been tested on Debian Jessie LXDE desktop with modesetting driver.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Hi Bjorn,
+
+On 9/29/2016 5:49 PM, Bjorn Helgaas wrote:
+>> +	}
+> This pattern of "unlock, do something, relock" needs some
+> justification.  In general it's unsafe because the lock is protecting
+> *something*, and you have to assume that something can change as soon
+> as you unlock.  Maybe you know it's safe in this situation, and if so,
+> the explanation of why it's safe is what I'm looking for.
+
+Agreed. 
+
+The problem is that save and restore routines obtain the lock again and
+they fails as the lock is already held.
+
+The alternative is to change the dev_locks in save and restore to try_lock
+so that it will work if locks were previously obtained or not. 
+
 > 
-> I've done a very quick read-through, looks real pretty. A few comments
-> below and in-line.
-
-Thanks much for looking at it.
-
-> For testing, have you tried to run i-g-t validation tests per our
-> documentation? See https://dri.freedesktop.org/docs/drm/gpu/drm-uapi.html#validating-changes-with-igt
-
-Sorry for my ignorance on that.  I'm on business travel right now, and
-will give it a try once I get back to the hardware.
-
-> >  drivers/gpu/drm/Kconfig          |   2 +
-> >  drivers/gpu/drm/Makefile         |   1 +
-> >  drivers/gpu/drm/zte/Kconfig      |   8 +
-> >  drivers/gpu/drm/zte/Makefile     |   8 +
-> >  drivers/gpu/drm/zte/zx_crtc.c    | 691 +++++++++++++++++++++++++++++++++++++++
-> >  drivers/gpu/drm/zte/zx_crtc.h    |  47 +++
-> >  drivers/gpu/drm/zte/zx_drm_drv.c | 258 +++++++++++++++
-> >  drivers/gpu/drm/zte/zx_drm_drv.h |  22 ++
-> >  drivers/gpu/drm/zte/zx_hdmi.c    | 540 ++++++++++++++++++++++++++++++
-> >  drivers/gpu/drm/zte/zx_plane.c   | 362 ++++++++++++++++++++
-> >  drivers/gpu/drm/zte/zx_plane.h   |  26 ++
-> >  11 files changed, 1965 insertions(+)
-> >  create mode 100644 drivers/gpu/drm/zte/Kconfig
-> >  create mode 100644 drivers/gpu/drm/zte/Makefile
-> >  create mode 100644 drivers/gpu/drm/zte/zx_crtc.c
-> >  create mode 100644 drivers/gpu/drm/zte/zx_crtc.h
-> >  create mode 100644 drivers/gpu/drm/zte/zx_drm_drv.c
-> >  create mode 100644 drivers/gpu/drm/zte/zx_drm_drv.h
-> >  create mode 100644 drivers/gpu/drm/zte/zx_hdmi.c
-> >  create mode 100644 drivers/gpu/drm/zte/zx_plane.c
-> >  create mode 100644 drivers/gpu/drm/zte/zx_plane.h
+> Also, you're now calling pci_reset_bridge_secondary_bus() with the dev
+> unlocked, where we called it with the dev locked before.  Some (but
+> worryingly, not all) of the other pci_reset_bridge_secondary_bus()
+> callers also have the dev locked.  I didn't look long enough to figure
+> out if there is a strategy there or if these inconsistencies are
+> latent bugs.
 > 
-> New entry in MAINTAINERS listening you (and probably dri-devel as the m-l)
-> is missing.
 
-Okay.  I will add a patch to do that in the next version.
+The goal of this routine is to reset the device not the bridge and the code
+will use FLR or others if available. Therefore, it makes perfect sense to
+obtain the device lock while doing this. 
 
-> > +static int zx_drm_bind(struct device *dev)
-> > +{
-> > +	struct drm_device *drm;
-> > +	struct zx_drm_private *priv;
-> > +	int ret;
-> > +
-> > +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> > +	if (!priv)
-> > +		return -ENOMEM;
-> > +
-> > +	drm = drm_dev_alloc(&zx_drm_driver, dev);
-> > +	if (!drm)
-> > +		return -ENOMEM;
-> > +
-> > +	drm->dev_private = priv;
-> > +	dev_set_drvdata(dev, drm);
-> > +
-> > +	drm_mode_config_init(drm);
-> > +	drm->mode_config.min_width = 16;
-> > +	drm->mode_config.min_height = 16;
-> > +	drm->mode_config.max_width = 4096;
-> > +	drm->mode_config.max_height = 4096;
-> > +	drm->mode_config.funcs = &zx_drm_mode_config_funcs;
-> > +
-> > +	ret = drm_dev_register(drm, 0);
-> 
-> drm_dev_register should be the last function call in your bind function.
-> Similar for unbind, drm_dev_register should be called first.
-> 
-> As a consequence of that you can remove the drm_connector_(un)register
-> calls, those are only needed for hotplugged connectors like dp mst. But
-> with correct ordering of drm_dev_(un)register that function will also take
-> care of connector registration and unregistration.
+The code tries to reset the bus if none of the other resets work. This is
+where the problem is. It destroys the context for other devices.
 
-Aha, that's the trick to save the call to drm_connector_register() from
-connector driver.  Thanks for the info.
+I can fix get rid of this unlock, do something and then lock again business
+by rewriting the locks in save and restore.
 
-> > +static int zx_hdmi_get_edid_block(void *data, u8 *buf, unsigned int block,
-> > +				  size_t len)
-> > +{
-> > +	struct zx_hdmi *hdmi = data;
-> > +	int retry = 0;
-> > +	int ret = 0;
-> > +	int i = 0;
-> > +	u8 val;
-> > +
-> > +	/* Enable DDC master access */
-> > +	val = hdmi_readb(hdmi, TPI_DDC_MASTER_EN);
-> > +	val |= HW_DDC_MASTER;
-> > +	hdmi_writeb(hdmi, TPI_DDC_MASTER_EN, val);
-> > +
-> > +	hdmi_writeb(hdmi, ZX_DDC_ADDR, 0xa0);
-> > +	hdmi_writeb(hdmi, ZX_DDC_OFFSET, block * EDID_LENGTH);
-> > +	/* Bits [9:8] of bytes */
-> > +	hdmi_writeb(hdmi, ZX_DDC_DIN_CNT2, (len >> 8) & 0xff);
-> > +	/* Bits [7:0] of bytes */
-> > +	hdmi_writeb(hdmi, ZX_DDC_DIN_CNT1, len & 0xff);
-> > +
-> > +	/* Clear FIFO */
-> > +	val = hdmi_readb(hdmi, ZX_DDC_CMD);
-> > +	val &= ~DDC_CMD_MASK;
-> > +	val |= DDC_CMD_CLEAR_FIFO;
-> > +	hdmi_writeb(hdmi, ZX_DDC_CMD, val);
-> > +
-> > +	/* Kick off the read */
-> > +	val = hdmi_readb(hdmi, ZX_DDC_CMD);
-> > +	val &= ~DDC_CMD_MASK;
-> > +	val |= DDC_CMD_SEQUENTIAL_READ;
-> > +	hdmi_writeb(hdmi, ZX_DDC_CMD, val);
-> 
-> It looks like the ZX_DDC register range implements a hw i2c engine (since
-> you specifiy port and offsets and everything). Please implement it as an
-> i2c_adapter driver and use the normal drm_get_edid function.
+Sinan
 
-Okay.  I will give it a try to see if it works.
-
-> > +static int zx_gl_plane_atomic_check(struct drm_plane *plane,
-> > +				    struct drm_plane_state *state)
-> > +{
-> > +	u32 src_w, src_h;
-> > +
-> > +	src_w = state->src_w >> 16;
-> > +	src_h = state->src_h >> 16;
-> > +
-> > +	/* TODO: support scaling of the plane source */
-> > +	if ((src_w != state->crtc_w) || (src_h != state->crtc_h))
-> > +		return -EINVAL;
-> 
-> This is generally not enough checking. You probably need a call to
-> drm_plane_helper_check_state.
-
-Okay, will do.
-
-Shawn
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
