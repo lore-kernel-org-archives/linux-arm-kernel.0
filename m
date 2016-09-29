@@ -1,32 +1,32 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Thu, 29 Sep 2016 11:29:48 +0800
-Subject: [PATCH 1/2] drm/mediatek: set vblank_disable_allowed to true
+Date: Thu, 29 Sep 2016 11:29:49 +0800
+Subject: [PATCH 2/2] drm/mediatek: clear IRQ status before enable OVL interrupt
 In-Reply-To: <1475119789-64619-1-git-send-email-bibby.hsieh@mediatek.com>
 References: <1475119789-64619-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1475119789-64619-2-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1475119789-64619-3-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MTK DRM driver didn't set the vblank_disable_allowed to
-true, it cause that the irq_handler is called every
-16.6 ms (every vblank) when the display didn't be updated.
+To make sure that the first vblank IRQ after enabling
+vblank isn't too short or immediate, we have to clear
+the IRQ status before enable OVL interrupt.
 
 Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_drv.c |    1 +
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c |    1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index eebb7d8..941ec5f 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -200,6 +200,7 @@ static int mtk_drm_kms_init(struct drm_device *drm)
- 	if (ret < 0)
- 		goto err_component_unbind;
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index 019b7ca..f75c5b5 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -80,6 +80,7 @@ static void mtk_ovl_enable_vblank(struct mtk_ddp_comp *comp,
+ 						 ddp_comp);
  
-+	drm->vblank_disable_allowed = true;
- 	drm_kms_helper_poll_init(drm);
- 	drm_mode_config_reset(drm);
+ 	priv->crtc = crtc;
++	writel(0x0, comp->regs + DISP_REG_OVL_INTSTA);
+ 	writel_relaxed(OVL_FME_CPL_INT, comp->regs + DISP_REG_OVL_INTEN);
+ }
  
 -- 
 1.7.9.5
