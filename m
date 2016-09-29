@@ -1,59 +1,38 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 29 Sep 2016 18:26:12 +0200
-Subject: [PATCH] KVM: arm/arm64: Fix occasional warning from the timer work
- function
-Message-ID: <20160929162612.23171-1-christoffer.dall@linaro.org>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Thu, 29 Sep 2016 18:31:49 +0200
+Subject: [PATCH 0/6] ARM: davinci: da850-lcdk: add support for tilcdc
+Message-ID: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a VCPU blocks (WFI) we arm (the verb, not the architecture) any
-timers scheduled to expire in the future to wake up the vcpu thread when
-appropriate.  Because such as wake up involves a vcpu kick, and the
-timer expire function can get called from interrupt context, and the
-kick may sleep, we have to schedule the kick in the work function.
+This series enables the tilcdc support for da850-lcdk. Besides the
+device tree changes it contains some tweaks needed to make it work.
 
-The work function currently has a warning that gets raised if it turns
-out that the timer shouldn't fire when it's run, which was added because
-the idea was that then the work should never have been cancelled.
+Tested with a da850-lcdk board with an LCD display connected over
+VGA with the following modes:
 
-However, the work function can run long after a vcpu thread gets
-scheduled again and the timer conditions can have changed as a result of
-running the vcpu, which would raise this warning.  This can happen on a
-busy system, for example.
+  modetest -M tilcdc -s 26:800x600 at RG16
+  modetest -M tilcdc -s 26:1024x768 at RG16
 
-The solution is to simply not raise this warning, because a kick is
-never harmful.  Also, cancel any scheduled work when the vcpu thread is
-running anyway, since there is no need to run the work function anymore.
+Rebased on top of some necessary changes in the tilcdc drm driver.
+These changes will go upstream through the drm tree.
 
-Reported-by: Matthias Brugger <mbrugger@suse.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/arch_timer.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Bartosz Golaszewski (3):
+  ARM: dts: da850-lcdk: add support for 1024x768 resolution
+  ARM: davinci: enable the LCDC DRM driver in defconfig
+  ARM: da850: adjust memory settings for tilcdc
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 27a1f63..e136902 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -91,8 +91,6 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
- 	vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
- 	vcpu->arch.timer_cpu.armed = false;
- 
--	WARN_ON(!kvm_timer_should_fire(vcpu));
--
- 	/*
- 	 * If the vcpu is blocked we want to wake it up so that it will see
- 	 * the timer has expired when entering the guest.
-@@ -240,6 +238,9 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	timer_disarm(timer);
-+
-+	/* No need for another thread to kick us if we're already running */
-+	cancel_work_sync(&timer->expired);
- }
- 
- /**
+Karl Beldan (3):
+  ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for lcdc
+  ARM: dts: da850: add a node for the LCD controller
+  ARM: dts: da850-lcdk: enable the LCD controller
+
+ arch/arm/boot/dts/da850-lcdk.dts           | 71 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/da850.dtsi               |  8 ++++
+ arch/arm/configs/davinci_all_defconfig     |  2 +
+ arch/arm/mach-davinci/da8xx-dt.c           | 44 ++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |  4 ++
+ 5 files changed, 129 insertions(+)
+
 -- 
-2.9.0
+2.7.4
