@@ -1,39 +1,34 @@
-From: colin.king@canonical.com (Colin King)
-Date: Thu, 29 Sep 2016 19:14:38 +0100
-Subject: [PATCH][V2] dmaengine: coh901318: fix integer overflow when shifting
- more than 32 places
-Message-ID: <20160929181438.14374-1-colin.king@canonical.com>
+From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 29 Sep 2016 20:22:05 +0200
+Subject: [PATCH 1/2] ARM: dts: armada-370-rn104: add pinmuxing for i2c0
+Message-ID: <1475173326-24673-1-git-send-email-uwe@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Up to now a working i2c bus depended on the bootloader to configure the
+pinmuxing. Make it explicit.
 
-Currently U300_DMA_CHANNELS is set to 40, meaning that the shift of 1 can
-be more than 32 places, which leads to a 32 bit integer overflow. Fix this
-by using 1ULL instead of 1 before shifting it.  Also add braces on the
-for-loop to keep with coding style conventions.
+As a side effect this change makes i2c work in barebox.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 ---
- drivers/dma/coh901318.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
-index 2835f3e..74794c9 100644
---- a/drivers/dma/coh901318.c
-+++ b/drivers/dma/coh901318.c
-@@ -1352,9 +1352,10 @@ static ssize_t coh901318_debugfs_read(struct file *file, char __user *buf,
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+index 11565752b9f6..d44a850d879c 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+@@ -128,6 +128,10 @@
+ 			i2c at 11000 {
+ 				compatible = "marvell,mv64xxx-i2c";
+ 				clock-frequency = <100000>;
++
++				pinctrl-0 = <&i2c0_pins>;
++				pinctrl-names = "default";
++
+ 				status = "okay";
  
- 	tmp += sprintf(tmp, "DMA -- enabled dma channels\n");
- 
--	for (i = 0; i < U300_DMA_CHANNELS; i++)
--		if (started_channels & (1 << i))
-+	for (i = 0; i < U300_DMA_CHANNELS; i++) {
-+		if (started_channels & (1ULL << i))
- 			tmp += sprintf(tmp, "channel %d\n", i);
-+	}
- 
- 	tmp += sprintf(tmp, "Pool alloc nbr %d\n", pool_count);
- 
+ 				isl12057: isl12057 at 68 {
 -- 
-2.9.3
+2.8.1
