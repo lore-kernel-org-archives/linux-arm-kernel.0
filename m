@@ -1,46 +1,16 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 29 Sep 2016 12:38:54 +0200
-Subject: [PATCH] MAINTAINERS: add myself as Marvell berlin SoC
- co-maintainers
-In-Reply-To: <20160929065514.2784-1-jszhang@marvell.com>
-References: <20160929065514.2784-1-jszhang@marvell.com>
-Message-ID: <aaa36e7e-4525-bfcb-95fa-5ebc6a5428df@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 29 Sep 2016 03:39:40 -0700
+Subject: [PATCH V5 4/4] dts/imx6q-b850v3: Use GE B850v3 LVDS/DP++ Bridge
+In-Reply-To: <137a-57e8dc00-1-42b5770@58989149>
+References: <61b63c6a5fec9fce0332e5e9db676e6b6a6fc180.1470739193.git.peter.senna@collabora.com>
+ <137a-57e8dc00-1-42b5770@58989149>
+Message-ID: <20160929103939.GA15435@x250>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2016 08:55 AM, Jisheng Zhang wrote:
-> I would like to help maintaining Marvell berlin SoCs.
+On Mon, Sep 26, 2016 at 09:27:59AM +0100, Peter Senna Tschudin wrote:
+> Patch 1/4 is already on linux-next, but what about this one? Ping?
 
-NAK. ;)
+Ping me after driver part (patch #3) lands on mainline.
 
-Let's face it, you'd be lucky if _I_ can co-maintain berlin. So,
-let's be honest and describe it as it will be:
-
-You'll be maintaining berlin and both the Commit msg and the order
-of the E-mails below should represent that.
-
-Thanks for taking over and if you reword the Patch, feel free to
-add my
-
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-Sebastian
-
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index b003d0c..b1e5243 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1411,6 +1411,7 @@ F:	arch/arm/configs/mvebu_*_defconfig
->
->  ARM/Marvell Berlin SoC support
->  M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> +M:	Jisheng Zhang <jszhang@marvell.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	arch/arm/mach-berlin/
->
+Shawn
