@@ -1,38 +1,34 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 29 Sep 2016 18:31:49 +0200
-Subject: [PATCH 0/6] ARM: davinci: da850-lcdk: add support for tilcdc
-Message-ID: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
+Date: Thu, 29 Sep 2016 18:31:50 +0200
+Subject: [PATCH 1/6] ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for lcdc
+In-Reply-To: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1475166715-7857-2-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables the tilcdc support for da850-lcdk. Besides the
-device tree changes it contains some tweaks needed to make it work.
+From: Karl Beldan <kbeldan@baylibre.com>
 
-Tested with a da850-lcdk board with an LCD display connected over
-VGA with the following modes:
+This is required for tilcdc to be able to acquire a functional clock.
 
-  modetest -M tilcdc -s 26:800x600 at RG16
-  modetest -M tilcdc -s 26:1024x768 at RG16
+Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+[Bartosz: added the commit description]
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/da8xx-dt.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Rebased on top of some necessary changes in the tilcdc drm driver.
-These changes will go upstream through the drm tree.
-
-Bartosz Golaszewski (3):
-  ARM: dts: da850-lcdk: add support for 1024x768 resolution
-  ARM: davinci: enable the LCDC DRM driver in defconfig
-  ARM: da850: adjust memory settings for tilcdc
-
-Karl Beldan (3):
-  ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for lcdc
-  ARM: dts: da850: add a node for the LCD controller
-  ARM: dts: da850-lcdk: enable the LCD controller
-
- arch/arm/boot/dts/da850-lcdk.dts           | 71 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/da850.dtsi               |  8 ++++
- arch/arm/configs/davinci_all_defconfig     |  2 +
- arch/arm/mach-davinci/da8xx-dt.c           | 44 ++++++++++++++++++
- arch/arm/mach-davinci/include/mach/da8xx.h |  4 ++
- 5 files changed, 129 insertions(+)
-
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index c9f7e92..f8ecc02 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -38,6 +38,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 		       NULL),
+ 	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
+ 	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", NULL),
++	OF_DEV_AUXDATA("ti,am33xx-tilcdc", 0x01e13000, "da8xx_lcdc.0", NULL),
+ 	{}
+ };
+ 
 -- 
 2.7.4
