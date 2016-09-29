@@ -1,35 +1,30 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 29 Sep 2016 13:37:53 +0800
-Subject: [PATCH 2/2] drm/mediatek: clear IRQ status before enable OVL
- interrupt
-In-Reply-To: <1475119789-64619-3-git-send-email-bibby.hsieh@mediatek.com>
-References: <1475119789-64619-1-git-send-email-bibby.hsieh@mediatek.com>
- <1475119789-64619-3-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1475127473.18843.6.camel@mtksdaap41>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 29 Sep 2016 01:50:38 -0400 (EDT)
+Subject: [PATCH 0/3] [v2] Add basic ACPI support to the Qualcomm
+ Technologies EMAC driver
+In-Reply-To: <1475081924-12362-1-git-send-email-timur@codeaurora.org>
+References: <1475081924-12362-1-git-send-email-timur@codeaurora.org>
+Message-ID: <20160929.015038.2293483616753188761.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: CK Hu <ck.hu@mediatek.com>
+From: Timur Tabi <timur@codeaurora.org>
+Date: Wed, 28 Sep 2016 11:58:41 -0500
 
-On Thu, 2016-09-29 at 11:29 +0800, Bibby Hsieh wrote:
-> To make sure that the first vblank IRQ after enabling
-> vblank isn't too short or immediate, we have to clear
-> the IRQ status before enable OVL interrupt.
+> This patch series adds support to the EMAC driver for extracting addresses,
+> interrupts, and some _DSDs (properties) from ACPI.  The first two patches
+> clean up the code, and the third patch adds ACPI-specific functionality.
 > 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_disp_ovl.c |    1 +
->  1 file changed, 1 insertion(+)
+> The first patch fixes a bug with handling the platform_device for the
+> internal PHY.  This phy is treated as a separate device in both DT and
+> ACPI, but since the platform is not released automatically when the 
+> driver unloads, managed functions like devm_ioremap_resource cannot be
+> used. 
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> index 019b7ca..f75c5b5 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> @@ -80,6 +80,7 @@ static void mtk_ovl_enable_vblank(struct mtk_ddp_comp *comp,
->  						 ddp_comp);
->  
->  	priv->crtc = crtc;
-> +	writel(0x0, comp->regs + DISP_REG_OVL_INTSTA);
->  	writel_relaxed(OVL_FME_CPL_INT, comp->regs + DISP_REG_OVL_INTEN);
->  }
->  
+> The second patch replaces of_get_mac_address with its platform-independent
+> equivalent device_get_mac_address.  
+> 
+> The third patch parses the ACPI tables to obtain the platform_device for
+> the primary EMAC node ("QCOM8070") and the internal phy node ("QCOM8071").
+
+Series applied, thanks.
