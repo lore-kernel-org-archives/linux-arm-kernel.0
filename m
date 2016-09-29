@@ -1,53 +1,39 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 29 Sep 2016 18:31:30 +0530
-Subject: [PATCH 0/4] Add DMA support for ti_am335x_adc driver
-In-Reply-To: <22588f2d-d0de-7911-35ed-92094f7dd28d@kernel.org>
-References: <20160921161134.6951-1-mugunthanvnm@ti.com>
- <22588f2d-d0de-7911-35ed-92094f7dd28d@kernel.org>
-Message-ID: <ff19f584-e4e5-61ff-046d-68ec37ab51c2@ti.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Thu, 29 Sep 2016 21:09:21 +0800
+Subject: [PATCH] dmaengine: pxa_dma: remove unused function
+Message-ID: <1475154561-12327-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 25 September 2016 03:11 PM, Jonathan Cameron wrote:
-> On 21/09/16 17:11, Mugunthan V N wrote:
->> > The ADC has a 64 work depth fifo length which holds the ADC data
->> > till the CPU reads. So when a user program needs a large ADC data
->> > to operate on, then it has to do multiple reads to get its
->> > buffer. Currently if the application asks for 4 samples per
->> > channel with all 8 channels are enabled, kernel can provide only
->> > 3 samples per channel when all 8 channels are enabled (logs at
->> > [1]). So with DMA support user can request for large number of
->> > samples at a time (logs at [2]).
->> > 
->> > Tested the patch on AM437x-gp-evm and AM335x Boneblack with the
->> > patch [3] to enable ADC and pushed a branch for testing [4]
->> > 
->> > [1] - http://pastebin.ubuntu.com/23211490/
->> > [2] - http://pastebin.ubuntu.com/23211492/
->> > [3] - http://pastebin.ubuntu.com/23211494/
->> > [4] - git://git.ti.com/~mugunthanvnm/ti-linux-kernel/linux.git iio-dma
-> Just curious.  How fast is the ADC sampling at in these?  Never that
-> obvious for this driver!
-> 
-> I'm also curious as to whether you started to hit the limits of the
-> kfifo based interface.  Might be worth considering adding alternative
-> support for the dma buffers interface which is obviously much lower
-> overhead.
-> 
-> Good to have this work prior to that as the kfifo stuff is somewhat
-> easier to use.
+We get 1 warning when building kernel with W=1:
+drivers/dma/pxa_dma.c:1525:5: warning: no previous prototype for 'pxad_toggle_reserved_channel' [-Wmissing-prototypes]
 
-Currently ADC clock is 3MHz, which can produce a data rate of 225KBps
-per channel with no open delay and no averaging of samples. So when all
-8 Channels are enables the data rate will be 1.75MBps
+In fact, this function is called by no one, so this patch removes it.
 
-ADC can be operated at 24MHz, which can generate a data rate of 28MBps
-with all 8 channels enabled and no open delay and averaging, but our
-target is to get 800K samples per second per channel which has a data
-rate of 12.5MBps
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ drivers/dma/pxa_dma.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-I think with this data rate, DMA will be the best option to implement
-without any data loss and less cpu overload to read the ADC samples.
-
-Regards
-Mugunthan V N
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index 3f56f9c..7d9b1cc 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -1522,15 +1522,6 @@ bool pxad_filter_fn(struct dma_chan *chan, void *param)
+ }
+ EXPORT_SYMBOL_GPL(pxad_filter_fn);
+ 
+-int pxad_toggle_reserved_channel(int legacy_channel)
+-{
+-	if (legacy_unavailable & (BIT(legacy_channel)))
+-		return -EBUSY;
+-	legacy_reserved ^= BIT(legacy_channel);
+-	return 0;
+-}
+-EXPORT_SYMBOL_GPL(pxad_toggle_reserved_channel);
+-
+ module_platform_driver(pxad_driver);
+ 
+ MODULE_DESCRIPTION("Marvell PXA Peripheral DMA Driver");
+-- 
+2.7.4
