@@ -1,29 +1,22 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 29 Sep 2016 18:51:20 +0800
-Subject: [PATCH v2] MAINTAINERS: add myself as Marvell berlin SoC maintainer
-Message-ID: <20160929105120.374-1-jszhang@marvell.com>
+From: martin@sperl.org (Martin Sperl)
+Date: Thu, 29 Sep 2016 13:05:01 +0200
+Subject: [PATCH v3 3/7] i2c: bcm2835: Use dev_dbg logging on transfer
+ errors
+In-Reply-To: <1475085056-5205-4-git-send-email-noralf@tronnes.org>
+References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+ <1475085056-5205-4-git-send-email-noralf@tronnes.org>
+Message-ID: <BB56B9B7-75EF-4674-9951-22426C3BD8BF@sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I would like to take maintainership for Marvell berlin SoCs.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b003d0c..3dfb8c3 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1410,6 +1410,7 @@ F:	drivers/cpufreq/mvebu-cpufreq.c
- F:	arch/arm/configs/mvebu_*_defconfig
- 
- ARM/Marvell Berlin SoC support
-+M:	Jisheng Zhang <jszhang@marvell.com>
- M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
--- 
-2.9.3
+On 28.09.2016, at 19:50, Noralf Tr?nnes <noralf@tronnes.org> wrote:
+> 
+> Writing to an AT24C32 generates on average 2x i2c transfer errors per
+> 32-byte page write. Which amounts to a lot for a 4k write. This is due
+> to the fact that the chip doesn't respond during it's internal write
+> cycle when the at24 driver tries and retries the next write.
+> Only a handful drivers use dev_err() on transfer error, so switch to
+> dev_dbg() instead.
+> 
+> Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
+Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
