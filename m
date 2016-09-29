@@ -1,41 +1,58 @@
 From: muhammadabdul.wahab@supelec.fr (Muhammad Abdul WAHAB)
-Date: Thu, 29 Sep 2016 12:26:13 +0200
-Subject: [PATCH] Adding Support for Coresight Components on Zynq 7000.
-Message-ID: <c6836102-9b7e-a9d9-bad9-34b100d4ae49@supelec.fr>
+Date: Thu, 29 Sep 2016 12:27:21 +0200
+Subject: [PATCH] Adding missing features of Coresight PTM components
+Message-ID: <f274ff8d-368c-5034-5c1f-4fba60c14711@supelec.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Coresight components are present on the Zynq SoC but the corresponding
-device tree entries are missing. This patch adds device tree entries for
-coresight components while explaining how it was done in order to allow
-porting towards other boards easily.
+In the current driver for Coresight components, two features of PTM
+components are missing:
 
-By adding the entries for Coresight components in the device tree: if no
-files are created in sysfile system, you need to contact the board designer
-to sort out the problem. On some boards, Coresight components are not
-powered on boot.
+1. Branch Broadcasting (present also in ETM but called Branch Output)
+2. Return Stack (only present in PTM v1.0 and PTMv1.1)
+
+These features can be added simply to the code using `mode` field of
+`etm_config` struct.
+
+### Modifications in coresight-etm.h
+Two defines are added in register definition part of `coresight_etm.h` file
+that corresponds to the bitfield of these options. Two defines for mode
+field are added as well in the same file. The `ETM_MODE_ALL` field is
+modified accordingly.
+
+### Modifs in coresight-etm3x-sysfs.c
+As the return stack feature is only available in PTM components, a test is
+made to make sure that for ETM components, this part is never executed.
+In addition, these two options (Branch Broadcasting and Return Stack) must
+not be enabled at the same time because the obtained trace is unpredictable
+  in this case (as described in
+[PFT architecture v1.1](https://goo.gl/lZ72R1)). For now, a warning is
+shown to alert user that the behavior is unpredictable. However, only one
+option could be allowed to trace. The user need to change configuration
+of PTM.
+
+To enable these features, the correct value should be written in `mode`
+file. The values are :
+
+1. Branch Broadcasting (1 << 5)
+2. Return Stack (1 << 6)
 
 Signed-off-by: Muhammad Abdul Wahab <muhammadabdul.wahab@centralesupelec.fr>
 ---
-The documentation file was very helpful
-(Documentation/devicetree/bindings/arm/coresight.txt). However, few details
-can be added to make it more clear for beginners.
+#### Purpose
 
-Things to modify in device tree when changing the board are mainly:
+1. **Branch Broadcast** : The branch broadcast feature is present in ETM
+components as well and is called Branch output. It allows to retrieve
+addresses for direct branch addresses alongside the indirect branch
+addresses. For example, it could be useful in cases when tracing without
+source code.
+2. **Return Stack** : The return stack option allows to retrieve the return
+  addresses of function calls. It can be useful to avoid CRA
+(Code Reuse Attacks) by keeping a shadowstack.
+### Testing
 
-- address
-- `clocks` field
-- some references in other entries may be missing (e.g. for `CPU` field in
-   ETM/PTM component, references need to be created)
-
-Furthermore, the `reg` field should be adapted according to
-`#address-cells` and `#size-cells`. It may appear obvious, not for
-beginners.
-
-## Testing
-
-The trace sink components need to be enabled by accessing through sysfile
-system.
+The trace sink components need to be enabled by accessing through sys file
+  system.
 
      echo 1 > /sys/bus/coresight/devices/@addr.etb/enable\_sink
 
@@ -49,179 +66,85 @@ Then the trace can be read by dumping ETB.
 
      dd if=/dev/@addr.etb of=trace_kernel.bin
 
-The trace can be visualized by:
+The trace can be visualized by
 
      hexdump -C trace_kernel.bin
 
-Or stored using:
+Or stored using
 
      hexdump -C trace_kernel.bin > trace_kernel.txt
 
-The trace need to be decoded to be readable. All these above steps can now
+The trace need to be decoded to be readable.All these above steps can now
 be performed with Perf Library which was not available at the time I was
 playing with DT entries.
 
---- linux-4.7/arch/arm/boot/dts/zynq-7000.dtsi.orig     2016-07-24 
-21:23:50.000000000 +0200
-+++ linux-4.7/arch/arm/boot/dts/zynq-7000.dtsi    2016-09-28 
-19:13:52.651881000 +0200
-@@ -363,5 +363,159 @@
-              reg = <0xf8005000 0x1000>;
-              timeout-sec = <10>;
-          };
+diff -uprN -X linux-4.7-vanilla/Documentation/dontdiff 
+linux-4.7-vanilla/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c 
+linux-4.7/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+--- 
+linux-4.7-vanilla/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c 
+2016-07-24 21:23:50.000000000 +0200
++++ linux-4.7/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c 
+2016-09-28 15:36:39.886542702 +0200
+@@ -145,7 +145,7 @@ static ssize_t mode_store(struct device
+              goto err_unlock;
+          }
+          config->ctrl |= ETMCR_STALL_MODE;
+-     } else
++    } else
+          config->ctrl &= ~ETMCR_STALL_MODE;
+
+      if (config->mode & ETM_MODE_TIMESTAMP) {
+@@ -163,6 +163,20 @@ static ssize_t mode_store(struct device
+      else
+          config->ctrl &= ~ETMCR_CTXID_SIZE;
+
++    if (config->mode & ETM_MODE_BBROAD)
++        config->ctrl |= ETMCR_BRANCH_BROADCAST;
++    else
++        config->ctrl &= ~ETMCR_BRANCH_BROADCAST;
 +
-+        etb at F8801000 {
-+            compatible = "arm,coresight-etb10", "arm,primecell";
-+            reg = <0xf8801000 0x1000>;
-+            coresight-default-sink;
-+            clocks = <&clkc 47>;
-+            clock-names = "apb_pclk";
++    if (drvdata->arch == (PFT_ARCH_V1_0 | PFT_ARCH_V1_1)) {
++        if (config->mode & ETM_MODE_RET_STACK) {
++            if (config->mode & ETM_MODE_BBROAD)
++                dev_warn(drvdata->dev, "behavior is unpredictable\n");
++            config->ctrl |= ETMCR_RETURN_STACK_EN;
++        } else
++            config->ctrl &= ~ETMCR_RETURN_STACK_EN;
++    }
 +
-+            port {
-+
-+                endpoint at 0 {
-+                    slave-mode;
-+                    remote-endpoint = <0x8>;
-+                    linux,phandle = <0xd>;
-+                    phandle = <0xd>;
-+                };
-+            };
-+        };
-+
-+        tpiu at F8803000 {
-+            compatible = "arm,coresight-tpiu", "arm,primecell";
-+            reg = <0xf8803000 0x1000>;
-+            clocks = <&clkc 47>, <&clkc 16>;
-+            clock-names = "apb_pclk", "fclk1";
-+            clock-frequency=<0xee6b280>;
-+
-+            port {
-+
-+                endpoint at 0 {
-+                    slave-mode;
-+                    remote-endpoint = <0x9>;
-+                    linux,phandle = <0xe>;
-+                    phandle = <0xe>;
-+                };
-+            };
-+        };
-+
-+        funnel at F8804000 {
-+            compatible = "arm,coresight-funnel", "arm,primecell";
-+            reg = <0xf8804000 0x1000>;
-+            clocks = <&clkc 47>;
-+            clock-names = "apb_pclk";
-+
-+            ports {
-+                #address-cells = <0x1>;
-+                #size-cells = <0x0>;
-+
-+                port at 0 {
-+                    reg = <0x0>;
-+
-+                    endpoint {
-+                        remote-endpoint = <0xa>;
-+                        linux,phandle = <0xf>;
-+                        phandle = <0xf>;
-+                    };
-+                };
-+
-+                port at 1 {
-+                    reg = <0x0>;
-+
-+                    endpoint {
-+                        slave-mode;
-+                        remote-endpoint = <0xb>;
-+                        linux,phandle = <0x11>;
-+                        phandle = <0x11>;
-+                    };
-+                };
-+
-+                port at 2 {
-+                    reg = <0x1>;
-+
-+                    endpoint {
-+                        slave-mode;
-+                        remote-endpoint = <0xc>;
-+                        linux,phandle = <0x13>;
-+                        phandle = <0x13>;
-+                    };
-+                };
-+            };
-+        };
-+
-+        replicator {
-+            compatible = "arm,coresight-replicator";
-+
-+            ports {
-+                #address-cells = <0x1>;
-+                #size-cells = <0x0>;
-+
-+                port at 0 {
-+                    reg = <0x0>;
-+
-+                    endpoint {
-+                        remote-endpoint = <0xd>;
-+                        linux,phandle = <0x8>;
-+                        phandle = <0x8>;
-+                    };
-+                };
-+
-+                port at 1 {
-+                    reg = <0x1>;
-+
-+                    endpoint {
-+                        remote-endpoint = <0xe>;
-+                        linux,phandle = <0x9>;
-+                        phandle = <0x9>;
-+                    };
-+                };
-+
-+                port at 2 {
-+                    reg = <0x0>;
-+
-+                    endpoint {
-+                        slave-mode;
-+                        remote-endpoint = <0xf>;
-+                        linux,phandle = <0xa>;
-+                        phandle = <0xa>;
-+                    };
-+                };
-+            };
-+        };
-+
-+        ptm0 at F889C000 {
-+            compatible = "arm,coresight-etm3x", "arm,primecell";
-+            reg = <0xf889c000 0x1000>;
-+            cpu = <0x10>;
-+            clocks = <&clkc 47>;
-+            clock-names = "apb_pclk";
-+
-+            port {
-+
-+                endpoint {
-+                    remote-endpoint = <0x11>;
-+                    linux,phandle = <0xb>;
-+                    phandle = <0xb>;
-+                };
-+            };
-+        };
-+
-+        ptm1 at F889D000 {
-+            compatible = "arm,coresight-etm3x", "arm,primecell";
-+            reg = <0xf889d000 0x1000>;
-+            cpu = <0x12>;
-+            clocks = <&clkc 47>;
-+            clock-names = "apb_pclk";
-+
-+            port {
-+
-+                endpoint {
-+                    remote-endpoint = <0x13>;
-+                    linux,phandle = <0xc>;
-+                    phandle = <0xc>;
-+                };
-+            };
-+        };
-      };
-  };
+      if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
+          etm_config_trace_mode(config);
+
+diff -uprN -X linux-4.7-vanilla/Documentation/dontdiff 
+linux-4.7-vanilla/drivers/hwtracing/coresight/coresight-etm.h 
+linux-4.7/drivers/hwtracing/coresight/coresight-etm.h
+--- linux-4.7-vanilla/drivers/hwtracing/coresight/coresight-etm.h 
+2016-07-24 21:23:50.000000000 +0200
++++ linux-4.7/drivers/hwtracing/coresight/coresight-etm.h 2016-09-28 
+15:35:59.862544418 +0200
+@@ -89,11 +89,13 @@
+  /* ETMCR - 0x00 */
+  #define ETMCR_PWD_DWN        BIT(0)
+  #define ETMCR_STALL_MODE    BIT(7)
++#define ETMCR_BRANCH_BROADCAST    BIT(8)
+  #define ETMCR_ETM_PRG        BIT(10)
+  #define ETMCR_ETM_EN        BIT(11)
+  #define ETMCR_CYC_ACC        BIT(12)
+  #define ETMCR_CTXID_SIZE    (BIT(14)|BIT(15))
+  #define ETMCR_TIMESTAMP_EN    BIT(28)
++#define ETMCR_RETURN_STACK_EN    BIT(29)  /* PTM v1.0 & PTM v1.1 */
+  /* ETMCCR - 0x04 */
+  #define ETMCCR_FIFOFULL        BIT(23)
+  /* ETMPDCR - 0x310 */
+@@ -110,8 +112,11 @@
+  #define ETM_MODE_STALL        BIT(2)
+  #define ETM_MODE_TIMESTAMP    BIT(3)
+  #define ETM_MODE_CTXID        BIT(4)
++#define ETM_MODE_BBROAD    BIT(5)
++#define ETM_MODE_RET_STACK    BIT(6)
+  #define ETM_MODE_ALL        (ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
+                   ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
++                 ETM_MODE_BBROAD | ETM_MODE_RET_STACK | \
+                   ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
+                   ETM_MODE_EXCL_USER)
