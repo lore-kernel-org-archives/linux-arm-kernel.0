@@ -1,60 +1,53 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 29 Sep 2016 16:28:55 +0200
-Subject: [PATCH] clk: mvebu: armada-37xx-periph: Fix the clock provider
- registration
-Message-ID: <20160929142855.30408-1-gregory.clement@free-electrons.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Thu, 29 Sep 2016 07:32:23 -0700
+Subject: [PATCH] arm64: make rpm failed due to incorrect path to Image.gz
+Message-ID: <1475159543-2519-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While trying using a peripheral clock on a driver, I saw that the clock
-pointer returned by the provider was NULL.
+The "make rpm" and "make rpm-pkg" commands for arm64 platform are broken
+due to rpmbuild couldn't find Image.gz file at default location (which
+is kernel src root):
+ cp: cannot stat 'Image.gz': No such file or directory
+ error: Bad exit status from /var/tmp/rpm-tmp.ocFBmP (%install)
 
-The problem was a missing indirection. It was the pointer stored in the
-hws array which needed to be updated not the value it contains.
+While the correct path to arm64 kernel image file
+is "arch/arm64/boot/Image.gz".
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+The exact file name (Image.gz) is stored at KBUILD_IMAGE variable
+and read by rpmbuild with "make image_name" command at
+install phase after kernel build is complete.
+
+Accordingly to  Michal's Marek comment it is necesary
+that the KBUILD_IMAGE variable value has to be set
+accordingly to point to actual file and thus fix that issue.
+
+Since the KBUILD_IMAGE variable is used in general cases of
+build we need to prevent other build types breakage by changing it.
+
+The solution is to add to arch/arm64/Makefie extra target "image_name"
+with dependency "KBUILD_IMAGE:=<proper path to Image.gz file>".
+Thus it will allow to set proper path to Image.gz file only for
+the "image_name" build target and this exact value will be picked up
+while rpm build install phase.
+
+Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
 ---
- drivers/clk/mvebu/armada-37xx-periph.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm64/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
-index 45905fc0d75b..d5dfbad4ceab 100644
---- a/drivers/clk/mvebu/armada-37xx-periph.c
-+++ b/drivers/clk/mvebu/armada-37xx-periph.c
-@@ -305,7 +305,7 @@ static const struct of_device_id armada_3700_periph_clock_of_match[] = {
- };
- static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
- 					 void __iomem *reg, spinlock_t *lock,
--					 struct device *dev, struct clk_hw *hw)
-+					 struct device *dev, struct clk_hw **hw)
- {
- 	const struct clk_ops *mux_ops = NULL, *gate_ops = NULL,
- 		*rate_ops = NULL;
-@@ -353,13 +353,13 @@ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
- 		}
- 	}
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index ab51aed..09926d3 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -101,6 +101,8 @@ all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
  
--	hw = clk_hw_register_composite(dev, data->name, data->parent_names,
-+	*hw = clk_hw_register_composite(dev, data->name, data->parent_names,
- 				       data->num_parents, mux_hw,
- 				       mux_ops, rate_hw, rate_ops,
- 				       gate_hw, gate_ops, CLK_IGNORE_UNUSED);
+ boot := arch/arm64/boot
  
--	if (IS_ERR(hw))
--		return PTR_ERR(hw);
-+	if (IS_ERR(*hw))
-+		return PTR_ERR(*hw);
++image_name: KBUILD_IMAGE :=$(boot)/$(KBUILD_IMAGE)
++
+ Image: vmlinux
+ 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
  
- 	return 0;
- }
-@@ -400,7 +400,7 @@ static int armada_3700_periph_clock_probe(struct platform_device *pdev)
- 	spin_lock_init(&driver_data->lock);
- 
- 	for (i = 0; i < num_periph; i++) {
--		struct clk_hw *hw = driver_data->hw_data->hws[i];
-+		struct clk_hw **hw = &driver_data->hw_data->hws[i];
- 
- 		if (armada_3700_add_composite_clk(&data[i], reg,
- 						  &driver_data->lock, dev, hw))
 -- 
-2.9.3
+1.8.3.1
