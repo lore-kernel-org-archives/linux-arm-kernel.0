@@ -1,35 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 29 Sep 2016 09:37:46 +0200
-Subject: [PATCH] MAINTAINERS: update entry for atmel_serial driver
-In-Reply-To: <20160929063148.GA418@kroah.com>
-References: <20160928154735.25265-1-nicolas.ferre@atmel.com>
- <20160929063148.GA418@kroah.com>
-Message-ID: <3dc3a39b-5cae-1ad1-df44-bed4703121c3@atmel.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 29 Sep 2016 15:34:11 +0800
+Subject: [PATCH] mm/vmalloc: reduce the number of lazy_max_pages to reduce
+ latency
+Message-ID: <20160929073411.3154-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29/09/2016 ? 08:31, Greg Kroah-Hartman a ?crit :
-> On Wed, Sep 28, 2016 at 05:47:35PM +0200, Nicolas Ferre wrote:
->> Change maintainer for the serial driver found on most of the
->> Microchip / Atmel MPUs and take advantage of the move to rename
->> and reorder the entry.
->> I'm happy that Richard is taking over the maintenance of this
->> driver.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Acked-by: Richard Genoud <richard.genoud@gmail.com>
->> ---
->>  MAINTAINERS | 11 ++++++-----
->>  1 file changed, 6 insertions(+), 5 deletions(-)
-> 
-> This doesn't apply to my tty-next tree at all, what did you make it
-> against?
+On Marvell berlin arm64 platforms, I see the preemptoff tracer report
+a max 26543 us latency at __purge_vmap_area_lazy, this latency is an
+awfully bad for STB. And the ftrace log also shows __free_vmap_area
+contributes most latency now. I noticed that Joel mentioned the same
+issue[1] on x86 platform and gave two solutions, but it seems no patch
+is sent out for this purpose.
 
-Yesterdays' linux-next (next-20160928 tag). I thought it would be the
-best for easy pick-up by anybody, particularly on a highly shared file
-like MAINTAINERS.
+This patch adopts Joel's first solution, but I use 16MB per core
+rather than 8MB per core for the number of lazy_max_pages. After this
+patch, the preemptoff tracer reports a max 6455us latency, reduced to
+1/4 of original result.
 
-Tell me if you want me to collect all tags, rebase on tty-next and re-send.
+[1] http://lkml.iu.edu/hypermail/linux/kernel/1603.2/04803.html
 
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ mm/vmalloc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 91f44e7..66f377a 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -596,7 +596,7 @@ static unsigned long lazy_max_pages(void)
+ 
+ 	log = fls(num_online_cpus());
+ 
+-	return log * (32UL * 1024 * 1024 / PAGE_SIZE);
++	return log * (16UL * 1024 * 1024 / PAGE_SIZE);
+ }
+ 
+ static atomic_t vmap_lazy_nr = ATOMIC_INIT(0);
 -- 
-Nicolas Ferre
+2.9.3
