@@ -1,13 +1,13 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 30 Sep 2016 01:21:54 +0300
-Subject: [PATCH RFC v2 3/12] soc: renesas: rcar-sysc: add R8A7743 support
+Date: Fri, 30 Sep 2016 01:23:52 +0300
+Subject: [PATCH RFC v2 4/12] ARM: shmobile: r8a7743: basic SoC support
 In-Reply-To: <1987532.PE2ex6PrJ5@wasted.cogentembedded.com>
 References: <1987532.PE2ex6PrJ5@wasted.cogentembedded.com>
-Message-ID: <1979633.oxsqSuXO5u@wasted.cogentembedded.com>
+Message-ID: <3178356.WuR0emdY7D@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for RZ/G1M (R8A7743) SoC power areas to the R-Car SYSC driver.
+Add minimal support for the RZ/G1M (R8A7743) SoC.
 
 Based on the original (and large) patch by Dmitry Shifrin
 <dmitry.shifrin@cogentembedded.com>.
@@ -17,107 +17,92 @@ Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 ---
 Changes in version 2:
-- documented the R8A7743 SYSC device tree binding;
-- added "R-Car" to the patch description;
+- removed "select I2C" from the R8A7743 Kconfig entry;
+- documented the R8A7743 device tree binding;
 - added Geert's tag.
 
- Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt |    7 +-
- drivers/soc/renesas/Makefile                                  |    1 
- drivers/soc/renesas/r8a7743-sysc.c                            |   32 ++++++++++
- drivers/soc/renesas/rcar-sysc.c                               |    3 
- drivers/soc/renesas/rcar-sysc.h                               |    1 
- 5 files changed, 41 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/shmobile.txt |    2 +
+ arch/arm/mach-shmobile/Kconfig                     |    4 ++
+ arch/arm/mach-shmobile/Makefile                    |    1 
+ arch/arm/mach-shmobile/setup-r8a7743.c             |   34 +++++++++++++++++++++
+ 4 files changed, 41 insertions(+)
 
-Index: renesas/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
+Index: renesas/Documentation/devicetree/bindings/arm/shmobile.txt
 ===================================================================
---- renesas.orig/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
-+++ renesas/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
-@@ -1,12 +1,13 @@
--DT bindings for the Renesas R-Car System Controller
-+DT bindings for the Renesas R-Car (RZ/G) System Controller
- 
- == System Controller Node ==
- 
--The R-Car System Controller provides power management for the CPU cores and
--various coprocessors.
-+The R-Car (RZ/G) System Controller provides power management for the CPU cores
-+and various coprocessors.
- 
- Required properties:
-   - compatible: Must contain exactly one of the following:
-+      - "renesas,r8a7743-sysc" (RZ/G1M)
-       - "renesas,r8a7779-sysc" (R-Car H1)
-       - "renesas,r8a7790-sysc" (R-Car H2)
-       - "renesas,r8a7791-sysc" (R-Car M2-W)
-Index: renesas/drivers/soc/renesas/Makefile
+--- renesas.orig/Documentation/devicetree/bindings/arm/shmobile.txt
++++ renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -13,6 +13,8 @@ SoCs:
+     compatible = "renesas,r8a73a4"
+   - R-Mobile A1 (R8A77400)
+     compatible = "renesas,r8a7740"
++  - RZ/G1M (R8A77430)
++    compatible = "renesas,r8a7743"
+   - R-Car M1A (R8A77781)
+     compatible = "renesas,r8a7778"
+   - R-Car H1 (R8A77790)
+Index: renesas/arch/arm/mach-shmobile/Kconfig
 ===================================================================
---- renesas.orig/drivers/soc/renesas/Makefile
-+++ renesas/drivers/soc/renesas/Makefile
-@@ -1,3 +1,4 @@
-+obj-$(CONFIG_ARCH_R8A7743)	+= rcar-sysc.o r8a7743-sysc.o
- obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
- obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
- obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
-Index: renesas/drivers/soc/renesas/r8a7743-sysc.c
+--- renesas.orig/arch/arm/mach-shmobile/Kconfig
++++ renesas/arch/arm/mach-shmobile/Kconfig
+@@ -68,6 +68,10 @@ config ARCH_R8A7740
+ 	select ARCH_RMOBILE
+ 	select RENESAS_INTC_IRQPIN
+ 
++config ARCH_R8A7743
++	bool "RZ/G1M (R8A77430)"
++	select ARCH_RCAR_GEN2
++
+ config ARCH_R8A7778
+ 	bool "R-Car M1A (R8A77781)"
+ 	select ARCH_RCAR_GEN1
+Index: renesas/arch/arm/mach-shmobile/Makefile
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/Makefile
++++ renesas/arch/arm/mach-shmobile/Makefile
+@@ -9,6 +9,7 @@ obj-y				:= timer.o
+ obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o
+ obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o
+ obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o
++obj-$(CONFIG_ARCH_R8A7743)	+= setup-r8a7743.o
+ obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o pm-r8a7779.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
+Index: renesas/arch/arm/mach-shmobile/setup-r8a7743.c
 ===================================================================
 --- /dev/null
-+++ renesas/drivers/soc/renesas/r8a7743-sysc.c
-@@ -0,0 +1,32 @@
++++ renesas/arch/arm/mach-shmobile/setup-r8a7743.c
+@@ -0,0 +1,34 @@
 +/*
-+ * Renesas RZ/G1M System Controller
++ * r8a7743 processor support
 + *
-+ * Copyright (C) 2016 Cogent Embedded Inc.
++ * Copyright (C) 2016 Cogent Embedded, Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation; of the License.
++ *  published by the Free Software Foundation; of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+#include <linux/bug.h>
-+#include <linux/kernel.h>
++#include <linux/init.h>
 +
-+#include <dt-bindings/power/r8a7743-sysc.h>
++#include <asm/mach/arch.h>
 +
-+#include "rcar-sysc.h"
++#include "common.h"
++#include "rcar-gen2.h"
 +
-+static const struct rcar_sysc_area r8a7743_areas[] __initconst = {
-+	{ "always-on",	    0, 0, R8A7743_PD_ALWAYS_ON,	-1, PD_ALWAYS_ON },
-+	{ "ca15-scu",	0x180, 0, R8A7743_PD_CA15_SCU,	R8A7743_PD_ALWAYS_ON,
-+	  PD_SCU },
-+	{ "ca15-cpu0",	 0x40, 0, R8A7743_PD_CA15_CPU0,	R8A7743_PD_CA15_SCU,
-+	  PD_CPU_NOCR },
-+	{ "ca15-cpu1",	 0x40, 1, R8A7743_PD_CA15_CPU1,	R8A7743_PD_CA15_SCU,
-+	  PD_CPU_NOCR },
-+	{ "sgx",	 0xc0, 0, R8A7743_PD_SGX,	R8A7743_PD_ALWAYS_ON },
++static const char * const r8a7743_boards_compat_dt[] __initconst = {
++	"renesas,r8a7743",
++	NULL,
 +};
 +
-+const struct rcar_sysc_info r8a7743_sysc_info __initconst = {
-+	.areas = r8a7743_areas,
-+	.num_areas = ARRAY_SIZE(r8a7743_areas),
-+};
-Index: renesas/drivers/soc/renesas/rcar-sysc.c
-===================================================================
---- renesas.orig/drivers/soc/renesas/rcar-sysc.c
-+++ renesas/drivers/soc/renesas/rcar-sysc.c
-@@ -275,6 +275,9 @@ finalize:
- }
- 
- static const struct of_device_id rcar_sysc_matches[] = {
-+#ifdef CONFIG_ARCH_R8A7743
-+	{ .compatible = "renesas,r8a7743-sysc", .data = &r8a7743_sysc_info },
-+#endif
- #ifdef CONFIG_ARCH_R8A7779
- 	{ .compatible = "renesas,r8a7779-sysc", .data = &r8a7779_sysc_info },
- #endif
-Index: renesas/drivers/soc/renesas/rcar-sysc.h
-===================================================================
---- renesas.orig/drivers/soc/renesas/rcar-sysc.h
-+++ renesas/drivers/soc/renesas/rcar-sysc.h
-@@ -50,6 +50,7 @@ struct rcar_sysc_info {
- 	unsigned int num_areas;
- };
- 
-+extern const struct rcar_sysc_info r8a7743_sysc_info;
- extern const struct rcar_sysc_info r8a7779_sysc_info;
- extern const struct rcar_sysc_info r8a7790_sysc_info;
- extern const struct rcar_sysc_info r8a7791_sysc_info;
++DT_MACHINE_START(R8A7743_DT, "Generic R8A7743 (Flattened Device Tree)")
++	.init_early	= shmobile_init_delay,
++	.init_time	= rcar_gen2_timer_init,
++	.init_late	= shmobile_init_late,
++	.reserve	= rcar_gen2_reserve,
++	.dt_compat	= r8a7743_boards_compat_dt,
++MACHINE_END
