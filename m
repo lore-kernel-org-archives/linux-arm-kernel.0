@@ -1,108 +1,73 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 29 Sep 2016 10:24:09 +0930
-Subject: [PATCH 1/8] pinctrl: aspeed: "Not enabled" is a significant mux
- state
-In-Reply-To: <a2fce70d4285ec2321a64a4f7145ea8a90d988b3.1474986045.git-series.andrew@aj.id.au>
+Date: Thu, 29 Sep 2016 10:24:13 +0930
+Subject: [PATCH 2/8] pinctrl: aspeed-g5: Fix names of GPID2 pins
+In-Reply-To: <69eda17c16684f4212a9f3e64d9587abfcc7ae74.1474986045.git-series.andrew@aj.id.au>
 References: <cover.115463f791b69859c5ce9dafd61a5755ea039f4b.1474986045.git-series.andrew@aj.id.au>
- <a2fce70d4285ec2321a64a4f7145ea8a90d988b3.1474986045.git-series.andrew@aj.id.au>
-Message-ID: <CACPK8XcWuZe9bCLAwX+FGvEjgMqQmEhGAR1V65hvCmKuTa-s7Q@mail.gmail.com>
+ <69eda17c16684f4212a9f3e64d9587abfcc7ae74.1474986045.git-series.andrew@aj.id.au>
+Message-ID: <CACPK8XchVHEn9cJKwkQWTDO+M2Luvc1Vd2K9+M1+umbsPcexqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Sep 28, 2016 at 12:20 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> Consider a scenario with one pin P that has two signals A and B, where A
-> is defined to be higher priority than B: That is, if the mux IP is in a
-> state that would consider both A and B to be active on P, then A will be
-> the active signal.
+> Fixes simple typos in the initial commit. There is no behavioural
+> change.
 >
-> To instead configure B as the active signal we must configure the mux so
-> that A is inactive. The mux state for signals can be described by
-> logical operations on one or more bits from one or more registers (a
-> "signal expression"), which in some cases leads to aliased mux states for
-> a particular signal. Further, signals described by multi-bit bitfields
-> often do not only need to record the states that would make them active
-> (the "enable" expressions), but also the states that makes them inactive
-> (the "disable" expressions). All of this combined leads to four possible
-> states for a signal:
->
->          1. A signal is active with respect to an "enable" expression
->          2. A signal is not active with respect to an "enable" expression
->          3. A signal is inactive with respect to a "disable" expression
->          4. A signal is not inactive with respect to a "disable" expression
->
-> In the case of P, if we are looking to activate B without explicitly
-> having configured A it's enough to consider A inactive if all of A's
-> "enable" signal expressions evaluate to "not active". If any evaluate to
-> "active" then the corresponding "disable" states must be applied so it
-> becomes inactive.
->
-> For example, on the AST2400 the pins composing GPIO bank H provide
-> signals ROMD8 through ROMD15 (high priority) and those for UART6 (low
-> priority). The mux states for ROMD8 through ROMD15 are aliased, i.e.
-> there are two mux states that result in the respective signals being
-> configured:
->
->          A. SCU90[6]=1
->          B. Strap[4,1:0]=100
->
-> Further, the second mux state is a 3-bit bitfield that explicitly
-> defines the enabled state but the disabled state is implicit, i.e. if
-> Strap[4,1:0] is not exactly "100" then ROMD8 through ROMD15 are not
-> considered active. This requires the mux function evaluation logic to
-> use approach 2. above, however the existing code was using approach 3.
-> The problem was brought to light on the Palmetto machines where the
-> strap register value is 0x120ce416, and prevented GPIO requests in bank
-> H from succeeding despite the hardware being in a position to allow
-> them.
->
-> Fixes: 318398c09a8d ("pinctrl: Add core pinctrl support for Aspeed SoCs")
+> Fixes: 56e57cb6c07f (pinctrl: Add pinctrl-aspeed-g5 driver)
+> Reported-by: Xo Wang <xow@google.com>
 > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-
-That's a decent commit message.
 
 Reviewed-by: Joel Stanley <joel@jms.id.au>
 
 > ---
->  drivers/pinctrl/aspeed/pinctrl-aspeed.c | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
+>  drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 >
-> diff --git a/drivers/pinctrl/aspeed/pinctrl-aspeed.c b/drivers/pinctrl/aspeed/pinctrl-aspeed.c
-> index 0391f9f13f3e..49aeba912531 100644
-> --- a/drivers/pinctrl/aspeed/pinctrl-aspeed.c
-> +++ b/drivers/pinctrl/aspeed/pinctrl-aspeed.c
-> @@ -166,13 +166,9 @@ static bool aspeed_sig_expr_set(const struct aspeed_sig_expr *expr,
->                                 bool enable, struct regmap *map)
->  {
->         int i;
-> -       bool ret;
-> -
-> -       ret = aspeed_sig_expr_eval(expr, enable, map);
-> -       if (ret)
-> -               return ret;
+> diff --git a/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c b/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c
+> index e1ab864e1a7f..14639834a5eb 100644
+> --- a/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c
+> +++ b/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c
+> @@ -151,21 +151,21 @@ FUNC_GROUP_DECL(GPID0, F19, E21);
 >
->         for (i = 0; i < expr->ndescs; i++) {
-> +               bool ret;
->                 const struct aspeed_sig_desc *desc = &expr->descs[i];
->                 u32 pattern = enable ? desc->enable : desc->disable;
+>  #define GPID2_DESC      SIG_DESC_SET(SCU8C, 9)
 >
-> @@ -199,12 +195,18 @@ static bool aspeed_sig_expr_set(const struct aspeed_sig_expr *expr,
->  static bool aspeed_sig_expr_enable(const struct aspeed_sig_expr *expr,
->                                    struct regmap *map)
->  {
-> +       if (aspeed_sig_expr_eval(expr, true, map))
-> +               return true;
-> +
->         return aspeed_sig_expr_set(expr, true, map);
->  }
+> -#define D20 26
+> +#define F20 26
+>  SIG_EXPR_LIST_DECL_SINGLE(SD2DAT0, SD2, SD2_DESC);
+>  SIG_EXPR_DECL(GPID2IN, GPID2, GPID2_DESC);
+>  SIG_EXPR_DECL(GPID2IN, GPID, GPID_DESC);
+>  SIG_EXPR_LIST_DECL_DUAL(GPID2IN, GPID2, GPID);
+> -MS_PIN_DECL(D20, GPIOD2, SD2DAT0, GPID2IN);
+> +MS_PIN_DECL(F20, GPIOD2, SD2DAT0, GPID2IN);
 >
->  static bool aspeed_sig_expr_disable(const struct aspeed_sig_expr *expr,
->                                     struct regmap *map)
->  {
-> +       if (!aspeed_sig_expr_eval(expr, true, map))
-> +               return true;
-> +
->         return aspeed_sig_expr_set(expr, false, map);
->  }
+> -#define D21 27
+> +#define D20 27
+>  SIG_EXPR_LIST_DECL_SINGLE(SD2DAT1, SD2, SD2_DESC);
+>  SIG_EXPR_DECL(GPID2OUT, GPID2, GPID2_DESC);
+>  SIG_EXPR_DECL(GPID2OUT, GPID, GPID_DESC);
+>  SIG_EXPR_LIST_DECL_DUAL(GPID2OUT, GPID2, GPID);
+> -MS_PIN_DECL(D21, GPIOD3, SD2DAT1, GPID2OUT);
+> +MS_PIN_DECL(D20, GPIOD3, SD2DAT1, GPID2OUT);
 >
+> -FUNC_GROUP_DECL(GPID2, D20, D21);
+> +FUNC_GROUP_DECL(GPID2, F20, D20);
+>
+>  #define GPIE_DESC      SIG_DESC_SET(HW_STRAP1, 21)
+>  #define GPIE0_DESC     SIG_DESC_SET(SCU8C, 12)
+> @@ -614,7 +614,6 @@ static struct pinctrl_pin_desc aspeed_g5_pins[ASPEED_G5_NR_PINS] = {
+>         ASPEED_PINCTRL_PIN(D10),
+>         ASPEED_PINCTRL_PIN(D2),
+>         ASPEED_PINCTRL_PIN(D20),
+> -       ASPEED_PINCTRL_PIN(D21),
+>         ASPEED_PINCTRL_PIN(D4),
+>         ASPEED_PINCTRL_PIN(D5),
+>         ASPEED_PINCTRL_PIN(D6),
+> @@ -630,6 +629,7 @@ static struct pinctrl_pin_desc aspeed_g5_pins[ASPEED_G5_NR_PINS] = {
+>         ASPEED_PINCTRL_PIN(E7),
+>         ASPEED_PINCTRL_PIN(E9),
+>         ASPEED_PINCTRL_PIN(F19),
+> +       ASPEED_PINCTRL_PIN(F20),
+>         ASPEED_PINCTRL_PIN(F9),
+>         ASPEED_PINCTRL_PIN(H20),
+>         ASPEED_PINCTRL_PIN(L1),
 > --
 > git-series 0.8.10
