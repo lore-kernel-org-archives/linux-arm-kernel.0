@@ -1,65 +1,227 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Thu, 29 Sep 2016 12:23:59 +0200
-Subject: [PATCH 3.12 003/119] arm64: Define AT_VECTOR_SIZE_ARCH for ARCH_DLINFO
-In-Reply-To: <a528a0fa6d67ebe60bfc762c72b316d28ed21dea.1475144721.git.jslaby@suse.cz>
-References: <a528a0fa6d67ebe60bfc762c72b316d28ed21dea.1475144721.git.jslaby@suse.cz>
-Message-ID: <29fe597d4b04182ebcf448b0b90cde7ff8f9d2f5.1475144721.git.jslaby@suse.cz>
+From: muhammadabdul.wahab@supelec.fr (Muhammad Abdul WAHAB)
+Date: Thu, 29 Sep 2016 12:26:13 +0200
+Subject: [PATCH] Adding Support for Coresight Components on Zynq 7000.
+Message-ID: <c6836102-9b7e-a9d9-bad9-34b100d4ae49@supelec.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Hogan <james.hogan@imgtec.com>
+The Coresight components are present on the Zynq SoC but the corresponding
+device tree entries are missing. This patch adds device tree entries for
+coresight components while explaining how it was done in order to allow
+porting towards other boards easily.
 
-3.12-stable review patch.  If anyone has any objections, please let me know.
+By adding the entries for Coresight components in the device tree: if no
+files are created in sysfile system, you need to contact the board designer
+to sort out the problem. On some boards, Coresight components are not
+powered on boot.
 
-===============
-
-commit 3146bc64d12377a74dbda12b96ea32da3774ae07 upstream.
-
-AT_VECTOR_SIZE_ARCH should be defined with the maximum number of
-NEW_AUX_ENT entries that ARCH_DLINFO can contain, but it wasn't defined
-for arm64 at all even though ARCH_DLINFO will contain one NEW_AUX_ENT
-for the VDSO address.
-
-This shouldn't be a problem as AT_VECTOR_SIZE_BASE includes space for
-AT_BASE_PLATFORM which arm64 doesn't use, but lets define it now and add
-the comment above ARCH_DLINFO as found in several other architectures to
-remind future modifiers of ARCH_DLINFO to keep AT_VECTOR_SIZE_ARCH up to
-date.
-
-Fixes: f668cd1673aa ("arm64: ELF definitions")
-Signed-off-by: James Hogan <james.hogan@imgtec.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Jiri Slaby <jslaby@suse.cz>
+Signed-off-by: Muhammad Abdul Wahab <muhammadabdul.wahab@centralesupelec.fr>
 ---
- arch/arm64/include/asm/elf.h         | 1 +
- arch/arm64/include/uapi/asm/auxvec.h | 2 ++
- 2 files changed, 3 insertions(+)
+The documentation file was very helpful
+(Documentation/devicetree/bindings/arm/coresight.txt). However, few details
+can be added to make it more clear for beginners.
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index e7fa87f9201b..a4e1758c44dc 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -124,6 +124,7 @@ extern unsigned long randomize_et_dyn(unsigned long base);
- 
- #define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
- 
-+/* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
- #define ARCH_DLINFO							\
- do {									\
- 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
-index 22d6d8885854..4cf0c17787a8 100644
---- a/arch/arm64/include/uapi/asm/auxvec.h
-+++ b/arch/arm64/include/uapi/asm/auxvec.h
-@@ -19,4 +19,6 @@
- /* vDSO location */
- #define AT_SYSINFO_EHDR	33
- 
-+#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
+Things to modify in device tree when changing the board are mainly:
+
+- address
+- `clocks` field
+- some references in other entries may be missing (e.g. for `CPU` field in
+   ETM/PTM component, references need to be created)
+
+Furthermore, the `reg` field should be adapted according to
+`#address-cells` and `#size-cells`. It may appear obvious, not for
+beginners.
+
+## Testing
+
+The trace sink components need to be enabled by accessing through sysfile
+system.
+
+     echo 1 > /sys/bus/coresight/devices/@addr.etb/enable\_sink
+
+Then enable the CS source component:
+
+     echo 1 > /sys/bus/coresight/devices/@addr.ptm/enable\_source
+
+By default, CS Source components are configured to trace the kernel.
+
+Then the trace can be read by dumping ETB.
+
+     dd if=/dev/@addr.etb of=trace_kernel.bin
+
+The trace can be visualized by:
+
+     hexdump -C trace_kernel.bin
+
+Or stored using:
+
+     hexdump -C trace_kernel.bin > trace_kernel.txt
+
+The trace need to be decoded to be readable. All these above steps can now
+be performed with Perf Library which was not available at the time I was
+playing with DT entries.
+
+--- linux-4.7/arch/arm/boot/dts/zynq-7000.dtsi.orig     2016-07-24 
+21:23:50.000000000 +0200
++++ linux-4.7/arch/arm/boot/dts/zynq-7000.dtsi    2016-09-28 
+19:13:52.651881000 +0200
+@@ -363,5 +363,159 @@
+              reg = <0xf8005000 0x1000>;
+              timeout-sec = <10>;
+          };
 +
- #endif
--- 
-2.10.0
++        etb at F8801000 {
++            compatible = "arm,coresight-etb10", "arm,primecell";
++            reg = <0xf8801000 0x1000>;
++            coresight-default-sink;
++            clocks = <&clkc 47>;
++            clock-names = "apb_pclk";
++
++            port {
++
++                endpoint at 0 {
++                    slave-mode;
++                    remote-endpoint = <0x8>;
++                    linux,phandle = <0xd>;
++                    phandle = <0xd>;
++                };
++            };
++        };
++
++        tpiu at F8803000 {
++            compatible = "arm,coresight-tpiu", "arm,primecell";
++            reg = <0xf8803000 0x1000>;
++            clocks = <&clkc 47>, <&clkc 16>;
++            clock-names = "apb_pclk", "fclk1";
++            clock-frequency=<0xee6b280>;
++
++            port {
++
++                endpoint at 0 {
++                    slave-mode;
++                    remote-endpoint = <0x9>;
++                    linux,phandle = <0xe>;
++                    phandle = <0xe>;
++                };
++            };
++        };
++
++        funnel at F8804000 {
++            compatible = "arm,coresight-funnel", "arm,primecell";
++            reg = <0xf8804000 0x1000>;
++            clocks = <&clkc 47>;
++            clock-names = "apb_pclk";
++
++            ports {
++                #address-cells = <0x1>;
++                #size-cells = <0x0>;
++
++                port at 0 {
++                    reg = <0x0>;
++
++                    endpoint {
++                        remote-endpoint = <0xa>;
++                        linux,phandle = <0xf>;
++                        phandle = <0xf>;
++                    };
++                };
++
++                port at 1 {
++                    reg = <0x0>;
++
++                    endpoint {
++                        slave-mode;
++                        remote-endpoint = <0xb>;
++                        linux,phandle = <0x11>;
++                        phandle = <0x11>;
++                    };
++                };
++
++                port at 2 {
++                    reg = <0x1>;
++
++                    endpoint {
++                        slave-mode;
++                        remote-endpoint = <0xc>;
++                        linux,phandle = <0x13>;
++                        phandle = <0x13>;
++                    };
++                };
++            };
++        };
++
++        replicator {
++            compatible = "arm,coresight-replicator";
++
++            ports {
++                #address-cells = <0x1>;
++                #size-cells = <0x0>;
++
++                port at 0 {
++                    reg = <0x0>;
++
++                    endpoint {
++                        remote-endpoint = <0xd>;
++                        linux,phandle = <0x8>;
++                        phandle = <0x8>;
++                    };
++                };
++
++                port at 1 {
++                    reg = <0x1>;
++
++                    endpoint {
++                        remote-endpoint = <0xe>;
++                        linux,phandle = <0x9>;
++                        phandle = <0x9>;
++                    };
++                };
++
++                port at 2 {
++                    reg = <0x0>;
++
++                    endpoint {
++                        slave-mode;
++                        remote-endpoint = <0xf>;
++                        linux,phandle = <0xa>;
++                        phandle = <0xa>;
++                    };
++                };
++            };
++        };
++
++        ptm0 at F889C000 {
++            compatible = "arm,coresight-etm3x", "arm,primecell";
++            reg = <0xf889c000 0x1000>;
++            cpu = <0x10>;
++            clocks = <&clkc 47>;
++            clock-names = "apb_pclk";
++
++            port {
++
++                endpoint {
++                    remote-endpoint = <0x11>;
++                    linux,phandle = <0xb>;
++                    phandle = <0xb>;
++                };
++            };
++        };
++
++        ptm1 at F889D000 {
++            compatible = "arm,coresight-etm3x", "arm,primecell";
++            reg = <0xf889d000 0x1000>;
++            cpu = <0x12>;
++            clocks = <&clkc 47>;
++            clock-names = "apb_pclk";
++
++            port {
++
++                endpoint {
++                    remote-endpoint = <0x13>;
++                    linux,phandle = <0xc>;
++                    phandle = <0xc>;
++                };
++            };
++        };
+      };
+  };
