@@ -1,57 +1,46 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu, 29 Sep 2016 10:59:52 +0200
-Subject: [PATCH] ARM: *: mm: Implement get_user_pages_fast()
-In-Reply-To: <CACOPJM6AC5TwSEPUA7Df8F-FuChrjVP1TWVNeSrHt6ZaSyFiGg@mail.gmail.com>
-References: <CACOPJM6AC5TwSEPUA7Df8F-FuChrjVP1TWVNeSrHt6ZaSyFiGg@mail.gmail.com>
-Message-ID: <20160929085952.GA15574@lnxartpec.se.axis.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 29 Sep 2016 10:15:19 +0100
+Subject: Crash seen on ARM Juno r1 with 4.8-rc8 when Coresight is enabled
+In-Reply-To: <CANLsYkypz383Smuqv3B5K3i9mzGxMdc1OJdc_tWQZ5qHWQCeJw@mail.gmail.com>
+References: <CAGhh56EPK0BYbjV_v7cehT+yuB=L3O-AkFR2mLQMDAS66zDgDg@mail.gmail.com>
+ <CANLsYkypz383Smuqv3B5K3i9mzGxMdc1OJdc_tWQZ5qHWQCeJw@mail.gmail.com>
+Message-ID: <941e74f1-a00c-e618-cf20-065b89d16191@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2016 at 07:00:28PM -0700, Yuriy Romanenko wrote:
-> +int get_user_pages_fast(unsigned long start, int nr_pages, int write,
-> + struct page **pages)
-> +{
-> + struct mm_struct *mm = current->mm;
-> + int ret;
-> + unsigned long page_addr = (start & PAGE_MASK);
-> + int nr = 0;
-> +
-> + struct gup_private_data private_data = {
-> + .nr = 0,
-> + .pages = pages,
-> + .write = write
-> + };
-> +
-> + struct mm_walk gup_walk = {
-> + .pte_entry = gup_pte_entry,
-> + .pte_hole = gup_pte_hole_entry,
-> + .mm = mm,
-> + .private = (void *)&private_data
-> + };
-> +
-> + ret = walk_page_range(page_addr,
-> + page_addr + nr_pages * PAGE_SIZE,
-> + &gup_walk);
-> + nr = ret ? ret : nr_pages;
+Hi Mathieu,
 
-walk_page_range() can't be called without the mmap_sem.
+On 28/09/16 18:41, Mathieu Poirier wrote:
+> On 28 September 2016 at 10:35, Venkatesh Vivekanandan
+> <venkatesh.vivekanandan@broadcom.com> wrote:
+>> Hi All,
+>>
+>> I am trying to boot 4.8-rc8 in ARM Juno r1 board with coresight
+>> enabled and could see crash. When coresight is disabled at kernel
+>> config, then it boots to the linux prompt with rootfs in USB.
+>>
+>> I am using UEFI binary that came along with Juno-r1 board.
+>>
+>> Used following Image and dtb,
+>>
 
-  * Locking:
-  *   Callers of walk_page_range() and walk_page_vma() should hold
-  *   @walk->mm->mmap_sem, because these function traverse vma list and/or
-  *   access to vma's data.
-  */
- int walk_page_range(unsigned long start, unsigned long end,
- 		    struct mm_walk *walk)
- {
- 	int err = 0;
- 	unsigned long next;
- 	struct vm_area_struct *vma;
- 
- 	if (start >= end)
- 		return -EINVAL;
- 
- 	if (!walk->mm)
- 		return -EINVAL;
- 
- 	VM_BUG_ON_MM(!rwsem_is_locked(&walk->mm->mmap_sem), walk->mm);
+[...]
+
+>
+> Thanks you for reporting this Vankatesh,
+>
+> Sudeep and Suzuki, can you guys help me with this - I don't have an R1
+> to test with.
+>
+
+R1 and R2 are almost same except A57 is replaced by A72.
+Anyways I reported the exact crash along with the fix sometime in June.
+It got missed in v4.8, but is already queued in linux-next(in-fact twice
+;), from your tree as well as greg's).
+
+e05b386c878d coresight: access conn->child_name only if it's initialised
+b8392153721c coresight: access conn->child_name only if it's initialised
+
+-- 
+Regards,
+Sudeep
