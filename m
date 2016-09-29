@@ -1,85 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 29 Sep 2016 17:08:47 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: Don't assume clock runs in
- suspend
-In-Reply-To: <20160928012309.GA29518@localhost>
-References: <20160916054917.16930-1-briannorris@chromium.org>
- <57DBA81F.2060404@arm.com> <20160919231441.GA60928@google.com>
- <57E0E97B.5000106@arm.com> <20160928012309.GA29518@localhost>
-Message-ID: <20160929170847.1227a312@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 29 Sep 2016 18:26:12 +0200
+Subject: [PATCH] KVM: arm/arm64: Fix occasional warning from the timer work
+ function
+Message-ID: <20160929162612.23171-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Sep 2016 18:23:11 -0700
-Brian Norris <briannorris@chromium.org> wrote:
+When a VCPU blocks (WFI) we arm (the verb, not the architecture) any
+timers scheduled to expire in the future to wake up the vcpu thread when
+appropriate.  Because such as wake up involves a vcpu kick, and the
+timer expire function can get called from interrupt context, and the
+kick may sleep, we have to schedule the kick in the work function.
 
-Hi Brian,
+The work function currently has a warning that gets raised if it turns
+out that the timer shouldn't fire when it's run, which was added because
+the idea was that then the work should never have been cancelled.
 
-> Hi Marc,
-> 
-> Thanks again for the help. I was checking with Rockchip on the details.
-> 
-> On Tue, Sep 20, 2016 at 08:47:07AM +0100, Marc Zyngier wrote:
-> > The counter is allowed to be clocked at a different rate, as long as it
-> > is incremented by the frequency ratio on each tick of the new frequency.
-> > In your case, the counter should increment by 750 on each tick of the
-> > 32kHz clock. If the rk3399 implementation doesn't do this, then this is
-> > a bug, and we need a quirk to work around it.  
-> 
-> I had hope that we could find a switch that would do the above for
-> rk3399, since other parts of the system (e.g., the PMU itself) support
-> switching from the 24MHz to 32KHz clock, but Rockchip confirmed that it
-> is indeed a HW quirk that the arch timer's counter does not support
-> clocking out ticks based on the 32KHz clock. So I'm planning to send a
-> v2 that adds a "arm,no-tick-in-suspend" property.
+However, the work function can run long after a vcpu thread gets
+scheduled again and the timer conditions can have changed as a result of
+running the vcpu, which would raise this warning.  This can happen on a
+busy system, for example.
 
-Fair enough.
+The solution is to simply not raise this warning, because a kick is
+never harmful.  Also, cancel any scheduled work when the vcpu thread is
+running anyway, since there is no need to run the work function anymore.
 
-> 
-> <Begin side note>
-> rk3288 (ARMv7 system widely used for our Chromebooks) has the same
-> issue, except the kernel we're using for production (based on v3.14)
-> doesn't have the following commit, which stopped utilizing the RTC:
-> 
-> commit 0fa88cb4b82b5cf7429bc1cef9db006ca035754e
-> Author: Xunlei Pang <pang.xunlei@linaro.org>
-> Date:   Wed Apr 1 20:34:38 2015 -0700
-> 
->     time, drivers/rtc: Don't bother with rtc_resume() for the nonstop clocksource
-> 
-> And any mainline testing on rk3288 doesn't see the problem, because
-> mainline doesn't support its lowest-power sleep modes well enough (see
-> ROCKCHIP_ARM_OFF_LOGIC_DEEP in arch/arm/mach-rockchip/pm.c).
+Reported-by: Matthias Brugger <mbrugger@suse.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/arch_timer.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Arghh... So even my favourite Chromebook (from which I'm typing this
-email) is affected? Not very nice...
-
-> <End side note>
-> 
-> > Note that such a quirk will have some other impacts, such as the
-> > gettimeofday implementation in the VDSO (which relies on the counter
-> > making forward progress). There could be other issues in the timer
-> > subsystem as well... This doesn't look like a pleasant thing to fix.  
-> 
-> How sure are you of these problems? I'm a bit new to the kernel
-> timekeeping subsystem, but doesn't this kind of code already have to
-> handle time adjustments like this when reprogramming the system time
-> (settimeofday())? And might we be covered for the suspend/resume case
-> when we allow the kernel to fall back to the RTC instead, which adjusts
-> the sleep delta with timekeeping_inject_sleeptime64()? And (weaker
-> evidence here) we haven't seen problems on rk3288 so far, at least
-> without the above referenced rtc commit 0fa88cb4b82. But admittedly
-> there are some differences between arch/{arm,arm64}/.
-
-The 32bit port only gained a VDSO recently (3.14 doesn't have it), and
-mainline doesn't switch the counter off, as you noted above.
-
-As for the 64bit kernel, it would be interesting to verify that on
-resume, the VDSO does return the right (corrected) value, and not
-something stale.
-
-Thanks,
-
-	M.
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 27a1f63..e136902 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -91,8 +91,6 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
+ 	vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
+ 	vcpu->arch.timer_cpu.armed = false;
+ 
+-	WARN_ON(!kvm_timer_should_fire(vcpu));
+-
+ 	/*
+ 	 * If the vcpu is blocked we want to wake it up so that it will see
+ 	 * the timer has expired when entering the guest.
+@@ -240,6 +238,9 @@ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	timer_disarm(timer);
++
++	/* No need for another thread to kick us if we're already running */
++	cancel_work_sync(&timer->expired);
+ }
+ 
+ /**
 -- 
-Jazz is not dead. It just smells funny.
+2.9.0
