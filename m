@@ -1,80 +1,127 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 29 Sep 2016 16:28:08 +0800
-Subject: [PATCH] mm/vmalloc: reduce the number of lazy_max_pages to
- reduce latency
-In-Reply-To: <20160929081818.GE28107@nuc-i3427.alporthouse.com>
-References: <20160929073411.3154-1-jszhang@marvell.com>
- <20160929081818.GE28107@nuc-i3427.alporthouse.com>
-Message-ID: <20160929162808.745c869b@xhacker>
+From: wangxiongfeng2@huawei.com (wangxiongfeng (C))
+Date: Thu, 29 Sep 2016 16:33:46 +0800
+Subject: [PATCH v12 0/8] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <1473763144-5653-1-git-send-email-fu.wei@linaro.org>
+References: <1473763144-5653-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <6a1af526-3500-e603-351f-2b2da5726140@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Sep 2016 09:18:18 +0100 Chris Wilson wrote:
+for sbsa watchdog part,  Tested-by:  wangxiongfeng2 at huawei.com on D05 board.
 
-> On Thu, Sep 29, 2016 at 03:34:11PM +0800, Jisheng Zhang wrote:
-> > On Marvell berlin arm64 platforms, I see the preemptoff tracer report
-> > a max 26543 us latency at __purge_vmap_area_lazy, this latency is an
-> > awfully bad for STB. And the ftrace log also shows __free_vmap_area
-> > contributes most latency now. I noticed that Joel mentioned the same
-> > issue[1] on x86 platform and gave two solutions, but it seems no patch
-> > is sent out for this purpose.
-> > 
-> > This patch adopts Joel's first solution, but I use 16MB per core
-> > rather than 8MB per core for the number of lazy_max_pages. After this
-> > patch, the preemptoff tracer reports a max 6455us latency, reduced to
-> > 1/4 of original result.  
+On 2016/9/13 18:38, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
 > 
-> My understanding is that
+> This patchset:
+>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>         1. Move some enums and marcos to header file;
+>         2. Add a new enum for spi type;
+>         3. Improve printk relevant code.
 > 
-> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-> index 91f44e78c516..3f7c6d6969ac 100644
-> --- a/mm/vmalloc.c
-> +++ b/mm/vmalloc.c
-> @@ -626,7 +626,6 @@ void set_iounmap_nonlazy(void)
->  static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
->                                         int sync, int force_flush)
->  {
-> -       static DEFINE_SPINLOCK(purge_lock);
->         struct llist_node *valist;
->         struct vmap_area *va;
->         struct vmap_area *n_va;
-> @@ -637,12 +636,6 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
->          * should not expect such behaviour. This just simplifies locking for
->          * the case that isn't actually used at the moment anyway.
->          */
-> -       if (!sync && !force_flush) {
-> -               if (!spin_trylock(&purge_lock))
-> -                       return;
-> -       } else
-> -               spin_lock(&purge_lock);
-> -
->         if (sync)
->                 purge_fragmented_blocks_allcpus();
->  
-> @@ -667,7 +660,6 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
->                         __free_vmap_area(va);
->                 spin_unlock(&vmap_area_lock);
-
-Hi Chris,
-
-Per my test, the bottleneck now is __free_vmap_area() over the valist, the
-iteration is protected with spinlock vmap_area_lock. So the larger lazy max
-pages, the longer valist, the bigger the latency.
-
-So besides above patch, we still need to remove vmap_are_lock or replace with
-mutex.
-
-Thanks,
-Jisheng
-
->         }
-> -       spin_unlock(&purge_lock);
->  }
->  
->  /*
+>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>     memory-mapped timer and SBSA Generic Watchdog timer.
+>     This driver can help to simplify all the relevant timer drivers,
+>     and separate all the ACPI GTDT knowledge from them.
 > 
+>     (3)Simplify ACPI code for arm_arch_timer
 > 
-> should now be safe. That should significantly reduce the preempt-disabled
-> section, I think.
-> -Chris
+>     (4)Add GTDT support for ARM memory-mapped timer
+> 
+> This patchset depends on the following patchset:
+> [UPDATE PATCH V11 1/8] ACPI: I/O Remapping Table (IORT) initial support
+> https://lkml.org/lkml/2016/9/12/949
+> 
+> This patchset has been tested on the following platforms:
+>     (1)ARM Foundation v8 model
+> 
+> Changelog:
+> v12: https://lkml.org/lkml/2016/9/13/
+>      Rebase to latest Linux 4.8-rc6
+>      Delete the confusing "skipping" in the error message.
+> 
+> V11: https://lkml.org/lkml/2016/9/6/354
+>      Rebase to latest Linux 4.8-rc5
+>      Delete typedef (suggested by checkpatch.pl)
+> 
+> V10: https://lkml.org/lkml/2016/7/26/215
+>      Drop the "readq" patch.
+>      Rebase to latest Linux 4.7.
+> 
+> V9: https://lkml.org/lkml/2016/7/25/345
+>     Improve pr_err message in acpi gtdt driver.
+>     Update Commit message for 7/9
+>     shorten the irq mapping function name
+>     Improve GTDT driver for memory-mapped timer
+> 
+> v8: https://lkml.org/lkml/2016/7/19/660
+>     Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+>     and also improve printk message.
+>     Simplify is_timer_block and is_watchdog.
+>     Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
+>     Delete __init in include/linux/acpi.h for GTDT API
+>     Make ARM64 select GTDT.
+>     Delete "#include <linux/module.h>" from acpi_gtdt.c
+>     Simplify GT block parse code.
+> 
+> v7: https://lkml.org/lkml/2016/7/13/769
+>     Move the GTDT driver to drivers/acpi/arm64
+>     Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+>     Merge 3 patches of GTDT parser driver.
+>     Fix the for_each_platform_timer bug.
+> 
+> v6: https://lkml.org/lkml/2016/6/29/580
+>     split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+>     and SBSA Generic Watchdog timer
+>     Improve driver by suggestions and example code from Daniel Lezcano
+> 
+> v5: https://lkml.org/lkml/2016/5/24/356
+>     Sorting out all patches, simplify the API of GTDT driver:
+>     GTDT driver just fills the data struct for arm_arch_timer driver.
+> 
+> v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+>     Delete the kvm relevant patches
+>     Separate two patches for sorting out the code for arm_arch_timer.
+>     Improve irq info export code to allow missing irq info in GTDT table.
+> 
+> v3: https://lkml.org/lkml/2016/2/1/658
+>     Improve GTDT driver code:
+>       (1)improve pr_* by defining pr_fmt(fmt)
+>       (2)simplify gtdt_sbsa_gwdt_init
+>       (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+>       to get GTDT table.
+>     Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+>     Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+> 
+> v2: https://lkml.org/lkml/2015/12/2/10
+>     Rebase to latest kernel version(4.4-rc3).
+>     Fix the bug about the config problem,
+>     use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+> 
+> v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+> 
+> Fu Wei (8):
+>   clocksource/drivers/arm_arch_timer: Move enums and defines to header
+>     file
+>   clocksource/drivers/arm_arch_timer: Add a new enum for spi type
+>   clocksource/drivers/arm_arch_timer: Improve printk relevant code
+>   acpi/arm64: Add GTDT table parse driver
+>   clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
+>   acpi/arm64: Add memory-mapped timer support in GTDT driver
+>   clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
+>     timer
+>   acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+> 
+>  arch/arm64/Kconfig                   |   1 +
+>  drivers/acpi/arm64/Kconfig           |   3 +
+>  drivers/acpi/arm64/Makefile          |   1 +
+>  drivers/acpi/arm64/gtdt.c            | 309 +++++++++++++++++++++++++++++++++++
+>  drivers/clocksource/Kconfig          |   2 +-
+>  drivers/clocksource/arm_arch_timer.c | 225 +++++++++++++++++--------
+>  drivers/watchdog/Kconfig             |   1 +
+>  include/clocksource/arm_arch_timer.h |  32 ++++
+>  include/linux/acpi.h                 |   7 +
+>  9 files changed, 510 insertions(+), 71 deletions(-)
+>  create mode 100644 drivers/acpi/arm64/gtdt.c
 > 
