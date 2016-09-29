@@ -1,42 +1,40 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 29 Sep 2016 15:34:11 +0800
-Subject: [PATCH] mm/vmalloc: reduce the number of lazy_max_pages to reduce
- latency
-Message-ID: <20160929073411.3154-1-jszhang@marvell.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 29 Sep 2016 09:40:00 +0200
+Subject: [PATCH v6 0/3] arm64 kexec-tools patches
+In-Reply-To: <f1331028-e20b-50a3-fdeb-1e24861c7f29@suse.com>
+ <20160923085840.GA22928@localhost.localdomain>
+Message-ID: <20160929074000.GB14497@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Marvell berlin arm64 platforms, I see the preemptoff tracer report
-a max 26543 us latency at __purge_vmap_area_lazy, this latency is an
-awfully bad for STB. And the ftrace log also shows __free_vmap_area
-contributes most latency now. I noticed that Joel mentioned the same
-issue[1] on x86 platform and gave two solutions, but it seems no patch
-is sent out for this purpose.
+On Wed, Sep 28, 2016 at 06:05:14PM +0200, Matthias Brugger wrote:
+> 
+> 
+> On 21/09/16 20:14, Geoff Levand wrote:
+> >This series adds the core support for kexec re-boot on ARM64.
+> >
+> 
+> I also tested on seattle.
+> 
+> Tested-By: Matthias Brugger <mbrugger@suse.com>
 
-This patch adopts Joel's first solution, but I use 16MB per core
-rather than 8MB per core for the number of lazy_max_pages. After this
-patch, the preemptoff tracer reports a max 6455us latency, reduced to
-1/4 of original result.
+On Fri, Sep 23, 2016 at 02:28:40PM +0530, Pratyush Anand wrote:
+> Hi Geoff,
+> 
+> On 21/09/2016:06:14:25 PM, Geoff Levand wrote:
+> > This series adds the core support for kexec re-boot on ARM64.
+> 
+> I tested this series with mustang and seattle and they work.
+> 
+> So you can use my "Tested-By: Pratyush Anand <panand@redhat.com>".
+> 
+> Just one Nitpick: In patch 2/3 arm64_header_check_msb(),
+> arm64_header_page_size() and arm64_header_placement() have been defined but they
+> have not been used anywhere. So, may be they can be removed.
 
-[1] http://lkml.iu.edu/hypermail/linux/kernel/1603.2/04803.html
+Thanks everyone, I have queued this up with the above tags.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- mm/vmalloc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Please consider a follow-up patch to remove the functions mentioned above.
 
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 91f44e7..66f377a 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -596,7 +596,7 @@ static unsigned long lazy_max_pages(void)
- 
- 	log = fls(num_online_cpus());
- 
--	return log * (32UL * 1024 * 1024 / PAGE_SIZE);
-+	return log * (16UL * 1024 * 1024 / PAGE_SIZE);
- }
- 
- static atomic_t vmap_lazy_nr = ATOMIC_INIT(0);
--- 
-2.9.3
+FWIW I tested v5 of this patchset on Renesas Gen3 R-Car H3 and M3-W and
+it seems to work fine.
