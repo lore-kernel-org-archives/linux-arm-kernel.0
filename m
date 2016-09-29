@@ -1,27 +1,29 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 29 Sep 2016 11:47:37 -0700
-Subject: next-20160929 build: 2 failures 4 warnings (next-20160929)
-In-Reply-To: <E1bpZhb-0002Oz-OQ@optimist>
-References: <E1bpZhb-0002Oz-OQ@optimist>
-Message-ID: <20160929184737.ragquwy2tmhxo5bn@sirena.org.uk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 29 Sep 2016 20:52:21 +0200
+Subject: [PATCH] ARM: dts: armada-xp-rn2120: drop wrong compatible for i2c0
+Message-ID: <20160929185221.23194-1-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2016 at 12:40:35PM +0100, Build bot for Mark Brown wrote:
+The compatible is supposed to be "marvell,mv78230-i2c", "marvell,mv64xxx-i2c",
+as provided by armada-xp.dtsi.
 
-For the past couple of days -next has been failing to build an ARM
-allmodconfig due to:
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-> 	arm-allmodconfig
-> ERROR: "__aeabi_uldivmod" [net/netfilter/xt_hashlimit.ko] undefined!
-
-which appears to be triggered by 11d5f15723c9 (netfilter: xt_hashlimit:
-Create revision 2 to support higher pps rates) introducing a division of
-a 64 bit number which should be done using do_div().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160929/faf6b914/attachment.sig>
+diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+index d19f44c70925..3e930fdbaabc 100644
+--- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
++++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+@@ -97,7 +97,6 @@
+ 			};
+ 
+ 			i2c at 11000 {
+-				compatible = "marvell,mv64xxx-i2c";
+ 				clock-frequency = <400000>;
+ 				status = "okay";
+ 
+-- 
+2.9.3
