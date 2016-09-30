@@ -1,45 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Sep 2016 19:25:17 +0200
-Subject: [PATCH] mtd: mtk: avoid warning in mtk_ecc_encode
-In-Reply-To: <20160930185139.15c8be66@bbrezillon>
-References: <20160930163429.380785-1-arnd@arndb.de>
- <20160930185139.15c8be66@bbrezillon>
-Message-ID: <201609301925.17577.arnd@arndb.de>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 30 Sep 2016 23:19:11 +0530
+Subject: [PATCH][V2] dmaengine: coh901318: fix integer overflow when
+ shifting more than 32 places
+In-Reply-To: <20160929181438.14374-1-colin.king@canonical.com>
+References: <20160929181438.14374-1-colin.king@canonical.com>
+Message-ID: <20160930174911.GW2467@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 September 2016, Boris Brezillon wrote:
-> > +     /* copy into possibly unaligned OOB region with actual length */
-> > +     memcpy(data + bytes, eccdata, len);
+On Thu, Sep 29, 2016 at 07:14:38PM +0100, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> Is it better than
-> 
->         for (i = 0; i < len; i += 4) {
->                 u32 val = __raw_readl(ecc->regs + ECC_ENCPAR(i / 4));
-> 
->                 memcpy(data + bytes + i, &val, min(len, 4));
->         }
-> 
-> I'm probably missing something, but what's the point of creating a
-> temporary buffer of 112 bytes on the stack since you'll have to copy
-> this data to the oob buffer at some point?
+> Currently U300_DMA_CHANNELS is set to 40, meaning that the shift of 1 can
+> be more than 32 places, which leads to a 32 bit integer overflow. Fix this
+> by using 1ULL instead of 1 before shifting it.  Also add braces on the
+> for-loop to keep with coding style conventions.
 
+Applied, thanks
 
-I tried something like that first, but wasn't too happy with it for
-a number of small reasons:
-
-- __raw_readl in a driver is not usually the right API, __memcpy32_from_io
-  uses it internally, but it's better for a driver not to rely on that,
-  in case we need some barriers (which we may in factt need for other drivers).
-
-- the min(len,4) expression is incorrect, fixing that makes it more complicated
-  again
-
-- I didn't like to call memcpy() multiple times, as that might get turned
-  into an external function call (the compiler is free to optimize small
-  memcpy calls or not).
-
-I agree that he 112 byte buffer isn't ideal either, it just seemed to
-be the lesser annoyance.
-
-	Arnd
+-- 
+~Vinod
