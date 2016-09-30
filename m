@@ -1,33 +1,35 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 30 Sep 2016 16:25:06 +0200
-Subject: [PATCH 3/6] arm: stmf32: Enable SYSCON
+Date: Fri, 30 Sep 2016 16:25:09 +0200
+Subject: [PATCH 6/6] ARM: dts: stm32f429: Add QSPI clock
 In-Reply-To: <1475245509-6487-1-git-send-email-gabriel.fernandez@st.com>
 References: <1475245509-6487-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1475245509-6487-4-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1475245509-6487-7-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-The clock drivers needs to disable the power domain write protection
-using syscon/regmap to enable RTC clock.
+This patch adds the QSPI clock for stm32f469 discovery board.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- arch/arm/configs/stm32_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/stm32f469-disco.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index 08786d8..f3b1ea5 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -49,6 +49,7 @@ CONFIG_SERIAL_STM32=y
- CONFIG_SERIAL_STM32_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
- # CONFIG_HWMON is not set
-+CONFIG_MFD_SYSCON=y
- # CONFIG_USB_SUPPORT is not set
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
+diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+index cb55ac8..80aecc0 100644
+--- a/arch/arm/boot/dts/stm32f469-disco.dts
++++ b/arch/arm/boot/dts/stm32f469-disco.dts
+@@ -66,6 +66,10 @@
+ 	};
+ };
+ 
++&rcc {
++	compatible = "st,stm32f46xx-rcc", "st,stm32-rcc";
++};
++
+ &clk_hse {
+ 	clock-frequency = <8000000>;
+ };
 -- 
 1.9.1
