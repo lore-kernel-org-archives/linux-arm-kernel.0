@@ -1,76 +1,55 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Fri, 30 Sep 2016 17:26:08 +0800
-Subject: [PATCH v4 1/2] mm/hugetlb: Introduce ARCH_HAS_GIGANTIC_PAGE
-In-Reply-To: <1475227569-63446-1-git-send-email-xieyisheng1@huawei.com>
-References: <1475227569-63446-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <1475227569-63446-2-git-send-email-xieyisheng1@huawei.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Fri, 30 Sep 2016 11:31:46 +0200
+Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
+In-Reply-To: <20160929190736.vgd3xylzm2nh32l4@gobelin>
+References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
+ <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
+ <20160929190736.vgd3xylzm2nh32l4@gobelin>
+Message-ID: <CAMpxmJVQwQPa6FK+UGe1f7n5LdWUQyN9g+hO3OHB7PFqWrNY=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid making ifdef get pretty unwieldy if many ARCHs support gigantic page.
-No functional change with this patch.
+2016-09-29 21:07 GMT+02:00 Karl Beldan <karl.beldan@gmail.com>:
+> Hi,
+>
+> On Thu, Sep 29, 2016 at 06:31:55PM +0200, Bartosz Golaszewski wrote:
+>> Default memory settings of da850 do not meet the throughput/latency
+>> requirements of tilcdc. This results in the image displayed being
+>> incorrect and the following warning being displayed by the LCDC
+>> drm driver:
+>>
+>>   tilcdc da8xx_lcdc.0: tilcdc_crtc_irq(0x00000020): FIFO underfow
+>>
+>> Reconfigure the LCDC priority to the highest. This is a workaround
+>> for the da850-lcdk board which has the LCD controller enabled in
+>> the device tree, but a long-term, system-wide fix is needed for
+>> all davinci boards.
+>>
+>> This patch has been modified for mainline linux. It comes from a
+>> downstream TI release for da850[1].
+>>
+>> Original author: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+>>
+>> [1] http://arago-project.org/git/projects/linux-davinci.git?p=projects/linux-davinci.git;a=commitdiff;h=b9bd39a34cc02c3ba2fc15539a2f0bc2b68d25da;hp=6f6c795faa6366a4ebc1037a0235edba6018a991
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>
+> FWIW, the quirks could be applied conditionnally depending on the lcdc
+> node presence in the DT, a bit like:
+> https://github.com/kbeldan/linux/commit/cf15572ffef8e8a0d8110b3f6b29bd401d0538be
+> https://github.com/kbeldan/linux/commit/07e4fff9958bc1625a96791dce284c163fbe9c43
+>
+>
+> Regards,
+> Karl
 
-Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
-Suggested-by: Michal Hocko <mhocko@suse.com>
-Acked-by: Michal Hocko <mhocko@suse.com>
-Acked-by: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
----
- arch/s390/Kconfig | 1 +
- arch/x86/Kconfig  | 1 +
- fs/Kconfig        | 3 +++
- mm/hugetlb.c      | 2 +-
- 4 files changed, 6 insertions(+), 1 deletion(-)
+Hi Karl,
 
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index c109f07..74a9e45 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -71,6 +71,7 @@ config S390
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-+	select ARCH_HAS_GIGANTIC_PAGE
- 	select ARCH_HAS_KCOV
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 2a1f0ce..aa0b26a 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -28,6 +28,7 @@ config X86
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_FAST_MULTIPLIER
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-+	select ARCH_HAS_GIGANTIC_PAGE		if X86_64
- 	select ARCH_HAS_KCOV			if X86_64
- 	select ARCH_HAS_PMEM_API		if X86_64
- 	select ARCH_HAS_MMIO_FLUSH
-diff --git a/fs/Kconfig b/fs/Kconfig
-index 2bc7ad7..b938205 100644
---- a/fs/Kconfig
-+++ b/fs/Kconfig
-@@ -199,6 +199,9 @@ config HUGETLBFS
- config HUGETLB_PAGE
- 	def_bool HUGETLBFS
- 
-+config ARCH_HAS_GIGANTIC_PAGE
-+	bool
-+
- source "fs/configfs/Kconfig"
- source "fs/efivarfs/Kconfig"
- 
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index 87e11d8..8488dcc 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -1022,7 +1022,7 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
- 		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
- 		nr_nodes--)
- 
--#if (defined(CONFIG_X86_64) || defined(CONFIG_S390)) && \
-+#if defined(CONFIG_ARCH_HAS_GIGANTIC_PAGE) && \
- 	((defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || \
- 	defined(CONFIG_CMA))
- static void destroy_compound_gigantic_page(struct page *page,
--- 
-1.7.12.4
+I decided to post the simplest possible way of this to get the lcdc
+working upstream. In parallel I'm working on a system-wide way of
+applying such quirks not only limited to device tree nodes' presence.
+Thanks for the info!
+
+Best regards,
+Bartosz Golaszewski
