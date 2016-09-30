@@ -1,52 +1,57 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 30 Sep 2016 15:48:01 +0200
-Subject: [PATCH 4/6] ARM: dts: da850-lcdk: add support for 1024x768
- resolution
-In-Reply-To: <20160930124942.ul737vxmdmkxqdre@gobelin>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-5-git-send-email-bgolaszewski@baylibre.com>
- <20160929185805.q2pdihajikgzo4lm@gobelin>
- <CAMpxmJVA+p1st7HzwoOJftArqpY-wUQb8WKbQFAEWnBOysxF6w@mail.gmail.com>
- <20160930124942.ul737vxmdmkxqdre@gobelin>
-Message-ID: <CAMpxmJX25Yx0Rget4bOUf+t2qn01bpbNGBwwVFfomK1h_2Oydg@mail.gmail.com>
+Date: Fri, 30 Sep 2016 15:52:44 +0200
+Subject: [PATCH v2] drm: tilcdc: add a da850-specific compatible string
+Message-ID: <1475243564-15765-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-09-30 14:49 GMT+02:00 Karl Beldan <karl.beldan@gmail.com>:
-> On Fri, Sep 30, 2016 at 11:37:57AM +0200, Bartosz Golaszewski wrote:
->> 2016-09-29 20:58 GMT+02:00 Karl Beldan <karl.beldan@gmail.com>:
->> > Hi,
->> >
->> > On Thu, Sep 29, 2016 at 06:31:53PM +0200, Bartosz Golaszewski wrote:
->> >> Add svga timings for 1024x768 resolution to the da850-lcdk
->> >> device tree.
->> >>
->> >
->>
->> [snip]
->>
->> >
->> > Why do you also call 1024x768 svga ?
->> >
->>
->> Thanks, should have been xga. will fix in v2.
->>
->> > I don't think the LCDK can cope with this resolution at this frequency
->> > (in terms of mem bandwidth), at least that's what I observed back in
->> > August. If confirmed I think it is worth mentioning in the log at least,
->> > but then I doubt adding this config would be useful.
->> >
->>
->> Thanks for the heads up. How would that manifest itself? This seems to
->> work fine for me - I'm not getting any warnings on a simple system -
->> maybe if I added some additional memory load it would complain.
->>
->
-> A mere dmesg > /dev/tty0 (or repeatedly cat-ting a file to /dev/tty0)
-> should suffice to make the issue visible and trigger FIFO underflows.
->
+Due to some potential tweaks for the da850 LCDC (for example: the
+required memory bandwith settings) we need a separate compatible
+for the IP present on the da850 boards.
 
-Thanks, this is correct unfortunately.
+Suggested-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+v1 -> v2:
+- added the new compatible to the bindings documentation
 
-Best regards,
-Bartosz Golaszewski
+ Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt | 4 ++--
+ drivers/gpu/drm/tilcdc/tilcdc_drv.c                         | 1 +
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt b/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
+index a83abd7..33b6e8a 100644
+--- a/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
++++ b/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
+@@ -1,7 +1,7 @@
+ Device-Tree bindings for tilcdc DRM driver
+ 
+ Required properties:
+- - compatible: value should be "ti,am33xx-tilcdc".
++ - compatible: value should be "ti,am33xx-tilcdc" or "ti,da850-tilcdc".
+  - interrupts: the interrupt number
+  - reg: base address and size of the LCDC device
+ 
+@@ -51,7 +51,7 @@ Optional nodes:
+ Example:
+ 
+ 	fb: fb at 4830e000 {
+-		compatible = "ti,am33xx-tilcdc";
++		compatible = "ti,am33xx-tilcdc", "ti,da850-tilcdc";
+ 		reg = <0x4830e000 0x1000>;
+ 		interrupt-parent = <&intc>;
+ 		interrupts = <36>;
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+index a694977..231f2c7 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
+@@ -723,6 +723,7 @@ static int tilcdc_pdev_remove(struct platform_device *pdev)
+ 
+ static struct of_device_id tilcdc_of_match[] = {
+ 		{ .compatible = "ti,am33xx-tilcdc", },
++		{ .compatible = "ti,da850-tilcdc", },
+ 		{ },
+ };
+ MODULE_DEVICE_TABLE(of, tilcdc_of_match);
+-- 
+2.9.3
