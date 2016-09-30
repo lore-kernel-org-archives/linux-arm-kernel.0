@@ -1,44 +1,30 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 30 Sep 2016 13:54:24 +0200
-Subject: [PATCHv4 2/3] tty/serial: at91: fix hardware handshake with GPIOs
-In-Reply-To: <CACQ1gAg21UEeyT_yGed58HB1gkwfg4LA8u5AVMkKsY=d5-EbMQ@mail.gmail.com>
-References: <20160930085801.21497-1-richard.genoud@gmail.com>
- <20160930085801.21497-3-richard.genoud@gmail.com>
- <20160930091230.qzd42qnelylmkqxe@pengutronix.de>
- <CACQ1gAgE+BvteH9y62PcRx_tA9_e2X11RCJ12PC98FK+5z98QQ@mail.gmail.com>
- <20160930111606.zcain6i4nsujsg5s@piout.net>
- <CACQ1gAg21UEeyT_yGed58HB1gkwfg4LA8u5AVMkKsY=d5-EbMQ@mail.gmail.com>
-Message-ID: <20160930115424.yhy6f72jomz5bknw@piout.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 30 Sep 2016 14:13:52 +0200
+Subject: [PATCH v4 5/5] ARM: sunxi: Enable VGA bridge
+In-Reply-To: <20160930121352.30184-1-maxime.ripard@free-electrons.com>
+References: <20160930121352.30184-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160930121352.30184-6-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/2016 at 13:45:47 +0200, Richard Genoud wrote :
-> 2016-09-30 13:16 GMT+02:00 Alexandre Belloni
-> <alexandre.belloni@free-electrons.com>:
-> > On 30/09/2016 at 13:04:28 +0200, Richard Genoud wrote :
-> >> Anyway, the problematics setups are all the setups with USMODE_HWHS
-> >> enabled on platform without Fifos or PDC,
-> >> i.e. all platforms but sama5d2 (Cyrille, correct me if I'm wrong).
-> >>
-> >
-> > This is a wrong assumption, at91rm9200 to at91sam9g45 all have a pdc.
-> > Please, don't break those platforms.
-> >
-> > The only affected platforms are sam9x5, sama5d3 and sama5d4.
-> Have you tested them ?
-> 
-> And why are you saying that rm9200 and g45 will be broken with this patch ?
-> If they have a pdc, they will fall in the case:
-> (atmel_use_pdc_rx(port) || atmel_use_fifo(port))
-> and thus use:
-> mode |= ATMEL_US_USMODE_HWHS;
-> 
-> won't they ?
+Enable the VGA bridge used on the A13-Olinuxino in the sunxi defconfig
 
-Well, this patch wouldn't have my ack if it was breaking them. However,
-I'm still not sure about 3/3.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/configs/sunxi_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 714da336ec86..d830e258db59 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -98,6 +98,7 @@ CONFIG_MEDIA_RC_SUPPORT=y
+ CONFIG_RC_DEVICES=y
+ CONFIG_IR_SUNXI=y
+ CONFIG_DRM=y
++CONFIG_DRM_RGB_TO_VGA=y
+ CONFIG_DRM_SUN4I=y
+ CONFIG_FB=y
+ CONFIG_FB_SIMPLE=y
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.9.3
