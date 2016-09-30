@@ -1,30 +1,112 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 30 Sep 2016 14:45:43 +0800
-Subject: [PATCH] drm/mediatek: stop using drm_vblank_count() as the hw frame
- counter
-Message-ID: <1475217943-12427-1-git-send-email-yt.shen@mediatek.com>
+From: l.majewski@majess.pl (Lukasz Majewski)
+Date: Fri, 30 Sep 2016 08:49:58 +0200
+Subject: [PATCH] pwm: imx: Port "pwm: imx: support output polarity
+ inversion" to Linux v4.7
+In-Reply-To: <20160911110112.564df4ab@jawa>
+References: <1473584109-10710-1-git-send-email-l.majewski@majess.pl>
+ <20160911110112.564df4ab@jawa>
+Message-ID: <20160930084958.2f3f6e3a@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-using drm_vblank_no_hw_counter() to eliminate kernel warning.
+Dear all,
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_drm_drv.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Dear Lothar, Stefan,
+> 
+> > This patch ports "pwm: imx: support output polarity inversion" patch
+> > set written by Lothar Wassmann (v6 from 10.2014).
+> > 
+> 
+> I've read the e-mail from Stefan regarding missing support for pwm-imx
+> polarity inversion feature.
+> 
+> I also would like to see it in ML. Hence, my patch. Lothar, please
+> feel free to squash it to your patches when you (I hope :-) ) will
+> prepare v7 of this feature.
+> 
+> I hope that this would help.
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index eebb7d8..e286193 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -239,7 +239,7 @@ static struct drm_driver mtk_drm_driver = {
- 	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME |
- 			   DRIVER_ATOMIC,
- 
--	.get_vblank_counter = drm_vblank_count,
-+	.get_vblank_counter = drm_vblank_no_hw_counter,
- 	.enable_vblank = mtk_drm_crtc_enable_vblank,
- 	.disable_vblank = mtk_drm_crtc_disable_vblank,
- 
--- 
-1.9.1
+Was there any decision about those patches?
+
+Would they be included to main line anytime soon?
+
+Best regards,
+?ukasz Majewski
+
+> 
+> Best regards,
+> ?ukasz Majewski
+> 
+> > It is used to control backlight of panels via inverted PWM signal.
+> > 
+> > The "inversion" of PWM output is not an issue at such devices, since
+> > separate GPIO pin is responsible for enabling and disabling the
+> > panel's backlight.
+> > 
+> > This patch should be put on top of:
+> > 
+> > https://patchwork.kernel.org/patch/5065841/
+> > https://patchwork.kernel.org/patch/5065821/
+> > https://patchwork.kernel.org/patch/5065811/
+> > 
+> > 
+> > Signed-off-by: Lukasz Majewski <l.majewski@majess.pl>
+> > ---
+> >  drivers/pwm/pwm-imx.c | 20 ++++++++++++++------
+> >  1 file changed, 14 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+> > index 471a99e..c37d223 100644
+> > --- a/drivers/pwm/pwm-imx.c
+> > +++ b/drivers/pwm/pwm-imx.c
+> > @@ -181,7 +181,7 @@ static int imx_pwm_config_v2(struct pwm_chip
+> > *chip, if (enable)
+> >  		cr |= MX3_PWMCR_EN;
+> >  
+> > -	if (pwm->polarity == PWM_POLARITY_INVERSED)
+> > +	if (pwm->args.polarity == PWM_POLARITY_INVERSED)
+> >  		cr |= MX3_PWMCR_POUTC;
+> >  
+> >  	writel(cr, imx->mmio_base + MX3_PWMCR);
+> > @@ -201,11 +201,6 @@ static void imx_pwm_set_enable_v2(struct
+> > pwm_chip *chip, bool enable) else
+> >  		val &= ~MX3_PWMCR_EN;
+> >  
+> > -	if (chip->pwms[0].polarity == PWM_POLARITY_INVERSED)
+> > -		val |= MX3_PWMCR_POUTC;
+> > -	else
+> > -		val &= ~MX3_PWMCR_POUTC;
+> > -
+> >  	writel(val, imx->mmio_base + MX3_PWMCR);
+> >  }
+> >  
+> > @@ -253,6 +248,19 @@ static int imx_pwm_set_polarity(struct pwm_chip
+> > *chip, struct pwm_device *pwm, enum pwm_polarity polarity)
+> >  {
+> >  	struct imx_chip *imx = to_imx_chip(chip);
+> > +	u32 val;
+> > +
+> > +	if (polarity == pwm->args.polarity)
+> > +		return 0;
+> > +
+> > +	val = readl(imx->mmio_base + MX3_PWMCR);
+> > +
+> > +	if (polarity == PWM_POLARITY_INVERSED)
+> > +		val |= MX3_PWMCR_POUTC;
+> > +	else
+> > +		val &= ~MX3_PWMCR_POUTC;
+> > +
+> > +	writel(val, imx->mmio_base + MX3_PWMCR);
+> >  
+> >  	dev_dbg(imx->chip.dev, "%s: polarity set to %s\n",
+> > __func__, polarity == PWM_POLARITY_INVERSED ? "inverted" :
+> > "normal");
+> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160930/22860f65/attachment.sig>
