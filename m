@@ -1,45 +1,92 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Sep 2016 14:13:48 +0200
-Subject: [PATCH v4 1/5] drm/sun4i: rgb: Remove the bridge enable/disable
- functions
+Date: Fri, 30 Sep 2016 14:13:50 +0200
+Subject: [PATCH v4 3/5] ARM: sun5i: a13-olinuxino: Enable VGA bridge
 In-Reply-To: <20160930121352.30184-1-maxime.ripard@free-electrons.com>
 References: <20160930121352.30184-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160930121352.30184-2-maxime.ripard@free-electrons.com>
+Message-ID: <20160930121352.30184-4-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atomic helpers already call the drm_bridge_enable on our behalf,
-there's no need to do it a second time.
+Now that we have support for the VGA bridges using our DRM driver, enable
+the display engine for the Olimex A13-Olinuxino.
 
-Reported-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_rgb.c | 6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 54 +++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index 4e4bea6f395c..d198ad7e5323 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -155,9 +155,6 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
- 	if (!IS_ERR(tcon->panel))
- 		drm_panel_prepare(tcon->panel);
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+index b3c234c65ea1..01ce7ea9032d 100644
+--- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+@@ -72,6 +72,47 @@
+ 			default-state = "on";
+ 		};
+ 	};
++
++	bridge {
++		compatible = "rgb-to-vga-bridge";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++
++				vga_bridge_in: endpoint {
++					remote-endpoint = <&tcon0_out_vga>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++
++				vga_bridge_out: endpoint {
++					remote-endpoint = <&vga_con_in>;
++				};
++			};
++		};
++	};
++
++	vga {
++		compatible = "vga-connector";
++
++		port {
++			vga_con_in: endpoint {
++				remote-endpoint = <&vga_bridge_out>;
++			};
++		};
++	};
++};
++
++&be0 {
++	status = "okay";
+ };
  
--	/* encoder->bridge can be NULL; drm_bridge_enable checks for it */
--	drm_bridge_enable(encoder->bridge);
--
- 	sun4i_tcon_channel_enable(tcon, 0);
+ &ehci0 {
+@@ -211,6 +252,19 @@
+ 	status = "okay";
+ };
  
- 	if (!IS_ERR(tcon->panel))
-@@ -177,9 +174,6 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
- 
- 	sun4i_tcon_channel_disable(tcon, 0);
- 
--	/* encoder->bridge can be NULL; drm_bridge_disable checks for it */
--	drm_bridge_disable(encoder->bridge);
--
- 	if (!IS_ERR(tcon->panel))
- 		drm_panel_unprepare(tcon->panel);
- }
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd_rgb666_pins>;
++	status = "okay";
++};
++
++&tcon0_out {
++	tcon0_out_vga: endpoint at 0 {
++		reg = <0>;
++		remote-endpoint = <&vga_bridge_in>;
++	};
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins_b>;
 -- 
 2.9.3
