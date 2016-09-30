@@ -1,42 +1,143 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 30 Sep 2016 15:13:24 -0700
-Subject: [PATCH v5 3/3] pci:aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <VI1PR0401MB17090ED60A826FDCBFB8B33D92F60@VI1PR0401MB1709.eurprd04.prod.outlook.com>
-References: <1472625442-23309-2-git-send-email-po.liu@nxp.com>
- <1473741659-17618-1-git-send-email-po.liu@nxp.com>
- <1473741659-17618-3-git-send-email-po.liu@nxp.com>
- <20160918005212.GF15478@tiger>
- <VI1PR0401MB1709F91B0C1EB6C80D741E4492F50@VI1PR0401MB1709.eurprd04.prod.outlook.com>
- <20160920123926.GA3744@tiger>
- <VI1PR0401MB17090ED60A826FDCBFB8B33D92F60@VI1PR0401MB1709.eurprd04.prod.outlook.com>
-Message-ID: <20160930221323.GC2373@x250>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Fri, 30 Sep 2016 22:42:45 +0000
+Subject: [PATCH v2 1/1] arm64: Add DTS support for FSL's LS1012A SoC
+In-Reply-To: <AM4PR0401MB2275F9FBAE954BD420AA67F98CC10@AM4PR0401MB2275.eurprd04.prod.outlook.com>
+References: <1472207241-18461-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <20160829095239.GM30790@tiger>
+ <AM4PR0401MB22753C87DE074EE7BF456CE48CC10@AM4PR0401MB2275.eurprd04.prod.outlook.com>
+ <VI1PR0401MB2638683943A984F9C638F4A88DC10@VI1PR0401MB2638.eurprd04.prod.outlook.com>
+ <AM4PR0401MB2275F9FBAE954BD420AA67F98CC10@AM4PR0401MB2275.eurprd04.prod.outlook.com>
+Message-ID: <VI1PR0401MB2638893C7424783A2A98FDB78DC10@VI1PR0401MB2638.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2016 at 06:54:59AM +0000, Po Liu wrote:
-> >  > >  Will the new kernel work with existing/old DTB?  I'm trying to
-> >  > > understand the dependency between driver and DTS changes.
-> >  >
-> >  > Yes, We've never use name 'intr' before. So we remove it is ok.
-> >  > 'aer' is a dts name for researching it's true interrupt number by
-> >  kernel. This patch is first time to use name 'aer'. So it must be
-> >  compatible with existing/old DTB.
-> >  
-> >  Does that mean driver and DTS changes can go through separate trees, i.e.
-> >  PCI and arm-soc, without introducing regressions on either tree?
-> >  Or does the patch series needs to go in as a whole?
+
+
+> -----Original Message-----
+> From: Bhaskar U
+> Sent: Friday, September 30, 2016 4:13 PM
+> To: Stuart Yoder <stuart.yoder@nxp.com>; Shawn Guo <shawnguo@kernel.org>
+> Cc: devicetree at vger.kernel.org; oss at buserror.net; Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>;
+> linux-devel at gforge.freescale.net; Pratiyush Srivastava <pratiyush.srivastava@nxp.com>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: [PATCH v2 1/1] arm64: Add DTS support for FSL's LS1012A SoC
 > 
-> Should be as a whole. The driver base on the dts. Or else, the driver would not found the 'aer' point.
+> 
+> 
+> >-----Original Message-----
+> >From: Stuart Yoder
+> >Sent: Friday, September 30, 2016 7:26 PM
+> >To: Bhaskar U <bhaskar.upadhaya@nxp.com>; Shawn Guo
+> ><shawnguo@kernel.org>
+> >Cc: devicetree at vger.kernel.org; oss at buserror.net; Prabhakar Kushwaha
+> ><prabhakar.kushwaha@nxp.com>; linux-devel at gforge.freescale.net; Pratiyush
+> >Srivastava <pratiyush.srivastava@nxp.com>; linux-arm-
+> >kernel at lists.infradead.org
+> >Subject: RE: [PATCH v2 1/1] arm64: Add DTS support for FSL's LS1012A SoC
+> >
+> >> >> +&qspi {
+> >> >> +	num-cs = <2>;
+> >> >> +	bus-num = <0>;
+> >> >> +	status = "disabled";
+> >> >
+> >> >Why is it being disabled?
+> >>
+> >> Ok, will change like below.
+> >> status = "okay";
+> >
+> >The comment was not "change this to okay".  The question is why is this disabled?
+> >Can you explain why it was disabled?   Should it have been disasbled?  Is qspi
+> >working and tested on this board?
+> 
+> The intension of putting the status in disabled state is that the qspi functionality is not tested with
+> the up-streamed kernel.
+> Yes qspi is working and tested on this board with 4.1 kernel version.
 
-Let me try to understand this one more time.  So if the new kernel boots
-with an existing DTB, the driver will fail to find 'aer' interrupt,
-right?  My question is that in this case, the driver will just stop
-working or keep working in the same way as old kernel.  The former case
-is a regression which breaks old DTB support, and the latter is pretty
-much like that we are adding a new support, and the DTS change can go
-independently with driver part through different subsystem tree.
+If the qspi is supported and you have a high degree of confidence that the
+node is correct based on testing on 4.1, I would say keep the node and
+mark it as "ok".
 
-Hope I make my question clear this time.
+> >>
+> >> >
+> >> >> +	fsl,ddr-sampling-point = <4>;
+> >> >
+> >> >I do not find the bindings for this property, neither how driver supports it.
+> >>
+> >> Yes the QSPI DDR mode is not yet up-streamed, so  I will remove this property
+> >as of now.
+> >>
+> >> >
+> >> >> +
+> >> >> +	qflash0: s25fs512s at 0 {
+> >> >> +		compatible = "spansion,m25p80";
+> >> >> +		#address-cells = <1>;
+> >> >> +		#size-cells = <1>;
+> >> >> +		spi-max-frequency = <20000000>;
+> >> >> +		m25p,fast-read;
+> >> >> +		reg = <0>;
+> >> >> +	};
+> >> >> +};
+> >> >> +
+> >> >> +&i2c0 {
+> >> >> +	status = "okay";
+> >> >> +
+> >> >> +	codec: sgtl5000 at a {
+> >> >> +		#sound-dai-cells = <0>;
+> >> >> +		compatible = "fsl,sgtl5000";
+> >> >> +		reg = <0xa>;
+> >> >> +		VDDA-supply = <&reg_1p8v>;
+> >> >> +		VDDIO-supply = <&reg_1p8v>;
+> >> >> +		clocks = <&sys_mclk>;
+> >> >> +	};
+> >> >> +};
+> >> >> +
+> >> >> +&duart0 {
+> >> >> +	status = "okay";
+> >> >> +};
+> >> >> +
+> >> >> +&esdhc0 {
+> >> >> +	status = "disabled";
+> >> >
+> >> >We prefer to disable devices which have board level options by
+> >> >default in <soc>.dtsi, and enable them per availability in <board>.dts.
+> >>
+> >> Ok , will make the status as okay i.e. status = "okay";
+> >
+> >Again, the feedback was not "set this to okay".  Why was esdhc0 set to "disabled"
+> >here in the first place?  Was there a reason?
+> >
+> >The comment is that if there are certain boards where esdhc0 is not available,
+> >then fsl-ls1012a.dtsi should set this to "disabled" and board .dts files should
+> >override it.
+> 
+> esdhc0 is not there on this board so shall we mark the status in disabled state ?
 
-Shawn
+If it's not there then it should be disabled, but it should be set to disabled
+in the dtsi file (not the dts).
+
+> >
+> >> >
+> >> >> +};
+> >> >> +
+> >> >> +&esdhc1 {
+> >> >> +	status = "disabled";
+> >> >> +};
+> >> >> +
+> >> >> +&sai2 {
+> >> >> +	status = "disabled";
+> >> >> +};
+> >
+> >Same comment for the above nodes.  The fsl-ls1012a.dtsi should set them to
+> >disabled and any .dts file should override with "ok" if applicable.
+> 
+> esdhc1 is not there on the board, so shall we keep the status of esdhc1 in disabled state ?
+
+If it's not there on the board, then yes, mark as disabled.
+
+> sai2 is working and tested on this board, so shall we put the sai2 status as  "okay" ?
+> Earlier when we kept sai2 status as disabled, by that time sai2 was not tested but now it is working
+> fine.
+
+If the board supports it and it's been tested, then yes mark as "okay".
+
+Stuart
