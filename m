@@ -1,53 +1,45 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 30 Sep 2016 10:16:28 -0700
-Subject: [PATCH 3/3] arm64: dump: Add checking for writable and exectuable
- pages
-In-Reply-To: <20160930164147.GD1729@remoulade>
-References: <20160929213257.30505-1-labbott@redhat.com>
- <20160929213257.30505-4-labbott@redhat.com>
- <20160930155814.GA1729@remoulade>
- <CAGXu5jJHohnRBxQAY-S7_iccgjc6xNUdBGb67b1-cOATyO-q0A@mail.gmail.com>
- <20160930164147.GD1729@remoulade>
-Message-ID: <CAGXu5jK_HDf=YnPfueKhoCP63JA-Q6KFU_0BQ6RFd3Um5aOg7Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Sep 2016 19:25:17 +0200
+Subject: [PATCH] mtd: mtk: avoid warning in mtk_ecc_encode
+In-Reply-To: <20160930185139.15c8be66@bbrezillon>
+References: <20160930163429.380785-1-arnd@arndb.de>
+ <20160930185139.15c8be66@bbrezillon>
+Message-ID: <201609301925.17577.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2016 at 9:41 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Sep 30, 2016 at 09:25:45AM -0700, Kees Cook wrote:
->> On Fri, Sep 30, 2016 at 8:58 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->
->> > Would it be worth verifying that all kernel mappings are UXN, too?
->> >
->> > ARMv8 allows execute-only mappings, and a !UXN mapping could result in an info
->> > leak (e.g. pointers in MOVZ+MOVK sequences), or potential asynchronous issues
->> > (e.g. user instruction fetches accessing read-destructive device registers).
->> > All kernel mappings *should* be UXN.
->>
->> I love this idea, but based on what came up with hardened usercopy,
->> there are a lot of readers of kernel memory still. I think the
->> expectations around UXN need to be clarified so we can reason about
->> things like perf that want to read the kernel text.
->
-> The UXN (User eXecute Never) bit only controls whether userspace can execute a
-> page, not whether the kernel can read it. The RW permissions come from the AP
-> bits regardless.
+On Friday 30 September 2016, Boris Brezillon wrote:
+> > +     /* copy into possibly unaligned OOB region with actual length */
+> > +     memcpy(data + bytes, eccdata, len);
+> 
+> Is it better than
+> 
+>         for (i = 0; i < len; i += 4) {
+>                 u32 val = __raw_readl(ecc->regs + ECC_ENCPAR(i / 4));
+> 
+>                 memcpy(data + bytes + i, &val, min(len, 4));
+>         }
+> 
+> I'm probably missing something, but what's the point of creating a
+> temporary buffer of 112 bytes on the stack since you'll have to copy
+> this data to the oob buffer at some point?
 
-Ah! Sorry, I misunderstood. Yeah, UXN checking makes sense there then. :)
 
-> We already try to ensure that all kernel memory is UXN by construction, so this
-> would just be a sanity check, as with the rest of the W^X checks.
->
-> The MOVZ+MOVK case above is where a sequence of 16-bit immediate MOVs are used
-> to encode a pointer. If a kernel mapping lacked UXN, userspace could execute it
-> (unprivileged), and extract the pointer generated into a GPR.
->
-> Having kernel exec-only memory is a different story entirely, though I agree
-> it's something to look into.
+I tried something like that first, but wasn't too happy with it for
+a number of small reasons:
 
-Yeah, this'll need to get sorted out for x86 too.
+- __raw_readl in a driver is not usually the right API, __memcpy32_from_io
+  uses it internally, but it's better for a driver not to rely on that,
+  in case we need some barriers (which we may in factt need for other drivers).
 
--Kees
+- the min(len,4) expression is incorrect, fixing that makes it more complicated
+  again
 
--- 
-Kees Cook
-Nexus Security
+- I didn't like to call memcpy() multiple times, as that might get turned
+  into an external function call (the compiler is free to optimize small
+  memcpy calls or not).
+
+I agree that he 112 byte buffer isn't ideal either, it just seemed to
+be the lesser annoyance.
+
+	Arnd
