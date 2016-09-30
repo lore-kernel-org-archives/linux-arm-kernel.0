@@ -1,143 +1,78 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Fri, 30 Sep 2016 22:42:45 +0000
-Subject: [PATCH v2 1/1] arm64: Add DTS support for FSL's LS1012A SoC
-In-Reply-To: <AM4PR0401MB2275F9FBAE954BD420AA67F98CC10@AM4PR0401MB2275.eurprd04.prod.outlook.com>
-References: <1472207241-18461-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <20160829095239.GM30790@tiger>
- <AM4PR0401MB22753C87DE074EE7BF456CE48CC10@AM4PR0401MB2275.eurprd04.prod.outlook.com>
- <VI1PR0401MB2638683943A984F9C638F4A88DC10@VI1PR0401MB2638.eurprd04.prod.outlook.com>
- <AM4PR0401MB2275F9FBAE954BD420AA67F98CC10@AM4PR0401MB2275.eurprd04.prod.outlook.com>
-Message-ID: <VI1PR0401MB2638893C7424783A2A98FDB78DC10@VI1PR0401MB2638.eurprd04.prod.outlook.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 30 Sep 2016 16:01:55 -0700
+Subject: [PATCH] efi/arm: fix absolute relocation detection for older
+ toolchains
+Message-ID: <1475276515-21801-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When building the ARM kernel with CONFIG_EFI=y, the following build
+error may occur when using a less recent version of binutils (2.23 or
+older):
 
+   STUBCPY drivers/firmware/efi/libstub/lib-sort.stub.o
+ 00000000 R_ARM_ABS32       sort
+ 00000004 R_ARM_ABS32       __ksymtab_strings
+ drivers/firmware/efi/libstub/lib-sort.stub.o: absolute symbol references
+ not allowed in the EFI stub
 
-> -----Original Message-----
-> From: Bhaskar U
-> Sent: Friday, September 30, 2016 4:13 PM
-> To: Stuart Yoder <stuart.yoder@nxp.com>; Shawn Guo <shawnguo@kernel.org>
-> Cc: devicetree at vger.kernel.org; oss at buserror.net; Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>;
-> linux-devel at gforge.freescale.net; Pratiyush Srivastava <pratiyush.srivastava@nxp.com>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: RE: [PATCH v2 1/1] arm64: Add DTS support for FSL's LS1012A SoC
-> 
-> 
-> 
-> >-----Original Message-----
-> >From: Stuart Yoder
-> >Sent: Friday, September 30, 2016 7:26 PM
-> >To: Bhaskar U <bhaskar.upadhaya@nxp.com>; Shawn Guo
-> ><shawnguo@kernel.org>
-> >Cc: devicetree at vger.kernel.org; oss at buserror.net; Prabhakar Kushwaha
-> ><prabhakar.kushwaha@nxp.com>; linux-devel at gforge.freescale.net; Pratiyush
-> >Srivastava <pratiyush.srivastava@nxp.com>; linux-arm-
-> >kernel at lists.infradead.org
-> >Subject: RE: [PATCH v2 1/1] arm64: Add DTS support for FSL's LS1012A SoC
-> >
-> >> >> +&qspi {
-> >> >> +	num-cs = <2>;
-> >> >> +	bus-num = <0>;
-> >> >> +	status = "disabled";
-> >> >
-> >> >Why is it being disabled?
-> >>
-> >> Ok, will change like below.
-> >> status = "okay";
-> >
-> >The comment was not "change this to okay".  The question is why is this disabled?
-> >Can you explain why it was disabled?   Should it have been disasbled?  Is qspi
-> >working and tested on this board?
-> 
-> The intension of putting the status in disabled state is that the qspi functionality is not tested with
-> the up-streamed kernel.
-> Yes qspi is working and tested on this board with 4.1 kernel version.
+(and when building with debug symbols, the list above is much longer, and
+contains all the internal references between the .debug sections and the
+actual code)
 
-If the qspi is supported and you have a high degree of confidence that the
-node is correct based on testing on 4.1, I would say keep the node and
-mark it as "ok".
+This issue is caused by the fact that objcopy v2.23 or earlier does not
+support wildcards in its -R and -j options, which means the following
+line from the Makefile:
 
-> >>
-> >> >
-> >> >> +	fsl,ddr-sampling-point = <4>;
-> >> >
-> >> >I do not find the bindings for this property, neither how driver supports it.
-> >>
-> >> Yes the QSPI DDR mode is not yet up-streamed, so  I will remove this property
-> >as of now.
-> >>
-> >> >
-> >> >> +
-> >> >> +	qflash0: s25fs512s at 0 {
-> >> >> +		compatible = "spansion,m25p80";
-> >> >> +		#address-cells = <1>;
-> >> >> +		#size-cells = <1>;
-> >> >> +		spi-max-frequency = <20000000>;
-> >> >> +		m25p,fast-read;
-> >> >> +		reg = <0>;
-> >> >> +	};
-> >> >> +};
-> >> >> +
-> >> >> +&i2c0 {
-> >> >> +	status = "okay";
-> >> >> +
-> >> >> +	codec: sgtl5000 at a {
-> >> >> +		#sound-dai-cells = <0>;
-> >> >> +		compatible = "fsl,sgtl5000";
-> >> >> +		reg = <0xa>;
-> >> >> +		VDDA-supply = <&reg_1p8v>;
-> >> >> +		VDDIO-supply = <&reg_1p8v>;
-> >> >> +		clocks = <&sys_mclk>;
-> >> >> +	};
-> >> >> +};
-> >> >> +
-> >> >> +&duart0 {
-> >> >> +	status = "okay";
-> >> >> +};
-> >> >> +
-> >> >> +&esdhc0 {
-> >> >> +	status = "disabled";
-> >> >
-> >> >We prefer to disable devices which have board level options by
-> >> >default in <soc>.dtsi, and enable them per availability in <board>.dts.
-> >>
-> >> Ok , will make the status as okay i.e. status = "okay";
-> >
-> >Again, the feedback was not "set this to okay".  Why was esdhc0 set to "disabled"
-> >here in the first place?  Was there a reason?
-> >
-> >The comment is that if there are certain boards where esdhc0 is not available,
-> >then fsl-ls1012a.dtsi should set this to "disabled" and board .dts files should
-> >override it.
-> 
-> esdhc0 is not there on this board so shall we mark the status in disabled state ?
+  STUBCOPY_FLAGS-y		:= -R .debug* -R *ksymtab* -R *kcrctab*
 
-If it's not there then it should be disabled, but it should be set to disabled
-in the dtsi file (not the dts).
+fails to take effect, leaving harmless absolute relocations in the binary
+that are indistinguishable from relocations that may cause crashes at
+runtime due to the fact that these relocations are resolved at link time
+using the virtual address of the kernel, which is always different from
+the address at which the EFI firmware loads and invokes the stub.
 
-> >
-> >> >
-> >> >> +};
-> >> >> +
-> >> >> +&esdhc1 {
-> >> >> +	status = "disabled";
-> >> >> +};
-> >> >> +
-> >> >> +&sai2 {
-> >> >> +	status = "disabled";
-> >> >> +};
-> >
-> >Same comment for the above nodes.  The fsl-ls1012a.dtsi should set them to
-> >disabled and any .dts file should override with "ok" if applicable.
-> 
-> esdhc1 is not there on the board, so shall we keep the status of esdhc1 in disabled state ?
+So, as a workaround, disable debug symbols explicitly when building the
+stub for ARM, and strip the ksymtab and kcrctab symbols for the only
+exported symbol we currently reuse in the stub, which is 'sort'.
 
-If it's not there on the board, then yes, mark as disabled.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-> sai2 is working and tested on this board, so shall we put the sai2 status as  "okay" ?
-> Earlier when we kept sai2 status as disabled, by that time sai2 was not tested but now it is working
-> fine.
+This is a workaround for now. We can revisit this when a need arises to copy
+more kernel code into the stub, by which time we could put in a more elaborate
+fix, or decide to no longer care about 'older' versions of objcopy.
 
-If the board supports it and it's been tested, then yes mark as "okay".
+Since this fixes an ARM specific issue and only affects ARM specific Makefile
+variables, I am happy for this to go on top of the arm-soc patch that enables
+CONFIG_EFI for ARM's multi_v7_defconfig (queued for v4.9), given that we have
+no other changes queued in linux-efi that should conflict with this patch.
 
-Stuart
+Matt, any concerns?
+
+ drivers/firmware/efi/libstub/Makefile | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index c06945160a41..5e23e2d305e7 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -11,7 +11,7 @@ cflags-$(CONFIG_X86)		+= -m$(BITS) -D__KERNEL__ $(LINUX_INCLUDE) -O2 \
+ 				   -mno-mmx -mno-sse
+ 
+ cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS))
+-cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
++cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) -g0 \
+ 				   -fno-builtin -fpic -mno-single-pic-base
+ 
+ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+@@ -79,5 +79,6 @@ quiet_cmd_stubcopy = STUBCPY $@
+ # decompressor. So move our .data to .data.efistub, which is preserved
+ # explicitly by the decompressor linker script.
+ #
+-STUBCOPY_FLAGS-$(CONFIG_ARM)	+= --rename-section .data=.data.efistub
++STUBCOPY_FLAGS-$(CONFIG_ARM)	+= --rename-section .data=.data.efistub \
++				   -R ___ksymtab+sort -R ___kcrctab+sort
+ STUBCOPY_RELOC-$(CONFIG_ARM)	:= R_ARM_ABS
+-- 
+2.7.4
