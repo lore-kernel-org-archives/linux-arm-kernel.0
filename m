@@ -1,112 +1,60 @@
-From: l.majewski@majess.pl (Lukasz Majewski)
-Date: Fri, 30 Sep 2016 08:49:58 +0200
-Subject: [PATCH] pwm: imx: Port "pwm: imx: support output polarity
- inversion" to Linux v4.7
-In-Reply-To: <20160911110112.564df4ab@jawa>
-References: <1473584109-10710-1-git-send-email-l.majewski@majess.pl>
- <20160911110112.564df4ab@jawa>
-Message-ID: <20160930084958.2f3f6e3a@jawa>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Fri, 30 Sep 2016 00:03:26 -0700
+Subject: [PATCH v2] arm64: make rpm failed due to incorrect path to
+ Image.gz
+In-Reply-To: <1475160367-2633-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+References: <1475160367-2633-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20160930070325.GA3834@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+[Adding Will Deacon]
+Sorry, should do this at the very beginning. (
 
-> Dear Lothar, Stefan,
+On Thu, Sep 29, 2016 at 07:46:07AM -0700, Vadim Lomovtsev wrote:
+> The "make rpm" and "make rpm-pkg" commands for arm64 platform
+> are broken due to rpmbuild couldn't find Image.gz file at
+> default location (which is kernel src root):
+>  cp: cannot stat 'Image.gz': No such file or directory
+>  error: Bad exit status from /var/tmp/rpm-tmp.ocFBmP (%install)
 > 
-> > This patch ports "pwm: imx: support output polarity inversion" patch
-> > set written by Lothar Wassmann (v6 from 10.2014).
-> > 
+> While the correct path to arm64 kernel image file
+> is "arch/arm64/boot/Image.gz".
 > 
-> I've read the e-mail from Stefan regarding missing support for pwm-imx
-> polarity inversion feature.
+> The exact file name (Image.gz) is stored at KBUILD_IMAGE variable
+> and read by rpmbuild with "make image_name" command at
+> install phase after kernel build is complete.
 > 
-> I also would like to see it in ML. Hence, my patch. Lothar, please
-> feel free to squash it to your patches when you (I hope :-) ) will
-> prepare v7 of this feature.
+> Accordingly to Michal's Marek comment the KBUILD_IMAGE
+> variable has to be set to point to actual file.
 > 
-> I hope that this would help.
-
-Was there any decision about those patches?
-
-Would they be included to main line anytime soon?
-
-Best regards,
-?ukasz Majewski
-
+> Since the KBUILD_IMAGE variable is used in general cases of
+> build we need to prevent other build types breakage by changing it.
 > 
-> Best regards,
-> ?ukasz Majewski
+> The solution is to add to arch/arm64/Makefie extra target "image_name"
+> with dependency "KBUILD_IMAGE:=<proper path to Image.gz file>".
+> Thus it will allow to set proper path to Image.gz file only for
+> the "image_name" build target and this exact value will be picked up
+> while rpm build install phase.
 > 
-> > It is used to control backlight of panels via inverted PWM signal.
-> > 
-> > The "inversion" of PWM output is not an issue at such devices, since
-> > separate GPIO pin is responsible for enabling and disabling the
-> > panel's backlight.
-> > 
-> > This patch should be put on top of:
-> > 
-> > https://patchwork.kernel.org/patch/5065841/
-> > https://patchwork.kernel.org/patch/5065821/
-> > https://patchwork.kernel.org/patch/5065811/
-> > 
-> > 
-> > Signed-off-by: Lukasz Majewski <l.majewski@majess.pl>
-> > ---
-> >  drivers/pwm/pwm-imx.c | 20 ++++++++++++++------
-> >  1 file changed, 14 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-> > index 471a99e..c37d223 100644
-> > --- a/drivers/pwm/pwm-imx.c
-> > +++ b/drivers/pwm/pwm-imx.c
-> > @@ -181,7 +181,7 @@ static int imx_pwm_config_v2(struct pwm_chip
-> > *chip, if (enable)
-> >  		cr |= MX3_PWMCR_EN;
-> >  
-> > -	if (pwm->polarity == PWM_POLARITY_INVERSED)
-> > +	if (pwm->args.polarity == PWM_POLARITY_INVERSED)
-> >  		cr |= MX3_PWMCR_POUTC;
-> >  
-> >  	writel(cr, imx->mmio_base + MX3_PWMCR);
-> > @@ -201,11 +201,6 @@ static void imx_pwm_set_enable_v2(struct
-> > pwm_chip *chip, bool enable) else
-> >  		val &= ~MX3_PWMCR_EN;
-> >  
-> > -	if (chip->pwms[0].polarity == PWM_POLARITY_INVERSED)
-> > -		val |= MX3_PWMCR_POUTC;
-> > -	else
-> > -		val &= ~MX3_PWMCR_POUTC;
-> > -
-> >  	writel(val, imx->mmio_base + MX3_PWMCR);
-> >  }
-> >  
-> > @@ -253,6 +248,19 @@ static int imx_pwm_set_polarity(struct pwm_chip
-> > *chip, struct pwm_device *pwm, enum pwm_polarity polarity)
-> >  {
-> >  	struct imx_chip *imx = to_imx_chip(chip);
-> > +	u32 val;
-> > +
-> > +	if (polarity == pwm->args.polarity)
-> > +		return 0;
-> > +
-> > +	val = readl(imx->mmio_base + MX3_PWMCR);
-> > +
-> > +	if (polarity == PWM_POLARITY_INVERSED)
-> > +		val |= MX3_PWMCR_POUTC;
-> > +	else
-> > +		val &= ~MX3_PWMCR_POUTC;
-> > +
-> > +	writel(val, imx->mmio_base + MX3_PWMCR);
-> >  
-> >  	dev_dbg(imx->chip.dev, "%s: polarity set to %s\n",
-> > __func__, polarity == PWM_POLARITY_INVERSED ? "inverted" :
-> > "normal");
+> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+> ---
+>  arch/arm64/Makefile | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160930/22860f65/attachment.sig>
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index ab51aed..09926d3 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -101,6 +101,8 @@ all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
+>  
+>  boot := arch/arm64/boot
+>  
+> +image_name: KBUILD_IMAGE :=$(boot)/$(KBUILD_IMAGE)
+> +
+>  Image: vmlinux
+>  	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+>  
+> -- 
+> 1.8.3.1
+> 
