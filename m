@@ -1,24 +1,19 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 30 Sep 2016 12:00:04 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable BCM47xx/BCM5301x drivers
-In-Reply-To: <1472339552-9960-1-git-send-email-f.fainelli@gmail.com>
-References: <1472339552-9960-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <2a25e754-6327-b8b2-32f9-07050a24ca63@gmail.com>
+Date: Fri, 30 Sep 2016 12:00:51 -0700
+Subject: [PATCH 1/3] ARM: BCM5301X: Add separated DTS include file for
+ BCM47094
+In-Reply-To: <20160921205838.15627-1-zajec5@gmail.com>
+References: <20160921205838.15627-1-zajec5@gmail.com>
+Message-ID: <a2985e5d-1695-cce0-b1a6-b08a7e89c967@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2016 04:12 PM, Florian Fainelli wrote:
-> Add a bunch of required drivers and subsystems:
+On 09/21/2016 01:58 PM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> - BCMA is the on-chip discoverable bus which registers a bunch of
->   peripherals
-> - Enable the BCM47xx watchdog driver to get working system reboot
-> - Enable the BCM47xx NVRAM/SPROM drivers to be able to fetch MAC
->   addresses and other variables needed for system operation
-> - Make BGMAC (built-in Ethernet adapter) a module
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Use it to store BCM47094 specific properties/values and avoid repeating
+> them in device DTS files.
 
-Applied to defconfig/next.
+Series applied, thanks!
 -- 
 Florian
