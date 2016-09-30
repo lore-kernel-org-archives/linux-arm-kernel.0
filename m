@@ -1,32 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Sep 2016 16:33:20 +0200
-Subject: [PATCH] drm/sun4i: Check that the plane coordinates are not negative
-Message-ID: <20160930143320.26241-1-maxime.ripard@free-electrons.com>
+Date: Fri, 30 Sep 2016 16:37:05 +0200
+Subject: [PATCH v5 1/5] drm/sun4i: rgb: Remove the bridge enable/disable
+ functions
+In-Reply-To: <20160930143709.1388-1-maxime.ripard@free-electrons.com>
+References: <20160930143709.1388-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160930143709.1388-2-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our planes cannot be set at negative coordinates. Make sure we reject such
-configuration.
+The atomic helpers already call the drm_bridge_enable on our behalf,
+there's no need to do it a second time.
 
-Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reported-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_rgb.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index f0035bf5efea..f5463c4c2cde 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -29,6 +29,9 @@ struct sun4i_plane_desc {
- static int sun4i_backend_layer_atomic_check(struct drm_plane *plane,
- 					    struct drm_plane_state *state)
- {
-+	if ((state->crtc_x < 0) || (state->crtc_y < 0))
-+		return -EINVAL;
-+
- 	return 0;
- }
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index 4e4bea6f395c..d198ad7e5323 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -155,9 +155,6 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+ 	if (!IS_ERR(tcon->panel))
+ 		drm_panel_prepare(tcon->panel);
  
+-	/* encoder->bridge can be NULL; drm_bridge_enable checks for it */
+-	drm_bridge_enable(encoder->bridge);
+-
+ 	sun4i_tcon_channel_enable(tcon, 0);
+ 
+ 	if (!IS_ERR(tcon->panel))
+@@ -177,9 +174,6 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+ 
+ 	sun4i_tcon_channel_disable(tcon, 0);
+ 
+-	/* encoder->bridge can be NULL; drm_bridge_disable checks for it */
+-	drm_bridge_disable(encoder->bridge);
+-
+ 	if (!IS_ERR(tcon->panel))
+ 		drm_panel_unprepare(tcon->panel);
+ }
 -- 
 2.9.3
