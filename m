@@ -1,60 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 30 Sep 2016 19:51:28 +0530
-Subject: [PATCH 3/6] ARM: dts: da850-lcdk: enable the LCD controller
-In-Reply-To: <1475166715-7857-4-git-send-email-bgolaszewski@baylibre.com>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-4-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <29c3b30d-ce3f-078d-03a4-a98b0ae0cddc@ti.com>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Fri, 30 Sep 2016 16:25:03 +0200
+Subject: [PATCH 0/6] STM32F4 Add RTC & QSPI clocks
+Message-ID: <1475245509-6487-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 September 2016 10:01 PM, Bartosz Golaszewski wrote:
-> From: Karl Beldan <kbeldan@baylibre.com>
-> 
-> This adds the pins used by the LCD controller, and uses 'tilcdc,panel'
-> with some default timings for 800x600.
-> 
-> Tested on an LCDK connected on the VGA port (the LCDC is connected to
-> this port via a THS8135).
-> 
-> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> [Bartosz:
->   - fixed whitespace errors
->   - tweaked the description
->   - fixed the incorrect hback-porch value
->   - other minor tweaks]
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-> +	lcd_pins: pinmux_lcd_pins {
-> +		pinctrl-single,bits = <
-> +			/*
-> +			 * LCD_D[2], LCD_D[3], LCD_D[4], LCD_D[5],
-> +			 * LCD_D[6], LCD_D[7]
-> +			 */
-> +			0x40 0x22222200 0xffffff00
-> +			/*
-> +			 * LCD_D[10], LCD_D[11], LCD_D[12], LCD_D[13],
-> +			 * LCD_D[14], LCD_D[15], LCD_D[0], LCD_D[1]
-> +			 */
-> +			0x44 0x22222222 0xffffffff
-> +			/* LCD_D[8], LCD_D[9] */
-> +			0x48 0x00000022 0x000000ff
-> +
-> +			/* LCD_PCLK */
-> +			0x48 0x02000000 0x0f000000
-> +			/* LCD_AC_ENB_CS, LCD_VSYNC, LCD_HSYNC */
-> +			0x4c 0x02000022 0x0f0000ff
-> +		>;
-> +	};
+This patch-set introduce RTC and QSPI clocks for STM32F4 socs
+RTC clock has 3 parents clock oscillators (lsi/lse/hse_rtc)
 
-Since almost all boards that use LCD will configure the pins in the same
-way, we can move this to da850.dtsi. Please see existing examples of the
-same.
+example to use rtc clock:
 
-The only place where we don't do this is if the common pinmux definition
-may not find much reuse because of differing nature of how the external
-peripherals are interfaced.
+		rtc: rtc at 40002800 {
+			compatible = "st,stm32-rtc";
+			reg = <0x40002800 0x400>;
+			...
+			clocks = <&rcc 1 CLK_RTC>;
 
-Thanks,
-Sekhar
+			assigned-clocks =  <&rcc 1 CLK_RTC>;
+			assigned-clock-parents = <&rcc 1 CLK_LSE>;
+			...
+		};
+
+Gabriel Fernandez (6):
+  clk: stm32f4: Add LSI & LSE clocks
+  ARM: dts: stm32f429: add LSI and LSE clocks
+  arm: stmf32: Enable SYSCON
+  clk: stm32f4: Add RTC clock
+  clk: stm32f469: Add QSPI clock
+  ARM: dts: stm32f429: Add QSPI clock
+
+ .../devicetree/bindings/clock/st,stm32-rcc.txt     |   4 +-
+ arch/arm/boot/dts/stm32f429.dtsi                   |  18 +
+ arch/arm/boot/dts/stm32f469-disco.dts              |   4 +
+ arch/arm/configs/stm32_defconfig                   |   1 +
+ drivers/clk/clk-stm32f4.c                          | 450 ++++++++++++++++++++-
+ 5 files changed, 455 insertions(+), 22 deletions(-)
+
+-- 
+1.9.1
