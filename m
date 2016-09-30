@@ -1,37 +1,44 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 30 Sep 2016 17:17:32 +0530
-Subject: [PATCH 4/6] ARM: dts: da850-lcdk: add support for 1024x768
- resolution
-In-Reply-To: <CAMpxmJVA+p1st7HzwoOJftArqpY-wUQb8WKbQFAEWnBOysxF6w@mail.gmail.com>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-5-git-send-email-bgolaszewski@baylibre.com>
- <20160929185805.q2pdihajikgzo4lm@gobelin>
- <CAMpxmJVA+p1st7HzwoOJftArqpY-wUQb8WKbQFAEWnBOysxF6w@mail.gmail.com>
-Message-ID: <2ae49789-1857-8a74-401e-6f1d27c71fae@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 30 Sep 2016 13:54:24 +0200
+Subject: [PATCHv4 2/3] tty/serial: at91: fix hardware handshake with GPIOs
+In-Reply-To: <CACQ1gAg21UEeyT_yGed58HB1gkwfg4LA8u5AVMkKsY=d5-EbMQ@mail.gmail.com>
+References: <20160930085801.21497-1-richard.genoud@gmail.com>
+ <20160930085801.21497-3-richard.genoud@gmail.com>
+ <20160930091230.qzd42qnelylmkqxe@pengutronix.de>
+ <CACQ1gAgE+BvteH9y62PcRx_tA9_e2X11RCJ12PC98FK+5z98QQ@mail.gmail.com>
+ <20160930111606.zcain6i4nsujsg5s@piout.net>
+ <CACQ1gAg21UEeyT_yGed58HB1gkwfg4LA8u5AVMkKsY=d5-EbMQ@mail.gmail.com>
+Message-ID: <20160930115424.yhy6f72jomz5bknw@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 September 2016 03:07 PM, Bartosz Golaszewski wrote:
-> 2016-09-29 20:58 GMT+02:00 Karl Beldan <karl.beldan@gmail.com>:
->> Hi,
->>
->> On Thu, Sep 29, 2016 at 06:31:53PM +0200, Bartosz Golaszewski wrote:
->>> Add svga timings for 1024x768 resolution to the da850-lcdk
->>> device tree.
->>>
->>
+On 30/09/2016 at 13:45:47 +0200, Richard Genoud wrote :
+> 2016-09-30 13:16 GMT+02:00 Alexandre Belloni
+> <alexandre.belloni@free-electrons.com>:
+> > On 30/09/2016 at 13:04:28 +0200, Richard Genoud wrote :
+> >> Anyway, the problematics setups are all the setups with USMODE_HWHS
+> >> enabled on platform without Fifos or PDC,
+> >> i.e. all platforms but sama5d2 (Cyrille, correct me if I'm wrong).
+> >>
+> >
+> > This is a wrong assumption, at91rm9200 to at91sam9g45 all have a pdc.
+> > Please, don't break those platforms.
+> >
+> > The only affected platforms are sam9x5, sama5d3 and sama5d4.
+> Have you tested them ?
 > 
-> [snip]
+> And why are you saying that rm9200 and g45 will be broken with this patch ?
+> If they have a pdc, they will fall in the case:
+> (atmel_use_pdc_rx(port) || atmel_use_fifo(port))
+> and thus use:
+> mode |= ATMEL_US_USMODE_HWHS;
 > 
->>
->> Why do you also call 1024x768 svga ?
->>
-> 
-> Thanks, should have been xga. will fix in v2.
+> won't they ?
 
-When you send the v2, can you please include the driver folks too. I am
-no expert on DRM and LCDC and would like to ensure they had a look at
-the dts patches too.
+Well, this patch wouldn't have my ack if it was breaking them. However,
+I'm still not sure about 3/3.
 
-Thanks,
-Sekhar
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
