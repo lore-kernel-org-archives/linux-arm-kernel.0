@@ -1,70 +1,75 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 30 Sep 2016 22:19:21 +0300
-Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
-In-Reply-To: <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
- <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
- <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
-Message-ID: <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 30 Sep 2016 12:23:12 -0700
+Subject: [GIT PULL 1/4] Broadcom devicetree changes for 4.9 (part 2)
+Message-ID: <1475263395-27653-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2016 06:06 PM, Bartosz Golaszewski wrote:
-> 2016-09-30 14:59 GMT+02:00 Peter Ujfalusi <peter.ujfalusi@ti.com>:
->> On 09/29/16 19:31, Bartosz Golaszewski wrote:
->>> Default memory settings of da850 do not meet the throughput/latency
->>> requirements of tilcdc. This results in the image displayed being
->>> incorrect and the following warning being displayed by the LCDC
->>> drm driver:
->>>
->>>   tilcdc da8xx_lcdc.0: tilcdc_crtc_irq(0x00000020): FIFO underfow
->>>
->>> Reconfigure the LCDC priority to the highest. This is a workaround
->>> for the da850-lcdk board which has the LCD controller enabled in
->>> the device tree, but a long-term, system-wide fix is needed for
->>> all davinci boards.
->>>
->>> This patch has been modified for mainline linux. It comes from a
->>> downstream TI release for da850[1].
->>>
->>> Original author: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
->>>
-> 
-> [snip]
-> 
->>
->> Is this safe to do for all da850 boards (to change PR_OLD_COUNT from 0xff to
->> 0x20)? Most probably it is, but this setting has nothing to do with LCDC.
->>
->> The whole priority configuration has nothing to do with the LCDC, it is a
->> system level priority.
->>
->> Now you have lowered the eDMA3_0-TPTC0/1 priority. Audio is serviced by
->> eDMA3_0-TPTC1. So are we going to see issues in audio if LCDC is taking the
->> highest priority?
->>
-> 
-> Just ran a quick test with speaker-test -c2 -twav. Besides the fact
-> that the left and right channels are inverted (I'm looking into that),
-> I didn't notice any problems. Even at 1024x768 resolution, playing
-> audio at the same time seems to work fine.
+The following changes since commit 7260ecd22baa3c62ef6efaf59e7de53f4c8df800:
 
-That's good to hear, but I think the priorities should be set:
-LCDC and EDMA30TC1 to highest priority
-EDMA30TC0 to priority 2
+  Merge tag 'bcm2835-dt-next-2016-08-29' into devicetree/next (2016-08-30 20:02:04 -0700)
 
-The 0TC0 is used by MMC and if you want to play a video you might need the
-servicing TC to be higher priority then other masters.
+are available in the git repository at:
 
-If audio playback would trigger sync losts in lcdc then we might need to move
-0TC1 to priority 1.
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.9/devicetree-part2
 
-I agree that LCDC priority needs to be higher, but I do wonder why the default
-(5) is not working and if it is not working why it is 5...
+for you to fetch changes up to ef3bc318adeb15b38688df6a583bafea2befce43:
 
-My guess is that the change in the PBBPR register is the one actually helping
-here.
+  ARM: BCM5301X: Add DT for Luxul XWR-3100 (2016-09-30 11:58:31 -0700)
 
--- 
-P?ter
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoCs Device Tree changes for 4.9,
+please pull the following:
+
+- Rafal adds support for the Netgear R8500 routers, adds basic support
+  for the Tenda AC9 router which uses the new BCM53573 SoC (single core Cortex
+  A7). He also enables the UART on the Netgear R8000 and restructures the
+  include files a bit for the BCM47094 SoC, finally he adds USB 3.0 PHY nodes
+  which enables USB 3.0 on BCM5301X devices that support it
+
+- Kamal adds support for the QSPI controller on the Northstar Plus SoCs and updates
+  the bcm958625k reference board to have it enabled
+
+- Dan adds support for the Luxul XAP-1510 and XWR-3100 devices
+
+----------------------------------------------------------------
+Dan Haab (2):
+      ARM: BCM5301X: Add DT for Luxul XAP-1510
+      ARM: BCM5301X: Add DT for Luxul XWR-3100
+
+Kamal Dasu (1):
+      ARM: dts: NSP: Add QSPI nodes to NSPI and bcm958625k DTSes
+
+Rafa? Mi?ecki (5):
+      ARM: BCM5301X: Add DT for Netgear R8500
+      ARM: BCM5301X: Add basic dts for BCM53573 based Tenda AC9
+      ARM: BCM5301X: Add separated DTS include file for BCM47094
+      ARM: BCM5301X: Enable UART on Netgear R8000
+      ARM: BCM5301X: Specify USB 3.0 PHY in DT
+
+ arch/arm/boot/dts/Makefile                        |   5 +
+ arch/arm/boot/dts/bcm-nsp.dtsi                    |  31 ++++-
+ arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts      |  64 ++++++++++
+ arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts       |   2 +-
+ arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts |   2 +-
+ arch/arm/boot/dts/bcm4709-netgear-r7000.dts       |   2 +-
+ arch/arm/boot/dts/bcm4709-netgear-r8000.dts       |   6 +-
+ arch/arm/boot/dts/bcm4709.dtsi                    |  11 ++
+ arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts     |   3 +-
+ arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts     | 111 ++++++++++++++++
+ arch/arm/boot/dts/bcm47094-netgear-r8500.dts      | 103 +++++++++++++++
+ arch/arm/boot/dts/bcm47094.dtsi                   |  17 +++
+ arch/arm/boot/dts/bcm47189-tenda-ac9.dts          |  74 +++++++++++
+ arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi     |  13 ++
+ arch/arm/boot/dts/bcm5301x.dtsi                   |   7 ++
+ arch/arm/boot/dts/bcm53573.dtsi                   | 147 ++++++++++++++++++++++
+ arch/arm/boot/dts/bcm958625k.dts                  |  34 +++++
+ 17 files changed, 625 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
+ create mode 100644 arch/arm/boot/dts/bcm4709.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
+ create mode 100644 arch/arm/boot/dts/bcm47094-netgear-r8500.dts
+ create mode 100644 arch/arm/boot/dts/bcm47094.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm47189-tenda-ac9.dts
+ create mode 100644 arch/arm/boot/dts/bcm5301x-nand-cs0-bch4.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm53573.dtsi
