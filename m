@@ -1,78 +1,149 @@
-From: karl.beldan@gmail.com (Karl Beldan)
-Date: Fri, 30 Sep 2016 13:15:44 +0000
-Subject: [PATCH 3/6] ARM: dts: da850-lcdk: enable the LCD controller
-In-Reply-To: <CAMpxmJU45aP7=vs5h6s2T=v-gB5q06AvhGJdcRV9WDgNzs+Enw@mail.gmail.com>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-4-git-send-email-bgolaszewski@baylibre.com>
- <20160929184001.yooxkwulqgioak6a@gobelin>
- <CAMpxmJU45aP7=vs5h6s2T=v-gB5q06AvhGJdcRV9WDgNzs+Enw@mail.gmail.com>
-Message-ID: <20160930131544.265ljbjdnt2kiop3@gobelin>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 30 Sep 2016 14:24:40 +0100
+Subject: [RFC 05/11] iommu/dma: iommu_dma_(un)map_mixed
+In-Reply-To: <1475009318-2617-6-git-send-email-eric.auger@redhat.com>
+References: <1475009318-2617-1-git-send-email-eric.auger@redhat.com>
+ <1475009318-2617-6-git-send-email-eric.auger@redhat.com>
+Message-ID: <1b1b30b3-4199-9e18-362c-b8bc9d45277d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2016 at 11:42:14AM +0200, Bartosz Golaszewski wrote:
-> 2016-09-29 20:40 GMT+02:00 Karl Beldan <karl.beldan@gmail.com>:
-> > Hi,
-> >
-> > On Thu, Sep 29, 2016 at 06:31:52PM +0200, Bartosz Golaszewski wrote:
-> >> From: Karl Beldan <kbeldan@baylibre.com>
-> >>
-> >> This adds the pins used by the LCD controller, and uses 'tilcdc,panel'
-> >> with some default timings for 800x600.
-> >>
-> >> Tested on an LCDK connected on the VGA port (the LCDC is connected to
-> >> this port via a THS8135).
-> >>
-> >> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> >> [Bartosz:
-> >>   - fixed whitespace errors
-> >>   - tweaked the description
-> >
-> > The description tweak you mention is the removal of an erratum which is
-> > in the mentioned commit I put on github @
-> > (https://github.com/kbeldan/linux/commit/b7720bc983c00a083dece119f68ea9d2f522c6c4)
-> > it included an erratum wrt FIFO threshold I think is worth keeping:
-> > {
-> > There is an erratum (fifo-th) "LCDC: Underflow During Initialization":
-> > [...]
-> > "This problem may occur if the LCDC FIFO threshold size (
-> > LCDDMA_CTRL[TH_FIFO_READY]) is left at its default value after reset.
-> > Increasing the FIFO threshold size will reduce or eliminate underflows.
-> > Setting the threshold size to 256 double words or larger is
-> > recommended."
-> > }
-> 
-> Isn't this the issue that is fixed by changing the memory priority for lcdc?
-> 
+Hi Eric,
 
-It is possible that the erratum and the memory priority settings try to
-address the symptoms of the same underlying issue, it is impossible to
-state with the publicly available information, however, the erratum
-relates to the LCDC registers settings, namely the fifo-th propperty of
-panel-info in the dts, which is really different from the memory
-priority adjustments in the SYSCFG and DDR_CTL.
+On 27/09/16 21:48, Eric Auger wrote:
+> iommu_dma_map_mixed and iommu_dma_unmap_mixed operate on
+> IOMMU_DOMAIN_MIXED typed domains. On top of standard iommu_map/unmap
+> they reserve the IOVA window to prevent the iova allocator to
+> allocate in those areas.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  drivers/iommu/dma-iommu.c | 48 +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/dma-iommu.h | 18 ++++++++++++++++++
+>  2 files changed, 66 insertions(+)
+> 
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index 04bbc85..db21143 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -759,3 +759,51 @@ int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>  	return 0;
+>  }
+>  EXPORT_SYMBOL(iommu_get_dma_msi_region_cookie);
+> +
+> +int iommu_dma_map_mixed(struct iommu_domain *domain, unsigned long iova,
+> +			phys_addr_t paddr, size_t size, int prot)
+> +{
+> +	struct iova_domain *iovad;
+> +	unsigned long lo, hi;
+> +	int ret;
+> +
+> +	if (domain->type != IOMMU_DOMAIN_MIXED)
+> +		return -EINVAL;
+> +
+> +	if (!domain->iova_cookie)
+> +		return -EINVAL;
+> +
+> +	iovad = cookie_iovad(domain);
+> +
+> +	lo = iova_pfn(iovad, iova);
+> +	hi = iova_pfn(iovad, iova + size - 1);
+> +	reserve_iova(iovad, lo, hi);
 
-Regards, 
-Karl
+This can't work reliably - reserve_iova() will (for good reason) merge
+any adjacent or overlapping entries, so any unmap is liable to free more
+IOVA space than actually gets unmapped, and things will get subtly out
+of sync and go wrong later.
 
-> >
-> >>   - fixed the incorrect hback-porch value
-> >
-> > It can't be a fix, this value depends on the monitor connected.
-> >
+The more general issue with this whole approach, though, is that it
+effectively rules out userspace doing guest memory hotplug or similar,
+and I'm not we want to paint ourselves into that corner. Basically, as
+soon as a device is attached to a guest, the entirety of the unallocated
+IPA space becomes reserved, and userspace can never add anything further
+to it, because any given address *might* be in use for an MSI mapping.
+
+I think it still makes most sense to stick with the original approach of
+cooperating with userspace to reserve a bounded area - it's just that we
+can then let automatic mapping take care of itself within that area.
+
+Speaking of which, I've realised the same fundamental reservation
+problem already applies to PCI without ACS, regardless of MSIs. I just
+tried on my Juno with guest memory placed at 0x4000000000, (i.e.
+matching the host PA of the 64-bit PCI window), and sure enough when the
+guest kicks off some DMA on the passed-through NIC, the root complex
+interprets the guest IPA as (unsupported) peer-to-peer DMA to a BAR
+claimed by the video card, and it fails. I guess this doesn't get hit in
+practice on x86 because the guest memory map is unlikely to be much
+different from the host's.
+
+It seems like we basically need a general way of communicating fixed and
+movable host reservations to userspace :/
+
+Robin.
+
+> +	ret = iommu_map(domain, iova, paddr, size, prot);
+> +	if (ret)
+> +		free_iova(iovad, lo);
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL(iommu_dma_map_mixed);
+> +
+> +size_t iommu_dma_unmap_mixed(struct iommu_domain *domain, unsigned long iova,
+> +			     size_t size)
+> +{
+> +	struct iova_domain *iovad;
+> +	unsigned long lo;
+> +	size_t ret;
+> +
+> +	if (domain->type != IOMMU_DOMAIN_MIXED)
+> +		return -EINVAL;
+> +
+> +	if (!domain->iova_cookie)
+> +		return -EINVAL;
+> +
+> +	iovad = cookie_iovad(domain);
+> +	lo = iova_pfn(iovad, iova);
+> +
+> +	ret = iommu_unmap(domain, iova, size);
+> +	if (ret == size)
+> +		free_iova(iovad, lo);
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL(iommu_dma_unmap_mixed);
+> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+> index 1c55413..f2aa855 100644
+> --- a/include/linux/dma-iommu.h
+> +++ b/include/linux/dma-iommu.h
+> @@ -70,6 +70,12 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
+>  int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>  		dma_addr_t base, u64 size);
+>  
+> +int iommu_dma_map_mixed(struct iommu_domain *domain, unsigned long iova,
+> +			phys_addr_t paddr, size_t size, int prot);
+> +
+> +size_t iommu_dma_unmap_mixed(struct iommu_domain *domain, unsigned long iova,
+> +			     size_t size);
+> +
+>  #else
+>  
+>  struct iommu_domain;
+> @@ -99,6 +105,18 @@ static inline int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>  	return -ENODEV;
+>  }
+>  
+> +int iommu_dma_map_mixed(struct iommu_domain *domain, unsigned long iova,
+> +			phys_addr_t paddr, size_t size, int prot)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +size_t iommu_dma_unmap_mixed(struct iommu_domain *domain, unsigned long iova,
+> +			     size_t size)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+>  #endif	/* CONFIG_IOMMU_DMA */
+>  #endif	/* __KERNEL__ */
+>  #endif	/* __DMA_IOMMU_H */
 > 
-> Thanks, I'm new to drm. From reading the datasheet it seemed to me
-> that this depends on the resolution. FWIW it seems that most LCDs are
-> able to adjust to this themselves - I tested with two different
-> displays and the value I introduced worked on both while the previous
-> one shifted the image to the right. I'll look into that.
-> 
-> >>   - other minor tweaks]
-> >
-> > I didn't see any other change while diffing.
-> >
-> 
-> Dropped the refresh rate from the timings node name.
-> 
-> Thanks,
-> Bartosz
