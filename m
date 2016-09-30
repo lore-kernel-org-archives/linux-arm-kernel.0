@@ -1,113 +1,40 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 30 Sep 2016 12:04:46 +0200
-Subject: [PATCH v3 1/9] mtd:fsl-quadspi:use the property fields of SPI-NOR
-In-Reply-To: <1471505884-33996-1-git-send-email-B56489@freescale.com>
-References: <1471505884-33996-1-git-send-email-B56489@freescale.com>
-Message-ID: <22010794-652a-4f1e-21ec-4f0025073a82@atmel.com>
+From: appro@openssl.org (Andy Polyakov)
+Date: Fri, 30 Sep 2016 12:44:13 +0200
+Subject: [PATCH] arm64: add support for SHA256 using NEON instructions
+In-Reply-To: <1475189503-9175-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1475189503-9175-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <a11d5dcc-1681-7e62-c3ac-f2fd53c50f14@openssl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yunhui,
+> This is a port of the ARMv7 implementation in arch/arm/crypto. For a Cortex-A57
+> (r2p1), the performance numbers are listed below. In summary, 40% - 50% speedup
+> where it counts, i.e., block sizes over 256 bytes with few updates.
 
-Indeed it's a really good thing to update the Freescale QSPI controller driver
-so it relies more on the settings chosen in spi-nor.c: it avoids duplicating
-the code. spi-nor.c is supposed to select all the instruction codes and memory
-settings according to both the (Q)SPI memory and the controller capabilities.
-The controller driver should only be responsible for sending the SPI commands
-but should neither modify those commands nor be aware of the actual memory
-connected to it.
+Cool! Great! Just in case for reference. You compare generic, new NEON
+and hardware-assisted implementations. I assume that first one refers to
+C compiler-generated code. But there is another option, i.e. non-NEON
+assembly. Now to the "for reference" part. The reason for why NEON is
+not utilized in OpenSSL is because it's deemed that it doesn't provide
+"extraordinary" improvement over non-NEON assembly code, especially on
+less sophisticated processors such as Cortex-A53. Note that I'm not
+saying that NEON SHA256 subroutine is not faster, it is, only that it's
+not "extraordinarily" faster in most relevant cases(*). In other words
+it's reckoned that non-NEON assembly provides adequate *all-round*
+performance, taking into consideration that it does it without being
+dependent on optional NEON. Non-NEON assembly should also be interesting
+in kernel context, because there are situations when you can't call NEON
+procedure, be it suggested one or hardware-assisted, which itself relies
+on NEON. And of course another nice quality about SHA2 module in OpenSSL
+is that it emits both SHA256 and SHA512 codes ;-) On related note it
+should be noted that NEON-izing SHA512 on ARM64 makes lesser sense, it's
+bound to provide lesser improvement than SHA256 [if any at all in some
+cases]. This is because in SHA256 you engage 4 lanes of NEON registers,
+while in SHA512 case you have only 2.
 
-So the idea of this patch is great :)
-
-Best regards,
-
-Cyrille
-
-Le 18/08/2016 ? 09:37, Yunhui Cui a ?crit :
-> We can get the read/write/erase opcode from the spi nor framework
-> directly. This patch uses the information stored in the SPI-NOR to
-> remove the hardcode in the fsl_qspi_init_lut().
-> 
-> Signed-off-by: Yunhui Cui <B56489@freescale.com>
-> Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
-Reviewed-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> ---
->  drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------------
->  1 file changed, 12 insertions(+), 28 deletions(-)
-> 
-> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-> index 5c82e4e..5ad6402 100644
-> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
-> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-> @@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
->  	void __iomem *base = q->iobase;
->  	int rxfifo = q->devtype_data->rxfifo;
->  	u32 lut_base;
-> -	u8 cmd, addrlen, dummy;
->  	int i;
->  
-> +	struct spi_nor *nor = &q->nor[0];
-> +	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
-> +	u8 read_op = nor->read_opcode;
-> +	u8 read_dm = nor->read_dummy;
-> +
->  	fsl_qspi_unlock_lut(q);
->  
->  	/* Clear all the LUT table */
-> @@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
->  	/* Quad Read */
->  	lut_base = SEQID_QUAD_READ * 4;
->  
-> -	if (q->nor_size <= SZ_16M) {
-> -		cmd = SPINOR_OP_READ_1_1_4;
-> -		addrlen = ADDR24BIT;
-> -		dummy = 8;
-> -	} else {
-> -		/* use the 4-byte address */
-> -		cmd = SPINOR_OP_READ_1_1_4;
-> -		addrlen = ADDR32BIT;
-> -		dummy = 8;
-> -	}
-> -
-> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-> +	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
->  			base + QUADSPI_LUT(lut_base));
-> -	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4, rxfifo),
-> +	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> +		    LUT1(FSL_READ, PAD4, rxfifo),
->  			base + QUADSPI_LUT(lut_base + 1));
->  
->  	/* Write enable */
-> @@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
->  	/* Page Program */
->  	lut_base = SEQID_PP * 4;
->  
-> -	if (q->nor_size <= SZ_16M) {
-> -		cmd = SPINOR_OP_PP;
-> -		addrlen = ADDR24BIT;
-> -	} else {
-> -		/* use the 4-byte address */
-> -		cmd = SPINOR_OP_PP;
-> -		addrlen = ADDR32BIT;
-> -	}
-> -
-> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-> +	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
-> +		    LUT1(ADDR, PAD1, addrlen),
->  			base + QUADSPI_LUT(lut_base));
->  	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
->  			base + QUADSPI_LUT(lut_base + 1));
-> @@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
->  	/* Erase a sector */
->  	lut_base = SEQID_SE * 4;
->  
-> -	cmd = q->nor[0].erase_opcode;
-> -	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
-> -
-> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-> +	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
-> +		    LUT1(ADDR, PAD1, addrlen),
->  			base + QUADSPI_LUT(lut_base));
->  
->  	/* Erase the whole chip */
-> 
+(*) Well, this is also question of priorities. My rationale is that
+there is a lot of Cortex-A53 and A57 phones out there that don't have
+crypto-extensions, I refer to Qualcomm SoCs, where NEON gives less than
+10% improvement [over non-NEON assembly]. Yes, it gives more on X-Gene,
+but X-Gene is not wide-spread, and the rest (including upcoming X-Gene)
+have crypto-extensions, so alternative code path doesn't matter.
