@@ -1,34 +1,66 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 30 Sep 2016 12:23:14 -0700
-Subject: [GIT PULL 3/4] Broadcom defconfig changes for 4.9 (part 2)
-In-Reply-To: <1475263395-27653-1-git-send-email-f.fainelli@gmail.com>
-References: <1475263395-27653-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1475263395-27653-3-git-send-email-f.fainelli@gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Fri, 30 Sep 2016 21:31:51 +0200
+Subject: [PATCH 0/3] Support userspace irqchip with arch timers
+In-Reply-To: <20160930154335.GB7996@cbox>
+References: <20160927190806.22988-1-christoffer.dall@linaro.org>
+ <de375a6e-095c-a17a-0db7-876a5619df42@suse.de>
+ <3e85d538-2539-f190-0d17-a2ecfe7b48ce@suse.de> <20160930154335.GB7996@cbox>
+Message-ID: <71b0ae9d-baea-1f65-3c01-5d87f4f4746f@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
-are available in the git repository at:
+On 30.09.16 17:43, Christoffer Dall wrote:
+> On Fri, Sep 30, 2016 at 05:38:11PM +0200, Alexander Graf wrote:
+>>
+>>
+>> On 30.09.16 16:54, Alexander Graf wrote:
+>>>
+>>>
+>>> On 27.09.16 21:08, Christoffer Dall wrote:
+>>>> Hi Alex,
+>>>>
+>>>> Marc and I have been looking at this during Linaro connect and have
+>>>> slightly reworked your patch into this small series.
+>>>>
+>>>> It would be good if you could have a look at it and test it out.
+>>>>
+>>>> I've tested it with your QEMU, and it works for UP, but secondary CPUs
+>>>> fail to come up, and it looks like the kernel never gets an IPI for
+>>>> those CPUs from userspace.  Any chance you're willing to take a look at
+>>>> that?
+>>>
+>>> I still need to see whether I can come up with a prettier solution, but
+>>> for now this works:
+>>>
+>>> diff --git a/target-i386/kvm.c b/target-i386/kvm.c
+>>
+>> Eh, no, not in i386 code :). But the problem seems to be a missing
+>> mpstate sync.
+>>
+> Yeah, that looked really dodgy.  Have you tested it? :)
 
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.9/defconfig
+This time around tested with the correct command line parameters I hope
+:). I'll send a pretty patch later.
 
-for you to fetch changes up to ca2a92f87d9d8dc070f91f88ecd0f0d4c5f4dfad:
+diff --git a/target-arm/kvm.c b/target-arm/kvm.c
+index b4c8fe2..b549f00 100644
+--- a/target-arm/kvm.c
++++ b/target-arm/kvm.c
+@@ -173,6 +173,12 @@ int kvm_arch_init(MachineState *ms, KVMState *s)
+      */
+     kvm_async_interrupts_allowed = true;
 
-  ARM: multi_v7_defconfig: Enable BCM47xx/BCM5301x drivers (2016-09-30 11:53:55 -0700)
++    /*
++     * PSCI wakes up secondary cores, so we always need to
++     * have vCPUs waiting in kernel space
++     */
++    kvm_halt_in_kernel_allowed = true;
++
+     cap_has_mp_state = kvm_check_extension(s, KVM_CAP_MP_STATE);
 
-----------------------------------------------------------------
-This pull request contains Broadcom ARM-based defconfig changes for 4.9, please
-pull the following:
+     type_register_static(&host_arm_cpu_type_info);
 
-- Florian updates the multi_v7_defconfig with the relevant basic drivers needed
-  for the Broadcom BCM5301x (Northstar) SoCs to reboot, have PCIe, and Ethernet
 
-----------------------------------------------------------------
-Florian Fainelli (1):
-      ARM: multi_v7_defconfig: Enable BCM47xx/BCM5301x drivers
-
- arch/arm/configs/multi_v7_defconfig | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Alex
