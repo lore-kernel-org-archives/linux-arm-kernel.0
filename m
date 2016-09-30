@@ -1,24 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 30 Sep 2016 19:10:04 +0530
-Subject: [PATCH] drm: tilcdc: add a da850-specific compatible string
-In-Reply-To: <1475240456-22936-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1475240456-22936-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <a967b5b6-9238-169b-7587-8c9d1f40c99d@ti.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Fri, 30 Sep 2016 15:48:01 +0200
+Subject: [PATCH 4/6] ARM: dts: da850-lcdk: add support for 1024x768
+ resolution
+In-Reply-To: <20160930124942.ul737vxmdmkxqdre@gobelin>
+References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
+ <1475166715-7857-5-git-send-email-bgolaszewski@baylibre.com>
+ <20160929185805.q2pdihajikgzo4lm@gobelin>
+ <CAMpxmJVA+p1st7HzwoOJftArqpY-wUQb8WKbQFAEWnBOysxF6w@mail.gmail.com>
+ <20160930124942.ul737vxmdmkxqdre@gobelin>
+Message-ID: <CAMpxmJX25Yx0Rget4bOUf+t2qn01bpbNGBwwVFfomK1h_2Oydg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 September 2016 06:30 PM, Bartosz Golaszewski wrote:
-> Due to some potential tweaks for the da850 LCDC (for example: the
-> required memory bandwith settings) we need a separate compatible
-> for the IP present on the da850 boards.
-> 
-> Suggested-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  drivers/gpu/drm/tilcdc/tilcdc_drv.c | 1 +
+2016-09-30 14:49 GMT+02:00 Karl Beldan <karl.beldan@gmail.com>:
+> On Fri, Sep 30, 2016 at 11:37:57AM +0200, Bartosz Golaszewski wrote:
+>> 2016-09-29 20:58 GMT+02:00 Karl Beldan <karl.beldan@gmail.com>:
+>> > Hi,
+>> >
+>> > On Thu, Sep 29, 2016 at 06:31:53PM +0200, Bartosz Golaszewski wrote:
+>> >> Add svga timings for 1024x768 resolution to the da850-lcdk
+>> >> device tree.
+>> >>
+>> >
+>>
+>> [snip]
+>>
+>> >
+>> > Why do you also call 1024x768 svga ?
+>> >
+>>
+>> Thanks, should have been xga. will fix in v2.
+>>
+>> > I don't think the LCDK can cope with this resolution at this frequency
+>> > (in terms of mem bandwidth), at least that's what I observed back in
+>> > August. If confirmed I think it is worth mentioning in the log at least,
+>> > but then I doubt adding this config would be useful.
+>> >
+>>
+>> Thanks for the heads up. How would that manifest itself? This seems to
+>> work fine for me - I'm not getting any warnings on a simple system -
+>> maybe if I added some additional memory load it would complain.
+>>
+>
+> A mere dmesg > /dev/tty0 (or repeatedly cat-ting a file to /dev/tty0)
+> should suffice to make the issue visible and trigger FIFO underflows.
+>
 
-This patch should document the new compatible in
-Documentation/devicetree/bindings/..
+Thanks, this is correct unfortunately.
 
-Thanks,
-Sekhar
+Best regards,
+Bartosz Golaszewski
