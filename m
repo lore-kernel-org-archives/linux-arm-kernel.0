@@ -1,33 +1,24 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 30 Sep 2016 20:52:31 +0200
-Subject: [RFC] arm64: Enforce observed order for spinlock and data
-In-Reply-To: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
-References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
-Message-ID: <20160930185231.GA3142@twins.programming.kicks-ass.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 30 Sep 2016 12:00:04 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable BCM47xx/BCM5301x drivers
+In-Reply-To: <1472339552-9960-1-git-send-email-f.fainelli@gmail.com>
+References: <1472339552-9960-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <2a25e754-6327-b8b2-32f9-07050a24ca63@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2016 at 01:40:57PM -0400, Brent DeGraaf wrote:
-> Prior spinlock code solely used load-acquire and store-release
-> semantics to ensure ordering of the spinlock lock and the area it
-> protects. However, store-release semantics and ordinary stores do
-> not protect against accesses to the protected area being observed
-> prior to the access that locks the lock itself.
+On 08/27/2016 04:12 PM, Florian Fainelli wrote:
+> Add a bunch of required drivers and subsystems:
 > 
-> While the load-acquire and store-release ordering is sufficient
-> when the spinlock routines themselves are strictly used, other
-> kernel code that references the lock values directly (e.g. lockrefs)
-> could observe changes to the area protected by the spinlock prior
-> to observance of the lock itself being in a locked state, despite
-> the fact that the spinlock logic itself is correct.
+> - BCMA is the on-chip discoverable bus which registers a bunch of
+>   peripherals
+> - Enable the BCM47xx watchdog driver to get working system reboot
+> - Enable the BCM47xx NVRAM/SPROM drivers to be able to fetch MAC
+>   addresses and other variables needed for system operation
+> - Make BGMAC (built-in Ethernet adapter) a module
 > 
-> Barriers were added to all the locking routines wherever necessary
-> to ensure that outside observers which read the lock values directly
-> will not observe changes to the protected data before the lock itself
-> is observed.
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-I cannot see this going in. You're making spinlocks far more expensive
-in the common case that doesn't need this.
-
-Please enumerate the special cases (there's more than just lockref?) and
-fix those.
+Applied to defconfig/next.
+-- 
+Florian
