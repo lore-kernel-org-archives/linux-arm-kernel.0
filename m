@@ -1,66 +1,88 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 30 Sep 2016 21:31:51 +0200
-Subject: [PATCH 0/3] Support userspace irqchip with arch timers
-In-Reply-To: <20160930154335.GB7996@cbox>
-References: <20160927190806.22988-1-christoffer.dall@linaro.org>
- <de375a6e-095c-a17a-0db7-876a5619df42@suse.de>
- <3e85d538-2539-f190-0d17-a2ecfe7b48ce@suse.de> <20160930154335.GB7996@cbox>
-Message-ID: <71b0ae9d-baea-1f65-3c01-5d87f4f4746f@suse.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 30 Sep 2016 20:32:32 +0100
+Subject: [RFC] arm64: Enforce observed order for spinlock and data
+In-Reply-To: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
+References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
+Message-ID: <20160930193231.GA2521@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 30, 2016 at 01:40:57PM -0400, Brent DeGraaf wrote:
+> Prior spinlock code solely used load-acquire and store-release
+> semantics to ensure ordering of the spinlock lock and the area it
+> protects. However, store-release semantics and ordinary stores do
+> not protect against accesses to the protected area being observed
+> prior to the access that locks the lock itself.
+> 
+> While the load-acquire and store-release ordering is sufficient
+> when the spinlock routines themselves are strictly used, other
+> kernel code that references the lock values directly (e.g. lockrefs)
+> could observe changes to the area protected by the spinlock prior
+> to observance of the lock itself being in a locked state, despite
+> the fact that the spinlock logic itself is correct.
 
+If the spinlock logic is correct, why are we changing that, and not the lockref
+code that you say has a problem?
 
-On 30.09.16 17:43, Christoffer Dall wrote:
-> On Fri, Sep 30, 2016 at 05:38:11PM +0200, Alexander Graf wrote:
->>
->>
->> On 30.09.16 16:54, Alexander Graf wrote:
->>>
->>>
->>> On 27.09.16 21:08, Christoffer Dall wrote:
->>>> Hi Alex,
->>>>
->>>> Marc and I have been looking at this during Linaro connect and have
->>>> slightly reworked your patch into this small series.
->>>>
->>>> It would be good if you could have a look at it and test it out.
->>>>
->>>> I've tested it with your QEMU, and it works for UP, but secondary CPUs
->>>> fail to come up, and it looks like the kernel never gets an IPI for
->>>> those CPUs from userspace.  Any chance you're willing to take a look at
->>>> that?
->>>
->>> I still need to see whether I can come up with a prettier solution, but
->>> for now this works:
->>>
->>> diff --git a/target-i386/kvm.c b/target-i386/kvm.c
->>
->> Eh, no, not in i386 code :). But the problem seems to be a missing
->> mpstate sync.
->>
-> Yeah, that looked really dodgy.  Have you tested it? :)
+What exactly goes wrong in the lockref code? Can you give a concrete example?
 
-This time around tested with the correct command line parameters I hope
-:). I'll send a pretty patch later.
+Why does the lockref code accesses lock-protected fields without taking the
+lock first? Wouldn't concurrent modification be a problem regardless?
 
-diff --git a/target-arm/kvm.c b/target-arm/kvm.c
-index b4c8fe2..b549f00 100644
---- a/target-arm/kvm.c
-+++ b/target-arm/kvm.c
-@@ -173,6 +173,12 @@ int kvm_arch_init(MachineState *ms, KVMState *s)
-      */
-     kvm_async_interrupts_allowed = true;
+> +	/*
+> +	 * Yes: The store done on this cpu was the one that locked the lock.
+> +	 * Store-release one-way barrier on LL/SC means that accesses coming
+> +	 * after this could be reordered into the critical section of the
 
-+    /*
-+     * PSCI wakes up secondary cores, so we always need to
-+     * have vCPUs waiting in kernel space
-+     */
-+    kvm_halt_in_kernel_allowed = true;
-+
-     cap_has_mp_state = kvm_check_extension(s, KVM_CAP_MP_STATE);
+I assume you meant s/store-release/load-acquire/ here. This does not make sense
+to me otherwise.
 
-     type_register_static(&host_arm_cpu_type_info);
+> +	 * load-acquire/store-release, where we did not own the lock. On LSE,
+> +	 * even the one-way barrier of the store-release semantics is missing,
 
+Likewise (for the LSE case description).
 
-Alex
+> +	 * so LSE needs an explicit barrier here as well.  Without this, the
+> +	 * changed contents of the area protected by the spinlock could be
+> +	 * observed prior to the lock.
+> +	 */
+
+By whom? We generally expect that if data is protected by a lock, you take the
+lock before accessing it. If you expect concurrent lockless readers, then
+there's a requirement on the writer side to explicitly provide the ordering it
+requires -- spinlocks are not expected to provide that.
+
+So, why aren't those observers taking the lock?
+
+What pattern of accesses are made by readers and writers such that there is a
+problem?
+
+What does this result in?
+
+> +"	dmb	ish\n"
+> +"	b	3f\n"
+> +"4:\n"
+>  	/*
+>  	 * No: spin on the owner. Send a local event to avoid missing an
+>  	 * unlock before the exclusive load.
+> @@ -116,7 +129,15 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
+>  "	ldaxrh	%w2, %4\n"
+>  "	eor	%w1, %w2, %w0, lsr #16\n"
+>  "	cbnz	%w1, 2b\n"
+> -	/* We got the lock. Critical section starts here. */
+> +	/*
+> +	 * We got the lock and have observed the prior owner's store-release.
+> +	 * In this case, the one-way barrier of the prior owner that we
+> +	 * observed combined with the one-way barrier of our load-acquire is
+> +	 * enough to ensure accesses to the protected area coming after this
+> +	 * are not accessed until we own the lock.  In this case, other
+> +	 * observers will not see our changes prior to observing the lock
+> +	 * itself.  Critical locked section starts here.
+> +	 */
+
+Each of these comments ends up covers, and their repeated presence makes the
+code harder to read. If there's a common problem, note it once at the top of
+the file.
+
+Thanks,
+Mark.
