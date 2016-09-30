@@ -1,113 +1,43 @@
-From: hs.liao@mediatek.com (Horng-Shyang Liao)
-Date: Fri, 30 Sep 2016 16:56:18 +0800
-Subject: [PATCH v14 2/4] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <1475204778.13398.28.camel@mtksdaap41>
-References: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
- <1473039885-24009-3-git-send-email-hs.liao@mediatek.com>
- <1475204778.13398.28.camel@mtksdaap41>
-Message-ID: <1475225778.25044.35.camel@mtksdaap41>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 30 Sep 2016 10:57:58 +0200
+Subject: [PATCHv4 0/3] Fix hardware handshake on SAM9x5 platforms
+Message-ID: <20160930085801.21497-1-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi CK,
+Since commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
+hardware handshake is enabled"), hardware handshake is not working
+anymore on SAM9x5/SAMA5D3/SAM9 platforms.
 
-Please see my inline reply.
+The first two patches fix the hardware handshake when CTS/RTS pins are
+handled by GPIOs.
 
-On Fri, 2016-09-30 at 11:06 +0800, CK Hu wrote:
-> Hi, HS:
-> 
-> On Mon, 2016-09-05 at 09:44 +0800, HS Liao wrote:
-> > This patch is first version of Mediatek Command Queue(CMDQ) driver. The
-> > CMDQ is used to help write registers with critical time limitation,
-> > such as updating display configuration during the vblank. It controls
-> > Global Command Engine (GCE) hardware to achieve this requirement.
-> > Currently, CMDQ only supports display related hardwares, but we expect
-> > it can be extended to other hardwares for future requirements.
-> > 
-> > Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> > Signed-off-by: CK Hu <ck.hu@mediatek.com>
-> > ---
-> 
-> [snip...]
-> 
-> > +
-> > +struct cmdq_task {
-> > +	struct cmdq		*cmdq;
-> > +	struct list_head	list_entry;
-> > +	void			*va_base;
-> > +	dma_addr_t		pa_base;
-> > +	size_t			cmd_buf_size; /* command occupied size */
-> > +	size_t			buf_size; /* real buffer size */
-> > +	bool			finalized;
-> > +	struct cmdq_thread	*thread;
-> 
-> I think thread info could be removed from cmdq_task. Only
-> cmdq_task_handle_error() and cmdq_task_insert_into_thread() use
-> task->thread and caller of both function has the thread info. So you
-> could just pass thread info into these two function and remove thread
-> info in cmdq_task.
+The last patch fixes hardware handshake when CTS/RTS pins are not GPIOs.
 
-This modification will remove 1 pointer but add 2 pointers. Moreover,
-more pointers will need to be delivered between functions for future
-extension. IMHO, it would be better to keep thread pointer inside
-cmdq_task.
+Changes since v3:
+ - remove superfuous #include <linux/err.h> (thanks to Uwe)
+ - rebase on next-20160930
 
-> > +	struct cmdq_task_cb	cb;
-> 
-> I think this callback function is equal to mailbox client tx_done
-> callback. It's better to use already-defined interface rather than
-> creating your own.
+Changes since v2:
+ - remove IS_ERR_OR_NULL() test in patch 1/3 as Uwe suggested.
+ - fix typos in patch 2/3
+ - rebase on next-20160927
+ - simplify the logic in patch 3/3.
 
-This is because CMDQ driver allows different callback functions for
-different tasks, but mailbox only allows one callback function per
-channel. But, I think I can add a wrapper for tx_done to call CMDQ
-callback functions. So, I will use tx_done in CMDQ v15.
+Changes since v1:
+ - Correct patch 1 with the error found by kbuild.
+ - Add Alexandre's Acked-by on patch 2
+ - Rewrite patch 3 logic in the light of the on-going discussion
+   with Cyrille and Alexandre.
 
-> > +};
-> > +
-> 
-> [snip...]
-> 
-> > +
-> > +static int cmdq_suspend(struct device *dev)
-> > +{
-> > +	struct cmdq *cmdq = dev_get_drvdata(dev);
-> > +	struct cmdq_thread *thread;
-> > +	int i;
-> > +	bool task_running = false;
-> > +
-> > +	mutex_lock(&cmdq->task_mutex);
-> > +	cmdq->suspended = true;
-> > +	mutex_unlock(&cmdq->task_mutex);
-> > +
-> > +	for (i = 0; i < ARRAY_SIZE(cmdq->thread); i++) {
-> > +		thread = &cmdq->thread[i];
-> > +		if (!list_empty(&thread->task_busy_list)) {
-> > +			mod_timer(&thread->timeout, jiffies + 1);
-> > +			task_running = true;
-> > +		}
-> > +	}
-> > +
-> > +	if (task_running) {
-> > +		dev_warn(dev, "exist running task(s) in suspend\n");
-> > +		msleep(20);
-> 
-> Why sleep here? It looks like a recovery but could 20ms recovery
-> something? I think warning message is enough because you see the warning
-> message, and you fix the bug, so no need to recovery anything.
+NB: patch 2 NEEDS patch 1 to compile.
 
-My purpose is context switch to finish timer's work.
-I will replace it by schedule().
+Richard Genoud (3):
+  serial: mctrl_gpio: implement mctrl_gpio_use_rtscts
+  tty/serial: at91: fix hardware handshake with GPIOs
+  tty/serial: at91: fix hardware handshake on SAM9x5 (without GPIOs)
 
-> > +	}
-> > +
-> > +	clk_unprepare(cmdq->clock);
-> > +	return 0;
-> > +}
-> > +
-> 
-> Regards,
-> CK
-
-Thanks,
-HS
+ drivers/tty/serial/atmel_serial.c      | 26 +++++++++++++++++---------
+ drivers/tty/serial/serial_mctrl_gpio.c |  7 +++++++
+ drivers/tty/serial/serial_mctrl_gpio.h | 10 ++++++++++
+ 3 files changed, 34 insertions(+), 9 deletions(-)
