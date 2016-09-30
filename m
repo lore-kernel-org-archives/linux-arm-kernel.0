@@ -1,76 +1,96 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 30 Sep 2016 11:11:59 +0800
-Subject: [PATCH] drm/mediatek: fix a typo
-In-Reply-To: <1f324471-bebb-c8bf-75c1-391355c50a99@gmail.com>
-References: <1475119322-58657-1-git-send-email-bibby.hsieh@mediatek.com>
- <1475121682.18843.2.camel@mtksdaap41>
- <1f324471-bebb-c8bf-75c1-391355c50a99@gmail.com>
-Message-ID: <1475205119.13345.6.camel@mtksdaap41>
+From: john3909@gmail.com (John Syne)
+Date: Thu, 29 Sep 2016 20:37:19 -0700
+Subject: [PATCH 0/4] Add DMA support for ti_am335x_adc driver
+In-Reply-To: <ff19f584-e4e5-61ff-046d-68ec37ab51c2@ti.com>
+References: <20160921161134.6951-1-mugunthanvnm@ti.com>
+ <22588f2d-d0de-7911-35ed-92094f7dd28d@kernel.org>
+ <ff19f584-e4e5-61ff-046d-68ec37ab51c2@ti.com>
+Message-ID: <FB72863E-4B9D-4202-8837-F4B70AA0C045@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-09-29 at 10:46 +0200, Matthias Brugger wrote:
+I applied your patches to the following kernel:
+
+github.com/RobertCNelson/bb-kernel.git 
+branch am33x-v4.8
+
+Changing 
+#define REG_DMAENABLE_CLEAR	0x038
+to
+#define REG_DMAENABLE_CLEAR	0x03C
+
+Also applying the following DTS changes:
+
+		target = <&tscadc>;
+		__overlay__ {
+
+			status = "okay";
+			adc {
+				ti,adc-channels = <0 1 2 3 4 5 6>;
+				ti,chan-step-avg = <0x1 0x1 0x1 0x1 0x1 0x1 0x1>;
+				ti,chan-step-opendelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
+				ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
+			};
+		};
+
+Running on a BeagleBoneBlack, I was able to stream samples at 200ksps continuously and it looked stable. 
+
+htop showed CPU utilization between 5% and 7%
+
+Thank you for getting this to work.
+
+Regards,
+John
+
+
+
+
+> On Sep 29, 2016, at 6:01 AM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
 > 
-> On 29/09/16 06:01, CK Hu wrote:
-> > Acked-by: CK Hu <ck.hu@mediatek.com>
-> >
-> > On Thu, 2016-09-29 at 11:22 +0800, Bibby Hsieh wrote:
-> >> Fix the typo: OD_RELAYMODE->OD_CFG
-> >>
+> On Sunday 25 September 2016 03:11 PM, Jonathan Cameron wrote:
+>> On 21/09/16 17:11, Mugunthan V N wrote:
+>>>> The ADC has a 64 work depth fifo length which holds the ADC data
+>>>> till the CPU reads. So when a user program needs a large ADC data
+>>>> to operate on, then it has to do multiple reads to get its
+>>>> buffer. Currently if the application asks for 4 samples per
+>>>> channel with all 8 channels are enabled, kernel can provide only
+>>>> 3 samples per channel when all 8 channels are enabled (logs at
+>>>> [1]). So with DMA support user can request for large number of
+>>>> samples at a time (logs at [2]).
+>>>> 
+>>>> Tested the patch on AM437x-gp-evm and AM335x Boneblack with the
+>>>> patch [3] to enable ADC and pushed a branch for testing [4]
+>>>> 
+>>>> [1] - http://pastebin.ubuntu.com/23211490/
+>>>> [2] - http://pastebin.ubuntu.com/23211492/
+>>>> [3] - http://pastebin.ubuntu.com/23211494/
+>>>> [4] - git://git.ti.com/~mugunthanvnm/ti-linux-kernel/linux.git iio-dma
+>> Just curious.  How fast is the ADC sampling at in these?  Never that
+>> obvious for this driver!
+>> 
+>> I'm also curious as to whether you started to hit the limits of the
+>> kfifo based interface.  Might be worth considering adding alternative
+>> support for the dma buffers interface which is obviously much lower
+>> overhead.
+>> 
+>> Good to have this work prior to that as the kfifo stuff is somewhat
+>> easier to use.
 > 
-
-Hi, Matthias
-Thanks for your reply.
-
-> Although it is quite clear what the patch does, could you write one 
-> sentence to explain what it does. Maybe explain even which effect it 
-> has, which error get fixed etc.
-
-Ok, I will do that.
-
-> As we are getting public available boards now, we should take more care 
-> about fixes. If you have a fix for a commit introduced in an earlier 
-> version of linux and it should be fixed for this version as well (e.g. 
-> v4.6 does have the feature but it does not work correctly) then please 
-> add these two lines before your Signed-off-by:
-> Fixes: <commit-hash> ("<commit subject line>")
-> Cc: stable at vger.kernel.org # v4.6+
+> Currently ADC clock is 3MHz, which can produce a data rate of 225KBps
+> per channel with no open delay and no averaging of samples. So when all
+> 8 Channels are enables the data rate will be 1.75MBps
 > 
-> Where v4.6+ stands for the oldest version where this should get fixed.
+> ADC can be operated at 24MHz, which can generate a data rate of 28MBps
+> with all 8 channels enabled and no open delay and averaging, but our
+> target is to get 800K samples per second per channel which has a data
+> rate of 12.5MBps
 > 
-
-Ok, but the patch hasn't been merged into v4.8 (just in drm-next [1] and
-linux-next [2]), how can I mark that?
-
-[1]
-https://cgit.freedesktop.org/~airlied/linux/commit/?h=drm-next&id=7216436420414144646f5d8343d061355fd23483
-[2]
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=7216436420414144646f5d8343d061355fd23483
-
-
-> Thanks a lot,
-> Matthias
+> I think with this data rate, DMA will be the best option to implement
+> without any data loss and less cpu overload to read the ADC samples.
 > 
-> >> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> >> ---
-> >>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> >> index df33b3c..aa5f20f 100644
-> >> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> >> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> >> @@ -123,7 +123,7 @@ static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
-> >>  			  unsigned int bpc)
-> >>  {
-> >>  	writel(w << 16 | h, comp->regs + DISP_OD_SIZE);
-> >> -	writel(OD_RELAYMODE, comp->regs + OD_RELAYMODE);
-> >> +	writel(OD_RELAYMODE, comp->regs + OD_CFG);
-> >>  	mtk_dither_set(comp, bpc, DISP_OD_CFG);
-> >>  }
-> >>
-> >
-> >
-
--- 
-Bibby
+> Regards
+> Mugunthan V N
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
