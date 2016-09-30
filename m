@@ -1,131 +1,91 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 30 Sep 2016 03:08:14 +0100
-Subject: [PATCH 3/3] arm64: dump: Add checking for writable and
- exectuable pages
-In-Reply-To: <20160929213257.30505-4-labbott@redhat.com>
-References: <20160929213257.30505-1-labbott@redhat.com>
- <20160929213257.30505-4-labbott@redhat.com>
-Message-ID: <20160930020813.GB4611@remoulade>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Fri, 30 Sep 2016 11:06:18 +0800
+Subject: [PATCH v14 2/4] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <1473039885-24009-3-git-send-email-hs.liao@mediatek.com>
+References: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
+ <1473039885-24009-3-git-send-email-hs.liao@mediatek.com>
+Message-ID: <1475204778.13398.28.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, HS:
 
-On Thu, Sep 29, 2016 at 02:32:57PM -0700, Laura Abbott wrote:
-> Page mappings with full RWX permissions are a security risk. x86
-> has an option to walk the page tables and dump any bad pages.
-> (See e1a58320a38d ("x86/mm: Warn on W^X mappings")). Add a similar
-> implementation for arm64.
+On Mon, 2016-09-05 at 09:44 +0800, HS Liao wrote:
+> This patch is first version of Mediatek Command Queue(CMDQ) driver. The
+> CMDQ is used to help write registers with critical time limitation,
+> such as updating display configuration during the vblank. It controls
+> Global Command Engine (GCE) hardware to achieve this requirement.
+> Currently, CMDQ only supports display related hardwares, but we expect
+> it can be extended to other hardwares for future requirements.
 > 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> Signed-off-by: CK Hu <ck.hu@mediatek.com>
+> ---
 
-> @@ -31,6 +32,8 @@ struct ptdump_info {
->  	const struct addr_marker	*markers;
->  	unsigned long			base_addr;
->  	unsigned long			max_addr;
+[snip...]
 
-(unrelated aside: it looks like max_addr is never used or even assigned to;
-care to delete it in a prep patch?)
+> +
+> +struct cmdq_task {
+> +	struct cmdq		*cmdq;
+> +	struct list_head	list_entry;
+> +	void			*va_base;
+> +	dma_addr_t		pa_base;
+> +	size_t			cmd_buf_size; /* command occupied size */
+> +	size_t			buf_size; /* real buffer size */
+> +	bool			finalized;
+> +	struct cmdq_thread	*thread;
 
-> +	/* Internal, do not touch */
-> +	struct list_head		node;
->  };
+I think thread info could be removed from cmdq_task. Only
+cmdq_task_handle_error() and cmdq_task_insert_into_thread() use
+task->thread and caller of both function has the thread info. So you
+could just pass thread info into these two function and remove thread
+info in cmdq_task.
 
-> +static LIST_HEAD(dump_info);
+> +	struct cmdq_task_cb	cb;
 
-With the EFI runtime map tables it's unfortunately valid (and very likely with
-64K pages) that there will be RWX mappings, at least with contemporary versions
-of the UEFI spec. Luckily, those are only installed rarely and transiently.
+I think this callback function is equal to mailbox client tx_done
+callback. It's better to use already-defined interface rather than
+creating your own.
 
-Given that (and other potential ptdump users), I don't think we should have a
-dynamic list of ptdump_infos for W^X checks, and should instead have
-ptdump_check_wx() explicitly check the tables we care about. More comments
-below on that.
-
-I think we only care about the swapper and hyp tables, as nothing else is
-permanent. Does that sound sane?
-
->  struct prot_bits {
-> @@ -219,6 +223,15 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
->  		unsigned long delta;
->  
->  		if (st->current_prot) {
-> +			if (st->check_wx &&
-> +			((st->current_prot & PTE_RDONLY) != PTE_RDONLY) &&
-> +			((st->current_prot & PTE_PXN) != PTE_PXN)) {
-> +				WARN_ONCE(1, "arm64/mm: Found insecure W+X mapping at address %p/%pS\n",
-> +					 (void *)st->start_address,
-> +					 (void *)st->start_address);
-> +				st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
-> +			}
+> +};
 > +
 
-Currently note_page() is painful to read due to the indentation and logic.
-Rather than adding to that, could we factor this into a helper? e.g.
+[snip...]
 
-note_prot_wx(struct pg_state *st, unsigned long addr)
-{
-	if (!st->check_wx)
-		return;
-	if ((st->current_prot & PTE_RDONLY) == PTE_RDONLY)
-		return;
-	if ((st->current_prot & PTE_PXN) == PTE_PXN)
-		return;
-
-	WARN_ONCE(1, "arm64/mm: Found insecure W+X mapping at address %p/%pS\n",
-		  (void *)st->start_address, (void *)st->start_address);
-
-	st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
-}
-
-> +void ptdump_check_wx(void)
+> +
+> +static int cmdq_suspend(struct device *dev)
 > +{
-> +	struct ptdump_info *info;
+> +	struct cmdq *cmdq = dev_get_drvdata(dev);
+> +	struct cmdq_thread *thread;
+> +	int i;
+> +	bool task_running = false;
 > +
-> +	list_for_each_entry(info, &dump_info, node) {
-> +		struct pg_state st = {
-> +			.seq = NULL,
-> +			.marker = info->markers,
-> +			.check_wx = true,
-> +		};
+> +	mutex_lock(&cmdq->task_mutex);
+> +	cmdq->suspended = true;
+> +	mutex_unlock(&cmdq->task_mutex);
 > +
-> +		__walk_pgd(&st, info->mm, info->base_addr);
-> +		note_page(&st, 0, 0, 0);
-> +		if (st.wx_pages)
-> +			pr_info("Checked W+X mappings (%p): FAILED, %lu W+X pages found\n",
-> +				info->mm,
-> +				st.wx_pages);
-> +		else
-> +			pr_info("Checked W+X mappings (%p): passed, no W+X pages found\n", info->mm);
+> +	for (i = 0; i < ARRAY_SIZE(cmdq->thread); i++) {
+> +		thread = &cmdq->thread[i];
+> +		if (!list_empty(&thread->task_busy_list)) {
+> +			mod_timer(&thread->timeout, jiffies + 1);
+> +			task_running = true;
+> +		}
 > +	}
+> +
+> +	if (task_running) {
+> +		dev_warn(dev, "exist running task(s) in suspend\n");
+> +		msleep(20);
+
+Why sleep here? It looks like a recovery but could 20ms recovery
+something? I think warning message is enough because you see the warning
+message, and you fix the bug, so no need to recovery anything.
+
+> +	}
+> +
+> +	clk_unprepare(cmdq->clock);
+> +	return 0;
 > +}
+> +
 
-As above, I don't think we should use a list of arbitrary ptdump_infos.
-
-Given we won't log addresses in the walking code, I think that we can make up a
-trivial marker array, and then just use init_mm direct, e.g. (never even
-compile-tested):
-
-void ptdump_check_wx(void)
-{
-	struct pg_state st = {
-		.seq = NULL,
-		.marker = (struct addr_markers[]) {
-			{ -1, NULL},
-		},
-		.check_wx = true,
-	};
-
-	__walk_pgd(&st, init_mm, 0);
-	note_page(&st, 0, 0, 0);
-	if (st.wx_pages)
-		pr_info("Checked W+X mappings (%p): FAILED, %lu W+X pages found\n",
-			info->mm,
-			st.wx_pages);
-	else
-		pr_info("Checked W+X mappings (%p): passed, no W+X pages found\n", info->mm);
-}
-
-Otherwise, this looks good to me. Thanks for putting this together!
-
-Mark.
+Regards,
+CK
