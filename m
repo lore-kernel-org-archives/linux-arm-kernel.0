@@ -1,73 +1,120 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 29 Sep 2016 17:31:09 -0700
-Subject: [PATCH 1/3] arm64: dump: Make ptdump debugfs a separate option
-In-Reply-To: <20160930001339.GA4369@remoulade>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 30 Sep 2016 01:36:28 +0100
+Subject: [PATCH 2/3] arm64: dump: Make the page table dumping seq_file
+ optional
+In-Reply-To: <20160929213257.30505-3-labbott@redhat.com>
 References: <20160929213257.30505-1-labbott@redhat.com>
- <20160929213257.30505-2-labbott@redhat.com> <20160930001339.GA4369@remoulade>
-Message-ID: <e17189c7-54e0-f0a1-2b16-36f486111c4c@redhat.com>
+ <20160929213257.30505-3-labbott@redhat.com>
+Message-ID: <20160930003627.GB4369@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2016 05:13 PM, Mark Rutland wrote:
-> Hi,
+On Thu, Sep 29, 2016 at 02:32:56PM -0700, Laura Abbott wrote:
+> The page table dumping code always assumes it will be dumping to a
+> seq_file to userspace. The dumping code is useful in other situations.
+> Let the seq_file be optional.
 >
-> On Thu, Sep 29, 2016 at 02:32:55PM -0700, Laura Abbott wrote:
->> ptdump_register currently initializes a set of page table information and
->> registers debugfs. There are uses for the ptdump option without wanting the
->> debugfs options. Split this out to make it a separate option.
->>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->>  arch/arm64/Kconfig.debug        |  6 +++++-
->>  arch/arm64/include/asm/ptdump.h | 15 +++++++++++++--
->>  arch/arm64/mm/Makefile          |  3 ++-
->>  arch/arm64/mm/dump.c            | 30 +++++++++---------------------
->>  arch/arm64/mm/ptdump_debugfs.c  | 33 +++++++++++++++++++++++++++++++++
->>  5 files changed, 62 insertions(+), 25 deletions(-)
->>  create mode 100644 arch/arm64/mm/ptdump_debugfs.c
->
-> As a heads-up, Ard has new ARM64_PTUMP user under drivers/firmware/efi queued
-> up in the EFI tree, which will also need fixing up. See commit d80448ac92b72051
-> ("efi/arm64: Add debugfs node to dump UEFI runtime page tables") [1].
->
-> [...]
->
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 
-I'll take a look at that, thanks for the pointer!
+It might be worth elaborating on those other situations, e.g. that for those
+we'll have some additional logic that will only run in the absence of a
+seq_file.
 
->> +#include <linux/seq_file.h>
->>  #include <linux/mm_types.h>
->
-> Nit: please keep headers in alphabetical order.
->
->> -static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
->> +static void __walk_pgd(struct pg_state *st, struct mm_struct *mm,
->
-> Can we leave this name as-is? We didn't change walk_{pud,pmd,pte}, so this is
-> inconsistent, and we haven't reused the name.
->
+The NOPing out of logic in the !seq_file case does feel a bit like spaghetti
+code, but it's not obvious to me that adding finer-grained callbacks is much
+better, and I guess we can reconsider that if and when we need to add more
+logic.
 
-Yes, I think this is a relic of earlier refactoring attempts.
+Regardless of the above:
 
-> [...]
->
->> +int ptdump_register(struct ptdump_info *info, const char *name)
->> +{
->> +	ptdump_initialize(info);
->> +	return ptdump_debugfs_create(info, name);
->>  }
->
-> It feels like a layering violation to have the core ptdump code call the
-> debugfs ptdump code. Is there some reason this has to live here?
->
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Which 'this' are you referring to here? Are you suggesting moving
-the ptdump_register elsewhere or moving the debugfs create elsewhere?
+Thanks,
+Mark.
 
-> Other than the above points, this looks good to me.
->
-> Thanks,
-> Mark.
->
-> [1] https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=9d80448ac92b720512c415265597d349d8b5c3e8
->
+> ---
+>  arch/arm64/mm/dump.c | 26 +++++++++++++++++++-------
+>  1 file changed, 19 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> index 29e0838..e318f3d 100644
+> --- a/arch/arm64/mm/dump.c
+> +++ b/arch/arm64/mm/dump.c
+> @@ -50,6 +50,18 @@ static const struct addr_marker address_markers[] = {
+>  	{ -1,				NULL },
+>  };
+>  
+> +#define pt_dump_seq_printf(m, fmt, args...)	\
+> +({						\
+> +	if (m)					\
+> +		seq_printf(m, fmt, ##args);	\
+> +})
+> +
+> +#define pt_dump_seq_puts(m, fmt)	\
+> +({					\
+> +	if (m)				\
+> +		seq_printf(m, fmt);	\
+> +})
+> +
+>  /*
+>   * The page dumper groups page table entries of the same type into a single
+>   * description. It uses pg_state to track the range information while
+> @@ -186,7 +198,7 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits,
+>  			s = bits->clear;
+>  
+>  		if (s)
+> -			seq_printf(st->seq, " %s", s);
+> +			pt_dump_seq_printf(st->seq, " %s", s);
+>  	}
+>  }
+>  
+> @@ -200,14 +212,14 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
+>  		st->level = level;
+>  		st->current_prot = prot;
+>  		st->start_address = addr;
+> -		seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
+> +		pt_dump_seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
+>  	} else if (prot != st->current_prot || level != st->level ||
+>  		   addr >= st->marker[1].start_address) {
+>  		const char *unit = units;
+>  		unsigned long delta;
+>  
+>  		if (st->current_prot) {
+> -			seq_printf(st->seq, "0x%016lx-0x%016lx   ",
+> +			pt_dump_seq_printf(st->seq, "0x%016lx-0x%016lx   ",
+>  				   st->start_address, addr);
+>  
+>  			delta = (addr - st->start_address) >> 10;
+> @@ -215,17 +227,17 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
+>  				delta >>= 10;
+>  				unit++;
+>  			}
+> -			seq_printf(st->seq, "%9lu%c %s", delta, *unit,
+> +			pt_dump_seq_printf(st->seq, "%9lu%c %s", delta, *unit,
+>  				   pg_level[st->level].name);
+>  			if (pg_level[st->level].bits)
+>  				dump_prot(st, pg_level[st->level].bits,
+>  					  pg_level[st->level].num);
+> -			seq_puts(st->seq, "\n");
+> +			pt_dump_seq_puts(st->seq, "\n");
+>  		}
+>  
+>  		if (addr >= st->marker[1].start_address) {
+>  			st->marker++;
+> -			seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
+> +			pt_dump_seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
+>  		}
+>  
+>  		st->start_address = addr;
+> @@ -235,7 +247,7 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
+>  
+>  	if (addr >= st->marker[1].start_address) {
+>  		st->marker++;
+> -		seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
+> +		pt_dump_seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
+>  	}
+>  
+>  }
+> -- 
+> 2.10.0
+> 
