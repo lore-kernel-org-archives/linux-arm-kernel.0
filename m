@@ -1,54 +1,55 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 29 Sep 2016 19:50:11 -0400
-Subject: [PATCH V2 3/5] PCI: save and restore bus on parent bus reset
-In-Reply-To: <20160929214942.GD20897@localhost>
-References: <1474056395-21843-1-git-send-email-okaya@codeaurora.org>
- <1474056395-21843-4-git-send-email-okaya@codeaurora.org>
- <20160929214942.GD20897@localhost>
-Message-ID: <8dbad89c-2646-773a-e114-42d21ce14cc7@codeaurora.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 29 Sep 2016 18:10:52 -0600
+Subject: Crash seen on ARM Juno r1 with 4.8-rc8 when Coresight is enabled
+In-Reply-To: <5dc4d096-d580-900c-5750-38e0db1ccbce@arm.com>
+References: <CAGhh56EPK0BYbjV_v7cehT+yuB=L3O-AkFR2mLQMDAS66zDgDg@mail.gmail.com>
+ <CANLsYkypz383Smuqv3B5K3i9mzGxMdc1OJdc_tWQZ5qHWQCeJw@mail.gmail.com>
+ <20160929084953.GA24154@lnxartpec.se.axis.com>
+ <5dc4d096-d580-900c-5750-38e0db1ccbce@arm.com>
+Message-ID: <CANLsYkycnUJmHNAWPDS9L0LqA-p30-Fbv9GFLN1q+SZbrafORg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On 29 September 2016 at 03:17, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 29/09/16 09:49, Rabin Vincent wrote:
+>>
+>> On Wed, Sep 28, 2016 at 11:41:41AM -0600, Mathieu Poirier wrote:
+>
+> [...]
+>
+>>> Thanks you for reporting this Vankatesh,
+>>>
+>>> Sudeep and Suzuki, can you guys help me with this - I don't have an R1
+>>> to test with.
+>>
+>>
+>> I've seen this too, on other platforms.  This should fix it:
+>>
+>> 8<-----------
+>> From a9da7d7b47e67dd6ffcafddadb50e6f97503f296 Mon Sep 17 00:00:00 2001
+>> From: Rabin Vincent <rabinv@axis.com>
+>> Date: Tue, 30 Aug 2016 08:54:21 +0200
+>> Subject: [PATCH] coresight: check for NULL child_name
+>>
+>> Connection child names associated to ports can sometimes be NULL, which
+>> is the case when booting a system on QEMU or when the Coresight power
+>> domain isn't switched on.  fadf3a44e974 ("coresight: checking for NULL
+>> string in coresight_name_match()") fixed one place to handle this but
+>> the same check is needed in coresight_orphan_match() to prevent a crash
+>> there.
+>>
+>
+> Thanks Rabin, we have exact same fix in linux-next already.
 
-On 9/29/2016 5:49 PM, Bjorn Helgaas wrote:
->> +	}
-> This pattern of "unlock, do something, relock" needs some
-> justification.  In general it's unsafe because the lock is protecting
-> *something*, and you have to assume that something can change as soon
-> as you unlock.  Maybe you know it's safe in this situation, and if so,
-> the explanation of why it's safe is what I'm looking for.
+Sorry for the late reply - I am currently travelling.
 
-Agreed. 
+Sudeep is correct, we have this underway for the 4.9 cycle.
 
-The problem is that save and restore routines obtain the lock again and
-they fails as the lock is already held.
+Mathieu
 
-The alternative is to change the dev_locks in save and restore to try_lock
-so that it will work if locks were previously obtained or not. 
-
-> 
-> Also, you're now calling pci_reset_bridge_secondary_bus() with the dev
-> unlocked, where we called it with the dev locked before.  Some (but
-> worryingly, not all) of the other pci_reset_bridge_secondary_bus()
-> callers also have the dev locked.  I didn't look long enough to figure
-> out if there is a strategy there or if these inconsistencies are
-> latent bugs.
-> 
-
-The goal of this routine is to reset the device not the bridge and the code
-will use FLR or others if available. Therefore, it makes perfect sense to
-obtain the device lock while doing this. 
-
-The code tries to reset the bus if none of the other resets work. This is
-where the problem is. It destroys the context for other devices.
-
-I can fix get rid of this unlock, do something and then lock again business
-by rewriting the locks in save and restore.
-
-Sinan
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>
+> --
+> Regards,
+> Sudeep
