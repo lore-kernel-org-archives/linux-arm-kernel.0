@@ -1,71 +1,44 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 30 Sep 2016 10:58:01 +0200
-Subject: [PATCHv4 3/3] tty/serial: at91: fix hardware handshake on SAM9x5
- (without GPIOs)
-In-Reply-To: <20160930085801.21497-1-richard.genoud@gmail.com>
-References: <20160930085801.21497-1-richard.genoud@gmail.com>
-Message-ID: <20160930085801.21497-4-richard.genoud@gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 30 Sep 2016 11:01:32 +0200
+Subject: [PATCH v14 4/4] CMDQ: save more energy in idle
+In-Reply-To: <1475225766.25044.33.camel@mtksdaap41>
+References: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
+ <1473039885-24009-5-git-send-email-hs.liao@mediatek.com>
+ <CABb+yY1YqyReK5bii6n5a_rJ6fgpPi=aC3sfKJdomvM5+NG9FA@mail.gmail.com>
+ <1474622885.21723.25.camel@mtksdaap41> <1475225766.25044.33.camel@mtksdaap41>
+Message-ID: <73a10cdc-6aeb-73be-adcb-0367e2e07824@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
-hardware handshake is enabled") broke the hardware handshake on SAM9x5
-platforms.
 
-On Atmel platforms, the USART can only handle the handware handshake
-(ATMEL_US_USMODE_HWHS) if FIFOs or PDC are used.
 
-Thus, ATMEL_US_USMODE_HWHS mode should only be used in this case.
+On 09/30/2016 10:56 AM, Horng-Shyang Liao wrote:
+> On Fri, 2016-09-23 at 17:28 +0800, Horng-Shyang Liao wrote:
+>> On Thu, 2016-09-22 at 13:22 +0530, Jassi Brar wrote:
+>>> On Mon, Sep 5, 2016 at 7:14 AM, HS Liao <hs.liao@mediatek.com> wrote:
+>>>> Use clk_disable_unprepare instead of clk_disable to save more energy
+>>>> when CMDQ is idle.
+>>>>
+>>>> Signed-off-by: HS Liao <hs.liao@mediatek.com>
+>>>> ---
+>>>>  drivers/mailbox/mtk-cmdq.c | 54 +++++++++++++++++++++++++++++++++++++++-------
+>>>
+>>> The driver is introduced by second patch of the set, so it makes sense
+>>> to merge this patch into patch 2/4.
+>>
+>> Hi Jassi,
+>>
+>> Could you take a look at previous discussion between Matthias and me?
+>> http://lkml.iu.edu/hypermail/linux/kernel/1606.2/05239.html
+>> His basic idea is to simplify first working version.
+>> Therefore, I move some code to this patch.
+>>
 
-For SAM9x5, there's no FIFOs nor PDC for the USART, so the mode should
-be ATMEL_US_USMODE_NORMAL and the RTS pin should be controlled by the
-driver.
+Well what I wanted to say is, that right now this driver is quite a big 
+beast and this makes it difficult to review. So my idea was to just 
+submit the most basic version of this driver.
+Any improvements on the driver should be sent in follow-up patches after 
+the basic driver got merged. That was my idea.
 
-NB: -stable is not Cced because it doesn't cleanly apply on 4.1+
-
-Tested on SAM9G35-CM with and without DMA
-
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when hardware handshake is enabled")
----
- drivers/tty/serial/atmel_serial.c | 24 ++++++++++++++----------
- 1 file changed, 14 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index b01b68ece35c..4d033e6af44a 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -2131,19 +2131,23 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 				  port->rs485.delay_rts_after_send);
- 		mode |= ATMEL_US_USMODE_RS485;
- 	} else if ((termios->c_cflag & CRTSCTS) &&
--		   !mctrl_gpio_use_rtscts(atmel_port->gpios)) {
-+		   !mctrl_gpio_use_rtscts(atmel_port->gpios) &&
-+		   (atmel_use_pdc_rx(port) || atmel_use_fifo(port))) {
- 		/*
--		 * RS232 with hardware handshake (RTS/CTS)
--		 * handled by the controller.
-+		 * Automatic hardware handshake (RTS/CTS) only work with
-+		 * FIFOs or PDC.
-+		 * Meaning that on SAM9x5 the controller can't handle
-+		 * the hardware handshake (no FIFOs nor PDC on these platforms).
- 		 */
--		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
--			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
--			termios->c_cflag &= ~CRTSCTS;
--		} else {
--			mode |= ATMEL_US_USMODE_HWHS;
--		}
-+		mode |= ATMEL_US_USMODE_HWHS;
- 	} else {
--		/* RS232 without hardware handshake or controlled by GPIOs */
-+		/*
-+		 * Other cases are:
-+		 * - RS232 without hardware handshake
-+		 * - RS232 with hardware handshake and:
-+		 *   - controller unable to handle CTS/RTS by itself
-+		 *   - or CTS/RTS handled by GPIOs
-+		 */
- 		mode |= ATMEL_US_USMODE_NORMAL;
- 	}
- 
+Regards,
+Matthias
