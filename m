@@ -1,40 +1,82 @@
-From: appro@openssl.org (Andy Polyakov)
-Date: Fri, 30 Sep 2016 12:44:13 +0200
-Subject: [PATCH] arm64: add support for SHA256 using NEON instructions
-In-Reply-To: <1475189503-9175-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1475189503-9175-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <a11d5dcc-1681-7e62-c3ac-f2fd53c50f14@openssl.org>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 30 Sep 2016 13:04:28 +0200
+Subject: [PATCHv4 2/3] tty/serial: at91: fix hardware handshake with GPIOs
+In-Reply-To: <20160930091230.qzd42qnelylmkqxe@pengutronix.de>
+References: <20160930085801.21497-1-richard.genoud@gmail.com>
+ <20160930085801.21497-3-richard.genoud@gmail.com>
+ <20160930091230.qzd42qnelylmkqxe@pengutronix.de>
+Message-ID: <CACQ1gAgE+BvteH9y62PcRx_tA9_e2X11RCJ12PC98FK+5z98QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This is a port of the ARMv7 implementation in arch/arm/crypto. For a Cortex-A57
-> (r2p1), the performance numbers are listed below. In summary, 40% - 50% speedup
-> where it counts, i.e., block sizes over 256 bytes with few updates.
+2016-09-30 11:12 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Richard,
+>
+> On Fri, Sep 30, 2016 at 10:58:00AM +0200, Richard Genoud wrote:
+>> Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
+>> hardware handshake is enabled") broke the hardware handshake when GPIOs
+>> were used.
+>>
+>> Hardware handshake with GPIOs used to work before this commit because
+>> the CRTSCTS flag (termios->c_cflag) was set, but not the
+>> ATMEL_US_USMODE_HWHS flag (controller register) ; so hardware handshake
+>> enabled, but not handled by the controller.
+>
+> What does the HWHS flag control? What if only RTS is a gpio and CTS is
+> not? Or the other way round?
+First, HWHS flag is used only in SAMA5D2. (if I correctly understood
+Atmel HW guys,
+all other platforms (sam9, sam9x5, sama5d3...) have this flag, but it
+is unusable,
+because they don't have Fifos nor PDC).
+So, on SAMA5D2, the HWHS flag tells the controller to drive the RTS
+pin according to
+the number of char present in the rx fifo (cf Figure 44-29 ?44.7.3.15 p.1438 of
+ http://www.atmel.com/Images/Atmel-11267-32-bit-Cortex-A5-Microcontroller-SAMA5D2_Datasheet.pdf).
+The controller will also start/stop the transmission on CTS changes.
+But, as I haven't got this hard, I couldn't test it. (but Cyrille did I guess).
+With this flag set, It's mandatory to have CTS and RTS not handled via
+GPIO, because if
+they were, the controller couldn't, well, control them.
 
-Cool! Great! Just in case for reference. You compare generic, new NEON
-and hardware-assisted implementations. I assume that first one refers to
-C compiler-generated code. But there is another option, i.e. non-NEON
-assembly. Now to the "for reference" part. The reason for why NEON is
-not utilized in OpenSSL is because it's deemed that it doesn't provide
-"extraordinary" improvement over non-NEON assembly code, especially on
-less sophisticated processors such as Cortex-A53. Note that I'm not
-saying that NEON SHA256 subroutine is not faster, it is, only that it's
-not "extraordinarily" faster in most relevant cases(*). In other words
-it's reckoned that non-NEON assembly provides adequate *all-round*
-performance, taking into consideration that it does it without being
-dependent on optional NEON. Non-NEON assembly should also be interesting
-in kernel context, because there are situations when you can't call NEON
-procedure, be it suggested one or hardware-assisted, which itself relies
-on NEON. And of course another nice quality about SHA2 module in OpenSSL
-is that it emits both SHA256 and SHA512 codes ;-) On related note it
-should be noted that NEON-izing SHA512 on ARM64 makes lesser sense, it's
-bound to provide lesser improvement than SHA256 [if any at all in some
-cases]. This is because in SHA256 you engage 4 lanes of NEON registers,
-while in SHA512 case you have only 2.
+The NORMAL flag, on the contrary, just tell the controller not to mess
+with RTS/CTS,
+and in this case, the driver will handle CTS changes and drive the RTS
+pin, via GPIO or
+via the CR register.
 
-(*) Well, this is also question of priorities. My rationale is that
-there is a lot of Cortex-A53 and A57 phones out there that don't have
-crypto-extensions, I refer to Qualcomm SoCs, where NEON gives less than
-10% improvement [over non-NEON assembly]. Yes, it gives more on X-Gene,
-but X-Gene is not wide-spread, and the rest (including upcoming X-Gene)
-have crypto-extensions, so alternative code path doesn't matter.
+It's not a problem to have CTS as a GPIO and RTS controlled via the CR register
+(or CTS changes read in CSR register and RTS as a GPIO).
+I just gave it a quick try, works the same.
+( But I don't know if it will work with FIFOs
+
+> What is the problematic setup? I guess it's RTS and CTS are gpios and
+> with that setting ATMEL_US_USMODE_HWHS is wrong? What happens if that
+> happens?
+
+Yes, CTS/RTS as GPIOs + HWHS flag is clearly wrong.
+If that happens, well, the controller will try to drive an RTS pin
+that won't have been muxed
+as RTS. It does not seems to be a problem, but instructing the
+controller do drive pins it doesn't
+have access doesn't really make sense.
+And in the case of the SAMA5D2, well I don't know what the result will
+be, but it could stop transmission
+from the "ghost" CTS signal I guess.
+
+Anyway, the problematics setups are all the setups with USMODE_HWHS
+enabled on platform without Fifos or PDC,
+i.e. all platforms but sama5d2 (Cyrille, correct me if I'm wrong).
+
+For instance, on sam9x5, if DMA is used, USMODE_HWHS enabled and
+RTS/CTS NOT muxed as GPIOS,
+it's like there was no flow control at all (the CTS pin doesn't
+disable the transmitter).
+
+Since atmel HW guys said that USMODE_HWHS is broken for platforms !sama5d2,
+(cfhttps://lkml.org/lkml/2016/9/7/598 ),  I honestly didn't dig any
+further into that flag.
+
+
+Regards,
+Richard
