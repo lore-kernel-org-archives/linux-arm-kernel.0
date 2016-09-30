@@ -1,48 +1,115 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 30 Sep 2016 17:55:28 +0200
-Subject: [PATCH 0/3] Support userspace irqchip with arch timers
-In-Reply-To: <20160930154335.GB7996@cbox>
-References: <20160927190806.22988-1-christoffer.dall@linaro.org>
- <de375a6e-095c-a17a-0db7-876a5619df42@suse.de>
- <3e85d538-2539-f190-0d17-a2ecfe7b48ce@suse.de> <20160930154335.GB7996@cbox>
-Message-ID: <d3d1d3ef-27af-bb97-62bd-1c467f39a2f1@suse.de>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 30 Sep 2016 08:51:13 -0700
+Subject: [PATCH] pwm: imx: Port "pwm: imx: support output polarity
+ inversion" to Linux v4.7
+In-Reply-To: <20160930084958.2f3f6e3a@jawa>
+References: <1473584109-10710-1-git-send-email-l.majewski@majess.pl>
+ <20160911110112.564df4ab@jawa> <20160930084958.2f3f6e3a@jawa>
+Message-ID: <cc7706ef0e93383759244adaae533156@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 30.09.16 17:43, Christoffer Dall wrote:
-> On Fri, Sep 30, 2016 at 05:38:11PM +0200, Alexander Graf wrote:
+On 2016-09-29 23:49, Lukasz Majewski wrote:
+> Dear all,
+> 
+>> Dear Lothar, Stefan,
 >>
+>> > This patch ports "pwm: imx: support output polarity inversion" patch
+>> > set written by Lothar Wassmann (v6 from 10.2014).
+>> >
 >>
->> On 30.09.16 16:54, Alexander Graf wrote:
->>>
->>>
->>> On 27.09.16 21:08, Christoffer Dall wrote:
->>>> Hi Alex,
->>>>
->>>> Marc and I have been looking at this during Linaro connect and have
->>>> slightly reworked your patch into this small series.
->>>>
->>>> It would be good if you could have a look at it and test it out.
->>>>
->>>> I've tested it with your QEMU, and it works for UP, but secondary CPUs
->>>> fail to come up, and it looks like the kernel never gets an IPI for
->>>> those CPUs from userspace.  Any chance you're willing to take a look at
->>>> that?
->>>
->>> I still need to see whether I can come up with a prettier solution, but
->>> for now this works:
->>>
->>> diff --git a/target-i386/kvm.c b/target-i386/kvm.c
+>> I've read the e-mail from Stefan regarding missing support for pwm-imx
+>> polarity inversion feature.
 >>
->> Eh, no, not in i386 code :). But the problem seems to be a missing
->> mpstate sync.
+>> I also would like to see it in ML. Hence, my patch. Lothar, please
+>> feel free to squash it to your patches when you (I hope :-) ) will
+>> prepare v7 of this feature.
 >>
-> Yeah, that looked really dodgy.  Have you tested it? :)
+>> I hope that this would help.
+> 
+> Was there any decision about those patches?
 
-I have, but I ran the wrong command line and by accident used -M
-...,kernel-irqchip=on :)
+Bhuvan here at Toradex is preparing an updated patchset...
 
+> 
+> Would they be included to main line anytime soon?
 
-Alex
+I don't think that there were fundamental issues with the patchset, so I
+hope they make it once upon a time...
+
+--
+Stefan
+
+> 
+> Best regards,
+> ?ukasz Majewski
+> 
+>>
+>> Best regards,
+>> ?ukasz Majewski
+>>
+>> > It is used to control backlight of panels via inverted PWM signal.
+>> >
+>> > The "inversion" of PWM output is not an issue at such devices, since
+>> > separate GPIO pin is responsible for enabling and disabling the
+>> > panel's backlight.
+>> >
+>> > This patch should be put on top of:
+>> >
+>> > https://patchwork.kernel.org/patch/5065841/
+>> > https://patchwork.kernel.org/patch/5065821/
+>> > https://patchwork.kernel.org/patch/5065811/
+>> >
+>> >
+>> > Signed-off-by: Lukasz Majewski <l.majewski@majess.pl>
+>> > ---
+>> >  drivers/pwm/pwm-imx.c | 20 ++++++++++++++------
+>> >  1 file changed, 14 insertions(+), 6 deletions(-)
+>> >
+>> > diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+>> > index 471a99e..c37d223 100644
+>> > --- a/drivers/pwm/pwm-imx.c
+>> > +++ b/drivers/pwm/pwm-imx.c
+>> > @@ -181,7 +181,7 @@ static int imx_pwm_config_v2(struct pwm_chip
+>> > *chip, if (enable)
+>> >  		cr |= MX3_PWMCR_EN;
+>> >
+>> > -	if (pwm->polarity == PWM_POLARITY_INVERSED)
+>> > +	if (pwm->args.polarity == PWM_POLARITY_INVERSED)
+>> >  		cr |= MX3_PWMCR_POUTC;
+>> >
+>> >  	writel(cr, imx->mmio_base + MX3_PWMCR);
+>> > @@ -201,11 +201,6 @@ static void imx_pwm_set_enable_v2(struct
+>> > pwm_chip *chip, bool enable) else
+>> >  		val &= ~MX3_PWMCR_EN;
+>> >
+>> > -	if (chip->pwms[0].polarity == PWM_POLARITY_INVERSED)
+>> > -		val |= MX3_PWMCR_POUTC;
+>> > -	else
+>> > -		val &= ~MX3_PWMCR_POUTC;
+>> > -
+>> >  	writel(val, imx->mmio_base + MX3_PWMCR);
+>> >  }
+>> >
+>> > @@ -253,6 +248,19 @@ static int imx_pwm_set_polarity(struct pwm_chip
+>> > *chip, struct pwm_device *pwm, enum pwm_polarity polarity)
+>> >  {
+>> >  	struct imx_chip *imx = to_imx_chip(chip);
+>> > +	u32 val;
+>> > +
+>> > +	if (polarity == pwm->args.polarity)
+>> > +		return 0;
+>> > +
+>> > +	val = readl(imx->mmio_base + MX3_PWMCR);
+>> > +
+>> > +	if (polarity == PWM_POLARITY_INVERSED)
+>> > +		val |= MX3_PWMCR_POUTC;
+>> > +	else
+>> > +		val &= ~MX3_PWMCR_POUTC;
+>> > +
+>> > +	writel(val, imx->mmio_base + MX3_PWMCR);
+>> >
+>> >  	dev_dbg(imx->chip.dev, "%s: polarity set to %s\n",
+>> > __func__, polarity == PWM_POLARITY_INVERSED ? "inverted" :
+>> > "normal");
+>>
