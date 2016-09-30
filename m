@@ -1,55 +1,61 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 29 Sep 2016 18:10:52 -0600
-Subject: Crash seen on ARM Juno r1 with 4.8-rc8 when Coresight is enabled
-In-Reply-To: <5dc4d096-d580-900c-5750-38e0db1ccbce@arm.com>
-References: <CAGhh56EPK0BYbjV_v7cehT+yuB=L3O-AkFR2mLQMDAS66zDgDg@mail.gmail.com>
- <CANLsYkypz383Smuqv3B5K3i9mzGxMdc1OJdc_tWQZ5qHWQCeJw@mail.gmail.com>
- <20160929084953.GA24154@lnxartpec.se.axis.com>
- <5dc4d096-d580-900c-5750-38e0db1ccbce@arm.com>
-Message-ID: <CANLsYkycnUJmHNAWPDS9L0LqA-p30-Fbv9GFLN1q+SZbrafORg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 30 Sep 2016 01:13:40 +0100
+Subject: [PATCH 1/3] arm64: dump: Make ptdump debugfs a separate option
+In-Reply-To: <20160929213257.30505-2-labbott@redhat.com>
+References: <20160929213257.30505-1-labbott@redhat.com>
+ <20160929213257.30505-2-labbott@redhat.com>
+Message-ID: <20160930001339.GA4369@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 September 2016 at 03:17, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 29/09/16 09:49, Rabin Vincent wrote:
->>
->> On Wed, Sep 28, 2016 at 11:41:41AM -0600, Mathieu Poirier wrote:
->
-> [...]
->
->>> Thanks you for reporting this Vankatesh,
->>>
->>> Sudeep and Suzuki, can you guys help me with this - I don't have an R1
->>> to test with.
->>
->>
->> I've seen this too, on other platforms.  This should fix it:
->>
->> 8<-----------
->> From a9da7d7b47e67dd6ffcafddadb50e6f97503f296 Mon Sep 17 00:00:00 2001
->> From: Rabin Vincent <rabinv@axis.com>
->> Date: Tue, 30 Aug 2016 08:54:21 +0200
->> Subject: [PATCH] coresight: check for NULL child_name
->>
->> Connection child names associated to ports can sometimes be NULL, which
->> is the case when booting a system on QEMU or when the Coresight power
->> domain isn't switched on.  fadf3a44e974 ("coresight: checking for NULL
->> string in coresight_name_match()") fixed one place to handle this but
->> the same check is needed in coresight_orphan_match() to prevent a crash
->> there.
->>
->
-> Thanks Rabin, we have exact same fix in linux-next already.
+Hi,
 
-Sorry for the late reply - I am currently travelling.
+On Thu, Sep 29, 2016 at 02:32:55PM -0700, Laura Abbott wrote:
+> ptdump_register currently initializes a set of page table information and
+> registers debugfs. There are uses for the ptdump option without wanting the
+> debugfs options. Split this out to make it a separate option.
+> 
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+>  arch/arm64/Kconfig.debug        |  6 +++++-
+>  arch/arm64/include/asm/ptdump.h | 15 +++++++++++++--
+>  arch/arm64/mm/Makefile          |  3 ++-
+>  arch/arm64/mm/dump.c            | 30 +++++++++---------------------
+>  arch/arm64/mm/ptdump_debugfs.c  | 33 +++++++++++++++++++++++++++++++++
+>  5 files changed, 62 insertions(+), 25 deletions(-)
+>  create mode 100644 arch/arm64/mm/ptdump_debugfs.c
 
-Sudeep is correct, we have this underway for the 4.9 cycle.
+As a heads-up, Ard has new ARM64_PTUMP user under drivers/firmware/efi queued
+up in the EFI tree, which will also need fixing up. See commit d80448ac92b72051
+("efi/arm64: Add debugfs node to dump UEFI runtime page tables") [1].
 
-Mathieu
+[...]
 
->
-> --
-> Regards,
-> Sudeep
+> +#include <linux/seq_file.h>
+>  #include <linux/mm_types.h>
+
+Nit: please keep headers in alphabetical order.
+
+> -static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
+> +static void __walk_pgd(struct pg_state *st, struct mm_struct *mm,
+
+Can we leave this name as-is? We didn't change walk_{pud,pmd,pte}, so this is
+inconsistent, and we haven't reused the name.
+
+[...]
+
+> +int ptdump_register(struct ptdump_info *info, const char *name)
+> +{
+> +	ptdump_initialize(info);
+> +	return ptdump_debugfs_create(info, name);
+>  }
+
+It feels like a layering violation to have the core ptdump code call the
+debugfs ptdump code. Is there some reason this has to live here?
+
+Other than the above points, this looks good to me.
+
+Thanks,
+Mark.
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=9d80448ac92b720512c415265597d349d8b5c3e8
