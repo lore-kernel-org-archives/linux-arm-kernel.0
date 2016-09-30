@@ -1,66 +1,188 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 30 Sep 2016 16:25:05 +0200
-Subject: [PATCH 2/6] ARM: dts: stm32f429: add LSI and LSE clocks
+Date: Fri, 30 Sep 2016 16:25:07 +0200
+Subject: [PATCH 4/6] clk: stm32f4: Add RTC clock
 In-Reply-To: <1475245509-6487-1-git-send-email-gabriel.fernandez@st.com>
 References: <1475245509-6487-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1475245509-6487-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1475245509-6487-5-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch adds lsi / lse oscillators. These clocks can be use by
-RTC clocks.
-The clock drivers needs to disable the power domain write protection using
-syscon / regmap to enable these clocks.
+This patch introduces the support of the RTC clock.
+RTC clock can have 3 sources: lsi, lse and hse_rtc.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/clk/clk-stm32f4.c | 135 +++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 134 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 35df462..0979fb6 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -55,6 +55,18 @@
- 			compatible = "fixed-clock";
- 			clock-frequency = <0>;
- 		};
-+
-+		clk-lse {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+		};
-+
-+		clk-lsi {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32000>;
-+		};
- 	};
+diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+index f57e73c..6e26d39 100644
+--- a/drivers/clk/clk-stm32f4.c
++++ b/drivers/clk/clk-stm32f4.c
+@@ -134,7 +134,7 @@ static const struct stm32f4_gate_data stm32f4_gates[] __initconst = {
+ 	{ STM32F4_RCC_APB2ENR, 26,	"ltdc",		"apb2_div" },
+ };
  
- 	soc {
-@@ -176,6 +188,11 @@
- 			reg = <0x40013800 0x400>;
- 		};
+-enum { SYSTICK, FCLK, CLK_LSI, CLK_LSE, END_PRIMARY_CLK };
++enum { SYSTICK, FCLK, CLK_LSI, CLK_LSE, CLK_HSE_RTC, CLK_RTC, END_PRIMARY_CLK };
+ /*
+  * MAX_CLKS is the maximum value in the enumeration below plus the combined
+  * hweight of stm32f42xx_gate_map (plus one).
+@@ -318,6 +318,15 @@ static inline void enable_power_domain_write_protection(void)
+ 	regmap_update_bits(pdrm, 0x00, (1 << 8), (0 << 8));
+ }
  
-+		pwrcfg: power-config at 40007000 {
-+			compatible = "syscon";
-+			reg = <0x40007000 0x400>;
-+		};
++static inline void sofware_reset_backup_domain(void)
++{
++	unsigned long val;
 +
- 		pin-controller {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-@@ -330,6 +347,7 @@
- 			compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
- 			reg = <0x40023800 0x400>;
- 			clocks = <&clk_hse>;
-+			st,syscfg = <&pwrcfg>;
- 		};
++	val = readl(base + STM32F4_RCC_BDCR);
++	writel(val |= (1 << 16), base + STM32F4_RCC_BDCR);
++	writel(val & ~(1 << 16), base + STM32F4_RCC_BDCR);
++}
++
+ struct stm32_rgate {
+ 	struct	clk_hw hw;
+ 	struct	clk_gate gate;
+@@ -404,6 +413,113 @@ static struct clk_hw *clk_register_rgate(struct device *dev, const char *name,
+ 	return hw;
+ }
  
- 		dma1: dma-controller at 40026000 {
++static int cclk_gate_enable(struct clk_hw *hw)
++{
++	int ret;
++
++	disable_power_domain_write_protection();
++
++	ret = clk_gate_ops.enable(hw);
++
++	enable_power_domain_write_protection();
++
++	return ret;
++}
++
++static void cclk_gate_disable(struct clk_hw *hw)
++{
++	disable_power_domain_write_protection();
++
++	clk_gate_ops.disable(hw);
++
++	enable_power_domain_write_protection();
++}
++
++static int cclk_gate_is_enabled(struct clk_hw *hw)
++{
++	return clk_gate_ops.is_enabled(hw);
++}
++
++static const struct clk_ops cclk_gate_ops = {
++	.enable		= cclk_gate_enable,
++	.disable	= cclk_gate_disable,
++	.is_enabled	= cclk_gate_is_enabled,
++};
++
++static u8 cclk_mux_get_parent(struct clk_hw *hw)
++{
++	return clk_mux_ops.get_parent(hw);
++}
++
++
++static int cclk_mux_set_parent(struct clk_hw *hw, u8 index)
++{
++	int ret;
++
++	disable_power_domain_write_protection();
++
++	sofware_reset_backup_domain();
++
++	ret = clk_mux_ops.set_parent(hw, index);
++
++	enable_power_domain_write_protection();
++
++	return ret;
++}
++
++
++static const struct clk_ops cclk_mux_ops = {
++	.get_parent = cclk_mux_get_parent,
++	.set_parent = cclk_mux_set_parent,
++};
++
++static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
++		const char * const *parent_names, int num_parents,
++		void __iomem *reg, u8 bit_idx, u8 shift, unsigned long flags,
++		spinlock_t *lock)
++{
++	struct clk_hw *hw;
++	struct clk_gate *gate;
++	struct clk_mux *mux;
++
++	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
++	if (!gate) {
++		hw = ERR_PTR(-EINVAL);
++		goto fail;
++	}
++
++	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
++	if (!mux) {
++		kfree(gate);
++		hw = ERR_PTR(-EINVAL);
++		goto fail;
++	}
++
++	gate->reg = reg;
++	gate->bit_idx = bit_idx;
++	gate->flags = 0;
++	gate->lock = lock;
++
++	mux->reg = reg;
++	mux->shift = shift;
++	mux->mask = 3;
++	mux->flags = 0;
++
++	hw = clk_hw_register_composite(dev, name, parent_names, num_parents,
++			&mux->hw, &cclk_mux_ops,
++			NULL, NULL,
++			&gate->hw, &cclk_gate_ops,
++			flags);
++
++	if (IS_ERR(hw)) {
++		kfree(gate);
++		kfree(mux);
++	}
++
++fail:
++	return hw;
++}
++
+ static const char *sys_parents[] __initdata =   { "hsi", NULL, "pll" };
+ 
+ const char *rtc_parents[4] = {
+@@ -509,6 +625,23 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+ 		goto fail;
+ 	}
+ 
++	clks[CLK_HSE_RTC] = clk_hw_register_divider(NULL, "hse-rtc", "clk-hse",
++			0, base + STM32F4_RCC_CFGR, 16, 5, 0,
++			&stm32f4_clk_lock);
++
++	if (IS_ERR(clks[CLK_HSE_RTC])) {
++		pr_err("Unable to register hse-rtc clock\n");
++		goto fail;
++	}
++
++	clks[CLK_RTC] = stm32_register_cclk(NULL, "rtc", rtc_parents, 4,
++			base + STM32F4_RCC_BDCR, 15, 8, 0, &stm32f4_clk_lock);
++
++	if (IS_ERR(clks[CLK_RTC])) {
++		pr_err("Unable to register rtc clock\n");
++		goto fail;
++	}
++
+ 	of_clk_add_hw_provider(np, stm32f4_rcc_lookup_clk, NULL);
+ 	return;
+ fail:
 -- 
 1.9.1
