@@ -1,24 +1,30 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 29 Sep 2016 23:30:12 -0700
-Subject: [PATCH 2/2] mmc: sdhci-of-arasan: mark sdhci_arasan_reset() static
-In-Reply-To: <1475199459-4775-2-git-send-email-baoyou.xie@linaro.org>
-References: <1475199459-4775-1-git-send-email-baoyou.xie@linaro.org>
- <1475199459-4775-2-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20160930063012.GL16583@xsjsorenbubuntu>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Fri, 30 Sep 2016 14:45:43 +0800
+Subject: [PATCH] drm/mediatek: stop using drm_vblank_count() as the hw frame
+ counter
+Message-ID: <1475217943-12427-1-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-09-30 at 09:37:39 +0800, Baoyou Xie wrote:
-> We get 1 warning when building kernel with W=1:
-> drivers/mmc/host/sdhci-of-arasan.c:253:6: warning: no previous prototype for 'sdhci_arasan_reset' [-Wmissing-prototypes]
-> 
-> In fact, this function is only used in the file in which it is
-> declared and don't need a declaration, but can be made static.
-> So this patch marks it 'static'.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+using drm_vblank_no_hw_counter() to eliminate kernel warning.
 
-There is already a patch for this:
-https://patchwork.kernel.org/patch/9349805/
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-	S?ren
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index eebb7d8..e286193 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -239,7 +239,7 @@ static struct drm_driver mtk_drm_driver = {
+ 	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME |
+ 			   DRIVER_ATOMIC,
+ 
+-	.get_vblank_counter = drm_vblank_count,
++	.get_vblank_counter = drm_vblank_no_hw_counter,
+ 	.enable_vblank = mtk_drm_crtc_enable_vblank,
+ 	.disable_vblank = mtk_drm_crtc_disable_vblank,
+ 
+-- 
+1.9.1
