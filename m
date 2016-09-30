@@ -1,92 +1,67 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Sep 2016 14:13:50 +0200
-Subject: [PATCH v4 3/5] ARM: sun5i: a13-olinuxino: Enable VGA bridge
-In-Reply-To: <20160930121352.30184-1-maxime.ripard@free-electrons.com>
-References: <20160930121352.30184-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160930121352.30184-4-maxime.ripard@free-electrons.com>
+Date: Fri, 30 Sep 2016 14:13:47 +0200
+Subject: [PATCH v4 0/5] drm: Add Support for Passive RGB to VGA bridges
+Message-ID: <20160930121352.30184-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have support for the VGA bridges using our DRM driver, enable
-the display engine for the Olimex A13-Olinuxino.
+Hi,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 54 +++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+This serie is about adding support for the RGB to VGA bridge found in
+the A13-Olinuxino and the CHIP VGA adapter.
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index b3c234c65ea1..01ce7ea9032d 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -72,6 +72,47 @@
- 			default-state = "on";
- 		};
- 	};
-+
-+	bridge {
-+		compatible = "rgb-to-vga-bridge";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				vga_bridge_in: endpoint {
-+					remote-endpoint = <&tcon0_out_vga>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				vga_bridge_out: endpoint {
-+					remote-endpoint = <&vga_con_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	vga {
-+		compatible = "vga-connector";
-+
-+		port {
-+			vga_con_in: endpoint {
-+				remote-endpoint = <&vga_bridge_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&be0 {
-+	status = "okay";
- };
- 
- &ehci0 {
-@@ -211,6 +252,19 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
-+	status = "okay";
-+};
-+
-+&tcon0_out {
-+	tcon0_out_vga: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&vga_bridge_in>;
-+	};
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins_b>;
+Both these boards rely on an entirely passive bridge made out of
+resitor ladders that do not require any initialisation. The only thing
+needed is to get the timings from the screen if available (and if not,
+fall back on XGA standards), set up the display pipeline to output on
+the RGB bus with the proper timings, and you're done.
+
+This serie also fixes a bunch of bugs uncovered when trying to
+increase the resolution, and hence the pixel clock, of our
+pipeline. It also fixes a few bugs in the DRM driver itself that went
+unnoticed before.
+
+Let me know what you think,
+Maxime
+
+Changes from v3:
+  - Depends on OF in Kconfig
+  - Fixed typos in the driver comments
+  - Removed the mention of a "passive" bridge in the bindings doc
+  - Made the strcuture const
+  - Removed the nops and best_encoders implementations
+  - Removed the call to drm_bridge_enable in the sun4i driver
+
+Changes from v2:
+  - Changed the compatible as suggested
+  - Rebased on top 4.8
+
+Changes from v1:
+  - Switch to using a vga-connector
+  - Use drm_encoder bridge pointer instead of doing our own
+  - Report the connector status as unknown instead of connected by
+    default, and as connected only if we can retrieve the EDID.
+  - Switch to of_i2c_get_adapter by node, and put the reference when done
+  - Rebased on linux-next	      
+
+Maxime Ripard (5):
+  drm/sun4i: rgb: Remove the bridge enable/disable functions
+  drm/bridge: Add RGB to VGA bridge support
+  ARM: sun5i: a13-olinuxino: Enable VGA bridge
+  ARM: multi_v7: enable VGA bridge
+  ARM: sunxi: Enable VGA bridge
+
+ .../bindings/display/bridge/rgb-to-vga-bridge.txt  |  48 +++++
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |  54 +++++
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/sunxi_defconfig                   |   1 +
+ drivers/gpu/drm/bridge/Kconfig                     |   7 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/rgb-to-vga.c                | 239 +++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_rgb.c                  |   6 -
+ 8 files changed, 351 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
+ create mode 100644 drivers/gpu/drm/bridge/rgb-to-vga.c
+
 -- 
 2.9.3
