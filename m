@@ -1,49 +1,53 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 30 Sep 2016 10:07:27 -0700
-Subject: [PATCH v2] clk: bcm2835: Clamp the PLL's requested rate to the
- hardware limits.
-Message-ID: <20160930170727.32544-1-eric@anholt.net>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 30 Sep 2016 10:16:28 -0700
+Subject: [PATCH 3/3] arm64: dump: Add checking for writable and exectuable
+ pages
+In-Reply-To: <20160930164147.GD1729@remoulade>
+References: <20160929213257.30505-1-labbott@redhat.com>
+ <20160929213257.30505-4-labbott@redhat.com>
+ <20160930155814.GA1729@remoulade>
+ <CAGXu5jJHohnRBxQAY-S7_iccgjc6xNUdBGb67b1-cOATyO-q0A@mail.gmail.com>
+ <20160930164147.GD1729@remoulade>
+Message-ID: <CAGXu5jK_HDf=YnPfueKhoCP63JA-Q6KFU_0BQ6RFd3Um5aOg7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes setting low-resolution video modes on HDMI.  Now the PLLH_PIX
-divider adjusts itself until the PLLH is within bounds.
+On Fri, Sep 30, 2016 at 9:41 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Sep 30, 2016 at 09:25:45AM -0700, Kees Cook wrote:
+>> On Fri, Sep 30, 2016 at 8:58 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>
+>> > Would it be worth verifying that all kernel mappings are UXN, too?
+>> >
+>> > ARMv8 allows execute-only mappings, and a !UXN mapping could result in an info
+>> > leak (e.g. pointers in MOVZ+MOVK sequences), or potential asynchronous issues
+>> > (e.g. user instruction fetches accessing read-destructive device registers).
+>> > All kernel mappings *should* be UXN.
+>>
+>> I love this idea, but based on what came up with hardened usercopy,
+>> there are a lot of readers of kernel memory still. I think the
+>> expectations around UXN need to be clarified so we can reason about
+>> things like perf that want to read the kernel text.
+>
+> The UXN (User eXecute Never) bit only controls whether userspace can execute a
+> page, not whether the kernel can read it. The RW permissions come from the AP
+> bits regardless.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- drivers/clk/bcm/clk-bcm2835.c | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+Ah! Sorry, I misunderstood. Yeah, UXN checking makes sense there then. :)
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 7a7970865c2d..69a1849d140c 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -499,8 +499,12 @@ static long bcm2835_pll_rate_from_divisors(unsigned long parent_rate,
- static long bcm2835_pll_round_rate(struct clk_hw *hw, unsigned long rate,
- 				   unsigned long *parent_rate)
- {
-+	struct bcm2835_pll *pll = container_of(hw, struct bcm2835_pll, hw);
-+	const struct bcm2835_pll_data *data = pll->data;
- 	u32 ndiv, fdiv;
- 
-+	rate = clamp(rate, data->min_rate, data->max_rate);
-+
- 	bcm2835_pll_choose_ndiv_and_fdiv(rate, *parent_rate, &ndiv, &fdiv);
- 
- 	return bcm2835_pll_rate_from_divisors(*parent_rate, ndiv, fdiv, 1);
-@@ -605,13 +609,6 @@ static int bcm2835_pll_set_rate(struct clk_hw *hw,
- 	u32 ana[4];
- 	int i;
- 
--	if (rate < data->min_rate || rate > data->max_rate) {
--		dev_err(cprman->dev, "%s: rate out of spec: %lu vs (%lu, %lu)\n",
--			clk_hw_get_name(hw), rate,
--			data->min_rate, data->max_rate);
--		return -EINVAL;
--	}
--
- 	if (rate > data->max_fb_rate) {
- 		use_fb_prediv = true;
- 		rate /= 2;
+> We already try to ensure that all kernel memory is UXN by construction, so this
+> would just be a sanity check, as with the rest of the W^X checks.
+>
+> The MOVZ+MOVK case above is where a sequence of 16-bit immediate MOVs are used
+> to encode a pointer. If a kernel mapping lacked UXN, userspace could execute it
+> (unprivileged), and extract the pointer generated into a GPR.
+>
+> Having kernel exec-only memory is a different story entirely, though I agree
+> it's something to look into.
+
+Yeah, this'll need to get sorted out for x86 too.
+
+-Kees
+
 -- 
-2.9.3
+Kees Cook
+Nexus Security
