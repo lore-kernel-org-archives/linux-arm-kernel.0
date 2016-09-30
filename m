@@ -1,88 +1,168 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 30 Sep 2016 20:32:32 +0100
-Subject: [RFC] arm64: Enforce observed order for spinlock and data
-In-Reply-To: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
-References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
-Message-ID: <20160930193231.GA2521@remoulade>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Fri, 30 Sep 2016 23:42:19 +0300
+Subject: [PATCH] drm/sun4i: Check that the plane coordinates are not
+ negative
+In-Reply-To: <20160930183348.75541582@bbrezillon>
+References: <20160930143320.26241-1-maxime.ripard@free-electrons.com>
+ <20160930180826.169e3daf@bbrezillon>
+ <20160930162211.GQ4329@intel.com>
+ <20160930183348.75541582@bbrezillon>
+Message-ID: <20160930204219.GR4329@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2016 at 01:40:57PM -0400, Brent DeGraaf wrote:
-> Prior spinlock code solely used load-acquire and store-release
-> semantics to ensure ordering of the spinlock lock and the area it
-> protects. However, store-release semantics and ordinary stores do
-> not protect against accesses to the protected area being observed
-> prior to the access that locks the lock itself.
+On Fri, Sep 30, 2016 at 06:33:48PM +0200, Boris Brezillon wrote:
+> On Fri, 30 Sep 2016 19:22:11 +0300
+> Ville Syrj?l? <ville.syrjala@linux.intel.com> wrote:
 > 
-> While the load-acquire and store-release ordering is sufficient
-> when the spinlock routines themselves are strictly used, other
-> kernel code that references the lock values directly (e.g. lockrefs)
-> could observe changes to the area protected by the spinlock prior
-> to observance of the lock itself being in a locked state, despite
-> the fact that the spinlock logic itself is correct.
+> > On Fri, Sep 30, 2016 at 06:08:26PM +0200, Boris Brezillon wrote:
+> > > On Fri, 30 Sep 2016 16:33:20 +0200
+> > > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > >   
+> > > > Our planes cannot be set at negative coordinates. Make sure we reject such
+> > > > configuration.
+> > > > 
+> > > > Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > ---
+> > > >  drivers/gpu/drm/sun4i/sun4i_layer.c | 3 +++
+> > > >  1 file changed, 3 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+> > > > index f0035bf5efea..f5463c4c2cde 100644
+> > > > --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
+> > > > +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+> > > > @@ -29,6 +29,9 @@ struct sun4i_plane_desc {
+> > > >  static int sun4i_backend_layer_atomic_check(struct drm_plane *plane,
+> > > >  					    struct drm_plane_state *state)
+> > > >  {
+> > > > +	if ((state->crtc_x < 0) || (state->crtc_y < 0))
+> > > > +		return -EINVAL;
+> > > > +  
+> > > 
+> > > Hm, I think it's a perfectly valid use case from the DRM framework and
+> > > DRM user PoV: you may want to place your plane at a negative CRTC
+> > > offset (which means part of the plane will be hidden).
+> > > 
+> > > Maybe I'm wrong, but it seems you can support that by adapting the
+> > > start address of your framebuffer pointer and the layer size.
+> > > 
+> > > Have you tried doing something like that?  
+> > 
+> > You shouldn't even be looking at the user provided coordinates. Also
+> > you can't return an error from the atomic update hook. The void return
+> > value should have been a decent hint ;)
+> 
+> Note that Maxime is not returning a value from the atomic update
+> implementation (it's done in the atomic_check implem),
 
-If the spinlock logic is correct, why are we changing that, and not the lockref
-code that you say has a problem?
+Ah, missed that. Anyway it's still the wrong thing to check since
+negative coordinates are a perfectly valid thing to have.
 
-What exactly goes wrong in the lockref code? Can you give a concrete example?
+> and I'm not
+> checking crtc_x,y consistency at all (which is obviously wrong), I'm
+> just blindly patching the values in sun4i_backend helpers.
+> 
+> > The right fix would be
+> > to move all the error handling into the atomic check hook, which
+> > probably should just call the helper to clip the coordinates and
+> > whatnot. Then the update hook can just use at the clipped 
+> > coordinates when programming the hw registers.
+> 
+> That's probably the best approach indeed, but that means having our
+> private sun4i_plane_state struct where we would store the patched
+> crtc_{w,h,x,y} info.
 
-Why does the lockref code accesses lock-protected fields without taking the
-lock first? Wouldn't concurrent modification be a problem regardless?
+Nope. The src/dst rects are now stored in drm_plane_state. Assuming my
+patches went in already. I think they did.
 
-> +	/*
-> +	 * Yes: The store done on this cpu was the one that locked the lock.
-> +	 * Store-release one-way barrier on LL/SC means that accesses coming
-> +	 * after this could be reordered into the critical section of the
+> 
+> Anyway, before we do that, that's probably better to check if it really
+> works on this HW (which is why I sent this informal patch).
 
-I assume you meant s/store-release/load-acquire/ here. This does not make sense
-to me otherwise.
+Most hardware can't do negative coordinates natively. But when things
+get clipped, the negative coordinates disappear. Then the only question
+left is whether the resulting coordinates are fullscreen or not, and
+whether the hardware can handle the "not" case.
 
-> +	 * load-acquire/store-release, where we did not own the lock. On LSE,
-> +	 * even the one-way barrier of the store-release semantics is missing,
+> 
+> > 
+> > >   
+> > > --->8---  
+> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > > index 3ab560450a82..6b68804f3035 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > > @@ -110,15 +110,30 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
+> > >  {
+> > >         struct drm_plane_state *state = plane->state;
+> > >         struct drm_framebuffer *fb = state->fb;
+> > > +       int crtc_w, crtc_h, crtc_x, crtc_y;
+> > >  
+> > >         DRM_DEBUG_DRIVER("Updating layer %d\n", layer);
+> > >  
+> > > +       crtc_x = state->crtc_x;
+> > > +       crtc_y = state->crtc_y;
+> > > +       crtc_w = state->crtc_w;
+> > > +       crtc_h = state->crtc_h;
+> > > +
+> > > +       if (crtc_x < 0) {
+> > > +               crtc_w += crtx_x;
+> > > +               crtc_x = 0;
+> > > +       }
+> > > +
+> > > +       if (crtc_y < 0) {
+> > > +               crtc_h += crtx_y;
+> > > +               crtc_y = 0;
+> > > +       }
+> > > +
+> > >         if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
+> > >                 DRM_DEBUG_DRIVER("Primary layer, updating global size W: %u H: %u\n",
+> > >                                  state->crtc_w, state->crtc_h);
+> > >                 regmap_write(backend->regs, SUN4I_BACKEND_DISSIZE_REG,
+> > > -                            SUN4I_BACKEND_DISSIZE(state->crtc_w,
+> > > -                                                  state->crtc_h));
+> > > +                            SUN4I_BACKEND_DISSIZE(crtc_w, crtc_h));
+> > >         }
+> > >  
+> > >         /* Set the line width */
+> > > @@ -130,15 +145,13 @@ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
+> > >         DRM_DEBUG_DRIVER("Layer size W: %u H: %u\n",
+> > >                          state->crtc_w, state->crtc_h);
+> > >         regmap_write(backend->regs, SUN4I_BACKEND_LAYSIZE_REG(layer),
+> > > -                    SUN4I_BACKEND_LAYSIZE(state->crtc_w,
+> > > -                                          state->crtc_h));
+> > > +                    SUN4I_BACKEND_LAYSIZE(crtc_w, crtc_h));
+> > >  
+> > >         /* Set base coordinates */
+> > >         DRM_DEBUG_DRIVER("Layer coordinates X: %d Y: %d\n",
+> > >                          state->crtc_x, state->crtc_y);
+> > >         regmap_write(backend->regs, SUN4I_BACKEND_LAYCOOR_REG(layer),
+> > > -                    SUN4I_BACKEND_LAYCOOR(state->crtc_x,
+> > > -                                          state->crtc_y));
+> > > +                    SUN4I_BACKEND_LAYCOOR(crtc_x, crtc_y));
+> > >  
+> > >         return 0;
+> > >  }
+> > > @@ -198,6 +211,12 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
+> > >         paddr += (state->src_x >> 16) * bpp;
+> > >         paddr += (state->src_y >> 16) * fb->pitches[0];
+> > >  
+> > > +       if (state->crtc_x < 0)
+> > > +               paddr -= bpp * state->crtc_x;
+> > > +
+> > > +       if (state->crtc_y < 0)
+> > > +               paddr -= fb->pitches[0] * state->crtc_y;
+> > > +
+> > >         DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
+> > >  
+> > >         /* Write the 32 lower bits of the address (in bits) */
+> > > _______________________________________________
+> > > dri-devel mailing list
+> > > dri-devel at lists.freedesktop.org
+> > > https://lists.freedesktop.org/mailman/listinfo/dri-devel  
+> > 
 
-Likewise (for the LSE case description).
-
-> +	 * so LSE needs an explicit barrier here as well.  Without this, the
-> +	 * changed contents of the area protected by the spinlock could be
-> +	 * observed prior to the lock.
-> +	 */
-
-By whom? We generally expect that if data is protected by a lock, you take the
-lock before accessing it. If you expect concurrent lockless readers, then
-there's a requirement on the writer side to explicitly provide the ordering it
-requires -- spinlocks are not expected to provide that.
-
-So, why aren't those observers taking the lock?
-
-What pattern of accesses are made by readers and writers such that there is a
-problem?
-
-What does this result in?
-
-> +"	dmb	ish\n"
-> +"	b	3f\n"
-> +"4:\n"
->  	/*
->  	 * No: spin on the owner. Send a local event to avoid missing an
->  	 * unlock before the exclusive load.
-> @@ -116,7 +129,15 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
->  "	ldaxrh	%w2, %4\n"
->  "	eor	%w1, %w2, %w0, lsr #16\n"
->  "	cbnz	%w1, 2b\n"
-> -	/* We got the lock. Critical section starts here. */
-> +	/*
-> +	 * We got the lock and have observed the prior owner's store-release.
-> +	 * In this case, the one-way barrier of the prior owner that we
-> +	 * observed combined with the one-way barrier of our load-acquire is
-> +	 * enough to ensure accesses to the protected area coming after this
-> +	 * are not accessed until we own the lock.  In this case, other
-> +	 * observers will not see our changes prior to observing the lock
-> +	 * itself.  Critical locked section starts here.
-> +	 */
-
-Each of these comments ends up covers, and their repeated presence makes the
-code harder to read. If there's a common problem, note it once at the top of
-the file.
-
-Thanks,
-Mark.
+-- 
+Ville Syrj?l?
+Intel OTC
