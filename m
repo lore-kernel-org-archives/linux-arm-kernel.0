@@ -1,170 +1,60 @@
 From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Sat, 1 Oct 2016 15:42:32 +0530
-Subject: [PATCH v2 3/6] pwm: imx: support output polarity inversion
+Date: Sat, 1 Oct 2016 15:42:33 +0530
+Subject: [PATCH v2 4/6] arm: dts: imx7: Update #pwm-cells for PWM polarity
+ control
 In-Reply-To: <20161001101235.24598-1-bhuvanchandra.dv@toradex.com>
 References: <20161001101235.24598-1-bhuvanchandra.dv@toradex.com>
-Message-ID: <20161001101235.24598-4-bhuvanchandra.dv@toradex.com>
+Message-ID: <20161001101235.24598-5-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lothar Wassmann <LW@KARO-electronics.de>
+Update #pwm-cells to 3 in order to support PWM signal polarity control.
 
-The i.MX pwm unit on i.MX27 and newer SoCs provides a configurable output
-polarity. This patch adds support to utilize this feature where available.
-
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
 Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/pwm/imx-pwm.txt |  6 +--
- drivers/pwm/pwm-imx.c                             | 51 +++++++++++++++++++++--
- 2 files changed, 51 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/imx7s.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pwm/imx-pwm.txt b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-index e00c2e9..c61bdf8 100644
---- a/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-@@ -6,8 +6,8 @@ Required properties:
-   - "fsl,imx1-pwm" for PWM compatible with the one integrated on i.MX1
-   - "fsl,imx27-pwm" for PWM compatible with the one integrated on i.MX27
- - reg: physical base address and length of the controller's registers
--- #pwm-cells: should be 2. See pwm.txt in this directory for a description of
--  the cells format.
-+- #pwm-cells: 2 for i.MX1 and 3 for i.MX27 and newer SoCs. See pwm.txt
-+  in this directory for a description of the cells format.
- - clocks : Clock specifiers for both ipg and per clocks.
- - clock-names : Clock names should include both "ipg" and "per"
- See the clock consumer binding,
-@@ -17,7 +17,7 @@ See the clock consumer binding,
- Example:
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 0d7d5ac..8d1d471 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -601,7 +601,7 @@
+ 				clocks = <&clks IMX7D_PWM1_ROOT_CLK>,
+ 					 <&clks IMX7D_PWM1_ROOT_CLK>;
+ 				clock-names = "ipg", "per";
+-				#pwm-cells = <2>;
++				#pwm-cells = <3>;
+ 				status = "disabled";
+ 			};
  
- pwm1: pwm at 53fb4000 {
--	#pwm-cells = <2>;
-+	#pwm-cells = <3>;
- 	compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
- 	reg = <0x53fb4000 0x4000>;
- 	clocks = <&clks IMX5_CLK_PWM1_IPG_GATE>,
-diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-index d600fd5..c37d223 100644
---- a/drivers/pwm/pwm-imx.c
-+++ b/drivers/pwm/pwm-imx.c
-@@ -38,6 +38,7 @@
- #define MX3_PWMCR_DOZEEN		(1 << 24)
- #define MX3_PWMCR_WAITEN		(1 << 23)
- #define MX3_PWMCR_DBGEN			(1 << 22)
-+#define MX3_PWMCR_POUTC			(1 << 18)
- #define MX3_PWMCR_CLKSRC_IPG_HIGH	(2 << 16)
- #define MX3_PWMCR_CLKSRC_IPG		(1 << 16)
- #define MX3_PWMCR_SWR			(1 << 3)
-@@ -180,6 +181,9 @@ static int imx_pwm_config_v2(struct pwm_chip *chip,
- 	if (enable)
- 		cr |= MX3_PWMCR_EN;
+@@ -612,7 +612,7 @@
+ 				clocks = <&clks IMX7D_PWM2_ROOT_CLK>,
+ 					 <&clks IMX7D_PWM2_ROOT_CLK>;
+ 				clock-names = "ipg", "per";
+-				#pwm-cells = <2>;
++				#pwm-cells = <3>;
+ 				status = "disabled";
+ 			};
  
-+	if (pwm->args.polarity == PWM_POLARITY_INVERSED)
-+		cr |= MX3_PWMCR_POUTC;
-+
- 	writel(cr, imx->mmio_base + MX3_PWMCR);
+@@ -623,7 +623,7 @@
+ 				clocks = <&clks IMX7D_PWM3_ROOT_CLK>,
+ 					 <&clks IMX7D_PWM3_ROOT_CLK>;
+ 				clock-names = "ipg", "per";
+-				#pwm-cells = <2>;
++				#pwm-cells = <3>;
+ 				status = "disabled";
+ 			};
  
- 	return 0;
-@@ -240,27 +244,62 @@ static void imx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	clk_disable_unprepare(imx->clk_per);
- }
- 
--static struct pwm_ops imx_pwm_ops = {
-+static int imx_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-+				enum pwm_polarity polarity)
-+{
-+	struct imx_chip *imx = to_imx_chip(chip);
-+	u32 val;
-+
-+	if (polarity == pwm->args.polarity)
-+		return 0;
-+
-+	val = readl(imx->mmio_base + MX3_PWMCR);
-+
-+	if (polarity == PWM_POLARITY_INVERSED)
-+		val |= MX3_PWMCR_POUTC;
-+	else
-+		val &= ~MX3_PWMCR_POUTC;
-+
-+	writel(val, imx->mmio_base + MX3_PWMCR);
-+
-+	dev_dbg(imx->chip.dev, "%s: polarity set to %s\n", __func__,
-+		polarity == PWM_POLARITY_INVERSED ? "inverted" : "normal");
-+
-+	return 0;
-+}
-+
-+static struct pwm_ops imx_pwm_ops_v1 = {
- 	.enable = imx_pwm_enable,
- 	.disable = imx_pwm_disable,
- 	.config = imx_pwm_config,
- 	.owner = THIS_MODULE,
- };
- 
-+static struct pwm_ops imx_pwm_ops_v2 = {
-+	.enable = imx_pwm_enable,
-+	.disable = imx_pwm_disable,
-+	.set_polarity = imx_pwm_set_polarity,
-+	.config = imx_pwm_config,
-+	.owner = THIS_MODULE,
-+};
-+
- struct imx_pwm_data {
- 	int (*config)(struct pwm_chip *chip,
- 		struct pwm_device *pwm, int duty_ns, int period_ns);
- 	void (*set_enable)(struct pwm_chip *chip, bool enable);
-+	struct pwm_ops *pwm_ops;
- };
- 
- static struct imx_pwm_data imx_pwm_data_v1 = {
- 	.config = imx_pwm_config_v1,
- 	.set_enable = imx_pwm_set_enable_v1,
-+	.pwm_ops = &imx_pwm_ops_v1,
- };
- 
- static struct imx_pwm_data imx_pwm_data_v2 = {
- 	.config = imx_pwm_config_v2,
- 	.set_enable = imx_pwm_set_enable_v2,
-+	.pwm_ops = &imx_pwm_ops_v2,
- };
- 
- static const struct of_device_id imx_pwm_dt_ids[] = {
-@@ -282,6 +321,8 @@ static int imx_pwm_probe(struct platform_device *pdev)
- 	if (!of_id)
- 		return -ENODEV;
- 
-+	data = of_id->data;
-+
- 	imx = devm_kzalloc(&pdev->dev, sizeof(*imx), GFP_KERNEL);
- 	if (imx == NULL)
- 		return -ENOMEM;
-@@ -300,18 +341,22 @@ static int imx_pwm_probe(struct platform_device *pdev)
- 		return PTR_ERR(imx->clk_ipg);
- 	}
- 
--	imx->chip.ops = &imx_pwm_ops;
-+	imx->chip.ops = data->pwm_ops;
- 	imx->chip.dev = &pdev->dev;
- 	imx->chip.base = -1;
- 	imx->chip.npwm = 1;
- 	imx->chip.can_sleep = true;
-+	if (data->pwm_ops->set_polarity) {
-+		dev_dbg(&pdev->dev, "PWM supports output inversion\n");
-+		imx->chip.of_xlate = of_pwm_xlate_with_flags;
-+		imx->chip.of_pwm_n_cells = 3;
-+	}
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	imx->mmio_base = devm_ioremap_resource(&pdev->dev, r);
- 	if (IS_ERR(imx->mmio_base))
- 		return PTR_ERR(imx->mmio_base);
- 
--	data = of_id->data;
- 	imx->config = data->config;
- 	imx->set_enable = data->set_enable;
+@@ -634,7 +634,7 @@
+ 				clocks = <&clks IMX7D_PWM4_ROOT_CLK>,
+ 					 <&clks IMX7D_PWM4_ROOT_CLK>;
+ 				clock-names = "ipg", "per";
+-				#pwm-cells = <2>;
++				#pwm-cells = <3>;
+ 				status = "disabled";
+ 			};
  
 -- 
 2.9.2
