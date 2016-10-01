@@ -1,26 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sat, 1 Oct 2016 18:09:01 +0530
-Subject: [PATCH 5/6] ARM: davinci: enable the LCDC DRM driver in defconfig
-In-Reply-To: <1475166715-7857-6-git-send-email-bgolaszewski@baylibre.com>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-6-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <c266b3f9-09c0-bf51-48a4-2b780c0c6ad0@ti.com>
+From: paweljarosz3691@gmail.com (=?us-ascii?B?PT9VVEYtOD9xP1Bhd2U9QzU9ODI9MjBKYXJvc3o/PQ==?=)
+Date: Sat, 1 Oct 2016 16:09:39 +0200
+Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on rk3066
+Message-ID: <20161001140939.GA31220@vaio-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 September 2016 10:01 PM, Bartosz Golaszewski wrote:
-> With the device tree changes for tilcdc in place, we can now enable
-> the driver by default in the davinci_all defconfig file.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+For some reason accessing memory region above 0xfe000000 freezes
+system on rk3066. There is similiar bug on later rockchip soc (rk3288)
+solved same way.
 
-Applied to v4.10/defconfig branch of my tree. Adjusted the subject line
-to be consistent with how patches for defconfig are usually headlines.
+Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
+---
+ arch/arm/boot/dts/rk3066a.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-ARM: davinci_all_defconfig: enable LCDC DRM driver
-
-defconfig updates are last in the pull request I will send up, so the
-description will make sense when finally merged.
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 0d0dae3..44c8956 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -93,6 +93,19 @@
+ 		};
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		/*
++		 * The rk3066 cannot use the memory area above 0x9F000000
++		 * for some unknown reason.
++		 */
++		unusable at 9F000000 {
++			reg = <0x9F000000 0x1000000>;
++		};
++	};
++
+ 	i2s0: i2s at 10118000 {
+ 		compatible = "rockchip,rk3066-i2s";
+ 		reg = <0x10118000 0x2000>;
+-- 
+2.7.4
