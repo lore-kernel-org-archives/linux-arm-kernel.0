@@ -1,37 +1,46 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Sat, 1 Oct 2016 11:35:45 +0530
-Subject: [PATCH] dmaengine: omap-dma: Enable burst and data pack for SG
-In-Reply-To: <20160916105315.28320-1-peter.ujfalusi@ti.com>
-References: <20160916105315.28320-1-peter.ujfalusi@ti.com>
-Message-ID: <20161001060544.GD2467@localhost>
+Date: Sat, 1 Oct 2016 11:47:11 +0530
+Subject: [PATCH V4 04/10] dmaengine: qcom_hidma: configure DMA and MSI
+ for OF
+In-Reply-To: <1475115167-5898-5-git-send-email-okaya@codeaurora.org>
+References: <1475115167-5898-1-git-send-email-okaya@codeaurora.org>
+ <1475115167-5898-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <20161001061710.GF2467@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 01:53:15PM +0300, Peter Ujfalusi wrote:
-> From: Misael Lopez Cruz <misael.lopez@ti.com>
+On Wed, Sep 28, 2016 at 10:12:41PM -0400, Sinan Kaya wrote:
+> Configure the DMA bindings for the device tree based firmware.
 > 
-> Enable the burst and data pack modes for the scatter-gather
-> in order to improve the throughput of the data transfers.
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/dma/qcom/hidma_mgmt.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-> The improvement has been verified with MMC HS200 mode in
-> the DRA72 EVM using the iozone tool to compare the read
-> throughput (in kB/s) with and without burst/pack for
-> different reclens (in kB).
-> 
->                               With
->     reclen    Baseline   sDMA burst/pack
->     ------    --------   ---------------
->        64       46568         50820
->       128       57564         63413
->       256       65634         74937
->       512       72427         83483
->      1024       74563         84504
->      2048       76265         86079
->      4096       78045         87335
->      8192       78989         88154
->     16384       81265         91034
+> diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
+> index 82f36e4..e8f6b84 100644
+> --- a/drivers/dma/qcom/hidma_mgmt.c
+> +++ b/drivers/dma/qcom/hidma_mgmt.c
+> @@ -375,8 +375,11 @@ static int __init hidma_mgmt_of_populate_channels(struct device_node *np)
+>  			ret = PTR_ERR(new_pdev);
+>  			goto out;
+>  		}
+> +		of_node_get(child);
+> +		new_pdev->dev.of_node = child;
+>  		of_dma_configure(&new_pdev->dev, child);
+> -
+> +		of_msi_configure(&new_pdev->dev, child);
+> +		of_node_put(child);
 
-Applied, thanks
+should this be done unconditionally? Dont we needto call this only for
+platforms with msi?
+
+>  		kfree(res);
+>  		res = NULL;
+>  	}
+> -- 
+> 1.9.1
+> 
 
 -- 
 ~Vinod
