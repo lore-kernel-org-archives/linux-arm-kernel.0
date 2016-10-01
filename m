@@ -1,45 +1,37 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 31 Oct 2016 17:37:34 -0700
-Subject: [PATCH -next] remoteproc: st: Fix error return code in
- st_rproc_probe()
-In-Reply-To: <1476721415-20224-1-git-send-email-weiyj.lk@gmail.com>
-References: <1476721415-20224-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <20161101003734.GA14397@tuxbot>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sat, 1 Oct 2016 11:35:45 +0530
+Subject: [PATCH] dmaengine: omap-dma: Enable burst and data pack for SG
+In-Reply-To: <20160916105315.28320-1-peter.ujfalusi@ti.com>
+References: <20160916105315.28320-1-peter.ujfalusi@ti.com>
+Message-ID: <20161001060544.GD2467@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 17 Oct 09:23 PDT 2016, Wei Yongjun wrote:
-
-> From: Wei Yongjun <weiyongjun1@huawei.com>
+On Fri, Sep 16, 2016 at 01:53:15PM +0300, Peter Ujfalusi wrote:
+> From: Misael Lopez Cruz <misael.lopez@ti.com>
 > 
-> Fix to return a negative error code from the st_rproc_state() error
-> handling case instead of 0, as done elsewhere in this function.
+> Enable the burst and data pack modes for the scatter-gather
+> in order to improve the throughput of the data transfers.
 > 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-
-Applied, with added "Fixes". Thanks!
-
-Regards,
-Bjorn
-
-> ---
->  drivers/remoteproc/st_remoteproc.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+> The improvement has been verified with MMC HS200 mode in
+> the DRA72 EVM using the iozone tool to compare the read
+> throughput (in kB/s) with and without burst/pack for
+> different reclens (in kB).
 > 
-> diff --git a/drivers/remoteproc/st_remoteproc.c b/drivers/remoteproc/st_remoteproc.c
-> index ae8963f..da4e152 100644
-> --- a/drivers/remoteproc/st_remoteproc.c
-> +++ b/drivers/remoteproc/st_remoteproc.c
-> @@ -245,8 +245,10 @@ static int st_rproc_probe(struct platform_device *pdev)
->  		goto free_rproc;
->  
->  	enabled = st_rproc_state(pdev);
-> -	if (enabled < 0)
-> +	if (enabled < 0) {
-> +		ret = enabled;
->  		goto free_rproc;
-> +	}
->  
->  	if (enabled) {
->  		atomic_inc(&rproc->power);
-> 
+>                               With
+>     reclen    Baseline   sDMA burst/pack
+>     ------    --------   ---------------
+>        64       46568         50820
+>       128       57564         63413
+>       256       65634         74937
+>       512       72427         83483
+>      1024       74563         84504
+>      2048       76265         86079
+>      4096       78045         87335
+>      8192       78989         88154
+>     16384       81265         91034
+
+Applied, thanks
+
+-- 
+~Vinod
