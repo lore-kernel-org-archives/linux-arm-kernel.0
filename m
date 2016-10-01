@@ -1,20 +1,39 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sat, 1 Oct 2016 23:08:27 +0530
-Subject: [PATCH 0/4] ARM: davinci: Remove DMA resources for MMC/SPI
-In-Reply-To: <20160928103530.15291-1-peter.ujfalusi@ti.com>
-References: <20160928103530.15291-1-peter.ujfalusi@ti.com>
-Message-ID: <95c32453-ca2a-7754-ffa5-97aff1618d32@ti.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sat,  1 Oct 2016 13:46:15 -0400
+Subject: [PATCH 2/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA interrupts
+In-Reply-To: <1475343976-20744-1-git-send-email-okaya@codeaurora.org>
+References: <1475343976-20744-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1475343976-20744-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 September 2016 04:05 PM, Peter Ujfalusi wrote:
-> Hi,
-> 
-> The drivers for davinci MMC and SPI have been converted to the new DMAengine API
-> and no longer rely on the IORESOURCE_DMA.
-> This is the case for at least one release cycle so now we can remove the
-> IORESOURCE_DMA for these devices.
+The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
+resource requirements") removed PCI_USING penalty from
+acpi_pci_link_allocate function as there is no longer a fixed size penalty
+array for both PCI and IRQ interrupts.
 
-Hi Peter, applied to v4.10/cleanup branch of my tree. Thanks!
+We need to add the PCI_USING penalty for ISA interrupts too if the link is
+in use and matches our ISA IRQ number.
 
-~Sekhar
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/acpi/pci_link.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+index f3792f4..06c2a11 100644
+--- a/drivers/acpi/pci_link.c
++++ b/drivers/acpi/pci_link.c
+@@ -620,6 +620,10 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
+ 			    acpi_device_bid(link->device));
+ 		return -ENODEV;
+ 	} else {
++		if (link->irq.active < ACPI_MAX_IRQS)
++			acpi_irq_penalty[link->irq.active] +=
++				PIRQ_PENALTY_PCI_USING;
++
+ 		printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
+ 		       acpi_device_name(link->device),
+ 		       acpi_device_bid(link->device), link->irq.active);
+-- 
+1.9.1
