@@ -1,37 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sat, 1 Oct 2016 13:29:48 +0200
-Subject: [PATCH RFC v2 0/12] Add R8A7743/SK-RZG1M board support
-In-Reply-To: <1987532.PE2ex6PrJ5@wasted.cogentembedded.com>
-References: <1987532.PE2ex6PrJ5@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdX1vNH5SYNuQ4UdvjcVump+GP=MN3ri3DF4JpH48hX3vQ@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat,  1 Oct 2016 14:18:58 +0200
+Subject: [PATCH v3 1/3] Documentation: dt-bindings: update the meson-usb2-phy
+ example
+In-Reply-To: <20161001121900.1168-1-martin.blumenstingl@googlemail.com>
+References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
+ <20161001121900.1168-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20161001121900.1168-2-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Update the example so the node name uses a dash (instead of an
+underscore) as per convention.
+Additionally it updates the example register offset to a real example
+(the old value was taken from a draft where there was an additional PHY
+bus).
 
-On Fri, Sep 30, 2016 at 12:14 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
->    Here's the set of 12 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-20160926-v4.8-rc8' tag. I'm adding the device tree support for
-> the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the board
-> seems  identical to the R8A7791/Porter board. This version includes the Ether,
-> so the board should boot with NFS root now. I tried to address all the comments
-> to the version 1 (except the need to use the new CPG/MSSR drivers -- this one
-> will be addressed RSN). The DMAC/SCIF/IRQC bindings patches posted recently are
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ Documentation/devicetree/bindings/phy/meson-usb2-phy.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-There's an (old) version of an r8a7791 CPG/MSSR driver at
-https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git/log/?h=topic/cpg-mssr-v4
-
-To handle it cleanly, this is going to need "[PATCH/RFC v3 00/22] soc:
-renesas: Add R-Car RST driver for obtaining mode pin state"...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/phy/meson-usb2-phy.txt b/Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
+index 9da5ea2..bc616c1 100644
+--- a/Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
++++ b/Documentation/devicetree/bindings/phy/meson-usb2-phy.txt
+@@ -16,10 +16,10 @@ Optional properties:
+ 
+ Example:
+ 
+-usb0_phy: usb_phy at 0 {
++usb0_phy: usb-phy at c0000000 {
+ 	compatible = "amlogic,meson-gxbb-usb2-phy";
+ 	#phy-cells = <0>;
+-	reg = <0x0 0x0 0x0 0x20>;
++	reg = <0x0 0xc0000000 0x0 0x20>;
+ 	resets = <&reset RESET_USB_OTG>;
+ 	clocks = <&clkc CLKID_USB>, <&clkc CLKID_USB0>;
+ 	clock-names = "usb_general", "usb";
+-- 
+2.10.0
