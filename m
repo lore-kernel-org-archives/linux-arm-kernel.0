@@ -1,156 +1,75 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat,  1 Oct 2016 13:46:14 -0400
-Subject: [PATCH 1/3] Revert "ACPI, PCI,
- IRQ: reduce static IRQ array size to 16"
-Message-ID: <1475343976-20744-1-git-send-email-okaya@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sat, 1 Oct 2016 19:11:01 +0100
+Subject: [RFC] arm64: Enforce observed order for spinlock and data
+In-Reply-To: <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
+References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
+ <20160930193231.GA2521@remoulade>
+ <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
+Message-ID: <20161001181101.GA17554@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 5c5087a55390 ("ACPI,PCI,IRQ: reduce static IRQ array
-size to 16").
+Hi Brent,
 
-The code maintains a fixed size array for IRQ penalties. The array
-gets updated by external calls such as acpi_penalize_sci_irq,
-acpi_penalize_isa_irq to reflect the actual interrupt usage of the
-system. Since the IRQ distribution is platform specific, this is
-not known ahead of time. The IRQs get updated based on the SCI
-interrupt number BIOS has chosen or the ISA IRQs that were assigned
-to existing peripherals.
+Evidently my questions weren't sufficiently clear; even with your answers it's
+not clear to me what precise issue you're attempting to solve. I've tried to be
+more specific this time.
 
-By the time ACPI gets initialized, this code tries to determine an
-IRQ number based on penalty values in this array. It will try to locate
-the IRQ with the least penalty assignment so that interrupt sharing is
-avoided if possible.
+At a high-level, can you clarify whether you're attempting to solve is:
 
-A couple of notes about the external APIs:
-1. These API can be called before the ACPI is started. Therefore, one
-cannot assume that the PCI link objects are initialized for calculating
-penalties.
-2. The polarity and trigger information passed via the
-acpi_penalize_sci_irq from the BIOS may not match what the IRQ subsystem
-is reporting as the call might have been placed before the IRQ is
-registered by the interrupt subsystem.
+(a) a functional correctness issue (e.g. data corruption) 
+(b) a performance issue
 
-The previous change was in the direction to remove these external API and
-try to calculate the penalties at runtime for the ISA path as well. This
-didn't work out well with the existing platforms.
+And whether this was seen in practice, or found through code inspection?
 
-Restoring the old behavior for IRQ < 256 and the new behavior will remain
-effective for IRQ >= 256.
+On Sat, Oct 01, 2016 at 12:11:36PM -0400, bdegraaf at codeaurora.org wrote:
+> On 2016-09-30 15:32, Mark Rutland wrote:
+> >On Fri, Sep 30, 2016 at 01:40:57PM -0400, Brent DeGraaf wrote:
+> >>+	 * so LSE needs an explicit barrier here as well.  Without this, the
+> >>+	 * changed contents of the area protected by the spinlock could be
+> >>+	 * observed prior to the lock.
+> >>+	 */
+> >
+> >By whom? We generally expect that if data is protected by a lock, you take
+> >the lock before accessing it. If you expect concurrent lockless readers,
+> >then there's a requirement on the writer side to explicitly provide the
+> >ordering it requires -- spinlocks are not expected to provide that.
+>
+> More details are in my response to Robin, but there is an API arm64 supports
+> in spinlock.h which is used by lockref to determine whether a lock is free or
+> not.  For that code to work properly without adding these barriers, that API
+> needs to take the lock.
 
-Link: http://www.spinics.net/lists/linux-pci/msg54599.html
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/acpi/pci_link.c | 35 ++++++++++++++++++-----------------
- 1 file changed, 18 insertions(+), 17 deletions(-)
+Can you please provide a concrete example of a case where things go wrong,
+citing the code (or access pattern) in question? e.g. as in the commit messages
+for:
 
-diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-index c983bf7..f3792f4 100644
---- a/drivers/acpi/pci_link.c
-+++ b/drivers/acpi/pci_link.c
-@@ -438,6 +438,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
-  * enabled system.
-  */
- 
-+#define ACPI_MAX_IRQS		256
- #define ACPI_MAX_ISA_IRQS	16
- 
- #define PIRQ_PENALTY_PCI_POSSIBLE	(16*16)
-@@ -446,7 +447,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
- #define PIRQ_PENALTY_ISA_USED		(16*16*16*16*16)
- #define PIRQ_PENALTY_ISA_ALWAYS		(16*16*16*16*16*16)
- 
--static int acpi_isa_irq_penalty[ACPI_MAX_ISA_IRQS] = {
-+static int acpi_irq_penalty[ACPI_MAX_IRQS] = {
- 	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ0 timer */
- 	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ1 keyboard */
- 	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ2 cascade */
-@@ -511,7 +512,7 @@ static int acpi_irq_get_penalty(int irq)
- 	}
- 
- 	if (irq < ACPI_MAX_ISA_IRQS)
--		return penalty + acpi_isa_irq_penalty[irq];
-+		return penalty + acpi_irq_penalty[irq];
- 
- 	penalty += acpi_irq_pci_sharing_penalty(irq);
- 	return penalty;
-@@ -538,14 +539,14 @@ int __init acpi_irq_penalty_init(void)
- 
- 			for (i = 0; i < link->irq.possible_count; i++) {
- 				if (link->irq.possible[i] < ACPI_MAX_ISA_IRQS)
--					acpi_isa_irq_penalty[link->irq.
-+					acpi_irq_penalty[link->irq.
- 							 possible[i]] +=
- 					    penalty;
- 			}
- 
- 		} else if (link->irq.active &&
--				(link->irq.active < ACPI_MAX_ISA_IRQS)) {
--			acpi_isa_irq_penalty[link->irq.active] +=
-+				(link->irq.active < ACPI_MAX_IRQS)) {
-+			acpi_irq_penalty[link->irq.active] +=
- 			    PIRQ_PENALTY_PCI_POSSIBLE;
- 		}
- 	}
-@@ -828,7 +829,7 @@ static void acpi_pci_link_remove(struct acpi_device *device)
- }
- 
- /*
-- * modify acpi_isa_irq_penalty[] from cmdline
-+ * modify acpi_irq_penalty[] from cmdline
-  */
- static int __init acpi_irq_penalty_update(char *str, int used)
- {
-@@ -837,24 +838,24 @@ static int __init acpi_irq_penalty_update(char *str, int used)
- 	for (i = 0; i < 16; i++) {
- 		int retval;
- 		int irq;
--		int new_penalty;
- 
- 		retval = get_option(&str, &irq);
- 
- 		if (!retval)
- 			break;	/* no number found */
- 
--		/* see if this is a ISA IRQ */
--		if ((irq < 0) || (irq >= ACPI_MAX_ISA_IRQS))
-+		if (irq < 0)
-+			continue;
-+
-+		if (irq >= ARRAY_SIZE(acpi_irq_penalty))
- 			continue;
- 
- 		if (used)
--			new_penalty = acpi_irq_get_penalty(irq) +
--					PIRQ_PENALTY_ISA_USED;
-+			acpi_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
-+				PIRQ_PENALTY_ISA_USED;
- 		else
--			new_penalty = 0;
-+			acpi_irq_penalty[irq] = 0;
- 
--		acpi_isa_irq_penalty[irq] = new_penalty;
- 		if (retval != 2)	/* no next number */
- 			break;
- 	}
-@@ -870,14 +871,14 @@ static int __init acpi_irq_penalty_update(char *str, int used)
-  */
- void acpi_penalize_isa_irq(int irq, int active)
- {
--	if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
--		acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
--		  (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
-+	if (irq >= 0 && irq < ARRAY_SIZE(acpi_irq_penalty))
-+		acpi_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
-+		    (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
- }
- 
- bool acpi_isa_irq_available(int irq)
- {
--	return irq >= 0 && (irq >= ARRAY_SIZE(acpi_isa_irq_penalty) ||
-+	return irq >= 0 && (irq >= ARRAY_SIZE(acpi_irq_penalty) ||
- 		    acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
- }
- 
--- 
-1.9.1
+  8e86f0b409a44193 ("arm64: atomics: fix use of acquire + release for full barrier semantics)
+  859b7a0e89120505 ("mm/slub: fix lockups on PREEMPT && !SMP kernels")
+
+(for the latter, I messed up the register -> var mapping in one paragraph, but
+the style and reasoning is otherwise sound).
+
+In the absence of a concrete example as above, it's very difficult to reason
+about what the underlying issue is, and what a valid fix would be for said
+issue.
+
+> >What pattern of accesses are made by readers and writers such that there is
+> >a problem?
+
+Please note here I was asking specifically w.r.t. the lockref code, e.g. which
+loads could see stale data, and what does the code do based on this value such
+that there is a problem.
+
+> I added the barriers to the readers/writers because I do not know these are
+> not similarly abused.  There is a lot of driver code out there, and ensuring
+> order is the safest way to be sure we don't get burned by something similar
+> to the lockref access.
+
+Making the architecture-provided primitives overly strong harms performance and
+efficiency (in general), makes the code harder to maintain and optimise in
+future, and only masks the issue (which could crop up on other architectures,
+for instance).
+
+Thanks,
+Mark.
