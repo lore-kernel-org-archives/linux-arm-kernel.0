@@ -1,150 +1,84 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 1 Sep 2016 14:54:59 +0800
-Subject: [PATCH v8 08/16] arm64: numa: Use pr_fmt()
-In-Reply-To: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1472712907-12700-9-git-send-email-thunder.leizhen@huawei.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sat, 1 Oct 2016 14:54:07 +0530
+Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
+In-Reply-To: <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
+References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
+ <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
+ <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
+ <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
+ <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
+Message-ID: <948c3f9e-f11b-092c-e002-e2ef4436197f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kefeng Wang <wangkefeng.wang@huawei.com>
+On Saturday 01 October 2016 12:49 AM, Peter Ujfalusi wrote:
+> On 09/30/2016 06:06 PM, Bartosz Golaszewski wrote:
+>> 2016-09-30 14:59 GMT+02:00 Peter Ujfalusi <peter.ujfalusi@ti.com>:
+>>> On 09/29/16 19:31, Bartosz Golaszewski wrote:
+>>>> Default memory settings of da850 do not meet the throughput/latency
+>>>> requirements of tilcdc. This results in the image displayed being
+>>>> incorrect and the following warning being displayed by the LCDC
+>>>> drm driver:
+>>>>
+>>>>   tilcdc da8xx_lcdc.0: tilcdc_crtc_irq(0x00000020): FIFO underfow
+>>>>
+>>>> Reconfigure the LCDC priority to the highest. This is a workaround
+>>>> for the da850-lcdk board which has the LCD controller enabled in
+>>>> the device tree, but a long-term, system-wide fix is needed for
+>>>> all davinci boards.
+>>>>
+>>>> This patch has been modified for mainline linux. It comes from a
+>>>> downstream TI release for da850[1].
+>>>>
+>>>> Original author: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
+>>>>
+>>
+>> [snip]
+>>
+>>>
+>>> Is this safe to do for all da850 boards (to change PR_OLD_COUNT from 0xff to
+>>> 0x20)? Most probably it is, but this setting has nothing to do with LCDC.
+>>>
+>>> The whole priority configuration has nothing to do with the LCDC, it is a
+>>> system level priority.
+>>>
+>>> Now you have lowered the eDMA3_0-TPTC0/1 priority. Audio is serviced by
+>>> eDMA3_0-TPTC1. So are we going to see issues in audio if LCDC is taking the
+>>> highest priority?
+>>>
+>>
+>> Just ran a quick test with speaker-test -c2 -twav. Besides the fact
+>> that the left and right channels are inverted (I'm looking into that),
+>> I didn't notice any problems. Even at 1024x768 resolution, playing
+>> audio at the same time seems to work fine.
+> 
+> That's good to hear, but I think the priorities should be set:
+> LCDC and EDMA30TC1 to highest priority
+> EDMA30TC0 to priority 2
+> 
+> The 0TC0 is used by MMC and if you want to play a video you might need the
+> servicing TC to be higher priority then other masters.
+> 
+> If audio playback would trigger sync losts in lcdc then we might need to move
+> 0TC1 to priority 1.
+> 
+> I agree that LCDC priority needs to be higher, but I do wonder why the default
+> (5) is not working and if it is not working why it is 5...
+> 
+> My guess is that the change in the PBBPR register is the one actually helping
+> here.
 
-Use pr_fmt to prefix kernel output, and remove duplicated msg
-of NUMA turned off.
+Good point, Peter. If you are booting off NFS and not playing any audio,
+then there is pretty much no EDMA generated traffic on the interconnect.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/mm/numa.c | 37 ++++++++++++++++++-------------------
- 1 file changed, 18 insertions(+), 19 deletions(-)
+I would guess too that its the PBBPR setting that is making a
+difference. The EDMA vs LCDC priority adjustment might be needed in
+particular situations too, but specific experiments should be done to
+narrow down on that being the cause.
 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index d97c6e2..0e75b53 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -17,6 +17,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+In any case, to configure the PBBR, you will have to introduce a driver
+for it in drivers/memory. Then you can set it up per board using a DT
+parameter.
 
-+#define pr_fmt(fmt) "NUMA: " fmt
-+
- #include <linux/acpi.h>
- #include <linux/bootmem.h>
- #include <linux/memblock.h>
-@@ -38,10 +40,9 @@ static __init int numa_parse_early_param(char *opt)
- {
- 	if (!opt)
- 		return -EINVAL;
--	if (!strncmp(opt, "off", 3)) {
--		pr_info("%s\n", "NUMA turned off");
-+	if (!strncmp(opt, "off", 3))
- 		numa_off = true;
--	}
-+
- 	return 0;
- }
- early_param("numa", numa_parse_early_param);
-@@ -110,7 +111,7 @@ static void __init setup_node_to_cpumask_map(void)
- 		set_cpu_numa_node(cpu, NUMA_NO_NODE);
-
- 	/* cpumask_of_node() will now work */
--	pr_debug("NUMA: Node to cpumask map for %d nodes\n", nr_node_ids);
-+	pr_debug("Node to cpumask map for %d nodes\n", nr_node_ids);
- }
-
- /*
-@@ -145,13 +146,13 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
-
- 	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
- 	if (ret < 0) {
--		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
-+		pr_err("memblock [0x%llx - 0x%llx] failed to add on node %d\n",
- 			start, (end - 1), nid);
- 		return ret;
- 	}
-
- 	node_set(nid, numa_nodes_parsed);
--	pr_info("NUMA: Adding memblock [0x%llx - 0x%llx] on node %d\n",
-+	pr_info("Adding memblock [0x%llx - 0x%llx] on node %d\n",
- 			start, (end - 1), nid);
- 	return ret;
- }
-@@ -166,19 +167,18 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
- 	void *nd;
- 	int tnid;
-
--	pr_info("NUMA: Initmem setup node %d [mem %#010Lx-%#010Lx]\n",
--			nid, start_pfn << PAGE_SHIFT,
--			(end_pfn << PAGE_SHIFT) - 1);
-+	pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n",
-+		nid, start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
-
- 	nd_pa = memblock_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
- 	nd = __va(nd_pa);
-
- 	/* report and initialize */
--	pr_info("NUMA: NODE_DATA [mem %#010Lx-%#010Lx]\n",
-+	pr_info("NODE_DATA [mem %#010Lx-%#010Lx]\n",
- 		nd_pa, nd_pa + nd_size - 1);
- 	tnid = early_pfn_to_nid(nd_pa >> PAGE_SHIFT);
- 	if (tnid != nid)
--		pr_info("NUMA: NODE_DATA(%d) on node %d\n", nid, tnid);
-+		pr_info("NODE_DATA(%d) on node %d\n", nid, tnid);
-
- 	node_data[nid] = nd;
- 	memset(NODE_DATA(nid), 0, sizeof(pg_data_t));
-@@ -235,8 +235,7 @@ static int __init numa_alloc_distance(void)
- 			numa_distance[i * numa_distance_cnt + j] = i == j ?
- 				LOCAL_DISTANCE : REMOTE_DISTANCE;
-
--	pr_debug("NUMA: Initialized distance table, cnt=%d\n",
--			numa_distance_cnt);
-+	pr_debug("Initialized distance table, cnt=%d\n", numa_distance_cnt);
-
- 	return 0;
- }
-@@ -257,20 +256,20 @@ static int __init numa_alloc_distance(void)
- void __init numa_set_distance(int from, int to, int distance)
- {
- 	if (!numa_distance) {
--		pr_warn_once("NUMA: Warning: distance table not allocated yet\n");
-+		pr_warn_once("Warning: distance table not allocated yet\n");
- 		return;
- 	}
-
- 	if (from >= numa_distance_cnt || to >= numa_distance_cnt ||
- 			from < 0 || to < 0) {
--		pr_warn_once("NUMA: Warning: node ids are out of bound, from=%d to=%d distance=%d\n",
-+		pr_warn_once("Warning: node ids are out of bound, from=%d to=%d distance=%d\n",
- 			    from, to, distance);
- 		return;
- 	}
-
- 	if ((u8)distance != distance ||
- 	    (from == to && distance != LOCAL_DISTANCE)) {
--		pr_warn_once("NUMA: Warning: invalid distance parameter, from=%d to=%d distance=%d\n",
-+		pr_warn_once("Warning: invalid distance parameter, from=%d to=%d distance=%d\n",
- 			     from, to, distance);
- 		return;
- 	}
-@@ -297,7 +296,7 @@ static int __init numa_register_nodes(void)
- 	/* Check that valid nid is set to memblks */
- 	for_each_memblock(memory, mblk)
- 		if (mblk->nid == NUMA_NO_NODE || mblk->nid >= MAX_NUMNODES) {
--			pr_warn("NUMA: Warning: invalid memblk node %d [mem %#010Lx-%#010Lx]\n",
-+			pr_warn("Warning: invalid memblk node %d [mem %#010Lx-%#010Lx]\n",
- 				mblk->nid, mblk->base,
- 				mblk->base + mblk->size - 1);
- 			return -EINVAL;
-@@ -369,8 +368,8 @@ static int __init dummy_numa_init(void)
-
- 	if (numa_off)
- 		pr_info("NUMA disabled\n"); /* Forced off on command line. */
--	pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
--	       0LLU, PFN_PHYS(max_pfn) - 1);
-+	pr_info("Faking a node at [mem %#018Lx-%#018Lx]\n",
-+		0LLU, PFN_PHYS(max_pfn) - 1);
-
- 	for_each_memblock(memory, mblk) {
- 		ret = numa_add_memblk(0, mblk->base, mblk->base + mblk->size);
---
-2.5.0
+Thanks,
+Sekhar
