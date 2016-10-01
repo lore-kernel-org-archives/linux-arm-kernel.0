@@ -1,43 +1,37 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Sat, 1 Oct 2016 15:42:30 +0530
-Subject: [PATCH v2 1/6] pwm: print error messages with pr_err() instead of
- pr_debug()
-In-Reply-To: <20161001101235.24598-1-bhuvanchandra.dv@toradex.com>
-References: <20161001101235.24598-1-bhuvanchandra.dv@toradex.com>
-Message-ID: <20161001101235.24598-2-bhuvanchandra.dv@toradex.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sat, 1 Oct 2016 13:29:48 +0200
+Subject: [PATCH RFC v2 0/12] Add R8A7743/SK-RZG1M board support
+In-Reply-To: <1987532.PE2ex6PrJ5@wasted.cogentembedded.com>
+References: <1987532.PE2ex6PrJ5@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdX1vNH5SYNuQ4UdvjcVump+GP=MN3ri3DF4JpH48hX3vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lothar Wassmann <LW@KARO-electronics.de>
+Hi Sergei,
 
-Make the messages that are printed in case of fatal errors actually visible to
-the user without having to recompile the driver with debugging enabled.
+On Fri, Sep 30, 2016 at 12:14 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+>    Here's the set of 12 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-20160926-v4.8-rc8' tag. I'm adding the device tree support for
+> the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the board
+> seems  identical to the R8A7791/Porter board. This version includes the Ether,
+> so the board should boot with NFS root now. I tried to address all the comments
+> to the version 1 (except the need to use the new CPG/MSSR drivers -- this one
+> will be addressed RSN). The DMAC/SCIF/IRQC bindings patches posted recently are
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
----
- drivers/pwm/core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+There's an (old) version of an r8a7791 CPG/MSSR driver at
+https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git/log/?h=topic/cpg-mssr-v4
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 0dbd29e..195373e 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -661,13 +661,13 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
- 	err = of_parse_phandle_with_args(np, "pwms", "#pwm-cells", index,
- 					 &args);
- 	if (err) {
--		pr_debug("%s(): can't parse \"pwms\" property\n", __func__);
-+		pr_err("%s(): can't parse \"pwms\" property\n", __func__);
- 		return ERR_PTR(err);
- 	}
- 
- 	pc = of_node_to_pwmchip(args.np);
- 	if (IS_ERR(pc)) {
--		pr_debug("%s(): PWM chip not found\n", __func__);
-+		pr_err("%s(): PWM chip not found\n", __func__);
- 		pwm = ERR_CAST(pc);
- 		goto put;
- 	}
--- 
-2.9.2
+To handle it cleanly, this is going to need "[PATCH/RFC v3 00/22] soc:
+renesas: Add R-Car RST driver for obtaining mode pin state"...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
