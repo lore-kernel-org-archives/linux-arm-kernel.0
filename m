@@ -1,75 +1,56 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Sat, 1 Oct 2016 19:11:01 +0100
-Subject: [RFC] arm64: Enforce observed order for spinlock and data
-In-Reply-To: <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
-References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
- <20160930193231.GA2521@remoulade>
- <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
-Message-ID: <20161001181101.GA17554@remoulade>
+Date: Sat, 1 Oct 2016 19:17:11 +0100
+Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on
+ rk3066
+In-Reply-To: <20161001140939.GA31220@vaio-ubuntu>
+References: <20161001140939.GA31220@vaio-ubuntu>
+Message-ID: <20161001181711.GB17554@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brent,
+Hi,
 
-Evidently my questions weren't sufficiently clear; even with your answers it's
-not clear to me what precise issue you're attempting to solve. I've tried to be
-more specific this time.
+On Sat, Oct 01, 2016 at 04:09:39PM +0200, =?UTF-8?q?Pawe=C5=82=20Jarosz?= wrote:
+> For some reason accessing memory region above 0xfe000000 freezes
+> system on rk3066. There is similiar bug on later rockchip soc (rk3288)
+> solved same way.
+> 
+> Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
+> ---
+>  arch/arm/boot/dts/rk3066a.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+> index 0d0dae3..44c8956 100644
+> --- a/arch/arm/boot/dts/rk3066a.dtsi
+> +++ b/arch/arm/boot/dts/rk3066a.dtsi
+> @@ -93,6 +93,19 @@
+>  		};
+>  	};
+>  
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +		/*
+> +		 * The rk3066 cannot use the memory area above 0x9F000000
+> +		 * for some unknown reason.
+> +		 */
+> +		unusable at 9F000000 {
+> +			reg = <0x9F000000 0x1000000>;
+> +		};
 
-At a high-level, can you clarify whether you're attempting to solve is:
+I don't think this is a sane workaround, but it is at best difficult to tell,
+given there's no reason given for why this memory is unusable.
 
-(a) a functional correctness issue (e.g. data corruption) 
-(b) a performance issue
+For instance, if bus accesses to this address hang, then this patch only makes
+the hand less likely, since the kernel will still map the region (and therefore
+the CPU can perform speculative accesses).
 
-And whether this was seen in practice, or found through code inspection?
+Are issues with this memory consistently seen in practice?
 
-On Sat, Oct 01, 2016 at 12:11:36PM -0400, bdegraaf at codeaurora.org wrote:
-> On 2016-09-30 15:32, Mark Rutland wrote:
-> >On Fri, Sep 30, 2016 at 01:40:57PM -0400, Brent DeGraaf wrote:
-> >>+	 * so LSE needs an explicit barrier here as well.  Without this, the
-> >>+	 * changed contents of the area protected by the spinlock could be
-> >>+	 * observed prior to the lock.
-> >>+	 */
-> >
-> >By whom? We generally expect that if data is protected by a lock, you take
-> >the lock before accessing it. If you expect concurrent lockless readers,
-> >then there's a requirement on the writer side to explicitly provide the
-> >ordering it requires -- spinlocks are not expected to provide that.
->
-> More details are in my response to Robin, but there is an API arm64 supports
-> in spinlock.h which is used by lockref to determine whether a lock is free or
-> not.  For that code to work properly without adding these barriers, that API
-> needs to take the lock.
-
-Can you please provide a concrete example of a case where things go wrong,
-citing the code (or access pattern) in question? e.g. as in the commit messages
-for:
-
-  8e86f0b409a44193 ("arm64: atomics: fix use of acquire + release for full barrier semantics)
-  859b7a0e89120505 ("mm/slub: fix lockups on PREEMPT && !SMP kernels")
-
-(for the latter, I messed up the register -> var mapping in one paragraph, but
-the style and reasoning is otherwise sound).
-
-In the absence of a concrete example as above, it's very difficult to reason
-about what the underlying issue is, and what a valid fix would be for said
-issue.
-
-> >What pattern of accesses are made by readers and writers such that there is
-> >a problem?
-
-Please note here I was asking specifically w.r.t. the lockref code, e.g. which
-loads could see stale data, and what does the code do based on this value such
-that there is a problem.
-
-> I added the barriers to the readers/writers because I do not know these are
-> not similarly abused.  There is a lot of driver code out there, and ensuring
-> order is the safest way to be sure we don't get burned by something similar
-> to the lockref access.
-
-Making the architecture-provided primitives overly strong harms performance and
-efficiency (in general), makes the code harder to maintain and optimise in
-future, and only masks the issue (which could crop up on other architectures,
-for instance).
+Can you enable CONFIG_MEMTEST and pass 'memtest' to the kernel, to determine if
+the memory is returning erroneous values?
 
 Thanks,
 Mark.
