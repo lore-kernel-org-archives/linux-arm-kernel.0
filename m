@@ -1,84 +1,60 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sat, 1 Oct 2016 14:54:07 +0530
-Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
-In-Reply-To: <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
- <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
- <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
- <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
-Message-ID: <948c3f9e-f11b-092c-e002-e2ef4436197f@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat, 1 Oct 2016 11:25:05 +0200
+Subject: [PATCH] mtd: mtk: avoid warning in mtk_ecc_encode
+In-Reply-To: <201609301925.17577.arnd@arndb.de>
+References: <20160930163429.380785-1-arnd@arndb.de>
+ <20160930185139.15c8be66@bbrezillon>
+ <201609301925.17577.arnd@arndb.de>
+Message-ID: <20161001112505.5f391ee6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 01 October 2016 12:49 AM, Peter Ujfalusi wrote:
-> On 09/30/2016 06:06 PM, Bartosz Golaszewski wrote:
->> 2016-09-30 14:59 GMT+02:00 Peter Ujfalusi <peter.ujfalusi@ti.com>:
->>> On 09/29/16 19:31, Bartosz Golaszewski wrote:
->>>> Default memory settings of da850 do not meet the throughput/latency
->>>> requirements of tilcdc. This results in the image displayed being
->>>> incorrect and the following warning being displayed by the LCDC
->>>> drm driver:
->>>>
->>>>   tilcdc da8xx_lcdc.0: tilcdc_crtc_irq(0x00000020): FIFO underfow
->>>>
->>>> Reconfigure the LCDC priority to the highest. This is a workaround
->>>> for the da850-lcdk board which has the LCD controller enabled in
->>>> the device tree, but a long-term, system-wide fix is needed for
->>>> all davinci boards.
->>>>
->>>> This patch has been modified for mainline linux. It comes from a
->>>> downstream TI release for da850[1].
->>>>
->>>> Original author: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
->>>>
->>
->> [snip]
->>
->>>
->>> Is this safe to do for all da850 boards (to change PR_OLD_COUNT from 0xff to
->>> 0x20)? Most probably it is, but this setting has nothing to do with LCDC.
->>>
->>> The whole priority configuration has nothing to do with the LCDC, it is a
->>> system level priority.
->>>
->>> Now you have lowered the eDMA3_0-TPTC0/1 priority. Audio is serviced by
->>> eDMA3_0-TPTC1. So are we going to see issues in audio if LCDC is taking the
->>> highest priority?
->>>
->>
->> Just ran a quick test with speaker-test -c2 -twav. Besides the fact
->> that the left and right channels are inverted (I'm looking into that),
->> I didn't notice any problems. Even at 1024x768 resolution, playing
->> audio at the same time seems to work fine.
-> 
-> That's good to hear, but I think the priorities should be set:
-> LCDC and EDMA30TC1 to highest priority
-> EDMA30TC0 to priority 2
-> 
-> The 0TC0 is used by MMC and if you want to play a video you might need the
-> servicing TC to be higher priority then other masters.
-> 
-> If audio playback would trigger sync losts in lcdc then we might need to move
-> 0TC1 to priority 1.
-> 
-> I agree that LCDC priority needs to be higher, but I do wonder why the default
-> (5) is not working and if it is not working why it is 5...
-> 
-> My guess is that the change in the PBBPR register is the one actually helping
-> here.
+On Fri, 30 Sep 2016 19:25:17 +0200
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-Good point, Peter. If you are booting off NFS and not playing any audio,
-then there is pretty much no EDMA generated traffic on the interconnect.
+> On Friday 30 September 2016, Boris Brezillon wrote:
+> > > +     /* copy into possibly unaligned OOB region with actual length */
+> > > +     memcpy(data + bytes, eccdata, len);  
+> > 
+> > Is it better than
+> > 
+> >         for (i = 0; i < len; i += 4) {
+> >                 u32 val = __raw_readl(ecc->regs + ECC_ENCPAR(i / 4));
+> > 
+> >                 memcpy(data + bytes + i, &val, min(len, 4));
+> >         }
+> > 
+> > I'm probably missing something, but what's the point of creating a
+> > temporary buffer of 112 bytes on the stack since you'll have to copy
+> > this data to the oob buffer at some point?  
+> 
+> 
+> I tried something like that first, but wasn't too happy with it for
+> a number of small reasons:
+> 
+> - __raw_readl in a driver is not usually the right API, __memcpy32_from_io
+>   uses it internally, but it's better for a driver not to rely on that,
+>   in case we need some barriers (which we may in factt need for other drivers).
 
-I would guess too that its the PBBPR setting that is making a
-difference. The EDMA vs LCDC priority adjustment might be needed in
-particular situations too, but specific experiments should be done to
-narrow down on that being the cause.
+I agree, even though calling something prefixed with __ (in this case,
+__ioread32_copy()) sounds like a bad thing too :).
 
-In any case, to configure the PBBR, you will have to introduce a driver
-for it in drivers/memory. Then you can set it up per board using a DT
-parameter.
+> 
+> - the min(len,4) expression is incorrect, fixing that makes it more complicated
+>   again
 
-Thanks,
-Sekhar
+Sorry, it's min(len - i, 4), which is not that complicated :P.
+
+> 
+> - I didn't like to call memcpy() multiple times, as that might get turned
+>   into an external function call (the compiler is free to optimize small
+>   memcpy calls or not).
+
+Okay.
+
+> 
+> I agree that he 112 byte buffer isn't ideal either, it just seemed to
+> be the lesser annoyance.
+
+How about we keep your approach, but put the buffer in the mtk_ecc
+struct?
