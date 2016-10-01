@@ -1,60 +1,49 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 1 Oct 2016 11:25:05 +0200
-Subject: [PATCH] mtd: mtk: avoid warning in mtk_ecc_encode
-In-Reply-To: <201609301925.17577.arnd@arndb.de>
-References: <20160930163429.380785-1-arnd@arndb.de>
- <20160930185139.15c8be66@bbrezillon>
- <201609301925.17577.arnd@arndb.de>
-Message-ID: <20161001112505.5f391ee6@bbrezillon>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sat, 1 Oct 2016 15:00:56 +0530
+Subject: [PATCH v2] drm: tilcdc: add a da850-specific compatible string
+In-Reply-To: <1475243564-15765-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1475243564-15765-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <12dad169-de04-ce7d-0422-94c57074c839@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Sep 2016 19:25:17 +0200
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Friday 30 September 2016, Boris Brezillon wrote:
-> > > +     /* copy into possibly unaligned OOB region with actual length */
-> > > +     memcpy(data + bytes, eccdata, len);  
-> > 
-> > Is it better than
-> > 
-> >         for (i = 0; i < len; i += 4) {
-> >                 u32 val = __raw_readl(ecc->regs + ECC_ENCPAR(i / 4));
-> > 
-> >                 memcpy(data + bytes + i, &val, min(len, 4));
-> >         }
-> > 
-> > I'm probably missing something, but what's the point of creating a
-> > temporary buffer of 112 bytes on the stack since you'll have to copy
-> > this data to the oob buffer at some point?  
+On Friday 30 September 2016 07:22 PM, Bartosz Golaszewski wrote:
+> Due to some potential tweaks for the da850 LCDC (for example: the
+> required memory bandwith settings) we need a separate compatible
+> for the IP present on the da850 boards.
 > 
+> Suggested-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+> v1 -> v2:
+> - added the new compatible to the bindings documentation
 > 
-> I tried something like that first, but wasn't too happy with it for
-> a number of small reasons:
+>  Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt | 4 ++--
+>  drivers/gpu/drm/tilcdc/tilcdc_drv.c                         | 1 +
+>  2 files changed, 3 insertions(+), 2 deletions(-)
 > 
-> - __raw_readl in a driver is not usually the right API, __memcpy32_from_io
->   uses it internally, but it's better for a driver not to rely on that,
->   in case we need some barriers (which we may in factt need for other drivers).
+> diff --git a/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt b/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
+> index a83abd7..33b6e8a 100644
+> --- a/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
+> +++ b/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
+> @@ -1,7 +1,7 @@
+>  Device-Tree bindings for tilcdc DRM driver
+>  
+>  Required properties:
+> - - compatible: value should be "ti,am33xx-tilcdc".
+> + - compatible: value should be "ti,am33xx-tilcdc" or "ti,da850-tilcdc".
 
-I agree, even though calling something prefixed with __ (in this case,
-__ioread32_copy()) sounds like a bad thing too :).
+This documentation does not help much :( It should be on the lines of:
 
-> 
-> - the min(len,4) expression is incorrect, fixing that makes it more complicated
->   again
+compatible: value should be "ti,am33xx-tilcdc" for AM335x based boards
+	    value should be "ti,da850-tilcdc" for DA850/AM18x/OMAP-L138
+	    based boards
 
-Sorry, it's min(len - i, 4), which is not that complicated :P.
+There are many existing examples of the way compatible strings are
+documented. You can take a look at them too. Also, since you are
+introducing a new device-tree compatible, please keep the devicetree
+list and maintainers in CC too. I don't think it shows up in
+get_maintainer.pl, so you will have to remember to do it.
 
-> 
-> - I didn't like to call memcpy() multiple times, as that might get turned
->   into an external function call (the compiler is free to optimize small
->   memcpy calls or not).
-
-Okay.
-
-> 
-> I agree that he 112 byte buffer isn't ideal either, it just seemed to
-> be the lesser annoyance.
-
-How about we keep your approach, but put the buffer in the mtk_ecc
-struct?
+Thanks,
+Sekhar
