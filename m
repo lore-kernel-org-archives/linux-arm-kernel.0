@@ -1,42 +1,58 @@
-From: paweljarosz3691@gmail.com (=?us-ascii?B?PT9VVEYtOD9xP1Bhd2U9QzU9ODI9MjBKYXJvc3o/PQ==?=)
-Date: Sat, 1 Oct 2016 16:09:39 +0200
-Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on rk3066
-Message-ID: <20161001140939.GA31220@vaio-ubuntu>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sat, 1 Oct 2016 11:15:00 -0400
+Subject: [PATCH V4 04/10] dmaengine: qcom_hidma: configure DMA and MSI for
+ OF
+In-Reply-To: <20161001061710.GF2467@localhost>
+References: <1475115167-5898-1-git-send-email-okaya@codeaurora.org>
+ <1475115167-5898-5-git-send-email-okaya@codeaurora.org>
+ <20161001061710.GF2467@localhost>
+Message-ID: <da6536a3-353e-1364-7074-9d3dcbcc4171@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some reason accessing memory region above 0xfe000000 freezes
-system on rk3066. There is similiar bug on later rockchip soc (rk3288)
-solved same way.
+On 10/1/2016 2:17 AM, Vinod Koul wrote:
+> On Wed, Sep 28, 2016 at 10:12:41PM -0400, Sinan Kaya wrote:
+>> Configure the DMA bindings for the device tree based firmware.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  drivers/dma/qcom/hidma_mgmt.c | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
+>> index 82f36e4..e8f6b84 100644
+>> --- a/drivers/dma/qcom/hidma_mgmt.c
+>> +++ b/drivers/dma/qcom/hidma_mgmt.c
+>> @@ -375,8 +375,11 @@ static int __init hidma_mgmt_of_populate_channels(struct device_node *np)
+>>  			ret = PTR_ERR(new_pdev);
+>>  			goto out;
+>>  		}
+>> +		of_node_get(child);
+>> +		new_pdev->dev.of_node = child;
+>>  		of_dma_configure(&new_pdev->dev, child);
+>> -
+>> +		of_msi_configure(&new_pdev->dev, child);
+>> +		of_node_put(child);
+> 
+> should this be done unconditionally? Dont we needto call this only for
+> platforms with msi?
 
-Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
----
- arch/arm/boot/dts/rk3066a.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+I followed the pattern in of_platform_device_create_pdata function. of_msi_configure does
+nothing if MSI is not enabled as irq_find_matching_host returns NULL. It didn't have any
+side effects on my testing either.
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 0d0dae3..44c8956 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -93,6 +93,19 @@
- 		};
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		/*
-+		 * The rk3066 cannot use the memory area above 0x9F000000
-+		 * for some unknown reason.
-+		 */
-+		unusable at 9F000000 {
-+			reg = <0x9F000000 0x1000000>;
-+		};
-+	};
-+
- 	i2s0: i2s at 10118000 {
- 		compatible = "rockchip,rk3066-i2s";
- 		reg = <0x10118000 0x2000>;
+
+> 
+>>  		kfree(res);
+>>  		res = NULL;
+>>  	}
+>> -- 
+>> 1.9.1
+>>
+> 
+
+
 -- 
-2.7.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
