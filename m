@@ -1,88 +1,243 @@
-From: paweljarosz3691@gmail.com (=?UTF-8?Q?Pawe=c5=82_Jarosz?=)
-Date: Sat, 1 Oct 2016 21:59:42 +0200
-Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on
- rk3066
-In-Reply-To: <6962779.A926KxJite@phil>
-References: <20161001140939.GA31220@vaio-ubuntu>
- <20161001181711.GB17554@remoulade> <6962779.A926KxJite@phil>
-Message-ID: <799e2fe9-36ac-6f95-7422-f8d834f2d2ec@gmail.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sat,  1 Oct 2016 21:46:17 +0200
+Subject: [PATCH 00/15] improve function-level documentation
+Message-ID: <1475351192-27079-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-main symptom is complete system freeze.
-With CONFIG_MEMTEST enabled and with passed "memtest" to the kernel all 
-tests run ok.
-But when i run command for example "memtester 800M" or simple "apt 
-update" freeze happening.
-And when i reserve this region in dts, board is stable again.
+These patches fix cases where the documentation above a function definition
+is not consistent with the function header.  Issues are detected using the
+semantic patch below (http://coccinelle.lip6.fr/).  Basically, the semantic
+patch parses a file to find comments, then matches each function header,
+and checks that the name and parameter list in the function header are
+compatible with the comment that preceeds it most closely.
 
-Thanks,
-Pawel
+// <smpl>
+@initialize:ocaml@
+@@
 
-W dniu 01.10.2016 o 21:18, Heiko Stuebner pisze:
-> Am Samstag, 1. Oktober 2016, 19:17:11 CEST schrieb Mark Rutland:
->> Hi,
->>
->> On Sat, Oct 01, 2016 at 04:09:39PM +0200, =?UTF-8?q?Pawe=C5=82=20Jarosz?=
-> wrote:
->>> For some reason accessing memory region above 0xfe000000 freezes
->>> system on rk3066. There is similiar bug on later rockchip soc (rk3288)
->>> solved same way.
->>>
->>> Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
->>> ---
->>>
->>>   arch/arm/boot/dts/rk3066a.dtsi | 13 +++++++++++++
->>>   1 file changed, 13 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/rk3066a.dtsi
->>> b/arch/arm/boot/dts/rk3066a.dtsi index 0d0dae3..44c8956 100644
->>> --- a/arch/arm/boot/dts/rk3066a.dtsi
->>> +++ b/arch/arm/boot/dts/rk3066a.dtsi
->>> @@ -93,6 +93,19 @@
->>>
->>>   		};
->>>   	
->>>   	};
->>>
->>> +	reserved-memory {
->>> +		#address-cells = <1>;
->>> +		#size-cells = <1>;
->>> +		ranges;
->>> +		/*
->>> +		 * The rk3066 cannot use the memory area above 0x9F000000
->>> +		 * for some unknown reason.
->>> +		 */
->>> +		unusable at 9F000000 {
->>> +			reg = <0x9F000000 0x1000000>;
->>> +		};
->> I don't think this is a sane workaround, but it is at best difficult to
->> tell, given there's no reason given for why this memory is unusable.
->>
->> For instance, if bus accesses to this address hang, then this patch only
->> makes the hand less likely, since the kernel will still map the region (and
->> therefore the CPU can perform speculative accesses).
->>
->> Are issues with this memory consistently seen in practice?
->>
->> Can you enable CONFIG_MEMTEST and pass 'memtest' to the kernel, to determine
->> if the memory is returning erroneous values?
-> just for the sake of completeness, on the rk3288 the issue was the dma not
-> being able to access the specific memory region (interestingly also the last
-> 16MB but of the 4GB area supported on the rk3288). So memory itself was ok,
-> just dma access to it failed.
->
-> We didn't find any other sane solution to limit the dma access in a general way
-> at the time, so opted for just blocking the memory region (as it was similarly
-> only
->
-> In the patch above, the newly blocked area is in the middle of the two 1gb
-> memory areas (0x60000000-0xa0000000-1, 0xa0000000-0xe0000000-1).
->
-> Pavel, apart from Mark's CONFIG_MEMTEST request above could you also specifiy
-> what type of error you see please?
->
->
-> Thanks
-> Heiko
+let tbl = ref []
+let fnstart = ref []
+let success = Hashtbl.create 101
+let thefile = ref ""
+let parsed = ref []
+let nea = ref []
+
+let parse file =
+  thefile := List.nth (Str.split (Str.regexp "linux-next/") file) 1;
+  let i = open_in file in
+  let startline = ref 0 in
+  let fn = ref "" in
+  let ids = ref [] in
+  let rec inside n =
+    let l = input_line i in
+    let n = n + 1 in
+    match Str.split_delim (Str.regexp_string "*/") l with
+      before::after::_ ->
+	(if not (!fn = "")
+	then tbl := (!startline,n,!fn,List.rev !ids)::!tbl);
+	startline := 0;
+	fn := "";
+	ids := [];
+	outside n
+    | _ ->
+	(match Str.split (Str.regexp "[ \t]+") l with
+	  "*"::name::rest ->
+	    let len = String.length name in
+	    (if !fn = "" && len > 2 && String.sub name (len-2) 2 = "()"
+	    then fn := String.sub name 0 (len-2)
+	    else if !fn = "" && (not (rest = [])) && List.hd rest = "-"
+	    then
+	      if String.get name (len-1) = ':'
+	      then fn := String.sub name 0 (len-1)
+	      else fn := name
+	    else if not(!fn = "") && len > 2 &&
+	      String.get name 0 = '@' && String.get name (len-1) = ':'
+	    then ids := (String.sub name 1 (len-2)) :: !ids);
+	| _ -> ());
+	inside n
+  and outside n =
+    let l = input_line i in
+    let n = n + 1 in
+    if String.length l > 2 && String.sub l 0 3 = "/**"
+    then
+      begin
+	startline := n;
+	inside n
+      end
+    else outside n in
+  try outside 0 with End_of_file -> ()
+
+let hashadd tbl k v =
+  let cell =
+    try Hashtbl.find tbl k
+    with Not_found ->
+      let cell = ref [] in
+      Hashtbl.add tbl k cell;
+      cell in
+  cell := v :: !cell
+
+@script:ocaml@
+@@
+
+tbl := [];
+fnstart := [];
+Hashtbl.clear success;
+parsed := [];
+nea := [];
+parse (List.hd (Coccilib.files()))
+
+@r@
+identifier f;
+position p;
+@@
+
+f at p(...) { ... }
+
+@script:ocaml@
+p << r.p;
+f << r.f;
+@@
+
+parsed := f :: !parsed;
+fnstart := (List.hd p).line :: !fnstart
+
+@param@
+identifier f;
+type T;
+identifier i;
+parameter list[n] ps;
+parameter list[n1] ps1;
+position p;
+@@
+
+f@p(ps,T i,ps1) { ... }
+
+@script:ocaml@
+@@
+
+tbl := List.rev (List.sort compare !tbl)
+
+@script:ocaml@
+p << param.p;
+f << param.f;
+@@
+
+let myline = (List.hd p).line in
+let prevline =
+  List.fold_left
+    (fun prev x ->
+      if x < myline
+      then max x prev
+      else prev)
+    0 !fnstart in
+let _ =
+  List.exists
+    (function (st,fn,nm,ids) ->
+      if prevline < st && myline > st && prevline < fn && myline > fn
+      then
+	begin
+	  (if not (String.lowercase f = String.lowercase nm)
+	  then
+	    Printf.printf "%s:%d %s doesn't match preceding comment: %s\n"
+	      !thefile myline f nm);
+	  true
+	end
+      else false)
+    !tbl in
+()
+
+@script:ocaml@
+p << param.p;
+n << param.n;
+n1 << param.n1;
+i << param.i;
+f << param.f;
+@@
+
+let myline = (List.hd p).line in
+let prevline =
+  List.fold_left
+    (fun prev x ->
+      if x < myline
+      then max x prev
+      else prev)
+    0 !fnstart in
+let _ =
+  List.exists
+    (function (st,fn,nm,ids) ->
+      if prevline < st && myline > st && prevline < fn && myline > fn
+      then
+	begin
+	  (if List.mem i ids then hashadd success (st,fn,nm) i);
+	  (if ids = [] (* arg list seems not obligatory *)
+	  then ()
+	  else if not (List.mem i ids)
+	  then
+	    Printf.printf "%s:%d %s doesn't appear in ids: %s\n"
+	      !thefile myline i (String.concat " " ids)
+	  else if List.length ids <= n || List.length ids <= n1
+	  then
+	    (if not (List.mem f !nea)
+	    then
+	      begin
+		nea := f :: !nea;
+		Printf.printf "%s:%d %s not enough args\n" !thefile myline f;
+	      end)
+	  else
+	    let foundid = List.nth ids n in
+	    let efoundid = List.nth (List.rev ids) n1 in
+	    if not(foundid = i || efoundid = i)
+	    then
+	      Printf.printf "%s:%d %s wrong arg in position %d: %s\n"
+		!thefile myline i n foundid);
+	  true
+	end
+      else false)
+    !tbl in
+()
+
+@script:ocaml@
+@@
+List.iter
+  (function (st,fn,nm,ids) ->
+    if List.mem nm !parsed
+    then
+      let entry =
+	try !(Hashtbl.find success (st,fn,nm))
+	with Not_found -> [] in
+      List.iter
+	(fun id ->
+	  if not (List.mem id entry) && not (id = "...")
+	  then Printf.printf "%s:%d %s not used\n" !thefile st id)
+	ids)
+  !tbl
+// </smpl>
+
+
+---
+
+ drivers/clk/keystone/pll.c               |    4 ++--
+ drivers/clk/sunxi/clk-mod0.c             |    2 +-
+ drivers/clk/tegra/cvb.c                  |   10 +++++-----
+ drivers/dma-buf/sw_sync.c                |    6 +++---
+ drivers/gpu/drm/gma500/intel_i2c.c       |    3 +--
+ drivers/gpu/drm/omapdrm/omap_drv.c       |    4 ++--
+ drivers/irqchip/irq-metag-ext.c          |    1 -
+ drivers/irqchip/irq-vic.c                |    1 -
+ drivers/mfd/tc3589x.c                    |    4 ++--
+ drivers/power/supply/ab8500_fg.c         |    8 ++++----
+ drivers/power/supply/abx500_chargalg.c   |    1 +
+ drivers/power/supply/intel_mid_battery.c |    2 +-
+ drivers/power/supply/power_supply_core.c |    4 ++--
+ fs/crypto/crypto.c                       |    4 ++--
+ fs/crypto/fname.c                        |    4 ++--
+ fs/ubifs/file.c                          |    2 +-
+ fs/ubifs/gc.c                            |    2 +-
+ fs/ubifs/lprops.c                        |    2 +-
+ fs/ubifs/lpt_commit.c                    |    4 +---
+ fs/ubifs/replay.c                        |    2 +-
+ lib/kobject_uevent.c                     |    6 +++---
+ lib/lru_cache.c                          |    4 ++--
+ lib/nlattr.c                             |    2 +-
+ 23 files changed, 39 insertions(+), 43 deletions(-)
