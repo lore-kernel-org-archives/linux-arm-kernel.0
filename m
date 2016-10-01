@@ -1,41 +1,32 @@
-From: joe@perches.com (Joe Perches)
-Date: Sat, 01 Oct 2016 13:19:54 -0700
-Subject: [PATCH 00/15] improve function-level documentation
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sat,  1 Oct 2016 21:46:24 +0200
+Subject: [PATCH 07/15] clk: sunxi: mod0: improve function-level documentation
 In-Reply-To: <1475351192-27079-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1475351192-27079-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1475353194.1996.3.camel@perches.com>
+Message-ID: <1475351192-27079-8-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-10-01 at 21:46 +0200, Julia Lawall wrote:
-> These patches fix cases where the documentation above a function definition
-> is not consistent with the function header.  Issues are detected using the
-> semantic patch below (http://coccinelle.lip6.fr/).  Basically, the semantic
-> patch parses a file to find comments, then matches each function header,
-> and checks that the name and parameter list in the function header are
-> compatible with the comment that preceeds it most closely.
+Use the actual function name in the function documentation.
 
-Hi Julia.
+Issue detected using Coccinelle (http://coccinelle.lip6.fr/)
 
-Would it be possible for a semantic patch to scan for
-function definitions where the types do not have
-identifiers and update the definitions to match the
-declarations?
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-For instance, given:
+---
+ drivers/clk/sunxi/clk-mod0.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-<some.h>
-int foo(int);
-
-<some.c>
-int foo(int bar)
-{
-	return baz;
-}
-
-Could coccinelle output:
-
-diff a/some.h b/some.h
-[]
--int foo(int);
-+int foo(int bar);
+diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
+index e54266c..4417ae1 100644
+--- a/drivers/clk/sunxi/clk-mod0.c
++++ b/drivers/clk/sunxi/clk-mod0.c
+@@ -24,7 +24,7 @@
+ #include "clk-factors.h"
+ 
+ /**
+- * sun4i_get_mod0_factors() - calculates m, n factors for MOD0-style clocks
++ * sun4i_a10_get_mod0_factors() - calculates m, n factors for MOD0-style clocks
+  * MOD0 rate is calculated as follows
+  * rate = (parent_rate >> p) / (m + 1);
+  */
