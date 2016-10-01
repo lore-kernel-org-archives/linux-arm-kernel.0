@@ -1,58 +1,39 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sat, 1 Oct 2016 15:05:01 +0530
-Subject: [PATCH 4/6] ARM: dts: da850-lcdk: add support for 1024x768
- resolution
-In-Reply-To: <CAMpxmJX25Yx0Rget4bOUf+t2qn01bpbNGBwwVFfomK1h_2Oydg@mail.gmail.com>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-5-git-send-email-bgolaszewski@baylibre.com>
- <20160929185805.q2pdihajikgzo4lm@gobelin>
- <CAMpxmJVA+p1st7HzwoOJftArqpY-wUQb8WKbQFAEWnBOysxF6w@mail.gmail.com>
- <20160930124942.ul737vxmdmkxqdre@gobelin>
- <CAMpxmJX25Yx0Rget4bOUf+t2qn01bpbNGBwwVFfomK1h_2Oydg@mail.gmail.com>
-Message-ID: <c4de4240-62d6-754f-c0d0-d83ecce59485@ti.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Sat, 1 Oct 2016 15:42:29 +0530
+Subject: [PATCH v2 0/6] Support PWM polarity control
+Message-ID: <20161001101235.24598-1-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 September 2016 07:18 PM, Bartosz Golaszewski wrote:
-> 2016-09-30 14:49 GMT+02:00 Karl Beldan <karl.beldan@gmail.com>:
->> On Fri, Sep 30, 2016 at 11:37:57AM +0200, Bartosz Golaszewski wrote:
->>> 2016-09-29 20:58 GMT+02:00 Karl Beldan <karl.beldan@gmail.com>:
->>>> Hi,
->>>>
->>>> On Thu, Sep 29, 2016 at 06:31:53PM +0200, Bartosz Golaszewski wrote:
->>>>> Add svga timings for 1024x768 resolution to the da850-lcdk
->>>>> device tree.
->>>>>
->>>>
->>>
->>> [snip]
->>>
->>>>
->>>> Why do you also call 1024x768 svga ?
->>>>
->>>
->>> Thanks, should have been xga. will fix in v2.
->>>
->>>> I don't think the LCDK can cope with this resolution at this frequency
->>>> (in terms of mem bandwidth), at least that's what I observed back in
->>>> August. If confirmed I think it is worth mentioning in the log at least,
->>>> but then I doubt adding this config would be useful.
->>>>
->>>
->>> Thanks for the heads up. How would that manifest itself? This seems to
->>> work fine for me - I'm not getting any warnings on a simple system -
->>> maybe if I added some additional memory load it would complain.
->>>
->>
->> A mere dmesg > /dev/tty0 (or repeatedly cat-ting a file to /dev/tty0)
->> should suffice to make the issue visible and trigger FIFO underflows.
->>
-> 
-> Thanks, this is correct unfortunately.
+Changes since v2:
 
-The OMAP-L138 datasheet documents 37.5 MHz as the maximum pixel clock
-possible on the device. Looks like you need 72MHz pixel clock for
-1024x768 which is definitely out of spec.
+- Picked the stalled patchset[1] from Lothar Wassmann which adds the basic
+  support for polarity control on imx-pwm driver and adds backward compatibility
+  support for devices which does not have polarity control feature.
 
-Thanks,
-Sekhar
+Changes since Lothars v6:
+
+- Squash Lukasz patch[2].
+
+[1] http://thread.gmane.org/gmane.linux.pwm/1621
+[2] https://www.spinics.net/lists/arm-kernel/msg530818.html
+
+Bhuvanchandra DV (3):
+  arm: dts: imx7: Update #pwm-cells for PWM polarity control
+  arm: dts: imx7-colibri: Use pwm polarity control
+  arm: dts: imx7-colibri: Use enable-gpios for BL_ON
+
+Lothar Wassmann (3):
+  pwm: print error messages with pr_err() instead of pr_debug()
+  pwm: core: make the PWM_POLARITY flag in DTB optional
+  pwm: imx: support output polarity inversion
+
+ Documentation/devicetree/bindings/pwm/imx-pwm.txt |  6 +--
+ arch/arm/boot/dts/imx7-colibri.dtsi               | 12 +++++-
+ arch/arm/boot/dts/imx7s.dtsi                      |  8 ++--
+ drivers/pwm/core.c                                | 31 ++++++++------
+ drivers/pwm/pwm-imx.c                             | 51 +++++++++++++++++++++--
+ 5 files changed, 83 insertions(+), 25 deletions(-)
+
+-- 
+2.9.2
