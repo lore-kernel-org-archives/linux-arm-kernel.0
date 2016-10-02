@@ -1,110 +1,80 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Sun, 2 Oct 2016 22:40:44 +1100
-Subject: [3/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
-In-Reply-To: <1475343976-20744-3-git-send-email-okaya@codeaurora.org>
-References: <1475343976-20744-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <CANwerB1jnx7x28F0p4zOXJq6Cchs3+SNU3EHN0mV3jJ_90xjVQ@mail.gmail.com>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Sun, 2 Oct 2016 16:19:57 +0200
+Subject: [PATCH v3 2/7] i2c: bcm2835: Protect against unexpected TXW/RXR
+ interrupts
+In-Reply-To: <1708178720.178936.b155d019-5320-4754-bbe2-4afc1ae71cd6.open-xchange@email.1und1.de>
+References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+ <1475085056-5205-3-git-send-email-noralf@tronnes.org>
+ <87oa37fzx6.fsf@eliezer.anholt.net>
+ <d93a0590-1783-b913-9362-007628cb17d6@tronnes.org>
+ <1708178720.178936.b155d019-5320-4754-bbe2-4afc1ae71cd6.open-xchange@email.1und1.de>
+Message-ID: <0c943ee9-d152-79c4-2ad7-8a88c2d9c960@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2016 at 04:46, Sinan Kaya <okaya@codeaurora.org> wrote:
-> This reverts commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI penalize
-> function"). SCI penalty API was replaced by the runtime penalty calculation
-> based on the value of acpi_gbl_FADT.sci_interrupt.
->
-> acpi_gbl_FADT.sci_interrupt type does not get updated at the right time
-> for some platforms and results in incorrect penalty assignment for PCI
-> IRQs as irq_get_trigger_type returns the wrong type.
->
-> Link: http://www.spinics.net/lists/linux-pci/msg54599.html
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  arch/x86/kernel/acpi/boot.c |  1 +
->  drivers/acpi/pci_link.c     | 34 ++++++++++++++--------------------
->  include/linux/acpi.h        |  1 +
->  3 files changed, 16 insertions(+), 20 deletions(-)
->
-> diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-> index 90d84c3..0ffd26e 100644
-> --- a/arch/x86/kernel/acpi/boot.c
-> +++ b/arch/x86/kernel/acpi/boot.c
-> @@ -453,6 +453,7 @@ static void __init acpi_sci_ioapic_setup(u8 bus_irq, u16 polarity, u16 trigger,
->                 polarity = acpi_sci_flags & ACPI_MADT_POLARITY_MASK;
->
->         mp_override_legacy_irq(bus_irq, polarity, trigger, gsi);
-> +       acpi_penalize_sci_irq(bus_irq, trigger, polarity);
->
->         /*
->          * stash over-ride to indicate we've been here
-> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> index 06c2a11..6a2af19 100644
-> --- a/drivers/acpi/pci_link.c
-> +++ b/drivers/acpi/pci_link.c
-> @@ -495,27 +495,10 @@ static int acpi_irq_pci_sharing_penalty(int irq)
->
->  static int acpi_irq_get_penalty(int irq)
->  {
-> -       int penalty = 0;
-> -
-> -       /*
-> -       * Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
-> -       * with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
-> -       * use for PCI IRQs.
-> -       */
-> -       if (irq == acpi_gbl_FADT.sci_interrupt) {
-> -               u32 type = irq_get_trigger_type(irq) & IRQ_TYPE_SENSE_MASK;
-> -
-> -               if (type != IRQ_TYPE_LEVEL_LOW)
-> -                       penalty += PIRQ_PENALTY_ISA_ALWAYS;
-> -               else
-> -                       penalty += PIRQ_PENALTY_PCI_USING;
-> -       }
-> -
-> -       if (irq < ACPI_MAX_ISA_IRQS)
-> -               return penalty + acpi_irq_penalty[irq];
-> +       if (irq < ACPI_MAX_IRQS)
-> +               return acpi_irq_penalty[irq];
->
-> -       penalty += acpi_irq_pci_sharing_penalty(irq);
-> -       return penalty;
-> +       return acpi_irq_pci_sharing_penalty(irq);
->  }
->
->  int __init acpi_irq_penalty_init(void)
-> @@ -886,6 +869,17 @@ bool acpi_isa_irq_available(int irq)
->                     acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
->  }
->
-> +void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
-> +{
-> +       if (irq >= 0 && irq < ARRAY_SIZE(acpi_irq_penalty)) {
-> +               if (trigger != ACPI_MADT_TRIGGER_LEVEL ||
-> +                   polarity != ACPI_MADT_POLARITY_ACTIVE_LOW)
-> +                       acpi_irq_penalty[irq] += PIRQ_PENALTY_ISA_ALWAYS;
-> +               else
-> +                       acpi_irq_penalty[irq] += PIRQ_PENALTY_PCI_USING;
-> +       }
-> +}
-> +
->  /*
->   * Over-ride default table to reserve additional IRQs for use by ISA
->   * e.g. acpi_irq_isa=5
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 4d8452c..85ac7d5 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -318,6 +318,7 @@ struct pci_dev;
->  int acpi_pci_irq_enable (struct pci_dev *dev);
->  void acpi_penalize_isa_irq(int irq, int active);
->  bool acpi_isa_irq_available(int irq);
-> +void acpi_penalize_sci_irq(int irq, int trigger, int polarity);
->  void acpi_pci_irq_disable (struct pci_dev *dev);
->
->  extern int ec_read(u8 addr, u8 *val);
 
-This series fixes one or more network adapters in VirtualBox not
-working with Linux 32-bit x86 guest if I have 4 network adapters
-enabled. The following message no longer appears in the kernel log:
-ACPI: No IRQ available for PCI Interrupt Link [LNKD]. Try pci=noacpi or acpi=off
+Den 29.09.2016 07:37, skrev Stefan Wahren:
+>> Noralf Tr?nnes <noralf@tronnes.org> hat am 29. September 2016 um 00:22
+>> geschrieben:
+>>
+>>
+>>
+>> Den 29.09.2016 00:00, skrev Eric Anholt:
+>>> Noralf Tr?nnes <noralf@tronnes.org> writes:
+>>>
+>>>> If an unexpected TXW or RXR interrupt occurs (msg_buf_remaining == 0),
+>>>> the driver has no way to fill/drain the FIFO to stop the interrupts.
+>>>> In this case the controller has to be disabled and the transfer
+>>>> completed to avoid hang.
+>>>>
+>>>> (CLKT | ERR) and DONE interrupts are completed in their own paths, and
+>>>> the controller is disabled in the transfer function after completion.
+>>>> Unite the code paths and do disabling inside the interrupt routine.
+>>>>
+>>>> Clear interrupt status bits in the united completion path instead of
+>>>> trying to do it on every interrupt which isn't necessary.
+>>>> Only CLKT, ERR and DONE can be cleared that way.
+>>>>
+>>>> Add the status value to the error value in case of TXW/RXR errors to
+>>>> distinguish them from the other S_LEN error.
+>>> I was surprised that not writing the TXW/RXR bits on handling their
+>>> interrupts was OK, given that we were doing so before, but it's a level
+>>> interrupt and those bits are basically ignored on write.
+>>>
+>>> This patch and 3, 4, and 6 are:
+>>>
+>>> Reviewed-by: Eric Anholt <eric@anholt.net>
+>>>
+>>> Patch 5 is:
+>>>
+>>> Acked-by: Eric Anholt <eric@anholt.net>
+>>>
+>>> Note for future debug: The I2C_C_CLEAR on errors will take some time to
+>>> resolve -- if you were in non-idle state and I2C_C_READ, it sets an
+>>> abort_rx flag and runs through the state machine to send a NACK and a
+>>> STOP, I think.  Since we're setting CLEAR without I2CEN, that NACK will
+>>> be hanging around queued up for next time we start the engine.
+>> Maybe you're able to explain the issues I had with reset:
+>> https://github.com/raspberrypi/linux/issues/1653
+>>
+>> Should we put your note into the commit message?
+>> It will most likely be lost if it just stays in this email.
+> I prefer to have this kind of information as a code comment.
 
-Tested-by: Jonathan Liu <net147@gmail.com>
+Eric, does this look good to you as a code comment:
+
+/*
+  * Note about I2C_C_CLEAR on error:
+  * The I2C_C_CLEAR on errors will take some time to resolve -- if you 
+were in
+  * non-idle state and I2C_C_READ, it sets an abort_rx flag and runs through
+  * the state machine to send a NACK and a STOP. Since we're setting CLEAR
+  * without I2CEN, that NACK will be hanging around queued up for next time
+  * we start the engine.
+  */
+
+
+If it is, I'll resend the series with this change and add all the ack's 
+and r-b's.
+
+Noralf.
