@@ -1,41 +1,106 @@
 From: net147@gmail.com (Jonathan Liu)
-Date: Sun, 2 Oct 2016 22:40:36 +1100
-Subject: [2/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA interrupts
-In-Reply-To: <1475343976-20744-2-git-send-email-okaya@codeaurora.org>
-References: <1475343976-20744-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <CANwerB0+yS709kZG9BkAQaqSixmyfz4As3fUs-dcZ3uun=S+5w@mail.gmail.com>
+Date: Sun, 2 Oct 2016 22:40:44 +1100
+Subject: [3/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
+In-Reply-To: <1475343976-20744-3-git-send-email-okaya@codeaurora.org>
+References: <1475343976-20744-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <CANwerB1jnx7x28F0p4zOXJq6Cchs3+SNU3EHN0mV3jJ_90xjVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 2 October 2016 at 04:46, Sinan Kaya <okaya@codeaurora.org> wrote:
-> The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
-> resource requirements") removed PCI_USING penalty from
-> acpi_pci_link_allocate function as there is no longer a fixed size penalty
-> array for both PCI and IRQ interrupts.
+> This reverts commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI penalize
+> function"). SCI penalty API was replaced by the runtime penalty calculation
+> based on the value of acpi_gbl_FADT.sci_interrupt.
 >
-> We need to add the PCI_USING penalty for ISA interrupts too if the link is
-> in use and matches our ISA IRQ number.
+> acpi_gbl_FADT.sci_interrupt type does not get updated at the right time
+> for some platforms and results in incorrect penalty assignment for PCI
+> IRQs as irq_get_trigger_type returns the wrong type.
 >
+> Link: http://www.spinics.net/lists/linux-pci/msg54599.html
 > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  drivers/acpi/pci_link.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/x86/kernel/acpi/boot.c |  1 +
+>  drivers/acpi/pci_link.c     | 34 ++++++++++++++--------------------
+>  include/linux/acpi.h        |  1 +
+>  3 files changed, 16 insertions(+), 20 deletions(-)
 >
+> diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
+> index 90d84c3..0ffd26e 100644
+> --- a/arch/x86/kernel/acpi/boot.c
+> +++ b/arch/x86/kernel/acpi/boot.c
+> @@ -453,6 +453,7 @@ static void __init acpi_sci_ioapic_setup(u8 bus_irq, u16 polarity, u16 trigger,
+>                 polarity = acpi_sci_flags & ACPI_MADT_POLARITY_MASK;
+>
+>         mp_override_legacy_irq(bus_irq, polarity, trigger, gsi);
+> +       acpi_penalize_sci_irq(bus_irq, trigger, polarity);
+>
+>         /*
+>          * stash over-ride to indicate we've been here
 > diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> index f3792f4..06c2a11 100644
+> index 06c2a11..6a2af19 100644
 > --- a/drivers/acpi/pci_link.c
 > +++ b/drivers/acpi/pci_link.c
-> @@ -620,6 +620,10 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
->                             acpi_device_bid(link->device));
->                 return -ENODEV;
->         } else {
-> +               if (link->irq.active < ACPI_MAX_IRQS)
-> +                       acpi_irq_penalty[link->irq.active] +=
-> +                               PIRQ_PENALTY_PCI_USING;
+> @@ -495,27 +495,10 @@ static int acpi_irq_pci_sharing_penalty(int irq)
+>
+>  static int acpi_irq_get_penalty(int irq)
+>  {
+> -       int penalty = 0;
+> -
+> -       /*
+> -       * Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
+> -       * with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
+> -       * use for PCI IRQs.
+> -       */
+> -       if (irq == acpi_gbl_FADT.sci_interrupt) {
+> -               u32 type = irq_get_trigger_type(irq) & IRQ_TYPE_SENSE_MASK;
+> -
+> -               if (type != IRQ_TYPE_LEVEL_LOW)
+> -                       penalty += PIRQ_PENALTY_ISA_ALWAYS;
+> -               else
+> -                       penalty += PIRQ_PENALTY_PCI_USING;
+> -       }
+> -
+> -       if (irq < ACPI_MAX_ISA_IRQS)
+> -               return penalty + acpi_irq_penalty[irq];
+> +       if (irq < ACPI_MAX_IRQS)
+> +               return acpi_irq_penalty[irq];
+>
+> -       penalty += acpi_irq_pci_sharing_penalty(irq);
+> -       return penalty;
+> +       return acpi_irq_pci_sharing_penalty(irq);
+>  }
+>
+>  int __init acpi_irq_penalty_init(void)
+> @@ -886,6 +869,17 @@ bool acpi_isa_irq_available(int irq)
+>                     acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
+>  }
+>
+> +void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
+> +{
+> +       if (irq >= 0 && irq < ARRAY_SIZE(acpi_irq_penalty)) {
+> +               if (trigger != ACPI_MADT_TRIGGER_LEVEL ||
+> +                   polarity != ACPI_MADT_POLARITY_ACTIVE_LOW)
+> +                       acpi_irq_penalty[irq] += PIRQ_PENALTY_ISA_ALWAYS;
+> +               else
+> +                       acpi_irq_penalty[irq] += PIRQ_PENALTY_PCI_USING;
+> +       }
+> +}
 > +
->                 printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
->                        acpi_device_name(link->device),
->                        acpi_device_bid(link->device), link->irq.active);
+>  /*
+>   * Over-ride default table to reserve additional IRQs for use by ISA
+>   * e.g. acpi_irq_isa=5
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 4d8452c..85ac7d5 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -318,6 +318,7 @@ struct pci_dev;
+>  int acpi_pci_irq_enable (struct pci_dev *dev);
+>  void acpi_penalize_isa_irq(int irq, int active);
+>  bool acpi_isa_irq_available(int irq);
+> +void acpi_penalize_sci_irq(int irq, int trigger, int polarity);
+>  void acpi_pci_irq_disable (struct pci_dev *dev);
+>
+>  extern int ec_read(u8 addr, u8 *val);
 
 This series fixes one or more network adapters in VirtualBox not
 working with Linux 32-bit x86 guest if I have 4 network adapters
