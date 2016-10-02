@@ -1,107 +1,163 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 2 Oct 2016 11:56:14 +0200
-Subject: [RFC 05/11] iommu/dma: iommu_dma_(un)map_mixed
-In-Reply-To: <1b1b30b3-4199-9e18-362c-b8bc9d45277d@arm.com>
-References: <1475009318-2617-1-git-send-email-eric.auger@redhat.com>
- <1475009318-2617-6-git-send-email-eric.auger@redhat.com>
- <1b1b30b3-4199-9e18-362c-b8bc9d45277d@arm.com>
-Message-ID: <20161002095614.GA23218@cbox>
+From: net147@gmail.com (Jonathan Liu)
+Date: Sun, 2 Oct 2016 22:40:05 +1100
+Subject: [1/3] Revert "ACPI,PCI,IRQ: reduce static IRQ array size to 16"
+In-Reply-To: <1475343976-20744-1-git-send-email-okaya@codeaurora.org>
+References: <1475343976-20744-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <CANwerB2bhMbkQrGG55Bq-yrFk_DC3Pz2tF0CRrt4ccmrzTmrzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2016 at 02:24:40PM +0100, Robin Murphy wrote:
-> Hi Eric,
-> 
-> On 27/09/16 21:48, Eric Auger wrote:
-> > iommu_dma_map_mixed and iommu_dma_unmap_mixed operate on
-> > IOMMU_DOMAIN_MIXED typed domains. On top of standard iommu_map/unmap
-> > they reserve the IOVA window to prevent the iova allocator to
-> > allocate in those areas.
-> > 
-> > Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> > ---
-> >  drivers/iommu/dma-iommu.c | 48 +++++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/dma-iommu.h | 18 ++++++++++++++++++
-> >  2 files changed, 66 insertions(+)
-> > 
-> > diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> > index 04bbc85..db21143 100644
-> > --- a/drivers/iommu/dma-iommu.c
-> > +++ b/drivers/iommu/dma-iommu.c
-> > @@ -759,3 +759,51 @@ int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
-> >  	return 0;
-> >  }
-> >  EXPORT_SYMBOL(iommu_get_dma_msi_region_cookie);
-> > +
-> > +int iommu_dma_map_mixed(struct iommu_domain *domain, unsigned long iova,
-> > +			phys_addr_t paddr, size_t size, int prot)
-> > +{
-> > +	struct iova_domain *iovad;
-> > +	unsigned long lo, hi;
-> > +	int ret;
-> > +
-> > +	if (domain->type != IOMMU_DOMAIN_MIXED)
-> > +		return -EINVAL;
-> > +
-> > +	if (!domain->iova_cookie)
-> > +		return -EINVAL;
-> > +
-> > +	iovad = cookie_iovad(domain);
-> > +
-> > +	lo = iova_pfn(iovad, iova);
-> > +	hi = iova_pfn(iovad, iova + size - 1);
-> > +	reserve_iova(iovad, lo, hi);
-> 
-> This can't work reliably - reserve_iova() will (for good reason) merge
-> any adjacent or overlapping entries, so any unmap is liable to free more
-> IOVA space than actually gets unmapped, and things will get subtly out
-> of sync and go wrong later.
-> 
-> The more general issue with this whole approach, though, is that it
-> effectively rules out userspace doing guest memory hotplug or similar,
-> and I'm not we want to paint ourselves into that corner. Basically, as
-> soon as a device is attached to a guest, the entirety of the unallocated
-> IPA space becomes reserved, and userspace can never add anything further
-> to it, because any given address *might* be in use for an MSI mapping.
+On 2 October 2016 at 04:46, Sinan Kaya <okaya@codeaurora.org> wrote:
+> This reverts commit 5c5087a55390 ("ACPI,PCI,IRQ: reduce static IRQ array
+> size to 16").
+>
+> The code maintains a fixed size array for IRQ penalties. The array
+> gets updated by external calls such as acpi_penalize_sci_irq,
+> acpi_penalize_isa_irq to reflect the actual interrupt usage of the
+> system. Since the IRQ distribution is platform specific, this is
+> not known ahead of time. The IRQs get updated based on the SCI
+> interrupt number BIOS has chosen or the ISA IRQs that were assigned
+> to existing peripherals.
+>
+> By the time ACPI gets initialized, this code tries to determine an
+> IRQ number based on penalty values in this array. It will try to locate
+> the IRQ with the least penalty assignment so that interrupt sharing is
+> avoided if possible.
+>
+> A couple of notes about the external APIs:
+> 1. These API can be called before the ACPI is started. Therefore, one
+> cannot assume that the PCI link objects are initialized for calculating
+> penalties.
+> 2. The polarity and trigger information passed via the
+> acpi_penalize_sci_irq from the BIOS may not match what the IRQ subsystem
+> is reporting as the call might have been placed before the IRQ is
+> registered by the interrupt subsystem.
+>
+> The previous change was in the direction to remove these external API and
+> try to calculate the penalties at runtime for the ISA path as well. This
+> didn't work out well with the existing platforms.
+>
+> Restoring the old behavior for IRQ < 256 and the new behavior will remain
+> effective for IRQ >= 256.
+>
+> Link: http://www.spinics.net/lists/linux-pci/msg54599.html
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/acpi/pci_link.c | 35 ++++++++++++++++++-----------------
+>  1 file changed, 18 insertions(+), 17 deletions(-)
+>
+> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> index c983bf7..f3792f4 100644
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -438,6 +438,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
+>   * enabled system.
+>   */
+>
+> +#define ACPI_MAX_IRQS          256
+>  #define ACPI_MAX_ISA_IRQS      16
+>
+>  #define PIRQ_PENALTY_PCI_POSSIBLE      (16*16)
+> @@ -446,7 +447,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
+>  #define PIRQ_PENALTY_ISA_USED          (16*16*16*16*16)
+>  #define PIRQ_PENALTY_ISA_ALWAYS                (16*16*16*16*16*16)
+>
+> -static int acpi_isa_irq_penalty[ACPI_MAX_ISA_IRQS] = {
+> +static int acpi_irq_penalty[ACPI_MAX_IRQS] = {
+>         PIRQ_PENALTY_ISA_ALWAYS,        /* IRQ0 timer */
+>         PIRQ_PENALTY_ISA_ALWAYS,        /* IRQ1 keyboard */
+>         PIRQ_PENALTY_ISA_ALWAYS,        /* IRQ2 cascade */
+> @@ -511,7 +512,7 @@ static int acpi_irq_get_penalty(int irq)
+>         }
+>
+>         if (irq < ACPI_MAX_ISA_IRQS)
+> -               return penalty + acpi_isa_irq_penalty[irq];
+> +               return penalty + acpi_irq_penalty[irq];
+>
+>         penalty += acpi_irq_pci_sharing_penalty(irq);
+>         return penalty;
+> @@ -538,14 +539,14 @@ int __init acpi_irq_penalty_init(void)
+>
+>                         for (i = 0; i < link->irq.possible_count; i++) {
+>                                 if (link->irq.possible[i] < ACPI_MAX_ISA_IRQS)
+> -                                       acpi_isa_irq_penalty[link->irq.
+> +                                       acpi_irq_penalty[link->irq.
+>                                                          possible[i]] +=
+>                                             penalty;
+>                         }
+>
+>                 } else if (link->irq.active &&
+> -                               (link->irq.active < ACPI_MAX_ISA_IRQS)) {
+> -                       acpi_isa_irq_penalty[link->irq.active] +=
+> +                               (link->irq.active < ACPI_MAX_IRQS)) {
+> +                       acpi_irq_penalty[link->irq.active] +=
+>                             PIRQ_PENALTY_PCI_POSSIBLE;
+>                 }
+>         }
+> @@ -828,7 +829,7 @@ static void acpi_pci_link_remove(struct acpi_device *device)
+>  }
+>
+>  /*
+> - * modify acpi_isa_irq_penalty[] from cmdline
+> + * modify acpi_irq_penalty[] from cmdline
+>   */
+>  static int __init acpi_irq_penalty_update(char *str, int used)
+>  {
+> @@ -837,24 +838,24 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+>         for (i = 0; i < 16; i++) {
+>                 int retval;
+>                 int irq;
+> -               int new_penalty;
+>
+>                 retval = get_option(&str, &irq);
+>
+>                 if (!retval)
+>                         break;  /* no number found */
+>
+> -               /* see if this is a ISA IRQ */
+> -               if ((irq < 0) || (irq >= ACPI_MAX_ISA_IRQS))
+> +               if (irq < 0)
+> +                       continue;
+> +
+> +               if (irq >= ARRAY_SIZE(acpi_irq_penalty))
+>                         continue;
+>
+>                 if (used)
+> -                       new_penalty = acpi_irq_get_penalty(irq) +
+> -                                       PIRQ_PENALTY_ISA_USED;
+> +                       acpi_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+> +                               PIRQ_PENALTY_ISA_USED;
+>                 else
+> -                       new_penalty = 0;
+> +                       acpi_irq_penalty[irq] = 0;
+>
+> -               acpi_isa_irq_penalty[irq] = new_penalty;
+>                 if (retval != 2)        /* no next number */
+>                         break;
+>         }
+> @@ -870,14 +871,14 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+>   */
+>  void acpi_penalize_isa_irq(int irq, int active)
+>  {
+> -       if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
+> -               acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+> -                 (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+> +       if (irq >= 0 && irq < ARRAY_SIZE(acpi_irq_penalty))
+> +               acpi_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+> +                   (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+>  }
+>
+>  bool acpi_isa_irq_available(int irq)
+>  {
+> -       return irq >= 0 && (irq >= ARRAY_SIZE(acpi_isa_irq_penalty) ||
+> +       return irq >= 0 && (irq >= ARRAY_SIZE(acpi_irq_penalty) ||
+>                     acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
+>  }
+>
 
-Ah, we didn't think of that when discussing this design at KVM Forum,
-because the idea was that the IOVA allocator was in charge of that
-resource, and the IOVA was a separate concept from the IPA space.
+This series fixes one or more network adapters in VirtualBox not
+working with Linux 32-bit x86 guest if I have 4 network adapters
+enabled. The following message no longer appears in the kernel log:
+ACPI: No IRQ available for PCI Interrupt Link [LNKD]. Try pci=noacpi or acpi=off
 
-I think what tripped us up, is that while the above is true for the MSI
-configuration where we trap the bar and do the allocation at VFIO init
-time, the guest device driver can program DMA to any address without
-trapping, and therefore there's an inherent relationship between the
-IOVA and the IPA space.  Is that right?
-
-> 
-> I think it still makes most sense to stick with the original approach of
-> cooperating with userspace to reserve a bounded area - it's just that we
-> can then let automatic mapping take care of itself within that area.
-
-I was thinking that it's also possible to do it the other way around: To
-let userspace say wherever memory may be hotplugged and do the
-allocation within the remaining area, but I suppose that's pretty much
-the same thing, and it should just depend on what's easiest to implement
-and what userspace can best predict.
-
-> 
-> Speaking of which, I've realised the same fundamental reservation
-> problem already applies to PCI without ACS, regardless of MSIs. I just
-> tried on my Juno with guest memory placed at 0x4000000000, (i.e.
-> matching the host PA of the 64-bit PCI window), and sure enough when the
-> guest kicks off some DMA on the passed-through NIC, the root complex
-> interprets the guest IPA as (unsupported) peer-to-peer DMA to a BAR
-> claimed by the video card, and it fails. I guess this doesn't get hit in
-> practice on x86 because the guest memory map is unlikely to be much
-> different from the host's.
-> 
-> It seems like we basically need a general way of communicating fixed and
-> movable host reservations to userspace :/
-> 
-
-Yes, this makes sense to me.   Do we have any existing way of
-discovering this from userspace or can we think of something?
-
-Thanks,
--Christoffer
+Tested-by: Jonathan Liu <net147@gmail.com>
