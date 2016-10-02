@@ -1,43 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun,  2 Oct 2016 23:53:59 +0200
-Subject: [PATCH] bus: qcom-ebi2: depend on HAS_IOMEM
-Message-ID: <1475445239-25006-1-git-send-email-linus.walleij@linaro.org>
+From: jcm@jonmasters.org (Jon Masters)
+Date: Sun, 2 Oct 2016 15:03:58 -0700
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <5869118.UilSPY9Sai@wuerfel>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <5140357.dcW9ibtZJ6@wuerfel> <57D963C4.4010406@hisilicon.com>
+ <5869118.UilSPY9Sai@wuerfel>
+Message-ID: <2af4f2d8-e3a4-fa00-e700-60af70bf4560@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After being asked to not depend on ARCH_QCOM* or similar,
-unsurprisingly compilation fails on UM as it has no I/O
-memory:
+On 09/14/2016 02:32 PM, Arnd Bergmann wrote:
+> On Wednesday, September 14, 2016 10:50:44 PM CEST zhichang.yuan wrote:
 
-drivers/built-in.o: In function `qcom_ebi2_probe':
->> drivers/bus/qcom-ebi2.c:333: undefined reference to
-   `devm_ioremap_resource'
+>> And there are probably multiple child devices under LPC, the global arm64_extio_ops only can cover one PIO range. It is fortunate only ipmi driver can not support I/O
+>> operation registering, serial driver has serial_in/serial_out to
+>> be registered. So, only the PIO range for ipmi device is stored
+>> in arm64_extio_ops and the indirect-IO
+>> works well for ipmi device.
+> 
+> You should not do that in the serial driver, please just use the
+> normal 8250 driver that works fine once you handle the entire
+> port range.
 
-Fix this by letting the Kconfig atleast depend on HAS_IOMEM.
+Just for the record, Arnd has the right idea. There is only one type of
+UART permitted by SBSA (PL011). We carved out an exception for a design
+that was already in flight and allowed it to be 16550. That other design
+was then corrected in future generations to be PL011 as we required it
+to be. Then there's the Hip06. I've given feedback elsewhere about the
+need for there to be (at most) two types of UART in the wild. This "LPC"
+stuff needs cleaning up (feedback given elsewhere already on that), but
+we won't be adding a third serial driver into the mix in order to make
+it work. There will be standard ARM servers. There will not be the
+kinda-sorta-standard. Thanks.
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: linux-arm-msm at vger.kernel.org
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC maintainers: please apply this directly on the offending
-branch, or line it up for v4.9 fixes.
----
- drivers/bus/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 5a2d47c71525..7010dcac9328 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -110,6 +110,7 @@ config OMAP_OCP2SCP
- 
- config QCOM_EBI2
- 	bool "Qualcomm External Bus Interface 2 (EBI2)"
-+	depends on HAS_IOMEM
- 	help
- 	  Say y here to enable support for the Qualcomm External Bus
- 	  Interface 2, which can be used to connect things like NAND Flash,
--- 
-2.7.4
+Jon.
