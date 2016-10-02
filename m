@@ -1,80 +1,24 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Sun, 2 Oct 2016 16:19:57 +0200
-Subject: [PATCH v3 2/7] i2c: bcm2835: Protect against unexpected TXW/RXR
- interrupts
-In-Reply-To: <1708178720.178936.b155d019-5320-4754-bbe2-4afc1ae71cd6.open-xchange@email.1und1.de>
-References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
- <1475085056-5205-3-git-send-email-noralf@tronnes.org>
- <87oa37fzx6.fsf@eliezer.anholt.net>
- <d93a0590-1783-b913-9362-007628cb17d6@tronnes.org>
- <1708178720.178936.b155d019-5320-4754-bbe2-4afc1ae71cd6.open-xchange@email.1und1.de>
-Message-ID: <0c943ee9-d152-79c4-2ad7-8a88c2d9c960@tronnes.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sun, 2 Oct 2016 22:37:36 +0800
+Subject: [PATCH] crypto: sunxi-ss: mark sun4i_hash() static
+In-Reply-To: <1474691326-15541-1-git-send-email-baoyou.xie@linaro.org>
+References: <1474691326-15541-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20161002143736.GB18268@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Sep 24, 2016 at 12:28:46PM +0800, Baoyou Xie wrote:
+> We get 1 warning when building kernel with W=1:
+> drivers/crypto/sunxi-ss/sun4i-ss-hash.c:168:5: warning: no previous prototype for 'sun4i_hash' [-Wmissing-prototypes]
+> 
+> In fact, this function is only used in the file in which it is
+> declared and don't need a declaration, but can be made static.
+> So this patch marks it 'static'.
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 
-Den 29.09.2016 07:37, skrev Stefan Wahren:
->> Noralf Tr?nnes <noralf@tronnes.org> hat am 29. September 2016 um 00:22
->> geschrieben:
->>
->>
->>
->> Den 29.09.2016 00:00, skrev Eric Anholt:
->>> Noralf Tr?nnes <noralf@tronnes.org> writes:
->>>
->>>> If an unexpected TXW or RXR interrupt occurs (msg_buf_remaining == 0),
->>>> the driver has no way to fill/drain the FIFO to stop the interrupts.
->>>> In this case the controller has to be disabled and the transfer
->>>> completed to avoid hang.
->>>>
->>>> (CLKT | ERR) and DONE interrupts are completed in their own paths, and
->>>> the controller is disabled in the transfer function after completion.
->>>> Unite the code paths and do disabling inside the interrupt routine.
->>>>
->>>> Clear interrupt status bits in the united completion path instead of
->>>> trying to do it on every interrupt which isn't necessary.
->>>> Only CLKT, ERR and DONE can be cleared that way.
->>>>
->>>> Add the status value to the error value in case of TXW/RXR errors to
->>>> distinguish them from the other S_LEN error.
->>> I was surprised that not writing the TXW/RXR bits on handling their
->>> interrupts was OK, given that we were doing so before, but it's a level
->>> interrupt and those bits are basically ignored on write.
->>>
->>> This patch and 3, 4, and 6 are:
->>>
->>> Reviewed-by: Eric Anholt <eric@anholt.net>
->>>
->>> Patch 5 is:
->>>
->>> Acked-by: Eric Anholt <eric@anholt.net>
->>>
->>> Note for future debug: The I2C_C_CLEAR on errors will take some time to
->>> resolve -- if you were in non-idle state and I2C_C_READ, it sets an
->>> abort_rx flag and runs through the state machine to send a NACK and a
->>> STOP, I think.  Since we're setting CLEAR without I2CEN, that NACK will
->>> be hanging around queued up for next time we start the engine.
->> Maybe you're able to explain the issues I had with reset:
->> https://github.com/raspberrypi/linux/issues/1653
->>
->> Should we put your note into the commit message?
->> It will most likely be lost if it just stays in this email.
-> I prefer to have this kind of information as a code comment.
-
-Eric, does this look good to you as a code comment:
-
-/*
-  * Note about I2C_C_CLEAR on error:
-  * The I2C_C_CLEAR on errors will take some time to resolve -- if you 
-were in
-  * non-idle state and I2C_C_READ, it sets an abort_rx flag and runs through
-  * the state machine to send a NACK and a STOP. Since we're setting CLEAR
-  * without I2CEN, that NACK will be hanging around queued up for next time
-  * we start the engine.
-  */
-
-
-If it is, I'll resend the series with this change and add all the ack's 
-and r-b's.
-
-Noralf.
+This patch has already been applied.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
