@@ -1,81 +1,49 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Sat, 1 Oct 2016 22:39:15 +0200 (CEST)
-Subject: [PATCH 00/15] improve function-level documentation
-In-Reply-To: <1475353194.1996.3.camel@perches.com>
-References: <1475351192-27079-1-git-send-email-Julia.Lawall@lip6.fr>
- <1475353194.1996.3.camel@perches.com>
-Message-ID: <alpine.DEB.2.10.1610012232350.3445@hadrien>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Sat,  1 Oct 2016 18:28:39 -0700
+Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-b: Remove I2C3
+Message-ID: <1475371719-28736-1-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I2C3 bus was only brought out in revision A1 of the board and revision
+B1 only brings out 3 I2C busses (I2C0, I2C1 and I2C2).
 
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 14 --------------
+ 1 file changed, 14 deletions(-)
 
-On Sat, 1 Oct 2016, Joe Perches wrote:
-
-> On Sat, 2016-10-01 at 21:46 +0200, Julia Lawall wrote:
-> > These patches fix cases where the documentation above a function definition
-> > is not consistent with the function header.  Issues are detected using the
-> > semantic patch below (http://coccinelle.lip6.fr/).  Basically, the semantic
-> > patch parses a file to find comments, then matches each function header,
-> > and checks that the name and parameter list in the function header are
-> > compatible with the comment that preceeds it most closely.
->
-> Hi Julia.
->
-> Would it be possible for a semantic patch to scan for
-> function definitions where the types do not have
-> identifiers and update the definitions to match the
-> declarations?
->
-> For instance, given:
->
-> <some.h>
-> int foo(int);
->
-> <some.c>
-> int foo(int bar)
-> {
-> 	return baz;
-> }
->
-> Could coccinelle output:
->
-> diff a/some.h b/some.h
-> []
-> -int foo(int);
-> +int foo(int bar);
-
-The following seems to work:
-
-@r@
-identifier f;
-position p;
-type T, t;
-parameter list[n] ps;
-@@
-
-T f at p(ps,t,...);
-
-@s@
-identifier r.f,x;
-type r.T, r.t;
-parameter list[r.n] ps;
-@@
-
-T f(ps,t x,...) { ... }
-
-@@
-identifier r.f, s.x;
-position r.p;
-type r.T, r.t;
-parameter list[r.n] ps;
-@@
-
-T f at p(ps,t
-+ x
-  ,...);
-
-After letting it run for a few minutes without making any effort to
-include .h files, I get over 2700 changed lines.
-
-julia
+diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+index 5c1fcab..fa19cfd 100644
+--- a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
++++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+@@ -499,13 +499,6 @@
+ 	};
+ };
+ 
+-&i2c3 {
+-	clock-frequency = <100000>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c3>;
+-	status = "okay";
+-};
+-
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart0>;
+@@ -663,13 +656,6 @@
+ 		>;
+ 	};
+ 
+-	pinctrl_i2c3: i2c3grp {
+-		fsl,pins = <
+-			VF610_PAD_PTA30__I2C3_SCL	0x37ff
+-			VF610_PAD_PTA31__I2C3_SDA	0x37ff
+-		>;
+-	};
+-
+ 	pinctrl_leds_debug: pinctrl-leds-debug {
+ 		fsl,pins = <
+ 			 VF610_PAD_PTD20__GPIO_74	0x31c2
+-- 
+2.5.5
