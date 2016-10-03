@@ -1,44 +1,49 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 2 Oct 2016 22:09:23 -0700
-Subject: [PATCH] ARM: dts: lpc32xx: add device node for IRAM on-chip memory
-In-Reply-To: <1467931601-25067-1-git-send-email-vz@mleia.com>
-References: <1467931601-25067-1-git-send-email-vz@mleia.com>
-Message-ID: <20161003050923.GA4403@localhost>
+Date: Sun, 2 Oct 2016 22:19:17 -0700
+Subject: [PATCH] arm64: Enable HIBERNATION in defconfig
+In-Reply-To: <20160915100231.GG2492@e104818-lin.cambridge.arm.com>
+References: <1473932534-2710-1-git-send-email-catalin.marinas@arm.com>
+ <20160915100231.GG2492@e104818-lin.cambridge.arm.com>
+Message-ID: <20161003051917.GC4403@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 01:46:41AM +0300, Vladimir Zapolskiy wrote:
-> The change adds a new device node with description of generic SRAM
-> on-chip memory found on NXP LPC32xx SoC series and connected to AHB
-> matrix slave port 3.
-> 
-> Note that NXP LPC3220 SoC has 128KiB of SRAM memory, the other
-> LPC3230, LPC3240 and LPC3250 SoCs all have 256KiB SRAM space,
-> in the shared DTSI file this change specifies 128KiB SRAM size.
-> 
-> Also it's worth to mention that the SRAM area contains of 64KiB banks,
-> 2 banks on LPC3220 and 4 banks on the other SoCs from the series, and
-> all SRAM banks but the first one have independent power controls,
-> the description of this feature will be added with the introduction of
-> power domains for the SoC series.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
-> ---
-> 
-> Hi Arnd, Olof, Kevin,
-> 
-> please consider to include this NXP LPC32xx DT change directly to
-> ARM tree for v4.8.
-> 
-> The SRAM device node will be utilized to store PM resume code
-> and to store MAC buffers.
-
 Hi,
 
-When sweeping my inbox looking for patches we had missed, this still showed
-up from back in July. I've now applied it, it'll make it into 4.9 (in
-next/late). Sorry for missing it earlier.
+On Thu, Sep 15, 2016 at 11:02:31AM +0100, Catalin Marinas wrote:
+> On Thu, Sep 15, 2016 at 10:42:14AM +0100, Catalin Marinas wrote:
+> > This patch adds CONFIG_HIBERNATION to the arm64 defconfig.
+> > 
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
+> >  arch/arm64/configs/defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> > index eadf4855ad2d..91a7592029e3 100644
+> > --- a/arch/arm64/configs/defconfig
+> > +++ b/arch/arm64/configs/defconfig
+> > @@ -80,6 +80,7 @@ CONFIG_KEXEC=y
+> >  # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+> >  CONFIG_COMPAT=y
+> >  CONFIG_CPU_IDLE=y
+> > +CONFIG_HIBERNATION=y
+> >  CONFIG_ARM_CPUIDLE=y
+> >  CONFIG_CPU_FREQ=y
+> >  CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
+> 
+> Or maybe it could go through arm-soc as it seems Arnd has picked up a
+> few other defconfig patches.
+
+When we just get a cc of a reply to a patch, it's usually pretty error prone
+whether we end up applying it. Which happened here, I just came across this
+when making a final sweep.
+
+Yes, in general we tend to have more changes to the defconfig, so it's
+appreciated to get these sent our way.
+
+Given timing, resend after -rc1? We should be OK with applying it for 4.9
+still around that time.
 
 
 -Olof
