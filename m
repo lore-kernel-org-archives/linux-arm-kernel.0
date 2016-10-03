@@ -1,37 +1,26 @@
-From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Mon,  3 Oct 2016 22:06:10 +0200
-Subject: [PATCH v4 3/7] i2c: bcm2835: Use dev_dbg logging on transfer errors
-In-Reply-To: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
-References: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
-Message-ID: <1475525174-28604-4-git-send-email-noralf@tronnes.org>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Mon, 3 Oct 2016 21:52:33 +0100
+Subject: [PATCH] efi/arm: fix absolute relocation detection for older
+ toolchains
+In-Reply-To: <1475276515-21801-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1475276515-21801-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161003205233.GO16071@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writing to an AT24C32 generates on average 2x i2c transfer errors per
-32-byte page write. Which amounts to a lot for a 4k write. This is due
-to the fact that the chip doesn't respond during it's internal write
-cycle when the at24 driver tries and retries the next write.
-Only a handful drivers use dev_err() on transfer error, so switch to
-dev_dbg() instead.
+On Fri, 30 Sep, at 04:01:55PM, Ard Biesheuvel wrote:
+> 
+> This is a workaround for now. We can revisit this when a need arises to copy
+> more kernel code into the stub, by which time we could put in a more elaborate
+> fix, or decide to no longer care about 'older' versions of objcopy.
+> 
+> Since this fixes an ARM specific issue and only affects ARM specific Makefile
+> variables, I am happy for this to go on top of the arm-soc patch that enables
+> CONFIG_EFI for ARM's multi_v7_defconfig (queued for v4.9), given that we have
+> no other changes queued in linux-efi that should conflict with this patch.
+> 
+> Matt, any concerns?
 
-Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
-Reviewed-by: Eric Anholt <eric@anholt.net>
----
- drivers/i2c/busses/i2c-bcm2835.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index d2ba1a4..54d510a 100644
---- a/drivers/i2c/busses/i2c-bcm2835.c
-+++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -216,7 +216,7 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
- 	    (msg->flags & I2C_M_IGNORE_NAK))
- 		return 0;
- 
--	dev_err(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
-+	dev_dbg(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
- 
- 	if (i2c_dev->msg_err & BCM2835_I2C_S_ERR)
- 		return -EREMOTEIO;
--- 
-2.8.2
+Not with the patch, but could we clarify the user-visible effects of
+not applying it? Are the absolute relocations harmless, or will they
+lead to crashes? 
