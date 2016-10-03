@@ -1,333 +1,231 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 3 Oct 2016 14:33:16 +0200
-Subject: [PATCH v2 1/1] crypto: atmel-aes: add support to the XTS mode
-Message-ID: <5ba0856b4ef013fa22c8d5ef00a7d97efe63d61f.1475497672.git.cyrille.pitchen@atmel.com>
+From: mjaggi@caviumnetworks.com (Manish Jaggi)
+Date: Mon, 3 Oct 2016 18:11:40 +0530
+Subject: [PATCH v26 0/7] arm64: add kdump support
+In-Reply-To: <20161003110424.GD14025@linaro.org>
+References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
+ <8a57223d-000d-536e-6885-d427ee81508c@caviumnetworks.com>
+ <20161003110424.GD14025@linaro.org>
+Message-ID: <1ae717d6-b2aa-105b-4f47-d879882ca5d3@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the xts(aes) algorithm, which is supported from
-hardware version 0x500 and above (sama5d2x).
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
-ChangeLog:
 
-v1 -> v2:
-- fix typo in comment inside atmel_aes_xts_process_data():
-  s/reverted/reversed/
-- use xts_check_key() from atmel_aes_xts_setkey() as suggested by
-  Stephan Mueller.
+On 10/03/2016 04:34 PM, AKASHI Takahiro wrote:
+> Manish,
+> 
+> On Mon, Oct 03, 2016 at 01:24:34PM +0530, Manish Jaggi wrote:
+>> Hi Akashi,
+>>
+>> On 09/07/2016 09:59 AM, AKASHI Takahiro wrote:
+>>>     v26-specific note: After a comment from Rob[0], an idea of adding
+>>>     "linux,usable-memory-range" was dropped. Instead, an existing
+>>>     "reserved-memory" node will be used to limit usable memory ranges
+>>>     on crash dump kernel.
+>>>     This works not only on UEFI/ACPI systems but also on DT-only systems,
+>>>     but if he really insists on using DT-specific "usable-memory" property,
+>>>     I will post additional patches for kexec-tools. Those would be
+>>>     redundant, though.
+>>>     Even in that case, the kernel will not have to be changed.
+>>>
+>>> This patch series adds kdump support on arm64.
+>>> There are some prerequisite patches [1],[2].
+>>>
+>>> To load a crash-dump kernel to the systems, a series of patches to
+>>> kexec-tools, which have not yet been merged upstream, are needed.
+>>> Please always use my latest kdump patches, v3 [3].
+>>>
+>>> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+>>>   - crash utility (coming v7.1.6 or later) [4]
+>>>     (Necessary patches have already been queued in the master.)
+>>>
+>>>
+>>> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/452582.html
+>>> [1] "arm64: mark reserved memblock regions explicitly in iomem"
+>>>     http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/450433.html
+>>> [2] "efi: arm64: treat regions with WT/WC set but WB cleared as memory"
+>>>     http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/451491.html
+>>> [3] T.B.D.
+>>> [4] https://github.com/crash-utility/crash.git
+>>>
+>>
+>> With the v26 kdump and v3 kexec-tools and top of tree crash.git, below are the tests done
+>> Attached is a patch in crash.git (symbols.c) to make crash utility work on my setup.
+>> Can you please have a look and provide your comments.
+>>
+>> To generate a panic, i have a kernel module which on init calls panic.
+>>
+>> Observations:
+>> 1.1. Dump capture kernel shows different memory map.
+>> ---------------------------------------------------
+>> In dump capture kernel /proc/meminfo and /proc/iomem differ
+>>
+>> root at arm64:/home/ubuntu/CODE/crash#
+>> MemTotal:       65882432 kB
+>> MemFree:        65507136 kB
+>> MemAvailable:   60373632 kB
+>> Buffers:           29248 kB
+>> Cached:            46720 kB
+>> SwapCached:            0 kB
+>> Active:            63872 kB
+>> Inactive:          19776 kB
+>> Active(anon):       8256 kB
+>> Inactive(anon):     7616 kB
+>>
+>> First kernel is booted with mem=2G crashkernel=1G command line option.
+>> While the system has 64G memory.
+>>
+>> root at arm64:/home/ubuntu/CODE/crash# cat /proc/iomem
+>> 41400000-fffeffff : System RAM
+>>   41480000-420cffff : Kernel code
+>>   42490000-4278ffff : Kernel data
+>> ffff0000-ffffffff : reserved
+>> 100000000-ffaa7ffff : System RAM
+>> ffaa80000-ffaabffff : reserved
+>> ffaac0000-fffa6ffff : System RAM
+>> fffa70000-fffacffff : reserved
+>> fffad0000-fffffffff : System RAM
+> 
+> Are you saying that "mem=..." doesn't have any effect?
+What I am saying it that If the first kernel is booted using mem= option and crashkernel= option
+the memory for second kernel has to be withing the crashkernel size.
+As per /proc/iomem System RAM the information is correct, but the /proc/meminfo is showing total memory
+much more than the first kernel had in first place.
+> What about if you don't specify "crashkernel=...?"
+> 
+In that case the second kernel will not boot as kexec tools will complain that memory not reserved.
+>> 1.2 Live crash dump fails with error
+>> --------------------------------------
+>> $crash vmlinux
+>>
+>> crash 7.1.5++
+>> Copyright (C) 2002-2016  Red Hat, Inc.
+>> Copyright (C) 2004, 2005, 2006, 2010  IBM Corporation
+>> Copyright (C) 1999-2006  Hewlett-Packard Co
+>> Copyright (C) 2005, 2006, 2011, 2012  Fujitsu Limited
+>> Copyright (C) 2006, 2007  VA Linux Systems Japan K.K.
+>> Copyright (C) 2005, 2011  NEC Corporation
+>> Copyright (C) 1999, 2002, 2007  Silicon Graphics, Inc.
+>> Copyright (C) 1999, 2000, 2001, 2002  Mission Critical Linux, Inc.
+>> This program is free software, covered by the GNU General Public License,
+>> and you are welcome to change it and/or distribute copies of it under
+>> certain conditions.  Enter "help copying" to see the conditions.
+>> This program has absolutely no warranty.  Enter "help warranty" for details.
+>>
+>> GNU gdb (GDB) 7.6
+>> Copyright (C) 2013 Free Software Foundation, Inc.
+>> License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+>> This is free software: you are free to change and redistribute it.
+>> There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+>> and "show warranty" for details.
+>> This GDB was configured as "aarch64-unknown-linux-gnu"...
+>>
+>> crash: read error: kernel virtual address: ffff800ffffffcc0  type: "pglist node_id"
+> 
+> I have no ideas here.
+If I run with debug logs phys address accessed is > 64G. (10413ffcc0)
+Could be that somehow 64 + 1G + (addr) = 10413ffcc0 and actually addr was required.
+addr = 413ffcc0 which seems in line with 424b0c50
 
- drivers/crypto/atmel-aes-regs.h |   4 +
- drivers/crypto/atmel-aes.c      | 185 ++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 183 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/crypto/atmel-aes-regs.h b/drivers/crypto/atmel-aes-regs.h
-index 6c2951bb70b1..0ec04407b533 100644
---- a/drivers/crypto/atmel-aes-regs.h
-+++ b/drivers/crypto/atmel-aes-regs.h
-@@ -28,6 +28,7 @@
- #define AES_MR_OPMOD_CFB		(0x3 << 12)
- #define AES_MR_OPMOD_CTR		(0x4 << 12)
- #define AES_MR_OPMOD_GCM		(0x5 << 12)
-+#define AES_MR_OPMOD_XTS		(0x6 << 12)
- #define AES_MR_LOD				(0x1 << 15)
- #define AES_MR_CFBS_MASK		(0x7 << 16)
- #define AES_MR_CFBS_128b		(0x0 << 16)
-@@ -67,6 +68,9 @@
- #define AES_CTRR	0x98
- #define AES_GCMHR(x)	(0x9c + ((x) * 0x04))
- 
-+#define AES_TWR(x)	(0xc0 + ((x) * 0x04))
-+#define AES_ALPHAR(x)	(0xd0 + ((x) * 0x04))
-+
- #define AES_HW_VERSION	0xFC
- 
- #endif /* __ATMEL_AES_REGS_H__ */
-diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 1d9e7bd3f377..6b656f4a9378 100644
---- a/drivers/crypto/atmel-aes.c
-+++ b/drivers/crypto/atmel-aes.c
-@@ -36,6 +36,7 @@
- #include <crypto/scatterwalk.h>
- #include <crypto/algapi.h>
- #include <crypto/aes.h>
-+#include <crypto/xts.h>
- #include <crypto/internal/aead.h>
- #include <linux/platform_data/crypto-atmel.h>
- #include <dt-bindings/dma/at91.h>
-@@ -68,6 +69,7 @@
- #define AES_FLAGS_CFB8		(AES_MR_OPMOD_CFB | AES_MR_CFBS_8b)
- #define AES_FLAGS_CTR		AES_MR_OPMOD_CTR
- #define AES_FLAGS_GCM		AES_MR_OPMOD_GCM
-+#define AES_FLAGS_XTS		AES_MR_OPMOD_XTS
- 
- #define AES_FLAGS_MODE_MASK	(AES_FLAGS_OPMODE_MASK |	\
- 				 AES_FLAGS_ENCRYPT |		\
-@@ -89,6 +91,7 @@ struct atmel_aes_caps {
- 	bool			has_cfb64;
- 	bool			has_ctr32;
- 	bool			has_gcm;
-+	bool			has_xts;
- 	u32			max_burst_size;
- };
- 
-@@ -135,6 +138,12 @@ struct atmel_aes_gcm_ctx {
- 	atmel_aes_fn_t		ghash_resume;
- };
- 
-+struct atmel_aes_xts_ctx {
-+	struct atmel_aes_base_ctx	base;
-+
-+	u32			key2[AES_KEYSIZE_256 / sizeof(u32)];
-+};
-+
- struct atmel_aes_reqctx {
- 	unsigned long		mode;
- };
-@@ -282,6 +291,20 @@ static const char *atmel_aes_reg_name(u32 offset, char *tmp, size_t sz)
- 		snprintf(tmp, sz, "GCMHR[%u]", (offset - AES_GCMHR(0)) >> 2);
- 		break;
- 
-+	case AES_TWR(0):
-+	case AES_TWR(1):
-+	case AES_TWR(2):
-+	case AES_TWR(3):
-+		snprintf(tmp, sz, "TWR[%u]", (offset - AES_TWR(0)) >> 2);
-+		break;
-+
-+	case AES_ALPHAR(0):
-+	case AES_ALPHAR(1):
-+	case AES_ALPHAR(2):
-+	case AES_ALPHAR(3):
-+		snprintf(tmp, sz, "ALPHAR[%u]", (offset - AES_ALPHAR(0)) >> 2);
-+		break;
-+
- 	default:
- 		snprintf(tmp, sz, "0x%02x", offset);
- 		break;
-@@ -453,15 +476,15 @@ static inline int atmel_aes_complete(struct atmel_aes_dev *dd, int err)
- 	return err;
- }
- 
--static void atmel_aes_write_ctrl(struct atmel_aes_dev *dd, bool use_dma,
--				 const u32 *iv)
-+static void atmel_aes_write_ctrl_key(struct atmel_aes_dev *dd, bool use_dma,
-+				     const u32 *iv, const u32 *key, int keylen)
- {
- 	u32 valmr = 0;
- 
- 	/* MR register must be set before IV registers */
--	if (dd->ctx->keylen == AES_KEYSIZE_128)
-+	if (keylen == AES_KEYSIZE_128)
- 		valmr |= AES_MR_KEYSIZE_128;
--	else if (dd->ctx->keylen == AES_KEYSIZE_192)
-+	else if (keylen == AES_KEYSIZE_192)
- 		valmr |= AES_MR_KEYSIZE_192;
- 	else
- 		valmr |= AES_MR_KEYSIZE_256;
-@@ -478,13 +501,19 @@ static void atmel_aes_write_ctrl(struct atmel_aes_dev *dd, bool use_dma,
- 
- 	atmel_aes_write(dd, AES_MR, valmr);
- 
--	atmel_aes_write_n(dd, AES_KEYWR(0), dd->ctx->key,
--			  SIZE_IN_WORDS(dd->ctx->keylen));
-+	atmel_aes_write_n(dd, AES_KEYWR(0), key, SIZE_IN_WORDS(keylen));
- 
- 	if (iv && (valmr & AES_MR_OPMOD_MASK) != AES_MR_OPMOD_ECB)
- 		atmel_aes_write_block(dd, AES_IVR(0), iv);
- }
- 
-+static inline void atmel_aes_write_ctrl(struct atmel_aes_dev *dd, bool use_dma,
-+					const u32 *iv)
-+
-+{
-+	atmel_aes_write_ctrl_key(dd, use_dma, iv,
-+				 dd->ctx->key, dd->ctx->keylen);
-+}
- 
- /* CPU transfer */
- 
-@@ -1769,6 +1798,137 @@ static struct aead_alg aes_gcm_alg = {
- };
- 
- 
-+/* xts functions */
-+
-+static inline struct atmel_aes_xts_ctx *
-+atmel_aes_xts_ctx_cast(struct atmel_aes_base_ctx *ctx)
-+{
-+	return container_of(ctx, struct atmel_aes_xts_ctx, base);
-+}
-+
-+static int atmel_aes_xts_process_data(struct atmel_aes_dev *dd);
-+
-+static int atmel_aes_xts_start(struct atmel_aes_dev *dd)
-+{
-+	struct atmel_aes_xts_ctx *ctx = atmel_aes_xts_ctx_cast(dd->ctx);
-+	struct ablkcipher_request *req = ablkcipher_request_cast(dd->areq);
-+	struct atmel_aes_reqctx *rctx = ablkcipher_request_ctx(req);
-+	unsigned long flags;
-+	int err;
-+
-+	atmel_aes_set_mode(dd, rctx);
-+
-+	err = atmel_aes_hw_init(dd);
-+	if (err)
-+		return atmel_aes_complete(dd, err);
-+
-+	/* Compute the tweak value from req->info with ecb(aes). */
-+	flags = dd->flags;
-+	dd->flags &= ~AES_FLAGS_MODE_MASK;
-+	dd->flags |= (AES_FLAGS_ECB | AES_FLAGS_ENCRYPT);
-+	atmel_aes_write_ctrl_key(dd, false, NULL,
-+				 ctx->key2, ctx->base.keylen);
-+	dd->flags = flags;
-+
-+	atmel_aes_write_block(dd, AES_IDATAR(0), req->info);
-+	return atmel_aes_wait_for_data_ready(dd, atmel_aes_xts_process_data);
-+}
-+
-+static int atmel_aes_xts_process_data(struct atmel_aes_dev *dd)
-+{
-+	struct ablkcipher_request *req = ablkcipher_request_cast(dd->areq);
-+	bool use_dma = (req->nbytes >= ATMEL_AES_DMA_THRESHOLD);
-+	u32 tweak[AES_BLOCK_SIZE / sizeof(u32)];
-+	static const u32 one[AES_BLOCK_SIZE / sizeof(u32)] = {cpu_to_le32(1), };
-+	u8 *tweak_bytes = (u8 *)tweak;
-+	int i;
-+
-+	/* Read the computed ciphered tweak value. */
-+	atmel_aes_read_block(dd, AES_ODATAR(0), tweak);
-+	/*
-+	 * Hardware quirk:
-+	 * the order of the ciphered tweak bytes need to be reversed before
-+	 * writing them into the ODATARx registers.
-+	 */
-+	for (i = 0; i < AES_BLOCK_SIZE/2; ++i) {
-+		u8 tmp = tweak_bytes[AES_BLOCK_SIZE - 1 - i];
-+
-+		tweak_bytes[AES_BLOCK_SIZE - 1 - i] = tweak_bytes[i];
-+		tweak_bytes[i] = tmp;
-+	}
-+
-+	/* Process the data. */
-+	atmel_aes_write_ctrl(dd, use_dma, NULL);
-+	atmel_aes_write_block(dd, AES_TWR(0), tweak);
-+	atmel_aes_write_block(dd, AES_ALPHAR(0), one);
-+	if (use_dma)
-+		return atmel_aes_dma_start(dd, req->src, req->dst, req->nbytes,
-+					   atmel_aes_transfer_complete);
-+
-+	return atmel_aes_cpu_start(dd, req->src, req->dst, req->nbytes,
-+				   atmel_aes_transfer_complete);
-+}
-+
-+static int atmel_aes_xts_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
-+				unsigned int keylen)
-+{
-+	struct atmel_aes_xts_ctx *ctx = crypto_ablkcipher_ctx(tfm);
-+	int err;
-+
-+	err = xts_check_key(crypto_ablkcipher_tfm(tfm), key, keylen);
-+	if (err)
-+		return err;
-+
-+	memcpy(ctx->base.key, key, keylen/2);
-+	memcpy(ctx->key2, key + keylen/2, keylen/2);
-+	ctx->base.keylen = keylen/2;
-+
-+	return 0;
-+}
-+
-+static int atmel_aes_xts_encrypt(struct ablkcipher_request *req)
-+{
-+	return atmel_aes_crypt(req, AES_FLAGS_XTS | AES_FLAGS_ENCRYPT);
-+}
-+
-+static int atmel_aes_xts_decrypt(struct ablkcipher_request *req)
-+{
-+	return atmel_aes_crypt(req, AES_FLAGS_XTS);
-+}
-+
-+static int atmel_aes_xts_cra_init(struct crypto_tfm *tfm)
-+{
-+	struct atmel_aes_xts_ctx *ctx = crypto_tfm_ctx(tfm);
-+
-+	tfm->crt_ablkcipher.reqsize = sizeof(struct atmel_aes_reqctx);
-+	ctx->base.start = atmel_aes_xts_start;
-+
-+	return 0;
-+}
-+
-+static struct crypto_alg aes_xts_alg = {
-+	.cra_name		= "xts(aes)",
-+	.cra_driver_name	= "atmel-xts-aes",
-+	.cra_priority		= ATMEL_AES_PRIORITY,
-+	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER | CRYPTO_ALG_ASYNC,
-+	.cra_blocksize		= AES_BLOCK_SIZE,
-+	.cra_ctxsize		= sizeof(struct atmel_aes_xts_ctx),
-+	.cra_alignmask		= 0xf,
-+	.cra_type		= &crypto_ablkcipher_type,
-+	.cra_module		= THIS_MODULE,
-+	.cra_init		= atmel_aes_xts_cra_init,
-+	.cra_exit		= atmel_aes_cra_exit,
-+	.cra_u.ablkcipher = {
-+		.min_keysize	= 2 * AES_MIN_KEY_SIZE,
-+		.max_keysize	= 2 * AES_MAX_KEY_SIZE,
-+		.ivsize		= AES_BLOCK_SIZE,
-+		.setkey		= atmel_aes_xts_setkey,
-+		.encrypt	= atmel_aes_xts_encrypt,
-+		.decrypt	= atmel_aes_xts_decrypt,
-+	}
-+};
-+
-+
- /* Probe functions */
- 
- static int atmel_aes_buff_init(struct atmel_aes_dev *dd)
-@@ -1877,6 +2037,9 @@ static void atmel_aes_unregister_algs(struct atmel_aes_dev *dd)
- {
- 	int i;
- 
-+	if (dd->caps.has_xts)
-+		crypto_unregister_alg(&aes_xts_alg);
-+
- 	if (dd->caps.has_gcm)
- 		crypto_unregister_aead(&aes_gcm_alg);
- 
-@@ -1909,8 +2072,16 @@ static int atmel_aes_register_algs(struct atmel_aes_dev *dd)
- 			goto err_aes_gcm_alg;
- 	}
- 
-+	if (dd->caps.has_xts) {
-+		err = crypto_register_alg(&aes_xts_alg);
-+		if (err)
-+			goto err_aes_xts_alg;
-+	}
-+
- 	return 0;
- 
-+err_aes_xts_alg:
-+	crypto_unregister_aead(&aes_gcm_alg);
- err_aes_gcm_alg:
- 	crypto_unregister_alg(&aes_cfb64_alg);
- err_aes_cfb64_alg:
-@@ -1928,6 +2099,7 @@ static void atmel_aes_get_cap(struct atmel_aes_dev *dd)
- 	dd->caps.has_cfb64 = 0;
- 	dd->caps.has_ctr32 = 0;
- 	dd->caps.has_gcm = 0;
-+	dd->caps.has_xts = 0;
- 	dd->caps.max_burst_size = 1;
- 
- 	/* keep only major version number */
-@@ -1937,6 +2109,7 @@ static void atmel_aes_get_cap(struct atmel_aes_dev *dd)
- 		dd->caps.has_cfb64 = 1;
- 		dd->caps.has_ctr32 = 1;
- 		dd->caps.has_gcm = 1;
-+		dd->caps.has_xts = 1;
- 		dd->caps.max_burst_size = 4;
- 		break;
- 	case 0x200:
--- 
-2.7.4
+Logs:
+<read_dev_mem: addr: ffff0000090b3008 paddr: 424b3008 cnt: 8>
+node_online_map: [1] -> nodes online: 1
+<readmem: ffff0000090b0c50, KVADDR, ""node_data"", 8, (ROE), ffffc330eb00>
+<read_dev_mem: addr: ffff0000090b0c50 paddr: 424b0c50 cnt: 8>
+<readmem: ffff800ffffffcc0, KVADDR, ""pglist node_id"", 4, (FOE), ffffc330f1e4>
+<read_dev_mem: addr: ffff800ffffffcc0 paddr: 10413ffcc0 cnt: 4>
+/dev/mem: Bad address
+crash: read(/dev/mem, 10413ffcc0, 4): 4294967295 (ffffffff)
+crash: read error: kernel virtual address: ffff800ffffffcc0  type: ""pglist node_id""
+"
+> 
+>> Observation 2
+>> ------------
+>> If saved vmcore file is used
+>>
+>> $crash vmlinux vmcore_saved
+>> Got the below error.
+>>
+>> please wait... (gathering module symbol data)crash: malloc.c:2846: mremap_chunk: Assertion `((size + offset) & (_rtld_global_ro._dl_pagesize - 1)) == 0' failed.
+>> Aborted
+> 
+> I have no ideas here.
+> 
+>> Experiment 3
+>> ------------
+>> If crash.git is modified with a hack patch in symbols.c. Crash utility works fine log, bt commands work.
+> 
+> In which case, "crash vmlinux" or "crash vmlinux vmcore_saved?"
+> 
+vmcore_saved
+> I was able to reproduce this issue in the latter case
+> (but with a different error message).
+> It seems to be a crash util's bug.
+> Please report it to crash-util mailing list.
+> I will post a patch.
+The same patch as below ?
+Can you please share your patch
+> 
+> Thanks,
+> -Takahiro AKASHI
+> 
+>> -------------------
+>> Patch: symbols.c
+>> git diff symbols.c
+>> diff --git a/symbols.c b/symbols.c
+>> index 13282f4..f7c6cac 100644
+>> --- a/symbols.c
+>> +++ b/symbols.c
+>> @@ -2160,6 +2160,7 @@ store_module_kallsyms_v2(struct load_module *lm, int start
+>>                  FREEBUF(module_buf);
+>>                  return 0;
+>>          }
+>> +       lm->mod_init_size = 0;
+>>
+>>         if (lm->mod_init_size > 0) {
+>>                 module_buf_init = GETBUF(lm->mod_init_size);
+>> ------------------
+>>
+>> $ crash vmlinux vmcore_saved
+>>     KERNEL: /home/ubuntu/CODE/linux/vmlinux
+>>     DUMPFILE: vm
+>>         CPUS: 48 [OFFLINE: 46]
+>>         DATE: Mon Oct  3 00:11:47 2016
+>>       UPTIME: 00:02:41
+>> LOAD AVERAGE: 0.36, 0.14, 0.05
+>>        TASKS: 171
+>>     NODENAME: arm64
+>>      RELEASE: 4.8.0-rc3-00044-g070a615-dirty
+>>      VERSION: #63 SMP Sat Oct 1 01:39:45 PDT 2016
+>>      MACHINE: aarch64  (unknown Mhz)
+>>       MEMORY: 2 GB
+>>        PANIC: "Kernel panic - not syncing: crash module starting"
+>>          PID: 958
+>>      COMMAND: "insmod"
+>>         TASK: ffff800007859300  [THREAD_INFO: ffff80000c940000]
+>>          CPU: 0
+>>        STATE: TASK_RUNNING (PANIC)
+>>
+>> crash> bt
+>> PID: 958    TASK: ffff800007859300  CPU: 0   COMMAND: "insmod"
+>>  #0 [ffff80000c943980] __crash_kexec at ffff000008144fe8
+>>  #1 [ffff80000c943ae0] panic at ffff0000081ae704
+>>  #2 [ffff80000c943ba0] init_module at ffff000000900014 [crash]
+>>  #3 [ffff80000c943bb0] do_one_initcall at ffff000008083bb4
+>>  #4 [ffff80000c943c40] do_init_module at ffff0000081af6f0
+>>  #5 [ffff80000c943c70] load_module at ffff000008140b7c
+>>  #6 [ffff80000c943e10] sys_finit_module at ffff000008141634
+>>  #7 [ffff80000c943ed0] el0_svc_naked at ffff0000080833ec
+>>      PC: 00000003  LR: ffffaca050a0  SP: ffffaca865a0  PSTATE: 00000111
+>>     X12: ffffac941a5c X11: 00000080 X10: 00000004  X9: 00000030
+>>      X8: ffffffff  X7: fefefefefefeff40  X6: 00000111  X5: 00000001
+>>      X4: 00000001  X3: 0002ed61  X2: 00000000  X1: 00000003
+>>      X0: 00000000
+>> crash>
+>>
+>>
+>> ---
+>> Thanks,
+>> manish
+>>
