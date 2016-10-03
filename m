@@ -1,42 +1,32 @@
 From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Mon,  3 Oct 2016 22:06:13 +0200
-Subject: [PATCH v4 6/7] i2c: bcm2835: Support i2c-dev ioctl I2C_TIMEOUT
-In-Reply-To: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
-References: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
-Message-ID: <1475525174-28604-7-git-send-email-noralf@tronnes.org>
+Date: Mon,  3 Oct 2016 22:06:07 +0200
+Subject: [PATCH v4 0/7] i2c: bcm2835: Bring in changes from downstream
+Message-ID: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use i2c_adapter->timeout for the completion timeout value. The core
-default is 1 second.
+This patchset tries to bring in the lessons learned in the downstream
+driver i2c-bcm2708. The downstream clock stretcing timeout patch has
+been left out since clock stretching is broken/unreliable on this
+controller, so no point in setting it.
 
-Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
-Reviewed-by: Eric Anholt <eric@anholt.net>
----
- drivers/i2c/busses/i2c-bcm2835.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Changes since version 3:
+- Add comment about I2C_C_CLEAR on error
 
-diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index 241e08a..d2085dd 100644
---- a/drivers/i2c/busses/i2c-bcm2835.c
-+++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -53,8 +53,6 @@
- #define BCM2835_I2C_CDIV_MIN	0x0002
- #define BCM2835_I2C_CDIV_MAX	0xFFFE
- 
--#define BCM2835_I2C_TIMEOUT (msecs_to_jiffies(1000))
--
- struct bcm2835_i2c_dev {
- 	struct device *dev;
- 	void __iomem *regs;
-@@ -242,7 +240,7 @@ static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
- 	bcm2835_i2c_start_transfer(i2c_dev);
- 
- 	time_left = wait_for_completion_timeout(&i2c_dev->completion,
--						BCM2835_I2C_TIMEOUT);
-+						adap->timeout);
- 	if (!time_left) {
- 		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C,
- 				   BCM2835_I2C_C_CLEAR);
--- 
+Noralf.
+
+
+Noralf Tr?nnes (7):
+  i2c: bcm2835: Fix hang for writing messages larger than 16 bytes
+  i2c: bcm2835: Protect against unexpected TXW/RXR interrupts
+  i2c: bcm2835: Use dev_dbg logging on transfer errors
+  i2c: bcm2835: Can't support I2C_M_IGNORE_NAK
+  i2c: bcm2835: Add support for Repeated Start Condition
+  i2c: bcm2835: Support i2c-dev ioctl I2C_TIMEOUT
+  i2c: bcm2835: Add support for dynamic clock
+
+ drivers/i2c/busses/i2c-bcm2835.c | 218 +++++++++++++++++++++++++--------------
+ 1 file changed, 139 insertions(+), 79 deletions(-)
+
+--
 2.8.2
