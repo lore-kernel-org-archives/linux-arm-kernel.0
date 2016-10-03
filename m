@@ -1,95 +1,134 @@
 From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Mon,  3 Oct 2016 22:06:08 +0200
-Subject: [PATCH v4 1/7] i2c: bcm2835: Fix hang for writing messages larger
- than 16 bytes
+Date: Mon,  3 Oct 2016 22:06:09 +0200
+Subject: [PATCH v4 2/7] i2c: bcm2835: Protect against unexpected TXW/RXR
+ interrupts
 In-Reply-To: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
 References: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
-Message-ID: <1475525174-28604-2-git-send-email-noralf@tronnes.org>
+Message-ID: <1475525174-28604-3-git-send-email-noralf@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writing messages larger than the FIFO size results in a hang, rendering
-the machine unusable. This is because the RXD status flag is set on the
-first interrupt which results in bcm2835_drain_rxfifo() stealing bytes
-from the buffer. The controller continues to trigger interrupts waiting
-for the missing bytes, but bcm2835_fill_txfifo() has none to give.
-In this situation wait_for_completion_timeout() apparently is unable to
-stop the madness.
+If an unexpected TXW or RXR interrupt occurs (msg_buf_remaining == 0),
+the driver has no way to fill/drain the FIFO to stop the interrupts.
+In this case the controller has to be disabled and the transfer
+completed to avoid hang.
 
-The BCM2835 ARM Peripherals datasheet has this to say about the flags:
-  TXD: is set when the FIFO has space for at least one byte of data.
-  RXD: is set when the FIFO contains at least one byte of data.
-  TXW: is set during a write transfer and the FIFO is less than full.
-  RXR: is set during a read transfer and the FIFO is or more full.
+(CLKT | ERR) and DONE interrupts are completed in their own paths, and
+the controller is disabled in the transfer function after completion.
+Unite the code paths and do disabling inside the interrupt routine.
 
-Implementing the logic from the downstream i2c-bcm2708 driver solved
-the hang problem.
+Clear interrupt status bits in the united completion path instead of
+trying to do it on every interrupt which isn't necessary.
+Only CLKT, ERR and DONE can be cleared that way.
+
+Add the status value to the error value in case of TXW/RXR errors to
+distinguish them from the other S_LEN error.
 
 Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
 Reviewed-by: Eric Anholt <eric@anholt.net>
-Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/i2c/busses/i2c-bcm2835.c | 22 ++++++++++++++--------
- 1 file changed, 14 insertions(+), 8 deletions(-)
+
+Changes since v3:
+- Add comment about I2C_C_CLEAR on error
+
+ drivers/i2c/busses/i2c-bcm2835.c | 40 +++++++++++++++++++++++++++++++---------
+ 1 file changed, 31 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index d4f3239..f283b71 100644
+index f283b71..d2ba1a4 100644
 --- a/drivers/i2c/busses/i2c-bcm2835.c
 +++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -64,6 +64,7 @@ struct bcm2835_i2c_dev {
- 	int irq;
- 	struct i2c_adapter adapter;
- 	struct completion completion;
-+	struct i2c_msg *curr_msg;
- 	u32 msg_err;
- 	u8 *msg_buf;
- 	size_t msg_buf_remaining;
-@@ -126,14 +127,13 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
- 		return IRQ_HANDLED;
- 	}
- 
--	if (val & BCM2835_I2C_S_RXD) {
--		bcm2835_drain_rxfifo(i2c_dev);
--		if (!(val & BCM2835_I2C_S_DONE))
--			return IRQ_HANDLED;
--	}
+@@ -50,8 +50,6 @@
+ #define BCM2835_I2C_S_CLKT	BIT(9)
+ #define BCM2835_I2C_S_LEN	BIT(10) /* Fake bit for SW error reporting */
+
+-#define BCM2835_I2C_BITMSK_S	0x03FF
 -
- 	if (val & BCM2835_I2C_S_DONE) {
--		if (i2c_dev->msg_buf_remaining)
-+		if (i2c_dev->curr_msg->flags & I2C_M_RD) {
-+			bcm2835_drain_rxfifo(i2c_dev);
-+			val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
-+		}
+ #define BCM2835_I2C_CDIV_MIN	0x0002
+ #define BCM2835_I2C_CDIV_MAX	0xFFFE
+
+@@ -111,20 +109,26 @@ static void bcm2835_drain_rxfifo(struct bcm2835_i2c_dev *i2c_dev)
+ 	}
+ }
+
++/*
++ * Note about I2C_C_CLEAR on error:
++ * The I2C_C_CLEAR on errors will take some time to resolve -- if you were in
++ * non-idle state and I2C_C_READ, it sets an abort_rx flag and runs through
++ * the state machine to send a NACK and a STOP. Since we're setting CLEAR
++ * without I2CEN, that NACK will be hanging around queued up for next time
++ * we start the engine.
++ */
 +
-+		if ((val & BCM2835_I2C_S_RXD) || i2c_dev->msg_buf_remaining)
+ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
+ {
+ 	struct bcm2835_i2c_dev *i2c_dev = data;
+ 	u32 val, err;
+
+ 	val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
+-	val &= BCM2835_I2C_BITMSK_S;
+-	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, val);
+
+ 	err = val & (BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR);
+ 	if (err) {
+ 		i2c_dev->msg_err = err;
+-		complete(&i2c_dev->completion);
+-		return IRQ_HANDLED;
++		goto complete;
+ 	}
+
+ 	if (val & BCM2835_I2C_S_DONE) {
+@@ -137,21 +141,38 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
  			i2c_dev->msg_err = BCM2835_I2C_S_LEN;
  		else
  			i2c_dev->msg_err = 0;
-@@ -141,11 +141,16 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
- 		return IRQ_HANDLED;
+-		complete(&i2c_dev->completion);
+-		return IRQ_HANDLED;
++		goto complete;
  	}
- 
--	if (val & BCM2835_I2C_S_TXD) {
-+	if (val & BCM2835_I2C_S_TXW) {
+
+ 	if (val & BCM2835_I2C_S_TXW) {
++		if (!i2c_dev->msg_buf_remaining) {
++			i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
++			goto complete;
++		}
++
  		bcm2835_fill_txfifo(i2c_dev);
  		return IRQ_HANDLED;
  	}
- 
-+	if (val & BCM2835_I2C_S_RXR) {
-+		bcm2835_drain_rxfifo(i2c_dev);
-+		return IRQ_HANDLED;
-+	}
+
+ 	if (val & BCM2835_I2C_S_RXR) {
++		if (!i2c_dev->msg_buf_remaining) {
++			i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
++			goto complete;
++		}
 +
+ 		bcm2835_drain_rxfifo(i2c_dev);
+ 		return IRQ_HANDLED;
+ 	}
+
  	return IRQ_NONE;
++
++complete:
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, BCM2835_I2C_S_CLKT |
++			   BCM2835_I2C_S_ERR | BCM2835_I2C_S_DONE);
++	complete(&i2c_dev->completion);
++
++	return IRQ_HANDLED;
  }
- 
-@@ -155,6 +160,7 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
- 	u32 c;
- 	unsigned long time_left;
- 
-+	i2c_dev->curr_msg = msg;
- 	i2c_dev->msg_buf = msg->buf;
- 	i2c_dev->msg_buf_remaining = msg->len;
- 	reinit_completion(&i2c_dev->completion);
--- 
+
+ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
+@@ -181,8 +202,9 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
+
+ 	time_left = wait_for_completion_timeout(&i2c_dev->completion,
+ 						BCM2835_I2C_TIMEOUT);
+-	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
+ 	if (!time_left) {
++		bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C,
++				   BCM2835_I2C_C_CLEAR);
+ 		dev_err(i2c_dev->dev, "i2c transfer timed out\n");
+ 		return -ETIMEDOUT;
+ 	}
+--
 2.8.2
