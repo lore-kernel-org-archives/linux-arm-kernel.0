@@ -1,62 +1,36 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon,  3 Oct 2016 17:45:19 +0200
-Subject: [PATCH v3] drm: tilcdc: add a da850-specific compatible string
-Message-ID: <1475509519-29516-1-git-send-email-bgolaszewski@baylibre.com>
+Date: Mon, 3 Oct 2016 17:46:51 +0200
+Subject: [PATCH v2] drm: tilcdc: add a da850-specific compatible string
+In-Reply-To: <12dad169-de04-ce7d-0422-94c57074c839@ti.com>
+References: <1475243564-15765-1-git-send-email-bgolaszewski@baylibre.com>
+ <12dad169-de04-ce7d-0422-94c57074c839@ti.com>
+Message-ID: <CAMpxmJU2vd+R-HBY7-LcSM02g8XdVqVCs1=cGCj5+jt6ii7ndg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to some potential tweaks for the da850 LCDC (for example: the
-required memory bandwith settings) we need a separate compatible
-for the IP present on the da850 boards.
+2016-10-01 11:30 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
+> On Friday 30 September 2016 07:22 PM, Bartosz Golaszewski wrote:
+>> Due to some potential tweaks for the da850 LCDC (for example: the
+>> required memory bandwith settings) we need a separate compatible
+>> for the IP present on the da850 boards.
+>>
+>
+> This documentation does not help much :( It should be on the lines of:
+>
+> compatible: value should be "ti,am33xx-tilcdc" for AM335x based boards
+>             value should be "ti,da850-tilcdc" for DA850/AM18x/OMAP-L138
+>             based boards
+>
+> There are many existing examples of the way compatible strings are
+> documented. You can take a look at them too. Also, since you are
+> introducing a new device-tree compatible, please keep the devicetree
+> list and maintainers in CC too. I don't think it shows up in
+> get_maintainer.pl, so you will have to remember to do it.
+>
 
-Suggested-by: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
-v1 -> v2:
-- added the new compatible to the bindings documentation
+Hi Sekhar,
 
-v2 -> v3:
-- made the documentation more detailed
+sorry for that, hope v3 is good.
 
- Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt | 6 ++++--
- drivers/gpu/drm/tilcdc/tilcdc_drv.c                         | 1 +
- 2 files changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt b/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
-index a83abd7..6fddb4f 100644
---- a/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
-+++ b/Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt
-@@ -1,7 +1,9 @@
- Device-Tree bindings for tilcdc DRM driver
- 
- Required properties:
-- - compatible: value should be "ti,am33xx-tilcdc".
-+ - compatible: value should be one of the following:
-+    - "ti,am33xx-tilcdc" for AM335x based boards
-+    - "ti,da850-tilcdc" for DA850/AM18x/OMAP-L138 based boards
-  - interrupts: the interrupt number
-  - reg: base address and size of the LCDC device
- 
-@@ -51,7 +53,7 @@ Optional nodes:
- Example:
- 
- 	fb: fb at 4830e000 {
--		compatible = "ti,am33xx-tilcdc";
-+		compatible = "ti,am33xx-tilcdc", "ti,da850-tilcdc";
- 		reg = <0x4830e000 0x1000>;
- 		interrupt-parent = <&intc>;
- 		interrupts = <36>;
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_drv.c b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-index a694977..231f2c7 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_drv.c
-@@ -723,6 +723,7 @@ static int tilcdc_pdev_remove(struct platform_device *pdev)
- 
- static struct of_device_id tilcdc_of_match[] = {
- 		{ .compatible = "ti,am33xx-tilcdc", },
-+		{ .compatible = "ti,da850-tilcdc", },
- 		{ },
- };
- MODULE_DEVICE_TABLE(of, tilcdc_of_match);
--- 
-2.9.3
+Thanks,
+Bartosz
