@@ -1,149 +1,262 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  3 Oct 2016 10:09:09 +0200
-Subject: [PATCH v3 5/9] clk: sunxi-ng: Implement minimum for multipliers
+Date: Mon,  3 Oct 2016 10:09:05 +0200
+Subject: [PATCH v3 1/9] clk: sunxi-ng: Rename the internal structures
 In-Reply-To: <20161003080913.24197-1-maxime.ripard@free-electrons.com>
 References: <20161003080913.24197-1-maxime.ripard@free-electrons.com>
-Message-ID: <20161003080913.24197-6-maxime.ripard@free-electrons.com>
+Message-ID: <20161003080913.24197-2-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the CCU drivers to specify a multiplier for their clocks.
+Rename the structures meant to be embedded in other structures to make it
+consistent with the mux structure name
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu_mult.c |  2 +-
- drivers/clk/sunxi-ng/ccu_mult.h | 13 +++++++++----
- drivers/clk/sunxi-ng/ccu_nk.c   |  8 ++++----
- drivers/clk/sunxi-ng/ccu_nkm.c  |  8 ++++----
- drivers/clk/sunxi-ng/ccu_nkmp.c |  4 ++--
- drivers/clk/sunxi-ng/ccu_nm.c   |  2 +-
- 6 files changed, 21 insertions(+), 16 deletions(-)
+ drivers/clk/sunxi-ng/ccu_div.h  |  6 +++---
+ drivers/clk/sunxi-ng/ccu_frac.c | 12 ++++++------
+ drivers/clk/sunxi-ng/ccu_frac.h | 14 +++++++-------
+ drivers/clk/sunxi-ng/ccu_mp.h   |  4 ++--
+ drivers/clk/sunxi-ng/ccu_mult.h |  4 ++--
+ drivers/clk/sunxi-ng/ccu_nk.h   |  4 ++--
+ drivers/clk/sunxi-ng/ccu_nkm.h  |  6 +++---
+ drivers/clk/sunxi-ng/ccu_nkmp.h |  8 ++++----
+ drivers/clk/sunxi-ng/ccu_nm.h   |  6 +++---
+ 9 files changed, 32 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
-index 6a02ffee5386..678b6cb49f01 100644
---- a/drivers/clk/sunxi-ng/ccu_mult.c
-+++ b/drivers/clk/sunxi-ng/ccu_mult.c
-@@ -105,7 +105,7 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
- 	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
- 						&parent_rate);
+diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+index 34c338832c0d..06540f7cf41c 100644
+--- a/drivers/clk/sunxi-ng/ccu_div.h
++++ b/drivers/clk/sunxi-ng/ccu_div.h
+@@ -20,7 +20,7 @@
+ #include "ccu_mux.h"
  
--	_cm.min = 1;
-+	_cm.min = cm->mult.min;
- 	_cm.max = 1 << cm->mult.width;
- 	ccu_mult_find_best(parent_rate, rate, &_cm);
+ /**
+- * struct _ccu_div - Internal divider description
++ * struct ccu_div_internal - Internal divider description
+  * @shift: Bit offset of the divider in its register
+  * @width: Width of the divider field in its register
+  * @max: Maximum value allowed for that divider. This is the
+@@ -36,7 +36,7 @@
+  * It is basically a wrapper around the clk_divider functions
+  * arguments.
+  */
+-struct _ccu_div {
++struct ccu_div_internal {
+ 	u8			shift;
+ 	u8			width;
  
-diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
-index 113780b7558e..c1a2134bdc71 100644
---- a/drivers/clk/sunxi-ng/ccu_mult.h
-+++ b/drivers/clk/sunxi-ng/ccu_mult.h
-@@ -7,14 +7,19 @@
- struct ccu_mult_internal {
- 	u8	shift;
- 	u8	width;
-+	u8	min;
+@@ -78,7 +78,7 @@ struct _ccu_div {
+ struct ccu_div {
+ 	u32			enable;
+ 
+-	struct _ccu_div		div;
++	struct ccu_div_internal		div;
+ 	struct ccu_mux_internal	mux;
+ 	struct ccu_common	common;
  };
+diff --git a/drivers/clk/sunxi-ng/ccu_frac.c b/drivers/clk/sunxi-ng/ccu_frac.c
+index 5c4b10cd15b5..8b5eb7756bf7 100644
+--- a/drivers/clk/sunxi-ng/ccu_frac.c
++++ b/drivers/clk/sunxi-ng/ccu_frac.c
+@@ -14,7 +14,7 @@
+ #include "ccu_frac.h"
  
--#define _SUNXI_CCU_MULT(_shift, _width)		\
--	{					\
--		.shift	= _shift,		\
--		.width	= _width,		\
-+#define _SUNXI_CCU_MULT_MIN(_shift, _width, _min)	\
-+	{						\
-+		.shift	= _shift,			\
-+		.width	= _width,			\
-+		.min	= _min,				\
+ bool ccu_frac_helper_is_enabled(struct ccu_common *common,
+-				struct _ccu_frac *cf)
++				struct ccu_frac_internal *cf)
+ {
+ 	if (!(common->features & CCU_FEATURE_FRACTIONAL))
+ 		return false;
+@@ -23,7 +23,7 @@ bool ccu_frac_helper_is_enabled(struct ccu_common *common,
+ }
+ 
+ void ccu_frac_helper_enable(struct ccu_common *common,
+-			    struct _ccu_frac *cf)
++			    struct ccu_frac_internal *cf)
+ {
+ 	unsigned long flags;
+ 	u32 reg;
+@@ -38,7 +38,7 @@ void ccu_frac_helper_enable(struct ccu_common *common,
+ }
+ 
+ void ccu_frac_helper_disable(struct ccu_common *common,
+-			     struct _ccu_frac *cf)
++			     struct ccu_frac_internal *cf)
+ {
+ 	unsigned long flags;
+ 	u32 reg;
+@@ -53,7 +53,7 @@ void ccu_frac_helper_disable(struct ccu_common *common,
+ }
+ 
+ bool ccu_frac_helper_has_rate(struct ccu_common *common,
+-			      struct _ccu_frac *cf,
++			      struct ccu_frac_internal *cf,
+ 			      unsigned long rate)
+ {
+ 	if (!(common->features & CCU_FEATURE_FRACTIONAL))
+@@ -63,7 +63,7 @@ bool ccu_frac_helper_has_rate(struct ccu_common *common,
+ }
+ 
+ unsigned long ccu_frac_helper_read_rate(struct ccu_common *common,
+-					struct _ccu_frac *cf)
++					struct ccu_frac_internal *cf)
+ {
+ 	u32 reg;
+ 
+@@ -84,7 +84,7 @@ unsigned long ccu_frac_helper_read_rate(struct ccu_common *common,
+ }
+ 
+ int ccu_frac_helper_set_rate(struct ccu_common *common,
+-			     struct _ccu_frac *cf,
++			     struct ccu_frac_internal *cf,
+ 			     unsigned long rate)
+ {
+ 	unsigned long flags;
+diff --git a/drivers/clk/sunxi-ng/ccu_frac.h b/drivers/clk/sunxi-ng/ccu_frac.h
+index e4c670b1cdfe..7b1ee380156f 100644
+--- a/drivers/clk/sunxi-ng/ccu_frac.h
++++ b/drivers/clk/sunxi-ng/ccu_frac.h
+@@ -18,7 +18,7 @@
+ 
+ #include "ccu_common.h"
+ 
+-struct _ccu_frac {
++struct ccu_frac_internal {
+ 	u32		enable;
+ 	u32		select;
+ 
+@@ -33,21 +33,21 @@ struct _ccu_frac {
  	}
  
-+#define _SUNXI_CCU_MULT(_shift, _width)		\
-+	_SUNXI_CCU_MULT_MIN(_shift, _width, 1)
-+
+ bool ccu_frac_helper_is_enabled(struct ccu_common *common,
+-				struct _ccu_frac *cf);
++				struct ccu_frac_internal *cf);
+ void ccu_frac_helper_enable(struct ccu_common *common,
+-			    struct _ccu_frac *cf);
++			    struct ccu_frac_internal *cf);
+ void ccu_frac_helper_disable(struct ccu_common *common,
+-			     struct _ccu_frac *cf);
++			     struct ccu_frac_internal *cf);
+ 
+ bool ccu_frac_helper_has_rate(struct ccu_common *common,
+-			      struct _ccu_frac *cf,
++			      struct ccu_frac_internal *cf,
+ 			      unsigned long rate);
+ 
+ unsigned long ccu_frac_helper_read_rate(struct ccu_common *common,
+-					struct _ccu_frac *cf);
++					struct ccu_frac_internal *cf);
+ 
+ int ccu_frac_helper_set_rate(struct ccu_common *common,
+-			     struct _ccu_frac *cf,
++			     struct ccu_frac_internal *cf,
+ 			     unsigned long rate);
+ 
+ #endif /* _CCU_FRAC_H_ */
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.h b/drivers/clk/sunxi-ng/ccu_mp.h
+index edf9215ea8cc..915625e97d98 100644
+--- a/drivers/clk/sunxi-ng/ccu_mp.h
++++ b/drivers/clk/sunxi-ng/ccu_mp.h
+@@ -29,8 +29,8 @@
+ struct ccu_mp {
+ 	u32			enable;
+ 
+-	struct _ccu_div		m;
+-	struct _ccu_div		p;
++	struct ccu_div_internal		m;
++	struct ccu_div_internal		p;
+ 	struct ccu_mux_internal	mux;
+ 	struct ccu_common	common;
+ };
+diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
+index 5d2c8dc14073..113780b7558e 100644
+--- a/drivers/clk/sunxi-ng/ccu_mult.h
++++ b/drivers/clk/sunxi-ng/ccu_mult.h
+@@ -4,7 +4,7 @@
+ #include "ccu_common.h"
+ #include "ccu_mux.h"
+ 
+-struct _ccu_mult {
++struct ccu_mult_internal {
+ 	u8	shift;
+ 	u8	width;
+ };
+@@ -18,7 +18,7 @@ struct _ccu_mult {
  struct ccu_mult {
  	u32			enable;
  
-diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
-index a42d870ba0ef..eaf0fdf78d2b 100644
---- a/drivers/clk/sunxi-ng/ccu_nk.c
-+++ b/drivers/clk/sunxi-ng/ccu_nk.c
-@@ -97,9 +97,9 @@ static long ccu_nk_round_rate(struct clk_hw *hw, unsigned long rate,
- 	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 		rate *= nk->fixed_post_div;
+-	struct _ccu_mult	mult;
++	struct ccu_mult_internal	mult;
+ 	struct ccu_mux_internal	mux;
+ 	struct ccu_common	common;
+ };
+diff --git a/drivers/clk/sunxi-ng/ccu_nk.h b/drivers/clk/sunxi-ng/ccu_nk.h
+index 4b52da0c29fe..437836b80696 100644
+--- a/drivers/clk/sunxi-ng/ccu_nk.h
++++ b/drivers/clk/sunxi-ng/ccu_nk.h
+@@ -30,8 +30,8 @@ struct ccu_nk {
+ 	u32			enable;
+ 	u32			lock;
  
--	_nk.min_n = 1;
-+	_nk.min_n = nk->n.min;
- 	_nk.max_n = 1 << nk->n.width;
--	_nk.min_k = 1;
-+	_nk.min_k = nk->k.min;
- 	_nk.max_k = 1 << nk->k.width;
+-	struct _ccu_mult	n;
+-	struct _ccu_mult	k;
++	struct ccu_mult_internal	n;
++	struct ccu_mult_internal	k;
  
- 	ccu_nk_find_best(*parent_rate, rate, &_nk);
-@@ -122,9 +122,9 @@ static int ccu_nk_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 		rate = rate * nk->fixed_post_div;
+ 	unsigned int		fixed_post_div;
  
--	_nk.min_n = 1;
-+	_nk.min_n = nk->n.min;
- 	_nk.max_n = 1 << nk->n.width;
--	_nk.min_k = 1;
-+	_nk.min_k = nk->k.min;
- 	_nk.max_k = 1 << nk->k.width;
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.h b/drivers/clk/sunxi-ng/ccu_nkm.h
+index 35493fddd8ab..34580894f4d1 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkm.h
++++ b/drivers/clk/sunxi-ng/ccu_nkm.h
+@@ -29,9 +29,9 @@ struct ccu_nkm {
+ 	u32			enable;
+ 	u32			lock;
  
- 	ccu_nk_find_best(parent_rate, rate, &_nk);
-diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-index b2a5fccf2f8c..715b49211ddb 100644
---- a/drivers/clk/sunxi-ng/ccu_nkm.c
-+++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-@@ -100,9 +100,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
- 	struct ccu_nkm *nkm = data;
- 	struct _ccu_nkm _nkm;
+-	struct _ccu_mult	n;
+-	struct _ccu_mult	k;
+-	struct _ccu_div		m;
++	struct ccu_mult_internal	n;
++	struct ccu_mult_internal	k;
++	struct ccu_div_internal		m;
+ 	struct ccu_mux_internal	mux;
  
--	_nkm.min_n = 1;
-+	_nkm.min_n = nkm->n.min;
- 	_nkm.max_n = 1 << nkm->n.width;
--	_nkm.min_k = 1;
-+	_nkm.min_n = nkm->k.min;
- 	_nkm.max_k = 1 << nkm->k.width;
- 	_nkm.min_m = 1;
- 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
-@@ -129,9 +129,9 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
- 	unsigned long flags;
- 	u32 reg;
+ 	struct ccu_common	common;
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.h b/drivers/clk/sunxi-ng/ccu_nkmp.h
+index 5adb0c92a614..a82facbc6144 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.h
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.h
+@@ -29,10 +29,10 @@ struct ccu_nkmp {
+ 	u32			enable;
+ 	u32			lock;
  
--	_nkm.min_n = 1;
-+	_nkm.min_n = nkm->n.min;
- 	_nkm.max_n = 1 << nkm->n.width;
--	_nkm.min_k = 1;
-+	_nkm.min_n = nkm->k.min;
- 	_nkm.max_k = 1 << nkm->k.width;
- 	_nkm.min_m = 1;
- 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
-diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-index 2c1398192e48..7968e0bac5db 100644
---- a/drivers/clk/sunxi-ng/ccu_nkmp.c
-+++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-@@ -107,9 +107,9 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
- 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
- 	struct _ccu_nkmp _nkmp;
+-	struct _ccu_mult	n;
+-	struct _ccu_mult	k;
+-	struct _ccu_div		m;
+-	struct _ccu_div		p;
++	struct ccu_mult_internal	n;
++	struct ccu_mult_internal	k;
++	struct ccu_div_internal		m;
++	struct ccu_div_internal		p;
  
--	_nkmp.min_n = 1;
-+	_nkmp.min_n = nkmp->n.min;
- 	_nkmp.max_n = 1 << nkmp->n.width;
--	_nkmp.min_k = 1;
-+	_nkmp.min_n = nkmp->k.min;
- 	_nkmp.max_k = 1 << nkmp->k.width;
- 	_nkmp.min_m = 1;
- 	_nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
-diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
-index 2a190bc032a9..b1f3f0e8899d 100644
---- a/drivers/clk/sunxi-ng/ccu_nm.c
-+++ b/drivers/clk/sunxi-ng/ccu_nm.c
-@@ -93,7 +93,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
- 	struct ccu_nm *nm = hw_to_ccu_nm(hw);
- 	struct _ccu_nm _nm;
+ 	struct ccu_common	common;
+ };
+diff --git a/drivers/clk/sunxi-ng/ccu_nm.h b/drivers/clk/sunxi-ng/ccu_nm.h
+index 0b7bcd33a2df..e87fd186da78 100644
+--- a/drivers/clk/sunxi-ng/ccu_nm.h
++++ b/drivers/clk/sunxi-ng/ccu_nm.h
+@@ -30,9 +30,9 @@ struct ccu_nm {
+ 	u32			enable;
+ 	u32			lock;
  
--	_nm.min_n = 1;
-+	_nm.min_n = nm->n.min;
- 	_nm.max_n = 1 << nm->n.width;
- 	_nm.min_m = 1;
- 	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
+-	struct _ccu_mult	n;
+-	struct _ccu_div		m;
+-	struct _ccu_frac	frac;
++	struct ccu_mult_internal	n;
++	struct ccu_div_internal		m;
++	struct ccu_frac_internal	frac;
+ 
+ 	struct ccu_common	common;
+ };
 -- 
 2.9.3
