@@ -1,69 +1,42 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Mon, 3 Oct 2016 16:43:41 +0530
-Subject: [PATCH 2/2] drm/rockchip: analogix_dp: Refuse to enable PSR if
- panel doesn't support it
-In-Reply-To: <CAOw6vbL1fDpPbFeePEFqYZ+i0sbbsB+vu7fCC8U88HAj-1D2Ag@mail.gmail.com>
-References: <1474639600-30090-1-git-send-email-tomeu.vizoso@collabora.com>
- <1474639600-30090-2-git-send-email-tomeu.vizoso@collabora.com>
- <CAOw6vbL1fDpPbFeePEFqYZ+i0sbbsB+vu7fCC8U88HAj-1D2Ag@mail.gmail.com>
-Message-ID: <de7a4a12-6e52-92c8-7c4c-fc5ec4533eeb@codeaurora.org>
+From: venkatesh.vivekanandan@broadcom.com (Venkatesh Vivekanandan)
+Date: Mon, 3 Oct 2016 17:06:15 +0530
+Subject: Coresight ETF trace dump failed in Juno r1 with 4.8-rc8
+Message-ID: <CAGhh56F-VWCCy82msQ8CimZ4a0a2h=tqR2qv1KcfeyuQXo=R1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi All,
 
+I am trying to collect ETF trace from Juno R1 and could see "cpu
+stall" while dumping the trace. Attached is the log of sequence
+followed. Was trying to collect the trace data from hardware and see
+if it is any valid data. Am I missing anything here?.
 
-On 09/27/2016 06:58 PM, Sean Paul wrote:
-> On Fri, Sep 23, 2016 at 10:06 AM, Tomeu Vizoso
-> <tomeu.vizoso@collabora.com> wrote:
->> There's no point in enabling PSR when the panel doesn't support it.
->>
->> This also avoids a problem when PSR gets enabled when a CRTC is being
->> disabled, because sometimes in that situation the DSP_HOLD_VALID_INTR
->> interrupt on which we wait will never arrive. This was observed on
->> RK3288 with a panel without PSR (veyron-jaq Chromebook).
->>
->> It's very easy to reproduce by running the kms_rmfb test in IGT a few
->> times.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->
-> Thanks for digging into this.
->
-> Reviewed-by: Sean Paul <seanpaul@chromium.org>
->
+cenaro-test [rc=0]# echo 0 > /sys/bus/coresight/devices/22140000.etm/enable_sour
+[   89.609083] coresight-etm4x 22140000.etm: ETM tracing disabled
+[   89.614892] coresight-funnel 220c0000.cluster0-funnel: FUNNEL
+inport 1 disabled
+[   89.622140] coresight-funnel 20040000.main-funnel: FUNNEL inport 0 disabled
+[   89.629057] coresight-tmc 20010000.etf: TMC-ETB/ETF disabled
+linaro-test [rc=0]# dd if=/dev/20010000.etf of=/cstrace.bin bs=1
+[  128.876846] INFO: rcu_preempt detected stalls on CPUs/tasks:
+[  128.882457]  3-...: (65 GPs behind) idle=a3f/140000000000000/0
+softirq=314/315 fqs=2288
+[  128.890462]  (detected by 1, t=5252 jiffies, g=0, c=-1, q=19)
+[  128.896151] Task dump for CPU 3:
+[  128.899340] dd              R  running task        0  1237   1234 0x00000002
+[  128.906322] Call trace:
+[  128.908745] [<ffff000008085560>] __switch_to+0xc8/0xd4
+[  128.913826] [<0000000000020000>] 0x20000
 
-queued to drm-misc.
+This happens consistently with every boot.
 
-Archit
-
-
->
->
->> Cc: Sean Paul <seanpaul@chromium.org>
->> Cc: Yakir Yang <ykk@rock-chips.com>
->> Cc: Archit Taneja <architt@codeaurora.org>
->> ---
->>  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
->> index e83be157cc2a..8548e8271639 100644
->> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
->> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
->> @@ -85,6 +85,9 @@ static void analogix_dp_psr_set(struct drm_encoder *encoder, bool enabled)
->>         struct rockchip_dp_device *dp = to_dp(encoder);
->>         unsigned long flags;
->>
->> +       if (!analogix_dp_psr_supported(dp->dev))
->> +               return;
->> +
->>         dev_dbg(dp->dev, "%s PSR...\n", enabled ? "Entry" : "Exit");
->>
->>         spin_lock_irqsave(&dp->psr_lock, flags);
->> --
->> 2.7.4
->>
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+Venkatesh.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: r1-trace-log
+Type: application/octet-stream
+Size: 4121 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161003/34981cfd/attachment-0001.obj>
