@@ -1,49 +1,121 @@
 From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Mon,  3 Oct 2016 22:06:11 +0200
-Subject: [PATCH v4 4/7] i2c: bcm2835: Can't support I2C_M_IGNORE_NAK
+Date: Mon,  3 Oct 2016 22:06:14 +0200
+Subject: [PATCH v4 7/7] i2c: bcm2835: Add support for dynamic clock
 In-Reply-To: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
 References: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
-Message-ID: <1475525174-28604-5-git-send-email-noralf@tronnes.org>
+Message-ID: <1475525174-28604-8-git-send-email-noralf@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The controller can't support this flag, so remove it.
-
-Documentation/i2c/i2c-protocol states that all of the message is sent:
-
-I2C_M_IGNORE_NAK:
-    Normally message is interrupted immediately if there is [NA] from the
-    client. Setting this flag treats any [NA] as [A], and all of
-    message is sent.
-
->From the BCM2835 ARM Peripherals datasheet:
-
-    The ERR field is set when the slave fails to acknowledge either
-    its address or a data byte written to it.
-
-So when the controller doesn't receive an ack, it sets ERR and raises
-an interrupt. In other words, the whole message is not sent.
+Support a dynamic clock by reading the frequency and setting the
+divisor in the transfer function instead of during probe.
 
 Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
-Reviewed-by: Eric Anholt <eric@anholt.net>
+Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/i2c/busses/i2c-bcm2835.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/i2c/busses/i2c-bcm2835.c | 51 +++++++++++++++++++++++++---------------
+ 1 file changed, 32 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index 54d510a..565ef69 100644
+index d2085dd..c3436f6 100644
 --- a/drivers/i2c/busses/i2c-bcm2835.c
 +++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -212,10 +212,6 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
- 	if (likely(!i2c_dev->msg_err))
- 		return 0;
+@@ -58,6 +58,7 @@ struct bcm2835_i2c_dev {
+ 	void __iomem *regs;
+ 	struct clk *clk;
+ 	int irq;
++	u32 bus_clk_rate;
+ 	struct i2c_adapter adapter;
+ 	struct completion completion;
+ 	struct i2c_msg *curr_msg;
+@@ -78,6 +79,30 @@ static inline u32 bcm2835_i2c_readl(struct bcm2835_i2c_dev *i2c_dev, u32 reg)
+ 	return readl(i2c_dev->regs + reg);
+ }
  
--	if ((i2c_dev->msg_err & BCM2835_I2C_S_ERR) &&
--	    (msg->flags & I2C_M_IGNORE_NAK))
--		return 0;
++static int bcm2835_i2c_set_divider(struct bcm2835_i2c_dev *i2c_dev)
++{
++	u32 divider;
++
++	divider = DIV_ROUND_UP(clk_get_rate(i2c_dev->clk),
++			       i2c_dev->bus_clk_rate);
++	/*
++	 * Per the datasheet, the register is always interpreted as an even
++	 * number, by rounding down. In other words, the LSB is ignored. So,
++	 * if the LSB is set, increment the divider to avoid any issue.
++	 */
++	if (divider & 1)
++		divider++;
++	if ((divider < BCM2835_I2C_CDIV_MIN) ||
++	    (divider > BCM2835_I2C_CDIV_MAX)) {
++		dev_err_ratelimited(i2c_dev->dev, "Invalid clock-frequency\n");
++		return -EINVAL;
++	}
++
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DIV, divider);
++
++	return 0;
++}
++
+ static void bcm2835_fill_txfifo(struct bcm2835_i2c_dev *i2c_dev)
+ {
+ 	u32 val;
+@@ -224,7 +249,7 @@ static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
+ {
+ 	struct bcm2835_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
+ 	unsigned long time_left;
+-	int i;
++	int i, ret;
+ 
+ 	for (i = 0; i < (num - 1); i++)
+ 		if (msgs[i].flags & I2C_M_RD) {
+@@ -233,6 +258,10 @@ static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
+ 			return -EOPNOTSUPP;
+ 		}
+ 
++	ret = bcm2835_i2c_set_divider(i2c_dev);
++	if (ret)
++		return ret;
++
+ 	i2c_dev->curr_msg = msgs;
+ 	i2c_dev->num_msgs = num;
+ 	reinit_completion(&i2c_dev->completion);
+@@ -282,7 +311,6 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
+ {
+ 	struct bcm2835_i2c_dev *i2c_dev;
+ 	struct resource *mem, *irq;
+-	u32 bus_clk_rate, divider;
+ 	int ret;
+ 	struct i2c_adapter *adap;
+ 
+@@ -306,27 +334,12 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	ret = of_property_read_u32(pdev->dev.of_node, "clock-frequency",
+-				   &bus_clk_rate);
++				   &i2c_dev->bus_clk_rate);
+ 	if (ret < 0) {
+ 		dev_warn(&pdev->dev,
+ 			 "Could not read clock-frequency property\n");
+-		bus_clk_rate = 100000;
+-	}
 -
- 	dev_dbg(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
+-	divider = DIV_ROUND_UP(clk_get_rate(i2c_dev->clk), bus_clk_rate);
+-	/*
+-	 * Per the datasheet, the register is always interpreted as an even
+-	 * number, by rounding down. In other words, the LSB is ignored. So,
+-	 * if the LSB is set, increment the divider to avoid any issue.
+-	 */
+-	if (divider & 1)
+-		divider++;
+-	if ((divider < BCM2835_I2C_CDIV_MIN) ||
+-	    (divider > BCM2835_I2C_CDIV_MAX)) {
+-		dev_err(&pdev->dev, "Invalid clock-frequency\n");
+-		return -ENODEV;
++		i2c_dev->bus_clk_rate = 100000;
+ 	}
+-	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DIV, divider);
  
- 	if (i2c_dev->msg_err & BCM2835_I2C_S_ERR)
+ 	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+ 	if (!irq) {
 -- 
 2.8.2
