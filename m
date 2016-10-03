@@ -1,32 +1,53 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon,  3 Oct 2016 11:52:08 -0700
-Subject: [PATCH 3/4] ARM: bcm2835: Add #define for VCHIQ property message.
+Date: Mon,  3 Oct 2016 11:52:07 -0700
+Subject: [PATCH 2/4] staging/vchi: Update for rename of page_cache_release()
+ to put_page().
 In-Reply-To: <20161003185209.27733-1-eric@anholt.net>
 References: <20161003185209.27733-1-eric@anholt.net>
-Message-ID: <20161003185209.27733-4-eric@anholt.net>
+Message-ID: <20161003185209.27733-3-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This comes from the downstream tree and is needed for the new VCHIQ
-driver in staging.
-
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- include/soc/bcm2835/raspberrypi-firmware.h | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c | 4 ++--
+ drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c      | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
-index 3fb357193f09..a06baffdf580 100644
---- a/include/soc/bcm2835/raspberrypi-firmware.h
-+++ b/include/soc/bcm2835/raspberrypi-firmware.h
-@@ -109,6 +109,8 @@ enum rpi_firmware_property_tag {
- 	RPI_FIRMWARE_FRAMEBUFFER_SET_OVERSCAN =               0x0004800a,
- 	RPI_FIRMWARE_FRAMEBUFFER_SET_PALETTE =                0x0004800b,
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+index 18f268ee6d4b..4cb5bff23728 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+@@ -439,7 +439,7 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
+ 			while (actual_pages > 0)
+ 			{
+ 				actual_pages--;
+-				page_cache_release(pages[actual_pages]);
++				put_page(pages[actual_pages]);
+ 			}
+ 			kfree(pagelist);
+ 			if (actual_pages == 0)
+@@ -578,7 +578,7 @@ free_pagelist(PAGELIST_T *pagelist, int actual)
+ 				offset = 0;
+ 				set_page_dirty(pg);
+ 			}
+-			page_cache_release(pg);
++			put_page(pg);
+ 		}
+ 	}
  
-+	RPI_FIRMWARE_VCHIQ_INIT =                             0x00048010,
-+
- 	RPI_FIRMWARE_GET_COMMAND_LINE =                       0x00050001,
- 	RPI_FIRMWARE_GET_DMA_CHANNELS =                       0x00060001,
- };
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index 56c2c48f6801..47df1af2219d 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -1512,7 +1512,7 @@ dump_phys_mem(void *virt_addr, uint32_t num_bytes)
+ 		kunmap(page);
+ 
+ 	for (page_idx = 0; page_idx < num_pages; page_idx++)
+-		page_cache_release(pages[page_idx]);
++		put_page(pages[page_idx]);
+ 
+ 	kfree(pages);
+ }
 -- 
 2.9.3
