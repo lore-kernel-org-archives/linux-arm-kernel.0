@@ -1,35 +1,95 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 3 Oct 2016 20:51:31 +0100
-Subject: [PATCH -next v2] arm*/efi: efi_init error handling fix
-In-Reply-To: <1474371593-10250-1-git-send-email-xieyisheng1@huawei.com>
-References: <1474371593-10250-1-git-send-email-xieyisheng1@huawei.com>
-Message-ID: <20161003195131.GK16071@codeblueprint.co.uk>
+From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
+Date: Mon,  3 Oct 2016 22:06:08 +0200
+Subject: [PATCH v4 1/7] i2c: bcm2835: Fix hang for writing messages larger
+ than 16 bytes
+In-Reply-To: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
+References: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
+Message-ID: <1475525174-28604-2-git-send-email-noralf@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Sep, at 07:39:53PM, Yisheng Xie wrote:
-> There's an early memmap leak in efi_init error path, fix it.
-> 
-> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
-> ---
->  drivers/firmware/efi/arm-init.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index 9f8d996..7c2fe57 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -245,8 +245,10 @@ void __init efi_init(void)
->  	     "Unexpected EFI_MEMORY_DESCRIPTOR version %ld",
->  	      efi.memmap.desc_version);
->  
-> -	if (uefi_init() < 0)
-> +	if (uefi_init() < 0) {
-> +		efi_memmap_unmap();
->  		return;
-> +	}
->  
->  	reserve_regions();
->  	efi_memattr_init();
+Writing messages larger than the FIFO size results in a hang, rendering
+the machine unusable. This is because the RXD status flag is set on the
+first interrupt which results in bcm2835_drain_rxfifo() stealing bytes
+from the buffer. The controller continues to trigger interrupts waiting
+for the missing bytes, but bcm2835_fill_txfifo() has none to give.
+In this situation wait_for_completion_timeout() apparently is unable to
+stop the madness.
 
-Thanks, applied to 'next'.
+The BCM2835 ARM Peripherals datasheet has this to say about the flags:
+  TXD: is set when the FIFO has space for at least one byte of data.
+  RXD: is set when the FIFO contains at least one byte of data.
+  TXW: is set during a write transfer and the FIFO is less than full.
+  RXR: is set during a read transfer and the FIFO is or more full.
+
+Implementing the logic from the downstream i2c-bcm2708 driver solved
+the hang problem.
+
+Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
+---
+ drivers/i2c/busses/i2c-bcm2835.c | 22 ++++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
+index d4f3239..f283b71 100644
+--- a/drivers/i2c/busses/i2c-bcm2835.c
++++ b/drivers/i2c/busses/i2c-bcm2835.c
+@@ -64,6 +64,7 @@ struct bcm2835_i2c_dev {
+ 	int irq;
+ 	struct i2c_adapter adapter;
+ 	struct completion completion;
++	struct i2c_msg *curr_msg;
+ 	u32 msg_err;
+ 	u8 *msg_buf;
+ 	size_t msg_buf_remaining;
+@@ -126,14 +127,13 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
+ 		return IRQ_HANDLED;
+ 	}
+ 
+-	if (val & BCM2835_I2C_S_RXD) {
+-		bcm2835_drain_rxfifo(i2c_dev);
+-		if (!(val & BCM2835_I2C_S_DONE))
+-			return IRQ_HANDLED;
+-	}
+-
+ 	if (val & BCM2835_I2C_S_DONE) {
+-		if (i2c_dev->msg_buf_remaining)
++		if (i2c_dev->curr_msg->flags & I2C_M_RD) {
++			bcm2835_drain_rxfifo(i2c_dev);
++			val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
++		}
++
++		if ((val & BCM2835_I2C_S_RXD) || i2c_dev->msg_buf_remaining)
+ 			i2c_dev->msg_err = BCM2835_I2C_S_LEN;
+ 		else
+ 			i2c_dev->msg_err = 0;
+@@ -141,11 +141,16 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
+ 		return IRQ_HANDLED;
+ 	}
+ 
+-	if (val & BCM2835_I2C_S_TXD) {
++	if (val & BCM2835_I2C_S_TXW) {
+ 		bcm2835_fill_txfifo(i2c_dev);
+ 		return IRQ_HANDLED;
+ 	}
+ 
++	if (val & BCM2835_I2C_S_RXR) {
++		bcm2835_drain_rxfifo(i2c_dev);
++		return IRQ_HANDLED;
++	}
++
+ 	return IRQ_NONE;
+ }
+ 
+@@ -155,6 +160,7 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
+ 	u32 c;
+ 	unsigned long time_left;
+ 
++	i2c_dev->curr_msg = msg;
+ 	i2c_dev->msg_buf = msg->buf;
+ 	i2c_dev->msg_buf_remaining = msg->len;
+ 	reinit_completion(&i2c_dev->completion);
+-- 
+2.8.2
