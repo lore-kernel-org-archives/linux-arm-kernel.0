@@ -1,108 +1,95 @@
-From: bdegraaf@codeaurora.org (bdegraaf at codeaurora.org)
-Date: Mon, 03 Oct 2016 15:20:57 -0400
-Subject: [RFC] arm64: Enforce observed order for spinlock and data
-In-Reply-To: <20161001181101.GA17554@remoulade>
-References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
- <20160930193231.GA2521@remoulade>
- <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
- <20161001181101.GA17554@remoulade>
-Message-ID: <b86926dc0203384522e0e6ce18bbb132@codeaurora.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 03 Oct 2016 12:42:29 -0700
+Subject: [PATCH v3 2/7] i2c: bcm2835: Protect against unexpected TXW/RXR
+ interrupts
+In-Reply-To: <d93a0590-1783-b913-9362-007628cb17d6@tronnes.org>
+References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+ <1475085056-5205-3-git-send-email-noralf@tronnes.org>
+ <87oa37fzx6.fsf@eliezer.anholt.net>
+ <d93a0590-1783-b913-9362-007628cb17d6@tronnes.org>
+Message-ID: <8760p9xlqy.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-10-01 14:11, Mark Rutland wrote:
-> Hi Brent,
-> 
-> Evidently my questions weren't sufficiently clear; even with your 
-> answers it's
-> not clear to me what precise issue you're attempting to solve. I've 
-> tried to be
-> more specific this time.
-> 
-> At a high-level, can you clarify whether you're attempting to solve is:
-> 
-> (a) a functional correctness issue (e.g. data corruption)
-> (b) a performance issue
-> 
-> And whether this was seen in practice, or found through code 
-> inspection?
-> 
-> On Sat, Oct 01, 2016 at 12:11:36PM -0400, bdegraaf at codeaurora.org 
-> wrote:
->> On 2016-09-30 15:32, Mark Rutland wrote:
->> >On Fri, Sep 30, 2016 at 01:40:57PM -0400, Brent DeGraaf wrote:
->> >>+	 * so LSE needs an explicit barrier here as well.  Without this, the
->> >>+	 * changed contents of the area protected by the spinlock could be
->> >>+	 * observed prior to the lock.
->> >>+	 */
->> >
->> >By whom? We generally expect that if data is protected by a lock, you take
->> >the lock before accessing it. If you expect concurrent lockless readers,
->> >then there's a requirement on the writer side to explicitly provide the
->> >ordering it requires -- spinlocks are not expected to provide that.
->> 
->> More details are in my response to Robin, but there is an API arm64 
->> supports
->> in spinlock.h which is used by lockref to determine whether a lock is 
->> free or
->> not.  For that code to work properly without adding these barriers, 
->> that API
->> needs to take the lock.
-> 
-> Can you please provide a concrete example of a case where things go 
-> wrong,
-> citing the code (or access pattern) in question? e.g. as in the commit 
-> messages
-> for:
-> 
->   8e86f0b409a44193 ("arm64: atomics: fix use of acquire + release for
-> full barrier semantics)
->   859b7a0e89120505 ("mm/slub: fix lockups on PREEMPT && !SMP kernels")
-> 
-> (for the latter, I messed up the register -> var mapping in one 
-> paragraph, but
-> the style and reasoning is otherwise sound).
-> 
-> In the absence of a concrete example as above, it's very difficult to 
-> reason
-> about what the underlying issue is, and what a valid fix would be for 
-> said
-> issue.
-> 
->> >What pattern of accesses are made by readers and writers such that there is
->> >a problem?
-> 
-> Please note here I was asking specifically w.r.t. the lockref code, 
-> e.g. which
-> loads could see stale data, and what does the code do based on this 
-> value such
-> that there is a problem.
-> 
->> I added the barriers to the readers/writers because I do not know 
->> these are
->> not similarly abused.  There is a lot of driver code out there, and 
->> ensuring
->> order is the safest way to be sure we don't get burned by something 
->> similar
->> to the lockref access.
-> 
-> Making the architecture-provided primitives overly strong harms 
-> performance and
-> efficiency (in general), makes the code harder to maintain and optimise 
-> in
-> future, and only masks the issue (which could crop up on other 
-> architectures,
-> for instance).
-> 
-> Thanks,
-> Mark.
+Noralf Tr?nnes <noralf@tronnes.org> writes:
 
+> Den 29.09.2016 00:00, skrev Eric Anholt:
+>> Noralf Tr?nnes <noralf@tronnes.org> writes:
+>>
+>>> If an unexpected TXW or RXR interrupt occurs (msg_buf_remaining == 0),
+>>> the driver has no way to fill/drain the FIFO to stop the interrupts.
+>>> In this case the controller has to be disabled and the transfer
+>>> completed to avoid hang.
+>>>
+>>> (CLKT | ERR) and DONE interrupts are completed in their own paths, and
+>>> the controller is disabled in the transfer function after completion.
+>>> Unite the code paths and do disabling inside the interrupt routine.
+>>>
+>>> Clear interrupt status bits in the united completion path instead of
+>>> trying to do it on every interrupt which isn't necessary.
+>>> Only CLKT, ERR and DONE can be cleared that way.
+>>>
+>>> Add the status value to the error value in case of TXW/RXR errors to
+>>> distinguish them from the other S_LEN error.
+>> I was surprised that not writing the TXW/RXR bits on handling their
+>> interrupts was OK, given that we were doing so before, but it's a level
+>> interrupt and those bits are basically ignored on write.
+>>
+>> This patch and 3, 4, and 6 are:
+>>
+>> Reviewed-by: Eric Anholt <eric@anholt.net>
+>>
+>> Patch 5 is:
+>>
+>> Acked-by: Eric Anholt <eric@anholt.net>
+>>
+>> Note for future debug: The I2C_C_CLEAR on errors will take some time to
+>> resolve -- if you were in non-idle state and I2C_C_READ, it sets an
+>> abort_rx flag and runs through the state machine to send a NACK and a
+>> STOP, I think.  Since we're setting CLEAR without I2CEN, that NACK will
+>> be hanging around queued up for next time we start the engine.
+>
+> Maybe you're able to explain the issues I had with reset:
+> https://github.com/raspberrypi/linux/issues/1653
 
-Thinking about this, as the reader/writer code has no known "abuse" 
-case, I'll
-remove it from the patchset, then provide a v2 patchset with a detailed
-explanation for the lockref problem using the commits you provided as an 
-example,
-as well as performance consideration.
+One of the questions I think you might have is "what state does the
+controller end up in after the various interrupts?"
 
-Brent
+ERR:
+- produced if we get a nack that's not at the end of a read.
+
+- Proceeds to repeated start if BCM2835_I2C_C_ST is queued, otherwise
+  stop.
+
+CLKT:
+- Triggered by a counter outside of the state machine when stretching
+  happens and then times out.
+
+- Sets cs_override, which causes proceeding through the state machine as
+  if the clock wasn't getting stretched, until the end of the next byte
+  sent/received.
+
+- According to Wolfram we shouldn't be timing out on clock stretching
+  for i2c, just on the transfer as a whole
+  (https://patchwork.kernel.org/patch/9148431/), so I wrote
+  https://github.com/anholt/linux/commit/894200276239d2e4c60b378bdc52164fcb13af8d.
+  However, I don't see an obvious way to get back to IDLE while the
+  slave is still stretching, without triggering the clock stretching
+  timeout path.
+
+DONE:
+- Signaled at STOP, and just moves to IDLE state which keeps scl/sda
+  high and waits for a BCM2835_I2C_C_ST while we're not clearing the
+  FIFOs (if you do signal start while the fifos are clearing, the start
+  will hang around until the fifo clear is done).  This is the only way
+  to get to IDLE.
+
+I'm don't think I have an answer to the "what should I do?" question you
+had, but hopefully this helps.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161003/0b6762c3/attachment.sig>
