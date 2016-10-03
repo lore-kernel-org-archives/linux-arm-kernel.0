@@ -1,29 +1,32 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon,  3 Oct 2016 11:52:05 -0700
-Subject: [PATCH 0/4] staging: Fix build of VCHIQ driver.
-Message-ID: <20161003185209.27733-1-eric@anholt.net>
+Date: Mon,  3 Oct 2016 11:52:08 -0700
+Subject: [PATCH 3/4] ARM: bcm2835: Add #define for VCHIQ property message.
+In-Reply-To: <20161003185209.27733-1-eric@anholt.net>
+References: <20161003185209.27733-1-eric@anholt.net>
+Message-ID: <20161003185209.27733-4-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a series of fixes for the vchiq driver that Greg recently
-added to his staging-testing branch.
+This comes from the downstream tree and is needed for the new VCHIQ
+driver in staging.
 
-A full tree with nasty patches to add the other drivers necessary to
-do "vcdbg log msg" is available at:
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ include/soc/bcm2835/raspberrypi-firmware.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-https://github.com/anholt/linux/tree/vchiq
-
-Eric Anholt (4):
-  staging/vchi: Convert to current get_user_pages() arguments.
-  staging/vchi: Update for rename of page_cache_release() to put_page().
-  ARM: bcm2835: Add #define for VCHIQ property message.
-  drivers/vchi: Remove dependency on CONFIG_BROKEN.
-
- drivers/staging/vc04_services/Kconfig                              | 2 +-
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c | 6 +++---
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c      | 5 ++---
- include/soc/bcm2835/raspberrypi-firmware.h                         | 2 ++
- 4 files changed, 8 insertions(+), 7 deletions(-)
-
+diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
+index 3fb357193f09..a06baffdf580 100644
+--- a/include/soc/bcm2835/raspberrypi-firmware.h
++++ b/include/soc/bcm2835/raspberrypi-firmware.h
+@@ -109,6 +109,8 @@ enum rpi_firmware_property_tag {
+ 	RPI_FIRMWARE_FRAMEBUFFER_SET_OVERSCAN =               0x0004800a,
+ 	RPI_FIRMWARE_FRAMEBUFFER_SET_PALETTE =                0x0004800b,
+ 
++	RPI_FIRMWARE_VCHIQ_INIT =                             0x00048010,
++
+ 	RPI_FIRMWARE_GET_COMMAND_LINE =                       0x00050001,
+ 	RPI_FIRMWARE_GET_DMA_CHANNELS =                       0x00060001,
+ };
 -- 
 2.9.3
