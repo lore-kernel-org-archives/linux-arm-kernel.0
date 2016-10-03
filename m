@@ -1,192 +1,256 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  3 Oct 2016 10:09:07 +0200
-Subject: [PATCH v3 3/9] clk: sunxi-ng: Finish to convert to structures for
- arguments
+Date: Mon,  3 Oct 2016 10:09:08 +0200
+Subject: [PATCH v3 4/9] clk: sunxi-ng: Add minimums for all the relevant
+ structures and clocks
 In-Reply-To: <20161003080913.24197-1-maxime.ripard@free-electrons.com>
 References: <20161003080913.24197-1-maxime.ripard@free-electrons.com>
-Message-ID: <20161003080913.24197-4-maxime.ripard@free-electrons.com>
+Message-ID: <20161003080913.24197-5-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks still use an explicit list of arguments, which make it a bit
-more tedious to add new parameters.
-
-Convert those over to a structure pointer argument to add as many
-arguments as possible without having to many noise in our patches, or a
-very long list of arguments.
+Modify the current clocks we have to be able to specify the minimum for
+each clocks we support, just like we support the max.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu_mult.c | 28 ++++++++++++++++++++--------
- drivers/clk/sunxi-ng/ccu_nk.c   | 39 ++++++++++++++++++++++-----------------
- 2 files changed, 42 insertions(+), 25 deletions(-)
+ drivers/clk/sunxi-ng/ccu_mult.c |  7 ++++++-
+ drivers/clk/sunxi-ng/ccu_nk.c   | 12 ++++++++----
+ drivers/clk/sunxi-ng/ccu_nkm.c  | 18 ++++++++++++------
+ drivers/clk/sunxi-ng/ccu_nkmp.c | 16 ++++++++++++----
+ drivers/clk/sunxi-ng/ccu_nm.c   | 12 ++++++++----
+ 5 files changed, 46 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
-index 010e9424691d..32a1964439a2 100644
+index 32a1964439a2..6a02ffee5386 100644
 --- a/drivers/clk/sunxi-ng/ccu_mult.c
 +++ b/drivers/clk/sunxi-ng/ccu_mult.c
-@@ -13,10 +13,20 @@
- #include "ccu_gate.h"
+@@ -14,7 +14,7 @@
  #include "ccu_mult.h"
  
-+struct _ccu_mult {
-+	unsigned long	mult, max;
-+};
-+
+ struct _ccu_mult {
+-	unsigned long	mult, max;
++	unsigned long	mult, min, max;
+ };
+ 
  static void ccu_mult_find_best(unsigned long parent, unsigned long rate,
--			       unsigned int max_n, unsigned int *n)
-+			       struct _ccu_mult *mult)
- {
--	*n = rate / parent;
-+	int _mult;
-+
-+	_mult = rate / parent;
-+	if (_mult > mult->max)
-+		_mult = mult->max;
-+
-+	mult->mult = _mult;
- }
+@@ -23,6 +23,9 @@ static void ccu_mult_find_best(unsigned long parent, unsigned long rate,
+ 	int _mult;
  
- static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
-@@ -25,11 +35,12 @@ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
- 					void *data)
- {
+ 	_mult = rate / parent;
++	if (_mult < mult->min)
++		_mult = mult->min;
++
+ 	if (_mult > mult->max)
+ 		_mult = mult->max;
+ 
+@@ -37,6 +40,7 @@ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
  	struct ccu_mult *cm = data;
--	unsigned int n;
-+	struct _ccu_mult _cm;
+ 	struct _ccu_mult _cm;
  
--	ccu_mult_find_best(parent_rate, rate, 1 << cm->mult.width, &n);
-+	_cm.max = 1 << cm->mult.width;
-+	ccu_mult_find_best(parent_rate, rate, &_cm);
++	_cm.min = 1;
+ 	_cm.max = 1 << cm->mult.width;
+ 	ccu_mult_find_best(parent_rate, rate, &_cm);
  
--	return parent_rate * n;
-+	return parent_rate * _cm.mult;
- }
- 
- static void ccu_mult_disable(struct clk_hw *hw)
-@@ -83,21 +94,22 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
- 			   unsigned long parent_rate)
- {
- 	struct ccu_mult *cm = hw_to_ccu_mult(hw);
-+	struct _ccu_mult _cm;
- 	unsigned long flags;
--	unsigned int n;
- 	u32 reg;
- 
+@@ -101,6 +105,7 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
  	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
  						&parent_rate);
  
--	ccu_mult_find_best(parent_rate, rate, 1 << cm->mult.width, &n);
-+	_cm.max = 1 << cm->mult.width;
-+	ccu_mult_find_best(parent_rate, rate, &_cm);
++	_cm.min = 1;
+ 	_cm.max = 1 << cm->mult.width;
+ 	ccu_mult_find_best(parent_rate, rate, &_cm);
  
- 	spin_lock_irqsave(cm->common.lock, flags);
- 
- 	reg = readl(cm->common.base + cm->common.reg);
- 	reg &= ~GENMASK(cm->mult.width + cm->mult.shift - 1, cm->mult.shift);
- 
--	writel(reg | ((n - 1) << cm->mult.shift),
-+	writel(reg | ((_cm.mult - 1) << cm->mult.shift),
- 	       cm->common.base + cm->common.reg);
- 
- 	spin_unlock_irqrestore(cm->common.lock, flags);
 diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
-index d6fafb397489..e7e2e75618ef 100644
+index e7e2e75618ef..a42d870ba0ef 100644
 --- a/drivers/clk/sunxi-ng/ccu_nk.c
 +++ b/drivers/clk/sunxi-ng/ccu_nk.c
-@@ -9,21 +9,24 @@
-  */
- 
- #include <linux/clk-provider.h>
--#include <linux/rational.h>
- 
- #include "ccu_gate.h"
+@@ -14,8 +14,8 @@
  #include "ccu_nk.h"
  
-+struct _ccu_nk {
-+	unsigned long	n, max_n;
-+	unsigned long	k, max_k;
-+};
-+
+ struct _ccu_nk {
+-	unsigned long	n, max_n;
+-	unsigned long	k, max_k;
++	unsigned long	n, min_n, max_n;
++	unsigned long	k, min_k, max_k;
+ };
+ 
  static void ccu_nk_find_best(unsigned long parent, unsigned long rate,
--			     unsigned int max_n, unsigned int max_k,
--			     unsigned int *n, unsigned int *k)
-+			     struct _ccu_nk *nk)
- {
- 	unsigned long best_rate = 0;
+@@ -25,8 +25,8 @@ static void ccu_nk_find_best(unsigned long parent, unsigned long rate,
  	unsigned int best_k = 0, best_n = 0;
  	unsigned int _k, _n;
  
--	for (_k = 1; _k <= max_k; _k++) {
--		for (_n = 1; _n <= max_n; _n++) {
-+	for (_k = 1; _k <= nk->max_k; _k++) {
-+		for (_n = 1; _n <= nk->max_n; _n++) {
+-	for (_k = 1; _k <= nk->max_k; _k++) {
+-		for (_n = 1; _n <= nk->max_n; _n++) {
++	for (_k = nk->min_k; _k <= nk->max_k; _k++) {
++		for (_n = nk->min_n; _n <= nk->max_n; _n++) {
  			unsigned long tmp_rate = parent * _n * _k;
  
  			if (tmp_rate > rate)
-@@ -37,8 +40,8 @@ static void ccu_nk_find_best(unsigned long parent, unsigned long rate,
- 		}
- 	}
- 
--	*k = best_k;
--	*n = best_n;
-+	nk->k = best_k;
-+	nk->n = best_n;
- }
- 
- static void ccu_nk_disable(struct clk_hw *hw)
-@@ -89,16 +92,17 @@ static long ccu_nk_round_rate(struct clk_hw *hw, unsigned long rate,
- 			      unsigned long *parent_rate)
- {
- 	struct ccu_nk *nk = hw_to_ccu_nk(hw);
--	unsigned int n, k;
-+	struct _ccu_nk _nk;
- 
+@@ -97,7 +97,9 @@ static long ccu_nk_round_rate(struct clk_hw *hw, unsigned long rate,
  	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
  		rate *= nk->fixed_post_div;
  
--	ccu_nk_find_best(*parent_rate, rate,
--			 1 << nk->n.width, 1 << nk->k.width,
--			 &n, &k);
-+	_nk.max_n = 1 << nk->n.width;
-+	_nk.max_k = 1 << nk->k.width;
-+
-+	ccu_nk_find_best(*parent_rate, rate, &_nk);
-+	rate = *parent_rate * _nk.n * _nk.k;
++	_nk.min_n = 1;
+ 	_nk.max_n = 1 << nk->n.width;
++	_nk.min_k = 1;
+ 	_nk.max_k = 1 << nk->k.width;
  
--	rate = *parent_rate * n * k;
- 	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 		rate = rate / nk->fixed_post_div;
- 
-@@ -110,15 +114,16 @@ static int ccu_nk_set_rate(struct clk_hw *hw, unsigned long rate,
- {
- 	struct ccu_nk *nk = hw_to_ccu_nk(hw);
- 	unsigned long flags;
--	unsigned int n, k;
-+	struct _ccu_nk _nk;
- 	u32 reg;
- 
+ 	ccu_nk_find_best(*parent_rate, rate, &_nk);
+@@ -120,7 +122,9 @@ static int ccu_nk_set_rate(struct clk_hw *hw, unsigned long rate,
  	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
  		rate = rate * nk->fixed_post_div;
  
--	ccu_nk_find_best(parent_rate, rate,
--			 1 << nk->n.width, 1 << nk->k.width,
--			 &n, &k);
-+	_nk.max_n = 1 << nk->n.width;
-+	_nk.max_k = 1 << nk->k.width;
-+
-+	ccu_nk_find_best(parent_rate, rate, &_nk);
++	_nk.min_n = 1;
+ 	_nk.max_n = 1 << nk->n.width;
++	_nk.min_k = 1;
+ 	_nk.max_k = 1 << nk->k.width;
  
- 	spin_lock_irqsave(nk->common.lock, flags);
+ 	ccu_nk_find_best(parent_rate, rate, &_nk);
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+index 0b08d000eb38..b2a5fccf2f8c 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkm.c
++++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+@@ -14,9 +14,9 @@
+ #include "ccu_nkm.h"
  
-@@ -126,7 +131,7 @@ static int ccu_nk_set_rate(struct clk_hw *hw, unsigned long rate,
- 	reg &= ~GENMASK(nk->n.width + nk->n.shift - 1, nk->n.shift);
- 	reg &= ~GENMASK(nk->k.width + nk->k.shift - 1, nk->k.shift);
+ struct _ccu_nkm {
+-	unsigned long	n, max_n;
+-	unsigned long	k, max_k;
+-	unsigned long	m, max_m;
++	unsigned long	n, min_n, max_n;
++	unsigned long	k, min_k, max_k;
++	unsigned long	m, min_m, max_m;
+ };
  
--	writel(reg | ((k - 1) << nk->k.shift) | ((n - 1) << nk->n.shift),
-+	writel(reg | ((_nk.k - 1) << nk->k.shift) | ((_nk.n - 1) << nk->n.shift),
- 	       nk->common.base + nk->common.reg);
+ static void ccu_nkm_find_best(unsigned long parent, unsigned long rate,
+@@ -26,9 +26,9 @@ static void ccu_nkm_find_best(unsigned long parent, unsigned long rate,
+ 	unsigned long best_n = 0, best_k = 0, best_m = 0;
+ 	unsigned long _n, _k, _m;
  
- 	spin_unlock_irqrestore(nk->common.lock, flags);
+-	for (_k = 1; _k <= nkm->max_k; _k++) {
+-		for (_n = 1; _n <= nkm->max_n; _n++) {
+-			for (_m = 1; _n <= nkm->max_m; _m++) {
++	for (_k = nkm->min_k; _k <= nkm->max_k; _k++) {
++		for (_n = nkm->min_n; _n <= nkm->max_n; _n++) {
++			for (_m = nkm->min_m; _n <= nkm->max_m; _m++) {
+ 				unsigned long tmp_rate;
+ 
+ 				tmp_rate = parent * _n * _k / _m;
+@@ -100,8 +100,11 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+ 	struct ccu_nkm *nkm = data;
+ 	struct _ccu_nkm _nkm;
+ 
++	_nkm.min_n = 1;
+ 	_nkm.max_n = 1 << nkm->n.width;
++	_nkm.min_k = 1;
+ 	_nkm.max_k = 1 << nkm->k.width;
++	_nkm.min_m = 1;
+ 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+ 
+ 	ccu_nkm_find_best(parent_rate, rate, &_nkm);
+@@ -126,8 +129,11 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long flags;
+ 	u32 reg;
+ 
++	_nkm.min_n = 1;
+ 	_nkm.max_n = 1 << nkm->n.width;
++	_nkm.min_k = 1;
+ 	_nkm.max_k = 1 << nkm->k.width;
++	_nkm.min_m = 1;
+ 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+ 
+ 	ccu_nkm_find_best(parent_rate, rate, &_nkm);
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+index 4b457d8cce11..2c1398192e48 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.c
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+@@ -27,10 +27,10 @@ static void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
+ 	unsigned long best_n = 0, best_k = 0, best_m = 0, best_p = 0;
+ 	unsigned long _n, _k, _m, _p;
+ 
+-	for (_k = 1; _k <= nkmp->max_k; _k++) {
+-		for (_n = 1; _n <= nkm->max_n; _n++) {
+-			for (_m = 1; _n <= nkm->max_m; _m++) {
+-				for (_p = 1; _p <= nkmp->max_p; _p <<= 1) {
++	for (_k = nkmp->min_k; _k <= nkmp->max_k; _k++) {
++		for (_n = nkmp->min_n; _n <= nkmp->max_n; _n++) {
++			for (_m = nkmp->min_m; _n <= nkmp->max_m; _m++) {
++				for (_p = nkmp->min_p; _p <= nkmp->max_p; _p <<= 1) {
+ 					unsigned long tmp_rate;
+ 
+ 					tmp_rate = parent * _n * _k / (_m * _p);
+@@ -107,9 +107,13 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+ 	struct _ccu_nkmp _nkmp;
+ 
++	_nkmp.min_n = 1;
+ 	_nkmp.max_n = 1 << nkmp->n.width;
++	_nkmp.min_k = 1;
+ 	_nkmp.max_k = 1 << nkmp->k.width;
++	_nkmp.min_m = 1;
+ 	_nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
++	_nkmp.min_p = 1;
+ 	_nkmp.max_p = nkmp->p.max ?: 1 << ((1 << nkmp->p.width) - 1);
+ 
+ 	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
+@@ -125,9 +129,13 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long flags;
+ 	u32 reg;
+ 
++	_nkmp.min_n = 1;
+ 	_nkmp.max_n = 1 << nkmp->n.width;
++	_nkmp.min_k = 1;
+ 	_nkmp.max_k = 1 << nkmp->k.width;
++	_nkmp.min_m = 1;
+ 	_nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
++	_nkmp.min_p = 1;
+ 	_nkmp.max_p = nkmp->p.max ?: 1 << ((1 << nkmp->p.width) - 1);
+ 
+ 	ccu_nkmp_find_best(parent_rate, rate, &_nkmp);
+diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+index c6d652289320..2a190bc032a9 100644
+--- a/drivers/clk/sunxi-ng/ccu_nm.c
++++ b/drivers/clk/sunxi-ng/ccu_nm.c
+@@ -15,8 +15,8 @@
+ #include "ccu_nm.h"
+ 
+ struct _ccu_nm {
+-	unsigned long	n, max_n;
+-	unsigned long	m, max_m;
++	unsigned long	n, min_n, max_n;
++	unsigned long	m, min_m, max_m;
+ };
+ 
+ static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
+@@ -26,8 +26,8 @@ static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
+ 	unsigned long best_n = 0, best_m = 0;
+ 	unsigned long _n, _m;
+ 
+-	for (_n = 1; _n <= nm->max_n; _n++) {
+-		for (_m = 1; _n <= nm->max_m; _m++) {
++	for (_n = nm->min_n; _n <= nm->max_n; _n++) {
++		for (_m = nm->min_m; _n <= nm->max_m; _m++) {
+ 			unsigned long tmp_rate = parent * _n  / _m;
+ 
+ 			if (tmp_rate > rate)
+@@ -93,7 +93,9 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct ccu_nm *nm = hw_to_ccu_nm(hw);
+ 	struct _ccu_nm _nm;
+ 
++	_nm.min_n = 1;
+ 	_nm.max_n = 1 << nm->n.width;
++	_nm.min_m = 1;
+ 	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
+ 
+ 	ccu_nm_find_best(*parent_rate, rate, &_nm);
+@@ -114,7 +116,9 @@ static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	else
+ 		ccu_frac_helper_disable(&nm->common, &nm->frac);
+ 
++	_nm.min_n = 1;
+ 	_nm.max_n = 1 << nm->n.width;
++	_nm.min_m = 1;
+ 	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
+ 
+ 	ccu_nm_find_best(parent_rate, rate, &_nm);
 -- 
 2.9.3
