@@ -1,90 +1,149 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  3 Oct 2016 10:09:04 +0200
-Subject: [PATCH v3 0/9] arm64: Allwinner A64 support based on sunxi-ng
-Message-ID: <20161003080913.24197-1-maxime.ripard@free-electrons.com>
+Date: Mon,  3 Oct 2016 10:09:09 +0200
+Subject: [PATCH v3 5/9] clk: sunxi-ng: Implement minimum for multipliers
+In-Reply-To: <20161003080913.24197-1-maxime.ripard@free-electrons.com>
+References: <20161003080913.24197-1-maxime.ripard@free-electrons.com>
+Message-ID: <20161003080913.24197-6-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Allow the CCU drivers to specify a multiplier for their clocks.
 
-As it was in the first iteration, this is the A64 support based on the
-new sunxi-ng clock framework.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi-ng/ccu_mult.c |  2 +-
+ drivers/clk/sunxi-ng/ccu_mult.h | 13 +++++++++----
+ drivers/clk/sunxi-ng/ccu_nk.c   |  8 ++++----
+ drivers/clk/sunxi-ng/ccu_nkm.c  |  8 ++++----
+ drivers/clk/sunxi-ng/ccu_nkmp.c |  4 ++--
+ drivers/clk/sunxi-ng/ccu_nm.c   |  2 +-
+ 6 files changed, 21 insertions(+), 16 deletions(-)
 
-The support for it is quite minimal at the moment, but it should be
-fairly easy to add new devices, as most of the design is shared with
-older SoCs.
-
-Let me know what you think,
-Maxime
-
-Changes from v2:
-  - Added pull-ups on the Pine64 i2c bus
-  - Removed the PMU since it doesn't work
-  - Refactored the sunxi-ng framework to deal with the specifities of
-    the A64 CCU, especially in terms of minimum factors.
-  - Fixed a few things in the CCU driver: added CLK_SET_RATE PARENT
-    flags, fixed some mux width, etc.
-  - Converted the CCU driver to a platform driver
-  - Added the DRAM reset line
-  - Added IDs for the USB muxes (even though we're not using them yet)
-
-Changes from v1:
-  - Split the A64 CCU support out of the H3 driver
-  - Added the PMU support
-  - Removed the clocks node
-  - Rebased on top of current sunxi/clk-for-4.9 branch
-
-Andre Przywara (3):
-  arm64: dts: add Allwinner A64 SoC .dtsi
-  Documentation: devicetree: add vendor prefix for Pine64
-  arm64: dts: add Pine64 support
-
-Maxime Ripard (6):
-  clk: sunxi-ng: Rename the internal structures
-  clk: sunxi-ng: Remove the use of rational computations
-  clk: sunxi-ng: Finish to convert to structures for arguments
-  clk: sunxi-ng: Add minimums for all the relevant structures and clocks
-  clk: sunxi-ng: Implement minimum for multipliers
-  clk: sunxi-ng: Add A64 clocks
-
- Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
- .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   1 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/allwinner/Makefile             |   5 +
- .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  |  50 ++
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  74 ++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 263 ++++++
- drivers/clk/sunxi-ng/Kconfig                       |  14 +-
- drivers/clk/sunxi-ng/Makefile                      |   1 +
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c              | 918 +++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun50i-a64.h              |  72 ++
- drivers/clk/sunxi-ng/ccu_div.h                     |   6 +-
- drivers/clk/sunxi-ng/ccu_frac.c                    |  12 +-
- drivers/clk/sunxi-ng/ccu_frac.h                    |  14 +-
- drivers/clk/sunxi-ng/ccu_mp.h                      |   4 +-
- drivers/clk/sunxi-ng/ccu_mult.c                    |  33 +-
- drivers/clk/sunxi-ng/ccu_mult.h                    |  17 +-
- drivers/clk/sunxi-ng/ccu_nk.c                      |  43 +-
- drivers/clk/sunxi-ng/ccu_nk.h                      |   4 +-
- drivers/clk/sunxi-ng/ccu_nkm.c                     |  45 +-
- drivers/clk/sunxi-ng/ccu_nkm.h                     |   6 +-
- drivers/clk/sunxi-ng/ccu_nkmp.c                    |  55 +-
- drivers/clk/sunxi-ng/ccu_nkmp.h                    |   8 +-
- drivers/clk/sunxi-ng/ccu_nm.c                      |  58 +-
- drivers/clk/sunxi-ng/ccu_nm.h                      |   6 +-
- include/dt-bindings/clock/sun50i-a64-ccu.h         | 134 +++
- include/dt-bindings/reset/sun50i-a64-ccu.h         |  98 +++
- 29 files changed, 1824 insertions(+), 121 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-a64.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-a64.h
- create mode 100644 include/dt-bindings/clock/sun50i-a64-ccu.h
- create mode 100644 include/dt-bindings/reset/sun50i-a64-ccu.h
-
+diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
+index 6a02ffee5386..678b6cb49f01 100644
+--- a/drivers/clk/sunxi-ng/ccu_mult.c
++++ b/drivers/clk/sunxi-ng/ccu_mult.c
+@@ -105,7 +105,7 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
+ 						&parent_rate);
+ 
+-	_cm.min = 1;
++	_cm.min = cm->mult.min;
+ 	_cm.max = 1 << cm->mult.width;
+ 	ccu_mult_find_best(parent_rate, rate, &_cm);
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
+index 113780b7558e..c1a2134bdc71 100644
+--- a/drivers/clk/sunxi-ng/ccu_mult.h
++++ b/drivers/clk/sunxi-ng/ccu_mult.h
+@@ -7,14 +7,19 @@
+ struct ccu_mult_internal {
+ 	u8	shift;
+ 	u8	width;
++	u8	min;
+ };
+ 
+-#define _SUNXI_CCU_MULT(_shift, _width)		\
+-	{					\
+-		.shift	= _shift,		\
+-		.width	= _width,		\
++#define _SUNXI_CCU_MULT_MIN(_shift, _width, _min)	\
++	{						\
++		.shift	= _shift,			\
++		.width	= _width,			\
++		.min	= _min,				\
+ 	}
+ 
++#define _SUNXI_CCU_MULT(_shift, _width)		\
++	_SUNXI_CCU_MULT_MIN(_shift, _width, 1)
++
+ struct ccu_mult {
+ 	u32			enable;
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
+index a42d870ba0ef..eaf0fdf78d2b 100644
+--- a/drivers/clk/sunxi-ng/ccu_nk.c
++++ b/drivers/clk/sunxi-ng/ccu_nk.c
+@@ -97,9 +97,9 @@ static long ccu_nk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
+ 		rate *= nk->fixed_post_div;
+ 
+-	_nk.min_n = 1;
++	_nk.min_n = nk->n.min;
+ 	_nk.max_n = 1 << nk->n.width;
+-	_nk.min_k = 1;
++	_nk.min_k = nk->k.min;
+ 	_nk.max_k = 1 << nk->k.width;
+ 
+ 	ccu_nk_find_best(*parent_rate, rate, &_nk);
+@@ -122,9 +122,9 @@ static int ccu_nk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
+ 		rate = rate * nk->fixed_post_div;
+ 
+-	_nk.min_n = 1;
++	_nk.min_n = nk->n.min;
+ 	_nk.max_n = 1 << nk->n.width;
+-	_nk.min_k = 1;
++	_nk.min_k = nk->k.min;
+ 	_nk.max_k = 1 << nk->k.width;
+ 
+ 	ccu_nk_find_best(parent_rate, rate, &_nk);
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+index b2a5fccf2f8c..715b49211ddb 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkm.c
++++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+@@ -100,9 +100,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+ 	struct ccu_nkm *nkm = data;
+ 	struct _ccu_nkm _nkm;
+ 
+-	_nkm.min_n = 1;
++	_nkm.min_n = nkm->n.min;
+ 	_nkm.max_n = 1 << nkm->n.width;
+-	_nkm.min_k = 1;
++	_nkm.min_n = nkm->k.min;
+ 	_nkm.max_k = 1 << nkm->k.width;
+ 	_nkm.min_m = 1;
+ 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+@@ -129,9 +129,9 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long flags;
+ 	u32 reg;
+ 
+-	_nkm.min_n = 1;
++	_nkm.min_n = nkm->n.min;
+ 	_nkm.max_n = 1 << nkm->n.width;
+-	_nkm.min_k = 1;
++	_nkm.min_n = nkm->k.min;
+ 	_nkm.max_k = 1 << nkm->k.width;
+ 	_nkm.min_m = 1;
+ 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+index 2c1398192e48..7968e0bac5db 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.c
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+@@ -107,9 +107,9 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+ 	struct _ccu_nkmp _nkmp;
+ 
+-	_nkmp.min_n = 1;
++	_nkmp.min_n = nkmp->n.min;
+ 	_nkmp.max_n = 1 << nkmp->n.width;
+-	_nkmp.min_k = 1;
++	_nkmp.min_n = nkmp->k.min;
+ 	_nkmp.max_k = 1 << nkmp->k.width;
+ 	_nkmp.min_m = 1;
+ 	_nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
+diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+index 2a190bc032a9..b1f3f0e8899d 100644
+--- a/drivers/clk/sunxi-ng/ccu_nm.c
++++ b/drivers/clk/sunxi-ng/ccu_nm.c
+@@ -93,7 +93,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct ccu_nm *nm = hw_to_ccu_nm(hw);
+ 	struct _ccu_nm _nm;
+ 
+-	_nm.min_n = 1;
++	_nm.min_n = nm->n.min;
+ 	_nm.max_n = 1 << nm->n.width;
+ 	_nm.min_m = 1;
+ 	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
 -- 
 2.9.3
