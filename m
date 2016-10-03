@@ -1,57 +1,44 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  3 Oct 2016 01:36:59 -0400
-Subject: [PATCH V3 1/2] PCI: add CRS support to error handling path
-In-Reply-To: <1475473021-14251-1-git-send-email-okaya@codeaurora.org>
-References: <1475473021-14251-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1475473021-14251-2-git-send-email-okaya@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 2 Oct 2016 22:09:23 -0700
+Subject: [PATCH] ARM: dts: lpc32xx: add device node for IRAM on-chip memory
+In-Reply-To: <1467931601-25067-1-git-send-email-vz@mleia.com>
+References: <1467931601-25067-1-git-send-email-vz@mleia.com>
+Message-ID: <20161003050923.GA4403@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCIE spec allows an endpoint device to extend the initialization time
-beyond 1 second by issuing Configuration Request Retry Status (CRS) for a
-vendor ID read request.
+On Fri, Jul 08, 2016 at 01:46:41AM +0300, Vladimir Zapolskiy wrote:
+> The change adds a new device node with description of generic SRAM
+> on-chip memory found on NXP LPC32xx SoC series and connected to AHB
+> matrix slave port 3.
+> 
+> Note that NXP LPC3220 SoC has 128KiB of SRAM memory, the other
+> LPC3230, LPC3240 and LPC3250 SoCs all have 256KiB SRAM space,
+> in the shared DTSI file this change specifies 128KiB SRAM size.
+> 
+> Also it's worth to mention that the SRAM area contains of 64KiB banks,
+> 2 banks on LPC3220 and 4 banks on the other SoCs from the series, and
+> all SRAM banks but the first one have independent power controls,
+> the description of this feature will be added with the introduction of
+> power domains for the SoC series.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> ---
+> 
+> Hi Arnd, Olof, Kevin,
+> 
+> please consider to include this NXP LPC32xx DT change directly to
+> ARM tree for v4.8.
+> 
+> The SRAM device node will be utilized to store PM resume code
+> and to store MAC buffers.
 
-This basically means "I'm busy now, please call me back later".
+Hi,
 
-There are two moving parts to CRS support from the SW perspective. One part
-is to determine if CRS is supported or not. The second part is to set the
-CRS visibility register.
+When sweeping my inbox looking for patches we had missed, this still showed
+up from back in July. I've now applied it, it'll make it into 4.9 (in
+next/late). Sorry for missing it earlier.
 
-As part of the probe, the Linux kernel sets the above two conditions in
-pci_enable_crs function. The kernel is also honoring the returned CRS in
-pci_bus_read_dev_vendor_id function if supported. The function will poll up
-to specified amount of time while endpoint is returning CRS response.
 
-The PCIe spec also allows CRS to be issued during cold, warm, hot and FLR
-resets.
-
-The hot reset is initiated by starting a secondary bus reset. A bus/device
-restore follows the reset.  This patch is adding vendor ID read into dev
-restore function to validate that the device is accessible before writing
-the register contents. If the device issues CRS, the code might poll up
-to 60 seconds.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pci.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index aab9d51..c8749b9 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4020,6 +4020,12 @@ static void pci_dev_save_and_disable(struct pci_dev *dev)
- 
- static void pci_dev_restore(struct pci_dev *dev)
- {
-+	u32 l;
-+
-+	/* see if the device is accessible first */
-+	if (!pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l, 60 * 1000))
-+		return;
-+
- 	pci_restore_state(dev);
- 	pci_reset_notify(dev, false);
- }
--- 
-1.9.1
+-Olof
