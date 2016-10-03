@@ -1,35 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  3 Oct 2016 12:21:04 +0200
-Subject: [PATCH 6/9] dt-bindings: pinctrl: Deprecate sunxi pinctrl bindings
+Date: Mon,  3 Oct 2016 12:21:01 +0200
+Subject: [PATCH 3/9] pinctrl: sunxi: Handle bias disable
 In-Reply-To: <cover.26c6f76b361d146fb079d744251f020ef6d2db7d.1475489558.git-series.maxime.ripard@free-electrons.com>
 References: <cover.26c6f76b361d146fb079d744251f020ef6d2db7d.1475489558.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <fad5a977d8ecdd43b37d7028b1bc32d8667b65a2.1475489558.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <f4de32e1b124b25c27e34efcadc1d332cb93ee59.1475489558.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic pin configuration and multiplexing should be preferred now,
-even though we still support the old one.
+So far, putting NO_PULL in allwinner,pull was ignored, behaving like if
+that property was not there at all.
+
+Obviously, this is not the right thing to do, and in that case, we really
+need to just disable the bias.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 5 +++++
- 1 file changed, 5 insertions(+), 0 deletions(-)
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 8 ++++++++
+ 1 file changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index 69617220c5d6..e8b7cf64fdf1 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -36,6 +36,11 @@ pins it needs, and how they should be configured, with regard to muxer
- configuration, drive strength and pullups. If one of these options is
- not set, its actual value will be unspecified.
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 5be455d5e252..6f6f1e0011e2 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -166,6 +166,8 @@ static int sunxi_pctrl_parse_bias_prop(struct device_node *node)
+ 		return -EINVAL;
  
-+This driver supports the generic pin multiplexing and configuration
-+bindings.
-+
-+*** Deprecated pin configuration and multiplexing binding
-+
- Required subnode-properties:
- 
- - allwinner,pins: List of strings containing the pin name.
+ 	switch (val) {
++	case SUN4I_PINCTRL_NO_PULL:
++		return PIN_CONFIG_BIAS_DISABLE;
+ 	case SUN4I_PINCTRL_PULL_UP:
+ 		return PIN_CONFIG_BIAS_PULL_UP;
+ 	case SUN4I_PINCTRL_PULL_DOWN:
+@@ -402,6 +404,12 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
+ 				| dlevel << sunxi_dlevel_offset(pin),
+ 				pctl->membase + sunxi_dlevel_reg(pin));
+ 			break;
++		case PIN_CONFIG_BIAS_DISABLE:
++			val = readl(pctl->membase + sunxi_pull_reg(pin));
++			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
++			writel((val & ~mask),
++			       pctl->membase + sunxi_pull_reg(pin));
++			break;
+ 		case PIN_CONFIG_BIAS_PULL_UP:
+ 			val = readl(pctl->membase + sunxi_pull_reg(pin));
+ 			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
 -- 
 git-series 0.8.10
