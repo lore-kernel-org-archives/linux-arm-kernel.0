@@ -1,59 +1,56 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Mon, 3 Oct 2016 17:48:56 +0200
-Subject: [PATCH v2 0/2] Improve DMA chaining for ahash requests
-In-Reply-To: <20161003151739.11615-1-romain.perier@free-electrons.com>
-References: <20161003151739.11615-1-romain.perier@free-electrons.com>
-Message-ID: <57F27DE8.1050703@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 3 Oct 2016 18:18:40 +0200
+Subject: [PATCH] drm/sun4i: Check that the plane coordinates are not
+ negative
+In-Reply-To: <20161003125811.GH5228@lukather>
+References: <20160930143320.26241-1-maxime.ripard@free-electrons.com>
+ <20160930180826.169e3daf@bbrezillon>
+ <20161003125811.GH5228@lukather>
+Message-ID: <20161003181840.0cb369d8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, 3 Oct 2016 14:58:11 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-Le 03/10/2016 17:17, Romain Perier a ?crit :
-> This series contain performance improvement regarding ahash requests.
-> So far, ahash requests were systematically not chained at the DMA level.
-> However, in some case, like this is the case by using IPSec, some ahash
-> requests can be processed directly by the engine, and don't have
-> intermediaire partial update states.
->
-> This series firstly re-work the way outer IVs are copied from the SRAM
-> into the dma pool. To do so, we introduce a common dma pool for all type
-> of requests that contains outer results (like IV or digest). Then, for
-> ahash requests that can be processed directly by the engine, outer
-> results are copied from the SRAM into the common dma pool. These requests
-> are then allowed to be chained at the DMA level.
->
->
-> Benchmarking results with iperf throught IPSec
-> ==============================================
-> 		ESP			AH
->
-> Before		343 Mbits/s		492 Mbits/s
-> After		392 Mbits/s		557 Mbits/s
-> Improvement	+14%			+13%
->
-> Romain Perier (2):
->    crypto: marvell - Use an unique pool to copy results of requests
->    crypto: marvell - Don't break chain for computable last ahash requests
->
->   drivers/crypto/marvell/cesa.c   |  4 ---
->   drivers/crypto/marvell/cesa.h   |  5 ++-
->   drivers/crypto/marvell/cipher.c |  6 ++--
->   drivers/crypto/marvell/hash.c   | 79 +++++++++++++++++++++++++++++++++--------
->   drivers/crypto/marvell/tdma.c   | 17 +++++----
->   5 files changed, 78 insertions(+), 33 deletions(-)
->
+> Hi Boris,
+> 
+> On Fri, Sep 30, 2016 at 06:08:26PM +0200, Boris Brezillon wrote:
+> > On Fri, 30 Sep 2016 16:33:20 +0200
+> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> >   
+> > > Our planes cannot be set at negative coordinates. Make sure we reject such
+> > > configuration.
+> > > 
+> > > Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > >  drivers/gpu/drm/sun4i/sun4i_layer.c | 3 +++
+> > >  1 file changed, 3 insertions(+)
+> > > 
+> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+> > > index f0035bf5efea..f5463c4c2cde 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+> > > @@ -29,6 +29,9 @@ struct sun4i_plane_desc {
+> > >  static int sun4i_backend_layer_atomic_check(struct drm_plane *plane,
+> > >  					    struct drm_plane_state *state)
+> > >  {
+> > > +	if ((state->crtc_x < 0) || (state->crtc_y < 0))
+> > > +		return -EINVAL;
+> > > +  
+> > 
+> > Hm, I think it's a perfectly valid use case from the DRM framework and
+> > DRM user PoV: you may want to place your plane at a negative CRTC
+> > offset (which means part of the plane will be hidden).
+> > 
+> > Maybe I'm wrong, but it seems you can support that by adapting the
+> > start address of your framebuffer pointer and the layer size.  
+> 
+> Indeed, that would probably work. This is even somewhat what we've
+> been using to implement the VGA hack we use on the CHIP.
+> 
+> Can you send that patch?
 
-After an internal discussion, we can handle things differently. Instead 
-of allocating a new mv_cesa_op_ctx in the op_pool, we can just allocate 
-a new descriptor which points to the first op ctx of the chain, and then 
-copy outer data.
-
-Please ignore this series.
-
-Regards,
-
--- 
-Romain Perier, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Actually, Ville suggested a slightly different approach: use the
+->src and ->dst in drm_plane_state.
