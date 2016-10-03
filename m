@@ -1,122 +1,150 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon,  3 Oct 2016 19:08:02 +0800
-Subject: [PATCH 10/12] ASoC: sun4i-codec: Add support for A31 board level
- audio routing
+Date: Mon,  3 Oct 2016 19:08:00 +0800
+Subject: [PATCH 08/12] ASoC: sun4i-codec: Add support for A31 analog
+ microphone inputs
 In-Reply-To: <20161003110804.28235-1-wens@csie.org>
 References: <20161003110804.28235-1-wens@csie.org>
-Message-ID: <20161003110804.28235-11-wens@csie.org>
+Message-ID: <20161003110804.28235-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31 SoC's codec has various inputs, outputs and microphone bias
-supplies. These can be routed on the board in different ways, such as:
+The A31 internal codec has 3 microphone outputs, of which MIC2 and MIC3
+are muxed internally. The resulting two microphone inputs have separate
+gain controls and mixer inputs.
 
-  - Microphones all use the MBIAS main microphone supply or one mic may
-    use the HBIAS supply, which supports headset detection and buttons.
+The codec also has 2 microphone bias pins. HBIAS is specifically for the
+headphone jack, which also supports headphone detection and control
+buttons. These extra functions are not supported yet. The other, MBIAS,
+is for all other analog microphones.
 
-  - Line Out may be routed to an audio jack, or an onboard speaker amp
-    with power controls.
-
-Add support for specifying the audio routes in the device tree.
+There is also mention of digital microphone support, but documentation
+is scarce, and no hardware with it is available.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- .../devicetree/bindings/sound/sun4i-codec.txt      | 35 ++++++++++++++++++++++
- sound/soc/sunxi/sun4i-codec.c                      | 21 +++++++++++--
- 2 files changed, 54 insertions(+), 2 deletions(-)
+ sound/soc/sunxi/sun4i-codec.c | 70 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-index 1d2411cea98d..893f37413943 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-@@ -19,6 +19,32 @@ Required properties:
- Optional properties:
- - allwinner,pa-gpios: gpio to enable external amplifier
- 
-+Required properties for "allwinner,sun6i-a31-codec":
-+- allwinner,audio-routing: A list of the connections between audio components.
-+			   Each entry is a pair of strings, the first being the
-+			   connection's sink, the second being the connection's
-+			   source. Valid names include:
-+
-+			   Audio pins on the SoC:
-+			   "HP"
-+			   "LINEIN"
-+			   "LINEOUT"
-+			   "MIC1"
-+			   "MIC2"
-+			   "MIC3"
-+
-+			   Microphone biases from the SoC:
-+			   "HBIAS"
-+			   "MBIAS"
-+
-+			   Board connectors:
-+			   "Headphone"
-+			   "Headset Mic"
-+			   "Line In"
-+			   "Line Out"
-+			   "Mic"
-+			   "Speaker"
-+
- Example:
- codec: codec at 01c22c00 {
- 	#sound-dai-cells = <0>;
-@@ -29,4 +55,13 @@ codec: codec at 01c22c00 {
- 	clock-names = "apb", "codec";
- 	dmas = <&dma 0 19>, <&dma 0 19>;
- 	dma-names = "rx", "tx";
-+	allwinner,pa-gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
-+	allwinner,audio-routing =
-+		"Headphone", "HP",
-+		"Speaker", "LINEOUT",
-+		"LINEIN", "Line In",
-+		"MIC1",	"MBIAS",
-+		"MIC1", "Mic",
-+		"MIC2", "HBIAS",
-+		"MIC2", "Headset Mic";
- };
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index cd21914fd01f..4c364e6410dd 100644
+index 5cbbab62bfd2..727f54e3bd13 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -1133,9 +1133,19 @@ static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
- 	return card;
+@@ -751,6 +751,14 @@ static const struct snd_kcontrol_new sun6i_codec_mixer_controls[] = {
+ 			SUN6I_CODEC_OM_DACA_CTRL,
+ 			SUN6I_CODEC_OM_DACA_CTRL_LMIX_LINEINL,
+ 			SUN6I_CODEC_OM_DACA_CTRL_RMIX_LINEINR, 1, 0),
++	SOC_DAPM_DOUBLE("Mic1 Playback Switch",
++			SUN6I_CODEC_OM_DACA_CTRL,
++			SUN6I_CODEC_OM_DACA_CTRL_LMIX_MIC1,
++			SUN6I_CODEC_OM_DACA_CTRL_RMIX_MIC1, 1, 0),
++	SOC_DAPM_DOUBLE("Mic2 Playback Switch",
++			SUN6I_CODEC_OM_DACA_CTRL,
++			SUN6I_CODEC_OM_DACA_CTRL_LMIX_MIC2,
++			SUN6I_CODEC_OM_DACA_CTRL_RMIX_MIC2, 1, 0),
  };
  
-+static const struct snd_soc_dapm_widget sun6i_codec_card_dapm_widgets[] = {
-+	SND_SOC_DAPM_HP("Headphone", NULL),
-+	SND_SOC_DAPM_LINE("Line In", NULL),
-+	SND_SOC_DAPM_LINE("Line Out", NULL),
-+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-+	SND_SOC_DAPM_MIC("Mic", NULL),
-+	SND_SOC_DAPM_SPK("Speaker", sun4i_codec_spk_event),
+ /* headphone controls */
+@@ -768,6 +776,21 @@ static const struct snd_kcontrol_new sun6i_codec_hp_src[] = {
+ 	SOC_DAPM_ENUM("Headphone Source Playback Route", sun6i_codec_hp_src_enum),
+ };
+ 
++/* microphone controls */
++static const char * const sun6i_codec_mic2_src_enum_text[] = {
++	"Mic2", "Mic3",
 +};
 +
- static struct snd_soc_card *sun6i_codec_create_card(struct device *dev)
- {
- 	struct snd_soc_card *card;
-+	int ret;
- 
- 	card = devm_kzalloc(dev, sizeof(*card), GFP_KERNEL);
- 	if (!card)
-@@ -1145,8 +1155,15 @@ static struct snd_soc_card *sun6i_codec_create_card(struct device *dev)
- 	if (!card->dai_link)
- 		return NULL;
- 
--	card->dev	= dev;
--	card->name	= "sun4i-codec";
-+	card->dev		= dev;
-+	card->name		= "sun4i-codec";
-+	card->dapm_widgets	= sun6i_codec_card_dapm_widgets;
-+	card->num_dapm_widgets	= ARRAY_SIZE(sun6i_codec_card_dapm_widgets);
-+	card->fully_routed	= true;
++static SOC_ENUM_SINGLE_DECL(sun6i_codec_mic2_src_enum,
++			    SUN6I_CODEC_MIC_CTRL,
++			    SUN6I_CODEC_MIC_CTRL_MIC2SLT,
++			    sun6i_codec_mic2_src_enum_text);
 +
-+	ret = snd_soc_of_parse_audio_routing(card, "allwinner,audio-routing");
-+	if (ret)
-+		dev_warn(dev, "failed to parse audio-routing: %d\n", ret);
++static const struct snd_kcontrol_new sun6i_codec_mic2_src[] = {
++	SOC_DAPM_ENUM("Mic2 Amplifier Source Route",
++		      sun6i_codec_mic2_src_enum),
++};
++
+ /* line out controls */
+ static const char * const sun6i_codec_lineout_src_enum_text[] = {
+ 	"Stereo", "Mono Differential",
+@@ -790,6 +813,10 @@ static const DECLARE_TLV_DB_SCALE(sun6i_codec_hp_vol_scale, -6300, 100, 1);
+ static const DECLARE_TLV_DB_SCALE(sun6i_codec_lineout_vol_scale, -4800, 150, 0);
+ static const DECLARE_TLV_DB_SCALE(sun6i_codec_out_mixer_pregain_scale,
+ 				  -450, 150, 0);
++static const DECLARE_TLV_DB_RANGE(sun6i_codec_mic_gain_scale,
++	0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
++	1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0),
++);
  
- 	return card;
+ static const struct snd_kcontrol_new sun6i_codec_codec_widgets[] = {
+ 	SOC_SINGLE_TLV("DAC Playback Volume", SUN4I_CODEC_DAC_DPC,
+@@ -815,9 +842,42 @@ static const struct snd_kcontrol_new sun6i_codec_codec_widgets[] = {
+ 	SOC_SINGLE_TLV("Line In Playback Volume",
+ 		       SUN6I_CODEC_OM_PA_CTRL, SUN6I_CODEC_OM_PA_CTRL_LINEING,
+ 		       0x7, 0, sun6i_codec_out_mixer_pregain_scale),
++	SOC_SINGLE_TLV("Mic1 Playback Volume",
++		       SUN6I_CODEC_OM_PA_CTRL, SUN6I_CODEC_OM_PA_CTRL_MIC1G,
++		       0x7, 0, sun6i_codec_out_mixer_pregain_scale),
++	SOC_SINGLE_TLV("Mic2 Playback Volume",
++		       SUN6I_CODEC_OM_PA_CTRL, SUN6I_CODEC_OM_PA_CTRL_MIC2G,
++		       0x7, 0, sun6i_codec_out_mixer_pregain_scale),
++
++	/* Microphone Amp boost gains */
++	SOC_SINGLE_TLV("Mic1 Boost Volume", SUN6I_CODEC_MIC_CTRL,
++		       SUN6I_CODEC_MIC_CTRL_MIC1BOOST, 0x7, 0,
++		       sun6i_codec_mic_gain_scale),
++	SOC_SINGLE_TLV("Mic2 Boost Volume", SUN6I_CODEC_MIC_CTRL,
++		       SUN6I_CODEC_MIC_CTRL_MIC2BOOST, 0x7, 0,
++		       sun6i_codec_mic_gain_scale),
  };
+ 
+ static const struct snd_soc_dapm_widget sun6i_codec_codec_dapm_widgets[] = {
++	/* Microphone inputs */
++	SND_SOC_DAPM_INPUT("MIC1"),
++	SND_SOC_DAPM_INPUT("MIC2"),
++	SND_SOC_DAPM_INPUT("MIC3"),
++
++	/* Microphone Bias */
++	SND_SOC_DAPM_SUPPLY("HBIAS", SUN6I_CODEC_MIC_CTRL,
++			    SUN6I_CODEC_MIC_CTRL_HBIASEN, 0, NULL, 0),
++	SND_SOC_DAPM_SUPPLY("MBIAS", SUN6I_CODEC_MIC_CTRL,
++			    SUN6I_CODEC_MIC_CTRL_MBIASEN, 0, NULL, 0),
++
++	/* Mic input path */
++	SND_SOC_DAPM_MUX("Mic2 Amplifier Source Route",
++			 SND_SOC_NOPM, 0, 0, sun6i_codec_mic2_src),
++	SND_SOC_DAPM_PGA("Mic1 Amplifier", SUN6I_CODEC_MIC_CTRL,
++			 SUN6I_CODEC_MIC_CTRL_MIC1AMPEN, 0, NULL, 0),
++	SND_SOC_DAPM_PGA("Mic2 Amplifier", SUN6I_CODEC_MIC_CTRL,
++			 SUN6I_CODEC_MIC_CTRL_MIC2AMPEN, 0, NULL, 0),
++
+ 	/* Line In */
+ 	SND_SOC_DAPM_INPUT("LINEIN"),
+ 
+@@ -858,15 +918,25 @@ static const struct snd_soc_dapm_route sun6i_codec_codec_dapm_routes[] = {
+ 	{ "Left DAC", NULL, "DAC Enable" },
+ 	{ "Right DAC", NULL, "DAC Enable" },
+ 
++	/* Microphone Routes */
++	{ "Mic1 Amplifier", NULL, "MIC1"},
++	{ "Mic2 Amplifier Source Route", "Mic2", "MIC2" },
++	{ "Mic2 Amplifier Source Route", "Mic3", "MIC3" },
++	{ "Mic2 Amplifier", NULL, "Mic2 Amplifier Source Route"},
++
+ 	/* Left Mixer Routes */
+ 	{ "Left Mixer", "DAC Playback Switch", "Left DAC" },
+ 	{ "Left Mixer", "DAC Reversed Playback Switch", "Right DAC" },
+ 	{ "Left Mixer", "Line In Playback Switch", "LINEIN" },
++	{ "Left Mixer", "Mic1 Playback Switch", "Mic1 Amplifier" },
++	{ "Left Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
+ 
+ 	/* Right Mixer Routes */
+ 	{ "Right Mixer", "DAC Playback Switch", "Right DAC" },
+ 	{ "Right Mixer", "DAC Reversed Playback Switch", "Left DAC" },
+ 	{ "Right Mixer", "Line In Playback Switch", "LINEIN" },
++	{ "Right Mixer", "Mic1 Playback Switch", "Mic1 Amplifier" },
++	{ "Right Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
+ 
+ 	/* Headphone Routes */
+ 	{ "Headphone Source Playback Route", "DAC", "Left DAC" },
 -- 
 2.9.3
