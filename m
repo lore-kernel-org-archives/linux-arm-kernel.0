@@ -1,98 +1,77 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Mon, 3 Oct 2016 11:36:01 +0100
-Subject: [PATCH v2 2/2] drm: zte: add initial vou drm driver
-In-Reply-To: <20161001002228.GA2989@x250>
-References: <1474727185-24180-1-git-send-email-shawn.guo@linaro.org>
- <1474727185-24180-3-git-send-email-shawn.guo@linaro.org>
- <CACvgo51feNJYrHaKT+M06Z7kOUqzYo1Uv_TAHdLhNXPtRUwsvw@mail.gmail.com>
- <20161001002228.GA2989@x250>
-Message-ID: <CACvgo53A7BpVWHgkFrZsjWnw_uW6xDmKRsrxF=46HOEWQ43BxA@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 03 Oct 2016 12:54:56 +0200
+Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on
+ rk3066
+In-Reply-To: <20161003102054.GB7632@leverpostej>
+References: <20161001140939.GA31220@vaio-ubuntu> <6962779.A926KxJite@phil>
+ <20161003102054.GB7632@leverpostej>
+Message-ID: <2391111.dvDuarNnp9@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 October 2016 at 01:22, Shawn Guo <shawnguo@kernel.org> wrote:
-> Hi Emil,
->
-> On Fri, Sep 30, 2016 at 01:34:14PM +0100, Emil Velikov wrote:
->> Hi Shawn,
->>
->> A couple of fly-by suggestions, which I hope you'll find useful :-)
->
-> Thanks for the suggestions.
->
->> On 24 September 2016 at 15:26, Shawn Guo <shawn.guo@linaro.org> wrote:
->>
->> > +
->>  > +       val = ((vm.hsync_len - 1) << SYNC_WIDE_SHIFT) & SYNC_WIDE_MASK;
->> To save some writing/minimise the chances to typos getting, in you can
->> have single/collection to static inline functions similar to msm [1].
->> On a similar note inline wrappers zte_read/write/mask (around
->> writel/readl) will provide quite useful for debugging/tracing :-)
->>
->> [1] drivers/gpu/drm/msm/adreno/a4xx.xml.h
->
-> I would not add a header file with hundreds or thousands of defines
-> while only tens of them are actually used.  For debugging, I prefer
-> to print particular registers than every single read/write, which
-> might not be easy to check what I want to check.
->
-I've never implied adding hundreds/etc defines, but a few
-macros/inlines which get you from
+Am Montag, 3. Oktober 2016, 11:20:54 CEST schrieb Mark Rutland:
+> On Sat, Oct 01, 2016 at 09:18:15PM +0200, Heiko Stuebner wrote:
+> > Am Samstag, 1. Oktober 2016, 19:17:11 CEST schrieb Mark Rutland:
+> > > On Sat, Oct 01, 2016 at 04:09:39PM +0200,
+> > > =?UTF-8?q?Pawe=C5=82=20Jarosz?=
+> > 
+> > wrote:
+> > > > For some reason accessing memory region above 0xfe000000 freezes
+> > > > system on rk3066. There is similiar bug on later rockchip soc (rk3288)
+> > > > solved same way.
+> 
+> [...]
+> 
+> > > > +	reserved-memory {
+> > > > +		#address-cells = <1>;
+> > > > +		#size-cells = <1>;
+> > > > +		ranges;
+> > > > +		/*
+> > > > +		 * The rk3066 cannot use the memory area above 0x9F000000
+> > > > +		 * for some unknown reason.
+> > > > +		 */
+> > > > +		unusable at 9F000000 {
+> > > > +			reg = <0x9F000000 0x1000000>;
+> > > > +		};
+> > > 
+> > > I don't think this is a sane workaround, but it is at best difficult to
+> > > tell, given there's no reason given for why this memory is unusable.
+> > > 
+> > > For instance, if bus accesses to this address hang, then this patch only
+> > > makes the hand less likely, since the kernel will still map the region
+> > > (and
+> > > therefore the CPU can perform speculative accesses).
+> > > 
+> > > Are issues with this memory consistently seen in practice?
+> > > 
+> > > Can you enable CONFIG_MEMTEST and pass 'memtest' to the kernel, to
+> > > determine if the memory is returning erroneous values?
+> > 
+> > just for the sake of completeness, on the rk3288 the issue was the dma not
+> > being able to access the specific memory region (interestingly also the
+> > last 16MB but of the 4GB area supported on the rk3288). So memory itself
+> > was ok, just dma access to it failed.
+> 
+> How odd.
+> 
+> > We didn't find any other sane solution to limit the dma access in a
+> > general way at the time, so opted for just blocking the memory region (as
+> > it was similarly only
+> 
+> I was under the impression that dma-ranges could describe this kind of
+> DMA addressing limitation. Was there some problem with that? Perhaps the
+> driver is not acquiring/configuring its mask correctly?
 
-  val = ((vm.hsync_len - 1) << SYNC_WIDE_SHIFT) & SYNC_WIDE_MASK;
-  ....
-  val = readl(vou->vouctl + VOU_CLK_EN);
-  val |= inf->clocks_en_bits;
-  writel(val, vou->vouctl + VOU_CLK_EN);
+I remember looking at (and trying) different options back then.
 
-to
+dma-mask wanted power-of-2 values (so it's either 4GB or 2GB (or lower)),  
+zone-dma was a 32bit (and non-dt) thing and dma-ranges seem to simply also 
+calculate a dma-mask from the value, so you're down to 2GB again.
 
-  val = SYNC_WIDE(vm.hsync_len - 1);
-  ...
-  zte_vouctl_mask(vou, VOU_CLK_EN, mask, value); // or any permutation
-of upper/lower case, argument order, use/discard the VOU_ register
-prefix, etc.
+So just blocking of those 16MB at the end for 4GB devices somehow sounded 
+nicer than limiting dma access to only half the memory.
+
+I may be overlooking something but that was what I came up with last year.
 
 
-The latter tends to be easier to read and less error prone. Either
-way, it was just a suggestion.
-
-
->> > +static int zx_gl_get_fmt(uint32_t format)
->> > +{
->> > +       switch (format) {
->> > +       case DRM_FORMAT_ARGB8888:
->> > +       case DRM_FORMAT_XRGB8888:
->> > +               return GL_FMT_ARGB8888;
->> > +       case DRM_FORMAT_RGB888:
->> > +               return GL_FMT_RGB888;
->> > +       case DRM_FORMAT_RGB565:
->> > +               return GL_FMT_RGB565;
->> > +       case DRM_FORMAT_ARGB1555:
->> > +               return GL_FMT_ARGB1555;
->> > +       case DRM_FORMAT_ARGB4444:
->> > +               return GL_FMT_ARGB4444;
->> > +       default:
->> > +               WARN_ONCE(1, "invalid pixel format %d\n", format);
->> > +               return -EINVAL;
->> Afaics the only user of this is atomic_update() and that function
->> cannot fail. You might want to move this to the _check() function.
->> Same logic goes for the rest of the driver, in case I've missed any.
->
-> The function does the conversion from DRM format values to the ones that
-> hardware accepts.  And I need to set up hardware register with the
-> converted value.
->
-> I suppose that the error case in 'default' should never be hit, since
-> all valid format have been reported to DRM core by gl_formats?  In that
-> case, I can simply drop the WARN and return a sane default format
-> instead?
->
-I'd just do the error checking in check() function and keep the
-mapping in update(). As devs add new formats to DRM core it's not
-possible for them to test every driver so getting a failure early is
-better (imho) than getting subtle visual and/or other issues. Either
-way it's up-to you really.
-
-Regards,
-Emil
+Heiko
