@@ -1,7 +1,10 @@
 From: vijaykumar@zilogic.com (Vijay Kumar B)
-Date: Mon,  3 Oct 2016 15:40:12 +0530
-Subject: [PATCH] Specify all interrupts for the GPIO controller.
-Message-ID: <1475489412-9758-1-git-send-email-vijaykumar@zilogic.com>
+Date: Mon,  3 Oct 2016 15:48:12 +0530
+Subject: [RESEND PATCH] ARM: dts: pxa2xx: Specify all interrupts for the GPIO
+ controller.
+In-Reply-To: <1475489412-9758-1-git-send-email-vijaykumar@zilogic.com>
+References: <1475489412-9758-1-git-send-email-vijaykumar@zilogic.com>
+Message-ID: <1475489892-10316-1-git-send-email-vijaykumar@zilogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
