@@ -1,121 +1,186 @@
 From: noralf@tronnes.org (=?UTF-8?q?Noralf=20Tr=C3=B8nnes?=)
-Date: Mon,  3 Oct 2016 22:06:14 +0200
-Subject: [PATCH v4 7/7] i2c: bcm2835: Add support for dynamic clock
+Date: Mon,  3 Oct 2016 22:06:12 +0200
+Subject: [PATCH v4 5/7] i2c: bcm2835: Add support for Repeated Start Condition
 In-Reply-To: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
 References: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
-Message-ID: <1475525174-28604-8-git-send-email-noralf@tronnes.org>
+Message-ID: <1475525174-28604-6-git-send-email-noralf@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support a dynamic clock by reading the frequency and setting the
-divisor in the transfer function instead of during probe.
+Documentation/i2c/i2c-protocol states that Combined transactions should
+separate messages with a Start bit and end the whole transaction with a
+Stop bit. This patch adds support for issuing only a Start between
+messages instead of a Stop followed by a Start.
+
+This implementation differs from downstream i2c-bcm2708 in 2 respects:
+- it uses an interrupt to detect that the transfer is active instead
+  of using polling. There is no interrupt for Transfer Active, but by
+  not prefilling the FIFO it's possible to use the TXW interrupt.
+- when resetting/disabling the controller between transfers it writes
+  CLEAR to the control register instead of just zero.
+  Using just zero gave many errors. This might be the reason why
+  downstream had to disable this feature and make it available with a
+  module parameter.
+
+I have run thousands of transfers to a DS1307 (rtc), MMA8451 (accel)
+and AT24C32 (eeprom) in parallel without problems.
 
 Signed-off-by: Noralf Tr?nnes <noralf@tronnes.org>
-Reviewed-by: Martin Sperl <kernel@martin.sperl.org>
+Acked-by: Eric Anholt <eric@anholt.net>
 ---
- drivers/i2c/busses/i2c-bcm2835.c | 51 +++++++++++++++++++++++++---------------
- 1 file changed, 32 insertions(+), 19 deletions(-)
+ drivers/i2c/busses/i2c-bcm2835.c | 101 ++++++++++++++++++++++++---------------
+ 1 file changed, 63 insertions(+), 38 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index d2085dd..c3436f6 100644
+index 565ef69..241e08a 100644
 --- a/drivers/i2c/busses/i2c-bcm2835.c
 +++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -58,6 +58,7 @@ struct bcm2835_i2c_dev {
- 	void __iomem *regs;
- 	struct clk *clk;
- 	int irq;
-+	u32 bus_clk_rate;
+@@ -63,6 +63,7 @@ struct bcm2835_i2c_dev {
  	struct i2c_adapter adapter;
  	struct completion completion;
  	struct i2c_msg *curr_msg;
-@@ -78,6 +79,30 @@ static inline u32 bcm2835_i2c_readl(struct bcm2835_i2c_dev *i2c_dev, u32 reg)
- 	return readl(i2c_dev->regs + reg);
++	int num_msgs;
+ 	u32 msg_err;
+ 	u8 *msg_buf;
+ 	size_t msg_buf_remaining;
+@@ -110,6 +111,45 @@ static void bcm2835_drain_rxfifo(struct bcm2835_i2c_dev *i2c_dev)
  }
  
-+static int bcm2835_i2c_set_divider(struct bcm2835_i2c_dev *i2c_dev)
+ /*
++ * Repeated Start Condition (Sr)
++ * The BCM2835 ARM Peripherals datasheet mentions a way to trigger a Sr when it
++ * talks about reading from a slave with 10 bit address. This is achieved by
++ * issuing a write, poll the I2CS.TA flag and wait for it to be set, and then
++ * issue a read.
++ * A comment in https://github.com/raspberrypi/linux/issues/254 shows how the
++ * firmware actually does it using polling and says that it's a workaround for
++ * a problem in the state machine.
++ * It turns out that it is possible to use the TXW interrupt to know when the
++ * transfer is active, provided the FIFO has not been prefilled.
++ */
++
++static void bcm2835_i2c_start_transfer(struct bcm2835_i2c_dev *i2c_dev)
 +{
-+	u32 divider;
++	u32 c = BCM2835_I2C_C_ST | BCM2835_I2C_C_I2CEN;
++	struct i2c_msg *msg = i2c_dev->curr_msg;
++	bool last_msg = (i2c_dev->num_msgs == 1);
 +
-+	divider = DIV_ROUND_UP(clk_get_rate(i2c_dev->clk),
-+			       i2c_dev->bus_clk_rate);
-+	/*
-+	 * Per the datasheet, the register is always interpreted as an even
-+	 * number, by rounding down. In other words, the LSB is ignored. So,
-+	 * if the LSB is set, increment the divider to avoid any issue.
-+	 */
-+	if (divider & 1)
-+		divider++;
-+	if ((divider < BCM2835_I2C_CDIV_MIN) ||
-+	    (divider > BCM2835_I2C_CDIV_MAX)) {
-+		dev_err_ratelimited(i2c_dev->dev, "Invalid clock-frequency\n");
-+		return -EINVAL;
-+	}
++	if (!i2c_dev->num_msgs)
++		return;
 +
-+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DIV, divider);
++	i2c_dev->num_msgs--;
++	i2c_dev->msg_buf = msg->buf;
++	i2c_dev->msg_buf_remaining = msg->len;
 +
-+	return 0;
++	if (msg->flags & I2C_M_RD)
++		c |= BCM2835_I2C_C_READ | BCM2835_I2C_C_INTR;
++	else
++		c |= BCM2835_I2C_C_INTT;
++
++	if (last_msg)
++		c |= BCM2835_I2C_C_INTD;
++
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_A, msg->addr);
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DLEN, msg->len);
++	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, c);
 +}
 +
- static void bcm2835_fill_txfifo(struct bcm2835_i2c_dev *i2c_dev)
- {
- 	u32 val;
-@@ -224,7 +249,7 @@ static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
- {
- 	struct bcm2835_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
- 	unsigned long time_left;
--	int i;
-+	int i, ret;
- 
- 	for (i = 0; i < (num - 1); i++)
- 		if (msgs[i].flags & I2C_M_RD) {
-@@ -233,6 +258,10 @@ static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
- 			return -EOPNOTSUPP;
++/*
+  * Note about I2C_C_CLEAR on error:
+  * The I2C_C_CLEAR on errors will take some time to resolve -- if you were in
+  * non-idle state and I2C_C_READ, it sets an abort_rx flag and runs through
+@@ -151,6 +191,12 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
  		}
  
-+	ret = bcm2835_i2c_set_divider(i2c_dev);
-+	if (ret)
-+		return ret;
+ 		bcm2835_fill_txfifo(i2c_dev);
 +
- 	i2c_dev->curr_msg = msgs;
- 	i2c_dev->num_msgs = num;
- 	reinit_completion(&i2c_dev->completion);
-@@ -282,7 +311,6 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
++		if (i2c_dev->num_msgs && !i2c_dev->msg_buf_remaining) {
++			i2c_dev->curr_msg++;
++			bcm2835_i2c_start_transfer(i2c_dev);
++		}
++
+ 		return IRQ_HANDLED;
+ 	}
+ 
+@@ -175,30 +221,25 @@ static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
+-				struct i2c_msg *msg)
++static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
++			    int num)
  {
- 	struct bcm2835_i2c_dev *i2c_dev;
- 	struct resource *mem, *irq;
--	u32 bus_clk_rate, divider;
- 	int ret;
- 	struct i2c_adapter *adap;
+-	u32 c;
++	struct bcm2835_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
+ 	unsigned long time_left;
++	int i;
  
-@@ -306,27 +334,12 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
- 	}
- 
- 	ret = of_property_read_u32(pdev->dev.of_node, "clock-frequency",
--				   &bus_clk_rate);
-+				   &i2c_dev->bus_clk_rate);
- 	if (ret < 0) {
- 		dev_warn(&pdev->dev,
- 			 "Could not read clock-frequency property\n");
--		bus_clk_rate = 100000;
--	}
+-	i2c_dev->curr_msg = msg;
+-	i2c_dev->msg_buf = msg->buf;
+-	i2c_dev->msg_buf_remaining = msg->len;
+-	reinit_completion(&i2c_dev->completion);
 -
--	divider = DIV_ROUND_UP(clk_get_rate(i2c_dev->clk), bus_clk_rate);
--	/*
--	 * Per the datasheet, the register is always interpreted as an even
--	 * number, by rounding down. In other words, the LSB is ignored. So,
--	 * if the LSB is set, increment the divider to avoid any issue.
--	 */
--	if (divider & 1)
--		divider++;
--	if ((divider < BCM2835_I2C_CDIV_MIN) ||
--	    (divider > BCM2835_I2C_CDIV_MAX)) {
--		dev_err(&pdev->dev, "Invalid clock-frequency\n");
--		return -ENODEV;
-+		i2c_dev->bus_clk_rate = 100000;
- 	}
--	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DIV, divider);
+-	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
++	for (i = 0; i < (num - 1); i++)
++		if (msgs[i].flags & I2C_M_RD) {
++			dev_warn_once(i2c_dev->dev,
++				      "only one read message supported, has to be last\n");
++			return -EOPNOTSUPP;
++		}
  
- 	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 	if (!irq) {
+-	if (msg->flags & I2C_M_RD) {
+-		c = BCM2835_I2C_C_READ | BCM2835_I2C_C_INTR;
+-	} else {
+-		c = BCM2835_I2C_C_INTT;
+-		bcm2835_fill_txfifo(i2c_dev);
+-	}
+-	c |= BCM2835_I2C_C_ST | BCM2835_I2C_C_INTD | BCM2835_I2C_C_I2CEN;
++	i2c_dev->curr_msg = msgs;
++	i2c_dev->num_msgs = num;
++	reinit_completion(&i2c_dev->completion);
+ 
+-	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_A, msg->addr);
+-	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DLEN, msg->len);
+-	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, c);
++	bcm2835_i2c_start_transfer(i2c_dev);
+ 
+ 	time_left = wait_for_completion_timeout(&i2c_dev->completion,
+ 						BCM2835_I2C_TIMEOUT);
+@@ -209,31 +250,15 @@ static int bcm2835_i2c_xfer_msg(struct bcm2835_i2c_dev *i2c_dev,
+ 		return -ETIMEDOUT;
+ 	}
+ 
+-	if (likely(!i2c_dev->msg_err))
+-		return 0;
++	if (!i2c_dev->msg_err)
++		return num;
+ 
+ 	dev_dbg(i2c_dev->dev, "i2c transfer failed: %x\n", i2c_dev->msg_err);
+ 
+ 	if (i2c_dev->msg_err & BCM2835_I2C_S_ERR)
+ 		return -EREMOTEIO;
+-	else
+-		return -EIO;
+-}
+-
+-static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
+-			    int num)
+-{
+-	struct bcm2835_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
+-	int i;
+-	int ret = 0;
+-
+-	for (i = 0; i < num; i++) {
+-		ret = bcm2835_i2c_xfer_msg(i2c_dev, &msgs[i]);
+-		if (ret)
+-			break;
+-	}
+ 
+-	return ret ?: i;
++	return -EIO;
+ }
+ 
+ static u32 bcm2835_i2c_func(struct i2c_adapter *adap)
 -- 
 2.8.2
