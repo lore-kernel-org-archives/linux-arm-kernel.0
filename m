@@ -1,53 +1,33 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon,  3 Oct 2016 11:52:07 -0700
-Subject: [PATCH 2/4] staging/vchi: Update for rename of page_cache_release()
- to put_page().
-In-Reply-To: <20161003185209.27733-1-eric@anholt.net>
-References: <20161003185209.27733-1-eric@anholt.net>
-Message-ID: <20161003185209.27733-3-eric@anholt.net>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 3 Oct 2016 13:57:13 -0500
+Subject: [PATCH 4/8] pinctrl: aspeed-g5: Fix pin association of SPI1
+ function
+In-Reply-To: <bdd34f8c4bfabbc1d3cd05a66ac8734da514b1e5.1474986045.git-series.andrew@aj.id.au>
+References: <cover.115463f791b69859c5ce9dafd61a5755ea039f4b.1474986045.git-series.andrew@aj.id.au>
+ <bdd34f8c4bfabbc1d3cd05a66ac8734da514b1e5.1474986045.git-series.andrew@aj.id.au>
+Message-ID: <20161003185713.GA30227@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c | 4 ++--
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c      | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+On Wed, Sep 28, 2016 at 12:20:16AM +0930, Andrew Jeffery wrote:
+> The SPI1 function was associated with the wrong pins: The functions that
+> those pins provide is either an SPI debug or passthrough function
+> coupled to SPI1. Make the SPI1 mux function configure the relevant pins
+> and associate new SPI1DEBUG and SPI1PASSTHRU functions with the pins
+> that were already defined.
+> 
+> The notation used in the datasheet's multi-function pin table for the SoC is
+> often creative: in this case the SYS* signals are enabled by a single bit,
+> which is nothing unusual on its own, but in this case the bit was also
+> participating in a multi-bit bitfield and therefore represented multiple
+> functions. This fact was overlooked in the original patch.
+> 
+> Fixes: 56e57cb6c07f (pinctrl: Add pinctrl-aspeed-g5 driver)
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> ---
+>  Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt |  4 +-
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-index 18f268ee6d4b..4cb5bff23728 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-@@ -439,7 +439,7 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 			while (actual_pages > 0)
- 			{
- 				actual_pages--;
--				page_cache_release(pages[actual_pages]);
-+				put_page(pages[actual_pages]);
- 			}
- 			kfree(pagelist);
- 			if (actual_pages == 0)
-@@ -578,7 +578,7 @@ free_pagelist(PAGELIST_T *pagelist, int actual)
- 				offset = 0;
- 				set_page_dirty(pg);
- 			}
--			page_cache_release(pg);
-+			put_page(pg);
- 		}
- 	}
- 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index 56c2c48f6801..47df1af2219d 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -1512,7 +1512,7 @@ dump_phys_mem(void *virt_addr, uint32_t num_bytes)
- 		kunmap(page);
- 
- 	for (page_idx = 0; page_idx < num_pages; page_idx++)
--		page_cache_release(pages[page_idx]);
-+		put_page(pages[page_idx]);
- 
- 	kfree(pages);
- }
--- 
-2.9.3
+Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c                   | 86 ++++++-
+>  2 files changed, 81 insertions(+), 9 deletions(-)
