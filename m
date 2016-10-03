@@ -1,86 +1,175 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 3 Oct 2016 10:46:14 +0200
-Subject: [PATCH] drm/mediatek: fix a typo
-In-Reply-To: <1475205119.13345.6.camel@mtksdaap41>
-References: <1475119322-58657-1-git-send-email-bibby.hsieh@mediatek.com>
- <1475121682.18843.2.camel@mtksdaap41>
- <1f324471-bebb-c8bf-75c1-391355c50a99@gmail.com>
- <1475205119.13345.6.camel@mtksdaap41>
-Message-ID: <8ac926cb-e585-0a4c-97cc-8948d17b4bba@gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 3 Oct 2016 11:38:02 +0200
+Subject: [RFC 05/11] iommu/dma: iommu_dma_(un)map_mixed
+In-Reply-To: <1b1b30b3-4199-9e18-362c-b8bc9d45277d@arm.com>
+References: <1475009318-2617-1-git-send-email-eric.auger@redhat.com>
+ <1475009318-2617-6-git-send-email-eric.auger@redhat.com>
+ <1b1b30b3-4199-9e18-362c-b8bc9d45277d@arm.com>
+Message-ID: <ea947436-95d4-807c-1720-1e26a60ddafb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Robin,
 
-
-On 30/09/16 05:11, Bibby Hsieh wrote:
-> On Thu, 2016-09-29 at 10:46 +0200, Matthias Brugger wrote:
+On 30/09/2016 15:24, Robin Murphy wrote:
+> Hi Eric,
+> 
+> On 27/09/16 21:48, Eric Auger wrote:
+>> iommu_dma_map_mixed and iommu_dma_unmap_mixed operate on
+>> IOMMU_DOMAIN_MIXED typed domains. On top of standard iommu_map/unmap
+>> they reserve the IOVA window to prevent the iova allocator to
+>> allocate in those areas.
 >>
->> On 29/09/16 06:01, CK Hu wrote:
->>> Acked-by: CK Hu <ck.hu@mediatek.com>
->>>
->>> On Thu, 2016-09-29 at 11:22 +0800, Bibby Hsieh wrote:
->>>> Fix the typo: OD_RELAYMODE->OD_CFG
->>>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  drivers/iommu/dma-iommu.c | 48 +++++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/dma-iommu.h | 18 ++++++++++++++++++
+>>  2 files changed, 66 insertions(+)
 >>
->
-> Hi, Matthias
-> Thanks for your reply.
->
->> Although it is quite clear what the patch does, could you write one
->> sentence to explain what it does. Maybe explain even which effect it
->> has, which error get fixed etc.
->
-> Ok, I will do that.
->
->> As we are getting public available boards now, we should take more care
->> about fixes. If you have a fix for a commit introduced in an earlier
->> version of linux and it should be fixed for this version as well (e.g.
->> v4.6 does have the feature but it does not work correctly) then please
->> add these two lines before your Signed-off-by:
->> Fixes: <commit-hash> ("<commit subject line>")
->> Cc: stable at vger.kernel.org # v4.6+
+>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index 04bbc85..db21143 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -759,3 +759,51 @@ int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>>  	return 0;
+>>  }
+>>  EXPORT_SYMBOL(iommu_get_dma_msi_region_cookie);
+>> +
+>> +int iommu_dma_map_mixed(struct iommu_domain *domain, unsigned long iova,
+>> +			phys_addr_t paddr, size_t size, int prot)
+>> +{
+>> +	struct iova_domain *iovad;
+>> +	unsigned long lo, hi;
+>> +	int ret;
+>> +
+>> +	if (domain->type != IOMMU_DOMAIN_MIXED)
+>> +		return -EINVAL;
+>> +
+>> +	if (!domain->iova_cookie)
+>> +		return -EINVAL;
+>> +
+>> +	iovad = cookie_iovad(domain);
+>> +
+>> +	lo = iova_pfn(iovad, iova);
+>> +	hi = iova_pfn(iovad, iova + size - 1);
+>> +	reserve_iova(iovad, lo, hi);
+> 
+> This can't work reliably - reserve_iova() will (for good reason) merge
+> any adjacent or overlapping entries, so any unmap is liable to free more
+> IOVA space than actually gets unmapped, and things will get subtly out
+> of sync and go wrong later.
+OK. I did not notice that.
+> 
+> The more general issue with this whole approach, though, is that it
+> effectively rules out userspace doing guest memory hotplug or similar,
+> and I'm not we want to paint ourselves into that corner. Basically, as
+> soon as a device is attached to a guest, the entirety of the unallocated
+> IPA space becomes reserved, and userspace can never add anything further
+> to it, because any given address *might* be in use for an MSI mapping.
+I fully agree. My bad, I mixed up about how/when the PCI MMIO space was
+iommu mapped. So we don't have any other solution than having the guest
+providing unused and non reserved GPA. Back to the original approach then.
+> 
+> I think it still makes most sense to stick with the original approach of
+> cooperating with userspace to reserve a bounded area - it's just that we
+> can then let automatic mapping take care of itself within that area.
+OK will respin asap.
+> 
+> Speaking of which, I've realised the same fundamental reservation
+> problem already applies to PCI without ACS, regardless of MSIs. I just
+> tried on my Juno with guest memory placed at 0x4000000000, (i.e.
+> matching the host PA of the 64-bit PCI window), and sure enough when the
+> guest kicks off some DMA on the passed-through NIC, the root complex
+> interprets the guest IPA as (unsupported) peer-to-peer DMA to a BAR
+> claimed by the video card, and it fails. I guess this doesn't get hit in
+> practice on x86 because the guest memory map is unlikely to be much
+> different from the host's.
+> 
+> It seems like we basically need a general way of communicating fixed and
+> movable host reservations to userspace :/
+
+Yes I saw "iommu/dma: Avoid PCI host bridge windows". Well this looks
+like a generalisation of the MSI geometry issue (they also face this one
+on x86 with a non x86 guest). This will also hit the fact that on QEMU
+the ARM guest memory map is static.
+
+Thank you for your time
+
+Best Regards
+
+Eric
+> 
+> Robin.
+> 
+>> +	ret = iommu_map(domain, iova, paddr, size, prot);
+>> +	if (ret)
+>> +		free_iova(iovad, lo);
+>> +	return ret;
+>> +}
+>> +EXPORT_SYMBOL(iommu_dma_map_mixed);
+>> +
+>> +size_t iommu_dma_unmap_mixed(struct iommu_domain *domain, unsigned long iova,
+>> +			     size_t size)
+>> +{
+>> +	struct iova_domain *iovad;
+>> +	unsigned long lo;
+>> +	size_t ret;
+>> +
+>> +	if (domain->type != IOMMU_DOMAIN_MIXED)
+>> +		return -EINVAL;
+>> +
+>> +	if (!domain->iova_cookie)
+>> +		return -EINVAL;
+>> +
+>> +	iovad = cookie_iovad(domain);
+>> +	lo = iova_pfn(iovad, iova);
+>> +
+>> +	ret = iommu_unmap(domain, iova, size);
+>> +	if (ret == size)
+>> +		free_iova(iovad, lo);
+>> +	return ret;
+>> +}
+>> +EXPORT_SYMBOL(iommu_dma_unmap_mixed);
+>> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+>> index 1c55413..f2aa855 100644
+>> --- a/include/linux/dma-iommu.h
+>> +++ b/include/linux/dma-iommu.h
+>> @@ -70,6 +70,12 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
+>>  int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>>  		dma_addr_t base, u64 size);
+>>  
+>> +int iommu_dma_map_mixed(struct iommu_domain *domain, unsigned long iova,
+>> +			phys_addr_t paddr, size_t size, int prot);
+>> +
+>> +size_t iommu_dma_unmap_mixed(struct iommu_domain *domain, unsigned long iova,
+>> +			     size_t size);
+>> +
+>>  #else
+>>  
+>>  struct iommu_domain;
+>> @@ -99,6 +105,18 @@ static inline int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>>  	return -ENODEV;
+>>  }
+>>  
+>> +int iommu_dma_map_mixed(struct iommu_domain *domain, unsigned long iova,
+>> +			phys_addr_t paddr, size_t size, int prot)
+>> +{
+>> +	return -ENODEV;
+>> +}
+>> +
+>> +size_t iommu_dma_unmap_mixed(struct iommu_domain *domain, unsigned long iova,
+>> +			     size_t size)
+>> +{
+>> +	return -ENODEV;
+>> +}
+>> +
+>>  #endif	/* CONFIG_IOMMU_DMA */
+>>  #endif	/* __KERNEL__ */
+>>  #endif	/* __DMA_IOMMU_H */
 >>
->> Where v4.6+ stands for the oldest version where this should get fixed.
->>
->
-> Ok, but the patch hasn't been merged into v4.8 (just in drm-next [1] and
-> linux-next [2]), how can I mark that?
->
-
-
-If the commit get's into v4.9 then make sure that this patch get's 
-merged into the fixes for v4.9 by the corresponding maintainer.
-
-Regards,
-Matthias
-
-> [1]
-> https://cgit.freedesktop.org/~airlied/linux/commit/?h=drm-next&id=7216436420414144646f5d8343d061355fd23483
-> [2]
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=7216436420414144646f5d8343d061355fd23483
->
->
->> Thanks a lot,
->> Matthias
->>
->>>> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
->>>> ---
->>>>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    2 +-
->>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
->>>> index df33b3c..aa5f20f 100644
->>>> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
->>>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
->>>> @@ -123,7 +123,7 @@ static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
->>>>  			  unsigned int bpc)
->>>>  {
->>>>  	writel(w << 16 | h, comp->regs + DISP_OD_SIZE);
->>>> -	writel(OD_RELAYMODE, comp->regs + OD_RELAYMODE);
->>>> +	writel(OD_RELAYMODE, comp->regs + OD_CFG);
->>>>  	mtk_dither_set(comp, bpc, DISP_OD_CFG);
->>>>  }
->>>>
->>>
->>>
->
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
