@@ -1,66 +1,54 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 2 Oct 2016 22:57:14 -0700
-Subject: [PATCH v3 2/2] ARM64: dts: bcm: Use a symlink to R-Pi dtsi files
- from arch=arm
-In-Reply-To: <1471516926-11466-2-git-send-email-ijc@hellion.org.uk>
-References: <1471516926-11466-1-git-send-email-ijc@hellion.org.uk>
- <1471516926-11466-2-git-send-email-ijc@hellion.org.uk>
-Message-ID: <20161003055714.GA12261@localhost>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 3 Oct 2016 10:13:25 +0300
+Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
+In-Reply-To: <948c3f9e-f11b-092c-e002-e2ef4436197f@ti.com>
+References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
+ <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
+ <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
+ <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
+ <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
+ <948c3f9e-f11b-092c-e002-e2ef4436197f@ti.com>
+Message-ID: <0125defa-5c34-85d0-f62a-133235c5094c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 18, 2016 at 11:42:06AM +0100, Ian Campbell wrote:
-> The ../../../arm... style cross-references added by commit 9d56c22a7861
-> ("ARM: bcm2835: Add devicetree for the Raspberry Pi 3.") do not work in the
-> context of the split device-tree repository[0] (where the directory
-> structure differs). As with commit 8ee57b8182c4 ("ARM64: dts: vexpress: Use
-> a symlink to vexpress-v2m-rs1.dtsi from arch=arm") use symlinks instead.
+On 10/01/16 12:24, Sekhar Nori wrote:
+>> That's good to hear, but I think the priorities should be set:
+>> LCDC and EDMA30TC1 to highest priority
+>> EDMA30TC0 to priority 2
+>>
+>> The 0TC0 is used by MMC and if you want to play a video you might need the
+>> servicing TC to be higher priority then other masters.
+>>
+>> If audio playback would trigger sync losts in lcdc then we might need to move
+>> 0TC1 to priority 1.
+>>
+>> I agree that LCDC priority needs to be higher, but I do wonder why the default
+>> (5) is not working and if it is not working why it is 5...
+>>
+>> My guess is that the change in the PBBPR register is the one actually helping
+>> here.
 > 
-> [0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
-> 
-> Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Frank Rowand <frowand.list@gmail.com>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Lee Jones <lee@kernel.org>
-> Cc: Gerd Hoffmann <kraxel@redhat.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-rpi-kernel at lists.infradead.org
-> Cc: arm at kernel.org
-> ---
-> v2: No more need for skeleton.dtsi since this was cleaned up in the previous
->     patch
-> v3: Collected tags
+> Good point, Peter. If you are booting off NFS and not playing any audio,
+> then there is pretty much no EDMA generated traffic on the interconnect.
 
-Hi,
+Yes, this is my understanding as well.
 
-I still think this is fundamentally the wrong approach. We shouldn't have
-created these file links in the first place.
+> I would guess too that its the PBBPR setting that is making a
+> difference. The EDMA vs LCDC priority adjustment might be needed in
+> particular situations too, but specific experiments should be done to
+> narrow down on that being the cause.
 
-I'd rather have something like this in our tree:
+True, we can use some conservative values for the priority, but the PBBPR
+register for sure needs to be updated.
 
-arch/arm64/boot/dts/include/arm -> ../../../../arm/boot/dts
-arch/arm64/boot/dts/include/arm64 -> ../..
-arch/arm/boot/dts/include/arm64 -> ../../../../arm64/boot/dts
-arch/arm/boot/dts/include/arm -> ../..
+> In any case, to configure the PBBR, you will have to introduce a driver
+> for it in drivers/memory. Then you can set it up per board using a DT
+> parameter.
 
+and we can reuse the introduced bindings for am335x and OMAP1/2 as well. On
+OMAP the legacy DMA API provided a call to raise the priority of the sDMA in
+EMIF :o That needs to be removed and replaced.
 
-That way you can include by using <arm/bcm2835-rpi.dtsi> instead.
-
-You'll populate another (or the same) directory with links as appropriate
-in your out-of-tree version of the DT contents.
-
-No more symlinked files, and still a clear way of showing that you're
-referencing contents out of the other architecture.
-
-Considerably cleaner, isn't it?
-
-
--Olof
+-- 
+P?ter
