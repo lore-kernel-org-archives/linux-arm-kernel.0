@@ -1,258 +1,112 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  3 Oct 2016 12:20:59 +0200
-Subject: [PATCH 1/9] pinctrl: sunxi: Rework the pin config building code
+Date: Mon,  3 Oct 2016 12:21:03 +0200
+Subject: [PATCH 5/9] pinctrl: sunxi: Support generic binding
 In-Reply-To: <cover.26c6f76b361d146fb079d744251f020ef6d2db7d.1475489558.git-series.maxime.ripard@free-electrons.com>
 References: <cover.26c6f76b361d146fb079d744251f020ef6d2db7d.1475489558.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <709f95f6725453af12bc989ce9039df5aa252ea5.1475489558.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <1b45160fb37e2dcabd855d2192fc403a1c4db324.1475489558.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support more easily the generic pinctrl properties, rework the
-pinctrl maps configuration and split it into several sub-functions.
+Our bindings are mostly irrelevant now that we have generic pinctrl
+bindings that cover exactly the same uses cases.
 
-One of the side-effects from that rework is that we only parse the pin
-configuration once, since it's going to be common to every pin, instead of
-having to parsing once for each pin.
+Add support for the new ones, and obviously keep our old binding support in
+order to keep the ABI stable.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 178 +++++++++++++++++++--------
- 1 file changed, 130 insertions(+), 48 deletions(-)
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 48 ++++++++++++++++++++++++++--
+ 1 file changed, 46 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 54455af566ec..64f7f6dcc027 100644
+index cec977fcf98c..b52af7f1418a 100644
 --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
 +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -146,6 +146,110 @@ static int sunxi_pctrl_get_group_pins(struct pinctrl_dev *pctldev,
- 	return 0;
+@@ -150,18 +150,33 @@ static int sunxi_pctrl_get_group_pins(struct pinctrl_dev *pctldev,
+ 
+ static bool sunxi_pctrl_has_bias_prop(struct device_node *node)
+ {
+-	return of_find_property(node, "allwinner,pull", NULL);
++	return of_find_property(node, "bias-pull-up", NULL) ||
++		of_find_property(node, "bias-pull-down", NULL) ||
++		of_find_property(node, "bias-disable", NULL) ||
++		of_find_property(node, "allwinner,pull", NULL);
  }
  
-+static bool sunxi_pctrl_has_bias_prop(struct device_node *node)
-+{
-+	return of_find_property(node, "allwinner,pull", NULL);
-+}
-+
-+static bool sunxi_pctrl_has_drive_prop(struct device_node *node)
-+{
-+	return of_find_property(node, "allwinner,drive", NULL);
-+}
-+
-+static int sunxi_pctrl_parse_bias_prop(struct device_node *node)
-+{
-+	u32 val;
-+
-+	if (of_property_read_u32(node, "allwinner,pull", &val))
-+		return -EINVAL;
-+
-+	switch (val) {
-+	case 1:
+ static bool sunxi_pctrl_has_drive_prop(struct device_node *node)
+ {
+-	return of_find_property(node, "allwinner,drive", NULL);
++	return of_find_property(node, "drive-strength", NULL) ||
++		of_find_property(node, "allwinner,drive", NULL);
+ }
+ 
+ static int sunxi_pctrl_parse_bias_prop(struct device_node *node)
+ {
+ 	u32 val;
+ 
++	/* Try the new style binding */
++	if (of_find_property(node, "bias-pull-up", NULL))
 +		return PIN_CONFIG_BIAS_PULL_UP;
-+	case 2:
++
++	if (of_find_property(node, "bias-pull-down", NULL))
 +		return PIN_CONFIG_BIAS_PULL_DOWN;
++
++	if (of_find_property(node, "bias-disable", NULL))
++		return PIN_CONFIG_BIAS_DISABLE;
++
++	/* And fall back to the old binding */
+ 	if (of_property_read_u32(node, "allwinner,pull", &val))
+ 		return -EINVAL;
+ 
+@@ -181,6 +196,21 @@ static int sunxi_pctrl_parse_drive_prop(struct device_node *node)
+ {
+ 	u32 val;
+ 
++	/* Try the new style binding */
++	if (!of_property_read_u32(node, "drive-strength", &val)) {
++		/* We can't go below 10mA ... */
++		if (val < 10)
++			return -EINVAL;
++
++		/* ... and only up to 40 mA ... */
++		if (val > 40)
++			val = 40;
++
++		/* by steps of 10 mA */
++		return rounddown(val, 10);
 +	}
 +
-+	return -EINVAL;
-+}
-+
-+static int sunxi_pctrl_parse_drive_prop(struct device_node *node)
-+{
-+	u32 val;
-+
-+	if (of_property_read_u32(node, "allwinner,drive", &val))
-+		return -EINVAL;
-+
-+	return (val + 1) * 10;
-+}
-+
-+static const char *sunxi_pctrl_parse_function_prop(struct device_node *node)
-+{
-+	const char *function;
-+	int ret;
-+
-+	ret = of_property_read_string(node, "allwinner,function", &function);
++	/* And then fall back to the old binding */
+ 	if (of_property_read_u32(node, "allwinner,drive", &val))
+ 		return -EINVAL;
+ 
+@@ -192,6 +222,12 @@ static const char *sunxi_pctrl_parse_function_prop(struct device_node *node)
+ 	const char *function;
+ 	int ret;
+ 
++	/* Try the generic binding */
++	ret = of_property_read_string(node, "function", &function);
 +	if (!ret)
 +		return function;
 +
-+	return NULL;
-+}
-+
-+static const char *sunxi_pctrl_find_pins_prop(struct device_node *node,
-+					      int *npins)
-+{
-+	int count;
-+
-+	count = of_property_count_strings(node, "allwinner,pins");
++	/* And fall back to our legacy one */
+ 	ret = of_property_read_string(node, "allwinner,function", &function);
+ 	if (!ret)
+ 		return function;
+@@ -204,6 +240,14 @@ static const char *sunxi_pctrl_find_pins_prop(struct device_node *node,
+ {
+ 	int count;
+ 
++	/* Try the generic binding */
++	count = of_property_count_strings(node, "pins");
 +	if (count > 0) {
 +		*npins = count;
-+		return "allwinner,pins";
++		return "pins";
 +	}
 +
-+	return NULL;
-+}
-+
-+static unsigned long *sunxi_pctrl_build_pin_config(struct device_node *node,
-+						   unsigned int *len)
-+{
-+	unsigned long *pinconfig;
-+	unsigned int configlen = 0, idx = 0;
-+
-+	if (sunxi_pctrl_has_drive_prop(node))
-+		configlen++;
-+	if (sunxi_pctrl_has_bias_prop(node))
-+		configlen++;
-+
-+	pinconfig = kzalloc(configlen * sizeof(*pinconfig), GFP_KERNEL);
-+	if (!pinconfig)
-+		return NULL;
-+
-+	if (sunxi_pctrl_has_drive_prop(node)) {
-+		int drive = sunxi_pctrl_parse_drive_prop(node);
-+		if (drive < 0)
-+			goto err_free;
-+
-+		pinconfig[idx++] = pinconf_to_config_packed(PIN_CONFIG_DRIVE_STRENGTH,
-+							  drive);
-+	}
-+
-+	if (sunxi_pctrl_has_bias_prop(node)) {
-+		int pull = sunxi_pctrl_parse_bias_prop(node);
-+		if (pull < 0)
-+			goto err_free;
-+
-+		pinconfig[idx++] = pinconf_to_config_packed(pull, 0);
-+	}
-+
-+
-+	*len = configlen;
-+	return pinconfig;
-+
-+err_free:
-+	kfree(pinconfig);
-+	return NULL;
-+}
-+
- static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 				      struct device_node *node,
- 				      struct pinctrl_map **map,
-@@ -154,38 +258,45 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 	unsigned long *pinconfig;
- 	struct property *prop;
--	const char *function;
-+	const char *function, *pin_prop;
- 	const char *group;
--	int ret, nmaps, i = 0;
--	u32 val;
-+	int ret, npins, nmaps, configlen = 0, i = 0;
- 
- 	*map = NULL;
- 	*num_maps = 0;
- 
--	ret = of_property_read_string(node, "allwinner,function", &function);
--	if (ret) {
--		dev_err(pctl->dev,
--			"missing allwinner,function property in node %s\n",
-+	function = sunxi_pctrl_parse_function_prop(node);
-+	if (!function) {
-+		dev_err(pctl->dev, "missing function property in node %s\n",
- 			node->name);
- 		return -EINVAL;
- 	}
- 
--	nmaps = of_property_count_strings(node, "allwinner,pins") * 2;
--	if (nmaps < 0) {
--		dev_err(pctl->dev,
--			"missing allwinner,pins property in node %s\n",
-+	pin_prop = sunxi_pctrl_find_pins_prop(node, &npins);
-+	if (!pin_prop) {
-+		dev_err(pctl->dev, "missing pins property in node %s\n",
- 			node->name);
- 		return -EINVAL;
- 	}
- 
-+	/*
-+	 * We have two maps for each pin: one for the function, one
-+	 * for the configuration (bias, strength, etc)
-+	 */
-+	nmaps = npins * 2;
- 	*map = kmalloc(nmaps * sizeof(struct pinctrl_map), GFP_KERNEL);
- 	if (!*map)
- 		return -ENOMEM;
- 
--	of_property_for_each_string(node, "allwinner,pins", prop, group) {
-+	pinconfig = sunxi_pctrl_build_pin_config(node, &configlen);
-+	if (!pinconfig) {
-+		ret = -EINVAL;
-+		goto err_free_map;
-+	}
-+
-+	of_property_for_each_string(node, pin_prop, prop, group) {
- 		struct sunxi_pinctrl_group *grp =
- 			sunxi_pinctrl_find_group_by_name(pctl, group);
--		int j = 0, configlen = 0;
- 
- 		if (!grp) {
- 			dev_err(pctl->dev, "unknown pin %s", group);
-@@ -208,34 +319,6 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 
- 		(*map)[i].type = PIN_MAP_TYPE_CONFIGS_GROUP;
- 		(*map)[i].data.configs.group_or_pin = group;
--
--		if (of_find_property(node, "allwinner,drive", NULL))
--			configlen++;
--		if (of_find_property(node, "allwinner,pull", NULL))
--			configlen++;
--
--		pinconfig = kzalloc(configlen * sizeof(*pinconfig), GFP_KERNEL);
--		if (!pinconfig) {
--			kfree(*map);
--			return -ENOMEM;
--		}
--
--		if (!of_property_read_u32(node, "allwinner,drive", &val)) {
--			u16 strength = (val + 1) * 10;
--			pinconfig[j++] =
--				pinconf_to_config_packed(PIN_CONFIG_DRIVE_STRENGTH,
--							 strength);
--		}
--
--		if (!of_property_read_u32(node, "allwinner,pull", &val)) {
--			enum pin_config_param pull = PIN_CONFIG_END;
--			if (val == 1)
--				pull = PIN_CONFIG_BIAS_PULL_UP;
--			else if (val == 2)
--				pull = PIN_CONFIG_BIAS_PULL_DOWN;
--			pinconfig[j++] = pinconf_to_config_packed(pull, 0);
--		}
--
- 		(*map)[i].data.configs.configs = pinconfig;
- 		(*map)[i].data.configs.num_configs = configlen;
- 
-@@ -245,19 +328,18 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 	*num_maps = nmaps;
- 
- 	return 0;
-+
-+err_free_map:
-+	kfree(map);
-+	return ret;
- }
- 
- static void sunxi_pctrl_dt_free_map(struct pinctrl_dev *pctldev,
- 				    struct pinctrl_map *map,
- 				    unsigned num_maps)
- {
--	int i;
--
--	for (i = 0; i < num_maps; i++) {
--		if (map[i].type == PIN_MAP_TYPE_CONFIGS_GROUP)
--			kfree(map[i].data.configs.configs);
--	}
--
-+	/* All the maps have the same pin config, free only the first one */
-+	kfree(map[0].data.configs.configs);
- 	kfree(map);
- }
- 
++	/* And fall back to our legacy one */
+ 	count = of_property_count_strings(node, "allwinner,pins");
+ 	if (count > 0) {
+ 		*npins = count;
 -- 
 git-series 0.8.10
