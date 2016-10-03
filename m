@@ -1,54 +1,66 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 3 Oct 2016 10:13:25 +0300
-Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
-In-Reply-To: <948c3f9e-f11b-092c-e002-e2ef4436197f@ti.com>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
- <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
- <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
- <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
- <948c3f9e-f11b-092c-e002-e2ef4436197f@ti.com>
-Message-ID: <0125defa-5c34-85d0-f62a-133235c5094c@ti.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 3 Oct 2016 09:48:25 +0200
+Subject: [GIT PULL 1/3] ARM: soc: exynos: Drivers for v4.9
+In-Reply-To: <CAOesGMgSu=bfVwWYkEG0+eDKBxh_zqSM0uxFAq3Y3X-O0vLGKQ@mail.gmail.com>
+References: <1474216788-17282-1-git-send-email-krzk@kernel.org>
+ <1474216788-17282-2-git-send-email-krzk@kernel.org>
+ <2663426.T8oUku18qe@wuerfel> <20160919155302.GA4447@kozik-book>
+ <CAOesGMgSu=bfVwWYkEG0+eDKBxh_zqSM0uxFAq3Y3X-O0vLGKQ@mail.gmail.com>
+Message-ID: <20161003074825.GA2724@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/16 12:24, Sekhar Nori wrote:
->> That's good to hear, but I think the priorities should be set:
->> LCDC and EDMA30TC1 to highest priority
->> EDMA30TC0 to priority 2
->>
->> The 0TC0 is used by MMC and if you want to play a video you might need the
->> servicing TC to be higher priority then other masters.
->>
->> If audio playback would trigger sync losts in lcdc then we might need to move
->> 0TC1 to priority 1.
->>
->> I agree that LCDC priority needs to be higher, but I do wonder why the default
->> (5) is not working and if it is not working why it is 5...
->>
->> My guess is that the change in the PBBPR register is the one actually helping
->> here.
+On Sun, Oct 02, 2016 at 05:25:07PM -0700, Olof Johansson wrote:
+> On Mon, Sep 19, 2016 at 8:53 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > On Mon, Sep 19, 2016 at 05:02:40PM +0200, Arnd Bergmann wrote:
+> >> On Sunday, September 18, 2016 6:39:46 PM CEST Krzysztof Kozlowski wrote:
+> >> > Samsung drivers/soc update for v4.9:
+> >> > 1. Allow compile testing of exynos-mct clocksource driver on ARM64.
+> >> > 2. Document Exynos5433 PMU compatible (already used by clkout driver and more
+> >> >    will be coming soon).
+> >>
+> >> Pulled into next/drivers, thanks
+> >>
+> >> Just for my understanding: why do we need the exynos-mct driver on ARM64
+> >> but not the delay-timer portion of it?
+> >
+> > I think we want all of it but Doug's optimization 3252a646aa2c
+> > ("clocksource: exynos_mct: Only use 32-bits where possible") is not
+> > ARM64 friendly. One way of dealing with it would be to prepare two
+> > versions of exynos4_read_current_timer(). One reading only lower 32-bit
+> > value for ARMv7 and second (slow) reading lower and upper for ARMv8.
+> >
+> >>
+> >> Is there an advantage in using MCT over the architected timer on these
+> >> chips? If so, should we also have a way to use it as the delay timer?
+> >
+> > No, there is no real advantage... except that the SoC has some
+> > interesting "characteristics"... The timers are tightly coupled. Very
+> > tightly. I spent a lot of time and failed to boot my ARMv8 board without
+> > some MCT magic.
 > 
-> Good point, Peter. If you are booting off NFS and not playing any audio,
-> then there is pretty much no EDMA generated traffic on the interconnect.
+> What kind of magic is that?
 
-Yes, this is my understanding as well.
+Most notably: the arch timer starts when MCT forward running counter
+starts. Without kicking MCT, the arch timer seems to be frozen.
 
-> I would guess too that its the PBBPR setting that is making a
-> difference. The EDMA vs LCDC priority adjustment might be needed in
-> particular situations too, but specific experiments should be done to
-> narrow down on that being the cause.
+> I can understand that needing the MCT for
+> some system-level timer functionality might be true (wakeups, etc),
+> but for system timesource avoiding the MMIO timer and using the arch
+> ones is a substantial performance improvement for gettimeofday() and
+> friends.
+> 
+> There was extensive discussion last year over using arch timers on
+> 5420/5422, and it fizzled out with vague comments about something not
+> working right between A15/A7 on b.L. hardware. I'm presuming whatever
+> implementation details of that SoC has since been fixed on later chips
+> (including v8). Any chance you can confirm? It'd be very nice to leave
+> MCT behind on v8 as a system time source.
 
-True, we can use some conservative values for the priority, but the PBBPR
-register for sure needs to be updated.
+Unfortunately, I cannot confirm this, at least on Exynos5433 (ARMv8). I
+played with arch and MCT timers on it and failed to get the
+arch-timer-only setup working. I did not have access to newer Exynos
+designs (Exynos 7) so I do not know how it works there.
 
-> In any case, to configure the PBBR, you will have to introduce a driver
-> for it in drivers/memory. Then you can set it up per board using a DT
-> parameter.
-
-and we can reuse the introduced bindings for am335x and OMAP1/2 as well. On
-OMAP the legacy DMA API provided a call to raise the priority of the sDMA in
-EMIF :o That needs to be removed and replaced.
-
--- 
-P?ter
+Best regards,
+Krzysztof
