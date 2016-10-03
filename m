@@ -1,64 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 3 Oct 2016 14:58:11 +0200
-Subject: [PATCH] drm/sun4i: Check that the plane coordinates are not
- negative
-In-Reply-To: <20160930180826.169e3daf@bbrezillon>
-References: <20160930143320.26241-1-maxime.ripard@free-electrons.com>
- <20160930180826.169e3daf@bbrezillon>
-Message-ID: <20161003125811.GH5228@lukather>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Mon,  3 Oct 2016 18:20:37 +0530
+Subject: [PATCH v1 1/2] ARM: dts: vfxxx: Enable DMA for DSPI on Vybrid
+Message-ID: <63fc108e2df00d2297a9b7014955f203bc802f34.1475498805.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Enable DMA for DSPI on Vybrid.
 
-On Fri, Sep 30, 2016 at 06:08:26PM +0200, Boris Brezillon wrote:
-> On Fri, 30 Sep 2016 16:33:20 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > Our planes cannot be set at negative coordinates. Make sure we reject such
-> > configuration.
-> > 
-> > Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_layer.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> > index f0035bf5efea..f5463c4c2cde 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> > @@ -29,6 +29,9 @@ struct sun4i_plane_desc {
-> >  static int sun4i_backend_layer_atomic_check(struct drm_plane *plane,
-> >  					    struct drm_plane_state *state)
-> >  {
-> > +	if ((state->crtc_x < 0) || (state->crtc_y < 0))
-> > +		return -EINVAL;
-> > +
-> 
-> Hm, I think it's a perfectly valid use case from the DRM framework and
-> DRM user PoV: you may want to place your plane at a negative CRTC
-> offset (which means part of the plane will be hidden).
-> 
-> Maybe I'm wrong, but it seems you can support that by adapting the
-> start address of your framebuffer pointer and the layer size.
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+ arch/arm/boot/dts/vf-colibri.dtsi | 4 ++++
+ arch/arm/boot/dts/vfxxx.dtsi      | 6 ++++++
+ 2 files changed, 10 insertions(+)
 
-Indeed, that would probably work. This is even somewhat what we've
-been using to implement the VGA hack we use on the CHIP.
-
-Can you send that patch?
-
-Thanks,
-Maxime
-
+diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
+index b741709..21bfef9 100644
+--- a/arch/arm/boot/dts/vf-colibri.dtsi
++++ b/arch/arm/boot/dts/vf-colibri.dtsi
+@@ -108,6 +108,10 @@
+ 	status = "okay";
+ };
+ 
++&edma1 {
++	status = "okay";
++};
++
+ &esdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 2c13ec6..eac4213 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -194,6 +194,9 @@
+ 				clocks = <&clks VF610_CLK_DSPI0>;
+ 				clock-names = "dspi";
+ 				spi-num-chipselects = <6>;
++				dmas = <&edma1 1 12>,
++					<&edma1 1 13>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -206,6 +209,9 @@
+ 				clocks = <&clks VF610_CLK_DSPI1>;
+ 				clock-names = "dspi";
+ 				spi-num-chipselects = <4>;
++				dmas = <&edma1 1 14>,
++					<&edma1 1 15>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161003/32b3fe92/attachment.sig>
+2.10.0
