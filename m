@@ -1,80 +1,81 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  3 Oct 2016 10:09:11 +0200
-Subject: [PATCH v3 7/9] arm64: dts: add Allwinner A64 SoC .dtsi
+Date: Mon,  3 Oct 2016 10:09:13 +0200
+Subject: [PATCH v3 9/9] arm64: dts: add Pine64 support
 In-Reply-To: <20161003080913.24197-1-maxime.ripard@free-electrons.com>
 References: <20161003080913.24197-1-maxime.ripard@free-electrons.com>
-Message-ID: <20161003080913.24197-8-maxime.ripard@free-electrons.com>
+Message-ID: <20161003080913.24197-10-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-The Allwinner A64 SoC is a low-cost chip with 4 ARM Cortex-A53 cores
-and the typical tablet / TV box peripherals.
-The SoC is based on the (32-bit) Allwinner H3 chip, sharing most of
-the peripherals and the memory map.
-Although the cores are proper 64-bit ones, the whole SoC is actually
-limited to 4GB (including all the supported DRAM), so we use 32-bit
-address and size cells. This has the nice feature of us being able to
-reuse the DT for 32-bit kernels as well.
-This .dtsi lists the hardware that we support so far.
+The Pine64 is a cost-efficient development board based on the
+Allwinner A64 SoC.
+There are three models: the basic version with Fast Ethernet and
+512 MB of DRAM (Pine64) and two Pine64+ versions, which both
+feature Gigabit Ethernet and additional connectors for touchscreens
+and a camera. Or as my son put it: "Those are smaller and these are
+missing." ;-)
+The two Pine64+ models just differ in the amount of DRAM
+(1GB vs. 2GB). Since U-Boot will figure out the right size for us and
+patches the DT accordingly we just need to provide one DT for the
+Pine64+.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-[Maxime: Convert to CCU binding, drop the MMC support for now]
+[Maxime: Removed the common DTSI and include directly the pine64 DTS]
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/sunxi.txt |   1 +
- MAINTAINERS                                     |   1 +
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi   | 263 ++++++++++++++++++++++++
- 3 files changed, 265 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+ arch/arm64/boot/dts/Makefile                       |  1 +
+ arch/arm64/boot/dts/allwinner/Makefile             |  5 ++
+ .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  | 50 +++++++++++
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 74 +++++++++++++++++
+ include/dt-bindings/reset/sun50i-a64-ccu.h         | 97 +++++++++++-----------
+ 5 files changed, 179 insertions(+), 48 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
 
-diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-index 3975d0a0e4c2..4d6467cc2aa2 100644
---- a/Documentation/devicetree/bindings/arm/sunxi.txt
-+++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-@@ -14,4 +14,5 @@ using one of the following compatible strings:
-   allwinner,sun8i-a83t
-   allwinner,sun8i-h3
-   allwinner,sun9i-a80
-+  allwinner,sun50i-a64
-   nextthing,gr8
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7be47efb2159..926879c05dc6 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -983,6 +983,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- N:	sun[x456789]i
- F:	arch/arm/boot/dts/ntc-gr8*
-+F:	arch/arm64/boot/dts/allwinner/
- 
- ARM/Allwinner SoC Clock Support
- M:	Emilio L?pez <emilio@elopez.com.ar>
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index 6e199c903676..ddcbf5a2c17e 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,4 +1,5 @@
+ dts-dirs += al
++dts-dirs += allwinner
+ dts-dirs += altera
+ dts-dirs += amd
+ dts-dirs += amlogic
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
 new file mode 100644
-index 000000000000..0f75fec23dc9
+index 000000000000..1e29a5ae8282
 --- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -0,0 +1,263 @@
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -0,0 +1,5 @@
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
++
++always		:= $(dtb-y)
++subdir-y	:= $(dts-dirs)
++clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+new file mode 100644
+index 000000000000..790d14daaa6a
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+@@ -0,0 +1,50 @@
 +/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ * based on the Allwinner H3 dtsi:
-+ *    Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
++ * Copyright (c) 2016 ARM Ltd.
 + *
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
 + * licensing only applies to this file, and not this project as a
 + * whole.
 + *
-+ *  a) This file is free software; you can redistribute it and/or
++ *  a) This library is free software; you can redistribute it and/or
 + *     modify it under the terms of the GNU General Public License as
 + *     published by the Free Software Foundation; either version 2 of the
 + *     License, or (at your option) any later version.
 + *
-+ *     This file is distributed in the hope that it will be useful,
++ *     This library is distributed in the hope that it will be useful,
 + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
 + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + *     GNU General Public License for more details.
@@ -103,224 +104,199 @@ index 000000000000..0f75fec23dc9
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include <dt-bindings/clock/sun50i-a64-ccu.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+#include <dt-bindings/reset/sun50i-a64-ccu.h>
++#include "sun50i-a64-pine64.dts"
 +
 +/ {
-+	interrupt-parent = <&gic>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
++	model = "Pine64+";
++	compatible = "pine64,pine64-plus", "allwinner,sun50i-a64";
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	/* TODO: Camera, Ethernet PHY, touchscreen, etc. */
++};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+new file mode 100644
+index 000000000000..9f127b3d0e33
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (c) 2016 ARM Ltd.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0>;
-+			enable-method = "psci";
-+		};
++/dts-v1/;
 +
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <1>;
-+			enable-method = "psci";
-+		};
++#include "sun50i-a64.dtsi"
 +
-+		cpu2: cpu at 2 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <2>;
-+			enable-method = "psci";
-+		};
++/ {
++	model = "Pine64";
++	compatible = "pine64,pine64", "allwinner,sun50i-a64";
 +
-+		cpu3: cpu at 3 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <3>;
-+			enable-method = "psci";
-+		};
++	aliases {
++		serial0 = &uart0;
 +	};
 +
-+	osc24M: osc24M_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		clock-output-names = "osc24M";
-+	};
-+
-+	osc32k: osc32k_clk {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <32768>;
-+		clock-output-names = "osc32k";
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 14
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 11
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
-+			     <GIC_PPI 10
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		ccu: clock at 01c20000 {
-+			compatible = "allwinner,sun50i-a64-ccu";
-+			reg = <0x01c20000 0x400>;
-+			clocks = <&osc24M>, <&osc32k>;
-+			clock-names = "hosc", "losc";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
-+		pio: pinctrl at 1c20800 {
-+			compatible = "allwinner,sun50i-a64-pinctrl";
-+			reg = <0x01c20800 0x400>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_PIO>;
-+			gpio-controller;
-+			#gpio-cells = <3>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+
-+			i2c1_pins: i2c1_pins {
-+				allwinner,pins = "PH2", "PH3";
-+				allwinner,function = "i2c1";
-+			};
-+
-+			uart0_pins_a: uart0 at 0 {
-+				allwinner,pins = "PB8", "PB9";
-+				allwinner,function = "uart0";
-+			};
-+		};
-+
-+		uart0: serial at 1c28000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28000 0x400>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART0>;
-+			resets = <&ccu RST_BUS_UART0>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 1c28400 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28400 0x400>;
-+			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART1>;
-+			resets = <&ccu RST_BUS_UART1>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 1c28800 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28800 0x400>;
-+			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART2>;
-+			resets = <&ccu RST_BUS_UART2>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 1c28c00 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28c00 0x400>;
-+			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART3>;
-+			resets = <&ccu RST_BUS_UART3>;
-+			status = "disabled";
-+		};
-+
-+		uart4: serial at 1c29000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c29000 0x400>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&ccu CLK_BUS_UART4>;
-+			resets = <&ccu RST_BUS_UART4>;
-+			status = "disabled";
-+		};
-+
-+		rtc: rtc at 1f00000 {
-+			compatible = "allwinner,sun6i-a31-rtc";
-+			reg = <0x01f00000 0x54>;
-+			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
-+		i2c0: i2c at 1c2ac00 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C0>;
-+			resets = <&ccu RST_BUS_I2C0>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c1: i2c at 1c2b000 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C1>;
-+			resets = <&ccu RST_BUS_I2C1>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c2: i2c at 1c2b400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_I2C2>;
-+			resets = <&ccu RST_BUS_I2C2>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		gic: interrupt-controller at 1c81000 {
-+			compatible = "arm,gic-400";
-+			reg = <0x01c81000 0x1000>,
-+			      <0x01c82000 0x2000>,
-+			      <0x01c84000 0x2000>,
-+			      <0x01c86000 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+		};
++	chosen {
++		stdout-path = "serial0:115200n8";
 +	};
 +};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++	status = "okay";
++};
++
++&i2c1_pins {
++	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++};
+diff --git a/include/dt-bindings/reset/sun50i-a64-ccu.h b/include/dt-bindings/reset/sun50i-a64-ccu.h
+index e61fac294d73..db60b29ddb11 100644
+--- a/include/dt-bindings/reset/sun50i-a64-ccu.h
++++ b/include/dt-bindings/reset/sun50i-a64-ccu.h
+@@ -46,52 +46,53 @@
+ #define RST_USB_PHY0		0
+ #define RST_USB_PHY1		1
+ #define RST_USB_HSIC		2
+-#define RST_MBUS		3
+-#define RST_BUS_MIPI_DSI	4
+-#define RST_BUS_CE		5
+-#define RST_BUS_DMA		6
+-#define RST_BUS_MMC0		7
+-#define RST_BUS_MMC1		8
+-#define RST_BUS_MMC2		9
+-#define RST_BUS_NAND		10
+-#define RST_BUS_DRAM		11
+-#define RST_BUS_EMAC		12
+-#define RST_BUS_TS		13
+-#define RST_BUS_HSTIMER		14
+-#define RST_BUS_SPI0		15
+-#define RST_BUS_SPI1		16
+-#define RST_BUS_OTG		17
+-#define RST_BUS_EHCI0		18
+-#define RST_BUS_EHCI1		19
+-#define RST_BUS_OHCI0		20
+-#define RST_BUS_OHCI1		21
+-#define RST_BUS_VE		22
+-#define RST_BUS_TCON0		23
+-#define RST_BUS_TCON1		24
+-#define RST_BUS_DEINTERLACE	25
+-#define RST_BUS_CSI		26
+-#define RST_BUS_HDMI0		27
+-#define RST_BUS_HDMI1		28
+-#define RST_BUS_DE		29
+-#define RST_BUS_GPU		30
+-#define RST_BUS_MSGBOX		31
+-#define RST_BUS_SPINLOCK	32
+-#define RST_BUS_DBG		33
+-#define RST_BUS_LVDS		34
+-#define RST_BUS_CODEC		35
+-#define RST_BUS_SPDIF		36
+-#define RST_BUS_THS		37
+-#define RST_BUS_I2S0		38
+-#define RST_BUS_I2S1		39
+-#define RST_BUS_I2S2		40
+-#define RST_BUS_I2C0		41
+-#define RST_BUS_I2C1		42
+-#define RST_BUS_I2C2		43
+-#define RST_BUS_SCR		44
+-#define RST_BUS_UART0		45
+-#define RST_BUS_UART1		46
+-#define RST_BUS_UART2		47
+-#define RST_BUS_UART3		48
+-#define RST_BUS_UART4		49
++#define RST_DRAM		3
++#define RST_MBUS		4
++#define RST_BUS_MIPI_DSI	5
++#define RST_BUS_CE		6
++#define RST_BUS_DMA		7
++#define RST_BUS_MMC0		8
++#define RST_BUS_MMC1		9
++#define RST_BUS_MMC2		10
++#define RST_BUS_NAND		11
++#define RST_BUS_DRAM		12
++#define RST_BUS_EMAC		13
++#define RST_BUS_TS		14
++#define RST_BUS_HSTIMER		15
++#define RST_BUS_SPI0		16
++#define RST_BUS_SPI1		17
++#define RST_BUS_OTG		18
++#define RST_BUS_EHCI0		19
++#define RST_BUS_EHCI1		20
++#define RST_BUS_OHCI0		21
++#define RST_BUS_OHCI1		22
++#define RST_BUS_VE		23
++#define RST_BUS_TCON0		24
++#define RST_BUS_TCON1		25
++#define RST_BUS_DEINTERLACE	26
++#define RST_BUS_CSI		27
++#define RST_BUS_HDMI0		28
++#define RST_BUS_HDMI1		29
++#define RST_BUS_DE		30
++#define RST_BUS_GPU		31
++#define RST_BUS_MSGBOX		32
++#define RST_BUS_SPINLOCK	33
++#define RST_BUS_DBG		34
++#define RST_BUS_LVDS		35
++#define RST_BUS_CODEC		36
++#define RST_BUS_SPDIF		37
++#define RST_BUS_THS		38
++#define RST_BUS_I2S0		39
++#define RST_BUS_I2S1		40
++#define RST_BUS_I2S2		41
++#define RST_BUS_I2C0		42
++#define RST_BUS_I2C1		43
++#define RST_BUS_I2C2		44
++#define RST_BUS_SCR		45
++#define RST_BUS_UART0		46
++#define RST_BUS_UART1		47
++#define RST_BUS_UART2		48
++#define RST_BUS_UART3		49
++#define RST_BUS_UART4		50
+ 
+-#endif /* _DT_BINDINGS_RST_SUN8I_H3_H_ */
++#endif /* _DT_BINDINGS_RST_SUN50I_A64_H_ */
 -- 
 2.9.3
