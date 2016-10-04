@@ -1,56 +1,159 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 4 Oct 2016 10:14:29 +0800
-Subject: [PATCH 3/9] pinctrl: sunxi: Handle bias disable
-In-Reply-To: <f4de32e1b124b25c27e34efcadc1d332cb93ee59.1475489558.git-series.maxime.ripard@free-electrons.com>
+Date: Tue, 4 Oct 2016 10:28:18 +0800
+Subject: [PATCH 4/9] pinctrl: sunxi: Deal with configless pins
+In-Reply-To: <8b72a134d957afdee6de48ec2c1891d8bba1b9e3.1475489558.git-series.maxime.ripard@free-electrons.com>
 References: <cover.26c6f76b361d146fb079d744251f020ef6d2db7d.1475489558.git-series.maxime.ripard@free-electrons.com>
- <f4de32e1b124b25c27e34efcadc1d332cb93ee59.1475489558.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v654R9vvcB_H9i_UoOaprZzqz0_LA-ha0BhsxUzJaOZODw@mail.gmail.com>
+ <8b72a134d957afdee6de48ec2c1891d8bba1b9e3.1475489558.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v654vv3B-OhHPgdLjsEOf0zPP=Ky1_+o=8mf9dZHMFjR-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Oct 3, 2016 at 6:21 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> So far, putting NO_PULL in allwinner,pull was ignored, behaving like if
-> that property was not there at all.
+> Even though the our binding had the assumption that the allwinner,pull and
+> allwinner,drive properties were optional, the code never took that into
+> account.
 >
-> Obviously, this is not the right thing to do, and in that case, we really
-> need to just disable the bias.
+> Fix that.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-I've done the same in my patches.
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
 > ---
->  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 8 ++++++++
->  1 file changed, 8 insertions(+), 0 deletions(-)
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 50 +++++++++++++++++++---------
+>  1 file changed, 35 insertions(+), 15 deletions(-)
 >
 > diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> index 5be455d5e252..6f6f1e0011e2 100644
+> index 6f6f1e0011e2..cec977fcf98c 100644
 > --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
 > +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> @@ -166,6 +166,8 @@ static int sunxi_pctrl_parse_bias_prop(struct device_node *node)
->                 return -EINVAL;
+> @@ -218,20 +218,29 @@ static unsigned long *sunxi_pctrl_build_pin_config(struct device_node *node,
+>  {
+>         unsigned long *pinconfig;
+>         unsigned int configlen = 0, idx = 0;
+> +       int ret;
 >
->         switch (val) {
-> +       case SUN4I_PINCTRL_NO_PULL:
-> +               return PIN_CONFIG_BIAS_DISABLE;
->         case SUN4I_PINCTRL_PULL_UP:
->                 return PIN_CONFIG_BIAS_PULL_UP;
->         case SUN4I_PINCTRL_PULL_DOWN:
-> @@ -402,6 +404,12 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
->                                 | dlevel << sunxi_dlevel_offset(pin),
->                                 pctl->membase + sunxi_dlevel_reg(pin));
->                         break;
-> +               case PIN_CONFIG_BIAS_DISABLE:
-> +                       val = readl(pctl->membase + sunxi_pull_reg(pin));
-> +                       mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
-> +                       writel((val & ~mask),
-> +                              pctl->membase + sunxi_pull_reg(pin));
-> +                       break;
->                 case PIN_CONFIG_BIAS_PULL_UP:
->                         val = readl(pctl->membase + sunxi_pull_reg(pin));
->                         mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
+>         if (sunxi_pctrl_has_drive_prop(node))
+>                 configlen++;
+>         if (sunxi_pctrl_has_bias_prop(node))
+>                 configlen++;
+>
+> +       /*
+> +        * If we don't have any configuration, bail out
+> +        */
+> +       if (!configlen)
+> +               return NULL;
+> +
+>         pinconfig = kzalloc(configlen * sizeof(*pinconfig), GFP_KERNEL);
+>         if (!pinconfig)
+> -               return NULL;
+> +               return ERR_PTR(-ENOMEM);
+>
+>         if (sunxi_pctrl_has_drive_prop(node)) {
+>                 int drive = sunxi_pctrl_parse_drive_prop(node);
+> -               if (drive < 0)
+> +               if (drive < 0) {
+> +                       ret = -EINVAL;
+
+Why not just pass the error code returned from the parse function?
+
+>                         goto err_free;
+> +               }
+>
+>                 pinconfig[idx++] = pinconf_to_config_packed(PIN_CONFIG_DRIVE_STRENGTH,
+>                                                           drive);
+> @@ -239,8 +248,10 @@ static unsigned long *sunxi_pctrl_build_pin_config(struct device_node *node,
+>
+>         if (sunxi_pctrl_has_bias_prop(node)) {
+>                 int pull = sunxi_pctrl_parse_bias_prop(node);
+> -               if (pull < 0)
+> +               if (pull < 0) {
+> +                       ret = -EINVAL;
+
+Same here.
+
+>                         goto err_free;
+> +               }
+>
+>                 pinconfig[idx++] = pinconf_to_config_packed(pull, 0);
+>         }
+> @@ -251,7 +262,7 @@ static unsigned long *sunxi_pctrl_build_pin_config(struct device_node *node,
+>
+>  err_free:
+>         kfree(pinconfig);
+> -       return NULL;
+> +       return ERR_PTR(ret);
+>  }
+>
+>  static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+> @@ -285,7 +296,10 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+>
+>         /*
+>          * We have two maps for each pin: one for the function, one
+> -        * for the configuration (bias, strength, etc)
+> +        * for the configuration (bias, strength, etc).
+> +        *
+> +        * We might be slightly overshooting, since we might not have
+> +        * any configuration.
+>          */
+>         nmaps = npins * 2;
+>         *map = kmalloc(nmaps * sizeof(struct pinctrl_map), GFP_KERNEL);
+> @@ -293,8 +307,8 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+>                 return -ENOMEM;
+>
+>         pinconfig = sunxi_pctrl_build_pin_config(node, &configlen);
+> -       if (!pinconfig) {
+> -               ret = -EINVAL;
+> +       if (IS_ERR(pinconfig)) {
+> +               ret = PTR_ERR(pinconfig);
+>                 goto err_free_map;
+>         }
+>
+> @@ -321,15 +335,16 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+>
+>                 i++;
+>
+> -               (*map)[i].type = PIN_MAP_TYPE_CONFIGS_GROUP;
+> -               (*map)[i].data.configs.group_or_pin = group;
+> -               (*map)[i].data.configs.configs = pinconfig;
+> -               (*map)[i].data.configs.num_configs = configlen;
+> -
+> -               i++;
+> +               if (pinconfig) {
+> +                       (*map)[i].type = PIN_MAP_TYPE_CONFIGS_GROUP;
+> +                       (*map)[i].data.configs.group_or_pin = group;
+> +                       (*map)[i].data.configs.configs = pinconfig;
+> +                       (*map)[i].data.configs.num_configs = configlen;
+> +                       i++;
+> +               }
+>         }
+>
+> -       *num_maps = nmaps;
+> +       *num_maps = i;
+
+Thought: should we do a krealloc to shrink the array?
+
+>
+>         return 0;
+>
+> @@ -342,8 +357,13 @@ static void sunxi_pctrl_dt_free_map(struct pinctrl_dev *pctldev,
+>                                     struct pinctrl_map *map,
+>                                     unsigned num_maps)
+>  {
+> +       unsigned long *pinconfig;
+> +
+>         /* All the maps have the same pin config, free only the first one */
+> -       kfree(map[0].data.configs.configs);
+> +       pinconfig = map[0].data.configs.configs;
+> +       if (pinconfig)
+> +               kfree(pinconfig);
+
+Passing NULL to kfree is allowed. (It becomes a no-op.)
+So you could leave this function alone.
+
+ChenYu
+
+> +
+>         kfree(map);
+>  }
+>
 > --
 > git-series 0.8.10
