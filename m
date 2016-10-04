@@ -1,74 +1,109 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 4 Oct 2016 20:12:10 +0100
-Subject: [RFC] arm64: Enforce observed order for spinlock and data
-In-Reply-To: <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
-References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
- <20160930193231.GA2521@remoulade>
- <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
- <20161001181101.GA17554@remoulade>
- <b86926dc0203384522e0e6ce18bbb132@codeaurora.org>
- <20161004101208.GA18083@leverpostej>
- <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
-Message-ID: <20161004191159.GA32596@leverpostej>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Tue, 4 Oct 2016 21:24:01 +0200
+Subject: [PATCH v3 2/7] i2c: bcm2835: Protect against unexpected TXW/RXR
+ interrupts
+In-Reply-To: <8760p9xlqy.fsf@eliezer.anholt.net>
+References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
+ <1475085056-5205-3-git-send-email-noralf@tronnes.org>
+ <87oa37fzx6.fsf@eliezer.anholt.net>
+ <d93a0590-1783-b913-9362-007628cb17d6@tronnes.org>
+ <8760p9xlqy.fsf@eliezer.anholt.net>
+Message-ID: <b5c2647f-fd75-61be-e9ba-b1e09630a1f0@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brent,
 
-Could you *please* clarify if you are trying to solve:
+Den 03.10.2016 21:42, skrev Eric Anholt:
+> Noralf Tr?nnes <noralf@tronnes.org> writes:
+>
+>> Den 29.09.2016 00:00, skrev Eric Anholt:
+>>> Noralf Tr?nnes <noralf@tronnes.org> writes:
+>>>
+>>>> If an unexpected TXW or RXR interrupt occurs (msg_buf_remaining == 0),
+>>>> the driver has no way to fill/drain the FIFO to stop the interrupts.
+>>>> In this case the controller has to be disabled and the transfer
+>>>> completed to avoid hang.
+>>>>
+>>>> (CLKT | ERR) and DONE interrupts are completed in their own paths, and
+>>>> the controller is disabled in the transfer function after completion.
+>>>> Unite the code paths and do disabling inside the interrupt routine.
+>>>>
+>>>> Clear interrupt status bits in the united completion path instead of
+>>>> trying to do it on every interrupt which isn't necessary.
+>>>> Only CLKT, ERR and DONE can be cleared that way.
+>>>>
+>>>> Add the status value to the error value in case of TXW/RXR errors to
+>>>> distinguish them from the other S_LEN error.
+>>> I was surprised that not writing the TXW/RXR bits on handling their
+>>> interrupts was OK, given that we were doing so before, but it's a level
+>>> interrupt and those bits are basically ignored on write.
+>>>
+>>> This patch and 3, 4, and 6 are:
+>>>
+>>> Reviewed-by: Eric Anholt <eric@anholt.net>
+>>>
+>>> Patch 5 is:
+>>>
+>>> Acked-by: Eric Anholt <eric@anholt.net>
+>>>
+>>> Note for future debug: The I2C_C_CLEAR on errors will take some time to
+>>> resolve -- if you were in non-idle state and I2C_C_READ, it sets an
+>>> abort_rx flag and runs through the state machine to send a NACK and a
+>>> STOP, I think.  Since we're setting CLEAR without I2CEN, that NACK will
+>>> be hanging around queued up for next time we start the engine.
+>> Maybe you're able to explain the issues I had with reset:
+>> https://github.com/raspberrypi/linux/issues/1653
+> One of the questions I think you might have is "what state does the
+> controller end up in after the various interrupts?"
+>
+> ERR:
+> - produced if we get a nack that's not at the end of a read.
+>
+> - Proceeds to repeated start if BCM2835_I2C_C_ST is queued, otherwise
+>    stop.
+>
+> CLKT:
+> - Triggered by a counter outside of the state machine when stretching
+>    happens and then times out.
+>
+> - Sets cs_override, which causes proceeding through the state machine as
+>    if the clock wasn't getting stretched, until the end of the next byte
+>    sent/received.
+>
+> - According to Wolfram we shouldn't be timing out on clock stretching
+>    for i2c, just on the transfer as a whole
+>    (https://patchwork.kernel.org/patch/9148431/), so I wrote
+>    https://github.com/anholt/linux/commit/894200276239d2e4c60b378bdc52164fcb13af8d.
+>    However, I don't see an obvious way to get back to IDLE while the
+>    slave is still stretching, without triggering the clock stretching
+>    timeout path.
 
-(a) a correctness issue (e.g. data corruption) seen in practice.
-(b) a correctness issue (e.g. data corruption) found by inspection.
-(c) A performance issue, seen in practice.
-(d) A performance issue, found by inspection.
+If the transfer times out, whatever the reason, we clear the fifo
+(and disable). Doesn't that get us back to IDLE?
 
-Any one of these is fine; we just need to know in order to be able to
-help effectively, and so far it hasn't been clear.
+Code with my patches:
 
-On Tue, Oct 04, 2016 at 01:53:35PM -0400, bdegraaf at codeaurora.org wrote:
-> After looking at this, the problem is not with the lockref code per
-> se: it is a problem with arch_spin_value_unlocked(). In the
-> out-of-order case, arch_spin_value_unlocked() can return TRUE for a
-> spinlock that is in fact locked but the lock is not observable yet via
-> an ordinary load. 
+static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
+                 int num)
+{
+[...]
+     bcm2835_i2c_start_transfer(i2c_dev);
 
-Given arch_spin_value_unlocked() doesn't perform any load itself, I
-assume the ordinary load that you are referring to is the READ_ONCE()
-early in CMPXCHG_LOOP().
+     time_left = wait_for_completion_timeout(&i2c_dev->completion,
+                         adap->timeout);
+     if (!time_left) {
+         bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C,
+                    BCM2835_I2C_C_CLEAR);
+         dev_err(i2c_dev->dev, "i2c transfer timed out\n");
+         return -ETIMEDOUT;
+     }
 
-It's worth noting that even if we ignore ordering and assume a
-sequentially-consistent machine, READ_ONCE() can give us a stale value.
-We could perform the read, then another agent can acquire the lock, then
-we can move onto the cmpxchg(), i.e.
-
-    CPU0                              CPU1
-    old = READ_ONCE(x.lock_val)
-                                      spin_lock(x.lock)
-    cmpxchg(x.lock_val, old, new)
-                                      spin_unlock(x.lock)
-
-If the 'old' value is stale, the cmpxchg *must* fail, and the cmpxchg
-should return an up-to-date value which we will then retry with.
-
-> Other than ensuring order on the locking side (as the prior patch
-> did), there is a way to make arch_spin_value_unlock's TRUE return
-> value deterministic, 
-
-In general, this cannot be made deterministic. As above, there is a race
-that cannot be avoided.
-
-> but it requires that it does a write-back to the lock to ensure we
-> didn't observe the unlocked value while another agent was in process
-> of writing back a locked value.
-
-The cmpxchg gives us this guarantee. If it successfully stores, then the
-value it observed was the same as READ_ONCE() saw, and the update was
-atomic.
-
-There *could* have been an intervening sequence between the READ_ONCE
-and cmpxchg (e.g. put(); get()) but that's not problematic for lockref.
-Until you've taken your reference it was possible that things changed
-underneath you.
-
-Thanks,
-Mark.
+> DONE:
+> - Signaled at STOP, and just moves to IDLE state which keeps scl/sda
+>    high and waits for a BCM2835_I2C_C_ST while we're not clearing the
+>    FIFOs (if you do signal start while the fifos are clearing, the start
+>    will hang around until the fifo clear is done).  This is the only way
+>    to get to IDLE.
+>
+> I'm don't think I have an answer to the "what should I do?" question you
+> had, but hopefully this helps.
