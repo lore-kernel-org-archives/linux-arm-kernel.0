@@ -1,43 +1,28 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 4 Oct 2016 11:30:59 +0100
-Subject: Coresight ETF trace dump failed in Juno r1 with 4.8-rc8
-In-Reply-To: <CAGhh56H7a9oEYxzEA4gGvBey=COMqwgisd4tzewU8DLGcGrsww@mail.gmail.com>
-References: <CAGhh56F-VWCCy82msQ8CimZ4a0a2h=tqR2qv1KcfeyuQXo=R1w@mail.gmail.com>
- <42c2ac9c-abdf-5341-01b5-3f342c5164b7@arm.com>
- <CAGhh56H7a9oEYxzEA4gGvBey=COMqwgisd4tzewU8DLGcGrsww@mail.gmail.com>
-Message-ID: <cc531f08-d09b-1976-90c2-377a5878b1eb@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Oct 2016 12:32:31 +0200
+Subject: [PATCH 08/14] dt-bindings: sound: Add sun8i analog codec
+ documentation
+In-Reply-To: <06ea14939405c3eb0fb9be655d26ee564a04a53d.1475571575.git.mylene.josserand@free-electrons.com>
+References: <cover.1475571575.git.mylene.josserand@free-electrons.com>
+ <06ea14939405c3eb0fb9be655d26ee564a04a53d.1475571575.git.mylene.josserand@free-electrons.com>
+Message-ID: <20161004103231.hmi3pk2bz6epcg5h@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 04, 2016 at 11:46:21AM +0200, Myl?ne Josserand wrote:
 
+> +* Allwinner A23/A33 Analog Codec
+> +
+> +This codec must be handled as a PRCM subnode.
 
-On 04/10/16 06:37, Venkatesh Vivekanandan wrote:
-> On Mon, Oct 3, 2016 at 6:44 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Venkatesh,
->>
->> On 03/10/16 12:36, Venkatesh Vivekanandan wrote:
->>>
->>> Hi All,
->>>
->>> I am trying to collect ETF trace from Juno R1 and could see "cpu
->>> stall" while dumping the trace. Attached is the log of sequence
->>> followed. Was trying to collect the trace data from hardware and see
->>> if it is any valid data. Am I missing anything here?.
->>>
->>
->> There are few fixes from me and Suzuki queued for v4.9.
->> Can you check if this issue persists even on linux-next ?
->
-> Issue is the same in linux-next as well. Please find the attached log.
->
+What does this mean - how does one handle something as a "PRCM subnode"?
 
-OK, what do you mean by the issue still being present. I no longer see
-any ETM failures or messages. Does the system hang when you try to read
-/dev/<addr>.etf ?
-
-Also the RCU stalls could be related to CPUIdle. Are you using latest
-versions of trusted firmware ?
-
--- 
-Regards,
-Sudeep
+Please use subject lines matching the style for the subsystem.  This
+makes it easier for people to identify relevant patches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161004/c28f6542/attachment.sig>
