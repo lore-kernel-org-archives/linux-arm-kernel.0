@@ -1,69 +1,79 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 4 Oct 2016 18:56:13 +0800
-Subject: [PATCH 04/14] ASoC: Add sun8i analog codec driver
-In-Reply-To: <CAEKpxBk-e-sXXWD7p6Db_EsFP1bTVjeFsroy7+r5V-ZYC4ndmg@mail.gmail.com>
+Date: Tue, 4 Oct 2016 18:59:55 +0800
+Subject: [PATCH 07/14] ASoC: Add sun8i audio card
+In-Reply-To: <CAEKpxB=JLwqd_wKv1bUAifiQqVpX_RzXq6TSbjVWwza4LT6fhg@mail.gmail.com>
 References: <cover.1475571575.git.mylene.josserand@free-electrons.com>
  <cover.1475569400.git.mylene.josserand@free-electrons.com>
- <db0f628732e8b52b36b8204f146573926957e654.1475571575.git.mylene.josserand@free-electrons.com>
- <CAEKpxBk-e-sXXWD7p6Db_EsFP1bTVjeFsroy7+r5V-ZYC4ndmg@mail.gmail.com>
-Message-ID: <CAGb2v649QDygmRc2eqGiiPvWYUw3SASLm7MRvCh0oB_oqTpkxQ@mail.gmail.com>
+ <33d641ff43f0c0349cdfa2cdbbfdcdde66205596.1475571575.git.mylene.josserand@free-electrons.com>
+ <CAEKpxB=JLwqd_wKv1bUAifiQqVpX_RzXq6TSbjVWwza4LT6fhg@mail.gmail.com>
+Message-ID: <CAGb2v65hS0=ZDHJhR80t-KP8ATu_f+vs8qf5Vn3eyyHDh-4ABg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 4, 2016 at 6:21 PM, Code Kipper <codekipper@gmail.com> wrote:
+On Tue, Oct 4, 2016 at 6:16 PM, Code Kipper <codekipper@gmail.com> wrote:
 > On 4 October 2016 at 11:46, Myl?ne Josserand
 > <mylene.josserand@free-electrons.com> wrote:
->> Add the analog part of the sun8i (A33) codec driver. This driver
->> implements all the analog part of the codec using PRCM registers.
->>
->> The read/write regmap functions must be handled in a custom way as
->> the PRCM register behaves as "mailbox" register.
+>> Add the audio card for sun8i SoC. This card links the codec driver
+>> (digital part) with the DAI driver. The analog codec driver is
+>> added as an aux_device.
 >>
 >> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 >> ---
->>  sound/soc/sunxi/Kconfig              |   7 +
->>  sound/soc/sunxi/Makefile             |   1 +
->>  sound/soc/sunxi/sun8i-codec-analog.c | 304 +++++++++++++++++++++++++++++++++++
->>  3 files changed, 312 insertions(+)
->>  create mode 100644 sound/soc/sunxi/sun8i-codec-analog.c
+>>  sound/soc/sunxi/Kconfig  |  14 +++++++
+>>  sound/soc/sunxi/Makefile |   1 +
+>>  sound/soc/sunxi/sun8i.c  | 101 +++++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 116 insertions(+)
+>>  create mode 100644 sound/soc/sunxi/sun8i.c
 >>
 >> diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
->> index dd23682..7aee95a 100644
+>> index 9e287b0..7b97395 100644
 >> --- a/sound/soc/sunxi/Kconfig
 >> +++ b/sound/soc/sunxi/Kconfig
->> @@ -26,4 +26,11 @@ config SND_SUN4I_SPDIF
->>         help
+>> @@ -27,6 +27,20 @@ config SND_SUN4I_SPDIF
 >>           Say Y or M to add support for the S/PDIF audio block in the Allwinner
 >>           A10 and affiliated SoCs.
->> +
->> +config SND_SUN8I_CODEC_ANALOG
->> +       tristate "Allwinner SUN8I analog codec"
+>>
+>> +config SND_SUN8I
+>> +       tristate "Allwinner SUN6I/SUN8I audio card support"
+>> +       select SND_SUN8I_CODEC
+>> +       select SND_SUN4I_I2S
+>> +       select SND_SUN8I_CODEC_ANALOG
 >> +       select REGMAP_MMIO
->> +        help
->> +         Say Y or M if you want to add sun8i analog audiocodec support
+>> +       help
+>> +         This option enables the audio card for Allwinner A33 (sun8i) SoC.
+>> +         It enables the DAI driver (SND_SUN4I_I2S), the digital audio
+>> +         codec driver (SND_SUN8I_CODEC) and the analog codec driver
+>> +         (SND_SUN8I_CODEC_ANALOG).
 >> +
->>  endmenu
+>> +         Say Y or M if you want to add sun8i/6i card support
+>> +
+>>  config SND_SUN8I_CODEC
+>>         tristate "Allwinner SUN8I audio codec"
+>>         select REGMAP_MMIO
 >> diff --git a/sound/soc/sunxi/Makefile b/sound/soc/sunxi/Makefile
->> index 604c7b84..241c0df 100644
+>> index 1da63d3..7f1bab9 100644
 >> --- a/sound/soc/sunxi/Makefile
 >> +++ b/sound/soc/sunxi/Makefile
->> @@ -1,3 +1,4 @@
+>> @@ -1,5 +1,6 @@
 >>  obj-$(CONFIG_SND_SUN4I_CODEC) += sun4i-codec.o
 >>  obj-$(CONFIG_SND_SUN4I_I2S) += sun4i-i2s.o
 >>  obj-$(CONFIG_SND_SUN4I_SPDIF) += sun4i-spdif.o
->> +obj-$(CONFIG_SND_SUN8I_CODEC_ANALOG) += sun8i-codec-analog.o
->> diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
+>> +obj-$(CONFIG_SND_SUN8I) += sun8i.o
+> Great work with this...I've been battling with the audio codec for the
+> h3 for a while and it looks like almost everything that I need is
+> delivered here.
+>>  obj-$(CONFIG_SND_SUN8I_CODEC) += sun8i-codec.o
+>>  obj-$(CONFIG_SND_SUN8I_CODEC_ANALOG) += sun8i-codec-analog.o
+>> diff --git a/sound/soc/sunxi/sun8i.c b/sound/soc/sunxi/sun8i.c
 >> new file mode 100644
->> index 0000000..be3d540
+>> index 0000000..565cd88
 >> --- /dev/null
->> +++ b/sound/soc/sunxi/sun8i-codec-analog.c
->> @@ -0,0 +1,304 @@
+>> +++ b/sound/soc/sunxi/sun8i.c
+>> @@ -0,0 +1,101 @@
 >> +/*
->> + * This driver supports the analog controls for the internal codec
->> + * found in Allwinner's A31s, A33 and A23 SoCs.
+>> + * ALSA SoC driver for Allwinner sun8i SoC
 >> + *
->> + * Copyright 2016 Chen-Yu Tsai <wens@csie.org>
->> + * Copyright 2016 Myl?ne Josserand <mylene.josserand@free-electrons.com>
+>> + * Copyright (C) 2016 Myl?ne Josserand <mylene.josserand@free-electrons.com>
 >> + *
 >> + * This program is free software; you can redistribute it and/or modify
 >> + * it under the terms of the GNU General Public License as published by
@@ -76,310 +86,101 @@ On Tue, Oct 4, 2016 at 6:21 PM, Code Kipper <codekipper@gmail.com> wrote:
 >> + * GNU General Public License for more details.
 >> + */
 >> +
+>> +#include <linux/firmware.h>
 >> +#include <linux/module.h>
->> +#include <linux/io.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/regmap.h>
 >> +
 >> +#include <sound/soc.h>
->> +#include <sound/soc-dapm.h>
->> +#include <sound/tlv.h>
 >> +
->> +/* Codec analog control register offsets and bit fields */
->> +#define SUN8I_ADDA_HP_VOLC                             0x00
->> +#define SUN8I_ADDA_HP_VOLC_PA_CLK_GATE                 7
->> +#define SUN8I_ADDA_HP_VOLC_HP_VOL                      0
->> +#define SUN8I_ADDA_LOMIXSC                             0x01
->> +#define SUN8I_ADDA_LOMIXSC_MIC1                        6
->> +#define SUN8I_ADDA_LOMIXSC_MIC2                        5
->> +#define SUN8I_ADDA_LOMIXSC_PHONE                       4
->> +#define SUN8I_ADDA_LOMIXSC_PHONEN                      3
->> +#define SUN8I_ADDA_LOMIXSC_LINEINL                     2
->> +#define SUN8I_ADDA_LOMIXSC_DACL                        1
->> +#define SUN8I_ADDA_LOMIXSC_DACR                        0
->> +#define SUN8I_ADDA_ROMIXSC                             0x02
->> +#define SUN8I_ADDA_ROMIXSC_MIC1                        6
->> +#define SUN8I_ADDA_ROMIXSC_MIC2                        5
->> +#define SUN8I_ADDA_ROMIXSC_PHONE                       4
->> +#define SUN8I_ADDA_ROMIXSC_PHONEP                      3
->> +#define SUN8I_ADDA_ROMIXSC_LINEINR                     2
->> +#define SUN8I_ADDA_ROMIXSC_DACR                        1
->> +#define SUN8I_ADDA_ROMIXSC_DACL                        0
->> +#define SUN8I_ADDA_DAC_PA_SRC                          0x03
->> +#define SUN8I_ADDA_DAC_PA_SRC_DACAREN                  7
->> +#define SUN8I_ADDA_DAC_PA_SRC_DACALEN                  6
->> +#define SUN8I_ADDA_DAC_PA_SRC_RMIXEN                   5
->> +#define SUN8I_ADDA_DAC_PA_SRC_LMIXEN                   4
->> +#define SUN8I_ADDA_DAC_PA_SRC_RHPPAMUTE                3
->> +#define SUN8I_ADDA_DAC_PA_SRC_LHPPAMUTE                2
->> +#define SUN8I_ADDA_DAC_PA_SRC_RHPIS                    1
->> +#define SUN8I_ADDA_DAC_PA_SRC_LHPIS                    0
->> +#define SUN8I_ADDA_PHONEIN_GCTRL                       0x04
->> +#define SUN8I_ADDA_PHONEIN_GCTRL_PHONEPG               4
->> +#define SUN8I_ADDA_PHONEIN_GCTRL_PHONENG               0
->> +#define SUN8I_ADDA_LINEIN_GCTRL                        0x05
->> +#define SUN8I_ADDA_LINEIN_GCTRL_LINEING                4
->> +#define SUN8I_ADDA_LINEIN_GCTRL_PHONEG                 0
->> +#define SUN8I_ADDA_MICIN_GCTRL                         0x06
->> +#define SUN8I_ADDA_MICIN_GCTRL_MIC1G                   4
->> +#define SUN8I_ADDA_MICIN_GCTRL_MIC2G                   0
->> +#define SUN8I_ADDA_PAEN_HP_CTRL                        0x07
->> +#define SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN                 7
->> +#define SUN8I_ADDA_PAEN_HP_CTRL_HPCOM_FC               5
->> +#define SUN8I_ADDA_PAEN_HP_CTRL_COMPTEN                4
->> +#define SUN8I_ADDA_PAEN_HP_CTRL_PA_ANTI_POP_CTRL       2
->> +#define SUN8I_ADDA_PAEN_HP_CTRL_LTRNMUTE               1
->> +#define SUN8I_ADDA_PAEN_HP_CTRL_RTLNMUTE               0
->> +#define SUN8I_ADDA_PHONEOUT_CTRL                       0x08
->> +#define SUN8I_ADDA_PHONEOUT_CTRL_PHONEOUTG             5
->> +#define SUN8I_ADDA_PHONEOUT_CTRL_PHONEOUTEN            4
->> +#define SUN8I_ADDA_PHONEOUT_CTRL_PHONEOUTS3            3
->> +#define SUN8I_ADDA_PHONEOUT_CTRL_PHONEOUTS2            2
->> +#define SUN8I_ADDA_PHONEOUT_CTRL_PHONEOUTS1            1
->> +#define SUN8I_ADDA_PHONEOUT_CTRL_PHONEOUTS0            0
->> +#define SUN8I_ADDA_PHONE_GAIN_CTRL                     0x09
->> +#define SUN8I_ADDA_PHONE_GAIN_CTRL_PHONEPREG           0
->> +#define SUN8I_ADDA_MIC2G_CTRL                          0x0a
->> +#define SUN8I_ADDA_MIC2G_CTRL_MIC2AMPEN                7
->> +#define SUN8I_ADDA_MIC2G_CTRL_MIC2BOOST                4
->> +#define SUN8I_ADDA_MIC1G_MICBIAS_CTRL                  0x0b
->> +#define SUN8I_ADDA_MIC1G_MICBIAS_CTRL_HMICBIASEN       7
->> +#define SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MMICBIASEN       6
->> +#define SUN8I_ADDA_MIC1G_MICBIAS_CTRL_HMICBIAS_MODE    5
->> +#define SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1AMPEN        3
->> +#define SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1BOOST        0
->> +#define SUN8I_ADDA_PA_ANTI_POP_CTRL                    0x0e
->> +#define SUN8I_ADDA_ADC_AP_EN                           0x0f
->> +
->> +/* Analog control register access bits */
->> +#define ADDA_PR                                0x0 /* PRCM base + 0x1c0 */
->> +#define ADDA_PR_RESET                          BIT(28)
->> +#define ADDA_PR_WRITE                          BIT(24)
->> +#define ADDA_PR_ADDR_SHIFT                     16
->> +#define ADDA_PR_ADDR_MASK                      GENMASK(4, 0)
->> +#define ADDA_PR_DATA_IN_SHIFT                  8
->> +#define ADDA_PR_DATA_IN_MASK                   GENMASK(7, 0)
->> +#define ADDA_PR_DATA_OUT_SHIFT                 0
->> +#define ADDA_PR_DATA_OUT_MASK                  GENMASK(7, 0)
->> +
->> +/* regmap access bits */
->> +static int adda_reg_read(void *context, unsigned int reg, unsigned int *val)
->> +{
->> +       void __iomem *base = context;
->> +       u32 tmp;
->> +
->> +       tmp = readl(base);
->> +
->> +       /* De-assert reset */
->> +       writel(tmp | ADDA_PR_RESET, base);
->> +
->> +       tmp &= ~(ADDA_PR_ADDR_MASK << ADDA_PR_ADDR_SHIFT);
->> +       tmp |= reg << ADDA_PR_ADDR_SHIFT;
->> +       writel(tmp, base);
->> +
->> +       *val = readl(base) & ADDA_PR_DATA_OUT_MASK;
->> +
->> +       return 0;
->> +}
->> +
->> +static int adda_reg_write(void *context, unsigned int reg, unsigned int val)
->> +{
->> +       void __iomem *base = context;
->> +       u32 tmp;
->> +
->> +       tmp = readl(base);
->> +       /* De-assert reset */
->> +       writel(tmp | ADDA_PR_RESET, base);
->> +
->> +       /* Write the address */
->> +       tmp &= ~(ADDA_PR_ADDR_MASK << ADDA_PR_ADDR_SHIFT);
->> +       tmp |= reg << ADDA_PR_ADDR_SHIFT;
->> +       writel(tmp, base);
->> +
->> +       /* Write the value */
->> +       tmp &= ~(ADDA_PR_DATA_IN_MASK << ADDA_PR_DATA_IN_SHIFT);
->> +       tmp |= val << ADDA_PR_DATA_IN_SHIFT;
->> +       writel(tmp, base);
->> +
->> +       /* Indicate that the previous value must be written */
->> +       writel(readl(base) | ADDA_PR_WRITE, base);
->> +
->> +       /* Reset the write bit */
->> +       writel(readl(base) & ~(ADDA_PR_WRITE), base);
->> +
->> +       return 0;
->> +}
->> +
->> +struct regmap_config adda_pr_regmap_cfg = {
->> +       .name           = "adda-pr",
->> +       .reg_bits       = 5,
->> +       .reg_stride     = 1,
->> +       .val_bits       = 8,
->> +       .reg_read       = adda_reg_read,
->> +       .reg_write      = adda_reg_write,
->> +       .fast_io        = true,
->> +       .max_register   = 24,
->> +};
->> +
->> +static DECLARE_TLV_DB_SCALE(sun8i_codec_headphone_volume_scale, -6300, 100, 1);
->> +
->> +static const struct snd_kcontrol_new sun8i_analog_widgets[] = {
->> +       SOC_SINGLE_TLV("Headphone Volume", SUN8I_ADDA_HP_VOLC,
->> +                      SUN8I_ADDA_HP_VOLC_HP_VOL, 0x3F, 0,
->> +                      sun8i_codec_headphone_volume_scale),
->> +
->> +       /* Playback Switch */
->> +       SOC_DOUBLE("DAC Playback Switch", SUN8I_ADDA_DAC_PA_SRC,
->> +                  SUN8I_ADDA_DAC_PA_SRC_DACALEN, SUN8I_ADDA_DAC_PA_SRC_DACAREN,
->> +                  1, 0),
->> +
->> +       SOC_DOUBLE("Headphone Playback Switch", SUN8I_ADDA_DAC_PA_SRC,
->> +                  SUN8I_ADDA_DAC_PA_SRC_LHPPAMUTE,
->> +                  SUN8I_ADDA_DAC_PA_SRC_RHPPAMUTE, 1, 0),
->> +};
->> +
->> +/* headphone controls */
->> +static const char * const sun8i_codec_hp_src_enum_text[] = {
->> +       "DAC", "Mixer",
->> +};
->> +
->> +static SOC_ENUM_DOUBLE_DECL(sun8i_codec_hp_src_enum,
->> +                           SUN8I_ADDA_DAC_PA_SRC,
->> +                           SUN8I_ADDA_DAC_PA_SRC_LHPIS,
->> +                           SUN8I_ADDA_DAC_PA_SRC_RHPIS,
->> +                           sun8i_codec_hp_src_enum_text);
->> +
->> +static const struct snd_kcontrol_new sun8i_codec_hp_src[] = {
->> +       SOC_DAPM_ENUM("Headphone Source Playback Route",
->> +                     sun8i_codec_hp_src_enum),
->> +};
->> +
->> +static const struct snd_kcontrol_new sun8i_codec_mixer_controls[] = {
->> +       SOC_DAPM_SINGLE("DAC Left Playback Switch",
->> +                       SUN8I_ADDA_LOMIXSC,
->> +                       SUN8I_ADDA_LOMIXSC_DACL, 1, 0),
->> +       SOC_DAPM_SINGLE("DAC Right Playback Switch",
->> +                       SUN8I_ADDA_ROMIXSC,
->> +                       SUN8I_ADDA_ROMIXSC_DACR, 1, 0),
->> +       SOC_DAPM_SINGLE("DAC Reversed Left Playback Switch",
->> +                       SUN8I_ADDA_LOMIXSC,
->> +                       SUN8I_ADDA_LOMIXSC_DACR, 1, 0),
->> +       SOC_DAPM_SINGLE("DAC Reversed Right Playback Switch",
->> +                       SUN8I_ADDA_ROMIXSC,
->> +                       SUN8I_ADDA_ROMIXSC_DACL, 1, 0),
->> +};
->> +
->> +static const struct snd_soc_dapm_widget sun8i_codec_analog_dapm_widgets[] = {
->> +       /* Mixers */
->> +       SOC_MIXER_ARRAY("Left Mixer", SUN8I_ADDA_DAC_PA_SRC,
->> +                       SUN8I_ADDA_DAC_PA_SRC_LMIXEN, 0,
->> +                       sun8i_codec_mixer_controls),
->> +       SOC_MIXER_ARRAY("Right Mixer", SUN8I_ADDA_DAC_PA_SRC,
->> +                       SUN8I_ADDA_DAC_PA_SRC_RMIXEN, 0,
->> +                       sun8i_codec_mixer_controls),
->> +
->> +       /* Headphone output path */
->> +       SND_SOC_DAPM_MUX("Headphone Source Playback Route",
->> +                        SND_SOC_NOPM, 0, 0, sun8i_codec_hp_src),
->> +       SND_SOC_DAPM_OUT_DRV("Headphone Amp", SUN8I_ADDA_PAEN_HP_CTRL,
->> +                            SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN, 0, NULL, 0),
->> +
->> +       /* Headphone outputs */
->> +       SND_SOC_DAPM_OUTPUT("HP"),
->> +
->> +};
->> +
->> +static const struct snd_soc_dapm_route sun8i_codec_analog_dapm_routes[] = {
->> +       /* Left Mixer Routes */
->> +       { "Left Mixer", "DAC Playback Switch", "Left DAC" },
->> +       { "Left Mixer", "DAC Reversed Left Playback Switch", "Right DAC" },
->> +
->> +       /* Right Mixer Routes */
->> +       { "Right Mixer", "DAC Playback Switch", "Right DAC" },
->> +       { "Right Mixer", "DAC Reversed Right Playback Switch", "Left DAC" },
->> +
->> +       /* Headphone Routes */
->> +       { "Headphone Source Playback Route", "DAC", "Left DAC" },
->> +       { "Headphone Source Playback Route", "DAC", "Right DAC" },
->> +       { "Headphone Source Playback Route", "Mixer", "Left Mixer" },
->> +       { "Headphone Source Playback Route", "Mixer", "Right Mixer" },
->> +       { "Headphone Amp", NULL, "Headphone Source Playback Route" },
->> +       { "HP", NULL, "Headphone Amp" },
->> +};
->> +
->> +static const struct snd_soc_component_driver sun8i_codec_analog_cmpnt_drv = {
->> +       .name                   = "sun8i-codec-analog",
->> +       .controls               = sun8i_analog_widgets,
->> +       .num_controls           = ARRAY_SIZE(sun8i_analog_widgets),
->> +       .dapm_widgets           = sun8i_codec_analog_dapm_widgets,
->> +       .num_dapm_widgets       = ARRAY_SIZE(sun8i_codec_analog_dapm_widgets),
->> +       .dapm_routes            = sun8i_codec_analog_dapm_routes,
->> +       .num_dapm_routes        = ARRAY_SIZE(sun8i_codec_analog_dapm_routes),
->> +};
->> +
->> +static const struct of_device_id sun8i_codec_analog_of_match[] = {
->> +       { .compatible = "allwinner,sun8i-codec-analog", },
->> +       {}
->> +};
->> +MODULE_DEVICE_TABLE(of, sun8i_codec_analog_of_match);
->> +
->> +static int sun8i_codec_analog_probe(struct platform_device *pdev)
->> +{
->> +       struct resource *res;
->> +       struct regmap *regmap;
->> +       void __iomem *base;
->> +
->> +       /* Get PRCM resources and registers */
->> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +       base = devm_ioremap_resource(&pdev->dev, res);
->> +       if (IS_ERR(base)) {
->> +               dev_err(&pdev->dev, "Failed to map PRCM registers\n");
->> +               return PTR_ERR(base);
->> +       }
->> +
->> +       regmap = devm_regmap_init(&pdev->dev, NULL, base, &adda_pr_regmap_cfg);
->> +       if (IS_ERR(regmap)) {
->> +               dev_err(&pdev->dev, "Regmap initialisation failed\n");
->> +               return PTR_ERR(regmap);
->> +       }
->> +
->> +       return devm_snd_soc_register_component(&pdev->dev,
->> +                                              &sun8i_codec_analog_cmpnt_drv,
->> +                                              NULL, 0);
->> +}
->> +
->> +static struct platform_driver sun8i_codec_analog_driver = {
->> +       .driver = {
+>> +static struct snd_soc_aux_dev sun8i_audio_prcm_aux_devs[] = {
+>> +       {
 >> +               .name = "sun8i-codec-analog",
->> +               .of_match_table = sun8i_codec_analog_of_match,
+>> +               .codec_name = "sun8i-codec-analog.0",
 >> +       },
->> +       .probe = sun8i_codec_analog_probe,
 >> +};
->> +module_platform_driver(sun8i_codec_analog_driver);
 >> +
->> +MODULE_DESCRIPTION("Allwinner A31s/A33/A23 codec analog controls driver");
-> Does the A31s have the prcm for the codec?, as I was under the
-> impression that it was the same as the A31 and I can't seem to find a
-> datasheet for that SoC. You could also add H3 and A64 here.
+>> +static struct snd_soc_dai_link sun8i_dai_link = {
+>> +       .name           = "sun4i-i2s",
+>> +       .stream_name    = "Playback",
+>> +       .codec_dai_name = "sun8i",
+>> +       .dai_fmt        = SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_I2S |
+>> +                       SND_SOC_DAIFMT_CBM_CFM,
+>> +};
+>> +
+>> +static struct snd_soc_card sun8i_card = {
+>> +       .name           = "sun8i-card",
+>> +       .owner          = THIS_MODULE,
+>> +       .dai_link       = &sun8i_dai_link,
+>> +       .num_links      = 1,
+>> +       .aux_dev        = sun8i_audio_prcm_aux_devs,
+>> +       .num_aux_devs   = ARRAY_SIZE(sun8i_audio_prcm_aux_devs),
+>> +};
+>> +
+>> +static int sun8i_probe(struct platform_device *pdev)
+>> +{
+>> +       struct snd_soc_dai_link *link = &sun8i_dai_link;
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +       int ret;
+>> +
+>> +       /* register the soc card */
+>> +       sun8i_card.dev = &pdev->dev;
+>> +
+>> +       /* Retrieve the audio-codec from DT */
+>> +       link->codec_of_node = of_parse_phandle(np, "allwinner,audio-codec", 0);
+>> +       if (!link->codec_of_node) {
+>> +               dev_err(&pdev->dev, "Missing audio codec\n");
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       /* Retrieve DAI from DT */
+>> +       link->cpu_of_node = of_parse_phandle(np, "allwinner,i2s-controller", 0);
+>> +       if (!link->cpu_of_node) {
+>> +               dev_err(&pdev->dev, "Missing I2S controller\n");
+>> +               return -EINVAL;
+>> +       }
+>> +
+> My one question is that we have sun8i-a23 and sun8i-a33, and I think
+> we need to distinguish them here. The sun8i-a23 doesn't use the i2s
+> block but does use the prcm.
 
-Yes it does, which is why I made this driver.
-
-You can find the datasheet for the A31s in Allwinner's Github repo:
-
-    https://github.com/allwinner-zh/documents
+Agreed. Both the A23 and H3 follow the A31s, that is the codec is similar
+to the A10/A31, but the analog controls are moved to the PRCM. We should
+support these kinds with the existing codec driver.
 
 ChenYu
 
-> CK
->> +MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+>> +       link->platform_of_node = link->cpu_of_node;
+>> +
+>> +       /* Register the sound card */
+>> +       ret = devm_snd_soc_register_card(&pdev->dev, &sun8i_card);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev,
+>> +                       "Soc register card failed %d\n", ret);
+>> +               return ret;
+>> +       }
+>> +
+>> +       return ret;
+>> +}
+>> +
+>> +static const struct of_device_id sun8i_of_match[] = {
+>> +       { .compatible = "allwinner,sun8i-audio", },
+>> +       {},
+>> +};
+>> +
+>> +MODULE_DEVICE_TABLE(of, sun8i_of_match);
+>> +
+>> +static struct platform_driver sun8i_card_driver = {
+>> +       .probe = sun8i_probe,
+>> +       .driver = {
+>> +               .name   = "sun8i-audio",
+>> +               .of_match_table = sun8i_of_match,
+>> +       },
+>> +};
+>> +
+>> +module_platform_driver(sun8i_card_driver);
+>> +
 >> +MODULE_AUTHOR("Myl?ne Josserand <mylene.josserand@free-electrons.com>");
->> +MODULE_LICENSE("GPL");
->> +MODULE_ALIAS("platform:sun8i-codec-analog");
+>> +MODULE_DESCRIPTION("Allwinner sun8i machine ASoC driver");
+>> +MODULE_LICENSE("GPL v2");
 >> --
 >> 2.9.3
 >>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
