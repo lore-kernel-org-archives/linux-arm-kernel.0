@@ -1,184 +1,60 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 4 Oct 2016 10:26:44 -0600
-Subject: [PATCH] Adding missing features of Coresight PTM components
-In-Reply-To: <583ccfa4-ee4e-561a-5480-d0f243194ee3@supelec.fr>
-References: <583ccfa4-ee4e-561a-5480-d0f243194ee3@supelec.fr>
-Message-ID: <CANLsYkybp0Lm-WStT=__yyug1Z9hFG7dgCp8E=iL5_x9C1vv-w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Oct 2016 18:32:29 +0200
+Subject: [PATCH 10/14] dt-bindings: sound: Add sun8i audio card
+ documentation
+In-Reply-To: <c317ce9f180a24611e79086944feca00d416b7b4.1475571575.git.mylene.josserand@free-electrons.com>
+References: <cover.1475571575.git.mylene.josserand@free-electrons.com>
+ <c317ce9f180a24611e79086944feca00d416b7b4.1475571575.git.mylene.josserand@free-electrons.com>
+Message-ID: <20161004163229.GR5228@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 September 2016 at 04:16, Muhammad Abdul WAHAB
-<muhammadabdul.wahab@supelec.fr> wrote:
-> In the current driver for Coresight components, two features of PTM
-> components are missing:
->
-> 1. Branch Broadcasting (present also in ETM but called Branch Output)
-> 2. Return Stack (only present in PTM v1.0 and PTMv1.1)
->
-> These features can be added simply to the code using `mode` field of
-> `etm_config` struct.
-
-The rule of thumb when writing a patch description is to specify "why"
-rather than "what" you are doing.  The above describe the why alright
-and should be kept.  Everything below until your SOB describe what you
-are doing and should be removed.
-
->
-> ## Modifications in coresight-etm.h
-> Two defines are added in register definition part of `coresight_etm.h` file
-> that corresponds to the bitfield of these options. Two defines for mode
-> field are added as well in the same file. The `ETM_MODE_ALL` field is
-> modified accordingly.
->
-> ## Modifs in coresight-etm3x-sysfs.c
-> As the return stack feature is only available in PTM components, a test is
-> made to make sure that for ETM components, this part is never executed.
-> In addition, these two options (Branch Broadcasting and Return Stack) must
-> not be enabled at the same time because the obtained trace is unpredictable
->  in this case (as described in
-> [PFT architecture v1.1](https://goo.gl/lZ72R1)). For now, a warning is
-> shown to alert user that the behavior is unpredictable. However, only one
-> option could be allowed to trace. The user need to change configuration
-> of PTM.
->
-> To enable these features, the correct value should be written in `mode`
-> file. The values are :
->
-> 1. Branch Broadcasting (1 << 5)
-> 2. Return Stack (1 << 6)
->
-> Signed-off-by: Muhammad Abdul Wahab <muhammadabdul.wahab@centralesupelec.fr>
+On Tue, Oct 04, 2016 at 11:46:23AM +0200, Myl?ne Josserand wrote:
+> Add the documentation for dt-binding of the audio card driver
+> for sun8i SoC.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 > ---
-> ### Purpose
->
-> 1. **Branch Broadcast** : The branch broadcast feature is present in ETM
-> components as well and is called Branch output. It allows to retrieve
-> addresses for direct branch addresses alongside the indirect branch
-> addresses. For example, it could be useful in cases when tracing without
-> source code.
-> 2. **Return Stack** : The return stack option allows to retrieve the return
->  addresses of function calls. It can be useful to avoid CRA
-> (Code Reuse Attacks) by keeping a shadowstack.
-
-The above should go in the patch description.
-
->
-> ### Testing
->
-> The trace sink components need to be enabled by accessing through sys file
->  system.
->
->     echo 1 > /sys/bus/coresight/devices/@addr.etb/enable\_sink
->
-> Then enable the CS source component:
->
->     echo 1 > /sys/bus/coresight/devices/@addr.ptm/enable\_source
->
-> By default, CS Source components are configured to trace the kernel.
->
-> Then the trace can be read by dumping ETB.
->
->     dd if=/dev/@addr.etb of=trace_kernel.bin
->
-> The trace can be visualized by
->
->     hexdump -C trace_kernel.bin
->
-> Or stored using
->
->     hexdump -C trace_kernel.bin > trace_kernel.txt
->
-> The trace need to be decoded to be readable.All these above steps can now
-> be performed with Perf Library which was not available at the time I was
-> playing with DT entries.
-
-All of the above is not needed.
-
->
-> diff -uprN -X linux-4.7-vanilla/Documentation/dontdiff
-> linux-4.7-vanilla/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> linux-4.7/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> --- linux-4.7-vanilla/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> 2016-07-24 21:23:50.000000000 +0200
-> +++ linux-4.7/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> 2016-09-28 15:36:39.886542702 +0200
-> @@ -145,7 +145,7 @@ static ssize_t mode_store(struct device
->              goto err_unlock;
->          }
->          config->ctrl |= ETMCR_STALL_MODE;
-> -     } else
-> +    } else
-
-There is indeed an indentation problem here but it can't be fixed in
-this patch.  Please do another patch for this.
-
->          config->ctrl &= ~ETMCR_STALL_MODE;
->
->      if (config->mode & ETM_MODE_TIMESTAMP) {
-> @@ -163,6 +163,20 @@ static ssize_t mode_store(struct device
->      else
->          config->ctrl &= ~ETMCR_CTXID_SIZE;
->
-> +    if (config->mode & ETM_MODE_BBROAD)
-> +        config->ctrl |= ETMCR_BRANCH_BROADCAST;
-> +    else
-> +        config->ctrl &= ~ETMCR_BRANCH_BROADCAST;
+>  Documentation/devicetree/bindings/sound/sun8i-audio.txt | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/sun8i-audio.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/sun8i-audio.txt b/Documentation/devicetree/bindings/sound/sun8i-audio.txt
+> new file mode 100644
+> index 0000000..2403983
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/sun8i-audio.txt
+> @@ -0,0 +1,17 @@
+> +* Allwinner A23/A33 audio card
 > +
-> +    if (drvdata->arch == (PFT_ARCH_V1_0 | PFT_ARCH_V1_1)) {
-
-The sysFS mode users can do what they want, including configurations
-not supported by the HW.  There are so many rules and exception that
-adding a check for every one of they doesn't scale up.  I suggest to
-remove the above check.
-
-> +        if (config->mode & ETM_MODE_RET_STACK) {
-> +            if (config->mode & ETM_MODE_BBROAD)
-> +                dev_warn(drvdata->dev, "behavior is unpredictable\n");
-> +            config->ctrl |= ETMCR_RETURN_STACK_EN;
-> +        } else
-> +            config->ctrl &= ~ETMCR_RETURN_STACK_EN;
-> +    }
+> +This binding implements the A33 audio card.
 > +
->      if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
->          etm_config_trace_mode(config);
->
-> diff -uprN -X linux-4.7-vanilla/Documentation/dontdiff
-> linux-4.7-vanilla/drivers/hwtracing/coresight/coresight-etm.h
-> linux-4.7/drivers/hwtracing/coresight/coresight-etm.h
-> --- linux-4.7-vanilla/drivers/hwtracing/coresight/coresight-etm.h
-> 2016-07-24 21:23:50.000000000 +0200
-> +++ linux-4.7/drivers/hwtracing/coresight/coresight-etm.h    2016-09-28
-> 15:35:59.862544418 +0200
-> @@ -89,11 +89,13 @@
->  /* ETMCR - 0x00 */
->  #define ETMCR_PWD_DWN        BIT(0)
->  #define ETMCR_STALL_MODE    BIT(7)
-> +#define ETMCR_BRANCH_BROADCAST    BIT(8)
->  #define ETMCR_ETM_PRG        BIT(10)
->  #define ETMCR_ETM_EN        BIT(11)
->  #define ETMCR_CYC_ACC        BIT(12)
->  #define ETMCR_CTXID_SIZE    (BIT(14)|BIT(15))
->  #define ETMCR_TIMESTAMP_EN    BIT(28)
-> +#define ETMCR_RETURN_STACK_EN    BIT(29)  /* PTM v1.0 & PTM v1.1 */
->  /* ETMCCR - 0x04 */
->  #define ETMCCR_FIFOFULL        BIT(23)
->  /* ETMPDCR - 0x310 */
-> @@ -110,8 +112,11 @@
->  #define ETM_MODE_STALL        BIT(2)
->  #define ETM_MODE_TIMESTAMP    BIT(3)
->  #define ETM_MODE_CTXID        BIT(4)
-> +#define ETM_MODE_BBROAD    BIT(5)
-> +#define ETM_MODE_RET_STACK    BIT(6)
->  #define ETM_MODE_ALL        (ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
->                   ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
-> +                 ETM_MODE_BBROAD | ETM_MODE_RET_STACK | \
->                   ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
->                   ETM_MODE_EXCL_USER)
+> +Required properties:
+> +- compatible: must be "allwinner,sun8i-audio"
+> +- allwinner,audio-codec: must have the phandle of the audio codec
+> +  ("sun8i-a33-codec", for example).
+> +- allwinner,i2s-controller: must have the phandle of the DAI
+> +  ("allwinner,sun4i-a10-i2s", for example)
 
-You patch doesn't apply on my tree.  Please use "git format-patch" for
-your next submission.  Last but not least the email address in the
-"from:" part of the submission doesn't match the one in the SOB - they
-have to be similar.
+You should probably have a link to the PRCM too, instead of relying on
+the name of the device in your card, which is quite fragile.
+
+Also, I'm wondering, shouldn't all these nodes be part of a single
+MFD? They share the same address space (even though it's split
+nicely), the same clocks, and really are just one big device. Chen-Yu,
+Mark, any opinion?
 
 Thanks,
-Mathieu
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161004/998b2002/attachment.sig>
