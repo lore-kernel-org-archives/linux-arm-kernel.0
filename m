@@ -1,153 +1,62 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  4 Oct 2016 22:33:52 +0530
-Subject: [PATCH V3 8/8] arm64: dma-mapping: Remove the notifier trick to
- handle early setting of dma_ops
-In-Reply-To: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
-References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1475600632-21289-9-git-send-email-sricharan@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 4 Oct 2016 18:07:41 +0100
+Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
+In-Reply-To: <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
+References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
+ <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
+Message-ID: <20161004170741.GC29008@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With arch_setup_dma_ops now being called late during device's probe after the
-device's iommu is probed, the notifier trick required to handle the early
-setup of dma_ops before the iommu group gets created is not required.
-So removing the notifier's here.
+On Tue, Oct 04, 2016 at 05:35:33PM +0200, Fredrik Markstrom wrote:
+> This makes getcpu() ~1000 times faster, this is very useful when
+> implementing per-cpu buffers in userspace (to avoid cache line
+> bouncing). As an example lttng ust becomes ~30% faster.
+> 
+> The patch will break applications using TPIDRURW (which is context switched
+> since commit 4780adeefd042482f624f5e0d577bf9cdcbb760 ("ARM: 7735/2:
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- arch/arm64/mm/dma-mapping.c | 100 ++------------------------------------------
- 1 file changed, 3 insertions(+), 97 deletions(-)
+It looks like you dropped the leading 'a' from the commit ID. For
+everyone else's benefit, the full ID is:
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index faf4b92..eb593af 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -799,24 +799,6 @@ static struct dma_map_ops iommu_dma_ops = {
- 	.mapping_error = iommu_dma_mapping_error,
- };
- 
--/*
-- * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
-- * everything it needs to - the device is only partially created and the
-- * IOMMU driver hasn't seen it yet, so it can't have a group. Thus we
-- * need this delayed attachment dance. Once IOMMU probe ordering is sorted
-- * to move the arch_setup_dma_ops() call later, all the notifier bits below
-- * become unnecessary, and will go away.
-- */
--struct iommu_dma_notifier_data {
--	struct list_head list;
--	struct device *dev;
--	const struct iommu_ops *ops;
--	u64 dma_base;
--	u64 size;
--};
--static LIST_HEAD(iommu_dma_masters);
--static DEFINE_MUTEX(iommu_dma_notifier_lock);
--
- static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
- 			   u64 dma_base, u64 size)
- {
-@@ -837,79 +819,9 @@ static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
- 	return true;
- }
- 
--static void queue_iommu_attach(struct device *dev, const struct iommu_ops *ops,
--			      u64 dma_base, u64 size)
--{
--	struct iommu_dma_notifier_data *iommudata;
--
--	iommudata = kzalloc(sizeof(*iommudata), GFP_KERNEL);
--	if (!iommudata)
--		return;
--
--	iommudata->dev = dev;
--	iommudata->ops = ops;
--	iommudata->dma_base = dma_base;
--	iommudata->size = size;
--
--	mutex_lock(&iommu_dma_notifier_lock);
--	list_add(&iommudata->list, &iommu_dma_masters);
--	mutex_unlock(&iommu_dma_notifier_lock);
--}
--
--static int __iommu_attach_notifier(struct notifier_block *nb,
--				   unsigned long action, void *data)
--{
--	struct iommu_dma_notifier_data *master, *tmp;
--
--	if (action != BUS_NOTIFY_BIND_DRIVER)
--		return 0;
--
--	mutex_lock(&iommu_dma_notifier_lock);
--	list_for_each_entry_safe(master, tmp, &iommu_dma_masters, list) {
--		if (data == master->dev && do_iommu_attach(master->dev,
--				master->ops, master->dma_base, master->size)) {
--			list_del(&master->list);
--			kfree(master);
--			break;
--		}
--	}
--	mutex_unlock(&iommu_dma_notifier_lock);
--	return 0;
--}
--
--static int __init register_iommu_dma_ops_notifier(struct bus_type *bus)
--{
--	struct notifier_block *nb = kzalloc(sizeof(*nb), GFP_KERNEL);
--	int ret;
--
--	if (!nb)
--		return -ENOMEM;
--
--	nb->notifier_call = __iommu_attach_notifier;
--
--	ret = bus_register_notifier(bus, nb);
--	if (ret) {
--		pr_warn("Failed to register DMA domain notifier; IOMMU DMA ops unavailable on bus '%s'\n",
--			bus->name);
--		kfree(nb);
--	}
--	return ret;
--}
--
- static int __init __iommu_dma_init(void)
- {
--	int ret;
--
--	ret = iommu_dma_init();
--	if (!ret)
--		ret = register_iommu_dma_ops_notifier(&platform_bus_type);
--	if (!ret)
--		ret = register_iommu_dma_ops_notifier(&amba_bustype);
--#ifdef CONFIG_PCI
--	if (!ret)
--		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
--#endif
--	return ret;
-+	return iommu_dma_init();
- }
- arch_initcall(__iommu_dma_init);
- 
-@@ -920,18 +832,12 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 
- 	if (!ops)
- 		return;
--	/*
--	 * TODO: As a concession to the future, we're ready to handle being
--	 * called both early and late (i.e. after bus_add_device). Once all
--	 * the platform bus code is reworked to call us late and the notifier
--	 * junk above goes away, move the body of do_iommu_attach here.
--	 */
-+
- 	group = iommu_group_get(dev);
-+
- 	if (group) {
- 		do_iommu_attach(dev, ops, dma_base, size);
- 		iommu_group_put(group);
--	} else {
--		queue_iommu_attach(dev, ops, dma_base, size);
- 	}
- }
- 
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+  a4780adeefd042482f624f5e0d577bf9cdcbb760
+
+Please note that arm64 has done similar for compat tasks since commit:
+
+  d00a3810c16207d2 ("arm64: context-switch user tls register tpidr_el0 for
+  compat tasks")
+
+> Preserve the user r/w register TPIDRURW on context switch and fork")) and
+> is therefore made configurable.
+
+As you note above, this is an ABI break and *will* break some existing
+applications. That's generally a no-go.
+
+This also leaves arm64's compat with the existing behaviour, differing
+from arm.
+
+I was under the impression that other mechanisms were being considered
+for fast userspace access to per-cpu data structures, e.g. restartable
+sequences. What is the state of those? Why is this better?
+
+If getcpu() specifically is necessary, is there no other way to
+implement it?
+
+> +notrace int __vdso_getcpu(unsigned int *cpup, unsigned int *nodep,
+> +			  struct getcpu_cache *tcache)
+> +{
+> +	unsigned long node_and_cpu;
+> +
+> +	asm("mrc p15, 0, %0, c13, c0, 2\n" : "=r"(node_and_cpu));
+> +
+> +	if (nodep)
+> +		*nodep = cpu_to_node(node_and_cpu >> 16);
+> +	if (cpup)
+> +		*cpup  = node_and_cpu & 0xffffUL;
+
+Given this is directly user-accessible, this format is a de-facto ABI,
+even if it's not documented as such. Is this definitely the format you
+want long-term?
+
+Thanks,
+Mark.
