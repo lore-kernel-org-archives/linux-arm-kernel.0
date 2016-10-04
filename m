@@ -1,32 +1,29 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 4 Oct 2016 09:23:30 +0200 (CEST)
-Subject: [PATCH 3/3] Revert "ACPI,PCI,IRQ: remove SCI penalize
- function"
-In-Reply-To: <1475343976-20744-3-git-send-email-okaya@codeaurora.org>
-References: <1475343976-20744-1-git-send-email-okaya@codeaurora.org>
- <1475343976-20744-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <alpine.DEB.2.20.1610040919110.5278@nanos>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 4 Oct 2016 09:28:56 +0200
+Subject: [PATCHv4 1/3] serial: mctrl_gpio: implement mctrl_gpio_use_rtscts
+In-Reply-To: <20160930085801.21497-2-richard.genoud@gmail.com>
+References: <20160930085801.21497-1-richard.genoud@gmail.com>
+ <20160930085801.21497-2-richard.genoud@gmail.com>
+Message-ID: <20161004072856.cgocbex2uj5f3yp4@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 1 Oct 2016, Sinan Kaya wrote:
+Hello Greg,
 
-> This reverts commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI penalize
-> function"). SCI penalty API was replaced by the runtime penalty calculation
-> based on the value of acpi_gbl_FADT.sci_interrupt.
+On Fri, Sep 30, 2016 at 10:57:59AM +0200, Richard Genoud wrote:
+> This function returns true if CTS and RTS are used as GPIOs.
+> Some drivers (like atmel_serial) needs to know if the flow control is
+> handled by the controller or by GPIOs.
 
-This does more than only reverting said commit ....
- 
-> acpi_gbl_FADT.sci_interrupt type does not get updated at the right time
-> for some platforms and results in incorrect penalty assignment for PCI
-> IRQs as irq_get_trigger_type returns the wrong type.
+just for the record: I don't like this patch because I think it's highly
+at91 specific and could so well live in that driver. Moreover I'm not
+conviced yet that it's really the correct thing to do even for this
+driver. So please don't apply, at least until we're done with the
+discussion of patch 2.
 
-And the obvious question is: Why does irq_get_trigger_type() return the
-wrong type?
+Best regards
+Uwe
 
-What's the root cause of this problem? Your changelog does not tell
-anything.
-
-Thanks,
-
-	tglx
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
