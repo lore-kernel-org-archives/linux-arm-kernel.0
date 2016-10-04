@@ -1,57 +1,206 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 4 Oct 2016 13:02:25 +0100
-Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <2af4f2d8-e3a4-fa00-e700-60af70bf4560@jonmasters.org>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <5140357.dcW9ibtZJ6@wuerfel> <57D963C4.4010406@hisilicon.com>
- <5869118.UilSPY9Sai@wuerfel>
- <2af4f2d8-e3a4-fa00-e700-60af70bf4560@jonmasters.org>
-Message-ID: <6bbfeb57-7a55-6a3e-60b2-3f44525e5882@huawei.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 4 Oct 2016 14:04:39 +0200
+Subject: [PATCH v3 2/8] scpi: Add alternative legacy structures, functions
+ and macros
+In-Reply-To: <da2f9471-4b54-c4cd-c3c2-de09fca52ab6@arm.com>
+References: <1473262477-18045-1-git-send-email-narmstrong@baylibre.com>
+ <1473262477-18045-3-git-send-email-narmstrong@baylibre.com>
+ <da2f9471-4b54-c4cd-c3c2-de09fca52ab6@arm.com>
+Message-ID: <ab7962ba-f943-092c-e288-463827fb0d75@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2016 23:03, Jon Masters wrote:
-> On 09/14/2016 02:32 PM, Arnd Bergmann wrote:
->> On Wednesday, September 14, 2016 10:50:44 PM CEST zhichang.yuan wrote:
->
->>> And there are probably multiple child devices under LPC, the global arm64_extio_ops only can cover one PIO range. It is fortunate only ipmi driver can not support I/O
->>> operation registering, serial driver has serial_in/serial_out to
->>> be registered. So, only the PIO range for ipmi device is stored
->>> in arm64_extio_ops and the indirect-IO
->>> works well for ipmi device.
+On 09/19/2016 05:24 PM, Sudeep Holla wrote:
+> 
+> 
+> On 07/09/16 16:34, Neil Armstrong wrote:
+>> In order to support the legacy SCPI protocol variant, add back the structures
+>> and macros that varies against the final specification.
+>> Add indirection table for legacy commands.
+>> Add bitmap field for channel selection
+>> Add support for legacy in scpi_send_message.
 >>
->> You should not do that in the serial driver, please just use the
->> normal 8250 driver that works fine once you handle the entire
->> port range.
->
-> Just for the record, Arnd has the right idea. There is only one type of
-> UART permitted by SBSA (PL011). We carved out an exception for a design
-> that was already in flight and allowed it to be 16550. That other design
-> was then corrected in future generations to be PL011 as we required it
-> to be. Then there's the Hip06. I've given feedback elsewhere about the
-> need for there to be (at most) two types of UART in the wild. This "LPC"
-> stuff needs cleaning up (feedback given elsewhere already on that), but
-> we won't be adding a third serial driver into the mix in order to make
-> it work. There will be standard ARM servers. There will not be the
-> kinda-sorta-standard. Thanks.
->
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  drivers/firmware/arm_scpi.c | 218 ++++++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 211 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+>> index 9a87687..9ba1020 100644
+>> --- a/drivers/firmware/arm_scpi.c
+>> +++ b/drivers/firmware/arm_scpi.c
+> 
+> [..]
+> 
+>> @@ -336,6 +424,39 @@ static void scpi_handle_remote_msg(struct mbox_client *c, void *msg)
+>>      scpi_process_cmd(ch, cmd);
+>>  }
+>>
+>> +static void legacy_scpi_process_cmd(struct scpi_chan *ch)
+>> +{
+>> +    unsigned long flags;
+>> +    struct scpi_xfer *t;
+>> +
+>> +    spin_lock_irqsave(&ch->rx_lock, flags);
+>> +    if (list_empty(&ch->rx_pending)) {
+>> +        spin_unlock_irqrestore(&ch->rx_lock, flags);
+>> +        return;
+>> +    }
+>> +
+>> +    t = list_first_entry(&ch->rx_pending, struct scpi_xfer, node);
+>> +    list_del(&t->node);
+>> +
+> 
+> This is a bad assumption that it will be always first. The legacy SCPI
+> did support multiple commands at a time and they can be reordered when
+> SCP responds to them. Except this it's almost same scpi_process_cmd. You
+> should be able to use it as is if you pass the command.
 
-Right, so I think Zhichang can make the necessary generic changes to 
-8250 OF driver to support IO port as well as MMIO-based.
+I would be happy this was the case...
 
-However an LPC-based earlycon driver is still required.
+> 
+>> +    /* check if wait_for_completion is in progress or timed-out */
+>> +    if (t && !completion_done(&t->done)) {
+>> +        struct legacy_scpi_shared_mem *mem = ch->rx_payload;
+>> +        unsigned int len = t->rx_len;
+>> +
+>> +        t->status = le32_to_cpu(mem->status);
+>> +        memcpy_fromio(t->rx_buf, mem->payload, len);
+>> +        complete(&t->done);
+>> +    }
+>> +    spin_unlock_irqrestore(&ch->rx_lock, flags);
+>> +}
+>> +
+>> +static void legacy_scpi_handle_remote_msg(struct mbox_client *c, void *_msg)
+>> +{
+>> +    struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
+>> +
+>> +    legacy_scpi_process_cmd(ch);
+> 
+> You will get the command in *_msg IIRC. So you can just pass that to
+> scpi_process_cmd. You can even reuse scpi_handle_remote_msg
 
-A note on hip07-based D05 (for those unaware): this does not use 
-LPC-based uart. It uses PL011. The hardware guys have managed some 
-trickery where they loopback the serial line around the BMC/CPLD. But we 
-still need it for hip06 D03 and any other boards which want to use LPC 
-bus for uart.
+But Amlogic SCP firmware does not answer the command but only the first bit...
+so we cannot queue commands because we cannot find back the queued command
+from the replied MHU STAT value.
 
-A question on SBSA: does it propose how to provide serial via BMC for SOL?
+> 
+> diff --git i/drivers/firmware/arm_scpi.c w/drivers/firmware/arm_scpi.c
+> index edf1a3327041..165f2fc3b627 100644
+> --- i/drivers/firmware/arm_scpi.c
+> +++ w/drivers/firmware/arm_scpi.c
+> @@ -419,7 +419,12 @@ static void scpi_handle_remote_msg(struct mbox_client *c, void *msg)
+>  {
+>         struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
+>         struct scpi_shared_mem *mem = ch->rx_payload;
+> -       u32 cmd = le32_to_cpu(mem->command);
+> +       u32 cmd;
+> +
+> +       if (ch->is_legacy)
+> +               cmd = *(u32 *)msg;
+> +       else
+> +               cmd = le32_to_cpu(mem->command);
+> 
+>         scpi_process_cmd(ch, cmd);
+>  }
+> 
+>> +}
+>> +
+>>  static void scpi_tx_prepare(struct mbox_client *c, void *msg)
+>>  {
+>>      unsigned long flags;
+>> @@ -356,6 +477,21 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
+>>      mem->command = cpu_to_le32(t->cmd);
+>>  }
+>>
+>> +static void legacy_scpi_tx_prepare(struct mbox_client *c, void *msg)
+>> +{
+>> +    unsigned long flags;
+>> +    struct scpi_xfer *t = msg;
+>> +    struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
+>> +
+>> +    if (t->tx_buf)
+>> +        memcpy_toio(ch->tx_payload, t->tx_buf, t->tx_len);
+>> +    if (t->rx_buf) {
+>> +        spin_lock_irqsave(&ch->rx_lock, flags);
+>> +        list_add_tail(&t->node, &ch->rx_pending);
+>> +        spin_unlock_irqrestore(&ch->rx_lock, flags);
+>> +    }
+>> +}
+> 
+> Again here the only difference is token addition. I think we should
+> retain that as it's helpful in debugging and I don't think it will have
+> any issues. Worst case we can make it conditional but let's check if we
+> can retain it first.
 
+Yes token addition works.
 
-> Jon.
->
->
-> .
->
+> 
+>> @@ -386,15 +522,25 @@ static int scpi_send_message(u8 cmd, void *tx_buf, unsigned int tx_len,
+>>      struct scpi_xfer *msg;
+>>      struct scpi_chan *scpi_chan;
+>>
+>> -    chan = atomic_inc_return(&scpi_info->next_chan) % scpi_info->num_chans;
+>> +    if (scpi_info->is_legacy)
+>> +        chan = test_bit(cmd, scpi_info->cmd_priority) ? 1 : 0;
+>> +    else
+>> +        chan = atomic_inc_return(&scpi_info->next_chan) %
+>> +            scpi_info->num_chans;
+>>      scpi_chan = scpi_info->channels + chan;
+>>
+>>      msg = get_scpi_xfer(scpi_chan);
+>>      if (!msg)
+>>          return -ENOMEM;
+>>
+>> -    msg->slot = BIT(SCPI_SLOT);
+>> -    msg->cmd = PACK_SCPI_CMD(cmd, tx_len);
+>> +    if (scpi_info->is_legacy) {
+>> +        mutex_lock(&scpi_chan->xfers_lock);
+> 
+> Why does legacy need a different locking scheme ?
+
+Since we cannot queue, locking seems a really good idea...
+
+> 
+> [...]
+> 
+>> @@ -635,6 +804,24 @@ static int scpi_sensor_get_value(u16 sensor, u64 *val)
+>>      return ret;
+>>  }
+>>
+>> +static int legacy_scpi_sensor_get_value(u16 sensor, u64 *val)
+>> +{
+>> +    __le16 id = cpu_to_le16(sensor);
+>> +    struct sensor_value buf;
+>> +    int ret;
+>> +
+>> +    ret = check_cmd(CMD_SENSOR_VALUE);
+>> +    if (ret)
+>> +        return ret;
+>> +
+>> +    ret = scpi_send_message(scpi_info->scpi_cmds[CMD_SENSOR_VALUE],
+>> +                &id, sizeof(id), &buf, sizeof(buf));
+>> +    if (!ret)
+>> +        *val = (u64)le32_to_cpu(buf.lo_val);
+>> +
+> 
+> This is not needed as it's backward compatible as discussed before.
+> Any particular reason you retained it here ?
+> 
+
+Sudeep,
+
+I merged the commands as asked but Amlogic's SCP firmware only replies the value 1 in the MHU STAT registers.
+
+This implies that :
+ - We cannot distinguish what command ended in scpi_handle_remote_msg
+ - We cannot find the last rx command in rx_pending list
+ - We cannot read rx data length from the replied command
+ - We cannot push multiple commands
+ - We also need to wait for TX commands completion
+ - We need locking in scpi_send_message around mbox_send_message and completion
+
+I have an highly tweaked version with simplified path for legacy but with merged handle_remote_msg, tx_prepare and send_message functions
+I will post shortly.
+
+Neil
