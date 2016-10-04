@@ -1,54 +1,26 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 4 Oct 2016 11:20:34 +0200
-Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
-In-Reply-To: <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
- <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
- <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
- <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
-Message-ID: <CAMpxmJW=JgXvM8Rnk40nXxNL7dcqX2jU6HCR2MtQZXRJMd-UZw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Oct 2016 11:22:11 +0200
+Subject: [PATCH] bus: qcom-ebi2: depend on HAS_IOMEM
+In-Reply-To: <e3b1a575-7f97-ed6c-e2c0-16ae193b1b49@codeaurora.org>
+References: <1475445239-25006-1-git-send-email-linus.walleij@linaro.org>
+ <e3b1a575-7f97-ed6c-e2c0-16ae193b1b49@codeaurora.org>
+Message-ID: <4689181.6Kvp1DKsXN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-09-30 21:19 GMT+02:00 Peter Ujfalusi <peter.ujfalusi@ti.com>:
-> On 09/30/2016 06:06 PM, Bartosz Golaszewski wrote:
->>
->> Just ran a quick test with speaker-test -c2 -twav. Besides the fact
->> that the left and right channels are inverted (I'm looking into that),
->> I didn't notice any problems. Even at 1024x768 resolution, playing
->> audio at the same time seems to work fine.
->
+On Monday, October 3, 2016 12:04:00 PM CEST Stephen Boyd wrote:
+> On 10/02/2016 02:53 PM, Linus Walleij wrote:
+> > After being asked to not depend on ARCH_QCOM* or similar,
+> > unsurprisingly compilation fails on UM as it has no I/O
+> > memory:
+> 
+> We could have depends on ARCH_QCOM || COMPILE_TEST and then life is
+> good. The HAS_IOMEM would of course stick around for compile testing.
 
-Hi Peter
+Agreed, that would be nice also since most x86 don't want to
+see the Kconfig option unless they set COMPILE_TEST.
 
-> That's good to hear, but I think the priorities should be set:
-> LCDC and EDMA30TC1 to highest priority
-> EDMA30TC0 to priority 2
->
-> The 0TC0 is used by MMC and if you want to play a video you might need the
-> servicing TC to be higher priority then other masters.
->
-> If audio playback would trigger sync losts in lcdc then we might need to move
-> 0TC1 to priority 1.
->
+Note that COMPILE_TEST now depends on !UML, so we don't have
+to worry about that any more.
 
-Did you mean "set EDMA31TC0 to priority 2"? EDMA30TC0 is already at
-the highest priority. Or did you mean that we need to lower the
-EDMA30TC0 priority? In that case: is 2 the correct value? EDMA31TC0 is
-used by mmc1 and its priority is 4. Shouldn't we set both to be the
-same?
-
-> I agree that LCDC priority needs to be higher, but I do wonder why the default
-> (5) is not working and if it is not working why it is 5...
->
-> My guess is that the change in the PBBPR register is the one actually helping
-> here.
->
-
-While it seems that lowering the EDMA30TC0 priority is indeed
-unnecessary, if I don't set the LCDC master to priority 0, I still get
-FIFO underflows even with the change in PBBPR.
-
-Thanks,
-Bartosz
+	Arnd
