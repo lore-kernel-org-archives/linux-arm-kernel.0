@@ -1,109 +1,32 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Tue, 4 Oct 2016 21:24:01 +0200
-Subject: [PATCH v3 2/7] i2c: bcm2835: Protect against unexpected TXW/RXR
- interrupts
-In-Reply-To: <8760p9xlqy.fsf@eliezer.anholt.net>
-References: <1475085056-5205-1-git-send-email-noralf@tronnes.org>
- <1475085056-5205-3-git-send-email-noralf@tronnes.org>
- <87oa37fzx6.fsf@eliezer.anholt.net>
- <d93a0590-1783-b913-9362-007628cb17d6@tronnes.org>
- <8760p9xlqy.fsf@eliezer.anholt.net>
-Message-ID: <b5c2647f-fd75-61be-e9ba-b1e09630a1f0@tronnes.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Oct 2016 23:05:51 +0200
+Subject: [PATCH 07/15] clk: sunxi: mod0: improve function-level
+ documentation
+In-Reply-To: <1475351192-27079-8-git-send-email-Julia.Lawall@lip6.fr>
+References: <1475351192-27079-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1475351192-27079-8-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20161004210551.GT5228@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Oct 01, 2016 at 09:46:24PM +0200, Julia Lawall wrote:
+> Use the actual function name in the function documentation.
+> 
+> Issue detected using Coccinelle (http://coccinelle.lip6.fr/)
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Den 03.10.2016 21:42, skrev Eric Anholt:
-> Noralf Tr?nnes <noralf@tronnes.org> writes:
->
->> Den 29.09.2016 00:00, skrev Eric Anholt:
->>> Noralf Tr?nnes <noralf@tronnes.org> writes:
->>>
->>>> If an unexpected TXW or RXR interrupt occurs (msg_buf_remaining == 0),
->>>> the driver has no way to fill/drain the FIFO to stop the interrupts.
->>>> In this case the controller has to be disabled and the transfer
->>>> completed to avoid hang.
->>>>
->>>> (CLKT | ERR) and DONE interrupts are completed in their own paths, and
->>>> the controller is disabled in the transfer function after completion.
->>>> Unite the code paths and do disabling inside the interrupt routine.
->>>>
->>>> Clear interrupt status bits in the united completion path instead of
->>>> trying to do it on every interrupt which isn't necessary.
->>>> Only CLKT, ERR and DONE can be cleared that way.
->>>>
->>>> Add the status value to the error value in case of TXW/RXR errors to
->>>> distinguish them from the other S_LEN error.
->>> I was surprised that not writing the TXW/RXR bits on handling their
->>> interrupts was OK, given that we were doing so before, but it's a level
->>> interrupt and those bits are basically ignored on write.
->>>
->>> This patch and 3, 4, and 6 are:
->>>
->>> Reviewed-by: Eric Anholt <eric@anholt.net>
->>>
->>> Patch 5 is:
->>>
->>> Acked-by: Eric Anholt <eric@anholt.net>
->>>
->>> Note for future debug: The I2C_C_CLEAR on errors will take some time to
->>> resolve -- if you were in non-idle state and I2C_C_READ, it sets an
->>> abort_rx flag and runs through the state machine to send a NACK and a
->>> STOP, I think.  Since we're setting CLEAR without I2CEN, that NACK will
->>> be hanging around queued up for next time we start the engine.
->> Maybe you're able to explain the issues I had with reset:
->> https://github.com/raspberrypi/linux/issues/1653
-> One of the questions I think you might have is "what state does the
-> controller end up in after the various interrupts?"
->
-> ERR:
-> - produced if we get a nack that's not at the end of a read.
->
-> - Proceeds to repeated start if BCM2835_I2C_C_ST is queued, otherwise
->    stop.
->
-> CLKT:
-> - Triggered by a counter outside of the state machine when stretching
->    happens and then times out.
->
-> - Sets cs_override, which causes proceeding through the state machine as
->    if the clock wasn't getting stretched, until the end of the next byte
->    sent/received.
->
-> - According to Wolfram we shouldn't be timing out on clock stretching
->    for i2c, just on the transfer as a whole
->    (https://patchwork.kernel.org/patch/9148431/), so I wrote
->    https://github.com/anholt/linux/commit/894200276239d2e4c60b378bdc52164fcb13af8d.
->    However, I don't see an obvious way to get back to IDLE while the
->    slave is still stretching, without triggering the clock stretching
->    timeout path.
+Applied, thanks!
+Maxime
 
-If the transfer times out, whatever the reason, we clear the fifo
-(and disable). Doesn't that get us back to IDLE?
-
-Code with my patches:
-
-static int bcm2835_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
-                 int num)
-{
-[...]
-     bcm2835_i2c_start_transfer(i2c_dev);
-
-     time_left = wait_for_completion_timeout(&i2c_dev->completion,
-                         adap->timeout);
-     if (!time_left) {
-         bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C,
-                    BCM2835_I2C_C_CLEAR);
-         dev_err(i2c_dev->dev, "i2c transfer timed out\n");
-         return -ETIMEDOUT;
-     }
-
-> DONE:
-> - Signaled at STOP, and just moves to IDLE state which keeps scl/sda
->    high and waits for a BCM2835_I2C_C_ST while we're not clearing the
->    FIFOs (if you do signal start while the fifos are clearing, the start
->    will hang around until the fifo clear is done).  This is the only way
->    to get to IDLE.
->
-> I'm don't think I have an answer to the "what should I do?" question you
-> had, but hopefully this helps.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161004/6642e966/attachment.sig>
