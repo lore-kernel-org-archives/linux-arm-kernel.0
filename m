@@ -1,41 +1,43 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue,  4 Oct 2016 17:15:18 -0400
-Subject: [PATCH V2 2/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA interrupts
-In-Reply-To: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
-References: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1475615720-31047-3-git-send-email-okaya@codeaurora.org>
+Date: Tue,  4 Oct 2016 17:15:16 -0400
+Subject: [PATCH V2 0/3] ACPI,PCI,IRQ: revert penalty calculation for SCI
+Message-ID: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
-resource requirements") removed PCI_USING penalty from
-acpi_pci_link_allocate function as there is no longer a fixed size penalty
-array for both PCI and IRQ interrupts.
+Restoring the old behavior for IRQ < 256 and the dynamic penalty behavior
+will remain effective for IRQ >= 256.
 
-We need to add the PCI_USING penalty for ISA interrupts too if the link is
-in use and matches our ISA IRQ number.
+By the time ACPI gets initialized, this code tries to determine an
+IRQ number based on penalty values in this array. It will try to locate
+the IRQ with the least penalty assignment so that interrupt sharing is
+avoided if possible.
 
-Tested-by: Jonathan Liu <net147@gmail.com>
-Tested-by: Ondrej Zary <linux@rainbow-software.org>
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/acpi/pci_link.c | 4 ++++
- 1 file changed, 4 insertions(+)
+A couple of notes about the external APIs:
+1. These API can be called before the ACPI is started. Therefore, one
+cannot assume that the PCI link objects are initialized for calculating
+penalties.
+2. The polarity and trigger information passed via the
+acpi_penalize_sci_irq from the BIOS may not match what the IRQ subsystem
+is reporting as the call might have been placed before the IRQ is
+registered by the interrupt subsystem.
 
-diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-index f3792f4..06c2a11 100644
---- a/drivers/acpi/pci_link.c
-+++ b/drivers/acpi/pci_link.c
-@@ -620,6 +620,10 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
- 			    acpi_device_bid(link->device));
- 		return -ENODEV;
- 	} else {
-+		if (link->irq.active < ACPI_MAX_IRQS)
-+			acpi_irq_penalty[link->irq.active] +=
-+				PIRQ_PENALTY_PCI_USING;
-+
- 		printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
- 		       acpi_device_name(link->device),
- 		       acpi_device_bid(link->device), link->irq.active);
+The reverted changes were in the direction to remove these external API and
+try to calculate the penalties at runtime for the ISA, SCI as well as PCI
+IRQS. This didn't work out well with the existing platforms.
+
+Changes from V1 (https://lkml.org/lkml/2016/10/1/106):
+* Commit message updates
+
+Sinan Kaya (3):
+  Revert "ACPI,PCI,IRQ: reduce static IRQ array size to 16"
+  ACPI, PCI IRQ: add PCI_USING penalty for ISA interrupts
+  Revert "ACPI,PCI,IRQ: remove SCI penalize function"
+
+ arch/x86/kernel/acpi/boot.c |  1 +
+ drivers/acpi/pci_link.c     | 71 ++++++++++++++++++++++-----------------------
+ include/linux/acpi.h        |  1 +
+ 3 files changed, 37 insertions(+), 36 deletions(-)
+
 -- 
 1.9.1
