@@ -1,206 +1,64 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 4 Oct 2016 14:04:39 +0200
-Subject: [PATCH v3 2/8] scpi: Add alternative legacy structures, functions
- and macros
-In-Reply-To: <da2f9471-4b54-c4cd-c3c2-de09fca52ab6@arm.com>
-References: <1473262477-18045-1-git-send-email-narmstrong@baylibre.com>
- <1473262477-18045-3-git-send-email-narmstrong@baylibre.com>
- <da2f9471-4b54-c4cd-c3c2-de09fca52ab6@arm.com>
-Message-ID: <ab7962ba-f943-092c-e288-463827fb0d75@baylibre.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 4 Oct 2016 14:12:21 +0200
+Subject: [PATCH 01/14] dma: sun6i-dma: Add burst case of 4
+In-Reply-To: <20161004124011.d7f5754a082d5f17d5185fc4@free.fr>
+References: <cover.1475569400.git.mylene.josserand@free-electrons.com>
+ <3a2404510b5f8b16ae3bb193982d70f158700b2b.1475571575.git.mylene.josserand@free-electrons.com>
+ <20161004124011.d7f5754a082d5f17d5185fc4@free.fr>
+Message-ID: <20161004141221.55327f1b@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2016 05:24 PM, Sudeep Holla wrote:
-> 
-> 
-> On 07/09/16 16:34, Neil Armstrong wrote:
->> In order to support the legacy SCPI protocol variant, add back the structures
->> and macros that varies against the final specification.
->> Add indirection table for legacy commands.
->> Add bitmap field for channel selection
->> Add support for legacy in scpi_send_message.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  drivers/firmware/arm_scpi.c | 218 ++++++++++++++++++++++++++++++++++++++++++--
->>  1 file changed, 211 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
->> index 9a87687..9ba1020 100644
->> --- a/drivers/firmware/arm_scpi.c
->> +++ b/drivers/firmware/arm_scpi.c
-> 
-> [..]
-> 
->> @@ -336,6 +424,39 @@ static void scpi_handle_remote_msg(struct mbox_client *c, void *msg)
->>      scpi_process_cmd(ch, cmd);
->>  }
->>
->> +static void legacy_scpi_process_cmd(struct scpi_chan *ch)
->> +{
->> +    unsigned long flags;
->> +    struct scpi_xfer *t;
->> +
->> +    spin_lock_irqsave(&ch->rx_lock, flags);
->> +    if (list_empty(&ch->rx_pending)) {
->> +        spin_unlock_irqrestore(&ch->rx_lock, flags);
->> +        return;
->> +    }
->> +
->> +    t = list_first_entry(&ch->rx_pending, struct scpi_xfer, node);
->> +    list_del(&t->node);
->> +
-> 
-> This is a bad assumption that it will be always first. The legacy SCPI
-> did support multiple commands at a time and they can be reordered when
-> SCP responds to them. Except this it's almost same scpi_process_cmd. You
-> should be able to use it as is if you pass the command.
+Hello,
 
-I would be happy this was the case...
+On Tue, 4 Oct 2016 12:40:11 +0200, Jean-Francois Moine wrote:
 
+> > Add the case of a burst of 4 which is handled by the SoC.
+> > 
+> > Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> > ---
+> >  drivers/dma/sun6i-dma.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> > index 8346199..0485204 100644
+> > --- a/drivers/dma/sun6i-dma.c
+> > +++ b/drivers/dma/sun6i-dma.c
+> > @@ -240,6 +240,8 @@ static inline s8 convert_burst(u32 maxburst)
+> >  	switch (maxburst) {
+> >  	case 1:
+> >  		return 0;
+> > +	case 4:
+> > +		return 1;
+> >  	case 8:
+> >  		return 2;
+> >  	default:
+> > -- 
+> > 2.9.3  
 > 
->> +    /* check if wait_for_completion is in progress or timed-out */
->> +    if (t && !completion_done(&t->done)) {
->> +        struct legacy_scpi_shared_mem *mem = ch->rx_payload;
->> +        unsigned int len = t->rx_len;
->> +
->> +        t->status = le32_to_cpu(mem->status);
->> +        memcpy_fromio(t->rx_buf, mem->payload, len);
->> +        complete(&t->done);
->> +    }
->> +    spin_unlock_irqrestore(&ch->rx_lock, flags);
->> +}
->> +
->> +static void legacy_scpi_handle_remote_msg(struct mbox_client *c, void *_msg)
->> +{
->> +    struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
->> +
->> +    legacy_scpi_process_cmd(ch);
+> This patch has already been rejected by Maxime in the threads
+> 	http://www.spinics.net/lists/dmaengine/msg08610.html
+> and
+> 	http://www.spinics.net/lists/dmaengine/msg08719.html
 > 
-> You will get the command in *_msg IIRC. So you can just pass that to
-> scpi_process_cmd. You can even reuse scpi_handle_remote_msg
+> I hope you will find the way he wants for this maxburst to be added.
 
-But Amlogic SCP firmware does not answer the command but only the first bit...
-so we cannot queue commands because we cannot find back the queued command
-from the replied MHU STAT value.
+I was about to reply to Mylene's e-mail, suggesting that she should add
+a comment in the code (and maybe in the commit log) to explain why this
+addition is needed, and also that even though the schematics say that
+value "1" (max burst size of 4 bytes) is reserved, it is in fact
+incorrect. The Allwinner BSP code is really using this value, and it's
+the value that makes audio work, so we believe the datasheet is simply
+incorrect.
 
-> 
-> diff --git i/drivers/firmware/arm_scpi.c w/drivers/firmware/arm_scpi.c
-> index edf1a3327041..165f2fc3b627 100644
-> --- i/drivers/firmware/arm_scpi.c
-> +++ w/drivers/firmware/arm_scpi.c
-> @@ -419,7 +419,12 @@ static void scpi_handle_remote_msg(struct mbox_client *c, void *msg)
->  {
->         struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
->         struct scpi_shared_mem *mem = ch->rx_payload;
-> -       u32 cmd = le32_to_cpu(mem->command);
-> +       u32 cmd;
-> +
-> +       if (ch->is_legacy)
-> +               cmd = *(u32 *)msg;
-> +       else
-> +               cmd = le32_to_cpu(mem->command);
-> 
->         scpi_process_cmd(ch, cmd);
->  }
-> 
->> +}
->> +
->>  static void scpi_tx_prepare(struct mbox_client *c, void *msg)
->>  {
->>      unsigned long flags;
->> @@ -356,6 +477,21 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
->>      mem->command = cpu_to_le32(t->cmd);
->>  }
->>
->> +static void legacy_scpi_tx_prepare(struct mbox_client *c, void *msg)
->> +{
->> +    unsigned long flags;
->> +    struct scpi_xfer *t = msg;
->> +    struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
->> +
->> +    if (t->tx_buf)
->> +        memcpy_toio(ch->tx_payload, t->tx_buf, t->tx_len);
->> +    if (t->rx_buf) {
->> +        spin_lock_irqsave(&ch->rx_lock, flags);
->> +        list_add_tail(&t->node, &ch->rx_pending);
->> +        spin_unlock_irqrestore(&ch->rx_lock, flags);
->> +    }
->> +}
-> 
-> Again here the only difference is token addition. I think we should
-> retain that as it's helpful in debugging and I don't think it will have
-> any issues. Worst case we can make it conditional but let's check if we
-> can retain it first.
+We already discussed it with Maxime, so I believe he should agree this
+time. But I would suggest to have such details explained in the commit
+log and in a comment in the code.
 
-Yes token addition works.
+Best regards,
 
-> 
->> @@ -386,15 +522,25 @@ static int scpi_send_message(u8 cmd, void *tx_buf, unsigned int tx_len,
->>      struct scpi_xfer *msg;
->>      struct scpi_chan *scpi_chan;
->>
->> -    chan = atomic_inc_return(&scpi_info->next_chan) % scpi_info->num_chans;
->> +    if (scpi_info->is_legacy)
->> +        chan = test_bit(cmd, scpi_info->cmd_priority) ? 1 : 0;
->> +    else
->> +        chan = atomic_inc_return(&scpi_info->next_chan) %
->> +            scpi_info->num_chans;
->>      scpi_chan = scpi_info->channels + chan;
->>
->>      msg = get_scpi_xfer(scpi_chan);
->>      if (!msg)
->>          return -ENOMEM;
->>
->> -    msg->slot = BIT(SCPI_SLOT);
->> -    msg->cmd = PACK_SCPI_CMD(cmd, tx_len);
->> +    if (scpi_info->is_legacy) {
->> +        mutex_lock(&scpi_chan->xfers_lock);
-> 
-> Why does legacy need a different locking scheme ?
-
-Since we cannot queue, locking seems a really good idea...
-
-> 
-> [...]
-> 
->> @@ -635,6 +804,24 @@ static int scpi_sensor_get_value(u16 sensor, u64 *val)
->>      return ret;
->>  }
->>
->> +static int legacy_scpi_sensor_get_value(u16 sensor, u64 *val)
->> +{
->> +    __le16 id = cpu_to_le16(sensor);
->> +    struct sensor_value buf;
->> +    int ret;
->> +
->> +    ret = check_cmd(CMD_SENSOR_VALUE);
->> +    if (ret)
->> +        return ret;
->> +
->> +    ret = scpi_send_message(scpi_info->scpi_cmds[CMD_SENSOR_VALUE],
->> +                &id, sizeof(id), &buf, sizeof(buf));
->> +    if (!ret)
->> +        *val = (u64)le32_to_cpu(buf.lo_val);
->> +
-> 
-> This is not needed as it's backward compatible as discussed before.
-> Any particular reason you retained it here ?
-> 
-
-Sudeep,
-
-I merged the commands as asked but Amlogic's SCP firmware only replies the value 1 in the MHU STAT registers.
-
-This implies that :
- - We cannot distinguish what command ended in scpi_handle_remote_msg
- - We cannot find the last rx command in rx_pending list
- - We cannot read rx data length from the replied command
- - We cannot push multiple commands
- - We also need to wait for TX commands completion
- - We need locking in scpi_send_message around mbox_send_message and completion
-
-I have an highly tweaked version with simplified path for legacy but with merged handle_remote_msg, tx_prepare and send_message functions
-I will post shortly.
-
-Neil
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
