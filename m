@@ -1,54 +1,67 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 4 Oct 2016 10:49:04 -0700
-Subject: [PATCH] clocksource: arm_arch_timer: Don't assume clock runs in
- suspend
-In-Reply-To: <20160929170847.1227a312@arm.com>
-References: <20160916054917.16930-1-briannorris@chromium.org>
- <57DBA81F.2060404@arm.com> <20160919231441.GA60928@google.com>
- <57E0E97B.5000106@arm.com> <20160928012309.GA29518@localhost>
- <20160929170847.1227a312@arm.com>
-Message-ID: <20161004174903.GA3098@localhost>
+From: bdegraaf@codeaurora.org (bdegraaf at codeaurora.org)
+Date: Tue, 04 Oct 2016 13:53:35 -0400
+Subject: [RFC] arm64: Enforce observed order for spinlock and data
+In-Reply-To: <20161004101208.GA18083@leverpostej>
+References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
+ <20160930193231.GA2521@remoulade>
+ <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
+ <20161001181101.GA17554@remoulade>
+ <b86926dc0203384522e0e6ce18bbb132@codeaurora.org>
+ <20161004101208.GA18083@leverpostej>
+Message-ID: <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On Thu, Sep 29, 2016 at 05:08:47PM +0100, Marc Zyngier wrote:
-> On Tue, 27 Sep 2016 18:23:11 -0700
-> Brian Norris <briannorris@chromium.org> wrote:
-> > On Tue, Sep 20, 2016 at 08:47:07AM +0100, Marc Zyngier wrote:
-> > <Begin side note>
-> > rk3288 (ARMv7 system widely used for our Chromebooks) has the same
-> > issue, except the kernel we're using for production (based on v3.14)
-> > doesn't have the following commit, which stopped utilizing the RTC:
-> > 
-> > commit 0fa88cb4b82b5cf7429bc1cef9db006ca035754e
-> > Author: Xunlei Pang <pang.xunlei@linaro.org>
-> > Date:   Wed Apr 1 20:34:38 2015 -0700
-> > 
-> >     time, drivers/rtc: Don't bother with rtc_resume() for the nonstop clocksource
-> > 
-> > And any mainline testing on rk3288 doesn't see the problem, because
-> > mainline doesn't support its lowest-power sleep modes well enough (see
-> > ROCKCHIP_ARM_OFF_LOGIC_DEEP in arch/arm/mach-rockchip/pm.c).
+On 2016-10-04 06:12, Mark Rutland wrote:
+> On Mon, Oct 03, 2016 at 03:20:57PM -0400, bdegraaf at codeaurora.org 
+> wrote:
+>> On 2016-10-01 14:11, Mark Rutland wrote:
+>> >Hi Brent,
+>> >
+>> >Evidently my questions weren't sufficiently clear; even with your
+>> >answers it's not clear to me what precise issue you're attempting to
+>> >solve.  I've tried to be more specific this time.
+>> >
+>> >At a high-level, can you clarify whether you're attempting to solve is:
+>> >
+>> >(a) a functional correctness issue (e.g. data corruption)
+>> >(b) a performance issue
+>> >
+>> >And whether this was seen in practice, or found through code
+>> >inspection?
 > 
-> Arghh... So even my favourite Chromebook (from which I'm typing this
-> email) is affected? Not very nice...
+>> Thinking about this, as the reader/writer code has no known "abuse"
+>> case, I'll remove it from the patchset, then provide a v2 patchset
+>> with a detailed explanation for the lockref problem using the commits
+>> you provided as an example, as well as performance consideration.
+> 
+> If there's a functional problem, let's consider that in isolation 
+> first.
+> Once we understand that, then we can consider doing what is optimal.
+> 
+> As should be obvious from the above, I'm confused because this patch
+> conflates functional details with performance optimisations which (to
+> me) sound architecturally dubious.
+> 
+> I completely agree with Peter that if the problem lies with lockref, it
+> should be solved in the lockref code.
+> 
+> Thanks,
+> Mark.
 
-Yep. But if you're running mainline, you just get to have high S3 power
-consumption instead!
+After looking at this, the problem is not with the lockref code per se: 
+it is
+a problem with arch_spin_value_unlocked().  In the out-of-order case,
+arch_spin_value_unlocked() can return TRUE for a spinlock that is in 
+fact
+locked but the lock is not observable yet via an ordinary load.  Other 
+than
+ensuring order on the locking side (as the prior patch did), there is a 
+way
+to make arch_spin_value_unlock's TRUE return value deterministic, but it
+requires that it does a write-back to the lock to ensure we didn't 
+observe
+the unlocked value while another agent was in process of writing back a
+locked value.
 
-> > <End side note>
-
-> As for the 64bit kernel, it would be interesting to verify that on
-> resume, the VDSO does return the right (corrected) value, and not
-> something stale.
-
-It would be interesting, except all my current user spaces are built for
-32-bit, so it's not too easy for me to test. Perhaps I could pull in
-this [1]. (On the bright side, this means that VDSO can't possibly be
-breaking on my systems!)
-
-Brian
-
-[1] http://www.spinics.net/lists/arm-kernel/msg530185.html
+Brent
