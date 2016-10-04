@@ -1,133 +1,73 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 4 Oct 2016 10:02:45 +0200
-Subject: [PATCH 1/3] pinctrl: sunxi: Add support for fetching pinconf
- settings from hardware
-In-Reply-To: <20161004015112.20833-2-wens@csie.org>
-References: <20161004015112.20833-1-wens@csie.org>
- <20161004015112.20833-2-wens@csie.org>
-Message-ID: <20161004080245.GK5228@lukather>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue,  4 Oct 2016 17:08:18 +0200
+Subject: [RFC 00/10] irqchip: meson: add support for the gpio interrupt
+ controller
+Message-ID: <1475593708-10526-1-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2016 at 09:51:10AM +0800, Chen-Yu Tsai wrote:
-> The sunxi pinctrl driver only caches whatever pinconf setting was last
-> set on a given pingroup. This is not particularly helpful, nor is it
-> correct.
-> 
-> Fix this by actually reading the hardware registers and returning
-> the correct results or error codes. Also filter out unsupported
-> pinconf settings. Since this driver has a peculiar setup of 1 pin
-> per group, we can support both pin and pingroup pinconf setting
-> read back with the same code. The sunxi_pconf_reg helper and code
-> structure is inspired by pinctrl-msm.
-> 
-> With this done we can also claim to support generic pinconf, by
-> setting .is_generic = true in pinconf_ops.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 85 +++++++++++++++++++++++++++++++++--
->  1 file changed, 82 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> index 54455af566ec..609843c9a65c 100644
-> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-> @@ -10,6 +10,7 @@
->   * warranty of any kind, whether express or implied.
->   */
->  
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
->  #include <linux/io.h>
->  #include <linux/clk.h>
->  #include <linux/gpio/driver.h>
-> @@ -269,15 +270,91 @@ static const struct pinctrl_ops sunxi_pctrl_ops = {
->  	.get_group_pins		= sunxi_pctrl_get_group_pins,
->  };
->  
-> +static int sunxi_pconf_reg(unsigned pin, enum pin_config_param param,
-> +			   u32 *offset, u32 *shift, u32 *mask)
-> +{
-> +	switch (param) {
-> +	case PIN_CONFIG_DRIVE_STRENGTH:
-> +		*offset = sunxi_dlevel_reg(pin);
-> +		*shift = sunxi_dlevel_offset(pin);
-> +		*mask = DLEVEL_PINS_MASK;
-> +		break;
-> +
-> +	case PIN_CONFIG_BIAS_PULL_UP:
-> +	case PIN_CONFIG_BIAS_PULL_DOWN:
-> +	case PIN_CONFIG_BIAS_DISABLE:
-> +		*offset = sunxi_pull_reg(pin);
-> +		*shift = sunxi_pull_offset(pin);
-> +		*mask = PULL_PINS_MASK;
-> +		break;
-> +
-> +	default:
-> +		return -ENOTSUPP;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_pconf_get(struct pinctrl_dev *pctldev, unsigned pin,
-> +			   unsigned long *config)
-> +{
-> +	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
-> +	enum pin_config_param param = pinconf_to_config_param(*config);
-> +	u32 offset, shift, mask, val;
-> +	u16 arg;
-> +	int ret;
-> +
-> +	pin -= pctl->desc->pin_base;
-> +
-> +	ret = sunxi_pconf_reg(pin, param, &offset, &shift, &mask);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	val = (readl(pctl->membase + offset) >> shift) & mask;
-> +
-> +	switch (pinconf_to_config_param(*config)) {
-> +	case PIN_CONFIG_DRIVE_STRENGTH:
-> +		arg = (val + 1) * 10;
-> +		break;
-> +
-> +	case PIN_CONFIG_BIAS_PULL_UP:
-> +		if (val != SUN4I_PINCTRL_PULL_UP)
-> +			return -EINVAL;
-> +		arg = 1; /* hardware is weak pull-up */
-> +		break;
-> +
-> +	case PIN_CONFIG_BIAS_PULL_DOWN:
-> +		if (val != SUN4I_PINCTRL_PULL_DOWN)
-> +			return -EINVAL;
-> +		arg = 1; /* hardware is weak pull-down */
-> +		break;
-> +
-> +	case PIN_CONFIG_BIAS_DISABLE:
-> +		if (val != SUN4I_PINCTRL_NO_PULL)
-> +			return -EINVAL;
-> +		arg = 0;
-> +		break;
-> +
-> +	default:
-> +		/* sunxi_pconf_reg should catch anything unsupported */
-> +		WARN_ON(1);
-> +		return -ENOTSUPP;
+This patch series adds support for the GPIO interrupt controller found
+on Amlogic's meson SoC families.
 
-This should be EINVAL. The operation is supported, but one of the
-argument is not valid.
+Unlike what the name suggests, this controller is not part of the SoC GPIO
+subsystem. It's an indepedent controller which can watch almost all pad of
+the SoC and generate and interrupt from it. Some pins, which are not part
+of the public datasheet, don't seem to have this capability though.
 
-Maxime
+Hardware wise, the controller is a 256 to 8 multiplexer. It can take up
+to 256 input pads and route them to any of 8 GIC's interrupts. There is also
+a filter block in the middle to select the appropriate edge or level.
+
+The number of interrupt declared by the irqchip is lowered from 256 to the
+actual number of signal routed to the controller on each SoC family. As we
+have access to only 8 GIC?s interrupts, these are allocated when an
+interrupt is requested from the controller, on a first come, first served
+basis.
+
+This series has been tested on Amlogic S905-P200 board with the front
+panel power button. Directly passing an IRQ or using gpio_to_irq both work
+with this driver.
+
+This work is derived from the previous work of Carlo Caione [1].
+
+http://lkml.kernel.org/r/1448987062-31225-1-git-send-email-carlo at caione.org
+
+Note:
+As the comment will explain, patch 10 is not strictly required but would
+be an appreciated bonus.
+
+Jerome Brunet (10):
+  irqchip: meson: add support for gpio interrupt controller
+  dt-bindings: interrupt-controller: add DT binding for meson GPIO
+    interrupt controller
+  pinctrl: meson: update pinctrl data with gpio irq base number
+  pinctrl: meson: allow gpio to request irq
+  dt-bindings: pinctrl: meson: update gpio dt-bindings
+  ARM64: meson: enable MESON_IRQ_GPIO in Kconfig
+  ARM: meson: enable MESON_IRQ_GPIO in Kconfig for meson8
+  ARM64: dts: amlogic: enable gpio interrupt controller on gxbb
+  ARM: dts: amlogic: enable gpio interrupt controller on meson8
+  irqchip: meson: Add support for IRQ_TYPE_EDGE_BOTH
+
+ .../amlogic,meson-gpio-intc.txt                    |  39 ++
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |   4 +
+ arch/arm/boot/dts/meson8.dtsi                      |  19 +
+ arch/arm/boot/dts/meson8b.dtsi                     |  19 +
+ arch/arm/mach-meson/Kconfig                        |   2 +
+ arch/arm64/Kconfig.platforms                       |   1 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  17 +
+ drivers/irqchip/Kconfig                            |   9 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-meson-gpio.c                   | 437 +++++++++++++++++++++
+ drivers/pinctrl/Kconfig                            |   2 +
+ drivers/pinctrl/meson/pinctrl-meson-gxbb.c         |  22 +-
+ drivers/pinctrl/meson/pinctrl-meson.c              |  83 +++-
+ drivers/pinctrl/meson/pinctrl-meson.h              |  16 +-
+ drivers/pinctrl/meson/pinctrl-meson8.c             |  20 +-
+ drivers/pinctrl/meson/pinctrl-meson8b.c            |  32 +-
+ 16 files changed, 686 insertions(+), 37 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt
+ create mode 100644 drivers/irqchip/irq-meson-gpio.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161004/a71ffd23/attachment.sig>
+2.7.4
