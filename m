@@ -1,62 +1,132 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 4 Oct 2016 18:07:41 +0100
-Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
-In-Reply-To: <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
-References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
- <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
-Message-ID: <20161004170741.GC29008@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 4 Oct 2016 18:18:12 +0100
+Subject: [RFC 05/11] iommu/dma: iommu_dma_(un)map_mixed
+In-Reply-To: <20161002095614.GA23218@cbox>
+References: <1475009318-2617-1-git-send-email-eric.auger@redhat.com>
+ <1475009318-2617-6-git-send-email-eric.auger@redhat.com>
+ <1b1b30b3-4199-9e18-362c-b8bc9d45277d@arm.com> <20161002095614.GA23218@cbox>
+Message-ID: <7474f131-9e44-bfde-6937-7cdbd6b2c8a5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2016 at 05:35:33PM +0200, Fredrik Markstrom wrote:
-> This makes getcpu() ~1000 times faster, this is very useful when
-> implementing per-cpu buffers in userspace (to avoid cache line
-> bouncing). As an example lttng ust becomes ~30% faster.
+On 02/10/16 10:56, Christoffer Dall wrote:
+> On Fri, Sep 30, 2016 at 02:24:40PM +0100, Robin Murphy wrote:
+>> Hi Eric,
+>>
+>> On 27/09/16 21:48, Eric Auger wrote:
+>>> iommu_dma_map_mixed and iommu_dma_unmap_mixed operate on
+>>> IOMMU_DOMAIN_MIXED typed domains. On top of standard iommu_map/unmap
+>>> they reserve the IOVA window to prevent the iova allocator to
+>>> allocate in those areas.
+>>>
+>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>> ---
+>>>  drivers/iommu/dma-iommu.c | 48 +++++++++++++++++++++++++++++++++++++++++++++++
+>>>  include/linux/dma-iommu.h | 18 ++++++++++++++++++
+>>>  2 files changed, 66 insertions(+)
+>>>
+>>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>>> index 04bbc85..db21143 100644
+>>> --- a/drivers/iommu/dma-iommu.c
+>>> +++ b/drivers/iommu/dma-iommu.c
+>>> @@ -759,3 +759,51 @@ int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>>>  	return 0;
+>>>  }
+>>>  EXPORT_SYMBOL(iommu_get_dma_msi_region_cookie);
+>>> +
+>>> +int iommu_dma_map_mixed(struct iommu_domain *domain, unsigned long iova,
+>>> +			phys_addr_t paddr, size_t size, int prot)
+>>> +{
+>>> +	struct iova_domain *iovad;
+>>> +	unsigned long lo, hi;
+>>> +	int ret;
+>>> +
+>>> +	if (domain->type != IOMMU_DOMAIN_MIXED)
+>>> +		return -EINVAL;
+>>> +
+>>> +	if (!domain->iova_cookie)
+>>> +		return -EINVAL;
+>>> +
+>>> +	iovad = cookie_iovad(domain);
+>>> +
+>>> +	lo = iova_pfn(iovad, iova);
+>>> +	hi = iova_pfn(iovad, iova + size - 1);
+>>> +	reserve_iova(iovad, lo, hi);
+>>
+>> This can't work reliably - reserve_iova() will (for good reason) merge
+>> any adjacent or overlapping entries, so any unmap is liable to free more
+>> IOVA space than actually gets unmapped, and things will get subtly out
+>> of sync and go wrong later.
+>>
+>> The more general issue with this whole approach, though, is that it
+>> effectively rules out userspace doing guest memory hotplug or similar,
+>> and I'm not we want to paint ourselves into that corner. Basically, as
+>> soon as a device is attached to a guest, the entirety of the unallocated
+>> IPA space becomes reserved, and userspace can never add anything further
+>> to it, because any given address *might* be in use for an MSI mapping.
 > 
-> The patch will break applications using TPIDRURW (which is context switched
-> since commit 4780adeefd042482f624f5e0d577bf9cdcbb760 ("ARM: 7735/2:
+> Ah, we didn't think of that when discussing this design at KVM Forum,
+> because the idea was that the IOVA allocator was in charge of that
+> resource, and the IOVA was a separate concept from the IPA space.
+> 
+> I think what tripped us up, is that while the above is true for the MSI
+> configuration where we trap the bar and do the allocation at VFIO init
+> time, the guest device driver can program DMA to any address without
+> trapping, and therefore there's an inherent relationship between the
+> IOVA and the IPA space.  Is that right?
 
-It looks like you dropped the leading 'a' from the commit ID. For
-everyone else's benefit, the full ID is:
+Yes, for anything the guest knows about and/or can touch directly, IOVA
+must equal IPA, or DMA is going to go horribly wrong. It's only direct
+interactions between device and host behind the guest's back where we
+(may) have some freedom with IOVA assignment.
 
-  a4780adeefd042482f624f5e0d577bf9cdcbb760
+>> I think it still makes most sense to stick with the original approach of
+>> cooperating with userspace to reserve a bounded area - it's just that we
+>> can then let automatic mapping take care of itself within that area.
+> 
+> I was thinking that it's also possible to do it the other way around: To
+> let userspace say wherever memory may be hotplugged and do the
+> allocation within the remaining area, but I suppose that's pretty much
+> the same thing, and it should just depend on what's easiest to implement
+> and what userspace can best predict.
 
-Please note that arm64 has done similar for compat tasks since commit:
+Indeed, if userspace *is* able to pre-emptively claim everything it
+might ever want, that does kind of implicitly solve the "tell me where I
+can put this" problem (assuming it doesn't simply claim the whole
+address space, of course), but I'm not so sure it works well if there
+are any specific restrictions (e.g. if some device is going to require
+the MSI range to be 32-bit addressable). It also fails to address the
+issue below...
 
-  d00a3810c16207d2 ("arm64: context-switch user tls register tpidr_el0 for
-  compat tasks")
+>> Speaking of which, I've realised the same fundamental reservation
+>> problem already applies to PCI without ACS, regardless of MSIs. I just
+>> tried on my Juno with guest memory placed at 0x4000000000, (i.e.
+>> matching the host PA of the 64-bit PCI window), and sure enough when the
+>> guest kicks off some DMA on the passed-through NIC, the root complex
+>> interprets the guest IPA as (unsupported) peer-to-peer DMA to a BAR
+>> claimed by the video card, and it fails. I guess this doesn't get hit in
+>> practice on x86 because the guest memory map is unlikely to be much
+>> different from the host's.
+>>
+>> It seems like we basically need a general way of communicating fixed and
+>> movable host reservations to userspace :/
+>>
+> 
+> Yes, this makes sense to me.   Do we have any existing way of
+> discovering this from userspace or can we think of something?
 
-> Preserve the user r/w register TPIDRURW on context switch and fork")) and
-> is therefore made configurable.
+I know virtually nothing about the userspace interface, but I was under
+the impression it would require something new. I wasn't even aware you
+could do the VFIO-under-QEMU-TCG thing which Eric points out, so it
+seems like the general "tell userspace about addresses it can't use"
+issue is perhaps the more pressing one. On investigation, QEMU's static
+memory map with RAM at 0x4000000 is already busted for VFIO on Juno, as
+that results in attempting DMA to config space, which goes about as well
+as one might expect.
 
-As you note above, this is an ABI break and *will* break some existing
-applications. That's generally a no-go.
+Robin.
 
-This also leaves arm64's compat with the existing behaviour, differing
-from arm.
-
-I was under the impression that other mechanisms were being considered
-for fast userspace access to per-cpu data structures, e.g. restartable
-sequences. What is the state of those? Why is this better?
-
-If getcpu() specifically is necessary, is there no other way to
-implement it?
-
-> +notrace int __vdso_getcpu(unsigned int *cpup, unsigned int *nodep,
-> +			  struct getcpu_cache *tcache)
-> +{
-> +	unsigned long node_and_cpu;
-> +
-> +	asm("mrc p15, 0, %0, c13, c0, 2\n" : "=r"(node_and_cpu));
-> +
-> +	if (nodep)
-> +		*nodep = cpu_to_node(node_and_cpu >> 16);
-> +	if (cpup)
-> +		*cpup  = node_and_cpu & 0xffffUL;
-
-Given this is directly user-accessible, this format is a de-facto ABI,
-even if it's not documented as such. Is this definitely the format you
-want long-term?
-
-Thanks,
-Mark.
+> 
+> Thanks,
+> -Christoffer
+> 
