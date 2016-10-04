@@ -1,40 +1,53 @@
-From: colin.king@canonical.com (Colin King)
-Date: Tue,  4 Oct 2016 12:11:41 +0100
-Subject: [PATCH] net: axienet: Add missing \n to end of dev_err messages
-Message-ID: <20161004111141.11768-1-colin.king@canonical.com>
+From: paweljarosz3691@gmail.com (=?UTF-8?Q?Pawe=c5=82_Jarosz?=)
+Date: Tue, 4 Oct 2016 13:56:07 +0200
+Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on
+ rk3066
+In-Reply-To: <2391111.dvDuarNnp9@phil>
+References: <20161001140939.GA31220@vaio-ubuntu> <6962779.A926KxJite@phil>
+ <20161003102054.GB7632@leverpostej> <2391111.dvDuarNnp9@phil>
+Message-ID: <81d1fb8b-ee0e-35a7-77db-5e15c3f46449@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
 
-Trival fix, dev_err messages are missing a \n, so add it.
+>>>> I don't think this is a sane workaround, but it is at best difficult to
+>>>> tell, given there's no reason given for why this memory is unusable.
+>>>>
+>>>> For instance, if bus accesses to this address hang, then this patch only
+>>>> makes the hand less likely, since the kernel will still map the region
+>>>> (and
+>>>> therefore the CPU can perform speculative accesses).
+>>>>
+>>>> Are issues with this memory consistently seen in practice?
+>>>>
+>>>> Can you enable CONFIG_MEMTEST and pass 'memtest' to the kernel, to
+>>>> determine if the memory is returning erroneous values?
+>>> just for the sake of completeness, on the rk3288 the issue was the dma not
+>>> being able to access the specific memory region (interestingly also the
+>>> last 16MB but of the 4GB area supported on the rk3288). So memory itself
+>>> was ok, just dma access to it failed.
+>> How odd.
+>>
+>>> We didn't find any other sane solution to limit the dma access in a
+>>> general way at the time, so opted for just blocking the memory region (as
+>>> it was similarly only
+>> I was under the impression that dma-ranges could describe this kind of
+>> DMA addressing limitation. Was there some problem with that? Perhaps the
+>> driver is not acquiring/configuring its mask correctly?
+> I remember looking at (and trying) different options back then.
+>
+> dma-mask wanted power-of-2 values (so it's either 4GB or 2GB (or lower)),
+> zone-dma was a 32bit (and non-dt) thing and dma-ranges seem to simply also
+> calculate a dma-mask from the value, so you're down to 2GB again.
+>
+> So just blocking of those 16MB at the end for 4GB devices somehow sounded
+> nicer than limiting dma access to only half the memory.
+>
+> I may be overlooking something but that was what I came up with last year.
+>
+>
+> Heiko
+Is there a chance to accept this patch?
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index 69e2a83..35f9f97 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -818,7 +818,7 @@ static irqreturn_t axienet_tx_irq(int irq, void *_ndev)
- 		goto out;
- 	}
- 	if (!(status & XAXIDMA_IRQ_ALL_MASK))
--		dev_err(&ndev->dev, "No interrupts asserted in Tx path");
-+		dev_err(&ndev->dev, "No interrupts asserted in Tx path\n");
- 	if (status & XAXIDMA_IRQ_ERROR_MASK) {
- 		dev_err(&ndev->dev, "DMA Tx error 0x%x\n", status);
- 		dev_err(&ndev->dev, "Current BD is at: 0x%x\n",
-@@ -867,7 +867,7 @@ static irqreturn_t axienet_rx_irq(int irq, void *_ndev)
- 		goto out;
- 	}
- 	if (!(status & XAXIDMA_IRQ_ALL_MASK))
--		dev_err(&ndev->dev, "No interrupts asserted in Rx path");
-+		dev_err(&ndev->dev, "No interrupts asserted in Rx path\n");
- 	if (status & XAXIDMA_IRQ_ERROR_MASK) {
- 		dev_err(&ndev->dev, "DMA Rx error 0x%x\n", status);
- 		dev_err(&ndev->dev, "Current BD is at: 0x%x\n",
--- 
-2.9.3
+I know it's not the best solution to this problem, but i don't know
+a better one.
