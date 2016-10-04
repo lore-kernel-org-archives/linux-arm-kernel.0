@@ -1,77 +1,67 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 04 Oct 2016 11:27:17 +0200
-Subject: Applied "spi: omap2-mcspi: Fix modifying platform resource data" to
- the spi tree
-In-Reply-To: <1405683053-14104-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <E1brM0L-0003Zk-Qz@finisterre>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 04 Oct 2016 10:46:27 +0100
+Subject: [PATCH v26 0/7] arm64: add kdump support
+In-Reply-To: <1ae717d6-b2aa-105b-4f47-d879882ca5d3@caviumnetworks.com>
+References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
+ <8a57223d-000d-536e-6885-d427ee81508c@caviumnetworks.com>
+ <20161003110424.GD14025@linaro.org>
+ <1ae717d6-b2aa-105b-4f47-d879882ca5d3@caviumnetworks.com>
+Message-ID: <57F37A73.3030105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Manish,
 
-   spi: omap2-mcspi: Fix modifying platform resource data
+On 03/10/16 13:41, Manish Jaggi wrote:
+> On 10/03/2016 04:34 PM, AKASHI Takahiro wrote:
+>> On Mon, Oct 03, 2016 at 01:24:34PM +0530, Manish Jaggi wrote:
+>>> With the v26 kdump and v3 kexec-tools and top of tree crash.git, below are the tests done
+>>> Attached is a patch in crash.git (symbols.c) to make crash utility work on my setup.
+>>> Can you please have a look and provide your comments.
+>>>
+>>> To generate a panic, i have a kernel module which on init calls panic.
 
-has been applied to the spi tree at
+... modules ... I haven't tested that. I bet it causes some problems!
+We probably need to include module_alloc_base as an elf note in the vmcore file...
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+>>> First kernel is booted with mem=2G crashkernel=1G command line option.
+>>> While the system has 64G memory.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+>> Are you saying that "mem=..." doesn't have any effect?
+> What I am saying it that If the first kernel is booted using mem= option and crashkernel= option
+> the memory for second kernel has to be withing the crashkernel size.
+> As per /proc/iomem System RAM the information is correct, but the /proc/meminfo is showing total memory
+> much more than the first kernel had in first place.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+So your second crashkernel has 63G of memory? Unless you provide the same 'mem='
+to the kdump kernel, this is the expected behaviour. The
+DT:/reserved-memory/crash_dump describes the memory not to use.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+On your first boot with 'mem=2G' memblock_mem_limit_remove_map() called from
+arm64_memblock_init() removed the top 62G of memory. Neither the first kernel
+nor kexec-tools know about the top 62G.
+When you run kexec-tools, it describes what it sees in /proc/iomem in the
+DT:/reserved-memory/crash_dump, which is just the remaining 1G of memory.
+
+When we crash and reboot, the crash kernel discovers all 64G of memory from the
+EFI memory map.
+kexec-tools described the 1G of memory that the first kernel was using in the
+DT:/reserved-memory/crash_dump node, so early_init_fdt_scan_reserved_mem()
+reserves the 1G of memory the first kernel used. This leaves us with 63G of memory.
+
+This may change with the next version of kdump if it switches back to using
+DT:/chosen/linux,usable-memory-range.
+If you need v26 to avoid the top 62G of memory, you need to provide the same
+'mem=' to the first and second kernel.
+
+
+>>> 1.2 Live crash dump fails with error
+
+... do we expect this to work? I don't think it has anything to do with this
+series...
+
 
 Thanks,
-Mark
 
->From 0142d2ee7e9f107248ebf69bd66037c536d3f6cc Mon Sep 17 00:00:00 2001
-From: Vikram N <vicky773@gmail.com>
-Date: Fri, 30 Sep 2016 19:53:11 +0530
-Subject: [PATCH] spi: omap2-mcspi: Fix modifying platform resource data
-
-currently during probe the resource data gets modified and device
-physical address remains valid only during first load. If the module is
-unloaded and loaded again, the ioremp will be done on a incorrect address
-as the resource was modified during previous module load.
-This patch fixes this issue.
-
-Signed-off-by: Vikram N <vicky773@gmail.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-omap2-mcspi.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-index d5157b2222ce..3567e1dfd30d 100644
---- a/drivers/spi/spi-omap2-mcspi.c
-+++ b/drivers/spi/spi-omap2-mcspi.c
-@@ -1391,15 +1391,13 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
- 		goto free_master;
- 	}
- 
--	r->start += regs_offset;
--	r->end += regs_offset;
--	mcspi->phys = r->start;
--
- 	mcspi->base = devm_ioremap_resource(&pdev->dev, r);
- 	if (IS_ERR(mcspi->base)) {
- 		status = PTR_ERR(mcspi->base);
- 		goto free_master;
- 	}
-+	mcspi->phys = r->start + regs_offset;
-+	mcspi->base += regs_offset;
- 
- 	mcspi->dev = &pdev->dev;
- 
--- 
-2.9.3
+James
