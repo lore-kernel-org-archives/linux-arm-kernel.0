@@ -1,161 +1,132 @@
-From: fredrik.markstrom@gmail.com (Fredrik Markstrom)
-Date: Tue,  4 Oct 2016 17:35:33 +0200
-Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
-In-Reply-To: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
-References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
-Message-ID: <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 4 Oct 2016 23:49:27 +0800
+Subject: [PATCH 1/3] pinctrl: sunxi: Add support for fetching pinconf
+ settings from hardware
+In-Reply-To: <20161004080245.GK5228@lukather>
+References: <20161004015112.20833-1-wens@csie.org>
+ <20161004015112.20833-2-wens@csie.org>
+ <20161004080245.GK5228@lukather>
+Message-ID: <CAGb2v65BAx9EHhuyM-85F2vD+tXeiakLs8CQYuQOBVsVn=+BTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes getcpu() ~1000 times faster, this is very useful when
-implementing per-cpu buffers in userspace (to avoid cache line
-bouncing). As an example lttng ust becomes ~30% faster.
+On Tue, Oct 4, 2016 at 4:02 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Oct 04, 2016 at 09:51:10AM +0800, Chen-Yu Tsai wrote:
+>> The sunxi pinctrl driver only caches whatever pinconf setting was last
+>> set on a given pingroup. This is not particularly helpful, nor is it
+>> correct.
+>>
+>> Fix this by actually reading the hardware registers and returning
+>> the correct results or error codes. Also filter out unsupported
+>> pinconf settings. Since this driver has a peculiar setup of 1 pin
+>> per group, we can support both pin and pingroup pinconf setting
+>> read back with the same code. The sunxi_pconf_reg helper and code
+>> structure is inspired by pinctrl-msm.
+>>
+>> With this done we can also claim to support generic pinconf, by
+>> setting .is_generic = true in pinconf_ops.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 85 +++++++++++++++++++++++++++++++++--
+>>  1 file changed, 82 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> index 54455af566ec..609843c9a65c 100644
+>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> @@ -10,6 +10,7 @@
+>>   * warranty of any kind, whether express or implied.
+>>   */
+>>
+>> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>>  #include <linux/io.h>
+>>  #include <linux/clk.h>
+>>  #include <linux/gpio/driver.h>
+>> @@ -269,15 +270,91 @@ static const struct pinctrl_ops sunxi_pctrl_ops = {
+>>       .get_group_pins         = sunxi_pctrl_get_group_pins,
+>>  };
+>>
+>> +static int sunxi_pconf_reg(unsigned pin, enum pin_config_param param,
+>> +                        u32 *offset, u32 *shift, u32 *mask)
+>> +{
+>> +     switch (param) {
+>> +     case PIN_CONFIG_DRIVE_STRENGTH:
+>> +             *offset = sunxi_dlevel_reg(pin);
+>> +             *shift = sunxi_dlevel_offset(pin);
+>> +             *mask = DLEVEL_PINS_MASK;
+>> +             break;
+>> +
+>> +     case PIN_CONFIG_BIAS_PULL_UP:
+>> +     case PIN_CONFIG_BIAS_PULL_DOWN:
+>> +     case PIN_CONFIG_BIAS_DISABLE:
+>> +             *offset = sunxi_pull_reg(pin);
+>> +             *shift = sunxi_pull_offset(pin);
+>> +             *mask = PULL_PINS_MASK;
+>> +             break;
+>> +
+>> +     default:
+>> +             return -ENOTSUPP;
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int sunxi_pconf_get(struct pinctrl_dev *pctldev, unsigned pin,
+>> +                        unsigned long *config)
+>> +{
+>> +     struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
+>> +     enum pin_config_param param = pinconf_to_config_param(*config);
+>> +     u32 offset, shift, mask, val;
+>> +     u16 arg;
+>> +     int ret;
+>> +
+>> +     pin -= pctl->desc->pin_base;
+>> +
+>> +     ret = sunxi_pconf_reg(pin, param, &offset, &shift, &mask);
+>> +     if (ret < 0)
+>> +             return ret;
+>> +
+>> +     val = (readl(pctl->membase + offset) >> shift) & mask;
+>> +
+>> +     switch (pinconf_to_config_param(*config)) {
+>> +     case PIN_CONFIG_DRIVE_STRENGTH:
+>> +             arg = (val + 1) * 10;
+>> +             break;
+>> +
+>> +     case PIN_CONFIG_BIAS_PULL_UP:
+>> +             if (val != SUN4I_PINCTRL_PULL_UP)
+>> +                     return -EINVAL;
+>> +             arg = 1; /* hardware is weak pull-up */
+>> +             break;
+>> +
+>> +     case PIN_CONFIG_BIAS_PULL_DOWN:
+>> +             if (val != SUN4I_PINCTRL_PULL_DOWN)
+>> +                     return -EINVAL;
+>> +             arg = 1; /* hardware is weak pull-down */
+>> +             break;
+>> +
+>> +     case PIN_CONFIG_BIAS_DISABLE:
+>> +             if (val != SUN4I_PINCTRL_NO_PULL)
+>> +                     return -EINVAL;
+>> +             arg = 0;
+>> +             break;
+>> +
+>> +     default:
+>> +             /* sunxi_pconf_reg should catch anything unsupported */
+>> +             WARN_ON(1);
+>> +             return -ENOTSUPP;
+>
+> This should be EINVAL. The operation is supported, but one of the
+> argument is not valid.
 
-The patch will break applications using TPIDRURW (which is context switched
-since commit 4780adeefd042482f624f5e0d577bf9cdcbb760 ("ARM: 7735/2:
-Preserve the user r/w register TPIDRURW on context switch and fork")) and
-is therefore made configurable.
+According to include/linux/pinctrl/pinconf.h
 
-Signed-off-by: Fredrik Markstrom <fredrik.markstrom@gmail.com>
----
- arch/arm/include/asm/tls.h   |  8 +++++++-
- arch/arm/kernel/entry-armv.S |  1 -
- arch/arm/mm/Kconfig          | 10 ++++++++++
- arch/arm/vdso/Makefile       |  3 +++
- arch/arm/vdso/vdso.lds.S     |  3 +++
- arch/arm/vdso/vgetcpu.c      | 34 ++++++++++++++++++++++++++++++++++
- 6 files changed, 57 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/vdso/vgetcpu.c
+ * @pin_config_get: get the config of a certain pin, if the requested config
+ *      is not available on this controller this should return -ENOTSUPP
+ *      and if it is available but disabled it should return -EINVAL
 
-diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
-index 5f833f7..170fd76 100644
---- a/arch/arm/include/asm/tls.h
-+++ b/arch/arm/include/asm/tls.h
-@@ -10,10 +10,15 @@
- 	.endm
- 
- 	.macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
-+#ifdef CONFIG_VDSO_GETCPU
-+	ldr	\tpuser, [r2, #TI_CPU]
-+#else
- 	mrc	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
-+	ldr	\tpuser, [r2, #TI_TP_VALUE + 4]
-+	str	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
-+#endif
- 	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
- 	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
--	str	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
- 	.endm
- 
- 	.macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
-@@ -22,6 +27,7 @@
- 	mov	\tmp2, #0xffff0fff
- 	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
- 	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
-+	ldrne	\tpuser, [r2, #TI_TP_VALUE + 4] @ load the saved user r/w reg
- 	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
- 	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
- 	mcrne	p15, 0, \tpuser, c13, c0, 2	@ set user r/w register
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 9f157e7..4e1369a 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -787,7 +787,6 @@ ENTRY(__switch_to)
-  THUMB(	str	sp, [ip], #4		   )
-  THUMB(	str	lr, [ip], #4		   )
- 	ldr	r4, [r2, #TI_TP_VALUE]
--	ldr	r5, [r2, #TI_TP_VALUE + 4]
- #ifdef CONFIG_CPU_USE_DOMAINS
- 	mrc	p15, 0, r6, c3, c0, 0		@ Get domain register
- 	str	r6, [r1, #TI_CPU_DOMAIN]	@ Save old domain register
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c1799dd..f18334a 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -854,6 +854,16 @@ config VDSO
- 	  You must have glibc 2.22 or later for programs to seamlessly
- 	  take advantage of this.
- 
-+config VDSO_GETCPU
-+	bool "Enable VDSO for getcpu"
-+	depends on VDSO && (CPU_V6K || CPU_V7 || CPU_V7M)
-+	help
-+	  Say Y to make getcpu a VDSO (fast) call. This is useful if you
-+	  want to implement per cpu buffers to avoid cache line bouncing
-+	  in user mode.
-+	  This mechanism uses the TPIDRURW register so enabling it will break
-+	  applications using this register for it's own purpose.
-+
- config DMA_CACHE_RWFO
- 	bool "Enable read/write for ownership DMA cache maintenance"
- 	depends on CPU_V6K && SMP
-diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
-index 59a8fa7..9f1ec51 100644
---- a/arch/arm/vdso/Makefile
-+++ b/arch/arm/vdso/Makefile
-@@ -1,6 +1,9 @@
- hostprogs-y := vdsomunge
- 
- obj-vdso := vgettimeofday.o datapage.o
-+#ifeq ($(CONFIG_VDSO_GETCPU),y)
-+obj-vdso += vgetcpu.o
-+#endif
- 
- # Build rules
- targets := $(obj-vdso) vdso.so vdso.so.dbg vdso.so.raw vdso.lds
-diff --git a/arch/arm/vdso/vdso.lds.S b/arch/arm/vdso/vdso.lds.S
-index 89ca89f..1af39fb 100644
---- a/arch/arm/vdso/vdso.lds.S
-+++ b/arch/arm/vdso/vdso.lds.S
-@@ -82,6 +82,9 @@ VERSION
- 	global:
- 		__vdso_clock_gettime;
- 		__vdso_gettimeofday;
-+#ifdef CONFIG_VDSO_GETCPU
-+		__vdso_getcpu;
-+#endif
- 	local: *;
- 	};
- }
-diff --git a/arch/arm/vdso/vgetcpu.c b/arch/arm/vdso/vgetcpu.c
-new file mode 100644
-index 0000000..1b710af
---- /dev/null
-+++ b/arch/arm/vdso/vgetcpu.c
-@@ -0,0 +1,34 @@
-+/*
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; version 2 of the
-+ * License.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/compiler.h>
-+#include <asm/topology.h>
-+
-+struct getcpu_cache;
-+
-+notrace int __vdso_getcpu(unsigned int *cpup, unsigned int *nodep,
-+			  struct getcpu_cache *tcache)
-+{
-+	unsigned long node_and_cpu;
-+
-+	asm("mrc p15, 0, %0, c13, c0, 2\n" : "=r"(node_and_cpu));
-+
-+	if (nodep)
-+		*nodep = cpu_to_node(node_and_cpu >> 16);
-+	if (cpup)
-+		*cpup  = node_and_cpu & 0xffffUL;
-+
-+	return 0;
-+}
-+
--- 
-2.7.2
+So I think it is correct to return -ENOTSUPP here.
+
+ChenYu
