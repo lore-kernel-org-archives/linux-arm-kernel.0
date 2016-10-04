@@ -1,78 +1,161 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 4 Oct 2016 17:42:18 +0200
-Subject: [PATCH 03/14] ASoC: sun4i-i2s: Add apb reset
-In-Reply-To: <20161004141516.53c6fa8c@free-electrons.com>
-References: <cover.1475569400.git.mylene.josserand@free-electrons.com>
- <2c5abe6578c8e4e841cb59357d88ce397551a593.1475571575.git.mylene.josserand@free-electrons.com>
- <20161004141516.53c6fa8c@free-electrons.com>
-Message-ID: <20161004154218.GM5228@lukather>
+From: fredrik.markstrom@gmail.com (Fredrik Markstrom)
+Date: Tue,  4 Oct 2016 17:35:33 +0200
+Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
+In-Reply-To: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
+References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
+Message-ID: <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This makes getcpu() ~1000 times faster, this is very useful when
+implementing per-cpu buffers in userspace (to avoid cache line
+bouncing). As an example lttng ust becomes ~30% faster.
 
-On Tue, Oct 04, 2016 at 02:15:16PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Tue,  4 Oct 2016 11:46:16 +0200, Myl?ne Josserand wrote:
-> 
-> >  #include <sound/dmaengine_pcm.h>
-> >  #include <sound/pcm_params.h>
-> > @@ -589,6 +590,7 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
-> >  {
-> >  	struct sun4i_i2s *i2s;
-> >  	struct resource *res;
-> > +	struct reset_control *reset_apb;
-> >  	void __iomem *regs;
-> >  	int irq, ret;
-> >  
-> > @@ -626,7 +628,19 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
-> >  		dev_err(&pdev->dev, "Can't get our mod clock\n");
-> >  		return PTR_ERR(i2s->mod_clk);
-> >  	}
-> > -	
-> > +
-> > +	reset_apb = devm_reset_control_get(&pdev->dev, "apb_reset");
-> 
-> I believe this is a change in the Device Tree binding, since you're
-> adding support for a new resource. Perhaps the Device Tree binding
-> documentation should be updated accordingly?
+The patch will break applications using TPIDRURW (which is context switched
+since commit 4780adeefd042482f624f5e0d577bf9cdcbb760 ("ARM: 7735/2:
+Preserve the user r/w register TPIDRURW on context switch and fork")) and
+is therefore made configurable.
 
-Indeed.
+Signed-off-by: Fredrik Markstrom <fredrik.markstrom@gmail.com>
+---
+ arch/arm/include/asm/tls.h   |  8 +++++++-
+ arch/arm/kernel/entry-armv.S |  1 -
+ arch/arm/mm/Kconfig          | 10 ++++++++++
+ arch/arm/vdso/Makefile       |  3 +++
+ arch/arm/vdso/vdso.lds.S     |  3 +++
+ arch/arm/vdso/vgetcpu.c      | 34 ++++++++++++++++++++++++++++++++++
+ 6 files changed, 57 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/vdso/vgetcpu.c
 
-You have two solutions to do that:
-  - Either mark it as optional and use reset_control_get_optional
-    (because here, you broke the other SoCs that have that controller
-    but no reset line)
-  - Or introduce a new compatible, and make the reset property
-    mandatory for that new compatible.
-
-I prefer the latter, since you get a stricter error check, and you
-cannot end up in a situation where your driver probes but is
-useless. But you'll find both in our drivers.
-
-> > +	}
-> > +
-> > +	ret = reset_control_deassert(reset_apb);
-> > +	if (ret < 0) {
-> > +		dev_err(&pdev->dev, "Can't deassert apb reset (%d)\n", ret);
-> > +		return ret;
-> > +	}
-> 
-> Do you need to re-assert the reset line in the ->remove() hook?
-
-Even better, you can add it to the runtime_pm hooks! :)
-
-Maxime
-
+diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+index 5f833f7..170fd76 100644
+--- a/arch/arm/include/asm/tls.h
++++ b/arch/arm/include/asm/tls.h
+@@ -10,10 +10,15 @@
+ 	.endm
+ 
+ 	.macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
++#ifdef CONFIG_VDSO_GETCPU
++	ldr	\tpuser, [r2, #TI_CPU]
++#else
+ 	mrc	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
++	ldr	\tpuser, [r2, #TI_TP_VALUE + 4]
++	str	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
++#endif
+ 	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
+ 	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
+-	str	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
+ 	.endm
+ 
+ 	.macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
+@@ -22,6 +27,7 @@
+ 	mov	\tmp2, #0xffff0fff
+ 	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+ 	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
++	ldrne	\tpuser, [r2, #TI_TP_VALUE + 4] @ load the saved user r/w reg
+ 	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
+ 	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
+ 	mcrne	p15, 0, \tpuser, c13, c0, 2	@ set user r/w register
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 9f157e7..4e1369a 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -787,7 +787,6 @@ ENTRY(__switch_to)
+  THUMB(	str	sp, [ip], #4		   )
+  THUMB(	str	lr, [ip], #4		   )
+ 	ldr	r4, [r2, #TI_TP_VALUE]
+-	ldr	r5, [r2, #TI_TP_VALUE + 4]
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ 	mrc	p15, 0, r6, c3, c0, 0		@ Get domain register
+ 	str	r6, [r1, #TI_CPU_DOMAIN]	@ Save old domain register
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index c1799dd..f18334a 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -854,6 +854,16 @@ config VDSO
+ 	  You must have glibc 2.22 or later for programs to seamlessly
+ 	  take advantage of this.
+ 
++config VDSO_GETCPU
++	bool "Enable VDSO for getcpu"
++	depends on VDSO && (CPU_V6K || CPU_V7 || CPU_V7M)
++	help
++	  Say Y to make getcpu a VDSO (fast) call. This is useful if you
++	  want to implement per cpu buffers to avoid cache line bouncing
++	  in user mode.
++	  This mechanism uses the TPIDRURW register so enabling it will break
++	  applications using this register for it's own purpose.
++
+ config DMA_CACHE_RWFO
+ 	bool "Enable read/write for ownership DMA cache maintenance"
+ 	depends on CPU_V6K && SMP
+diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+index 59a8fa7..9f1ec51 100644
+--- a/arch/arm/vdso/Makefile
++++ b/arch/arm/vdso/Makefile
+@@ -1,6 +1,9 @@
+ hostprogs-y := vdsomunge
+ 
+ obj-vdso := vgettimeofday.o datapage.o
++#ifeq ($(CONFIG_VDSO_GETCPU),y)
++obj-vdso += vgetcpu.o
++#endif
+ 
+ # Build rules
+ targets := $(obj-vdso) vdso.so vdso.so.dbg vdso.so.raw vdso.lds
+diff --git a/arch/arm/vdso/vdso.lds.S b/arch/arm/vdso/vdso.lds.S
+index 89ca89f..1af39fb 100644
+--- a/arch/arm/vdso/vdso.lds.S
++++ b/arch/arm/vdso/vdso.lds.S
+@@ -82,6 +82,9 @@ VERSION
+ 	global:
+ 		__vdso_clock_gettime;
+ 		__vdso_gettimeofday;
++#ifdef CONFIG_VDSO_GETCPU
++		__vdso_getcpu;
++#endif
+ 	local: *;
+ 	};
+ }
+diff --git a/arch/arm/vdso/vgetcpu.c b/arch/arm/vdso/vgetcpu.c
+new file mode 100644
+index 0000000..1b710af
+--- /dev/null
++++ b/arch/arm/vdso/vgetcpu.c
+@@ -0,0 +1,34 @@
++/*
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; version 2 of the
++ * License.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/compiler.h>
++#include <asm/topology.h>
++
++struct getcpu_cache;
++
++notrace int __vdso_getcpu(unsigned int *cpup, unsigned int *nodep,
++			  struct getcpu_cache *tcache)
++{
++	unsigned long node_and_cpu;
++
++	asm("mrc p15, 0, %0, c13, c0, 2\n" : "=r"(node_and_cpu));
++
++	if (nodep)
++		*nodep = cpu_to_node(node_and_cpu >> 16);
++	if (cpup)
++		*cpup  = node_and_cpu & 0xffffUL;
++
++	return 0;
++}
++
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161004/193777b3/attachment.sig>
+2.7.2
