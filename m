@@ -1,97 +1,89 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 4 Oct 2016 15:39:42 +0100
-Subject: [PATCH 2/2] mfd: ab8500-debugfs: remove unused function
-In-Reply-To: <1474695413-30460-1-git-send-email-baoyou.xie@linaro.org>
-References: <1474695413-30460-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20161004143942.GA29257@dell>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 4 Oct 2016 10:07:07 +0200
+Subject: [PATCH 3/3] pinctrl: sunxi: Make sunxi_pconf_group_set use
+ sunxi_pconf_reg helper
+In-Reply-To: <20161004015112.20833-4-wens@csie.org>
+References: <20161004015112.20833-1-wens@csie.org>
+ <20161004015112.20833-4-wens@csie.org>
+Message-ID: <20161004080707.GL5228@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 24 Sep 2016, Baoyou Xie wrote:
-
-> We get 1 warning when building kernel with W=1:
-> drivers/mfd/ab8500-debugfs.c:1395:6: warning: no previous prototype for 'ab8500_dump_all_banks_to_mem' [-Wmissing-prototypes]
+On Tue, Oct 04, 2016 at 09:51:12AM +0800, Chen-Yu Tsai wrote:
+> The sunxi_pconf_reg helper introduced in the last patch gives us the
+> chance to rework sunxi_pconf_group_set to have it match the structure
+> of sunxi_pconf_(group_)get and make it easier to understand.
 > 
-> In fact, this function is called by no one and not exported,
-> so this patch removes it.
+> For each config to set, it:
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+>     1. checks if the parameter is supported.
+>     2. checks if the argument is within limits.
+>     3. converts argument to the register value.
+>     4. writes to the register with spinlock held.
+> 
+> As a result the function now blocks unsupported config parameters,
+> instead of silently ignoring them.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  drivers/mfd/ab8500-debugfs.c | 54 --------------------------------------------
->  1 file changed, 54 deletions(-)
-
-This is already in -next:
-
-  e310960300e78764f59a4b044205b02a5c59381a
-
-> diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-> index 0aecd7b..9f04a25 100644
-> --- a/drivers/mfd/ab8500-debugfs.c
-> +++ b/drivers/mfd/ab8500-debugfs.c
-> @@ -1382,60 +1382,6 @@ void ab8500_dump_all_banks(struct device *dev)
->  	}
->  }
->  
-> -/* Space for 500 registers. */
-> -#define DUMP_MAX_REGS 700
-> -static struct ab8500_register_dump
-> -{
-> -	u8 bank;
-> -	u8 reg;
-> -	u8 value;
-> -} ab8500_complete_register_dump[DUMP_MAX_REGS];
-> -
-> -/* This shall only be called upon kernel panic! */
-> -void ab8500_dump_all_banks_to_mem(void)
-> -{
-> -	int i, r = 0;
-> -	u8 bank;
-> -	int err = 0;
-> -
-> -	pr_info("Saving all ABB registers for crash analysis.\n");
-> -
-> -	for (bank = 0; bank < AB8500_NUM_BANKS; bank++) {
-> -		for (i = 0; i < debug_ranges[bank].num_ranges; i++) {
-> -			u8 reg;
-> -
-> -			for (reg = debug_ranges[bank].range[i].first;
-> -			     reg <= debug_ranges[bank].range[i].last;
-> -			     reg++) {
-> -				u8 value;
-> -
-> -				err = prcmu_abb_read(bank, reg, &value, 1);
-> -
-> -				if (err < 0)
-> -					goto out;
-> -
-> -				ab8500_complete_register_dump[r].bank = bank;
-> -				ab8500_complete_register_dump[r].reg = reg;
-> -				ab8500_complete_register_dump[r].value = value;
-> -
-> -				r++;
-> -
-> -				if (r >= DUMP_MAX_REGS) {
-> -					pr_err("%s: too many register to dump!\n",
-> -						__func__);
-> -					err = -EINVAL;
-> -					goto out;
-> -				}
-> -			}
-> -		}
-> -	}
-> -out:
-> -	if (err >= 0)
-> -		pr_info("Saved all ABB registers.\n");
-> -	else
-> -		pr_info("Failed to save all ABB registers.\n");
-> -}
-> -
->  static int ab8500_all_banks_open(struct inode *inode, struct file *file)
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 65 +++++++++++++++++++----------------
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.h |  1 -
+>  2 files changed, 35 insertions(+), 31 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> index 236272a2339d..1f02c4cd55c7 100644
+> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> @@ -364,23 +364,27 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
 >  {
->  	struct seq_file *s;
+>  	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
+>  	struct sunxi_pinctrl_group *g = &pctl->groups[group];
+> -	unsigned long flags;
+>  	unsigned pin = g->pin - pctl->desc->pin_base;
+> -	u32 val, mask;
+> -	u16 strength;
+> -	u8 dlevel;
+>  	int i;
+>  
+> -	spin_lock_irqsave(&pctl->lock, flags);
+> -
+>  	for (i = 0; i < num_configs; i++) {
+> -		switch (pinconf_to_config_param(configs[i])) {
+> +		enum pin_config_param param;
+> +		unsigned long flags;
+> +		u32 offset, shift, mask, val;
+> +		u16 arg;
+> +		int ret;
+> +
+> +		param = pinconf_to_config_param(configs[i]);
+> +		arg = pinconf_to_config_argument(configs[i]);
+> +
+> +		ret = sunxi_pconf_reg(pin, param, &offset, &shift, &mask);
+> +		if (ret < 0)
+> +			return ret;
+> +
+> +		switch (param) {
+>  		case PIN_CONFIG_DRIVE_STRENGTH:
+> -			strength = pinconf_to_config_argument(configs[i]);
+> -			if (strength > 40) {
+> -				spin_unlock_irqrestore(&pctl->lock, flags);
+> +			if (arg < 10 || arg > 40)
+
+This is a nitpick, but I'd really like to store the value in a
+separate variable, to have a distinction between the value that was
+given us as an argument, and what we're going to write.
+
+Thanks!
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161004/bed27c82/attachment.sig>
