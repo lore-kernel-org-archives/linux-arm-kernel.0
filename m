@@ -1,37 +1,67 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 04 Oct 2016 06:02:48 -0700
-Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
-In-Reply-To: <0125defa-5c34-85d0-f62a-133235c5094c@ti.com> (Peter Ujfalusi's
- message of "Mon, 3 Oct 2016 10:13:25 +0300")
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
- <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
- <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
- <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
- <948c3f9e-f11b-092c-e002-e2ef4436197f@ti.com>
- <0125defa-5c34-85d0-f62a-133235c5094c@ti.com>
-Message-ID: <7hvax8ferr.fsf@baylibre.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Oct 2016 15:07:27 +0200
+Subject: [PATCH 06/14] ASoC: Add sun8i digital audio codec
+In-Reply-To: <20161004144008.0d07d18c@free-electrons.com>
+References: <cover.1475569400.git.mylene.josserand@free-electrons.com>
+ <85cbd9926e52d0aa03f6bbfd8794373d8db491e0.1475571575.git.mylene.josserand@free-electrons.com>
+ <20161004144008.0d07d18c@free-electrons.com>
+Message-ID: <20161004130727.srmaielkvd2z5k3s@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
+On Tue, Oct 04, 2016 at 02:40:08PM +0200, Thomas Petazzoni wrote:
 
-> On 10/01/16 12:24, Sekhar Nori wrote:
+> > +/* CODEC_OFFSET represents the offset of the codec registers
+> > + * and not all the DAI registers
+> > + */
 
-[...]
+> This is not the proper comment style I believe for audio code, it
+> should be:
 
->> In any case, to configure the PBBR, you will have to introduce a driver
->> for it in drivers/memory. Then you can set it up per board using a DT
->> parameter.
->
-> and we can reuse the introduced bindings for am335x and OMAP1/2 as well. On
-> OMAP the legacy DMA API provided a call to raise the priority of the sDMA in
-> EMIF :o That needs to be removed and replaced.
+> /*
+>  * ...
+>  */
 
-Can you point us to the bindings you're referring to?
+I don't care, IIRC that's something from CodingStyle which checkpatch
+moans about.
 
-Also, a new driver in drivers/memory is fine for setting the PBBR, but
-what about the SYSCFG0 registers.  Are you OK with leaving those in the
-init code as proposed in $SUBJECT patch?
+> > +	/* pcm operations */
+> > +	.ops = &sun8i_codec_dai_ops,
+> > +};
+> > +EXPORT_SYMBOL(sun8i_codec_dai);
 
-Kevin
+> This EXPORT_SYMBOL looks wrong. First because it doesn't seem to be
+> used outside of this module. And second because using EXPORT_SYMBOL on
+> a function defined as static doesn't make much sense, as the "static"
+> qualifier limits the visibility of the symbol to the current
+> compilation unit.
+
+Also all the ASoC code is _GPL so a non-GPL export is an issue.
+
+> > +	.component_driver = {
+> > +		.dapm_widgets		= sun8i_codec_dapm_widgets,
+> > +		.num_dapm_widgets	= ARRAY_SIZE(sun8i_codec_dapm_widgets),
+> > +		.dapm_routes		= sun8i_codec_dapm_routes,
+> > +		.num_dapm_routes	= ARRAY_SIZE(sun8i_codec_dapm_routes),
+
+> I'm probably missing something, but in the sun4i-codec.c driver, those
+> fields are initialized directly in the snd_soc_codec_driver structure,
+> not in the .component_driver sub-structure.
+
+We're in the process of pushing everything out to component level, this
+update should be made in the old code if it's not happened already.
+
+> > +	if (clk_prepare_enable(scodec->clk_module))
+> > +		pr_err("err:open failed;\n");
+
+> Grr, pr_err, not good. Plus you want to return with an error from the
+> probe() function.
+
+Also when printing an error message use dev_err().
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161004/4287ed0a/attachment.sig>
