@@ -1,84 +1,77 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Tue,  4 Oct 2016 11:12:09 -0700
-Subject: [PATCH v2 1/2] clocksource: arm_arch_timer: Don't assume clock runs
- in suspend
-Message-ID: <1475604730-140264-1-git-send-email-briannorris@chromium.org>
+From: bdegraaf@codeaurora.org (bdegraaf at codeaurora.org)
+Date: Tue, 04 Oct 2016 14:28:00 -0400
+Subject: [RFC] arm64: Enforce observed order for spinlock and data
+In-Reply-To: <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
+References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
+ <20160930193231.GA2521@remoulade>
+ <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
+ <20161001181101.GA17554@remoulade>
+ <b86926dc0203384522e0e6ce18bbb132@codeaurora.org>
+ <20161004101208.GA18083@leverpostej>
+ <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
+Message-ID: <612c8b809a6530698f7af27af8ca2bf5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM ARM specifies that the system counter "must be implemented in an
-always-on power domain," and so we try to use the counter as a source of
-timekeeping across suspend/resume. Unfortunately, some SoCs (e.g.,
-Rockchip's RK3399) do not keep the counter ticking properly when
-switched from their high-power clock to the lower-power clock used in
-system suspend. Support this quirk by adding a new device tree property.
+On 2016-10-04 13:53, bdegraaf at codeaurora.org wrote:
+> On 2016-10-04 06:12, Mark Rutland wrote:
+>> On Mon, Oct 03, 2016 at 03:20:57PM -0400, bdegraaf at codeaurora.org 
+>> wrote:
+>>> On 2016-10-01 14:11, Mark Rutland wrote:
+>>> >Hi Brent,
+>>> >
+>>> >Evidently my questions weren't sufficiently clear; even with your
+>>> >answers it's not clear to me what precise issue you're attempting to
+>>> >solve.  I've tried to be more specific this time.
+>>> >
+>>> >At a high-level, can you clarify whether you're attempting to solve is:
+>>> >
+>>> >(a) a functional correctness issue (e.g. data corruption)
+>>> >(b) a performance issue
+>>> >
+>>> >And whether this was seen in practice, or found through code
+>>> >inspection?
+>> 
+>>> Thinking about this, as the reader/writer code has no known "abuse"
+>>> case, I'll remove it from the patchset, then provide a v2 patchset
+>>> with a detailed explanation for the lockref problem using the commits
+>>> you provided as an example, as well as performance consideration.
+>> 
+>> If there's a functional problem, let's consider that in isolation 
+>> first.
+>> Once we understand that, then we can consider doing what is optimal.
+>> 
+>> As should be obvious from the above, I'm confused because this patch
+>> conflates functional details with performance optimisations which (to
+>> me) sound architecturally dubious.
+>> 
+>> I completely agree with Peter that if the problem lies with lockref, 
+>> it
+>> should be solved in the lockref code.
+>> 
+>> Thanks,
+>> Mark.
+> 
+> After looking at this, the problem is not with the lockref code per se: 
+> it is
+> a problem with arch_spin_value_unlocked().  In the out-of-order case,
+> arch_spin_value_unlocked() can return TRUE for a spinlock that is in 
+> fact
+> locked but the lock is not observable yet via an ordinary load.  Other 
+> than
+> ensuring order on the locking side (as the prior patch did), there is a 
+> way
+> to make arch_spin_value_unlock's TRUE return value deterministic, but 
+> it
+> requires that it does a write-back to the lock to ensure we didn't 
+> observe
+> the unlocked value while another agent was in process of writing back a
+> locked value.
+> 
+> Brent
 
-Signed-off-by: Brian Norris <briannorris@chromium.org>
----
-v2:
- * add new device tree property, instead of re-using the "always-on"
-   property (which has different meaning)
-
- Documentation/devicetree/bindings/arm/arch_timer.txt | 5 +++++
- drivers/clocksource/arm_arch_timer.c                 | 9 ++++++++-
- 2 files changed, 13 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-index ef5fbe9a77c7..ad440a2b8051 100644
---- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-+++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-@@ -38,6 +38,11 @@ to deliver its interrupts via SPIs.
-   architecturally-defined reset values. Only supported for 32-bit
-   systems which follow the ARMv7 architected reset values.
- 
-+- arm,no-tick-in-suspend : The main counter does not tick when the system is in
-+  low-power system suspend on some SoCs. This behavior does not match the
-+  Architecture Reference Manual's specification that the system counter "must
-+  be implemented in an always-on power domain."
-+
- 
- Example:
- 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 73c487da6d2a..a2503db7e533 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -81,6 +81,7 @@ static struct clock_event_device __percpu *arch_timer_evt;
- static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
- static bool arch_timer_c3stop;
- static bool arch_timer_mem_use_virtual;
-+static bool arch_counter_suspend_stop;
- 
- static bool evtstrm_enable = IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM);
- 
-@@ -576,7 +577,7 @@ static struct clocksource clocksource_counter = {
- 	.rating	= 400,
- 	.read	= arch_counter_read,
- 	.mask	= CLOCKSOURCE_MASK(56),
--	.flags	= CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_SUSPEND_NONSTOP,
-+	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
- static struct cyclecounter cyclecounter = {
-@@ -616,6 +617,8 @@ static void __init arch_counter_register(unsigned type)
- 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
- 	}
- 
-+	if (!arch_counter_suspend_stop)
-+		clocksource_counter.flags |= CLOCK_SOURCE_SUSPEND_NONSTOP;
- 	start_count = arch_timer_read_counter();
- 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
- 	cyclecounter.mult = clocksource_counter.mult;
-@@ -907,6 +910,10 @@ static int __init arch_timer_of_init(struct device_node *np)
- 	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
- 		arch_timer_uses_ppi = PHYS_SECURE_PPI;
- 
-+	/* On some systems, the counter stops ticking when in suspend. */
-+	arch_counter_suspend_stop = of_property_read_bool(np,
-+							 "arm,no-tick-in-suspend");
-+
- 	return arch_timer_init();
- }
- CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_of_init);
--- 
-2.8.0.rc3.226.g39d4020
+Scratch that--things get complicated as the lock itself gets "cloned," 
+which
+could happen during the out-of-order window.  I'll post back later after 
+I've
+analyzed it fully.
