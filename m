@@ -1,112 +1,57 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  4 Oct 2016 22:33:44 +0530
-Subject: [PATCH V3 0/8] IOMMU probe deferral support
-Message-ID: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+Date: Tue,  4 Oct 2016 22:33:45 +0530
+Subject: [PATCH V3 1/8] arm: dma-mapping: Don't override dma_ops in
+ arch_setup_dma_ops()
+In-Reply-To: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1475600632-21289-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial post from Laurent Pinchart[1]. This is
-series calls the dma ops configuration for the devices
-at a generic place so that it works for all busses.
-The dma_configure_ops for a device is now called during
-the device_attach callback just before the probe of the
-bus/driver is called. Similarly dma_deconfigure is called during
-device/driver_detach path.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
+The arch_setup_dma_ops() function is in charge of setting dma_ops with a
+call to set_dma_ops(). set_dma_ops() is also called from
 
-pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
-       |                         |
-pci_bus_add_device     (device_add/driver_register)
-       |                         |
-device_attach           device_initial_probe
-       |                         |
-__device_attach_driver    __device_attach_driver
-       |
-driver_probe_device
-       |
-really_probe
-       |
-dma_configure
+- highbank and mvebu bus notifiers
+- dmabounce (to be replaced with swiotlb)
+- arm_iommu_attach_device
 
- Similarly on the device/driver_unregister path __device_release_driver is
- called which inturn calls dma_deconfigure.
+(arm_iommu_attach_device is itself called from IOMMU and bus master
+device drivers)
 
- If the ACPI bus code follows the same, we can add acpi_dma_configure
- at the same place as of_dma_configure.
+To allow the arch_setup_dma_ops() call to be moved from device add time
+to device probe time we must ensure that dma_ops already setup by any of
+the above callers will not be overridden.
 
- This series is based on the recently merged Generic DT bindings for
- PCI IOMMUs and ARM SMMU from Robin Murphy robin.murphy at arm.com [2]
+Aftering replacing dmabounce with swiotlb, converting IOMMU drivers to
+of_xlate and taking care of highbank and mvebu, the workaround should be
+removed.
 
- This time tested this with platform and pci device for probe deferral
- and reprobe on arm64 based platform. There is an issue on the cleanup
- path for arm64 though, where there is WARN_ON if the dma_ops is reset while
- device is attached to an domain in arch_teardown_dma_ops.
- But with iommu_groups created from the iommu driver, the device is always
- attached to a domain/default_domain. So so the WARN has to be removed/handled
- probably.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ arch/arm/mm/dma-mapping.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
- Previous post of this series [3].
-
- [V3]
-     * Removed the patch to split dma_masks/dma_ops configuration separately
-       based on review comments that both masks and ops are required only
-       during the device probe time.
-
-     * Reworked the series based on Generic DT bindings series [2].
-
-     * Added call to iommu's remove_device in the cleanup path for arm and arm64.
-
-     * Removed the notifier trick in arm64 to handle early device registration.
-
-     * Added reset of dma_ops in cleanup path for arm based on comments.
-
-     * Fixed the pci_iommu_configure path and tested with PCI device as well.
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index c6834c0..dde6514 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -2322,6 +2322,15 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 	struct dma_map_ops *dma_ops;
  
-     * Fixed a bug to return the correct iommu_ops from patch 7 [4] in last post.
-
-     * Fixed few other cosmetic comments.
-  
- [V2]
-     * Updated the Initial post to call dma_configure/deconfigure from generic code
- 
-     * Added iommu add_device callback from of_iommu_configure path
-
- [V1]
-     * Initial post
-
-[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013016.html
-[2] http://www.spinics.net/lists/devicetree/msg142943.html
-[3] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg13941.html
-[4] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg13940.html
-
-
-
-Laurent Pinchart (4):
-  arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
-  of: dma: Move range size workaround to of_dma_get_range()
-  of: dma: Make of_dma_deconfigure() public
-  iommu: of: Handle IOMMU lookup failure with deferred probing or error
-
-Sricharan R (4):
-  drivers: platform: Configure dma operations at probe time
-  arm: dma-mapping: Reset the device's dma_ops
-  arm/arm64: dma-mapping: Call iommu's remove_device callback during
-    device detach
-  arm64: dma-mapping: Remove the notifier trick to handle early setting
-    of dma_ops
-
- arch/arm/mm/dma-mapping.c   |  18 ++++++++
- arch/arm64/mm/dma-mapping.c | 107 +++++---------------------------------------
- drivers/base/dd.c           |  10 +++++
- drivers/base/dma-mapping.c  |  11 +++++
- drivers/iommu/of_iommu.c    |  47 +++++++++++++++++--
- drivers/of/address.c        |  20 ++++++++-
- drivers/of/device.c         |  34 +++++++-------
- drivers/of/platform.c       |   9 ----
- drivers/pci/probe.c         |   5 +--
- include/linux/dma-mapping.h |   3 ++
- include/linux/of_device.h   |   7 ++-
- 11 files changed, 138 insertions(+), 133 deletions(-)
-
+ 	dev->archdata.dma_coherent = coherent;
++
++	/*
++	 * Don't override the dma_ops if they have already been set. Ideally
++	 * this should be the only location where dma_ops are set, remove this
++	 * check when all other callers of set_dma_ops will have disappeared.
++	 */
++	if (dev->archdata.dma_ops)
++		return;
++
+ 	if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
+ 		dma_ops = arm_get_iommu_dma_map_ops(coherent);
+ 	else
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
