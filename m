@@ -1,120 +1,54 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 4 Oct 2016 11:32:16 +0300
-Subject: [PATCH v2 2/4] drivers: iio: ti_am335x_adc: add dma support
-In-Reply-To: <20161003130318.12591-3-mugunthanvnm@ti.com>
-References: <20161003130318.12591-1-mugunthanvnm@ti.com>
- <20161003130318.12591-3-mugunthanvnm@ti.com>
-Message-ID: <0ff2c6ef-3fa1-dc8b-fb6e-1a4dcfea8ea9@ti.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Tue, 4 Oct 2016 11:20:34 +0200
+Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
+In-Reply-To: <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
+References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
+ <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
+ <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
+ <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
+ <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
+Message-ID: <CAMpxmJW=JgXvM8Rnk40nXxNL7dcqX2jU6HCR2MtQZXRJMd-UZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/16 16:03, Mugunthan V N wrote:
-> +static int tiadc_request_dma(struct platform_device *pdev,
-> +			     struct tiadc_device *adc_dev)
-> +{
-> +	struct tiadc_dma	*dma = &adc_dev->dma;
-> +	dma_cap_mask_t		mask;
-> +
-> +	/* Default slave configuration parameters */
-> +	dma->conf.direction = DMA_DEV_TO_MEM;
-> +	dma->conf.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-> +	dma->conf.src_addr = adc_dev->mfd_tscadc->tscadc_phys_base + REG_FIFO1;
-> +
-> +	dma_cap_zero(mask);
-> +	dma_cap_set(DMA_CYCLIC, mask);
-> +
-> +	/* Get a channel for RX */
-> +	dma->chan = dma_request_chan(adc_dev->mfd_tscadc->dev, "fifo1");
-> +	if (!dma->chan)
-> +		return -ENODEV;
+2016-09-30 21:19 GMT+02:00 Peter Ujfalusi <peter.ujfalusi@ti.com>:
+> On 09/30/2016 06:06 PM, Bartosz Golaszewski wrote:
+>>
+>> Just ran a quick test with speaker-test -c2 -twav. Besides the fact
+>> that the left and right channels are inverted (I'm looking into that),
+>> I didn't notice any problems. Even at 1024x768 resolution, playing
+>> audio at the same time seems to work fine.
+>
 
-dma_request_chan() ERR_PTR in case of failure, never NULL. You should reuse
-the returned error code to support deferred probing.
+Hi Peter
 
-> +
-> +	/* RX buffer */
-> +	dma->buf = dma_alloc_coherent(dma->chan->device->dev, DMA_BUFFER_SIZE,
-> +				      &dma->addr, GFP_KERNEL);
-> +	if (!dma->buf)
-> +		goto err;
-> +
-> +	return 0;
-> +err:
-> +	dma_release_channel(dma->chan);
-> +
-> +	return -ENOMEM;
-> +}
-> +
->  static int tiadc_parse_dt(struct platform_device *pdev,
->  			  struct tiadc_device *adc_dev)
->  {
-> @@ -512,8 +639,14 @@ static int tiadc_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, indio_dev);
->  
-> +	err = tiadc_request_dma(pdev, adc_dev);
-> +	if (err && err != -ENODEV)
-> +		goto err_dma;
+> That's good to hear, but I think the priorities should be set:
+> LCDC and EDMA30TC1 to highest priority
+> EDMA30TC0 to priority 2
+>
+> The 0TC0 is used by MMC and if you want to play a video you might need the
+> servicing TC to be higher priority then other masters.
+>
+> If audio playback would trigger sync losts in lcdc then we might need to move
+> 0TC1 to priority 1.
+>
 
-You should handle the deferred probing for DMA channel.
+Did you mean "set EDMA31TC0 to priority 2"? EDMA30TC0 is already at
+the highest priority. Or did you mean that we need to lower the
+EDMA30TC0 priority? In that case: is 2 the correct value? EDMA31TC0 is
+used by mmc1 and its priority is 4. Shouldn't we set both to be the
+same?
 
-> +
->  	return 0;
->  
-> +err_dma:
-> +	iio_device_unregister(indio_dev);
->  err_buffer_unregister:
->  	tiadc_iio_buffered_hardware_remove(indio_dev);
->  err_free_channels:
-> @@ -525,8 +658,14 @@ static int tiadc_remove(struct platform_device *pdev)
->  {
->  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->  	struct tiadc_device *adc_dev = iio_priv(indio_dev);
-> +	struct tiadc_dma *dma = &adc_dev->dma;
->  	u32 step_en;
->  
-> +	if (dma->chan) {
-> +		dma_free_coherent(dma->chan->device->dev, DMA_BUFFER_SIZE,
-> +				  dma->buf, dma->addr);
-> +		dma_release_channel(dma->chan);
-> +	}
->  	iio_device_unregister(indio_dev);
->  	tiadc_iio_buffered_hardware_remove(indio_dev);
->  	tiadc_channels_remove(indio_dev);
-> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
-> index e45a208..b9a53e0 100644
-> --- a/include/linux/mfd/ti_am335x_tscadc.h
-> +++ b/include/linux/mfd/ti_am335x_tscadc.h
-> @@ -23,6 +23,8 @@
->  #define REG_IRQENABLE		0x02C
->  #define REG_IRQCLR		0x030
->  #define REG_IRQWAKEUP		0x034
-> +#define REG_DMAENABLE_SET	0x038
-> +#define REG_DMAENABLE_CLEAR	0x03c
->  #define REG_CTRL		0x040
->  #define REG_ADCFSM		0x044
->  #define REG_CLKDIV		0x04C
-> @@ -36,6 +38,7 @@
->  #define REG_FIFO0THR		0xE8
->  #define REG_FIFO1CNT		0xF0
->  #define REG_FIFO1THR		0xF4
-> +#define REG_DMA1REQ		0xF8
->  #define REG_FIFO0		0x100
->  #define REG_FIFO1		0x200
->  
-> @@ -126,6 +129,10 @@
->  #define FIFOREAD_DATA_MASK (0xfff << 0)
->  #define FIFOREAD_CHNLID_MASK (0xf << 16)
->  
-> +/* DMA ENABLE/CLEAR Register */
-> +#define DMA_FIFO0		BIT(0)
-> +#define DMA_FIFO1		BIT(1)
-> +
->  /* Sequencer Status */
->  #define SEQ_STATUS BIT(5)
->  #define CHARGE_STEP		0x11
-> 
+> I agree that LCDC priority needs to be higher, but I do wonder why the default
+> (5) is not working and if it is not working why it is 5...
+>
+> My guess is that the change in the PBBPR register is the one actually helping
+> here.
+>
 
+While it seems that lowering the EDMA30TC0 priority is indeed
+unnecessary, if I don't set the LCDC master to priority 0, I still get
+FIFO underflows even with the change in PBBPR.
 
--- 
-P?ter
+Thanks,
+Bartosz
