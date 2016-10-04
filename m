@@ -1,32 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 4 Oct 2016 23:05:51 +0200
-Subject: [PATCH 07/15] clk: sunxi: mod0: improve function-level
- documentation
-In-Reply-To: <1475351192-27079-8-git-send-email-Julia.Lawall@lip6.fr>
-References: <1475351192-27079-1-git-send-email-Julia.Lawall@lip6.fr>
- <1475351192-27079-8-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20161004210551.GT5228@lukather>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue,  4 Oct 2016 17:15:18 -0400
+Subject: [PATCH V2 2/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA interrupts
+In-Reply-To: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
+References: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1475615720-31047-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 01, 2016 at 09:46:24PM +0200, Julia Lawall wrote:
-> Use the actual function name in the function documentation.
-> 
-> Issue detected using Coccinelle (http://coccinelle.lip6.fr/)
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
+resource requirements") removed PCI_USING penalty from
+acpi_pci_link_allocate function as there is no longer a fixed size penalty
+array for both PCI and IRQ interrupts.
 
-Applied, thanks!
-Maxime
+We need to add the PCI_USING penalty for ISA interrupts too if the link is
+in use and matches our ISA IRQ number.
 
+Tested-by: Jonathan Liu <net147@gmail.com>
+Tested-by: Ondrej Zary <linux@rainbow-software.org>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/acpi/pci_link.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+index f3792f4..06c2a11 100644
+--- a/drivers/acpi/pci_link.c
++++ b/drivers/acpi/pci_link.c
+@@ -620,6 +620,10 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
+ 			    acpi_device_bid(link->device));
+ 		return -ENODEV;
+ 	} else {
++		if (link->irq.active < ACPI_MAX_IRQS)
++			acpi_irq_penalty[link->irq.active] +=
++				PIRQ_PENALTY_PCI_USING;
++
+ 		printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
+ 		       acpi_device_name(link->device),
+ 		       acpi_device_bid(link->device), link->irq.active);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161004/6642e966/attachment.sig>
+1.9.1
