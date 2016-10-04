@@ -1,43 +1,40 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 4 Oct 2016 18:26:04 +0530
-Subject: [PATCH v2 1/4] net: phy: dp83867: Add documentation for optional
- impedance control
+Date: Tue, 4 Oct 2016 18:26:06 +0530
+Subject: [PATCH v2 3/4] ARM: dts: dra72-evm-revc: fix correct phy delay and
+ impedance settings
 In-Reply-To: <20161004125607.10569-1-mugunthanvnm@ti.com>
 References: <20161004125607.10569-1-mugunthanvnm@ti.com>
-Message-ID: <20161004125607.10569-2-mugunthanvnm@ti.com>
+Message-ID: <20161004125607.10569-4-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documention of ti,impedance-control which can be used to
-correct MAC impedance mismatch using phy extended registers.
+The default impedance settings of the phy is not the optimal
+value, due to this the second ethernet is not working. Fix it
+with correct values which makes the second ethernet port to work.
 
 Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 ---
- Documentation/devicetree/bindings/net/ti,dp83867.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/dra72-evm-revc.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/ti,dp83867.txt b/Documentation/devicetree/bindings/net/ti,dp83867.txt
-index 5d21141..85bf945 100644
---- a/Documentation/devicetree/bindings/net/ti,dp83867.txt
-+++ b/Documentation/devicetree/bindings/net/ti,dp83867.txt
-@@ -9,6 +9,18 @@ Required properties:
- 	- ti,fifo-depth - Transmitt FIFO depth- see dt-bindings/net/ti-dp83867.h
- 		for applicable values
+diff --git a/arch/arm/boot/dts/dra72-evm-revc.dts b/arch/arm/boot/dts/dra72-evm-revc.dts
+index f9cfd3b..d626cd7 100644
+--- a/arch/arm/boot/dts/dra72-evm-revc.dts
++++ b/arch/arm/boot/dts/dra72-evm-revc.dts
+@@ -62,6 +62,7 @@
+ 		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
+ 		ti,tx-internal-delay = <DP83867_RGMIIDCTL_1_NS>;
+ 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
++		ti,min-output-imepdance;
+ 	};
  
-+Optional property:
-+	- ti,min-output-impedance - MAC Interface Impedance control to set
-+				    the programmable output impedance to
-+				    minimum value (35 ohms).
-+	- ti,max-output-impedance - MAC Interface Impedance control to set
-+				    the programmable output impedance to
-+				    maximum value (70 ohms).
-+
-+Note: ti,min-output-impedance and ti,max-output-impedance are mutually
-+      exclusive. When both properties are present ti,max-output-impedance
-+      takes precedence.
-+
- Default child nodes are standard Ethernet PHY device
- nodes as described in Documentation/devicetree/bindings/net/phy.txt
- 
+ 	dp83867_1: ethernet-phy at 3 {
+@@ -69,5 +70,6 @@
+ 		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
+ 		ti,tx-internal-delay = <DP83867_RGMIIDCTL_1_NS>;
+ 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
++		ti,min-output-imepdance;
+ 	};
+ };
 -- 
 2.10.0.372.g6fe1b14
