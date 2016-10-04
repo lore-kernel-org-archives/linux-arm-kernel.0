@@ -1,67 +1,40 @@
-From: bdegraaf@codeaurora.org (bdegraaf at codeaurora.org)
-Date: Tue, 04 Oct 2016 13:53:35 -0400
-Subject: [RFC] arm64: Enforce observed order for spinlock and data
-In-Reply-To: <20161004101208.GA18083@leverpostej>
-References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
- <20160930193231.GA2521@remoulade>
- <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
- <20161001181101.GA17554@remoulade>
- <b86926dc0203384522e0e6ce18bbb132@codeaurora.org>
- <20161004101208.GA18083@leverpostej>
-Message-ID: <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
+From: briannorris@chromium.org (Brian Norris)
+Date: Tue,  4 Oct 2016 11:12:10 -0700
+Subject: [PATCH v2 2/2] arm64: dts: rockchip: arch counter doesn't tick in
+ system suspend
+In-Reply-To: <1475604730-140264-1-git-send-email-briannorris@chromium.org>
+References: <1475604730-140264-1-git-send-email-briannorris@chromium.org>
+Message-ID: <1475604730-140264-2-git-send-email-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-10-04 06:12, Mark Rutland wrote:
-> On Mon, Oct 03, 2016 at 03:20:57PM -0400, bdegraaf at codeaurora.org 
-> wrote:
->> On 2016-10-01 14:11, Mark Rutland wrote:
->> >Hi Brent,
->> >
->> >Evidently my questions weren't sufficiently clear; even with your
->> >answers it's not clear to me what precise issue you're attempting to
->> >solve.  I've tried to be more specific this time.
->> >
->> >At a high-level, can you clarify whether you're attempting to solve is:
->> >
->> >(a) a functional correctness issue (e.g. data corruption)
->> >(b) a performance issue
->> >
->> >And whether this was seen in practice, or found through code
->> >inspection?
-> 
->> Thinking about this, as the reader/writer code has no known "abuse"
->> case, I'll remove it from the patchset, then provide a v2 patchset
->> with a detailed explanation for the lockref problem using the commits
->> you provided as an example, as well as performance consideration.
-> 
-> If there's a functional problem, let's consider that in isolation 
-> first.
-> Once we understand that, then we can consider doing what is optimal.
-> 
-> As should be obvious from the above, I'm confused because this patch
-> conflates functional details with performance optimisations which (to
-> me) sound architecturally dubious.
-> 
-> I completely agree with Peter that if the problem lies with lockref, it
-> should be solved in the lockref code.
-> 
-> Thanks,
-> Mark.
+The "arm,no-tick-in-suspend" property was introduced to note
+implementations where the system counter does not quite follow the ARM
+specification that it "must be implemented in an always-on power
+domain".
 
-After looking at this, the problem is not with the lockref code per se: 
-it is
-a problem with arch_spin_value_unlocked().  In the out-of-order case,
-arch_spin_value_unlocked() can return TRUE for a spinlock that is in 
-fact
-locked but the lock is not observable yet via an ordinary load.  Other 
-than
-ensuring order on the locking side (as the prior patch did), there is a 
-way
-to make arch_spin_value_unlock's TRUE return value deterministic, but it
-requires that it does a write-back to the lock to ensure we didn't 
-observe
-the unlocked value while another agent was in process of writing back a
-locked value.
+Particularly, RK3399's counter stops ticking when we switch from the
+24MHz clock to the 32KHz clock in low-power suspend, so let's mark it as
+such.
 
-Brent
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+---
+v2: new in v2
+
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 76b28649f0b0..401c8be8c8ac 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -174,6 +174,7 @@
+ 			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW 0>,
+ 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW 0>,
+ 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW 0>;
++		arm,no-tick-in-suspend;
+ 	};
+ 
+ 	xin24m: xin24m {
+-- 
+2.8.0.rc3.226.g39d4020
