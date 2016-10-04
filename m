@@ -1,45 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Oct 2016 14:23:51 +0200
-Subject: [PATCH] dmaengine: coh901318: fix integer overflow when shifting
- more than 32 places
-In-Reply-To: <1475172392.2027.12.camel@perches.com>
-References: <20160929175725.14157-1-colin.king@canonical.com>
- <1475172392.2027.12.camel@perches.com>
-Message-ID: <CACRpkdZ1gfZu=Snh9YK1X9w+ZW-zcuEFh8aojGi-LUKoyMKcCQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 4 Oct 2016 14:25:07 +0200
+Subject: [PATCH 07/14] ASoC: Add sun8i audio card
+In-Reply-To: <33d641ff43f0c0349cdfa2cdbbfdcdde66205596.1475571575.git.mylene.josserand@free-electrons.com>
+References: <cover.1475569400.git.mylene.josserand@free-electrons.com>
+ <33d641ff43f0c0349cdfa2cdbbfdcdde66205596.1475571575.git.mylene.josserand@free-electrons.com>
+Message-ID: <20161004142507.56a6fab6@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2016 at 8:06 PM, Joe Perches <joe@perches.com> wrote:
-> On Thu, 2016-09-29 at 18:57 +0100, Colin King wrote:
->> Currently U300_DMA_CHANNELS is set to 40, meaning that the shift of 1 can
->> be more than 32 places, which leads to a 32 bit integer overflow. Fix this
->> by casting 1 to a u64 (the same type as started_channels) before shifting
->> it.
->
-> trivia:
->
->> diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
-> []
->> @@ -1353,7 +1353,7 @@ static ssize_t coh901318_debugfs_read(struct file *file, char __user *buf,
->>       tmp += sprintf(tmp, "DMA -- enabled dma channels\n");
->>
->>       for (i = 0; i < U300_DMA_CHANNELS; i++)
->> -             if (started_channels & (1 << i))
->> +             if (started_channels & ((u64)1 << i))
->
-> Using
->
->                 if (started_channels & (1ULL << i))
->
-> would be more common.
+Hello,
 
-Even better (IMO):
+On Tue,  4 Oct 2016 11:46:20 +0200, Myl?ne Josserand wrote:
 
-#include <linux/bitops.h>
+> +config SND_SUN8I
+> +	tristate "Allwinner SUN6I/SUN8I audio card support"
+> +	select SND_SUN8I_CODEC
+> +	select SND_SUN4I_I2S
+> +	select SND_SUN8I_CODEC_ANALOG
+> +	select REGMAP_MMIO
 
-if (started_channels & BIT(i))
+I believe you need a:
 
-Apparently code is there to avoid the bit 31 problem, mea culpa.
+	depends on OF
 
-Yours,
-Linus Walleij
+since you're unconditionally using some DT-related functionality in the
+driver code.
+
+> +#include <linux/firmware.h>
+
+Do you really need this header file? I don't see anything
+firmware-loading related in the driver.
+
+> +static int sun8i_probe(struct platform_device *pdev)
+> +{
+> +	struct snd_soc_dai_link *link = &sun8i_dai_link;
+> +	struct device_node *np = pdev->dev.of_node;
+> +	int ret;
+> +
+> +	/* register the soc card */
+> +	sun8i_card.dev = &pdev->dev;
+> +
+> +	/* Retrieve the audio-codec from DT */
+> +	link->codec_of_node = of_parse_phandle(np, "allwinner,audio-codec", 0);
+
+Whenever you're using of_parse_phandle(), you must have a corresponding
+of_node_put() to release the reference to the Device Tree node. So I
+guess this should be done 1/ in the error path of ->probe(), and 2/
+during the ->remove() hook.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
