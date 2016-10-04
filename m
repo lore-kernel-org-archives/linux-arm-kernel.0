@@ -1,177 +1,60 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Tue, 4 Oct 2016 12:16:24 +0200
-Subject: [PATCH 07/14] ASoC: Add sun8i audio card
-In-Reply-To: <33d641ff43f0c0349cdfa2cdbbfdcdde66205596.1475571575.git.mylene.josserand@free-electrons.com>
-References: <cover.1475571575.git.mylene.josserand@free-electrons.com>
- <cover.1475569400.git.mylene.josserand@free-electrons.com>
- <33d641ff43f0c0349cdfa2cdbbfdcdde66205596.1475571575.git.mylene.josserand@free-electrons.com>
-Message-ID: <CAEKpxB=JLwqd_wKv1bUAifiQqVpX_RzXq6TSbjVWwza4LT6fhg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 4 Oct 2016 11:18:33 +0100
+Subject: [PATCH v26 0/7] arm64: add kdump support
+In-Reply-To: <1ae717d6-b2aa-105b-4f47-d879882ca5d3@caviumnetworks.com>
+References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
+ <8a57223d-000d-536e-6885-d427ee81508c@caviumnetworks.com>
+ <20161003110424.GD14025@linaro.org>
+ <1ae717d6-b2aa-105b-4f47-d879882ca5d3@caviumnetworks.com>
+Message-ID: <20161004101833.GB18083@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 October 2016 at 11:46, Myl?ne Josserand
-<mylene.josserand@free-electrons.com> wrote:
-> Add the audio card for sun8i SoC. This card links the codec driver
-> (digital part) with the DAI driver. The analog codec driver is
-> added as an aux_device.
->
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> ---
->  sound/soc/sunxi/Kconfig  |  14 +++++++
->  sound/soc/sunxi/Makefile |   1 +
->  sound/soc/sunxi/sun8i.c  | 101 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 116 insertions(+)
->  create mode 100644 sound/soc/sunxi/sun8i.c
->
-> diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
-> index 9e287b0..7b97395 100644
-> --- a/sound/soc/sunxi/Kconfig
-> +++ b/sound/soc/sunxi/Kconfig
-> @@ -27,6 +27,20 @@ config SND_SUN4I_SPDIF
->           Say Y or M to add support for the S/PDIF audio block in the Allwinner
->           A10 and affiliated SoCs.
->
-> +config SND_SUN8I
-> +       tristate "Allwinner SUN6I/SUN8I audio card support"
-> +       select SND_SUN8I_CODEC
-> +       select SND_SUN4I_I2S
-> +       select SND_SUN8I_CODEC_ANALOG
-> +       select REGMAP_MMIO
-> +       help
-> +         This option enables the audio card for Allwinner A33 (sun8i) SoC.
-> +         It enables the DAI driver (SND_SUN4I_I2S), the digital audio
-> +         codec driver (SND_SUN8I_CODEC) and the analog codec driver
-> +         (SND_SUN8I_CODEC_ANALOG).
-> +
-> +         Say Y or M if you want to add sun8i/6i card support
-> +
->  config SND_SUN8I_CODEC
->         tristate "Allwinner SUN8I audio codec"
->         select REGMAP_MMIO
-> diff --git a/sound/soc/sunxi/Makefile b/sound/soc/sunxi/Makefile
-> index 1da63d3..7f1bab9 100644
-> --- a/sound/soc/sunxi/Makefile
-> +++ b/sound/soc/sunxi/Makefile
-> @@ -1,5 +1,6 @@
->  obj-$(CONFIG_SND_SUN4I_CODEC) += sun4i-codec.o
->  obj-$(CONFIG_SND_SUN4I_I2S) += sun4i-i2s.o
->  obj-$(CONFIG_SND_SUN4I_SPDIF) += sun4i-spdif.o
-> +obj-$(CONFIG_SND_SUN8I) += sun8i.o
-Great work with this...I've been battling with the audio codec for the
-h3 for a while and it looks like almost everything that I need is
-delivered here.
->  obj-$(CONFIG_SND_SUN8I_CODEC) += sun8i-codec.o
->  obj-$(CONFIG_SND_SUN8I_CODEC_ANALOG) += sun8i-codec-analog.o
-> diff --git a/sound/soc/sunxi/sun8i.c b/sound/soc/sunxi/sun8i.c
-> new file mode 100644
-> index 0000000..565cd88
-> --- /dev/null
-> +++ b/sound/soc/sunxi/sun8i.c
-> @@ -0,0 +1,101 @@
-> +/*
-> + * ALSA SoC driver for Allwinner sun8i SoC
-> + *
-> + * Copyright (C) 2016 Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/firmware.h>
-> +#include <linux/module.h>
-> +
-> +#include <sound/soc.h>
-> +
-> +static struct snd_soc_aux_dev sun8i_audio_prcm_aux_devs[] = {
-> +       {
-> +               .name = "sun8i-codec-analog",
-> +               .codec_name = "sun8i-codec-analog.0",
-> +       },
-> +};
-> +
-> +static struct snd_soc_dai_link sun8i_dai_link = {
-> +       .name           = "sun4i-i2s",
-> +       .stream_name    = "Playback",
-> +       .codec_dai_name = "sun8i",
-> +       .dai_fmt        = SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_I2S |
-> +                       SND_SOC_DAIFMT_CBM_CFM,
-> +};
-> +
-> +static struct snd_soc_card sun8i_card = {
-> +       .name           = "sun8i-card",
-> +       .owner          = THIS_MODULE,
-> +       .dai_link       = &sun8i_dai_link,
-> +       .num_links      = 1,
-> +       .aux_dev        = sun8i_audio_prcm_aux_devs,
-> +       .num_aux_devs   = ARRAY_SIZE(sun8i_audio_prcm_aux_devs),
-> +};
-> +
-> +static int sun8i_probe(struct platform_device *pdev)
-> +{
-> +       struct snd_soc_dai_link *link = &sun8i_dai_link;
-> +       struct device_node *np = pdev->dev.of_node;
-> +       int ret;
-> +
-> +       /* register the soc card */
-> +       sun8i_card.dev = &pdev->dev;
-> +
-> +       /* Retrieve the audio-codec from DT */
-> +       link->codec_of_node = of_parse_phandle(np, "allwinner,audio-codec", 0);
-> +       if (!link->codec_of_node) {
-> +               dev_err(&pdev->dev, "Missing audio codec\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       /* Retrieve DAI from DT */
-> +       link->cpu_of_node = of_parse_phandle(np, "allwinner,i2s-controller", 0);
-> +       if (!link->cpu_of_node) {
-> +               dev_err(&pdev->dev, "Missing I2S controller\n");
-> +               return -EINVAL;
-> +       }
-> +
-My one question is that we have sun8i-a23 and sun8i-a33, and I think
-we need to distinguish them here. The sun8i-a23 doesn't use the i2s
-block but does use the prcm.
-> +       link->platform_of_node = link->cpu_of_node;
-> +
-> +       /* Register the sound card */
-> +       ret = devm_snd_soc_register_card(&pdev->dev, &sun8i_card);
-> +       if (ret) {
-> +               dev_err(&pdev->dev,
-> +                       "Soc register card failed %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       return ret;
-> +}
-> +
-> +static const struct of_device_id sun8i_of_match[] = {
-> +       { .compatible = "allwinner,sun8i-audio", },
-> +       {},
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, sun8i_of_match);
-> +
-> +static struct platform_driver sun8i_card_driver = {
-> +       .probe = sun8i_probe,
-> +       .driver = {
-> +               .name   = "sun8i-audio",
-> +               .of_match_table = sun8i_of_match,
-> +       },
-> +};
-> +
-> +module_platform_driver(sun8i_card_driver);
-> +
-> +MODULE_AUTHOR("Myl?ne Josserand <mylene.josserand@free-electrons.com>");
-> +MODULE_DESCRIPTION("Allwinner sun8i machine ASoC driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.9.3
->
+On Mon, Oct 03, 2016 at 06:11:40PM +0530, Manish Jaggi wrote:
+> On 10/03/2016 04:34 PM, AKASHI Takahiro wrote:
+> > On Mon, Oct 03, 2016 at 01:24:34PM +0530, Manish Jaggi wrote:
+> >> Observations:
+> >> 1.1. Dump capture kernel shows different memory map.
+> >> ---------------------------------------------------
+> >> In dump capture kernel /proc/meminfo and /proc/iomem differ
+> >>
+> >> root at arm64:/home/ubuntu/CODE/crash#
+> >> MemTotal:       65882432 kB
+> >> MemFree:        65507136 kB
+> >> MemAvailable:   60373632 kB
+> >> Buffers:           29248 kB
+> >> Cached:            46720 kB
+> >> SwapCached:            0 kB
+> >> Active:            63872 kB
+> >> Inactive:          19776 kB
+> >> Active(anon):       8256 kB
+> >> Inactive(anon):     7616 kB
+> >>
+> >> First kernel is booted with mem=2G crashkernel=1G command line option.
+> >> While the system has 64G memory.
+> >>
+> >> root at arm64:/home/ubuntu/CODE/crash# cat /proc/iomem
+> >> 41400000-fffeffff : System RAM
+> >>   41480000-420cffff : Kernel code
+> >>   42490000-4278ffff : Kernel data
+> >> ffff0000-ffffffff : reserved
+> >> 100000000-ffaa7ffff : System RAM
+> >> ffaa80000-ffaabffff : reserved
+> >> ffaac0000-fffa6ffff : System RAM
+> >> fffa70000-fffacffff : reserved
+> >> fffad0000-fffffffff : System RAM
+> > 
+> > Are you saying that "mem=..." doesn't have any effect?
+> What I am saying it that If the first kernel is booted using mem= option and crashkernel= option
+> the memory for second kernel has to be withing the crashkernel size.
+
+Please don't try to use mem= to limit the kernel to a specific range of
+memory. It's really only there as a tool to test handling of low-memory
+situations. 
+
+While it guarantees that at most, the amount requested will be used
+(modulo a number of edge cases with reserved memory ranges), it does not
+guarantee *which* memory will be used. It is *very* fragile.
+
+Thanks,
+Mark.
