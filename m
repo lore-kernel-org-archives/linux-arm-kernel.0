@@ -1,24 +1,23 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 4 Oct 2016 14:12:51 +0200
-Subject: [PATCH 02/14] clk: ccu-sun8i-a33: Add CLK_SET_RATE_PARENT to
- ac-dig
-In-Reply-To: <8dfe0935d35b8a218ebf39d37113e27289a0de9b.1475571575.git.mylene.josserand@free-electrons.com>
-References: <cover.1475569400.git.mylene.josserand@free-electrons.com>
- <8dfe0935d35b8a218ebf39d37113e27289a0de9b.1475571575.git.mylene.josserand@free-electrons.com>
-Message-ID: <20161004141251.4e82378e@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Oct 2016 14:14:11 +0200
+Subject: [PATCH 2/2] mfd: ab8500-debugfs: remove unused function
+In-Reply-To: <1474695413-30460-1-git-send-email-baoyou.xie@linaro.org>
+References: <1474695413-30460-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <CACRpkdZFnPC7NqAPbJH+QqmuRbOFhWEXEGkmdw_KUdVH=hFDwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, Sep 24, 2016 at 7:36 AM, Baoyou Xie <baoyou.xie@linaro.org> wrote:
 
-On Tue,  4 Oct 2016 11:46:15 +0200, Myl?ne Josserand wrote:
-> Add the flag CLK_SET_RATE_PARENT to 'ac-dig' clock.
+> We get 1 warning when building kernel with W=1:
+> drivers/mfd/ab8500-debugfs.c:1395:6: warning: no previous prototype for 'ab8500_dump_all_banks_to_mem' [-Wmissing-prototypes]
+>
+> In fact, this function is called by no one and not exported,
+> so this patch removes it.
+>
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 
-There is no need to repeat the commit title inside the commit log
-itself. What would be more useful is to explain *why* this is needed.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
