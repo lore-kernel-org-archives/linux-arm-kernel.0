@@ -1,123 +1,112 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 4 Oct 2016 18:55:54 +0200
-Subject: [PATCH 01/14] dma: sun6i-dma: Add burst case of 4
-In-Reply-To: <20161004124011.d7f5754a082d5f17d5185fc4@free.fr>
-References: <cover.1475569400.git.mylene.josserand@free-electrons.com>
- <3a2404510b5f8b16ae3bb193982d70f158700b2b.1475571575.git.mylene.josserand@free-electrons.com>
- <20161004124011.d7f5754a082d5f17d5185fc4@free.fr>
-Message-ID: <20161004165553.GS5228@lukather>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue,  4 Oct 2016 22:33:44 +0530
+Subject: [PATCH V3 0/8] IOMMU probe deferral support
+Message-ID: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2016 at 12:40:11PM +0200, Jean-Francois Moine wrote:
-> On Tue,  4 Oct 2016 11:46:14 +0200
-> Myl?ne Josserand <mylene.josserand@free-electrons.com> wrote:
-> 
-> > Add the case of a burst of 4 which is handled by the SoC.
-> > 
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> > ---
-> >  drivers/dma/sun6i-dma.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-> > index 8346199..0485204 100644
-> > --- a/drivers/dma/sun6i-dma.c
-> > +++ b/drivers/dma/sun6i-dma.c
-> > @@ -240,6 +240,8 @@ static inline s8 convert_burst(u32 maxburst)
-> >  	switch (maxburst) {
-> >  	case 1:
-> >  		return 0;
-> > +	case 4:
-> > +		return 1;
-> >  	case 8:
-> >  		return 2;
-> >  	default:
-> > -- 
-> > 2.9.3
-> 
-> This patch has already been rejected by Maxime in the threads
-> 	http://www.spinics.net/lists/dmaengine/msg08610.html
-> and
-> 	http://www.spinics.net/lists/dmaengine/msg08719.html
-> 
-> I hope you will find the way he wants for this maxburst to be added.
+Initial post from Laurent Pinchart[1]. This is
+series calls the dma ops configuration for the devices
+at a generic place so that it works for all busses.
+The dma_configure_ops for a device is now called during
+the device_attach callback just before the probe of the
+bus/driver is called. Similarly dma_deconfigure is called during
+device/driver_detach path.
 
-I was talking about something along these lines (not tested):
 
--------8<---------
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 83461994e418..573ac4608293 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -240,6 +240,8 @@ static inline s8 convert_burst(u32 maxburst)
- 	switch (maxburst) {
- 	case 1:
- 		return 0;
-+	case 4:
-+		return 1;
- 	case 8:
- 		return 2;
- 	default:
-@@ -1110,11 +1112,19 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 	sdc->slave.dst_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
- 						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
- 						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	sdc->slave.dst_bursts			= BIT(1) | BIT(8);
-+	sdc->slave.src_bursts			= BIT(1) | BIT(8);
- 	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
- 						  BIT(DMA_MEM_TO_DEV);
- 	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
- 	sdc->slave.dev = &pdev->dev;
+pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
+       |                         |
+pci_bus_add_device     (device_add/driver_register)
+       |                         |
+device_attach           device_initial_probe
+       |                         |
+__device_attach_driver    __device_attach_driver
+       |
+driver_probe_device
+       |
+really_probe
+       |
+dma_configure
+
+ Similarly on the device/driver_unregister path __device_release_driver is
+ called which inturn calls dma_deconfigure.
+
+ If the ACPI bus code follows the same, we can add acpi_dma_configure
+ at the same place as of_dma_configure.
+
+ This series is based on the recently merged Generic DT bindings for
+ PCI IOMMUs and ARM SMMU from Robin Murphy robin.murphy at arm.com [2]
+
+ This time tested this with platform and pci device for probe deferral
+ and reprobe on arm64 based platform. There is an issue on the cleanup
+ path for arm64 though, where there is WARN_ON if the dma_ops is reset while
+ device is attached to an domain in arch_teardown_dma_ops.
+ But with iommu_groups created from the iommu driver, the device is always
+ attached to a domain/default_domain. So so the WARN has to be removed/handled
+ probably.
+
+ Previous post of this series [3].
+
+ [V3]
+     * Removed the patch to split dma_masks/dma_ops configuration separately
+       based on review comments that both masks and ops are required only
+       during the device probe time.
+
+     * Reworked the series based on Generic DT bindings series [2].
+
+     * Added call to iommu's remove_device in the cleanup path for arm and arm64.
+
+     * Removed the notifier trick in arm64 to handle early device registration.
+
+     * Added reset of dma_ops in cleanup path for arm based on comments.
+
+     * Fixed the pci_iommu_configure path and tested with PCI device as well.
  
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+				    "allwinner,sun8i-h3-dma")) {
-+		sdc->slave.dst_bursts |= BIT(4);
-+		sdc->slave.src_bursts |= BIT(4);
-+	}
-+
- 	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->cfg->nr_max_channels,
- 				   sizeof(struct sun6i_pchan), GFP_KERNEL);
- 	if (!sdc->pchans)
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-index cc535a478bae..f7bbec24bb58 100644
---- a/include/linux/dmaengine.h
-+++ b/include/linux/dmaengine.h
-@@ -673,6 +673,8 @@ struct dma_filter {
-  * 	each type of direction, the dma controller should fill (1 <<
-  * 	<TYPE>) and same should be checked by controller as well
-  * @max_burst: max burst capability per-transfer
-+ * @dst_bursts: bitfield of the available burst sizes for the destination
-+ * @src_bursts: bitfield of the available burst sizes for the source
-  * @residue_granularity: granularity of the transfer residue reported
-  *	by tx_status
-  * @device_alloc_chan_resources: allocate resources and return the
-@@ -800,6 +802,14 @@ struct dma_device {
- static inline int dmaengine_slave_config(struct dma_chan *chan,
- 					  struct dma_slave_config *config)
- {
-+	if (config->src_maxburst && config->device->src_bursts &&
-+	    !(BIT(config->src_maxburst) & config->device->src_bursts))
-+		return -EINVAL;
-+
-+	if (config->dst_maxburst && config->device->dst_bursts &&
-+	    !(BIT(config->dst_maxburst) & config->device->dst_bursts))
-+		return -EINVAL;
-+
- 	if (chan->device->device_config)
- 		return chan->device->device_config(chan, config);
--------8<------------ 
+     * Fixed a bug to return the correct iommu_ops from patch 7 [4] in last post.
 
-Maxime
+     * Fixed few other cosmetic comments.
+  
+ [V2]
+     * Updated the Initial post to call dma_configure/deconfigure from generic code
+ 
+     * Added iommu add_device callback from of_iommu_configure path
+
+ [V1]
+     * Initial post
+
+[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013016.html
+[2] http://www.spinics.net/lists/devicetree/msg142943.html
+[3] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg13941.html
+[4] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg13940.html
+
+
+
+Laurent Pinchart (4):
+  arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
+  of: dma: Move range size workaround to of_dma_get_range()
+  of: dma: Make of_dma_deconfigure() public
+  iommu: of: Handle IOMMU lookup failure with deferred probing or error
+
+Sricharan R (4):
+  drivers: platform: Configure dma operations at probe time
+  arm: dma-mapping: Reset the device's dma_ops
+  arm/arm64: dma-mapping: Call iommu's remove_device callback during
+    device detach
+  arm64: dma-mapping: Remove the notifier trick to handle early setting
+    of dma_ops
+
+ arch/arm/mm/dma-mapping.c   |  18 ++++++++
+ arch/arm64/mm/dma-mapping.c | 107 +++++---------------------------------------
+ drivers/base/dd.c           |  10 +++++
+ drivers/base/dma-mapping.c  |  11 +++++
+ drivers/iommu/of_iommu.c    |  47 +++++++++++++++++--
+ drivers/of/address.c        |  20 ++++++++-
+ drivers/of/device.c         |  34 +++++++-------
+ drivers/of/platform.c       |   9 ----
+ drivers/pci/probe.c         |   5 +--
+ include/linux/dma-mapping.h |   3 ++
+ include/linux/of_device.h   |   7 ++-
+ 11 files changed, 138 insertions(+), 133 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161004/925068da/attachment.sig>
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
