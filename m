@@ -1,77 +1,77 @@
-From: bdegraaf@codeaurora.org (bdegraaf at codeaurora.org)
-Date: Tue, 04 Oct 2016 14:28:00 -0400
-Subject: [RFC] arm64: Enforce observed order for spinlock and data
-In-Reply-To: <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
-References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
- <20160930193231.GA2521@remoulade>
- <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
- <20161001181101.GA17554@remoulade>
- <b86926dc0203384522e0e6ce18bbb132@codeaurora.org>
- <20161004101208.GA18083@leverpostej>
- <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
-Message-ID: <612c8b809a6530698f7af27af8ca2bf5@codeaurora.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 04 Oct 2016 20:56:27 +0200
+Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on
+ rk3066
+In-Reply-To: <81d1fb8b-ee0e-35a7-77db-5e15c3f46449@gmail.com>
+References: <20161001140939.GA31220@vaio-ubuntu> <2391111.dvDuarNnp9@phil>
+ <81d1fb8b-ee0e-35a7-77db-5e15c3f46449@gmail.com>
+Message-ID: <2236986.cydz8Jad7F@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-10-04 13:53, bdegraaf at codeaurora.org wrote:
-> On 2016-10-04 06:12, Mark Rutland wrote:
->> On Mon, Oct 03, 2016 at 03:20:57PM -0400, bdegraaf at codeaurora.org 
->> wrote:
->>> On 2016-10-01 14:11, Mark Rutland wrote:
->>> >Hi Brent,
->>> >
->>> >Evidently my questions weren't sufficiently clear; even with your
->>> >answers it's not clear to me what precise issue you're attempting to
->>> >solve.  I've tried to be more specific this time.
->>> >
->>> >At a high-level, can you clarify whether you're attempting to solve is:
->>> >
->>> >(a) a functional correctness issue (e.g. data corruption)
->>> >(b) a performance issue
->>> >
->>> >And whether this was seen in practice, or found through code
->>> >inspection?
->> 
->>> Thinking about this, as the reader/writer code has no known "abuse"
->>> case, I'll remove it from the patchset, then provide a v2 patchset
->>> with a detailed explanation for the lockref problem using the commits
->>> you provided as an example, as well as performance consideration.
->> 
->> If there's a functional problem, let's consider that in isolation 
->> first.
->> Once we understand that, then we can consider doing what is optimal.
->> 
->> As should be obvious from the above, I'm confused because this patch
->> conflates functional details with performance optimisations which (to
->> me) sound architecturally dubious.
->> 
->> I completely agree with Peter that if the problem lies with lockref, 
->> it
->> should be solved in the lockref code.
->> 
->> Thanks,
->> Mark.
-> 
-> After looking at this, the problem is not with the lockref code per se: 
-> it is
-> a problem with arch_spin_value_unlocked().  In the out-of-order case,
-> arch_spin_value_unlocked() can return TRUE for a spinlock that is in 
-> fact
-> locked but the lock is not observable yet via an ordinary load.  Other 
-> than
-> ensuring order on the locking side (as the prior patch did), there is a 
-> way
-> to make arch_spin_value_unlock's TRUE return value deterministic, but 
-> it
-> requires that it does a write-back to the lock to ensure we didn't 
-> observe
-> the unlocked value while another agent was in process of writing back a
-> locked value.
-> 
-> Brent
+Hi Pawe?,
 
-Scratch that--things get complicated as the lock itself gets "cloned," 
-which
-could happen during the out-of-order window.  I'll post back later after 
-I've
-analyzed it fully.
+Am Dienstag, 4. Oktober 2016, 13:56:07 schrieb Pawe? Jarosz:
+> >>>> I don't think this is a sane workaround, but it is at best difficult to
+> >>>> tell, given there's no reason given for why this memory is unusable.
+> >>>> 
+> >>>> For instance, if bus accesses to this address hang, then this patch
+> >>>> only
+> >>>> makes the hand less likely, since the kernel will still map the region
+> >>>> (and
+> >>>> therefore the CPU can perform speculative accesses).
+> >>>> 
+> >>>> Are issues with this memory consistently seen in practice?
+> >>>> 
+> >>>> Can you enable CONFIG_MEMTEST and pass 'memtest' to the kernel, to
+> >>>> determine if the memory is returning erroneous values?
+> >>> 
+> >>> just for the sake of completeness, on the rk3288 the issue was the dma
+> >>> not
+> >>> being able to access the specific memory region (interestingly also the
+> >>> last 16MB but of the 4GB area supported on the rk3288). So memory itself
+> >>> was ok, just dma access to it failed.
+> >> 
+> >> How odd.
+> >> 
+> >>> We didn't find any other sane solution to limit the dma access in a
+> >>> general way at the time, so opted for just blocking the memory region
+> >>> (as
+> >>> it was similarly only
+> >> 
+> >> I was under the impression that dma-ranges could describe this kind of
+> >> DMA addressing limitation. Was there some problem with that? Perhaps the
+> >> driver is not acquiring/configuring its mask correctly?
+> > 
+> > I remember looking at (and trying) different options back then.
+> > 
+> > dma-mask wanted power-of-2 values (so it's either 4GB or 2GB (or lower)),
+> > zone-dma was a 32bit (and non-dt) thing and dma-ranges seem to simply also
+> > calculate a dma-mask from the value, so you're down to 2GB again.
+> > 
+> > So just blocking of those 16MB at the end for 4GB devices somehow sounded
+> > nicer than limiting dma access to only half the memory.
+> > 
+> > I may be overlooking something but that was what I came up with last year.
+> > 
+> > 
+> > Heiko
+> 
+> Is there a chance to accept this patch?
+> 
+> I know it's not the best solution to this problem, but i don't know
+> a better one.
+
+there is always a "chance". But with changes like these, we always try to find 
+a real cause first, before resorting to solutions like this. So it's definitly 
+not off the table, but I'd like to investigate further first, so that we don't 
+accumulate unnecessary hacks over time.
+
+Especially that your region seems to be in the middle of the designated ram 
+area is strange.
+
+Could you please tell which board you're using (and how much memory it has)
+
+
+Thanks
+Heiko
