@@ -1,49 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 4 Oct 2016 16:53:04 +0100
-Subject: [PATCH v6] soc: qcom: add l2 cache perf events driver
-In-Reply-To: <1474492374-12140-1-git-send-email-nleeder@codeaurora.org>
-References: <1474492374-12140-1-git-send-email-nleeder@codeaurora.org>
-Message-ID: <20161004155304.GB29008@leverpostej>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 04 Oct 2016 09:01:33 -0700
+Subject: [PATCH] dmaengine: coh901318: fix integer overflow when
+ shifting more than 32 places
+In-Reply-To: <20161004153645.GG2467@localhost>
+References: <20160929175725.14157-1-colin.king@canonical.com>
+ <1475172392.2027.12.camel@perches.com>
+ <CACRpkdZ1gfZu=Snh9YK1X9w+ZW-zcuEFh8aojGi-LUKoyMKcCQ@mail.gmail.com>
+ <20161004153645.GG2467@localhost>
+Message-ID: <1475596893.2340.3.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+On Tue, 2016-10-04 at 21:06 +0530, Vinod Koul wrote:
+> On Tue, Oct 04, 2016 at 02:23:51PM +0200, Linus Walleij wrote:
+> > On Thu, Sep 29, 2016 at 8:06 PM, Joe Perches <joe@perches.com> wrote:
+> > > On Thu, 2016-09-29 at 18:57 +0100, Colin King wrote:
+> > > > Currently U300_DMA_CHANNELS is set to 40, meaning that the shift of 1 can
+> > > > be more than 32 places, which leads to a 32 bit integer overflow. Fix this
+> > > > by casting 1 to a u64 (the same type as started_channels) before shifting
+> > > > it.
+> > > trivia:
+> > > > diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+> > > []
+> > > > @@ -1353,7 +1353,7 @@ static ssize_t coh901318_debugfs_read(struct file *file, char __user *buf,
+> > > > ?     tmp += sprintf(tmp, "DMA -- enabled dma channels\n");
+> > > > 
+> > > > ?     for (i = 0; i < U300_DMA_CHANNELS; i++)
+> > > > -             if (started_channels & (1 << i))
+> > > > +             if (started_channels & ((u64)1 << i))
+> > > Using
+> > > ?               if (started_channels & (1ULL << i))
+> > > would be more common.
+> > Even better (IMO):
+> > #include <linux/bitops.h>
+> > if (started_channels & BIT(i))
+> > Apparently code is there to avoid the bit 31 problem, mea culpa.
+> I have already applied this one, so feel free to send this as an update :)
 
-On Wed, Sep 21, 2016 at 05:12:54PM -0400, Neil Leeder wrote:
-> Adds perf events support for L2 cache PMU.
-> 
-> The L2 cache PMU driver is named 'l2cache_0' and can be used
-> with perf events to profile L2 events such as cache hits
-> and misses.
-> 
-> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
-> ---
+BIT_ULL as it still needs to be u64 not unsigned long.
 
->  drivers/soc/qcom/Kconfig         |   9 +
->  drivers/soc/qcom/Makefile        |   1 +
->  drivers/soc/qcom/perf_event_l2.c | 948 +++++++++++++++++++++++++++++++++++++++
->  include/linux/cpuhotplug.h       |   1 +
->  4 files changed, 959 insertions(+)
->  create mode 100644 drivers/soc/qcom/perf_event_l2.c
-
-Apologies for the delay; this has been on my todo list, but I've been a
-little distracted and haven't had the time necessary to devote to this.
-It's somewhat unusual given the constraint logic and the percpu uncore
-component, so there's more to consider than usual.
-
-At a high level, this will need to be moved to drivers/perf/, per [1].
-
-Can you move the driver there, and post the result atop of v4.8-rc1 at
-the end of the merge window? Until then, I can't guarantee that I'll
-have the time to look at this.
-
-Can you also give Vince's perf fuzzer [2] a spin against the driver? I
-can't recall if we covered that previously, and in practice it's found a
-number of issues in drivers that have otherwise looked fine. If you've
-done so, it'd be worth noting in the cover.
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/457188.html
-[2] https://github.com/deater/perf_event_tests
+But if a change is really desired, please use it
+consistently in the entire file and not just this
+instance.
