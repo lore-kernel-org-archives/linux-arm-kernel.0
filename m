@@ -1,77 +1,81 @@
-From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue,  4 Oct 2016 11:46:25 +0200
-Subject: [PATCH 12/14] ARM: dts: sun8i: Add audio codec, dai and card for A33
-In-Reply-To: <cover.1475569400.git.mylene.josserand@free-electrons.com>
-References: <cover.1475569400.git.mylene.josserand@free-electrons.com>
-Message-ID: <0c5caea86dea5e8f8198c61af47983ceb511ff78.1475571575.git.mylene.josserand@free-electrons.com>
+From: mjaggi@caviumnetworks.com (Manish Jaggi)
+Date: Tue, 4 Oct 2016 15:35:43 +0530
+Subject: [PATCH v26 0/7] arm64: add kdump support
+In-Reply-To: <57F37A73.3030105@arm.com>
+References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
+ <8a57223d-000d-536e-6885-d427ee81508c@caviumnetworks.com>
+ <20161003110424.GD14025@linaro.org>
+ <1ae717d6-b2aa-105b-4f47-d879882ca5d3@caviumnetworks.com>
+ <57F37A73.3030105@arm.com>
+Message-ID: <691230c7-051d-afee-9014-d22963a8f045@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the audio codec, dai and a sun8i card to be able to use the
-audio stream of the builtin codec on sun8i SoC.
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
----
- arch/arm/boot/dts/sun8i-a33.dtsi | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index fd1e1cd..4f8b442 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -43,6 +43,7 @@
-  */
- 
- #include "sun8i-a23-a33.dtsi"
-+#include <dt-bindings/dma/sun4i-a10.h>
- 
- / {
- 	cpus {
-@@ -69,6 +70,12 @@
- 		reg = <0x40000000 0x80000000>;
- 	};
- 
-+	sound {
-+		compatible = "allwinner,sun8i-audio";
-+		allwinner,audio-codec = <&codec>;
-+		allwinner,i2s-controller = <&dai>;
-+	};
-+
- 	soc at 01c00000 {
- 		tcon0: lcd-controller at 01c0c000 {
- 			compatible = "allwinner,sun8i-a33-tcon";
-@@ -116,6 +123,32 @@
- 			reset-names = "ahb";
- 		};
- 
-+		dai: dai at 01c22c00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-i2s";
-+			reg = <0x01c22c00 0x200>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "mod";
-+			resets = <&ccu RST_BUS_CODEC>;
-+			reset-names = "apb_reset";
-+			dmas = <&dma 15>, /* AUDIO_CODEC port */
-+				<&dma 15>; /* AUDIO_CODEC port */
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		codec: codec at 01c22e00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-a33-codec";
-+			reg = <0x01c22e00 0x400>; /* SUNXI_AUDIO_PBASE + 0x200 */
-+			reg-names = "audio";
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "codec";
-+			status = "disabled";
-+		};
-+
- 		fe0: display-frontend at 01e00000 {
- 			compatible = "allwinner,sun8i-a33-display-frontend";
- 			reg = <0x01e00000 0x20000>;
--- 
-2.9.3
+On 10/04/2016 03:16 PM, James Morse wrote:
+> Hi Manish,
+> 
+> On 03/10/16 13:41, Manish Jaggi wrote:
+>> On 10/03/2016 04:34 PM, AKASHI Takahiro wrote:
+>>> On Mon, Oct 03, 2016 at 01:24:34PM +0530, Manish Jaggi wrote:
+>>>> With the v26 kdump and v3 kexec-tools and top of tree crash.git, below are the tests done
+>>>> Attached is a patch in crash.git (symbols.c) to make crash utility work on my setup.
+>>>> Can you please have a look and provide your comments.
+>>>>
+>>>> To generate a panic, i have a kernel module which on init calls panic.
+> 
+> ... modules ... I haven't tested that. I bet it causes some problems!
+> We probably need to include module_alloc_base as an elf note in the vmcore file...
+> 
+> 
+>>>> First kernel is booted with mem=2G crashkernel=1G command line option.
+>>>> While the system has 64G memory.
+> 
+>>> Are you saying that "mem=..." doesn't have any effect?
+>> What I am saying it that If the first kernel is booted using mem= option and crashkernel= option
+>> the memory for second kernel has to be withing the crashkernel size.
+>> As per /proc/iomem System RAM the information is correct, but the /proc/meminfo is showing total memory
+>> much more than the first kernel had in first place.
+> 
+> So your second crashkernel has 63G of memory? Unless you provide the same 'mem='
+> to the kdump kernel, this is the expected behaviour. The
+> DT:/reserved-memory/crash_dump describes the memory not to use.
+> 
+> On your first boot with 'mem=2G' memblock_mem_limit_remove_map() called from
+> arm64_memblock_init() removed the top 62G of memory. Neither the first kernel
+> nor kexec-tools know about the top 62G.
+> When you run kexec-tools, it describes what it sees in /proc/iomem in the
+> DT:/reserved-memory/crash_dump, which is just the remaining 1G of memory.
+> 
+> When we crash and reboot, the crash kernel discovers all 64G of memory from the
+> EFI memory map.
+So the iomem and meminfo should be same or different for the second kernel?
+Also i assumed that crashkernel=1G should restrict the second kernels to 1G.
+This is my understanding from the description. It should not require a second mem= option
+> kexec-tools described the 1G of memory that the first kernel was using in the
+> DT:/reserved-memory/crash_dump node, so early_init_fdt_scan_reserved_mem()
+> reserves the 1G of memory the first kernel used. This leaves us with 63G of memory.
+> 
+> This may change with the next version of kdump if it switches back to using
+> DT:/chosen/linux,usable-memory-range.
+> If you need v26 to avoid the top 62G of memory, you need to provide the same
+> 'mem=' to the first and second kernel.
+If I provide for second kernel, I dont see any prints after Bye.
+Have you tired this anytime?
+> 
+> 
+>>>> 1.2 Live crash dump fails with error
+> 
+> ... do we expect this to work? I don't think it has anything to do with this
+> series...
+> 
+Why it should not?
+I saved the vmcore file while in second kernel. Since crash without vmcore file didnt run,
+Tried with vmcore file and it worked. Its just that if you want to boot a second kernel
+ with read only file system without network live crash dump analysis is handy.
+> 
+> Thanks,
+> 
+> James
+> 
