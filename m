@@ -1,67 +1,103 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 04 Oct 2016 10:46:27 +0100
-Subject: [PATCH v26 0/7] arm64: add kdump support
-In-Reply-To: <1ae717d6-b2aa-105b-4f47-d879882ca5d3@caviumnetworks.com>
-References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
- <8a57223d-000d-536e-6885-d427ee81508c@caviumnetworks.com>
- <20161003110424.GD14025@linaro.org>
- <1ae717d6-b2aa-105b-4f47-d879882ca5d3@caviumnetworks.com>
-Message-ID: <57F37A73.3030105@arm.com>
+From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Tue,  4 Oct 2016 11:46:13 +0200
+Subject: [PATCH 00/14] ASoc: sunxi: Add Allwinner A33 codec driver
+Message-ID: <cover.1475569400.git.mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manish,
-
-On 03/10/16 13:41, Manish Jaggi wrote:
-> On 10/03/2016 04:34 PM, AKASHI Takahiro wrote:
->> On Mon, Oct 03, 2016 at 01:24:34PM +0530, Manish Jaggi wrote:
->>> With the v26 kdump and v3 kexec-tools and top of tree crash.git, below are the tests done
->>> Attached is a patch in crash.git (symbols.c) to make crash utility work on my setup.
->>> Can you please have a look and provide your comments.
->>>
->>> To generate a panic, i have a kernel module which on init calls panic.
-
-... modules ... I haven't tested that. I bet it causes some problems!
-We probably need to include module_alloc_base as an elf note in the vmcore file...
+Hi everyone,
 
 
->>> First kernel is booted with mem=2G crashkernel=1G command line option.
->>> While the system has 64G memory.
+This patchset add the audio codec for Allwinner A33 (sun8i) SoC.
 
->> Are you saying that "mem=..." doesn't have any effect?
-> What I am saying it that If the first kernel is booted using mem= option and crashkernel= option
-> the memory for second kernel has to be withing the crashkernel size.
-> As per /proc/iomem System RAM the information is correct, but the /proc/meminfo is showing total memory
-> much more than the first kernel had in first place.
+It adds different drivers:
+   - sun8i-codec-analog (patch 4): This driver implements the analog part
+   of the audio codec. The analog part is handled in PRCM registers so this
+   driver must be added as prcm's subnode (patch 5).
+   - sun8i-codec (patch 6): This driver implements the digital part of the
+   A33 codec.
+   - sun8i (patch 7): This driver implements a sound card for A33.
+   It links the DAI and the audio codec. The analog codec driver is handled
+   as an "aux_device".
 
-So your second crashkernel has 63G of memory? Unless you provide the same 'mem='
-to the kdump kernel, this is the expected behaviour. The
-DT:/reserved-memory/crash_dump describes the memory not to use.
+The DAI for this codec is the same than for A20: "sun4i-i2s".
+The digital codec code is coming from Allwinner's BSP (after some
+cleanup and DAPM conversion) [1]
+The analog codec driver is coming from Chen-Yu Tsai's driver [2]
+with some modifications (such as read/write regmap functions).
 
-On your first boot with 'mem=2G' memblock_mem_limit_remove_map() called from
-arm64_memblock_init() removed the top 62G of memory. Neither the first kernel
-nor kexec-tools know about the top 62G.
-When you run kexec-tools, it describes what it sees in /proc/iomem in the
-DT:/reserved-memory/crash_dump, which is just the remaining 1G of memory.
+Currently, all the drivers handle only the playback feature.
+The other ones (such as capture) and all other interfaces except
+headphone are not supported.
 
-When we crash and reboot, the crash kernel discovers all 64G of memory from the
-EFI memory map.
-kexec-tools described the 1G of memory that the first kernel was using in the
-DT:/reserved-memory/crash_dump node, so early_init_fdt_scan_reserved_mem()
-reserves the 1G of memory the first kernel used. This leaves us with 63G of memory.
+These drivers are functional except for one issue. When playing a sound
+for the first time, a short delay can be noticed. On a second play
+(right after), the sound is played correctly. If we wait a short time
+(~5 sec), the delay is back.
+There is the same behavior for left/right channel. On the first
+time, a left sound is played on the left channel but in the second
+time, the sound will be played on wrong channel.
 
-This may change with the next version of kdump if it switches back to using
-DT:/chosen/linux,usable-memory-range.
-If you need v26 to avoid the top 62G of memory, you need to provide the same
-'mem=' to the first and second kernel.
+These issues will be fixed in a second time. Is someone have suggestions
+about it?
 
+Examples of amixer commands:
+	amixer set 'Headphone' 75%
+	amixer set 'Headphone' on
+	amixer set 'DAC' on
+	amixer set 'Right DAC Mixer RSlot 0' on
+	amixer set 'Left DAC Mixer LSlot 0' on
+	amixer set 'DAC Reversed Right' on
+	amixer set 'DAC Reversed Left' on
 
->>> 1.2 Live crash dump fails with error
+It was tested on Parrot and Sinlinx board where device tree's modifications
+are added (patch 11 to 14).
 
-... do we expect this to work? I don't think it has anything to do with this
-series...
+Thank you in advance,
+Best regards,
 
+[1]: https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/sound/soc/sunxi/audiocodec/sun8iw5_sndcodec.c
+[2]: https://github.com/wens/linux/tree/a31-audio
 
-Thanks,
+Myl?ne Josserand (14):
+  dma: sun6i-dma: Add burst case of 4
+  clk: ccu-sun8i-a33: Add CLK_SET_RATE_PARENT to ac-dig
+  ASoC: sun4i-i2s: Add apb reset
+  ASoC: Add sun8i analog codec driver
+  mfd: sun6i-prcm: Add sun8i analog codec as subnode
+  ASoC: Add sun8i digital audio codec
+  ASoC: Add sun8i audio card
+  dt-bindings: sound: Add sun8i analog codec documentation
+  dt-bindings: sound: Add sun8i codec documentation
+  dt-bindings: sound: Add sun8i audio card documentation
+  ARM: dts: sun8i: Add analog codec on prcm node
+  ARM: dts: sun8i: Add audio codec, dai and card for A33
+  ARM: dts: sun8i: parrot: Enable audio nodes
+  ARM: dts: sun8i: sinlinx: Enable audio nodes
 
-James
+ .../devicetree/bindings/sound/sun8i-audio.txt      |  17 +
+ .../bindings/sound/sun8i-codec-analog.txt          |  20 +
+ .../devicetree/bindings/sound/sun8i-codec.txt      |  24 +
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               |   7 +
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |   8 +
+ arch/arm/boot/dts/sun8i-a33.dtsi                   |  33 ++
+ arch/arm/boot/dts/sun8i-r16-parrot.dts             |   8 +
+ drivers/clk/sunxi-ng/ccu-sun8i-a33.c               |   2 +-
+ drivers/dma/sun6i-dma.c                            |   2 +
+ drivers/mfd/sun6i-prcm.c                           |  16 +
+ sound/soc/sunxi/Kconfig                            |  30 ++
+ sound/soc/sunxi/Makefile                           |   3 +
+ sound/soc/sunxi/sun4i-i2s.c                        |  16 +-
+ sound/soc/sunxi/sun8i-codec-analog.c               | 305 +++++++++++++
+ sound/soc/sunxi/sun8i-codec.c                      | 492 +++++++++++++++++++++
+ sound/soc/sunxi/sun8i.c                            | 101 +++++
+ 16 files changed, 1082 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun8i-audio.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/sun8i-codec.txt
+ create mode 100644 sound/soc/sunxi/sun8i-codec-analog.c
+ create mode 100644 sound/soc/sunxi/sun8i-codec.c
+ create mode 100644 sound/soc/sunxi/sun8i.c
+
+-- 
+2.9.3
