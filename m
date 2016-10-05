@@ -1,26 +1,40 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Wed, 5 Oct 2016 08:58:27 +0530
-Subject: [PATCH v2 2/4] net: phy: dp83867: add support for MAC impedance
- configuration
-In-Reply-To: <20161004131032.GL11677@lunn.ch>
+Date: Wed, 5 Oct 2016 08:59:14 +0530
+Subject: [PATCH v2 3/4] ARM: dts: dra72-evm-revc: fix correct phy delay
+ and impedance settings
+In-Reply-To: <a4ef7fc1-73f7-7136-0d60-6ce8a8ff33b9@ti.com>
 References: <20161004125607.10569-1-mugunthanvnm@ti.com>
- <20161004125607.10569-3-mugunthanvnm@ti.com> <20161004131032.GL11677@lunn.ch>
-Message-ID: <20264692-6a13-58c0-c262-f631af8f355e@ti.com>
+ <20161004125607.10569-4-mugunthanvnm@ti.com>
+ <a4ef7fc1-73f7-7136-0d60-6ce8a8ff33b9@ti.com>
+Message-ID: <c454c5d8-e5d6-28f4-a02d-3ce0bc05d986@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 October 2016 06:40 PM, Andrew Lunn wrote:
->> +	if (of_property_read_bool(of_node, "ti,max-output-imepdance"))
->> +		dp83867->io_impedance = DP83867_IO_MUX_CFG_IO_IMPEDANCE_MAX;
->> +	else if (of_property_read_bool(of_node, "ti,min-output-imepdance"))
+On Tuesday 04 October 2016 06:41 PM, Lokesh Vutla wrote:
 > 
-> Did you really test this? Or did you make the same typos in your device
-> tree file?
+> On Tuesday 04 October 2016 06:26 PM, Mugunthan V N wrote:
+>> > The default impedance settings of the phy is not the optimal
+>> > value, due to this the second ethernet is not working. Fix it
+>> > with correct values which makes the second ethernet port to work.
+>> > 
+>> > Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+>> > ---
+>> >  arch/arm/boot/dts/dra72-evm-revc.dts | 2 ++
+>> >  1 file changed, 2 insertions(+)
+>> > 
+>> > diff --git a/arch/arm/boot/dts/dra72-evm-revc.dts b/arch/arm/boot/dts/dra72-evm-revc.dts
+>> > index f9cfd3b..d626cd7 100644
+>> > --- a/arch/arm/boot/dts/dra72-evm-revc.dts
+>> > +++ b/arch/arm/boot/dts/dra72-evm-revc.dts
+>> > @@ -62,6 +62,7 @@
+>> >  		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
+>> >  		ti,tx-internal-delay = <DP83867_RGMIIDCTL_1_NS>;
+>> >  		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
+>> > +		ti,min-output-imepdance;
+> s/imepdance/impedance
 > 
 
-I have tested this and attached the log in cover letter. Since there is
-a typo error on both dts and driver it worked as expected. Will send a
-v3 ASAP.
+Thanks for quick catch. Will fix this in v3.
 
 Regards
 Mugunthan V N
