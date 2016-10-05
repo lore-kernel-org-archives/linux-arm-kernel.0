@@ -1,144 +1,31 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  5 Oct 2016 10:09:40 +0200
-Subject: [PATCH v2 2/2] ARM: dts: meson-gxbb: Add support for the Nexbox A95X
- Board
+Date: Wed,  5 Oct 2016 10:09:39 +0200
+Subject: [PATCH v2 1/2] devicetree: Add vendor prefix for Nexbox
 In-Reply-To: <1475654980-16414-1-git-send-email-narmstrong@baylibre.com>
 References: <1475654980-16414-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1475654980-16414-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1475654980-16414-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the S905 (GXBB) version of the Nexbox A95X.
+Nexbox is an IPTV set-top-box distributor, mainly with Amlogic SoCs:
+        https://www.inexbox.com
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/Makefile               |   1 +
- .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 108 +++++++++++++++++++++
- 2 files changed, 109 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index 57e0ae0..5a64050 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -1,3 +1,4 @@
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nexbox-a95x.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-odroidc2.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p200.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p201.dtb
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-new file mode 100644
-index 0000000..80d7b35
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-@@ -0,0 +1,108 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ * Copyright (c) 2016 BayLibre, Inc.
-+ * Author: Neil Armstrong <narmstrong@kernel.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-gxbb.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	compatible = "nexbox,a95x", "amlogic,meson-gxbb";
-+	model = "NEXBOX A95X";
-+	
-+	aliases {
-+		serial0 = &uart_AO;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x40000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		blue {
-+			label = "a95x:system-status";
-+			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
-+	};
-+
-+	gpio-keys-polled {
-+		compatible = "gpio-keys-polled";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		poll-interval = <100>;
-+
-+		button at 0 {
-+			label = "reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&uart_AO {
-+	status = "okay";
-+	pinctrl-0 = <&uart_ao_a_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&ethmac {
-+	status = "okay";
-+	pinctrl-0 = <&eth_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&ir {
-+	status = "okay";
-+	pinctrl-0 = <&remote_input_ao_pins>;
-+	pinctrl-names = "default";
-+};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index a9999a3..ecb360f 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -182,6 +182,7 @@ neonode		Neonode Inc.
+ netgear	NETGEAR
+ netlogic	Broadcom Corporation (formerly NetLogic Microsystems)
+ netxeon		Shenzhen Netxeon Technology CO., LTD
++nexbox	Nexbox
+ newhaven	Newhaven Display International
+ nintendo	Nintendo
+ nokia	Nokia
 -- 
 1.9.1
