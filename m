@@ -1,32 +1,36 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  5 Oct 2016 09:33:31 +0200
-Subject: [PATCH v4 5/8] scpi: grow MAX_DVFS_OPPS to 16 entries
+Date: Wed,  5 Oct 2016 09:33:33 +0200
+Subject: [PATCH v4 7/8] ARM64: dts: meson-gxbb: Add SRAM node
 In-Reply-To: <1475652814-30619-1-git-send-email-narmstrong@baylibre.com>
 References: <1475652814-30619-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1475652814-30619-6-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1475652814-30619-8-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Amlogic SoCs reports more than 8 OPPs per domains, grow the structure
-size to 16.
-
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/firmware/arm_scpi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index 21fafbe..bc15348 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -70,7 +70,7 @@
- #define SCPI_SLOT		0
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 443811b..88f98f5 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -94,6 +94,15 @@
+ 			status = "disabled";
+ 		};
  
- #define MAX_DVFS_DOMAINS	8
--#define MAX_DVFS_OPPS		8
-+#define MAX_DVFS_OPPS		16
- #define DVFS_LATENCY(hdr)	(le32_to_cpu(hdr) >> 16)
- #define DVFS_OPP_COUNT(hdr)	((le32_to_cpu(hdr) >> 8) & 0xff)
- 
++		sram: sram at c8000000 {
++			compatible = "amlogic,meson-gxbb-sram", "mmio-sram";
++			reg = <0x0 0xc8000000 0x0 0x14000>;
++
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x0 0xc8000000 0x14000>;
++		};
++
+ 		usb0: usb at c9000000 {
+ 			compatible = "amlogic,meson-gxbb-usb", "snps,dwc2";
+ 			reg = <0x0 0xc9000000 0x0 0x40000>;
 -- 
 1.9.1
