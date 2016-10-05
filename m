@@ -1,98 +1,86 @@
-From: gerald.baeza@st.com (Gerald Baeza)
-Date: Wed, 5 Oct 2016 16:09:12 +0200
-Subject: [PATCH 02/11] DOCUMENTATION: dt-bindings: Document the STM32
- USART bindings
-In-Reply-To: <20160923152907.GA19206@rob-hp-laptop>
-References: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
- <1473957763-30629-3-git-send-email-alexandre.torgue@st.com>
- <20160923152907.GA19206@rob-hp-laptop>
-Message-ID: <dd28f224-3e3b-0a00-f978-16861b946fd1@st.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Wed, 05 Oct 2016 10:11:19 -0400
+Subject: [PATCH] ARM: dts: lpc32xx: set pwm1 & pwm2 default clock rate
+In-Reply-To: <1443ec62-4936-c70a-b323-6980a9240a1e@mleia.com>
+References: <1474916056-11336-1-git-send-email-slemieux.tyco@gmail.com>
+ <1443ec62-4936-c70a-b323-6980a9240a1e@mleia.com>
+Message-ID: <1475676679.23405.15.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2016 05:29 PM, Rob Herring wrote:
-> On Thu, Sep 15, 2016 at 06:42:34PM +0200, Alexandre TORGUE wrote:
->> This adds documentation of device tree bindings for the
->> STM32 USART
->
-> Please make your subject prefixes consistent and drop "DOCUMENTATION".
->
+Hi Vladimir,
 
-Ok, thanks
+On Wed, 2016-10-05 at 05:08 +0300, Vladimir Zapolskiy wrote:
+> Hi Sylvain,
+> 
+> On 26.09.2016 21:54, Sylvain Lemieux wrote:
+> > From: Sylvain Lemieux <slemieux@tycoint.com>
+> > 
+> > Probably most of NXP LPC32xx boards have 13MHz main oscillator
+> > and therefore for HCLK PLL and ARM core clock rate default
+> > hardware setting of 16 * 13MHz = 208MHz and the AHB bus clock
+> > rate of 208MHz / 2 = 104MHz.
+> > 
+> > The change explicitly defines the peripheral PWM1/PWM2 default
+> > clock output rate of 104MHz. If needed it can be redefined
+> > in a board DTS file.
+> > 
+> > Signed-off-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> > ---
+> > Note:
+> > * There is a dependency on the following patch:
+> >   "ARM: dts: lpc32xx: set default parent clock for pwm1 & pwm2"
+> >   http://www.spinics.net/lists/arm-kernel/msg530277.html
+> > * This patch should be apply after
+> >   "ARM: dts: lpc32xx: add pwm-cells to base dts file"
+> >   http://www.spinics.net/lists/arm-kernel/msg534050.html
+> >   - There is no dependency between the patches.
+> > 
+> >  arch/arm/boot/dts/lpc32xx.dtsi | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+> > index c031c94..d669200 100644
+> > --- a/arch/arm/boot/dts/lpc32xx.dtsi
+> > +++ b/arch/arm/boot/dts/lpc32xx.dtsi
+> > @@ -471,6 +471,7 @@
+> >  				clocks = <&clk LPC32XX_CLK_PWM1>;
+> >  				assigned-clocks = <&clk LPC32XX_CLK_PWM1>;
+> >  				assigned-clock-parents = <&clk LPC32XX_CLK_PERIPH>;
+> > +				assigned-clock-rates = <104000000>;
+> 
+> PWM controller clock source can be 32KHz or CLK_PERIPH, the latter is
+> equal either to SYSCLK or HCLK PLL divided by HCLKDIV_CTRL[6:2].
+> 
+> Do you set the divider to 1? If yes, then I would say
+> 
+> 1) this is very specific to your board, generally CLK_PERIPH
+>    is set to be about 10-13MHz,
+> 2) HCLKDIV or PERIPH clock configuration shall not be done in pwm device node.
+> 
+> 104MHz is too high value to be set by default for PWM clock.
+> 
+This is a good catch; it was an error on my side.
+The purpose of the patch was to setup the output of the
+PWM clock to the default CLK_PERIPH value (13325000).
 
->>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>
->> diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
->> new file mode 100644
->> index 0000000..75b1400
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
->> @@ -0,0 +1,34 @@
->> +* STMicroelectronics STM32 USART
->> +
->> +Required properties:
->> +- compatible: Can be either "st,stm32-usart", "st,stm32-uart",
->> +"st,stm32f7-usart" or "st,stm32f7-uart" depending on whether
->> +the device supports synchronous mode and is compatible with
->> +stm32(f4) or stm32f7.
->
-> Why not put f4 in the compatible string. stm32 is too generic.
+This change does not modify the HCLKDIV or the PERIPH clock.
 
-The initial binding is not in current kernel so it has been put in this 
-serie as PATCH 07/11. It will be squashed with this one, as you requested.
+I can submit a version 2 with the proper value and update
+the patch description to list the default peripheral clock
+setup of 13MHz.
 
-But the driver tty/serial/stm32-usart.c was already upstreamed and it 
-already mentions the "st,stm32-usart" and "st,stm32-uart" for stm32f4 so 
-I kept this as it for backward compatibility for those who already use 
-the driver.
+This change is adding a default value for the PWM clock
+(setup to CLK_PERIPH) to the PWM device node, allowing the
+board specific DTS to only enable the PWM to get it work.
 
-I do not have the history to explain this inconsistency but can you 
-confirm that keeping the existing compatible values from the driver is 
-the good approach please?
+If the PWM clock output is not setup with a default value,
+only enabling the PWM in the board specific DTS file is not
+enough; the PWM divider will keep the default value of zero
+(i.e. PWM clock off).
 
-> What determines sync mode or not? If it is IP configuration fixed in the
-> design, then this is fine. If it is user choice or board dependent, then
-> use a separate property.
+> --
+> With best wishes,
+> Vladimir
 
-This is IP configuration fixed in the design, indeed.
-
->> +- reg: The address and length of the peripheral registers space
->> +- interrupts: The interrupt line of the USART instance
->> +- clocks: The input clock of the USART instance
->> +
->> +Optional properties:
->> +- pinctrl: The reference on the pins configuration
->> +- st,hw-flow-ctrl: bool flag to enable hardware flow control.
->> +
->> +Examples:
->> +usart4: serial at 40004c00 {
->> +	compatible = "st,stm32-uart";
->> +	reg = <0x40004c00 0x400>;
->> +	interrupts = <52>;
->> +	clocks = <&clk_pclk1>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_usart4>;
->> +};
->> +
->> +usart2: serial at 40004400 {
->> +	compatible = "st,stm32-usart", "st,stm32-uart";
->
-> What are valid combinations? usart is sync only, not sync and async?
-
-usart (sync and async) is a superset of uart (async).
-But the current driver does not use the synchronous mode, so the 
-distinction is just here to be consistent with the reference manual 
-instances naming (so configuration).
-
->> +	reg = <0x40004400 0x400>;
->> +	interrupts = <38>;
->> +	clocks = <&clk_pclk1>;
->> +	st,hw-flow-ctrl;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_usart2 &pinctrl_usart2_rtscts>;
->> +};
->> --
->> 1.9.1
->>
+Sylvain
