@@ -1,173 +1,82 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed,  5 Oct 2016 14:31:54 -0600
-Subject: [PATCH 3/8] PM / Domains: Allow domain power states to be read from DT
+Date: Wed,  5 Oct 2016 14:31:56 -0600
+Subject: [PATCH 5/8] dt/bindings: Update binding for PM domain idle states
 In-Reply-To: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
 References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1475699519-109623-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1475699519-109623-6-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows domains to define idle states in the DT. SoC's can
-define domain idle states in DT using the "domain-idle-states" property
-of the domain provider. Calling of_pm_genpd_init() will  read the idle
-states and initialize the genpd for the domain.
-
-In addition to the entry and exit latency for idle state, also add
-residency_ns, param and of_node property to each state. A domain idling
-in a state is only power effecient if it stays idle for a certain period
-in that state. The residency provides this minimum time for the idle
-state to provide power benefits. The param is a state specific u32 value
-that the platform may use for that idle state.
+Update DT bindings to describe idle states of PM domains.
 
 This patch is based on the original patch by Marc Titinger.
 
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/base/power/domain.c | 103 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pm_domain.h   |   8 ++++
- 2 files changed, 111 insertions(+)
+ .../devicetree/bindings/power/power_domain.txt     | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 740afa9..368a5b8 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1895,6 +1895,109 @@ out:
- 	return ret ? -EPROBE_DEFER : 0;
- }
- EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
-+
-+static const struct of_device_id idle_state_match[] = {
-+	{ .compatible = "arm,idle-state", },
-+	{ }
-+};
-+
-+static int read_genpd_state(struct genpd_power_state *genpd_state,
-+				    struct device_node *state_node)
-+{
-+	int err = 0;
-+	u32 latency;
-+	u32 residency;
-+	u32 entry_latency, exit_latency;
-+	const struct of_device_id *match_id;
-+
-+	match_id = of_match_node(idle_state_match, state_node);
-+	if (!match_id)
-+		return -EINVAL;
-+
-+	err = of_property_read_u32(state_node, "entry-latency-us",
-+						&entry_latency);
-+	if (err) {
-+		pr_debug(" * %s missing entry-latency-us property\n",
-+						state_node->full_name);
-+		return -EINVAL;
-+	}
-+
-+	err = of_property_read_u32(state_node, "exit-latency-us",
-+						&exit_latency);
-+	if (err) {
-+		pr_debug(" * %s missing exit-latency-us property\n",
-+						state_node->full_name);
-+		return -EINVAL;
-+	}
-+
-+	err = of_property_read_u32(state_node, "min-residency-us", &residency);
-+	if (!err)
-+		genpd_state->residency_ns = 1000 * residency;
-+
-+	latency = entry_latency + exit_latency;
-+	genpd_state->power_on_latency_ns = 1000 * latency;
-+	genpd_state->power_off_latency_ns = 1000 * entry_latency;
-+
-+	return 0;
-+}
-+
-+/**
-+ * of_genpd_parse_idle_states: Return array of idle states for the genpd.
-+ *
-+ * @dn: The genpd device node
-+ * @states: The pointer to which the state array will be saved.
-+ * @n: The count of elements in the array returned from this function.
-+ *
-+ * Returns the device states parsed from the OF node. The memory for the states
-+ * is allocated by this function and is the responsibility of the caller to
-+ * free the memory after use.
-+ */
-+int of_genpd_parse_idle_states(struct device_node *dn,
-+			struct genpd_power_state **states, int *n)
-+{
-+	struct genpd_power_state *st;
-+	struct device_node *np;
-+	int i, ret = 0;
-+	int count;
-+
-+	for (count = 0; ; count++)
-+		if (!of_parse_phandle(dn, "domain-idle-states", count))
-+			break;
-+
-+	st = kcalloc(count, sizeof(*st), GFP_KERNEL);
-+	if (!st)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < count; i++) {
-+		np = of_parse_phandle(dn, "domain-idle-states", i);
-+		if (!np) {
-+			ret = -EFAULT;
-+			break;
-+		}
-+
-+		ret = read_genpd_state(&st[i], np);
-+		if (ret) {
-+			pr_err
-+			("Parsing idle state node %s failed with err %d\n",
-+							np->full_name, ret);
-+			of_node_put(np);
-+			break;
-+		}
-+		of_node_put(np);
-+	}
-+
-+	if (ret) {
-+		kfree(st);
-+		return ret;
-+	}
-+
-+	*n = count;
-+	*states = st;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(of_genpd_parse_idle_states);
-+
- #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
+diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+index 025b5e7..a043315 100644
+--- a/Documentation/devicetree/bindings/power/power_domain.txt
++++ b/Documentation/devicetree/bindings/power/power_domain.txt
+@@ -29,6 +29,10 @@ Optional properties:
+    specified by this binding. More details about power domain specifier are
+    available in the next section.
  
- 
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index c113713..4c9152d 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -204,6 +204,8 @@ extern int of_genpd_add_device(struct of_phandle_args *args,
- extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
- 				  struct of_phandle_args *new_subdomain);
- extern struct generic_pm_domain *of_genpd_remove_last(struct device_node *np);
-+extern int of_genpd_parse_idle_states(struct device_node *dn,
-+			struct genpd_power_state **states, int *n);
- 
- int genpd_dev_pm_attach(struct device *dev);
- #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
-@@ -233,6 +235,12 @@ static inline int of_genpd_add_subdomain(struct of_phandle_args *parent,
- 	return -ENODEV;
- }
- 
-+static inline int of_genpd_parse_idle_states(struct device_node *dn,
-+			struct genpd_power_state **states, int *n)
-+{
-+	return -ENODEV;
-+}
++- domain-idle-states : A phandle of an idle-state that shall be soaked into a
++                generic domain power state. The idle state definitions are
++                compatible with arm,idle-state specified in [1].
 +
- static inline int genpd_dev_pm_attach(struct device *dev)
- {
- 	return -ENODEV;
+ Example:
+ 
+ 	power: power-controller at 12340000 {
+@@ -59,6 +63,36 @@ The nodes above define two power controllers: 'parent' and 'child'.
+ Domains created by the 'child' power controller are subdomains of '0' power
+ domain provided by the 'parent' power controller.
+ 
++Example 3:
++	parent: power-controller at 12340000 {
++		compatible = "foo,power-controller";
++		reg = <0x12340000 0x1000>;
++		#power-domain-cells = <1>;
++		domain-idle-states = <&DOMAIN_RET, &DOMAIN_PWR_DN>;
++	};
++
++	child: power-controller at 12341000 {
++		compatible = "foo,power-controller";
++		reg = <0x12341000 0x1000>;
++		power-domains = <&parent 0>;
++		#power-domain-cells = <1>;
++		domain-idle-states = <&DOMAIN_PWR_DN>;
++	};
++
++	DOMAIN_RET: state at 0 {
++		compatible = "arm,idle-state";
++		entry-latency-us = <1000>;
++		exit-latency-us = <2000>;
++		min-residency-us = <10000>;
++	};
++
++	DOMAIN_PWR_DN: state at 1 {
++		compatible = "arm,idle-state";
++		entry-latency-us = <5000>;
++		exit-latency-us = <8000>;
++		min-residency-us = <7000>;
++	};
++
+ ==PM domain consumers==
+ 
+ Required properties:
+@@ -76,3 +110,5 @@ Example:
+ The node above defines a typical PM domain consumer device, which is located
+ inside a PM domain with index 0 of a power controller represented by a node
+ with the label "power".
++
++[1]. Documentation/devicetree/bindings/arm/idle-states.txt
 -- 
 2.7.4
