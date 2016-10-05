@@ -1,50 +1,53 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 06 Oct 2016 00:42:28 +0300
-Subject: [PATCH v3 07/11] ARM: dts: r8a7743: add Ether support
+Date: Thu, 06 Oct 2016 00:43:27 +0300
+Subject: [PATCH v3 08/11] ARM: dts: r8a7743: add IRQC support
 In-Reply-To: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
 References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
-Message-ID: <1823688.my1YjA2iHn@wasted.cogentembedded.com>
+Message-ID: <1550113.UvRQMtlFiI@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A7743 part of the Ether device node.
-
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+Describe the IRQC interrupt controller in the R8A7743 device tree.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
 Changes in version 3:
-- resoled a reject;
 - updated the "clocks" property for the CPG/MSSR driver.
 
 Changes in version 2:
 - new patch.
 
- arch/arm/boot/dts/r8a7743.dtsi |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/r8a7743.dtsi |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 Index: renesas/arch/arm/boot/dts/r8a7743.dtsi
 ===================================================================
 --- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
 +++ renesas/arch/arm/boot/dts/r8a7743.dtsi
-@@ -423,6 +423,18 @@
- 			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
- 			status = "disabled";
+@@ -72,6 +72,25 @@
+ 				      IRQ_TYPE_LEVEL_HIGH)>;
  		};
-+
-+		ether: ethernet at ee700000 {
-+			compatible = "renesas,ether-r8a7743";
-+			reg = <0 0xee700000 0 0x400>;
-+			interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 813>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			phy-mode = "rmii";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
- 	};
  
- 	/* External root clock */
++		irqc: interrupt-controller at e61c0000 {
++			compatible = "renesas,irqc-r8a7743", "renesas,irqc";
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			reg = <0 0xe61c0000 0 0x200>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 407>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++		};
++
+ 		timer {
+ 			compatible = "arm,armv7-timer";
+ 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
