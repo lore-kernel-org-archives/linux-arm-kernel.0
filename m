@@ -1,44 +1,97 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Oct 2016 22:01:38 +0100
-Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
-In-Reply-To: <20161005204452.GB26721@remoulade>
-References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
- <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
- <20161004170741.GC29008@leverpostej>
- <CAKdL+dS4_My6hyMEGNc65mzDapia_tMiVzZ9DMw=ddZM+XiwAw@mail.gmail.com>
- <CAKdL+dTGDqgpnMTkAj=N4cY-cZF_U+bkH1v1vUA4umZoSbWHKQ@mail.gmail.com>
- <50e025e0-7052-9b15-3b3e-36d1d9dfd695@arm.com>
- <CAKdL+dQH=9C2aGf7ys5-vXM7pkdPYUQ8xYWLipwVbABOz09f1g@mail.gmail.com>
- <20161005204452.GB26721@remoulade>
-Message-ID: <20161005210137.GS1041@n2100.armlinux.org.uk>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 5 Oct 2016 15:15:39 -0600
+Subject: [PATCH v2] Adding missing features of Coresight PTM components
+In-Reply-To: <f029bcee-696f-3519-b0f1-4cdcf24ad3f8@centralesupelec.fr>
+References: <f029bcee-696f-3519-b0f1-4cdcf24ad3f8@centralesupelec.fr>
+Message-ID: <CANLsYkxepzF1VuU6uDSrMEmd6F5ET_yyM73eBSvypaTJCu4eyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 05, 2016 at 09:44:53PM +0100, Mark Rutland wrote:
-> The zeroing case is similar to the restartable sequences design. So that's
-> probably worth looking into.
+On 5 October 2016 at 05:42, Muhammad Abdul WAHAB
+<muhammadabdul.wahab@centralesupelec.fr> wrote:
+> In the current driver for Coresight components, two features of PTM
+> components are missing:
+>
+> 1. Branch Broadcasting (present also in ETM but called Branch Output)
+> 2. Return Stack (only present in PTM v1.0 and PTMv1.1)
+>
+> These features can be added simply to the code using `mode` field of
+> `etm_config` struct.
+>
+> 1. **Branch Broadcast** : The branch broadcast feature is present in ETM
+> components as well and is called Branch output. It allows to retrieve
+> addresses for direct branch addresses alongside the indirect branch
+> addresses. For example, it could be useful in cases when tracing without
+> source code.
+> 2. **Return Stack** : The return stack option allows to retrieve the return
+>  addresses of function calls. It can be useful to avoid CRA
+> (Code Reuse Attacks) by keeping a shadowstack.
+>
+> Signed-off-by: Muhammad Abdul Wahab <muhammadabdul.wahab@centralesupelec.fr>
+> ---
+> changes in v2 :
+>         - modified patch description
+>         - removed additional comments on testing
+>         - removed a check on architecture version of ETM
+>         - generated using "git format-patch"
+>         - same email address in from: and SOB
+>
+>  drivers/hwtracing/coresight/coresight-etm.h         |  3 +++
+>  drivers/hwtracing/coresight/coresight-etm3x-sysfs.c | 12 ++++++++++++
+>  2 files changed, 15 insertions(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm.h
+> b/drivers/hwtracing/coresight/coresight-etm.h
+> index 4a18ee4..7a34860 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm.h
+> +++ b/drivers/hwtracing/coresight/coresight-etm.h
+> @@ -110,8 +110,11 @@
+>  #define ETM_MODE_STALL         BIT(2)
+>  #define ETM_MODE_TIMESTAMP     BIT(3)
+>  #define ETM_MODE_CTXID         BIT(4)
+> +#define ETM_MODE_BBROAD                BIT(5)
+> +#define ETM_MODE_RET_STACK     BIT(6)
+>  #define ETM_MODE_ALL           (ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
+>                                  ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
+> +                                ETM_MODE_BBROAD | ETM_MODE_RET_STACK | \
+>                                  ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
+>                                  ETM_MODE_EXCL_USER)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> index 5ea0909..4e0eab7 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> @@ -164,6 +164,18 @@ static ssize_t mode_store(struct device *dev,
+>         else
+>                 config->ctrl &= ~ETMCR_CTXID_SIZE;
+>
+> +       if (config->mode & ETM_MODE_BBROAD)
+> +               config->ctrl |= ETMCR_BRANCH_BROADCAST;
+> +       else
+> +               config->ctrl &= ~ETMCR_BRANCH_BROADCAST;
+> +
+> +       if (config->mode & ETM_MODE_RET_STACK) {
+> +               if (config->mode & ETM_MODE_BBROAD)
+> +                       dev_warn(drvdata->dev, "behavior is
+> unpredictable\n");
 
-You're sending mixed messages: in your previous message, you said:
+Please remove the warning message as well - there is no point having
+it there because:
 
-  Arguably, someone could have (ab)used TPIDRURW between commits 6a1c531
-  and a4780ad to detect context switches, but in practice they don't
-  appear to have, and we know of an established user relying on the
-  current behaviour.
+1) From sysFS users are supposed to know what they're doing.
+2) If we start warning users on all the things that can go wrong the
+code will become unbelievably cluttered.
 
-  For better or worse, the current behaviour is ABI.
+Thanks,
+Mathieu
 
-Now you're suggesting that we could go back to the case where the
-register is zeroed.
-
-Well, the fact is that we _can_ change the TPIDRURW behaviour - we just
-need to be careful about how we change it.  Eg, we _could_ introduce a
-per-process flag which indicates that we want some other behaviour from
-TPIDRURW such as zeroing it on context switches.  The default would be
-to preserve the existing behaviour as doing anything else breaks
-existing programs.  The problem there is finding an acceptable way to
-control such a flag from userspace (eg, prctl, syscall, etc).
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> +               config->ctrl |= ETMCR_RETURN_STACK_EN;
+> +       } else
+> +               config->ctrl &= ~ETMCR_RETURN_STACK_EN;
+> +
+>         if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
+>                 etm_config_trace_mode(config);
+>
+> --
+> 1.9.1
