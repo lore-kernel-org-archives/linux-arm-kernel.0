@@ -1,32 +1,138 @@
-From: paweljarosz3691@gmail.com (=?UTF-8?Q?Pawe=c5=82_Jarosz?=)
-Date: Wed, 5 Oct 2016 08:09:17 +0200
-Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on
- rk3066
-In-Reply-To: <6239b970-09d3-f7ee-e6f5-c019eaedb725@rock-chips.com>
-References: <20161001140939.GA31220@vaio-ubuntu>
- <6239b970-09d3-f7ee-e6f5-c019eaedb725@rock-chips.com>
-Message-ID: <f8aba48d-6c69-b246-4cb2-48a2770c80e4@gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Wed, 5 Oct 2016 11:51:56 +0530
+Subject: [PATCH v2 2/4] drivers: iio: ti_am335x_adc: add dma support
+In-Reply-To: <0ff2c6ef-3fa1-dc8b-fb6e-1a4dcfea8ea9@ti.com>
+References: <20161003130318.12591-1-mugunthanvnm@ti.com>
+ <20161003130318.12591-3-mugunthanvnm@ti.com>
+ <0ff2c6ef-3fa1-dc8b-fb6e-1a4dcfea8ea9@ti.com>
+Message-ID: <e9c3108e-ffd1-472a-a2d3-2948665de217@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tuesday 04 October 2016 02:02 PM, Peter Ujfalusi wrote:
+> On 10/03/16 16:03, Mugunthan V N wrote:
+>> +static int tiadc_request_dma(struct platform_device *pdev,
+>> +			     struct tiadc_device *adc_dev)
+>> +{
+>> +	struct tiadc_dma	*dma = &adc_dev->dma;
+>> +	dma_cap_mask_t		mask;
+>> +
+>> +	/* Default slave configuration parameters */
+>> +	dma->conf.direction = DMA_DEV_TO_MEM;
+>> +	dma->conf.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+>> +	dma->conf.src_addr = adc_dev->mfd_tscadc->tscadc_phys_base + REG_FIFO1;
+>> +
+>> +	dma_cap_zero(mask);
+>> +	dma_cap_set(DMA_CYCLIC, mask);
+>> +
+>> +	/* Get a channel for RX */
+>> +	dma->chan = dma_request_chan(adc_dev->mfd_tscadc->dev, "fifo1");
+>> +	if (!dma->chan)
+>> +		return -ENODEV;
+> 
+> dma_request_chan() ERR_PTR in case of failure, never NULL. You should reuse
+> the returned error code to support deferred probing.
 
+Will fix this in v3.
 
-W dniu 05.10.2016 o 04:27, Huang, Tao pisze:
-> Hi, Pawe?:
-> On 2016?10?01? 22:09, =?UTF-8?q?Pawe=C5=82=20Jarosz?= wrote:
->> For some reason accessing memory region above 0xfe000000 freezes
->> system on rk3066. There is similiar bug on later rockchip soc (rk3288)
-> RK3066 only support 2GB memory from 0x60000000 to 0xE0000000, can not access
-> above 0xfe000000. I think you mean 0x9F000000?
-Yes i meant 0x9F00000. Sorry for that.
-> I don't remember RK3066 has such limit. I will double check with our IC
-> design team.
-> Do you know which master can not access this memory area
-> [0x9F000000~0xA0000000)?
-I don't.
-> Could you please tell which board you're using (and how much memory it has)
-Rikomagic MK808 1GB RAM
+> 
+>> +
+>> +	/* RX buffer */
+>> +	dma->buf = dma_alloc_coherent(dma->chan->device->dev, DMA_BUFFER_SIZE,
+>> +				      &dma->addr, GFP_KERNEL);
+>> +	if (!dma->buf)
+>> +		goto err;
+>> +
+>> +	return 0;
+>> +err:
+>> +	dma_release_channel(dma->chan);
+>> +
+>> +	return -ENOMEM;
+>> +}
+>> +
+>>  static int tiadc_parse_dt(struct platform_device *pdev,
+>>  			  struct tiadc_device *adc_dev)
+>>  {
+>> @@ -512,8 +639,14 @@ static int tiadc_probe(struct platform_device *pdev)
+>>  
+>>  	platform_set_drvdata(pdev, indio_dev);
+>>  
+>> +	err = tiadc_request_dma(pdev, adc_dev);
+>> +	if (err && err != -ENODEV)
+>> +		goto err_dma;
+> 
+> You should handle the deferred probing for DMA channel.
 
-Thanks
-Pawel
++	dma->chan = dma_request_chan(adc_dev->mfd_tscadc->dev, "fifo1");
++	if (IS_ERR(dma->chan)) {
++		int ret = PTR_ERR(dma->chan);
++
++		dma->chan = NULL;
++		return ret;
++	}
+
+With this probe defer will be taken care and ADC will continue without
+DMA when request channel returns -ENODEV.
+
+Regards
+Mugunthan V N
+
+> 
+>> +
+>>  	return 0;
+>>  
+>> +err_dma:
+>> +	iio_device_unregister(indio_dev);
+>>  err_buffer_unregister:
+>>  	tiadc_iio_buffered_hardware_remove(indio_dev);
+>>  err_free_channels:
+>> @@ -525,8 +658,14 @@ static int tiadc_remove(struct platform_device *pdev)
+>>  {
+>>  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+>>  	struct tiadc_device *adc_dev = iio_priv(indio_dev);
+>> +	struct tiadc_dma *dma = &adc_dev->dma;
+>>  	u32 step_en;
+>>  
+>> +	if (dma->chan) {
+>> +		dma_free_coherent(dma->chan->device->dev, DMA_BUFFER_SIZE,
+>> +				  dma->buf, dma->addr);
+>> +		dma_release_channel(dma->chan);
+>> +	}
+>>  	iio_device_unregister(indio_dev);
+>>  	tiadc_iio_buffered_hardware_remove(indio_dev);
+>>  	tiadc_channels_remove(indio_dev);
+>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+>> index e45a208..b9a53e0 100644
+>> --- a/include/linux/mfd/ti_am335x_tscadc.h
+>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+>> @@ -23,6 +23,8 @@
+>>  #define REG_IRQENABLE		0x02C
+>>  #define REG_IRQCLR		0x030
+>>  #define REG_IRQWAKEUP		0x034
+>> +#define REG_DMAENABLE_SET	0x038
+>> +#define REG_DMAENABLE_CLEAR	0x03c
+>>  #define REG_CTRL		0x040
+>>  #define REG_ADCFSM		0x044
+>>  #define REG_CLKDIV		0x04C
+>> @@ -36,6 +38,7 @@
+>>  #define REG_FIFO0THR		0xE8
+>>  #define REG_FIFO1CNT		0xF0
+>>  #define REG_FIFO1THR		0xF4
+>> +#define REG_DMA1REQ		0xF8
+>>  #define REG_FIFO0		0x100
+>>  #define REG_FIFO1		0x200
+>>  
+>> @@ -126,6 +129,10 @@
+>>  #define FIFOREAD_DATA_MASK (0xfff << 0)
+>>  #define FIFOREAD_CHNLID_MASK (0xf << 16)
+>>  
+>> +/* DMA ENABLE/CLEAR Register */
+>> +#define DMA_FIFO0		BIT(0)
+>> +#define DMA_FIFO1		BIT(1)
+>> +
+>>  /* Sequencer Status */
+>>  #define SEQ_STATUS BIT(5)
+>>  #define CHARGE_STEP		0x11
+>>
+> 
+> 
