@@ -1,122 +1,84 @@
-From: fredrik.markstrom@gmail.com (=?UTF-8?Q?Fredrik_Markstr=C3=B6m?=)
-Date: Wed, 5 Oct 2016 18:39:32 +0200
-Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
-In-Reply-To: <CAKdL+dS4_My6hyMEGNc65mzDapia_tMiVzZ9DMw=ddZM+XiwAw@mail.gmail.com>
-References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
- <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
- <20161004170741.GC29008@leverpostej>
- <CAKdL+dS4_My6hyMEGNc65mzDapia_tMiVzZ9DMw=ddZM+XiwAw@mail.gmail.com>
-Message-ID: <CAKdL+dTGDqgpnMTkAj=N4cY-cZF_U+bkH1v1vUA4umZoSbWHKQ@mail.gmail.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Wed, 5 Oct 2016 18:41:02 +0200
+Subject: [PATCH 5/7] arm64/kvm: hyp: tlb: use __tlbi() helper
+In-Reply-To: <1473761769-30572-6-git-send-email-punit.agrawal@arm.com>
+References: <1473761769-30572-1-git-send-email-punit.agrawal@arm.com>
+ <1473761769-30572-6-git-send-email-punit.agrawal@arm.com>
+Message-ID: <07921948-8692-67c1-8ae9-a68f0cc387c8@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The approach I suggested below with the vDSO data page will obviously
-not work on smp, so suggestions are welcome.
-
-/Fredrik
 
 
-On Wed, Oct 5, 2016 at 2:25 PM, Fredrik Markstr?m
-<fredrik.markstrom@gmail.com> wrote:
-> On Tue, Oct 4, 2016 at 7:08 PM Mark Rutland <mark.rutland@arm.com> wrote:
->>
->> On Tue, Oct 04, 2016 at 05:35:33PM +0200, Fredrik Markstrom wrote:
->> > This makes getcpu() ~1000 times faster, this is very useful when
->> > implementing per-cpu buffers in userspace (to avoid cache line
->> > bouncing). As an example lttng ust becomes ~30% faster.
->> >
->> > The patch will break applications using TPIDRURW (which is context switched
->> > since commit 4780adeefd042482f624f5e0d577bf9cdcbb760 ("ARM: 7735/2:
->>
->> It looks like you dropped the leading 'a' from the commit ID. For
->> everyone else's benefit, the full ID is:
->>
->>   a4780adeefd042482f624f5e0d577bf9cdcbb760
+On 13/09/16 12:16, Punit Agrawal wrote:
+> From: Mark Rutland <mark.rutland@arm.com>
 >
+> Now that we have a __tlbi() helper, make use of this in the arm64 KVM hyp
+> code to get rid of asm() boilerplate. At the same time, we simplify
+> __tlb_flush_vm_context by using __flush_icache_all(), as this has the
+> appropriate instruction cache maintenance and barrier.
 >
-> Sorry for that and thanks for fixing it.
->
->>
->>
->> Please note that arm64 has done similar for compat tasks since commit:
->>
->>   d00a3810c16207d2 ("arm64: context-switch user tls register tpidr_el0 for
->>   compat tasks")
->>
->> > Preserve the user r/w register TPIDRURW on context switch and fork")) and
->> > is therefore made configurable.
->>
->> As you note above, this is an ABI break and *will* break some existing
->> applications. That's generally a no-go.
->
->
-> Ok, I wasn't sure this was considered an ABI (but I'm not entirely
-> surprised ;) ). The way I was
-> trying to defend the breakage was by reasoning that that if it was an
-> ABI we broke it both with a4780ad
-> and with 6a1c531, and since we don't break ABI:s, it can't be one.
->
-> But hey, I'm humble here and ready to back off.
->
->>
->> This also leaves arm64's compat with the existing behaviour, differing
->> from arm.
->>
->> I was under the impression that other mechanisms were being considered
->> for fast userspace access to per-cpu data structures, e.g. restartable
->> sequences. What is the state of those? Why is this better?
->>
->> If getcpu() specifically is necessary, is there no other way to
->> implement it?
->
-> If you are referring to the user space stuff can probably be
-> implemented other ways,
-> it's just convenient since the interface is there and it will speed up
-> stuff like lttng without
-> modifications (well, except glibc). It's also already implemented as a
-> vDSO on other
-> major architectures (like x86, x86_64, ppc32 and ppc64).
->
-> If you are referring to the implementation of the vdso call, there are
-> other possibilities, but
-> I haven't found any that doesn't introduce overhead in context switching.
->
-> But if TPIDRURW is definitely a no go, I can work on a patch that does
-> this with a thread notifier
-> and the vdso data page. Would that be a viable option ?
->
->>
->> > +notrace int __vdso_getcpu(unsigned int *cpup, unsigned int *nodep,
->> > +                       struct getcpu_cache *tcache)
->> > +{
->> > +     unsigned long node_and_cpu;
->> > +
->> > +     asm("mrc p15, 0, %0, c13, c0, 2\n" : "=r"(node_and_cpu));
->> > +
->> > +     if (nodep)
->> > +             *nodep = cpu_to_node(node_and_cpu >> 16);
->> > +     if (cpup)
->> > +             *cpup  = node_and_cpu & 0xffffUL;
->>
->> Given this is directly user-accessible, this format is a de-facto ABI,
->> even if it's not documented as such. Is this definitely the format you
->> want long-term?
->
-> Yes, this (the interface) is indeed the important part and therefore I
-> tried not to invent anything
-> on my own.
-> This is the interface used by ppc32, ppc64, x86, x86_64. It's also this is
-> how the getcpu(2) system call is documented.
->
-> /Fredrik
->
->
->>
->>
->> Thanks,
->> Mark.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> [ rename tlbi -> __tlbi, convert additional sites, update commit log ]
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
 
+Reviewed-by: Matthias Brugger <mbrugger@suse.com>
 
-
--- 
-/Fredrik
+>  arch/arm64/kvm/hyp/tlb.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+> index be8177c..4cda100 100644
+> --- a/arch/arm64/kvm/hyp/tlb.c
+> +++ b/arch/arm64/kvm/hyp/tlb.c
+> @@ -16,6 +16,7 @@
+>   */
+>
+>  #include <asm/kvm_hyp.h>
+> +#include <asm/tlbflush.h>
+>
+>  static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  {
+> @@ -32,7 +33,7 @@ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  	 * whole of Stage-1. Weep...
+>  	 */
+>  	ipa >>= 12;
+> -	asm volatile("tlbi ipas2e1is, %0" : : "r" (ipa));
+> +	__tlbi(ipas2e1is, ipa);
+>
+>  	/*
+>  	 * We have to ensure completion of the invalidation at Stage-2,
+> @@ -41,7 +42,7 @@ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+>  	 * the Stage-1 invalidation happened first.
+>  	 */
+>  	dsb(ish);
+> -	asm volatile("tlbi vmalle1is" : : );
+> +	__tlbi(vmalle1is);
+>  	dsb(ish);
+>  	isb();
+>
+> @@ -60,7 +61,7 @@ static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
+>  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+>  	isb();
+>
+> -	asm volatile("tlbi vmalls12e1is" : : );
+> +	__tlbi(vmalls12e1is);
+>  	dsb(ish);
+>  	isb();
+>
+> @@ -72,9 +73,8 @@ __alias(__tlb_flush_vmid) void __kvm_tlb_flush_vmid(struct kvm *kvm);
+>  static void __hyp_text __tlb_flush_vm_context(void)
+>  {
+>  	dsb(ishst);
+> -	asm volatile("tlbi alle1is	\n"
+> -		     "ic ialluis	  ": : );
+> -	dsb(ish);
+> +	__tlbi(alle1is);
+> +	__flush_icache_all(); /* contains a dsb(ish) */
+>  }
+>
+>  __alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
+>
