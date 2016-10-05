@@ -1,155 +1,115 @@
-From: venkatesh.vivekanandan@broadcom.com (Venkatesh Vivekanandan)
-Date: Wed, 5 Oct 2016 10:57:08 +0530
-Subject: Coresight ETF trace dump failed in Juno r1 with 4.8-rc8
-In-Reply-To: <434a0256-de86-c1f0-0dc3-a38f55596e8e@arm.com>
-References: <CAGhh56F-VWCCy82msQ8CimZ4a0a2h=tqR2qv1KcfeyuQXo=R1w@mail.gmail.com>
- <42c2ac9c-abdf-5341-01b5-3f342c5164b7@arm.com>
- <CAGhh56H7a9oEYxzEA4gGvBey=COMqwgisd4tzewU8DLGcGrsww@mail.gmail.com>
- <434a0256-de86-c1f0-0dc3-a38f55596e8e@arm.com>
-Message-ID: <CAGhh56GeZkLT=sN4cEhUJMeuz+ZD6jMnU2sbb3yRVLESUcWrtg@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 5 Oct 2016 14:41:12 +0900
+Subject: [PATCH v26 0/7] arm64: add kdump support
+In-Reply-To: <57F37A73.3030105@arm.com>
+References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
+ <8a57223d-000d-536e-6885-d427ee81508c@caviumnetworks.com>
+ <20161003110424.GD14025@linaro.org>
+ <1ae717d6-b2aa-105b-4f47-d879882ca5d3@caviumnetworks.com>
+ <57F37A73.3030105@arm.com>
+Message-ID: <20161005054111.GA19531@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 4, 2016 at 7:59 PM, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 04/10/16 06:37, Venkatesh Vivekanandan wrote:
->>
->> On Mon, Oct 3, 2016 at 6:44 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>
->>> Hi Venkatesh,
->>>
->>> On 03/10/16 12:36, Venkatesh Vivekanandan wrote:
->>>>
->>>>
->>>> Hi All,
->>>>
->>>> I am trying to collect ETF trace from Juno R1 and could see "cpu
->>>> stall" while dumping the trace. Attached is the log of sequence
->>>> followed. Was trying to collect the trace data from hardware and see
->>>> if it is any valid data. Am I missing anything here?.
->>>>
->>>
->>> There are few fixes from me and Suzuki queued for v4.9.
->>> Can you check if this issue persists even on linux-next ?
->>
->>
->> Issue is the same in linux-next as well. Please find the attached log.
->>
->> linaro-test [rc=0]# dd if=/dev/20010000.etf of=/cstrace.bin bs=1
->> [  120.009698] INFO: rcu_preempt detected stalls on CPUs/tasks:
->> [  120.015307]  2-...: (1 GPs behind) idle=f11/140000000000000/0
->> softirq=224/224 fqs=1903
->> [  120.023226]  (detected by 1, t=5255 jiffies, g=-1, c=-2, q=19)
->> [  120.029001] Task dump for CPU 2:
->> [  120.032190] dd              R  running task        0  1270   1267
->> 0x00000002
->> [  120.039172] Call trace:
->> [  120.041594] [<ffff000008085534>] __switch_to+0xc8/0xd4
->> [  120.046675] [<0000000000020000>] 0x20000
->>
->> Steps followed,
->> # git clone
->> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
->> linux-next
->> # cd linux-next
->> # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
->> # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- menuconfig  <---
->> enable coresight
->> # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j8 Image
->> # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- dtbs
->> # arch/arm64/boot/Image <--- copied this kernel
->> # arch/arm64/boot/dts/arm/juno-r1.dtb <--- copied this dtb
->>
->> Top commit in linux-next is,
->>
->> commit c7d3b912180a9bb0733e5cfab84e5a7493dd3599
->> Author: Stephen Rothwell <sfr@canb.auug.org.au>
->> Date:   Tue Oct 4 14:52:03 2016 +1100
->>
->>     Add linux-next specific files for 20161004
->
->
-> Can't reproduce it here either.
->
-> root at localhost:/sys/bus/coresight/devices# echo 1 > 20010000.etf/enable_sink
-> root at localhost:/sys/bus/coresight/devices# echo 1 >
-> 22140000.etm/enable_source
-> root at localhost:/sys/bus/coresight/devices# dd if=/dev/20010000.etf bs=1
-> of=/root/etr.bin
-> 65536+0 records in
-> 65536+0 records out
-> 65536 bytes (66 kB) copied, 0.227546 s, 288 kB/s
-> root at localhost:/sys/bus/coresight/devices# dd if=/dev/20010000.etf bs=1
-> of=/root/etr.bin
-> 65536+0 records in
-> 65536+0 records out
-> 65536 bytes (66 kB) copied, 0.233527 s, 281 kB/s
-> root at localhost:/sys/bus/coresight/devices# echo 0 > 20010000.etf/enable_sink
-> root at localhost:/sys/bus/coresight/devices# dd if=/dev/20010000.etf bs=1
-> of=/root/etr.bin
-> 65536+0 records in
-> 65536+0 records out
-> 65536 bytes (66 kB) copied, 0.474943 s, 138 kB/s
->
-> FWIW, here is my firmware version :
->
-> NOTICE:  Booting Trusted Firmware
-> NOTICE:  BL1: v1.1(release):e04723e21362
-> NOTICE:  BL1: Built : 15:39:56, Sep  1 2015
-> NOTICE:  BL1: Booting BL2
-> NOTICE:  BL2: v1.1(release):e04723e21362
-> NOTICE:  BL2: Built : 15:42:30, Sep  1 2015
-> NOTICE:  BL1: Booting BL3-1
-> NOTICE:  BL3-1: v1.1(release):604d5da6f2aa
-> NOTICE:  BL3-1: Built : 14:50:36, Sep 10 2015
-> UEFI firmware (version ea31f8e built at 16:35:17 on Aug  5 2015)
->
+On Tue, Oct 04, 2016 at 10:46:27AM +0100, James Morse wrote:
+> Hi Manish,
+> 
+> On 03/10/16 13:41, Manish Jaggi wrote:
+> > On 10/03/2016 04:34 PM, AKASHI Takahiro wrote:
+> >> On Mon, Oct 03, 2016 at 01:24:34PM +0530, Manish Jaggi wrote:
+> >>> With the v26 kdump and v3 kexec-tools and top of tree crash.git, below are the tests done
+> >>> Attached is a patch in crash.git (symbols.c) to make crash utility work on my setup.
+> >>> Can you please have a look and provide your comments.
+> >>>
+> >>> To generate a panic, i have a kernel module which on init calls panic.
+> 
+> ... modules ... I haven't tested that. I bet it causes some problems!
+> We probably need to include module_alloc_base as an elf note in the vmcore file...
 
-Hang is seen while trying to dump trace _after_ disabling the ETM
-source. Is it not supposed to work?.
-It works fine, when dumped before disabling ETM source. Please find
-the log below.
+No, I don't think so :)
+I created some test module as Manish implied and tested kdump:
+(My kernel here even enables KASLR.)
+===8<===
+$ crash vmlinux vmcore
+...
+please wait... (gathering module symbol data)
+...
+crash> mod -S
+     MODULE       NAME      SIZE  OBJECT FILE
+ffff04d78f4b8000  testmod  16384  /opt/buildroot/15.11_64/root/kexec/testmod.ko 
+crash> bt
+PID: 1102   TASK: ffffb4da8e910000  CPU: 0   COMMAND: "insmod"
+ #0 [ffffb4da8e9afa30] __crash_kexec at ffff0e0045020a54
+ #1 [ffffb4da8e9afb90] panic at ffff0e004505523c
+ #2 [ffffb4da8e9afc50] testmod_init at ffff04d78f4b6014 [testmod]
+ #3 [ffffb4da8e9afb40] do_one_initcall at ffff0e0044f7333c
+--- <Exception in user> ---
+     PC: 0000000a  LR: 00000000  SP: ffff04d78f4b6000  PSTATE: 7669726420656c75
+    X12: ffffb4da8e9ac000 X11: ffff04d78f4b6018 X10: ffffb4da8e9afc50  X9: 20676e6973756143
+     X8: 00000000  X7: ffff0e0045e5ce00  X6: ffff0e0045e5c000  X5: 600001c5
+     X4: ffff0e0045020a58  X3: ffffb4da8e9afa30  X2: ffff0e004502098c  X1: ffffb4da8e9afa30
+     X0: 00000124
+crash> disas testmod_init
+Dump of assembler code for function testmod_init:
+   0xffff04d78f4b6000 <+0>:     stp     x29, x30, [sp,#-16]!
+   0xffff04d78f4b6004 <+4>:     mov     x29, sp
+   0xffff04d78f4b6008 <+8>:     ldr     x0, 0xffff04d78f4b6018
+   0xffff04d78f4b600c <+12>:    bl      0xffff04d78f4b6090
+   0xffff04d78f4b6010 <+16>:    ldr     x0, 0xffff04d78f4b6020
+   0xffff04d78f4b6014 <+20>:    bl      0xffff04d78f4b6080
+End of assembler dump.
+===>8===
+(I see some issue in disassembled code, though.)
 
-linaro-test [rc=0]# echo 1 > 20010000.etf/enable_sink
-linaro-test [rc=0]# echo 1 > 22140000.etm/enable_source
-[   91.792145] coresight-tmc 20010000.etf: TMC-ETB/ETF enabled
-[   91.797719] coresight-funnel 20040000.main-funnel: FUNNEL inport 0 enabled
-[   91.804552] coresight-funnel 220c0000.cluster0-funnel: FUNNEL
-inport 1 enabled
-[   91.815990] coresight-etm4x 22140000.etm: ETM tracing enabled
-linaro-test [rc=0]# dd if=/dev/20010000.etf of=/cstrace.bin bs=1
-[  108.105492] coresight-tmc 20010000.etf: TMC read start
-[  108.404335] coresight-tmc 20010000.etf: TMC read end
-65536+0 records in
-65536+0 records out
-linaro-test [rc=0]# echo 0 > 20010000.etf/enable_sink
-linaro-test [rc=0]# dd if=/dev/20010000.etf of=/cstrace.bin bs=1
-[  125.069740] coresight-tmc 20010000.etf: TMC read start
-[  125.184370] coresight-tmc 20010000.etf: TMC read end
-65536+0 records in
-65536+0 records out
-linaro-test [rc=0]# echo 0 > 22140000.etm/enable_source
-[  140.271163] coresight-etm4x 22140000.etm: ETM tracing disabled
-[  140.276964] coresight-funnel 220c0000.cluster0-funnel: FUNNEL
-inport 1 disabled
-[  140.284211] coresight-funnel 20040000.main-funnel: FUNNEL inport 0 disabled
-[  140.291128] coresight-tmc 20010000.etf: TMC-ETB/ETF disabled
-linaro-test [rc=0]# dd if=/dev/20010000.etf of=/cstrace.bin bs=1
-<---- It hangs here...
+> 
+> 
+> >>> First kernel is booted with mem=2G crashkernel=1G command line option.
+> >>> While the system has 64G memory.
+> 
+> >> Are you saying that "mem=..." doesn't have any effect?
+> > What I am saying it that If the first kernel is booted using mem= option and crashkernel= option
+> > the memory for second kernel has to be withing the crashkernel size.
+> > As per /proc/iomem System RAM the information is correct, but the /proc/meminfo is showing total memory
+> > much more than the first kernel had in first place.
+> 
+> So your second crashkernel has 63G of memory? Unless you provide the same 'mem='
+> to the kdump kernel, this is the expected behaviour. The
+> DT:/reserved-memory/crash_dump describes the memory not to use.
+> 
+> On your first boot with 'mem=2G' memblock_mem_limit_remove_map() called from
+> arm64_memblock_init() removed the top 62G of memory. Neither the first kernel
+> nor kexec-tools know about the top 62G.
+> When you run kexec-tools, it describes what it sees in /proc/iomem in the
+> DT:/reserved-memory/crash_dump, which is just the remaining 1G of memory.
+> 
+> When we crash and reboot, the crash kernel discovers all 64G of memory from the
+> EFI memory map.
+> kexec-tools described the 1G of memory that the first kernel was using in the
+> DT:/reserved-memory/crash_dump node, so early_init_fdt_scan_reserved_mem()
+> reserves the 1G of memory the first kernel used. This leaves us with 63G of memory.
 
-My firmware version,
+Thank you very much for elaborating this on behalf of myself!
 
-NOTICE:  Booting Trusted Firmware
-NOTICE:  BL1: v1.1(debug):4a1dcde
-NOTICE:  BL1: Built : 17:54:40, Nov 24 2015
-NOTICE:  BL1: Booting BL2
-NOTICE:  BL2: v1.1(debug):4a1dcde
-NOTICE:  BL2: Built : 17:54:40, Nov 24 2015
-NOTICE:  BL1: Booting BL3-1
-NOTICE:  BL3-1: v1.1(debug):4a1dcde
-NOTICE:  BL3-1: Built : 17:54:40, Nov 24 2015
-UEFI firmware (version 9ed6f7e built@17:54:28 on Nov 24 2015)
+> This may change with the next version of kdump if it switches back to using
+> DT:/chosen/linux,usable-memory-range.
 
+Indeed.
+We need to talk to Rob.
+
+Thanks,
+-Takahiro AKASHI
+
+> If you need v26 to avoid the top 62G of memory, you need to provide the same
+> 'mem=' to the first and second kernel.
 >
-> Cheers
-> Suzuki
->
+> 
+> >>> 1.2 Live crash dump fails with error
+> 
+> ... do we expect this to work? I don't think it has anything to do with this
+> series...
+> 
+> 
+> Thanks,
+> 
+> James
+> 
