@@ -1,84 +1,38 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Wed, 5 Oct 2016 18:41:02 +0200
-Subject: [PATCH 5/7] arm64/kvm: hyp: tlb: use __tlbi() helper
-In-Reply-To: <1473761769-30572-6-git-send-email-punit.agrawal@arm.com>
-References: <1473761769-30572-1-git-send-email-punit.agrawal@arm.com>
- <1473761769-30572-6-git-send-email-punit.agrawal@arm.com>
-Message-ID: <07921948-8692-67c1-8ae9-a68f0cc387c8@suse.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Wed, 5 Oct 2016 18:53:07 +0200
+Subject: [PATCH 1/1] ARM: at91/dt: sama5d2: enable FIFOs for high-speed i2c
+ controllers
+Message-ID: <69f559c9dd08696d280a2cea0f666ef18253e459.1475685906.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch enables the RX and TX FIFOs (16 data each) of the two
+high-speed i2c controllers (i2c0 and i2c1).
 
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ arch/arm/boot/dts/sama5d2.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-On 13/09/16 12:16, Punit Agrawal wrote:
-> From: Mark Rutland <mark.rutland@arm.com>
->
-> Now that we have a __tlbi() helper, make use of this in the arm64 KVM hyp
-> code to get rid of asm() boilerplate. At the same time, we simplify
-> __tlb_flush_vm_context by using __flush_icache_all(), as this has the
-> appropriate instruction cache maintenance and barrier.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> [ rename tlbi -> __tlbi, convert additional sites, update commit log ]
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
-
-Reviewed-by: Matthias Brugger <mbrugger@suse.com>
-
->  arch/arm64/kvm/hyp/tlb.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-> index be8177c..4cda100 100644
-> --- a/arch/arm64/kvm/hyp/tlb.c
-> +++ b/arch/arm64/kvm/hyp/tlb.c
-> @@ -16,6 +16,7 @@
->   */
->
->  #include <asm/kvm_hyp.h>
-> +#include <asm/tlbflush.h>
->
->  static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->  {
-> @@ -32,7 +33,7 @@ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->  	 * whole of Stage-1. Weep...
->  	 */
->  	ipa >>= 12;
-> -	asm volatile("tlbi ipas2e1is, %0" : : "r" (ipa));
-> +	__tlbi(ipas2e1is, ipa);
->
->  	/*
->  	 * We have to ensure completion of the invalidation at Stage-2,
-> @@ -41,7 +42,7 @@ static void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->  	 * the Stage-1 invalidation happened first.
->  	 */
->  	dsb(ish);
-> -	asm volatile("tlbi vmalle1is" : : );
-> +	__tlbi(vmalle1is);
->  	dsb(ish);
->  	isb();
->
-> @@ -60,7 +61,7 @@ static void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
->  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
->  	isb();
->
-> -	asm volatile("tlbi vmalls12e1is" : : );
-> +	__tlbi(vmalls12e1is);
->  	dsb(ish);
->  	isb();
->
-> @@ -72,9 +73,8 @@ __alias(__tlb_flush_vmid) void __kvm_tlb_flush_vmid(struct kvm *kvm);
->  static void __hyp_text __tlb_flush_vm_context(void)
->  {
->  	dsb(ishst);
-> -	asm volatile("tlbi alle1is	\n"
-> -		     "ic ialluis	  ": : );
-> -	dsb(ish);
-> +	__tlbi(alle1is);
-> +	__flush_icache_all(); /* contains a dsb(ish) */
->  }
->
->  __alias(__tlb_flush_vm_context) void __kvm_flush_vm_context(void);
->
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 35bf72d57f7c..20e5bc182c2d 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -1052,6 +1052,7 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				clocks = <&twi0_clk>;
++				atmel,fifo-size = <16>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -1253,6 +1254,7 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				clocks = <&twi1_clk>;
++				atmel,fifo-size = <16>;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.7.4
