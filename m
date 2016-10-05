@@ -1,40 +1,57 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 6 Oct 2016 09:41:14 +1100
-Subject: linux-next: manual merge of the gpio tree with the arm-soc tree
-In-Reply-To: <20160927150542.7e81e7ee@canb.auug.org.au>
-References: <20160927150542.7e81e7ee@canb.auug.org.au>
-Message-ID: <20161006094114.764d2f34@canb.auug.org.au>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Wed, 05 Oct 2016 23:56:11 +0100
+Subject: [PATCH] ARM: fix delays
+Message-ID: <E1brv6h-0003j7-7J@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Commit 215e362dafed ("ARM: 8306/1: loop_udelay: remove bogomips value
+limitation") tried to increase the bogomips limitation, but in doing
+so messed up udelay such that it always gives about a 5% error in the
+delay, even if we use a timer.
 
-On Tue, 27 Sep 2016 15:05:42 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->
-> Today's linux-next merge of the gpio tree got a conflict in:
-> 
->   arch/arm/mach-omap2/board-rx51-peripherals.c
-> 
-> between commit:
-> 
->   9b7141d01a76 ("ARM: OMAP2+: Drop legacy board file for n900")
-> 
-> from the arm-soc tree and commit:
-> 
->   9132ce450bd1 ("ARM: omap2: fix missing include")
-> 
-> from the gpio tree.
-> 
-> I fixed it up (the former removed the file, so I did that) and can
-> carry the fix as necessary. This is now fixed as far as linux-next is
-> concerned, but any non trivial conflicts should be mentioned to your
-> upstream maintainer when your tree is submitted for merging.  You may
-> also want to consider cooperating with the maintainer of the conflicting
-> tree to minimise any particularly complex conflicts.
+The calculation is:
 
-Since Linus (Torvalds) has merged the gpio tree, this conflict (and
-file removal) now affects the merge of the arm-soc tree).
+	loops = UDELAY_MULT * us_delay * ticks_per_jiffy >> UDELAY_SHIFT
 
+Originally, UDELAY_MULT was ((UL(2199023) * HZ) >> 11) and UDELAY_SHIFT
+30.  Assuming HZ=100, us_delay of 1000 and ticks_per_jiffy of 1660000
+(eg, 166MHz timer, 1ms delay) this would calculate:
+
+	((UL(2199023) * HZ) >> 11) * 1000 * 1660000 >> 30
+		=> 165999
+
+With the new values of 2047 * HZ + 483648 * HZ / 1000000 and 31, we get:
+
+	(2047 * HZ + 483648 * HZ / 1000000) * 1000 * 1660000 >> 31
+		=> 158269
+
+which is incorrect.  This is due to a typo - correcting it gives:
+
+	(2147 * HZ + 483648 * HZ / 1000000) * 1000 * 1660000 >> 31
+		=> 165999
+
+i.o.w, the original value.
+
+Fixes: 215e362dafed ("ARM: 8306/1: loop_udelay: remove bogomips value limitation")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/include/asm/delay.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
+index b7a428154355..b1ce037e4380 100644
+--- a/arch/arm/include/asm/delay.h
++++ b/arch/arm/include/asm/delay.h
+@@ -10,7 +10,7 @@
+ #include <asm/param.h>	/* HZ */
+ 
+ #define MAX_UDELAY_MS	2
+-#define UDELAY_MULT	UL(2047 * HZ + 483648 * HZ / 1000000)
++#define UDELAY_MULT	UL(2147 * HZ + 483648 * HZ / 1000000)
+ #define UDELAY_SHIFT	31
+ 
+ #ifndef __ASSEMBLY__
 -- 
-Cheers,
-Stephen Rothwell
+2.1.0
