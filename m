@@ -1,38 +1,99 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 5 Oct 2016 18:53:07 +0200
-Subject: [PATCH 1/1] ARM: at91/dt: sama5d2: enable FIFOs for high-speed i2c
- controllers
-Message-ID: <69f559c9dd08696d280a2cea0f666ef18253e459.1475685906.git.cyrille.pitchen@atmel.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 05 Oct 2016 09:50:27 -0700
+Subject: [PATCH v2 0/6] Support PWM polarity control
+In-Reply-To: <20161004094805.466ebc6d@jawa>
+References: <20161001101235.24598-1-bhuvanchandra.dv@toradex.com>
+ <20161004094805.466ebc6d@jawa>
+Message-ID: <be9c9f6b22788ca4d9c9243a46932945@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the RX and TX FIFOs (16 data each) of the two
-high-speed i2c controllers (i2c0 and i2c1).
+Hi Lukasz,
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- arch/arm/boot/dts/sama5d2.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+On 2016-10-04 00:48, Lukasz Majewski wrote:
+> Dear Bhuvanchandra,
+> 
+> Thank you for your effort to send those patches to ML.
+> 
+>> Changes since v2:
+>>
+>> - Picked the stalled patchset[1] from Lothar Wassmann which adds the
+>> basic support for polarity control on imx-pwm driver and adds
+>> backward compatibility support for devices which does not have
+>> polarity control feature.
+>>
+>> Changes since Lothars v6:
+>>
+>> - Squash Lukasz patch[2].
+>>
+>> [1] http://thread.gmane.org/gmane.linux.pwm/1621
+>> [2] https://www.spinics.net/lists/arm-kernel/msg530818.html
+>>
+>> Bhuvanchandra DV (3):
+>>   arm: dts: imx7: Update #pwm-cells for PWM polarity control
+>>   arm: dts: imx7-colibri: Use pwm polarity control
+>>   arm: dts: imx7-colibri: Use enable-gpios for BL_ON
+>>
+>> Lothar Wassmann (3):
+>>   pwm: print error messages with pr_err() instead of pr_debug()
+>>   pwm: core: make the PWM_POLARITY flag in DTB optional
+>>   pwm: imx: support output polarity inversion
+> 
+> For some reason this patchset works differently than the one developed
+> by Lothar.
+> 
+> The difference is with the brightness level control.
+> 
+> My brightness definition in DTS:
+> 
+>            pwms = <&pwm2 0 5000000 PWM_POLARITY_INVERTED>;
+> 
+>  		brightness-levels = <  0   1   2   3   4   5   6   7   8   9
+> 
+> 					 ..  ............
+> 				    250 251 252 253 254 255>;
+> 		default-brightness-level = <50>;
+> 		enable-gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+> 
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 35bf72d57f7c..20e5bc182c2d 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -1052,6 +1052,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				clocks = <&twi0_clk>;
-+				atmel,fifo-size = <16>;
- 				status = "disabled";
- 			};
- 
-@@ -1253,6 +1254,7 @@
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				clocks = <&twi1_clk>;
-+				atmel,fifo-size = <16>;
- 				status = "disabled";
- 			};
- 
--- 
-2.7.4
+If you are using something else than i.MX 7 you also want to update the
+SoC level device tree, specifically change the pwm-cells property:
+#pwm-cells = <3>;
+
+
+> When I go to the backlight sysfs entry:
+> 
+> cd /sys/devices/soc0/backlight/backlight/backlight
+> 
+> It seems like the brightness level control is inverted - i.e. 
+> 'echo 20 > brightness" makes picture on the screen very bright, and 
+> 'echo 200 > brightness' makes the picture diminish.
+> 
+> With my "internal" patches the situation is opposite (and I've checked it with
+> my HW connections).
+
+Just to check whether the driver actually applies the polarity you can
+add a #define DEBUG at the top of the driver (drivers/pwm/pwm-imx.c) and
+pass ignore_loglevel as kernel command line. This should give you "PWM
+supports output inversion" at startup and a "... polarity set to .."
+message whenever the polarity is set.
+
+--
+Stefan
+
+> 
+> Could you check on your setup if similar situation takes place? I mean
+> if the brightness control works as expected?
+> 
+> Thanks in advance,
+> ?ukasz Majewski
+> 
+>>
+>>  Documentation/devicetree/bindings/pwm/imx-pwm.txt |  6 +--
+>>  arch/arm/boot/dts/imx7-colibri.dtsi               | 12 +++++-
+>>  arch/arm/boot/dts/imx7s.dtsi                      |  8 ++--
+>>  drivers/pwm/core.c                                | 31 ++++++++------
+>>  drivers/pwm/pwm-imx.c                             | 51
+>> +++++++++++++++++++++-- 5 files changed, 83 insertions(+), 25
+>> deletions(-)
+>>
