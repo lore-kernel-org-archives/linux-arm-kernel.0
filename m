@@ -1,47 +1,122 @@
-From: paweljarosz3691@gmail.com (=?us-ascii?B?PT9VVEYtOD9xP1Bhd2U9QzU9ODI9MjBKYXJvc3o/PQ==?=)
-Date: Wed, 5 Oct 2016 18:18:11 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: Reserve unusable memory region on
- rk3066
-Message-ID: <20161005161811.GA17211@vaio-ubuntu>
+From: fredrik.markstrom@gmail.com (=?UTF-8?Q?Fredrik_Markstr=C3=B6m?=)
+Date: Wed, 5 Oct 2016 18:39:32 +0200
+Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
+In-Reply-To: <CAKdL+dS4_My6hyMEGNc65mzDapia_tMiVzZ9DMw=ddZM+XiwAw@mail.gmail.com>
+References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
+ <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
+ <20161004170741.GC29008@leverpostej>
+ <CAKdL+dS4_My6hyMEGNc65mzDapia_tMiVzZ9DMw=ddZM+XiwAw@mail.gmail.com>
+Message-ID: <CAKdL+dTGDqgpnMTkAj=N4cY-cZF_U+bkH1v1vUA4umZoSbWHKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some reason accessing memory region above 0x9F000000 freezes
-system on rk3066. There is similiar bug on later rockchip soc (rk3288)
-solved same way.
+The approach I suggested below with the vDSO data page will obviously
+not work on smp, so suggestions are welcome.
 
-Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
----
+/Fredrik
 
-Changes in v2:
-- updated commit message.
 
- arch/arm/boot/dts/rk3066a.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+On Wed, Oct 5, 2016 at 2:25 PM, Fredrik Markstr?m
+<fredrik.markstrom@gmail.com> wrote:
+> On Tue, Oct 4, 2016 at 7:08 PM Mark Rutland <mark.rutland@arm.com> wrote:
+>>
+>> On Tue, Oct 04, 2016 at 05:35:33PM +0200, Fredrik Markstrom wrote:
+>> > This makes getcpu() ~1000 times faster, this is very useful when
+>> > implementing per-cpu buffers in userspace (to avoid cache line
+>> > bouncing). As an example lttng ust becomes ~30% faster.
+>> >
+>> > The patch will break applications using TPIDRURW (which is context switched
+>> > since commit 4780adeefd042482f624f5e0d577bf9cdcbb760 ("ARM: 7735/2:
+>>
+>> It looks like you dropped the leading 'a' from the commit ID. For
+>> everyone else's benefit, the full ID is:
+>>
+>>   a4780adeefd042482f624f5e0d577bf9cdcbb760
+>
+>
+> Sorry for that and thanks for fixing it.
+>
+>>
+>>
+>> Please note that arm64 has done similar for compat tasks since commit:
+>>
+>>   d00a3810c16207d2 ("arm64: context-switch user tls register tpidr_el0 for
+>>   compat tasks")
+>>
+>> > Preserve the user r/w register TPIDRURW on context switch and fork")) and
+>> > is therefore made configurable.
+>>
+>> As you note above, this is an ABI break and *will* break some existing
+>> applications. That's generally a no-go.
+>
+>
+> Ok, I wasn't sure this was considered an ABI (but I'm not entirely
+> surprised ;) ). The way I was
+> trying to defend the breakage was by reasoning that that if it was an
+> ABI we broke it both with a4780ad
+> and with 6a1c531, and since we don't break ABI:s, it can't be one.
+>
+> But hey, I'm humble here and ready to back off.
+>
+>>
+>> This also leaves arm64's compat with the existing behaviour, differing
+>> from arm.
+>>
+>> I was under the impression that other mechanisms were being considered
+>> for fast userspace access to per-cpu data structures, e.g. restartable
+>> sequences. What is the state of those? Why is this better?
+>>
+>> If getcpu() specifically is necessary, is there no other way to
+>> implement it?
+>
+> If you are referring to the user space stuff can probably be
+> implemented other ways,
+> it's just convenient since the interface is there and it will speed up
+> stuff like lttng without
+> modifications (well, except glibc). It's also already implemented as a
+> vDSO on other
+> major architectures (like x86, x86_64, ppc32 and ppc64).
+>
+> If you are referring to the implementation of the vdso call, there are
+> other possibilities, but
+> I haven't found any that doesn't introduce overhead in context switching.
+>
+> But if TPIDRURW is definitely a no go, I can work on a patch that does
+> this with a thread notifier
+> and the vdso data page. Would that be a viable option ?
+>
+>>
+>> > +notrace int __vdso_getcpu(unsigned int *cpup, unsigned int *nodep,
+>> > +                       struct getcpu_cache *tcache)
+>> > +{
+>> > +     unsigned long node_and_cpu;
+>> > +
+>> > +     asm("mrc p15, 0, %0, c13, c0, 2\n" : "=r"(node_and_cpu));
+>> > +
+>> > +     if (nodep)
+>> > +             *nodep = cpu_to_node(node_and_cpu >> 16);
+>> > +     if (cpup)
+>> > +             *cpup  = node_and_cpu & 0xffffUL;
+>>
+>> Given this is directly user-accessible, this format is a de-facto ABI,
+>> even if it's not documented as such. Is this definitely the format you
+>> want long-term?
+>
+> Yes, this (the interface) is indeed the important part and therefore I
+> tried not to invent anything
+> on my own.
+> This is the interface used by ppc32, ppc64, x86, x86_64. It's also this is
+> how the getcpu(2) system call is documented.
+>
+> /Fredrik
+>
+>
+>>
+>>
+>> Thanks,
+>> Mark.
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 0d0dae3..44c8956 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -93,6 +93,19 @@
- 		};
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		/*
-+		 * The rk3066 cannot use the memory area above 0x9F000000
-+		 * for some unknown reason.
-+		 */
-+		unusable at 9F000000 {
-+			reg = <0x9F000000 0x1000000>;
-+		};
-+	};
-+
- 	i2s0: i2s at 10118000 {
- 		compatible = "rockchip,rk3066-i2s";
- 		reg = <0x10118000 0x2000>;
+
+
 -- 
-2.7.4
+/Fredrik
