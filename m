@@ -1,47 +1,42 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 05 Oct 2016 17:35:51 +0200
-Subject: [PATCH] arm64: dts: marvell: Add definition for the Globalscale
- Marvell ESPRESSOBin Board
-In-Reply-To: <20161005172837.5ea130a1@free-electrons.com> (Thomas Petazzoni's
- message of "Wed, 5 Oct 2016 17:28:37 +0200")
-References: <20161005142734.18995-1-romain.perier@free-electrons.com>
- <87fuoaygie.fsf@free-electrons.com>
- <20161005172837.5ea130a1@free-electrons.com>
-Message-ID: <87bmyyyfjc.fsf@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed,  5 Oct 2016 17:51:12 +0200
+Subject: [PATCH] mfd: axp20x-i2c: Add i2c-ids to fix module auto-loading
+In-Reply-To: <20161005155112.13774-1-hdegoede@redhat.com>
+References: <20161005155112.13774-1-hdegoede@redhat.com>
+Message-ID: <20161005155112.13774-2-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+The i2c subsys does not load modules by compatible, only by
+i2c-id, with e.g. a modalias of: "i2c:axp209".
+
+Populate the axp20x_i2c_id[] table with supported ids, so that
+module auto-loading will work.
+
+Reported-by: Dennis Gilmore <dennis@ausil.us>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/mfd/axp20x-i2c.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mfd/axp20x-i2c.c b/drivers/mfd/axp20x-i2c.c
+index b1b8658..d35a5fe 100644
+--- a/drivers/mfd/axp20x-i2c.c
++++ b/drivers/mfd/axp20x-i2c.c
+@@ -69,10 +69,11 @@ static const struct of_device_id axp20x_i2c_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, axp20x_i2c_of_match);
  
- On mer., oct. 05 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-
-> Hello,
->
-> On Wed, 05 Oct 2016 17:14:49 +0200, Gregory CLEMENT wrote:
->
->> > +	memory {
->> > +		device_type = "memory";  
->> 
->> 
->> According to the kickstarter page the boards will came with different
->> amount of memory (from 512MB to 2GB). So we could put a comment
->> here about tuning this value depending of the board.
->
-> U-Boot does this tuning automatically, so there is no need for the user
-> to tune anything here.
-
-Great!
-
-It was not the case with the first Armada XP and 370 boards, but at this
-time we appended the dtb to the kernel and the U-Boot on these board was
-not dt capable.
-
-Thanks,
-
-Gregory
-
+-/*
+- * This is useless for OF-enabled devices, but it is needed by I2C subsystem
+- */
+ static const struct i2c_device_id axp20x_i2c_id[] = {
++	{ "axp152", 0 },
++	{ "axp202", 0 },
++	{ "axp209", 0 },
++	{ "axp221", 0 },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.9.3
