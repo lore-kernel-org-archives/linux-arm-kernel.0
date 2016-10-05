@@ -1,54 +1,40 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 06 Oct 2016 00:48:09 +0300
-Subject: [PATCH v3 11/11] ARM: dts: sk-rzg1m: add Ether support
-In-Reply-To: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
-References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
-Message-ID: <1764267.cmIUehPqzi@wasted.cogentembedded.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 6 Oct 2016 09:41:14 +1100
+Subject: linux-next: manual merge of the gpio tree with the arm-soc tree
+In-Reply-To: <20160927150542.7e81e7ee@canb.auug.org.au>
+References: <20160927150542.7e81e7ee@canb.auug.org.au>
+Message-ID: <20161006094114.764d2f34@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the SK-RZG1M board dependent part of the Ether device node.
-Enable DHCP and NFS root  for the kernel booting.
+Hi all,
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+On Tue, 27 Sep 2016 15:05:42 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>
+> Today's linux-next merge of the gpio tree got a conflict in:
+> 
+>   arch/arm/mach-omap2/board-rx51-peripherals.c
+> 
+> between commit:
+> 
+>   9b7141d01a76 ("ARM: OMAP2+: Drop legacy board file for n900")
+> 
+> from the arm-soc tree and commit:
+> 
+>   9132ce450bd1 ("ARM: omap2: fix missing include")
+> 
+> from the gpio tree.
+> 
+> I fixed it up (the former removed the file, so I did that) and can
+> carry the fix as necessary. This is now fixed as far as linux-next is
+> concerned, but any non trivial conflicts should be mentioned to your
+> upstream maintainer when your tree is submitted for merging.  You may
+> also want to consider cooperating with the maintainer of the conflicting
+> tree to minimise any particularly complex conflicts.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Since Linus (Torvalds) has merged the gpio tree, this conflict (and
+file removal) now affects the merge of the arm-soc tree).
 
----
-Changes in version 2:
-- new patch.
-
- arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-+++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-@@ -20,7 +20,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -42,3 +42,16 @@
- &scif0 {
- 	status = "okay";
- };
-+
-+&ether {
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		micrel,led-mode = <1>;
-+	};
-+};
+-- 
+Cheers,
+Stephen Rothwell
