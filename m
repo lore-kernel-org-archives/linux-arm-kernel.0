@@ -1,150 +1,79 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Wed,  5 Oct 2016 09:56:33 +0200
-Subject: [PATCH v4 2/2] crypto: marvell - Don't break chain for computable
- last ahash requests
-In-Reply-To: <20161005075633.12711-1-romain.perier@free-electrons.com>
-References: <20161005075633.12711-1-romain.perier@free-electrons.com>
-Message-ID: <20161005075633.12711-3-romain.perier@free-electrons.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 5 Oct 2016 11:02:36 +0300
+Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
+In-Reply-To: <CAMpxmJW=JgXvM8Rnk40nXxNL7dcqX2jU6HCR2MtQZXRJMd-UZw@mail.gmail.com>
+References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
+ <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
+ <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
+ <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
+ <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
+ <CAMpxmJW=JgXvM8Rnk40nXxNL7dcqX2jU6HCR2MtQZXRJMd-UZw@mail.gmail.com>
+Message-ID: <0b6b9bdd-c761-7c54-54ac-3313f38af159@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the driver breaks chain for all kind of hash requests in order to
-don't override intermediate states of partial ahash updates. However, some final
-ahash requests can be directly processed by the engine, and so without
-intermediate state. This is typically the case for most for the HMAC requests
-processed via IPSec.
+On 10/04/16 12:20, Bartosz Golaszewski wrote:
+> 2016-09-30 21:19 GMT+02:00 Peter Ujfalusi <peter.ujfalusi@ti.com>:
+>> On 09/30/2016 06:06 PM, Bartosz Golaszewski wrote:
+>>>
+>>> Just ran a quick test with speaker-test -c2 -twav. Besides the fact
+>>> that the left and right channels are inverted (I'm looking into that),
+>>> I didn't notice any problems. Even at 1024x768 resolution, playing
+>>> audio at the same time seems to work fine.
+>>
+> 
+> Hi Peter
+> 
+>> That's good to hear, but I think the priorities should be set:
+>> LCDC and EDMA30TC1 to highest priority
+>> EDMA30TC0 to priority 2
+>>
+>> The 0TC0 is used by MMC and if you want to play a video you might need the
+>> servicing TC to be higher priority then other masters.
+>>
+>> If audio playback would trigger sync losts in lcdc then we might need to move
+>> 0TC1 to priority 1.
+>>
+> 
+> Did you mean "set EDMA31TC0 to priority 2"? EDMA30TC0 is already at
+> the highest priority. Or did you mean that we need to lower the
+> EDMA30TC0 priority? In that case: is 2 the correct value? EDMA31TC0 is
+> used by mmc1 and its priority is 4. Shouldn't we set both to be the
+> same?
 
-This commits adds a TDMA descriptor to copy context for these of requests
-into the "op" dma pool, then it allow to chain these requests at the DMA level.
-The 'complete' operation is also updated to retrieve the MAC digest from the
-right location.
+What I mean is:
+EMDA30TC1 = LCDC = 0;
+EDMA30TC0 = 2;
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
----
+I don't know what the MMC1 is used on the LCDK, but it is only used by add-on
+card on Logic's OMAP-L138 EVM (wifi if I recall right). I would leave
+EDMA31TC0 as 4.
 
-Changes in v4:
- - Remove the dummy descriptor at the end of the chain, when a TDMA_RESULT
-   is present. So, we re-wrote a bit the code of ahash_complete accordingly.
+And while we are here: this is my problem, I don't want LCDC to be high
+priority on OMAP-L138 EVM as it has no display by default, no point of
+fiddling with the EMIF priority there.
 
-Changes in v3:
- - Copy the whole context back to RAM and not just the digest. Also
-   fixed a rebase issue ^^ (whoops)
+This is the reason why we should have a way via DT to set these priorities. A
+DT fragment for OMAP-L138 EVM's wifi module might want to increase the
+EDMA31TC0 priority to get better throughput, but on a bare board we don't want
+that. If I would have the display module for the EVM, I would like to rise the
+LCDC priority also, but I don't have one. If I have the aduio add-on module I
+would want to keep audio as the highest priority (and the MMC0 to be able to
+record/play audio files). etc.
 
-Changes in v2:
- - Replaced BUG_ON by an error
- - Add a variable "break_chain", with "type" to break the chain
+>> I agree that LCDC priority needs to be higher, but I do wonder why the default
+>> (5) is not working and if it is not working why it is 5...
+>>
+>> My guess is that the change in the PBBPR register is the one actually helping
+>> here.
+>>
+> 
+> While it seems that lowering the EDMA30TC0 priority is indeed
+> unnecessary, if I don't set the LCDC master to priority 0, I still get
+> FIFO underflows even with the change in PBBPR.
 
- drivers/crypto/marvell/hash.c | 65 ++++++++++++++++++++++++++++++++-----------
- 1 file changed, 49 insertions(+), 16 deletions(-)
+I believe it is valid to raise the LCDC priority, but I wonder what blocks the
+LCDC accesses when you don't really have anything going on in the background.
 
-diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-index 9f28468..2a92605 100644
---- a/drivers/crypto/marvell/hash.c
-+++ b/drivers/crypto/marvell/hash.c
-@@ -312,24 +312,40 @@ static void mv_cesa_ahash_complete(struct crypto_async_request *req)
- 	int i;
- 
- 	digsize = crypto_ahash_digestsize(crypto_ahash_reqtfm(ahashreq));
--	for (i = 0; i < digsize / 4; i++)
--		creq->state[i] = readl_relaxed(engine->regs + CESA_IVDIG(i));
- 
--	if (creq->last_req) {
-+	if (mv_cesa_req_get_type(&creq->base) == CESA_DMA_REQ &&
-+	    (creq->base.chain.last->flags & CESA_TDMA_TYPE_MSK) == CESA_TDMA_RESULT) {
-+		__le32 *data = NULL;
-+
- 		/*
--		 * Hardware's MD5 digest is in little endian format, but
--		 * SHA in big endian format
-+		 * Result is already in the correct endianess when the SA is
-+		 * used
- 		 */
--		if (creq->algo_le) {
--			__le32 *result = (void *)ahashreq->result;
-+		data = creq->base.chain.last->op->ctx.hash.hash;
-+		for (i = 0; i < digsize / 4; i++)
-+			creq->state[i] = cpu_to_le32(data[i]);
- 
--			for (i = 0; i < digsize / 4; i++)
--				result[i] = cpu_to_le32(creq->state[i]);
--		} else {
--			__be32 *result = (void *)ahashreq->result;
-+		memcpy(ahashreq->result, data, digsize);
-+	} else {
-+		for (i = 0; i < digsize / 4; i++)
-+			creq->state[i] = readl_relaxed(engine->regs +
-+						       CESA_IVDIG(i));
-+		if (creq->last_req) {
-+			/*
-+			* Hardware's MD5 digest is in little endian format, but
-+			* SHA in big endian format
-+			*/
-+			if (creq->algo_le) {
-+				__le32 *result = (void *)ahashreq->result;
-+
-+				for (i = 0; i < digsize / 4; i++)
-+					result[i] = cpu_to_le32(creq->state[i]);
-+			} else {
-+				__be32 *result = (void *)ahashreq->result;
- 
--			for (i = 0; i < digsize / 4; i++)
--				result[i] = cpu_to_be32(creq->state[i]);
-+				for (i = 0; i < digsize / 4; i++)
-+					result[i] = cpu_to_be32(creq->state[i]);
-+			}
- 		}
- 	}
- 
-@@ -504,6 +520,12 @@ mv_cesa_ahash_dma_last_req(struct mv_cesa_tdma_chain *chain,
- 						CESA_SA_DESC_CFG_LAST_FRAG,
- 				      CESA_SA_DESC_CFG_FRAG_MSK);
- 
-+		ret = mv_cesa_dma_add_result_op(chain,
-+						CESA_SA_CFG_SRAM_OFFSET,
-+						CESA_SA_DATA_SRAM_OFFSET,
-+						CESA_TDMA_SRC_IN_SRAM, flags);
-+		if (ret)
-+			return ERR_PTR(-ENOMEM);
- 		return op;
- 	}
- 
-@@ -564,6 +586,7 @@ static int mv_cesa_ahash_dma_req_init(struct ahash_request *req)
- 	struct mv_cesa_op_ctx *op = NULL;
- 	unsigned int frag_len;
- 	int ret;
-+	u32 type;
- 
- 	basereq->chain.first = NULL;
- 	basereq->chain.last = NULL;
-@@ -635,7 +658,15 @@ static int mv_cesa_ahash_dma_req_init(struct ahash_request *req)
- 		goto err_free_tdma;
- 	}
- 
--	if (op) {
-+	/*
-+	 * If results are copied via DMA, this means that this
-+	 * request can be directly processed by the engine,
-+	 * without partial updates. So we can chain it at the
-+	 * DMA level with other requests.
-+	 */
-+	type = basereq->chain.last->flags & CESA_TDMA_TYPE_MSK;
-+
-+	if (op && type != CESA_TDMA_RESULT) {
- 		/* Add dummy desc to wait for crypto operation end */
- 		ret = mv_cesa_dma_add_dummy_end(&basereq->chain, flags);
- 		if (ret)
-@@ -648,8 +679,10 @@ static int mv_cesa_ahash_dma_req_init(struct ahash_request *req)
- 	else
- 		creq->cache_ptr = 0;
- 
--	basereq->chain.last->flags |= (CESA_TDMA_END_OF_REQ |
--				       CESA_TDMA_BREAK_CHAIN);
-+	basereq->chain.last->flags |= CESA_TDMA_END_OF_REQ;
-+
-+	if (type != CESA_TDMA_RESULT)
-+		basereq->chain.last->flags |= CESA_TDMA_BREAK_CHAIN;
- 
- 	return 0;
- 
 -- 
-2.9.3
+P?ter
