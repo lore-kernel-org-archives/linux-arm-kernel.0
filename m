@@ -1,41 +1,207 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 5 Oct 2016 15:38:52 +0200 (CEST)
-Subject: [PATCH V2 3/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
-In-Reply-To: <1475615720-31047-4-git-send-email-okaya@codeaurora.org>
-References: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
- <1475615720-31047-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <alpine.DEB.2.20.1610051538310.8953@nanos>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 05 Oct 2016 16:51:26 +0300
+Subject: [PATCH] ARM: shmobile: Consolidate R8A779[234] machine definitions
+In-Reply-To: <1475663489-4789-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1475663489-4789-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <18001316.v0q3v65y95@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Oct 2016, Sinan Kaya wrote:
+On Wednesday 05 Oct 2016 13:31:29 Laurent Pinchart wrote:
+> The three SoCs use the exact same machine definition, consolidate them
+> into a single one.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  arch/arm/mach-shmobile/Makefile          |  3 ---
+>  arch/arm/mach-shmobile/setup-r8a7792.c   | 35
+> -------------------------------- arch/arm/mach-shmobile/setup-r8a7793.c   |
+> 33 ------------------------------ arch/arm/mach-shmobile/setup-r8a7794.c  
+> | 33 ------------------------------
+> arch/arm/mach-shmobile/setup-rcar-gen2.c | 20 ++++++++++++++++++
+>  5 files changed, 20 insertions(+), 104 deletions(-)
+>  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7792.c
+>  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7793.c
+>  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7794.c
+> 
+> I don't have access to any R8A779[234] board, I'd appreciate if someone
+> could test the patch series.
+> 
+> diff --git a/arch/arm/mach-shmobile/Makefile
+> b/arch/arm/mach-shmobile/Makefile index 3fc48b02eb4f..64611a1b4276 100644
+> --- a/arch/arm/mach-shmobile/Makefile
+> +++ b/arch/arm/mach-shmobile/Makefile
+> @@ -13,9 +13,6 @@ obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
+>  obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o pm-r8a7779.o
+>  obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
+>  obj-$(CONFIG_ARCH_R8A7791)	+= setup-r8a7791.o
+> -obj-$(CONFIG_ARCH_R8A7792)	+= setup-r8a7792.o
+> -obj-$(CONFIG_ARCH_R8A7793)	+= setup-r8a7793.o
+> -obj-$(CONFIG_ARCH_R8A7794)	+= setup-r8a7794.o
+>  obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
+>  obj-$(CONFIG_ARCH_R7S72100)	+= setup-r7s72100.o
+> 
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7792.c
+> b/arch/arm/mach-shmobile/setup-r8a7792.c deleted file mode 100644
+> index a0910395da09..000000000000
+> --- a/arch/arm/mach-shmobile/setup-r8a7792.c
+> +++ /dev/null
+> @@ -1,35 +0,0 @@
+> -/*
+> - * r8a7792 processor support
+> - *
+> - * Copyright (C) 2014 Renesas Electronics Corporation
+> - * Copyright (C) 2016 Cogent  Embedded, Inc.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; version 2 of the License.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - */
+> -
+> -#include <linux/of_platform.h>
+> -
+> -#include <asm/mach/arch.h>
+> -
+> -#include "common.h"
+> -#include "rcar-gen2.h"
+> -
+> -static const char * const r8a7792_boards_compat_dt[] __initconst = {
+> -	"renesas,r8a7792",
+> -	NULL,
+> -};
+> -
+> -DT_MACHINE_START(R8A7792_DT, "Generic R8A7792 (Flattened Device Tree)")
+> -	.init_early	= shmobile_init_delay,
+> -	.init_late	= shmobile_init_late,
+> -	.init_time	= rcar_gen2_timer_init,
+> -	.reserve	= rcar_gen2_reserve,
+> -	.dt_compat	= r8a7792_boards_compat_dt,
+> -MACHINE_END
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7793.c
+> b/arch/arm/mach-shmobile/setup-r8a7793.c deleted file mode 100644
+> index 5fce87f7f254..000000000000
+> --- a/arch/arm/mach-shmobile/setup-r8a7793.c
+> +++ /dev/null
+> @@ -1,33 +0,0 @@
+> -/*
+> - * r8a7793 processor support
+> - *
+> - * Copyright (C) 2015  Ulrich Hecht
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; version 2 of the License.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - */
+> -
+> -#include <linux/init.h>
+> -#include <asm/mach/arch.h>
+> -
+> -#include "common.h"
+> -#include "rcar-gen2.h"
+> -
+> -static const char * const r8a7793_boards_compat_dt[] __initconst = {
+> -	"renesas,r8a7793",
+> -	NULL,
+> -};
+> -
+> -DT_MACHINE_START(R8A7793_DT, "Generic R8A7793 (Flattened Device Tree)")
+> -	.init_early	= shmobile_init_delay,
+> -	.init_time	= rcar_gen2_timer_init,
+> -	.init_late	= shmobile_init_late,
+> -	.reserve	= rcar_gen2_reserve,
+> -	.dt_compat	= r8a7793_boards_compat_dt,
+> -MACHINE_END
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7794.c
+> b/arch/arm/mach-shmobile/setup-r8a7794.c deleted file mode 100644
+> index d2b093033132..000000000000
+> --- a/arch/arm/mach-shmobile/setup-r8a7794.c
+> +++ /dev/null
+> @@ -1,33 +0,0 @@
+> -/*
+> - * r8a7794 processor support
+> - *
+> - * Copyright (C) 2014  Renesas Electronics Corporation
+> - * Copyright (C) 2014  Ulrich Hecht
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; version 2 of the License.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - */
+> -
+> -#include <linux/of_platform.h>
+> -#include "common.h"
+> -#include "rcar-gen2.h"
+> -#include <asm/mach/arch.h>
+> -
+> -static const char * const r8a7794_boards_compat_dt[] __initconst = {
+> -	"renesas,r8a7794",
+> -	NULL,
+> -};
+> -
+> -DT_MACHINE_START(R8A7794_DT, "Generic R8A7794 (Flattened Device Tree)")
+> -	.init_early	= shmobile_init_delay,
+> -	.init_late	= shmobile_init_late,
+> -	.init_time	= rcar_gen2_timer_init,
+> -	.reserve	= rcar_gen2_reserve,
+> -	.dt_compat	= r8a7794_boards_compat_dt,
+> -MACHINE_END
+> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> b/arch/arm/mach-shmobile/setup-rcar-gen2.c index afb9fdcd3d90..4d5052564f21
+> 100644
+> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/memblock.h>
+>  #include <linux/of.h>
+>  #include <linux/of_fdt.h>
+> +#include <linux/of_platform.h>
+>  #include <asm/mach/arch.h>
+>  #include "common.h"
+>  #include "rcar-gen2.h"
+> @@ -203,3 +204,22 @@ void __init rcar_gen2_reserve(void)
+>  	}
+>  #endif
+>  }
+> +
+> +static const char * const rcar_gen2_boards_compat_dt[] __initconst = {
+> +	/*
+> +	 * R8A7790 and R8A7791 can't be handled here as long as they need SMP
+> +	 * initialization fallback.
+> +	 */
+> +	"renesas,r8a7792",
+> +	"renesas,r8a7793",
+> +	"renesas,r8a7794",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(RCAR_GEN2_DT, "Generic Gen2 (Flattened Device Tree)")
 
-> The SCI function was removed in two steps (first refactor and then remove).
-> This patch does the revert in one step.
-> 
-> The commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
-> refactored the original code so that SCI penalty is calculated dynamically
-> by the time get_penalty function is called. This patch does a partial
-> revert for the SCI functionality only.
-> 
-> The commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI penalize function") is
-> for the removal of the function. SCI penalty API was replaced by the
-> runtime penalty calculation based on the value of
-> acpi_gbl_FADT.sci_interrupt.
-> 
-> The IRQ type does not get updated at the right time for some platforms and
-> results in incorrect penalty assignment for PCI IRQs as
-> irq_get_trigger_type returns the wrong type.
-> 
-> The register_gsi function delivers the IRQ found in the ACPI table to
-> the interrupt controller driver.  Penalties are calculated before a
-> link object is enabled to find out which interrupt has the least number
-> of users. By the time penalties are calculated, the IRQ is not registered
-> yet and the API returns the wrong type.
-> 
-> Tested-by: Jonathan Liu <net147@gmail.com>
-> Tested-by: Ondrej Zary <linux@rainbow-software.org>
-> Link: https://lkml.org/lkml/2016/10/4/283
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+This should of course read "Generic R-Car Gen2 (Flattened Device Tree)". I'll 
+fix it in the next version, after getting initial review.
 
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
+> +	.init_early	= shmobile_init_delay,
+> +	.init_late	= shmobile_init_late,
+> +	.init_time	= rcar_gen2_timer_init,
+> +	.reserve	= rcar_gen2_reserve,
+> +	.dt_compat	= rcar_gen2_boards_compat_dt,
+> +MACHINE_END
+
+-- 
+Regards,
+
+Laurent Pinchart
