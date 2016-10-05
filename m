@@ -1,181 +1,98 @@
-From: jani.nikula@linux.intel.com (Jani Nikula)
-Date: Wed, 05 Oct 2016 17:04:43 +0300
-Subject: kernel-doc-rst-lint (was: Re: [PATCH 00/15] improve function-level
- documentation)
-In-Reply-To: <CAKMK7uHT3FutHQuQQ3iwXmYbidB3AOs7AxnpaJD4MTqy0-QehQ@mail.gmail.com>
-References: <1475351192-27079-1-git-send-email-Julia.Lawall@lip6.fr>
- <CAKMK7uHT3FutHQuQQ3iwXmYbidB3AOs7AxnpaJD4MTqy0-QehQ@mail.gmail.com>
-Message-ID: <87h98quc1w.fsf@intel.com>
+From: gerald.baeza@st.com (Gerald Baeza)
+Date: Wed, 5 Oct 2016 16:09:12 +0200
+Subject: [PATCH 02/11] DOCUMENTATION: dt-bindings: Document the STM32
+ USART bindings
+In-Reply-To: <20160923152907.GA19206@rob-hp-laptop>
+References: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
+ <1473957763-30629-3-git-send-email-alexandre.torgue@st.com>
+ <20160923152907.GA19206@rob-hp-laptop>
+Message-ID: <dd28f224-3e3b-0a00-f978-16861b946fd1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 05 Oct 2016, Daniel Vetter <daniel@ffwll.ch> wrote:
-> Jani Nikula has a patch with a scrip to make the one kernel-doc parser
-> into a lint/checker pass over the entire kernel. I think that'd would
-> be more robust instead of trying to approximate the real kerneldoc
-> parser. Otoh that parser is a horror show of a perl/regex driven state
-> machine ;-)
+On 09/23/2016 05:29 PM, Rob Herring wrote:
+> On Thu, Sep 15, 2016 at 06:42:34PM +0200, Alexandre TORGUE wrote:
+>> This adds documentation of device tree bindings for the
+>> STM32 USART
 >
-> Jani, can you pls digg out these patches? Can't find them right now ...
+> Please make your subject prefixes consistent and drop "DOCUMENTATION".
+>
 
-Expanding the massive Cc: with linux-doc list...
+Ok, thanks
 
-Here goes. It's a quick hack from months ago, but still seems to
-somewhat work. At least for the kernel-doc parts. The reStructuredText
-lint part isn't all that great, and doesn't have mapping to line numbers
-like the Sphinx kernel-doc extension does. Anyway I'm happy how this
-integrates with kernel build CHECK and C=1/C=2.
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>>
+>> diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+>> new file mode 100644
+>> index 0000000..75b1400
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+>> @@ -0,0 +1,34 @@
+>> +* STMicroelectronics STM32 USART
+>> +
+>> +Required properties:
+>> +- compatible: Can be either "st,stm32-usart", "st,stm32-uart",
+>> +"st,stm32f7-usart" or "st,stm32f7-uart" depending on whether
+>> +the device supports synchronous mode and is compatible with
+>> +stm32(f4) or stm32f7.
+>
+> Why not put f4 in the compatible string. stm32 is too generic.
 
-I guess Julia's goal is to automate the *fixing* of some of the error
-classes from kernel-doc. Not sure how well this could be made to
-integrate with any of that.
+The initial binding is not in current kernel so it has been put in this 
+serie as PATCH 07/11. It will be squashed with this one, as you requested.
 
-BR,
-Jani.
+But the driver tty/serial/stm32-usart.c was already upstreamed and it 
+already mentions the "st,stm32-usart" and "st,stm32-uart" for stm32f4 so 
+I kept this as it for backward compatibility for those who already use 
+the driver.
 
+I do not have the history to explain this inconsistency but can you 
+confirm that keeping the existing compatible values from the driver is 
+the good approach please?
 
->From 1244efa0f63a7b13795e8c37f81733a3c8bfc56a Mon Sep 17 00:00:00 2001
-From: Jani Nikula <jani.nikula@intel.com>
-Date: Tue, 31 May 2016 18:11:33 +0300
-Subject: [PATCH] kernel-doc-rst-lint: add tool to check kernel-doc and rst
- correctness
-Organization: Intel Finland Oy - BIC 0357606-4 - Westendinkatu 7, 02160 Espoo
-Cc: Jani Nikula <jani.nikula@intel.com>
+> What determines sync mode or not? If it is IP configuration fixed in the
+> design, then this is fine. If it is user choice or board dependent, then
+> use a separate property.
 
-Simple kernel-doc and reStructuredText lint tool that can be used
-independently and as a kernel build CHECK tool to validate kernel-doc
-comments.
+This is IP configuration fixed in the design, indeed.
 
-Independent usage:
-$ kernel-doc-rst-lint FILE
+>> +- reg: The address and length of the peripheral registers space
+>> +- interrupts: The interrupt line of the USART instance
+>> +- clocks: The input clock of the USART instance
+>> +
+>> +Optional properties:
+>> +- pinctrl: The reference on the pins configuration
+>> +- st,hw-flow-ctrl: bool flag to enable hardware flow control.
+>> +
+>> +Examples:
+>> +usart4: serial at 40004c00 {
+>> +	compatible = "st,stm32-uart";
+>> +	reg = <0x40004c00 0x400>;
+>> +	interrupts = <52>;
+>> +	clocks = <&clk_pclk1>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usart4>;
+>> +};
+>> +
+>> +usart2: serial at 40004400 {
+>> +	compatible = "st,stm32-usart", "st,stm32-uart";
+>
+> What are valid combinations? usart is sync only, not sync and async?
 
-Kernel CHECK usage:
-$ make CHECK=scripts/kernel-doc-rst-lint C=1		# (or C=2)
+usart (sync and async) is a superset of uart (async).
+But the current driver does not use the synchronous mode, so the 
+distinction is just here to be consistent with the reference manual 
+instances naming (so configuration).
 
-Depends on docutils and the rst-lint package
-https://pypi.python.org/pypi/restructuredtext_lint
-
-Signed-off-by: Jani Nikula <jani.nikula@intel.com>
----
- scripts/kernel-doc-rst-lint | 106 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 106 insertions(+)
- create mode 100755 scripts/kernel-doc-rst-lint
-
-diff --git a/scripts/kernel-doc-rst-lint b/scripts/kernel-doc-rst-lint
-new file mode 100755
-index 000000000000..7e0157679f83
---- /dev/null
-+++ b/scripts/kernel-doc-rst-lint
-@@ -0,0 +1,106 @@
-+#!/usr/bin/env python
-+# coding=utf-8
-+#
-+# Copyright ? 2016 Intel Corporation
-+#
-+# Permission is hereby granted, free of charge, to any person obtaining a
-+# copy of this software and associated documentation files (the "Software"),
-+# to deal in the Software without restriction, including without limitation
-+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-+# and/or sell copies of the Software, and to permit persons to whom the
-+# Software is furnished to do so, subject to the following conditions:
-+#
-+# The above copyright notice and this permission notice (including the next
-+# paragraph) shall be included in all copies or substantial portions of the
-+# Software.
-+#
-+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-+# IN THE SOFTWARE.
-+#
-+# Authors:
-+#    Jani Nikula <jani.nikula@intel.com>
-+#
-+# Simple kernel-doc and reStructuredText lint tool that can be used
-+# independently and as a kernel build CHECK tool to validate kernel-doc
-+# comments.
-+#
-+# Independent usage:
-+# $ kernel-doc-rst-lint FILE
-+#
-+# Kernel CHECK usage:
-+# $ make CHECK=scripts/kernel-doc-rst-lint C=1		# (or C=2)
-+#
-+# Depends on docutils and the rst-lint package
-+# https://pypi.python.org/pypi/restructuredtext_lint
-+#
-+
-+import os
-+import subprocess
-+import sys
-+
-+from docutils.parsers.rst import directives
-+from docutils.parsers.rst import Directive
-+from docutils.parsers.rst import roles
-+from docutils import nodes, statemachine
-+import restructuredtext_lint
-+
-+class DummyDirective(Directive):
-+    required_argument = 1
-+    optional_arguments = 0
-+    option_spec = { }
-+    has_content = True
-+
-+    def run(self):
-+        return []
-+
-+# Fake the Sphinx C Domain directives and roles
-+directives.register_directive('c:function', DummyDirective)
-+directives.register_directive('c:type', DummyDirective)
-+roles.register_generic_role('c:func', nodes.emphasis)
-+roles.register_generic_role('c:type', nodes.emphasis)
-+
-+# We accept but ignore parameters to be compatible with how the kernel build
-+# invokes CHECK.
-+if len(sys.argv) < 2:
-+    sys.stderr.write('usage: kernel-doc-rst-lint [IGNORED OPTIONS] FILE\n');
-+    sys.exit(1)
-+
-+infile = sys.argv[len(sys.argv) - 1]
-+cmd = ['scripts/kernel-doc', '-rst', infile]
-+
-+try:
-+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-+    out, err = p.communicate()
-+
-+    # python2 needs conversion to unicode.
-+    # python3 with universal_newlines=True returns strings.
-+    if sys.version_info.major < 3:
-+        out, err = unicode(out, 'utf-8'), unicode(err, 'utf-8')
-+
-+    # kernel-doc errors
-+    sys.stderr.write(err)
-+    if p.returncode != 0:
-+        sys.exit(p.returncode)
-+
-+    # restructured text errors
-+    lines = statemachine.string2lines(out, 8, convert_whitespace=True)
-+    lint_errors = restructuredtext_lint.lint(out, infile)
-+    for error in lint_errors:
-+        # Ignore INFO
-+        if error.level <= 1:
-+            continue
-+
-+        print(error.source + ': ' + error.type + ': ' + error.full_message)
-+        if error.line is not None:
-+            print('Context:')
-+            print('\t' + lines[error.line - 1])
-+            print('\t' + lines[error.line])
-+
-+except Exception as e:
-+    sys.stderr.write(str(e) + '\n')
-+    sys.exit(1)
--- 
-2.1.4
-
-
--- 
-Jani Nikula, Intel Open Source Technology Center
+>> +	reg = <0x40004400 0x400>;
+>> +	interrupts = <38>;
+>> +	clocks = <&clk_pclk1>;
+>> +	st,hw-flow-ctrl;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usart2 &pinctrl_usart2_rtscts>;
+>> +};
+>> --
+>> 1.9.1
+>>
