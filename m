@@ -1,286 +1,117 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Wed, 5 Oct 2016 16:47:00 +0200 (CEST)
-Subject: [PATCH 00/15] improve function-level documentation
-In-Reply-To: <CAKMK7uHT3FutHQuQQ3iwXmYbidB3AOs7AxnpaJD4MTqy0-QehQ@mail.gmail.com>
-References: <1475351192-27079-1-git-send-email-Julia.Lawall@lip6.fr>
- <CAKMK7uHT3FutHQuQQ3iwXmYbidB3AOs7AxnpaJD4MTqy0-QehQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.10.1610051645310.3568@hadrien>
+From: bdegraaf@codeaurora.org (bdegraaf at codeaurora.org)
+Date: Wed, 05 Oct 2016 10:55:57 -0400
+Subject: [RFC] arm64: Enforce observed order for spinlock and data
+In-Reply-To: <20161004191159.GA32596@leverpostej>
+References: <1475257257-23072-1-git-send-email-bdegraaf@codeaurora.org>
+ <20160930193231.GA2521@remoulade>
+ <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
+ <20161001181101.GA17554@remoulade>
+ <b86926dc0203384522e0e6ce18bbb132@codeaurora.org>
+ <20161004101208.GA18083@leverpostej>
+ <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
+ <20161004191159.GA32596@leverpostej>
+Message-ID: <54b18de220f61747bf1c3cdf2a1b9447@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2016-10-04 15:12, Mark Rutland wrote:
+> Hi Brent,
+> 
+> Could you *please* clarify if you are trying to solve:
+> 
+> (a) a correctness issue (e.g. data corruption) seen in practice.
+> (b) a correctness issue (e.g. data corruption) found by inspection.
+> (c) A performance issue, seen in practice.
+> (d) A performance issue, found by inspection.
+> 
+> Any one of these is fine; we just need to know in order to be able to
+> help effectively, and so far it hasn't been clear.
+> 
+> On Tue, Oct 04, 2016 at 01:53:35PM -0400, bdegraaf at codeaurora.org 
+> wrote:
+>> After looking at this, the problem is not with the lockref code per
+>> se: it is a problem with arch_spin_value_unlocked(). In the
+>> out-of-order case, arch_spin_value_unlocked() can return TRUE for a
+>> spinlock that is in fact locked but the lock is not observable yet via
+>> an ordinary load.
+> 
+> Given arch_spin_value_unlocked() doesn't perform any load itself, I
+> assume the ordinary load that you are referring to is the READ_ONCE()
+> early in CMPXCHG_LOOP().
+> 
+> It's worth noting that even if we ignore ordering and assume a
+> sequentially-consistent machine, READ_ONCE() can give us a stale value.
+> We could perform the read, then another agent can acquire the lock, 
+> then
+> we can move onto the cmpxchg(), i.e.
+> 
+>     CPU0                              CPU1
+>     old = READ_ONCE(x.lock_val)
+>                                       spin_lock(x.lock)
+>     cmpxchg(x.lock_val, old, new)
+>                                       spin_unlock(x.lock)
+> 
+> If the 'old' value is stale, the cmpxchg *must* fail, and the cmpxchg
+> should return an up-to-date value which we will then retry with.
+> 
+>> Other than ensuring order on the locking side (as the prior patch
+>> did), there is a way to make arch_spin_value_unlock's TRUE return
+>> value deterministic,
+> 
+> In general, this cannot be made deterministic. As above, there is a 
+> race
+> that cannot be avoided.
+> 
+>> but it requires that it does a write-back to the lock to ensure we
+>> didn't observe the unlocked value while another agent was in process
+>> of writing back a locked value.
+> 
+> The cmpxchg gives us this guarantee. If it successfully stores, then 
+> the
+> value it observed was the same as READ_ONCE() saw, and the update was
+> atomic.
+> 
+> There *could* have been an intervening sequence between the READ_ONCE
+> and cmpxchg (e.g. put(); get()) but that's not problematic for lockref.
+> Until you've taken your reference it was possible that things changed
+> underneath you.
+> 
+> Thanks,
+> Mark.
 
+Mark,
 
-On Wed, 5 Oct 2016, Daniel Vetter wrote:
+I found the problem.
 
-> Jani Nikula has a patch with a scrip to make the one kernel-doc parser
-> into a lint/checker pass over the entire kernel. I think that'd would
-> be more robust instead of trying to approximate the real kerneldoc
-> parser. Otoh that parser is a horror show of a perl/regex driven state
-> machine ;-)
+Back in September of 2013, arm64 atomics were broken due to missing 
+barriers
+in certain situations, but the problem at that time was undiscovered.
 
-Sure.  To my recollection, I found around 2000 issues.  Many I ignored, eg
-functions that simply have no documentation abuot the parameters,
-functions that document their local variables, when these were more
-interesting than the parameters etc.  But the set of patches is not
-exhaustive with respect to the remaining interesting ones either.
+Will Deacon's commit d2212b4dce596fee83e5c523400bf084f4cc816c went in at 
+that
+time and changed the correct cmpxchg64 in lockref.c to 
+cmpxchg64_relaxed.
 
-julia
+d2212b4 appeared to be OK at that time because the additional barrier
+requirements of this specific code sequence were not yet discovered, and
+this change was consistent with the arm64 atomic code of that time.
 
->
-> Jani, can you pls digg out these patches? Can't find them right now ...
-> -Daniel
->
->
-> On Sat, Oct 1, 2016 at 9:46 PM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
-> > These patches fix cases where the documentation above a function definition
-> > is not consistent with the function header.  Issues are detected using the
-> > semantic patch below (http://coccinelle.lip6.fr/).  Basically, the semantic
-> > patch parses a file to find comments, then matches each function header,
-> > and checks that the name and parameter list in the function header are
-> > compatible with the comment that preceeds it most closely.
-> >
-> > // <smpl>
-> > @initialize:ocaml@
-> > @@
-> >
-> > let tbl = ref []
-> > let fnstart = ref []
-> > let success = Hashtbl.create 101
-> > let thefile = ref ""
-> > let parsed = ref []
-> > let nea = ref []
-> >
-> > let parse file =
-> >   thefile := List.nth (Str.split (Str.regexp "linux-next/") file) 1;
-> >   let i = open_in file in
-> >   let startline = ref 0 in
-> >   let fn = ref "" in
-> >   let ids = ref [] in
-> >   let rec inside n =
-> >     let l = input_line i in
-> >     let n = n + 1 in
-> >     match Str.split_delim (Str.regexp_string "*/") l with
-> >       before::after::_ ->
-> >         (if not (!fn = "")
-> >         then tbl := (!startline,n,!fn,List.rev !ids)::!tbl);
-> >         startline := 0;
-> >         fn := "";
-> >         ids := [];
-> >         outside n
-> >     | _ ->
-> >         (match Str.split (Str.regexp "[ \t]+") l with
-> >           "*"::name::rest ->
-> >             let len = String.length name in
-> >             (if !fn = "" && len > 2 && String.sub name (len-2) 2 = "()"
-> >             then fn := String.sub name 0 (len-2)
-> >             else if !fn = "" && (not (rest = [])) && List.hd rest = "-"
-> >             then
-> >               if String.get name (len-1) = ':'
-> >               then fn := String.sub name 0 (len-1)
-> >               else fn := name
-> >             else if not(!fn = "") && len > 2 &&
-> >               String.get name 0 = '@' && String.get name (len-1) = ':'
-> >             then ids := (String.sub name 1 (len-2)) :: !ids);
-> >         | _ -> ());
-> >         inside n
-> >   and outside n =
-> >     let l = input_line i in
-> >     let n = n + 1 in
-> >     if String.length l > 2 && String.sub l 0 3 = "/**"
-> >     then
-> >       begin
-> >         startline := n;
-> >         inside n
-> >       end
-> >     else outside n in
-> >   try outside 0 with End_of_file -> ()
-> >
-> > let hashadd tbl k v =
-> >   let cell =
-> >     try Hashtbl.find tbl k
-> >     with Not_found ->
-> >       let cell = ref [] in
-> >       Hashtbl.add tbl k cell;
-> >       cell in
-> >   cell := v :: !cell
-> >
-> > @script:ocaml@
-> > @@
-> >
-> > tbl := [];
-> > fnstart := [];
-> > Hashtbl.clear success;
-> > parsed := [];
-> > nea := [];
-> > parse (List.hd (Coccilib.files()))
-> >
-> > @r@
-> > identifier f;
-> > position p;
-> > @@
-> >
-> > f at p(...) { ... }
-> >
-> > @script:ocaml@
-> > p << r.p;
-> > f << r.f;
-> > @@
-> >
-> > parsed := f :: !parsed;
-> > fnstart := (List.hd p).line :: !fnstart
-> >
-> > @param@
-> > identifier f;
-> > type T;
-> > identifier i;
-> > parameter list[n] ps;
-> > parameter list[n1] ps1;
-> > position p;
-> > @@
-> >
-> > f at p(ps,T i,ps1) { ... }
-> >
-> > @script:ocaml@
-> > @@
-> >
-> > tbl := List.rev (List.sort compare !tbl)
-> >
-> > @script:ocaml@
-> > p << param.p;
-> > f << param.f;
-> > @@
-> >
-> > let myline = (List.hd p).line in
-> > let prevline =
-> >   List.fold_left
-> >     (fun prev x ->
-> >       if x < myline
-> >       then max x prev
-> >       else prev)
-> >     0 !fnstart in
-> > let _ =
-> >   List.exists
-> >     (function (st,fn,nm,ids) ->
-> >       if prevline < st && myline > st && prevline < fn && myline > fn
-> >       then
-> >         begin
-> >           (if not (String.lowercase f = String.lowercase nm)
-> >           then
-> >             Printf.printf "%s:%d %s doesn't match preceding comment: %s\n"
-> >               !thefile myline f nm);
-> >           true
-> >         end
-> >       else false)
-> >     !tbl in
-> > ()
-> >
-> > @script:ocaml@
-> > p << param.p;
-> > n << param.n;
-> > n1 << param.n1;
-> > i << param.i;
-> > f << param.f;
-> > @@
-> >
-> > let myline = (List.hd p).line in
-> > let prevline =
-> >   List.fold_left
-> >     (fun prev x ->
-> >       if x < myline
-> >       then max x prev
-> >       else prev)
-> >     0 !fnstart in
-> > let _ =
-> >   List.exists
-> >     (function (st,fn,nm,ids) ->
-> >       if prevline < st && myline > st && prevline < fn && myline > fn
-> >       then
-> >         begin
-> >           (if List.mem i ids then hashadd success (st,fn,nm) i);
-> >           (if ids = [] (* arg list seems not obligatory *)
-> >           then ()
-> >           else if not (List.mem i ids)
-> >           then
-> >             Printf.printf "%s:%d %s doesn't appear in ids: %s\n"
-> >               !thefile myline i (String.concat " " ids)
-> >           else if List.length ids <= n || List.length ids <= n1
-> >           then
-> >             (if not (List.mem f !nea)
-> >             then
-> >               begin
-> >                 nea := f :: !nea;
-> >                 Printf.printf "%s:%d %s not enough args\n" !thefile myline f;
-> >               end)
-> >           else
-> >             let foundid = List.nth ids n in
-> >             let efoundid = List.nth (List.rev ids) n1 in
-> >             if not(foundid = i || efoundid = i)
-> >             then
-> >               Printf.printf "%s:%d %s wrong arg in position %d: %s\n"
-> >                 !thefile myline i n foundid);
-> >           true
-> >         end
-> >       else false)
-> >     !tbl in
-> > ()
-> >
-> > @script:ocaml@
-> > @@
-> > List.iter
-> >   (function (st,fn,nm,ids) ->
-> >     if List.mem nm !parsed
-> >     then
-> >       let entry =
-> >         try !(Hashtbl.find success (st,fn,nm))
-> >         with Not_found -> [] in
-> >       List.iter
-> >         (fun id ->
-> >           if not (List.mem id entry) && not (id = "...")
-> >           then Printf.printf "%s:%d %s not used\n" !thefile st id)
-> >         ids)
-> >   !tbl
-> > // </smpl>
-> >
-> >
-> > ---
-> >
-> >  drivers/clk/keystone/pll.c               |    4 ++--
-> >  drivers/clk/sunxi/clk-mod0.c             |    2 +-
-> >  drivers/clk/tegra/cvb.c                  |   10 +++++-----
-> >  drivers/dma-buf/sw_sync.c                |    6 +++---
-> >  drivers/gpu/drm/gma500/intel_i2c.c       |    3 +--
-> >  drivers/gpu/drm/omapdrm/omap_drv.c       |    4 ++--
-> >  drivers/irqchip/irq-metag-ext.c          |    1 -
-> >  drivers/irqchip/irq-vic.c                |    1 -
-> >  drivers/mfd/tc3589x.c                    |    4 ++--
-> >  drivers/power/supply/ab8500_fg.c         |    8 ++++----
-> >  drivers/power/supply/abx500_chargalg.c   |    1 +
-> >  drivers/power/supply/intel_mid_battery.c |    2 +-
-> >  drivers/power/supply/power_supply_core.c |    4 ++--
-> >  fs/crypto/crypto.c                       |    4 ++--
-> >  fs/crypto/fname.c                        |    4 ++--
-> >  fs/ubifs/file.c                          |    2 +-
-> >  fs/ubifs/gc.c                            |    2 +-
-> >  fs/ubifs/lprops.c                        |    2 +-
-> >  fs/ubifs/lpt_commit.c                    |    4 +---
-> >  fs/ubifs/replay.c                        |    2 +-
-> >  lib/kobject_uevent.c                     |    6 +++---
-> >  lib/lru_cache.c                          |    4 ++--
-> >  lib/nlattr.c                             |    2 +-
-> >  23 files changed, 39 insertions(+), 43 deletions(-)
-> > _______________________________________________
-> > dri-devel mailing list
-> > dri-devel at lists.freedesktop.org
-> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
->
->
->
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> +41 (0) 79 365 57 48 - http://blog.ffwll.ch
-> --
-> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+Around February of 2014, some discovery led Will to correct the problem 
+with
+the atomic code via commit 8e86f0b409a44193f1587e87b69c5dcf8f65be67, 
+which
+has an excellent explanation of potential ordering problems with the 
+same
+code sequence used by lockref.c.
+
+With this updated understanding, the earlier commit
+(d2212b4dce596fee83e5c523400bf084f4cc816c) should be reverted.
+
+Because acquire/release semantics are insufficient for the full 
+ordering,
+the single barrier after the store exclusive is the best approach, 
+similar
+to Will's atomic barrier fix.
+
+Best regards,
+Brent
