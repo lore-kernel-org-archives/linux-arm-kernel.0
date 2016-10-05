@@ -1,34 +1,31 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  5 Oct 2016 17:23:33 +0200
-Subject: [PATCH v2 0/3] reset: Add support for OX820 SoC
-Message-ID: <20161005152336.467-1-narmstrong@baylibre.com>
+Date: Wed,  5 Oct 2016 17:23:34 +0200
+Subject: [PATCH v2 1/3] reset: oxnas: Add OX820 support
+In-Reply-To: <20161005152336.467-1-narmstrong@baylibre.com>
+References: <20161005152336.467-1-narmstrong@baylibre.com>
+Message-ID: <20161005152336.467-2-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the reset controller in the Oxford
-Semiconductor OX820 SoC, big brother of the OX810SE.
+In order to support the Oxford Semiconductor OX820 SoC, add a new
+compatible string.
 
-Since this driver uses a regmap access, it's important to tag each
-compatible SoC since the regmap offset could differ in later SoCs.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/reset/reset-oxnas.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-This patchet also moves the reset indices to a clean DT include file.
-
-Changes since v1 at: http://lkml.kernel.org/r/20160909131955.27334-1-narmstrong at baylibre.com
- - Reformat bindings
- - Add reference to include files in bindings
-
-Neil Armstrong (3):
-  reset: oxnas: Add OX820 support
-  dt-bindings: reset: oxnas: Add include file with reset indexes
-  dt-bindings: reset: oxnas: Update for OX820
-
- .../devicetree/bindings/reset/oxnas,reset.txt      | 39 ++--------------
- drivers/reset/reset-oxnas.c                        |  1 +
- include/dt-bindings/reset/oxsemi,ox810se.h         | 53 ++++++++++++++++++++++
- include/dt-bindings/reset/oxsemi,ox820.h           | 53 ++++++++++++++++++++++
- 4 files changed, 110 insertions(+), 36 deletions(-)
- create mode 100644 include/dt-bindings/reset/oxsemi,ox810se.h
- create mode 100644 include/dt-bindings/reset/oxsemi,ox820.h
-
+diff --git a/drivers/reset/reset-oxnas.c b/drivers/reset/reset-oxnas.c
+index 9449805..0d9036d 100644
+--- a/drivers/reset/reset-oxnas.c
++++ b/drivers/reset/reset-oxnas.c
+@@ -80,6 +80,7 @@ static const struct reset_control_ops oxnas_reset_ops = {
+ 
+ static const struct of_device_id oxnas_reset_dt_ids[] = {
+ 	 { .compatible = "oxsemi,ox810se-reset", },
++	 { .compatible = "oxsemi,ox820-reset", },
+ 	 { /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, oxnas_reset_dt_ids);
 -- 
 2.7.0
