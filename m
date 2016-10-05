@@ -1,46 +1,197 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Oct 2016 20:53:59 +0100
-Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
-In-Reply-To: <50e025e0-7052-9b15-3b3e-36d1d9dfd695@arm.com>
-References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
- <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
- <20161004170741.GC29008@leverpostej>
- <CAKdL+dS4_My6hyMEGNc65mzDapia_tMiVzZ9DMw=ddZM+XiwAw@mail.gmail.com>
- <CAKdL+dTGDqgpnMTkAj=N4cY-cZF_U+bkH1v1vUA4umZoSbWHKQ@mail.gmail.com>
- <50e025e0-7052-9b15-3b3e-36d1d9dfd695@arm.com>
-Message-ID: <20161005195359.GR1041@n2100.armlinux.org.uk>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Wed, 5 Oct 2016 22:25:35 +0200 (CEST)
+Subject: kernel-doc-rst-lint (was: Re: [PATCH 00/15] improve function-level
+ documentation)
+In-Reply-To: <87h98quc1w.fsf@intel.com>
+References: <1475351192-27079-1-git-send-email-Julia.Lawall@lip6.fr>
+ <CAKMK7uHT3FutHQuQQ3iwXmYbidB3AOs7AxnpaJD4MTqy0-QehQ@mail.gmail.com>
+ <87h98quc1w.fsf@intel.com>
+Message-ID: <alpine.DEB.2.10.1610052224240.3130@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 05, 2016 at 06:48:05PM +0100, Robin Murphy wrote:
-> On 05/10/16 17:39, Fredrik Markstr?m wrote:
-> > The approach I suggested below with the vDSO data page will obviously
-> > not work on smp, so suggestions are welcome.
-> 
-> Well, given that it's user-writeable, is there any reason an application
-> which cares couldn't simply run some per-cpu threads to call getcpu()
-> once and cache the result in TPIDRURW themselves? That would appear to
-> both raise no compatibility issues and work with existing kernels.
 
-There is - the contents of TPIDRURW is thread specific, and it moves
-with the thread between CPU cores.  So, if a thread was running on CPU0
-when it cached the getcpu() value in TPIDRURW, and then migrated to CPU1,
-TPIDRURW would still contain 0.
 
-I'm also not in favour of changing the TPIDRURW usage to be a storage
-repository for the CPU number - it's far too specific a usage and seems
-like a waste of hardware resources to solve one problem.  As Mark says,
-it's an ABI breaking change too, even if it is under a config option.
+On Wed, 5 Oct 2016, Jani Nikula wrote:
 
-Take a moment to consider distro kernels: how should they set this
-config option - should they enable it to get faster getcpu() or should
-they disable it to retain existing compatibility to prevent userspace
-breakage.  Who can advise them to make the right decision?  Kernel
-developers can't, because the usage of this register is purely a
-userspace issue right now, and kernels devs don't know what use it's
-been put to.
+> On Wed, 05 Oct 2016, Daniel Vetter <daniel@ffwll.ch> wrote:
+> > Jani Nikula has a patch with a scrip to make the one kernel-doc parser
+> > into a lint/checker pass over the entire kernel. I think that'd would
+> > be more robust instead of trying to approximate the real kerneldoc
+> > parser. Otoh that parser is a horror show of a perl/regex driven state
+> > machine ;-)
+> >
+> > Jani, can you pls digg out these patches? Can't find them right now ...
+>
+> Expanding the massive Cc: with linux-doc list...
+>
+> Here goes. It's a quick hack from months ago, but still seems to
+> somewhat work. At least for the kernel-doc parts. The reStructuredText
+> lint part isn't all that great, and doesn't have mapping to line numbers
+> like the Sphinx kernel-doc extension does. Anyway I'm happy how this
+> integrates with kernel build CHECK and C=1/C=2.
+>
+> I guess Julia's goal is to automate the *fixing* of some of the error
+> classes from kernel-doc. Not sure how well this could be made to
+> integrate with any of that.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+No, my work doesn't fix anything.  Coccinelle can't actually process
+comments.  I just correlated the parsed comment with the function header.
+
+julia
+
+>
+> BR,
+> Jani.
+>
+>
+> From 1244efa0f63a7b13795e8c37f81733a3c8bfc56a Mon Sep 17 00:00:00 2001
+> From: Jani Nikula <jani.nikula@intel.com>
+> Date: Tue, 31 May 2016 18:11:33 +0300
+> Subject: [PATCH] kernel-doc-rst-lint: add tool to check kernel-doc and rst
+>  correctness
+> Organization: Intel Finland Oy - BIC 0357606-4 - Westendinkatu 7, 02160 Espoo
+> Cc: Jani Nikula <jani.nikula@intel.com>
+>
+> Simple kernel-doc and reStructuredText lint tool that can be used
+> independently and as a kernel build CHECK tool to validate kernel-doc
+> comments.
+>
+> Independent usage:
+> $ kernel-doc-rst-lint FILE
+>
+> Kernel CHECK usage:
+> $ make CHECK=scripts/kernel-doc-rst-lint C=1		# (or C=2)
+>
+> Depends on docutils and the rst-lint package
+> https://pypi.python.org/pypi/restructuredtext_lint
+>
+> Signed-off-by: Jani Nikula <jani.nikula@intel.com>
+> ---
+>  scripts/kernel-doc-rst-lint | 106 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 106 insertions(+)
+>  create mode 100755 scripts/kernel-doc-rst-lint
+>
+> diff --git a/scripts/kernel-doc-rst-lint b/scripts/kernel-doc-rst-lint
+> new file mode 100755
+> index 000000000000..7e0157679f83
+> --- /dev/null
+> +++ b/scripts/kernel-doc-rst-lint
+> @@ -0,0 +1,106 @@
+> +#!/usr/bin/env python
+> +# coding=utf-8
+> +#
+> +# Copyright ? 2016 Intel Corporation
+> +#
+> +# Permission is hereby granted, free of charge, to any person obtaining a
+> +# copy of this software and associated documentation files (the "Software"),
+> +# to deal in the Software without restriction, including without limitation
+> +# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+> +# and/or sell copies of the Software, and to permit persons to whom the
+> +# Software is furnished to do so, subject to the following conditions:
+> +#
+> +# The above copyright notice and this permission notice (including the next
+> +# paragraph) shall be included in all copies or substantial portions of the
+> +# Software.
+> +#
+> +# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> +# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> +# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+> +# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> +# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> +# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+> +# IN THE SOFTWARE.
+> +#
+> +# Authors:
+> +#    Jani Nikula <jani.nikula@intel.com>
+> +#
+> +# Simple kernel-doc and reStructuredText lint tool that can be used
+> +# independently and as a kernel build CHECK tool to validate kernel-doc
+> +# comments.
+> +#
+> +# Independent usage:
+> +# $ kernel-doc-rst-lint FILE
+> +#
+> +# Kernel CHECK usage:
+> +# $ make CHECK=scripts/kernel-doc-rst-lint C=1		# (or C=2)
+> +#
+> +# Depends on docutils and the rst-lint package
+> +# https://pypi.python.org/pypi/restructuredtext_lint
+> +#
+> +
+> +import os
+> +import subprocess
+> +import sys
+> +
+> +from docutils.parsers.rst import directives
+> +from docutils.parsers.rst import Directive
+> +from docutils.parsers.rst import roles
+> +from docutils import nodes, statemachine
+> +import restructuredtext_lint
+> +
+> +class DummyDirective(Directive):
+> +    required_argument = 1
+> +    optional_arguments = 0
+> +    option_spec = { }
+> +    has_content = True
+> +
+> +    def run(self):
+> +        return []
+> +
+> +# Fake the Sphinx C Domain directives and roles
+> +directives.register_directive('c:function', DummyDirective)
+> +directives.register_directive('c:type', DummyDirective)
+> +roles.register_generic_role('c:func', nodes.emphasis)
+> +roles.register_generic_role('c:type', nodes.emphasis)
+> +
+> +# We accept but ignore parameters to be compatible with how the kernel build
+> +# invokes CHECK.
+> +if len(sys.argv) < 2:
+> +    sys.stderr.write('usage: kernel-doc-rst-lint [IGNORED OPTIONS] FILE\n');
+> +    sys.exit(1)
+> +
+> +infile = sys.argv[len(sys.argv) - 1]
+> +cmd = ['scripts/kernel-doc', '-rst', infile]
+> +
+> +try:
+> +    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+> +    out, err = p.communicate()
+> +
+> +    # python2 needs conversion to unicode.
+> +    # python3 with universal_newlines=True returns strings.
+> +    if sys.version_info.major < 3:
+> +        out, err = unicode(out, 'utf-8'), unicode(err, 'utf-8')
+> +
+> +    # kernel-doc errors
+> +    sys.stderr.write(err)
+> +    if p.returncode != 0:
+> +        sys.exit(p.returncode)
+> +
+> +    # restructured text errors
+> +    lines = statemachine.string2lines(out, 8, convert_whitespace=True)
+> +    lint_errors = restructuredtext_lint.lint(out, infile)
+> +    for error in lint_errors:
+> +        # Ignore INFO
+> +        if error.level <= 1:
+> +            continue
+> +
+> +        print(error.source + ': ' + error.type + ': ' + error.full_message)
+> +        if error.line is not None:
+> +            print('Context:')
+> +            print('\t' + lines[error.line - 1])
+> +            print('\t' + lines[error.line])
+> +
+> +except Exception as e:
+> +    sys.stderr.write(str(e) + '\n')
+> +    sys.exit(1)
+> --
+> 2.1.4
+>
+>
+> --
+> Jani Nikula, Intel Open Source Technology Center
+> --
+> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
