@@ -1,146 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 05 Oct 2016 17:14:49 +0200
-Subject: [PATCH] arm64: dts: marvell: Add definition for the Globalscale
- Marvell ESPRESSOBin Board
-In-Reply-To: <20161005142734.18995-1-romain.perier@free-electrons.com> (Romain
- Perier's message of "Wed, 5 Oct 2016 16:27:34 +0200")
-References: <20161005142734.18995-1-romain.perier@free-electrons.com>
-Message-ID: <87fuoaygie.fsf@free-electrons.com>
+From: karl.beldan@gmail.com (Karl Beldan)
+Date: Wed, 5 Oct 2016 15:16:46 +0000
+Subject: [PATCH 0/2] ARM: davinci: initial infrastructure for LCDC
+In-Reply-To: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <20161005151646.qpdycrefwbdrzhtq@gobelin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
- 
- On mer., oct. 05 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
+On Wed, Oct 05, 2016 at 03:05:30PM +0200, Bartosz Golaszewski wrote:
+> After discussing the matter with Laurent Pinchart it turned out that
+> using ti,tilcdc,panel was wrong and we should go with the new
+> simple-vga-dac driver proposed by Maxime Ripard and currently being
+> reviewed.
+> 
+> The da850-lcdk board on which I'm working has a THS8135 video DAC for
+> which the new driver seems to be best suited and we'll be able to
+> query the connected display for supported modes instead of hardcoding
+> them in the dt as is needed for the panel driver.
+> 
 
-> This adds a basic definition for this board.
->
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/marvell/Makefile               |  1 +
->  .../boot/dts/marvell/armada-3720-espressobin.dts   | 78 ++++++++++++++++++++++
->  2 files changed, 79 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
->
-> diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-> index 308468d..392eeb6 100644
-> --- a/arch/arm64/boot/dts/marvell/Makefile
-> +++ b/arch/arm64/boot/dts/marvell/Makefile
-> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
->  
->  # Mvebu SoC Family
->  dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
-> +dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
->  dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db.dtb
->  
->  always		:= $(dtb-y)
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> new file mode 100644
-> index 0000000..57035a3
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> @@ -0,0 +1,78 @@
-> +/*
-> + * Device Tree file for Globalscale Marvell ESPRESSOBin Board
-> + * Copyright (C) 2016 Marvell
-> + *
-> + * Romain Perier <romain.perier@free-electrons.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
+I meant to point to these new changes but then it slipped my mind, it is
+clearly the way to go.
 
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "armada-372x.dtsi"
-> +
-> +/ {
-> +	model = "Globalscale Marvell ESPRESSOBin Board";
-> +	compatible = "globalscale,espressobin", "marvell,armada3720", "marvell,armada3710";
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
+Regards, 
+Karl
 
 
-According to the kickstarter page the boards will came with different
-amount of memory (from 512MB to 2GB). So we could put a comment
-here about tuning this value depending of the board.
-> +		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
-> +	};
-> +};
-> +
-
-Could you add information about the connector for each of the following
-interfaces?
-
-You can have a look on the armada-3720-db.dts to see the kind of info I
-expect.
-
-Thanks,
-
-Gregory
-
-> +&pcie0 {
-> +	status = "okay";
-> +};
-> +
-> +&sata {
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> +&usb3 {
-> +	status = "okay";
-> +};
+> In the meantime I'm posting two patches based on Karl Beldan's
+> previous work that can already be merged.
+> 
+> The first one adds OF_DEV_AUXDATA entry to da8xx-dt.c. I changed the
+> compatible string to the new one we're introducing in the tilcdc
+> driver.
+> 
+> The second adds the lcd pins and the display node to da850.dtsi. As
+> suggested by Sekhar: I moved the pins node, which was previously in
+> da850-lcdk.dts, to da850.dtsi. I also squashed Karl's two patches and
+> removed the panel node.
+> 
+> Tested on a da850-lcdk with an LCD display connected over VGA with
+> two patches already posted to the drm mailing list:
+> 
+>   drm: tilcdc: add a da850-specific compatible string
+>   drm: tilcdc: add a workaround for failed clk_set_rate()
+> 
+> and some additional work-in-progress/hacks on top of that.
+> 
+> Karl Beldan (2):
+>   ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for lcdc
+>   ARM: dts: da850: add a node for the LCD controller
+> 
+>  arch/arm/boot/dts/da850.dtsi     | 29 +++++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/da8xx-dt.c |  1 +
+>  2 files changed, 30 insertions(+)
+> 
 > -- 
 > 2.9.3
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 
