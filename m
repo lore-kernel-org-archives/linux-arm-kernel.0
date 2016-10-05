@@ -1,178 +1,32 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Wed, 5 Oct 2016 08:04:26 +0200
-Subject: [PATCH 07/14] ASoC: Add sun8i audio card
-In-Reply-To: <33d641ff43f0c0349cdfa2cdbbfdcdde66205596.1475571575.git.mylene.josserand@free-electrons.com>
-References: <cover.1475571575.git.mylene.josserand@free-electrons.com>
- <cover.1475569400.git.mylene.josserand@free-electrons.com>
- <33d641ff43f0c0349cdfa2cdbbfdcdde66205596.1475571575.git.mylene.josserand@free-electrons.com>
-Message-ID: <CAEKpxBkUbCGJdToReQx7P+5i92doUdNeMvA5fiDACGcniY=nJg@mail.gmail.com>
+From: paweljarosz3691@gmail.com (=?UTF-8?Q?Pawe=c5=82_Jarosz?=)
+Date: Wed, 5 Oct 2016 08:09:17 +0200
+Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on
+ rk3066
+In-Reply-To: <6239b970-09d3-f7ee-e6f5-c019eaedb725@rock-chips.com>
+References: <20161001140939.GA31220@vaio-ubuntu>
+ <6239b970-09d3-f7ee-e6f5-c019eaedb725@rock-chips.com>
+Message-ID: <f8aba48d-6c69-b246-4cb2-48a2770c80e4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 October 2016 at 11:46, Myl?ne Josserand
-<mylene.josserand@free-electrons.com> wrote:
-> Add the audio card for sun8i SoC. This card links the codec driver
-> (digital part) with the DAI driver. The analog codec driver is
-> added as an aux_device.
->
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> ---
->  sound/soc/sunxi/Kconfig  |  14 +++++++
->  sound/soc/sunxi/Makefile |   1 +
->  sound/soc/sunxi/sun8i.c  | 101 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 116 insertions(+)
->  create mode 100644 sound/soc/sunxi/sun8i.c
->
-> diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
-> index 9e287b0..7b97395 100644
-> --- a/sound/soc/sunxi/Kconfig
-> +++ b/sound/soc/sunxi/Kconfig
-> @@ -27,6 +27,20 @@ config SND_SUN4I_SPDIF
->           Say Y or M to add support for the S/PDIF audio block in the Allwinner
->           A10 and affiliated SoCs.
->
-> +config SND_SUN8I
-> +       tristate "Allwinner SUN6I/SUN8I audio card support"
-> +       select SND_SUN8I_CODEC
-> +       select SND_SUN4I_I2S
-> +       select SND_SUN8I_CODEC_ANALOG
-> +       select REGMAP_MMIO
-> +       help
-> +         This option enables the audio card for Allwinner A33 (sun8i) SoC.
-> +         It enables the DAI driver (SND_SUN4I_I2S), the digital audio
-> +         codec driver (SND_SUN8I_CODEC) and the analog codec driver
-> +         (SND_SUN8I_CODEC_ANALOG).
-> +
-> +         Say Y or M if you want to add sun8i/6i card support
-> +
->  config SND_SUN8I_CODEC
->         tristate "Allwinner SUN8I audio codec"
->         select REGMAP_MMIO
-> diff --git a/sound/soc/sunxi/Makefile b/sound/soc/sunxi/Makefile
-> index 1da63d3..7f1bab9 100644
-> --- a/sound/soc/sunxi/Makefile
-> +++ b/sound/soc/sunxi/Makefile
-> @@ -1,5 +1,6 @@
->  obj-$(CONFIG_SND_SUN4I_CODEC) += sun4i-codec.o
->  obj-$(CONFIG_SND_SUN4I_I2S) += sun4i-i2s.o
->  obj-$(CONFIG_SND_SUN4I_SPDIF) += sun4i-spdif.o
-> +obj-$(CONFIG_SND_SUN8I) += sun8i.o
->  obj-$(CONFIG_SND_SUN8I_CODEC) += sun8i-codec.o
->  obj-$(CONFIG_SND_SUN8I_CODEC_ANALOG) += sun8i-codec-analog.o
-> diff --git a/sound/soc/sunxi/sun8i.c b/sound/soc/sunxi/sun8i.c
-> new file mode 100644
-> index 0000000..565cd88
-> --- /dev/null
-> +++ b/sound/soc/sunxi/sun8i.c
-> @@ -0,0 +1,101 @@
-> +/*
-> + * ALSA SoC driver for Allwinner sun8i SoC
-> + *
-> + * Copyright (C) 2016 Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/firmware.h>
-> +#include <linux/module.h>
-> +
-> +#include <sound/soc.h>
-> +
-> +static struct snd_soc_aux_dev sun8i_audio_prcm_aux_devs[] = {
-> +       {
-> +               .name = "sun8i-codec-analog",
-> +               .codec_name = "sun8i-codec-analog.0",
-> +       },
-> +};
-> +
-> +static struct snd_soc_dai_link sun8i_dai_link = {
-> +       .name           = "sun4i-i2s",
-> +       .stream_name    = "Playback",
-> +       .codec_dai_name = "sun8i",
-> +       .dai_fmt        = SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_I2S |
-> +                       SND_SOC_DAIFMT_CBM_CFM,
-> +};
-> +
-> +static struct snd_soc_card sun8i_card = {
-> +       .name           = "sun8i-card",
-> +       .owner          = THIS_MODULE,
-> +       .dai_link       = &sun8i_dai_link,
-> +       .num_links      = 1,
-> +       .aux_dev        = sun8i_audio_prcm_aux_devs,
-> +       .num_aux_devs   = ARRAY_SIZE(sun8i_audio_prcm_aux_devs),
-> +};
-> +
-> +static int sun8i_probe(struct platform_device *pdev)
-> +{
-> +       struct snd_soc_dai_link *link = &sun8i_dai_link;
-> +       struct device_node *np = pdev->dev.of_node;
-> +       int ret;
-> +
-> +       /* register the soc card */
-> +       sun8i_card.dev = &pdev->dev;
-> +
-> +       /* Retrieve the audio-codec from DT */
-> +       link->codec_of_node = of_parse_phandle(np, "allwinner,audio-codec", 0);
-> +       if (!link->codec_of_node) {
-> +               dev_err(&pdev->dev, "Missing audio codec\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       /* Retrieve DAI from DT */
-> +       link->cpu_of_node = of_parse_phandle(np, "allwinner,i2s-controller", 0);
-Now that I've spent some time trying to add my changes for the H3
-ontop of your code,  I think this file should be more generic and rely
-on the dtsi more. It's pretty A33 specific but with little effort it
-can be worked to cover all of the sun8i type drivers. I would change
-"allwinner,i2s-controller" to "allwinner,audio-dai" for starters and
-then maybe pull in some info for the dai-link from the dtsi.
-CK
-> +       if (!link->cpu_of_node) {
-> +               dev_err(&pdev->dev, "Missing I2S controller\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       link->platform_of_node = link->cpu_of_node;
-> +
-> +       /* Register the sound card */
-> +       ret = devm_snd_soc_register_card(&pdev->dev, &sun8i_card);
-> +       if (ret) {
-> +               dev_err(&pdev->dev,
-> +                       "Soc register card failed %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       return ret;
-> +}
-> +
-> +static const struct of_device_id sun8i_of_match[] = {
-> +       { .compatible = "allwinner,sun8i-audio", },
-> +       {},
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, sun8i_of_match);
-> +
-> +static struct platform_driver sun8i_card_driver = {
-> +       .probe = sun8i_probe,
-> +       .driver = {
-> +               .name   = "sun8i-audio",
-> +               .of_match_table = sun8i_of_match,
-> +       },
-> +};
-> +
-> +module_platform_driver(sun8i_card_driver);
-> +
-> +MODULE_AUTHOR("Myl?ne Josserand <mylene.josserand@free-electrons.com>");
-> +MODULE_DESCRIPTION("Allwinner sun8i machine ASoC driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.9.3
->
+Hi
+
+
+W dniu 05.10.2016 o 04:27, Huang, Tao pisze:
+> Hi, Pawe?:
+> On 2016?10?01? 22:09, =?UTF-8?q?Pawe=C5=82=20Jarosz?= wrote:
+>> For some reason accessing memory region above 0xfe000000 freezes
+>> system on rk3066. There is similiar bug on later rockchip soc (rk3288)
+> RK3066 only support 2GB memory from 0x60000000 to 0xE0000000, can not access
+> above 0xfe000000. I think you mean 0x9F000000?
+Yes i meant 0x9F00000. Sorry for that.
+> I don't remember RK3066 has such limit. I will double check with our IC
+> design team.
+> Do you know which master can not access this memory area
+> [0x9F000000~0xA0000000)?
+I don't.
+> Could you please tell which board you're using (and how much memory it has)
+Rikomagic MK808 1GB RAM
+
+Thanks
+Pawel
