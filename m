@@ -1,28 +1,108 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 06 Oct 2016 00:23:55 +0300
-Subject: [PATCH v3 0/11] Add R8A7743/SK-RZG1M board support
-Message-ID: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
+Date: Thu, 06 Oct 2016 00:37:08 +0300
+Subject: [PATCH v3 03/11] ARM: shmobile: r8a7743: basic SoC support
+In-Reply-To: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
+References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
+Message-ID: <15557770.lH5aPepOeZ@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Add minimal support for the RZ/G1M (R8A7743) SoC.
 
-   Here's the set of 11 patches against Simon Horman's 'renesas.git' repo's
-'renesas-devel-20161003-v4.8' tag. I'm adding the device tree support for
-the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the board
-seems identical to the R8A7791/Porter board. The device tree patches depend on
-the R8A7743 CPG/MSSR driver series just posted in order to compile and work.
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
 
-[01/12] ARM: shmobile: r8a7743: add power domain index macros
-[02/12] soc: renesas: rcar-sysc: add R8A7743 support
-[03/12] ARM: shmobile: r8a7743: basic SoC support
-[04/12] ARM: dts: r8a7743: initial SoC device tree
-[05/12] ARM: dts: r8a7743: add SYS-DMAC support
-[06/12] ARM: dts: r8a7743: add [H]SCIF{A|B} support
-[07/12] ARM: dts: r8a7743: add Ether support
-[08/12] ARM: dts: r8a7743: add IRQC support
-[09/12] DT: arm: shmobile: document SK-RZG1M board
-[10/12] ARM: dts: sk-rzg1m: initial device tree
-[11/12] ARM: dts: sk-rzg1m: add Ether support
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-WBR, Sergei
+---
+Changes in version 2:
+- removed "select I2C" from the R8A7743 Kconfig entry;
+- documented the R8A7743 device tree binding;
+- added Geert's tag.
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |    2 +
+ arch/arm/mach-shmobile/Kconfig                     |    4 ++
+ arch/arm/mach-shmobile/Makefile                    |    1 
+ arch/arm/mach-shmobile/setup-r8a7743.c             |   34 +++++++++++++++++++++
+ 4 files changed, 41 insertions(+)
+
+Index: renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+===================================================================
+--- renesas.orig/Documentation/devicetree/bindings/arm/shmobile.txt
++++ renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -13,6 +13,8 @@ SoCs:
+     compatible = "renesas,r8a73a4"
+   - R-Mobile A1 (R8A77400)
+     compatible = "renesas,r8a7740"
++  - RZ/G1M (R8A77430)
++    compatible = "renesas,r8a7743"
+   - R-Car M1A (R8A77781)
+     compatible = "renesas,r8a7778"
+   - R-Car H1 (R8A77790)
+Index: renesas/arch/arm/mach-shmobile/Kconfig
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/Kconfig
++++ renesas/arch/arm/mach-shmobile/Kconfig
+@@ -68,6 +68,10 @@ config ARCH_R8A7740
+ 	select ARCH_RMOBILE
+ 	select RENESAS_INTC_IRQPIN
+ 
++config ARCH_R8A7743
++	bool "RZ/G1M (R8A77430)"
++	select ARCH_RCAR_GEN2
++
+ config ARCH_R8A7778
+ 	bool "R-Car M1A (R8A77781)"
+ 	select ARCH_RCAR_GEN1
+Index: renesas/arch/arm/mach-shmobile/Makefile
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/Makefile
++++ renesas/arch/arm/mach-shmobile/Makefile
+@@ -9,6 +9,7 @@ obj-y				:= timer.o
+ obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o
+ obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o
+ obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o
++obj-$(CONFIG_ARCH_R8A7743)	+= setup-r8a7743.o
+ obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o pm-r8a7779.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
+Index: renesas/arch/arm/mach-shmobile/setup-r8a7743.c
+===================================================================
+--- /dev/null
++++ renesas/arch/arm/mach-shmobile/setup-r8a7743.c
+@@ -0,0 +1,34 @@
++/*
++ * r8a7743 processor support
++ *
++ * Copyright (C) 2016 Cogent Embedded, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation; of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++
++#include <asm/mach/arch.h>
++
++#include "common.h"
++#include "rcar-gen2.h"
++
++static const char * const r8a7743_boards_compat_dt[] __initconst = {
++	"renesas,r8a7743",
++	NULL,
++};
++
++DT_MACHINE_START(R8A7743_DT, "Generic R8A7743 (Flattened Device Tree)")
++	.init_early	= shmobile_init_delay,
++	.init_time	= rcar_gen2_timer_init,
++	.init_late	= shmobile_init_late,
++	.reserve	= rcar_gen2_reserve,
++	.dt_compat	= r8a7743_boards_compat_dt,
++MACHINE_END
