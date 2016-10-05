@@ -1,123 +1,96 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Wed, 5 Oct 2016 20:13:32 +0530
-Subject: [PATCH v14 2/4] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <1475670705.335.27.camel@mtksdaap41>
-References: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
- <1473039885-24009-3-git-send-email-hs.liao@mediatek.com>
- <1475204778.13398.28.camel@mtksdaap41>
- <1475225778.25044.35.camel@mtksdaap41> <1475226691.13398.35.camel@mtksdaap41>
- <1475228829.3658.1.camel@mtksdaap41> <1475636064.21937.25.camel@mtksdaap41>
- <CAJe_ZhcXw1-MOEiiix5VTtKEVr9Z23s_OyikboDYCd0RQwS5pg@mail.gmail.com>
- <1475670705.335.27.camel@mtksdaap41>
-Message-ID: <CAJe_ZheeEe0xEj733pxr4q=-YzxKHgRM4MMPDJNHa9uRC9Q2zA@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed,  5 Oct 2016 16:44:33 +0200
+Subject: [PATCH] ARM64: dts: meson-gxbb: Add rmii pinctrl node and rename
+ rgmii node
+Message-ID: <1475678673-15277-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2016 at 18:01, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
-> On Wed, 2016-10-05 at 09:07 +0530, Jassi Brar wrote:
->> On 5 October 2016 at 08:24, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
->> > On Fri, 2016-09-30 at 17:47 +0800, Horng-Shyang Liao wrote:
->> >> On Fri, 2016-09-30 at 17:11 +0800, CK Hu wrote:
->>
->> >
->> > After I trace mailbox driver, I realize that CMDQ driver cannot use
->> > tx_done.
->> >
->> > CMDQ clients will flush many tasks into CMDQ driver, and then CMDQ
->> > driver will apply these tasks into GCE HW "immediately". These tasks,
->> > which are queued in GCE HW, may not execute immediately since they
->> > may need to wait event(s), e.g. vsync.
->> >
->> > However, in mailbox driver, mailbox uses a software buffer to queue
->> > sent messages. It only sends next message until previous message is
->> > done. This cannot fulfill CMDQ's requirement.
->> >
->> I understand
->>  a) GCE HW can internally queue many tasks in some 'FIFO'
->>  b) Execution of some task may have to wait until some external event
->> occurs (like vsync)
->>  c) GCE does not generate irq/flag for each task executed (?)
->>
->> If so, may be your tx_done should return 'true' so long as the GCE HW
->> can accept tasks in its 'FIFO'. For mailbox api, any task that is
->> queued on GCE, is assumed to be transmitted.
->>
->> > Quote some code from mailbox driver. Please notice "active_req" part.
->> >
->> > static void msg_submit(struct mbox_chan *chan)
->> > {
->> >         ...
->> >         if (!chan->msg_count || chan->active_req)
->> >                 goto exit;
->> >         ...
->> >         err = chan->mbox->ops->send_data(chan, data);
->> >         if (!err) {
->> >                 chan->active_req = data;
->> >                 chan->msg_count--;
->> >         }
->> >         ...
->> > }
->> >
->> > static void tx_tick(struct mbox_chan *chan, int r)
->> > {
->> >         ...
->> >         spin_lock_irqsave(&chan->lock, flags);
->> >         mssg = chan->active_req;
->> >         chan->active_req = NULL;
->> >         spin_unlock_irqrestore(&chan->lock, flags);
->> >         ...
->> > }
->> >
->> > Current workable CMDQ driver uses mbox_client_txdone() to prevent
->> > this issue, and then uses self callback functions to handle done tasks.
->> >
->> > int cmdq_task_flush_async(struct cmdq_client *client, struct cmdq_task
->> > *task, cmdq_async_flush_cb cb, void *data)
->> > {
->> >         ...
->> >         mbox_send_message(client->chan, task);
->> >         /* We can send next task immediately, so just call txdone. */
->> >         mbox_client_txdone(client->chan, 0);
->> >         ...
->> > }
->> >
->> > Another solution is to use rx_callback; i.e. CMDQ mailbox controller
->> > call mbox_chan_received_data() when CMDQ task is done. But, this may
->> > violate the design of mailbox. What do you think?
->> >
->> If my point (c) above does not hold, maybe look at implementing
->> tx_done() callback and submit next task from the callback of last
->> done.
->
->
-> Hi Jassi,
->
-> For point (c), GCE irq means 1~n tasks done or
-> 0~n tasks done + 1 task error.
-> In irq, we can know which tasks are done by register and GCE pc.
->
-> As I mentioned before, we cannot submit next task after previous task
-> call tx_done. We need to submit multiple tasks to GCE HW immediately
-> and queue them in GCE HW.
+For boards only supporting 10/100 ethernet over a RMII PHY link, add
+a separate pinctrl node. By the way, rename the existing node to rgmii
+specific naming in all boards dts.
 
-> Let me explain this requirement by mouse
-> cursor example. User may move mouse quickly between two vsync, so DRM
-> may update display registers frequently. For CMDQ, that means many tasks
-> are flushed into CMDQ driver, and CMDQ driver needs to process all of
-> them in next vblank. Therefore, we cannot block any CMDQ task in SW
-> buffer.
->
-We are interested only in the current position of cursor and not its
-trail. Also the current position should be updated at next vsync (and
-not the one after it).
-Going by this example, if the GCE HW can take in 'N' tasks at a time,
-then the N+1th submission should shift out (drop) the 1st task queued.
-So that at any time GCE HW has only the latest N tasks. Right?
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts  |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi     |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 17 ++++++++++++++++-
+ 4 files changed, 19 insertions(+), 4 deletions(-)
 
- If yes, maybe you don't need to care about tx-done and simply keep
-shoving tasks as you generate them.
-
- If no, maybe your client driver need to emulate such a circular
-buffer where oldest task is overwritten by newest submission. And you
-submit the circular buffer (most relevant tasks) at one go to the GCE
-HW.
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index e6e3491..325b9c5 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -83,7 +83,7 @@
+ 
+ &ethmac {
+ 	status = "okay";
+-	pinctrl-0 = <&eth_pins>;
++	pinctrl-0 = <&eth_rgmii_pins>;
+ 	pinctrl-names = "default";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+index 06a34dc..031d69b 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+@@ -81,7 +81,7 @@
+ 
+ &ethmac {
+ 	status = "okay";
+-	pinctrl-0 = <&eth_pins>;
++	pinctrl-0 = <&eth_rgmii_pins>;
+ 	pinctrl-names = "default";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+index 73f1593..e93221a 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+@@ -82,7 +82,7 @@
+ 
+ &ethmac {
+ 	status = "okay";
+-	pinctrl-0 = <&eth_pins>;
++	pinctrl-0 = <&eth_rgmii_pins>;
+ 	pinctrl-names = "default";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 443811b..aad639a 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -443,7 +443,7 @@
+ 			};
+ 		};
+ 
+-		eth_pins: eth_c {
++		eth_rgmii_pins: eth-rgmii {
+ 			mux {
+ 				groups = "eth_mdio",
+ 				       "eth_mdc",
+@@ -463,6 +463,21 @@
+ 			};
+ 		};
+ 
++		eth_rmii_pins: eth-rmii {
++			mux {
++				groups = "eth_mdio",
++				       "eth_mdc",
++				       "eth_clk_rx_clk",
++				       "eth_rx_dv",
++				       "eth_rxd0",
++				       "eth_rxd1",
++				       "eth_tx_en",
++				       "eth_txd0",
++				       "eth_txd1";
++				function = "eth";
++			};
++		};
++
+ 		pwm_a_x_pins: pwm_a_x {
+ 			mux {
+ 				groups = "pwm_a_x";
+-- 
+1.9.1
