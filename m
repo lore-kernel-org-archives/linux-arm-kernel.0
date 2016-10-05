@@ -1,108 +1,45 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 06 Oct 2016 00:37:08 +0300
-Subject: [PATCH v3 03/11] ARM: shmobile: r8a7743: basic SoC support
-In-Reply-To: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
-References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
-Message-ID: <15557770.lH5aPepOeZ@wasted.cogentembedded.com>
+From: fredrik.markstrom@gmail.com (=?UTF-8?Q?Fredrik_Markstr=C3=B6m?=)
+Date: Wed, 5 Oct 2016 23:37:06 +0200
+Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
+In-Reply-To: <20161005204452.GB26721@remoulade>
+References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
+ <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
+ <20161004170741.GC29008@leverpostej>
+ <CAKdL+dS4_My6hyMEGNc65mzDapia_tMiVzZ9DMw=ddZM+XiwAw@mail.gmail.com>
+ <CAKdL+dTGDqgpnMTkAj=N4cY-cZF_U+bkH1v1vUA4umZoSbWHKQ@mail.gmail.com>
+ <50e025e0-7052-9b15-3b3e-36d1d9dfd695@arm.com>
+ <CAKdL+dQH=9C2aGf7ys5-vXM7pkdPYUQ8xYWLipwVbABOz09f1g@mail.gmail.com>
+ <20161005204452.GB26721@remoulade>
+Message-ID: <CAKdL+dTYR7Ch9uwyzZGG_wz533pth_+4CkAzYtzaCVn5bF20ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add minimal support for the RZ/G1M (R8A7743) SoC.
+On Wed, Oct 5, 2016 at 10:44 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Oct 05, 2016 at 08:00:38PM +0000, Fredrik Markstr?m wrote:
+>> On Wed, Oct 5, 2016 at 7:48 PM Robin Murphy <robin.murphy@arm.com> wrote:
+>> As far as I understand TPIDRURW isn't anything else then an architecture
+>> specific piece of tls since the last patch, possibly slightly faster then a
+>> "__thread u32 x;"
+>>
+>> The irony is that the two different ways it was handled earlier (not context
+>> switched or always set to zero on swap in) would have made it useful for this
+>> purpose.
+>
+> The "not context switched" case was also arbitrarily corrupted, and could not
+> have been relied upon.
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+Ok, I missed that, sorry !
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> The zeroing case is similar to the restartable sequences design. So that's
+> probably worth looking into.
 
----
-Changes in version 2:
-- removed "select I2C" from the R8A7743 Kconfig entry;
-- documented the R8A7743 device tree binding;
-- added Geert's tag.
+Ok, I'm starting to believe my best bet is to hope that those make it
+into the kernel
+eventually, until then I'll probably just go with a local solution.
 
- Documentation/devicetree/bindings/arm/shmobile.txt |    2 +
- arch/arm/mach-shmobile/Kconfig                     |    4 ++
- arch/arm/mach-shmobile/Makefile                    |    1 
- arch/arm/mach-shmobile/setup-r8a7743.c             |   34 +++++++++++++++++++++
- 4 files changed, 41 insertions(+)
+/Fredrik
 
-Index: renesas/Documentation/devicetree/bindings/arm/shmobile.txt
-===================================================================
---- renesas.orig/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ renesas/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -13,6 +13,8 @@ SoCs:
-     compatible = "renesas,r8a73a4"
-   - R-Mobile A1 (R8A77400)
-     compatible = "renesas,r8a7740"
-+  - RZ/G1M (R8A77430)
-+    compatible = "renesas,r8a7743"
-   - R-Car M1A (R8A77781)
-     compatible = "renesas,r8a7778"
-   - R-Car H1 (R8A77790)
-Index: renesas/arch/arm/mach-shmobile/Kconfig
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/Kconfig
-+++ renesas/arch/arm/mach-shmobile/Kconfig
-@@ -68,6 +68,10 @@ config ARCH_R8A7740
- 	select ARCH_RMOBILE
- 	select RENESAS_INTC_IRQPIN
- 
-+config ARCH_R8A7743
-+	bool "RZ/G1M (R8A77430)"
-+	select ARCH_RCAR_GEN2
-+
- config ARCH_R8A7778
- 	bool "R-Car M1A (R8A77781)"
- 	select ARCH_RCAR_GEN1
-Index: renesas/arch/arm/mach-shmobile/Makefile
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/Makefile
-+++ renesas/arch/arm/mach-shmobile/Makefile
-@@ -9,6 +9,7 @@ obj-y				:= timer.o
- obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o
- obj-$(CONFIG_ARCH_R8A73A4)	+= setup-r8a73a4.o
- obj-$(CONFIG_ARCH_R8A7740)	+= setup-r8a7740.o
-+obj-$(CONFIG_ARCH_R8A7743)	+= setup-r8a7743.o
- obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
- obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o pm-r8a7779.o
- obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7743.c
-===================================================================
---- /dev/null
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7743.c
-@@ -0,0 +1,34 @@
-+/*
-+ * r8a7743 processor support
-+ *
-+ * Copyright (C) 2016 Cogent Embedded, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation; of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/init.h>
-+
-+#include <asm/mach/arch.h>
-+
-+#include "common.h"
-+#include "rcar-gen2.h"
-+
-+static const char * const r8a7743_boards_compat_dt[] __initconst = {
-+	"renesas,r8a7743",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(R8A7743_DT, "Generic R8A7743 (Flattened Device Tree)")
-+	.init_early	= shmobile_init_delay,
-+	.init_time	= rcar_gen2_timer_init,
-+	.init_late	= shmobile_init_late,
-+	.reserve	= rcar_gen2_reserve,
-+	.dt_compat	= r8a7743_boards_compat_dt,
-+MACHINE_END
+>
+> Thanks,
+> Mark.
