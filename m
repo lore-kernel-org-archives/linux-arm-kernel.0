@@ -1,57 +1,58 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Wed, 05 Oct 2016 23:56:11 +0100
-Subject: [PATCH] ARM: fix delays
-Message-ID: <E1brv6h-0003j7-7J@rmk-PC.armlinux.org.uk>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Wed,  5 Oct 2016 20:46:54 -0300
+Subject: [PATCH 0/3] mtd: s3c2410: add device tree support
+Message-ID: <1475711217-974-1-git-send-email-sergio.prado@e-labworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 215e362dafed ("ARM: 8306/1: loop_udelay: remove bogomips value
-limitation") tried to increase the bogomips limitation, but in doing
-so messed up udelay such that it always gives about a 5% error in the
-delay, even if we use a timer.
+This series adds support for configuring Samsung's s3c2410 and
+compatible flash memory controller via devicetree.
 
-The calculation is:
+Tested on FriendlyARM mini2440, based on s3c2440 SoC.
 
-	loops = UDELAY_MULT * us_delay * ticks_per_jiffy >> UDELAY_SHIFT
+Patch 3 depends on patch 1.
 
-Originally, UDELAY_MULT was ((UL(2199023) * HZ) >> 11) and UDELAY_SHIFT
-30.  Assuming HZ=100, us_delay of 1000 and ticks_per_jiffy of 1660000
-(eg, 166MHz timer, 1ms delay) this would calculate:
+Changes since v1:
+- read timings from nand_sdr_timings when booting with a device tree
+- naming improvements in the device tree binding
+  (s/nand/nand-controller/, s/_/-, s/children/child)
+- dropped property samsung,ignore_unset_ecc
+- remove @0 from nand device node
+- checking pdev->dev.of_node instead of using ifdef CONFIG_OF_MTD
+- preventing from parsing device tree properties twice
+- increment the nand controller child node refcount, since we
+  maintain a reference to it and its name field
+- using of_device_get_match_data() instead of of_match_device()
+  to make the code simpler
+- remove CONFIG_MTD_NAND_S3C2410_HWECC compile option so we can
+  select ECC mode using nand-ecc-mode property in the device tree
 
-	((UL(2199023) * HZ) >> 11) * 1000 * 1660000 >> 30
-		=> 165999
+Sergio Prado (3):
+  mtd: s3c2410: make ecc mode configurable via platform data
+  dt-bindings: mtd: add DT binding for s3c2410 flash controller
+  mtd: s3c2410: parse the device configuration from OF node
 
-With the new values of 2047 * HZ + 483648 * HZ / 1000000 and 31, we get:
+ .../devicetree/bindings/mtd/samsung-s3c2410.txt    |  57 +++++
+ arch/arm/mach-s3c24xx/common-smdk.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-anubis.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-at2440evb.c             |   1 +
+ arch/arm/mach-s3c24xx/mach-bast.c                  |   1 +
+ arch/arm/mach-s3c24xx/mach-gta02.c                 |   1 +
+ arch/arm/mach-s3c24xx/mach-jive.c                  |   1 +
+ arch/arm/mach-s3c24xx/mach-mini2440.c              |   1 +
+ arch/arm/mach-s3c24xx/mach-osiris.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-qt2410.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-rx1950.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-rx3715.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-vstms.c                 |   1 +
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |   1 +
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |   1 +
+ arch/arm/mach-s3c64xx/mach-real6410.c              |   1 +
+ drivers/mtd/nand/Kconfig                           |   9 -
+ drivers/mtd/nand/s3c2410.c                         | 284 +++++++++++++++------
+ include/linux/platform_data/mtd-nand-s3c2410.h     |   7 +-
+ 19 files changed, 289 insertions(+), 83 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
 
-	(2047 * HZ + 483648 * HZ / 1000000) * 1000 * 1660000 >> 31
-		=> 158269
-
-which is incorrect.  This is due to a typo - correcting it gives:
-
-	(2147 * HZ + 483648 * HZ / 1000000) * 1000 * 1660000 >> 31
-		=> 165999
-
-i.o.w, the original value.
-
-Fixes: 215e362dafed ("ARM: 8306/1: loop_udelay: remove bogomips value limitation")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/include/asm/delay.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index b7a428154355..b1ce037e4380 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -10,7 +10,7 @@
- #include <asm/param.h>	/* HZ */
- 
- #define MAX_UDELAY_MS	2
--#define UDELAY_MULT	UL(2047 * HZ + 483648 * HZ / 1000000)
-+#define UDELAY_MULT	UL(2147 * HZ + 483648 * HZ / 1000000)
- #define UDELAY_SHIFT	31
- 
- #ifndef __ASSEMBLY__
 -- 
-2.1.0
+1.9.1
