@@ -1,50 +1,108 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Wed, 5 Oct 2016 12:23:15 +0000
-Subject: [PATCH v5] devicetree: bindings: uart: Add new compatible
- string for ZynqMP
-In-Reply-To: <20161003184234.GA13165@rob-hp-laptop>
-References: <1474898801-36571-1-git-send-email-navam@xilinx.com>
- <20161003184234.GA13165@rob-hp-laptop>
-Message-ID: <C89496FEAE474D468F30D558A9468D9F26D2AB89@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: fredrik.markstrom@gmail.com (=?UTF-8?Q?Fredrik_Markstr=C3=B6m?=)
+Date: Wed, 5 Oct 2016 14:25:22 +0200
+Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
+In-Reply-To: <20161004170741.GC29008@leverpostej>
+References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
+ <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
+ <20161004170741.GC29008@leverpostej>
+Message-ID: <CAKdL+dS4_My6hyMEGNc65mzDapia_tMiVzZ9DMw=ddZM+XiwAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tue, Oct 4, 2016 at 7:08 PM Mark Rutland <mark.rutland@arm.com> wrote:
+>
+> On Tue, Oct 04, 2016 at 05:35:33PM +0200, Fredrik Markstrom wrote:
+> > This makes getcpu() ~1000 times faster, this is very useful when
+> > implementing per-cpu buffers in userspace (to avoid cache line
+> > bouncing). As an example lttng ust becomes ~30% faster.
+> >
+> > The patch will break applications using TPIDRURW (which is context switched
+> > since commit 4780adeefd042482f624f5e0d577bf9cdcbb760 ("ARM: 7735/2:
+>
+> It looks like you dropped the leading 'a' from the commit ID. For
+> everyone else's benefit, the full ID is:
+>
+>   a4780adeefd042482f624f5e0d577bf9cdcbb760
 
-	Thanks for the review...
 
-> > Changes for v5:
-> > 		-Fixed some minor comments.
-> 
-> Not a useful changelog. The point of these comments is to remind the
-> reviewers of what they commented on.
+Sorry for that and thanks for fixing it.
 
-Ok will take care from next version onwards...
+>
+>
+> Please note that arm64 has done similar for compat tasks since commit:
+>
+>   d00a3810c16207d2 ("arm64: context-switch user tls register tpidr_el0 for
+>   compat tasks")
+>
+> > Preserve the user r/w register TPIDRURW on context switch and fork")) and
+> > is therefore made configurable.
+>
+> As you note above, this is an ABI break and *will* break some existing
+> applications. That's generally a no-go.
 
-> >  Required properties:
-> > -- compatible : should be "cdns,uart-r1p8", or "xlnx,xuartps"
-> > +- compatible :
-> > +  Use "cdns,uart-r1p8", or "xlnx,xuartps" for Zynq-7xxx SoC.
-> 
-> This is still not right. It was wrong before, but you are touching it so make it
-> right.
-> 
-> OR doesn't match the dts files. It is AND and the opposite order.
-> 
-> xlnx,xuartps wasn't the best naming, but it's in use so we'll have to live with it
-> for zynq-7xxx.
-> 
-> > +  Use "cdns,uart-r1p12" for Zynq Ultrascale+ MPSoC.
-> 
-> What I meant here was this should have something like "xlnx,mpsoc-uart"
-> as the first compatible with "cdns,uart-r1p12" as the second. Not sure if
-> "mpsoc" is the best name here.
 
-You mean something like below
- Use "xlnx,xuartps" or "cdns,uart-r1p8" for Zynq-7xxx SoC.
-Use "xlnx,zynqmp-uart" or " cdns,uart-r1p12" for Zynq Ultrascale+ MPSoC.
+Ok, I wasn't sure this was considered an ABI (but I'm not entirely
+surprised ;) ). The way I was
+trying to defend the breakage was by reasoning that that if it was an
+ABI we broke it both with a4780ad
+and with 6a1c531, and since we don't break ABI:s, it can't be one.
 
-Please correct me if my understanding is wrong.
+But hey, I'm humble here and ready to back off.
 
-Regards,
-Navakishore.
+>
+> This also leaves arm64's compat with the existing behaviour, differing
+> from arm.
+>
+> I was under the impression that other mechanisms were being considered
+> for fast userspace access to per-cpu data structures, e.g. restartable
+> sequences. What is the state of those? Why is this better?
+>
+> If getcpu() specifically is necessary, is there no other way to
+> implement it?
+
+If you are referring to the user space stuff can probably be
+implemented other ways,
+it's just convenient since the interface is there and it will speed up
+stuff like lttng without
+modifications (well, except glibc). It's also already implemented as a
+vDSO on other
+major architectures (like x86, x86_64, ppc32 and ppc64).
+
+If you are referring to the implementation of the vdso call, there are
+other possibilities, but
+I haven't found any that doesn't introduce overhead in context switching.
+
+But if TPIDRURW is definitely a no go, I can work on a patch that does
+this with a thread notifier
+and the vdso data page. Would that be a viable option ?
+
+>
+> > +notrace int __vdso_getcpu(unsigned int *cpup, unsigned int *nodep,
+> > +                       struct getcpu_cache *tcache)
+> > +{
+> > +     unsigned long node_and_cpu;
+> > +
+> > +     asm("mrc p15, 0, %0, c13, c0, 2\n" : "=r"(node_and_cpu));
+> > +
+> > +     if (nodep)
+> > +             *nodep = cpu_to_node(node_and_cpu >> 16);
+> > +     if (cpup)
+> > +             *cpup  = node_and_cpu & 0xffffUL;
+>
+> Given this is directly user-accessible, this format is a de-facto ABI,
+> even if it's not documented as such. Is this definitely the format you
+> want long-term?
+
+Yes, this (the interface) is indeed the important part and therefore I
+tried not to invent anything
+on my own.
+This is the interface used by ppc32, ppc64, x86, x86_64. It's also this is
+how the getcpu(2) system call is documented.
+
+/Fredrik
+
+
+>
+>
+> Thanks,
+> Mark.
