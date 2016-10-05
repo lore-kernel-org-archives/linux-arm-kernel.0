@@ -1,78 +1,50 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 5 Oct 2016 11:42:36 +0100
-Subject: Coresight ETF trace dump failed in Juno r1 with 4.8-rc8
-In-Reply-To: <CAGhh56GeZkLT=sN4cEhUJMeuz+ZD6jMnU2sbb3yRVLESUcWrtg@mail.gmail.com>
-References: <CAGhh56F-VWCCy82msQ8CimZ4a0a2h=tqR2qv1KcfeyuQXo=R1w@mail.gmail.com>
- <42c2ac9c-abdf-5341-01b5-3f342c5164b7@arm.com>
- <CAGhh56H7a9oEYxzEA4gGvBey=COMqwgisd4tzewU8DLGcGrsww@mail.gmail.com>
- <434a0256-de86-c1f0-0dc3-a38f55596e8e@arm.com>
- <CAGhh56GeZkLT=sN4cEhUJMeuz+ZD6jMnU2sbb3yRVLESUcWrtg@mail.gmail.com>
-Message-ID: <7e1e514b-fc3b-ca96-4631-88d537019e08@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed,  5 Oct 2016 12:25:40 +0100
+Subject: [PATCH] MAINTAINERS: Add ARM64-specific ACPI maintainers entry
+Message-ID: <20161005112540.22189-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The ARM64 architecture defines ARM64 specific ACPI bindings to
+configure and set-up arch specific components. To simplify
+code reviews/updates and streamline the maintainership structure
+supporting the arch specific code, a new arm64 directory was created in
+/drivers/acpi, to contain ACPI code that is specific to ARM64
+architecture.
 
-On 05/10/16 06:27, Venkatesh Vivekanandan wrote:
+Add the ARM64-specific ACPI maintainers entry in MAINTAINERS for
+the newly created subdirectory and respective code content.
 
-[...]
+Lorenzo Pieralisi will be in charge of submitting and managing
+the pull requests on behalf of all maintainers listed.
 
->
-> Hang is seen while trying to dump trace _after_ disabling the ETM
-> source. Is it not supposed to work?.
-> It works fine, when dumped before disabling ETM source. Please find
-> the log below.
->
-> linaro-test [rc=0]# echo 1 > 20010000.etf/enable_sink
-> linaro-test [rc=0]# echo 1 > 22140000.etm/enable_source
-> [   91.792145] coresight-tmc 20010000.etf: TMC-ETB/ETF enabled
-> [   91.797719] coresight-funnel 20040000.main-funnel: FUNNEL inport 0 enabled
-> [   91.804552] coresight-funnel 220c0000.cluster0-funnel: FUNNEL
-> inport 1 enabled
-> [   91.815990] coresight-etm4x 22140000.etm: ETM tracing enabled
-> linaro-test [rc=0]# dd if=/dev/20010000.etf of=/cstrace.bin bs=1
-> [  108.105492] coresight-tmc 20010000.etf: TMC read start
-> [  108.404335] coresight-tmc 20010000.etf: TMC read end
-> 65536+0 records in
-> 65536+0 records out
-> linaro-test [rc=0]# echo 0 > 20010000.etf/enable_sink
-> linaro-test [rc=0]# dd if=/dev/20010000.etf of=/cstrace.bin bs=1
-> [  125.069740] coresight-tmc 20010000.etf: TMC read start
-> [  125.184370] coresight-tmc 20010000.etf: TMC read end
-> 65536+0 records in
-> 65536+0 records out
-> linaro-test [rc=0]# echo 0 > 22140000.etm/enable_source
-> [  140.271163] coresight-etm4x 22140000.etm: ETM tracing disabled
-> [  140.276964] coresight-funnel 220c0000.cluster0-funnel: FUNNEL
-> inport 1 disabled
-> [  140.284211] coresight-funnel 20040000.main-funnel: FUNNEL inport 0 disabled
-> [  140.291128] coresight-tmc 20010000.etf: TMC-ETB/ETF disabled
-> linaro-test [rc=0]# dd if=/dev/20010000.etf of=/cstrace.bin bs=1
-> <---- It hangs here...
->
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Link: http://lkml.kernel.org/r/1603704.EGiVTcCxLR at vostro.rjw.lan
+---
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-I get dd: failed to open '/dev/20010000.etf': Invalid argument
-once all the data is read.
-
-> My firmware version,
->
-> NOTICE:  Booting Trusted Firmware
-> NOTICE:  BL1: v1.1(debug):4a1dcde
-> NOTICE:  BL1: Built : 17:54:40, Nov 24 2015
-> NOTICE:  BL1: Booting BL2
-> NOTICE:  BL2: v1.1(debug):4a1dcde
-> NOTICE:  BL2: Built : 17:54:40, Nov 24 2015
-> NOTICE:  BL1: Booting BL3-1
-> NOTICE:  BL3-1: v1.1(debug):4a1dcde
-> NOTICE:  BL3-1: Built : 17:54:40, Nov 24 2015
-> UEFI firmware (version 9ed6f7e built at 17:54:28 on Nov 24 2015)
->
-
-OK, this looks as good as what Suzuki has, so should be fine.
-But it doesn't list SCP version, can you see that from the Linux boot
-logs ?(something like below)
-
-"scpi_protocol scpi: SCP Protocol 1.2 Firmware 1.17.0 version"
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f593300..2a70dd9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -316,6 +316,14 @@ W:	https://01.org/linux-acpi
+ S:	Supported
+ F:	drivers/acpi/fan.c
+ 
++ACPI FOR ARM64 (ACPI/arm64)
++M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
++M:	Hanjun Guo <hanjun.guo@linaro.org>
++M:	Sudeep Holla <sudeep.holla@arm.com>
++L:	linux-acpi at vger.kernel.org
++S:	Maintained
++F:	drivers/acpi/arm64
++
+ ACPI THERMAL DRIVER
+ M:	Zhang Rui <rui.zhang@intel.com>
+ L:	linux-acpi at vger.kernel.org
 -- 
-Regards,
-Sudeep
+2.10.0
