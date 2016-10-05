@@ -1,52 +1,112 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 5 Oct 2016 11:22:07 +0300
-Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
-In-Reply-To: <7hvax8ferr.fsf@baylibre.com>
-References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
- <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
- <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
- <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
- <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
- <948c3f9e-f11b-092c-e002-e2ef4436197f@ti.com>
- <0125defa-5c34-85d0-f62a-133235c5094c@ti.com> <7hvax8ferr.fsf@baylibre.com>
-Message-ID: <eff0e150-e8d2-3859-1abe-c5f70f576fad@ti.com>
+Date: Wed, 5 Oct 2016 11:46:17 +0300
+Subject: [PATCH v2 2/4] drivers: iio: ti_am335x_adc: add dma support
+In-Reply-To: <1ffce826-b94a-5b9f-ffb4-ba2d0324b246@ti.com>
+References: <20161003130318.12591-1-mugunthanvnm@ti.com>
+ <20161003130318.12591-3-mugunthanvnm@ti.com>
+ <0ff2c6ef-3fa1-dc8b-fb6e-1a4dcfea8ea9@ti.com>
+ <e9c3108e-ffd1-472a-a2d3-2948665de217@ti.com>
+ <de6bbf1c-e9e2-83b1-73c2-49aa64cc939c@ti.com>
+ <1ffce826-b94a-5b9f-ffb4-ba2d0324b246@ti.com>
+Message-ID: <f00632fa-a542-c633-ae5e-3a42cf364a9f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/16 16:02, Kevin Hilman wrote:
-> Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
-> 
->> On 10/01/16 12:24, Sekhar Nori wrote:
-> 
-> [...]
-> 
->>> In any case, to configure the PBBR, you will have to introduce a driver
->>> for it in drivers/memory. Then you can set it up per board using a DT
->>> parameter.
+On 10/05/16 11:17, Mugunthan V N wrote:
+> On Wednesday 05 October 2016 12:01 PM, Peter Ujfalusi wrote:
+>> On 10/05/16 09:21, Mugunthan V N wrote:
+>>> On Tuesday 04 October 2016 02:02 PM, Peter Ujfalusi wrote:
+>>>> On 10/03/16 16:03, Mugunthan V N wrote:
+>>>>> +static int tiadc_request_dma(struct platform_device *pdev,
+>>>>> +			     struct tiadc_device *adc_dev)
+>>>>> +{
+>>>>> +	struct tiadc_dma	*dma = &adc_dev->dma;
+>>>>> +	dma_cap_mask_t		mask;
+>>>>> +
+>>>>> +	/* Default slave configuration parameters */
+>>>>> +	dma->conf.direction = DMA_DEV_TO_MEM;
+>>>>> +	dma->conf.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+>>>>> +	dma->conf.src_addr = adc_dev->mfd_tscadc->tscadc_phys_base + REG_FIFO1;
+>>>>> +
+>>>>> +	dma_cap_zero(mask);
+>>>>> +	dma_cap_set(DMA_CYCLIC, mask);
+>>>>> +
+>>>>> +	/* Get a channel for RX */
+>>>>> +	dma->chan = dma_request_chan(adc_dev->mfd_tscadc->dev, "fifo1");
+>>>>> +	if (!dma->chan)
+>>>>> +		return -ENODEV;
+>>>>
+>>>> dma_request_chan() ERR_PTR in case of failure, never NULL. You should reuse
+>>>> the returned error code to support deferred probing.
+>>>
+>>> Will fix this in v3.
+>>>
+>>>>
+>>>>> +
+>>>>> +	/* RX buffer */
+>>>>> +	dma->buf = dma_alloc_coherent(dma->chan->device->dev, DMA_BUFFER_SIZE,
+>>>>> +				      &dma->addr, GFP_KERNEL);
+>>>>> +	if (!dma->buf)
+>>>>> +		goto err;
+>>>>> +
+>>>>> +	return 0;
+>>>>> +err:
+>>>>> +	dma_release_channel(dma->chan);
+>>>>> +
+>>>>> +	return -ENOMEM;
+>>>>> +}
+>>>>> +
+>>>>>  static int tiadc_parse_dt(struct platform_device *pdev,
+>>>>>  			  struct tiadc_device *adc_dev)
+>>>>>  {
+>>>>> @@ -512,8 +639,14 @@ static int tiadc_probe(struct platform_device *pdev)
+>>>>>  
+>>>>>  	platform_set_drvdata(pdev, indio_dev);
+>>>>>  
+>>>>> +	err = tiadc_request_dma(pdev, adc_dev);
+>>>>> +	if (err && err != -ENODEV)
+>>>>> +		goto err_dma;
+>>>>
+>>>> You should handle the deferred probing for DMA channel.
+>>>
+>>> +	dma->chan = dma_request_chan(adc_dev->mfd_tscadc->dev, "fifo1");
+>>> +	if (IS_ERR(dma->chan)) {
+>>> +		int ret = PTR_ERR(dma->chan);
+>>> +
+>>> +		dma->chan = NULL;
+>>> +		return ret;
 >>
->> and we can reuse the introduced bindings for am335x and OMAP1/2 as well. On
->> OMAP the legacy DMA API provided a call to raise the priority of the sDMA in
->> EMIF :o That needs to be removed and replaced.
+>> You don't need the 'ret' variable:
+>> 		return PTR_ERR(dma->chan);
 > 
-> Can you point us to the bindings you're referring to?
+> So you mean change all *if (dma->chan)* to *if (IS_ERR(dma->chan))*?
 
-We don't have one atm.
+Oh, sorry. Your version was fine as you NULL the dma->chan before the return.
 
-And the DMA priority hack in legacy sDMA code is for OMAP1:
-omap_set_dma_priority(). Basically it can change the sDMA priority in
-OCPT1_PRIOR, OCPT2_PRIOR, EMIFF_PRIOR and EMIFS_PRIOR registers.
+> 
+>>
+>>> +	}
+>>>
+>>> With this probe defer will be taken care and ADC will continue without
+>>> DMA when request channel returns -ENODEV.
+>>
+>> I would rather have explicit check for deferred probe:
+>>
+>> err = tiadc_request_dma(pdev, adc_dev);
+>> if (err && err == -EPROBE_DEFER)
+>> 	goto err_dma;
+> 
+> But in this case any other failure other than -EPROBE_DEFER will be
+> masked and ADC will be in PIO mode?
 
-> Also, a new driver in drivers/memory is fine for setting the PBBR, but
-> what about the SYSCFG0 registers.  Are you OK with leaving those in the
-> init code as proposed in $SUBJECT patch?
+Yes, exactly. If we fail to get the DMA channel we should not use the DMA and
+we only want to handle the deferred probing.
 
-My problem is - as I described it in reply to Bartosz - is that for example I
-don't want the LCDC to get high priority on OMAP-L138 EVM from Logic as it
-does not have LCD/VGA by default. ifdef for LCDC is not good either since my
-kernel have LCDC compiled in, but it is disabled.
+> 
+> Regards
+> Mugunthan V N
+> 
 
-The easiest way would be to have pdata quirk to handle the LCDK until we have
-proper handling of the priority configuration.
 
 -- 
 P?ter
