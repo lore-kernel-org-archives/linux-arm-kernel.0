@@ -1,45 +1,43 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 5 Oct 2016 12:21:30 +0200
-Subject: [PATCH] ARM: dt: sun8i-h3: Add sunxi-sid to dts for sun8i-h3
-In-Reply-To: <1475660904-7959-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1475660904-7959-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20161005122130.8cc229ff5d4990149956b49c@free.fr>
+From: muhammadabdul.wahab@centralesupelec.fr (Muhammad Abdul WAHAB)
+Date: Wed, 5 Oct 2016 12:23:18 +0200
+Subject: [PATCH] Adding missing features of Coresight PTM components
+In-Reply-To: <CANLsYkybp0Lm-WStT=__yyug1Z9hFG7dgCp8E=iL5_x9C1vv-w@mail.gmail.com>
+References: <583ccfa4-ee4e-561a-5480-d0f243194ee3@supelec.fr>
+ <CANLsYkybp0Lm-WStT=__yyug1Z9hFG7dgCp8E=iL5_x9C1vv-w@mail.gmail.com>
+Message-ID: <e4115ffb-5fcb-4322-7270-b0ca87065880@centralesupelec.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  5 Oct 2016 11:48:24 +0200
-Corentin Labbe <clabbe.montjoie@gmail.com> wrote:
+Hi Mathieu,
 
-> This patch add support for the sunxi-sid driver to the device tree for sun8i-h3.
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index 9f58bb4..abfd29c 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -211,6 +211,11 @@
->  			#size-cells = <0>;
->  		};
->  
-> +		sid: eeprom at 01c14200 {
-> +			compatible = "allwinner,sun7i-a20-sid";
-> +			reg = <0x01c14200 0x200>;
+> The rule of thumb when writing a patch description is to specify "why"
+> rather than "what" you are doing.  The above describe the why alright
+> and should be kept.  Everything below until your SOB describe what you
+> are doing and should be removed.
 
-The datasheet says 1Kb starting at 0x01c14000.
-Is there any reason to reduce the area and to shift the offset?
+I modified the patch according to your remarks and will submit it.
 
-> +		};
-> +
->  		usbphy: phy at 01c19400 {
->  			compatible = "allwinner,sun8i-h3-usb-phy";
->  			reg = <0x01c19400 0x2c>,
-> -- 
-> 2.7.3
+ > There is indeed an indentation problem here but it can't be fixed in
+ > this patch.  Please do another patch for this.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+I created another patch for it.
+
+ > The sysFS mode users can do what they want, including configurations
+ > not supported by the HW.  There are so many rules and exception that
+ > adding a check for every one of they doesn't scale up.  I suggest to
+ > remove the above check.
+
+This check was removed. The return stack feature is not available in ETM 
+and the corresponding bit is reserved and should be zero. That's why an 
+additional check was made.
+
+ > You patch doesn't apply on my tree.  Please use "git format-patch" for
+ > your next submission.  Last but not least the email address in the
+ > "from:" part of the submission doesn't match the one in the SOB - they
+ > have to be similar.
+
+All the above suggestions were made and will be submitted in the 2nd 
+version of the patch.
+
+Thank you,
+M.Abdul WAHAB
