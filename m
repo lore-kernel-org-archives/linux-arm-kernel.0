@@ -1,152 +1,158 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 5 Oct 2016 05:38:37 +0300
-Subject: [PATCH] clk: lpc32xx: fix pwm clock divider computation
-In-Reply-To: <1474915467-11101-1-git-send-email-slemieux.tyco@gmail.com>
-References: <1474915467-11101-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <78c1e683-ac17-437b-289f-113ea842f62b@mleia.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Wed, 5 Oct 2016 10:54:24 +0800
+Subject: [PATCH v14 2/4] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <1475228829.3658.1.camel@mtksdaap41>
+References: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
+ <1473039885-24009-3-git-send-email-hs.liao@mediatek.com>
+ <1475204778.13398.28.camel@mtksdaap41>
+ <1475225778.25044.35.camel@mtksdaap41>
+ <1475226691.13398.35.camel@mtksdaap41> <1475228829.3658.1.camel@mtksdaap41>
+Message-ID: <1475636064.21937.25.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
-
-On 26.09.2016 21:44, Sylvain Lemieux wrote:
-> From: Sylvain Lemieux <slemieux@tycoint.com>
+On Fri, 2016-09-30 at 17:47 +0800, Horng-Shyang Liao wrote:
+> On Fri, 2016-09-30 at 17:11 +0800, CK Hu wrote:
+> > Hi, HS:
+> > 
+> > One comment inline
+> > 
+> > On Fri, 2016-09-30 at 16:56 +0800, Horng-Shyang Liao wrote:
+> > > Hi CK,
+> > > 
+> > > Please see my inline reply.
+> > > 
+> > > On Fri, 2016-09-30 at 11:06 +0800, CK Hu wrote:
+> > > > Hi, HS:
+> > > > 
+> > > > On Mon, 2016-09-05 at 09:44 +0800, HS Liao wrote:
+> > > > > This patch is first version of Mediatek Command Queue(CMDQ) driver. The
+> > > > > CMDQ is used to help write registers with critical time limitation,
+> > > > > such as updating display configuration during the vblank. It controls
+> > > > > Global Command Engine (GCE) hardware to achieve this requirement.
+> > > > > Currently, CMDQ only supports display related hardwares, but we expect
+> > > > > it can be extended to other hardwares for future requirements.
+> > > > > 
+> > > > > Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> > > > > Signed-off-by: CK Hu <ck.hu@mediatek.com>
+> > > > > ---
+> > > > 
+> > > > [snip...]
+> > > > 
+> > > > > +
+> > > > > +struct cmdq_task {
+> > > > > +	struct cmdq		*cmdq;
+> > > > > +	struct list_head	list_entry;
+> > > > > +	void			*va_base;
+> > > > > +	dma_addr_t		pa_base;
+> > > > > +	size_t			cmd_buf_size; /* command occupied size */
+> > > > > +	size_t			buf_size; /* real buffer size */
+> > > > > +	bool			finalized;
+> > > > > +	struct cmdq_thread	*thread;
+> > > > 
+> > > > I think thread info could be removed from cmdq_task. Only
+> > > > cmdq_task_handle_error() and cmdq_task_insert_into_thread() use
+> > > > task->thread and caller of both function has the thread info. So you
+> > > > could just pass thread info into these two function and remove thread
+> > > > info in cmdq_task.
+> > > 
+> > > This modification will remove 1 pointer but add 2 pointers. Moreover,
+> > > more pointers will need to be delivered between functions for future
+> > > extension. IMHO, it would be better to keep thread pointer inside
+> > > cmdq_task.
+> > > 
+> > > > > +	struct cmdq_task_cb	cb;
+> > > > 
+> > > > I think this callback function is equal to mailbox client tx_done
+> > > > callback. It's better to use already-defined interface rather than
+> > > > creating your own.
+> > > 
+> > > This is because CMDQ driver allows different callback functions for
+> > > different tasks, but mailbox only allows one callback function per
+> > > channel. But, I think I can add a wrapper for tx_done to call CMDQ
+> > > callback functions. So, I will use tx_done in CMDQ v15.
+> > 
+> > Up to now, one callback function for one channel is enough for DRM. So
+> > 'different callback function for different sent-message' looks like an
+> > advanced function. Maybe you should not include it in first patch. 
+> > 
+> > Regards,
+> > CK
 > 
-> A zero value in the PWM clock divider register
-> (PWM1_FREQ/PWM2_FREQ) turn off the PWM clock.
+> Hi CK,
 > 
-> The "CLK_DIVIDER_ALLOW_ZERO" option is used for hardware that handle
-> the zero divider by not modifying their clock input (i.e. bypass).
-> See "/include/linux/clk-provider.h" for details.
-
-the problem is that the divider value is not set to some non-zero
-value when the clock is enabled, right?
-
-I think it does not matter if the clock rate value is set to parent
-clock rate or any other value when divider is 0 *and* clock is gated.
-Enabling or disabling a clock is a gate control, so I suggest two
-alternative options at your choice (my preference is option 2):
-
-1) add a custom clk_pwm_gate_enable(), clk_pwm_gate_disable() and
-clk_pwm_gate_is_enabled() functions combined under lpc32xx_clk_pwm_gate_ops.
-
-Next instead of adding one more define for a single exception
-please reassign .ops for two PWM clocks in runtime in
-lpc32xx_clk_init() function before calling lpc32xx_clk_register()
-in a loop.
-
-But this option is too invasive, a simpler solution is below.
-
-2) in lpc32xx_clk_init() before clock registrations check for zero
-dividers of PWM clocks, then if a divider is 0 and clock is gated
-set divider to 1, if the divider is 0 and clock is not gated then
-gate the clock and set divider to 1, in other cases do nothing.
-
-> Remove the CLK_DIVIDER_ALLOW_ZERO option and add support to handle
-> the clock rate computation of the PWM clock divider 0 value.
+> OK. I will do it.
 > 
-> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
-> ---
-> Note:
-> * Should we include a new CLK_DIVIDER option for this case
->   (i.e. clock off when zero ) in "clk-provider.h"?
+> Thanks,
+> HS
 > 
->  drivers/clk/nxp/clk-lpc32xx.c | 52 +++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 48 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
-> index 34c9735..3ca3a14 100644
-> --- a/drivers/clk/nxp/clk-lpc32xx.c
-> +++ b/drivers/clk/nxp/clk-lpc32xx.c
-> @@ -959,6 +959,25 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->  				   divider->flags);
->  }
->  
-> +static unsigned long clk_divider_pwm_recalc_rate(struct clk_hw *hw,
-> +		unsigned long parent_rate)
-> +{
-> +	struct lpc32xx_clk_div *divider = to_lpc32xx_div(hw);
-> +	unsigned int val;
-> +
-> +	regmap_read(clk_regmap, divider->reg, &val);
-> +
-> +	val >>= divider->shift;
-> +	val &= div_mask(divider->width);
-> +
-> +	/* Handle 0 divider -> PWM clock is off. */
-> +	if(val == 0)
+> [snip...]
 
-No space in front of the open parenthesis.
 
-> +		return 0;
-> +
-> +	return divider_recalc_rate(hw, parent_rate, val, divider->table,
-> +				   divider->flags);
-> +}
-> +
->  static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
->  				unsigned long *prate)
->  {
-> @@ -999,6 +1018,12 @@ static const struct clk_ops lpc32xx_clk_divider_ops = {
->  	.set_rate = clk_divider_set_rate,
->  };
->  
-> +static const struct clk_ops lpc32xx_clk_pwm_divider_ops = {
-> +	.recalc_rate = clk_divider_pwm_recalc_rate,
-> +	.round_rate = clk_divider_round_rate,
-> +	.set_rate = clk_divider_set_rate,
-> +};
-> +
->  static u8 clk_mux_get_parent(struct clk_hw *hw)
->  {
->  	struct lpc32xx_clk_mux *mux = to_lpc32xx_mux(hw);
-> @@ -1151,6 +1176,25 @@ struct clk_hw_proto {
->  	},								\
->  }
->  
-> +#define LPC32XX_DEFINE_PWM_DIV(_idx, _reg, _shift, _width, _tab, _fl)	\
-> +[CLK_PREFIX(_idx)] = {							\
-> +	.type = CLK_DIV,						\
-> +	{								\
-> +		.hw0 = {						\
-> +			.ops = &lpc32xx_clk_pwm_divider_ops,		\
-> +			{						\
-> +				.div = {				\
-> +					.reg = LPC32XX_CLKPWR_ ## _reg,	\
-> +					.shift = (_shift),		\
-> +					.width = (_width),		\
-> +					.table = (_tab),		\
-> +					.flags = (_fl),			\
-> +				 },					\
-> +			},						\
-> +		 },							\
-> +	},								\
-> +}
-> +
->  #define LPC32XX_DEFINE_GATE(_idx, _reg, _bit, _flags)			\
->  [CLK_PREFIX(_idx)] = {							\
->  	.type = CLK_GATE,						\
-> @@ -1281,14 +1325,14 @@ static struct clk_hw_proto clk_hw_proto[LPC32XX_CLK_HW_MAX] = {
->  	LPC32XX_DEFINE_GATE(MCPWM, TIMCLK_CTRL1, 6, 0),
->  
->  	LPC32XX_DEFINE_MUX(PWM1_MUX, PWMCLK_CTRL, 1, 0x1, NULL, 0),
-> -	LPC32XX_DEFINE_DIV(PWM1_DIV, PWMCLK_CTRL, 4, 4, NULL,
-> -			   CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO),
-> +	LPC32XX_DEFINE_PWM_DIV(PWM1_DIV, PWMCLK_CTRL, 4, 4, NULL,
-> +			       CLK_DIVIDER_ONE_BASED),
->  	LPC32XX_DEFINE_GATE(PWM1_GATE, PWMCLK_CTRL, 0, 0),
->  	LPC32XX_DEFINE_COMPOSITE(PWM1, PWM1_MUX, PWM1_DIV, PWM1_GATE),
->  
->  	LPC32XX_DEFINE_MUX(PWM2_MUX, PWMCLK_CTRL, 3, 0x1, NULL, 0),
-> -	LPC32XX_DEFINE_DIV(PWM2_DIV, PWMCLK_CTRL, 8, 4, NULL,
-> -			   CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO),
-> +	LPC32XX_DEFINE_PWM_DIV(PWM2_DIV, PWMCLK_CTRL, 8, 4, NULL,
-> +			       CLK_DIVIDER_ONE_BASED),
->  	LPC32XX_DEFINE_GATE(PWM2_GATE, PWMCLK_CTRL, 2, 0),
->  	LPC32XX_DEFINE_COMPOSITE(PWM2, PWM2_MUX, PWM2_DIV, PWM2_GATE),
->  
-> 
+Hi CK,
 
---
-With best wishes,
-Vladimir
+After I trace mailbox driver, I realize that CMDQ driver cannot use
+tx_done.
+
+CMDQ clients will flush many tasks into CMDQ driver, and then CMDQ
+driver will apply these tasks into GCE HW "immediately". These tasks,
+which are queued in GCE HW, may not execute immediately since they
+may need to wait event(s), e.g. vsync.
+
+However, in mailbox driver, mailbox uses a software buffer to queue
+sent messages. It only sends next message until previous message is
+done. This cannot fulfill CMDQ's requirement.
+
+Quote some code from mailbox driver. Please notice "active_req" part.
+
+static void msg_submit(struct mbox_chan *chan)
+{
+	...
+	if (!chan->msg_count || chan->active_req)
+		goto exit;
+	...
+	err = chan->mbox->ops->send_data(chan, data);
+	if (!err) {
+		chan->active_req = data;
+		chan->msg_count--;
+	}
+	...
+}
+
+static void tx_tick(struct mbox_chan *chan, int r)
+{
+	...
+	spin_lock_irqsave(&chan->lock, flags);
+	mssg = chan->active_req;
+	chan->active_req = NULL;
+	spin_unlock_irqrestore(&chan->lock, flags);
+	...
+}
+
+Current workable CMDQ driver uses mbox_client_txdone() to prevent
+this issue, and then uses self callback functions to handle done tasks.
+
+int cmdq_task_flush_async(struct cmdq_client *client, struct cmdq_task
+*task, cmdq_async_flush_cb cb, void *data)
+{
+	...
+	mbox_send_message(client->chan, task);
+	/* We can send next task immediately, so just call txdone. */
+	mbox_client_txdone(client->chan, 0);
+	...
+}
+
+Another solution is to use rx_callback; i.e. CMDQ mailbox controller
+call mbox_chan_received_data() when CMDQ task is done. But, this may
+violate the design of mailbox. What do you think?
+
+Thanks,
+HS
+
+
+Hi Jassi,
+
+Do you have any suggestion about previous situation?
+
+Thanks,
+HS
