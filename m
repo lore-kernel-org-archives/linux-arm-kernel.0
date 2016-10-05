@@ -1,141 +1,105 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  5 Oct 2016 17:27:09 +0200
-Subject: [RESEND PATCH v2 2/3] dt-bindings: reset: oxnas: Add include file
- with reset indexes
-In-Reply-To: <20161005152710.2898-1-narmstrong@baylibre.com>
-References: <20161005152710.2898-1-narmstrong@baylibre.com>
-Message-ID: <20161005152710.2898-3-narmstrong@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 5 Oct 2016 10:13:12 -0500
+Subject: [PATCH 02/11] DOCUMENTATION: dt-bindings: Document the STM32
+ USART bindings
+In-Reply-To: <dd28f224-3e3b-0a00-f978-16861b946fd1@st.com>
+References: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
+ <1473957763-30629-3-git-send-email-alexandre.torgue@st.com>
+ <20160923152907.GA19206@rob-hp-laptop>
+ <dd28f224-3e3b-0a00-f978-16861b946fd1@st.com>
+Message-ID: <CAL_JsqK=VCHcPbupnwLVEWehqJbXfGD1CSZT++A4+N6DD6VqxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT include file for Oxford Semiconductor OX810SE and OX820 reset
-controller support.
+On Wed, Oct 5, 2016 at 9:09 AM, Gerald Baeza <gerald.baeza@st.com> wrote:
+> On 09/23/2016 05:29 PM, Rob Herring wrote:
+>>
+>> On Thu, Sep 15, 2016 at 06:42:34PM +0200, Alexandre TORGUE wrote:
+>>>
+>>> This adds documentation of device tree bindings for the
+>>> STM32 USART
+>>
+>>
+>> Please make your subject prefixes consistent and drop "DOCUMENTATION".
+>>
+>
+> Ok, thanks
+>
+>>>
+>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+>>> b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+>>> new file mode 100644
+>>> index 0000000..75b1400
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+>>> @@ -0,0 +1,34 @@
+>>> +* STMicroelectronics STM32 USART
+>>> +
+>>> +Required properties:
+>>> +- compatible: Can be either "st,stm32-usart", "st,stm32-uart",
+>>> +"st,stm32f7-usart" or "st,stm32f7-uart" depending on whether
+>>> +the device supports synchronous mode and is compatible with
+>>> +stm32(f4) or stm32f7.
+>>
+>>
+>> Why not put f4 in the compatible string. stm32 is too generic.
+>
+>
+> The initial binding is not in current kernel so it has been put in this
+> serie as PATCH 07/11. It will be squashed with this one, as you requested.
+>
+> But the driver tty/serial/stm32-usart.c was already upstreamed and it
+> already mentions the "st,stm32-usart" and "st,stm32-uart" for stm32f4 so I
+> kept this as it for backward compatibility for those who already use the
+> driver.
+>
+> I do not have the history to explain this inconsistency but can you confirm
+> that keeping the existing compatible values from the driver is the good
+> approach please?
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- include/dt-bindings/reset/oxsemi,ox810se.h | 53 ++++++++++++++++++++++++++++++
- include/dt-bindings/reset/oxsemi,ox820.h   | 53 ++++++++++++++++++++++++++++++
- 2 files changed, 106 insertions(+)
- create mode 100644 include/dt-bindings/reset/oxsemi,ox810se.h
- create mode 100644 include/dt-bindings/reset/oxsemi,ox820.h
+Yes, keep it as it. Please reformat 1 valid combination per line.
 
-diff --git a/include/dt-bindings/reset/oxsemi,ox810se.h b/include/dt-bindings/reset/oxsemi,ox810se.h
-new file mode 100644
-index 0000000..960c26e
---- /dev/null
-+++ b/include/dt-bindings/reset/oxsemi,ox810se.h
-@@ -0,0 +1,53 @@
-+/*
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef DT_RESET_OXSEMI_OX810SE_H
-+#define DT_RESET_OXSEMI_OX810SE_H
-+
-+#define RESET_ARM	0
-+#define RESET_COPRO	1
-+/* Reserved		2 */
-+/* Reserved		3 */
-+#define RESET_USBHS	4
-+#define RESET_USBHSPHY	5
-+#define RESET_MAC	6
-+#define RESET_PCI	7
-+#define RESET_DMA	8
-+#define RESET_DPE	9
-+#define RESET_DDR	10
-+#define RESET_SATA	11
-+#define RESET_SATA_LINK	12
-+#define RESET_SATA_PHY	13
-+ /* Reserved		14 */
-+#define RESET_NAND	15
-+#define RESET_GPIO	16
-+#define RESET_UART1	17
-+#define RESET_UART2	18
-+#define RESET_MISC	19
-+#define RESET_I2S	20
-+#define RESET_AHB_MON	21
-+#define RESET_UART3	22
-+#define RESET_UART4	23
-+#define RESET_SGDMA	24
-+/* Reserved		25 */
-+/* Reserved		26 */
-+/* Reserved		27 */
-+/* Reserved		28 */
-+/* Reserved		29 */
-+/* Reserved		30 */
-+#define RESET_BUS	31
-+
-+#endif /* DT_RESET_OXSEMI_OX810SE_H */
-diff --git a/include/dt-bindings/reset/oxsemi,ox820.h b/include/dt-bindings/reset/oxsemi,ox820.h
-new file mode 100644
-index 0000000..cc6797b
---- /dev/null
-+++ b/include/dt-bindings/reset/oxsemi,ox820.h
-@@ -0,0 +1,53 @@
-+/*
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef DT_RESET_OXSEMI_OX820_H
-+#define DT_RESET_OXSEMI_OX820_H
-+
-+#define RESET_SCU	0
-+#define RESET_LEON	1
-+#define RESET_ARM0	2
-+#define RESET_ARM1	3
-+#define RESET_USBHS	4
-+#define RESET_USBPHYA	5
-+#define RESET_MAC	6
-+#define RESET_PCIEA	7
-+#define RESET_SGDMA	8
-+#define RESET_CIPHER	9
-+#define RESET_DDR	10
-+#define RESET_SATA	11
-+#define RESET_SATA_LINK	12
-+#define RESET_SATA_PHY	13
-+#define RESET_PCIEPHY	14
-+#define RESET_NAND	15
-+#define RESET_GPIO	16
-+#define RESET_UART1	17
-+#define RESET_UART2	18
-+#define RESET_MISC	19
-+#define RESET_I2S	20
-+#define RESET_SD	21
-+#define RESET_MAC_2	22
-+#define RESET_PCIEB	23
-+#define RESET_VIDEO	24
-+#define RESET_DDR_PHY	25
-+#define RESET_USBPHYB	26
-+#define RESET_USBDEV	27
-+/* Reserved		29 */
-+#define RESET_ARMDBG	29
-+#define RESET_PLLA	30
-+#define RESET_PLLB	31
-+
-+#endif /* DT_RESET_OXSEMI_OX820_H */
--- 
-2.7.0
+>> What determines sync mode or not? If it is IP configuration fixed in the
+>> design, then this is fine. If it is user choice or board dependent, then
+>> use a separate property.
+>
+>
+> This is IP configuration fixed in the design, indeed.
+>
+>>> +- reg: The address and length of the peripheral registers space
+>>> +- interrupts: The interrupt line of the USART instance
+>>> +- clocks: The input clock of the USART instance
+>>> +
+>>> +Optional properties:
+>>> +- pinctrl: The reference on the pins configuration
+>>> +- st,hw-flow-ctrl: bool flag to enable hardware flow control.
+>>> +
+>>> +Examples:
+>>> +usart4: serial at 40004c00 {
+>>> +       compatible = "st,stm32-uart";
+>>> +       reg = <0x40004c00 0x400>;
+>>> +       interrupts = <52>;
+>>> +       clocks = <&clk_pclk1>;
+>>> +       pinctrl-names = "default";
+>>> +       pinctrl-0 = <&pinctrl_usart4>;
+>>> +};
+>>> +
+>>> +usart2: serial at 40004400 {
+>>> +       compatible = "st,stm32-usart", "st,stm32-uart";
+>>
+>>
+>> What are valid combinations? usart is sync only, not sync and async?
+>
+>
+> usart (sync and async) is a superset of uart (async).
+> But the current driver does not use the synchronous mode, so the distinction
+> is just here to be consistent with the reference manual instances naming (so
+> configuration).
+
+Okay, but this point is not clear in the compatible text. The
+description should allow me to validate the example or a dts file.
+
+Rob
