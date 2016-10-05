@@ -1,209 +1,129 @@
-From: markus.heiser@darmarit.de (Markus Heiser)
-Date: Wed, 5 Oct 2016 19:27:12 +0200
-Subject: kernel-doc-rst-lint (was: Re: [PATCH 00/15] improve
- function-level documentation)
-In-Reply-To: <87h98quc1w.fsf@intel.com>
-References: <1475351192-27079-1-git-send-email-Julia.Lawall@lip6.fr>
- <CAKMK7uHT3FutHQuQQ3iwXmYbidB3AOs7AxnpaJD4MTqy0-QehQ@mail.gmail.com>
- <87h98quc1w.fsf@intel.com>
-Message-ID: <0311F11C-D5CB-4A90-86BD-4DDAD1103685@darmarit.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 5 Oct 2016 18:48:05 +0100
+Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
+In-Reply-To: <CAKdL+dTGDqgpnMTkAj=N4cY-cZF_U+bkH1v1vUA4umZoSbWHKQ@mail.gmail.com>
+References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
+ <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
+ <20161004170741.GC29008@leverpostej>
+ <CAKdL+dS4_My6hyMEGNc65mzDapia_tMiVzZ9DMw=ddZM+XiwAw@mail.gmail.com>
+ <CAKdL+dTGDqgpnMTkAj=N4cY-cZF_U+bkH1v1vUA4umZoSbWHKQ@mail.gmail.com>
+Message-ID: <50e025e0-7052-9b15-3b3e-36d1d9dfd695@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/10/16 17:39, Fredrik Markstr?m wrote:
+> The approach I suggested below with the vDSO data page will obviously
+> not work on smp, so suggestions are welcome.
 
-Am 05.10.2016 um 16:04 schrieb Jani Nikula <jani.nikula@linux.intel.com>:
+Well, given that it's user-writeable, is there any reason an application
+which cares couldn't simply run some per-cpu threads to call getcpu()
+once and cache the result in TPIDRURW themselves? That would appear to
+both raise no compatibility issues and work with existing kernels.
 
-> On Wed, 05 Oct 2016, Daniel Vetter <daniel@ffwll.ch> wrote:
->> Jani Nikula has a patch with a scrip to make the one kernel-doc parser
->> into a lint/checker pass over the entire kernel. I think that'd would
->> be more robust instead of trying to approximate the real kerneldoc
->> parser. Otoh that parser is a horror show of a perl/regex driven state
->> machine ;-)
->> 
->> Jani, can you pls digg out these patches? Can't find them right now ...
-> 
-> Expanding the massive Cc: with linux-doc list...
-> 
-> Here goes. It's a quick hack from months ago, but still seems to
-> somewhat work. At least for the kernel-doc parts. The reStructuredText
-> lint part isn't all that great, and doesn't have mapping to line numbers
-> like the Sphinx kernel-doc extension does. Anyway I'm happy how this
-> integrates with kernel build CHECK and C=1/C=2.
-> 
-> I guess Julia's goal is to automate the *fixing* of some of the error
-> classes from kernel-doc. Not sure how well this could be made to
-> integrate with any of that.
-> 
-> BR,
-> Jani.
+Robin.
 
-Another lint alternative: 
-
- use the lint from the linuxdoc project 
-
-install the linuxdoc package:
-
-*  https://return42.github.io/linuxdoc/install.html
-
-e.g.::
-
- pip install --user git+http://github.com/return42/linuxdoc.git
-
-and run kernel-lintdoc with the file/folder to lint as argument / e.g.::
-
- kernel-lintdoc include/media/
-
--- Markus --
-
-
+> /Fredrik
 > 
 > 
-> From 1244efa0f63a7b13795e8c37f81733a3c8bfc56a Mon Sep 17 00:00:00 2001
-> From: Jani Nikula <jani.nikula@intel.com>
-> Date: Tue, 31 May 2016 18:11:33 +0300
-> Subject: [PATCH] kernel-doc-rst-lint: add tool to check kernel-doc and rst
-> correctness
-> Organization: Intel Finland Oy - BIC 0357606-4 - Westendinkatu 7, 02160 Espoo
-> Cc: Jani Nikula <jani.nikula@intel.com>
-> 
-> Simple kernel-doc and reStructuredText lint tool that can be used
-> independently and as a kernel build CHECK tool to validate kernel-doc
-> comments.
-> 
-> Independent usage:
-> $ kernel-doc-rst-lint FILE
-> 
-> Kernel CHECK usage:
-> $ make CHECK=scripts/kernel-doc-rst-lint C=1		# (or C=2)
-> 
-> Depends on docutils and the rst-lint package
-> https://pypi.python.org/pypi/restructuredtext_lint
-> 
-> Signed-off-by: Jani Nikula <jani.nikula@intel.com>
-> ---
-> scripts/kernel-doc-rst-lint | 106 ++++++++++++++++++++++++++++++++++++++++++++
-> 1 file changed, 106 insertions(+)
-> create mode 100755 scripts/kernel-doc-rst-lint
-> 
-> diff --git a/scripts/kernel-doc-rst-lint b/scripts/kernel-doc-rst-lint
-> new file mode 100755
-> index 000000000000..7e0157679f83
-> --- /dev/null
-> +++ b/scripts/kernel-doc-rst-lint
-> @@ -0,0 +1,106 @@
-> +#!/usr/bin/env python
-> +# coding=utf-8
-> +#
-> +# Copyright ? 2016 Intel Corporation
-> +#
-> +# Permission is hereby granted, free of charge, to any person obtaining a
-> +# copy of this software and associated documentation files (the "Software"),
-> +# to deal in the Software without restriction, including without limitation
-> +# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-> +# and/or sell copies of the Software, and to permit persons to whom the
-> +# Software is furnished to do so, subject to the following conditions:
-> +#
-> +# The above copyright notice and this permission notice (including the next
-> +# paragraph) shall be included in all copies or substantial portions of the
-> +# Software.
-> +#
-> +# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-> +# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-> +# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-> +# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-> +# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> +# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-> +# IN THE SOFTWARE.
-> +#
-> +# Authors:
-> +#    Jani Nikula <jani.nikula@intel.com>
-> +#
-> +# Simple kernel-doc and reStructuredText lint tool that can be used
-> +# independently and as a kernel build CHECK tool to validate kernel-doc
-> +# comments.
-> +#
-> +# Independent usage:
-> +# $ kernel-doc-rst-lint FILE
-> +#
-> +# Kernel CHECK usage:
-> +# $ make CHECK=scripts/kernel-doc-rst-lint C=1		# (or C=2)
-> +#
-> +# Depends on docutils and the rst-lint package
-> +# https://pypi.python.org/pypi/restructuredtext_lint
-> +#
-> +
-> +import os
-> +import subprocess
-> +import sys
-> +
-> +from docutils.parsers.rst import directives
-> +from docutils.parsers.rst import Directive
-> +from docutils.parsers.rst import roles
-> +from docutils import nodes, statemachine
-> +import restructuredtext_lint
-> +
-> +class DummyDirective(Directive):
-> +    required_argument = 1
-> +    optional_arguments = 0
-> +    option_spec = { }
-> +    has_content = True
-> +
-> +    def run(self):
-> +        return []
-> +
-> +# Fake the Sphinx C Domain directives and roles
-> +directives.register_directive('c:function', DummyDirective)
-> +directives.register_directive('c:type', DummyDirective)
-> +roles.register_generic_role('c:func', nodes.emphasis)
-> +roles.register_generic_role('c:type', nodes.emphasis)
-> +
-> +# We accept but ignore parameters to be compatible with how the kernel build
-> +# invokes CHECK.
-> +if len(sys.argv) < 2:
-> +    sys.stderr.write('usage: kernel-doc-rst-lint [IGNORED OPTIONS] FILE\n');
-> +    sys.exit(1)
-> +
-> +infile = sys.argv[len(sys.argv) - 1]
-> +cmd = ['scripts/kernel-doc', '-rst', infile]
-> +
-> +try:
-> +    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-> +    out, err = p.communicate()
-> +
-> +    # python2 needs conversion to unicode.
-> +    # python3 with universal_newlines=True returns strings.
-> +    if sys.version_info.major < 3:
-> +        out, err = unicode(out, 'utf-8'), unicode(err, 'utf-8')
-> +
-> +    # kernel-doc errors
-> +    sys.stderr.write(err)
-> +    if p.returncode != 0:
-> +        sys.exit(p.returncode)
-> +
-> +    # restructured text errors
-> +    lines = statemachine.string2lines(out, 8, convert_whitespace=True)
-> +    lint_errors = restructuredtext_lint.lint(out, infile)
-> +    for error in lint_errors:
-> +        # Ignore INFO
-> +        if error.level <= 1:
-> +            continue
-> +
-> +        print(error.source + ': ' + error.type + ': ' + error.full_message)
-> +        if error.line is not None:
-> +            print('Context:')
-> +            print('\t' + lines[error.line - 1])
-> +            print('\t' + lines[error.line])
-> +
-> +except Exception as e:
-> +    sys.stderr.write(str(e) + '\n')
-> +    sys.exit(1)
-> -- 
-> 2.1.4
+> On Wed, Oct 5, 2016 at 2:25 PM, Fredrik Markstr?m
+> <fredrik.markstrom@gmail.com> wrote:
+>> On Tue, Oct 4, 2016 at 7:08 PM Mark Rutland <mark.rutland@arm.com> wrote:
+>>>
+>>> On Tue, Oct 04, 2016 at 05:35:33PM +0200, Fredrik Markstrom wrote:
+>>>> This makes getcpu() ~1000 times faster, this is very useful when
+>>>> implementing per-cpu buffers in userspace (to avoid cache line
+>>>> bouncing). As an example lttng ust becomes ~30% faster.
+>>>>
+>>>> The patch will break applications using TPIDRURW (which is context switched
+>>>> since commit 4780adeefd042482f624f5e0d577bf9cdcbb760 ("ARM: 7735/2:
+>>>
+>>> It looks like you dropped the leading 'a' from the commit ID. For
+>>> everyone else's benefit, the full ID is:
+>>>
+>>>   a4780adeefd042482f624f5e0d577bf9cdcbb760
+>>
+>>
+>> Sorry for that and thanks for fixing it.
+>>
+>>>
+>>>
+>>> Please note that arm64 has done similar for compat tasks since commit:
+>>>
+>>>   d00a3810c16207d2 ("arm64: context-switch user tls register tpidr_el0 for
+>>>   compat tasks")
+>>>
+>>>> Preserve the user r/w register TPIDRURW on context switch and fork")) and
+>>>> is therefore made configurable.
+>>>
+>>> As you note above, this is an ABI break and *will* break some existing
+>>> applications. That's generally a no-go.
+>>
+>>
+>> Ok, I wasn't sure this was considered an ABI (but I'm not entirely
+>> surprised ;) ). The way I was
+>> trying to defend the breakage was by reasoning that that if it was an
+>> ABI we broke it both with a4780ad
+>> and with 6a1c531, and since we don't break ABI:s, it can't be one.
+>>
+>> But hey, I'm humble here and ready to back off.
+>>
+>>>
+>>> This also leaves arm64's compat with the existing behaviour, differing
+>>> from arm.
+>>>
+>>> I was under the impression that other mechanisms were being considered
+>>> for fast userspace access to per-cpu data structures, e.g. restartable
+>>> sequences. What is the state of those? Why is this better?
+>>>
+>>> If getcpu() specifically is necessary, is there no other way to
+>>> implement it?
+>>
+>> If you are referring to the user space stuff can probably be
+>> implemented other ways,
+>> it's just convenient since the interface is there and it will speed up
+>> stuff like lttng without
+>> modifications (well, except glibc). It's also already implemented as a
+>> vDSO on other
+>> major architectures (like x86, x86_64, ppc32 and ppc64).
+>>
+>> If you are referring to the implementation of the vdso call, there are
+>> other possibilities, but
+>> I haven't found any that doesn't introduce overhead in context switching.
+>>
+>> But if TPIDRURW is definitely a no go, I can work on a patch that does
+>> this with a thread notifier
+>> and the vdso data page. Would that be a viable option ?
+>>
+>>>
+>>>> +notrace int __vdso_getcpu(unsigned int *cpup, unsigned int *nodep,
+>>>> +                       struct getcpu_cache *tcache)
+>>>> +{
+>>>> +     unsigned long node_and_cpu;
+>>>> +
+>>>> +     asm("mrc p15, 0, %0, c13, c0, 2\n" : "=r"(node_and_cpu));
+>>>> +
+>>>> +     if (nodep)
+>>>> +             *nodep = cpu_to_node(node_and_cpu >> 16);
+>>>> +     if (cpup)
+>>>> +             *cpup  = node_and_cpu & 0xffffUL;
+>>>
+>>> Given this is directly user-accessible, this format is a de-facto ABI,
+>>> even if it's not documented as such. Is this definitely the format you
+>>> want long-term?
+>>
+>> Yes, this (the interface) is indeed the important part and therefore I
+>> tried not to invent anything
+>> on my own.
+>> This is the interface used by ppc32, ppc64, x86, x86_64. It's also this is
+>> how the getcpu(2) system call is documented.
+>>
+>> /Fredrik
+>>
+>>
+>>>
+>>>
+>>> Thanks,
+>>> Mark.
 > 
 > 
-> -- 
-> Jani Nikula, Intel Open Source Technology Center
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
