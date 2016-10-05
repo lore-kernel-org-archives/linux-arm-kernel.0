@@ -1,59 +1,34 @@
-From: karl.beldan@gmail.com (Karl Beldan)
-Date: Wed, 5 Oct 2016 15:16:46 +0000
-Subject: [PATCH 0/2] ARM: davinci: initial infrastructure for LCDC
-In-Reply-To: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <20161005151646.qpdycrefwbdrzhtq@gobelin>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed,  5 Oct 2016 17:23:33 +0200
+Subject: [PATCH v2 0/3] reset: Add support for OX820 SoC
+Message-ID: <20161005152336.467-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 05, 2016 at 03:05:30PM +0200, Bartosz Golaszewski wrote:
-> After discussing the matter with Laurent Pinchart it turned out that
-> using ti,tilcdc,panel was wrong and we should go with the new
-> simple-vga-dac driver proposed by Maxime Ripard and currently being
-> reviewed.
-> 
-> The da850-lcdk board on which I'm working has a THS8135 video DAC for
-> which the new driver seems to be best suited and we'll be able to
-> query the connected display for supported modes instead of hardcoding
-> them in the dt as is needed for the panel driver.
-> 
+This patchset adds support for the reset controller in the Oxford
+Semiconductor OX820 SoC, big brother of the OX810SE.
 
-I meant to point to these new changes but then it slipped my mind, it is
-clearly the way to go.
+Since this driver uses a regmap access, it's important to tag each
+compatible SoC since the regmap offset could differ in later SoCs.
 
-Regards, 
-Karl
+This patchet also moves the reset indices to a clean DT include file.
 
+Changes since v1 at: http://lkml.kernel.org/r/20160909131955.27334-1-narmstrong at baylibre.com
+ - Reformat bindings
+ - Add reference to include files in bindings
 
-> In the meantime I'm posting two patches based on Karl Beldan's
-> previous work that can already be merged.
-> 
-> The first one adds OF_DEV_AUXDATA entry to da8xx-dt.c. I changed the
-> compatible string to the new one we're introducing in the tilcdc
-> driver.
-> 
-> The second adds the lcd pins and the display node to da850.dtsi. As
-> suggested by Sekhar: I moved the pins node, which was previously in
-> da850-lcdk.dts, to da850.dtsi. I also squashed Karl's two patches and
-> removed the panel node.
-> 
-> Tested on a da850-lcdk with an LCD display connected over VGA with
-> two patches already posted to the drm mailing list:
-> 
->   drm: tilcdc: add a da850-specific compatible string
->   drm: tilcdc: add a workaround for failed clk_set_rate()
-> 
-> and some additional work-in-progress/hacks on top of that.
-> 
-> Karl Beldan (2):
->   ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for lcdc
->   ARM: dts: da850: add a node for the LCD controller
-> 
->  arch/arm/boot/dts/da850.dtsi     | 29 +++++++++++++++++++++++++++++
->  arch/arm/mach-davinci/da8xx-dt.c |  1 +
->  2 files changed, 30 insertions(+)
-> 
-> -- 
-> 2.9.3
-> 
+Neil Armstrong (3):
+  reset: oxnas: Add OX820 support
+  dt-bindings: reset: oxnas: Add include file with reset indexes
+  dt-bindings: reset: oxnas: Update for OX820
+
+ .../devicetree/bindings/reset/oxnas,reset.txt      | 39 ++--------------
+ drivers/reset/reset-oxnas.c                        |  1 +
+ include/dt-bindings/reset/oxsemi,ox810se.h         | 53 ++++++++++++++++++++++
+ include/dt-bindings/reset/oxsemi,ox820.h           | 53 ++++++++++++++++++++++
+ 4 files changed, 110 insertions(+), 36 deletions(-)
+ create mode 100644 include/dt-bindings/reset/oxsemi,ox810se.h
+ create mode 100644 include/dt-bindings/reset/oxsemi,ox820.h
+
+-- 
+2.7.0
