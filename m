@@ -1,33 +1,41 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 06 Oct 2016 11:18:32 +1100
-Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <6bbfeb57-7a55-6a3e-60b2-3f44525e5882@huawei.com>
-References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
- <5140357.dcW9ibtZJ6@wuerfel> <57D963C4.4010406@hisilicon.com>
- <5869118.UilSPY9Sai@wuerfel>
- <2af4f2d8-e3a4-fa00-e700-60af70bf4560@jonmasters.org>
- <6bbfeb57-7a55-6a3e-60b2-3f44525e5882@huawei.com>
-Message-ID: <1475713112.3784.183.camel@kernel.crashing.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 6 Oct 2016 09:13:52 +0530
+Subject: [GIT PULL] Mailbox changes for v4.9
+Message-ID: <CABb+yY19ZdZVJeztGZAyPq=hb0XNtaVYDcy+Pbv_jkio4usKbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-10-04 at 13:02 +0100, John Garry wrote:
-> Right, so I think Zhichang can make the necessary generic changes to?
-> 8250 OF driver to support IO port as well as MMIO-based.
-> 
-> However an LPC-based earlycon driver is still required.
-> 
-> A note on hip07-based D05 (for those unaware): this does not use?
-> LPC-based uart. It uses PL011. The hardware guys have managed some?
-> trickery where they loopback the serial line around the BMC/CPLD. But we?
-> still need it for hip06 D03 and any other boards which want to use LPC?
-> bus for uart.
-> 
-> A question on SBSA: does it propose how to provide serial via BMC for SOL?
+Hi Linus,
 
-Probably another reason to keep 8250 as a legal option ... The (very
-popular) Aspeed BMCs tend to do this via a 8250-looking virtual UART on
-LPC.
+The following changes since commit d060e0f603a4156087813d221d818bb39ec91429:
 
-Cheers,
-Ben,
+  Merge tag 'for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/dledford/rdma
+(2016-09-06 12:33:12 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+mailbox-for-next
+
+for you to fetch changes up to a649244de727b87d38fe46d86ef98c8d1fc49551:
+
+  dt-bindings: mailbox: Add Amlogic Meson MHU Bindings (2016-09-07
+13:07:18 +0530)
+
+----------------------------------------------------------------
+- New driver and DT bindings for MHU controller integrated
+    on Amlogic Meson platform.
+
+----------------------------------------------------------------
+Neil Armstrong (2):
+      mailbox: Add Platform Message-Handling-Unit variant driver
+      dt-bindings: mailbox: Add Amlogic Meson MHU Bindings
+
+ .../devicetree/bindings/mailbox/meson-mhu.txt      |  34 ++++
+ drivers/mailbox/Kconfig                            |  10 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/platform_mhu.c                     | 205 +++++++++++++++++++++
+ 4 files changed, 251 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/meson-mhu.txt
+ create mode 100644 drivers/mailbox/platform_mhu.c
