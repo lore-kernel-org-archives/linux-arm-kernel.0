@@ -1,12 +1,12 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 6 Oct 2016 09:53:36 -0600
+Date: Thu, 6 Oct 2016 09:54:39 -0600
 Subject: [PATCH 3/8] PM / Domains: Allow domain power states to be read
  from DT
 In-Reply-To: <CAPDyKFqWE=-tMLN-6zKWpb6K2a2bBxkA7q+mSivJFpzNntcupw@mail.gmail.com>
 References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
  <1475699519-109623-4-git-send-email-lina.iyer@linaro.org>
  <CAPDyKFqWE=-tMLN-6zKWpb6K2a2bBxkA7q+mSivJFpzNntcupw@mail.gmail.com>
-Message-ID: <20161006155336.GD28930@linaro.org>
+Message-ID: <20161006155439.GE28930@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -52,12 +52,15 @@ On Thu, Oct 06 2016 at 03:47 -0600, Ulf Hansson wrote:
 >
 >/s/read_genpd_state/genpd_parse_state
 >
+Ok.
+
 >> +                                   struct device_node *state_node)
 >> +{
 >> +       int err = 0;
 >
 >No need to assign err to 0.
 >
+Will fix.
 >> +       u32 latency;
 >> +       u32 residency;
 >> +       u32 entry_latency, exit_latency;
@@ -95,6 +98,7 @@ On Thu, Oct 06 2016 at 03:47 -0600, Ulf Hansson wrote:
 >->power_on_latency_ns and the ->power_off_latency_ns, when it
 >validates which idle state you are allowed to enter.
 >
+Good catch.
 >> +       genpd_state->power_on_latency_ns = 1000 * latency;
 >> +       genpd_state->power_off_latency_ns = 1000 * entry_latency;
 >> +
@@ -127,7 +131,6 @@ On Thu, Oct 06 2016 at 03:47 -0600, Ulf Hansson wrote:
 >I think it's better to use of_count_phandle_with_args() to find out
 >the number of phandles.
 >
-
 >> +
 >> +       st = kcalloc(count, sizeof(*st), GFP_KERNEL);
 >> +       if (!st)
@@ -139,11 +142,6 @@ On Thu, Oct 06 2016 at 03:47 -0600, Ulf Hansson wrote:
 >Isn't this a case of when it would be convenient to use the
 >of_phandle_iterator*() APIs?
 >
-
-Hmm.. But if we move back to static allocation of states, we won't need
-any of this ;)
-
--- Lina
 >> +               if (!np) {
 >> +                       ret = -EFAULT;
 >> +                       break;
