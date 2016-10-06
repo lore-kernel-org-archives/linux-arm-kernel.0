@@ -1,34 +1,123 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 6 Oct 2016 10:16:43 +0200
-Subject: [PATCH 2/3] gpio: Add a driver for the Raspberry Pi's firmware
- GPIO calls.
-In-Reply-To: <87lgyh6at5.fsf@eliezer.anholt.net>
-References: <20160919161314.25858-1-eric@anholt.net>
- <20160919161314.25858-2-eric@anholt.net>
- <CACRpkda6HpJp97FUAh6yvo-BhiDbAXxzQS9U6uT+jvg6hiB8ag@mail.gmail.com>
- <87mviy92qw.fsf@eliezer.anholt.net>
- <CACRpkdbJoM-RbcuoC=7xJyrT3v7p2n9HiidRp1GUw=o43_Fkwg@mail.gmail.com>
- <87lgyh6at5.fsf@eliezer.anholt.net>
-Message-ID: <CACRpkda5=zqbZSOSyhEmaGg2RUKGPQwcQJ1jmv55t+F==xvSJg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 6 Oct 2016 10:36:57 +0200
+Subject: [PATCH 1/8] PM / Domains: Make genpd state allocation dynamic
+In-Reply-To: <1475699519-109623-2-git-send-email-lina.iyer@linaro.org>
+References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
+ <1475699519-109623-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFpNnJxueNNk9g7KzHPAsJVQ8xeiaw8OHMevBZ3myhd-xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 24, 2016 at 9:01 AM, Eric Anholt <eric@anholt.net> wrote:
-> Linus Walleij <linus.walleij@linaro.org> writes:
-
->> Sorry I am not familiar with your development model. I don't know
->> about any RPI downstream tree... What I mean is that the patch to
->> include/soc/bcm2835/raspberrypi-firmware.h should be merged by
->> whoever is maintaining that file, it is not a GPIO file.
->>
->> If I get an ACK from the maintainer I can take it into the GPIO
->> tree.
+On 5 October 2016 at 22:31, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Allow PM Domain states to be defined dynamically by the drivers. This
+> removes the limitation on the maximum number of states possible for a
+> domain.
 >
-> Oh, people often say "the rpi tree" to mean downstream (currently 4.4).
-> The maintainer of that file upstream is me, and I was hoping you could
-> merge through your tree.
+> Cc: Axel Haslam <ahaslam+renesas@baylibre.com>
+> Suggested-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  arch/arm/mach-imx/gpc.c     | 17 ++++++++++-------
+>  drivers/base/power/domain.c | 10 ----------
+>  include/linux/pm_domain.h   |  4 +---
+>  3 files changed, 11 insertions(+), 20 deletions(-)
+>
+> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+> index 0df062d..b92dad5 100644
+> --- a/arch/arm/mach-imx/gpc.c
+> +++ b/arch/arm/mach-imx/gpc.c
+> @@ -380,13 +380,6 @@ static struct pu_domain imx6q_pu_domain = {
+>                 .name = "PU",
+>                 .power_off = imx6q_pm_pu_power_off,
+>                 .power_on = imx6q_pm_pu_power_on,
+> -               .states = {
+> -                       [0] = {
+> -                               .power_off_latency_ns = 25000,
+> -                               .power_on_latency_ns = 2000000,
+> -                       },
+> -               },
+> -               .state_count = 1,
+>         },
+>  };
+>
+> @@ -430,6 +423,16 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
+>         if (!IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
+>                 return 0;
+>
+> +       imx6q_pu_domain.base.states = devm_kzalloc(dev,
+> +                                       sizeof(*imx6q_pu_domain.base.states),
+> +                                       GFP_KERNEL);
+> +       if (!imx6q_pu_domain.base.states)
+> +               return -ENOMEM;
+> +
+> +       imx6q_pu_domain.base.states[0].power_off_latency_ns = 25000;
+> +       imx6q_pu_domain.base.states[0].power_on_latency_ns = 2000000;
+> +       mx6q_pu_domain.base.state_count = 1,
+> +
+>         pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
+>         return of_genpd_add_provider_onecell(dev->of_node,
+>                                              &imx_gpc_onecell_data);
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index e023066..740afa9 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1325,16 +1325,6 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
+>                 genpd->dev_ops.start = pm_clk_resume;
+>         }
+>
+> -       if (genpd->state_idx >= GENPD_MAX_NUM_STATES) {
+> -               pr_warn("Initial state index out of bounds.\n");
+> -               genpd->state_idx = GENPD_MAX_NUM_STATES - 1;
+> -       }
+> -
+> -       if (genpd->state_count > GENPD_MAX_NUM_STATES) {
+> -               pr_warn("Limiting states to  %d\n", GENPD_MAX_NUM_STATES);
+> -               genpd->state_count = GENPD_MAX_NUM_STATES;
+> -       }
+> -
+>         /* Use only one "off" state if there were no states declared */
+>         if (genpd->state_count == 0)
+>                 genpd->state_count = 1;
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index a09fe5c..bd1ffb9 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -19,8 +19,6 @@
+>  /* Defines used for the flags field in the struct generic_pm_domain */
+>  #define GENPD_FLAG_PM_CLK      (1U << 0) /* PM domain uses PM clk */
+>
+> -#define GENPD_MAX_NUM_STATES   8 /* Number of possible low power states */
+> -
+>  enum gpd_status {
+>         GPD_STATE_ACTIVE = 0,   /* PM domain is active */
+>         GPD_STATE_POWER_OFF,    /* PM domain is off */
+> @@ -70,7 +68,7 @@ struct generic_pm_domain {
+>         void (*detach_dev)(struct generic_pm_domain *domain,
+>                            struct device *dev);
+>         unsigned int flags;             /* Bit field of configs for genpd */
+> -       struct genpd_power_state states[GENPD_MAX_NUM_STATES];
+> +       struct genpd_power_state *states;
+>         unsigned int state_count; /* number of states */
+>         unsigned int state_idx; /* state that genpd will go to when off */
+>
+> --
+> 2.7.4
+>
 
-OK no problem, I can merge it once we agree on the mechanics :)
+In general I like the improvement, but..
 
-Yours,
-Linus Walleij
+This change implies that ->states may very well be NULL. This isn't
+validated by genpd's internal logic when power off/on the domain
+(genpd_power_on|off(), __default_power_down_ok()). You need to fix
+this, somehow.
+
+Perhaps the easiest solutions is, when pm_genpd_init() finds that
+->state is NULL, that we allocate a struct genpd_power_state with
+array size of 1 and assign it to ->states. Although, doing this also
+means you need to track that genpd was responsible for the the
+allocation, so it must also free the data from within genpd_remove().
+
+Unless you have other ideas!?
+
+Kind regards
+Uffe
