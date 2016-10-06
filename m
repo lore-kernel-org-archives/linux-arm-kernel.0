@@ -1,62 +1,99 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 6 Oct 2016 09:44:39 -0600
-Subject: [PATCH 3/8] PM / Domains: Allow domain power states to be read
- from DT
-In-Reply-To: <CAMuHMdU4HiauULf4fX67Cwj1GQmEExBiu4WyQPJBbj=xNg0eEQ@mail.gmail.com>
-References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
- <1475699519-109623-4-git-send-email-lina.iyer@linaro.org>
- <CAMuHMdU4HiauULf4fX67Cwj1GQmEExBiu4WyQPJBbj=xNg0eEQ@mail.gmail.com>
-Message-ID: <20161006154439.GC28930@linaro.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 6 Oct 2016 09:52:08 -0600
+Subject: [PATCH v3] Adding missing features of Coresight PTM components
+In-Reply-To: <60a1f04c-1e73-0ff1-dfee-775b875d2c4a@centralesupelec.fr>
+References: <f029bcee-696f-3519-b0f1-4cdcf24ad3f8@centralesupelec.fr>
+ <60a1f04c-1e73-0ff1-dfee-775b875d2c4a@centralesupelec.fr>
+Message-ID: <CANLsYkyPTtiGsfKg13ZY2pgCC3rh+MfirMwTrLG1=TZ5gUJqzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 06 2016 at 02:04 -0600, Geert Uytterhoeven wrote:
->Hi Lina,
+On 6 October 2016 at 06:18, Muhammad Abdul WAHAB
+<muhammadabdul.wahab@centralesupelec.fr> wrote:
+> In the current driver for Coresight components, two features of PTM
+> components are missing:
 >
->On Wed, Oct 5, 2016 at 10:31 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> This patch allows domains to define idle states in the DT. SoC's can
->> define domain idle states in DT using the "domain-idle-states" property
->> of the domain provider. Calling of_pm_genpd_init() will  read the idle
->> states and initialize the genpd for the domain.
->>
->> In addition to the entry and exit latency for idle state, also add
->> residency_ns, param and of_node property to each state. A domain idling
->> in a state is only power effecient if it stays idle for a certain period
->> in that state. The residency provides this minimum time for the idle
->> state to provide power benefits. The param is a state specific u32 value
->> that the platform may use for that idle state.
->>
->> This patch is based on the original patch by Marc Titinger.
->>
->> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> ---
->>  drivers/base/power/domain.c | 103 ++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/pm_domain.h   |   8 ++++
->>  2 files changed, 111 insertions(+)
->>
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index 740afa9..368a5b8 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -1895,6 +1895,109 @@ out:
->>         return ret ? -EPROBE_DEFER : 0;
->>  }
->>  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
->> +
->> +static const struct of_device_id idle_state_match[] = {
->> +       { .compatible = "arm,idle-state", },
+> 1. Branch Broadcasting (present also in ETM but called Branch Output)
+> 2. Return Stack (only present in PTM v1.0 and PTMv1.1)
 >
->Do we want ARM-specific compatible values without an #ifdef in drivers/base/?
+> These features can be added simply to the code using `mode` field of
+> `etm_config` struct.
 >
->I know we already have "samsung,power-domain".
->Perhaps that should be protected by #ifdef, too.
+> 1. **Branch Broadcast** : The branch broadcast feature is present in ETM
+> components as well and is called Branch output. It allows to retrieve
+> addresses for direct branch addresses alongside the indirect branch
+> addresses. For example, it could be useful in cases when tracing without
+> source code.
+> 2. **Return Stack** : The return stack option allows to retrieve the return
+>  addresses of function calls. It can be useful to avoid CRA
+> (Code Reuse Attacks) by keeping a shadowstack.
 >
-The arm,idle-state DT binding is re-used here to describe domain idle
-states, because that is exactly what we need here. The binding is not
-dependent on the ARM architecture, so we won't need a #ifdef around
-this. I do agree that using this compatible is not very intuitive.
+> Signed-off-by: Muhammad Abdul Wahab <muhammadabdul.wahab@centralesupelec.fr>
+> ---
+> changes in v3 :
+>         - deleted warning message
+>         - bit field definition of Branch Broadcast and Return Stack
+>
+>  drivers/hwtracing/coresight/coresight-etm.h         |  5 +++++
+>  drivers/hwtracing/coresight/coresight-etm3x-sysfs.c | 10 ++++++++++
+>  2 files changed, 15 insertions(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm.h
+> b/drivers/hwtracing/coresight/coresight-etm.h
+> index 4a18ee4..ad063d7 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm.h
+> +++ b/drivers/hwtracing/coresight/coresight-etm.h
+> @@ -89,11 +89,13 @@
+>  /* ETMCR - 0x00 */
+>  #define ETMCR_PWD_DWN          BIT(0)
+>  #define ETMCR_STALL_MODE       BIT(7)
+> +#define ETMCR_BRANCH_BROADCAST BIT(8)
+>  #define ETMCR_ETM_PRG          BIT(10)
+>  #define ETMCR_ETM_EN           BIT(11)
+>  #define ETMCR_CYC_ACC          BIT(12)
+>  #define ETMCR_CTXID_SIZE       (BIT(14)|BIT(15))
+>  #define ETMCR_TIMESTAMP_EN     BIT(28)
+> +#define ETMCR_RETURN_STACK     BIT(29)
+>  /* ETMCCR - 0x04 */
+>  #define ETMCCR_FIFOFULL                BIT(23)
+>  /* ETMPDCR - 0x310 */
+> @@ -110,8 +112,11 @@
+>  #define ETM_MODE_STALL         BIT(2)
+>  #define ETM_MODE_TIMESTAMP     BIT(3)
+>  #define ETM_MODE_CTXID         BIT(4)
+> +#define ETM_MODE_BBROAD                BIT(5)
+> +#define ETM_MODE_RET_STACK     BIT(6)
+>  #define ETM_MODE_ALL           (ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
+>                                  ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
+> +                                ETM_MODE_BBROAD | ETM_MODE_RET_STACK | \
+>                                  ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
+>                                  ETM_MODE_EXCL_USER)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> index 5ea0909..a76009a 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> @@ -164,6 +164,16 @@ static ssize_t mode_store(struct device *dev,
+>         else
+>                 config->ctrl &= ~ETMCR_CTXID_SIZE;
+>
+> +       if (config->mode & ETM_MODE_BBROAD)
+> +               config->ctrl |= ETMCR_BRANCH_BROADCAST;
+> +       else
+> +               config->ctrl &= ~ETMCR_BRANCH_BROADCAST;
+> +
+> +       if (config->mode & ETM_MODE_RET_STACK)
+> +               config->ctrl |= ETMCR_RETURN_STACK_EN;
+> +       else
+> +               config->ctrl &= ~ETMCR_RETURN_STACK_EN;
+> +
 
-Thanks,
-Lina
+Where is ETMCR_RETURN_STACK_EN defined?  Did you send me code that
+doesn't compile?
+
+>         if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
+>                 etm_config_trace_mode(config);
+>
+> --
+> 1.9.1
