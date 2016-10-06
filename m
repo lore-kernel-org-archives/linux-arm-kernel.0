@@ -1,101 +1,128 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu,  6 Oct 2016 10:29:00 +0200
-Subject: [PATCH 4.4 30/93] irqchip/gicv3: Silence noisy DEBUG_PER_CPU_MAPS
- warning
-In-Reply-To: <20161006074731.150212126@linuxfoundation.org>
-References: <20161006074731.150212126@linuxfoundation.org>
-Message-ID: <20161006074732.410375228@linuxfoundation.org>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Thu,  6 Oct 2016 11:14:29 +0200
+Subject: [PATCH v2] arm64: dts: marvell: Add definition for the Globalscale
+ Marvell ESPRESSOBin Board
+Message-ID: <20161006091429.8974-1-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.4-stable review patch.  If anyone has any objections, please let me know.
+This is a high performance 64 bit dual core low power consuming
+networking computing platform based on the ARMv8 architecture.
+It contains an Armada 3720 running up to 1.2Ghz.
 
-------------------
+This commit adds a basic definition for this board.
 
-From: James Morse <james.morse@arm.com>
-
-commit 727653d6ce7103b245eb8041f55dd5885f4c3289 upstream.
-
-gic_raise_softirq() walks the list of cpus using for_each_cpu(), it calls
-gic_compute_target_list() which advances the iterator by the number of
-CPUs in the cluster.
-
-If gic_compute_target_list() reaches the last CPU it leaves the iterator
-pointing at the last CPU. This means the next time round the for_each_cpu()
-loop cpumask_next() will be called with an invalid CPU.
-
-This triggers a warning when built with CONFIG_DEBUG_PER_CPU_MAPS:
-[    3.077738] GICv3: CPU1: found redistributor 1 region 0:0x000000002f120000
-[    3.077943] CPU1: Booted secondary processor [410fd0f0]
-[    3.078542] ------------[ cut here ]------------
-[    3.078746] WARNING: CPU: 1 PID: 0 at ../include/linux/cpumask.h:121 gic_raise_softirq+0x12c/0x170
-[    3.078812] Modules linked in:
-[    3.078869]
-[    3.078930] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc5+ #5188
-[    3.078994] Hardware name: Foundation-v8A (DT)
-[    3.079059] task: ffff80087a1a0080 task.stack: ffff80087a19c000
-[    3.079145] PC is at gic_raise_softirq+0x12c/0x170
-[    3.079226] LR is at gic_raise_softirq+0xa4/0x170
-[    3.079296] pc : [<ffff0000083ead24>] lr : [<ffff0000083eac9c>] pstate: 200001c9
-[    3.081139] Call trace:
-[    3.081202] Exception stack(0xffff80087a19fbe0 to 0xffff80087a19fd10)
-
-[    3.082269] [<ffff0000083ead24>] gic_raise_softirq+0x12c/0x170
-[    3.082354] [<ffff00000808e614>] smp_send_reschedule+0x34/0x40
-[    3.082433] [<ffff0000080e80a0>] resched_curr+0x50/0x88
-[    3.082512] [<ffff0000080e89d0>] check_preempt_curr+0x60/0xd0
-[    3.082593] [<ffff0000080e8a60>] ttwu_do_wakeup+0x20/0xe8
-[    3.082672] [<ffff0000080e8bb8>] ttwu_do_activate+0x90/0xc0
-[    3.082753] [<ffff0000080ea9a4>] try_to_wake_up+0x224/0x370
-[    3.082836] [<ffff0000080eabc8>] default_wake_function+0x10/0x18
-[    3.082920] [<ffff000008103134>] __wake_up_common+0x5c/0xa0
-[    3.083003] [<ffff0000081031f4>] __wake_up_locked+0x14/0x20
-[    3.083086] [<ffff000008103f80>] complete+0x40/0x60
-[    3.083168] [<ffff00000808df7c>] secondary_start_kernel+0x15c/0x1d0
-[    3.083240] [<00000000808911a4>] 0x808911a4
-[    3.113401] Detected PIPT I-cache on CPU2
-
-Avoid updating the iterator if the next call to cpumask_next() would
-cause the for_each_cpu() loop to exit.
-
-There is no change to gic_raise_softirq()'s behaviour, (cpumask_next()s
-eventual call to _find_next_bit() will return early as start >= nbits),
-this patch just silences the warning.
-
-Fixes: 021f653791ad ("irqchip: gic-v3: Initial support for GICv3")
-Signed-off-by: James Morse <james.morse@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Jason Cooper <jason@lakedaemon.net>
-Link: http://lkml.kernel.org/r/1474306155-3303-1-git-send-email-james.morse at arm.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
+Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 ---
- drivers/irqchip/irq-gic-v3.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
 
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -544,7 +544,7 @@ static struct notifier_block gic_cpu_not
- static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
- 				   unsigned long cluster_id)
- {
--	int cpu = *base_cpu;
-+	int next_cpu, cpu = *base_cpu;
- 	unsigned long mpidr = cpu_logical_map(cpu);
- 	u16 tlist = 0;
+Changes in v2:
+ - Improved commit message
+ - Added informations about connectors
+
+ arch/arm64/boot/dts/marvell/Makefile               |  1 +
+ .../boot/dts/marvell/armada-3720-espressobin.dts   | 82 ++++++++++++++++++++++
+ 2 files changed, 83 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+
+diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
+index 308468d..392eeb6 100644
+--- a/arch/arm64/boot/dts/marvell/Makefile
++++ b/arch/arm64/boot/dts/marvell/Makefile
+@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
  
-@@ -558,9 +558,10 @@ static u16 gic_compute_target_list(int *
+ # Mvebu SoC Family
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
++dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db.dtb
  
- 		tlist |= 1 << (mpidr & 0xf);
- 
--		cpu = cpumask_next(cpu, mask);
--		if (cpu >= nr_cpu_ids)
-+		next_cpu = cpumask_next(cpu, mask);
-+		if (next_cpu >= nr_cpu_ids)
- 			goto out;
-+		cpu = next_cpu;
- 
- 		mpidr = cpu_logical_map(cpu);
- 
+ always		:= $(dtb-y)
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+new file mode 100644
+index 0000000..ae005f1
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+@@ -0,0 +1,82 @@
++/*
++ * Device Tree file for Globalscale Marvell ESPRESSOBin Board
++ * Copyright (C) 2016 Marvell
++ *
++ * Romain Perier <romain.perier@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "armada-372x.dtsi"
++
++/ {
++	model = "Globalscale Marvell ESPRESSOBin Board";
++	compatible = "globalscale,espressobin", "marvell,armada3720", "marvell,armada3710";
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
++	};
++};
++
++/* J9 */
++&pcie0 {
++	status = "okay";
++};
++
++/* J6 */
++&sata {
++	status = "okay";
++};
++
++/* J5 */
++&uart0 {
++	status = "okay";
++};
++
++/* J7 */
++&usb3 {
++	status = "okay";
++};
+-- 
+2.9.3
