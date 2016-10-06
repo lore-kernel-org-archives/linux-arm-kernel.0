@@ -1,93 +1,30 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Thu, 6 Oct 2016 11:10:17 +0100
-Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
- issue.
-In-Reply-To: <20160927170115.GD7509@tuxbot>
-References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
- <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
- <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
- <CACvgo53fuoPVjBAkZbWFPVxosObjvxoDgFdR_BkSTgevqyGg9g@mail.gmail.com>
- <20160927170115.GD7509@tuxbot>
-Message-ID: <CACvgo50RghJs6Sfpp1z5SSnX=J1dBFAJeFzA=MOBDCo4PsiC9Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  6 Oct 2016 11:27:24 +0100
+Subject: [PATCH 0/2] efi: add support for seeding the kernel RNG from UEFI
+Message-ID: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+This implements generic EFI core kernel code to seed the kernel entropy
+pool from a Linux specific UEFI configuration table containing a random seed
+supplied by the firmware. (#1)
 
-On 27 September 2016 at 18:01, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Wed 21 Sep 05:09 PDT 2016, Emil Velikov wrote:
->
->> On 20 September 2016 at 09:32, Peter Griffin <peter.griffin@linaro.org> wrote:
->> > Hi Emil,
->> >
->> > On Tue, 20 Sep 2016, Emil Velikov wrote:
->> >
->> >> On 5 September 2016 at 14:16, Peter Griffin <peter.griffin@linaro.org> wrote:
->> >> > ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
->> >> > recursive dependency.
->> >
->> >
->> >> >
->> >> From a humble skim through remoteproc, drm and a few other subsystems
->> >> I think the above is wrong. All the drivers (outside of remoteproc),
->> >> that I've seen, depend on the core component, they don't select it.
->> >
->> > I will let Bjorn comment on the remoteproc subsystem Kconfig design, and
->> > why it is like it is.
->> >
->> > For this particular SLIM_RPROC I have added it to Kconfig in keeping with all
->> > the other drivers in the remoteproc subsystem which has exposed this recursive
->> > dependency issue.
->> >
->> > For this particular kconfig symbol a quick grep reveals more drivers in
->> > the kernel using 'select', than 'depend on'
->> >
->> > git grep "select VIRTIO" | wc -l
->> > 14
->> >
->> > git grep "depends on VIRTIO" | wc -l
->> > 10
->> >
->> Might be worth taking a closer look into these at some point.
->>
->
-> The general idea here is that VIRTIO provides the "framework" and as
-> such drivers implementing VIRTIO do select and drivers using virtio use
-> depends.
->
-> This is found in several places around the kernel.
->
->> >
->> >> Furthermore most places explicitly hide the drivers from the menu if
->> >> the core component isn't enabled.
->> >
->> > Remoteproc subsystem takes a different approach, the core code is only enabled
->> > if a driver which relies on it is enabled. This IMHO makes sense, as
->> > remoteproc is not widely used (only a few particular ARM SoC's).
->> >
->> > It is true that for subsystems which rely on the core component being
->> > explicitly enabled, they often tend to hide drivers which depend on it
->> > from the menu unless it is. This also makes sense.
->> >
->> >>
->> >> Is there something that requires such a different/unusual behaviour in
->> >> remoteproc ?
->> >>
->
-> There's nothing unusual in remoteproc that forces us to stay with this
-> model; however the parts related to the REMOTEPROC config is useless by
-> themselves.
->
-I'm afraid that the "supporting" arguments you're using are generic
-and not specific to remoteproc. Although as Jani mentioned and pointed
-to the documentation, remoteproc is {mis,ab}using 'select' leading to
-issues elsewhere.
+In addition, it wires it up for ARM and arm64, by invoking the EFI_RNG_PROTOCOL
+UEFI protocol from the stub, and populating such a UEFI config table using its
+output.
 
-In the long term we might want to switch to 'select' and attribute
-kconfig like Jani suggested.  But in the short term we want to avoid
-select-ing things just for our "convenience".
+How to wire this up for x86 is left as an exercise for the Intel developer.
 
-Thanks
-Emil
+Ard Biesheuvel (2):
+  efi: add support for seeding the RNG from a UEFI config table
+  efi/arm*: libstub: invoke EFI_RNG_PROTOCOL to seed the UEFI RNG table
+
+ drivers/firmware/efi/efi.c              | 26 +++++++++++
+ drivers/firmware/efi/libstub/arm-stub.c |  2 +
+ drivers/firmware/efi/libstub/efistub.h  |  2 +
+ drivers/firmware/efi/libstub/random.c   | 48 ++++++++++++++++++++
+ include/linux/efi.h                     |  9 ++++
+ 5 files changed, 87 insertions(+)
+
+-- 
+2.7.4
