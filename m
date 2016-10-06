@@ -1,55 +1,87 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 6 Oct 2016 15:43:21 -0400
-Subject: [PATCH v6 1/5] drm/sun4i: rgb: Remove the bridge enable/disable
- functions
-In-Reply-To: <5100ee37c9bbb53f8227bd38f1d3160e507c489d.1475740611.git-series.maxime.ripard@free-electrons.com>
-References: <cover.2ec28e2292f37131839babc08427ef9f1aece26a.1475740611.git-series.maxime.ripard@free-electrons.com>
- <5100ee37c9bbb53f8227bd38f1d3160e507c489d.1475740611.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAOw6vbJ5C95rxK6--zEintO=qeu+Pm=OcvB+SYzQuvz5pSQaaw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 6 Oct 2016 21:45:14 +0200
+Subject: [PATCH 1/8] PM / Domains: Make genpd state allocation dynamic
+In-Reply-To: <20161006154052.GB28930@linaro.org>
+References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
+ <1475699519-109623-2-git-send-email-lina.iyer@linaro.org>
+ <CAPDyKFpNnJxueNNk9g7KzHPAsJVQ8xeiaw8OHMevBZ3myhd-xA@mail.gmail.com>
+ <20161006154052.GB28930@linaro.org>
+Message-ID: <CAPDyKFps5kZLcVW1UJsZtgOQEysRxc9tj41uDDTeJav8YBQG4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 6, 2016 at 3:57 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The atomic helpers already call the drm_bridge_enable on our behalf,
-> there's no need to do it a second time.
+On 6 October 2016 at 17:40, Lina Iyer <lina.iyer@linaro.org> wrote:
+> On Thu, Oct 06 2016 at 02:37 -0600, Ulf Hansson wrote:
+>>
+>> On 5 October 2016 at 22:31, Lina Iyer <lina.iyer@linaro.org> wrote:
+>>>
+>>> Allow PM Domain states to be defined dynamically by the drivers. This
+>>> removes the limitation on the maximum number of states possible for a
+>>> domain.
+>>>
+>>> Cc: Axel Haslam <ahaslam+renesas@baylibre.com>
+>>> Suggested-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 >
-> Reported-by: Sean Paul <seanpaul@chromium.org>
+> <...>
+>>>
+>>> -#define GENPD_MAX_NUM_STATES   8 /* Number of possible low power states
+>>> */
+>>> -
+>>>  enum gpd_status {
+>>>         GPD_STATE_ACTIVE = 0,   /* PM domain is active */
+>>>         GPD_STATE_POWER_OFF,    /* PM domain is off */
+>>> @@ -70,7 +68,7 @@ struct generic_pm_domain {
+>>>         void (*detach_dev)(struct generic_pm_domain *domain,
+>>>                            struct device *dev);
+>>>         unsigned int flags;             /* Bit field of configs for genpd
+>>> */
+>>> -       struct genpd_power_state states[GENPD_MAX_NUM_STATES];
+>>> +       struct genpd_power_state *states;
+>>>         unsigned int state_count; /* number of states */
+>>>         unsigned int state_idx; /* state that genpd will go to when off
+>>> */
+>>>
+>>> --
+>>> 2.7.4
+>>>
+>>
+>> In general I like the improvement, but..
+>>
+>> This change implies that ->states may very well be NULL. This isn't
+>> validated by genpd's internal logic when power off/on the domain
+>> (genpd_power_on|off(), __default_power_down_ok()). You need to fix
+>> this, somehow.
+>>
+> Good point.
+>
+>> Perhaps the easiest solutions is, when pm_genpd_init() finds that
+>> ->state is NULL, that we allocate a struct genpd_power_state with
+>> array size of 1 and assign it to ->states. Although, doing this also
+>> means you need to track that genpd was responsible for the the
+>> allocation, so it must also free the data from within genpd_remove().
+>>
+>> Unless you have other ideas!?
+>>
+> I can think of some hacks, but they are uglier than the problem we are
+> trying to solve. We could drop this patch. Real world situations would
+> not have more than 8 states and if there is one, we can think about it
+> then.
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
+The problem with the current approach is that we waste some memory as
+we always have an array of 8 states per genpd. In the worst case,
+which currently is the most common case, only 1 out of 8 states is
+being used.
 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_rgb.c | 6 ------
->  1 file changed, 0 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> index 4e4bea6f395c..d198ad7e5323 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> @@ -155,9 +155,6 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
->         if (!IS_ERR(tcon->panel))
->                 drm_panel_prepare(tcon->panel);
->
-> -       /* encoder->bridge can be NULL; drm_bridge_enable checks for it */
-> -       drm_bridge_enable(encoder->bridge);
-> -
->         sun4i_tcon_channel_enable(tcon, 0);
->
->         if (!IS_ERR(tcon->panel))
-> @@ -177,9 +174,6 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
->
->         sun4i_tcon_channel_disable(tcon, 0);
->
-> -       /* encoder->bridge can be NULL; drm_bridge_disable checks for it */
-> -       drm_bridge_disable(encoder->bridge);
-> -
->         if (!IS_ERR(tcon->panel))
->                 drm_panel_unprepare(tcon->panel);
->  }
-> --
-> git-series 0.8.10
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+So, let's not be lazy here and instead take the opportunity to fix
+this, and especially I think this makes sense, before we go on and add
+the DT parsing of the domain-idle-states.
+
+The more sophisticated method would probably be to use kobject/kref,
+but let's not go there for now. Instead let's try an easy method of
+just tracking whether the allocations had been made internally by
+genpd, via adding a "bool state_allocated to the struct
+generic_pm_domain. Would that work?
+
+Kind regards
+Uffe
