@@ -1,85 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Oct 2016 10:09:10 +0200
-Subject: [PATCH 5/8] dt/bindings: Update binding for PM domain idle states
-In-Reply-To: <CAMuHMdWxft8o493XN2zg1wj2By7P+qBkrvyQOt7WdBnhPAvSXQ@mail.gmail.com>
-References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
- <1475699519-109623-6-git-send-email-lina.iyer@linaro.org>
- <CAMuHMdWxft8o493XN2zg1wj2By7P+qBkrvyQOt7WdBnhPAvSXQ@mail.gmail.com>
-Message-ID: <CAMuHMdUKbJ1Mt3viEkbCDmZGHQjGi_E=bxEBSHOB1MMY+qfSYQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 6 Oct 2016 10:16:43 +0200
+Subject: [PATCH 2/3] gpio: Add a driver for the Raspberry Pi's firmware
+ GPIO calls.
+In-Reply-To: <87lgyh6at5.fsf@eliezer.anholt.net>
+References: <20160919161314.25858-1-eric@anholt.net>
+ <20160919161314.25858-2-eric@anholt.net>
+ <CACRpkda6HpJp97FUAh6yvo-BhiDbAXxzQS9U6uT+jvg6hiB8ag@mail.gmail.com>
+ <87mviy92qw.fsf@eliezer.anholt.net>
+ <CACRpkdbJoM-RbcuoC=7xJyrT3v7p2n9HiidRp1GUw=o43_Fkwg@mail.gmail.com>
+ <87lgyh6at5.fsf@eliezer.anholt.net>
+Message-ID: <CACRpkda5=zqbZSOSyhEmaGg2RUKGPQwcQJ1jmv55t+F==xvSJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 6, 2016 at 10:06 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Wed, Oct 5, 2016 at 10:31 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> Update DT bindings to describe idle states of PM domains.
+On Sat, Sep 24, 2016 at 9:01 AM, Eric Anholt <eric@anholt.net> wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
+
+>> Sorry I am not familiar with your development model. I don't know
+>> about any RPI downstream tree... What I mean is that the patch to
+>> include/soc/bcm2835/raspberrypi-firmware.h should be merged by
+>> whoever is maintaining that file, it is not a GPIO file.
 >>
->> This patch is based on the original patch by Marc Titinger.
->>
->> Cc: <devicetree@vger.kernel.org>
->> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->>  .../devicetree/bindings/power/power_domain.txt     | 36 ++++++++++++++++++++++
->>  1 file changed, 36 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
->> index 025b5e7..a043315 100644
->> --- a/Documentation/devicetree/bindings/power/power_domain.txt
->> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
->> @@ -29,6 +29,10 @@ Optional properties:
->>     specified by this binding. More details about power domain specifier are
->>     available in the next section.
->>
->> +- domain-idle-states : A phandle of an idle-state that shall be soaked into a
->> +                generic domain power state. The idle state definitions are
->> +                compatible with arm,idle-state specified in [1].
->> +
->>  Example:
->>
->>         power: power-controller at 12340000 {
->> @@ -59,6 +63,36 @@ The nodes above define two power controllers: 'parent' and 'child'.
->>  Domains created by the 'child' power controller are subdomains of '0' power
->>  domain provided by the 'parent' power controller.
->>
->> +Example 3:
->> +       parent: power-controller at 12340000 {
+>> If I get an ACK from the maintainer I can take it into the GPIO
+>> tree.
 >
-> With W=1, this is gonna trigger:
->
->     Warning (unit_address_vs_reg): Node foo has a unit name, but no reg property
->
-> Yes, there are pre-existing users in this file.
+> Oh, people often say "the rpi tree" to mean downstream (currently 4.4).
+> The maintainer of that file upstream is me, and I was hoping you could
+> merge through your tree.
 
-Scrap this... switching desktops causes loss of position...
+OK no problem, I can merge it once we agree on the mechanics :)
 
->> +               compatible = "foo,power-controller";
->> +               reg = <0x12340000 0x1000>;
->> +               #power-domain-cells = <1>;
->> +               domain-idle-states = <&DOMAIN_RET, &DOMAIN_PWR_DN>;
->> +       };
-
-+       DOMAIN_RET: state at 0 {
-+               compatible = "arm,idle-state";
-+               entry-latency-us = <1000>;
-+               exit-latency-us = <2000>;
-+               min-residency-us = <10000>;
-
-This one is gonna trigger
-
-Warning (unit_address_vs_reg): Node foo has a unit name, but no reg property
-
-+       };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
