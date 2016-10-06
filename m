@@ -1,117 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  6 Oct 2016 11:27:26 +0100
-Subject: [PATCH 2/2] efi/arm*: libstub: invoke EFI_RNG_PROTOCOL to seed the
- UEFI RNG table
-In-Reply-To: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1475749646-10844-3-git-send-email-ard.biesheuvel@linaro.org>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Thu, 6 Oct 2016 11:45:41 +0100
+Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
+ issue.
+In-Reply-To: <20161006093721.GA436@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
+ <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
+ <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
+ <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
+ <8760pqncee.fsf@intel.com>
+ <20161006093721.GA436@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <CACvgo50vU5_=KFUCAZDaQPepPdsbnF8KN1b+f6KJNuBW6qRdSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Invoke the EFI_RNG_PROTOCOL protocol in the context of the stub and
-install the Linux-specific RNG seed UEFI config table. This will be
-picked up by the EFI routines in the core kernel to seed the kernel
-entropy pool.
+On 6 October 2016 at 10:37, Peter Griffin <peter.griffin@linaro.org> wrote:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/libstub/arm-stub.c |  2 +
- drivers/firmware/efi/libstub/efistub.h  |  2 +
- drivers/firmware/efi/libstub/random.c   | 48 ++++++++++++++++++++
- include/linux/efi.h                     |  1 +
- 4 files changed, 53 insertions(+)
+> In fact the help text for VIRTIO even states this option should be selected
+> by any driver which implements virtio.
+>
+Almost but not quite. It says:
 
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 993aa56755f6..b4f7d78f9e8b 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -340,6 +340,8 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 	if (status != EFI_SUCCESS)
- 		pr_efi_err(sys_table, "Failed initrd from command line!\n");
- 
-+	efi_random_get_seed(sys_table);
-+
- 	new_fdt_addr = fdt_addr;
- 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
- 				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
-diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index ee49cd23ee63..1c57715286a7 100644
---- a/drivers/firmware/efi/libstub/efistub.h
-+++ b/drivers/firmware/efi/libstub/efistub.h
-@@ -62,4 +62,6 @@ efi_status_t efi_random_alloc(efi_system_table_t *sys_table_arg,
- 
- efi_status_t check_platform_features(efi_system_table_t *sys_table_arg);
- 
-+efi_status_t efi_random_get_seed(efi_system_table_t *sys_table_arg);
-+
- #endif
-diff --git a/drivers/firmware/efi/libstub/random.c b/drivers/firmware/efi/libstub/random.c
-index 0c9f58c5ba50..0109bc3a1f3f 100644
---- a/drivers/firmware/efi/libstub/random.c
-+++ b/drivers/firmware/efi/libstub/random.c
-@@ -141,3 +141,51 @@ efi_status_t efi_random_alloc(efi_system_table_t *sys_table_arg,
- 
- 	return status;
- }
-+
-+#define RANDOM_SEED_SIZE	32
-+
-+efi_status_t efi_random_get_seed(efi_system_table_t *sys_table_arg)
-+{
-+	efi_guid_t rng_proto = EFI_RNG_PROTOCOL_GUID;
-+	efi_guid_t rng_algo_raw = EFI_RNG_ALGORITHM_RAW;
-+	efi_guid_t rng_table_guid = LINUX_EFI_RANDOM_SEED_TABLE_GUID;
-+	struct efi_rng_protocol *rng;
-+	struct linux_efi_random_seed *seed;
-+	efi_status_t status;
-+
-+	status = efi_call_early(locate_protocol, &rng_proto, NULL,
-+				(void **)&rng);
-+	if (status != EFI_SUCCESS)
-+		return status;
-+
-+	status = efi_call_early(allocate_pool, EFI_LOADER_DATA,
-+				sizeof(*seed) + RANDOM_SEED_SIZE,
-+				(void **)&seed);
-+	if (status != EFI_SUCCESS)
-+		return status;
-+
-+	status = rng->get_rng(rng, &rng_algo_raw, RANDOM_SEED_SIZE,
-+			      seed->bits);
-+	if (status == EFI_UNSUPPORTED)
-+		/*
-+		 * Use whatever algorithm we have available if the raw algorithm
-+		 * is not implemented.
-+		 */
-+		status = rng->get_rng(rng, NULL, RANDOM_SEED_SIZE,
-+				      seed->bits);
-+
-+	if (status != EFI_SUCCESS)
-+		goto err_freepool;
-+
-+	seed->size = RANDOM_SEED_SIZE;
-+	status = efi_call_early(install_configuration_table, &rng_table_guid,
-+				seed);
-+	if (status != EFI_SUCCESS)
-+		goto err_freepool;
-+
-+	return EFI_SUCCESS;
-+
-+err_freepool:
-+	efi_call_early(free_pool, seed);
-+	return status;
-+}
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 85e28b138cdd..f5a821d9b90c 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -589,6 +589,7 @@ void efi_native_runtime_setup(void);
- #define DEVICE_TREE_GUID			EFI_GUID(0xb1b621d5, 0xf19c, 0x41a5,  0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0)
- #define EFI_PROPERTIES_TABLE_GUID		EFI_GUID(0x880aaca3, 0x4adc, 0x4a04,  0x90, 0x79, 0xb7, 0x47, 0x34, 0x08, 0x25, 0xe5)
- #define EFI_RNG_PROTOCOL_GUID			EFI_GUID(0x3152bca5, 0xeade, 0x433d,  0x86, 0x2e, 0xc0, 0x1c, 0xdc, 0x29, 0x1f, 0x44)
-+#define EFI_RNG_ALGORITHM_RAW			EFI_GUID(0xe43176d7, 0xb6e8, 0x4827,  0xb7, 0x84, 0x7f, 0xfd, 0xc4, 0xb6, 0x85, 0x61)
- #define EFI_MEMORY_ATTRIBUTES_TABLE_GUID	EFI_GUID(0xdcfa911d, 0x26eb, 0x469f,  0xa2, 0x20, 0x38, 0xb7, 0xdc, 0x46, 0x12, 0x20)
- #define EFI_CONSOLE_OUT_DEVICE_GUID		EFI_GUID(0xd3b36f2c, 0xd551, 0x11d4,  0x9a, 0x46, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d)
- 
--- 
-2.7.4
+"This option is selected by any driver which implements the virtio _bus_"
+
+REMOTEPROC obviously does that while the ST SLIM driver does not. Thus
+the latter should _not_ select, be that explicitly or implicitly via
+REMOTEPROC, the symbol.
+
+>>
+>> People tend to abuse select because it's "convenient". If you depend,
+>> but some of your dependencies aren't met, you're in for some digging
+>> through Kconfig to find the missing deps. Just to make the option you
+>> want visible in menuconfig. If you instead select something with
+>> dependencies, it'll be right most of the time, and it's "convenient",
+>> until it breaks. (And hey, it usually breaks for someone else with some
+>> other config, so it's still convenient for you.)
+>
+> I'm sure they do but in this case it is actually the use of 'depends on'
+> which has caused the breakage and inconvenience for somebody else and sadly this
+> inconvienice is still on-going due to this patch not being applied or getting an
+> acked-by from the appropriate maintainers.
+>
+Surely you're not saying that pre-existing driver following the
+documentation, is 'causing breakage' for a new driver {ab,mis}using a
+feature ?
+
+This reminds me an old saying: "If the shoe doesn?t fit, it doesn?t
+mean there is anything wrong with your feet."
+You seem to be suggesting the opposite ?
+
+>>
+>> Perhaps kconfig should complain about selecting visible symbols and
+>> symbols with dependencies.
+>
+> That sounds like it would be a useful addition.
+>
+> Is it possible to get this patch applied or an acked-by to avoid further delay
+> to the fdma series?
+>
+Please don't apply duct tape, especially where it's _not_ needed.
+
+$ sed -i s/select REMOTEPROC/depends on REMOTEPROC/ drivers/remoteproc/Kconfig
+
+... will resolve things in the right place. The alternative will lead
+to random issues in other subsystems.
+
+Regards,
+Emil
