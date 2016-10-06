@@ -1,85 +1,45 @@
-From: rrichter@cavium.com (Robert Richter)
-Date: Thu, 6 Oct 2016 11:52:07 +0200
-Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire section
-Message-ID: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 6 Oct 2016 10:59:01 +0100
+Subject: Coresight ETF trace dump failed in Juno r1 with 4.8-rc8
+In-Reply-To: <CAGhh56Fuvkejfb0jMhtHq2saLQT6iSQa0rioW7mOpELugdmtPQ@mail.gmail.com>
+References: <CAGhh56F-VWCCy82msQ8CimZ4a0a2h=tqR2qv1KcfeyuQXo=R1w@mail.gmail.com>
+ <42c2ac9c-abdf-5341-01b5-3f342c5164b7@arm.com>
+ <CAGhh56H7a9oEYxzEA4gGvBey=COMqwgisd4tzewU8DLGcGrsww@mail.gmail.com>
+ <434a0256-de86-c1f0-0dc3-a38f55596e8e@arm.com>
+ <CAGhh56GeZkLT=sN4cEhUJMeuz+ZD6jMnU2sbb3yRVLESUcWrtg@mail.gmail.com>
+ <7e1e514b-fc3b-ca96-4631-88d537019e08@arm.com>
+ <CAGhh56Fuvkejfb0jMhtHq2saLQT6iSQa0rioW7mOpELugdmtPQ@mail.gmail.com>
+Message-ID: <c0fb1444-7c81-b11f-fbbc-10b416de2167@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a memory setup problem on ThunderX systems with certain
-memory configurations. The symptom is
 
- kernel BUG at mm/page_alloc.c:1848!
 
-This happens for some configs with 64k page size enabled. The bug
-triggers for page zones with some pages in the zone not assigned to
-this particular zone. In my case some pages that are marked as nomap
-were not reassigned to the new zone of node 1, so those are still
-assigned to node 0.
+On 06/10/16 06:21, Venkatesh Vivekanandan wrote:
+> On Wed, Oct 5, 2016 at 4:12 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>> On 05/10/16 06:27, Venkatesh Vivekanandan wrote:
+>>
 
-The reason for the mis-configuration is a change in pfn_valid() which
-reports pages marked nomap as invalid:
+[...]
 
- 68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
+>> OK, this looks as good as what Suzuki has, so should be fine.
+>> But it doesn't list SCP version, can you see that from the Linux boot
+>> logs ?(something like below)
+>>
+>> "scpi_protocol scpi: SCP Protocol 1.2 Firmware 1.17.0 version"
+>
+> [    2.537096] scpi_protocol scpi: SCP Protocol 1.0 Firmware 1.11.0 version
+>
 
-This causes pages marked as nomap being no long reassigned to the new
-zone in memmap_init_zone() by calling __init_single_pfn().
+So you have not upgraded the firmware yet ? IIRC, the latest release
+link I provided has v1.16.0 or 1.17.0
 
-Fixing this by restoring the old behavior of pfn_valid() to use
-memblock_is_memory(). Also changing users of pfn_valid() in arm64 code
-to use memblock_is_map_memory() where necessary. This only affects
-code in ioremap.c. The code in mmu.c still can use the new version of
-pfn_valid().
+v1.11.0 is almost a year old and I have worked with the firmware team to
+get various issues around ETM I encountered since then. If you are
+facing issue even with latest release firmware, then I will be able to
+look at it and help you.
 
-Should be marked stable v4.5..
-
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- arch/arm64/mm/init.c    | 2 +-
- arch/arm64/mm/ioremap.c | 5 +++--
- 2 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index bbb7ee76e319..25b8659c2a9f 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -147,7 +147,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
- #ifdef CONFIG_HAVE_ARCH_PFN_VALID
- int pfn_valid(unsigned long pfn)
- {
--	return memblock_is_map_memory(pfn << PAGE_SHIFT);
-+	return memblock_is_memory(pfn << PAGE_SHIFT);
- }
- EXPORT_SYMBOL(pfn_valid);
- #endif
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index 01e88c8bcab0..c17c220b0c48 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -21,6 +21,7 @@
-  */
- 
- #include <linux/export.h>
-+#include <linux/memblock.h>
- #include <linux/mm.h>
- #include <linux/vmalloc.h>
- #include <linux/io.h>
-@@ -55,7 +56,7 @@ static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
- 	/*
- 	 * Don't allow RAM to be mapped.
- 	 */
--	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-+	if (WARN_ON(memblock_is_map_memory(phys_addr)))
- 		return NULL;
- 
- 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
-@@ -96,7 +97,7 @@ EXPORT_SYMBOL(__iounmap);
- void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
- {
- 	/* For normal memory we already have a cacheable mapping. */
--	if (pfn_valid(__phys_to_pfn(phys_addr)))
-+	if (memblock_is_map_memory(phys_addr))
- 		return (void __iomem *)__phys_to_virt(phys_addr);
- 
- 	return __ioremap_caller(phys_addr, size, __pgprot(PROT_NORMAL),
 -- 
-2.7.0.rc3
+Regards,
+Sudeep
