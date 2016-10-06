@@ -1,113 +1,63 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Thu, 6 Oct 2016 17:09:57 +0530
-Subject: [PATCH v5 2/5] drm/bridge: Add RGB to VGA bridge support
-In-Reply-To: <20161006072106.GA4684@lukather>
-References: <20160930143709.1388-1-maxime.ripard@free-electrons.com>
- <20160930143709.1388-3-maxime.ripard@free-electrons.com>
- <8795dc49-26f9-0505-f442-2ca74b51872f@codeaurora.org>
- <20161006072106.GA4684@lukather>
-Message-ID: <96cef428-19e5-ff98-1de1-fa31dd8d4142@codeaurora.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 6 Oct 2016 13:48:39 +0200
+Subject: [PATCH 8/8] PM / doc: Update device documentation for devices in
+ IRQ safe PM domains
+In-Reply-To: <1475699519-109623-9-git-send-email-lina.iyer@linaro.org>
+References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
+ <1475699519-109623-9-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFp_phou_aA2N8NUmoi4Ve5+y1GODipR5t5Q7d-5fpcZhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 5 October 2016 at 22:31, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Update documentation to reflect the changes made to support IRQ safe PM
+> domains.
+>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  Documentation/power/devices.txt | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
+> index 8ba6625..a622136 100644
+> --- a/Documentation/power/devices.txt
+> +++ b/Documentation/power/devices.txt
+> @@ -607,7 +607,17 @@ individually.  Instead, a set of devices sharing a power resource can be put
+>  into a low-power state together at the same time by turning off the shared
+>  power resource.  Of course, they also need to be put into the full-power state
+>  together, by turning the shared power resource on.  A set of devices with this
+> -property is often referred to as a power domain.
+> +property is often referred to as a power domain. A power domain may also be
+> +nested inside another power domain.
+> +
+> +Devices, by default, operate in process context. If a device can operate in
+> +IRQ safe context that has to be explicitly indicated by setting the irq_safe
+> +boolean inside struct generic_pm_domain to be true. Power domains by default,
 
+This doesn't make much sense.
 
-On 10/06/2016 12:51 PM, Maxime Ripard wrote:
-> Hi Archit,
->
-> On Mon, Oct 03, 2016 at 04:40:57PM +0530, Archit Taneja wrote:
->> Hi Maxime,
->>
->> On 09/30/2016 08:07 PM, Maxime Ripard wrote:
->>> Some boards have an entirely passive RGB to VGA bridge, based on either
->>> DACs or resistor ladders.
->>>
->>> Those might or might not have an i2c bus routed to the VGA connector in
->>> order to access the screen EDIDs.
->>>
->>> Add a bridge that doesn't do anything but expose the modes available on the
->>> screen, either based on the EDIDs if available, or based on the XGA
->>> standards.
->>>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> ---
->>> .../bindings/display/bridge/rgb-to-vga-bridge.txt  |  48 +++++
->>> drivers/gpu/drm/bridge/Kconfig                     |   7 +
->>> drivers/gpu/drm/bridge/Makefile                    |   1 +
->>> drivers/gpu/drm/bridge/rgb-to-vga.c                | 229 +++++++++++++++++++++
->>> 4 files changed, 285 insertions(+)
->>> create mode 100644 Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
->>> create mode 100644 drivers/gpu/drm/bridge/rgb-to-vga.c
->>>
->>> diff --git a/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
->>> new file mode 100644
->>> index 000000000000..a8375bc1f9cb
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
->>> @@ -0,0 +1,48 @@
->>> +Dumb RGB to VGA bridge
->>> +----------------------
->>> +
->>> +This binding is aimed for dumb RGB to VGA bridges that do not require
->>> +any configuration.
->>> +
->>> +Required properties:
->>> +
->>> +- compatible: Must be "rgb-to-vga-bridge"
->>
->> I'd talked to Laurent on IRC if he's okay with this. And I guess you to
->> had discussed it during XDC too. He's suggested that it'd be better to
->> have the compatible string as "simple-vga-dac".
->
-> I just wished this bikeshedding had taken place publicly and be
-> actually part of that discussion, but yeah, ok.
+First, I think you should mention that this is about which context the
+device's corresponding runtime PM callbacks are allowed to execute in.
+Second, it's not clear *why* you must set the irq_safe boolean inside
+struct generic_pm_domain to true, for IRQ-safe devices. You probably
+shouldn't state this at all.
 
-Sorry about that. I'd pinged him for an Ack, the discussion went
-more than that :)
+Perhaps a better description is to elaborate on the constraints an
+IRQ-safe device holds. Then one could explain a bit about how IRQ safe
+(genpd) PM domains can be used for these devices (something like
+below).
 
+> +operate in process context but could have devices that are IRQ safe. Such
+> +power domains cannot be powered on/off during runtime PM. On the other hand,
+> +IRQ safe PM domains that have IRQ safe devices may be powered off when all
+> +the devices are in idle. An IRQ safe domain may only be attached as a
+> +subdomain to another IRQ safe domain.
 >
->> Some of the reasons behind having this:
->>
->> - We don't need to specify "rgb" in the compatible string since most
->> simple VGA DACs can only work with an RGB input.
->
-> Ok.
->
->> - Also, with "dac" specified in the string, we don't need to
->> specifically mention "bridge" in the string. Also, bridge is a drm
->> specific term.
->>
->> - "simple" is considered because it's an unconfigurable bridge, and it
->> might be misleading for other VGA DACs to not use "vga-dac".
->
-> All those "simple" bindings are just the biggest lie we ever
-> told. It's simple when you introduce it, and then grows into something
-> much more complicated than a non-simple implementation.
-
-"simple" here is supposed to mean that it's an unconfigurable RGB to
-VGA DAC. This isn't supposed to follow the simple-panel model, where
-you add the "simple-panel" string in the compatible node, along with
-you chip specific compatible string.
-
-In other words, this driver shouldn't be touched again in the future :)
-If someone wants to write a RGB to VGA driver which is even
-slightly configurable, they'll need to write a new bridge driver.
-
-Thanks,
-Archit
-
->
->> What do you think about this? If you think it's good, would it be
->> possible for you to change this? I guess it's okay for the rest of
->> the patch to stay the same.
->
-> I'll update and respin the serie.
->
-> Thanks,
-> Maxime
+>  Support for power domains is provided through the pm_domain field of struct
+>  device.  This field is a pointer to an object of type struct dev_pm_domain,
+> --
+> 2.7.4
 >
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Kind regards
+Uffe
