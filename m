@@ -1,121 +1,128 @@
-From: emil@limesaudio.com (Emil Lundmark)
-Date: Thu,  6 Oct 2016 13:12:11 +0200
-Subject: [PATCH 2/2] ARM: imx: improve precision of AV PLL to 1 Hz
-In-Reply-To: <1475752331-19525-1-git-send-email-emil@limesaudio.com>
-References: <1475752331-19525-1-git-send-email-emil@limesaudio.com>
-Message-ID: <1475752331-19525-2-git-send-email-emil@limesaudio.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Thu, 6 Oct 2016 12:31:25 +0100
+Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
+ issue.
+In-Reply-To: <20161006104807.GB436@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
+ <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
+ <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
+ <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
+ <CACvgo53fuoPVjBAkZbWFPVxosObjvxoDgFdR_BkSTgevqyGg9g@mail.gmail.com>
+ <20161006104807.GB436@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <CACvgo52zh5ZH8YhOJ=eE=RA7m=4vUoVFCdW+YSyN8WSHVi=Maw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The audio and video PLLs are designed to have a precision of 1 Hz if some
-conditions are met. The current implementation only allows a precision that
-depends on the rate of the parent clock. E.g., if the parent clock is 24
-MHz, the precision will be 24 Hz; or more generally the precision will be
+Hi Peter,
 
-    p / 10^6 Hz
+On 6 October 2016 at 11:48, Peter Griffin <peter.griffin@linaro.org> wrote:
+> Hi Emil,
+>
+> On Wed, 21 Sep 2016, Emil Velikov wrote:
+>
+>> On 20 September 2016 at 09:32, Peter Griffin <peter.griffin@linaro.org> wrote:
+>> > Hi Emil,
+>> >
+>> > On Tue, 20 Sep 2016, Emil Velikov wrote:
+>> >
+>> >> On 5 September 2016 at 14:16, Peter Griffin <peter.griffin@linaro.org> wrote:
+>> >> > ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
+>> >> > recursive dependency.
+>> >
+>> >
+>> >> >
+>> >> From a humble skim through remoteproc, drm and a few other subsystems
+>> >> I think the above is wrong. All the drivers (outside of remoteproc),
+>> >> that I've seen, depend on the core component, they don't select it.
+>> >
+>> > I will let Bjorn comment on the remoteproc subsystem Kconfig design, and
+>> > why it is like it is.
+>> >
+>> > For this particular SLIM_RPROC I have added it to Kconfig in keeping with all
+>> > the other drivers in the remoteproc subsystem which has exposed this recursive
+>> > dependency issue.
+>> >
+>> > For this particular kconfig symbol a quick grep reveals more drivers in
+>> > the kernel using 'select', than 'depend on'
+>> >
+>> > git grep "select VIRTIO" | wc -l
+>> > 14
+>> >
+>> > git grep "depends on VIRTIO" | wc -l
+>> > 10
+>> >
+>> Might be worth taking a closer look into these at some point.
+>
+> VIRTIO has no dependencies, and is a non visible symbol. Its Kconfig help also
+> mentions that drivers should select it.
+>
+This is a (un)fortunate detail cannot/should not overrule the other
+arguments I've mentioned, should it ?
 
-where p is the parent clock rate. This comes down to how the register
-values for the PLL's fractional loop divider is chosen.
+>>
+>> >
+>> >> Furthermore most places explicitly hide the drivers from the menu if
+>> >> the core component isn't enabled.
+>> >
+>> > Remoteproc subsystem takes a different approach, the core code is only enabled
+>> > if a driver which relies on it is enabled. This IMHO makes sense, as
+>> > remoteproc is not widely used (only a few particular ARM SoC's).
+>> >
+>> > It is true that for subsystems which rely on the core component being
+>> > explicitly enabled, they often tend to hide drivers which depend on it
+>> > from the menu unless it is. This also makes sense.
+>> >
+>> >>
+>> >> Is there something that requires such a different/unusual behaviour in
+>> >> remoteproc ?
+>> >>
+>> >
+>> > I'm not sure it is that unusual...looking at config USB, it selects USB_COMMON in
+>> > mfd subsystem, client drivers select MFD_CORE.
+>> >
+>> On the USB case I'm not sure what the reasoning behind the USB vs
+>> USB_COMMON split. In seems that one could just fold them, but that's
+>> another topic. On the MFD side... it follows the select {,mis,ab}use.
+>> With one (the only one?) MFD driver not using/selecting MFD_CORE doing
+>> it's own version of mfd_add_devices... which could be reworked,
+>> possibly.
+>
+> Much like selecting VIRTIO in this patch, MFD_CORE is a non visible symbol
+> with no dependencies so it matches the documentation Jani referenced.
+>
+> I personally think the approach taken makes sense, as why would you want to have
+> a CONFIG_MFD_CORE=y symbol being enabled unless you actually have a MFD device
+> which uses it also enabled in your kernel?
+>
+> It seems to me a good solution to make the client drivers select the core
+> component so that it only gets enabled if at least one driver requires it.
+> This avoids having useless core code which will never be used compiled into the
+> kernel and in the end a smaller kernel size for a given kernel configuration (better
+> cache use etc etc).
+>
+>> > I've added Arnd to this thread, as I've seen lots of Kconfig patches from him
+>> > recently, maybe he has some thoughts on whether this is the correct fix or not?
+>> >
+>> Ack. Fwiw, I believe that the reasoning put by Jani is perfeclty
+>> reasonable, but it'll be great to hear others as well.
+>
+> Yes me to. However I don't think anything in this patch is at odds with the
+> documentation Jani has referenced.
+>
+It case it's not clear, let me elaborate:
 
-The clock rate calculation for the PLL is
+Yes, using depend might not be the most user-friendly thing to do and
+in the long term we might want to move to select.
+Yes, I agree with the argument about symbol visibility but that is not
+the only contributing factor.
 
-    PLL output frequency = Fref * (DIV_SELECT + NUM / DENOM)
+If one wants to pick on specific users which opt for $driver select
+$core they must do the same for $driver depends on $core. Check the
+number 'in favour" of each case and draw their conclusions ;-)
 
-or with a shorter notation
+In particular: both MFD_CORE and USB_COMMON, are _optional_ as only
+some drivers depends on them. Thus giving them as an example is
+wrong/irrelevant, I'm afraid.
 
-    r = p * (d + a / b)
-
-In addition to all variables being integers, we also have the following
-conditions:
-
-    27 <= d <= 54
-
-    0 <= a <= 2^30-1
-    0 <  b <= 2^30-1
-    a < b
-
-Here, d, a and b are register values for the fractional loop divider. We
-want to chose d, a and b such that f(p, r) = p, i.e. f is our round_rate
-function. Currently, d and b are chosen as
-
-    d = r / p
-    b = 10^6
-
-hence we get the poor precision. And a is defined in terms of r, d, p and
-b:
-
-    a = (r - d * p) * b / p
-
-I propose that if p <= 2^30-1 (i.e., the max value for b), we chose b as
-
-    b = p
-
-The rationale behind this is that if b = p:
-
-    a = (r - d * p) * b / p
-      = (r - d * p) * p / p
-      = r - d * p
-
-    r = p * (d + a / b)
-      = p * d + p * a / b
-      = p * d + p * a / p
-      = p * d + a
-
-and if d = r / p:
-
-    a = r - d * p
-      = r - r / p * p
-      = 0
-
-    r = p * d + a
-      = p * d + 0
-      = p * r / p
-      = r
-
-I reckon this is the intention by the design of the clock rate formula.
-
-Signed-off-by: Emil Lundmark <emil@limesaudio.com>
----
- drivers/clk/imx/clk-pllv3.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-index bc7f163..5ff55ff 100644
---- a/drivers/clk/imx/clk-pllv3.c
-+++ b/drivers/clk/imx/clk-pllv3.c
-@@ -234,6 +234,7 @@ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
- 	unsigned long max_rate = parent_rate * 54;
- 	u32 div;
- 	u32 mfn, mfd = 1000000;
-+	u32 max_mfd = 0x3FFFFFFF;
- 	u64 temp64;
- 
- 	if (rate > max_rate)
-@@ -241,6 +242,9 @@ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
- 	else if (rate < min_rate)
- 		rate = min_rate;
- 
-+	if (parent_rate <= max_mfd)
-+		mfd = parent_rate;
-+
- 	div = rate / parent_rate;
- 	temp64 = (u64) (rate - div * parent_rate);
- 	temp64 *= mfd;
-@@ -262,11 +266,15 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
- 	unsigned long max_rate = parent_rate * 54;
- 	u32 val, div;
- 	u32 mfn, mfd = 1000000;
-+	u32 max_mfd = 0x3FFFFFFF;
- 	u64 temp64;
- 
- 	if (rate < min_rate || rate > max_rate)
- 		return -EINVAL;
- 
-+	if (parent_rate <= max_mfd)
-+		mfd = parent_rate;
-+
- 	div = rate / parent_rate;
- 	temp64 = (u64) (rate - div * parent_rate);
- 	temp64 *= mfd;
--- 
-2.7.4
+Thanks
+Emil
