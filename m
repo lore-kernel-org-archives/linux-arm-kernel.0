@@ -1,47 +1,34 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  6 Oct 2016 15:33:14 -0400
-Subject: [PATCH] dmaengine: qcom_hidma: prevent disable in error
-Message-ID: <1475782394-27887-1-git-send-email-okaya@codeaurora.org>
+From: paweljarosz3691@gmail.com (=?utf-8?B?UGF3ZcWC?= Jarosz)
+Date: Thu, 6 Oct 2016 21:42:21 +0200
+Subject: [PATCH] ARM: dts: rockchip: initialize rk3066 PLL clock rate
+Message-ID: <20161006194221.GA4895@vaio-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an error is observed, we try to disable the channel and prevent
-further accesses from the client.
+Initialize PLL rate while kernel init. No other module does than.
+Clock rates are taken from rk3066 TRM. Assigned values are for 125 degrees
+celcius operating point.
+This gives us performance boost observable for example in mmc transfers.
 
-Depending on the type of error, transitioning into disabled state might
-not be possible. Adding a check to make sure that HW is in enabled/running
-state before the disable transition happens.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
 ---
- drivers/dma/qcom/hidma_ll.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ arch/arm/boot/dts/rk3066a.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index 3224f24..c3a66c9 100644
---- a/drivers/dma/qcom/hidma_ll.c
-+++ b/drivers/dma/qcom/hidma_ll.c
-@@ -564,19 +564,8 @@ int hidma_ll_disable(struct hidma_lldev *lldev)
- 	u32 val;
- 	int ret;
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 0d0dae3..cf215e8 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -151,6 +151,10 @@
  
--	val = readl(lldev->evca + HIDMA_EVCA_CTRLSTS_REG);
--	lldev->evch_state = HIDMA_CH_STATE(val);
--	val = readl(lldev->trca + HIDMA_TRCA_CTRLSTS_REG);
--	lldev->trch_state = HIDMA_CH_STATE(val);
--
--	/* already suspended by this OS */
--	if ((lldev->trch_state == HIDMA_CH_SUSPENDED) ||
--	    (lldev->evch_state == HIDMA_CH_SUSPENDED))
--		return 0;
--
--	/* already stopped by the manager */
--	if ((lldev->trch_state == HIDMA_CH_STOPPED) ||
--	    (lldev->evch_state == HIDMA_CH_STOPPED))
-+	/* The channel needs to be in working state */
-+	if (!hidma_ll_isenabled(lldev))
- 		return 0;
+ 		#clock-cells = <1>;
+ 		#reset-cells = <1>;
++		assigned-clocks = <&cru PLL_DPLL>, <&cru PLL_APLL>,
++				  <&cru PLL_CPLL>, <&cru PLL_GPLL>;
++		assigned-clock-rates = <533000000>, <600000000>,
++				       <600000000>, <600000000>;
+ 	};
  
- 	val = readl(lldev->trca + HIDMA_TRCA_CTRLSTS_REG);
+ 	timer at 2000e000 {
 -- 
-1.9.1
+2.7.4
