@@ -1,23 +1,22 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 06 Oct 2016 16:54:40 +0200
-Subject: [PATCH 2/2] ARM: dts: armada-370-rn104: drop specification of
- compatible for i2c0
-In-Reply-To: <1475173326-24673-2-git-send-email-uwe@kleine-koenig.org> ("Uwe
- =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Thu, 29 Sep 2016 20:22:06
+Date: Thu, 06 Oct 2016 16:56:06 +0200
+Subject: [PATCH] ARM: dts: armada-xp-rn2120: drop wrong compatible for i2c0
+In-Reply-To: <20160929185221.23194-1-u.kleine-koenig@pengutronix.de> ("Uwe
+ =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Thu, 29 Sep 2016 20:52:21
  +0200")
-References: <1475173326-24673-1-git-send-email-uwe@kleine-koenig.org>
- <1475173326-24673-2-git-send-email-uwe@kleine-koenig.org>
-Message-ID: <878tu1wmrz.fsf@free-electrons.com>
+References: <20160929185221.23194-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <874m4pwmpl.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Uwe,
  
- On jeu., sept. 29 2016, Uwe Kleine-K?nig <uwe@kleine-koenig.org> wrote:
+ On jeu., sept. 29 2016, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
-> The compatible string is already provided by armada-370.dtsi.
+> The compatible is supposed to be "marvell,mv78230-i2c", "marvell,mv64xxx-i2c",
+> as provided by armada-xp.dtsi.
 >
-> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
 Applied on mvebu/dt-4.10
 
@@ -25,23 +24,23 @@ Thanks,
 
 Gregory
 > ---
->  arch/arm/boot/dts/armada-370-netgear-rn104.dts | 1 -
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts | 1 -
 >  1 file changed, 1 deletion(-)
 >
-> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> index d44a850d879c..14c379699350 100644
-> --- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> +++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
-> @@ -126,7 +126,6 @@
+> diff --git a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> index d19f44c70925..3e930fdbaabc 100644
+> --- a/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> +++ b/arch/arm/boot/dts/armada-xp-netgear-rn2120.dts
+> @@ -97,7 +97,6 @@
 >  			};
 >  
 >  			i2c at 11000 {
 > -				compatible = "marvell,mv64xxx-i2c";
->  				clock-frequency = <100000>;
+>  				clock-frequency = <400000>;
+>  				status = "okay";
 >  
->  				pinctrl-0 = <&i2c0_pins>;
 > -- 
-> 2.8.1
+> 2.9.3
 >
 
 -- 
