@@ -1,83 +1,42 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 6 Oct 2016 10:43:53 +0530
-Subject: [PATCH v3 2/4] net: phy: dp83867: add support for MAC impedance
- configuration
-In-Reply-To: <20161006051355.15947-1-mugunthanvnm@ti.com>
-References: <20161006051355.15947-1-mugunthanvnm@ti.com>
-Message-ID: <20161006051355.15947-3-mugunthanvnm@ti.com>
+Date: Thu, 6 Oct 2016 10:43:51 +0530
+Subject: [PATCH v3 0/4] add support for impedance control for TI dp83867 phy
+ and fix 2nd ethernet on dra72 rev C evm
+Message-ID: <20161006051355.15947-1-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for programmable MAC impedance configuration
+Add support for configurable impedance control for TI dp83867
+phy via devicetree. More documentation in [1].
+CPSW second ethernet is not working, fix it by enabling
+impedance configuration on the phy.
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- drivers/net/phy/dp83867.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Verified the patch on DRA72 Rev C evm, logs at [2]. Also pushed
+a branch [3] for others to test.
 
-diff --git a/drivers/net/phy/dp83867.c b/drivers/net/phy/dp83867.c
-index 91177a4..1b63924 100644
---- a/drivers/net/phy/dp83867.c
-+++ b/drivers/net/phy/dp83867.c
-@@ -33,6 +33,7 @@
- /* Extended Registers */
- #define DP83867_RGMIICTL	0x0032
- #define DP83867_RGMIIDCTL	0x0086
-+#define DP83867_IO_MUX_CFG	0x0170
- 
- #define DP83867_SW_RESET	BIT(15)
- #define DP83867_SW_RESTART	BIT(14)
-@@ -62,10 +63,17 @@
- /* RGMIIDCTL bits */
- #define DP83867_RGMII_TX_CLK_DELAY_SHIFT	4
- 
-+/* IO_MUX_CFG bits */
-+#define DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL	0x1f
-+
-+#define DP83867_IO_MUX_CFG_IO_IMPEDANCE_MAX	0x0
-+#define DP83867_IO_MUX_CFG_IO_IMPEDANCE_MIN	0x1f
-+
- struct dp83867_private {
- 	int rx_id_delay;
- 	int tx_id_delay;
- 	int fifo_depth;
-+	int io_impedance;
- };
- 
- static int dp83867_ack_interrupt(struct phy_device *phydev)
-@@ -111,6 +119,14 @@ static int dp83867_of_init(struct phy_device *phydev)
- 	if (!of_node)
- 		return -ENODEV;
- 
-+	dp83867->io_impedance = -EINVAL;
-+
-+	/* Optional configuration */
-+	if (of_property_read_bool(of_node, "ti,max-output-impedance"))
-+		dp83867->io_impedance = DP83867_IO_MUX_CFG_IO_IMPEDANCE_MAX;
-+	else if (of_property_read_bool(of_node, "ti,min-output-impedance"))
-+		dp83867->io_impedance = DP83867_IO_MUX_CFG_IO_IMPEDANCE_MIN;
-+
- 	ret = of_property_read_u32(of_node, "ti,rx-internal-delay",
- 				   &dp83867->rx_id_delay);
- 	if (ret)
-@@ -184,6 +200,18 @@ static int dp83867_config_init(struct phy_device *phydev)
- 
- 		phy_write_mmd_indirect(phydev, DP83867_RGMIIDCTL,
- 				       DP83867_DEVADDR, delay);
-+
-+		if (dp83867->io_impedance >= 0) {
-+			val = phy_read_mmd_indirect(phydev, DP83867_IO_MUX_CFG,
-+						    DP83867_DEVADDR);
-+
-+			val &= ~DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL;
-+			val |= dp83867->io_impedance &
-+			       DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL;
-+
-+			phy_write_mmd_indirect(phydev, DP83867_IO_MUX_CFG,
-+					       DP83867_DEVADDR, val);
-+		}
- 	}
- 
- 	return 0;
+Changes from v2:
+* Fixed a typo in dts and driver.
+
+Changes from initial version:
+* As per Sekhar's comment, instead of passing impedance values,
+  change to max and min impedance from DT
+* Adopted phy_read_mmd_indirect() to cunnrent implementation.
+* Corrected the phy delay timings to the optimal value.
+
+[1] - http://www.ti.com/lit/ds/symlink/dp83867ir.pdf
+[2] - http://pastebin.ubuntu.com/23283056/
+[3] - git://git.ti.com/~mugunthanvnm/ti-linux-kernel/linux.git dp83867-v3
+
+Mugunthan V N (4):
+  net: phy: dp83867: Add documentation for optional impedance control
+  net: phy: dp83867: add support for MAC impedance configuration
+  ARM: dts: dra72-evm-revc: add phy impedance settings
+  ARM: dts: dra72-evm-revc: fix correct phy delay
+
+ .../devicetree/bindings/net/ti,dp83867.txt         | 12 ++++++++++
+ arch/arm/boot/dts/dra72-evm-revc.dts               | 10 ++++----
+ drivers/net/phy/dp83867.c                          | 28 ++++++++++++++++++++++
+ 3 files changed, 46 insertions(+), 4 deletions(-)
+
 -- 
 2.10.0.372.g6fe1b14
