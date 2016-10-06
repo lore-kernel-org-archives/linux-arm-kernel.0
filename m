@@ -1,64 +1,88 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 07 Oct 2016 00:06:57 +0800
-Subject: [PATCH 06/14] ASoC: Add sun8i digital audio codec
-In-Reply-To: <20161004161549.GO5228@lukather>
-References: <cover.1475571575.git.mylene.josserand@free-electrons.com>
- <85cbd9926e52d0aa03f6bbfd8794373d8db491e0.1475571575.git.mylene.josserand@free-electrons.com>
- <20161004161549.GO5228@lukather>
-Message-ID: <901741475770017@web21g.yandex.ru>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 6 Oct 2016 10:10:46 -0600
+Subject: [PATCH v3] Adding missing features of Coresight PTM components
+In-Reply-To: <04170bc7-a947-ae75-cb14-7989a6cb4870@centralesupelec.fr>
+References: <f029bcee-696f-3519-b0f1-4cdcf24ad3f8@centralesupelec.fr>
+ <60a1f04c-1e73-0ff1-dfee-775b875d2c4a@centralesupelec.fr>
+ <CANLsYkyPTtiGsfKg13ZY2pgCC3rh+MfirMwTrLG1=TZ5gUJqzA@mail.gmail.com>
+ <04170bc7-a947-ae75-cb14-7989a6cb4870@centralesupelec.fr>
+Message-ID: <CANLsYkwns_VpivKd3hGnzDC7jnyWEUgGv1aVPEgLdG88DmhB0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-05.10.2016, 00:20, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+On 6 October 2016 at 09:57, Muhammad Abdul WAHAB
+<muhammadabdul.wahab@centralesupelec.fr> wrote:
 > Hi,
 >
->> ?+static const struct of_device_id sun8i_codec_of_match[] = {
->> ?+ { .compatible = "allwinner,sun8i-a33-codec" },
->> ?+ { .compatible = "allwinner,sun8i-a23-codec" },
+>> Where is ETMCR_RETURN_STACK_EN defined?  Did you send me code that
+>> doesn't compile?
 >
-> I thought that the A23 and A33 had different codecs? In that case, it
-> wouldn't be a good assumption to make
+> I changed the naming in the .h file before submitting it and I forgot to
+> change it in .c file. I am sorry. It is defined in coresight-etm.h.
+> Here is the correct patch.
 
-Yes.
+Then send me a proper V4 patch.
 
+>From hereon I suggest you compile your code before sending patches to
+the mailing list - other people won't be as lenient as I am.
+
+> ---
+>  drivers/hwtracing/coresight/coresight-etm.h         |  5 +++++
+>  drivers/hwtracing/coresight/coresight-etm3x-sysfs.c | 10 ++++++++++
+>  2 files changed, 15 insertions(+)
 >
->> ?+ {}
->> ?+};
->> ?+MODULE_DEVICE_TABLE(of, sun8i_codec_of_match);
->> ?+
->> ?+static struct platform_driver sun8i_codec_driver = {
->> ?+ .driver = {
->> ?+ .name = "sun8i-codec",
->> ?+ .owner = THIS_MODULE,
->> ?+ .of_match_table = sun8i_codec_of_match,
->> ?+ },
->> ?+ .probe = sun8i_codec_probe,
->> ?+ .remove = sun8i_codec_remove,
->> ?+};
->> ?+module_platform_driver(sun8i_codec_driver);
->> ?+
->> ?+MODULE_DESCRIPTION("Allwinner A33 (sun8i) codec driver");
->> ?+MODULE_AUTHOR("huanxin<huanxin@reuuimllatech.com>");
+> diff --git a/drivers/hwtracing/coresight/coresight-etm.h
+> b/drivers/hwtracing/coresight/coresight-etm.h
+> index 4a18ee4..ad063d7 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm.h
+> +++ b/drivers/hwtracing/coresight/coresight-etm.h
+> @@ -89,11 +89,13 @@
+>  /* ETMCR - 0x00 */
+>  #define ETMCR_PWD_DWN          BIT(0)
+>  #define ETMCR_STALL_MODE       BIT(7)
+> +#define ETMCR_BRANCH_BROADCAST BIT(8)
+>  #define ETMCR_ETM_PRG          BIT(10)
+>  #define ETMCR_ETM_EN           BIT(11)
+>  #define ETMCR_CYC_ACC          BIT(12)
+>  #define ETMCR_CTXID_SIZE       (BIT(14)|BIT(15))
+>  #define ETMCR_TIMESTAMP_EN     BIT(28)
+> +#define ETMCR_RETURN_STACK     BIT(29)
+>  /* ETMCCR - 0x04 */
+>  #define ETMCCR_FIFOFULL                BIT(23)
+>  /* ETMPDCR - 0x310 */
+> @@ -110,8 +112,11 @@
+>  #define ETM_MODE_STALL         BIT(2)
+>  #define ETM_MODE_TIMESTAMP     BIT(3)
+>  #define ETM_MODE_CTXID         BIT(4)
+> +#define ETM_MODE_BBROAD                BIT(5)
+> +#define ETM_MODE_RET_STACK     BIT(6)
+>  #define ETM_MODE_ALL           (ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
+>                                  ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
+> +                                ETM_MODE_BBROAD | ETM_MODE_RET_STACK | \
+>                                  ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
+>                                  ETM_MODE_EXCL_USER)
 >
-> Those obfuscated email adresses are not really helpful :)
-
-This kind of email addresses  are kept in many places in mainline kernel.
-
-e.g. drivers/mmc/host/sunxi-mmc.c have 'Aaron Maoye <leafy.myeh@reuuimllatech.com>'
-
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> index 5ea0909..a76009a 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> @@ -164,6 +164,16 @@ static ssize_t mode_store(struct device *dev,
+>         else
+>                 config->ctrl &= ~ETMCR_CTXID_SIZE;
 >
-> Thanks,
-> Maxime
+> +       if (config->mode & ETM_MODE_BBROAD)
+> +               config->ctrl |= ETMCR_BRANCH_BROADCAST;
+> +       else
+> +               config->ctrl &= ~ETMCR_BRANCH_BROADCAST;
+> +
+> +       if (config->mode & ETM_MODE_RET_STACK)
+> +               config->ctrl |= ETMCR_RETURN_STACK;
+> +       else
+> +               config->ctrl &= ~ETMCR_RETURN_STACK;
+> +
+>         if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
+>                 etm_config_trace_mode(config);
 >
 > --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-> ,
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 1.9.1
