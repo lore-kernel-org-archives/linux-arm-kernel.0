@@ -1,129 +1,66 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 6 Oct 2016 10:00:53 +0200
-Subject: [PATCH 02/11] DOCUMENTATION: dt-bindings: Document the STM32
- USART bindings
-In-Reply-To: <CAL_JsqK=VCHcPbupnwLVEWehqJbXfGD1CSZT++A4+N6DD6VqxA@mail.gmail.com>
-References: <1473957763-30629-1-git-send-email-alexandre.torgue@st.com>
- <1473957763-30629-3-git-send-email-alexandre.torgue@st.com>
- <20160923152907.GA19206@rob-hp-laptop>
- <dd28f224-3e3b-0a00-f978-16861b946fd1@st.com>
- <CAL_JsqK=VCHcPbupnwLVEWehqJbXfGD1CSZT++A4+N6DD6VqxA@mail.gmail.com>
-Message-ID: <34ed9c82-6aff-8770-68a8-afd95f161e27@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 6 Oct 2016 10:04:17 +0200
+Subject: [PATCH 3/8] PM / Domains: Allow domain power states to be read
+ from DT
+In-Reply-To: <1475699519-109623-4-git-send-email-lina.iyer@linaro.org>
+References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
+ <1475699519-109623-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAMuHMdU4HiauULf4fX67Cwj1GQmEExBiu4WyQPJBbj=xNg0eEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Lina,
 
-On 10/05/2016 05:13 PM, Rob Herring wrote:
-> On Wed, Oct 5, 2016 at 9:09 AM, Gerald Baeza <gerald.baeza@st.com> wrote:
->> On 09/23/2016 05:29 PM, Rob Herring wrote:
->>>
->>> On Thu, Sep 15, 2016 at 06:42:34PM +0200, Alexandre TORGUE wrote:
->>>>
->>>> This adds documentation of device tree bindings for the
->>>> STM32 USART
->>>
->>>
->>> Please make your subject prefixes consistent and drop "DOCUMENTATION".
->>>
->>
->> Ok, thanks
->>
->>>>
->>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
->>>> b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
->>>> new file mode 100644
->>>> index 0000000..75b1400
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
->>>> @@ -0,0 +1,34 @@
->>>> +* STMicroelectronics STM32 USART
->>>> +
->>>> +Required properties:
->>>> +- compatible: Can be either "st,stm32-usart", "st,stm32-uart",
->>>> +"st,stm32f7-usart" or "st,stm32f7-uart" depending on whether
->>>> +the device supports synchronous mode and is compatible with
->>>> +stm32(f4) or stm32f7.
->>>
->>>
->>> Why not put f4 in the compatible string. stm32 is too generic.
->>
->>
->> The initial binding is not in current kernel so it has been put in this
->> serie as PATCH 07/11. It will be squashed with this one, as you requested.
->>
->> But the driver tty/serial/stm32-usart.c was already upstreamed and it
->> already mentions the "st,stm32-usart" and "st,stm32-uart" for stm32f4 so I
->> kept this as it for backward compatibility for those who already use the
->> driver.
->>
->> I do not have the history to explain this inconsistency but can you confirm
->> that keeping the existing compatible values from the driver is the good
->> approach please?
+On Wed, Oct 5, 2016 at 10:31 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+> This patch allows domains to define idle states in the DT. SoC's can
+> define domain idle states in DT using the "domain-idle-states" property
+> of the domain provider. Calling of_pm_genpd_init() will  read the idle
+> states and initialize the genpd for the domain.
 >
-> Yes, keep it as it. Please reformat 1 valid combination per line.
-
-Ok. Do you mean something like:
-
-- compatible: "st,stm32-usart", "st,stm32-uart" For STM32F4 SOC and if
-  	      IP supports synchronous mode.
-- compatible: "st,stm32-uart" For STM32F4 SOC.
-- compatible: "st,stm32f7-usart", "st,stm32f7-uart": For STM32F7 SOC
-	      and if IP supports synchronous mode.
-- compatible: "st,stm32f7-uart" For STM32F7 SOC
-
-If you agree, what do you prefer to send modification ? I mean, those 
-bindings documentation patches are already in linux-next tree. Do you 
-want a new patch on top of linux-next or do you prefer I resend only 
-those ones ?
-
-Regards
-
-Alex
-
+> In addition to the entry and exit latency for idle state, also add
+> residency_ns, param and of_node property to each state. A domain idling
+> in a state is only power effecient if it stays idle for a certain period
+> in that state. The residency provides this minimum time for the idle
+> state to provide power benefits. The param is a state specific u32 value
+> that the platform may use for that idle state.
 >
->>> What determines sync mode or not? If it is IP configuration fixed in the
->>> design, then this is fine. If it is user choice or board dependent, then
->>> use a separate property.
->>
->>
->> This is IP configuration fixed in the design, indeed.
->>
->>>> +- reg: The address and length of the peripheral registers space
->>>> +- interrupts: The interrupt line of the USART instance
->>>> +- clocks: The input clock of the USART instance
->>>> +
->>>> +Optional properties:
->>>> +- pinctrl: The reference on the pins configuration
->>>> +- st,hw-flow-ctrl: bool flag to enable hardware flow control.
->>>> +
->>>> +Examples:
->>>> +usart4: serial at 40004c00 {
->>>> +       compatible = "st,stm32-uart";
->>>> +       reg = <0x40004c00 0x400>;
->>>> +       interrupts = <52>;
->>>> +       clocks = <&clk_pclk1>;
->>>> +       pinctrl-names = "default";
->>>> +       pinctrl-0 = <&pinctrl_usart4>;
->>>> +};
->>>> +
->>>> +usart2: serial at 40004400 {
->>>> +       compatible = "st,stm32-usart", "st,stm32-uart";
->>>
->>>
->>> What are valid combinations? usart is sync only, not sync and async?
->>
->>
->> usart (sync and async) is a superset of uart (async).
->> But the current driver does not use the synchronous mode, so the distinction
->> is just here to be consistent with the reference manual instances naming (so
->> configuration).
+> This patch is based on the original patch by Marc Titinger.
 >
-> Okay, but this point is not clear in the compatible text. The
-> description should allow me to validate the example or a dts file.
+> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  drivers/base/power/domain.c | 103 ++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pm_domain.h   |   8 ++++
+>  2 files changed, 111 insertions(+)
 >
-> Rob
->
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 740afa9..368a5b8 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1895,6 +1895,109 @@ out:
+>         return ret ? -EPROBE_DEFER : 0;
+>  }
+>  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+> +
+> +static const struct of_device_id idle_state_match[] = {
+> +       { .compatible = "arm,idle-state", },
+
+Do we want ARM-specific compatible values without an #ifdef in drivers/base/?
+
+I know we already have "samsung,power-domain".
+Perhaps that should be protected by #ifdef, too.
+
+> +       { }
+> +};
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
