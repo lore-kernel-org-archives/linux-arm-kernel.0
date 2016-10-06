@@ -1,143 +1,78 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 07 Oct 2016 00:04:13 +0300
-Subject: [PATCH v5 2/5] drm/bridge: Add RGB to VGA bridge support
-In-Reply-To: <CAOw6vbLC=HnnpuaxFf8EzSTmuYoZd-r1aqx-ixja97Ht_U6S6Q@mail.gmail.com>
-References: <20160930143709.1388-1-maxime.ripard@free-electrons.com>
- <5319260.UeCnJXKVPe@avalon>
- <CAOw6vbLC=HnnpuaxFf8EzSTmuYoZd-r1aqx-ixja97Ht_U6S6Q@mail.gmail.com>
-Message-ID: <1757833.hOePAQC2sg@avalon>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu,  6 Oct 2016 17:30:29 -0400
+Subject: [PATCH] Revert "debugfs: ->d_parent is never NULL or negative"
+Message-ID: <1475789429-11414-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+This reverts commit acc29fb8f792 ("debugfs: ->d_parent is never NULL or
+negative") as it breaks the debugfs_remove_recursive API as show in the
+callstack below.
 
-On Thursday 06 Oct 2016 15:53:28 Sean Paul wrote:
-> On Thu, Oct 6, 2016 at 1:27 PM, Laurent Pinchart wrote:
-> > On Thursday 06 Oct 2016 17:09:57 Archit Taneja wrote:
-> >> On 10/06/2016 12:51 PM, Maxime Ripard wrote:
-> >>> On Mon, Oct 03, 2016 at 04:40:57PM +0530, Archit Taneja wrote:
-> >>>> On 09/30/2016 08:07 PM, Maxime Ripard wrote:
-> >>>>> Some boards have an entirely passive RGB to VGA bridge, based on
-> >>>>> either DACs or resistor ladders.
-> >>>>> 
-> >>>>> Those might or might not have an i2c bus routed to the VGA connector
-> >>>>> in order to access the screen EDIDs.
-> >>>>> 
-> >>>>> Add a bridge that doesn't do anything but expose the modes available
-> >>>>> on the screen, either based on the EDIDs if available, or based on
-> >>>>> the XGA standards.
-> >>>>> 
-> >>>>> Acked-by: Rob Herring <robh@kernel.org>
-> >>>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>>>> ---
-> >>>>> .../bindings/display/bridge/rgb-to-vga-bridge.txt  |  48 +++++
-> >>>>> drivers/gpu/drm/bridge/Kconfig                     |   7 +
-> >>>>> drivers/gpu/drm/bridge/Makefile                    |   1 +
-> >>>>> drivers/gpu/drm/bridge/rgb-to-vga.c                | 229 +++++++++++++
-> >>>>> 4 files changed, 285 insertions(+)
-> >>>>> create mode 100644
-> >>>>> Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.tx
-> >>>>> t
-> >>>>> create mode 100644 drivers/gpu/drm/bridge/rgb-to-vga.c
-> >>>>> 
-> >>>>> diff --git
-> >>>>> a/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.
-> >>>>> txt
-> >>>>> b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.
-> >>>>> txt
-> >>>>> new file mode 100644
-> >>>>> index 000000000000..a8375bc1f9cb
-> >>>>> --- /dev/null
-> >>>>> +++
-> >>>>> b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.
-> >>>>> tx
-> >>>>> t @@ -0,0 +1,48 @@
-> >>>>> +Dumb RGB to VGA bridge
-> >>>>> +----------------------
-> >>>>> +
-> >>>>> +This binding is aimed for dumb RGB to VGA bridges that do not
-> >>>>> require
-> >>>>> +any configuration.
-> >>>>> +
-> >>>>> +Required properties:
-> >>>>> +
-> >>>>> +- compatible: Must be "rgb-to-vga-bridge"
-> >>>> 
-> >>>> I'd talked to Laurent on IRC if he's okay with this. And I guess you
-> >>>> to had discussed it during XDC too. He's suggested that it'd be better
-> >>>> to have the compatible string as "simple-vga-dac".
-> >>> 
-> >>> I just wished this bikeshedding had taken place publicly and be
-> >>> actually part of that discussion, but yeah, ok.
-> >> 
-> >> Sorry about that. I'd pinged him for an Ack, the discussion went
-> >> more than that :)
-> >> 
-> >>>> Some of the reasons behind having this:
-> >>>> 
-> >>>> - We don't need to specify "rgb" in the compatible string since most
-> >>>> simple VGA DACs can only work with an RGB input.
-> >>> 
-> >>> Ok.
-> >>> 
-> >>>> - Also, with "dac" specified in the string, we don't need to
-> >>>> specifically mention "bridge" in the string. Also, bridge is a drm
-> >>>> specific term.
-> >>>> 
-> >>>> - "simple" is considered because it's an unconfigurable bridge, and it
-> >>>> might be misleading for other VGA DACs to not use "vga-dac".
-> >>> 
-> >>> All those "simple" bindings are just the biggest lie we ever
-> >>> told. It's simple when you introduce it, and then grows into something
-> >>> much more complicated than a non-simple implementation.
-> >> 
-> >> "simple" here is supposed to mean that it's an unconfigurable RGB to
-> >> VGA DAC. This isn't supposed to follow the simple-panel model, where
-> >> you add the "simple-panel" string in the compatible node, along with
-> >> you chip specific compatible string.
-> > 
-> > I agree with Maxime, I don't like the word "simple". My preference would
-> > be "vga-dac" for a lack of a better qualifier than "simple" to describe
-> > the fact that the device requires no configuration. My only concern with
-> > "vga-dac" is that we would restrict usage of that compatible string for a
-> > subset of VGA DACs, with more complex devices not being compatible with
-> > "vga-dac" even though they are VGA DACs. That's a problem I can live with
-> > though.
->
-> While we're bikeshedding (feel free to ignore my input on this), I
-> think Maxime's initial "dumb" qualifier was better than "simple".
+Tested against:
+c802e87 Add linux-next specific files for 20161006
 
-I think I agree.
+Unable to handle kernel NULL pointer dereference at virtual address
+000000a8
+pgd = ffff800bc81c1000
+[000000a8] *pgd=0000004bc83e1003, *pud=0000004bc6519003,
+*pmd=0000000000000000
+Internal error: Oops: 96000006 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 13 PID: 1758 Comm: tee Not tainted 4.8.0-next-20161006-00013-gd66147c
+Hardware name: (null) (DT)
+task: ffff800bc7fe0000 task.stack: ffff800bc645c000
+PC is at down_write+0x18/0x68
+LR is at debugfs_remove_recursive+0x50/0x1c0
+pc : [<ffff00000889f480>] lr : [<ffff00000831c220>] pstate: 80000145
 
-> I think "passive" also gets the point across better than "simple", which
-> we've already established as something else in drm.
+[<ffff00000889f480>] down_write+0x18/0x68
+[<ffff00000831c220>] debugfs_remove_recursive+0x50/0x1c0
+[<ffff00000848e0a8>] hidma_debug_uninit+0x20/0x30
+[<ffff00000848c5d8>] hidma_remove+0x48/0x98
+[<ffff000008511b6c>] platform_drv_remove+0x24/0x68
+[<ffff00000850fac8>] __device_release_driver+0x80/0x118
+[<ffff00000850fb84>] device_release_driver+0x24/0x38
+[<ffff00000850e928>] unbind_store+0xe8/0x110
+[<ffff00000850dd30>] drv_attr_store+0x20/0x30
+[<ffff000008253a48>] sysfs_kf_write+0x48/0x58
+[<ffff000008252dd8>] kernfs_fop_write+0xb0/0x1d8
+[<ffff0000081dab3c>] __vfs_write+0x1c/0x110
+[<ffff0000081db940>] vfs_write+0xa0/0x1b8
+[<ffff0000081dcd34>] SyS_write+0x44/0xa0
+[<ffff000008082ef0>] el0_svc_naked+0x24/0x28
 
-To my electrical engineer's ear, passive refers to a component or combination 
-of components that is not capable of power gain. The resistors ladder VGA DAC 
-that Maxime is trying to support is a passive system, but the ADV7123 VGA DAC 
-that equally requires no configuration is an active component.
+Reverting this change seems to fix the issue.
 
-> Now that I've gotten that out of the way, this patch looks good to me
-> regardless of the name.
-> 
-> Reviewed-by: Sean Paul <seanpaul@chromium.org>
-> 
-> Sean
-> 
-> >> In other words, this driver shouldn't be touched again in the future :)
-> >> If someone wants to write a RGB to VGA driver which is even
-> >> slightly configurable, they'll need to write a new bridge driver.
-> > 
-> > I'm sure that won't be true. I can certainly foresee the addition of
-> > regulators support for instance. It's unfortunately never black and white.
-> > 
-> >>>> What do you think about this? If you think it's good, would it be
-> >>>> possible for you to change this? I guess it's okay for the rest of
-> >>>> the patch to stay the same.
-> >>> 
-> >>> I'll update and respin the serie.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ fs/debugfs/inode.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
+diff --git a/fs/debugfs/inode.c b/fs/debugfs/inode.c
+index f17fcf8..02166d6 100644
+--- a/fs/debugfs/inode.c
++++ b/fs/debugfs/inode.c
+@@ -621,6 +621,9 @@ void debugfs_remove(struct dentry *dentry)
+ 		return;
+ 
+ 	parent = dentry->d_parent;
++	if (!parent || d_really_is_negative(parent))
++		return;
++
+ 	inode_lock(d_inode(parent));
+ 	ret = __debugfs_remove(dentry, parent);
+ 	inode_unlock(d_inode(parent));
+@@ -651,6 +654,10 @@ void debugfs_remove_recursive(struct dentry *dentry)
+ 	if (IS_ERR_OR_NULL(dentry))
+ 		return;
+ 
++	parent = dentry->d_parent;
++	if (!parent || d_really_is_negative(parent))
++		return;
++
+ 	parent = dentry;
+  down:
+ 	inode_lock(d_inode(parent));
 -- 
-Regards,
-
-Laurent Pinchart
+1.9.1
