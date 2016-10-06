@@ -1,64 +1,89 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 6 Oct 2016 09:55:36 -0600
-Subject: [PATCH 4/8] PM / Domains: Add fwnode provider to genpd states
-In-Reply-To: <CAPDyKFrsLjchkbkqg4O=RfKamO+EgOhZtzw1-_3e5QphLON0XQ@mail.gmail.com>
+Date: Thu, 6 Oct 2016 09:56:25 -0600
+Subject: [PATCH 5/8] dt/bindings: Update binding for PM domain idle states
+In-Reply-To: <CAMuHMdUKbJ1Mt3viEkbCDmZGHQjGi_E=bxEBSHOB1MMY+qfSYQ@mail.gmail.com>
 References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
- <1475699519-109623-5-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFrsLjchkbkqg4O=RfKamO+EgOhZtzw1-_3e5QphLON0XQ@mail.gmail.com>
-Message-ID: <20161006155536.GF28930@linaro.org>
+ <1475699519-109623-6-git-send-email-lina.iyer@linaro.org>
+ <CAMuHMdWxft8o493XN2zg1wj2By7P+qBkrvyQOt7WdBnhPAvSXQ@mail.gmail.com>
+ <CAMuHMdUKbJ1Mt3viEkbCDmZGHQjGi_E=bxEBSHOB1MMY+qfSYQ@mail.gmail.com>
+Message-ID: <20161006155625.GG28930@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 06 2016 at 06:01 -0600, Ulf Hansson wrote:
->On 5 October 2016 at 22:31, Lina Iyer <lina.iyer@linaro.org> wrote:
->> Save the fwnode for the genpd state in the state node. PM Domain clients
->> may use the fwnode to read in the rest of the properties for the domain
->> state.
->
->What is the "rest"? I assume you mean the non PM domain generic parts,
->but perhaps you could elaborate a bit on that?
->
+On Thu, Oct 06 2016 at 02:09 -0600, Geert Uytterhoeven wrote:
+>On Thu, Oct 6, 2016 at 10:06 AM, Geert Uytterhoeven
+><geert@linux-m68k.org> wrote:
+>> On Wed, Oct 5, 2016 at 10:31 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>>> Update DT bindings to describe idle states of PM domains.
+>>>
+>>> This patch is based on the original patch by Marc Titinger.
+>>>
+>>> Cc: <devicetree@vger.kernel.org>
+>>> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> ---
+>>>  .../devicetree/bindings/power/power_domain.txt     | 36 ++++++++++++++++++++++
+>>>  1 file changed, 36 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>>> index 025b5e7..a043315 100644
+>>> --- a/Documentation/devicetree/bindings/power/power_domain.txt
+>>> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+>>> @@ -29,6 +29,10 @@ Optional properties:
+>>>     specified by this binding. More details about power domain specifier are
+>>>     available in the next section.
+>>>
+>>> +- domain-idle-states : A phandle of an idle-state that shall be soaked into a
+>>> +                generic domain power state. The idle state definitions are
+>>> +                compatible with arm,idle-state specified in [1].
+>>> +
+>>>  Example:
+>>>
+>>>         power: power-controller at 12340000 {
+>>> @@ -59,6 +63,36 @@ The nodes above define two power controllers: 'parent' and 'child'.
+>>>  Domains created by the 'child' power controller are subdomains of '0' power
+>>>  domain provided by the 'parent' power controller.
+>>>
+>>> +Example 3:
+>>> +       parent: power-controller at 12340000 {
 >>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> ---
->>  drivers/base/power/domain.c | 1 +
->>  include/linux/pm_domain.h   | 1 +
->>  2 files changed, 2 insertions(+)
+>> With W=1, this is gonna trigger:
 >>
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index 368a5b8..52fcdb2 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -1937,6 +1937,7 @@ static int read_genpd_state(struct genpd_power_state *genpd_state,
->>         latency = entry_latency + exit_latency;
->>         genpd_state->power_on_latency_ns = 1000 * latency;
->>         genpd_state->power_off_latency_ns = 1000 * entry_latency;
->> +       genpd_state->provider = &state_node->fwnode;
+>>     Warning (unit_address_vs_reg): Node foo has a unit name, but no reg property
 >>
->>         return 0;
->>  }
->> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
->> index 4c9152d..eacfa71 100644
->> --- a/include/linux/pm_domain.h
->> +++ b/include/linux/pm_domain.h
->> @@ -39,6 +39,7 @@ struct genpd_power_state {
->>         s64 power_off_latency_ns;
->>         s64 power_on_latency_ns;
->>         s64 residency_ns;
->> +       struct fwnode_handle *provider;
+>> Yes, there are pre-existing users in this file.
 >
->I don't think this is a provider, but just a fwnode_handle to a
->domain-idle-state. Therefore, I would suggest you to rename it to
->"fwnode" instead.
+>Scrap this... switching desktops causes loss of position...
 >
-OK.
+>>> +               compatible = "foo,power-controller";
+>>> +               reg = <0x12340000 0x1000>;
+>>> +               #power-domain-cells = <1>;
+>>> +               domain-idle-states = <&DOMAIN_RET, &DOMAIN_PWR_DN>;
+>>> +       };
+>
+>+       DOMAIN_RET: state at 0 {
+>+               compatible = "arm,idle-state";
+>+               entry-latency-us = <1000>;
+>+               exit-latency-us = <2000>;
+>+               min-residency-us = <10000>;
+>
+>This one is gonna trigger
+>
+>Warning (unit_address_vs_reg): Node foo has a unit name, but no reg property
+>
+>+       };
+>
+Its just an example, Will fix the example.
 
->>  };
->>
->>  struct generic_pm_domain {
->> --
->> 2.7.4
->>
+>Gr{oetje,eeting}s,
 >
->Kind regards
->Uffe
+>                        Geert
+>
+>--
+>Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+>In personal conversations with technical people, I call myself a hacker. But
+>when I'm talking to journalists I just say "programmer" or something like that.
+>                                -- Linus Torvalds
