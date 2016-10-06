@@ -1,31 +1,15 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Thu,  6 Oct 2016 14:35:58 -0700
-Subject: [PATCH net-next 2/2] arm64: xgene: defconfig: Enable Standby GPIO
-In-Reply-To: <1475789758-5196-1-git-send-email-isubramanian@apm.com>
-References: <1475789758-5196-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1475789758-5196-3-git-send-email-isubramanian@apm.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Thu, 6 Oct 2016 22:37:34 +0100
+Subject: [PATCH] Revert "debugfs: ->d_parent is never NULL or negative"
+In-Reply-To: <1475789429-11414-1-git-send-email-okaya@codeaurora.org>
+References: <1475789429-11414-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20161006213734.GM19539@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable CONFIG_GPIO_XGENE_SB.
+On Thu, Oct 06, 2016 at 05:30:29PM -0400, Sinan Kaya wrote:
+> This reverts commit acc29fb8f792 ("debugfs: ->d_parent is never NULL or
+> negative") as it breaks the debugfs_remove_recursive API as show in the
+> callstack below.
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Signed-off-by: Quan Nguyen <qnguyen@apm.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index eadf485..be52a00 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -240,6 +240,7 @@ CONFIG_GPIO_DWAPB=y
- CONFIG_GPIO_PL061=y
- CONFIG_GPIO_RCAR=y
- CONFIG_GPIO_XGENE=y
-+CONFIG_GPIO_XGENE_SB=y
- CONFIG_GPIO_PCA953X=y
- CONFIG_GPIO_PCA953X_IRQ=y
- CONFIG_GPIO_MAX77620=y
--- 
-1.9.1
+NAK.  Fix your code, don't break global asserts.
