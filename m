@@ -1,243 +1,62 @@
-From: paweljarosz3691@gmail.com (=?utf-8?B?UGF3ZcWC?= Jarosz)
-Date: Thu, 6 Oct 2016 19:38:15 +0200
-Subject: [PATCH v2 2/2] ARM: dts: rockchip: Add rk3066 MK808 board
-In-Reply-To: <cover.1475774981.git.paweljarosz3691@gmail.com>
-References: <cover.1475774981.git.paweljarosz3691@gmail.com>
-Message-ID: <b63a0ad452a487beb1d0c07addb9208cc3b3eeef.1475774981.git.paweljarosz3691@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 6 Oct 2016 23:27:02 +0530
+Subject: [PATCH 6/6] ARM: da850: adjust memory settings for tilcdc
+In-Reply-To: <eff0e150-e8d2-3859-1abe-c5f70f576fad@ti.com>
+References: <1475166715-7857-1-git-send-email-bgolaszewski@baylibre.com>
+ <1475166715-7857-7-git-send-email-bgolaszewski@baylibre.com>
+ <4e089d20-d00f-ff54-7c54-85aa061e23c2@ti.com>
+ <CAMpxmJXafyT5G8ZyD8RBAtzD6R9HmvyS0NBpz5i2fJ0SwOhXBA@mail.gmail.com>
+ <91db8934-bfd6-8fc4-74e3-4844ef3bd3e7@ti.com>
+ <948c3f9e-f11b-092c-e002-e2ef4436197f@ti.com>
+ <0125defa-5c34-85d0-f62a-133235c5094c@ti.com> <7hvax8ferr.fsf@baylibre.com>
+ <eff0e150-e8d2-3859-1abe-c5f70f576fad@ti.com>
+Message-ID: <3dfc112b-ba14-6c49-b707-730cfc3dae97@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MK808 is a tv stick which has rockchip rk3066 CPU inside, two usb ports
-- host and otg, micro sd card slot and onboard wifi RK901.
+On Wednesday 05 October 2016 01:52 PM, Peter Ujfalusi wrote:
+> On 10/04/16 16:02, Kevin Hilman wrote:
+>> Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
+>>
+>>> On 10/01/16 12:24, Sekhar Nori wrote:
+>>
+>> [...]
+>>
+>>>> In any case, to configure the PBBR, you will have to introduce a driver
+>>>> for it in drivers/memory. Then you can set it up per board using a DT
+>>>> parameter.
+>>>
+>>> and we can reuse the introduced bindings for am335x and OMAP1/2 as well. On
+>>> OMAP the legacy DMA API provided a call to raise the priority of the sDMA in
+>>> EMIF :o That needs to be removed and replaced.
+>>
+>> Can you point us to the bindings you're referring to?
+> 
+> We don't have one atm.
+> 
+> And the DMA priority hack in legacy sDMA code is for OMAP1:
+> omap_set_dma_priority(). Basically it can change the sDMA priority in
+> OCPT1_PRIOR, OCPT2_PRIOR, EMIFF_PRIOR and EMIFS_PRIOR registers.
+> 
+>> Also, a new driver in drivers/memory is fine for setting the PBBR, but
+>> what about the SYSCFG0 registers.  Are you OK with leaving those in the
+>> init code as proposed in $SUBJECT patch?
+> 
+> My problem is - as I described it in reply to Bartosz - is that for example I
+> don't want the LCDC to get high priority on OMAP-L138 EVM from Logic as it
+> does not have LCD/VGA by default. ifdef for LCDC is not good either since my
+> kernel have LCDC compiled in, but it is disabled.
+> 
+> The easiest way would be to have pdata quirk to handle the LCDK until we have
+> proper handling of the priority configuration.
 
-Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
----
+We don't have pdata quirks handling in mach-davinci. And I think instead
+of investing time in adding pdata quirks which are anyway a short term
+solution, it is better to work on a drivers/bus/ based driver which can
+help adjust master priorities via DT.
 
-Changes in v2:
-- included Heiko sugestion.
+Although as Peter asked, it is indeed intriguing as to why LCDC priority
+has to be raised even in supposed absence of any competing traffic.
 
- Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk3066a-mk808.dts                | 184 +++++++++++++++++++++
- 3 files changed, 189 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3066a-mk808.dts
-
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 55f388f..c09595b 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -17,6 +17,10 @@ Rockchip platforms device tree bindings
-     Required root node properties:
-       - compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
- 
-+- Rikomagic MK808 v1 board:
-+    Required root node properties:
-+      - compatible = "rikomagic,mk808", "rockchip,rk3066a";
-+
- - Radxa Rock board:
-     Required root node properties:
-       - compatible = "radxa,rock", "rockchip,rk3188";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index befcd26..f19cc1d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -639,6 +639,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3036-kylin.dtb \
- 	rk3066a-bqcurie2.dtb \
- 	rk3066a-marsboard.dtb \
-+	rk3066a-mk808.dtb \
- 	rk3066a-rayeager.dtb \
- 	rk3188-radxarock.dtb \
- 	rk3228-evb.dtb \
-diff --git a/arch/arm/boot/dts/rk3066a-mk808.dts b/arch/arm/boot/dts/rk3066a-mk808.dts
-new file mode 100644
-index 0000000..2878562
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3066a-mk808.dts
-@@ -0,0 +1,184 @@
-+/*
-+ * Copyright (c) 2016 Pawe? Jarosz <paweljarosz3691@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "rk3066a.dtsi"
-+
-+/ {
-+	model = "Rikomagic MK808";
-+	compatible = "rikomagic,mk808", "rockchip,rk3066a";
-+
-+	chosen {
-+		stdout-path = "serial2:115200n8";
-+	};
-+
-+	memory at 60000000 {
-+		device_type = "memory";
-+		reg = <0x60000000 0x40000000>;
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		blue {
-+			label = "mk808:blue:power";
-+			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	mmc_pwrseq: mmc-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc_pwr>;
-+		reset-gpios = <&gpio3 7 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	sdio_pwrseq: sdio-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_pwr>;
-+		reset-gpios = <&gpio3 24 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	vcc_io: vcc-io {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_io";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
-+	vcc_host: usb-host-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-+		pinctrl-0 = <&host_drv>;
-+		pinctrl-names = "default";
-+		regulator-always-on;
-+		regulator-name = "host-pwr";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+
-+	vcc_otg: usb-otg-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-+		pinctrl-0 = <&otg_drv>;
-+		pinctrl-names = "default";
-+		regulator-always-on;
-+		regulator-name = "vcc_otg";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+};
-+
-+&mmc0 {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	mmc-pwrseq = <&mmc_pwrseq>;
-+	num-slots = <1>;
-+	status = "okay";
-+	vmmc-supply = <&vcc_io>;
-+};
-+
-+&mmc1 {
-+	bus-width = <4>;
-+	disable-wp;
-+	mmc-pwrseq = <&sdio_pwrseq>;
-+	non-removable;
-+	num-slots = <1>;
-+	status = "okay";
-+	vmmc-supply = <&vcc_io>;
-+};
-+
-+&pinctrl {
-+	usb-host {
-+		host_drv: host-drv {
-+			rockchip,pins = <RK_GPIO0 6 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	usb-otg {
-+		otg_drv: otg-drv {
-+			rockchip,pins = <RK_GPIO0 5 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	sdmmc {
-+		sdmmc_pwr: sdmmc-pwr {
-+			rockchip,pins = <RK_GPIO3 7 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	sdio {
-+		wifi_pwr: wifi-pwr {
-+			rockchip,pins = <RK_GPIO3 24 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&usb_host {
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
-+
--- 
-2.7.4
+Thanks,
+Sekhar
