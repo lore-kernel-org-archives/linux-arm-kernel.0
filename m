@@ -1,128 +1,42 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Thu,  6 Oct 2016 11:14:29 +0200
-Subject: [PATCH v2] arm64: dts: marvell: Add definition for the Globalscale
- Marvell ESPRESSOBin Board
-Message-ID: <20161006091429.8974-1-romain.perier@free-electrons.com>
+From: rric@kernel.org (Robert Richter)
+Date: Thu, 6 Oct 2016 11:15:22 +0200
+Subject: [PATCH] arm64, numa: Add cpu_to_node() implementation.
+In-Reply-To: <57EA1100.2080900@linaro.org>
+References: <1474310970-21264-1-git-send-email-ddaney.cavm@gmail.com>
+ <20160920104348.GP25086@rric.localdomain>
+ <57E11E52.8060303@linaro.org>
+ <20160920132120.GQ25086@rric.localdomain>
+ <57EA1100.2080900@linaro.org>
+Message-ID: <20161006091522.GJ1535@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a high performance 64 bit dual core low power consuming
-networking computing platform based on the ARMv8 architecture.
-It contains an Armada 3720 running up to 1.2Ghz.
+On 27.09.16 14:26:08, Hanjun Guo wrote:
+> On 09/20/2016 09:21 PM, Robert Richter wrote:
+> >On 20.09.16 19:32:34, Hanjun Guo wrote:
+> >>On 09/20/2016 06:43 PM, Robert Richter wrote:
+> >
+> >>>Unfortunately either your nor my code does fix the BUG_ON() I see with
+> >>>the numa kernel:
+> >>>
+> >>>  kernel BUG at mm/page_alloc.c:1848!
+> >>>
+> >>>See below for the core dump. It looks like this happens due to moving
+> >>>a mem block where first and last page are mapped to different numa
+> >>>nodes, thus, triggering the BUG_ON().
+> >>
+> >>Didn't triggered it on our NUMA hardware, could you provide your
+> >>config then we can have a try?
+> >
+> >Config attached. Other configs with an initrd fail too.
+> 
+> hmm, we can't reproduce it on our hardware, do we need
+> to run some specific stress test on it?
 
-This commit adds a basic definition for this board.
+No, it depends on the efi memory zones marked reserved. See my other
+thread on this where I have attached mem ranges from the log. I have a
+fix available already.
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
----
+Thanks,
 
-Changes in v2:
- - Improved commit message
- - Added informations about connectors
-
- arch/arm64/boot/dts/marvell/Makefile               |  1 +
- .../boot/dts/marvell/armada-3720-espressobin.dts   | 82 ++++++++++++++++++++++
- 2 files changed, 83 insertions(+)
- create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-
-diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-index 308468d..392eeb6 100644
---- a/arch/arm64/boot/dts/marvell/Makefile
-+++ b/arch/arm64/boot/dts/marvell/Makefile
-@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
- 
- # Mvebu SoC Family
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
-+dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-new file mode 100644
-index 0000000..ae005f1
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-@@ -0,0 +1,82 @@
-+/*
-+ * Device Tree file for Globalscale Marvell ESPRESSOBin Board
-+ * Copyright (C) 2016 Marvell
-+ *
-+ * Romain Perier <romain.perier@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "armada-372x.dtsi"
-+
-+/ {
-+	model = "Globalscale Marvell ESPRESSOBin Board";
-+	compatible = "globalscale,espressobin", "marvell,armada3720", "marvell,armada3710";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
-+	};
-+};
-+
-+/* J9 */
-+&pcie0 {
-+	status = "okay";
-+};
-+
-+/* J6 */
-+&sata {
-+	status = "okay";
-+};
-+
-+/* J5 */
-+&uart0 {
-+	status = "okay";
-+};
-+
-+/* J7 */
-+&usb3 {
-+	status = "okay";
-+};
--- 
-2.9.3
+-Robert
