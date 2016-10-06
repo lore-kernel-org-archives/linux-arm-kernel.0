@@ -1,40 +1,117 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 6 Oct 2016 19:21:33 -0400
-Subject: [PATCH] Revert "debugfs: ->d_parent is never NULL or negative"
-In-Reply-To: <20161006224117.GP19539@ZenIV.linux.org.uk>
-References: <1475789429-11414-1-git-send-email-okaya@codeaurora.org>
- <20161006213734.GM19539@ZenIV.linux.org.uk>
- <f6ba2bf7-4f0b-e874-d642-6620d5df2212@codeaurora.org>
- <20161006220050.GN19539@ZenIV.linux.org.uk>
- <20161006223729.GO19539@ZenIV.linux.org.uk>
- <20161006224117.GP19539@ZenIV.linux.org.uk>
-Message-ID: <65156a02-fe6a-611f-907b-85997ee30755@codeaurora.org>
+Date: Thu,  6 Oct 2016 19:23:09 -0400
+Subject: [PATCH] dmaengine: qcom_hidma: cleanup sysfs entries during remove
+Message-ID: <1475796189-26553-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/6/2016 6:41 PM, Al Viro wrote:
-> On Thu, Oct 06, 2016 at 11:37:29PM +0100, Al Viro wrote:
-> 
->> If you ever get NULL in ->d_parent of struct dentry instance, you are
->> practically certain to have a dangling pointer to memory that used to
->> contain a struct dentry at some point but got freed and reused since then.
-> 
-> ... which is what happens in your case, apparently.  ->stats is still
-> pointing to a dentry that had just been freed and its memory reused.
-> 
+The 4.8-rc8 kernel is printing duplicate file entry warnings while removing
+the HIDMA object. This is caused by stale sysfs entries remaining from the
+previous execution.
 
-Thanks for explaining the behavior. I posted the change a minute ago
-and forgot to include you. 
+_sysfs_warn_dup+0x5c/0x78
+ sysfs_add_file_mode_ns+0x13c/0x1c0
+ sysfs_create_file_ns+0x2c/0x40
+ device_create_file+0x54/0xa0
+ hidma_probe+0x7c8/0x808
 
-dmaengine: qcom_hidma: remove useless debugfs file removal
+Create hidma_sysfs_init and hidma_sysfs_uninit functions and call them from
+the probe and remove path. To do proper clean up, adding the attrs object
+to the device data structure to keep it around until remove call is made.
 
-I have a very similar problem with sysfs now. It looks like the new kernel
-is more assertive than the older ones. 
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/dma/qcom/hidma.c | 31 +++++++++++++++++++++++++------
+ drivers/dma/qcom/hidma.h |  3 +++
+ 2 files changed, 28 insertions(+), 6 deletions(-)
 
-I'll post the sysfs change in a minute. 
-
-
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index f4fe4ee..414ea12 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -578,8 +578,17 @@ static ssize_t hidma_show_values(struct device *dev,
+ 	return strlen(buf);
+ }
+ 
+-static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
+-				    int mode)
++static int hidma_sysfs_uninit(struct hidma_dev *dev)
++{
++	if (!dev->chid_attrs)
++		return -ENOMEM;
++
++	device_remove_file(dev->ddev.dev, dev->chid_attrs);
++	return 0;
++}
++
++static struct device_attribute*
++hidma_create_sysfs_entry(struct hidma_dev *dev, char *name, int mode)
+ {
+ 	struct device_attribute *attrs;
+ 	char *name_copy;
+@@ -587,20 +596,29 @@ static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
+ 	attrs = devm_kmalloc(dev->ddev.dev, sizeof(struct device_attribute),
+ 			     GFP_KERNEL);
+ 	if (!attrs)
+-		return -ENOMEM;
++		return NULL;
+ 
+ 	name_copy = devm_kstrdup(dev->ddev.dev, name, GFP_KERNEL);
+ 	if (!name_copy)
+-		return -ENOMEM;
++		return NULL;
+ 
+ 	attrs->attr.name = name_copy;
+ 	attrs->attr.mode = mode;
+ 	attrs->show = hidma_show_values;
+ 	sysfs_attr_init(&attrs->attr);
++	return attrs;
++}
+ 
+-	return device_create_file(dev->ddev.dev, attrs);
++static int hidma_sysfs_init(struct hidma_dev *dev)
++{
++	dev->chid_attrs = hidma_create_sysfs_entry(dev, "chid", S_IRUGO);
++	if (!dev->chid_attrs)
++		return -ENOMEM;
++
++	return device_create_file(dev->ddev.dev, dev->chid_attrs);
+ }
+ 
++
+ #ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+ static void hidma_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
+ {
+@@ -823,7 +841,7 @@ static int hidma_probe(struct platform_device *pdev)
+ 	dmadev->irq = chirq;
+ 	tasklet_init(&dmadev->task, hidma_issue_task, (unsigned long)dmadev);
+ 	hidma_debug_init(dmadev);
+-	hidma_create_sysfs_entry(dmadev, "chid", S_IRUGO);
++	hidma_sysfs_init(dmadev);
+ 	dev_info(&pdev->dev, "HI-DMA engine driver registration complete\n");
+ 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
+ 	pm_runtime_put_autosuspend(dmadev->ddev.dev);
+@@ -849,6 +867,7 @@ static int hidma_remove(struct platform_device *pdev)
+ 	dma_async_device_unregister(&dmadev->ddev);
+ 	devm_free_irq(dmadev->ddev.dev, dmadev->irq, dmadev->lldev);
+ 	tasklet_kill(&dmadev->task);
++	hidma_sysfs_uninit(dmadev);
+ 	hidma_debug_uninit(dmadev);
+ 	hidma_ll_uninit(dmadev->lldev);
+ 	hidma_free(dmadev);
+diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
+index 05f8ba4..c7d0142 100644
+--- a/drivers/dma/qcom/hidma.h
++++ b/drivers/dma/qcom/hidma.h
+@@ -130,6 +130,9 @@ struct hidma_dev {
+ 	struct dentry			*debugfs;
+ 	struct dentry			*stats;
+ 
++	/* sysfs entry for the channel id */
++	struct device_attribute		*chid_attrs;
++
+ 	/* Task delivering issue_pending */
+ 	struct tasklet_struct		task;
+ };
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+1.9.1
