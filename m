@@ -1,56 +1,81 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  6 Oct 2016 18:21:29 -0400
-Subject: [PATCH] dmaengine: qcom_hidma: remove useless debugfs file removal
-Message-ID: <1475792489-1415-1-git-send-email-okaya@codeaurora.org>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Thu, 6 Oct 2016 23:37:29 +0100
+Subject: [PATCH] Revert "debugfs: ->d_parent is never NULL or negative"
+In-Reply-To: <20161006220050.GN19539@ZenIV.linux.org.uk>
+References: <1475789429-11414-1-git-send-email-okaya@codeaurora.org>
+ <20161006213734.GM19539@ZenIV.linux.org.uk>
+ <f6ba2bf7-4f0b-e874-d642-6620d5df2212@codeaurora.org>
+ <20161006220050.GN19539@ZenIV.linux.org.uk>
+Message-ID: <20161006223729.GO19539@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 'commit acc29fb8f792 ("debugfs: ->d_parent is never NULL or
-negative")', HIDMA object removal is no longer working. This is due to
-redundant debugfs remove call in hidma_debug_uninit.
+On Thu, Oct 06, 2016 at 11:00:51PM +0100, Al Viro wrote:
+> On Thu, Oct 06, 2016 at 05:41:34PM -0400, Sinan Kaya wrote:
+> > On 10/6/2016 5:37 PM, Al Viro wrote:
+> > > On Thu, Oct 06, 2016 at 05:30:29PM -0400, Sinan Kaya wrote:
+> > >> This reverts commit acc29fb8f792 ("debugfs: ->d_parent is never NULL or
+> > >> negative") as it breaks the debugfs_remove_recursive API as show in the
+> > >> callstack below.
+> > > 
+> > > NAK.  Fix your code, don't break global asserts.
+> > > 
+> > 
+> > I can fix the code if you tell me what the problem is:
+> 
+> Getting dentries with NULL ->d_parent should never, ever happen.  Find the
+> place where such a beast appears and you've got your problem.
+> 
+> The same goes for negative dentries with children.  Again, if your code
+> triggers such a situation, find where it does so and you've found a bug.
+> More than one, at that.
 
-debugfs_remove_recursive(dmadev->debugfs);
-debugfs_remove_recursive(dmadev->stats);
+Note that there are exactly 4 places where ->d_parent of some struct
+dentry is modified, all in fs/dcache.c.
 
-The first remove is for the directory. Second remove is for the file under
-the directory. The directory remove makes file remove invalid.
+1) __d_alloc() sets ->d_parent of new instance pointing to the instance
+itself and does so before anyone else could observe that dentry.  That's
+the only allocator of struct dentry - all of them start their life when
+returned by it.  With non-NULL value of ->d_parent.
 
-Unable to handle kernel NULL pointer dereference at virtual address
+2) d_alloc() sets it to given (non-NULL) parent.  Note that it has
+already dereferenced that parent (spin_lock(&parent->d_lock) a couple of
+lines prior to that), so it would've oopsed before it reached that assignment
+if it was passed NULL as parent.
 
-[<ffff00000889f480>] down_write+0x18/0x68
-[<ffff00000831c220>] debugfs_remove_recursive+0x50/0x1c0
-[<ffff00000848e0a8>] hidma_debug_uninit+0x20/0x30
-[<ffff00000848c5d8>] hidma_remove+0x48/0x98
-[<ffff000008511b6c>] platform_drv_remove+0x24/0x68
-[<ffff00000850fac8>] __device_release_driver+0x80/0x118
-[<ffff00000850fb84>] device_release_driver+0x24/0x38
-[<ffff00000850e928>] unbind_store+0xe8/0x110
-[<ffff00000850dd30>] drv_attr_store+0x20/0x30
-[<ffff000008253a48>] sysfs_kf_write+0x48/0x58
-[<ffff000008252dd8>] kernfs_fop_write+0xb0/0x1d8
-[<ffff0000081dab3c>] __vfs_write+0x1c/0x110
-[<ffff0000081db940>] vfs_write+0xa0/0x1b8
-[<ffff0000081dcd34>] SyS_write+0x44/0xa0
-[<ffff000008082ef0>] el0_svc_naked+0x24/0x28
+3) d_alloc_cursor() - ditto, only there it had been an access to parent->d_sb.
 
-Removing the second line.
+4)?__d_move() does
+                dentry->d_parent = target->d_parent;
+                target->d_parent = target;
+in one case and
+                swap(dentry->d_parent, target->d_parent);
+in another.  The values had either already been in ->d_parent of another
+instance prior to that or are guaranteed to be non-NULL since we'd just
+survived dereferencing them.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma_dbg.c | 1 -
- 1 file changed, 1 deletion(-)
+If you ever get NULL in ->d_parent of struct dentry instance, you are
+practically certain to have a dangling pointer to memory that used to
+contain a struct dentry at some point but got freed and reused since then.
+Any such case is a bug, and this check only papers over that bug - after all,
+we might have very well reused it for anything whatsoever, with arbitrary
+values ending up in it.
 
-diff --git a/drivers/dma/qcom/hidma_dbg.c b/drivers/dma/qcom/hidma_dbg.c
-index 87db285..3bdcb80 100644
---- a/drivers/dma/qcom/hidma_dbg.c
-+++ b/drivers/dma/qcom/hidma_dbg.c
-@@ -165,7 +165,6 @@ static int hidma_dma_info_open(struct inode *inode, struct file *file)
- void hidma_debug_uninit(struct hidma_dev *dmadev)
- {
- 	debugfs_remove_recursive(dmadev->debugfs);
--	debugfs_remove_recursive(dmadev->stats);
- }
- 
- int hidma_debug_init(struct hidma_dev *dmadev)
--- 
-1.9.1
+As for the negatives...
+	* if ->d_parent points to something other than dentry itself,
+it contributes to ->d_count of parent
+	* positive dentry can only be turned into negative if the
+caller of d_delete() is holding the only reference to it
+	* any code setting ->d_parent to another dentry does so only when
+the parent to be is known to be positive at the moment.
+
+So if you get a dentry with negative parent passed to it, the only way
+it could happen (aside of outright memory corruption) is that dentry
+you are passing has ->d_parent pointing to *itself* (and had never been
+made positive).  If that can legitimately happen, the proper test is
+IS_ROOT(dentry) && !dentry->d_inode, and I strongly suspect that the
+second part is irrelevant.  But I would really like to see what leads
+to that - I don't see any way for debugfs_create_{file,dir}() et.al. to
+return a detached (or negative, for that matter) dentry.
+
+are
