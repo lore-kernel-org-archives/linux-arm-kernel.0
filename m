@@ -1,117 +1,37 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  6 Oct 2016 19:23:09 -0400
-Subject: [PATCH] dmaengine: qcom_hidma: cleanup sysfs entries during remove
-Message-ID: <1475796189-26553-1-git-send-email-okaya@codeaurora.org>
+From: ken.lin@advantech.com (Ken.Lin)
+Date: Thu, 6 Oct 2016 16:26:32 -0700
+Subject: The possible regression in kernel 4.8 - clk: imx: correct AV
+ PLL rate formula
+References: <03B5A3CA1724CE4EAC32B27E39292A677FC5A390AF@AUSMAIL1.AUS.ADVANTECH.CORP>
+Message-ID: <WM!ed3fbaeb0522ef511432f86a8f960e4450d5dc585c3e6a7282707c963f20491527420d38f737d38adb9ab7cba9794282!@dg.advantech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 4.8-rc8 kernel is printing duplicate file entry warnings while removing
-the HIDMA object. This is caused by stale sysfs entries remaining from the
-previous execution.
 
-_sysfs_warn_dup+0x5c/0x78
- sysfs_add_file_mode_ns+0x13c/0x1c0
- sysfs_create_file_ns+0x2c/0x40
- device_create_file+0x54/0xa0
- hidma_probe+0x7c8/0x808
 
-Create hidma_sysfs_init and hidma_sysfs_uninit functions and call them from
-the probe and remove path. To do proper clean up, adding the attrs object
-to the device data structure to keep it around until remove call is made.
+-----Original Message-----
+From: Ken.Lin 
+Sent: Thursday, October 6, 2016 4:21 PM
+To: 'shawnguo at kernel.org'; 'kernel at pengutronix.de'; 'sboyd at codeaurora.org'; 'mturquette at baylibre.com'
+Cc: 'linux-arm-kernel at lists.infradead.org'; 'linux-clk at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; Peter.Stretz; Peter.Chiang; Akshay Bhat
+Subject: The possible regression in kernel 4.8 - clk: imx: correct AV PLL rate formula
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma.c | 31 +++++++++++++++++++++++++------
- drivers/dma/qcom/hidma.h |  3 +++
- 2 files changed, 28 insertions(+), 6 deletions(-)
+Hi,
 
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index f4fe4ee..414ea12 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -578,8 +578,17 @@ static ssize_t hidma_show_values(struct device *dev,
- 	return strlen(buf);
- }
- 
--static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
--				    int mode)
-+static int hidma_sysfs_uninit(struct hidma_dev *dev)
-+{
-+	if (!dev->chid_attrs)
-+		return -ENOMEM;
-+
-+	device_remove_file(dev->ddev.dev, dev->chid_attrs);
-+	return 0;
-+}
-+
-+static struct device_attribute*
-+hidma_create_sysfs_entry(struct hidma_dev *dev, char *name, int mode)
- {
- 	struct device_attribute *attrs;
- 	char *name_copy;
-@@ -587,20 +596,29 @@ static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
- 	attrs = devm_kmalloc(dev->ddev.dev, sizeof(struct device_attribute),
- 			     GFP_KERNEL);
- 	if (!attrs)
--		return -ENOMEM;
-+		return NULL;
- 
- 	name_copy = devm_kstrdup(dev->ddev.dev, name, GFP_KERNEL);
- 	if (!name_copy)
--		return -ENOMEM;
-+		return NULL;
- 
- 	attrs->attr.name = name_copy;
- 	attrs->attr.mode = mode;
- 	attrs->show = hidma_show_values;
- 	sysfs_attr_init(&attrs->attr);
-+	return attrs;
-+}
- 
--	return device_create_file(dev->ddev.dev, attrs);
-+static int hidma_sysfs_init(struct hidma_dev *dev)
-+{
-+	dev->chid_attrs = hidma_create_sysfs_entry(dev, "chid", S_IRUGO);
-+	if (!dev->chid_attrs)
-+		return -ENOMEM;
-+
-+	return device_create_file(dev->ddev.dev, dev->chid_attrs);
- }
- 
-+
- #ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
- static void hidma_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
- {
-@@ -823,7 +841,7 @@ static int hidma_probe(struct platform_device *pdev)
- 	dmadev->irq = chirq;
- 	tasklet_init(&dmadev->task, hidma_issue_task, (unsigned long)dmadev);
- 	hidma_debug_init(dmadev);
--	hidma_create_sysfs_entry(dmadev, "chid", S_IRUGO);
-+	hidma_sysfs_init(dmadev);
- 	dev_info(&pdev->dev, "HI-DMA engine driver registration complete\n");
- 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
- 	pm_runtime_put_autosuspend(dmadev->ddev.dev);
-@@ -849,6 +867,7 @@ static int hidma_remove(struct platform_device *pdev)
- 	dma_async_device_unregister(&dmadev->ddev);
- 	devm_free_irq(dmadev->ddev.dev, dmadev->irq, dmadev->lldev);
- 	tasklet_kill(&dmadev->task);
-+	hidma_sysfs_uninit(dmadev);
- 	hidma_debug_uninit(dmadev);
- 	hidma_ll_uninit(dmadev->lldev);
- 	hidma_free(dmadev);
-diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
-index 05f8ba4..c7d0142 100644
---- a/drivers/dma/qcom/hidma.h
-+++ b/drivers/dma/qcom/hidma.h
-@@ -130,6 +130,9 @@ struct hidma_dev {
- 	struct dentry			*debugfs;
- 	struct dentry			*stats;
- 
-+	/* sysfs entry for the channel id */
-+	struct device_attribute		*chid_attrs;
-+
- 	/* Task delivering issue_pending */
- 	struct tasklet_struct		task;
- };
+We found a possible regression issue (not seen in kernel 4.7-stable), which has to do with the new NXP commit ba7f4f557eb67ee21c979c8539dc1886f5d5341c when we did a DP test (1920x1080 at 60) with clock source PLL5.
+The DP desired pixel clock (148.5MHz that is calculated from the input of PLL output frequency) would be correct again when we reverted this commit.
+Could you please help check if the commit has the side effect since it would have impacts on our on-going project when it requires moving from kernel 4.7 to kernel 4.8 or newer version?
+
+Please check the following URL for the details
+https://www.dropbox.com/s/7wc5jdp8unlsiob/possible_regression_for_clk_imx_correct_VL_PLL_rate_formula.pdf?dl=0
+
+
+Thank you
+
+Cheers,
+Ken Lin
+
 -- 
-1.9.1
+This message has been scanned for viruses and
+dangerous content by MailScanner, and is
+believed to be clean.
