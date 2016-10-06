@@ -1,48 +1,52 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu,  6 Oct 2016 13:34:18 -0700
-Subject: [PATCH 2/3] doc: dt: add cyclone-spi binding document
+Date: Thu,  6 Oct 2016 13:34:19 -0700
+Subject: [PATCH 3/3] ARM: dts: imx6q-evi: support cyclonespi
 In-Reply-To: <4b4432c04b4ea92a2af814e3d7866c33f2eb12ea.1475783742.git.stillcompiling@gmail.com>
 References: <4b4432c04b4ea92a2af814e3d7866c33f2eb12ea.1475783742.git.stillcompiling@gmail.com>
-Message-ID: <8d89e70475e8e1c3ce5117a0367c8444c11c61e3.1475783742.git.stillcompiling@gmail.com>
+Message-ID: <16ba10d2523a6f0eaf40246dfbd9e660f297fd22.1475783742.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe a cyclonespi devicetree entry, required features
+Add support for Altera cyclone V FPGA connected to an spi port
 
 Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 ---
- .../bindings/fpga/cyclone-spi-fpga-mgr.txt         | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/cyclone-spi-fpga-mgr.txt
+ arch/arm/boot/dts/imx6q-evi.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/fpga/cyclone-spi-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/cyclone-spi-fpga-mgr.txt
-new file mode 100644
-index 0000000..8de34db
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fpga/cyclone-spi-fpga-mgr.txt
-@@ -0,0 +1,23 @@
-+Altera SOCFPGA FPGA Manager
+diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
+index 6de21ff..7e5d3cf 100644
+--- a/arch/arm/boot/dts/imx6q-evi.dts
++++ b/arch/arm/boot/dts/imx6q-evi.dts
+@@ -95,6 +95,15 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
+ 	status = "okay";
 +
-+Altera cyclone FPGAs support a method of loading the bitstream over what is
-+referred to as "passive serial".
-+The passive serial link is not technically spi, and might require extra
-+circuits in order to play nicely with other spi slaves on the same bus.
-+
-+See https://www.altera.com/literature/hb/cyc/cyc_c51013.pdf
-+
-+Required properties:
-+- compatible  : should contain "altr,cyclonespi-fpga-mgr"
-+- reg         : spi slave id of the fpga
-+- reset-gpio  : reset pin (referred to as nCONFIG in the cyclone manual)
-+- status-gpio : status pin (referred to as nSTATUS in the cyclone manual)
-+
-+Example:
-+	fpga_spi: evi-fpga-spi at 0 {
++	fpga_spi: cyclonespi at 0 {
 +		compatible = "altr,cyclonespi-fpga-mgr";
 +		spi-max-frequency = <20000000>;
 +		reg = <0>;
++		pinctrl-0 = <&pinctrl_fpgaspi>;
 +		reset-gpio = <&gpio4 9 GPIO_ACTIVE_HIGH>;
 +		status-gpio = <&gpio4 11 GPIO_ACTIVE_HIGH>;
 +	};
+ };
+ 
+ &ecspi3 {
+@@ -325,6 +334,13 @@
+ 		>;
+ 	};
+ 
++	pinctrl_fpgaspi: fpgaspigrp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_ROW1__GPIO4_IO09 0x1b0b0
++			MX6QDL_PAD_KEY_ROW2__GPIO4_IO11 0x1b0b0
++		>;
++	};
++
+ 	pinctrl_gpminand: gpminandgrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_NANDF_CLE__NAND_CLE 0xb0b1
 -- 
 2.7.4
