@@ -1,107 +1,51 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 6 Oct 2016 11:48:07 +0100
-Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
- issue.
-In-Reply-To: <CACvgo53fuoPVjBAkZbWFPVxosObjvxoDgFdR_BkSTgevqyGg9g@mail.gmail.com>
-References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
- <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
- <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
- <CACvgo53fuoPVjBAkZbWFPVxosObjvxoDgFdR_BkSTgevqyGg9g@mail.gmail.com>
-Message-ID: <20161006104807.GB436@griffinp-ThinkPad-X1-Carbon-2nd>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 6 Oct 2016 12:56:20 +0200
+Subject: [PATCH 6/8] PM / Domains: Abstract genpd locking
+In-Reply-To: <1475699519-109623-7-git-send-email-lina.iyer@linaro.org>
+References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
+ <1475699519-109623-7-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFrzPbr_njosTxO9y0V3KKG0stfhA3XejmQk_3RJMr3=Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emil,
+On 5 October 2016 at 22:31, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Abstract genpd lock/unlock calls, in preparation for domain specific
+> locks added in the following patches.
+>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/base/power/domain.c | 121 +++++++++++++++++++++++++++++---------------
+>  include/linux/pm_domain.h   |   5 +-
+>  2 files changed, 85 insertions(+), 41 deletions(-)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 52fcdb2..82e6a33 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -39,6 +39,46 @@
+>  static LIST_HEAD(gpd_list);
+>  static DEFINE_MUTEX(gpd_list_lock);
+>
+> +struct genpd_lock_fns {
 
-On Wed, 21 Sep 2016, Emil Velikov wrote:
+May I suggest you to rename the struct to "genpd_lock_ops"?
 
-> On 20 September 2016 at 09:32, Peter Griffin <peter.griffin@linaro.org> wrote:
-> > Hi Emil,
-> >
-> > On Tue, 20 Sep 2016, Emil Velikov wrote:
-> >
-> >> On 5 September 2016 at 14:16, Peter Griffin <peter.griffin@linaro.org> wrote:
-> >> > ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
-> >> > recursive dependency.
-> >
-> >
-> >> >
-> >> From a humble skim through remoteproc, drm and a few other subsystems
-> >> I think the above is wrong. All the drivers (outside of remoteproc),
-> >> that I've seen, depend on the core component, they don't select it.
-> >
-> > I will let Bjorn comment on the remoteproc subsystem Kconfig design, and
-> > why it is like it is.
-> >
-> > For this particular SLIM_RPROC I have added it to Kconfig in keeping with all
-> > the other drivers in the remoteproc subsystem which has exposed this recursive
-> > dependency issue.
-> >
-> > For this particular kconfig symbol a quick grep reveals more drivers in
-> > the kernel using 'select', than 'depend on'
-> >
-> > git grep "select VIRTIO" | wc -l
-> > 14
-> >
-> > git grep "depends on VIRTIO" | wc -l
-> > 10
-> >
-> Might be worth taking a closer look into these at some point.
+I think "*_ops" is in general what we use in the kernel for callbacks
+and functions pointers like these.
 
-VIRTIO has no dependencies, and is a non visible symbol. Its Kconfig help also
-mentions that drivers should select it.
+> +       void (*lock)(struct generic_pm_domain *genpd);
+> +       void (*lock_nested)(struct generic_pm_domain *genpd, int depth);
+> +       int (*lock_interruptible)(struct generic_pm_domain *genpd);
+> +       void (*unlock)(struct generic_pm_domain *genpd);
+> +};
+> +
 
-> 
-> >
-> >> Furthermore most places explicitly hide the drivers from the menu if
-> >> the core component isn't enabled.
-> >
-> > Remoteproc subsystem takes a different approach, the core code is only enabled
-> > if a driver which relies on it is enabled. This IMHO makes sense, as
-> > remoteproc is not widely used (only a few particular ARM SoC's).
-> >
-> > It is true that for subsystems which rely on the core component being
-> > explicitly enabled, they often tend to hide drivers which depend on it
-> > from the menu unless it is. This also makes sense.
-> >
-> >>
-> >> Is there something that requires such a different/unusual behaviour in
-> >> remoteproc ?
-> >>
-> >
-> > I'm not sure it is that unusual...looking at config USB, it selects USB_COMMON in
-> > mfd subsystem, client drivers select MFD_CORE.
-> >
-> On the USB case I'm not sure what the reasoning behind the USB vs
-> USB_COMMON split. In seems that one could just fold them, but that's
-> another topic. On the MFD side... it follows the select {,mis,ab}use.
-> With one (the only one?) MFD driver not using/selecting MFD_CORE doing
-> it's own version of mfd_add_devices... which could be reworked,
-> possibly.
+[...]
 
-Much like selecting VIRTIO in this patch, MFD_CORE is a non visible symbol
-with no dependencies so it matches the documentation Jani referenced.
+Otherwise this looks good to me!
 
-I personally think the approach taken makes sense, as why would you want to have
-a CONFIG_MFD_CORE=y symbol being enabled unless you actually have a MFD device
-which uses it also enabled in your kernel?
-
-It seems to me a good solution to make the client drivers select the core
-component so that it only gets enabled if at least one driver requires it.
-This avoids having useless core code which will never be used compiled into the
-kernel and in the end a smaller kernel size for a given kernel configuration (better
-cache use etc etc).
-
-> > I've added Arnd to this thread, as I've seen lots of Kconfig patches from him
-> > recently, maybe he has some thoughts on whether this is the correct fix or not?
-> >
-> Ack. Fwiw, I believe that the reasoning put by Jani is perfeclty
-> reasonable, but it'll be great to hear others as well.
-
-Yes me to. However I don't think anything in this patch is at odds with the
-documentation Jani has referenced. 
-
-regards,
-
-Peter.
+Kind regards
+Uffe
