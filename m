@@ -1,21 +1,72 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Thu, 6 Oct 2016 23:41:17 +0100
-Subject: [PATCH] Revert "debugfs: ->d_parent is never NULL or negative"
-In-Reply-To: <20161006223729.GO19539@ZenIV.linux.org.uk>
-References: <1475789429-11414-1-git-send-email-okaya@codeaurora.org>
- <20161006213734.GM19539@ZenIV.linux.org.uk>
- <f6ba2bf7-4f0b-e874-d642-6620d5df2212@codeaurora.org>
- <20161006220050.GN19539@ZenIV.linux.org.uk>
- <20161006223729.GO19539@ZenIV.linux.org.uk>
-Message-ID: <20161006224117.GP19539@ZenIV.linux.org.uk>
+From: aaron.brice@datasoft.com (Aaron Brice)
+Date: Thu,  6 Oct 2016 15:54:17 -0700
+Subject: [PATCH] sdhci-esdhc-imx: Correct two register accesses
+Message-ID: <1475794457-17993-1-git-send-email-aaron.brice@datasoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 06, 2016 at 11:37:29PM +0100, Al Viro wrote:
+ - The DMA error interrupt bit is in a different position as
+   compared to the sdhci standard.  This is accounted for in
+   many cases, but not handled in the case of clearing the
+   INT_STATUS register by writing a 1 to that location.
+ - The HOST_CONTROL register is very different as compared to
+   the sdhci standard.  This is accounted for in the write
+   case, but not when read back out (which it is in the sdhci
+   code).
 
-> If you ever get NULL in ->d_parent of struct dentry instance, you are
-> practically certain to have a dangling pointer to memory that used to
-> contain a struct dentry at some point but got freed and reused since then.
+Signed-off-by: Dave Russell <david.russell@datasoft.com>
+Signed-off-by: Aaron Brice <aaron.brice@datasoft.com>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-... which is what happens in your case, apparently.  ->stats is still
-pointing to a dentry that had just been freed and its memory reused.
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 1f54fd8..d61ef16 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -346,7 +346,8 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
+ 	u32 data;
+ 
+-	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)) {
++	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE ||
++			reg == SDHCI_INT_STATUS)) {
+ 		if ((val & SDHCI_INT_CARD_INT) && !esdhc_is_usdhc(imx_data)) {
+ 			/*
+ 			 * Clear and then set D3CD bit to avoid missing the
+@@ -555,6 +556,25 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+ 	esdhc_clrset_le(host, 0xffff, val, reg);
+ }
+ 
++static u8 esdhc_readb_le(struct sdhci_host *host, int reg)
++{
++	u8 ret;
++	u32 long_val;
++
++	switch (reg) {
++	case SDHCI_HOST_CONTROL:
++		long_val = readl(host->ioaddr + reg);
++
++		ret = long_val & SDHCI_CTRL_LED;
++		ret |= (long_val >> 5) & SDHCI_CTRL_DMA_MASK;
++		ret |= (long_val & ESDHC_CTRL_4BITBUS);
++		ret |= (long_val & ESDHC_CTRL_8BITBUS) << 3;
++		return ret;
++	}
++
++	return readb(host->ioaddr + reg);
++}
++
+ static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+@@ -947,6 +967,7 @@ static void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.read_l = esdhc_readl_le,
+ 	.read_w = esdhc_readw_le,
++	.read_b = esdhc_readb_le,
+ 	.write_l = esdhc_writel_le,
+ 	.write_w = esdhc_writew_le,
+ 	.write_b = esdhc_writeb_le,
+-- 
+2.7.4
