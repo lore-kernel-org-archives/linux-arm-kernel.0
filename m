@@ -1,30 +1,46 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 6 Oct 2016 18:40:04 +0530
-Subject: [PATCH v14 2/4] CMDQ: Mediatek CMDQ driver
-In-Reply-To: <1475758897.4102.31.camel@mtksdaap41>
-References: <1473039885-24009-1-git-send-email-hs.liao@mediatek.com>
- <1473039885-24009-3-git-send-email-hs.liao@mediatek.com>
- <1475204778.13398.28.camel@mtksdaap41>
- <1475225778.25044.35.camel@mtksdaap41> <1475226691.13398.35.camel@mtksdaap41>
- <1475228829.3658.1.camel@mtksdaap41> <1475636064.21937.25.camel@mtksdaap41>
- <CAJe_ZhcXw1-MOEiiix5VTtKEVr9Z23s_OyikboDYCd0RQwS5pg@mail.gmail.com>
- <1475670705.335.27.camel@mtksdaap41>
- <CAJe_ZheeEe0xEj733pxr4q=-YzxKHgRM4MMPDJNHa9uRC9Q2zA@mail.gmail.com>
- <1475758897.4102.31.camel@mtksdaap41>
-Message-ID: <CAJe_ZheptRQSmQp2gagqUyXqkOpi1qaTo8QPDTFpQ-+62B6kUw@mail.gmail.com>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Thu, 6 Oct 2016 15:09:31 +0200
+Subject: [PATCH] exynos-drm: Fix error messages to print flags and size
+In-Reply-To: <1470850236-9101-1-git-send-email-shuahkh@osg.samsung.com>
+References: <1470850236-9101-1-git-send-email-shuahkh@osg.samsung.com>
+Message-ID: <57F64D0B.5050506@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 October 2016 at 18:31, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+Hello,
 
-> Back to our original statement, we need to flush all tasks to queue
-> in GCE HW; i.e. we need to use mbox_client_txdone after
-> mbox_send_message, or send tx_done once mailbox controller receive
-> message (task). However, we still need a way to notice done tasks to
-> clients. Currently, we don't have a good way to call callback in mailbox
-> framework. Therefore, CMDQ driver has its owner callback functions.
->
-mbox_client_txdone() is called by the client driver when only it knows
-the messages has been transmitted (i.e your submitted tasks are done).
-Obviously the client driver should do any callbacks to its users
-upstream.
+I think this patch was never picked up. So just a short 'ping' from my side.
+
+With best wishes,
+Tobias
+
+
+Shuah Khan wrote:
+> Fix exynos_drm_gem_create() error messages to include flags and size when
+> flags and size are invalid.
+> 
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_gem.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+> index cdf9f1a..4c4cb0e 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+> @@ -231,12 +231,12 @@ struct exynos_drm_gem *exynos_drm_gem_create(struct drm_device *dev,
+>  	int ret;
+>  
+>  	if (flags & ~(EXYNOS_BO_MASK)) {
+> -		DRM_ERROR("invalid flags.\n");
+> +		DRM_ERROR("invalid GEM buffer flags: %u\n", flags);
+>  		return ERR_PTR(-EINVAL);
+>  	}
+>  
+>  	if (!size) {
+> -		DRM_ERROR("invalid size.\n");
+> +		DRM_ERROR("invalid GEM buffer size: %lu\n", size);
+>  		return ERR_PTR(-EINVAL);
+>  	}
+>  
+> 
