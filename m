@@ -1,37 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 6 Oct 2016 13:05:58 +0200
-Subject: v4.8: working bluetooth support
-In-Reply-To: <20161006100927.GD27254@pali>
-References: <20161006100300.GA17524@amd>
- <20161006100927.GD27254@pali>
-Message-ID: <20161006110557.GA20968@amd>
+From: emil@limesaudio.com (Emil Lundmark)
+Date: Thu,  6 Oct 2016 13:12:10 +0200
+Subject: [PATCH 1/2] ARM: imx: fix integer overflow in AV PLL round rate
+Message-ID: <1475752331-19525-1-git-send-email-emil@limesaudio.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2016-10-06 12:09:27, Pali Roh?r wrote:
-> On Thursday 06 October 2016 12:03:00 Pavel Machek wrote:
-> > Hi!
-> > 
-> > I got bluetooth to work in useful configuration (on n900). Perhaps it
-> > is useful for Sebastian?
-> 
-> Hi! Is still bluetooth driver bases on Sebastian's one? Or older
-> versions which were removed from staging?
+Since parent_rate * mfn may overflow 32 bits, the result should be stored
+using 64 bits.
 
-Older versions.
+This issue was previously addressed in ba7f4f557eb6, but this particular
+case was not fixed.
 
-I believe the plan is to wait for Sebastian's version to land in
-mainline, then try to addapt it. But if you have time and want to
-play... :-).
-									Pavel
+Signed-off-by: Emil Lundmark <emil@limesaudio.com>
+---
+ drivers/clk/imx/clk-pllv3.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+index 19f9b62..bc7f163 100644
+--- a/drivers/clk/imx/clk-pllv3.c
++++ b/drivers/clk/imx/clk-pllv3.c
+@@ -247,7 +247,11 @@ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	do_div(temp64, parent_rate);
+ 	mfn = temp64;
+ 
+-	return parent_rate * div + parent_rate * mfn / mfd;
++	temp64 = (u64)parent_rate;
++	temp64 *= mfn;
++	do_div(temp64, mfd);
++
++	return parent_rate * div + (u32)temp64;
+ }
+ 
+ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161006/dbfda014/attachment-0001.sig>
+2.7.4
