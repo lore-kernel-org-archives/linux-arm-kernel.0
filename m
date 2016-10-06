@@ -1,87 +1,137 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 6 Oct 2016 21:45:14 +0200
-Subject: [PATCH 1/8] PM / Domains: Make genpd state allocation dynamic
-In-Reply-To: <20161006154052.GB28930@linaro.org>
-References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
- <1475699519-109623-2-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFpNnJxueNNk9g7KzHPAsJVQ8xeiaw8OHMevBZ3myhd-xA@mail.gmail.com>
- <20161006154052.GB28930@linaro.org>
-Message-ID: <CAPDyKFps5kZLcVW1UJsZtgOQEysRxc9tj41uDDTeJav8YBQG4A@mail.gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 6 Oct 2016 15:53:28 -0400
+Subject: [PATCH v5 2/5] drm/bridge: Add RGB to VGA bridge support
+In-Reply-To: <5319260.UeCnJXKVPe@avalon>
+References: <20160930143709.1388-1-maxime.ripard@free-electrons.com>
+ <20161006072106.GA4684@lukather>
+ <96cef428-19e5-ff98-1de1-fa31dd8d4142@codeaurora.org>
+ <5319260.UeCnJXKVPe@avalon>
+Message-ID: <CAOw6vbLC=HnnpuaxFf8EzSTmuYoZd-r1aqx-ixja97Ht_U6S6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 October 2016 at 17:40, Lina Iyer <lina.iyer@linaro.org> wrote:
-> On Thu, Oct 06 2016 at 02:37 -0600, Ulf Hansson wrote:
->>
->> On 5 October 2016 at 22:31, Lina Iyer <lina.iyer@linaro.org> wrote:
->>>
->>> Allow PM Domain states to be defined dynamically by the drivers. This
->>> removes the limitation on the maximum number of states possible for a
->>> domain.
->>>
->>> Cc: Axel Haslam <ahaslam+renesas@baylibre.com>
->>> Suggested-by: Ulf Hansson <ulf.hansson@linaro.org>
->>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+On Thu, Oct 6, 2016 at 1:27 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hello,
 >
-> <...>
->>>
->>> -#define GENPD_MAX_NUM_STATES   8 /* Number of possible low power states
->>> */
->>> -
->>>  enum gpd_status {
->>>         GPD_STATE_ACTIVE = 0,   /* PM domain is active */
->>>         GPD_STATE_POWER_OFF,    /* PM domain is off */
->>> @@ -70,7 +68,7 @@ struct generic_pm_domain {
->>>         void (*detach_dev)(struct generic_pm_domain *domain,
->>>                            struct device *dev);
->>>         unsigned int flags;             /* Bit field of configs for genpd
->>> */
->>> -       struct genpd_power_state states[GENPD_MAX_NUM_STATES];
->>> +       struct genpd_power_state *states;
->>>         unsigned int state_count; /* number of states */
->>>         unsigned int state_idx; /* state that genpd will go to when off
->>> */
->>>
->>> --
->>> 2.7.4
->>>
+> On Thursday 06 Oct 2016 17:09:57 Archit Taneja wrote:
+>> On 10/06/2016 12:51 PM, Maxime Ripard wrote:
+>> > On Mon, Oct 03, 2016 at 04:40:57PM +0530, Archit Taneja wrote:
+>> >> On 09/30/2016 08:07 PM, Maxime Ripard wrote:
+>> >>> Some boards have an entirely passive RGB to VGA bridge, based on either
+>> >>> DACs or resistor ladders.
+>> >>>
+>> >>> Those might or might not have an i2c bus routed to the VGA connector in
+>> >>> order to access the screen EDIDs.
+>> >>>
+>> >>> Add a bridge that doesn't do anything but expose the modes available on
+>> >>> the screen, either based on the EDIDs if available, or based on the XGA
+>> >>> standards.
+>> >>>
+>> >>> Acked-by: Rob Herring <robh@kernel.org>
+>> >>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> >>> ---
+>> >>> .../bindings/display/bridge/rgb-to-vga-bridge.txt  |  48 +++++
+>> >>> drivers/gpu/drm/bridge/Kconfig                     |   7 +
+>> >>> drivers/gpu/drm/bridge/Makefile                    |   1 +
+>> >>> drivers/gpu/drm/bridge/rgb-to-vga.c                | 229 +++++++++++++++
+>> >>> 4 files changed, 285 insertions(+)
+>> >>> create mode 100644
+>> >>> Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.txt
+>> >>> create mode 100644 drivers/gpu/drm/bridge/rgb-to-vga.c
+>> >>>
+>> >>> diff --git
+>> >>> a/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.tx
+>> >>> t
+>> >>> b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.tx
+>> >>> t new file mode 100644
+>> >>> index 000000000000..a8375bc1f9cb
+>> >>> --- /dev/null
+>> >>> +++
+>> >>> b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.tx
+>> >>> t @@ -0,0 +1,48 @@
+>> >>> +Dumb RGB to VGA bridge
+>> >>> +----------------------
+>> >>> +
+>> >>> +This binding is aimed for dumb RGB to VGA bridges that do not require
+>> >>> +any configuration.
+>> >>> +
+>> >>> +Required properties:
+>> >>> +
+>> >>> +- compatible: Must be "rgb-to-vga-bridge"
+>> >>
+>> >> I'd talked to Laurent on IRC if he's okay with this. And I guess you to
+>> >> had discussed it during XDC too. He's suggested that it'd be better to
+>> >> have the compatible string as "simple-vga-dac".
+>> >
+>> > I just wished this bikeshedding had taken place publicly and be
+>> > actually part of that discussion, but yeah, ok.
 >>
->> In general I like the improvement, but..
+>> Sorry about that. I'd pinged him for an Ack, the discussion went
+>> more than that :)
 >>
->> This change implies that ->states may very well be NULL. This isn't
->> validated by genpd's internal logic when power off/on the domain
->> (genpd_power_on|off(), __default_power_down_ok()). You need to fix
->> this, somehow.
+>> >> Some of the reasons behind having this:
+>> >>
+>> >> - We don't need to specify "rgb" in the compatible string since most
+>> >> simple VGA DACs can only work with an RGB input.
+>> >
+>> > Ok.
+>> >
+>> >> - Also, with "dac" specified in the string, we don't need to
+>> >> specifically mention "bridge" in the string. Also, bridge is a drm
+>> >> specific term.
+>> >>
+>> >> - "simple" is considered because it's an unconfigurable bridge, and it
+>> >> might be misleading for other VGA DACs to not use "vga-dac".
+>> >
+>> > All those "simple" bindings are just the biggest lie we ever
+>> > told. It's simple when you introduce it, and then grows into something
+>> > much more complicated than a non-simple implementation.
 >>
-> Good point.
+>> "simple" here is supposed to mean that it's an unconfigurable RGB to
+>> VGA DAC. This isn't supposed to follow the simple-panel model, where
+>> you add the "simple-panel" string in the compatible node, along with
+>> you chip specific compatible string.
 >
->> Perhaps the easiest solutions is, when pm_genpd_init() finds that
->> ->state is NULL, that we allocate a struct genpd_power_state with
->> array size of 1 and assign it to ->states. Although, doing this also
->> means you need to track that genpd was responsible for the the
->> allocation, so it must also free the data from within genpd_remove().
->>
->> Unless you have other ideas!?
->>
-> I can think of some hacks, but they are uglier than the problem we are
-> trying to solve. We could drop this patch. Real world situations would
-> not have more than 8 states and if there is one, we can think about it
-> then.
+> I agree with Maxime, I don't like the word "simple". My preference would be
+> "vga-dac" for a lack of a better qualifier than "simple" to describe the fact
+> that the device requires no configuration. My only concern with "vga-dac" is
+> that we would restrict usage of that compatible string for a subset of VGA
+> DACs, with more complex devices not being compatible with "vga-dac" even
+> though they are VGA DACs. That's a problem I can live with though.
 
-The problem with the current approach is that we waste some memory as
-we always have an array of 8 states per genpd. In the worst case,
-which currently is the most common case, only 1 out of 8 states is
-being used.
+While we're bikeshedding (feel free to ignore my input on this), I
+think Maxime's initial "dumb" qualifier was better than "simple". I
+think "passive" also gets the point across better than "simple", which
+we've already established as something else in drm.
 
-So, let's not be lazy here and instead take the opportunity to fix
-this, and especially I think this makes sense, before we go on and add
-the DT parsing of the domain-idle-states.
+Now that I've gotten that out of the way, this patch looks good to me
+regardless of the name.
 
-The more sophisticated method would probably be to use kobject/kref,
-but let's not go there for now. Instead let's try an easy method of
-just tracking whether the allocations had been made internally by
-genpd, via adding a "bool state_allocated to the struct
-generic_pm_domain. Would that work?
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-Kind regards
-Uffe
+Sean
+
+>
+>> In other words, this driver shouldn't be touched again in the future :)
+>> If someone wants to write a RGB to VGA driver which is even
+>> slightly configurable, they'll need to write a new bridge driver.
+>
+> I'm sure that won't be true. I can certainly foresee the addition of
+> regulators support for instance. It's unfortunately never black and white.
+>
+>> >> What do you think about this? If you think it's good, would it be
+>> >> possible for you to change this? I guess it's okay for the rest of
+>> >> the patch to stay the same.
+>> >
+>> > I'll update and respin the serie.
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
