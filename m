@@ -1,99 +1,209 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 6 Oct 2016 09:52:08 -0600
-Subject: [PATCH v3] Adding missing features of Coresight PTM components
-In-Reply-To: <60a1f04c-1e73-0ff1-dfee-775b875d2c4a@centralesupelec.fr>
-References: <f029bcee-696f-3519-b0f1-4cdcf24ad3f8@centralesupelec.fr>
- <60a1f04c-1e73-0ff1-dfee-775b875d2c4a@centralesupelec.fr>
-Message-ID: <CANLsYkyPTtiGsfKg13ZY2pgCC3rh+MfirMwTrLG1=TZ5gUJqzA@mail.gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 6 Oct 2016 09:53:36 -0600
+Subject: [PATCH 3/8] PM / Domains: Allow domain power states to be read
+ from DT
+In-Reply-To: <CAPDyKFqWE=-tMLN-6zKWpb6K2a2bBxkA7q+mSivJFpzNntcupw@mail.gmail.com>
+References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
+ <1475699519-109623-4-git-send-email-lina.iyer@linaro.org>
+ <CAPDyKFqWE=-tMLN-6zKWpb6K2a2bBxkA7q+mSivJFpzNntcupw@mail.gmail.com>
+Message-ID: <20161006155336.GD28930@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 October 2016 at 06:18, Muhammad Abdul WAHAB
-<muhammadabdul.wahab@centralesupelec.fr> wrote:
-> In the current driver for Coresight components, two features of PTM
-> components are missing:
+On Thu, Oct 06 2016 at 03:47 -0600, Ulf Hansson wrote:
+>On 5 October 2016 at 22:31, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> This patch allows domains to define idle states in the DT. SoC's can
+>> define domain idle states in DT using the "domain-idle-states" property
+>> of the domain provider. Calling of_pm_genpd_init() will  read the idle
+>> states and initialize the genpd for the domain.
+>>
+>> In addition to the entry and exit latency for idle state, also add
+>> residency_ns, param and of_node property to each state. A domain idling
+>> in a state is only power effecient if it stays idle for a certain period
+>> in that state. The residency provides this minimum time for the idle
+>> state to provide power benefits. The param is a state specific u32 value
+>> that the platform may use for that idle state.
+>>
+>> This patch is based on the original patch by Marc Titinger.
+>>
+>> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>  drivers/base/power/domain.c | 103 ++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/pm_domain.h   |   8 ++++
+>>  2 files changed, 111 insertions(+)
+>>
+>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>> index 740afa9..368a5b8 100644
+>> --- a/drivers/base/power/domain.c
+>> +++ b/drivers/base/power/domain.c
+>> @@ -1895,6 +1895,109 @@ out:
+>>         return ret ? -EPROBE_DEFER : 0;
+>>  }
+>>  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+>> +
+>> +static const struct of_device_id idle_state_match[] = {
+>> +       { .compatible = "arm,idle-state", },
+>> +       { }
+>> +};
+>> +
+>> +static int read_genpd_state(struct genpd_power_state *genpd_state,
 >
-> 1. Branch Broadcasting (present also in ETM but called Branch Output)
-> 2. Return Stack (only present in PTM v1.0 and PTMv1.1)
+>/s/read_genpd_state/genpd_parse_state
 >
-> These features can be added simply to the code using `mode` field of
-> `etm_config` struct.
+>> +                                   struct device_node *state_node)
+>> +{
+>> +       int err = 0;
 >
-> 1. **Branch Broadcast** : The branch broadcast feature is present in ETM
-> components as well and is called Branch output. It allows to retrieve
-> addresses for direct branch addresses alongside the indirect branch
-> addresses. For example, it could be useful in cases when tracing without
-> source code.
-> 2. **Return Stack** : The return stack option allows to retrieve the return
->  addresses of function calls. It can be useful to avoid CRA
-> (Code Reuse Attacks) by keeping a shadowstack.
+>No need to assign err to 0.
 >
-> Signed-off-by: Muhammad Abdul Wahab <muhammadabdul.wahab@centralesupelec.fr>
-> ---
-> changes in v3 :
->         - deleted warning message
->         - bit field definition of Branch Broadcast and Return Stack
+>> +       u32 latency;
+>> +       u32 residency;
+>> +       u32 entry_latency, exit_latency;
+>> +       const struct of_device_id *match_id;
+>> +
+>> +       match_id = of_match_node(idle_state_match, state_node);
+>> +       if (!match_id)
+>> +               return -EINVAL;
+>> +
+>> +       err = of_property_read_u32(state_node, "entry-latency-us",
+>> +                                               &entry_latency);
+>> +       if (err) {
+>> +               pr_debug(" * %s missing entry-latency-us property\n",
+>> +                                               state_node->full_name);
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       err = of_property_read_u32(state_node, "exit-latency-us",
+>> +                                               &exit_latency);
+>> +       if (err) {
+>> +               pr_debug(" * %s missing exit-latency-us property\n",
+>> +                                               state_node->full_name);
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       err = of_property_read_u32(state_node, "min-residency-us", &residency);
+>> +       if (!err)
+>> +               genpd_state->residency_ns = 1000 * residency;
+>> +
+>> +       latency = entry_latency + exit_latency;
 >
->  drivers/hwtracing/coresight/coresight-etm.h         |  5 +++++
->  drivers/hwtracing/coresight/coresight-etm3x-sysfs.c | 10 ++++++++++
->  2 files changed, 15 insertions(+)
+>Hmm, this is probably not what you want.
 >
-> diff --git a/drivers/hwtracing/coresight/coresight-etm.h
-> b/drivers/hwtracing/coresight/coresight-etm.h
-> index 4a18ee4..ad063d7 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm.h
-> +++ b/drivers/hwtracing/coresight/coresight-etm.h
-> @@ -89,11 +89,13 @@
->  /* ETMCR - 0x00 */
->  #define ETMCR_PWD_DWN          BIT(0)
->  #define ETMCR_STALL_MODE       BIT(7)
-> +#define ETMCR_BRANCH_BROADCAST BIT(8)
->  #define ETMCR_ETM_PRG          BIT(10)
->  #define ETMCR_ETM_EN           BIT(11)
->  #define ETMCR_CYC_ACC          BIT(12)
->  #define ETMCR_CTXID_SIZE       (BIT(14)|BIT(15))
->  #define ETMCR_TIMESTAMP_EN     BIT(28)
-> +#define ETMCR_RETURN_STACK     BIT(29)
->  /* ETMCCR - 0x04 */
->  #define ETMCCR_FIFOFULL                BIT(23)
->  /* ETMPDCR - 0x310 */
-> @@ -110,8 +112,11 @@
->  #define ETM_MODE_STALL         BIT(2)
->  #define ETM_MODE_TIMESTAMP     BIT(3)
->  #define ETM_MODE_CTXID         BIT(4)
-> +#define ETM_MODE_BBROAD                BIT(5)
-> +#define ETM_MODE_RET_STACK     BIT(6)
->  #define ETM_MODE_ALL           (ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
->                                  ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
-> +                                ETM_MODE_BBROAD | ETM_MODE_RET_STACK | \
->                                  ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
->                                  ETM_MODE_EXCL_USER)
+>The genpd governor, via __default_power_down_ok(), already adds the
+>->power_on_latency_ns and the ->power_off_latency_ns, when it
+>validates which idle state you are allowed to enter.
 >
-> diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> index 5ea0909..a76009a 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> @@ -164,6 +164,16 @@ static ssize_t mode_store(struct device *dev,
->         else
->                 config->ctrl &= ~ETMCR_CTXID_SIZE;
+>> +       genpd_state->power_on_latency_ns = 1000 * latency;
+>> +       genpd_state->power_off_latency_ns = 1000 * entry_latency;
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +/**
+>> + * of_genpd_parse_idle_states: Return array of idle states for the genpd.
+>> + *
+>> + * @dn: The genpd device node
+>> + * @states: The pointer to which the state array will be saved.
+>> + * @n: The count of elements in the array returned from this function.
+>> + *
+>> + * Returns the device states parsed from the OF node. The memory for the states
+>> + * is allocated by this function and is the responsibility of the caller to
+>> + * free the memory after use.
+>> + */
+>> +int of_genpd_parse_idle_states(struct device_node *dn,
+>> +                       struct genpd_power_state **states, int *n)
+>> +{
+>> +       struct genpd_power_state *st;
+>> +       struct device_node *np;
+>> +       int i, ret = 0;
+>> +       int count;
+>> +
+>> +       for (count = 0; ; count++)
+>> +               if (!of_parse_phandle(dn, "domain-idle-states", count))
+>> +                       break;
 >
-> +       if (config->mode & ETM_MODE_BBROAD)
-> +               config->ctrl |= ETMCR_BRANCH_BROADCAST;
-> +       else
-> +               config->ctrl &= ~ETMCR_BRANCH_BROADCAST;
-> +
-> +       if (config->mode & ETM_MODE_RET_STACK)
-> +               config->ctrl |= ETMCR_RETURN_STACK_EN;
-> +       else
-> +               config->ctrl &= ~ETMCR_RETURN_STACK_EN;
-> +
+>I think it's better to use of_count_phandle_with_args() to find out
+>the number of phandles.
+>
 
-Where is ETMCR_RETURN_STACK_EN defined?  Did you send me code that
-doesn't compile?
-
->         if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
->                 etm_config_trace_mode(config);
+>> +
+>> +       st = kcalloc(count, sizeof(*st), GFP_KERNEL);
+>> +       if (!st)
+>> +               return -ENOMEM;
+>> +
+>> +       for (i = 0; i < count; i++) {
+>> +               np = of_parse_phandle(dn, "domain-idle-states", i);
 >
-> --
-> 1.9.1
+>Isn't this a case of when it would be convenient to use the
+>of_phandle_iterator*() APIs?
+>
+
+Hmm.. But if we move back to static allocation of states, we won't need
+any of this ;)
+
+-- Lina
+>> +               if (!np) {
+>> +                       ret = -EFAULT;
+>> +                       break;
+>> +               }
+>> +
+>> +               ret = read_genpd_state(&st[i], np);
+>> +               if (ret) {
+>> +                       pr_err
+>> +                       ("Parsing idle state node %s failed with err %d\n",
+>> +                                                       np->full_name, ret);
+>> +                       of_node_put(np);
+>> +                       break;
+>> +               }
+>> +               of_node_put(np);
+>> +       }
+>> +
+>> +       if (ret) {
+>> +               kfree(st);
+>> +               return ret;
+>> +       }
+>> +
+>> +       *n = count;
+>> +       *states = st;
+>> +
+>> +       return 0;
+>> +}
+>> +EXPORT_SYMBOL(of_genpd_parse_idle_states);
+>> +
+>>  #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
+>>
+>>
+>> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+>> index c113713..4c9152d 100644
+>> --- a/include/linux/pm_domain.h
+>> +++ b/include/linux/pm_domain.h
+>> @@ -204,6 +204,8 @@ extern int of_genpd_add_device(struct of_phandle_args *args,
+>>  extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
+>>                                   struct of_phandle_args *new_subdomain);
+>>  extern struct generic_pm_domain *of_genpd_remove_last(struct device_node *np);
+>> +extern int of_genpd_parse_idle_states(struct device_node *dn,
+>> +                       struct genpd_power_state **states, int *n);
+>>
+>>  int genpd_dev_pm_attach(struct device *dev);
+>>  #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+>> @@ -233,6 +235,12 @@ static inline int of_genpd_add_subdomain(struct of_phandle_args *parent,
+>>         return -ENODEV;
+>>  }
+>>
+>> +static inline int of_genpd_parse_idle_states(struct device_node *dn,
+>> +                       struct genpd_power_state **states, int *n)
+>> +{
+>> +       return -ENODEV;
+>> +}
+>> +
+>>  static inline int genpd_dev_pm_attach(struct device *dev)
+>>  {
+>>         return -ENODEV;
+>> --
+>> 2.7.4
+>>
+>
+>Kind regards
+>Uffe
