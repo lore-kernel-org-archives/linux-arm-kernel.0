@@ -1,146 +1,52 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 06 Oct 2016 16:44:59 +0200
-Subject: [PATCH v2] arm64: dts: marvell: Add definition for the
- Globalscale Marvell ESPRESSOBin Board
-In-Reply-To: <20161006091429.8974-1-romain.perier@free-electrons.com> (Romain
- Perier's message of "Thu, 6 Oct 2016 11:14:29 +0200")
-References: <20161006091429.8974-1-romain.perier@free-electrons.com>
-Message-ID: <87h98pwn84.fsf@free-electrons.com>
+Date: Thu, 06 Oct 2016 16:54:07 +0200
+Subject: [PATCH 1/2] ARM: dts: armada-370-rn104: add pinmuxing for i2c0
+In-Reply-To: <1475173326-24673-1-git-send-email-uwe@kleine-koenig.org> ("Uwe
+ =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Thu, 29 Sep 2016 20:22:05
+ +0200")
+References: <1475173326-24673-1-git-send-email-uwe@kleine-koenig.org>
+Message-ID: <87d1jdwmsw.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
+Hi Uwe,
  
- On jeu., oct. 06 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
+ On jeu., sept. 29 2016, Uwe Kleine-K?nig <uwe@kleine-koenig.org> wrote:
 
-> This is a high performance 64 bit dual core low power consuming
-> networking computing platform based on the ARMv8 architecture.
-> It contains an Armada 3720 running up to 1.2Ghz.
+> Up to now a working i2c bus depended on the bootloader to configure the
+> pinmuxing. Make it explicit.
 >
-> This commit adds a basic definition for this board.
+> As a side effect this change makes i2c work in barebox.
 >
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 
-Applied on mvebu/dt64-4.10, I also added that the uart is exported on
-the micro USB connector through an FTDI.
+Applied on mvebu/dt-4.10
 
 Thanks,
 
 Gregory
 
 > ---
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
 >
-> Changes in v2:
->  - Improved commit message
->  - Added informations about connectors
->
->  arch/arm64/boot/dts/marvell/Makefile               |  1 +
->  .../boot/dts/marvell/armada-3720-espressobin.dts   | 82 ++++++++++++++++++++++
->  2 files changed, 83 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
->
-> diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-> index 308468d..392eeb6 100644
-> --- a/arch/arm64/boot/dts/marvell/Makefile
-> +++ b/arch/arm64/boot/dts/marvell/Makefile
-> @@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-stb.dtb
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> index 11565752b9f6..d44a850d879c 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+> @@ -128,6 +128,10 @@
+>  			i2c at 11000 {
+>  				compatible = "marvell,mv64xxx-i2c";
+>  				clock-frequency = <100000>;
+> +
+> +				pinctrl-0 = <&i2c0_pins>;
+> +				pinctrl-names = "default";
+> +
+>  				status = "okay";
 >  
->  # Mvebu SoC Family
->  dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
-> +dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
->  dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db.dtb
->  
->  always		:= $(dtb-y)
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> new file mode 100644
-> index 0000000..ae005f1
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> @@ -0,0 +1,82 @@
-> +/*
-> + * Device Tree file for Globalscale Marvell ESPRESSOBin Board
-> + * Copyright (C) 2016 Marvell
-> + *
-> + * Romain Perier <romain.perier@free-electrons.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "armada-372x.dtsi"
-> +
-> +/ {
-> +	model = "Globalscale Marvell ESPRESSOBin Board";
-> +	compatible = "globalscale,espressobin", "marvell,armada3720", "marvell,armada3710";
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
-> +	};
-> +};
-> +
-> +/* J9 */
-> +&pcie0 {
-> +	status = "okay";
-> +};
-> +
-> +/* J6 */
-> +&sata {
-> +	status = "okay";
-> +};
-> +
-> +/* J5 */
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> +/* J7 */
-> +&usb3 {
-> +	status = "okay";
-> +};
+>  				isl12057: isl12057 at 68 {
 > -- 
-> 2.9.3
+> 2.8.1
 >
 
 -- 
