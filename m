@@ -1,51 +1,37 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 6 Oct 2016 12:56:20 +0200
-Subject: [PATCH 6/8] PM / Domains: Abstract genpd locking
-In-Reply-To: <1475699519-109623-7-git-send-email-lina.iyer@linaro.org>
-References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
- <1475699519-109623-7-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAPDyKFrzPbr_njosTxO9y0V3KKG0stfhA3XejmQk_3RJMr3=Tg@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 6 Oct 2016 13:05:58 +0200
+Subject: v4.8: working bluetooth support
+In-Reply-To: <20161006100927.GD27254@pali>
+References: <20161006100300.GA17524@amd>
+ <20161006100927.GD27254@pali>
+Message-ID: <20161006110557.GA20968@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2016 at 22:31, Lina Iyer <lina.iyer@linaro.org> wrote:
-> Abstract genpd lock/unlock calls, in preparation for domain specific
-> locks added in the following patches.
->
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/base/power/domain.c | 121 +++++++++++++++++++++++++++++---------------
->  include/linux/pm_domain.h   |   5 +-
->  2 files changed, 85 insertions(+), 41 deletions(-)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 52fcdb2..82e6a33 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -39,6 +39,46 @@
->  static LIST_HEAD(gpd_list);
->  static DEFINE_MUTEX(gpd_list_lock);
->
-> +struct genpd_lock_fns {
+On Thu 2016-10-06 12:09:27, Pali Roh?r wrote:
+> On Thursday 06 October 2016 12:03:00 Pavel Machek wrote:
+> > Hi!
+> > 
+> > I got bluetooth to work in useful configuration (on n900). Perhaps it
+> > is useful for Sebastian?
+> 
+> Hi! Is still bluetooth driver bases on Sebastian's one? Or older
+> versions which were removed from staging?
 
-May I suggest you to rename the struct to "genpd_lock_ops"?
+Older versions.
 
-I think "*_ops" is in general what we use in the kernel for callbacks
-and functions pointers like these.
+I believe the plan is to wait for Sebastian's version to land in
+mainline, then try to addapt it. But if you have time and want to
+play... :-).
+									Pavel
 
-> +       void (*lock)(struct generic_pm_domain *genpd);
-> +       void (*lock_nested)(struct generic_pm_domain *genpd, int depth);
-> +       int (*lock_interruptible)(struct generic_pm_domain *genpd);
-> +       void (*unlock)(struct generic_pm_domain *genpd);
-> +};
-> +
-
-[...]
-
-Otherwise this looks good to me!
-
-Kind regards
-Uffe
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161006/dbfda014/attachment-0001.sig>
