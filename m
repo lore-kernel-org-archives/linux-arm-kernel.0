@@ -1,34 +1,55 @@
-From: paweljarosz3691@gmail.com (=?utf-8?B?UGF3ZcWC?= Jarosz)
-Date: Thu, 6 Oct 2016 21:42:21 +0200
-Subject: [PATCH] ARM: dts: rockchip: initialize rk3066 PLL clock rate
-Message-ID: <20161006194221.GA4895@vaio-ubuntu>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 6 Oct 2016 15:43:21 -0400
+Subject: [PATCH v6 1/5] drm/sun4i: rgb: Remove the bridge enable/disable
+ functions
+In-Reply-To: <5100ee37c9bbb53f8227bd38f1d3160e507c489d.1475740611.git-series.maxime.ripard@free-electrons.com>
+References: <cover.2ec28e2292f37131839babc08427ef9f1aece26a.1475740611.git-series.maxime.ripard@free-electrons.com>
+ <5100ee37c9bbb53f8227bd38f1d3160e507c489d.1475740611.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAOw6vbJ5C95rxK6--zEintO=qeu+Pm=OcvB+SYzQuvz5pSQaaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize PLL rate while kernel init. No other module does than.
-Clock rates are taken from rk3066 TRM. Assigned values are for 125 degrees
-celcius operating point.
-This gives us performance boost observable for example in mmc transfers.
+On Thu, Oct 6, 2016 at 3:57 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The atomic helpers already call the drm_bridge_enable on our behalf,
+> there's no need to do it a second time.
+>
+> Reported-by: Sean Paul <seanpaul@chromium.org>
 
-Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
----
- arch/arm/boot/dts/rk3066a.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 0d0dae3..cf215e8 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -151,6 +151,10 @@
- 
- 		#clock-cells = <1>;
- 		#reset-cells = <1>;
-+		assigned-clocks = <&cru PLL_DPLL>, <&cru PLL_APLL>,
-+				  <&cru PLL_CPLL>, <&cru PLL_GPLL>;
-+		assigned-clock-rates = <533000000>, <600000000>,
-+				       <600000000>, <600000000>;
- 	};
- 
- 	timer at 2000e000 {
--- 
-2.7.4
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_rgb.c | 6 ------
+>  1 file changed, 0 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> index 4e4bea6f395c..d198ad7e5323 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> @@ -155,9 +155,6 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+>         if (!IS_ERR(tcon->panel))
+>                 drm_panel_prepare(tcon->panel);
+>
+> -       /* encoder->bridge can be NULL; drm_bridge_enable checks for it */
+> -       drm_bridge_enable(encoder->bridge);
+> -
+>         sun4i_tcon_channel_enable(tcon, 0);
+>
+>         if (!IS_ERR(tcon->panel))
+> @@ -177,9 +174,6 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+>
+>         sun4i_tcon_channel_disable(tcon, 0);
+>
+> -       /* encoder->bridge can be NULL; drm_bridge_disable checks for it */
+> -       drm_bridge_disable(encoder->bridge);
+> -
+>         if (!IS_ERR(tcon->panel))
+>                 drm_panel_unprepare(tcon->panel);
+>  }
+> --
+> git-series 0.8.10
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
