@@ -1,111 +1,81 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  6 Oct 2016 08:45:17 +0000
-Subject: [PATCH v13 01/15] iommu: Introduce DOMAIN_ATTR_MSI_GEOMETRY
-In-Reply-To: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
-References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1475743531-4780-2-git-send-email-eric.auger@redhat.com>
+Date: Thu,  6 Oct 2016 08:45:16 +0000
+Subject: [PATCH v13 00/15] KVM PCIe/MSI passthrough on ARM/ARM64
+Message-ID: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new DOMAIN_ATTR_MSI_GEOMETRY domain attribute. It enables
-to query the aperture of the IOVA window dedicated to MSIs and
-test whether the MSIs must be IOMMU mapped.
+Following Robin's series [1], addressing MSI IOMMU mapping for devices
+attached to a DMA ops domain, quite a lot of changes (and simplifications)
+were induced with respect to the v12 iteration:
 
-x86 IOMMUs will typically expose an MSI aperture matching the 1MB
-region [FEE0_0000h - FEF0_000h] corresponding to the the APIC
-configuration space and no support for MSI IOMMU mapping.
+- msi-iommu API role now is handled at dma-iommu level
+- MSI doorbell registration API still is used for security assessment
+  and doorbell overall iommu page size computation.
+- MSI layer part II is not needed anymore since mapping directly is
+  done in the irqchip compose callback.
 
-On ARM, the requirement to map MSIs will be reported by setting
-iommu_msi_supported to true.
+The VFIO user API and VFIO layer changes have not changed though. All the
+patches now are in the same series.
 
-A helper function is added to allow testing if the aperture is valid.
+Tested on AMD Overdrive (single GICv2m frame) with I350 VF assignment.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Suggested-by: Alex Williamson <alex.williamson@redhat.com>
+dependency:
+the series depends on Robin's generic-v7 branch:
+[1] [PATCH v7 00/22] Generic DT bindings for PCI IOMMUs and ARM SMMU
+http://www.spinics.net/lists/arm-kernel/msg531110.html
 
----
-v12 -> v13:
-- reword the commit message
+Best Regards
 
-v8 -> v9:
-- rename programmable into iommu_msi_supported
-- add iommu_domain_msi_aperture_valid
+Eric
 
-v8: creation
-- deprecates DOMAIN_ATTR_MSI_MAPPING flag
----
- drivers/iommu/iommu.c |  5 +++++
- include/linux/iommu.h | 14 ++++++++++++++
- 2 files changed, 19 insertions(+)
+Git: complete series available at
+https://github.com/eauger/linux/tree/generic-v7-pcie-passthru-v13
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 9a2f196..617cb2b 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1485,6 +1485,7 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
- 			  enum iommu_attr attr, void *data)
- {
- 	struct iommu_domain_geometry *geometry;
-+	struct iommu_domain_msi_geometry *msi_geometry;
- 	bool *paging;
- 	int ret = 0;
- 	u32 *count;
-@@ -1495,6 +1496,10 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
- 		*geometry = domain->geometry;
- 
- 		break;
-+	case DOMAIN_ATTR_MSI_GEOMETRY:
-+		msi_geometry  = data;
-+		*msi_geometry = domain->msi_geometry;
-+		break;
- 	case DOMAIN_ATTR_PAGING:
- 		paging  = data;
- 		*paging = (domain->pgsize_bitmap != 0UL);
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 436dc21..9f90735 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -52,6 +52,12 @@ struct iommu_domain_geometry {
- 	bool force_aperture;       /* DMA only allowed in mappable range? */
- };
- 
-+struct iommu_domain_msi_geometry {
-+	dma_addr_t aperture_start; /* First address used for MSI IOVA    */
-+	dma_addr_t aperture_end;   /* Last address used for MSI IOVA     */
-+	bool iommu_msi_supported;  /* Is MSI mapping supported?		 */
-+};
-+
- /* Domain feature flags */
- #define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
- #define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
-@@ -83,6 +89,7 @@ struct iommu_domain {
- 	iommu_fault_handler_t handler;
- 	void *handler_token;
- 	struct iommu_domain_geometry geometry;
-+	struct iommu_domain_msi_geometry msi_geometry;
- 	void *iova_cookie;
- };
- 
-@@ -108,6 +115,7 @@ enum iommu_cap {
- 
- enum iommu_attr {
- 	DOMAIN_ATTR_GEOMETRY,
-+	DOMAIN_ATTR_MSI_GEOMETRY,
- 	DOMAIN_ATTR_PAGING,
- 	DOMAIN_ATTR_WINDOWS,
- 	DOMAIN_ATTR_FSL_PAMU_STASH,
-@@ -352,6 +360,12 @@ int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
- void iommu_fwspec_free(struct device *dev);
- int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
- 
-+static inline bool iommu_domain_msi_aperture_valid(struct iommu_domain *domain)
-+{
-+	return (domain->msi_geometry.aperture_end >
-+		domain->msi_geometry.aperture_start);
-+}
-+
- #else /* CONFIG_IOMMU_API */
- 
- struct iommu_ops {};
+the above branch includes a temporary patch to work around a ThunderX pci
+bus reset crash (which I think unrelated to this series):
+"vfio: pci: HACK! workaround thunderx pci_try_reset_bus crash"
+Do not take this one for other platforms.
+
+Eric Auger (14):
+  iommu: Introduce DOMAIN_ATTR_MSI_GEOMETRY
+  iommu/arm-smmu: Initialize the msi geometry
+  genirq/msi: Introduce the MSI doorbell API
+  genirq/msi: msi_doorbell_calc_pages
+  irqchip/gic-v2m: Register the MSI doorbell
+  irqchip/gicv3-its: Register the MSI doorbell
+  vfio: Introduce a vfio_dma type field
+  vfio/type1: vfio_find_dma accepting a type argument
+  vfio/type1: Implement recursive vfio_find_dma_from_node
+  vfio/type1: Handle unmap/unpin and replay for VFIO_IOVA_RESERVED slots
+  vfio: Allow reserved msi iova registration
+  vfio/type1: Check doorbell safety
+  iommu/arm-smmu: Do not advertise IOMMU_CAP_INTR_REMAP
+  vfio/type1: Return the MSI geometry through VFIO_IOMMU_GET_INFO
+    capability chains
+
+Robin Murphy (1):
+  iommu/dma: Allow MSI-only cookies
+
+ drivers/iommu/Kconfig            |   2 +
+ drivers/iommu/arm-smmu-v3.c      |   5 +-
+ drivers/iommu/arm-smmu.c         |   6 +-
+ drivers/iommu/dma-iommu.c        |  40 +++++++
+ drivers/iommu/iommu.c            |   5 +
+ drivers/irqchip/irq-gic-v2m.c    |  11 +-
+ drivers/irqchip/irq-gic-v3-its.c |  14 +++
+ drivers/vfio/Kconfig             |   1 +
+ drivers/vfio/vfio_iommu_type1.c  | 244 ++++++++++++++++++++++++++++++++++++---
+ include/linux/dma-iommu.h        |   9 ++
+ include/linux/iommu.h            |  14 +++
+ include/linux/msi-doorbell.h     |  92 +++++++++++++++
+ include/uapi/linux/vfio.h        |  42 ++++++-
+ kernel/irq/Kconfig               |   4 +
+ kernel/irq/Makefile              |   1 +
+ kernel/irq/msi-doorbell.c        | 162 ++++++++++++++++++++++++++
+ 16 files changed, 633 insertions(+), 19 deletions(-)
+ create mode 100644 include/linux/msi-doorbell.h
+ create mode 100644 kernel/irq/msi-doorbell.c
+
 -- 
 1.9.1
