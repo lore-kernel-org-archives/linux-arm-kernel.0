@@ -1,128 +1,202 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Thu, 6 Oct 2016 12:31:25 +0100
-Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
- issue.
-In-Reply-To: <20161006104807.GB436@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
- <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
- <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
- <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
- <CACvgo53fuoPVjBAkZbWFPVxosObjvxoDgFdR_BkSTgevqyGg9g@mail.gmail.com>
- <20161006104807.GB436@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <CACvgo52zh5ZH8YhOJ=eE=RA7m=4vUoVFCdW+YSyN8WSHVi=Maw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 6 Oct 2016 13:34:58 +0200
+Subject: [PATCH 7/8] PM / Domains: Support IRQ safe PM domains
+In-Reply-To: <1475699519-109623-8-git-send-email-lina.iyer@linaro.org>
+References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
+ <1475699519-109623-8-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFoqx9demH=NXj13s5NqG9zJw+OnYRki+FSXYmULhirU_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On 5 October 2016 at 22:31, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Generic Power Domains currently support turning on/off only in process
+> context. This prevents the usage of PM domains for domains that could be
+> powered on/off in a context where IRQs are disabled. Many such domains
+> exist today and do not get powered off, when the IRQ safe devices in
+> that domain are powered off, because of this limitation.
+>
+> However, not all domains can operate in IRQ safe contexts. Genpd
+> therefore, has to support both cases where the domain may or may not
+> operate in IRQ safe contexts. Configuring genpd to use an appropriate
+> lock for that domain, would allow domains that have IRQ safe devices to
+> runtime suspend and resume, in atomic context.
+>
+> To achieve domain specific locking, set the domain's ->flag to
+> GENPD_FLAG_IRQ_SAFE while defining the domain. This indicates that genpd
+> should use a spinlock instead of a mutex for locking the domain. Locking
+> is abstracted through genpd_lock() and genpd_unlock() functions that use
+> the flag to determine the appropriate lock to be used for that domain.
+>
+> Domains that have lower latency to suspend and resume and can operate
+> with IRQs disabled may now be able to save power, when the component
+> devices and sub-domains are idle at runtime.
+>
+> The restriction this imposes on the domain hierarchy is that non-IRQ
+> safe domains may not have IRQ-safe subdomains, but IRQ safe domains may
+> have IRQ safe and non-IRQ safe subdomains and devices.
+>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  drivers/base/power/domain.c | 107 +++++++++++++++++++++++++++++++++++++++-----
+>  include/linux/pm_domain.h   |  10 ++++-
+>  2 files changed, 106 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 82e6a33..77e92c2 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -74,11 +74,61 @@ static const struct genpd_lock_fns genpd_mtx_fns  = {
+>         .unlock = genpd_unlock_mtx,
+>  };
+>
+> +static void genpd_lock_spin(struct generic_pm_domain *genpd)
+> +       __acquires(&genpd->slock)
+> +{
+> +       unsigned long flags;
+> +
+> +       spin_lock_irqsave(&genpd->slock, flags);
+> +       genpd->lock_flags = flags;
+> +}
+> +
+> +static void genpd_lock_nested_spin(struct generic_pm_domain *genpd,
+> +                                       int depth)
+> +       __acquires(&genpd->slock)
+> +{
+> +       unsigned long flags;
+> +
+> +       spin_lock_irqsave_nested(&genpd->slock, flags, depth);
+> +       genpd->lock_flags = flags;
+> +}
+> +
+> +static int genpd_lock_interruptible_spin(struct generic_pm_domain *genpd)
+> +       __acquires(&genpd->slock)
+> +{
+> +       unsigned long flags;
+> +
+> +       spin_lock_irqsave(&genpd->slock, flags);
+> +       genpd->lock_flags = flags;
+> +       return 0;
+> +}
+> +
+> +static void genpd_unlock_spin(struct generic_pm_domain *genpd)
+> +       __releases(&genpd->slock)
+> +{
+> +       spin_unlock_irqrestore(&genpd->slock, genpd->lock_flags);
+> +}
+> +
+> +static const struct genpd_lock_fns genpd_spin_fns = {
+> +       .lock = genpd_lock_spin,
+> +       .lock_nested = genpd_lock_nested_spin,
+> +       .lock_interruptible = genpd_lock_interruptible_spin,
+> +       .unlock = genpd_unlock_spin,
+> +};
+> +
+>  #define genpd_lock(p)                  p->lock_fns->lock(p)
+>  #define genpd_lock_nested(p, d)                p->lock_fns->lock_nested(p, d)
+>  #define genpd_lock_interruptible(p)    p->lock_fns->lock_interruptible(p)
+>  #define genpd_unlock(p)                        p->lock_fns->unlock(p)
+>
+> +#define genpd_is_irq_safe(genpd)       (genpd->flags & GENPD_FLAG_IRQ_SAFE)
+> +
+> +static inline bool irq_safe_dev_in_no_sleep_domain(struct device *dev,
+> +               struct generic_pm_domain *genpd)
+> +{
+> +       return pm_runtime_is_irq_safe(dev) && !genpd_is_irq_safe(genpd);
+> +}
+> +
+>  /*
+>   * Get the generic PM domain for a particular struct device.
+>   * This validates the struct device pointer, the PM domain pointer,
+> @@ -343,7 +393,12 @@ static int genpd_poweroff(struct generic_pm_domain *genpd, bool is_async)
+>                 if (stat > PM_QOS_FLAGS_NONE)
+>                         return -EBUSY;
+>
+> -               if (!pm_runtime_suspended(pdd->dev) || pdd->dev->power.irq_safe)
+> +               /*
+> +                * Do not allow PM domain to be powered off, when an IRQ safe
+> +                * device is part of a non-IRQ safe domain.
+> +                */
+> +               if (!pm_runtime_suspended(pdd->dev) ||
+> +                       irq_safe_dev_in_no_sleep_domain(pdd->dev, genpd))
+>                         not_suspended++;
+>         }
+>
+> @@ -506,10 +561,10 @@ static int genpd_runtime_suspend(struct device *dev)
+>         }
+>
+>         /*
+> -        * If power.irq_safe is set, this routine will be run with interrupts
+> -        * off, so it can't use mutexes.
+> +        * If power.irq_safe is set, this routine may be run with
+> +        * IRQs disabled, so suspend only if the PM domain also is irq_safe.
+>          */
+> -       if (dev->power.irq_safe)
+> +       if (irq_safe_dev_in_no_sleep_domain(dev, genpd))
+>                 return 0;
+>
+>         genpd_lock(genpd);
+> @@ -543,8 +598,11 @@ static int genpd_runtime_resume(struct device *dev)
+>         if (IS_ERR(genpd))
+>                 return -EINVAL;
+>
+> -       /* If power.irq_safe, the PM domain is never powered off. */
+> -       if (dev->power.irq_safe) {
+> +       /*
+> +        * As we don't power off a non IRQ safe domain, which holds
+> +        * an IRQ safe device, we don't need to restore power to it.
+> +        */
+> +       if (irq_safe_dev_in_no_sleep_domain(dev, genpd)) {
+>                 timed = false;
+>                 goto out;
+>         }
+> @@ -586,7 +644,8 @@ static int genpd_runtime_resume(struct device *dev)
+>  err_stop:
+>         genpd_stop_dev(genpd, dev);
+>  err_poweroff:
+> -       if (!dev->power.irq_safe) {
+> +       if (!dev->power.irq_safe ||
+> +               (dev->power.irq_safe && genpd_is_irq_safe(genpd))) {
 
-On 6 October 2016 at 11:48, Peter Griffin <peter.griffin@linaro.org> wrote:
-> Hi Emil,
->
-> On Wed, 21 Sep 2016, Emil Velikov wrote:
->
->> On 20 September 2016 at 09:32, Peter Griffin <peter.griffin@linaro.org> wrote:
->> > Hi Emil,
->> >
->> > On Tue, 20 Sep 2016, Emil Velikov wrote:
->> >
->> >> On 5 September 2016 at 14:16, Peter Griffin <peter.griffin@linaro.org> wrote:
->> >> > ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
->> >> > recursive dependency.
->> >
->> >
->> >> >
->> >> From a humble skim through remoteproc, drm and a few other subsystems
->> >> I think the above is wrong. All the drivers (outside of remoteproc),
->> >> that I've seen, depend on the core component, they don't select it.
->> >
->> > I will let Bjorn comment on the remoteproc subsystem Kconfig design, and
->> > why it is like it is.
->> >
->> > For this particular SLIM_RPROC I have added it to Kconfig in keeping with all
->> > the other drivers in the remoteproc subsystem which has exposed this recursive
->> > dependency issue.
->> >
->> > For this particular kconfig symbol a quick grep reveals more drivers in
->> > the kernel using 'select', than 'depend on'
->> >
->> > git grep "select VIRTIO" | wc -l
->> > 14
->> >
->> > git grep "depends on VIRTIO" | wc -l
->> > 10
->> >
->> Might be worth taking a closer look into these at some point.
->
-> VIRTIO has no dependencies, and is a non visible symbol. Its Kconfig help also
-> mentions that drivers should select it.
->
-This is a (un)fortunate detail cannot/should not overrule the other
-arguments I've mentioned, should it ?
+Please take the opportunity to convert into use
+pm_runtime_is_irq_safe(), in favour of checking "dev->power.irq_safe".
 
->>
->> >
->> >> Furthermore most places explicitly hide the drivers from the menu if
->> >> the core component isn't enabled.
->> >
->> > Remoteproc subsystem takes a different approach, the core code is only enabled
->> > if a driver which relies on it is enabled. This IMHO makes sense, as
->> > remoteproc is not widely used (only a few particular ARM SoC's).
->> >
->> > It is true that for subsystems which rely on the core component being
->> > explicitly enabled, they often tend to hide drivers which depend on it
->> > from the menu unless it is. This also makes sense.
->> >
->> >>
->> >> Is there something that requires such a different/unusual behaviour in
->> >> remoteproc ?
->> >>
->> >
->> > I'm not sure it is that unusual...looking at config USB, it selects USB_COMMON in
->> > mfd subsystem, client drivers select MFD_CORE.
->> >
->> On the USB case I'm not sure what the reasoning behind the USB vs
->> USB_COMMON split. In seems that one could just fold them, but that's
->> another topic. On the MFD side... it follows the select {,mis,ab}use.
->> With one (the only one?) MFD driver not using/selecting MFD_CORE doing
->> it's own version of mfd_add_devices... which could be reworked,
->> possibly.
+>                 genpd_lock(genpd);
+>                 genpd_poweroff(genpd, 0);
+>                 genpd_unlock(genpd);
+> @@ -1111,6 +1170,11 @@ static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
+>         if (IS_ERR(gpd_data))
+>                 return PTR_ERR(gpd_data);
 >
-> Much like selecting VIRTIO in this patch, MFD_CORE is a non visible symbol
-> with no dependencies so it matches the documentation Jani referenced.
->
-> I personally think the approach taken makes sense, as why would you want to have
-> a CONFIG_MFD_CORE=y symbol being enabled unless you actually have a MFD device
-> which uses it also enabled in your kernel?
->
-> It seems to me a good solution to make the client drivers select the core
-> component so that it only gets enabled if at least one driver requires it.
-> This avoids having useless core code which will never be used compiled into the
-> kernel and in the end a smaller kernel size for a given kernel configuration (better
-> cache use etc etc).
->
->> > I've added Arnd to this thread, as I've seen lots of Kconfig patches from him
->> > recently, maybe he has some thoughts on whether this is the correct fix or not?
->> >
->> Ack. Fwiw, I believe that the reasoning put by Jani is perfeclty
->> reasonable, but it'll be great to hear others as well.
->
-> Yes me to. However I don't think anything in this patch is at odds with the
-> documentation Jani has referenced.
->
-It case it's not clear, let me elaborate:
+> +       /* Check if we are adding an IRQ safe device to non-IRQ safe domain */
+> +       if (irq_safe_dev_in_no_sleep_domain(dev, genpd))
+> +               dev_warn_once(dev, "PM domain %s will not be powered off\n",
+> +                               genpd->name);
+> +
 
-Yes, using depend might not be the most user-friendly thing to do and
-in the long term we might want to move to select.
-Yes, I agree with the argument about symbol visibility but that is not
-the only contributing factor.
+It may turn out that a subsystem/driver decides to enable
+pm_runtime_irq_safe() for the device at a later point, while probing.
+Due to that, this warning is not going to be printed.
 
-If one wants to pick on specific users which opt for $driver select
-$core they must do the same for $driver depends on $core. Check the
-number 'in favour" of each case and draw their conclusions ;-)
+If we want this warning printed, I think we should strive towards a
+more consistent behaviour. Perhaps we should move this print inside
+irq_safe_dev_in_no_sleep_domain()?
 
-In particular: both MFD_CORE and USB_COMMON, are _optional_ as only
-some drivers depends on them. Thus giving them as an example is
-wrong/irrelevant, I'm afraid.
+[...]
 
-Thanks
-Emil
+One more thing that popped up in my mind. We currently also have the
+"pm_domain_always_on_gov". If we checked for such configuration and
+before taking the lock for the genpd during runtime suspend, we would
+be able to allow IRQ safe device to be suspended when they reside in
+these types of always-on domains, don't you think?
+
+Anyway, you don't need to do that change as part of $subject patch,
+but perhaps we might want to extend the support for irq safe devices
+later on?
+
+Besides the minor nitpicks, this looks good to me!
+
+Kind regards
+Uffe
