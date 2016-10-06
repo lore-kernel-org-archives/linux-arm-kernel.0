@@ -1,152 +1,98 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  7 Oct 2016 00:06:22 +0800
-Subject: [PATCH 2/9] drm/sun4i: tcon: Move SoC specific quirks to a DT matched
- data structure
+Date: Fri,  7 Oct 2016 00:06:23 +0800
+Subject: [PATCH 3/9] drm/sun4i: Put dotclock range into tcon quirks and check
+ against them
 In-Reply-To: <20161006160629.11198-1-wens@csie.org>
 References: <20161006160629.11198-1-wens@csie.org>
-Message-ID: <20161006160629.11198-3-wens@csie.org>
+Message-ID: <20161006160629.11198-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already have some differences between the 2 supported SoCs.
-More will be added as we support other SoCs. To avoid bloating
-the probe function with even more conditionals, move the quirks
-to a separate data structure that's tied to the compatible string.
+In commit bb43d40d7c83 ("drm/sun4i: rgb: Validate the clock rate") the
+driver was rounding the requested clock rate and then checking the
+result against the original requested rate.
 
+This does not work well for a number of reasons:
+
+  - The pixel clock does not have enough resolution to be able to
+    provide all sub-MHz clock rates. This makes it filter out most modes
+    found in simple-panel.
+
+  - When first introduced, the main limiting factors were the video PLL
+    clock range (27 ~ 381 MHz) and the lowest divider (6). On sun6i and
+    later, the valid PLL clock range is extended to 30 ~ 600 MHz. The
+    PLL's multiplier and divider can make it go much higher out of range,
+    but the clock driver currently has no checks for it.
+
+Since the limits are well known, we can hard code the range into the
+tcon driver, and check against them. And we really only care about the
+upper limit, which affects the highest resolutions we can support.
+
+Fixes: bb43d40d7c83 ("drm/sun4i: rgb: Validate the clock rate")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 35 ++++++++++++++++++++---------------
- drivers/gpu/drm/sun4i/sun4i_tcon.h | 13 +++++++++----
- 2 files changed, 29 insertions(+), 19 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_rgb.c  | 8 +-------
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 ++
+ drivers/gpu/drm/sun4i/sun4i_tcon.h | 1 +
+ 3 files changed, 4 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index 8b520d9f5bd9..edbb42ead1f1 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -60,8 +60,6 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+ 	struct sun4i_tcon *tcon = drv->tcon;
+ 	u32 hsync = mode->hsync_end - mode->hsync_start;
+ 	u32 vsync = mode->vsync_end - mode->vsync_start;
+-	unsigned long rate = mode->clock * 1000;
+-	long rounded_rate;
+ 
+ 	DRM_DEBUG_DRIVER("Validating modes...\n");
+ 
+@@ -93,11 +91,7 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+ 
+ 	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
+ 
+-	rounded_rate = clk_round_rate(tcon->dclk, rate);
+-	if (rounded_rate < rate)
+-		return MODE_CLOCK_LOW;
+-
+-	if (rounded_rate > rate)
++	if (mode->clock > tcon->quirks->max_clock)
+ 		return MODE_CLOCK_HIGH;
+ 
+ 	DRM_DEBUG_DRIVER("Clock rate OK\n");
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index cadacb517f95..c6c1c7ce94a1 100644
+index c6c1c7ce94a1..5a5407193753 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -20,6 +20,7 @@
- #include <linux/component.h>
- #include <linux/ioport.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/of_graph.h>
- #include <linux/of_irq.h>
- #include <linux/regmap.h>
-@@ -62,7 +63,7 @@ void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon, int channel)
- 		return;
- 	}
- 
--	WARN_ON(!tcon->has_channel_1);
-+	WARN_ON(!tcon->quirks->has_channel_1);
- 	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
- 			   SUN4I_TCON1_CTL_TCON_ENABLE, 0);
- 	clk_disable_unprepare(tcon->sclk1);
-@@ -80,7 +81,7 @@ void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel)
- 		return;
- 	}
- 
--	WARN_ON(!tcon->has_channel_1);
-+	WARN_ON(!tcon->quirks->has_channel_1);
- 	regmap_update_bits(tcon->regs, SUN4I_TCON1_CTL_REG,
- 			   SUN4I_TCON1_CTL_TCON_ENABLE,
- 			   SUN4I_TCON1_CTL_TCON_ENABLE);
-@@ -202,7 +203,7 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
- 	u8 clk_delay;
- 	u32 val;
- 
--	WARN_ON(!tcon->has_channel_1);
-+	WARN_ON(!tcon->quirks->has_channel_1);
- 
- 	/* Adjust clock delay */
- 	clk_delay = sun4i_tcon_get_clk_delay(mode, 1);
-@@ -266,7 +267,7 @@ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
- 	/*
- 	 * FIXME: Undocumented bits
- 	 */
--	if (tcon->has_mux)
-+	if (tcon->quirks->is_sun5i)
- 		regmap_write(tcon->regs, SUN4I_TCON_MUX_CTRL_REG, 1);
- }
- EXPORT_SYMBOL(sun4i_tcon1_mode_set);
-@@ -327,7 +328,7 @@ static int sun4i_tcon_init_clocks(struct device *dev,
- 		return PTR_ERR(tcon->sclk0);
- 	}
- 
--	if (tcon->has_channel_1) {
-+	if (tcon->quirks->has_channel_1) {
- 		tcon->sclk1 = devm_clk_get(dev, "tcon-ch1");
- 		if (IS_ERR(tcon->sclk1)) {
- 			dev_err(dev, "Couldn't get the TCON channel 1 clock\n");
-@@ -487,14 +488,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	drv->tcon = tcon;
- 	tcon->drm = drm;
- 	tcon->dev = dev;
--
--	if (of_device_is_compatible(dev->of_node, "allwinner,sun5i-a13-tcon")) {
--		tcon->has_mux = true;
--		tcon->has_channel_1 = true;
--	} else {
--		tcon->has_mux = false;
--		tcon->has_channel_1 = false;
--	}
-+	tcon->quirks = of_device_get_match_data(dev);
- 
- 	tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
- 	if (IS_ERR(tcon->lcd_rst)) {
-@@ -588,9 +582,20 @@ static int sun4i_tcon_remove(struct platform_device *pdev)
- 	return 0;
+@@ -583,6 +583,7 @@ static int sun4i_tcon_remove(struct platform_device *pdev)
  }
  
-+const struct sun4i_tcon_quirks sun5i_a13_quirks = {
-+	.is_sun5i	= true,
-+	.has_channel_1	= true,
-+	.has_bypass_src	= true,
-+	.has_dma_src	= true,
-+};
-+
-+const struct sun4i_tcon_quirks sun8i_a33_quirks = {
-+	/* nothing is supported */
-+};
-+
- static const struct of_device_id sun4i_tcon_of_table[] = {
--	{ .compatible = "allwinner,sun5i-a13-tcon" },
--	{ .compatible = "allwinner,sun8i-a33-tcon" },
-+	{ .compatible = "allwinner,sun5i-a13-tcon", .data = &sun5i_a13_quirks },
-+	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
- 	{ }
+ const struct sun4i_tcon_quirks sun5i_a13_quirks = {
++	.max_clock	= 63500,
+ 	.is_sun5i	= true,
+ 	.has_channel_1	= true,
+ 	.has_bypass_src	= true,
+@@ -590,6 +591,7 @@ const struct sun4i_tcon_quirks sun5i_a13_quirks = {
  };
- MODULE_DEVICE_TABLE(of, sun4i_tcon_of_table);
+ 
+ const struct sun4i_tcon_quirks sun8i_a33_quirks = {
++	.max_clock	= 200000,
+ 	/* nothing is supported */
+ };
+ 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 12bd48925f4d..96c4f15c6922 100644
+index 96c4f15c6922..972ca2b7c8c2 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -142,6 +142,13 @@
- 
+@@ -143,6 +143,7 @@
  #define SUN4I_TCON_MAX_CHANNELS		2
  
-+struct sun4i_tcon_quirks {
-+	bool	is_sun5i;	/* sun5i has undocumented mux */
-+	bool	has_channel_1;	/* a33 does not have channel 1 */
-+	bool	has_bypass_src;	/* has separate input bypassing CEU */
-+	bool	has_dma_src;	/* has DMA input */
-+};
-+
- struct sun4i_tcon {
- 	struct device			*dev;
- 	struct drm_device		*drm;
-@@ -160,12 +167,10 @@ struct sun4i_tcon {
- 	/* Reset control */
- 	struct reset_control		*lcd_rst;
- 
--	/* Platform adjustments */
--	bool				has_mux;
--
- 	struct drm_panel		*panel;
- 
--	bool				has_channel_1;
-+	/* Platform adjustments */
-+	const struct sun4i_tcon_quirks	*quirks;
- };
- 
- struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
+ struct sun4i_tcon_quirks {
++	int	max_clock;	/* Highest possible dotclock in kHz */
+ 	bool	is_sun5i;	/* sun5i has undocumented mux */
+ 	bool	has_channel_1;	/* a33 does not have channel 1 */
+ 	bool	has_bypass_src;	/* has separate input bypassing CEU */
 -- 
 2.9.3
