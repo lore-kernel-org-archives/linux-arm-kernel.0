@@ -1,60 +1,25 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 6 Oct 2016 14:01:33 +0200
-Subject: [PATCH 4/8] PM / Domains: Add fwnode provider to genpd states
-In-Reply-To: <1475699519-109623-5-git-send-email-lina.iyer@linaro.org>
-References: <1475699519-109623-1-git-send-email-lina.iyer@linaro.org>
- <1475699519-109623-5-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAPDyKFrsLjchkbkqg4O=RfKamO+EgOhZtzw1-_3e5QphLON0XQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 6 Oct 2016 14:14:13 +0200
+Subject: [PATCH v7 0/7] arm/arm64: vgic: Implement API for vGICv3 live
+ migration
+In-Reply-To: <CALicx6uFBF=J5J4L6sVspqMx-sjGCjoAgONHAe5Q4msonfVYEA@mail.gmail.com>
+References: <1474645482-28131-1-git-send-email-vijay.kilari@gmail.com>
+ <CALicx6uFBF=J5J4L6sVspqMx-sjGCjoAgONHAe5Q4msonfVYEA@mail.gmail.com>
+Message-ID: <CAMJs5B8aLZCDeAVhJN7Cajt4PL4HBtXc3BiNzMyjK1tOSjMwmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2016 at 22:31, Lina Iyer <lina.iyer@linaro.org> wrote:
-> Save the fwnode for the genpd state in the state node. PM Domain clients
-> may use the fwnode to read in the rest of the properties for the domain
-> state.
+Hi Vijay,
 
-What is the "rest"? I assume you mean the non PM domain generic parts,
-but perhaps you could elaborate a bit on that?
+On Wed, Oct 5, 2016 at 4:33 PM, Vijay Kilari <vijay.kilari@gmail.com> wrote:
+> Hi Marc, Christoffer,
+>
+>   Do you have any review comments on this patch set?.
+>
+Since we missed the 4.9 merge window there is no urgency just yet, and
+I'm tied up with other things for a while, and Marc is away this week
+on holiday.  I'm sure he'll have a look when he's back and I'll follow
+up later.
 
->
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> ---
->  drivers/base/power/domain.c | 1 +
->  include/linux/pm_domain.h   | 1 +
->  2 files changed, 2 insertions(+)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 368a5b8..52fcdb2 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1937,6 +1937,7 @@ static int read_genpd_state(struct genpd_power_state *genpd_state,
->         latency = entry_latency + exit_latency;
->         genpd_state->power_on_latency_ns = 1000 * latency;
->         genpd_state->power_off_latency_ns = 1000 * entry_latency;
-> +       genpd_state->provider = &state_node->fwnode;
->
->         return 0;
->  }
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index 4c9152d..eacfa71 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -39,6 +39,7 @@ struct genpd_power_state {
->         s64 power_off_latency_ns;
->         s64 power_on_latency_ns;
->         s64 residency_ns;
-> +       struct fwnode_handle *provider;
-
-I don't think this is a provider, but just a fwnode_handle to a
-domain-idle-state. Therefore, I would suggest you to rename it to
-"fwnode" instead.
-
->  };
->
->  struct generic_pm_domain {
-> --
-> 2.7.4
->
-
-Kind regards
-Uffe
+Thanks,
+-Christoffer
