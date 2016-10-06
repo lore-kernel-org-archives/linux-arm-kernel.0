@@ -1,46 +1,44 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Thu, 6 Oct 2016 15:09:31 +0200
-Subject: [PATCH] exynos-drm: Fix error messages to print flags and size
-In-Reply-To: <1470850236-9101-1-git-send-email-shuahkh@osg.samsung.com>
-References: <1470850236-9101-1-git-send-email-shuahkh@osg.samsung.com>
-Message-ID: <57F64D0B.5050506@math.uni-bielefeld.de>
+From: john.garry@huawei.com (John Garry)
+Date: Thu, 6 Oct 2016 14:31:52 +0100
+Subject: [PATCH V3 2/4] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <1475713112.3784.183.camel@kernel.crashing.org>
+References: <1473855354-150093-1-git-send-email-yuanzhichang@hisilicon.com>
+ <5140357.dcW9ibtZJ6@wuerfel> <57D963C4.4010406@hisilicon.com>
+ <5869118.UilSPY9Sai@wuerfel>
+ <2af4f2d8-e3a4-fa00-e700-60af70bf4560@jonmasters.org>
+ <6bbfeb57-7a55-6a3e-60b2-3f44525e5882@huawei.com>
+ <1475713112.3784.183.camel@kernel.crashing.org>
+Message-ID: <3bab676a-2b65-8f27-d414-9cacc055094e@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 06/10/2016 01:18, Benjamin Herrenschmidt wrote:
+> On Tue, 2016-10-04 at 13:02 +0100, John Garry wrote:
+>> Right, so I think Zhichang can make the necessary generic changes to
+>> 8250 OF driver to support IO port as well as MMIO-based.
+>>
+>> However an LPC-based earlycon driver is still required.
+>>
+>> A note on hip07-based D05 (for those unaware): this does not use
+>> LPC-based uart. It uses PL011. The hardware guys have managed some
+>> trickery where they loopback the serial line around the BMC/CPLD. But we
+>> still need it for hip06 D03 and any other boards which want to use LPC
+>> bus for uart.
+>>
+>> A question on SBSA: does it propose how to provide serial via BMC for SOL?
+>
+> Probably another reason to keep 8250 as a legal option ... The (very
+> popular) Aspeed BMCs tend to do this via a 8250-looking virtual UART on
+> LPC.
+>
+> Cheers,
+> Ben,
 
-I think this patch was never picked up. So just a short 'ping' from my side.
+I think we're talking about the same thing for our LPC-based UART.
 
-With best wishes,
-Tobias
+John
 
-
-Shuah Khan wrote:
-> Fix exynos_drm_gem_create() error messages to include flags and size when
-> flags and size are invalid.
-> 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_gem.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-> index cdf9f1a..4c4cb0e 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-> @@ -231,12 +231,12 @@ struct exynos_drm_gem *exynos_drm_gem_create(struct drm_device *dev,
->  	int ret;
->  
->  	if (flags & ~(EXYNOS_BO_MASK)) {
-> -		DRM_ERROR("invalid flags.\n");
-> +		DRM_ERROR("invalid GEM buffer flags: %u\n", flags);
->  		return ERR_PTR(-EINVAL);
->  	}
->  
->  	if (!size) {
-> -		DRM_ERROR("invalid size.\n");
-> +		DRM_ERROR("invalid GEM buffer size: %lu\n", size);
->  		return ERR_PTR(-EINVAL);
->  	}
->  
-> 
+>
+>
+> .
+>
