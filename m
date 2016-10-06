@@ -1,95 +1,80 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  6 Oct 2016 08:45:22 +0000
-Subject: [PATCH v13 06/15] irqchip/gic-v2m: Register the MSI doorbell
+Date: Thu,  6 Oct 2016 08:45:23 +0000
+Subject: [PATCH v13 07/15] irqchip/gicv3-its: Register the MSI doorbell
 In-Reply-To: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
 References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1475743531-4780-7-git-send-email-eric.auger@redhat.com>
+Message-ID: <1475743531-4780-8-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the GIC V2M global doorbell. The registered information
-are used to set up the KVM passthrough use case.
+This patch registers the ITS global doorbell. Registered information
+are needed to set up the KVM passthrough use case.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 v12 -> v13:
-- use new msi doorbell registration prototype
-- remove iommu protection attributes
-- add unregistration in teardown
+- use new doorbell registration prototype
 
 v11 -> v12:
-- use irq_get_msi_doorbell_info new name
+- use new irq_get_msi_doorbell_info name
 - simplify error handling
 
 v10 -> v11:
-- use the new registration API and re-implement the msi_doorbell_info
-  ops
-
-v9 -> v10:
-- introduce the registration concept in place of msi_doorbell_info
-  callback
-
-v8 -> v9:
-- use global_doorbell instead of percpu_doorbells
-
-v7 -> v8:
-- gicv2m_msi_doorbell_info does not return a pointer to const
-- remove spurious !v2m check
-- add IOMMU_MMIO flag
-
-v7: creation
+- adapt to new doorbell registration API and implement msi_doorbell_info
 ---
- drivers/irqchip/irq-gic-v2m.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-gic-v3-its.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
-index 863e073..343f19f 100644
---- a/drivers/irqchip/irq-gic-v2m.c
-+++ b/drivers/irqchip/irq-gic-v2m.c
-@@ -26,6 +26,7 @@
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 98ff669..3fc715e 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -30,6 +30,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/percpu.h>
  #include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/irqchip/arm-gic.h>
 +#include <linux/msi-doorbell.h>
  
- /*
- * MSI_TYPER:
-@@ -70,6 +71,7 @@ struct v2m_data {
- 	u32 spi_offset;		/* offset to be subtracted from SPI number */
- 	unsigned long *bm;	/* MSI vector bitmap */
- 	u32 flags;		/* v2m flags for specific implementation */
-+	struct msi_doorbell_info *doorbell_info; /* MSI doorbell */
+ #include <linux/irqchip.h>
+ #include <linux/irqchip/arm-gic-v3.h>
+@@ -86,6 +87,7 @@ struct its_node {
+ 	u32			ite_size;
+ 	u32			device_ids;
+ 	int			numa_node;
++	struct msi_doorbell_info	*doorbell_info;
  };
  
- static void gicv2m_mask_msi_irq(struct irq_data *d)
-@@ -254,6 +256,7 @@ static void gicv2m_teardown(void)
- 	struct v2m_data *v2m, *tmp;
+ #define ITS_ITT_ALIGN		SZ_256
+@@ -1717,6 +1719,7 @@ static int __init its_probe(struct device_node *node,
  
- 	list_for_each_entry_safe(v2m, tmp, &v2m_nodes, entry) {
-+		msi_doorbell_unregister_global(v2m->doorbell_info);
- 		list_del(&v2m->entry);
- 		kfree(v2m->bm);
- 		iounmap(v2m->base);
-@@ -370,12 +373,18 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
- 		goto err_iounmap;
- 	}
+ 	if (of_property_read_bool(node, "msi-controller")) {
+ 		struct msi_domain_info *info;
++		phys_addr_t translater;
  
-+	ret = msi_doorbell_register_global(v2m->res.start, sizeof(u32),
-+					   false, &v2m->doorbell_info);
-+	if (ret)
-+		goto err_free_bm;
+ 		info = kzalloc(sizeof(*info), GFP_KERNEL);
+ 		if (!info) {
+@@ -1724,10 +1727,21 @@ static int __init its_probe(struct device_node *node,
+ 			goto out_free_tables;
+ 		}
+ 
++		translater = its->phys_base + GITS_TRANSLATER;
++		err = msi_doorbell_register_global(translater, sizeof(u32),
++						   true, &its->doorbell_info);
 +
- 	list_add_tail(&v2m->entry, &v2m_nodes);
++		if (err)  {
++			kfree(info);
++			goto out_free_tables;
++		}
++
++
+ 		inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
+ 		if (!inner_domain) {
+ 			err = -ENOMEM;
+ 			kfree(info);
++			msi_doorbell_unregister_global(its->doorbell_info);
+ 			goto out_free_tables;
+ 		}
  
- 	pr_info("range%pR, SPI[%d:%d]\n", res,
- 		v2m->spi_start, (v2m->spi_start + v2m->nr_spis - 1));
- 	return 0;
--
-+err_free_bm:
-+	kfree(v2m->bm);
- err_iounmap:
- 	iounmap(v2m->base);
- err_free_v2m:
 -- 
 1.9.1
