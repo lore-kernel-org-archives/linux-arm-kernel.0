@@ -1,101 +1,111 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu,  6 Oct 2016 10:28:06 +0200
-Subject: [PATCH 4.7 050/141] irqchip/gicv3: Silence noisy DEBUG_PER_CPU_MAPS
- warning
-In-Reply-To: <20161006074448.608056610@linuxfoundation.org>
-References: <20161006074448.608056610@linuxfoundation.org>
-Message-ID: <20161006074450.892272238@linuxfoundation.org>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Thu,  6 Oct 2016 08:45:17 +0000
+Subject: [PATCH v13 01/15] iommu: Introduce DOMAIN_ATTR_MSI_GEOMETRY
+In-Reply-To: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
+References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1475743531-4780-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.7-stable review patch.  If anyone has any objections, please let me know.
+Introduce a new DOMAIN_ATTR_MSI_GEOMETRY domain attribute. It enables
+to query the aperture of the IOVA window dedicated to MSIs and
+test whether the MSIs must be IOMMU mapped.
 
-------------------
+x86 IOMMUs will typically expose an MSI aperture matching the 1MB
+region [FEE0_0000h - FEF0_000h] corresponding to the the APIC
+configuration space and no support for MSI IOMMU mapping.
 
-From: James Morse <james.morse@arm.com>
+On ARM, the requirement to map MSIs will be reported by setting
+iommu_msi_supported to true.
 
-commit 727653d6ce7103b245eb8041f55dd5885f4c3289 upstream.
+A helper function is added to allow testing if the aperture is valid.
 
-gic_raise_softirq() walks the list of cpus using for_each_cpu(), it calls
-gic_compute_target_list() which advances the iterator by the number of
-CPUs in the cluster.
-
-If gic_compute_target_list() reaches the last CPU it leaves the iterator
-pointing at the last CPU. This means the next time round the for_each_cpu()
-loop cpumask_next() will be called with an invalid CPU.
-
-This triggers a warning when built with CONFIG_DEBUG_PER_CPU_MAPS:
-[    3.077738] GICv3: CPU1: found redistributor 1 region 0:0x000000002f120000
-[    3.077943] CPU1: Booted secondary processor [410fd0f0]
-[    3.078542] ------------[ cut here ]------------
-[    3.078746] WARNING: CPU: 1 PID: 0 at ../include/linux/cpumask.h:121 gic_raise_softirq+0x12c/0x170
-[    3.078812] Modules linked in:
-[    3.078869]
-[    3.078930] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.8.0-rc5+ #5188
-[    3.078994] Hardware name: Foundation-v8A (DT)
-[    3.079059] task: ffff80087a1a0080 task.stack: ffff80087a19c000
-[    3.079145] PC is at gic_raise_softirq+0x12c/0x170
-[    3.079226] LR is at gic_raise_softirq+0xa4/0x170
-[    3.079296] pc : [<ffff0000083ead24>] lr : [<ffff0000083eac9c>] pstate: 200001c9
-[    3.081139] Call trace:
-[    3.081202] Exception stack(0xffff80087a19fbe0 to 0xffff80087a19fd10)
-
-[    3.082269] [<ffff0000083ead24>] gic_raise_softirq+0x12c/0x170
-[    3.082354] [<ffff00000808e614>] smp_send_reschedule+0x34/0x40
-[    3.082433] [<ffff0000080e80a0>] resched_curr+0x50/0x88
-[    3.082512] [<ffff0000080e89d0>] check_preempt_curr+0x60/0xd0
-[    3.082593] [<ffff0000080e8a60>] ttwu_do_wakeup+0x20/0xe8
-[    3.082672] [<ffff0000080e8bb8>] ttwu_do_activate+0x90/0xc0
-[    3.082753] [<ffff0000080ea9a4>] try_to_wake_up+0x224/0x370
-[    3.082836] [<ffff0000080eabc8>] default_wake_function+0x10/0x18
-[    3.082920] [<ffff000008103134>] __wake_up_common+0x5c/0xa0
-[    3.083003] [<ffff0000081031f4>] __wake_up_locked+0x14/0x20
-[    3.083086] [<ffff000008103f80>] complete+0x40/0x60
-[    3.083168] [<ffff00000808df7c>] secondary_start_kernel+0x15c/0x1d0
-[    3.083240] [<00000000808911a4>] 0x808911a4
-[    3.113401] Detected PIPT I-cache on CPU2
-
-Avoid updating the iterator if the next call to cpumask_next() would
-cause the for_each_cpu() loop to exit.
-
-There is no change to gic_raise_softirq()'s behaviour, (cpumask_next()s
-eventual call to _find_next_bit() will return early as start >= nbits),
-this patch just silences the warning.
-
-Fixes: 021f653791ad ("irqchip: gic-v3: Initial support for GICv3")
-Signed-off-by: James Morse <james.morse@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Jason Cooper <jason@lakedaemon.net>
-Link: http://lkml.kernel.org/r/1474306155-3303-1-git-send-email-james.morse at arm.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Suggested-by: Alex Williamson <alex.williamson@redhat.com>
 
 ---
- drivers/irqchip/irq-gic-v3.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+v12 -> v13:
+- reword the commit message
 
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -558,7 +558,7 @@ static struct notifier_block gic_cpu_not
- static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
- 				   unsigned long cluster_id)
+v8 -> v9:
+- rename programmable into iommu_msi_supported
+- add iommu_domain_msi_aperture_valid
+
+v8: creation
+- deprecates DOMAIN_ATTR_MSI_MAPPING flag
+---
+ drivers/iommu/iommu.c |  5 +++++
+ include/linux/iommu.h | 14 ++++++++++++++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 9a2f196..617cb2b 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1485,6 +1485,7 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
+ 			  enum iommu_attr attr, void *data)
  {
--	int cpu = *base_cpu;
-+	int next_cpu, cpu = *base_cpu;
- 	unsigned long mpidr = cpu_logical_map(cpu);
- 	u16 tlist = 0;
+ 	struct iommu_domain_geometry *geometry;
++	struct iommu_domain_msi_geometry *msi_geometry;
+ 	bool *paging;
+ 	int ret = 0;
+ 	u32 *count;
+@@ -1495,6 +1496,10 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
+ 		*geometry = domain->geometry;
  
-@@ -572,9 +572,10 @@ static u16 gic_compute_target_list(int *
+ 		break;
++	case DOMAIN_ATTR_MSI_GEOMETRY:
++		msi_geometry  = data;
++		*msi_geometry = domain->msi_geometry;
++		break;
+ 	case DOMAIN_ATTR_PAGING:
+ 		paging  = data;
+ 		*paging = (domain->pgsize_bitmap != 0UL);
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 436dc21..9f90735 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -52,6 +52,12 @@ struct iommu_domain_geometry {
+ 	bool force_aperture;       /* DMA only allowed in mappable range? */
+ };
  
- 		tlist |= 1 << (mpidr & 0xf);
++struct iommu_domain_msi_geometry {
++	dma_addr_t aperture_start; /* First address used for MSI IOVA    */
++	dma_addr_t aperture_end;   /* Last address used for MSI IOVA     */
++	bool iommu_msi_supported;  /* Is MSI mapping supported?		 */
++};
++
+ /* Domain feature flags */
+ #define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
+ #define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
+@@ -83,6 +89,7 @@ struct iommu_domain {
+ 	iommu_fault_handler_t handler;
+ 	void *handler_token;
+ 	struct iommu_domain_geometry geometry;
++	struct iommu_domain_msi_geometry msi_geometry;
+ 	void *iova_cookie;
+ };
  
--		cpu = cpumask_next(cpu, mask);
--		if (cpu >= nr_cpu_ids)
-+		next_cpu = cpumask_next(cpu, mask);
-+		if (next_cpu >= nr_cpu_ids)
- 			goto out;
-+		cpu = next_cpu;
+@@ -108,6 +115,7 @@ enum iommu_cap {
  
- 		mpidr = cpu_logical_map(cpu);
+ enum iommu_attr {
+ 	DOMAIN_ATTR_GEOMETRY,
++	DOMAIN_ATTR_MSI_GEOMETRY,
+ 	DOMAIN_ATTR_PAGING,
+ 	DOMAIN_ATTR_WINDOWS,
+ 	DOMAIN_ATTR_FSL_PAMU_STASH,
+@@ -352,6 +360,12 @@ int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
+ void iommu_fwspec_free(struct device *dev);
+ int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
  
++static inline bool iommu_domain_msi_aperture_valid(struct iommu_domain *domain)
++{
++	return (domain->msi_geometry.aperture_end >
++		domain->msi_geometry.aperture_start);
++}
++
+ #else /* CONFIG_IOMMU_API */
+ 
+ struct iommu_ops {};
+-- 
+1.9.1
