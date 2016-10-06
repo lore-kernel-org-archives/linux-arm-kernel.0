@@ -1,25 +1,93 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Thu, 6 Oct 2016 12:09:27 +0200
-Subject: v4.8: working bluetooth support
-In-Reply-To: <20161006100300.GA17524@amd>
-References: <20161006100300.GA17524@amd>
-Message-ID: <20161006100927.GD27254@pali>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Thu, 6 Oct 2016 11:10:17 +0100
+Subject: [PATCH v9 17/19] drm/virtio: kconfig: Fix recursive dependency
+ issue.
+In-Reply-To: <20160927170115.GD7509@tuxbot>
+References: <1473081421-16555-1-git-send-email-peter.griffin@linaro.org>
+ <1473081421-16555-18-git-send-email-peter.griffin@linaro.org>
+ <CACvgo52_g7anGBd9HTUyYsbp5QmQEk9LR3nNHgSTgjQ29G3ViA@mail.gmail.com>
+ <20160920083251.GB26093@griffinp-ThinkPad-X1-Carbon-2nd>
+ <CACvgo53fuoPVjBAkZbWFPVxosObjvxoDgFdR_BkSTgevqyGg9g@mail.gmail.com>
+ <20160927170115.GD7509@tuxbot>
+Message-ID: <CACvgo50RghJs6Sfpp1z5SSnX=J1dBFAJeFzA=MOBDCo4PsiC9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 October 2016 12:03:00 Pavel Machek wrote:
-> Hi!
-> 
-> I got bluetooth to work in useful configuration (on n900). Perhaps it
-> is useful for Sebastian?
-> 
-> Best regards,
-> 									Pavel
-> 
+Hi Bjorn,
 
-Hi! Is still bluetooth driver bases on Sebastian's one? Or older
-versions which were removed from staging?
+On 27 September 2016 at 18:01, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Wed 21 Sep 05:09 PDT 2016, Emil Velikov wrote:
+>
+>> On 20 September 2016 at 09:32, Peter Griffin <peter.griffin@linaro.org> wrote:
+>> > Hi Emil,
+>> >
+>> > On Tue, 20 Sep 2016, Emil Velikov wrote:
+>> >
+>> >> On 5 September 2016 at 14:16, Peter Griffin <peter.griffin@linaro.org> wrote:
+>> >> > ST_SLIM_REMOTEPROC must select REMOTEPROC, which exposes the following
+>> >> > recursive dependency.
+>> >
+>> >
+>> >> >
+>> >> From a humble skim through remoteproc, drm and a few other subsystems
+>> >> I think the above is wrong. All the drivers (outside of remoteproc),
+>> >> that I've seen, depend on the core component, they don't select it.
+>> >
+>> > I will let Bjorn comment on the remoteproc subsystem Kconfig design, and
+>> > why it is like it is.
+>> >
+>> > For this particular SLIM_RPROC I have added it to Kconfig in keeping with all
+>> > the other drivers in the remoteproc subsystem which has exposed this recursive
+>> > dependency issue.
+>> >
+>> > For this particular kconfig symbol a quick grep reveals more drivers in
+>> > the kernel using 'select', than 'depend on'
+>> >
+>> > git grep "select VIRTIO" | wc -l
+>> > 14
+>> >
+>> > git grep "depends on VIRTIO" | wc -l
+>> > 10
+>> >
+>> Might be worth taking a closer look into these at some point.
+>>
+>
+> The general idea here is that VIRTIO provides the "framework" and as
+> such drivers implementing VIRTIO do select and drivers using virtio use
+> depends.
+>
+> This is found in several places around the kernel.
+>
+>> >
+>> >> Furthermore most places explicitly hide the drivers from the menu if
+>> >> the core component isn't enabled.
+>> >
+>> > Remoteproc subsystem takes a different approach, the core code is only enabled
+>> > if a driver which relies on it is enabled. This IMHO makes sense, as
+>> > remoteproc is not widely used (only a few particular ARM SoC's).
+>> >
+>> > It is true that for subsystems which rely on the core component being
+>> > explicitly enabled, they often tend to hide drivers which depend on it
+>> > from the menu unless it is. This also makes sense.
+>> >
+>> >>
+>> >> Is there something that requires such a different/unusual behaviour in
+>> >> remoteproc ?
+>> >>
+>
+> There's nothing unusual in remoteproc that forces us to stay with this
+> model; however the parts related to the REMOTEPROC config is useless by
+> themselves.
+>
+I'm afraid that the "supporting" arguments you're using are generic
+and not specific to remoteproc. Although as Jani mentioned and pointed
+to the documentation, remoteproc is {mis,ab}using 'select' leading to
+issues elsewhere.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+In the long term we might want to switch to 'select' and attribute
+kconfig like Jani suggested.  But in the short term we want to avoid
+select-ing things just for our "convenience".
+
+Thanks
+Emil
