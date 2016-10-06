@@ -1,88 +1,108 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 6 Oct 2016 10:10:46 -0600
-Subject: [PATCH v3] Adding missing features of Coresight PTM components
-In-Reply-To: <04170bc7-a947-ae75-cb14-7989a6cb4870@centralesupelec.fr>
-References: <f029bcee-696f-3519-b0f1-4cdcf24ad3f8@centralesupelec.fr>
- <60a1f04c-1e73-0ff1-dfee-775b875d2c4a@centralesupelec.fr>
- <CANLsYkyPTtiGsfKg13ZY2pgCC3rh+MfirMwTrLG1=TZ5gUJqzA@mail.gmail.com>
- <04170bc7-a947-ae75-cb14-7989a6cb4870@centralesupelec.fr>
-Message-ID: <CANLsYkwns_VpivKd3hGnzDC7jnyWEUgGv1aVPEgLdG88DmhB0w@mail.gmail.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Thu, 6 Oct 2016 18:11:14 +0200
+Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
+ section
+In-Reply-To: <CAKv+Gu-oYzSn_eeqaX3QVFeQjBGkaX-Wh7+oPcQFcXv7J6GOFQ@mail.gmail.com>
+References: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
+ <CAKv+Gu-oYzSn_eeqaX3QVFeQjBGkaX-Wh7+oPcQFcXv7J6GOFQ@mail.gmail.com>
+Message-ID: <20161006161114.GH22012@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 October 2016 at 09:57, Muhammad Abdul WAHAB
-<muhammadabdul.wahab@centralesupelec.fr> wrote:
-> Hi,
->
->> Where is ETMCR_RETURN_STACK_EN defined?  Did you send me code that
->> doesn't compile?
->
-> I changed the naming in the .h file before submitting it and I forgot to
-> change it in .c file. I am sorry. It is defined in coresight-etm.h.
-> Here is the correct patch.
+Ard,
 
-Then send me a proper V4 patch.
+thank you for your answer and you explanation.
 
->From hereon I suggest you compile your code before sending patches to
-the mailing list - other people won't be as lenient as I am.
+On 06.10.16 11:00:33, Ard Biesheuvel wrote:
+> On 6 October 2016 at 10:52, Robert Richter <rrichter@cavium.com> wrote:
+> > There is a memory setup problem on ThunderX systems with certain
+> > memory configurations. The symptom is
+> >
+> >  kernel BUG at mm/page_alloc.c:1848!
+> >
+> > This happens for some configs with 64k page size enabled. The bug
+> > triggers for page zones with some pages in the zone not assigned to
+> > this particular zone. In my case some pages that are marked as nomap
+> > were not reassigned to the new zone of node 1, so those are still
+> > assigned to node 0.
+> >
+> > The reason for the mis-configuration is a change in pfn_valid() which
+> > reports pages marked nomap as invalid:
+> >
+> >  68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
+> >
+> 
+> These pages are owned by the firmware, which may map it with
+> attributes that conflict with the attributes we use for the linear
+> mapping. This means they should not be covered by the linear mapping.
+> 
+> > This causes pages marked as nomap being no long reassigned to the new
+> > zone in memmap_init_zone() by calling __init_single_pfn().
+> >
+> 
+> This sounds like the root cause of your issue. Could we not fix that instead?
 
-> ---
->  drivers/hwtracing/coresight/coresight-etm.h         |  5 +++++
->  drivers/hwtracing/coresight/coresight-etm3x-sysfs.c | 10 ++++++++++
->  2 files changed, 15 insertions(+)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm.h
-> b/drivers/hwtracing/coresight/coresight-etm.h
-> index 4a18ee4..ad063d7 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm.h
-> +++ b/drivers/hwtracing/coresight/coresight-etm.h
-> @@ -89,11 +89,13 @@
->  /* ETMCR - 0x00 */
->  #define ETMCR_PWD_DWN          BIT(0)
->  #define ETMCR_STALL_MODE       BIT(7)
-> +#define ETMCR_BRANCH_BROADCAST BIT(8)
->  #define ETMCR_ETM_PRG          BIT(10)
->  #define ETMCR_ETM_EN           BIT(11)
->  #define ETMCR_CYC_ACC          BIT(12)
->  #define ETMCR_CTXID_SIZE       (BIT(14)|BIT(15))
->  #define ETMCR_TIMESTAMP_EN     BIT(28)
-> +#define ETMCR_RETURN_STACK     BIT(29)
->  /* ETMCCR - 0x04 */
->  #define ETMCCR_FIFOFULL                BIT(23)
->  /* ETMPDCR - 0x310 */
-> @@ -110,8 +112,11 @@
->  #define ETM_MODE_STALL         BIT(2)
->  #define ETM_MODE_TIMESTAMP     BIT(3)
->  #define ETM_MODE_CTXID         BIT(4)
-> +#define ETM_MODE_BBROAD                BIT(5)
-> +#define ETM_MODE_RET_STACK     BIT(6)
->  #define ETM_MODE_ALL           (ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
->                                  ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
-> +                                ETM_MODE_BBROAD | ETM_MODE_RET_STACK | \
->                                  ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
->                                  ETM_MODE_EXCL_USER)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> index 5ea0909..a76009a 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> @@ -164,6 +164,16 @@ static ssize_t mode_store(struct device *dev,
->         else
->                 config->ctrl &= ~ETMCR_CTXID_SIZE;
->
-> +       if (config->mode & ETM_MODE_BBROAD)
-> +               config->ctrl |= ETMCR_BRANCH_BROADCAST;
-> +       else
-> +               config->ctrl &= ~ETMCR_BRANCH_BROADCAST;
-> +
-> +       if (config->mode & ETM_MODE_RET_STACK)
-> +               config->ctrl |= ETMCR_RETURN_STACK;
-> +       else
-> +               config->ctrl &= ~ETMCR_RETURN_STACK;
-> +
->         if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
->                 etm_config_trace_mode(config);
->
-> --
-> 1.9.1
+Yes, this is proposal b) from my last mail that would work too: I
+implemented an arm64 private early_pfn_valid() function that uses
+memblock_is_memory() to setup all pages of a zone. Though, I think
+this is the wrong way and thus I prefer this patch instead. I see
+serveral reasons for this:
+
+Inconsistent use of struct *page, it is initialized but never used
+again.
+
+Other archs only do a basic range check in pfn_valid(), the default
+implementation just returns if the whole section is valid. As I
+understand the code, if the mem range is not aligned to the section,
+then there will be pfn's in the section that don't have physical mem
+attached. The page is then just initialized, it's not marked reserved
+nor the refcount is non-zero. It is then simply not used. This is how
+no-map pages should be handled too.
+
+I think pfn_valid() is just a quick check if the pfn's struct *page
+can be used. There is a good description for this in include/linux/
+mmzone.h. So there can be memory holes that have a valid pfn.
+
+If the no-map memory needs special handling, then additional checks
+need to be added to the particular code (as in ioremap.c). It's imo
+wrong to (mis-)use pfn_valid for that.
+
+Variant b) involves generic mm code to fix it for arm64, this patch is
+an arm64 change only. This makes it harder to get a fix for it.
+(Though maybe only a problem of patch logistics.)
+
+> 
+> > Fixing this by restoring the old behavior of pfn_valid() to use
+> > memblock_is_memory().
+> 
+> This is incorrect imo. In general, pfn_valid() means ordinary memory
+> covered by the linear mapping and the struct page array. Returning
+> reserved ranges that the kernel should not even touch only to please
+> the NUMA code seems like an inappropriate way to deal with this issue.
+
+As said above, it is not marked as reserved, it is treated like
+non-existing memory.
+
+This has been observed for non-numa kernels too and can happen for
+each zone that is only partly initialized.
+
+I think the patch addresses your concerns. I can't see there the
+kernel uses memory marked as nomap in a wrong way.
+
+Thanks,
+
+-Robert
+
+> 
+> > Also changing users of pfn_valid() in arm64 code
+> > to use memblock_is_map_memory() where necessary. This only affects
+> > code in ioremap.c. The code in mmu.c still can use the new version of
+> > pfn_valid().
+> >
+> > Should be marked stable v4.5..
+> >
+> > Signed-off-by: Robert Richter <rrichter@cavium.com>
+> > ---
+> >  arch/arm64/mm/init.c    | 2 +-
+> >  arch/arm64/mm/ioremap.c | 5 +++--
+> >  2 files changed, 4 insertions(+), 3 deletions(-)
