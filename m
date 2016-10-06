@@ -1,40 +1,47 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 6 Oct 2016 10:04:49 -0600
-Subject: [PATCH] indentation fix (extra space removed)
-In-Reply-To: <0b897b22-fc32-c97e-b678-1c0040782a62@centralesupelec.fr>
-References: <0b897b22-fc32-c97e-b678-1c0040782a62@centralesupelec.fr>
-Message-ID: <CANLsYkzs+oy1f6j8sBg29Dc4kmcQ1ZEwQ18j_wDbrPVv9WjN-A@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri,  7 Oct 2016 00:06:21 +0800
+Subject: [PATCH 1/9] drm/sun4i: sun6i-drc: Support DRC on A31 and A31s
+In-Reply-To: <20161006160629.11198-1-wens@csie.org>
+References: <20161006160629.11198-1-wens@csie.org>
+Message-ID: <20161006160629.11198-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2016 at 05:41, Muhammad Abdul WAHAB
-<muhammadabdul.wahab@centralesupelec.fr> wrote:
-> An extra space is removed.
->
-> Signed-off-by: Muhammad Abdul Wahab <muhammadabdul.wahab@centralesupelec.fr>
-> ---
->  drivers/hwtracing/coresight/coresight-etm3x-sysfs.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> index e9b0719..5ea0909 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> @@ -146,7 +146,7 @@ static ssize_t mode_store(struct device *dev,
->                         goto err_unlock;
->                 }
->                 config->ctrl |= ETMCR_STALL_MODE;
-> -        } else
-> +       } else
->                 config->ctrl &= ~ETMCR_STALL_MODE;
->
->         if (config->mode & ETM_MODE_TIMESTAMP) {
+The A31 and A31s also have the DRC as part of the display pipeline.
+As we know virtually nothing about them, just add compatible strings
+for both SoCs to the stub driver.
 
-Applied, but prepended "coresight: etm3x:" to the original title.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 2 ++
+ drivers/gpu/drm/sun4i/sun6i_drc.c                             | 2 ++
+ 2 files changed, 4 insertions(+)
 
-Thanks,
-Mathieu
-
-> --
-> 1.9.1
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index b95696d748c7..5368961cd727 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -64,6 +64,8 @@ adaptive backlight control.
+ 
+ Required properties:
+   - compatible: value must be one of:
++    * allwinner,sun6i-a31-drc
++    * allwinner,sun6i-a31s-drc
+     * allwinner,sun8i-a33-drc
+   - reg: base address and size of the memory-mapped region.
+   - interrupts: interrupt associated to this IP
+diff --git a/drivers/gpu/drm/sun4i/sun6i_drc.c b/drivers/gpu/drm/sun4i/sun6i_drc.c
+index bf6d846d8132..6ef707c5a719 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_drc.c
++++ b/drivers/gpu/drm/sun4i/sun6i_drc.c
+@@ -98,6 +98,8 @@ static int sun6i_drc_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id sun6i_drc_of_table[] = {
++	{ .compatible = "allwinner,sun6i-a31-drc" },
++	{ .compatible = "allwinner,sun6i-a31s-drc" },
+ 	{ .compatible = "allwinner,sun8i-a33-drc" },
+ 	{ }
+ };
+-- 
+2.9.3
