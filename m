@@ -1,211 +1,85 @@
-From: paweljarosz3691@gmail.com (=?us-ascii?B?PT9VVEYtOD9xP1Bhd2U9QzU9ODI9MjBKYXJvc3o/PQ==?=)
-Date: Thu, 6 Oct 2016 18:23:21 +0200
-Subject: [PATCH 3/3] ARM: dts: rockchip: Add rk3066 MK808 board devicetree
- description file
-In-Reply-To: <cover.1475764778.git.paweljarosz3691@gmail.com>
-References: <cover.1475764778.git.paweljarosz3691@gmail.com>
-Message-ID: <3314a4b5fd563c7c0fb923a95039f3bcd51721cd.1475764778.git.paweljarosz3691@gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 07 Oct 2016 00:23:00 +0800
+Subject: [linux-sunxi] [PATCH 9/9] [DO NOT MERGE] ARM: dts: sun6i: Enable
+ 7" LCD panel on Sinlinx SinA31s
+In-Reply-To: <20161006160629.11198-10-wens@csie.org>
+References: <20161006160629.11198-1-wens@csie.org>
+ <20161006160629.11198-10-wens@csie.org>
+Message-ID: <1057651475770980@web10h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MK808 is a tv stick which has rockchip rk3066 CPU inside, two usb ports
-- host and otg, micro sd card slot and onboard wifi RK901.
 
-Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
----
- arch/arm/boot/dts/rk3066a-mk808.dts | 184 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 184 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3066a-mk808.dts
 
-diff --git a/arch/arm/boot/dts/rk3066a-mk808.dts b/arch/arm/boot/dts/rk3066a-mk808.dts
-new file mode 100644
-index 0000000..2878562
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3066a-mk808.dts
-@@ -0,0 +1,184 @@
-+/*
-+ * Copyright (c) 2016 Pawe? Jarosz <paweljarosz3691@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "rk3066a.dtsi"
-+
-+/ {
-+	model = "Rikomagic MK808";
-+	compatible = "rikomagic,mk808", "rockchip,rk3066a";
-+
-+	chosen {
-+		stdout-path = "serial2:115200n8";
-+	};
-+
-+	memory at 60000000 {
-+		device_type = "memory";
-+		reg = <0x60000000 0x40000000>;
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		blue {
-+			label = "mk808:blue:power";
-+			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	mmc_pwrseq: mmc-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc_pwr>;
-+		reset-gpios = <&gpio3 7 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	sdio_pwrseq: sdio-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_pwr>;
-+		reset-gpios = <&gpio3 24 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	vcc_io: vcc-io {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_io";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
-+	vcc_host: usb-host-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-+		pinctrl-0 = <&host_drv>;
-+		pinctrl-names = "default";
-+		regulator-always-on;
-+		regulator-name = "host-pwr";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+
-+	vcc_otg: usb-otg-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-+		pinctrl-0 = <&otg_drv>;
-+		pinctrl-names = "default";
-+		regulator-always-on;
-+		regulator-name = "vcc_otg";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+};
-+
-+&mmc0 {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	mmc-pwrseq = <&mmc_pwrseq>;
-+	num-slots = <1>;
-+	status = "okay";
-+	vmmc-supply = <&vcc_io>;
-+};
-+
-+&mmc1 {
-+	bus-width = <4>;
-+	disable-wp;
-+	mmc-pwrseq = <&sdio_pwrseq>;
-+	non-removable;
-+	num-slots = <1>;
-+	status = "okay";
-+	vmmc-supply = <&vcc_io>;
-+};
-+
-+&pinctrl {
-+	usb-host {
-+		host_drv: host-drv {
-+			rockchip,pins = <RK_GPIO0 6 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	usb-otg {
-+		otg_drv: otg-drv {
-+			rockchip,pins = <RK_GPIO0 5 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	sdmmc {
-+		sdmmc_pwr: sdmmc-pwr {
-+			rockchip,pins = <RK_GPIO3 7 RK_FUNC_GPIO &pcfg_pull_default>;
-+		};
-+	};
-+
-+	sdio {
-+		wifi_pwr: wifi-pwr {
-+			rockchip,pins = <RK_GPIO3 24 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&usb_host {
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
-+
--- 
-2.7.4
+07.10.2016, 00:06, "Chen-Yu Tsai" <wens@csie.org>:
+> Sinlinx SinA31s comes with an optional 7" 1024x600 LCD panel with
+> capacitive touch panel that bolts on to the board.
+>
+> Enable the display using a panel with close timings. This patch is more
+> of a proof of concept. The LCD panel has no markings whatsoever, and
+> the timings are not exactly the same, and as a result the display produces
+> glitch lines sometimes.
+
+As you say, you can use the panel of SinA33...
+
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> ?arch/arm/boot/dts/sun6i-a31s-sina31s.dts | 30 ++++++++++++++++++++++++++++++
+> ?1 file changed, 30 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+> index 6ead2f5c847a..2d5cf8c9a12f 100644
+> --- a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+> +++ b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+> @@ -63,6 +63,23 @@
+> ?????????????????????????gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>; /* PH13 */
+> ?????????????????};
+> ?????????};
+> +
+> + panel: panel {
+> + compatible = "avic,tm070ddh03", "simple-panel";
+> + #address-cells = <1>;
+> + #size-cells = <0>;
+> +
+> + port at 0 {
+> + reg = <0>;
+> + #address-cells = <1>;
+> + #size-cells = <0>;
+> +
+> + panel_input: endpoint at 0 {
+> + reg = <0>;
+> + remote-endpoint = <&tcon0_out_lcd>;
+> + };
+> + };
+> + };
+> ?};
+>
+> ?&ehci0 {
+> @@ -148,6 +165,19 @@
+> ?????????regulator-name = "vcc-gmac-phy";
+> ?};
+>
+> +&tcon0 {
+> + pinctrl-names = "default";
+> + pinctrl-0 = <&lcd0_rgb888_pins>;
+> + status = "okay";
+> +};
+> +
+> +&tcon0_out {
+> + tcon0_out_lcd: endpoint at 0 {
+> + reg = <0>;
+> + remote-endpoint = <&panel_input>;
+> + };
+> +};
+> +
+> ?&usbphy {
+> ?????????status = "okay";
+> ?};
+> --
+> 2.9.3
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
