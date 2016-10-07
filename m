@@ -1,24 +1,20 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 7 Oct 2016 12:32:15 +0900
-Subject: [PATCH 0/2] ARM: shmobile: alt/gose: Add board part number to DT
- bindings
-In-Reply-To: <1475587248-13670-1-git-send-email-geert+renesas@glider.be>
-References: <1475587248-13670-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20161007033214.GO13721@verge.net.au>
+Date: Fri, 7 Oct 2016 12:33:52 +0900
+Subject: [PATCH] ARM: dts: r8a7794: Fix W=1 dtc warnings
+In-Reply-To: <1475587908-22151-1-git-send-email-geert+renesas@glider.be>
+References: <1475587908-22151-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20161007033352.GP13721@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2016 at 03:20:46PM +0200, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
-> 
-> This series at the missing board part numbers for r8a7794/alt and
-> r8a7793/gose to the DT binding documentation, like is done for the other
-> boards.
-> 
-> Thanks for applying!
-> 
-> Geert Uytterhoeven (2):
->   ARM: shmobile: r8a7794/alt: Add board part number to DT bindings
->   ARM: shmobile: r8a7793/gose: Add board part number to DT bindings
+On Tue, Oct 04, 2016 at 03:31:48PM +0200, Geert Uytterhoeven wrote:
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,dvc/dvc at 0 has a unit name, but no reg property
 
-Thanks, I have queued these up.
+...
+
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  arch/arm/boot/dts/r8a7794.dtsi | 58 +++++++++++++++++++++---------------------
+>  1 file changed, 29 insertions(+), 29 deletions(-)
+
+Thanks, I have queued this up.
