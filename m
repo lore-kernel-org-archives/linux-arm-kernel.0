@@ -1,147 +1,99 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 7 Oct 2016 19:14:03 +0200
-Subject: [PATCH v13 03/15] iommu/dma: Allow MSI-only cookies
-In-Reply-To: <20161006141717.13c9c111@t450s.home>
-References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
- <1475743531-4780-4-git-send-email-eric.auger@redhat.com>
- <20161006141717.13c9c111@t450s.home>
-Message-ID: <d3f5918d-3f04-4f54-db43-ca79cbbc170b@redhat.com>
+From: labath@google.com (Pavel Labath)
+Date: Fri, 7 Oct 2016 10:24:14 -0700
+Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
+ addresses
+In-Reply-To: <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
+References: <1474643941-109020-1-git-send-email-labath@google.com>
+ <1474643941-109020-2-git-send-email-labath@google.com>
+ <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
+Message-ID: <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+On 7 October 2016 at 09:38, Pratyush Anand <panand@redhat.com> wrote:
+>
+>
+> IIUC, then you see an issue when an address watched is not the base
+> address accessed by the instruction. For example, if an address 'a+8'
+> is watched and an instruction accesses instruction from  a to a +16. I
+> tried to reproduce the issue with mustang using your test-case in
+> patch3 (after couple of syntax modifcations for resolving compilation
+> issue with gcc). All the test case did pass with existing code in
+> v4.8. I noticed that, watchpoint exception is generated if any of the
+> sub-location accessed from a single instruction is watched, provided
+> watchdpoint watches either a byte, half word, word or double word
+> from the base.
+>
+>
+> So, either I must be missing something or the problem is not related
+> to all arm64 platform.
 
-On 06/10/2016 22:17, Alex Williamson wrote:
-> On Thu,  6 Oct 2016 08:45:19 +0000
-> Eric Auger <eric.auger@redhat.com> wrote:
-> 
->> From: Robin Murphy <robin.murphy@arm.com>
->>
->> IOMMU domain users such as VFIO face a similar problem to DMA API ops
->> with regard to mapping MSI messages in systems where the MSI write is
->> subject to IOMMU translation. With the relevant infrastructure now in
->> place for managed DMA domains, it's actually really simple for other
->> users to piggyback off that and reap the benefits without giving up
->> their own IOVA management, and without having to reinvent their own
->> wheel in the MSI layer.
->>
->> Allow such users to opt into automatic MSI remapping by dedicating a
->> region of their IOVA space to a managed cookie.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> v1 -> v2:
->> - compared to Robin's version
->> - add NULL last param to iommu_dma_init_domain
->> - set the msi_geometry aperture
->> - I removed
->>   if (base < U64_MAX - size)
->>      reserve_iova(iovad, iova_pfn(iovad, base + size), ULONG_MAX);
->>   don't get why we would reserve something out of the scope of the iova domain?
->>   what do I miss?
->> ---
->>  drivers/iommu/dma-iommu.c | 40 ++++++++++++++++++++++++++++++++++++++++
->>  include/linux/dma-iommu.h |  9 +++++++++
->>  2 files changed, 49 insertions(+)
->>
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index c5ab866..11da1a0 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -716,3 +716,43 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
->>  		msg->address_lo += lower_32_bits(msi_page->iova);
->>  	}
->>  }
->> +
->> +/**
->> + * iommu_get_dma_msi_region_cookie - Configure a domain for MSI remapping only
-> 
-> Should this perhaps be iommu_setup_dma_msi_region_cookie, or something
-> along those lines.  I'm not sure what we're get'ing.  Thanks,
-This was chosen by analogy with legacy iommu_get_dma_cookie/
-iommu_put_dma_cookie. But in practice it does both get &
-iommu_dma_init_domain.
 
-I plan to rename into iommu_setup_dma_msi_region if no objection
+Hello Pratyush,
 
-Thanks
+Thank you for looking into this.
 
-Eric
+The thing is, I have observed different behavior here depending on the
+exact hardware used. I don't have the exact parameters with me now,
+but I can look it up next week.
 
-> 
-> Alex
-> 
->> + * @domain: IOMMU domain to prepare
->> + * @base: Base address of IOVA region to use as the MSI remapping aperture
->> + * @size: Size of the desired MSI aperture
->> + *
->> + * Users who manage their own IOVA allocation and do not want DMA API support,
->> + * but would still like to take advantage of automatic MSI remapping, can use
->> + * this to initialise their own domain appropriately.
->> + */
->> +int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
->> +		dma_addr_t base, u64 size)
->> +{
->> +	struct iommu_dma_cookie *cookie;
->> +	struct iova_domain *iovad;
->> +	int ret;
->> +
->> +	if (domain->type == IOMMU_DOMAIN_DMA)
->> +		return -EINVAL;
->> +
->> +	ret = iommu_get_dma_cookie(domain);
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = iommu_dma_init_domain(domain, base, size, NULL);
->> +	if (ret) {
->> +		iommu_put_dma_cookie(domain);
->> +		return ret;
->> +	}
->> +
->> +	domain->msi_geometry.aperture_start = base;
->> +	domain->msi_geometry.aperture_end = base + size - 1;
->> +
->> +	cookie = domain->iova_cookie;
->> +	iovad = &cookie->iovad;
->> +
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL(iommu_get_dma_msi_region_cookie);
->> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
->> index 32c5890..1c55413 100644
->> --- a/include/linux/dma-iommu.h
->> +++ b/include/linux/dma-iommu.h
->> @@ -67,6 +67,9 @@ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
->>  /* The DMA API isn't _quite_ the whole story, though... */
->>  void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
->>  
->> +int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
->> +		dma_addr_t base, u64 size);
->> +
->>  #else
->>  
->>  struct iommu_domain;
->> @@ -90,6 +93,12 @@ static inline void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
->>  {
->>  }
->>  
->> +static inline int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
->> +		dma_addr_t base, u64 size)
->> +{
->> +	return -ENODEV;
->> +}
->> +
->>  #endif	/* CONFIG_IOMMU_DMA */
->>  #endif	/* __KERNEL__ */
->>  #endif	/* __DMA_IOMMU_H */
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+The thing is that the spec is imprecise about what exact address the
+hardware can report for the watchpoint hit. I presume that is
+deliberate to give some leeway to implementers. The spec says the
+address can be anywhere in the range from the lowest memory address
+accessed by the instruction to the highest address watched by the
+watchpoint, but most hardware seems to be stricter than that and
+return an address that fits inside the watched range.
+
+On chip 1, I observed the behavior where the hardware would
+consistently report an address out of range of the watchpoint and we
+would just spin it in a loop.
+
+On chip 2, I observed the behavior where the hardware would report an
+out-of-range address for the first two dozen (~) iterations, after
+which it would "give up" and report an address that we were happy
+with. I don't really have an explanation for this - I can only assume
+that some external event like a reschedule to a different core caused
+some internal state of the hardware to be reset and cause it to report
+a different (better?) address instead. In the case where this was
+happening, it had no observable effects on userspace - it did not see
+the fact that we had re-executed the offending instruction a dozen
+times and as far as it was concerned, the watchpoint functionality
+worked perfectly. You can check whether this is happening in your case
+by instrumenting the code to print the reported address whenever it
+enters `watchpoint_handler`.
+
+(I am sorry about the test errors. I was compiling the test case with
+an android gcc - I'll make sure to check it with a vanilla linux gcc
+also.)
+
+ >
+> However, I did notice that it does not work if we watch an address
+> which is at some offset from address programmed. For example, it works
+> when byte_mask is 0x3, but it does not work if byte_mask if 0x2 (which
+> is supported by hardware).
+>
+> I do have some patches to resolve that.
+>
+> https://github.com/pratyushanand/linux/commits/perf/upstream_arm64_devel
+>
+> I will send them for review comment after some testing.
+
+I am looking forward to these patches - they were the next on my list
+to look into after I got this resolved. :)
+
+However: Are sure about 0x2 not being a valid byte mask? According to
+my reading of the armv8 spec (section  D7.3.11, "DBGWCR<n>_EL1, Debug
+Watchpoint Control Registers, n = 0 - 15") it should be fine.
+====
+The valid values for BAS are 0b0000000, or a binary number all of
+whose set bits are contiguous. All other values are reserved and must
+not be used by software.
+====
+So, 0x2 (as well as 0x6, 0xC, 0xE) should be fine as it has a
+contiguous sequence of set bit(s). I haven't tried yet whether any
+hardware actually handles that correctly, but I was certainly hoping
+we would be able to watch more precise memory regions.
+
+regards,
+Pavel
