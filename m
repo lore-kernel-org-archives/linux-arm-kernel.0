@@ -1,56 +1,219 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri, 7 Oct 2016 13:54:02 -0700
-Subject: [PATCH 1/3] fpga manager: Add cyclonespi driver for Altera fpgas
-In-Reply-To: <alpine.DEB.2.02.1610071248320.32627@linuxheads99>
-References: <cover.1475783742.git.stillcompiling@gmail.com>
- <4b4432c04b4ea92a2af814e3d7866c33f2eb12ea.1475783742.git.stillcompiling@gmail.com>
- <CAAtXAHcWLpn3DFP6YLWqBxsMQ0O=HNNCmB+kHbHhyAHFHQUbwA@mail.gmail.com>
- <alpine.DEB.2.02.1610071248320.32627@linuxheads99>
-Message-ID: <46d5a356-f2c1-3b9f-45f3-4910c97695dc@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri,  7 Oct 2016 15:10:43 -0600
+Subject: [PATCH] coresight: reset "enable_sink" flag when need be
+Message-ID: <1475874643-9464-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When using coresight from the perf interface sinks are specified
+as part of the perf command line.  As such the sink needs to be
+disabled once it has been acknowledged by the coresight framework.
+Otherwise the sink stays enabled, which may interfere with other
+sessions.
 
-On 10/07/2016 11:21 AM, atull wrote:
-> On Fri, 7 Oct 2016, Moritz Fischer wrote:
->
->>> +static inline u32 revbit8x4(u32 n)
->>> +{
->>> +       n = ((n & 0xF0F0F0F0UL) >> 4) | ((n & 0x0F0F0F0FUL) << 4);
->>> +       n = ((n & 0xCCCCCCCCUL) >> 2) | ((n & 0x33333333UL) << 2);
->>> +       n = ((n & 0xAAAAAAAAUL) >> 1) | ((n & 0x55555555UL) << 1);
->>> +       return n;
->>> +}
-The real issue is that The FPGA wants lsb first, and my SPI driver
-doesn't support it.
-What I really wanted to do here was to get generic support for lsb-first
-SPI into the SPI subsystem.
->> During the Zynq FPGA manager reviews we decided that manipulating the bitstream
->> to be consumable by the driver is userland's job.
-> Moritz, Can you remind me what that issue was there (or point me to
-> that email, I can't find it)?  I don't think I had a problem with that
-> in your case.  In general I think if these drivers can take the
-> bitstream that comes from the manufacturer's tools and stuff it into
-> the FPGA, then we are accomplishing what we want.  So I am OK with
-> this here.  The intent of the driver is to load a standard rbf, same
-> as the other Altera FPGA drivers.
-> There is a problem here though it will be easy to fix.  This call to
-> revbit8x4 should happen in cyclonespi_write(), not in
-> cyclonespi_write_init(). The reason for that is that write_init() may
-> just get the first chunk of the image (the header) and that write()
-> will be called multiple times for the remaining chunks.  The current
-> FPGA manager API won't show this problem since you have to give
-> fpga_mgr_buf_load the whole image buffer at once.  But it is easy to
-> imagine that some time in the future we may want to expand the FPGA
-> manager API to support streaming where we don't have the whole buffer.
-OK.
-If generic lsb first support for SPI is too high a bar (which it may be),
-I will move the bit reversing code into the write function.
-> Thanks for submitting, Joshua.  Will be looking at this over the
-> next several days.
->
-> Alan
-Thanks for the quick response!
-I'll be looking forward to your review,
+This patch removes the sink selection check from the build path
+process and make it a function on it's own.  The function is
+then used when operating from sysFS or perf to determine what
+sink has been selected.
 
-Joshua Clayton
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 31 ++++++------
+ drivers/hwtracing/coresight/coresight-priv.h     |  4 +-
+ drivers/hwtracing/coresight/coresight.c          | 62 +++++++++++++++++++++---
+ 3 files changed, 75 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index 2cd7c718198a..1103073b2640 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -202,6 +202,21 @@ static void *etm_setup_aux(int event_cpu, void **pages,
+ 	if (!event_data)
+ 		return NULL;
+ 
++	/*
++	 * In theory nothing prevent tracers in a trace session from being
++	 * associated with different sinks, nor having a sink per tracer.  But
++	 * until we have HW with this kind of topolog we need to assume tracers
++	 * in a trace session are using the same sink.  Therefore go through
++	 * the coresight bus and pick the first enabled sink.
++	 *
++	 * When operated from sysFS users are responsible to enable the sink
++	 * while from perf, the perf tools will do it based on the choice made
++	 * on the cmd line.  As such the "enable_sink" flag in sysFS is reset.
++	 */
++	sink = coresight_get_enabled_sink(true);
++	if (!sink)
++		return NULL;
++
+ 	INIT_WORK(&event_data->work, free_event_data);
+ 
+ 	mask = &event_data->mask;
+@@ -219,25 +234,11 @@ static void *etm_setup_aux(int event_cpu, void **pages,
+ 		 * list of devices from source to sink that can be
+ 		 * referenced later when the path is actually needed.
+ 		 */
+-		event_data->path[cpu] = coresight_build_path(csdev);
++		event_data->path[cpu] = coresight_build_path(csdev, sink);
+ 		if (IS_ERR(event_data->path[cpu]))
+ 			goto err;
+ 	}
+ 
+-	/*
+-	 * In theory nothing prevent tracers in a trace session from being
+-	 * associated with different sinks, nor having a sink per tracer.  But
+-	 * until we have HW with this kind of topology and a way to convey
+-	 * sink assignement from the perf cmd line we need to assume tracers
+-	 * in a trace session are using the same sink.  Therefore pick the sink
+-	 * found at the end of the first available path.
+-	 */
+-	cpu = cpumask_first(mask);
+-	/* Grab the sink at the end of the path */
+-	sink = coresight_get_sink(event_data->path[cpu]);
+-	if (!sink)
+-		goto err;
+-
+ 	if (!sink_ops(sink)->alloc_buffer)
+ 		goto err;
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index 196a14be4b3d..ef9d8e93e3b2 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -111,7 +111,9 @@ static inline void CS_UNLOCK(void __iomem *addr)
+ void coresight_disable_path(struct list_head *path);
+ int coresight_enable_path(struct list_head *path, u32 mode);
+ struct coresight_device *coresight_get_sink(struct list_head *path);
+-struct list_head *coresight_build_path(struct coresight_device *csdev);
++struct coresight_device *coresight_get_enabled_sink(bool reset);
++struct list_head *coresight_build_path(struct coresight_device *csdev,
++				       struct coresight_device *sink);
+ void coresight_release_path(struct list_head *path);
+ 
+ #ifdef CONFIG_CORESIGHT_SOURCE_ETM3X
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 7bf00a0beb6f..40ede643d553 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -368,6 +368,40 @@ struct coresight_device *coresight_get_sink(struct list_head *path)
+ 	return csdev;
+ }
+ 
++static int coresight_enabled_sink(struct device *dev, void *data)
++{
++	bool *reset = data;
++	struct coresight_device *csdev = to_coresight_device(dev);
++
++	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
++	     csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) &&
++	     csdev->activated) {
++		/*
++		 * Now that we have a handle on the sink for this session,
++		 * disable the sysFS "enable_sink" flag so that possible
++		 * concurrent perf session that wish to use another sink don't
++		 * trip on it.  Doing so has no ramification for the current
++		 * session.
++		 */
++		if (*reset)
++			csdev->activated = false;
++
++		return 1;
++	}
++
++	return 0;
++}
++
++struct coresight_device *coresight_get_enabled_sink(bool reset)
++{
++	struct device *dev = NULL;
++
++	dev = bus_find_device(&coresight_bustype, NULL, &reset,
++			      coresight_enabled_sink);
++
++	return dev ? to_coresight_device(dev) : NULL;
++}
++
+ /**
+  * _coresight_build_path - recursively build a path from a @csdev to a sink.
+  * @csdev:	The device to start from.
+@@ -380,6 +414,7 @@ struct coresight_device *coresight_get_sink(struct list_head *path)
+  * last one.
+  */
+ static int _coresight_build_path(struct coresight_device *csdev,
++				 struct coresight_device *sink,
+ 				 struct list_head *path)
+ {
+ 	int i;
+@@ -387,15 +422,15 @@ static int _coresight_build_path(struct coresight_device *csdev,
+ 	struct coresight_node *node;
+ 
+ 	/* An activated sink has been found.  Enqueue the element */
+-	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
+-	     csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) && csdev->activated)
++	if (csdev == sink)
+ 		goto out;
+ 
+ 	/* Not a sink - recursively explore each port found on this element */
+ 	for (i = 0; i < csdev->nr_outport; i++) {
+ 		struct coresight_device *child_dev = csdev->conns[i].child_dev;
+ 
+-		if (child_dev && _coresight_build_path(child_dev, path) == 0) {
++		if (child_dev &&
++		    _coresight_build_path(child_dev, sink, path) == 0) {
+ 			found = true;
+ 			break;
+ 		}
+@@ -422,18 +457,22 @@ out:
+ 	return 0;
+ }
+ 
+-struct list_head *coresight_build_path(struct coresight_device *csdev)
++struct list_head *coresight_build_path(struct coresight_device *source,
++				       struct coresight_device *sink)
+ {
+ 	struct list_head *path;
+ 	int rc;
+ 
++	if (!sink)
++		return ERR_PTR(-EINVAL);
++
+ 	path = kzalloc(sizeof(struct list_head), GFP_KERNEL);
+ 	if (!path)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	INIT_LIST_HEAD(path);
+ 
+-	rc = _coresight_build_path(csdev, path);
++	rc = _coresight_build_path(source, sink, path);
+ 	if (rc) {
+ 		kfree(path);
+ 		return ERR_PTR(rc);
+@@ -497,6 +536,7 @@ static int coresight_validate_source(struct coresight_device *csdev,
+ int coresight_enable(struct coresight_device *csdev)
+ {
+ 	int cpu, ret = 0;
++	struct coresight_device *sink;
+ 	struct list_head *path;
+ 
+ 	mutex_lock(&coresight_mutex);
+@@ -508,7 +548,17 @@ int coresight_enable(struct coresight_device *csdev)
+ 	if (csdev->enable)
+ 		goto out;
+ 
+-	path = coresight_build_path(csdev);
++	/*
++	 * Search for a valid sink for this session but don't reset the
++	 * "enable_sink" flag in sysFS.  Users get to do that explicitly.
++	 */
++	sink = coresight_get_enabled_sink(false);
++	if (!sink) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	path = coresight_build_path(csdev, sink);
+ 	if (IS_ERR(path)) {
+ 		pr_err("building path(s) failed\n");
+ 		ret = PTR_ERR(path);
+-- 
+2.7.4
