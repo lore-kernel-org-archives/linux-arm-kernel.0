@@ -1,44 +1,31 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri,  7 Oct 2016 10:25:55 +0200
-Subject: [PATCH v4 08/10] ARM: dts: sun8i: Enable sun8i-emac on the Orange Pi 2
+Date: Fri,  7 Oct 2016 10:25:56 +0200
+Subject: [PATCH v4 09/10] ARM: sunxi: Enable sun8i-emac driver on
+ sunxi_defconfig
 In-Reply-To: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
 References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1475828757-926-9-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1475828757-926-10-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sun8i-emac hardware is present on the Orange PI 2.
-It uses the internal PHY.
-
-This patch create the needed emac node.
+Enable the sun8i-emac driver in the sunxi default configuration
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/configs/sunxi_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-index f93f5d1..5608eb4 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-@@ -54,6 +54,7 @@
- 
- 	aliases {
- 		serial0 = &uart0;
-+		ethernet0 = &emac;
- 	};
- 
- 	chosen {
-@@ -184,3 +185,10 @@
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	status = "okay";
- };
-+
-+&emac {
-+	phy-handle = <&int_mii_phy>;
-+	phy-mode = "mii";
-+	allwinner,leds-active-low;
-+	status = "okay";
-+};
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 714da33..153707a 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -40,6 +40,7 @@ CONFIG_ATA=y
+ CONFIG_AHCI_SUNXI=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SUN4I_EMAC=y
++CONFIG_SUN8I_EMAC=y
+ # CONFIG_NET_VENDOR_ARC is not set
+ # CONFIG_NET_CADENCE is not set
+ # CONFIG_NET_VENDOR_BROADCOM is not set
 -- 
 2.7.3
