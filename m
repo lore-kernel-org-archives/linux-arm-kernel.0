@@ -1,121 +1,156 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Fri, 7 Oct 2016 10:19:57 +0530
-Subject: [PATCH v2 2/6] pwm: core: make the PWM_POLARITY flag in DTB
- optional
-In-Reply-To: <20161006083642.6a28a629@jawa>
-References: <20161001101235.24598-1-bhuvanchandra.dv@toradex.com>
- <20161001101235.24598-3-bhuvanchandra.dv@toradex.com>
- <20161006083642.6a28a629@jawa>
-Message-ID: <815c2a76-a22d-8938-6d27-ff3da5694791@toradex.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Fri, 7 Oct 2016 10:27:31 +0530
+Subject: [PATCH v5 2/5] drm/bridge: Add RGB to VGA bridge support
+In-Reply-To: <1757833.hOePAQC2sg@avalon>
+References: <20160930143709.1388-1-maxime.ripard@free-electrons.com>
+ <5319260.UeCnJXKVPe@avalon>
+ <CAOw6vbLC=HnnpuaxFf8EzSTmuYoZd-r1aqx-ixja97Ht_U6S6Q@mail.gmail.com>
+ <1757833.hOePAQC2sg@avalon>
+Message-ID: <f39e907c-424f-7572-f88e-5dd0b6009631@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
 
-On 10/06/16 12:06, Lukasz Majewski wrote:
 
-> Hi Bhuvanchandra,
+On 10/07/2016 02:34 AM, Laurent Pinchart wrote:
+> Hi Sean,
 >
->> From: Lothar Wassmann <LW@KARO-electronics.de>
+> On Thursday 06 Oct 2016 15:53:28 Sean Paul wrote:
+>> On Thu, Oct 6, 2016 at 1:27 PM, Laurent Pinchart wrote:
+>>> On Thursday 06 Oct 2016 17:09:57 Archit Taneja wrote:
+>>>> On 10/06/2016 12:51 PM, Maxime Ripard wrote:
+>>>>> On Mon, Oct 03, 2016 at 04:40:57PM +0530, Archit Taneja wrote:
+>>>>>> On 09/30/2016 08:07 PM, Maxime Ripard wrote:
+>>>>>>> Some boards have an entirely passive RGB to VGA bridge, based on
+>>>>>>> either DACs or resistor ladders.
+>>>>>>>
+>>>>>>> Those might or might not have an i2c bus routed to the VGA connector
+>>>>>>> in order to access the screen EDIDs.
+>>>>>>>
+>>>>>>> Add a bridge that doesn't do anything but expose the modes available
+>>>>>>> on the screen, either based on the EDIDs if available, or based on
+>>>>>>> the XGA standards.
+>>>>>>>
+>>>>>>> Acked-by: Rob Herring <robh@kernel.org>
+>>>>>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>>>>>> ---
+>>>>>>> .../bindings/display/bridge/rgb-to-vga-bridge.txt  |  48 +++++
+>>>>>>> drivers/gpu/drm/bridge/Kconfig                     |   7 +
+>>>>>>> drivers/gpu/drm/bridge/Makefile                    |   1 +
+>>>>>>> drivers/gpu/drm/bridge/rgb-to-vga.c                | 229 +++++++++++++
+>>>>>>> 4 files changed, 285 insertions(+)
+>>>>>>> create mode 100644
+>>>>>>> Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.tx
+>>>>>>> t
+>>>>>>> create mode 100644 drivers/gpu/drm/bridge/rgb-to-vga.c
+>>>>>>>
+>>>>>>> diff --git
+>>>>>>> a/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.
+>>>>>>> txt
+>>>>>>> b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.
+>>>>>>> txt
+>>>>>>> new file mode 100644
+>>>>>>> index 000000000000..a8375bc1f9cb
+>>>>>>> --- /dev/null
+>>>>>>> +++
+>>>>>>> b/Documentation/devicetree/bindings/display/bridge/rgb-to-vga-bridge.
+>>>>>>> tx
+>>>>>>> t @@ -0,0 +1,48 @@
+>>>>>>> +Dumb RGB to VGA bridge
+>>>>>>> +----------------------
+>>>>>>> +
+>>>>>>> +This binding is aimed for dumb RGB to VGA bridges that do not
+>>>>>>> require
+>>>>>>> +any configuration.
+>>>>>>> +
+>>>>>>> +Required properties:
+>>>>>>> +
+>>>>>>> +- compatible: Must be "rgb-to-vga-bridge"
+>>>>>>
+>>>>>> I'd talked to Laurent on IRC if he's okay with this. And I guess you
+>>>>>> to had discussed it during XDC too. He's suggested that it'd be better
+>>>>>> to have the compatible string as "simple-vga-dac".
+>>>>>
+>>>>> I just wished this bikeshedding had taken place publicly and be
+>>>>> actually part of that discussion, but yeah, ok.
+>>>>
+>>>> Sorry about that. I'd pinged him for an Ack, the discussion went
+>>>> more than that :)
+>>>>
+>>>>>> Some of the reasons behind having this:
+>>>>>>
+>>>>>> - We don't need to specify "rgb" in the compatible string since most
+>>>>>> simple VGA DACs can only work with an RGB input.
+>>>>>
+>>>>> Ok.
+>>>>>
+>>>>>> - Also, with "dac" specified in the string, we don't need to
+>>>>>> specifically mention "bridge" in the string. Also, bridge is a drm
+>>>>>> specific term.
+>>>>>>
+>>>>>> - "simple" is considered because it's an unconfigurable bridge, and it
+>>>>>> might be misleading for other VGA DACs to not use "vga-dac".
+>>>>>
+>>>>> All those "simple" bindings are just the biggest lie we ever
+>>>>> told. It's simple when you introduce it, and then grows into something
+>>>>> much more complicated than a non-simple implementation.
+>>>>
+>>>> "simple" here is supposed to mean that it's an unconfigurable RGB to
+>>>> VGA DAC. This isn't supposed to follow the simple-panel model, where
+>>>> you add the "simple-panel" string in the compatible node, along with
+>>>> you chip specific compatible string.
+>>>
+>>> I agree with Maxime, I don't like the word "simple". My preference would
+>>> be "vga-dac" for a lack of a better qualifier than "simple" to describe
+>>> the fact that the device requires no configuration. My only concern with
+>>> "vga-dac" is that we would restrict usage of that compatible string for a
+>>> subset of VGA DACs, with more complex devices not being compatible with
+>>> "vga-dac" even though they are VGA DACs. That's a problem I can live with
+>>> though.
 >>
->> Change the pwm chip driver registration, so that a chip driver that
->> supports polarity inversion can still be used with DTBs that don't
->> provide the 'PWM_POLARITY' flag.
->>
->> This is done to provide polarity inversion support for the pwm-imx
->> driver without having to modify all existing DTS files.
->>
->> Signed-off-by: Lothar Wassmann <LW@KARO-electronics.de>
->> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
->> Suggested-by: Thierry Reding <thierry.reding@gmail.com>
->> ---
->>   drivers/pwm/core.c | 27 ++++++++++++++++-----------
->>   1 file changed, 16 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
->> index 195373e..aae8db3 100644
->> --- a/drivers/pwm/core.c
->> +++ b/drivers/pwm/core.c
->> @@ -137,9 +137,14 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc,
->> const struct of_phandle_args *args) {
->>   	struct pwm_device *pwm;
->>   
->> +	/* check, whether the driver supports a third cell for flags
->> */ if (pc->of_pwm_n_cells < 3)
->>   		return ERR_PTR(-EINVAL);
->>   
->> +	/* flags in the third cell are optional */
->> +	if (args->args_count < 2)
->> +		return ERR_PTR(-EINVAL);
->> +
->>   	if (args->args[0] >= pc->npwm)
->>   		return ERR_PTR(-EINVAL);
->>   
->> @@ -149,10 +154,12 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc,
->> const struct of_phandle_args *args)
->>   	pwm->args.period = args->args[1];
->>   
->> -	if (args->args[2] & PWM_POLARITY_INVERTED)
->> -		pwm->args.polarity = PWM_POLARITY_INVERSED;
->> -	else
->> -		pwm->args.polarity = PWM_POLARITY_NORMAL;
->> +	if (args->args_count > 2) {
->> +		if (args->args[2] & PWM_POLARITY_INVERTED)
->> +			pwm_set_polarity(pwm, PWM_POLARITY_INVERSED);
-> 			^^^^^^^^^^^^^^^^
-> 			here we should set pwm->args.polarity, since
-> 			the pwm_set_polarity() calls pwm_apply_state()
-> 			which requires duty_cycle and period to be set.
+>> While we're bikeshedding (feel free to ignore my input on this), I
+>> think Maxime's initial "dumb" qualifier was better than "simple".
 >
-> 			In this particular moment it is not yet set and
-> 			polarity is not properly configured.
+> I think I agree.
+>
+>> I think "passive" also gets the point across better than "simple", which
+>> we've already established as something else in drm.
+>
+> To my electrical engineer's ear, passive refers to a component or combination
+> of components that is not capable of power gain. The resistors ladder VGA DAC
+> that Maxime is trying to support is a passive system, but the ADV7123 VGA DAC
+> that equally requires no configuration is an active component.
 
-Agreed. Will do a clean v3 patchset along with the patch you sent
-(pwm: core: Use pwm->args.polarity to setup PWM_POLARITY_INVERSED).
+If no one has any more objections within the next day, I'll pull in
+Maxime's v5 RGB to VGA bridge driver, and change the compatible to
+"dumb-vga-dac".
 
---
-Bhuvan
+Thanks,
+Archit
+
 
 >
-> Patch fixing this will be sent as a reply to this e-mail. Please just
-> squash it and test on your platform.
+>> Now that I've gotten that out of the way, this patch looks good to me
+>> regardless of the name.
+>>
+>> Reviewed-by: Sean Paul <seanpaul@chromium.org>
+>>
+>> Sean
+>>
+>>>> In other words, this driver shouldn't be touched again in the future :)
+>>>> If someone wants to write a RGB to VGA driver which is even
+>>>> slightly configurable, they'll need to write a new bridge driver.
+>>>
+>>> I'm sure that won't be true. I can certainly foresee the addition of
+>>> regulators support for instance. It's unfortunately never black and white.
+>>>
+>>>>>> What do you think about this? If you think it's good, would it be
+>>>>>> possible for you to change this? I guess it's okay for the rest of
+>>>>>> the patch to stay the same.
+>>>>>
+>>>>> I'll update and respin the serie.
 >
-> Best regards,
-> ?ukasz Majewski
->
->> +		else
->> +			pwm_set_polarity(pwm, PWM_POLARITY_NORMAL);
->> +	}
->>   
->>   	return pwm;
->>   }
->> @@ -163,9 +170,14 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const
->> struct of_phandle_args *args) {
->>   	struct pwm_device *pwm;
->>   
->> +	/* sanity check driver support */
->>   	if (pc->of_pwm_n_cells < 2)
->>   		return ERR_PTR(-EINVAL);
->>   
->> +	/* all cells are required */
->> +	if (args->args_count != pc->of_pwm_n_cells)
->> +		return ERR_PTR(-EINVAL);
->> +
->>   	if (args->args[0] >= pc->npwm)
->>   		return ERR_PTR(-EINVAL);
->>   
->> @@ -672,13 +684,6 @@ struct pwm_device *of_pwm_get(struct device_node
->> *np, const char *con_id) goto put;
->>   	}
->>   
->> -	if (args.args_count != pc->of_pwm_n_cells) {
->> -		pr_debug("%s: wrong #pwm-cells for %s\n",
->> np->full_name,
->> -			 args.np->full_name);
->> -		pwm = ERR_PTR(-EINVAL);
->> -		goto put;
->> -	}
->> -
->>   	pwm = pc->of_xlate(pc, &args);
->>   	if (IS_ERR(pwm))
->>   		goto put;
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
