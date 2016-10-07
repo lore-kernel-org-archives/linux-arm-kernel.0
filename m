@@ -1,30 +1,28 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 7 Oct 2016 10:38:53 +0200
-Subject: [PATCH 2/9] drm/sun4i: tcon: Move SoC specific quirks to a DT
- matched data structure
-In-Reply-To: <20161006160629.11198-3-wens@csie.org>
+Date: Fri, 7 Oct 2016 10:55:28 +0200
+Subject: [PATCH 4/9] drm/sun4i: Add compatible string for A31/A31s TCON
+ (timing controller)
+In-Reply-To: <20161006160629.11198-5-wens@csie.org>
 References: <20161006160629.11198-1-wens@csie.org>
- <20161006160629.11198-3-wens@csie.org>
-Message-ID: <20161007083853.GH4684@lukather>
+ <20161006160629.11198-5-wens@csie.org>
+Message-ID: <20161007085528.GJ4684@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Oct 07, 2016 at 12:06:22AM +0800, Chen-Yu Tsai wrote:
-> +struct sun4i_tcon_quirks {
-> +	bool	is_sun5i;	/* sun5i has undocumented mux */
-> +	bool	has_channel_1;	/* a33 does not have channel 1 */
-> +	bool	has_bypass_src;	/* has separate input bypassing CEU */
-> +	bool	has_dma_src;	/* has DMA input */
-> +};
-> +
+On Fri, Oct 07, 2016 at 12:06:24AM +0800, Chen-Yu Tsai wrote:
+> The A31 TCON has mux controls for how TCON outputs are routed to the
+> HDMI and MIPI DSI blocks.
+> 
+> Since the A31s does not have MIPI DSI, it only has a mux for the HDMI
+> controller input.
+> 
+> This patch only adds support for the compatible strings. Actual support
+> for the mux controls should be added with HDMI and MIPI DSI support.
 
-I'd really prefer to keep the has_mux quirk name. is_sun5i doesn't
-really relate to what we're doing there, is redundant with the
-compatible, and render the other quirks name useless, since we could
-just have is_sun.i quirks and deal with that (which is essentially
-what we were doing before).
+Then let's add those fields then, having dead code and useless
+variables is never a good option :)
 
 Maxime
 
@@ -38,4 +36,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161007/ea01852f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161007/265db26f/attachment-0001.sig>
