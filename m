@@ -1,223 +1,207 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri,  7 Oct 2016 18:34:27 +0200
-Subject: [PATCH 2/2] power/reset: at91-poweroff: timely shitdown LPDDR memories
-In-Reply-To: <20161007163427.11454-1-alexandre.belloni@free-electrons.com>
-References: <20161007163427.11454-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161007163427.11454-3-alexandre.belloni@free-electrons.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 7 Oct 2016 22:08:43 +0530
+Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
+ addresses
+In-Reply-To: <1474643941-109020-2-git-send-email-labath@google.com>
+References: <1474643941-109020-1-git-send-email-labath@google.com>
+ <1474643941-109020-2-git-send-email-labath@google.com>
+Message-ID: <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LPDDR memories can only handle up to 400 uncontrolled power off. Ensure the
-proper power off sequence is used before shutting down the platform.
+On Fri, Sep 23, 2016 at 8:49 PM, Pavel Labath
+<test.tberghammer@gmail.com> wrote:
+> Arm64 hardware does not always report a watchpoint hit address that
+> matches one of the watchpoints set. It can also report an address
+> "near" the watchpoint if a single instruction access both watched and
+> unwatched addresses. There is no straight-forward way, short of
+> disassembling the offending instruction, to map that address back to
+> the watchpoint.
+>
+> Previously, when the hardware reported a watchpoint hit on an address
+> that did not match our watchpoint (this happens in case of instructions
+> which access large chunks of memory such as "stp") the process would
+> enter a loop where we would be continually resuming it (because we did
+> not recognise that watchpoint hit) and it would keep hitting the
+> watchpoint again and again. The tracing process would never get
+> notified of the watchpoint hit.
+>
+> This commit fixes the problem by looking at the watchpoints near the
+> address reported by the hardware. If the address does not exactly match
+> one of the watchpoints we have set, it attributes the hit to the
+> nearest watchpoint we have.  This heuristic is a bit dodgy, but I don't
+> think we can do much more, given the hardware limitations.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/power/reset/at91-poweroff.c      | 52 +++++++++++++++++++++++++++++++-
- drivers/power/reset/at91-sama5d2_shdwc.c | 48 ++++++++++++++++++++++++++++-
- 2 files changed, 98 insertions(+), 2 deletions(-)
+IIUC, then you see an issue when an address watched is not the base
+address accessed by the instruction. For example, if an address 'a+8'
+is watched and an instruction accesses instruction from  a to a +16. I
+tried to reproduce the issue with mustang using your test-case in
+patch3 (after couple of syntax modifcations for resolving compilation
+issue with gcc). All the test case did pass with existing code in
+v4.8. I noticed that, watchpoint exception is generated if any of the
+sub-location accessed from a single instruction is watched, provided
+watchdpoint watches either a byte, half word, word or double word
+from the base.
 
-diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at91-poweroff.c
-index e9e24df35f26..bf97390e6cd7 100644
---- a/drivers/power/reset/at91-poweroff.c
-+++ b/drivers/power/reset/at91-poweroff.c
-@@ -14,9 +14,12 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/platform_device.h>
- #include <linux/printk.h>
- 
-+#include <soc/at91/at91sam9_ddrsdr.h>
-+
- #define AT91_SHDW_CR	0x00		/* Shut Down Control Register */
- #define AT91_SHDW_SHDW		BIT(0)			/* Shut Down command */
- #define AT91_SHDW_KEY		(0xa5 << 24)		/* KEY Password */
-@@ -50,6 +53,7 @@ static const char *shdwc_wakeup_modes[] = {
- 
- static void __iomem *at91_shdwc_base;
- static struct clk *sclk;
-+static void __iomem *mpddrc_base;
- 
- static void __init at91_wakeup_status(void)
- {
-@@ -73,6 +77,28 @@ static void at91_poweroff(void)
- 	writel(AT91_SHDW_KEY | AT91_SHDW_SHDW, at91_shdwc_base + AT91_SHDW_CR);
- }
- 
-+static void at91_lpddr_poweroff(void)
-+{
-+	asm volatile(
-+		/* Align to cache lines */
-+		".balign 32\n\t"
-+
-+		"	ldr	r6, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
-+
-+		/* Power down SDRAM0 */
-+		"	str	%1, [%0, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
-+		/* Shutdown CPU */
-+		"	str	%3, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
-+
-+		"	b	.\n\t"
-+		:
-+		: "r" (mpddrc_base),
-+		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
-+		  "r" (at91_shdwc_base),
-+		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
-+		: "r0");
-+}
-+
- static int at91_poweroff_get_wakeup_mode(struct device_node *np)
- {
- 	const char *pm;
-@@ -124,6 +150,8 @@ static void at91_poweroff_dt_set_wakeup_mode(struct platform_device *pdev)
- static int __init at91_poweroff_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-+	struct device_node *np;
-+	u32 ddr_type;
- 	int ret;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -150,12 +178,29 @@ static int __init at91_poweroff_probe(struct platform_device *pdev)
- 
- 	pm_power_off = at91_poweroff;
- 
-+	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d3-ddramc");
-+	if (!np)
-+		return 0;
-+
-+	mpddrc_base = of_iomap(np, 0);
-+	of_node_put(np);
-+
-+	if (!mpddrc_base)
-+		return 0;
-+
-+	ddr_type = readl(mpddrc_base + AT91_DDRSDRC_MDR) & AT91_DDRSDRC_MD;
-+	if ((ddr_type == AT91_DDRSDRC_MD_LPDDR2) ||
-+	    (ddr_type == AT91_DDRSDRC_MD_LPDDR3))
-+	else
-+		iounmap(mpddrc_base);
-+
- 	return 0;
- }
- 
- static int __exit at91_poweroff_remove(struct platform_device *pdev)
- {
--	if (pm_power_off == at91_poweroff)
-+	if (pm_power_off == at91_poweroff ||
-+	    pm_power_off == at91_lpddr_poweroff)
- 		pm_power_off = NULL;
- 
- 	clk_disable_unprepare(sclk);
-@@ -163,6 +208,11 @@ static int __exit at91_poweroff_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id at91_ramc_of_match[] = {
-+	{ .compatible = "atmel,sama5d3-ddramc", },
-+	{ /* sentinel */ }
-+};
-+
- static const struct of_device_id at91_poweroff_of_match[] = {
- 	{ .compatible = "atmel,at91sam9260-shdwc", },
- 	{ .compatible = "atmel,at91sam9rl-shdwc", },
-diff --git a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
-index 8a5ac9706c9c..5736f360b374 100644
---- a/drivers/power/reset/at91-sama5d2_shdwc.c
-+++ b/drivers/power/reset/at91-sama5d2_shdwc.c
-@@ -22,9 +22,12 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/platform_device.h>
- #include <linux/printk.h>
- 
-+#include <soc/at91/at91sam9_ddrsdr.h>
-+
- #define SLOW_CLOCK_FREQ	32768
- 
- #define AT91_SHDW_CR	0x00		/* Shut Down Control Register */
-@@ -75,6 +78,7 @@ struct shdwc {
-  */
- static struct shdwc *at91_shdwc;
- static struct clk *sclk;
-+static void __iomem *mpddrc_base;
- 
- static const unsigned long long sdwc_dbc_period[] = {
- 	0, 3, 32, 512, 4096, 32768,
-@@ -108,6 +112,28 @@ static void at91_poweroff(void)
- 	       at91_shdwc->at91_shdwc_base + AT91_SHDW_CR);
- }
- 
-+static void at91_lpddr_poweroff(void)
-+{
-+	asm volatile(
-+		/* Align to cache lines */
-+		".balign 32\n\t"
-+
-+		"	ldr	r6, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
-+
-+		/* Power down SDRAM0 */
-+		"	str	%1, [%0, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
-+		/* Shutdown CPU */
-+		"	str	%3, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
-+
-+		"	b	.\n\t"
-+		:
-+		: "r" (mpddrc_base),
-+		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
-+		  "r" (at91_shdwc->at91_shdwc_base),
-+		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
-+		: "r0");
-+}
-+
- static u32 at91_shdwc_debouncer_value(struct platform_device *pdev,
- 				      u32 in_period_us)
- {
-@@ -212,6 +238,8 @@ static int __init at91_shdwc_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
- 	const struct of_device_id *match;
-+	struct device_node *np;
-+	u32 ddr_type;
- 	int ret;
- 
- 	if (!pdev->dev.of_node)
-@@ -249,6 +277,23 @@ static int __init at91_shdwc_probe(struct platform_device *pdev)
- 
- 	pm_power_off = at91_poweroff;
- 
-+	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d3-ddramc");
-+	if (!np)
-+		return 0;
-+
-+	mpddrc_base = of_iomap(np, 0);
-+	of_node_put(np);
-+
-+	if (!mpddrc_base)
-+		return 0;
-+
-+	ddr_type = readl(mpddrc_base + AT91_DDRSDRC_MDR) & AT91_DDRSDRC_MD;
-+	if ((ddr_type == AT91_DDRSDRC_MD_LPDDR2) ||
-+	    (ddr_type == AT91_DDRSDRC_MD_LPDDR3))
-+		pm_power_off = at91_lpddr_poweroff;
-+	else
-+		iounmap(mpddrc_base);
-+
- 	return 0;
- }
- 
-@@ -256,7 +301,8 @@ static int __exit at91_shdwc_remove(struct platform_device *pdev)
- {
- 	struct shdwc *shdw = platform_get_drvdata(pdev);
- 
--	if (pm_power_off == at91_poweroff)
-+	if (pm_power_off == at91_poweroff ||
-+	    pm_power_off == at91_lpddr_poweroff)
- 		pm_power_off = NULL;
- 
- 	/* Reset values to disable wake-up features  */
--- 
-2.9.3
+So, either I must be missing something or the problem is not related
+to all arm64 platform.
+
+However, I did notice that it does not work if we watch an address
+which is at some offset from address programmed. For example, it works
+when byte_mask is 0x3, but it does not work if byte_mask if 0x2 (which
+is supported by hardware).
+
+I do have some patches to resolve that.
+
+https://github.com/pratyushanand/linux/commits/perf/upstream_arm64_devel
+
+I will send them for review comment after some testing.
+
+~Pratyush
+
+>
+> Signed-off-by: Pavel Labath <labath@google.com>
+> ---
+>  arch/arm64/kernel/hw_breakpoint.c | 98 +++++++++++++++++++++++++--------------
+>  1 file changed, 64 insertions(+), 34 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+> index 14562ae..3ce27ea 100644
+> --- a/arch/arm64/kernel/hw_breakpoint.c
+> +++ b/arch/arm64/kernel/hw_breakpoint.c
+> @@ -664,49 +664,63 @@ unlock:
+>  }
+>  NOKPROBE_SYMBOL(breakpoint_handler);
+>
+> +/*
+> + * Arm64 hardware does not always report a watchpoint hit address that matches
+> + * one of the watchpoints set. It can also report an address "near" the
+> + * watchpoint if a single instruction access both watched and unwatched
+> + * addresses. There is no straight-forward way, short of disassembling the
+> + * offending instruction, to map that address back to the watchpoint. This
+> + * function computes the distance of the memory access from the watchpoint as a
+> + * heuristic for the likelyhood that a given access triggered the watchpoint.
+> + *
+> + * See Section D2.10.5 "Determining the memory location that caused a Watchpoint
+> + * exception" of ARMv8 Architecture Reference Manual for details.
+> + *
+> + * The function returns the distance of the address from the bytes watched by
+> + * the watchpoint. In case of an exact match, it returns 0.
+> + */
+> +static u64 get_distance_from_watchpoint(unsigned long addr, int i,
+> +                                       struct arch_hw_breakpoint *info)
+> +{
+> +       u64 wp_low, wp_high;
+> +       int first_bit;
+> +
+> +       first_bit = ffs(info->ctrl.len);
+> +       if (first_bit == 0)
+> +               return -1;
+> +
+> +       wp_low = info->address + first_bit - 1;
+> +       wp_high = info->address + fls(info->ctrl.len) - 1;
+> +       if (addr < wp_low)
+> +               return wp_low - addr;
+> +       else if (addr > wp_high)
+> +               return addr - wp_high;
+> +       else
+> +               return 0;
+> +
+> +}
+> +
+>  static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>                               struct pt_regs *regs)
+>  {
+> -       int i, step = 0, *kernel_step, access;
+> -       u32 ctrl_reg;
+> -       u64 val, alignment_mask;
+> +       int i, step = 0, *kernel_step, access, closest_match = 0;
+> +       u64 min_dist = -1, dist;
+>         struct perf_event *wp, **slots;
+>         struct debug_info *debug_info;
+>         struct arch_hw_breakpoint *info;
+> -       struct arch_hw_breakpoint_ctrl ctrl;
+>
+>         slots = this_cpu_ptr(wp_on_reg);
+>         debug_info = &current->thread.debug;
+>
+> +       /*
+> +        * Find all watchpoints that match the reported address. If no exact
+> +        * match is found. Attribute the hit to the closest watchpoint.
+> +        */
+> +       rcu_read_lock();
+>         for (i = 0; i < core_num_wrps; ++i) {
+> -               rcu_read_lock();
+> -
+>                 wp = slots[i];
+> -
+>                 if (wp == NULL)
+> -                       goto unlock;
+> -
+> -               info = counter_arch_bp(wp);
+> -               /* AArch32 watchpoints are either 4 or 8 bytes aligned. */
+> -               if (is_compat_task()) {
+> -                       if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
+> -                               alignment_mask = 0x7;
+> -                       else
+> -                               alignment_mask = 0x3;
+> -               } else {
+> -                       alignment_mask = 0x7;
+> -               }
+> -
+> -               /* Check if the watchpoint value matches. */
+> -               val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
+> -               if (val != (addr & ~alignment_mask))
+> -                       goto unlock;
+> -
+> -               /* Possible match, check the byte address select to confirm. */
+> -               ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
+> -               decode_ctrl_reg(ctrl_reg, &ctrl);
+> -               if (!((1 << (addr & alignment_mask)) & ctrl.len))
+> -                       goto unlock;
+> +                       continue;
+>
+>                 /*
+>                  * Check that the access type matches.
+> @@ -715,7 +729,18 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>                 access = (esr & AARCH64_ESR_ACCESS_MASK) ? HW_BREAKPOINT_W :
+>                          HW_BREAKPOINT_R;
+>                 if (!(access & hw_breakpoint_type(wp)))
+> -                       goto unlock;
+> +                       continue;
+> +
+> +               info = counter_arch_bp(wp);
+> +
+> +               dist = get_distance_from_watchpoint(addr, i, info);
+> +               if (dist < min_dist) {
+> +                       min_dist = dist;
+> +                       closest_match = i;
+> +               }
+> +               /* Is this an exact match? */
+> +               if (dist != 0)
+> +                       continue;
+>
+>                 info->trigger = addr;
+>                 perf_bp_event(wp, regs);
+> @@ -723,10 +748,15 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>                 /* Do we need to handle the stepping? */
+>                 if (is_default_overflow_handler(wp))
+>                         step = 1;
+> -
+> -unlock:
+> -               rcu_read_unlock();
+>         }
+> +       if (min_dist > 0 && min_dist != -1) {
+> +               /* No exact match found. */
+> +               wp = slots[closest_match];
+> +               info = counter_arch_bp(wp);
+> +               info->trigger = addr;
+> +               perf_bp_event(wp, regs);
+> +       }
+> +       rcu_read_unlock();
+>
+>         if (!step)
+>                 return 0;
+> --
+> 2.8.0.rc3.226.g39d4020
+>
