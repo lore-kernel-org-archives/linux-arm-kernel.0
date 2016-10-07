@@ -1,54 +1,57 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Fri, 7 Oct 2016 20:41:29 +0530
-Subject: [PATCH v3 6/6] arm: dts: imx7-colibri: Use enable-gpios for BL_ON
-In-Reply-To: <20161007151129.6043-1-bhuvanchandra.dv@toradex.com>
-References: <20161007151129.6043-1-bhuvanchandra.dv@toradex.com>
-Message-ID: <20161007151129.6043-7-bhuvanchandra.dv@toradex.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  7 Oct 2016 17:22:49 +0200
+Subject: [PATCH 3/10] mmc: sdhci: Export sdhci_execute_tuning() in sdhci.c
+In-Reply-To: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
+References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
+Message-ID: <f94f7f1e6f0ce1afb2d1f6b0aaf8a1817b15c8fc.1475853198.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pwm-backlight driver 'enable-gpios' property for backlight on/off control.
+From: Ziji Hu <huziji@marvell.com>
 
-Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+Export sdhci_execute_tuning() from sdhci.c.
+Thus vendor sdhci driver can execute its own tuning process.
+
+Signed-off-by: Hu Ziji <huziji@marvell.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/imx7-colibri.dtsi | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/mmc/host/sdhci.c | 3 ++-
+ drivers/mmc/host/sdhci.h | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index 2af5e3e..ce5edb5 100644
---- a/arch/arm/boot/dts/imx7-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -43,7 +43,10 @@
- / {
- 	bl: backlight {
- 		compatible = "pwm-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_bl_on>;
- 		pwms = <&pwm1 0 5000000 0>;
-+		enable-gpios = <&gpio5 1 GPIO_ACTIVE_HIGH>;
- 	};
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 2250ea22231f..330119cd5a93 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1946,7 +1946,7 @@ static int sdhci_prepare_hs400_tuning(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	return 0;
+ }
  
- 	reg_module_3v3: regulator-module-3v3 {
-@@ -356,7 +359,6 @@
- 		fsl,pins = <
- 			MX7D_PAD_ECSPI2_SS0__GPIO4_IO23		0x14 /* SODIMM 65 */
- 			MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x14 /* SODIMM 69 */
--			MX7D_PAD_SD1_WP__GPIO5_IO1		0x14 /* SODIMM 71 */
- 			MX7D_PAD_I2C4_SDA__GPIO4_IO15		0x14 /* SODIMM 75 */
- 			MX7D_PAD_ECSPI1_MISO__GPIO4_IO18	0x14 /* SODIMM 79 */
- 			MX7D_PAD_I2C3_SCL__GPIO4_IO12		0x14 /* SODIMM 81 */
-@@ -388,6 +390,12 @@
- 		>;
- 	};
+-static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
++int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ {
+ 	struct sdhci_host *host = mmc_priv(mmc);
+ 	u16 ctrl;
+@@ -2135,6 +2135,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ 	return err;
+ }
++EXPORT_SYMBOL_GPL(sdhci_execute_tuning);
  
-+		pinctrl_gpio_bl_on: gpio-bl-on {
-+			fsl,pins = <
-+				MX7D_PAD_SD1_WP__GPIO5_IO1		0x14
-+			>;
-+		};
-+
- 	pinctrl_i2c1_int: i2c1-int-grp { /* PMIC / TOUCH */
- 		fsl,pins = <
- 			MX7D_PAD_GPIO1_IO13__GPIO1_IO13	0x79
+ static int sdhci_select_drive_strength(struct mmc_card *card,
+ 				       unsigned int max_dtr, int host_drv,
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index c38ab65b9a97..035274ddea54 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -689,6 +689,7 @@ void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing);
+ void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
+ int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+ 				      struct mmc_ios *ios);
++int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
+ 
+ #ifdef CONFIG_PM
+ extern int sdhci_suspend_host(struct sdhci_host *host);
 -- 
-2.10.0
+git-series 0.8.10
