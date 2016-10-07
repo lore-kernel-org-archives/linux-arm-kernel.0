@@ -1,88 +1,98 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 07 Oct 2016 10:03:57 +0200
-Subject: [PATCH] clk: mvebu: armada-37xx-periph: Fix the clock provider
- registration
-In-Reply-To: <20160929142855.30408-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Thu, 29 Sep 2016 16:28:55 +0200")
-References: <20160929142855.30408-1-gregory.clement@free-electrons.com>
-Message-ID: <87h98ovb4i.fsf@free-electrons.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri,  7 Oct 2016 10:25:47 +0200
+Subject: [PATCH v4 00/10] net-next: ethernet: add sun8i-emac driver
+Message-ID: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen and Mike
- 
- On jeu., sept. 29 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+Hello
 
-> While trying using a peripheral clock on a driver, I saw that the clock
-> pointer returned by the provider was NULL.
->
-> The problem was a missing indirection. It was the pointer stored in the
-> hws array which needed to be updated not the value it contains.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+This patch series add the driver for sun8i-emac which handle the Ethernet MAC
+present on Allwinner H3/A83T/A64 SoCs.
 
-I saw that you already did the pull request for the clk subsystem.
+It supports 10/100/1000 Mbit/s speed with half/full duplex.
+It can use an internal PHY (MII 10/100) or an external PHY
+via RGMII/RMII.
 
-Do you consider to do a another pull request for the fixes?
+This patch series enable the driver only for the H3 SoC since A83T and A64
+doesn't have the necessary clocks present in mainline.
 
-It would be nice to have this driver working since the rc1 :)
+This patch series enable the driver only for OrangePiPC and OrangePIOne boards
+since other board with H3 use external PHY which need optional regulators
+that will be supported later.
 
-For this driver an other fix is needed:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-September/459640.html
+The driver have been tested on the following boards:
+- H3 Orange PI PC, Orange PI Plus, BananaPI-M2+
+- A64 Pine64
+- A83T BananaPI-M3
 
-Thanks!
+I would like to thanks Chen-Yu Tsai for his help on developing this driver.
 
-Gregory
+Regards
 
-> ---
->  drivers/clk/mvebu/armada-37xx-periph.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
-> index 45905fc0d75b..d5dfbad4ceab 100644
-> --- a/drivers/clk/mvebu/armada-37xx-periph.c
-> +++ b/drivers/clk/mvebu/armada-37xx-periph.c
-> @@ -305,7 +305,7 @@ static const struct of_device_id armada_3700_periph_clock_of_match[] = {
->  };
->  static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
->  					 void __iomem *reg, spinlock_t *lock,
-> -					 struct device *dev, struct clk_hw *hw)
-> +					 struct device *dev, struct clk_hw **hw)
->  {
->  	const struct clk_ops *mux_ops = NULL, *gate_ops = NULL,
->  		*rate_ops = NULL;
-> @@ -353,13 +353,13 @@ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
->  		}
->  	}
->  
-> -	hw = clk_hw_register_composite(dev, data->name, data->parent_names,
-> +	*hw = clk_hw_register_composite(dev, data->name, data->parent_names,
->  				       data->num_parents, mux_hw,
->  				       mux_ops, rate_hw, rate_ops,
->  				       gate_hw, gate_ops, CLK_IGNORE_UNUSED);
->  
-> -	if (IS_ERR(hw))
-> -		return PTR_ERR(hw);
-> +	if (IS_ERR(*hw))
-> +		return PTR_ERR(*hw);
->  
->  	return 0;
->  }
-> @@ -400,7 +400,7 @@ static int armada_3700_periph_clock_probe(struct platform_device *pdev)
->  	spin_lock_init(&driver_data->lock);
->  
->  	for (i = 0; i < num_periph; i++) {
-> -		struct clk_hw *hw = driver_data->hw_data->hws[i];
-> +		struct clk_hw **hw = &driver_data->hw_data->hws[i];
->  
->  		if (armada_3700_add_composite_clk(&data[i], reg,
->  						  &driver_data->lock, dev, hw))
-> -- 
-> 2.9.3
->
+Changes since v3
+- sun8i-emac require a DT mdio node
+- moved sun8i_emac_power() so that no clock/reset/regulator is used
+    until netdev/open is called
+- Removed PM patch until proper tests are done
+- DT use phy-handle instead of phy
+- Moved DT aliases ethernet to subnodes
+- Renamed PHY nodes to [int|ext]_[r|g]mii_phy
+- Moved clock/reset for internal PHY to PHY node.
+
+Changes since v2
+- Added patch to support Orange PI One
+- Added a patch to enable SUN8I_EMAC in sunxi_defconfig
+- Added a patch to enable pm_runtime
+- The Emac clock is now used standard syscon/regmap
+- Added netdev_sent_queue/netdev_completed_queue
+- Added lots of documentation on working (locks, memory barrier, etc...)
+- Cleaned DT bindings documentation
+- Added ethernet0 aliases as suggested by Hans de Goede
+- Change prefix of all DEFINE to EMAC_
+- The driver is now endian safe
+- Reworked the internal PHY mechanism
+- Removed dma_set_mask_and_coherent(32) since it is the default for of_platform_driver
+
+Changes since v1
+- Implement NAPI
+- Sorted and reworded all define
+- Reworked ethtools stats strings
+- Removed all unneeded __packked and __aligned
+- Added tuning of RX/TX ring size via ethtool
+- Corrected use of sk/skb naming
+- Added some wmb when needed
+- Moved irq claim/free to emac_open/close
+- Lots of code refactoring
+
+Corentin Labbe (9):
+  ethernet: add sun8i-emac driver
+  MAINTAINERS: Add myself as maintainer of sun8i-emac
+  ARM: sun8i: dt: Add DT bindings documentation for Allwinner sun8i-emac
+  ARM: dts: sun8i-h3: Add dt node for the syscon control module
+  ARM: dts: sun8i-h3: add sun8i-emac ethernet driver
+  ARM: dts: sun8i: Enable sun8i-emac on the Orange PI PC
+  ARM: dts: sun8i: Enable sun8i-emac on the Orange Pi 2
+  ARM: sunxi: Enable sun8i-emac driver on multi_v7_defconfig
+  ARM: sunxi: Enable sun8i-emac driver on sunxi_defconfig
+
+Hans de Goede (1):
+  ARM: dts: sun8i: Enable sun8i-emac on the Orange PI One
+
+ .../bindings/net/allwinner,sun8i-emac.txt          |   70 +
+ MAINTAINERS                                        |    6 +
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |    8 +
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |    8 +
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |    8 +
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |   29 +
+ arch/arm/configs/multi_v7_defconfig                |    1 +
+ arch/arm/configs/sunxi_defconfig                   |    1 +
+ drivers/net/ethernet/allwinner/Kconfig             |   13 +
+ drivers/net/ethernet/allwinner/Makefile            |    1 +
+ drivers/net/ethernet/allwinner/sun8i-emac.c        | 2266 ++++++++++++++++++++
+ 11 files changed, 2411 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+ create mode 100644 drivers/net/ethernet/allwinner/sun8i-emac.c
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.7.3
