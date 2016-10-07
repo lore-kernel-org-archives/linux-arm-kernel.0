@@ -1,10 +1,9 @@
 From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Fri,  7 Oct 2016 15:31:20 -0600
-Subject: [PATCH V3 08/10] ras: acpi / apei: generate trace event for
- unrecognized CPER section
+Date: Fri,  7 Oct 2016 15:31:19 -0600
+Subject: [PATCH V3 07/10] efi: print unrecognized CPER section
 In-Reply-To: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
 References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1475875882-2604-9-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1475875882-2604-8-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,143 +11,59 @@ UEFI spec allows for non-standard section in Common Platform Error
 Record. This is defined in section N.2.3 of UEFI version 2.5.
 
 Currently if the CPER section's type (UUID) does not match with
-any section type that the kernel knows how to parse, trace event
-is not generated for such section. And thus user is not able to know
-happening of such hardware error, including error record of
-non-standard section.
+one of the section types that the kernel knows how to parse, the
+section is skipped. Therefore, user is not able to see
+such CPER data, for instance, error record of non-standard section.
 
-This commit generates a trace event which contains raw error data
-for unrecognized CPER section.
+For above mentioned case, this change prints out the raw data in
+hex in dmesg buffer. Data length is taken from Error Data length
+field of Generic Error Data Entry.
+
+Following is a sample output from dmesg:
+[  115.771702] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
+[  115.779042] {1}[Hardware Error]: It has been corrected by h/w and requires no further action
+[  115.787456] {1}[Hardware Error]: event severity: corrected
+[  115.792927] {1}[Hardware Error]:  Error 0, type: corrected
+[  115.798415] {1}[Hardware Error]:  fru_id: 00000000-0000-0000-0000-000000000000
+[  115.805596] {1}[Hardware Error]:  fru_text:
+[  115.816105] {1}[Hardware Error]:  section type: d2e2621c-f936-468d-0d84-15a4ed015c8b
+[  115.823880] {1}[Hardware Error]:  section length: 88
+[  115.828779] {1}[Hardware Error]:   00000000: 01000001 00000002 5f434345 525f4543
+[  115.836153] {1}[Hardware Error]:   00000010: 0000574d 00000000 00000000 00000000
+[  115.843531] {1}[Hardware Error]:   00000020: 00000000 00000000 00000000 00000000
+[  115.850908] {1}[Hardware Error]:   00000030: 00000000 00000000 00000000 00000000
+[  115.858288] {1}[Hardware Error]:   00000040: fe800000 00000000 00000004 5f434345
+[  115.865665] {1}[Hardware Error]:   00000050: 525f4543 0000574d
 
 Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
 Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
 ---
- drivers/acpi/apei/ghes.c | 18 +++++++++++++++++-
- drivers/ras/ras.c        |  1 +
- include/ras/ras_event.h  | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 63 insertions(+), 1 deletion(-)
+ drivers/firmware/efi/cper.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 36894c8..cb4c7f4 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -49,6 +49,7 @@
- #include <acpi/ghes.h>
- #include <acpi/apei.h>
- #include <asm/tlbflush.h>
-+#include <ras/ras_event.h>
- 
- #ifdef CONFIG_HAVE_ACPI_APEI_SEA
- #include <asm/system_misc.h>
-@@ -468,12 +469,21 @@ static void ghes_do_proc(struct ghes *ghes,
- 	int sev, sec_sev;
- 	struct acpi_hest_generic_data *gdata;
- 	uuid_le sec_type;
-+	uuid_le *fru_id;
-+	char *fru_text = "";
- 
- 	sev = ghes_severity(estatus->error_severity);
- 	apei_estatus_for_each_section(estatus, gdata) {
- 		sec_sev = ghes_severity(gdata->error_severity);
- 		sec_type = *(uuid_le *)gdata->section_type;
- 
-+		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
-+			fru_id = (uuid_le *)gdata->fru_id;
-+		else
-+			fru_id = &NULL_UUID_LE;
-+		if (gdata->validation_bits & CPER_SEC_VALID_FRU_TEXT)
-+			fru_text = gdata->fru_text;
+diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+index 2594245..f9ffba6 100644
+--- a/drivers/firmware/efi/cper.c
++++ b/drivers/firmware/efi/cper.c
+@@ -605,8 +605,16 @@ static void cper_estatus_print_section(
+ 			cper_print_proc_armv8(newpfx, armv8_err);
+ 		else
+ 			goto err_section_too_small;
+-	} else
+-		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
++	} else {
++		const void *unknown_err;
 +
- 		if (!uuid_le_cmp(sec_type,
- 				 CPER_SEC_PLATFORM_MEM)) {
- 			struct cper_sec_mem_err *mem_err;
-@@ -485,7 +495,7 @@ static void ghes_do_proc(struct ghes *ghes,
- 			ghes_handle_memory_failure(gdata, sev);
- 		}
- #ifdef CONFIG_ACPI_APEI_PCIEAER
--		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
-+		else if (!uuid_le_cmp(sec_type,
- 				      CPER_SEC_PCIE)) {
- 			struct cper_sec_pcie *pcie_err;
++		unknown_err = acpi_hest_generic_data_payload(gdata);
++		printk("%ssection type: %pUl\n", newpfx, sec_type);
++		printk("%ssection length: %d\n", newpfx,
++		       gdata->error_data_length);
++		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4,
++			       unknown_err, gdata->error_data_length, 0);
++	}
  
-@@ -518,6 +528,12 @@ static void ghes_do_proc(struct ghes *ghes,
+ 	return;
  
- 		}
- #endif
-+		else {
-+			void *unknown_err = acpi_hest_generic_data_payload(gdata);
-+			trace_unknown_sec_event(&sec_type,
-+					fru_id, fru_text, sec_sev,
-+					unknown_err, gdata->error_data_length);
-+		}
- 	}
- }
- 
-diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
-index b67dd36..fb2500b 100644
---- a/drivers/ras/ras.c
-+++ b/drivers/ras/ras.c
-@@ -27,3 +27,4 @@ subsys_initcall(ras_init);
- EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
- #endif
- EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
-+EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
-diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-index 1791a12..5861b6f 100644
---- a/include/ras/ras_event.h
-+++ b/include/ras/ras_event.h
-@@ -162,6 +162,51 @@ TRACE_EVENT(mc_event,
- );
- 
- /*
-+ * Unknown Section Report
-+ *
-+ * This event is generated when hardware detected a hardware
-+ * error event, which may be of non-standard section as defined
-+ * in UEFI spec appendix "Common Platform Error Record", or may
-+ * be of sections for which TRACE_EVENT is not defined.
-+ *
-+ */
-+TRACE_EVENT(unknown_sec_event,
-+
-+	TP_PROTO(const uuid_le *sec_type,
-+		 const uuid_le *fru_id,
-+		 const char *fru_text,
-+		 const u8 sev,
-+		 const u8 *err,
-+		 const u32 len),
-+
-+	TP_ARGS(sec_type, fru_id, fru_text, sev, err, len),
-+
-+	TP_STRUCT__entry(
-+		__array(char, sec_type, 16)
-+		__array(char, fru_id, 16)
-+		__string(fru_text, fru_text)
-+		__field(u8, sev)
-+		__field(u32, len)
-+		__dynamic_array(u8, buf, len)
-+	),
-+
-+	TP_fast_assign(
-+		memcpy(__entry->sec_type, sec_type, sizeof(uuid_le));
-+		memcpy(__entry->fru_id, fru_id, sizeof(uuid_le));
-+		__assign_str(fru_text, fru_text);
-+		__entry->sev = sev;
-+		__entry->len = len;
-+		memcpy(__get_dynamic_array(buf), err, len);
-+	),
-+
-+	TP_printk("severity: %d; sec type:%pU; FRU: %pU %s; data len:%d; raw data:%s",
-+		  __entry->sev, __entry->sec_type,
-+		  __entry->fru_id, __get_str(fru_text),
-+		  __entry->len,
-+		  __print_hex(__get_dynamic_array(buf), __entry->len))
-+);
-+
-+/*
-  * PCIe AER Trace event
-  *
-  * These events are generated when hardware detects a corrected or
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
