@@ -1,326 +1,164 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 07 Oct 2016 11:21:14 -0500
-Subject: [PATCH 3/5] PCI: aardvark: Swap order of advk_write() reg/val
- arguments
+Date: Fri, 07 Oct 2016 11:21:23 -0500
+Subject: [PATCH 4/5] PCI: aardvark: Add local struct device pointers
 In-Reply-To: <20161007162053.22668.91420.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 References: <20161007162053.22668.91420.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20161007162114.22668.11180.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <20161007162122.22668.25538.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Swap order of advk_writel() arguments to match the "dev, pos, val" order
-used by pci_write_config_word() and other drivers.  No functional change
-intended.
+Use a local "struct device *dev" for brevity and consistency with other
+drivers.  No functional change intended.
 
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/host/pci-aardvark.c |  109 +++++++++++++++++++--------------------
- 1 file changed, 54 insertions(+), 55 deletions(-)
+ drivers/pci/host/pci-aardvark.c |   36 ++++++++++++++++++++----------------
+ 1 file changed, 20 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 3d629d4..af6312a 100644
+index af6312a..b255a08 100644
 --- a/drivers/pci/host/pci-aardvark.c
 +++ b/drivers/pci/host/pci-aardvark.c
-@@ -214,7 +214,7 @@ static u32 advk_readl(struct advk_pcie *advk, u64 reg)
- 	return readl(advk->base + reg);
- }
+@@ -230,19 +230,20 @@ static int advk_pcie_link_up(struct advk_pcie *advk)
  
--static void advk_writel(struct advk_pcie *advk, u32 val, u64 reg)
-+static void advk_writel(struct advk_pcie *advk, u64 reg, u32 val)
+ static int advk_pcie_wait_for_link(struct advk_pcie *advk)
  {
- 	writel(val, advk->base + reg);
++	struct device *dev = &advk->pdev->dev;
+ 	int retries;
+ 
+ 	/* check if the link is up or not */
+ 	for (retries = 0; retries < LINK_WAIT_MAX_RETRIES; retries++) {
+ 		if (advk_pcie_link_up(advk)) {
+-			dev_info(&advk->pdev->dev, "link up\n");
++			dev_info(dev, "link up\n");
+ 			return 0;
+ 		}
+ 
+ 		usleep_range(LINK_WAIT_USLEEP_MIN, LINK_WAIT_USLEEP_MAX);
+ 	}
+ 
+-	dev_err(&advk->pdev->dev, "link never came up\n");
++	dev_err(dev, "link never came up\n");
+ 
+ 	return -ETIMEDOUT;
  }
-@@ -257,14 +257,14 @@ static void advk_pcie_set_ob_win(struct advk_pcie *advk,
- 				 u32 mask_ls, u32 remap_ms,
- 				 u32 remap_ls, u32 action)
- {
--	advk_writel(advk, match_ls, OB_WIN_MATCH_LS(win_num));
--	advk_writel(advk, match_ms, OB_WIN_MATCH_MS(win_num));
--	advk_writel(advk, mask_ms, OB_WIN_MASK_MS(win_num));
--	advk_writel(advk, mask_ls, OB_WIN_MASK_LS(win_num));
--	advk_writel(advk, remap_ms, OB_WIN_REMAP_MS(win_num));
--	advk_writel(advk, remap_ls, OB_WIN_REMAP_LS(win_num));
--	advk_writel(advk, action, OB_WIN_ACTIONS(win_num));
--	advk_writel(advk, match_ls | BIT(0), OB_WIN_MATCH_LS(win_num));
-+	advk_writel(advk, OB_WIN_MATCH_LS(win_num), match_ls);
-+	advk_writel(advk, OB_WIN_MATCH_MS(win_num), match_ms);
-+	advk_writel(advk, OB_WIN_MASK_MS(win_num), mask_ms);
-+	advk_writel(advk, OB_WIN_MASK_LS(win_num), mask_ls);
-+	advk_writel(advk, OB_WIN_REMAP_MS(win_num), remap_ms);
-+	advk_writel(advk, OB_WIN_REMAP_LS(win_num), remap_ls);
-+	advk_writel(advk, OB_WIN_ACTIONS(win_num), action);
-+	advk_writel(advk, OB_WIN_MATCH_LS(win_num), match_ls | BIT(0));
- }
- 
- static void advk_pcie_setup_hw(struct advk_pcie *advk)
-@@ -280,98 +280,98 @@ static void advk_pcie_setup_hw(struct advk_pcie *advk)
- 	reg = advk_readl(advk, CTRL_CONFIG_REG);
- 	reg &= ~(CTRL_MODE_MASK << CTRL_MODE_SHIFT);
- 	reg |= ((PCIE_CORE_MODE_DIRECT & CTRL_MODE_MASK) << CTRL_MODE_SHIFT);
--	advk_writel(advk, reg, CTRL_CONFIG_REG);
-+	advk_writel(advk, CTRL_CONFIG_REG, reg);
- 
- 	/* Set PCI global control register to RC mode */
- 	reg = advk_readl(advk, PCIE_CORE_CTRL0_REG);
- 	reg |= (IS_RC_MSK << IS_RC_SHIFT);
--	advk_writel(advk, reg, PCIE_CORE_CTRL0_REG);
-+	advk_writel(advk, PCIE_CORE_CTRL0_REG, reg);
- 
- 	/* Set Advanced Error Capabilities and Control PF0 register */
- 	reg = PCIE_CORE_ERR_CAPCTL_ECRC_CHK_TX |
- 		PCIE_CORE_ERR_CAPCTL_ECRC_CHK_TX_EN |
- 		PCIE_CORE_ERR_CAPCTL_ECRC_CHCK |
- 		PCIE_CORE_ERR_CAPCTL_ECRC_CHCK_RCV;
--	advk_writel(advk, reg, PCIE_CORE_ERR_CAPCTL_REG);
-+	advk_writel(advk, PCIE_CORE_ERR_CAPCTL_REG, reg);
- 
- 	/* Set PCIe Device Control and Status 1 PF0 register */
- 	reg = PCIE_CORE_DEV_CTRL_STATS_RELAX_ORDER_DISABLE |
- 		(7 << PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT) |
- 		PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE |
- 		PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT;
--	advk_writel(advk, reg, PCIE_CORE_DEV_CTRL_STATS_REG);
-+	advk_writel(advk, PCIE_CORE_DEV_CTRL_STATS_REG, reg);
- 
- 	/* Program PCIe Control 2 to disable strict ordering */
- 	reg = PCIE_CORE_CTRL2_RESERVED |
- 		PCIE_CORE_CTRL2_TD_ENABLE;
--	advk_writel(advk, reg, PCIE_CORE_CTRL2_REG);
-+	advk_writel(advk, PCIE_CORE_CTRL2_REG, reg);
- 
- 	/* Set GEN2 */
- 	reg = advk_readl(advk, PCIE_CORE_CTRL0_REG);
- 	reg &= ~PCIE_GEN_SEL_MSK;
- 	reg |= SPEED_GEN_2;
--	advk_writel(advk, reg, PCIE_CORE_CTRL0_REG);
-+	advk_writel(advk, PCIE_CORE_CTRL0_REG, reg);
- 
- 	/* Set lane X1 */
- 	reg = advk_readl(advk, PCIE_CORE_CTRL0_REG);
- 	reg &= ~LANE_CNT_MSK;
- 	reg |= LANE_COUNT_1;
--	advk_writel(advk, reg, PCIE_CORE_CTRL0_REG);
-+	advk_writel(advk, PCIE_CORE_CTRL0_REG, reg);
- 
- 	/* Enable link training */
- 	reg = advk_readl(advk, PCIE_CORE_CTRL0_REG);
- 	reg |= LINK_TRAINING_EN;
--	advk_writel(advk, reg, PCIE_CORE_CTRL0_REG);
-+	advk_writel(advk, PCIE_CORE_CTRL0_REG, reg);
- 
- 	/* Enable MSI */
- 	reg = advk_readl(advk, PCIE_CORE_CTRL2_REG);
- 	reg |= PCIE_CORE_CTRL2_MSI_ENABLE;
--	advk_writel(advk, reg, PCIE_CORE_CTRL2_REG);
-+	advk_writel(advk, PCIE_CORE_CTRL2_REG, reg);
- 
- 	/* Clear all interrupts */
--	advk_writel(advk, PCIE_ISR0_ALL_MASK, PCIE_ISR0_REG);
--	advk_writel(advk, PCIE_ISR1_ALL_MASK, PCIE_ISR1_REG);
--	advk_writel(advk, PCIE_IRQ_ALL_MASK, HOST_CTRL_INT_STATUS_REG);
-+	advk_writel(advk, PCIE_ISR0_REG, PCIE_ISR0_ALL_MASK);
-+	advk_writel(advk, PCIE_ISR1_REG, PCIE_ISR1_ALL_MASK);
-+	advk_writel(advk, HOST_CTRL_INT_STATUS_REG, PCIE_IRQ_ALL_MASK);
- 
- 	/* Disable All ISR0/1 Sources */
- 	reg = PCIE_ISR0_ALL_MASK;
- 	reg &= ~PCIE_ISR0_MSI_INT_PENDING;
--	advk_writel(advk, reg, PCIE_ISR0_MASK_REG);
-+	advk_writel(advk, PCIE_ISR0_MASK_REG, reg);
- 
--	advk_writel(advk, PCIE_ISR1_ALL_MASK, PCIE_ISR1_MASK_REG);
-+	advk_writel(advk, PCIE_ISR1_MASK_REG, PCIE_ISR1_ALL_MASK);
- 
- 	/* Unmask all MSI's */
--	advk_writel(advk, 0, PCIE_MSI_MASK_REG);
-+	advk_writel(advk, PCIE_MSI_MASK_REG, 0);
- 
- 	/* Enable summary interrupt for GIC SPI source */
- 	reg = PCIE_IRQ_ALL_MASK & (~PCIE_IRQ_ENABLE_INTS_MASK);
--	advk_writel(advk, reg, HOST_CTRL_INT_MASK_REG);
-+	advk_writel(advk, HOST_CTRL_INT_MASK_REG, reg);
- 
- 	reg = advk_readl(advk, PCIE_CORE_CTRL2_REG);
- 	reg |= PCIE_CORE_CTRL2_OB_WIN_ENABLE;
--	advk_writel(advk, reg, PCIE_CORE_CTRL2_REG);
-+	advk_writel(advk, PCIE_CORE_CTRL2_REG, reg);
- 
- 	/* Bypass the address window mapping for PIO */
- 	reg = advk_readl(advk, PIO_CTRL);
- 	reg |= PIO_CTRL_ADDR_WIN_DISABLE;
--	advk_writel(advk, reg, PIO_CTRL);
-+	advk_writel(advk, PIO_CTRL, reg);
- 
- 	/* Start link training */
- 	reg = advk_readl(advk, PCIE_CORE_LINK_CTRL_STAT_REG);
- 	reg |= PCIE_CORE_LINK_TRAINING;
--	advk_writel(advk, reg, PCIE_CORE_LINK_CTRL_STAT_REG);
-+	advk_writel(advk, PCIE_CORE_LINK_CTRL_STAT_REG, reg);
- 
- 	advk_pcie_wait_for_link(advk);
- 
- 	reg = PCIE_CORE_LINK_L0S_ENTRY |
- 		(1 << PCIE_CORE_LINK_WIDTH_SHIFT);
--	advk_writel(advk, reg, PCIE_CORE_LINK_CTRL_STAT_REG);
-+	advk_writel(advk, PCIE_CORE_LINK_CTRL_STAT_REG, reg);
- 
- 	reg = advk_readl(advk, PCIE_CORE_CMD_STATUS_REG);
- 	reg |= PCIE_CORE_CMD_MEM_ACCESS_EN |
- 		PCIE_CORE_CMD_IO_ACCESS_EN |
- 		PCIE_CORE_CMD_MEM_IO_REQ_EN;
--	advk_writel(advk, reg, PCIE_CORE_CMD_STATUS_REG);
-+	advk_writel(advk, PCIE_CORE_CMD_STATUS_REG, reg);
- }
+@@ -376,6 +377,7 @@ static void advk_pcie_setup_hw(struct advk_pcie *advk)
  
  static void advk_pcie_check_pio_status(struct advk_pcie *advk)
-@@ -443,8 +443,8 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
- 	}
- 
- 	/* Start PIO */
--	advk_writel(advk, 0, PIO_START);
--	advk_writel(advk, 1, PIO_ISR);
-+	advk_writel(advk, PIO_START, 0);
-+	advk_writel(advk, PIO_ISR, 1);
- 
- 	/* Program the control register */
- 	reg = advk_readl(advk, PIO_CTRL);
-@@ -453,18 +453,18 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
- 		reg |= PCIE_CONFIG_RD_TYPE0;
+ {
++	struct device *dev = &advk->pdev->dev;
+ 	u32 reg;
+ 	unsigned int status;
+ 	char *strcomp_status, *str_posted;
+@@ -407,12 +409,13 @@ static void advk_pcie_check_pio_status(struct advk_pcie *advk)
  	else
- 		reg |= PCIE_CONFIG_RD_TYPE1;
--	advk_writel(advk, reg, PIO_CTRL);
-+	advk_writel(advk, PIO_CTRL, reg);
+ 		str_posted = "Posted";
  
- 	/* Program the address registers */
- 	reg = PCIE_BDF(devfn) | PCIE_CONF_REG(where);
--	advk_writel(advk, reg, PIO_ADDR_LS);
--	advk_writel(advk, 0, PIO_ADDR_MS);
-+	advk_writel(advk, PIO_ADDR_LS, reg);
-+	advk_writel(advk, PIO_ADDR_MS, 0);
+-	dev_err(&advk->pdev->dev, "%s PIO Response Status: %s, %#x @ %#x\n",
++	dev_err(dev, "%s PIO Response Status: %s, %#x @ %#x\n",
+ 		str_posted, strcomp_status, reg, advk_readl(advk, PIO_ADDR_LS));
+ }
  
- 	/* Program the data strobe */
--	advk_writel(advk, 0xf, PIO_WR_DATA_STRB);
-+	advk_writel(advk, PIO_WR_DATA_STRB, 0xf);
+ static int advk_pcie_wait_pio(struct advk_pcie *advk)
+ {
++	struct device *dev = &advk->pdev->dev;
+ 	unsigned long timeout;
  
- 	/* Start the transfer */
--	advk_writel(advk, 1, PIO_START);
-+	advk_writel(advk, PIO_START, 1);
+ 	timeout = jiffies + msecs_to_jiffies(PIO_TIMEOUT_MS);
+@@ -426,7 +429,7 @@ static int advk_pcie_wait_pio(struct advk_pcie *advk)
+ 			return 0;
+ 	}
  
- 	ret = advk_pcie_wait_pio(advk);
- 	if (ret < 0)
-@@ -498,8 +498,8 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- 		return PCIBIOS_SET_FAILED;
+-	dev_err(&advk->pdev->dev, "config read/write timed out\n");
++	dev_err(dev, "config read/write timed out\n");
+ 	return -ETIMEDOUT;
+ }
  
- 	/* Start PIO */
--	advk_writel(advk, 0, PIO_START);
--	advk_writel(advk, 1, PIO_ISR);
-+	advk_writel(advk, PIO_START, 0);
-+	advk_writel(advk, PIO_ISR, 1);
+@@ -560,10 +563,11 @@ static int advk_pcie_alloc_msi(struct advk_pcie *advk)
  
- 	/* Program the control register */
- 	reg = advk_readl(advk, PIO_CTRL);
-@@ -508,12 +508,12 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- 		reg |= PCIE_CONFIG_WR_TYPE0;
+ static void advk_pcie_free_msi(struct advk_pcie *advk, int hwirq)
+ {
++	struct device *dev = &advk->pdev->dev;
++
+ 	mutex_lock(&advk->msi_used_lock);
+ 	if (!test_bit(hwirq, advk->msi_irq_in_use))
+-		dev_err(&advk->pdev->dev, "trying to free unused MSI#%d\n",
+-			hwirq);
++		dev_err(dev, "trying to free unused MSI#%d\n", hwirq);
  	else
- 		reg |= PCIE_CONFIG_WR_TYPE1;
--	advk_writel(advk, reg, PIO_CTRL);
-+	advk_writel(advk, PIO_CTRL, reg);
+ 		clear_bit(hwirq, advk->msi_irq_in_use);
+ 	mutex_unlock(&advk->msi_used_lock);
+@@ -905,6 +909,7 @@ out_release_res:
  
- 	/* Program the address registers */
- 	reg = PCIE_CONF_ADDR(bus->number, devfn, where);
--	advk_writel(advk, reg, PIO_ADDR_LS);
--	advk_writel(advk, 0, PIO_ADDR_MS);
-+	advk_writel(advk, PIO_ADDR_LS, reg);
-+	advk_writel(advk, PIO_ADDR_MS, 0);
+ static int advk_pcie_probe(struct platform_device *pdev)
+ {
++	struct device *dev = &pdev->dev;
+ 	struct advk_pcie *advk;
+ 	struct resource *res;
+ 	struct pci_bus *bus, *child;
+@@ -912,8 +917,7 @@ static int advk_pcie_probe(struct platform_device *pdev)
+ 	struct device_node *msi_node;
+ 	int ret, irq;
  
- 	/* Calculate the write strobe */
- 	offset      = where & 0x3;
-@@ -521,13 +521,13 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- 	data_strobe = GENMASK(size - 1, 0) << offset;
+-	advk = devm_kzalloc(&pdev->dev, sizeof(struct advk_pcie),
+-			    GFP_KERNEL);
++	advk = devm_kzalloc(dev, sizeof(struct advk_pcie), GFP_KERNEL);
+ 	if (!advk)
+ 		return -ENOMEM;
  
- 	/* Program the data register */
--	advk_writel(advk, reg, PIO_WR_DATA);
-+	advk_writel(advk, PIO_WR_DATA, reg);
+@@ -921,22 +925,22 @@ static int advk_pcie_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, advk);
  
- 	/* Program the data strobe */
--	advk_writel(advk, data_strobe, PIO_WR_DATA_STRB);
-+	advk_writel(advk, PIO_WR_DATA_STRB, data_strobe);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	advk->base = devm_ioremap_resource(&pdev->dev, res);
++	advk->base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(advk->base))
+ 		return PTR_ERR(advk->base);
  
- 	/* Start the transfer */
--	advk_writel(advk, 1, PIO_START);
-+	advk_writel(advk, PIO_START, 1);
- 
- 	ret = advk_pcie_wait_pio(advk);
- 	if (ret < 0)
-@@ -640,7 +640,7 @@ static void advk_pcie_irq_mask(struct irq_data *d)
- 
- 	mask = advk_readl(advk, PCIE_ISR0_MASK_REG);
- 	mask |= PCIE_ISR0_INTX_ASSERT(hwirq);
--	advk_writel(advk, mask, PCIE_ISR0_MASK_REG);
-+	advk_writel(advk, PCIE_ISR0_MASK_REG, mask);
- }
- 
- static void advk_pcie_irq_unmask(struct irq_data *d)
-@@ -651,7 +651,7 @@ static void advk_pcie_irq_unmask(struct irq_data *d)
- 
- 	mask = advk_readl(advk, PCIE_ISR0_MASK_REG);
- 	mask &= ~PCIE_ISR0_INTX_ASSERT(hwirq);
--	advk_writel(advk, mask, PCIE_ISR0_MASK_REG);
-+	advk_writel(advk, PCIE_ISR0_MASK_REG, mask);
- }
- 
- static int advk_pcie_irq_map(struct irq_domain *h,
-@@ -703,8 +703,8 @@ static int advk_pcie_init_msi_irq_domain(struct advk_pcie *advk)
- 
- 	msi_msg_phys = virt_to_phys(&advk->msi_msg);
- 
--	advk_writel(advk, lower_32_bits(msi_msg_phys), PCIE_MSI_ADDR_LOW_REG);
--	advk_writel(advk, upper_32_bits(msi_msg_phys), PCIE_MSI_ADDR_HIGH_REG);
-+	advk_writel(advk, PCIE_MSI_ADDR_LOW_REG, lower_32_bits(msi_msg_phys));
-+	advk_writel(advk, PCIE_MSI_ADDR_HIGH_REG, upper_32_bits(msi_msg_phys));
- 
- 	advk->msi_domain =
- 		irq_domain_add_linear(NULL, MSI_IRQ_NUM,
-@@ -783,12 +783,12 @@ static void advk_pcie_handle_msi(struct advk_pcie *advk)
- 		if (!(BIT(msi_idx) & msi_status))
- 			continue;
- 
--		advk_writel(advk, BIT(msi_idx), PCIE_MSI_STATUS_REG);
-+		advk_writel(advk, PCIE_MSI_STATUS_REG, BIT(msi_idx));
- 		msi_data = advk_readl(advk, PCIE_MSI_PAYLOAD_REG) & 0xFF;
- 		generic_handle_irq(msi_data);
+ 	irq = platform_get_irq(pdev, 0);
+-	ret = devm_request_irq(&pdev->dev, irq, advk_pcie_irq_handler,
++	ret = devm_request_irq(dev, irq, advk_pcie_irq_handler,
+ 			       IRQF_SHARED | IRQF_NO_THREAD, "advk-pcie",
+ 			       advk);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "Failed to register interrupt\n");
++		dev_err(dev, "Failed to register interrupt\n");
+ 		return ret;
  	}
  
--	advk_writel(advk, PCIE_ISR0_MSI_INT_PENDING, PCIE_ISR0_REG);
-+	advk_writel(advk, PCIE_ISR0_REG, PCIE_ISR0_MSI_INT_PENDING);
- }
- 
- static void advk_pcie_handle_int(struct advk_pcie *advk)
-@@ -801,7 +801,7 @@ static void advk_pcie_handle_int(struct advk_pcie *advk)
- 	status = val & ((~mask) & PCIE_ISR0_ALL_MASK);
- 
- 	if (!status) {
--		advk_writel(advk, val, PCIE_ISR0_REG);
-+		advk_writel(advk, PCIE_ISR0_REG, val);
- 		return;
+ 	ret = advk_pcie_parse_request_of_pci_ranges(advk);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "Failed to parse resources\n");
++		dev_err(dev, "Failed to parse resources\n");
+ 		return ret;
  	}
  
-@@ -814,8 +814,7 @@ static void advk_pcie_handle_int(struct advk_pcie *advk)
- 		if (!(status & PCIE_ISR0_INTX_ASSERT(i)))
- 			continue;
+@@ -944,24 +948,24 @@ static int advk_pcie_probe(struct platform_device *pdev)
  
--		advk_writel(advk, PCIE_ISR0_INTX_ASSERT(i),
--			    PCIE_ISR0_REG);
-+		advk_writel(advk, PCIE_ISR0_REG, PCIE_ISR0_INTX_ASSERT(i));
+ 	ret = advk_pcie_init_irq_domain(advk);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "Failed to initialize irq\n");
++		dev_err(dev, "Failed to initialize irq\n");
+ 		return ret;
+ 	}
  
- 		virq = irq_find_mapping(advk->irq_domain, i);
- 		generic_handle_irq(virq);
-@@ -834,7 +833,7 @@ static irqreturn_t advk_pcie_irq_handler(int irq, void *arg)
- 	advk_pcie_handle_int(advk);
+ 	ret = advk_pcie_init_msi_irq_domain(advk);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "Failed to initialize irq\n");
++		dev_err(dev, "Failed to initialize irq\n");
+ 		advk_pcie_remove_irq_domain(advk);
+ 		return ret;
+ 	}
  
- 	/* Clear interrupt */
--	advk_writel(advk, PCIE_IRQ_CORE_INT, HOST_CTRL_INT_STATUS_REG);
-+	advk_writel(advk, HOST_CTRL_INT_STATUS_REG, PCIE_IRQ_CORE_INT);
+-	msi_node = of_parse_phandle(pdev->dev.of_node, "msi-parent", 0);
++	msi_node = of_parse_phandle(dev->of_node, "msi-parent", 0);
+ 	if (msi_node)
+ 		msi = of_pci_find_msi_chip_by_node(msi_node);
+ 	else
+ 		msi = NULL;
  
- 	return IRQ_HANDLED;
- }
+-	bus = pci_scan_root_bus_msi(&pdev->dev, 0, &advk_pcie_ops,
++	bus = pci_scan_root_bus_msi(dev, 0, &advk_pcie_ops,
+ 				    advk, &advk->resources, &advk->msi);
+ 	if (!bus) {
+ 		advk_pcie_remove_msi_irq_domain(advk);
