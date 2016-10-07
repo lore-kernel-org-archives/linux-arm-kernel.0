@@ -1,21 +1,29 @@
-From: emil@limesaudio.com (Emil Lundmark)
-Date: Fri, 7 Oct 2016 16:12:25 +0200
-Subject: [PATCH 1/2] ARM: imx: fix integer overflow in AV PLL round rate
-In-Reply-To: <1475752331-19525-1-git-send-email-emil@limesaudio.com>
-References: <1475752331-19525-1-git-send-email-emil@limesaudio.com>
-Message-ID: <20161007141224.GA18011@lime>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Fri, 7 Oct 2016 19:51:16 +0530
+Subject: [PATCH v6 0/6] ARM: dts: imx6q: Add Engicam i.CoreM6 dts
+In-Reply-To: <1474917787-29030-1-git-send-email-jteki@openedev.com>
+References: <1474917787-29030-1-git-send-email-jteki@openedev.com>
+Message-ID: <CAD6G_RRw68FVxG5rum41OeSrb9wDD0SkKeDgwjRLSJ2BuVtqfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I realize that the two patches in this series does not actually depend on
-each other. This is my first contribution to Linux so I wonder if I should
-resubmit these as two separate patches instead?
+On Tue, Sep 27, 2016 at 12:53 AM, Jagan Teki <jteki@openedev.com> wrote:
+> This is series add dts support for Engicam I.Core M6 qdl modules on
+> top of */shawnguo/linux.git for-next.
+>
+> Jagan Teki (6):
+>   of: Add vendor prefix for Engicam s.r.l company
+>   ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual initial support
+>   ARM: dts: imx6q: Add Engicam i.CoreM6 DualLite/Solo initial support
+>   ARM: dts: imx6qdl-icore: Add usbhost support
+>   ARM: dts: imx6qdl-icore: Add usbotg support
+>   ARM: dts: imx6qdl-icore: Add FEC support
 
-For example, what if the second patch in the series is not needed? Do you
-only accept the first patch then? Or what if I need to revise the second
-patch? It seems unnecessary to include the first patch in that case.
+Shawn, please pick this series.
 
-I also got the threading wrong, but thats another story.
-
+thanks!
 -- 
-Emil Lundmark
+Jagan Teki
+Free Software Engineer | www.openedev.com
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
