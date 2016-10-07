@@ -1,96 +1,349 @@
-From: linux@mniewoehner.de (Michael =?ISO-8859-1?Q?Niew=F6hner?=)
-Date: Fri, 07 Oct 2016 22:26:02 +0200
-Subject: PROBLEM: DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
-In-Reply-To: <87y420wqoy.fsf@linux.intel.com>
-References: <1472414695.3845.3.camel@mniewoehner.de>
- <87lgzgdof3.fsf@linux.intel.com> <57C41582.1030604@linux.intel.com>
- <1472468730.4925.3.camel@mniewoehner.de>
- <CANAwSgQMsK8YPxR==UXtR49kiJzYhkzvSCNwn8mDJfj-3wpa2w@mail.gmail.com>
- <CAFp+6iGrS0DTP=KUKDvk3NwWB32+1uj-irKT6fn5XTcfk572Hg@mail.gmail.com>
- <1475578687.1912.28.camel@mniewoehner.de>
- <CAFp+6iGx-jf+xrdHF=0J3FK9dDBg54zESYNVo8bz2Qz6G4gEZg@mail.gmail.com>
- <1475771380.22019.5.camel@mniewoehner.de> <87y420wqoy.fsf@linux.intel.com>
-Message-ID: <1475871962.1697.12.camel@mniewoehner.de>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Fri, 7 Oct 2016 14:38:11 -0600
+Subject: [PATCH v13 15/15] vfio/type1: Return the MSI geometry through
+ VFIO_IOMMU_GET_INFO capability chains
+In-Reply-To: <4adea280-4bdf-7d0e-be2f-88e7f6219b9c@redhat.com>
+References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
+ <1475743531-4780-16-git-send-email-eric.auger@redhat.com>
+ <20161006142040.13cbdb8f@t450s.home>
+ <20161006144251.46b45117@t450s.home>
+ <4adea280-4bdf-7d0e-be2f-88e7f6219b9c@redhat.com>
+Message-ID: <20161007143811.1fb3ebfe@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Fri, 7 Oct 2016 19:10:27 +0200
+Auger Eric <eric.auger@redhat.com> wrote:
 
-On Fr, 2016-10-07 at 10:42 +0300, Felipe Balbi wrote:
-> Hi,
+> Hi Alex,
 > 
-> Michael Niew?hner <linux@mniewoehner.de> writes:
+> On 06/10/2016 22:42, Alex Williamson wrote:
+> > On Thu, 6 Oct 2016 14:20:40 -0600
+> > Alex Williamson <alex.williamson@redhat.com> wrote:
+> >   
+> >> On Thu,  6 Oct 2016 08:45:31 +0000
+> >> Eric Auger <eric.auger@redhat.com> wrote:
+> >>  
+> >>> This patch allows the user-space to retrieve the MSI geometry. The
+> >>> implementation is based on capability chains, now also added to
+> >>> VFIO_IOMMU_GET_INFO.
+> >>>
+> >>> The returned info comprise:
+> >>> - whether the MSI IOVA are constrained to a reserved range (x86 case) and
+> >>>   in the positive, the start/end of the aperture,
+> >>> - or whether the IOVA aperture need to be set by the userspace. In that
+> >>>   case, the size and alignment of the IOVA window to be provided are
+> >>>   returned.
+> >>>
+> >>> In case the userspace must provide the IOVA aperture, we currently report
+> >>> a size/alignment based on all the doorbells registered by the host kernel.
+> >>> This may exceed the actual needs.
+> >>>
+> >>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> >>>
+> >>> ---
+> >>> v11 -> v11:
+> >>> - msi_doorbell_pages was renamed msi_doorbell_calc_pages
+> >>>
+> >>> v9 -> v10:
+> >>> - move cap_offset after iova_pgsizes
+> >>> - replace __u64 alignment by __u32 order
+> >>> - introduce __u32 flags in vfio_iommu_type1_info_cap_msi_geometry and
+> >>>   fix alignment
+> >>> - call msi-doorbell API to compute the size/alignment
+> >>>
+> >>> v8 -> v9:
+> >>> - use iommu_msi_supported flag instead of programmable
+> >>> - replace IOMMU_INFO_REQUIRE_MSI_MAP flag by a more sophisticated
+> >>>   capability chain, reporting the MSI geometry
+> >>>
+> >>> v7 -> v8:
+> >>> - use iommu_domain_msi_geometry
+> >>>
+> >>> v6 -> v7:
+> >>> - remove the computation of the number of IOVA pages to be provisionned.
+> >>>   This number depends on the domain/group/device topology which can
+> >>>   dynamically change. Let's rely instead rely on an arbitrary max depending
+> >>>   on the system
+> >>>
+> >>> v4 -> v5:
+> >>> - move msi_info and ret declaration within the conditional code
+> >>>
+> >>> v3 -> v4:
+> >>> - replace former vfio_domains_require_msi_mapping by
+> >>>   more complex computation of MSI mapping requirements, especially the
+> >>>   number of pages to be provided by the user-space.
+> >>> - reword patch title
+> >>>
+> >>> RFC v1 -> v1:
+> >>> - derived from
+> >>>   [RFC PATCH 3/6] vfio: Extend iommu-info to return MSIs automap state
+> >>> - renamed allow_msi_reconfig into require_msi_mapping
+> >>> - fixed VFIO_IOMMU_GET_INFO
+> >>> ---
+> >>>  drivers/vfio/vfio_iommu_type1.c | 78 ++++++++++++++++++++++++++++++++++++++++-
+> >>>  include/uapi/linux/vfio.h       | 32 ++++++++++++++++-
+> >>>  2 files changed, 108 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+> >>> index dc3ee5d..ce5e7eb 100644
+> >>> --- a/drivers/vfio/vfio_iommu_type1.c
+> >>> +++ b/drivers/vfio/vfio_iommu_type1.c
+> >>> @@ -38,6 +38,8 @@
+> >>>  #include <linux/workqueue.h>
+> >>>  #include <linux/dma-iommu.h>
+> >>>  #include <linux/msi-doorbell.h>
+> >>> +#include <linux/irqdomain.h>
+> >>> +#include <linux/msi.h>
+> >>>  
+> >>>  #define DRIVER_VERSION  "0.2"
+> >>>  #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+> >>> @@ -1101,6 +1103,55 @@ static int vfio_domains_have_iommu_cache(struct vfio_iommu *iommu)
+> >>>  	return ret;
+> >>>  }
+> >>>  
+> >>> +static int compute_msi_geometry_caps(struct vfio_iommu *iommu,
+> >>> +				     struct vfio_info_cap *caps)
+> >>> +{
+> >>> +	struct vfio_iommu_type1_info_cap_msi_geometry *vfio_msi_geometry;
+> >>> +	unsigned long order = __ffs(vfio_pgsize_bitmap(iommu));
+> >>> +	struct iommu_domain_msi_geometry msi_geometry;
+> >>> +	struct vfio_info_cap_header *header;
+> >>> +	struct vfio_domain *d;
+> >>> +	bool reserved;
+> >>> +	size_t size;
+> >>> +
+> >>> +	mutex_lock(&iommu->lock);
+> >>> +	/* All domains have same require_msi_map property, pick first */
+> >>> +	d = list_first_entry(&iommu->domain_list, struct vfio_domain, next);
+> >>> +	iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_GEOMETRY,
+> >>> +			      &msi_geometry);
+> >>> +	reserved = !msi_geometry.iommu_msi_supported;
+> >>> +
+> >>> +	mutex_unlock(&iommu->lock);
+> >>> +
+> >>> +	size = sizeof(*vfio_msi_geometry);
+> >>> +	header = vfio_info_cap_add(caps, size,
+> >>> +				   VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY, 1);
+> >>> +
+> >>> +	if (IS_ERR(header))
+> >>> +		return PTR_ERR(header);
+> >>> +
+> >>> +	vfio_msi_geometry = container_of(header,
+> >>> +				struct vfio_iommu_type1_info_cap_msi_geometry,
+> >>> +				header);
+> >>> +
+> >>> +	vfio_msi_geometry->flags = reserved;    
+> >>
+> >> Use the bit flag VFIO_IOMMU_MSI_GEOMETRY_RESERVED
+> >>  
+> >>> +	if (reserved) {
+> >>> +		vfio_msi_geometry->aperture_start = msi_geometry.aperture_start;
+> >>> +		vfio_msi_geometry->aperture_end = msi_geometry.aperture_end;    
+> >>
+> >> But maybe nobody has set these, did you intend to use
+> >> iommu_domain_msi_aperture_valid(), which you defined early on but never
+> >> used?
+> >>  
+> >>> +		return 0;
+> >>> +	}
+> >>> +
+> >>> +	vfio_msi_geometry->order = order;    
+> >>
+> >> I'm tempted to suggest that a user could do the same math on their own
+> >> since we provide the supported bitmap already... could it ever not be
+> >> the same? 
+> >>  
+> >>> +	/*
+> >>> +	 * we compute a system-wide requirement based on all the registered
+> >>> +	 * doorbells
+> >>> +	 */
+> >>> +	vfio_msi_geometry->size =
+> >>> +		msi_doorbell_calc_pages(order) * ((uint64_t) 1 << order);
+> >>> +
+> >>> +	return 0;
+> >>> +}
+> >>> +
+> >>>  static long vfio_iommu_type1_ioctl(void *iommu_data,
+> >>>  				   unsigned int cmd, unsigned long arg)
+> >>>  {
+> >>> @@ -1122,8 +1173,10 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+> >>>  		}
+> >>>  	} else if (cmd == VFIO_IOMMU_GET_INFO) {
+> >>>  		struct vfio_iommu_type1_info info;
+> >>> +		struct vfio_info_cap caps = { .buf = NULL, .size = 0 };
+> >>> +		int ret;
+> >>>  
+> >>> -		minsz = offsetofend(struct vfio_iommu_type1_info, iova_pgsizes);
+> >>> +		minsz = offsetofend(struct vfio_iommu_type1_info, cap_offset);
+> >>>  
+> >>>  		if (copy_from_user(&info, (void __user *)arg, minsz))
+> >>>  			return -EFAULT;
+> >>> @@ -1135,6 +1188,29 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+> >>>  
+> >>>  		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
+> >>>  
+> >>> +		ret = compute_msi_geometry_caps(iommu, &caps);
+> >>> +		if (ret)
+> >>> +			return ret;
+> >>> +
+> >>> +		if (caps.size) {
+> >>> +			info.flags |= VFIO_IOMMU_INFO_CAPS;
+> >>> +			if (info.argsz < sizeof(info) + caps.size) {
+> >>> +				info.argsz = sizeof(info) + caps.size;
+> >>> +				info.cap_offset = 0;
+> >>> +			} else {
+> >>> +				vfio_info_cap_shift(&caps, sizeof(info));
+> >>> +				if (copy_to_user((void __user *)arg +
+> >>> +						sizeof(info), caps.buf,
+> >>> +						caps.size)) {
+> >>> +					kfree(caps.buf);
+> >>> +					return -EFAULT;
+> >>> +				}
+> >>> +				info.cap_offset = sizeof(info);
+> >>> +			}
+> >>> +
+> >>> +			kfree(caps.buf);
+> >>> +		}
+> >>> +
+> >>>  		return copy_to_user((void __user *)arg, &info, minsz) ?
+> >>>  			-EFAULT : 0;
+> >>>  
+> >>> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
+> >>> index 4a9dbc2..8dae013 100644
+> >>> --- a/include/uapi/linux/vfio.h
+> >>> +++ b/include/uapi/linux/vfio.h
+> >>> @@ -488,7 +488,35 @@ struct vfio_iommu_type1_info {
+> >>>  	__u32	argsz;
+> >>>  	__u32	flags;
+> >>>  #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
+> >>> -	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
+> >>> +#define VFIO_IOMMU_INFO_CAPS	(1 << 1)	/* Info supports caps */
+> >>> +	__u64	iova_pgsizes;	/* Bitmap of supported page sizes */
+> >>> +	__u32	__resv;
+> >>> +	__u32   cap_offset;	/* Offset within info struct of first cap */
+> >>> +};    
+> >>
+> >> I understand the padding, but not the ordering.  Why not end with
+> >> padding?
+> >>  
+> >>> +
+> >>> +#define VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY	1
+> >>> +
+> >>> +/*
+> >>> + * The MSI geometry capability allows to report the MSI IOVA geometry:
+> >>> + * - either the MSI IOVAs are constrained within a reserved IOVA aperture
+> >>> + *   whose boundaries are given by [@aperture_start, @aperture_end].
+> >>> + *   this is typically the case on x86 host. The userspace is not allowed
+> >>> + *   to map userspace memory at IOVAs intersecting this range using
+> >>> + *   VFIO_IOMMU_MAP_DMA.
+> >>> + * - or the MSI IOVAs are not requested to belong to any reserved range;
+> >>> + *   in that case the userspace must provide an IOVA window characterized by
+> >>> + *   @size and @alignment using VFIO_IOMMU_MAP_DMA with RESERVED_MSI_IOVA flag.
+> >>> + */
+> >>> +struct vfio_iommu_type1_info_cap_msi_geometry {
+> >>> +	struct vfio_info_cap_header header;
+> >>> +	__u32 flags;
+> >>> +#define VFIO_IOMMU_MSI_GEOMETRY_RESERVED (1 << 0) /* reserved geometry */
+> >>> +	/* not reserved */
+> >>> +	__u32 order; /* iommu page order used for aperture alignment*/
+> >>> +	__u64 size; /* IOVA aperture size (bytes) the userspace must provide */
+> >>> +	/* reserved */
+> >>> +	__u64 aperture_start;
+> >>> +	__u64 aperture_end;    
+> >>
+> >> Should these be a union?  We never set them both.  Should the !reserved
+> >> case have a flag as well, so the user can positively identify what's
+> >> being provided?  
 > > 
-> > > 
-> > > The clocks are same across working/non-working.
-> > > Is it possible to bisect the commit that's causing hang for 4.8x ?
-> > 
-> > 
-> > [c499ff71ff2a281366c6ec7a904c547d806cbcd1] usb: dwc3: core: re-factor init and exit paths
-> > This patch causes both the hang on reboot and the lsusb hang.
+> > Actually, is there really any need to fit both of these within the same
+> > structure?  Part of the idea of the capability chains is we can create
+> > a capability for each new thing we want to describe.  So, we could
+> > simply define a generic reserved IOVA range capability with a 'start'
+> > and 'end' and then another capability to define MSI mapping
+> > requirements.  Thanks,  
+> Yes your suggested approach makes sense to me.
 > 
-> How to reproduce? Why don't we see this on x86 and TI boards? I'm
-> guessing this is failed bisection, as I can't see anything in that
-> commit that would cause reboot hang. Also, that code path is *NOT*
-> executed when you run lsusb.
+> One reason why I proceeded that way is we are mixing things at iommu.h
+> level too. Personally I would have preferred to separate things:
+> 1) add a new IOMMU_CAP_TRANSLATE_MSI capability in iommu_cap
+> 2) rename iommu_msi_supported into "programmable" bool: reporting
+> whether the aperture is reserved or programmable.
 > 
+> In the early releases I think it was as above but slightly we moved to a
+> mixed description.
+> 
+> What do you think?
 
-I've tested this procedure multiple times to be sure:
+The API certainly doesn't seem like it has a cohesive feel to me.  It's
+not entirely clear to me how we know when we need to register a DMA MSI
+cookie, or how we know that the MSI doorbell API is actually
+initialized and in use by the MSI/IOMMU layer, or exactly what is the
+MSI geometry telling me.  Perhaps this is why the code doesn't seem to
+have a good rejection mechanism for architectures that need it versus
+those that don't, it's too hard to tell.
 
-- checkout?c499ff71, compile, boot the odroid
-- run lsusb -v => lsusb hangs, can't terminate with ctrl-c
-- hard reset, after boot run poweroff or reboot => board does not completely power off / reboot (see log below)
-- revert c499ff71, mrproper, compile, boot the odroid
-- run lsusb -v => shows full output, not hanging
-- run reboot or poweroff => board powers off / reboots just fine
+Maybe we can look at what we think the user API should be and work
+backwards.  For x86 we simply have a reserved range of IOVA.  I'm not
+entirely sure it adds to the user API to know that it's for MSI, it's
+just a range of IOVAs that we cannot allocate for regular DMA.  In
+fact, we currently lack a mechanism for describing the IOVA space of
+the IOMMU at all, so rather than focusing on a mechanism to describe a
+hole in the IOVA space, we might simply want to focus on a mechanism to
+describe the available IOVA space.  Everybody needs that, not just
+x86.  That sort of sounds like a VFIO_IOMMU_TYPE1_INFO_CAP_IOVA_RANGE
+that perhaps looks like:
 
+struct vfio_iommu_type1_info_cap_iova_range {
+	struct vfio_info_cap_header header;
+	u64 start;
+	u64 end;
+};
 
-dmesg poweroff not working:
-...
-[??120.733519] systemd-journald[144]: systemd-journald stopped as pid 144???????
-[??120.742663] systemd-shutdown[1]: Sending SIGKILL to remaining processes...???
-[??120.769212] systemd-shutdown[1]: Unmounting file systems.????????????????????
-[??120.773713] systemd-shutdown[1]: Unmounting /sys/kernel/debug.???????????????
-[??120.827211] systemd-shutdown[1]: Unmounting /dev/mqueue.?????????????????????
-[??121.081672] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-[??121.091687] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-[??121.095608] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-[??121.101014] systemd-shutdown[1]: All filesystems unmounted.??????????????????
-[??121.106523] systemd-shutdown[1]: Deactivating swaps.?????????????????????????
-[??121.111585] systemd-shutdown[1]: All swaps deactivated.??????????????????????
-[??121.116661] systemd-shutdown[1]: Detaching loop devices.?????????????????????
-[??121.126395] systemd-shutdown[1]: All loop devices detached.??????????????????
-[??121.130525] systemd-shutdown[1]: Detaching DM devices.???????????????????????
-[??121.135824] systemd-shutdown[1]: All DM devices detached.????????????????????
-[??121.166327] systemd-shutdown[1]: /lib/systemd/system-shutdown succeeded.?????
-[??121.171739] systemd-shutdown[1]: Powering off.
+Clearly we need to allow multiple of these in the capability chain
+since the existing x86 MSI range bisects this address space.
 
-=> at this point removing the sd card would show a message?
-"removed mmc0" (not sure what the real message was...) so the board is not completely off.
+To support this, we basically need the same information from the IOMMU
+API.  We already have DOMAIN_ATTR_GEOMETRY, which should give us the
+base IOVA range, but we don't have anything describing the gaps.  We
+don't know how many sources of gaps we'll have in the future, but let's
+keep it simple and assume we can look for MSI gaps and add other
+possible sources of gaps in the future, it's an internal API after all.
+So we can use DOMAIN_ATTR_MSI_GEOMETRY to tell us about the (we assume
+one) MSI range of reserved IOVA within DOMAIN_ATTR_GEOMETRY.  For x86
+this is fixed, for SMMU this is a zero range until someone programs it.
 
+Now, what does a user need to know to add a reserved MSI IOVA range?
+They need to know a) that it needs to be done, and b) how big to make
+it (and maybe alignment requirements).  Really all we need to describe
+then is b) since b) implies a). So maybe that gives us another
+capability chain entry:
 
-dmesg poweroff working:
-...
-[??120.733519] systemd-journald[144]: systemd-journald stopped as pid 144???????
-[??120.742663] systemd-shutdown[1]: Sending SIGKILL to remaining processes...???
-[??120.769212] systemd-shutdown[1]: Unmounting file systems.????????????????????
-[??120.773713] systemd-shutdown[1]: Unmounting /sys/kernel/debug.???????????????
-[??120.827211] systemd-shutdown[1]: Unmounting /dev/mqueue.?????????????????????
-[??121.081672] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-[??121.091687] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-[??121.095608] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-[??121.101014] systemd-shutdown[1]: All filesystems unmounted.??????????????????
-[??121.106523] systemd-shutdown[1]: Deactivating swaps.?????????????????????????
-[??121.111585] systemd-shutdown[1]: All swaps deactivated.??????????????????????
-[??121.116661] systemd-shutdown[1]: Detaching loop devices.?????????????????????
-[??121.126395] systemd-shutdown[1]: All loop devices detached.??????????????????
-[??121.130525] systemd-shutdown[1]: Detaching DM devices.???????????????????????
-[??121.135824] systemd-shutdown[1]: All DM devices detached.????????????????????
-[??121.166327] systemd-shutdown[1]: /lib/systemd/system-shutdown succeeded.?????
-[??121.171739] systemd-shutdown[1]: Powering off.
-[??121.182331] rebo?
+struct vfio_iommu_type1_info_cap_msi_resv {
+	struct vfio_info_cap_header header;
+	u64 size;
+	u64 alignment;
+};
 
+It doesn't seem like we need to waste a flag bit on
+vfio_iommu_type1_info.flags for this since the existence of this
+capability would imply that VFIO_IOMMU_MAP_DMA supports an MSI_RESV
+flag.
 
+So what do we need from the kernel infrastructure to make that happen?
+Well, we need a) and b) above, and again b) can imply a), so if the
+IOMMU API provided a DOMAIN_ATTR_MSI_RESV, providing the same
+size/alignment, then we're nearly there.  Then we just need a way to
+set that range, which I'd probably try to plumb through the IOMMU API
+rather than pulling in separate doorbell APIs and DMA cookie APIs.  If
+it's going to pull together all those different things, let's at least
+only do that in one place so we can expose a consistent API through the
+IOMMU API.  Obviously once a range is set, DOMAIN_ATTR_MSI_RESV should
+report that range, so if the user were to look at the type1 info
+capability chain again, the available IOVA ranges would reflect the now
+reserved range.
 
-Best regards
-Michael
+Maybe that's more than you're asking for, but that's the approach I
+would take to solidify the API.  Thanks,
+
+Alex
