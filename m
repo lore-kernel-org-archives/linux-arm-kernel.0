@@ -1,65 +1,31 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 7 Oct 2016 19:28:10 +0300
-Subject: [PATCH 3/3] mtd: s3c2410: parse the device configuration from OF
- node
-In-Reply-To: <1475711217-974-4-git-send-email-sergio.prado@e-labworks.com>
-References: <1475711217-974-1-git-send-email-sergio.prado@e-labworks.com>
- <1475711217-974-4-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <20161007162810.GB4222@kozik-lap>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri,  7 Oct 2016 18:34:25 +0200
+Subject: [PATCH 0/2] ARM: at91: properly handle LPDDR poweroff
+Message-ID: <20161007163427.11454-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 05, 2016 at 08:46:57PM -0300, Sergio Prado wrote:
-> Allows configuring Samsung's s3c2410 memory controller using a
-> devicetree.
-> 
-> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> ---
->  drivers/mtd/nand/s3c2410.c                     | 171 ++++++++++++++++++++++---
->  include/linux/platform_data/mtd-nand-s3c2410.h |   1 +
->  2 files changed, 156 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-> index 174ac9dc4265..352cf2656bc8 100644
-> --- a/drivers/mtd/nand/s3c2410.c
-> +++ b/drivers/mtd/nand/s3c2410.c
-> @@ -39,6 +39,8 @@
->  #include <linux/slab.h>
->  #include <linux/clk.h>
->  #include <linux/cpufreq.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->  
->  #include <linux/mtd/mtd.h>
->  #include <linux/mtd/nand.h>
-> @@ -185,6 +187,26 @@ struct s3c2410_nand_info {
->  #endif
->  };
->  
-> +struct s3c24XX_nand_devtype_data {
-> +	enum s3c_cpu_type type;
-> +};
-> +
-> +struct s3c24XX_nand_devtype_data s3c2410_nand_devtype_data = {
-> +	.type = TYPE_S3C2410,
-> +};
-> +
-> +struct s3c24XX_nand_devtype_data s3c2412_nand_devtype_data = {
-> +	.type = TYPE_S3C2412,
-> +};
-> +
-> +struct s3c24XX_nand_devtype_data s3c2440_nand_devtype_data = {
-> +	.type = TYPE_S3C2440,
-> +};
-> +
-> +struct s3c24XX_nand_devtype_data s3c6400_nand_devtype_data = {
-> +	.type = TYPE_S3C2412,
+Hi,
 
-All of these look like candidate for static const.
+This patch set improves LPDDR support on SoCs using the Atmel MPDDR controller.
 
-Additionally you are not actually differentiating between s3c2412 and
-s3c64xx so I think there is not need of samsung,s3c6400-nand compatible.
-Just use existing one.
+LPDDR memoris can only handle up to 400 uncontrolled power offs in their
+life. The proper power off sequence has to be applied before shutting down the SoC.
 
-Best regards,
-Krzysztof
+I'm not too happy with the code duplication but this is a design choice
+that has been made before because both shitdown controler are really
+different appart from the shutdown itself.
+
+I guess it is still better than slowly killing the LPDDR.
+
+Alexandre Belloni (2):
+  ARM: at91: define LPDDR types
+  power/reset: at91-poweroff: timely shitdown LPDDR memories
+
+ drivers/power/reset/at91-poweroff.c      | 52 +++++++++++++++++++++++++++++++-
+ drivers/power/reset/at91-sama5d2_shdwc.c | 48 ++++++++++++++++++++++++++++-
+ include/soc/at91/at91sam9_ddrsdr.h       |  3 ++
+ 3 files changed, 101 insertions(+), 2 deletions(-)
+
+-- 
+2.9.3
