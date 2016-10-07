@@ -1,20 +1,115 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 7 Oct 2016 16:44:12 +0200
-Subject: [PATCH 1/4] staging/vchi: Convert to current get_user_pages()
- arguments.
-In-Reply-To: <20161003185209.27733-2-eric@anholt.net>
-References: <20161003185209.27733-1-eric@anholt.net>
- <20161003185209.27733-2-eric@anholt.net>
-Message-ID: <20161007144412.GA27514@kroah.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri,  7 Oct 2016 16:59:15 +0200
+Subject: [PATCH v2] ARM64: dts: meson-gxbb: Add rmii pinctrl node and rename
+ rgmii node
+Message-ID: <1475852355-24096-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2016 at 11:52:06AM -0700, Eric Anholt wrote:
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+For boards only supporting 10/100 ethernet over a RMII PHY link, add
+a separate pinctrl node. By the way, rename the existing node to rgmii
+specific naming in all boards dts.
 
-In the future, it's good to put at least some changelog text in here.  I
-normally do not accept patches without it.  But I'll take these two.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts |  3 ++-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts    |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi       |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi   |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi            | 17 ++++++++++++++++-
+ 5 files changed, 21 insertions(+), 5 deletions(-)
 
-thanks,
+Changes since v1 at http://lkml.kernel.org/r/1475678673-15277-1-git-send-email-narmstrong at baylibre.com :
+ - Change Nexbox A95X to rmii interface
 
-greg k-h
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+index 80d7b35..399d85f 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+@@ -97,8 +97,9 @@
+ 
+ &ethmac {
+ 	status = "okay";
+-	pinctrl-0 = <&eth_pins>;
++	pinctrl-0 = <&eth_rmii_pins>;
+ 	pinctrl-names = "default";
++	phy-mode = "rmii";
+ };
+ 
+ &ir {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index e6e3491..325b9c5 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -83,7 +83,7 @@
+ 
+ &ethmac {
+ 	status = "okay";
+-	pinctrl-0 = <&eth_pins>;
++	pinctrl-0 = <&eth_rgmii_pins>;
+ 	pinctrl-names = "default";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+index 06a34dc..031d69b 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+@@ -81,7 +81,7 @@
+ 
+ &ethmac {
+ 	status = "okay";
+-	pinctrl-0 = <&eth_pins>;
++	pinctrl-0 = <&eth_rgmii_pins>;
+ 	pinctrl-names = "default";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+index 73f1593..e93221a 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+@@ -82,7 +82,7 @@
+ 
+ &ethmac {
+ 	status = "okay";
+-	pinctrl-0 = <&eth_pins>;
++	pinctrl-0 = <&eth_rgmii_pins>;
+ 	pinctrl-names = "default";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 443811b..aad639a 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -443,7 +443,7 @@
+ 			};
+ 		};
+ 
+-		eth_pins: eth_c {
++		eth_rgmii_pins: eth-rgmii {
+ 			mux {
+ 				groups = "eth_mdio",
+ 				       "eth_mdc",
+@@ -463,6 +463,21 @@
+ 			};
+ 		};
+ 
++		eth_rmii_pins: eth-rmii {
++			mux {
++				groups = "eth_mdio",
++				       "eth_mdc",
++				       "eth_clk_rx_clk",
++				       "eth_rx_dv",
++				       "eth_rxd0",
++				       "eth_rxd1",
++				       "eth_tx_en",
++				       "eth_txd0",
++				       "eth_txd1";
++				function = "eth";
++			};
++		};
++
+ 		pwm_a_x_pins: pwm_a_x {
+ 			mux {
+ 				groups = "pwm_a_x";
+-- 
+1.9.1
