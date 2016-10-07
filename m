@@ -1,41 +1,76 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Fri, 07 Oct 2016 10:42:21 +0300
-Subject: PROBLEM: DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
-In-Reply-To: <1475771380.22019.5.camel@mniewoehner.de>
-References: <1472414695.3845.3.camel@mniewoehner.de>
- <87lgzgdof3.fsf@linux.intel.com> <57C41582.1030604@linux.intel.com>
- <1472468730.4925.3.camel@mniewoehner.de>
- <CANAwSgQMsK8YPxR==UXtR49kiJzYhkzvSCNwn8mDJfj-3wpa2w@mail.gmail.com>
- <CAFp+6iGrS0DTP=KUKDvk3NwWB32+1uj-irKT6fn5XTcfk572Hg@mail.gmail.com>
- <1475578687.1912.28.camel@mniewoehner.de>
- <CAFp+6iGx-jf+xrdHF=0J3FK9dDBg54zESYNVo8bz2Qz6G4gEZg@mail.gmail.com>
- <1475771380.22019.5.camel@mniewoehner.de>
-Message-ID: <87y420wqoy.fsf@linux.intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 7 Oct 2016 09:43:53 +0200
+Subject: [PATCH] ARM: shmobile: Consolidate R8A779[234] machine definitions
+In-Reply-To: <1475663489-4789-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1475663489-4789-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CAMuHMdVVE2N20zmCddy6Y2mMBf4zk0u=WfQ3Sa1e_ASOf5zO_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laurent,
 
-Hi,
+On Wed, Oct 5, 2016 at 12:31 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
+> The three SoCs use the exact same machine definition, consolidate them
+> into a single one.
 
-Michael Niew?hner <linux@mniewoehner.de> writes:
->> The clocks are same across working/non-working.
->> Is it possible to bisect the commit that's causing hang for 4.8x ?
->
->
-> [c499ff71ff2a281366c6ec7a904c547d806cbcd1] usb: dwc3: core: re-factor init and exit paths
-> This patch causes both the hang on reboot and the lsusb hang.
+Thanks for your patch!
 
-How to reproduce? Why don't we see this on x86 and TI boards? I'm
-guessing this is failed bisection, as I can't see anything in that
-commit that would cause reboot hang. Also, that code path is *NOT*
-executed when you run lsusb.
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161007/291447b6/attachment.sig>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+I'm wondering if we can improve upon...
+
+> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+
+> @@ -203,3 +204,22 @@ void __init rcar_gen2_reserve(void)
+>         }
+>  #endif
+>  }
+> +
+> +static const char * const rcar_gen2_boards_compat_dt[] __initconst = {
+> +       /*
+> +        * R8A7790 and R8A7791 can't be handled here as long as they need SMP
+> +        * initialization fallback.
+> +        */
+> +       "renesas,r8a7792",
+> +       "renesas,r8a7793",
+> +       "renesas,r8a7794",
+> +       NULL,
+> +};
+> +
+> +DT_MACHINE_START(RCAR_GEN2_DT, "Generic Gen2 (Flattened Device Tree)")
+> +       .init_early     = shmobile_init_delay,
+
+shmobile_init_delay() is not really Renesas-specific, but ARM-specific.
+This is just to avoid calibrating the delay loop?
+
+> +       .init_late      = shmobile_init_late,
+
+This calls only into shmobile_suspend_init(), which is also not
+Renesas-specific.
+
+> +       .init_time      = rcar_gen2_timer_init,
+
+This is about fixing up the ARM Arch timer, and initializing clocks as we
+need to pass the mode pin state (ugh, will hopefully go away soon).
+
+> +       .reserve        = rcar_gen2_reserve,
+
+Reserving a block for CMA DMA is also not really Renesas-specific.
+
+> +       .dt_compat      = rcar_gen2_boards_compat_dt,
+> +MACHINE_END
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
