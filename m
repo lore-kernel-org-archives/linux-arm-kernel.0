@@ -1,34 +1,56 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 7 Oct 2016 14:51:57 +0900
-Subject: [PATCH] ARM: shmobile: Consolidate R8A779[234] machine definitions
-In-Reply-To: <18001316.v0q3v65y95@avalon>
-References: <1475663489-4789-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <18001316.v0q3v65y95@avalon>
-Message-ID: <20161007055156.GC5855@verge.net.au>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Fri, 7 Oct 2016 11:38:52 +0530
+Subject: [PATCH v2 5/6] arm: dts: imx7-colibri: Use pwm polarity control
+In-Reply-To: <20161006084007.44c5cbae@jawa>
+References: <20161001101235.24598-1-bhuvanchandra.dv@toradex.com>
+ <20161001101235.24598-6-bhuvanchandra.dv@toradex.com>
+ <20161006084007.44c5cbae@jawa>
+Message-ID: <5fd194a3-5bfb-2fab-af82-95c87a0e7af1@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 05, 2016 at 04:51:26PM +0300, Laurent Pinchart wrote:
-> On Wednesday 05 Oct 2016 13:31:29 Laurent Pinchart wrote:
-> > The three SoCs use the exact same machine definition, consolidate them
-> > into a single one.
-> > 
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> >  arch/arm/mach-shmobile/Makefile          |  3 ---
-> >  arch/arm/mach-shmobile/setup-r8a7792.c   | 35
-> > -------------------------------- arch/arm/mach-shmobile/setup-r8a7793.c   |
-> > 33 ------------------------------ arch/arm/mach-shmobile/setup-r8a7794.c  
-> > | 33 ------------------------------
-> > arch/arm/mach-shmobile/setup-rcar-gen2.c | 20 ++++++++++++++++++
-> >  5 files changed, 20 insertions(+), 104 deletions(-)
-> >  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7792.c
-> >  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7793.c
-> >  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7794.c
-> > 
-> > I don't have access to any R8A779[234] board, I'd appreciate if someone
-> > could test the patch series.
+On 10/06/16 12:10, Lukasz Majewski wrote:
 
-I have tested this on an r8a7793/gose and r8a7794/alt.
+> On Sat, 1 Oct 2016 15:42:34 +0530
+> Bhuvanchandra DV <bhuvanchandra.dv@toradex.com> wrote:
+>
+>> Configure PWM polarity control.
+>>
+>> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+>> ---
+>>   arch/arm/boot/dts/imx7-colibri.dtsi | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi
+>> b/arch/arm/boot/dts/imx7-colibri.dtsi index a9cc657..2af5e3e 100644
+>> --- a/arch/arm/boot/dts/imx7-colibri.dtsi
+>> +++ b/arch/arm/boot/dts/imx7-colibri.dtsi
+>> @@ -43,7 +43,7 @@
+>>   / {
+>>   	bl: backlight {
+>>   		compatible = "pwm-backlight";
+>> -		pwms = <&pwm1 0 5000000>;
+>> +		pwms = <&pwm1 0 5000000 0>;
+> My recommendation would be to add:
+> #include <dt-bindings/pwm/pwm.h>
+>
+> and then define pwms as:
+>
+> pwms = <&pwm1 0 5000000 PWM_POLARITY_NORMAL>;
 
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
+Addendum:
+There is no "PWM_POLARITY_NORMAL" defined in "#include <dt-bindings/pwm/pwm.h>"
+I guess it is helpful when polarity inversion is enabled.
+
+--
+Bhuvan
+
+>
+> It would be more readable
+>
+> Best regards,
+> ?ukasz Majewski
+>
+>>   	};
+>>   
+>>   	reg_module_3v3: regulator-module-3v3 {
