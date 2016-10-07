@@ -1,63 +1,92 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Fri, 7 Oct 2016 13:17:39 +0200
-Subject: [PATCH v2 0/5] Add runtime PM support for clocks (on Exynos SoC
- example)
-In-Reply-To: <c1cf1a1f-2d1f-7f35-3e3b-f2de90959a24@samsung.com>
-References: <CGME20160919105545eucas1p1026e435bbaeb1f5c866a9abcdd051464@eucas1p1.samsung.com>
- <1474282525-30441-1-git-send-email-m.szyprowski@samsung.com>
- <57F6926F.1070707@math.uni-bielefeld.de>
- <c1cf1a1f-2d1f-7f35-3e3b-f2de90959a24@samsung.com>
-Message-ID: <57F78453.4090201@math.uni-bielefeld.de>
+From: muhammadabdul.wahab@centralesupelec.fr (Muhammad Abdul WAHAB)
+Date: Fri, 7 Oct 2016 14:16:18 +0200
+Subject: [PATCH v4] Adding missing features of Coresight PTM components
+In-Reply-To: <60a1f04c-1e73-0ff1-dfee-775b875d2c4a@centralesupelec.fr>
+References: <60a1f04c-1e73-0ff1-dfee-775b875d2c4a@centralesupelec.fr>
+Message-ID: <0b570076-08cb-c63a-7240-8c81d34fc383@centralesupelec.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Marek,
+In the current driver for Coresight components, two features of PTM
+components are missing:
 
+1. Branch Broadcasting (present also in ETM but called Branch Output)
+2. Return Stack (only present in PTM v1.0 and PTMv1.1)
 
-Marek Szyprowski wrote:
-> Hi Tobias,
-> 
-> 
-> On 2016-10-06 20:05, Tobias Jakobi wrote:
->> Hello Marek,
->>
->> I'm using the patches from the v4.8-clocks-pm-v2 branch plus the ones
->> from the v4.8-clocks-pm-v2 branch on top of 4.8.0.
->>
->> I see some warnings on boot coming from driver core. It appears that the
->> warnings are actually meaningful, since IOMMUs stop working completly.
->> E.g. if I modprobe s5p-mfc later, firmware loading fails because
->> apparantly the IOMMU domain isn't online.
->>
->>> WARNING: CPU: 0 PID: 1 at drivers/base/core.c:356
->>> device_links_driver_bound+0x124/0x12c
->> I added some debug printk() to device_links_driver_bound(), to show the
->> link status. Apparantly it is always DEVICE_LINK_AVAILABLE.
-> 
-> Please note that some additional patches are needed to get IOMMU working
-> properly with both runtime-pm patches and deferred probe, which feature
-> in turn is needed to get it working after adding clocks-pm changes. I
-> will send such patch soon (as a new version of IOMMU deferred probe
-> support patches were posted a few days ago).
-I see. I thought that this was supposed to work with the patches in
-v4.8-clocks-pm-v2.
+These features can be added simply to the code using `mode` field of
+`etm_config` struct.
 
-I picked the patches in this range (endpoints included).
-- arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
-- clocks: exynos5433: add runtime pm support
+1. **Branch Broadcast** : The branch broadcast feature is present in ETM
+components as well and is called Branch output. It allows to retrieve
+addresses for direct branch addresses alongside the indirect branch
+addresses. For example, it could be useful in cases when tracing without
+source code.
+2. **Return Stack** : The return stack option allows to retrieve the 
+return addresses of function calls. It can be useful to avoid CRA
+(Code Reuse Attacks) by keeping a shadowstack.
 
-And this range in v4.8-iommu-pm-v4>
-- driver core: Add a wrapper around __device_release_driver()
-- iommu/exynos: Add proper runtime pm support
+Signed-off-by: Muhammad Abdul Wahab <muhammadabdul.wahab@centralesupelec.fr>
+---
+change(s) in v4 :
+	- syntax error correction (sorry did not compile after 1st version but 
+did compile it before sending it this time)
 
+drivers/hwtracing/coresight/coresight-etm.h         |  5 +++++
+  drivers/hwtracing/coresight/coresight-etm3x-sysfs.c | 10 ++++++++++
+  2 files changed, 15 insertions(+)
 
-Anyway, looking forward to test the new patchset.
+diff --git a/drivers/hwtracing/coresight/coresight-etm.h 
+b/drivers/hwtracing/coresight/coresight-etm.h
+index 4a18ee4..ad063d7 100644
+--- a/drivers/hwtracing/coresight/coresight-etm.h
++++ b/drivers/hwtracing/coresight/coresight-etm.h
+@@ -89,11 +89,13 @@
+  /* ETMCR - 0x00 */
+  #define ETMCR_PWD_DWN		BIT(0)
+  #define ETMCR_STALL_MODE	BIT(7)
++#define ETMCR_BRANCH_BROADCAST	BIT(8)
+  #define ETMCR_ETM_PRG		BIT(10)
+  #define ETMCR_ETM_EN		BIT(11)
+  #define ETMCR_CYC_ACC		BIT(12)
+  #define ETMCR_CTXID_SIZE	(BIT(14)|BIT(15))
+  #define ETMCR_TIMESTAMP_EN	BIT(28)
++#define ETMCR_RETURN_STACK	BIT(29)
+  /* ETMCCR - 0x04 */
+  #define ETMCCR_FIFOFULL		BIT(23)
+  /* ETMPDCR - 0x310 */
+@@ -110,8 +112,11 @@
+  #define ETM_MODE_STALL		BIT(2)
+  #define ETM_MODE_TIMESTAMP	BIT(3)
+  #define ETM_MODE_CTXID		BIT(4)
++#define ETM_MODE_BBROAD		BIT(5)
++#define ETM_MODE_RET_STACK	BIT(6)
+  #define ETM_MODE_ALL		(ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
+  				 ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
++				 ETM_MODE_BBROAD | ETM_MODE_RET_STACK | \
+  				 ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
+  				 ETM_MODE_EXCL_USER)
 
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c 
+b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+index e9b0719..7308304 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+@@ -164,6 +164,16 @@ static ssize_t mode_store(struct device *dev,
+  	else
+  		config->ctrl &= ~ETMCR_CTXID_SIZE;
 
-- Tobias
++	if (config->mode & ETM_MODE_BBROAD)
++		config->ctrl |= ETMCR_BRANCH_BROADCAST;
++	else
++		config->ctrl &= ~ETMCR_BRANCH_BROADCAST;
++
++	if (config->mode & ETM_MODE_RET_STACK)
++		config->ctrl |= ETMCR_RETURN_STACK;
++	else
++		config->ctrl &= ~ETMCR_RETURN_STACK;
++
+  	if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
+  		etm_config_trace_mode(config);
 
-
-> 
->> (...)
-> 
-> Best regards
+-- 
+1.9.1
