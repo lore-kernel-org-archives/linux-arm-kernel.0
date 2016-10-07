@@ -1,101 +1,153 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 7 Oct 2016 15:44:12 -0600
-Subject: [PATCH v4] Adding missing features of Coresight PTM components
-In-Reply-To: <0b570076-08cb-c63a-7240-8c81d34fc383@centralesupelec.fr>
-References: <60a1f04c-1e73-0ff1-dfee-775b875d2c4a@centralesupelec.fr>
- <0b570076-08cb-c63a-7240-8c81d34fc383@centralesupelec.fr>
-Message-ID: <CANLsYkzS1L3k8uSJ=4o8DHHsRBKUe2vK9Pm60hJcPXX2D432qw@mail.gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri,  7 Oct 2016 15:36:54 -0700
+Subject: [PATCH v2 1/8] PM / Domains: Make genpd state allocation dynamic
+In-Reply-To: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
+References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1475879821-8035-2-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 October 2016 at 06:16, Muhammad Abdul WAHAB
-<muhammadabdul.wahab@centralesupelec.fr> wrote:
-> In the current driver for Coresight components, two features of PTM
-> components are missing:
->
-> 1. Branch Broadcasting (present also in ETM but called Branch Output)
-> 2. Return Stack (only present in PTM v1.0 and PTMv1.1)
->
-> These features can be added simply to the code using `mode` field of
-> `etm_config` struct.
->
-> 1. **Branch Broadcast** : The branch broadcast feature is present in ETM
-> components as well and is called Branch output. It allows to retrieve
-> addresses for direct branch addresses alongside the indirect branch
-> addresses. For example, it could be useful in cases when tracing without
-> source code.
-> 2. **Return Stack** : The return stack option allows to retrieve the return
-> addresses of function calls. It can be useful to avoid CRA
-> (Code Reuse Attacks) by keeping a shadowstack.
->
-> Signed-off-by: Muhammad Abdul Wahab <muhammadabdul.wahab@centralesupelec.fr>
-> ---
-> change(s) in v4 :
->         - syntax error correction (sorry did not compile after 1st version
-> but did compile it before sending it this time)
->
-> drivers/hwtracing/coresight/coresight-etm.h         |  5 +++++
->  drivers/hwtracing/coresight/coresight-etm3x-sysfs.c | 10 ++++++++++
->  2 files changed, 15 insertions(+)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm.h
-> b/drivers/hwtracing/coresight/coresight-etm.h
-> index 4a18ee4..ad063d7 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm.h
-> +++ b/drivers/hwtracing/coresight/coresight-etm.h
-> @@ -89,11 +89,13 @@
->  /* ETMCR - 0x00 */
->  #define ETMCR_PWD_DWN          BIT(0)
->  #define ETMCR_STALL_MODE       BIT(7)
-> +#define ETMCR_BRANCH_BROADCAST BIT(8)
->  #define ETMCR_ETM_PRG          BIT(10)
->  #define ETMCR_ETM_EN           BIT(11)
->  #define ETMCR_CYC_ACC          BIT(12)
->  #define ETMCR_CTXID_SIZE       (BIT(14)|BIT(15))
->  #define ETMCR_TIMESTAMP_EN     BIT(28)
-> +#define ETMCR_RETURN_STACK     BIT(29)
->  /* ETMCCR - 0x04 */
->  #define ETMCCR_FIFOFULL                BIT(23)
->  /* ETMPDCR - 0x310 */
-> @@ -110,8 +112,11 @@
->  #define ETM_MODE_STALL         BIT(2)
->  #define ETM_MODE_TIMESTAMP     BIT(3)
->  #define ETM_MODE_CTXID         BIT(4)
-> +#define ETM_MODE_BBROAD                BIT(5)
-> +#define ETM_MODE_RET_STACK     BIT(6)
->  #define ETM_MODE_ALL           (ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
->                                  ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
-> +                                ETM_MODE_BBROAD | ETM_MODE_RET_STACK | \
->                                  ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
->                                  ETM_MODE_EXCL_USER)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> index e9b0719..7308304 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-> @@ -164,6 +164,16 @@ static ssize_t mode_store(struct device *dev,
->         else
->                 config->ctrl &= ~ETMCR_CTXID_SIZE;
->
-> +       if (config->mode & ETM_MODE_BBROAD)
-> +               config->ctrl |= ETMCR_BRANCH_BROADCAST;
-> +       else
-> +               config->ctrl &= ~ETMCR_BRANCH_BROADCAST;
-> +
-> +       if (config->mode & ETM_MODE_RET_STACK)
-> +               config->ctrl |= ETMCR_RETURN_STACK;
-> +       else
-> +               config->ctrl &= ~ETMCR_RETURN_STACK;
-> +
->         if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
->                 etm_config_trace_mode(config);
+Allow PM Domain states to be defined dynamically by the drivers. This
+removes the limitation on the maximum number of states possible for a
+domain.
 
-Applied.
+Cc: Axel Haslam <ahaslam+renesas@baylibre.com>
+Suggested-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+ arch/arm/mach-imx/gpc.c     | 17 ++++++++++-------
+ drivers/base/power/domain.c | 36 ++++++++++++++++++++++++------------
+ include/linux/pm_domain.h   |  5 ++---
+ 3 files changed, 36 insertions(+), 22 deletions(-)
 
-Thanks,
-Mathieu
-
->
-> --
-> 1.9.1
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 0df062d..57a410b 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -380,13 +380,6 @@ static struct pu_domain imx6q_pu_domain = {
+ 		.name = "PU",
+ 		.power_off = imx6q_pm_pu_power_off,
+ 		.power_on = imx6q_pm_pu_power_on,
+-		.states = {
+-			[0] = {
+-				.power_off_latency_ns = 25000,
+-				.power_on_latency_ns = 2000000,
+-			},
+-		},
+-		.state_count = 1,
+ 	},
+ };
+ 
+@@ -430,6 +423,16 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
+ 	if (!IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
+ 		return 0;
+ 
++	imx6q_pu_domain.base.states = devm_kzalloc(dev,
++					sizeof(*imx6q_pu_domain.base.states),
++					GFP_KERNEL);
++	if (!imx6q_pu_domain.base.states)
++		return -ENOMEM;
++
++	imx6q_pu_domain.base.states[0].power_off_latency_ns = 25000;
++	imx6q_pu_domain.base.states[0].power_on_latency_ns = 2000000;
++	imx6q_pu_domain.base.state_count = 1;
++
+ 	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
+ 	return of_genpd_add_provider_onecell(dev->of_node,
+ 					     &imx_gpc_onecell_data);
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index e023066..4e87170 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1282,6 +1282,21 @@ out:
+ }
+ EXPORT_SYMBOL_GPL(pm_genpd_remove_subdomain);
+ 
++static int genpd_set_default_power_state(struct generic_pm_domain *genpd)
++{
++	struct genpd_power_state *state;
++
++	state = kzalloc(sizeof(*state), GFP_KERNEL);
++	if (!state)
++		return -ENOMEM;
++
++	genpd->states = state;
++	genpd->state_count = 1;
++	genpd->free = state;
++
++	return 0;
++}
++
+ /**
+  * pm_genpd_init - Initialize a generic I/O PM domain object.
+  * @genpd: PM domain object to initialize.
+@@ -1293,6 +1308,8 @@ EXPORT_SYMBOL_GPL(pm_genpd_remove_subdomain);
+ int pm_genpd_init(struct generic_pm_domain *genpd,
+ 		  struct dev_power_governor *gov, bool is_off)
+ {
++	int ret;
++
+ 	if (IS_ERR_OR_NULL(genpd))
+ 		return -EINVAL;
+ 
+@@ -1325,19 +1342,12 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
+ 		genpd->dev_ops.start = pm_clk_resume;
+ 	}
+ 
+-	if (genpd->state_idx >= GENPD_MAX_NUM_STATES) {
+-		pr_warn("Initial state index out of bounds.\n");
+-		genpd->state_idx = GENPD_MAX_NUM_STATES - 1;
+-	}
+-
+-	if (genpd->state_count > GENPD_MAX_NUM_STATES) {
+-		pr_warn("Limiting states to  %d\n", GENPD_MAX_NUM_STATES);
+-		genpd->state_count = GENPD_MAX_NUM_STATES;
+-	}
+-
+ 	/* Use only one "off" state if there were no states declared */
+-	if (genpd->state_count == 0)
+-		genpd->state_count = 1;
++	if (genpd->state_count == 0) {
++		ret = genpd_set_default_power_state(genpd);
++		if (ret)
++			return ret;
++	}
+ 
+ 	mutex_lock(&gpd_list_lock);
+ 	list_add(&genpd->gpd_list_node, &gpd_list);
+@@ -1374,6 +1384,8 @@ static int genpd_remove(struct generic_pm_domain *genpd)
+ 		kfree(link);
+ 	}
+ 
++	kfree(genpd->free);
++
+ 	list_del(&genpd->gpd_list_node);
+ 	mutex_unlock(&genpd->lock);
+ 	cancel_work_sync(&genpd->power_off_work);
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index a09fe5c..de1d8f3 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -19,8 +19,6 @@
+ /* Defines used for the flags field in the struct generic_pm_domain */
+ #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
+ 
+-#define GENPD_MAX_NUM_STATES	8 /* Number of possible low power states */
+-
+ enum gpd_status {
+ 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
+ 	GPD_STATE_POWER_OFF,	/* PM domain is off */
+@@ -70,9 +68,10 @@ struct generic_pm_domain {
+ 	void (*detach_dev)(struct generic_pm_domain *domain,
+ 			   struct device *dev);
+ 	unsigned int flags;		/* Bit field of configs for genpd */
+-	struct genpd_power_state states[GENPD_MAX_NUM_STATES];
++	struct genpd_power_state *states;
+ 	unsigned int state_count; /* number of states */
+ 	unsigned int state_idx; /* state that genpd will go to when off */
++	void *free; /* Free the state that was allocated for default */
+ 
+ };
+ 
+-- 
+2.7.4
