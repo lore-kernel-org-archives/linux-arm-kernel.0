@@ -1,62 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  7 Oct 2016 17:22:48 +0200
-Subject: [PATCH 2/10] mmc: sdhci: Export sdhci_start_signal_voltage_switch()
- in sdhci.c
-In-Reply-To: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
-References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
-Message-ID: <9a660a813af58ad7c108fd06289513302426c9fb.1475853198.git-series.gregory.clement@free-electrons.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 7 Oct 2016 19:28:10 +0300
+Subject: [PATCH 3/3] mtd: s3c2410: parse the device configuration from OF
+ node
+In-Reply-To: <1475711217-974-4-git-send-email-sergio.prado@e-labworks.com>
+References: <1475711217-974-1-git-send-email-sergio.prado@e-labworks.com>
+ <1475711217-974-4-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <20161007162810.GB4222@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ziji Hu <huziji@marvell.com>
+On Wed, Oct 05, 2016 at 08:46:57PM -0300, Sergio Prado wrote:
+> Allows configuring Samsung's s3c2410 memory controller using a
+> devicetree.
+> 
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  drivers/mtd/nand/s3c2410.c                     | 171 ++++++++++++++++++++++---
+>  include/linux/platform_data/mtd-nand-s3c2410.h |   1 +
+>  2 files changed, 156 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> index 174ac9dc4265..352cf2656bc8 100644
+> --- a/drivers/mtd/nand/s3c2410.c
+> +++ b/drivers/mtd/nand/s3c2410.c
+> @@ -39,6 +39,8 @@
+>  #include <linux/slab.h>
+>  #include <linux/clk.h>
+>  #include <linux/cpufreq.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/nand.h>
+> @@ -185,6 +187,26 @@ struct s3c2410_nand_info {
+>  #endif
+>  };
+>  
+> +struct s3c24XX_nand_devtype_data {
+> +	enum s3c_cpu_type type;
+> +};
+> +
+> +struct s3c24XX_nand_devtype_data s3c2410_nand_devtype_data = {
+> +	.type = TYPE_S3C2410,
+> +};
+> +
+> +struct s3c24XX_nand_devtype_data s3c2412_nand_devtype_data = {
+> +	.type = TYPE_S3C2412,
+> +};
+> +
+> +struct s3c24XX_nand_devtype_data s3c2440_nand_devtype_data = {
+> +	.type = TYPE_S3C2440,
+> +};
+> +
+> +struct s3c24XX_nand_devtype_data s3c6400_nand_devtype_data = {
+> +	.type = TYPE_S3C2412,
 
-Export sdhci_start_signal_voltage_switch() from sdhci.c.
-Thus vendor sdhci driver can implement its own signal voltage
-switch routine.
+All of these look like candidate for static const.
 
-Signed-off-by: Hu Ziji <huziji@marvell.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/mmc/host/sdhci.c | 5 +++--
- drivers/mmc/host/sdhci.h | 2 ++
- 2 files changed, 5 insertions(+), 2 deletions(-)
+Additionally you are not actually differentiating between s3c2412 and
+s3c64xx so I think there is not need of samsung,s3c6400-nand compatible.
+Just use existing one.
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index d4bb818c52d5..2250ea22231f 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1828,8 +1828,8 @@ static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 	spin_unlock_irqrestore(&host->lock, flags);
- }
- 
--static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
--					     struct mmc_ios *ios)
-+int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
-+				      struct mmc_ios *ios)
- {
- 	struct sdhci_host *host = mmc_priv(mmc);
- 	u16 ctrl;
-@@ -1921,6 +1921,7 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
- 		return 0;
- 	}
- }
-+EXPORT_SYMBOL_GPL(sdhci_start_signal_voltage_switch);
- 
- static int sdhci_card_busy(struct mmc_host *mmc)
- {
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index 21dc80b8ae3d..c38ab65b9a97 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -687,6 +687,8 @@ void sdhci_set_bus_width(struct sdhci_host *host, int width);
- void sdhci_reset(struct sdhci_host *host, u8 mask);
- void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing);
- void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
-+int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
-+				      struct mmc_ios *ios);
- 
- #ifdef CONFIG_PM
- extern int sdhci_suspend_host(struct sdhci_host *host);
--- 
-git-series 0.8.10
+Best regards,
+Krzysztof
