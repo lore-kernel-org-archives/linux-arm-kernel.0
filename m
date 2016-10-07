@@ -1,106 +1,56 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 7 Oct 2016 14:45:17 -0600
-Subject: [PATCH v13 12/15] vfio: Allow reserved msi iova registration
-In-Reply-To: <27e4db66-7df2-16b4-c3d9-982d6ea845b0@redhat.com>
-References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
- <1475743531-4780-13-git-send-email-eric.auger@redhat.com>
- <20161006141932.0a193f9b@t450s.home>
- <27e4db66-7df2-16b4-c3d9-982d6ea845b0@redhat.com>
-Message-ID: <20161007144517.74d876bb@t450s.home>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Fri, 7 Oct 2016 13:54:02 -0700
+Subject: [PATCH 1/3] fpga manager: Add cyclonespi driver for Altera fpgas
+In-Reply-To: <alpine.DEB.2.02.1610071248320.32627@linuxheads99>
+References: <cover.1475783742.git.stillcompiling@gmail.com>
+ <4b4432c04b4ea92a2af814e3d7866c33f2eb12ea.1475783742.git.stillcompiling@gmail.com>
+ <CAAtXAHcWLpn3DFP6YLWqBxsMQ0O=HNNCmB+kHbHhyAHFHQUbwA@mail.gmail.com>
+ <alpine.DEB.2.02.1610071248320.32627@linuxheads99>
+Message-ID: <46d5a356-f2c1-3b9f-45f3-4910c97695dc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Oct 2016 19:11:43 +0200
-Auger Eric <eric.auger@redhat.com> wrote:
 
-> Hi Alex,
-> 
-> On 06/10/2016 22:19, Alex Williamson wrote:
-> > On Thu,  6 Oct 2016 08:45:28 +0000
-> > Eric Auger <eric.auger@redhat.com> wrote:
-> >   
-> >> The user is allowed to register a reserved MSI IOVA range by using the
-> >> DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
-> >> This region is stored in the vfio_dma rb tree. At that point the iova
-> >> range is not mapped to any target address yet. The host kernel will use
-> >> those iova when needed, typically when MSIs are allocated.
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> >> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
-> >>
-> >> ---
-> >> v12 -> v13:
-> >> - use iommu_get_dma_msi_region_cookie
-> >>
-> >> v9 -> v10
-> >> - use VFIO_IOVA_RESERVED_MSI enum value
-> >>
-> >> v7 -> v8:
-> >> - use iommu_msi_set_aperture function. There is no notion of
-> >>   unregistration anymore since the reserved msi slot remains
-> >>   until the container gets closed.
-> >>
-> >> v6 -> v7:
-> >> - use iommu_free_reserved_iova_domain
-> >> - convey prot attributes downto dma-reserved-iommu iova domain creation
-> >> - reserved bindings teardown now performed on iommu domain destruction
-> >> - rename VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA into
-> >>          VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA
-> >> - change title
-> >> - pass the protection attribute to dma-reserved-iommu API
-> >>
-> >> v3 -> v4:
-> >> - use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
-> >> - protect vfio_register_reserved_iova_range implementation with
-> >>   CONFIG_IOMMU_DMA_RESERVED
-> >> - handle unregistration by user-space and on vfio_iommu_type1 release
-> >>
-> >> v1 -> v2:
-> >> - set returned value according to alloc_reserved_iova_domain result
-> >> - free the iova domains in case any error occurs
-> >>
-> >> RFC v1 -> v1:
-> >> - takes into account Alex comments, based on
-> >>   [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
-> >> - use the existing dma map/unmap ioctl interface with a flag to register
-> >>   a reserved IOVA range. A single reserved iova region is allowed.
-> >> ---
-> >>  drivers/vfio/vfio_iommu_type1.c | 77 ++++++++++++++++++++++++++++++++++++++++-
-> >>  include/uapi/linux/vfio.h       | 10 +++++-
-> >>  2 files changed, 85 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-> >> index 5bc5fc9..c2f8bd9 100644
-> >> --- a/drivers/vfio/vfio_iommu_type1.c
-> >> +++ b/drivers/vfio/vfio_iommu_type1.c
-> >> @@ -442,6 +442,20 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
-> >>  	vfio_lock_acct(-unlocked);
-> >>  }
-> >>  
-> >> +static int vfio_set_msi_aperture(struct vfio_iommu *iommu,
-> >> +				dma_addr_t iova, size_t size)
-> >> +{
-> >> +	struct vfio_domain *d;
-> >> +	int ret = 0;
-> >> +
-> >> +	list_for_each_entry(d, &iommu->domain_list, next) {
-> >> +		ret = iommu_get_dma_msi_region_cookie(d->domain, iova, size);
-> >> +		if (ret)
-> >> +			break;
-> >> +	}
-> >> +	return ret;  
-> > 
-> > Doesn't this need an unwind on failure loop?  
-> At the moment the de-allocation is done by the smmu driver, on
-> domain_free ops, which calls iommu_put_dma_cookie. In case,
-> iommu_get_dma_msi_region_cookie fails on a given VFIO domain currently
-> there is no other way but destroying all VFIO domains and redo everything.
-> 
-> So yes I plan to unfold everything, ie call iommu_put_dma_cookie for
-> each domain.
+On 10/07/2016 11:21 AM, atull wrote:
+> On Fri, 7 Oct 2016, Moritz Fischer wrote:
+>
+>>> +static inline u32 revbit8x4(u32 n)
+>>> +{
+>>> +       n = ((n & 0xF0F0F0F0UL) >> 4) | ((n & 0x0F0F0F0FUL) << 4);
+>>> +       n = ((n & 0xCCCCCCCCUL) >> 2) | ((n & 0x33333333UL) << 2);
+>>> +       n = ((n & 0xAAAAAAAAUL) >> 1) | ((n & 0x55555555UL) << 1);
+>>> +       return n;
+>>> +}
+The real issue is that The FPGA wants lsb first, and my SPI driver
+doesn't support it.
+What I really wanted to do here was to get generic support for lsb-first
+SPI into the SPI subsystem.
+>> During the Zynq FPGA manager reviews we decided that manipulating the bitstream
+>> to be consumable by the driver is userland's job.
+> Moritz, Can you remind me what that issue was there (or point me to
+> that email, I can't find it)?  I don't think I had a problem with that
+> in your case.  In general I think if these drivers can take the
+> bitstream that comes from the manufacturer's tools and stuff it into
+> the FPGA, then we are accomplishing what we want.  So I am OK with
+> this here.  The intent of the driver is to load a standard rbf, same
+> as the other Altera FPGA drivers.
+> There is a problem here though it will be easy to fix.  This call to
+> revbit8x4 should happen in cyclonespi_write(), not in
+> cyclonespi_write_init(). The reason for that is that write_init() may
+> just get the first chunk of the image (the header) and that write()
+> will be called multiple times for the remaining chunks.  The current
+> FPGA manager API won't show this problem since you have to give
+> fpga_mgr_buf_load the whole image buffer at once.  But it is easy to
+> imagine that some time in the future we may want to expand the FPGA
+> manager API to support streaming where we don't have the whole buffer.
+OK.
+If generic lsb first support for SPI is too high a bar (which it may be),
+I will move the bit reversing code into the write function.
+> Thanks for submitting, Joshua.  Will be looking at this over the
+> next several days.
+>
+> Alan
+Thanks for the quick response!
+I'll be looking forward to your review,
 
-That's a pretty harsh user experience isn't it?  They potentially have
-some domains where the cookie is setup and others without and they have
-no means to recover except to tear it all down and start over?  Thanks,
-
-Alex
+Joshua Clayton
