@@ -1,22 +1,20 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 07 Oct 2016 07:43:48 -0700
-Subject: [PATCH] ARM64: dts: meson-gx: Add missing L2 cache node
-In-Reply-To: <1475675630-31514-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Wed, 5 Oct 2016 15:53:50 +0200")
-References: <1475675630-31514-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7h7f9kfcd7.fsf@baylibre.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 7 Oct 2016 16:44:12 +0200
+Subject: [PATCH 1/4] staging/vchi: Convert to current get_user_pages()
+ arguments.
+In-Reply-To: <20161003185209.27733-2-eric@anholt.net>
+References: <20161003185209.27733-1-eric@anholt.net>
+ <20161003185209.27733-2-eric@anholt.net>
+Message-ID: <20161007144412.GA27514@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+On Mon, Oct 03, 2016 at 11:52:06AM -0700, Eric Anholt wrote:
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-> In order to remove the boot warning :
-> [    2.290933] Unable to detect cache hierarchy from DT for CPU 0
-> And add missing L2 cache hierarchy information, add a simple l2 cache node
-> and reference it from the A53 cpu nodes.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+In the future, it's good to put at least some changelog text in here.  I
+normally do not accept patches without it.  But I'll take these two.
 
-Applied to v4.10/dt64.
+thanks,
 
-Kevin
+greg k-h
