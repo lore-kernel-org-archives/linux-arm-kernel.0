@@ -1,167 +1,101 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 7 Oct 2016 17:39:59 -0400
-Subject: [PATCH V3 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <1475875882-2604-10-git-send-email-tbaicar@codeaurora.org>
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-10-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20161007173959.5ff3fcfa@gandalf.local.home>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 7 Oct 2016 15:44:12 -0600
+Subject: [PATCH v4] Adding missing features of Coresight PTM components
+In-Reply-To: <0b570076-08cb-c63a-7240-8c81d34fc383@centralesupelec.fr>
+References: <60a1f04c-1e73-0ff1-dfee-775b875d2c4a@centralesupelec.fr>
+ <0b570076-08cb-c63a-7240-8c81d34fc383@centralesupelec.fr>
+Message-ID: <CANLsYkzS1L3k8uSJ=4o8DHHsRBKUe2vK9Pm60hJcPXX2D432qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  7 Oct 2016 15:31:21 -0600
-Tyler Baicar <tbaicar@codeaurora.org> wrote:
-
-> Currently there are trace events for the various RAS
-> errors with the exception of ARM processor type errors.
-> Add a new trace event for such errors so that the user
-> will know when they occur. These trace events are
-> consistent with the ARM processor error section type
-> defined in UEFI 2.6 spec section N.2.4.4.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+On 7 October 2016 at 06:16, Muhammad Abdul WAHAB
+<muhammadabdul.wahab@centralesupelec.fr> wrote:
+> In the current driver for Coresight components, two features of PTM
+> components are missing:
+>
+> 1. Branch Broadcasting (present also in ETM but called Branch Output)
+> 2. Return Stack (only present in PTM v1.0 and PTMv1.1)
+>
+> These features can be added simply to the code using `mode` field of
+> `etm_config` struct.
+>
+> 1. **Branch Broadcast** : The branch broadcast feature is present in ETM
+> components as well and is called Branch output. It allows to retrieve
+> addresses for direct branch addresses alongside the indirect branch
+> addresses. For example, it could be useful in cases when tracing without
+> source code.
+> 2. **Return Stack** : The return stack option allows to retrieve the return
+> addresses of function calls. It can be useful to avoid CRA
+> (Code Reuse Attacks) by keeping a shadowstack.
+>
+> Signed-off-by: Muhammad Abdul Wahab <muhammadabdul.wahab@centralesupelec.fr>
 > ---
->  drivers/firmware/efi/cper.c |  9 ++++++
->  drivers/ras/ras.c           |  1 +
->  include/ras/ras_event.h     | 67 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 77 insertions(+)
-> 
-> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-> index f9ffba6..21b8a6f 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -34,6 +34,7 @@
->  #include <linux/aer.h>
->  #include <linux/printk.h>
->  #include <linux/bcd.h>
-> +#include <ras/ras_event.h>
->  
->  #define INDENT_SP	" "
->  
-> @@ -256,6 +257,14 @@ static void cper_print_proc_armv8(const char *pfx,
->  		    CPER_ARMV8_INFO_VALID_PHYSICAL_ADDR)
->  			printk("%sphysical fault address: 0x%016llx\n",
->  				newpfx, err_info->physical_fault_addr);
-> +		trace_arm_event(proc->affinity_level, proc->mpidr, proc->midr,
-> +				proc->running_state, proc->psci_state,
-> +				err_info->version, err_info->type,
-> +				err_info->multiple_error,
-> +				err_info->validation_bits,
-> +				err_info->error_info,
-> +				err_info->virt_fault_addr,
-> +				err_info->physical_fault_addr);
-
-Why waste all the effort into passing each individual field. Why not
-just pass the structure in and sort it out in the TP_fast_assign()?
-
->  		err_info += 1;
->  	}
->  
-> diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
-> index fb2500b..8ba5a94 100644
-> --- a/drivers/ras/ras.c
-> +++ b/drivers/ras/ras.c
-> @@ -28,3 +28,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
->  #endif
->  EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
->  EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
-> +EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
-> diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-> index 5861b6f..eb2719a 100644
-> --- a/include/ras/ras_event.h
-> +++ b/include/ras/ras_event.h
-> @@ -162,6 +162,73 @@ TRACE_EVENT(mc_event,
->  );
->  
->  /*
-> + * ARM Processor Events Report
-> + *
-> + * This event is generated when hardware detects an ARM processor error
-> + * has occurred. UEFI 2.6 spec section N.2.4.4.
-> + */
-> +TRACE_EVENT(arm_event,
+> change(s) in v4 :
+>         - syntax error correction (sorry did not compile after 1st version
+> but did compile it before sending it this time)
+>
+> drivers/hwtracing/coresight/coresight-etm.h         |  5 +++++
+>  drivers/hwtracing/coresight/coresight-etm3x-sysfs.c | 10 ++++++++++
+>  2 files changed, 15 insertions(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm.h
+> b/drivers/hwtracing/coresight/coresight-etm.h
+> index 4a18ee4..ad063d7 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm.h
+> +++ b/drivers/hwtracing/coresight/coresight-etm.h
+> @@ -89,11 +89,13 @@
+>  /* ETMCR - 0x00 */
+>  #define ETMCR_PWD_DWN          BIT(0)
+>  #define ETMCR_STALL_MODE       BIT(7)
+> +#define ETMCR_BRANCH_BROADCAST BIT(8)
+>  #define ETMCR_ETM_PRG          BIT(10)
+>  #define ETMCR_ETM_EN           BIT(11)
+>  #define ETMCR_CYC_ACC          BIT(12)
+>  #define ETMCR_CTXID_SIZE       (BIT(14)|BIT(15))
+>  #define ETMCR_TIMESTAMP_EN     BIT(28)
+> +#define ETMCR_RETURN_STACK     BIT(29)
+>  /* ETMCCR - 0x04 */
+>  #define ETMCCR_FIFOFULL                BIT(23)
+>  /* ETMPDCR - 0x310 */
+> @@ -110,8 +112,11 @@
+>  #define ETM_MODE_STALL         BIT(2)
+>  #define ETM_MODE_TIMESTAMP     BIT(3)
+>  #define ETM_MODE_CTXID         BIT(4)
+> +#define ETM_MODE_BBROAD                BIT(5)
+> +#define ETM_MODE_RET_STACK     BIT(6)
+>  #define ETM_MODE_ALL           (ETM_MODE_EXCLUDE | ETM_MODE_CYCACC | \
+>                                  ETM_MODE_STALL | ETM_MODE_TIMESTAMP | \
+> +                                ETM_MODE_BBROAD | ETM_MODE_RET_STACK | \
+>                                  ETM_MODE_CTXID | ETM_MODE_EXCL_KERN | \
+>                                  ETM_MODE_EXCL_USER)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> index e9b0719..7308304 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> @@ -164,6 +164,16 @@ static ssize_t mode_store(struct device *dev,
+>         else
+>                 config->ctrl &= ~ETMCR_CTXID_SIZE;
+>
+> +       if (config->mode & ETM_MODE_BBROAD)
+> +               config->ctrl |= ETMCR_BRANCH_BROADCAST;
+> +       else
+> +               config->ctrl &= ~ETMCR_BRANCH_BROADCAST;
 > +
-> +	TP_PROTO(const u8 affinity,
-> +		 const u64 mpidr,
-> +		 const u64 midr,
-> +		 const u32 running_state,
-> +		 const u32 psci_state,
-> +		 const u8 version,
-> +		 const u8 type,
-> +		 const u16 err_count,
-> +		 const u8 flags,
-> +		 const u64 info,
-> +		 const u64 virt_fault_addr,
-> +		 const u64 phys_fault_addr),
+> +       if (config->mode & ETM_MODE_RET_STACK)
+> +               config->ctrl |= ETMCR_RETURN_STACK;
+> +       else
+> +               config->ctrl &= ~ETMCR_RETURN_STACK;
 > +
-> +	TP_ARGS(affinity, mpidr, midr, running_state, psci_state,
-> +		version, type, err_count, flags, info, virt_fault_addr,
-> +		phys_fault_addr),
-> +
-> +	TP_STRUCT__entry(
-> +		__field(u8, affinity)
-> +		__field(u64, mpidr)
-> +		__field(u64, midr)
-> +		__field(u32, running_state)
-> +		__field(u32, psci_state)
-> +		__field(u8, version)
-> +		__field(u8, type)
-> +		__field(u16, err_count)
-> +		__field(u8, flags)
-> +		__field(u64, info)
-> +		__field(u64, virt_fault_addr)
-> +		__field(u64, phys_fault_addr)
+>         if (config->mode & (ETM_MODE_EXCL_KERN | ETM_MODE_EXCL_USER))
+>                 etm_config_trace_mode(config);
 
-The above creates a structure with lots of holes in it. Pack it better.
-You want something like:
+Applied.
 
-	__field(u64, mpidr)
-	__field(u64, midr)
-	__field(u64, info)
-	__field(u64, virt_fault_addr)
-	__field(u64, phys_fault_addr)
-	__field(u32, running_state)
-	__field(u32, psci_state)
-	__field(u16, err_count)
-	__field(u8, affinity)
-	__field(u8, version)
-	__field(u8, type)
-	__field(u8, flags)
+Thanks,
+Mathieu
 
-The above is a total of 54 bytes. Your original was at a minimum, 64
-bytes.
-
--- Steve
-
-> +	),
-> +
-> +	TP_fast_assign(
-> +		__entry->affinity = affinity;
-> +		__entry->mpidr = mpidr;
-> +		__entry->midr = midr;
-> +		__entry->running_state = running_state;
-> +		__entry->psci_state = psci_state;
-> +		__entry->version = version;
-> +		__entry->type = type;
-> +		__entry->err_count = err_count;
-> +		__entry->flags = flags;
-> +		__entry->info = info;
-> +		__entry->virt_fault_addr = virt_fault_addr;
-> +		__entry->phys_fault_addr = phys_fault_addr;
-> +	),
-> +
-> +	TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
-> +		  "running state: %d; PSCI state: %d; version: %d; type: %d; "
-> +		  "error count: 0x%04x; flags: 0x%02x; info: %016llx; "
-> +		  "virtual fault address: %016llx; "
-> +		  "physical fault address: %016llx",
-> +		  __entry->affinity, __entry->mpidr, __entry->midr,
-> +		  __entry->running_state, __entry->psci_state, __entry->version,
-> +		  __entry->type, __entry->err_count, __entry->flags,
-> +		  __entry->info, __entry->virt_fault_addr,
-> +		  __entry->phys_fault_addr)
-> +);
-> +
-> +/*
->   * Unknown Section Report
->   *
->   * This event is generated when hardware detected a hardware
+>
+> --
+> 1.9.1
