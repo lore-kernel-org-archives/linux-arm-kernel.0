@@ -1,20 +1,24 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 7 Oct 2016 12:15:37 +0900
-Subject: [PATCH v3 03/11] ARM: shmobile: r8a7743: basic SoC support
-In-Reply-To: <15557770.lH5aPepOeZ@wasted.cogentembedded.com>
-References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
- <15557770.lH5aPepOeZ@wasted.cogentembedded.com>
-Message-ID: <20161007031537.GK13721@verge.net.au>
+Date: Fri, 7 Oct 2016 12:32:15 +0900
+Subject: [PATCH 0/2] ARM: shmobile: alt/gose: Add board part number to DT
+ bindings
+In-Reply-To: <1475587248-13670-1-git-send-email-geert+renesas@glider.be>
+References: <1475587248-13670-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20161007033214.GO13721@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 06, 2016 at 12:37:08AM +0300, Sergei Shtylyov wrote:
-> Add minimal support for the RZ/G1M (R8A7743) SoC.
+On Tue, Oct 04, 2016 at 03:20:46PM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> Based on the original (and large) patch by Dmitry Shifrin
-> <dmitry.shifrin@cogentembedded.com>.
+> This series at the missing board part numbers for r8a7794/alt and
+> r8a7793/gose to the DT binding documentation, like is done for the other
+> boards.
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Thanks for applying!
+> 
+> Geert Uytterhoeven (2):
+>   ARM: shmobile: r8a7794/alt: Add board part number to DT bindings
+>   ARM: shmobile: r8a7793/gose: Add board part number to DT bindings
 
-Thanks, I have queued this up.
+Thanks, I have queued these up.
