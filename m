@@ -1,52 +1,70 @@
 From: ahaslam@baylibre.com (ahaslam at baylibre.com)
-Date: Fri,  7 Oct 2016 18:42:50 +0200
-Subject: [PATCH/RFT 05/12] USB: ohci-da8xx: Fix probe for devices with no
- vbus/oci gpio
+Date: Fri,  7 Oct 2016 18:42:49 +0200
+Subject: [PATCH/RFT 04/12] USB: ohci-da8xx: Divide power up time in the ohci
+ driver
 In-Reply-To: <1475858577-10366-1-git-send-email-ahaslam@baylibre.com>
 References: <1475858577-10366-1-git-send-email-ahaslam@baylibre.com>
-Message-ID: <1475858577-10366-6-git-send-email-ahaslam@baylibre.com>
+Message-ID: <1475858577-10366-5-git-send-email-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Axel Haslam <ahaslam@baylibre.com>
 
-Some boards dont have gpios assigened for vbus or oci.
-
-Allow these boards to enumerate usb without declaring the set_power
-and/or the ocic_notify callbacks in platform data.
+Instead of requiring platform data to know that the effective time
+should be diveded by two, Make that operation in the driver so that
+users (platform board files/Device tree) dont have to worry about it.
 
 Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
 ---
- drivers/usb/host/ohci-da8xx.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/mach-davinci/board-da830-evm.c     | 2 +-
+ arch/arm/mach-davinci/board-omapl138-hawk.c | 2 +-
+ drivers/usb/host/ohci-da8xx.c               | 8 ++++++--
+ 3 files changed, 8 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index 18d2b10..8d126e4 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -94,7 +94,7 @@ static struct da8xx_ohci_platform_data da830_evm_usb11_pdata = {
+ 	.ocic_notify	= da830_evm_usb_ocic_notify,
+ 
+ 	/* TPS2065 switch @ 5V */
+-	.potpgt		= (3 + 1) / 2,	/* 3 ms max */
++	.potpgt		= 3,	/* 3 ms max */
+ };
+ 
+ static irqreturn_t da830_evm_usb_ocic_irq(int irq, void *dev_id)
+diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+index a2bf3eb..f9cd388 100644
+--- a/arch/arm/mach-davinci/board-omapl138-hawk.c
++++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+@@ -232,7 +232,7 @@ static struct da8xx_ohci_platform_data omapl138_hawk_usb11_pdata = {
+ 	.get_oci        = hawk_usb_get_oci,
+ 	.ocic_notify    = hawk_usb_ocic_notify,
+ 	/* TPS2087 switch @ 5V */
+-	.potpgt         = (3 + 1) / 2,  /* 3 ms max */
++	.potpgt         = 3  /* 3 ms max */
+ };
+ 
+ static irqreturn_t omapl138_hawk_usb_ocic_irq(int irq, void *dev_id)
 diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
-index 3c85d6c..9d9f8e3 100644
+index 8ed9a52..3c85d6c 100644
 --- a/drivers/usb/host/ohci-da8xx.c
 +++ b/drivers/usb/host/ohci-da8xx.c
-@@ -215,7 +215,7 @@ static int ohci_da8xx_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 				temp ? "Set" : "Clear", wIndex, "POWER");
- 
- 			if (!pdata->set_power)
--				return -EPIPE;
-+				return 0;
- 
- 			return pdata->set_power(wIndex, temp) ? -EPIPE : 0;
- 		case USB_PORT_FEAT_C_OVER_CURRENT:
-@@ -343,10 +343,12 @@ static int usb_hcd_da8xx_probe(const struct hc_driver *driver,
- 
- 	if (pdata->ocic_notify) {
- 		error = pdata->ocic_notify(ohci_da8xx_ocic_handler);
--		if (!error)
--			return 0;
-+		if (error)
-+			goto err_notify;
+@@ -115,8 +115,12 @@ static int ohci_da8xx_init(struct usb_hcd *hcd)
+ 		rh_a &= ~RH_A_NOCP;
+ 		rh_a |=  RH_A_OCPM;
  	}
+-	rh_a &= ~RH_A_POTPGT;
+-	rh_a |= pdata->potpgt << 24;
++
++	if (pdata->potpgt) {
++		rh_a &= ~RH_A_POTPGT;
++		rh_a |= (DIV_ROUND_UP(pdata->potpgt, 2) << 24);
++	}
++
+ 	ohci_writel(ohci, rh_a, &ohci->regs->roothub.a);
  
-+	return 0;
-+err_notify:
- 	usb_remove_hcd(hcd);
- err:
- 	usb_put_hcd(hcd);
+ 	return result;
 -- 
 2.7.1
