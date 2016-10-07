@@ -1,54 +1,62 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  7 Oct 2016 17:22:55 +0200
-Subject: [PATCH 9/10] arm64: dts: marvell: add sdhci support for Armada 7K/8K
+Date: Fri,  7 Oct 2016 17:22:48 +0200
+Subject: [PATCH 2/10] mmc: sdhci: Export sdhci_start_signal_voltage_switch()
+ in sdhci.c
 In-Reply-To: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
 References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
-Message-ID: <ff336f8fe0f60df3cbfbe3f7cd54605b7c2357dd.1475853198.git-series.gregory.clement@free-electrons.com>
+Message-ID: <9a660a813af58ad7c108fd06289513302426c9fb.1475853198.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also enable it on the Armada 7040 DB board
+From: Ziji Hu <huziji@marvell.com>
 
+Export sdhci_start_signal_voltage_switch() from sdhci.c.
+Thus vendor sdhci driver can implement its own signal voltage
+switch routine.
+
+Signed-off-by: Hu Ziji <huziji@marvell.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-7040-db.dts |  7 +++++++
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi  |  9 +++++++++
- 2 files changed, 16 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sdhci.c | 5 +++--
+ drivers/mmc/host/sdhci.h | 2 ++
+ 2 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 070b589680c5..f7f978a12a49 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -146,3 +146,10 @@
- &cpm_usb3_1 {
- 	status = "okay";
- };
-+
-+&sdhci0 {
-+	status = "okay";
-+	bus-width = <4>;
-+	no-1-8-v;
-+	non-removable;
-+};
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 7b6136182ad0..ef2ce6be7205 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -229,6 +229,15 @@
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index d4bb818c52d5..2250ea22231f 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1828,8 +1828,8 @@ static void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable)
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
  
- 			};
+-static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+-					     struct mmc_ios *ios)
++int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
++				      struct mmc_ios *ios)
+ {
+ 	struct sdhci_host *host = mmc_priv(mmc);
+ 	u16 ctrl;
+@@ -1921,6 +1921,7 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+ 		return 0;
+ 	}
+ }
++EXPORT_SYMBOL_GPL(sdhci_start_signal_voltage_switch);
  
-+			sdhci0: sdhci at 6e0000 {
-+				compatible = "marvell,sdhci-xenon";
-+				reg = <0x6e0000 0x300>;
-+				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+				clock-names = "core";
-+				clocks = <&cpm_syscon0 1 4>;
-+				status = "disabled";
-+			};
-+
- 			ap_syscon: system-controller at 6f4000 {
- 				compatible = "marvell,ap806-system-controller",
- 					     "syscon";
+ static int sdhci_card_busy(struct mmc_host *mmc)
+ {
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 21dc80b8ae3d..c38ab65b9a97 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -687,6 +687,8 @@ void sdhci_set_bus_width(struct sdhci_host *host, int width);
+ void sdhci_reset(struct sdhci_host *host, u8 mask);
+ void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing);
+ void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
++int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
++				      struct mmc_ios *ios);
+ 
+ #ifdef CONFIG_PM
+ extern int sdhci_suspend_host(struct sdhci_host *host);
 -- 
 git-series 0.8.10
