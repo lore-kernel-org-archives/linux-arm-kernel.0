@@ -1,57 +1,33 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  7 Oct 2016 17:22:49 +0200
-Subject: [PATCH 3/10] mmc: sdhci: Export sdhci_execute_tuning() in sdhci.c
-In-Reply-To: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
-References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
-Message-ID: <f94f7f1e6f0ce1afb2d1f6b0aaf8a1817b15c8fc.1475853198.git-series.gregory.clement@free-electrons.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 7 Oct 2016 12:34:42 -0300
+Subject: [PATCH 1/2] ARM: imx: fix integer overflow in AV PLL round rate
+In-Reply-To: <20161007141224.GA18011@lime>
+References: <1475752331-19525-1-git-send-email-emil@limesaudio.com>
+ <20161007141224.GA18011@lime>
+Message-ID: <CAOMZO5CYST3fw1q11RidmSMepsUpaHg91T5gD_c6XA6vsAsJLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ziji Hu <huziji@marvell.com>
+Hi Emil,
 
-Export sdhci_execute_tuning() from sdhci.c.
-Thus vendor sdhci driver can execute its own tuning process.
+On Fri, Oct 7, 2016 at 11:12 AM, Emil Lundmark <emil@limesaudio.com> wrote:
+> I realize that the two patches in this series does not actually depend on
+> each other. This is my first contribution to Linux so I wonder if I should
+> resubmit these as two separate patches instead?
+>
+> For example, what if the second patch in the series is not needed? Do you
+> only accept the first patch then? Or what if I need to revise the second
+> patch? It seems unnecessary to include the first patch in that case.
+>
+> I also got the threading wrong, but thats another story.
 
-Signed-off-by: Hu Ziji <huziji@marvell.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/mmc/host/sdhci.c | 3 ++-
- drivers/mmc/host/sdhci.h | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+It is better to resend these two patches and mark them as v2:
+[PATCH v2 1/2]
+[PATCH v2 2/2]
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 2250ea22231f..330119cd5a93 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1946,7 +1946,7 @@ static int sdhci_prepare_hs400_tuning(struct mmc_host *mmc, struct mmc_ios *ios)
- 	return 0;
- }
- 
--static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
-+int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
- {
- 	struct sdhci_host *host = mmc_priv(mmc);
- 	u16 ctrl;
-@@ -2135,6 +2135,7 @@ static int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode)
- 	spin_unlock_irqrestore(&host->lock, flags);
- 	return err;
- }
-+EXPORT_SYMBOL_GPL(sdhci_execute_tuning);
- 
- static int sdhci_select_drive_strength(struct mmc_card *card,
- 				       unsigned int max_dtr, int host_drv,
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index c38ab65b9a97..035274ddea54 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -689,6 +689,7 @@ void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing);
- void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
- int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
- 				      struct mmc_ios *ios);
-+int sdhci_execute_tuning(struct mmc_host *mmc, u32 opcode);
- 
- #ifdef CONFIG_PM
- extern int sdhci_suspend_host(struct sdhci_host *host);
--- 
-git-series 0.8.10
+Then put below the --- line what has changed from the previous one. If
+nothing changed just put "None".
+
+I am wondering if your patch series tries to fix the regression
+reported by Ken Lin or is it unrelated?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/460451.html
