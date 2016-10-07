@@ -1,49 +1,42 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 7 Oct 2016 16:52:47 +0800
-Subject: [PATCH v2 2/2] ARM: dts: rockchip: Add rk3066 MK808 board
-In-Reply-To: <18c0552c-10fa-a749-9777-9a99da9f275f@gmail.com>
-References: <cover.1475774981.git.paweljarosz3691@gmail.com>
- <b63a0ad452a487beb1d0c07addb9208cc3b3eeef.1475774981.git.paweljarosz3691@gmail.com>
- <a166a444-8819-ffe7-8ee1-1f632f6a66ab@rock-chips.com>
- <18c0552c-10fa-a749-9777-9a99da9f275f@gmail.com>
-Message-ID: <202c4ce7-ffaa-33f8-66e4-a48c15fade69@rock-chips.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 07 Oct 2016 11:12:20 +0200
+Subject: [PATCH v2 0/5] Add runtime PM support for clocks (on Exynos SoC
+ example)
+In-Reply-To: <57F6926F.1070707@math.uni-bielefeld.de>
+References: <CGME20160919105545eucas1p1026e435bbaeb1f5c866a9abcdd051464@eucas1p1.samsung.com>
+ <1474282525-30441-1-git-send-email-m.szyprowski@samsung.com>
+ <57F6926F.1070707@math.uni-bielefeld.de>
+Message-ID: <c1cf1a1f-2d1f-7f35-3e3b-f2de90959a24@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/10/7 16:40, Pawe? Jarosz ??:
-> Hi Shawn,
->
->
->>> +&mmc0 {
->>> +    bus-width = <4>;
->>> +    cap-mmc-highspeed;
->>> +    cap-sd-highspeed;
->>> +    mmc-pwrseq = <&mmc_pwrseq>;
->>
->> Removed this could make SD works?
->
-> Yes but disabling bus-width causes sd performance decrease(defaults to
-> 1?) so i'll leave this one.
-
-I just pointed to the mmc-pwrseq, not for others properties :)
-
->
-> Other sugestions will be included in v3.
->
-> Thanks
->
-> Pawe?.
->
->
->
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+Hi Tobias,
 
 
+On 2016-10-06 20:05, Tobias Jakobi wrote:
+> Hello Marek,
+>
+> I'm using the patches from the v4.8-clocks-pm-v2 branch plus the ones
+> from the v4.8-clocks-pm-v2 branch on top of 4.8.0.
+>
+> I see some warnings on boot coming from driver core. It appears that the
+> warnings are actually meaningful, since IOMMUs stop working completly.
+> E.g. if I modprobe s5p-mfc later, firmware loading fails because
+> apparantly the IOMMU domain isn't online.
+>
+>> WARNING: CPU: 0 PID: 1 at drivers/base/core.c:356 device_links_driver_bound+0x124/0x12c
+> I added some debug printk() to device_links_driver_bound(), to show the
+> link status. Apparantly it is always DEVICE_LINK_AVAILABLE.
+
+Please note that some additional patches are needed to get IOMMU working 
+properly with both runtime-pm patches and deferred probe, which feature 
+in turn is needed to get it working after adding clocks-pm changes. I 
+will send such patch soon (as a new version of IOMMU deferred probe 
+support patches were posted a few days ago).
+
+ > (...)
+
+Best regards
 -- 
-Best Regards
-Shawn Lin
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
