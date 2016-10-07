@@ -1,137 +1,41 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri,  7 Oct 2016 01:25:13 -0400
-Subject: [PATCH V5 08/10] dmaengine: qcom_hidma: protect common data structures
+Date: Fri,  7 Oct 2016 01:25:14 -0400
+Subject: [PATCH V5 09/10] dmaengine: qcom_hidma: break completion processing
+ on error
 In-Reply-To: <1475817915-11976-1-git-send-email-okaya@codeaurora.org>
 References: <1475817915-11976-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1475817915-11976-9-git-send-email-okaya@codeaurora.org>
+Message-ID: <1475817915-11976-10-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When MSI interrupts are supported, error and the transfer interrupt can
-come from multiple processor contexts.
+We try to consume as much successful transfers as possible. Now that we
+support MSI interrupts, an error interrupt might be observed by another
+processor while we are finishing the successful ones.
 
-Each error interrupt is an MSI interrupt. If the channel is disabled by
-the first error interrupt, the remaining error interrupts will gracefully
-return in the interrupt handler.
-
-If an error is observed while servicing the completions in success case,
-the posting of the completions will be aborted as soon as channel disabled
-state is observed. The error interrupt handler will take it from there and
-finish the remaining completions. We don't want to create multiple success
-and error messages to be delivered to the client in mixed order.
+Try to abort successful processing if this is the case.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/qcom/hidma_ll.c | 44 +++++++++++---------------------------------
- 1 file changed, 11 insertions(+), 33 deletions(-)
+ drivers/dma/qcom/hidma_ll.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index 9d78c86..c4e8b64 100644
+index c4e8b64..aa76ec1 100644
 --- a/drivers/dma/qcom/hidma_ll.c
 +++ b/drivers/dma/qcom/hidma_ll.c
-@@ -198,13 +198,16 @@ static void hidma_ll_tre_complete(unsigned long arg)
- 	}
- }
- 
--static int hidma_post_completed(struct hidma_lldev *lldev, int tre_iterator,
--				u8 err_info, u8 err_code)
-+static int hidma_post_completed(struct hidma_lldev *lldev, u8 err_info,
-+				u8 err_code)
- {
- 	struct hidma_tre *tre;
- 	unsigned long flags;
-+	u32 tre_iterator;
- 
- 	spin_lock_irqsave(&lldev->lock, flags);
+@@ -291,6 +291,13 @@ static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
+ 		evre_write_off =
+ 		    readl_relaxed(lldev->evca + HIDMA_EVCA_WRITE_PTR_REG);
+ 		num_completed++;
 +
-+	tre_iterator = lldev->tre_processed_off;
- 	tre = lldev->pending_tre_list[tre_iterator / HIDMA_TRE_SIZE];
- 	if (!tre) {
- 		spin_unlock_irqrestore(&lldev->lock, flags);
-@@ -223,6 +226,9 @@ static int hidma_post_completed(struct hidma_lldev *lldev, int tre_iterator,
- 		atomic_set(&lldev->pending_tre_count, 0);
++		/*
++		 * An error interrupt might have arrived while we are processing
++		 * the completed interrupt.
++		 */
++		if (!hidma_ll_isenabled(lldev))
++			break;
  	}
  
-+	HIDMA_INCREMENT_ITERATOR(tre_iterator, HIDMA_TRE_SIZE,
-+				 lldev->tre_ring_size);
-+	lldev->tre_processed_off = tre_iterator;
- 	spin_unlock_irqrestore(&lldev->lock, flags);
- 
- 	tre->err_info = err_info;
-@@ -244,13 +250,11 @@ static int hidma_post_completed(struct hidma_lldev *lldev, int tre_iterator,
- static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
- {
- 	u32 evre_ring_size = lldev->evre_ring_size;
--	u32 tre_ring_size = lldev->tre_ring_size;
- 	u32 err_info, err_code, evre_write_off;
--	u32 tre_iterator, evre_iterator;
-+	u32 evre_iterator;
- 	u32 num_completed = 0;
- 
- 	evre_write_off = readl_relaxed(lldev->evca + HIDMA_EVCA_WRITE_PTR_REG);
--	tre_iterator = lldev->tre_processed_off;
- 	evre_iterator = lldev->evre_processed_off;
- 
- 	if ((evre_write_off > evre_ring_size) ||
-@@ -273,12 +277,9 @@ static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
- 		err_code =
- 		    (cfg >> HIDMA_EVRE_CODE_BIT_POS) & HIDMA_EVRE_CODE_MASK;
- 
--		if (hidma_post_completed(lldev, tre_iterator, err_info,
--					 err_code))
-+		if (hidma_post_completed(lldev, err_info, err_code))
- 			break;
- 
--		HIDMA_INCREMENT_ITERATOR(tre_iterator, HIDMA_TRE_SIZE,
--					 tre_ring_size);
- 		HIDMA_INCREMENT_ITERATOR(evre_iterator, HIDMA_EVRE_SIZE,
- 					 evre_ring_size);
- 
-@@ -295,16 +296,10 @@ static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
  	if (num_completed) {
- 		u32 evre_read_off = (lldev->evre_processed_off +
- 				     HIDMA_EVRE_SIZE * num_completed);
--		u32 tre_read_off = (lldev->tre_processed_off +
--				    HIDMA_TRE_SIZE * num_completed);
--
- 		evre_read_off = evre_read_off % evre_ring_size;
--		tre_read_off = tre_read_off % tre_ring_size;
--
- 		writel(evre_read_off, lldev->evca + HIDMA_EVCA_DOORBELL_REG);
- 
- 		/* record the last processed tre offset */
--		lldev->tre_processed_off = tre_read_off;
- 		lldev->evre_processed_off = evre_read_off;
- 	}
- 
-@@ -314,27 +309,10 @@ static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
- void hidma_cleanup_pending_tre(struct hidma_lldev *lldev, u8 err_info,
- 			       u8 err_code)
- {
--	u32 tre_iterator;
--	u32 tre_ring_size = lldev->tre_ring_size;
--	int num_completed = 0;
--	u32 tre_read_off;
--
--	tre_iterator = lldev->tre_processed_off;
- 	while (atomic_read(&lldev->pending_tre_count)) {
--		if (hidma_post_completed(lldev, tre_iterator, err_info,
--					 err_code))
-+		if (hidma_post_completed(lldev, err_info, err_code))
- 			break;
--		HIDMA_INCREMENT_ITERATOR(tre_iterator, HIDMA_TRE_SIZE,
--					 tre_ring_size);
--		num_completed++;
- 	}
--	tre_read_off = (lldev->tre_processed_off +
--			HIDMA_TRE_SIZE * num_completed);
--
--	tre_read_off = tre_read_off % tre_ring_size;
--
--	/* record the last processed tre offset */
--	lldev->tre_processed_off = tre_read_off;
- }
- 
- static int hidma_ll_reset(struct hidma_lldev *lldev)
 -- 
 1.9.1
