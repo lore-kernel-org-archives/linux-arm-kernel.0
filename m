@@ -1,40 +1,240 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 7 Oct 2016 20:11:44 +0300
-Subject: [PATCH/RFT 11/12] ARM: dts: da850: Add the usb ohci device node
-In-Reply-To: <1475858577-10366-12-git-send-email-ahaslam@baylibre.com>
-References: <1475858577-10366-1-git-send-email-ahaslam@baylibre.com>
- <1475858577-10366-12-git-send-email-ahaslam@baylibre.com>
-Message-ID: <7227c5ff-4f9e-bcb5-ea0f-cdd122d42445@cogentembedded.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 7 Oct 2016 19:11:43 +0200
+Subject: [PATCH v13 12/15] vfio: Allow reserved msi iova registration
+In-Reply-To: <20161006141932.0a193f9b@t450s.home>
+References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
+ <1475743531-4780-13-git-send-email-eric.auger@redhat.com>
+ <20161006141932.0a193f9b@t450s.home>
+Message-ID: <27e4db66-7df2-16b4-c3d9-982d6ea845b0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Alex,
 
-On 10/07/2016 07:42 PM, ahaslam at baylibre.com wrote:
+On 06/10/2016 22:19, Alex Williamson wrote:
+> On Thu,  6 Oct 2016 08:45:28 +0000
+> Eric Auger <eric.auger@redhat.com> wrote:
+> 
+>> The user is allowed to register a reserved MSI IOVA range by using the
+>> DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
+>> This region is stored in the vfio_dma rb tree. At that point the iova
+>> range is not mapped to any target address yet. The host kernel will use
+>> those iova when needed, typically when MSIs are allocated.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+>>
+>> ---
+>> v12 -> v13:
+>> - use iommu_get_dma_msi_region_cookie
+>>
+>> v9 -> v10
+>> - use VFIO_IOVA_RESERVED_MSI enum value
+>>
+>> v7 -> v8:
+>> - use iommu_msi_set_aperture function. There is no notion of
+>>   unregistration anymore since the reserved msi slot remains
+>>   until the container gets closed.
+>>
+>> v6 -> v7:
+>> - use iommu_free_reserved_iova_domain
+>> - convey prot attributes downto dma-reserved-iommu iova domain creation
+>> - reserved bindings teardown now performed on iommu domain destruction
+>> - rename VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA into
+>>          VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA
+>> - change title
+>> - pass the protection attribute to dma-reserved-iommu API
+>>
+>> v3 -> v4:
+>> - use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
+>> - protect vfio_register_reserved_iova_range implementation with
+>>   CONFIG_IOMMU_DMA_RESERVED
+>> - handle unregistration by user-space and on vfio_iommu_type1 release
+>>
+>> v1 -> v2:
+>> - set returned value according to alloc_reserved_iova_domain result
+>> - free the iova domains in case any error occurs
+>>
+>> RFC v1 -> v1:
+>> - takes into account Alex comments, based on
+>>   [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
+>> - use the existing dma map/unmap ioctl interface with a flag to register
+>>   a reserved IOVA range. A single reserved iova region is allowed.
+>> ---
+>>  drivers/vfio/vfio_iommu_type1.c | 77 ++++++++++++++++++++++++++++++++++++++++-
+>>  include/uapi/linux/vfio.h       | 10 +++++-
+>>  2 files changed, 85 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+>> index 5bc5fc9..c2f8bd9 100644
+>> --- a/drivers/vfio/vfio_iommu_type1.c
+>> +++ b/drivers/vfio/vfio_iommu_type1.c
+>> @@ -442,6 +442,20 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
+>>  	vfio_lock_acct(-unlocked);
+>>  }
+>>  
+>> +static int vfio_set_msi_aperture(struct vfio_iommu *iommu,
+>> +				dma_addr_t iova, size_t size)
+>> +{
+>> +	struct vfio_domain *d;
+>> +	int ret = 0;
+>> +
+>> +	list_for_each_entry(d, &iommu->domain_list, next) {
+>> +		ret = iommu_get_dma_msi_region_cookie(d->domain, iova, size);
+>> +		if (ret)
+>> +			break;
+>> +	}
+>> +	return ret;
+> 
+> Doesn't this need an unwind on failure loop?
+At the moment the de-allocation is done by the smmu driver, on
+domain_free ops, which calls iommu_put_dma_cookie. In case,
+iommu_get_dma_msi_region_cookie fails on a given VFIO domain currently
+there is no other way but destroying all VFIO domains and redo everything.
 
-> From: Axel Haslam <ahaslam@baylibre.com>
->
-> This adds the device tree node for the usb11 (ohci)
-> controller present in the da850 family of SoC's.
->
-> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index 33fcdce..afae565 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -381,6 +381,14 @@
->  			#phy-cells = <1>;
->  			status = "disabled";
->  		};
-> +		usb11: usb11 at 0225000 {
+So yes I plan to unfold everything, ie call iommu_put_dma_cookie for
+each domain.
+> 
+>> +}
+>> +
+>>  static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
+>>  {
+>>  	vfio_unmap_unpin(iommu, dma);
+>> @@ -691,6 +705,63 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
+>>  	return ret;
+>>  }
+>>  
+>> +static int vfio_register_msi_range(struct vfio_iommu *iommu,
+>> +				   struct vfio_iommu_type1_dma_map *map)
+>> +{
+>> +	dma_addr_t iova = map->iova;
+>> +	size_t size = map->size;
+>> +	int ret = 0;
+>> +	struct vfio_dma *dma;
+>> +	unsigned long order;
+>> +	uint64_t mask;
+>> +
+>> +	/* Verify that none of our __u64 fields overflow */
+>> +	if (map->size != size || map->iova != iova)
+>> +		return -EINVAL;
+>> +
+>> +	order =  __ffs(vfio_pgsize_bitmap(iommu));
+>> +	mask = ((uint64_t)1 << order) - 1;
+>> +
+>> +	WARN_ON(mask & PAGE_MASK);
+>> +
+>> +	if (!size || (size | iova) & mask)
+>> +		return -EINVAL;
+>> +
+>> +	/* Don't allow IOVA address wrap */
+>> +	if (iova + size - 1 < iova)
+>> +		return -EINVAL;
+>> +
+>> +	mutex_lock(&iommu->lock);
+>> +
+>> +	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
+>> +		ret =  -EEXIST;
+>> +		goto unlock;
+>> +	}
+>> +
+>> +	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
+>> +	if (!dma) {
+>> +		ret = -ENOMEM;
+>> +		goto unlock;
+>> +	}
+>> +
+>> +	dma->iova = iova;
+>> +	dma->size = size;
+>> +	dma->type = VFIO_IOVA_RESERVED_MSI;
+>> +
+>> +	ret = vfio_set_msi_aperture(iommu, iova, size);
+>> +	if (ret)
+>> +		goto free_unlock;
+>> +
+>> +	vfio_link_dma(iommu, dma);
+>> +	goto unlock;
+>> +
+>> +free_unlock:
+>> +	kfree(dma);
+>> +unlock:
+>> +	mutex_unlock(&iommu->lock);
+>> +	return ret;
+>> +}
+>> +
+>>  static int vfio_bus_type(struct device *dev, void *data)
+>>  {
+>>  	struct bus_type **bus = data;
+>> @@ -1064,7 +1135,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+>>  	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
+>>  		struct vfio_iommu_type1_dma_map map;
+>>  		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
+>> -				VFIO_DMA_MAP_FLAG_WRITE;
+>> +				VFIO_DMA_MAP_FLAG_WRITE |
+>> +				VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA;
+>>  
+>>  		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
+>>  
+>> @@ -1074,6 +1146,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
+>>  		if (map.argsz < minsz || map.flags & ~mask)
+>>  			return -EINVAL;
+>>  
+>> +		if (map.flags & VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA)
+>> +			return vfio_register_msi_range(iommu, &map);
+>> +
+>>  		return vfio_dma_do_map(iommu, &map);
+>>  
+>>  	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
+>> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
+>> index 255a211..4a9dbc2 100644
+>> --- a/include/uapi/linux/vfio.h
+>> +++ b/include/uapi/linux/vfio.h
+>> @@ -498,12 +498,19 @@ struct vfio_iommu_type1_info {
+>>   *
+>>   * Map process virtual addresses to IO virtual addresses using the
+>>   * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
+>> + *
+>> + * In case RESERVED_MSI_IOVA flag is set, the API only aims at registering an
+>> + * IOVA region that will be used on some platforms to map the host MSI frames.
+>> + * In that specific case, vaddr is ignored. Once registered, an MSI reserved
+>> + * IOVA region stays until the container is closed.
+>>   */
+>>  struct vfio_iommu_type1_dma_map {
+>>  	__u32	argsz;
+>>  	__u32	flags;
+>>  #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
+>>  #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
+>> +/* reserved iova for MSI vectors*/
+>> +#define VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA (1 << 2)
+>>  	__u64	vaddr;				/* Process virtual address */
+>>  	__u64	iova;				/* IO virtual address */
+>>  	__u64	size;				/* Size of mapping (bytes) */
+>> @@ -519,7 +526,8 @@ struct vfio_iommu_type1_dma_map {
+>>   * Caller sets argsz.  The actual unmapped size is returned in the size
+>>   * field.  No guarantee is made to the user that arbitrary unmaps of iova
+>>   * or size different from those used in the original mapping call will
+>> - * succeed.
+>> + * succeed. Once registered, an MSI region cannot be unmapped and stays
+>> + * until the container is closed.
+>>   */
+>>  struct vfio_iommu_type1_dma_unmap {
+>>  	__u32	argsz;
+> 
+> What happens when an x86 user does a mapping with this new flag set?
+> It seems like we end up configuring everything just as we would on a
+> platform requiring MSI mapping, including setting the domain MSI
+> geometry.  Should we be testing the MSI geometry flag on the iommu to
+> see if this is supported?  Surprisingly few things seem to check that
+> flag.
 
-    No, usb@<unit-address> to comply with the DT spec the node names should be 
-generic.
+Yes I need to test the capability first and return -EINVAL in case the
+capability is not supported..
 
-[...]
+Thanks
 
-MBR, Sergei
+Eric
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
