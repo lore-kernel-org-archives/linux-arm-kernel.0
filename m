@@ -1,148 +1,823 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 7 Oct 2016 17:26:14 +0200
-Subject: [PATCHv4 2/3] tty/serial: at91: fix hardware handshake with GPIOs
-In-Reply-To: <20161004072525.josgoglunmvufcn2@pengutronix.de>
-References: <20160930085801.21497-1-richard.genoud@gmail.com>
- <20160930085801.21497-3-richard.genoud@gmail.com>
- <20160930091230.qzd42qnelylmkqxe@pengutronix.de>
- <CACQ1gAgE+BvteH9y62PcRx_tA9_e2X11RCJ12PC98FK+5z98QQ@mail.gmail.com>
- <20161004072525.josgoglunmvufcn2@pengutronix.de>
-Message-ID: <20161007172614.5e6748ae@lnx-rg>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  7 Oct 2016 17:22:52 +0200
+Subject: [PATCH 6/10] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+ functionality
+In-Reply-To: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
+References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
+Message-ID: <ecde22fd342b0b2001ff5676ea1e67b7226d6946.1475853198.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue, 4 Oct 2016 09:25:25 +0200,
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> a ?crit :
+From: Ziji Hu <huziji@marvell.com>
 
-> On Fri, Sep 30, 2016 at 01:04:28PM +0200, Richard Genoud wrote:
-> > 2016-09-30 11:12 GMT+02:00 Uwe Kleine-K?nig
-> > <u.kleine-koenig@pengutronix.de>:
-> > > Hello Richard,
-> > >
-> > > On Fri, Sep 30, 2016 at 10:58:00AM +0200, Richard Genoud wrote:
-> > >> Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management
-> > >> when hardware handshake is enabled") broke the hardware
-> > >> handshake when GPIOs were used.
-> > >>
-> > >> Hardware handshake with GPIOs used to work before this commit
-> > >> because the CRTSCTS flag (termios->c_cflag) was set, but not the
-> > >> ATMEL_US_USMODE_HWHS flag (controller register) ; so hardware
-> > >> handshake enabled, but not handled by the controller.
-> > >
-> > > What does the HWHS flag control? What if only RTS is a gpio and
-> > > CTS is not? Or the other way round?
-> > First, HWHS flag is used only in SAMA5D2. (if I correctly understood
-> > Atmel HW guys,
-> > all other platforms (sam9, sam9x5, sama5d3...) have this flag, but
-> > it is unusable,
-> > because they don't have Fifos nor PDC).
-> > So, on SAMA5D2, the HWHS flag tells the controller to drive the RTS
-> > pin according to
-> > the number of char present in the rx fifo (cf Figure 44-29
-> > ?44.7.3.15 p.1438 of
-> > http://www.atmel.com/Images/Atmel-11267-32-bit-Cortex-A5-Microcontroller-SAMA5D2_Datasheet.pdf).
-> > The controller will also start/stop the transmission on CTS
-> > changes. But, as I haven't got this hard, I couldn't test it. (but
-> > Cyrille did I guess). With this flag set, It's mandatory to have
-> > CTS and RTS not handled via GPIO, because if they were, the
-> > controller couldn't, well, control them.
-> 
-> Assuming the respective pin doesn't reach the hardware both are no
-> problem though. And it would keep the driver simpler to just ignore
-> this. There would be no need for patch 1 and also this patch could be
-> dropped. So I guess there is really something to fix, otherwise you
-> wouldn't start patching the driver. But I don't understand the issue,
-> so I'd like to have a better picture.
-> 
-> Best regards
-> Uwe
-> 
-Ok, so I'll try to explain what's going on.
+Add Xenon eMMC/SD/SDIO host controller core functionality.
+Add Xenon specific intialization process.
+Add Xenon specific mmc_host_ops APIs.
+Add Xenon specific register definitions.
 
-I'm sure you're familiar with hardware handshaking (aka flow control),
-but anyway, it doesn't hurt to explain it for the big picture
-understanding.
+Add CONFIG_MMC_SDHCI_XENON support in drivers/mmc/host/Kconfig.
 
-On RS232, flow control is handled by 2 pins: RTS and CTS.
-CTS is an input. When it's high (ttl), it indicates that we should stop
-transmitting.
-RTS is an output, we drive it at high level (ttl) to indicate that we
-can't receive anymore data for now (because the rx buffer is full, or
-the device is closed for instance).
+Marvell Xenon SDHC conforms to SD Physical Layer Specification
+Version 3.01 and is designed according to the guidelines provided
+in the SD Host Controller Standard Specification Version 3.00.
 
-The RTS and CTS management is done in serial_core.c which calls
-atmel_set/get_mctrl to set/get RTS/CTS pin state.
-And CTS changes are detected via an interrupt in atmel_interrupt().
+Signed-off-by: Hu Ziji <huziji@marvell.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ MAINTAINERS                    |   1 +-
+ drivers/mmc/host/Kconfig       |   9 +-
+ drivers/mmc/host/Makefile      |   3 +-
+ drivers/mmc/host/sdhci-xenon.c | 599 ++++++++++++++++++++++++++++++++++-
+ drivers/mmc/host/sdhci-xenon.h | 134 ++++++++-
+ 5 files changed, 746 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mmc/host/sdhci-xenon.c
+ create mode 100644 drivers/mmc/host/sdhci-xenon.h
 
-Now, the atmel USART controller has a feature that can handle part of
-the flow control job:
-- disabling the transmitter when the CTS pin gets high
-- drive the RTS pin high when the DMA buffer transfer is completed or
-  PDC rx buffer full or rx FIFO is beyond threshold. (depending on the
-  controller version).
-This feature is enabled by setting the flag ATMEL_US_USMODE_HWHS.
-And to be clear, this feature is *not* mandatory for the flow control to
-work !
-
-[ The fun part is that according to atmel designers, this feature is
-broken for platforms with no PDC and no FIFO.
-(source: https://lkml.org/lkml/2016/9/7/598 ) ]
-
-Before commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management
-when hardware handshake is enabled"), this flag was never set.
-Thus, the CTS/RTS where only handled by serial_core (and everything
-worked just fine).
-
-This commit introduced the use of the ATMEL_US_USMODE_HWHS (among other
-things).
-The logic introduced was to set the flag ATMEL_US_USMODE_HWHS for all
-boards when the user space enables flow control.
-This was clearly wrong because this feature can only be used when PDC
-or FIFO are in use.
-
-If ATMEL_US_USMODE_HWHS is enabled and PDC/FIFO/DMA are not used, the
-RTS pin stays at high level no matter what, preventing any data to be
-received.
-
-Then, commit 5be605ac9af9 ("tty/serial: atmel: fix hardware handshake
-selection") did something completely wrong:
-Instead of removing the flag ATMEL_US_USMODE_HWHS for platforms with
-no PDC nor FIFOs, and let serial_core happily handle the CTS/RTS, it
-refused to set the flow control when the user space asked for it.
-This was because of a misunderstanding:
-It's not that platforms without PDC and FIFO can't do flow control at
-all, they just can't enable the USART controller feature relative to
-flag ATMEL_US_USMODE_HWHS.
-And, again, this feature is *not* mandatory for the flow control to
-work.
-
-So, now, all atmel platforms with no PDC and no FIFO (SAM9G35, SAMA5D3,
-etc.) can't use flow control anymore.
-
-
-That's the reason of this patch series.
-
-
-And as the controller flow control feature only works with PDC and
-FIFOs, the logic would be to set the ATMEL_US_USMODE_HWHS like that:
-if ((termios->c_cflag & CRTSCTS) &&
-    !mctrl_gpio_use_rtscts(atmel_port->gpios) &&
-    (atmel_use_pdc_rx(port) || atmel_use_fifo(port))) {
-    mode |= ATMEL_US_USMODE_HWHS;
-}
-
-I added the mctrl_gpio_use_rtscts() test, because:
-- There's no point using the ATMEL_US_USMODE_HWHS feature when CTS/RTS
-  are driven by GPIOs, it doesn't make any sense.
-- And it simply doesn't work because the transmitter is shut down.
-(and that's the other reason of this patch series)
-
-For the mctrl_gpio_use_rtscts() function, I agree that it may be atmel
-specific, and I could implement as something like
-atmel_use_{c,r}ts_gpio().
-
-I'll have soon other hardware to test this on, and I'll resend a series
-after that.
-
-regards,
-Richard
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4aa0eac9bfc7..859420e5dfd3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7582,6 +7582,7 @@ MARVELL XENON MMC/SD/SDIO HOST CONTROLLER DRIVER
+ M:	Ziji Hu <huziji@marvell.com>
+ L:	linux-mmc at vger.kernel.org
+ S:	Supported
++F:	drivers/mmc/host/sdhci-xenon.*
+ F:	Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt
+ 
+ MATROX FRAMEBUFFER DRIVER
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 5274f503a39a..85a53623526a 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -798,3 +798,12 @@ config MMC_SDHCI_BRCMSTB
+ 	  Broadcom STB SoCs.
+ 
+ 	  If unsure, say Y.
++
++config MMC_SDHCI_XENON
++	tristate "Marvell Xenon eMMC/SD/SDIO SDHCI driver"
++	depends on MMC_SDHCI && MMC_SDHCI_PLTFM
++	help
++	  This selects Marvell Xenon eMMC/SD/SDIO SDHCI.
++	  If you have a machine with integrated Marvell Xenon SDHC IP,
++	  say Y or M here.
++	  If unsure, say N.
+diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+index e2bdaaf43184..75eaf743486c 100644
+--- a/drivers/mmc/host/Makefile
++++ b/drivers/mmc/host/Makefile
+@@ -80,3 +80,6 @@ obj-$(CONFIG_MMC_SDHCI_BRCMSTB)		+= sdhci-brcmstb.o
+ ifeq ($(CONFIG_CB710_DEBUG),y)
+ 	CFLAGS-cb710-mmc	+= -DDEBUG
+ endif
++
++obj-$(CONFIG_MMC_SDHCI_XENON)	+= sdhci-xenon-driver.o
++sdhci-xenon-driver-y		+= sdhci-xenon.o
+diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+new file mode 100644
+index 000000000000..03ba183494d3
+--- /dev/null
++++ b/drivers/mmc/host/sdhci-xenon.c
+@@ -0,0 +1,599 @@
++/*
++ * Driver for Marvell SOC Platform Group Xenon SDHC as a platform device
++ *
++ * Copyright (C) 2016 Marvell, All Rights Reserved.
++ *
++ * Author:	Hu Ziji <huziji@marvell.com>
++ * Date:	2016-8-24
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * Inspired by Jisheng Zhang <jszhang@marvell.com>
++ * Special thanks to Video BG4 project team.
++ */
++
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/mmc.h>
++#include <linux/mmc/sdio.h>
++#include <linux/mmc/card.h>
++#include <linux/mmc/host.h>
++#include <linux/module.h>
++#include <linux/of.h>
++
++#include "sdhci-pltfm.h"
++#include "sdhci.h"
++#include "sdhci-xenon.h"
++
++/* Set SDCLK-off-while-idle */
++static void xenon_set_sdclk_off_idle(struct sdhci_host *host,
++				     unsigned char slot_idx, bool enable)
++{
++	u32 reg;
++	u32 mask;
++
++	reg = sdhci_readl(host, SDHC_SYS_OP_CTRL);
++	/* Get the bit shift basing on the slot index */
++	mask = (0x1 << (SDCLK_IDLEOFF_ENABLE_SHIFT + slot_idx));
++	if (enable)
++		reg |= mask;
++	else
++		reg &= ~mask;
++
++	sdhci_writel(host, reg, SDHC_SYS_OP_CTRL);
++}
++
++/* Enable/Disable the Auto Clock Gating function */
++static void xenon_set_acg(struct sdhci_host *host, bool enable)
++{
++	u32 reg;
++
++	reg = sdhci_readl(host, SDHC_SYS_OP_CTRL);
++	if (enable)
++		reg &= ~AUTO_CLKGATE_DISABLE_MASK;
++	else
++		reg |= AUTO_CLKGATE_DISABLE_MASK;
++	sdhci_writel(host, reg, SDHC_SYS_OP_CTRL);
++}
++
++/* Enable this slot */
++static void xenon_enable_slot(struct sdhci_host *host,
++			      unsigned char slot_idx)
++{
++	u32 reg;
++
++	reg = sdhci_readl(host, SDHC_SYS_OP_CTRL);
++	reg |= (BIT(slot_idx) << SLOT_ENABLE_SHIFT);
++	sdhci_writel(host, reg, SDHC_SYS_OP_CTRL);
++
++	/*
++	 * Manually set the flag which all the slots require,
++	 * including SD, eMMC, SDIO
++	 */
++	host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
++}
++
++/* Disable this slot */
++static void xenon_disable_slot(struct sdhci_host *host,
++			       unsigned char slot_idx)
++{
++	u32 reg;
++
++	reg = sdhci_readl(host, SDHC_SYS_OP_CTRL);
++	reg &= ~(BIT(slot_idx) << SLOT_ENABLE_SHIFT);
++	sdhci_writel(host, reg, SDHC_SYS_OP_CTRL);
++}
++
++/* Enable Parallel Transfer Mode */
++static void xenon_enable_slot_parallel_tran(struct sdhci_host *host,
++					    unsigned char slot_idx)
++{
++	u32 reg;
++
++	reg = sdhci_readl(host, SDHC_SYS_EXT_OP_CTRL);
++	reg |= BIT(slot_idx);
++	sdhci_writel(host, reg, SDHC_SYS_EXT_OP_CTRL);
++}
++
++static void xenon_slot_tuning_setup(struct sdhci_host *host)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++	u32 reg;
++
++	/* Disable the Re-Tuning Request functionality */
++	reg = sdhci_readl(host, SDHC_SLOT_RETUNING_REQ_CTRL);
++	reg &= ~RETUNING_COMPATIBLE;
++	sdhci_writel(host, reg, SDHC_SLOT_RETUNING_REQ_CTRL);
++
++	/* Disbale the Re-tuning Event Signal Enable */
++	reg = sdhci_readl(host, SDHCI_SIGNAL_ENABLE);
++	reg &= ~SDHCI_INT_RETUNE;
++	sdhci_writel(host, reg, SDHCI_SIGNAL_ENABLE);
++
++	/* Force to use Tuning Mode 1 */
++	host->tuning_mode = SDHCI_TUNING_MODE_1;
++	/* Set re-tuning period */
++	host->tuning_count = 1 << (priv->tuning_count - 1);
++}
++
++/*
++ * Operations inside struct sdhci_ops
++ */
++/* Recover the Register Setting cleared during SOFTWARE_RESET_ALL */
++static void sdhci_xenon_reset_exit(struct sdhci_host *host,
++				   unsigned char slot_idx, u8 mask)
++{
++	/* Only SOFTWARE RESET ALL will clear the register setting */
++	if (!(mask & SDHCI_RESET_ALL))
++		return;
++
++	/* Disable tuning request and auto-retuing again */
++	xenon_slot_tuning_setup(host);
++
++	xenon_set_acg(host, true);
++
++	xenon_set_sdclk_off_idle(host, slot_idx, false);
++}
++
++static void sdhci_xenon_reset(struct sdhci_host *host, u8 mask)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++
++	sdhci_reset(host, mask);
++	sdhci_xenon_reset_exit(host, priv->slot_idx, mask);
++}
++
++/*
++ * Xenon defines different values for HS200 and SDR104
++ * in Host_Control_2
++ */
++static void xenon_set_uhs_signaling(struct sdhci_host *host,
++				    unsigned int timing)
++{
++	u16 ctrl_2;
++
++	ctrl_2 = sdhci_readw(host, SDHCI_HOST_CONTROL2);
++	/* Select Bus Speed Mode for host */
++	ctrl_2 &= ~SDHCI_CTRL_UHS_MASK;
++	if (timing == MMC_TIMING_MMC_HS200)
++		ctrl_2 |= XENON_SDHCI_CTRL_HS200;
++	else if (timing == MMC_TIMING_UHS_SDR104)
++		ctrl_2 |= SDHCI_CTRL_UHS_SDR104;
++	else if (timing == MMC_TIMING_UHS_SDR12)
++		ctrl_2 |= SDHCI_CTRL_UHS_SDR12;
++	else if (timing == MMC_TIMING_UHS_SDR25)
++		ctrl_2 |= SDHCI_CTRL_UHS_SDR25;
++	else if (timing == MMC_TIMING_UHS_SDR50)
++		ctrl_2 |= SDHCI_CTRL_UHS_SDR50;
++	else if ((timing == MMC_TIMING_UHS_DDR50) ||
++		 (timing == MMC_TIMING_MMC_DDR52))
++		ctrl_2 |= SDHCI_CTRL_UHS_DDR50;
++	else if (timing == MMC_TIMING_MMC_HS400)
++		ctrl_2 |= XENON_SDHCI_CTRL_HS400;
++	sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
++}
++
++static const struct sdhci_ops sdhci_xenon_ops = {
++	.set_clock		= sdhci_set_clock,
++	.set_bus_width		= sdhci_set_bus_width,
++	.reset			= sdhci_xenon_reset,
++	.set_uhs_signaling	= xenon_set_uhs_signaling,
++	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
++};
++
++static const struct sdhci_pltfm_data sdhci_xenon_pdata = {
++	.ops = &sdhci_xenon_ops,
++	.quirks = SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC |
++			SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 |
++			SDHCI_QUIRK_NO_SIMULT_VDD_AND_POWER |
++			SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
++};
++
++/*
++ * Xenon Specific Operations in mmc_host_ops
++ */
++static void xenon_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
++{
++	struct sdhci_host *host = mmc_priv(mmc);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++	unsigned long flags;
++
++	/*
++	 * HS400/HS200/eMMC HS doesn't have Preset Value register.
++	 * However, sdhci_set_ios will read HS400/HS200 Preset register.
++	 * Disable Preset Value register for HS400/HS200.
++	 * eMMC HS with preset_enabled set will trigger a bug in
++	 * get_preset_value().
++	 */
++	spin_lock_irqsave(&host->lock, flags);
++	if ((ios->timing == MMC_TIMING_MMC_HS400) ||
++	    (ios->timing == MMC_TIMING_MMC_HS200) ||
++	    (ios->timing == MMC_TIMING_MMC_HS)) {
++		host->preset_enabled = false;
++		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
++	} else {
++		host->quirks2 &= ~SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
++	}
++	spin_unlock_irqrestore(&host->lock, flags);
++
++	sdhci_set_ios(mmc, ios);
++
++	if (host->clock > DEFAULT_SDCLK_FREQ) {
++		spin_lock_irqsave(&host->lock, flags);
++		xenon_set_sdclk_off_idle(host, priv->slot_idx, true);
++		spin_unlock_irqrestore(&host->lock, flags);
++	}
++}
++
++static int __emmc_signal_voltage_switch(struct mmc_host *mmc,
++					const unsigned char signal_voltage)
++{
++	u32 ctrl;
++	unsigned char voltage_code;
++	struct sdhci_host *host = mmc_priv(mmc);
++
++	if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
++		voltage_code = EMMC_VCCQ_3_3V;
++	else if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
++		voltage_code = EMMC_VCCQ_1_8V;
++	else
++		return -EINVAL;
++
++	/*
++	 * This host is for eMMC, XENON self-defined
++	 * eMMC slot control register should be accessed
++	 * instead of Host Control 2
++	 */
++	ctrl = sdhci_readl(host, SDHC_SLOT_EMMC_CTRL);
++	ctrl &= ~EMMC_VCCQ_MASK;
++	ctrl |= voltage_code;
++	sdhci_writel(host, ctrl, SDHC_SLOT_EMMC_CTRL);
++
++	/* There is no standard to determine this waiting period */
++	usleep_range(1000, 2000);
++
++	/* Check whether io voltage switch is done */
++	ctrl = sdhci_readl(host, SDHC_SLOT_EMMC_CTRL);
++	ctrl &= EMMC_VCCQ_MASK;
++	/*
++	 * This bit is set only when regulator feeds back the voltage switch
++	 * results to Xenon SDHC.
++	 * However, in actaul implementation, regulator might not provide
++	 * this feedback.
++	 * Thus we shall not rely on this bit to determine if switch failed.
++	 * If the bit is not set, just throw a message.
++	 * Besides, error code should not be returned.
++	 */
++	if (ctrl != voltage_code)
++		dev_info(mmc_dev(mmc), "fail to detect eMMC signal voltage stable\n");
++	return 0;
++}
++
++static int xenon_emmc_signal_voltage_switch(struct mmc_host *mmc,
++					    struct mmc_ios *ios)
++{
++	unsigned char voltage = ios->signal_voltage;
++
++	if ((voltage == MMC_SIGNAL_VOLTAGE_330) ||
++	    (voltage == MMC_SIGNAL_VOLTAGE_180))
++		return __emmc_signal_voltage_switch(mmc, voltage);
++
++	dev_err(mmc_dev(mmc), "Unsupported signal voltage: %d\n",
++		voltage);
++	return -EINVAL;
++}
++
++static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
++					     struct mmc_ios *ios)
++{
++	struct sdhci_host *host = mmc_priv(mmc);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++
++	/*
++	 * Before SD/SDIO set signal voltage, SD bus clock should be
++	 * disabled. However, sdhci_set_clock will also disable the Internal
++	 * clock in mmc_set_signal_voltage().
++	 * If Internal clock is disabled, the 3.3V/1.8V bit can not be updated.
++	 * Thus here manually enable internal clock.
++	 *
++	 * After switch completes, it is unnecessary to disable internal clock,
++	 * since keeping internal clock active obeys SD spec.
++	 */
++	enable_xenon_internal_clk(host);
++
++	if (priv->card_candidate) {
++		if (mmc_card_mmc(priv->card_candidate))
++			return xenon_emmc_signal_voltage_switch(mmc, ios);
++	}
++
++	return sdhci_start_signal_voltage_switch(mmc, ios);
++}
++
++/*
++ * After determining which slot is used for SDIO,
++ * some additional task is required.
++ */
++static void xenon_init_card(struct mmc_host *mmc, struct mmc_card *card)
++{
++	struct sdhci_host *host = mmc_priv(mmc);
++	u32 reg;
++	u8 slot_idx;
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++
++	/* Link the card for delay adjustment */
++	priv->card_candidate = card;
++	/* Set tuning functionality of this slot */
++	xenon_slot_tuning_setup(host);
++
++	slot_idx = priv->slot_idx;
++	if (!mmc_card_sdio(card)) {
++		/* Re-enable the Auto-CMD12 cap flag. */
++		host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
++		host->flags |= SDHCI_AUTO_CMD12;
++
++		/* Clear SDIO Card Inserted indication */
++		reg = sdhci_readl(host, SDHC_SYS_CFG_INFO);
++		reg &= ~(1 << (slot_idx + SLOT_TYPE_SDIO_SHIFT));
++		sdhci_writel(host, reg, SDHC_SYS_CFG_INFO);
++
++		if (mmc_card_mmc(card)) {
++			mmc->caps |= MMC_CAP_NONREMOVABLE;
++			if (!(host->quirks2 & SDHCI_QUIRK2_NO_1_8_V))
++				mmc->caps |= MMC_CAP_1_8V_DDR;
++			/*
++			 * Force to clear BUS_TEST to
++			 * skip bus_test_pre and bus_test_post
++			 */
++			mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
++			mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
++				      MMC_CAP2_PACKED_CMD;
++			if (mmc->caps & MMC_CAP_8_BIT_DATA)
++				mmc->caps2 |= MMC_CAP2_HS400_1_8V;
++		}
++	} else {
++		/*
++		 * Delete the Auto-CMD12 cap flag.
++		 * Otherwise, when sending multi-block CMD53,
++		 * Driver will set Transfer Mode Register to enable Auto CMD12.
++		 * However, SDIO device cannot recognize CMD12.
++		 * Thus SDHC will time-out for waiting for CMD12 response.
++		 */
++		host->quirks &= ~SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
++		host->flags &= ~SDHCI_AUTO_CMD12;
++
++		/*
++		 * Set SDIO Card Inserted indication
++		 * to inform that the current slot is for SDIO
++		 */
++		reg = sdhci_readl(host, SDHC_SYS_CFG_INFO);
++		reg |= (1 << (slot_idx + SLOT_TYPE_SDIO_SHIFT));
++		sdhci_writel(host, reg, SDHC_SYS_CFG_INFO);
++	}
++}
++
++static int xenon_execute_tuning(struct mmc_host *mmc, u32 opcode)
++{
++	struct sdhci_host *host = mmc_priv(mmc);
++
++	if (host->timing == MMC_TIMING_UHS_DDR50)
++		return 0;
++
++	return sdhci_execute_tuning(mmc, opcode);
++}
++
++static void xenon_replace_mmc_host_ops(struct sdhci_host *host)
++{
++	host->mmc_host_ops.set_ios = xenon_set_ios;
++	host->mmc_host_ops.start_signal_voltage_switch =
++			xenon_start_signal_voltage_switch;
++	host->mmc_host_ops.init_card = xenon_init_card;
++	host->mmc_host_ops.execute_tuning = xenon_execute_tuning;
++}
++
++static int xenon_probe_dt(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct sdhci_host *host = platform_get_drvdata(pdev);
++	struct mmc_host *mmc = host->mmc;
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++	int err;
++	u32 slot_idx, nr_slot;
++	u32 tuning_count;
++	u32 reg;
++
++	/* Standard MMC property */
++	err = mmc_of_parse(mmc);
++	if (err)
++		return err;
++
++	/* Standard SDHCI property */
++	sdhci_get_of_property(pdev);
++
++	/*
++	 * Xenon Specific property:
++	 * slotno: the index of slot. Refer to SDHC_SYS_CFG_INFO register
++	 * tuning-count: the interval between re-tuning
++	 * PHY type: "sdhc phy", "emmc phy 5.0" or "emmc phy 5.1"
++	 */
++	if (!of_property_read_u32(np, "xenon,slotno", &slot_idx)) {
++		nr_slot = sdhci_readl(host, SDHC_SYS_CFG_INFO);
++		nr_slot &= NR_SUPPORTED_SLOT_MASK;
++		if (unlikely(slot_idx > nr_slot)) {
++			dev_err(mmc_dev(mmc), "Slot Index %d exceeds Number of slots %d\n",
++				slot_idx, nr_slot);
++			return -EINVAL;
++		}
++	} else {
++		priv->slot_idx = 0x0;
++	}
++
++	if (!of_property_read_u32(np, "xenon,tuning-count", &tuning_count)) {
++		if (unlikely(tuning_count >= TMR_RETUN_NO_PRESENT)) {
++			dev_err(mmc_dev(mmc), "Wrong Re-tuning Count. Set default value %d\n",
++				DEF_TUNING_COUNT);
++			tuning_count = DEF_TUNING_COUNT;
++		}
++	} else {
++		priv->tuning_count = DEF_TUNING_COUNT;
++	}
++
++	if (of_property_read_bool(np, "xenon,mask-conflict-err")) {
++		reg = sdhci_readl(host, SDHC_SYS_EXT_OP_CTRL);
++		reg |= MASK_CMD_CONFLICT_ERROR;
++		sdhci_writel(host, reg, SDHC_SYS_EXT_OP_CTRL);
++	}
++
++	return err;
++}
++
++static int xenon_slot_probe(struct sdhci_host *host)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++	u8 slot_idx = priv->slot_idx;
++
++	/* Enable slot */
++	xenon_enable_slot(host, slot_idx);
++
++	/* Enable ACG */
++	xenon_set_acg(host, true);
++
++	/* Enable Parallel Transfer Mode */
++	xenon_enable_slot_parallel_tran(host, slot_idx);
++
++	priv->timing = MMC_TIMING_FAKE;
++	priv->clock = 0;
++
++	return 0;
++}
++
++static void xenon_slot_remove(struct sdhci_host *host)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++	u8 slot_idx = priv->slot_idx;
++
++	/* disable slot */
++	xenon_disable_slot(host, slot_idx);
++}
++
++static int sdhci_xenon_probe(struct platform_device *pdev)
++{
++	struct sdhci_pltfm_host *pltfm_host;
++	struct sdhci_host *host;
++	struct clk *clk, *axi_clk;
++	struct sdhci_xenon_priv *priv;
++	int err;
++
++	host = sdhci_pltfm_init(pdev, &sdhci_xenon_pdata,
++				sizeof(struct sdhci_xenon_priv));
++	if (IS_ERR(host))
++		return PTR_ERR(host);
++
++	pltfm_host = sdhci_priv(host);
++	priv = sdhci_pltfm_priv(pltfm_host);
++
++	xenon_set_acg(host, false);
++
++	/*
++	 * Link Xenon specific mmc_host_ops function,
++	 * to replace standard ones in sdhci_ops.
++	 */
++	xenon_replace_mmc_host_ops(host);
++
++	clk = devm_clk_get(&pdev->dev, "core");
++	if (IS_ERR(clk)) {
++		dev_err(&pdev->dev, "Failed to setup input clk.\n");
++		err = PTR_ERR(clk);
++		goto free_pltfm;
++	}
++	clk_prepare_enable(clk);
++	pltfm_host->clk = clk;
++
++	/*
++	 * Some SOCs require additional clock to
++	 * manage AXI bus clock.
++	 * It is optional.
++	 */
++	axi_clk = devm_clk_get(&pdev->dev, "axi");
++	if (!IS_ERR(axi_clk)) {
++		clk_prepare_enable(axi_clk);
++		priv->axi_clk = axi_clk;
++	}
++
++	err = xenon_probe_dt(pdev);
++	if (err)
++		goto err_clk;
++
++	err = xenon_slot_probe(host);
++	if (err)
++		goto err_clk;
++
++	err = sdhci_add_host(host);
++	if (err)
++		goto remove_slot;
++
++	return 0;
++
++remove_slot:
++	xenon_slot_remove(host);
++err_clk:
++	clk_disable_unprepare(pltfm_host->clk);
++	if (!IS_ERR(axi_clk))
++		clk_disable_unprepare(axi_clk);
++free_pltfm:
++	sdhci_pltfm_free(pdev);
++	return err;
++}
++
++static int sdhci_xenon_remove(struct platform_device *pdev)
++{
++	struct sdhci_host *host = platform_get_drvdata(pdev);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xFFFFFFFF);
++
++	xenon_slot_remove(host);
++
++	sdhci_remove_host(host, dead);
++
++	clk_disable_unprepare(pltfm_host->clk);
++	clk_disable_unprepare(priv->axi_clk);
++
++	sdhci_pltfm_free(pdev);
++
++	return 0;
++}
++
++static const struct of_device_id sdhci_xenon_dt_ids[] = {
++	{ .compatible = "marvell,sdhci-xenon",},
++	{ .compatible = "marvell,armada-3700-sdhci",},
++	{}
++};
++MODULE_DEVICE_TABLE(of, sdhci_xenon_dt_ids);
++
++static struct platform_driver sdhci_xenon_driver = {
++	.driver	= {
++		.name	= "sdhci-xenon",
++		.of_match_table = sdhci_xenon_dt_ids,
++		.pm = &sdhci_pltfm_pmops,
++	},
++	.probe	= sdhci_xenon_probe,
++	.remove	= sdhci_xenon_remove,
++};
++
++module_platform_driver(sdhci_xenon_driver);
++
++MODULE_DESCRIPTION("SDHCI platform driver for Marvell Xenon SDHC");
++MODULE_AUTHOR("Hu Ziji <huziji@marvell.com>");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
+new file mode 100644
+index 000000000000..c2370493fbe8
+--- /dev/null
++++ b/drivers/mmc/host/sdhci-xenon.h
+@@ -0,0 +1,134 @@
++/*
++ * Copyright (C) 2016 Marvell, All Rights Reserved.
++ *
++ * Author:	Hu Ziji <huziji@marvell.com>
++ * Date:	2016-8-24
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ */
++#ifndef SDHCI_XENON_H_
++#define SDHCI_XENON_H_
++
++#include <linux/clk.h>
++#include <linux/mmc/card.h>
++#include <linux/of.h>
++#include "sdhci.h"
++
++/* Register Offset of SD Host Controller SOCP self-defined register */
++#define SDHC_SYS_CFG_INFO			0x0104
++#define SLOT_TYPE_SDIO_SHIFT			24
++#define SLOT_TYPE_EMMC_MASK			0xFF
++#define SLOT_TYPE_EMMC_SHIFT			16
++#define SLOT_TYPE_SD_SDIO_MMC_MASK		0xFF
++#define SLOT_TYPE_SD_SDIO_MMC_SHIFT		8
++#define NR_SUPPORTED_SLOT_MASK			0x7
++
++#define SDHC_SYS_OP_CTRL			0x0108
++#define AUTO_CLKGATE_DISABLE_MASK		BIT(20)
++#define SDCLK_IDLEOFF_ENABLE_SHIFT		8
++#define SLOT_ENABLE_SHIFT			0
++
++#define SDHC_SYS_EXT_OP_CTRL			0x010C
++#define MASK_CMD_CONFLICT_ERROR			BIT(8)
++
++#define SDHC_SLOT_OP_STATUS_CTRL		0x0128
++#define DELAY_90_DEGREE_MASK_EMMC5		BIT(7)
++#define DELAY_90_DEGREE_SHIFT_EMMC5		7
++#define EMMC_5_0_PHY_FIXED_DELAY_MASK		0x7F
++#define EMMC_PHY_FIXED_DELAY_MASK		0xFF
++#define EMMC_PHY_FIXED_DELAY_WINDOW_MIN		(EMMC_PHY_FIXED_DELAY_MASK >> 3)
++#define SDH_PHY_FIXED_DELAY_MASK		0x1FF
++#define SDH_PHY_FIXED_DELAY_WINDOW_MIN		(SDH_PHY_FIXED_DELAY_MASK >> 4)
++
++#define TUN_CONSECUTIVE_TIMES_SHIFT		16
++#define TUN_CONSECUTIVE_TIMES_MASK		0x7
++#define TUN_CONSECUTIVE_TIMES			0x4
++#define TUNING_STEP_SHIFT			12
++#define TUNING_STEP_MASK			0xF
++#define TUNING_STEP_DIVIDER			BIT(6)
++
++#define FORCE_SEL_INVERSE_CLK_SHIFT		11
++
++#define SDHC_SLOT_EMMC_CTRL			0x0130
++#define ENABLE_DATA_STROBE			BIT(24)
++#define SET_EMMC_RSTN				BIT(16)
++#define DISABLE_RD_DATA_CRC			BIT(14)
++#define DISABLE_CRC_STAT_TOKEN			BIT(13)
++#define EMMC_VCCQ_MASK				0x3
++#define EMMC_VCCQ_1_8V				0x1
++#define EMMC_VCCQ_3_3V				0x3
++
++#define SDHC_SLOT_RETUNING_REQ_CTRL		0x0144
++/* retuning compatible */
++#define RETUNING_COMPATIBLE			0x1
++
++#define SDHC_SLOT_EXT_PRESENT_STATE		0x014C
++#define LOCK_STATE				0x1
++
++#define SDHC_SLOT_DLL_CUR_DLY_VAL		0x0150
++
++/* Tuning Parameter */
++#define TMR_RETUN_NO_PRESENT			0xF
++#define DEF_TUNING_COUNT			0x9
++
++#define MMC_TIMING_FAKE				0xFF
++
++#define DEFAULT_SDCLK_FREQ			(400000)
++
++/* Xenon specific Mode Select value */
++#define XENON_SDHCI_CTRL_HS200			0x5
++#define XENON_SDHCI_CTRL_HS400			0x6
++
++struct sdhci_xenon_priv {
++	/*
++	 * The bus_width, timing, and clock fields in below
++	 * record the current setting of Xenon SDHC.
++	 * Driver will call a Sampling Fixed Delay Adjustment
++	 * if any setting is changed.
++	 */
++	unsigned char	bus_width;
++	unsigned char	timing;
++	unsigned char	tuning_count;
++	unsigned int	clock;
++	struct clk	*axi_clk;
++
++	/* Slot idx */
++	u8		slot_idx;
++
++	/*
++	 * When initializing card, Xenon has to determine card type and
++	 * adjust Sampling Fixed delay.
++	 * However, at that time, card structure is not linked to mmc_host.
++	 * Thus a card pointer is added here to provide
++	 * the delay adjustment function with the card structure
++	 * of the card during initialization
++	 */
++	struct mmc_card *card_candidate;
++};
++
++static inline int enable_xenon_internal_clk(struct sdhci_host *host)
++{
++	u32 reg;
++	u8 timeout;
++
++	reg = sdhci_readl(host, SDHCI_CLOCK_CONTROL);
++	reg |= SDHCI_CLOCK_INT_EN;
++	sdhci_writel(host, reg, SDHCI_CLOCK_CONTROL);
++	/* Wait max 20 ms */
++	timeout = 20;
++	while (!((reg = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
++			& SDHCI_CLOCK_INT_STABLE)) {
++		if (timeout == 0) {
++			pr_err("%s: Internal clock never stabilised.\n",
++			       mmc_hostname(host->mmc));
++			return -ETIMEDOUT;
++		}
++		timeout--;
++		mdelay(1);
++	}
++
++	return 0;
++}
++#endif
+-- 
+git-series 0.8.10
