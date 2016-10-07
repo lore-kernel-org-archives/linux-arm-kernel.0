@@ -1,22 +1,47 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 07 Oct 2016 08:12:13 -0700
-Subject: [PATCH v2] ARM64: dts: meson-gxbb: Add rmii pinctrl node and
- rename rgmii node
-In-Reply-To: <1475852355-24096-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Fri, 7 Oct 2016 16:59:15 +0200")
-References: <1475852355-24096-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7hy420dwhe.fsf@baylibre.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Fri, 7 Oct 2016 20:41:23 +0530
+Subject: [PATCH v3 0/6] Support PWM polarity control
+Message-ID: <20161007151129.6043-1-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Changes since v3:
 
-> For boards only supporting 10/100 ethernet over a RMII PHY link, add
-> a separate pinctrl node. By the way, rename the existing node to rgmii
-> specific naming in all boards dts.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+- Set pwm->args.polarity, before using pwm_set_polarity() function as suggested
+  by Lukasz.
+- Squash Lukasz patch( https://lkml.org/lkml/2016/10/6/32 )
 
-Applied to v4.10/dt64,
+Tested on Toradex Colibri iMX6S module.
 
-Kevin
+Changes since v2:
+
+- Picked the stalled patchset[1] from Lothar Wassmann which adds the basic
+  support for polarity control on imx-pwm driver and adds backward compatibility
+  support for devices which does not have polarity control feature.
+
+Changes since Lothars v6:
+
+- Squash Lukasz patch[2].
+
+[1] http://thread.gmane.org/gmane.linux.pwm/1621
+[2] https://www.spinics.net/lists/arm-kernel/msg530818.html
+
+Bhuvanchandra DV (3):
+  arm: dts: imx7: Update #pwm-cells for PWM polarity control
+  arm: dts: imx7-colibri: Use pwm polarity control
+  arm: dts: imx7-colibri: Use enable-gpios for BL_ON
+
+Lothar Wassmann (3):
+  pwm: print error messages with pr_err() instead of pr_debug()
+  pwm: core: make the PWM_POLARITY flag in DTB optional
+  pwm: imx: support output polarity inversion
+
+ Documentation/devicetree/bindings/pwm/imx-pwm.txt |  6 +--
+ arch/arm/boot/dts/imx7-colibri.dtsi               | 12 +++++-
+ arch/arm/boot/dts/imx7s.dtsi                      |  8 ++--
+ drivers/pwm/core.c                                | 26 ++++++------
+ drivers/pwm/pwm-imx.c                             | 51 +++++++++++++++++++++--
+ 5 files changed, 79 insertions(+), 24 deletions(-)
+
+-- 
+2.10.0
