@@ -1,30 +1,63 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 7 Oct 2016 18:37:48 +0800
-Subject: [PATCH 0/2] fix issue: vblank interrupts are never disabled
-In-Reply-To: <1475119789-64619-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1475119789-64619-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <CAGS+omDG9ge+U4kXQcmV_YDO8frWh8V5RAZ=107jHo4Uq_QBeA@mail.gmail.com>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Fri, 7 Oct 2016 13:17:39 +0200
+Subject: [PATCH v2 0/5] Add runtime PM support for clocks (on Exynos SoC
+ example)
+In-Reply-To: <c1cf1a1f-2d1f-7f35-3e3b-f2de90959a24@samsung.com>
+References: <CGME20160919105545eucas1p1026e435bbaeb1f5c866a9abcdd051464@eucas1p1.samsung.com>
+ <1474282525-30441-1-git-send-email-m.szyprowski@samsung.com>
+ <57F6926F.1070707@math.uni-bielefeld.de>
+ <c1cf1a1f-2d1f-7f35-3e3b-f2de90959a24@samsung.com>
+Message-ID: <57F78453.4090201@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2016 at 11:29 AM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
->
-> Clean the interrupt status before enable interrupt
-> and set the vblank_disable_allowed to fix the issue.
+Hey Marek,
 
-For the series:
 
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+Marek Szyprowski wrote:
+> Hi Tobias,
+> 
+> 
+> On 2016-10-06 20:05, Tobias Jakobi wrote:
+>> Hello Marek,
+>>
+>> I'm using the patches from the v4.8-clocks-pm-v2 branch plus the ones
+>> from the v4.8-clocks-pm-v2 branch on top of 4.8.0.
+>>
+>> I see some warnings on boot coming from driver core. It appears that the
+>> warnings are actually meaningful, since IOMMUs stop working completly.
+>> E.g. if I modprobe s5p-mfc later, firmware loading fails because
+>> apparantly the IOMMU domain isn't online.
+>>
+>>> WARNING: CPU: 0 PID: 1 at drivers/base/core.c:356
+>>> device_links_driver_bound+0x124/0x12c
+>> I added some debug printk() to device_links_driver_bound(), to show the
+>> link status. Apparantly it is always DEVICE_LINK_AVAILABLE.
+> 
+> Please note that some additional patches are needed to get IOMMU working
+> properly with both runtime-pm patches and deferred probe, which feature
+> in turn is needed to get it working after adding clocks-pm changes. I
+> will send such patch soon (as a new version of IOMMU deferred probe
+> support patches were posted a few days ago).
+I see. I thought that this was supposed to work with the patches in
+v4.8-clocks-pm-v2.
 
->
-> Bibby Hsieh (2):
->   drm/mediatek: set vblank_disable_allowed to true
->   drm/mediatek: clear IRQ status before enable OVL interrupt
->
->  drivers/gpu/drm/mediatek/mtk_disp_ovl.c |    1 +
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c  |    1 +
->  2 files changed, 2 insertions(+)
->
-> --
-> 1.7.9.5
->
+I picked the patches in this range (endpoints included).
+- arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
+- clocks: exynos5433: add runtime pm support
+
+And this range in v4.8-iommu-pm-v4>
+- driver core: Add a wrapper around __device_release_driver()
+- iommu/exynos: Add proper runtime pm support
+
+
+Anyway, looking forward to test the new patchset.
+
+
+- Tobias
+
+
+> 
+>> (...)
+> 
+> Best regards
