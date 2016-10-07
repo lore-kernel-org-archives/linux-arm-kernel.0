@@ -1,282 +1,195 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 7 Oct 2016 10:29:48 +0800
-Subject: [PATCH v2 2/2] ARM: dts: rockchip: Add rk3066 MK808 board
-In-Reply-To: <b63a0ad452a487beb1d0c07addb9208cc3b3eeef.1475774981.git.paweljarosz3691@gmail.com>
-References: <cover.1475774981.git.paweljarosz3691@gmail.com>
- <b63a0ad452a487beb1d0c07addb9208cc3b3eeef.1475774981.git.paweljarosz3691@gmail.com>
-Message-ID: <a166a444-8819-ffe7-8ee1-1f632f6a66ab@rock-chips.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Thu, 6 Oct 2016 19:48:42 -0700
+Subject: [PATCH 1/3] fpga manager: Add cyclonespi driver for Altera fpgas
+In-Reply-To: <4b4432c04b4ea92a2af814e3d7866c33f2eb12ea.1475783742.git.stillcompiling@gmail.com>
+References: <cover.1475783742.git.stillcompiling@gmail.com>
+ <4b4432c04b4ea92a2af814e3d7866c33f2eb12ea.1475783742.git.stillcompiling@gmail.com>
+Message-ID: <CAAtXAHcWLpn3DFP6YLWqBxsMQ0O=HNNCmB+kHbHhyAHFHQUbwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawe? ,
+Hi Joshua,
 
-On 2016/10/7 1:38, Pawe? Jarosz wrote:
-> MK808 is a tv stick which has rockchip rk3066 CPU inside, two usb ports
-> - host and otg, micro sd card slot and onboard wifi RK901.
+couple of nits inline below:
+
+On Thu, Oct 6, 2016 at 1:34 PM, Joshua Clayton <stillcompiling@gmail.com> wrote:
+
+> diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
+> index cd84934..ccad5b1 100644
+> --- a/drivers/fpga/Kconfig
+> +++ b/drivers/fpga/Kconfig
+> @@ -13,6 +13,12 @@ config FPGA
 >
-> Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
-> ---
+>  if FPGA
 >
-> Changes in v2:
-> - included Heiko sugestion.
->
->  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/rk3066a-mk808.dts                | 184 +++++++++++++++++++++
->  3 files changed, 189 insertions(+)
->  create mode 100644 arch/arm/boot/dts/rk3066a-mk808.dts
->
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-> index 55f388f..c09595b 100644
-> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> @@ -17,6 +17,10 @@ Rockchip platforms device tree bindings
->      Required root node properties:
->        - compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
->
-> +- Rikomagic MK808 v1 board:
-> +    Required root node properties:
-> +      - compatible = "rikomagic,mk808", "rockchip,rk3066a";
+> +config FPGA_MGR_CYCLONE_SPI
+> +       tristate "Altera Cyclone V SPI"
+> +       depends on SPI
+> +       help
+> +         FPGA manager driver support for Altera Cyclone V over SPI
 > +
->  - Radxa Rock board:
->      Required root node properties:
->        - compatible = "radxa,rock", "rockchip,rk3188";
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index befcd26..f19cc1d 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -639,6 +639,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->  	rk3036-kylin.dtb \
->  	rk3066a-bqcurie2.dtb \
->  	rk3066a-marsboard.dtb \
-> +	rk3066a-mk808.dtb \
->  	rk3066a-rayeager.dtb \
->  	rk3188-radxarock.dtb \
->  	rk3228-evb.dtb \
-> diff --git a/arch/arm/boot/dts/rk3066a-mk808.dts b/arch/arm/boot/dts/rk3066a-mk808.dts
+>  config FPGA_MGR_SOCFPGA
+>         tristate "Altera SOCFPGA FPGA Manager"
+>         depends on ARCH_SOCFPGA
+> diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
+> index 8d83fc6..c03f40de 100644
+> --- a/drivers/fpga/Makefile
+> +++ b/drivers/fpga/Makefile
+> @@ -6,5 +6,6 @@
+>  obj-$(CONFIG_FPGA)                     += fpga-mgr.o
+>
+>  # FPGA Manager Drivers
+> +obj-$(CONFIG_FPGA_MGR_CYCLONE_SPI)     += cyclonespi.o
+>  obj-$(CONFIG_FPGA_MGR_SOCFPGA)         += socfpga.o
+>  obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)       += zynq-fpga.o
+> diff --git a/drivers/fpga/cyclonespi.c b/drivers/fpga/cyclonespi.c
 > new file mode 100644
-> index 0000000..2878562
+> index 0000000..1ffa67c
 > --- /dev/null
-> +++ b/arch/arm/boot/dts/rk3066a-mk808.dts
-> @@ -0,0 +1,184 @@
-> +/*
-> + * Copyright (c) 2016 Pawe? Jarosz <paweljarosz3691@gmail.com>
+> +++ b/drivers/fpga/cyclonespi.c
+> @@ -0,0 +1,173 @@
+> +/**
+> + * Copyright (c) 2015 United Western Technologies, Corporation
 > + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
+> + * Joshua Clayton <stillcompiling@gmail.com>
 > + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "rk3066a.dtsi"
-> +
-> +/ {
-> +	model = "Rikomagic MK808";
-> +	compatible = "rikomagic,mk808", "rockchip,rk3066a";
-> +
-> +	chosen {
-> +		stdout-path = "serial2:115200n8";
-> +	};
-> +
-> +	memory at 60000000 {
-> +		device_type = "memory";
-> +		reg = <0x60000000 0x40000000>;
-> +	};
-> +
-> +	gpio-leds {
-> +		compatible = "gpio-leds";
-> +
-> +		blue {
-> +			label = "mk808:blue:power";
-> +			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +			linux,default-trigger = "default-on";
-> +		};
-> +	};
-> +
-> +	mmc_pwrseq: mmc-pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sdmmc_pwr>;
+> + * Manage Altera fpga firmware that is loaded over spi.
+> + * Firmware must be in binary "rbf" format.
+> + * Works on Cyclone V. Should work on cyclone series.
+> + * May work on other Altera fpgas.
 
-sd slot does not contain a reset pin. So the power pin should be
-enough. just add sdmmc_pwr to mmc0's pinctrl-0 and let mmc driver
-control it should be enough. Typically pwrseq is for emmc and sdio.
-We don't need a pwerseq to control power for sd slot..
+I think at one point we decided it's gonna be 'FPGA' to be consistent.
 
-But it seems sdmmc_pwr is a GPIO, but not functional port.
-So I am interesting that why MK808 board doesn't use the mmc
-controller's default power pin but chosing another gpio, so finally
-we have to add thses code for your DT.
-
-> +		reset-gpios = <&gpio3 7 GPIO_ACTIVE_HIGH>;
-> +	};
 > +
-> +	sdio_pwrseq: sdio-pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&wifi_pwr>;
-> +		reset-gpios = <&gpio3 24 GPIO_ACTIVE_LOW>;
-> +	};
-> +
-> +	vcc_io: vcc-io {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc_io";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-
-Are you sure it should be fixed to 5V? I ask this since I see
-the mmc use this as vmmc which should be 3V~3V3 in principle.
-
-> +		regulator-always-on;
-
-I'm not sure whether you need this. The regulator would maintain
-the user_count there. So from this patch, I think it should be turned
-off since we possible don't enable usb and mmc?
-
-Moreover, the always-on power supply is depreciated by vmmc since it
-cause some problem to a certain degree.
-
-> +	};
-> +
-> +	vcc_host: usb-host-regulator {
-> +		compatible = "regulator-fixed";
-> +		gpio = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-0 = <&host_drv>;
-> +		pinctrl-names = "default";
-> +		regulator-always-on;
-> +		regulator-name = "host-pwr";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		startup-delay-us = <100000>;
-> +		vin-supply = <&vcc_io>;
-> +	};
-> +
-> +	vcc_otg: usb-otg-regulator {
-> +		compatible = "regulator-fixed";
-> +		gpio = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-0 = <&otg_drv>;
-> +		pinctrl-names = "default";
-> +		regulator-always-on;
-> +		regulator-name = "vcc_otg";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		startup-delay-us = <100000>;
-> +		vin-supply = <&vcc_io>;
-> +	};
+> +static const struct of_device_id of_ef_match[] = {
+> +       { .compatible = "altr,cyclonespi-fpga-mgr", },
+> +       {}
 > +};
+> +MODULE_DEVICE_TABLE(of, of_ef_match);
+> +
+> +static enum fpga_mgr_states cyclonespi_state(struct fpga_manager *mgr)
+> +{
+> +       return mgr->state;
+> +}
+> +
+> +static inline u32 revbit8x4(u32 n)
+> +{
+> +       n = ((n & 0xF0F0F0F0UL) >> 4) | ((n & 0x0F0F0F0FUL) << 4);
+> +       n = ((n & 0xCCCCCCCCUL) >> 2) | ((n & 0x33333333UL) << 2);
+> +       n = ((n & 0xAAAAAAAAUL) >> 1) | ((n & 0x55555555UL) << 1);
+> +       return n;
+> +}
 
-Same concern for these above.
+During the Zynq FPGA manager reviews we decided that manipulating the bitstream
+to be consumable by the driver is userland's job.
 
 > +
-> +&mmc0 {
-> +	bus-width = <4>;
-> +	cap-mmc-highspeed;
-> +	cap-sd-highspeed;
-> +	mmc-pwrseq = <&mmc_pwrseq>;
+> +static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
+> +                               const char *buf, size_t count)
+> +{
+> +       struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
+> +       u32 *fw32 = (u32 *)buf;
+> +       const u32 *fw_end = (u32 *)(buf + count);
+> +
+> +       if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
+> +               dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
+> +               return -EINVAL;
 
-Removed this could make SD works?
+-ENOTSUPP?
+> +       }
+> +
+> +       gpiod_set_value(conf->reset, 0);
+> +       udelay(50);
 
-Also do you need disable-wp for sd slot?
+Should that value either be configurable, or a named constant?
+> +       msleep(1);
 
-> +	num-slots = <1>;
-> +	status = "okay";
-> +	vmmc-supply = <&vcc_io>;
+See above.
+
+> +       /* set buffer to lsb first */
+> +       while (fw32 < fw_end) {
+> +               *fw32 = revbit8x4(*fw32);
+> +               fw32++;
+> +       }
+
+See above.
+> +
+> +       return 0;
+> +}
+> +
+> +static int cyclonespi_write(struct fpga_manager *mgr, const char *buf,
+> +                          size_t count)
+> +{
+> +       struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
+> +       const char *fw_data = buf;
+> +       const char *fw_data_end = fw_data + count;
+> +
+> +       while (fw_data < fw_data_end) {
+> +               int ret;
+> +               int stride = fw_data_end - fw_data;
+> +
+> +               if (stride > SZ_4K)
+> +                       stride = SZ_4K;
+> +
+> +               ret = spi_write(conf->spi, fw_data, stride);
+> +               if (ret) {
+> +                       dev_err(&mgr->dev, "spi error in firmware write: %d\n",
+> +                                       ret);
+> +                       return ret;
+> +               }
+> +               fw_data += stride;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int cyclonespi_write_complete(struct fpga_manager *mgr, u32 flags)
+> +{
+> +       struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
+> +
+> +       if (gpiod_get_value(conf->status) == 0) {
+> +               dev_err(&mgr->dev, "Error during configuration.\n");
+> +               return -EIO;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct fpga_manager_ops cyclonespi_ops = {
+> +       .state = cyclonespi_state,
+> +       .write_init = cyclonespi_write_init,
+> +       .write = cyclonespi_write,
+> +       .write_complete = cyclonespi_write_complete,
 > +};
 > +
-> +&mmc1 {
-> +	bus-width = <4>;
-> +	disable-wp;
-> +	mmc-pwrseq = <&sdio_pwrseq>;
-> +	non-removable;
-> +	num-slots = <1>;
-> +	status = "okay";
-> +	vmmc-supply = <&vcc_io>;
-> +};
+> +static int cyclonespi_probe(struct spi_device *spi)
+> +{
+> +       struct cyclonespi_conf *conf = devm_kzalloc(&spi->dev, sizeof(*conf),
+> +                                               GFP_KERNEL);
 > +
-> +&pinctrl {
-> +	usb-host {
-> +		host_drv: host-drv {
-> +			rockchip,pins = <RK_GPIO0 6 RK_FUNC_GPIO &pcfg_pull_default>;
-> +		};
-> +	};
+> +       if (!conf)
+> +               return -ENOMEM;
 > +
-> +	usb-otg {
-> +		otg_drv: otg-drv {
-> +			rockchip,pins = <RK_GPIO0 5 RK_FUNC_GPIO &pcfg_pull_default>;
-> +		};
-> +	};
+> +       conf->spi = spi;
+> +       conf->reset = devm_gpiod_get(&spi->dev, "reset", GPIOD_OUT_LOW);
+> +       if (IS_ERR(conf->reset)) {
+> +               dev_err(&spi->dev, "Failed to get reset gpio: %ld\n",
+> +                       PTR_ERR(conf->reset));
+> +               return PTR_ERR(conf->reset);
+> +       }
 > +
-> +	sdmmc {
-> +		sdmmc_pwr: sdmmc-pwr {
-> +			rockchip,pins = <RK_GPIO3 7 RK_FUNC_GPIO &pcfg_pull_default>;
-> +		};
-> +	};
+> +       conf->status = devm_gpiod_get(&spi->dev, "status", GPIOD_IN);
+> +       if (IS_ERR(conf->status)) {
+> +               dev_err(&spi->dev, "Failed to get status gpio: %ld\n",
+> +                               PTR_ERR(conf->status));
+> +               return PTR_ERR(conf->status);
+> +       }
 > +
-> +	sdio {
-> +		wifi_pwr: wifi-pwr {
-> +			rockchip,pins = <RK_GPIO3 24 RK_FUNC_GPIO &pcfg_pull_none>;
-> +		};
-> +	};
-> +};
-> +
-> +&uart2 {
-> +	status = "okay";
-> +};
-> +
-> +&usb_host {
-> +	status = "okay";
-> +};
-> +
-> +&usb_otg {
-> +	status = "okay";
-> +};
-> +
-> +&usbphy {
-> +	status = "okay";
-> +};
-> +
-> +&wdt {
-> +	status = "okay";
-> +};
-> +
->
+> +       return fpga_mgr_register(&spi->dev, "Altera SPI FPGA Manager",
+> +                                &cyclonespi_ops, conf);
 
+Nit: Altera >Cyclone< SPI FPGA Manager
 
--- 
-Best Regards
-Shawn Lin
+Thanks ... reminds me I wanted to submit my patch for the icoboard ;-)
+
+Moritz
