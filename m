@@ -1,31 +1,29 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat,  8 Oct 2016 22:20:11 +0200
-Subject: [PATCH] KVM: arm64: Correct trace exception name after SError handling
-Message-ID: <20161008202011.30835-1-christoffer.dall@linaro.org>
+From: paweljarosz3691@gmail.com (=?utf-8?B?UGF3ZcWC?= Jarosz)
+Date: Sat, 8 Oct 2016 22:21:47 +0200
+Subject: [PATCH v3 0/2] Add MK808 RK3066 device
+Message-ID: <cover.1475957884.git.paweljarosz3691@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 9aecafc8 introduced ARM_EXCEPTION_EL1_SERROR we should
-adjust the description of the exception type for trace events.
+Add MK808 RK3066 device
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/include/asm/kvm_arm.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This patchset adds support for Rikomagic MK808 v1 device with RK901 wifi.
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 4b5c977..b942ce4 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -207,7 +207,8 @@
- 
- #define kvm_arm_exception_type	\
- 	{0, "IRQ" }, 		\
--	{1, "TRAP" }
-+	{1, "SError" }, 	\
-+	{2, "TRAP" }
- 
- #define ECN(x) { ESR_ELx_EC_##x, #x }
- 
+It is hdmi stick with two usb ports(host and otg), sdmmc, wifi and uart
+onboard.
+
+It is RK3066 based.
+
+Pawe? Jarosz (2):
+  devicetree: Add vendor prefix for Rikomagic
+  ARM: dts: rockchip: Add rk3066 MK808 board
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk3066a-mk808.dts                | 196 +++++++++++++++++++++
+ 4 files changed, 202 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3066a-mk808.dts
+
 -- 
-2.9.0
+2.7.4
