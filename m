@@ -1,40 +1,33 @@
 From: Rob Herring <robh@kernel.org>
-To: Neil Armstrong <narmstrong@baylibre.com>
-Cc: linus.walleij at linaro.org, gnurou at gmail.com, linux-gpio at vger.kernel.org,
-	linux-arm-kernel at lists.infradead.org, linux-kernel at vger.kernel.org,
-	linux-oxnas at lists.tuxfamily.org, devicetree at vger.kernel.org
-Subject: Re: [PATCH 3/3] dt-bindings: oxnas: Update Pinctrl and GPIO for
- OX820 Support
-Message-ID: <20161008232940.GA19861@rob-hp-laptop>
-References: <20161004134148.23028-1-narmstrong@baylibre.com>
- <20161004134148.23028-4-narmstrong@baylibre.com>
+To: Jerome Brunet <jbrunet@baylibre.com>
+Cc: Kevin Hilman <khilman@baylibre.com>, Carlo Caione <carlo@caione.org>,
+	Thomas Gleixner <tglx@linutronix.de>,
+	Jason Cooper <jason@lakedaemon.net>,
+	Marc Zyngier <marc.zyngier@arm.com>,
+	linux-amlogic at lists.infradead.org,
+	linux-arm-kernel at lists.infradead.org, devicetree at vger.kernel.org,
+	linux-gpio at vger.kernel.org
+Subject: Re: [RFC 05/10] dt-bindings: pinctrl: meson: update gpio dt-bindings
+Message-ID: <20161008233300.GA22543@rob-hp-laptop>
+References: <1475593708-10526-1-git-send-email-jbrunet@baylibre.com>
+ <1475593708-10526-6-git-send-email-jbrunet@baylibre.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-In-Reply-To: <20161004134148.23028-4-narmstrong@baylibre.com>
-Date: Sat, 8 Oct 2016 18:29:42 -0500
+In-Reply-To: <1475593708-10526-6-git-send-email-jbrunet@baylibre.com>
+Date: Sat, 8 Oct 2016 18:33:03 -0500
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2016 at 03:41:48PM +0200, Neil Armstrong wrote:
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  Documentation/devicetree/bindings/gpio/gpio_oxnas.txt       | 2 +-
->  Documentation/devicetree/bindings/pinctrl/oxnas,pinctrl.txt | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+On Tue, Oct 04, 2016 at 05:08:23PM +0200, Jerome Brunet wrote:
+> Add description for the interrupt-parent property of the gpio sub-node
+> If provided here, this property must be a phandle to an interrupt
+> controller suitable for meson pinctrl, like the meson gpio interrupt
+> controller.
 > 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
-> index 928ed4f..9665147 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
-> @@ -3,7 +3,7 @@
->  Please refer to gpio.txt for generic information regarding GPIO bindings.
->  
->  Required properties:
-> - - compatible: "oxsemi,ox810se-gpio"
-> + - compatible: "oxsemi,ox810se-gpio" or "oxsemi,ox820-gpio"
-
-It is preferred to have one per line, but it's fine unless you respin 
-the series.
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
