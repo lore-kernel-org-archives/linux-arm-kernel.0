@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 08 Oct 2016 02:29:43 +0200
-Subject: [GIT PULL 1/8] ARM: SoC cleanups for v4.9
+Date: Sat, 08 Oct 2016 02:30:27 +0200
+Subject: [GIT PULL 2/8] ARM: SoC platform updates for v4.9
 In-Reply-To: <3637015.LRn5VyhPVM@wuerfel>
 References: <3637015.LRn5VyhPVM@wuerfel>
-Message-ID: <1943879.l2iBNmR8MC@wuerfel>
+Message-ID: <2989237.kUCxXKV2uh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,239 +13,232 @@ The following changes since commit 3eab887a55424fc2c27553b7bfe32330df83f7b8:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-cleanup
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-soc
 
-for you to fetch changes up to e13688fe618881dd407a68dfbd2295d70b21a445:
+for you to fetch changes up to e40454d3f444ba7f8cc78dd985a1414a5945757c:
 
-  ARM: select PCI_DOMAINS config from ARCH_MULTIPLATFORM (2016-09-21 22:45:13 +0200)
-
-----------------------------------------------------------------
-ARM: SoC cleanups for v4.9
-
-The cleanups for v4.9 are a little larger that usual, but thankfully
-that is almost exclusively due to removing a significant number of
-files that have become obsolete after the still ongoing conversion
-of old board files to devicetree.
-
-- for mach-omap2, which is still the largest platform in arch/arm/,
-  the conversion to DT is finally complete after the Nokia N900 is
-  now fully supported there, along with the omap3 LDP, and we can
-  remove those two board files.
-  If no regressions are found, another large cleanup for the platform
-  will happen as a follow-up, removing dead code and restructuring
-  the platform based on being DT-only.
-
-- In mach-imx, similar work is ongoing, but has not come that far.
-  This time, we remove the obsolete board file for the i.MX1
-  generation, which like i.MX25, i.MX5, i.MX6, and i.MX7 is now DT-only.
-  The remaining board files are for i.MX2 and i.MX3 machines
-  based on old ARM926 or ARM1136 cores that should work with DT
-  in principle.
-
-- realview has just been converted from board files to DT, and a lot
-  of code gets removed in the process. This is the last
-  ARM/Keil/Versatile derived platform that was still using board
-  files, the other ones being integrator, versatile and vexpress.
-  We can probably merge the remaining code into a single directory
-  in the near future.
-
-- clps711x had completed the conversion in v4.8, but we accidentally
-  left the files in place that should have been deleted then.
-
-Conflicts: two files deleted here have been modified upstream,
-the changes can be discarded.
+  Merge tag 'mvebu-soc-4.9-1' of git://git.infradead.org/linux-mvebu into next/soc (2016-09-21 22:35:56 +0200)
 
 ----------------------------------------------------------------
-Alexander Kurz (2):
-      ARM: i.MX31 iomux: remove plain duplicates
-      ARM: i.MX31 iomux: remove duplicates with alternate name
+ARM: SoC platform updates for v4.9
 
-Alexander Shiyan (4):
-      ARM: i.MX: Remove i.MX1 Armadeus APF9328 board support
-      ARM: i.MX: Remove i.MX1 Synertronixx SCB9328 board support
-      ARM: i.MX: Remove i.MX1 non-DT support
-      ARM: i.MX: Move SOC_IMX1 into 'Device tree only'
+These are updates for platform specific code on 32-bit ARM machines,
+essentially anything that can not (yet) be expressed using DT files.
 
-Arnd Bergmann (5):
-      Merge tag 'realview-broomstick-sweep' of git://git.kernel.org/.../linusw/linux-integrator into next/cleanup
-      ARM: clps711x: remove extraneous files
-      Merge tag 'omap-for-v4.8/legacy-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup
-      Merge tag 'omap-for-v4.9/soc-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup
-      Merge tag 'imx-cleanup-4.9' of git://git.kernel.org/.../shawnguo/linux into next/cleanup
+Noteworthy changes include:
 
-Fabian Frederick (1):
-      ARM: imx: remove platform-mxc_rnga
+- We get support for running in big-endian mode on two platforms:
+  sunxi (Allwinner) and s3c24xx (old Samsung).
 
-Javier Martinez Canillas (3):
-      ARM: OMAP1: use IS_ENABLED() instead of checking for built-in or module
-      ARM: OMAP2+: use IS_ENABLED() instead of checking for built-in or module
-      ARM: imx: use IS_ENABLED() instead of checking for built-in or module
+- The recently added Uniphier platform now uses standard PSCI
+  methods for SMP booting and we remove support for old bootloader
+  versions that did not support it yet.
 
-Kishon Vijay Abraham I (2):
-      ARM: stop *MIGHT_HAVE_PCI* config from being selected redundantly
-      ARM: select PCI_DOMAINS config from ARCH_MULTIPLATFORM
+- In sunxi, we gain support for the "Nextthing GR8" SoC, which
+  is a close relative of the Allwinner A13 and R8 chips.
 
-Linus Walleij (2):
-      ARM: realview: delete the RealView board files
-      ARM: realview: imply device tree boot
+- PXA completes its move over to the generic dmaengine framework
+  and removes its old private API
 
-Lothar Wa?mann (1):
-      ARM: mxs: remove obsolete startup code for TX28
+- mach-bcm gains support for BCM47189/BCM53573, their first ARM
+  SoC with integrated 802.11ac wireless networking.
 
-Martin Kaiser (1):
-      ARM: imx: (trivial) fix typo and grammar
+----------------------------------------------------------------
+Andy Gross (1):
+      ARM: qcom: Cleanup/Remove unnecessary board file
 
-Tony Lindgren (3):
-      Merge remote-tracking branch 'peter/peter/for-4.8_omapdss_part1' into omap-for-v4.8/legacy
-      ARM: OMAP2+: Drop legacy board file for n900
-      ARM: OMAP2+: Drop legacy board file for LDP
+Anson Huang (3):
+      ARM: imx: rename imx6q_set_int_mem_clk_lpm() function
+      ARM: imx: enable WAIT mode hardware workaround for imx6sx
+      ARM: imx: add cpuidle support for i.mx6ul
 
-Vladimir Murzin (2):
-      ARM: imx: no need to select SMP_ON_UP explicitly
-      ARM: realview: no need to select SMP_ON_UP explicitly
+Arnd Bergmann (16):
+      Merge tag 'davinci-for-v4.9/soc' of git://git.kernel.org/.../nsekhar/linux-davinci into next/soc
+      Merge tag 'samsung-soc-4.9' of git://git.kernel.org/.../krzk/linux into next/soc
+      ARM: imx: build cpuidle-imx6sx.o for imx6ul
+      ARM: mv78xx0: simplify ethernet device creation
+      ARM: mvebu/orion: remove NO_IRQ check from device init
+      ARM: orion: simplify orion_ge00_switch_init
+      ARM: orion5x: remove extraneous NO_IRQ
+      Merge tag 'qcom-soc-for-4.9' of git://git.kernel.org/.../agross/linux into next/soc
+      Merge tag 'arm-soc/for-4.9/soc' of http://github.com/Broadcom/stblinux into next/soc
+      Merge tag 'renesas-soc-for-v4.9' of git://git.kernel.org/.../horms/renesas into next/soc
+      Merge tag 'pxa-for-4.9' of https://github.com/rjarzmik/linux into next/soc
+      Merge tag 'sunxi-core-for-4.9' of https://git.kernel.org/.../mripard/linux into next/soc
+      Merge tag 'imx-soc-4.9' of git://git.kernel.org/.../shawnguo/linux into next/soc
+      Merge tag 'uniphier-soc-v4.9' of git://git.kernel.org/.../masahiroy/linux-uniphier into next/soc
+      Merge tag 'imx-legacy-4.9' of git://git.kernel.org/.../shawnguo/linux into next/soc
+      Merge tag 'mvebu-soc-4.9-1' of git://git.infradead.org/linux-mvebu into next/soc
 
- arch/arm/Kconfig                              |    4 +-
- arch/arm/configs/imx_v4_v5_defconfig          |    3 +-
- arch/arm/configs/multi_v4t_defconfig          |    4 +-
- arch/arm/mach-at91/Kconfig                    |    1 -
- arch/arm/mach-axxia/Kconfig                   |    2 -
- arch/arm/mach-clps711x/Makefile.boot          |    0
- arch/arm/mach-clps711x/board-autcpu12.c       |  275 ------
- arch/arm/mach-clps711x/board-cdb89712.c       |  147 ---
- arch/arm/mach-clps711x/board-clep7312.c       |   45 -
- arch/arm/mach-clps711x/board-edb7211.c        |  188 ----
- arch/arm/mach-clps711x/board-p720t.c          |  373 -------
- arch/arm/mach-clps711x/common.c               |   65 --
- arch/arm/mach-clps711x/common.h               |   23 -
- arch/arm/mach-clps711x/devices.c              |  149 ---
- arch/arm/mach-clps711x/devices.h              |   12 -
- arch/arm/mach-cns3xxx/Kconfig                 |    1 -
- arch/arm/mach-exynos/Kconfig                  |    2 -
- arch/arm/mach-imx/Kconfig                     |   52 +-
- arch/arm/mach-imx/Makefile                    |    7 +-
- arch/arm/mach-imx/common.h                    |    5 -
- arch/arm/mach-imx/devices-imx1.h              |   30 -
- arch/arm/mach-imx/devices/Makefile            |    1 -
- arch/arm/mach-imx/devices/devices-common.h    |   12 -
- arch/arm/mach-imx/devices/platform-imx-fb.c   |    5 -
- arch/arm/mach-imx/devices/platform-imx-i2c.c  |    5 -
- arch/arm/mach-imx/devices/platform-imx-uart.c |   37 -
- arch/arm/mach-imx/devices/platform-spi_imx.c  |    9 -
- arch/arm/mach-imx/hardware.h                  |    3 +-
- arch/arm/mach-imx/iomux-mx1.h                 |  155 ---
- arch/arm/mach-imx/iomux-mx3.h                 |   34 -
- arch/arm/mach-imx/mach-apf9328.c              |  148 ---
- arch/arm/mach-imx/{imx1-dt.c => mach-imx1.c}  |   23 +-
- arch/arm/mach-imx/mach-kzm_arm11_01.c         |    6 +-
- arch/arm/mach-imx/mach-pcm037.c               |    2 +-
- arch/arm/mach-imx/mach-scb9328.c              |  143 ---
- arch/arm/mach-imx/mm-imx1.c                   |   67 --
- arch/arm/mach-imx/mx1.h                       |  172 ----
- arch/arm/mach-integrator/Kconfig              |    1 -
- arch/arm/mach-keystone/Kconfig                |    2 -
- arch/arm/mach-mxs/mach-mxs.c                  |   77 --
- arch/arm/mach-omap1/board-h2-mmc.c            |    2 +-
- arch/arm/mach-omap1/board-h2.c                |    2 +-
- arch/arm/mach-omap1/board-h3-mmc.c            |    2 +-
- arch/arm/mach-omap1/board-h3.c                |    2 +-
- arch/arm/mach-omap1/board-htcherald.c         |    4 +-
- arch/arm/mach-omap1/board-innovator.c         |    4 +-
- arch/arm/mach-omap1/board-nokia770.c          |    4 +-
- arch/arm/mach-omap1/board-sx1-mmc.c           |    2 +-
- arch/arm/mach-omap1/devices.c                 |   10 +-
- arch/arm/mach-omap1/fb.c                      |    2 +-
- arch/arm/mach-omap1/include/mach/usb.h        |    2 +-
- arch/arm/mach-omap1/mmc.h                     |    2 +-
- arch/arm/mach-omap1/usb.c                     |    6 +-
- arch/arm/mach-omap2/Kconfig                   |   12 -
- arch/arm/mach-omap2/Makefile                  |    4 -
- arch/arm/mach-omap2/board-flash.c             |   10 +-
- arch/arm/mach-omap2/board-flash.h             |   11 +-
- arch/arm/mach-omap2/board-ldp.c               |  430 --------
- arch/arm/mach-omap2/board-n8x0.c              |    5 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c  | 1312 -------------------------
- arch/arm/mach-omap2/board-rx51-video.c        |   67 --
- arch/arm/mach-omap2/board-rx51.c              |  141 ---
- arch/arm/mach-omap2/board-rx51.h              |   11 -
- arch/arm/mach-omap2/common-board-devices.c    |    3 +-
- arch/arm/mach-omap2/devices.c                 |    7 +-
- arch/arm/mach-omap2/drm.c                     |    2 +-
- arch/arm/mach-omap2/fb.c                      |    2 +-
- arch/arm/mach-omap2/gpmc-smsc911x.h           |    2 +-
- arch/arm/mach-omap2/hsmmc.c                   |    2 +-
- arch/arm/mach-omap2/hsmmc.h                   |    2 +-
- arch/arm/mach-omap2/twl-common.c              |    3 +-
- arch/arm/mach-realview/Kconfig                |   72 +-
- arch/arm/mach-realview/Makefile               |   12 +-
- arch/arm/mach-realview/board-eb.h             |   94 --
- arch/arm/mach-realview/board-pb1176.h         |   81 --
- arch/arm/mach-realview/board-pb11mp.h         |   96 --
- arch/arm/mach-realview/board-pba8.h           |   71 --
- arch/arm/mach-realview/board-pbx.h            |  106 --
- arch/arm/mach-realview/core.c                 |  404 --------
- arch/arm/mach-realview/core.h                 |   58 --
- arch/arm/mach-realview/hardware.h             |   40 -
- arch/arm/mach-realview/hotplug.h              |    1 +
- arch/arm/mach-realview/irqs-eb.h              |  114 ---
- arch/arm/mach-realview/irqs-pb1176.h          |   77 --
- arch/arm/mach-realview/irqs-pb11mp.h          |   97 --
- arch/arm/mach-realview/irqs-pba8.h            |   71 --
- arch/arm/mach-realview/irqs-pbx.h             |   87 --
- arch/arm/mach-realview/platform.h             |  247 -----
- arch/arm/mach-realview/platsmp-dt.c           |    3 +-
- arch/arm/mach-realview/platsmp.c              |   86 --
- arch/arm/mach-realview/realview_eb.c          |  492 ----------
- arch/arm/mach-realview/realview_pb1176.c      |  395 --------
- arch/arm/mach-realview/realview_pb11mp.c      |  385 --------
- arch/arm/mach-realview/realview_pba8.c        |  307 ------
- arch/arm/mach-realview/realview_pbx.c         |  402 --------
- arch/arm/mach-shmobile/Kconfig                |    1 -
- arch/arm/mach-spear/Kconfig                   |    1 -
- arch/arm/mach-versatile/Kconfig               |    1 -
- drivers/clk/imx/clk-imx1.c                    |   46 +-
- drivers/irqchip/Makefile                      |    2 +-
- drivers/mtd/maps/Kconfig                      |    2 +-
- 101 files changed, 105 insertions(+), 8106 deletions(-)
- delete mode 100644 arch/arm/mach-clps711x/Makefile.boot
- delete mode 100644 arch/arm/mach-clps711x/board-autcpu12.c
- delete mode 100644 arch/arm/mach-clps711x/board-cdb89712.c
- delete mode 100644 arch/arm/mach-clps711x/board-clep7312.c
- delete mode 100644 arch/arm/mach-clps711x/board-edb7211.c
- delete mode 100644 arch/arm/mach-clps711x/board-p720t.c
- delete mode 100644 arch/arm/mach-clps711x/common.c
- delete mode 100644 arch/arm/mach-clps711x/common.h
- delete mode 100644 arch/arm/mach-clps711x/devices.c
- delete mode 100644 arch/arm/mach-clps711x/devices.h
- delete mode 100644 arch/arm/mach-imx/devices-imx1.h
- delete mode 100644 arch/arm/mach-imx/iomux-mx1.h
- delete mode 100644 arch/arm/mach-imx/mach-apf9328.c
- rename arch/arm/mach-imx/{imx1-dt.c => mach-imx1.c} (63%)
- delete mode 100644 arch/arm/mach-imx/mach-scb9328.c
- delete mode 100644 arch/arm/mach-imx/mm-imx1.c
- delete mode 100644 arch/arm/mach-imx/mx1.h
- delete mode 100644 arch/arm/mach-omap2/board-ldp.c
- delete mode 100644 arch/arm/mach-omap2/board-rx51-peripherals.c
- delete mode 100644 arch/arm/mach-omap2/board-rx51-video.c
- delete mode 100644 arch/arm/mach-omap2/board-rx51.c
- delete mode 100644 arch/arm/mach-omap2/board-rx51.h
- delete mode 100644 arch/arm/mach-realview/board-eb.h
- delete mode 100644 arch/arm/mach-realview/board-pb1176.h
- delete mode 100644 arch/arm/mach-realview/board-pb11mp.h
- delete mode 100644 arch/arm/mach-realview/board-pba8.h
- delete mode 100644 arch/arm/mach-realview/board-pbx.h
- delete mode 100644 arch/arm/mach-realview/core.c
- delete mode 100644 arch/arm/mach-realview/core.h
- delete mode 100644 arch/arm/mach-realview/hardware.h
- create mode 100644 arch/arm/mach-realview/hotplug.h
- delete mode 100644 arch/arm/mach-realview/irqs-eb.h
- delete mode 100644 arch/arm/mach-realview/irqs-pb1176.h
- delete mode 100644 arch/arm/mach-realview/irqs-pb11mp.h
- delete mode 100644 arch/arm/mach-realview/irqs-pba8.h
- delete mode 100644 arch/arm/mach-realview/irqs-pbx.h
- delete mode 100644 arch/arm/mach-realview/platform.h
- delete mode 100644 arch/arm/mach-realview/platsmp.c
- delete mode 100644 arch/arm/mach-realview/realview_eb.c
- delete mode 100644 arch/arm/mach-realview/realview_pb1176.c
- delete mode 100644 arch/arm/mach-realview/realview_pb11mp.c
- delete mode 100644 arch/arm/mach-realview/realview_pba8.c
- delete mode 100644 arch/arm/mach-realview/realview_pbx.c
+Bartlomiej Zolnierkiewicz (4):
+      arm: colibri_pxa270_defconfig: disable IDE subsystem
+      arm: lpda270_defconfig: disable IDE subsystem
+      arm: pxa255-idp_defconfig: disable IDE subsystem
+      arm: trizeps4_defconfig: disable IDE subsystem
+
+Ben Dooks (1):
+      ARM: EXYNOS: Enable ARCH_SUPPORTS_BIG_ENDIAN explicitly
+
+Florian Fainelli (1):
+      ARM: brcmstb: Add earlyprintk support using run-time checks
+
+Geert Uytterhoeven (1):
+      ARM: debug-ll: Add support for r8a7992
+
+Karl Beldan (1):
+      ARM: davinci: da850: Add ti-aemif lookup for clock matching
+
+Markus Elfring (2):
+      ARM: s3c64xx: Delete unnecessary assignment for the field "owner"
+      ARM: pxa: Use kmalloc_array() in pxa_pm_init()
+
+Masahiro Yamada (1):
+      ARM: uniphier: remove SoC-specific SMP code
+
+Maxime Ripard (1):
+      ARM: sunxi: Support the Nextthing GR8
+
+Michael Weiser (1):
+      ARM: sunxi: enable big-endian
+
+Neil Armstrong (1):
+      MAINTAINERS: update list of Oxnas maintainers
+
+Pankaj Dubey (1):
+      ARM: EXYNOS: Remove unused DMC and CMU offsets and their mappings
+
+Petr Cvek (1):
+      ARM: pxa: magician: Remove duplicated I2C pins declaration
+
+Rafa? Mi?ecki (1):
+      ARM: BCM53573: Initial support for Broadcom BCM53573 SoCs
+
+Robert Jarzmik (7):
+      ARM: pxa: remove devicetree boards from pxa_defconfig
+      ARM: pxa: remove platform dma code
+      ARM: pxa: prepare pxa25x interrupts for device-tree platforms
+      ARM: pxa: add pxa25x device-tree support
+      ARM: pxa: fix GPIO double shifts
+      ARM: pxa: remove irq init from dt machines
+      ARM: pxa: pxa_cplds: fix interrupt handling
+
+Sylwester Nawrocki (2):
+      ARM: S3C24XX: Add dma_mask assignments for DMA devices
+      ARM: S3C24XX: Add missing DMA device for Mini2440 board
+
+Vladimir Zapolskiy (17):
+      ARM: imx legacy: kzm: move peripheral initialization to .init_late
+      ARM: imx legacy: mx31lite: move peripheral initialization to .init_late
+      ARM: imx legacy: mx31ads: move peripheral initialization to .init_late
+      ARM: imx legacy: mx31lilly: move peripheral initialization to .init_late
+      ARM: imx legacy: pcm037: move peripheral initialization to .init_late
+      ARM: imx legacy: mx31-3ds: move peripheral initialization to .init_late
+      ARM: imx legacy: qong: move peripheral initialization to .init_late
+      ARM: imx legacy: armadillo5x0: move peripheral initialization to .init_late
+      ARM: imx legacy: mx31moboard: move peripheral initialization to .init_late
+      ARM: imx legacy: vpr200: move peripheral initialization to .init_late
+      ARM: imx legacy: imx27-visstrim-m10: move peripheral initialization to .init_late
+      ARM: imx legacy: mx27-3ds: move peripheral initialization to .init_late
+      ARM: imx legacy: mx35-3ds: move peripheral initialization to .init_late
+      ARM: imx legacy: pcm043: move peripheral initialization to .init_late
+      ARM: imx legacy: mx21ads: move peripheral initialization to .init_late
+      ARM: imx legacy: mx27ads: move peripheral initialization to .init_late
+      ARM: imx legacy: pca100: move peripheral initialization to .init_late
+
+Wolfram Sang (2):
+      ARM: shmobile: r8a7790: only use smp_init when SMP is selected
+      ARM: shmobile: r8a7791: only use smp_init when SMP is selected
+
+ Documentation/arm/sunxi/README                  |   2 +
+ Documentation/devicetree/bindings/arm/sunxi.txt |   1 +
+ MAINTAINERS                                     |   9 +
+ arch/arm/Kconfig.debug                          |  22 +-
+ arch/arm/configs/colibri_pxa270_defconfig       |   1 -
+ arch/arm/configs/lpd270_defconfig               |   1 -
+ arch/arm/configs/pxa255-idp_defconfig           |   1 -
+ arch/arm/configs/pxa_defconfig                  |   2 -
+ arch/arm/configs/trizeps4_defconfig             |   2 -
+ arch/arm/include/asm/hardware/cache-uniphier.h  |  20 +-
+ arch/arm/include/debug/brcmstb.S                | 145 +++++++++
+ arch/arm/mach-bcm/Kconfig                       |  14 +
+ arch/arm/mach-bcm/brcmstb.c                     |  16 +
+ arch/arm/mach-davinci/da850.c                   |   1 +
+ arch/arm/mach-davinci/da8xx-dt.c                |   1 +
+ arch/arm/mach-exynos/Kconfig                    |   1 +
+ arch/arm/mach-exynos/exynos.c                   |  15 -
+ arch/arm/mach-exynos/include/mach/map.h         |   5 -
+ arch/arm/mach-imx/Makefile                      |   1 +
+ arch/arm/mach-imx/common.h                      |   2 +-
+ arch/arm/mach-imx/cpuidle-imx6q.c               |   2 +-
+ arch/arm/mach-imx/cpuidle-imx6sx.c              |  11 +
+ arch/arm/mach-imx/mach-armadillo5x0.c           |  39 ++-
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c     |  24 +-
+ arch/arm/mach-imx/mach-imx6ul.c                 |   3 +
+ arch/arm/mach-imx/mach-kzm_arm11_01.c           |   9 +-
+ arch/arm/mach-imx/mach-mx21ads.c                |  13 +-
+ arch/arm/mach-imx/mach-mx27_3ds.c               |  30 +-
+ arch/arm/mach-imx/mach-mx27ads.c                |  13 +-
+ arch/arm/mach-imx/mach-mx31_3ds.c               |  39 ++-
+ arch/arm/mach-imx/mach-mx31ads.c                |  18 +-
+ arch/arm/mach-imx/mach-mx31lilly.c              |  50 ++-
+ arch/arm/mach-imx/mach-mx31lite.c               |  68 +++--
+ arch/arm/mach-imx/mach-mx31moboard.c            |  23 +-
+ arch/arm/mach-imx/mach-mx35_3ds.c               |  15 +-
+ arch/arm/mach-imx/mach-pca100.c                 |  26 +-
+ arch/arm/mach-imx/mach-pcm037.c                 |  67 ++--
+ arch/arm/mach-imx/mach-pcm043.c                 |  10 +-
+ arch/arm/mach-imx/mach-qong.c                   |   2 +-
+ arch/arm/mach-imx/mach-vpr200.c                 |  29 +-
+ arch/arm/mach-imx/mx31lilly-db.c                |  20 --
+ arch/arm/mach-imx/mx31lite-db.c                 |  33 --
+ arch/arm/mach-imx/pm-imx6.c                     |   8 +-
+ arch/arm/mach-mv78xx0/common.c                  |   9 +-
+ arch/arm/mach-orion5x/common.c                  |   4 +-
+ arch/arm/mach-orion5x/common.h                  |   2 +-
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c    |   4 +-
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c     |   5 +-
+ arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c    |   6 +-
+ arch/arm/mach-orion5x/wnr854t-setup.c           |   4 +-
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c        |   4 +-
+ arch/arm/mach-pxa/Kconfig                       |  11 +
+ arch/arm/mach-pxa/Makefile                      |   3 +-
+ arch/arm/mach-pxa/corgi_pm.c                    |  13 +-
+ arch/arm/mach-pxa/devices.h                     |   1 +
+ arch/arm/mach-pxa/generic.h                     |   2 -
+ arch/arm/mach-pxa/include/mach/dma.h            |   1 -
+ arch/arm/mach-pxa/magician.c                    |   4 -
+ arch/arm/mach-pxa/pm.c                          |   5 +-
+ arch/arm/mach-pxa/pxa-dt.c                      |  35 ++-
+ arch/arm/mach-pxa/pxa25x.c                      |  26 +-
+ arch/arm/mach-pxa/pxa27x.c                      |  14 +-
+ arch/arm/mach-pxa/pxa3xx.c                      |  11 +-
+ arch/arm/mach-pxa/pxa_cplds_irqs.c              |  24 +-
+ arch/arm/mach-pxa/sharpsl_pm.c                  |   2 +-
+ arch/arm/mach-pxa/sharpsl_pm.h                  |   2 +-
+ arch/arm/mach-pxa/spitz_pm.c                    |   9 +-
+ arch/arm/mach-qcom/Makefile                     |   1 -
+ arch/arm/mach-qcom/board.c                      |  31 --
+ arch/arm/mach-s3c24xx/common.c                  |  20 +-
+ arch/arm/mach-s3c24xx/mach-mini2440.c           |   1 +
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c    |   3 +-
+ arch/arm/mach-shmobile/setup-r8a7790.c          |   2 +-
+ arch/arm/mach-shmobile/setup-r8a7791.c          |   2 +-
+ arch/arm/mach-sunxi/Kconfig                     |   1 +
+ arch/arm/mach-sunxi/sunxi.c                     |   1 +
+ arch/arm/mach-uniphier/Makefile                 |   2 +-
+ arch/arm/mach-uniphier/headsmp.S                |  43 ---
+ arch/arm/mach-uniphier/platsmp.c                | 209 -------------
+ arch/arm/mm/cache-uniphier.c                    |  63 +---
+ arch/arm/plat-orion/common.c                    |  85 ++----
+ arch/arm/plat-orion/include/plat/common.h       |  10 +-
+ arch/arm/plat-pxa/Makefile                      |   2 -
+ arch/arm/plat-pxa/dma.c                         | 386 ------------------------
+ arch/arm/plat-pxa/include/plat/dma.h            | 100 ------
+ arch/arm/plat-samsung/include/plat/map-s5p.h    |   4 -
+ 86 files changed, 696 insertions(+), 1285 deletions(-)
+ create mode 100644 arch/arm/include/debug/brcmstb.S
+ delete mode 100644 arch/arm/mach-qcom/board.c
+ delete mode 100644 arch/arm/mach-uniphier/headsmp.S
+ delete mode 100644 arch/arm/mach-uniphier/platsmp.c
+ delete mode 100644 arch/arm/plat-pxa/dma.c
+ delete mode 100644 arch/arm/plat-pxa/include/plat/dma.h
