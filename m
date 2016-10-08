@@ -1,122 +1,116 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Sat,  8 Oct 2016 13:52:25 +0100
-Subject: [PATCH v10 03/11] remoteproc: Update Kconfig setup to 'depends on
- REMOTEPROC'
+Date: Sat,  8 Oct 2016 13:52:26 +0100
+Subject: [PATCH v10 04/11] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
+ binding documentation
 In-Reply-To: <1475931154-1021-1-git-send-email-peter.griffin@linaro.org>
 References: <1475931154-1021-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1475931154-1021-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1475931154-1021-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make REMOTEPROC core a selectable kconfig option, and update
-remoteproc client drivers to 'depends on' the core. This avoids
-some nasty Kconfig recursive dependency issues. Also when using
-menuconfig client drivers will be hidden until the core has been
-enabled.
+This patch adds the DT binding documentation for the FDMA constroller
+found on STi based chipsets from STMicroelectronics.
 
-Documentation/kbuild/kconfig-language.txt:
-
-  Note:
-        select should be used with care. select will force
-        a symbol to a value without visiting the dependencies.
-        By abusing select you are able to select a symbol FOO even
-        if FOO depends on BAR that is not set.
-        In general use select only for non-visible symbols
-        (no prompts anywhere) and for symbols with no dependencies.
-        That will limit the usefulness but on the other hand avoid
-        the illegal configurations all over.
-
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/remoteproc/Kconfig | 21 ++++++++++++---------
- 1 file changed, 12 insertions(+), 9 deletions(-)
+ Documentation/devicetree/bindings/dma/st_fdma.txt | 87 +++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
 
-diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-index a7bedc6..decdcbe 100644
---- a/drivers/remoteproc/Kconfig
-+++ b/drivers/remoteproc/Kconfig
-@@ -1,20 +1,21 @@
- menu "Remoteproc drivers"
- 
--# REMOTEPROC gets selected by whoever wants it
- config REMOTEPROC
--	tristate
-+	tristate "Support for Remote Processor subsystem"
- 	depends on HAS_DMA
- 	select CRC32
- 	select FW_LOADER
- 	select VIRTIO
- 	select VIRTUALIZATION
- 
-+if REMOTEPROC
+diff --git a/Documentation/devicetree/bindings/dma/st_fdma.txt b/Documentation/devicetree/bindings/dma/st_fdma.txt
+new file mode 100644
+index 0000000..495d853
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/st_fdma.txt
+@@ -0,0 +1,87 @@
++* STMicroelectronics Flexible Direct Memory Access Device Tree bindings
 +
- config OMAP_REMOTEPROC
- 	tristate "OMAP remoteproc support"
- 	depends on HAS_DMA
- 	depends on ARCH_OMAP4 || SOC_OMAP5
- 	depends on OMAP_IOMMU
--	select REMOTEPROC
-+	depends on REMOTEPROC
- 	select MAILBOX
- 	select OMAP2PLUS_MBOX
- 	select RPMSG
-@@ -34,7 +35,7 @@ config OMAP_REMOTEPROC
- config STE_MODEM_RPROC
- 	tristate "STE-Modem remoteproc support"
- 	depends on HAS_DMA
--	select REMOTEPROC
-+	depends on REMOTEPROC
- 	default n
- 	help
- 	  Say y or m here to support STE-Modem shared memory driver.
-@@ -44,7 +45,7 @@ config STE_MODEM_RPROC
- config WKUP_M3_RPROC
- 	tristate "AMx3xx Wakeup M3 remoteproc support"
- 	depends on SOC_AM33XX || SOC_AM43XX
--	select REMOTEPROC
-+	depends on REMOTEPROC
- 	help
- 	  Say y here to support Wakeup M3 remote processor on TI AM33xx
- 	  and AM43xx family of SoCs.
-@@ -57,8 +58,8 @@ config WKUP_M3_RPROC
- config DA8XX_REMOTEPROC
- 	tristate "DA8xx/OMAP-L13x remoteproc support"
- 	depends on ARCH_DAVINCI_DA8XX
-+	depends on REMOTEPROC
- 	select CMA if MMU
--	select REMOTEPROC
- 	select RPMSG
- 	help
- 	  Say y here to support DA8xx/OMAP-L13x remote processors via the
-@@ -84,9 +85,9 @@ config QCOM_Q6V5_PIL
- 	tristate "Qualcomm Hexagon V5 Peripherial Image Loader"
- 	depends on OF && ARCH_QCOM
- 	depends on QCOM_SMEM
-+	depends on REMOTEPROC
- 	select MFD_SYSCON
- 	select QCOM_MDT_LOADER
--	select REMOTEPROC
- 	help
- 	  Say y here to support the Qualcomm Peripherial Image Loader for the
- 	  Hexagon V5 based remote processors.
-@@ -94,7 +95,7 @@ config QCOM_Q6V5_PIL
- config ST_REMOTEPROC
- 	tristate "ST remoteproc support"
- 	depends on ARCH_STI
--	select REMOTEPROC
-+	depends on REMOTEPROC
- 	help
- 	  Say y here to support ST's adjunct processors via the remote
- 	  processor framework.
-@@ -102,6 +103,8 @@ config ST_REMOTEPROC
- 
- config ST_SLIM_REMOTEPROC
- 	tristate
--	select REMOTEPROC
-+	depends on REMOTEPROC
++The FDMA is a general-purpose direct memory access controller capable of
++supporting 16 independent DMA channels. It accepts up to 32 DMA requests.
++The FDMA is based on a Slim processor which requires a firmware.
 +
-+endif # REMOTEPROC
- 
- endmenu
++* FDMA Controller
++
++Required properties:
++- compatible	: Should be one of
++		 - st,stih407-fdma-mpe31-11, "st,slim-rproc";
++		 - st,stih407-fdma-mpe31-12, "st,slim-rproc";
++		 - st,stih407-fdma-mpe31-13, "st,slim-rproc";
++- reg		: Should contain an entry for each name in reg-names
++- reg-names	: Must contain "slimcore", "dmem", "peripherals", "imem" entries
++- interrupts	: Should contain one interrupt shared by all channels
++- dma-channels	: Number of channels supported by the controller
++- #dma-cells	: Must be <3>. See DMA client section below
++- clocks	: Must contain an entry for each clock
++See: Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++
++Example:
++
++	fdma0: dma-controller at 8e20000 {
++		compatible = "st,stih407-fdma-mpe31-11", "st,slim-rproc";
++		reg = <0x8e20000 0x8000>,
++		      <0x8e30000 0x3000>,
++		      <0x8e37000 0x1000>,
++		      <0x8e38000 0x8000>;
++		reg-names = "slimcore", "dmem", "peripherals", "imem";
++		clocks = <&clk_s_c0_flexgen CLK_FDMA>,
++			 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
++			 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
++			 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
++		interrupts = <GIC_SPI 5 IRQ_TYPE_NONE>;
++		dma-channels = <16>;
++		#dma-cells = <3>;
++	};
++
++* DMA client
++
++Required properties:
++- dmas: Comma separated list of dma channel requests
++- dma-names: Names of the aforementioned requested channels
++
++Each dmas request consists of 4 cells:
++1. A phandle pointing to the FDMA controller
++2. The request line number
++3. A 32bit mask specifying (see include/linux/platform_data/dma-st-fdma.h)
++ -bit 2-0: Holdoff value, dreq will be masked for
++	0x0: 0-0.5us
++	0x1: 0.5-1us
++	0x2: 1-1.5us
++ -bit 17: data swap
++	0x0: disabled
++	0x1: enabled
++ -bit 21: Increment Address
++	0x0: no address increment between transfers
++	0x1: increment address between transfers
++ -bit 22: 2 STBus Initiator Coprocessor interface
++	0x0: high priority port
++	0x1: low priority port
++4. transfers type
++ 0 free running
++ 1 paced
++
++Example:
++
++	sti_uni_player2: sti-uni-player at 2 {
++		compatible = "st,sti-uni-player";
++		status = "disabled";
++		#sound-dai-cells = <0>;
++		st,syscfg = <&syscfg_core>;
++		clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
++		assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
++		assigned-clock-parents = <&clk_s_d0_quadfs 2>;
++		assigned-clock-rates = <50000000>;
++		reg = <0x8D82000 0x158>;
++		interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
++		dmas = <&fdma0 4 0 1>;
++		dai-name = "Uni Player #1 (DAC)";
++		dma-names = "tx";
++		st,uniperiph-id = <2>;
++		st,version = <5>;
++		st,mode = "PCM";
++	};
 -- 
 1.9.1
