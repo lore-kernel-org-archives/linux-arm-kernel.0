@@ -1,43 +1,28 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 8 Oct 2016 15:50:03 -0500
-Subject: [PATCH 5/6] clk: stm32f469: Add QSPI clock
-In-Reply-To: <1475245509-6487-6-git-send-email-gabriel.fernandez@st.com>
-References: <1475245509-6487-1-git-send-email-gabriel.fernandez@st.com>
- <1475245509-6487-6-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20161008205003.GB17455@rob-hp-laptop>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Sat, 8 Oct 2016 14:02:35 -0700
+Subject: [PATCH v2] arm64: dts: rename ns2.txt to brcm,ns2.txt
+In-Reply-To: <1475959684-18085-1-git-send-email-scott.branden@broadcom.com>
+References: <1475959684-18085-1-git-send-email-scott.branden@broadcom.com>
+Message-ID: <c0cfffa7-d72a-6acb-c457-cd696e24f2eb@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2016 at 04:25:08PM +0200, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> This patch adds the QSPI clock for stm32f469 discovery board.
-> The gate mapping is a little bit different from stm32f429 soc.
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+On 10/8/2016 1:48 PM, Scott Branden wrote:
+> Rename ns2.txt to brcm,ns2.txt to match naming convention followed
+> by rest of Broadcom binding documentation.
+>
+> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
 > ---
->  .../devicetree/bindings/clock/st,stm32-rcc.txt     |   4 +-
->  drivers/clk/clk-stm32f4.c                          | 173 ++++++++++++++++++---
->  2 files changed, 158 insertions(+), 19 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-> index fee3205..eace3de 100644
-> --- a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-> +++ b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-> @@ -8,7 +8,9 @@ Please also refer to clock-bindings.txt in this directory for common clock
->  controller binding usage.
->  
->  Required properties:
-> -- compatible: Should be "st,stm32f42xx-rcc"
-> +- compatible: Should be:
-> +  "st,stm32f42xx-rcc"
-> +  "st,stm32f46xx-rcc"
+>  Documentation/devicetree/bindings/arm/bcm/{ns2.txt => brcm,ns2.txt} | 0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  rename Documentation/devicetree/bindings/arm/bcm/{ns2.txt => brcm,ns2.txt} (100%)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/ns2.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,ns2.txt
+> similarity index 100%
+> rename from Documentation/devicetree/bindings/arm/bcm/ns2.txt
+> rename to Documentation/devicetree/bindings/arm/bcm/brcm,ns2.txt
+>
 
-Generally, we don't use wildcards in compatible strings. I know there's 
-lots of part numbers of stm32 parts which I guess are often same die 
-with different fusing or package. Your compatible strings should be at 
-least specific enough to identify parts that are really different die. 
+Looks good to me!
 
->  - reg: should be register base and length as documented in the
->    datasheet
->  - #clock-cells: 2, device nodes should specify the clock in their "clocks"
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
