@@ -1,196 +1,177 @@
-From: l.majewski@majess.pl (Lukasz Majewski)
-Date: Sat, 8 Oct 2016 16:32:46 +0200
-Subject: [PATCH v3 3/6] pwm: imx: support output polarity inversion
-In-Reply-To: <20161007151129.6043-4-bhuvanchandra.dv@toradex.com>
-References: <20161007151129.6043-1-bhuvanchandra.dv@toradex.com>
- <20161007151129.6043-4-bhuvanchandra.dv@toradex.com>
-Message-ID: <20161008163246.4bee7896@jawa>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 08 Oct 2016 17:24:38 +0200
+Subject: [PATCH v2 2/2] ARM: dts: rockchip: Add rk3066 MK808 board
+In-Reply-To: <c5ca69d3-698a-5ef4-623b-204c2a50c28f@rock-chips.com>
+References: <cover.1475774981.git.paweljarosz3691@gmail.com>
+ <2320435.WKGs9crzlB@phil>
+ <c5ca69d3-698a-5ef4-623b-204c2a50c28f@rock-chips.com>
+Message-ID: <6652929.xB7y1bpV6i@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bhuvanchandra,
-
-> From: Lothar Wassmann <LW@KARO-electronics.de>
+Am Samstag, 8. Oktober 2016, 11:01:08 schrieb Shawn Lin:
+> ? 2016/10/7 18:01, Heiko Stuebner ??:
+> > Am Freitag, 7. Oktober 2016, 10:29:48 CEST schrieb Shawn Lin:
+> >> Hi Pawe? ,
+> >> 
+> >> On 2016/10/7 1:38, Pawe? Jarosz wrote:
+> >>> MK808 is a tv stick which has rockchip rk3066 CPU inside, two usb ports
+> >>> - host and otg, micro sd card slot and onboard wifi RK901.
+> >>> 
+> >>> Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
+> >>> ---
+> >>> 
+> >>> Changes in v2:
+> >>> - included Heiko sugestion.
+> >>> 
+> >>>  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+> >>>  arch/arm/boot/dts/Makefile                         |   1 +
+> >>>  arch/arm/boot/dts/rk3066a-mk808.dts                | 184
+> >>>  +++++++++++++++++++++ 3 files changed, 189 insertions(+)
+> >>>  create mode 100644 arch/arm/boot/dts/rk3066a-mk808.dts
+> >>> 
+> >>> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
+> >>> b/Documentation/devicetree/bindings/arm/rockchip.txt index
+> >>> 55f388f..c09595b 100644
+> >>> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
+> >>> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+> >>> @@ -17,6 +17,10 @@ Rockchip platforms device tree bindings
+> >>> 
+> >>>      Required root node properties:
+> >>>        - compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
+> >>> 
+> >>> +- Rikomagic MK808 v1 board:
+> >>> +    Required root node properties:
+> >>> +      - compatible = "rikomagic,mk808", "rockchip,rk3066a";
+> >>> +
+> >>> 
+> >>>  - Radxa Rock board:
+> >>>      Required root node properties:
+> >>>        - compatible = "radxa,rock", "rockchip,rk3188";
+> >>> 
+> >>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >>> index befcd26..f19cc1d 100644
+> >>> --- a/arch/arm/boot/dts/Makefile
+> >>> +++ b/arch/arm/boot/dts/Makefile
+> >>> @@ -639,6 +639,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+> >>> 
+> >>>  	rk3036-kylin.dtb \
+> >>>  	rk3066a-bqcurie2.dtb \
+> >>>  	rk3066a-marsboard.dtb \
+> >>> 
+> >>> +	rk3066a-mk808.dtb \
+> >>> 
+> >>>  	rk3066a-rayeager.dtb \
+> >>>  	rk3188-radxarock.dtb \
+> >>>  	rk3228-evb.dtb \
+> >>> 
+> >>> diff --git a/arch/arm/boot/dts/rk3066a-mk808.dts
+> >>> b/arch/arm/boot/dts/rk3066a-mk808.dts new file mode 100644
+> >>> index 0000000..2878562
+> >>> --- /dev/null
+> >>> +++ b/arch/arm/boot/dts/rk3066a-mk808.dts
+> >>> @@ -0,0 +1,184 @@
+> >>> +/*
+> >>> + * Copyright (c) 2016 Pawe? Jarosz <paweljarosz3691@gmail.com>
+> >>> + *
+> >>> + * This file is dual-licensed: you can use it either under the terms
+> >>> + * of the GPL or the X11 license, at your option. Note that this dual
+> >>> + * licensing only applies to this file, and not this project as a
+> >>> + * whole.
+> >>> + *
+> >>> + *  a) This file is free software; you can redistribute it and/or
+> >>> + *     modify it under the terms of the GNU General Public License as
+> >>> + *     published by the Free Software Foundation; either version 2 of
+> >>> the
+> >>> + *     License, or (at your option) any later version.
+> >>> + *
+> >>> + *     This file is distributed in the hope that it will be useful,
+> >>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>> + *     GNU General Public License for more details.
+> >>> + *
+> >>> + * Or, alternatively,
+> >>> + *
+> >>> + *  b) Permission is hereby granted, free of charge, to any person
+> >>> + *     obtaining a copy of this software and associated documentation
+> >>> + *     files (the "Software"), to deal in the Software without
+> >>> + *     restriction, including without limitation the rights to use,
+> >>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> >>> + *     sell copies of the Software, and to permit persons to whom the
+> >>> + *     Software is furnished to do so, subject to the following
+> >>> + *     conditions:
+> >>> + *
+> >>> + *     The above copyright notice and this permission notice shall be
+> >>> + *     included in all copies or substantial portions of the Software.
+> >>> + *
+> >>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> >>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> >>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> >>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> >>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> >>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> >>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >>> + *     OTHER DEALINGS IN THE SOFTWARE.
+> >>> + */
+> >>> +
+> >>> +/dts-v1/;
+> >>> +#include "rk3066a.dtsi"
+> >>> +
+> >>> +/ {
+> >>> +	model = "Rikomagic MK808";
+> >>> +	compatible = "rikomagic,mk808", "rockchip,rk3066a";
+> >>> +
+> >>> +	chosen {
+> >>> +		stdout-path = "serial2:115200n8";
+> >>> +	};
+> >>> +
+> >>> +	memory at 60000000 {
+> >>> +		device_type = "memory";
+> >>> +		reg = <0x60000000 0x40000000>;
+> >>> +	};
+> >>> +
+> >>> +	gpio-leds {
+> >>> +		compatible = "gpio-leds";
+> >>> +
+> >>> +		blue {
+> >>> +			label = "mk808:blue:power";
+> >>> +			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+> >>> +			default-state = "off";
+> >>> +			linux,default-trigger = "default-on";
+> >>> +		};
+> >>> +	};
+> >>> +
+> >>> +	mmc_pwrseq: mmc-pwrseq {
+> >>> +		compatible = "mmc-pwrseq-simple";
+> >>> +		pinctrl-names = "default";
+> >>> +		pinctrl-0 = <&sdmmc_pwr>;
+> >> 
+> >> sd slot does not contain a reset pin. So the power pin should be
+> >> enough. just add sdmmc_pwr to mmc0's pinctrl-0 and let mmc driver
+> >> control it should be enough. Typically pwrseq is for emmc and sdio.
+> >> We don't need a pwerseq to control power for sd slot..
+> >> 
+> >> But it seems sdmmc_pwr is a GPIO, but not functional port.
+> >> So I am interesting that why MK808 board doesn't use the mmc
+> >> controller's default power pin but chosing another gpio, so finally
+> >> we have to add thses code for your DT.
+> > 
+> > Actually, we always model the sd-mmc pwr-pin as gpio-based regulator (see
+> > sdmmc-regulator for example in the rk3066a-rayeager.dts), and specifiy
+> > this
+> > regulator as vmmc. That way the mmc core really can control the power.
 > 
-> The i.MX pwm unit on i.MX27 and newer SoCs provides a configurable
-> output polarity. This patch adds support to utilize this feature
-> where available.
+> yes it did. There are two ways for us to control vmmc properly.
+> If we use gpio-based regulator or PMIC, mmc core take over it
+> to control the power correctly. But if we use the dafault functional
+> port, namely SDMMC_PWREN, the dw_mmc driver could handle the control
+> when doing set_ios.. Both of these two could work fine. But I always
+> chose the latter one to simplify the dts.
 > 
-> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
-> Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
-> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Anyway, I won't insist on it if it looks okay to you. :)
 
-I've tested those patches on my iMX6q board on top of v4.7 linux kernel.
+yes, I'd really prefer the mmc subsystem explicitly controlling the cards 
+power via a regulator :-) .
 
-Tested-by: Lukasz Majewski <l.majewski@majess.pl>
 
-Best regards,
-?ukasz Majewski
-
-> ---
->  Documentation/devicetree/bindings/pwm/imx-pwm.txt |  6 +--
->  drivers/pwm/pwm-imx.c                             | 51
-> +++++++++++++++++++++-- 2 files changed, 51 insertions(+), 6
-> deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/imx-pwm.txt
-> b/Documentation/devicetree/bindings/pwm/imx-pwm.txt index
-> e00c2e9..c61bdf8 100644 ---
-> a/Documentation/devicetree/bindings/pwm/imx-pwm.txt +++
-> b/Documentation/devicetree/bindings/pwm/imx-pwm.txt @@ -6,8 +6,8 @@
-> Required properties:
->    - "fsl,imx1-pwm" for PWM compatible with the one integrated on
-> i.MX1
->    - "fsl,imx27-pwm" for PWM compatible with the one integrated on
-> i.MX27
->  - reg: physical base address and length of the controller's registers
-> -- #pwm-cells: should be 2. See pwm.txt in this directory for a
-> description of
-> -  the cells format.
-> +- #pwm-cells: 2 for i.MX1 and 3 for i.MX27 and newer SoCs. See
-> pwm.txt
-> +  in this directory for a description of the cells format.
->  - clocks : Clock specifiers for both ipg and per clocks.
->  - clock-names : Clock names should include both "ipg" and "per"
->  See the clock consumer binding,
-> @@ -17,7 +17,7 @@ See the clock consumer binding,
->  Example:
->  
->  pwm1: pwm at 53fb4000 {
-> -	#pwm-cells = <2>;
-> +	#pwm-cells = <3>;
->  	compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
->  	reg = <0x53fb4000 0x4000>;
->  	clocks = <&clks IMX5_CLK_PWM1_IPG_GATE>,
-> diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
-> index d600fd5..c37d223 100644
-> --- a/drivers/pwm/pwm-imx.c
-> +++ b/drivers/pwm/pwm-imx.c
-> @@ -38,6 +38,7 @@
->  #define MX3_PWMCR_DOZEEN		(1 << 24)
->  #define MX3_PWMCR_WAITEN		(1 << 23)
->  #define MX3_PWMCR_DBGEN			(1 << 22)
-> +#define MX3_PWMCR_POUTC			(1 << 18)
->  #define MX3_PWMCR_CLKSRC_IPG_HIGH	(2 << 16)
->  #define MX3_PWMCR_CLKSRC_IPG		(1 << 16)
->  #define MX3_PWMCR_SWR			(1 << 3)
-> @@ -180,6 +181,9 @@ static int imx_pwm_config_v2(struct pwm_chip
-> *chip, if (enable)
->  		cr |= MX3_PWMCR_EN;
->  
-> +	if (pwm->args.polarity == PWM_POLARITY_INVERSED)
-> +		cr |= MX3_PWMCR_POUTC;
-> +
->  	writel(cr, imx->mmio_base + MX3_PWMCR);
->  
->  	return 0;
-> @@ -240,27 +244,62 @@ static void imx_pwm_disable(struct pwm_chip
-> *chip, struct pwm_device *pwm) clk_disable_unprepare(imx->clk_per);
->  }
->  
-> -static struct pwm_ops imx_pwm_ops = {
-> +static int imx_pwm_set_polarity(struct pwm_chip *chip, struct
-> pwm_device *pwm,
-> +				enum pwm_polarity polarity)
-> +{
-> +	struct imx_chip *imx = to_imx_chip(chip);
-> +	u32 val;
-> +
-> +	if (polarity == pwm->args.polarity)
-> +		return 0;
-> +
-> +	val = readl(imx->mmio_base + MX3_PWMCR);
-> +
-> +	if (polarity == PWM_POLARITY_INVERSED)
-> +		val |= MX3_PWMCR_POUTC;
-> +	else
-> +		val &= ~MX3_PWMCR_POUTC;
-> +
-> +	writel(val, imx->mmio_base + MX3_PWMCR);
-> +
-> +	dev_dbg(imx->chip.dev, "%s: polarity set to %s\n", __func__,
-> +		polarity == PWM_POLARITY_INVERSED ? "inverted" :
-> "normal"); +
-> +	return 0;
-> +}
-> +
-> +static struct pwm_ops imx_pwm_ops_v1 = {
->  	.enable = imx_pwm_enable,
->  	.disable = imx_pwm_disable,
->  	.config = imx_pwm_config,
->  	.owner = THIS_MODULE,
->  };
->  
-> +static struct pwm_ops imx_pwm_ops_v2 = {
-> +	.enable = imx_pwm_enable,
-> +	.disable = imx_pwm_disable,
-> +	.set_polarity = imx_pwm_set_polarity,
-> +	.config = imx_pwm_config,
-> +	.owner = THIS_MODULE,
-> +};
-> +
->  struct imx_pwm_data {
->  	int (*config)(struct pwm_chip *chip,
->  		struct pwm_device *pwm, int duty_ns, int period_ns);
->  	void (*set_enable)(struct pwm_chip *chip, bool enable);
-> +	struct pwm_ops *pwm_ops;
->  };
->  
->  static struct imx_pwm_data imx_pwm_data_v1 = {
->  	.config = imx_pwm_config_v1,
->  	.set_enable = imx_pwm_set_enable_v1,
-> +	.pwm_ops = &imx_pwm_ops_v1,
->  };
->  
->  static struct imx_pwm_data imx_pwm_data_v2 = {
->  	.config = imx_pwm_config_v2,
->  	.set_enable = imx_pwm_set_enable_v2,
-> +	.pwm_ops = &imx_pwm_ops_v2,
->  };
->  
->  static const struct of_device_id imx_pwm_dt_ids[] = {
-> @@ -282,6 +321,8 @@ static int imx_pwm_probe(struct platform_device
-> *pdev) if (!of_id)
->  		return -ENODEV;
->  
-> +	data = of_id->data;
-> +
->  	imx = devm_kzalloc(&pdev->dev, sizeof(*imx), GFP_KERNEL);
->  	if (imx == NULL)
->  		return -ENOMEM;
-> @@ -300,18 +341,22 @@ static int imx_pwm_probe(struct platform_device
-> *pdev) return PTR_ERR(imx->clk_ipg);
->  	}
->  
-> -	imx->chip.ops = &imx_pwm_ops;
-> +	imx->chip.ops = data->pwm_ops;
->  	imx->chip.dev = &pdev->dev;
->  	imx->chip.base = -1;
->  	imx->chip.npwm = 1;
->  	imx->chip.can_sleep = true;
-> +	if (data->pwm_ops->set_polarity) {
-> +		dev_dbg(&pdev->dev, "PWM supports output
-> inversion\n");
-> +		imx->chip.of_xlate = of_pwm_xlate_with_flags;
-> +		imx->chip.of_pwm_n_cells = 3;
-> +	}
->  
->  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	imx->mmio_base = devm_ioremap_resource(&pdev->dev, r);
->  	if (IS_ERR(imx->mmio_base))
->  		return PTR_ERR(imx->mmio_base);
->  
-> -	data = of_id->data;
->  	imx->config = data->config;
->  	imx->set_enable = data->set_enable;
->  
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161008/a63e8653/attachment-0001.sig>
+Heiko
