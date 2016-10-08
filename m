@@ -1,32 +1,30 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sat, 8 Oct 2016 11:31:50 +0900
-Subject: [PATCH v3 03/11] ARM: shmobile: r8a7743: basic SoC support
-In-Reply-To: <2345971.ESZSzve5jF@avalon>
+Date: Sat, 8 Oct 2016 11:28:51 +0900
+Subject: [PATCH v3 04/11] ARM: dts: r8a7743: initial SoC device tree
+In-Reply-To: <cd1391d1-d2b5-6315-ee15-0253019d9836@cogentembedded.com>
 References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
- <15557770.lH5aPepOeZ@wasted.cogentembedded.com>
- <20161007031537.GK13721@verge.net.au> <2345971.ESZSzve5jF@avalon>
-Message-ID: <20161008023149.GB14617@verge.net.au>
+ <2883940.Oo8sg10L7m@wasted.cogentembedded.com>
+ <20161007030932.GH13721@verge.net.au>
+ <cd1391d1-d2b5-6315-ee15-0253019d9836@cogentembedded.com>
+Message-ID: <20161008022851.GA14617@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2016 at 11:33:33AM +0300, Laurent Pinchart wrote:
-> Hi Simon,
+On Fri, Oct 07, 2016 at 12:57:28PM +0300, Sergei Shtylyov wrote:
+> On 10/7/2016 6:09 AM, Simon Horman wrote:
 > 
+> >>The  initial R8A7743 SoC device tree including CPU cores, GIC, timer, SYSC,
+> >>CPG, and the required clock descriptions.
+> >>
+> >>Based on the original (and large) patch by Dmitry Shifrin
+> >><dmitry.shifrin@cogentembedded.com>.
+> >>
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >
+> >I notice that this patch enables two CPUs. Have you tested SMP and:
+> >- CPU hotplug
+> >- Suspend to RAM
 > 
-> On Friday 07 Oct 2016 12:15:37 Simon Horman wrote:
-> > On Thu, Oct 06, 2016 at 12:37:08AM +0300, Sergei Shtylyov wrote:
-> > > Add minimal support for the RZ/G1M (R8A7743) SoC.
-> > > 
-> > > Based on the original (and large) patch by Dmitry Shifrin
-> > > <dmitry.shifrin@cogentembedded.com>.
-> > > 
-> > > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > 
-> > Thanks, I have queued this up.
-> 
-> I'd like to see this patch rebased on top of "[PATCH] ARM: shmobile: 
-> Consolidate R8A779[234] machine definitions".
+>    No, not really. I'll remove CPU1. :-<
 
-I'm happy to drop this patch if that is the desired outcome of
-the discussion in this sub-thread.
+Thanks.
