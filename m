@@ -1,38 +1,31 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Sat,  8 Oct 2016 13:52:33 +0100
-Subject: [PATCH v10 11/11] ARM: multi_v7_defconfig: Enable STi and simple-card
- drivers.
+Date: Sat,  8 Oct 2016 13:52:32 +0100
+Subject: [PATCH v10 10/11] ARM: multi_v7_defconfig: Enable STi FDMA driver
 In-Reply-To: <1475931154-1021-1-git-send-email-peter.griffin@linaro.org>
 References: <1475931154-1021-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1475931154-1021-12-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1475931154-1021-11-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the STi ALSA drivers found on STi platforms
-as well as the simple-card driver which is a dependency to have
-working sound.
+This DMA controller is found on all STi chipsets.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 Acked-by: Lee Jones <lee.jones@linaro.org>
-Cc: arnaud.pouliquen at st.com
-Cc: broonie at kernel.org
 ---
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 46f174e..5d92092 100644
+index 33f7a8a..46f174e 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -644,6 +644,9 @@ CONFIG_SND_SOC_AK4642=m
- CONFIG_SND_SOC_SGTL5000=m
- CONFIG_SND_SOC_SPDIF=m
- CONFIG_SND_SOC_WM8978=m
-+CONFIG_SND_SOC_STI=m
-+CONFIG_SND_SOC_STI_SAS=m
-+CONFIG_SND_SIMPLE_CARD=m
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_XHCI_MVEBU=y
+@@ -784,6 +784,7 @@ CONFIG_DMA_OMAP=y
+ CONFIG_QCOM_BAM_DMA=y
+ CONFIG_XILINX_DMA=y
+ CONFIG_DMA_SUN6I=y
++CONFIG_ST_FDMA=m
+ CONFIG_STAGING=y
+ CONFIG_SENSORS_ISL29018=y
+ CONFIG_SENSORS_ISL29028=y
 -- 
 1.9.1
