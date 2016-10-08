@@ -1,54 +1,81 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri,  7 Oct 2016 21:23:12 -0700
-Subject: [PATCH 2/5] rpmsg: Introduce a driver override mechanism
+Date: Fri,  7 Oct 2016 21:23:13 -0700
+Subject: [PATCH 3/5] rpmsg: Support drivers without primary endpoint
 In-Reply-To: <1475900595-8375-1-git-send-email-bjorn.andersson@linaro.org>
 References: <1475900595-8375-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1475900595-8375-2-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1475900595-8375-3-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to other subsystems it's useful to provide a mechanism to force
-a specific driver match on a device, so introduce this.
+Some types of rpmsg drivers does not have a primary endpoint to tie
+their existence upon, but wishes to create and destroy endpoints
+dynamically, e.g. based on user interactions.
+
+Allow rpmsg drivers to omit a driver callback to signal this case and
+make the probe path not create a primary endpoint in this case.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- drivers/rpmsg/rpmsg_core.c | 3 +++
- include/linux/rpmsg.h      | 2 ++
- 2 files changed, 5 insertions(+)
+ drivers/rpmsg/rpmsg_core.c | 32 ++++++++++++++++++--------------
+ 1 file changed, 18 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/rpmsg/rpmsg_core.c b/drivers/rpmsg/rpmsg_core.c
-index b6ea9ffa7381..087d4db896c8 100644
+index 087d4db896c8..7561941ba413 100644
 --- a/drivers/rpmsg/rpmsg_core.c
 +++ b/drivers/rpmsg/rpmsg_core.c
-@@ -315,6 +315,9 @@ static int rpmsg_dev_match(struct device *dev, struct device_driver *drv)
- 	const struct rpmsg_device_id *ids = rpdrv->id_table;
- 	unsigned int i;
+@@ -347,27 +347,30 @@ static int rpmsg_dev_probe(struct device *dev)
+ 	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
+ 	struct rpmsg_driver *rpdrv = to_rpmsg_driver(rpdev->dev.driver);
+ 	struct rpmsg_channel_info chinfo = {};
+-	struct rpmsg_endpoint *ept;
++	struct rpmsg_endpoint *ept = NULL;
+ 	int err;
  
-+	if (rpdev->driver_override)
-+		return !strcmp(rpdev->driver_override, drv->name);
-+
- 	if (ids)
- 		for (i = 0; ids[i].name[0]; i++)
- 			if (rpmsg_id_match(rpdev, &ids[i]))
-diff --git a/include/linux/rpmsg.h b/include/linux/rpmsg.h
-index 452d393cc8dd..7ad6c205f110 100644
---- a/include/linux/rpmsg.h
-+++ b/include/linux/rpmsg.h
-@@ -64,6 +64,7 @@ struct rpmsg_channel_info {
-  * rpmsg_device - device that belong to the rpmsg bus
-  * @dev: the device struct
-  * @id: device id (used to match between rpmsg drivers and devices)
-+ * @driver_override: driver name to force a match
-  * @src: local address
-  * @dst: destination address
-  * @ept: the rpmsg endpoint of this channel
-@@ -72,6 +73,7 @@ struct rpmsg_channel_info {
- struct rpmsg_device {
- 	struct device dev;
- 	struct rpmsg_device_id id;
-+	char *driver_override;
- 	u32 src;
- 	u32 dst;
- 	struct rpmsg_endpoint *ept;
+-	strncpy(chinfo.name, rpdev->id.name, RPMSG_NAME_SIZE);
+-	chinfo.src = rpdev->src;
+-	chinfo.dst = RPMSG_ADDR_ANY;
++	if (rpdrv->callback) {
++		strncpy(chinfo.name, rpdev->id.name, RPMSG_NAME_SIZE);
++		chinfo.src = rpdev->src;
++		chinfo.dst = RPMSG_ADDR_ANY;
+ 
+-	ept = rpmsg_create_ept(rpdev, rpdrv->callback, NULL, chinfo);
+-	if (!ept) {
+-		dev_err(dev, "failed to create endpoint\n");
+-		err = -ENOMEM;
+-		goto out;
+-	}
++		ept = rpmsg_create_ept(rpdev, rpdrv->callback, NULL, chinfo);
++		if (!ept) {
++			dev_err(dev, "failed to create endpoint\n");
++			err = -ENOMEM;
++			goto out;
++		}
+ 
+-	rpdev->ept = ept;
+-	rpdev->src = ept->addr;
++		rpdev->ept = ept;
++		rpdev->src = ept->addr;
++	}
+ 
+ 	err = rpdrv->probe(rpdev);
+ 	if (err) {
+ 		dev_err(dev, "%s: failed: %d\n", __func__, err);
+-		rpmsg_destroy_ept(ept);
++		if (ept)
++			rpmsg_destroy_ept(ept);
+ 		goto out;
+ 	}
+ 
+@@ -388,7 +391,8 @@ static int rpmsg_dev_remove(struct device *dev)
+ 
+ 	rpdrv->remove(rpdev);
+ 
+-	rpmsg_destroy_ept(rpdev->ept);
++	if (rpdev->ept)
++		rpmsg_destroy_ept(rpdev->ept);
+ 
+ 	return err;
+ }
 -- 
 2.5.0
