@@ -1,184 +1,115 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Sat, 8 Oct 2016 11:01:08 +0800
-Subject: [PATCH v2 2/2] ARM: dts: rockchip: Add rk3066 MK808 board
-In-Reply-To: <2320435.WKGs9crzlB@phil>
-References: <cover.1475774981.git.paweljarosz3691@gmail.com>
- <b63a0ad452a487beb1d0c07addb9208cc3b3eeef.1475774981.git.paweljarosz3691@gmail.com>
- <a166a444-8819-ffe7-8ee1-1f632f6a66ab@rock-chips.com>
- <2320435.WKGs9crzlB@phil>
-Message-ID: <c5ca69d3-698a-5ef4-623b-204c2a50c28f@rock-chips.com>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Sat, 8 Oct 2016 03:28:01 +0000
+Subject: [v12, 0/8] Fix eSDHC host version register bug
+References: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com> 
+Message-ID: <DB6PR0401MB2536F6224B12A62D0A0FBCBAF8D90@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/10/7 18:01, Heiko Stuebner ??:
-> Am Freitag, 7. Oktober 2016, 10:29:48 CEST schrieb Shawn Lin:
->> Hi Pawe? ,
->>
->> On 2016/10/7 1:38, Pawe? Jarosz wrote:
->>> MK808 is a tv stick which has rockchip rk3066 CPU inside, two usb ports
->>> - host and otg, micro sd card slot and onboard wifi RK901.
->>>
->>> Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
->>> ---
->>>
->>> Changes in v2:
->>> - included Heiko sugestion.
->>>
->>>  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
->>>  arch/arm/boot/dts/Makefile                         |   1 +
->>>  arch/arm/boot/dts/rk3066a-mk808.dts                | 184
->>>  +++++++++++++++++++++ 3 files changed, 189 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/rk3066a-mk808.dts
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
->>> b/Documentation/devicetree/bindings/arm/rockchip.txt index
->>> 55f388f..c09595b 100644
->>> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
->>> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
->>> @@ -17,6 +17,10 @@ Rockchip platforms device tree bindings
->>>
->>>      Required root node properties:
->>>        - compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
->>>
->>> +- Rikomagic MK808 v1 board:
->>> +    Required root node properties:
->>> +      - compatible = "rikomagic,mk808", "rockchip,rk3066a";
->>> +
->>>
->>>  - Radxa Rock board:
->>>      Required root node properties:
->>>        - compatible = "radxa,rock", "rockchip,rk3188";
->>>
->>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>> index befcd26..f19cc1d 100644
->>> --- a/arch/arm/boot/dts/Makefile
->>> +++ b/arch/arm/boot/dts/Makefile
->>> @@ -639,6 +639,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->>>
->>>  	rk3036-kylin.dtb \
->>>  	rk3066a-bqcurie2.dtb \
->>>  	rk3066a-marsboard.dtb \
->>>
->>> +	rk3066a-mk808.dtb \
->>>
->>>  	rk3066a-rayeager.dtb \
->>>  	rk3188-radxarock.dtb \
->>>  	rk3228-evb.dtb \
->>>
->>> diff --git a/arch/arm/boot/dts/rk3066a-mk808.dts
->>> b/arch/arm/boot/dts/rk3066a-mk808.dts new file mode 100644
->>> index 0000000..2878562
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/rk3066a-mk808.dts
->>> @@ -0,0 +1,184 @@
->>> +/*
->>> + * Copyright (c) 2016 Pawe? Jarosz <paweljarosz3691@gmail.com>
->>> + *
->>> + * This file is dual-licensed: you can use it either under the terms
->>> + * of the GPL or the X11 license, at your option. Note that this dual
->>> + * licensing only applies to this file, and not this project as a
->>> + * whole.
->>> + *
->>> + *  a) This file is free software; you can redistribute it and/or
->>> + *     modify it under the terms of the GNU General Public License as
->>> + *     published by the Free Software Foundation; either version 2 of the
->>> + *     License, or (at your option) any later version.
->>> + *
->>> + *     This file is distributed in the hope that it will be useful,
->>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + *     GNU General Public License for more details.
->>> + *
->>> + * Or, alternatively,
->>> + *
->>> + *  b) Permission is hereby granted, free of charge, to any person
->>> + *     obtaining a copy of this software and associated documentation
->>> + *     files (the "Software"), to deal in the Software without
->>> + *     restriction, including without limitation the rights to use,
->>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>> + *     sell copies of the Software, and to permit persons to whom the
->>> + *     Software is furnished to do so, subject to the following
->>> + *     conditions:
->>> + *
->>> + *     The above copyright notice and this permission notice shall be
->>> + *     included in all copies or substantial portions of the Software.
->>> + *
->>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>> + */
->>> +
->>> +/dts-v1/;
->>> +#include "rk3066a.dtsi"
->>> +
->>> +/ {
->>> +	model = "Rikomagic MK808";
->>> +	compatible = "rikomagic,mk808", "rockchip,rk3066a";
->>> +
->>> +	chosen {
->>> +		stdout-path = "serial2:115200n8";
->>> +	};
->>> +
->>> +	memory at 60000000 {
->>> +		device_type = "memory";
->>> +		reg = <0x60000000 0x40000000>;
->>> +	};
->>> +
->>> +	gpio-leds {
->>> +		compatible = "gpio-leds";
->>> +
->>> +		blue {
->>> +			label = "mk808:blue:power";
->>> +			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
->>> +			default-state = "off";
->>> +			linux,default-trigger = "default-on";
->>> +		};
->>> +	};
->>> +
->>> +	mmc_pwrseq: mmc-pwrseq {
->>> +		compatible = "mmc-pwrseq-simple";
->>> +		pinctrl-names = "default";
->>> +		pinctrl-0 = <&sdmmc_pwr>;
->>
->> sd slot does not contain a reset pin. So the power pin should be
->> enough. just add sdmmc_pwr to mmc0's pinctrl-0 and let mmc driver
->> control it should be enough. Typically pwrseq is for emmc and sdio.
->> We don't need a pwerseq to control power for sd slot..
->>
->> But it seems sdmmc_pwr is a GPIO, but not functional port.
->> So I am interesting that why MK808 board doesn't use the mmc
->> controller's default power pin but chosing another gpio, so finally
->> we have to add thses code for your DT.
->
-> Actually, we always model the sd-mmc pwr-pin as gpio-based regulator (see
-> sdmmc-regulator for example in the rk3066a-rayeager.dts), and specifiy this
-> regulator as vmmc. That way the mmc core really can control the power.
+Hi Uffe, Arnd and Scott,
 
-yes it did. There are two ways for us to control vmmc properly.
-If we use gpio-based regulator or PMIC, mmc core take over it
-to control the power correctly. But if we use the dafault functional
-port, namely SDMMC_PWREN, the dw_mmc driver could handle the control
-when doing set_ios.. Both of these two could work fine. But I always
-chose the latter one to simplify the dts.
-
-Anyway, I won't insist on it if it looks okay to you. :)
-
->
->
-> Heiko
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->
+Any comments on this latest patcheset?
+Could we consider to merge it if no any other changes needed?
+:)
 
 
--- 
-Best Regards
-Shawn Lin
+Thanks.
+
+Best regards,
+Yangbo Lu
+
+> -----Original Message-----
+> From: Y.B. Lu
+> Sent: Monday, September 26, 2016 11:15 AM
+> To: linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Scott Wood; Arnd
+> Bergmann
+> Cc: linuxppc-dev at lists.ozlabs.org; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
+> foundation.org; netdev at vger.kernel.org; Mark Rutland; Rob Herring;
+> Russell King; Jochen Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh
+> Sharma; Qiang Zhao; Kumar Gala; Santosh Shilimkar; Leo Li; X.B. Xie; M.H.
+> Lian
+> Subject: RE: [v12, 0/8] Fix eSDHC host version register bug
+> 
+> Any comments about this version patchset ?
+> 
+> :)
+> 
+> 
+> > -----Original Message-----
+> > From: Yangbo Lu [mailto:yangbo.lu at nxp.com]
+> > Sent: Wednesday, September 21, 2016 2:57 PM
+> > To: linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Scott Wood;
+> > Arnd Bergmann
+> > Cc: linuxppc-dev at lists.ozlabs.org; devicetree at vger.kernel.org;
+> > linux-arm- kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > linux- clk at vger.kernel.org; linux-i2c at vger.kernel.org;
+> > iommu at lists.linux- foundation.org; netdev at vger.kernel.org; Mark
+> > Rutland; Rob Herring; Russell King; Jochen Friedrich; Joerg Roedel;
+> > Claudiu Manoil; Bhupesh Sharma; Qiang Zhao; Kumar Gala; Santosh
+> Shilimkar; Leo Li; X.B. Xie; M.H.
+> > Lian; Y.B. Lu
+> > Subject: [v12, 0/8] Fix eSDHC host version register bug
+> >
+> > This patchset is used to fix a host version register bug in the T4240-
+> > R1.0-R2.0 eSDHC controller. To match the SoC version and revision, 10
+> > previous version patchsets had tried many methods but all of them were
+> > rejected by reviewers.
+> > Such as
+> > 	- dts compatible method
+> > 	- syscon method
+> > 	- ifdef PPC method
+> > 	- GUTS driver getting SVR method
+> > Anrd suggested a soc_device_match method in v10, and this is the only
+> > available method left now. This v11 patchset introduces the
+> > soc_device_match interface in soc driver.
+> >
+> > The first six patches of Yangbo are to add the GUTS driver. This is
+> > used to register a soc device which contain soc version and revision
+> > information.
+> > The other two patches introduce the soc_device_match method in soc
+> > driver and apply it on esdhc driver to fix this bug.
+> >
+> > Arnd Bergmann (1):
+> >   base: soc: introduce soc_device_match() interface
+> >
+> > Yangbo Lu (7):
+> >   dt: bindings: update Freescale DCFG compatible
+> >   ARM64: dts: ls2080a: add device configuration node
+> >   dt: bindings: move guts devicetree doc out of powerpc directory
+> >   powerpc/fsl: move mpc85xx.h to include/linux/fsl
+> >   soc: fsl: add GUTS driver for QorIQ platforms
+> >   MAINTAINERS: add entry for Freescale SoC drivers
+> >   mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
+> >
+> >  Documentation/devicetree/bindings/arm/fsl.txt      |   6 +-
+> >  .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
+> >  MAINTAINERS                                        |  11 +-
+> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 +
+> >  arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
+> >  arch/powerpc/sysdev/fsl_pci.c                      |   2 +-
+> >  drivers/base/Kconfig                               |   1 +
+> >  drivers/base/soc.c                                 |  66 ++++++
+> >  drivers/clk/clk-qoriq.c                            |   3 +-
+> >  drivers/i2c/busses/i2c-mpc.c                       |   2 +-
+> >  drivers/iommu/fsl_pamu.c                           |   3 +-
+> >  drivers/mmc/host/Kconfig                           |   1 +
+> >  drivers/mmc/host/sdhci-of-esdhc.c                  |  20 ++
+> >  drivers/net/ethernet/freescale/gianfar.c           |   2 +-
+> >  drivers/soc/Kconfig                                |   2 +-
+> >  drivers/soc/fsl/Kconfig                            |  19 ++
+> >  drivers/soc/fsl/Makefile                           |   1 +
+> >  drivers/soc/fsl/guts.c                             | 257
+> > +++++++++++++++++++++
+> >  include/linux/fsl/guts.h                           | 125 ++++++----
+> >  .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
+> >  include/linux/sys_soc.h                            |   3 +
+> >  21 files changed, 478 insertions(+), 61 deletions(-)  rename
+> > Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+> > create mode 100644 drivers/soc/fsl/Kconfig  create mode 100644
+> > drivers/soc/fsl/guts.c  rename arch/powerpc/include/asm/mpc85xx.h =>
+> > include/linux/fsl/svr.h (97%)
+> >
+> > --
+> > 2.1.0.27.g96db324
