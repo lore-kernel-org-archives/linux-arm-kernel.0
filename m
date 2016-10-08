@@ -1,25 +1,31 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Sat, 08 Oct 2016 09:12:49 -0700
-Subject: [PATCH v2] ARM64: dts: meson-gxbb-odroidc2: Enable USB Nodes
-In-Reply-To: <1475564803-9616-1-git-send-email-brian.kim@hardkernel.com>
- (Brian Kim's message of "Tue, 4 Oct 2016 16:06:43 +0900")
-References: <1475564803-9616-1-git-send-email-brian.kim@hardkernel.com>
-Message-ID: <7hbmyues5a.fsf@baylibre.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat,  8 Oct 2016 22:20:11 +0200
+Subject: [PATCH] KVM: arm64: Correct trace exception name after SError handling
+Message-ID: <20161008202011.30835-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Brian Kim <brian.kim@hardkernel.com> writes:
+After commit 9aecafc8 introduced ARM_EXCEPTION_EL1_SERROR we should
+adjust the description of the exception type for trace events.
 
-> Enable both gxbb USB controller and add a 5V regulator for the OTG port
-> VBUS
->
-> Signed-off-by: Brian Kim <brian.kim@hardkernel.com>
-> ---
-> This patch was written on Kevin Hilman's repository[1] and branch[2]:
-> [1] https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
-> [2] v4.8/integ
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/include/asm/kvm_arm.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Applied to the v4.10/dt64 branch, and will be included shortly in the
-integration branch.
-
-Kevin
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 4b5c977..b942ce4 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -207,7 +207,8 @@
+ 
+ #define kvm_arm_exception_type	\
+ 	{0, "IRQ" }, 		\
+-	{1, "TRAP" }
++	{1, "SError" }, 	\
++	{2, "TRAP" }
+ 
+ #define ECN(x) { ESR_ELx_EC_##x, #x }
+ 
+-- 
+2.9.0
