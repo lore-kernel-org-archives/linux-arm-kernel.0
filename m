@@ -1,26 +1,35 @@
 From: ray.jui@broadcom.com (Ray Jui)
-Date: Sat, 8 Oct 2016 14:02:35 -0700
-Subject: [PATCH v2] arm64: dts: rename ns2.txt to brcm,ns2.txt
-In-Reply-To: <1475959684-18085-1-git-send-email-scott.branden@broadcom.com>
-References: <1475959684-18085-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <c0cfffa7-d72a-6acb-c457-cd696e24f2eb@broadcom.com>
+Date: Sat, 8 Oct 2016 14:03:18 -0700
+Subject: [PATCH] ARM: dts: fix naming of pinctrl node
+In-Reply-To: <1475958866-15942-1-git-send-email-scott.branden@broadcom.com>
+References: <1475958866-15942-1-git-send-email-scott.branden@broadcom.com>
+Message-ID: <6039a5f9-2b36-c427-2f8a-addf76cf1c26@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/8/2016 1:48 PM, Scott Branden wrote:
-> Rename ns2.txt to brcm,ns2.txt to match naming convention followed
-> by rest of Broadcom binding documentation.
+
+
+On 10/8/2016 1:34 PM, Scott Branden wrote:
+> Remove 0x from pinctrl node to match device tree naming convention.
 >
 > Signed-off-by: Scott Branden <scott.branden@broadcom.com>
 > ---
->  Documentation/devicetree/bindings/arm/bcm/{ns2.txt => brcm,ns2.txt} | 0
->  1 file changed, 0 insertions(+), 0 deletions(-)
->  rename Documentation/devicetree/bindings/arm/bcm/{ns2.txt => brcm,ns2.txt} (100%)
+>  arch/arm/boot/dts/bcm-cygnus.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/ns2.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,ns2.txt
-> similarity index 100%
-> rename from Documentation/devicetree/bindings/arm/bcm/ns2.txt
-> rename to Documentation/devicetree/bindings/arm/bcm/brcm,ns2.txt
+> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> index fabc9f3..539c58f 100644
+> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
+> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> @@ -108,7 +108,7 @@
+>  			};
+>  		};
+>
+> -		pinctrl: pinctrl at 0x0301d0c8 {
+> +		pinctrl: pinctrl at 0301d0c8 {
+>  			compatible = "brcm,cygnus-pinmux";
+>  			reg = <0x0301d0c8 0x30>,
+>  			      <0x0301d24c 0x2c>;
 >
 
 Looks good to me!
