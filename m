@@ -1,30 +1,36 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 8 Oct 2016 11:18:53 +0900
-Subject: [PATCH] ARM: uniphier: select ARCH_HAS_RESET_CONTROLLER
-In-Reply-To: <1474356649.4030.8.camel@pengutronix.de>
-References: <1474346599-29925-1-git-send-email-yamada.masahiro@socionext.com>
- <1474356649.4030.8.camel@pengutronix.de>
-Message-ID: <CAK7LNAQoOrvVLLyUdqmfzNo=+S4HRLfznq5RnaTC0KiKC2cJzg@mail.gmail.com>
+Date: Sat,  8 Oct 2016 11:25:34 +0900
+Subject: [PATCH] arm64: uniphier: select ARCH_HAS_RESET_CONTROLLER
+Message-ID: <1475893534-12198-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-09-20 16:30 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> Am Dienstag, den 20.09.2016, 13:43 +0900 schrieb Masahiro Yamada:
->> The UniPhier reset driver (drivers/reset/reset-uniphier.c) has been
->> merged.  Select ARCH_HAS_RESET_CONTROLLER from the SoC Kconfig.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
->
-> regards
-> Philipp
+The UniPhier reset driver (drivers/reset/reset-uniphier.c) has been
+merged.  Select ARCH_HAS_RESET_CONTROLLER from the SoC Kconfig.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+This is a counter-part of the following ARM-32bit variant:
+https://patchwork.kernel.org/patch/9341021/
+
+As discussed with Philipp, we go ARCH_HAS_RESET_CONTROLLER for now.
 
 
-Applied.
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index b6b3657..d4f5f5c 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -178,6 +178,7 @@ config ARCH_THUNDER
+ 
+ config ARCH_UNIPHIER
+ 	bool "Socionext UniPhier SoC Family"
++	select ARCH_HAS_RESET_CONTROLLER
+ 	select PINCTRL
+ 	help
+ 	  This enables support for Socionext UniPhier SoC family.
 -- 
-Best Regards
-Masahiro Yamada
+1.9.1
