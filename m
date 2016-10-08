@@ -1,28 +1,37 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 08 Oct 2016 11:31:51 +0200
-Subject: [PATCH] ARM: dts: pxa: fix gpio0 and gpio1 interrupts
-In-Reply-To: <1474874531-26703-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Mon, 26 Sep 2016 09:22:11 +0200")
-References: <1474874531-26703-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <8760p389vc.fsf@belgarion.home>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 8 Oct 2016 12:26:05 +0200
+Subject: [PATCH 1/3] nvmem: add NXP LPC18xx OTP driver
+In-Reply-To: <8ad4d5fb-0672-fbd7-6076-a91c89dee132@mleia.com>
+References: <20160913161241.22492-1-manabian@gmail.com>
+ <20160913161241.22492-2-manabian@gmail.com>
+ <8ad4d5fb-0672-fbd7-6076-a91c89dee132@mleia.com>
+Message-ID: <CAGhQ9VytKvCK9ViHLqmc6wCeOh0RsmB3n87zNDTOMLkE5-9arw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+Hi Vladimir,
 
-> Since gpio-pxa was redesigned to differenciate gpio0, gpio1 and the
-> gpio-mux interrupt as in the hardware IP, the device-tree description
-> should be amended so that interrupts from gpio0 and gpio1 can be mapped
-> to consumers.
+On 7 October 2016 at 03:44, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> Hi Joachim, Srinivas,
 >
-> This is especially true on lubbock and mainstone devices where gpio0 is
-> multiplexed on pxa_cplds for ethernet, sa1111, usb udc, and other
-> devices.
+> On 13.09.2016 19:12, Joachim Eastwood wrote:
+>> Add simple read only driver for the internal OTP (One Time Programmable)
+>> memory found on all NXP LPC18xx and LPC43xx devices.
+>>
+>> The OTP memory is split into 4 banks each with 4 32-bits word. Some of
+>> the banks contain predefined data while others are for general purpose
+>> and user programmable via the OTP API in ROM. Note that writing to the
+>> OTP memory is not yet supported.
+>>
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> ---
 >
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Applied to pxa/dt.
+> please feel free to add my
+>
+>   Tested-by: Vladimir Zapolskiy <vz@mleia.com>
 
-Cheers.
+Thanks for testing!
 
--- 
-Robert
+
+regards,
+Joachim Eastwood
