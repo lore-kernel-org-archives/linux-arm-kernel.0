@@ -1,37 +1,38 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Sat, 8 Oct 2016 14:03:18 -0700
-Subject: [PATCH] ARM: dts: fix naming of pinctrl node
-In-Reply-To: <1475958866-15942-1-git-send-email-scott.branden@broadcom.com>
-References: <1475958866-15942-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <6039a5f9-2b36-c427-2f8a-addf76cf1c26@broadcom.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 09 Oct 2016 00:14:08 +0300
+Subject: [PATCH v3 03/11] ARM: shmobile: r8a7743: basic SoC support
+In-Reply-To: <20161008023149.GB14617@verge.net.au>
+References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
+ <2345971.ESZSzve5jF@avalon> <20161008023149.GB14617@verge.net.au>
+Message-ID: <1887466.Snaz5pv2hP@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
+On Saturday 08 Oct 2016 11:31:50 Simon Horman wrote:
+> On Fri, Oct 07, 2016 at 11:33:33AM +0300, Laurent Pinchart wrote:
+> > On Friday 07 Oct 2016 12:15:37 Simon Horman wrote:
+> >> On Thu, Oct 06, 2016 at 12:37:08AM +0300, Sergei Shtylyov wrote:
+> >>> Add minimal support for the RZ/G1M (R8A7743) SoC.
+> >>> 
+> >>> Based on the original (and large) patch by Dmitry Shifrin
+> >>> <dmitry.shifrin@cogentembedded.com>.
+> >>> 
+> >>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> 
+> >> Thanks, I have queued this up.
+> > 
+> > I'd like to see this patch rebased on top of "[PATCH] ARM: shmobile:
+> > Consolidate R8A779[234] machine definitions".
+> 
+> I'm happy to drop this patch if that is the desired outcome of
+> the discussion in this sub-thread.
 
-On 10/8/2016 1:34 PM, Scott Branden wrote:
-> Remove 0x from pinctrl node to match device tree naming convention.
->
-> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  arch/arm/boot/dts/bcm-cygnus.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-> index fabc9f3..539c58f 100644
-> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-> @@ -108,7 +108,7 @@
->  			};
->  		};
->
-> -		pinctrl: pinctrl at 0x0301d0c8 {
-> +		pinctrl: pinctrl at 0301d0c8 {
->  			compatible = "brcm,cygnus-pinmux";
->  			reg = <0x0301d0c8 0x30>,
->  			      <0x0301d24c 0x2c>;
->
+It's at least my desired outcome ;-)
 
-Looks good to me!
+-- 
+Regards,
 
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Laurent Pinchart
