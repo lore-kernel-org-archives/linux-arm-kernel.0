@@ -1,36 +1,33 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 9 Oct 2016 08:26:08 +0800
-Subject: [PATCH] clk: hi6220: use CLK_OF_DECLARE_DRIVER for sysctrl and
- mediactrl clock init
-In-Reply-To: <1475933892-16021-1-git-send-email-shawn.guo@linaro.org>
-References: <1475933892-16021-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20161009002608.GA8772@tiger>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 8 Oct 2016 17:22:41 -0500
+Subject: [PATCH 3/3] bindings: add compatible "fsl, ls1043-ucc-hdlc" to
+ bindings
+In-Reply-To: <1475034038-7217-3-git-send-email-qiang.zhao@nxp.com>
+References: <1475034038-7217-1-git-send-email-qiang.zhao@nxp.com>
+ <1475034038-7217-3-git-send-email-qiang.zhao@nxp.com>
+Message-ID: <57f99974.920b9d0a.5b72e.d3aa@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 08, 2016 at 09:38:12PM +0800, Shawn Guo wrote:
-> The hi6220-sysctrl and hi6220-mediactrl are not only clock provider but
-> also reset controller.  It worked fine that single sysctrl/mediactrl
-> device node in DT can be used to initialize clock driver and populate
-> platform device for reset controller.  But it stops working after
-> commit 989eafd0b609 ("clk: core: Avoid double initialization of clocks")
-> gets merged.  The commit sets flag OF_POPULATED during clock
-> initialization to skip the platform device populating for the same
-> device node.  On hi6220, it effectively makes hi6220-sysctrl reset
-> driver not probe any more.
-> 
-> The patch changes hi6220 sysctrl and mediactrl clock init macro from
-> CLK_OF_DECLARE to CLK_OF_DECLARE_DRIVER, so that the reset driver using
-> the same hardware block can continue working.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On Wed, Sep 28, 2016 at 11:40:38AM +0800, Zhao Qiang wrote:
+> Signed-off-by: Zhao Qiang <qiang.zhao@nxp.com>
 > ---
-> It fixes an issue that is seen on linux-next, i.e. the new added
-> hi6220-sysctrl reset driver doesn't probe at all, and consequently the
-> mmc driver fails to register.
+>  Documentation/devicetree/bindings/soc/fsl/cpm_qe/network.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/fsl/cpm_qe/network.txt b/Documentation/devicetree/bindings/soc/fsl/cpm_qe/network.txt
+> index 03c7416..325e3e2 100644
+> --- a/Documentation/devicetree/bindings/soc/fsl/cpm_qe/network.txt
+> +++ b/Documentation/devicetree/bindings/soc/fsl/cpm_qe/network.txt
+> @@ -45,7 +45,7 @@ Example:
+>  * HDLC
+>  
+>  Currently defined compatibles:
+> -- fsl,ucc-hdlc
+> +- "fsl,ucc-hdlc", "fsl,ls1043-ucc-hdlc"
 
-Correction: the hi6220-sysctrl has been there for a while, and the issue
-is discovered by mmc driver which adds reset support recently.  So
-technically, this is a regression fix.
+What's the relationship of these 2 compatibles? Both should be specified 
+for LS1043 or ...? The former only applies to certain SoCs? Rework this 
+text to answer these questions.
 
-Shawn
+Rob
