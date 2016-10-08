@@ -1,58 +1,42 @@
 From: Rob Herring <robh@kernel.org>
-To: =?utf-8?B?UmFmYcWCIE1pxYJlY2tp?= <zajec5@gmail.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
-	Hauke Mehrtens <hauke@hauke-m.de>,
-	=?utf-8?B?UmFmYcWCIE1pxYJlY2tp?= <rafal@milecki.pl>,
-	Mark Rutland <mark.rutland@arm.com>,
-	Mathias Nyman <mathias.nyman@intel.com>,
-	"open list:USB SUBSYSTEM" <linux-usb@vger.kernel.org>,
-	"open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS" <devicetree@vger.kernel.org>,
-	open list <linux-kernel@vger.kernel.org>
-Subject: Re: [PATCH] usb: xhci: add support for performing fake doorbell
-Message-ID: <20161008223240.GA13162@rob-hp-laptop>
-References: <20161001215817.25384-1-zajec5@gmail.com>
+To: Jeremy McNicoll <jmcnicol@redhat.com>
+Cc: andy.gross at linaro.org, sboyd at codeaurora.org, arnd at arndb.de,
+	bjorn.andersson at linaro.org, git at kchr.de, jeremymc at redhat.com,
+	linux-arm-msm at vger.kernel.org, linux-soc at vger.kernel.org,
+	devicetree at vger.kernel.org
+Subject: Re: [RFC V2 PATCH 04/12] dt-bindings: qcom: Add msm8992 bindings
+Message-ID: <20161008224105.GA18534@rob-hp-laptop>
+References: <1475375919-618-1-git-send-email-jmcnicol@redhat.com>
+ <1475375919-618-5-git-send-email-jmcnicol@redhat.com>
 MIME-Version: 1.0
-Content-Type: text/plain; charset=utf-8
+Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
-Content-Transfer-Encoding: 8bit
-In-Reply-To: <20161001215817.25384-1-zajec5@gmail.com>
-Date: Sat, 8 Oct 2016 17:32:46 -0500
+In-Reply-To: <1475375919-618-5-git-send-email-jmcnicol@redhat.com>
+Date: Sat, 8 Oct 2016 17:41:09 -0500
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 01, 2016 at 11:58:10PM +0200, Rafa?? Mi??ecki wrote:
-> From: Rafa?? Mi??ecki <rafal@milecki.pl>
-> 
-> Broadcom's Northstar XHCI controllers seem to need a special start
-> procedure to work correctly. There isn't any official documentation on
-> this, the problem is that controller doesn't detect any connected
-> devices with default setup. Moreover connecting USB device to controller
-> that doesn't run properly can cause SoC's watchdog issues.
-> 
-> A workaround that was successfully tested on multiple devices is to
-> perform a fake doorbell. This patch adds code for doing that and a DT
-> binding enabling it.
-> 
-> Signed-off-by: Rafa?? Mi??ecki <rafal@milecki.pl>
+On Sat, Oct 01, 2016 at 07:38:31PM -0700, Jeremy McNicoll wrote:
+> Signed-off-by: Jeremy McNicoll <jeremymc@redhat.com>
 > ---
->  Documentation/devicetree/bindings/usb/usb-xhci.txt |  2 +
->  drivers/usb/host/xhci-plat.c                       |  6 +++
->  drivers/usb/host/xhci.c                            | 63 ++++++++++++++++++++--
->  drivers/usb/host/xhci.h                            |  1 +
->  4 files changed, 69 insertions(+), 3 deletions(-)
+>  Documentation/devicetree/bindings/arm/qcom.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-> index 966885c..ce01b7f 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-> @@ -26,6 +26,8 @@ Required properties:
->  Optional properties:
->    - clocks: reference to a clock
->    - usb3-lpm-capable: determines if platform is USB3 LPM capable
-> +  - usb3-fake-doorbell: determines if controller requires a fake doorbell when
-> +			starting it
+> diff --git a/Documentation/devicetree/bindings/arm/qcom.txt b/Documentation/devicetree/bindings/arm/qcom.txt
+> index 3e24518..fc5d5ee 100644
+> --- a/Documentation/devicetree/bindings/arm/qcom.txt
+> +++ b/Documentation/devicetree/bindings/arm/qcom.txt
+> @@ -22,6 +22,7 @@ The 'SoC' element must be one of the following strings:
+>  	msm8916
+>  	msm8974
+>  	msm8996
+> +	msm8992
 
-You should use Northstar XHCI compatible string to enable this. Then the 
-DT doesn't need updating.
+What about 8994 and 8994v2?
 
-Rob
+>  
+>  The 'board' element must be one of the following strings:
+>  
+> -- 
+> 2.6.1
+> 
