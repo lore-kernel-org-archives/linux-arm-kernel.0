@@ -1,95 +1,57 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Sat, 8 Oct 2016 21:10:37 +0800
-Subject: [PATCH] sdhci-esdhc-imx: Correct two register accesses
-In-Reply-To: <1475794457-17993-1-git-send-email-aaron.brice@datasoft.com>
-References: <1475794457-17993-1-git-send-email-aaron.brice@datasoft.com>
-Message-ID: <CAA+hA=Sm_KLxahjrF5C2Mir7=SE8Kb9uoQoisdO8KpcLnJQOow@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat,  8 Oct 2016 21:38:12 +0800
+Subject: [PATCH] clk: hi6220: use CLK_OF_DECLARE_DRIVER for sysctrl and
+ mediactrl clock init
+Message-ID: <1475933892-16021-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 7, 2016 at 6:54 AM, Aaron Brice <aaron.brice@datasoft.com> wrote:
->  - The DMA error interrupt bit is in a different position as
->    compared to the sdhci standard.  This is accounted for in
->    many cases, but not handled in the case of clearing the
->    INT_STATUS register by writing a 1 to that location.
->  - The HOST_CONTROL register is very different as compared to
->    the sdhci standard.  This is accounted for in the write
->    case, but not when read back out (which it is in the sdhci
->    code).
->
-> Signed-off-by: Dave Russell <david.russell@datasoft.com>
-> Signed-off-by: Aaron Brice <aaron.brice@datasoft.com>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c | 23 ++++++++++++++++++++++-
->  1 file changed, 22 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 1f54fd8..d61ef16 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -346,7 +346,8 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
->         struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
->         u32 data;
->
-> -       if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)) {
-> +       if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE ||
-> +                       reg == SDHCI_INT_STATUS)) {
->                 if ((val & SDHCI_INT_CARD_INT) && !esdhc_is_usdhc(imx_data)) {
->                         /*
->                          * Clear and then set D3CD bit to avoid missing the
-> @@ -555,6 +556,25 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
->         esdhc_clrset_le(host, 0xffff, val, reg);
->  }
->
-> +static u8 esdhc_readb_le(struct sdhci_host *host, int reg)
-> +{
-> +       u8 ret;
-> +       u32 long_val;
-> +
-> +       switch (reg) {
-> +       case SDHCI_HOST_CONTROL:
-> +               long_val = readl(host->ioaddr + reg);
-> +
-> +               ret = long_val & SDHCI_CTRL_LED;
-> +               ret |= (long_val >> 5) & SDHCI_CTRL_DMA_MASK;
-> +               ret |= (long_val & ESDHC_CTRL_4BITBUS);
-> +               ret |= (long_val & ESDHC_CTRL_8BITBUS) << 3;
-> +               return ret;
+The hi6220-sysctrl and hi6220-mediactrl are not only clock provider but
+also reset controller.  It worked fine that single sysctrl/mediactrl
+device node in DT can be used to initialize clock driver and populate
+platform device for reset controller.  But it stops working after
+commit 989eafd0b609 ("clk: core: Avoid double initialization of clocks")
+gets merged.  The commit sets flag OF_POPULATED during clock
+initialization to skip the platform device populating for the same
+device node.  On hi6220, it effectively makes hi6220-sysctrl reset
+driver not probe any more.
 
-Thanks for the effort.
+The patch changes hi6220 sysctrl and mediactrl clock init macro from
+CLK_OF_DECLARE to CLK_OF_DECLARE_DRIVER, so that the reset driver using
+the same hardware block can continue working.
 
-One nitpick: would be more like to use 'val' instead of 'long_val' to
-be consistent with exist using.
-(i saw a few 'new_val' as well, maybe we could clean up them in the future,
-but at least we could avoid inventing more from now)
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+It fixes an issue that is seen on linux-next, i.e. the new added
+hi6220-sysctrl reset driver doesn't probe at all, and consequently the
+mmc driver fails to register.
 
-Otherwise,
-Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+Shawn
 
-Regards
-Dong Aisheng
+ drivers/clk/hisilicon/clk-hi6220.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> +       }
-> +
-> +       return readb(host->ioaddr + reg);
-> +}
-> +
->  static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
->  {
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> @@ -947,6 +967,7 @@ static void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
->  static struct sdhci_ops sdhci_esdhc_ops = {
->         .read_l = esdhc_readl_le,
->         .read_w = esdhc_readw_le,
-> +       .read_b = esdhc_readb_le,
->         .write_l = esdhc_writel_le,
->         .write_w = esdhc_writew_le,
->         .write_b = esdhc_writeb_le,
-> --
-> 2.7.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
+index fe364e63f8de..c0e8e1f196aa 100644
+--- a/drivers/clk/hisilicon/clk-hi6220.c
++++ b/drivers/clk/hisilicon/clk-hi6220.c
+@@ -195,7 +195,7 @@ static void __init hi6220_clk_sys_init(struct device_node *np)
+ 	hi6220_clk_register_divider(hi6220_div_clks_sys,
+ 			ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
+ }
+-CLK_OF_DECLARE(hi6220_clk_sys, "hisilicon,hi6220-sysctrl", hi6220_clk_sys_init);
++CLK_OF_DECLARE_DRIVER(hi6220_clk_sys, "hisilicon,hi6220-sysctrl", hi6220_clk_sys_init);
+ 
+ 
+ /* clocks in media controller */
+@@ -252,7 +252,7 @@ static void __init hi6220_clk_media_init(struct device_node *np)
+ 	hi6220_clk_register_divider(hi6220_div_clks_media,
+ 				ARRAY_SIZE(hi6220_div_clks_media), clk_data);
+ }
+-CLK_OF_DECLARE(hi6220_clk_media, "hisilicon,hi6220-mediactrl", hi6220_clk_media_init);
++CLK_OF_DECLARE_DRIVER(hi6220_clk_media, "hisilicon,hi6220-mediactrl", hi6220_clk_media_init);
+ 
+ 
+ /* clocks in pmctrl */
+-- 
+1.9.1
