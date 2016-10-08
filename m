@@ -1,31 +1,38 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Sat,  8 Oct 2016 13:52:31 +0100
-Subject: [PATCH v10 09/11] ARM: multi_v7_defconfig: Enable st_remoteproc
- driver.
+Date: Sat,  8 Oct 2016 13:52:33 +0100
+Subject: [PATCH v10 11/11] ARM: multi_v7_defconfig: Enable STi and simple-card
+ drivers.
 In-Reply-To: <1475931154-1021-1-git-send-email-peter.griffin@linaro.org>
 References: <1475931154-1021-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1475931154-1021-10-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1475931154-1021-12-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The st231 remote coprocessors are found on all STi chipsets.
+This patch enables the STi ALSA drivers found on STi platforms
+as well as the simple-card driver which is a dependency to have
+working sound.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Cc: arnaud.pouliquen at st.com
+Cc: broonie at kernel.org
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/multi_v7_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index c94611c..33f7a8a 100644
+index 46f174e..5d92092 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -818,6 +818,7 @@ CONFIG_ROCKCHIP_IOMMU=y
- CONFIG_TEGRA_IOMMU_GART=y
- CONFIG_TEGRA_IOMMU_SMMU=y
- CONFIG_REMOTEPROC=m
-+CONFIG_ST_REMOTEPROC=m
- CONFIG_PM_DEVFREQ=y
- CONFIG_ARM_TEGRA_DEVFREQ=m
- CONFIG_MEMORY=y
+@@ -644,6 +644,9 @@ CONFIG_SND_SOC_AK4642=m
+ CONFIG_SND_SOC_SGTL5000=m
+ CONFIG_SND_SOC_SPDIF=m
+ CONFIG_SND_SOC_WM8978=m
++CONFIG_SND_SOC_STI=m
++CONFIG_SND_SOC_STI_SAS=m
++CONFIG_SND_SIMPLE_CARD=m
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_MVEBU=y
 -- 
 1.9.1
