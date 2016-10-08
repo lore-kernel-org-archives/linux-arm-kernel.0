@@ -1,51 +1,54 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri,  7 Oct 2016 21:23:11 -0700
-Subject: [PATCH 1/5] rpmsg: smd: Reduce restrictions when finding channel
-Message-ID: <1475900595-8375-1-git-send-email-bjorn.andersson@linaro.org>
+Date: Fri,  7 Oct 2016 21:23:12 -0700
+Subject: [PATCH 2/5] rpmsg: Introduce a driver override mechanism
+In-Reply-To: <1475900595-8375-1-git-send-email-bjorn.andersson@linaro.org>
+References: <1475900595-8375-1-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1475900595-8375-2-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SMD channels are created by the remotes in "opening" state, but
-sometimes as we close and try to reopen them they linger in closing
-state.
-
-Following the search for a matching channel the create_ept() will verify
-that the channel is in a suitable state, so we can lax the restrictions
-of the search function to work around above difference in behaviour.
+Similar to other subsystems it's useful to provide a mechanism to force
+a specific driver match on a device, so introduce this.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- drivers/rpmsg/qcom_smd.c | 15 ++++-----------
- 1 file changed, 4 insertions(+), 11 deletions(-)
+ drivers/rpmsg/rpmsg_core.c | 3 +++
+ include/linux/rpmsg.h      | 2 ++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/drivers/rpmsg/qcom_smd.c b/drivers/rpmsg/qcom_smd.c
-index 06fef2b4c814..92efa74a0024 100644
---- a/drivers/rpmsg/qcom_smd.c
-+++ b/drivers/rpmsg/qcom_smd.c
-@@ -820,20 +820,13 @@ qcom_smd_find_channel(struct qcom_smd_edge *edge, const char *name)
- 	struct qcom_smd_channel *channel;
- 	struct qcom_smd_channel *ret = NULL;
- 	unsigned long flags;
--	unsigned state;
+diff --git a/drivers/rpmsg/rpmsg_core.c b/drivers/rpmsg/rpmsg_core.c
+index b6ea9ffa7381..087d4db896c8 100644
+--- a/drivers/rpmsg/rpmsg_core.c
++++ b/drivers/rpmsg/rpmsg_core.c
+@@ -315,6 +315,9 @@ static int rpmsg_dev_match(struct device *dev, struct device_driver *drv)
+ 	const struct rpmsg_device_id *ids = rpdrv->id_table;
+ 	unsigned int i;
  
- 	spin_lock_irqsave(&edge->channels_lock, flags);
- 	list_for_each_entry(channel, &edge->channels, list) {
--		if (strcmp(channel->name, name))
--			continue;
--
--		state = GET_RX_CHANNEL_INFO(channel, state);
--		if (state != SMD_CHANNEL_OPENING &&
--		    state != SMD_CHANNEL_OPENED)
--			continue;
--
--		ret = channel;
--		break;
-+		if (!strcmp(channel->name, name)) {
-+			ret = channel;
-+			break;
-+		}
- 	}
- 	spin_unlock_irqrestore(&edge->channels_lock, flags);
- 
++	if (rpdev->driver_override)
++		return !strcmp(rpdev->driver_override, drv->name);
++
+ 	if (ids)
+ 		for (i = 0; ids[i].name[0]; i++)
+ 			if (rpmsg_id_match(rpdev, &ids[i]))
+diff --git a/include/linux/rpmsg.h b/include/linux/rpmsg.h
+index 452d393cc8dd..7ad6c205f110 100644
+--- a/include/linux/rpmsg.h
++++ b/include/linux/rpmsg.h
+@@ -64,6 +64,7 @@ struct rpmsg_channel_info {
+  * rpmsg_device - device that belong to the rpmsg bus
+  * @dev: the device struct
+  * @id: device id (used to match between rpmsg drivers and devices)
++ * @driver_override: driver name to force a match
+  * @src: local address
+  * @dst: destination address
+  * @ept: the rpmsg endpoint of this channel
+@@ -72,6 +73,7 @@ struct rpmsg_channel_info {
+ struct rpmsg_device {
+ 	struct device dev;
+ 	struct rpmsg_device_id id;
++	char *driver_override;
+ 	u32 src;
+ 	u32 dst;
+ 	struct rpmsg_endpoint *ept;
 -- 
 2.5.0
