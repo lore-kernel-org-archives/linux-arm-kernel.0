@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 08 Oct 2016 02:31:51 +0200
-Subject: [GIT PULL 4/8] ARM: SoC 64-bit changes for v4.9
+Date: Sat, 08 Oct 2016 02:31:12 +0200
+Subject: [GIT PULL 3/8] ARM: SoC defconfig changes for v4.9
 In-Reply-To: <3637015.LRn5VyhPVM@wuerfel>
 References: <3637015.LRn5VyhPVM@wuerfel>
-Message-ID: <6697867.ecXgajhiod@wuerfel>
+Message-ID: <19964061.WQ4GtRfllB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,86 +13,92 @@ The following changes since commit 3eab887a55424fc2c27553b7bfe32330df83f7b8:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-arm64
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-defconfig
 
-for you to fetch changes up to a119a2c4c093716193574675590ea4a7835fa277:
+for you to fetch changes up to 3f0958d8aea708019d52962a7a8fe827d9f9006c:
 
-  Merge tag 'zte-defconfig64-4.9' of git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux into next/arm64 (2016-09-19 22:35:21 +0200)
-
-----------------------------------------------------------------
-ARM: SoC 64-bit changes for v4.9
-
-Changes to platform code for 64-bit ARM platforms.
-
-Nearly all of these are defconfig updates to enable new drivers or old
-drivers still used on these 64-bit platforms.
-
-Aside from that, we gain initial support for two set-top-box platforms,
-both of which already have 32-bit support in arch/arm:
-
-- Broadcom adds abstract support for the bcm7xxx/brcmstb platform,
-  presumably the respective dts files and more information will
-  follow at a later point.
-
-- The ZTE ZX296718 SoC for set-top-boxes, a relative of the 32-bit
-  ZX296702 SoC that we already support.
+  ARM: multi_v7_defconfig: enable CONFIG_EFI (2016-09-19 17:16:34 +0200)
 
 ----------------------------------------------------------------
-Andre Przywara (1):
-      arm64: sunxi: Kconfig: add essential pinctrl driver
+ARM: SoC defconfig updates for v4.9
 
-Arnd Bergmann (8):
-      Merge tag 'hisi-defconfig-for-4.9' of git://github.com/hisilicon/linux-hisi into next/arm64
-      Merge tag 'qcom-arm64-defconfig-for-4.9' of git://git.kernel.org/.../agross/linux into next/arm64
-      Merge tag 'mvebu-defconfig64-4.9-1' of git://git.infradead.org/linux-mvebu into next/arm64
-      Merge tag 'renesas-arm64-defconfig-for-v4.9' of git://git.kernel.org/.../horms/renesas into next/arm64
-      Merge tag 'arm-soc/for-4.9/soc-arm64' of http://github.com/Broadcom/stblinux into next/arm64
-      Merge tag 'sunxi-config64-for-4.9' of https://git.kernel.org/.../mripard/linux into next/arm64
-      Merge tag 'zte-soc64-4.9' of git://git.kernel.org/.../shawnguo/linux into next/arm64
-      Merge tag 'zte-defconfig64-4.9' of git://git.kernel.org/.../shawnguo/linux into next/arm64
+Defconfig additions, removals, etc. Most of these are small changes adding
+the options for newly upstreamed drivers, or drivers needed for new board
+support. Nothing specifically sticks out this time.
 
-Christopher Covington (1):
-      arm64: defconfig: Enable QDF2432 config options
+----------------------------------------------------------------
+Ard Biesheuvel (1):
+      ARM: multi_v7_defconfig: enable CONFIG_EFI
 
-Florian Fainelli (1):
-      arm64: Add Broadcom Set Top Box Kconfig entry point
+Arnd Bergmann (6):
+      Merge tag 'davinci-for-v4.9/defconfig' of git://git.kernel.org/.../nsekhar/linux-davinci into next/defconfig
+      Merge tag 'samsung-defconfig-4.9' of git://git.kernel.org/.../krzk/linux into next/defconfig
+      Merge tag 'omap-for-v4.9/defconfig-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/defconfig
+      Merge tag 'keystone_config_for_4.9' of git://git.kernel.org/.../ssantosh/linux-keystone into next/defconfig
+      Merge tag 'mvebu-defconfig-4.9-1' of git://git.infradead.org/linux-mvebu into next/defconfig
+      Merge tag 'imx-defconfig-4.9' of git://git.kernel.org/.../shawnguo/linux into next/defconfig
 
-Gregory CLEMENT (1):
-      arm64: configs: enable PCIe driver for Aardvark
+Borislav Petkov (1):
+      ARM: s3c2410_defconfig: Remove CONFIG_IPV6_PRIVACY
 
-Guodong Xu (3):
-      arm64: defconfig: Enable HiSilicon kirin drm, adv7533 for HiKey
-      arm64: defconfig: enable CONFIG_INPUT_HISI_POWERKEY for HiKey
-      arm64: defconfig: enable bluetooth supports as modules
+Breno Lima (1):
+      ARM: imx_v6_v7_defconfig: Add CONFIG_MPL3115
 
-John Stultz (1):
-      Kconfig: ARCH_HISI: Add PINCTRL to HISI platform
+Chanwoo Choi (1):
+      ARM: exynos_defconfig: Enable bus frequency scaling with devfreq
 
-Jun Nie (2):
-      arm64: defconfig: enable ZTE ZX related config
-      arm64: add ZTE ZX SoC family
+Fabian Frederick (1):
+      ARM: mvebu_v5_defconfig: use MV88E6XXX
 
-Kefeng Wang (1):
-      arm64: defconfig: Enable Hisi SAS and HNS
+Fabio Estevam (2):
+      ARM: imx_v6_v7_defconfig: Enable GPU support
+      ARM: imx_v6_v7_defconfig: Select the wm8960 codec driver
 
-Kevin Hilman (4):
-      arm64: defconfig: enable HW random as module
-      arm64: defconfig: enable meson WDT as modules
-      arm64: defconfig: enable meson SPI as module
-      arm64: defconfig: enable meson I2C
+Grzegorz Jaszczyk (2):
+      ARM: mvebu: enable MTD command line partition table in mvebu_v7_defconfig
+      ARM: mvebu: enable UBI and UBIFS in mvebu_v7_defconfig
 
-Leo Yan (1):
-      arm64: defconfig: enable common modules for power management
+Javier Martinez Canillas (1):
+      ARM: multi_v7_defconfig: Build Atmel maXTouch driver as a module
 
-Simon Horman (1):
-      arm64: defconfig: Enable SDHI and GPIO_REGULATOR
+Karl Beldan (4):
+      ARM: davinci_all_defconfig: enable RTC driver as module
+      ARM: davinci_all_defconfig: enable SMSC ethernet PHY
+      ARM: davinci_all_defconfig: Enable AEMIF as a module
+      ARM: davinci_all_defconfig: Enable some UBI modules
 
-Thomas Petazzoni (1):
-      arm64: defconfig: enable xhci-platform
+Kevin Hilman (2):
+      ARM: davinci_all_defconfig: cleanup with savedefconfig
+      ARM: davinci_all_defconfig: enable DA850 audio as modules
 
-Yoshihiro Shimoda (1):
-      arm64: defconfig: Add Renesas R-Car HSUSB driver support as module
+Krzysztof Kozlowski (4):
+      ARM: exynos_defconfig: Enable PM_DEBUG
+      ARM: exynos_defconfig: Enable SECCOMP
+      ARM: multi_v7_defconfig: Enable SECCOMP
+      Merge tag 'tags/samsung-defconfig-schedutil-4.9' into next/defconfig
 
- arch/arm64/Kconfig.platforms | 15 +++++++++++++++
- arch/arm64/configs/defconfig | 35 +++++++++++++++++++++++++++++++++--
- 2 files changed, 48 insertions(+), 2 deletions(-)
+Linus Walleij (2):
+      ARM: omap2plus_defconfig: switch to the IIO BMP085 driver
+      ARM: defconfig: update the Integrator defconfig
+
+Peter Chen (1):
+      ARM: imx_v6_v7_defconfig: enable more USB configurations
+
+Roger Quadros (1):
+      ARM: keystone: defconfig: Fix USB configuration
+
+Tuomas Tynkkynen (2):
+      ARM: multi_v7_defconfig: Enable AHCI_IMX
+      ARM: multi_v7_defconfig: Enable ARM_IMX6Q_CPUFREQ
+
+ arch/arm/configs/davinci_all_defconfig | 66 +++++++++++++---------------------
+ arch/arm/configs/exynos_defconfig      | 11 +++++-
+ arch/arm/configs/imx_v6_v7_defconfig   | 17 +++++----
+ arch/arm/configs/integrator_defconfig  | 13 ++-----
+ arch/arm/configs/keystone_defconfig    |  1 +
+ arch/arm/configs/multi_v7_defconfig    | 13 +++++--
+ arch/arm/configs/mvebu_v5_defconfig    |  5 +--
+ arch/arm/configs/mvebu_v7_defconfig    |  3 ++
+ arch/arm/configs/omap2plus_defconfig   |  2 +-
+ arch/arm/configs/s3c2410_defconfig     |  1 -
+ 10 files changed, 66 insertions(+), 66 deletions(-)
