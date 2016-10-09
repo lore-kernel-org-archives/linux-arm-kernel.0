@@ -1,99 +1,85 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 9 Oct 2016 20:52:41 +0300
-Subject: [PATCH v3 00/17] pinctrl: exynos/samsung: Add header with values
- used for configuration
-In-Reply-To: <CA+Ln22GgjF=wVzL3fF7xzvOZtJpiZjVcFTrvDQAu6T2RCfY89g@mail.gmail.com>
-References: <1472987060-28293-1-git-send-email-krzk@kernel.org>
- <CA+Ln22Eotn=dLyA8KYT_6Fnwvp1sTSxzP8DepAFB2P8EUMME6Q@mail.gmail.com>
- <20161009163910.GB9672@kozik-lap>
- <CA+Ln22GgjF=wVzL3fF7xzvOZtJpiZjVcFTrvDQAu6T2RCfY89g@mail.gmail.com>
-Message-ID: <20161009175241.GA13098@kozik-lap>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Sun, 9 Oct 2016 23:57:59 +0530
+Subject: [PATCH 1/2] host: ehci-exynos: Convert to use the
+ SET_SYSTEM_SLEEP_PM_OPS
+In-Reply-To: <20161009172757.GA11916@kozik-lap>
+References: <1476023655-3232-1-git-send-email-linux.amoon@gmail.com>
+ <20161009163446.GA9672@kozik-lap>
+ <CANAwSgSr6-0x47=0P_NCiGCv=FSZR9dNT89JpY=9R_32U8HywQ@mail.gmail.com>
+ <20161009172757.GA11916@kozik-lap>
+Message-ID: <CANAwSgS9tbhPK4jwoqR6G1=iKAo15H3Dizu3Lp03KMGbQ4aj9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2016 at 02:49:01AM +0900, Tomasz Figa wrote:
-> 2016-10-10 1:39 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
-> > On Sun, Oct 09, 2016 at 04:04:11PM +0900, Tomasz Figa wrote:
-> >> Hi Krzysztof,
-> >>
-> >> 2016-09-04 20:04 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
-> >> >
-> >> > Hi,
-> >> >
-> >> > Changes since v2
-> >> > ================
-> >> > 1. Combine separate patchsets into one. Previously I sent separately the fixes
-> >> >    and changes for S3C platforms.
-> >> > 2. Fix issues pointed during review.
-> >> > 3. Add review tags.
-> >> >
-> >> > Changes since v1
-> >> > ================
-> >> > 1. Follow Arnd's suggestion about moving the macros to common place.
-> >> > 2. Subjects: replace "GPIO" with "pinctrl".
-> >> > 3. There were some major changes here so I did not add Javier's
-> >> >    reviewed-by and tested-by tags.
-> >> >
-> >> > Merging
-> >> > =======
-> >> > Patches #1 and #2 should probably go through pinctrl tree. In that case I would
-> >> > appreciate a stable branch/tag so DTS could base on top of it.
-> >> >
-> >> > Goal
-> >> > ====
-> >> > Increase readability:
-> >> >         uart0_data: uart0-data {
-> >> >                 samsung,pins = "gpa0-0", "gpa0-1";
-> >> > -               samsung,pin-function = <2>;
-> >> > -               samsung,pin-pud = <0>;
-> >> > -               samsung,pin-drv = <0>;
-> >> > +               samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
-> >> > +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-> >> > +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
-> >>
-> >> I like the idea, thanks for cleaning this up. However I'd like to
-> >> bikeshed the prefix a bit. Since the properties are already prefixed
-> >> by "samsung,", I think it would make much more sense to also prefix
-> >> the generic values with "SAMSUNG_". Of course for soc/family-specific
-> >> values, the soc/family name prefix sounds right.
-> >
-> > I am lost. Sorry, I don't get what kind of final prefixes you would like
-> > to have.
-> >
-> > SAMSUNG_EXYNOS4_PIN_DRV_LV1
-> > SAMSUNG_EXYNOS5260_PIN_DRV_LV1
-> > ?
-> 
-> For SoC-specific definitions:
-> 
-> EXYNOS4_PIN_DRV_LV1
-> EXYNOS5260_PIN_DRV_LV1
+hi Krzysztof,
 
-ok... so no change needed in my patch.
+On 9 October 2016 at 22:57, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Sun, Oct 09, 2016 at 10:45:40PM +0530, Anand Moon wrote:
+>> Hi Krzysztof,
+>>
+>> On 9 October 2016 at 22:04, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> > On Sun, Oct 09, 2016 at 02:34:14PM +0000, Anand Moon wrote:
+>> >> Move the ehci-exynos system PM callbacks within #ifdef CONFIG_PM_SLEEP
+>> >> as to avoid them being build when not used. This also allows us to use the
+>> >> SET_SYSTEM_SLEEP_PM_OPS macro which simplifies the code.
+>> >>
+>> >> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>> >> ---
+>> >>  drivers/usb/host/ehci-exynos.c | 14 ++++++--------
+>> >>  1 file changed, 6 insertions(+), 8 deletions(-)
+>> >>
+>> >> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
+>> >> index 42e5b66..1899900 100644
+>> >> --- a/drivers/usb/host/ehci-exynos.c
+>> >> +++ b/drivers/usb/host/ehci-exynos.c
+>> >> @@ -251,7 +251,7 @@ static int exynos_ehci_remove(struct platform_device *pdev)
+>> >>       return 0;
+>> >>  }
+>> >>
+>> >> -#ifdef CONFIG_PM
+>> >> +#ifdef CONFIG_PM_SLEEP
+>> >
+>> > Does not look like an equivalent change. How will it behave in a config
+>> > with !SUSPEND && !HIBERNATE && PM?
+>> >
+>>
+>> [snip]
+>>
+>> I just wanted to update suspend and resume callback to use
+>> SET_SYSTEM_SLEEP_PM_OPS
+>> as they are define under CONFIG_PM_SLEEP so I update above to avoid
+>> compilation warning/error.
+>
+Apologize: for not understanding your question.
 
-> 
-> >
-> >> Similarly for rest of the value names, such as SAMSUNG_PIN_PUD instead
-> >> of SAMSUNG_PIN_PULL, which obviously sounds more like correct English,
-> >> however hurts the consistency and could confuse the people writing new
-> >> dts files.
-> >
-> > SAMSUNG_S3C64XX_PIN_PUD_NONE
-> > SAMSUNG_EXYNOS_PIN_PUD_NONE
-> 
-> For definitions common for the whole Samsung pinctrl driver:
-> 
-> SAMSUNG_PIN_PUD_NONE
+> First of all you did not answer to my question, so let me rephrase into
+> two:
+> 1. Is the code equivalent?
 
-These are not the same. The "none" is the same but rest is not.
+No CONFIG_PM and CONFIG_PM_SLEEP are different options.
+But I could not disable CONFIG_PM_SLEEP option with either in exynos_defconfig
 
-> But actually I think I missed the fact that there is almost no common
-> definitions. Is that correct? Was that the missing part of my
-> understanding?
+CONFIG_PM_SLEEP=n or
+# CONFIG_PM_SLEEP is not set
 
-Yes. The only common definition for all Samsung SoCs would be the
-function of a pin. On the other hand this will bring inconsistency:
-everything prefixed with SoC except the function.
+> 2. What will be the output with !SUSPEND && !HIBERNATE && PM?
 
-Best regards,
-Krzysztof
+#
+# Power management options
+#
+# CONFIG_SUSPEND is not set
+# CONFIG_HIBERNATION is not set
+# CONFIG_PM is not set
+
+When CONFIG_SUSPEND and CONFIG_HIBERNATION are not set
+CONFIG_PM is disabled and so is CONFIG_PM_SLEEP.
+
+Best Regards
+-Anand Moon
+
+>
+> You didn't mention compilation warning/error in message commit so I do
+> not know what you are thinking about...
+>
+> Best regards,
+> Krzysztof
