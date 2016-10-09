@@ -1,88 +1,97 @@
-From: joel.opensrc@gmail.com (Joel Fernandes)
-Date: Sun, 9 Oct 2016 12:00:31 -0700
-Subject: [PATCH] mm/vmalloc: reduce the number of lazy_max_pages to reduce
- latency
-In-Reply-To: <20161009124242.GA2718@nuc-i3427.alporthouse.com>
-References: <20160929073411.3154-1-jszhang@marvell.com>
- <20160929081818.GE28107@nuc-i3427.alporthouse.com>
- <CAD=GYpYKL9=uY=Fks2xO6oK3bJ772yo4EiJ1tJkVU9PheSD+Cw@mail.gmail.com>
- <20161009124242.GA2718@nuc-i3427.alporthouse.com>
-Message-ID: <CAEi0qNnozbib-92NwWpUV=_YiiUHYGzzBuuY8kDZY9gaZm-W7Q@mail.gmail.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Mon, 10 Oct 2016 00:31:16 +0530
+Subject: [PATCH 1/2] host: ehci-exynos: Convert to use the
+ SET_SYSTEM_SLEEP_PM_OPS
+In-Reply-To: <20161009183933.GA15270@kozik-lap>
+References: <1476023655-3232-1-git-send-email-linux.amoon@gmail.com>
+ <20161009163446.GA9672@kozik-lap>
+ <CANAwSgSr6-0x47=0P_NCiGCv=FSZR9dNT89JpY=9R_32U8HywQ@mail.gmail.com>
+ <20161009172757.GA11916@kozik-lap>
+ <CANAwSgS9tbhPK4jwoqR6G1=iKAo15H3Dizu3Lp03KMGbQ4aj9A@mail.gmail.com>
+ <20161009183933.GA15270@kozik-lap>
+Message-ID: <CANAwSgRGTL0HEZ1M9AVN45gmQdyvMcidY68nNb-zONSBVKGdcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 9, 2016 at 5:42 AM, Chris Wilson <chris@chris-wilson.co.uk> wrote:
-[..]
->> > My understanding is that
->> >
->> > diff --git a/mm/vmalloc.c b/mm/vmalloc.c
->> > index 91f44e78c516..3f7c6d6969ac 100644
->> > --- a/mm/vmalloc.c
->> > +++ b/mm/vmalloc.c
->> > @@ -626,7 +626,6 @@ void set_iounmap_nonlazy(void)
->> >  static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
->> >                                         int sync, int force_flush)
->> >  {
->> > -       static DEFINE_SPINLOCK(purge_lock);
->> >         struct llist_node *valist;
->> >         struct vmap_area *va;
->> >         struct vmap_area *n_va;
->> > @@ -637,12 +636,6 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
->> >          * should not expect such behaviour. This just simplifies locking for
->> >          * the case that isn't actually used at the moment anyway.
->> >          */
->> > -       if (!sync && !force_flush) {
->> > -               if (!spin_trylock(&purge_lock))
->> > -                       return;
->> > -       } else
->> > -               spin_lock(&purge_lock);
->> > -
->> >         if (sync)
->> >                 purge_fragmented_blocks_allcpus();
->> >
->> > @@ -667,7 +660,6 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
->> >                         __free_vmap_area(va);
->> >                 spin_unlock(&vmap_area_lock);
->> >         }
->> > -       spin_unlock(&purge_lock);
->> >  }
->> >
->> [..]
->> > should now be safe. That should significantly reduce the preempt-disabled
->> > section, I think.
->>
->> I believe that the purge_lock is supposed to prevent concurrent purges
->> from happening.
->>
->> For the case where if you have another concurrent overflow happen in
->> alloc_vmap_area() between the spin_unlock and purge :
->>
->> spin_unlock(&vmap_area_lock);
->> if (!purged)
->>    purge_vmap_area_lazy();
->>
->> Then the 2 purges would happen at the same time and could subtract
->> vmap_lazy_nr twice.
->
-> That itself is not the problem, as each instance of
-> __purge_vmap_area_lazy() operates on its own freelist, and so there will
-> be no double accounting.
->
-> However, removing the lock removes the serialisation which does mean
-> that alloc_vmap_area() will not block on another thread conducting the
-> purge, and so it will try to reallocate before that is complete and the
-> free area made available. It also means that we are doing the
-> atomic_sub(vmap_lazy_nr) too early.
->
-> That supports making the outer lock a mutex as you suggested. But I think
-> cond_resched_lock() is better for the vmap_area_lock (just because it
-> turns out to be an expensive loop and we may want the reschedule).
-> -Chris
+hi Krzysztof,
 
-Ok. So I'll submit a patch with mutex for purge_lock and use
-cond_resched_lock for the vmap_area_lock as you suggested. I'll also
-drop the lazy_max_pages to 8MB as Andi suggested to reduce the lock
-hold time. Let me know if you have any objections.
+On 10 October 2016 at 00:09, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Sun, Oct 09, 2016 at 11:57:59PM +0530, Anand Moon wrote:
+>> hi Krzysztof,
+>>
+>> On 9 October 2016 at 22:57, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> > On Sun, Oct 09, 2016 at 10:45:40PM +0530, Anand Moon wrote:
+>> >> Hi Krzysztof,
+>> >>
+>> >> On 9 October 2016 at 22:04, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> >> > On Sun, Oct 09, 2016 at 02:34:14PM +0000, Anand Moon wrote:
+>> >> >> Move the ehci-exynos system PM callbacks within #ifdef CONFIG_PM_SLEEP
+>> >> >> as to avoid them being build when not used. This also allows us to use the
+>> >> >> SET_SYSTEM_SLEEP_PM_OPS macro which simplifies the code.
+>> >> >>
+>> >> >> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>> >> >> ---
+>> >> >>  drivers/usb/host/ehci-exynos.c | 14 ++++++--------
+>> >> >>  1 file changed, 6 insertions(+), 8 deletions(-)
+>> >> >>
+>> >> >> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
+>> >> >> index 42e5b66..1899900 100644
+>> >> >> --- a/drivers/usb/host/ehci-exynos.c
+>> >> >> +++ b/drivers/usb/host/ehci-exynos.c
+>> >> >> @@ -251,7 +251,7 @@ static int exynos_ehci_remove(struct platform_device *pdev)
+>> >> >>       return 0;
+>> >> >>  }
+>> >> >>
+>> >> >> -#ifdef CONFIG_PM
+>> >> >> +#ifdef CONFIG_PM_SLEEP
+>> >> >
+>> >> > Does not look like an equivalent change. How will it behave in a config
+>> >> > with !SUSPEND && !HIBERNATE && PM?
+>> >> >
+>> >>
+>> >> [snip]
+>> >>
+>> >> I just wanted to update suspend and resume callback to use
+>> >> SET_SYSTEM_SLEEP_PM_OPS
+>> >> as they are define under CONFIG_PM_SLEEP so I update above to avoid
+>> >> compilation warning/error.
+>> >
+>> Apologize: for not understanding your question.
+>>
+>> > First of all you did not answer to my question, so let me rephrase into
+>> > two:
+>> > 1. Is the code equivalent?
+>>
+>> No CONFIG_PM and CONFIG_PM_SLEEP are different options.
+>> But I could not disable CONFIG_PM_SLEEP option with either in exynos_defconfig
+>
+> So the code is not equivalent...
+>
+>>
+>> CONFIG_PM_SLEEP=n or
+>> # CONFIG_PM_SLEEP is not set
+>>
+>> > 2. What will be the output with !SUSPEND && !HIBERNATE && PM?
+>>
+>> #
+>> # Power management options
+>> #
+>> # CONFIG_SUSPEND is not set
+>> # CONFIG_HIBERNATION is not set
+>> # CONFIG_PM is not set
+>>
+>> When CONFIG_SUSPEND and CONFIG_HIBERNATION are not set
+>> CONFIG_PM is disabled and so is CONFIG_PM_SLEEP.
+>
+> In my config, the CONFIG_PM was enabled thus the code changes the
+> functionality... Maybe this was intented but I really don't get it from
+> the commit message or from your explanations here.
+>
+> Krzysztof
 
-Thanks,
-Joel
+Ok I will keep the changes to use CONFIG_PM,
+but use the SET_SYSTEM_SLEEP_PM_OPS option in V2 patch.
+Is that ok.
+
+-Best Regards
+-Anand Moon
