@@ -1,28 +1,33 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 8 Oct 2016 20:29:08 -0500
-Subject: [PATCH v3] drm: tilcdc: add a da850-specific compatible string
-In-Reply-To: <1475509519-29516-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1475509519-29516-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <20161009012908.GP18158@rob-hp-laptop>
+Date: Sat, 8 Oct 2016 20:29:24 -0500
+Subject: [PATCH 3/3] dt-bindings: oxnas: Update Pinctrl and GPIO for
+ OX820 Support
+In-Reply-To: <20161004134148.23028-4-narmstrong@baylibre.com>
+References: <20161004134148.23028-1-narmstrong@baylibre.com>
+ <20161004134148.23028-4-narmstrong@baylibre.com>
+Message-ID: <20161009012924.GU18158@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2016 at 05:45:19PM +0200, Bartosz Golaszewski wrote:
-> Due to some potential tweaks for the da850 LCDC (for example: the
-> required memory bandwith settings) we need a separate compatible
-> for the IP present on the da850 boards.
-> 
-> Suggested-by: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Tue, Oct 04, 2016 at 03:41:48PM +0200, Neil Armstrong wrote:
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
-> v1 -> v2:
-> - added the new compatible to the bindings documentation
+>  Documentation/devicetree/bindings/gpio/gpio_oxnas.txt       | 2 +-
+>  Documentation/devicetree/bindings/pinctrl/oxnas,pinctrl.txt | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> v2 -> v3:
-> - made the documentation more detailed
-> 
->  Documentation/devicetree/bindings/display/tilcdc/tilcdc.txt | 6 ++++--
->  drivers/gpu/drm/tilcdc/tilcdc_drv.c                         | 1 +
->  2 files changed, 5 insertions(+), 2 deletions(-)
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+> index 928ed4f..9665147 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+> @@ -3,7 +3,7 @@
+>  Please refer to gpio.txt for generic information regarding GPIO bindings.
+>  
+>  Required properties:
+> - - compatible: "oxsemi,ox810se-gpio"
+> + - compatible: "oxsemi,ox810se-gpio" or "oxsemi,ox820-gpio"
+
+It is preferred to have one per line, but it's fine unless you respin 
+the series.
 
 Acked-by: Rob Herring <robh@kernel.org>
