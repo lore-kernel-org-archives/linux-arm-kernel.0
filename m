@@ -1,58 +1,41 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 9 Oct 2016 20:27:57 +0300
-Subject: [PATCH 1/2] host: ehci-exynos: Convert to use the
- SET_SYSTEM_SLEEP_PM_OPS
-In-Reply-To: <CANAwSgSr6-0x47=0P_NCiGCv=FSZR9dNT89JpY=9R_32U8HywQ@mail.gmail.com>
-References: <1476023655-3232-1-git-send-email-linux.amoon@gmail.com>
- <20161009163446.GA9672@kozik-lap>
- <CANAwSgSr6-0x47=0P_NCiGCv=FSZR9dNT89JpY=9R_32U8HywQ@mail.gmail.com>
-Message-ID: <20161009172757.GA11916@kozik-lap>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun,  9 Oct 2016 18:42:19 +0100
+Subject: [PATCH 0/6] crypto: arm64 - big endian fixes
+Message-ID: <1476034945-9186-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 09, 2016 at 10:45:40PM +0530, Anand Moon wrote:
-> Hi Krzysztof,
-> 
-> On 9 October 2016 at 22:04, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > On Sun, Oct 09, 2016 at 02:34:14PM +0000, Anand Moon wrote:
-> >> Move the ehci-exynos system PM callbacks within #ifdef CONFIG_PM_SLEEP
-> >> as to avoid them being build when not used. This also allows us to use the
-> >> SET_SYSTEM_SLEEP_PM_OPS macro which simplifies the code.
-> >>
-> >> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> >> ---
-> >>  drivers/usb/host/ehci-exynos.c | 14 ++++++--------
-> >>  1 file changed, 6 insertions(+), 8 deletions(-)
-> >>
-> >> diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
-> >> index 42e5b66..1899900 100644
-> >> --- a/drivers/usb/host/ehci-exynos.c
-> >> +++ b/drivers/usb/host/ehci-exynos.c
-> >> @@ -251,7 +251,7 @@ static int exynos_ehci_remove(struct platform_device *pdev)
-> >>       return 0;
-> >>  }
-> >>
-> >> -#ifdef CONFIG_PM
-> >> +#ifdef CONFIG_PM_SLEEP
-> >
-> > Does not look like an equivalent change. How will it behave in a config
-> > with !SUSPEND && !HIBERNATE && PM?
-> >
-> 
-> [snip]
-> 
-> I just wanted to update suspend and resume callback to use
-> SET_SYSTEM_SLEEP_PM_OPS
-> as they are define under CONFIG_PM_SLEEP so I update above to avoid
-> compilation warning/error.
+As it turns out, none of the accelerated crypto routines under arch/arm64/crypto
+currently work, or have ever worked correctly when built for big endian. So this
+series fixes all of them.
 
-First of all you did not answer to my question, so let me rephrase into
-two:
-1. Is the code equivalent?
-2. What will be the output with !SUSPEND && !HIBERNATE && PM?
+Each of these patches carries a fixes tag, and could be backported to stable.
+However, for patches #1 and #5, the fixes tag denotes the oldest commit that the
+fix is compatible with, not the patch that introduced the algorithm. This is due
+to the fact that the key schedules are incompatible between generic AES and the
+arm64 Crypto Extensions implementation (but only when building for big endian)
+This is not a problem in practice, but it does mean that the AES-CCM and AES in
+EBC/CBC/CTR/XTS mode implementations before v3.19 require a different fix, i.e.,
+one that is compatible with the generic AES key schedule generation code (which
+it currently no longer uses)
 
-You didn't mention compilation warning/error in message commit so I do
-not know what you are thinking about...
+In any case, please apply with cc to stable.
 
-Best regards,
-Krzysztof
+Ard Biesheuvel (6):
+  crypto: arm64/aes-ce - fix for big endian
+  crypto: arm64/ghash-ce - fix for big endian
+  crypto: arm64/sha1-ce - fix for big endian
+  crypto: arm64/sha2-ce - fix for big endian
+  crypto: arm64/aes-ccm-ce: fix for big endian
+  crypto: arm64/aes-neon - fix for big endian
+
+ arch/arm64/crypto/aes-ce-ccm-core.S | 53 ++++++++++----------
+ arch/arm64/crypto/aes-ce-cipher.c   | 25 +++++----
+ arch/arm64/crypto/aes-neon.S        | 25 +++++----
+ arch/arm64/crypto/ghash-ce-core.S   |  6 +--
+ arch/arm64/crypto/sha1-ce-core.S    |  4 +-
+ arch/arm64/crypto/sha2-ce-core.S    |  4 +-
+ 6 files changed, 64 insertions(+), 53 deletions(-)
+
+-- 
+2.7.4
