@@ -1,36 +1,71 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 9 Oct 2016 09:34:52 +0100
-Subject: [PATCH v3 3/4] ARM: dts: am33xx: add DMA properties for tscadc
-In-Reply-To: <20161005090443.24576-4-mugunthanvnm@ti.com>
-References: <20161005090443.24576-1-mugunthanvnm@ti.com>
- <20161005090443.24576-4-mugunthanvnm@ti.com>
-Message-ID: <b8272b0e-3051-445b-865e-968d2dac1a9f@kernel.org>
+From: yuantian.tang@nxp.com (yuantian.tang at nxp.com)
+Date: Sun, 9 Oct 2016 16:57:40 +0800
+Subject: [PATCH] ahci: qoriq: added ls1046a platform support
+Message-ID: <1476003460-1005-1-git-send-email-yuantian.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/16 10:04, Mugunthan V N wrote:
-> Add DMA properties for tscadc
-> 
-> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-Do the binding docs need updating to reflect this?  I can't immediately
-find the relevant doc to check!
+From: Tang Yuantian <Yuantian.Tang@nxp.com>
 
-Jonathan
-> ---
->  arch/arm/boot/dts/am33xx.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 98748c6..6d607b8 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -917,6 +917,8 @@
->  			interrupts = <16>;
->  			ti,hwmods = "adc_tsc";
->  			status = "disabled";
-> +			dmas = <&edma 53 0>, <&edma 57 0>;
-> +			dma-names = "fifo0", "fifo1";
->  
->  			tsc {
->  				compatible = "ti,am3359-tsc";
-> 
+Ls1046a is a new introduced soc which supports ATA3.0.
+
+Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+---
+ drivers/ata/ahci_qoriq.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
+index 1eba8df..9884c8c 100644
+--- a/drivers/ata/ahci_qoriq.c
++++ b/drivers/ata/ahci_qoriq.c
+@@ -46,11 +46,13 @@
+ #define LS1021A_AXICC_ADDR	0xC0
+ 
+ #define SATA_ECC_DISABLE	0x00020000
++#define LS1046A_SATA_ECC_DIS	0x80000000
+ 
+ enum ahci_qoriq_type {
+ 	AHCI_LS1021A,
+ 	AHCI_LS1043A,
+ 	AHCI_LS2080A,
++	AHCI_LS1046A,
+ };
+ 
+ struct ahci_qoriq_priv {
+@@ -63,6 +65,7 @@ static const struct of_device_id ahci_qoriq_of_match[] = {
+ 	{ .compatible = "fsl,ls1021a-ahci", .data = (void *)AHCI_LS1021A},
+ 	{ .compatible = "fsl,ls1043a-ahci", .data = (void *)AHCI_LS1043A},
+ 	{ .compatible = "fsl,ls2080a-ahci", .data = (void *)AHCI_LS2080A},
++	{ .compatible = "fsl,ls1046a-ahci", .data = (void *)AHCI_LS1046A},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, ahci_qoriq_of_match);
+@@ -175,6 +178,13 @@ static int ahci_qoriq_phy_init(struct ahci_host_priv *hpriv)
+ 		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
+ 		writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
+ 		break;
++
++	case AHCI_LS1046A:
++		writel(LS1046A_SATA_ECC_DIS, qpriv->ecc_addr);
++		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
++		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
++		writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
++		break;
+ 	}
+ 
+ 	return 0;
+@@ -204,9 +214,9 @@ static int ahci_qoriq_probe(struct platform_device *pdev)
+ 
+ 	qoriq_priv->type = (enum ahci_qoriq_type)of_id->data;
+ 
+-	if (qoriq_priv->type == AHCI_LS1021A) {
+-		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-				"sata-ecc");
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
++			"sata-ecc");
++	if (res) {
+ 		qoriq_priv->ecc_addr = devm_ioremap_resource(dev, res);
+ 		if (IS_ERR(qoriq_priv->ecc_addr))
+ 			return PTR_ERR(qoriq_priv->ecc_addr);
+-- 
+2.1.0.27.g96db324
