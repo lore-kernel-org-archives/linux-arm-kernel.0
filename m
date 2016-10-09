@@ -1,93 +1,84 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Sun, 9 Oct 2016 02:47:36 +0000
-Subject: [PATCH v6 3/3] pci:add support aer/pme interrupts with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <20161008204959.GA17455@rob-hp-laptop>
-References: <1473741659-17618-3-git-send-email-po.liu@nxp.com>
- <1475226697-7709-1-git-send-email-po.liu@nxp.com>
- <1475226697-7709-3-git-send-email-po.liu@nxp.com>
- <20161008204959.GA17455@rob-hp-laptop>
-Message-ID: <VI1PR0401MB170914050D7ADE4E8FC96A0A92D80@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: agnel.joel@gmail.com (Joel Fernandes)
+Date: Sat, 8 Oct 2016 20:43:51 -0700
+Subject: [PATCH] mm/vmalloc: reduce the number of lazy_max_pages to reduce
+ latency
+In-Reply-To: <20160929081818.GE28107@nuc-i3427.alporthouse.com>
+References: <20160929073411.3154-1-jszhang@marvell.com>
+ <20160929081818.GE28107@nuc-i3427.alporthouse.com>
+Message-ID: <CAD=GYpYKL9=uY=Fks2xO6oK3bJ772yo4EiJ1tJkVU9PheSD+Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Thu, Sep 29, 2016 at 1:18 AM, Chris Wilson <chris@chris-wilson.co.uk> wrote:
+> On Thu, Sep 29, 2016 at 03:34:11PM +0800, Jisheng Zhang wrote:
+>> On Marvell berlin arm64 platforms, I see the preemptoff tracer report
+>> a max 26543 us latency at __purge_vmap_area_lazy, this latency is an
+>> awfully bad for STB. And the ftrace log also shows __free_vmap_area
+>> contributes most latency now. I noticed that Joel mentioned the same
+>> issue[1] on x86 platform and gave two solutions, but it seems no patch
+>> is sent out for this purpose.
+>>
+>> This patch adopts Joel's first solution, but I use 16MB per core
+>> rather than 8MB per core for the number of lazy_max_pages. After this
+>> patch, the preemptoff tracer reports a max 6455us latency, reduced to
+>> 1/4 of original result.
+>
+> My understanding is that
+>
+> diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+> index 91f44e78c516..3f7c6d6969ac 100644
+> --- a/mm/vmalloc.c
+> +++ b/mm/vmalloc.c
+> @@ -626,7 +626,6 @@ void set_iounmap_nonlazy(void)
+>  static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
+>                                         int sync, int force_flush)
+>  {
+> -       static DEFINE_SPINLOCK(purge_lock);
+>         struct llist_node *valist;
+>         struct vmap_area *va;
+>         struct vmap_area *n_va;
+> @@ -637,12 +636,6 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
+>          * should not expect such behaviour. This just simplifies locking for
+>          * the case that isn't actually used at the moment anyway.
+>          */
+> -       if (!sync && !force_flush) {
+> -               if (!spin_trylock(&purge_lock))
+> -                       return;
+> -       } else
+> -               spin_lock(&purge_lock);
+> -
+>         if (sync)
+>                 purge_fragmented_blocks_allcpus();
+>
+> @@ -667,7 +660,6 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
+>                         __free_vmap_area(va);
+>                 spin_unlock(&vmap_area_lock);
+>         }
+> -       spin_unlock(&purge_lock);
+>  }
+>
+[..]
+> should now be safe. That should significantly reduce the preempt-disabled
+> section, I think.
 
-Best regards,
-Liu Po
+I believe that the purge_lock is supposed to prevent concurrent purges
+from happening.
 
->  -----Original Message-----
->  From: Rob Herring [mailto:robh at kernel.org]
->  Sent: Sunday, October 09, 2016 4:50 AM
->  To: Po Liu
->  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Bjorn Helgaas;
->  Shawn Guo; Marc Zyngier; Roy Zang; Mingkai Hu; Stuart Yoder; Leo Li;
->  Arnd Bergmann; M.H. Lian; Murali Karicheri
->  Subject: Re: [PATCH v6 3/3] pci:add support aer/pme interrupts with none
->  MSI/MSI-X/INTx mode
->  
->  On Fri, Sep 30, 2016 at 05:11:37PM +0800, Po Liu wrote:
->  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
->  > When chip support the aer/pme interrupts with none MSI/MSI-X/INTx
->  > mode, maybe there is interrupt line for aer pme etc. Search the
->  > interrupt number in the fdt file. Then fixup the dev->irq with it.
->  
->  Again, explain why you are breaking compatibility. Will an old dtb using
->  "intr" still work with this change? It should normally. There are some
->  exceptions, but you need to say what they are.
->  
-Ok, understand.
+For the case where if you have another concurrent overflow happen in
+alloc_vmap_area() between the spin_unlock and purge :
 
->  >
->  > Signed-off-by: Po Liu <po.liu@nxp.com>
->  > ---
->  > changes for v6:
->  > 	- modify bindings for "aer""pme";
->  > 	- changing to the hood method to implement the aer pme interrupt;
->  > 	- add pme interrupt in the same way;
->  >
->  >  .../devicetree/bindings/pci/layerscape-pci.txt     | 13 +++++--
->  >  arch/arm/kernel/bios32.c                           | 43
->  ++++++++++++++++++++++
->  >  arch/arm64/kernel/pci.c                            | 43
->  ++++++++++++++++++++++
->  >  drivers/pci/pcie/portdrv_core.c                    | 31
->  +++++++++++++++-
->  >  include/linux/pci.h                                |  1 +
->  >  5 files changed, 126 insertions(+), 5 deletions(-)
->  >
->  > diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > index 41e9f55..51ed49e 100644
->  > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
->  > @@ -18,8 +18,12 @@ Required properties:
->  >  - reg: base addresses and lengths of the PCIe controller
->  >  - interrupts: A list of interrupt outputs of the controller. Must
->  contain an
->  >    entry for each entry in the interrupt-names property.
->  > -- interrupt-names: Must include the following entries:
->  > -  "intr": The interrupt that is asserted for controller interrupts
->  > +- interrupt-names: It could include the following entries:
->  
->  "Could" is not strong enough. Every valid combination of interrupts
->  should correspond to a specific compatible string. A given version of
->  h/w either has these interrupts or not.
+spin_unlock(&vmap_area_lock);
+if (!purged)
+   purge_vmap_area_lazy();
 
-Ok, will change to 'must'.
+Then the 2 purges would happen at the same time and could subtract
+vmap_lazy_nr twice.
 
->  
->  > +  "aer": Asserted for aer interrupt when chip support the aer
->  interrupt with
->  > +		 none MSI/MSI-X/INTx mode,but there is interrupt line for
->  aer.
->  > +  "pme": Asserted for pme interrupt when chip support the pme
->  interrupt with
->  > +		 none MSI/MSI-X/INTx mode,but there is interrupt line for
->  pme.
->  > +  ......
->  >  - fsl,pcie-scfg: Must include two entries.
->  >    The first entry must be a link to the SCFG device node
->  >    The second entry must be '0' or '1' based on physical PCIe
->  controller index.
+I had proposed to change it to mutex in [1]. How do you feel about
+that? Let me know your suggestions, thanks. I am also Ok with reducing
+the lazy_max_pages value.
+
+[1] http://lkml.iu.edu/hypermail/linux/kernel/1603.2/04803.html
+
+Regards,
+Joel
