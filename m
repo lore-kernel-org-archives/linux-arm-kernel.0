@@ -1,271 +1,61 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Sun, 9 Oct 2016 21:38:28 +0800
-Subject: [PATCH v3 2/2] ARM: dts: rockchip: Add rk3066 MK808 board
-In-Reply-To: <876234f84363b4a83c566137866cd823528ed07a.1475957884.git.paweljarosz3691@gmail.com>
-References: <cover.1475957884.git.paweljarosz3691@gmail.com>
- <876234f84363b4a83c566137866cd823528ed07a.1475957884.git.paweljarosz3691@gmail.com>
-Message-ID: <6926c482-e9c1-6cd0-fb2c-b7a10f5ee963@rock-chips.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Sun,  9 Oct 2016 14:34:14 +0000
+Subject: [PATCH 1/2] host: ehci-exynos: Convert to use the
+ SET_SYSTEM_SLEEP_PM_OPS
+Message-ID: <1476023655-3232-1-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/10/9 4:22, Pawe? Jarosz ??:
-> MK808 is a tv stick which has rockchip rk3066 CPU inside, two usb ports
-> - host and otg, micro sd card slot and onboard wifi RK901.
->
-> Signed-off-by: Pawe? Jarosz <paweljarosz3691@gmail.com>
+Move the ehci-exynos system PM callbacks within #ifdef CONFIG_PM_SLEEP
+as to avoid them being build when not used. This also allows us to use the
+SET_SYSTEM_SLEEP_PM_OPS macro which simplifies the code.
 
-It looks okay to me, so feel free to add
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+---
+ drivers/usb/host/ehci-exynos.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-Reviewed-by: Shawn Lin <shawn.lin@rock-chip.com>
-
-> ---
->
-> Changes in v2:
-> - included Heiko sugestion.
->
-> Changes in v3:
-> - added regulators for mmc0 and mmc1
-> - added proper pincontrol for mmc1
-> - removed regulator-always-on flag from vcc_io
->
->  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/rk3066a-mk808.dts                | 196 +++++++++++++++++++++
->  3 files changed, 201 insertions(+)
->  create mode 100644 arch/arm/boot/dts/rk3066a-mk808.dts
->
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-> index 55f388f..c09595b 100644
-> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> @@ -17,6 +17,10 @@ Rockchip platforms device tree bindings
->      Required root node properties:
->        - compatible = "chipspark,rayeager-px2", "rockchip,rk3066a";
->
-> +- Rikomagic MK808 v1 board:
-> +    Required root node properties:
-> +      - compatible = "rikomagic,mk808", "rockchip,rk3066a";
-> +
->  - Radxa Rock board:
->      Required root node properties:
->        - compatible = "radxa,rock", "rockchip,rk3188";
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index befcd26..f19cc1d 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -639,6 +639,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->  	rk3036-kylin.dtb \
->  	rk3066a-bqcurie2.dtb \
->  	rk3066a-marsboard.dtb \
-> +	rk3066a-mk808.dtb \
->  	rk3066a-rayeager.dtb \
->  	rk3188-radxarock.dtb \
->  	rk3228-evb.dtb \
-> diff --git a/arch/arm/boot/dts/rk3066a-mk808.dts b/arch/arm/boot/dts/rk3066a-mk808.dts
-> new file mode 100644
-> index 0000000..0123fa4
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rk3066a-mk808.dts
-> @@ -0,0 +1,196 @@
-> +/*
-> + * Copyright (c) 2016 Pawe? Jarosz <paweljarosz3691@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "rk3066a.dtsi"
-> +
-> +/ {
-> +	model = "Rikomagic MK808";
-> +	compatible = "rikomagic,mk808", "rockchip,rk3066a";
-> +
-> +	chosen {
-> +		stdout-path = "serial2:115200n8";
-> +	};
-> +
-> +	memory at 60000000 {
-> +		device_type = "memory";
-> +		reg = <0x60000000 0x40000000>;
-> +	};
-> +
-> +	gpio-leds {
-> +		compatible = "gpio-leds";
-> +
-> +		blue {
-> +			label = "mk808:blue:power";
-> +			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +			linux,default-trigger = "default-on";
-> +		};
-> +	};
-> +
-> +	vcc_io: vcc-io {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc_io";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	vcc_host: usb-host-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-0 = <&host_drv>;
-> +		pinctrl-names = "default";
-> +		regulator-always-on;
-> +		regulator-name = "host-pwr";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		startup-delay-us = <100000>;
-> +		vin-supply = <&vcc_io>;
-> +	};
-> +
-> +	vcc_otg: usb-otg-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-0 = <&otg_drv>;
-> +		pinctrl-names = "default";
-> +		regulator-always-on;
-> +		regulator-name = "vcc_otg";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		startup-delay-us = <100000>;
-> +		vin-supply = <&vcc_io>;
-> +	};
-> +
-> +	vcc_sd: sdmmc-regulator {
-> +		compatible = "regulator-fixed";
-> +		gpio = <&gpio3 7 GPIO_ACTIVE_LOW>;
-> +		pinctrl-0 = <&sdmmc_pwr>;
-> +		pinctrl-names = "default";
-> +		regulator-name = "vcc_sd";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		startup-delay-us = <100000>;
-> +		vin-supply = <&vcc_io>;
-> +	};
-> +
-> +	vcc_wifi: sdio-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio3 24 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-0 = <&wifi_pwr>;
-> +		pinctrl-names = "default";
-> +		regulator-name = "vcc_wifi";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		startup-delay-us = <100000>;
-> +		vin-supply = <&vcc_io>;
-> +	};
-> +};
-> +
-> +&mmc0 {
-> +	bus-width = <4>;
-> +	cap-mmc-highspeed;
-> +	cap-sd-highspeed;
-> +	num-slots = <1>;
-> +	status = "okay";
-> +	vmmc-supply = <&vcc_sd>;
-> +};
-> +
-> +&mmc1 {
-> +	bus-width = <4>;
-> +	disable-wp;
-> +	non-removable;
-> +	num-slots = <1>;
-> +	pinctrl-0 = <&sd1_clk &sd1_cmd &sd1_bus4>;
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +	vmmc-supply = <&vcc_wifi>;
-> +};
-> +
-> +&pinctrl {
-> +	usb-host {
-> +		host_drv: host-drv {
-> +			rockchip,pins = <RK_GPIO0 6 RK_FUNC_GPIO &pcfg_pull_default>;
-> +		};
-> +	};
-> +
-> +	usb-otg {
-> +		otg_drv: otg-drv {
-> +			rockchip,pins = <RK_GPIO0 5 RK_FUNC_GPIO &pcfg_pull_default>;
-> +		};
-> +	};
-> +
-> +	sdmmc {
-> +		sdmmc_pwr: sdmmc-pwr {
-> +			rockchip,pins = <RK_GPIO3 7 RK_FUNC_GPIO &pcfg_pull_default>;
-> +		};
-> +	};
-> +
-> +	sdio {
-> +		wifi_pwr: wifi-pwr {
-> +			rockchip,pins = <RK_GPIO3 24 RK_FUNC_GPIO &pcfg_pull_none>;
-> +		};
-> +	};
-> +};
-> +
-> +&uart2 {
-> +	status = "okay";
-> +};
-> +
-> +&usb_host {
-> +	status = "okay";
-> +};
-> +
-> +&usb_otg {
-> +	status = "okay";
-> +};
-> +
-> +&usbphy {
-> +	status = "okay";
-> +};
-> +
-> +&wdt {
-> +	status = "okay";
-> +};
-> +
->
-
-
+diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
+index 42e5b66..1899900 100644
+--- a/drivers/usb/host/ehci-exynos.c
++++ b/drivers/usb/host/ehci-exynos.c
+@@ -251,7 +251,7 @@ static int exynos_ehci_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_PM_SLEEP
+ static int exynos_ehci_suspend(struct device *dev)
+ {
+ 	struct usb_hcd *hcd = dev_get_drvdata(dev);
+@@ -292,15 +292,13 @@ static int exynos_ehci_resume(struct device *dev)
+ 	ehci_resume(hcd, false);
+ 	return 0;
+ }
+-#else
+-#define exynos_ehci_suspend	NULL
+-#define exynos_ehci_resume	NULL
+-#endif
+ 
+ static const struct dev_pm_ops exynos_ehci_pm_ops = {
+-	.suspend	= exynos_ehci_suspend,
+-	.resume		= exynos_ehci_resume,
++	SET_SYSTEM_SLEEP_PM_OPS(exynos_ehci_suspend, exynos_ehci_resume)
+ };
++#endif /* CONFIG_PM_SLEEP */
++
++#define DEV_PM_OPS IS_ENABLED(CONFIG_PM_SLEEP) ? &exynos_ehci_pm_ops : NULL
+ 
+ #ifdef CONFIG_OF
+ static const struct of_device_id exynos_ehci_match[] = {
+@@ -317,7 +315,7 @@ static struct platform_driver exynos_ehci_driver = {
+ 	.shutdown	= usb_hcd_platform_shutdown,
+ 	.driver = {
+ 		.name	= "exynos-ehci",
+-		.pm	= &exynos_ehci_pm_ops,
++		.pm	= DEV_PM_OPS,
+ 		.of_match_table = of_match_ptr(exynos_ehci_match),
+ 	}
+ };
 -- 
-Best Regards
-Shawn Lin
+2.7.4
