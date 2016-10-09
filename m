@@ -1,63 +1,80 @@
-From: hongtao.jia@nxp.com (Troy Jia)
-Date: Sun, 9 Oct 2016 07:12:46 +0000
-Subject: [PATCH V2 1/7] dt-bindings: Update QorIQ TMU thermal bindings
-In-Reply-To: <1474253068.23153.2.camel@intel.com>
-References: <1465270054-31512-1-git-send-email-hongtao.jia@nxp.com>
- <20160608195241.GA6805@rob-hp-laptop>
- <CADRPPNQ+hikr1qNK1wPbLnhudUrU1bN_2iuYyRQnqCN4Zwh83Q@mail.gmail.com>
- <1474253068.23153.2.camel@intel.com>
-Message-ID: <AM4PR0401MB18433BD56D0441C832B06123EBD80@AM4PR0401MB1843.eurprd04.prod.outlook.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 9 Oct 2016 15:49:10 +0800
+Subject: [PATCH v2 1/2] dt-bindings: add bindings doc for ZTE VOU display
+ controller
+In-Reply-To: <20161003174429.GA26054@rob-hp-laptop>
+References: <1474727185-24180-1-git-send-email-shawn.guo@linaro.org>
+ <1474727185-24180-2-git-send-email-shawn.guo@linaro.org>
+ <20161003174429.GA26054@rob-hp-laptop>
+Message-ID: <20161009074910.GA15400@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Zhang Rui [mailto:rui.zhang at intel.com]
-> Sent: Monday, September 19, 2016 10:44 AM
-> To: Leo Li <pku.leo@gmail.com>; Rob Herring <robh@kernel.org>
-> Cc: Troy Jia <hongtao.jia@nxp.com>; devicetree at vger.kernel.org; linux-
-> pm at vger.kernel.org; linuxppc-dev <linuxppc-dev@lists.ozlabs.org>; lkml <linux-
-> kernel at vger.kernel.org>; Scott Wood <scott.wood@nxp.com>; Eduardo Valentin
-> <edubezval@gmail.com>; Kumar Gala <galak@codeaurora.org>; Shawn Guo
-> <shawnguo@kernel.org>; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V2 1/7] dt-bindings: Update QorIQ TMU thermal bindings
+On Mon, Oct 03, 2016 at 12:44:29PM -0500, Rob Herring wrote:
+> > +Example:
+> > +
+> > +vou: vou at 1440000 {
+> > +	compatible = "zte,zx296718-vou";
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> > +	reg = <0x1440000 0x10000>;
+> > +	ranges;
 > 
-> On ?, 2016-09-14 at 11:40 -0500, Leo Li wrote:
-> > On Wed, Jun 8, 2016 at 2:52 PM, Rob Herring <robh@kernel.org> wrote:
-> > >
-> > > On Tue, Jun 07, 2016 at 11:27:34AM +0800, Jia Hongtao wrote:
-> > > >
-> > > > For different types of SoC the sensor id and endianness may vary.
-> > > > "#thermal-sensor-cells" is used to provide sensor id information.
-> > > > "little-endian" property is to tell the endianness of TMU.
-> > > >
-> > > > Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
-> > > > ---
-> > > > Changes for V2:
-> > > > * Remove formatting chnages.
-> > > >
-> > > > ?Documentation/devicetree/bindings/thermal/qoriq-thermal.txt | 7
-> > > > +++++++
-> > > > ?1 file changed, 7 insertions(+)
-> > > Acked-by: Rob Herring <robh@kernel.org>
-> > Hi Zhang Rui,
-> >
-> > Since you have applied the driver patch, can you also apply the
-> > binding patch???The binding is supposed to go with the driver.
-> >
-> 
-> Do you mean I should take both patch 1/7 and 7/7? I can not see the other patches
-> in this patch set.
+> You still have overlapping addresses. Explicitly list the sub ranges in 
+> reg here used by the VOU driver if the driver usage doesn't overlap. If 
+> there is overlap (2 drivers accessing the same range), then you need 
+> some APIs between the components (or possibly regmap).
 
-Yes, please take 7/7 as well.
-I also reworked the device tree patches and you can find them here:
-https://patchwork.kernel.org/patch/9368377/
-https://patchwork.kernel.org/patch/9368381/
-https://patchwork.kernel.org/patch/9368383/
-https://patchwork.kernel.org/patch/9368379/
-https://patchwork.kernel.org/patch/9368385/
+The driver matching "zte,zx296718-vou" doesn't map or access the any
+'reg' address.  The 'reg' property here is more like a hint telling
+that the VOU block covers the address space of all child devices.
 
--Hongtao.
+I will simply drop the 'reg' property here.
 
-> 
-> thanks,
-> rui
+> Also, don't do an empty ranges here. Fill it in so the child nodes are 
+> just offsets of 0x1440000
+
+Okay.  I thought that empty 'ranges' is fine as long as parent and child
+address spaces are identical (1:1 mapping).
+
+So with your suggestion, I made the changes below.  Let me know if this
+is still not what you are asking for.
+
+Shawn
+
+-----8<-----------------
+
+diff --git a/Documentation/devicetree/bindings/display/zte,vou.txt b/Documentation/devicetree/bindings/display/zte,vou.txt
+index d03ba4c4810c..6bb4ab2517ef 100644
+--- a/Documentation/devicetree/bindings/display/zte,vou.txt
++++ b/Documentation/devicetree/bindings/display/zte,vou.txt
+@@ -56,14 +56,13 @@ vou: vou@1440000 {
+        compatible = "zte,zx296718-vou";
+        #address-cells = <1>;
+        #size-cells = <1>;
+-       reg = <0x1440000 0x10000>;
+-       ranges;
++       ranges = <0 0x1440000 0x10000>;
+ 
+-       dpc: dpc at 1440000 {
++       dpc: dpc at 0 {
+                compatible = "zte,zx296718-dpc";
+-               reg = <0x1440000 0x1000>, <0x1441000 0x1000>,
+-                     <0x1445000 0x1000>, <0x1446000 0x1000>,
+-                     <0x144a000 0x1000>;
++               reg = <0x0000 0x1000>, <0x1000 0x1000>,
++                     <0x5000 0x1000>, <0x6000 0x1000>,
++                     <0xa000 0x1000>;
+                reg-names = "osd", "timing_ctrl",
+                            "dtrc", "vou_ctrl",
+                            "otfppu";
+@@ -74,9 +73,9 @@ vou: vou at 1440000 {
+                              "main_wclk", "aux_wclk";
+        };
+ 
+-       hdmi: hdmi at 144c000 {
++       hdmi: hdmi at c000 {
+                compatible = "zte,zx296718-hdmi";
+-               reg = <0x144c000 0x4000>;
++               reg = <0xc000 0x4000>;
+                interrupts = <GIC_SPI 82 IRQ_TYPE_EDGE_RISING>;
