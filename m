@@ -1,43 +1,110 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun,  9 Oct 2016 18:42:23 +0100
-Subject: [PATCH 4/6] crypto: arm64/sha2-ce - fix for big endian
+Date: Sun,  9 Oct 2016 18:42:25 +0100
+Subject: [PATCH 6/6] crypto: arm64/aes-neon - fix for big endian
 In-Reply-To: <1476034945-9186-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1476034945-9186-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1476034945-9186-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1476034945-9186-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SHA256 digest is an array of 8 32-bit quantities, so we should refer
-to them as such in order for this code to work correctly when built for
-big endian. So replace 16 byte scalar loads and stores with 4x32 vector
-ones where appropriate.
+The AES implementation using pure NEON instructions relies on the generic
+AES key schedule generation routines, which store the round keys as arrays
+of 32-bit quantities stored in memory using native endianness. This means
+we should refer to these round keys using 4x4 loads rather than 16x1 loads.
+In addition, the ShiftRows tables are loading using a single scalar load,
+which is also affected by endianness, so emit these tables in the correct
+order depending on whether we are building for big endian or not.
 
-Fixes: 6ba6c74dfc6b ("arm64/crypto: SHA-224/SHA-256 using ARMv8 Crypto Extensions")
+Fixes: 49788fe2a128 ("arm64/crypto: AES-ECB/CBC/CTR/XTS using ARMv8 NEON and Crypto Extensions")
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/sha2-ce-core.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/crypto/aes-neon.S | 25 ++++++++++++--------
+ 1 file changed, 15 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/crypto/sha2-ce-core.S b/arch/arm64/crypto/sha2-ce-core.S
-index 5df9d9d470ad..01cfee066837 100644
---- a/arch/arm64/crypto/sha2-ce-core.S
-+++ b/arch/arm64/crypto/sha2-ce-core.S
-@@ -85,7 +85,7 @@ ENTRY(sha2_ce_transform)
- 	ld1		{v12.4s-v15.4s}, [x8]
+diff --git a/arch/arm64/crypto/aes-neon.S b/arch/arm64/crypto/aes-neon.S
+index b93170e1cc93..85f07ead7c5c 100644
+--- a/arch/arm64/crypto/aes-neon.S
++++ b/arch/arm64/crypto/aes-neon.S
+@@ -9,6 +9,7 @@
+  */
  
- 	/* load state */
--	ldp		dga, dgb, [x0]
-+	ld1		{dgav.4s, dgbv.4s}, [x0]
+ #include <linux/linkage.h>
++#include <asm/assembler.h>
  
- 	/* load sha256_ce_state::finalize */
- 	ldr		w4, [x0, #:lo12:sha256_ce_offsetof_finalize]
-@@ -148,6 +148,6 @@ CPU_LE(	rev32		v19.16b, v19.16b	)
- 	b		1b
+ #define AES_ENTRY(func)		ENTRY(neon_ ## func)
+ #define AES_ENDPROC(func)	ENDPROC(neon_ ## func)
+@@ -83,13 +84,13 @@
+ 	.endm
  
- 	/* store new state */
--3:	stp		dga, dgb, [x0]
-+3:	st1		{dgav.4s, dgbv.4s}, [x0]
- 	ret
- ENDPROC(sha2_ce_transform)
+ 	.macro		do_block, enc, in, rounds, rk, rkp, i
+-	ld1		{v15.16b}, [\rk]
++	ld1		{v15.4s}, [\rk]
+ 	add		\rkp, \rk, #16
+ 	mov		\i, \rounds
+ 1111:	eor		\in\().16b, \in\().16b, v15.16b		/* ^round key */
+ 	tbl		\in\().16b, {\in\().16b}, v13.16b	/* ShiftRows */
+ 	sub_bytes	\in
+-	ld1		{v15.16b}, [\rkp], #16
++	ld1		{v15.4s}, [\rkp], #16
+ 	subs		\i, \i, #1
+ 	beq		2222f
+ 	.if		\enc == 1
+@@ -229,7 +230,7 @@
+ 	.endm
+ 
+ 	.macro		do_block_2x, enc, in0, in1 rounds, rk, rkp, i
+-	ld1		{v15.16b}, [\rk]
++	ld1		{v15.4s}, [\rk]
+ 	add		\rkp, \rk, #16
+ 	mov		\i, \rounds
+ 1111:	eor		\in0\().16b, \in0\().16b, v15.16b	/* ^round key */
+@@ -237,7 +238,7 @@
+ 	sub_bytes_2x	\in0, \in1
+ 	tbl		\in0\().16b, {\in0\().16b}, v13.16b	/* ShiftRows */
+ 	tbl		\in1\().16b, {\in1\().16b}, v13.16b	/* ShiftRows */
+-	ld1		{v15.16b}, [\rkp], #16
++	ld1		{v15.4s}, [\rkp], #16
+ 	subs		\i, \i, #1
+ 	beq		2222f
+ 	.if		\enc == 1
+@@ -254,7 +255,7 @@
+ 	.endm
+ 
+ 	.macro		do_block_4x, enc, in0, in1, in2, in3, rounds, rk, rkp, i
+-	ld1		{v15.16b}, [\rk]
++	ld1		{v15.4s}, [\rk]
+ 	add		\rkp, \rk, #16
+ 	mov		\i, \rounds
+ 1111:	eor		\in0\().16b, \in0\().16b, v15.16b	/* ^round key */
+@@ -266,7 +267,7 @@
+ 	tbl		\in1\().16b, {\in1\().16b}, v13.16b	/* ShiftRows */
+ 	tbl		\in2\().16b, {\in2\().16b}, v13.16b	/* ShiftRows */
+ 	tbl		\in3\().16b, {\in3\().16b}, v13.16b	/* ShiftRows */
+-	ld1		{v15.16b}, [\rkp], #16
++	ld1		{v15.4s}, [\rkp], #16
+ 	subs		\i, \i, #1
+ 	beq		2222f
+ 	.if		\enc == 1
+@@ -306,12 +307,16 @@
+ 	.text
+ 	.align		4
+ .LForward_ShiftRows:
+-	.byte		0x0, 0x5, 0xa, 0xf, 0x4, 0x9, 0xe, 0x3
+-	.byte		0x8, 0xd, 0x2, 0x7, 0xc, 0x1, 0x6, 0xb
++CPU_LE(	.byte		0x0, 0x5, 0xa, 0xf, 0x4, 0x9, 0xe, 0x3	)
++CPU_LE(	.byte		0x8, 0xd, 0x2, 0x7, 0xc, 0x1, 0x6, 0xb	)
++CPU_BE(	.byte		0xb, 0x6, 0x1, 0xc, 0x7, 0x2, 0xd, 0x8	)
++CPU_BE(	.byte		0x3, 0xe, 0x9, 0x4, 0xf, 0xa, 0x5, 0x0	)
+ 
+ .LReverse_ShiftRows:
+-	.byte		0x0, 0xd, 0xa, 0x7, 0x4, 0x1, 0xe, 0xb
+-	.byte		0x8, 0x5, 0x2, 0xf, 0xc, 0x9, 0x6, 0x3
++CPU_LE(	.byte		0x0, 0xd, 0xa, 0x7, 0x4, 0x1, 0xe, 0xb	)
++CPU_LE(	.byte		0x8, 0x5, 0x2, 0xf, 0xc, 0x9, 0x6, 0x3	)
++CPU_BE(	.byte		0x3, 0x6, 0x9, 0xc, 0xf, 0x2, 0x5, 0x8	)
++CPU_BE(	.byte		0xb, 0xe, 0x1, 0x4, 0x7, 0xa, 0xd, 0x0	)
+ 
+ .LForward_Sbox:
+ 	.byte		0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5
 -- 
 2.7.4
