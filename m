@@ -1,52 +1,54 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun,  9 Oct 2016 14:27:13 +0800
-Subject: [PATCH v2 3/4] ARM: dts: add battery node for axp20x/axp22x dtsi
+Date: Sun,  9 Oct 2016 14:27:14 +0800
+Subject: [PATCH v2 4/4] ARM: sunxi: enable battery on reference design tablets
 In-Reply-To: <20161009062714.5085-1-icenowy@aosc.xyz>
 References: <20161009062714.5085-1-icenowy@aosc.xyz>
-Message-ID: <20161009062714.5085-3-icenowy@aosc.xyz>
+Message-ID: <20161009062714.5085-4-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Since battery is one part of the reference design of Allwinner tablets,
+enable the battery node of reference design tablets.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
 Changes since v1:
-- Add support for AXP20x.
+- Applied to reference design tablet, not Q8 only now.
+- Add support for sun5i reference design tablet.
 
- arch/arm/boot/dts/axp209.dtsi | 5 +++++
- arch/arm/boot/dts/axp22x.dtsi | 5 +++++
- 2 files changed, 10 insertions(+)
+ arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi | 4 ++++
+ arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 4 ++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/axp209.dtsi b/arch/arm/boot/dts/axp209.dtsi
-index afbe89c..1602987 100644
---- a/arch/arm/boot/dts/axp209.dtsi
-+++ b/arch/arm/boot/dts/axp209.dtsi
-@@ -91,6 +91,11 @@
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+index 20cc940..9e17b46 100644
+--- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+@@ -92,6 +92,10 @@
  
-+	battery: battery {
-+		compatible = "x-powers,axp202-battery";
-+		status = "disabled";
-+	};
-+
- 	usb_power_supply: usb_power_supply {
- 		compatible = "x-powers,axp202-usb-power-supply";
- 		status = "disabled";
-diff --git a/arch/arm/boot/dts/axp22x.dtsi b/arch/arm/boot/dts/axp22x.dtsi
-index 458b668..a09ba3f 100644
---- a/arch/arm/boot/dts/axp22x.dtsi
-+++ b/arch/arm/boot/dts/axp22x.dtsi
-@@ -148,6 +148,11 @@
- 		};
- 	};
+ #include "axp209.dtsi"
  
-+	battery: battery {
-+		compatible = "x-powers,axp221-battery";
-+		status = "disabled";
-+	};
++&battery {
++	status = "okay";
++};
 +
- 	usb_power_supply: usb_power_supply {
- 		compatible = "x-powers,axp221-usb-power-supply";
- 		status = "disabled";
+ &lradc {
+ 	vref-supply = <&reg_ldo2>;
+ };
+diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+index 9d90361..74517ab 100644
+--- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+@@ -112,6 +112,10 @@
+ 
+ #include "axp22x.dtsi"
+ 
++&battery {
++	status = "okay";
++};
++
+ &reg_aldo1 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <3000000>;
 -- 
 2.10.0
