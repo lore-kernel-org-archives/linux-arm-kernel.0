@@ -1,54 +1,25 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun,  9 Oct 2016 14:27:14 +0800
-Subject: [PATCH v2 4/4] ARM: sunxi: enable battery on reference design tablets
-In-Reply-To: <20161009062714.5085-1-icenowy@aosc.xyz>
-References: <20161009062714.5085-1-icenowy@aosc.xyz>
-Message-ID: <20161009062714.5085-4-icenowy@aosc.xyz>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Sun, 9 Oct 2016 14:50:28 +0800
+Subject: [RESEND PATCH v6, 3/5] usb: xhci-mtk: make IPPC register optional
+In-Reply-To: <1474437277-27201-4-git-send-email-chunfeng.yun@mediatek.com>
+References: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1474437277-27201-4-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1475995828.15546.12.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since battery is one part of the reference design of Allwinner tablets,
-enable the battery node of reference design tablets.
+On Wed, 2016-09-21 at 13:54 +0800, Chunfeng Yun wrote:
+> Make IPPC register optional to support host side of dual-role mode,
+> due to it is moved into common glue layer for simplification.
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/usb/host/xhci-mtk.c |   36 +++++++++++++++++++++++++++++-------
+>  1 file changed, 29 insertions(+), 7 deletions(-)
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes since v1:
-- Applied to reference design tablet, not Q8 only now.
-- Add support for sun5i reference design tablet.
+Hi Mathias,
 
- arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi | 4 ++++
- arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 4 ++++
- 2 files changed, 8 insertions(+)
+    Would you please take a little time out of your busy schedule and
+help review this patch?
 
-diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
-index 20cc940..9e17b46 100644
---- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
-+++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
-@@ -92,6 +92,10 @@
- 
- #include "axp209.dtsi"
- 
-+&battery {
-+	status = "okay";
-+};
-+
- &lradc {
- 	vref-supply = <&reg_ldo2>;
- };
-diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-index 9d90361..74517ab 100644
---- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-+++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-@@ -112,6 +112,10 @@
- 
- #include "axp22x.dtsi"
- 
-+&battery {
-+	status = "okay";
-+};
-+
- &reg_aldo1 {
- 	regulator-always-on;
- 	regulator-min-microvolt = <3000000>;
--- 
-2.10.0
+    Thank you very much.
