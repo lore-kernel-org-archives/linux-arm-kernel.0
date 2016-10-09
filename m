@@ -1,110 +1,90 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun,  9 Oct 2016 18:42:25 +0100
-Subject: [PATCH 6/6] crypto: arm64/aes-neon - fix for big endian
-In-Reply-To: <1476034945-9186-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1476034945-9186-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1476034945-9186-7-git-send-email-ard.biesheuvel@linaro.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 10 Oct 2016 02:49:01 +0900
+Subject: [PATCH v3 00/17] pinctrl: exynos/samsung: Add header with values
+ used for configuration
+In-Reply-To: <20161009163910.GB9672@kozik-lap>
+References: <1472987060-28293-1-git-send-email-krzk@kernel.org>
+ <CA+Ln22Eotn=dLyA8KYT_6Fnwvp1sTSxzP8DepAFB2P8EUMME6Q@mail.gmail.com>
+ <20161009163910.GB9672@kozik-lap>
+Message-ID: <CA+Ln22GgjF=wVzL3fF7xzvOZtJpiZjVcFTrvDQAu6T2RCfY89g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AES implementation using pure NEON instructions relies on the generic
-AES key schedule generation routines, which store the round keys as arrays
-of 32-bit quantities stored in memory using native endianness. This means
-we should refer to these round keys using 4x4 loads rather than 16x1 loads.
-In addition, the ShiftRows tables are loading using a single scalar load,
-which is also affected by endianness, so emit these tables in the correct
-order depending on whether we are building for big endian or not.
+2016-10-10 1:39 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+> On Sun, Oct 09, 2016 at 04:04:11PM +0900, Tomasz Figa wrote:
+>> Hi Krzysztof,
+>>
+>> 2016-09-04 20:04 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+>> >
+>> > Hi,
+>> >
+>> > Changes since v2
+>> > ================
+>> > 1. Combine separate patchsets into one. Previously I sent separately the fixes
+>> >    and changes for S3C platforms.
+>> > 2. Fix issues pointed during review.
+>> > 3. Add review tags.
+>> >
+>> > Changes since v1
+>> > ================
+>> > 1. Follow Arnd's suggestion about moving the macros to common place.
+>> > 2. Subjects: replace "GPIO" with "pinctrl".
+>> > 3. There were some major changes here so I did not add Javier's
+>> >    reviewed-by and tested-by tags.
+>> >
+>> > Merging
+>> > =======
+>> > Patches #1 and #2 should probably go through pinctrl tree. In that case I would
+>> > appreciate a stable branch/tag so DTS could base on top of it.
+>> >
+>> > Goal
+>> > ====
+>> > Increase readability:
+>> >         uart0_data: uart0-data {
+>> >                 samsung,pins = "gpa0-0", "gpa0-1";
+>> > -               samsung,pin-function = <2>;
+>> > -               samsung,pin-pud = <0>;
+>> > -               samsung,pin-drv = <0>;
+>> > +               samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
+>> > +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+>> > +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
+>>
+>> I like the idea, thanks for cleaning this up. However I'd like to
+>> bikeshed the prefix a bit. Since the properties are already prefixed
+>> by "samsung,", I think it would make much more sense to also prefix
+>> the generic values with "SAMSUNG_". Of course for soc/family-specific
+>> values, the soc/family name prefix sounds right.
+>
+> I am lost. Sorry, I don't get what kind of final prefixes you would like
+> to have.
+>
+> SAMSUNG_EXYNOS4_PIN_DRV_LV1
+> SAMSUNG_EXYNOS5260_PIN_DRV_LV1
+> ?
 
-Fixes: 49788fe2a128 ("arm64/crypto: AES-ECB/CBC/CTR/XTS using ARMv8 NEON and Crypto Extensions")
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/crypto/aes-neon.S | 25 ++++++++++++--------
- 1 file changed, 15 insertions(+), 10 deletions(-)
+For SoC-specific definitions:
 
-diff --git a/arch/arm64/crypto/aes-neon.S b/arch/arm64/crypto/aes-neon.S
-index b93170e1cc93..85f07ead7c5c 100644
---- a/arch/arm64/crypto/aes-neon.S
-+++ b/arch/arm64/crypto/aes-neon.S
-@@ -9,6 +9,7 @@
-  */
- 
- #include <linux/linkage.h>
-+#include <asm/assembler.h>
- 
- #define AES_ENTRY(func)		ENTRY(neon_ ## func)
- #define AES_ENDPROC(func)	ENDPROC(neon_ ## func)
-@@ -83,13 +84,13 @@
- 	.endm
- 
- 	.macro		do_block, enc, in, rounds, rk, rkp, i
--	ld1		{v15.16b}, [\rk]
-+	ld1		{v15.4s}, [\rk]
- 	add		\rkp, \rk, #16
- 	mov		\i, \rounds
- 1111:	eor		\in\().16b, \in\().16b, v15.16b		/* ^round key */
- 	tbl		\in\().16b, {\in\().16b}, v13.16b	/* ShiftRows */
- 	sub_bytes	\in
--	ld1		{v15.16b}, [\rkp], #16
-+	ld1		{v15.4s}, [\rkp], #16
- 	subs		\i, \i, #1
- 	beq		2222f
- 	.if		\enc == 1
-@@ -229,7 +230,7 @@
- 	.endm
- 
- 	.macro		do_block_2x, enc, in0, in1 rounds, rk, rkp, i
--	ld1		{v15.16b}, [\rk]
-+	ld1		{v15.4s}, [\rk]
- 	add		\rkp, \rk, #16
- 	mov		\i, \rounds
- 1111:	eor		\in0\().16b, \in0\().16b, v15.16b	/* ^round key */
-@@ -237,7 +238,7 @@
- 	sub_bytes_2x	\in0, \in1
- 	tbl		\in0\().16b, {\in0\().16b}, v13.16b	/* ShiftRows */
- 	tbl		\in1\().16b, {\in1\().16b}, v13.16b	/* ShiftRows */
--	ld1		{v15.16b}, [\rkp], #16
-+	ld1		{v15.4s}, [\rkp], #16
- 	subs		\i, \i, #1
- 	beq		2222f
- 	.if		\enc == 1
-@@ -254,7 +255,7 @@
- 	.endm
- 
- 	.macro		do_block_4x, enc, in0, in1, in2, in3, rounds, rk, rkp, i
--	ld1		{v15.16b}, [\rk]
-+	ld1		{v15.4s}, [\rk]
- 	add		\rkp, \rk, #16
- 	mov		\i, \rounds
- 1111:	eor		\in0\().16b, \in0\().16b, v15.16b	/* ^round key */
-@@ -266,7 +267,7 @@
- 	tbl		\in1\().16b, {\in1\().16b}, v13.16b	/* ShiftRows */
- 	tbl		\in2\().16b, {\in2\().16b}, v13.16b	/* ShiftRows */
- 	tbl		\in3\().16b, {\in3\().16b}, v13.16b	/* ShiftRows */
--	ld1		{v15.16b}, [\rkp], #16
-+	ld1		{v15.4s}, [\rkp], #16
- 	subs		\i, \i, #1
- 	beq		2222f
- 	.if		\enc == 1
-@@ -306,12 +307,16 @@
- 	.text
- 	.align		4
- .LForward_ShiftRows:
--	.byte		0x0, 0x5, 0xa, 0xf, 0x4, 0x9, 0xe, 0x3
--	.byte		0x8, 0xd, 0x2, 0x7, 0xc, 0x1, 0x6, 0xb
-+CPU_LE(	.byte		0x0, 0x5, 0xa, 0xf, 0x4, 0x9, 0xe, 0x3	)
-+CPU_LE(	.byte		0x8, 0xd, 0x2, 0x7, 0xc, 0x1, 0x6, 0xb	)
-+CPU_BE(	.byte		0xb, 0x6, 0x1, 0xc, 0x7, 0x2, 0xd, 0x8	)
-+CPU_BE(	.byte		0x3, 0xe, 0x9, 0x4, 0xf, 0xa, 0x5, 0x0	)
- 
- .LReverse_ShiftRows:
--	.byte		0x0, 0xd, 0xa, 0x7, 0x4, 0x1, 0xe, 0xb
--	.byte		0x8, 0x5, 0x2, 0xf, 0xc, 0x9, 0x6, 0x3
-+CPU_LE(	.byte		0x0, 0xd, 0xa, 0x7, 0x4, 0x1, 0xe, 0xb	)
-+CPU_LE(	.byte		0x8, 0x5, 0x2, 0xf, 0xc, 0x9, 0x6, 0x3	)
-+CPU_BE(	.byte		0x3, 0x6, 0x9, 0xc, 0xf, 0x2, 0x5, 0x8	)
-+CPU_BE(	.byte		0xb, 0xe, 0x1, 0x4, 0x7, 0xa, 0xd, 0x0	)
- 
- .LForward_Sbox:
- 	.byte		0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5
--- 
-2.7.4
+EXYNOS4_PIN_DRV_LV1
+EXYNOS5260_PIN_DRV_LV1
+
+>
+>> Similarly for rest of the value names, such as SAMSUNG_PIN_PUD instead
+>> of SAMSUNG_PIN_PULL, which obviously sounds more like correct English,
+>> however hurts the consistency and could confuse the people writing new
+>> dts files.
+>
+> SAMSUNG_S3C64XX_PIN_PUD_NONE
+> SAMSUNG_EXYNOS_PIN_PUD_NONE
+
+For definitions common for the whole Samsung pinctrl driver:
+
+SAMSUNG_PIN_PUD_NONE
+
+...
+
+But actually I think I missed the fact that there is almost no common
+definitions. Is that correct? Was that the missing part of my
+understanding?
+
+Best regards,
+Tomasz
