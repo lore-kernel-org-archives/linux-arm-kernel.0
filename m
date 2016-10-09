@@ -1,25 +1,45 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Sun, 9 Oct 2016 14:50:28 +0800
-Subject: [RESEND PATCH v6, 3/5] usb: xhci-mtk: make IPPC register optional
-In-Reply-To: <1474437277-27201-4-git-send-email-chunfeng.yun@mediatek.com>
-References: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
- <1474437277-27201-4-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1475995828.15546.12.camel@mhfsdcap03>
+From: hongtao.jia@nxp.com (Jia Hongtao)
+Date: Sun, 9 Oct 2016 14:47:02 +0800
+Subject: [PATCH V2 1/5] powerpc/mpc85xx: Update TMU device tree node for
+ T1040/T1042
+Message-ID: <1475995626-14049-1-git-send-email-hongtao.jia@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-09-21 at 13:54 +0800, Chunfeng Yun wrote:
-> Make IPPC register optional to support host side of dual-role mode,
-> due to it is moved into common glue layer for simplification.
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  drivers/usb/host/xhci-mtk.c |   36 +++++++++++++++++++++++++++++-------
->  1 file changed, 29 insertions(+), 7 deletions(-)
+From: Hongtao Jia <hongtao.jia@nxp.com>
 
-Hi Mathias,
+SoC compatible string and endianness property are added according to the
+new bindings.
 
-    Would you please take a little time out of your busy schedule and
-help review this patch?
+Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
+---
+Changes for V2:
+* Rebase on latest linux-next tree (next-20161006).
 
-    Thank you very much.
+ arch/powerpc/boot/dts/fsl/t1040si-post.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi b/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
+index 44e399b..145c7f4 100644
+--- a/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
+@@ -526,7 +526,7 @@
+ 
+ 				       0x00030000 0x00000012
+ 				       0x00030001 0x0000001d>;
+-		#thermal-sensor-cells = <0>;
++		#thermal-sensor-cells = <1>;
+ 	};
+ 
+ 	thermal-zones {
+@@ -534,7 +534,7 @@
+ 			polling-delay-passive = <1000>;
+ 			polling-delay = <5000>;
+ 
+-			thermal-sensors = <&tmu>;
++			thermal-sensors = <&tmu 2>;
+ 
+ 			trips {
+ 				cpu_alert: cpu-alert {
+-- 
+2.1.0.27.g96db324
