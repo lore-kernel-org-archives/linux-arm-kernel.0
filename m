@@ -1,77 +1,48 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sat, 8 Oct 2016 22:12:48 -0700
-Subject: [PATCH 5/9] mtd: nand: Expose data interface for ONFI mode 0
-In-Reply-To: <20160915145625.15e81012@bbrezillon>
-References: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
- <1473928373-8680-6-git-send-email-s.hauer@pengutronix.de>
- <20160915145625.15e81012@bbrezillon>
-Message-ID: <20161009051248.GC10199@brian-ubuntu>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sun,  9 Oct 2016 14:27:11 +0800
+Subject: [PATCH v2 1/4] mfd: axp20x: add adc volatile ranges for axp22x
+Message-ID: <20161009062714.5085-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2016 at 02:56:25PM +0200, Boris Brezillon wrote:
-> On Thu, 15 Sep 2016 10:32:49 +0200
-> Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> > The nand layer will need ONFI mode 0 to use it as timing mode
-> > before and right after reset.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  drivers/mtd/nand/nand_timings.c | 11 +++++++++++
-> >  include/linux/mtd/nand.h        |  2 ++
-> >  2 files changed, 13 insertions(+)
-> > 
-> > diff --git a/drivers/mtd/nand/nand_timings.c b/drivers/mtd/nand/nand_timings.c
-> > index 608d098..9cdbc16 100644
-> > --- a/drivers/mtd/nand/nand_timings.c
-> > +++ b/drivers/mtd/nand/nand_timings.c
-> > @@ -297,3 +297,14 @@ int onfi_init_data_interface(struct nand_chip *chip,
-> >  
-> >  	return 0;
-> >  }
-> > +
-> > +/**
-> > + * nand_get_default_data_interface - [NAND Interface] Retrieve NAND
-> > + * data interface for mode 0. This is used as default timing after
-> > + * reset.
-> > + */
-> > +const struct nand_data_interface *nand_get_default_data_interface(void)
-> > +{
-> > +	return &onfi_sdr_timings[0];
-> > +}
-> > +EXPORT_SYMBOL(nand_get_default_data_interface);
-> 
-> You export nand_get_default_data_interface() here, but you don't export
-> onfi_init_data_interface().
-> None of these functions should be called from NAND controller drivers,
-> so they don't need to be exported. ITOH, the prototypes are public
-> (defined in nand.h), so nothing prevents a driver from calling these
-> functions.
+AXP22x has also some different register map than axp20x, they're also
+added here.
 
-A bit late, but we can still change things for the next cycle of
-course...
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+Changes since v1:
+- Nothing.
 
-> I don't know what's the best solution here:
-> 1/ Export both nand_get_default_data_interface() and
->    onfi_init_data_interface()
+ drivers/mfd/axp20x.c       | 1 +
+ include/linux/mfd/axp20x.h | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-I don't really like this one. We shouldn't export them if we don't want
-people to use them in modules. And I'm sure the various compile-test
-builders out there would complain eventually if someone did.
-
-> 2/ Do not export them, but keep their prototypes in nand.h with a
->    comment saying that they should not be directly called by NAND
->    controller drivers
-
-Could be OK.
-
-> 3/ Removing the prototypes from nand.h and defining them in nand_base.c
->    (or in a private header).
-
-I like this one. Why not add a drivers/mtd/nand/nand.h that's intended
-for the nand.{o,ko} module only?
-
-> Brian, Richard, Sascha, any comments?
-
-Brian
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index fd80b09..17877b2 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -97,6 +97,7 @@ static const struct regmap_range axp22x_volatile_ranges[] = {
+ 	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
+ 	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
+ 	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
++	regmap_reg_range(AXP22X_PMIC_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
+ 	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
+ };
+ 
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index 0be4982..ad3d9c7 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -201,6 +201,10 @@ enum {
+ #define AXP20X_OCV_MAX			0xf
+ 
+ /* AXP22X specific registers */
++#define AXP22X_PMIC_ADC_H		0x56
++#define AXP22X_PMIC_ADC_L		0x57
++#define AXP22X_TS_ADC_H			0x58
++#define AXP22X_TS_ADC_L			0x59
+ #define AXP22X_BATLOW_THRES1		0xe6
+ 
+ /* AXP288 specific registers */
+-- 
+2.10.0
