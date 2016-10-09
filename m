@@ -1,9 +1,10 @@
 From: hongtao.jia@nxp.com (Jia Hongtao)
-Date: Sun, 9 Oct 2016 14:47:04 +0800
-Subject: [PATCH V2 3/5] arm:dt:ls1021a: Add TMU device tree support for LS1021A
+Date: Sun, 9 Oct 2016 14:47:06 +0800
+Subject: [PATCH V2 5/5] arm64:dt:ls2080a: Add TMU device tree support for
+ LS2080A
 In-Reply-To: <1475995626-14049-1-git-send-email-hongtao.jia@nxp.com>
 References: <1475995626-14049-1-git-send-email-hongtao.jia@nxp.com>
-Message-ID: <1475995626-14049-3-git-send-email-hongtao.jia@nxp.com>
+Message-ID: <1475995626-14049-5-git-send-email-hongtao.jia@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,87 +17,186 @@ Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
 Changes for V2:
 * Rebase on latest linux-next tree (next-20161006).
 
- arch/arm/boot/dts/ls1021a.dtsi | 84 +++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 82 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts  |   2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts  |   2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts |   2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     | 116 +++++++++++++++++++--
+ 4 files changed, 111 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 368e219..282d854 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -47,6 +47,7 @@
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
+index b0dd010..8bc1f8f 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
+@@ -46,7 +46,7 @@
  
- #include "skeleton64.dtsi"
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/thermal/thermal.h>
+ /dts-v1/;
+ 
+-/include/ "fsl-ls2080a.dtsi"
++#include "fsl-ls2080a.dtsi"
  
  / {
- 	compatible = "fsl,ls1021a";
-@@ -70,14 +71,15 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+ 	model = "Freescale Layerscape 2080a QDS Board";
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
+index ad0ebb8..265e0a8 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
+@@ -46,7 +46,7 @@
  
--		cpu at f00 {
-+		cpu0: cpu at f00 {
- 			compatible = "arm,cortex-a7";
+ /dts-v1/;
+ 
+-/include/ "fsl-ls2080a.dtsi"
++#include "fsl-ls2080a.dtsi"
+ 
+ / {
+ 	model = "Freescale Layerscape 2080a RDB Board";
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts
+index 505d038..290604b 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-simu.dts
+@@ -46,7 +46,7 @@
+ 
+ /dts-v1/;
+ 
+-/include/ "fsl-ls2080a.dtsi"
++#include "fsl-ls2080a.dtsi"
+ 
+ / {
+ 	model = "Freescale Layerscape 2080a software Simulator model";
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 337da90..723185e 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -44,6 +44,8 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
++#include <dt-bindings/thermal/thermal.h>
++
+ / {
+ 	compatible = "fsl,ls2080a";
+ 	interrupt-parent = <&gic>;
+@@ -62,15 +64,16 @@
+ 		 */
+ 
+ 		/* We have 4 clusters having 2 Cortex-A57 cores each */
+-		cpu at 0 {
++		cpu0: cpu at 0 {
  			device_type = "cpu";
- 			reg = <0xf00>;
- 			clocks = <&cluster1_clk>;
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x0>;
+ 			clocks = <&clockgen 1 0>;
+ 			next-level-cache = <&cluster0_l2>;
 +			#cooling-cells = <2>;
  		};
  
--		cpu at f01 {
-+		cpu1: cpu at f01 {
- 			compatible = "arm,cortex-a7";
+-		cpu at 1 {
++		cpu1: cpu at 1 {
  			device_type = "cpu";
- 			reg = <0xf01>;
-@@ -251,6 +253,84 @@
- 			};
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x1>;
+@@ -78,15 +81,16 @@
+ 			next-level-cache = <&cluster0_l2>;
  		};
  
-+		tmu: tmu at 1f00000 {
+-		cpu at 100 {
++		cpu2: cpu at 100 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x100>;
+ 			clocks = <&clockgen 1 1>;
+ 			next-level-cache = <&cluster1_l2>;
++			#cooling-cells = <2>;
+ 		};
+ 
+-		cpu at 101 {
++		cpu3: cpu at 101 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x101>;
+@@ -94,15 +98,16 @@
+ 			next-level-cache = <&cluster1_l2>;
+ 		};
+ 
+-		cpu at 200 {
++		cpu4: cpu at 200 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x200>;
+ 			clocks = <&clockgen 1 2>;
+ 			next-level-cache = <&cluster2_l2>;
++			#cooling-cells = <2>;
+ 		};
+ 
+-		cpu at 201 {
++		cpu5: cpu at 201 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x201>;
+@@ -110,15 +115,16 @@
+ 			next-level-cache = <&cluster2_l2>;
+ 		};
+ 
+-		cpu at 300 {
++		cpu6: cpu at 300 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x300>;
+ 			clocks = <&clockgen 1 3>;
+ 			next-level-cache = <&cluster3_l2>;
++			#cooling-cells = <2>;
+ 		};
+ 
+-		cpu at 301 {
++		cpu7: cpu at 301 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a57";
+ 			reg = <0x301>;
+@@ -215,6 +221,100 @@
+ 			clocks = <&sysclk>;
+ 		};
+ 
++		tmu: tmu at 1f80000 {
 +			compatible = "fsl,qoriq-tmu";
-+			reg = <0x0 0x1f00000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-+			fsl,tmu-range = <0xb0000 0xa0026 0x80048 0x30061>;
-+			fsl,tmu-calibration = <0x00000000 0x0000000f
-+					       0x00000001 0x00000017
-+					       0x00000002 0x0000001e
-+					       0x00000003 0x00000026
-+					       0x00000004 0x0000002e
-+					       0x00000005 0x00000035
-+					       0x00000006 0x0000003d
-+					       0x00000007 0x00000044
-+					       0x00000008 0x0000004c
-+					       0x00000009 0x00000053
-+					       0x0000000a 0x0000005b
-+					       0x0000000b 0x00000064
++			reg = <0x0 0x1f80000 0x0 0x10000>;
++			interrupts = <0 23 0x4>;
++			fsl,tmu-range = <0xb0000 0x9002a 0x6004c 0x30062>;
++			fsl,tmu-calibration = <0x00000000 0x00000026
++					       0x00000001 0x0000002d
++					       0x00000002 0x00000032
++					       0x00000003 0x00000039
++					       0x00000004 0x0000003f
++					       0x00000005 0x00000046
++					       0x00000006 0x0000004d
++					       0x00000007 0x00000054
++					       0x00000008 0x0000005a
++					       0x00000009 0x00000061
++					       0x0000000a 0x0000006a
++					       0x0000000b 0x00000071
 +
-+					       0x00010000 0x00000011
-+					       0x00010001 0x0000001c
-+					       0x00010002 0x00000024
-+					       0x00010003 0x0000002b
-+					       0x00010004 0x00000034
-+					       0x00010005 0x00000039
-+					       0x00010006 0x00000042
-+					       0x00010007 0x0000004c
-+					       0x00010008 0x00000051
-+					       0x00010009 0x0000005a
-+					       0x0001000a 0x00000063
++					       0x00010000 0x00000025
++					       0x00010001 0x0000002c
++					       0x00010002 0x00000035
++					       0x00010003 0x0000003d
++					       0x00010004 0x00000045
++					       0x00010005 0x0000004e
++					       0x00010006 0x00000057
++					       0x00010007 0x00000061
++					       0x00010008 0x0000006b
++					       0x00010009 0x00000076
 +
-+					       0x00020000 0x00000013
-+					       0x00020001 0x00000019
-+					       0x00020002 0x00000024
-+					       0x00020003 0x0000002c
-+					       0x00020004 0x00000035
-+					       0x00020005 0x0000003d
-+					       0x00020006 0x00000046
-+					       0x00020007 0x00000050
-+					       0x00020008 0x00000059
++					       0x00020000 0x00000029
++					       0x00020001 0x00000033
++					       0x00020002 0x0000003d
++					       0x00020003 0x00000049
++					       0x00020004 0x00000056
++					       0x00020005 0x00000061
++					       0x00020006 0x0000006d
 +
-+					       0x00030000 0x00000002
-+					       0x00030001 0x0000000d
-+					       0x00030002 0x00000019
-+					       0x00030003 0x00000024>;
++					       0x00030000 0x00000021
++					       0x00030001 0x0000002a
++					       0x00030002 0x0000003c
++					       0x00030003 0x0000004e>;
++			little-endian;
 +			#thermal-sensor-cells = <1>;
 +		};
 +
@@ -105,16 +205,16 @@ index 368e219..282d854 100644
 +				polling-delay-passive = <1000>;
 +				polling-delay = <5000>;
 +
-+				thermal-sensors = <&tmu 0>;
++				thermal-sensors = <&tmu 4>;
 +
 +				trips {
 +					cpu_alert: cpu-alert {
-+						temperature = <85000>;
++						temperature = <75000>;
 +						hysteresis = <2000>;
 +						type = "passive";
 +					};
 +					cpu_crit: cpu-crit {
-+						temperature = <95000>;
++						temperature = <85000>;
 +						hysteresis = <2000>;
 +						type = "critical";
 +					};
@@ -127,12 +227,30 @@ index 368e219..282d854 100644
 +							<&cpu0 THERMAL_NO_LIMIT
 +							THERMAL_NO_LIMIT>;
 +					};
++					map1 {
++						trip = <&cpu_alert>;
++						cooling-device =
++							<&cpu2 THERMAL_NO_LIMIT
++							THERMAL_NO_LIMIT>;
++					};
++					map2 {
++						trip = <&cpu_alert>;
++						cooling-device =
++							<&cpu4 THERMAL_NO_LIMIT
++							THERMAL_NO_LIMIT>;
++					};
++					map3 {
++						trip = <&cpu_alert>;
++						cooling-device =
++							<&cpu6 THERMAL_NO_LIMIT
++							THERMAL_NO_LIMIT>;
++					};
 +				};
 +			};
 +		};
 +
- 		dspi0: dspi at 2100000 {
- 			compatible = "fsl,ls1021a-v1.0-dspi";
- 			#address-cells = <1>;
+ 		serial0: serial at 21c0500 {
+ 			compatible = "fsl,ns16550", "ns16550a";
+ 			reg = <0x0 0x21c0500 0x0 0x100>;
 -- 
 2.1.0.27.g96db324
