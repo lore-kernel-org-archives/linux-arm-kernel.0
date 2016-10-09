@@ -1,33 +1,44 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 8 Oct 2016 20:29:24 -0500
-Subject: [PATCH 3/3] dt-bindings: oxnas: Update Pinctrl and GPIO for
- OX820 Support
-In-Reply-To: <20161004134148.23028-4-narmstrong@baylibre.com>
-References: <20161004134148.23028-1-narmstrong@baylibre.com>
- <20161004134148.23028-4-narmstrong@baylibre.com>
-Message-ID: <20161009012924.GU18158@rob-hp-laptop>
+Date: Sat, 8 Oct 2016 20:29:27 -0500
+Subject: [RFC 02/10] dt-bindings: interrupt-controller: add DT binding
+ for meson GPIO interrupt controller
+In-Reply-To: <1475593708-10526-3-git-send-email-jbrunet@baylibre.com>
+References: <1475593708-10526-1-git-send-email-jbrunet@baylibre.com>
+ <1475593708-10526-3-git-send-email-jbrunet@baylibre.com>
+Message-ID: <20161009012927.GV18158@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2016 at 03:41:48PM +0200, Neil Armstrong wrote:
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  Documentation/devicetree/bindings/gpio/gpio_oxnas.txt       | 2 +-
->  Documentation/devicetree/bindings/pinctrl/oxnas,pinctrl.txt | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+On Tue, Oct 04, 2016 at 05:08:20PM +0200, Jerome Brunet wrote:
+> This commit adds the device tree bindings description for Amlogic's GPIO
+> interrupt controller available on the meson8, meson8b and gxbb SoC families
 > 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
-> index 928ed4f..9665147 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
-> @@ -3,7 +3,7 @@
->  Please refer to gpio.txt for generic information regarding GPIO bindings.
->  
->  Required properties:
-> - - compatible: "oxsemi,ox810se-gpio"
-> + - compatible: "oxsemi,ox810se-gpio" or "oxsemi,ox820-gpio"
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  .../amlogic,meson-gpio-intc.txt                    | 39 ++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt
+> new file mode 100644
+> index 000000000000..bd4cceefcda1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt
+> @@ -0,0 +1,39 @@
+> +Amlogic meson GPIO interrupt controller
+> +
+> +Meson SoCs contains an interrupt controller which is able watch the SoC pads
+> +and generate an interrupt on edges or level. The controller is essentially a
+> +256 pads to 8 GIC interrupt multiplexer, with a filter block to select edge
+> +or level and polarity. We don?t expose all 256 mux inputs because the
+> +documentation shows that upper part is not mapped to any pad. The actual number
+> +of interrupt exposed depends on the SoC.
+> +
+> +Required properties:
+> +
+> +- compatible : should be: "amlogic,meson8-gpio-intc? or
+> +  ?amlogic,meson8b-gpio-intc? or ?amlogic,gxbb-gpio-intc?
 
-It is preferred to have one per line, but it's fine unless you respin 
-the series.
+One per line please if you respin the series.
 
 Acked-by: Rob Herring <robh@kernel.org>
