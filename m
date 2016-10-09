@@ -1,97 +1,95 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 9 Oct 2016 13:58:21 +0200
-Subject: [PATCH 5/9] mtd: nand: Expose data interface for ONFI mode 0
-In-Reply-To: <20161009051248.GC10199@brian-ubuntu>
-References: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
- <1473928373-8680-6-git-send-email-s.hauer@pengutronix.de>
- <20160915145625.15e81012@bbrezillon>
- <20161009051248.GC10199@brian-ubuntu>
-Message-ID: <20161009135821.02ec6636@bbrezillon>
+From: chris@chris-wilson.co.uk (Chris Wilson)
+Date: Sun, 9 Oct 2016 13:42:42 +0100
+Subject: [PATCH] mm/vmalloc: reduce the number of lazy_max_pages to
+ reduce latency
+In-Reply-To: <CAD=GYpYKL9=uY=Fks2xO6oK3bJ772yo4EiJ1tJkVU9PheSD+Cw@mail.gmail.com>
+References: <20160929073411.3154-1-jszhang@marvell.com>
+ <20160929081818.GE28107@nuc-i3427.alporthouse.com>
+ <CAD=GYpYKL9=uY=Fks2xO6oK3bJ772yo4EiJ1tJkVU9PheSD+Cw@mail.gmail.com>
+Message-ID: <20161009124242.GA2718@nuc-i3427.alporthouse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
-
-On Sat, 8 Oct 2016 22:12:48 -0700
-Brian Norris <computersforpeace@gmail.com> wrote:
-
-> On Thu, Sep 15, 2016 at 02:56:25PM +0200, Boris Brezillon wrote:
-> > On Thu, 15 Sep 2016 10:32:49 +0200
-> > Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >   
-> > > The nand layer will need ONFI mode 0 to use it as timing mode
-> > > before and right after reset.
-> > > 
-> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > > ---
-> > >  drivers/mtd/nand/nand_timings.c | 11 +++++++++++
-> > >  include/linux/mtd/nand.h        |  2 ++
-> > >  2 files changed, 13 insertions(+)
-> > > 
-> > > diff --git a/drivers/mtd/nand/nand_timings.c b/drivers/mtd/nand/nand_timings.c
-> > > index 608d098..9cdbc16 100644
-> > > --- a/drivers/mtd/nand/nand_timings.c
-> > > +++ b/drivers/mtd/nand/nand_timings.c
-> > > @@ -297,3 +297,14 @@ int onfi_init_data_interface(struct nand_chip *chip,
-> > >  
-> > >  	return 0;
-> > >  }
-> > > +
-> > > +/**
-> > > + * nand_get_default_data_interface - [NAND Interface] Retrieve NAND
-> > > + * data interface for mode 0. This is used as default timing after
-> > > + * reset.
-> > > + */
-> > > +const struct nand_data_interface *nand_get_default_data_interface(void)
-> > > +{
-> > > +	return &onfi_sdr_timings[0];
-> > > +}
-> > > +EXPORT_SYMBOL(nand_get_default_data_interface);  
-> > 
-> > You export nand_get_default_data_interface() here, but you don't export
-> > onfi_init_data_interface().
-> > None of these functions should be called from NAND controller drivers,
-> > so they don't need to be exported. ITOH, the prototypes are public
-> > (defined in nand.h), so nothing prevents a driver from calling these
-> > functions.  
+On Sat, Oct 08, 2016 at 08:43:51PM -0700, Joel Fernandes wrote:
+> On Thu, Sep 29, 2016 at 1:18 AM, Chris Wilson <chris@chris-wilson.co.uk> wrote:
+> > On Thu, Sep 29, 2016 at 03:34:11PM +0800, Jisheng Zhang wrote:
+> >> On Marvell berlin arm64 platforms, I see the preemptoff tracer report
+> >> a max 26543 us latency at __purge_vmap_area_lazy, this latency is an
+> >> awfully bad for STB. And the ftrace log also shows __free_vmap_area
+> >> contributes most latency now. I noticed that Joel mentioned the same
+> >> issue[1] on x86 platform and gave two solutions, but it seems no patch
+> >> is sent out for this purpose.
+> >>
+> >> This patch adopts Joel's first solution, but I use 16MB per core
+> >> rather than 8MB per core for the number of lazy_max_pages. After this
+> >> patch, the preemptoff tracer reports a max 6455us latency, reduced to
+> >> 1/4 of original result.
+> >
+> > My understanding is that
+> >
+> > diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+> > index 91f44e78c516..3f7c6d6969ac 100644
+> > --- a/mm/vmalloc.c
+> > +++ b/mm/vmalloc.c
+> > @@ -626,7 +626,6 @@ void set_iounmap_nonlazy(void)
+> >  static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
+> >                                         int sync, int force_flush)
+> >  {
+> > -       static DEFINE_SPINLOCK(purge_lock);
+> >         struct llist_node *valist;
+> >         struct vmap_area *va;
+> >         struct vmap_area *n_va;
+> > @@ -637,12 +636,6 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
+> >          * should not expect such behaviour. This just simplifies locking for
+> >          * the case that isn't actually used at the moment anyway.
+> >          */
+> > -       if (!sync && !force_flush) {
+> > -               if (!spin_trylock(&purge_lock))
+> > -                       return;
+> > -       } else
+> > -               spin_lock(&purge_lock);
+> > -
+> >         if (sync)
+> >                 purge_fragmented_blocks_allcpus();
+> >
+> > @@ -667,7 +660,6 @@ static void __purge_vmap_area_lazy(unsigned long *start, unsigned long *end,
+> >                         __free_vmap_area(va);
+> >                 spin_unlock(&vmap_area_lock);
+> >         }
+> > -       spin_unlock(&purge_lock);
+> >  }
+> >
+> [..]
+> > should now be safe. That should significantly reduce the preempt-disabled
+> > section, I think.
 > 
-> A bit late, but we can still change things for the next cycle of
-> course...
+> I believe that the purge_lock is supposed to prevent concurrent purges
+> from happening.
 > 
-> > I don't know what's the best solution here:
-> > 1/ Export both nand_get_default_data_interface() and
-> >    onfi_init_data_interface()  
+> For the case where if you have another concurrent overflow happen in
+> alloc_vmap_area() between the spin_unlock and purge :
 > 
-> I don't really like this one. We shouldn't export them if we don't want
-> people to use them in modules. And I'm sure the various compile-test
-> builders out there would complain eventually if someone did.
-
-Yes, I had the feeling it was the wrong choice, but it was also the
-less invasive one ;-).
-
+> spin_unlock(&vmap_area_lock);
+> if (!purged)
+>    purge_vmap_area_lazy();
 > 
-> > 2/ Do not export them, but keep their prototypes in nand.h with a
-> >    comment saying that they should not be directly called by NAND
-> >    controller drivers  
-> 
-> Could be OK.
+> Then the 2 purges would happen at the same time and could subtract
+> vmap_lazy_nr twice.
 
-I don't like that one. It just bloats nand.h with things that are not
-supposed to be exported to NAND controller drivers, which just adds
-more confusion (the NAND framework is already hard to
-follow/understand, let's try not to make it worse).
+That itself is not the problem, as each instance of
+__purge_vmap_area_lazy() operates on its own freelist, and so there will
+be no double accounting.
 
-> 
-> > 3/ Removing the prototypes from nand.h and defining them in nand_base.c
-> >    (or in a private header).  
-> 
-> I like this one. Why not add a drivers/mtd/nand/nand.h that's intended
-> for the nand.{o,ko} module only?
+However, removing the lock removes the serialisation which does mean
+that alloc_vmap_area() will not block on another thread conducting the
+purge, and so it will try to reallocate before that is complete and the
+free area made available. It also means that we are doing the
+atomic_sub(vmap_lazy_nr) too early.
 
-I like this one too. I'll try to come up with something (maybe with a
-different name, like core.h, to prevent developers from including this
-file in their NAND controller drivers).
+That supports making the outer lock a mutex as you suggested. But I think
+cond_resched_lock() is better for the vmap_area_lock (just because it
+turns out to be an expensive loop and we may want the reschedule).
+-Chris
 
-Thanks,
-
-Boris
+-- 
+Chris Wilson, Intel Open Source Technology Centre
