@@ -1,33 +1,77 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sun, 09 Oct 2016 11:58:20 +0800
-Subject: [PATCH] MAINTAINERS: Add ARM64-specific ACPI maintainers entry
-In-Reply-To: <20161005112540.22189-1-lorenzo.pieralisi@arm.com>
-References: <20161005112540.22189-1-lorenzo.pieralisi@arm.com>
-Message-ID: <57F9C05C.9050700@linaro.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Sat, 8 Oct 2016 22:12:48 -0700
+Subject: [PATCH 5/9] mtd: nand: Expose data interface for ONFI mode 0
+In-Reply-To: <20160915145625.15e81012@bbrezillon>
+References: <1473928373-8680-1-git-send-email-s.hauer@pengutronix.de>
+ <1473928373-8680-6-git-send-email-s.hauer@pengutronix.de>
+ <20160915145625.15e81012@bbrezillon>
+Message-ID: <20161009051248.GC10199@brian-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2016 07:25 PM, Lorenzo Pieralisi wrote:
-> The ARM64 architecture defines ARM64 specific ACPI bindings to
-> configure and set-up arch specific components. To simplify
-> code reviews/updates and streamline the maintainership structure
-> supporting the arch specific code, a new arm64 directory was created in
-> /drivers/acpi, to contain ACPI code that is specific to ARM64
-> architecture.
->
-> Add the ARM64-specific ACPI maintainers entry in MAINTAINERS for
-> the newly created subdirectory and respective code content.
->
-> Lorenzo Pieralisi will be in charge of submitting and managing
-> the pull requests on behalf of all maintainers listed.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Link: http://lkml.kernel.org/r/1603704.EGiVTcCxLR at vostro.rjw.lan
+On Thu, Sep 15, 2016 at 02:56:25PM +0200, Boris Brezillon wrote:
+> On Thu, 15 Sep 2016 10:32:49 +0200
+> Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> 
+> > The nand layer will need ONFI mode 0 to use it as timing mode
+> > before and right after reset.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  drivers/mtd/nand/nand_timings.c | 11 +++++++++++
+> >  include/linux/mtd/nand.h        |  2 ++
+> >  2 files changed, 13 insertions(+)
+> > 
+> > diff --git a/drivers/mtd/nand/nand_timings.c b/drivers/mtd/nand/nand_timings.c
+> > index 608d098..9cdbc16 100644
+> > --- a/drivers/mtd/nand/nand_timings.c
+> > +++ b/drivers/mtd/nand/nand_timings.c
+> > @@ -297,3 +297,14 @@ int onfi_init_data_interface(struct nand_chip *chip,
+> >  
+> >  	return 0;
+> >  }
+> > +
+> > +/**
+> > + * nand_get_default_data_interface - [NAND Interface] Retrieve NAND
+> > + * data interface for mode 0. This is used as default timing after
+> > + * reset.
+> > + */
+> > +const struct nand_data_interface *nand_get_default_data_interface(void)
+> > +{
+> > +	return &onfi_sdr_timings[0];
+> > +}
+> > +EXPORT_SYMBOL(nand_get_default_data_interface);
+> 
+> You export nand_get_default_data_interface() here, but you don't export
+> onfi_init_data_interface().
+> None of these functions should be called from NAND controller drivers,
+> so they don't need to be exported. ITOH, the prototypes are public
+> (defined in nand.h), so nothing prevents a driver from calling these
+> functions.
 
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+A bit late, but we can still change things for the next cycle of
+course...
 
-Thanks
-Hanjun
+> I don't know what's the best solution here:
+> 1/ Export both nand_get_default_data_interface() and
+>    onfi_init_data_interface()
+
+I don't really like this one. We shouldn't export them if we don't want
+people to use them in modules. And I'm sure the various compile-test
+builders out there would complain eventually if someone did.
+
+> 2/ Do not export them, but keep their prototypes in nand.h with a
+>    comment saying that they should not be directly called by NAND
+>    controller drivers
+
+Could be OK.
+
+> 3/ Removing the prototypes from nand.h and defining them in nand_base.c
+>    (or in a private header).
+
+I like this one. Why not add a drivers/mtd/nand/nand.h that's intended
+for the nand.{o,ko} module only?
+
+> Brian, Richard, Sascha, any comments?
+
+Brian
