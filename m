@@ -1,70 +1,183 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 10 Oct 2016 16:45:06 +0100
-Subject: [PATCH v2 5/8] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <1475879821-8035-6-git-send-email-lina.iyer@linaro.org>
-References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
- <1475879821-8035-6-git-send-email-lina.iyer@linaro.org>
-Message-ID: <4e55d6ad-8de7-72d7-7512-5e4ff2aabc79@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 10 Oct 2016 16:52:37 +0100
+Subject: [PATCH v13 03/15] iommu/dma: Allow MSI-only cookies
+In-Reply-To: <b6771e0c-6f2d-21c1-05ac-8258b2bec462@redhat.com>
+References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
+ <1475743531-4780-4-git-send-email-eric.auger@redhat.com>
+ <20161006141717.13c9c111@t450s.home>
+ <6b944a74-7429-caf2-507d-30d6ae336bec@arm.com>
+ <b6771e0c-6f2d-21c1-05ac-8258b2bec462@redhat.com>
+Message-ID: <8ee2dda7-2513-16c3-ccdf-f60f03e06b99@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/10/16 15:47, Auger Eric wrote:
+> Hi Robin,
+> 
+> On 10/10/2016 16:26, Robin Murphy wrote:
+>> Hi Alex, Eric,
+>>
+>> On 06/10/16 21:17, Alex Williamson wrote:
+>>> On Thu,  6 Oct 2016 08:45:19 +0000
+>>> Eric Auger <eric.auger@redhat.com> wrote:
+>>>
+>>>> From: Robin Murphy <robin.murphy@arm.com>
+>>>>
+>>>> IOMMU domain users such as VFIO face a similar problem to DMA API ops
+>>>> with regard to mapping MSI messages in systems where the MSI write is
+>>>> subject to IOMMU translation. With the relevant infrastructure now in
+>>>> place for managed DMA domains, it's actually really simple for other
+>>>> users to piggyback off that and reap the benefits without giving up
+>>>> their own IOVA management, and without having to reinvent their own
+>>>> wheel in the MSI layer.
+>>>>
+>>>> Allow such users to opt into automatic MSI remapping by dedicating a
+>>>> region of their IOVA space to a managed cookie.
+>>>>
+>>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>>
+>>>> ---
+>>>>
+>>>> v1 -> v2:
+>>>> - compared to Robin's version
+>>>> - add NULL last param to iommu_dma_init_domain
+>>>> - set the msi_geometry aperture
+>>>> - I removed
+>>>>   if (base < U64_MAX - size)
+>>>>      reserve_iova(iovad, iova_pfn(iovad, base + size), ULONG_MAX);
+>>>>   don't get why we would reserve something out of the scope of the iova domain?
+>>>>   what do I miss?
+>>>> ---
+>>>>  drivers/iommu/dma-iommu.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>>>>  include/linux/dma-iommu.h |  9 +++++++++
+>>>>  2 files changed, 49 insertions(+)
+>>>>
+>>>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>>>> index c5ab866..11da1a0 100644
+>>>> --- a/drivers/iommu/dma-iommu.c
+>>>> +++ b/drivers/iommu/dma-iommu.c
+>>>> @@ -716,3 +716,43 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
+>>>>  		msg->address_lo += lower_32_bits(msi_page->iova);
+>>>>  	}
+>>>>  }
+>>>> +
+>>>> +/**
+>>>> + * iommu_get_dma_msi_region_cookie - Configure a domain for MSI remapping only
+>>>
+>>> Should this perhaps be iommu_setup_dma_msi_region_cookie, or something
+>>> along those lines.  I'm not sure what we're get'ing.  Thanks,
+>>
+>> What we're getting is private third-party resources for the iommu_domain
+>> given in the argument. It's a get/put rather than alloc/free model since
+>> we operate opaquely on the domain as a container, rather than on the
+>> actual resource in question (an IOVA allocator).
+>>
+>> Since this particular use case is slightly different from the normal
+>> flow and has special initialisation requirements, it seemed a lot
+>> cleaner to simply combine that initialisation operation with the
+>> prerequisite "get" into a single call. Especially as it helps emphasise
+>> that this is not 'normal' DMA cookie usage.
+> 
+> I renamed iommu_get_dma_msi_region_cookie into
+> iommu_setup_dma_msi_region. Is it a problem for you?
 
+I'd still prefer not to completely disguise the fact that it's
+performing a get_cookie(), which ultimately still needs to be matched by
+a put_cookie() somewhere. Really, VFIO should be doing the latter itself
+before freeing the domain, as there's not strictly any guarantee that
+the underlying IOMMU driver knows anything about this.
 
-On 07/10/16 23:36, Lina Iyer wrote:
-> Update DT bindings to describe idle states of PM domains.
->
-> This patch is based on the original patch by Marc Titinger.
->
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/power/power_domain.txt     | 38 ++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
-> index 025b5e7..7f8f27e 100644
-> --- a/Documentation/devicetree/bindings/power/power_domain.txt
-> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
-> @@ -29,6 +29,10 @@ Optional properties:
->     specified by this binding. More details about power domain specifier are
->     available in the next section.
->
-> +- domain-idle-states : A phandle of an idle-state that shall be soaked into a
-> +                generic domain power state. The idle state definitions are
-> +                compatible with arm,idle-state specified in [1].
-> +
+Robin.
 
-Please do add the following details to the binding. IMO, this binding is
-not complete in terms of specification as there are few open questions:
-
-1. What not define a standard compatible instead of "arm,idle-state" ?
-    I agree it can be used, but as part of this *generic* binding, IMO
-    it's better to have something generic and can be used by devices.
-    Otherwise, this binding becomes CPU specific, that too ARM CPU
-    specific.
-
-2. Now taking CPU as a special device, how does this co-exist with the
-    cpu-idle-states ? Better to have some description may be in the ARM
-    CPU idle binding document(not here of-course)
-
-3. I still haven't seen any explanation for not considering complete
-    hierarchical power domain representation which was raised in earlier
-    versions. I had provided example for the proposal. I just saw them
-    already in use in the upstream kernel by Renasas. e.g.:
-    arch/arm/boot/dts/r8a73a4.dtsi
-
-    How does that fit with your proposal, though you have not made one
-    yet for CPUs in this binding ? In the above file, CPUs have either
-    own power domain inside the L2 one which is cluster level power
-    domain.
-
-One must be able to get answers to these above questions with this
-binding. Until then it's *incomplete* though it may be correct.
-
--- 
-Regards,
-Sudeep
+>>
+>>>
+>>> Alex
+>>>
+>>>> + * @domain: IOMMU domain to prepare
+>>>> + * @base: Base address of IOVA region to use as the MSI remapping aperture
+>>>> + * @size: Size of the desired MSI aperture
+>>>> + *
+>>>> + * Users who manage their own IOVA allocation and do not want DMA API support,
+>>>> + * but would still like to take advantage of automatic MSI remapping, can use
+>>>> + * this to initialise their own domain appropriately.
+>>>> + */
+>>>> +int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>>>> +		dma_addr_t base, u64 size)
+>>>> +{
+>>>> +	struct iommu_dma_cookie *cookie;
+>>>> +	struct iova_domain *iovad;
+>>>> +	int ret;
+>>>> +
+>>>> +	if (domain->type == IOMMU_DOMAIN_DMA)
+>>>> +		return -EINVAL;
+>>>> +
+>>>> +	ret = iommu_get_dma_cookie(domain);
+>>>> +	if (ret)
+>>>> +		return ret;
+>>>> +
+>>>> +	ret = iommu_dma_init_domain(domain, base, size, NULL);
+>>>> +	if (ret) {
+>>>> +		iommu_put_dma_cookie(domain);
+>>>> +		return ret;
+>>>> +	}
+>>
+>> It *is* necessary to explicitly reserve the upper part of the IOVA
+>> domain here - the aforementioned "special initialisation" - because
+>> dma_32bit_pfn is only an optimisation hint to prevent the allocator
+>> walking down from the very top of the the tree every time when devices
+>> with different DMA masks share a domain (I'm in two minds as to whether
+>> to tweak the way the iommu-dma code uses it in this respect, now that I
+>> fully understand things). The only actual upper limit to allocation is
+>> the DMA mask passed into each alloc_iova() call, so if we want to ensure
+>> IOVAs are really allocated within this specific region, we have to carve
+>> out everything above it.
+> 
+> thank you for the explanation. So I will restore the reserve then.
+> 
+> Thanks
+> 
+> Eric
+>>
+>> Robin.
+>>
+>>>> +
+>>>> +	domain->msi_geometry.aperture_start = base;
+>>>> +	domain->msi_geometry.aperture_end = base + size - 1;
+>>>> +
+>>>> +	cookie = domain->iova_cookie;
+>>>> +	iovad = &cookie->iovad;
+>>>> +
+>>>> +	return 0;
+>>>> +}
+>>>> +EXPORT_SYMBOL(iommu_get_dma_msi_region_cookie);
+>>>> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+>>>> index 32c5890..1c55413 100644
+>>>> --- a/include/linux/dma-iommu.h
+>>>> +++ b/include/linux/dma-iommu.h
+>>>> @@ -67,6 +67,9 @@ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
+>>>>  /* The DMA API isn't _quite_ the whole story, though... */
+>>>>  void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
+>>>>  
+>>>> +int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>>>> +		dma_addr_t base, u64 size);
+>>>> +
+>>>>  #else
+>>>>  
+>>>>  struct iommu_domain;
+>>>> @@ -90,6 +93,12 @@ static inline void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
+>>>>  {
+>>>>  }
+>>>>  
+>>>> +static inline int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>>>> +		dma_addr_t base, u64 size)
+>>>> +{
+>>>> +	return -ENODEV;
+>>>> +}
+>>>> +
+>>>>  #endif	/* CONFIG_IOMMU_DMA */
+>>>>  #endif	/* __KERNEL__ */
+>>>>  #endif	/* __DMA_IOMMU_H */
+>>>
+>>
+> 
