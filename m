@@ -1,149 +1,157 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Oct 2016 16:23:19 +0200
-Subject: [PATCH/RFC 4/4] soc: renesas: Identify SoC and register with the
- SoC bus
-In-Reply-To: <1475572167-29581-5-git-send-email-geert+renesas@glider.be>
-References: <1475572167-29581-1-git-send-email-geert+renesas@glider.be>
- <1475572167-29581-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <1560471.cOCZ4VcGTh@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 10 Oct 2016 15:26:35 +0100
+Subject: [PATCH v13 03/15] iommu/dma: Allow MSI-only cookies
+In-Reply-To: <20161006141717.13c9c111@t450s.home>
+References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
+ <1475743531-4780-4-git-send-email-eric.auger@redhat.com>
+ <20161006141717.13c9c111@t450s.home>
+Message-ID: <6b944a74-7429-caf2-507d-30d6ae336bec@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 4, 2016 11:09:27 AM CEST Geert Uytterhoeven wrote:
-> Identify the SoC type and revision, and register this information with
-> the SoC bus, so it is available under /sys/devices/soc0/, and can be
-> checked where needed using soc_device_match().
+Hi Alex, Eric,
+
+On 06/10/16 21:17, Alex Williamson wrote:
+> On Thu,  6 Oct 2016 08:45:19 +0000
+> Eric Auger <eric.auger@redhat.com> wrote:
 > 
-> In addition, on SoCs that support it, the product ID is read from a
-> hardware register and validated, to catch accidental use of a DTB for a
-> different SoC.
+>> From: Robin Murphy <robin.murphy@arm.com>
+>>
+>> IOMMU domain users such as VFIO face a similar problem to DMA API ops
+>> with regard to mapping MSI messages in systems where the MSI write is
+>> subject to IOMMU translation. With the relevant infrastructure now in
+>> place for managed DMA domains, it's actually really simple for other
+>> users to piggyback off that and reap the benefits without giving up
+>> their own IOVA management, and without having to reinvent their own
+>> wheel in the MSI layer.
+>>
+>> Allow such users to opt into automatic MSI remapping by dedicating a
+>> region of their IOVA space to a managed cookie.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>>
+>> v1 -> v2:
+>> - compared to Robin's version
+>> - add NULL last param to iommu_dma_init_domain
+>> - set the msi_geometry aperture
+>> - I removed
+>>   if (base < U64_MAX - size)
+>>      reserve_iova(iovad, iova_pfn(iovad, base + size), ULONG_MAX);
+>>   don't get why we would reserve something out of the scope of the iova domain?
+>>   what do I miss?
+>> ---
+>>  drivers/iommu/dma-iommu.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/dma-iommu.h |  9 +++++++++
+>>  2 files changed, 49 insertions(+)
+>>
+>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index c5ab866..11da1a0 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -716,3 +716,43 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
+>>  		msg->address_lo += lower_32_bits(msi_page->iova);
+>>  	}
+>>  }
+>> +
+>> +/**
+>> + * iommu_get_dma_msi_region_cookie - Configure a domain for MSI remapping only
 > 
-> Example:
+> Should this perhaps be iommu_setup_dma_msi_region_cookie, or something
+> along those lines.  I'm not sure what we're get'ing.  Thanks,
+
+What we're getting is private third-party resources for the iommu_domain
+given in the argument. It's a get/put rather than alloc/free model since
+we operate opaquely on the domain as a container, rather than on the
+actual resource in question (an IOVA allocator).
+
+Since this particular use case is slightly different from the normal
+flow and has special initialisation requirements, it seemed a lot
+cleaner to simply combine that initialisation operation with the
+prerequisite "get" into a single call. Especially as it helps emphasise
+that this is not 'normal' DMA cookie usage.
+
 > 
->     Detected Renesas r8a7791 ES1.0
->     ...
->     # cat /sys/devices/soc0/{family,machine,soc_id,revision}
->     R-Car Gen2
->     Koelsch
->     r8a7791
->     ES1.0
+> Alex
 > 
+>> + * @domain: IOMMU domain to prepare
+>> + * @base: Base address of IOVA region to use as the MSI remapping aperture
+>> + * @size: Size of the desired MSI aperture
+>> + *
+>> + * Users who manage their own IOVA allocation and do not want DMA API support,
+>> + * but would still like to take advantage of automatic MSI remapping, can use
+>> + * this to initialise their own domain appropriately.
+>> + */
+>> +int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>> +		dma_addr_t base, u64 size)
+>> +{
+>> +	struct iommu_dma_cookie *cookie;
+>> +	struct iova_domain *iovad;
+>> +	int ret;
+>> +
+>> +	if (domain->type == IOMMU_DOMAIN_DMA)
+>> +		return -EINVAL;
+>> +
+>> +	ret = iommu_get_dma_cookie(domain);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = iommu_dma_init_domain(domain, base, size, NULL);
+>> +	if (ret) {
+>> +		iommu_put_dma_cookie(domain);
+>> +		return ret;
+>> +	}
 
-Seems all reasonable.
+It *is* necessary to explicitly reserve the upper part of the IOVA
+domain here - the aforementioned "special initialisation" - because
+dma_32bit_pfn is only an optimisation hint to prevent the allocator
+walking down from the very top of the the tree every time when devices
+with different DMA masks share a domain (I'm in two minds as to whether
+to tweak the way the iommu-dma code uses it in this respect, now that I
+fully understand things). The only actual upper limit to allocation is
+the DMA mask passed into each alloc_iova() call, so if we want to ensure
+IOVAs are really allocated within this specific region, we have to carve
+out everything above it.
 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> This patch does NOT add a call to
+Robin.
+
+>> +
+>> +	domain->msi_geometry.aperture_start = base;
+>> +	domain->msi_geometry.aperture_end = base + size - 1;
+>> +
+>> +	cookie = domain->iova_cookie;
+>> +	iovad = &cookie->iovad;
+>> +
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL(iommu_get_dma_msi_region_cookie);
+>> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+>> index 32c5890..1c55413 100644
+>> --- a/include/linux/dma-iommu.h
+>> +++ b/include/linux/dma-iommu.h
+>> @@ -67,6 +67,9 @@ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
+>>  /* The DMA API isn't _quite_ the whole story, though... */
+>>  void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
+>>  
+>> +int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>> +		dma_addr_t base, u64 size);
+>> +
+>>  #else
+>>  
+>>  struct iommu_domain;
+>> @@ -90,6 +93,12 @@ static inline void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
+>>  {
+>>  }
+>>  
+>> +static inline int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
+>> +		dma_addr_t base, u64 size)
+>> +{
+>> +	return -ENODEV;
+>> +}
+>> +
+>>  #endif	/* CONFIG_IOMMU_DMA */
+>>  #endif	/* __KERNEL__ */
+>>  #endif	/* __DMA_IOMMU_H */
 > 
->         of_platform_default_populate(NULL, NULL,
->                                      soc_device_to_device(soc_dev));
-> 
-> Contrary to suggested by commit 74d1d82cdaaec727 ("drivers/base: add bus
-> for System-on-Chip devices), doing so would not only move on-SoC devices
-> from /sys/devices/platform/ to /sys/devices/soc0/, but also all other
-> board (off-SoC) devices specified in the DTB.
-
-Right, we have moved away from that a while ago, and now just
-use the device for identification, not to model the device
-hierarchy.
-
-> diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
-> new file mode 100644
-> index 0000000000000000..74b72e4112b8889e
-> --- /dev/null
-> +++ b/drivers/soc/renesas/renesas-soc.c
-> @@ -0,0 +1,266 @@
-> +/*
-> + * Renesas SoC Identification
-> + *
-> + * Copyright (C) 2014-2016 Glider bvba
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/slab.h>
-> +#include <linux/string.h>
-> +#include <linux/sys_soc.h>
-> +
-> +
-> +struct renesas_family {
-> +	const char name[16];
-> +	u32 reg;			/* CCCR, PVR, or PRR */
-> +};
-> +
-> +static const struct renesas_family fam_emev2 __initconst = {
-> +	.name	= "Emma Mobile EV2",
-> +};
-
-As this is not related to the others and doesn't have the respective
-register, I'd leave the platform out of this, and possibly have
-a separate driver for it.
-
-> +static const struct renesas_family fam_rza __initconst = {
-> +	.name	= "RZ/A",
-> +};
-
-I'm not sure about the relationship between this one and the others,
-maybe it should be treated in the same way as emev2 and left out from
-this driver?
-
-> +static const struct renesas_family fam_rmobile __initconst = {
-> +	.name	= "R-Mobile",
-> +	.reg	= 0xe600101c,		/* CCCR (Common Chip Code Register) */
-> +};
-> +
-> +static const struct renesas_family fam_rcar_gen1 __initconst = {
-> +	.name	= "R-Car Gen1",
-> +	.reg	= 0xff000044,		/* PRR (Product Register) */
-> +};
-> +
-> +static const struct renesas_family fam_rcar_gen2 __initconst = {
-> +	.name	= "R-Car Gen2",
-> +	.reg	= 0xff000044,		/* PRR (Product Register) */
-> +};
-> +
-> +static const struct renesas_family fam_rcar_gen3 __initconst = {
-> +	.name	= "R-Car Gen3",
-> +	.reg	= 0xfff00044,		/* PRR (Product Register) */
-> +};
-> +
-> +static const struct renesas_family fam_rzg __initconst = {
-> +	.name	= "RZ/G",
-> +	.reg	= 0xff000044,		/* PRR (Product Register) */
-> +};
-> +
-> +static const struct renesas_family fam_shmobile __initconst = {
-> +	.name	= "SH-Mobile",
-> +	.reg	= 0xe600101c,		/* CCCR (Common Chip Code Register) */
-> +};
-
-These seem to fall into two distinct categories, maybe there is a
-better way to group them. What device contain the two kinds of
-registers (PRR, CCCR)?
-
-Hardcoding the register address seems rather ugly here, so maybe
-there is a way to have two separate probe methods based on the
-surrounding register range, and then bind to that?
-
-> +static const struct of_device_id renesas_socs[] __initconst = {
-> +#ifdef CONFIG_ARCH_EMEV2
-> +	{ .compatible = "renesas,emev2",	.data = &soc_emev2 },
-> +#endif
-> +#ifdef CONFIG_ARCH_R7S72100
-> +	{ .compatible = "renesas,r7s72100",	.data = &soc_rz_a1h },
-> +#endif
-> +#ifdef CONFIG_ARCH_R8A73A4
-
-I think the #ifdefs here will result in warnings for unused symbols 
-when the Kconfig symbols are disabled.
-
-	Arnd
