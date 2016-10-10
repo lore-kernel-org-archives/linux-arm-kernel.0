@@ -1,39 +1,23 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 10 Oct 2016 11:11:55 +0200
-Subject: camera on n900, v4.8
-In-Reply-To: <20161010084859.GD4467@pali>
-References: <20161005190340.GA25755@amd>
- <20161010084859.GD4467@pali>
-Message-ID: <20161010091155.GC7597@amd>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Oct 2016 10:11:46 +0100
+Subject: [PATCH v3 02/12] scsi/cumana_1: Remove unused cumanascsi_setup()
+ function
+In-Reply-To: <0e4fe7993945cd855f230f95bc0d7410dd5a9baa.1476051962.git.fthain@telegraphics.com.au>
+References: <cover.1476051961.git.fthain@telegraphics.com.au>
+ <0e4fe7993945cd855f230f95bc0d7410dd5a9baa.1476051962.git.fthain@telegraphics.com.au>
+Message-ID: <20161010091146.GV1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2016-10-10 10:48:59, Pali Roh?r wrote:
-> On Wednesday 05 October 2016 21:03:41 Pavel Machek wrote:
-> > Hi!
-> > 
-> > Camera has some non-trivial dependencies on N900; it seems to rely on
-> > gpio-switch.c, for example. I'll try to strip the diff further, but in
-> > the meantime, here's the version I'm working with.
-> > 
-> 
-> With "Camera" do you mean some Maemo userspace application? Because I
-> think that nobody else could depends on gpio-switch kernel driver.
+On Mon, Oct 10, 2016 at 12:46:52AM -0400, Finn Thain wrote:
+> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+> Reviewed-by: Hannes Reinecke <hare@suse.com>
 
-With camera, I mean kernel drivers for /dev/video*. I don't know why
-they depend on gpio-switch.c, but they do.
+Thanks.
 
-I'm using fcam-dev for userspace control of camera. I'd prefer not to
-touch anything w/o sources.
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161010/1f4c86e0/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
