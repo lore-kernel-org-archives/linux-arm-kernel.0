@@ -1,48 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 10 Oct 2016 12:26:00 +0100
-Subject: [PATCH 0/6] crypto: arm64 - big endian fixes
-In-Reply-To: <1476034945-9186-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1476034945-9186-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9Nj5ccpRpgqg9Ohif4=k5+dAVuP8tKtNEj9_z7BQ_jjQ@mail.gmail.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 10 Oct 2016 13:32:06 +0200
+Subject: [PATCH] Reorganize STM32 clocks in order to prepare them for
+ PLLI2S and PLLSAI
+In-Reply-To: <b6fd21b7-75a6-c38d-a9f1-fbf07132a1d3@linaro.org>
+References: <1475791294-5804-1-git-send-email-user@localhost>
+ <2d6d5c10-346e-0541-1bc0-b75ef5b40d3f@linaro.org>
+ <CAFvLkMQjDZysgoT3FfkVP8UQVkqghW9=CZU-OEmGUAdMR7CO2A@mail.gmail.com>
+ <b6fd21b7-75a6-c38d-a9f1-fbf07132a1d3@linaro.org>
+Message-ID: <1880a125-b5ec-b64a-5c9b-90d4e9c0af86@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 October 2016 at 18:42, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> As it turns out, none of the accelerated crypto routines under arch/arm64/crypto
-> currently work, or have ever worked correctly when built for big endian. So this
-> series fixes all of them.
+Hi Radoslaw,
+
+I add Gabriel in the discussion. Gabriel is updating PLL management for 
+STM32F429.
+
+Regards
+Alex
+
+On 10/10/2016 12:31 PM, Daniel Thompson wrote:
+> On 10/10/16 10:56, Rados?aw Pietrzyk wrote:
+>> Hi,
+>> all plls have the same clock parent which is after a main divider.
+>> Currently the divider and multiplier are connected together within vco
+>> clock and therefore there is no chance to reuse the divider and clearly
+>> state where the conncetion "really" is. We can arrange all of them
+>> separately but than the divider will be hidden for all of them
+>> separately.
 >
-> Each of these patches carries a fixes tag, and could be backported to stable.
-> However, for patches #1 and #5, the fixes tag denotes the oldest commit that the
-> fix is compatible with, not the patch that introduced the algorithm. This is due
-> to the fact that the key schedules are incompatible between generic AES and the
-> arm64 Crypto Extensions implementation (but only when building for big endian)
-> This is not a problem in practice, but it does mean that the AES-CCM and AES in
-> EBC/CBC/CTR/XTS mode implementations before v3.19 require a different fix, i.e.,
-> one that is compatible with the generic AES key schedule generation code (which
-> it currently no longer uses)
+> Quoting my last mail "I can see the value of naming the "/M"
+> pre-division separately". In other words I agree with the idea of the
+> patch.
 >
-> In any case, please apply with cc to stable.
+> To more explicitly state my review comments...
 >
-
-Herbert,
-
-I have an additional fix to add to this series, and a couple for
-32-bit ARM as well. They escaped my attention due to this code (in
-algboss.c:250)
-
-/* This piece of crap needs to disappear into per-type test hooks. */
-if (!((type ^ CRYPTO_ALG_TYPE_BLKCIPHER) &
-     CRYPTO_ALG_TYPE_BLKCIPHER_MASK) && !(type & CRYPTO_ALG_GENIV) &&
-   ((alg->cra_flags & CRYPTO_ALG_TYPE_MASK) ==
-    CRYPTO_ALG_TYPE_BLKCIPHER ? alg->cra_blkcipher.ivsize :
-alg->cra_ablkcipher.ivsize))
-type |= CRYPTO_ALG_TESTED;
-
-This causes cbc(aes), ctr(aes) and xts(aes) to remain untested, unless
-I add CRYPTO_ALG_GENIV to their cra_flags. Is this expected behavior?
-What would be your recommended way to ensure these algos are covered
-by the boottime tests?
-
-Thanks,
-Ard.
+>> From: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+>
+> Please add a explanation of the problem and solution in the patch
+> description.
+>
+>
+>> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+>> ---
+>>  drivers/clk/clk-stm32f4.c | 7 ++++---
+>>  1 file changed, 4 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+>> index 02d6810..1fd3eac 100644
+>> --- a/drivers/clk/clk-stm32f4.c
+>> +++ b/drivers/clk/clk-stm32f4.c
+>> @@ -245,9 +245,10 @@ static void stm32f4_rcc_register_pll(const char
+> *hse_clk, const char *hsi_clk)
+>>      const char   *pllsrc = pllcfgr & BIT(22) ? hse_clk : hsi_clk;
+>>      unsigned long pllq   = (pllcfgr >> 24) & 0xf;
+>>
+>> -    clk_register_fixed_factor(NULL, "vco", pllsrc, 0, plln, pllm);
+>> -    clk_register_fixed_factor(NULL, "pll", "vco", 0, 1, pllp);
+>> -    clk_register_fixed_factor(NULL, "pll48", "vco", 0, 1, pllq);
+>> +    clk_register_fixed_factor(NULL, "vco-div", pllsrc, 0, 1, pllm);
+>
+> This strikes me as a bad name for a clock that is shared by all three
+> PLLs (the vco being an internal component of the PLL) however since the
+> clock is not named in the datasheet we are forced to invent a name [I
+> suspect that's why I gave up trying to name it when I wrote the driver
+> originally ;-) ].
+>
+> Perhaps "pllin-prediv"?
+>
+>
+>> +    clk_register_fixed_factor(NULL, "vco-mul", "vco-div", 0, plln, 1);
+>
+> Why rename this clock? Multiplying is a what the vco (and its control
+> circuits) is *for*. Tagging it "-mul" is meaningless.
+>
+>
+> Daniel.
