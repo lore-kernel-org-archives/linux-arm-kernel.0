@@ -1,46 +1,65 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 11 Oct 2016 09:57:35 +1030
-Subject: [PATCH 0/8] pinctrl: aspeed: Fixes for core and g5, implement
- remaining pins
-In-Reply-To: <CACRpkdZWbx1_SYJMOn40teQaEw1JAq80kDAp7N+OYaMRRO6NBg@mail.gmail.com>
-References: <cover.115463f791b69859c5ce9dafd61a5755ea039f4b.1474986045.git-series.andrew@aj.id.au>
- <CACRpkdZWbx1_SYJMOn40teQaEw1JAq80kDAp7N+OYaMRRO6NBg@mail.gmail.com>
-Message-ID: <1476142055.16733.4.camel@aj.id.au>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 10 Oct 2016 18:33:25 -0500
+Subject: [PATCH/RFT 09/12] usb: host: ohci-da8xx: Add devicetree bindings
+ documentation
+In-Reply-To: <1475858577-10366-10-git-send-email-ahaslam@baylibre.com>
+References: <1475858577-10366-1-git-send-email-ahaslam@baylibre.com>
+ <1475858577-10366-10-git-send-email-ahaslam@baylibre.com>
+Message-ID: <33e5d2ff-4d39-2d84-670c-5cac12518945@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-10-10 at 09:59 +0200, Linus Walleij wrote:
-> On Tue, Sep 27, 2016 at 4:50 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> 
-> > 
-> > The initial Aspeed pinctrl patches implemented a subset of pins for each of the
-> > g4 and g5 SoCs. This series provides a number of fixes to the initial patches,
-> > mostly for issues identified in the g5 driver. The fixes account for the first
-> > half of the series (up to and including "pinctrl: aspeed-g5: Fix pin
-> > association of SPI1 function") and should be applied for 4.9.
-> Those are applied for fixes.
+On 10/07/2016 11:42 AM, ahaslam at baylibre.com wrote:
+> From: Axel Haslam <ahaslam@baylibre.com>
+>
+> This patch documents the device tree bindings required for
+> the ohci controller found in TI da8xx family of SoC's
+>
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> ---
+>  .../devicetree/bindings/usb/ohci-da8xx.txt         | 32 ++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/ohci-da8xx.txt
+>
+> diff --git a/Documentation/devicetree/bindings/usb/ohci-da8xx.txt b/Documentation/devicetree/bindings/usb/ohci-da8xx.txt
+> new file mode 100644
+> index 0000000..e954ce5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/ohci-da8xx.txt
+> @@ -0,0 +1,32 @@
+> +DA8XX USB OHCI controller
+> +
+> +Required properties:
+> +
+> + - compatible: Should be "ti,da830-ohci"
+> + - reg:        Should contain one register range i.e. start and length
+> + - interrupts: Description of the interrupt line
+> + - phys:       Phandle for the PHY device
+> + - phy-names:  Should be "usb-phy"
+> +
 
-Thanks!
+If these are required, shouldn't they say "Must" instead of "Should"?
 
-> 
-> > 
-> > The second half, from "pinctrl: aspeed: Enable capture of off-SCU pinmux
-> > state", implements some additional functionality in the core engine for the
-> > Aspeed SoCs and follows up with patches implementing mux configuration tables
-> > for all remaining pins. Given the significant additions in the last few
-> > patches, their lateness in the cycle and the light testing they have received
-> > they are best left for 4.10, but I'm keen to get them out for review.
-> I'm holding these back until v4.9-rc1 is out.
-
-No worries; they need some discussion when you have the time.
-
-Cheers,
-
-Andrew
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161011/339a02a0/attachment.sig>
+> +Optional properties:
+> + - vbus-gpio:  If present, specifies a gpio that needs to be
+> +               activated for the bus to be powered.
+> + - oci-gpio:   If present, specifies a gpio that needs to be
+> +               activated for the overcurrent detection.
+> + - power_on_delay: Power On to Power Good time - in ms.
+> +
+> +Example for omap138-lck:
+> +
+> +usb_phy: usb-phy {
+> +        compatible = "ti,da830-usb-phy";
+> +        #phy-cells = <1>;
+> +        status = "disabled";
+> +};
+> +usb11: usb11 at 0225000 {
+> +        compatible = "ti,da830-ohci";
+> +        reg = <0x225000 0x1000>;
+> +        interrupts = <59>;
+> +        phys = <&usb_phy 1>;
+> +        phy-names = "usb-phy";
+> +        status = "disabled";
+> +};
+>
