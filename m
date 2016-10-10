@@ -1,29 +1,39 @@
-From: paweljarosz3691@gmail.com (=?UTF-8?Q?Pawe=c5=82_Jarosz?=)
-Date: Mon, 10 Oct 2016 11:11:09 +0200
-Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on
- rk3066
-In-Reply-To: <67831fd0-76af-a793-0b2f-958e45633fe8@rock-chips.com>
-References: <20161001140939.GA31220@vaio-ubuntu>
- <6239b970-09d3-f7ee-e6f5-c019eaedb725@rock-chips.com>
- <f8aba48d-6c69-b246-4cb2-48a2770c80e4@gmail.com>
- <67831fd0-76af-a793-0b2f-958e45633fe8@rock-chips.com>
-Message-ID: <149df5ee-3478-6d15-bb76-47becac146e9@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 10 Oct 2016 11:11:55 +0200
+Subject: camera on n900, v4.8
+In-Reply-To: <20161010084859.GD4467@pali>
+References: <20161005190340.GA25755@amd>
+ <20161010084859.GD4467@pali>
+Message-ID: <20161010091155.GC7597@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Mon 2016-10-10 10:48:59, Pali Roh?r wrote:
+> On Wednesday 05 October 2016 21:03:41 Pavel Machek wrote:
+> > Hi!
+> > 
+> > Camera has some non-trivial dependencies on N900; it seems to rely on
+> > gpio-switch.c, for example. I'll try to strip the diff further, but in
+> > the meantime, here's the version I'm working with.
+> > 
+> 
+> With "Camera" do you mean some Maemo userspace application? Because I
+> think that nobody else could depends on gpio-switch kernel driver.
 
+With camera, I mean kernel drivers for /dev/video*. I don't know why
+they depend on gpio-switch.c, but they do.
 
-W dniu 10.10.2016 o 09:18, Huang, Tao pisze:
-> Our IC guy need us tell them which master can not access such area, DMA
-> or EMMC Controller or GPU, etc? Could you tell me how to reproduce such
-> issue?
-> And we can confirm CPU core can access this memory through /dev/mem and
-> the test board is 1GB too. Personally, I don't think RK3066 has such
-> limit because when we verify this chip, we don't found such limit at all.
->
-> Thanks,
-> Huang, Tao
+I'm using fcam-dev for userspace control of camera. I'd prefer not to
+touch anything w/o sources.
 
-I'm getting this on Ubuntu 16.04 with mainline kernel.
-My board always freezes when i type: "memtester 800M"
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161010/1f4c86e0/attachment.sig>
