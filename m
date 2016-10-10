@@ -1,48 +1,70 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Mon, 10 Oct 2016 08:33:50 -0700
-Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
-References: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
-Message-ID: <57FBB4DE.2090502@gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 10 Oct 2016 16:45:06 +0100
+Subject: [PATCH v2 5/8] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <1475879821-8035-6-git-send-email-lina.iyer@linaro.org>
+References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
+ <1475879821-8035-6-git-send-email-lina.iyer@linaro.org>
+Message-ID: <4e55d6ad-8de7-72d7-7512-5e4ff2aabc79@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2016 02:52 AM, Robert Richter wrote:
-> There is a memory setup problem on ThunderX systems with certain
-> memory configurations. The symptom is
->
->   kernel BUG at mm/page_alloc.c:1848!
->
-> This happens for some configs with 64k page size enabled. The bug
-> triggers for page zones with some pages in the zone not assigned to
-> this particular zone. In my case some pages that are marked as nomap
-> were not reassigned to the new zone of node 1, so those are still
-> assigned to node 0.
->
-> The reason for the mis-configuration is a change in pfn_valid() which
-> reports pages marked nomap as invalid:
->
->   68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
->
-> This causes pages marked as nomap being no long reassigned to the new
-> zone in memmap_init_zone() by calling __init_single_pfn().
->
-> Fixing this by restoring the old behavior of pfn_valid() to use
-> memblock_is_memory(). Also changing users of pfn_valid() in arm64 code
-> to use memblock_is_map_memory() where necessary. This only affects
-> code in ioremap.c. The code in mmu.c still can use the new version of
-> pfn_valid().
->
-> Should be marked stable v4.5..
-
-In that case you should add:
-
-Cc: <stable@vger.kernel.org> # 4.5.x-
-
-here.
 
 
+On 07/10/16 23:36, Lina Iyer wrote:
+> Update DT bindings to describe idle states of PM domains.
 >
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-[...]
+> This patch is based on the original patch by Marc Titinger.
+>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../devicetree/bindings/power/power_domain.txt     | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+> index 025b5e7..7f8f27e 100644
+> --- a/Documentation/devicetree/bindings/power/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+> @@ -29,6 +29,10 @@ Optional properties:
+>     specified by this binding. More details about power domain specifier are
+>     available in the next section.
+>
+> +- domain-idle-states : A phandle of an idle-state that shall be soaked into a
+> +                generic domain power state. The idle state definitions are
+> +                compatible with arm,idle-state specified in [1].
+> +
+
+Please do add the following details to the binding. IMO, this binding is
+not complete in terms of specification as there are few open questions:
+
+1. What not define a standard compatible instead of "arm,idle-state" ?
+    I agree it can be used, but as part of this *generic* binding, IMO
+    it's better to have something generic and can be used by devices.
+    Otherwise, this binding becomes CPU specific, that too ARM CPU
+    specific.
+
+2. Now taking CPU as a special device, how does this co-exist with the
+    cpu-idle-states ? Better to have some description may be in the ARM
+    CPU idle binding document(not here of-course)
+
+3. I still haven't seen any explanation for not considering complete
+    hierarchical power domain representation which was raised in earlier
+    versions. I had provided example for the proposal. I just saw them
+    already in use in the upstream kernel by Renasas. e.g.:
+    arch/arm/boot/dts/r8a73a4.dtsi
+
+    How does that fit with your proposal, though you have not made one
+    yet for CPUs in this binding ? In the above file, CPUs have either
+    own power domain inside the L2 one which is cluster level power
+    domain.
+
+One must be able to get answers to these above questions with this
+binding. Until then it's *incomplete* though it may be correct.
+
+-- 
+Regards,
+Sudeep
