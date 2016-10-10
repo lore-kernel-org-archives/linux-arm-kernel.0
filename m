@@ -1,151 +1,66 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 10 Oct 2016 16:13:32 -0600
-Subject: [PATCH v2 5/8] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <ffc0b521-329a-d41f-c952-bb9c4877ea87@arm.com>
-References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
- <1475879821-8035-6-git-send-email-lina.iyer@linaro.org>
- <4e55d6ad-8de7-72d7-7512-5e4ff2aabc79@arm.com>
- <20161010164342.GC44885@linaro.org>
- <ffc0b521-329a-d41f-c952-bb9c4877ea87@arm.com>
-Message-ID: <20161010221332.GD44885@linaro.org>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Tue, 11 Oct 2016 09:57:47 +1100 (AEDT)
+Subject: [PATCH v3 10/12] scsi/ncr5380: Expedite register polling
+In-Reply-To: <20161010091709.GY1041@n2100.armlinux.org.uk>
+References: <cover.1476051961.git.fthain@telegraphics.com.au>
+ <2806ba151f6983923fa0aae700245dfeb4cfaf38.1476051962.git.fthain@telegraphics.com.au>
+ <20161010091709.GY1041@n2100.armlinux.org.uk>
+Message-ID: <alpine.LNX.2.00.1610110924160.8220@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10 2016 at 11:13 -0600, Sudeep Holla wrote:
->
->
->On 10/10/16 17:43, Lina Iyer wrote:
->>On Mon, Oct 10 2016 at 09:45 -0600, Sudeep Holla wrote:
->>>
->>>
->>>On 07/10/16 23:36, Lina Iyer wrote:
->>>>Update DT bindings to describe idle states of PM domains.
->>>>
->>>>This patch is based on the original patch by Marc Titinger.
->>>>
->>>>Cc: <devicetree@vger.kernel.org>
->>>>Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
->>>>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>>>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>>>Acked-by: Rob Herring <robh@kernel.org>
->>>>---
->>>>.../devicetree/bindings/power/power_domain.txt     | 38
->>>>++++++++++++++++++++++
->>>>1 file changed, 38 insertions(+)
->>>>
->>>>diff --git a/Documentation/devicetree/bindings/power/power_domain.txt
->>>>b/Documentation/devicetree/bindings/power/power_domain.txt
->>>>index 025b5e7..7f8f27e 100644
->>>>--- a/Documentation/devicetree/bindings/power/power_domain.txt
->>>>+++ b/Documentation/devicetree/bindings/power/power_domain.txt
->>>>@@ -29,6 +29,10 @@ Optional properties:
->>>>   specified by this binding. More details about power domain
->>>>specifier are
->>>>   available in the next section.
->>>>
->>>>+- domain-idle-states : A phandle of an idle-state that shall be
->>>>soaked into a
->>>>+                generic domain power state. The idle state
->>>>definitions are
->>>>+                compatible with arm,idle-state specified in [1].
->>>>+
->>>
->>>Please do add the following details to the binding. IMO, this binding is
->>>not complete in terms of specification as there are few open questions:
->>>
->>>1. What not define a standard compatible instead of "arm,idle-state" ?
->>>  I agree it can be used, but as part of this *generic* binding, IMO
->>>  it's better to have something generic and can be used by devices.
->>>  Otherwise, this binding becomes CPU specific, that too ARM CPU
->>>  specific.
->>>
->>We had gone down this path of having a separate DT bindings for domains
->>that is not arm,idle-state. See RFC patches. But the binding did closely
->>match this and it so was suggested that we use arm,idle-state which is
->>already defined.
->>
->
->Either we say this binding is ARM CPU specific or generic, I can't
->understand this mix 'n' match really. You have removed all the CPUIdle
->stuff from this series which is good and makes it simpler, but linking
->it to only "arm,idle-state" make be feel it's not generic. OK I will
->have a look at the RFC as why generic compatible was rejected.
->
-I will look for the discussion around it as well. A initial look through
-didn't get me the thread I was looking for.
 
->>>2. Now taking CPU as a special device, how does this co-exist with the
->>>  cpu-idle-states ? Better to have some description may be in the ARM
->>>  CPU idle binding document(not here of-course)
->>>
->>The is a binding for a generic PM domain. This has no bearing on the CPU
->>or its idle states. Its just that the data is compatible with
->>arm,idle-state.
->>
->
->I understand that but it's not that simple which I assume you *do*
->agree. Hence may need bit of an explanation in the binding(not here
->of-course as I mentioned earlier, but in the CPU Idle bindings).
->Please consider DT bindings as any other specification. All I am
->asking is more description in the binding.
->
-Any ideas of what description you would like to see? It seemed fairly
-explanatory in the idle-states.txt, so I didn't go into depth here.
+On Mon, 10 Oct 2016, Russell King - ARM Linux wrote:
 
->>>3. I still haven't seen any explanation for not considering complete
->>>  hierarchical power domain representation which was raised in earlier
->>>  versions. I had provided example for the proposal. I just saw them
->>>  already in use in the upstream kernel by Renasas. e.g.:
->>>  arch/arm/boot/dts/r8a73a4.dtsi
->>>
->>Hierarchical power domains have been available for few years in DT. The
->>OF features of domains have always supported it. Platforms are free to
->>define domains in hierarchy they seem fit for their SoCs. This is a
->>feature that is available today and is not being modified in these
->>patches. It will be creating confusion if I talk about hierarchical
->>domains which are obvious and irrelevant to this series.
->>
->
->Agreed and sorry if I created any confusion. But this binding doesn't
->clearly state how to build up the hierarchy if the leaf node is not a
->power-domain node and I am just trying have those clarifications in the
->binding. It would be good if those details are *explicitly* mentioned in
->the binding, not this particularly, but in CPU Idle one when you
->introduce the user of that.
->
-As we have today, devices have their own way of figuring out their idle
-states, they are not represented in DT (CPU being an exception). 
+> On Mon, Oct 10, 2016 at 12:46:53AM -0400, Finn Thain wrote:
+> > Avoid the call to NCR5380_poll_politely2() when possible. The call is 
+> > easily short-circuited on the PIO fast path, using the inline wrapper. 
+> > This requires that the NCR5380_read macro be made available before any 
+> > #include "NCR5380.h" so a few declarations have to be moved too.
+> > 
+> > Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+> > Reviewed-by: Hannes Reinecke <hare@suse.com>
+> > Tested-by: Ondrej Zary <linux@rainbow-software.org>
+> > Tested-by: Michael Schmitz <schmitzmic@gmail.com>
+> > ---
+> 
+> > diff --git a/drivers/scsi/arm/cumana_1.c b/drivers/scsi/arm/cumana_1.c
+> > index ae1d4c6..fb7600d 100644
+> > --- a/drivers/scsi/arm/cumana_1.c
+> > +++ b/drivers/scsi/arm/cumana_1.c
+> > @@ -29,6 +29,10 @@
+> >  #define NCR5380_implementation_fields	\
+> >  	unsigned ctrl
+> >  
+> > +struct NCR5380_hostdata;
+> > +static u8 cumanascsi_read(struct NCR5380_hostdata *, unsigned int);
+> > +static void cumanascsi_write(struct NCR5380_hostdata *, unsigned int, u8);
+> > +
+> >  #include "../NCR5380.h"
+> >  
+> >  #define CTRL	0x16fc
+> 
+> This seems to be non-obviously unrelated to this commit - should it be 
+> in some other commit?
+> 
 
->>>  How does that fit with your proposal, though you have not made one
->>>  yet for CPUs in this binding ? In the above file, CPUs have either
->>>  own power domain inside the L2 one which is cluster level power
->>>  domain.
->>>
->>Again, this series is not about the CPUs. This is about adding features
->>to genpd that may be used in other contexts including cpuidle in the
->>future.
->>
->
->Yes I understand and hence I was confused as why I don't see an
->*generic* compatible but just *arm,idle-states* in the example.
->
->>>One must be able to get answers to these above questions with this
->>>binding. Until then it's *incomplete* though it may be correct.
->>>
->>I have always tried to answer all your questions. If anything remains
->>unclarified pls. bring it up.
->>
->
->It's not about questions, and definitely you have answered all my
->questions, no argument there at all. Now we need to make those useful
->discussions part of this binding so that it's *self explanatory* and
->one need not refer back these discussions when writing DT for some
->different SoC which differs from this. Again that could be part of
->your CPUIdle series, I just raised it here as it got mixed sense from
->this series. It was hard to be not to associate CPUIdle for reasons
->mentioned above.
->
+The source of the problem here is the #include "../NCR5380.h", because 
+that header file both declares struct NCR5380_hostdata and (with this 
+patch) it also calls cumanascsi_read(). That means cumanascsi_read() has 
+to be declared earlier, and that in turn requires an incomplete definition 
+of struct NCR5380_hostdata. The commit log alludes to the problem but 
+could be made more explicit if you would like (?).
 
-Thanks,
-Lina
+BTW, this problem doesn't arise in the other six 5380 drivers because each 
+one implements NCR5380_read() as a macro. It would be nice to get rid of 
+the macros in favour of an ops struct (in the course of converting the 
+driver to a library module) but I doubt that this is feasible now that 
+I've seen the performance benefit of this patch series.
+
+In the absence of link time optimization, the library module design would 
+prevent the inlining of functions like cumanascsi_read(). Since every byte 
+transfered by the 5380 in a PIO transfer requires at least 5 chip register 
+accesses, function calls would be prohibitively expensive. So I think we 
+are stuck with inline accessors or macros.
+
+-- 
