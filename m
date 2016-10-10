@@ -1,157 +1,58 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 10 Oct 2016 15:26:35 +0100
-Subject: [PATCH v13 03/15] iommu/dma: Allow MSI-only cookies
-In-Reply-To: <20161006141717.13c9c111@t450s.home>
-References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
- <1475743531-4780-4-git-send-email-eric.auger@redhat.com>
- <20161006141717.13c9c111@t450s.home>
-Message-ID: <6b944a74-7429-caf2-507d-30d6ae336bec@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Oct 2016 16:28:28 +0200
+Subject: [PATCH 0/4] soc: renesas: Identify SoC and register with the SoC
+ bus
+In-Reply-To: <1475572167-29581-1-git-send-email-geert+renesas@glider.be>
+References: <1475572167-29581-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <6327808.hNezbnImkk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex, Eric,
-
-On 06/10/16 21:17, Alex Williamson wrote:
-> On Thu,  6 Oct 2016 08:45:19 +0000
-> Eric Auger <eric.auger@redhat.com> wrote:
+On Tuesday, October 4, 2016 11:09:23 AM CEST Geert Uytterhoeven wrote:
+> 	Hi all,
 > 
->> From: Robin Murphy <robin.murphy@arm.com>
->>
->> IOMMU domain users such as VFIO face a similar problem to DMA API ops
->> with regard to mapping MSI messages in systems where the MSI write is
->> subject to IOMMU translation. With the relevant infrastructure now in
->> place for managed DMA domains, it's actually really simple for other
->> users to piggyback off that and reap the benefits without giving up
->> their own IOVA management, and without having to reinvent their own
->> wheel in the MSI layer.
->>
->> Allow such users to opt into automatic MSI remapping by dedicating a
->> region of their IOVA space to a managed cookie.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> v1 -> v2:
->> - compared to Robin's version
->> - add NULL last param to iommu_dma_init_domain
->> - set the msi_geometry aperture
->> - I removed
->>   if (base < U64_MAX - size)
->>      reserve_iova(iovad, iova_pfn(iovad, base + size), ULONG_MAX);
->>   don't get why we would reserve something out of the scope of the iova domain?
->>   what do I miss?
->> ---
->>  drivers/iommu/dma-iommu.c | 40 ++++++++++++++++++++++++++++++++++++++++
->>  include/linux/dma-iommu.h |  9 +++++++++
->>  2 files changed, 49 insertions(+)
->>
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index c5ab866..11da1a0 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -716,3 +716,43 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
->>  		msg->address_lo += lower_32_bits(msi_page->iova);
->>  	}
->>  }
->> +
->> +/**
->> + * iommu_get_dma_msi_region_cookie - Configure a domain for MSI remapping only
+> Some Renesas SoCs may exist in different revisions, providing slightly
+> different functionalities (e.g. R-Car H3 ES1.x and ES2.0). This needs to
+> be catered for by drivers and/or platform code.  The recently proposed
+> soc_device_match() API seems like a good fit to handle this.
 > 
-> Should this perhaps be iommu_setup_dma_msi_region_cookie, or something
-> along those lines.  I'm not sure what we're get'ing.  Thanks,
-
-What we're getting is private third-party resources for the iommu_domain
-given in the argument. It's a get/put rather than alloc/free model since
-we operate opaquely on the domain as a container, rather than on the
-actual resource in question (an IOVA allocator).
-
-Since this particular use case is slightly different from the normal
-flow and has special initialisation requirements, it seemed a lot
-cleaner to simply combine that initialisation operation with the
-prerequisite "get" into a single call. Especially as it helps emphasise
-that this is not 'normal' DMA cookie usage.
-
+> This patch series implements the core infrastructure to provide SoC and
+> revision information through the SoC bus for Renesas ARM SoCs. It
+> consists of 4 patches:
+>   - Patch 1 avoids a crash when SoC revision information is needed and
+>     provided early,
+>   - Patch 2 (from Arnd) introduces the soc_device_match() API.
+>     I don't know if, when, and through which channel this patch is
+>     planned to go upstream,
+>   - Patch 3 fixes a bug in soc_device_match(), causing a crash when
+>     trying to match on an SoC attribute that is not provided (seen on
+>     EMEV2, RZ/A, and R-Car M1A, which lack revision information),
+>   - Patch 4 identifies Renesas SoCs and registers them with the SoC bus.
 > 
-> Alex
+> Tested on (family, machine, soc_id, optional revision):
 > 
->> + * @domain: IOMMU domain to prepare
->> + * @base: Base address of IOVA region to use as the MSI remapping aperture
->> + * @size: Size of the desired MSI aperture
->> + *
->> + * Users who manage their own IOVA allocation and do not want DMA API support,
->> + * but would still like to take advantage of automatic MSI remapping, can use
->> + * this to initialise their own domain appropriately.
->> + */
->> +int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
->> +		dma_addr_t base, u64 size)
->> +{
->> +	struct iommu_dma_cookie *cookie;
->> +	struct iova_domain *iovad;
->> +	int ret;
->> +
->> +	if (domain->type == IOMMU_DOMAIN_DMA)
->> +		return -EINVAL;
->> +
->> +	ret = iommu_get_dma_cookie(domain);
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = iommu_dma_init_domain(domain, base, size, NULL);
->> +	if (ret) {
->> +		iommu_put_dma_cookie(domain);
->> +		return ret;
->> +	}
+>     Emma Mobile EV2, EMEV2 KZM9D Board, emev2
+>     RZ/A, Genmai, r7s72100
+>     R-Mobile, APE6EVM, r8a73a4, ES1.0
+>     R-Mobile, armadillo 800 eva, r8a7740, ES2.0
+>     R-Car Gen1, bockw, r8a7778
+>     R-Car Gen1, marzen, r8a7779, ES1.0
+>     R-Car Gen2, Lager, r8a7790, ES1.0
+>     R-Car Gen2, Koelsch, r8a7791, ES1.0
+>     R-Car Gen2, Gose, r8a7793, ES1.0
+>     R-Car Gen2, Alt, r8a7794, ES1.0
+>     R-Car Gen3, Renesas Salvator-X board based on r8a7795, r8a7795, ES1.0
+>     R-Car Gen3, Renesas Salvator-X board based on r8a7796, r8a7796, ES1.0
+>     SH-Mobile, KZM-A9-GT, sh73a0, ES2.0
 
-It *is* necessary to explicitly reserve the upper part of the IOVA
-domain here - the aforementioned "special initialisation" - because
-dma_32bit_pfn is only an optimisation hint to prevent the allocator
-walking down from the very top of the the tree every time when devices
-with different DMA masks share a domain (I'm in two minds as to whether
-to tweak the way the iommu-dma code uses it in this respect, now that I
-fully understand things). The only actual upper limit to allocation is
-the DMA mask passed into each alloc_iova() call, so if we want to ensure
-IOVAs are really allocated within this specific region, we have to carve
-out everything above it.
+As mentioned in the comment for the driver patch, I think this makes
+a lot of sense for the machines that have a revision register, in
+particular when the interpretation of that register is always done
+the same way, but I'm a bit skeptical about doing it in the same driver
+for machines that don't have the register.
 
-Robin.
+Matching by a device rather than the SoC platform also has the advantage
+that there is no need to maintain a list of compatible numbers in the
+driver.
 
->> +
->> +	domain->msi_geometry.aperture_start = base;
->> +	domain->msi_geometry.aperture_end = base + size - 1;
->> +
->> +	cookie = domain->iova_cookie;
->> +	iovad = &cookie->iovad;
->> +
->> +	return 0;
->> +}
->> +EXPORT_SYMBOL(iommu_get_dma_msi_region_cookie);
->> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
->> index 32c5890..1c55413 100644
->> --- a/include/linux/dma-iommu.h
->> +++ b/include/linux/dma-iommu.h
->> @@ -67,6 +67,9 @@ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
->>  /* The DMA API isn't _quite_ the whole story, though... */
->>  void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
->>  
->> +int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
->> +		dma_addr_t base, u64 size);
->> +
->>  #else
->>  
->>  struct iommu_domain;
->> @@ -90,6 +93,12 @@ static inline void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
->>  {
->>  }
->>  
->> +static inline int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
->> +		dma_addr_t base, u64 size)
->> +{
->> +	return -ENODEV;
->> +}
->> +
->>  #endif	/* CONFIG_IOMMU_DMA */
->>  #endif	/* __KERNEL__ */
->>  #endif	/* __DMA_IOMMU_H */
-> 
+	Arnd
