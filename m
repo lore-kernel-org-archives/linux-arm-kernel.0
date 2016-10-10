@@ -1,20 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Oct 2016 07:59:02 -0500
-Subject: [PATCH 6/6] dt-bindings: clk: oxnas,stdclk: Add OX820 bindings
-In-Reply-To: <20161005150752.22618-7-narmstrong@baylibre.com>
-References: <20161005150752.22618-1-narmstrong@baylibre.com>
- <20161005150752.22618-7-narmstrong@baylibre.com>
-Message-ID: <20161010125902.GA30591@rob-hp-laptop>
+Date: Mon, 10 Oct 2016 07:59:46 -0500
+Subject: [RESEND PATCH v2 3/3] dt-bindings: reset: oxnas: Update for OX820
+In-Reply-To: <20161005152710.2898-4-narmstrong@baylibre.com>
+References: <20161005152710.2898-1-narmstrong@baylibre.com>
+ <20161005152710.2898-4-narmstrong@baylibre.com>
+Message-ID: <20161010125946.GA31343@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 05, 2016 at 05:07:52PM +0200, Neil Armstrong wrote:
-> Add OX820 bindings and remove clock indices from bindings since they are present
-> in the dt-bindings headers files.
+On Wed, Oct 05, 2016 at 05:27:10PM +0200, Neil Armstrong wrote:
+> Add new compatible string for reset and sys-ctrl for the Oxford
+> Semiconductor OX820 Support.
+> Drop the OX810SE indices since they moved in a dedicated include file.
 > 
 > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
->  .../devicetree/bindings/clock/oxnas,stdclk.txt        | 19 ++++++-------------
->  1 file changed, 6 insertions(+), 13 deletions(-)
+>  .../devicetree/bindings/reset/oxnas,reset.txt      | 44 +++++-----------------
+>  1 file changed, 9 insertions(+), 35 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
