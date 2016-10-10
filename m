@@ -1,398 +1,250 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 10 Oct 2016 13:21:35 +0200
-Subject: [PATCH v2 1/5] clk: add support for runtime pm
-In-Reply-To: <CAPDyKFqtGTJ38K5xm+-xVZcjAmLuo21613GHwUkQKKJXvYtsLQ@mail.gmail.com>
-References: <CGME20160919105548eucas1p24b28143fab25eb47f5629d31f817b0bc@eucas1p2.samsung.com>
- <1474282525-30441-1-git-send-email-m.szyprowski@samsung.com>
- <1474282525-30441-2-git-send-email-m.szyprowski@samsung.com>
- <CAPDyKFqtGTJ38K5xm+-xVZcjAmLuo21613GHwUkQKKJXvYtsLQ@mail.gmail.com>
-Message-ID: <86cd1c31-6265-7493-fe6d-9a64fc34cd65@samsung.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 10 Oct 2016 19:25:52 +0800
+Subject: [PATCH v1 1/2] ARM: dts: add rockchip PX3 Evaluation board
+In-Reply-To: <738050204.FfkOZgkGGl@phil>
+References: <1473529249-6151-1-git-send-email-andy.yan@rock-chips.com>
+ <1473529440-6202-1-git-send-email-andy.yan@rock-chips.com>
+ <64f4be31-1b19-60e3-da7c-f2fec186fab9@suse.de> <738050204.FfkOZgkGGl@phil>
+Message-ID: <0a74b063-a94f-00d9-d1f7-a417c03c06a9@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi Heiko:
 
-Thanks for your comments!
 
-On 2016-10-07 12:07, Ulf Hansson wrote:
-> On 19 September 2016 at 12:55, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> Registers for some clocks might be located in the SOC area, which are under the
->> power domain. To enable access to those registers respective domain has to be
->> turned on. Additionally, registers for such clocks will usually loose its
->> contents when power domain is turned off, so additional saving and restoring of
->> them might be needed in the clock controller driver.
->>
->> This patch adds basic infrastructure in the clocks core to allow implementing
->> driver for such clocks under power domains. Clock provider can supply a
->> struct device pointer, which is the used by clock core for tracking and managing
->> clock's controller runtime pm state. Each clk_prepare() operation
->> will first call pm_runtime_get_sync() on the supplied device, while
->> clk_unprepare() will do pm_runtime_put() at the end.
->>
->> Additional calls to pm_runtime_get/put functions are required to ensure that any
->> register access (like calculating/changing clock rates and unpreparing/disabling
->> unused clocks on boot) will be done with clock controller in runtime resumend
->> state.
->>
->> When one wants to register clock controller, which make use of this feature, he
->> has to:
->> 1. Provide a struct device to the core when registering the provider and set
->>     CLK_RUNTIME_PM flags for its clocks.
->> 2. It needs to enable runtime PM for that device.
->> 3. It needs to make sure the runtime PM status of the controller device reflects
->>     the HW state.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   drivers/clk/clk.c            | 107 +++++++++++++++++++++++++++++++++++++++----
->>   include/linux/clk-provider.h |   1 +
->>   2 files changed, 98 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index 820a939fb6bb..096a199b8e46 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -21,6 +21,7 @@
->>   #include <linux/of.h>
->>   #include <linux/device.h>
->>   #include <linux/init.h>
->> +#include <linux/pm_runtime.h>
->>   #include <linux/sched.h>
->>   #include <linux/clkdev.h>
->>
->> @@ -46,6 +47,7 @@ struct clk_core {
->>          const struct clk_ops    *ops;
->>          struct clk_hw           *hw;
->>          struct module           *owner;
->> +       struct device           *dev;
->>          struct clk_core         *parent;
->>          const char              **parent_names;
->>          struct clk_core         **parents;
->> @@ -87,6 +89,26 @@ struct clk {
->>          struct hlist_node clks_node;
->>   };
->>
->> +/***           runtime pm          ***/
->> +static int clk_pm_runtime_get(struct clk_core *core)
->> +{
->> +       int ret = 0;
->> +
->> +       if (!core->dev)
->> +               return 0;
->> +
->> +       ret = pm_runtime_get_sync(core->dev);
->> +       return ret < 0 ? ret : 0;
->> +}
->> +
->> +static void clk_pm_runtime_put(struct clk_core *core)
->> +{
->> +       if (!core->dev)
->> +               return;
->> +
->> +       pm_runtime_put(core->dev);
->> +}
->> +
->>   /***           locking             ***/
->>   static void clk_prepare_lock(void)
->>   {
->> @@ -150,6 +172,8 @@ static void clk_enable_unlock(unsigned long flags)
->>
->>   static bool clk_core_is_prepared(struct clk_core *core)
->>   {
->> +       bool status;
->> +
->>          /*
->>           * .is_prepared is optional for clocks that can prepare
->>           * fall back to software usage counter if it is missing
->> @@ -157,11 +181,17 @@ static bool clk_core_is_prepared(struct clk_core *core)
->>          if (!core->ops->is_prepared)
->>                  return core->prepare_count;
->>
->> -       return core->ops->is_prepared(core->hw);
->> +       clk_pm_runtime_get(core);
-> I guess you should assign status to the return code, and check it.
-
-Okay. I assume that in case of any failure from runtime pm, the function
-should return false?
-
+On 2016?10?10? 17:54, Heiko Stuebner wrote:
+> Hi Andreas, Andy,
 >
->> +       status = core->ops->is_prepared(core->hw);
->> +       clk_pm_runtime_put(core);
->> +
->> +       return status;
->>   }
+> Am Dienstag, 13. September 2016, 14:14:01 CEST schrieb Andreas F?rber:
+>> Hi Andy,
 >>
->>   static bool clk_core_is_enabled(struct clk_core *core)
->>   {
->> +       bool status;
->> +
->>          /*
->>           * .is_enabled is only mandatory for clocks that gate
->>           * fall back to software usage counter if .is_enabled is missing
->> @@ -169,7 +199,29 @@ static bool clk_core_is_enabled(struct clk_core *core)
->>          if (!core->ops->is_enabled)
->>                  return core->enable_count;
+>> This patch didn't make it to linux-rockchip list somehow...
+>> Not sure why I'm CC'ed, I don't have access to such a board to check, so
+>> just a couple formal nitpicks:
 >>
->> -       return core->ops->is_enabled(core->hw);
->> +       /*
->> +        * Check if runtime pm is enabled before calling .is_enabled callback,
->> +        * if not assume that clock is disabled, because we might be called
->> +        * from atomic context, from which pm_runtime_get() is not allowed.
->> +        * This function is called mainly from clk_disable_unused_subtree,
->> +        * which ensures proper runtime pm activation of controller before
->> +        * taking enable spinlock, but the below check is needed if one tries
->> +        * to call it from other place.
->> +        */
->> +       if (core->dev) {
->> +               pm_runtime_get_noresume(core->dev);
->> +               if (pm_runtime_suspended(core->dev)) {
-> I think it's wrong to use pm_runtime_suspended().
+>> Am 10.09.2016 um 19:44 schrieb Andy Yan:
+>>> PX3 EVB is designed by Rockchip for automotive field,
+>>> which intergrated with CVBS(TP2825)/MIPI DSI/LVDS/HDMI
+>> "integrated"
+>> but the grammar is somewhat incorrect with "which" referring to field -
+>> I assume you meant "with integrated CVBS..."?
+>>
+>>> video input/output interface, WIFI/BT/GPS(on a module
+>> Also please always leave a space before an opening parenthesis in
+>> English text. Similarly above, spaces around "/" would help recognize
+>> that MIPI DSI belongs together rather than being two lists.
+>>
+>> If nothing else applies below then maybe Heiko can edit it for you?
+> I've fixed the remarks in the commit description.
 >
-> What you should be checking, is whether the device is RPM_ACTIVE or if
-> runtime PM isn't enabled for device.
 >
-> In other words, you should use pm_runtime_active() to find out whether
-> it's okay to invoke the ->is_enabled() ops or not.
+>>> named S500 which based on MT6620), Gsensor BMA250E and
+>>> light&proximity sensor STK3410.
+>>>
+>>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+>>>
+>>> ---
+>>>
+>>> Changes in v1:
+>>> - board rename
+>>> - add vendor prefix for i2c interfaced sensors
+>>> - use stdout-path to set the default console
+>>>
+>>>   Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+>>>   arch/arm/boot/dts/Makefile                         |   1 +
+>>>   arch/arm/boot/dts/rk3188-px3-evb.dts               | 337
+>>>   +++++++++++++++++++++ 3 files changed, 342 insertions(+)
+>>>   create mode 100644 arch/arm/boot/dts/rk3188-px3-evb.dts
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
+>>> b/Documentation/devicetree/bindings/arm/rockchip.txt index
+>>> 6668645..6da3881 100644
+>>> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+>>> @@ -21,6 +21,10 @@ Rockchip platforms device tree bindings
+>>>
+>>>       Required root node properties:
+>>>         - compatible = "radxa,rock", "rockchip,rk3188";
+>>>
+>>> +- Rockchip PX3 Evaluation board:
+>>> +    Required root node properties:
+>>> +      - compatible = "rockchip,px3-evb", "rockchip,px3",
+>>> "rockchip,rk3188";
+>> How compatible is PX3 with RK3188? It is a separate SoC product:
+>>
+>> http://www.rock-chips.com/a/en/products/rkpower/2015/1125/730.html
+>>
+>> Wondering whether or not to drop the third compatible string.
+> As discussed in IRC (and with arm-soc maintainers), I intend to keep the
+> rk3188 part, as the chip really is just a (hardened?) variant of the consumer
+> rk3188, but shares the same internals with the original.
 >
-> Accordingly, I think the upper comment you added then needs to be a
-> rephrased a bit to reflect this.
-
-Okay, I will change it to use pm_runtime_active(). It looks that mentally
-I still assume that runtime pm will be disabled in system sleep transitions
-phase, so the only check that provided some useful information about
-previous runtime pm state was pm_runtime_suspended().
-
+>>> +
+>>>
+>>>   - Radxa Rock2 Square board:
+>>>       Required root node properties:
+>>>         - compatible = "radxa,rock2-square", "rockchip,rk3288";
+>>>
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index faacd52..88d27a2 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -620,6 +620,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+>>>
+>>>   	rk3066a-marsboard.dtb \
+>>>   	rk3066a-rayeager.dtb \
+>>>   	rk3188-radxarock.dtb \
+>>>
+>>> +	rk3188-px3-evb.dtb \
+>> Affects file naming as well: px3-evb.dtb?
+> see above
 >
->> +                       status = false;
->> +                       goto done;
->> +               }
->> +       }
->> +
->> +       status = core->ops->is_enabled(core->hw);
->> +done:
->> +       if (core->dev)
->> +               pm_runtime_put(core->dev);
->> +
->> +       return status;
->>   }
->>
->>   /***    helper functions   ***/
->> @@ -489,6 +541,8 @@ static void clk_core_unprepare(struct clk_core *core)
->>          if (core->ops->unprepare)
->>                  core->ops->unprepare(core->hw);
->>
->> +       clk_pm_runtime_put(core);
->> +
->>          trace_clk_unprepare_complete(core);
->>          clk_core_unprepare(core->parent);
->>   }
->> @@ -530,10 +584,14 @@ static int clk_core_prepare(struct clk_core *core)
->>                  return 0;
->>
->>          if (core->prepare_count == 0) {
->> -               ret = clk_core_prepare(core->parent);
->> +               ret = clk_pm_runtime_get(core);
->>                  if (ret)
->>                          return ret;
->>
->> +               ret = clk_core_prepare(core->parent);
->> +               if (ret)
->> +                       goto runtime_put;
->> +
->>                  trace_clk_prepare(core);
->>
->>                  if (core->ops->prepare)
->> @@ -541,15 +599,18 @@ static int clk_core_prepare(struct clk_core *core)
->>
->>                  trace_clk_prepare_complete(core);
->>
->> -               if (ret) {
->> -                       clk_core_unprepare(core->parent);
->> -                       return ret;
->> -               }
->> +               if (ret)
->> +                       goto unprepare;
->>          }
->>
->>          core->prepare_count++;
->>
->>          return 0;
->> +unprepare:
->> +       clk_core_unprepare(core->parent);
->> +runtime_put:
->> +       clk_pm_runtime_put(core);
->> +       return ret;
->>   }
->>
->>   static int clk_core_prepare_lock(struct clk_core *core)
->> @@ -745,6 +806,9 @@ static void clk_unprepare_unused_subtree(struct clk_core *core)
->>          if (core->flags & CLK_IGNORE_UNUSED)
->>                  return;
->>
->> +       if (clk_pm_runtime_get(core) != 0)
-> You may simplify this:
-> if (clk_pm_runtime_get(core))
+>>>   	rk3228-evb.dtb \
+>>>   	rk3229-evb.dtb \
+>>>   	rk3288-evb-act8846.dtb \
+>>>
+>>> diff --git a/arch/arm/boot/dts/rk3188-px3-evb.dts
+>>> b/arch/arm/boot/dts/rk3188-px3-evb.dts new file mode 100644
+>>> index 0000000..f6bc738
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/rk3188-px3-evb.dts
+>>> @@ -0,0 +1,337 @@
+>>> +/*
+>>> + * Copyright (c) 2016 Andy Yan <andy.yan@rock-chips.com>
+>>> + *
+>>> + * This file is dual-licensed: you can use it either under the terms
+>>> + * of the GPL or the X11 license, at your option. Note that this dual
+>>> + * licensing only applies to this file, and not this project as a
+>>> + * whole.
+>>> + *
+>>> + *  a) This file is free software; you can redistribute it and/or
+>>> + *     modify it under the terms of the GNU General Public License as
+>>> + *     published by the Free Software Foundation; either version 2 of the
+>>> + *     License, or (at your option) any later version.
+>>> + *
+>>> + *     This file is distributed in the hope that it will be useful,
+>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + *     GNU General Public License for more details.
+>>> + *
+>>> + * Or, alternatively,
+>>> + *
+>>> + *  b) Permission is hereby granted, free of charge, to any person
+>>> + *     obtaining a copy of this software and associated documentation
+>>> + *     files (the "Software"), to deal in the Software without
+>>> + *     restriction, including without limitation the rights to use,
+>>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>>> + *     sell copies of the Software, and to permit persons to whom the
+>>> + *     Software is furnished to do so, subject to the following
+>>> + *     conditions:
+>>> + *
+>>> + *     The above copyright notice and this permission notice shall be
+>>> + *     included in all copies or substantial portions of the Software.
+>>> + *
+>>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>>> + */
+>>> +
+>>> +/dts-v1/;
+>>> +#include <dt-bindings/input/input.h>
+>>> +#include "rk3188.dtsi"
+>> I'm surprised there is no [rk3188-]px3.dtsi here! Surely some automotive
+>> vendor may design their own board with it and should have at least the
+>> two trailing compatible strings pre-set.
+> see above. I don't think there is a need to pollute the directory with
+> (nearly) empty dtsi files, especially as the compatible will get overwritten by
+> a board compatible anyway.
 >
->> +               return;
->> +
->>          if (clk_core_is_prepared(core)) {
->>                  trace_clk_unprepare(core);
->>                  if (core->ops->unprepare_unused)
->> @@ -753,6 +817,8 @@ static void clk_unprepare_unused_subtree(struct clk_core *core)
->>                          core->ops->unprepare(core->hw);
->>                  trace_clk_unprepare_complete(core);
->>          }
->> +
->> +       clk_pm_runtime_put(core);
->>   }
+>>> +
+>>> +/ {
+>>> +	model = "Rockchip PX3-EVB";
+>>> +	compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
+>>> +
+>>> +	chosen {
+>>> +		stdout-path = "serial2:115200n8";
+>>> +	};
+>>> +
+>>> +	memory {
+>>> +		device_type = "memory";
+>>> +		reg = <0x60000000 0x80000000>;
+>>> +	};
+>>> +
+>>> +	gpio-keys {
+>>> +		compatible = "gpio-keys";
+>>> +		autorepeat;
+>>> +
+>>> +		power {
+>>> +			gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
+>>> +			linux,code = <KEY_POWER>;
+>>> +			label = "GPIO Key Power";
+>>> +			linux,input-type = <1>;
+>>> +			wakeup-source;
+>>> +			debounce-interval = <100>;
+>>> +		};
+>>> +	};
+>>> +
+>>> +	vcc_sys: vsys-regulator {
+>>> +		compatible = "regulator-fixed";
+>>> +		regulator-name = "vsys";
+>>> +		regulator-min-microvolt = <5000000>;
+>>> +		regulator-max-microvolt = <5000000>;
+>>> +		regulator-boot-on;
+>>> +	};
+>>> +};
+>>> +
+>>> +&cpu0 {
+>>> +	cpu0-supply = <&vdd_cpu>;
+>>> +};
+>>> +
+>>> +&i2c0 {
+>>> +	status = "okay";
+>>> +
+>>> +	 /* Accelerometer */
+>> Space after tab intentional?
 >>
->>   static void clk_disable_unused_subtree(struct clk_core *core)
->> @@ -768,6 +834,9 @@ static void clk_disable_unused_subtree(struct clk_core *core)
->>          if (core->flags & CLK_OPS_PARENT_ENABLE)
->>                  clk_core_prepare_enable(core->parent);
->>
->> +       if (clk_pm_runtime_get(core) != 0)
-> Is there any reason to why you haven't moved this further down in this
-> function, like just before calling clk_core_is_enabled()?
-
-Yes, clk_enable_lock() takes a spinlock, so I cannot call pm_runtime_get 
-after it.
-
+>>> +	bma250 at 18 {
+>>> +		compatible = "bosch,bma250";
+>>> +		reg = <0x18>;
+>>> +		interrupt-parent = <&gpio0>;
+>>> +		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
+>>> +	};
+>>> +
+>>> +	stk3410 at 48 {
+>>> +		compatible = "sensortek,STK3310";
+>>> +		reg = <0x48>;
+>>> +		interrupt-parent = <&gpio1>;
+>>> +		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
+>>> +	};
+>> Generally it is undesired to repeat the compatible name as node name -
+>> did you compare other .dts files? (e.g., accelerometer at 18 would be
+>> self-documenting) If this is a copy from an existing .dts then please
+>> ignore this comment.
+> due to the compatible ambiguity, I had dropped the stk3410 node anyway.
+> I've also checked how the bma250 gets specified and there are both variants in
+> use (accelerometer@ and bmc250@). So to set a good example for the future,
+> I've changed the node name to accelerometer at 18 and dropped the now self
+> explanatory comment obove it.
 >
-> You may also simplify this:
-> if (clk_pm_runtime_get(core))
 >
->> +               return;
->> +
-> You need to restore the call made to clk_core_prepare_enable()
-> earlier, so please update the error handling to cope with this.
+>>> +};
+>>> +
+>>> +&i2c1 {
+>>> +	status = "okay";
+>>> +	clock-frequency = <400000>;
+>> Insert white line?
+> done
 >
->>          flags = clk_enable_lock();
->>
->>          if (core->enable_count)
->> @@ -794,6 +863,8 @@ unlock_out:
->>          clk_enable_unlock(flags);
->>          if (core->flags & CLK_OPS_PARENT_ENABLE)
->>                  clk_core_disable_unprepare(core->parent);
->> +
->> +       clk_pm_runtime_put(core);
->>   }
->>
->>   static bool clk_ignore_unused;
->> @@ -1563,6 +1634,7 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
->>   {
->>          struct clk_core *top, *fail_clk;
->>          unsigned long rate = req_rate;
->> +       int ret = 0;
->>
->>          if (!core)
->>                  return 0;
->> @@ -1579,21 +1651,28 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
->>          if (!top)
->>                  return -EINVAL;
->>
->> +       ret = clk_pm_runtime_get(core);
->> +       if (ret)
->> +               return ret;
->> +
->>          /* notify that we are about to change rates */
->>          fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
->>          if (fail_clk) {
->>                  pr_debug("%s: failed to set %s rate\n", __func__,
->>                                  fail_clk->name);
->>                  clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
->> -               return -EBUSY;
->> +               ret = -EBUSY;
->> +               goto err;
->>          }
->>
->>          /* change the rates */
->>          clk_change_rate(top);
->>
->>          core->req_rate = req_rate;
->> +err:
->> +       clk_pm_runtime_put(core);
->>
->> -       return 0;
->> +       return ret;
->>   }
->>
->>   /**
->> @@ -1824,12 +1903,16 @@ static int clk_core_set_parent(struct clk_core *core, struct clk_core *parent)
->>                  p_rate = parent->rate;
->>          }
->>
->> +       ret = clk_pm_runtime_get(core);
->> +       if (ret)
->> +               goto out;
->> +
->>          /* propagate PRE_RATE_CHANGE notifications */
->>          ret = __clk_speculate_rates(core, p_rate);
->>
->>          /* abort if a driver objects */
->>          if (ret & NOTIFY_STOP_MASK)
->> -               goto out;
->> +               goto runtime_put;
->>
->>          /* do the re-parent */
->>          ret = __clk_set_parent(core, parent, p_index);
->> @@ -1842,6 +1925,8 @@ static int clk_core_set_parent(struct clk_core *core, struct clk_core *parent)
->>                  __clk_recalc_accuracies(core);
->>          }
->>
->> +runtime_put:
->> +       clk_pm_runtime_put(core);
->>   out:
->>          clk_prepare_unlock();
->>
->> @@ -2546,6 +2631,8 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
->>                  goto fail_name;
->>          }
->>          core->ops = hw->init->ops;
->> +       if (dev && (hw->init->flags & CLK_RUNTIME_PM))
->> +               core->dev = dev;
-> I guess you need this to play safe, although I am really wondering if
-> we should try without.
 >
-> Not that many clocks are currently being registered with a valid
-> struct device pointer. For the other cases why not try to use runtime
-> PM as per default?
-
-I've that tried initially, but it causes failure for all the clock
-controllers, which don't enable runtime pm. One of such case is max77686
-PMIC, which provides 3 clocks. Maybe a negative flag (CLK_NO_RUNTIME_PM)
-will be a better solution, so by default the runtime pm calls will be
-enabled for every driver providing struct device?
-
-> Moreover we anyway rely on the clock provider to enable runtime PM for
-> the clock device, and when that isn't the case the runtime PM
-> deployment in the core should still be safe, right!?
-
-I don't get the above comment. Do you want to check if runtime pm has
-been enabled during clock registration?
-
->>         if (dev && dev->driver)
->>                  core->owner = dev->driver->owner;
->>          core->hw = hw;
->> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->> index a39c0c530778..8a131eb71fdf 100644
->> --- a/include/linux/clk-provider.h
->> +++ b/include/linux/clk-provider.h
->> @@ -35,6 +35,7 @@
->>   #define CLK_IS_CRITICAL                BIT(11) /* do not gate, ever */
->>   /* parents need enable during gate/ungate, set rate and re-parent */
->>   #define CLK_OPS_PARENT_ENABLE  BIT(12)
->> +#define CLK_RUNTIME_PM         BIT(13)
->>
->>   struct clk;
->>   struct clk_hw;
->> --
->> 1.9.1
->>
+> Heiko
+>
 >
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+
+
+  I have no problem with these above, Thanks for all you have done.
