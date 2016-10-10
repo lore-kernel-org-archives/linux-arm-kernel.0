@@ -1,53 +1,165 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 10 Oct 2016 09:39:45 +0100
-Subject: [PATCH] efi/arm: fix absolute relocation detection for older
- toolchains
-In-Reply-To: <CAKv+Gu-QJt4-c2Egnog0TdjJ0hLdg8g4Q303T2R9u_F3RXcwOA@mail.gmail.com>
-References: <1475276515-21801-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161003205233.GO16071@codeblueprint.co.uk>
- <CAKv+Gu94ZEuGyrcGTKMvTPKpvaR+R3AAXNY=diX28RDhc=Cv7Q@mail.gmail.com>
- <20161004213045.GT16071@codeblueprint.co.uk>
- <CAKv+Gu-QJt4-c2Egnog0TdjJ0hLdg8g4Q303T2R9u_F3RXcwOA@mail.gmail.com>
-Message-ID: <21cba02d-b239-78e8-a42b-04d030d3ca3d@nvidia.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 10 Oct 2016 10:40:33 +0200
+Subject: [PATCH v2 1/8] PM / Domains: Make genpd state allocation dynamic
+In-Reply-To: <1475879821-8035-2-git-send-email-lina.iyer@linaro.org>
+References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
+ <1475879821-8035-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFo1wFdNo3hR9WUZJ=sonKi4_sWb1PUFvPvyHeavbvqLvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 8 October 2016 at 00:36, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Allow PM Domain states to be defined dynamically by the drivers. This
+> removes the limitation on the maximum number of states possible for a
+> domain.
+>
+> Cc: Axel Haslam <ahaslam+renesas@baylibre.com>
+> Suggested-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  arch/arm/mach-imx/gpc.c     | 17 ++++++++++-------
+>  drivers/base/power/domain.c | 36 ++++++++++++++++++++++++------------
+>  include/linux/pm_domain.h   |  5 ++---
+>  3 files changed, 36 insertions(+), 22 deletions(-)
+>
+> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+> index 0df062d..57a410b 100644
+> --- a/arch/arm/mach-imx/gpc.c
+> +++ b/arch/arm/mach-imx/gpc.c
+> @@ -380,13 +380,6 @@ static struct pu_domain imx6q_pu_domain = {
+>                 .name = "PU",
+>                 .power_off = imx6q_pm_pu_power_off,
+>                 .power_on = imx6q_pm_pu_power_on,
+> -               .states = {
+> -                       [0] = {
+> -                               .power_off_latency_ns = 25000,
+> -                               .power_on_latency_ns = 2000000,
+> -                       },
+> -               },
+> -               .state_count = 1,
+>         },
+>  };
+>
+> @@ -430,6 +423,16 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
+>         if (!IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
+>                 return 0;
+>
+> +       imx6q_pu_domain.base.states = devm_kzalloc(dev,
+> +                                       sizeof(*imx6q_pu_domain.base.states),
+> +                                       GFP_KERNEL);
+> +       if (!imx6q_pu_domain.base.states)
+> +               return -ENOMEM;
+> +
+> +       imx6q_pu_domain.base.states[0].power_off_latency_ns = 25000;
+> +       imx6q_pu_domain.base.states[0].power_on_latency_ns = 2000000;
+> +       imx6q_pu_domain.base.state_count = 1;
+> +
+>         pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
+>         return of_genpd_add_provider_onecell(dev->of_node,
+>                                              &imx_gpc_onecell_data);
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index e023066..4e87170 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1282,6 +1282,21 @@ out:
+>  }
+>  EXPORT_SYMBOL_GPL(pm_genpd_remove_subdomain);
+>
+> +static int genpd_set_default_power_state(struct generic_pm_domain *genpd)
+> +{
+> +       struct genpd_power_state *state;
+> +
+> +       state = kzalloc(sizeof(*state), GFP_KERNEL);
+> +       if (!state)
+> +               return -ENOMEM;
+> +
+> +       genpd->states = state;
+> +       genpd->state_count = 1;
+> +       genpd->free = state;
+> +
+> +       return 0;
+> +}
+> +
+>  /**
+>   * pm_genpd_init - Initialize a generic I/O PM domain object.
+>   * @genpd: PM domain object to initialize.
+> @@ -1293,6 +1308,8 @@ EXPORT_SYMBOL_GPL(pm_genpd_remove_subdomain);
+>  int pm_genpd_init(struct generic_pm_domain *genpd,
+>                   struct dev_power_governor *gov, bool is_off)
+>  {
+> +       int ret;
+> +
+>         if (IS_ERR_OR_NULL(genpd))
+>                 return -EINVAL;
+>
+> @@ -1325,19 +1342,12 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
+>                 genpd->dev_ops.start = pm_clk_resume;
+>         }
+>
+> -       if (genpd->state_idx >= GENPD_MAX_NUM_STATES) {
+> -               pr_warn("Initial state index out of bounds.\n");
+> -               genpd->state_idx = GENPD_MAX_NUM_STATES - 1;
+> -       }
+> -
+> -       if (genpd->state_count > GENPD_MAX_NUM_STATES) {
+> -               pr_warn("Limiting states to  %d\n", GENPD_MAX_NUM_STATES);
+> -               genpd->state_count = GENPD_MAX_NUM_STATES;
+> -       }
+> -
+>         /* Use only one "off" state if there were no states declared */
+> -       if (genpd->state_count == 0)
+> -               genpd->state_count = 1;
+> +       if (genpd->state_count == 0) {
+> +               ret = genpd_set_default_power_state(genpd);
+> +               if (ret)
+> +                       return ret;
+> +       }
+>
+>         mutex_lock(&gpd_list_lock);
+>         list_add(&genpd->gpd_list_node, &gpd_list);
+> @@ -1374,6 +1384,8 @@ static int genpd_remove(struct generic_pm_domain *genpd)
+>                 kfree(link);
+>         }
+>
+> +       kfree(genpd->free);
+> +
 
-On 05/10/16 18:30, Ard Biesheuvel wrote:
-> On 4 October 2016 at 22:30, Matt Fleming <matt@codeblueprint.co.uk> wrote:
->> On Tue, 04 Oct, at 11:34:31AM, Ard Biesheuvel wrote:
->>>
->>> These relocations are harmless, since the debug ones are only
->>> interpreted by the debugger, and the ones generated by
->>> EXPORT_SYMBOL(sort) will never be referenced, since the symbols they
->>> contain are either renamed to __efistub_xxx (arm64), or they are not
->>> part of the kernel proper (arm)
->>>
->>> So both cases are false positives, but the diagnostic is important,
->>> and so breaking the build is appropriate for any other absolute
->>> relocation that may appear.
->>>
->>> The effect of the patch is not that the diagnostic is ignored, but
->>> that these relocations are not generated in the first place (-g0) or
->>> removed explicitly (ksymtab/krcrctab+sort) rather than via a wildcard.
->>> So other than not breaking the build, this patch should have no user
->>> observeable differences.
->>
->> Thanks Ard, sounds reasonable. Feel free to take this through
->> whichever tree you think is best.
->>
->> Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
-> 
-> Thanks Matt.
-> 
-> Arnd: could you take this on top of the patch that adds CONFIG_EFI to
-> multi_v7_defconfig? That would minimize the breakage, I think.
+To be safe, let's move this after cancel_work_sync() - as to prevent
+no accesses is made to ->states pointer after you have freed it.
 
-Can someone pick up this fix? -next has been broken for me since 20th
-Sept :-(
+>         list_del(&genpd->gpd_list_node);
+>         mutex_unlock(&genpd->lock);
+>         cancel_work_sync(&genpd->power_off_work);
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index a09fe5c..de1d8f3 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -19,8 +19,6 @@
+>  /* Defines used for the flags field in the struct generic_pm_domain */
+>  #define GENPD_FLAG_PM_CLK      (1U << 0) /* PM domain uses PM clk */
+>
+> -#define GENPD_MAX_NUM_STATES   8 /* Number of possible low power states */
+> -
+>  enum gpd_status {
+>         GPD_STATE_ACTIVE = 0,   /* PM domain is active */
+>         GPD_STATE_POWER_OFF,    /* PM domain is off */
+> @@ -70,9 +68,10 @@ struct generic_pm_domain {
+>         void (*detach_dev)(struct generic_pm_domain *domain,
+>                            struct device *dev);
+>         unsigned int flags;             /* Bit field of configs for genpd */
+> -       struct genpd_power_state states[GENPD_MAX_NUM_STATES];
+> +       struct genpd_power_state *states;
+>         unsigned int state_count; /* number of states */
+>         unsigned int state_idx; /* state that genpd will go to when off */
+> +       void *free; /* Free the state that was allocated for default */
+>
+>  };
+>
+> --
+> 2.7.4
+>
 
-Cheers
-Jon
+After the minor change suggested above, you may add my ack.
 
--- 
-nvpublic
+Kind regards
+Uffe
