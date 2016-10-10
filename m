@@ -1,47 +1,43 @@
-From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Mon, 10 Oct 2016 21:25:55 +0530
-Subject: [PATCH] kernel: irq: fix build failure
-In-Reply-To: <1475775403-27207-1-git-send-email-sudipm.mukherjee@gmail.com>
-References: <1475775403-27207-1-git-send-email-sudipm.mukherjee@gmail.com>
-Message-ID: <57FBBA0B.9070500@gmail.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Mon, 10 Oct 2016 09:01:58 -0700
+Subject: [PATCH RESEND] ARM: dts: keystone-k2*: Increase SPI Flash
+ partition size for U-Boot
+In-Reply-To: <20161010143144.GB1041@n2100.armlinux.org.uk>
+References: <20161010141141.21333-1-vigneshr@ti.com>
+ <20161010143144.GB1041@n2100.armlinux.org.uk>
+Message-ID: <d1a4b59e-5524-9851-425e-5e86e05a593c@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 October 2016 11:06 PM, Sudip Mukherjee wrote:
-> The allmodconfig build of powerpc is failing with the error:
-> ERROR: ".irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
->
-> export the symbol to fix the failure.
+Vignesh,
 
-Hi Thomas,
-powerpc and arm allmodconfig builds still fails with the same error.
-Build logs of next-20161010 are at:
-arm at https://travis-ci.org/sudipm-mukherjee/parport/jobs/166321467
-powerpc at https://travis-ci.org/sudipm-mukherjee/parport/jobs/166321473
+On 10/10/2016 7:31 AM, Russell King - ARM Linux wrote:
+> On Mon, Oct 10, 2016 at 07:41:41PM +0530, Vignesh R wrote:
+>> U-Boot SPI Boot image is now more than 512KB for Keystone2 devices and
+>> cannot fit into existing partition. So, increase the SPI Flash partition
+>> for U-Boot to 1MB for all Keystone2 devices.
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> ---
+>>
+>> This was submitted to v4.9 merge window but was never picked up:
+>> https://patchwork.kernel.org/patch/9135023/
 
-Regards
-Sudip
+Another point is, if you want me to pick your patch, please copy
+me next time :-). AFAIK, am seeing this patch in my inbox first time.
 
 >
-> Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
-> ---
+> I think you need to explain why it's safe to change the layout of the
+> flash partitions like this.
 >
-> build log is at:
-> https://travis-ci.org/sudipm-mukherjee/parport/jobs/165418652
+> - What is this "misc" partition?
 >
->   kernel/irq/manage.c | 1 +
->   1 file changed, 1 insertion(+)
+> - Why is it safe to move the "misc" partition in this way?
 >
-> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-> index 0c5f1a5..5072814 100644
-> --- a/kernel/irq/manage.c
-> +++ b/kernel/irq/manage.c
-> @@ -721,6 +721,7 @@ int irq_set_parent(int irq, int parent_irq)
->   	irq_put_desc_unlock(desc, flags);
->   	return 0;
->   }
-> +EXPORT_SYMBOL(irq_set_parent);
->   #endif
+> - Do users need to do anything with data stored in the "misc" partition
+>   when changing kernels?
 >
->   /*
+> If the "misc" partition is simply unused space on the flash device, why
+> list it in DT?
 >
+Thanks Russell. Yes, above clarification would be good to get first.
