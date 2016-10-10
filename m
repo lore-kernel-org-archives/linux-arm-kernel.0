@@ -1,70 +1,22 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Oct 2016 15:12:05 +0200
-Subject: [PATCH v2 2/4] power: add axp20x-battery driver
-In-Reply-To: <20161010125726.GJ3462@lukather>
-References: <20161009062714.5085-1-icenowy@aosc.xyz>
- <20161009062714.5085-2-icenowy@aosc.xyz>
- <20161010125726.GJ3462@lukather>
-Message-ID: <20161010131205.GK3462@lukather>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Oct 2016 08:16:14 -0500
+Subject: [PATCH 2/3] dt-bindings: mtd: add DT binding for s3c2410 flash
+ controller
+In-Reply-To: <1475711217-974-3-git-send-email-sergio.prado@e-labworks.com>
+References: <1475711217-974-1-git-send-email-sergio.prado@e-labworks.com>
+ <1475711217-974-3-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <20161010131614.GA7855@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the real Quentin address
+On Wed, Oct 05, 2016 at 08:46:56PM -0300, Sergio Prado wrote:
+> Adds the device tree bindings description for Samsung S3C2410 and
+> compatible NAND flash controller.
+> 
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  .../devicetree/bindings/mtd/samsung-s3c2410.txt    | 57 ++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
 
-On Mon, Oct 10, 2016 at 02:57:26PM +0200, Maxime Ripard wrote:
-> Hi Icenowy,
-> 
-> On Sun, Oct 09, 2016 at 02:27:12PM +0800, Icenowy Zheng wrote:
-> > +	case POWER_SUPPLY_PROP_CURRENT_NOW:
-> > +		ret = regmap_read(power->regmap, AXP20X_BATT_DISCHRG_I_H, &dh);
-> > +		if (ret)
-> > +			return ret;
-> > +		ret = regmap_read(power->regmap, AXP20X_BATT_DISCHRG_I_L, &dl);
-> > +		if (ret)
-> > +			return ret;
-> > +		/* it's a 12 bit integer, high 8-bit is stored in dh */
-> > +		val->intval = dh << 4 | dl >> 4;
-> > +		break;
-> > +	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-> > +		ret = regmap_read(power->regmap, AXP20X_BATT_V_H, &dh);
-> > +		if (ret)
-> > +			return ret;
-> > +		ret = regmap_read(power->regmap, AXP20X_BATT_V_L, &dl);
-> > +		if (ret)
-> > +			return ret;
-> > +		/* it's a 12 bit integer, high 8-bit is stored in dh */
-> > +		val->intval = dh << 4 | dl >> 4;
-> > +		/* The formula below is from axp22_vbat_to_mV function
-> > +		 * of Allwinner 3.4 kernel.
-> > +		 */
-> > +		val->intval = val->intval * 1100 / 1000;
-> > +		break;
-> 
-> I really feel that this should be implemented through a IIO driver
-> (like the AXP288). This is especially true for the AXP209 and its
-> multiple GPIOs that can be muxed to a general purpose ADC, but it's
-> also true for the AXP221 / 223 TS pin that can also be used as an ADC.
-> 
-> Quentin has been working on this lately for the AXP209, feel free to
-> sync with him to support the AXP22*
-> 
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
-
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161010/ff37d435/attachment.sig>
+Acked-by: Rob Herring <robh@kernel.org>
