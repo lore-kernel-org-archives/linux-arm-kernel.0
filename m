@@ -1,117 +1,62 @@
-From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
-Date: Thu, 13 Oct 2016 09:32:51 +0200
-Subject: [PATCH 00/10] mm: adjust get_user_pages* functions to explicitly
- pass FOLL_* flags
-In-Reply-To: <20161013002020.3062-1-lstoakes@gmail.com>
-References: <20161013002020.3062-1-lstoakes@gmail.com>
-Message-ID: <914b917f-6871-2ba3-95ba-981dd2855743@amd.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 10 Oct 2016 16:42:13 +0200
+Subject: [PATCH] ARM: dts: imx6sx: Fix LCDIF interrupt type
+In-Reply-To: <1476106556.2376.12.camel@pengutronix.de>
+References: <20161002164435.5812-1-marex@denx.de>
+ <1476106556.2376.12.camel@pengutronix.de>
+Message-ID: <af1a450d-c36b-a5fa-b9e5-d02177b21501@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 13.10.2016 um 02:20 schrieb Lorenzo Stoakes:
-> This patch series adjusts functions in the get_user_pages* family such that
-> desired FOLL_* flags are passed as an argument rather than implied by flags.
->
-> The purpose of this change is to make the use of FOLL_FORCE explicit so it is
-> easier to grep for and clearer to callers that this flag is being used. The use
-> of FOLL_FORCE is an issue as it overrides missing VM_READ/VM_WRITE flags for the
-> VMA whose pages we are reading from/writing to, which can result in surprising
-> behaviour.
->
-> The patch series came out of the discussion around commit 38e0885, which
-> addressed a BUG_ON() being triggered when a page was faulted in with PROT_NONE
-> set but having been overridden by FOLL_FORCE. do_numa_page() was run on the
-> assumption the page _must_ be one marked for NUMA node migration as an actual
-> PROT_NONE page would have been dealt with prior to this code path, however
-> FOLL_FORCE introduced a situation where this assumption did not hold.
->
-> See https://marc.info/?l=linux-mm&m=147585445805166 for the patch proposal.
->
-> Lorenzo Stoakes (10):
->    mm: remove write/force parameters from __get_user_pages_locked()
->    mm: remove write/force parameters from __get_user_pages_unlocked()
->    mm: replace get_user_pages_unlocked() write/force parameters with gup_flags
->    mm: replace get_user_pages_locked() write/force parameters with gup_flags
->    mm: replace get_vaddr_frames() write/force parameters with gup_flags
->    mm: replace get_user_pages() write/force parameters with gup_flags
->    mm: replace get_user_pages_remote() write/force parameters with gup_flags
->    mm: replace __access_remote_vm() write parameter with gup_flags
->    mm: replace access_remote_vm() write parameter with gup_flags
->    mm: replace access_process_vm() write parameter with gup_flags
+On 10/10/2016 03:35 PM, Lucas Stach wrote:
+> Am Sonntag, den 02.10.2016, 18:44 +0200 schrieb Marek Vasut:
+>> The LCDIF interrupt should be triggered by the rising edge of the
+>> IRQ line because we only want the interrupt to trigger once per each
+>> frame. It seems the LCDIF IRQ line cannot be explicitly de-asserted
+>> by software, so the previous behavior before this patch, where the
+>> interrupt was triggered by level-high status of the IRQ line, caused
+>> the interrupt to fire again immediatelly after it was handled, which
+>> caused the system to lock up due to the high rate of interrupts.
+>>
+> If there is no way to ack the IRQ how is the line going low again? Some
+> hardware state machine?
 
-Patch number 6 in this series (which touches drivers I co-maintain) is 
-Acked-by: Christian K?nig <christian.koenig@amd.com>.
+My understanding is that it goes down at the end of VBLANK period.
 
-In general looks like a very nice cleanup to me, but I'm not enlightened 
-enough to full judge.
+>> Signed-off-by: Marek Vasut <marex@denx.de>
+>> Cc: Lucas Stach <l.stach@pengutronix.de>
+>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+>> Cc: Shawn Guo <shawnguo@kernel.org>
+>> ---
+>>  arch/arm/boot/dts/imx6sx.dtsi | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+>> index 1a473e8..9526c38 100644
+>> --- a/arch/arm/boot/dts/imx6sx.dtsi
+>> +++ b/arch/arm/boot/dts/imx6sx.dtsi
+>> @@ -1143,7 +1143,7 @@
+>>  				lcdif1: lcdif at 02220000 {
+>>  					compatible = "fsl,imx6sx-lcdif", "fsl,imx28-lcdif";
+>>  					reg = <0x02220000 0x4000>;
+>> -					interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+>> +					interrupts = <GIC_SPI 5 IRQ_TYPE_EDGE_RISING>;
+>>  					clocks = <&clks IMX6SX_CLK_LCDIF1_PIX>,
+>>  						 <&clks IMX6SX_CLK_LCDIF_APB>,
+>>  						 <&clks IMX6SX_CLK_DISPLAY_AXI>;
+>> @@ -1154,7 +1154,7 @@
+>>  				lcdif2: lcdif at 02224000 {
+>>  					compatible = "fsl,imx6sx-lcdif", "fsl,imx28-lcdif";
+>>  					reg = <0x02224000 0x4000>;
+>> -					interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+>> +					interrupts = <GIC_SPI 6 IRQ_TYPE_EDGE_RISING>;
+>>  					clocks = <&clks IMX6SX_CLK_LCDIF2_PIX>,
+>>  						 <&clks IMX6SX_CLK_LCDIF_APB>,
+>>  						 <&clks IMX6SX_CLK_DISPLAY_AXI>;
+> 
+> 
 
-Regards,
-Christian.
 
->
->   arch/alpha/kernel/ptrace.c                         |  9 ++--
->   arch/blackfin/kernel/ptrace.c                      |  5 ++-
->   arch/cris/arch-v32/drivers/cryptocop.c             |  4 +-
->   arch/cris/arch-v32/kernel/ptrace.c                 |  4 +-
->   arch/ia64/kernel/err_inject.c                      |  2 +-
->   arch/ia64/kernel/ptrace.c                          | 14 +++---
->   arch/m32r/kernel/ptrace.c                          | 15 ++++---
->   arch/mips/kernel/ptrace32.c                        |  5 ++-
->   arch/mips/mm/gup.c                                 |  2 +-
->   arch/powerpc/kernel/ptrace32.c                     |  5 ++-
->   arch/s390/mm/gup.c                                 |  3 +-
->   arch/score/kernel/ptrace.c                         | 10 +++--
->   arch/sh/mm/gup.c                                   |  3 +-
->   arch/sparc/kernel/ptrace_64.c                      | 24 +++++++----
->   arch/sparc/mm/gup.c                                |  3 +-
->   arch/x86/kernel/step.c                             |  3 +-
->   arch/x86/mm/gup.c                                  |  2 +-
->   arch/x86/mm/mpx.c                                  |  5 +--
->   arch/x86/um/ptrace_32.c                            |  3 +-
->   arch/x86/um/ptrace_64.c                            |  3 +-
->   drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c            |  7 ++-
->   drivers/gpu/drm/etnaviv/etnaviv_gem.c              |  7 ++-
->   drivers/gpu/drm/exynos/exynos_drm_g2d.c            |  3 +-
->   drivers/gpu/drm/i915/i915_gem_userptr.c            |  6 ++-
->   drivers/gpu/drm/radeon/radeon_ttm.c                |  3 +-
->   drivers/gpu/drm/via/via_dmablit.c                  |  4 +-
->   drivers/infiniband/core/umem.c                     |  6 ++-
->   drivers/infiniband/core/umem_odp.c                 |  7 ++-
->   drivers/infiniband/hw/mthca/mthca_memfree.c        |  2 +-
->   drivers/infiniband/hw/qib/qib_user_pages.c         |  3 +-
->   drivers/infiniband/hw/usnic/usnic_uiom.c           |  5 ++-
->   drivers/media/pci/ivtv/ivtv-udma.c                 |  4 +-
->   drivers/media/pci/ivtv/ivtv-yuv.c                  |  5 ++-
->   drivers/media/platform/omap/omap_vout.c            |  2 +-
->   drivers/media/v4l2-core/videobuf-dma-sg.c          |  7 ++-
->   drivers/media/v4l2-core/videobuf2-memops.c         |  6 ++-
->   drivers/misc/mic/scif/scif_rma.c                   |  3 +-
->   drivers/misc/sgi-gru/grufault.c                    |  2 +-
->   drivers/platform/goldfish/goldfish_pipe.c          |  3 +-
->   drivers/rapidio/devices/rio_mport_cdev.c           |  3 +-
->   drivers/scsi/st.c                                  |  5 +--
->   .../interface/vchiq_arm/vchiq_2835_arm.c           |  3 +-
->   .../vc04_services/interface/vchiq_arm/vchiq_arm.c  |  3 +-
->   drivers/video/fbdev/pvr2fb.c                       |  4 +-
->   drivers/virt/fsl_hypervisor.c                      |  4 +-
->   fs/exec.c                                          |  9 +++-
->   fs/proc/base.c                                     | 19 +++++---
->   include/linux/mm.h                                 | 18 ++++----
->   kernel/events/uprobes.c                            |  6 ++-
->   kernel/ptrace.c                                    | 16 ++++---
->   mm/frame_vector.c                                  |  9 ++--
->   mm/gup.c                                           | 50 ++++++++++------------
->   mm/memory.c                                        | 16 ++++---
->   mm/mempolicy.c                                     |  2 +-
->   mm/nommu.c                                         | 38 +++++++---------
->   mm/process_vm_access.c                             |  7 ++-
->   mm/util.c                                          |  8 ++--
->   net/ceph/pagevec.c                                 |  2 +-
->   security/tomoyo/domain.c                           |  2 +-
->   virt/kvm/async_pf.c                                |  3 +-
->   virt/kvm/kvm_main.c                                | 11 +++--
->   61 files changed, 260 insertions(+), 187 deletions(-)
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+-- 
+Best regards,
+Marek Vasut
