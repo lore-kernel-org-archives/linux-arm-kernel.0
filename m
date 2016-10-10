@@ -1,39 +1,46 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 10 Oct 2016 18:27:49 -0500
-Subject: [PATCH/RFT 08/12] ARM: davinci: register the usb20_phy clock on
- the SoC file
-In-Reply-To: <1475858577-10366-9-git-send-email-ahaslam@baylibre.com>
-References: <1475858577-10366-1-git-send-email-ahaslam@baylibre.com>
- <1475858577-10366-9-git-send-email-ahaslam@baylibre.com>
-Message-ID: <383dd208-ff45-fde9-6500-ca12ec0ca805@lechnology.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Tue, 11 Oct 2016 09:57:35 +1030
+Subject: [PATCH 0/8] pinctrl: aspeed: Fixes for core and g5, implement
+ remaining pins
+In-Reply-To: <CACRpkdZWbx1_SYJMOn40teQaEw1JAq80kDAp7N+OYaMRRO6NBg@mail.gmail.com>
+References: <cover.115463f791b69859c5ce9dafd61a5755ea039f4b.1474986045.git-series.andrew@aj.id.au>
+ <CACRpkdZWbx1_SYJMOn40teQaEw1JAq80kDAp7N+OYaMRRO6NBg@mail.gmail.com>
+Message-ID: <1476142055.16733.4.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2016 11:42 AM, ahaslam at baylibre.com wrote:
-> From: Axel Haslam <ahaslam@baylibre.com>
->
-> The usb20_phy clock needs to be registered for the driver to be able
-> to get and enable a clock. Currently the usb phy clocks are registered
-> form board files, which will not be called during a device tree based
-> boot.
->
-> To be able to probe correctly usb form a device tree boot, register
-> the usb phy clocks form the SoC specific init.
->
-> Unfourtunatly, davinci does not have proper clock support on device tree
-> yet, so by registering the clock form de SoC specific file we are
-> forced to hardcode the parent clock, and cannot select refclkin as
-> parent for any of the phy clocks of the da850 family.
+On Mon, 2016-10-10 at 09:59 +0200, Linus Walleij wrote:
+> On Tue, Sep 27, 2016 at 4:50 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> 
+> > 
+> > The initial Aspeed pinctrl patches implemented a subset of pins for each of the
+> > g4 and g5 SoCs. This series provides a number of fixes to the initial patches,
+> > mostly for issues identified in the g5 driver. The fixes account for the first
+> > half of the series (up to and including "pinctrl: aspeed-g5: Fix pin
+> > association of SPI1 function") and should be applied for 4.9.
+> Those are applied for fixes.
 
-FYI, I have started working on the clocks as well if you want to take it 
-and run with it.
+Thanks!
 
-https://github.com/dlech/ev3dev-kernel/compare/9d6b50cde34b51309c74d97c26b1430c7ff6aa0f...d02084598785c369fdb23884171cbbec4fef77b0
+> 
+> > 
+> > The second half, from "pinctrl: aspeed: Enable capture of off-SCU pinmux
+> > state", implements some additional functionality in the core engine for the
+> > Aspeed SoCs and follows up with patches implementing mux configuration tables
+> > for all remaining pins. Given the significant additions in the last few
+> > patches, their lateness in the cycle and the light testing they have received
+> > they are best left for 4.10, but I'm keen to get them out for review.
+> I'm holding these back until v4.9-rc1 is out.
 
-(Ignore the ev3dev commit stuck in the middle there.)
+No worries; they need some discussion when you have the time.
 
->
-> As none of the current da850 based boards currently in mainline use
-> refclkin as source. I guess we can live with this limitation until clocks
-> are correctly represented through CCF/device tree.
->
+Cheers,
+
+Andrew
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161011/339a02a0/attachment.sig>
