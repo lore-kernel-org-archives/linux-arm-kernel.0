@@ -1,49 +1,44 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 10 Oct 2016 13:06:48 +0200
-Subject: [PATCH v2 8/8] PM / doc: Update device documentation for devices
- in IRQ safe PM domains
-In-Reply-To: <1475879821-8035-9-git-send-email-lina.iyer@linaro.org>
-References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
- <1475879821-8035-9-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAPDyKFrPwp=iOH3jmDdwk4fKT94tDSrm_3sEicZ_0BaqXNsNOA@mail.gmail.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Mon, 10 Oct 2016 16:42:13 +0530
+Subject: [PATCH] tty: serial: fsl_lpuart: Fix Tx DMA edge case
+In-Reply-To: <1475791984-17705-1-git-send-email-aaron.brice@datasoft.com>
+References: <1475791984-17705-1-git-send-email-aaron.brice@datasoft.com>
+Message-ID: <6d198918-c5a8-45e6-a2a8-5af5de61abce@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 October 2016 at 00:37, Lina Iyer <lina.iyer@linaro.org> wrote:
-> Update documentation to reflect the changes made to support IRQ safe PM
-> domains.
+On 10/07/16 03:43, Aaron Brice wrote:
+
+> In the case where head == 0 on the circular buffer, there should be one
+> DMA buffer, not two.  The second zero-length buffer would break the
+> lpuart driver, transfer would never complete.
+
+Tested-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+
 >
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-
-Kind regards
-Uffe
-
+> Signed-off-by: Aaron Brice <aaron.brice@datasoft.com>
 > ---
->  Documentation/power/devices.txt | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+>   drivers/tty/serial/fsl_lpuart.c | 3 +--
+>   1 file changed, 1 insertion(+), 2 deletions(-)
 >
-> diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
-> index 8ba6625..0401b53 100644
-> --- a/Documentation/power/devices.txt
-> +++ b/Documentation/power/devices.txt
-> @@ -607,7 +607,14 @@ individually.  Instead, a set of devices sharing a power resource can be put
->  into a low-power state together at the same time by turning off the shared
->  power resource.  Of course, they also need to be put into the full-power state
->  together, by turning the shared power resource on.  A set of devices with this
-> -property is often referred to as a power domain.
-> +property is often referred to as a power domain. A power domain may also be
-> +nested inside another power domain.
-> +
-> +Devices and PM domains may be defined as IRQ-safe, if they can be powered
-> +on/off even when the IRQs are disabled. An IRQ-safe device in a domain will
-> +disallow power management on the domain, unless the domain is also defined as
-> +IRQ-safe. The restriction this framework imposes on the parent domain of an
-> +IRQ-safe domain is that it must also be defined as IRQ-safe.
->
->  Support for power domains is provided through the pm_domain field of struct
->  device.  This field is a pointer to an object of type struct dev_pm_domain,
-> --
-> 2.7.4
->
+> diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+> index de9d510..76103f2 100644
+> --- a/drivers/tty/serial/fsl_lpuart.c
+> +++ b/drivers/tty/serial/fsl_lpuart.c
+> @@ -328,7 +328,7 @@ static void lpuart_dma_tx(struct lpuart_port *sport)
+>   
+>   	sport->dma_tx_bytes = uart_circ_chars_pending(xmit);
+>   
+> -	if (xmit->tail < xmit->head) {
+> +	if (xmit->tail < xmit->head || xmit->head == 0) {
+>   		sport->dma_tx_nents = 1;
+>   		sg_init_one(sgl, xmit->buf + xmit->tail, sport->dma_tx_bytes);
+>   	} else {
+> @@ -359,7 +359,6 @@ static void lpuart_dma_tx(struct lpuart_port *sport)
+>   	sport->dma_tx_in_progress = true;
+>   	sport->dma_tx_cookie = dmaengine_submit(sport->dma_tx_desc);
+>   	dma_async_issue_pending(sport->dma_tx_chan);
+> -
+>   }
+>   
+>   static void lpuart_dma_tx_complete(void *arg)
