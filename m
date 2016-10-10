@@ -1,256 +1,189 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 10 Oct 2016 11:54:01 +0200
-Subject: [PATCH v1 1/2] ARM: dts: add rockchip PX3 Evaluation board
-In-Reply-To: <64f4be31-1b19-60e3-da7c-f2fec186fab9@suse.de>
-References: <1473529249-6151-1-git-send-email-andy.yan@rock-chips.com>
- <1473529440-6202-1-git-send-email-andy.yan@rock-chips.com>
- <64f4be31-1b19-60e3-da7c-f2fec186fab9@suse.de>
-Message-ID: <738050204.FfkOZgkGGl@phil>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 10 Oct 2016 12:01:44 +0200
+Subject: [PATCH v2 3/8] PM / Domains: Allow domain power states to be read
+ from DT
+In-Reply-To: <1475879821-8035-4-git-send-email-lina.iyer@linaro.org>
+References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
+ <1475879821-8035-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFo62XuwsoqqPyFa7FYMutd2ng-xt9f7aFh_2T6ab=vAZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas, Andy,
+On 8 October 2016 at 00:36, Lina Iyer <lina.iyer@linaro.org> wrote:
+> This patch allows domains to define idle states in the DT. SoC's can
+> define domain idle states in DT using the "domain-idle-states" property
+> of the domain provider. Add API to read the idle states from DT that can
+> be set in the genpd object.
+>
+> This patch is based on the original patch by Marc Titinger.
+>
+> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  drivers/base/power/domain.c | 95 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pm_domain.h   |  8 ++++
+>  2 files changed, 103 insertions(+)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 4e87170..4208b67 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1917,6 +1917,101 @@ out:
+>         return ret ? -EPROBE_DEFER : 0;
+>  }
+>  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+> +
+> +static const struct of_device_id idle_state_match[] = {
+> +       { .compatible = "arm,idle-state", },
+> +       { }
+> +};
+> +
+> +static int genpd_parse_state(struct genpd_power_state *genpd_state,
+> +                                   struct device_node *state_node)
+> +{
+> +       int err;
+> +       u32 residency;
+> +       u32 entry_latency, exit_latency;
+> +       const struct of_device_id *match_id;
+> +
+> +       match_id = of_match_node(idle_state_match, state_node);
+> +       if (!match_id)
+> +               return -EINVAL;
+> +
+> +       err = of_property_read_u32(state_node, "entry-latency-us",
+> +                                               &entry_latency);
+> +       if (err) {
+> +               pr_debug(" * %s missing entry-latency-us property\n",
+> +                                               state_node->full_name);
+> +               return -EINVAL;
+> +       }
+> +
+> +       err = of_property_read_u32(state_node, "exit-latency-us",
+> +                                               &exit_latency);
+> +       if (err) {
+> +               pr_debug(" * %s missing exit-latency-us property\n",
+> +                                               state_node->full_name);
+> +               return -EINVAL;
+> +       }
+> +
+> +       err = of_property_read_u32(state_node, "min-residency-us", &residency);
+> +       if (!err)
+> +               genpd_state->residency_ns = 1000 * residency;
+> +
+> +       genpd_state->power_on_latency_ns = 1000 * exit_latency;
+> +       genpd_state->power_off_latency_ns = 1000 * entry_latency;
+> +
+> +       return 0;
+> +}
+> +
+> +/**
+> + * of_genpd_parse_idle_states: Return array of idle states for the genpd.
+> + *
+> + * @dn: The genpd device node
+> + * @states: The pointer to which the state array will be saved.
+> + * @n: The count of elements in the array returned from this function.
+> + *
+> + * Returns the device states parsed from the OF node. The memory for the states
+> + * is allocated by this function and is the responsibility of the caller to
+> + * free the memory after use.
+> + */
+> +int of_genpd_parse_idle_states(struct device_node *dn,
+> +                       struct genpd_power_state **states, int *n)
 
-Am Dienstag, 13. September 2016, 14:14:01 CEST schrieb Andreas F?rber:
-> Hi Andy,
-> 
-> This patch didn't make it to linux-rockchip list somehow...
-> Not sure why I'm CC'ed, I don't have access to such a board to check, so
-> just a couple formal nitpicks:
-> 
-> Am 10.09.2016 um 19:44 schrieb Andy Yan:
-> > PX3 EVB is designed by Rockchip for automotive field,
-> > which intergrated with CVBS(TP2825)/MIPI DSI/LVDS/HDMI
-> 
-> "integrated"
-> but the grammar is somewhat incorrect with "which" referring to field -
-> I assume you meant "with integrated CVBS..."?
-> 
-> > video input/output interface, WIFI/BT/GPS(on a module
-> 
-> Also please always leave a space before an opening parenthesis in
-> English text. Similarly above, spaces around "/" would help recognize
-> that MIPI DSI belongs together rather than being two lists.
-> 
-> If nothing else applies below then maybe Heiko can edit it for you?
+Instead of taking **states as a parameter, let's instead return it as
+a pointer for the allocated struct. In case of failures, let's return
+ERR_PTR().
 
-I've fixed the remarks in the commit description.
+> +{
+> +       struct genpd_power_state *st;
+> +       struct device_node *np;
+> +       int i = 0;
+> +       int err, ret;
+> +       int count;
+> +       struct of_phandle_iterator it;
+> +
+> +       count = of_count_phandle_with_args(dn, "domain-idle-states", NULL);
 
+If count is zero or an error, we should return an error code (ERR_PTR()). Right?
 
-> > named S500 which based on MT6620), Gsensor BMA250E and
-> > light&proximity sensor STK3410.
-> > 
-> > Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> > 
-> > ---
-> > 
-> > Changes in v1:
-> > - board rename
-> > - add vendor prefix for i2c interfaced sensors
-> > - use stdout-path to set the default console
-> > 
-> >  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
-> >  arch/arm/boot/dts/Makefile                         |   1 +
-> >  arch/arm/boot/dts/rk3188-px3-evb.dts               | 337
-> >  +++++++++++++++++++++ 3 files changed, 342 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/rk3188-px3-evb.dts
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
-> > b/Documentation/devicetree/bindings/arm/rockchip.txt index
-> > 6668645..6da3881 100644
-> > --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> > +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> > @@ -21,6 +21,10 @@ Rockchip platforms device tree bindings
-> > 
-> >      Required root node properties:
-> >        - compatible = "radxa,rock", "rockchip,rk3188";
-> > 
-> > +- Rockchip PX3 Evaluation board:
-> > +    Required root node properties:
-> > +      - compatible = "rockchip,px3-evb", "rockchip,px3",
-> > "rockchip,rk3188";
-> How compatible is PX3 with RK3188? It is a separate SoC product:
-> 
-> http://www.rock-chips.com/a/en/products/rkpower/2015/1125/730.html
-> 
-> Wondering whether or not to drop the third compatible string.
+> +
+> +       st = kcalloc(count, sizeof(*st), GFP_KERNEL);
+> +       if (!st)
+> +               return -ENOMEM;
+> +
+> +       /* Loop over the phandles until all the requested entry is found */
+> +       of_for_each_phandle(&it, err, dn, "domain-idle-states", NULL, 0) {
+> +               np = of_node_get(it.node);
 
-As discussed in IRC (and with arm-soc maintainers), I intend to keep the 
-rk3188 part, as the chip really is just a (hardened?) variant of the consumer 
-rk3188, but shares the same internals with the original.
+I don't think you need to increment the usage count for the device
+node as that is already managed by of_for_each_phandle().
 
-> > +
-> > 
-> >  - Radxa Rock2 Square board:
-> >      Required root node properties:
-> >        - compatible = "radxa,rock2-square", "rockchip,rk3288";
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index faacd52..88d27a2 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -620,6 +620,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
-> > 
-> >  	rk3066a-marsboard.dtb \
-> >  	rk3066a-rayeager.dtb \
-> >  	rk3188-radxarock.dtb \
-> > 
-> > +	rk3188-px3-evb.dtb \
-> 
-> Affects file naming as well: px3-evb.dtb?
+It's only in the error case below, when it's needed.
 
-see above
+> +               ret = genpd_parse_state(&st[i++], np);
+> +               if (ret) {
+> +                       pr_err
+> +                       ("Parsing idle state node %s failed with err %d\n",
+> +                                                       np->full_name, ret);
+> +                       of_node_put(np);
+> +                       goto fail;
 
-> 
-> >  	rk3228-evb.dtb \
-> >  	rk3229-evb.dtb \
-> >  	rk3288-evb-act8846.dtb \
-> > 
-> > diff --git a/arch/arm/boot/dts/rk3188-px3-evb.dts
-> > b/arch/arm/boot/dts/rk3188-px3-evb.dts new file mode 100644
-> > index 0000000..f6bc738
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/rk3188-px3-evb.dts
-> > @@ -0,0 +1,337 @@
-> > +/*
-> > + * Copyright (c) 2016 Andy Yan <andy.yan@rock-chips.com>
-> > + *
-> > + * This file is dual-licensed: you can use it either under the terms
-> > + * of the GPL or the X11 license, at your option. Note that this dual
-> > + * licensing only applies to this file, and not this project as a
-> > + * whole.
-> > + *
-> > + *  a) This file is free software; you can redistribute it and/or
-> > + *     modify it under the terms of the GNU General Public License as
-> > + *     published by the Free Software Foundation; either version 2 of the
-> > + *     License, or (at your option) any later version.
-> > + *
-> > + *     This file is distributed in the hope that it will be useful,
-> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + *     GNU General Public License for more details.
-> > + *
-> > + * Or, alternatively,
-> > + *
-> > + *  b) Permission is hereby granted, free of charge, to any person
-> > + *     obtaining a copy of this software and associated documentation
-> > + *     files (the "Software"), to deal in the Software without
-> > + *     restriction, including without limitation the rights to use,
-> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> > + *     sell copies of the Software, and to permit persons to whom the
-> > + *     Software is furnished to do so, subject to the following
-> > + *     conditions:
-> > + *
-> > + *     The above copyright notice and this permission notice shall be
-> > + *     included in all copies or substantial portions of the Software.
-> > + *
-> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> > + *     OTHER DEALINGS IN THE SOFTWARE.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include <dt-bindings/input/input.h>
-> > +#include "rk3188.dtsi"
-> 
-> I'm surprised there is no [rk3188-]px3.dtsi here! Surely some automotive
-> vendor may design their own board with it and should have at least the
-> two trailing compatible strings pre-set.
+The goto seems unnecessary. Why not deal with all error handling here
+and return the error code?
 
-see above. I don't think there is a need to pollute the directory with 
-(nearly) empty dtsi files, especially as the compatible will get overwritten by 
-a board compatible anyway.
+> +               }
+> +               of_node_put(np);
 
-> 
-> > +
-> > +/ {
-> > +	model = "Rockchip PX3-EVB";
-> > +	compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial2:115200n8";
-> > +	};
-> > +
-> > +	memory {
-> > +		device_type = "memory";
-> > +		reg = <0x60000000 0x80000000>;
-> > +	};
-> > +
-> > +	gpio-keys {
-> > +		compatible = "gpio-keys";
-> > +		autorepeat;
-> > +
-> > +		power {
-> > +			gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
-> > +			linux,code = <KEY_POWER>;
-> > +			label = "GPIO Key Power";
-> > +			linux,input-type = <1>;
-> > +			wakeup-source;
-> > +			debounce-interval = <100>;
-> > +		};
-> > +	};
-> > +
-> > +	vcc_sys: vsys-regulator {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "vsys";
-> > +		regulator-min-microvolt = <5000000>;
-> > +		regulator-max-microvolt = <5000000>;
-> > +		regulator-boot-on;
-> > +	};
-> > +};
-> > +
-> > +&cpu0 {
-> > +	cpu0-supply = <&vdd_cpu>;
-> > +};
-> > +
-> > +&i2c0 {
-> > +	status = "okay";
-> > +
-> > +	 /* Accelerometer */
-> 
-> Space after tab intentional?
-> 
-> > +	bma250 at 18 {
-> > +		compatible = "bosch,bma250";
-> > +		reg = <0x18>;
-> > +		interrupt-parent = <&gpio0>;
-> > +		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
-> > +	};
-> > +
-> > +	stk3410 at 48 {
-> > +		compatible = "sensortek,STK3310";
-> > +		reg = <0x48>;
-> > +		interrupt-parent = <&gpio1>;
-> > +		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
-> > +	};
-> 
-> Generally it is undesired to repeat the compatible name as node name -
-> did you compare other .dts files? (e.g., accelerometer at 18 would be
-> self-documenting) If this is a copy from an existing .dts then please
-> ignore this comment.
+According the comment above, you should be able to remove this.
 
-due to the compatible ambiguity, I had dropped the stk3410 node anyway.
-I've also checked how the bma250 gets specified and there are both variants in 
-use (accelerometer@ and bmc250@). So to set a good example for the future, 
-I've changed the node name to accelerometer at 18 and dropped the now self 
-explanatory comment obove it.
+> +       }
+> +
+> +       *n = count;
+> +       *states = st;
+> +
+> +       return 0;
+> +fail:
+> +       kfree(st);
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL(of_genpd_parse_idle_states);
 
+Please use EXPORT_SYMBOL_GPL() instead.
 
-> 
-> > +};
-> > +
-> > +&i2c1 {
-> > +	status = "okay";
-> > +	clock-frequency = <400000>;
-> 
-> Insert white line?
+> +
+>  #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
+>
+>
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index f4492eb..b489496 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -205,6 +205,8 @@ extern int of_genpd_add_device(struct of_phandle_args *args,
+>  extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
+>                                   struct of_phandle_args *new_subdomain);
+>  extern struct generic_pm_domain *of_genpd_remove_last(struct device_node *np);
+> +extern int of_genpd_parse_idle_states(struct device_node *dn,
+> +                       struct genpd_power_state **states, int *n);
+>
+>  int genpd_dev_pm_attach(struct device *dev);
+>  #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+> @@ -234,6 +236,12 @@ static inline int of_genpd_add_subdomain(struct of_phandle_args *parent,
+>         return -ENODEV;
+>  }
+>
+> +static inline int of_genpd_parse_idle_states(struct device_node *dn,
+> +                       struct genpd_power_state **states, int *n)
+> +{
+> +       return -ENODEV;
+> +}
+> +
+>  static inline int genpd_dev_pm_attach(struct device *dev)
+>  {
+>         return -ENODEV;
+> --
+> 2.7.4
+>
 
-done
-
-
-Heiko
+Kind regards
+Uffe
