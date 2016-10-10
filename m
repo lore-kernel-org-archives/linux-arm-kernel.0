@@ -1,374 +1,203 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 10 Oct 2016 17:01:47 +0200
-Subject: [PATCH v13 15/15] vfio/type1: Return the MSI geometry through
- VFIO_IOMMU_GET_INFO capability chains
-In-Reply-To: <20161007143811.1fb3ebfe@t450s.home>
-References: <1475743531-4780-1-git-send-email-eric.auger@redhat.com>
- <1475743531-4780-16-git-send-email-eric.auger@redhat.com>
- <20161006142040.13cbdb8f@t450s.home> <20161006144251.46b45117@t450s.home>
- <4adea280-4bdf-7d0e-be2f-88e7f6219b9c@redhat.com>
- <20161007143811.1fb3ebfe@t450s.home>
-Message-ID: <66c8c931-586d-b6f2-a867-e4ddaab1ba6c@redhat.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 10 Oct 2016 09:03:01 -0600
+Subject: [PATCH v2 3/8] PM / Domains: Allow domain power states to be
+ read from DT
+In-Reply-To: <CAPDyKFo62XuwsoqqPyFa7FYMutd2ng-xt9f7aFh_2T6ab=vAZg@mail.gmail.com>
+References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
+ <1475879821-8035-4-git-send-email-lina.iyer@linaro.org>
+ <CAPDyKFo62XuwsoqqPyFa7FYMutd2ng-xt9f7aFh_2T6ab=vAZg@mail.gmail.com>
+Message-ID: <20161010150301.GA44885@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-On 07/10/2016 22:38, Alex Williamson wrote:
-> On Fri, 7 Oct 2016 19:10:27 +0200
-> Auger Eric <eric.auger@redhat.com> wrote:
-> 
->> Hi Alex,
+On Mon, Oct 10 2016 at 04:01 -0600, Ulf Hansson wrote:
+>On 8 October 2016 at 00:36, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> This patch allows domains to define idle states in the DT. SoC's can
+>> define domain idle states in DT using the "domain-idle-states" property
+>> of the domain provider. Add API to read the idle states from DT that can
+>> be set in the genpd object.
 >>
->> On 06/10/2016 22:42, Alex Williamson wrote:
->>> On Thu, 6 Oct 2016 14:20:40 -0600
->>> Alex Williamson <alex.williamson@redhat.com> wrote:
->>>   
->>>> On Thu,  6 Oct 2016 08:45:31 +0000
->>>> Eric Auger <eric.auger@redhat.com> wrote:
->>>>  
->>>>> This patch allows the user-space to retrieve the MSI geometry. The
->>>>> implementation is based on capability chains, now also added to
->>>>> VFIO_IOMMU_GET_INFO.
->>>>>
->>>>> The returned info comprise:
->>>>> - whether the MSI IOVA are constrained to a reserved range (x86 case) and
->>>>>   in the positive, the start/end of the aperture,
->>>>> - or whether the IOVA aperture need to be set by the userspace. In that
->>>>>   case, the size and alignment of the IOVA window to be provided are
->>>>>   returned.
->>>>>
->>>>> In case the userspace must provide the IOVA aperture, we currently report
->>>>> a size/alignment based on all the doorbells registered by the host kernel.
->>>>> This may exceed the actual needs.
->>>>>
->>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>>>
->>>>> ---
->>>>> v11 -> v11:
->>>>> - msi_doorbell_pages was renamed msi_doorbell_calc_pages
->>>>>
->>>>> v9 -> v10:
->>>>> - move cap_offset after iova_pgsizes
->>>>> - replace __u64 alignment by __u32 order
->>>>> - introduce __u32 flags in vfio_iommu_type1_info_cap_msi_geometry and
->>>>>   fix alignment
->>>>> - call msi-doorbell API to compute the size/alignment
->>>>>
->>>>> v8 -> v9:
->>>>> - use iommu_msi_supported flag instead of programmable
->>>>> - replace IOMMU_INFO_REQUIRE_MSI_MAP flag by a more sophisticated
->>>>>   capability chain, reporting the MSI geometry
->>>>>
->>>>> v7 -> v8:
->>>>> - use iommu_domain_msi_geometry
->>>>>
->>>>> v6 -> v7:
->>>>> - remove the computation of the number of IOVA pages to be provisionned.
->>>>>   This number depends on the domain/group/device topology which can
->>>>>   dynamically change. Let's rely instead rely on an arbitrary max depending
->>>>>   on the system
->>>>>
->>>>> v4 -> v5:
->>>>> - move msi_info and ret declaration within the conditional code
->>>>>
->>>>> v3 -> v4:
->>>>> - replace former vfio_domains_require_msi_mapping by
->>>>>   more complex computation of MSI mapping requirements, especially the
->>>>>   number of pages to be provided by the user-space.
->>>>> - reword patch title
->>>>>
->>>>> RFC v1 -> v1:
->>>>> - derived from
->>>>>   [RFC PATCH 3/6] vfio: Extend iommu-info to return MSIs automap state
->>>>> - renamed allow_msi_reconfig into require_msi_mapping
->>>>> - fixed VFIO_IOMMU_GET_INFO
->>>>> ---
->>>>>  drivers/vfio/vfio_iommu_type1.c | 78 ++++++++++++++++++++++++++++++++++++++++-
->>>>>  include/uapi/linux/vfio.h       | 32 ++++++++++++++++-
->>>>>  2 files changed, 108 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
->>>>> index dc3ee5d..ce5e7eb 100644
->>>>> --- a/drivers/vfio/vfio_iommu_type1.c
->>>>> +++ b/drivers/vfio/vfio_iommu_type1.c
->>>>> @@ -38,6 +38,8 @@
->>>>>  #include <linux/workqueue.h>
->>>>>  #include <linux/dma-iommu.h>
->>>>>  #include <linux/msi-doorbell.h>
->>>>> +#include <linux/irqdomain.h>
->>>>> +#include <linux/msi.h>
->>>>>  
->>>>>  #define DRIVER_VERSION  "0.2"
->>>>>  #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
->>>>> @@ -1101,6 +1103,55 @@ static int vfio_domains_have_iommu_cache(struct vfio_iommu *iommu)
->>>>>  	return ret;
->>>>>  }
->>>>>  
->>>>> +static int compute_msi_geometry_caps(struct vfio_iommu *iommu,
->>>>> +				     struct vfio_info_cap *caps)
->>>>> +{
->>>>> +	struct vfio_iommu_type1_info_cap_msi_geometry *vfio_msi_geometry;
->>>>> +	unsigned long order = __ffs(vfio_pgsize_bitmap(iommu));
->>>>> +	struct iommu_domain_msi_geometry msi_geometry;
->>>>> +	struct vfio_info_cap_header *header;
->>>>> +	struct vfio_domain *d;
->>>>> +	bool reserved;
->>>>> +	size_t size;
->>>>> +
->>>>> +	mutex_lock(&iommu->lock);
->>>>> +	/* All domains have same require_msi_map property, pick first */
->>>>> +	d = list_first_entry(&iommu->domain_list, struct vfio_domain, next);
->>>>> +	iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_GEOMETRY,
->>>>> +			      &msi_geometry);
->>>>> +	reserved = !msi_geometry.iommu_msi_supported;
->>>>> +
->>>>> +	mutex_unlock(&iommu->lock);
->>>>> +
->>>>> +	size = sizeof(*vfio_msi_geometry);
->>>>> +	header = vfio_info_cap_add(caps, size,
->>>>> +				   VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY, 1);
->>>>> +
->>>>> +	if (IS_ERR(header))
->>>>> +		return PTR_ERR(header);
->>>>> +
->>>>> +	vfio_msi_geometry = container_of(header,
->>>>> +				struct vfio_iommu_type1_info_cap_msi_geometry,
->>>>> +				header);
->>>>> +
->>>>> +	vfio_msi_geometry->flags = reserved;    
->>>>
->>>> Use the bit flag VFIO_IOMMU_MSI_GEOMETRY_RESERVED
->>>>  
->>>>> +	if (reserved) {
->>>>> +		vfio_msi_geometry->aperture_start = msi_geometry.aperture_start;
->>>>> +		vfio_msi_geometry->aperture_end = msi_geometry.aperture_end;    
->>>>
->>>> But maybe nobody has set these, did you intend to use
->>>> iommu_domain_msi_aperture_valid(), which you defined early on but never
->>>> used?
->>>>  
->>>>> +		return 0;
->>>>> +	}
->>>>> +
->>>>> +	vfio_msi_geometry->order = order;    
->>>>
->>>> I'm tempted to suggest that a user could do the same math on their own
->>>> since we provide the supported bitmap already... could it ever not be
->>>> the same? 
->>>>  
->>>>> +	/*
->>>>> +	 * we compute a system-wide requirement based on all the registered
->>>>> +	 * doorbells
->>>>> +	 */
->>>>> +	vfio_msi_geometry->size =
->>>>> +		msi_doorbell_calc_pages(order) * ((uint64_t) 1 << order);
->>>>> +
->>>>> +	return 0;
->>>>> +}
->>>>> +
->>>>>  static long vfio_iommu_type1_ioctl(void *iommu_data,
->>>>>  				   unsigned int cmd, unsigned long arg)
->>>>>  {
->>>>> @@ -1122,8 +1173,10 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
->>>>>  		}
->>>>>  	} else if (cmd == VFIO_IOMMU_GET_INFO) {
->>>>>  		struct vfio_iommu_type1_info info;
->>>>> +		struct vfio_info_cap caps = { .buf = NULL, .size = 0 };
->>>>> +		int ret;
->>>>>  
->>>>> -		minsz = offsetofend(struct vfio_iommu_type1_info, iova_pgsizes);
->>>>> +		minsz = offsetofend(struct vfio_iommu_type1_info, cap_offset);
->>>>>  
->>>>>  		if (copy_from_user(&info, (void __user *)arg, minsz))
->>>>>  			return -EFAULT;
->>>>> @@ -1135,6 +1188,29 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
->>>>>  
->>>>>  		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
->>>>>  
->>>>> +		ret = compute_msi_geometry_caps(iommu, &caps);
->>>>> +		if (ret)
->>>>> +			return ret;
->>>>> +
->>>>> +		if (caps.size) {
->>>>> +			info.flags |= VFIO_IOMMU_INFO_CAPS;
->>>>> +			if (info.argsz < sizeof(info) + caps.size) {
->>>>> +				info.argsz = sizeof(info) + caps.size;
->>>>> +				info.cap_offset = 0;
->>>>> +			} else {
->>>>> +				vfio_info_cap_shift(&caps, sizeof(info));
->>>>> +				if (copy_to_user((void __user *)arg +
->>>>> +						sizeof(info), caps.buf,
->>>>> +						caps.size)) {
->>>>> +					kfree(caps.buf);
->>>>> +					return -EFAULT;
->>>>> +				}
->>>>> +				info.cap_offset = sizeof(info);
->>>>> +			}
->>>>> +
->>>>> +			kfree(caps.buf);
->>>>> +		}
->>>>> +
->>>>>  		return copy_to_user((void __user *)arg, &info, minsz) ?
->>>>>  			-EFAULT : 0;
->>>>>  
->>>>> diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
->>>>> index 4a9dbc2..8dae013 100644
->>>>> --- a/include/uapi/linux/vfio.h
->>>>> +++ b/include/uapi/linux/vfio.h
->>>>> @@ -488,7 +488,35 @@ struct vfio_iommu_type1_info {
->>>>>  	__u32	argsz;
->>>>>  	__u32	flags;
->>>>>  #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
->>>>> -	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
->>>>> +#define VFIO_IOMMU_INFO_CAPS	(1 << 1)	/* Info supports caps */
->>>>> +	__u64	iova_pgsizes;	/* Bitmap of supported page sizes */
->>>>> +	__u32	__resv;
->>>>> +	__u32   cap_offset;	/* Offset within info struct of first cap */
->>>>> +};    
->>>>
->>>> I understand the padding, but not the ordering.  Why not end with
->>>> padding?
->>>>  
->>>>> +
->>>>> +#define VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY	1
->>>>> +
->>>>> +/*
->>>>> + * The MSI geometry capability allows to report the MSI IOVA geometry:
->>>>> + * - either the MSI IOVAs are constrained within a reserved IOVA aperture
->>>>> + *   whose boundaries are given by [@aperture_start, @aperture_end].
->>>>> + *   this is typically the case on x86 host. The userspace is not allowed
->>>>> + *   to map userspace memory at IOVAs intersecting this range using
->>>>> + *   VFIO_IOMMU_MAP_DMA.
->>>>> + * - or the MSI IOVAs are not requested to belong to any reserved range;
->>>>> + *   in that case the userspace must provide an IOVA window characterized by
->>>>> + *   @size and @alignment using VFIO_IOMMU_MAP_DMA with RESERVED_MSI_IOVA flag.
->>>>> + */
->>>>> +struct vfio_iommu_type1_info_cap_msi_geometry {
->>>>> +	struct vfio_info_cap_header header;
->>>>> +	__u32 flags;
->>>>> +#define VFIO_IOMMU_MSI_GEOMETRY_RESERVED (1 << 0) /* reserved geometry */
->>>>> +	/* not reserved */
->>>>> +	__u32 order; /* iommu page order used for aperture alignment*/
->>>>> +	__u64 size; /* IOVA aperture size (bytes) the userspace must provide */
->>>>> +	/* reserved */
->>>>> +	__u64 aperture_start;
->>>>> +	__u64 aperture_end;    
->>>>
->>>> Should these be a union?  We never set them both.  Should the !reserved
->>>> case have a flag as well, so the user can positively identify what's
->>>> being provided?  
->>>
->>> Actually, is there really any need to fit both of these within the same
->>> structure?  Part of the idea of the capability chains is we can create
->>> a capability for each new thing we want to describe.  So, we could
->>> simply define a generic reserved IOVA range capability with a 'start'
->>> and 'end' and then another capability to define MSI mapping
->>> requirements.  Thanks,  
->> Yes your suggested approach makes sense to me.
+>> This patch is based on the original patch by Marc Titinger.
 >>
->> One reason why I proceeded that way is we are mixing things at iommu.h
->> level too. Personally I would have preferred to separate things:
->> 1) add a new IOMMU_CAP_TRANSLATE_MSI capability in iommu_cap
->> 2) rename iommu_msi_supported into "programmable" bool: reporting
->> whether the aperture is reserved or programmable.
+>> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>  drivers/base/power/domain.c | 95 +++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/pm_domain.h   |  8 ++++
+>>  2 files changed, 103 insertions(+)
 >>
->> In the early releases I think it was as above but slightly we moved to a
->> mixed description.
+>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>> index 4e87170..4208b67 100644
+>> --- a/drivers/base/power/domain.c
+>> +++ b/drivers/base/power/domain.c
+>> @@ -1917,6 +1917,101 @@ out:
+>>         return ret ? -EPROBE_DEFER : 0;
+>>  }
+>>  EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+>> +
+>> +static const struct of_device_id idle_state_match[] = {
+>> +       { .compatible = "arm,idle-state", },
+>> +       { }
+>> +};
+>> +
+>> +static int genpd_parse_state(struct genpd_power_state *genpd_state,
+>> +                                   struct device_node *state_node)
+>> +{
+>> +       int err;
+>> +       u32 residency;
+>> +       u32 entry_latency, exit_latency;
+>> +       const struct of_device_id *match_id;
+>> +
+>> +       match_id = of_match_node(idle_state_match, state_node);
+>> +       if (!match_id)
+>> +               return -EINVAL;
+>> +
+>> +       err = of_property_read_u32(state_node, "entry-latency-us",
+>> +                                               &entry_latency);
+>> +       if (err) {
+>> +               pr_debug(" * %s missing entry-latency-us property\n",
+>> +                                               state_node->full_name);
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       err = of_property_read_u32(state_node, "exit-latency-us",
+>> +                                               &exit_latency);
+>> +       if (err) {
+>> +               pr_debug(" * %s missing exit-latency-us property\n",
+>> +                                               state_node->full_name);
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       err = of_property_read_u32(state_node, "min-residency-us", &residency);
+>> +       if (!err)
+>> +               genpd_state->residency_ns = 1000 * residency;
+>> +
+>> +       genpd_state->power_on_latency_ns = 1000 * exit_latency;
+>> +       genpd_state->power_off_latency_ns = 1000 * entry_latency;
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +/**
+>> + * of_genpd_parse_idle_states: Return array of idle states for the genpd.
+>> + *
+>> + * @dn: The genpd device node
+>> + * @states: The pointer to which the state array will be saved.
+>> + * @n: The count of elements in the array returned from this function.
+>> + *
+>> + * Returns the device states parsed from the OF node. The memory for the states
+>> + * is allocated by this function and is the responsibility of the caller to
+>> + * free the memory after use.
+>> + */
+>> +int of_genpd_parse_idle_states(struct device_node *dn,
+>> +                       struct genpd_power_state **states, int *n)
+>
+>Instead of taking **states as a parameter, let's instead return it as
+>a pointer for the allocated struct. In case of failures, let's return
+>ERR_PTR().
+>
+Hmm.. I thought about it. There are 2 return values from this function.
+If we return a pointer to the allocated memory, we still have to return
+the size of it as an argument. I wasn't happy splitting the return
+values in 2 different places.
+
+>> +{
+>> +       struct genpd_power_state *st;
+>> +       struct device_node *np;
+>> +       int i = 0;
+>> +       int err, ret;
+>> +       int count;
+>> +       struct of_phandle_iterator it;
+>> +
+>> +       count = of_count_phandle_with_args(dn, "domain-idle-states", NULL);
+>
+>If count is zero or an error, we should return an error code (ERR_PTR()). Right?
+>
+OK
+>> +
+>> +       st = kcalloc(count, sizeof(*st), GFP_KERNEL);
+>> +       if (!st)
+>> +               return -ENOMEM;
+>> +
+>> +       /* Loop over the phandles until all the requested entry is found */
+>> +       of_for_each_phandle(&it, err, dn, "domain-idle-states", NULL, 0) {
+>> +               np = of_node_get(it.node);
+>
+>I don't think you need to increment the usage count for the device
+>node as that is already managed by of_for_each_phandle().
+>
+>It's only in the error case below, when it's needed.
+>
+Hmm.. Didn't realize that.. will fix.
+
+>> +               ret = genpd_parse_state(&st[i++], np);
+>> +               if (ret) {
+>> +                       pr_err
+>> +                       ("Parsing idle state node %s failed with err %d\n",
+>> +                                                       np->full_name, ret);
+>> +                       of_node_put(np);
+>> +                       goto fail;
+>
+>The goto seems unnecessary. Why not deal with all error handling here
+>and return the error code?
+>
+>> +               }
+>> +               of_node_put(np);
+>
+>According the comment above, you should be able to remove this.
+>
+>> +       }
+>> +
+>> +       *n = count;
+>> +       *states = st;
+>> +
+>> +       return 0;
+>> +fail:
+>> +       kfree(st);
+>> +       return ret;
+>> +}
+>> +EXPORT_SYMBOL(of_genpd_parse_idle_states);
+>
+>Please use EXPORT_SYMBOL_GPL() instead.
+>
+Hmm.. OK
+
+Thanks,
+Lina
+>> +
+>>  #endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
 >>
->> What do you think?
-> 
-> The API certainly doesn't seem like it has a cohesive feel to me.  It's
-> not entirely clear to me how we know when we need to register a DMA MSI
-> cookie, or how we know that the MSI doorbell API is actually
-> initialized and in use by the MSI/IOMMU layer, or exactly what is the
-> MSI geometry telling me.  Perhaps this is why the code doesn't seem to
-> have a good rejection mechanism for architectures that need it versus
-> those that don't, it's too hard to tell.
-> 
-> Maybe we can look at what we think the user API should be and work
-> backwards.  For x86 we simply have a reserved range of IOVA.  I'm not
-> entirely sure it adds to the user API to know that it's for MSI, it's
-> just a range of IOVAs that we cannot allocate for regular DMA.  In
-> fact, we currently lack a mechanism for describing the IOVA space of
-> the IOMMU at all, so rather than focusing on a mechanism to describe a
-> hole in the IOVA space, we might simply want to focus on a mechanism to
-> describe the available IOVA space.  Everybody needs that, not just
-> x86.  That sort of sounds like a VFIO_IOMMU_TYPE1_INFO_CAP_IOVA_RANGE
-> that perhaps looks like:
-> 
-> struct vfio_iommu_type1_info_cap_iova_range {
-> 	struct vfio_info_cap_header header;
-> 	u64 start;
-> 	u64 end;
-> };
-> 
-> Clearly we need to allow multiple of these in the capability chain
-> since the existing x86 MSI range bisects this address space.
-> 
-> To support this, we basically need the same information from the IOMMU
-> API.  We already have DOMAIN_ATTR_GEOMETRY, which should give us the
-> base IOVA range, but we don't have anything describing the gaps.  We
-> don't know how many sources of gaps we'll have in the future, but let's
-> keep it simple and assume we can look for MSI gaps and add other
-> possible sources of gaps in the future, it's an internal API after all.
-> So we can use DOMAIN_ATTR_MSI_GEOMETRY to tell us about the (we assume
-> one) MSI range of reserved IOVA within DOMAIN_ATTR_GEOMETRY.  For x86
-> this is fixed, for SMMU this is a zero range until someone programs it.
-> 
-> Now, what does a user need to know to add a reserved MSI IOVA range?
-> They need to know a) that it needs to be done, and b) how big to make
-> it (and maybe alignment requirements).  Really all we need to describe
-> then is b) since b) implies a). So maybe that gives us another
-> capability chain entry:
-> 
-> struct vfio_iommu_type1_info_cap_msi_resv {
-> 	struct vfio_info_cap_header header;
-> 	u64 size;
-> 	u64 alignment;
-> };
-
-I like the approach and I like the idea to separate the 2 issues in
-separate structs, both at VFIO level and IOMMU level. It makes even more
-sense now we have the other requirement to handle host PCIe host bridge
-window.
-> 
-> It doesn't seem like we need to waste a flag bit on
-> vfio_iommu_type1_info.flags for this since the existence of this
-> capability would imply that VFIO_IOMMU_MAP_DMA supports an MSI_RESV
-> flag.
-I agree.
-> 
-> So what do we need from the kernel infrastructure to make that happen?
-> Well, we need a) and b) above, and again b) can imply a), so if the
-> IOMMU API provided a DOMAIN_ATTR_MSI_RESV, providing the same
-> size/alignment, then we're nearly there.
-Agreed
-  Then we just need a way to
-> set that range, which I'd probably try to plumb through the IOMMU API
-> rather than pulling in separate doorbell APIs and DMA cookie APIs.  If
-> it's going to pull together all those different things, let's at least
-> only do that in one place so we can expose a consistent API through the
-> IOMMU API.  Obviously once a range is set, DOMAIN_ATTR_MSI_RESV should
-> report that range, so if the user were to look at the type1 info
-> capability chain again, the available IOVA ranges would reflect the now
-> reserved range.
-So my plan is to respin the passthrough series with
-vfio_iommu_type1_info_cap_msi_resv and associated iommu struct.
-
-I would prefer to send a separate series to report IOVA  usable address
-space.
-
-Thanks
-
-Eric
-> 
-> Maybe that's more than you're asking for, but that's the approach I
-> would take to solidify the API.  Thanks,
-> 
-> Alex
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>>
+>> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+>> index f4492eb..b489496 100644
+>> --- a/include/linux/pm_domain.h
+>> +++ b/include/linux/pm_domain.h
+>> @@ -205,6 +205,8 @@ extern int of_genpd_add_device(struct of_phandle_args *args,
+>>  extern int of_genpd_add_subdomain(struct of_phandle_args *parent,
+>>                                   struct of_phandle_args *new_subdomain);
+>>  extern struct generic_pm_domain *of_genpd_remove_last(struct device_node *np);
+>> +extern int of_genpd_parse_idle_states(struct device_node *dn,
+>> +                       struct genpd_power_state **states, int *n);
+>>
+>>  int genpd_dev_pm_attach(struct device *dev);
+>>  #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+>> @@ -234,6 +236,12 @@ static inline int of_genpd_add_subdomain(struct of_phandle_args *parent,
+>>         return -ENODEV;
+>>  }
+>>
+>> +static inline int of_genpd_parse_idle_states(struct device_node *dn,
+>> +                       struct genpd_power_state **states, int *n)
+>> +{
+>> +       return -ENODEV;
+>> +}
+>> +
+>>  static inline int genpd_dev_pm_attach(struct device *dev)
+>>  {
+>>         return -ENODEV;
+>> --
+>> 2.7.4
+>>
+>
+>Kind regards
+>Uffe
