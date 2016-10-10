@@ -1,54 +1,37 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 10 Oct 2016 12:03:33 +0200
-Subject: [PATCH v2 4/8] PM / Domains: Save the fwnode in genpd_power_state
-In-Reply-To: <1475879821-8035-5-git-send-email-lina.iyer@linaro.org>
-References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
- <1475879821-8035-5-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAPDyKFqp8B67Hxpj+07aQ_8kEZNJ_5M+MexWz21jLpWWacw+bw@mail.gmail.com>
+From: emil@limesaudio.com (Emil Lundmark)
+Date: Mon, 10 Oct 2016 12:03:05 +0200
+Subject: [PATCH v2 1/2] clk: imx: fix integer overflow in AV PLL round rate
+In-Reply-To: <cover.1476092427.git.emil@limesaudio.com>
+References: <cover.1476092427.git.emil@limesaudio.com>
+Message-ID: <4e8696869cc82443825a590966bbd3a265befdfa.1476092427.git.emil@limesaudio.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 October 2016 at 00:36, Lina Iyer <lina.iyer@linaro.org> wrote:
-> Save the fwnode for the genpd state in the state node. PM Domain clients
-> may use the fwnode to read in the platform specific domain state
-> properties and associate them with the state.
->
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Since 'parent_rate * mfn' may overflow 32 bits, the result should be
+stored using 64 bits.
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Fixes: ba7f4f557eb6 ("clk: imx: correct AV PLL rate formula")
+Signed-off-by: Emil Lundmark <emil@limesaudio.com>
+---
+ drivers/clk/imx/clk-pllv3.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Kind regards
-Uffe
-
-> ---
->  drivers/base/power/domain.c | 1 +
->  include/linux/pm_domain.h   | 1 +
->  2 files changed, 2 insertions(+)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 4208b67..e0f31fe 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1957,6 +1957,7 @@ static int genpd_parse_state(struct genpd_power_state *genpd_state,
->
->         genpd_state->power_on_latency_ns = 1000 * exit_latency;
->         genpd_state->power_off_latency_ns = 1000 * entry_latency;
-> +       genpd_state->fwnode = &state_node->fwnode;
->
->         return 0;
->  }
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index b489496..6a89881 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -39,6 +39,7 @@ struct genpd_power_state {
->         s64 power_off_latency_ns;
->         s64 power_on_latency_ns;
->         s64 residency_ns;
-> +       struct fwnode_handle *fwnode;
->  };
->
->  struct generic_pm_domain {
-> --
-> 2.7.4
->
+diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+index 19f9b622981a..bc7f163ea13c 100644
+--- a/drivers/clk/imx/clk-pllv3.c
++++ b/drivers/clk/imx/clk-pllv3.c
+@@ -247,7 +247,11 @@ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	do_div(temp64, parent_rate);
+ 	mfn = temp64;
+ 
+-	return parent_rate * div + parent_rate * mfn / mfd;
++	temp64 = (u64)parent_rate;
++	temp64 *= mfn;
++	do_div(temp64, mfd);
++
++	return parent_rate * div + (u32)temp64;
+ }
+ 
+ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
+-- 
+2.7.4
