@@ -1,56 +1,45 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 10 Oct 2016 19:46:10 +0530
-Subject: [PATCH 1/2] host: ehci-exynos: Convert to use the
- SET_SYSTEM_SLEEP_PM_OPS
-In-Reply-To: <Pine.LNX.4.44L0.1610091713490.1734-100000@netrider.rowland.org>
-References: <20161009163446.GA9672@kozik-lap>
- <Pine.LNX.4.44L0.1610091713490.1734-100000@netrider.rowland.org>
-Message-ID: <CANAwSgTfnjmyHJv+MTr1ukcwjb8cu73564kFqb2u=5xtX-r7Tw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Oct 2016 15:18:19 +0100
+Subject: MAINTAINERS entry for ARM/CLKDEV SUPPORT
+In-Reply-To: <20161010140810.GA30609@mwanda>
+References: <20161010140810.GA30609@mwanda>
+Message-ID: <20161010141819.GA1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Alan/Krzysztof,
+On Mon, Oct 10, 2016 at 05:08:10PM +0300, Dan Carpenter wrote:
+> Hello Stephen Boyd,
 
-On 10 October 2016 at 02:47, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Sun, 9 Oct 2016, Krzysztof Kozlowski wrote:
->
->> On Sun, Oct 09, 2016 at 02:34:14PM +0000, Anand Moon wrote:
->> > Move the ehci-exynos system PM callbacks within #ifdef CONFIG_PM_SLEEP
->> > as to avoid them being build when not used. This also allows us to use the
->> > SET_SYSTEM_SLEEP_PM_OPS macro which simplifies the code.
->> >
->> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->> > ---
->> >  drivers/usb/host/ehci-exynos.c | 14 ++++++--------
->> >  1 file changed, 6 insertions(+), 8 deletions(-)
->> >
->> > diff --git a/drivers/usb/host/ehci-exynos.c b/drivers/usb/host/ehci-exynos.c
->> > index 42e5b66..1899900 100644
->> > --- a/drivers/usb/host/ehci-exynos.c
->> > +++ b/drivers/usb/host/ehci-exynos.c
->> > @@ -251,7 +251,7 @@ static int exynos_ehci_remove(struct platform_device *pdev)
->> >     return 0;
->> >  }
->> >
->> > -#ifdef CONFIG_PM
->> > +#ifdef CONFIG_PM_SLEEP
->>
->> Does not look like an equivalent change. How will it behave in a config
->> with !SUSPEND && !HIBERNATE && PM?
->
-> It's hard to say what Anand originally had in mind.  To me, it looks
-> like it will behave exactly the same as before, the only difference
-> being that the object image will not contain unused exynos_ehci_suspend
-> and exynos_ehci_resume routines.  And the compiler won't issue a
-> warning at build time that the routines are unused.
->
-> Alan Stern
->
+Okay, that's really not nice.
 
-Thanks for looking into this closely.
+This is _not_ a question for Stephen.  Stephen does _not_ co-maintain
+clkdev or the clk API, but co-maintains CCF.  I've no idea why you are
+addressing this to Stephen when this is clearly a question for me to
+answer.
 
-I will just send one line changes to use SET_SYSTEM_SLEEP_PM_OPS
-with better commit logs, if you people agree with this.
+> The MAINTAINERS entry looks like this:
+> 
+> ARM/CLKDEV SUPPORT
+> M:      Russell King <linux@armlinux.org.uk>
+> L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> S:      Maintained
+> F:      arch/arm/include/asm/clkdev.h
+> F:      drivers/clk/clkdev.c
+> 
+> 
+> We removed arch/arm/include/asm/clkdev.h in 34d2f4d3a4d6a6b ('ARM: Use
+> generic clkdev.h header').  Do you still need to be CC'd on the clkdev.c
+> changes?
 
-Best Regards
--Anand Moon
+Technically, it is redundant anyway, as I'm listed for all arch/arm
+changes.  However, the maintainership of arch/arm and the maintainership
+of clkdev are separate, the explicit entry is quite right.
+
+It's also right that it's retained, because if we stop using the generic
+clkdev.h header, I want to be copied on such a change, and this entry
+will allow checkpatch to list me as clkdev maintainer.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
