@@ -1,38 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 10 Oct 2016 10:15:26 +0300
-Subject: [PATCH v5 2/5] drm/bridge: Add RGB to VGA bridge support
-In-Reply-To: <04679d93-ae58-7c94-616e-2eec23e84d6e@codeaurora.org>
-References: <20160930143709.1388-1-maxime.ripard@free-electrons.com>
- <20161007091444.GO4684@lukather>
- <04679d93-ae58-7c94-616e-2eec23e84d6e@codeaurora.org>
-Message-ID: <2147837.toaTVtNybe@avalon>
+From: huangtao@rock-chips.com (Huang, Tao)
+Date: Mon, 10 Oct 2016 15:18:34 +0800
+Subject: [PATCH] ARM: dts: rockchip: Reserve unusable memory region on
+ rk3066
+In-Reply-To: <f8aba48d-6c69-b246-4cb2-48a2770c80e4@gmail.com>
+References: <20161001140939.GA31220@vaio-ubuntu>
+ <6239b970-09d3-f7ee-e6f5-c019eaedb725@rock-chips.com>
+ <f8aba48d-6c69-b246-4cb2-48a2770c80e4@gmail.com>
+Message-ID: <67831fd0-76af-a793-0b2f-958e45633fe8@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Archit,
+Hi Pawe?:
+On 2016?10?05? 14:09, Pawe? Jarosz wrote:
+> W dniu 05.10.2016 o 04:27, Huang, Tao pisze:
+>> I don't remember RK3066 has such limit. I will double check with our IC
+>> design team.
+>> Do you know which master can not access this memory area
+>> [0x9F000000~0xA0000000)?
+> I don't.
+>> Could you please tell which board you're using (and how much memory it has)
+> Rikomagic MK808 1GB RAM
+>
+Our IC guy need us tell them which master can not access such area, DMA
+or EMMC Controller or GPU, etc? Could you tell me how to reproduce such
+issue?
+And we can confirm CPU core can access this memory through /dev/mem and
+the test board is 1GB too. Personally, I don't think RK3066 has such
+limit because when we verify this chip, we don't found such limit at all.
 
-On Monday 10 Oct 2016 11:05:10 Archit Taneja wrote:
-> On 10/07/2016 02:44 PM, Maxime Ripard wrote:
-> > On Fri, Oct 07, 2016 at 10:27:31AM +0530, Archit Taneja wrote:
-
-[snip]
-
-> >> If no one has any more objections within the next day, I'll pull in
-> >> Maxime's v5 RGB to VGA bridge driver, and change the compatible to
-> >> "dumb-vga-dac".
-> > 
-> > That works for me. You'll probably want to update the Kconfig and file
-> > name to match though.
-> 
-> Queued to drm-misc, with the changes suggested by you and Laurent.
-
-Those changes would have been worth a repost. I've had a look at the patch 
-you've committed and it looks OK to me, so no harm done (the commit message is 
-a bit inaccurate, but it's not the end of the world). Could you please make 
-sure you repost patches in the future when you change them in non-trivial ways 
-?
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+Huang, Tao
