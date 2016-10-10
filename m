@@ -1,34 +1,22 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 10 Oct 2016 15:43:41 +0100
-Subject: [PATCH] MAINTAINERS: Add ARM64-specific ACPI maintainers entry
-In-Reply-To: <20161005112540.22189-1-lorenzo.pieralisi@arm.com>
-References: <20161005112540.22189-1-lorenzo.pieralisi@arm.com>
-Message-ID: <3e72e04e-18d8-b833-d59d-d475d80afab5@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Oct 2016 09:45:37 -0500
+Subject: [PATCH 1/9] drm/sun4i: sun6i-drc: Support DRC on A31 and A31s
+In-Reply-To: <20161006160629.11198-2-wens@csie.org>
+References: <20161006160629.11198-1-wens@csie.org>
+ <20161006160629.11198-2-wens@csie.org>
+Message-ID: <20161010144537.GA22357@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 07, 2016 at 12:06:21AM +0800, Chen-Yu Tsai wrote:
+> The A31 and A31s also have the DRC as part of the display pipeline.
+> As we know virtually nothing about them, just add compatible strings
+> for both SoCs to the stub driver.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 2 ++
+>  drivers/gpu/drm/sun4i/sun6i_drc.c                             | 2 ++
+>  2 files changed, 4 insertions(+)
 
-
-On 05/10/16 12:25, Lorenzo Pieralisi wrote:
-> The ARM64 architecture defines ARM64 specific ACPI bindings to
-> configure and set-up arch specific components. To simplify
-> code reviews/updates and streamline the maintainership structure
-> supporting the arch specific code, a new arm64 directory was created in
-> /drivers/acpi, to contain ACPI code that is specific to ARM64
-> architecture.
->
-> Add the ARM64-specific ACPI maintainers entry in MAINTAINERS for
-> the newly created subdirectory and respective code content.
->
-> Lorenzo Pieralisi will be in charge of submitting and managing
-> the pull requests on behalf of all maintainers listed.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-
--- 
-Regards,
-Sudeep
+Acked-by: Rob Herring <robh@kernel.org>
