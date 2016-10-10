@@ -1,21 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Oct 2016 07:59:46 -0500
-Subject: [RESEND PATCH v2 3/3] dt-bindings: reset: oxnas: Update for OX820
-In-Reply-To: <20161005152710.2898-4-narmstrong@baylibre.com>
-References: <20161005152710.2898-1-narmstrong@baylibre.com>
- <20161005152710.2898-4-narmstrong@baylibre.com>
-Message-ID: <20161010125946.GA31343@rob-hp-laptop>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 10 Oct 2016 15:09:43 +0200
+Subject: [PATCH v4 10/10] ARM: sunxi: Enable sun8i-emac driver on
+ multi_v7_defconfig
+In-Reply-To: <20161010123511.GA16103@Red>
+References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1475828757-926-11-git-send-email-clabbe.montjoie@gmail.com>
+ <20161010123046.GH3462@lukather> <20161010123511.GA16103@Red>
+Message-ID: <20161010150943.fa7ca85fe52f4c6f9508b5eb@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 05, 2016 at 05:27:10PM +0200, Neil Armstrong wrote:
-> Add new compatible string for reset and sys-ctrl for the Oxford
-> Semiconductor OX820 Support.
-> Drop the OX810SE indices since they moved in a dedicated include file.
-> 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../devicetree/bindings/reset/oxnas,reset.txt      | 44 +++++-----------------
->  1 file changed, 9 insertions(+), 35 deletions(-)
+On Mon, 10 Oct 2016 14:35:11 +0200
+LABBE Corentin <clabbe.montjoie@gmail.com> wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> On Mon, Oct 10, 2016 at 02:30:46PM +0200, Maxime Ripard wrote:
+> > On Fri, Oct 07, 2016 at 10:25:57AM +0200, Corentin Labbe wrote:
+> > > Enable the sun8i-emac driver in the multi_v7 default configuration
+> > > 
+> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > > ---
+> > >  arch/arm/configs/multi_v7_defconfig | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> > > index 5845910..f44d633 100644
+> > > --- a/arch/arm/configs/multi_v7_defconfig
+> > > +++ b/arch/arm/configs/multi_v7_defconfig
+> > > @@ -229,6 +229,7 @@ CONFIG_NETDEVICES=y
+> > >  CONFIG_VIRTIO_NET=y
+> > >  CONFIG_HIX5HD2_GMAC=y
+> > >  CONFIG_SUN4I_EMAC=y
+> > > +CONFIG_SUN8I_EMAC=y
+> > 
+> > Any reason to build it statically?
+> > 
+> 
+> No, just copied the same than CONFIG_SUN4I_EMAC that probably do not need it also.
+
+All arm configs are done the same way, and, some day, the generic ARM
+V7 kernel will not be loadable in 1Gb RAM...
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
