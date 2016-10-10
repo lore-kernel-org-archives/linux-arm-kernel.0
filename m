@@ -1,36 +1,54 @@
-From: emil@limesaudio.com (Emil Lundmark)
-Date: Mon, 10 Oct 2016 12:03:04 +0200
-Subject: [PATCH v2 0/2] clk: imx: fix AV PLL rate setting
-Message-ID: <cover.1476092427.git.emil@limesaudio.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 10 Oct 2016 12:03:33 +0200
+Subject: [PATCH v2 4/8] PM / Domains: Save the fwnode in genpd_power_state
+In-Reply-To: <1475879821-8035-5-git-send-email-lina.iyer@linaro.org>
+References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
+ <1475879821-8035-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFqp8B67Hxpj+07aQ_8kEZNJ_5M+MexWz21jLpWWacw+bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 8 October 2016 at 00:36, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Save the fwnode for the genpd state in the state node. PM Domain clients
+> may use the fwnode to read in the platform specific domain state
+> properties and associate them with the state.
+>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 
-I did not use a cover letter in v1, so here is a summary instead.
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-I discovered a problem when trying to set the rate of the audio PLL
-(pll4_post_div) on an i.MX6Q. The rate I wanted to set was 196.608 MHz, but
-the actual rate I got was 192.000570 MHz. This patch series fixes this
-issue and also improves the precision of the audio/video PLL.
+Kind regards
+Uffe
 
-There are no code changes in v2, only clarifications in the commit
-messages.
-
-Changes since v1:
-- Use correct subsystem name in commit summary.
-- Use 'Fixes:' tag to indicate bug fix.
-- Revise argument for choosing the denominator register value after
-  comments from Lothar Wa?mann.
-
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/460350.html
-
-Emil Lundmark (2):
-  clk: imx: fix integer overflow in AV PLL round rate
-  clk: imx: improve precision of AV PLL to 1 Hz
-
- drivers/clk/imx/clk-pllv3.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
-
--- 
-2.7.4
+> ---
+>  drivers/base/power/domain.c | 1 +
+>  include/linux/pm_domain.h   | 1 +
+>  2 files changed, 2 insertions(+)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 4208b67..e0f31fe 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1957,6 +1957,7 @@ static int genpd_parse_state(struct genpd_power_state *genpd_state,
+>
+>         genpd_state->power_on_latency_ns = 1000 * exit_latency;
+>         genpd_state->power_off_latency_ns = 1000 * entry_latency;
+> +       genpd_state->fwnode = &state_node->fwnode;
+>
+>         return 0;
+>  }
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index b489496..6a89881 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -39,6 +39,7 @@ struct genpd_power_state {
+>         s64 power_off_latency_ns;
+>         s64 power_on_latency_ns;
+>         s64 residency_ns;
+> +       struct fwnode_handle *fwnode;
+>  };
+>
+>  struct generic_pm_domain {
+> --
+> 2.7.4
+>
