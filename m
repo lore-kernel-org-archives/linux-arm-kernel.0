@@ -1,123 +1,270 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 10 Oct 2016 12:55:13 +0200
-Subject: [RESEND PATCH v6, 3/5] usb: xhci-mtk: make IPPC register optional
-In-Reply-To: <1474437277-27201-4-git-send-email-chunfeng.yun@mediatek.com>
-References: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
- <1474437277-27201-4-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <62b78471-d93f-a5c2-20ef-dfeeea1720db@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 10 Oct 2016 13:04:58 +0200
+Subject: [PATCH v2 7/8] PM / Domains: Support IRQ safe PM domains
+In-Reply-To: <1475879821-8035-8-git-send-email-lina.iyer@linaro.org>
+References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
+ <1475879821-8035-8-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFqDtcL+qz3jx=1wGiXO-u_g7k_RW-PEeB7L1hyqNQH-wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/21/2016 07:54 AM, Chunfeng Yun wrote:
-> Make IPPC register optional to support host side of dual-role mode,
-> due to it is moved into common glue layer for simplification.
+On 8 October 2016 at 00:37, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Generic Power Domains currently support turning on/off only in process
+> context. This prevents the usage of PM domains for domains that could be
+> powered on/off in a context where IRQs are disabled. Many such domains
+> exist today and do not get powered off, when the IRQ safe devices in
+> that domain are powered off, because of this limitation.
 >
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> However, not all domains can operate in IRQ safe contexts. Genpd
+> therefore, has to support both cases where the domain may or may not
+> operate in IRQ safe contexts. Configuring genpd to use an appropriate
+> lock for that domain, would allow domains that have IRQ safe devices to
+> runtime suspend and resume, in atomic context.
+>
+> To achieve domain specific locking, set the domain's ->flag to
+> GENPD_FLAG_IRQ_SAFE while defining the domain. This indicates that genpd
+> should use a spinlock instead of a mutex for locking the domain. Locking
+> is abstracted through genpd_lock() and genpd_unlock() functions that use
+> the flag to determine the appropriate lock to be used for that domain.
+>
+> Domains that have lower latency to suspend and resume and can operate
+> with IRQs disabled may now be able to save power, when the component
+> devices and sub-domains are idle at runtime.
+>
+> The restriction this imposes on the domain hierarchy is that non-IRQ
+> safe domains may not have IRQ-safe subdomains, but IRQ safe domains may
+> have IRQ safe and non-IRQ safe subdomains and devices.
+>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Kind regards
+Uffe
+
 > ---
->  drivers/usb/host/xhci-mtk.c |   36 +++++++++++++++++++++++++++++-------
->  1 file changed, 29 insertions(+), 7 deletions(-)
+>  drivers/base/power/domain.c | 111 ++++++++++++++++++++++++++++++++++++++++----
+>  include/linux/pm_domain.h   |  10 +++-
+>  2 files changed, 110 insertions(+), 11 deletions(-)
 >
-> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-> index 79959f1..4bf99b9 100644
-> --- a/drivers/usb/host/xhci-mtk.c
-> +++ b/drivers/usb/host/xhci-mtk.c
-> @@ -94,6 +94,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
->  	int ret;
->  	int i;
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index d0ae559..87a016a 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -74,11 +74,70 @@ static const struct genpd_lock_ops genpd_mtx_ops = {
+>         .unlock = genpd_unlock_mtx,
+>  };
 >
-> +	if (ippc == NULL)
-> +		return 0;
+> +static void genpd_lock_spin(struct generic_pm_domain *genpd)
+> +       __acquires(&genpd->slock)
+> +{
+> +       unsigned long flags;
 > +
->  	/* power on host ip */
->  	value = readl(&ippc->ip_pw_ctr1);
->  	value &= ~CTRL1_IP_HOST_PDN;
-> @@ -139,6 +142,9 @@ static int xhci_mtk_host_disable(struct xhci_hcd_mtk *mtk)
->  	int ret;
->  	int i;
->
-> +	if (ippc == NULL)
-> +		return 0;
+> +       spin_lock_irqsave(&genpd->slock, flags);
+> +       genpd->lock_flags = flags;
+> +}
 > +
->  	/* power down all u3 ports */
->  	for (i = 0; i < mtk->num_u3_ports; i++) {
->  		value = readl(&ippc->u3_ctrl_p[i]);
-> @@ -173,6 +179,9 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
->  	struct mu3c_ippc_regs __iomem *ippc = mtk->ippc_regs;
->  	u32 value;
->
-> +	if (ippc == NULL)
-> +		return 0;
+> +static void genpd_lock_nested_spin(struct generic_pm_domain *genpd,
+> +                                       int depth)
+> +       __acquires(&genpd->slock)
+> +{
+> +       unsigned long flags;
 > +
-
-I would prefer to add a flag/bool in xhci_hcd_mtk to signal the absence 
-of the ippc. Or at least use a macro which checks the presence before 
-calling any of this three functions.
-
-Regards,
-Matthias
->  	/* reset whole ip */
->  	value = readl(&ippc->ip_pw_ctr0);
->  	value |= CTRL0_IP_SW_RST;
-> @@ -475,6 +484,7 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
->  /* called during probe() after chip reset completes */
->  static int xhci_mtk_setup(struct usb_hcd *hcd)
->  {
-> +	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
->  	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
->  	int ret;
->
-> @@ -482,12 +492,21 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
->  		ret = xhci_mtk_ssusb_config(mtk);
->  		if (ret)
->  			return ret;
-> +	}
+> +       spin_lock_irqsave_nested(&genpd->slock, flags, depth);
+> +       genpd->lock_flags = flags;
+> +}
 > +
-> +	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
-> +	if (ret)
-> +		return ret;
+> +static int genpd_lock_interruptible_spin(struct generic_pm_domain *genpd)
+> +       __acquires(&genpd->slock)
+> +{
+> +       unsigned long flags;
 > +
-> +	if (usb_hcd_is_primary_hcd(hcd)) {
-> +		mtk->num_u3_ports = xhci->num_usb3_ports;
-> +		mtk->num_u2_ports = xhci->num_usb2_ports;
->  		ret = xhci_mtk_sch_init(mtk);
->  		if (ret)
->  			return ret;
->  	}
+> +       spin_lock_irqsave(&genpd->slock, flags);
+> +       genpd->lock_flags = flags;
+> +       return 0;
+> +}
+> +
+> +static void genpd_unlock_spin(struct generic_pm_domain *genpd)
+> +       __releases(&genpd->slock)
+> +{
+> +       spin_unlock_irqrestore(&genpd->slock, genpd->lock_flags);
+> +}
+> +
+> +static const struct genpd_lock_ops genpd_spin_ops = {
+> +       .lock = genpd_lock_spin,
+> +       .lock_nested = genpd_lock_nested_spin,
+> +       .lock_interruptible = genpd_lock_interruptible_spin,
+> +       .unlock = genpd_unlock_spin,
+> +};
+> +
+>  #define genpd_lock(p)                  p->lock_ops->lock(p)
+>  #define genpd_lock_nested(p, d)                p->lock_ops->lock_nested(p, d)
+>  #define genpd_lock_interruptible(p)    p->lock_ops->lock_interruptible(p)
+>  #define genpd_unlock(p)                        p->lock_ops->unlock(p)
 >
-> -	return xhci_gen_setup(hcd, xhci_mtk_quirks);
-> +	return ret;
+> +#define genpd_is_irq_safe(genpd)       (genpd->flags & GENPD_FLAG_IRQ_SAFE)
+> +
+> +static inline bool irq_safe_dev_in_no_sleep_domain(struct device *dev,
+> +               struct generic_pm_domain *genpd)
+> +{
+> +       bool ret;
+> +
+> +       ret = pm_runtime_is_irq_safe(dev) && !genpd_is_irq_safe(genpd);
+> +
+> +       /* Warn once for each IRQ safe dev in no sleep domain */
+> +       if (ret)
+> +               dev_warn_once(dev, "PM domain %s will not be powered off\n",
+> +                               genpd->name);
+> +
+> +       return ret;
+> +}
+> +
+>  /*
+>   * Get the generic PM domain for a particular struct device.
+>   * This validates the struct device pointer, the PM domain pointer,
+> @@ -343,7 +402,12 @@ static int genpd_poweroff(struct generic_pm_domain *genpd, bool is_async)
+>                 if (stat > PM_QOS_FLAGS_NONE)
+>                         return -EBUSY;
+>
+> -               if (!pm_runtime_suspended(pdd->dev) || pdd->dev->power.irq_safe)
+> +               /*
+> +                * Do not allow PM domain to be powered off, when an IRQ safe
+> +                * device is part of a non-IRQ safe domain.
+> +                */
+> +               if (!pm_runtime_suspended(pdd->dev) ||
+> +                       irq_safe_dev_in_no_sleep_domain(pdd->dev, genpd))
+>                         not_suspended++;
+>         }
+>
+> @@ -506,10 +570,10 @@ static int genpd_runtime_suspend(struct device *dev)
+>         }
+>
+>         /*
+> -        * If power.irq_safe is set, this routine will be run with interrupts
+> -        * off, so it can't use mutexes.
+> +        * If power.irq_safe is set, this routine may be run with
+> +        * IRQs disabled, so suspend only if the PM domain also is irq_safe.
+>          */
+> -       if (dev->power.irq_safe)
+> +       if (irq_safe_dev_in_no_sleep_domain(dev, genpd))
+>                 return 0;
+>
+>         genpd_lock(genpd);
+> @@ -543,8 +607,11 @@ static int genpd_runtime_resume(struct device *dev)
+>         if (IS_ERR(genpd))
+>                 return -EINVAL;
+>
+> -       /* If power.irq_safe, the PM domain is never powered off. */
+> -       if (dev->power.irq_safe) {
+> +       /*
+> +        * As we don't power off a non IRQ safe domain, which holds
+> +        * an IRQ safe device, we don't need to restore power to it.
+> +        */
+> +       if (irq_safe_dev_in_no_sleep_domain(dev, genpd)) {
+>                 timed = false;
+>                 goto out;
+>         }
+> @@ -586,7 +653,8 @@ static int genpd_runtime_resume(struct device *dev)
+>  err_stop:
+>         genpd_stop_dev(genpd, dev);
+>  err_poweroff:
+> -       if (!dev->power.irq_safe) {
+> +       if (!pm_runtime_is_irq_safe(dev) ||
+> +               (pm_runtime_is_irq_safe(dev) && genpd_is_irq_safe(genpd))) {
+>                 genpd_lock(genpd);
+>                 genpd_poweroff(genpd, 0);
+>                 genpd_unlock(genpd);
+> @@ -1223,6 +1291,17 @@ static int genpd_add_subdomain(struct generic_pm_domain *genpd,
+>             || genpd == subdomain)
+>                 return -EINVAL;
+>
+> +       /*
+> +        * If the domain can be powered on/off in an IRQ safe
+> +        * context, ensure that the subdomain can also be
+> +        * powered on/off in that context.
+> +        */
+> +       if (!genpd_is_irq_safe(genpd) && genpd_is_irq_safe(subdomain)) {
+> +               WARN("Parent %s of subdomain %s must be IRQ safe\n",
+> +                               genpd->name, subdomain->name);
+> +               return -EINVAL;
+> +       }
+> +
+>         link = kzalloc(sizeof(*link), GFP_KERNEL);
+>         if (!link)
+>                 return -ENOMEM;
+> @@ -1337,6 +1416,17 @@ static int genpd_set_default_power_state(struct generic_pm_domain *genpd)
+>         return 0;
 >  }
 >
->  static int xhci_mtk_probe(struct platform_device *pdev)
-> @@ -586,7 +605,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
->  	mtk->hcd = platform_get_drvdata(pdev);
->  	platform_set_drvdata(pdev, mtk);
+> +static void genpd_lock_init(struct generic_pm_domain *genpd)
+> +{
+> +       if (genpd->flags & GENPD_FLAG_IRQ_SAFE) {
+> +               spin_lock_init(&genpd->slock);
+> +               genpd->lock_ops = &genpd_spin_ops;
+> +       } else {
+> +               mutex_init(&genpd->mlock);
+> +               genpd->lock_ops = &genpd_mtx_ops;
+> +       }
+> +}
+> +
+>  /**
+>   * pm_genpd_init - Initialize a generic I/O PM domain object.
+>   * @genpd: PM domain object to initialize.
+> @@ -1356,8 +1446,7 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
+>         INIT_LIST_HEAD(&genpd->master_links);
+>         INIT_LIST_HEAD(&genpd->slave_links);
+>         INIT_LIST_HEAD(&genpd->dev_list);
+> -       mutex_init(&genpd->mlock);
+> -       genpd->lock_ops = &genpd_mtx_ops;
+> +       genpd_lock_init(genpd);
+>         genpd->gov = gov;
+>         INIT_WORK(&genpd->power_off_work, genpd_power_off_work_fn);
+>         atomic_set(&genpd->sd_count, 0);
+> @@ -2133,7 +2222,9 @@ static int pm_genpd_summary_one(struct seq_file *s,
+>         }
 >
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac");
->  	hcd->regs = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(hcd->regs)) {
->  		ret = PTR_ERR(hcd->regs);
-> @@ -595,11 +614,14 @@ static int xhci_mtk_probe(struct platform_device *pdev)
->  	hcd->rsrc_start = res->start;
->  	hcd->rsrc_len = resource_size(res);
+>         list_for_each_entry(pm_data, &genpd->dev_list, list_node) {
+> -               kobj_path = kobject_get_path(&pm_data->dev->kobj, GFP_KERNEL);
+> +               kobj_path = kobject_get_path(&pm_data->dev->kobj,
+> +                               genpd_is_irq_safe(genpd) ?
+> +                               GFP_ATOMIC : GFP_KERNEL);
+>                 if (kobj_path == NULL)
+>                         continue;
 >
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> -	mtk->ippc_regs = devm_ioremap_resource(dev, res);
-> -	if (IS_ERR(mtk->ippc_regs)) {
-> -		ret = PTR_ERR(mtk->ippc_regs);
-> -		goto put_usb2_hcd;
-> +	mtk->ippc_regs = NULL;
-> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ippc");
-> +	if (res) {	/* ippc register is optional */
-> +		mtk->ippc_regs = devm_ioremap_resource(dev, res);
-> +		if (IS_ERR(mtk->ippc_regs)) {
-> +			ret = PTR_ERR(mtk->ippc_regs);
-> +			goto put_usb2_hcd;
-> +		}
->  	}
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index 811b968..81ece61 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -15,9 +15,11 @@
+>  #include <linux/err.h>
+>  #include <linux/of.h>
+>  #include <linux/notifier.h>
+> +#include <linux/spinlock.h>
 >
->  	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
+>  /* Defines used for the flags field in the struct generic_pm_domain */
+>  #define GENPD_FLAG_PM_CLK      (1U << 0) /* PM domain uses PM clk */
+> +#define GENPD_FLAG_IRQ_SAFE    (1U << 1) /* PM domain operates in atomic */
+>
+>  enum gpd_status {
+>         GPD_STATE_ACTIVE = 0,   /* PM domain is active */
+> @@ -76,7 +78,13 @@ struct generic_pm_domain {
+>         unsigned int state_idx; /* state that genpd will go to when off */
+>         void *free; /* Free the state that was allocated for default */
+>         const struct genpd_lock_ops *lock_ops;
+> -       struct mutex mlock;
+> +       union {
+> +               struct mutex mlock;
+> +               struct {
+> +                       spinlock_t slock;
+> +                       unsigned long lock_flags;
+> +               };
+> +       };
+>
+>  };
+>
+> --
+> 2.7.4
 >
