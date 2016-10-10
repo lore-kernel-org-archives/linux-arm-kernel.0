@@ -1,53 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 10 Oct 2016 10:14:25 +0100
-Subject: [PATCH v3] arm64: mm: move zero page from .bss to right before
- swapper_pg_dir
-In-Reply-To: <20161009231017.GA11582@remoulade>
-References: <1473696925-26156-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu-V+OKoeNFqvHvQOOFYi4VLm5mLKrmf9Z5oZY4KQkirsQ@mail.gmail.com>
- <20161009231017.GA11582@remoulade>
-Message-ID: <CAKv+Gu-eDFJkAU4+nox==tu=rPENmtF7DOYq9rS2_C-4nd0-6w@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Oct 2016 10:15:41 +0100
+Subject: [PATCH v3 11/12] scsi/ncr5380: Use correct types for DMA routines
+In-Reply-To: <8390541e30d7b7cd418a7b5095fdb4b5fc7aa0ed.1476051962.git.fthain@telegraphics.com.au>
+References: <cover.1476051961.git.fthain@telegraphics.com.au>
+ <8390541e30d7b7cd418a7b5095fdb4b5fc7aa0ed.1476051962.git.fthain@telegraphics.com.au>
+Message-ID: <20161010091541.GX1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2016 at 00:10, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Oct 07, 2016 at 10:31:14AM +0100, Ard Biesheuvel wrote:
->> On 12 September 2016 at 17:15, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > Move the statically allocated zero page from the .bss section to right
->> > before swapper_pg_dir. This allows us to refer to its physical address
->> > by simply reading TTBR1_EL1 (which always points to swapper_pg_dir and
->> > always has its ASID field cleared), and subtracting PAGE_SIZE.
->> >
->> > To protect the zero page from inadvertent modification, carve out a
->> > segment that covers it as well as idmap_pg_dir[], and mark it read-only
->> > in both the primary and the linear mappings of the kernel.
->
-> [...]
->
->> > -       map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
->> > +       map_kernel_segment(pgd, _data, __robss_start, PAGE_KERNEL,
->> > +                          &vmlinux_data);
->> > +       map_kernel_segment(pgd, __robss_start, __robss_end, PAGE_KERNEL_RO,
->> > +                          &vmlinux_robss);
->>
->> I realised it is actually unnecessary to map the idmap and the zero
->> page into the kernel mapping, so we could drop this line.
->
-> Given that drivers use the zero page, I wouldn't be entirely surprised to see
-> phys_to_virt(virt_to_phys(zero_page)) happen indirectly, and the end result
-> read. Are we sure that doesn't happen anywhere?
->
+On Mon, Oct 10, 2016 at 12:46:53AM -0400, Finn Thain wrote:
+> Apply prototypes to get consistent function signatures for the DMA
+> functions implemented in the board-specific drivers. To avoid using
+> macros to alter actual parameters, some of those functions are reworked
+> slightly.
+> 
+> This is a step toward the goal of passing the board-specific routines
+> to the core driver using an ops struct (as in a platform driver or
+> library module).
+> 
+> This also helps fix some inconsistent types: where the core driver uses
+> ints (cmd->SCp.this_residual and hostdata->dma_len) for keeping track of
+> transfers, certain board-specific routines used unsigned long.
+> 
+> While we are fixing these function signatures, pass the hostdata pointer
+> to DMA routines instead of a Scsi_Host pointer, for shorter and faster
+> code.
+> 
+> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+> Reviewed-by: Hannes Reinecke <hare@suse.com>
+> Tested-by: Ondrej Zary <linux@rainbow-software.org>
+> Tested-by: Michael Schmitz <schmitzmic@gmail.com>
+> ---
+>  drivers/scsi/arm/cumana_1.c | 26 ++++++++++------
+>  drivers/scsi/arm/oak.c      | 13 ++++----
 
-That conversion would actually still work, it would be the direct
-reference that is left unmapped. But given that it is mapped R/O
-anyway (which is the whole point of the patch), it makes more sense to
-follow the principle of least surprise, and make the direct symbol
-dereference work as expected.
+For these two,
 
-> For the idmap, I think we might walk that were we to take a fault (though
-> perhaps we don't). Otherwise, unless we add a sysfs walker for it I guess we
-> don't strictly need it in the linear map.
->
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Likewise, this is the kernel mapping not the linear mapping. But given
-how little this matters, please forget I said anything :-)
+Thanks.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
