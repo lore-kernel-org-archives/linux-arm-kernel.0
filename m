@@ -1,34 +1,24 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Mon, 10 Oct 2016 10:48:59 +0200
-Subject: camera on n900, v4.8
-In-Reply-To: <20161005190340.GA25755@amd>
-References: <20161005190340.GA25755@amd>
-Message-ID: <20161010084859.GD4467@pali>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 10 Oct 2016 01:57:32 -0700
+Subject: [PATCH devicetree] ARM: BCM53573: Specify PMU and its ILP clock
+ in the DT
+In-Reply-To: <20160917201346.15060-1-zajec5@gmail.com>
+References: <20160917201346.15060-1-zajec5@gmail.com>
+Message-ID: <c6443f52-e76b-f8a0-ad00-ce0dd950081e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 October 2016 21:03:41 Pavel Machek wrote:
-> Hi!
-> 
-> Camera has some non-trivial dependencies on N900; it seems to rely on
-> gpio-switch.c, for example. I'll try to strip the diff further, but in
-> the meantime, here's the version I'm working with.
-> 
-> 									Pavel
-> 
-> 
 
-With "Camera" do you mean some Maemo userspace application? Because I
-think that nobody else could depends on gpio-switch kernel driver.
 
-Anyway, it should be easy to rewrite such gpio-switch application to use
-either input kernel events (from /dev/input/something) or directly check
-gpio state via /sys/class/gpio/.
+On 09/17/2016 01:13 PM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+> 
+> ILP clock (sometimes called a "slow clock") is a part of PMU (Power
+> Management Unit). There has been recently added a driver for it, so add
+> a proper entry in the DT as well.
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-IIRC Maemo's Camera needed gpio-switch for testing if back camera cover
-is open or closed and for checking when camera push button pressed and
-released.
-
+Applied, thanks!
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
+Florian
