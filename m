@@ -1,45 +1,94 @@
-From: atull@opensource.altera.com (atull)
-Date: Mon, 10 Oct 2016 11:24:11 -0500
-Subject: [PATCH 2/3] doc: dt: add cyclone-spi binding document
-In-Reply-To: <CAAtXAHeZLBT-y8xTKgG4PnZA6DH1z5=FoaM4ipC3pTEVU9KR+Q@mail.gmail.com>
-References: <cover.1475783742.git.stillcompiling@gmail.com>
- <4b4432c04b4ea92a2af814e3d7866c33f2eb12ea.1475783742.git.stillcompiling@gmail.com>
- <8d89e70475e8e1c3ce5117a0367c8444c11c61e3.1475783742.git.stillcompiling@gmail.com>
- <CAAtXAHeZLBT-y8xTKgG4PnZA6DH1z5=FoaM4ipC3pTEVU9KR+Q@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1610101117320.28839@linuxheads99>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 10 Oct 2016 10:43:42 -0600
+Subject: [PATCH v2 5/8] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <4e55d6ad-8de7-72d7-7512-5e4ff2aabc79@arm.com>
+References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
+ <1475879821-8035-6-git-send-email-lina.iyer@linaro.org>
+ <4e55d6ad-8de7-72d7-7512-5e4ff2aabc79@arm.com>
+Message-ID: <20161010164342.GC44885@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Oct 2016, Moritz Fischer wrote:
+On Mon, Oct 10 2016 at 09:45 -0600, Sudeep Holla wrote:
+>
+>
+>On 07/10/16 23:36, Lina Iyer wrote:
+>>Update DT bindings to describe idle states of PM domains.
+>>
+>>This patch is based on the original patch by Marc Titinger.
+>>
+>>Cc: <devicetree@vger.kernel.org>
+>>Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+>>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>Acked-by: Rob Herring <robh@kernel.org>
+>>---
+>> .../devicetree/bindings/power/power_domain.txt     | 38 ++++++++++++++++++++++
+>> 1 file changed, 38 insertions(+)
+>>
+>>diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>>index 025b5e7..7f8f27e 100644
+>>--- a/Documentation/devicetree/bindings/power/power_domain.txt
+>>+++ b/Documentation/devicetree/bindings/power/power_domain.txt
+>>@@ -29,6 +29,10 @@ Optional properties:
+>>    specified by this binding. More details about power domain specifier are
+>>    available in the next section.
+>>
+>>+- domain-idle-states : A phandle of an idle-state that shall be soaked into a
+>>+                generic domain power state. The idle state definitions are
+>>+                compatible with arm,idle-state specified in [1].
+>>+
+>
+>Please do add the following details to the binding. IMO, this binding is
+>not complete in terms of specification as there are few open questions:
+>
+>1. What not define a standard compatible instead of "arm,idle-state" ?
+>   I agree it can be used, but as part of this *generic* binding, IMO
+>   it's better to have something generic and can be used by devices.
+>   Otherwise, this binding becomes CPU specific, that too ARM CPU
+>   specific.
+>
+We had gone down this path of having a separate DT bindings for domains
+that is not arm,idle-state. See RFC patches. But the binding did closely
+match this and it so was suggested that we use arm,idle-state which is
+already defined.
 
-> > +referred to as "passive serial".
-> > +The passive serial link is not technically spi, and might require extra
-> > +circuits in order to play nicely with other spi slaves on the same bus.
-> > +
-> > +See https://www.altera.com/literature/hb/cyc/cyc_c51013.pdf
-> > +
-> > +Required properties:
-> > +- compatible  : should contain "altr,cyclonespi-fpga-mgr"
-> 
-> Alan, do you guys have any input on the compat string?
+>2. Now taking CPU as a special device, how does this co-exist with the
+>   cpu-idle-states ? Better to have some description may be in the ARM
+>   CPU idle binding document(not here of-course)
+>
+The is a binding for a generic PM domain. This has no bearing on the CPU
+or its idle states. Its just that the data is compatible with
+arm,idle-state.
 
-We want to make it clear that this is for fpga configuration
-using a specific programming method (passive serial).
+>3. I still haven't seen any explanation for not considering complete
+>   hierarchical power domain representation which was raised in earlier
+>   versions. I had provided example for the proposal. I just saw them
+>   already in use in the upstream kernel by Renasas. e.g.:
+>   arch/arm/boot/dts/r8a73a4.dtsi
+>
+Hierarchical power domains have been available for few years in DT. The
+OF features of domains have always supported it. Platforms are free to
+define domains in hierarchy they seem fit for their SoCs. This is a
+feature that is available today and is not being modified in these
+patches. It will be creating confusion if I talk about hierarchical
+domains which are obvious and irrelevant to this series.
 
-How about altr,cyclone-ps-spi ?
+>   How does that fit with your proposal, though you have not made one
+>   yet for CPUs in this binding ? In the above file, CPUs have either
+>   own power domain inside the L2 one which is cluster level power
+>   domain.
+>
+Again, this series is not about the CPUs. This is about adding features
+to genpd that may be used in other contexts including cpuidle in the
+future.
 
-> 
-> I think generally the bindings should go before the actual usage in
-> your patch series. Meaning you wanna document the binding
-> before you use it. I think this patch should be [1/3].
-
-I agree.
+>One must be able to get answers to these above questions with this
+>binding. Until then it's *incomplete* though it may be correct.
+>
+I have always tried to answer all your questions. If anything remains
+unclarified pls. bring it up.
 
 Thanks,
-Alan
-
-> 
-> Cheers,
-> 
-> Moritz
-> 
+Lina
