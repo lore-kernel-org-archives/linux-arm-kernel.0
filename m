@@ -1,46 +1,39 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 10 Oct 2016 02:07:08 -0700
-Subject: [PATCH] ARM: dts: fix naming of pinctrl node
-In-Reply-To: <6039a5f9-2b36-c427-2f8a-addf76cf1c26@broadcom.com>
-References: <1475958866-15942-1-git-send-email-scott.branden@broadcom.com>
- <6039a5f9-2b36-c427-2f8a-addf76cf1c26@broadcom.com>
-Message-ID: <e21a9568-2e98-1cee-94bb-004639bc8ab2@gmail.com>
+Date: Mon, 10 Oct 2016 02:08:05 -0700
+Subject: [PATCH] arm64: defconfig: enable EEPROM_AT25 config option
+In-Reply-To: <1475875432-13627-1-git-send-email-scott.branden@broadcom.com>
+References: <1475875432-13627-1-git-send-email-scott.branden@broadcom.com>
+Message-ID: <a61b2b9d-356f-f24b-914b-0fb0e2bcdcc6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 10/08/2016 02:03 PM, Ray Jui wrote:
+On 10/07/2016 02:23 PM, Scott Branden wrote:
+> Enable support for on board SPI EEPROM by turning on
+> CONFIG_EEPROM_AT25.
 > 
-> 
-> On 10/8/2016 1:34 PM, Scott Branden wrote:
->> Remove 0x from pinctrl node to match device tree naming convention.
->>
->> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->> ---
->>  arch/arm/boot/dts/bcm-cygnus.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi
->> b/arch/arm/boot/dts/bcm-cygnus.dtsi
->> index fabc9f3..539c58f 100644
->> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
->> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
->> @@ -108,7 +108,7 @@
->>              };
->>          };
->>
->> -        pinctrl: pinctrl at 0x0301d0c8 {
->> +        pinctrl: pinctrl at 0301d0c8 {
->>              compatible = "brcm,cygnus-pinmux";
->>              reg = <0x0301d0c8 0x30>,
->>                    <0x0301d24c 0x2c>;
->>
-> 
-> Looks good to me!
-> 
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
 
-Applied, thanks!
+Looks fine to me, unless this needs to be a module, Arnd, what do you think?
+
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index eadf485..9955ee1 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -136,6 +136,7 @@ CONFIG_MTD_SPI_NOR=y
+>  CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_BLK_DEV_NBD=m
+>  CONFIG_VIRTIO_BLK=y
+> +CONFIG_EEPROM_AT25=y
+>  CONFIG_SRAM=y
+>  # CONFIG_SCSI_PROC_FS is not set
+>  CONFIG_BLK_DEV_SD=y
+> 
+
 -- 
 Florian
