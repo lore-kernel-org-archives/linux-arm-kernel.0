@@ -1,26 +1,72 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 9 Oct 2016 19:53:39 -0500
-Subject: [PATCH 8/8] pinctrl: aspeed-g5: Add mux configuration for all pins
-In-Reply-To: <a17175fdeaf1656afa307a180a4ab4953d4ad19c.1474986045.git-series.andrew@aj.id.au>
-References: <cover.115463f791b69859c5ce9dafd61a5755ea039f4b.1474986045.git-series.andrew@aj.id.au>
- <a17175fdeaf1656afa307a180a4ab4953d4ad19c.1474986045.git-series.andrew@aj.id.au>
-Message-ID: <20161010005339.GA29854@rob-hp-laptop>
+From: mayhs11saini@gmail.com (Shyam Saini)
+Date: Mon, 10 Oct 2016 07:06:59 +0530
+Subject: [PATCH 1/1] mfd: Remove unused variable using Coccinelle
+Message-ID: <1476063419-13866-1-git-send-email-mayhs11saini@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2016 at 12:20:20AM +0930, Andrew Jeffery wrote:
-> The patch introducing the g5 pinctrl driver implemented a smattering of
-> pins to flesh out the implementation of the core and provide bare-bones
-> support for some OpenPOWER platforms and the AST2500 evaluation board.
-> Now, update the bindings document to reflect the complete functionality
-> and implement the necessary pin configuration tables in the driver.
-> 
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> ---
->  Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt |   17 +-
+The variable err is initialized but never used otherwise.
 
-Acked-by: Rob Herring <robh@kernel.org>
+The semantic patch that makes this change is as follows:
 
->  drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c                   | 1476 ++++++-
->  drivers/pinctrl/aspeed/pinctrl-aspeed.h                      |    1 +-
->  3 files changed, 1487 insertions(+), 7 deletions(-)
+// <smpl>
+@@
+type T;
+identifier i;
+constant C;
+@@
+
+(
+extern T i;
+|
+- T i;
+  <+... when != i
+- i = C;
+  ...+>
+)
+// </smpl>
+
+Signed-off-by: Shyam Saini <mayhs11saini@gmail.com>
+---
+ drivers/mfd/ab3100-core.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/drivers/mfd/ab3100-core.c b/drivers/mfd/ab3100-core.c
+index 6a5a988..3ebb2f0 100644
+--- a/drivers/mfd/ab3100-core.c
++++ b/drivers/mfd/ab3100-core.c
+@@ -584,8 +584,6 @@ static struct dentry *ab3100_set_reg_file;
+ 
+ static void ab3100_setup_debugfs(struct ab3100 *ab3100)
+ {
+-	int err;
+-
+ 	ab3100_dir = debugfs_create_dir("ab3100", NULL);
+ 	if (!ab3100_dir)
+ 		goto exit_no_debugfs;
+@@ -594,7 +592,6 @@ static void ab3100_setup_debugfs(struct ab3100 *ab3100)
+ 				S_IRUGO, ab3100_dir, ab3100,
+ 				&ab3100_registers_fops);
+ 	if (!ab3100_reg_file) {
+-		err = -ENOMEM;
+ 		goto exit_destroy_dir;
+ 	}
+ 
+@@ -604,7 +601,6 @@ static void ab3100_setup_debugfs(struct ab3100 *ab3100)
+ 				S_IWUSR, ab3100_dir, &ab3100_get_priv,
+ 				&ab3100_get_set_reg_fops);
+ 	if (!ab3100_get_reg_file) {
+-		err = -ENOMEM;
+ 		goto exit_destroy_reg;
+ 	}
+ 
+@@ -614,7 +610,6 @@ static void ab3100_setup_debugfs(struct ab3100 *ab3100)
+ 				S_IWUSR, ab3100_dir, &ab3100_set_priv,
+ 				&ab3100_get_set_reg_fops);
+ 	if (!ab3100_set_reg_file) {
+-		err = -ENOMEM;
+ 		goto exit_destroy_get_reg;
+ 	}
+ 	return;
+-- 
+2.7.4
