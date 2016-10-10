@@ -1,98 +1,413 @@
-From: gabriel.fernandez@st.com (Gabriel Fernandez)
-Date: Mon, 10 Oct 2016 14:10:12 +0200
-Subject: [PATCH] Reorganize STM32 clocks in order to prepare them for
- PLLI2S and PLLSAI
-In-Reply-To: <1880a125-b5ec-b64a-5c9b-90d4e9c0af86@st.com>
-References: <1475791294-5804-1-git-send-email-user@localhost>
- <2d6d5c10-346e-0541-1bc0-b75ef5b40d3f@linaro.org>
- <CAFvLkMQjDZysgoT3FfkVP8UQVkqghW9=CZU-OEmGUAdMR7CO2A@mail.gmail.com>
- <b6fd21b7-75a6-c38d-a9f1-fbf07132a1d3@linaro.org>
- <1880a125-b5ec-b64a-5c9b-90d4e9c0af86@st.com>
-Message-ID: <4302f362-2ec4-73f8-d20b-b120d32b96a2@st.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 10 Oct 2016 14:23:15 +0200
+Subject: [PATCH v1 2/2] arm64: dts: rockchip: Add PX5 Evaluation board
+In-Reply-To: <ef2bb52c-26f9-49a5-fe18-538effcd30b0@suse.de>
+References: <1473529249-6151-1-git-send-email-andy.yan@rock-chips.com>
+ <1473529623-6268-1-git-send-email-andy.yan@rock-chips.com>
+ <ef2bb52c-26f9-49a5-fe18-538effcd30b0@suse.de>
+Message-ID: <16590443.vsxkmsdpMT@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rados?aw,
+Hi Andreas, Andy,
 
-Yes i m nearly ready to push a patch-set to manage LCD-TFT clock.
+Am Dienstag, 13. September 2016, 14:23:35 CEST schrieb Andreas F?rber:
+> Hi,
+> 
+> Am 10.09.2016 um 19:47 schrieb Andy Yan:
+> > PX5 EVB is designed by Rockchip for automotive field,
+> > which intergrated with CVBS(TP2825)/MIPI DSI/CSI/LVDS
+> > HDMI video input/output interface, audio codec ES8396,
+> > WIFI/BT(on RTL8723BS), Gsensor BMA250E and light&proximity
+> > sensor STK3410.
+> > 
+> > Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> 
+> Most comments from PX3 1/2 apply here, too.
 
-In my patch-set i introduced PLLI2S and PLLSAI in generic way, and offer 
-the possibility to change the vco frequency (in order to cover all 
-frequencies for any LCD).
+ammended te commit
 
-And then, the vco is no longer a fixed factor.
+> > ---
+> > 
+> > Changes in v1:
+> > - board rename
+> > - add vendor prefix for i2c interfaced devices
+> > 
+> >  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+> >  arch/arm64/boot/dts/rockchip/Makefile              |   1 +
+> >  arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts    | 304
+> >  +++++++++++++++++++++ 3 files changed, 309 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
+> > b/Documentation/devicetree/bindings/arm/rockchip.txt index
+> > 6da3881..b6f92d6 100644
+> > --- a/Documentation/devicetree/bindings/arm/rockchip.txt
+> > +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+> > @@ -107,6 +107,10 @@ Rockchip platforms device tree bindings
+> > 
+> >      Required root node properties:
+> >        - compatible = "rockchip,r88", "rockchip,rk3368";
+> > 
+> > +- Rockchip PX5 Evaluation board:
+> > +    Required root node properties:
+> > +      - compatible = "rockchip,px5-evb", "rockchip,px5",
+> > "rockchip,rk3368"; +
+> > 
+> >  - Rockchip RK3228 Evaluation board:
+> >      Required root node properties:
+> >       - compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
+> > 
+> > diff --git a/arch/arm64/boot/dts/rockchip/Makefile
+> > b/arch/arm64/boot/dts/rockchip/Makefile index 7037a16..86c74b2 100644
+> > --- a/arch/arm64/boot/dts/rockchip/Makefile
+> > +++ b/arch/arm64/boot/dts/rockchip/Makefile
+> > @@ -1,6 +1,7 @@
+> > 
+> >  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+> >  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
+> >  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
+> > 
+> > +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
+> 
+> There is no PX5 listed on your English website (yet), but given that you
+> have your own rockchip/ folder for arm64 I would encourage you to rename
+> to px5-evb.dtb independent of any internal heritage or compatibility the
+> SoC has. Compare apq/ipq/msm in qcom.
 
-This patch is just a fix or do you planned to upstream PLLI2S and PLLSAI ?
+I prefer to keep it like it is, see comment in px3 patch.
 
-If you are ok I can send my patch-set ?
+> 
+> >  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
+> >  
+> >  always		:= $(dtb-y)
+> > 
+> > diff --git a/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
+> > b/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts new file mode 100644
+> > index 0000000..be0e915
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
+> > @@ -0,0 +1,304 @@
+> > +/*
+> > + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This file is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of the
+> > + *     License, or (at your option) any later version.
+> > + *
+> > + *     This file is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "rk3368.dtsi"
+> 
+> Similarly suggest a px5.dtsi here.
+> 
+> > +#include <dt-bindings/input/input.h>
+> > +
+> > +/ {
+> > +	model = "Rockchip PX5 EVB";
+> > +	compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
+> > +
+> > +	chosen {
+> > +		stdout-path = "serial4:115200n8";
+> > +	};
+> > +
+> > +	memory at 0 {
+> > +		device_type = "memory";
+> > +		reg = <0x0 0x0 0x0 0x80000000>;
+> > +	};
+> > +
+> > +	keys: gpio-keys {
+> > +		compatible = "gpio-keys";
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&pwr_key>;
+> > +
+> > +		power {
+> > +			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+> > +			label = "GPIO Power";
+> > +			linux,code = <KEY_POWER>;
+> > +			wakeup-source;
+> > +		};
+> > +	};
+> > +
+> > +	vcc_sys: vcc-sys-regulator {
+> > +		compatible = "regulator-fixed";
+> > +		regulator-name = "vcc_sys";
+> > +		regulator-min-microvolt = <5000000>;
+> > +		regulator-max-microvolt = <5000000>;
+> > +		regulator-always-on;
+> > +		regulator-boot-on;
+> > +	};
+> > +};
+> > +
+> > +&emmc {
+> > +	status = "okay";
+> > +	bus-width = <8>;
+> > +	cap-mmc-highspeed;
+> > +	clock-frequency = <150000000>;
+> > +	disable-wp;
+> > +	keep-power-in-suspend;
+> > +	non-removable;
+> > +	num-slots = <1>;
+> > +	vmmc-supply = <&vcc_io>;
+> > +	vqmmc-supply = <&vcc18_flash>;
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_bus8>;
+> > +};
+> > +
+> > +&i2c0 {
+> > +	status = "okay";
+> > +
+> > +	rk808: pmic at 1b {
+> > +		compatible = "rockchip,rk808";
+> > +		reg = <0x1b>;
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&pmic_int>, <&pmic_sleep>;
+> > +		interrupt-parent = <&gpio0>;
+> > +		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
+> > +		rockchip,system-power-controller;
+> > +		vcc1-supply = <&vcc_sys>;
+> > +		vcc2-supply = <&vcc_sys>;
+> > +		vcc3-supply = <&vcc_sys>;
+> > +		vcc4-supply = <&vcc_sys>;
+> > +		vcc6-supply = <&vcc_sys>;
+> > +		vcc7-supply = <&vcc_sys>;
+> > +		vcc8-supply = <&vcc_io>;
+> > +		vcc9-supply = <&vcc_sys>;
+> > +		vcc10-supply = <&vcc_sys>;
+> > +		vcc11-supply = <&vcc_sys>;
+> > +		vcc12-supply = <&vcc_io>;
+> > +		clock-output-names = "xin32k", "rk808-clkout2";
+> > +		#clock-cells = <1>;
+> > +
+> > +		regulators {
+> > +			vdd_cpu: DCDC_REG1 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-min-microvolt = <700000>;
+> > +				regulator-max-microvolt = <1500000>;
+> > +				regulator-name = "vdd_cpu";
+> > +			};
+> > +
+> > +			vdd_log: DCDC_REG2 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-min-microvolt = <700000>;
+> > +				regulator-max-microvolt = <1500000>;
+> > +				regulator-name = "vdd_log";
+> > +			};
+> > +
+> > +			vcc_ddr: DCDC_REG3 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-name = "vcc_ddr";
+> > +			};
+> > +
+> > +			vcc_io: DCDC_REG4 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-min-microvolt = <3300000>;
+> > +				regulator-max-microvolt = <3300000>;
+> > +				regulator-name = "vcc_io";
+> > +			};
+> > +
+> > +			vcc18_flash: LDO_REG1 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-min-microvolt = <1800000>;
+> > +				regulator-max-microvolt = <1800000>;
+> > +				regulator-name = "vcc18_flash";
+> > +			};
+> > +
+> > +			vcca_33: LDO_REG2 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-min-microvolt = <3300000>;
+> > +				regulator-max-microvolt = <3300000>;
+> > +				regulator-name = "vcca_33";
+> > +			};
+> > +
+> > +			vdd_10: LDO_REG3 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-min-microvolt = <1000000>;
+> > +				regulator-max-microvolt = <1000000>;
+> > +				regulator-name = "vdd_10";
+> > +			};
+> > +
+> > +			avdd_33: LDO_REG4 {
+> > +				regulator-min-microvolt = <3300000>;
+> > +				regulator-max-microvolt = <3300000>;
+> > +				regulator-name = "avdd_33";
+> > +			};
+> > +
+> > +			vccio_sd: LDO_REG5 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-min-microvolt = <1800000>;
+> > +				regulator-max-microvolt = <3300000>;
+> > +				regulator-name = "vccio_sd";
+> > +			};
+> > +
+> > +			vdd10_lcd: LDO_REG6 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-min-microvolt = <1000000>;
+> > +				regulator-max-microvolt = <1000000>;
+> > +				regulator-name = "vdd10_lcd";
+> > +			};
+> > +
+> > +			vcc_18: LDO_REG7 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-min-microvolt = <1800000>;
+> > +				regulator-max-microvolt = <1800000>;
+> > +				regulator-name = "vcc_18";
+> > +			};
+> > +
+> > +			vcc18_lcd: LDO_REG8 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-min-microvolt = <1800000>;
+> > +				regulator-max-microvolt = <1800000>;
+> > +				regulator-name = "vcc18_lcd";
+> > +			};
+> > +
+> > +			vcc_sd: SWITCH_REG1 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-name = "vcc_sd";
+> > +			};
+> > +
+> > +			vcc33_lcd: SWITCH_REG2 {
+> > +				regulator-always-on;
+> > +				regulator-boot-on;
+> > +				regulator-name = "vcc33_lcd";
+> > +			};
+> > +		};
+> > +	};
+> > +};
+> > +
+> > +&i2c1 {
+> > +	status = "okay";
+> > +
+> > +	/* Accelerometer */
+> > +	bma250 at 18 {
 
-Best Regards
+changed to accelerometer at 18 similar to px3
 
-Gabriel
+> > +		compatible = "bosch,bma250";
+> > +		reg = <0x18>;
+> > +		interrupt-parent = <&gpio2>;
+> > +		interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
+> > +	};
+> > +
+> > +	stk3410 at 48 {
+> > +		compatible = "sensortek,STK3310";
+> > +		reg = <0x48>;
+> > +		interrupt-parent = <&gpio2>;
+> > +		interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
+> > +	};
+> > +};
+> > +
+> > +&i2c2 {
+> > +	status = "okay";
+> > +
+> > +	gsl1680: touchscreen at 40 {
+> > +		compatible = "silead,gsl1680";
+> > +		reg = <0x40>;
+> > +		interrupt-parent = <&gpio3>;
+> > +		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
+> > +		power-gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
+> > +		touchscreen-size-x = <800>;
+> > +		touchscreen-size-y = <1280>;
+> > +		silead,max-fingers = <5>;
+> > +	};
+> > +};
+> > +
+> > +&pinctrl {
+> > +
+> 
+> Drop white line?
 
-On 10/10/2016 01:32 PM, Alexandre Torgue wrote:
-> Hi Radoslaw,
->
-> I add Gabriel in the discussion. Gabriel is updating PLL management 
-> for STM32F429.
->
-> Regards
-> Alex
->
-> On 10/10/2016 12:31 PM, Daniel Thompson wrote:
->> On 10/10/16 10:56, Rados?aw Pietrzyk wrote:
->>> Hi,
->>> all plls have the same clock parent which is after a main divider.
->>> Currently the divider and multiplier are connected together within vco
->>> clock and therefore there is no chance to reuse the divider and clearly
->>> state where the conncetion "really" is. We can arrange all of them
->>> separately but than the divider will be hidden for all of them
->>> separately.
->>
->> Quoting my last mail "I can see the value of naming the "/M"
->> pre-division separately". In other words I agree with the idea of the
->> patch.
->>
->> To more explicitly state my review comments...
->>
->>> From: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
->>
->> Please add a explanation of the problem and solution in the patch
->> description.
->>
->>
->>> Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
->>> ---
->>>  drivers/clk/clk-stm32f4.c | 7 ++++---
->>>  1 file changed, 4 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
->>> index 02d6810..1fd3eac 100644
->>> --- a/drivers/clk/clk-stm32f4.c
->>> +++ b/drivers/clk/clk-stm32f4.c
->>> @@ -245,9 +245,10 @@ static void stm32f4_rcc_register_pll(const char
->> *hse_clk, const char *hsi_clk)
->>>      const char   *pllsrc = pllcfgr & BIT(22) ? hse_clk : hsi_clk;
->>>      unsigned long pllq   = (pllcfgr >> 24) & 0xf;
->>>
->>> -    clk_register_fixed_factor(NULL, "vco", pllsrc, 0, plln, pllm);
->>> -    clk_register_fixed_factor(NULL, "pll", "vco", 0, 1, pllp);
->>> -    clk_register_fixed_factor(NULL, "pll48", "vco", 0, 1, pllq);
->>> +    clk_register_fixed_factor(NULL, "vco-div", pllsrc, 0, 1, pllm);
->>
->> This strikes me as a bad name for a clock that is shared by all three
->> PLLs (the vco being an internal component of the PLL) however since the
->> clock is not named in the datasheet we are forced to invent a name [I
->> suspect that's why I gave up trying to name it when I wrote the driver
->> originally ;-) ].
->>
->> Perhaps "pllin-prediv"?
->>
->>
->>> +    clk_register_fixed_factor(NULL, "vco-mul", "vco-div", 0, plln, 1);
->>
->> Why rename this clock? Multiplying is a what the vco (and its control
->> circuits) is *for*. Tagging it "-mul" is meaningless.
->>
->>
->> Daniel.
+seems I dropped that already.
+
+
+> > +	keys {
+> > +		pwr_key: pwr-key {
+> > +			rockchip,pins = <0 2 RK_FUNC_GPIO &pcfg_pull_none>;
+> > +		};
+> > +	};
+> > +
+> > +	pmic {
+> > +		pmic_sleep: pmic-sleep {
+> > +			rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
+> > +		};
+> > +
+> > +		pmic_int: pmic-int {
+> > +			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
+> > +		};
+> > +	};
+> > +};
+> > +
+> > +&tsadc {
+> > +	status = "okay";
+> > +	rockchip,hw-tshut-mode = <0>; /* CRU */
+> > +	rockchip,hw-tshut-polarity = <1>; /* high */
+> > +};
+> > +
+> > +&uart4 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usb_host0_ehci {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usb_otg {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&wdt {
+> > +	status = "okay";
+> > +};
+> 
+> Otherwise formally looks fine.
+
+Thanks for looking at the patch.
+
+
+Heiko
