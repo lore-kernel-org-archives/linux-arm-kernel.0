@@ -1,37 +1,123 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon, 10 Oct 2016 16:23:07 +0530
-Subject: [PATCH v6 0/6] ARM: dts: imx6q: Add Engicam i.CoreM6 dts
-In-Reply-To: <CAD6G_RRw68FVxG5rum41OeSrb9wDD0SkKeDgwjRLSJ2BuVtqfw@mail.gmail.com>
-References: <1474917787-29030-1-git-send-email-jteki@openedev.com>
- <CAD6G_RRw68FVxG5rum41OeSrb9wDD0SkKeDgwjRLSJ2BuVtqfw@mail.gmail.com>
-Message-ID: <CAD6G_RQqehYZ-Ys2iPGy9aWF7RTdnX-N9RzMOX4x=wEMfRg7SQ@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 10 Oct 2016 12:55:13 +0200
+Subject: [RESEND PATCH v6, 3/5] usb: xhci-mtk: make IPPC register optional
+In-Reply-To: <1474437277-27201-4-git-send-email-chunfeng.yun@mediatek.com>
+References: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1474437277-27201-4-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <62b78471-d93f-a5c2-20ef-dfeeea1720db@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
 
-On Fri, Oct 7, 2016 at 7:51 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
-> On Tue, Sep 27, 2016 at 12:53 AM, Jagan Teki <jteki@openedev.com> wrote:
->> This is series add dts support for Engicam I.Core M6 qdl modules on
->> top of */shawnguo/linux.git for-next.
->>
->> Jagan Teki (6):
->>   of: Add vendor prefix for Engicam s.r.l company
 
-This patch applied already.
+On 09/21/2016 07:54 AM, Chunfeng Yun wrote:
+> Make IPPC register optional to support host side of dual-role mode,
+> due to it is moved into common glue layer for simplification.
+>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/usb/host/xhci-mtk.c |   36 +++++++++++++++++++++++++++++-------
+>  1 file changed, 29 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> index 79959f1..4bf99b9 100644
+> --- a/drivers/usb/host/xhci-mtk.c
+> +++ b/drivers/usb/host/xhci-mtk.c
+> @@ -94,6 +94,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
+>  	int ret;
+>  	int i;
+>
+> +	if (ippc == NULL)
+> +		return 0;
+> +
+>  	/* power on host ip */
+>  	value = readl(&ippc->ip_pw_ctr1);
+>  	value &= ~CTRL1_IP_HOST_PDN;
+> @@ -139,6 +142,9 @@ static int xhci_mtk_host_disable(struct xhci_hcd_mtk *mtk)
+>  	int ret;
+>  	int i;
+>
+> +	if (ippc == NULL)
+> +		return 0;
+> +
+>  	/* power down all u3 ports */
+>  	for (i = 0; i < mtk->num_u3_ports; i++) {
+>  		value = readl(&ippc->u3_ctrl_p[i]);
+> @@ -173,6 +179,9 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
+>  	struct mu3c_ippc_regs __iomem *ippc = mtk->ippc_regs;
+>  	u32 value;
+>
+> +	if (ippc == NULL)
+> +		return 0;
+> +
 
->>   ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual initial support
->>   ARM: dts: imx6q: Add Engicam i.CoreM6 DualLite/Solo initial support
->>   ARM: dts: imx6qdl-icore: Add usbhost support
->>   ARM: dts: imx6qdl-icore: Add usbotg support
->>   ARM: dts: imx6qdl-icore: Add FEC support
+I would prefer to add a flag/bool in xhci_hcd_mtk to signal the absence 
+of the ippc. Or at least use a macro which checks the presence before 
+calling any of this three functions.
 
-Please take these five patches, I was trying to rebase but no resent
-*/git/shawnguo/linux.git tree.
-
-thanks!
--- 
-Jagan Teki
-Free Software Engineer | www.openedev.com
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Regards,
+Matthias
+>  	/* reset whole ip */
+>  	value = readl(&ippc->ip_pw_ctr0);
+>  	value |= CTRL0_IP_SW_RST;
+> @@ -475,6 +484,7 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
+>  /* called during probe() after chip reset completes */
+>  static int xhci_mtk_setup(struct usb_hcd *hcd)
+>  {
+> +	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+>  	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
+>  	int ret;
+>
+> @@ -482,12 +492,21 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
+>  		ret = xhci_mtk_ssusb_config(mtk);
+>  		if (ret)
+>  			return ret;
+> +	}
+> +
+> +	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (usb_hcd_is_primary_hcd(hcd)) {
+> +		mtk->num_u3_ports = xhci->num_usb3_ports;
+> +		mtk->num_u2_ports = xhci->num_usb2_ports;
+>  		ret = xhci_mtk_sch_init(mtk);
+>  		if (ret)
+>  			return ret;
+>  	}
+>
+> -	return xhci_gen_setup(hcd, xhci_mtk_quirks);
+> +	return ret;
+>  }
+>
+>  static int xhci_mtk_probe(struct platform_device *pdev)
+> @@ -586,7 +605,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  	mtk->hcd = platform_get_drvdata(pdev);
+>  	platform_set_drvdata(pdev, mtk);
+>
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac");
+>  	hcd->regs = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(hcd->regs)) {
+>  		ret = PTR_ERR(hcd->regs);
+> @@ -595,11 +614,14 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  	hcd->rsrc_start = res->start;
+>  	hcd->rsrc_len = resource_size(res);
+>
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> -	mtk->ippc_regs = devm_ioremap_resource(dev, res);
+> -	if (IS_ERR(mtk->ippc_regs)) {
+> -		ret = PTR_ERR(mtk->ippc_regs);
+> -		goto put_usb2_hcd;
+> +	mtk->ippc_regs = NULL;
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ippc");
+> +	if (res) {	/* ippc register is optional */
+> +		mtk->ippc_regs = devm_ioremap_resource(dev, res);
+> +		if (IS_ERR(mtk->ippc_regs)) {
+> +			ret = PTR_ERR(mtk->ippc_regs);
+> +			goto put_usb2_hcd;
+> +		}
+>  	}
+>
+>  	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
+>
