@@ -1,21 +1,20 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 10 Oct 2016 14:37:48 +0200
-Subject: [PATCH -next] mmc: sdhci-of-arasan: Fix non static symbol warning
-In-Reply-To: <1474818243-19207-1-git-send-email-weiyj.lk@gmail.com>
-References: <1474818243-19207-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <CAPDyKFoGM7+pzSHCTVYfi1S1uo3DRauXLhY5ZQ8gDmeBBQV47A@mail.gmail.com>
+Date: Mon, 10 Oct 2016 14:37:55 +0200
+Subject: [PATCH 1/2] mmc: block: add missing header dependencies
+In-Reply-To: <1475199459-4775-1-git-send-email-baoyou.xie@linaro.org>
+References: <1475199459-4775-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <CAPDyKFpTB-YM3J3dB7Us0Q_AF2fojm369eZmHw7M2v1ZiWJu2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 September 2016 at 17:44, Wei Yongjun <weiyj.lk@gmail.com> wrote:
-> From: Wei Yongjun <weiyongjun1@huawei.com>
+On 30 September 2016 at 03:37, Baoyou Xie <baoyou.xie@linaro.org> wrote:
+> We get 1 warning when building kernel with W=1:
+> drivers/mmc/card/block.c:2147:5: warning: no previous prototype for 'mmc_blk_issue_rq' [-Wmissing-prototypes]
 >
-> Fixes the following sparse warning:
+> In fact, this function is declared in drivers/mmc/card/block.h,
+> so this patch adds missing header dependencies.
 >
-> drivers/mmc/host/sdhci-of-arasan.c:253:6: warning:
->  symbol 'sdhci_arasan_reset' was not declared. Should it be static?
->
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 
 Thanks, applied for fixes!
 
@@ -23,22 +22,21 @@ Kind regards
 Uffe
 
 > ---
->  drivers/mmc/host/sdhci-of-arasan.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/mmc/card/block.c | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index da8e40a..e263671 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -250,7 +250,7 @@ static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
->         writel(vendor, host->ioaddr + SDHCI_ARASAN_VENDOR_REGISTER);
->  }
+> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+> index c333511..0f2cc9f2 100644
+> --- a/drivers/mmc/card/block.c
+> +++ b/drivers/mmc/card/block.c
+> @@ -46,6 +46,7 @@
+>  #include <asm/uaccess.h>
 >
-> -void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
-> +static void sdhci_arasan_reset(struct sdhci_host *host, u8 mask)
->  {
->         u8 ctrl;
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>  #include "queue.h"
+> +#include "block.h"
 >
->
+>  MODULE_ALIAS("mmc:block");
+>  #ifdef MODULE_PARAM_PREFIX
+> --
+> 2.7.4
 >
