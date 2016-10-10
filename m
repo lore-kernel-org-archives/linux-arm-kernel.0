@@ -1,45 +1,70 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 10 Oct 2016 15:09:43 +0200
-Subject: [PATCH v4 10/10] ARM: sunxi: Enable sun8i-emac driver on
- multi_v7_defconfig
-In-Reply-To: <20161010123511.GA16103@Red>
-References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
- <1475828757-926-11-git-send-email-clabbe.montjoie@gmail.com>
- <20161010123046.GH3462@lukather> <20161010123511.GA16103@Red>
-Message-ID: <20161010150943.fa7ca85fe52f4c6f9508b5eb@free.fr>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Oct 2016 15:12:05 +0200
+Subject: [PATCH v2 2/4] power: add axp20x-battery driver
+In-Reply-To: <20161010125726.GJ3462@lukather>
+References: <20161009062714.5085-1-icenowy@aosc.xyz>
+ <20161009062714.5085-2-icenowy@aosc.xyz>
+ <20161010125726.GJ3462@lukather>
+Message-ID: <20161010131205.GK3462@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Oct 2016 14:35:11 +0200
-LABBE Corentin <clabbe.montjoie@gmail.com> wrote:
+Adding the real Quentin address
 
-> On Mon, Oct 10, 2016 at 02:30:46PM +0200, Maxime Ripard wrote:
-> > On Fri, Oct 07, 2016 at 10:25:57AM +0200, Corentin Labbe wrote:
-> > > Enable the sun8i-emac driver in the multi_v7 default configuration
-> > > 
-> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > ---
-> > >  arch/arm/configs/multi_v7_defconfig | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> > > index 5845910..f44d633 100644
-> > > --- a/arch/arm/configs/multi_v7_defconfig
-> > > +++ b/arch/arm/configs/multi_v7_defconfig
-> > > @@ -229,6 +229,7 @@ CONFIG_NETDEVICES=y
-> > >  CONFIG_VIRTIO_NET=y
-> > >  CONFIG_HIX5HD2_GMAC=y
-> > >  CONFIG_SUN4I_EMAC=y
-> > > +CONFIG_SUN8I_EMAC=y
-> > 
-> > Any reason to build it statically?
-> > 
+On Mon, Oct 10, 2016 at 02:57:26PM +0200, Maxime Ripard wrote:
+> Hi Icenowy,
 > 
-> No, just copied the same than CONFIG_SUN4I_EMAC that probably do not need it also.
+> On Sun, Oct 09, 2016 at 02:27:12PM +0800, Icenowy Zheng wrote:
+> > +	case POWER_SUPPLY_PROP_CURRENT_NOW:
+> > +		ret = regmap_read(power->regmap, AXP20X_BATT_DISCHRG_I_H, &dh);
+> > +		if (ret)
+> > +			return ret;
+> > +		ret = regmap_read(power->regmap, AXP20X_BATT_DISCHRG_I_L, &dl);
+> > +		if (ret)
+> > +			return ret;
+> > +		/* it's a 12 bit integer, high 8-bit is stored in dh */
+> > +		val->intval = dh << 4 | dl >> 4;
+> > +		break;
+> > +	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+> > +		ret = regmap_read(power->regmap, AXP20X_BATT_V_H, &dh);
+> > +		if (ret)
+> > +			return ret;
+> > +		ret = regmap_read(power->regmap, AXP20X_BATT_V_L, &dl);
+> > +		if (ret)
+> > +			return ret;
+> > +		/* it's a 12 bit integer, high 8-bit is stored in dh */
+> > +		val->intval = dh << 4 | dl >> 4;
+> > +		/* The formula below is from axp22_vbat_to_mV function
+> > +		 * of Allwinner 3.4 kernel.
+> > +		 */
+> > +		val->intval = val->intval * 1100 / 1000;
+> > +		break;
+> 
+> I really feel that this should be implemented through a IIO driver
+> (like the AXP288). This is especially true for the AXP209 and its
+> multiple GPIOs that can be muxed to a general purpose ADC, but it's
+> also true for the AXP221 / 223 TS pin that can also be used as an ADC.
+> 
+> Quentin has been working on this lately for the AXP209, feel free to
+> sync with him to support the AXP22*
+> 
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-All arm configs are done the same way, and, some day, the generic ARM
-V7 kernel will not be loadable in 1Gb RAM...
+
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161010/ff37d435/attachment.sig>
