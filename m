@@ -1,68 +1,59 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 10 Oct 2016 14:50:21 +0200
-Subject: [PATCH v4 04/10] ARM: dts: sun8i-h3: Add dt node for the syscon
- control module
-In-Reply-To: <20161010123151.GI3462@lukather>
-References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
- <1475828757-926-5-git-send-email-clabbe.montjoie@gmail.com>
- <20161010123151.GI3462@lukather>
-Message-ID: <20161010145021.00586f772e3398833217796a@free.fr>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Oct 2016 14:57:26 +0200
+Subject: [PATCH v2 2/4] power: add axp20x-battery driver
+In-Reply-To: <20161009062714.5085-2-icenowy@aosc.xyz>
+References: <20161009062714.5085-1-icenowy@aosc.xyz>
+ <20161009062714.5085-2-icenowy@aosc.xyz>
+Message-ID: <20161010125726.GJ3462@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Oct 2016 14:31:51 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hi Icenowy,
 
-> Hi,
-> 
-> On Fri, Oct 07, 2016 at 10:25:51AM +0200, Corentin Labbe wrote:
-> > This patch add the dt node for the syscon register present on the
-> > Allwinner H3.
-> > 
-> > Only two register are present in this syscon and the only one useful is
-> > the one dedicated to EMAC clock.
-> > 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/sun8i-h3.dtsi | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> > index 8a95e36..1101d2f 100644
-> > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> > @@ -140,6 +140,11 @@
-> >  		#size-cells = <1>;
-> >  		ranges;
-> >  
-> > +		syscon: syscon at 01c00000 {
-> > +			compatible = "syscon";
-> 
-> It would be great to have a more specific compatible here in addition
-> to the syscon, like "allwinner,sun8i-h3-system-controller".
+On Sun, Oct 09, 2016 at 02:27:12PM +0800, Icenowy Zheng wrote:
+> +	case POWER_SUPPLY_PROP_CURRENT_NOW:
+> +		ret = regmap_read(power->regmap, AXP20X_BATT_DISCHRG_I_H, &dh);
+> +		if (ret)
+> +			return ret;
+> +		ret = regmap_read(power->regmap, AXP20X_BATT_DISCHRG_I_L, &dl);
+> +		if (ret)
+> +			return ret;
+> +		/* it's a 12 bit integer, high 8-bit is stored in dh */
+> +		val->intval = dh << 4 | dl >> 4;
+> +		break;
+> +	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+> +		ret = regmap_read(power->regmap, AXP20X_BATT_V_H, &dh);
+> +		if (ret)
+> +			return ret;
+> +		ret = regmap_read(power->regmap, AXP20X_BATT_V_L, &dl);
+> +		if (ret)
+> +			return ret;
+> +		/* it's a 12 bit integer, high 8-bit is stored in dh */
+> +		val->intval = dh << 4 | dl >> 4;
+> +		/* The formula below is from axp22_vbat_to_mV function
+> +		 * of Allwinner 3.4 kernel.
+> +		 */
+> +		val->intval = val->intval * 1100 / 1000;
+> +		break;
 
-The System Control area is just like the PRCM area: it would be simpler
-to define the specific registers in the associated drivers.
+I really feel that this should be implemented through a IIO driver
+(like the AXP288). This is especially true for the AXP209 and its
+multiple GPIOs that can be muxed to a general purpose ADC, but it's
+also true for the AXP221 / 223 TS pin that can also be used as an ADC.
 
-Here, instead of the syscon node, plus
+Quentin has been working on this lately for the AXP209, feel free to
+sync with him to support the AXP22*
 
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun8i-h3-emac";
-+			syscon = <&syscon>;
-+			reg = <0x01c30000 0x104>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-			...
-
-there would be no 'syscon' node and
-
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun8i-h3-emac";
-+			syscon = <&syscon>;
-+			reg =	<0x01c30000 0x104>,	/* EMAC */
-+				<0x01c00030 4>;		/* system control */
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-			...
+Maxime
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161010/f2256077/attachment.sig>
