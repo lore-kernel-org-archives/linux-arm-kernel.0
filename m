@@ -1,31 +1,28 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 10 Oct 2016 22:38:40 +0530
-Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
- addresses
-In-Reply-To: <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
-References: <1474643941-109020-1-git-send-email-labath@google.com>
- <1474643941-109020-2-git-send-email-labath@google.com>
- <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
- <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
-Message-ID: <149b6faf-8643-3b9b-8cd4-8ec6d59e328f@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Oct 2016 12:10:56 -0500
+Subject: [PATCH v3 3/6] pwm: imx: support output polarity inversion
+In-Reply-To: <20161007151129.6043-4-bhuvanchandra.dv@toradex.com>
+References: <20161007151129.6043-1-bhuvanchandra.dv@toradex.com>
+ <20161007151129.6043-4-bhuvanchandra.dv@toradex.com>
+Message-ID: <20161010171055.GA9460@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 07, 2016 at 08:41:26PM +0530, Bhuvanchandra DV wrote:
+> From: Lothar Wassmann <LW@KARO-electronics.de>
+> 
+> The i.MX pwm unit on i.MX27 and newer SoCs provides a configurable output
+> polarity. This patch adds support to utilize this feature where available.
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  Documentation/devicetree/bindings/pwm/imx-pwm.txt |  6 +--
 
+Acked-by: Rob Herring <robh@kernel.org>
 
-On Friday 07 October 2016 10:54 PM, Pavel Labath wrote:
-> However, I did notice that it does not work if we watch an address
->> which is at some offset from address programmed. For example, it works
->> when byte_mask is 0x3, but it does not work if byte_mask if 0x2 (which
->> is supported by hardware).
->>
->> I do have some patches to resolve that.
->>
->> https://github.com/pratyushanand/linux/commits/perf/upstream_arm64_devel
->>
->> I will send them for review comment after some testing.
-
-This branch has been updated with a test code as well. So far they work 
-fine at my end. Planning to send them tomorrow for review.
-
-~Pratyush
+>  drivers/pwm/pwm-imx.c                             | 51 +++++++++++++++++++++--
+>  2 files changed, 51 insertions(+), 6 deletions(-)
