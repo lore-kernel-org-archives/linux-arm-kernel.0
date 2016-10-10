@@ -1,43 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 10 Oct 2016 00:10:17 +0100
-Subject: [PATCH v3] arm64: mm: move zero page from .bss to right before
- swapper_pg_dir
-In-Reply-To: <CAKv+Gu-V+OKoeNFqvHvQOOFYi4VLm5mLKrmf9Z5oZY4KQkirsQ@mail.gmail.com>
-References: <1473696925-26156-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu-V+OKoeNFqvHvQOOFYi4VLm5mLKrmf9Z5oZY4KQkirsQ@mail.gmail.com>
-Message-ID: <20161009231017.GA11582@remoulade>
+From: joel@porquet.org (Joel Porquet)
+Date: Sun,  9 Oct 2016 17:03:06 -0700
+Subject: [PATCH 0/2] make asm-generic/futex.h usable for more arch ports
+Message-ID: <20161010000308.13212-1-joel@porquet.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2016 at 10:31:14AM +0100, Ard Biesheuvel wrote:
-> On 12 September 2016 at 17:15, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > Move the statically allocated zero page from the .bss section to right
-> > before swapper_pg_dir. This allows us to refer to its physical address
-> > by simply reading TTBR1_EL1 (which always points to swapper_pg_dir and
-> > always has its ASID field cleared), and subtracting PAGE_SIZE.
-> >
-> > To protect the zero page from inadvertent modification, carve out a
-> > segment that covers it as well as idmap_pg_dir[], and mark it read-only
-> > in both the primary and the linear mappings of the kernel.
+Hi all,
 
-[...]
+I've had a patch on my shelf for a couple of years, from when I ported Linux on
+a new processor architecture for an academic project, and thought I could send
+it and let you decide if it's worth taking or not.
 
-> > -       map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
-> > +       map_kernel_segment(pgd, _data, __robss_start, PAGE_KERNEL,
-> > +                          &vmlinux_data);
-> > +       map_kernel_segment(pgd, __robss_start, __robss_end, PAGE_KERNEL_RO,
-> > +                          &vmlinux_robss);
-> 
-> I realised it is actually unnecessary to map the idmap and the zero
-> page into the kernel mapping, so we could drop this line.
+During my port, I basically modified the generic header "asm-generic/futex.h"
+and made it into a more generic version so that I could include it in my code
+and only redefine the necessary arch-specific bits.
 
-Given that drivers use the zero page, I wouldn't be entirely surprised to see
-phys_to_virt(virt_to_phys(zero_page)) happen indirectly, and the end result
-read. Are we sure that doesn't happen anywhere?
+Right now, most of the arch ports redefine their own "asm/futex.h" completely
+although, for example for "futex_atomic_op_inuser()", they often share the exact
+same preamble and epilogue and could benefit from some code refactoring.
 
-For the idmap, I think we might walk that were we to take a fault (though
-perhaps we don't). Otherwise, unless we add a sysfs walker for it I guess we
-don't strictly need it in the linear map.
+My (short) series is made of two patches: 1/ refactoring "asm-generic/futex.h"
+in order to make the arch-specific routines into overload-able macros that arch
+ports can redefine when required, 2/ an example of how to use this refactoring
+with the ARM port.
 
-Thanks,
-Mark.
+Let me know what you think.
+
+Cheers,
+Jo?l
+
+Joel Porquet (2):
+  asm-generic/futex.h: code refactoring
+  arm: futex: Use asm-generic/futex.h instead of redefining the entire
+    header
+
+ arch/arm/include/asm/futex.h | 203 +++++++++++++++++----------------------
+ include/asm-generic/futex.h  | 219 ++++++++++++++++++++++---------------------
+ 2 files changed, 196 insertions(+), 226 deletions(-)
+
+-- 
+2.10.0
