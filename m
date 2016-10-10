@@ -1,82 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Oct 2016 12:04:44 +0200
-Subject: [PATCH 05/12] ASoC: sun4i-codec: Add support for A31 playback
- through headphone output
-In-Reply-To: <CAGb2v66b_zG=xK_JVBnwY=SPtvJ+c-fZjuugAHUybzZdkkcScg@mail.gmail.com>
-References: <20161003110804.28235-1-wens@csie.org>
- <20161003110804.28235-6-wens@csie.org>
- <20161003114709.GC5228@lukather>
- <CAGb2v66b_zG=xK_JVBnwY=SPtvJ+c-fZjuugAHUybzZdkkcScg@mail.gmail.com>
-Message-ID: <20161010100444.GD3462@lukather>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 10 Oct 2016 11:31:06 +0100
+Subject: [PATCH] Reorganize STM32 clocks in order to prepare them for
+ PLLI2S and PLLSAI
+In-Reply-To: <CAFvLkMQjDZysgoT3FfkVP8UQVkqghW9=CZU-OEmGUAdMR7CO2A@mail.gmail.com>
+References: <1475791294-5804-1-git-send-email-user@localhost>
+ <2d6d5c10-346e-0541-1bc0-b75ef5b40d3f@linaro.org>
+ <CAFvLkMQjDZysgoT3FfkVP8UQVkqghW9=CZU-OEmGUAdMR7CO2A@mail.gmail.com>
+Message-ID: <b6fd21b7-75a6-c38d-a9f1-fbf07132a1d3@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2016 at 12:26:08PM +0800, Chen-Yu Tsai wrote:
-> >> +struct sun4i_codec_regs {
-> >> +     u32     adc_fifoc;
-> >> +     u32     adc_fifos;
-> >> +     u32     adc_rxdata;
-> >> +};
-> >> +
-> >>  struct sun4i_codec {
-> >>       struct device   *dev;
-> >>       struct regmap   *regmap;
-> >>       struct clk      *clk_apb;
-> >>       struct clk      *clk_module;
-> >>       struct gpio_desc *gpio_pa;
-> >> +     const struct sun4i_codec_regs *regs;
-> >
-> > You're reimplementing reg_field here.
-> 
-> Are you suggesting we do reg_fields for each register?
-> Or all the bit fields separately. The latter would add
-> quite a few pointers.
+On 10/10/16 10:56, Rados?aw Pietrzyk wrote:
+> Hi,
+> all plls have the same clock parent which is after a main divider.
+> Currently the divider and multiplier are connected together within vco
+> clock and therefore there is no chance to reuse the divider and clearly
+> state where the conncetion "really" is. We can arrange all of them
+> separately but than the divider will be hidden for all of them separately.
 
-only the one that change, so judging from your structure, only the ADC
-fifo control, status and data registers.
-> >> +static const struct of_device_id sun4i_codec_of_match[] = {
-> >> +     {
-> >> +             .compatible = "allwinner,sun4i-a10-codec",
-> >> +             .data = &sun4i_codec_quirks,
-> >> +     },
-> >> +     {
-> >> +             .compatible = "allwinner,sun6i-a31-codec",
-> >> +             .data = &sun6i_a31_codec_quirks,
-> >> +     },
-> >> +     {
-> >> +             .compatible = "allwinner,sun7i-a20-codec",
-> >> +             .data = &sun7i_codec_quirks,
-> >> +     },
-> >> +     {}
-> >> +};
-> >> +MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
-> >> +
-> >
-> > I don't really like moving blocks of code over and over again,
-> > especially in the middle of an unrelated patch.
-> 
-> It's not completely unrelated. I want different create_card
-> functions for the different SoCs, and that has to be part of the
-> quirks, so the quirks and the of_match list have to be moved
-> below them. I suppose I could leave the regmap parts in place,
-> but keeping them together is nicer.
-> 
-> If I split out the addition of the .create_card field and
-> code movement into a separate patch, would that be OK?
+Quoting my last mail "I can see the value of naming the "/M" 
+pre-division separately". In other words I agree with the idea of the patch.
 
-Yep, that would work.
+To more explicitly state my review comments...
 
-Thanks!
-Maxime
+ > From: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161010/0827457c/attachment.sig>
+Please add a explanation of the problem and solution in the patch 
+description.
+
+
+ > Signed-off-by: Radoslaw Pietrzyk <radoslaw.pietrzyk@gmail.com>
+ > ---
+ >  drivers/clk/clk-stm32f4.c | 7 ++++---
+ >  1 file changed, 4 insertions(+), 3 deletions(-)
+ >
+ > diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+ > index 02d6810..1fd3eac 100644
+ > --- a/drivers/clk/clk-stm32f4.c
+ > +++ b/drivers/clk/clk-stm32f4.c
+ > @@ -245,9 +245,10 @@ static void stm32f4_rcc_register_pll(const char 
+*hse_clk, const char *hsi_clk)
+ >  	const char   *pllsrc = pllcfgr & BIT(22) ? hse_clk : hsi_clk;
+ >  	unsigned long pllq   = (pllcfgr >> 24) & 0xf;
+ >
+ > -	clk_register_fixed_factor(NULL, "vco", pllsrc, 0, plln, pllm);
+ > -	clk_register_fixed_factor(NULL, "pll", "vco", 0, 1, pllp);
+ > -	clk_register_fixed_factor(NULL, "pll48", "vco", 0, 1, pllq);
+ > +	clk_register_fixed_factor(NULL, "vco-div", pllsrc, 0, 1, pllm);
+
+This strikes me as a bad name for a clock that is shared by all three 
+PLLs (the vco being an internal component of the PLL) however since the 
+clock is not named in the datasheet we are forced to invent a name [I 
+suspect that's why I gave up trying to name it when I wrote the driver 
+originally ;-) ].
+
+Perhaps "pllin-prediv"?
+
+
+ > +	clk_register_fixed_factor(NULL, "vco-mul", "vco-div", 0, plln, 1);
+
+Why rename this clock? Multiplying is a what the vco (and its control 
+circuits) is *for*. Tagging it "-mul" is meaningless.
+
+
+Daniel.
