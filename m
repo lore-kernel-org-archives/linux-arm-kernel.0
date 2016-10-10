@@ -1,66 +1,57 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Tue, 11 Oct 2016 09:57:47 +1100 (AEDT)
-Subject: [PATCH v3 10/12] scsi/ncr5380: Expedite register polling
-In-Reply-To: <20161010091709.GY1041@n2100.armlinux.org.uk>
-References: <cover.1476051961.git.fthain@telegraphics.com.au>
- <2806ba151f6983923fa0aae700245dfeb4cfaf38.1476051962.git.fthain@telegraphics.com.au>
- <20161010091709.GY1041@n2100.armlinux.org.uk>
-Message-ID: <alpine.LNX.2.00.1610110924160.8220@nippy.intranet>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 10 Oct 2016 18:18:46 -0500
+Subject: [PATCH/RFT 07/12] USB: ohci-da8xx: Request gpios and handle
+ interrupt in the driver
+In-Reply-To: <1475858577-10366-8-git-send-email-ahaslam@baylibre.com>
+References: <1475858577-10366-1-git-send-email-ahaslam@baylibre.com>
+ <1475858577-10366-8-git-send-email-ahaslam@baylibre.com>
+Message-ID: <22f1532a-b651-3330-b2ce-9a64a35c85af@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/07/2016 11:42 AM, ahaslam at baylibre.com wrote:
+> From: Axel Haslam <ahaslam@baylibre.com>
+>
+> Currently requesting the vbus and overcurrent gpio is handled on
+> the board specific file. But this does not play well moving to
+> device tree.
+>
+> In preparation to migrate to a device tree boot, handle requesting
+> gpios and overcurrent interrupt on the usb driver itself, thus avoiding
+> callbacks to arch/mach*
+>
 
-On Mon, 10 Oct 2016, Russell King - ARM Linux wrote:
+Instead of using gpios, it seems like it would be better to use a 
+regulator here. I don't know of any real-life cases, but who is to say 
+someone will not design a board that uses a regulator controlled by I2C 
+instead of gpios or something like that.
 
-> On Mon, Oct 10, 2016 at 12:46:53AM -0400, Finn Thain wrote:
-> > Avoid the call to NCR5380_poll_politely2() when possible. The call is 
-> > easily short-circuited on the PIO fast path, using the inline wrapper. 
-> > This requires that the NCR5380_read macro be made available before any 
-> > #include "NCR5380.h" so a few declarations have to be moved too.
-> > 
-> > Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
-> > Reviewed-by: Hannes Reinecke <hare@suse.com>
-> > Tested-by: Ondrej Zary <linux@rainbow-software.org>
-> > Tested-by: Michael Schmitz <schmitzmic@gmail.com>
-> > ---
-> 
-> > diff --git a/drivers/scsi/arm/cumana_1.c b/drivers/scsi/arm/cumana_1.c
-> > index ae1d4c6..fb7600d 100644
-> > --- a/drivers/scsi/arm/cumana_1.c
-> > +++ b/drivers/scsi/arm/cumana_1.c
-> > @@ -29,6 +29,10 @@
-> >  #define NCR5380_implementation_fields	\
-> >  	unsigned ctrl
-> >  
-> > +struct NCR5380_hostdata;
-> > +static u8 cumanascsi_read(struct NCR5380_hostdata *, unsigned int);
-> > +static void cumanascsi_write(struct NCR5380_hostdata *, unsigned int, u8);
-> > +
-> >  #include "../NCR5380.h"
-> >  
-> >  #define CTRL	0x16fc
-> 
-> This seems to be non-obviously unrelated to this commit - should it be 
-> in some other commit?
-> 
+Then, boards that don't have gpios can just use a fixed regulator (or 
+you can make the regulator optional). Using a regulator would also allow 
+users to decide how to respond to overcurrent events (by supplying their 
+own regulator driver) instead of the behavior being dictated by the ohci 
+driver.
 
-The source of the problem here is the #include "../NCR5380.h", because 
-that header file both declares struct NCR5380_hostdata and (with this 
-patch) it also calls cumanascsi_read(). That means cumanascsi_read() has 
-to be declared earlier, and that in turn requires an incomplete definition 
-of struct NCR5380_hostdata. The commit log alludes to the problem but 
-could be made more explicit if you would like (?).
+In my particular area of interest (LEGO MINDSTORMS EV3), the 5V 
+(hardware) regulator for VBUS does use gpios, but the 5V is also shared 
+with the LEGO input and output ports. So what I would ultimately like to 
+be able to do is have userspace notified of an overcurrent event and let 
+userspace decided when to turn the vbus back on. For example, someone 
+might plug something into one of the LEGO input or output ports that 
+causes a short circuit. I would like to display a notification to the 
+user and wait for them to correct the problem and then press a button to 
+turn the power back on.
 
-BTW, this problem doesn't arise in the other six 5380 drivers because each 
-one implements NCR5380_read() as a macro. It would be nice to get rid of 
-the macros in favour of an ops struct (in the course of converting the 
-driver to a library module) but I doubt that this is feasible now that 
-I've seen the performance benefit of this patch series.
+This will require some modifications to the regulator subsystem though. 
+I actually started work on this a while back, but haven't had the time 
+to pursue it any farther.
 
-In the absence of link time optimization, the library module design would 
-prevent the inlining of functions like cumanascsi_read(). Since every byte 
-transfered by the 5380 in a PIO transfer requires at least 5 chip register 
-accesses, function calls would be prohibitively expensive. So I think we 
-are stuck with inline accessors or macros.
-
--- 
+Here are my WIP patches in case there is any interest:
+* 
+https://github.com/dlech/ev3dev-kernel/commit/541a42b3b8ed639e95bbc835df3292f80190c789
+* 
+https://github.com/dlech/ev3dev-kernel/commit/2ba99b1ad6a06c944dd33a073f54044e71b75ae6
+* 
+https://github.com/dlech/ev3dev-kernel/commit/cdb03caa50e64931d4f2836c648739aa4385ed3b
+* 
+https://github.com/dlech/ev3dev-kernel/commit/9d6b50cde34b51309c74d97c26b1430c7ff6aa0f
