@@ -1,72 +1,79 @@
-From: mayhs11saini@gmail.com (Shyam Saini)
-Date: Mon, 10 Oct 2016 07:06:59 +0530
-Subject: [PATCH 1/1] mfd: Remove unused variable using Coccinelle
-Message-ID: <1476063419-13866-1-git-send-email-mayhs11saini@gmail.com>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Mon, 10 Oct 2016 00:46:53 -0400 (EDT)
+Subject: [PATCH v3 10/12] scsi/ncr5380: Expedite register polling
+In-Reply-To: <cover.1476051961.git.fthain@telegraphics.com.au>
+References: <cover.1476051961.git.fthain@telegraphics.com.au>
+Message-ID: <2806ba151f6983923fa0aae700245dfeb4cfaf38.1476051962.git.fthain@telegraphics.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variable err is initialized but never used otherwise.
+Avoid the call to NCR5380_poll_politely2() when possible. The call is
+easily short-circuited on the PIO fast path, using the inline wrapper.
+This requires that the NCR5380_read macro be made available before
+any #include "NCR5380.h" so a few declarations have to be moved too.
 
-The semantic patch that makes this change is as follows:
-
-// <smpl>
-@@
-type T;
-identifier i;
-constant C;
-@@
-
-(
-extern T i;
-|
-- T i;
-  <+... when != i
-- i = C;
-  ...+>
-)
-// </smpl>
-
-Signed-off-by: Shyam Saini <mayhs11saini@gmail.com>
+Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+Reviewed-by: Hannes Reinecke <hare@suse.com>
+Tested-by: Ondrej Zary <linux@rainbow-software.org>
+Tested-by: Michael Schmitz <schmitzmic@gmail.com>
 ---
- drivers/mfd/ab3100-core.c | 5 -----
- 1 file changed, 5 deletions(-)
+ drivers/scsi/NCR5380.h      | 3 +++
+ drivers/scsi/arm/cumana_1.c | 4 ++++
+ drivers/scsi/atari_scsi.c   | 6 +++---
+ 3 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mfd/ab3100-core.c b/drivers/mfd/ab3100-core.c
-index 6a5a988..3ebb2f0 100644
---- a/drivers/mfd/ab3100-core.c
-+++ b/drivers/mfd/ab3100-core.c
-@@ -584,8 +584,6 @@ static struct dentry *ab3100_set_reg_file;
- 
- static void ab3100_setup_debugfs(struct ab3100 *ab3100)
+diff --git a/drivers/scsi/NCR5380.h b/drivers/scsi/NCR5380.h
+index 4682baa..b2c560c 100644
+--- a/drivers/scsi/NCR5380.h
++++ b/drivers/scsi/NCR5380.h
+@@ -310,6 +310,9 @@ static inline int NCR5380_poll_politely(struct NCR5380_hostdata *hostdata,
+                                         unsigned int reg, u8 bit, u8 val,
+                                         unsigned long wait)
  {
--	int err;
++	if ((NCR5380_read(reg) & bit) == val)
++		return 0;
++
+ 	return NCR5380_poll_politely2(hostdata, reg, bit, val,
+ 						reg, bit, val, wait);
+ }
+diff --git a/drivers/scsi/arm/cumana_1.c b/drivers/scsi/arm/cumana_1.c
+index ae1d4c6..fb7600d 100644
+--- a/drivers/scsi/arm/cumana_1.c
++++ b/drivers/scsi/arm/cumana_1.c
+@@ -29,6 +29,10 @@
+ #define NCR5380_implementation_fields	\
+ 	unsigned ctrl
+ 
++struct NCR5380_hostdata;
++static u8 cumanascsi_read(struct NCR5380_hostdata *, unsigned int);
++static void cumanascsi_write(struct NCR5380_hostdata *, unsigned int, u8);
++
+ #include "../NCR5380.h"
+ 
+ #define CTRL	0x16fc
+diff --git a/drivers/scsi/atari_scsi.c b/drivers/scsi/atari_scsi.c
+index aed69ac..f77c311 100644
+--- a/drivers/scsi/atari_scsi.c
++++ b/drivers/scsi/atari_scsi.c
+@@ -57,6 +57,9 @@
+ 
+ #define NCR5380_implementation_fields   /* none */
+ 
++static u8 (*atari_scsi_reg_read)(unsigned int);
++static void (*atari_scsi_reg_write)(unsigned int, u8);
++
+ #define NCR5380_read(reg)               atari_scsi_reg_read(reg)
+ #define NCR5380_write(reg, value)       atari_scsi_reg_write(reg, value)
+ 
+@@ -126,9 +129,6 @@ static inline unsigned long SCSI_DMA_GETADR(void)
+ 
+ static void atari_scsi_fetch_restbytes(void);
+ 
+-static u8 (*atari_scsi_reg_read)(unsigned int);
+-static void (*atari_scsi_reg_write)(unsigned int, u8);
 -
- 	ab3100_dir = debugfs_create_dir("ab3100", NULL);
- 	if (!ab3100_dir)
- 		goto exit_no_debugfs;
-@@ -594,7 +592,6 @@ static void ab3100_setup_debugfs(struct ab3100 *ab3100)
- 				S_IRUGO, ab3100_dir, ab3100,
- 				&ab3100_registers_fops);
- 	if (!ab3100_reg_file) {
--		err = -ENOMEM;
- 		goto exit_destroy_dir;
- 	}
- 
-@@ -604,7 +601,6 @@ static void ab3100_setup_debugfs(struct ab3100 *ab3100)
- 				S_IWUSR, ab3100_dir, &ab3100_get_priv,
- 				&ab3100_get_set_reg_fops);
- 	if (!ab3100_get_reg_file) {
--		err = -ENOMEM;
- 		goto exit_destroy_reg;
- 	}
- 
-@@ -614,7 +610,6 @@ static void ab3100_setup_debugfs(struct ab3100 *ab3100)
- 				S_IWUSR, ab3100_dir, &ab3100_set_priv,
- 				&ab3100_get_set_reg_fops);
- 	if (!ab3100_set_reg_file) {
--		err = -ENOMEM;
- 		goto exit_destroy_get_reg;
- 	}
- 	return;
+ static unsigned long	atari_dma_residual, atari_dma_startaddr;
+ static short		atari_dma_active;
+ /* pointer to the dribble buffer */
 -- 
-2.7.4
+2.7.3
