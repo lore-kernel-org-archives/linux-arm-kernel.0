@@ -1,56 +1,76 @@
-From: atull@opensource.altera.com (atull)
-Date: Mon, 10 Oct 2016 13:38:18 -0500
-Subject: [PATCH 1/3] fpga manager: Add cyclonespi driver for Altera fpgas
-In-Reply-To: <CAAtXAHfax5qve7bpxNoObZOZGZk1CoJkusMecMXyMc_w1JBbvw@mail.gmail.com>
-References: <cover.1475783742.git.stillcompiling@gmail.com>
- <4b4432c04b4ea92a2af814e3d7866c33f2eb12ea.1475783742.git.stillcompiling@gmail.com>
- <CAAtXAHcWLpn3DFP6YLWqBxsMQ0O=HNNCmB+kHbHhyAHFHQUbwA@mail.gmail.com>
- <alpine.DEB.2.02.1610071248320.32627@linuxheads99>
- <CAAtXAHfax5qve7bpxNoObZOZGZk1CoJkusMecMXyMc_w1JBbvw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1610101148520.28839@linuxheads99>
+From: aaron.brice@datasoft.com (Aaron Brice)
+Date: Mon, 10 Oct 2016 11:39:52 -0700
+Subject: [PATCH v2] sdhci-esdhc-imx: Correct two register accesses
+Message-ID: <1476124792-18441-1-git-send-email-aaron.brice@datasoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Oct 2016, Moritz Fischer wrote:
+ - The DMA error interrupt bit is in a different position as
+   compared to the sdhci standard.  This is accounted for in
+   many cases, but not handled in the case of clearing the
+   INT_STATUS register by writing a 1 to that location.
+ - The HOST_CONTROL register is very different as compared to
+   the sdhci standard.  This is accounted for in the write
+   case, but not when read back out (which it is in the sdhci
+   code).
 
-> Hi Alan,
-> 
-> On Fri, Oct 7, 2016 at 11:21 AM, atull <atull@opensource.altera.com> wrote:
-> 
-> > Moritz, Can you remind me what that issue was there (or point me to
-> > that email, I can't find it)?  I don't think I had a problem with that
-> > in your case.  In general I think if these drivers can take the
-> > bitstream that comes from the manufacturer's tools and stuff it into
-> > the FPGA, then we are accomplishing what we want.  So I am OK with
-> > this here.  The intent of the driver is to load a standard rbf, same
-> > as the other Altera FPGA drivers.
-> 
-> My first version of the zynq fpga manager had byte swapping in there
-> and detection of which format was used. Greg even (accidentially)
-> merged my initial code
-> which I then cleaned up in 4d10eaff5bfc69997a769f9c83b749f0a8c542fa
-> ("fpga: zynq-fpga: Change fw format to handle bin instead of bit.") to
-> address the review
-> comments.
-> 
-> I do see your point about useability, and if this is something that
-> keeps coming up
-> we could pull that into the framework with a flag to SWAP or as part
-> of the image_information
-> struct.
-> 
-> Thoughts?
+Signed-off-by: Dave Russell <david.russell@datasoft.com>
+Signed-off-by: Aaron Brice <aaron.brice@datasoft.com>
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+v1 -> v2:
+- rename long_val to val
 
-I agree.  Some day we may want to see it useful to extend
-the flow to do that.  Currently it's not needed so we can
-wait until we see clearly what is needed.
+ drivers/mmc/host/sdhci-esdhc-imx.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-Alan
-
-> 
-> Cheers,
-> 
-> Moritz
-> 
-> [1] https://mail-archive.com/linux-kernel at vger.kernel.org/msg995245.html
-> 
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 1f54fd8..7123ef9 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -346,7 +346,8 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
+ 	u32 data;
+ 
+-	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)) {
++	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE ||
++			reg == SDHCI_INT_STATUS)) {
+ 		if ((val & SDHCI_INT_CARD_INT) && !esdhc_is_usdhc(imx_data)) {
+ 			/*
+ 			 * Clear and then set D3CD bit to avoid missing the
+@@ -555,6 +556,25 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+ 	esdhc_clrset_le(host, 0xffff, val, reg);
+ }
+ 
++static u8 esdhc_readb_le(struct sdhci_host *host, int reg)
++{
++	u8 ret;
++	u32 val;
++
++	switch (reg) {
++	case SDHCI_HOST_CONTROL:
++		val = readl(host->ioaddr + reg);
++
++		ret = val & SDHCI_CTRL_LED;
++		ret |= (val >> 5) & SDHCI_CTRL_DMA_MASK;
++		ret |= (val & ESDHC_CTRL_4BITBUS);
++		ret |= (val & ESDHC_CTRL_8BITBUS) << 3;
++		return ret;
++	}
++
++	return readb(host->ioaddr + reg);
++}
++
+ static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+@@ -947,6 +967,7 @@ static void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+ static struct sdhci_ops sdhci_esdhc_ops = {
+ 	.read_l = esdhc_readl_le,
+ 	.read_w = esdhc_readw_le,
++	.read_b = esdhc_readb_le,
+ 	.write_l = esdhc_writel_le,
+ 	.write_w = esdhc_writew_le,
+ 	.write_b = esdhc_writeb_le,
+-- 
+2.7.4
