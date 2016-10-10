@@ -1,42 +1,48 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 10 Oct 2016 14:37:55 +0200
-Subject: [PATCH 1/2] mmc: block: add missing header dependencies
-In-Reply-To: <1475199459-4775-1-git-send-email-baoyou.xie@linaro.org>
-References: <1475199459-4775-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <CAPDyKFpTB-YM3J3dB7Us0Q_AF2fojm369eZmHw7M2v1ZiWJu2Q@mail.gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 10 Oct 2016 20:44:22 +0800
+Subject: [PATCH] PM / AVS: rockchip-io: make the log more consistent
+Message-ID: <1476103462-7559-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 September 2016 at 03:37, Baoyou Xie <baoyou.xie@linaro.org> wrote:
-> We get 1 warning when building kernel with W=1:
-> drivers/mmc/card/block.c:2147:5: warning: no previous prototype for 'mmc_blk_issue_rq' [-Wmissing-prototypes]
->
-> In fact, this function is declared in drivers/mmc/card/block.h,
-> so this patch adds missing header dependencies.
->
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+When testing SD hotplug automatically, I got bunch of
+useless log like this:
 
-Thanks, applied for fixes!
+[  588.357838] mmc0: card 0007 removed
+[  589.492664] rockchip-iodomain ff770000.syscon:io-domains: Setting to 3300000 done
+[  589.500698] vccio_sd: ramp_delay not set
+[  589.504817] rockchip-iodomain ff770000.syscon:io-domains: Setting to 3300000 done
+[  589.669705] rockchip-iodomain ff770000.syscon:io-domains: Setting to 3300000 done
+[  589.677593] vccio_sd: ramp_delay not set
+[  589.681581] rockchip-iodomain ff770000.syscon:io-domains: Setting to 1800000 done
+[  590.032820] dwmmc_rockchip ff0c0000.dwmmc: Successfully tuned phase to 140
+[  590.039725] mmc0: new ultra high speed SDR50 SDHC card at address 0007
+[  590.046641] mmcblk0: mmc0:0007 SD32G 29.3 GiB
+[  590.052163]  mmcblk0: p1
 
-Kind regards
-Uffe
+Moreover the code is intent to print the 'uV' for debug but
+later print it using dev_info. It looks more like to me that
+it should be the real intention of the code. Anyway, let's
+mark this verbose log as debug message.
 
-> ---
->  drivers/mmc/card/block.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-> index c333511..0f2cc9f2 100644
-> --- a/drivers/mmc/card/block.c
-> +++ b/drivers/mmc/card/block.c
-> @@ -46,6 +46,7 @@
->  #include <asm/uaccess.h>
->
->  #include "queue.h"
-> +#include "block.h"
->
->  MODULE_ALIAS("mmc:block");
->  #ifdef MODULE_PARAM_PREFIX
-> --
-> 2.7.4
->
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+---
+
+ drivers/power/avs/rockchip-io-domain.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
+index 01b6d3f..56bce19 100644
+--- a/drivers/power/avs/rockchip-io-domain.c
++++ b/drivers/power/avs/rockchip-io-domain.c
+@@ -143,7 +143,7 @@ static int rockchip_iodomain_notify(struct notifier_block *nb,
+ 	if (ret && event == REGULATOR_EVENT_PRE_VOLTAGE_CHANGE)
+ 		return NOTIFY_BAD;
+ 
+-	dev_info(supply->iod->dev, "Setting to %d done\n", uV);
++	dev_dbg(supply->iod->dev, "Setting to %d done\n", uV);
+ 	return NOTIFY_OK;
+ }
+ 
+-- 
+2.3.7
