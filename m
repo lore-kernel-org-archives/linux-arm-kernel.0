@@ -1,413 +1,111 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 10 Oct 2016 14:23:15 +0200
-Subject: [PATCH v1 2/2] arm64: dts: rockchip: Add PX5 Evaluation board
-In-Reply-To: <ef2bb52c-26f9-49a5-fe18-538effcd30b0@suse.de>
-References: <1473529249-6151-1-git-send-email-andy.yan@rock-chips.com>
- <1473529623-6268-1-git-send-email-andy.yan@rock-chips.com>
- <ef2bb52c-26f9-49a5-fe18-538effcd30b0@suse.de>
-Message-ID: <16590443.vsxkmsdpMT@phil>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Oct 2016 14:30:23 +0200
+Subject: [PATCH v4 03/10] ARM: sun8i: dt: Add DT bindings documentation
+ for Allwinner sun8i-emac
+In-Reply-To: <1475828757-926-4-git-send-email-clabbe.montjoie@gmail.com>
+References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1475828757-926-4-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20161010123023.GG3462@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas, Andy,
-
-Am Dienstag, 13. September 2016, 14:23:35 CEST schrieb Andreas F?rber:
-> Hi,
+On Fri, Oct 07, 2016 at 10:25:50AM +0200, Corentin Labbe wrote:
+> This patch adds documentation for Device-Tree bindings for the
+> Allwinner sun8i-emac driver.
 > 
-> Am 10.09.2016 um 19:47 schrieb Andy Yan:
-> > PX5 EVB is designed by Rockchip for automotive field,
-> > which intergrated with CVBS(TP2825)/MIPI DSI/CSI/LVDS
-> > HDMI video input/output interface, audio codec ES8396,
-> > WIFI/BT(on RTL8723BS), Gsensor BMA250E and light&proximity
-> > sensor STK3410.
-> > 
-> > Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  .../bindings/net/allwinner,sun8i-emac.txt          | 70 ++++++++++++++++++++++
+>  1 file changed, 70 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
 > 
-> Most comments from PX3 1/2 apply here, too.
+> diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> new file mode 100644
+> index 0000000..92e4ef3b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> @@ -0,0 +1,70 @@
+> +* Allwinner sun8i EMAC ethernet controller
+> +
+> +Required properties:
+> +- compatible: should be one of the following string:
+> +		"allwinner,sun8i-a83t-emac"
+> +		"allwinner,sun8i-h3-emac"
+> +		"allwinner,sun50i-a64-emac"
+> +- reg: address and length of the register for the device.
+> +- syscon: A phandle to the syscon of the SoC
+> +- interrupts: interrupt for the device
+> +- clocks: A phandle to the reference clock for this device
+> +- clock-names: should be "ahb"
+> +- resets: A phandle to the reset control for this device
+> +- reset-names: should be "ahb"
+> +- phy-mode: See ethernet.txt
+> +- phy-handle: See ethernet.txt
+> +- #address-cells: shall be 1
+> +- #size-cells: shall be 0
+> +
+> +Optional properties:
+> +- allwinner,tx-delay: TX clock delay chain value. Range value is 0-0x07. Default is 0)
+> +- allwinner,rx-delay: RX clock delay chain value. Range value is 0-0x1F. Default is 0)
+> +Both delay properties does not have units, there are arbitrary value.
+> +The TX/RX clock delay chain settings are board specific and could be found
+> +in vendor FEX files.
+> +
+> +Optional properties for "allwinner,sun8i-h3-emac":
+> +- allwinner,leds-active-low: EPHY LEDs are active low
+> +
+> +Required child node of emac:
+> +- mdio bus node: should be named mdio
+> +
+> +Required properties of the mdio node:
+> +- #address-cells: shall be 1
+> +- #size-cells: shall be 0
+> +
+> +The device node referenced by "phy" or "phy-handle" should be a child node
+> +of the mdio node. See phy.txt for the generic PHY bindings.
+> +
+> +Required properties of the phy node with "allwinner,sun8i-h3-emac":
+> +- clocks: an extra phandle to the reference clock for the EPHY
+> +- resets: an extra phandle to the reset control for the EPHY
+> +
+> +Example:
+> +
+> +emac: ethernet at 01c0b000 {
+> +	compatible = "allwinner,sun8i-h3-emac";
+> +	syscon = <&syscon>;
+> +	reg = <0x01c0b000 0x104>;
+> +	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> +	resets = <&ccu RST_BUS_EMAC>;
+> +	reset-names = "ahb";
+> +	clocks = <&ccu CLK_BUS_EMAC>;
+> +	clock-names = "ahb";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	phy = <&int_mii_phy>;
+> +	phy-mode = "mii";
+> +	allwinner,leds-active-low;
+> +	mdio: mdio {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		int_mii_phy: ethernet-phy at 1 {
+> +			reg = <1>;
+> +			clocks = <&ccu CLK_BUS_EPHY>;
+> +			resets = <&ccu RST_BUS_EPHY>;
 
-ammended te commit
+That works for me, let's see how the DT maintainers feel about it.
 
-> > ---
-> > 
-> > Changes in v1:
-> > - board rename
-> > - add vendor prefix for i2c interfaced devices
-> > 
-> >  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
-> >  arch/arm64/boot/dts/rockchip/Makefile              |   1 +
-> >  arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts    | 304
-> >  +++++++++++++++++++++ 3 files changed, 309 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
-> > b/Documentation/devicetree/bindings/arm/rockchip.txt index
-> > 6da3881..b6f92d6 100644
-> > --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> > +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> > @@ -107,6 +107,10 @@ Rockchip platforms device tree bindings
-> > 
-> >      Required root node properties:
-> >        - compatible = "rockchip,r88", "rockchip,rk3368";
-> > 
-> > +- Rockchip PX5 Evaluation board:
-> > +    Required root node properties:
-> > +      - compatible = "rockchip,px5-evb", "rockchip,px5",
-> > "rockchip,rk3368"; +
-> > 
-> >  - Rockchip RK3228 Evaluation board:
-> >      Required root node properties:
-> >       - compatible = "rockchip,rk3228-evb", "rockchip,rk3228";
-> > 
-> > diff --git a/arch/arm64/boot/dts/rockchip/Makefile
-> > b/arch/arm64/boot/dts/rockchip/Makefile index 7037a16..86c74b2 100644
-> > --- a/arch/arm64/boot/dts/rockchip/Makefile
-> > +++ b/arch/arm64/boot/dts/rockchip/Makefile
-> > @@ -1,6 +1,7 @@
-> > 
-> >  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
-> >  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
-> >  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
-> > 
-> > +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-px5-evb.dtb
-> 
-> There is no PX5 listed on your English website (yet), but given that you
-> have your own rockchip/ folder for arm64 I would encourage you to rename
-> to px5-evb.dtb independent of any internal heritage or compatibility the
-> SoC has. Compare apq/ipq/msm in qcom.
+Thanks!
+Maxime
 
-I prefer to keep it like it is, see comment in px3 patch.
-
-> 
-> >  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
-> >  
-> >  always		:= $(dtb-y)
-> > 
-> > diff --git a/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
-> > b/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts new file mode 100644
-> > index 0000000..be0e915
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
-> > @@ -0,0 +1,304 @@
-> > +/*
-> > + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
-> > + *
-> > + * This file is dual-licensed: you can use it either under the terms
-> > + * of the GPL or the X11 license, at your option. Note that this dual
-> > + * licensing only applies to this file, and not this project as a
-> > + * whole.
-> > + *
-> > + *  a) This file is free software; you can redistribute it and/or
-> > + *     modify it under the terms of the GNU General Public License as
-> > + *     published by the Free Software Foundation; either version 2 of the
-> > + *     License, or (at your option) any later version.
-> > + *
-> > + *     This file is distributed in the hope that it will be useful,
-> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + *     GNU General Public License for more details.
-> > + *
-> > + * Or, alternatively,
-> > + *
-> > + *  b) Permission is hereby granted, free of charge, to any person
-> > + *     obtaining a copy of this software and associated documentation
-> > + *     files (the "Software"), to deal in the Software without
-> > + *     restriction, including without limitation the rights to use,
-> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> > + *     sell copies of the Software, and to permit persons to whom the
-> > + *     Software is furnished to do so, subject to the following
-> > + *     conditions:
-> > + *
-> > + *     The above copyright notice and this permission notice shall be
-> > + *     included in all copies or substantial portions of the Software.
-> > + *
-> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> > + *     OTHER DEALINGS IN THE SOFTWARE.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "rk3368.dtsi"
-> 
-> Similarly suggest a px5.dtsi here.
-> 
-> > +#include <dt-bindings/input/input.h>
-> > +
-> > +/ {
-> > +	model = "Rockchip PX5 EVB";
-> > +	compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial4:115200n8";
-> > +	};
-> > +
-> > +	memory at 0 {
-> > +		device_type = "memory";
-> > +		reg = <0x0 0x0 0x0 0x80000000>;
-> > +	};
-> > +
-> > +	keys: gpio-keys {
-> > +		compatible = "gpio-keys";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pwr_key>;
-> > +
-> > +		power {
-> > +			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
-> > +			label = "GPIO Power";
-> > +			linux,code = <KEY_POWER>;
-> > +			wakeup-source;
-> > +		};
-> > +	};
-> > +
-> > +	vcc_sys: vcc-sys-regulator {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "vcc_sys";
-> > +		regulator-min-microvolt = <5000000>;
-> > +		regulator-max-microvolt = <5000000>;
-> > +		regulator-always-on;
-> > +		regulator-boot-on;
-> > +	};
-> > +};
-> > +
-> > +&emmc {
-> > +	status = "okay";
-> > +	bus-width = <8>;
-> > +	cap-mmc-highspeed;
-> > +	clock-frequency = <150000000>;
-> > +	disable-wp;
-> > +	keep-power-in-suspend;
-> > +	non-removable;
-> > +	num-slots = <1>;
-> > +	vmmc-supply = <&vcc_io>;
-> > +	vqmmc-supply = <&vcc18_flash>;
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_bus8>;
-> > +};
-> > +
-> > +&i2c0 {
-> > +	status = "okay";
-> > +
-> > +	rk808: pmic at 1b {
-> > +		compatible = "rockchip,rk808";
-> > +		reg = <0x1b>;
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pmic_int>, <&pmic_sleep>;
-> > +		interrupt-parent = <&gpio0>;
-> > +		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
-> > +		rockchip,system-power-controller;
-> > +		vcc1-supply = <&vcc_sys>;
-> > +		vcc2-supply = <&vcc_sys>;
-> > +		vcc3-supply = <&vcc_sys>;
-> > +		vcc4-supply = <&vcc_sys>;
-> > +		vcc6-supply = <&vcc_sys>;
-> > +		vcc7-supply = <&vcc_sys>;
-> > +		vcc8-supply = <&vcc_io>;
-> > +		vcc9-supply = <&vcc_sys>;
-> > +		vcc10-supply = <&vcc_sys>;
-> > +		vcc11-supply = <&vcc_sys>;
-> > +		vcc12-supply = <&vcc_io>;
-> > +		clock-output-names = "xin32k", "rk808-clkout2";
-> > +		#clock-cells = <1>;
-> > +
-> > +		regulators {
-> > +			vdd_cpu: DCDC_REG1 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-min-microvolt = <700000>;
-> > +				regulator-max-microvolt = <1500000>;
-> > +				regulator-name = "vdd_cpu";
-> > +			};
-> > +
-> > +			vdd_log: DCDC_REG2 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-min-microvolt = <700000>;
-> > +				regulator-max-microvolt = <1500000>;
-> > +				regulator-name = "vdd_log";
-> > +			};
-> > +
-> > +			vcc_ddr: DCDC_REG3 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-name = "vcc_ddr";
-> > +			};
-> > +
-> > +			vcc_io: DCDC_REG4 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-min-microvolt = <3300000>;
-> > +				regulator-max-microvolt = <3300000>;
-> > +				regulator-name = "vcc_io";
-> > +			};
-> > +
-> > +			vcc18_flash: LDO_REG1 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-min-microvolt = <1800000>;
-> > +				regulator-max-microvolt = <1800000>;
-> > +				regulator-name = "vcc18_flash";
-> > +			};
-> > +
-> > +			vcca_33: LDO_REG2 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-min-microvolt = <3300000>;
-> > +				regulator-max-microvolt = <3300000>;
-> > +				regulator-name = "vcca_33";
-> > +			};
-> > +
-> > +			vdd_10: LDO_REG3 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-min-microvolt = <1000000>;
-> > +				regulator-max-microvolt = <1000000>;
-> > +				regulator-name = "vdd_10";
-> > +			};
-> > +
-> > +			avdd_33: LDO_REG4 {
-> > +				regulator-min-microvolt = <3300000>;
-> > +				regulator-max-microvolt = <3300000>;
-> > +				regulator-name = "avdd_33";
-> > +			};
-> > +
-> > +			vccio_sd: LDO_REG5 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-min-microvolt = <1800000>;
-> > +				regulator-max-microvolt = <3300000>;
-> > +				regulator-name = "vccio_sd";
-> > +			};
-> > +
-> > +			vdd10_lcd: LDO_REG6 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-min-microvolt = <1000000>;
-> > +				regulator-max-microvolt = <1000000>;
-> > +				regulator-name = "vdd10_lcd";
-> > +			};
-> > +
-> > +			vcc_18: LDO_REG7 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-min-microvolt = <1800000>;
-> > +				regulator-max-microvolt = <1800000>;
-> > +				regulator-name = "vcc_18";
-> > +			};
-> > +
-> > +			vcc18_lcd: LDO_REG8 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-min-microvolt = <1800000>;
-> > +				regulator-max-microvolt = <1800000>;
-> > +				regulator-name = "vcc18_lcd";
-> > +			};
-> > +
-> > +			vcc_sd: SWITCH_REG1 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-name = "vcc_sd";
-> > +			};
-> > +
-> > +			vcc33_lcd: SWITCH_REG2 {
-> > +				regulator-always-on;
-> > +				regulator-boot-on;
-> > +				regulator-name = "vcc33_lcd";
-> > +			};
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +&i2c1 {
-> > +	status = "okay";
-> > +
-> > +	/* Accelerometer */
-> > +	bma250 at 18 {
-
-changed to accelerometer at 18 similar to px3
-
-> > +		compatible = "bosch,bma250";
-> > +		reg = <0x18>;
-> > +		interrupt-parent = <&gpio2>;
-> > +		interrupts = <17 IRQ_TYPE_LEVEL_LOW>;
-> > +	};
-> > +
-> > +	stk3410 at 48 {
-> > +		compatible = "sensortek,STK3310";
-> > +		reg = <0x48>;
-> > +		interrupt-parent = <&gpio2>;
-> > +		interrupts = <19 IRQ_TYPE_LEVEL_LOW>;
-> > +	};
-> > +};
-> > +
-> > +&i2c2 {
-> > +	status = "okay";
-> > +
-> > +	gsl1680: touchscreen at 40 {
-> > +		compatible = "silead,gsl1680";
-> > +		reg = <0x40>;
-> > +		interrupt-parent = <&gpio3>;
-> > +		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
-> > +		power-gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
-> > +		touchscreen-size-x = <800>;
-> > +		touchscreen-size-y = <1280>;
-> > +		silead,max-fingers = <5>;
-> > +	};
-> > +};
-> > +
-> > +&pinctrl {
-> > +
-> 
-> Drop white line?
-
-seems I dropped that already.
-
-
-> > +	keys {
-> > +		pwr_key: pwr-key {
-> > +			rockchip,pins = <0 2 RK_FUNC_GPIO &pcfg_pull_none>;
-> > +		};
-> > +	};
-> > +
-> > +	pmic {
-> > +		pmic_sleep: pmic-sleep {
-> > +			rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
-> > +		};
-> > +
-> > +		pmic_int: pmic-int {
-> > +			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +&tsadc {
-> > +	status = "okay";
-> > +	rockchip,hw-tshut-mode = <0>; /* CRU */
-> > +	rockchip,hw-tshut-polarity = <1>; /* high */
-> > +};
-> > +
-> > +&uart4 {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&usb_host0_ehci {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&usb_otg {
-> > +	status = "okay";
-> > +};
-> > +
-> > +&wdt {
-> > +	status = "okay";
-> > +};
-> 
-> Otherwise formally looks fine.
-
-Thanks for looking at the patch.
-
-
-Heiko
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161010/ffac48c2/attachment.sig>
