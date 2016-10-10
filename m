@@ -1,102 +1,72 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Oct 2016 10:15:39 -0500
-Subject: [PATCH v4 03/10] ARM: sun8i: dt: Add DT bindings documentation
- for Allwinner sun8i-emac
-In-Reply-To: <20161010123023.GG3462@lukather>
-References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
- <1475828757-926-4-git-send-email-clabbe.montjoie@gmail.com>
- <20161010123023.GG3462@lukather>
-Message-ID: <20161010151539.GB3111@rob-hp-laptop>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 10 Oct 2016 16:29:48 +0100
+Subject: [PATCH v2] arm: Added support for getcpu() vDSO using TPIDRURW
+In-Reply-To: <CAKdL+dSt+cBCpwW5q+VCQh+7XeKrnyJgfTsEsuo2nKoUr9ytxw@mail.gmail.com>
+References: <1475589000-29315-1-git-send-email-fredrik.markstrom@gmail.com>
+ <1475595363-4272-1-git-send-email-fredrik.markstrom@gmail.com>
+ <20161004170741.GC29008@leverpostej>
+ <CAKdL+dS4_My6hyMEGNc65mzDapia_tMiVzZ9DMw=ddZM+XiwAw@mail.gmail.com>
+ <CAKdL+dTGDqgpnMTkAj=N4cY-cZF_U+bkH1v1vUA4umZoSbWHKQ@mail.gmail.com>
+ <50e025e0-7052-9b15-3b3e-36d1d9dfd695@arm.com>
+ <20161005195359.GR1041@n2100.armlinux.org.uk>
+ <CAKdL+dSt+cBCpwW5q+VCQh+7XeKrnyJgfTsEsuo2nKoUr9ytxw@mail.gmail.com>
+Message-ID: <20161010152948.GD14561@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2016 at 02:30:23PM +0200, Maxime Ripard wrote:
-> On Fri, Oct 07, 2016 at 10:25:50AM +0200, Corentin Labbe wrote:
-> > This patch adds documentation for Device-Tree bindings for the
-> > Allwinner sun8i-emac driver.
-> > 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  .../bindings/net/allwinner,sun8i-emac.txt          | 70 ++++++++++++++++++++++
-> >  1 file changed, 70 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> > new file mode 100644
-> > index 0000000..92e4ef3b
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> > @@ -0,0 +1,70 @@
-> > +* Allwinner sun8i EMAC ethernet controller
-> > +
-> > +Required properties:
-> > +- compatible: should be one of the following string:
-> > +		"allwinner,sun8i-a83t-emac"
-> > +		"allwinner,sun8i-h3-emac"
-> > +		"allwinner,sun50i-a64-emac"
-> > +- reg: address and length of the register for the device.
-> > +- syscon: A phandle to the syscon of the SoC
-> > +- interrupts: interrupt for the device
-> > +- clocks: A phandle to the reference clock for this device
-> > +- clock-names: should be "ahb"
-> > +- resets: A phandle to the reset control for this device
-> > +- reset-names: should be "ahb"
-> > +- phy-mode: See ethernet.txt
-> > +- phy-handle: See ethernet.txt
-> > +- #address-cells: shall be 1
-> > +- #size-cells: shall be 0
-> > +
-> > +Optional properties:
-> > +- allwinner,tx-delay: TX clock delay chain value. Range value is 0-0x07. Default is 0)
-> > +- allwinner,rx-delay: RX clock delay chain value. Range value is 0-0x1F. Default is 0)
-> > +Both delay properties does not have units, there are arbitrary value.
-> > +The TX/RX clock delay chain settings are board specific and could be found
-> > +in vendor FEX files.
-> > +
-> > +Optional properties for "allwinner,sun8i-h3-emac":
-> > +- allwinner,leds-active-low: EPHY LEDs are active low
-> > +
-> > +Required child node of emac:
-> > +- mdio bus node: should be named mdio
-> > +
-> > +Required properties of the mdio node:
-> > +- #address-cells: shall be 1
-> > +- #size-cells: shall be 0
-> > +
-> > +The device node referenced by "phy" or "phy-handle" should be a child node
-> > +of the mdio node. See phy.txt for the generic PHY bindings.
-> > +
-> > +Required properties of the phy node with "allwinner,sun8i-h3-emac":
-> > +- clocks: an extra phandle to the reference clock for the EPHY
-> > +- resets: an extra phandle to the reset control for the EPHY
-> > +
-> > +Example:
-> > +
-> > +emac: ethernet at 01c0b000 {
-> > +	compatible = "allwinner,sun8i-h3-emac";
-> > +	syscon = <&syscon>;
-> > +	reg = <0x01c0b000 0x104>;
-> > +	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-> > +	resets = <&ccu RST_BUS_EMAC>;
-> > +	reset-names = "ahb";
-> > +	clocks = <&ccu CLK_BUS_EMAC>;
-> > +	clock-names = "ahb";
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> > +
-> > +	phy = <&int_mii_phy>;
-> > +	phy-mode = "mii";
-> > +	allwinner,leds-active-low;
-> > +	mdio: mdio {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +		int_mii_phy: ethernet-phy at 1 {
-> > +			reg = <1>;
-> > +			clocks = <&ccu CLK_BUS_EPHY>;
-> > +			resets = <&ccu RST_BUS_EPHY>;
+Hi Fredrik,
+
+[adding Mathieu -- background is getcpu() in userspace for arm]
+
+On Thu, Oct 06, 2016 at 12:17:07AM +0200, Fredrik Markstr?m wrote:
+> On Wed, Oct 5, 2016 at 9:53 PM, Russell King - ARM Linux <linux@armlinux.org.uk
+> > wrote:
+> > On Wed, Oct 05, 2016 at 06:48:05PM +0100, Robin Murphy wrote:
+> >> On 05/10/16 17:39, Fredrik Markstr?m wrote:
+> >> > The approach I suggested below with the vDSO data page will obviously
+> >> > not work on smp, so suggestions are welcome.
+> >>
+> >> Well, given that it's user-writeable, is there any reason an application
+> >> which cares couldn't simply run some per-cpu threads to call getcpu()
+> >> once and cache the result in TPIDRURW themselves? That would appear to
+> >> both raise no compatibility issues and work with existing kernels.
+> >
+> > There is - the contents of TPIDRURW is thread specific, and it moves
+> > with the thread between CPU cores.  So, if a thread was running on CPU0
+> > when it cached the getcpu() value in TPIDRURW, and then migrated to CPU1,
+> > TPIDRURW would still contain 0.
+> >
+> > I'm also not in favour of changing the TPIDRURW usage to be a storage
+> > repository for the CPU number - it's far too specific a usage and seems
+> > like a waste of hardware resources to solve one problem. 
 > 
-> That works for me, let's see how the DT maintainers feel about it.
+> Ok, but right now it's nothing but a (architecture specific) piece of TLS,
+> which we have generic mechanisms for. From my point of view that is a waste of
+> hardware resources.
+> 
+> > As Mark says, it's an ABI breaking change too, even if it is under a config
+> option.
+> 
+> I can't argue with that. If it's an ABI it's an ABI, even if I can't imagine
+> why anyone would use it over normal tls... but then again, people probably do. 
+> 
+> So in conclusion I agree and give up.
 
-The phy should have a compatible string since you have extra properties.
+Rather than give up, you could take a look at the patches from Mathieu
+Desnoyers, that tackle this in a very different way. It's also the reason
+we've been holding off implementing an optimised getcpu in the arm64 vdso,
+because it might all well be replaced by the new restartable sequences
+approach:
 
-Rob
+  http://lkml.kernel.org/r/1471637274-13583-1-git-send-email-mathieu.desnoyers at efficios.com
+
+He's also got support for arch/arm/ in that series, so you could take
+them for a spin. The main thing missing at the moment is justification
+for the feature using real-world code, as requested by Linus:
+
+  http://lkml.kernel.org/r/CA+55aFz+Q33m1+ju3ANaznBwYCcWo9D9WDr2=p0YLEF4gJF12g at mail.gmail.com
+
+so if your per-cpu buffer use-case is compelling in its own right (as
+opposed to a micro-benchmark), then you could chime in over there.
+
+Will
