@@ -1,48 +1,68 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Mon, 10 Oct 2016 20:44:22 +0800
-Subject: [PATCH] PM / AVS: rockchip-io: make the log more consistent
-Message-ID: <1476103462-7559-1-git-send-email-shawn.lin@rock-chips.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 10 Oct 2016 14:50:21 +0200
+Subject: [PATCH v4 04/10] ARM: dts: sun8i-h3: Add dt node for the syscon
+ control module
+In-Reply-To: <20161010123151.GI3462@lukather>
+References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1475828757-926-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20161010123151.GI3462@lukather>
+Message-ID: <20161010145021.00586f772e3398833217796a@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When testing SD hotplug automatically, I got bunch of
-useless log like this:
+On Mon, 10 Oct 2016 14:31:51 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-[  588.357838] mmc0: card 0007 removed
-[  589.492664] rockchip-iodomain ff770000.syscon:io-domains: Setting to 3300000 done
-[  589.500698] vccio_sd: ramp_delay not set
-[  589.504817] rockchip-iodomain ff770000.syscon:io-domains: Setting to 3300000 done
-[  589.669705] rockchip-iodomain ff770000.syscon:io-domains: Setting to 3300000 done
-[  589.677593] vccio_sd: ramp_delay not set
-[  589.681581] rockchip-iodomain ff770000.syscon:io-domains: Setting to 1800000 done
-[  590.032820] dwmmc_rockchip ff0c0000.dwmmc: Successfully tuned phase to 140
-[  590.039725] mmc0: new ultra high speed SDR50 SDHC card at address 0007
-[  590.046641] mmcblk0: mmc0:0007 SD32G 29.3 GiB
-[  590.052163]  mmcblk0: p1
+> Hi,
+> 
+> On Fri, Oct 07, 2016 at 10:25:51AM +0200, Corentin Labbe wrote:
+> > This patch add the dt node for the syscon register present on the
+> > Allwinner H3.
+> > 
+> > Only two register are present in this syscon and the only one useful is
+> > the one dedicated to EMAC clock.
+> > 
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/sun8i-h3.dtsi | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > index 8a95e36..1101d2f 100644
+> > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > @@ -140,6 +140,11 @@
+> >  		#size-cells = <1>;
+> >  		ranges;
+> >  
+> > +		syscon: syscon at 01c00000 {
+> > +			compatible = "syscon";
+> 
+> It would be great to have a more specific compatible here in addition
+> to the syscon, like "allwinner,sun8i-h3-system-controller".
 
-Moreover the code is intent to print the 'uV' for debug but
-later print it using dev_info. It looks more like to me that
-it should be the real intention of the code. Anyway, let's
-mark this verbose log as debug message.
+The System Control area is just like the PRCM area: it would be simpler
+to define the specific registers in the associated drivers.
 
-Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
----
+Here, instead of the syscon node, plus
 
- drivers/power/avs/rockchip-io-domain.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
++		emac: ethernet at 1c30000 {
++			compatible = "allwinner,sun8i-h3-emac";
++			syscon = <&syscon>;
++			reg = <0x01c30000 0x104>;
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+			...
 
-diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
-index 01b6d3f..56bce19 100644
---- a/drivers/power/avs/rockchip-io-domain.c
-+++ b/drivers/power/avs/rockchip-io-domain.c
-@@ -143,7 +143,7 @@ static int rockchip_iodomain_notify(struct notifier_block *nb,
- 	if (ret && event == REGULATOR_EVENT_PRE_VOLTAGE_CHANGE)
- 		return NOTIFY_BAD;
- 
--	dev_info(supply->iod->dev, "Setting to %d done\n", uV);
-+	dev_dbg(supply->iod->dev, "Setting to %d done\n", uV);
- 	return NOTIFY_OK;
- }
- 
+there would be no 'syscon' node and
+
++		emac: ethernet at 1c30000 {
++			compatible = "allwinner,sun8i-h3-emac";
++			syscon = <&syscon>;
++			reg =	<0x01c30000 0x104>,	/* EMAC */
++				<0x01c00030 4>;		/* system control */
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+			...
+
 -- 
-2.3.7
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
