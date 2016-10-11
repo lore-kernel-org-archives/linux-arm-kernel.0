@@ -1,89 +1,205 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Oct 2016 17:38:33 +0100
-Subject: [PATCH] arm64: mmu: set the contiguous for kernel mappings when
- appropriate
-In-Reply-To: <20161011162914.GF9532@arm.com>
-References: <1476123164-10532-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161011074419.GA20213@remoulade>
- <CAPvkgC1p5yZLtENYMi6zd5-pPDOYUtMw0Lxvb592u975gc+Zvg@mail.gmail.com>
- <CAKv+Gu-e6HT2YNvXJV2AbAzLrEeV6OvM6-hfTsCH0oXqH8zbKQ@mail.gmail.com>
- <CAKv+Gu9W69rP5o09t+d498nVE666Show1VK-Sm9LmchjeUsD_A@mail.gmail.com>
- <20161011124118.GB9532@arm.com>
- <CAKv+Gu_AX80Uts8gtn+PD9F0DWDMU2tEw6PEZg1p6G+ajXS_eg@mail.gmail.com>
- <20161011162914.GF9532@arm.com>
-Message-ID: <CAKv+Gu8XrB5id0bX1mobsyZte4BY_Z7=+aDkPdEK2Zv0MHn7Jw@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 11 Oct 2016 18:28:41 +0100
+Subject: [PATCH V3 02/10] ras: acpi/apei: cper: generic error data entry
+ v3 per ACPI 6.1
+In-Reply-To: <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <3f17d0a8-6b63-5792-903a-341effaae432@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 October 2016 at 17:29, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Oct 11, 2016 at 01:56:26PM +0100, Ard Biesheuvel wrote:
->> On 11 October 2016 at 13:41, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Oct 11, 2016 at 12:17:54PM +0100, Ard Biesheuvel wrote:
->> >> On 11 October 2016 at 10:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> >> > On 11 October 2016 at 09:48, Steve Capper <steve.capper@linaro.org> wrote:
->> >> >> So in arch/arm64/include/asm/pgtable-hwdef.h, we have:
->> >> >> CONT_PTE_SHIFT
->> >> >> CONT_PMD_SHIFT
->> >> >> CONT_PTES
->> >> >> CONT_PMDS
->> >> >> CONT_PTE_SIZE
->> >> >> CONT_PTE_MASK
->> >> >> ...
->> >> >>
->> >> >> which are used by the contiguous hint HugeTLB code.
->> >> >> Can those be adopted instead of CONT_MASK and CONT_SIZE?
->> >> >>
->> >>
->> >> Looking at the hugetlb code, it appears to support contiguous PMDs for
->> >> 4k and 64k pages as well, while the ARM ARM only defines it for 16k
->> >> pages. I suppose the contiguous bit is simply ignored for level 2
->> >> entries when using 4k or 64k pages kernels, but I think it would be
->> >> better for the code to reflect this as well.
->> >
->> > Which bit in the ARM ARM says that you can't support contiguous PMDs for 4k
->> > and 64k pages? I see that the number of contiguous entries changes between
->> > levels for 16k pages, but that's it.
->> >
->>
->> You are right, the ARM ARM does not say that at all. But given Mark's comment:
->>
->> """
->> With 16K pages, we can have contiguous PMD entries. Should we handle those,
->> too? e.g. have separate {PMD,PTE}_CONT{,_SIZE}?
->> """
->>
->> it seems I am not the only one who is confused about this. In any
->> case, the fact that the ARM ARM documents levels 2 and 3 explicitly
->> for 16k pages does very little to clarify at which levels this bit is
->> defined, and if it is defined at levels < 2, what the granularity is
->> for 16k pages.
+On 07/10/16 22:31, Tyler Baicar wrote:
+> Currently when a RAS error is reported it is not timestamped.
+> The ACPI 6.1 spec adds the timestamp field to the generic error
+> data entry v3 structure. The timestamp of when the firmware
+> generated the error is now being reported.
 >
-> I see you're going to work on a more comprehensive v3 (thanks!), but just
-> to help clarify this: the contiguous bit is valid whenever a block or page
-> (i.e. a leaf) entry is valid. The only complication with 16k pages is that
-> the number of contiguous entries changes between level 2 and level 3,
-> which makes sense if you think about the TLB entries supported due to
-> non-contiguous block mappings in other regimes anyway (and brings into
-> question whether people bother with 16G in practice).
->
-> That means you can use the contiguous bit as:
->
-> 4k: levels 1,2,3 (16G, 32M, 64K)
-> 16k: levels 2,3 (1G, 2M)
-> 64k: levels 2,3 (16G, 2M)
->
-> Hopefully my maths is correct and that clears things up,
->
+> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
 
-Yes, that resembles my own calculations. Another complication is that
-folded PUDs and PMDs need to be dealt with at the PGD level, but I
-think I have worked it out now.
+Please could you keep the people who reviewed/commented on your series in the past,
+whenever you post a new version ?
 
-Re 16 GB: are you saying don't bother? Because supporting this would
-require ARM64_MEMSTART_SHIFT to be increased to (CONT_PUD_SHIFT +
-PUD_SHIFT) or (CONT_PMD_SHIFT + PMD_SHIFT) [for 4k and 16k/64k,
-respectively] in order to guarantee that the physical and virtual
-addresses are always equal modulo 16 GB (for granules that support
-it). It's a nice idea that the linear mapping can be covered by fewer
-TLB entries if you have huge amounts of RAM, but if the hardware is
-unlikely to honour it, it may not be worth the trouble.
+> ---
+>  drivers/acpi/apei/ghes.c    | 25 ++++++++++--
+>  drivers/firmware/efi/cper.c | 97 +++++++++++++++++++++++++++++++++++++++------
+>  2 files changed, 105 insertions(+), 17 deletions(-)
+>
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 3021f0e..c8488f1 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -80,6 +80,10 @@
+>  	((struct acpi_hest_generic_status *)				\
+>  	 ((struct ghes_estatus_node *)(estatus_node) + 1))
+>
+> +#define acpi_hest_generic_data_version(gdata)			\
+> +	(gdata->revision >> 8)
+
+...
+
+> +inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data *gdata)
+> +{
+> +	return acpi_hest_generic_data_version(gdata) >= 3 ?
+> +		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
+> +		gdata + 1;
+> +}
+> +
+
+
+
+> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+> index d425374..9fa1317 100644
+> --- a/drivers/firmware/efi/cper.c
+> +++ b/drivers/firmware/efi/cper.c
+
+   
+> +#define acpi_hest_generic_data_version(gdata)		\
+> +	(gdata->revision >> 8)
+> +
+
+...
+
+> +static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data *gdata)
+> +{
+> +	return acpi_hest_generic_data_version(gdata) >= 3 ?
+> +		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
+> +		gdata + 1;
+> +}
+
+Could these go to a header file, so that we don't need duplicate definitions of these helpers in
+different files ?
+
+> +
+> +static void cper_estatus_print_section_v300(const char *pfx,
+> +	const struct acpi_hest_generic_data_v300 *gdata)
+> +{
+> +	__u8 hour, min, sec, day, mon, year, century, *timestamp;
+> +
+> +	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
+> +		timestamp = (__u8 *)&(gdata->time_stamp);
+> +		memcpy(&sec, timestamp, 1);
+> +		memcpy(&min, timestamp + 1, 1);
+> +		memcpy(&hour, timestamp + 2, 1);
+> +		memcpy(&day, timestamp + 4, 1);
+> +		memcpy(&mon, timestamp + 5, 1);
+> +		memcpy(&year, timestamp + 6, 1);
+> +		memcpy(&century, timestamp + 7, 1);
+> +		printk("%stime: ", pfx);
+> +		printk("%7s", 0x01 & *(timestamp + 3) ? "precise" : "");
+
+What format is the (timestamp + 3) stored in ? Does it need conversion ?
+
+> +		printk(" %02d:%02d:%02d %02d%02d-%02d-%02d\n",
+> +			bcd2bin(hour), bcd2bin(min), bcd2bin(sec),
+> +			bcd2bin(century), bcd2bin(year), bcd2bin(mon),
+> +			bcd2bin(day));
+> +	}
+
+minor nit: Would it be easier to order/parse the error messages if the date
+is printed first followed by time ?
+
+i.e,
+	17:20:14 2016-09-15 Mon
+		vs
+	2016-09-15 Mon 17:20:14
+
+e.g, people looking at a huge log, looking for logs from a specific date might
+find the latter more useful to skip the messages.
+
+> +}
+> +
+>  static void cper_estatus_print_section(
+> -	const char *pfx, const struct acpi_hest_generic_data *gdata, int sec_no)
+> +	const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
+>  {
+>  	uuid_le *sec_type = (uuid_le *)gdata->section_type;
+>  	__u16 severity;
+>  	char newpfx[64];
+>
+> +	if ((gdata->revision >> 8) >= 0x03)
+
+Could we use the helper defined above ?
+
+> @@ -451,12 +497,22 @@ void cper_estatus_print(const char *pfx,
+>  	printk("%s""event severity: %s\n", pfx, cper_severity_str(severity));
+>  	data_len = estatus->data_length;
+>  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+> +	if ((gdata->revision >> 8) >= 0x03)
+
+Same as above, use the macro ?
+
+> +		gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
+> +
+>  	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+> +
+>  	while (data_len >= sizeof(*gdata)) {
+>  		gedata_len = gdata->error_data_length;
+>  		cper_estatus_print_section(newpfx, gdata, sec_no);
+> -		data_len -= gedata_len + sizeof(*gdata);
+> -		gdata = (void *)(gdata + 1) + gedata_len;
+> +		if(gdata_v3) {
+> +			data_len -= gedata_len + sizeof(*gdata_v3);
+> +			gdata_v3 = (void *)(gdata_v3 + 1) + gedata_len;
+> +			gdata = (struct acpi_hest_generic_data *)gdata_v3;
+> +		} else {
+> +			data_len -= gedata_len + sizeof(*gdata);
+> +			gdata = (void *)(gdata + 1) + gedata_len;
+> +		}
+>  		sec_no++;
+>  	}
+
+...
+
+>
+> @@ -486,15 +543,29 @@ int cper_estatus_check(const struct acpi_hest_generic_status *estatus)
+>  		return rc;
+>  	data_len = estatus->data_length;
+>  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+> -	while (data_len >= sizeof(*gdata)) {
+> -		gedata_len = gdata->error_data_length;
+> -		if (gedata_len > data_len - sizeof(*gdata))
+> +
+> +	if ((gdata->revision >> 8) >= 0x03) {
+> +		gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
+> +		while (data_len >= sizeof(*gdata_v3)) {
+> +			gedata_len = gdata_v3->error_data_length;
+> +			if (gedata_len > data_len - sizeof(*gdata_v3))
+> +				return -EINVAL;
+> +			data_len -= gedata_len + sizeof(*gdata_v3);
+> +			gdata_v3 = (void *)(gdata_v3 + 1) + gedata_len;
+> +		}
+> +		if (data_len)
+> +			return -EINVAL;
+> +	} else {
+> +		while (data_len >= sizeof(*gdata)) {
+> +			gedata_len = gdata->error_data_length;
+> +			if (gedata_len > data_len - sizeof(*gdata))
+> +				return -EINVAL;
+> +			data_len -= gedata_len + sizeof(*gdata);
+> +			gdata = (void *)(gdata + 1) + gedata_len;
+> +		}
+> +		if (data_len)
+
+As mentioned in the previous version, would it make sense to add some more
+helpers to deal with record versions ? We seem to be doing the version switch and
+code duplication at different places.
+
+Does the following help ? Thoughts ?
+
+#define acpi_hest_generic_data_error_length(gdata) (((struct acpi_hest_generic_data *)(gdata))->error_data_length)
+#define acpi_hest_generic_data_size(gdata) \
+	((acpi_hest_generic_data_version(gdata) >= 3) ? \
+	 sizeof(struct acpi_hest_generic_data_v300) :	\
+	 sizeof(struct acpi_hest_generic_data))
+#define acpi_hest_generic_data_record_size(gdata)
+	(acpi_hest_generic_data_size(gdata) + \
+	 acpi_hest_generic_data_error_length(gdata))
+#define acpi_hest_generic_data_next(gdata) \
+	((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
+
+
+Suzuki
