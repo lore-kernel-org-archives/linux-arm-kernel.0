@@ -1,51 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 11 Oct 2016 10:10:00 +0200
-Subject: [PATCH] n900 device tree: cleanup, add camera flash
-In-Reply-To: <20161011080139.GK4467@pali>
-References: <20161011075416.GA22453@amd>
- <20161011080139.GK4467@pali>
-Message-ID: <20161011081000.GA24476@amd>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 11 Oct 2016 08:48:28 +0100
+Subject: [PATCH] arm64: mmu: set the contiguous for kernel mappings when
+ appropriate
+In-Reply-To: <20161011074419.GA20213@remoulade>
+References: <1476123164-10532-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161011074419.GA20213@remoulade>
+Message-ID: <20161011074827.GB20213@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2016-10-11 10:01:39, Pali Roh?r wrote:
-> On Tuesday 11 October 2016 09:54:17 Pavel Machek wrote:
-> > @@ -669,6 +670,22 @@
+On Tue, Oct 11, 2016 at 08:44:19AM +0100, Mark Rutland wrote:
+> >  {
+> > +	pgprot_t prot_cont = __pgprot(pgprot_val(prot) | PTE_CONT);
+> > +	bool cont = false;
+> >  	pte_t *pte;
 > >  
-> >  		ti,usb-charger-detection = <&isp1707>;
-> >  	};
-> > +
-> > +	adp1653: led-controller at 30 {
-> > +		compatible = "adi,adp1653";
-> > +		reg = <0x30>;
-> > +		gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
-> > +
-> > +		flash {
-> > +			flash-timeout-us = <500000>;
-> > +			flash-max-microamp = <320000>;
-> > +			max-microamp = <50000>;
-> > +		};
-> > +
-> > +		indicator {
-> > +			max-microamp = <17500>;
-> > +		};
-> > +	};
-> >  };
+> >  	BUG_ON(pmd_sect(*pmd));
+> > @@ -115,7 +118,20 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
 > >  
-> >  &i2c3 {
-> > 
+> >  	pte = pte_set_fixmap_offset(pmd, addr);
+> >  	do {
+> > -		set_pte(pte, pfn_pte(pfn, prot));
+> > +		/*
+> > +		 * Set the contiguous bit for the subsequent group of PTEs if
+> > +		 * its size and alignment are suitable.
+> > +		 */
+> > +		if (((addr | PFN_PHYS(pfn)) & ~CONT_MASK) == 0)
+> > +			cont = allow_block_mappings && end - addr >= CONT_SIZE;
 > 
-> This part of patch is already in mainline kernel, isn't?
+> Given we increment addr by PAGE_SIZE in the loop, isn't this only true for the
+> first CONT_SIZE aligned entry, and not its (intended-to-be-contiguous)
+> siblings?
 
-Oops, sorry about that. Disregard the patch.
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161011/89240514/attachment-0001.sig>
+Looking again, I'd mis-read the above; it will work as expected.
+
+Sorry for the noise.
+
+Thanks,
+Mark.
