@@ -1,57 +1,49 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 11 Oct 2016 23:52:59 +0200
-Subject: [PATCH] MAINTAINERS: Add ARM64-specific ACPI maintainers entry
-In-Reply-To: <20161005112540.22189-1-lorenzo.pieralisi@arm.com>
-References: <20161005112540.22189-1-lorenzo.pieralisi@arm.com>
-Message-ID: <10118372.T2zXaxxCRu@vostro.rjw.lan>
+Date: Tue, 11 Oct 2016 23:55:30 +0200
+Subject: [PATCH V2 0/3] ACPI,PCI,IRQ: revert penalty calculation for SCI
+In-Reply-To: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
+References: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <16782518.MvPkQ6RUZe@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 05, 2016 12:25:40 PM Lorenzo Pieralisi wrote:
-> The ARM64 architecture defines ARM64 specific ACPI bindings to
-> configure and set-up arch specific components. To simplify
-> code reviews/updates and streamline the maintainership structure
-> supporting the arch specific code, a new arm64 directory was created in
-> /drivers/acpi, to contain ACPI code that is specific to ARM64
-> architecture.
+On Tuesday, October 04, 2016 05:15:16 PM Sinan Kaya wrote:
+> Restoring the old behavior for IRQ < 256 and the dynamic penalty behavior
+> will remain effective for IRQ >= 256.
 > 
-> Add the ARM64-specific ACPI maintainers entry in MAINTAINERS for
-> the newly created subdirectory and respective code content.
+> By the time ACPI gets initialized, this code tries to determine an
+> IRQ number based on penalty values in this array. It will try to locate
+> the IRQ with the least penalty assignment so that interrupt sharing is
+> avoided if possible.
 > 
-> Lorenzo Pieralisi will be in charge of submitting and managing
-> the pull requests on behalf of all maintainers listed.
+> A couple of notes about the external APIs:
+> 1. These API can be called before the ACPI is started. Therefore, one
+> cannot assume that the PCI link objects are initialized for calculating
+> penalties.
+> 2. The polarity and trigger information passed via the
+> acpi_penalize_sci_irq from the BIOS may not match what the IRQ subsystem
+> is reporting as the call might have been placed before the IRQ is
+> registered by the interrupt subsystem.
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Link: http://lkml.kernel.org/r/1603704.EGiVTcCxLR at vostro.rjw.lan
-> ---
->  MAINTAINERS | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> The reverted changes were in the direction to remove these external API and
+> try to calculate the penalties at runtime for the ISA, SCI as well as PCI
+> IRQS. This didn't work out well with the existing platforms.
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index f593300..2a70dd9 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -316,6 +316,14 @@ W:	https://01.org/linux-acpi
->  S:	Supported
->  F:	drivers/acpi/fan.c
->  
-> +ACPI FOR ARM64 (ACPI/arm64)
-> +M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> +M:	Hanjun Guo <hanjun.guo@linaro.org>
-> +M:	Sudeep Holla <sudeep.holla@arm.com>
-> +L:	linux-acpi at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/acpi/arm64
-> +
->  ACPI THERMAL DRIVER
->  M:	Zhang Rui <rui.zhang@intel.com>
->  L:	linux-acpi at vger.kernel.org
+> Changes from V1 (https://lkml.org/lkml/2016/10/1/106):
+> * Commit message updates
+> 
+> Sinan Kaya (3):
+>   Revert "ACPI,PCI,IRQ: reduce static IRQ array size to 16"
+>   ACPI, PCI IRQ: add PCI_USING penalty for ISA interrupts
+>   Revert "ACPI,PCI,IRQ: remove SCI penalize function"
+> 
+>  arch/x86/kernel/acpi/boot.c |  1 +
+>  drivers/acpi/pci_link.c     | 71 ++++++++++++++++++++++-----------------------
+>  include/linux/acpi.h        |  1 +
+>  3 files changed, 37 insertions(+), 36 deletions(-)
 > 
 
-Applied (with tags).
+I've queued up the series, but still waiting on Bjorn's response.
 
 Thanks,
 Rafael
