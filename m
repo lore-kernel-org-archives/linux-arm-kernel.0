@@ -1,38 +1,151 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Tue, 11 Oct 2016 12:01:15 -0400
-Subject: [PATCH] clk: lpc32xx: add a quirk for PWM and MS clock dividers
-In-Reply-To: <1475803015-4067-1-git-send-email-vz@mleia.com>
-References: <1475803015-4067-1-git-send-email-vz@mleia.com>
-Message-ID: <1476201675.7075.24.camel@localhost>
+From: austinwc@codeaurora.org (Austin Christ)
+Date: Tue, 11 Oct 2016 10:27:56 -0600
+Subject: [PATCH v6 1/2] i2c: qup: add ACPI support
+In-Reply-To: <1476203277-6893-1-git-send-email-austinwc@codeaurora.org>
+References: <1476203277-6893-1-git-send-email-austinwc@codeaurora.org>
+Message-ID: <1476203277-6893-2-git-send-email-austinwc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+From: Naveen Kaje <nkaje@codeaurora.org>
 
-On Fri, 2016-10-07 at 04:16 +0300, Vladimir Zapolskiy wrote:
-> In common clock framework CLK_DIVIDER_ONE_BASED or'ed with
-> CLK_DIVIDER_ALLOW_ZERO flags indicates that
-> 1) a divider clock may be set to zero value,
-> 2) divider's zero value is interpreted as a non-divided clock.
-> 
-> On the LPC32xx platform clock dividers of PWM and memory card clocks
-> comply with the first condition, but zero value means a gated clock,
-> thus it may happen that the divider value is not updated when
-> the clock is enabled and the clock remains gated.
-> 
-> The change adds one-shot quirks, which check for zero value of divider
-> on initialization and set it to a non-zero value, therefore in runtime
-> a gate clock will work as expected.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Add support to get the device parameters from ACPI. Assume
+that the clocks are managed by firmware.
 
-This patch resolved the issue reported in the following post:
-https://www.spinics.net/lists/arm-kernel/msg534048.html
+Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+Signed-off-by: Austin Christ <austinwc@codeaurora.org>
+Reviewed-by: Sricharan R <sricharan@codeaurora.org>
+---
+ drivers/i2c/busses/i2c-qup.c | 58 ++++++++++++++++++++++++++++++++------------
+ 1 file changed, 42 insertions(+), 16 deletions(-)
 
-Reviewed-by: Sylvain Lemieux <slemieux.tyco@gmail.com> 
-
-> ---
->  drivers/clk/nxp/clk-lpc32xx.c | 32 ++++++++++++++++++++++++++++----
->  1 file changed, 28 insertions(+), 4 deletions(-)
-> 
-[...]
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index 041050e..bf0957e 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -14,6 +14,7 @@
+  *
+  */
+ 
++#include <linux/acpi.h>
+ #include <linux/atomic.h>
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+@@ -132,6 +133,10 @@
+ /* Max timeout in ms for 32k bytes */
+ #define TOUT_MAX			300
+ 
++/* Default values. Use these if FW query fails */
++#define DEFAULT_CLK_FREQ 100000
++#define DEFAULT_SRC_CLK 20000000
++
+ struct qup_i2c_block {
+ 	int	count;
+ 	int	pos;
+@@ -1356,14 +1361,13 @@ static void qup_i2c_disable_clocks(struct qup_i2c_dev *qup)
+ static int qup_i2c_probe(struct platform_device *pdev)
+ {
+ 	static const int blk_sizes[] = {4, 16, 32};
+-	struct device_node *node = pdev->dev.of_node;
+ 	struct qup_i2c_dev *qup;
+ 	unsigned long one_bit_t;
+ 	struct resource *res;
+ 	u32 io_mode, hw_ver, size;
+ 	int ret, fs_div, hs_div;
+-	int src_clk_freq;
+-	u32 clk_freq = 100000;
++	u32 src_clk_freq = DEFAULT_SRC_CLK;
++	u32 clk_freq = DEFAULT_CLK_FREQ;
+ 	int blocks;
+ 
+ 	qup = devm_kzalloc(&pdev->dev, sizeof(*qup), GFP_KERNEL);
+@@ -1374,7 +1378,11 @@ static int qup_i2c_probe(struct platform_device *pdev)
+ 	init_completion(&qup->xfer);
+ 	platform_set_drvdata(pdev, qup);
+ 
+-	of_property_read_u32(node, "clock-frequency", &clk_freq);
++	ret = device_property_read_u32(qup->dev, "clock-frequency", &clk_freq);
++	if (ret) {
++		dev_notice(qup->dev, "using default clock-frequency %d",
++			DEFAULT_CLK_FREQ);
++	}
+ 
+ 	if (of_device_is_compatible(pdev->dev.of_node, "qcom,i2c-qup-v1.1.1")) {
+ 		qup->adap.algo = &qup_i2c_algo;
+@@ -1456,20 +1464,30 @@ nodma:
+ 		return qup->irq;
+ 	}
+ 
+-	qup->clk = devm_clk_get(qup->dev, "core");
+-	if (IS_ERR(qup->clk)) {
+-		dev_err(qup->dev, "Could not get core clock\n");
+-		return PTR_ERR(qup->clk);
+-	}
++	if (has_acpi_companion(qup->dev)) {
++		ret = device_property_read_u32(qup->dev,
++				"src-clock-hz", &src_clk_freq);
++		if (ret) {
++			dev_notice(qup->dev, "using default src-clock-hz %d",
++				DEFAULT_SRC_CLK);
++		}
++		ACPI_COMPANION_SET(&qup->adap.dev, ACPI_COMPANION(qup->dev));
++	} else {
++		qup->clk = devm_clk_get(qup->dev, "core");
++		if (IS_ERR(qup->clk)) {
++			dev_err(qup->dev, "Could not get core clock\n");
++			return PTR_ERR(qup->clk);
++		}
+ 
+-	qup->pclk = devm_clk_get(qup->dev, "iface");
+-	if (IS_ERR(qup->pclk)) {
+-		dev_err(qup->dev, "Could not get iface clock\n");
+-		return PTR_ERR(qup->pclk);
++		qup->pclk = devm_clk_get(qup->dev, "iface");
++		if (IS_ERR(qup->pclk)) {
++			dev_err(qup->dev, "Could not get iface clock\n");
++			return PTR_ERR(qup->pclk);
++		}
++		qup_i2c_enable_clocks(qup);
++		src_clk_freq = clk_get_rate(qup->clk);
+ 	}
+ 
+-	qup_i2c_enable_clocks(qup);
+-
+ 	/*
+ 	 * Bootloaders might leave a pending interrupt on certain QUP's,
+ 	 * so we reset the core before registering for interrupts.
+@@ -1516,7 +1534,6 @@ nodma:
+ 	size = QUP_INPUT_FIFO_SIZE(io_mode);
+ 	qup->in_fifo_sz = qup->in_blk_sz * (2 << size);
+ 
+-	src_clk_freq = clk_get_rate(qup->clk);
+ 	fs_div = ((src_clk_freq / clk_freq) / 2) - 3;
+ 	hs_div = 3;
+ 	qup->clk_ctl = (hs_div << 8) | (fs_div & 0xff);
+@@ -1641,6 +1658,14 @@ static const struct of_device_id qup_i2c_dt_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, qup_i2c_dt_match);
+ 
++#if IS_ENABLED(CONFIG_ACPI)
++static const struct acpi_device_id qup_i2c_acpi_match[] = {
++	{ "QCOM8010"},
++	{ },
++};
++MODULE_DEVICE_TABLE(acpi, qup_i2c_acpi_match);
++#endif
++
+ static struct platform_driver qup_i2c_driver = {
+ 	.probe  = qup_i2c_probe,
+ 	.remove = qup_i2c_remove,
+@@ -1648,6 +1673,7 @@ static struct platform_driver qup_i2c_driver = {
+ 		.name = "i2c_qup",
+ 		.pm = &qup_i2c_qup_pm_ops,
+ 		.of_match_table = qup_i2c_dt_match,
++		.acpi_match_table = ACPI_PTR(qup_i2c_acpi_match),
+ 	},
+ };
+ 
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
