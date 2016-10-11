@@ -1,65 +1,50 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 11 Oct 2016 07:59:54 -0000
-Subject: [PATCH] clk: meson-gxbb: Export PWM related clocks for DT
-In-Reply-To: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
-References: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <147285925618.69079.14195001640916253279@resonance>
+Date: Tue, 11 Oct 2016 08:00:00 -0000
+Subject: [PATCH v2 3/3] ARM64: dts: meson-gxbb: Add GXBB AO Clock and
+ Reset node
+In-Reply-To: <m260qjjx26.fsf@baylibre.com>
+References: <1471514928-3341-1-git-send-email-narmstrong@baylibre.com>
+ <1471514928-3341-4-git-send-email-narmstrong@baylibre.com>
+ <7hk2fc76xx.fsf@baylibre.com>
+ <147208015014.66208.14165603610884470316@resonance>
+ <m260qjjx26.fsf@baylibre.com>
+Message-ID: <147285935146.69079.16726192933831918899@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Neil Armstrong (2016-08-22 05:49:37)
-> Add the PWM related clocks in order to be referenced as PWM source
-> clocks.
+Quoting Kevin Hilman (2016-08-29 10:37:37)
+> Michael Turquette <mturquette@baylibre.com> writes:
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> > Quoting Kevin Hilman (2016-08-19 15:03:06)
+> >> Neil Armstrong <narmstrong@baylibre.com> writes:
+> >> 
+> >> > Add the AO clock controller node for the AmLogic GXBB SoC.
+> >> >
+> >> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> >> > ---
+> >> 
+> >> Applying this to the amlogic tree, but will need to wait a cycle due to
+> >> include dependencies on the bindings, which are going through the clock
+> >> tree.
+> >
+> > FYI, for picked patches, Stephen and I create a stable branch for each
+> > platform. You can pull this into your tree if you want, just let us know
+> > so we'll be sure not to rebase:
+> >
+> > git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-meson-gxbb-ao
+> >
+> 
+> OK, I'll be using clk-meson-gxb and clk-meson-gxbb-ao.
 
-Applied.
+Heads up, I merged clk-meson-gxbb-ao into clk-meson-gxbb yesterday to
+make it easier to merge the emmc clock gate patches. If you haven't
+pulled clk-meson-gxbb-ao already then you can just re-pull
+clk-meson-gxbb and you'll get it.
 
 Regards,
 Mike
 
-> ---
->  drivers/clk/meson/gxbb.h              | 6 +++---
->  include/dt-bindings/clock/gxbb-clkc.h | 3 +++
->  2 files changed, 6 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-> index a2adf34..523b494 100644
-> --- a/drivers/clk/meson/gxbb.h
-> +++ b/drivers/clk/meson/gxbb.h
-> @@ -170,11 +170,11 @@
->   */
->  #define CLKID_SYS_PLL            0
->  /* CLKID_CPUCLK */
-> -#define CLKID_HDMI_PLL           2
-> +/* CLKID_HDMI_PLL */
->  #define CLKID_FIXED_PLL                  3
->  #define CLKID_FCLK_DIV2                  4
-> -#define CLKID_FCLK_DIV3                  5
-> -#define CLKID_FCLK_DIV4                  6
-> +/* CLKID_FCLK_DIV3 */
-> +/* CLKID_FCLK_DIV4 */
->  #define CLKID_FCLK_DIV5                  7
->  #define CLKID_FCLK_DIV7                  8
->  #define CLKID_GP0_PLL            9
-> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-> index f889d80..a5897f3 100644
-> --- a/include/dt-bindings/clock/gxbb-clkc.h
-> +++ b/include/dt-bindings/clock/gxbb-clkc.h
-> @@ -6,6 +6,9 @@
->  #define __GXBB_CLKC_H
->  
->  #define CLKID_CPUCLK           1
-> +#define CLKID_HDMI_PLL         2
-> +#define CLKID_FCLK_DIV3                5
-> +#define CLKID_FCLK_DIV4                6
->  #define CLKID_CLK81            12
->  #define CLKID_ETH              36
->  
-> -- 
-> 1.9.1
+> Thanks,
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Kevin
