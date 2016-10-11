@@ -1,62 +1,93 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Oct 2016 13:56:26 +0100
-Subject: [PATCH] arm64: mmu: set the contiguous for kernel mappings when
- appropriate
-In-Reply-To: <20161011124118.GB9532@arm.com>
-References: <1476123164-10532-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161011074419.GA20213@remoulade>
- <CAPvkgC1p5yZLtENYMi6zd5-pPDOYUtMw0Lxvb592u975gc+Zvg@mail.gmail.com>
- <CAKv+Gu-e6HT2YNvXJV2AbAzLrEeV6OvM6-hfTsCH0oXqH8zbKQ@mail.gmail.com>
- <CAKv+Gu9W69rP5o09t+d498nVE666Show1VK-Sm9LmchjeUsD_A@mail.gmail.com>
- <20161011124118.GB9532@arm.com>
-Message-ID: <CAKv+Gu_AX80Uts8gtn+PD9F0DWDMU2tEw6PEZg1p6G+ajXS_eg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Oct 2016 14:36:24 +0100
+Subject: [PATCH v3 07/11] arm64/tracing: fix compat syscall handling
+In-Reply-To: <1476182576-15247-8-git-send-email-marcin.nowakowski@imgtec.com>
+References: <1476182576-15247-1-git-send-email-marcin.nowakowski@imgtec.com>
+ <1476182576-15247-8-git-send-email-marcin.nowakowski@imgtec.com>
+Message-ID: <20161011133623.GE9532@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 October 2016 at 13:41, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Oct 11, 2016 at 12:17:54PM +0100, Ard Biesheuvel wrote:
->> On 11 October 2016 at 10:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > On 11 October 2016 at 09:48, Steve Capper <steve.capper@linaro.org> wrote:
->> >> So in arch/arm64/include/asm/pgtable-hwdef.h, we have:
->> >> CONT_PTE_SHIFT
->> >> CONT_PMD_SHIFT
->> >> CONT_PTES
->> >> CONT_PMDS
->> >> CONT_PTE_SIZE
->> >> CONT_PTE_MASK
->> >> ...
->> >>
->> >> which are used by the contiguous hint HugeTLB code.
->> >> Can those be adopted instead of CONT_MASK and CONT_SIZE?
->> >>
->>
->> Looking at the hugetlb code, it appears to support contiguous PMDs for
->> 4k and 64k pages as well, while the ARM ARM only defines it for 16k
->> pages. I suppose the contiguous bit is simply ignored for level 2
->> entries when using 4k or 64k pages kernels, but I think it would be
->> better for the code to reflect this as well.
->
-> Which bit in the ARM ARM says that you can't support contiguous PMDs for 4k
-> and 64k pages? I see that the number of contiguous entries changes between
-> levels for 16k pages, but that's it.
->
+On Tue, Oct 11, 2016 at 12:42:52PM +0200, Marcin Nowakowski wrote:
+> Add arch_syscall_addr for arm64 and define NR_compat_syscalls, as the
+> number of compat syscalls for arm64 exceeds the number defined by
+> NR_syscalls.
+> 
+> Signed-off-by: Marcin Nowakowski <marcin.nowakowski@imgtec.com>
+> Cc: Steven Rostedt <rostedt@goodmis.org>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm64/include/asm/ftrace.h | 12 +-----------
+>  arch/arm64/include/asm/unistd.h |  1 +
+>  arch/arm64/kernel/Makefile      |  1 +
+>  arch/arm64/kernel/ftrace.c      | 16 ++++++++++++++++
+>  4 files changed, 19 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+> index caa955f..b57ff7c 100644
+> --- a/arch/arm64/include/asm/ftrace.h
+> +++ b/arch/arm64/include/asm/ftrace.h
+> @@ -41,17 +41,7 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+>  
+>  #define ftrace_return_address(n) return_address(n)
+>  
+> -/*
+> - * Because AArch32 mode does not share the same syscall table with AArch64,
+> - * tracing compat syscalls may result in reporting bogus syscalls or even
+> - * hang-up, so just do not trace them.
+> - * See kernel/trace/trace_syscalls.c
+> - *
+> - * x86 code says:
+> - * If the user really wants these, then they should use the
+> - * raw syscall tracepoints with filtering.
+> - */
+> -#define ARCH_TRACE_IGNORE_COMPAT_SYSCALLS
+> +#define ARCH_COMPAT_SYSCALL_NUMBERS_OVERLAP 1
+>  static inline bool arch_trace_is_compat_syscall(struct pt_regs *regs)
+>  {
+>  	return is_compat_task();
+> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+> index e78ac26..276d049 100644
+> --- a/arch/arm64/include/asm/unistd.h
+> +++ b/arch/arm64/include/asm/unistd.h
+> @@ -45,6 +45,7 @@
+>  #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
+>  
+>  #define __NR_compat_syscalls		394
+> +#define NR_compat_syscalls (__NR_compat_syscalls)
 
-You are right, the ARM ARM does not say that at all. But given Mark's comment:
+We may as well just define NR_compat_syscalls instead of
+__NR_compat_syscalls and move the handful of users over.
 
-"""
-With 16K pages, we can have contiguous PMD entries. Should we handle those,
-too? e.g. have separate {PMD,PTE}_CONT{,_SIZE}?
-"""
+> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+> index 40ad08a..75d010f 100644
+> --- a/arch/arm64/kernel/ftrace.c
+> +++ b/arch/arm64/kernel/ftrace.c
+> @@ -176,4 +176,20 @@ int ftrace_disable_ftrace_graph_caller(void)
+>  	return ftrace_modify_graph_caller(false);
+>  }
+>  #endif /* CONFIG_DYNAMIC_FTRACE */
+> +
+>  #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+> +
+> +#if (defined CONFIG_FTRACE_SYSCALLS) && (defined CONFIG_COMPAT)
+> +
+> +extern const void *sys_call_table[];
+> +extern const void *compat_sys_call_table[];
+> +
+> +unsigned long __init arch_syscall_addr(int nr, bool compat)
+> +{
+> +	if (compat)
+> +		return (unsigned long)compat_sys_call_table[nr];
+> +
+> +	return (unsigned long)sys_call_table[nr];
+> +}
 
-it seems I am not the only one who is confused about this. In any
-case, the fact that the ARM ARM documents levels 2 and 3 explicitly
-for 16k pages does very little to clarify at which levels this bit is
-defined, and if it is defined at levels < 2, what the granularity is
-for 16k pages.
+Do we care about the compat private syscalls (from base 0x0f0000)? We
+need to make sure that we exhibit the same behaviour as a native
+32-bit ARM machine.
 
-So the v2 I just sent out could be modified to allow contiguous PMDs
-(32 MB blocks) on 4 KB kernels, which seems useful. I will take that
-into account when I prepare the v3.
-
--- 
-Ard.
+Will
