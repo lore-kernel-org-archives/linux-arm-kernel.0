@@ -1,45 +1,63 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 11 Oct 2016 09:59:00 +0200
-Subject: [PATCH 0/6] clk: oxnas: Rework driver to add support for OX820
-In-Reply-To: <20161005150752.22618-1-narmstrong@baylibre.com>
-References: <20161005150752.22618-1-narmstrong@baylibre.com>
-Message-ID: <147617274057.17481.2362814012745242458@resonance>
+Date: Tue, 11 Oct 2016 07:59:54 -0000
+Subject: [PATCH] clk: meson-gxbb: Export PWM related clocks for DT
+In-Reply-To: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
+References: <1471870177-10609-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <147285925618.69079.14195001640916253279@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Neil Armstrong (2016-10-05 17:07:46)
-> In order to to support the Oxford Semiconductor OX820 Soc clock gates,
-> rework the original driver with a structure inspired from the Qcom or Meson
-> drivers and using the new devm_clk_hw_register() call.
+Quoting Neil Armstrong (2016-08-22 05:49:37)
+> Add the PWM related clocks in order to be referenced as PWM source
+> clocks.
 > 
-> The first patches add dt-bindings include file to clarify the clock indices.
-> 
-> In future work, OX820 PLLs should also be handled by this driver.
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Series looks good to me. Will apply after -rc1 drops.
+Applied.
 
 Regards,
 Mike
 
+> ---
+>  drivers/clk/meson/gxbb.h              | 6 +++---
+>  include/dt-bindings/clock/gxbb-clkc.h | 3 +++
+>  2 files changed, 6 insertions(+), 3 deletions(-)
 > 
-> Neil Armstrong (6):
->   clk: oxnas: Add dt-bindings include file for OX810SE
->   clk: oxnas: Add dt-bindings include file for OX820
->   clk: oxnas: Rename to clk_oxnas_gate
->   clk: oxnas: Refactor to make use of devm_clk_hw_register()
->   clk: oxnas: Add OX820 Gate clocks
->   dt-bindings: clk: oxnas,stdclk: Add OX820 bindings
-> 
->  .../devicetree/bindings/clock/oxnas,stdclk.txt     |  19 +-
->  drivers/clk/clk-oxnas.c                            | 232 ++++++++++++++-------
->  include/dt-bindings/clock/oxsemi,ox810se.h         |  30 +++
->  include/dt-bindings/clock/oxsemi,ox820.h           |  40 ++++
->  4 files changed, 231 insertions(+), 90 deletions(-)
->  create mode 100644 include/dt-bindings/clock/oxsemi,ox810se.h
->  create mode 100644 include/dt-bindings/clock/oxsemi,ox820.h
-> 
+> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+> index a2adf34..523b494 100644
+> --- a/drivers/clk/meson/gxbb.h
+> +++ b/drivers/clk/meson/gxbb.h
+> @@ -170,11 +170,11 @@
+>   */
+>  #define CLKID_SYS_PLL            0
+>  /* CLKID_CPUCLK */
+> -#define CLKID_HDMI_PLL           2
+> +/* CLKID_HDMI_PLL */
+>  #define CLKID_FIXED_PLL                  3
+>  #define CLKID_FCLK_DIV2                  4
+> -#define CLKID_FCLK_DIV3                  5
+> -#define CLKID_FCLK_DIV4                  6
+> +/* CLKID_FCLK_DIV3 */
+> +/* CLKID_FCLK_DIV4 */
+>  #define CLKID_FCLK_DIV5                  7
+>  #define CLKID_FCLK_DIV7                  8
+>  #define CLKID_GP0_PLL            9
+> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+> index f889d80..a5897f3 100644
+> --- a/include/dt-bindings/clock/gxbb-clkc.h
+> +++ b/include/dt-bindings/clock/gxbb-clkc.h
+> @@ -6,6 +6,9 @@
+>  #define __GXBB_CLKC_H
+>  
+>  #define CLKID_CPUCLK           1
+> +#define CLKID_HDMI_PLL         2
+> +#define CLKID_FCLK_DIV3                5
+> +#define CLKID_FCLK_DIV4                6
+>  #define CLKID_CLK81            12
+>  #define CLKID_ETH              36
+>  
 > -- 
-> 2.7.0
+> 1.9.1
 > 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-clk" in
