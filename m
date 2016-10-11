@@ -1,29 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 11 Oct 2016 15:00:53 -0300
-Subject: The possible regression in kernel 4.8 - clk: imx: correct AV PLL
- rate formula
-In-Reply-To: <WM!8ae38b052eee9a42a4712d13aee34e2d793055d4125e98cc2c03451811f33168b3556d3bf52ee5ba8dda879cea808cdc!@dg.advantech.com>
-References: <03B5A3CA1724CE4EAC32B27E39292A677FC5A390AE@AUSMAIL1.AUS.ADVANTECH.CORP>
- <WM!ea1806249edeb2cf70790bb7482fb813b9b7cef636576d9ca4b01897c8831c3650f71356a13ce9ba5e358a69b86f6a82!@dg.advantech.com>
- <CAOMZO5CXTEpNvAhuc2Et60HxfM=nQngMTdMOtDbazi=1EQ95Jw@mail.gmail.com>
- <03B5A3CA1724CE4EAC32B27E39292A677FC5A39613@AUSMAIL1.AUS.ADVANTECH.CORP>
- <WM!8b5ef465717800ac4466674b98bb32450dc231d955cd4979ca96fd54828a7c3af7de5f376015ebf046c75f20677161c6!@dgg.advantech.com>
- <WM!8ae38b052eee9a42a4712d13aee34e2d793055d4125e98cc2c03451811f33168b3556d3bf52ee5ba8dda879cea808cdc!@dg.advantech.com>
-Message-ID: <CAOMZO5CVggufx2U0pZUXd1o=i36Jo-c1B=hgFcSaWeM+=oagaQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 11 Oct 2016 19:15:12 +0100
+Subject: [PATCH v2 0/8] crypto: ARM/arm64 - big endian fixes 
+Message-ID: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ken,
+As it turns out, none of the accelerated crypto routines under arch/arm64/crypto
+currently work, or have ever worked correctly when built for big endian. So this
+series fixes all of them. This v2 now includes a similar fix for 32-bit ARM as
+well, and an additional fix for XTS which escaped my attention before.
 
-On Tue, Oct 11, 2016 at 2:49 PM, Ken.Lin <ken.lin@advantech.com> wrote:
+Each of these patches carries a fixes tag, and could be backported to stable.
+However, for patches #1 and #5, the fixes tag denotes the oldest commit that the
+fix is compatible with, not the patch that introduced the algorithm. This is due
+to the fact that the key schedules are incompatible between generic AES and the
+arm64 Crypto Extensions implementation (but only when building for big endian)
+This is not a problem in practice, but it does mean that the AES-CCM and AES in
+EBC/CBC/CTR/XTS mode implementations before v3.19 require a different fix, i.e.,
+one that is compatible with the generic AES key schedule generation code (which
+it currently no longer uses)
 
-> With the patches applied, the pixel clock (148500000 required for 1920x1080 at 60) is correct as we checked in kernel 4.7 and the actual measurement result looked good as we expected.
-> I think the patches should fix the issue.
+In any case, please apply with cc to stable.
 
-That's good news. Thanks for testing.
+Ard Biesheuvel (8):
+  crypto: arm64/aes-ce - fix for big endian
+  crypto: arm64/ghash-ce - fix for big endian
+  crypto: arm64/sha1-ce - fix for big endian
+  crypto: arm64/sha2-ce - fix for big endian
+  crypto: arm64/aes-ccm-ce: fix for big endian
+  crypto: arm64/aes-neon - fix for big endian
+  crypto: arm64/aes-xts-ce: fix for big endian
+  crypto: arm/aes-ce - fix for big endian
 
-Emil is working on a v3 version of the patch series.
+ arch/arm/crypto/aes-ce-glue.c       |  5 ++
+ arch/arm64/crypto/aes-ce-ccm-core.S | 53 ++++++++++----------
+ arch/arm64/crypto/aes-ce-cipher.c   | 25 +++++----
+ arch/arm64/crypto/aes-ce.S          |  1 +
+ arch/arm64/crypto/aes-modes.S       |  3 +-
+ arch/arm64/crypto/aes-neon.S        | 25 +++++----
+ arch/arm64/crypto/ghash-ce-core.S   |  6 +--
+ arch/arm64/crypto/sha1-ce-core.S    |  4 +-
+ arch/arm64/crypto/sha2-ce-core.S    |  4 +-
+ 9 files changed, 72 insertions(+), 54 deletions(-)
 
-Emil,
-
-Please add Ken Lin on Cc when you submit v3.
+-- 
+2.7.4
