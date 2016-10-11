@@ -1,49 +1,78 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 11 Oct 2016 23:55:30 +0200
-Subject: [PATCH V2 0/3] ACPI,PCI,IRQ: revert penalty calculation for SCI
-In-Reply-To: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
-References: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <16782518.MvPkQ6RUZe@vostro.rjw.lan>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 12 Oct 2016 00:00:12 +0200
+Subject: [PATCH v1 1/2] include: dt-bindings: Add GPIO pin index
+ definition for rockchip pinctrl
+In-Reply-To: <1473210053-23743-1-git-send-email-andy.yan@rock-chips.com>
+References: <1473210053-23743-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <13068948.jkWM1OvpR7@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 04, 2016 05:15:16 PM Sinan Kaya wrote:
-> Restoring the old behavior for IRQ < 256 and the dynamic penalty behavior
-> will remain effective for IRQ >= 256.
+Am Mittwoch, 7. September 2016, 09:00:53 CEST schrieb Andy Yan:
+> Add gpio pin index definition to make it easier to describe
+> GPIO in dts.
 > 
-> By the time ACPI gets initialized, this code tries to determine an
-> IRQ number based on penalty values in this array. It will try to locate
-> the IRQ with the least penalty assignment so that interrupt sharing is
-> avoided if possible.
-> 
-> A couple of notes about the external APIs:
-> 1. These API can be called before the ACPI is started. Therefore, one
-> cannot assume that the PCI link objects are initialized for calculating
-> penalties.
-> 2. The polarity and trigger information passed via the
-> acpi_penalize_sci_irq from the BIOS may not match what the IRQ subsystem
-> is reporting as the call might have been placed before the IRQ is
-> registered by the interrupt subsystem.
-> 
-> The reverted changes were in the direction to remove these external API and
-> try to calculate the penalties at runtime for the ISA, SCI as well as PCI
-> IRQS. This didn't work out well with the existing platforms.
-> 
-> Changes from V1 (https://lkml.org/lkml/2016/10/1/106):
-> * Commit message updates
-> 
-> Sinan Kaya (3):
->   Revert "ACPI,PCI,IRQ: reduce static IRQ array size to 16"
->   ACPI, PCI IRQ: add PCI_USING penalty for ISA interrupts
->   Revert "ACPI,PCI,IRQ: remove SCI penalize function"
-> 
->  arch/x86/kernel/acpi/boot.c |  1 +
->  drivers/acpi/pci_link.c     | 71 ++++++++++++++++++++++-----------------------
->  include/linux/acpi.h        |  1 +
->  3 files changed, 37 insertions(+), 36 deletions(-)
-> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-I've queued up the series, but still waiting on Bjorn's response.
+just as a heads up, as I didn't respond yet:
 
-Thanks,
-Rafael
+Looks good and I'll take them, I just want to wait for the merge-window to 
+close (should be the coming sunday), to be able to put the header change in a 
+shared branch for the case that other users appear during the 4.10 cycle.
+
+
+Heiko
+
+> ---
+> 
+> Changes in v1:
+> - remove gpio bank definition RK_GPIO7/8
+> - redefine GPIO PIN as RK_PA/B/C/Dx
+> 
+>  include/dt-bindings/pinctrl/rockchip.h | 33
+> +++++++++++++++++++++++++++++++++ 1 file changed, 33 insertions(+)
+> 
+> diff --git a/include/dt-bindings/pinctrl/rockchip.h
+> b/include/dt-bindings/pinctrl/rockchip.h index 743e66a..aaec8ba 100644
+> --- a/include/dt-bindings/pinctrl/rockchip.h
+> +++ b/include/dt-bindings/pinctrl/rockchip.h
+> @@ -25,6 +25,39 @@
+>  #define RK_GPIO4	4
+>  #define RK_GPIO6	6
+> 
+> +#define RK_PA0		0
+> +#define RK_PA1		1
+> +#define RK_PA2		2
+> +#define RK_PA3		3
+> +#define RK_PA4		4
+> +#define RK_PA5		5
+> +#define RK_PA6		6
+> +#define RK_PA7		7
+> +#define RK_PB0		8
+> +#define RK_PB1		9
+> +#define RK_PB2		10
+> +#define RK_PB3		11
+> +#define RK_PB4		12
+> +#define RK_PB5		13
+> +#define RK_PB6		14
+> +#define RK_PB7		15
+> +#define RK_PC0		16
+> +#define RK_PC1		17
+> +#define RK_PC2		18
+> +#define RK_PC3		19
+> +#define RK_PC4		20
+> +#define RK_PC5		21
+> +#define RK_PC6		22
+> +#define RK_PC7		23
+> +#define RK_PD0		24
+> +#define RK_PD1		25
+> +#define RK_PD2		26
+> +#define RK_PD3		27
+> +#define RK_PD4		28
+> +#define RK_PD5		29
+> +#define RK_PD6		30
+> +#define RK_PD7		31
+> +
+>  #define RK_FUNC_GPIO	0
+>  #define RK_FUNC_1	1
+>  #define RK_FUNC_2	2
