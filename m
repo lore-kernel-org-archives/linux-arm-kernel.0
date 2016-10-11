@@ -1,35 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Oct 2016 11:16:23 +0100
-Subject: [PATCH v8 10/16] mm/memblock: add a new function
- memblock_alloc_near_nid
-In-Reply-To: <57FC43F4.1020909@huawei.com>
-References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
- <1472712907-12700-11-git-send-email-thunder.leizhen@huawei.com>
- <57FC43F4.1020909@huawei.com>
-Message-ID: <20161011101623.GC23648@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Oct 2016 12:16:30 +0200
+Subject: master build: 2 failures 4 warnings (v4.8-11811-g35ff96d)
+In-Reply-To: <E1btqa6-0001tx-HV@optimist>
+References: <E1btqa6-0001tx-HV@optimist>
+Message-ID: <20161011101630.xtlcpw76nwjwcbzg@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2016 at 09:44:20AM +0800, Leizhen (ThunderTown) wrote:
-> On 2016/9/1 14:55, Zhen Lei wrote:
-> > If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
-> > actually exist. The percpu variable areas and numa control blocks of that
-> > memoryless numa nodes must be allocated from the nearest available node
-> > to improve performance.
-> > 
-> > Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> > ---
-> >  include/linux/memblock.h |  1 +
-> >  mm/memblock.c            | 28 ++++++++++++++++++++++++++++
-> >  2 files changed, 29 insertions(+)
-> 
-> Hi Will,
->   It seems no one take care about this, how about I move below function into arch/arm64/mm/numa.c
-> again? So that, merge it and patch 11 into one.
+On Tue, Oct 11, 2016 at 07:30:35AM +0100, Build bot for Mark Brown wrote:
 
-I'd rather you reposted it after the merge window so we can see what to
-do with it then. The previous posting was really hard to figure out and
-mixed lots of different concepts into one series, so it's not completely
-surprising that it didn't all get picked up.
+Linus' tree is currently failing to build arm and arm64 allmodconfigs
+with:
 
-Will
+> 	arm64-allmodconfig
+> ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+
+> 	arm-allmodconfig
+> ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+
+due to 6556bdacf646fc (mfd: tps65217: Add support for IRQs) since
+irq_set_parent() isn't exported.  This has been present in -next
+for getting on for a month, a patch was proposed adding the relevant
+export but that isn't present in -next yet.
+
+The function is being used in order to enable lazy IRQ disabling for
+threaded interrupts:
+
+	https://www.spinics.net/lists/arm-kernel/msg532864.html
+
+What's the plan for getting this fixed in Linus' tree?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161011/37a83c95/attachment.sig>
