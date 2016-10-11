@@ -1,60 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Oct 2016 12:17:54 +0100
-Subject: [PATCH] arm64: mmu: set the contiguous for kernel mappings when
- appropriate
-In-Reply-To: <CAKv+Gu-e6HT2YNvXJV2AbAzLrEeV6OvM6-hfTsCH0oXqH8zbKQ@mail.gmail.com>
-References: <1476123164-10532-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161011074419.GA20213@remoulade>
- <CAPvkgC1p5yZLtENYMi6zd5-pPDOYUtMw0Lxvb592u975gc+Zvg@mail.gmail.com>
- <CAKv+Gu-e6HT2YNvXJV2AbAzLrEeV6OvM6-hfTsCH0oXqH8zbKQ@mail.gmail.com>
-Message-ID: <CAKv+Gu9W69rP5o09t+d498nVE666Show1VK-Sm9LmchjeUsD_A@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 11 Oct 2016 12:29:30 +0100
+Subject: [PATCH v2 5/8] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <20161010221332.GD44885@linaro.org>
+References: <1475879821-8035-1-git-send-email-lina.iyer@linaro.org>
+ <1475879821-8035-6-git-send-email-lina.iyer@linaro.org>
+ <4e55d6ad-8de7-72d7-7512-5e4ff2aabc79@arm.com>
+ <20161010164342.GC44885@linaro.org>
+ <ffc0b521-329a-d41f-c952-bb9c4877ea87@arm.com>
+ <20161010221332.GD44885@linaro.org>
+Message-ID: <5a50adda-5c34-2e6c-83a0-4e2b7d15ab51@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 October 2016 at 10:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 11 October 2016 at 09:48, Steve Capper <steve.capper@linaro.org> wrote:
->>
->>
->> On 11 October 2016 at 08:44, Mark Rutland <mark.rutland@arm.com> wrote:
->>>
->>> Hi Ard,
->>>
->>> On Mon, Oct 10, 2016 at 07:12:44PM +0100, Ard Biesheuvel wrote:
->>> > Now that we no longer allow live kernel PMDs to be split, it is safe to
->>> > start using the contiguous bit for kernel mappings. So set the
->>> > contiguous
->>> > bit in the kernel page mappings for regions whose size and alignment are
->>> > suitable for this.
->>> >
->>> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>
->>> Given the splitting is now gone, using the contiguous bit makes sense to
->>> me.
->>>
->>> With 16K pages, we can have contiguous PMD entries. Should we handle
->>> those,
->>> too? e.g. have separate {PMD,PTE}_CONT{,_SIZE}?
->>>
->>> Otherwise, I have some comments below.
->>
->>
->> Hi,
->>
->> So in arch/arm64/include/asm/pgtable-hwdef.h, we have:
->> CONT_PTE_SHIFT
->> CONT_PMD_SHIFT
->> CONT_PTES
->> CONT_PMDS
->> CONT_PTE_SIZE
->> CONT_PTE_MASK
->> ...
->>
->> which are used by the contiguous hint HugeTLB code.
->> Can those be adopted instead of CONT_MASK and CONT_SIZE?
->>
 
-Looking at the hugetlb code, it appears to support contiguous PMDs for
-4k and 64k pages as well, while the ARM ARM only defines it for 16k
-pages. I suppose the contiguous bit is simply ignored for level 2
-entries when using 4k or 64k pages kernels, but I think it would be
-better for the code to reflect this as well.
+
+On 10/10/16 23:13, Lina Iyer wrote:
+> On Mon, Oct 10 2016 at 11:13 -0600, Sudeep Holla wrote:
+
+[...]
+
+>> Either we say this binding is ARM CPU specific or generic, I can't
+>> understand this mix 'n' match really. You have removed all the
+>> CPUIdle stuff from this series which is good and makes it simpler,
+>> but linking it to only "arm,idle-state" make be feel it's not
+>> generic. OK I will have a look at the RFC as why generic compatible
+>> was rejected.
+>>
+> I will look for the discussion around it as well. A initial look
+> through didn't get me the thread I was looking for.
+>
+
+Sure
+
+[...]
+
+>>
+>> I understand that but it's not that simple which I assume you *do*
+>> agree. Hence may need bit of an explanation in the binding(not here
+>> of-course as I mentioned earlier, but in the CPU Idle bindings).
+>> Please consider DT bindings as any other specification. All I am
+>> asking is more description in the binding.
+>>
+> Any ideas of what description you would like to see? It seemed fairly
+> explanatory in the idle-states.txt, so I didn't go into depth here.
+>
+
+Various use cases we discussed and what takes precedence,... etc
+E.g.: if the Renasas example I pointed out had cpu-idle-states and
+power-domain but no domain-idle-states which is perfectly valid without
+this bindings.
+
+Basically all the important this we have discussed so far. Even the
+OSC/PCC is worth mentioning so that we are explicitly clear that this
+binding has no affiliation to those PSCI methods. In short it should be
+able to answer any question one might get if is completely new to this
+binding but is aware of old one.
+
+[...]
+
+>>
+>> Agreed and sorry if I created any confusion. But this binding doesn't
+>> clearly state how to build up the hierarchy if the leaf node is not a
+>> power-domain node and I am just trying have those clarifications in the
+>> binding. It would be good if those details are *explicitly* mentioned in
+>> the binding, not this particularly, but in CPU Idle one when you
+>> introduce the user of that.
+>>
+> As we have today, devices have their own way of figuring out their idle
+> states, they are not represented in DT (CPU being an exception).
+
+I understand that, and I assume this binding will provide a way to
+represent that for devices too if required. No ? Otherwise I see no
+point in just saying it's generic.
+
+-- 
+Regards,
+Sudeep
