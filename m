@@ -1,195 +1,149 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 11 Oct 2016 16:28:27 +0200
-Subject: [PATCH v4 9/9] arm64: dts: add Pine64 support
+Date: Tue, 11 Oct 2016 16:28:23 +0200
+Subject: [PATCH v4 5/9] clk: sunxi-ng: Implement minimum for multipliers
 In-Reply-To: <cover.024e1b023e41efe548dc6a004f7a946408d5c9a2.1476196031.git-series.maxime.ripard@free-electrons.com>
 References: <cover.024e1b023e41efe548dc6a004f7a946408d5c9a2.1476196031.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <0ceb2e4d03b16b3c7edf1550ba4a79fbbfac925b.1476196031.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <dc2601d4f35d9921ec50ed443cdd413f699fa270.1476196031.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+Allow the CCU drivers to specify a multiplier for their clocks.
 
-The Pine64 is a cost-efficient development board based on the
-Allwinner A64 SoC.
-There are three models: the basic version with Fast Ethernet and
-512 MB of DRAM (Pine64) and two Pine64+ versions, which both
-feature Gigabit Ethernet and additional connectors for touchscreens
-and a camera. Or as my son put it: "Those are smaller and these are
-missing." ;-)
-The two Pine64+ models just differ in the amount of DRAM
-(1GB vs. 2GB). Since U-Boot will figure out the right size for us and
-patches the DT accordingly we just need to provide one DT for the
-Pine64+.
-
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-[Maxime: Removed the common DTSI and include directly the pine64 DTS]
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm64/boot/dts/Makefile                             |  1 +-
- arch/arm64/boot/dts/allwinner/Makefile                   |  5 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts | 50 ++++++-
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts      | 74 +++++++++-
- 4 files changed, 130 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+ drivers/clk/sunxi-ng/ccu_mult.c |  2 +-
+ drivers/clk/sunxi-ng/ccu_mult.h | 13 +++++++++----
+ drivers/clk/sunxi-ng/ccu_nk.c   |  8 ++++----
+ drivers/clk/sunxi-ng/ccu_nkm.c  |  8 ++++----
+ drivers/clk/sunxi-ng/ccu_nkmp.c |  4 ++--
+ drivers/clk/sunxi-ng/ccu_nm.c   |  2 +-
+ 6 files changed, 21 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index 6e199c903676..ddcbf5a2c17e 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,4 +1,5 @@
- dts-dirs += al
-+dts-dirs += allwinner
- dts-dirs += altera
- dts-dirs += amd
- dts-dirs += amlogic
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-new file mode 100644
-index 000000000000..1e29a5ae8282
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -0,0 +1,5 @@
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
+index 6a02ffee5386..678b6cb49f01 100644
+--- a/drivers/clk/sunxi-ng/ccu_mult.c
++++ b/drivers/clk/sunxi-ng/ccu_mult.c
+@@ -105,7 +105,7 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
+ 						&parent_rate);
+ 
+-	_cm.min = 1;
++	_cm.min = cm->mult.min;
+ 	_cm.max = 1 << cm->mult.width;
+ 	ccu_mult_find_best(parent_rate, rate, &_cm);
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
+index 113780b7558e..c1a2134bdc71 100644
+--- a/drivers/clk/sunxi-ng/ccu_mult.h
++++ b/drivers/clk/sunxi-ng/ccu_mult.h
+@@ -7,14 +7,19 @@
+ struct ccu_mult_internal {
+ 	u8	shift;
+ 	u8	width;
++	u8	min;
+ };
+ 
+-#define _SUNXI_CCU_MULT(_shift, _width)		\
+-	{					\
+-		.shift	= _shift,		\
+-		.width	= _width,		\
++#define _SUNXI_CCU_MULT_MIN(_shift, _width, _min)	\
++	{						\
++		.shift	= _shift,			\
++		.width	= _width,			\
++		.min	= _min,				\
+ 	}
+ 
++#define _SUNXI_CCU_MULT(_shift, _width)		\
++	_SUNXI_CCU_MULT_MIN(_shift, _width, 1)
 +
-+always		:= $(dtb-y)
-+subdir-y	:= $(dts-dirs)
-+clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-new file mode 100644
-index 000000000000..790d14daaa6a
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-@@ -0,0 +1,50 @@
-+/*
-+ * Copyright (c) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "sun50i-a64-pine64.dts"
-+
-+/ {
-+	model = "Pine64+";
-+	compatible = "pine64,pine64-plus", "allwinner,sun50i-a64";
-+
-+	/* TODO: Camera, Ethernet PHY, touchscreen, etc. */
-+};
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-new file mode 100644
-index 000000000000..9f127b3d0e33
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright (c) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "sun50i-a64.dtsi"
-+
-+/ {
-+	model = "Pine64";
-+	compatible = "pine64,pine64", "allwinner,sun50i-a64";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+	status = "okay";
-+};
-+
-+&i2c1_pins {
-+	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+};
+ struct ccu_mult {
+ 	u32			enable;
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
+index a42d870ba0ef..eaf0fdf78d2b 100644
+--- a/drivers/clk/sunxi-ng/ccu_nk.c
++++ b/drivers/clk/sunxi-ng/ccu_nk.c
+@@ -97,9 +97,9 @@ static long ccu_nk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
+ 		rate *= nk->fixed_post_div;
+ 
+-	_nk.min_n = 1;
++	_nk.min_n = nk->n.min;
+ 	_nk.max_n = 1 << nk->n.width;
+-	_nk.min_k = 1;
++	_nk.min_k = nk->k.min;
+ 	_nk.max_k = 1 << nk->k.width;
+ 
+ 	ccu_nk_find_best(*parent_rate, rate, &_nk);
+@@ -122,9 +122,9 @@ static int ccu_nk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
+ 		rate = rate * nk->fixed_post_div;
+ 
+-	_nk.min_n = 1;
++	_nk.min_n = nk->n.min;
+ 	_nk.max_n = 1 << nk->n.width;
+-	_nk.min_k = 1;
++	_nk.min_k = nk->k.min;
+ 	_nk.max_k = 1 << nk->k.width;
+ 
+ 	ccu_nk_find_best(parent_rate, rate, &_nk);
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+index b2a5fccf2f8c..715b49211ddb 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkm.c
++++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+@@ -100,9 +100,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+ 	struct ccu_nkm *nkm = data;
+ 	struct _ccu_nkm _nkm;
+ 
+-	_nkm.min_n = 1;
++	_nkm.min_n = nkm->n.min;
+ 	_nkm.max_n = 1 << nkm->n.width;
+-	_nkm.min_k = 1;
++	_nkm.min_n = nkm->k.min;
+ 	_nkm.max_k = 1 << nkm->k.width;
+ 	_nkm.min_m = 1;
+ 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+@@ -129,9 +129,9 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long flags;
+ 	u32 reg;
+ 
+-	_nkm.min_n = 1;
++	_nkm.min_n = nkm->n.min;
+ 	_nkm.max_n = 1 << nkm->n.width;
+-	_nkm.min_k = 1;
++	_nkm.min_n = nkm->k.min;
+ 	_nkm.max_k = 1 << nkm->k.width;
+ 	_nkm.min_m = 1;
+ 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+index 2c1398192e48..7968e0bac5db 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.c
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+@@ -107,9 +107,9 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+ 	struct _ccu_nkmp _nkmp;
+ 
+-	_nkmp.min_n = 1;
++	_nkmp.min_n = nkmp->n.min;
+ 	_nkmp.max_n = 1 << nkmp->n.width;
+-	_nkmp.min_k = 1;
++	_nkmp.min_n = nkmp->k.min;
+ 	_nkmp.max_k = 1 << nkmp->k.width;
+ 	_nkmp.min_m = 1;
+ 	_nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
+diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+index 2a190bc032a9..b1f3f0e8899d 100644
+--- a/drivers/clk/sunxi-ng/ccu_nm.c
++++ b/drivers/clk/sunxi-ng/ccu_nm.c
+@@ -93,7 +93,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct ccu_nm *nm = hw_to_ccu_nm(hw);
+ 	struct _ccu_nm _nm;
+ 
+-	_nm.min_n = 1;
++	_nm.min_n = nm->n.min;
+ 	_nm.max_n = 1 << nm->n.width;
+ 	_nm.min_m = 1;
+ 	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
 -- 
 git-series 0.8.10
