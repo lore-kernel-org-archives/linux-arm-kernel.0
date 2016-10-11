@@ -1,38 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Oct 2016 16:46:01 +0100
-Subject: [PATCH v2 0/3] arm64/mm: use the contiguous attribute for kernel
- mappings
-In-Reply-To: <1476189589-1443-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1476189589-1443-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu93VDi80ETG4sd097xb6MSUQfy-ap0F-+qNJoakBy15Xw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 11 Oct 2016 17:46:00 +0200
+Subject: [PATCH v2 2/9] pinctrl: sunxi: Use macros from bindings header file
+ for DT parsing
+In-Reply-To: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
+References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <5de3087f625d6d4a4d552d4a85faafac689f5f54.1476200742.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 October 2016 at 13:39, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This 3-piece series is a followup to the single patch 'arm64: mmu: set the
-> contiguous for kernel mappings when appropriate' sent out on the 10th [0].
->
-> This v2 addresses the following issues:
-> - the contiguous attribute is also useful for contigous PMD mappings on 16k
->   granule kernels (i.e., 1 GB blocks)
-> - the function parameter 'block_mappings_allowed' does not clearly convey
->   whether contiguous page mappings should be used, so it is renamed to
->   'page_mappings_only', and its meaning inverted
-> - instead of BUGging on changes in the PTE_CONT attribute in PMD or PTE entries
->   that have been populated already, BUG on any modification except for
->   permission attributes, which don't require break-before-make when changed.
->
-> [0] http://marc.info/?l=linux-arm-kernel&m=147612332130714
->
+Since we have some bindings header for our hardcoded flags, let's use them
+when we can.
 
-In addition to the fact, as mentioned by Will, that contiguous PMDs
-are supported for 4k and 64k granules too, this series fails to deal
-with folded PUDs and PMDs (which should result in contiguous PGDs for
-2 level or 3 level configurations)
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Since this is no longer a drive-by patch, I wil take some time for the
-v3 and address all the corner cases, and do some more elaborate
-testing.
-
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 64f7f6dcc027..5be455d5e252 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -28,6 +28,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
+ #include "../core.h"
+ #include "../../gpio/gpiolib.h"
+ #include "pinctrl-sunxi.h"
+@@ -164,9 +166,9 @@ static int sunxi_pctrl_parse_bias_prop(struct device_node *node)
+ 		return -EINVAL;
+ 
+ 	switch (val) {
+-	case 1:
++	case SUN4I_PINCTRL_PULL_UP:
+ 		return PIN_CONFIG_BIAS_PULL_UP;
+-	case 2:
++	case SUN4I_PINCTRL_PULL_DOWN:
+ 		return PIN_CONFIG_BIAS_PULL_DOWN;
+ 	}
+ 
 -- 
-Ard.
+git-series 0.8.10
