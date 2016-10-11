@@ -1,17 +1,294 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 11 Oct 2016 18:05:03 +0800
-Subject: [PATCH v7 3/3] ARM: sunxi: Enable VGA bridge
-In-Reply-To: <9569fecfab89f2cfee25c899f91d388b1af0cf22.1476090316.git-series.maxime.ripard@free-electrons.com>
-References: <cover.60fc2fa7a6c5b5800b4e3a97b5598216817e0d9c.1476090316.git-series.maxime.ripard@free-electrons.com>
- <9569fecfab89f2cfee25c899f91d388b1af0cf22.1476090316.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v67Gp+ykhfDFGeEqYZ2CpmwgRNF58OEKeQ3Y7H+pbfwMkQ@mail.gmail.com>
+From: huziji@marvell.com (Ziji Hu)
+Date: Tue, 11 Oct 2016 18:03:47 +0800
+Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
+ Controller
+In-Reply-To: <20161010213417.GA11795@rob-hp-laptop>
+References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
+ <fc0ca2b3140287cbccf5c176a12b7dce25d06a47.1475853198.git-series.gregory.clement@free-electrons.com>
+ <20161010213417.GA11795@rob-hp-laptop>
+Message-ID: <d95c3035-e3cd-a93c-d408-27f4c8dba589@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2016 at 5:05 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Enable the VGA bridge used on the A13-Olinuxino in the sunxi defconfig
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi Rob,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+	Thanks a for the review.
+	It is really helpful to me.
+
+On 2016/10/11 5:34, Rob Herring wrote:
+> On Fri, Oct 07, 2016 at 05:22:51PM +0200, Gregory CLEMENT wrote:
+>> From: Ziji Hu <huziji@marvell.com>
+>>
+>> Marvell Xenon SDHC can support eMMC/SD/SDIO.
+>> Add Xenon-specific properties.
+>> Also add properties for Xenon PHY setting.
+>>
+>> Signed-off-by: Hu Ziji <huziji@marvell.com>
+>> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt | 164 +++++++-
+>>  MAINTAINERS                                                   |   1 +-
+>>  2 files changed, 165 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt b/Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt
+>> new file mode 100644
+>> index 000000000000..8b25ad28ebbd
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt
+>> @@ -0,0 +1,164 @@
+>> +Marvell's Xenon SDHCI Controller device tree bindings
+>> +This file documents differences between the core mmc properties
+>> +described by mmc.txt and the properties used by the Xenon implementation.
+>> +
+>> +A single Xenon IP can support multiple slots.
+>> +Each slot acts as an independent SDHC. It owns independent resources, such
+>> +as register sets clock and PHY.
+> 
+> Is the phy really part of the same block?
+> 
+	Each SDHC slot owns its PHY. It is part of a SDHC slot.
+	It is independent to another SDHC slot.
+
+>> +Each slot should have an independent device tree node.
+>> +
+>> +Required Properties:
+>> +- compatible: should be "marvell,sdhci-xenon" or "marvell,armada-3700-sdhci".
+> 
+> Perhaps some consistent ordering (w/ -sdhci on the end).
+	Sure.
+	I will adjust the ordering.
+
+> 
+>> +
+>> +- Input Clock Name
+> 
+> Your formatting of properties is a bit strange. Please restructure like 
+> most bindings so the property names are before all the description.
+> 
+	OK.
+	I will fix the format.
+
+>> +  Some SOCs require additional clock for AXI bus.
+> 
+> Those SoCs should have a specific compatible string and you need to 
+> define which compatible strings have 2 clocks vs. 1 clock.
+> 
+	Actually, I copy this implementation from another Marvell SDIO Host Controller, sdhci-pxa.
+	It is in sdhci-pxa.txt.
+	I would like to know if it is still acceptable.
+
+>> +  The input clock for Xenon IP core should be named as "core".
+>> +  The optional AXI clock should be named as "axi".
+>> +  - clocks = <&core_clk>, <&axi_clock>;
+>> +  - clock-names = "core", "axi";
+>> +
+>> +- Register Set Size
+> 
+> Is this a property name?
+
+	Sorry, it isn't.
+	I will fix the format.
+
+> 
+>> +  Different Xenon SDHC release has different register set size.
+>> +  The specific size should also refer to the SOC implementation.
+>> +
+>> +Optional Properties:
+>> +- Slot Index
+>> +  A single Xenon IP can support multiple slots.
+>> +  During initialization, each slot should set corresponding setting bit in
+>> +  some Xenon-specific registers. The corresponding bit is determined by
+>> +  this property.
+>> +  - xenon,slotno = <slot_index>;
+> 
+> Slots should probably be represented as child nodes with the reg 
+> property being the slot number.
+
+	Since each SDHC slot is independent, I find it is more convenient to implement each one as independent SD host/MMC host instant.
+	Otherwise, a main function should loop and initialize each slot, like sdhci-pci. I prefer to avoiding such a unnecessary main function.
+
+	It is very hard to determine the slot number by reg property.
+	Xenon slots are likely to be different types. 1st slot might be eMMC and 2nd one might be SD. They might have different register size.
+	The register size might also varies in different Xenon versions.
+
+> 
+> Also, xenon is not a vendor prefix.
+> 
+	Yes. The issue is that there are multiple Marvell SD Host Controllers existing in kernel.
+	If marvell is used as a prefix here, I concern that it might be confused with other Marvell sdhc.
+	Can I use a combination of marvell and xenon as a prefix, such as mrvl-xenon?
+
+>> +  If this property is not provided, Xenon IP should contain only one slot
+>> +  and the slot index will be 0x0 by default.
+>> +
+>> +- PHY Type
+> 
+> You're going to need to come of with a common binding for this.
+> 
+	Could you please provide more details about the "common binding" here?
+
+	The PHY Type property is Xenon-specific, instead of a standard or a spec.
+	Thus I cannot find a common property to stand for it.
+
+>> +  Xenon support mutilple types of PHYs.
+>> +  To select eMMC 5.1 PHY, set:
+>> +  - xenon,phy-type = "emmc 5.1 phy"
+>> +  eMMC 5.1 PHY is the default choice if this property is not provided.
+>> +  To select eMMC 5.0 PHY, set:
+>> +  - xenon,phy-type = "emmc 5.0 phy"
+>> +  To select SDH PHY, set:
+>> +  - xenon,phy-type = "sdh phy"
+>> +  Please note that eMMC PHY is a general PHY for eMMC/SD/SDIO, other than for
+>> +  eMMC only.
+>> +
+>> +- Customized eMMC PHY Parameters
+>> +  Some boards require different values of some specific eMMC PHY parameters.
+>> +  Some SOCs also require specific workaround to set eMMC PHY.
+>> +  These properties enable diverse boards to customize the eMMC PHY.
+>> +  The supported eMMC PHY parameters are listed in below. All those properties
+>> +  are only available for eMMC PHY 5.1 and eMMC PHY 5.0.
+>> +  ZNR
+>> +  valid range = [0:0x1F].
+>> +  ZNR is set as 0xF by default if this property is not provided.
+>> +  - xenon,phy-znr = <value>;
+>> +
+>> +  ZPR
+>> +  valid range = [0:0x1F].
+>> +  ZPR is set as 0xF by default if this property is not provided.
+>> +  - xenon,phy-zpr = <value>;
+> 
+> marvell is the vendor prefix.
+> 
+>> +
+>> +  Number of successful tuning times
+>> +  Set the number of required consecutive successful sampling points used to
+>> +  identify a valid sampling window, in tuning process.
+>> +  Valid range = [1:7]. Set as 0x4 by default if this property is not provided.
+>> +  - xenon,phy-nr-tun-times = <nr_times>;
+>> +
+>> +  Divider for TUN_STEP
+>> +  Set the divider for calculating TUN_STEP.
+>> +  Set as 64 by default if this property is not provided.
+>> +  - xenon,phy-tun-step-divider = <divider>;
+>> +
+>> +  Force PHY into slow mode.
+>> +  Only available when bus frequency lower than 50MHz in SDR mde.
+>> +  Disabled by default. Please do not enable it unless it is necessary.
+>> +  - xenon,phy-slow-mode;
+>> +
+>> +- Mask Conflict Error Report
+>> +  Disable Conflict Error alert on some SOC. Disabled by default.
+>> +  xenon,mask-conflict-err;
+>> +
+>> +- Re-tuning Counter
+>> +  Xenon SDHC SOC usually doesn't provide re-tuning counter in
+>> +  Capabilities Register 3 Bit[11:8].
+>> +  This property provides the re-tuning counter.
+>> +  xenon,tuning-count = <count>;
+>> +  If this property is not set, default re-tuning counter will
+>> +  be set as 0x9 in driver.
+>> +
+>> +- SOC PHY PAD Voltage Control register
+>> +  Some SOCs have SOC PHY PAD Voltage Control register outside Xenon IP.
+>> +  This register sets SOC PHY PAD Voltage to keep aligh with Vccq.
+>> +  Two properties provide information of this control register.
+>> +  These two properties are only valid when "marvell,armada-3700-sdhci"
+>> +  is selected. Both of them must be provided when "marvell,armada-3700-sdhci"
+>> +  is selected.
+>> +  - xenon,pad-type
+>> +    Two types: "sd" and "fixed-1-8v".
+>> +    If "sd" is slected, SOC PHY PAD is set as 3.3V at the beginning and is
+>> +    switched to 1.8V when SD in UHS-I.
+>> +    If "fixed-1-8v" is slected, SOC PHY PAD is fixed 1.8V, such as for eMMC.
+> 
+> You should be able to existing, common properties for i/o voltage 
+> capabilities/constraints.
+> 
+	The above property is for a special SOC platform in Marvell.
+	It is irrelevant to common PHY framework or standard MMC bindings.
+	Thus I cannot find a existing and common property to represent it.
+
+	Thank you.
+
+Best regards,
+Hu Ziji
+
+>> +  - reg
+>> +    Physical address and size of SOC PHY PAD register.
+>> +    Append after Xenon SDHC register space, as a second register field.
+>> +
+>> +  Please follow the examples with compatible "marvell,armada-3700-sdhci"
+>> +  in below.
+>> +
+>> +Example:
+>> +- For eMMC slot:
+>> +
+>> +	sdhci at aa0000 {
+>> +		compatible = "marvell,sdhci-xenon";
+>> +		reg = <0xaa0000 0x1000>;
+>> +		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
+>> +		clocks = <&emmcclk>;
+>> +		clock-names = "core";
+>> +		xenon,slotno = <0>;
+>> +		xenon,phy-type = "emmc 5.1 phy";
+>> +		bus-width = <8>;
+>> +		tuning-count = <11>;
+>> +	};
+>> +
+>> +- For SD/SDIO slot:
+>> +
+>> +	sdhci at ab0000 {
+>> +		compatible = "marvell,sdhci-xenon";
+>> +		reg = <0xab0000 0x1000>;
+>> +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
+>> +		vqmmc-supply = <&sd_regulator>;
+>> +		clocks = <&sdclk>;
+>> +		clock-names = "core";
+>> +		bus-width = <4>;
+>> +		tuning-count = <9>;
+>> +	};
+>> +
+>> +- For eMMC slot with compatible "marvell,armada-3700-sdhci":
+>> +
+>> +	sdhci at aa0000 {
+>> +		compatible = "marvell,armada-3700-sdhci";
+>> +		reg = <0xaa0000 0x1000>,
+>> +		      <phy_addr 0x4>;
+>> +		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
+>> +		clocks = <&emmcclk>;
+>> +		clock-names = "core";
+>> +		bus-width = <8>;
+>> +
+>> +		xenon,pad-type = "fixed-1-8v";
+>> +	};
+>> +
+>> +- For SD/SDIO slot with compatible "marvell,armada-3700-sdhci":
+>> +
+>> +	sdhci at ab0000 {
+>> +		compatible = "marvell,armada-3700-sdhci";
+>> +		reg = <0xab0000 0x1000>,
+>> +		      <phy_addr 0x4>;
+>> +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
+>> +		vqmmc-supply = <&sd_regulator>;
+>> +		clocks = <&sdclk>;
+>> +		clock-names = "core";
+>> +		bus-width = <4>;
+>> +
+>> +		xenon,pad-type = "sd";
+>> +	};
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 89adcd57aa25..4aa0eac9bfc7 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -7582,6 +7582,7 @@ MARVELL XENON MMC/SD/SDIO HOST CONTROLLER DRIVER
+>>  M:	Ziji Hu <huziji@marvell.com>
+>>  L:	linux-mmc at vger.kernel.org
+>>  S:	Supported
+>> +F:	Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt
+>>  
+>>  MATROX FRAMEBUFFER DRIVER
+>>  L:	linux-fbdev at vger.kernel.org
+>> -- 
+>> git-series 0.8.10
