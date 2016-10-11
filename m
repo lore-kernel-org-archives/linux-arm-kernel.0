@@ -1,67 +1,47 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 11 Oct 2016 09:54:17 +0200
-Subject: [PATCH] n900 device tree: cleanup, add camera flash
-Message-ID: <20161011075416.GA22453@amd>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Tue, 11 Oct 2016 09:59:00 +0200
+Subject: [PATCH 0/6] clk: oxnas: Rework driver to add support for OX820
+In-Reply-To: <20161005150752.22618-1-narmstrong@baylibre.com>
+References: <20161005150752.22618-1-narmstrong@baylibre.com>
+Message-ID: <147617274057.17481.2362814012745242458@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix GPIO comment to be consistent with rest of file, add comment what
-tpa6130 is, and addd support for adp1653 camera flash.
+Quoting Neil Armstrong (2016-10-05 17:07:46)
+> In order to to support the Oxford Semiconductor OX820 Soc clock gates,
+> rework the original driver with a structure inspired from the Qcom or Meson
+> drivers and using the new devm_clk_hw_register() call.
+> 
+> The first patches add dt-bindings include file to clarify the clock indices.
+> 
+> In future work, OX820 PLLs should also be handled by this driver.
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Series looks good to me. Will apply after -rc1 drops.
 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index bfffd6c..ca9fe8c 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -47,7 +47,7 @@
- 		compatible = "gpio-leds";
- 		heartbeat {
- 			label = "debug::sleep";
--			gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;  /* gpio162 */
-+			gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;  /* 162 */
- 			linux,default-trigger = "default-on";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&debug_leds>;
-@@ -637,6 +637,7 @@
- 		reg = <0x55>;
- 	};
- 
-+	/* Stereo headphone amplifier */
- 	tpa6130a2: tpa6130a2 at 60 {
- 		compatible = "ti,tpa6130a2";
- 		reg = <0x60>;
-@@ -669,6 +670,22 @@
- 
- 		ti,usb-charger-detection = <&isp1707>;
- 	};
-+
-+	adp1653: led-controller at 30 {
-+		compatible = "adi,adp1653";
-+		reg = <0x30>;
-+		gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
-+
-+		flash {
-+			flash-timeout-us = <500000>;
-+			flash-max-microamp = <320000>;
-+			max-microamp = <50000>;
-+		};
-+
-+		indicator {
-+			max-microamp = <17500>;
-+		};
-+	};
- };
- 
- &i2c3 {
+Regards,
+Mike
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161011/b5958bee/attachment.sig>
+> 
+> Neil Armstrong (6):
+>   clk: oxnas: Add dt-bindings include file for OX810SE
+>   clk: oxnas: Add dt-bindings include file for OX820
+>   clk: oxnas: Rename to clk_oxnas_gate
+>   clk: oxnas: Refactor to make use of devm_clk_hw_register()
+>   clk: oxnas: Add OX820 Gate clocks
+>   dt-bindings: clk: oxnas,stdclk: Add OX820 bindings
+> 
+>  .../devicetree/bindings/clock/oxnas,stdclk.txt     |  19 +-
+>  drivers/clk/clk-oxnas.c                            | 232 ++++++++++++++-------
+>  include/dt-bindings/clock/oxsemi,ox810se.h         |  30 +++
+>  include/dt-bindings/clock/oxsemi,ox820.h           |  40 ++++
+>  4 files changed, 231 insertions(+), 90 deletions(-)
+>  create mode 100644 include/dt-bindings/clock/oxsemi,ox810se.h
+>  create mode 100644 include/dt-bindings/clock/oxsemi,ox820.h
+> 
+> -- 
+> 2.7.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
