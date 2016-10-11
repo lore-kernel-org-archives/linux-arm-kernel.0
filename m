@@ -1,85 +1,44 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 11 Oct 2016 12:23:55 +0200
-Subject: [RESEND PATCH v6, 4/5] usb: Add MediaTek USB3 DRD Driver
-In-Reply-To: <1476155663.15546.32.camel@mhfsdcap03>
-References: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
- <1474437277-27201-5-git-send-email-chunfeng.yun@mediatek.com>
- <49293f1b-42b5-f06b-8fdc-f46fe996e237@gmail.com>
- <1476155663.15546.32.camel@mhfsdcap03>
-Message-ID: <48357a7f-deee-b114-ccd4-914fd5fa400f@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 11 Oct 2016 12:26:31 +0200
+Subject: [PATCH v7 0/3] drm: Add Support for Passive RGB to VGA bridges
+In-Reply-To: <cover.60fc2fa7a6c5b5800b4e3a97b5598216817e0d9c.1476090316.git-series.maxime.ripard@free-electrons.com>
+References: <cover.60fc2fa7a6c5b5800b4e3a97b5598216817e0d9c.1476090316.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20161011102631.GU3462@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 10, 2016 at 11:05:40AM +0200, Maxime Ripard wrote:
+> Hi,
+> 
+> This serie is about adding support for the RGB to VGA bridge found in
+> the A13-Olinuxino and the CHIP VGA adapter.
+> 
+> Both these boards rely on an entirely passive bridge made out of
+> resitor ladders that do not require any initialisation. The only thing
+> needed is to get the timings from the screen if available (and if not,
+> fall back on XGA standards), set up the display pipeline to output on
+> the RGB bus with the proper timings, and you're done.
+> 
+> This serie also fixes a bunch of bugs uncovered when trying to
+> increase the resolution, and hence the pixel clock, of our
+> pipeline. It also fixes a few bugs in the DRM driver itself that went
+> unnoticed before.
+> 
+> Let me know what you think,
+> Maxime
 
+Queued all three for 4.10.
 
-On 10/11/2016 05:14 AM, Chunfeng Yun wrote:
-> On Mon, 2016-10-10 at 13:00 +0200, Matthias Brugger wrote:
->>
->> On 09/21/2016 07:54 AM, Chunfeng Yun wrote:
->>> This patch adds support for the MediaTek USB3 controller
->>> integrated into MT8173. It can be configured as Dual-Role
->>> Device (DRD), Peripheral Only and Host Only (xHCI) modes.
->>>
->>> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
->>> ---
->>>  drivers/usb/Kconfig                |    2 +
->>>  drivers/usb/Makefile               |    1 +
->>>  drivers/usb/mtu3/Kconfig           |   54 +++
->>>  drivers/usb/mtu3/Makefile          |   19 +
->>>  drivers/usb/mtu3/mtu3.h            |  422 +++++++++++++++++
->>>  drivers/usb/mtu3/mtu3_core.c       |  871 +++++++++++++++++++++++++++++++++++
->>>  drivers/usb/mtu3/mtu3_dr.c         |  379 ++++++++++++++++
->>>  drivers/usb/mtu3/mtu3_dr.h         |  108 +++++
->>>  drivers/usb/mtu3/mtu3_gadget.c     |  731 +++++++++++++++++++++++++++++
->>>  drivers/usb/mtu3/mtu3_gadget_ep0.c |  883 ++++++++++++++++++++++++++++++++++++
->>>  drivers/usb/mtu3/mtu3_host.c       |  294 ++++++++++++
->>>  drivers/usb/mtu3/mtu3_hw_regs.h    |  473 +++++++++++++++++++
->>>  drivers/usb/mtu3/mtu3_plat.c       |  490 ++++++++++++++++++++
->>>  drivers/usb/mtu3/mtu3_qmu.c        |  599 ++++++++++++++++++++++++
->>>  drivers/usb/mtu3/mtu3_qmu.h        |   43 ++
->>>  15 files changed, 5369 insertions(+)
->>>  create mode 100644 drivers/usb/mtu3/Kconfig
->>>  create mode 100644 drivers/usb/mtu3/Makefile
->>>  create mode 100644 drivers/usb/mtu3/mtu3.h
->>>  create mode 100644 drivers/usb/mtu3/mtu3_core.c
->>>  create mode 100644 drivers/usb/mtu3/mtu3_dr.c
->>>  create mode 100644 drivers/usb/mtu3/mtu3_dr.h
->>>  create mode 100644 drivers/usb/mtu3/mtu3_gadget.c
->>>  create mode 100644 drivers/usb/mtu3/mtu3_gadget_ep0.c
->>>  create mode 100644 drivers/usb/mtu3/mtu3_host.c
->>>  create mode 100644 drivers/usb/mtu3/mtu3_hw_regs.h
->>>  create mode 100644 drivers/usb/mtu3/mtu3_plat.c
->>>  create mode 100644 drivers/usb/mtu3/mtu3_qmu.c
->>>  create mode 100644 drivers/usb/mtu3/mtu3_qmu.h
->>>
->>
->> As Oliver already said, this patch is quiet big which makes it difficult
->> to review.
->> I propose to provide a first implementation with minimal functionality
->> and incremental patches on top of this when the first got merged.
->>
->> You could split the patch in three series/parts:
->> 1. Host only
->> 2. Peripheral only
->> 3. Dual mode
->>
->> What do you think?
->
-> Ok, I'll split the patch into some small ones as many as possible.
+Maxime
 
-There is no direct policy how to do that and it depends a bit on every 
-maintainer what he prefers. As a rule of thumb each commit should 
-compile on it's own without errors. This makes bisecting the kernel much 
-easier.
-
-Regards,
-Matthias
-
->
-> Thanks a lot
->>
->> Regards,
->> Matthias
->>
->
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161011/7305a832/attachment.sig>
