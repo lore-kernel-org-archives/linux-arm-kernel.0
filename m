@@ -1,99 +1,80 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 11 Oct 2016 08:33:59 +0800
-Subject: [PATCH 5/5] ARM: dts: sun6i: enable ili2139 on Colorfly E708 Q1
-In-Reply-To: <20161011003359.26079-1-icenowy@aosc.xyz>
-References: <20161011003359.26079-1-icenowy@aosc.xyz>
-Message-ID: <20161011003359.26079-5-icenowy@aosc.xyz>
+From: kgene.kim@gmail.com (Kukjin Kim)
+Date: Tue, 11 Oct 2016 09:46:49 +0900
+Subject: [GIT PULL 1/3] ARM: soc: exynos: Drivers for v4.9
+In-Reply-To: <53745281-AF17-4A3A-8BB5-63EED3563298@gmail.com>
+References: <1474216788-17282-1-git-send-email-krzk@kernel.org>
+ <1474216788-17282-2-git-send-email-krzk@kernel.org>
+ <2663426.T8oUku18qe@wuerfel> <20160919155302.GA4447@kozik-book>
+ <CAOesGMgSu=bfVwWYkEG0+eDKBxh_zqSM0uxFAq3Y3X-O0vLGKQ@mail.gmail.com>
+ <20161003074825.GA2724@kozik-lap>
+ <53745281-AF17-4A3A-8BB5-63EED3563298@gmail.com>
+Message-ID: <50A42280-0A39-44E3-8E35-C24031EB4DF0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many users report that their Colorfly E708 Q1's come with ili2139 touch
-IC. This patch adds the device node of this IC.
+2016. 10. 3. 21:19 Kukjin Kim <kgene.kim@gmail.com> wrote:
 
-It seems that two devices are attached to I2C bus 1: a ili2139 touch
-controller at 0x41, and a stil unknown device at 0x38. So make PA2
-controlled by a dummy regulator node, rather than a power sequence GPIO
-for ili2139.
++ my samsung email
 
-There's also some users who report that their tablets come with touch
-screen with Goodix GT911 touch IC. In the device, the touch IC is
-connected on the screen rather soldered on the PCB, so the two touch
-screens may be both acceptable FRUs of the tablet. They have different
-addresses, and may be runtime detectable. (The Allwinner BSP kernel have
-such a detection method, however, mainline kernel have no such method
-now except enable both touch ICs' driver and wait for one driver's
-failure)
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts | 48 +++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-index 882a4d8..73ac574 100644
---- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-@@ -47,6 +47,38 @@
- / {
- 	model = "Colorfly E708 Q1 tablet";
- 	compatible = "colorfly,e708-q1", "allwinner,sun6i-a31s";
-+
-+	/* This is actually a common reset line for both the
-+	 * touchscreen and the accelerometer.
-+	 */
-+	i2c1_on: i2c1_on {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&i2c1_on_e708_q1>;
-+
-+		regulator-name = "i2c1_on";
-+		regulator-min-microvolt = "3000000";
-+		regulator-max-microvolt = "3000000";
-+		regulator-always-on;
-+		gpio = <&pio 0 2 GPIO_ACTIVE_HIGH>; /* PA2 */
-+		enable-active-high;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+
-+	ctp at 41 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ili2139_int_e708_q1>;
-+
-+		compatible = "ilitek,ili2139", "ili2139";
-+		reg = <0x41>;
-+		interrupt-parent = <&pio>;
-+		interrupts = <0 3 IRQ_TYPE_LEVEL_HIGH>; /* PA3 */
-+	};
- };
- 
- &lradc {
-@@ -61,6 +93,22 @@
- 	};
- };
- 
-+&pio {
-+	i2c1_on_e708_q1: i2c1_on at 0 {
-+		allwinner,pins = "PA2";
-+	        allwinner,function = "gpio_out";
-+	        allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+	        allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	ili2139_int_e708_q1: ili2139_int at 0 {
-+		allwinner,pins = "PA3";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
- &reg_dldo2 {
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
--- 
-2.10.1
+> 2016. 10. 3. 15:48 Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> 
+>>>> On Sun, Oct 02, 2016 at 05:25:07PM -0700, Olof Johansson wrote:
+>>>>> On Mon, Sep 19, 2016 at 8:53 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>>>>> On Mon, Sep 19, 2016 at 05:02:40PM +0200, Arnd Bergmann wrote:
+>>>>>> On Sunday, September 18, 2016 6:39:46 PM CEST Krzysztof Kozlowski wrote:
+>>>>>> Samsung drivers/soc update for v4.9:
+>>>>>> 1. Allow compile testing of exynos-mct clocksource driver on ARM64.
+>>>>>> 2. Document Exynos5433 PMU compatible (already used by clkout driver and more
+>>>>>>  will be coming soon).
+>>>>> 
+>>>>> Pulled into next/drivers, thanks
+>>>>> 
+>>>>> Just for my understanding: why do we need the exynos-mct driver on ARM64
+>>>>> but not the delay-timer portion of it?
+>>>> 
+>>>> I think we want all of it but Doug's optimization 3252a646aa2c
+>>>> ("clocksource: exynos_mct: Only use 32-bits where possible") is not
+>>>> ARM64 friendly. One way of dealing with it would be to prepare two
+>>>> versions of exynos4_read_current_timer(). One reading only lower 32-bit
+>>>> value for ARMv7 and second (slow) reading lower and upper for ARMv8.
+>>>> 
+>>>>> 
+>>>>> Is there an advantage in using MCT over the architected timer on these
+>>>>> chips? If so, should we also have a way to use it as the delay timer?
+>>>> 
+>>>> No, there is no real advantage... except that the SoC has some
+>>>> interesting "characteristics"... The timers are tightly coupled. Very
+>>>> tightly. I spent a lot of time and failed to boot my ARMv8 board without
+>>>> some MCT magic.
+>>> 
+>>> What kind of magic is that?
+>> 
+>> Most notably: the arch timer starts when MCT forward running counter
+>> starts. Without kicking MCT, the arch timer seems to be frozen.
+>> 
+>>> I can understand that needing the MCT for
+>>> some system-level timer functionality might be true (wakeups, etc),
+>>> but for system timesource avoiding the MMIO timer and using the arch
+>>> ones is a substantial performance improvement for gettimeofday() and
+>>> friends.
+>>> 
+>>> There was extensive discussion last year over using arch timers on
+>>> 5420/5422, and it fizzled out with vague comments about something not
+>>> working right between A15/A7 on b.L. hardware. I'm presuming whatever
+>>> implementation details of that SoC has since been fixed on later chips
+>>> (including v8). Any chance you can confirm? It'd be very nice to leave
+>>> MCT behind on v8 as a system time source.
+>> 
+>> Unfortunately, I cannot confirm this, at least on Exynos5433 (ARMv8). I
+>> played with arch and MCT timers on it and failed to get the
+>> arch-timer-only setup working. I did not have access to newer Exynos
+>> designs (Exynos 7) so I do not know how it works there.
+> 
+> Hi guys,
+> 
+> I know what Olof want to know and actually several days ago someone asked me about that. As you guys talked, a couple of years ago there were some discussions...BTW I need to contact to hardware designer before let you guys know because something needs to be confirmed by them even I know roughly.
+> 
+> Note I'm in vacation with my family. Will be back on this in several days with exact information.
+> 
+> BRs,
+> Kukjin
