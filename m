@@ -1,47 +1,88 @@
-From: sergio.prado@e-labworks.com (Sergio Prado)
-Date: Mon, 10 Oct 2016 22:31:04 -0300
-Subject: [PATCH 3/3] mtd: s3c2410: parse the device configuration from OF
- node
-In-Reply-To: <20161007162810.GB4222@kozik-lap>
-References: <1475711217-974-1-git-send-email-sergio.prado@e-labworks.com>
- <1475711217-974-4-git-send-email-sergio.prado@e-labworks.com>
- <20161007162810.GB4222@kozik-lap>
-Message-ID: <20161011013104.GA10064@sprado-desktop>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Tue, 11 Oct 2016 09:44:20 +0800
+Subject: [PATCH v8 10/16] mm/memblock: add a new function
+ memblock_alloc_near_nid
+In-Reply-To: <1472712907-12700-11-git-send-email-thunder.leizhen@huawei.com>
+References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472712907-12700-11-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <57FC43F4.1020909@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2016 at 07:28:10PM +0300, Krzysztof Kozlowski wrote:
 
-> > +struct s3c24XX_nand_devtype_data {
-> > +	enum s3c_cpu_type type;
-> > +};
-> > +
-> > +struct s3c24XX_nand_devtype_data s3c2410_nand_devtype_data = {
-> > +	.type = TYPE_S3C2410,
-> > +};
-> > +
-> > +struct s3c24XX_nand_devtype_data s3c2412_nand_devtype_data = {
-> > +	.type = TYPE_S3C2412,
-> > +};
-> > +
-> > +struct s3c24XX_nand_devtype_data s3c2440_nand_devtype_data = {
-> > +	.type = TYPE_S3C2440,
-> > +};
-> > +
-> > +struct s3c24XX_nand_devtype_data s3c6400_nand_devtype_data = {
-> > +	.type = TYPE_S3C2412,
+
+On 2016/9/1 14:55, Zhen Lei wrote:
+> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
+> actually exist. The percpu variable areas and numa control blocks of that
+> memoryless numa nodes must be allocated from the nearest available node
+> to improve performance.
 > 
-> All of these look like candidate for static const.
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  include/linux/memblock.h |  1 +
+>  mm/memblock.c            | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 29 insertions(+)
+
+Hi Will,
+  It seems no one take care about this, how about I move below function into arch/arm64/mm/numa.c
+again? So that, merge it and patch 11 into one.
+
 > 
-> Additionally you are not actually differentiating between s3c2412 and
-> s3c64xx so I think there is not need of samsung,s3c6400-nand compatible.
-> Just use existing one.
+> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> index 2925da2..8e866e0 100644
+> --- a/include/linux/memblock.h
+> +++ b/include/linux/memblock.h
+> @@ -290,6 +290,7 @@ static inline int memblock_get_region_node(const struct memblock_region *r)
 > 
-> Best regards,
-> Krzysztof
-
-You are right. I'll review and send V2.
-
-Best regards,
-
-Sergio Prado
+>  phys_addr_t memblock_alloc_nid(phys_addr_t size, phys_addr_t align, int nid);
+>  phys_addr_t memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid);
+> +phys_addr_t memblock_alloc_near_nid(phys_addr_t size, phys_addr_t align, int nid);
+> 
+>  phys_addr_t memblock_alloc(phys_addr_t size, phys_addr_t align);
+> 
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index 483197e..6578fff 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -1189,6 +1189,34 @@ again:
+>  	return ret;
+>  }
+> 
+> +phys_addr_t __init memblock_alloc_near_nid(phys_addr_t size, phys_addr_t align, int nid)
+> +{
+> +	int i, best_nid, distance;
+> +	u64 pa;
+> +	DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
+> +
+> +	bitmap_zero(nodes_map, MAX_NUMNODES);
+> +
+> +find_nearest_node:
+> +	best_nid = NUMA_NO_NODE;
+> +	distance = INT_MAX;
+> +
+> +	for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
+> +		if (node_distance(nid, i) < distance) {
+> +			best_nid = i;
+> +			distance = node_distance(nid, i);
+> +		}
+> +
+> +	pa = memblock_alloc_nid(size, align, best_nid);
+> +	if (!pa) {
+> +		BUG_ON(best_nid == NUMA_NO_NODE);
+> +		bitmap_set(nodes_map, best_nid, 1);
+> +		goto find_nearest_node;
+> +	}
+> +
+> +	return pa;
+> +}
+> +
+>  phys_addr_t __init __memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
+>  {
+>  	return memblock_alloc_base_nid(size, align, max_addr, NUMA_NO_NODE,
+> --
+> 2.5.0
+> 
+> 
+> 
+> .
+> 
