@@ -1,60 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 11 Oct 2016 11:40:42 +0200
-Subject: [PATCH v4 10/10] ARM: sunxi: Enable sun8i-emac driver on
- multi_v7_defconfig
-In-Reply-To: <20161010150943.fa7ca85fe52f4c6f9508b5eb@free.fr>
-References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
- <1475828757-926-11-git-send-email-clabbe.montjoie@gmail.com>
- <20161010123046.GH3462@lukather> <20161010123511.GA16103@Red>
- <20161010150943.fa7ca85fe52f4c6f9508b5eb@free.fr>
-Message-ID: <20161011094042.GS3462@lukather>
+From: emil@limesaudio.com (Emil Lundmark)
+Date: Tue, 11 Oct 2016 11:52:23 +0200
+Subject: [PATCH v2 1/2] clk: imx: fix integer overflow in AV PLL round rate
+In-Reply-To: <20161010135454.a6t46o4ocpwjmkwi@pengutronix.de>
+References: <cover.1476092427.git.emil@limesaudio.com>
+ <4e8696869cc82443825a590966bbd3a265befdfa.1476092427.git.emil@limesaudio.com>
+ <20161010135454.a6t46o4ocpwjmkwi@pengutronix.de>
+Message-ID: <20161011095223.GA8477@lime>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2016 at 03:09:43PM +0200, Jean-Francois Moine wrote:
-> On Mon, 10 Oct 2016 14:35:11 +0200
-> LABBE Corentin <clabbe.montjoie@gmail.com> wrote:
-> 
-> > On Mon, Oct 10, 2016 at 02:30:46PM +0200, Maxime Ripard wrote:
-> > > On Fri, Oct 07, 2016 at 10:25:57AM +0200, Corentin Labbe wrote:
-> > > > Enable the sun8i-emac driver in the multi_v7 default configuration
-> > > > 
-> > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > > ---
-> > > >  arch/arm/configs/multi_v7_defconfig | 1 +
-> > > >  1 file changed, 1 insertion(+)
-> > > > 
-> > > > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> > > > index 5845910..f44d633 100644
-> > > > --- a/arch/arm/configs/multi_v7_defconfig
-> > > > +++ b/arch/arm/configs/multi_v7_defconfig
-> > > > @@ -229,6 +229,7 @@ CONFIG_NETDEVICES=y
-> > > >  CONFIG_VIRTIO_NET=y
-> > > >  CONFIG_HIX5HD2_GMAC=y
-> > > >  CONFIG_SUN4I_EMAC=y
-> > > > +CONFIG_SUN8I_EMAC=y
-> > > 
-> > > Any reason to build it statically?
+On Mon, Oct 10, 2016 at 03:54:54PM +0200, Uwe Kleine-K?nig wrote:
+> On Mon, Oct 10, 2016 at 12:03:05PM +0200, Emil Lundmark wrote:
+> > Since 'parent_rate * mfn' may overflow 32 bits, the result should be
+> > stored using 64 bits.
 > > 
-> > No, just copied the same than CONFIG_SUN4I_EMAC that probably do
-> > not need it also.
+> > Fixes: ba7f4f557eb6 ("clk: imx: correct AV PLL rate formula")
+> > Signed-off-by: Emil Lundmark <emil@limesaudio.com>
+> > ---
+> >  drivers/clk/imx/clk-pllv3.c | 6 +++++-
+> >  1 file changed, 5 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+> > index 19f9b622981a..bc7f163ea13c 100644
+> > --- a/drivers/clk/imx/clk-pllv3.c
+> > +++ b/drivers/clk/imx/clk-pllv3.c
+> > @@ -247,7 +247,11 @@ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
+> >  	do_div(temp64, parent_rate);
+> >  	mfn = temp64;
+> >  
+> > -	return parent_rate * div + parent_rate * mfn / mfd;
+> > +	temp64 = (u64)parent_rate;
+> > +	temp64 *= mfn;
+> > +	do_div(temp64, mfd);
 > 
-> All arm configs are done the same way, and, some day, the generic ARM
-> V7 kernel will not be loadable in 1Gb RAM...
+> If you change parent_rate from unsigned long to u64 this simplifies to
+> 
+> 	temp64 = parent_rate * mfn
+> 	do_div(temp64, mfd);
+> 
 
-Yeah, if possible, I'd really like to avoid introducing statically
-built drivers to multi_v7.
+Yes, I took my inspiration from clk_pllv3_av_recalc_rate().
 
-Maxime
+> > +
+> > +	return parent_rate * div + (u32)temp64;
+> 
+> When thinking about overflow problems: Should this fail somehow if
+> temp64 != (u32)temp64?
+
+Well, it will fail in the sence that the desired clock will not be
+returned. However, since mfn / mfd < 1 it should be fine as long as
+ULONG_MAX <= U32_MAX. So, maybe it would be better to cast it to unsigned
+long? This would then also need to be changed in
+clk_pllv3_av_recalc_rate().
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161011/b305fb1b/attachment.sig>
+Emil Lundmark
