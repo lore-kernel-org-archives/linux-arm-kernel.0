@@ -1,38 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Oct 2016 12:16:30 +0200
-Subject: master build: 2 failures 4 warnings (v4.8-11811-g35ff96d)
-In-Reply-To: <E1btqa6-0001tx-HV@optimist>
-References: <E1btqa6-0001tx-HV@optimist>
-Message-ID: <20161011101630.xtlcpw76nwjwcbzg@sirena.org.uk>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Tue, 11 Oct 2016 12:20:41 +0200
+Subject: [PATCH 0/2] arm64 kexec-tools fixups
+In-Reply-To: <cover.1476134309.git.geoff@infradead.org>
+References: <cover.1476134309.git.geoff@infradead.org>
+Message-ID: <ebe32436-6069-06c5-702f-d435d0dacd48@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2016 at 07:30:35AM +0100, Build bot for Mark Brown wrote:
 
-Linus' tree is currently failing to build arm and arm64 allmodconfigs
-with:
 
-> 	arm64-allmodconfig
-> ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+On 10/10/2016 11:22 PM, Geoff Levand wrote:
+> Hi Simon,
+>
+> Fixes for 'make tarball'.  Please apply.
+>
+> -Geoff
+>
+> The following changes since commit 6e8804f9ca67bee65aedd5e1cdf504737ab5c7ed:
+>
+>   multiboot: Use the "reserved" type for non-ram zones (2016-10-07 11:54:44 +0900)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git for-merge-arm64-dist
+>
+> for you to fetch changes up to 3552a3e85a910688d932535549b35354a54927ad:
+>
+>   arm64: Add missing kexec dist files (2016-10-10 14:15:21 -0700)
+>
+> ----------------------------------------------------------------
+> Geoff Levand (2):
+>       arm64: Cleanup kexec Makefile
+>       arm64: Add missing kexec dist files
+>
+>  kexec/arch/arm64/Makefile | 15 +++++++++------
+>  1 file changed, 9 insertions(+), 6 deletions(-)
+>
 
-> 	arm-allmodconfig
-> ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
-
-due to 6556bdacf646fc (mfd: tps65217: Add support for IRQs) since
-irq_set_parent() isn't exported.  This has been present in -next
-for getting on for a month, a patch was proposed adding the relevant
-export but that isn't present in -next yet.
-
-The function is being used in order to enable lazy IRQ disabling for
-threaded interrupts:
-
-	https://www.spinics.net/lists/arm-kernel/msg532864.html
-
-What's the plan for getting this fixed in Linus' tree?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161011/37a83c95/attachment.sig>
+Reviewed-by: Matthias Brugger <mbrugger@suse.com>
