@@ -1,41 +1,70 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 10 Oct 2016 20:13:26 -0700
-Subject: [PATCH 1/5] dt-bindings: add vendor prefix for ILI Technology Corp
-In-Reply-To: <20161011003359.26079-1-icenowy@aosc.xyz>
-References: <20161011003359.26079-1-icenowy@aosc.xyz>
-Message-ID: <CAKdAkRT0WJ8EL62bumM1yz58LEAEqvmeX_hYzOZzAA0RvxJa3A@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 11 Oct 2016 11:14:23 +0800
+Subject: [RESEND PATCH v6, 4/5] usb: Add MediaTek USB3 DRD Driver
+In-Reply-To: <49293f1b-42b5-f06b-8fdc-f46fe996e237@gmail.com>
+References: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1474437277-27201-5-git-send-email-chunfeng.yun@mediatek.com>
+ <49293f1b-42b5-f06b-8fdc-f46fe996e237@gmail.com>
+Message-ID: <1476155663.15546.32.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2016 at 5:33 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> ILI Technology Corp (a.k.a Ilitek, http://www.ilitek.com/index-e.asp ) is a
-> company that produces LCD driver ICs and touch screen controller ICs.
+On Mon, 2016-10-10 at 13:00 +0200, Matthias Brugger wrote:
+> 
+> On 09/21/2016 07:54 AM, Chunfeng Yun wrote:
+> > This patch adds support for the MediaTek USB3 controller
+> > integrated into MT8173. It can be configured as Dual-Role
+> > Device (DRD), Peripheral Only and Host Only (xHCI) modes.
+> >
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  drivers/usb/Kconfig                |    2 +
+> >  drivers/usb/Makefile               |    1 +
+> >  drivers/usb/mtu3/Kconfig           |   54 +++
+> >  drivers/usb/mtu3/Makefile          |   19 +
+> >  drivers/usb/mtu3/mtu3.h            |  422 +++++++++++++++++
+> >  drivers/usb/mtu3/mtu3_core.c       |  871 +++++++++++++++++++++++++++++++++++
+> >  drivers/usb/mtu3/mtu3_dr.c         |  379 ++++++++++++++++
+> >  drivers/usb/mtu3/mtu3_dr.h         |  108 +++++
+> >  drivers/usb/mtu3/mtu3_gadget.c     |  731 +++++++++++++++++++++++++++++
+> >  drivers/usb/mtu3/mtu3_gadget_ep0.c |  883 ++++++++++++++++++++++++++++++++++++
+> >  drivers/usb/mtu3/mtu3_host.c       |  294 ++++++++++++
+> >  drivers/usb/mtu3/mtu3_hw_regs.h    |  473 +++++++++++++++++++
+> >  drivers/usb/mtu3/mtu3_plat.c       |  490 ++++++++++++++++++++
+> >  drivers/usb/mtu3/mtu3_qmu.c        |  599 ++++++++++++++++++++++++
+> >  drivers/usb/mtu3/mtu3_qmu.h        |   43 ++
+> >  15 files changed, 5369 insertions(+)
+> >  create mode 100644 drivers/usb/mtu3/Kconfig
+> >  create mode 100644 drivers/usb/mtu3/Makefile
+> >  create mode 100644 drivers/usb/mtu3/mtu3.h
+> >  create mode 100644 drivers/usb/mtu3/mtu3_core.c
+> >  create mode 100644 drivers/usb/mtu3/mtu3_dr.c
+> >  create mode 100644 drivers/usb/mtu3/mtu3_dr.h
+> >  create mode 100644 drivers/usb/mtu3/mtu3_gadget.c
+> >  create mode 100644 drivers/usb/mtu3/mtu3_gadget_ep0.c
+> >  create mode 100644 drivers/usb/mtu3/mtu3_host.c
+> >  create mode 100644 drivers/usb/mtu3/mtu3_hw_regs.h
+> >  create mode 100644 drivers/usb/mtu3/mtu3_plat.c
+> >  create mode 100644 drivers/usb/mtu3/mtu3_qmu.c
+> >  create mode 100644 drivers/usb/mtu3/mtu3_qmu.h
+> >
+> 
+> As Oliver already said, this patch is quiet big which makes it difficult 
+> to review.
+> I propose to provide a first implementation with minimal functionality 
+> and incremental patches on top of this when the first got merged.
+> 
+> You could split the patch in three series/parts:
+> 1. Host only
+> 2. Peripheral only
+> 3. Dual mode
+> 
+> What do you think?
 
-Was there patch 3/5? I do not see it in my mailbox.
+Ok, I'll split the patch into some small ones as many as possible.
 
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 24c6f65..4d37fdc 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -130,6 +130,7 @@ i2se        I2SE GmbH
->  ibm    International Business Machines (IBM)
->  idt    Integrated Device Technologies, Inc.
->  ifi    Ingenieurburo Fur Ic-Technologie (I/F/I)
-> +ilitek ILI Technologies Corp.
->  img    Imagination Technologies Ltd.
->  infineon Infineon Technologies
->  inforce        Inforce Computing
-> --
-> 2.10.1
->
-
-
-
--- 
-Dmitry
+Thanks a lot
+> 
+> Regards,
+> Matthias
+> 
