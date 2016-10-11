@@ -1,205 +1,406 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 11 Oct 2016 18:28:41 +0100
-Subject: [PATCH V3 02/10] ras: acpi/apei: cper: generic error data entry
- v3 per ACPI 6.1
-In-Reply-To: <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <3f17d0a8-6b63-5792-903a-341effaae432@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 11 Oct 2016 10:40:46 -0700
+Subject: [PATCH 3/5] Input: add driver for Ilitek ili2139 touch IC
+In-Reply-To: <20161011003359.26079-3-icenowy@aosc.xyz>
+References: <20161011003359.26079-1-icenowy@aosc.xyz>
+ <20161011003359.26079-3-icenowy@aosc.xyz>
+Message-ID: <20161011174046.GA27925@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/16 22:31, Tyler Baicar wrote:
-> Currently when a RAS error is reported it is not timestamped.
-> The ACPI 6.1 spec adds the timestamp field to the generic error
-> data entry v3 structure. The timestamp of when the firmware
-> generated the error is now being reported.
->
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+Hi Icenowy,
 
-Please could you keep the people who reviewed/commented on your series in the past,
-whenever you post a new version ?
+On Tue, Oct 11, 2016 at 08:33:57AM +0800, Icenowy Zheng wrote:
+> This driver adds support for Ilitek ili2139 touch IC, which is used in
+> several Colorfly tablets (for example, Colorfly E708 Q1, which is an
+> Allwinner A31s tablet with mainline kernel support).
+> 
+> Theortically it may support more Ilitek touch ICs, however, only ili2139
+> is used in any mainlined device.
+> 
+> It supports device tree enumeration, with screen resolution and axis
+> quirks configurable.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+
+Please extend ili210x.c instead of adding brand new driver, they look
+very similar.
+
+Thanks.
 
 > ---
->  drivers/acpi/apei/ghes.c    | 25 ++++++++++--
->  drivers/firmware/efi/cper.c | 97 +++++++++++++++++++++++++++++++++++++++------
->  2 files changed, 105 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 3021f0e..c8488f1 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -80,6 +80,10 @@
->  	((struct acpi_hest_generic_status *)				\
->  	 ((struct ghes_estatus_node *)(estatus_node) + 1))
->
-> +#define acpi_hest_generic_data_version(gdata)			\
-> +	(gdata->revision >> 8)
-
-...
-
-> +inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data *gdata)
+>  drivers/input/touchscreen/Kconfig   |  14 ++
+>  drivers/input/touchscreen/Makefile  |   1 +
+>  drivers/input/touchscreen/ili2139.c | 320 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 335 insertions(+)
+>  create mode 100644 drivers/input/touchscreen/ili2139.c
+> 
+> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+> index 5079813..bb4d9d2 100644
+> --- a/drivers/input/touchscreen/Kconfig
+> +++ b/drivers/input/touchscreen/Kconfig
+> @@ -348,6 +348,20 @@ config TOUCHSCREEN_ILI210X
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called ili210x.
+>  
+> +config TOUCHSCREEN_ILI2139
+> +	tristate "Ilitek ILI2139 based touchscreen"
+> +	depends on I2C
+> +	depends on OF
+> +	help
+> +	  Say Y here if you have a ILI2139 based touchscreen
+> +	  controller. Such kind of chipsets can be found in several
+> +	  Colorfly tablets.
+> +
+> +	  If unsure, say N.
+> +
+> +	  To compile this driver as a module, choose M here; the
+> +	  module will be called ili2139.
+> +
+>  config TOUCHSCREEN_IPROC
+>  	tristate "IPROC touch panel driver support"
+>  	depends on ARCH_BCM_IPROC || COMPILE_TEST
+> diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
+> index 81b8645..930b5e2 100644
+> --- a/drivers/input/touchscreen/Makefile
+> +++ b/drivers/input/touchscreen/Makefile
+> @@ -40,6 +40,7 @@ obj-$(CONFIG_TOUCHSCREEN_EGALAX_SERIAL)	+= egalax_ts_serial.o
+>  obj-$(CONFIG_TOUCHSCREEN_FUJITSU)	+= fujitsu_ts.o
+>  obj-$(CONFIG_TOUCHSCREEN_GOODIX)	+= goodix.o
+>  obj-$(CONFIG_TOUCHSCREEN_ILI210X)	+= ili210x.o
+> +obj-$(CONFIG_TOUCHSCREEN_ILI2139)	+= ili2139.o
+>  obj-$(CONFIG_TOUCHSCREEN_IMX6UL_TSC)	+= imx6ul_tsc.o
+>  obj-$(CONFIG_TOUCHSCREEN_INEXIO)	+= inexio.o
+>  obj-$(CONFIG_TOUCHSCREEN_INTEL_MID)	+= intel-mid-touch.o
+> diff --git a/drivers/input/touchscreen/ili2139.c b/drivers/input/touchscreen/ili2139.c
+> new file mode 100644
+> index 0000000..65c2dea
+> --- /dev/null
+> +++ b/drivers/input/touchscreen/ili2139.c
+> @@ -0,0 +1,320 @@
+> +/* -------------------------------------------------------------------------
+> + * Copyright (C) 2016, Icenowy Zheng <icenowy@aosc.xyz>
+> + *
+> + * Derived from:
+> + *  ili210x.c
+> + *  Copyright (C) Olivier Sobrie <olivier@sobrie.be>
+> + *
+> + *  This program is free software; you can redistribute it and/or modify
+> + *  it under the terms of the GNU General Public License as published by
+> + *  the Free Software Foundation; either version 2 of the License, or
+> + *  (at your option) any later version.
+> + *
+> + *  This program is distributed in the hope that it will be useful,
+> + *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *  GNU General Public License for more details.
+> + * -------------------------------------------------------------------------
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/i2c.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/slab.h>
+> +#include <linux/input.h>
+> +#include <linux/input/mt.h>
+> +#include <linux/input/touchscreen.h>
+> +#include <linux/delay.h>
+> +#include <linux/workqueue.h>
+> +
+> +#define DEFAULT_POLL_PERIOD	20
+> +
+> +#define MAX_TOUCHES		10
+> +#define COMPATIBLE_TOUCHES	2
+> +
+> +/* Touchscreen commands */
+> +#define REG_TOUCHDATA		0x10
+> +#define REG_TOUCHSUBDATA	0x11
+> +#define REG_PANEL_INFO		0x20
+> +#define REG_FIRMWARE_VERSION	0x40
+> +#define REG_PROTO_VERSION	0x42
+> +
+> +#define SUBDATA_STATUS_TOUCH_POINT	0x80
+> +#define SUBDATA_STATUS_RELEASE_POINT	0x00
+> +
+> +struct finger {
+> +	u8 x_low;
+> +	u8 x_high;
+> +	u8 y_low;
+> +	u8 y_high;
+> +} __packed;
+> +
+> +struct touchdata {
+> +	u8 length;
+> +	struct finger finger[COMPATIBLE_TOUCHES];
+> +} __packed;
+> +
+> +struct touch_subdata {
+> +	u8 status;
+> +	struct finger finger;
+> +} __packed;
+> +
+> +struct panel_info {
+> +	struct finger finger_max;
+> +	u8 xchannel_num;
+> +	u8 ychannel_num;
+> +} __packed;
+> +
+> +struct firmware_version {
+> +	u8 id;
+> +	u8 major;
+> +	u8 minor;
+> +} __packed;
+> +
+> +struct ili2139 {
+> +	struct i2c_client *client;
+> +	struct input_dev *input;
+> +	unsigned int poll_period;
+> +	struct delayed_work dwork;
+> +	struct touchscreen_properties prop;
+> +	int slots[MAX_TOUCHES];
+> +	int ids[MAX_TOUCHES];
+> +	struct input_mt_pos pos[MAX_TOUCHES];
+> +};
+> +
+> +static int ili2139_read_reg(struct i2c_client *client, u8 reg, void *buf,
+> +			    size_t len)
 > +{
-> +	return acpi_hest_generic_data_version(gdata) >= 3 ?
-> +		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
-> +		gdata + 1;
-> +}
+> +	struct i2c_msg msg[2] = {
+> +		{
+> +			.addr	= client->addr,
+> +			.flags	= 0,
+> +			.len	= 1,
+> +			.buf	= &reg,
+> +		},
+> +		{
+> +			.addr	= client->addr,
+> +			.flags	= I2C_M_RD,
+> +			.len	= len,
+> +			.buf	= buf,
+> +		}
+> +	};
 > +
-
-
-
-> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-> index d425374..9fa1317 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-
-   
-> +#define acpi_hest_generic_data_version(gdata)		\
-> +	(gdata->revision >> 8)
-> +
-
-...
-
-> +static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data *gdata)
-> +{
-> +	return acpi_hest_generic_data_version(gdata) >= 3 ?
-> +		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
-> +		gdata + 1;
-> +}
-
-Could these go to a header file, so that we don't need duplicate definitions of these helpers in
-different files ?
-
-> +
-> +static void cper_estatus_print_section_v300(const char *pfx,
-> +	const struct acpi_hest_generic_data_v300 *gdata)
-> +{
-> +	__u8 hour, min, sec, day, mon, year, century, *timestamp;
-> +
-> +	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
-> +		timestamp = (__u8 *)&(gdata->time_stamp);
-> +		memcpy(&sec, timestamp, 1);
-> +		memcpy(&min, timestamp + 1, 1);
-> +		memcpy(&hour, timestamp + 2, 1);
-> +		memcpy(&day, timestamp + 4, 1);
-> +		memcpy(&mon, timestamp + 5, 1);
-> +		memcpy(&year, timestamp + 6, 1);
-> +		memcpy(&century, timestamp + 7, 1);
-> +		printk("%stime: ", pfx);
-> +		printk("%7s", 0x01 & *(timestamp + 3) ? "precise" : "");
-
-What format is the (timestamp + 3) stored in ? Does it need conversion ?
-
-> +		printk(" %02d:%02d:%02d %02d%02d-%02d-%02d\n",
-> +			bcd2bin(hour), bcd2bin(min), bcd2bin(sec),
-> +			bcd2bin(century), bcd2bin(year), bcd2bin(mon),
-> +			bcd2bin(day));
+> +	if (i2c_transfer(client->adapter, msg, 2) != 2) {
+> +		dev_err(&client->dev, "i2c transfer failed\n");
+> +		return -EIO;
 > +	}
-
-minor nit: Would it be easier to order/parse the error messages if the date
-is printed first followed by time ?
-
-i.e,
-	17:20:14 2016-09-15 Mon
-		vs
-	2016-09-15 Mon 17:20:14
-
-e.g, people looking at a huge log, looking for logs from a specific date might
-find the latter more useful to skip the messages.
-
+> +
+> +	return 0;
 > +}
 > +
->  static void cper_estatus_print_section(
-> -	const char *pfx, const struct acpi_hest_generic_data *gdata, int sec_no)
-> +	const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
->  {
->  	uuid_le *sec_type = (uuid_le *)gdata->section_type;
->  	__u16 severity;
->  	char newpfx[64];
->
-> +	if ((gdata->revision >> 8) >= 0x03)
-
-Could we use the helper defined above ?
-
-> @@ -451,12 +497,22 @@ void cper_estatus_print(const char *pfx,
->  	printk("%s""event severity: %s\n", pfx, cper_severity_str(severity));
->  	data_len = estatus->data_length;
->  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
-> +	if ((gdata->revision >> 8) >= 0x03)
-
-Same as above, use the macro ?
-
-> +		gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
+> +static void ili2139_work(struct work_struct *work)
+> +{
+> +	int id;
+> +	struct ili2139 *priv = container_of(work, struct ili2139,
+> +					    dwork.work);
+> +	struct i2c_client *client = priv->client;
+> +	struct touchdata touchdata;
+> +	struct touch_subdata subdata;
+> +	int error;
 > +
->  	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+> +	error = ili2139_read_reg(client, REG_TOUCHDATA,
+> +				 &touchdata, sizeof(touchdata));
+> +	if (error) {
+> +		dev_err(&client->dev,
+> +			"Unable to get touchdata, err = %d\n", error);
+> +		return;
+> +	}
 > +
->  	while (data_len >= sizeof(*gdata)) {
->  		gedata_len = gdata->error_data_length;
->  		cper_estatus_print_section(newpfx, gdata, sec_no);
-> -		data_len -= gedata_len + sizeof(*gdata);
-> -		gdata = (void *)(gdata + 1) + gedata_len;
-> +		if(gdata_v3) {
-> +			data_len -= gedata_len + sizeof(*gdata_v3);
-> +			gdata_v3 = (void *)(gdata_v3 + 1) + gedata_len;
-> +			gdata = (struct acpi_hest_generic_data *)gdata_v3;
-> +		} else {
-> +			data_len -= gedata_len + sizeof(*gdata);
-> +			gdata = (void *)(gdata + 1) + gedata_len;
+> +	for (id = 0; id < touchdata.length; id++) {
+> +		error = ili2139_read_reg(client, REG_TOUCHSUBDATA, &subdata,
+> +					 sizeof(subdata));
+> +		if (error) {
+> +			dev_err(&client->dev,
+> +				"Unable to get touch subdata, err = %d\n",
+> +				error);
+> +			return;
 > +		}
->  		sec_no++;
->  	}
-
-...
-
->
-> @@ -486,15 +543,29 @@ int cper_estatus_check(const struct acpi_hest_generic_status *estatus)
->  		return rc;
->  	data_len = estatus->data_length;
->  	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
-> -	while (data_len >= sizeof(*gdata)) {
-> -		gedata_len = gdata->error_data_length;
-> -		if (gedata_len > data_len - sizeof(*gdata))
 > +
-> +	if ((gdata->revision >> 8) >= 0x03) {
-> +		gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
-> +		while (data_len >= sizeof(*gdata_v3)) {
-> +			gedata_len = gdata_v3->error_data_length;
-> +			if (gedata_len > data_len - sizeof(*gdata_v3))
-> +				return -EINVAL;
-> +			data_len -= gedata_len + sizeof(*gdata_v3);
-> +			gdata_v3 = (void *)(gdata_v3 + 1) + gedata_len;
-> +		}
-> +		if (data_len)
-> +			return -EINVAL;
-> +	} else {
-> +		while (data_len >= sizeof(*gdata)) {
-> +			gedata_len = gdata->error_data_length;
-> +			if (gedata_len > data_len - sizeof(*gdata))
-> +				return -EINVAL;
-> +			data_len -= gedata_len + sizeof(*gdata);
-> +			gdata = (void *)(gdata + 1) + gedata_len;
-> +		}
-> +		if (data_len)
+> +		priv->ids[id] = subdata.status & 0x3F;
+> +
+> +		/* The sequence changed in the v2 subdata protocol. */
+> +		touchscreen_set_mt_pos(&priv->pos[id], &priv->prop,
+> +			(subdata.finger.x_high | (subdata.finger.x_low << 8)),
+> +			(subdata.finger.y_high | (subdata.finger.y_low << 8)));
+> +	}
+> +
+> +	input_mt_assign_slots(priv->input, priv->slots, priv->pos,
+> +			      touchdata.length, 0);
+> +
+> +	for (id = 0; id < touchdata.length; id++) {
+> +		input_mt_slot(priv->input, priv->slots[id]);
+> +		input_mt_report_slot_state(priv->input, MT_TOOL_FINGER,
+> +					   subdata.status &
+> +					   SUBDATA_STATUS_TOUCH_POINT);
+> +		input_report_abs(priv->input, ABS_MT_POSITION_X,
+> +				 priv->pos[id].x);
+> +		input_report_abs(priv->input, ABS_MT_POSITION_Y,
+> +				 priv->pos[id].y);
+> +	}
+> +
+> +	input_mt_sync_frame(priv->input);
+> +	input_sync(priv->input);
+> +
+> +	schedule_delayed_work(&priv->dwork,
+> +			      msecs_to_jiffies(priv->poll_period));
+> +}
+> +
+> +static irqreturn_t ili2139_irq(int irq, void *irq_data)
+> +{
+> +	struct ili2139 *priv = irq_data;
+> +
+> +	schedule_delayed_work(&priv->dwork, 0);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int ili2139_i2c_probe(struct i2c_client *client,
+> +				       const struct i2c_device_id *id)
+> +{
+> +	struct device *dev = &client->dev;
+> +	struct ili2139 *priv;
+> +	struct input_dev *input;
+> +	struct panel_info panel;
+> +	struct firmware_version firmware;
+> +	int xmax, ymax;
+> +	int error;
+> +
+> +	dev_dbg(dev, "Probing for ILI2139 I2C Touschreen driver");
+> +
+> +	if (client->irq <= 0) {
+> +		dev_err(dev, "No IRQ!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	/* Get firmware version */
+> +	error = ili2139_read_reg(client, REG_FIRMWARE_VERSION,
+> +				 &firmware, sizeof(firmware));
+> +	if (error) {
+> +		dev_err(dev, "Failed to get firmware version, err: %d\n",
+> +			error);
+> +		return error;
+> +	}
+> +
+> +	/* get panel info */
+> +	error = ili2139_read_reg(client, REG_PANEL_INFO, &panel, sizeof(panel));
+> +	if (error) {
+> +		dev_err(dev, "Failed to get panel information, err: %d\n",
+> +			error);
+> +		return error;
+> +	}
+> +
+> +	xmax = panel.finger_max.x_low | (panel.finger_max.x_high << 8);
+> +	ymax = panel.finger_max.y_low | (panel.finger_max.y_high << 8);
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	input = devm_input_allocate_device(dev);
+> +	if (!priv || !input)
+> +		return -ENOMEM;
+> +
+> +	priv->client = client;
+> +	priv->input = input;
+> +	priv->poll_period = DEFAULT_POLL_PERIOD;
+> +	INIT_DELAYED_WORK(&priv->dwork, ili2139_work);
+> +
+> +	/* Setup input device */
+> +	input->name = "ILI2139 Touchscreen";
+> +	input->id.bustype = BUS_I2C;
+> +	input->dev.parent = dev;
+> +
+> +	__set_bit(EV_SYN, input->evbit);
+> +	__set_bit(EV_KEY, input->evbit);
+> +	__set_bit(EV_ABS, input->evbit);
+> +
+> +	/* Multi touch */
+> +	input_mt_init_slots(input, MAX_TOUCHES, INPUT_MT_DIRECT |
+> +			    INPUT_MT_DROP_UNUSED | INPUT_MT_TRACK);
+> +	input_set_abs_params(input, ABS_MT_POSITION_X, 0, xmax, 0, 0);
+> +	input_set_abs_params(input, ABS_MT_POSITION_Y, 0, ymax, 0, 0);
+> +
+> +	touchscreen_parse_properties(input, true, &priv->prop);
+> +
+> +	input_set_drvdata(input, priv);
+> +	i2c_set_clientdata(client, priv);
+> +
+> +	error = devm_request_irq(dev, client->irq, ili2139_irq,
+> +				 IRQF_TRIGGER_FALLING, client->name, priv);
+> +	if (error) {
+> +		dev_err(dev, "Unable to request touchscreen IRQ, err: %d\n",
+> +			error);
+> +		return error;
+> +	}
+> +
+> +	error = input_register_device(priv->input);
+> +	if (error) {
+> +		dev_err(dev, "Cannot register input device, err: %d\n", error);
+> +		return error;
+> +	}
+> +
+> +	device_init_wakeup(&client->dev, 1);
+> +
+> +	dev_dbg(dev,
+> +		"ILI2139 initialized (IRQ: %d), firmware version %d.%d.%d",
+> +		client->irq, firmware.id, firmware.major, firmware.minor);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ili2139_i2c_remove(struct i2c_client *client)
+> +{
+> +	struct ili2139 *priv = i2c_get_clientdata(client);
+> +
+> +	cancel_delayed_work_sync(&priv->dwork);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused ili2139_i2c_suspend(struct device *dev)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +
+> +	if (device_may_wakeup(&client->dev))
+> +		enable_irq_wake(client->irq);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused ili2139_i2c_resume(struct device *dev)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +
+> +	if (device_may_wakeup(&client->dev))
+> +		disable_irq_wake(client->irq);
+> +
+> +	return 0;
+> +}
+> +
+> +static SIMPLE_DEV_PM_OPS(ili2139_i2c_pm,
+> +			 ili2139_i2c_suspend, ili2139_i2c_resume);
+> +
+> +static const struct i2c_device_id ili2139_i2c_id[] = {
+> +	{ "ili2139", 0 },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(i2c, ili2139_i2c_id);
+> +
+> +static struct i2c_driver ili2139_ts_driver = {
+> +	.driver = {
+> +		.name = "ili2139_i2c",
+> +		.pm = &ili2139_i2c_pm,
+> +	},
+> +	.id_table = ili2139_i2c_id,
+> +	.probe = ili2139_i2c_probe,
+> +	.remove = ili2139_i2c_remove,
+> +};
+> +
+> +module_i2c_driver(ili2139_ts_driver);
+> +
+> +MODULE_AUTHOR("Olivier Sobrie <olivier@sobrie.be>");
+> +MODULE_DESCRIPTION("ILI2139 I2C Touchscreen Driver");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 2.10.1
+> 
 
-As mentioned in the previous version, would it make sense to add some more
-helpers to deal with record versions ? We seem to be doing the version switch and
-code duplication at different places.
-
-Does the following help ? Thoughts ?
-
-#define acpi_hest_generic_data_error_length(gdata) (((struct acpi_hest_generic_data *)(gdata))->error_data_length)
-#define acpi_hest_generic_data_size(gdata) \
-	((acpi_hest_generic_data_version(gdata) >= 3) ? \
-	 sizeof(struct acpi_hest_generic_data_v300) :	\
-	 sizeof(struct acpi_hest_generic_data))
-#define acpi_hest_generic_data_record_size(gdata)
-	(acpi_hest_generic_data_size(gdata) + \
-	 acpi_hest_generic_data_error_length(gdata))
-#define acpi_hest_generic_data_next(gdata) \
-	((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
-
-
-Suzuki
+-- 
+Dmitry
