@@ -1,40 +1,85 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Tue, 11 Oct 2016 12:20:41 +0200
-Subject: [PATCH 0/2] arm64 kexec-tools fixups
-In-Reply-To: <cover.1476134309.git.geoff@infradead.org>
-References: <cover.1476134309.git.geoff@infradead.org>
-Message-ID: <ebe32436-6069-06c5-702f-d435d0dacd48@suse.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 11 Oct 2016 12:23:55 +0200
+Subject: [RESEND PATCH v6, 4/5] usb: Add MediaTek USB3 DRD Driver
+In-Reply-To: <1476155663.15546.32.camel@mhfsdcap03>
+References: <1474437277-27201-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1474437277-27201-5-git-send-email-chunfeng.yun@mediatek.com>
+ <49293f1b-42b5-f06b-8fdc-f46fe996e237@gmail.com>
+ <1476155663.15546.32.camel@mhfsdcap03>
+Message-ID: <48357a7f-deee-b114-ccd4-914fd5fa400f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 10/10/2016 11:22 PM, Geoff Levand wrote:
-> Hi Simon,
+On 10/11/2016 05:14 AM, Chunfeng Yun wrote:
+> On Mon, 2016-10-10 at 13:00 +0200, Matthias Brugger wrote:
+>>
+>> On 09/21/2016 07:54 AM, Chunfeng Yun wrote:
+>>> This patch adds support for the MediaTek USB3 controller
+>>> integrated into MT8173. It can be configured as Dual-Role
+>>> Device (DRD), Peripheral Only and Host Only (xHCI) modes.
+>>>
+>>> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+>>> ---
+>>>  drivers/usb/Kconfig                |    2 +
+>>>  drivers/usb/Makefile               |    1 +
+>>>  drivers/usb/mtu3/Kconfig           |   54 +++
+>>>  drivers/usb/mtu3/Makefile          |   19 +
+>>>  drivers/usb/mtu3/mtu3.h            |  422 +++++++++++++++++
+>>>  drivers/usb/mtu3/mtu3_core.c       |  871 +++++++++++++++++++++++++++++++++++
+>>>  drivers/usb/mtu3/mtu3_dr.c         |  379 ++++++++++++++++
+>>>  drivers/usb/mtu3/mtu3_dr.h         |  108 +++++
+>>>  drivers/usb/mtu3/mtu3_gadget.c     |  731 +++++++++++++++++++++++++++++
+>>>  drivers/usb/mtu3/mtu3_gadget_ep0.c |  883 ++++++++++++++++++++++++++++++++++++
+>>>  drivers/usb/mtu3/mtu3_host.c       |  294 ++++++++++++
+>>>  drivers/usb/mtu3/mtu3_hw_regs.h    |  473 +++++++++++++++++++
+>>>  drivers/usb/mtu3/mtu3_plat.c       |  490 ++++++++++++++++++++
+>>>  drivers/usb/mtu3/mtu3_qmu.c        |  599 ++++++++++++++++++++++++
+>>>  drivers/usb/mtu3/mtu3_qmu.h        |   43 ++
+>>>  15 files changed, 5369 insertions(+)
+>>>  create mode 100644 drivers/usb/mtu3/Kconfig
+>>>  create mode 100644 drivers/usb/mtu3/Makefile
+>>>  create mode 100644 drivers/usb/mtu3/mtu3.h
+>>>  create mode 100644 drivers/usb/mtu3/mtu3_core.c
+>>>  create mode 100644 drivers/usb/mtu3/mtu3_dr.c
+>>>  create mode 100644 drivers/usb/mtu3/mtu3_dr.h
+>>>  create mode 100644 drivers/usb/mtu3/mtu3_gadget.c
+>>>  create mode 100644 drivers/usb/mtu3/mtu3_gadget_ep0.c
+>>>  create mode 100644 drivers/usb/mtu3/mtu3_host.c
+>>>  create mode 100644 drivers/usb/mtu3/mtu3_hw_regs.h
+>>>  create mode 100644 drivers/usb/mtu3/mtu3_plat.c
+>>>  create mode 100644 drivers/usb/mtu3/mtu3_qmu.c
+>>>  create mode 100644 drivers/usb/mtu3/mtu3_qmu.h
+>>>
+>>
+>> As Oliver already said, this patch is quiet big which makes it difficult
+>> to review.
+>> I propose to provide a first implementation with minimal functionality
+>> and incremental patches on top of this when the first got merged.
+>>
+>> You could split the patch in three series/parts:
+>> 1. Host only
+>> 2. Peripheral only
+>> 3. Dual mode
+>>
+>> What do you think?
 >
-> Fixes for 'make tarball'.  Please apply.
->
-> -Geoff
->
-> The following changes since commit 6e8804f9ca67bee65aedd5e1cdf504737ab5c7ed:
->
->   multiboot: Use the "reserved" type for non-ram zones (2016-10-07 11:54:44 +0900)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git for-merge-arm64-dist
->
-> for you to fetch changes up to 3552a3e85a910688d932535549b35354a54927ad:
->
->   arm64: Add missing kexec dist files (2016-10-10 14:15:21 -0700)
->
-> ----------------------------------------------------------------
-> Geoff Levand (2):
->       arm64: Cleanup kexec Makefile
->       arm64: Add missing kexec dist files
->
->  kexec/arch/arm64/Makefile | 15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
->
+> Ok, I'll split the patch into some small ones as many as possible.
 
-Reviewed-by: Matthias Brugger <mbrugger@suse.com>
+There is no direct policy how to do that and it depends a bit on every 
+maintainer what he prefers. As a rule of thumb each commit should 
+compile on it's own without errors. This makes bisecting the kernel much 
+easier.
+
+Regards,
+Matthias
+
+>
+> Thanks a lot
+>>
+>> Regards,
+>> Matthias
+>>
+>
+>
