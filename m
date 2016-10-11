@@ -1,114 +1,61 @@
-From: ken.lin@advantech.com (Ken.Lin)
-Date: Tue, 11 Oct 2016 10:49:33 -0700
-Subject: The possible regression in kernel 4.8 - clk: imx: correct AV
- PLL rate formula
-In-Reply-To: <WM!8b5ef465717800ac4466674b98bb32450dc231d955cd4979ca96fd54828a7c3af7de5f376015ebf046c75f20677161c6!@dgg.advantech.com>
-References: <03B5A3CA1724CE4EAC32B27E39292A677FC5A390AE@AUSMAIL1.AUS.ADVANTECH.CORP>
- <WM!ea1806249edeb2cf70790bb7482fb813b9b7cef636576d9ca4b01897c8831c3650f71356a13ce9ba5e358a69b86f6a82!@dg.advantech.com>
- <CAOMZO5CXTEpNvAhuc2Et60HxfM=nQngMTdMOtDbazi=1EQ95Jw@mail.gmail.com>
- <WM!8b5ef465717800ac4466674b98bb32450dc231d955cd4979ca96fd54828a7c3af7de5f376015ebf046c75f20677161c6!@dgg.advantech.com>
- <03B5A3CA1724CE4EAC32B27E39292A677FC5A39613@AUSMAIL1.AUS.ADVANTECH.CORP>
-Message-ID: <WM!8ae38b052eee9a42a4712d13aee34e2d793055d4125e98cc2c03451811f33168b3556d3bf52ee5ba8dda879cea808cdc!@dg.advantech.com>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Tue, 11 Oct 2016 14:53:33 -0300
+Subject: [PATCH] ARM: imx: gpc: Initialize all power domains
+Message-ID: <1476208413-11286-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+When booting a kernel built with multi_v7_defconfig the following
+probe error is seen:
 
+imx-gpc: probe of 20dc000.gpc failed with error -22
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Thursday, October 6, 2016 4:38 PM
-> To: Ken.Lin
-> Cc: shawnguo at kernel.org; kernel at pengutronix.de; sboyd at codeaurora.org;
-> mturquette at baylibre.com; linux-arm-kernel at lists.infradead.org; linux-
-> clk at vger.kernel.org; linux-kernel at vger.kernel.org; Peter.Stretz; Peter.Chiang;
-> Akshay Bhat; Jason Moss; emil at limesaudio.com
-> Subject: Re: The possible regression in kernel 4.8 - clk: imx: correct AV PLL rate
-> formula
-> 
-> Hi Ken,
-> 
-> On Thu, Oct 6, 2016 at 8:26 PM, Ken.Lin <ken.lin@advantech.com> wrote:
-> > Hi,
-> >
-> > We found a possible regression issue (not seen in kernel 4.7-stable), which has
-> to do with the new NXP commit ba7f4f557eb67ee21c979c8539dc1886f5d5341c
-> when we did a DP test (1920x1080 at 60) with clock source PLL5.
-> > The DP desired pixel clock (148.5MHz that is calculated from the input of PLL
-> output frequency) would be correct again when we reverted this commit.
-> > Could you please help check if the commit has the side effect since it would
-> have impacts on our on-going project when it requires moving from kernel 4.7
-> to kernel 4.8 or newer version?
-> >
-> > Please check the following URL for the details
-> > https://www.dropbox.com/s/7wc5jdp8unlsiob/possible_regression_for_clk_
-> > imx_correct_VL_PLL_rate_formula.pdf?dl=0
-> 
-> Do these patches from Emil fix the issue?
-> 
-> http://www.spinics.net/lists/arm-kernel/msg535204.html
-> 
-> and
-> 
-> http://www.spinics.net/lists/arm-kernel/msg535203.html
-> 
-> Thanks
+Later on the kernel crashes like this:
 
+[    1.723358] Unable to handle kernel NULL pointer dereference at virtual address 00000040
+[    1.731500] pgd = c0204000
+[    1.731863] hctosys: unable to open rtc device (rtc0)
+[    1.739301] [00000040] *pgd=00000000
+[    1.739310] Internal error: Oops: 5 [#1] SMP ARM
+[    1.739319] Modules linked in:
+[    1.739328] CPU: 1 PID: 95 Comm: kworker/1:4 Not tainted 4.8.0-11897-g6b5e09a #1
+[    1.739331] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+[    1.739352] Workqueue: pm genpd_power_off_work_fn
+[    1.739356] task: ee63d400 task.stack: ee70a000
+[    1.739365] PC is at mutex_lock+0xc/0x4c
+[    1.739374] LR is at regulator_disable+0x2c/0x60
+[    1.739379] pc : [<c0bc0da0>]    lr : [<c06e4b10>]    psr: 60000013
+[    1.739379] sp : ee70beb0  ip : 10624dd3  fp : ee6e6280
+[    1.739382] r10: eefb0900  r9 : 00000000  r8 : c1309918
+[    1.739385] r7 : 00000000  r6 : 00000040  r5 : 00000000  r4 : 00000040
+[    1.739390] r3 : 0000004c  r2 : 7fffd540  r1 : 000001e4  r0 : 00000040
 
-With the patches applied, the pixel clock (148500000 required for 1920x1080 at 60) is correct as we checked in kernel 4.7 and the actual measurement result looked good as we expected.
-I think the patches should fix the issue.
+The gpc probe fails because of_genpd_add_provider_onecell() checks
+if all the domains are initialized via pm_genpd_present() function
+and it returns an error on the multi_v7_defconfig case.
 
-Ref: /sys/kernel/debug/clk/clk_summary 
+In order to fix this error, initialize all the imx_gpc_domains, not
+only the imx6q_pu_domain.base one.
 
-    pll5                                  1            1  1039500000          0 0
-       pll5_bypass                        1            1  1039500000          0 0
-          pll5_video                      1            1  1039500000          0 0
-             pll5_post_div                1            1   519750000          0 0
-                pll5_video_div            2            2   519750000          0 0
-                   ipu2_di1_pre_sel           0            0   519750000          0 0
-                      ipu2_di1_pre           0            0   173250000          0 0
-                         ipu2_di1_sel           0            0   173250000          0 0
-                            ipu2_di1           0            0   173250000          0 0
-                   ipu2_di0_pre_sel           0            0   519750000          0 0
-                      ipu2_di0_pre           0            0   173250000          0 0
-                   ldb_di1_sel            1            1   519750000          0 0
-                      ldb_di1_div_3_5           1            1   148500000          0 0
-                         ldb_di1_podf           1            1   148500000          0 0
-                            ldb_di1           2            2   148500000          0 0
-                               ipu2_di0_sel           1            1   148500000          0 0
-                                  ipu2_di0           1            1   148500000          0 0
-                   ldb_di0_sel            1            1   519750000          0 0
-                      ldb_di0_div_3_5           1            1   148500000          0 0
-                         ldb_di0_podf           1            1   148500000          0 0
-                            ldb_di0           1            1   148500000          0 0
+Reported-by: Olof's autobooter <build@lixom.net>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/mach-imx/gpc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-
-Ref: kernel debug messages
-
-[  113.848959] imx-ipuv3-crtc imx-ipuv3-crtc.6: ipu_crtc_mode_set_nofb: mode->hdisplay: 1920
-[  113.857201] imx-ipuv3-crtc imx-ipuv3-crtc.6: ipu_crtc_mode_set_nofb: mode->vdisplay: 1080
-[  113.865421] imx-ipuv3-crtc imx-ipuv3-crtc.6: ipu_crtc_mode_set_nofb: attached to encoder types 0x8
-[  113.874483] imx-ipuv3 2800000.ipu: disp 0: panel size = 1920 x 1080
-[  113.880803] imx-ipuv3 2800000.ipu: Clocks: IPU 264000000Hz DI 75833334Hz Needed 148500000Hz
-[  113.889252] imx-ipuv3 2800000.ipu: Want 148500000Hz IPU 264000000Hz DI 75833334Hz using DI, 75833334Hz
-[  113.898768] imx-ldb 2000000.aips-bus:ldb at 020e0008: imx_ldb_set_clock: now: 227500000 want: 519750000
-[  113.908018] imx-ldb 2000000.aips-bus:ldb at 020e0008: imx_ldb_set_clock after: 519750000
-[  113.915886] imx-ldb 2000000.aips-bus:ldb at 020e0008: imx_ldb_set_clock: now: 148500000 want: 148500000
-[  113.925050] imx-ldb 2000000.aips-bus:ldb at 020e0008: imx_ldb_set_clock after: 148500000
-[  113.932928] imx-ldb 2000000.aips-bus:ldb at 020e0008: imx_ldb_set_clock: now: 519750000 want: 519750000
-[  113.942096] imx-ldb 2000000.aips-bus:ldb at 020e0008: imx_ldb_set_clock after: 519750000
-[  113.949938] imx-ldb 2000000.aips-bus:ldb at 020e0008: imx_ldb_set_clock: now: 148500000 want: 148500000
-[  113.959104] imx-ldb 2000000.aips-bus:ldb at 020e0008: imx_ldb_set_clock after: 148500000
-
-> 
-> --
-> This message has been scanned for viruses and dangerous content by
-> MailScanner, and is believed to be clean.
-
-Thank you
-
-
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 0df062d..d0463e9 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -430,7 +430,8 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
+ 	if (!IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
+ 		return 0;
+ 
+-	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
++	for (i = 0; i < ARRAY_SIZE(imx_gpc_domains); i++)
++		pm_genpd_init(imx_gpc_domains[i], NULL, false);
+ 	return of_genpd_add_provider_onecell(dev->of_node,
+ 					     &imx_gpc_onecell_data);
+ 
 -- 
-This message has been scanned for viruses and
-dangerous content by MailScanner, and is
-believed to be clean.
+2.7.4
