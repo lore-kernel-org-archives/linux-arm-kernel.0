@@ -1,34 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Oct 2016 12:01:56 +0100
-Subject: [PATCH 0/6] crypto: arm64 - big endian fixes
-In-Reply-To: <20161011021247.GA10976@gondor.apana.org.au>
-References: <1476034945-9186-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9Nj5ccpRpgqg9Ohif4=k5+dAVuP8tKtNEj9_z7BQ_jjQ@mail.gmail.com>
- <20161011021247.GA10976@gondor.apana.org.au>
-Message-ID: <CAKv+Gu-sxi7LXt=W9gCZUVDT8RXk8T0oqFk9m-n0WKidFoHXkA@mail.gmail.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Tue, 11 Oct 2016 19:04:24 +0800
+Subject: [PATCH v8 10/16] mm/memblock: add a new function
+ memblock_alloc_near_nid
+In-Reply-To: <20161011101623.GC23648@arm.com>
+References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
+ <1472712907-12700-11-git-send-email-thunder.leizhen@huawei.com>
+ <57FC43F4.1020909@huawei.com> <20161011101623.GC23648@arm.com>
+Message-ID: <57FCC738.7050005@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 October 2016 at 03:12, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Mon, Oct 10, 2016 at 12:26:00PM +0100, Ard Biesheuvel wrote:
->>
->> /* This piece of crap needs to disappear into per-type test hooks. */
->> if (!((type ^ CRYPTO_ALG_TYPE_BLKCIPHER) &
->>      CRYPTO_ALG_TYPE_BLKCIPHER_MASK) && !(type & CRYPTO_ALG_GENIV) &&
->>    ((alg->cra_flags & CRYPTO_ALG_TYPE_MASK) ==
->>     CRYPTO_ALG_TYPE_BLKCIPHER ? alg->cra_blkcipher.ivsize :
->> alg->cra_ablkcipher.ivsize))
->> type |= CRYPTO_ALG_TESTED;
->>
->> This causes cbc(aes), ctr(aes) and xts(aes) to remain untested, unless
->> I add CRYPTO_ALG_GENIV to their cra_flags. Is this expected behavior?
->> What would be your recommended way to ensure these algos are covered
->> by the boottime tests?
->
-> This is a leftover from the old blkcipher/ablkcipher interface.
-> I've got a patch pending which will remove this if clause.
->
 
+
+On 2016/10/11 18:16, Will Deacon wrote:
+> On Tue, Oct 11, 2016 at 09:44:20AM +0800, Leizhen (ThunderTown) wrote:
+>> On 2016/9/1 14:55, Zhen Lei wrote:
+>>> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
+>>> actually exist. The percpu variable areas and numa control blocks of that
+>>> memoryless numa nodes must be allocated from the nearest available node
+>>> to improve performance.
+>>>
+>>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>>> ---
+>>>  include/linux/memblock.h |  1 +
+>>>  mm/memblock.c            | 28 ++++++++++++++++++++++++++++
+>>>  2 files changed, 29 insertions(+)
+>>
+>> Hi Will,
+>>   It seems no one take care about this, how about I move below function into arch/arm64/mm/numa.c
+>> again? So that, merge it and patch 11 into one.
+> 
+> I'd rather you reposted it after the merge window so we can see what to
+> do with it then. The previous posting was really hard to figure out and
+> mixed lots of different concepts into one series, so it's not completely
+> surprising that it didn't all get picked up.
 OK, thanks.
 
-So I will follow up with a v2 of this series with two additional fixes.
+> 
+> Will
+> 
+> .
+> 
