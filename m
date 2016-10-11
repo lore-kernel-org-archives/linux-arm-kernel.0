@@ -1,101 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Oct 2016 13:39:49 +0100
-Subject: [PATCH v2 3/3] arm64: mm: set the contiguous bit for kernel mappings
- where appropriate
-In-Reply-To: <1476189589-1443-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1476189589-1443-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1476189589-1443-4-git-send-email-ard.biesheuvel@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Oct 2016 13:41:18 +0100
+Subject: [PATCH] arm64: mmu: set the contiguous for kernel mappings when
+ appropriate
+In-Reply-To: <CAKv+Gu9W69rP5o09t+d498nVE666Show1VK-Sm9LmchjeUsD_A@mail.gmail.com>
+References: <1476123164-10532-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161011074419.GA20213@remoulade>
+ <CAPvkgC1p5yZLtENYMi6zd5-pPDOYUtMw0Lxvb592u975gc+Zvg@mail.gmail.com>
+ <CAKv+Gu-e6HT2YNvXJV2AbAzLrEeV6OvM6-hfTsCH0oXqH8zbKQ@mail.gmail.com>
+ <CAKv+Gu9W69rP5o09t+d498nVE666Show1VK-Sm9LmchjeUsD_A@mail.gmail.com>
+Message-ID: <20161011124118.GB9532@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we no longer allow live kernel PMDs to be split, it is safe to
-start using the contiguous bit for kernel mappings. So set the contiguous
-bit in the kernel page mappings for regions whose size and alignment are
-suitable for this. This includes contiguous level 2 mappings for 16k
-granule kernels.
+On Tue, Oct 11, 2016 at 12:17:54PM +0100, Ard Biesheuvel wrote:
+> On 11 October 2016 at 10:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 11 October 2016 at 09:48, Steve Capper <steve.capper@linaro.org> wrote:
+> >> So in arch/arm64/include/asm/pgtable-hwdef.h, we have:
+> >> CONT_PTE_SHIFT
+> >> CONT_PMD_SHIFT
+> >> CONT_PTES
+> >> CONT_PMDS
+> >> CONT_PTE_SIZE
+> >> CONT_PTE_MASK
+> >> ...
+> >>
+> >> which are used by the contiguous hint HugeTLB code.
+> >> Can those be adopted instead of CONT_MASK and CONT_SIZE?
+> >>
+> 
+> Looking at the hugetlb code, it appears to support contiguous PMDs for
+> 4k and 64k pages as well, while the ARM ARM only defines it for 16k
+> pages. I suppose the contiguous bit is simply ignored for level 2
+> entries when using 4k or 64k pages kernels, but I think it would be
+> better for the code to reflect this as well.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/mm/mmu.c | 35 +++++++++++++++++---
- 1 file changed, 31 insertions(+), 4 deletions(-)
+Which bit in the ARM ARM says that you can't support contiguous PMDs for 4k
+and 64k pages? I see that the number of contiguous entries changes between
+levels for 16k pages, but that's it.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index ee3cda6c41a7..c2bf7396888b 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -102,8 +102,10 @@ static const pteval_t modifiable_attr_mask = PTE_PXN | PTE_RDONLY | PTE_WRITE;
- static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  pgprot_t prot,
--				  phys_addr_t (*pgtable_alloc)(void))
-+				  phys_addr_t (*pgtable_alloc)(void),
-+				  bool page_mappings_only)
- {
-+	pgprot_t __prot = prot;
- 	pte_t *pte;
- 
- 	BUG_ON(pmd_sect(*pmd));
-@@ -121,7 +123,18 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	do {
- 		pte_t old_pte = *pte;
- 
--		set_pte(pte, pfn_pte(pfn, prot));
-+		/*
-+		 * Set the contiguous bit for the subsequent group of PTEs if
-+		 * its size and alignment are suitable.
-+		 */
-+		if (((addr | PFN_PHYS(pfn)) & ~CONT_PTE_MASK) == 0) {
-+			if (!page_mappings_only && end - addr >= CONT_PTE_SIZE)
-+				__prot = __pgprot(pgprot_val(prot) | PTE_CONT);
-+			else
-+				__prot = prot;
-+		}
-+
-+		set_pte(pte, pfn_pte(pfn, __prot));
- 		pfn++;
- 
- 		/*
-@@ -141,6 +154,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 				  phys_addr_t (*pgtable_alloc)(void),
- 				  bool page_mappings_only)
- {
-+	pgprot_t __prot = prot;
- 	pmd_t *pmd;
- 	unsigned long next;
- 
-@@ -164,10 +178,22 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 
- 		next = pmd_addr_end(addr, end);
- 
-+		/*
-+		 * For 16K granule only, attempt to put down a 1 GB block by
-+		 * stringing 32 PMD block mappings together.
-+		 */
-+		if (IS_ENABLED(CONFIG_ARM64_16K_PAGES) &&
-+		    ((addr | phys) & ~CONT_PMD_MASK) == 0) {
-+			if (!page_mappings_only && end - addr >= CONT_PMD_SIZE)
-+				__prot = __pgprot(pgprot_val(prot) | PTE_CONT);
-+			else
-+				__prot = prot;
-+		}
-+
- 		/* try section mapping first */
- 		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
- 		      !page_mappings_only) {
--			pmd_set_huge(pmd, phys, prot);
-+			pmd_set_huge(pmd, phys, __prot);
- 
- 			/*
- 			 * After the PMD entry has been populated once, we
-@@ -178,7 +204,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 				~modifiable_attr_mask) != 0);
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
--				       prot, pgtable_alloc);
-+				       prot, pgtable_alloc,
-+				       page_mappings_only);
- 
- 			BUG_ON(!pmd_none(old_pmd) &&
- 			       pmd_val(old_pmd) != pmd_val(*pmd));
--- 
-2.7.4
+Will
