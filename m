@@ -1,55 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Oct 2016 10:09:31 +0100
-Subject: [PATCH] arm64: mmu: set the contiguous for kernel mappings when
- appropriate
-In-Reply-To: <CAPvkgC1p5yZLtENYMi6zd5-pPDOYUtMw0Lxvb592u975gc+Zvg@mail.gmail.com>
-References: <1476123164-10532-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161011074419.GA20213@remoulade>
- <CAPvkgC1p5yZLtENYMi6zd5-pPDOYUtMw0Lxvb592u975gc+Zvg@mail.gmail.com>
-Message-ID: <CAKv+Gu-e6HT2YNvXJV2AbAzLrEeV6OvM6-hfTsCH0oXqH8zbKQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 11 Oct 2016 17:16:21 +0800
+Subject: [PATCH 2/9] drm/sun4i: tcon: Move SoC specific quirks to a DT
+ matched data structure
+In-Reply-To: <20161007083853.GH4684@lukather>
+References: <20161006160629.11198-1-wens@csie.org>
+ <20161006160629.11198-3-wens@csie.org>
+ <20161007083853.GH4684@lukather>
+Message-ID: <CAGb2v67vZLCtUOaqBwtAnHmCMpoxmh3pxjtD5TL2nWp3Lm-Pzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 October 2016 at 09:48, Steve Capper <steve.capper@linaro.org> wrote:
->
->
-> On 11 October 2016 at 08:44, Mark Rutland <mark.rutland@arm.com> wrote:
->>
->> Hi Ard,
->>
->> On Mon, Oct 10, 2016 at 07:12:44PM +0100, Ard Biesheuvel wrote:
->> > Now that we no longer allow live kernel PMDs to be split, it is safe to
->> > start using the contiguous bit for kernel mappings. So set the
->> > contiguous
->> > bit in the kernel page mappings for regions whose size and alignment are
->> > suitable for this.
->> >
->> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> Given the splitting is now gone, using the contiguous bit makes sense to
->> me.
->>
->> With 16K pages, we can have contiguous PMD entries. Should we handle
->> those,
->> too? e.g. have separate {PMD,PTE}_CONT{,_SIZE}?
->>
->> Otherwise, I have some comments below.
->
->
+On Fri, Oct 7, 2016 at 4:38 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 > Hi,
 >
-> So in arch/arm64/include/asm/pgtable-hwdef.h, we have:
-> CONT_PTE_SHIFT
-> CONT_PMD_SHIFT
-> CONT_PTES
-> CONT_PMDS
-> CONT_PTE_SIZE
-> CONT_PTE_MASK
-> ...
+> On Fri, Oct 07, 2016 at 12:06:22AM +0800, Chen-Yu Tsai wrote:
+>> +struct sun4i_tcon_quirks {
+>> +     bool    is_sun5i;       /* sun5i has undocumented mux */
+>> +     bool    has_channel_1;  /* a33 does not have channel 1 */
+>> +     bool    has_bypass_src; /* has separate input bypassing CEU */
+>> +     bool    has_dma_src;    /* has DMA input */
+>> +};
+>> +
 >
-> which are used by the contiguous hint HugeTLB code.
-> Can those be adopted instead of CONT_MASK and CONT_SIZE?
->
+> I'd really prefer to keep the has_mux quirk name. is_sun5i doesn't
+> really relate to what we're doing there, is redundant with the
+> compatible, and render the other quirks name useless, since we could
+> just have is_sun.i quirks and deal with that (which is essentially
+> what we were doing before).
 
-That seems more appropriate, yes. I wonder why we have CONT_MASK and
-CONT_SIZE in the first place then.
+Lets call it has_unknown_mux then. has_mux would be confusing with
+the HDMI and MIPI DSI muxes on sun6i.
+
+ChenYu
