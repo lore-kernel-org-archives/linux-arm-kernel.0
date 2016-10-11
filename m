@@ -1,47 +1,40 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Oct 2016 19:15:19 +0100
-Subject: [PATCH v2 7/8] crypto: arm64/aes-xts-ce: fix for big endian
+Date: Tue, 11 Oct 2016 19:15:20 +0100
+Subject: [PATCH v2 8/8] crypto: arm/aes-ce - fix for big endian
 In-Reply-To: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1476209720-21114-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1476209720-21114-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emit the XTS tweak literal constants in the appropriate order for a
-single 128-bit scalar literal load.
+The AES key schedule generation is mostly endian agnostic, with the
+exception of the rotation and the incorporation of the round constant
+at the start of each round. So implement a big endian specific version
+of that part to make the whole routine big endian compatible.
 
-Fixes: 49788fe2a128 ("arm64/crypto: AES-ECB/CBC/CTR/XTS using ARMv8 NEON and Crypto Extensions")
+Fixes: 86464859cc77 ("crypto: arm - AES in ECB/CBC/CTR/XTS modes using ARMv8 Crypto Extensions")
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/aes-ce.S    | 1 +
- arch/arm64/crypto/aes-modes.S | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/crypto/aes-ce-glue.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/crypto/aes-ce.S b/arch/arm64/crypto/aes-ce.S
-index 78f3cfe92c08..b46093d567e5 100644
---- a/arch/arm64/crypto/aes-ce.S
-+++ b/arch/arm64/crypto/aes-ce.S
-@@ -10,6 +10,7 @@
-  */
+diff --git a/arch/arm/crypto/aes-ce-glue.c b/arch/arm/crypto/aes-ce-glue.c
+index aef022a87c53..04410d9f5e72 100644
+--- a/arch/arm/crypto/aes-ce-glue.c
++++ b/arch/arm/crypto/aes-ce-glue.c
+@@ -88,8 +88,13 @@ static int ce_aes_expandkey(struct crypto_aes_ctx *ctx, const u8 *in_key,
+ 		u32 *rki = ctx->key_enc + (i * kwords);
+ 		u32 *rko = rki + kwords;
  
- #include <linux/linkage.h>
-+#include <asm/assembler.h>
- 
- #define AES_ENTRY(func)		ENTRY(ce_ ## func)
- #define AES_ENDPROC(func)	ENDPROC(ce_ ## func)
-diff --git a/arch/arm64/crypto/aes-modes.S b/arch/arm64/crypto/aes-modes.S
-index f6e372c528eb..c53dbeae79f2 100644
---- a/arch/arm64/crypto/aes-modes.S
-+++ b/arch/arm64/crypto/aes-modes.S
-@@ -386,7 +386,8 @@ AES_ENDPROC(aes_ctr_encrypt)
- 	.endm
- 
- .Lxts_mul_x:
--	.word		1, 0, 0x87, 0
-+CPU_LE(	.quad		1, 0x87		)
-+CPU_BE(	.quad		0x87, 1		)
- 
- AES_ENTRY(aes_xts_encrypt)
- 	FRAME_PUSH
++#ifndef CONFIG_CPU_BIG_ENDIAN
+ 		rko[0] = ror32(ce_aes_sub(rki[kwords - 1]), 8);
+ 		rko[0] = rko[0] ^ rki[0] ^ rcon[i];
++#else
++		rko[0] = rol32(ce_aes_sub(rki[kwords - 1]), 8);
++		rko[0] = rko[0] ^ rki[0] ^ (rcon[i] << 24);
++#endif
+ 		rko[1] = rko[0] ^ rki[1];
+ 		rko[2] = rko[1] ^ rki[2];
+ 		rko[3] = rko[2] ^ rki[3];
 -- 
 2.7.4
