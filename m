@@ -1,56 +1,96 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 11 Oct 2016 09:05:05 +0200
-Subject: [PATCH 15/19] reset: sti: Remove STiH415/6 reset support
-In-Reply-To: <1474963347.2494.8.camel@pengutronix.de>
-References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
- <1473859677-9231-16-git-send-email-peter.griffin@linaro.org>
- <1474963347.2494.8.camel@pengutronix.de>
-Message-ID: <b9a50ba1-9932-0d71-6b61-efccee587d74@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 11 Oct 2016 08:44:19 +0100
+Subject: [PATCH] arm64: mmu: set the contiguous for kernel mappings when
+ appropriate
+In-Reply-To: <1476123164-10532-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1476123164-10532-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161011074419.GA20213@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp
+Hi Ard,
 
-On 09/27/2016 10:02 AM, Philipp Zabel wrote:
-> Hi Peter,
+On Mon, Oct 10, 2016 at 07:12:44PM +0100, Ard Biesheuvel wrote:
+> Now that we no longer allow live kernel PMDs to be split, it is safe to
+> start using the contiguous bit for kernel mappings. So set the contiguous
+> bit in the kernel page mappings for regions whose size and alignment are
+> suitable for this.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Given the splitting is now gone, using the contiguous bit makes sense to me.
+
+With 16K pages, we can have contiguous PMD entries. Should we handle those,
+too? e.g. have separate {PMD,PTE}_CONT{,_SIZE}?
+
+Otherwise, I have some comments below.
+
+> ---
+>  arch/arm64/mm/mmu.c | 23 ++++++++++++++++++++---
+>  1 file changed, 20 insertions(+), 3 deletions(-)
 > 
-> Am Mittwoch, den 14.09.2016, 14:27 +0100 schrieb Peter Griffin:
->> Support for STiH415/6 SoCs is being removed from the
->> kernel because the platforms are obsolete. This patch removes
->> the reset drivers for these SoC's.
->>
->> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->> Cc: <p.zabel@pengutronix.de>
->> ---
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 05615a3fdc6f..c491025c6a70 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -98,8 +98,11 @@ static phys_addr_t __init early_pgtable_alloc(void)
+>  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>  				  unsigned long end, unsigned long pfn,
+>  				  pgprot_t prot,
+> -				  phys_addr_t (*pgtable_alloc)(void))
+> +				  phys_addr_t (*pgtable_alloc)(void),
+> +				  bool allow_block_mappings)
 
-[...]
+Not a big deal, but the 'block' part here and elsewhere is now arguably
+misleading (given 'block' is an architectural term).
 
->> -	.driver = {
->> -		.name = "reset-stih416",
->> -		.of_match_table = stih416_reset_match,
->> -	},
->> -};
->> -
->> -static int __init stih416_reset_init(void)
->> -{
->> -	return platform_driver_register(&stih416_reset_driver);
->> -}
->> -arch_initcall(stih416_reset_init);
-> 
-> Can I pick up patches 15 and 19, or are there dependencies in the
-> series?
+I haven't come up with a better term, so again, not a big deal. ;)
 
-Yes, you can pick up patches 15 and 19
+>  {
+> +	pgprot_t prot_cont = __pgprot(pgprot_val(prot) | PTE_CONT);
+> +	bool cont = false;
+>  	pte_t *pte;
+>  
+>  	BUG_ON(pmd_sect(*pmd));
+> @@ -115,7 +118,20 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>  
+>  	pte = pte_set_fixmap_offset(pmd, addr);
+>  	do {
+> -		set_pte(pte, pfn_pte(pfn, prot));
+> +		/*
+> +		 * Set the contiguous bit for the subsequent group of PTEs if
+> +		 * its size and alignment are suitable.
+> +		 */
+> +		if (((addr | PFN_PHYS(pfn)) & ~CONT_MASK) == 0)
+> +			cont = allow_block_mappings && end - addr >= CONT_SIZE;
 
-> In the latter case,
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-> to merge both together with the other patches. Currently there is no
-> conflict with changes queued from the reset tree.
-> 
-> regards
-> Philipp
-> 
+Given we increment addr by PAGE_SIZE in the loop, isn't this only true for the
+first CONT_SIZE aligned entry, and not its (intended-to-be-contiguous)
+siblings?
 
-Thanks
+It be better to loop over CONT_SIZE increments, and then within that, pass the
+prot (with the contiguous bit set as required) to a loop with a PAGE_SIZE
+increment.
 
-Patrice
+Or have I misunderstood something?
+
+> +
+> +		/*
+> +		 * Ensure that we do not change the contiguous bit once this
+> +		 * PTE has been assigned.
+> +		 */
+> +		BUG_ON(!pte_none(*pte) && (cont ^ !!(pte_val(*pte) & PTE_CONT)));
+
+IIRC, we only ever intended to mess with the AP bits when remapping an existing region.
+
+So we could mask those out and ensure everything else is identical, rather than
+checking the cont bit specifically. Likewise at the {PMD,PUD,PGD} level.
+
+> +
+> +		set_pte(pte, pfn_pte(pfn, cont ? prot_cont : prot));
+
+It would be clearer if we just assigned to a local pte_prot variable when
+checking allow_block_mappings and so on above (or split the loop as above).
+
+Thanks,
+Mark.
