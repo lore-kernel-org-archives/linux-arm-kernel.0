@@ -1,34 +1,33 @@
 From: scott.branden@broadcom.com (Scott Branden)
-Date: Tue, 11 Oct 2016 15:33:28 -0700
-Subject: [PATCH] arm64: defconfig: enable EEPROM_AT25 config option
-In-Reply-To: <1503155.onL8VV3RJv@wuerfel>
-References: <1475875432-13627-1-git-send-email-scott.branden@broadcom.com>
- <a61b2b9d-356f-f24b-914b-0fb0e2bcdcc6@gmail.com> <1503155.onL8VV3RJv@wuerfel>
-Message-ID: <c282ed21-d286-a85c-8d37-d54d30d1d7db@broadcom.com>
+Date: Tue, 11 Oct 2016 15:38:06 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable Intel e1000e driver
+In-Reply-To: <8265935.TobkRj9BnG@wuerfel>
+References: <1475959264-16582-1-git-send-email-scott.branden@broadcom.com>
+ <8265935.TobkRj9BnG@wuerfel>
+Message-ID: <464e62ad-476e-5a2b-cdb4-c4e7f7f34e7d@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-On 16-10-10 02:20 AM, Arnd Bergmann wrote:
-> On Monday, October 10, 2016 2:08:05 AM CEST Florian Fainelli wrote:
->> On 10/07/2016 02:23 PM, Scott Branden wrote:
->>> Enable support for on board SPI EEPROM by turning on
->>> CONFIG_EEPROM_AT25.
->>>
->>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+On 16-10-10 12:47 AM, Arnd Bergmann wrote:
+> On Saturday, October 8, 2016 1:41:04 PM CEST Scott Branden wrote:
+>> Enable support for the Intel e1000e driver
 >>
->> Looks fine to me, unless this needs to be a module, Arnd, what do you think?
+>> Signed-off-by: Ray Jui <rjui@broadcom.com>
+>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+>>
 >
-> Please either make it a module or explain in the patch description
-> why it should be built-in.
-
+> Can we make this a loadable module and group it with the other
+> ethernet drivers?
+>
 We use a fixed rootfs image to test the kernel.  For simplicity we don't 
 construct a rootfs or load any modules.  We just test the kernel image. 
 So for us every defconfig we use needs to be set to y to use the 
 upstreamed kernel.
 
->
+Plus, how do you NFS mount a rootfs if the ethernet driver is a loadable 
+module?
 > 	Arnd
 >
 
