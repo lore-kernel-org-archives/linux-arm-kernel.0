@@ -1,101 +1,44 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Oct 2016 19:15:13 +0100
-Subject: [PATCH v2 1/8] crypto: arm64/aes-ce - fix for big endian
+Date: Tue, 11 Oct 2016 19:15:14 +0100
+Subject: [PATCH v2 2/8] crypto: arm64/ghash-ce - fix for big endian
 In-Reply-To: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1476209720-21114-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1476209720-21114-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core AES cipher implementation that uses ARMv8 Crypto Extensions
-instructions erroneously loads the round keys as 64-bit quantities,
-which causes the algorithm to fail when built for big endian. In
-addition, the key schedule generation routine fails to take endianness
-into account as well, when loading the combining the input key with
-the round constants. So fix both issues.
+The GHASH key and digest are both pairs of 64-bit quantities, but the
+GHASH code does not always refer to them as such, causing failures when
+built for big endian. So replace the 16x1 loads and stores with 2x8 ones.
 
-Fixes: 12ac3efe74f8 ("arm64/crypto: use crypto instructions to generate AES key schedule")
+Fixes: b913a6404ce2 ("arm64/crypto: improve performance of GHASH algorithm")
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/aes-ce-cipher.c | 25 ++++++++++++--------
- 1 file changed, 15 insertions(+), 10 deletions(-)
+ arch/arm64/crypto/ghash-ce-core.S | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/crypto/aes-ce-cipher.c b/arch/arm64/crypto/aes-ce-cipher.c
-index f7bd9bf0bbb3..50d9fe11d0c8 100644
---- a/arch/arm64/crypto/aes-ce-cipher.c
-+++ b/arch/arm64/crypto/aes-ce-cipher.c
-@@ -47,24 +47,24 @@ static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
- 	kernel_neon_begin_partial(4);
+diff --git a/arch/arm64/crypto/ghash-ce-core.S b/arch/arm64/crypto/ghash-ce-core.S
+index dc457015884e..f0bb9f0b524f 100644
+--- a/arch/arm64/crypto/ghash-ce-core.S
++++ b/arch/arm64/crypto/ghash-ce-core.S
+@@ -29,8 +29,8 @@
+ 	 *			   struct ghash_key const *k, const char *head)
+ 	 */
+ ENTRY(pmull_ghash_update)
+-	ld1		{SHASH.16b}, [x3]
+-	ld1		{XL.16b}, [x1]
++	ld1		{SHASH.2d}, [x3]
++	ld1		{XL.2d}, [x1]
+ 	movi		MASK.16b, #0xe1
+ 	ext		SHASH2.16b, SHASH.16b, SHASH.16b, #8
+ 	shl		MASK.2d, MASK.2d, #57
+@@ -74,6 +74,6 @@ CPU_LE(	rev64		T1.16b, T1.16b	)
  
- 	__asm__("	ld1	{v0.16b}, %[in]			;"
--		"	ld1	{v1.2d}, [%[key]], #16		;"
-+		"	ld1	{v1.16b}, [%[key]], #16		;"
- 		"	cmp	%w[rounds], #10			;"
- 		"	bmi	0f				;"
- 		"	bne	3f				;"
- 		"	mov	v3.16b, v1.16b			;"
- 		"	b	2f				;"
- 		"0:	mov	v2.16b, v1.16b			;"
--		"	ld1	{v3.2d}, [%[key]], #16		;"
-+		"	ld1	{v3.16b}, [%[key]], #16		;"
- 		"1:	aese	v0.16b, v2.16b			;"
- 		"	aesmc	v0.16b, v0.16b			;"
--		"2:	ld1	{v1.2d}, [%[key]], #16		;"
-+		"2:	ld1	{v1.16b}, [%[key]], #16		;"
- 		"	aese	v0.16b, v3.16b			;"
- 		"	aesmc	v0.16b, v0.16b			;"
--		"3:	ld1	{v2.2d}, [%[key]], #16		;"
-+		"3:	ld1	{v2.16b}, [%[key]], #16		;"
- 		"	subs	%w[rounds], %w[rounds], #3	;"
- 		"	aese	v0.16b, v1.16b			;"
- 		"	aesmc	v0.16b, v0.16b			;"
--		"	ld1	{v3.2d}, [%[key]], #16		;"
-+		"	ld1	{v3.16b}, [%[key]], #16		;"
- 		"	bpl	1b				;"
- 		"	aese	v0.16b, v2.16b			;"
- 		"	eor	v0.16b, v0.16b, v3.16b		;"
-@@ -92,24 +92,24 @@ static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
- 	kernel_neon_begin_partial(4);
+ 	cbnz		w0, 0b
  
- 	__asm__("	ld1	{v0.16b}, %[in]			;"
--		"	ld1	{v1.2d}, [%[key]], #16		;"
-+		"	ld1	{v1.16b}, [%[key]], #16		;"
- 		"	cmp	%w[rounds], #10			;"
- 		"	bmi	0f				;"
- 		"	bne	3f				;"
- 		"	mov	v3.16b, v1.16b			;"
- 		"	b	2f				;"
- 		"0:	mov	v2.16b, v1.16b			;"
--		"	ld1	{v3.2d}, [%[key]], #16		;"
-+		"	ld1	{v3.16b}, [%[key]], #16		;"
- 		"1:	aesd	v0.16b, v2.16b			;"
- 		"	aesimc	v0.16b, v0.16b			;"
--		"2:	ld1	{v1.2d}, [%[key]], #16		;"
-+		"2:	ld1	{v1.16b}, [%[key]], #16		;"
- 		"	aesd	v0.16b, v3.16b			;"
- 		"	aesimc	v0.16b, v0.16b			;"
--		"3:	ld1	{v2.2d}, [%[key]], #16		;"
-+		"3:	ld1	{v2.16b}, [%[key]], #16		;"
- 		"	subs	%w[rounds], %w[rounds], #3	;"
- 		"	aesd	v0.16b, v1.16b			;"
- 		"	aesimc	v0.16b, v0.16b			;"
--		"	ld1	{v3.2d}, [%[key]], #16		;"
-+		"	ld1	{v3.16b}, [%[key]], #16		;"
- 		"	bpl	1b				;"
- 		"	aesd	v0.16b, v2.16b			;"
- 		"	eor	v0.16b, v0.16b, v3.16b		;"
-@@ -173,7 +173,12 @@ int ce_aes_expandkey(struct crypto_aes_ctx *ctx, const u8 *in_key,
- 		u32 *rki = ctx->key_enc + (i * kwords);
- 		u32 *rko = rki + kwords;
- 
-+#ifndef CONFIG_CPU_BIG_ENDIAN
- 		rko[0] = ror32(aes_sub(rki[kwords - 1]), 8) ^ rcon[i] ^ rki[0];
-+#else
-+		rko[0] = rol32(aes_sub(rki[kwords - 1]), 8) ^ (rcon[i] << 24) ^
-+			 rki[0];
-+#endif
- 		rko[1] = rko[0] ^ rki[1];
- 		rko[2] = rko[1] ^ rki[2];
- 		rko[3] = rko[2] ^ rki[3];
+-	st1		{XL.16b}, [x1]
++	st1		{XL.2d}, [x1]
+ 	ret
+ ENDPROC(pmull_ghash_update)
 -- 
 2.7.4
