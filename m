@@ -1,39 +1,59 @@
-From: otavio.salvador@ossystems.com.br (Otavio Salvador)
-Date: Tue, 11 Oct 2016 15:34:52 -0300
-Subject: The possible regression in kernel 4.8 - clk: imx: correct AV PLL
- rate formula
-In-Reply-To: <CAOMZO5CVggufx2U0pZUXd1o=i36Jo-c1B=hgFcSaWeM+=oagaQ@mail.gmail.com>
-References: <03B5A3CA1724CE4EAC32B27E39292A677FC5A390AE@AUSMAIL1.AUS.ADVANTECH.CORP>
- <WM!ea1806249edeb2cf70790bb7482fb813b9b7cef636576d9ca4b01897c8831c3650f71356a13ce9ba5e358a69b86f6a82!@dg.advantech.com>
- <CAOMZO5CXTEpNvAhuc2Et60HxfM=nQngMTdMOtDbazi=1EQ95Jw@mail.gmail.com>
- <03B5A3CA1724CE4EAC32B27E39292A677FC5A39613@AUSMAIL1.AUS.ADVANTECH.CORP>
- <WM!8b5ef465717800ac4466674b98bb32450dc231d955cd4979ca96fd54828a7c3af7de5f376015ebf046c75f20677161c6!@dgg.advantech.com>
- <WM!8ae38b052eee9a42a4712d13aee34e2d793055d4125e98cc2c03451811f33168b3556d3bf52ee5ba8dda879cea808cdc!@dg.advantech.com>
- <CAOMZO5CVggufx2U0pZUXd1o=i36Jo-c1B=hgFcSaWeM+=oagaQ@mail.gmail.com>
-Message-ID: <CAP9ODKoyhkTA2=MR44LJ24OYTJaWrtg9vT=14vnYNnuuSDRe1A@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 11 Oct 2016 11:51:14 -0700
+Subject: [PATCH 3/5] Input: add driver for Ilitek ili2139 touch IC
+In-Reply-To: <220181476210841@web5j.yandex.ru>
+References: <20161011003359.26079-1-icenowy@aosc.xyz>
+ <20161011003359.26079-3-icenowy@aosc.xyz>
+ <20161011174046.GA27925@dtor-ws> <220181476210841@web5j.yandex.ru>
+Message-ID: <20161011185114.GB8841@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2016 at 3:00 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Ken,
->
-> On Tue, Oct 11, 2016 at 2:49 PM, Ken.Lin <ken.lin@advantech.com> wrote:
->
->> With the patches applied, the pixel clock (148500000 required for 1920x1080 at 60) is correct as we checked in kernel 4.7 and the actual measurement result looked good as we expected.
->> I think the patches should fix the issue.
->
-> That's good news. Thanks for testing.
->
-> Emil is working on a v3 version of the patch series.
->
-> Emil,
->
-> Please add Ken Lin on Cc when you submit v3.
+On Wed, Oct 12, 2016 at 02:34:01AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 12.10.2016, 01:40, "Dmitry Torokhov" <dmitry.torokhov@gmail.com>:
+> > Hi Icenowy,
+> >
+> > On Tue, Oct 11, 2016 at 08:33:57AM +0800, Icenowy Zheng wrote:
+> >> ?This driver adds support for Ilitek ili2139 touch IC, which is used in
+> >> ?several Colorfly tablets (for example, Colorfly E708 Q1, which is an
+> >> ?Allwinner A31s tablet with mainline kernel support).
+> >>
+> >> ?Theortically it may support more Ilitek touch ICs, however, only ili2139
+> >> ?is used in any mainlined device.
+> >>
+> >> ?It supports device tree enumeration, with screen resolution and axis
+> >> ?quirks configurable.
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >
+> > Please extend ili210x.c instead of adding brand new driver, they look
+> > very similar.
+> >
+> > Thanks.
+> 
+> The driver is too old, lack of maintaince and needs some platform data hacks.
+> (At least makes it not capable to be used on current ARM devices, as they're
+> described with device tree)
 
-And what will be done regarding 4.8? Is the faulty change to be
-reverted or this patches will be backported?
+There are many drivers that can do both platform and dt-setup.
+
+> 
+> Maybe I will rename the new driver modified by me to ili210x, add support for
+> the old protocol (but I have no chips to test it), and drop the old ili210x.
+> (This driver is capable of dt probing, and uses devm_ functions)
+
+You can add "racy on removal" to the list (you need to take care your
+work is canceled at right times, and canceling it before interrupt is
+freed is not the right time as interrupt might fire and the work get
+scheduled again). Also I think your driver is essentially working in
+polling mode because you always reschedule the delayed work.
+
+No, like I said, please work with existing driver, adding DT support and
+support for the newer version of the protocol.
+
+Thanks.
 
 -- 
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://code.ossystems.com.br
-Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
+Dmitry
