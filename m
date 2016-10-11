@@ -1,133 +1,83 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 11 Oct 2016 15:39:17 +0300
-Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
- Xenon SDHC
-In-Reply-To: <e08ffb085d02a784b28456ac47fa4dc6540a9139.1475853198.git-series.gregory.clement@free-electrons.com>
-References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
- <e08ffb085d02a784b28456ac47fa4dc6540a9139.1475853198.git-series.gregory.clement@free-electrons.com>
-Message-ID: <bfe30317-bb3b-b3dc-e9df-87b6ba100307@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 11 Oct 2016 14:50:19 +0200
+Subject: [PATCH v3 9/9] arm64: dts: add Pine64 support
+In-Reply-To: <7483f6ea-3b59-46ca-fb31-f26af6ec8423@arm.com>
+References: <20161003080913.24197-1-maxime.ripard@free-electrons.com>
+ <20161003080913.24197-10-maxime.ripard@free-electrons.com>
+ <7483f6ea-3b59-46ca-fb31-f26af6ec8423@arm.com>
+Message-ID: <20161011125019.GY3462@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/16 18:22, Gregory CLEMENT wrote:
-> From: Ziji Hu <huziji@marvell.com>
+On Mon, Oct 03, 2016 at 11:24:24AM +0100, Andre Przywara wrote:
+> Hi Maxime,
 > 
-> Marvell Xenon eMMC/SD/SDIO Host Controller contains PHY.
-> Three types of PHYs are supported.
+> thanks for the respin!
 > 
-> Add support to multiple types of PHYs init and configuration.
-> Add register definitions of PHYs.
+> On 03/10/16 09:09, Maxime Ripard wrote:
+> > From: Andre Przywara <andre.przywara@arm.com>
+> > 
+> > The Pine64 is a cost-efficient development board based on the
+> > Allwinner A64 SoC.
+> > There are three models: the basic version with Fast Ethernet and
+> > 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
+> > feature Gigabit Ethernet and additional connectors for touchscreens
+> > and a camera. Or as my son put it: "Those are smaller and these are
+> > missing." ;-)
+> > The two Pine64+ models just differ in the amount of DRAM
+> > (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
+> > patches the DT accordingly we just need to provide one DT for the
+> > Pine64+.
+> > 
+> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > [Maxime: Removed the common DTSI and include directly the pine64 DTS]
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm64/boot/dts/Makefile                       |  1 +
+> >  arch/arm64/boot/dts/allwinner/Makefile             |  5 ++
+> >  .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  | 50 +++++++++++
+> >  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 74 +++++++++++++++++
+> >  include/dt-bindings/reset/sun50i-a64-ccu.h         | 97 +++++++++++-----------
 > 
-> Signed-off-by: Hu Ziji <huziji@marvell.com>
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  MAINTAINERS                        |    1 +-
->  drivers/mmc/host/Makefile          |    2 +-
->  drivers/mmc/host/sdhci-xenon-phy.c | 1141 +++++++++++++++++++++++++++++-
->  drivers/mmc/host/sdhci-xenon-phy.h |  157 ++++-
->  drivers/mmc/host/sdhci-xenon.c     |    4 +-
->  drivers/mmc/host/sdhci-xenon.h     |   17 +-
->  6 files changed, 1321 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.c
->  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.h
+> Shouldn't the changes in this file be merged into patch 6/9?
+
+Oops, yeah, of course.
+
+> > diff --git a/include/dt-bindings/reset/sun50i-a64-ccu.h b/include/dt-bindings/reset/sun50i-a64-ccu.h
+> > index e61fac294d73..db60b29ddb11 100644
+> > --- a/include/dt-bindings/reset/sun50i-a64-ccu.h
+> > +++ b/include/dt-bindings/reset/sun50i-a64-ccu.h
+> > @@ -46,52 +46,53 @@
+> >  #define RST_USB_PHY0		0
+> >  #define RST_USB_PHY1		1
+> >  #define RST_USB_HSIC		2
+> > -#define RST_MBUS		3
+> ....
+> > +#define RST_DRAM		3
+> > +#define RST_MBUS		4
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 859420e5dfd3..b5673c2ee5f2 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -7583,6 +7583,7 @@ M:	Ziji Hu <huziji@marvell.com>
->  L:	linux-mmc at vger.kernel.org
->  S:	Supported
->  F:	drivers/mmc/host/sdhci-xenon.*
-> +F:	drivers/mmc/host/sdhci-xenon-phy.*
->  F:	Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt
->  
->  MATROX FRAMEBUFFER DRIVER
-> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-> index 75eaf743486c..4f2854556ff7 100644
-> --- a/drivers/mmc/host/Makefile
-> +++ b/drivers/mmc/host/Makefile
-> @@ -82,4 +82,4 @@ ifeq ($(CONFIG_CB710_DEBUG),y)
->  endif
->  
->  obj-$(CONFIG_MMC_SDHCI_XENON)	+= sdhci-xenon-driver.o
-> -sdhci-xenon-driver-y		+= sdhci-xenon.o
-> +sdhci-xenon-driver-y		+= sdhci-xenon.o sdhci-xenon-phy.o
-> diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
-> new file mode 100644
-> index 000000000000..4eb8fea1bec9
-> --- /dev/null
-> +++ b/drivers/mmc/host/sdhci-xenon-phy.c
+> So I take it that this kind of changes will not happen anymore once the
+> DT has been merged?
+> And this numbering is arbitrary and not connected to some hardware
+> bits/register addresses at all?
+> And in case we find some missing bits later we will just queue them at
+> the end?
 
-<SNIP>
+Your constant reminding of that on all the patches is getting
+old. Yes, this is what we agreed on two releases ago. And since
+there's already some very real bugs that can't be fixed because of
+that, there's really nothing to be proud of.
 
-> +static int __xenon_emmc_delay_adj_test(struct mmc_card *card)
-> +{
-> +	int err;
-> +	u8 *ext_csd = NULL;
-> +
-> +	err = mmc_get_ext_csd(card, &ext_csd);
-> +	kfree(ext_csd);
-> +
-> +	return err;
-> +}
-> +
-> +static int __xenon_sdio_delay_adj_test(struct mmc_card *card)
-> +{
-> +	struct mmc_command cmd = {0};
-> +	int err;
-> +
-> +	cmd.opcode = SD_IO_RW_DIRECT;
-> +	cmd.flags = MMC_RSP_R5 | MMC_CMD_AC;
-> +
-> +	err = mmc_wait_for_cmd(card->host, &cmd, 0);
-> +	if (err)
-> +		return err;
-> +
-> +	if (cmd.resp[0] & R5_ERROR)
-> +		return -EIO;
-> +	if (cmd.resp[0] & R5_FUNCTION_NUMBER)
-> +		return -EINVAL;
-> +	if (cmd.resp[0] & R5_OUT_OF_RANGE)
-> +		return -ERANGE;
-> +	return 0;
-> +}
-> +
-> +static int __xenon_sd_delay_adj_test(struct mmc_card *card)
-> +{
-> +	struct mmc_command cmd = {0};
-> +	int err;
-> +
-> +	cmd.opcode = MMC_SEND_STATUS;
-> +	cmd.arg = card->rca << 16;
-> +	cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
-> +
-> +	err = mmc_wait_for_cmd(card->host, &cmd, 0);
-> +	return err;
-> +}
-> +
-> +static int xenon_delay_adj_test(struct mmc_card *card)
-> +{
-> +	WARN_ON(!card);
-> +	WARN_ON(!card->host);
-> +
-> +	if (mmc_card_mmc(card))
-> +		return __xenon_emmc_delay_adj_test(card);
-> +	else if (mmc_card_sd(card))
-> +		return __xenon_sd_delay_adj_test(card);
-> +	else if (mmc_card_sdio(card))
-> +		return __xenon_sdio_delay_adj_test(card);
-> +	else
-> +		return -EINVAL;
-> +}
+Maxime
 
-So you are issuing commands from the ->set_ios() callback.  I would want to
-get Ulf's OK for that before going further.
-
-One thing: you will need to ensure you don't trigger get HS400 re-tuning
-because it will call back into ->set_ios().
-
-And you have the problem that you need to get a reference to the card before
-the card device has been added.  As I wrote in response to the previous
-patch, you should get Ulf's help with that too.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161011/c48fcec8/attachment.sig>
