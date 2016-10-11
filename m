@@ -1,35 +1,54 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 11 Oct 2016 17:16:21 +0800
-Subject: [PATCH 2/9] drm/sun4i: tcon: Move SoC specific quirks to a DT
- matched data structure
-In-Reply-To: <20161007083853.GH4684@lukather>
-References: <20161006160629.11198-1-wens@csie.org>
- <20161006160629.11198-3-wens@csie.org>
- <20161007083853.GH4684@lukather>
-Message-ID: <CAGb2v67vZLCtUOaqBwtAnHmCMpoxmh3pxjtD5TL2nWp3Lm-Pzg@mail.gmail.com>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Tue, 11 Oct 2016 11:17:16 +0200
+Subject: [PATCH 5/6] clk: stm32f469: Add QSPI clock
+In-Reply-To: <20161008205003.GB17455@rob-hp-laptop>
+References: <1475245509-6487-1-git-send-email-gabriel.fernandez@st.com>
+ <1475245509-6487-6-git-send-email-gabriel.fernandez@st.com>
+ <20161008205003.GB17455@rob-hp-laptop>
+Message-ID: <61b117b7-1a30-f433-872a-c9087ba41fc1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 7, 2016 at 4:38 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Fri, Oct 07, 2016 at 12:06:22AM +0800, Chen-Yu Tsai wrote:
->> +struct sun4i_tcon_quirks {
->> +     bool    is_sun5i;       /* sun5i has undocumented mux */
->> +     bool    has_channel_1;  /* a33 does not have channel 1 */
->> +     bool    has_bypass_src; /* has separate input bypassing CEU */
->> +     bool    has_dma_src;    /* has DMA input */
->> +};
->> +
->
-> I'd really prefer to keep the has_mux quirk name. is_sun5i doesn't
-> really relate to what we're doing there, is redundant with the
-> compatible, and render the other quirks name useless, since we could
-> just have is_sun.i quirks and deal with that (which is essentially
-> what we were doing before).
+Hi Rob,
 
-Lets call it has_unknown_mux then. has_mux would be confusing with
-the HDMI and MIPI DSI muxes on sun6i.
+Thanks for reviewing
 
-ChenYu
+On 10/08/2016 10:50 PM, Rob Herring wrote:
+> On Fri, Sep 30, 2016 at 04:25:08PM +0200, gabriel.fernandez at st.com wrote:
+>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>
+>> This patch adds the QSPI clock for stm32f469 discovery board.
+>> The gate mapping is a little bit different from stm32f429 soc.
+>>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>> ---
+>>   .../devicetree/bindings/clock/st,stm32-rcc.txt     |   4 +-
+>>   drivers/clk/clk-stm32f4.c                          | 173 ++++++++++++++++++---
+>>   2 files changed, 158 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
+>> index fee3205..eace3de 100644
+>> --- a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
+>> +++ b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
+>> @@ -8,7 +8,9 @@ Please also refer to clock-bindings.txt in this directory for common clock
+>>   controller binding usage.
+>>   
+>>   Required properties:
+>> -- compatible: Should be "st,stm32f42xx-rcc"
+>> +- compatible: Should be:
+>> +  "st,stm32f42xx-rcc"
+>> +  "st,stm32f46xx-rcc"
+> Generally, we don't use wildcards in compatible strings. I know there's
+> lots of part numbers of stm32 parts which I guess are often same die
+> with different fusing or package. Your compatible strings should be at
+> least specific enough to identify parts that are really different die.
+okay i will propose "st,stm32f469-rcc" if no one is against.
+
+BR
+
+Gabriel
+
+>
+>>   - reg: should be register base and length as documented in the
+>>     datasheet
+>>   - #clock-cells: 2, device nodes should specify the clock in their "clocks"
