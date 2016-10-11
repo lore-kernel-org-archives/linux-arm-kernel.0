@@ -1,43 +1,60 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Tue, 11 Oct 2016 19:04:24 +0800
-Subject: [PATCH v8 10/16] mm/memblock: add a new function
- memblock_alloc_near_nid
-In-Reply-To: <20161011101623.GC23648@arm.com>
-References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
- <1472712907-12700-11-git-send-email-thunder.leizhen@huawei.com>
- <57FC43F4.1020909@huawei.com> <20161011101623.GC23648@arm.com>
-Message-ID: <57FCC738.7050005@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 11 Oct 2016 12:17:54 +0100
+Subject: [PATCH] arm64: mmu: set the contiguous for kernel mappings when
+ appropriate
+In-Reply-To: <CAKv+Gu-e6HT2YNvXJV2AbAzLrEeV6OvM6-hfTsCH0oXqH8zbKQ@mail.gmail.com>
+References: <1476123164-10532-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161011074419.GA20213@remoulade>
+ <CAPvkgC1p5yZLtENYMi6zd5-pPDOYUtMw0Lxvb592u975gc+Zvg@mail.gmail.com>
+ <CAKv+Gu-e6HT2YNvXJV2AbAzLrEeV6OvM6-hfTsCH0oXqH8zbKQ@mail.gmail.com>
+Message-ID: <CAKv+Gu9W69rP5o09t+d498nVE666Show1VK-Sm9LmchjeUsD_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/10/11 18:16, Will Deacon wrote:
-> On Tue, Oct 11, 2016 at 09:44:20AM +0800, Leizhen (ThunderTown) wrote:
->> On 2016/9/1 14:55, Zhen Lei wrote:
->>> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
->>> actually exist. The percpu variable areas and numa control blocks of that
->>> memoryless numa nodes must be allocated from the nearest available node
->>> to improve performance.
->>>
->>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->>> ---
->>>  include/linux/memblock.h |  1 +
->>>  mm/memblock.c            | 28 ++++++++++++++++++++++++++++
->>>  2 files changed, 29 insertions(+)
+On 11 October 2016 at 10:09, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 11 October 2016 at 09:48, Steve Capper <steve.capper@linaro.org> wrote:
 >>
->> Hi Will,
->>   It seems no one take care about this, how about I move below function into arch/arm64/mm/numa.c
->> again? So that, merge it and patch 11 into one.
-> 
-> I'd rather you reposted it after the merge window so we can see what to
-> do with it then. The previous posting was really hard to figure out and
-> mixed lots of different concepts into one series, so it's not completely
-> surprising that it didn't all get picked up.
-OK, thanks.
+>>
+>> On 11 October 2016 at 08:44, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>
+>>> Hi Ard,
+>>>
+>>> On Mon, Oct 10, 2016 at 07:12:44PM +0100, Ard Biesheuvel wrote:
+>>> > Now that we no longer allow live kernel PMDs to be split, it is safe to
+>>> > start using the contiguous bit for kernel mappings. So set the
+>>> > contiguous
+>>> > bit in the kernel page mappings for regions whose size and alignment are
+>>> > suitable for this.
+>>> >
+>>> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>
+>>> Given the splitting is now gone, using the contiguous bit makes sense to
+>>> me.
+>>>
+>>> With 16K pages, we can have contiguous PMD entries. Should we handle
+>>> those,
+>>> too? e.g. have separate {PMD,PTE}_CONT{,_SIZE}?
+>>>
+>>> Otherwise, I have some comments below.
+>>
+>>
+>> Hi,
+>>
+>> So in arch/arm64/include/asm/pgtable-hwdef.h, we have:
+>> CONT_PTE_SHIFT
+>> CONT_PMD_SHIFT
+>> CONT_PTES
+>> CONT_PMDS
+>> CONT_PTE_SIZE
+>> CONT_PTE_MASK
+>> ...
+>>
+>> which are used by the contiguous hint HugeTLB code.
+>> Can those be adopted instead of CONT_MASK and CONT_SIZE?
+>>
 
-> 
-> Will
-> 
-> .
-> 
+Looking at the hugetlb code, it appears to support contiguous PMDs for
+4k and 64k pages as well, while the ARM ARM only defines it for 16k
+pages. I suppose the contiguous bit is simply ignored for level 2
+entries when using 4k or 64k pages kernels, but I think it would be
+better for the code to reflect this as well.
