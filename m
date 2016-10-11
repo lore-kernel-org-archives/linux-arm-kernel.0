@@ -1,88 +1,50 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Tue, 11 Oct 2016 09:44:20 +0800
-Subject: [PATCH v8 10/16] mm/memblock: add a new function
- memblock_alloc_near_nid
-In-Reply-To: <1472712907-12700-11-git-send-email-thunder.leizhen@huawei.com>
-References: <1472712907-12700-1-git-send-email-thunder.leizhen@huawei.com>
- <1472712907-12700-11-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <57FC43F4.1020909@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 11 Oct 2016 10:01:47 +0800
+Subject: [PATCH] clk: hi6220: use CLK_OF_DECLARE_DRIVER for sysctrl and
+ mediactrl clock init
+In-Reply-To: <CALAqxLV5oOsP8ZcKrwzwK6OsZZwTjsvyk18+aWEFpZh17VttnA@mail.gmail.com>
+References: <1475933892-16021-1-git-send-email-shawn.guo@linaro.org>
+ <CALAqxLV5oOsP8ZcKrwzwK6OsZZwTjsvyk18+aWEFpZh17VttnA@mail.gmail.com>
+Message-ID: <20161011020147.GB15400@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi John,
 
+On Mon, Oct 10, 2016 at 10:39:12AM -0700, John Stultz wrote:
+> On Sat, Oct 8, 2016 at 6:38 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > The hi6220-sysctrl and hi6220-mediactrl are not only clock provider but
+> > also reset controller.  It worked fine that single sysctrl/mediactrl
+> > device node in DT can be used to initialize clock driver and populate
+> > platform device for reset controller.  But it stops working after
+> > commit 989eafd0b609 ("clk: core: Avoid double initialization of clocks")
+> > gets merged.  The commit sets flag OF_POPULATED during clock
+> > initialization to skip the platform device populating for the same
+> > device node.  On hi6220, it effectively makes hi6220-sysctrl reset
+> > driver not probe any more.
+> >
+> > The patch changes hi6220 sysctrl and mediactrl clock init macro from
+> > CLK_OF_DECLARE to CLK_OF_DECLARE_DRIVER, so that the reset driver using
+> > the same hardware block can continue working.
+> >
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Tested-by: John Stultz <john.stultz@linaro.org>
+> 
+> I hit this as well last week when 989eafd0b609 ("clk: core: Avoid
+> double initialization of clocks") landed, which killed graphics on my
+> HiKey.
+> 
+> My workaround was a bit hackish, as I don't really know when one
+> should use OF_DECLARE vs OF_DECLARE_DRIVER, but I also converted the
+> hi6220_clk_ao and hi6220_clk_power to the _DRIVER side. Your patch
+> seems to work just as well for me, but I wanted to double check with
+> you that the ao/power clks didn't need the conversion as well.
 
-On 2016/9/1 14:55, Zhen Lei wrote:
-> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
-> actually exist. The percpu variable areas and numa control blocks of that
-> memoryless numa nodes must be allocated from the nearest available node
-> to improve performance.
-> 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  include/linux/memblock.h |  1 +
->  mm/memblock.c            | 28 ++++++++++++++++++++++++++++
->  2 files changed, 29 insertions(+)
+For now, clock driver is the only one matching compatible
+"hisilicon,hi6220-aoctrl" and "hisilicon,hi6220-pmctrl".  Whoever
+adding a platform driver probing the same compatible later will have
+to change it CLK_OF_DECLARE_DRIVER.  Otherwise, the platform driver
+simply doesn't probe.
 
-Hi Will,
-  It seems no one take care about this, how about I move below function into arch/arm64/mm/numa.c
-again? So that, merge it and patch 11 into one.
-
-> 
-> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-> index 2925da2..8e866e0 100644
-> --- a/include/linux/memblock.h
-> +++ b/include/linux/memblock.h
-> @@ -290,6 +290,7 @@ static inline int memblock_get_region_node(const struct memblock_region *r)
-> 
->  phys_addr_t memblock_alloc_nid(phys_addr_t size, phys_addr_t align, int nid);
->  phys_addr_t memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid);
-> +phys_addr_t memblock_alloc_near_nid(phys_addr_t size, phys_addr_t align, int nid);
-> 
->  phys_addr_t memblock_alloc(phys_addr_t size, phys_addr_t align);
-> 
-> diff --git a/mm/memblock.c b/mm/memblock.c
-> index 483197e..6578fff 100644
-> --- a/mm/memblock.c
-> +++ b/mm/memblock.c
-> @@ -1189,6 +1189,34 @@ again:
->  	return ret;
->  }
-> 
-> +phys_addr_t __init memblock_alloc_near_nid(phys_addr_t size, phys_addr_t align, int nid)
-> +{
-> +	int i, best_nid, distance;
-> +	u64 pa;
-> +	DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
-> +
-> +	bitmap_zero(nodes_map, MAX_NUMNODES);
-> +
-> +find_nearest_node:
-> +	best_nid = NUMA_NO_NODE;
-> +	distance = INT_MAX;
-> +
-> +	for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
-> +		if (node_distance(nid, i) < distance) {
-> +			best_nid = i;
-> +			distance = node_distance(nid, i);
-> +		}
-> +
-> +	pa = memblock_alloc_nid(size, align, best_nid);
-> +	if (!pa) {
-> +		BUG_ON(best_nid == NUMA_NO_NODE);
-> +		bitmap_set(nodes_map, best_nid, 1);
-> +		goto find_nearest_node;
-> +	}
-> +
-> +	return pa;
-> +}
-> +
->  phys_addr_t __init __memblock_alloc_base(phys_addr_t size, phys_addr_t align, phys_addr_t max_addr)
->  {
->  	return memblock_alloc_base_nid(size, align, max_addr, NUMA_NO_NODE,
-> --
-> 2.5.0
-> 
-> 
-> 
-> .
-> 
+Shawn
