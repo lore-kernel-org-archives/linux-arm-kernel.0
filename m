@@ -1,258 +1,141 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 11 Oct 2016 17:45:59 +0200
-Subject: [PATCH v2 1/9] pinctrl: sunxi: Rework the pin config building code
-In-Reply-To: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
-References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <709f95f6725453af12bc989ce9039df5aa252ea5.1476200742.git-series.maxime.ripard@free-electrons.com>
+Date: Tue, 11 Oct 2016 17:45:58 +0200
+Subject: [PATCH v2 0/9] pinctrl: sunxi: Generic bindings rework
+Message-ID: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support more easily the generic pinctrl properties, rework the
-pinctrl maps configuration and split it into several sub-functions.
+Hi,
 
-One of the side-effects from that rework is that we only parse the pin
-configuration once, since it's going to be common to every pin, instead of
-having to parsing once for each pin.
+This patch set reworks the Allwinner pinctrl driver to support the generic
+pin configuration and multiplexing bindings.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 178 +++++++++++++++++++--------
- 1 file changed, 130 insertions(+), 48 deletions(-)
+In the process, we also covered some lasting issues that were found: we
+were ignoring the case where no pull-up was set, and while our binding was
+saying that the allwinner,drive and allwinner,pull properties were
+optional, the code was not able to deal with the case where they were not
+present.
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 54455af566ec..64f7f6dcc027 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -146,6 +146,110 @@ static int sunxi_pctrl_get_group_pins(struct pinctrl_dev *pctldev,
- 	return 0;
- }
- 
-+static bool sunxi_pctrl_has_bias_prop(struct device_node *node)
-+{
-+	return of_find_property(node, "allwinner,pull", NULL);
-+}
-+
-+static bool sunxi_pctrl_has_drive_prop(struct device_node *node)
-+{
-+	return of_find_property(node, "allwinner,drive", NULL);
-+}
-+
-+static int sunxi_pctrl_parse_bias_prop(struct device_node *node)
-+{
-+	u32 val;
-+
-+	if (of_property_read_u32(node, "allwinner,pull", &val))
-+		return -EINVAL;
-+
-+	switch (val) {
-+	case 1:
-+		return PIN_CONFIG_BIAS_PULL_UP;
-+	case 2:
-+		return PIN_CONFIG_BIAS_PULL_DOWN;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+static int sunxi_pctrl_parse_drive_prop(struct device_node *node)
-+{
-+	u32 val;
-+
-+	if (of_property_read_u32(node, "allwinner,drive", &val))
-+		return -EINVAL;
-+
-+	return (val + 1) * 10;
-+}
-+
-+static const char *sunxi_pctrl_parse_function_prop(struct device_node *node)
-+{
-+	const char *function;
-+	int ret;
-+
-+	ret = of_property_read_string(node, "allwinner,function", &function);
-+	if (!ret)
-+		return function;
-+
-+	return NULL;
-+}
-+
-+static const char *sunxi_pctrl_find_pins_prop(struct device_node *node,
-+					      int *npins)
-+{
-+	int count;
-+
-+	count = of_property_count_strings(node, "allwinner,pins");
-+	if (count > 0) {
-+		*npins = count;
-+		return "allwinner,pins";
-+	}
-+
-+	return NULL;
-+}
-+
-+static unsigned long *sunxi_pctrl_build_pin_config(struct device_node *node,
-+						   unsigned int *len)
-+{
-+	unsigned long *pinconfig;
-+	unsigned int configlen = 0, idx = 0;
-+
-+	if (sunxi_pctrl_has_drive_prop(node))
-+		configlen++;
-+	if (sunxi_pctrl_has_bias_prop(node))
-+		configlen++;
-+
-+	pinconfig = kzalloc(configlen * sizeof(*pinconfig), GFP_KERNEL);
-+	if (!pinconfig)
-+		return NULL;
-+
-+	if (sunxi_pctrl_has_drive_prop(node)) {
-+		int drive = sunxi_pctrl_parse_drive_prop(node);
-+		if (drive < 0)
-+			goto err_free;
-+
-+		pinconfig[idx++] = pinconf_to_config_packed(PIN_CONFIG_DRIVE_STRENGTH,
-+							  drive);
-+	}
-+
-+	if (sunxi_pctrl_has_bias_prop(node)) {
-+		int pull = sunxi_pctrl_parse_bias_prop(node);
-+		if (pull < 0)
-+			goto err_free;
-+
-+		pinconfig[idx++] = pinconf_to_config_packed(pull, 0);
-+	}
-+
-+
-+	*len = configlen;
-+	return pinconfig;
-+
-+err_free:
-+	kfree(pinconfig);
-+	return NULL;
-+}
-+
- static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 				      struct device_node *node,
- 				      struct pinctrl_map **map,
-@@ -154,38 +258,45 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 	unsigned long *pinconfig;
- 	struct property *prop;
--	const char *function;
-+	const char *function, *pin_prop;
- 	const char *group;
--	int ret, nmaps, i = 0;
--	u32 val;
-+	int ret, npins, nmaps, configlen = 0, i = 0;
- 
- 	*map = NULL;
- 	*num_maps = 0;
- 
--	ret = of_property_read_string(node, "allwinner,function", &function);
--	if (ret) {
--		dev_err(pctl->dev,
--			"missing allwinner,function property in node %s\n",
-+	function = sunxi_pctrl_parse_function_prop(node);
-+	if (!function) {
-+		dev_err(pctl->dev, "missing function property in node %s\n",
- 			node->name);
- 		return -EINVAL;
- 	}
- 
--	nmaps = of_property_count_strings(node, "allwinner,pins") * 2;
--	if (nmaps < 0) {
--		dev_err(pctl->dev,
--			"missing allwinner,pins property in node %s\n",
-+	pin_prop = sunxi_pctrl_find_pins_prop(node, &npins);
-+	if (!pin_prop) {
-+		dev_err(pctl->dev, "missing pins property in node %s\n",
- 			node->name);
- 		return -EINVAL;
- 	}
- 
-+	/*
-+	 * We have two maps for each pin: one for the function, one
-+	 * for the configuration (bias, strength, etc)
-+	 */
-+	nmaps = npins * 2;
- 	*map = kmalloc(nmaps * sizeof(struct pinctrl_map), GFP_KERNEL);
- 	if (!*map)
- 		return -ENOMEM;
- 
--	of_property_for_each_string(node, "allwinner,pins", prop, group) {
-+	pinconfig = sunxi_pctrl_build_pin_config(node, &configlen);
-+	if (!pinconfig) {
-+		ret = -EINVAL;
-+		goto err_free_map;
-+	}
-+
-+	of_property_for_each_string(node, pin_prop, prop, group) {
- 		struct sunxi_pinctrl_group *grp =
- 			sunxi_pinctrl_find_group_by_name(pctl, group);
--		int j = 0, configlen = 0;
- 
- 		if (!grp) {
- 			dev_err(pctl->dev, "unknown pin %s", group);
-@@ -208,34 +319,6 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 
- 		(*map)[i].type = PIN_MAP_TYPE_CONFIGS_GROUP;
- 		(*map)[i].data.configs.group_or_pin = group;
--
--		if (of_find_property(node, "allwinner,drive", NULL))
--			configlen++;
--		if (of_find_property(node, "allwinner,pull", NULL))
--			configlen++;
--
--		pinconfig = kzalloc(configlen * sizeof(*pinconfig), GFP_KERNEL);
--		if (!pinconfig) {
--			kfree(*map);
--			return -ENOMEM;
--		}
--
--		if (!of_property_read_u32(node, "allwinner,drive", &val)) {
--			u16 strength = (val + 1) * 10;
--			pinconfig[j++] =
--				pinconf_to_config_packed(PIN_CONFIG_DRIVE_STRENGTH,
--							 strength);
--		}
--
--		if (!of_property_read_u32(node, "allwinner,pull", &val)) {
--			enum pin_config_param pull = PIN_CONFIG_END;
--			if (val == 1)
--				pull = PIN_CONFIG_BIAS_PULL_UP;
--			else if (val == 2)
--				pull = PIN_CONFIG_BIAS_PULL_DOWN;
--			pinconfig[j++] = pinconf_to_config_packed(pull, 0);
--		}
--
- 		(*map)[i].data.configs.configs = pinconfig;
- 		(*map)[i].data.configs.num_configs = configlen;
- 
-@@ -245,19 +328,18 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
- 	*num_maps = nmaps;
- 
- 	return 0;
-+
-+err_free_map:
-+	kfree(map);
-+	return ret;
- }
- 
- static void sunxi_pctrl_dt_free_map(struct pinctrl_dev *pctldev,
- 				    struct pinctrl_map *map,
- 				    unsigned num_maps)
- {
--	int i;
--
--	for (i = 0; i < num_maps; i++) {
--		if (map[i].type == PIN_MAP_TYPE_CONFIGS_GROUP)
--			kfree(map[i].data.configs.configs);
--	}
--
-+	/* All the maps have the same pin config, free only the first one */
-+	kfree(map[0].data.configs.configs);
- 	kfree(map);
- }
- 
+Changes from v1:
+  - Realloced the pinctrl_map array
+  - Detailed the generic properties we support
+  - Directly return the parsing functions return code
+  - Called kfree on the pinconfig directly
+  - Added Chen-Yu Acked-by
+  - Changed the patch 2 commit log as suggested
+
+Maxime Ripard (9):
+  pinctrl: sunxi: Rework the pin config building code
+  pinctrl: sunxi: Use macros from bindings header file for DT parsing
+  pinctrl: sunxi: Handle bias disable
+  pinctrl: sunxi: Deal with configless pins
+  pinctrl: sunxi: Support generic binding
+  dt-bindings: pinctrl: Deprecate sunxi pinctrl bindings
+  ARM: sunxi: Remove useless allwinner,drive property
+  ARM: sunxi: Remove useless allwinner,pull property
+  ARM: sunxi: Convert pinctrl nodes to generic bindings
+
+ Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt |  16 ++++-
+ arch/arm/boot/dts/ntc-gr8-evb.dts                                     |  24 ++----
+ arch/arm/boot/dts/ntc-gr8.dtsi                                        | 104 +++++++++------------------
+ arch/arm/boot/dts/sun4i-a10-a1000.dts                                 |  12 +--
+ arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts                            |   2 +-
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts                       |  14 +---
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts                            |  14 +---
+ arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts                      |  38 +++-------
+ arch/arm/boot/dts/sun4i-a10-gemei-g9.dts                              |   6 +--
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts                             |  12 +--
+ arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts                          |  16 +---
+ arch/arm/boot/dts/sun4i-a10-inet1.dts                                 |  26 ++-----
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts                             |  14 +---
+ arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts                          |  29 +++-----
+ arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts                            |  12 +--
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts                             |  13 +--
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts                            |   2 +-
+ arch/arm/boot/dts/sun4i-a10-mk802.dts                                 |  18 +----
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts                        |  27 ++-----
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts                               |  19 +----
+ arch/arm/boot/dts/sun4i-a10-pcduino2.dts                              |   6 +--
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts                      |  32 +++-----
+ arch/arm/boot/dts/sun4i-a10.dtsi                                      | 169 +++++++++++++++-----------------------------
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts                          |  18 ++---
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts                          |  29 +++-----
+ arch/arm/boot/dts/sun5i-a10s-mk802.dts                                |  19 +----
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts                      |  36 +++------
+ arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts                         |  20 ++---
+ arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts                              |  21 +----
+ arch/arm/boot/dts/sun5i-a10s.dtsi                                     |  61 ++++++----------
+ arch/arm/boot/dts/sun5i-a13-empire-electronix-d709.dts                |  23 ++----
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts                              |  22 ++----
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts                       |  40 ++++------
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts                             |  36 +++------
+ arch/arm/boot/dts/sun5i-a13-utoo-p66.dts                              |  17 +---
+ arch/arm/boot/dts/sun5i-a13.dtsi                                      |  24 ++----
+ arch/arm/boot/dts/sun5i-r8-chip.dts                                   |  12 +--
+ arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi                  |  33 +++------
+ arch/arm/boot/dts/sun5i.dtsi                                          |  57 +++++----------
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts                             |   6 +--
+ arch/arm/boot/dts/sun6i-a31-colombus.dts                              |  22 ++----
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts                           |  23 ++----
+ arch/arm/boot/dts/sun6i-a31-i7.dts                                    |  19 +----
+ arch/arm/boot/dts/sun6i-a31-m9.dts                                    |  19 +----
+ arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts                      |  19 +----
+ arch/arm/boot/dts/sun6i-a31.dtsi                                      | 136 ++++++++++++++---------------------
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts                              |  20 ++---
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts                              |  13 +--
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts                      |  29 +++-----
+ arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts              |   9 +--
+ arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi                  |  14 +---
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts                      |  27 ++-----
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts                              |  26 ++-----
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts                             |  37 +++-------
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts                           |  13 +--
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts                            |  38 +++-------
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts                           |  24 ++----
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts                             |  26 ++-----
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts                            |   7 +--
+ arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts                             |  30 +++-----
+ arch/arm/boot/dts/sun7i-a20-m3.dts                                    |   6 +--
+ arch/arm/boot/dts/sun7i-a20-mk808c.dts                                |  12 +--
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts                        |  32 +++-----
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts                        |  27 ++-----
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts                  |   6 +--
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts                       |  33 +++------
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts                       |  28 +++----
+ arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts                         |  45 ++++--------
+ arch/arm/boot/dts/sun7i-a20-orangepi.dts                              |  38 +++-------
+ arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts                         |  25 ++----
+ arch/arm/boot/dts/sun7i-a20-pcduino3.dts                              |  21 +----
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts                        |  25 ++----
+ arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts                      |  13 +--
+ arch/arm/boot/dts/sun7i-a20.dtsi                                      | 277 ++++++++++++++++++++++++++----------------------------------------------
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi                                  |  95 ++++++++++---------------
+ arch/arm/boot/dts/sun8i-a23-evb.dts                                   |   7 +--
+ arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts                 |   8 +--
+ arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts                 |   8 +--
+ arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts                        |   9 +--
+ arch/arm/boot/dts/sun8i-a33-olinuxino.dts                             |  18 +----
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts                        |  11 +--
+ arch/arm/boot/dts/sun8i-a33.dtsi                                      |   6 +--
+ arch/arm/boot/dts/sun8i-a83t.dtsi                                     |  21 +----
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts                       |  18 +----
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts                             |  12 +--
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts                             |  26 ++-----
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts                          |  18 +----
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts                           |  18 +----
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts                       |   4 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts                            |  18 +----
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts                          |  10 +--
+ arch/arm/boot/dts/sun8i-h3.dtsi                                       |  92 +++++++++---------------
+ arch/arm/boot/dts/sun8i-q8-common.dtsi                                |   9 +--
+ arch/arm/boot/dts/sun8i-r16-parrot.dts                                |  36 +++------
+ arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi                  |  26 ++-----
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts                           |  15 +---
+ arch/arm/boot/dts/sun9i-a80-optimus.dts                               |  33 +++------
+ arch/arm/boot/dts/sun9i-a80.dtsi                                      |  54 +++++---------
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi                        |  24 ++----
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c                                 | 267 +++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------
+ 100 files changed, 1307 insertions(+), 1794 deletions(-)
+
 -- 
 git-series 0.8.10
