@@ -1,75 +1,49 @@
-From: atull@opensource.altera.com (atull)
-Date: Tue, 11 Oct 2016 14:31:58 -0500
-Subject: [PATCH v19 01/12] fpga: add bindings document for fpga region
-In-Reply-To: <20161008204928.GB11595@rob-hp-laptop>
-References: <20160928182200.15800-1-atull@opensource.altera.com>
- <20160928182200.15800-2-atull@opensource.altera.com>
- <20161008204928.GB11595@rob-hp-laptop>
-Message-ID: <alpine.DEB.2.02.1610111427370.2480@linuxheads99>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 11 Oct 2016 23:41:40 +0200
+Subject: latest version of bluetooth for n950?
+In-Reply-To: <20161011145140.cq3jex2r23wuayph@earth>
+References: <20161011074704.GA21003@amd>
+ <20161011145140.cq3jex2r23wuayph@earth>
+Message-ID: <20161011214139.cgxe2ms7qjgruuxb@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 8 Oct 2016, Rob Herring wrote:
+Hi,
 
-> On Wed, Sep 28, 2016 at 01:21:49PM -0500, Alan Tull wrote:
-> > New bindings document for FPGA Region to support programming
-> > FPGA's under Device Tree control
+On Tue, Oct 11, 2016 at 04:51:40PM +0200, Sebastian Reichel wrote:
+> On Tue, Oct 11, 2016 at 09:47:04AM +0200, Pavel Machek wrote:
+> > I got some free cycles to play with n900 and bluetooth. There's still
+> > some unrelated config option that breaks even the old vesion of
+> > patches, but I'm ready for more debugging now.
 > > 
-> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> > Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> > ---
-> > v9:  initial version added to this patchset
-> > v10: s/fpga/FPGA/g
-> >      replace DT overlay example with slightly more complicated example
-> >      move to staging/simple-fpga-bus
-> > v11: No change in this patch for v11 of the patch set
-> > v12: Moved out of staging.
-> >      Changed to use FPGA bridges framework instead of resets
-> >      for bridges.
-> > v13: bridge at 0xff20000 -> bridge at ff200000, etc
-> >      Leave out directly talking about overlays
-> >      Remove regs and clocks directly under simple-fpga-bus in example
-> >      Use common "firmware-name" binding instead of "fpga-firmware"
-> > v14: Use firmware-name in bindings description
-> >      Call it FPGA Area
-> >      Remove bindings that specify FPGA Manager and FPGA Bridges
-> > v15: Cleanup as per Rob's comments
-> >      Combine usage doc with bindings document
-> >      Document as being Altera specific
-> >      Additions and changes to add FPGA Bus
-> > v16: Reworked to document FPGA Regions
-> >      rename altera-fpga-bus-fpga-area.txt -> fpga-region.txt
-> >      Remove references that made it sound exclusive to Altera
-> >      Remove altr, prefix from fpga-bus and fpga-area compatible strings
-> >      Added Moritz' usage example with Xilinx
-> >      Cleaned up unit addresses
-> > v17: Lots of rewrites to try to make things clearer
-> >      Clarify that overlay can be rejected if FPGA isn't programmed
-> >      Add external-fpga-config binding already used in u-boot
-> >      Change partial-reconfig binding to partial-fpga-config to align
-> >        with existing u-boot binding format *-fpga-config
-> >      Add a document from Xilinx' website
-> > v18: Fix node names underscores to be hyphens
-> >      Fix copy/pasted duplicate nodes in diagram
-> > v19: Fix more underscores
-> >      Make FPGA regions to be children of bridges
-> >      General cleanup and clarification
-> > ---
-> >  .../devicetree/bindings/fpga/fpga-region.txt       | 494 +++++++++++++++++++++
-> >  1 file changed, 494 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/fpga/fpga-region.txt
+> > Could I have the latest version of the (clean) bluetooth patch? I have
+> > feeling it might work with the right config option, and would like to
+> > try.
+> > 
+> > For the record, here's working .config and the tricky tricky oneliner
+> > that took me week to figure out.
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> https://git.kernel.org/cgit/linux/kernel/git/sre/linux-n900.git/log/?h=n950-bluetooth
 > 
-> Nice job.
-> 
-> Rob
-> 
+> My local branch is based on 4.8 and fixes a few of Marcel's
+> comments. I'm currently at ELCE, but I will push my local
+> stuff later in the hotel after verifying, that it works as
+> expected (luckily I brought N950 with me :)).
 
-Thanks, Rob!  I'll add your reviewed-by in v20 just
-to make it even.  
+It does not. Rebasing the pushed branch to v4.8 works, so the
+problem is somewhere in my new changes. I will try to have a
+look at it tomorrow.
 
-Besides that, squashing some patches and some
-minor changes for the Arria10 FPGA manager support.
+The changes shouldn't affect you for any tests, though. Just
+take the branch from above (and optionally rebase to v4.8).
 
-Alan
+-- Sebastian
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161011/59a1c8ba/attachment.sig>
