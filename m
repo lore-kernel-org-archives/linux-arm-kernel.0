@@ -1,89 +1,75 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Oct 2016 19:52:36 +0100
-Subject: [PATCH V3 02/10] ras: acpi/apei: cper: generic error data entry
- v3 per ACPI 6.1
-In-Reply-To: <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20161011185236.GC1041@n2100.armlinux.org.uk>
+From: atull@opensource.altera.com (atull)
+Date: Tue, 11 Oct 2016 14:31:58 -0500
+Subject: [PATCH v19 01/12] fpga: add bindings document for fpga region
+In-Reply-To: <20161008204928.GB11595@rob-hp-laptop>
+References: <20160928182200.15800-1-atull@opensource.altera.com>
+ <20160928182200.15800-2-atull@opensource.altera.com>
+ <20161008204928.GB11595@rob-hp-laptop>
+Message-ID: <alpine.DEB.2.02.1610111427370.2480@linuxheads99>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2016 at 03:31:14PM -0600, Tyler Baicar wrote:
-> +static void cper_estatus_print_section_v300(const char *pfx,
-> +	const struct acpi_hest_generic_data_v300 *gdata)
-> +{
-> +	__u8 hour, min, sec, day, mon, year, century, *timestamp;
-> +
-> +	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
-> +		timestamp = (__u8 *)&(gdata->time_stamp);
-> +		memcpy(&sec, timestamp, 1);
-> +		memcpy(&min, timestamp + 1, 1);
-> +		memcpy(&hour, timestamp + 2, 1);
-> +		memcpy(&day, timestamp + 4, 1);
-> +		memcpy(&mon, timestamp + 5, 1);
-> +		memcpy(&year, timestamp + 6, 1);
-> +		memcpy(&century, timestamp + 7, 1);
+On Sat, 8 Oct 2016, Rob Herring wrote:
 
-This is utterly silly.  Why are you using memcpy() to access individual
-bytes of a u8 pointer?  What's wrong with:
+> On Wed, Sep 28, 2016 at 01:21:49PM -0500, Alan Tull wrote:
+> > New bindings document for FPGA Region to support programming
+> > FPGA's under Device Tree control
+> > 
+> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> > Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> > ---
+> > v9:  initial version added to this patchset
+> > v10: s/fpga/FPGA/g
+> >      replace DT overlay example with slightly more complicated example
+> >      move to staging/simple-fpga-bus
+> > v11: No change in this patch for v11 of the patch set
+> > v12: Moved out of staging.
+> >      Changed to use FPGA bridges framework instead of resets
+> >      for bridges.
+> > v13: bridge at 0xff20000 -> bridge at ff200000, etc
+> >      Leave out directly talking about overlays
+> >      Remove regs and clocks directly under simple-fpga-bus in example
+> >      Use common "firmware-name" binding instead of "fpga-firmware"
+> > v14: Use firmware-name in bindings description
+> >      Call it FPGA Area
+> >      Remove bindings that specify FPGA Manager and FPGA Bridges
+> > v15: Cleanup as per Rob's comments
+> >      Combine usage doc with bindings document
+> >      Document as being Altera specific
+> >      Additions and changes to add FPGA Bus
+> > v16: Reworked to document FPGA Regions
+> >      rename altera-fpga-bus-fpga-area.txt -> fpga-region.txt
+> >      Remove references that made it sound exclusive to Altera
+> >      Remove altr, prefix from fpga-bus and fpga-area compatible strings
+> >      Added Moritz' usage example with Xilinx
+> >      Cleaned up unit addresses
+> > v17: Lots of rewrites to try to make things clearer
+> >      Clarify that overlay can be rejected if FPGA isn't programmed
+> >      Add external-fpga-config binding already used in u-boot
+> >      Change partial-reconfig binding to partial-fpga-config to align
+> >        with existing u-boot binding format *-fpga-config
+> >      Add a document from Xilinx' website
+> > v18: Fix node names underscores to be hyphens
+> >      Fix copy/pasted duplicate nodes in diagram
+> > v19: Fix more underscores
+> >      Make FPGA regions to be children of bridges
+> >      General cleanup and clarification
+> > ---
+> >  .../devicetree/bindings/fpga/fpga-region.txt       | 494 +++++++++++++++++++++
+> >  1 file changed, 494 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/fpga/fpga-region.txt
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> 
+> Nice job.
+> 
+> Rob
+> 
 
-		sec = timestamp[0];
-		min = timestamp[1];
-		hour = timestamp[2];
-		day = timestamp[4];
-		mon = timestamp[5];
-		year = timestamp[6];
-		century = timestamp[7];
+Thanks, Rob!  I'll add your reviewed-by in v20 just
+to make it even.  
 
-or even do the conversion here:
+Besides that, squashing some patches and some
+minor changes for the Arria10 FPGA manager support.
 
-		sec = bcd2bin(timestamp[0]);
-... etc ...
-
-> +		printk("%stime: ", pfx);
-> +		printk("%7s", 0x01 & *(timestamp + 3) ? "precise" : "");
-> +		printk(" %02d:%02d:%02d %02d%02d-%02d-%02d\n",
-> +			bcd2bin(hour), bcd2bin(min), bcd2bin(sec),
-> +			bcd2bin(century), bcd2bin(year), bcd2bin(mon),
-> +			bcd2bin(day));
-> +	}
-
-It's also a good idea to (as much as possible) keep to single printk()
-statements - which makes the emission of the string more atomic wrt
-other CPUs and contexts.  So, this should probably become (with the
-conversion being done at the assignment of sec etc):
-
-		printk("%stime: %7s %02d:%02d:%02d %02d%02d-%02d-%02d\n",
-			pfx, 0x01 & timestamp[3] ? "precise" : "",
-			hour, min, sec, century, year, mon, day);
-
-which, IMHO, looks a lot nicer and doesn't risk some other printk()
-getting between each individual part of the line.
-
-> +}
-> +
->  static void cper_estatus_print_section(
-> -	const char *pfx, const struct acpi_hest_generic_data *gdata, int sec_no)
-> +	const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
->  {
->  	uuid_le *sec_type = (uuid_le *)gdata->section_type;
->  	__u16 severity;
->  	char newpfx[64];
->  
-> +	if ((gdata->revision >> 8) >= 0x03)
-> +		cper_estatus_print_section_v300(pfx,
-> +			(const struct acpi_hest_generic_data_v300 *)gdata);
-> +
->  	severity = gdata->error_severity;
->  	printk("%s""Error %d, type: %s\n", pfx, sec_no,
->  	       cper_severity_str(severity));
-
-Not sure why you have the "" here - %sError works just as well and the
-"" is just obfuscation - the compiler will eliminate the double-double
-quote and merge the strings anyway.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Alan
