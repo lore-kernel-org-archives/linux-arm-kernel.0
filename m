@@ -1,256 +1,219 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Wed, 12 Oct 2016 16:10:52 -0600
-Subject: [PATCH V3 02/10] ras: acpi/apei: cper: generic error data entry
- v3 per ACPI 6.1
-In-Reply-To: <3f17d0a8-6b63-5792-903a-341effaae432@arm.com>
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
- <3f17d0a8-6b63-5792-903a-341effaae432@arm.com>
-Message-ID: <c17a0c03-5037-d88d-f096-4cc72dbfcb99@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 12 Oct 2016 17:13:57 -0500
+Subject: [PATCH V2 1/3] Revert "ACPI,PCI,IRQ: reduce static IRQ array
+ size to 16"
+In-Reply-To: <1475615720-31047-2-git-send-email-okaya@codeaurora.org>
+References: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
+ <1475615720-31047-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <20161012221357.GB15116@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Suzuki,
+Hi Sinan,
 
-Thank you for the feedback! Responses below.
+I have to apologize because I haven't followed all the discussion and
+now I'm trying to figure it out from the patches and changelogs.  But
+I guess that's not all bad, because future interested folks *should*
+be able to figure things out from that :)
 
+On Tue, Oct 04, 2016 at 05:15:17PM -0400, Sinan Kaya wrote:
+> This reverts commit 5c5087a55390 ("ACPI,PCI,IRQ: reduce static IRQ array
+> size to 16").
+> 
+> The code maintains a fixed size array for IRQ penalties. The array
+> gets updated by external calls such as acpi_penalize_sci_irq,
+> acpi_penalize_isa_irq to reflect the actual interrupt usage of the
+> system. Since the IRQ distribution is platform specific, this is
+> not known ahead of time. The IRQs get updated based on the SCI
+> interrupt number BIOS has chosen or the ISA IRQs that were assigned
+> to existing peripherals.
+> 
+> By the time ACPI gets initialized, this code tries to determine an
+> IRQ number based on penalty values in this array. It will try to locate
+> the IRQ with the least penalty assignment so that interrupt sharing is
+> avoided if possible.
+> 
+> A couple of notes about the external APIs:
+> 1. These API can be called before the ACPI is started. Therefore, one
+> cannot assume that the PCI link objects are initialized for calculating
+> penalties.
 
-On 10/11/2016 11:28 AM, Suzuki K Poulose wrote:
-> On 07/10/16 22:31, Tyler Baicar wrote:
->> Currently when a RAS error is reported it is not timestamped.
->> The ACPI 6.1 spec adds the timestamp field to the generic error
->> data entry v3 structure. The timestamp of when the firmware
->> generated the error is now being reported.
->>
->> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->> Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
->> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
->
-> Please could you keep the people who reviewed/commented on your series 
-> in the past,
-> whenever you post a new version ?
-Do you mean to just send the new version to their e-mail directly in 
-addition to the lists? If so, I will do that next time.
+Which API are you thinking about here?  pcibios_penalize_isa_irq() is
+called by ACPI and PNP, which should both be after ACPI is started.
 
-I know you provided good feedback on the previous patchset, but I did 
-not have anyone specifically respond to add "reviewed-by:...". I don't 
-think I should add reviewed-by for someone unless they specifically add 
-it in a response :)
->
->> ---
->>  drivers/acpi/apei/ghes.c    | 25 ++++++++++--
->>  drivers/firmware/efi/cper.c | 97 
->> +++++++++++++++++++++++++++++++++++++++------
->>  2 files changed, 105 insertions(+), 17 deletions(-)
->>
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index 3021f0e..c8488f1 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -80,6 +80,10 @@
->>      ((struct acpi_hest_generic_status *)                \
->>       ((struct ghes_estatus_node *)(estatus_node) + 1))
->>
->> +#define acpi_hest_generic_data_version(gdata)            \
->> +    (gdata->revision >> 8)
->
-> ...
->
->> +inline void *acpi_hest_generic_data_payload(struct 
->> acpi_hest_generic_data *gdata)
->> +{
->> +    return acpi_hest_generic_data_version(gdata) >= 3 ?
->> +        (void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
->> +        gdata + 1;
->> +}
->> +
->
->
->
->> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
->> index d425374..9fa1317 100644
->> --- a/drivers/firmware/efi/cper.c
->> +++ b/drivers/firmware/efi/cper.c
->
->> +#define acpi_hest_generic_data_version(gdata)        \
->> +    (gdata->revision >> 8)
->> +
->
-> ...
->
->> +static inline void *acpi_hest_generic_data_payload(struct 
->> acpi_hest_generic_data *gdata)
->> +{
->> +    return acpi_hest_generic_data_version(gdata) >= 3 ?
->> +        (void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
->> +        gdata + 1;
->> +}
->
-> Could these go to a header file, so that we don't need duplicate 
-> definitions of these helpers in
-> different files ?
->
-I think that should work to avoid duplication. I will move them to a 
-header file in the next patchset.
->> +
->> +static void cper_estatus_print_section_v300(const char *pfx,
->> +    const struct acpi_hest_generic_data_v300 *gdata)
->> +{
->> +    __u8 hour, min, sec, day, mon, year, century, *timestamp;
->> +
->> +    if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
->> +        timestamp = (__u8 *)&(gdata->time_stamp);
->> +        memcpy(&sec, timestamp, 1);
->> +        memcpy(&min, timestamp + 1, 1);
->> +        memcpy(&hour, timestamp + 2, 1);
->> +        memcpy(&day, timestamp + 4, 1);
->> +        memcpy(&mon, timestamp + 5, 1);
->> +        memcpy(&year, timestamp + 6, 1);
->> +        memcpy(&century, timestamp + 7, 1);
->> +        printk("%stime: ", pfx);
->> +        printk("%7s", 0x01 & *(timestamp + 3) ? "precise" : "");
->
-> What format is the (timestamp + 3) stored in ? Does it need conversion ?
-The third byte of the timestamp is currently only used to determine if 
-the time is precise or not. Bit 0 is used to specify that and the other 
-bits in this byte are marked as reserved. This is shown in table 247 of 
-the UEFI spec 2.6:
+My guess is you're thinking about acpi_penalize_sci_irq() (added back
+later in this series), which is called here, which is definitely
+before ACPI objects are available:
 
-Byte 3:
-   Bit 0 ? Timestamp is precise if this bit is set and correlates to the 
-time of the error event.
-   Bit 7:1 ? Reserved
->
->> +        printk(" %02d:%02d:%02d %02d%02d-%02d-%02d\n",
->> +            bcd2bin(hour), bcd2bin(min), bcd2bin(sec),
->> +            bcd2bin(century), bcd2bin(year), bcd2bin(mon),
->> +            bcd2bin(day));
->> +    }
->
-> minor nit: Would it be easier to order/parse the error messages if the 
-> date
-> is printed first followed by time ?
->
-> i.e,
->     17:20:14 2016-09-15 Mon
->         vs
->     2016-09-15 Mon 17:20:14
->
-> e.g, people looking at a huge log, looking for logs from a specific 
-> date might
-> find the latter more useful to skip the messages.
->
-The latter does seem like it would be better for parsing large logs. I 
-can rearrange the order in the next patchset.
->> +}
->> +
->>  static void cper_estatus_print_section(
->> -    const char *pfx, const struct acpi_hest_generic_data *gdata, int 
->> sec_no)
->> +    const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
->>  {
->>      uuid_le *sec_type = (uuid_le *)gdata->section_type;
->>      __u16 severity;
->>      char newpfx[64];
->>
->> +    if ((gdata->revision >> 8) >= 0x03)
->
-> Could we use the helper defined above ?
-Yes, I'll change this to use acpi_hest_generic_data_version(gdata) instead.
->
->> @@ -451,12 +497,22 @@ void cper_estatus_print(const char *pfx,
->>      printk("%s""event severity: %s\n", pfx, 
->> cper_severity_str(severity));
->>      data_len = estatus->data_length;
->>      gdata = (struct acpi_hest_generic_data *)(estatus + 1);
->> +    if ((gdata->revision >> 8) >= 0x03)
->
-> Same as above, use the macro ?
-Yes, I'll change this to use acpi_hest_generic_data_version(gdata) instead.
->
->> +        gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
->> +
->>      snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
->> +
->>      while (data_len >= sizeof(*gdata)) {
->>          gedata_len = gdata->error_data_length;
->>          cper_estatus_print_section(newpfx, gdata, sec_no);
->> -        data_len -= gedata_len + sizeof(*gdata);
->> -        gdata = (void *)(gdata + 1) + gedata_len;
->> +        if(gdata_v3) {
->> +            data_len -= gedata_len + sizeof(*gdata_v3);
->> +            gdata_v3 = (void *)(gdata_v3 + 1) + gedata_len;
->> +            gdata = (struct acpi_hest_generic_data *)gdata_v3;
->> +        } else {
->> +            data_len -= gedata_len + sizeof(*gdata);
->> +            gdata = (void *)(gdata + 1) + gedata_len;
->> +        }
->>          sec_no++;
->>      }
->
-> ...
->
->>
->> @@ -486,15 +543,29 @@ int cper_estatus_check(const struct 
->> acpi_hest_generic_status *estatus)
->>          return rc;
->>      data_len = estatus->data_length;
->>      gdata = (struct acpi_hest_generic_data *)(estatus + 1);
->> -    while (data_len >= sizeof(*gdata)) {
->> -        gedata_len = gdata->error_data_length;
->> -        if (gedata_len > data_len - sizeof(*gdata))
->> +
->> +    if ((gdata->revision >> 8) >= 0x03) {
->> +        gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
->> +        while (data_len >= sizeof(*gdata_v3)) {
->> +            gedata_len = gdata_v3->error_data_length;
->> +            if (gedata_len > data_len - sizeof(*gdata_v3))
->> +                return -EINVAL;
->> +            data_len -= gedata_len + sizeof(*gdata_v3);
->> +            gdata_v3 = (void *)(gdata_v3 + 1) + gedata_len;
->> +        }
->> +        if (data_len)
->> +            return -EINVAL;
->> +    } else {
->> +        while (data_len >= sizeof(*gdata)) {
->> +            gedata_len = gdata->error_data_length;
->> +            if (gedata_len > data_len - sizeof(*gdata))
->> +                return -EINVAL;
->> +            data_len -= gedata_len + sizeof(*gdata);
->> +            gdata = (void *)(gdata + 1) + gedata_len;
->> +        }
->> +        if (data_len)
->
-> As mentioned in the previous version, would it make sense to add some 
-> more
-> helpers to deal with record versions ? We seem to be doing the version 
-> switch and
-> code duplication at different places.
->
-> Does the following help ? Thoughts ?
->
-> #define acpi_hest_generic_data_error_length(gdata) (((struct 
-> acpi_hest_generic_data *)(gdata))->error_data_length)
-> #define acpi_hest_generic_data_size(gdata) \
->     ((acpi_hest_generic_data_version(gdata) >= 3) ? \
->      sizeof(struct acpi_hest_generic_data_v300) :    \
->      sizeof(struct acpi_hest_generic_data))
-> #define acpi_hest_generic_data_record_size(gdata)
->     (acpi_hest_generic_data_size(gdata) + \
->      acpi_hest_generic_data_error_length(gdata))
-> #define acpi_hest_generic_data_next(gdata) \
->     ((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
->
->
-> Suzuki
-These helpers will definitely help consolidate this code. I will use 
-these in the next version to remove the code duplication here.
+  setup_arch
+    acpi_boot_init
+      acpi_process_madt
+	acpi_parse_madt_ioapic_entries
+	  acpi_table_parse_madt
+	    acpi_parse_int_src_ovr
+	      acpi_sci_ioapic_setup
+	        acpi_penalize_sci_irq       # <---
 
-Thanks,
-Tyler
+> 2. The polarity and trigger information passed via the
+> acpi_penalize_sci_irq from the BIOS may not match what the IRQ subsystem
+> is reporting as the call might have been placed before the IRQ is
+> registered by the interrupt subsystem.
+> 
+> The previous change was in the direction to remove these external API and
+> try to calculate the penalties at runtime for the ISA path as well. This
+> didn't work out well with the existing platforms.
+> 
+> Restoring the old behavior for IRQ < 256 and the new behavior will remain
+> effective for IRQ >= 256.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+IIRC, this all started because we needed more than 256 IRQs, but we
+didn't know how to size a static table to be large enough without
+being wasteful.
+
+Prior to 5c5087a55390, we tracked penalties for IRQs 0-255.  After it,
+we only tracked penalties for IRQs 0-15.  I think this patch basically
+makes it so we track 0-255 again.
+
+*This* patch only increases the range for pcibios_penalize_isa_irq()
+(and command-line hints, but hopefully nobody cares about those).  A
+subsequent patch increases it for SCI as well.
+
+The name "ACPI_MAX_IRQS" is now slightly misleading (because we do
+support more than 256 IRQs) and the 256 value is sort of an
+unjustified magic number.  16 is explainable as the number of ISA
+IRQs, but I don't know what 256 is based on (other than historical
+practice, of course).  ACPI device IRQs can be much larger, and I
+think the SCI IRQ can be, too (the FADT SCI_INT field is 16 bits).
+
+Can you tie this back to the specific problem on the broken machine
+somehow?  Do we need a penalty for an IRQ in the 16-255 range?
+
+In a subsequent patch, I see something about the IRQ type not being
+updated at the right time, but I can't quite connect the dots.
+
+To be clear, I'm not asking for any changes in the patch; I'm just
+trying to understand what's going on.
+
+> Tested-by: Jonathan Liu <net147@gmail.com>
+> Tested-by: Ondrej Zary <linux@rainbow-software.org>
+> Link: http://www.gossamer-threads.com/lists/linux/kernel/2537016#2537016
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/acpi/pci_link.c | 35 ++++++++++++++++++-----------------
+>  1 file changed, 18 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> index c983bf7..f3792f4 100644
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -438,6 +438,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
+>   * enabled system.
+>   */
+>  
+> +#define ACPI_MAX_IRQS		256
+>  #define ACPI_MAX_ISA_IRQS	16
+>  
+>  #define PIRQ_PENALTY_PCI_POSSIBLE	(16*16)
+> @@ -446,7 +447,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
+>  #define PIRQ_PENALTY_ISA_USED		(16*16*16*16*16)
+>  #define PIRQ_PENALTY_ISA_ALWAYS		(16*16*16*16*16*16)
+>  
+> -static int acpi_isa_irq_penalty[ACPI_MAX_ISA_IRQS] = {
+> +static int acpi_irq_penalty[ACPI_MAX_IRQS] = {
+>  	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ0 timer */
+>  	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ1 keyboard */
+>  	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ2 cascade */
+> @@ -511,7 +512,7 @@ static int acpi_irq_get_penalty(int irq)
+>  	}
+>  
+>  	if (irq < ACPI_MAX_ISA_IRQS)
+> -		return penalty + acpi_isa_irq_penalty[irq];
+> +		return penalty + acpi_irq_penalty[irq];
+>  
+>  	penalty += acpi_irq_pci_sharing_penalty(irq);
+>  	return penalty;
+> @@ -538,14 +539,14 @@ int __init acpi_irq_penalty_init(void)
+>  
+>  			for (i = 0; i < link->irq.possible_count; i++) {
+>  				if (link->irq.possible[i] < ACPI_MAX_ISA_IRQS)
+> -					acpi_isa_irq_penalty[link->irq.
+> +					acpi_irq_penalty[link->irq.
+>  							 possible[i]] +=
+>  					    penalty;
+>  			}
+>  
+>  		} else if (link->irq.active &&
+> -				(link->irq.active < ACPI_MAX_ISA_IRQS)) {
+> -			acpi_isa_irq_penalty[link->irq.active] +=
+> +				(link->irq.active < ACPI_MAX_IRQS)) {
+> +			acpi_irq_penalty[link->irq.active] +=
+>  			    PIRQ_PENALTY_PCI_POSSIBLE;
+>  		}
+>  	}
+> @@ -828,7 +829,7 @@ static void acpi_pci_link_remove(struct acpi_device *device)
+>  }
+>  
+>  /*
+> - * modify acpi_isa_irq_penalty[] from cmdline
+> + * modify acpi_irq_penalty[] from cmdline
+>   */
+>  static int __init acpi_irq_penalty_update(char *str, int used)
+>  {
+> @@ -837,24 +838,24 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+>  	for (i = 0; i < 16; i++) {
+>  		int retval;
+>  		int irq;
+> -		int new_penalty;
+>  
+>  		retval = get_option(&str, &irq);
+>  
+>  		if (!retval)
+>  			break;	/* no number found */
+>  
+> -		/* see if this is a ISA IRQ */
+> -		if ((irq < 0) || (irq >= ACPI_MAX_ISA_IRQS))
+> +		if (irq < 0)
+> +			continue;
+> +
+> +		if (irq >= ARRAY_SIZE(acpi_irq_penalty))
+>  			continue;
+>  
+>  		if (used)
+> -			new_penalty = acpi_irq_get_penalty(irq) +
+> -					PIRQ_PENALTY_ISA_USED;
+> +			acpi_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+> +				PIRQ_PENALTY_ISA_USED;
+>  		else
+> -			new_penalty = 0;
+> +			acpi_irq_penalty[irq] = 0;
+>  
+> -		acpi_isa_irq_penalty[irq] = new_penalty;
+>  		if (retval != 2)	/* no next number */
+>  			break;
+>  	}
+> @@ -870,14 +871,14 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+>   */
+>  void acpi_penalize_isa_irq(int irq, int active)
+>  {
+> -	if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
+> -		acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+> -		  (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+> +	if (irq >= 0 && irq < ARRAY_SIZE(acpi_irq_penalty))
+> +		acpi_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+> +		    (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+>  }
+>  
+>  bool acpi_isa_irq_available(int irq)
+>  {
+> -	return irq >= 0 && (irq >= ARRAY_SIZE(acpi_isa_irq_penalty) ||
+> +	return irq >= 0 && (irq >= ARRAY_SIZE(acpi_irq_penalty) ||
+>  		    acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
+>  }
+>  
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
