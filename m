@@ -1,202 +1,113 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Wed, 12 Oct 2016 13:22:24 +0000
-Subject: [PATCH v14 16/16] vfio/type1: Introduce MSI_RESV capability
-In-Reply-To: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
-References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1476278544-3397-17-git-send-email-eric.auger@redhat.com>
+From: labath@google.com (Pavel Labath)
+Date: Wed, 12 Oct 2016 14:50:14 +0100
+Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
+ addresses
+In-Reply-To: <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
+References: <1474643941-109020-1-git-send-email-labath@google.com>
+ <1474643941-109020-2-git-send-email-labath@google.com>
+ <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
+ <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
+ <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
+Message-ID: <CAJt8pk-HJYFUCxRuY5EV6KnM+kNP6mVBrFgPwiGfEkMKqGyjXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows the user-space to retrieve the MSI reserved region
-requirements, if any. The implementation is based on capability chains,
-now also added to VFIO_IOMMU_GET_INFO.
+Hello Pratyush,
 
-The returned info comprises the size and the alignment requirements
+I am sorry about the delay. I have finally had a chance to try out
+your changes today. Response inline.
 
-In case the userspace must provide the IOVA aperture, we currently report
-a size/alignment based on all the doorbells registered by the host kernel.
-This may exceed the actual needs.
+On 8 October 2016 at 06:10, Pratyush Anand <panand@redhat.com> wrote:
+> On Fri, Oct 7, 2016 at 10:54 PM, Pavel Labath <labath@google.com> wrote:
+>> The thing is, I have observed different behavior here depending on the
+>> exact hardware used. I don't have the exact parameters with me now,
+>> but I can look it up next week.
+>>
+>> The thing is that the spec is imprecise about what exact address the
+>> hardware can report for the watchpoint hit. I presume that is
+>> deliberate to give some leeway to implementers. The spec says the
+>> address can be anywhere in the range from the lowest memory address
+>> accessed by the instruction to the highest address watched by the
+>> watchpoint,
+>
+> I think, my patches should  be able to take care of the above condition.
+Unfortunately, the patch does not solve the problem for my hardware,
+because of the leeway you give in watchpoint_handler is not big
+enough. It does work however, if I change the line
+> if (addr + 7 < val + lens || addr > val + lene)
+to
+> if (addr + 15 < val + lens || addr > val + lene)
+I do not think we can assume that address reported by the hardware
+will be at most 7 bytes off from the address we put the watchpoint at.
+There is nothing in the spec that guarantees that, and it does not
+seem to be enough for some hardware. In fact, I am not sure we can
+assume 15 is enough either, but maybe it can do for now, until we can
+find hardware that does not work with that (I haven't yet tried what
+happens it the watchpoint is triggered by cache management
+instructions, which can access much larger blocks of memory).
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+For reference, the hardware in question is:
+> Processor : AArch64 Processor rev 0 (aarch64)
+> processor : 0
+> min_vddcx : 400000
+> min_vddmx : 490000
+> BogoMIPS : 38.00
+> Features : fp asimd evtstrm aes pmull sha1 sha2 crc32
+> CPU implementer : 0x51
+> CPU architecture: 8
+> CPU variant : 0x2
+> CPU part : 0x201
+> CPU revision : 0
+> CPU param : 300 468 468 621 939 299 445 445 621 1077
+> Hardware : Qualcomm Technologies, Inc MSM8996pro
 
----
-v13 -> v14:
-- new capability struct
-- change the padding in vfio_iommu_type1_info
+And this is how it behaves:
+The output of the test app triggering the watchpoint (I have set a
+single-byte watchpoint at 555556705f)
+>
+> Writing to: 555556705f, size: 1
+> Writing to: 555556705e, size: 2
+> Writing to: 555556705c, size: 4
+> Writing to: 5555567058, size: 8
+> Writing to: 5555567050, size: 16
+> Writing to: 5555567040, size: 32
 
-v11 -> v12:
-- msi_doorbell_pages was renamed msi_doorbell_calc_pages
+The addresses received by the kernel:
+[  251.812166] c1   3780 hw-breakpoint: watchpoint_handler: addr:
+555556705f, val+lens: 555556705f, val+lene: 555556705f
+[  251.820341] c1   3781 hw-breakpoint: watchpoint_handler: addr:
+555556705e, val+lens: 555556705f, val+lene: 555556705f
+[  251.825572] c0   3782 hw-breakpoint: watchpoint_handler: addr:
+555556705c, val+lens: 555556705f, val+lene: 555556705f
+[  251.831085] c0   3783 hw-breakpoint: watchpoint_handler: addr:
+5555567058, val+lens: 555556705f, val+lene: 555556705f
+[  251.835804] c0   3784 hw-breakpoint: watchpoint_handler: addr:
+5555567050, val+lens: 555556705f, val+lene: 555556705f
+[  251.841350] c0   3785 hw-breakpoint: watchpoint_handler: addr:
+5555567050, val+lens: 555556705f, val+lene: 555556705f
 
-v9 -> v10:
-- move cap_offset after iova_pgsizes
-- replace __u64 alignment by __u32 order
-- introduce __u32 flags in vfio_iommu_type1_info_cap_msi_geometry and
-  fix alignment
-- call msi-doorbell API to compute the size/alignment
+Note that for the case of 16 and 32-byte access it returns the address
+5555567050 -- this is why the "+15" is sufficient for me.
 
-v8 -> v9:
-- use iommu_msi_supported flag instead of programmable
-- replace IOMMU_INFO_REQUIRE_MSI_MAP flag by a more sophisticated
-  capability chain, reporting the MSI geometry
 
-v7 -> v8:
-- use iommu_domain_msi_geometry
+The other thing I am not so sure about in your patch is that it has
+potential to mis-attribute the watchpoint hit if we have two
+watchpoints close together. For example, if I have first watchpoint on
+0x1008-0x100f and a second one on 0x1000-0x1007, *and* the application
+writes one byte to 0x1004, then your code will still attribute the hit
+to the first watchpoint, even though it was not really triggered. This
+is the reason I implemented my fix as a two-stage process, first
+looking for exact hits, and then falling back to the nearest one. That
+said, I don't know enough about the codebase to say if this is a real
+problem.
 
-v6 -> v7:
-- remove the computation of the number of IOVA pages to be provisionned.
-  This number depends on the domain/group/device topology which can
-  dynamically change. Let's rely instead rely on an arbitrary max depending
-  on the system
+On the plus side, I like the fact that we can watch arbitrary memory
+regions now, and the feature is working perfectly. :)
 
-v4 -> v5:
-- move msi_info and ret declaration within the conditional code
 
-v3 -> v4:
-- replace former vfio_domains_require_msi_mapping by
-  more complex computation of MSI mapping requirements, especially the
-  number of pages to be provided by the user-space.
-- reword patch title
+My proposal would be to combine the two patches - take the byte mask
+handling code from yours, and the hit-attribution code from my patch.
+What do you think?
 
-RFC v1 -> v1:
-- derived from
-  [RFC PATCH 3/6] vfio: Extend iommu-info to return MSIs automap state
-- renamed allow_msi_reconfig into require_msi_mapping
-- fixed VFIO_IOMMU_GET_INFO
----
- drivers/vfio/vfio_iommu_type1.c | 67 ++++++++++++++++++++++++++++++++++++++++-
- include/uapi/linux/vfio.h       | 20 +++++++++++-
- 2 files changed, 85 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index c18ba9d..6775da3 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -1147,6 +1147,46 @@ static int vfio_domains_have_iommu_cache(struct vfio_iommu *iommu)
- 	return ret;
- }
- 
-+static int msi_resv_caps(struct vfio_iommu *iommu, struct vfio_info_cap *caps)
-+{
-+	struct iommu_domain_msi_resv msi_resv = {.size = 0, .alignment = 0};
-+	struct vfio_iommu_type1_info_cap_msi_resv *cap;
-+	struct vfio_info_cap_header *header;
-+	struct iommu_domain_msi_resv iter;
-+	struct vfio_domain *d;
-+
-+	mutex_lock(&iommu->lock);
-+
-+	list_for_each_entry(d, &iommu->domain_list, next) {
-+		if (iommu_domain_get_attr(d->domain,
-+					  DOMAIN_ATTR_MSI_RESV, &iter))
-+			continue;
-+		if (iter.size >  msi_resv.size) {
-+			msi_resv.size = iter.size;
-+			msi_resv.alignment = iter.alignment;
-+		}
-+	}
-+
-+	if (!msi_resv.size)
-+		return 0;
-+
-+	mutex_unlock(&iommu->lock);
-+
-+	header = vfio_info_cap_add(caps, sizeof(*cap),
-+				   VFIO_IOMMU_TYPE1_INFO_CAP_MSI_RESV, 1);
-+
-+	if (IS_ERR(header))
-+		return PTR_ERR(header);
-+
-+	cap = container_of(header, struct vfio_iommu_type1_info_cap_msi_resv,
-+			   header);
-+
-+	cap->alignment = msi_resv.alignment;
-+	cap->size = msi_resv.size;
-+
-+	return 0;
-+}
-+
- static long vfio_iommu_type1_ioctl(void *iommu_data,
- 				   unsigned int cmd, unsigned long arg)
- {
-@@ -1168,8 +1208,10 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 		}
- 	} else if (cmd == VFIO_IOMMU_GET_INFO) {
- 		struct vfio_iommu_type1_info info;
-+		struct vfio_info_cap caps = { .buf = NULL, .size = 0 };
-+		int ret;
- 
--		minsz = offsetofend(struct vfio_iommu_type1_info, iova_pgsizes);
-+		minsz = offsetofend(struct vfio_iommu_type1_info, cap_offset);
- 
- 		if (copy_from_user(&info, (void __user *)arg, minsz))
- 			return -EFAULT;
-@@ -1181,6 +1223,29 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 
- 		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
- 
-+		ret = msi_resv_caps(iommu, &caps);
-+		if (ret)
-+			return ret;
-+
-+		if (caps.size) {
-+			info.flags |= VFIO_IOMMU_INFO_CAPS;
-+			if (info.argsz < sizeof(info) + caps.size) {
-+				info.argsz = sizeof(info) + caps.size;
-+				info.cap_offset = 0;
-+			} else {
-+				vfio_info_cap_shift(&caps, sizeof(info));
-+				if (copy_to_user((void __user *)arg +
-+						sizeof(info), caps.buf,
-+						caps.size)) {
-+					kfree(caps.buf);
-+					return -EFAULT;
-+				}
-+				info.cap_offset = sizeof(info);
-+			}
-+
-+			kfree(caps.buf);
-+		}
-+
- 		return copy_to_user((void __user *)arg, &info, minsz) ?
- 			-EFAULT : 0;
- 
-diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-index 4a9dbc2..e34a9a6 100644
---- a/include/uapi/linux/vfio.h
-+++ b/include/uapi/linux/vfio.h
-@@ -488,7 +488,23 @@ struct vfio_iommu_type1_info {
- 	__u32	argsz;
- 	__u32	flags;
- #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
--	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
-+#define VFIO_IOMMU_INFO_CAPS	(1 << 1)	/* Info supports caps */
-+	__u64	iova_pgsizes;	/* Bitmap of supported page sizes */
-+	__u32   cap_offset;	/* Offset within info struct of first cap */
-+	__u32	__resv;
-+};
-+
-+/*
-+ * The MSI_RESV capability allows to report the MSI reserved IOVA requirements:
-+ * In case this capability is supported, the userspace must provide an IOVA
-+ * window characterized by @size and @alignment using VFIO_IOMMU_MAP_DMA with
-+ * RESERVED_MSI_IOVA flag.
-+ */
-+#define VFIO_IOMMU_TYPE1_INFO_CAP_MSI_RESV  1
-+struct vfio_iommu_type1_info_cap_msi_resv {
-+	struct vfio_info_cap_header header;
-+	__u64 size;		/* requested IOVA aperture size in bytes */
-+	__u64 alignment;	/* requested byte alignment of the window */
- };
- 
- #define VFIO_IOMMU_GET_INFO _IO(VFIO_TYPE, VFIO_BASE + 12)
-@@ -503,6 +519,8 @@ struct vfio_iommu_type1_info {
-  * IOVA region that will be used on some platforms to map the host MSI frames.
-  * In that specific case, vaddr is ignored. Once registered, an MSI reserved
-  * IOVA region stays until the container is closed.
-+ * The requirement for provisioning such reserved IOVA range can be checked by
-+ * checking the VFIO_IOMMU_TYPE1_INFO_CAP_MSI_RESV capability.
-  */
- struct vfio_iommu_type1_dma_map {
- 	__u32	argsz;
--- 
-1.9.1
+regards,
+pavel
