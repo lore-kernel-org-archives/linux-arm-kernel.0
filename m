@@ -1,25 +1,36 @@
-From: qiyaoltc@gmail.com (Yao Qi)
-Date: Wed, 12 Oct 2016 12:16:29 +0100
-Subject: [PATCH 3/4] arm64: Allow hw watchpoint of length 3,5,6 and 7
-In-Reply-To: <d6ebb3e9776154da4c1a41f17446e9e31c891a7d.1476251587.git.panand@redhat.com>
-References: <cover.1476251587.git.panand@redhat.com>
- <d6ebb3e9776154da4c1a41f17446e9e31c891a7d.1476251587.git.panand@redhat.com>
-Message-ID: <CAH=s-PNFESLA6TTem-49g0CKsjpKOsj1XYfPUXz6YbEfMWXqXg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 12 Oct 2016 13:17:04 +0200
+Subject: [PATCH 0/2] ARM: at91: properly handle LPDDR poweroff
+In-Reply-To: <1791580.DIVsjjyavb@ws-stein>
+References: <20161007163427.11454-1-alexandre.belloni@free-electrons.com>
+ <1791580.DIVsjjyavb@ws-stein>
+Message-ID: <20161012111704.5mhtu4pjv2vncam5@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2016 at 6:58 AM, Pratyush Anand <panand@redhat.com> wrote:
-> Since, arm64 can support all offset within a double word limit. Therefore,
-> now support other lengths within that range as well.
+On 10/10/2016 at 08:00:30 +0200, Alexander Stein wrote :
+> Hi Alexandre,
+> 
+> On Friday 07 October 2016 18:34:25, Alexandre Belloni wrote:
+> > Hi,
+> > 
+> > This patch set improves LPDDR support on SoCs using the Atmel MPDDR
+> > controller.
+> > 
+> > LPDDR memoris can only handle up to 400 uncontrolled power offs in their
+> > life. The proper power off sequence has to be applied before shutting down
+> > the SoC.
+> > 
+> > I'm not too happy with the code duplication but this is a design choice
+> > that has been made before because both shitdown controler are really
+>                                          ^^^^^^^^
+> 
+> I guess you mean shutdown? :) Same for the suject of 2nd patch.
+> 
 
-How does ptracer (like GDB) detect kernel has already supported all byte
-address select values?  I suppose ptrace(NT_ARM_HW_WATCH, ) with
-len is 3 or 5 fail on current kernel but is of success after your patches
-applied.
-
-GDB is aware of the byte address select limitation in kernel, so it always
-sets 1,2,4,8 in len in ctrl.  GDB needs to know whether the limitation is still
-there or not.
+I'm planning to send a v2, hopefully fixing my typos ;)
 
 -- 
-Yao (??)
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
