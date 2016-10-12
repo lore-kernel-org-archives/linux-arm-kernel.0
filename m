@@ -1,79 +1,181 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Oct 2016 11:04:04 +0100
-Subject: [PATCH v3 07/11] arm64/tracing: fix compat syscall handling
-In-Reply-To: <fed0151c-ebfd-18d2-939c-21e315dc7584@imgtec.com>
-References: <1476182576-15247-1-git-send-email-marcin.nowakowski@imgtec.com>
- <1476182576-15247-8-git-send-email-marcin.nowakowski@imgtec.com>
- <20161011133623.GE9532@arm.com>
- <fed0151c-ebfd-18d2-939c-21e315dc7584@imgtec.com>
-Message-ID: <20161012100404.GD32032@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 12 Oct 2016 12:30:29 +0200
+Subject: [PATCH v7 2/8] power: add power sequence library
+In-Reply-To: <1474342607-27512-3-git-send-email-peter.chen@nxp.com>
+References: <1474342607-27512-1-git-send-email-peter.chen@nxp.com>
+ <1474342607-27512-3-git-send-email-peter.chen@nxp.com>
+Message-ID: <4691591.qnCGxrEkrZ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2016 at 09:07:03AM +0200, Marcin Nowakowski wrote:
-> On 11.10.2016 15:36, Will Deacon wrote:
-> >On Tue, Oct 11, 2016 at 12:42:52PM +0200, Marcin Nowakowski wrote:
-> >>diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-> >>index e78ac26..276d049 100644
-> >>--- a/arch/arm64/include/asm/unistd.h
-> >>+++ b/arch/arm64/include/asm/unistd.h
-> >>@@ -45,6 +45,7 @@
-> >> #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
-> >>
-> >> #define __NR_compat_syscalls		394
-> >>+#define NR_compat_syscalls (__NR_compat_syscalls)
-> >
-> >We may as well just define NR_compat_syscalls instead of
-> >__NR_compat_syscalls and move the handful of users over.
+Hi,
+
+Am Dienstag, 20. September 2016, 11:36:41 CEST schrieb Peter Chen:
+> We have an well-known problem that the device needs to do some power
+> sequence before it can be recognized by related host, the typical
+> example like hard-wired mmc devices and usb devices.
 > 
-> I had tried to minimise the amount of arch-specific changes here -
-> especially those that are not directly related to the proposed syscall
-> handling change. But I agree having these 2 #defines is a bit unnecessary
-
-There's only three users of __NR_compat_syscalls, so I think you can
-move them over.
-
-> >>diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-> >>index 40ad08a..75d010f 100644
-> >>--- a/arch/arm64/kernel/ftrace.c
-> >>+++ b/arch/arm64/kernel/ftrace.c
-> >>@@ -176,4 +176,20 @@ int ftrace_disable_ftrace_graph_caller(void)
-> >> 	return ftrace_modify_graph_caller(false);
-> >> }
-> >> #endif /* CONFIG_DYNAMIC_FTRACE */
-> >>+
-> >> #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
-> >>+
-> >>+#if (defined CONFIG_FTRACE_SYSCALLS) && (defined CONFIG_COMPAT)
-> >>+
-> >>+extern const void *sys_call_table[];
-> >>+extern const void *compat_sys_call_table[];
-> >>+
-> >>+unsigned long __init arch_syscall_addr(int nr, bool compat)
-> >>+{
-> >>+	if (compat)
-> >>+		return (unsigned long)compat_sys_call_table[nr];
-> >>+
-> >>+	return (unsigned long)sys_call_table[nr];
-> >>+}
-> >
-> >Do we care about the compat private syscalls (from base 0x0f0000)? We
-> >need to make sure that we exhibit the same behaviour as a native
-> >32-bit ARM machine.
-> >
-> >Will
+> This power sequence is hard to be described at device tree and handled by
+> related host driver, so we have created a common power sequence
+> library to cover this requirement. The core code has supplied
+> some common helpers for host driver, and individual power sequence
+> libraries handle kinds of power sequence for devices.
 > 
-> Tracing of such syscalls has been disabled for a long time (see
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=086ba77a6db0).
-> Apart from using non-contiguous numbers, they are not defined using standard
-> SYSCALL macros, so they do not have any metadata generated either.
-> My suggestion is that if you wanted those to be included in the trace then
-> it should be done separately from these changes.
+> pwrseq_generic is intended for general purpose of power sequence, which
+> handles gpios and clocks currently, and can cover regulator and pinctrl
+> in future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> if only one power sequence is needed, else call of_pwrseq_on_list
+> /of_pwrseq_off_list instead (eg, USB hub driver).
+>
+> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> Tested-by Joshua Clayton <stillcompiling@gmail.com>
+> Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+> Tested-by: Matthias Kaehlcke <mka@chromium.org>
 
-Fine by me -- I just wanted to make sure our compat behaviour matched
-the behaviour of native arch/arm/. It sounds like it does, so no need to
-change anything here.
+first of all, glad to see this move forward. I've only some qualms with the 
+static number of allocated power sequences below.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+[...]
 
-Will
+> diff --git a/drivers/power/pwrseq/Kconfig b/drivers/power/pwrseq/Kconfig
+> new file mode 100644
+> index 0000000..dff5e35
+> --- /dev/null
+> +++ b/drivers/power/pwrseq/Kconfig
+> @@ -0,0 +1,45 @@
+> +#
+> +# Power Sequence library
+> +#
+> +
+> +config POWER_SEQUENCE
+> +	bool
+> +
+> +menu "Power Sequence Support"
+> +
+> +config PWRSEQ_GENERIC
+> +	bool "Generic power sequence control"
+> +	depends on OF
+> +	select POWER_SEQUENCE
+> +	help
+> +	   It is used for drivers which needs to do power sequence
+> +	   (eg, turn on clock, toggle reset gpio) before the related
+> +	   devices can be found by hardware. This generic one can be
+> +	   used for common power sequence control.
+> +
+> +config PWRSEQ_GENERIC_INSTANCE_NUMBER
+> +	int "Number of Generic Power Sequence Instance"
+> +	depends on PWRSEQ_GENERIC
+> +	range 1 10
+> +	default 2
+> +	help
+> +	   Usually, there are not so many devices needs power sequence, we set two
+> +	   as default value.
+
+limiting this to some arbitary compile-time number somehow seems crippling for 
+the single-image approach. I.e. a distribution might select something and 
+during its lifetime the board requiring n+1 power-sequences appears and thus 
+needs a different kernel version just to support that additional sequence.
+
+Also, board designers are creative, and there were already complex examples 
+mentioned elsewhere, so nothing keeps people from inventing something even 
+more complex.
+
+[...]
+
+> diff --git a/drivers/power/pwrseq/pwrseq_generic.c
+> b/drivers/power/pwrseq/pwrseq_generic.c new file mode 100644
+> index 0000000..bcd16c3
+> --- /dev/null
+> +++ b/drivers/power/pwrseq/pwrseq_generic.c
+
+[...]
+
+> +static int pwrseq_generic_get(struct device_node *np, struct pwrseq
+> *pwrseq) +{
+> +	struct pwrseq_generic *pwrseq_gen = to_generic_pwrseq(pwrseq);
+> +	enum of_gpio_flags flags;
+> +	int reset_gpio, clk, ret = 0;
+> +
+> +	for (clk = 0; clk < PWRSEQ_MAX_CLKS; clk++) {
+> +		pwrseq_gen->clks[clk] = of_clk_get(np, clk);
+> +		if (IS_ERR(pwrseq_gen->clks[clk])) {
+> +			ret = PTR_ERR(pwrseq_gen->clks[clk]);
+> +			if (ret != -ENOENT)
+> +				goto err_put_clks;
+> +			pwrseq_gen->clks[clk] = NULL;
+> +			break;
+> +		}
+> +	}
+> +
+> +	reset_gpio = of_get_named_gpio_flags(np, "reset-gpios", 0, &flags);
+> +	if (gpio_is_valid(reset_gpio)) {
+> +		unsigned long gpio_flags;
+> +
+> +		if (flags & OF_GPIO_ACTIVE_LOW)
+> +			gpio_flags = GPIOF_ACTIVE_LOW | GPIOF_OUT_INIT_LOW;
+> +		else
+> +			gpio_flags = GPIOF_OUT_INIT_HIGH;
+> +
+> +		ret = gpio_request_one(reset_gpio, gpio_flags,
+> +				"pwrseq-reset-gpios");
+> +		if (ret)
+> +			goto err_put_clks;
+> +
+> +		pwrseq_gen->gpiod_reset = gpio_to_desc(reset_gpio);
+> +		of_property_read_u32(np, "reset-duration-us",
+> +				&pwrseq_gen->duration_us);
+> +	} else {
+> +		if (reset_gpio == -ENOENT)
+> +			return 0;
+> +
+> +		ret = reset_gpio;
+> +		pr_err("Failed to get reset gpio on %s, err = %d\n",
+> +				np->full_name, reset_gpio);
+> +		goto err_put_clks;
+> +	}
+> +
+> +	return ret;
+> +
+> +err_put_clks:
+> +	while (--clk >= 0)
+> +		clk_put(pwrseq_gen->clks[clk]);
+> +	return ret;
+> +}
+> +
+> +static const struct of_device_id generic_id_table[] = {
+> +	{ .compatible = "generic",},
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static int __init pwrseq_generic_register(void)
+> +{
+> +	struct pwrseq_generic *pwrseq_gen;
+> +	int i;
+> +
+> +	for (i = 0; i < CONFIG_PWRSEQ_GENERIC_INSTANCE_NUMBER; i++) {
+> +		pwrseq_gen = kzalloc(sizeof(*pwrseq_gen), GFP_KERNEL);
+> +		if (!pwrseq_gen)
+> +			return -ENOMEM;
+> +
+> +		pwrseq_gen->pwrseq.pwrseq_of_match_table = generic_id_table;
+> +		pwrseq_gen->pwrseq.get = pwrseq_generic_get;
+> +		pwrseq_gen->pwrseq.on = pwrseq_generic_on;
+> +		pwrseq_gen->pwrseq.off = pwrseq_generic_off;
+> +		pwrseq_gen->pwrseq.put = pwrseq_generic_put;
+> +		pwrseq_gen->pwrseq.free = pwrseq_generic_free;
+> +
+> +		pwrseq_register(&pwrseq_gen->pwrseq);
+> +	}
+> +
+> +	return 0;
+> +}
+> +postcore_initcall(pwrseq_generic_register)
+
+I see that you need to have it preallocated for the compatible matching, but 
+wouldn't it also work to either just register the type and allocate 
+dynamically or otherwise just allocate a new spare everytime 
+pwrseq_generic_get() picks up the previous spare?
+
+That way the total number of power sequences can still be dynamic without 
+haggling over how many power sequences should be the build-default in the 
+generic configs.
