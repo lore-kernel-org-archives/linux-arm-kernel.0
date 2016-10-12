@@ -1,26 +1,115 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 12 Oct 2016 09:21:03 +0300
-Subject: [patch] serial: stm32: fix a type issue
-Message-ID: <20161012062103.GS12841@mwanda>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 12 Oct 2016 11:54:57 +0530
+Subject: [PATCH V3 0/8] IOMMU probe deferral support
+In-Reply-To: <12cfb59f-f7ca-d4df-eb7f-42348e357979@samsung.com>
+References: <CGME20161004170414eucas1p141bebe16e1bf241862833e7ad0270c72@eucas1p1.samsung.com>
+ <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+ <12cfb59f-f7ca-d4df-eb7f-42348e357979@samsung.com>
+Message-ID: <000601d22451$5eb46fc0$1c1d4f40$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We store UNDEF_REG in a u8.  It causes a problem in functions like
-stm32_tx_dma_complete() where we check "if (ofs->icr == UNDEF_REG)".
+Hi Marek,
 
-Fixes: 3489187204eb ('serial: stm32: adding dma support')
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+>Hi Sricharan,
+>
+>
+>On 2016-10-04 19:03, Sricharan R wrote:
+>> Initial post from Laurent Pinchart[1]. This is
+>> series calls the dma ops configuration for the devices
+>> at a generic place so that it works for all busses.
+>> The dma_configure_ops for a device is now called during
+>> the device_attach callback just before the probe of the
+>> bus/driver is called. Similarly dma_deconfigure is called during
+>> device/driver_detach path.
+>>
+>>
+>> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
+>>         |                         |
+>> pci_bus_add_device     (device_add/driver_register)
+>>         |                         |
+>> device_attach           device_initial_probe
+>>         |                         |
+>> __device_attach_driver    __device_attach_driver
+>>         |
+>> driver_probe_device
+>>         |
+>> really_probe
+>>         |
+>> dma_configure
+>>
+>>   Similarly on the device/driver_unregister path __device_release_driver is
+>>   called which inturn calls dma_deconfigure.
+>>
+>>   If the ACPI bus code follows the same, we can add acpi_dma_configure
+>>   at the same place as of_dma_configure.
+>>
+>>   This series is based on the recently merged Generic DT bindings for
+>>   PCI IOMMUs and ARM SMMU from Robin Murphy robin.murphy at arm.com [2]
+>>
+>>   This time tested this with platform and pci device for probe deferral
+>>   and reprobe on arm64 based platform. There is an issue on the cleanup
+>>   path for arm64 though, where there is WARN_ON if the dma_ops is reset while
+>>   device is attached to an domain in arch_teardown_dma_ops.
+>>   But with iommu_groups created from the iommu driver, the device is always
+>>   attached to a domain/default_domain. So so the WARN has to be removed/handled
+>>   probably.
+>
+>Thanks for continuing work on this feature! Your can add my:
+>
+>Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>
+  Thanks for testing this. So the for the below fix, the remove_device callback
+  gets called on the dma_ops cleanup path, so would it be easy to remove the
+  data for the device there ?
 
-diff --git a/drivers/tty/serial/stm32-usart.h b/drivers/tty/serial/stm32-usart.h
-index 41d9749..f9887cc 100644
---- a/drivers/tty/serial/stm32-usart.h
-+++ b/drivers/tty/serial/stm32-usart.h
-@@ -31,7 +31,7 @@ struct stm32_usart_info {
- 	struct stm32_usart_config cfg;
- };
- 
--#define UNDEF_REG ~0
-+#define UNDEF_REG 0xFF
- 
- /* Register offsets */
- struct stm32_usart_info stm32f4_info = {
+Regards,
+ Sricharan
+
+
+>It works fine with Exynos SYSMMU driver, although a patch is needed to fix
+>infinite loop due to list corruption (same element is added twice if master
+>device fails with deferred probe):
+>
+>From: Marek Szyprowski <m.szyprowski@samsung.com>
+>Date: Mon, 10 Oct 2016 14:22:42 +0200
+>Subject: [PATCH] iommu/exynos: ensure that sysmmu is added only once to its
+>  master
+>
+>Since adding IOMMU deferred probing support, of_xlate() callback might
+>be called more than once for given master device (for example it happens
+>when masters device driver fails with EPROBE_DEFER), so ensure that
+>SYSMMU controller is added to its master device (owner) only once.
+>
+>Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>---
+>  drivers/iommu/exynos-iommu.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+>
+>diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+>index 30808e91b775..1525a86eb829 100644
+>--- a/drivers/iommu/exynos-iommu.c
+>+++ b/drivers/iommu/exynos-iommu.c
+>@@ -1253,7 +1253,7 @@ static int exynos_iommu_of_xlate(struct device *dev,
+>  {
+>      struct exynos_iommu_owner *owner = dev->archdata.iommu;
+>      struct platform_device *sysmmu = of_find_device_by_node(spec->np);
+>-    struct sysmmu_drvdata *data;
+>+    struct sysmmu_drvdata *data, *entry;
+>
+>      if (!sysmmu)
+>          return -ENODEV;
+>@@ -1271,6 +1271,10 @@ static int exynos_iommu_of_xlate(struct device *dev,
+>          dev->archdata.iommu = owner;
+>      }
+>
+>+    list_for_each_entry(entry, &owner->controllers, owner_node)
+>+        if (entry == data)
+>+            return 0;
+>+
+>      list_add_tail(&data->owner_node, &owner->controllers);
+>      return 0;
+>  }
+>--
+>1.9.1
+>
