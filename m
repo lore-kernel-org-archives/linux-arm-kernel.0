@@ -1,35 +1,42 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Tue, 11 Oct 2016 15:38:06 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable Intel e1000e driver
-In-Reply-To: <8265935.TobkRj9BnG@wuerfel>
-References: <1475959264-16582-1-git-send-email-scott.branden@broadcom.com>
- <8265935.TobkRj9BnG@wuerfel>
-Message-ID: <464e62ad-476e-5a2b-cdb4-c4e7f7f34e7d@broadcom.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Wed, 12 Oct 2016 10:14:15 +0800
+Subject: [PATCH 1/2] arm64: dts: zx: Change gic node to fix boot failure
+Message-ID: <1476238456-20420-1-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+GICR for multiple CPU can be described with start address and stride,
+or with multiple address. Current multiple address and stride are
+both used. Fix it.
 
-On 16-10-10 12:47 AM, Arnd Bergmann wrote:
-> On Saturday, October 8, 2016 1:41:04 PM CEST Scott Branden wrote:
->> Enable support for the Intel e1000e driver
->>
->> Signed-off-by: Ray Jui <rjui@broadcom.com>
->> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->>
->
-> Can we make this a loadable module and group it with the other
-> ethernet drivers?
->
-We use a fixed rootfs image to test the kernel.  For simplicity we don't 
-construct a rootfs or load any modules.  We just test the kernel image. 
-So for us every defconfig we use needs to be set to y to use the 
-upstreamed kernel.
+Signed-off-by: Jun Nie <jun.nie@linaro.org>
+---
+ arch/arm64/boot/dts/zte/zx296718.dtsi | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-Plus, how do you NFS mount a rootfs if the ethernet driver is a loadable 
-module?
-> 	Arnd
->
-
-Regards,
-  Scott
+diff --git a/arch/arm64/boot/dts/zte/zx296718.dtsi b/arch/arm64/boot/dts/zte/zx296718.dtsi
+index a223066..6b239a3 100644
+--- a/arch/arm64/boot/dts/zte/zx296718.dtsi
++++ b/arch/arm64/boot/dts/zte/zx296718.dtsi
+@@ -239,16 +239,11 @@
+ 		compatible = "arm,gic-v3";
+ 		#interrupt-cells = <3>;
+ 		#address-cells = <0>;
+-		#redistributor-regions = <6>;
+-		redistributor-stride = <0x0 0x40000>;
++		#redistributor-regions = <1>;
++		redistributor-stride = <0x20000>;
+ 		interrupt-controller;
+ 		reg = <0x02a00000 0x10000>,
+-		      <0x02b00000 0x20000>,
+-		      <0x02b20000 0x20000>,
+-		      <0x02b40000 0x20000>,
+-		      <0x02b60000 0x20000>,
+-		      <0x02b80000 0x20000>,
+-		      <0x02ba0000 0x20000>;
++		      <0x02b00000 0xc0000>;
+ 		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
+ 
+-- 
+1.9.1
