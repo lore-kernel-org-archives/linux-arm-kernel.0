@@ -1,37 +1,88 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 12 Oct 2016 10:48:11 +0100
-Subject: [RFC 0/1] misc: Add Allwinner Q8 tablet hardware manager
-In-Reply-To: <CAL_JsqJVkPPiDh66nhfh0D7BvkZ7KKN0X7uhfPGgiYbc2Ca1rg@mail.gmail.com>
-References: <20160901190820.21987-1-hdegoede@redhat.com>
- <CAL_JsqJVkPPiDh66nhfh0D7BvkZ7KKN0X7uhfPGgiYbc2Ca1rg@mail.gmail.com>
-Message-ID: <20161012094811.GA19509@remoulade>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Wed, 12 Oct 2016 18:00:42 +0800
+Subject: [PATCH] drm/bridge: analogix: protect power when get_modes or detect
+Message-ID: <1476266442-29803-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The drm callback ->detect and ->get_modes seems is not power safe,
+they may be called when device is power off, do register access on
+detect or get_modes will cause system die.
 
-On Fri, Sep 09, 2016 at 04:32:06PM -0500, Rob Herring wrote:
-> On Thu, Sep 1, 2016 at 2:08 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> > Hi All,
-> >
-> > Here is a first RFC for the q8 tablet hw-manager I've been talking
-> > about for a while now.
-> >
-> > The touchscreen part is finished, I'll start working on the
-> > accelerometer bits next.
-> 
-> This at least partially overlaps with the "overlay manager" just
-> posted. A dev board having different devices attached and a production
-> device have 2nd source components are not really different problems.
-> We need a common solution and can't have each platform making up their
-> own scheme.
+Here is the path call ->detect before analogix_dp power on
+[<ffffff800843babc>] analogix_dp_detect+0x44/0xdc
+[<ffffff80083fd840>] drm_helper_probe_single_connector_modes_merge_bits+0xe8/0x41c
+[<ffffff80083fdb84>] drm_helper_probe_single_connector_modes+0x10/0x18
+[<ffffff8008418d24>] drm_mode_getconnector+0xf4/0x304
+[<ffffff800840cff0>] drm_ioctl+0x23c/0x390
+[<ffffff80081a8adc>] do_vfs_ioctl+0x4b8/0x58c
+[<ffffff80081a8c10>] SyS_ioctl+0x60/0x88
 
-To follow up discussions at ELC-E, I agree that we need a common solution (if
-this has to happen in the kernel rather than in an earlier stage of the boot
-process).
+Cc: Inki Dae <inki.dae@samsung.com>
+Cc: Sean Paul <seanpaul@chromium.org>
+Cc: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
+Cc: "Ville Syrj?l?" <ville.syrjala@linux.intel.com>
 
-Otherwise, we're creating pseudo-board-files, and a whole new set of problems
-for ourselves.
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Thanks
-Mark.
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index efac8ab..09dece2 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -1062,6 +1062,13 @@ int analogix_dp_get_modes(struct drm_connector *connector)
+ 		return 0;
+ 	}
+ 
++	if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
++		pm_runtime_get_sync(dp->dev);
++
++		if (dp->plat_data->power_on)
++			dp->plat_data->power_on(dp->plat_data);
++	}
++
+ 	if (analogix_dp_handle_edid(dp) == 0) {
+ 		drm_mode_connector_update_edid_property(&dp->connector, edid);
+ 		num_modes += drm_add_edid_modes(&dp->connector, edid);
+@@ -1073,6 +1080,13 @@ int analogix_dp_get_modes(struct drm_connector *connector)
+ 	if (dp->plat_data->get_modes)
+ 		num_modes += dp->plat_data->get_modes(dp->plat_data, connector);
+ 
++	if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
++		if (dp->plat_data->power_off)
++			dp->plat_data->power_off(dp->plat_data);
++
++		pm_runtime_put_sync(dp->dev);
++	}
++
+ 	ret = analogix_dp_prepare_panel(dp, false, false);
+ 	if (ret)
+ 		DRM_ERROR("Failed to unprepare panel (%d)\n", ret);
+@@ -1106,9 +1120,23 @@ analogix_dp_detect(struct drm_connector *connector, bool force)
+ 		return connector_status_disconnected;
+ 	}
+ 
++	if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
++		pm_runtime_get_sync(dp->dev);
++
++		if (dp->plat_data->power_on)
++			dp->plat_data->power_on(dp->plat_data);
++	}
++
+ 	if (!analogix_dp_detect_hpd(dp))
+ 		status = connector_status_connected;
+ 
++	if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
++		if (dp->plat_data->power_off)
++			dp->plat_data->power_off(dp->plat_data);
++
++		pm_runtime_put_sync(dp->dev);
++	}
++
+ 	ret = analogix_dp_prepare_panel(dp, false, false);
+ 	if (ret)
+ 		DRM_ERROR("Failed to unprepare panel (%d)\n", ret);
+-- 
+1.9.1
