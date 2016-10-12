@@ -1,159 +1,69 @@
-From: huziji@marvell.com (Ziji Hu)
-Date: Wed, 12 Oct 2016 20:17:12 +0800
-Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
- Xenon SDHC
-In-Reply-To: <bfe30317-bb3b-b3dc-e9df-87b6ba100307@intel.com>
-References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
- <e08ffb085d02a784b28456ac47fa4dc6540a9139.1475853198.git-series.gregory.clement@free-electrons.com>
- <bfe30317-bb3b-b3dc-e9df-87b6ba100307@intel.com>
-Message-ID: <bcf4abca-9f2e-6d1b-6690-d672766e18cb@marvell.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Wed, 12 Oct 2016 05:21:44 -0700
+Subject: [RFC PATCH 00/11] pci: support for configurable PCI endpoint
+In-Reply-To: <57E8BB69.4020804@ti.com>
+References: <1473829927-20466-1-git-send-email-kishon@ti.com>
+ <2837059.ka7z3gzjF2@wuerfel> <57DA5CC1.6030502@ti.com>
+ <6722152.QTF992tLpW@wuerfel> <57E8BB69.4020804@ti.com>
+Message-ID: <20161012122144.GA2009@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian,
+On Mon, Sep 26, 2016 at 11:38:41AM +0530, Kishon Vijay Abraham I wrote:
+> > Ok, so in theory there can be other hardware (and quite likely is)
+> > that supports multiple functions, and we can extend the framework
+> > to support them without major obstacles, but your hardware doesn't,
+> > so you kept it simple with one hardcoded function, right?
+> 
+> right, PCIe can have upto 8 functions. So the issues with the current framework
+> has to be fixed. I don't expect major obstacles with this as of now.
 
-On 2016/10/11 20:39, Adrian Hunter wrote:
-> On 07/10/16 18:22, Gregory CLEMENT wrote:
->> From: Ziji Hu <huziji@marvell.com>
->>
->> Marvell Xenon eMMC/SD/SDIO Host Controller contains PHY.
->> Three types of PHYs are supported.
->>
->> Add support to multiple types of PHYs init and configuration.
->> Add register definitions of PHYs.
->>
->> Signed-off-by: Hu Ziji <huziji@marvell.com>
->> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  MAINTAINERS                        |    1 +-
->>  drivers/mmc/host/Makefile          |    2 +-
->>  drivers/mmc/host/sdhci-xenon-phy.c | 1141 +++++++++++++++++++++++++++++-
->>  drivers/mmc/host/sdhci-xenon-phy.h |  157 ++++-
->>  drivers/mmc/host/sdhci-xenon.c     |    4 +-
->>  drivers/mmc/host/sdhci-xenon.h     |   17 +-
->>  6 files changed, 1321 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.c
->>  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.h
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 859420e5dfd3..b5673c2ee5f2 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -7583,6 +7583,7 @@ M:	Ziji Hu <huziji@marvell.com>
->>  L:	linux-mmc at vger.kernel.org
->>  S:	Supported
->>  F:	drivers/mmc/host/sdhci-xenon.*
->> +F:	drivers/mmc/host/sdhci-xenon-phy.*
->>  F:	Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt
->>  
->>  MATROX FRAMEBUFFER DRIVER
->> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
->> index 75eaf743486c..4f2854556ff7 100644
->> --- a/drivers/mmc/host/Makefile
->> +++ b/drivers/mmc/host/Makefile
->> @@ -82,4 +82,4 @@ ifeq ($(CONFIG_CB710_DEBUG),y)
->>  endif
->>  
->>  obj-$(CONFIG_MMC_SDHCI_XENON)	+= sdhci-xenon-driver.o
->> -sdhci-xenon-driver-y		+= sdhci-xenon.o
->> +sdhci-xenon-driver-y		+= sdhci-xenon.o sdhci-xenon-phy.o
->> diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
->> new file mode 100644
->> index 000000000000..4eb8fea1bec9
->> --- /dev/null
->> +++ b/drivers/mmc/host/sdhci-xenon-phy.c
-> 
-> <SNIP>
-> 
->> +static int __xenon_emmc_delay_adj_test(struct mmc_card *card)
->> +{
->> +	int err;
->> +	u8 *ext_csd = NULL;
->> +
->> +	err = mmc_get_ext_csd(card, &ext_csd);
->> +	kfree(ext_csd);
->> +
->> +	return err;
->> +}
->> +
->> +static int __xenon_sdio_delay_adj_test(struct mmc_card *card)
->> +{
->> +	struct mmc_command cmd = {0};
->> +	int err;
->> +
->> +	cmd.opcode = SD_IO_RW_DIRECT;
->> +	cmd.flags = MMC_RSP_R5 | MMC_CMD_AC;
->> +
->> +	err = mmc_wait_for_cmd(card->host, &cmd, 0);
->> +	if (err)
->> +		return err;
->> +
->> +	if (cmd.resp[0] & R5_ERROR)
->> +		return -EIO;
->> +	if (cmd.resp[0] & R5_FUNCTION_NUMBER)
->> +		return -EINVAL;
->> +	if (cmd.resp[0] & R5_OUT_OF_RANGE)
->> +		return -ERANGE;
->> +	return 0;
->> +}
->> +
->> +static int __xenon_sd_delay_adj_test(struct mmc_card *card)
->> +{
->> +	struct mmc_command cmd = {0};
->> +	int err;
->> +
->> +	cmd.opcode = MMC_SEND_STATUS;
->> +	cmd.arg = card->rca << 16;
->> +	cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
->> +
->> +	err = mmc_wait_for_cmd(card->host, &cmd, 0);
->> +	return err;
->> +}
->> +
->> +static int xenon_delay_adj_test(struct mmc_card *card)
->> +{
->> +	WARN_ON(!card);
->> +	WARN_ON(!card->host);
->> +
->> +	if (mmc_card_mmc(card))
->> +		return __xenon_emmc_delay_adj_test(card);
->> +	else if (mmc_card_sd(card))
->> +		return __xenon_sd_delay_adj_test(card);
->> +	else if (mmc_card_sdio(card))
->> +		return __xenon_sdio_delay_adj_test(card);
->> +	else
->> +		return -EINVAL;
->> +}
-> 
-> So you are issuing commands from the ->set_ios() callback.  I would want to
-> get Ulf's OK for that before going further.
-> 
-	Yes, you are correct.
-	In some speed mode, Xenon SDHC has to send a series of transfers to search for a perfect sampling point in PHY delay line.
-	It is like tuning process.
+I wouldn't be too worried about.  We have two kinds of functions in
+PCIe: physical functions, or virtual functions using SR-IOV.
 
-> One thing: you will need to ensure you don't trigger get HS400 re-tuning
-> because it will call back into ->set_ios().
+For the first one we pretty much just need the controller driver to
+report them separately as there is almost no interaction between
+functions.
+
+SR-IOV support will be more interesting as the physical functions
+controls creation of the associated virtual functions.  I'd like to
+defer that problem until we get hold of a software programmable
+controller that supports SR-IOV and has open documentation.  (That
+beeing said, if someone has a pointer to such a beast send it my way!)
+
+> > We should still find out whether it's important that you can have
+> > a single PCI function with a software multi-function support of some
+> > sort. We'd still be limited to six BARs in total, and would also need
+> > something to identify those sub-functions, so implementing that might
+> > get quite hairy.
+> > 
+> > Possibly this could be done at a higher level, e.g. by implementing
+> > a PCI-virtio multiplexer that can host multiple virtio based devices
+> > inside of a single PCI function. If we think that would be a good idea,
+> > we should make sure the configfs interface is extensible enough to
+> > handle that.
 > 
-	Could you please make the term "HS400 re-tuning" more detailed?
-	In current MMC driver, "HS400 re-tuning" will go back to HS200, execute HS200 tuning and come back to HS400.
-	I'm sure our Xenon SDHC will not execute it.
+> Okay. So here the main function (actual PCI function) *can* perform the work of
+> virtio muliplexer if the platform wants to support sub-functions or it can be a
+> normal PCI function. right?
 
-	However, in coming eMMC 5.2, there is a real HS400 re-tuning, in which tuning can be directly executed in HS400 mode.
-	Our Xenon SDHC will neither trigger this HS400 re-tuning.
-	But since so far there is no such feature in MMC driver, I cannot give you a 100% guarantee now.
+I really don't think we should be worried about this multiplexer.  It's
+not something real PCIe devices do (sane ones anyway, the rest is
+handled by ad-hoc multiplexers), and we should avoid creating our own
+magic periphals for it.
 
-> And you have the problem that you need to get a reference to the card before
-> the card device has been added.  As I wrote in response to the previous
-> patch, you should get Ulf's help with that too.
+> > One use case I have in mind for this is to have a PCI function that
+> > can use virtio to provide rootfs (virtio-blk or 9pfs), network
+> > and console to the system that implements the PCI function (note
+> > that this is the opposite direction of what almost everyone else
+> > uses PCI devices for).
 > 
-	Sure.
-	I will get card_candidate solved at first.
-	Thank you again for your review and help.
+> Do you mean the virtio should actually be in the host side? Even here the
+> system that implements PCI function should have multiple functions right? (one
+> for network, other for console etc..). So there should be a virtio multiplexer
+> both in the host side and in the device side?
 
-	Thank you.
-
-Best regards,
-Hu Ziji
-> 
+We already support virtio over phsysical PCIe buses to support intel MIC
+devices.  Take a look at drivers/misc/mic/bus/vop_bus.c and
+drivers/misc/mic/vop (yes, what a horrible place for that code, not my
+fault)
