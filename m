@@ -1,94 +1,84 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Wed, 12 Oct 2016 17:11:37 -0600
-Subject: [PATCH] exynos-drm: Fix display manager failing to start without
- IOMMU problem
-In-Reply-To: <57B29925.4020600@samsung.com>
-References: <CGME20160810214111epcas1p4dd2a581353b550a1992fc7695e846da7@epcas1p4.samsung.com>
- <1470850251-9150-1-git-send-email-shuahkh@osg.samsung.com>
- <57ABB1ED.1080301@samsung.com> <57ABB31E.1070802@osg.samsung.com>
- <57AE0736.6020705@osg.samsung.com> <57AE0CCB.1010708@osg.samsung.com>
- <57B29925.4020600@samsung.com>
-Message-ID: <ce7a035c-f881-82ac-97f6-869442d1ed47@osg.samsung.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 12 Oct 2016 16:13:41 -0700
+Subject: [PATCHv2 1/4] arm64: dump: Make ptdump debugfs a separate option
+In-Reply-To: <3d550df8-f850-d217-aaae-d69c8ea8243b@redhat.com>
+References: <1476311522-15381-1-git-send-email-labbott@redhat.com>
+ <1476311522-15381-2-git-send-email-labbott@redhat.com>
+ <CAGXu5jLNUrt22Qg2gFmLj9rgStOTTTsOT7QGaw5efk==WbFwRg@mail.gmail.com>
+ <3d550df8-f850-d217-aaae-d69c8ea8243b@redhat.com>
+Message-ID: <CAGXu5jK+eYwiEPRGqfF3Ai=cGUkGAGU3o3fwDWCB6RJtHPA-bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Inki,
-
-On 08/15/2016 10:40 PM, Inki Dae wrote:
-
+On Wed, Oct 12, 2016 at 3:57 PM, Laura Abbott <labbott@redhat.com> wrote:
+> On 10/12/2016 03:45 PM, Kees Cook wrote:
 >>
->> okay the very first commit that added IOMMU support
->> introduced the code that rejects non-contig gem memory
->> type without IOMMU.
+>> On Wed, Oct 12, 2016 at 3:31 PM, Laura Abbott <labbott@redhat.com> wrote:
+>>>
+>>>
+>>> ptdump_register currently initializes a set of page table information and
+>>> registers debugfs. There are uses for the ptdump option without wanting
+>>> the
+>>> debugfs options. Split this out to make it a separate option.
+>>>
+>>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>>> ---
+>>> v2: Minor style fixups per Mark Rutland, intialization is now separate
+>>> from
+>>>     register since it never needed to be combined in the first place, EFI
+>>>     page table registration.
+>>> ---
+>>>  arch/arm64/Kconfig.debug           |  6 +++++-
+>>>  arch/arm64/include/asm/ptdump.h    | 13 ++++++++-----
+>>>  arch/arm64/mm/Makefile             |  3 ++-
+>>>  arch/arm64/mm/dump.c               | 26 +++++---------------------
+>>>  arch/arm64/mm/ptdump_debugfs.c     | 31 +++++++++++++++++++++++++++++++
+>>>  drivers/firmware/efi/arm-runtime.c |  5 ++---
+>>>  6 files changed, 53 insertions(+), 31 deletions(-)
+>>>  create mode 100644 arch/arm64/mm/ptdump_debugfs.c
+>>>
+>>> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+>>> index b661fe7..21a5b74 100644
+>>> --- a/arch/arm64/Kconfig.debug
+>>> +++ b/arch/arm64/Kconfig.debug
+>>> @@ -2,9 +2,13 @@ menu "Kernel hacking"
+>>>
+>>>  source "lib/Kconfig.debug"
+>>>
+>>> -config ARM64_PTDUMP
+>>> +config ARM64_PTDUMP_CORE
+>>> +       def_bool n
+>>> +
+>>> +config ARM64_PTDUMP_DEBUGFS
+>>>         bool "Export kernel pagetable layout to userspace via debugfs"
 >>
->> commit 0519f9a12d0113caab78980c48a7902d2bd40c2c
->> Author: Inki Dae <inki.dae@samsung.com>
->> Date:   Sat Oct 20 07:53:42 2012 -0700
 >>
->>     drm/exynos: add iommu support for exynos drm framework
+>> I think this can be a tristate now, yes? (I did this on x86 so I could
+>> load ptdump as a module for Chrome OS image testing but then leave the
+>> module off the read-only partition for release images...)
 >>
+>> https://git.kernel.org/linus/8609d1b5daa36350e020e737946c40887af1743a
+>>
+>> -Kees
+>>
+>
+> I saw the module for x86. arm64 works slightly differently since there
+> are multiple debugfs dumping sources, the init_mm and EFI page tables.
+> These are built in and can call register but then have no way to
+> actually register the debugfs entry when the module is inserted since
+> the current config covers both/all of the exporters. I
+> decided against trying to add the infrastructure to make modularity
+> work because I was spending more time on that than the actual W^X checks.
 
-I haven't given up on this yet. I am still seeing the following failure:
+Okay, sounds fine. I'll see if I can take a look at this in the future
+if no one else beats me to it.
 
-Additional debug messages I added:
-[   15.287403] exynos_drm_gem_create_ioctl() 1
-[   15.287419] exynos_drm_gem_create() flags 1
+In the meantime, this whole series looks good to me. :)
 
-[   15.311511] [drm:exynos_drm_framebuffer_init] *ERROR* Non-contiguous GEM memory is not supported.
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
-Additional debug message I added:
-[   15.318981] [drm:exynos_user_fb_create] *ERROR* failed to initialize framebuffer
+-Kees
 
-This is what happens:
-
-1. exynos_drm_gem_create_ioctl() gets called with EXYNOS_BO_NONCONTIG request
-2. exynos_drm_gem_create(0 goes ahead and creates the GEM buffers
-3. exynos_user_fb_create() tries to associate GEM to fb and fails during
-   check_fb_gem_memory_type()
-
-At this point, there is no recovery and lightdm fails
-
-xf86-video-armsoc/src/drmmode_exynos/drmmode_exynos.c assumes contiguous
-allocations are not supported in some exynos drm versions: The following
-commit introduced this change:
-
-https://git.linaro.org/arm/xorg/driver/xf86-video-armsoc.git/commitdiff/3be1f6273441fe95dd442f44064387322e16b7e9
-
-excerpts from the diff:-       if (create_gem->buf_type == ARMSOC_BO_SCANOUT)
--               create_exynos.flags = EXYNOS_BO_CONTIG;
--       else
--               create_exynos.flags = EXYNOS_BO_NONCONTIG;
-+
-+       /* Contiguous allocations are not supported in some exynos drm versions.
-+        * When they are supported all allocations are effectively contiguous
-+        * anyway, so for simplicity we always request non contiguous buffers.
-+        */
-+       create_exynos.flags = EXYNOS_BO_NONCONTIG;
-
-There might have been logic on exynos_drm that forced Contig when it coudn't
-support NONCONTIG. At least, that is what this comment suggests. This assumption
-doesn't appear to be a good one and not sure if this change was made to fix a bug.
-
-After the IOMMU support, this assumption is no longer true. Hence, with IOMMU
-support, latest kernels have a mismatch with the installed xf86-video-armsoc
-
-This is what I am running into. This leads to the following question:
-
-1. How do we ensure exynos_drm kernel changes don't break user-space
-   specifically xf86-video-armsoc
-2. This seems to have gone undetected for a while. I see a change in
-   exynos_drm_gem_dumb_create() that is probably addressing this type
-   of breakage. Commit 122beea84bb90236b1ae545f08267af58591c21b adds
-   handling for IOMMU NONCONTIG case.
-
-Anyway, I am interested in getting the exynos_drm kernel side code
-and xf86-video-armsoc in sync to resolve the issue.
-
-Could you recommend a going forward plan?
-
-I can submit a patch to xf86-video-armsoc. I am also looking ahead to
-see if we can avoid such breaks in the future by keeping kernel and
-xf86-video-armsoc in sync.
-
-thanks,
--- Shuah
+-- 
+Kees Cook
+Nexus Security
