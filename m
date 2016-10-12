@@ -1,78 +1,182 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Oct 2016 23:09:28 +0200
-Subject: [PATCH] drm/sun4i: Check that the plane coordinates are not
- negative
-In-Reply-To: <20161003181840.0cb369d8@bbrezillon>
-References: <20160930143320.26241-1-maxime.ripard@free-electrons.com>
- <20160930180826.169e3daf@bbrezillon>
- <20161003125811.GH5228@lukather>
- <20161003181840.0cb369d8@bbrezillon>
-Message-ID: <20161012210928.GB9245@lukather>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Wed, 12 Oct 2016 15:23:21 -0600
+Subject: [PATCH V3 09/10] trace, ras: add ARM processor error trace event
+In-Reply-To: <20161007173959.5ff3fcfa@gandalf.local.home>
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-10-git-send-email-tbaicar@codeaurora.org>
+ <20161007173959.5ff3fcfa@gandalf.local.home>
+Message-ID: <421c3f7c-d9f6-2cdc-71f4-c6548388bca8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2016 at 06:18:40PM +0200, Boris Brezillon wrote:
-> On Mon, 3 Oct 2016 14:58:11 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > Hi Boris,
-> > 
-> > On Fri, Sep 30, 2016 at 06:08:26PM +0200, Boris Brezillon wrote:
-> > > On Fri, 30 Sep 2016 16:33:20 +0200
-> > > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > >   
-> > > > Our planes cannot be set at negative coordinates. Make sure we reject such
-> > > > configuration.
-> > > > 
-> > > > Reported-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > ---
-> > > >  drivers/gpu/drm/sun4i/sun4i_layer.c | 3 +++
-> > > >  1 file changed, 3 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> > > > index f0035bf5efea..f5463c4c2cde 100644
-> > > > --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-> > > > +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> > > > @@ -29,6 +29,9 @@ struct sun4i_plane_desc {
-> > > >  static int sun4i_backend_layer_atomic_check(struct drm_plane *plane,
-> > > >  					    struct drm_plane_state *state)
-> > > >  {
-> > > > +	if ((state->crtc_x < 0) || (state->crtc_y < 0))
-> > > > +		return -EINVAL;
-> > > > +  
-> > > 
-> > > Hm, I think it's a perfectly valid use case from the DRM framework and
-> > > DRM user PoV: you may want to place your plane at a negative CRTC
-> > > offset (which means part of the plane will be hidden).
-> > > 
-> > > Maybe I'm wrong, but it seems you can support that by adapting the
-> > > start address of your framebuffer pointer and the layer size.  
-> > 
-> > Indeed, that would probably work. This is even somewhat what we've
-> > been using to implement the VGA hack we use on the CHIP.
-> > 
-> > Can you send that patch?
-> 
-> Actually, Ville suggested a slightly different approach: use the
-> ->src and ->dst in drm_plane_state.
+Hello Steve,
 
-After more tests, it turns out that it's actually simpler than
-that....
+Thank you for your feedback! Responses below.
 
-The hardware is able to take negative coordinates.
+On 10/7/2016 3:39 PM, Steven Rostedt wrote:
+> On Fri,  7 Oct 2016 15:31:21 -0600
+> Tyler Baicar <tbaicar@codeaurora.org> wrote:
+>
+>> Currently there are trace events for the various RAS
+>> errors with the exception of ARM processor type errors.
+>> Add a new trace event for such errors so that the user
+>> will know when they occur. These trace events are
+>> consistent with the ARM processor error section type
+>> defined in UEFI 2.6 spec section N.2.4.4.
+>>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> ---
+>>   drivers/firmware/efi/cper.c |  9 ++++++
+>>   drivers/ras/ras.c           |  1 +
+>>   include/ras/ras_event.h     | 67 +++++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 77 insertions(+)
+>>
+>> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+>> index f9ffba6..21b8a6f 100644
+>> --- a/drivers/firmware/efi/cper.c
+>> +++ b/drivers/firmware/efi/cper.c
+>> @@ -34,6 +34,7 @@
+>>   #include <linux/aer.h>
+>>   #include <linux/printk.h>
+>>   #include <linux/bcd.h>
+>> +#include <ras/ras_event.h>
+>>   
+>>   #define INDENT_SP	" "
+>>   
+>> @@ -256,6 +257,14 @@ static void cper_print_proc_armv8(const char *pfx,
+>>   		    CPER_ARMV8_INFO_VALID_PHYSICAL_ADDR)
+>>   			printk("%sphysical fault address: 0x%016llx\n",
+>>   				newpfx, err_info->physical_fault_addr);
+>> +		trace_arm_event(proc->affinity_level, proc->mpidr, proc->midr,
+>> +				proc->running_state, proc->psci_state,
+>> +				err_info->version, err_info->type,
+>> +				err_info->multiple_error,
+>> +				err_info->validation_bits,
+>> +				err_info->error_info,
+>> +				err_info->virt_fault_addr,
+>> +				err_info->physical_fault_addr);
+> Why waste all the effort into passing each individual field. Why not
+> just pass the structure in and sort it out in the TP_fast_assign()?
+That should be a lot cleaner, I will make that change in the next patchset.
+>>   		err_info += 1;
+>>   	}
+>>   
+>> diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
+>> index fb2500b..8ba5a94 100644
+>> --- a/drivers/ras/ras.c
+>> +++ b/drivers/ras/ras.c
+>> @@ -28,3 +28,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
+>>   #endif
+>>   EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
+>>   EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
+>> +EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
+>> diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
+>> index 5861b6f..eb2719a 100644
+>> --- a/include/ras/ras_event.h
+>> +++ b/include/ras/ras_event.h
+>> @@ -162,6 +162,73 @@ TRACE_EVENT(mc_event,
+>>   );
+>>   
+>>   /*
+>> + * ARM Processor Events Report
+>> + *
+>> + * This event is generated when hardware detects an ARM processor error
+>> + * has occurred. UEFI 2.6 spec section N.2.4.4.
+>> + */
+>> +TRACE_EVENT(arm_event,
+>> +
+>> +	TP_PROTO(const u8 affinity,
+>> +		 const u64 mpidr,
+>> +		 const u64 midr,
+>> +		 const u32 running_state,
+>> +		 const u32 psci_state,
+>> +		 const u8 version,
+>> +		 const u8 type,
+>> +		 const u16 err_count,
+>> +		 const u8 flags,
+>> +		 const u64 info,
+>> +		 const u64 virt_fault_addr,
+>> +		 const u64 phys_fault_addr),
+>> +
+>> +	TP_ARGS(affinity, mpidr, midr, running_state, psci_state,
+>> +		version, type, err_count, flags, info, virt_fault_addr,
+>> +		phys_fault_addr),
+>> +
+>> +	TP_STRUCT__entry(
+>> +		__field(u8, affinity)
+>> +		__field(u64, mpidr)
+>> +		__field(u64, midr)
+>> +		__field(u32, running_state)
+>> +		__field(u32, psci_state)
+>> +		__field(u8, version)
+>> +		__field(u8, type)
+>> +		__field(u16, err_count)
+>> +		__field(u8, flags)
+>> +		__field(u64, info)
+>> +		__field(u64, virt_fault_addr)
+>> +		__field(u64, phys_fault_addr)
+> The above creates a structure with lots of holes in it. Pack it better.
+> You want something like:
+>
+> 	__field(u64, mpidr)
+> 	__field(u64, midr)
+> 	__field(u64, info)
+> 	__field(u64, virt_fault_addr)
+> 	__field(u64, phys_fault_addr)
+> 	__field(u32, running_state)
+> 	__field(u32, psci_state)
+> 	__field(u16, err_count)
+> 	__field(u8, affinity)
+> 	__field(u8, version)
+> 	__field(u8, type)
+> 	__field(u8, flags)
+>
+> The above is a total of 54 bytes. Your original was at a minimum, 64
+> bytes.
+>
+> -- Steve
+I will reorder the structure in the next patchset. I originally used 
+this order because that is the order the entries appear in the spec 
+(table 260 and 261 of UEFI spec 2.6). It makes more sense to save the 
+space though.
 
-Sorry for the noise,
-Maxime
+Thanks,
+Tyler
+>> +	),
+>> +
+>> +	TP_fast_assign(
+>> +		__entry->affinity = affinity;
+>> +		__entry->mpidr = mpidr;
+>> +		__entry->midr = midr;
+>> +		__entry->running_state = running_state;
+>> +		__entry->psci_state = psci_state;
+>> +		__entry->version = version;
+>> +		__entry->type = type;
+>> +		__entry->err_count = err_count;
+>> +		__entry->flags = flags;
+>> +		__entry->info = info;
+>> +		__entry->virt_fault_addr = virt_fault_addr;
+>> +		__entry->phys_fault_addr = phys_fault_addr;
+>> +	),
+>> +
+>> +	TP_printk("affinity level: %d; MPIDR: %016llx; MIDR: %016llx; "
+>> +		  "running state: %d; PSCI state: %d; version: %d; type: %d; "
+>> +		  "error count: 0x%04x; flags: 0x%02x; info: %016llx; "
+>> +		  "virtual fault address: %016llx; "
+>> +		  "physical fault address: %016llx",
+>> +		  __entry->affinity, __entry->mpidr, __entry->midr,
+>> +		  __entry->running_state, __entry->psci_state, __entry->version,
+>> +		  __entry->type, __entry->err_count, __entry->flags,
+>> +		  __entry->info, __entry->virt_fault_addr,
+>> +		  __entry->phys_fault_addr)
+>> +);
+>> +
+>> +/*
+>>    * Unknown Section Report
+>>    *
+>>    * This event is generated when hardware detected a hardware
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161012/14a89d77/attachment.sig>
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
