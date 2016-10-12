@@ -1,71 +1,120 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Wed, 12 Oct 2016 13:22:10 +0000
-Subject: [PATCH v14 02/16] iommu: Introduce DOMAIN_ATTR_MSI_RESV
+Date: Wed, 12 Oct 2016 13:22:11 +0000
+Subject: [PATCH v14 03/16] iommu/dma: Allow MSI-only cookies
 In-Reply-To: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
 References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1476278544-3397-3-git-send-email-eric.auger@redhat.com>
+Message-ID: <1476278544-3397-4-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new DOMAIN_ATTR_MSI_RESV domain attribute and associated
-iommu_domain msi_resv field. It comprises the size and alignment
-of the IOVA reserved window dedicated to MSI mapping. This attribute
-only is supported when MSI must be IOMMU mapped.
+From: Robin Murphy <robin.murphy@arm.com>
 
-This is the case on ARM.
+IOMMU domain users such as VFIO face a similar problem to DMA API ops
+with regard to mapping MSI messages in systems where the MSI write is
+subject to IOMMU translation. With the relevant infrastructure now in
+place for managed DMA domains, it's actually really simple for other
+users to piggyback off that and reap the benefits without giving up
+their own IOVA management, and without having to reinvent their own
+wheel in the MSI layer.
 
+Allow such users to opt into automatic MSI remapping by dedicating a
+region of their IOVA space to a managed cookie.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Suggested-by: Alex Williamson <alex.williamson@redhat.com>
 
 ---
+
 v13 -> v14:
-- new msi_resv type and name
+- restore reserve_iova for iova >= base + size
 
-v12 -> v13:
-- reword the commit message
-
-v8 -> v9:
-- rename programmable into iommu_msi_supported
-- add iommu_domain_msi_aperture_valid
-
-v8: creation
-- deprecates DOMAIN_ATTR_MSI_MAPPING flag
+v1 -> v13 incorpration:
+- compared to Robin's version
+- add NULL last param to iommu_dma_init_domain
+- set the msi_geometry aperture
+- I removed
+  if (base < U64_MAX - size)
+     reserve_iova(iovad, iova_pfn(iovad, base + size), ULONG_MAX);
+  don't get why we would reserve something out of the scope of the iova domain?
+  what do I miss?
 ---
- include/linux/iommu.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/iommu/dma-iommu.c | 39 +++++++++++++++++++++++++++++++++++++++
+ include/linux/dma-iommu.h |  9 +++++++++
+ 2 files changed, 48 insertions(+)
 
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 436dc21..aaeb598 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -52,6 +52,12 @@ struct iommu_domain_geometry {
- 	bool force_aperture;       /* DMA only allowed in mappable range? */
- };
- 
-+/* MSI reserved IOVA window requirements */
-+struct iommu_domain_msi_resv {
-+	size_t size;		/* size in bytes	*/
-+	size_t alignment;	/* byte alignment	*/
-+};
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index c5ab866..d45f9a0 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -716,3 +716,42 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
+ 		msg->address_lo += lower_32_bits(msi_page->iova);
+ 	}
+ }
 +
- /* Domain feature flags */
- #define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
- #define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
-@@ -83,6 +89,7 @@ struct iommu_domain {
- 	iommu_fault_handler_t handler;
- 	void *handler_token;
- 	struct iommu_domain_geometry geometry;
-+	struct iommu_domain_msi_resv msi_resv;
- 	void *iova_cookie;
- };
++/**
++ * iommu_get_dma_msi_region_cookie - Configure a domain for MSI remapping only
++ * @domain: IOMMU domain to prepare
++ * @base: Base address of IOVA region to use as the MSI remapping aperture
++ * @size: Size of the desired MSI aperture
++ *
++ * Users who manage their own IOVA allocation and do not want DMA API support,
++ * but would still like to take advantage of automatic MSI remapping, can use
++ * this to initialise their own domain appropriately.
++ */
++int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
++			       dma_addr_t base, u64 size)
++{
++	struct iommu_dma_cookie *cookie;
++	struct iova_domain *iovad;
++	int ret;
++
++	if (domain->type == IOMMU_DOMAIN_DMA)
++		return -EINVAL;
++
++	ret = iommu_get_dma_cookie(domain);
++	if (ret)
++		return ret;
++
++	ret = iommu_dma_init_domain(domain, base, size, NULL);
++	if (ret) {
++		iommu_put_dma_cookie(domain);
++		return ret;
++	}
++
++	cookie = domain->iova_cookie;
++	iovad = &cookie->iovad;
++	if (base < U64_MAX - size)
++		reserve_iova(iovad, iova_pfn(iovad, base + size), ULONG_MAX);
++
++	return 0;
++}
++EXPORT_SYMBOL(iommu_get_dma_msi_region_cookie);
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index 32c5890..05ab5b4 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -67,6 +67,9 @@ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
+ /* The DMA API isn't _quite_ the whole story, though... */
+ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
  
-@@ -108,6 +115,7 @@ enum iommu_cap {
++int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
++				    dma_addr_t base, u64 size);
++
+ #else
  
- enum iommu_attr {
- 	DOMAIN_ATTR_GEOMETRY,
-+	DOMAIN_ATTR_MSI_RESV,
- 	DOMAIN_ATTR_PAGING,
- 	DOMAIN_ATTR_WINDOWS,
- 	DOMAIN_ATTR_FSL_PAMU_STASH,
+ struct iommu_domain;
+@@ -90,6 +93,12 @@ static inline void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
+ {
+ }
+ 
++static inline int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
++						  dma_addr_t base, u64 size)
++{
++	return -ENODEV;
++}
++
+ #endif	/* CONFIG_IOMMU_DMA */
+ #endif	/* __KERNEL__ */
+ #endif	/* __DMA_IOMMU_H */
 -- 
 1.9.1
