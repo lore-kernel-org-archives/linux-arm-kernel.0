@@ -1,63 +1,58 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 12 Oct 2016 10:55:59 +0200
-Subject: [PATCH v4 08/10] ARM: dts: sun8i: Enable sun8i-emac on the
- Orange Pi 2
-In-Reply-To: <1475828757-926-9-git-send-email-clabbe.montjoie@gmail.com>
-References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
- <1475828757-926-9-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20161012105559.aaf9122e376fa5969a2e61d9@free.fr>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 12 Oct 2016 11:01:05 +0200
+Subject: [PATCH 3/3] mtd: s3c2410: parse the device configuration from
+ OF node
+In-Reply-To: <1475711217-974-4-git-send-email-sergio.prado@e-labworks.com>
+References: <1475711217-974-1-git-send-email-sergio.prado@e-labworks.com>
+ <1475711217-974-4-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <20161012110105.49830f86@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  7 Oct 2016 10:25:55 +0200
-Corentin Labbe <clabbe.montjoie@gmail.com> wrote:
+Hi Sergio,
 
-> The sun8i-emac hardware is present on the Orange PI 2.
-> It uses the internal PHY.
+On Wed,  5 Oct 2016 20:46:57 -0300
+Sergio Prado <sergio.prado@e-labworks.com> wrote:
+
+> Allows configuring Samsung's s3c2410 memory controller using a
+> devicetree.
 > 
-> This patch create the needed emac node.
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
 > ---
->  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
+>  drivers/mtd/nand/s3c2410.c                     | 171 ++++++++++++++++++++++---
+>  include/linux/platform_data/mtd-nand-s3c2410.h |   1 +
+>  2 files changed, 156 insertions(+), 16 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-> index f93f5d1..5608eb4 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-> @@ -54,6 +54,7 @@
->  
->  	aliases {
->  		serial0 = &uart0;
-> +		ethernet0 = &emac;
+> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> index 174ac9dc4265..352cf2656bc8 100644
+> --- a/drivers/mtd/nand/s3c2410.c
+> +++ b/drivers/mtd/nand/s3c2410.c
 
-As there is no 'of_alias_get_id' in the driver, this alias is useless.
+[...]
 
->  	};
->  
->  	chosen {
-> @@ -184,3 +185,10 @@
->  	usb1_vbus-supply = <&reg_usb1_vbus>;
->  	status = "okay";
->  };
 > +
-> +&emac {
-> +	phy-handle = <&int_mii_phy>;
-> +	phy-mode = "mii";
-> +	allwinner,leds-active-low;
-> +	status = "okay";
-> +};
-> -- 
-> 2.7.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +static int s3c2410_nand_init_timings(struct s3c2410_nand_info *info,
+> +				     struct nand_chip *chip)
+> +{
+> +	struct s3c2410_platform_nand *pdata = info->platform;
+> +	const struct nand_sdr_timings *t;
+> +	int tacls, mode;
+> +
+> +	mode = onfi_get_async_timing_mode(chip);
+> +	if (mode == ONFI_TIMING_MODE_UNKNOWN)
+> +		mode = chip->onfi_timing_mode_default;
+> +
+> +	t = onfi_async_timing_mode_to_sdr_timings(mode);
+> +	if (IS_ERR(t))
+> +		return PTR_ERR(t);
 
+We recently introduced an method to automate timing selection and
+configuration [1]. Can you switch to this approach (the changes are in
+the nand/next branch [2] and should appear in 4.9-rc1)?
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Thanks,
+
+Boris
+
+[1]https://www.spinics.net/lists/arm-kernel/msg532007.html 
+[2]https://github.com/linux-nand/linux/tree/nand/next
