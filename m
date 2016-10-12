@@ -1,113 +1,129 @@
-From: labath@google.com (Pavel Labath)
-Date: Wed, 12 Oct 2016 14:50:14 +0100
-Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
- addresses
-In-Reply-To: <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
-References: <1474643941-109020-1-git-send-email-labath@google.com>
- <1474643941-109020-2-git-send-email-labath@google.com>
- <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
- <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
- <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
-Message-ID: <CAJt8pk-HJYFUCxRuY5EV6KnM+kNP6mVBrFgPwiGfEkMKqGyjXw@mail.gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 12 Oct 2016 10:51:14 -0400
+Subject: Question: Re: [PATCH] drm/bridge: analogix: protect power when
+ get_modes or detect
+In-Reply-To: <57FE0EF5.7010207@rock-chips.com>
+References: <1476266442-29803-1-git-send-email-mark.yao@rock-chips.com>
+ <57FE0EF5.7010207@rock-chips.com>
+Message-ID: <CAOw6vbKe0d66O1MymP24UQ-M3EmdR+=pZVWmgZG9iVm5x1Arrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Pratyush,
-
-I am sorry about the delay. I have finally had a chance to try out
-your changes today. Response inline.
-
-On 8 October 2016 at 06:10, Pratyush Anand <panand@redhat.com> wrote:
-> On Fri, Oct 7, 2016 at 10:54 PM, Pavel Labath <labath@google.com> wrote:
->> The thing is, I have observed different behavior here depending on the
->> exact hardware used. I don't have the exact parameters with me now,
->> but I can look it up next week.
->>
->> The thing is that the spec is imprecise about what exact address the
->> hardware can report for the watchpoint hit. I presume that is
->> deliberate to give some leeway to implementers. The spec says the
->> address can be anywhere in the range from the lowest memory address
->> accessed by the instruction to the highest address watched by the
->> watchpoint,
+On Wed, Oct 12, 2016 at 6:22 AM, Mark yao <mark.yao@rock-chips.com> wrote:
 >
-> I think, my patches should  be able to take care of the above condition.
-Unfortunately, the patch does not solve the problem for my hardware,
-because of the leeway you give in watchpoint_handler is not big
-enough. It does work however, if I change the line
-> if (addr + 7 < val + lens || addr > val + lene)
-to
-> if (addr + 15 < val + lens || addr > val + lene)
-I do not think we can assume that address reported by the hardware
-will be at most 7 bytes off from the address we put the watchpoint at.
-There is nothing in the spec that guarantees that, and it does not
-seem to be enough for some hardware. In fact, I am not sure we can
-assume 15 is enough either, but maybe it can do for now, until we can
-find hardware that does not work with that (I haven't yet tried what
-happens it the watchpoint is triggered by cache management
-instructions, which can access much larger blocks of memory).
-
-For reference, the hardware in question is:
-> Processor : AArch64 Processor rev 0 (aarch64)
-> processor : 0
-> min_vddcx : 400000
-> min_vddmx : 490000
-> BogoMIPS : 38.00
-> Features : fp asimd evtstrm aes pmull sha1 sha2 crc32
-> CPU implementer : 0x51
-> CPU architecture: 8
-> CPU variant : 0x2
-> CPU part : 0x201
-> CPU revision : 0
-> CPU param : 300 468 468 621 939 299 445 445 621 1077
-> Hardware : Qualcomm Technologies, Inc MSM8996pro
-
-And this is how it behaves:
-The output of the test app triggering the watchpoint (I have set a
-single-byte watchpoint at 555556705f)
+> I'm not familiar with the analogix driver, maybe use a power reference count
+> would better then direct power on/off analogix_dp.
 >
-> Writing to: 555556705f, size: 1
-> Writing to: 555556705e, size: 2
-> Writing to: 555556705c, size: 4
-> Writing to: 5555567058, size: 8
-> Writing to: 5555567050, size: 16
-> Writing to: 5555567040, size: 32
+> Does anyone has the idea to protect detect and get_modes context?
+>
 
-The addresses received by the kernel:
-[  251.812166] c1   3780 hw-breakpoint: watchpoint_handler: addr:
-555556705f, val+lens: 555556705f, val+lene: 555556705f
-[  251.820341] c1   3781 hw-breakpoint: watchpoint_handler: addr:
-555556705e, val+lens: 555556705f, val+lene: 555556705f
-[  251.825572] c0   3782 hw-breakpoint: watchpoint_handler: addr:
-555556705c, val+lens: 555556705f, val+lene: 555556705f
-[  251.831085] c0   3783 hw-breakpoint: watchpoint_handler: addr:
-5555567058, val+lens: 555556705f, val+lene: 555556705f
-[  251.835804] c0   3784 hw-breakpoint: watchpoint_handler: addr:
-5555567050, val+lens: 555556705f, val+lene: 555556705f
-[  251.841350] c0   3785 hw-breakpoint: watchpoint_handler: addr:
-5555567050, val+lens: 555556705f, val+lene: 555556705f
+I'm not sure a reference count is going to help here. The common
+pattern is to call detect() followed by get_modes() and then modeset.
+However, it's not guaranteed that any one of those functions will be
+called after the other. So, if you leave things on after detect or
+get_modes, you might be wasting power (or worse).
 
-Note that for the case of 16 and 32-byte access it returns the address
-5555567050 -- this is why the "+15" is sufficient for me.
+I recently ran into this exact problem with a panel we're using. Check
+out "0b8b059a7: drm/bridge: analogix_dp: Ensure the panel is properly
+prepared/unprepared". Perhaps you can piggyback on that function to
+add your pm_runtime and plat_data callbacks (since using dpms_mode
+might be racey).
+
+Sean
 
 
-The other thing I am not so sure about in your patch is that it has
-potential to mis-attribute the watchpoint hit if we have two
-watchpoints close together. For example, if I have first watchpoint on
-0x1008-0x100f and a second one on 0x1000-0x1007, *and* the application
-writes one byte to 0x1004, then your code will still attribute the hit
-to the first watchpoint, even though it was not really triggered. This
-is the reason I implemented my fix as a two-stage process, first
-looking for exact hits, and then falling back to the nearest one. That
-said, I don't know enough about the codebase to say if this is a real
-problem.
-
-On the plus side, I like the fact that we can watch arbitrary memory
-regions now, and the feature is working perfectly. :)
-
-
-My proposal would be to combine the two patches - take the byte mask
-handling code from yours, and the hit-attribution code from my patch.
-What do you think?
-
-regards,
-pavel
+> I found many other connector driver also direct access register on detect or
+> get_modes, no problem for it?
+>
+> On 2016?10?12? 18:00, Mark Yao wrote:
+>
+> The drm callback ->detect and ->get_modes seems is not power safe,
+> they may be called when device is power off, do register access on
+> detect or get_modes will cause system die.
+>
+> Here is the path call ->detect before analogix_dp power on
+> [<ffffff800843babc>] analogix_dp_detect+0x44/0xdc
+> [<ffffff80083fd840>]
+> drm_helper_probe_single_connector_modes_merge_bits+0xe8/0x41c
+> [<ffffff80083fdb84>] drm_helper_probe_single_connector_modes+0x10/0x18
+> [<ffffff8008418d24>] drm_mode_getconnector+0xf4/0x304
+> [<ffffff800840cff0>] drm_ioctl+0x23c/0x390
+> [<ffffff80081a8adc>] do_vfs_ioctl+0x4b8/0x58c
+> [<ffffff80081a8c10>] SyS_ioctl+0x60/0x88
+>
+> Cc: Inki Dae <inki.dae@samsung.com>
+> Cc: Sean Paul <seanpaul@chromium.org>
+> Cc: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
+> Cc: "Ville Syrj?l?" <ville.syrjala@linux.intel.com>
+>
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> ---
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 28
+> ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> index efac8ab..09dece2 100644
+> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+> @@ -1062,6 +1062,13 @@ int analogix_dp_get_modes(struct drm_connector
+> *connector)
+>   return 0;
+>   }
+>
+> + if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
+> + pm_runtime_get_sync(dp->dev);
+> +
+> + if (dp->plat_data->power_on)
+> + dp->plat_data->power_on(dp->plat_data);
+> + }
+> +
+>   if (analogix_dp_handle_edid(dp) == 0) {
+>   drm_mode_connector_update_edid_property(&dp->connector, edid);
+>   num_modes += drm_add_edid_modes(&dp->connector, edid);
+> @@ -1073,6 +1080,13 @@ int analogix_dp_get_modes(struct drm_connector
+> *connector)
+>   if (dp->plat_data->get_modes)
+>   num_modes += dp->plat_data->get_modes(dp->plat_data, connector);
+>
+> + if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
+> + if (dp->plat_data->power_off)
+> + dp->plat_data->power_off(dp->plat_data);
+> +
+> + pm_runtime_put_sync(dp->dev);
+> + }
+> +
+>   ret = analogix_dp_prepare_panel(dp, false, false);
+>   if (ret)
+>   DRM_ERROR("Failed to unprepare panel (%d)\n", ret);
+> @@ -1106,9 +1120,23 @@ analogix_dp_detect(struct drm_connector *connector,
+> bool force)
+>   return connector_status_disconnected;
+>   }
+>
+> + if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
+> + pm_runtime_get_sync(dp->dev);
+> +
+> + if (dp->plat_data->power_on)
+> + dp->plat_data->power_on(dp->plat_data);
+> + }
+> +
+>   if (!analogix_dp_detect_hpd(dp))
+>   status = connector_status_connected;
+>
+> + if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
+> + if (dp->plat_data->power_off)
+> + dp->plat_data->power_off(dp->plat_data);
+> +
+> + pm_runtime_put_sync(dp->dev);
+> + }
+> +
+>   ret = analogix_dp_prepare_panel(dp, false, false);
+>   if (ret)
+>   DRM_ERROR("Failed to unprepare panel (%d)\n", ret);
+>
+>
+>
+> --
+> ?ark Yao
