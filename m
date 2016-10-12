@@ -1,100 +1,90 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Wed, 12 Oct 2016 13:22:14 +0000
-Subject: [PATCH v14 06/16] iommu/arm-smmu: Implement domain_get_attr for
- DOMAIN_ATTR_MSI_RESV
+Date: Wed, 12 Oct 2016 13:22:15 +0000
+Subject: [PATCH v14 07/16] irqchip/gic-v2m: Register the MSI doorbell
 In-Reply-To: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
 References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1476278544-3397-7-git-send-email-eric.auger@redhat.com>
+Message-ID: <1476278544-3397-8-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM smmu and smmu-v3 translate MSI transactions so their driver
-are must implement domain_get_attr for DOMAIN_ATTR_MSI_RESV.
-
-This allows to retrieve the size and alignment requirements of
-the MSI reserved IOVA window.
-
-Also IOMMU_DMA gets selected since it exposes the API to map the
-MSIs.
+Register the GIC V2M global doorbell. The registered information
+are used to set up the KVM passthrough use case.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
----
- drivers/iommu/Kconfig       | 4 ++--
- drivers/iommu/arm-smmu-v3.c | 7 +++++++
- drivers/iommu/arm-smmu.c    | 7 +++++++
- 3 files changed, 16 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 8ee54d7..f5e5e4b 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -297,7 +297,7 @@ config SPAPR_TCE_IOMMU
- config ARM_SMMU
- 	bool "ARM Ltd. System MMU (SMMU) Support"
- 	depends on (ARM64 || ARM) && MMU
--	select IOMMU_API
-+	select IOMMU_DMA
- 	select IOMMU_IO_PGTABLE_LPAE
- 	select ARM_DMA_USE_IOMMU if ARM
- 	help
-@@ -310,7 +310,7 @@ config ARM_SMMU
- config ARM_SMMU_V3
- 	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
- 	depends on ARM64
--	select IOMMU_API
-+	select IOMMU_DMA
- 	select IOMMU_IO_PGTABLE_LPAE
- 	select GENERIC_MSI_IRQ_DOMAIN
- 	help
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 15c01c3..572cad8 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1559,6 +1559,9 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- 	if (ret < 0)
- 		free_io_pgtable_ops(pgtbl_ops);
+---
+v13 -> v14:
+- use iommu_msi_doorbell_alloc/free
+
+v12 -> v13:
+- use new msi doorbell registration prototype
+- remove iommu protection attributes
+- add unregistration in teardown
+
+v11 -> v12:
+- use irq_get_msi_doorbell_info new name
+- simplify error handling
+
+v10 -> v11:
+- use the new registration API and re-implement the msi_doorbell_info
+  ops
+
+v9 -> v10:
+- introduce the registration concept in place of msi_doorbell_info
+  callback
+
+v8 -> v9:
+- use global_doorbell instead of percpu_doorbells
+
+v7 -> v8:
+- gicv2m_msi_doorbell_info does not return a pointer to const
+- remove spurious !v2m check
+- add IOMMU_MMIO flag
+
+v7: creation
+---
+ drivers/irqchip/irq-gic-v2m.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index 863e073..33acfe0 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -70,6 +70,7 @@ struct v2m_data {
+ 	u32 spi_offset;		/* offset to be subtracted from SPI number */
+ 	unsigned long *bm;	/* MSI vector bitmap */
+ 	u32 flags;		/* v2m flags for specific implementation */
++	struct iommu_msi_doorbell_info *doorbell_info; /* MSI doorbell */
+ };
  
-+	if (domain->type == IOMMU_DOMAIN_UNMANAGED)
-+		iommu_calc_msi_resv(domain);
-+
- 	return ret;
- }
+ static void gicv2m_mask_msi_irq(struct irq_data *d)
+@@ -254,6 +255,7 @@ static void gicv2m_teardown(void)
+ 	struct v2m_data *v2m, *tmp;
  
-@@ -1840,6 +1843,10 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
- 	case DOMAIN_ATTR_NESTING:
- 		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
- 		return 0;
-+	case DOMAIN_ATTR_MSI_RESV:
-+		*(struct iommu_domain_msi_resv *)data =
-+			smmu_domain->domain.msi_resv;
-+		return 0;
- 	default:
- 		return -ENODEV;
+ 	list_for_each_entry_safe(v2m, tmp, &v2m_nodes, entry) {
++		iommu_msi_doorbell_free(v2m->doorbell_info);
+ 		list_del(&v2m->entry);
+ 		kfree(v2m->bm);
+ 		iounmap(v2m->base);
+@@ -370,12 +372,18 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
+ 		goto err_iounmap;
  	}
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ac4aab9..ae20b9c 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -943,6 +943,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	domain->geometry.aperture_end = (1UL << ias) - 1;
- 	domain->geometry.force_aperture = true;
  
-+	if (domain->type == IOMMU_DOMAIN_UNMANAGED)
-+		iommu_calc_msi_resv(domain);
++	v2m->doorbell_info = iommu_msi_doorbell_alloc(v2m->res.start,
++						      sizeof(u32), false);
++	if (IS_ERR(v2m->doorbell_info))
++		goto err_free_bm;
 +
- 	/* Initialise the context bank with our page table cfg */
- 	arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
+ 	list_add_tail(&v2m->entry, &v2m_nodes);
  
-@@ -1486,6 +1489,10 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
- 	case DOMAIN_ATTR_NESTING:
- 		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
- 		return 0;
-+	case DOMAIN_ATTR_MSI_RESV:
-+		*(struct iommu_domain_msi_resv *)data =
-+			smmu_domain->domain.msi_resv;
-+		return 0;
- 	default:
- 		return -ENODEV;
- 	}
+ 	pr_info("range%pR, SPI[%d:%d]\n", res,
+ 		v2m->spi_start, (v2m->spi_start + v2m->nr_spis - 1));
+ 	return 0;
+-
++err_free_bm:
++	kfree(v2m->bm);
+ err_iounmap:
+ 	iounmap(v2m->base);
+ err_free_v2m:
 -- 
 1.9.1
