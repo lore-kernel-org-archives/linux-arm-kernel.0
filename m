@@ -1,80 +1,256 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 13 Oct 2016 06:06:26 +0800
-Subject: [arm-soc:to-build 1/3] arch/x86/include/asm/thread_info.h:174:11:
- warning: calling '__builtin_frame_address' with a nonzero argument is unsafe
-Message-ID: <201610130620.AU1Lhqk7%fengguang.wu@intel.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Wed, 12 Oct 2016 16:10:52 -0600
+Subject: [PATCH V3 02/10] ras: acpi/apei: cper: generic error data entry
+ v3 per ACPI 6.1
+In-Reply-To: <3f17d0a8-6b63-5792-903a-341effaae432@arm.com>
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
+ <3f17d0a8-6b63-5792-903a-341effaae432@arm.com>
+Message-ID: <c17a0c03-5037-d88d-f096-4cc72dbfcb99@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
-head:   b0a8f2c6d232f3f8463955e5927c56dd057495b1
-commit: 3ddcb978f68b765b3af38bf45bf4a1a4b0a87df1 [1/3] Revert "Disable "maybe-uninitialized" warning globally"
-config: i386-randconfig-s1-201641 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 3ddcb978f68b765b3af38bf45bf4a1a4b0a87df1
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Hello Suzuki,
 
-All warnings (new ones prefixed by >>):
+Thank you for the feedback! Responses below.
 
-   In file included from include/linux/thread_info.h:69:0,
-                    from arch/x86/include/asm/preempt.h:6,
-                    from include/linux/preempt.h:59,
-                    from include/linux/spinlock.h:50,
-                    from include/linux/mmzone.h:7,
-                    from include/linux/gfp.h:5,
-                    from include/linux/mm.h:9,
-                    from mm/usercopy.c:17:
-   arch/x86/include/asm/thread_info.h: In function 'check_stack_object':
->> arch/x86/include/asm/thread_info.h:174:11: warning: calling '__builtin_frame_address' with a nonzero argument is unsafe [-Wframe-address]
-     oldframe = __builtin_frame_address(1);
-     ~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   arch/x86/include/asm/thread_info.h:176:9: warning: calling '__builtin_frame_address' with a nonzero argument is unsafe [-Wframe-address]
-      frame = __builtin_frame_address(2);
-      ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-vim +/__builtin_frame_address +174 arch/x86/include/asm/thread_info.h
+On 10/11/2016 11:28 AM, Suzuki K Poulose wrote:
+> On 07/10/16 22:31, Tyler Baicar wrote:
+>> Currently when a RAS error is reported it is not timestamped.
+>> The ACPI 6.1 spec adds the timestamp field to the generic error
+>> data entry v3 structure. The timestamp of when the firmware
+>> generated the error is now being reported.
+>>
+>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+>> Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+>
+> Please could you keep the people who reviewed/commented on your series 
+> in the past,
+> whenever you post a new version ?
+Do you mean to just send the new version to their e-mail directly in 
+addition to the lists? If so, I will do that next time.
 
-0f60a8ef Kees Cook 2016-07-12  158   * Walks up the stack frames to make sure that the specified object is
-0f60a8ef Kees Cook 2016-07-12  159   * entirely contained by a single stack frame.
-0f60a8ef Kees Cook 2016-07-12  160   *
-0f60a8ef Kees Cook 2016-07-12  161   * Returns:
-0f60a8ef Kees Cook 2016-07-12  162   *		 1 if within a frame
-0f60a8ef Kees Cook 2016-07-12  163   *		-1 if placed across a frame boundary (or outside stack)
-0f60a8ef Kees Cook 2016-07-12  164   *		 0 unable to determine (no frame pointers, etc)
-0f60a8ef Kees Cook 2016-07-12  165   */
-0f60a8ef Kees Cook 2016-07-12  166  static inline int arch_within_stack_frames(const void * const stack,
-0f60a8ef Kees Cook 2016-07-12  167  					   const void * const stackend,
-0f60a8ef Kees Cook 2016-07-12  168  					   const void *obj, unsigned long len)
-0f60a8ef Kees Cook 2016-07-12  169  {
-0f60a8ef Kees Cook 2016-07-12  170  #if defined(CONFIG_FRAME_POINTER)
-0f60a8ef Kees Cook 2016-07-12  171  	const void *frame = NULL;
-0f60a8ef Kees Cook 2016-07-12  172  	const void *oldframe;
-0f60a8ef Kees Cook 2016-07-12  173  
-0f60a8ef Kees Cook 2016-07-12 @174  	oldframe = __builtin_frame_address(1);
-0f60a8ef Kees Cook 2016-07-12  175  	if (oldframe)
-0f60a8ef Kees Cook 2016-07-12  176  		frame = __builtin_frame_address(2);
-0f60a8ef Kees Cook 2016-07-12  177  	/*
-0f60a8ef Kees Cook 2016-07-12  178  	 * low ----------------------------------------------> high
-0f60a8ef Kees Cook 2016-07-12  179  	 * [saved bp][saved ip][args][local vars][saved bp][saved ip]
-0f60a8ef Kees Cook 2016-07-12  180  	 *                     ^----------------^
-0f60a8ef Kees Cook 2016-07-12  181  	 *               allow copies only within here
-0f60a8ef Kees Cook 2016-07-12  182  	 */
+I know you provided good feedback on the previous patchset, but I did 
+not have anyone specifically respond to add "reviewed-by:...". I don't 
+think I should add reviewed-by for someone unless they specifically add 
+it in a response :)
+>
+>> ---
+>>  drivers/acpi/apei/ghes.c    | 25 ++++++++++--
+>>  drivers/firmware/efi/cper.c | 97 
+>> +++++++++++++++++++++++++++++++++++++++------
+>>  2 files changed, 105 insertions(+), 17 deletions(-)
+>>
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index 3021f0e..c8488f1 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -80,6 +80,10 @@
+>>      ((struct acpi_hest_generic_status *)                \
+>>       ((struct ghes_estatus_node *)(estatus_node) + 1))
+>>
+>> +#define acpi_hest_generic_data_version(gdata)            \
+>> +    (gdata->revision >> 8)
+>
+> ...
+>
+>> +inline void *acpi_hest_generic_data_payload(struct 
+>> acpi_hest_generic_data *gdata)
+>> +{
+>> +    return acpi_hest_generic_data_version(gdata) >= 3 ?
+>> +        (void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
+>> +        gdata + 1;
+>> +}
+>> +
+>
+>
+>
+>> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+>> index d425374..9fa1317 100644
+>> --- a/drivers/firmware/efi/cper.c
+>> +++ b/drivers/firmware/efi/cper.c
+>
+>> +#define acpi_hest_generic_data_version(gdata)        \
+>> +    (gdata->revision >> 8)
+>> +
+>
+> ...
+>
+>> +static inline void *acpi_hest_generic_data_payload(struct 
+>> acpi_hest_generic_data *gdata)
+>> +{
+>> +    return acpi_hest_generic_data_version(gdata) >= 3 ?
+>> +        (void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
+>> +        gdata + 1;
+>> +}
+>
+> Could these go to a header file, so that we don't need duplicate 
+> definitions of these helpers in
+> different files ?
+>
+I think that should work to avoid duplication. I will move them to a 
+header file in the next patchset.
+>> +
+>> +static void cper_estatus_print_section_v300(const char *pfx,
+>> +    const struct acpi_hest_generic_data_v300 *gdata)
+>> +{
+>> +    __u8 hour, min, sec, day, mon, year, century, *timestamp;
+>> +
+>> +    if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
+>> +        timestamp = (__u8 *)&(gdata->time_stamp);
+>> +        memcpy(&sec, timestamp, 1);
+>> +        memcpy(&min, timestamp + 1, 1);
+>> +        memcpy(&hour, timestamp + 2, 1);
+>> +        memcpy(&day, timestamp + 4, 1);
+>> +        memcpy(&mon, timestamp + 5, 1);
+>> +        memcpy(&year, timestamp + 6, 1);
+>> +        memcpy(&century, timestamp + 7, 1);
+>> +        printk("%stime: ", pfx);
+>> +        printk("%7s", 0x01 & *(timestamp + 3) ? "precise" : "");
+>
+> What format is the (timestamp + 3) stored in ? Does it need conversion ?
+The third byte of the timestamp is currently only used to determine if 
+the time is precise or not. Bit 0 is used to specify that and the other 
+bits in this byte are marked as reserved. This is shown in table 247 of 
+the UEFI spec 2.6:
 
-:::::: The code at line 174 was first introduced by commit
-:::::: 0f60a8efe4005ab5e65ce000724b04d4ca04a199 mm: Implement stack frame object validation
+Byte 3:
+   Bit 0 ? Timestamp is precise if this bit is set and correlates to the 
+time of the error event.
+   Bit 7:1 ? Reserved
+>
+>> +        printk(" %02d:%02d:%02d %02d%02d-%02d-%02d\n",
+>> +            bcd2bin(hour), bcd2bin(min), bcd2bin(sec),
+>> +            bcd2bin(century), bcd2bin(year), bcd2bin(mon),
+>> +            bcd2bin(day));
+>> +    }
+>
+> minor nit: Would it be easier to order/parse the error messages if the 
+> date
+> is printed first followed by time ?
+>
+> i.e,
+>     17:20:14 2016-09-15 Mon
+>         vs
+>     2016-09-15 Mon 17:20:14
+>
+> e.g, people looking at a huge log, looking for logs from a specific 
+> date might
+> find the latter more useful to skip the messages.
+>
+The latter does seem like it would be better for parsing large logs. I 
+can rearrange the order in the next patchset.
+>> +}
+>> +
+>>  static void cper_estatus_print_section(
+>> -    const char *pfx, const struct acpi_hest_generic_data *gdata, int 
+>> sec_no)
+>> +    const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
+>>  {
+>>      uuid_le *sec_type = (uuid_le *)gdata->section_type;
+>>      __u16 severity;
+>>      char newpfx[64];
+>>
+>> +    if ((gdata->revision >> 8) >= 0x03)
+>
+> Could we use the helper defined above ?
+Yes, I'll change this to use acpi_hest_generic_data_version(gdata) instead.
+>
+>> @@ -451,12 +497,22 @@ void cper_estatus_print(const char *pfx,
+>>      printk("%s""event severity: %s\n", pfx, 
+>> cper_severity_str(severity));
+>>      data_len = estatus->data_length;
+>>      gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+>> +    if ((gdata->revision >> 8) >= 0x03)
+>
+> Same as above, use the macro ?
+Yes, I'll change this to use acpi_hest_generic_data_version(gdata) instead.
+>
+>> +        gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
+>> +
+>>      snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+>> +
+>>      while (data_len >= sizeof(*gdata)) {
+>>          gedata_len = gdata->error_data_length;
+>>          cper_estatus_print_section(newpfx, gdata, sec_no);
+>> -        data_len -= gedata_len + sizeof(*gdata);
+>> -        gdata = (void *)(gdata + 1) + gedata_len;
+>> +        if(gdata_v3) {
+>> +            data_len -= gedata_len + sizeof(*gdata_v3);
+>> +            gdata_v3 = (void *)(gdata_v3 + 1) + gedata_len;
+>> +            gdata = (struct acpi_hest_generic_data *)gdata_v3;
+>> +        } else {
+>> +            data_len -= gedata_len + sizeof(*gdata);
+>> +            gdata = (void *)(gdata + 1) + gedata_len;
+>> +        }
+>>          sec_no++;
+>>      }
+>
+> ...
+>
+>>
+>> @@ -486,15 +543,29 @@ int cper_estatus_check(const struct 
+>> acpi_hest_generic_status *estatus)
+>>          return rc;
+>>      data_len = estatus->data_length;
+>>      gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+>> -    while (data_len >= sizeof(*gdata)) {
+>> -        gedata_len = gdata->error_data_length;
+>> -        if (gedata_len > data_len - sizeof(*gdata))
+>> +
+>> +    if ((gdata->revision >> 8) >= 0x03) {
+>> +        gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
+>> +        while (data_len >= sizeof(*gdata_v3)) {
+>> +            gedata_len = gdata_v3->error_data_length;
+>> +            if (gedata_len > data_len - sizeof(*gdata_v3))
+>> +                return -EINVAL;
+>> +            data_len -= gedata_len + sizeof(*gdata_v3);
+>> +            gdata_v3 = (void *)(gdata_v3 + 1) + gedata_len;
+>> +        }
+>> +        if (data_len)
+>> +            return -EINVAL;
+>> +    } else {
+>> +        while (data_len >= sizeof(*gdata)) {
+>> +            gedata_len = gdata->error_data_length;
+>> +            if (gedata_len > data_len - sizeof(*gdata))
+>> +                return -EINVAL;
+>> +            data_len -= gedata_len + sizeof(*gdata);
+>> +            gdata = (void *)(gdata + 1) + gedata_len;
+>> +        }
+>> +        if (data_len)
+>
+> As mentioned in the previous version, would it make sense to add some 
+> more
+> helpers to deal with record versions ? We seem to be doing the version 
+> switch and
+> code duplication at different places.
+>
+> Does the following help ? Thoughts ?
+>
+> #define acpi_hest_generic_data_error_length(gdata) (((struct 
+> acpi_hest_generic_data *)(gdata))->error_data_length)
+> #define acpi_hest_generic_data_size(gdata) \
+>     ((acpi_hest_generic_data_version(gdata) >= 3) ? \
+>      sizeof(struct acpi_hest_generic_data_v300) :    \
+>      sizeof(struct acpi_hest_generic_data))
+> #define acpi_hest_generic_data_record_size(gdata)
+>     (acpi_hest_generic_data_size(gdata) + \
+>      acpi_hest_generic_data_error_length(gdata))
+> #define acpi_hest_generic_data_next(gdata) \
+>     ((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
+>
+>
+> Suzuki
+These helpers will definitely help consolidate this code. I will use 
+these in the next version to remove the code duplication here.
 
-:::::: TO: Kees Cook <keescook@chromium.org>
-:::::: CC: Kees Cook <keescook@chromium.org>
+Thanks,
+Tyler
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 24527 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161013/8e639a65/attachment-0001.gz>
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
