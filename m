@@ -1,69 +1,26 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 12 Oct 2016 05:21:44 -0700
-Subject: [RFC PATCH 00/11] pci: support for configurable PCI endpoint
-In-Reply-To: <57E8BB69.4020804@ti.com>
-References: <1473829927-20466-1-git-send-email-kishon@ti.com>
- <2837059.ka7z3gzjF2@wuerfel> <57DA5CC1.6030502@ti.com>
- <6722152.QTF992tLpW@wuerfel> <57E8BB69.4020804@ti.com>
-Message-ID: <20161012122144.GA2009@infradead.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 12 Oct 2016 07:36:21 -0500
+Subject: [PATCH v2 0/2] PCI: aardvark: Cleanup
+Message-ID: <20161012123001.22186.4053.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2016 at 11:38:41AM +0530, Kishon Vijay Abraham I wrote:
-> > Ok, so in theory there can be other hardware (and quite likely is)
-> > that supports multiple functions, and we can extend the framework
-> > to support them without major obstacles, but your hardware doesn't,
-> > so you kept it simple with one hardcoded function, right?
-> 
-> right, PCIe can have upto 8 functions. So the issues with the current framework
-> has to be fixed. I don't expect major obstacles with this as of now.
+Add local "dev" pointers to reduce repetition of things like "&pdev->dev"
+and remove unused drvdata.
 
-I wouldn't be too worried about.  We have two kinds of functions in
-PCIe: physical functions, or virtual functions using SR-IOV.
+Changes from v1:
+  I dropped the following because they added a lot of churn for
+  questionable benefit:
+    PCI: aardvark: Name private struct pointer "advk" consistently
+    PCI: aardvark: Reorder accessor functions
+    PCI: aardvark: Swap order of advk_write() reg/val arguments
 
-For the first one we pretty much just need the controller driver to
-report them separately as there is almost no interaction between
-functions.
+---
 
-SR-IOV support will be more interesting as the physical functions
-controls creation of the associated virtual functions.  I'd like to
-defer that problem until we get hold of a software programmable
-controller that supports SR-IOV and has open documentation.  (That
-beeing said, if someone has a pointer to such a beast send it my way!)
+Bjorn Helgaas (2):
+      PCI: aardvark: Add local struct device pointers
+      PCI: aardvark: Remove unused platform data
 
-> > We should still find out whether it's important that you can have
-> > a single PCI function with a software multi-function support of some
-> > sort. We'd still be limited to six BARs in total, and would also need
-> > something to identify those sub-functions, so implementing that might
-> > get quite hairy.
-> > 
-> > Possibly this could be done at a higher level, e.g. by implementing
-> > a PCI-virtio multiplexer that can host multiple virtio based devices
-> > inside of a single PCI function. If we think that would be a good idea,
-> > we should make sure the configfs interface is extensible enough to
-> > handle that.
-> 
-> Okay. So here the main function (actual PCI function) *can* perform the work of
-> virtio muliplexer if the platform wants to support sub-functions or it can be a
-> normal PCI function. right?
 
-I really don't think we should be worried about this multiplexer.  It's
-not something real PCIe devices do (sane ones anyway, the rest is
-handled by ad-hoc multiplexers), and we should avoid creating our own
-magic periphals for it.
-
-> > One use case I have in mind for this is to have a PCI function that
-> > can use virtio to provide rootfs (virtio-blk or 9pfs), network
-> > and console to the system that implements the PCI function (note
-> > that this is the opposite direction of what almost everyone else
-> > uses PCI devices for).
-> 
-> Do you mean the virtio should actually be in the host side? Even here the
-> system that implements PCI function should have multiple functions right? (one
-> for network, other for console etc..). So there should be a virtio multiplexer
-> both in the host side and in the device side?
-
-We already support virtio over phsysical PCIe buses to support intel MIC
-devices.  Take a look at drivers/misc/mic/bus/vop_bus.c and
-drivers/misc/mic/vop (yes, what a horrible place for that code, not my
-fault)
+ drivers/pci/host/pci-aardvark.c |   39 ++++++++++++++++++++-------------------
+ 1 file changed, 20 insertions(+), 19 deletions(-)
