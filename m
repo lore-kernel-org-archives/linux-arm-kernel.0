@@ -1,89 +1,21 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 12 Oct 2016 19:00:00 +0100
-Subject: [PATCH V3 05/10] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <1475875882-2604-6-git-send-email-tbaicar@codeaurora.org> (Tyler
- Baicar's message of "Fri, 7 Oct 2016 15:31:17 -0600")
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-6-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <87shs1sb1b.fsf@e105922-lin.cambridge.arm.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed, 12 Oct 2016 11:35:50 -0700
+Subject: [PATCH 0/2] mmc: sdhci-iproc: Add byte register access support
+Message-ID: <1476297352-7812-1-git-send-email-scott.branden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tyler Baicar <tbaicar@codeaurora.org> writes:
+Add brcm,sdhci-iproc compat string and code for support of newer versions of
+sdhci-iproc controller that allow byte-wise register accesses.
 
-> ARM APEI extension proposal added SEA (Synchrounous External
-> Abort) notification type for ARMv8.
-> Add a new GHES error source handling function for SEA. If an error
-> source's notification type is SEA, then this function can be registered
-> into the SEA exception handler. That way GHES will parse and report
-> SEA exceptions when they occur.
->
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+Scott Branden (2):
+  mmc: sdhci-iproc: Add brcm,sdhci-iproc compat string in bindings
+    document
+  mmc: sdhci-iproc: support standard byte register accesses
 
-This patch fails to apply for me on v4.8. Is there a different tree this
-is based on?
+ .../devicetree/bindings/mmc/brcm,sdhci-iproc.txt   |  1 +
+ drivers/mmc/host/sdhci-iproc.c                     | 35 ++++++++++++++++++++--
+ 2 files changed, 34 insertions(+), 2 deletions(-)
 
-One comment below.
-
-[...]
-
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index c8488f1..28d5a09 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -50,6 +50,10 @@
->  #include <acpi/apei.h>
->  #include <asm/tlbflush.h>
->  
-> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
-> +#include <asm/system_misc.h>
-> +#endif
-> +
->  #include "apei-internal.h"
->  
->  #define GHES_PFX	"GHES: "
-> @@ -779,6 +783,62 @@ static struct notifier_block ghes_notifier_sci = {
->  	.notifier_call = ghes_notify_sci,
->  };
->  
-> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
-> +static LIST_HEAD(ghes_sea);
-> +
-> +static int ghes_notify_sea(struct notifier_block *this,
-> +				  unsigned long event, void *data)
-> +{
-> +	struct ghes *ghes;
-> +	int ret = NOTIFY_DONE;
-> +
-> +	rcu_read_lock();
-> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
-> +		if (!ghes_proc(ghes))
-> +			ret = NOTIFY_OK;
-
-Not something you've introduced but it looks like ghes_proc erroneously
-never returns anything other than 0. I plan to post the below fix to
-address it.
-
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 60746ef..caea575 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -662,7 +662,7 @@ static int ghes_proc(struct ghes *ghes)
-        ghes_do_proc(ghes, ghes->estatus);
- out:
-        ghes_clear_estatus(ghes);
--   return 0;
-+ return rc;
- }
-
-> +	}
-> +	rcu_read_unlock();
-> +
-> +	return ret;
-> +}
-> +
-
-[...]
+-- 
+2.5.0
