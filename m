@@ -1,88 +1,61 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Wed, 12 Oct 2016 17:01:52 +0200
-Subject: [PATCH/RFT 07/12] USB: ohci-da8xx: Request gpios and handle
- interrupt in the driver
-In-Reply-To: <22f1532a-b651-3330-b2ce-9a64a35c85af@lechnology.com>
-References: <1475858577-10366-1-git-send-email-ahaslam@baylibre.com>
- <1475858577-10366-8-git-send-email-ahaslam@baylibre.com>
- <22f1532a-b651-3330-b2ce-9a64a35c85af@lechnology.com>
-Message-ID: <CAKXjFTMO_tCzLxc5wznrW_g6rxMYT8jBgHCtiFfpHq_6M=RZWA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Oct 2016 16:04:29 +0100
+Subject: [PATCH v3 1/5] arm64: mm: BUG on unsupported manipulations of
+ live kernel mappings
+In-Reply-To: <1476271425-19401-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1476271425-19401-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161012150428.s4gajqlnnivo6bld@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David
+On Wed, Oct 12, 2016 at 12:23:41PM +0100, Ard Biesheuvel wrote:
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -28,8 +28,6 @@
+>  #include <linux/memblock.h>
+>  #include <linux/fs.h>
+>  #include <linux/io.h>
+> -#include <linux/slab.h>
+> -#include <linux/stop_machine.h>
+>  
+>  #include <asm/barrier.h>
+>  #include <asm/cputype.h>
+> @@ -95,6 +93,12 @@ static phys_addr_t __init early_pgtable_alloc(void)
+>  	return phys;
+>  }
+>  
+> +/*
+> + * The following mapping attributes may be updated in live
+> + * kernel mappings without the need for break-before-make.
+> + */
+> +static const pteval_t modifiable_attr_mask = PTE_PXN | PTE_RDONLY | PTE_WRITE;
+> +
+>  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>  				  unsigned long end, unsigned long pfn,
+>  				  pgprot_t prot,
+> @@ -115,8 +119,18 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>  
+>  	pte = pte_set_fixmap_offset(pmd, addr);
+>  	do {
+> +		pte_t old_pte = *pte;
+> +
+>  		set_pte(pte, pfn_pte(pfn, prot));
+>  		pfn++;
+> +
+> +		/*
+> +		 * After the PTE entry has been populated once, we
+> +		 * only allow updates to the permission attributes.
+> +		 */
+> +		BUG_ON(pte_val(old_pte) != 0 &&
+> +		       ((pte_val(old_pte) ^ pte_val(*pte)) &
+> +			~modifiable_attr_mask) != 0);
 
-On Tue, Oct 11, 2016 at 1:18 AM, David Lechner <david@lechnology.com> wrote:
-> On 10/07/2016 11:42 AM, ahaslam at baylibre.com wrote:
->>
->> From: Axel Haslam <ahaslam@baylibre.com>
->>
->> Currently requesting the vbus and overcurrent gpio is handled on
->> the board specific file. But this does not play well moving to
->> device tree.
->>
->> In preparation to migrate to a device tree boot, handle requesting
->> gpios and overcurrent interrupt on the usb driver itself, thus avoiding
->> callbacks to arch/mach*
->>
->
-> Instead of using gpios, it seems like it would be better to use a regulator
-> here. I don't know of any real-life cases, but who is to say someone
-> not design a board that uses a regulator controlled by I2C instead of gpios
-> or something like that.
->
-> Then, boards that don't have gpios can just use a fixed regulator (or you
-> can make the regulator optional). Using a regulator would also allow users
-> to decide how to respond to overcurrent events (by supplying their own
-> regulator driver) instead of the behavior being dictated by the ohci driver.
+Please turn this check into a single macro. You have it in three places
+already (though with different types but a macro would do). Something
+like below (feel free to come up with a better macro name):
 
+		BUG_ON(!safe_pgattr_change(old_pte, *pte));
 
-I  agree that we should use a regulator for the vbus power.
-i will make that change.  However, im not so sure about using the
-regulator for the overcurrent handling. There seems to be no other
-driver doing this, and as you mention, we would need to change the regulator
-framework, which might not be justifiable. I think there is not another way
-to handle the over current notification other than powering the port off.
-
->
-> In my particular area of interest (LEGO MINDSTORMS EV3), the 5V (hardware)
-> regulator for VBUS does use gpios, but the 5V is also shared with the LEGO
-> input and output ports. So what I would ultimately like to be able to do is
-> have userspace notified of an overcurrent event and let userspace decided
-> when to turn the vbus back on. For example, someone might plug something
-> into one of the LEGO input or output ports that causes a short circuit. I
-> would like to display a notification to the user and wait for them to
-> correct the problem and then press a button to turn the power back on.
->
-
-how about using regulator for vbus, but keeping gpio for overcurrent
-notifications?
-
-For the usersapce handling you describe above, maybe we should be able to
-listen for an usb overcurrent uevent in userspace? it seems this
-question was asked
-a couple of years back[1], but im not sure what the conclusion was. In any case,
-we could have DT and non-DT based ohci-da8xx working,
-And could work on a uevent notification for the scenario you describe
-above which
-i think is not specific to the ohci-da8xx.
-
-[1]http://linux-usb.vger.kernel.narkive.com/SjcUB5hk/how-best-to-get-over-current-notification-to-user-application
-
-
-Regards
-Axel
-
-> This will require some modifications to the regulator subsystem though. I
-> actually started work on this a while back, but haven't had the time to
-> pursue it any farther.
->
-> Here are my WIP patches in case there is any interest:
-> *
-> https://github.com/dlech/ev3dev-kernel/commit/541a42b3b8ed639e95bbc835df3292f80190c789
-> *
-> https://github.com/dlech/ev3dev-kernel/commit/2ba99b1ad6a06c944dd33a073f54044e71b75ae6
-> *
-> https://github.com/dlech/ev3dev-kernel/commit/cdb03caa50e64931d4f2836c648739aa4385ed3b
-> *
-> https://github.com/dlech/ev3dev-kernel/commit/9d6b50cde34b51309c74d97c26b1430c7ff6aa0f
+-- 
+Catalin
