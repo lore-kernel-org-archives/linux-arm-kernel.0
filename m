@@ -1,76 +1,34 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 12 Oct 2016 15:57:46 -0700
-Subject: [PATCHv2 1/4] arm64: dump: Make ptdump debugfs a separate option
-In-Reply-To: <CAGXu5jLNUrt22Qg2gFmLj9rgStOTTTsOT7QGaw5efk==WbFwRg@mail.gmail.com>
-References: <1476311522-15381-1-git-send-email-labbott@redhat.com>
- <1476311522-15381-2-git-send-email-labbott@redhat.com>
- <CAGXu5jLNUrt22Qg2gFmLj9rgStOTTTsOT7QGaw5efk==WbFwRg@mail.gmail.com>
-Message-ID: <3d550df8-f850-d217-aaae-d69c8ea8243b@redhat.com>
+From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
+Date: Thu, 13 Oct 2016 01:09:13 +0200
+Subject: Low network throughput on i.MX28
+Message-ID: <1476313753.2065.11.camel@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2016 03:45 PM, Kees Cook wrote:
-> On Wed, Oct 12, 2016 at 3:31 PM, Laura Abbott <labbott@redhat.com> wrote:
->>
->> ptdump_register currently initializes a set of page table information and
->> registers debugfs. There are uses for the ptdump option without wanting the
->> debugfs options. Split this out to make it a separate option.
->>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->> v2: Minor style fixups per Mark Rutland, intialization is now separate from
->>     register since it never needed to be combined in the first place, EFI
->>     page table registration.
->> ---
->>  arch/arm64/Kconfig.debug           |  6 +++++-
->>  arch/arm64/include/asm/ptdump.h    | 13 ++++++++-----
->>  arch/arm64/mm/Makefile             |  3 ++-
->>  arch/arm64/mm/dump.c               | 26 +++++---------------------
->>  arch/arm64/mm/ptdump_debugfs.c     | 31 +++++++++++++++++++++++++++++++
->>  drivers/firmware/efi/arm-runtime.c |  5 ++---
->>  6 files changed, 53 insertions(+), 31 deletions(-)
->>  create mode 100644 arch/arm64/mm/ptdump_debugfs.c
->>
->> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
->> index b661fe7..21a5b74 100644
->> --- a/arch/arm64/Kconfig.debug
->> +++ b/arch/arm64/Kconfig.debug
->> @@ -2,9 +2,13 @@ menu "Kernel hacking"
->>
->>  source "lib/Kconfig.debug"
->>
->> -config ARM64_PTDUMP
->> +config ARM64_PTDUMP_CORE
->> +       def_bool n
->> +
->> +config ARM64_PTDUMP_DEBUGFS
->>         bool "Export kernel pagetable layout to userspace via debugfs"
->
-> I think this can be a tristate now, yes? (I did this on x86 so I could
-> load ptdump as a module for Chrome OS image testing but then leave the
-> module off the read-only partition for release images...)
->
-> https://git.kernel.org/linus/8609d1b5daa36350e020e737946c40887af1743a
->
-> -Kees
->
+Hi,
 
-I saw the module for x86. arm64 works slightly differently since there
-are multiple debugfs dumping sources, the init_mm and EFI page tables.
-These are built in and can call register but then have no way to
-actually register the debugfs entry when the module is inserted since
-the current config covers both/all of the exporters. I
-decided against trying to add the infrastructure to make modularity
-work because I was spending more time on that than the actual W^X checks.
+I am using a custom i.MX28 board similar to the i.MX28-EVK. For Wi-Fi
+the board assembles a BCM43362 from Broadcom and for Ethernet a
+LAN8720A from Microchip. The board is running mainline Linux 4.7.
 
-Thanks,
-Laura
+While both, wireless and wired network interfaces work, the TCP
+throughput measured with iperf is low.
 
->>         depends on DEBUG_KERNEL
->> +       select ARM64_PTDUMP_CORE
->>         select DEBUG_FS
->>          help
->>           Say Y here if you want to show the kernel pagetable layout in a
->
->
->
+The bandwith for Ethernet is between 20-30 MBits/sec and for WLAN is
+about 4-5 MBits/sec.
+
+There exists an Application Note "i.MX28 Ethernet Performance on
+Linux" [1] which shows a bandwith of > 60 MBits/sec. A user an the NXP
+forum [2] told he achieved 20 MBits/sec with some Qualcom chip.
+
+Note, that these values are most probably measured with the legacy
+Linux Kernel 2.6.35 from NXP.
+
+Does anybody has done throughput tests on i.MX28 with mainline Kernel?
+If so, what are the results? What might be the bottleneck?
+
+[1] http://cache.freescale.com/files/32bit/doc/app_note/AN4544.pdf
+[2] https://community.nxp.com/thread/353921
+
+Best regards
+J?rg Krause
