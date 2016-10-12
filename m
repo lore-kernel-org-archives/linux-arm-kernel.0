@@ -1,34 +1,39 @@
-From: gerald.baeza@st.com (Gerald Baeza)
-Date: Wed, 12 Oct 2016 09:40:05 +0200
-Subject: [patch] serial: stm32: fix a type issue
-In-Reply-To: <20161012062103.GS12841@mwanda>
-References: <20161012062103.GS12841@mwanda>
-Message-ID: <2e281be5-986d-21fd-7a9d-b451b1d82d4a@st.com>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Wed, 12 Oct 2016 13:17:27 +0530
+Subject: [PATCH v6 1/2] serial: xuartps: Add new compatible string for ZynqMP
+Message-ID: <1476258448-20483-1-git-send-email-navam@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan and thanks for the patch
+This patch Adds the new compatible string for ZynqMP SoC.
 
-On 10/12/2016 08:21 AM, Dan Carpenter wrote:
-> We store UNDEF_REG in a u8.  It causes a problem in functions like
-> stm32_tx_dma_complete() where we check "if (ofs->icr == UNDEF_REG)".
->
-> Fixes: 3489187204eb ('serial: stm32: adding dma support')
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
->
-> diff --git a/drivers/tty/serial/stm32-usart.h b/drivers/tty/serial/stm32-usart.h
-> index 41d9749..f9887cc 100644
-> --- a/drivers/tty/serial/stm32-usart.h
-> +++ b/drivers/tty/serial/stm32-usart.h
-> @@ -31,7 +31,7 @@ struct stm32_usart_info {
->  	struct stm32_usart_config cfg;
->  };
->
-> -#define UNDEF_REG ~0
-> +#define UNDEF_REG 0xFF
->
->  /* Register offsets */
->  struct stm32_usart_info stm32f4_info = {
->
+Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+---
+Changes for v6:
+		-Added New patch.
 
-Reviewed-by: Gerald Baeza <gerald.baeza@st.com>
+ drivers/tty/serial/xilinx_uartps.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index f37edaa..dd4c02f 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1200,6 +1200,7 @@ static int __init cdns_early_console_setup(struct earlycon_device *device,
+ OF_EARLYCON_DECLARE(cdns, "xlnx,xuartps", cdns_early_console_setup);
+ OF_EARLYCON_DECLARE(cdns, "cdns,uart-r1p8", cdns_early_console_setup);
+ OF_EARLYCON_DECLARE(cdns, "cdns,uart-r1p12", cdns_early_console_setup);
++OF_EARLYCON_DECLARE(cdns, "xlnx,zynqmp-uart", cdns_early_console_setup);
+ 
+ /**
+  * cdns_uart_console_write - perform write operation
+@@ -1438,6 +1439,7 @@ static const struct of_device_id cdns_uart_of_match[] = {
+ 	{ .compatible = "xlnx,xuartps", },
+ 	{ .compatible = "cdns,uart-r1p8", },
+ 	{ .compatible = "cdns,uart-r1p12", .data = &zynqmp_uart_def },
++	{ .compatible = "xlnx,zynqmp-uart", .data = &zynqmp_uart_def },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, cdns_uart_of_match);
+-- 
+2.1.1
