@@ -1,101 +1,39 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Wed, 12 Oct 2016 16:18:58 -0600
-Subject: [PATCH V3 02/10] ras: acpi/apei: cper: generic error data entry
- v3 per ACPI 6.1
-In-Reply-To: <20161011185236.GC1041@n2100.armlinux.org.uk>
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
- <20161011185236.GC1041@n2100.armlinux.org.uk>
-Message-ID: <dfdf5c92-52a7-a641-42aa-c230f5ebc0b2@codeaurora.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 12 Oct 2016 15:31:58 -0700
+Subject: [PATCHv2 0/4] WX checking for arm64
+Message-ID: <1476311522-15381-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hi,
 
-Thank you for the feedback! Responses below
+This is v2 of the implementation to check for writable and executable pages on
+arm64.
 
+Major changes since v1:
+- I realized my concerns about initialization and registration were unfounded
+  so registration to register page tables with debugfs is simplified.
+- New patch to remove max_addr since it was pointed out it was unused.
+- Rebased to include changes for the EFI page tables as well.
+- Checking is now only done on the init_mm page tables. It was mentioned that
+  we should check the hyp page tables as well but that can be follow on work.
+- Checking for UXN per suggestion from Mark Rutland.
 
-On 10/11/2016 12:52 PM, Russell King - ARM Linux wrote:
-> On Fri, Oct 07, 2016 at 03:31:14PM -0600, Tyler Baicar wrote:
->> +static void cper_estatus_print_section_v300(const char *pfx,
->> +	const struct acpi_hest_generic_data_v300 *gdata)
->> +{
->> +	__u8 hour, min, sec, day, mon, year, century, *timestamp;
->> +
->> +	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
->> +		timestamp = (__u8 *)&(gdata->time_stamp);
->> +		memcpy(&sec, timestamp, 1);
->> +		memcpy(&min, timestamp + 1, 1);
->> +		memcpy(&hour, timestamp + 2, 1);
->> +		memcpy(&day, timestamp + 4, 1);
->> +		memcpy(&mon, timestamp + 5, 1);
->> +		memcpy(&year, timestamp + 6, 1);
->> +		memcpy(&century, timestamp + 7, 1);
-> This is utterly silly.  Why are you using memcpy() to access individual
-> bytes of a u8 pointer?  What's wrong with:
->
-> 		sec = timestamp[0];
-> 		min = timestamp[1];
-> 		hour = timestamp[2];
-> 		day = timestamp[4];
-> 		mon = timestamp[5];
-> 		year = timestamp[6];
-> 		century = timestamp[7];
->
-> or even do the conversion here:
->
-> 		sec = bcd2bin(timestamp[0]);
-> ... etc ...
-Yes, that will be a lot cleaner especially with moving the conversion here.
->
->> +		printk("%stime: ", pfx);
->> +		printk("%7s", 0x01 & *(timestamp + 3) ? "precise" : "");
->> +		printk(" %02d:%02d:%02d %02d%02d-%02d-%02d\n",
->> +			bcd2bin(hour), bcd2bin(min), bcd2bin(sec),
->> +			bcd2bin(century), bcd2bin(year), bcd2bin(mon),
->> +			bcd2bin(day));
->> +	}
-> It's also a good idea to (as much as possible) keep to single printk()
-> statements - which makes the emission of the string more atomic wrt
-> other CPUs and contexts.  So, this should probably become (with the
-> conversion being done at the assignment of sec etc):
->
-> 		printk("%stime: %7s %02d:%02d:%02d %02d%02d-%02d-%02d\n",
-> 			pfx, 0x01 & timestamp[3] ? "precise" : "",
-> 			hour, min, sec, century, year, mon, day);
->
-> which, IMHO, looks a lot nicer and doesn't risk some other printk()
-> getting between each individual part of the line.
-I will make this change in the next version. This printk does look a lot 
-nicer and avoids other prints from getting in the middle (I actually 
-just saw that happen in testing a couple days ago)
->> +}
->> +
->>   static void cper_estatus_print_section(
->> -	const char *pfx, const struct acpi_hest_generic_data *gdata, int sec_no)
->> +	const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
->>   {
->>   	uuid_le *sec_type = (uuid_le *)gdata->section_type;
->>   	__u16 severity;
->>   	char newpfx[64];
->>   
->> +	if ((gdata->revision >> 8) >= 0x03)
->> +		cper_estatus_print_section_v300(pfx,
->> +			(const struct acpi_hest_generic_data_v300 *)gdata);
->> +
->>   	severity = gdata->error_severity;
->>   	printk("%s""Error %d, type: %s\n", pfx, sec_no,
->>   	       cper_severity_str(severity));
-> Not sure why you have the "" here - %sError works just as well and the
-> "" is just obfuscation - the compiler will eliminate the double-double
-> quote and merge the strings anyway.
->
-I will remove the "" in the next version.
+Laura Abbott (4):
+  arm64: dump: Make ptdump debugfs a separate option
+  arm64: dump: Make the page table dumping seq_file optional
+  arm64: dump: Remove max_addr
+  arm64: dump: Add checking for writable and exectuable pages
 
-Thanks,
-Tyler
+ arch/arm64/Kconfig.debug           | 34 ++++++++++++++-
+ arch/arm64/include/asm/ptdump.h    | 22 +++++++---
+ arch/arm64/mm/Makefile             |  3 +-
+ arch/arm64/mm/dump.c               | 89 ++++++++++++++++++++++++++------------
+ arch/arm64/mm/mmu.c                |  2 +
+ arch/arm64/mm/ptdump_debugfs.c     | 31 +++++++++++++
+ drivers/firmware/efi/arm-runtime.c |  5 +--
+ 7 files changed, 147 insertions(+), 39 deletions(-)
+ create mode 100644 arch/arm64/mm/ptdump_debugfs.c
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.7.4
