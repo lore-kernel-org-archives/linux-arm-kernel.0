@@ -1,240 +1,222 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Wed, 12 Oct 2016 14:48:27 +0200
-Subject: [PATCH 2/2] power/reset: at91-poweroff: timely shitdown LPDDR
- memories
-In-Reply-To: <20161007163427.11454-3-alexandre.belloni@free-electrons.com>
-References: <20161007163427.11454-1-alexandre.belloni@free-electrons.com>
- <20161007163427.11454-3-alexandre.belloni@free-electrons.com>
-Message-ID: <CACh+v5NCxPb_U8HOeczHicCD-Wp8BqBzvc1LtCzmEXZ74Cgshw@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Wed, 12 Oct 2016 16:07:48 +0300
+Subject: [PATCH 6/10] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+ functionality
+In-Reply-To: <4009a66b-1e09-0780-b7c1-128ff1401b5f@marvell.com>
+References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
+ <ecde22fd342b0b2001ff5676ea1e67b7226d6946.1475853198.git-series.gregory.clement@free-electrons.com>
+ <1b015f16-aa37-591c-3299-9431f6e82cce@intel.com>
+ <4009a66b-1e09-0780-b7c1-128ff1401b5f@marvell.com>
+Message-ID: <7939a923-eb97-ca44-ac4c-f0a3cd4f45bc@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-07 18:34 GMT+02:00 Alexandre Belloni
-<alexandre.belloni@free-electrons.com>:
-> LPDDR memories can only handle up to 400 uncontrolled power off. Ensure the
-> proper power off sequence is used before shutting down the platform.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/power/reset/at91-poweroff.c      | 52 +++++++++++++++++++++++++++++++-
->  drivers/power/reset/at91-sama5d2_shdwc.c | 48 ++++++++++++++++++++++++++++-
->  2 files changed, 98 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at91-poweroff.c
-> index e9e24df35f26..bf97390e6cd7 100644
-> --- a/drivers/power/reset/at91-poweroff.c
-> +++ b/drivers/power/reset/at91-poweroff.c
-> @@ -14,9 +14,12 @@
->  #include <linux/io.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/platform_device.h>
->  #include <linux/printk.h>
->
-> +#include <soc/at91/at91sam9_ddrsdr.h>
-> +
->  #define AT91_SHDW_CR   0x00            /* Shut Down Control Register */
->  #define AT91_SHDW_SHDW         BIT(0)                  /* Shut Down command */
->  #define AT91_SHDW_KEY          (0xa5 << 24)            /* KEY Password */
-> @@ -50,6 +53,7 @@ static const char *shdwc_wakeup_modes[] = {
->
->  static void __iomem *at91_shdwc_base;
->  static struct clk *sclk;
-> +static void __iomem *mpddrc_base;
->
->  static void __init at91_wakeup_status(void)
->  {
-> @@ -73,6 +77,28 @@ static void at91_poweroff(void)
->         writel(AT91_SHDW_KEY | AT91_SHDW_SHDW, at91_shdwc_base + AT91_SHDW_CR);
->  }
->
-> +static void at91_lpddr_poweroff(void)
-> +{
-> +       asm volatile(
-> +               /* Align to cache lines */
-> +               ".balign 32\n\t"
-> +
-> +               "       ldr     r6, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
-At first sight, it looks useless. I assume it's used to preload the
-TLB before the LPDDR is turned off.
-A comment to explain why this line is useful would prevent its removal.
-> +
-> +               /* Power down SDRAM0 */
-> +               "       str     %1, [%0, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
-> +               /* Shutdown CPU */
-> +               "       str     %3, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
-> +
-> +               "       b       .\n\t"
-> +               :
-> +               : "r" (mpddrc_base),
-> +                 "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
-> +                 "r" (at91_shdwc_base),
-> +                 "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
-> +               : "r0");
-> +}
-> +
->  static int at91_poweroff_get_wakeup_mode(struct device_node *np)
->  {
->         const char *pm;
-> @@ -124,6 +150,8 @@ static void at91_poweroff_dt_set_wakeup_mode(struct platform_device *pdev)
->  static int __init at91_poweroff_probe(struct platform_device *pdev)
->  {
->         struct resource *res;
-> +       struct device_node *np;
-> +       u32 ddr_type;
->         int ret;
->
->         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -150,12 +178,29 @@ static int __init at91_poweroff_probe(struct platform_device *pdev)
->
->         pm_power_off = at91_poweroff;
->
-> +       np = of_find_compatible_node(NULL, NULL, "atmel,sama5d3-ddramc");
-> +       if (!np)
-> +               return 0;
-> +
-> +       mpddrc_base = of_iomap(np, 0);
-> +       of_node_put(np);
-> +
-> +       if (!mpddrc_base)
-> +               return 0;
-> +
-> +       ddr_type = readl(mpddrc_base + AT91_DDRSDRC_MDR) & AT91_DDRSDRC_MD;
-> +       if ((ddr_type == AT91_DDRSDRC_MD_LPDDR2) ||
-> +           (ddr_type == AT91_DDRSDRC_MD_LPDDR3))
-Souldn't there be something like "pm_power_off = at91_lpddr_poweroff;" here ?
+On 12/10/16 14:58, Ziji Hu wrote:
+> Hi Adrian,
+> 
+> 	Thank you very much for your review.
+> 	I will firstly fix the typo.
+> 
+> On 2016/10/11 20:37, Adrian Hunter wrote:
+>> On 07/10/16 18:22, Gregory CLEMENT wrote:
+>>> From: Ziji Hu <huziji@marvell.com>
+>>>
+>>> Add Xenon eMMC/SD/SDIO host controller core functionality.
+>>> Add Xenon specific intialization process.
+>>> Add Xenon specific mmc_host_ops APIs.
+>>> Add Xenon specific register definitions.
+>>>
+>>> Add CONFIG_MMC_SDHCI_XENON support in drivers/mmc/host/Kconfig.
+>>>
+>>> Marvell Xenon SDHC conforms to SD Physical Layer Specification
+>>> Version 3.01 and is designed according to the guidelines provided
+>>> in the SD Host Controller Standard Specification Version 3.00.
+>>>
+>>> Signed-off-by: Hu Ziji <huziji@marvell.com>
+>>> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>
+>> I looked at a couple of things but you need to sort out the issues with
+>> card_candidate before going further.
+>>
+> 	Understood.
+> 	I will improve the card_candidate. Please help check the details in below.
+> 
+>>> ---
+> <snip>
+>>> +
+>>> +static int xenon_emmc_signal_voltage_switch(struct mmc_host *mmc,
+>>> +					    struct mmc_ios *ios)
+>>> +{
+>>> +	unsigned char voltage = ios->signal_voltage;
+>>> +
+>>> +	if ((voltage == MMC_SIGNAL_VOLTAGE_330) ||
+>>> +	    (voltage == MMC_SIGNAL_VOLTAGE_180))
+>>> +		return __emmc_signal_voltage_switch(mmc, voltage);
+>>> +
+>>> +	dev_err(mmc_dev(mmc), "Unsupported signal voltage: %d\n",
+>>> +		voltage);
+>>> +	return -EINVAL;
+>>> +}
+>>> +
+>>> +static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
+>>> +					     struct mmc_ios *ios)
+>>> +{
+>>> +	struct sdhci_host *host = mmc_priv(mmc);
+>>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>>> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+>>> +
+>>> +	/*
+>>> +	 * Before SD/SDIO set signal voltage, SD bus clock should be
+>>> +	 * disabled. However, sdhci_set_clock will also disable the Internal
+>>> +	 * clock in mmc_set_signal_voltage().
+>>> +	 * If Internal clock is disabled, the 3.3V/1.8V bit can not be updated.
+>>> +	 * Thus here manually enable internal clock.
+>>> +	 *
+>>> +	 * After switch completes, it is unnecessary to disable internal clock,
+>>> +	 * since keeping internal clock active obeys SD spec.
+>>> +	 */
+>>> +	enable_xenon_internal_clk(host);
+>>> +
+>>> +	if (priv->card_candidate) {
+>>
+>> mmc_power_up() calls __mmc_set_signal_voltage() calls
+>> host->ops->start_signal_voltage_switch so priv->card_candidate could be an
+>> invalid reference to an old card.
+>>
+>> So that's not going to work if the card changes - not only for removable
+>> cards but even for eMMC if init fails and retries.
+>>
+> 	As you point out, this piece of code have defects, even though it actually works on Marvell multiple platforms, unless eMMC card is removable.
+> 
+> 	I can add a property to explicitly indicate eMMC type in DTS.
+> 	Then card_candidate access can be removed here.
+> 	Does it sounds more reasonable to you?
 
-Jean-Jacques
+Sure
 
-> +       else
-> +               iounmap(mpddrc_base);
-> +
->         return 0;
->  }
->
->  static int __exit at91_poweroff_remove(struct platform_device *pdev)
->  {
-> -       if (pm_power_off == at91_poweroff)
-> +       if (pm_power_off == at91_poweroff ||
-> +           pm_power_off == at91_lpddr_poweroff)
->                 pm_power_off = NULL;
->
->         clk_disable_unprepare(sclk);
-> @@ -163,6 +208,11 @@ static int __exit at91_poweroff_remove(struct platform_device *pdev)
->         return 0;
->  }
->
-> +static const struct of_device_id at91_ramc_of_match[] = {
-> +       { .compatible = "atmel,sama5d3-ddramc", },
-> +       { /* sentinel */ }
-> +};
-> +
->  static const struct of_device_id at91_poweroff_of_match[] = {
->         { .compatible = "atmel,at91sam9260-shdwc", },
->         { .compatible = "atmel,at91sam9rl-shdwc", },
-> diff --git a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
-> index 8a5ac9706c9c..5736f360b374 100644
-> --- a/drivers/power/reset/at91-sama5d2_shdwc.c
-> +++ b/drivers/power/reset/at91-sama5d2_shdwc.c
-> @@ -22,9 +22,12 @@
->  #include <linux/io.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/of_address.h>
->  #include <linux/platform_device.h>
->  #include <linux/printk.h>
->
-> +#include <soc/at91/at91sam9_ddrsdr.h>
-> +
->  #define SLOW_CLOCK_FREQ        32768
->
->  #define AT91_SHDW_CR   0x00            /* Shut Down Control Register */
-> @@ -75,6 +78,7 @@ struct shdwc {
->   */
->  static struct shdwc *at91_shdwc;
->  static struct clk *sclk;
-> +static void __iomem *mpddrc_base;
->
->  static const unsigned long long sdwc_dbc_period[] = {
->         0, 3, 32, 512, 4096, 32768,
-> @@ -108,6 +112,28 @@ static void at91_poweroff(void)
->                at91_shdwc->at91_shdwc_base + AT91_SHDW_CR);
->  }
->
-> +static void at91_lpddr_poweroff(void)
-> +{
-> +       asm volatile(
-> +               /* Align to cache lines */
-> +               ".balign 32\n\t"
-> +
-> +               "       ldr     r6, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
-> +
-> +               /* Power down SDRAM0 */
-> +               "       str     %1, [%0, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
-> +               /* Shutdown CPU */
-> +               "       str     %3, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
-> +
-> +               "       b       .\n\t"
-> +               :
-> +               : "r" (mpddrc_base),
-> +                 "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
-> +                 "r" (at91_shdwc->at91_shdwc_base),
-> +                 "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW)
-> +               : "r0");
-> +}
-> +
->  static u32 at91_shdwc_debouncer_value(struct platform_device *pdev,
->                                       u32 in_period_us)
->  {
-> @@ -212,6 +238,8 @@ static int __init at91_shdwc_probe(struct platform_device *pdev)
->  {
->         struct resource *res;
->         const struct of_device_id *match;
-> +       struct device_node *np;
-> +       u32 ddr_type;
->         int ret;
->
->         if (!pdev->dev.of_node)
-> @@ -249,6 +277,23 @@ static int __init at91_shdwc_probe(struct platform_device *pdev)
->
->         pm_power_off = at91_poweroff;
->
-> +       np = of_find_compatible_node(NULL, NULL, "atmel,sama5d3-ddramc");
-> +       if (!np)
-> +               return 0;
-> +
-> +       mpddrc_base = of_iomap(np, 0);
-> +       of_node_put(np);
-> +
-> +       if (!mpddrc_base)
-> +               return 0;
-> +
-> +       ddr_type = readl(mpddrc_base + AT91_DDRSDRC_MDR) & AT91_DDRSDRC_MD;
-> +       if ((ddr_type == AT91_DDRSDRC_MD_LPDDR2) ||
-> +           (ddr_type == AT91_DDRSDRC_MD_LPDDR3))
-> +               pm_power_off = at91_lpddr_poweroff;
-> +       else
-> +               iounmap(mpddrc_base);
-> +
->         return 0;
->  }
->
-> @@ -256,7 +301,8 @@ static int __exit at91_shdwc_remove(struct platform_device *pdev)
->  {
->         struct shdwc *shdw = platform_get_drvdata(pdev);
->
-> -       if (pm_power_off == at91_poweroff)
-> +       if (pm_power_off == at91_poweroff ||
-> +           pm_power_off == at91_lpddr_poweroff)
->                 pm_power_off = NULL;
->
->         /* Reset values to disable wake-up features  */
-> --
-> 2.9.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+>>> +		if (mmc_card_mmc(priv->card_candidate))
+>>> +			return xenon_emmc_signal_voltage_switch(mmc, ios);
+>>
+>> So if all you need to know is whether it is a eMMC, why can't DT tell you?
+>>
+> 	I can add an eMMC type property in DTS, to remove the card_candidate access here.
+> 
+>>> +	}
+>>> +
+>>> +	return sdhci_start_signal_voltage_switch(mmc, ios);
+>>> +}
+>>> +
+>>> +/*
+>>> + * After determining which slot is used for SDIO,
+>>> + * some additional task is required.
+>>> + */
+>>> +static void xenon_init_card(struct mmc_host *mmc, struct mmc_card *card)
+>>> +{
+>>> +	struct sdhci_host *host = mmc_priv(mmc);
+>>> +	u32 reg;
+>>> +	u8 slot_idx;
+>>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>>> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+>>> +
+>>> +	/* Link the card for delay adjustment */
+>>> +	priv->card_candidate = card;
+>>
+>> You really need a better way to get the card.  I suggest you take up the
+>> issue with Ulf.  One possibility is to have mmc core set host->card = card
+>> much earlier.
+>>
+> 	Could you please tell me if any issue related to card_candidate still exists, after the card_candidate is removed from xenon_start_signal_voltage_switch() in above?
+> 	It seems that when init_card is called, the structure card has already been updated and stable in MMC/SD/SDIO initialization sequence.
+> 	May I keep it here?
+
+It works by accident rather than by design.  We can do better.
+
+> 
+>>> +	/* Set tuning functionality of this slot */
+>>> +	xenon_slot_tuning_setup(host);
+>>> +
+>>> +	slot_idx = priv->slot_idx;
+>>> +	if (!mmc_card_sdio(card)) {
+>>> +		/* Re-enable the Auto-CMD12 cap flag. */
+>>> +		host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
+>>> +		host->flags |= SDHCI_AUTO_CMD12;
+>>> +
+>>> +		/* Clear SDIO Card Inserted indication */
+>>> +		reg = sdhci_readl(host, SDHC_SYS_CFG_INFO);
+>>> +		reg &= ~(1 << (slot_idx + SLOT_TYPE_SDIO_SHIFT));
+>>> +		sdhci_writel(host, reg, SDHC_SYS_CFG_INFO);
+>>> +
+>>> +		if (mmc_card_mmc(card)) {
+>>> +			mmc->caps |= MMC_CAP_NONREMOVABLE;
+>>> +			if (!(host->quirks2 & SDHCI_QUIRK2_NO_1_8_V))
+>>> +				mmc->caps |= MMC_CAP_1_8V_DDR;
+>>> +			/*
+>>> +			 * Force to clear BUS_TEST to
+>>> +			 * skip bus_test_pre and bus_test_post
+>>> +			 */
+>>> +			mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
+>>> +			mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
+>>> +				      MMC_CAP2_PACKED_CMD;
+>>> +			if (mmc->caps & MMC_CAP_8_BIT_DATA)
+>>> +				mmc->caps2 |= MMC_CAP2_HS400_1_8V;
+>>> +		}
+>>> +	} else {
+>>> +		/*
+>>> +		 * Delete the Auto-CMD12 cap flag.
+>>> +		 * Otherwise, when sending multi-block CMD53,
+>>> +		 * Driver will set Transfer Mode Register to enable Auto CMD12.
+>>> +		 * However, SDIO device cannot recognize CMD12.
+>>> +		 * Thus SDHC will time-out for waiting for CMD12 response.
+>>> +		 */
+>>> +		host->quirks &= ~SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
+>>> +		host->flags &= ~SDHCI_AUTO_CMD12;
+>>
+>> sdhci_set_transfer_mode() won't enable auto-CMD12 for CMD53 anyway, so is
+>> this needed?
+>>
+> 	In Xenon driver, Auto-CMD12 flag is set to enable full support to Auto-CMD feature, both Auto-CMD12 and Auto-CMD23.
+> 	As a result, when Xenon SDHC slot can both support SD and SDIO, Auto-CMD12 is disabled when SDIO card is inserted, and renabled when SD is inserted.
+> 
+> 	I recheck the sdhci code to set Auto-CMD bit in Transfer Mode register, in sdhci_set_transfer_mode():
+> 	if (mmc_op_multi(cmd->opcode) || data->blocks > 1)
+> 	As you can see, as long as it is CMD18/CMD25 OR there are multiple data blocks, Auto-CMD field will be set.
+> 	CMD53 doesn't have CMD23. Thus Auto-CMD12 is selected since Auto-CMD12 flag is set.
+> 	Thus I have to clear Auto-CMD12 to avoid issuing Auto-CMD12 in SDIO transfer.
+
+
+The code is:
+
+	if (mmc_op_multi(cmd->opcode) || data->blocks > 1) {
+		mode = SDHCI_TRNS_BLK_CNT_EN | SDHCI_TRNS_MULTI;
+		/*
+		 * If we are sending CMD23, CMD12 never gets sent
+		 * on successful completion (so no Auto-CMD12).
+		 */
+		if (sdhci_auto_cmd12(host, cmd->mrq) &&
+		    (cmd->opcode != SD_IO_RW_EXTENDED))
+			mode |= SDHCI_TRNS_AUTO_CMD12;
+		else if (cmd->mrq->sbc && (host->flags & SDHCI_AUTO_CMD23)) {
+			mode |= SDHCI_TRNS_AUTO_CMD23;
+			sdhci_writel(host, cmd->mrq->sbc->arg, SDHCI_ARGUMENT2);
+		}
+	}
+
+You can see the check for SD_IO_RW_EXTENDED which is CMD53.
+
+> 
+> 	I just meet a similar issue in RPMB.
+> 	When Auto-CMD12 flag is set, eMMC RPMB access will trigger Auto-CMD12, since CMD25 is in use.
+> 	It will cause RPMB access failed.
+
+Can you explain more about the RPMB issue.  Doesn't it use CMD23, so CMD12
+wouldn't be used - auto or manually.
+
+> 
+> 	One possible solution is to drop Auto-CMD12 support and use Auto-CMD23 only, in Xenon driver.
+> 	May I know you opinion, please?
+
+I don't use auto-CMD12 because I don't know if it provides any benefit and
+sdhci does not seem to have implemented Auto CMD12 Error Recovery, although
+I have never looked at it closely.
