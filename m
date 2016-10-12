@@ -1,28 +1,32 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 12 Oct 2016 11:00:22 -0500
-Subject: [PATCH v2 0/2] PCI: aardvark: Cleanup
-In-Reply-To: <20161012123001.22186.4053.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-References: <20161012123001.22186.4053.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20161012160021.GA4308@localhost>
+From: ttnguyen@apm.com (Tai Nguyen)
+Date: Wed, 12 Oct 2016 09:39:27 -0700
+Subject: [PATCH] perf: xgene: Remove bogus IS_ERR() check
+Message-ID: <1476290367-8092-1-git-send-email-ttnguyen@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2016 at 07:36:21AM -0500, Bjorn Helgaas wrote:
-> Add local "dev" pointers to reduce repetition of things like "&pdev->dev"
-> and remove unused drvdata.
-> 
-> Changes from v1:
->   I dropped the following because they added a lot of churn for
->   questionable benefit:
->     PCI: aardvark: Name private struct pointer "advk" consistently
->     PCI: aardvark: Reorder accessor functions
->     PCI: aardvark: Swap order of advk_write() reg/val arguments
-> 
-> ---
-> 
-> Bjorn Helgaas (2):
->       PCI: aardvark: Add local struct device pointers
->       PCI: aardvark: Remove unused platform data
+This patch fixes the warning issue with static checker.
+The bug is reported in [1]
 
-I applied these to pci/host-aardvark for v4.9.  I hope to ask Linus to
-pull them tomorrow, so if you see any issues, let me know soon.
+[1] https://www.spinics.net/lists/arm-kernel/msg535957.html
+
+Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
+---
+ drivers/perf/xgene_pmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
+index c2ac764..a8ac4bc 100644
+--- a/drivers/perf/xgene_pmu.c
++++ b/drivers/perf/xgene_pmu.c
+@@ -1011,7 +1011,7 @@ xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
+ 	rc = acpi_dev_get_resources(adev, &resource_list,
+ 				    acpi_pmu_dev_add_resource, &res);
+ 	acpi_dev_free_resource_list(&resource_list);
+-	if (rc < 0 || IS_ERR(&res)) {
++	if (rc < 0) {
+ 		dev_err(dev, "PMU type %d: No resource address found\n", type);
+ 		goto err;
+ 	}
+-- 
+1.9.1
