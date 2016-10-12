@@ -1,115 +1,111 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Wed, 12 Oct 2016 11:54:57 +0530
-Subject: [PATCH V3 0/8] IOMMU probe deferral support
-In-Reply-To: <12cfb59f-f7ca-d4df-eb7f-42348e357979@samsung.com>
-References: <CGME20161004170414eucas1p141bebe16e1bf241862833e7ad0270c72@eucas1p1.samsung.com>
- <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
- <12cfb59f-f7ca-d4df-eb7f-42348e357979@samsung.com>
-Message-ID: <000601d22451$5eb46fc0$1c1d4f40$@codeaurora.org>
+From: marcin.nowakowski@imgtec.com (Marcin Nowakowski)
+Date: Wed, 12 Oct 2016 09:07:03 +0200
+Subject: [PATCH v3 07/11] arm64/tracing: fix compat syscall handling
+In-Reply-To: <20161011133623.GE9532@arm.com>
+References: <1476182576-15247-1-git-send-email-marcin.nowakowski@imgtec.com>
+ <1476182576-15247-8-git-send-email-marcin.nowakowski@imgtec.com>
+ <20161011133623.GE9532@arm.com>
+Message-ID: <fed0151c-ebfd-18d2-939c-21e315dc7584@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Will,
 
->Hi Sricharan,
+On 11.10.2016 15:36, Will Deacon wrote:
+> On Tue, Oct 11, 2016 at 12:42:52PM +0200, Marcin Nowakowski wrote:
+>> Add arch_syscall_addr for arm64 and define NR_compat_syscalls, as the
+>> number of compat syscalls for arm64 exceeds the number defined by
+>> NR_syscalls.
+>>
+>> Signed-off-by: Marcin Nowakowski <marcin.nowakowski@imgtec.com>
+>> Cc: Steven Rostedt <rostedt@goodmis.org>
+>> Cc: Ingo Molnar <mingo@redhat.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+>>  arch/arm64/include/asm/ftrace.h | 12 +-----------
+>>  arch/arm64/include/asm/unistd.h |  1 +
+>>  arch/arm64/kernel/Makefile      |  1 +
+>>  arch/arm64/kernel/ftrace.c      | 16 ++++++++++++++++
+>>  4 files changed, 19 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+>> index caa955f..b57ff7c 100644
+>> --- a/arch/arm64/include/asm/ftrace.h
+>> +++ b/arch/arm64/include/asm/ftrace.h
+>> @@ -41,17 +41,7 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+>>
+>>  #define ftrace_return_address(n) return_address(n)
+>>
+>> -/*
+>> - * Because AArch32 mode does not share the same syscall table with AArch64,
+>> - * tracing compat syscalls may result in reporting bogus syscalls or even
+>> - * hang-up, so just do not trace them.
+>> - * See kernel/trace/trace_syscalls.c
+>> - *
+>> - * x86 code says:
+>> - * If the user really wants these, then they should use the
+>> - * raw syscall tracepoints with filtering.
+>> - */
+>> -#define ARCH_TRACE_IGNORE_COMPAT_SYSCALLS
+>> +#define ARCH_COMPAT_SYSCALL_NUMBERS_OVERLAP 1
+>>  static inline bool arch_trace_is_compat_syscall(struct pt_regs *regs)
+>>  {
+>>  	return is_compat_task();
+>> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+>> index e78ac26..276d049 100644
+>> --- a/arch/arm64/include/asm/unistd.h
+>> +++ b/arch/arm64/include/asm/unistd.h
+>> @@ -45,6 +45,7 @@
+>>  #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
+>>
+>>  #define __NR_compat_syscalls		394
+>> +#define NR_compat_syscalls (__NR_compat_syscalls)
 >
->
->On 2016-10-04 19:03, Sricharan R wrote:
->> Initial post from Laurent Pinchart[1]. This is
->> series calls the dma ops configuration for the devices
->> at a generic place so that it works for all busses.
->> The dma_configure_ops for a device is now called during
->> the device_attach callback just before the probe of the
->> bus/driver is called. Similarly dma_deconfigure is called during
->> device/driver_detach path.
->>
->>
->> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
->>         |                         |
->> pci_bus_add_device     (device_add/driver_register)
->>         |                         |
->> device_attach           device_initial_probe
->>         |                         |
->> __device_attach_driver    __device_attach_driver
->>         |
->> driver_probe_device
->>         |
->> really_probe
->>         |
->> dma_configure
->>
->>   Similarly on the device/driver_unregister path __device_release_driver is
->>   called which inturn calls dma_deconfigure.
->>
->>   If the ACPI bus code follows the same, we can add acpi_dma_configure
->>   at the same place as of_dma_configure.
->>
->>   This series is based on the recently merged Generic DT bindings for
->>   PCI IOMMUs and ARM SMMU from Robin Murphy robin.murphy at arm.com [2]
->>
->>   This time tested this with platform and pci device for probe deferral
->>   and reprobe on arm64 based platform. There is an issue on the cleanup
->>   path for arm64 though, where there is WARN_ON if the dma_ops is reset while
->>   device is attached to an domain in arch_teardown_dma_ops.
->>   But with iommu_groups created from the iommu driver, the device is always
->>   attached to a domain/default_domain. So so the WARN has to be removed/handled
->>   probably.
->
->Thanks for continuing work on this feature! Your can add my:
->
->Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->
-  Thanks for testing this. So the for the below fix, the remove_device callback
-  gets called on the dma_ops cleanup path, so would it be easy to remove the
-  data for the device there ?
+> We may as well just define NR_compat_syscalls instead of
+> __NR_compat_syscalls and move the handful of users over.
 
-Regards,
- Sricharan
+I had tried to minimise the amount of arch-specific changes here - 
+especially those that are not directly related to the proposed syscall 
+handling change. But I agree having these 2 #defines is a bit 
+unnecessary ...
 
+>> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+>> index 40ad08a..75d010f 100644
+>> --- a/arch/arm64/kernel/ftrace.c
+>> +++ b/arch/arm64/kernel/ftrace.c
+>> @@ -176,4 +176,20 @@ int ftrace_disable_ftrace_graph_caller(void)
+>>  	return ftrace_modify_graph_caller(false);
+>>  }
+>>  #endif /* CONFIG_DYNAMIC_FTRACE */
+>> +
+>>  #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+>> +
+>> +#if (defined CONFIG_FTRACE_SYSCALLS) && (defined CONFIG_COMPAT)
+>> +
+>> +extern const void *sys_call_table[];
+>> +extern const void *compat_sys_call_table[];
+>> +
+>> +unsigned long __init arch_syscall_addr(int nr, bool compat)
+>> +{
+>> +	if (compat)
+>> +		return (unsigned long)compat_sys_call_table[nr];
+>> +
+>> +	return (unsigned long)sys_call_table[nr];
+>> +}
+>
+> Do we care about the compat private syscalls (from base 0x0f0000)? We
+> need to make sure that we exhibit the same behaviour as a native
+> 32-bit ARM machine.
+>
+> Will
 
->It works fine with Exynos SYSMMU driver, although a patch is needed to fix
->infinite loop due to list corruption (same element is added twice if master
->device fails with deferred probe):
->
->From: Marek Szyprowski <m.szyprowski@samsung.com>
->Date: Mon, 10 Oct 2016 14:22:42 +0200
->Subject: [PATCH] iommu/exynos: ensure that sysmmu is added only once to its
->  master
->
->Since adding IOMMU deferred probing support, of_xlate() callback might
->be called more than once for given master device (for example it happens
->when masters device driver fails with EPROBE_DEFER), so ensure that
->SYSMMU controller is added to its master device (owner) only once.
->
->Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->---
->  drivers/iommu/exynos-iommu.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
->diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
->index 30808e91b775..1525a86eb829 100644
->--- a/drivers/iommu/exynos-iommu.c
->+++ b/drivers/iommu/exynos-iommu.c
->@@ -1253,7 +1253,7 @@ static int exynos_iommu_of_xlate(struct device *dev,
->  {
->      struct exynos_iommu_owner *owner = dev->archdata.iommu;
->      struct platform_device *sysmmu = of_find_device_by_node(spec->np);
->-    struct sysmmu_drvdata *data;
->+    struct sysmmu_drvdata *data, *entry;
->
->      if (!sysmmu)
->          return -ENODEV;
->@@ -1271,6 +1271,10 @@ static int exynos_iommu_of_xlate(struct device *dev,
->          dev->archdata.iommu = owner;
->      }
->
->+    list_for_each_entry(entry, &owner->controllers, owner_node)
->+        if (entry == data)
->+            return 0;
->+
->      list_add_tail(&data->owner_node, &owner->controllers);
->      return 0;
->  }
->--
->1.9.1
->
+Tracing of such syscalls has been disabled for a long time (see
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=086ba77a6db0).
+Apart from using non-contiguous numbers, they are not defined using 
+standard SYSCALL macros, so they do not have any metadata generated either.
+My suggestion is that if you wanted those to be included in the trace 
+then it should be done separately from these changes.
+
+Marcin
