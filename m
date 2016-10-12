@@ -1,188 +1,132 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Wed, 12 Oct 2016 13:22:12 +0000
-Subject: [PATCH v14 04/16] iommu/dma: MSI doorbell alloc/free
+Date: Wed, 12 Oct 2016 13:22:13 +0000
+Subject: [PATCH v14 05/16] iommu/dma: Introduce iommu_calc_msi_resv
 In-Reply-To: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
 References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1476278544-3397-5-git-send-email-eric.auger@redhat.com>
+Message-ID: <1476278544-3397-6-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We introduce the capability to (un)register MSI doorbells.
-
-A doorbell region is characterized by its physical address base, size,
-and whether it its safe (ie. it implements IRQ remapping). A doorbell
-can be per-cpu or global. We currently only care about global doorbells.
-
-A function returns whether all registered doorbells are safe.
-
-MSI controllers likely to work along with IOMMU that translate MSI
-transaction must register their doorbells to allow device assignment
-with MSI support.  Otherwise the MSI transactions will cause IOMMU faults.
+iommu_calc_msi_resv() sum up the number of iommu pages of the lowest
+order supported by the iommu domain requested to map all the registered
+doorbells. This function will allow to dimension the intermediate
+physical address (IPA) aperture requested to map the MSI doorbells.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 
-v13 -> v14:
-- previously in msi-doorbell.h/c
+v13 -> v14
+- name and proto changed, moved to dma-iommu
 ---
- drivers/iommu/dma-iommu.c | 75 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/dma-iommu.h | 41 ++++++++++++++++++++++++++
- 2 files changed, 116 insertions(+)
+ drivers/iommu/dma-iommu.c | 70 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/dma-iommu.h | 11 +++++++-
+ 2 files changed, 80 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index d45f9a0..d8a7d86 100644
+index d8a7d86..3a4b73b 100644
 --- a/drivers/iommu/dma-iommu.c
 +++ b/drivers/iommu/dma-iommu.c
-@@ -43,6 +43,38 @@ struct iommu_dma_cookie {
- 	spinlock_t		msi_lock;
- };
- 
-+/**
-+ * struct iommu_msi_doorbell_info - MSI doorbell region descriptor
-+ * @percpu_doorbells: per cpu doorbell base address
-+ * @global_doorbell: base address of the doorbell
-+ * @doorbell_is_percpu: is the doorbell per cpu or global?
-+ * @safe: true if irq remapping is implemented
-+ * @size: size of the doorbell
-+ */
-+struct iommu_msi_doorbell_info {
-+	union {
-+		phys_addr_t __percpu    *percpu_doorbells;
-+		phys_addr_t             global_doorbell;
-+	};
-+	bool    doorbell_is_percpu;
-+	bool    safe;
-+	size_t  size;
-+};
-+
-+struct iommu_msi_doorbell {
-+	struct iommu_msi_doorbell_info	info;
-+	struct list_head		next;
-+};
-+
-+/* list of registered MSI doorbells */
-+static LIST_HEAD(iommu_msi_doorbell_list);
-+
-+/* counts the number of unsafe registered doorbells */
-+static uint nb_unsafe_doorbells;
-+
-+/* protects the list and nb_unsafe_doorbells */
-+static DEFINE_MUTEX(iommu_msi_doorbell_mutex);
-+
- static inline struct iova_domain *cookie_iovad(struct iommu_domain *domain)
- {
- 	return &((struct iommu_dma_cookie *)domain->iova_cookie)->iovad;
-@@ -755,3 +787,46 @@ int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
- 	return 0;
+@@ -830,3 +830,73 @@ bool iommu_msi_doorbell_safe(void)
+ 	return !nb_unsafe_doorbells;
  }
- EXPORT_SYMBOL(iommu_get_dma_msi_region_cookie);
+ EXPORT_SYMBOL_GPL(iommu_msi_doorbell_safe);
 +
-+struct iommu_msi_doorbell_info *
-+iommu_msi_doorbell_alloc(phys_addr_t base, size_t size, bool safe)
++/**
++ * calc_region_reqs - compute the number of pages requested to map a region
++ *
++ * @addr: physical base address of the region
++ * @size: size of the region
++ * @order: the page order
++ *
++ * Return: the number of requested pages to map this region
++ */
++static int calc_region_reqs(phys_addr_t addr, size_t size, unsigned int order)
 +{
++	phys_addr_t offset, granule;
++	unsigned int nb_pages;
++
++	granule = (uint64_t)(1 << order);
++	offset = addr & (granule - 1);
++	size = ALIGN(size + offset, granule);
++	nb_pages = size >> order;
++
++	return nb_pages;
++}
++
++/**
++ * calc_dbinfo_reqs - compute the number of pages requested to map a given
++ * MSI doorbell
++ *
++ * @dbi: doorbell info descriptor
++ * @order: page order
++ *
++ * Return: the number of requested pages to map this doorbell
++ */
++static int calc_dbinfo_reqs(struct iommu_msi_doorbell_info *dbi,
++			    unsigned int order)
++{
++	int ret = 0;
++
++	if (!dbi->doorbell_is_percpu) {
++		ret = calc_region_reqs(dbi->global_doorbell, dbi->size, order);
++	} else {
++		phys_addr_t __percpu *pbase;
++		int cpu;
++
++		for_each_possible_cpu(cpu) {
++			pbase = per_cpu_ptr(dbi->percpu_doorbells, cpu);
++			ret += calc_region_reqs(*pbase, dbi->size, order);
++		}
++	}
++	return ret;
++}
++
++int iommu_calc_msi_resv(struct iommu_domain *domain)
++{
++	unsigned long order = __ffs(domain->pgsize_bitmap);
 +	struct iommu_msi_doorbell *db;
-+
-+	db = kzalloc(sizeof(*db), GFP_KERNEL);
-+	if (!db)
-+		return ERR_PTR(-ENOMEM);
-+
-+	db->info.global_doorbell = base;
-+	db->info.size = size;
-+	db->info.safe = safe;
++	phys_addr_t granule;
++	int size = 0;
 +
 +	mutex_lock(&iommu_msi_doorbell_mutex);
-+	list_add(&db->next, &iommu_msi_doorbell_list);
-+	if (!db->info.safe)
-+		nb_unsafe_doorbells++;
++	list_for_each_entry(db, &iommu_msi_doorbell_list, next)
++		size += calc_dbinfo_reqs(&db->info, order);
++
 +	mutex_unlock(&iommu_msi_doorbell_mutex);
-+	return &db->info;
++
++	granule = (uint64_t)(1 << order);
++	domain->msi_resv.size = size * granule;
++	domain->msi_resv.alignment = granule;
++
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(iommu_msi_doorbell_alloc);
-+
-+void iommu_msi_doorbell_free(struct iommu_msi_doorbell_info *dbinfo)
-+{
-+	struct iommu_msi_doorbell *db;
-+
-+	db = container_of(dbinfo, struct iommu_msi_doorbell, info);
-+
-+	mutex_lock(&iommu_msi_doorbell_mutex);
-+	list_del(&db->next);
-+	if (!db->info.safe)
-+		nb_unsafe_doorbells--;
-+	mutex_unlock(&iommu_msi_doorbell_mutex);
-+	kfree(db);
-+}
-+EXPORT_SYMBOL_GPL(iommu_msi_doorbell_free);
-+
-+bool iommu_msi_doorbell_safe(void)
-+{
-+	return !nb_unsafe_doorbells;
-+}
-+EXPORT_SYMBOL_GPL(iommu_msi_doorbell_safe);
 diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index 05ab5b4..9640a27 100644
+index 9640a27..95875c8 100644
 --- a/include/linux/dma-iommu.h
 +++ b/include/linux/dma-iommu.h
-@@ -19,6 +19,8 @@
- #ifdef __KERNEL__
- #include <asm/errno.h>
- 
-+struct iommu_msi_doorbell_info;
-+
- #ifdef CONFIG_IOMMU_DMA
- #include <linux/iommu.h>
- #include <linux/msi.h>
-@@ -70,6 +72,31 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
- int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
- 				    dma_addr_t base, u64 size);
+@@ -97,6 +97,16 @@ void iommu_msi_doorbell_free(struct iommu_msi_doorbell_info *db);
+  */
+ bool iommu_msi_doorbell_safe(void);
  
 +/**
-+ * iommu_msi_doorbell_alloc - allocate a global doorbell
-+ * @base: physical base address of the doorbell
-+ * @size: size of the doorbell
-+ * @safe: true is irq_remapping implemented for this doorbell
++ * iommu_calc_msi_resv - compute the number of pages of the lowest order
++ * supported by @domain, requested to map all the registered doorbells.
 + *
-+ * Return: the newly allocated doorbell info or a pointer converted error
-+ */
-+struct iommu_msi_doorbell_info *
-+iommu_msi_doorbell_alloc(phys_addr_t base, size_t size, bool safe);
-+
-+/**
-+ * iommu_msi_doorbell_free - free a global doorbell
-+ * @db: doorbell info to free
-+ */
-+void iommu_msi_doorbell_free(struct iommu_msi_doorbell_info *db);
-+
-+/**
-+ * iommu_msi_doorbell_safe - return whether all registered doorbells are safe
++ * @domain: iommu_domain
++ * @msi_resv: MSI reserved window requirements
 + *
-+ * Safe doorbells are those which implement irq remapping
-+ * Return: true if all doorbells are safe, false otherwise
 + */
-+bool iommu_msi_doorbell_safe(void);
++int iommu_calc_msi_resv(struct iommu_domain *domain);
 +
  #else
  
  struct iommu_domain;
-@@ -99,6 +126,20 @@ static inline int iommu_get_dma_msi_region_cookie(struct iommu_domain *domain,
- 	return -ENODEV;
+@@ -139,7 +149,6 @@ static inline bool iommu_msi_doorbell_safe(void)
+ {
+ 	return false;
  }
- 
-+static inline struct iommu_msi_doorbell_info *
-+iommu_msi_doorbell_alloc(phys_addr_t base, size_t size, bool safe)
-+{
-+	return NULL;
-+}
-+
-+static inline void
-+iommu_msi_doorbell_free(struct msi_doorbell_info *db) {}
-+
-+static inline bool iommu_msi_doorbell_safe(void)
-+{
-+	return false;
-+}
-+
+-
  #endif	/* CONFIG_IOMMU_DMA */
  #endif	/* __KERNEL__ */
  #endif	/* __DMA_IOMMU_H */
