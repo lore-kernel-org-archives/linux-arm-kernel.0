@@ -1,229 +1,93 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Wed, 12 Oct 2016 13:22:21 +0000
-Subject: [PATCH v14 13/16] vfio: Allow reserved msi iova registration
+Date: Wed, 12 Oct 2016 13:22:22 +0000
+Subject: [PATCH v14 14/16] vfio/type1: Check doorbell safety
 In-Reply-To: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
 References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1476278544-3397-14-git-send-email-eric.auger@redhat.com>
+Message-ID: <1476278544-3397-15-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The user is allowed to register a reserved MSI IOVA range by using the
-DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
-This region is stored in the vfio_dma rb tree. At that point the iova
-range is not mapped to any target address yet. The host kernel will use
-those iova when needed, typically when MSIs are allocated.
+On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
+by the msi controller.
+
+Since we currently have no way to detect whether the MSI controller is
+upstream or downstream to the IOMMU we rely on the MSI doorbell information
+registered by the interrupt controllers. In case at least one doorbell
+does not implement proper isolation, we state the assignment is unsafe
+with regard to interrupts. This is a coarse assessment but should allow to
+wait for a better system description.
+
+At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
+removed in next patch.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
 
 ---
-v13 -> v14:
-- in vfio_set_msi_aperture, unfold in case of failure
-- Get DOMAIN_ATTR_MSI_RESV attribute to decide whether to set the MSI
-  aperture
+v13 -> v15:
+- check vfio_msi_resv before checking whether msi doorbell is safe
 
-v12 -> v13:
-- use iommu_get_dma_msi_region_cookie
-
-v9 -> v10
-- use VFIO_IOVA_RESERVED_MSI enum value
-
-v7 -> v8:
-- use iommu_msi_set_aperture function. There is no notion of
-  unregistration anymore since the reserved msi slot remains
-  until the container gets closed.
-
-v6 -> v7:
-- use iommu_free_reserved_iova_domain
-- convey prot attributes downto dma-reserved-iommu iova domain creation
-- reserved bindings teardown now performed on iommu domain destruction
-- rename VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA into
-         VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA
-- change title
-- pass the protection attribute to dma-reserved-iommu API
+v9 -> v10:
+- coarse safety assessment based on MSI doorbell info
 
 v3 -> v4:
-- use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
-- protect vfio_register_reserved_iova_range implementation with
-  CONFIG_IOMMU_DMA_RESERVED
-- handle unregistration by user-space and on vfio_iommu_type1 release
+- rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
+  and irq_remapping into safe_irq_domains
 
-v1 -> v2:
-- set returned value according to alloc_reserved_iova_domain result
-- free the iova domains in case any error occurs
-
-RFC v1 -> v1:
-- takes into account Alex comments, based on
-  [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
-- use the existing dma map/unmap ioctl interface with a flag to register
-  a reserved IOVA range. A single reserved iova region is allowed.
+v2 -> v3:
+- protect vfio_msi_parent_irq_remapping_capable with
+  CONFIG_GENERIC_MSI_IRQ_DOMAIN
 ---
- drivers/vfio/vfio_iommu_type1.c | 97 ++++++++++++++++++++++++++++++++++++++++-
- include/uapi/linux/vfio.h       | 10 ++++-
- 2 files changed, 105 insertions(+), 2 deletions(-)
+ drivers/vfio/vfio_iommu_type1.c | 30 +++++++++++++++++++++++++++++-
+ 1 file changed, 29 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 2108e2e..e0c97ef 100644
+index e0c97ef..c18ba9d 100644
 --- a/drivers/vfio/vfio_iommu_type1.c
 +++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -441,6 +441,40 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
- 	vfio_lock_acct(-unlocked);
+@@ -442,6 +442,29 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
  }
  
-+/**
-+ * vfio_set_msi_aperture - Sets the msi aperture on all domains
-+ * requesting MSI mapping
+ /**
++ * vfio_msi_resv - Return whether any VFIO iommu domain requires
++ * MSI mapping
 + *
 + * @iommu: vfio iommu handle
-+ * @iova: MSI window iova base address
-+ * @size: size of the MSI reserved iova window
 + *
-+ * Return: 0 if the MSI reserved region was set on at least one domain,
-+ * negative value on failure
++ * Return: true of MSI mapping is needed, false otherwise
 + */
-+static int vfio_set_msi_aperture(struct vfio_iommu *iommu,
-+				dma_addr_t iova, size_t size)
++static bool vfio_msi_resv(struct vfio_iommu *iommu)
 +{
 +	struct iommu_domain_msi_resv msi_resv;
 +	struct vfio_domain *d;
-+	int ret = -EINVAL;
++	int ret;
 +
 +	list_for_each_entry(d, &iommu->domain_list, next) {
-+		if (iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_RESV,
-+					  &msi_resv))
-+			continue;
-+		ret = iommu_get_dma_msi_region_cookie(d->domain, iova, size);
-+		if (ret)
-+			goto unfold;
++		ret = iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_RESV,
++					    &msi_resv);
++		if (!ret)
++			return true;
 +	}
-+	return 0;
-+unfold:
-+	list_for_each_entry(d, &iommu->domain_list, next)
-+		iommu_put_dma_cookie(d->domain);
-+
-+	return ret;
++	return false;
 +}
 +
- static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
- {
- 	vfio_unmap_unpin(iommu, dma);
-@@ -690,6 +724,63 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
- 	return ret;
- }
- 
-+static int vfio_register_msi_range(struct vfio_iommu *iommu,
-+				   struct vfio_iommu_type1_dma_map *map)
-+{
-+	dma_addr_t iova = map->iova;
-+	size_t size = map->size;
-+	int ret = 0;
-+	struct vfio_dma *dma;
-+	unsigned long order;
-+	uint64_t mask;
-+
-+	/* Verify that none of our __u64 fields overflow */
-+	if (map->size != size || map->iova != iova)
-+		return -EINVAL;
-+
-+	order =  __ffs(vfio_pgsize_bitmap(iommu));
-+	mask = ((uint64_t)1 << order) - 1;
-+
-+	WARN_ON(mask & PAGE_MASK);
-+
-+	if (!size || (size | iova) & mask)
-+		return -EINVAL;
-+
-+	/* Don't allow IOVA address wrap */
-+	if (iova + size - 1 < iova)
-+		return -EINVAL;
-+
-+	mutex_lock(&iommu->lock);
-+
-+	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
-+		ret =  -EEXIST;
-+		goto unlock;
-+	}
-+
-+	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
-+	if (!dma) {
-+		ret = -ENOMEM;
-+		goto unlock;
-+	}
-+
-+	dma->iova = iova;
-+	dma->size = size;
-+	dma->type = VFIO_IOVA_RESERVED_MSI;
-+
-+	ret = vfio_set_msi_aperture(iommu, iova, size);
-+	if (ret)
-+		goto free_unlock;
-+
-+	vfio_link_dma(iommu, dma);
-+	goto unlock;
-+
-+free_unlock:
-+	kfree(dma);
-+unlock:
-+	mutex_unlock(&iommu->lock);
-+	return ret;
-+}
-+
- static int vfio_bus_type(struct device *dev, void *data)
- {
- 	struct bus_type **bus = data;
-@@ -1068,7 +1159,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
- 		struct vfio_iommu_type1_dma_map map;
- 		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
--				VFIO_DMA_MAP_FLAG_WRITE;
-+				VFIO_DMA_MAP_FLAG_WRITE |
-+				VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA;
- 
- 		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
- 
-@@ -1078,6 +1170,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 		if (map.argsz < minsz || map.flags & ~mask)
- 			return -EINVAL;
- 
-+		if (map.flags & VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA)
-+			return vfio_register_msi_range(iommu, &map);
-+
- 		return vfio_dma_do_map(iommu, &map);
- 
- 	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
-diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-index 255a211..4a9dbc2 100644
---- a/include/uapi/linux/vfio.h
-+++ b/include/uapi/linux/vfio.h
-@@ -498,12 +498,19 @@ struct vfio_iommu_type1_info {
++/**
+  * vfio_set_msi_aperture - Sets the msi aperture on all domains
+  * requesting MSI mapping
   *
-  * Map process virtual addresses to IO virtual addresses using the
-  * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
-+ *
-+ * In case RESERVED_MSI_IOVA flag is set, the API only aims@registering an
-+ * IOVA region that will be used on some platforms to map the host MSI frames.
-+ * In that specific case, vaddr is ignored. Once registered, an MSI reserved
-+ * IOVA region stays until the container is closed.
-  */
- struct vfio_iommu_type1_dma_map {
- 	__u32	argsz;
- 	__u32	flags;
- #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
- #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
-+/* reserved iova for MSI vectors*/
-+#define VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA (1 << 2)
- 	__u64	vaddr;				/* Process virtual address */
- 	__u64	iova;				/* IO virtual address */
- 	__u64	size;				/* Size of mapping (bytes) */
-@@ -519,7 +526,8 @@ struct vfio_iommu_type1_dma_map {
-  * Caller sets argsz.  The actual unmapped size is returned in the size
-  * field.  No guarantee is made to the user that arbitrary unmaps of iova
-  * or size different from those used in the original mapping call will
-- * succeed.
-+ * succeed. Once registered, an MSI region cannot be unmapped and stays
-+ * until the container is closed.
-  */
- struct vfio_iommu_type1_dma_unmap {
- 	__u32	argsz;
+@@ -945,8 +968,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	INIT_LIST_HEAD(&domain->group_list);
+ 	list_add(&group->next, &domain->group_list);
+ 
++	/*
++	 * to advertise safe interrupts either the IOMMU or the MSI controllers
++	 * must support IRQ remapping (aka. interrupt translation)
++	 */
+ 	if (!allow_unsafe_interrupts &&
+-	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
++	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) &&
++		!(vfio_msi_resv(iommu) && iommu_msi_doorbell_safe()))) {
+ 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+ 		       __func__);
+ 		ret = -EPERM;
 -- 
 1.9.1
