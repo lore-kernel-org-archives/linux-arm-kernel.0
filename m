@@ -1,219 +1,245 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 12 Oct 2016 17:13:57 -0500
-Subject: [PATCH V2 1/3] Revert "ACPI,PCI,IRQ: reduce static IRQ array
- size to 16"
-In-Reply-To: <1475615720-31047-2-git-send-email-okaya@codeaurora.org>
-References: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
- <1475615720-31047-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <20161012221357.GB15116@localhost>
+From: l.majewski@majess.pl (Lukasz Majewski)
+Date: Thu, 13 Oct 2016 00:15:40 +0200
+Subject: [PATCH v3 3/6] pwm: imx: support output polarity inversion
+In-Reply-To: <5325a332099473a2d8382530f79c5a8e@agner.ch>
+References: <20161007151129.6043-1-bhuvanchandra.dv@toradex.com>
+ <20161007151129.6043-4-bhuvanchandra.dv@toradex.com>
+ <5325a332099473a2d8382530f79c5a8e@agner.ch>
+Message-ID: <20161013001540.7f759158@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+Hi Stefan,
 
-I have to apologize because I haven't followed all the discussion and
-now I'm trying to figure it out from the patches and changelogs.  But
-I guess that's not all bad, because future interested folks *should*
-be able to figure things out from that :)
-
-On Tue, Oct 04, 2016 at 05:15:17PM -0400, Sinan Kaya wrote:
-> This reverts commit 5c5087a55390 ("ACPI,PCI,IRQ: reduce static IRQ array
-> size to 16").
+> On 2016-10-07 08:11, Bhuvanchandra DV wrote:
+> > From: Lothar Wassmann <LW@KARO-electronics.de>
+> > 
+> > The i.MX pwm unit on i.MX27 and newer SoCs provides a configurable
+> > output polarity. This patch adds support to utilize this feature
+> > where available.
+> > 
+> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+> > Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> > Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  Documentation/devicetree/bindings/pwm/imx-pwm.txt |  6 +--
+> >  drivers/pwm/pwm-imx.c                             | 51
+> > +++++++++++++++++++++-- 2 files changed, 51 insertions(+), 6
+> > deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> > b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> > index e00c2e9..c61bdf8 100644
+> > --- a/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> > +++ b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> > @@ -6,8 +6,8 @@ Required properties:
+> >    - "fsl,imx1-pwm" for PWM compatible with the one integrated on
+> > i.MX1
+> >    - "fsl,imx27-pwm" for PWM compatible with the one integrated on
+> > i.MX27
+> >  - reg: physical base address and length of the controller's
+> > registers -- #pwm-cells: should be 2. See pwm.txt in this directory
+> > for a description of
+> > -  the cells format.
+> > +- #pwm-cells: 2 for i.MX1 and 3 for i.MX27 and newer SoCs. See
+> > pwm.txt
+> > +  in this directory for a description of the cells format.
+> >  - clocks : Clock specifiers for both ipg and per clocks.
+> >  - clock-names : Clock names should include both "ipg" and "per"
+> >  See the clock consumer binding,
+> > @@ -17,7 +17,7 @@ See the clock consumer binding,
+> >  Example:
+> >  
+> >  pwm1: pwm at 53fb4000 {
+> > -	#pwm-cells = <2>;
+> > +	#pwm-cells = <3>;
+> >  	compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
+> >  	reg = <0x53fb4000 0x4000>;
+> >  	clocks = <&clks IMX5_CLK_PWM1_IPG_GATE>,
+> > diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+> > index d600fd5..c37d223 100644
+> > --- a/drivers/pwm/pwm-imx.c
+> > +++ b/drivers/pwm/pwm-imx.c
+> > @@ -38,6 +38,7 @@
+> >  #define MX3_PWMCR_DOZEEN		(1 << 24)
+> >  #define MX3_PWMCR_WAITEN		(1 << 23)
+> >  #define MX3_PWMCR_DBGEN			(1 << 22)
+> > +#define MX3_PWMCR_POUTC			(1 << 18)
+> >  #define MX3_PWMCR_CLKSRC_IPG_HIGH	(2 << 16)
+> >  #define MX3_PWMCR_CLKSRC_IPG		(1 << 16)
+> >  #define MX3_PWMCR_SWR			(1 << 3)
+> > @@ -180,6 +181,9 @@ static int imx_pwm_config_v2(struct pwm_chip
+> > *chip, if (enable)
+> >  		cr |= MX3_PWMCR_EN;
+> >  
+> > +	if (pwm->args.polarity == PWM_POLARITY_INVERSED)
+> > +		cr |= MX3_PWMCR_POUTC;
+> > +
 > 
-> The code maintains a fixed size array for IRQ penalties. The array
-> gets updated by external calls such as acpi_penalize_sci_irq,
-> acpi_penalize_isa_irq to reflect the actual interrupt usage of the
-> system. Since the IRQ distribution is platform specific, this is
-> not known ahead of time. The IRQs get updated based on the SCI
-> interrupt number BIOS has chosen or the ISA IRQs that were assigned
-> to existing peripherals.
+> This seems wrong to me, the config callback is meant for period/duty
+> cycle only.
+
+If it is meant only for that, then the polarity should be removed from
+it.
+
+However after very quick testing, at least on my setup, it turns out
+that removing this lines causes polarity to _not_ being set (and the
+polarity is not inverted).
+
+I will investigate this further on my setup and hopefully sent proper
+patch.
+
+> The set_polarity callback should get called in case a
+> different polarity is requested.
+
+On my setup the pwm2 is set from DT and pwm_backlight_probe() calls
+pwm_apply_args(), so everything should work. However, as I mentioned
+above there still is some problem with inversion setting.
+
 > 
-> By the time ACPI gets initialized, this code tries to determine an
-> IRQ number based on penalty values in this array. It will try to locate
-> the IRQ with the least penalty assignment so that interrupt sharing is
-> avoided if possible.
 > 
-> A couple of notes about the external APIs:
-> 1. These API can be called before the ACPI is started. Therefore, one
-> cannot assume that the PCI link objects are initialized for calculating
-> penalties.
-
-Which API are you thinking about here?  pcibios_penalize_isa_irq() is
-called by ACPI and PNP, which should both be after ACPI is started.
-
-My guess is you're thinking about acpi_penalize_sci_irq() (added back
-later in this series), which is called here, which is definitely
-before ACPI objects are available:
-
-  setup_arch
-    acpi_boot_init
-      acpi_process_madt
-	acpi_parse_madt_ioapic_entries
-	  acpi_table_parse_madt
-	    acpi_parse_int_src_ovr
-	      acpi_sci_ioapic_setup
-	        acpi_penalize_sci_irq       # <---
-
-> 2. The polarity and trigger information passed via the
-> acpi_penalize_sci_irq from the BIOS may not match what the IRQ subsystem
-> is reporting as the call might have been placed before the IRQ is
-> registered by the interrupt subsystem.
+> >  	writel(cr, imx->mmio_base + MX3_PWMCR);
+> >  
+> >  	return 0;
+> > @@ -240,27 +244,62 @@ static void imx_pwm_disable(struct pwm_chip
+> > *chip, struct pwm_device *pwm)
+> >  	clk_disable_unprepare(imx->clk_per);
+> >  }
+> >  
+> > -static struct pwm_ops imx_pwm_ops = {
+> > +static int imx_pwm_set_polarity(struct pwm_chip *chip, struct
+> > pwm_device *pwm,
+> > +				enum pwm_polarity polarity)
+> > +{
+> > +	struct imx_chip *imx = to_imx_chip(chip);
+> > +	u32 val;
+> > +
+> > +	if (polarity == pwm->args.polarity)
+> > +		return 0;
 > 
-> The previous change was in the direction to remove these external API and
-> try to calculate the penalties at runtime for the ISA path as well. This
-> didn't work out well with the existing platforms.
+> I don't think that this is right. Today, pwm_apply_args (in
+> include/linux/pwm.h) copies the polarity from args to state.polarity,
+> which is then passed as polarity argument to this function. So this
+> will always return 0 afaict.
+
+Yes, I've overlooked it (that the state is copied).
+
+It can be dropped.
+
 > 
-> Restoring the old behavior for IRQ < 256 and the new behavior will remain
-> effective for IRQ >= 256.
-
-IIRC, this all started because we needed more than 256 IRQs, but we
-didn't know how to size a static table to be large enough without
-being wasteful.
-
-Prior to 5c5087a55390, we tracked penalties for IRQs 0-255.  After it,
-we only tracked penalties for IRQs 0-15.  I think this patch basically
-makes it so we track 0-255 again.
-
-*This* patch only increases the range for pcibios_penalize_isa_irq()
-(and command-line hints, but hopefully nobody cares about those).  A
-subsequent patch increases it for SCI as well.
-
-The name "ACPI_MAX_IRQS" is now slightly misleading (because we do
-support more than 256 IRQs) and the 256 value is sort of an
-unjustified magic number.  16 is explainable as the number of ISA
-IRQs, but I don't know what 256 is based on (other than historical
-practice, of course).  ACPI device IRQs can be much larger, and I
-think the SCI IRQ can be, too (the FADT SCI_INT field is 16 bits).
-
-Can you tie this back to the specific problem on the broken machine
-somehow?  Do we need a penalty for an IRQ in the 16-255 range?
-
-In a subsequent patch, I see something about the IRQ type not being
-updated at the right time, but I can't quite connect the dots.
-
-To be clear, I'm not asking for any changes in the patch; I'm just
-trying to understand what's going on.
-
-> Tested-by: Jonathan Liu <net147@gmail.com>
-> Tested-by: Ondrej Zary <linux@rainbow-software.org>
-> Link: http://www.gossamer-threads.com/lists/linux/kernel/2537016#2537016
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/acpi/pci_link.c | 35 ++++++++++++++++++-----------------
->  1 file changed, 18 insertions(+), 17 deletions(-)
+> I would just drop that.
 > 
-> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> index c983bf7..f3792f4 100644
-> --- a/drivers/acpi/pci_link.c
-> +++ b/drivers/acpi/pci_link.c
-> @@ -438,6 +438,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
->   * enabled system.
->   */
->  
-> +#define ACPI_MAX_IRQS		256
->  #define ACPI_MAX_ISA_IRQS	16
->  
->  #define PIRQ_PENALTY_PCI_POSSIBLE	(16*16)
-> @@ -446,7 +447,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
->  #define PIRQ_PENALTY_ISA_USED		(16*16*16*16*16)
->  #define PIRQ_PENALTY_ISA_ALWAYS		(16*16*16*16*16*16)
->  
-> -static int acpi_isa_irq_penalty[ACPI_MAX_ISA_IRQS] = {
-> +static int acpi_irq_penalty[ACPI_MAX_IRQS] = {
->  	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ0 timer */
->  	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ1 keyboard */
->  	PIRQ_PENALTY_ISA_ALWAYS,	/* IRQ2 cascade */
-> @@ -511,7 +512,7 @@ static int acpi_irq_get_penalty(int irq)
->  	}
->  
->  	if (irq < ACPI_MAX_ISA_IRQS)
-> -		return penalty + acpi_isa_irq_penalty[irq];
-> +		return penalty + acpi_irq_penalty[irq];
->  
->  	penalty += acpi_irq_pci_sharing_penalty(irq);
->  	return penalty;
-> @@ -538,14 +539,14 @@ int __init acpi_irq_penalty_init(void)
->  
->  			for (i = 0; i < link->irq.possible_count; i++) {
->  				if (link->irq.possible[i] < ACPI_MAX_ISA_IRQS)
-> -					acpi_isa_irq_penalty[link->irq.
-> +					acpi_irq_penalty[link->irq.
->  							 possible[i]] +=
->  					    penalty;
->  			}
->  
->  		} else if (link->irq.active &&
-> -				(link->irq.active < ACPI_MAX_ISA_IRQS)) {
-> -			acpi_isa_irq_penalty[link->irq.active] +=
-> +				(link->irq.active < ACPI_MAX_IRQS)) {
-> +			acpi_irq_penalty[link->irq.active] +=
->  			    PIRQ_PENALTY_PCI_POSSIBLE;
->  		}
->  	}
-> @@ -828,7 +829,7 @@ static void acpi_pci_link_remove(struct acpi_device *device)
->  }
->  
->  /*
-> - * modify acpi_isa_irq_penalty[] from cmdline
-> + * modify acpi_irq_penalty[] from cmdline
->   */
->  static int __init acpi_irq_penalty_update(char *str, int used)
->  {
-> @@ -837,24 +838,24 @@ static int __init acpi_irq_penalty_update(char *str, int used)
->  	for (i = 0; i < 16; i++) {
->  		int retval;
->  		int irq;
-> -		int new_penalty;
->  
->  		retval = get_option(&str, &irq);
->  
->  		if (!retval)
->  			break;	/* no number found */
->  
-> -		/* see if this is a ISA IRQ */
-> -		if ((irq < 0) || (irq >= ACPI_MAX_ISA_IRQS))
-> +		if (irq < 0)
-> +			continue;
-> +
-> +		if (irq >= ARRAY_SIZE(acpi_irq_penalty))
->  			continue;
->  
->  		if (used)
-> -			new_penalty = acpi_irq_get_penalty(irq) +
-> -					PIRQ_PENALTY_ISA_USED;
-> +			acpi_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
-> +				PIRQ_PENALTY_ISA_USED;
->  		else
-> -			new_penalty = 0;
-> +			acpi_irq_penalty[irq] = 0;
->  
-> -		acpi_isa_irq_penalty[irq] = new_penalty;
->  		if (retval != 2)	/* no next number */
->  			break;
->  	}
-> @@ -870,14 +871,14 @@ static int __init acpi_irq_penalty_update(char *str, int used)
->   */
->  void acpi_penalize_isa_irq(int irq, int active)
->  {
-> -	if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
-> -		acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
-> -		  (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
-> +	if (irq >= 0 && irq < ARRAY_SIZE(acpi_irq_penalty))
-> +		acpi_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
-> +		    (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
->  }
->  
->  bool acpi_isa_irq_available(int irq)
->  {
-> -	return irq >= 0 && (irq >= ARRAY_SIZE(acpi_isa_irq_penalty) ||
-> +	return irq >= 0 && (irq >= ARRAY_SIZE(acpi_irq_penalty) ||
->  		    acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
->  }
->  
-> -- 
-> 1.9.1
+> There is probably one little problem in the current state of affairs:
+> If the bootloader makes use of a PWM channel with inverted state,
+> then the kernel would not know about that and currently assume a
+> wrong initial state... I guess at one point in time we should
+> implement the state retrieval callback and move to the new atomic PWM
+> API, which would mean to implement apply callback.
+
+Are there any patches on the horizon?
+
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Stefan
+> 
+> 
+> > +
+> > +	val = readl(imx->mmio_base + MX3_PWMCR);
+> > +
+> > +	if (polarity == PWM_POLARITY_INVERSED)
+> > +		val |= MX3_PWMCR_POUTC;
+> > +	else
+> > +		val &= ~MX3_PWMCR_POUTC;
+> > +
+> > +	writel(val, imx->mmio_base + MX3_PWMCR);
+> > +
+> > +	dev_dbg(imx->chip.dev, "%s: polarity set to %s\n",
+> > __func__,
+> > +		polarity == PWM_POLARITY_INVERSED ? "inverted" :
+> > "normal"); +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct pwm_ops imx_pwm_ops_v1 = {
+> >  	.enable = imx_pwm_enable,
+> >  	.disable = imx_pwm_disable,
+> >  	.config = imx_pwm_config,
+> >  	.owner = THIS_MODULE,
+> >  };
+> >  
+> > +static struct pwm_ops imx_pwm_ops_v2 = {
+> > +	.enable = imx_pwm_enable,
+> > +	.disable = imx_pwm_disable,
+> > +	.set_polarity = imx_pwm_set_polarity,
+> > +	.config = imx_pwm_config,
+> > +	.owner = THIS_MODULE,
+> > +};
+> > +
+> >  struct imx_pwm_data {
+> >  	int (*config)(struct pwm_chip *chip,
+> >  		struct pwm_device *pwm, int duty_ns, int
+> > period_ns); void (*set_enable)(struct pwm_chip *chip, bool enable);
+> > +	struct pwm_ops *pwm_ops;
+> >  };
+> >  
+> >  static struct imx_pwm_data imx_pwm_data_v1 = {
+> >  	.config = imx_pwm_config_v1,
+> >  	.set_enable = imx_pwm_set_enable_v1,
+> > +	.pwm_ops = &imx_pwm_ops_v1,
+> >  };
+> >  
+> >  static struct imx_pwm_data imx_pwm_data_v2 = {
+> >  	.config = imx_pwm_config_v2,
+> >  	.set_enable = imx_pwm_set_enable_v2,
+> > +	.pwm_ops = &imx_pwm_ops_v2,
+> >  };
+> >  
+> >  static const struct of_device_id imx_pwm_dt_ids[] = {
+> > @@ -282,6 +321,8 @@ static int imx_pwm_probe(struct platform_device
+> > *pdev) if (!of_id)
+> >  		return -ENODEV;
+> >  
+> > +	data = of_id->data;
+> > +
+> >  	imx = devm_kzalloc(&pdev->dev, sizeof(*imx), GFP_KERNEL);
+> >  	if (imx == NULL)
+> >  		return -ENOMEM;
+> > @@ -300,18 +341,22 @@ static int imx_pwm_probe(struct
+> > platform_device *pdev) return PTR_ERR(imx->clk_ipg);
+> >  	}
+> >  
+> > -	imx->chip.ops = &imx_pwm_ops;
+> > +	imx->chip.ops = data->pwm_ops;
+> >  	imx->chip.dev = &pdev->dev;
+> >  	imx->chip.base = -1;
+> >  	imx->chip.npwm = 1;
+> >  	imx->chip.can_sleep = true;
+> > +	if (data->pwm_ops->set_polarity) {
+> > +		dev_dbg(&pdev->dev, "PWM supports output
+> > inversion\n");
+> > +		imx->chip.of_xlate = of_pwm_xlate_with_flags;
+> > +		imx->chip.of_pwm_n_cells = 3;
+> > +	}
+> >  
+> >  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	imx->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+> >  	if (IS_ERR(imx->mmio_base))
+> >  		return PTR_ERR(imx->mmio_base);
+> >  
+> > -	data = of_id->data;
+> >  	imx->config = data->config;
+> >  	imx->set_enable = data->set_enable;
+> 
+
+Best regards,
+
+?ukasz Majewski
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161013/c11675fd/attachment-0001.sig>
