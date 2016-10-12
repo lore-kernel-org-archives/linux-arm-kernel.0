@@ -1,50 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 12 Oct 2016 12:23:45 +0100
-Subject: [PATCH v3 5/5] arm64: mm: round memstart_addr to contiguous PUD/PMD
- size
-In-Reply-To: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1476271425-19401-6-git-send-email-ard.biesheuvel@linaro.org>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Wed, 12 Oct 2016 14:32:29 +0300
+Subject: [bug report] perf: xgene: Add APM X-Gene SoC Performance Monitoring
+ Unit driver
+Message-ID: <20161012113229.GA16447@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Given that contiguous PUDs/PMDs allow the linear region to be mapped more
-efficiently, ensure that the relative alignment between the linear virtual
-and physical mappings of system RAM are equal modulo the contiguous PUD
-size (or contiguous PMD size, for 16k/64k granule size).
+Hello Tai Nguyen,
 
-Note that this reduces the KASLR randomization of the linear range by
-PUD_SHIFT (or PMD_SHIFT) bits.
+The patch 832c927d119b: "perf: xgene: Add APM X-Gene SoC Performance
+Monitoring Unit driver" from Jul 15, 2016, leads to the following
+static checker warning:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/kernel-pgtable.h | 11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+	drivers/perf/xgene_pmu.c:1014 acpi_get_pmu_hw_inf()
+	warn: '&res' isn't an ERR_PTR
 
-diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-index 7e51d1b57c0c..71dbd9e1e809 100644
---- a/arch/arm64/include/asm/kernel-pgtable.h
-+++ b/arch/arm64/include/asm/kernel-pgtable.h
-@@ -83,16 +83,13 @@
- /*
-  * To make optimal use of block mappings when laying out the linear
-  * mapping, round down the base of physical memory to a size that can
-- * be mapped efficiently, i.e., either PUD_SIZE (4k granule) or PMD_SIZE
-- * (64k granule), or a multiple that can be mapped using contiguous bits
-- * in the page tables: 32 * PMD_SIZE (16k granule)
-+ * be mapped efficiently, i.e., either CONT_PUD_SIZE (4k granule) or
-+ * CONT_PMD_SIZE (16k/64k granules)
-  */
- #if defined(CONFIG_ARM64_4K_PAGES)
--#define ARM64_MEMSTART_SHIFT		PUD_SHIFT
--#elif defined(CONFIG_ARM64_16K_PAGES)
--#define ARM64_MEMSTART_SHIFT		(PMD_SHIFT + 5)
-+#define ARM64_MEMSTART_SHIFT		(PUD_SHIFT + CONT_PUD_SHIFT)
- #else
--#define ARM64_MEMSTART_SHIFT		PMD_SHIFT
-+#define ARM64_MEMSTART_SHIFT		(PMD_SHIFT + CONT_PMD_SHIFT)
- #endif
- 
- /*
--- 
-2.7.4
+drivers/perf/xgene_pmu.c
+   992  static struct
+   993  xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
+   994                                         struct acpi_device *adev, u32 type)
+   995  {
+   996          struct device *dev = xgene_pmu->dev;
+   997          struct list_head resource_list;
+   998          struct xgene_pmu_dev_ctx *ctx;
+   999          const union acpi_object *obj;
+  1000          struct hw_pmu_info *inf;
+  1001          void __iomem *dev_csr;
+  1002          struct resource res;
+  1003          int enable_bit;
+  1004          int rc;
+  1005  
+  1006          ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
+  1007          if (!ctx)
+  1008                  return NULL;
+  1009  
+  1010          INIT_LIST_HEAD(&resource_list);
+  1011          rc = acpi_dev_get_resources(adev, &resource_list,
+  1012                                      acpi_pmu_dev_add_resource, &res);
+  1013          acpi_dev_free_resource_list(&resource_list);
+  1014          if (rc < 0 || IS_ERR(&res)) {
+                                     ^^^^
+Obviously this is a stack address and not an error pointer.  I'm not
+sure what was intended here.
+
+  1015                  dev_err(dev, "PMU type %d: No resource address found\n", type);
+  1016                  goto err;
+  1017          }
+  1018  
+
+
+regards,
+dan carpenter
