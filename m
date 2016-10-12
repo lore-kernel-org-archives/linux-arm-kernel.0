@@ -1,21 +1,31 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 12 Oct 2016 01:54:22 -0400 (EDT)
-Subject: [PATCH net-next 0/2] drivers: net: xgene: fix: Use GPIO to get
- link status
-In-Reply-To: <1475789758-5196-1-git-send-email-isubramanian@apm.com>
-References: <1475789758-5196-1-git-send-email-isubramanian@apm.com>
-Message-ID: <20161012.015422.1466108933958598182.davem@davemloft.net>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 12 Oct 2016 11:28:02 +0530
+Subject: [PATCH 0/4] ARM64: More flexible HW watchpoint
+Message-ID: <cover.1476251587.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Iyappan Subramanian <isubramanian@apm.com>
-Date: Thu,  6 Oct 2016 14:35:56 -0700
+Currently, we do not support all the byte select option provided by ARM64
+specs for a HW watchpoint.
 
-> Since the link value reported by the link status register is not
-> reliable if no SPF module inserted, this patchset fixes the issue by
-> using GPIO to determine the link status when no module inserted.
-> 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+This patch set will help user to instrument a watchpoint with all possible
+byte select options.
 
-Series applied, thanks.
+Pratyush Anand (4):
+  hw_breakpoint: Allow watchpoint of length 3,5,6 and 7
+  arm64: Allow hw watchpoint at varied offset from base address
+  arm64: Allow hw watchpoint of length 3,5,6 and 7
+  selftests: arm64: add test for unaligned watchpoint address handling
+
+ arch/arm64/include/asm/hw_breakpoint.h             |   6 +-
+ arch/arm64/kernel/hw_breakpoint.c                  |  79 ++++++--
+ arch/arm64/kernel/ptrace.c                         |   5 +-
+ include/uapi/linux/hw_breakpoint.h                 |   4 +
+ tools/include/uapi/linux/hw_breakpoint.h           |   4 +
+ tools/testing/selftests/breakpoints/Makefile       |   5 +-
+ .../selftests/breakpoints/breakpoint_test_arm64.c  | 223 +++++++++++++++++++++
+ 7 files changed, 300 insertions(+), 26 deletions(-)
+ create mode 100644 tools/testing/selftests/breakpoints/breakpoint_test_arm64.c
+
+-- 
+2.7.4
