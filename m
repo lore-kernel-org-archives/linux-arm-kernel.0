@@ -1,185 +1,88 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 13 Oct 2016 08:54:29 +0200
-Subject: [PATCH 02/10] mm: remove write/force parameters from
- __get_user_pages_unlocked()
-In-Reply-To: <20161013002020.3062-3-lstoakes@gmail.com>
-References: <20161013002020.3062-1-lstoakes@gmail.com>
- <20161013002020.3062-3-lstoakes@gmail.com>
-Message-ID: <ce8bd0b0-84e3-4b3a-edeb-27709b0c5ce6@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 13 Oct 2016 09:01:29 +0200
+Subject: [PATCH v2] sdhci-esdhc-imx: Correct two register accesses
+In-Reply-To: <1476124792-18441-1-git-send-email-aaron.brice@datasoft.com>
+References: <1476124792-18441-1-git-send-email-aaron.brice@datasoft.com>
+Message-ID: <CAPDyKFpxi0yLSjdSFQSJarBssFyBZ0JDQ518ACLtpfUB3Wp1wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 13/10/2016 02:20, Lorenzo Stoakes wrote:
-> This patch removes the write and force parameters from
-> __get_user_pages_unlocked() to make the use of FOLL_FORCE explicit in callers as
-> use of this flag can result in surprising behaviour (and hence bugs) within the
-> mm subsystem.
-> 
-> Signed-off-by: Lorenzo Stoakes <lstoakes@gmail.com>
+On 10 October 2016 at 20:39, Aaron Brice <aaron.brice@datasoft.com> wrote:
+>
+>  - The DMA error interrupt bit is in a different position as
+>    compared to the sdhci standard.  This is accounted for in
+>    many cases, but not handled in the case of clearing the
+>    INT_STATUS register by writing a 1 to that location.
+>  - The HOST_CONTROL register is very different as compared to
+>    the sdhci standard.  This is accounted for in the write
+>    case, but not when read back out (which it is in the sdhci
+>    code).
+>
+> Signed-off-by: Dave Russell <david.russell@datasoft.com>
+> Signed-off-by: Aaron Brice <aaron.brice@datasoft.com>
+> Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
->  include/linux/mm.h     |  3 +--
->  mm/gup.c               | 17 +++++++++--------
->  mm/nommu.c             | 12 +++++++++---
->  mm/process_vm_access.c |  7 +++++--
->  virt/kvm/async_pf.c    |  3 ++-
->  virt/kvm/kvm_main.c    | 11 ++++++++---
->  6 files changed, 34 insertions(+), 19 deletions(-)
-> 
-> diff --git a/include/linux/mm.h b/include/linux/mm.h
-> index e9caec6..2db98b6 100644
-> --- a/include/linux/mm.h
-> +++ b/include/linux/mm.h
-> @@ -1285,8 +1285,7 @@ long get_user_pages_locked(unsigned long start, unsigned long nr_pages,
->  		    int write, int force, struct page **pages, int *locked);
->  long __get_user_pages_unlocked(struct task_struct *tsk, struct mm_struct *mm,
->  			       unsigned long start, unsigned long nr_pages,
-> -			       int write, int force, struct page **pages,
-> -			       unsigned int gup_flags);
-> +			       struct page **pages, unsigned int gup_flags);
->  long get_user_pages_unlocked(unsigned long start, unsigned long nr_pages,
->  		    int write, int force, struct page **pages);
->  int get_user_pages_fast(unsigned long start, int nr_pages, int write,
-> diff --git a/mm/gup.c b/mm/gup.c
-> index ba83942..3d620dd 100644
-> --- a/mm/gup.c
-> +++ b/mm/gup.c
-> @@ -865,17 +865,11 @@ EXPORT_SYMBOL(get_user_pages_locked);
->   */
->  __always_inline long __get_user_pages_unlocked(struct task_struct *tsk, struct mm_struct *mm,
->  					       unsigned long start, unsigned long nr_pages,
-> -					       int write, int force, struct page **pages,
-> -					       unsigned int gup_flags)
-> +					       struct page **pages, unsigned int gup_flags)
->  {
->  	long ret;
->  	int locked = 1;
->  
-> -	if (write)
-> -		gup_flags |= FOLL_WRITE;
-> -	if (force)
-> -		gup_flags |= FOLL_FORCE;
-> -
->  	down_read(&mm->mmap_sem);
->  	ret = __get_user_pages_locked(tsk, mm, start, nr_pages, pages, NULL,
->  				      &locked, false, gup_flags);
-> @@ -905,8 +899,15 @@ EXPORT_SYMBOL(__get_user_pages_unlocked);
->  long get_user_pages_unlocked(unsigned long start, unsigned long nr_pages,
->  			     int write, int force, struct page **pages)
->  {
-> +	unsigned int flags = FOLL_TOUCH;
-> +
-> +	if (write)
-> +		flags |= FOLL_WRITE;
-> +	if (force)
-> +		flags |= FOLL_FORCE;
-> +
->  	return __get_user_pages_unlocked(current, current->mm, start, nr_pages,
-> -					 write, force, pages, FOLL_TOUCH);
-> +					 pages, flags);
->  }
->  EXPORT_SYMBOL(get_user_pages_unlocked);
->  
-> diff --git a/mm/nommu.c b/mm/nommu.c
-> index 95daf81..925dcc1 100644
-> --- a/mm/nommu.c
-> +++ b/mm/nommu.c
-> @@ -185,8 +185,7 @@ EXPORT_SYMBOL(get_user_pages_locked);
->  
->  long __get_user_pages_unlocked(struct task_struct *tsk, struct mm_struct *mm,
->  			       unsigned long start, unsigned long nr_pages,
-> -			       int write, int force, struct page **pages,
-> -			       unsigned int gup_flags)
-> +			       struct page **pages, unsigned int gup_flags)
->  {
->  	long ret;
->  	down_read(&mm->mmap_sem);
-> @@ -200,8 +199,15 @@ EXPORT_SYMBOL(__get_user_pages_unlocked);
->  long get_user_pages_unlocked(unsigned long start, unsigned long nr_pages,
->  			     int write, int force, struct page **pages)
->  {
-> +	unsigned int flags = 0;
-> +
-> +	if (write)
-> +		flags |= FOLL_WRITE;
-> +	if (force)
-> +		flags |= FOLL_FORCE;
-> +
->  	return __get_user_pages_unlocked(current, current->mm, start, nr_pages,
-> -					 write, force, pages, 0);
-> +					 pages, flags);
->  }
->  EXPORT_SYMBOL(get_user_pages_unlocked);
->  
-> diff --git a/mm/process_vm_access.c b/mm/process_vm_access.c
-> index 07514d4..be8dc8d 100644
-> --- a/mm/process_vm_access.c
-> +++ b/mm/process_vm_access.c
-> @@ -88,12 +88,16 @@ static int process_vm_rw_single_vec(unsigned long addr,
->  	ssize_t rc = 0;
->  	unsigned long max_pages_per_loop = PVM_MAX_KMALLOC_PAGES
->  		/ sizeof(struct pages *);
-> +	unsigned int flags = FOLL_REMOTE;
->  
->  	/* Work out address and page range required */
->  	if (len == 0)
->  		return 0;
->  	nr_pages = (addr + len - 1) / PAGE_SIZE - addr / PAGE_SIZE + 1;
->  
-> +	if (vm_write)
-> +		flags |= FOLL_WRITE;
-> +
->  	while (!rc && nr_pages && iov_iter_count(iter)) {
->  		int pages = min(nr_pages, max_pages_per_loop);
->  		size_t bytes;
-> @@ -104,8 +108,7 @@ static int process_vm_rw_single_vec(unsigned long addr,
->  		 * current/current->mm
->  		 */
->  		pages = __get_user_pages_unlocked(task, mm, pa, pages,
-> -						  vm_write, 0, process_pages,
-> -						  FOLL_REMOTE);
-> +						  process_pages, flags);
->  		if (pages <= 0)
->  			return -EFAULT;
->  
-> diff --git a/virt/kvm/async_pf.c b/virt/kvm/async_pf.c
-> index db96688..8035cc1 100644
-> --- a/virt/kvm/async_pf.c
-> +++ b/virt/kvm/async_pf.c
-> @@ -84,7 +84,8 @@ static void async_pf_execute(struct work_struct *work)
->  	 * mm and might be done in another context, so we must
->  	 * use FOLL_REMOTE.
->  	 */
-> -	__get_user_pages_unlocked(NULL, mm, addr, 1, 1, 0, NULL, FOLL_REMOTE);
-> +	__get_user_pages_unlocked(NULL, mm, addr, 1, NULL,
-> +			FOLL_WRITE | FOLL_REMOTE);
->  
->  	kvm_async_page_present_sync(vcpu, apf);
->  
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index 81dfc73..28510e7 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -1416,10 +1416,15 @@ static int hva_to_pfn_slow(unsigned long addr, bool *async, bool write_fault,
->  		down_read(&current->mm->mmap_sem);
->  		npages = get_user_page_nowait(addr, write_fault, page);
->  		up_read(&current->mm->mmap_sem);
-> -	} else
-> +	} else {
-> +		unsigned int flags = FOLL_TOUCH | FOLL_HWPOISON;
-> +
-> +		if (write_fault)
-> +			flags |= FOLL_WRITE;
-> +
->  		npages = __get_user_pages_unlocked(current, current->mm, addr, 1,
-> -						   write_fault, 0, page,
-> -						   FOLL_TOUCH|FOLL_HWPOISON);
-> +						   page, flags);
-> +	}
->  	if (npages != 1)
->  		return npages;
->  
-> 
 
-Acked-by: Paolo Bonzini <pbonzini@redhat.com>
+Thanks, applied for fixes!
+
+Kind regards
+Uffe
+
+>
+> v1 -> v2:
+> - rename long_val to val
+>
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 23 ++++++++++++++++++++++-
+>  1 file changed, 22 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 1f54fd8..7123ef9 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -346,7 +346,8 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+>         struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
+>         u32 data;
+>
+> -       if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)) {
+> +       if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE ||
+> +                       reg == SDHCI_INT_STATUS)) {
+>                 if ((val & SDHCI_INT_CARD_INT) && !esdhc_is_usdhc(imx_data)) {
+>                         /*
+>                          * Clear and then set D3CD bit to avoid missing the
+> @@ -555,6 +556,25 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+>         esdhc_clrset_le(host, 0xffff, val, reg);
+>  }
+>
+> +static u8 esdhc_readb_le(struct sdhci_host *host, int reg)
+> +{
+> +       u8 ret;
+> +       u32 val;
+> +
+> +       switch (reg) {
+> +       case SDHCI_HOST_CONTROL:
+> +               val = readl(host->ioaddr + reg);
+> +
+> +               ret = val & SDHCI_CTRL_LED;
+> +               ret |= (val >> 5) & SDHCI_CTRL_DMA_MASK;
+> +               ret |= (val & ESDHC_CTRL_4BITBUS);
+> +               ret |= (val & ESDHC_CTRL_8BITBUS) << 3;
+> +               return ret;
+> +       }
+> +
+> +       return readb(host->ioaddr + reg);
+> +}
+> +
+>  static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
+>  {
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> @@ -947,6 +967,7 @@ static void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>  static struct sdhci_ops sdhci_esdhc_ops = {
+>         .read_l = esdhc_readl_le,
+>         .read_w = esdhc_readw_le,
+> +       .read_b = esdhc_readb_le,
+>         .write_l = esdhc_writel_le,
+>         .write_w = esdhc_writew_le,
+>         .write_b = esdhc_writeb_le,
+> --
+> 2.7.4
+>
