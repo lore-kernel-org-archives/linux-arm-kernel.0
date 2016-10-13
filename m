@@ -1,77 +1,69 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 13 Oct 2016 21:25:59 +0800
-Subject: [arm-soc:to-build 4/4] arch/s390/pci/pci_dma.c:309:13: warning: 'pa'
- may be used uninitialized in this function
-Message-ID: <201610132149.t5xXbZdB%fengguang.wu@intel.com>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Thu, 13 Oct 2016 15:39:13 +0200
+Subject: [PATCH v4 03/10] ARM: sun8i: dt: Add DT bindings documentation
+ for Allwinner sun8i-emac
+In-Reply-To: <20161010151335.GA3111@rob-hp-laptop>
+References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1475828757-926-4-git-send-email-clabbe.montjoie@gmail.com>
+ <20161010151335.GA3111@rob-hp-laptop>
+Message-ID: <20161013133913.GA23079@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
-head:   346c22ea9cb8d0ee331c73529b205414e43a4655
-commit: 346c22ea9cb8d0ee331c73529b205414e43a4655 [4/4] Revert "Disable "maybe-uninitialized" warning globally"
-config: s390-default_defconfig (attached as .config)
-compiler: s390x-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 346c22ea9cb8d0ee331c73529b205414e43a4655
-        # save the attached .config to linux build tree
-        make.cross ARCH=s390 
+On Mon, Oct 10, 2016 at 10:13:35AM -0500, Rob Herring wrote:
+> On Fri, Oct 07, 2016 at 10:25:50AM +0200, Corentin Labbe wrote:
+> > This patch adds documentation for Device-Tree bindings for the
+> > Allwinner sun8i-emac driver.
+> > 
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  .../bindings/net/allwinner,sun8i-emac.txt          | 70 ++++++++++++++++++++++
+> >  1 file changed, 70 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> > new file mode 100644
+> > index 0000000..92e4ef3b
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> > @@ -0,0 +1,70 @@
+> > +* Allwinner sun8i EMAC ethernet controller
+> > +
+> > +Required properties:
+> > +- compatible: should be one of the following string:
+> > +		"allwinner,sun8i-a83t-emac"
+> > +		"allwinner,sun8i-h3-emac"
+> > +		"allwinner,sun50i-a64-emac"
+> > +- reg: address and length of the register for the device.
+> > +- syscon: A phandle to the syscon of the SoC
+> > +- interrupts: interrupt for the device
+> > +- clocks: A phandle to the reference clock for this device
+> > +- clock-names: should be "ahb"
+> > +- resets: A phandle to the reset control for this device
+> > +- reset-names: should be "ahb"
+> > +- phy-mode: See ethernet.txt
+> > +- phy-handle: See ethernet.txt
+> > +- #address-cells: shall be 1
+> > +- #size-cells: shall be 0
+> > +
+> > +Optional properties:
+> > +- allwinner,tx-delay: TX clock delay chain value. Range value is 0-0x07. Default is 0)
+> > +- allwinner,rx-delay: RX clock delay chain value. Range value is 0-0x1F. Default is 0)
+> > +Both delay properties does not have units, there are arbitrary value.
+> 
+> They have to have some sort of units. Some number of clocks perhaps. Or 
+> just say what register field they correspond to.
+> 
 
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+I have re-read all 3 datasheets (A64/H3/A83T) and made string search for finding any information.
+But still found nothing, no unit, no more informations than I already wrote in this file.
 
-All warnings (new ones prefixed by >>):
+For the register field, just saying that it is used in the syscon register EMAC_CLK_REG is sufficient ?
 
-   arch/s390/pci/pci_dma.c: In function '__s390_dma_map_sg':
->> arch/s390/pci/pci_dma.c:309:13: warning: 'pa' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     } __packed data = {rc, addr};
-                ^~~~
-   arch/s390/pci/pci_dma.c:426:16: note: 'pa' was declared here
-     unsigned long pa;
-                   ^~
+> > +The TX/RX clock delay chain settings are board specific and could be found
+> > +in vendor FEX files.
+> > +
 
-vim +/pa +309 arch/s390/pci/pci_dma.c
+Regards
 
-828b35f6 Jan Glauber         2012-11-29  293  		goto out;
-13954fd6 Sebastian Ott       2016-09-08  294  
-13954fd6 Sebastian Ott       2016-09-08  295  	if (zdev->tlb_refresh || s390_iommu_strict)
-828b35f6 Jan Glauber         2012-11-29  296  		bitmap_clear(zdev->iommu_bitmap, offset, size);
-13954fd6 Sebastian Ott       2016-09-08  297  	else
-13954fd6 Sebastian Ott       2016-09-08  298  		bitmap_set(zdev->lazy_bitmap, offset, size);
-13954fd6 Sebastian Ott       2016-09-08  299  
-828b35f6 Jan Glauber         2012-11-29  300  out:
-828b35f6 Jan Glauber         2012-11-29  301  	spin_unlock_irqrestore(&zdev->iommu_bitmap_lock, flags);
-828b35f6 Jan Glauber         2012-11-29  302  }
-828b35f6 Jan Glauber         2012-11-29  303  
-52d43d81 Sebastian Ott       2015-10-26  304  static inline void zpci_err_dma(unsigned long rc, unsigned long addr)
-52d43d81 Sebastian Ott       2015-10-26  305  {
-52d43d81 Sebastian Ott       2015-10-26  306  	struct {
-52d43d81 Sebastian Ott       2015-10-26  307  		unsigned long rc;
-52d43d81 Sebastian Ott       2015-10-26  308  		unsigned long addr;
-52d43d81 Sebastian Ott       2015-10-26 @309  	} __packed data = {rc, addr};
-52d43d81 Sebastian Ott       2015-10-26  310  
-52d43d81 Sebastian Ott       2015-10-26  311  	zpci_err_hex(&data, sizeof(data));
-52d43d81 Sebastian Ott       2015-10-26  312  }
-52d43d81 Sebastian Ott       2015-10-26  313  
-828b35f6 Jan Glauber         2012-11-29  314  static dma_addr_t s390_dma_map_pages(struct device *dev, struct page *page,
-828b35f6 Jan Glauber         2012-11-29  315  				     unsigned long offset, size_t size,
-828b35f6 Jan Glauber         2012-11-29  316  				     enum dma_data_direction direction,
-00085f1e Krzysztof Kozlowski 2016-08-03  317  				     unsigned long attrs)
-
-:::::: The code at line 309 was first introduced by commit
-:::::: 52d43d8184b1840c7cf6136724223585f51a1074 s390/pci_dma: improve debugging of errors during dma map
-
-:::::: TO: Sebastian Ott <sebott@linux.vnet.ibm.com>
-:::::: CC: Martin Schwidefsky <schwidefsky@de.ibm.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 16396 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161013/6b7b2883/attachment-0001.gz>
+Corentin Labbe
